@@ -23,7 +23,7 @@ flowchart LR
 
     MCP1[Work MCP] --> AP1[Work Access Profile]
     MCP2[Relationship MCP] --> AP2[Relationship Access Profile]
-    MCP3[Personal Agent] --> AP3[Owner Access Profile]
+    MCP3[Personal MCP] --> AP3[Owner Access Profile]
 
     AP1 -->|work only| ITEM
     AP2 -->|relationship only| ITEM
@@ -53,7 +53,7 @@ Memory、Value、Preference、Goal、Decision Criterionなど、すべてのBrai
 
 - 許可するAccess Labelの集合
 - 機微度: `normal` / `sensitive` / `highly_sensitive`
-- 外部Agentへの提供可否
+- 外部MCPへの提供可否
 - 一時的な許可と有効期限
 - 明示的な拒否
 - ラベルを本人が確認したか
@@ -75,16 +75,13 @@ Memory、Value、Preference、Goal、Decision Criterionなど、すべてのBrai
 
 Access Profileは、MCPやエージェントがBrainをどの用途で利用できるかを定義します。
 
-概念上の属性:
+Access Profileでは、次の内容を設定します。
 
-- `AccessProfileId`
-- `BrainId`
 - 表示名と目的
 - 許可されたAccess Label
-- 利用可能な機能とScope
+- 利用可能な機能
 - 許可できる最大機微度
 - 外部提供を拒否された情報の扱い
-- 状態と有効期限
 
 初期プリセット候補:
 
@@ -114,23 +111,13 @@ Access Profileは複数ラベルを許可できますが、許可ラベルを増
 
 ## 7. MCP接続
 
-AgentConnectionは`BrainId`と`AccessProfileId`を対象にします。
-
-```text
-AgentConnection
-├── AccountId
-├── BrainId
-├── AccessProfileId: Work Profile
-├── Agent Client
-├── Scope: profile:read, memory:search
-└── Expiration
-```
+各MCP接続には1つのAccess Profileを適用します。具体的な接続モデルと権限項目は後続で設計します。
 
 仕事用MCPの検索手順:
 
-1. Agent ClientとAgentConnectionを認証する
+1. MCP接続を認証する
 2. Work Access Profileを確定する
-3. 要求された操作がAgent Scopeに含まれるか確認する
+3. 要求された操作が接続に許可されているか確認する
 4. `work`が明示されたBrain Itemだけを検索候補にする
 5. 機微度、外部提供可否、拒否ルールを評価する
 6. 許可されたBrain Itemだけを検索・モデル入力に使う
@@ -140,12 +127,12 @@ AgentConnection
 
 ## 8. 派生情報の扱い
 
-AIがMemoryからInsight、要約、Decision Criterionなどを作る場合も情報漏えいに注意します。
+AIがMemoryから要約やDecision Criterionなどを作る場合も情報漏えいに注意します。
 
-- 派生したBrain Itemは、Evidenceの最も厳しいAccess Policyを引き継ぐ
+- 派生したBrain Itemは、元情報の最も厳しいAccess Policyを引き継ぐ
 - AIだけでAccess Labelを減らして公開範囲を広げない
-- 機微なEvidenceから安全な表現を作る場合は、新しいBrain Itemとして本人が承認する
-- 派生情報から非公開Evidenceの存在や内容を推測できる場合は公開しない
+- 機微な元情報から安全な表現を作る場合は、新しいBrain Itemとして本人が承認する
+- 派生情報から非公開情報の存在や内容を推測できる場合は公開しない
 
 たとえば恋愛相談から「対話を重視する」というValueを推定しても、自動的に`work`を追加しません。本人が内容を確認し、仕事でも使うと許可した場合だけ共有します。
 
@@ -157,7 +144,7 @@ AIがMemoryからInsight、要約、Decision Criterionなどを作る場合も�
 - Access Profileで許可されていないラベルの情報を検索しない
 - 拒否ルールは許可ルールより優先する
 - 非公開情報の存在自体を許可されていない接続先へ示さない
-- 派生情報のAccess PolicyをEvidenceより自動的に緩くしない
+- 派生情報のAccess Policyを元情報より自動的に緩くしない
 - 新しいAccess Labelへ既存情報を自動公開しない
 - ラベル変更後の外部アクセスを監査できる
 
@@ -168,9 +155,9 @@ AIがMemoryからInsight、要約、Decision Criterionなどを作る場合も�
 - Topic Labelとの明確な分離
 - `unclassified`状態
 - `normal` / `sensitive`の2段階の機微度
-- 外部Agentへの提供可否
+- 外部MCPへの提供可否
 - Work、Relationship、OwnerのAccess Profile
-- AgentConnectionごとに1つのAccess Profile
+- MCP接続ごとに1つのAccess Profile
 - 認可ラベルによる検索前フィルター
 - ユーザーによるラベル確認・変更
 - MCPアクセスの監査ログ
@@ -182,7 +169,7 @@ AIがMemoryからInsight、要約、Decision Criterionなどを作る場合も�
 1. 質問内容からAccess Labelの初期候補を決める方法
 2. ユーザーにラベル確認を求めるタイミング
 3. `relationship`を`private`から独立させるか
-4. 1つのAgentConnectionに複数Access Profileを許可するか
+4. 1つのMCP接続に複数Access Profileを許可するか
 5. Brain Itemの一部だけを別用途へ公開できるようにするか
 6. ラベル変更後のキャッシュと外部提供済みデータの扱い
 7. Owner Profileでも表示しない封印データが必要か
