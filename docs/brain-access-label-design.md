@@ -47,7 +47,7 @@ Access Labelは単なる文字列タグではなく、ドメイン上の認可�
 
 ## 4. Brain ItemのAccess Policy
 
-Memory、Value、Preference、Goal、Decision Criterionなど、すべてのBrain ItemにAccess Policyを適用します。
+すべてのBrain ItemにAccess Policyを適用します。Brain Itemの分類は[Brain内部情報の分類](brain-content-taxonomy.md)をSSoTとします。
 
 主な要素:
 
@@ -63,7 +63,7 @@ Memory、Value、Preference、Goal、Decision Criterionなど、すべてのBrai
 | Brain Item | 分類 | Topic Label | Access Label | 外部提供 |
 | --- | --- | --- | --- | --- |
 | TypeScriptが得意 | Capability | `skill` | `work`、`private` | 可 |
-| 誠実さを大切にする | Value | `value` | `work`、`relationship`、`private` | 可 |
+| 誠実さを大切にする | Value / Motivation | `value` | `work`、`relationship`、`private` | 可 |
 | 給与より成長を優先する | Decision Criterion | `career` | `work` | 可 |
 | パートナーとの約束 | Goal | `relationship` | `relationship` | 接続先による |
 | 家族の病歴 | Memory | `family`、`health` | `private` | 不可 |

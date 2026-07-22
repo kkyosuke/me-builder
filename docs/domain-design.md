@@ -76,22 +76,7 @@ Brain domainは「その人らしさを何で構成し、どの用途へ提供�
 
 ### Brain内部の大分類
 
-Brainの中身をすべてMemoryへ入れず、役割に応じて分類します。
-
-| 分類 | 答える問い |
-| --- | --- |
-| Identity | 自分は誰か |
-| Memory | 何があった・何を覚えているか |
-| Belief | 何が正しい・事実だと思うか |
-| Value | 何を大切にするか |
-| Preference | 何を好む・避けるか |
-| Goal | 何を実現したいか |
-| Decision System | どのように選ぶか |
-| Capability | 何ができるか |
-| Behavior Style | どのように行動・表現するか |
-| Current State | 今どういう状態か |
-
-詳細は[Brain内部情報の分類](brain-content-taxonomy.md)で扱います。
+Brainの中身をすべてMemoryへ入れず、役割に応じて分類します。分類名、定義、具体例、意思決定での利用方法は、SSoTである[Brain内部情報の分類](brain-content-taxonomy.md)で定義します。この文書では分類を重複して定義しません。
 
 ### Brainが守るルール
 
