@@ -7,6 +7,7 @@ me-builderは、さまざまな質問への回答を蓄積し、その人らし�
 ## ドキュメント
 
 - [プロジェクト概要](docs/project-overview.md)
+- [ドメイン設計](docs/domain-design.md)
 
 ## 現在のフェーズ
 
