@@ -8,7 +8,8 @@ me-builderは、さまざまな質問への回答を蓄積し、その人らし�
 
 - [プロジェクト概要](docs/project-overview.md)
 - [ドメイン設計](docs/domain-design.md)
-- [BrainのContext・Memory設計](docs/brain-context-memory-design.md)
+- [Brainのラベル・アクセス制御設計](docs/brain-access-label-design.md)
+- [Brain内部情報の分類](docs/brain-content-taxonomy.md)
 
 ## 現在のフェーズ
 
