@@ -16,11 +16,13 @@ me-builderの中核となる `Account` と `Brain` の責務、境界、関係�
 | Account | サービスを操作する主体。ログイン、状態、規約同意、接続許可を管理する |
 | Identity | LINE、Apple、Googleなど、Accountへログインするための外部ID |
 | Brain | ある人物を表現する分身の頭脳。回答、好み、知識、推定結果を束ねる |
+| Brain Context | Work、Relationship、Privateなど、特定の目的からBrainを利用するためのView |
+| Memory | Brainが共有して保持し、Context Access Policyを通じて利用する記憶単位 |
 | Subject | Brainが表現する対象人物 |
 | Question | Subjectを理解するために提示する問い |
 | Response | Subjectについてユーザーが入力した回答 |
 | Insight | Responseなどの根拠からAIまたはルールが導いた推定情報 |
-| Evidence | Insightや生成回答の根拠となったResponse |
+| Evidence | Memory、Insight、生成回答の根拠となったResponseまたはMemory |
 | Agent Client | MCPを通じてBrainの情報を利用するエージェント |
 
 `Account` は人そのものではなく、サービス上の利用主体です。`Brain` もLLMそのものではなく、分身を構成する情報とルールを表すドメイン概念です。
@@ -96,6 +98,7 @@ Agent Clientに対する接続許可を表す集約です。Accountとライフ�
 - `AgentConnectionId`
 - 許可した`AccountId`
 - 対象となる`BrainId`
+- 対象となる`BrainContextId`
 - 接続先を識別する`ClientId`
 - 許可したScope
 - 状態: `active` / `revoked` / `expired`
@@ -111,6 +114,7 @@ Agent Clientに対する接続許可を表す集約です。Accountとライフ�
 守るべきルール:
 
 - 有効なAccountだけが接続を許可できる
+- AgentConnectionは必ず1つのBrain Contextを対象にする
 - Scopeと有効期限を明示せずに接続を有効化しない
 - 取り消された接続は再利用できない
 - 許可されていないScopeへ権限を拡大しない
@@ -148,9 +152,11 @@ Brain domainは「分身が何を根拠として知っているか」を管理�
 
 - Brainの作成、編集、利用停止
 - Brainが表現するSubjectの定義
+- Work、Relationship、PrivateなどのBrain Context
+- Brain全体で共有するMemoryとContextごとのAccess Policy
 - Questionの提示可否
 - テキスト、選択肢、画像、動画、音声によるResponse
-- Responseの修正、撤回、公開範囲
+- Responseの修正、撤回、Context Access Policy
 - Responseを根拠としたInsightの生成・確認・却下
 - MCPやチャットに提供できる情報の判定
 - 本人入力とAI推定の区別
@@ -182,6 +188,48 @@ Brain domainは「分身が何を根拠として知っているか」を管理�
 - アーカイブしたBrainへ新しいResponseを追加しない
 - Brainを実在する本人として公開する場合は、必要な確認を満たす
 
+#### BrainContext
+
+仕事、恋愛、プライベートなど、特定の目的でBrainを利用するためのViewを表す集約です。Memoryそのものは所有せず、振る舞いとMemoryへのアクセス条件を定義します。
+
+主な概念上の属性:
+
+- `BrainContextId`
+- `BrainId`
+- 表示名と目的
+- 口調・判断方針
+- 状態: `active` / `archived`
+
+守るべきルール:
+
+- Brain Contextは1つのBrainに属する
+- アーカイブしたContextへ新しいAgentConnectionを作成しない
+- 新しいContextへ既存Memoryを自動的に公開しない
+
+#### Memory
+
+Brainが保持する事実、経験、好み、価値観などの記憶単位を表す集約です。同じ内容をContextごとに複製せず、Context Access Policyによって利用可否を制御します。
+
+主な概念上の属性:
+
+- `MemoryId`
+- `BrainId`
+- 内容と種類
+- 由来とEvidence
+- Topic Tag
+- Context Access Policy
+- 機微度
+- 状態: `proposed` / `active` / `withdrawn`
+
+守るべきルール:
+
+- Topic Tagはアクセス許可として使用しない
+- 作成元ContextがあるMemoryは、そのContextだけを初期許可する
+- 作成元ContextがないMemoryは未分類とし、MCPへ提供しない
+- 許可されていないContextから検索・生成に使用しない
+- 派生したMemoryはEvidenceより緩いAccess Policyを自動的に持たない
+- 撤回したMemoryを新しい回答の根拠に使用しない
+
 #### Question
 
 質問内容と回答方法を定義する集約です。Questionは多数のBrainから利用されるため、Brain集約には含めません。
@@ -211,7 +259,7 @@ Brain domainは「分身が何を根拠として知っているか」を管理�
 - `QuestionId`
 - 回答内容またはメディア参照
 - 回答の由来: `subject_input` / `proxy_input`
-- 公開範囲
+- Context Access Policy
 - 状態: `active` / `withdrawn`
 - 改訂情報
 
@@ -219,7 +267,7 @@ Brain domainは「分身が何を根拠として知っているか」を管理�
 
 - 回答する
 - 回答を修正する
-- 公開範囲を変更する
+- Context Access Policyを変更する
 - 回答を撤回する
 
 守るべきルール:
@@ -228,7 +276,7 @@ Brain domainは「分身が何を根拠として知っているか」を管理�
 - 回答の入力者・由来を失わない
 - 修正前の回答と修正後の回答を区別できる
 - 撤回した回答を新しい生成やInsightの根拠に使用しない
-- 公開範囲を超えて情報を提供しない
+- 許可されていないContextへ情報を提供しない
 
 #### Insight
 
@@ -239,8 +287,9 @@ Responseなどから導かれた好み、価値観、性格傾向、要約を表
 - `InsightId`
 - `BrainId`
 - 推定内容と種類
-- EvidenceとなるResponseへの参照
+- EvidenceとなるResponseまたはMemoryへの参照
 - 生成元
+- Context Access Policy
 - 状態: `proposed` / `confirmed` / `rejected` / `stale`
 
 主な操作:
@@ -255,18 +304,23 @@ Responseなどから導かれた好み、価値観、性格傾向、要約を表
 - EvidenceがないInsightを確定情報として扱わない
 - `proposed`のInsightはAIによる推定であることを明示する
 - Evidenceが撤回・非公開になった場合は再評価する
+- Evidenceより緩いContext Access Policyを自動的に設定しない
 - `rejected`のInsightを生成回答の根拠として使用しない
 
 ### 5.3 値オブジェクト候補
 
 - `BrainId`
+- `BrainContextId`
+- `MemoryId`
+- `ContextAccessPolicy`
+- `Sensitivity`
+- `TopicTag`
 - `SubjectProfile`
 - `QuestionId`
 - `ResponseId`
 - `ResponseContent`
 - `AnswerFormat`
 - `MediaReference`
-- `Visibility`
 - `Revision`
 - `InsightId`
 - `EvidenceReference`
@@ -280,7 +334,7 @@ Brainの状態、過去の回答、質問の対象条件から、次に提示で
 
 #### DisclosurePolicy
 
-ResponseやInsightの公開範囲と要求されたScopeを照合し、提供可能な情報だけを返します。Account domainによる接続許可を通過した後に適用します。
+Memory、Response、InsightのContext Access Policyと要求されたScopeを照合し、提供可能な情報だけを返します。Account domainによる接続許可を通過した後に適用します。
 
 #### InsightEvidencePolicy
 
@@ -291,11 +345,17 @@ Insightを提示するために十分なEvidenceがあるか、Evidenceが現在
 - `BrainCreated`
 - `BrainActivated`
 - `BrainArchived`
+- `BrainContextCreated`
+- `BrainContextArchived`
+- `MemoryProposed`
+- `MemoryActivated`
+- `MemoryContextAccessChanged`
+- `MemoryWithdrawn`
 - `QuestionPublished`
 - `QuestionRetired`
 - `ResponseSubmitted`
 - `ResponseRevised`
-- `ResponseVisibilityChanged`
+- `ResponseContextAccessChanged`
 - `ResponseWithdrawn`
 - `InsightProposed`
 - `InsightConfirmed`
@@ -310,11 +370,15 @@ MVPでは、1つのAccountが1つのBrainを所有する利用体験を基本と
 flowchart LR
     A[Account] -->|owns / manages| B[Brain]
     A -->|grants| C[AgentConnection]
-    C -->|targets| B
+    C -->|targets| BC[Brain Context]
+    B --> BC
+    B --> M[Shared Memory]
+    BC -->|policy-filtered view| M
     B --> R[Response]
     B --> I[Insight]
     Q[Question] --> R
     R -->|evidence| I
+    M -->|evidence| I
 ```
 
 分離する理由:
@@ -332,13 +396,13 @@ flowchart LR
 MCPからBrainの情報を取得する場合、次の順序で判定します。
 
 1. 認証基盤がAgent Clientを識別する
-2. Account domainがAgentConnectionの有効性とScopeを判定する
+2. Account domainがAgentConnectionの有効性、対象Brain Context、Scopeを判定する
 3. アプリケーション層が対象Brainへの管理権限を確認する
-4. Brain domainのDisclosurePolicyが各Response・Insightの公開可否を判定する
-5. 許可された情報だけをMCPアダプターが整形して返す
+4. Brain domainのDisclosurePolicyがMemory、Response、InsightのContext Accessを判定する
+5. 許可された情報だけを検索対象とし、MCPアダプターが整形して返す
 6. アクセス結果を監査用途に記録する
 
-Account domainの許可だけでBrain内のすべての情報を返してはいけません。接続単位のScopeと、情報単位の公開範囲の両方を満たす必要があります。
+Account domainの許可だけでBrain内のすべての情報を返してはいけません。接続単位のScope、対象Brain Context、情報単位のContext Access Policyをすべて満たす必要があります。Topic Tagはアクセス許可として使用しません。
 
 ## 8. 代表的なユースケース
 
@@ -360,7 +424,7 @@ AccountとBrainは別々に作成されます。一方が失敗した場合の�
 
 ### Agent Clientを接続する
 
-1. ユーザーへ接続先、目的、Scope、有効期限を表示する
+1. ユーザーへ接続先、対象Brain Context、目的、Scope、有効期限を表示する
 2. Account domainでAgentConnectionを作成する
 3. MCPアクセス時にAgentConnectionとDisclosurePolicyを評価する
 4. ユーザーはいつでも接続を取り消せる
@@ -370,7 +434,7 @@ AccountとBrainは別々に作成されます。一方が失敗した場合の�
 - Account domainはBrainの回答内容を知らない
 - Brain domainはLINEやAppleなどの認証方式を知らない
 - Brain domainはAgentConnectionの有効性を判断しない
-- Account domainは個別のResponseやInsightの公開可否を判断しない
+- Account domainは個別のMemory、Response、Insightの公開可否を判断しない
 - UI、MCP、データベース、AIモデル固有の型をドメインへ持ち込まない
 - ドメイン間では内部オブジェクトを共有せず、識別子と明示的な結果だけを受け渡す
 - 複数集約にまたがる処理はアプリケーション層で調整する
@@ -392,7 +456,9 @@ AccountとBrainは別々に作成されます。一方が失敗した場合の�
 2. Subjectは常にAccount本人に限定するか
 3. Questionを運営だけが作るか、ユーザーや外部提供者も作れるか
 4. Responseの修正履歴をユーザーへどのように見せるか
-5. `Visibility`をどの粒度で設定するか
+5. `ContextAccessPolicy`をどの粒度で設定するか
 6. AgentConnectionのScopeをどの粒度で定義するか
 7. Insightの本人確認を必須にする範囲
 8. Brainのエクスポート、移行、削除時の期待動作
+
+Brain ContextとMemoryの詳細は、[BrainのContext・Memory設計](brain-context-memory-design.md)で扱います。
