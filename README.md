@@ -10,6 +10,7 @@ me-builderは、さまざまな質問への回答を蓄積し、その人らし�
 - [ドメイン設計](docs/domain-design.md) — AccountとBrainの責務・境界
 - [Brainのラベル・アクセス制御設計](docs/brain-access-label-design.md) — ラベルと公開制御のSSoT
 - [Brain内部情報の分類](docs/brain-content-taxonomy.md) — Brain Item分類のSSoT
+- [Agent向けガイド](.agents/README.md) — ドキュメント運用・設計スコープのルール
 
 ## 現在のフェーズ
 
