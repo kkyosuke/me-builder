@@ -69,9 +69,16 @@ tasks:
   deploy:preview:
     desc: 'Deploy all applications to preview environment via Wrangler'
     cmds:
-      - bun --filter '*' deploy:preview
+      - bun --filter @me-builder/api deploy:preview
+      - bun --filter @me-builder/worker deploy:preview
+      - bun --filter @me-builder/mcp deploy:preview
+      - bun --filter @me-builder/web deploy:preview
 
   deploy:production:
     desc: 'Deploy all applications to production environment via Wrangler'
     cmds:
-      - bun --filter '*' deploy:production
+      - bun --filter @me-builder/api deploy:production
+      - bun --filter @me-builder/worker deploy:production
+      - bun --filter @me-builder/mcp deploy:production
+      - bun --filter @me-builder/web deploy:production
+

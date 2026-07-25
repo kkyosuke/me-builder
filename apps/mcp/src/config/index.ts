@@ -1,18 +1,8 @@
 import { getEnv } from "@me-builder/shared";
 import * as v from "valibot";
+import { type McpConfig, McpConfigSchema } from "./schema";
 
-export const McpConfigSchema = v.object({
-  port: v.pipe(
-    v.optional(v.string(), "3001"),
-    v.transform((val) => Number(val) || 3001),
-  ),
-  environment: v.optional(v.string(), "development"),
-  baseDomain: v.optional(v.string()),
-  baseUrl: v.optional(v.string()),
-  apiUrl: v.optional(v.string()),
-});
-
-export type McpConfig = v.InferOutput<typeof McpConfigSchema>;
+export { McpConfigSchema, type McpConfig };
 
 /**
  * MCP サーバーの環境変数を取得・整理し、Valibot で検証・整形した設定オブジェクトを生成します。
