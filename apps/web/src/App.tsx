@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { config } from "./config";
 
 interface ApiHealthResponse {
   status: string;
@@ -15,7 +16,10 @@ export function App() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/health");
+      const apiEndpoint = config.apiUrl
+        ? `${config.apiUrl.replace(/\/$/, "")}/api/health`
+        : "/api/health";
+      const res = await fetch(apiEndpoint);
       if (!res.ok) {
         throw new Error(`HTTP error! status: ${res.status}`);
       }
@@ -40,7 +44,7 @@ export function App() {
       <div className="card">
         <div className="status-badge">
           <span className="status-dot" />
-          API Server Link
+          API Server Link ({config.apiUrl || "local"})
         </div>
 
         <div>
