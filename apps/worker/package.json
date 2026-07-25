@@ -13,6 +13,7 @@
     "deploy:production": "wrangler deploy --env production"
   },
   "dependencies": {
+    "@me-builder/lib": "workspace:*",
     "@me-builder/shared": "workspace:*",
     "valibot": "^1.4.2"
   },

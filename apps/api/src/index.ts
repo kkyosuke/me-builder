@@ -1,8 +1,8 @@
+import { line } from "@me-builder/lib";
 import { type Queue, type WebhookQueueMessage, logger } from "@me-builder/shared";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { config, getConfig } from "./config";
-import { registerLineWebhook } from "./lib/line-webhook";
 
 const app = new Hono<{
   Bindings: {
@@ -71,7 +71,10 @@ app.get("/", (c) => {
 
 // 起動時の LINE Webhook 自動登録処理
 if (typeof process !== "undefined" && process.env) {
-  registerLineWebhook();
+  line.webhook.register({
+    channelAccessToken: config.lineChannelAccessToken,
+    webhookUrl: config.lineWebhookUrl,
+  });
 }
 
 logger.info(`API Server is running on http://localhost:${config.port}`);

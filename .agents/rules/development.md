@@ -12,6 +12,7 @@
   - `apps/mcp`: Cloudflare / Bun 上で動作する MCP Server スケルトン
   - `apps/worker`: Cloudflare Queues メッセージを消費する Worker
   - `packages/shared`: 共有型定義・ユーティリティ
+  - `packages/lib`: LINE連携等の共通ドメイン・ヘルパーライブラリ
 - **タスク実行とコマンド (`Taskfile.yml`)**:
   - 開発タスクはルートの `Taskfile.yml` 経由で実行します。
     - `task install` (または `task i`): 全パッケージの依存関係インストール (`bun install`)
@@ -56,9 +57,10 @@
 - **環境設定管理 (`src/config/`)**:
   - `@me-builder/shared` が提供する `getEnv` 関数を用いて、Cloudflare Workers Bindings (`c.env`) およびローカル環境 (`process.env`) の差分を吸収し、生の環境変数を取得・URL 補完・Valibot パースを行い設定オブジェクトを組み立てて返却します。
 
-- **LINE Webhook 自動登録機能**:
+- **LINE Webhook 自動登録およびオウム返し機能**:
   - API サーバー起動時 (`src/index.ts`) または CLI スクリプト (`bun run register:webhook`) の実行時、`LINE_CHANNEL_ACCESS_TOKEN` および `LINE_WEBHOOK_URL` (または `BASE_URL`) が環境変数として与えられている場合、公式 SDK (`@line/bot-sdk`) の `MessagingApiClient.setWebhookEndpoint` を用いて自動的に LINE Messaging API へ Webhook Endpoint URL を登録・更新します。
-  - 環境変数が未設定の場合は自動登録処理がログ出力とともに安全にスキップされます。
+  - Webhook 受信メッセージは Cloudflare Queues 経由で Queue Worker (`apps/worker`) に配信され、`replyToken` を使用して `MessagingApiClient.replyMessage` により送信元ユーザーへ同内容を返信 (オウム返し) します。
+  - 環境変数が未設定の場合は自動登録および返信処理がログ出力とともに安全にスキップされます。
 
 ## 5. コミット・Git 運用ルール
 

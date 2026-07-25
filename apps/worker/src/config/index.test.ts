@@ -12,11 +12,13 @@ describe("Worker Config", () => {
     const cfEnv = {
       ENVIRONMENT: "preview",
       BASE_DOMAIN: "stg.kagami.kyosuke.dev",
+      LINE_CHANNEL_ACCESS_TOKEN: "test-token-123",
     };
     const config = getWorkerConfig(cfEnv);
     expect(config.environment).toBe("preview");
     expect(config.baseDomain).toBe("stg.kagami.kyosuke.dev");
     expect(config.baseUrl).toBe("https://worker.stg.kagami.kyosuke.dev");
     expect(config.apiUrl).toBe("https://api.stg.kagami.kyosuke.dev");
+    expect(config.lineChannelAccessToken).toBe("test-token-123");
   });
 });

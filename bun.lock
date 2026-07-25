@@ -16,7 +16,7 @@
       "name": "@me-builder/api",
       "version": "0.1.0",
       "dependencies": {
-        "@line/bot-sdk": "^11.2.0",
+        "@me-builder/lib": "workspace:*",
         "@me-builder/shared": "workspace:*",
         "hono": "^4.4.0",
         "valibot": "^1.4.2",
@@ -57,11 +57,25 @@
       "name": "@me-builder/worker",
       "version": "0.1.0",
       "dependencies": {
+        "@me-builder/lib": "workspace:*",
         "@me-builder/shared": "workspace:*",
         "valibot": "^1.4.2",
       },
       "devDependencies": {
         "@types/bun": "latest",
+      },
+    },
+    "packages/lib": {
+      "name": "@me-builder/lib",
+      "version": "0.1.0",
+      "dependencies": {
+        "@line/bot-sdk": "^11.2.0",
+        "@me-builder/shared": "workspace:*",
+        "valibot": "^1.4.2",
+      },
+      "devDependencies": {
+        "@types/bun": "latest",
+        "typescript": "^5.4.5",
       },
     },
     "packages/shared": {
@@ -278,6 +292,8 @@
     "@line/bot-sdk": ["@line/bot-sdk@11.2.0", "", { "dependencies": { "@types/node": "^24.0.0" } }, "sha512-JKYFa3jaPYWqgI4hnc0ls+7tMmUEgnFF0Jb48kscKcGOO8qh4hddJyiq8/TFqaTWWxXQeSgYd1o5zrHjt6FrpQ=="],
 
     "@me-builder/api": ["@me-builder/api@workspace:apps/api"],
+
+    "@me-builder/lib": ["@me-builder/lib@workspace:packages/lib"],
 
     "@me-builder/mcp": ["@me-builder/mcp@workspace:apps/mcp"],
 

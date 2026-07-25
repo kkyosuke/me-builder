@@ -1,0 +1,22 @@
+{
+  "name": "@me-builder/lib",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --dir ."
+  },
+  "dependencies": {
+    "@line/bot-sdk": "^11.2.0",
+    "@me-builder/shared": "workspace:*",
+    "valibot": "^1.4.2"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.4.5"
+  }
+}

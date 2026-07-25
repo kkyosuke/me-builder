@@ -1,19 +1,24 @@
+import { line } from "@me-builder/lib";
 import {
   type Message,
   type MessageBatch,
   type WebhookQueueMessage,
   logger,
 } from "@me-builder/shared";
-import { getWorkerConfig } from "./config";
+import { type WorkerConfig, getWorkerConfig } from "./config";
 
 export interface Env {
   ENVIRONMENT?: string;
   BASE_DOMAIN?: string;
   BASE_URL?: string;
   API_URL?: string;
+  LINE_CHANNEL_ACCESS_TOKEN?: string;
 }
 
-export async function processWebhookMessage(message: Message<WebhookQueueMessage>): Promise<void> {
+export async function processWebhookMessage(
+  message: Message<WebhookQueueMessage>,
+  workerConfig?: WorkerConfig,
+): Promise<void> {
   logger.info(
     {
       id: message.id,
@@ -22,10 +27,18 @@ export async function processWebhookMessage(message: Message<WebhookQueueMessage
     },
     "Processing webhook message from queue",
   );
+
+  if (message.body.source === "line") {
+    await line.webhook.handleEvent(message.body.payload, workerConfig?.lineChannelAccessToken);
+  }
+
   message.ack();
 }
 
-export async function handleQueueBatch(batch: MessageBatch<WebhookQueueMessage>): Promise<void> {
+export async function handleQueueBatch(
+  batch: MessageBatch<WebhookQueueMessage>,
+  workerConfig?: WorkerConfig,
+): Promise<void> {
   logger.info(
     {
       queue: batch.queue,
@@ -35,7 +48,7 @@ export async function handleQueueBatch(batch: MessageBatch<WebhookQueueMessage>)
   );
 
   for (const message of batch.messages) {
-    await processWebhookMessage(message);
+    await processWebhookMessage(message, workerConfig);
   }
 }
 
@@ -43,7 +56,7 @@ export default {
   async queue(batch: MessageBatch<WebhookQueueMessage>, env: Env): Promise<void> {
     const workerConfig = getWorkerConfig(env as Record<string, unknown>);
     logger.info({ environment: workerConfig.environment }, "Worker queue handler triggered");
-    await handleQueueBatch(batch);
+    await handleQueueBatch(batch, workerConfig);
   },
   async fetch(_req: Request, env: Env): Promise<Response> {
     const workerConfig = getWorkerConfig(env as Record<string, unknown>);
