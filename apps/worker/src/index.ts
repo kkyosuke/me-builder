@@ -50,30 +50,60 @@ export async function handleQueueBatch(
   );
 
   for (const message of batch.messages) {
-    await processWebhookMessage(message, workerConfig);
+    try {
+      await processWebhookMessage(message, workerConfig);
+    } catch (err) {
+      logger.error(
+        {
+          err,
+          messageId: message.id,
+        },
+        "Error processing webhook message in worker",
+      );
+      throw err;
+    }
   }
 }
 
 export default {
   async queue(batch: MessageBatch<WebhookQueueMessage>, env: Env): Promise<void> {
-    const workerConfig = getWorkerConfig(env as Record<string, unknown>);
-    logger.info({ environment: workerConfig.environment }, "Worker queue handler triggered");
-    await handleQueueBatch(batch, workerConfig);
+    try {
+      const workerConfig = getWorkerConfig(env as Record<string, unknown>);
+      logger.info({ environment: workerConfig.environment }, "Worker queue handler triggered");
+      await handleQueueBatch(batch, workerConfig);
+    } catch (err) {
+      logger.error(
+        {
+          err,
+          queue: batch.queue,
+        },
+        "Unhandled exception in worker queue handler",
+      );
+      throw err;
+    }
   },
   async fetch(_req: Request, env: Env): Promise<Response> {
-    const workerConfig = getWorkerConfig(env as Record<string, unknown>);
-    return new Response(
-      JSON.stringify({
-        status: "ok",
-        service: "me-builder-worker",
-        environment: workerConfig.environment,
-        baseUrl: workerConfig.baseUrl,
-        apiUrl: workerConfig.apiUrl,
-      }),
-      {
-        status: 200,
+    try {
+      const workerConfig = getWorkerConfig(env as Record<string, unknown>);
+      return new Response(
+        JSON.stringify({
+          status: "ok",
+          service: "me-builder-worker",
+          environment: workerConfig.environment,
+          baseUrl: workerConfig.baseUrl,
+          apiUrl: workerConfig.apiUrl,
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    } catch (err) {
+      logger.error({ err }, "Unhandled exception in worker fetch handler");
+      return new Response(JSON.stringify({ error: "Internal Server Error" }), {
+        status: 500,
         headers: { "Content-Type": "application/json" },
-      },
-    );
+      });
+    }
   },
 };

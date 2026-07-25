@@ -51,4 +51,25 @@ describe("Worker Queue Handler", () => {
     expect(data.status).toBe("ok");
     expect(data.service).toBe("me-builder-worker");
   });
+
+  it("queue handler catches unhandled error and rethrows", async () => {
+    const message = {
+      id: "err-msg",
+      timestamp: new Date(),
+      attempts: 1,
+      body: null as unknown as WebhookQueueMessage,
+      ack: vi.fn(),
+      retry: vi.fn(),
+    } as Message<WebhookQueueMessage>;
+
+    const batch = {
+      queue: "test-queue",
+      messages: [message],
+      metadata: {},
+      ackAll: vi.fn(),
+      retryAll: vi.fn(),
+    } as unknown as MessageBatch<WebhookQueueMessage>;
+
+    await expect(worker.queue(batch, { ENVIRONMENT: "test" })).rejects.toThrow();
+  });
 });

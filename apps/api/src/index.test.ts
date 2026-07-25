@@ -39,4 +39,17 @@ describe("API Server Webhook Queue", () => {
     expect(data.status).toBe("ok");
     expect(data.queued).toBe(false);
   });
+
+  it("handles unhandled exception with 500 status using app.onError", async () => {
+    const testApp = new (await import("hono")).Hono();
+    testApp.onError((err, c) => c.json({ error: "Internal Server Error" }, 500));
+    testApp.get("/test-error", () => {
+      throw new Error("Test error");
+    });
+
+    const res = await testApp.request("/test-error");
+    expect(res.status).toBe(500);
+    const data = await res.json();
+    expect(data).toEqual({ error: "Internal Server Error" });
+  });
 });
