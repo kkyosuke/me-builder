@@ -132,8 +132,12 @@ flowchart TD
     - `wrangler.toml` 内の `env.local` ターゲット（`me-builder-api-local`, `me-builder-mcp-local`, `me-builder-web-local`）。
     - ルートの `bun dev` または `wrangler dev --env local` によりローカルエミュレーション実行。
   - **プレビュー環境 (`PR Preview`)**:
-    - `wrangler.toml` 内の `env.preview` ターゲット（`me-builder-api-preview`, `me-builder-mcp-preview`, `me-builder-web-preview`）。
+    - `wrangler.toml` 内の `env.preview` ターゲット（`me-builder-api-preview`, `me-builder-mcp-preview`, `me-builder-web`）。
     - プルリクエスト作成時、GitHub Actions / CI 経由で `wrangler deploy --env preview` または `wrangler pages deploy` を実行し、検証用プレビュー環境へ独立デプロイ。
+    - **カスタムドメイン・ルーティング配置**:
+      - UI (`apps/web`): `stg.kagami.kyosuke.dev`
+      - API (`apps/api`): `api.stg.kagami.kyosuke.dev`
+      - MCP (`apps/mcp`): `mcp.stg.kagami.kyosuke.dev`
   - **本番環境 (`Production`)**:
     - `wrangler.toml` 内の `env.production` ターゲット（`me-builder-api-production`, `me-builder-mcp-production`, `me-builder-web-production`）。
     - `main` ブランチマージ時に、CI/CD パイプライン経由で `wrangler deploy --env production` を実行し本番環境へデプロイ。
