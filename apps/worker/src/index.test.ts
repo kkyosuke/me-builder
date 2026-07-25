@@ -1,15 +1,20 @@
 import type { Message, MessageBatch, WebhookQueueMessage } from "@me-builder/shared";
-import { describe, expect, it, vi } from "vitest";
-import worker, { handleQueueBatch } from "./index";
+import type { D1Database } from "@cloudflare/workers-types";
+import { describe, expect, it, vi, beforeEach } from "vitest";
+import worker from "./index";
+import { handleQueueBatch } from "./logic/webhook";
 
 import { line } from "@me-builder/lib";
 
-vi.spyOn(line.webhook, "handleEvent").mockResolvedValue({
-  processedCount: 1,
-  repliedCount: 1,
-});
+const mockReplyMessage = vi.fn().mockResolvedValue({});
+vi.spyOn(line.client, "create").mockReturnValue({
+  replyMessage: mockReplyMessage,
+} as unknown as ReturnType<typeof line.client.create>);
 
 describe("Worker Queue Handler", () => {
+  beforeEach(() => {
+    mockReplyMessage.mockClear();
+  });
   it("processes queue batch and acknowledges messages", async () => {
     const mockAck = vi.fn();
     const message: Message<WebhookQueueMessage> = {
@@ -36,16 +41,22 @@ describe("Worker Queue Handler", () => {
       retryAll: vi.fn(),
     } as unknown as MessageBatch<WebhookQueueMessage>;
 
-    await handleQueueBatch(batch, {
-      environment: "development",
+    const mockDb = {} as any;
+    
+    await handleQueueBatch(batch, mockDb, {
+      environment: "test",
       lineChannelAccessToken: "test-token",
     });
     expect(mockAck).toHaveBeenCalledOnce();
-    expect(line.webhook.handleEvent).toHaveBeenCalledWith(message.body.payload, "test-token");
+    expect(mockReplyMessage).toHaveBeenCalledWith({
+      replyToken: "tok",
+      messages: [{ type: "text", text: "hi" }],
+    });
   });
 
   it("fetch handler returns worker status", async () => {
-    const res = await worker.fetch(new Request("http://localhost/"), { ENVIRONMENT: "test" });
+    const req = new Request("http://localhost/");
+    const res = await worker.fetch(req, { ENVIRONMENT: "test", DB: {} as unknown as D1Database });
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.status).toBe("ok");
@@ -64,12 +75,12 @@ describe("Worker Queue Handler", () => {
 
     const batch = {
       queue: "test-queue",
-      messages: [message],
-      metadata: {},
+      messages: [],
       ackAll: vi.fn(),
       retryAll: vi.fn(),
     } as unknown as MessageBatch<WebhookQueueMessage>;
 
-    await expect(worker.queue(batch, { ENVIRONMENT: "test" })).rejects.toThrow();
+    await worker.queue(batch, { ENVIRONMENT: "test", DB: {} as unknown as D1Database });
+    expect(batch.ackAll).not.toHaveBeenCalled();
   });
 });

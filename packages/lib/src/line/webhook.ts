@@ -1,10 +1,7 @@
 import { logger } from "@me-builder/shared";
+import type { webhook as lineWebhook } from "@line/bot-sdk";
 import { type LineClientConfig, client } from "./client";
 
-export interface LineReplyResult {
-  processedCount: number;
-  repliedCount: number;
-}
 
 /**
  * LINE Messaging API SDK (@line/bot-sdk) を使用して Webhook Endpoint URL を登録・更新します。
@@ -69,84 +66,25 @@ export function extractMessages(payload: unknown): string[] {
 }
 
 /**
- * LINE Webhook のイベントペイロードを解析し、メッセージイベントの replyToken を用いて同じ内容を返信します。
+ * LINE Webhook のイベントペイロードを解析し、WebhookEvent の配列として返します。
  */
-export async function handleEvent(
-  payload: unknown,
-  channelAccessToken?: string,
-): Promise<LineReplyResult> {
-  const result: LineReplyResult = {
-    processedCount: 0,
-    repliedCount: 0,
-  };
-
-  if (!payload || typeof payload !== "object") {
+export function parseEvents(payload: unknown): lineWebhook.Event[] {
+  if (!payload || typeof payload !== "object" || payload === null) {
     logger.warn("Received invalid LINE webhook payload (not an object)");
-    return result;
+    return [];
   }
 
   const events = (payload as Record<string, unknown>).events;
-  if (!Array.isArray(events) || events.length === 0) {
+  if (!Array.isArray(events)) {
     logger.info("LINE webhook payload contains no events");
-    return result;
+    return [];
   }
 
-  if (!channelAccessToken) {
-    logger.warn(
-      "[LINE Reply] LINE_CHANNEL_ACCESS_TOKEN is not configured. Skipping replyMessage calls.",
-    );
-    return result;
-  }
-
-  const apiClient = client.create(channelAccessToken);
-
-  for (const event of events) {
-    result.processedCount++;
-    if (
-      event &&
-      typeof event === "object" &&
-      event.type === "message" &&
-      typeof event.replyToken === "string" &&
-      event.message &&
-      typeof event.message === "object" &&
-      event.message.type === "text" &&
-      typeof event.message.text === "string"
-    ) {
-      const replyToken = event.replyToken;
-      const text = event.message.text;
-
-      try {
-        await apiClient.replyMessage({
-          replyToken,
-          messages: [
-            {
-              type: "text",
-              text,
-            },
-          ],
-        });
-        result.repliedCount++;
-        logger.info(
-          { replyToken, text, textLength: text.length },
-          "[LINE Reply] Echo reply sent successfully via LINE Messaging API",
-        );
-      } catch (error) {
-        logger.error(
-          {
-            replyToken,
-            error: error instanceof Error ? error.message : String(error),
-          },
-          "[LINE Reply] Failed to send reply message via LINE Messaging API",
-        );
-      }
-    }
-  }
-
-  return result;
+  return events as lineWebhook.Event[];
 }
 
 export const webhook = {
   register,
-  handleEvent,
+  parseEvents,
   extractMessages,
 };

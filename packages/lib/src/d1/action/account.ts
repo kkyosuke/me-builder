@@ -2,12 +2,12 @@ import { and, eq } from "drizzle-orm";
 import type { D1Client } from "../client";
 import { accountIdentities, accounts } from "../schema/account";
 
-export type UpsertAccountIdentityInput = {
+export type UpsertIdentityInput = {
   provider: "line" | "google";
   providerAccountId: string;
 };
 
-export type UpsertAccountIdentityResult = {
+export type UpsertIdentityResult = {
   account: typeof accounts.$inferSelect;
   identity: typeof accountIdentities.$inferSelect;
 };
@@ -16,10 +16,10 @@ export type UpsertAccountIdentityResult = {
  * Upserts accounts and account_identities records in D1 based on provider identity.
  * Uses a single JOIN query to fetch existing identity & account, and D1 batching for new insertions.
  */
-export async function upsertAccountIdentity(
+export async function upsertIdentity(
   db: D1Client,
-  input: UpsertAccountIdentityInput,
-): Promise<UpsertAccountIdentityResult> {
+  input: UpsertIdentityInput,
+): Promise<UpsertIdentityResult> {
   const now = new Date();
 
   // Find existing identity and linked active account in a single JOIN query

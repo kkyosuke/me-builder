@@ -3,7 +3,7 @@ import { drizzle } from "drizzle-orm/better-sqlite3";
 import { describe, expect, it } from "vitest";
 import type { D1Client } from "../client";
 import * as schema from "../schema";
-import { upsertAccountIdentity } from "./account";
+import { upsertIdentity } from "./account";
 
 function createTestDb(): D1Client {
   const sqlite = new Database(":memory:");
@@ -51,12 +51,12 @@ function createTestDb(): D1Client {
   return db as unknown as D1Client;
 }
 
-describe("upsertAccountIdentity", () => {
+describe("upsertIdentity", () => {
   it("should create new account and identity when identity does not exist", async () => {
     const db = createTestDb();
-    const result = await upsertAccountIdentity(db, {
+    const result = await upsertIdentity(db, {
       provider: "line",
-      providerAccountId: "U12345678",
+      providerAccountId: "line_user_123",
     });
 
     expect(result.account.id).toBeDefined();
@@ -68,17 +68,17 @@ describe("upsertAccountIdentity", () => {
 
   it("should update and return existing account and identity on second call", async () => {
     const db = createTestDb();
-    const res1 = await upsertAccountIdentity(db, {
+    const result1 = await upsertIdentity(db, {
       provider: "line",
-      providerAccountId: "U12345678",
+      providerAccountId: "line_user_reuse",
     });
 
-    const res2 = await upsertAccountIdentity(db, {
+    const result2 = await upsertIdentity(db, {
       provider: "line",
-      providerAccountId: "U12345678",
+      providerAccountId: "line_user_reuse",
     });
 
-    expect(res2.account.id).toBe(res1.account.id);
-    expect(res2.identity.id).toBe(res1.identity.id);
+    expect(result2.account.id).toBe(result1.account.id);
+    expect(result2.identity.id).toBe(result1.identity.id);
   });
 });

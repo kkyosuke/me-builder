@@ -9,6 +9,11 @@ enabled = true
 [[queues.consumers]]
 queue = "me-builder-webhook-queue-local"
 
+[[d1_databases]]
+binding = "DB"
+database_name = "me-builder-db-local"
+database_id = "me-builder-db-local-id"
+
 [vars]
 ENVIRONMENT = "local"
 
@@ -17,6 +22,11 @@ name = "me-builder-worker-local"
 
 [[env.local.queues.consumers]]
 queue = "me-builder-webhook-queue-local"
+
+[[env.local.d1_databases]]
+binding = "DB"
+database_name = "me-builder-db-local"
+database_id = "me-builder-db-local-id"
 
 [env.local.vars]
 ENVIRONMENT = "local"
@@ -27,6 +37,11 @@ name = "me-builder-worker-preview"
 [[env.preview.queues.consumers]]
 queue = "me-builder-webhook-queue-preview"
 
+[[env.preview.d1_databases]]
+binding = "DB"
+database_name = "me-builder-db-preview"
+database_id = "me-builder-db-preview-id"
+
 [env.preview.vars]
 ENVIRONMENT = "preview"
 
@@ -35,6 +50,11 @@ name = "me-builder-worker-production"
 
 [[env.production.queues.consumers]]
 queue = "me-builder-webhook-queue-production"
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "me-builder-db-production"
+database_id = "me-builder-db-production-id"
 
 [env.production.vars]
 ENVIRONMENT = "production"
