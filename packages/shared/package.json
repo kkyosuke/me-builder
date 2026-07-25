@@ -10,6 +10,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --dir ."
   },
+  "dependencies": {
+    "pino": "^9.6.0"
+  },
   "devDependencies": {
     "typescript": "^5.4.5"
   }

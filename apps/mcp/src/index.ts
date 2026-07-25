@@ -1,3 +1,4 @@
+import { logger } from "@me-builder/shared";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { config, getMcpConfig } from "./config";
@@ -26,7 +27,7 @@ app.post("/messages", (c) => {
   return c.json({ message: "MCP Message endpoint skeleton" });
 });
 
-console.log(`MCP Server is running on http://localhost:${config.port}`);
+logger.info(`MCP Server is running on http://localhost:${config.port}`);
 
 export default {
   port: config.port,

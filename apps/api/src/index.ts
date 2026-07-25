@@ -1,3 +1,4 @@
+import { logger } from "@me-builder/shared";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { config, getConfig } from "./config";
@@ -40,7 +41,7 @@ if (typeof process !== "undefined" && process.env) {
   registerLineWebhook();
 }
 
-console.log(`API Server is running on http://localhost:${config.port}`);
+logger.info(`API Server is running on http://localhost:${config.port}`);
 
 export { app };
 export default {

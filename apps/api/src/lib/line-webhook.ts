@@ -1,4 +1,5 @@
 import { messagingApi } from "@line/bot-sdk";
+import { logger } from "@me-builder/shared";
 import { config as defaultConfig } from "../config";
 
 export interface LineWebhookConfig {
@@ -18,7 +19,7 @@ export async function registerLineWebhook(
   if (!token || !url) {
     const msg =
       "[LINE Webhook] LINE_CHANNEL_ACCESS_TOKEN または Webhook URL (LINE_WEBHOOK_URL / BASE_URL) が設定されていないため自動登録をスキップします。";
-    console.log(msg);
+    logger.info(msg);
     return { success: false, message: msg };
   }
 
@@ -32,13 +33,13 @@ export async function registerLineWebhook(
     });
 
     const msg = `[LINE Webhook] LINE Messaging API SDK により Webhook URL を正常に登録しました: ${url}`;
-    console.log(msg);
+    logger.info(msg);
     return { success: true, message: msg };
   } catch (error) {
     const msg = `[LINE Webhook] LINE Messaging API SDK でのエラーが発生しました: ${
       error instanceof Error ? error.message : String(error)
     }`;
-    console.error(msg);
+    logger.error(msg);
     return { success: false, message: msg };
   }
 }

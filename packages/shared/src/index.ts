@@ -6,3 +6,5 @@ export interface UserProfile {
 }
 
 export const APP_NAME = "me-builder";
+
+export * from "./logger";

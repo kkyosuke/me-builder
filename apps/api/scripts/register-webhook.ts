@@ -1,10 +1,11 @@
+import { logger } from "@me-builder/shared";
 import { registerLineWebhook } from "../src/lib/line-webhook";
 
-console.log("[Script] Executing LINE Webhook registration...");
+logger.info("[Script] Executing LINE Webhook registration...");
 registerLineWebhook().then((result) => {
   if (result.success) {
-    console.log("[Script] Registration process completed successfully.");
+    logger.info("[Script] Registration process completed successfully.");
   } else {
-    console.log("[Script] Registration process ended with message:", result.message);
+    logger.info(`[Script] Registration process ended with message: ${result.message}`);
   }
 });
