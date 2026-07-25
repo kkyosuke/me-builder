@@ -9,8 +9,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --dir .",
     "preview": "vite preview",
-    "deploy:preview": "wrangler pages project create me-builder-web --production-branch main || true && wrangler pages domain add stg.kagami.kyosuke.dev --project-name=me-builder-web || true && wrangler pages deploy dist --project-name=me-builder-web --branch=preview",
-    "deploy:production": "wrangler pages project create me-builder-web --production-branch main || true && wrangler pages domain add kagami.kyosuke.dev --project-name=me-builder-web || true && wrangler pages deploy dist --project-name=me-builder-web --branch=main"
+    "deploy:preview": "wrangler pages project create me-builder-web --production-branch main || true && wrangler pages deploy dist --project-name=me-builder-web --branch=preview",
+    "deploy:production": "wrangler pages project create me-builder-web --production-branch main || true && wrangler pages deploy dist --project-name=me-builder-web --branch=main"
   },
   "dependencies": {
     "react": "^18.3.1",
