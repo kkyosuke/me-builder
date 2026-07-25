@@ -1,41 +1,37 @@
-name: CI / API
+name: CI / Lib
 
 on:
   push:
     branches:
       - main
     paths:
-      - 'apps/api/**'
-      - 'packages/shared/**'
       - 'packages/lib/**'
       - 'package.json'
       - 'bun.lock'
       - 'tsconfig.json'
-      - '.github/workflows/ci-api.yml'
+      - '.github/workflows/ci-lib.yml'
       - '.github/actions/**'
   pull_request:
     branches:
       - main
     paths:
-      - 'apps/api/**'
-      - 'packages/shared/**'
       - 'packages/lib/**'
       - 'package.json'
       - 'bun.lock'
       - 'tsconfig.json'
-      - '.github/workflows/ci-api.yml'
+      - '.github/workflows/ci-lib.yml'
       - '.github/actions/**'
 
 jobs:
-  api:
-    name: API Server CI
+  lib:
+    name: Lib Package CI
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-bun-workspace
       - name: Type Check
-        run: bun --filter @me-builder/api typecheck
+        run: bun --filter @me-builder/lib typecheck
       - name: Run Tests
-        run: bun --filter @me-builder/api test
+        run: bun --filter @me-builder/lib test
       - name: Build Check
-        run: bun --filter @me-builder/api build
+        run: bun --filter @me-builder/lib build

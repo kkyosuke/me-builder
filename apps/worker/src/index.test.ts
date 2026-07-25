@@ -2,6 +2,13 @@ import type { Message, MessageBatch, WebhookQueueMessage } from "@me-builder/sha
 import { describe, expect, it, vi } from "vitest";
 import worker, { handleQueueBatch } from "./index";
 
+import { line } from "@me-builder/lib";
+
+vi.spyOn(line.webhook, "handleEvent").mockResolvedValue({
+  processedCount: 1,
+  repliedCount: 1,
+});
+
 describe("Worker Queue Handler", () => {
   it("processes queue batch and acknowledges messages", async () => {
     const mockAck = vi.fn();
@@ -13,7 +20,9 @@ describe("Worker Queue Handler", () => {
         id: "evt-123",
         source: "line",
         receivedAt: "2026-07-25T12:00:00Z",
-        payload: { text: "hello" },
+        payload: {
+          events: [{ type: "message", replyToken: "tok", message: { type: "text", text: "hi" } }],
+        },
       },
       ack: mockAck,
       retry: vi.fn(),
@@ -27,8 +36,12 @@ describe("Worker Queue Handler", () => {
       retryAll: vi.fn(),
     } as unknown as MessageBatch<WebhookQueueMessage>;
 
-    await handleQueueBatch(batch);
+    await handleQueueBatch(batch, {
+      environment: "development",
+      lineChannelAccessToken: "test-token",
+    });
     expect(mockAck).toHaveBeenCalledOnce();
+    expect(line.webhook.handleEvent).toHaveBeenCalledWith(message.body.payload, "test-token");
   });
 
   it("fetch handler returns worker status", async () => {

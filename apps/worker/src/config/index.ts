@@ -32,11 +32,14 @@ export function getWorkerConfig(env?: Record<string, unknown>): WorkerConfig {
     rawApiUrl = domain;
   }
 
+  const rawLineChannelAccessToken = getEnv("LINE_CHANNEL_ACCESS_TOKEN", env);
+
   const rawConfig = {
     environment: rawEnvironment,
     baseDomain: rawBaseDomain,
     baseUrl: rawBaseUrl,
     apiUrl: rawApiUrl,
+    lineChannelAccessToken: rawLineChannelAccessToken,
   };
 
   return v.parse(WorkerConfigSchema, rawConfig);

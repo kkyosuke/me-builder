@@ -7,6 +7,7 @@ on:
     paths:
       - 'apps/worker/**'
       - 'packages/shared/**'
+      - 'packages/lib/**'
       - 'package.json'
       - 'bun.lock'
       - 'tsconfig.json'
@@ -18,6 +19,7 @@ on:
     paths:
       - 'apps/worker/**'
       - 'packages/shared/**'
+      - 'packages/lib/**'
       - 'package.json'
       - 'bun.lock'
       - 'tsconfig.json'
