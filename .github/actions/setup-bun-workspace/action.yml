@@ -1,12 +1,9 @@
 name: 'Setup Bun Workspace'
-description: 'Checkout repository, setup Bun, configure dependency cache, and run bun install'
+description: 'Setup Bun, configure dependency cache, and run bun install'
 
 runs:
   using: 'composite'
   steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-
     - name: Setup Bun
       uses: oven-sh/setup-bun@v2
       with:

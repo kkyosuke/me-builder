@@ -29,6 +29,7 @@ jobs:
     name: UI Web CI
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-bun-workspace
       - name: Type Check
         run: bun --filter @me-builder/web typecheck

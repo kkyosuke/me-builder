@@ -48,3 +48,4 @@
 - `node_modules`, `.bun`, `dist` などのインストール生成物およびビルド成果物は絶対にコミットに含まないこと。
 - 新規ファイル追加時は [`.gitignore`](../../.gitignore) の除外ルールを満たしているか事前に確認すること。
 - 変更後は必ず `git diff --check` を実行して不要な末尾空白や構文エラーがないか確認すること。
+- PR作成時は [PR作成手順書](../../docs/pull-request-guidelines.md) に従い、タイトルの命名規約 (`<type>(<scope>): <説明>`) および PR テンプレート ([`.github/PULL_REQUEST_TEMPLATE.md`](../../.github/PULL_REQUEST_TEMPLATE.md)) に沿って作成すること。
