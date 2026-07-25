@@ -24,10 +24,11 @@ jobs:
         run: bun run ci
 
       - name: Sync Secrets to Cloudflare Workers (Production)
-        if: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN != '' }}
+        if: ${{ env.LINE_CHANNEL_ACCESS_TOKEN != '' }}
         run: |
-          echo "${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}" | bun --cwd apps/api wrangler secret put LINE_CHANNEL_ACCESS_TOKEN --env production
+          echo "${LINE_CHANNEL_ACCESS_TOKEN}" | bun --cwd apps/api wrangler secret put LINE_CHANNEL_ACCESS_TOKEN --env production
         env:
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
