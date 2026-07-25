@@ -16,6 +16,7 @@
 | [ドメイン設計](../docs/domain-design.md) | AccountとBrainの責務・境界、今後の設計順序 |
 | [Brain内部情報の分類](../docs/brain-content-taxonomy.md) | Brain Itemの分類名、定義、具体例、意思決定での利用方法 |
 | [Brainのラベル・アクセス制御設計](../docs/brain-access-label-design.md) | Topic Label、Access Label、Access Profile、MCP提供時の原則 |
+| [インフラ・システム構成](../docs/infrastructure-architecture.md) | Cloudflareを全面的に採用したインフラ基盤、システム構成、サービス配置 |
 
 この表は各文書へのナビゲーションです。概念の定義そのものはリンク先だけに記載します。
 
