@@ -50,6 +50,8 @@
 - **Web標準 API の遵守**:
   - API サーバーおよび MCP サーバーは `Bun.serve` および **Hono** フレームワークを採用します。
   - 固有の非標準 API や特定のランタイム依存を避け、`Request`, `Response`, `fetch` などの Web標準 API / Web Standard Response に準拠して実装してください。これにより、ローカル (`bun serve`) とクラウド・エッジ (Cloudflare Workers 等) の双方向でそのまま稼働可能にします。
+- **環境設定管理 (`src/config/`)**:
+  - `local.ts` (`getLocalEnv`) で `process.env` から、`cloudflare.ts` (`getCloudflareEnv`) で Cloudflare Workers Bindings からそれぞれ生の環境変数を `rawSchema` / `RawConfig` (`schema.ts`) 型のオブジェクトとして回収し、`index.ts` の `buildConfig` (`schema.ts`) で URL 補完・Valibot パースを行い設定オブジェクトを組み立てて返却します。
 - **LINE Webhook 自動登録機能**:
   - API サーバー起動時 (`src/index.ts`) または CLI スクリプト (`bun run register:webhook`) の実行時、`LINE_CHANNEL_ACCESS_TOKEN` および `LINE_WEBHOOK_URL` (または `BASE_URL`) が環境変数として与えられている場合、公式 SDK (`@line/bot-sdk`) の `MessagingApiClient.setWebhookEndpoint` を用いて自動的に LINE Messaging API へ Webhook Endpoint URL を登録・更新します。
   - 環境変数が未設定の場合は自動登録処理がログ出力とともに安全にスキップされます。
