@@ -1,0 +1,36 @@
+name: CI / Shared
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'packages/shared/**'
+      - 'package.json'
+      - 'bun.lock'
+      - 'tsconfig.json'
+      - '.github/workflows/ci-shared.yml'
+      - '.github/actions/**'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'packages/shared/**'
+      - 'package.json'
+      - 'bun.lock'
+      - 'tsconfig.json'
+      - '.github/workflows/ci-shared.yml'
+      - '.github/actions/**'
+
+jobs:
+  shared:
+    name: Shared Package CI
+    runs-on: ubuntu-latest
+    steps:
+      - uses: ./.github/actions/setup-bun-workspace
+      - name: Type Check
+        run: bun --filter @me-builder/shared typecheck
+      - name: Run Tests
+        run: bun --filter @me-builder/shared test
+      - name: Build Check
+        run: bun --filter @me-builder/shared build

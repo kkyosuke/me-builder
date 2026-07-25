@@ -5,4 +5,4 @@ export interface UserProfile {
   email?: string;
 }
 
-export const APP_NAME = 'me-builder';
+export const APP_NAME = "me-builder";

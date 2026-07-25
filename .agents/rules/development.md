@@ -19,6 +19,15 @@
     - `task dev:api`: API サーバーの個別起動
     - `task dev:mcp`: MCP サーバーの個別起動
     - `task build`: 全パッケージのビルド
+    - `task typecheck`: 全パッケージの TypeScript 型チェック
+    - `task lint`: Biome によるコード Lint / フォーマット検証
+    - `task lint:fix`: Biome によるコード Lint / フォーマットの自動修復
+    - `task test`: Vitest による全テスト実行
+    - `task ci`: CI で実行される全検証（lint, typecheck, test, build）の一括ローカル実行
+  - **CI ワークフロー構造 (`.github/workflows/ci-*.yml`)**:
+    - GitHub Actions ワークフローはコンポーネントごとの個別の YAML ファイルに分離されています (`ci-lint.yml`, `ci-shared.yml`, `ci-api.yml`, `ci-mcp.yml`, `ci-ui.yml`)。
+    - 各ワークフローには `paths` フィルターが定義されており、関連するコード・設定の変更時のみ自動トリガーされます。
+    - リポジトリのチェックアウト、Bun のセットアップ、`actions/cache@v4` によるキャッシュ、および `bun install --frozen-lockfile` の一連の処理は GitHub Composite Action ([.github/actions/setup-bun-workspace](file:///Users/kyosuke/git/github.com/KKyosuke/me-builder/.github/actions/setup-bun-workspace/action.yml)) に共通化されています。
   - パッケージの追加・削除はルートで `bun add <package> --filter <workspace>` を使用し、個別ディレクトリで `npm install` を実行しないこと。
 
 ## 3. 共有パッケージ (`packages/*`) の開発ルール
