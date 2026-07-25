@@ -48,6 +48,16 @@ jobs:
         run: |
           echo "${LINE_CHANNEL_ACCESS_TOKEN}" | bun --cwd apps/api wrangler secret put LINE_CHANNEL_ACCESS_TOKEN --env preview
 
+      - name: Register LINE Webhook (Preview)
+        if: ${{ env.CLOUDFLARE_API_TOKEN != '' && env.LINE_CHANNEL_ACCESS_TOKEN != '' }}
+        env:
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+          BASE_DOMAIN: ${{ vars.BASE_DOMAIN }}
+        run: |
+          bun --cwd apps/api scripts/register-webhook.ts
+
+
+
       - name: Skip Deployment Notice
         if: ${{ env.CLOUDFLARE_API_TOKEN == '' }}
         run: |
