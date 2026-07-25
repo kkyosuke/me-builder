@@ -13,13 +13,25 @@ vi.mock("@line/bot-sdk", () => {
   };
 });
 
+vi.mock("../config", () => ({
+  config: {
+    lineChannelAccessToken: "",
+    lineWebhookUrl: "",
+  },
+}));
+
 describe("registerLineWebhook", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
   });
 
   it("トークンまたはURLが無い場合はスキップされること", async () => {
-    const result = await registerLineWebhook({});
+    const result = await registerLineWebhook({
+      channelAccessToken: "",
+      webhookUrl: "",
+    });
     expect(result.success).toBe(false);
     expect(result.message).toContain("自動登録をスキップします");
   });
