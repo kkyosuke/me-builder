@@ -1,0 +1,12 @@
+name = "me-builder-web"
+pages_build_output_dir = "./dist"
+compatibility_date = "2024-07-01"
+
+[vars]
+ENVIRONMENT = "local"
+
+[env.preview.vars]
+ENVIRONMENT = "preview"
+
+[env.production.vars]
+ENVIRONMENT = "production"

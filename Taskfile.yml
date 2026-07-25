@@ -59,3 +59,12 @@ tasks:
     cmds:
       - bun run ci
 
+  deploy:preview:
+    desc: 'Deploy all applications to preview environment via Wrangler'
+    cmds:
+      - bun --filter '*' deploy:preview
+
+  deploy:production:
+    desc: 'Deploy all applications to production environment via Wrangler'
+    cmds:
+      - bun --filter '*' deploy:production

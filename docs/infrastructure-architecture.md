@@ -113,27 +113,38 @@ flowchart TD
 - **モノレポ構成 (`Bun Workspaces`)**:
   ```text
   me-builder/
-  ├── Taskfile.yml       # タスクランナー定義 (task dev, task i 等)
-  ├── package.json       # ルート設定 (workspaces 定義)
+  ├── Taskfile.yml       # タスクランナー定義 (task dev, task i, task deploy:preview 等)
+  ├── package.json       # ルート設定 (workspaces 定義, wrangler devDependency)
   ├── tsconfig.json      # モノレポ共通 TypeScript 設定
   ├── apps/
-  │   ├── web/           # Frontend UI (React + Vite + TypeScript)
-  │   ├── api/           # API Server (Bun.serve + Hono)
-  │   └── mcp/           # MCP Server (Bun.serve / Workers)
+  │   ├── web/           # Frontend UI (React + Vite + TypeScript, wrangler.toml)
+  │   ├── api/           # API Server (Bun.serve / Cloudflare Workers, wrangler.toml)
+  │   └── mcp/           # MCP Server (Bun.serve / Cloudflare Workers, wrangler.toml)
   └── packages/
       └── shared/        # 共有型定義 & ユーティリティ (純粋な .ts ソース直参照)
   ```
-  - `apps/web`: React (Vite + TypeScript) によるフロントエンド。
-  - `apps/api`: `Bun.serve` および Web標準 API 準拠の **Hono** フレームワークを採用。ローカルでの高速実行とエッジ/クラウド環境への透過的なデプロイを両立。
-  - `apps/mcp`: Cloudflare Workers / Bun 上で動作する MCP (Model Context Protocol) サーバー。
+  - `apps/web`: React (Vite + TypeScript) によるフロントエンド。`apps/web/wrangler.toml` により Pages 設定および環境別設定（local, preview, production）を管理。
+  - `apps/api`: `Bun.serve` および Web標準 API 準拠の **Hono** フレームワークを採用。`apps/api/wrangler.toml` により Cloudflare Workers の環境別設定（local, preview, production）を制御。
+  - `apps/mcp`: Cloudflare Workers / Bun 上で動作する MCP (Model Context Protocol) サーバー。`apps/mcp/wrangler.toml` により Workers の環境別設定を制御。
   - `packages/shared`: 全アプリケーション間で共有されるドメイン型定義およびユーティリティライブラリ。
-- **ローカル開発環境 (`Local`)**:
-  - ルートの `bun dev` コマンドにより、`apps/api` (`Bun.serve`), `apps/mcp`, `apps/web` (Vite dev server) を並行起動して開発・デバッグを実施。
-  - `wrangler dev` やローカルデータベースエミュレーションとの統合もサポート。
-- **プレビュー環境 (`PR Preview`)**:
-  - プルリクエスト作成時、GitHub Actions 経由で `apps/web` を Cloudflare Pages Preview 環境へ、`apps/api` および `apps/mcp` を Cloudflare Workers Preview / 検証環境へ自動ビルド & デプロイ。
-- **本番環境 (`Production`)**:
-  - `main` ブランチマージ時に、CI/CD パイプライン経由で各サービスを宣言的に Cloudflare 本番環境（Pages, Workers）等へデプロイ。
+- **環境分類と Wrangler 構成 (`Local` / `Preview` / `Production`)**:
+  - **ローカル開発環境 (`Local`)**:
+    - `wrangler.toml` 内の `env.local` ターゲット（`me-builder-api-local`, `me-builder-mcp-local`, `me-builder-web-local`）。
+    - ルートの `bun dev` または `wrangler dev --env local` によりローカルエミュレーション実行。
+  - **プレビュー環境 (`PR Preview`)**:
+    - `wrangler.toml` 内の `env.preview` ターゲット（`me-builder-api-preview`, `me-builder-mcp-preview`, `me-builder-web`）。
+    - プルリクエスト作成時、GitHub Actions / CI 経由で `wrangler deploy --env preview` または `wrangler pages deploy` を実行し、検証用プレビュー環境へ独立デプロイ。
+    - **カスタムドメイン・ルーティング配置**:
+      - UI (`apps/web`): `stg.kagami.kyosuke.dev`
+      - API (`apps/api`): `api.stg.kagami.kyosuke.dev`
+      - MCP (`apps/mcp`): `mcp.stg.kagami.kyosuke.dev`
+  - **本番環境 (`Production`)**:
+    - `wrangler.toml` 内の `env.production` ターゲット（`me-builder-api-production`, `me-builder-mcp-production`, `me-builder-web`）。
+    - `main` ブランチマージ時に、CI/CD パイプライン経由で `wrangler deploy --env production` を実行し本番環境へデプロイ。
+    - **カスタムドメイン・ルーティング配置**:
+      - UI (`apps/web`): `kagami.kyosuke.dev`
+      - API (`apps/api`): `api.kagami.kyosuke.dev`
+      - MCP (`apps/mcp`): `mcp.kagami.kyosuke.dev`
 
 ## 7. 関連ドキュメント
 
