@@ -1,0 +1,25 @@
+name = "me-builder-mcp"
+main = "src/index.ts"
+compatibility_date = "2024-07-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+ENVIRONMENT = "local"
+
+[env.local]
+name = "me-builder-mcp-local"
+
+[env.local.vars]
+ENVIRONMENT = "local"
+
+[env.preview]
+name = "me-builder-mcp-preview"
+
+[env.preview.vars]
+ENVIRONMENT = "preview"
+
+[env.production]
+name = "me-builder-mcp-production"
+
+[env.production.vars]
+ENVIRONMENT = "production"

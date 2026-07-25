@@ -8,7 +8,9 @@
     "build": "tsc && vite build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --dir .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "deploy:preview": "wrangler pages deploy dist --project-name=me-builder-web-preview",
+    "deploy:production": "wrangler pages deploy dist --project-name=me-builder-web"
   },
   "dependencies": {
     "react": "^18.3.1",
