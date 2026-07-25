@@ -1,3 +1,4 @@
+import { logger } from "@me-builder/shared";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { config, getConfig } from "./config";
@@ -14,6 +15,19 @@ const app = new Hono<{
 
 // CORS を有効化
 app.use("*", cors());
+
+// HTTP リクエストログミドルウェア (構造化 JSON ログ)
+app.use("*", async (c, next) => {
+  const start = Date.now();
+  await next();
+  const ms = Date.now() - start;
+  logger.info({
+    method: c.req.method,
+    path: c.req.path,
+    status: c.res.status,
+    responseTimeMs: ms,
+  });
+});
 
 // ヘルスチェックエンドポイント
 app.get("/api/health", (c) => {
@@ -40,7 +54,7 @@ if (typeof process !== "undefined" && process.env) {
   registerLineWebhook();
 }
 
-console.log(`API Server is running on http://localhost:${config.port}`);
+logger.info(`API Server is running on http://localhost:${config.port}`);
 
 export { app };
 export default {
