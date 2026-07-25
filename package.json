@@ -1,0 +1,16 @@
+{
+  "name": "me-builder",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "bun --filter '*' dev",
+    "build": "bun --filter '*' build",
+    "lint": "bun --filter '*' lint"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  }
+}
