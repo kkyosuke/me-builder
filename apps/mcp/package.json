@@ -13,7 +13,8 @@
     "deploy:production": "wrangler deploy --env production"
   },
   "dependencies": {
-    "hono": "^4.4.0"
+    "hono": "^4.4.0",
+    "valibot": "^1.4.2"
   },
   "devDependencies": {
     "@types/bun": "latest"

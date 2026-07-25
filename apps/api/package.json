@@ -9,11 +9,14 @@
     "build": "bun build src/index.ts --outdir ./dist --target bun",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --dir .",
+    "register:webhook": "bun scripts/register-webhook.ts",
     "deploy:preview": "wrangler deploy --env preview",
     "deploy:production": "wrangler deploy --env production"
   },
   "dependencies": {
-    "hono": "^4.4.0"
+    "@line/bot-sdk": "^11.2.0",
+    "hono": "^4.4.0",
+    "valibot": "^1.4.2"
   },
   "devDependencies": {
     "@types/bun": "latest"
