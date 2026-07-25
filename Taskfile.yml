@@ -1,0 +1,35 @@
+version: '3'
+
+tasks:
+  install:
+    aliases: [i]
+    desc: 'Install all dependencies using Bun'
+    cmds:
+      - bun install
+
+  dev:
+    desc: 'Start all development servers (UI, API, MCP)'
+    deps:
+      - dev:ui
+      - dev:api
+      - dev:mcp
+
+  dev:ui:
+    desc: 'Start UI development server (React / Vite)'
+    cmds:
+      - bun --filter @me-builder/web dev
+
+  dev:api:
+    desc: 'Start API development server (Bun.serve / Hono)'
+    cmds:
+      - bun --filter @me-builder/api dev
+
+  dev:mcp:
+    desc: 'Start MCP development server'
+    cmds:
+      - bun --filter @me-builder/mcp dev
+
+  build:
+    desc: 'Build all applications and packages'
+    cmds:
+      - bun --filter '*' build

@@ -108,15 +108,37 @@ flowchart TD
 
 ## 6. 開発・運用環境方針
 
-開発およびデプロイ環境は Cloudflare の標準エコシステム（Wrangler CLI）に準拠します。
+開発基盤には **Bun Workspaces** を用いたモノレポ構造（`apps/web`, `apps/api`）を採用し、ローカル開発・PRプレビュー・本番環境で一貫した開発体験と安全なデプロイを実現します。
 
-- **ローカル開発環境**: `wrangler dev` を使用し、D1, R2, KV, Vectorize をローカル環境上でモック/エミュレートして開発・テストを行います。
-- **プレビュー環境**: Cloudflare Pages / Workers の Preview デプロイ機能を活用し、プルリクエストごとに独立した検証環境を自動作成します。
-- **本番環境**: GitHub Actions CI/CD パイプライン経由で Cloudflare 本番環境へ宣言的にデプロイします。
+- **モノレポ構成 (`Bun Workspaces`)**:
+  ```text
+  me-builder/
+  ├── Taskfile.yml       # タスクランナー定義 (task dev, task i 等)
+  ├── package.json       # ルート設定 (workspaces 定義)
+  ├── tsconfig.json      # モノレポ共通 TypeScript 設定
+  ├── apps/
+  │   ├── web/           # Frontend UI (React + Vite + TypeScript)
+  │   ├── api/           # API Server (Bun.serve + Hono)
+  │   └── mcp/           # MCP Server (Bun.serve / Workers)
+  └── packages/
+      └── shared/        # 共有型定義 & ユーティリティ (純粋な .ts ソース直参照)
+  ```
+  - `apps/web`: React (Vite + TypeScript) によるフロントエンド。
+  - `apps/api`: `Bun.serve` および Web標準 API 準拠の **Hono** フレームワークを採用。ローカルでの高速実行とエッジ/クラウド環境への透過的なデプロイを両立。
+  - `apps/mcp`: Cloudflare Workers / Bun 上で動作する MCP (Model Context Protocol) サーバー。
+  - `packages/shared`: 全アプリケーション間で共有されるドメイン型定義およびユーティリティライブラリ。
+- **ローカル開発環境 (`Local`)**:
+  - ルートの `bun dev` コマンドにより、`apps/api` (`Bun.serve`), `apps/mcp`, `apps/web` (Vite dev server) を並行起動して開発・デバッグを実施。
+  - `wrangler dev` やローカルデータベースエミュレーションとの統合もサポート。
+- **プレビュー環境 (`PR Preview`)**:
+  - プルリクエスト作成時、GitHub Actions 経由で `apps/web` を Cloudflare Pages Preview 環境へ、`apps/api` および `apps/mcp` を Cloudflare Workers Preview / 検証環境へ自動ビルド & デプロイ。
+- **本番環境 (`Production`)**:
+  - `main` ブランチマージ時に、CI/CD パイプライン経由で各サービスを宣言的に Cloudflare 本番環境（Pages, Workers）等へデプロイ。
 
 ## 7. 関連ドキュメント
 
 - [Agent向けガイド](../.agents/README.md)
+- [開発運用ルール](../.agents/rules/development.md)
 - [プロジェクト概要](project-overview.md)
 - [ドメイン設計](domain-design.md)
 - [Brain内部情報の分類](brain-content-taxonomy.md)
