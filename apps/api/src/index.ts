@@ -16,6 +16,19 @@ const app = new Hono<{
 // CORS を有効化
 app.use("*", cors());
 
+// HTTP リクエストログミドルウェア (構造化 JSON ログ)
+app.use("*", async (c, next) => {
+  const start = Date.now();
+  await next();
+  const ms = Date.now() - start;
+  logger.info({
+    method: c.req.method,
+    path: c.req.path,
+    status: c.res.status,
+    responseTimeMs: ms,
+  });
+});
+
 // ヘルスチェックエンドポイント
 app.get("/api/health", (c) => {
   const currentConfig = getConfig(c.env);
