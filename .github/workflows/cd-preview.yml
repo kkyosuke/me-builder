@@ -39,14 +39,14 @@ jobs:
       - name: Run CI Verification
         run: bun run ci
 
+      - name: Deploy to Cloudflare Preview
+        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
+        run: task deploy:preview
+
       - name: Sync Secrets to Cloudflare Workers (Preview)
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' && env.LINE_CHANNEL_ACCESS_TOKEN != '' }}
         run: |
           echo "${LINE_CHANNEL_ACCESS_TOKEN}" | bun --cwd apps/api wrangler secret put LINE_CHANNEL_ACCESS_TOKEN --env preview
-
-      - name: Deploy to Cloudflare Preview
-        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
-        run: task deploy:preview
 
       - name: Skip Deployment Notice
         if: ${{ env.CLOUDFLARE_API_TOKEN == '' }}
