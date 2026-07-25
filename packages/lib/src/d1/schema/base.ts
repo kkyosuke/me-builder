@@ -4,7 +4,7 @@ import { integer, text } from "drizzle-orm/sqlite-core";
  * Common base schema columns for D1 database tables.
  */
 export const baseSchema = {
-  id: text("id").primaryKey(),
+  id: text("id").primaryKey(), // UUID
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .$defaultFn(() => new Date()),
