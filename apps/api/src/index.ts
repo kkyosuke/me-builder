@@ -51,12 +51,25 @@ app.post("/api/line/webhook", async (c) => {
     payload: body,
   };
 
+  const messages = line.webhook.extractMessages(body);
+
   if (currentConfig.webhookQueue) {
     await currentConfig.webhookQueue.send(event);
-    logger.info({ id: event.id, source: event.source }, "Webhook event queued to WEBHOOK_QUEUE");
+    logger.info(
+      {
+        id: event.id,
+        source: event.source,
+        messages: messages.length > 0 ? messages : undefined,
+      },
+      "Webhook event queued to WEBHOOK_QUEUE",
+    );
   } else {
     logger.warn(
-      { id: event.id, source: event.source },
+      {
+        id: event.id,
+        source: event.source,
+        messages: messages.length > 0 ? messages : undefined,
+      },
       "WEBHOOK_QUEUE binding not configured, skipping queue push",
     );
   }

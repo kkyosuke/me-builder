@@ -65,3 +65,22 @@ describe("line.webhook.handleEvent", () => {
     });
   });
 });
+
+describe("line.webhook.extractMessages", () => {
+  it("extracts text messages from valid payload", () => {
+    const payload = {
+      events: [
+        { type: "message", message: { type: "text", text: "hello" } },
+        { type: "follow" },
+        { type: "message", message: { type: "text", text: "world" } },
+      ],
+    };
+    expect(line.webhook.extractMessages(payload)).toEqual(["hello", "world"]);
+  });
+
+  it("returns empty array for invalid payloads", () => {
+    expect(line.webhook.extractMessages(null)).toEqual([]);
+    expect(line.webhook.extractMessages({})).toEqual([]);
+    expect(line.webhook.extractMessages({ events: "not-an-array" })).toEqual([]);
+  });
+});
