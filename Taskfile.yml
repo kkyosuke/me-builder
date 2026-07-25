@@ -66,6 +66,22 @@ tasks:
     cmds:
       - bun run ci
 
+  db:migrate:local:
+    aliases: [db:migrate]
+    desc: 'Apply D1 database migrations locally'
+    cmds:
+      - bun --filter @me-builder/lib db:migrate:local
+
+  db:migrate:preview:
+    desc: 'Apply D1 database migrations to preview environment'
+    cmds:
+      - bun --filter @me-builder/lib db:migrate:preview
+
+  db:migrate:production:
+    desc: 'Apply D1 database migrations to production environment'
+    cmds:
+      - bun --filter @me-builder/lib db:migrate:production
+
   deploy:preview:
     desc: 'Deploy all applications to preview environment via Wrangler'
     cmds:
@@ -81,4 +97,3 @@ tasks:
       - bun --filter @me-builder/worker deploy:production
       - bun --filter @me-builder/mcp deploy:production
       - bun --filter @me-builder/web deploy:production
-

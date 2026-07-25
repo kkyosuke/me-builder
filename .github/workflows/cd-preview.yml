@@ -39,6 +39,10 @@ jobs:
       - name: Run CI Verification
         run: bun run ci
 
+      - name: Apply D1 Migrations (Preview)
+        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
+        run: task db:migrate:preview
+
       - name: Deploy to Cloudflare Preview
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
         run: task deploy:preview
