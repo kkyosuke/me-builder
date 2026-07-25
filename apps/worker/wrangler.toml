@@ -1,4 +1,4 @@
-name = "me-builder-api"
+name = "me-builder-worker"
 main = "src/index.ts"
 compatibility_date = "2024-07-01"
 compatibility_flags = ["nodejs_compat"]
@@ -6,45 +6,35 @@ compatibility_flags = ["nodejs_compat"]
 [observability]
 enabled = true
 
-[[queues.producers]]
+[[queues.consumers]]
 queue = "me-builder-webhook-queue-local"
-binding = "WEBHOOK_QUEUE"
 
 [vars]
 ENVIRONMENT = "local"
 
 [env.local]
-name = "me-builder-api-local"
+name = "me-builder-worker-local"
 
-[[env.local.queues.producers]]
+[[env.local.queues.consumers]]
 queue = "me-builder-webhook-queue-local"
-binding = "WEBHOOK_QUEUE"
 
 [env.local.vars]
 ENVIRONMENT = "local"
 
 [env.preview]
-name = "me-builder-api-preview"
-routes = [
-  { pattern = "api.stg.kagami.kyosuke.dev", custom_domain = true }
-]
+name = "me-builder-worker-preview"
 
-[[env.preview.queues.producers]]
+[[env.preview.queues.consumers]]
 queue = "me-builder-webhook-queue-preview"
-binding = "WEBHOOK_QUEUE"
 
 [env.preview.vars]
 ENVIRONMENT = "preview"
 
 [env.production]
-name = "me-builder-api-production"
-routes = [
-  { pattern = "api.kagami.kyosuke.dev", custom_domain = true }
-]
+name = "me-builder-worker-production"
 
-[[env.production.queues.producers]]
+[[env.production.queues.consumers]]
 queue = "me-builder-webhook-queue-production"
-binding = "WEBHOOK_QUEUE"
 
 [env.production.vars]
 ENVIRONMENT = "production"

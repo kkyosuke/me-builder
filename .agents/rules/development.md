@@ -10,14 +10,16 @@
   - `apps/web`: React UI (Vite + TypeScript)
   - `apps/api`: Bun.serve + Hono API Server
   - `apps/mcp`: Cloudflare / Bun 上で動作する MCP Server スケルトン
+  - `apps/worker`: Cloudflare Queues メッセージを消費する Worker
   - `packages/shared`: 共有型定義・ユーティリティ
 - **タスク実行とコマンド (`Taskfile.yml`)**:
   - 開発タスクはルートの `Taskfile.yml` 経由で実行します。
     - `task install` (または `task i`): 全パッケージの依存関係インストール (`bun install`)
-    - `task dev`: 全開発サーバー（UI, API, MCP）の並行起動
+    - `task dev`: 全開発サーバー（UI, API, MCP, Worker）の並行起動
     - `task dev:ui`: React UI の個別起動
     - `task dev:api`: API サーバーの個別起動
     - `task dev:mcp`: MCP サーバーの個別起動
+    - `task dev:worker`: Worker の個別起動
     - `task build`: 全パッケージのビルド
     - `task typecheck`: 全パッケージの TypeScript 型チェック
     - `task lint`: Biome によるコード Lint / フォーマット検証
@@ -27,12 +29,13 @@
     - `task deploy:preview`: 全アプリのプレビュー環境へのデプロイ (`wrangler deploy --env preview`, `wrangler pages deploy`)
     - `task deploy:production`: 全アプリの本番環境へのデプロイ (`wrangler deploy --env production`, `wrangler pages deploy`)
   - **CI/CD ワークフロー構造 (`.github/workflows/ci-*.yml`, `.github/workflows/cd-*.yml`)**:
-    - CI ワークフローはコンポーネントごとの個別の YAML ファイルに分離されています (`ci-lint.yml`, `ci-shared.yml`, `ci-api.yml`, `ci-mcp.yml`, `ci-ui.yml`)。
+    - CI ワークフローはコンポーネントごとの個別の YAML ファイルに分離されています (`ci-lint.yml`, `ci-shared.yml`, `ci-api.yml`, `ci-mcp.yml`, `ci-worker.yml`, `ci-ui.yml`)。
     - CD ワークフローはプレビュー・本番デプロイ用に分離されています (`cd-preview.yml`, `cd-production.yml`)。
     - PR 作成・更新時には `cd-preview.yml` が全検証後に Cloudflare プレビュー環境へ自動デプロイします。
     - `main` ブランチマージ時には `cd-production.yml` が全検証後に Cloudflare 本番環境へ自動デプロイします。
     - リポジトリのチェックアウト、Bun のセットアップ、`actions/cache@v4` によるキャッシュ、および `bun install --frozen-lockfile` の一連の処理は GitHub Composite Action ([.github/actions/setup-bun-workspace](file:///Users/kyosuke/git/github.com/KKyosuke/me-builder/.github/actions/setup-bun-workspace/action.yml)) に共通化されています。
   - パッケージの追加・削除はルートで `bun add <package> --filter <workspace>` を使用し、個別ディレクトリで `npm install` を実行しないこと。
+
 
 ## 3. 共有パッケージ (`packages/*`) の開発ルール
 
@@ -51,7 +54,8 @@
   - API サーバーおよび MCP サーバーは `Bun.serve` および **Hono** フレームワークを採用します。
   - 固有の非標準 API や特定のランタイム依存を避け、`Request`, `Response`, `fetch` などの Web標準 API / Web Standard Response に準拠して実装してください。これにより、ローカル (`bun serve`) とクラウド・エッジ (Cloudflare Workers 等) の双方向でそのまま稼働可能にします。
 - **環境設定管理 (`src/config/`)**:
-  - `local.ts` (`getLocalEnv`) で `process.env` から、`cloudflare.ts` (`getCloudflareEnv`) で Cloudflare Workers Bindings からそれぞれ生の環境変数を `rawSchema` / `RawConfig` (`schema.ts`) 型のオブジェクトとして回収し、`index.ts` の `buildConfig` (`schema.ts`) で URL 補完・Valibot パースを行い設定オブジェクトを組み立てて返却します。
+  - `@me-builder/shared` が提供する `getEnv` 関数を用いて、Cloudflare Workers Bindings (`c.env`) およびローカル環境 (`process.env`) の差分を吸収し、生の環境変数を取得・URL 補完・Valibot パースを行い設定オブジェクトを組み立てて返却します。
+
 - **LINE Webhook 自動登録機能**:
   - API サーバー起動時 (`src/index.ts`) または CLI スクリプト (`bun run register:webhook`) の実行時、`LINE_CHANNEL_ACCESS_TOKEN` および `LINE_WEBHOOK_URL` (または `BASE_URL`) が環境変数として与えられている場合、公式 SDK (`@line/bot-sdk`) の `MessagingApiClient.setWebhookEndpoint` を用いて自動的に LINE Messaging API へ Webhook Endpoint URL を登録・更新します。
   - 環境変数が未設定の場合は自動登録処理がログ出力とともに安全にスキップされます。

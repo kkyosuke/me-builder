@@ -1,26 +1,15 @@
 import { getEnv } from "@me-builder/shared";
 import * as v from "valibot";
+import { type WorkerConfig, WorkerConfigSchema } from "./schema";
 
-export const McpConfigSchema = v.object({
-  port: v.pipe(
-    v.optional(v.string(), "3001"),
-    v.transform((val) => Number(val) || 3001),
-  ),
-  environment: v.optional(v.string(), "development"),
-  baseDomain: v.optional(v.string()),
-  baseUrl: v.optional(v.string()),
-  apiUrl: v.optional(v.string()),
-});
-
-export type McpConfig = v.InferOutput<typeof McpConfigSchema>;
+export { WorkerConfigSchema, type WorkerConfig };
 
 /**
- * MCP サーバーの環境変数を取得・整理し、Valibot で検証・整形した設定オブジェクトを生成します。
- * Hono の c.env や process.env から値を取得します。
+ * Worker アプリケーションの環境設定を取得・パースして返却します。
+ * Cloudflare Workers の c.env や process.env の差分を @me-builder/shared の getEnv で吸収します。
  */
-export function getMcpConfig(env?: Record<string, unknown>): McpConfig {
+export function getWorkerConfig(env?: Record<string, unknown>): WorkerConfig {
   const rawEnvironment = getEnv(["ENVIRONMENT", "NODE_ENV"], env);
-  const rawPort = getEnv(["MCP_PORT", "PORT"], env);
   const rawBaseDomain = getEnv("BASE_DOMAIN", env);
   let rawBaseUrl = getEnv("BASE_URL", env);
   let rawApiUrl = getEnv("API_URL", env);
@@ -28,9 +17,9 @@ export function getMcpConfig(env?: Record<string, unknown>): McpConfig {
   if ((!rawBaseUrl || rawBaseUrl === "/") && rawBaseDomain) {
     const domain = rawBaseDomain.startsWith("http")
       ? rawBaseDomain
-      : rawBaseDomain.startsWith("mcp.")
+      : rawBaseDomain.startsWith("worker.")
         ? `https://${rawBaseDomain}`
-        : `https://mcp.${rawBaseDomain}`;
+        : `https://worker.${rawBaseDomain}`;
     rawBaseUrl = domain;
   }
 
@@ -44,14 +33,13 @@ export function getMcpConfig(env?: Record<string, unknown>): McpConfig {
   }
 
   const rawConfig = {
-    port: rawPort,
     environment: rawEnvironment,
     baseDomain: rawBaseDomain,
     baseUrl: rawBaseUrl,
     apiUrl: rawApiUrl,
   };
 
-  return v.parse(McpConfigSchema, rawConfig);
+  return v.parse(WorkerConfigSchema, rawConfig);
 }
 
-export const config = getMcpConfig();
+export const config = getWorkerConfig();
