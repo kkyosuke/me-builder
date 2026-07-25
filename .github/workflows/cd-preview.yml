@@ -8,6 +8,9 @@ on:
       - opened
       - synchronize
       - reopened
+  push:
+    branches-ignore:
+      - main
 
 permissions:
   contents: read
