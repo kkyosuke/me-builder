@@ -1,11 +1,11 @@
 import { line } from "@me-builder/lib";
+import type { d1 } from "@me-builder/lib";
 import {
   type Message,
   type MessageBatch,
   type WebhookQueueMessage,
   logger,
 } from "@me-builder/shared";
-import type { d1 } from "@me-builder/lib";
 import type { WorkerConfig } from "../config";
 import { processLineWebhook } from "./feature/line";
 

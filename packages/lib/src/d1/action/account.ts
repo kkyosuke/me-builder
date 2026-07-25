@@ -1,5 +1,5 @@
-import { and, eq } from "drizzle-orm";
 import { logger } from "@me-builder/shared";
+import { and, eq } from "drizzle-orm";
 import type { D1Client } from "../client";
 import { accountIdentities, accounts } from "../schema/account";
 
@@ -78,12 +78,16 @@ export async function upsertIdentity(
     ]);
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : String(err);
-    if (errorMsg.includes("UNIQUE constraint failed") || errorMsg.includes("D1_ERROR") || errorMsg.includes("SQLITE_CONSTRAINT")) {
+    if (
+      errorMsg.includes("UNIQUE constraint failed") ||
+      errorMsg.includes("D1_ERROR") ||
+      errorMsg.includes("SQLITE_CONSTRAINT")
+    ) {
       logger.warn(
         { err, providerAccountId: input.providerAccountId },
         "Unique constraint violation during upsert, fetching existing identity",
       );
-      
+
       const existing = await db
         .select({
           account: accounts,

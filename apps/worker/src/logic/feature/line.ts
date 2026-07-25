@@ -1,4 +1,4 @@
-import { line, d1 } from "@me-builder/lib";
+import { d1, line } from "@me-builder/lib";
 import { logger } from "@me-builder/shared";
 import type { WorkerConfig } from "../../config";
 
@@ -37,7 +37,10 @@ export async function processLineWebhook(
     }
 
     if (!account) {
-      logger.warn({ providerAccountId }, "[LINE Webhook] Account identity not found or created. Skipping message.");
+      logger.warn(
+        { providerAccountId },
+        "[LINE Webhook] Account identity not found or created. Skipping message.",
+      );
       continue;
     }
 

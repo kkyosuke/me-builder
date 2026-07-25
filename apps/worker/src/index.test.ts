@@ -1,15 +1,36 @@
-import type { Message, MessageBatch, WebhookQueueMessage } from "@me-builder/shared";
 import type { D1Database } from "@cloudflare/workers-types";
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import type { Message, MessageBatch, WebhookQueueMessage } from "@me-builder/shared";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import worker from "./index";
 import { handleQueueBatch } from "./logic/webhook";
 
-import { line } from "@me-builder/lib";
+import { d1, line } from "@me-builder/lib";
 
 const mockReplyMessage = vi.fn().mockResolvedValue({});
 vi.spyOn(line.client, "create").mockReturnValue({
   replyMessage: mockReplyMessage,
 } as unknown as ReturnType<typeof line.client.create>);
+
+vi.spyOn(d1.action.account, "upsertIdentity").mockResolvedValue({
+  account: {
+    id: "acc-123",
+    status: "active",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    deletedAt: null,
+    isDeleted: false,
+  },
+  identity: {
+    id: "ident-123",
+    accountId: "acc-123",
+    provider: "line",
+    providerAccountId: "test-user",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    deletedAt: null,
+    isDeleted: false,
+  },
+});
 
 describe("Worker Queue Handler", () => {
   beforeEach(() => {
@@ -26,7 +47,14 @@ describe("Worker Queue Handler", () => {
         source: "line",
         receivedAt: "2026-07-25T12:00:00Z",
         payload: {
-          events: [{ type: "message", replyToken: "tok", message: { type: "text", text: "hi" } }],
+          events: [
+            {
+              type: "message",
+              replyToken: "tok",
+              message: { type: "text", text: "hi" },
+              source: { type: "user", userId: "test-user" },
+            },
+          ],
         },
       },
       ack: mockAck,
@@ -41,8 +69,8 @@ describe("Worker Queue Handler", () => {
       retryAll: vi.fn(),
     } as unknown as MessageBatch<WebhookQueueMessage>;
 
-    const mockDb = {} as any;
-    
+    const mockDb = {} as unknown as d1.Client;
+
     await handleQueueBatch(batch, mockDb, {
       environment: "test",
       lineChannelAccessToken: "test-token",

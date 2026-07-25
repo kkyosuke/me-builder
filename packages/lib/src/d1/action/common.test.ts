@@ -1,3 +1,4 @@
+import path from "node:path";
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
@@ -11,7 +12,7 @@ function createTestDb(): D1Client {
   const sqlite = new Database(":memory:");
   const db = drizzle(sqlite, { schema });
   // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-  migrate(db as any, { migrationsFolder: "./drizzle" });
+  migrate(db as any, { migrationsFolder: path.resolve(__dirname, "../../../drizzle") });
   return db as unknown as D1Client;
 }
 

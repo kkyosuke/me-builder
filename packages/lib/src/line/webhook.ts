@@ -1,7 +1,6 @@
-import { logger } from "@me-builder/shared";
 import type { webhook as lineWebhook } from "@line/bot-sdk";
+import { logger } from "@me-builder/shared";
 import { type LineClientConfig, client } from "./client";
-
 
 /**
  * LINE Messaging API SDK (@line/bot-sdk) を使用して Webhook Endpoint URL を登録・更新します。

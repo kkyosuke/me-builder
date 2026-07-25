@@ -1,3 +1,4 @@
+import path from "node:path";
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
@@ -10,7 +11,7 @@ function createTestDb(): D1Client {
   const sqlite = new Database(":memory:");
   const db = drizzle(sqlite, { schema });
   // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-  migrate(db as any, { migrationsFolder: "./drizzle" });
+  migrate(db as any, { migrationsFolder: path.resolve(__dirname, "../../../drizzle") });
 
   Object.defineProperty(db, "batch", {
     value: async (queries: readonly unknown[]) => {
@@ -38,7 +39,7 @@ describe("upsertIdentity", () => {
     expect(result.account.status).toBe("active");
     expect(result.identity.accountId).toBe(result.account.id);
     expect(result.identity.provider).toBe("line");
-    expect(result.identity.providerAccountId).toBe("U12345678");
+    expect(result.identity.providerAccountId).toBe("line_user_123");
   });
 
   it("should update and return existing account and identity on second call", async () => {

@@ -23,8 +23,8 @@ describe("line.webhook.parseEvents", () => {
   it("returns events array for valid payload", () => {
     const payload = {
       events: [
-        { type: "message", replyToken: "token-123", message: { type: "text", text: "hello" } }
-      ]
+        { type: "message", replyToken: "token-123", message: { type: "text", text: "hello" } },
+      ],
     };
     expect(line.webhook.parseEvents(payload)).toEqual(payload.events);
   });
