@@ -9,10 +9,14 @@
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "test": "vitest run",
-    "ci": "bun run lint && bun run typecheck && bun run test && bun run build"
+    "ci": "bun run lint && bun run typecheck && bun run test && bun run build",
+    "task": "task",
+    "deploy:preview": "bun --filter '*' deploy:preview",
+    "deploy:production": "bun --filter '*' deploy:production"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.8.3",
+    "@go-task/cli": "^3.52.0",
     "typescript": "^5.4.5",
     "vitest": "^1.6.0",
     "wrangler": "^4.114.0"
