@@ -32,7 +32,13 @@ export async function processLineWebhook(
           { err, providerAccountId },
           "[LINE Webhook] Failed to upsert account identity",
         );
+        continue;
       }
+    }
+
+    if (!account) {
+      logger.warn({ providerAccountId }, "[LINE Webhook] Account identity not found or created. Skipping message.");
+      continue;
     }
 
     if (event.type === "message" && event.message.type === "text" && event.replyToken) {

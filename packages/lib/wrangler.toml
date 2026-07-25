@@ -1,0 +1,21 @@
+name = "me-builder-lib"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "me-builder-db-local"
+database_id = "me-builder-db-local-id"
+migrations_dir = "drizzle"
+
+[env.preview]
+[[env.preview.d1_databases]]
+binding = "DB"
+database_name = "me-builder-db-preview"
+database_id = "me-builder-db-preview-id"
+migrations_dir = "drizzle"
+
+[env.production]
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "me-builder-db-production"
+database_id = "me-builder-db-production-id"
+migrations_dir = "drizzle"

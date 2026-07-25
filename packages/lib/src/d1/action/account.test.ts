@@ -1,5 +1,6 @@
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
+import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { describe, expect, it } from "vitest";
 import type { D1Client } from "../client";
 import * as schema from "../schema";
@@ -7,35 +8,9 @@ import { upsertIdentity } from "./account";
 
 function createTestDb(): D1Client {
   const sqlite = new Database(":memory:");
-  sqlite.exec(`
-    CREATE TABLE accounts (
-      id TEXT PRIMARY KEY NOT NULL,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL,
-      deleted_at INTEGER,
-      is_deleted INTEGER NOT NULL DEFAULT 0,
-      status TEXT NOT NULL DEFAULT 'active'
-    );
-  `);
-  sqlite.exec(`
-    CREATE TABLE account_identities (
-      id TEXT PRIMARY KEY NOT NULL,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL,
-      deleted_at INTEGER,
-      is_deleted INTEGER NOT NULL DEFAULT 0,
-      account_id TEXT NOT NULL REFERENCES accounts(id),
-      provider TEXT NOT NULL,
-      provider_account_id TEXT NOT NULL
-    );
-  `);
-  sqlite.exec(`
-    CREATE UNIQUE INDEX provider_account_active_idx
-    ON account_identities (provider, provider_account_id)
-    WHERE is_deleted = 0;
-  `);
-
   const db = drizzle(sqlite, { schema });
+  // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+  migrate(db as any, { migrationsFolder: "./drizzle" });
 
   Object.defineProperty(db, "batch", {
     value: async (queries: readonly unknown[]) => {

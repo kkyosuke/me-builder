@@ -1,5 +1,6 @@
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
+import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { describe, expect, it } from "vitest";
 import type { D1Client } from "../client";
 import * as schema from "../schema";
@@ -8,17 +9,10 @@ import { softDelete } from "./common";
 
 function createTestDb(): D1Client {
   const sqlite = new Database(":memory:");
-  sqlite.exec(`
-    CREATE TABLE accounts (
-      id TEXT PRIMARY KEY NOT NULL,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL,
-      deleted_at INTEGER,
-      is_deleted INTEGER NOT NULL DEFAULT 0,
-      status TEXT NOT NULL DEFAULT 'active'
-    );
-  `);
-  return drizzle(sqlite, { schema }) as unknown as D1Client;
+  const db = drizzle(sqlite, { schema });
+  // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+  migrate(db as any, { migrationsFolder: "./drizzle" });
+  return db as unknown as D1Client;
 }
 
 describe("softDelete common action", () => {

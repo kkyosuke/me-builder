@@ -1,4 +1,5 @@
 import { and, eq } from "drizzle-orm";
+import { logger } from "@me-builder/shared";
 import type { D1Client } from "../client";
 import { accountIdentities, accounts } from "../schema/account";
 
@@ -70,10 +71,42 @@ export async function upsertIdentity(
     isDeleted: false,
   };
 
-  await db.batch([
-    db.insert(accounts).values(account),
-    db.insert(accountIdentities).values(identity),
-  ]);
+  try {
+    await db.batch([
+      db.insert(accounts).values(account),
+      db.insert(accountIdentities).values(identity),
+    ]);
+  } catch (err: unknown) {
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    if (errorMsg.includes("UNIQUE constraint failed") || errorMsg.includes("D1_ERROR") || errorMsg.includes("SQLITE_CONSTRAINT")) {
+      logger.warn(
+        { err, providerAccountId: input.providerAccountId },
+        "Unique constraint violation during upsert, fetching existing identity",
+      );
+      
+      const existing = await db
+        .select({
+          account: accounts,
+          identity: accountIdentities,
+        })
+        .from(accountIdentities)
+        .innerJoin(accounts, eq(accountIdentities.accountId, accounts.id))
+        .where(
+          and(
+            eq(accountIdentities.provider, input.provider),
+            eq(accountIdentities.providerAccountId, input.providerAccountId),
+            eq(accountIdentities.isDeleted, false),
+            eq(accounts.isDeleted, false),
+          ),
+        )
+        .get();
+
+      if (existing) {
+        return existing;
+      }
+    }
+    throw err;
+  }
 
   return { account, identity };
 }
