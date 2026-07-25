@@ -19,11 +19,13 @@ export async function processWebhookMessage(
   message: Message<WebhookQueueMessage>,
   workerConfig?: WorkerConfig,
 ): Promise<void> {
+  const messages = line.webhook.extractMessages(message.body.payload);
   logger.info(
     {
       id: message.id,
       timestamp: message.timestamp,
       event: message.body,
+      messages: messages.length > 0 ? messages : undefined,
     },
     "Processing webhook message from queue",
   );

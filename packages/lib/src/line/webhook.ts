@@ -41,6 +41,34 @@ export async function register(
 }
 
 /**
+ * LINE Webhook ペイロードからテキストメッセージを抽出します。
+ */
+export function extractMessages(payload: unknown): string[] {
+  if (!payload || typeof payload !== "object" || payload === null) {
+    return [];
+  }
+  const events = (payload as Record<string, unknown>).events;
+  if (!Array.isArray(events)) {
+    return [];
+  }
+  const messages: string[] = [];
+  for (const event of events) {
+    if (
+      event &&
+      typeof event === "object" &&
+      event.type === "message" &&
+      event.message &&
+      typeof event.message === "object" &&
+      event.message.type === "text" &&
+      typeof event.message.text === "string"
+    ) {
+      messages.push(event.message.text);
+    }
+  }
+  return messages;
+}
+
+/**
  * LINE Webhook のイベントペイロードを解析し、メッセージイベントの replyToken を用いて同じ内容を返信します。
  */
 export async function handleEvent(
@@ -99,7 +127,7 @@ export async function handleEvent(
         });
         result.repliedCount++;
         logger.info(
-          { replyToken, textLength: text.length },
+          { replyToken, text, textLength: text.length },
           "[LINE Reply] Echo reply sent successfully via LINE Messaging API",
         );
       } catch (error) {
@@ -120,4 +148,5 @@ export async function handleEvent(
 export const webhook = {
   register,
   handleEvent,
+  extractMessages,
 };
