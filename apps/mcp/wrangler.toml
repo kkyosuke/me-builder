@@ -23,6 +23,9 @@ ENVIRONMENT = "preview"
 
 [env.production]
 name = "me-builder-mcp-production"
+routes = [
+  { pattern = "mcp.kagami.kyosuke.dev", custom_domain = true }
+]
 
 [env.production.vars]
 ENVIRONMENT = "production"

@@ -23,6 +23,9 @@ ENVIRONMENT = "preview"
 
 [env.production]
 name = "me-builder-api-production"
+routes = [
+  { pattern = "api.kagami.kyosuke.dev", custom_domain = true }
+]
 
 [env.production.vars]
 ENVIRONMENT = "production"

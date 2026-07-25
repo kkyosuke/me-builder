@@ -139,8 +139,12 @@ flowchart TD
       - API (`apps/api`): `api.stg.kagami.kyosuke.dev`
       - MCP (`apps/mcp`): `mcp.stg.kagami.kyosuke.dev`
   - **本番環境 (`Production`)**:
-    - `wrangler.toml` 内の `env.production` ターゲット（`me-builder-api-production`, `me-builder-mcp-production`, `me-builder-web-production`）。
+    - `wrangler.toml` 内の `env.production` ターゲット（`me-builder-api-production`, `me-builder-mcp-production`, `me-builder-web`）。
     - `main` ブランチマージ時に、CI/CD パイプライン経由で `wrangler deploy --env production` を実行し本番環境へデプロイ。
+    - **カスタムドメイン・ルーティング配置**:
+      - UI (`apps/web`): `kagami.kyosuke.dev`
+      - API (`apps/api`): `api.kagami.kyosuke.dev`
+      - MCP (`apps/mcp`): `mcp.kagami.kyosuke.dev`
 
 ## 7. 関連ドキュメント
 
