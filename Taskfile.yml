@@ -33,3 +33,29 @@ tasks:
     desc: 'Build all applications and packages'
     cmds:
       - bun --filter '*' build
+
+  typecheck:
+    desc: 'Run TypeScript typecheck on all applications and packages'
+    cmds:
+      - bun run typecheck
+
+  lint:
+    desc: 'Run Biome check on the codebase'
+    cmds:
+      - bun run lint
+
+  lint:fix:
+    desc: 'Fix Biome lint and format issues'
+    cmds:
+      - bun run lint:fix
+
+  test:
+    desc: 'Run tests using Vitest'
+    cmds:
+      - bun run test
+
+  ci:
+    desc: 'Run full CI checks locally (lint, typecheck, test, build)'
+    cmds:
+      - bun run ci
+

@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite --port 5173",
     "build": "tsc && vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --dir .",
     "preview": "vite preview"
   },
   "dependencies": {

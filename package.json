@@ -1,16 +1,19 @@
 {
   "name": "me-builder",
   "private": true,
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
+  "workspaces": ["apps/*", "packages/*"],
   "scripts": {
     "dev": "bun --filter '*' dev",
     "build": "bun --filter '*' build",
-    "lint": "bun --filter '*' lint"
+    "typecheck": "bun --filter '*' typecheck",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "test": "vitest run",
+    "ci": "bun run lint && bun run typecheck && bun run test && bun run build"
   },
   "devDependencies": {
-    "typescript": "^5.4.5"
+    "@biomejs/biome": "^1.8.3",
+    "typescript": "^5.4.5",
+    "vitest": "^1.6.0"
   }
 }

@@ -1,0 +1,35 @@
+name: CI / Lint
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/**'
+      - 'packages/**'
+      - 'biome.json'
+      - 'package.json'
+      - 'bun.lock'
+      - '.github/workflows/ci-lint.yml'
+      - '.github/actions/**'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'apps/**'
+      - 'packages/**'
+      - 'biome.json'
+      - 'package.json'
+      - 'bun.lock'
+      - '.github/workflows/ci-lint.yml'
+      - '.github/actions/**'
+
+jobs:
+  lint:
+    name: Lint & Lockfile Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-bun-workspace
+      - name: Biome Lint & Format Check
+        run: bun run lint

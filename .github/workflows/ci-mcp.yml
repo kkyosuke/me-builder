@@ -1,0 +1,37 @@
+name: CI / MCP
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/mcp/**'
+      - 'packages/shared/**'
+      - 'package.json'
+      - 'bun.lock'
+      - 'tsconfig.json'
+      - '.github/workflows/ci-mcp.yml'
+      - '.github/actions/**'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'apps/mcp/**'
+      - 'packages/shared/**'
+      - 'package.json'
+      - 'bun.lock'
+      - 'tsconfig.json'
+      - '.github/workflows/ci-mcp.yml'
+      - '.github/actions/**'
+
+jobs:
+  mcp:
+    name: MCP Server CI
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-bun-workspace
+      - name: Type Check
+        run: bun --filter @me-builder/mcp typecheck
+      - name: Build Check
+        run: bun --filter @me-builder/mcp build
