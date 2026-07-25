@@ -42,6 +42,7 @@ flowchart TD
             Pages["Cloudflare Pages<br/>(Web / Admin Frontend)"]
             WorkersAPI["Cloudflare Workers<br/>(API Server)"]
             WorkersMCP["Cloudflare Workers<br/>(MCP Server)"]
+            WorkersWorker["Cloudflare Workers<br/>(Queue Worker)"]
         end
 
         subgraph Storage["データ & AI層"]
@@ -49,6 +50,7 @@ flowchart TD
             Vectorize[("Cloudflare Vectorize<br/>(Vector Search DB)")]
             R2[("Cloudflare R2<br/>(Object Storage)")]
             KV[("Cloudflare KV<br/>(Cache / Session / KV)")]
+            Queues[("Cloudflare Queues<br/>(Webhook Message Queue)")]
             DO["Cloudflare Durable Objects<br/>(Stateful / Realtime Session)"]
             WorkersAI["Cloudflare Workers AI<br/>(Embedding / LLM Inference)"]
         end
@@ -62,6 +64,9 @@ flowchart TD
     CF_Sec --> WorkersAPI
     CF_Sec --> WorkersMCP
 
+    WorkersAPI --> Queues
+    Queues --> WorkersWorker
+
     WorkersAPI --> D1
     WorkersAPI --> R2
     WorkersAPI --> KV
@@ -74,7 +79,7 @@ flowchart TD
     WorkersMCP --> KV
 
     classDef cfFill fill:#f6821f,stroke:#333,stroke-width:1px,color:#fff;
-    class Pages,WorkersAPI,WorkersMCP,D1,Vectorize,R2,KV,DO,WorkersAI cfFill;
+    class Pages,WorkersAPI,WorkersMCP,WorkersWorker,D1,Vectorize,R2,KV,Queues,DO,WorkersAI cfFill;
 ```
 
 ## 4. コンポーネント別の役割と選定
@@ -84,6 +89,8 @@ flowchart TD
 | **フロントエンド** | **Cloudflare Pages** | Webアプリケーションおよび管理者画面のビルド・ホスティング。高速なエッジ配信と自動プレビューデプロイを実現。 |
 | **API サーバー** | **Cloudflare Workers** | HTTP / REST / Webhook API（LINE連携、認証、データ登録等）の処理。軽量な TypeScript/Hono フレームワーク等で構築。 |
 | **MCP サーバー** | **Cloudflare Workers** | 外部 AI エージェント向け MCP (Model Context Protocol) 端点の提供。SSE (Server-Sent Events) および HTTP 通信を直接処理。 |
+| **キューワーカー** | **Cloudflare Workers** | Cloudflare Queues から非同期メッセージを受信・消費・バックグラウンド処理する非同期ワーカー。 |
+| **メッセージキュー** | **Cloudflare Queues** | Webhook 等のイベントを安全に保持・非同期配送するサーバーレスメッセージキュー。 |
 | **構造化データストア** | **Cloudflare D1** | サーバーレスリレーショナルデータベース (SQLite)。`Account` 情報、`Brain` メタデータ、`Access Label`、`Access Profile`、監査ログを保持。 |
 | **ベクトル検索ストア** | **Cloudflare Vectorize** | 完全マネージドなベクトルデータベース。`Brain Item` の埋め込みベクトル（Embedding）を保存し、コサイン類似度等による高速セマンティック検索を提供。 |
 | **メディアストレージ** | **Cloudflare R2** | S3互換のオブジェクトストレージ。ユーザーが投稿・回答した写真、イラスト、動画、音声などのメディア原本データを保存（エグレス料金ゼロ）。 |
@@ -106,9 +113,13 @@ flowchart TD
    - MCPリクエスト受領時、Cloudflare Workers は D1 および KV に保持された `Access Profile` と `Access Label` を照合し、認可範囲内の情報のみを返却します。
    - すべての閲覧・検索リクエストは D1 または KV に監査ログとして非同期書き込みされます。
 
+4. **非同期 Webhook メッセージ処理**
+   - Webhook リクエスト（LINE 等）は API サーバーで受信後、直ちに `Cloudflare Queues` へ投入され 200/202 応答を返却します。
+   - バックグラウンドの Queue Worker (`apps/worker`) がキューから非同期バッチメッセージを取り出し順次処理します。
+
 ## 6. 開発・運用環境方針
 
-開発基盤には **Bun Workspaces** を用いたモノレポ構造（`apps/web`, `apps/api`）を採用し、ローカル開発・PRプレビュー・本番環境で一貫した開発体験と安全なデプロイを実現します。
+開発基盤には **Bun Workspaces** を用いたモノレポ構造（`apps/web`, `apps/api`, `apps/mcp`, `apps/worker`）を採用し、ローカル開発・PRプレビュー・本番環境で一貫した開発体験と安全なデプロイを実現します。
 
 - **モノレポ構成 (`Bun Workspaces`)**:
   ```text
@@ -119,14 +130,17 @@ flowchart TD
   ├── apps/
   │   ├── web/           # Frontend UI (React + Vite + TypeScript, wrangler.toml)
   │   ├── api/           # API Server (Bun.serve / Cloudflare Workers, wrangler.toml)
-  │   └── mcp/           # MCP Server (Bun.serve / Cloudflare Workers, wrangler.toml)
+  │   ├── mcp/           # MCP Server (Bun.serve / Cloudflare Workers, wrangler.toml)
+  │   └── worker/        # Queue Worker (Cloudflare Workers, wrangler.toml)
   └── packages/
       └── shared/        # 共有型定義 & ユーティリティ (純粋な .ts ソース直参照)
   ```
   - `apps/web`: React (Vite + TypeScript) によるフロントエンド。`apps/web/wrangler.toml` により Pages 設定および環境別設定（local, preview, production）を管理。
   - `apps/api`: `Bun.serve` および Web標準 API 準拠の **Hono** フレームワークを採用。`apps/api/wrangler.toml` により Cloudflare Workers の環境別設定（local, preview, production）を制御。
   - `apps/mcp`: Cloudflare Workers / Bun 上で動作する MCP (Model Context Protocol) サーバー。`apps/mcp/wrangler.toml` により Workers の環境別設定を制御。
+  - `apps/worker`: Cloudflare Queues メッセージを非同期処理する Cloudflare Workers ワーカー。`apps/worker/wrangler.toml` により Worker の環境別設定を制御。
   - `packages/shared`: 全アプリケーション間で共有されるドメイン型定義およびユーティリティライブラリ。
+
 - **環境分類と Wrangler 構成 (`Local` / `Preview` / `Production`)**:
   - **ローカル開発環境 (`Local`)**:
     - `wrangler.toml` 内の `env.local` ターゲット（`me-builder-api-local`, `me-builder-mcp-local`, `me-builder-web-local`）。

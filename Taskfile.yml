@@ -8,11 +8,12 @@ tasks:
       - bun install
 
   dev:
-    desc: 'Start all development servers (UI, API, MCP)'
+    desc: 'Start all development servers (UI, API, MCP, Worker)'
     deps:
       - dev:ui
       - dev:api
       - dev:mcp
+      - dev:worker
 
   dev:ui:
     desc: 'Start UI development server (React / Vite)'
@@ -28,6 +29,12 @@ tasks:
     desc: 'Start MCP development server'
     cmds:
       - bun --filter @me-builder/mcp dev
+
+  dev:worker:
+    desc: 'Start Worker development server'
+    cmds:
+      - bun --filter @me-builder/worker dev
+
 
   build:
     desc: 'Build all applications and packages'
@@ -62,9 +69,16 @@ tasks:
   deploy:preview:
     desc: 'Deploy all applications to preview environment via Wrangler'
     cmds:
-      - bun --filter '*' deploy:preview
+      - bun --filter @me-builder/api deploy:preview
+      - bun --filter @me-builder/worker deploy:preview
+      - bun --filter @me-builder/mcp deploy:preview
+      - bun --filter @me-builder/web deploy:preview
 
   deploy:production:
     desc: 'Deploy all applications to production environment via Wrangler'
     cmds:
-      - bun --filter '*' deploy:production
+      - bun --filter @me-builder/api deploy:production
+      - bun --filter @me-builder/worker deploy:production
+      - bun --filter @me-builder/mcp deploy:production
+      - bun --filter @me-builder/web deploy:production
+

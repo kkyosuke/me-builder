@@ -1,13 +1,7 @@
 import * as v from "valibot";
+import { type WebConfig, WebConfigSchema } from "./schema";
 
-export const WebConfigSchema = v.object({
-  environment: v.optional(v.string(), "development"),
-  baseDomain: v.optional(v.string()),
-  baseUrl: v.optional(v.string()),
-  apiUrl: v.optional(v.string()),
-});
-
-export type WebConfig = v.InferOutput<typeof WebConfigSchema>;
+export { WebConfigSchema, type WebConfig };
 
 /**
  * Web UI の環境変数を取得・整理し、Valibot で検証・整形した設定オブジェクトを生成します。

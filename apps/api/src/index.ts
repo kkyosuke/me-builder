@@ -1,4 +1,4 @@
-import { logger } from "@me-builder/shared";
+import { type Queue, type WebhookQueueMessage, logger } from "@me-builder/shared";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { config, getConfig } from "./config";
@@ -10,6 +10,7 @@ const app = new Hono<{
     LINE_CHANNEL_ACCESS_TOKEN?: string;
     LINE_WEBHOOK_URL?: string;
     BASE_URL?: string;
+    WEBHOOK_QUEUE?: Queue<WebhookQueueMessage>;
   };
 }>();
 
@@ -39,9 +40,28 @@ app.get("/api/health", (c) => {
   });
 });
 
-// LINE Webhook 受信エンドポイント
+// LINE Webhook 受信エンドポイント（受け取ったら Queue へ投入）
 app.post("/api/line/webhook", async (c) => {
-  return c.json({ status: "ok" });
+  const currentConfig = getConfig(c.env);
+  const body = await c.req.json().catch(() => ({}));
+  const event: WebhookQueueMessage = {
+    id: crypto.randomUUID(),
+    source: "line",
+    receivedAt: new Date().toISOString(),
+    payload: body,
+  };
+
+  if (currentConfig.webhookQueue) {
+    await currentConfig.webhookQueue.send(event);
+    logger.info({ id: event.id, source: event.source }, "Webhook event queued to WEBHOOK_QUEUE");
+  } else {
+    logger.warn(
+      { id: event.id, source: event.source },
+      "WEBHOOK_QUEUE binding not configured, skipping queue push",
+    );
+  }
+
+  return c.json({ status: "ok", queued: Boolean(currentConfig.webhookQueue), id: event.id });
 });
 
 // ルート
