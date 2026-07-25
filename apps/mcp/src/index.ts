@@ -7,6 +7,19 @@ const app = new Hono<{ Bindings: { ENVIRONMENT?: string; BASE_DOMAIN?: string } 
 
 app.use("*", cors());
 
+// グローバルエラーハンドラー (未捕捉例外を logger.error で出力)
+app.onError((err, c) => {
+  logger.error(
+    {
+      err,
+      method: c.req.method,
+      path: c.req.path,
+    },
+    "Unhandled exception in MCP server",
+  );
+  return c.json({ error: "Internal Server Error" }, 500);
+});
+
 // HTTP リクエストログミドルウェア (構造化 JSON ログ)
 app.use("*", async (c, next) => {
   const start = Date.now();
@@ -42,6 +55,7 @@ app.post("/messages", (c) => {
 
 logger.info(`MCP Server is running on http://localhost:${config.port}`);
 
+export { app };
 export default {
   port: config.port,
   fetch: app.fetch,

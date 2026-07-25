@@ -17,6 +17,19 @@ const app = new Hono<{
 // CORS を有効化
 app.use("*", cors());
 
+// グローバルエラーハンドラー (未捕捉例外を logger.error で出力)
+app.onError((err, c) => {
+  logger.error(
+    {
+      err,
+      method: c.req.method,
+      path: c.req.path,
+    },
+    "Unhandled exception in API server",
+  );
+  return c.json({ error: "Internal Server Error" }, 500);
+});
+
 // HTTP リクエストログミドルウェア (構造化 JSON ログ)
 app.use("*", async (c, next) => {
   const start = Date.now();
