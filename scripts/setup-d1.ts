@@ -1,7 +1,7 @@
 import { exec } from "node:child_process";
-import { promisify } from "node:util";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { promisify } from "node:util";
 
 const execAsync = promisify(exec);
 
@@ -53,7 +53,7 @@ async function main() {
   console.log("\nUpdating wrangler.toml files...");
 
   const rootDir = path.resolve(__dirname, "..");
-  
+
   for (const file of WRANGLER_FILES) {
     const filePath = path.join(rootDir, file);
     try {
@@ -61,14 +61,16 @@ async function main() {
       let updated = false;
 
       // preview用のDBブロックを置換
-      const previewRegex = /(database_name\s*=\s*"me-builder-db-preview"\s*\n\s*database_id\s*=\s*)"[^"]+"/g;
+      const previewRegex =
+        /(database_name\s*=\s*"me-builder-db-preview"\s*\n\s*database_id\s*=\s*)"[^"]+"/g;
       if (previewRegex.test(content)) {
         content = content.replace(previewRegex, `$1"${previewId}"`);
         updated = true;
       }
 
       // production用のDBブロックを置換
-      const prodRegex = /(database_name\s*=\s*"me-builder-db-production"\s*\n\s*database_id\s*=\s*)"[^"]+"/g;
+      const prodRegex =
+        /(database_name\s*=\s*"me-builder-db-production"\s*\n\s*database_id\s*=\s*)"[^"]+"/g;
       if (prodRegex.test(content)) {
         content = content.replace(prodRegex, `$1"${productionId}"`);
         updated = true;
