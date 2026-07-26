@@ -93,8 +93,9 @@ export async function initializeLiff(liffId: string | undefined): Promise<LiffSt
 /**
  * ID トークンを API へ送り、サーバー側で本人性を検証して Account を解決させます。
  *
- * `liff.getProfile()` の結果はクライアントの自称なのでサーバーは信頼しません。表示は
- * それで行いますが、Account の解決は必ずこの検証を通します。ID トークンはログへ出力しません。
+ * `liff.getProfile()` の結果は画面表示には使いますが（嘘をつけても自分の画面の表示が
+ * 変わるだけ）、Account の解決には使いません。サーバーはクライアントから送られた値を
+ * 検証できないため、識別子は署名付きの ID トークンで渡します。トークンはログへ出力しません。
  */
 export async function verifyLiffSession(apiUrl: string | undefined): Promise<LiffSessionState> {
   let token: string | null;

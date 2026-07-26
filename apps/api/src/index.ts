@@ -142,8 +142,9 @@ app.post("/api/line/webhook", async (c) => {
 
 // LIFF の ID トークンを検証し、対応する Account を解決するエンドポイント。
 //
-// クライアントが自称する liff.getProfile() の結果は信頼せず、ID トークンの検証で得た
-// sub だけを本人の識別子として使う。sub と ID トークンは画面にもログにも出さない。
+// 受け付けるのは ID トークンだけ。クライアントから送られてきた userId は
+// サーバー側で検証できないため識別子として使わない (なりすましを防ぐ)。
+// sub と ID トークンは画面にもログにも出さない。
 app.post("/api/line/liff/session", async (c) => {
   const currentConfig = getConfig(c.env);
 

@@ -91,7 +91,8 @@
   - LINE の `userId` は本人識別子です。**画面表示もログ出力も行わず**、表示は `displayName` と `pictureUrl` に限ります ([プロジェクト概要 §8](../../docs/project-overview.md#8-プライバシーと安全性))。ID トークンおよびアクセストークンもログへ出力しません。
 
 - **LIFF の ID トークン検証と Account の解決**:
-  - クライアントの `liff.getProfile()` の結果は**サーバー側で信頼しません**。本人の識別子は必ず ID トークンの検証で得た `sub` を使います。検証は `packages/lib` の `line.idToken.verify`（LINE の `POST /oauth2/v2.1/verify` へ委譲）で行い、`aud` が LINE Login チャネル ID と一致することを受け取り側でも確認します。
+  - **クライアントから送られてきた識別子は受け付けません。** `liff.getProfile()` が返す値そのものは LINE から取得した本物ですが、サーバー側では「LINE の API が返した値の転送」と「手で書かれた値」を区別できないため、`userId` を識別子として使うと他人になりすませます。本人の識別子は必ず ID トークンの検証で得た `sub` を使います。
+  - 用途で使い分けます。**画面表示**（`displayName` / `pictureUrl`）は `liff.getProfile()` の値でよく（嘘をつけても本人の画面の表示が変わるだけ）、**本人の識別・認可**は検証済みの `sub` だけを使います。検証は `packages/lib` の `line.idToken.verify`（LINE の `POST /oauth2/v2.1/verify` へ委譲）で行い、`aud` が LINE Login チャネル ID と一致することを受け取り側でも確認します。
   - エンドポイントは `POST /api/line/liff/session`。ロジックは `apps/api/src/logic/liff-session.ts` に置き、ルートは HTTP への変換だけを行います（`apps/worker` の `processLineWebhook` と同じ形）。
   - Account の解決は `d1.action.account.resolveAccountByLineLogin` に集約します。`line_login` の identity → 同じ値の `line` の identity（同一プロバイダーなら userId が一致する）の順に探し、後者で見つかった場合は `line_login` を同じ Account へ紐づけます。
   - **どちらも見つからない場合は Account を作らず 404 を返します。** アカウント作成の起点は LINE 公式アカウントの友だち追加です（[プロジェクト概要 §5](../../docs/project-overview.md#5-アカウントと本人識別)）。userId が一致しない構成での紐づけ手段は未設計です。
