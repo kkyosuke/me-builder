@@ -14,6 +14,8 @@
     "deploy:preview": "bun --filter '*' deploy:preview",
     "deploy:production": "bun --filter '*' deploy:production",
     "lint:exports": "knip",
+    "lint:md": "markdownlint-cli2 '**/*.md' '#**/node_modules/**' '#**/.bun/**' '#**/dist/**'",
+    "lint:md:links": "find . -name '*.md' -not -path '*/node_modules/*' -not -path '*/.bun/*' -exec markdown-link-check -q -c mlc_config.json {} \\;",
     "postinstall": "lefthook install"
   },
   "devDependencies": {
@@ -23,6 +25,8 @@
     "@go-task/cli": "^3.52.0",
     "knip": "^6.29.0",
     "lefthook": "^2.1.10",
+    "markdown-link-check": "^3.14.2",
+    "markdownlint-cli2": "^0.23.1",
     "typescript": "^5.4.5",
     "vitest": "^1.6.0",
     "wrangler": "^4.114.0"

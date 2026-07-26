@@ -6,12 +6,14 @@ export type LineClientConfig = LineConfig;
 /**
  * LINE Messaging API クライアントを生成します。
  */
-export function create(channelAccessToken: string): messagingApi.MessagingApiClient {
+function create(channelAccessToken: string): messagingApi.MessagingApiClient {
   return new messagingApi.MessagingApiClient({
     channelAccessToken,
   });
 }
 
-export const client = {
+export const client: {
+  create: (channelAccessToken: string) => messagingApi.MessagingApiClient;
+} = {
   create,
 };

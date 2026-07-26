@@ -20,7 +20,6 @@
 | [インフラ・システム構成](../docs/infrastructure-architecture.md) | Cloudflareを全面的に採用したインフラ基盤、システム構成、サービス配置 |
 | [PR作成手順書](../docs/pull-request-guidelines.md) | PRタイトルの命名規則、概要の書き方、作成前の準備・検証手順 |
 
-
 この表は各文書へのナビゲーションです。概念の定義そのものはリンク先だけに記載します。
 
 ## 作業フロー
