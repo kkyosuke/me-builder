@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "source_fingerprint": "sha256:c6beb3f6badb8b4289c47ecdb113ad54ed47557b2e1e1364077ad2d533d1d178",
+  "issues": [
+    {
+      "number": 1,
+      "title": "fix(api): LINE Webhook の x-line-signature 署名検証を追加",
+      "status": "todo",
+      "priority": "high",
+      "labels": ["security", "api"],
+      "dependson": [],
+      "related": [],
+      "parent": null,
+      "milestone": null,
+      "file": "001-fix-api-line-webhook-x-line-signature.md",
+      "created_at": "2026-07-26T06:45:37.372421Z",
+      "updated_at": "2026-07-26T06:45:37.372421Z"
+    }
+  ]
+}

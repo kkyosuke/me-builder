@@ -9,6 +9,7 @@ vi.mock("@line/bot-sdk", () => {
         replyMessage: replyMessageMock,
       })),
     },
+    validateSignature: vi.fn().mockReturnValue(false),
   };
 });
 

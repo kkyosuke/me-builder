@@ -3,6 +3,12 @@ main = "src/index.ts"
 compatibility_date = "2024-07-01"
 compatibility_flags = ["nodejs_compat"]
 
+# Secrets (vars には置かない / `wrangler secret put <NAME> --env <ENV>` または CD で配布する)
+#   - LINE_CHANNEL_ACCESS_TOKEN: LINE Messaging API の呼び出しに使用
+#   - LINE_CHANNEL_SECRET:       POST /api/line/webhook の x-line-signature 検証に使用
+#                                (production では未設定時に全リクエストを 401 で拒否する)
+# ローカル開発では apps/api/.env (bun) もしくは apps/api/.dev.vars (wrangler dev) に設定する
+
 [observability]
 enabled = true
 

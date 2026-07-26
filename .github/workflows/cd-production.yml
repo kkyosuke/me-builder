@@ -14,6 +14,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+      LINE_CHANNEL_SECRET: ${{ secrets.LINE_CHANNEL_SECRET }}
       BASE_DOMAIN: ${{ vars.BASE_DOMAIN }}
       VITE_BASE_DOMAIN: ${{ vars.BASE_DOMAIN }}
 
@@ -43,6 +44,18 @@ jobs:
         run: |
           echo "${LINE_CHANNEL_ACCESS_TOKEN}" | bun --cwd apps/api wrangler secret put LINE_CHANNEL_ACCESS_TOKEN --env production
           echo "${LINE_CHANNEL_ACCESS_TOKEN}" | bun --cwd apps/worker wrangler secret put LINE_CHANNEL_ACCESS_TOKEN --env production
+
+      # x-line-signature の検証を行う apps/api にのみチャネルシークレットを配布する
+      # 本番環境では未設定だと全ての Webhook リクエストが 401 になるため、
+      # 設定漏れをエラーとして扱いデプロイを失敗させる
+      - name: Sync LINE Channel Secret to Cloudflare Workers (Production)
+        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
+        run: |
+          if [ -z "${LINE_CHANNEL_SECRET}" ]; then
+            echo "::error::LINE_CHANNEL_SECRET が GitHub Secrets に設定されていません。本番環境では x-line-signature の検証に必須です。"
+            exit 1
+          fi
+          echo "${LINE_CHANNEL_SECRET}" | bun --cwd apps/api wrangler secret put LINE_CHANNEL_SECRET --env production
 
       - name: Register LINE Webhook (Production)
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' && env.LINE_CHANNEL_ACCESS_TOKEN != '' }}

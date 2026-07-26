@@ -14,3 +14,13 @@ yarn-debug.log*
 yarn-error.log*
 bun.lockb
 .DS_Store
+
+# Wrangler / Miniflare のローカル状態とローカルシークレット
+.wrangler
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+
+# usagi (セッション worktree とロックファイルは追跡しない / issue 本体はコミットする)
+.usagi/sessions
+.usagi/issues/.lock

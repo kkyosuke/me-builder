@@ -1,6 +1,45 @@
-import type { webhook as lineWebhook } from "@line/bot-sdk";
+import { type webhook as lineWebhook, validateSignature } from "@line/bot-sdk";
 import { logger } from "@me-builder/shared";
 import { type LineClientConfig, client } from "./client";
+
+/**
+ * LINE Webhook の署名検証に必要な入力。
+ * body は必ず受信した生のリクエストボディ文字列を渡すこと
+ * (JSON.parse したものを再度 JSON.stringify するとバイト列が変わり検証が壊れる)。
+ */
+export type VerifySignatureParams = {
+  /** 受信した生のリクエストボディ文字列 */
+  body: string;
+  /** LINE Developers コンソールで発行されるチャネルシークレット */
+  channelSecret: string;
+  /** リクエストの x-line-signature ヘッダ値 (欠落時は undefined / null) */
+  signature: string | null | undefined;
+};
+
+/**
+ * LINE Platform から送信された Webhook リクエストの x-line-signature を検証します。
+ *
+ * 公式 SDK (@line/bot-sdk) の `validateSignature` に委譲します。
+ * SDK 内部では node:crypto の `createHmac` / `timingSafeEqual` を用いており、
+ * `nodejs_compat` を有効化した Cloudflare Workers (workerd) 上でも動作することを確認済みです。
+ * そのため Web Crypto によるフォールバック実装は用意していません。
+ */
+function verifySignature({ body, channelSecret, signature }: VerifySignatureParams): boolean {
+  if (!channelSecret || !signature) {
+    return false;
+  }
+
+  try {
+    return validateSignature(body, channelSecret, signature);
+  } catch (error) {
+    // 署名値やチャネルシークレットそのものはログに出さない
+    logger.warn(
+      { errorName: error instanceof Error ? error.name : "UnknownError" },
+      "Failed to validate LINE webhook signature",
+    );
+    return false;
+  }
+}
 
 /**
  * LINE Messaging API SDK (@line/bot-sdk) を使用して Webhook Endpoint URL を登録・更新します。
@@ -84,8 +123,10 @@ export const webhook: {
   register: (config: LineClientConfig) => Promise<{ success: boolean; message: string }>;
   parseEvents: (payload: unknown) => lineWebhook.Event[];
   extractMessages: (payload: unknown) => string[];
+  verifySignature: (params: VerifySignatureParams) => boolean;
 } = {
   register,
   parseEvents,
   extractMessages,
+  verifySignature,
 };

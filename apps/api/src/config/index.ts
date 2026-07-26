@@ -12,6 +12,7 @@ export function getConfig(env?: Record<string, unknown>): ApiConfig {
   const rawEnvironment = getEnv(["ENVIRONMENT", "NODE_ENV"], env);
   const rawPort = getEnv("PORT", env);
   const rawLineChannelAccessToken = getEnv("LINE_CHANNEL_ACCESS_TOKEN", env);
+  const rawLineChannelSecret = getEnv("LINE_CHANNEL_SECRET", env);
   const rawBaseDomain = getEnv("BASE_DOMAIN", env);
   let rawBaseUrl = getEnv("BASE_URL", env);
 
@@ -37,6 +38,7 @@ export function getConfig(env?: Record<string, unknown>): ApiConfig {
     port: rawPort,
     environment: rawEnvironment,
     lineChannelAccessToken: rawLineChannelAccessToken,
+    lineChannelSecret: rawLineChannelSecret,
     baseDomain: rawBaseDomain,
     baseUrl: rawBaseUrl,
     lineWebhookUrl: rawLineWebhookUrl,
