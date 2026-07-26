@@ -16,35 +16,36 @@ export async function processLineWebhook(
   const apiClient = line.client.create(workerConfig.lineChannelAccessToken);
 
   for (const event of events) {
-    // ユーザー情報のUpsert処理
     const providerAccountId = event.source?.userId;
-    let account = null;
 
-    if (providerAccountId) {
-      try {
-        const result = await d1.action.account.upsertIdentity(db, {
-          provider: "line",
-          providerAccountId,
-        });
-        account = result.account;
-      } catch (err) {
-        logger.error(
-          { err, providerAccountId },
-          "[LINE Webhook] Failed to upsert account identity",
-        );
-        continue;
+    // 1. followイベント時はユーザー情報をUpsertする
+    if (event.type === "follow") {
+      if (providerAccountId) {
+        try {
+          await d1.action.account.upsertIdentity(db, {
+            provider: "line",
+            providerAccountId,
+          });
+          logger.info(
+            { providerAccountId },
+            "[LINE Webhook] Account identity upserted on follow event",
+          );
+        } catch (err) {
+          logger.error(
+            { err, providerAccountId },
+            "[LINE Webhook] Failed to upsert account identity on follow event",
+          );
+        }
       }
-    }
-
-    if (!account) {
-      logger.warn(
-        { providerAccountId },
-        "[LINE Webhook] Account identity not found or created. Skipping message.",
-      );
       continue;
     }
 
+    // 2. messageイベント時の処理
     if (event.type === "message" && event.message.type === "text" && event.replyToken) {
+      // NOTE: 今後DBにメッセージを保存する実装を追加する場合、
+      // ユーザーの内部ID(accountId)を取得するために SELECT または Lazy Upsert を行います。
+      // (例: メッセージInsert時に外部キー制約エラーが出たら catch して upsertIdentity してリトライする等)
+      // 現状はただのEchoなのでDB操作は行わず、そのまま返信します。
       await handleTextMessage(event.replyToken, event.message.text, apiClient);
     }
   }
