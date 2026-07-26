@@ -12,11 +12,17 @@
     "ci": "bun run lint && bun run typecheck && bun run test && bun run build",
     "task": "task",
     "deploy:preview": "bun --filter '*' deploy:preview",
-    "deploy:production": "bun --filter '*' deploy:production"
+    "deploy:production": "bun --filter '*' deploy:production",
+    "lint:exports": "knip",
+    "postinstall": "lefthook install"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.8.3",
+    "@commitlint/cli": "^21.2.1",
+    "@commitlint/config-conventional": "^21.2.0",
     "@go-task/cli": "^3.52.0",
+    "knip": "^6.29.0",
+    "lefthook": "^2.1.10",
     "typescript": "^5.4.5",
     "vitest": "^1.6.0",
     "wrangler": "^4.114.0"

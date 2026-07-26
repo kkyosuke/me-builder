@@ -1,0 +1,25 @@
+pre-commit:
+  commands:
+    lint:
+      glob: "*.{js,ts,jsx,tsx,json}"
+      run: bunx biome check --write --no-errors-on-unmatched --files-ignore-unknown=true {staged_files}
+      stage_fixed: true
+
+pre-push:
+  commands:
+    branch-name:
+      run: |
+        branch=$(git branch --show-current)
+        if [[ ! $branch =~ ^(feature|bugfix|hotfix|chore|docs|refactor|test)/[a-zA-Z0-9\-]+$ ]] && [[ "$branch" != "main" ]]; then
+          echo "Error: Branch name does not follow convention (feature/xxx, bugfix/xxx, etc.)"
+          exit 1
+        fi
+    typecheck:
+      run: bun run typecheck
+    test:
+      run: bun run test
+
+commit-msg:
+  commands:
+    commitlint:
+      run: bunx commitlint --edit {1}

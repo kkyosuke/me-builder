@@ -42,7 +42,7 @@ describe("API Server Webhook Queue", () => {
 
   it("handles unhandled exception with 500 status using app.onError", async () => {
     const testApp = new (await import("hono")).Hono();
-    testApp.onError((err, c) => c.json({ error: "Internal Server Error" }, 500));
+    testApp.onError((_err, c) => c.json({ error: "Internal Server Error" }, 500));
     testApp.get("/test-error", () => {
       throw new Error("Test error");
     });
