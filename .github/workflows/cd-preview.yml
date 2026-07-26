@@ -24,8 +24,15 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
       LINE_CHANNEL_SECRET: ${{ secrets.LINE_CHANNEL_SECRET }}
+      # LIFF Server API は LINE Login チャネルのチャネルアクセストークンを要求する。
+      # LINE_LOGIN_CHANNEL_ID は未設定でも LIFF ID の接頭辞から補完される。
+      LINE_LOGIN_CHANNEL_ID: ${{ vars.LINE_LOGIN_CHANNEL_ID }}
+      LINE_LOGIN_CHANNEL_SECRET: ${{ secrets.LINE_LOGIN_CHANNEL_SECRET }}
       BASE_DOMAIN: ${{ vars.BASE_DOMAIN }}
       VITE_BASE_DOMAIN: ${{ vars.BASE_DOMAIN }}
+      # Vite は GitHub Actions 上のビルドで値を埋め込むため、LIFF ID は Pages 側ではなくここで渡す。
+      # 未設定の場合は LIFF 初期化がスキップされる (画面は壊れない)。
+      VITE_LIFF_ID: ${{ vars.LIFF_ID }}
 
     steps:
       - uses: actions/checkout@v4
@@ -54,6 +61,13 @@ jobs:
           echo "${LINE_CHANNEL_ACCESS_TOKEN}" | bun --cwd apps/api wrangler secret put LINE_CHANNEL_ACCESS_TOKEN --env preview
           echo "${LINE_CHANNEL_ACCESS_TOKEN}" | bun --cwd apps/worker wrangler secret put LINE_CHANNEL_ACCESS_TOKEN --env preview
 
+      # LIFF ID は秘密情報ではないが、GitHub Environment の変数を単一の出所にするため
+      # wrangler secret として配布する (wrangler には var を後から入れるコマンドがない)。
+      - name: Sync LIFF ID to Cloudflare Workers (Preview)
+        if: ${{ env.CLOUDFLARE_API_TOKEN != '' && vars.LIFF_ID != '' }}
+        run: |
+          echo "${{ vars.LIFF_ID }}" | bun --cwd apps/worker wrangler secret put LIFF_ID --env preview
+
       # x-line-signature の検証を行う apps/api にのみチャネルシークレットを配布する。
       # 未設定だと環境を問わず全ての Webhook リクエストが 401 になるため、
       # 設定漏れをエラーとして扱いデプロイを失敗させる
@@ -73,6 +87,12 @@ jobs:
           BASE_DOMAIN: ${{ vars.BASE_DOMAIN }}
         run: |
           bun --cwd apps/api scripts/register-webhook.ts
+
+      # デプロイ済みの URL を LIFF アプリのエンドポイント URL へ反映する
+      - name: Register LIFF Endpoint (Preview)
+        if: ${{ env.CLOUDFLARE_API_TOKEN != '' && env.LINE_LOGIN_CHANNEL_SECRET != '' }}
+        run: |
+          bun --cwd apps/web scripts/register-liff.ts preview
 
 
 

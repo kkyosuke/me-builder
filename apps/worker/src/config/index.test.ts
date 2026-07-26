@@ -21,4 +21,10 @@ describe("Worker Config", () => {
     expect(config.apiUrl).toBe("https://api.stg.kagami.kyosuke.dev");
     expect(config.lineChannelAccessToken).toBe("test-token-123");
   });
+
+  it("LIFF_ID を設定すると liffId が取得され、未設定・空文字なら undefined になること", () => {
+    expect(getWorkerConfig({ LIFF_ID: "1234567890-abcdefgh" }).liffId).toBe("1234567890-abcdefgh");
+    expect(getWorkerConfig({}).liffId).toBeUndefined();
+    expect(getWorkerConfig({ LIFF_ID: "  " }).liffId).toBeUndefined();
+  });
 });

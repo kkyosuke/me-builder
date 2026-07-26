@@ -2,10 +2,14 @@ import * as v from "valibot";
 import { describe, expect, it } from "vitest";
 import { WebConfigSchema, getWebConfig } from "./index";
 
+// 環境変数は必ず引数で明示的に渡します。`import.meta.env` は Vite がビルド時に注入し
+// テストから差し替えられないため、CI で `VITE_LIFF_ID` が設定されているかどうかで
+// 結果が変わるテストを書いてはいけません。
 describe("getWebConfig & WebConfigSchema", () => {
   it("Valibot スキーマでデフォルト値が正しく補完されること", () => {
     const parsed = v.parse(WebConfigSchema, {});
     expect(parsed.environment).toBe("development");
+    expect(parsed.liffId).toBeUndefined();
   });
 
   it("BASE_DOMAIN から UI URL および API URL が自動補完されること", () => {
@@ -18,5 +22,18 @@ describe("getWebConfig & WebConfigSchema", () => {
     expect(conf.baseDomain).toBe("stg.kagami.kyosuke.dev");
     expect(conf.baseUrl).toBe("https://stg.kagami.kyosuke.dev");
     expect(conf.apiUrl).toBe("https://api.stg.kagami.kyosuke.dev");
+  });
+
+  it("LIFF ID が設定されている場合に liffId が取得されること", () => {
+    expect(getWebConfig({ LIFF_ID: "1234567890-abcdefgh" }).liffId).toBe("1234567890-abcdefgh");
+  });
+
+  it("LIFF ID が未設定の場合に liffId が undefined になること", () => {
+    expect(getWebConfig({ LIFF_ID: undefined }).liffId).toBeUndefined();
+  });
+
+  it("LIFF ID が空文字や空白のみの場合に未設定として扱われること", () => {
+    expect(getWebConfig({ LIFF_ID: "" }).liffId).toBeUndefined();
+    expect(getWebConfig({ LIFF_ID: "   " }).liffId).toBeUndefined();
   });
 });

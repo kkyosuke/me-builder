@@ -33,6 +33,8 @@ export function getWorkerConfig(env?: Record<string, unknown>): WorkerConfig {
   }
 
   const rawLineChannelAccessToken = getEnv("LINE_CHANNEL_ACCESS_TOKEN", env);
+  // 空文字は「未設定」として扱い、返信にリンクを添えないようにします。
+  const rawLiffId = getEnv("LIFF_ID", env)?.trim() || undefined;
 
   const rawConfig = {
     environment: rawEnvironment,
@@ -40,6 +42,7 @@ export function getWorkerConfig(env?: Record<string, unknown>): WorkerConfig {
     baseUrl: rawBaseUrl,
     apiUrl: rawApiUrl,
     lineChannelAccessToken: rawLineChannelAccessToken,
+    liffId: rawLiffId,
   };
 
   return v.parse(WorkerConfigSchema, rawConfig);
