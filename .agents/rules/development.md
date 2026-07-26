@@ -68,9 +68,11 @@
 - **環境設定管理 (`src/config/`)**:
   - `@me-builder/shared` が提供する `getEnv` 関数を用いて、Cloudflare Workers Bindings (`c.env`) およびローカル環境 (`process.env`) の差分を吸収し、生の環境変数を取得・URL 補完・Valibot パースを行い設定オブジェクトを組み立てて返却します。
 
-- **LINE Webhook 自動登録およびオウム返し機能**:
+- **LINE Webhook 自動登録および日記の受付返信**:
   - API サーバー起動時 (`src/index.ts`) または CLI スクリプト (`bun run register:webhook`) の実行時、`LINE_CHANNEL_ACCESS_TOKEN` および `LINE_WEBHOOK_URL` (または `BASE_URL`) が環境変数として与えられている場合、公式 SDK (`@line/bot-sdk`) の `MessagingApiClient.setWebhookEndpoint` を用いて自動的に LINE Messaging API へ Webhook Endpoint URL を登録・更新します。
-  - Webhook 受信メッセージは Cloudflare Queues 経由で Queue Worker (`apps/worker`) に配信され、`replyToken` を使用して `MessagingApiClient.replyMessage` により送信元ユーザーへ同内容を返信 (オウム返し) します。
+  - Webhook 受信メッセージは Cloudflare Queues 経由で Queue Worker (`apps/worker`) に配信され、`replyToken` を使用して `MessagingApiClient.replyMessage` により受け付けた旨を返信します。**送られた本文をオウム返ししません。**
+  - 返信には「今日のアンケート」への導線として LIFF の URL (`https://liff.line.me/{LIFF_ID}`) を添えます。LINE 内から Web を開く主導線であり、設計は [プロジェクト概要 §4](../../docs/project-overview.md#4-想定する利用体験) を正とします。文面の組み立ては `apps/worker` の `buildReplyText` に集約します。
+  - `LIFF_ID` は `apps/worker` へ配布します。秘密情報ではありませんが、GitHub Environment の変数を単一の出所とするため CD ワークフローから `wrangler secret put` で配布します (wrangler には後から var を投入するコマンドがありません)。未設定の場合はリンクを省き、受け付けた旨だけを返します。
   - 環境変数が未設定の場合は自動登録および返信処理がログ出力とともに安全にスキップされます。
 
 - **LINE Webhook の署名検証 (`x-line-signature`)**:
@@ -78,7 +80,7 @@
   - 検証は **受信した生のリクエストボディ文字列** に対して行います。`c.req.json()` の結果を再度 `JSON.stringify` するとバイト列が変わり検証が壊れるため、`await c.req.text()` で取得した文字列を検証し、通過後に `JSON.parse` してください。
   - ヘッダ欠落・署名不一致は `401 Unauthorized` を返し、Queue 投入・LINE 返信・D1 書き込みのいずれも行いません。拒否時は `logger.warn` で構造化ログを出力しますが、**署名値およびチャネルシークレットそのものはログに含めません**。
   - チャネルシークレットは `LINE_CHANNEL_SECRET` として `apps/api` にのみ配布します (Cloudflare は `wrangler secret put` / CD ワークフロー、ローカルは `.env`)。`wrangler.toml` の `[vars]` には置きません。
-  - `LINE_CHANNEL_SECRET` は **必須** です。未設定の場合は環境 (`local` / `preview` / `production`) を問わず署名検証をスキップせず、`logger.error` を出力したうえで全ての Webhook リクエストを 401 で拒否します。ローカルでオウム返しの動作確認を行う場合も `.env` にチャネルシークレットを設定してください。
+  - `LINE_CHANNEL_SECRET` は **必須** です。未設定の場合は環境 (`local` / `preview` / `production`) を問わず署名検証をスキップせず、`logger.error` を出力したうえで全ての Webhook リクエストを 401 で拒否します。ローカルで Webhook 受信と返信の動作確認を行う場合も `.env` にチャネルシークレットを設定してください。
 
 - **Web UI の LIFF 初期化 (`apps/web`)**:
   - LINE 内から Web を開く主導線は LIFF です。導線の設計と根拠は [プロジェクト概要 §4](../../docs/project-overview.md#4-想定する利用体験) を正とし、このルールには再掲しません。

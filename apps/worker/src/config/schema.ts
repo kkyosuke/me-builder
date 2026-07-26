@@ -6,6 +6,8 @@ export const WorkerConfigSchema = v.object({
   baseUrl: v.optional(v.string()),
   apiUrl: v.optional(v.string()),
   lineChannelAccessToken: v.optional(v.string()),
+  /** LIFF ID。設定時のみ、返信に LIFF のリンクを添えます。 */
+  liffId: v.optional(v.string()),
 });
 
 export type WorkerConfig = v.InferOutput<typeof WorkerConfigSchema>;

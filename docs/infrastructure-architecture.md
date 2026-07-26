@@ -115,7 +115,7 @@ flowchart TD
 
 4. **非同期 Webhook メッセージ処理**
    - Webhook リクエスト（LINE 等）は API サーバーで受信後、直ちに `Cloudflare Queues` へ投入され 200/202 応答を返却します。
-   - バックグラウンドの Queue Worker (`apps/worker`) がキューから非同期バッチメッセージを取り出し順次処理します。LINE メッセージイベントを受信した場合、`replyToken` を用いて LINE Messaging API (`@line/bot-sdk`) 経由で同じ内容をオウム返し返信します。
+   - バックグラウンドの Queue Worker (`apps/worker`) がキューから非同期バッチメッセージを取り出し順次処理します。LINE メッセージイベントを受信した場合、`replyToken` を用いて LINE Messaging API (`@line/bot-sdk`) 経由で受け付けた旨を返信します。返信の内容は[開発運用ルール](../.agents/rules/development.md)を正とします。
 
 ## 6. 開発・運用環境方針
 

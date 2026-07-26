@@ -52,6 +52,13 @@ jobs:
           echo "${LINE_CHANNEL_ACCESS_TOKEN}" | bun --cwd apps/api wrangler secret put LINE_CHANNEL_ACCESS_TOKEN --env production
           echo "${LINE_CHANNEL_ACCESS_TOKEN}" | bun --cwd apps/worker wrangler secret put LINE_CHANNEL_ACCESS_TOKEN --env production
 
+      # LIFF ID は秘密情報ではないが、GitHub Environment の変数を単一の出所にするため
+      # wrangler secret として配布する (wrangler には var を後から入れるコマンドがない)。
+      - name: Sync LIFF ID to Cloudflare Workers (Production)
+        if: ${{ env.CLOUDFLARE_API_TOKEN != '' && vars.LIFF_ID != '' }}
+        run: |
+          echo "${{ vars.LIFF_ID }}" | bun --cwd apps/worker wrangler secret put LIFF_ID --env production
+
       # x-line-signature の検証を行う apps/api にのみチャネルシークレットを配布する。
       # 未設定だと環境を問わず全ての Webhook リクエストが 401 になるため、
       # 設定漏れをエラーとして扱いデプロイを失敗させる

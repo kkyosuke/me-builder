@@ -74,11 +74,18 @@ describe("Worker Queue Handler", () => {
     await handleQueueBatch(batch, mockDb, {
       environment: "test",
       lineChannelAccessToken: "test-token",
+      liffId: "1234567890-abcdefgh",
     });
     expect(mockAck).toHaveBeenCalledOnce();
+    // 送られた本文はオウム返しせず、受け付けた旨とアンケートへの LIFF リンクを返す
     expect(mockReplyMessage).toHaveBeenCalledWith({
       replyToken: "tok",
-      messages: [{ type: "text", text: "hi" }],
+      messages: [
+        {
+          type: "text",
+          text: "受け付けました。\n今日のアンケートに答える\nhttps://liff.line.me/1234567890-abcdefgh",
+        },
+      ],
     });
   });
 
