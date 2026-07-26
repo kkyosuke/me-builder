@@ -14,3 +14,16 @@ yarn-debug.log*
 yarn-error.log*
 bun.lockb
 .DS_Store
+
+# Wrangler / Miniflare のローカル状態とローカルシークレット
+.wrangler
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+
+# usagi (issue 本体の Markdown のみ追跡する)
+# index.json は Markdown から再生成される派生キャッシュ (source_fingerprint 不一致時に
+# rebuild される) のため追跡しない。並列セッションごとに書き換わりコンフリクトの原因になる。
+.usagi/sessions
+.usagi/issues/.lock
+.usagi/**/index.json

@@ -15,12 +15,19 @@ describe("getConfig & ConfigSchema", () => {
       ENVIRONMENT: "preview",
       BASE_DOMAIN: "stg.kagami.kyosuke.dev",
       LINE_CHANNEL_ACCESS_TOKEN: "preview-token",
+      LINE_CHANNEL_SECRET: "preview-channel-secret",
     });
     expect(conf.environment).toBe("preview");
     expect(conf.baseDomain).toBe("stg.kagami.kyosuke.dev");
     expect(conf.baseUrl).toBe("https://api.stg.kagami.kyosuke.dev");
     expect(conf.lineWebhookUrl).toBe("https://api.stg.kagami.kyosuke.dev/api/line/webhook");
     expect(conf.lineChannelAccessToken).toBe("preview-token");
+    expect(conf.lineChannelSecret).toBe("preview-channel-secret");
+  });
+
+  it("LINE_CHANNEL_SECRET が未設定の場合は undefined になること", () => {
+    const parsed = v.parse(ConfigSchema, {});
+    expect(parsed.lineChannelSecret).toBeUndefined();
   });
 
   it("BASE_DOMAIN から BASE_URL および LINE_WEBHOOK_URL が自動補完されること", () => {

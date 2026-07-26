@@ -63,6 +63,13 @@
   - Webhook 受信メッセージは Cloudflare Queues 経由で Queue Worker (`apps/worker`) に配信され、`replyToken` を使用して `MessagingApiClient.replyMessage` により送信元ユーザーへ同内容を返信 (オウム返し) します。
   - 環境変数が未設定の場合は自動登録および返信処理がログ出力とともに安全にスキップされます。
 
+- **LINE Webhook の署名検証 (`x-line-signature`)**:
+  - `POST /api/line/webhook` は、Queue 投入前に必ず `x-line-signature` ヘッダを検証します。検証は公式 SDK (`@line/bot-sdk`) の `validateSignature` (HMAC-SHA256 + timing-safe 比較) に委譲し、`packages/lib` の `line.webhook.verifySignature` として提供します。
+  - 検証は **受信した生のリクエストボディ文字列** に対して行います。`c.req.json()` の結果を再度 `JSON.stringify` するとバイト列が変わり検証が壊れるため、`await c.req.text()` で取得した文字列を検証し、通過後に `JSON.parse` してください。
+  - ヘッダ欠落・署名不一致は `401 Unauthorized` を返し、Queue 投入・LINE 返信・D1 書き込みのいずれも行いません。拒否時は `logger.warn` で構造化ログを出力しますが、**署名値およびチャネルシークレットそのものはログに含めません**。
+  - チャネルシークレットは `LINE_CHANNEL_SECRET` として `apps/api` にのみ配布します (Cloudflare は `wrangler secret put` / CD ワークフロー、ローカルは `.env`)。`wrangler.toml` の `[vars]` には置きません。
+  - `LINE_CHANNEL_SECRET` は **必須** です。未設定の場合は環境 (`local` / `preview` / `production`) を問わず署名検証をスキップせず、`logger.error` を出力したうえで全ての Webhook リクエストを 401 で拒否します。ローカルでオウム返しの動作確認を行う場合も `.env` にチャネルシークレットを設定してください。
+
 ## 5. コミット・Git 運用ルール
 
 - `node_modules`, `.bun`, `dist` などのインストール生成物およびビルド成果物は絶対にコミットに含まないこと。
