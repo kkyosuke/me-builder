@@ -1,4 +1,5 @@
 import { logger } from "@me-builder/shared";
+import { idToken } from "./id-token";
 
 /**
  * LIFF アプリのエンドポイント URL を LIFF Server API 経由で登録・更新します。
@@ -55,22 +56,14 @@ type LiffApp = {
 const toMessage = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
 
-/**
- * LIFF ID は `{LINE Login チャネル ID}-{ランダム文字列}` の形式のため、
- * チャネル ID が未設定の場合は接頭辞から補完します。
- */
+/** チャネル ID を解決します。未設定なら LIFF ID の接頭辞から補完します。 */
 function resolveChannelId(params: RegisterLiffEndpointParams): string | undefined {
-  if (params.channelId) {
-    return params.channelId;
-  }
-  const prefix = params.liffId?.split("-")[0];
-  if (prefix && /^\d+$/.test(prefix)) {
+  if (!params.channelId) {
     logger.info(
       "[LIFF] LINE_LOGIN_CHANNEL_ID が未設定のため LIFF ID の接頭辞をチャネル ID として使用します",
     );
-    return prefix;
   }
-  return undefined;
+  return idToken.resolveLoginChannelId(params);
 }
 
 /** client credentials で LINE Login チャネルのチャネルアクセストークンを発行します。 */

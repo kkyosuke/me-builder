@@ -3,8 +3,20 @@ import { and, eq } from "drizzle-orm";
 import type { D1Client } from "../client";
 import { accountIdentities, accounts } from "../schema/account";
 
+/**
+ * ログイン手段の提供元。
+ *
+ * - `line`: Messaging API で得られる userId（友だち追加が起点）
+ * - `line_login`: LINE Login / LIFF の ID トークンの `sub`
+ *
+ * LINE の userId は**プロバイダー単位**で一意なので、Messaging API チャネルと
+ * LINE Login チャネルが同一プロバイダー配下なら両者は同じ値になります。その場合
+ * `line` の identity をそのまま引けます（[resolveAccountByLineLogin](#) の手順 2）。
+ */
+export type IdentityProvider = "line" | "line_login" | "google";
+
 export type UpsertIdentityInput = {
-  provider: "line" | "google";
+  provider: IdentityProvider;
   providerAccountId: string;
 };
 
@@ -12,6 +24,106 @@ export type UpsertIdentityResult = {
   account: typeof accounts.$inferSelect;
   identity: typeof accountIdentities.$inferSelect;
 };
+
+/** 有効な identity とそれに紐づく有効な Account を 1 件取得します。 */
+async function findByIdentity(
+  db: D1Client,
+  provider: IdentityProvider,
+  providerAccountId: string,
+): Promise<UpsertIdentityResult | undefined> {
+  return await db
+    .select({
+      account: accounts,
+      identity: accountIdentities,
+    })
+    .from(accountIdentities)
+    .innerJoin(accounts, eq(accountIdentities.accountId, accounts.id))
+    .where(
+      and(
+        eq(accountIdentities.provider, provider),
+        eq(accountIdentities.providerAccountId, providerAccountId),
+        eq(accountIdentities.isDeleted, false),
+        eq(accounts.isDeleted, false),
+      ),
+    )
+    .get();
+}
+
+/**
+ * 既存の Account へログイン手段を 1 つ追加します。
+ *
+ * 新しい Account は作りません。`upsertIdentity` は「見つからなければ新規 Account を作る」
+ * ため、既存の本人へ別のログイン手段を足す用途には使えません。
+ */
+export async function linkIdentity(
+  db: D1Client,
+  input: UpsertIdentityInput & { accountId: string },
+): Promise<typeof accountIdentities.$inferSelect> {
+  const existing = await findByIdentity(db, input.provider, input.providerAccountId);
+  if (existing) {
+    if (existing.identity.accountId !== input.accountId) {
+      // 同じ外部ログインIDを複数の有効なAccountへ重複して紐づけない
+      // (docs/domain-design.md の Account が守るルール)
+      throw new Error("Identity is already linked to another account");
+    }
+    return existing.identity;
+  }
+
+  const now = new Date();
+  const identity: typeof accountIdentities.$inferSelect = {
+    id: crypto.randomUUID(),
+    accountId: input.accountId,
+    provider: input.provider,
+    providerAccountId: input.providerAccountId,
+    createdAt: now,
+    updatedAt: now,
+    deletedAt: null,
+    isDeleted: false,
+  };
+
+  await db.insert(accountIdentities).values(identity);
+  return identity;
+}
+
+/**
+ * LINE Login (LIFF) の `sub` から Account を解決します。
+ *
+ * 1. `line_login` の identity があればそれを使う（2 回目以降は必ずここで終わる）
+ * 2. 無ければ `line` の identity を同じ値で探す。見つかれば Messaging API チャネルと
+ *    LINE Login チャネルが同一プロバイダー配下で userId が一致しているので、その
+ *    Account へ `line_login` を追加して紐づける
+ * 3. どちらも無ければ `undefined` を返す。**新規 Account は作りません。**
+ *    アカウント作成の起点は LINE 公式アカウントの友だち追加であり
+ *    ([プロジェクト概要 §5](../../../../docs/project-overview.md#5-アカウントと本人識別))、
+ *    userId が一致しない構成での紐づけ手段は別途設計します
+ */
+export async function resolveAccountByLineLogin(
+  db: D1Client,
+  sub: string,
+): Promise<UpsertIdentityResult | undefined> {
+  const byLogin = await findByIdentity(db, "line_login", sub);
+  if (byLogin) {
+    return byLogin;
+  }
+
+  const byMessagingApi = await findByIdentity(db, "line", sub);
+  if (!byMessagingApi) {
+    return undefined;
+  }
+
+  const identity = await linkIdentity(db, {
+    accountId: byMessagingApi.account.id,
+    provider: "line_login",
+    providerAccountId: sub,
+  });
+
+  logger.info(
+    { accountId: byMessagingApi.account.id },
+    "Linked line_login identity to the account found by the Messaging API userId",
+  );
+
+  return { account: byMessagingApi.account, identity };
+}
 
 /**
  * Upserts accounts and account_identities records in D1 based on provider identity.
@@ -24,28 +136,10 @@ export async function upsertIdentity(
   const now = new Date();
 
   // Find existing identity and linked active account in a single JOIN query
-  const found = await db
-    .select({
-      account: accounts,
-      identity: accountIdentities,
-    })
-    .from(accountIdentities)
-    .innerJoin(accounts, eq(accountIdentities.accountId, accounts.id))
-    .where(
-      and(
-        eq(accountIdentities.provider, input.provider),
-        eq(accountIdentities.providerAccountId, input.providerAccountId),
-        eq(accountIdentities.isDeleted, false),
-        eq(accounts.isDeleted, false),
-      ),
-    )
-    .get();
+  const found = await findByIdentity(db, input.provider, input.providerAccountId);
 
   if (found) {
-    return {
-      account: found.account,
-      identity: found.identity,
-    };
+    return found;
   }
 
   // Create new account & identity link atomically using D1 batch
@@ -88,22 +182,7 @@ export async function upsertIdentity(
         "Unique constraint violation during upsert, fetching existing identity",
       );
 
-      const existing = await db
-        .select({
-          account: accounts,
-          identity: accountIdentities,
-        })
-        .from(accountIdentities)
-        .innerJoin(accounts, eq(accountIdentities.accountId, accounts.id))
-        .where(
-          and(
-            eq(accountIdentities.provider, input.provider),
-            eq(accountIdentities.providerAccountId, input.providerAccountId),
-            eq(accountIdentities.isDeleted, false),
-            eq(accounts.isDeleted, false),
-          ),
-        )
-        .get();
+      const existing = await findByIdentity(db, input.provider, input.providerAccountId);
 
       if (existing) {
         return existing;

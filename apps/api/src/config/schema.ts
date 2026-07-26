@@ -12,6 +12,10 @@ export const ConfigSchema = v.object({
   baseDomain: v.optional(v.string()),
   baseUrl: v.optional(v.string()),
   lineWebhookUrl: v.optional(v.string()),
+  /** LIFF ID。未設定の場合、LINE Login チャネル ID の補完元がなくなります。 */
+  liffId: v.optional(v.string()),
+  /** LINE Login チャネル ID。ID トークンの `aud` の期待値として使います。 */
+  lineLoginChannelId: v.optional(v.string()),
   webhookQueueName: v.optional(v.string()),
   webhookQueue: v.optional(
     v.custom<Queue<WebhookQueueMessage>>(

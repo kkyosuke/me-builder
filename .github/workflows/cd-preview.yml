@@ -67,6 +67,7 @@ jobs:
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' && vars.LIFF_ID != '' }}
         run: |
           echo "${{ vars.LIFF_ID }}" | bun --cwd apps/worker wrangler secret put LIFF_ID --env preview
+          echo "${{ vars.LIFF_ID }}" | bun --cwd apps/api wrangler secret put LIFF_ID --env preview
 
       # x-line-signature の検証を行う apps/api にのみチャネルシークレットを配布する。
       # 未設定だと環境を問わず全ての Webhook リクエストが 401 になるため、

@@ -1,8 +1,10 @@
-import { line } from "@me-builder/lib";
+import type { D1Database } from "@cloudflare/workers-types";
+import { d1, line } from "@me-builder/lib";
 import { type Queue, type WebhookQueueMessage, logger } from "@me-builder/shared";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { config, getConfig } from "./config";
+import { createLiffSession } from "./logic/liff-session";
 
 const app = new Hono<{
   Bindings: {
@@ -10,8 +12,11 @@ const app = new Hono<{
     LINE_CHANNEL_ACCESS_TOKEN?: string;
     LINE_CHANNEL_SECRET?: string;
     LINE_WEBHOOK_URL?: string;
+    LIFF_ID?: string;
+    LINE_LOGIN_CHANNEL_ID?: string;
     BASE_URL?: string;
     WEBHOOK_QUEUE?: Queue<WebhookQueueMessage>;
+    DB?: D1Database;
   };
 }>();
 
@@ -133,6 +138,35 @@ app.post("/api/line/webhook", async (c) => {
   }
 
   return c.json({ status: "ok", queued: Boolean(currentConfig.webhookQueue), id: event.id });
+});
+
+// LIFF の ID トークンを検証し、対応する Account を解決するエンドポイント。
+//
+// クライアントが自称する liff.getProfile() の結果は信頼せず、ID トークンの検証で得た
+// sub だけを本人の識別子として使う。sub と ID トークンは画面にもログにも出さない。
+app.post("/api/line/liff/session", async (c) => {
+  const currentConfig = getConfig(c.env);
+
+  if (!c.env?.DB) {
+    logger.error({ path: c.req.path }, "DB binding is not configured");
+    return c.json({ error: "Service Unavailable" }, 503);
+  }
+
+  let idToken: string | undefined;
+  try {
+    const body = (await c.req.json()) as { idToken?: unknown };
+    idToken = typeof body.idToken === "string" ? body.idToken : undefined;
+  } catch {
+    idToken = undefined;
+  }
+
+  const result = await createLiffSession({
+    idToken,
+    lineLoginChannelId: currentConfig.lineLoginChannelId,
+    db: d1.client.create(c.env.DB),
+  });
+
+  return c.json(result.body, result.status);
 });
 
 // ルート
