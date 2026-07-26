@@ -15,4 +15,3 @@ export namespace line {
 export { LineConfigSchema } from "./config";
 export type { LineConfig } from "./config";
 export type { LineClientConfig } from "./client";
-export type { LineReplyResult } from "./webhook";

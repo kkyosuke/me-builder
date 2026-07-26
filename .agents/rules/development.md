@@ -27,8 +27,11 @@
     - `task lint:fix`: Biome によるコード Lint / フォーマットの自動修復
     - `task test`: Vitest による全テスト実行
     - `task ci`: CI で実行される全検証（lint, typecheck, test, build）の一括ローカル実行
-    - `task deploy:preview`: 全アプリのプレビュー環境へのデプロイ (`wrangler deploy --env preview`, `wrangler pages deploy`)
-    - `task deploy:production`: 全アプリの本番環境へのデプロイ (`wrangler deploy --env production`, `wrangler pages deploy`)
+    - `task db:migrate:local` (または `task db:migrate`): D1 データベースマイグレーションのローカル適用
+    - `task db:migrate:preview`: プレビュー環境への D1 データベースマイグレーション適用
+    - `task db:migrate:production`: 本番環境への D1 データベースマイグレーション適用
+    - `task deploy:preview`: D1 マイグレーション適用および全アプリのプレビュー環境へのデプロイ (`wrangler deploy --env preview`, `wrangler pages deploy`)
+    - `task deploy:production`: D1 マイグレーション適用および全アプリの本番環境へのデプロイ (`wrangler deploy --env production`, `wrangler pages deploy`)
   - **CI/CD ワークフロー構造 (`.github/workflows/ci-*.yml`, `.github/workflows/cd-*.yml`)**:
     - CI ワークフローはコンポーネントごとの個別の YAML ファイルに分離されています (`ci-lint.yml`, `ci-shared.yml`, `ci-api.yml`, `ci-mcp.yml`, `ci-worker.yml`, `ci-ui.yml`)。
     - CD ワークフローはプレビュー・本番デプロイ用に分離されています (`cd-preview.yml`, `cd-production.yml`)。

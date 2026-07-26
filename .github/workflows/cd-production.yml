@@ -30,6 +30,10 @@ jobs:
       - name: Run CI Verification
         run: bun run ci
 
+      - name: Apply D1 Migrations (Production)
+        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
+        run: task db:migrate:production
+
       - name: Deploy to Cloudflare Production
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
         run: task deploy:production
