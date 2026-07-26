@@ -45,14 +45,14 @@ jobs:
           echo "${LINE_CHANNEL_ACCESS_TOKEN}" | bun --cwd apps/api wrangler secret put LINE_CHANNEL_ACCESS_TOKEN --env production
           echo "${LINE_CHANNEL_ACCESS_TOKEN}" | bun --cwd apps/worker wrangler secret put LINE_CHANNEL_ACCESS_TOKEN --env production
 
-      # x-line-signature の検証を行う apps/api にのみチャネルシークレットを配布する
-      # 本番環境では未設定だと全ての Webhook リクエストが 401 になるため、
+      # x-line-signature の検証を行う apps/api にのみチャネルシークレットを配布する。
+      # 未設定だと環境を問わず全ての Webhook リクエストが 401 になるため、
       # 設定漏れをエラーとして扱いデプロイを失敗させる
       - name: Sync LINE Channel Secret to Cloudflare Workers (Production)
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
         run: |
           if [ -z "${LINE_CHANNEL_SECRET}" ]; then
-            echo "::error::LINE_CHANNEL_SECRET が GitHub Secrets に設定されていません。本番環境では x-line-signature の検証に必須です。"
+            echo "::error::LINE_CHANNEL_SECRET が GitHub Secrets に設定されていません。x-line-signature の検証に必須です。"
             exit 1
           fi
           echo "${LINE_CHANNEL_SECRET}" | bun --cwd apps/api wrangler secret put LINE_CHANNEL_SECRET --env production

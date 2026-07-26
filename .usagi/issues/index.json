@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "source_fingerprint": "sha256:336ef5af8684a57ac6806386fad3cf86b82e8663ada80a7e089b48a73c3c1d1d",
+  "source_fingerprint": "sha256:fff9cbb642abeffbab3a484e780a21e1fd20d86d60936bcb97440f256b5ecf99",
   "issues": [
     {
       "number": 1,
@@ -14,7 +14,7 @@
       "milestone": null,
       "file": "001-fix-api-line-webhook-x-line-signature.md",
       "created_at": "2026-07-26T06:45:37.372421Z",
-      "updated_at": "2026-07-26T07:01:11.748120Z"
+      "updated_at": "2026-07-26T07:15:47.752998Z"
     }
   ]
 }

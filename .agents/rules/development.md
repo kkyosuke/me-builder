@@ -68,7 +68,7 @@
   - 検証は **受信した生のリクエストボディ文字列** に対して行います。`c.req.json()` の結果を再度 `JSON.stringify` するとバイト列が変わり検証が壊れるため、`await c.req.text()` で取得した文字列を検証し、通過後に `JSON.parse` してください。
   - ヘッダ欠落・署名不一致は `401 Unauthorized` を返し、Queue 投入・LINE 返信・D1 書き込みのいずれも行いません。拒否時は `logger.warn` で構造化ログを出力しますが、**署名値およびチャネルシークレットそのものはログに含めません**。
   - チャネルシークレットは `LINE_CHANNEL_SECRET` として `apps/api` にのみ配布します (Cloudflare は `wrangler secret put` / CD ワークフロー、ローカルは `.env`)。`wrangler.toml` の `[vars]` には置きません。
-  - `LINE_CHANNEL_SECRET` 未設定時の挙動は環境で異なります。`production` では検証をスキップせず全リクエストを 401 で拒否し、それ以外の環境 (`local` / `preview` / 開発) では `logger.warn` を出力したうえで検証をスキップします。
+  - `LINE_CHANNEL_SECRET` は **必須** です。未設定の場合は環境 (`local` / `preview` / `production`) を問わず署名検証をスキップせず、`logger.error` を出力したうえで全ての Webhook リクエストを 401 で拒否します。ローカルでオウム返しの動作確認を行う場合も `.env` にチャネルシークレットを設定してください。
 
 ## 5. コミット・Git 運用ルール
 

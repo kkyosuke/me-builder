@@ -54,16 +54,17 @@ jobs:
           echo "${LINE_CHANNEL_ACCESS_TOKEN}" | bun --cwd apps/api wrangler secret put LINE_CHANNEL_ACCESS_TOKEN --env preview
           echo "${LINE_CHANNEL_ACCESS_TOKEN}" | bun --cwd apps/worker wrangler secret put LINE_CHANNEL_ACCESS_TOKEN --env preview
 
-      # x-line-signature の検証を行う apps/api にのみチャネルシークレットを配布する
+      # x-line-signature の検証を行う apps/api にのみチャネルシークレットを配布する。
+      # 未設定だと環境を問わず全ての Webhook リクエストが 401 になるため、
+      # 設定漏れをエラーとして扱いデプロイを失敗させる
       - name: Sync LINE Channel Secret to Cloudflare Workers (Preview)
-        if: ${{ env.CLOUDFLARE_API_TOKEN != '' && env.LINE_CHANNEL_SECRET != '' }}
+        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
         run: |
+          if [ -z "${LINE_CHANNEL_SECRET}" ]; then
+            echo "::error::LINE_CHANNEL_SECRET が GitHub Secrets に設定されていません。x-line-signature の検証に必須です。"
+            exit 1
+          fi
           echo "${LINE_CHANNEL_SECRET}" | bun --cwd apps/api wrangler secret put LINE_CHANNEL_SECRET --env preview
-
-      - name: Warn Missing LINE Channel Secret (Preview)
-        if: ${{ env.CLOUDFLARE_API_TOKEN != '' && env.LINE_CHANNEL_SECRET == '' }}
-        run: |
-          echo "::warning::LINE_CHANNEL_SECRET が GitHub Secrets に設定されていないため、プレビュー環境では x-line-signature の検証がスキップされます。"
 
       - name: Register LINE Webhook (Preview)
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' && env.LINE_CHANNEL_ACCESS_TOKEN != '' }}

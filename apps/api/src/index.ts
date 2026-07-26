@@ -64,37 +64,32 @@ app.post("/api/line/webhook", async (c) => {
   const rawBody = await c.req.text();
   const signature = c.req.header("x-line-signature");
 
-  if (currentConfig.lineChannelSecret) {
-    const isValidSignature = line.webhook.verifySignature({
-      body: rawBody,
-      channelSecret: currentConfig.lineChannelSecret,
-      signature,
-    });
-
-    if (!isValidSignature) {
-      // 署名値・チャネルシークレットそのものはログに残さない
-      logger.warn(
-        {
-          path: c.req.path,
-          hasSignatureHeader: Boolean(signature),
-          bodyLength: rawBody.length,
-        },
-        "Rejected LINE webhook request with missing or invalid x-line-signature",
-      );
-      return c.json({ error: "Unauthorized" }, 401);
-    }
-  } else if (currentConfig.environment === "production") {
-    // 本番環境では署名検証をスキップせず、必ず拒否する
+  // LINE_CHANNEL_SECRET が未設定の場合、環境を問わず署名検証をスキップせず拒否する
+  if (!currentConfig.lineChannelSecret) {
     logger.error(
       { path: c.req.path, environment: currentConfig.environment },
-      "LINE_CHANNEL_SECRET is not configured in production, rejecting LINE webhook request",
+      "LINE_CHANNEL_SECRET is not configured, rejecting LINE webhook request",
     );
     return c.json({ error: "Unauthorized" }, 401);
-  } else {
+  }
+
+  const isValidSignature = line.webhook.verifySignature({
+    body: rawBody,
+    channelSecret: currentConfig.lineChannelSecret,
+    signature,
+  });
+
+  if (!isValidSignature) {
+    // 署名値・チャネルシークレットそのものはログに残さない
     logger.warn(
-      { path: c.req.path, environment: currentConfig.environment },
-      "LINE_CHANNEL_SECRET is not configured, skipping x-line-signature verification",
+      {
+        path: c.req.path,
+        hasSignatureHeader: Boolean(signature),
+        bodyLength: rawBody.length,
+      },
+      "Rejected LINE webhook request with missing or invalid x-line-signature",
     );
+    return c.json({ error: "Unauthorized" }, 401);
   }
 
   let body: unknown = {};

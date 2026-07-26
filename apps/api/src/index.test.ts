@@ -104,40 +104,28 @@ describe("POST /api/line/webhook signature verification", () => {
     expect(send).not.toHaveBeenCalled();
   });
 
-  it("rejects every request in production when LINE_CHANNEL_SECRET is not configured", async () => {
-    const { queue, send } = createMockQueue();
-    const body = JSON.stringify({ events: [] });
+  // LINE_CHANNEL_SECRET 未設定時は環境を問わず検証をスキップせず拒否する
+  it.each(["production", "preview", "local", "development"])(
+    "rejects every request when LINE_CHANNEL_SECRET is not configured (%s)",
+    async (environment) => {
+      const { queue, send } = createMockQueue();
+      const body = JSON.stringify({ events: [] });
 
-    const res = await app.request(
-      "/api/line/webhook",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-line-signature": sign(body) },
-        body,
-      },
-      { WEBHOOK_QUEUE: queue, LINE_CHANNEL_SECRET: "", ENVIRONMENT: "production" },
-    );
+      const res = await app.request(
+        "/api/line/webhook",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-line-signature": sign(body) },
+          body,
+        },
+        { WEBHOOK_QUEUE: queue, LINE_CHANNEL_SECRET: "", ENVIRONMENT: environment },
+      );
 
-    expect(res.status).toBe(401);
-    expect(send).not.toHaveBeenCalled();
-  });
-
-  it("skips verification outside production when LINE_CHANNEL_SECRET is not configured", async () => {
-    const { queue, send } = createMockQueue();
-
-    const res = await app.request(
-      "/api/line/webhook",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ events: [{ type: "message", text: "hello" }] }),
-      },
-      { WEBHOOK_QUEUE: queue, LINE_CHANNEL_SECRET: "", ENVIRONMENT: "local" },
-    );
-
-    expect(res.status).toBe(200);
-    expect(send).toHaveBeenCalledOnce();
-  });
+      expect(res.status).toBe(401);
+      expect(await res.json()).toEqual({ error: "Unauthorized" });
+      expect(send).not.toHaveBeenCalled();
+    },
+  );
 });
 
 describe("API Server Webhook Queue", () => {
