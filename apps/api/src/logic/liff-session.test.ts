@@ -79,14 +79,16 @@ describe("createLiffSession", () => {
 
     const result = await call();
 
-    expect(result.status).toBe(200);
-    expect(result.body).toEqual({
-      accountId: followed.account.id,
-      displayName: "うつし",
-      pictureUrl: "https://example.com/picture.jpg",
+    expect(result).toEqual({
+      type: "resolved",
+      session: {
+        accountId: followed.account.id,
+        displayName: "うつし",
+        pictureUrl: "https://example.com/picture.jpg",
+      },
     });
-    // sub (LINE の userId) をレスポンスへ含めない
-    expect(JSON.stringify(result.body)).not.toContain(SUB);
+    // sub (LINE の userId) を戻り値へ含めない
+    expect(JSON.stringify(result)).not.toContain(SUB);
     // Account は増えず、line_login の identity が同じ Account へ紐づく
     expect(await db.select().from(d1.schema.accounts).all()).toHaveLength(1);
     const identities = await db.select().from(d1.schema.accountIdentities).all();
@@ -101,11 +103,11 @@ describe("createLiffSession", () => {
     await call();
     const second = await call();
 
-    expect(second.status).toBe(200);
+    expect(second.type).toBe("resolved");
     expect(await db.select().from(d1.schema.accountIdentities).all()).toHaveLength(2);
   });
 
-  it("ID トークンが無い場合は 401 を返し、検証エンドポイントを呼ばないこと", async () => {
+  it("ID トークンが無い場合は unauthenticated を返し、検証エンドポイントを呼ばないこと", async () => {
     const fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);
 
@@ -115,42 +117,52 @@ describe("createLiffSession", () => {
       db,
     });
 
-    expect(result.status).toBe(401);
+    expect(result.type).toBe("unauthenticated");
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it("LINE Login チャネル ID が未設定なら 401 を返すこと", async () => {
+  it("LINE Login チャネル ID が未設定なら not-configured を返すこと", async () => {
     mockVerifyEndpoint({ json: validClaims });
 
     const result = await call("");
 
-    expect(result.status).toBe(401);
+    expect(result.type).toBe("not-configured");
   });
 
-  it("ID トークンの検証に失敗した場合は 401 を返し、Account を作らないこと", async () => {
+  it("ID トークンの検証に失敗した場合は unauthenticated を返し、Account を作らないこと", async () => {
     mockVerifyEndpoint({ status: 400, json: { error: "invalid_request" } });
 
     const result = await call();
 
-    expect(result.status).toBe(401);
+    expect(result.type).toBe("unauthenticated");
     expect(await db.select().from(d1.schema.accounts).all()).toHaveLength(0);
   });
 
-  it("aud が別チャネルの ID トークンを 401 で拒否すること", async () => {
+  it("aud が別チャネルの ID トークンを拒否すること", async () => {
     mockVerifyEndpoint({ json: { ...validClaims, aud: "9999999999" } });
 
     const result = await call();
 
-    expect(result.status).toBe(401);
+    expect(result.type).toBe("unauthenticated");
   });
 
-  it("該当する Account が無い場合は 404 を返し、Account を作らないこと", async () => {
+  it("該当する Account が無い場合は account-not-found を返し、Account を作らないこと", async () => {
     mockVerifyEndpoint({ json: validClaims });
 
     const result = await call();
 
-    expect(result.status).toBe(404);
-    expect(result.body).toMatchObject({ reason: "friendship_required" });
+    expect(result.type).toBe("account-not-found");
     expect(await db.select().from(d1.schema.accounts).all()).toHaveLength(0);
+  });
+
+  it("戻り値に HTTP のステータスコードを含めないこと", async () => {
+    await d1.action.account.upsertIdentity(db, { provider: "line", providerAccountId: SUB });
+    mockVerifyEndpoint({ json: validClaims });
+
+    const result = await call();
+
+    // logic は HTTP を知らない。ステータスコードへの変換は controller の責務
+    expect(result).not.toHaveProperty("status");
+    expect(result).not.toHaveProperty("body");
   });
 });

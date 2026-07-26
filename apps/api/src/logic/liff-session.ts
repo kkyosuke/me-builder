@@ -6,8 +6,10 @@ import { logger } from "@me-builder/shared";
  *
  * クライアントから送られてきたプロフィールは（値そのものが本物であっても）サーバー側では
  * 検証できないため、識別子としては受け付けません。本人の識別子は検証で得た `sub` だけを
- * 使います。`sub` と ID トークンはレスポンスにもログにも含めません
+ * 使います。`sub` と ID トークンは戻り値にもログにも含めません
  * ([プロジェクト概要 §8](../../../../docs/project-overview.md#8-プライバシーと安全性))。
+ *
+ * この層は HTTP を知りません。ステータスコードへの変換は controller が行います。
  */
 
 export type LiffSessionParams = {
@@ -17,41 +19,43 @@ export type LiffSessionParams = {
   db: d1.Client;
 };
 
-export type LiffSessionResult =
-  | {
-      status: 200;
-      body: {
-        accountId: string;
-        displayName?: string | undefined;
-        pictureUrl?: string | undefined;
-      };
-    }
-  | { status: 401; body: { error: string } }
-  | { status: 404; body: { error: string; reason: string } };
+/** 表示に使ってよい情報だけを持つ、解決済みのセッション。 */
+type ResolvedLiffSession = {
+  accountId: string;
+  displayName?: string | undefined;
+  pictureUrl?: string | undefined;
+};
+
+export type LiffSessionOutcome =
+  /** ID トークンを検証でき、Account を解決できた */
+  | { type: "resolved"; session: ResolvedLiffSession }
+  /** LINE Login チャネル ID が未設定で検証そのものができない（サーバー側の設定漏れ） */
+  | { type: "not-configured" }
+  /** ID トークンが無い、または検証に失敗した */
+  | { type: "unauthenticated"; reason: string }
+  /** 検証はできたが、対応する Account が存在しない */
+  | { type: "account-not-found" };
 
 export async function createLiffSession({
   idToken,
   lineLoginChannelId,
   db,
-}: LiffSessionParams): Promise<LiffSessionResult> {
+}: LiffSessionParams): Promise<LiffSessionOutcome> {
   if (!lineLoginChannelId) {
-    logger.error("LINE Login channel id is not configured, rejecting LIFF session request");
-    return { status: 401, body: { error: "Unauthorized" } };
+    logger.error("LINE Login channel id is not configured, cannot verify the id token");
+    return { type: "not-configured" };
   }
 
   if (!idToken) {
     logger.warn("LIFF session request without an id token");
-    return { status: 401, body: { error: "Unauthorized" } };
+    return { type: "unauthenticated", reason: "id_token がありません" };
   }
 
   const verified = await line.idToken.verify({ idToken, channelId: lineLoginChannelId });
 
   if (!verified.ok) {
-    logger.warn(
-      { reason: verified.reason },
-      "Rejected LIFF session request with an invalid id token",
-    );
-    return { status: 401, body: { error: "Unauthorized" } };
+    logger.warn({ reason: verified.reason }, "Rejected an invalid id token");
+    return { type: "unauthenticated", reason: verified.reason };
   }
 
   const resolved = await d1.action.account.resolveAccountByLineLogin(db, verified.claims.sub);
@@ -61,14 +65,14 @@ export async function createLiffSession({
     // ([プロジェクト概要 §5](../../../../docs/project-overview.md#5-アカウントと本人識別))。
     // Messaging API と LINE Login で userId が一致しない構成での紐づけ手段は別途設計する。
     logger.info("No account found for the verified LINE Login identity");
-    return { status: 404, body: { error: "Account not found", reason: "friendship_required" } };
+    return { type: "account-not-found" };
   }
 
   logger.info({ accountId: resolved.account.id }, "Resolved account for the LIFF session");
 
   return {
-    status: 200,
-    body: {
+    type: "resolved",
+    session: {
       accountId: resolved.account.id,
       displayName: verified.claims.name,
       pictureUrl: verified.claims.picture,

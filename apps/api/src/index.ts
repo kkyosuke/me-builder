@@ -1,24 +1,12 @@
-import type { D1Database } from "@cloudflare/workers-types";
-import { d1, line } from "@me-builder/lib";
-import { type Queue, type WebhookQueueMessage, logger } from "@me-builder/shared";
+import { line } from "@me-builder/lib";
+import { type WebhookQueueMessage, logger } from "@me-builder/shared";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { config, getConfig } from "./config";
-import { createLiffSession } from "./logic/liff-session";
+import { postLiffSession } from "./controller/liff-session";
+import type { AppEnv } from "./types";
 
-const app = new Hono<{
-  Bindings: {
-    ENVIRONMENT?: string;
-    LINE_CHANNEL_ACCESS_TOKEN?: string;
-    LINE_CHANNEL_SECRET?: string;
-    LINE_WEBHOOK_URL?: string;
-    LIFF_ID?: string;
-    LINE_LOGIN_CHANNEL_ID?: string;
-    BASE_URL?: string;
-    WEBHOOK_QUEUE?: Queue<WebhookQueueMessage>;
-    DB?: D1Database;
-  };
-}>();
+const app = new Hono<AppEnv>();
 
 // CORS を有効化
 app.use("*", cors());
@@ -144,31 +132,7 @@ app.post("/api/line/webhook", async (c) => {
 //
 // 受け付けるのは ID トークンだけ。クライアントから送られてきた userId は
 // サーバー側で検証できないため識別子として使わない (なりすましを防ぐ)。
-// sub と ID トークンは画面にもログにも出さない。
-app.post("/api/line/liff/session", async (c) => {
-  const currentConfig = getConfig(c.env);
-
-  if (!c.env?.DB) {
-    logger.error({ path: c.req.path }, "DB binding is not configured");
-    return c.json({ error: "Service Unavailable" }, 503);
-  }
-
-  let idToken: string | undefined;
-  try {
-    const body = (await c.req.json()) as { idToken?: unknown };
-    idToken = typeof body.idToken === "string" ? body.idToken : undefined;
-  } catch {
-    idToken = undefined;
-  }
-
-  const result = await createLiffSession({
-    idToken,
-    lineLoginChannelId: currentConfig.lineLoginChannelId,
-    db: d1.client.create(c.env.DB),
-  });
-
-  return c.json(result.body, result.status);
-});
+app.post("/api/line/liff/session", postLiffSession);
 
 // ルート
 app.get("/", (c) => {

@@ -65,6 +65,12 @@
 - **Web標準 API の遵守**:
   - API サーバーおよび MCP サーバーは `Bun.serve` および **Hono** フレームワークを採用します。
   - 固有の非標準 API や特定のランタイム依存を避け、`Request`, `Response`, `fetch` などの Web標準 API / Web Standard Response に準拠して実装してください。これにより、ローカル (`bun serve`) とクラウド・エッジ (Cloudflare Workers 等) の双方向でそのまま稼働可能にします。
+- **層の分離 (`src/controller/` と `src/logic/`)**:
+  - **`logic/` は HTTP を知りません。** ステータスコードやレスポンスボディを返さず、ドメイン上の結果を判別可能な union（例: `resolved` / `unauthenticated` / `account-not-found`）として返します。
+  - **`controller/` が HTTP との境界**です。リクエストの解釈（ボディのパース、バインディングの確認）と、`logic` が返した結果から `Response` への変換だけを担当します。ルート定義 (`src/index.ts`) からは controller を呼ぶだけにします。
+  - テストも層ごとに分けます。`logic` はドメインの結果を検証し、`controller` は `logic` をモックして HTTP への変換だけを検証します。
+  - `apps/worker` の `handler/` と `logic/` も同じ分離です。
+
 - **環境設定管理 (`src/config/`)**:
   - `@me-builder/shared` が提供する `getEnv` 関数を用いて、Cloudflare Workers Bindings (`c.env`) およびローカル環境 (`process.env`) の差分を吸収し、生の環境変数を取得・URL 補完・Valibot パースを行い設定オブジェクトを組み立てて返却します。
 
@@ -93,7 +99,7 @@
 - **LIFF の ID トークン検証と Account の解決**:
   - **クライアントから送られてきた識別子は受け付けません。** `liff.getProfile()` が返す値そのものは LINE から取得した本物ですが、サーバー側では「LINE の API が返した値の転送」と「手で書かれた値」を区別できないため、`userId` を識別子として使うと他人になりすませます。本人の識別子は必ず ID トークンの検証で得た `sub` を使います。
   - 用途で使い分けます。**画面表示**（`displayName` / `pictureUrl`）は `liff.getProfile()` の値でよく（嘘をつけても本人の画面の表示が変わるだけ）、**本人の識別・認可**は検証済みの `sub` だけを使います。検証は `packages/lib` の `line.idToken.verify`（LINE の `POST /oauth2/v2.1/verify` へ委譲）で行い、`aud` が LINE Login チャネル ID と一致することを受け取り側でも確認します。
-  - エンドポイントは `POST /api/line/liff/session`。ロジックは `apps/api/src/logic/liff-session.ts` に置き、ルートは HTTP への変換だけを行います（`apps/worker` の `processLineWebhook` と同じ形）。
+  - エンドポイントは `POST /api/line/liff/session`。
   - Account の解決は `d1.action.account.resolveAccountByLineLogin` に集約します。`line_login` の identity → 同じ値の `line` の identity（同一プロバイダーなら userId が一致する）の順に探し、後者で見つかった場合は `line_login` を同じ Account へ紐づけます。
   - **どちらも見つからない場合は Account を作らず 404 を返します。** アカウント作成の起点は LINE 公式アカウントの友だち追加です（[プロジェクト概要 §5](../../docs/project-overview.md#5-アカウントと本人識別)）。userId が一致しない構成での紐づけ手段は未設計です。
   - 既存の Account へログイン手段を追加するのは `d1.action.account.linkIdentity` です。`upsertIdentity` は見つからなければ新規 Account を作るため、この用途に使ってはいけません。
