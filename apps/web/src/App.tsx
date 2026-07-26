@@ -84,7 +84,7 @@ export function App() {
 
   useEffect(() => {
     let cancelled = false;
-    initializeLiff()
+    initializeLiff(config.liffId)
       .then((state) => {
         if (!cancelled) {
           setLiffState(state);

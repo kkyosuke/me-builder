@@ -1,6 +1,5 @@
 import liff from "@line/liff";
 import { logger } from "@me-builder/shared";
-import { config } from "../config";
 
 /**
  * 画面へ表示してよいプロフィール項目だけを持つ型。
@@ -38,10 +37,11 @@ const toMessage = (error: unknown): string =>
  * - `liffId` が未設定なら初期化をスキップします（LIFF なしでも画面は動作します）
  * - 未ログインなら `liff.login()` でログイン画面へ遷移します
  * - 初期化・プロフィール取得の失敗は例外を投げず `status: "error"` として返します
+ *
+ * `liffId` は既定値を持たせず呼び出し側（`config.liffId`）から渡します。既定値にすると
+ * `initializeLiff(undefined)` が「未設定」を表現できず、環境変数の有無で挙動が変わります。
  */
-export async function initializeLiff(
-  liffId: string | undefined = config.liffId,
-): Promise<LiffState> {
+export async function initializeLiff(liffId: string | undefined): Promise<LiffState> {
   if (!liffId) {
     logger.info("VITE_LIFF_ID が未設定のため LIFF の初期化をスキップします");
     return { status: "disabled", reason: "VITE_LIFF_ID が未設定です" };
