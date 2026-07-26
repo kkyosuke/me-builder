@@ -8,6 +8,10 @@ dist-ssr
 *.local
 *.tsbuildinfo
 
+# usagi (task issue store: lock file and session worktrees are machine-local)
+.usagi/issues/.lock
+.usagi/sessions
+
 # Logs
 npm-debug.log*
 yarn-debug.log*
