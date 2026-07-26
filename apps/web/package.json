@@ -9,6 +9,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --dir .",
     "preview": "vite preview",
+    "register:liff:preview": "bun scripts/register-liff.ts preview",
+    "register:liff:production": "bun scripts/register-liff.ts production",
     "deploy:preview": "wrangler pages project create me-builder-web --production-branch main || true && bun ../../scripts/setup-pages-domain.ts preview && wrangler pages deploy dist --project-name=me-builder-web --branch=preview",
     "deploy:production": "wrangler pages project create me-builder-web --production-branch main || true && bun ../../scripts/setup-pages-domain.ts production && wrangler pages deploy dist --project-name=me-builder-web --branch=main"
   },
@@ -20,6 +22,7 @@
     "valibot": "^1.4.2"
   },
   "devDependencies": {
+    "@me-builder/lib": "workspace:*",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",

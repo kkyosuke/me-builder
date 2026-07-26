@@ -24,6 +24,10 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
       LINE_CHANNEL_SECRET: ${{ secrets.LINE_CHANNEL_SECRET }}
+      # LIFF Server API は LINE Login チャネルのチャネルアクセストークンを要求する。
+      # LINE_LOGIN_CHANNEL_ID は未設定でも LIFF ID の接頭辞から補完される。
+      LINE_LOGIN_CHANNEL_ID: ${{ vars.LINE_LOGIN_CHANNEL_ID }}
+      LINE_LOGIN_CHANNEL_SECRET: ${{ secrets.LINE_LOGIN_CHANNEL_SECRET }}
       BASE_DOMAIN: ${{ vars.BASE_DOMAIN }}
       VITE_BASE_DOMAIN: ${{ vars.BASE_DOMAIN }}
       # Vite は GitHub Actions 上のビルドで値を埋め込むため、LIFF ID は Pages 側ではなくここで渡す。
@@ -76,6 +80,12 @@ jobs:
           BASE_DOMAIN: ${{ vars.BASE_DOMAIN }}
         run: |
           bun --cwd apps/api scripts/register-webhook.ts
+
+      # デプロイ済みの URL を LIFF アプリのエンドポイント URL へ反映する
+      - name: Register LIFF Endpoint (Preview)
+        if: ${{ env.CLOUDFLARE_API_TOKEN != '' && env.LINE_LOGIN_CHANNEL_SECRET != '' }}
+        run: |
+          bun --cwd apps/web scripts/register-liff.ts preview
 
 
 
