@@ -66,6 +66,11 @@ tasks:
     cmds:
       - bun run ci
 
+  db:setup:
+    desc: 'Automatically create missing remote D1 databases and update wrangler.toml files'
+    cmds:
+      - bun scripts/setup-d1.ts
+
   db:migrate:local:
     aliases: [db:migrate]
     desc: 'Apply D1 database migrations locally'
