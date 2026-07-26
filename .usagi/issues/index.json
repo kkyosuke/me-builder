@@ -1,0 +1,94 @@
+{
+  "version": 1,
+  "source_fingerprint": "sha256:0ca51156ecdc85bf8967e0961fe1a072075859c75529c4cc6f28ec52523acfa9",
+  "issues": [
+    {
+      "number": 2,
+      "title": "design: 設計順序 step 1 — Phase 1 の利用体験を確定する",
+      "status": "in-progress",
+      "priority": "high",
+      "labels": [
+        "design",
+        "docs"
+      ],
+      "dependson": [],
+      "related": [],
+      "parent": null,
+      "milestone": null,
+      "file": "002-design-step-1-phase-1.md",
+      "created_at": "2026-07-26T06:51:28.071641Z",
+      "updated_at": "2026-07-26T07:18:45.916595Z"
+    },
+    {
+      "number": 3,
+      "title": "docs: 設計順序 step 1 — Phase 1 の利用体験（チャネル・ログイン・役割分担）を確定する",
+      "status": "done",
+      "priority": "high",
+      "labels": [
+        "design",
+        "docs"
+      ],
+      "dependson": [],
+      "related": [],
+      "parent": 2,
+      "milestone": null,
+      "file": "003-docs-step-1-phase-1.md",
+      "created_at": "2026-07-26T06:51:39.215894Z",
+      "updated_at": "2026-07-26T07:18:50.594965Z"
+    },
+    {
+      "number": 4,
+      "title": "design: Phase 2 — 日記・アンケート回答とBrain Itemの対応づけを設計する（設計順序 step 3）",
+      "status": "todo",
+      "priority": "high",
+      "labels": [
+        "design",
+        "docs"
+      ],
+      "dependson": [],
+      "related": [],
+      "parent": null,
+      "milestone": null,
+      "file": "004-design-phase-2-brain-item-step-3.md",
+      "created_at": "2026-07-26T06:52:00.033413Z",
+      "updated_at": "2026-07-26T07:18:28.464521Z"
+    },
+    {
+      "number": 5,
+      "title": "design: 設計順序 step 4 — AI による推定と本人確認の流れを設計する",
+      "status": "todo",
+      "priority": "medium",
+      "labels": [
+        "design",
+        "docs"
+      ],
+      "dependson": [
+        4
+      ],
+      "related": [],
+      "parent": null,
+      "milestone": null,
+      "file": "005-design-step-4-ai.md",
+      "created_at": "2026-07-26T06:52:11.414004Z",
+      "updated_at": "2026-07-26T06:52:11.414004Z"
+    },
+    {
+      "number": 6,
+      "title": "design: 設計順序 step 6 — 質問・回答と Brain Item の永続化・検索方式を設計する",
+      "status": "todo",
+      "priority": "medium",
+      "labels": [
+        "design"
+      ],
+      "dependson": [
+        4
+      ],
+      "related": [],
+      "parent": null,
+      "milestone": null,
+      "file": "006-design-step-6-brain-item.md",
+      "created_at": "2026-07-26T06:52:23.985095Z",
+      "updated_at": "2026-07-26T06:52:23.985095Z"
+    }
+  ]
+}
