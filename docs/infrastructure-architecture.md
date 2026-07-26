@@ -17,7 +17,7 @@ me-builderの開発基盤および全体アーキテクチャにおいて、イ�
 
 ### 所有しない概念
 
-- `Account` および `Brain` のドメイン境界や責務の定義 — [ドメイン設計](domain-design.md)
+- `Account`、`Brain`、`Source` のドメイン境界や責務の定義 — [ドメイン設計](domain-design.md)
 - ラベルの分類・定義およびMCPアクセス許可規則 — [Brainのラベル・アクセス制御設計](brain-access-label-design.md)
 - Brain Itemの分類名および具体例 — [Brain内部情報の分類](brain-content-taxonomy.md)
 - プロジェクトの目標、MVP範囲、全体ロードマップ — [プロジェクト概要](project-overview.md)
