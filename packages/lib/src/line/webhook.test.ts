@@ -1,4 +1,3 @@
-import { messagingApi } from "@line/bot-sdk";
 import { describe, expect, it, vi } from "vitest";
 import { line } from "./index";
 

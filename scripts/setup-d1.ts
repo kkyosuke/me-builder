@@ -28,7 +28,7 @@ async function getOrCreateDatabaseId(dbName: string): Promise<string> {
       console.log(`✅ Found existing database ${dbName} (ID: ${match[1]})`);
       return match[1];
     }
-  } catch (error) {
+  } catch (_error) {
     // エラーになる場合はまだ存在しない
   }
 
@@ -83,7 +83,7 @@ async function main() {
       } else {
         console.log(`- Skipped ${file} (no matching blocks or already up-to-date)`);
       }
-    } catch (err) {
+    } catch (_err) {
       console.log(`⚠️  Could not read ${file}, skipping.`);
     }
   }

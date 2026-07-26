@@ -44,5 +44,3 @@ export function getWorkerConfig(env?: Record<string, unknown>): WorkerConfig {
 
   return v.parse(WorkerConfigSchema, rawConfig);
 }
-
-export const config = getWorkerConfig();

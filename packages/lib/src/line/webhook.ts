@@ -5,9 +5,7 @@ import { type LineClientConfig, client } from "./client";
 /**
  * LINE Messaging API SDK (@line/bot-sdk) を使用して Webhook Endpoint URL を登録・更新します。
  */
-export async function register(
-  config: LineClientConfig,
-): Promise<{ success: boolean; message: string }> {
+async function register(config: LineClientConfig): Promise<{ success: boolean; message: string }> {
   const token = config.channelAccessToken;
   const url = config.webhookUrl;
 
@@ -39,7 +37,7 @@ export async function register(
 /**
  * LINE Webhook ペイロードからテキストメッセージを抽出します。
  */
-export function extractMessages(payload: unknown): string[] {
+function extractMessages(payload: unknown): string[] {
   if (!payload || typeof payload !== "object" || payload === null) {
     return [];
   }
@@ -67,7 +65,7 @@ export function extractMessages(payload: unknown): string[] {
 /**
  * LINE Webhook のイベントペイロードを解析し、WebhookEvent の配列として返します。
  */
-export function parseEvents(payload: unknown): lineWebhook.Event[] {
+function parseEvents(payload: unknown): lineWebhook.Event[] {
   if (!payload || typeof payload !== "object" || payload === null) {
     logger.warn("Received invalid LINE webhook payload (not an object)");
     return [];
@@ -82,7 +80,11 @@ export function parseEvents(payload: unknown): lineWebhook.Event[] {
   return events as lineWebhook.Event[];
 }
 
-export const webhook = {
+export const webhook: {
+  register: (config: LineClientConfig) => Promise<{ success: boolean; message: string }>;
+  parseEvents: (payload: unknown) => lineWebhook.Event[];
+  extractMessages: (payload: unknown) => string[];
+} = {
   register,
   parseEvents,
   extractMessages,

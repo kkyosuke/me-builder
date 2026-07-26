@@ -92,7 +92,7 @@ describe("Worker Queue Handler", () => {
   });
 
   it("queue handler catches unhandled error and rethrows", async () => {
-    const message = {
+    const _message = {
       id: "err-msg",
       timestamp: new Date(),
       attempts: 1,

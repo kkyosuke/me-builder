@@ -33,3 +33,9 @@ jobs:
       - uses: ./.github/actions/setup-bun-workspace
       - name: Biome Lint & Format Check
         run: bun run lint
+      - name: Unused Exports Check (Knip)
+        run: bun run lint:exports
+      - name: Markdown Lint Check
+        run: bun run lint:md
+      - name: Markdown Link Check
+        run: bun run lint:md:links
