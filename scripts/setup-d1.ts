@@ -22,7 +22,8 @@ async function getOrCreateDatabaseId(dbName: string): Promise<string> {
   try {
     // 既存のデータベースの情報を取得してみる
     const { stdout: infoOut } = await execAsync(`bunx wrangler d1 info ${dbName}`);
-    const match = infoOut.match(/uuid\s*│\s*([a-f0-9-]+)/i);
+    const regex = new RegExp(`\\b${dbName}\\b\\s*│\\s*([a-f0-9-]+)`, "i");
+    const match = infoOut.match(regex);
     if (match?.[1]) {
       console.log(`✅ Found existing database ${dbName} (ID: ${match[1]})`);
       return match[1];
