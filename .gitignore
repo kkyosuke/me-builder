@@ -21,6 +21,9 @@ bun.lockb
 .dev.vars.*
 !.dev.vars.example
 
-# usagi (セッション worktree とロックファイルは追跡しない / issue 本体はコミットする)
+# usagi (issue 本体の Markdown のみ追跡する)
+# index.json は Markdown から再生成される派生キャッシュ (source_fingerprint 不一致時に
+# rebuild される) のため追跡しない。並列セッションごとに書き換わりコンフリクトの原因になる。
 .usagi/sessions
 .usagi/issues/.lock
+.usagi/**/index.json
