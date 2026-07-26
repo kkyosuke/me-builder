@@ -7,7 +7,7 @@ labels: [ci, web, infra]
 dependson: []
 related: [11, 12]
 created_at: 2026-07-26T12:42:29.267733+00:00
-updated_at: 2026-07-26T13:08:11.058719+00:00
+updated_at: 2026-07-26T13:11:38.868145+00:00
 ---
 
 ## 背景
@@ -24,25 +24,29 @@ Pages はドメインをプロジェクトへ登録するだけでは配信を�
   - 環境変数や権限が足りない場合は警告のみでスキップし、デプロイを失敗させない
 - `apps/web` の `deploy:preview` / `deploy:production` をこのスクリプトの呼び出しへ置き換えた
 - `CLOUDFLARE_API_TOKEN` に Zone:Edit / DNS:Edit を付与済み（2026-07-26）
-- preview デプロイで `stg.kagami.kyosuke.dev → preview.me-builder-web.pages.dev` の CNAME が作成され、DNS で解決するようになった
+
+### preview 側は解消を確認済み
+
+preview デプロイで CNAME が作成され、証明書の発行後（CNAME 作成から約 2 分）に配信が開始した。
 
 ```console
 $ dig +short stg.kagami.kyosuke.dev
 104.21.26.42
 172.67.168.56
+$ curl -s -o /dev/null -w '%{http_code}\n' https://stg.kagami.kyosuke.dev/
+200
 ```
+
+**`stg` は preview ブランチの内容を返している。** 配信中のバンドル (`/assets/index-JbFnHf6i.js`) が `preview.me-builder-web.pages.dev` と同一で、`VITE_LIFF_ID` の値を含んでいることを確認した（production にはまだ LIFF のコードが入っていないため、production の内容ではないと判別できる）。ブランチエイリアスへ CNAME を向ける方針（案 B）で成立したため、Pages プロジェクトを分ける案 A は採らない。
 
 ## 残っていること
 
-1. `https://stg.kagami.kyosuke.dev` が実際に 200 を返すか（証明書の発行完了と、Pages のドメイン状態が Active になること）を確認する。CNAME 作成直後は TLS ハンドシェイクが失敗し、plain HTTP は 522 になる
-2. **`stg` が preview ブランチの内容を返すことを確認する。** ブランチエイリアスへ CNAME を向けているが、Pages のプロジェクトカスタムドメインは production デプロイを指す仕様のため、production の内容が返る可能性がある
-   - その場合は preview 用に Pages プロジェクトを分ける（例: `me-builder-web-preview`。Workers 側の `-preview` / `-production` 命名と揃う）方針へ切り替える
-3. `kagami.kyosuke.dev`（production）は `main` へマージして `cd-production.yml` が走ったときに CNAME が作成される。マージ後に配信を確認する
-4. `docs/infrastructure-architecture.md` の記述と実態が合っているか確認し、必要なら更新する（Pages と Workers で環境の分け方・DNS の作り方が違う点）
+1. `kagami.kyosuke.dev`（production）の CNAME は `main` へマージして `cd-production.yml` が走ったときに作成される。マージ後に `https://kagami.kyosuke.dev` が 200 を返すことを確認する（証明書の発行に数分かかる）
+2. `docs/infrastructure-architecture.md` の記述と実態が合っているか確認し、必要なら更新する（Pages と Workers で環境の分け方・DNS の作り方が違う点）
 
 ## 完了条件
 
-- [ ] `https://stg.kagami.kyosuke.dev` が preview ブランチの内容を返す
+- [x] `https://stg.kagami.kyosuke.dev` が preview ブランチの内容を返す
 - [ ] `https://kagami.kyosuke.dev` が production（`main`）の内容を返す
 - [x] deploy スクリプトが実態と一致している（手動で作った設定に依存していない）
 - [x] `task ci` が成功する
