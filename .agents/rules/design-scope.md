@@ -11,6 +11,7 @@
 - Phase 1のログイン手段と復旧方針
 - Brain内部情報の大分類と、分類とは別に持つ共通属性
 - Source Recordの粒度とkind、Brain Itemの由来（Evidence / Derivation）
+- Source RecordとBrain Itemを結ぶ根拠・反証・改訂のエッジの種類と属性、その外部への開示粒度
 - Topic LabelとAccess Labelによる用途分離、取り込み時と導出時の既定ラベル
 - MCP提供時の高レベルなアクセス原則
 - MVPと設計順序
@@ -18,7 +19,8 @@
 ## 2. 明示的な依頼なしに深掘りしないこと
 
 - 質問（アンケート）の具体的なエンティティや集約（Phase 2）
-- Source RecordとBrain Itemを結ぶ根拠のエッジの種類とその属性
+- Confidenceの具体的な算出方法、閾値、提示のタイミングとUI
+- 反証を検出する処理の入出力
 - 原本と派生の区別（原本の不変性、原本の訂正・削除が派生したBrain Itemへ及ぼす影響）
 - 外部連携時のAccess Label既定値の詳細と、Source Connectorの具体的なモデル
 - 質問内容からAccess Labelの初期候補を決める方法（Phase 2）

@@ -1,13 +1,13 @@
 ---
 number: 7
 title: design: Source RecordとBrain Itemを結ぶ根拠のエッジの種類を設計する（論点2）
-status: todo
+status: done
 priority: high
 labels: [design, docs]
 dependson: [4]
 related: []
 created_at: 2026-07-26T10:56:20.409142+00:00
-updated_at: 2026-07-26T10:56:20.409142+00:00
+updated_at: 2026-07-26T11:26:26.358253+00:00
 ---
 
 ## 背景
