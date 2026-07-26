@@ -7,7 +7,7 @@ labels: [ci, web, infra]
 dependson: []
 related: [11, 12]
 created_at: 2026-07-26T12:42:29.267733+00:00
-updated_at: 2026-07-26T12:42:29.267733+00:00
+updated_at: 2026-07-26T13:00:58.220935+00:00
 ---
 
 ## 背景
@@ -33,9 +33,18 @@ $ dig +short api.stg.kagami.kyosuke.dev
 
 Workers 側は `wrangler.toml` の `routes` に `custom_domain = true` を書いているため DNS レコードが自動作成されるが、Pages 側は API でプロジェクトへドメインを登録するだけで DNS が未整備。結果として web は preview / production のどちらも独自ドメインで配信されていない。
 
+一方、Pages のブランチエイリアスは到達可能。
+
+```console
+$ curl -s -o /dev/null -w '%{http_code}\n' https://preview.me-builder-web.pages.dev/
+200
+```
+
 ## なぜ急ぐか
 
-LIFF アプリ（#11 / #12）のエンドポイント URL は `https://stg.kagami.kyosuke.dev` / `https://kagami.kyosuke.dev` を指す前提。**ドメインが到達可能でないと LIFF アプリを作成しても LINE 内で開けない**ため、#11 の LINE 内実機確認と #12 の前に解消が必要。
+LIFF アプリ（#11 / #12）のエンドポイント URL は `https://stg.kagami.kyosuke.dev` / `https://kagami.kyosuke.dev` を指す前提。**ドメインが到達可能でないと LINE 内で開けない**。
+
+暫定回避として LIFF アプリのエンドポイント URL に `https://preview.me-builder-web.pages.dev` を指定すれば #13 を待たずに LINE 内の動作確認はできる（#11 の PR 説明に記載）。この issue の完了後に独自ドメインへ差し替える。
 
 ## やること
 
@@ -46,6 +55,7 @@ LIFF アプリ（#11 / #12）のエンドポイント URL は `https://stg.kagam
 2. DNS レコードを整備し、両ドメインが実際に配信されることを確認する
 3. `docs/infrastructure-architecture.md` の記述と実態が合っているかを確認し、必要なら更新する（Pages と Workers で環境の分け方が違う点）
 4. `.agents/rules/development.md` §2 の Web UI の項へ、確定した方針を短く反映する
+5. LIFF アプリのエンドポイント URL を暫定の `pages.dev` から独自ドメインへ戻す（#11 の暫定回避を採った場合）
 
 ## 完了条件
 

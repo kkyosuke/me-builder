@@ -39,6 +39,10 @@
     - `main` ブランチマージ時には `cd-production.yml` が全検証後に Cloudflare 本番環境へ自動デプロイします。
     - リポジトリのチェックアウト、Bun のセットアップ、`actions/cache@v4` によるキャッシュ、および `bun install --frozen-lockfile` の一連の処理は GitHub Composite Action ([.github/actions/setup-bun-workspace](file:///Users/kyosuke/git/github.com/KKyosuke/me-builder/.github/actions/setup-bun-workspace/action.yml)) に共通化されています。
   - パッケージの追加・削除はルートから `bun add <package> --cwd <workspace-dir>`（例: `bun add @line/liff --cwd apps/web`）を使用し、個別ディレクトリで `npm install` を実行しないこと。ルートで引数なしに `bun add <package>` を実行するとルートの `package.json` に入ってしまうため、対象ワークスペースを必ず指定します。
+- **Web UI (`apps/web`) のカスタムドメイン**:
+  - `apps/web` は Cloudflare **Pages** で配信するため、Workers (`api` / `mcp` / `worker`) のように `wrangler.toml` の `routes` で DNS レコードを自動作成できません。ドメインのプロジェクト登録と DNS の CNAME 作成は [`scripts/setup-pages-domain.ts`](../../scripts/setup-pages-domain.ts) が行い、`apps/web` の `deploy:preview` / `deploy:production` から呼び出します。
+  - 対象ドメインは `BASE_DOMAIN` を使い、スクリプト側にハードコードしません。CNAME の宛先は preview がブランチエイリアス、production がプロジェクト既定のホストです。
+  - このスクリプトは `CLOUDFLARE_API_TOKEN` に Zone:Read / DNS:Edit の権限を必要とします。権限や環境変数が足りない場合は警告を出して**デプロイを止めずにスキップ**します（DNS の設定漏れでデプロイ自体を失敗させない）。
 - **Web UI (`apps/web`) の環境変数**:
   - Vite がクライアントバンドルへ埋め込むのは `VITE_` 接頭辞付きの環境変数だけです。変数を追加した場合は [`apps/web/.env.example`](../../apps/web/.env.example) へ必ず追記します。
   - バンドルへ埋め込まれた値は閲覧者から参照できます。チャネルシークレットや API キーなどのシークレットを `VITE_` 変数へ置いてはいけません。秘匿が必要な値はサーバー側 (`apps/api`) の環境変数として配布します。
