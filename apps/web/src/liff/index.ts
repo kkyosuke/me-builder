@@ -1,0 +1,81 @@
+import liff from "@line/liff";
+import { logger } from "@me-builder/shared";
+import { config } from "../config";
+
+/**
+ * 画面へ表示してよいプロフィール項目だけを持つ型。
+ *
+ * LINE の `userId` は本人識別子のため、画面表示もログ出力も行いません。
+ * 詳細は [プロジェクト概要 §8](../../../../docs/project-overview.md#8-プライバシーと安全性) を参照してください。
+ */
+interface LiffDisplayProfile {
+  displayName: string;
+  pictureUrl?: string;
+}
+
+/**
+ * LIFF 初期化の結果。どの状態でも画面を描画できるようにするため、
+ * 失敗やスキップも例外ではなく状態として表現します。
+ */
+export type LiffState =
+  /** 初期化中 */
+  | { status: "loading" }
+  /** `VITE_LIFF_ID` が未設定のため初期化をスキップした */
+  | { status: "disabled"; reason: string }
+  /** 未ログインのため LINE のログイン画面へ遷移した */
+  | { status: "login-required" }
+  /** 初期化とプロフィール取得に成功した */
+  | { status: "ready"; inClient: boolean; profile: LiffDisplayProfile }
+  /** 初期化またはプロフィール取得に失敗した */
+  | { status: "error"; message: string };
+
+const toMessage = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
+
+/**
+ * LIFF を初期化し、ログイン状態に応じた表示用の状態を返します。
+ *
+ * - `liffId` が未設定なら初期化をスキップします（LIFF なしでも画面は動作します）
+ * - 未ログインなら `liff.login()` でログイン画面へ遷移します
+ * - 初期化・プロフィール取得の失敗は例外を投げず `status: "error"` として返します
+ */
+export async function initializeLiff(
+  liffId: string | undefined = config.liffId,
+): Promise<LiffState> {
+  if (!liffId) {
+    logger.info("VITE_LIFF_ID が未設定のため LIFF の初期化をスキップします");
+    return { status: "disabled", reason: "VITE_LIFF_ID が未設定です" };
+  }
+
+  try {
+    await liff.init({ liffId });
+  } catch (error) {
+    logger.warn(`LIFF の初期化に失敗しました: ${toMessage(error)}`);
+    return { status: "error", message: `LIFF の初期化に失敗しました: ${toMessage(error)}` };
+  }
+
+  const inClient = liff.isInClient();
+
+  if (!liff.isLoggedIn()) {
+    logger.info(`LIFF が未ログインのためログイン画面へ遷移します (inClient: ${inClient})`);
+    liff.login();
+    return { status: "login-required" };
+  }
+
+  try {
+    const profile = await liff.getProfile();
+    logger.info(`LIFF の初期化とプロフィール取得に成功しました (inClient: ${inClient})`);
+    return {
+      status: "ready",
+      inClient,
+      // userId と statusMessage は意図的に含めません。
+      profile: {
+        displayName: profile.displayName,
+        ...(profile.pictureUrl ? { pictureUrl: profile.pictureUrl } : {}),
+      },
+    };
+  } catch (error) {
+    logger.warn(`LIFF のプロフィール取得に失敗しました: ${toMessage(error)}`);
+    return { status: "error", message: `プロフィールの取得に失敗しました: ${toMessage(error)}` };
+  }
+}

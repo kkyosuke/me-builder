@@ -38,7 +38,11 @@
     - PR 作成・更新時には `cd-preview.yml` が全検証後に Cloudflare プレビュー環境へ自動デプロイします。
     - `main` ブランチマージ時には `cd-production.yml` が全検証後に Cloudflare 本番環境へ自動デプロイします。
     - リポジトリのチェックアウト、Bun のセットアップ、`actions/cache@v4` によるキャッシュ、および `bun install --frozen-lockfile` の一連の処理は GitHub Composite Action ([.github/actions/setup-bun-workspace](file:///Users/kyosuke/git/github.com/KKyosuke/me-builder/.github/actions/setup-bun-workspace/action.yml)) に共通化されています。
-  - パッケージの追加・削除はルートで `bun add <package> --filter <workspace>` を使用し、個別ディレクトリで `npm install` を実行しないこと。
+  - パッケージの追加・削除はルートから `bun add <package> --cwd <workspace-dir>`（例: `bun add @line/liff --cwd apps/web`）を使用し、個別ディレクトリで `npm install` を実行しないこと。ルートで引数なしに `bun add <package>` を実行するとルートの `package.json` に入ってしまうため、対象ワークスペースを必ず指定します。
+- **Web UI (`apps/web`) の環境変数**:
+  - Vite がクライアントバンドルへ埋め込むのは `VITE_` 接頭辞付きの環境変数だけです。変数を追加した場合は [`apps/web/.env.example`](../../apps/web/.env.example) へ必ず追記します。
+  - バンドルへ埋め込まれた値は閲覧者から参照できます。チャネルシークレットや API キーなどのシークレットを `VITE_` 変数へ置いてはいけません。秘匿が必要な値はサーバー側 (`apps/api`) の環境変数として配布します。
+  - Cloudflare Pages ではビルド時に値が埋め込まれるため、変数を追加・変更した場合は Pages プロジェクトの環境変数を更新して再ビルドします。
 
 ## 3. 共有パッケージ (`packages/*`) の開発ルール
 
@@ -50,7 +54,7 @@
   - モノレポ全体のログ出力基盤として `packages/shared` が `Pino` を用いたロガー機能 (`createLogger`, `logger`) を提供します。
   - 各アプリケーション (`apps/api`, `apps/mcp` 等) やライブラリでのログ出力には `console.log` / `console.error` の代わりに `@me-builder/shared` の `logger` を使用し、構造化 JSON 形式で統一出力します。
 
-## 4. API Server および MCP Server の実装ルール
+## 4. アプリケーション実装ルール (API / MCP / Web UI)
 
 - **Web標準 API の遵守**:
   - API サーバーおよび MCP サーバーは `Bun.serve` および **Hono** フレームワークを採用します。
@@ -69,6 +73,14 @@
   - ヘッダ欠落・署名不一致は `401 Unauthorized` を返し、Queue 投入・LINE 返信・D1 書き込みのいずれも行いません。拒否時は `logger.warn` で構造化ログを出力しますが、**署名値およびチャネルシークレットそのものはログに含めません**。
   - チャネルシークレットは `LINE_CHANNEL_SECRET` として `apps/api` にのみ配布します (Cloudflare は `wrangler secret put` / CD ワークフロー、ローカルは `.env`)。`wrangler.toml` の `[vars]` には置きません。
   - `LINE_CHANNEL_SECRET` は **必須** です。未設定の場合は環境 (`local` / `preview` / `production`) を問わず署名検証をスキップせず、`logger.error` を出力したうえで全ての Webhook リクエストを 401 で拒否します。ローカルでオウム返しの動作確認を行う場合も `.env` にチャネルシークレットを設定してください。
+
+- **Web UI の LIFF 初期化 (`apps/web`)**:
+  - LINE 内から Web を開く主導線は LIFF です。導線の設計と根拠は [プロジェクト概要 §4](../../docs/project-overview.md#4-想定する利用体験) を正とし、このルールには再掲しません。
+  - LIFF ID は `VITE_LIFF_ID` として与え、`apps/web/src/config` の Valibot スキーマ経由で optional な `liffId` として取得します。SDK を呼ぶコードから `import.meta.env` を直接読まないこと。
+  - `@line/liff` の呼び出しは `apps/web/src/liff/` に閉じ込め、React コンポーネントから SDK を直接呼ばないこと。コンポーネントは初期化結果の状態オブジェクトだけを受け取ります。
+  - `VITE_LIFF_ID` が未設定の場合は、LIFF 初期化を `logger` へのログ出力とともに安全にスキップし、LIFF なしの画面を表示します（LINE Webhook 自動登録と同じ「環境変数が未設定なら安全にスキップする」方針）。
+  - `liff.init` の失敗時、および外部ブラウザで開かれた場合 (`liff.isInClient()` が false) も画面を白にせず、状態を画面へ表示します。LIFF の初期化結果を画面表示の前提条件にしないこと。
+  - LINE の `userId` は本人識別子です。**画面表示もログ出力も行わず**、表示は `displayName` と `pictureUrl` に限ります ([プロジェクト概要 §8](../../docs/project-overview.md#8-プライバシーと安全性))。ID トークンおよびアクセストークンもログへ出力しません。
 
 ## 5. コミット・Git 運用ルール
 

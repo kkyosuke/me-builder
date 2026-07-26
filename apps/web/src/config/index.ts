@@ -15,10 +15,9 @@ export function getWebConfig(env?: Record<string, string | undefined>): WebConfi
       typeof import.meta !== "undefined"
         ? (import.meta as { env?: Record<string, string> }).env
         : undefined;
+    const processEnv = typeof process !== "undefined" ? process.env : undefined;
     return (
-      metaEnv?.[`VITE_${key}`] ||
-      metaEnv?.[key] ||
-      (typeof process !== "undefined" ? process.env?.[key] : undefined)
+      metaEnv?.[`VITE_${key}`] || metaEnv?.[key] || processEnv?.[`VITE_${key}`] || processEnv?.[key]
     );
   };
 
@@ -41,11 +40,15 @@ export function getWebConfig(env?: Record<string, string | undefined>): WebConfi
     rawApiUrl = domain;
   }
 
+  // 空文字は「未設定」として扱い、LIFF 初期化をスキップできるようにします。
+  const rawLiffId = getEnv("LIFF_ID")?.trim() || undefined;
+
   const rawConfig = {
     environment: rawEnvironment,
     baseDomain: rawBaseDomain,
     baseUrl: rawBaseUrl,
     apiUrl: rawApiUrl,
+    liffId: rawLiffId,
   };
 
   return v.parse(WebConfigSchema, rawConfig);

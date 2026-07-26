@@ -13,6 +13,8 @@
     "deploy:production": "wrangler pages project create me-builder-web --production-branch main || true && (curl -s -X POST \"https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/me-builder-web/domains\" -H \"Authorization: Bearer $CLOUDFLARE_API_TOKEN\" -H \"Content-Type: application/json\" --data '{\"name\":\"kagami.kyosuke.dev\"}' || true) && wrangler pages deploy dist --project-name=me-builder-web --branch=main"
   },
   "dependencies": {
+    "@line/liff": "^2.29.1",
+    "@me-builder/shared": "workspace:*",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "valibot": "^1.4.2"
