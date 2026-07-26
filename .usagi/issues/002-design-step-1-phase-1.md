@@ -1,13 +1,13 @@
 ---
 number: 2
 title: design: 設計順序 step 1 — Phase 1 の利用体験を確定する
-status: in-progress
+status: done
 priority: high
 labels: [design, docs]
 dependson: []
 related: []
 created_at: 2026-07-26T06:51:28.071641+00:00
-updated_at: 2026-07-26T07:18:45.916595+00:00
+updated_at: 2026-07-26T08:06:28.952910+00:00
 ---
 
 ## 背景
