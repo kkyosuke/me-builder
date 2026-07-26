@@ -5,9 +5,9 @@ status: todo
 priority: high
 labels: [api, web, security, line]
 dependson: [11]
-related: []
+related: [13]
 created_at: 2026-07-26T12:15:19.097990+00:00
-updated_at: 2026-07-26T12:24:17.917476+00:00
+updated_at: 2026-07-26T12:43:16.246610+00:00
 ---
 
 ## 背景

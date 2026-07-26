@@ -26,6 +26,9 @@ jobs:
       LINE_CHANNEL_SECRET: ${{ secrets.LINE_CHANNEL_SECRET }}
       BASE_DOMAIN: ${{ vars.BASE_DOMAIN }}
       VITE_BASE_DOMAIN: ${{ vars.BASE_DOMAIN }}
+      # Vite は GitHub Actions 上のビルドで値を埋め込むため、LIFF ID は Pages 側ではなくここで渡す。
+      # 未設定の場合は LIFF 初期化がスキップされる (画面は壊れない)。
+      VITE_LIFF_ID: ${{ vars.LIFF_ID }}
 
     steps:
       - uses: actions/checkout@v4

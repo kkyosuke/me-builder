@@ -5,9 +5,9 @@ status: in-progress
 priority: high
 labels: [web, docs, line]
 dependson: []
-related: [12]
+related: [12, 13]
 created_at: 2026-07-26T12:14:51.723094+00:00
-updated_at: 2026-07-26T12:15:28.277377+00:00
+updated_at: 2026-07-26T12:46:23.982317+00:00
 ---
 
 ## 背景
@@ -43,6 +43,7 @@ Phase 1 のスワイプアンケートは Web が担当し、LINE からリン�
    - `VITE_LIFF_ID` 未設定 → LIFF 初期化をスキップし従来画面を表示（`logger` でログ出力）
    - 外部ブラウザで開いた（`liff.isInClient()` が false）/ `liff.init` が失敗した → 白画面にせず状態を画面に出す
 5. **テスト**: `config` のテストに `VITE_LIFF_ID` あり / なしのケースを追加。`liff` はモックし、初期化成功・失敗・未設定の分岐をテストする
+6. **CD 配線**: `cd-preview.yml` / `cd-production.yml` で `VITE_LIFF_ID: ${{ vars.LIFF_ID }}` を渡す
 
 ## 節番号を変えないこと（既知のリスク）
 
@@ -59,11 +60,19 @@ LIFF アプリの作成はコンソール操作なので Agent は実行でき�
 - LIFF アプリを作成するチャネル（LINE Login チャネル）
 - エンドポイント URL（preview: `https://stg.kagami.kyosuke.dev`、production: `https://kagami.kyosuke.dev`。`apps/web/package.json` の deploy スクリプトが登録するドメインと揃える）
 - サイズ、必要な scope（`profile`）
-- 発行された LIFF ID の設定先（ローカルは `.env`、Cloudflare Pages は環境変数）
+- 発行された LIFF ID の設定先
+  - ローカル: `apps/web/.env` の `VITE_LIFF_ID`
+  - preview / production: **GitHub Environment の変数 `LIFF_ID`**（preview は `dev`、production は `prd`）。CD ワークフローが `VITE_LIFF_ID` へマップしてビルド時に埋め込む。Vite は GitHub Actions 上のビルドで値を埋め込み、`wrangler pages deploy dist` はビルド済みアセットのみを上げるため、**Cloudflare Pages プロジェクト側の環境変数はバンドルへ反映されない**
+  - 進捗: `dev` は設定済み（2026-07-26）。`prd` は production 用 LIFF アプリの作成後に設定が必要
+
+## 前提となる別タスク
+
+- #13 Pages の preview ドメインが preview ブランチを配信するようにし DNS を整備する。現状 `stg.kagami.kyosuke.dev` / `kagami.kyosuke.dev` はどちらも DNS で引けないため、**LIFF アプリのエンドポイント URL が到達可能にならない**。LINE 内での実機確認は #13 の解消後に行う
 
 ## スコープ外
 
 - **LIFF の ID トークン検証と Account 紐づけ** → #12
+- Pages のドメイン・ブランチ構成の見直し → #13
 - スワイプアンケート画面そのものの実装
 - LINE 側のリッチメニュー / リンク配信を LIFF URL へ切り替える作業
 - 独立 Web 側の LINE Login 実装
@@ -74,11 +83,15 @@ LIFF アプリの作成はコンソール操作なので Agent は実行でき�
 
 ## 完了条件
 
-- [ ] `docs/project-overview.md` §4 が LIFF 主導線を根拠・代替案つきで確定しており、節番号が変わっていない
-- [ ] `.agents/rules/documentation.md` §9 のレビューチェックリストを満たす（概念の重複定義なし、旧記述が残っていない）
-- [ ] `VITE_LIFF_ID` 設定時に `liff.init` が成功しプロフィールが表示される実装になっている
-- [ ] `VITE_LIFF_ID` 未設定時・外部ブラウザ時に画面が壊れない
-- [ ] `userId` が画面・ログのどちらにも出ていない
-- [ ] `task ci`（lint / typecheck / test / build）が成功する
-- [ ] `git diff --check` が成功する
-- [ ] PR が `docs/pull-request-guidelines.md` の命名規約とテンプレートに沿っている
+- [x] `docs/project-overview.md` §4 が LIFF 主導線を根拠・代替案つきで確定しており、節番号が変わっていない
+- [x] `.agents/rules/documentation.md` §9 のレビューチェックリストを満たす（概念の重複定義なし、旧記述が残っていない）
+- [x] `VITE_LIFF_ID` 設定時に `liff.init` が成功しプロフィールが表示される実装になっている
+- [x] `VITE_LIFF_ID` 未設定時・外部ブラウザ時に画面が壊れない
+- [x] `userId` が画面・ログのどちらにも出ていない
+- [x] `task ci`（lint / typecheck / test / build）が成功する
+- [x] `git diff --check` が成功する
+- [x] PR が `docs/pull-request-guidelines.md` の命名規約とテンプレートに沿っている
+
+## PR
+
+<https://github.com/kkyosuke/me-builder/pull/24>
