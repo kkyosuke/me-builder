@@ -91,6 +91,9 @@ async function issueChannelAccessToken(channelId: string, channelSecret: string)
     if (res.ok) {
       const json = (await res.json()) as { access_token?: string };
       if (json.access_token) {
+        // どのエンドポイントで発行できたかを残す。短命トークンはチャネルあたり
+        // 30 個の上限があるため、フォールバックが常用されていないか確認できるようにする。
+        logger.info(`[LIFF] チャネルアクセストークンを発行しました (${endpoint})`);
         return json.access_token;
       }
       failures.push(`${endpoint}: response has no access_token`);
