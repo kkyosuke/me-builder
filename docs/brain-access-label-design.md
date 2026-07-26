@@ -13,6 +13,8 @@ Brain内の情報には用途を表すAccess Labelを付けます。MCPなど外
 - 未分類データは本人だけが確認でき、外部MCPへは提供しない
 - ラベル判定前の本文をLLMや外部検索サービスへ送らない
 
+この文書が扱うAccess Labelは、Brain Itemだけでなく[Source domain](domain-design.md#5-source-domain)のSource Recordにも適用します。文書名はBrainだけを対象としていた時点のものなので、BrainとSourceに共通のSSoTとして改名する方針です。改名と参照の更新は機械的な変更になるため後続の変更で行い、この文書の節番号と節構成は維持します。
+
 ## 2. 全体像
 
 ```mermaid
@@ -71,6 +73,8 @@ Access Labelは単なる文字列タグではなく、ドメイン上の認可�
 
 複数用途で利用する情報には、複数のAccess Labelを明示的に付けます。新しいAccess Labelを作っても、既存情報へ自動的には追加しません。
 
+Source RecordにもAccess Labelを付けます。既定値は[§6](#6-ラベル付与)で定義します。Source Recordに対して機微度や外部提供可否をどこまでBrain Itemと同じ形で扱うかは、外部連携の設計とあわせて後続で決めます。
+
 ## 5. Access Profile
 
 Access Profileは、MCPやエージェントがBrainをどの用途で利用できるかを定義します。
@@ -92,6 +96,21 @@ Access Profileでは、次の内容を設定します。
 Access Profileは複数ラベルを許可できますが、許可ラベルを増やす操作は権限拡大として本人へ明示します。
 
 ## 6. ラベル付与
+
+### 取り込み時と導出時の既定値
+
+**確定**: 取り込んだ時点と導出した時点の既定Access Labelを次のとおりとします。
+
+| 対象 | 既定のAccess Label |
+| --- | --- |
+| Source Record | `private` |
+| Source Recordから導出されたBrain Item | `unclassified` |
+
+根拠:
+
+- Source Recordは原本です。[プロジェクト概要 §3.2](project-overview.md#32-mcpでエージェントへ提供する)は「可能な限り写真や音声などの原本ではなく、本人が確認できる要約・特徴・回答を提供します」としており、原本を外部MCPへ出さない方針です。`private`を許可する外部向けAccess Profileは[§5](#5-access-profile)の初期プリセットに存在しません。これは意図した状態です
+- 導出されたBrain Itemの`unclassified`は、後述の「確信できない場合」の定義をそのまま適用したものです。本人の確認を経て`work`や`relationship`へ広がります
+- どちらも[プロジェクト概要 §8](project-overview.md#8-プライバシーと安全性)の「初期状態は非公開とし、外部提供は明示的な同意を必要とする」と整合します
 
 ### 入力時
 

@@ -6,18 +6,21 @@
 
 作業対象:
 
-- AccountとBrainの責務・境界
+- Account、Brain、Sourceの責務・境界とドメイン間の関係
 - Phase 1の対応チャネルと入力形式、チャネルの役割分担
 - Phase 1のログイン手段と復旧方針
-- Brain内部情報の大分類
-- Topic LabelとAccess Labelによる用途分離
+- Brain内部情報の大分類と、分類とは別に持つ共通属性
+- Source Recordの粒度とkind、Brain Itemの由来（Evidence / Derivation）
+- Topic LabelとAccess Labelによる用途分離、取り込み時と導出時の既定ラベル
 - MCP提供時の高レベルなアクセス原則
 - MVPと設計順序
 
 ## 2. 明示的な依頼なしに深掘りしないこと
 
-- 質問・回答の具体的なエンティティや集約（Phase 2）
-- 日記・アンケート回答とBrain Itemの対応づけ（Phase 2）
+- 質問（アンケート）の具体的なエンティティや集約（Phase 2）
+- Source RecordとBrain Itemを結ぶ根拠のエッジの種類とその属性
+- 原本と派生の区別（原本の不変性、原本の訂正・削除が派生したBrain Itemへ及ぼす影響）
+- 外部連携時のAccess Label既定値の詳細と、Source Connectorの具体的なモデル
 - 質問内容からAccess Labelの初期候補を決める方法（Phase 2）
 - AI推定結果と根拠の具体的なモデル
 - MCP接続クライアント、Scope、監査レコードの具体的なモデル
