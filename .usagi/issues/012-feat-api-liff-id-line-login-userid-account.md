@@ -7,7 +7,7 @@ labels: [api, web, security, line]
 dependson: [11]
 related: [13]
 created_at: 2026-07-26T12:15:19.097990+00:00
-updated_at: 2026-07-26T14:47:42.531659+00:00
+updated_at: 2026-07-26T21:55:32.033937+00:00
 ---
 
 ## 背景
@@ -47,17 +47,17 @@ LINE の用語集は userId を次のように定義している。**プロバ�
 
 - `packages/lib/src/line/id-token.ts`: `line.idToken.verify`。LINE の `POST https://api.line.me/oauth2/v2.1/verify` へ委譲し、`aud` の一致を受け取り側でも確認する。JWKS の取得と署名検証は自前で持たない
 - `packages/lib/src/line/id-token.ts`: `resolveLoginChannelId`。`LINE_LOGIN_CHANNEL_ID` 未設定時は LIFF ID の接頭辞から補完（`liff.ts` と共有）
-- `apps/api/src/logic/liff-session.ts`: `createLiffSession`。ルート `POST /api/line/liff/session` は HTTP への変換だけ行う
+- `apps/api`: `controller/line.ts`（`/api/line/` 配下の HTTP 変換）と `logic/liff-session.ts` / `logic/line-webhook.ts`（HTTP を知らないドメイン層）に分離。ルート定義は controller を呼ぶだけ
 - `apps/api` の config に `liffId` / `lineLoginChannelId` を追加。CD から `LIFF_ID` を `apps/api` へ配布
 - `apps/web`: `verifyLiffSession` で ID トークンを API へ送り、結果（本人確認済み / 友だち追加が必要 / エラー）を画面へ出す
-- `.agents/rules/development.md` §4 に運用ルールを追記
+- `.agents/rules/development.md` §4 に層の分離と運用ルールを追記
 
-テスト:
+## レビュー指摘への対応（PR #25）
 
-- `line.idToken.verify`: 成功 / `aud` 不一致 / 検証エンドポイントのエラー / `sub` 欠落 / 入力欠落 / ネットワークエラー / **拒否理由に ID トークンを含めない**
-- `resolveAccountByLineLogin` / `linkIdentity`: 実マイグレーション適用済みの SQLite に対して、ケース A の引き当て / 2 回目の冪等性 / Account を作らないこと / 他 Account の identity を奪わないこと
-- `createLiffSession`: 200 / 401（トークン無し・検証失敗・`aud` 不一致・チャネル ID 未設定） / 404、および `sub` をレスポンスへ含めないこと
-- `verifyLiffSession`（web）: verified / friendship-required / error / トークン取得失敗 / 通信失敗
+- **`linkIdentity` の競合**: 存在確認と INSERT の間に排他がなく、同じ `sub` で初回解決が並行するとユニーク制約違反が伝播して 500 になっていた（`Promise.allSettled` で再現確認）。`upsertIdentity` と同じく catch + 再取得で先に入った行を採用するようにし、同時実行の回帰テストを追加した
+- **`accountId` を返さない**: セッションとトークンの管理方式が[ドメイン設計](../../docs/domain-design.md)で未決定のうちにクライアントへ渡すと、後続リクエストで「クライアントが送ってきた `accountId`」を信頼する実装を誘発する。返すのは `displayName` / `pictureUrl` だけにした
+- **ID トークンのリプレイ**: **LIFF は `nonce` を指定できない**（`liff.login()` にパラメータが無いことをドキュメントで確認）ため、nonce による対策は採れない。代わりに `maxAgeSeconds` で受け入れる発行後の経過時間を絞れるようにした。既定は LIFF の ID トークンの有効期間と同じ 1 時間（LINE 側の検証より厳しくしない）で、検証成功時に経過秒数だけをログへ出力する。実際の分布を見てから絞る
+- **層の分離**: logic が HTTP のステータスコードを返していたのを、ドメイン上の結果を返す形へ変更し、controller を新設した
 
 ## 未実装（判定フローの 3 = ケース B）
 
@@ -69,11 +69,12 @@ userId が一致しない場合に、Messaging API 側の userId と LINE Login 
 | リンクに nonce を載せる | 実装は最小だが、転送された nonce を第三者が開くと第三者の `sub` が本人の Account へ紐づく。短命・単回・確認画面が必須 |
 | LINE 公式の Account Link (`linkToken`) | 堅いが重厚 |
 
-**まず構成の確認を優先する。** LINE Login チャネルを Messaging API チャネルと同一プロバイダーに置けるなら、ケース B ごと消える（プロバイダー間のチャネル移動はできないため作り直しになるが、現状 preview の LIFF アプリ 1 つだけなのでコストは小さい）。
+**まず構成の確認を優先する。** LINE Login チャネルを Messaging API チャネルと同一プロバイダーに置けるなら、ケース B ごと消える。
 
-## 検討事項
+## 残る検討事項
 
-- `(account_id, provider)` のユニーク制約が無いため、同一 Account に `line` identity が 2 本ぶら下がる状態を DB は防げない。[ドメイン設計の Account が守るルール](../../docs/domain-design.md)を DB レベルでも担保するなら制約追加を検討する（現状は `linkIdentity` がアプリ側で他 Account への重複紐づけを拒否している）
+- **サーバー発行のセッション**: ID トークンを毎回送る形のままだと、リプレイ耐性も認可の土台も弱い。書き込み系のエンドポイントを作る前に、セッション方式（[ドメイン設計](../../docs/domain-design.md)で未決定）を決める必要がある
+- `(account_id, provider)` のユニーク制約が無いため、同一 Account に `line` identity が 2 本ぶら下がる状態を DB は防げない。DB レベルでも担保するなら制約追加を検討する（現状は `linkIdentity` がアプリ側で他 Account への重複紐づけを拒否している）
 
 ## 完了条件
 

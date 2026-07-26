@@ -61,12 +61,7 @@ export async function linkIdentity(
 ): Promise<typeof accountIdentities.$inferSelect> {
   const existing = await findByIdentity(db, input.provider, input.providerAccountId);
   if (existing) {
-    if (existing.identity.accountId !== input.accountId) {
-      // 同じ外部ログインIDを複数の有効なAccountへ重複して紐づけない
-      // (docs/domain-design.md の Account が守るルール)
-      throw new Error("Identity is already linked to another account");
-    }
-    return existing.identity;
+    return assertSameAccount(existing, input.accountId);
   }
 
   const now = new Date();
@@ -81,8 +76,53 @@ export async function linkIdentity(
     isDeleted: false,
   };
 
-  await db.insert(accountIdentities).values(identity);
+  try {
+    await db.insert(accountIdentities).values(identity);
+  } catch (err: unknown) {
+    // 存在確認と INSERT の間に排他がないため、同じ identity を同時に作ろうとすると
+    // 部分ユニークインデックスに弾かれる。先に入った行を採用する (upsertIdentity と同じ方針)。
+    if (!isUniqueViolation(err)) {
+      throw err;
+    }
+    logger.warn(
+      { accountId: input.accountId, provider: input.provider },
+      "Unique constraint violation during linkIdentity, fetching the existing identity",
+    );
+
+    const inserted = await findByIdentity(db, input.provider, input.providerAccountId);
+    if (!inserted) {
+      throw err;
+    }
+    return assertSameAccount(inserted, input.accountId);
+  }
+
   return identity;
+}
+
+/**
+ * 既存の identity が期待した Account に属していることを確認します。
+ *
+ * 別の Account に属している場合は、[ドメイン設計](../../../../docs/domain-design.md)の
+ * 「同じ外部ログインIDを複数の有効なAccountへ重複して紐づけない」に従って拒否します。
+ */
+function assertSameAccount(
+  existing: UpsertIdentityResult,
+  accountId: string,
+): typeof accountIdentities.$inferSelect {
+  if (existing.identity.accountId !== accountId) {
+    throw new Error("Identity is already linked to another account");
+  }
+  return existing.identity;
+}
+
+/** D1 / SQLite のユニーク制約違反かどうかを判定します。 */
+function isUniqueViolation(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  return (
+    message.includes("UNIQUE constraint failed") ||
+    message.includes("D1_ERROR") ||
+    message.includes("SQLITE_CONSTRAINT")
+  );
 }
 
 /**
@@ -171,12 +211,7 @@ export async function upsertIdentity(
       db.insert(accountIdentities).values(identity),
     ]);
   } catch (err: unknown) {
-    const errorMsg = err instanceof Error ? err.message : String(err);
-    if (
-      errorMsg.includes("UNIQUE constraint failed") ||
-      errorMsg.includes("D1_ERROR") ||
-      errorMsg.includes("SQLITE_CONSTRAINT")
-    ) {
+    if (isUniqueViolation(err)) {
       logger.warn(
         { err, providerAccountId: input.providerAccountId },
         "Unique constraint violation during upsert, fetching existing identity",

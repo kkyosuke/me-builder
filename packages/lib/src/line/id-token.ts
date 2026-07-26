@@ -18,11 +18,26 @@ import { logger } from "@me-builder/shared";
 
 const VERIFY_ENDPOINT = "https://api.line.me/oauth2/v2.1/verify";
 
+/**
+ * 受け入れる ID トークンの最大経過時間（秒）の既定値。
+ *
+ * LIFF の ID トークンは発行から 1 時間有効なので、既定はそれに合わせています
+ * （LINE 側の検証より厳しくしない）。**LIFF は `nonce` を指定できない**ため
+ * （`liff.login()` に nonce のパラメータがない）、リプレイを nonce で防げません。
+ * 代わりにこの上限を絞ることで、漏れたトークンが使える時間を短くできます。
+ *
+ * 絞る前に実際の `iat` の分布を確認できるよう、検証成功時にトークンの経過秒数を
+ * ログへ出力します（トークン本体は出力しません）。
+ */
+const DEFAULT_MAX_AGE_SECONDS = 60 * 60;
+
 export type VerifyIdTokenParams = {
   /** クライアントから受け取った ID トークン */
   idToken: string;
   /** LINE Login チャネルの ID (`aud` の期待値) */
   channelId: string;
+  /** 受け入れる発行からの最大経過時間（秒）。既定は 3600 */
+  maxAgeSeconds?: number | undefined;
 };
 
 /** 検証済みのクレーム。表示に使えるのは `name` と `picture` だけです。 */
@@ -42,13 +57,19 @@ type VerifyResponse = {
   sub?: string;
   aud?: string;
   exp?: number;
+  /** 発行時刻 (UNIX 秒) */
+  iat?: number;
   name?: string;
   picture?: string;
   error?: string;
   error_description?: string;
 };
 
-async function verify({ idToken, channelId }: VerifyIdTokenParams): Promise<VerifyIdTokenResult> {
+async function verify({
+  idToken,
+  channelId,
+  maxAgeSeconds = DEFAULT_MAX_AGE_SECONDS,
+}: VerifyIdTokenParams): Promise<VerifyIdTokenResult> {
   if (!idToken || !channelId) {
     return { ok: false, reason: "id_token または LINE Login チャネル ID が指定されていません" };
   }
@@ -82,6 +103,18 @@ async function verify({ idToken, channelId }: VerifyIdTokenParams): Promise<Veri
   if (body.aud !== channelId) {
     logger.warn("[LINE ID Token] aud が LINE Login チャネル ID と一致しません");
     return { ok: false, reason: "aud が一致しません" };
+  }
+
+  // 発行からの経過時間を確認する。exp は LINE 側で検証されるが、
+  // nonce を使えない分、受け入れる期間を自分で絞れるようにしておく。
+  if (body.iat !== undefined) {
+    const ageSeconds = Math.floor(Date.now() / 1000) - body.iat;
+    if (ageSeconds > maxAgeSeconds) {
+      logger.warn({ ageSeconds, maxAgeSeconds }, "[LINE ID Token] 発行から時間が経ちすぎています");
+      return { ok: false, reason: "ID トークンが古すぎます" };
+    }
+    // 上限を絞る判断材料として経過時間だけ残す (トークン本体は出力しない)
+    logger.info({ ageSeconds }, "[LINE ID Token] 検証に成功しました");
   }
 
   return {

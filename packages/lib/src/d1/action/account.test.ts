@@ -150,6 +150,28 @@ describe("resolveAccountByLineLogin", () => {
     expect(await db.select().from(schema.accounts).all()).toHaveLength(1);
   });
 
+  it("同じ sub で同時に解決しても 500 にならず、identity が 1 本だけ増えること", async () => {
+    const db = createTestDb();
+    const followed = await upsertIdentity(db, {
+      provider: "line",
+      providerAccountId: "U_concurrent",
+    });
+
+    // 初回に LIFF を開いたときの二重実行 (StrictMode の二重 effect、リロード、2 タブ)
+    const results = await Promise.allSettled([
+      resolveAccountByLineLogin(db, "U_concurrent"),
+      resolveAccountByLineLogin(db, "U_concurrent"),
+    ]);
+
+    expect(results.filter((r) => r.status === "rejected")).toHaveLength(0);
+    for (const r of results) {
+      if (r.status === "fulfilled") {
+        expect(r.value?.account.id).toBe(followed.account.id);
+      }
+    }
+    expect(await db.select().from(schema.accountIdentities).all()).toHaveLength(2);
+  });
+
   it("2 回目以降は line_login の identity から直接解決すること", async () => {
     const db = createTestDb();
     const followed = await upsertIdentity(db, { provider: "line", providerAccountId: "U_second" });

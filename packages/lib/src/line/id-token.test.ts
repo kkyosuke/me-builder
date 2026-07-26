@@ -109,6 +109,66 @@ describe("line.idToken.verify", () => {
   });
 });
 
+describe("line.idToken.verify の経過時間チェック", () => {
+  beforeEach(() => {
+    calls = [];
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  /** `iat` を「今から n 秒前」に置いたクレームを作ります。 */
+  const claimsIssuedAgo = (seconds: number) => ({
+    iss: "https://access.line.me",
+    sub: SUB,
+    aud: CHANNEL_ID,
+    iat: Math.floor(Date.now() / 1000) - seconds,
+    exp: Math.floor(Date.now() / 1000) + 3600,
+  });
+
+  it("maxAgeSeconds を超えて古い ID トークンを拒否すること", async () => {
+    mockFetch({ json: claimsIssuedAgo(600) });
+
+    const result = await idToken.verify({
+      idToken: ID_TOKEN,
+      channelId: CHANNEL_ID,
+      maxAgeSeconds: 300,
+    });
+
+    expect(result).toMatchObject({ ok: false, reason: "ID トークンが古すぎます" });
+  });
+
+  it("maxAgeSeconds の範囲内なら受け入れること", async () => {
+    mockFetch({ json: claimsIssuedAgo(60) });
+
+    const result = await idToken.verify({
+      idToken: ID_TOKEN,
+      channelId: CHANNEL_ID,
+      maxAgeSeconds: 300,
+    });
+
+    expect(result.ok).toBe(true);
+  });
+
+  it("既定では LINE の有効期間 (1 時間) と同じ扱いにすること", async () => {
+    // 既定より厳しくしないので、59 分前のトークンは既定では通る
+    mockFetch({ json: claimsIssuedAgo(59 * 60) });
+
+    expect((await idToken.verify({ idToken: ID_TOKEN, channelId: CHANNEL_ID })).ok).toBe(true);
+
+    mockFetch({ json: claimsIssuedAgo(61 * 60) });
+
+    expect((await idToken.verify({ idToken: ID_TOKEN, channelId: CHANNEL_ID })).ok).toBe(false);
+  });
+
+  it("iat が無いレスポンスでも経過時間チェックで落とさないこと", async () => {
+    mockFetch({ json: { iss: "https://access.line.me", sub: SUB, aud: CHANNEL_ID } });
+
+    expect((await idToken.verify({ idToken: ID_TOKEN, channelId: CHANNEL_ID })).ok).toBe(true);
+  });
+});
+
 describe("line.idToken.resolveLoginChannelId", () => {
   it("チャネル ID が指定されていればそれを使うこと", () => {
     expect(idToken.resolveLoginChannelId({ channelId: "111", liffId: "222-abc" })).toBe("111");

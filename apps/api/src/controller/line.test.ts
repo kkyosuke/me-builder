@@ -44,8 +44,8 @@ describe("POST /api/line/liff/session", () => {
     const res = await request(JSON.stringify({ idToken: "dummy.id.token" }));
 
     expect(res.status).toBe(200);
+    // accountId はクライアントへ返さない (セッション管理の方式が未決定のため)
     expect(await res.json()).toEqual({
-      accountId: "acc-1",
       displayName: "うつし",
       pictureUrl: "https://example.com/p.jpg",
     });

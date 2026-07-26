@@ -68,6 +68,7 @@
 - **層の分離 (`src/controller/` と `src/logic/`)**:
   - **`logic/` は HTTP を知りません。** ステータスコードやレスポンスボディを返さず、ドメイン上の結果を判別可能な union（例: `resolved` / `unauthenticated` / `account-not-found`）として返します。
   - **`controller/` が HTTP との境界**です。リクエストの解釈（ボディのパース、バインディングの確認）と、`logic` が返した結果から `Response` への変換だけを担当します。ルート定義 (`src/index.ts`) からは controller を呼ぶだけにします。
+  - controller はパスの区分ごとに 1 ファイルにまとめます（例: `controller/line.ts` が `/api/line/` 配下を担当）。エンドポイントごとにファイルを増やしません。
   - テストも層ごとに分けます。`logic` はドメインの結果を検証し、`controller` は `logic` をモックして HTTP への変換だけを検証します。
   - `apps/worker` の `handler/` と `logic/` も同じ分離です。
 
@@ -104,6 +105,8 @@
   - **どちらも見つからない場合は Account を作らず 404 を返します。** アカウント作成の起点は LINE 公式アカウントの友だち追加です（[プロジェクト概要 §5](../../docs/project-overview.md#5-アカウントと本人識別)）。userId が一致しない構成での紐づけ手段は未設計です。
   - 既存の Account へログイン手段を追加するのは `d1.action.account.linkIdentity` です。`upsertIdentity` は見つからなければ新規 Account を作るため、この用途に使ってはいけません。
   - `LINE_LOGIN_CHANNEL_ID` は `apps/api` へ配布します。未設定の場合は `LIFF_ID` の接頭辞から補完します。ID トークン・アクセストークン・`sub` はレスポンスにもログにも含めません。
+  - **`accountId` をクライアントへ返しません。** セッションとトークンの管理方式は[ドメイン設計](../../docs/domain-design.md)で未決定であり、返すと後続リクエストで「クライアントが送ってきた `accountId`」を信頼する実装を誘発します。返すのは表示に使う `displayName` / `pictureUrl` だけです。
+  - **LIFF の ID トークンには `nonce` を設定できません**（`liff.login()` に nonce のパラメータがない）。そのためリプレイを nonce で防げず、代わりに `line.idToken.verify` の `maxAgeSeconds` で受け入れる発行後の経過時間を絞れるようにしています。既定は LIFF の ID トークンの有効期間と同じ 1 時間（LINE 側の検証より厳しくしない）で、検証成功時に経過秒数だけをログへ出力するので、実際の分布を見てから絞れます。恒久的な対策はサーバー発行のセッションであり、方式が決まってから対応します。
 
 - **LIFF アプリのエンドポイント URL の自動登録**:
   - Webhook Endpoint URL と同じく、デプロイのたびに「今デプロイした URL」を LIFF アプリへ反映します。ロジックは `packages/lib` の `line.liff.registerEndpoint`、実行は `bun --cwd apps/web scripts/register-liff.ts <preview|production>` で、CD ワークフローのデプロイ後に呼び出します。

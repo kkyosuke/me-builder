@@ -1,9 +1,9 @@
 import { line } from "@me-builder/lib";
-import { type WebhookQueueMessage, logger } from "@me-builder/shared";
+import { logger } from "@me-builder/shared";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { config, getConfig } from "./config";
-import { postLiffSession } from "./controller/liff-session";
+import { postLiffSession, postLineWebhook } from "./controller/line";
 import type { AppEnv } from "./types";
 
 const app = new Hono<AppEnv>();
@@ -48,85 +48,7 @@ app.get("/api/health", (c) => {
 });
 
 // LINE Webhook 受信エンドポイント（署名検証 → Queue へ投入）
-app.post("/api/line/webhook", async (c) => {
-  const currentConfig = getConfig(c.env);
-
-  // 署名検証は必ず「生のリクエストボディ文字列」に対して行う。
-  // c.req.json() の結果を再 stringify するとバイト列が変わり検証が壊れるため、
-  // まず text() で取得し、検証を通過してから JSON.parse する。
-  const rawBody = await c.req.text();
-  const signature = c.req.header("x-line-signature");
-
-  // LINE_CHANNEL_SECRET が未設定の場合、環境を問わず署名検証をスキップせず拒否する
-  if (!currentConfig.lineChannelSecret) {
-    logger.error(
-      { path: c.req.path, environment: currentConfig.environment },
-      "LINE_CHANNEL_SECRET is not configured, rejecting LINE webhook request",
-    );
-    return c.json({ error: "Unauthorized" }, 401);
-  }
-
-  const isValidSignature = line.webhook.verifySignature({
-    body: rawBody,
-    channelSecret: currentConfig.lineChannelSecret,
-    signature,
-  });
-
-  if (!isValidSignature) {
-    // 署名値・チャネルシークレットそのものはログに残さない
-    logger.warn(
-      {
-        path: c.req.path,
-        hasSignatureHeader: Boolean(signature),
-        bodyLength: rawBody.length,
-      },
-      "Rejected LINE webhook request with missing or invalid x-line-signature",
-    );
-    return c.json({ error: "Unauthorized" }, 401);
-  }
-
-  let body: unknown = {};
-  try {
-    body = rawBody.length > 0 ? JSON.parse(rawBody) : {};
-  } catch {
-    logger.warn(
-      { path: c.req.path, bodyLength: rawBody.length },
-      "Received LINE webhook request with a non-JSON body",
-    );
-  }
-
-  const event: WebhookQueueMessage = {
-    id: crypto.randomUUID(),
-    source: "line",
-    receivedAt: new Date().toISOString(),
-    payload: body,
-  };
-
-  const messages = line.webhook.extractMessages(body);
-
-  if (currentConfig.webhookQueue) {
-    await currentConfig.webhookQueue.send(event);
-    logger.info(
-      {
-        id: event.id,
-        source: event.source,
-        messages: messages.length > 0 ? messages : undefined,
-      },
-      "Webhook event queued to WEBHOOK_QUEUE",
-    );
-  } else {
-    logger.warn(
-      {
-        id: event.id,
-        source: event.source,
-        messages: messages.length > 0 ? messages : undefined,
-      },
-      "WEBHOOK_QUEUE binding not configured, skipping queue push",
-    );
-  }
-
-  return c.json({ status: "ok", queued: Boolean(currentConfig.webhookQueue), id: event.id });
-});
+app.post("/api/line/webhook", postLineWebhook);
 
 // LIFF の ID トークンを検証し、対応する Account を解決するエンドポイント。
 //
