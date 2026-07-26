@@ -7,7 +7,7 @@ labels: [docs]
 dependson: [4]
 related: []
 created_at: 2026-07-26T10:56:57.012661+00:00
-updated_at: 2026-07-26T10:56:57.012661+00:00
+updated_at: 2026-07-26T11:27:26.571087+00:00
 ---
 
 ## 背景
@@ -22,12 +22,14 @@ updated_at: 2026-07-26T10:56:57.012661+00:00
 - リポジトリ全体の参照を更新する（`rg` で旧ファイル名を検索して残さない）
 - `.agents/README.md` のドキュメントマップと `README.md` のリンクを更新する
 - `docs/infrastructure-architecture.md` §2「所有しない概念」と §7「関連ドキュメント」のリンクを更新する
+- `docs/evidence-edge-design.md`（#7 で新設）のリンクを更新する。§1 の「所有しない概念」表、§4 / §5 / §6 / §7 から節番号つきで参照している
 
 ## 既知のリスク: 節番号の参照
 
 **節構成と節番号を変えないこと。** 次の箇所が節番号で参照しているため、番号がずれると参照が壊れる。
 
 - `docs/project-overview.md` §12 → `brain-access-label-design.md#11-今後決めること`
+- `docs/evidence-edge-design.md` → §5 / §7 / §8 / §9 / §11
 - `.usagi/issues/004` → §11-1 / §11-2 / §9
 - `.usagi/issues/005` → §8
 - `.usagi/issues/006` → §7-4

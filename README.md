@@ -10,6 +10,7 @@ me-builderは、さまざまな質問への回答を蓄積し、その人らし�
 - [ドメイン設計](docs/domain-design.md) — Account / Brain / Sourceの責務・境界、設計順序と進捗
 - [Brainのラベル・アクセス制御設計](docs/brain-access-label-design.md) — ラベルと公開制御のSSoT
 - [Brain内部情報の分類](docs/brain-content-taxonomy.md) — Brain Item分類のSSoT
+- [根拠・反証・改訂のエッジ設計](docs/evidence-edge-design.md) — Source RecordとBrain Itemを結ぶエッジのSSoT
 - [インフラ・システム構成](docs/infrastructure-architecture.md) — Cloudflare全域を採用した開発基盤と技術スタックのSSoT
 - [キャラクターデザイン](docs/character-design.md) — うつし・ミラの設定とデザインアセットのSSoT
 - [Agent向けガイド](.agents/README.md) — ドキュメント運用・設計スコープのルール

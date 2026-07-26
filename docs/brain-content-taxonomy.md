@@ -224,7 +224,7 @@ AIが推定したValue / Motivationと本人が明言したValue / Motivationで
 
 ### Evidence
 
-すべてのBrain Itemは、1件以上のSource Recordを根拠として持ちます。Source RecordとBrain Itemの多重度、由来の必須性、本人の操作がSource Recordを生むかどうかは[ドメイン設計 §6](domain-design.md#6-ドメイン間の関係)をSSoTとします。根拠を表現するエッジの種類は未決です。
+すべてのBrain Itemは、1件以上のSource Recordを根拠として持ちます。Source RecordとBrain Itemの多重度、由来の必須性、本人の操作がSource Recordを生むかどうかは[ドメイン設計 §6](domain-design.md#6-ドメイン間の関係)をSSoTとします。根拠を表現するエッジの種類と属性は[根拠・反証・改訂のエッジ設計](evidence-edge-design.md)をSSoTとします。
 
 ### Derivation
 
@@ -239,6 +239,11 @@ Derivationは1つのBrain Itemにつき1つの値を持ちます。
 
 - Derivationは入力の種類ではなく、導出ごとに付きます。同じ乗車履歴から「平日朝7時台の乗車が多い」（集計なので`deterministic`）と「朝型である」（解釈なので`ai`）の両方が導出されえます
 - 根拠が混在し、`ai`の導出が1件でも混ざる場合、そのBrain ItemのDerivationは`ai`とします。[Brainのラベル・アクセス制御設計 §9](brain-access-label-design.md#9-不変条件)の「拒否ルールは許可ルールより優先する」と同じく、安全側へ固定します
+- 導出方法の値そのものは根拠のエッジが持ち、Brain ItemのDerivationはそこからの集計値です。集計の規則と、事後の裏付けを集計に含めない理由は[根拠・反証・改訂のエッジ設計 §4](evidence-edge-design.md#4-エッジの属性)をSSoTとします
+
+### Revision
+
+Revisionは改訂のエッジで表します。改訂で置き換えられた旧版を保持するか、検索の対象に含めるか、どのAccess Policyで開示するかは[根拠・反証・改訂のエッジ設計 §7](evidence-edge-design.md#7-改訂された旧版の扱い)をSSoTとします。
 
 ## 5. Access Labelとの関係
 
