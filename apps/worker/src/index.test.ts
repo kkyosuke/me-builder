@@ -94,6 +94,56 @@ describe("Worker Queue Handler", () => {
     });
   });
 
+  it("replies with the survey link when the text asks for the survey", async () => {
+    const message = {
+      id: "msg-124",
+      timestamp: new Date("2026-07-25T12:00:00Z"),
+      attempts: 1,
+      body: {
+        id: "evt-124",
+        source: "line",
+        receivedAt: "2026-07-25T12:00:00Z",
+        payload: {
+          events: [
+            {
+              type: "message",
+              replyToken: "tok",
+              message: { type: "text", text: "アンケート" },
+              source: { type: "user", userId: "test-user" },
+            },
+          ],
+        },
+      },
+      ack: vi.fn(),
+      retry: vi.fn(),
+    } as Message<WebhookQueueMessage>;
+
+    const batch = {
+      queue: "me-builder-webhook-queue-local",
+      messages: [message],
+      metadata: {},
+      ackAll: vi.fn(),
+      retryAll: vi.fn(),
+    } as unknown as MessageBatch<WebhookQueueMessage>;
+
+    await handleQueueBatch(batch, {} as unknown as d1.Client, {
+      environment: "test",
+      lineChannelAccessToken: "test-token",
+      liffId: "1234567890-abcdefgh",
+    });
+
+    // 日記の受付返信ではなく、アンケートのリンクだけを返す
+    expect(mockReplyMessage).toHaveBeenCalledWith({
+      replyToken: "tok",
+      messages: [
+        {
+          type: "text",
+          text: "今日のアンケートに答える\nhttps://liff.line.me/1234567890-abcdefgh",
+        },
+      ],
+    });
+  });
+
   it("fetch handler returns worker status", async () => {
     const req = new Request("http://localhost/");
     const res = await worker.fetch(req, { ENVIRONMENT: "test", DB: {} as unknown as D1Database });

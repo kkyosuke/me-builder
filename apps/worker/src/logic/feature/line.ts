@@ -30,7 +30,7 @@ export async function processLineWebhook(
       // ここで Account を補完する。友だち追加より前から利用しているユーザーや、
       // follow イベントの処理に失敗したユーザーが Web 側で本人確認できなくなるのを防ぐ。
       await ensureAccountIdentity(db, providerAccountId, "message");
-      await handleTextMessage(event.replyToken, apiClient, workerConfig.liffId);
+      await handleTextMessage(event.replyToken, event.message.text, apiClient, workerConfig.liffId);
     }
   }
 }
@@ -62,23 +62,79 @@ async function ensureAccountIdentity(
 }
 
 /**
- * 日記を受け付けた旨の返信文を組み立てます。
+ * テキストメッセージの意図。
  *
- * LIFF ID が設定されている場合は「今日のアンケート」への導線として LIFF の URL を添えます。
- * LIFF の URL をタップすると LINE 内で Web が開きます
+ * トークへ送られたテキストは既定で日記として扱い、アンケートのリンクを求めるキーワードだけを
+ * 例外として切り出します。LINE は日記の入力とアンケートのリンク配信を担当します
  * ([プロジェクト概要 §4](../../../../../docs/project-overview.md#4-想定する利用体験))。
- * 未設定の場合はリンクを省き、受け付けた旨だけを返します。
  */
-export function buildReplyText(liffId?: string): string {
+export type LineTextIntent = "survey-request" | "diary";
+
+/**
+ * アンケートのリンクを求めるキーワード。
+ *
+ * 判定は正規化後の**完全一致**で行い、部分一致は採りません。部分一致にすると
+ * 「今日は会社でアンケートに答えた」のような日記本文がコマンドとして飲み込まれ、
+ * 記録されるべき日記が返信だけになります。日記は蓄積の量を担う主要な入力なので、
+ * 取りこぼしよりも誤判定を避ける側へ寄せます。取りこぼしは常設の導線で補います。
+ */
+const SURVEY_KEYWORDS = ["アンケート", "今日のアンケート", "きょうのアンケート"];
+
+/**
+ * 表記ゆれを吸収します。
+ *
+ * - NFKC 正規化で全角英数・半角カナ (`ｱﾝｹｰﾄ`)・全角スペースを揃える
+ * - 前後の空白を落とす（コピー＆ペーストや予測変換で付きやすい）
+ * - ひらがなをカタカナへ寄せて `あんけーと` を同じ表記にする
+ */
+function normalizeMessageText(text: string): string {
+  return text
+    .normalize("NFKC")
+    .trim()
+    .replace(/[ぁ-ゖ]/g, (char) => String.fromCharCode(char.charCodeAt(0) + 0x60));
+}
+
+/** テキストメッセージの意図を判定します。 */
+export function classifyLineText(text: string): LineTextIntent {
+  const normalized = normalizeMessageText(text);
+  const isSurveyRequest = SURVEY_KEYWORDS.some(
+    (keyword) => normalizeMessageText(keyword) === normalized,
+  );
+  return isSurveyRequest ? "survey-request" : "diary";
+}
+
+/** 「今日のアンケート」への導線。タップすると LINE 内で Web が開きます。 */
+function buildSurveyLink(liffId: string): string {
+  return `今日のアンケートに答える\nhttps://liff.line.me/${liffId}`;
+}
+
+/**
+ * 受信したテキストに対する返信文を組み立てます。
+ *
+ * - 「アンケート」と送られた場合はアンケート (LIFF) のリンクを返す
+ * - それ以外（＝日記）は受け付けた旨と、あわせて「今日のアンケート」への導線を返す。
+ *   日記の返信はアンケートへの主要な再訪導線なので、キーワードの追加でも変えません
+ * - `LIFF_ID` 未設定時はリンクを省く（環境変数が未設定なら安全にスキップする既存方針）
+ */
+export function buildReplyText(messageText: string, liffId?: string): string {
+  if (classifyLineText(messageText) === "survey-request") {
+    if (!liffId) {
+      // リンクを出せない理由は利用者に関係がないため、設定の話はせず案内だけ返します。
+      return "いまはアンケートのリンクをお渡しできません。時間をおいてもう一度お試しください。";
+    }
+    return buildSurveyLink(liffId);
+  }
+
   const received = "受け付けました。";
   if (!liffId) {
     return received;
   }
-  return `${received}\n今日のアンケートに答える\nhttps://liff.line.me/${liffId}`;
+  return `${received}\n${buildSurveyLink(liffId)}`;
 }
 
 async function handleTextMessage(
   replyToken: string,
+  messageText: string,
   apiClient: ReturnType<typeof line.client.create>,
   liffId?: string,
 ): Promise<void> {
@@ -88,12 +144,13 @@ async function handleTextMessage(
       messages: [
         {
           type: "text",
-          text: buildReplyText(liffId),
+          text: buildReplyText(messageText, liffId),
         },
       ],
     });
     logger.info(
-      { replyToken, hasLiffLink: Boolean(liffId) },
+      // 本文は日記そのものなのでログへ出さず、判定結果だけを残します。
+      { replyToken, intent: classifyLineText(messageText), hasLiffLink: Boolean(liffId) },
       "[LINE Reply] Reply sent successfully via LINE Messaging API",
     );
   } catch (error) {
