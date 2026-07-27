@@ -33,8 +33,8 @@ export type SurveyIconName =
 /** スワイプの方向。左右の 2 択に対応します。 */
 export type SwipeDirection = "left" | "right";
 
-/** 1 つの選択肢。 */
-export interface SurveyChoice {
+/** 1 つの選択肢。`SurveyQuestion` 経由で参照するため、単体では公開しません。 */
+interface SurveyChoice {
   /** 回答として記録する値。表示文言（`label`）とは分けます。 */
   value: string;
   label: string;
