@@ -212,8 +212,10 @@ export async function upsertIdentity(
     ]);
   } catch (err: unknown) {
     if (isUniqueViolation(err)) {
+      // providerAccountId は本人識別子なのでログへ出さない
+      // ([プロジェクト概要 §8](../../../../docs/project-overview.md#8-プライバシーと安全性))
       logger.warn(
-        { err, providerAccountId: input.providerAccountId },
+        { err, provider: input.provider },
         "Unique constraint violation during upsert, fetching existing identity",
       );
 
