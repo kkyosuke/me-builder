@@ -77,6 +77,11 @@ describe("Worker Queue Handler", () => {
       liffId: "1234567890-abcdefgh",
     });
     expect(mockAck).toHaveBeenCalledOnce();
+    // follow を取り逃していても、メッセージ受信時に Account を補完する
+    expect(d1.action.account.upsertIdentity).toHaveBeenCalledWith(mockDb, {
+      provider: "line",
+      providerAccountId: "test-user",
+    });
     // 送られた本文はオウム返しせず、受け付けた旨とアンケートへの LIFF リンクを返す
     expect(mockReplyMessage).toHaveBeenCalledWith({
       replyToken: "tok",

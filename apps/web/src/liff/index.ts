@@ -28,6 +28,16 @@ export type LiffState =
   /** 初期化またはプロフィール取得に失敗した */
   | { status: "error"; message: string };
 
+/** API 側で ID トークンを検証した結果。 */
+export type LiffSessionState =
+  | { status: "idle" }
+  | { status: "verifying" }
+  /** 検証に成功し Account が解決できた */
+  | { status: "verified" }
+  /** 友だち追加がまだで Account が無い */
+  | { status: "friendship-required" }
+  | { status: "error"; message: string };
+
 const toMessage = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
 
@@ -77,5 +87,57 @@ export async function initializeLiff(liffId: string | undefined): Promise<LiffSt
   } catch (error) {
     logger.warn(`LIFF のプロフィール取得に失敗しました: ${toMessage(error)}`);
     return { status: "error", message: `プロフィールの取得に失敗しました: ${toMessage(error)}` };
+  }
+}
+
+/**
+ * ID トークンを API へ送り、サーバー側で本人性を検証して Account を解決させます。
+ *
+ * `liff.getProfile()` の結果は画面表示には使いますが（嘘をつけても自分の画面の表示が
+ * 変わるだけ）、Account の解決には使いません。サーバーはクライアントから送られた値を
+ * 検証できないため、識別子は署名付きの ID トークンで渡します。トークンはログへ出力しません。
+ */
+export async function verifyLiffSession(apiUrl: string | undefined): Promise<LiffSessionState> {
+  let token: string | null;
+  try {
+    token = liff.getIDToken();
+  } catch (error) {
+    logger.warn(`ID トークンを取得できませんでした: ${toMessage(error)}`);
+    return { status: "error", message: "ID トークンを取得できませんでした" };
+  }
+
+  if (!token) {
+    // openid スコープが無い場合、liff.getIDToken() は null を返す
+    // https://developers.line.biz/en/reference/liff/#get-id-token
+    logger.warn("ID トークンが取得できません。LIFF アプリの openid スコープを確認してください");
+    return {
+      status: "error",
+      message: "ID トークンを取得できませんでした（LIFF アプリの openid スコープが必要です）",
+    };
+  }
+
+  const endpoint = `${(apiUrl ?? "").replace(/\/$/, "")}/api/line/liff/session`;
+
+  try {
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ idToken: token }),
+    });
+
+    if (res.status === 404) {
+      logger.info("LINE Login の識別子に対応する Account がありません");
+      return { status: "friendship-required" };
+    }
+    if (!res.ok) {
+      logger.warn(`ID トークンの検証に失敗しました (HTTP ${res.status})`);
+      return { status: "error", message: `本人確認に失敗しました (HTTP ${res.status})` };
+    }
+
+    logger.info("ID トークンの検証に成功しました");
+    return { status: "verified" };
+  } catch (error) {
+    logger.warn(`ID トークンの検証リクエストに失敗しました: ${toMessage(error)}`);
+    return { status: "error", message: "本人確認のリクエストに失敗しました" };
   }
 }

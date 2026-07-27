@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { config } from "./config";
-import { type LiffState, initializeLiff } from "./liff";
+import { type LiffSessionState, type LiffState, initializeLiff, verifyLiffSession } from "./liff";
 
 interface ApiHealthResponse {
   status: string;
@@ -8,8 +8,36 @@ interface ApiHealthResponse {
   timestamp: string;
 }
 
+/** サーバー側の本人確認（ID トークン検証）の状態を 1 行で表示します。 */
+function SessionLine({ state }: { state: LiffSessionState }) {
+  const text: Record<LiffSessionState["status"], string> = {
+    idle: "",
+    verifying: "本人確認中...",
+    verified: "本人確認済み（サーバーで ID トークンを検証しました）",
+    "friendship-required":
+      "LINE 公式アカウントの友だち追加が必要です（アカウント作成の起点になります）",
+    error: state.status === "error" ? state.message : "",
+  };
+
+  if (!text[state.status]) {
+    return null;
+  }
+
+  return (
+    <p
+      style={{
+        marginTop: "0.75rem",
+        fontSize: "0.875rem",
+        color: state.status === "error" ? "#f87171" : "var(--text-muted)",
+      }}
+    >
+      {text[state.status]}
+    </p>
+  );
+}
+
 /** LIFF の状態を、白画面にせず必ず何かを表示するためのカード。 */
-function LiffCard({ state }: { state: LiffState }) {
+function LiffCard({ state, session }: { state: LiffState; session: LiffSessionState }) {
   return (
     <div className="card">
       <div className="status-badge">
@@ -48,6 +76,8 @@ function LiffCard({ state }: { state: LiffState }) {
           </div>
         </div>
       )}
+
+      <SessionLine state={session} />
     </div>
   );
 }
@@ -57,6 +87,7 @@ export function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [liffState, setLiffState] = useState<LiffState>({ status: "loading" });
+  const [sessionState, setSessionState] = useState<LiffSessionState>({ status: "idle" });
 
   const fetchHealth = useCallback(async () => {
     setLoading(true);
@@ -85,9 +116,20 @@ export function App() {
   useEffect(() => {
     let cancelled = false;
     initializeLiff(config.liffId)
-      .then((state) => {
+      .then(async (state) => {
+        if (cancelled) {
+          return;
+        }
+        setLiffState(state);
+
+        // 初期化に成功したときだけ、サーバー側で ID トークンを検証して Account を解決する
+        if (state.status !== "ready") {
+          return;
+        }
+        setSessionState({ status: "verifying" });
+        const session = await verifyLiffSession(config.apiUrl);
         if (!cancelled) {
-          setLiffState(state);
+          setSessionState(session);
         }
       })
       .catch((err: unknown) => {
@@ -109,7 +151,7 @@ export function App() {
       <h1>me-builder Workspace</h1>
       <p className="description">Bun Workspace + Bun.serve (API) + React (UI) の開発準備完了</p>
 
-      <LiffCard state={liffState} />
+      <LiffCard state={liffState} session={sessionState} />
 
       <div className="card">
         <div className="status-badge">

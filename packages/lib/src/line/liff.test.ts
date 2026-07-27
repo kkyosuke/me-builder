@@ -102,6 +102,7 @@ describe("line.liff.registerEndpoint", () => {
     expect(JSON.parse(put?.body ?? "{}")).toEqual({
       view: { type: "full", url: ENDPOINT },
       description: DESCRIPTION,
+      scope: ["openid", "profile"],
     });
   });
 
@@ -138,7 +139,12 @@ describe("line.liff.registerEndpoint", () => {
         return {
           json: {
             apps: [
-              { liffId: LIFF_ID, description: DESCRIPTION, view: { type: "full", url: ENDPOINT } },
+              {
+                liffId: LIFF_ID,
+                description: DESCRIPTION,
+                view: { type: "full", url: ENDPOINT },
+                scope: ["openid", "profile"],
+              },
             ],
           },
         };
@@ -170,7 +176,8 @@ describe("line.liff.registerEndpoint", () => {
     expect(JSON.parse(post?.body ?? "{}")).toEqual({
       view: { type: "full", url: ENDPOINT },
       description: DESCRIPTION,
-      scope: ["profile"],
+      // openid が無いと liff.getIDToken() が ID トークンを返さない
+      scope: ["openid", "profile"],
     });
   });
 
@@ -180,7 +187,17 @@ describe("line.liff.registerEndpoint", () => {
         return { json: { access_token: "dummy-token" } };
       }
       if (method === "GET") {
-        return { json: { apps: [{ liffId: LIFF_ID, view: { type: "full", url: ENDPOINT } }] } };
+        return {
+          json: {
+            apps: [
+              {
+                liffId: LIFF_ID,
+                view: { type: "full", url: ENDPOINT },
+                scope: ["openid", "profile"],
+              },
+            ],
+          },
+        };
       }
       return { json: {} };
     });
@@ -201,7 +218,17 @@ describe("line.liff.registerEndpoint", () => {
         return { json: { access_token: "dummy-token" } };
       }
       if (method === "GET") {
-        return { json: { apps: [{ liffId: LIFF_ID, view: { type: "full", url: ENDPOINT } }] } };
+        return {
+          json: {
+            apps: [
+              {
+                liffId: LIFF_ID,
+                view: { type: "full", url: ENDPOINT },
+                scope: ["openid", "profile"],
+              },
+            ],
+          },
+        };
       }
       return { json: {} };
     });
@@ -239,5 +266,56 @@ describe("line.liff.registerEndpoint", () => {
     expect(result.success).toBe(false);
     // API のレスポンス本文を転記する場合でも、こちらから送ったシークレットは出さない
     expect(result.message).not.toContain(CHANNEL_SECRET);
+  });
+
+  it("URL が一致していても openid が欠けていれば scope を付け直すこと", async () => {
+    mockFetch((url, method) => {
+      if (url.includes("/oauth")) {
+        return { json: { access_token: "dummy-token" } };
+      }
+      if (method === "GET") {
+        return {
+          json: {
+            apps: [
+              {
+                liffId: LIFF_ID,
+                description: DESCRIPTION,
+                view: { type: "full", url: ENDPOINT },
+                scope: ["profile"],
+              },
+            ],
+          },
+        };
+      }
+      return { json: {} };
+    });
+
+    const result = await liff.registerEndpoint(params);
+
+    expect(result.success).toBe(true);
+    const put = calls.find((c) => c.method === "PUT");
+    expect(JSON.parse(put?.body ?? "{}").scope).toEqual(["openid", "profile"]);
+  });
+
+  it("一覧が scope を返さない場合は判定できないので更新すること", async () => {
+    mockFetch((url, method) => {
+      if (url.includes("/oauth")) {
+        return { json: { access_token: "dummy-token" } };
+      }
+      if (method === "GET") {
+        return {
+          json: {
+            apps: [
+              { liffId: LIFF_ID, description: DESCRIPTION, view: { type: "full", url: ENDPOINT } },
+            ],
+          },
+        };
+      }
+      return { json: {} };
+    });
+
+    await liff.registerEndpoint(params);
+
+    expect(calls.some((c) => c.method === "PUT")).toBe(true);
   });
 });

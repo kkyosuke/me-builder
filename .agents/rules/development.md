@@ -65,6 +65,13 @@
 - **Web標準 API の遵守**:
   - API サーバーおよび MCP サーバーは `Bun.serve` および **Hono** フレームワークを採用します。
   - 固有の非標準 API や特定のランタイム依存を避け、`Request`, `Response`, `fetch` などの Web標準 API / Web Standard Response に準拠して実装してください。これにより、ローカル (`bun serve`) とクラウド・エッジ (Cloudflare Workers 等) の双方向でそのまま稼働可能にします。
+- **層の分離 (`src/controller/` と `src/logic/`)**:
+  - **`logic/` は HTTP を知りません。** ステータスコードやレスポンスボディを返さず、ドメイン上の結果を判別可能な union（例: `resolved` / `unauthenticated` / `account-not-found`）として返します。
+  - **`controller/` が HTTP との境界**です。リクエストの解釈（ボディのパース、バインディングの確認）と、`logic` が返した結果から `Response` への変換だけを担当します。ルート定義 (`src/index.ts`) からは controller を呼ぶだけにします。
+  - controller はパスの区分ごとに 1 ファイルにまとめます（例: `controller/line.ts` が `/api/line/` 配下を担当）。エンドポイントごとにファイルを増やしません。
+  - テストも層ごとに分けます。`logic` はドメインの結果を検証し、`controller` は `logic` をモックして HTTP への変換だけを検証します。
+  - `apps/worker` の `handler/` と `logic/` も同じ分離です。
+
 - **環境設定管理 (`src/config/`)**:
   - `@me-builder/shared` が提供する `getEnv` 関数を用いて、Cloudflare Workers Bindings (`c.env`) およびローカル環境 (`process.env`) の差分を吸収し、生の環境変数を取得・URL 補完・Valibot パースを行い設定オブジェクトを組み立てて返却します。
 
@@ -90,11 +97,23 @@
   - `liff.init` の失敗時、および外部ブラウザで開かれた場合 (`liff.isInClient()` が false) も画面を白にせず、状態を画面へ表示します。LIFF の初期化結果を画面表示の前提条件にしないこと。
   - LINE の `userId` は本人識別子です。**画面表示もログ出力も行わず**、表示は `displayName` と `pictureUrl` に限ります ([プロジェクト概要 §8](../../docs/project-overview.md#8-プライバシーと安全性))。ID トークンおよびアクセストークンもログへ出力しません。
 
+- **LIFF の ID トークン検証と Account の解決**:
+  - **クライアントから送られてきた識別子は受け付けません。** `liff.getProfile()` が返す値そのものは LINE から取得した本物ですが、サーバー側では「LINE の API が返した値の転送」と「手で書かれた値」を区別できないため、`userId` を識別子として使うと他人になりすませます。本人の識別子は必ず ID トークンの検証で得た `sub` を使います。
+  - 用途で使い分けます。**画面表示**（`displayName` / `pictureUrl`）は `liff.getProfile()` の値でよく（嘘をつけても本人の画面の表示が変わるだけ）、**本人の識別・認可**は検証済みの `sub` だけを使います。検証は `packages/lib` の `line.idToken.verify`（LINE の `POST /oauth2/v2.1/verify` へ委譲）で行い、`aud` が LINE Login チャネル ID と一致することを受け取り側でも確認します。
+  - エンドポイントは `POST /api/line/liff/session`。
+  - Account の解決は `d1.action.account.resolveAccountByLineLogin` に集約します。`line_login` の identity → 同じ値の `line` の identity（同一プロバイダーなら userId が一致する）の順に探し、後者で見つかった場合は `line_login` を同じ Account へ紐づけます。
+  - **どちらも見つからない場合は Account を作らず 404 を返します。** アカウント作成の起点は LINE 公式アカウントの友だち追加です（[プロジェクト概要 §5](../../docs/project-overview.md#5-アカウントと本人識別)）。userId が一致しない構成での紐づけ手段は未設計です。
+  - 既存の Account へログイン手段を追加するのは `d1.action.account.linkIdentity` です。`upsertIdentity` は見つからなければ新規 Account を作るため、この用途に使ってはいけません。
+  - `LINE_LOGIN_CHANNEL_ID` は `apps/api` へ配布します。未設定の場合は `LIFF_ID` の接頭辞から補完します。ID トークン・アクセストークン・`sub` はレスポンスにもログにも含めません。
+  - **`accountId` をクライアントへ返しません。** セッションとトークンの管理方式は[ドメイン設計](../../docs/domain-design.md)で未決定であり、返すと後続リクエストで「クライアントが送ってきた `accountId`」を信頼する実装を誘発します。返すのは表示に使う `displayName` / `pictureUrl` だけです。
+  - **LIFF の ID トークンには `nonce` を設定できません**（`liff.login()` に nonce のパラメータがない）。そのためリプレイを nonce で防げず、代わりに `line.idToken.verify` の `maxAgeSeconds` で受け入れる発行後の経過時間を絞れるようにしています。既定は LIFF の ID トークンの有効期間と同じ 1 時間（LINE 側の検証より厳しくしない）で、検証成功時に経過秒数だけをログへ出力するので、実際の分布を見てから絞れます。恒久的な対策はサーバー発行のセッションであり、方式が決まってから対応します。
+
 - **LIFF アプリのエンドポイント URL の自動登録**:
   - Webhook Endpoint URL と同じく、デプロイのたびに「今デプロイした URL」を LIFF アプリへ反映します。ロジックは `packages/lib` の `line.liff.registerEndpoint`、実行は `bun --cwd apps/web scripts/register-liff.ts <preview|production>` で、CD ワークフローのデプロイ後に呼び出します。
   - LIFF Server API は **LINE Login チャネル** のチャネルアクセストークンを要求します (Messaging API チャネルのトークンでは操作できません)。トークンは client credentials で発行し、有効期間が短くて発行数の上限がないステートレストークンを優先します。
   - `LINE_LOGIN_CHANNEL_SECRET` は Secret、`LINE_LOGIN_CHANNEL_ID` は変数として GitHub Environment へ置きます。チャネル ID が未設定の場合は LIFF ID の接頭辞 (`{チャネルID}-{ランダム}`) から補完します。
   - 更新対象は `LIFF_ID` が一致するアプリ、無ければ `description`（`me-builder-web (preview)` など）が一致するアプリです。どちらも無ければ新規作成し、発行された LIFF ID をログへ出力します。環境名はビルド時の値ではなく引数で渡します（preview と production で同じ description を掴まないため）。
+  - **scope は `openid` と `profile` を必ず設定します。** `openid` が無いと `liff.getIDToken()` が ID トークンを返さず、サーバー側で本人性を検証できません（[LIFF リファレンス](https://developers.line.biz/en/reference/liff/#get-id-token)）。エンドポイント URL の更新時にも scope を毎回送り、手で外された場合に次のデプロイで復旧できるようにします。
   - 環境変数が未設定の場合は警告を出して安全にスキップします。チャネルシークレットとチャネルアクセストークンはログへ出力せず、トークンエンドポイントのレスポンス本文も転記しません。
 
 ## 5. コミット・Git 運用ルール

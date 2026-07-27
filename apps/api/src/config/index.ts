@@ -1,3 +1,4 @@
+import { line } from "@me-builder/lib";
 import { getEnv } from "@me-builder/shared";
 import * as v from "valibot";
 import { type ApiConfig, ConfigSchema } from "./schema";
@@ -34,6 +35,13 @@ export function getConfig(env?: Record<string, unknown>): ApiConfig {
   const rawWebhookQueueName = getEnv(["WEBHOOK_QUEUE_NAME", "WEBHOOK_QUEUE"], env);
   const rawWebhookQueue = env?.WEBHOOK_QUEUE;
 
+  const rawLiffId = getEnv("LIFF_ID", env)?.trim() || undefined;
+  // LIFF ID は `{LINE Login チャネル ID}-{ランダム文字列}` の形式なので接頭辞から補完する
+  const rawLineLoginChannelId = line.idToken.resolveLoginChannelId({
+    channelId: getEnv("LINE_LOGIN_CHANNEL_ID", env)?.trim() || undefined,
+    liffId: rawLiffId,
+  });
+
   const rawConfig = {
     port: rawPort,
     environment: rawEnvironment,
@@ -44,6 +52,8 @@ export function getConfig(env?: Record<string, unknown>): ApiConfig {
     lineWebhookUrl: rawLineWebhookUrl,
     webhookQueueName: rawWebhookQueueName,
     webhookQueue: rawWebhookQueue,
+    liffId: rawLiffId,
+    lineLoginChannelId: rawLineLoginChannelId,
   };
 
   return v.parse(ConfigSchema, rawConfig);

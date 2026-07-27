@@ -1,5 +1,6 @@
 import { client } from "./client";
 import * as configModule from "./config";
+import { idToken } from "./id-token";
 import { liff } from "./liff";
 import { webhook } from "./webhook";
 
@@ -7,11 +8,13 @@ export const line: {
   client: typeof client;
   webhook: typeof webhook;
   liff: typeof liff;
+  idToken: typeof idToken;
   config: typeof configModule;
 } = {
   client,
   webhook,
   liff,
+  idToken,
   config: configModule,
 };
 
@@ -27,3 +30,4 @@ export type {
   RegisterLiffEndpointParams,
   RegisterLiffEndpointResult,
 } from "./liff";
+export type { VerifiedIdToken, VerifyIdTokenParams, VerifyIdTokenResult } from "./id-token";

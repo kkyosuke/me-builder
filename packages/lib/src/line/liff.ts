@@ -1,4 +1,5 @@
 import { logger } from "@me-builder/shared";
+import { idToken } from "./id-token";
 
 /**
  * LIFF アプリのエンドポイント URL を LIFF Server API 経由で登録・更新します。
@@ -20,6 +21,16 @@ const TOKEN_ENDPOINTS = [
   "https://api.line.me/oauth2/v3/token",
   "https://api.line.me/v2/oauth/accessToken",
 ] as const;
+
+/**
+ * LIFF アプリに必要な scope。
+ *
+ * - `profile`: `liff.getProfile()` で表示名とアイコンを取得する
+ * - `openid`: **`liff.getIDToken()` で ID トークンを取得する。これが無いと ID トークンを
+ *   取得できず、サーバー側で本人性を検証できません**
+ *   （[LIFF リファレンス](https://developers.line.biz/en/reference/liff/#get-id-token)）
+ */
+const REQUIRED_SCOPES = ["openid", "profile"] as const;
 
 /** LIFF アプリのビューのサイズ。 */
 export type LiffViewType = "compact" | "tall" | "full";
@@ -50,27 +61,33 @@ type LiffApp = {
   liffId: string;
   description?: string;
   view?: { type?: string; url?: string };
+  scope?: string[];
 };
 
 const toMessage = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
 
 /**
- * LIFF ID は `{LINE Login チャネル ID}-{ランダム文字列}` の形式のため、
- * チャネル ID が未設定の場合は接頭辞から補完します。
+ * 既存の LIFF アプリが要求どおりの設定かどうかを判定します。
+ *
+ * 一覧 API が `scope` を返さない場合は判定できないため「揃っていない」とみなし、更新を実行します
+ * （更新は冪等なので余分に 1 回 API を呼ぶだけで済みます）。
  */
+function isUpToDate(app: LiffApp, endpointUrl: string, viewType: LiffViewType): boolean {
+  const viewMatches = app.view?.url === endpointUrl && app.view?.type === viewType;
+  const scopeMatches =
+    Array.isArray(app.scope) && REQUIRED_SCOPES.every((scope) => app.scope?.includes(scope));
+  return viewMatches && scopeMatches;
+}
+
+/** チャネル ID を解決します。未設定なら LIFF ID の接頭辞から補完します。 */
 function resolveChannelId(params: RegisterLiffEndpointParams): string | undefined {
-  if (params.channelId) {
-    return params.channelId;
-  }
-  const prefix = params.liffId?.split("-")[0];
-  if (prefix && /^\d+$/.test(prefix)) {
+  if (!params.channelId) {
     logger.info(
       "[LIFF] LINE_LOGIN_CHANNEL_ID が未設定のため LIFF ID の接頭辞をチャネル ID として使用します",
     );
-    return prefix;
   }
-  return undefined;
+  return idToken.resolveLoginChannelId(params);
 }
 
 /** client credentials で LINE Login チャネルのチャネルアクセストークンを発行します。 */
@@ -164,17 +181,23 @@ async function registerEndpoint(
       apps.find((app) => app.description === description);
 
     if (target) {
-      if (target.view?.url === endpointUrl && target.view?.type === viewType) {
-        const msg = `[LIFF] LIFF アプリのエンドポイント URL は既に一致しています: ${endpointUrl} (${target.liffId})`;
+      if (isUpToDate(target, endpointUrl, viewType)) {
+        const msg = `[LIFF] LIFF アプリの設定は既に一致しています: ${endpointUrl} (${target.liffId})`;
         logger.info(msg);
         return { success: true, message: msg, liffId: target.liffId };
       }
 
+      // scope も毎回送る。openid が欠けていると ID トークンを取得できないため、
+      // 手でスコープを外された状態を次のデプロイで復旧できるようにする。
       await callLiffApi(token, `/${target.liffId}`, {
         method: "PUT",
-        body: JSON.stringify({ view: { type: viewType, url: endpointUrl }, description }),
+        body: JSON.stringify({
+          view: { type: viewType, url: endpointUrl },
+          description,
+          scope: [...REQUIRED_SCOPES],
+        }),
       });
-      const msg = `[LIFF] LIFF アプリのエンドポイント URL を更新しました: ${endpointUrl} (${target.liffId})`;
+      const msg = `[LIFF] LIFF アプリの設定を更新しました: ${endpointUrl} scope=${REQUIRED_SCOPES.join(",")} (${target.liffId})`;
       logger.info(msg);
       return { success: true, message: msg, liffId: target.liffId };
     }
@@ -184,7 +207,7 @@ async function registerEndpoint(
       body: JSON.stringify({
         view: { type: viewType, url: endpointUrl },
         description,
-        scope: ["profile"],
+        scope: [...REQUIRED_SCOPES],
       }),
     })) as { liffId?: string } | undefined;
 
