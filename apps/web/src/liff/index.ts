@@ -107,7 +107,13 @@ export async function verifyLiffSession(apiUrl: string | undefined): Promise<Lif
   }
 
   if (!token) {
-    return { status: "error", message: "ID トークンを取得できませんでした" };
+    // openid スコープが無い場合、liff.getIDToken() は null を返す
+    // https://developers.line.biz/en/reference/liff/#get-id-token
+    logger.warn("ID トークンが取得できません。LIFF アプリの openid スコープを確認してください");
+    return {
+      status: "error",
+      message: "ID トークンを取得できませんでした（LIFF アプリの openid スコープが必要です）",
+    };
   }
 
   const endpoint = `${(apiUrl ?? "").replace(/\/$/, "")}/api/line/liff/session`;
