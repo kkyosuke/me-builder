@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useState } from "react";
+import { SwipeSurvey } from "./components/swipe-survey";
 import { config } from "./config";
 import { type LiffSessionState, type LiffState, initializeLiff, verifyLiffSession } from "./liff";
 
@@ -6,6 +7,16 @@ interface ApiHealthResponse {
   status: string;
   environment: string;
   timestamp: string;
+}
+
+/** 稼働状態を示すバッジ。 */
+function StatusBadge({ children }: { children: ReactNode }) {
+  return (
+    <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-sm font-medium text-emerald-400">
+      <span className="size-2 animate-pulse rounded-full bg-emerald-400" />
+      {children}
+    </div>
+  );
 }
 
 /** サーバー側の本人確認（ID トークン検証）の状態を 1 行で表示します。 */
@@ -24,13 +35,7 @@ function SessionLine({ state }: { state: LiffSessionState }) {
   }
 
   return (
-    <p
-      style={{
-        marginTop: "0.75rem",
-        fontSize: "0.875rem",
-        color: state.status === "error" ? "#f87171" : "var(--text-muted)",
-      }}
-    >
+    <p className={`mt-3 text-sm ${state.status === "error" ? "text-red-400" : "text-slate-400"}`}>
       {text[state.status]}
     </p>
   );
@@ -39,38 +44,35 @@ function SessionLine({ state }: { state: LiffSessionState }) {
 /** LIFF の状態を、白画面にせず必ず何かを表示するためのカード。 */
 function LiffCard({ state, session }: { state: LiffState; session: LiffSessionState }) {
   return (
-    <div className="card">
-      <div className="status-badge">
-        <span className="status-dot" />
-        LIFF ({state.status})
-      </div>
+    <div className="mt-6 rounded-xl border border-slate-700 bg-slate-900/60 p-6">
+      <StatusBadge>LIFF ({state.status})</StatusBadge>
 
       {state.status === "loading" && <p>LIFF を初期化しています...</p>}
 
       {state.status === "disabled" && (
-        <p style={{ color: "var(--text-muted)" }}>
+        <p className="text-slate-400">
           {`LIFF は無効です（${state.reason}）。LINE 内から開く導線を確認する場合は VITE_LIFF_ID を設定してください。`}
         </p>
       )}
 
       {state.status === "login-required" && <p>LINE のログイン画面へ移動しています...</p>}
 
-      {state.status === "error" && <p style={{ color: "#f87171" }}>{state.message}</p>}
+      {state.status === "error" && <p className="text-red-400">{state.message}</p>}
 
       {state.status === "ready" && (
-        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+        <div className="flex items-center gap-3">
           {state.profile.pictureUrl && (
             <img
               src={state.profile.pictureUrl}
               alt=""
               width={48}
               height={48}
-              style={{ borderRadius: "50%" }}
+              className="rounded-full"
             />
           )}
           <div>
-            <p style={{ margin: 0 }}>{state.profile.displayName}</p>
-            <p style={{ margin: 0, fontSize: "0.875rem", color: "var(--text-muted)" }}>
+            <p>{state.profile.displayName}</p>
+            <p className="text-sm text-slate-400">
               {state.inClient ? "LINE 内 (LIFF) で表示中" : "外部ブラウザで表示中"}
             </p>
           </div>
@@ -147,34 +149,48 @@ export function App() {
   }, []);
 
   return (
-    <div className="container">
-      <h1>me-builder Workspace</h1>
-      <p className="description">Bun Workspace + Bun.serve (API) + React (UI) の開発準備完了</p>
+    <div className="mx-auto w-full max-w-2xl p-4 sm:p-8">
+      <div className="rounded-2xl border border-slate-700 bg-slate-800 p-6 shadow-2xl shadow-black/30 sm:p-10">
+        <h1 className="mb-6 bg-gradient-to-br from-sky-400 to-indigo-400 bg-clip-text text-4xl font-bold text-transparent">
+          me-builder
+        </h1>
 
-      <LiffCard state={liffState} session={sessionState} />
+        <SwipeSurvey />
 
-      <div className="card">
-        <div className="status-badge">
-          <span className="status-dot" />
-          API Server Link ({config.apiUrl || "local"})
-        </div>
+        <section className="mt-10 border-t border-slate-700 pt-6">
+          <h2 className="text-lg font-bold">接続状況</h2>
+          <p className="mt-1 text-sm text-slate-400">
+            Bun Workspace + Bun.serve (API) + React (UI) の開発用の表示です。
+          </p>
 
-        <div>
-          <button type="button" onClick={fetchHealth} disabled={loading}>
-            {loading ? "通信中..." : "API Health Check 再実行"}
-          </button>
-        </div>
+          <LiffCard state={liffState} session={sessionState} />
 
-        {error && <p style={{ color: "#f87171", marginTop: "1rem" }}>API通信エラー: {error}</p>}
+          <div className="mt-6 rounded-xl border border-slate-700 bg-slate-900/60 p-6">
+            <StatusBadge>API Server Link ({config.apiUrl || "local"})</StatusBadge>
 
-        {healthData && (
-          <div style={{ marginTop: "1rem" }}>
-            <p style={{ fontSize: "0.875rem", color: "var(--text-muted)" }}>
-              レスポンス (GET /api/health):
-            </p>
-            <pre>{JSON.stringify(healthData, null, 2)}</pre>
+            <div>
+              <button
+                type="button"
+                onClick={fetchHealth}
+                disabled={loading}
+                className="rounded-lg bg-gradient-to-br from-sky-400 to-sky-600 px-6 py-3 font-semibold text-slate-900 transition hover:-translate-y-px hover:shadow-lg hover:shadow-sky-400/30 disabled:opacity-60"
+              >
+                {loading ? "通信中..." : "API Health Check 再実行"}
+              </button>
+            </div>
+
+            {error && <p className="mt-4 text-red-400">API通信エラー: {error}</p>}
+
+            {healthData && (
+              <div className="mt-4">
+                <p className="text-sm text-slate-400">レスポンス (GET /api/health):</p>
+                <pre className="mt-2 overflow-x-auto rounded-lg bg-slate-950 p-4 font-mono text-sm text-slate-200">
+                  {JSON.stringify(healthData, null, 2)}
+                </pre>
+              </div>
+            )}
           </div>
-        )}
+        </section>
       </div>
     </div>
   );

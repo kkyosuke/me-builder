@@ -79,6 +79,10 @@
   - API サーバー起動時 (`src/index.ts`) または CLI スクリプト (`bun run register:webhook`) の実行時、`LINE_CHANNEL_ACCESS_TOKEN` および `LINE_WEBHOOK_URL` (または `BASE_URL`) が環境変数として与えられている場合、公式 SDK (`@line/bot-sdk`) の `MessagingApiClient.setWebhookEndpoint` を用いて自動的に LINE Messaging API へ Webhook Endpoint URL を登録・更新します。
   - Webhook 受信メッセージは Cloudflare Queues 経由で Queue Worker (`apps/worker`) に配信され、`replyToken` を使用して `MessagingApiClient.replyMessage` により受け付けた旨を返信します。**送られた本文をオウム返ししません。**
   - 返信には「今日のアンケート」への導線として LIFF の URL (`https://liff.line.me/{LIFF_ID}`) を添えます。LINE 内から Web を開く主導線であり、設計は [プロジェクト概要 §4](../../docs/project-overview.md#4-想定する利用体験) を正とします。文面の組み立ては `apps/worker` の `buildReplyText` に集約します。
+  - テキストメッセージは**既定で日記として扱い**、アンケートのリンクを求めるキーワード (`アンケート` など) だけを例外として切り出します。判定は `apps/worker` の `classifyLineText` に集約し、`survey-request` / `diary` の union で返します。
+    - キーワードの判定は **NFKC 正規化・前後の空白除去・ひらがなからカタカナへの寄せの後で完全一致**させます。部分一致は採りません。部分一致にすると「今日は会社でアンケートに答えた」のような日記本文がコマンドとして飲み込まれ、蓄積の量を担う日記が記録されなくなります。
+    - `survey-request` の返信はアンケートへのリンクだけを返します。`diary` の返信は従来どおり受け付けた旨とリンクを返します（日記の返信はアンケートへの主要な再訪導線なので、キーワードの追加でも変えません）。
+    - 日記の本文はログへ出力せず、判定結果 (`intent`) だけを残します。
   - `LIFF_ID` は `apps/worker` へ配布します。秘密情報ではありませんが、GitHub Environment の変数を単一の出所とするため CD ワークフローから `wrangler secret put` で配布します (wrangler には後から var を投入するコマンドがありません)。未設定の場合はリンクを省き、受け付けた旨だけを返します。
   - 環境変数が未設定の場合は自動登録および返信処理がログ出力とともに安全にスキップされます。
 
@@ -88,6 +92,18 @@
   - ヘッダ欠落・署名不一致は `401 Unauthorized` を返し、Queue 投入・LINE 返信・D1 書き込みのいずれも行いません。拒否時は `logger.warn` で構造化ログを出力しますが、**署名値およびチャネルシークレットそのものはログに含めません**。
   - チャネルシークレットは `LINE_CHANNEL_SECRET` として `apps/api` にのみ配布します (Cloudflare は `wrangler secret put` / CD ワークフロー、ローカルは `.env`)。`wrangler.toml` の `[vars]` には置きません。
   - `LINE_CHANNEL_SECRET` は **必須** です。未設定の場合は環境 (`local` / `preview` / `production`) を問わず署名検証をスキップせず、`logger.error` を出力したうえで全ての Webhook リクエストを 401 で拒否します。ローカルで Webhook 受信と返信の動作確認を行う場合も `.env` にチャネルシークレットを設定してください。
+
+- **Web UI のデザインシステム (`apps/web`)**:
+  - UI は **Tailwind CSS** のユーティリティと **lucide-react** のアイコンだけで組みます。他の UI コンポーネントライブラリ、アニメーションライブラリ、ジェスチャーライブラリ (framer-motion, react-spring, react-tinder-card 等) は導入しません。スワイプなどの操作は Pointer Events と CSS transform / transition で実装します。
+  - Tailwind は `@tailwindcss/vite` プラグインとして読み込み、PostCSS 設定ファイルは持ちません。`src/index.css` は `@import "tailwindcss"` と基礎スタイルだけを持ち、**コンポーネント固有の素の CSS やクラス定義を増やしません**（要素セレクタが以降のコンポーネントへ暗黙に効くため）。
+  - アニメーションは `prefers-reduced-motion: reduce` を尊重します。移動そのものを止めるのではなく、指の操作への追従は残し、自動で動く演出を省きます。
+  - 操作手段をポインタだけに依存させません。LINE 内 (LIFF) の主導線に加えて外部ブラウザの導線も維持しているため ([プロジェクト概要 §4](../../docs/project-overview.md#4-想定する利用体験))、同じ操作をボタンとキーボードでも行える状態を保ちます。
+
+- **スワイプアンケートの画面 (`apps/web`)**:
+  - 質問の取得は `apps/web/src/survey/` の 1 つの関数へ閉じ込め、コンポーネントは非同期の取得としてだけ扱います。質問配信・回答保存のサーバー実装はここを差し替える形で追加します。
+  - 質問・回答の型は `apps/web` に閉じ、`packages/shared` へ置きません。共有すると「サーバーとのスキーマ」を確定したことになり、[設計スコープのルール §2](design-scope.md) が後続設計へ延期している範囲へ踏み込みます。共有先はサーバー実装の時点で判断します。
+  - 質問データは JSON のまま扱える形に保ちます。アイコンはコンポーネントではなく名前で持ち、名前からコンポーネントへの対応は表示層に置きます。
+  - 判定や座標計算 (しきい値、傾き、transform) は純粋関数として `apps/web/src/survey/` に置き、DOM を用意せず単体テストできる状態にします。
 
 - **Web UI の LIFF 初期化 (`apps/web`)**:
   - LINE 内から Web を開く主導線は LIFF です。導線の設計と根拠は [プロジェクト概要 §4](../../docs/project-overview.md#4-想定する利用体験) を正とし、このルールには再掲しません。
