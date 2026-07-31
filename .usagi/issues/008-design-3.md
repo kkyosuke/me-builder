@@ -1,13 +1,13 @@
 ---
 number: 8
 title: design: 原本と派生の区別（原本の不変性、訂正・削除の波及）を設計する（論点3）
-status: todo
+status: done
 priority: high
 labels: [design, docs]
 dependson: [7]
 related: []
 created_at: 2026-07-26T10:56:30.725520+00:00
-updated_at: 2026-07-26T11:27:09.776079+00:00
+updated_at: 2026-07-31T23:33:02.999602+00:00
 ---
 
 ## 背景

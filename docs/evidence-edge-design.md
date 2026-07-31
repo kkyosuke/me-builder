@@ -21,8 +21,9 @@ Source RecordとBrain Itemを結ぶエッジと、Source Record同士・Brain It
 | Source Recordの粒度とkind、Source domainの責務 | [ドメイン設計 §5](domain-design.md#5-source-domain) |
 | Brain Itemの分類と共通属性（`Evidence`、`Derivation`、`Confidence`、`Revision`） | [Brain内部情報の分類](brain-content-taxonomy.md) |
 | Access Label、Access Policy、Access Profile、不変条件 | [Brainのラベル・アクセス制御設計](brain-access-label-design.md) |
+| Source Recordの不変性、訂正・削除・撤回とBrain Itemへの波及 | [Source Recordのライフサイクル設計](source-record-lifecycle-design.md) |
 
-この文書では、Confidenceの具体的な算出方法、原本の不変性、永続化方式を決めません（[§8](#8-この文書で決めていないこと)）。
+この文書では、Confidenceの具体的な算出方法と永続化方式を決めません（[§8](#8-この文書で決めていないこと)）。
 
 ## 2. 全体像
 
@@ -87,7 +88,7 @@ flowchart LR
 - [プロジェクト概要 §11](project-overview.md#11-段階的な進め方)より、Phase 1にはBrain Itemが存在しません。Brain Item間の改訂が必要になるのは、Brain Itemを導出するPhase 2以降です
 - [ドメイン設計 §6](domain-design.md#sourceの所有者と依存方向)の依存方向はBrain → Sourceの単方向です。Source Record間の改訂をBrain Item側の関係として表すことはできません
 
-Source Recordを訂正したときに旧版の原本をどう扱うかは、原本の不変性の問題として別に扱います（[§8](#8-この文書で決めていないこと)）。
+Source Recordを訂正・削除したときの原本と派生への波及は、[Source Recordのライフサイクル設計](source-record-lifecycle-design.md)で扱います。
 
 ### `conflicts_with`をMVPへ含めない
 
@@ -138,6 +139,8 @@ Source Recordを訂正したときに旧版の原本をどう扱うかは、原�
 - 同[§9](brain-access-label-design.md#9-不変条件)の「ラベル変更後の外部アクセスを監査できる」と、同[§7](brain-access-label-design.md#7-mcp接続)の手順7「使用したBrain Itemと結果を監査ログへ記録する」を満たすには、開示した時点のConfidenceが後から再現できる必要があります。エッジは後から増えるため、値を記録しなければ再現できません
 
 Confidenceの具体的な算出方法、閾値、提示のタイミングとUIはこの文書では決めません（[§8](#8-この文書で決めていないこと)）。
+
+Source Recordの削除時に古いConfidenceの開示を止めるタイミング、再計算後のBrain Item、監査ログへ記録済みのConfidenceの扱いは[Source Recordのライフサイクル設計 §5](source-record-lifecycle-design.md#5-brain-itemへの波及)をSSoTとします。
 
 ## 6. 外部への開示
 
@@ -199,6 +202,5 @@ Confidenceを外部へ開示するかどうかは、2つの要求が衝突しま
 
 - Confidenceの具体的な算出方法、閾値、提示のタイミングとUI
 - 反証を検出する処理の入出力と、反証エッジを張る主体
-- 原本の不変性と、原本の訂正・削除が派生したBrain Itemへ及ぼす影響。[§3](#3-エッジの種類)のSource Record間の改訂関係が直結しますが、波及の規則はこの文書では扱いません
 - 外部連携時のAccess Label既定値の詳細と、Source Connectorの具体的なモデル
 - エッジの永続化方式（テーブル定義、インデックス）

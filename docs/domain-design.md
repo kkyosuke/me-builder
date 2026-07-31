@@ -131,6 +131,8 @@ Source domainは「その人に関する生のデータを、どこから、ど�
 
 Source Recordから何を導き、どう分類し、どの用途へ提供するかは[Brain domain](#4-brain-domain)の責務です。R2やD1などの保存技術、外部サービスのAPI通信は、Source domainの外側にある技術的な仕組みとして扱います。
 
+Source Recordの不変性、訂正・削除・撤回と、派生したBrain Itemへの波及は[Source Recordのライフサイクル設計](source-record-lifecycle-design.md)をSSoTとします。
+
 ### Source Recordの粒度
 
 **確定**: 取り込み元が自然に区切る単位を、1件のSource Recordとします。
@@ -172,7 +174,6 @@ kindは「どこから来たデータか」だけを表します。「そのデ�
 ### 現時点で決めないこと
 
 - Source Connectorごとの具体的なモデルと外部サービスの認証方式
-- 原本の不変性、および原本の訂正・削除が派生したBrain Itemへ及ぼす影響
 - Import / Batchの具体的な属性
 - Source Recordの物理的な保存構造とメディア原本の参照方式
 - 外部連携時のAccess Label既定値の詳細
@@ -257,7 +258,6 @@ MVPでは、1つのAccountが1つのBrainを利用する体験を基本としま
 
 ### この関係で決めていないこと
 
-- 原本と派生の区別（原本の不変性、原本の訂正・削除が派生したBrain Itemへ及ぼす影響）
 - 外部連携時のAccess Label既定値の詳細
 - Confidenceの具体的な算出方法と、本人の認識との乖離をどう見せるか（エッジ集合からの派生値であることと、開示した値を記録することは[根拠・反証・改訂のエッジ設計 §5](evidence-edge-design.md#5-confidenceとエッジの関係)で確定）
 
@@ -292,7 +292,7 @@ MCPの具体的な接続モデルやツール設計は後続で検討します�
 | --- | --- | --- |
 | 1 | AccountとBrainの利用体験を確定する | 完了（Phase 1の範囲） |
 | 2 | Brain内部の分類とAccess Labelの初期セットを検証する | 完了 |
-| 3 | Sourceドメインを設計し、Brain Itemの由来を確定する | 一部完了（ドメイン境界、由来の必須性、根拠のエッジまで） |
+| 3 | Sourceドメインを設計し、Brain Itemの由来を確定する | 一部完了（ドメイン境界、由来、エッジ、原本のライフサイクルまで） |
 | 3.1 | Phase 1のQuestionnaireドメインを設計する | 完了（論理モデル） |
 | 4 | AIによる推定と本人確認の流れを設計する | 未着手 |
 | 5 | MCP接続、権限、監査の詳細を設計する | 未着手 |
@@ -300,7 +300,7 @@ MCPの具体的な接続モデルやツール設計は後続で検討します�
 
 step 1は、Phase 1に必要な範囲（対応チャネルと入力形式、チャネルの役割分担、ログイン手段と復旧方針、質問の作成主体と版管理）を確定させたことで完了とみなします。詳細は[プロジェクト概要 §4](project-overview.md#4-想定する利用体験)と[§5](project-overview.md#5-アカウントと本人識別)にあります。
 
-step 3は当初「質問・回答のドメインを設計する」としていましたが、日記とアンケートの回答に加えて購買履歴や移動履歴も取り込む前提が加わったため、取り込み元を限定しないSourceドメインの設計へ置き換えました。この文書の[§5](#5-source-domain)と[§6](#6-ドメイン間の関係)で、Source domainの責務、Source Recordの粒度とkind、Brain Itemとの多重度、由来の必須性、本人の操作の切り分けを確定しています。根拠を表現するエッジは[根拠・反証・改訂のエッジ設計](evidence-edge-design.md)で確定しました。原本と派生の区別、外部連携時のAccess Label既定値は未決のため、一部完了とします。
+step 3は当初「質問・回答のドメインを設計する」としていましたが、日記とアンケートの回答に加えて購買履歴や移動履歴も取り込む前提が加わったため、取り込み元を限定しないSourceドメインの設計へ置き換えました。この文書の[§5](#5-source-domain)と[§6](#6-ドメイン間の関係)で、Source domainの責務、Source Recordの粒度とkind、Brain Itemとの多重度、由来の必須性、本人の操作の切り分けを確定しています。根拠を表現するエッジは[根拠・反証・改訂のエッジ設計](evidence-edge-design.md)、原本の不変性と訂正・削除の波及は[Source Recordのライフサイクル設計](source-record-lifecycle-design.md)で確定しました。外部連携時のAccess Label既定値は未決のため、一部完了とします。
 
 step 3.1では、Phase 1の質問配信と回答保存に必要なQuestion、Survey、SurveyResponseの集約、状態、不変条件、Account / Sourceとの関係を[Phase 1 アンケートドメイン設計](questionnaire-domain-design.md)で確定しました。D1の物理モデルとAPI契約はstep 6の後続作業です。
 
