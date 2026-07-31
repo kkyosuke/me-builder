@@ -134,6 +134,8 @@ sequenceDiagram
 
 #### LINEからWebへの遷移とログイン
 
+アンケート一覧、回答、回答内容、LINE通知、リッチメニューの詳細なUIと遷移は[Phase 1 アンケート体験設計](questionnaire-experience.md)を正とします。
+
 **確定**: LINEで配信するリンクには認証情報を持たせず、本人性はLINE側のログイン状態が保証します。
 
 **確定**: LINE内からの主導線はLIFF（LINE Front-end Framework）でWebを開く形とします。あわせて、外部ブラウザから独立して開けるWebも維持し、そちらはLINE Loginによる認証を通します。
