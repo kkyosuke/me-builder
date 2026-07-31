@@ -15,7 +15,8 @@
 | [README](../README.md) | プロジェクトの短い入口と文書リンク |
 | [プロジェクト概要](../docs/project-overview.md) | 目的、主要要件、MVP、ロードマップ、Phase 1の入力体験とログイン手段 |
 | [Phase 1 アンケート体験設計](../docs/questionnaire-experience.md) | アンケート一覧、回答、回答内容、LINE通知、リッチメニューのUIと遷移、縦切りの完了条件 |
-| [ドメイン設計](../docs/domain-design.md) | Account / Brain / Sourceの責務・境界、ドメイン間の関係、Source Recordの粒度とkind、設計順序と進捗 |
+| [Phase 1 アンケートドメイン設計](../docs/questionnaire-domain-design.md) | Question、Survey、SurveyResponseの集約、状態、不変条件、Account / Sourceとの関係 |
+| [ドメイン設計](../docs/domain-design.md) | Account / Brain / Sourceの責務・境界、Questionnaireの位置づけ、ドメイン間の関係、設計順序と進捗 |
 | [Brain内部情報の分類](../docs/brain-content-taxonomy.md) | Brain Itemの分類名、定義、具体例、分類とは別に持つ共通属性、意思決定での利用方法 |
 | [根拠・反証・改訂のエッジ設計](../docs/evidence-edge-design.md) | Source RecordとBrain Itemを結ぶエッジの種類と属性、Confidenceとの関係、外部への開示粒度、改訂された旧版の扱い |
 | [Brainのラベル・アクセス制御設計](../docs/brain-access-label-design.md) | Topic Label、Access Label、Access Profile、MCP提供時の原則、Source Recordの既定ラベル |

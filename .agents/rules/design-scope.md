@@ -9,6 +9,7 @@
 - Account、Brain、Sourceの責務・境界とドメイン間の関係
 - Phase 1の対応チャネルと入力形式、チャネルの役割分担
 - Phase 1のログイン手段と復旧方針
+- Phase 1のQuestion、Survey、SurveyResponseの集約、状態、不変条件、Account / Sourceとの関係
 - Brain内部情報の大分類と、分類とは別に持つ共通属性
 - Source Recordの粒度とkind、Brain Itemの由来（Evidence / Derivation）
 - Source RecordとBrain Itemを結ぶ根拠・反証・改訂のエッジの種類と属性、その外部への開示粒度
@@ -18,7 +19,6 @@
 
 ## 2. 明示的な依頼なしに深掘りしないこと
 
-- 質問（アンケート）の具体的なエンティティや集約（Phase 2）
 - Confidenceの具体的な算出方法、閾値、提示のタイミングとUI
 - 反証を検出する処理の入出力
 - 原本と派生の区別（原本の不変性、原本の訂正・削除が派生したBrain Itemへ及ぼす影響）
