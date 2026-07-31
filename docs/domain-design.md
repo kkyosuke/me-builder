@@ -2,9 +2,9 @@
 
 ## 1. この文書の目的
 
-me-builderの中核となる`Account`、`Brain`、`Source`の責務、境界、関係を整理します。
+me-builderの中核となる`Account`、`Brain`、`Source`の責務、境界、関係と、Phase 1の入力を担う`Questionnaire`の位置づけを整理します。
 
-現在は構想段階のため、質問・回答・推定処理などの詳細なモデルには踏み込みません。データベース、API、認証製品、LLM、MCPの具体的な実装方式も決定しません。
+Questionnaireの詳細な論理モデルは[Phase 1 アンケートドメイン設計](questionnaire-domain-design.md)を正とします。データベース、API、認証製品、LLM、MCPの具体的な実装方式はこの文書では決定しません。
 
 ## 2. 中核となる3つのドメイン
 
@@ -18,9 +18,13 @@ me-builderの中核となる`Account`、`Brain`、`Source`の責務、境界、�
 
 `Source`を`Brain`から分ける理由は、Brainが担当する問いが「その人らしさを構成する情報」だからです。交通系ICカードの乗車履歴や購買明細そのものは、その人らしさを構成する情報ではありません。そこから導出されたBehavior PatternやPreferenceがBrainの中身になります。日記やアンケートの回答も同じく、Brain Itemそのものではなく、Brain Itemの元になるデータとして扱います。
 
+`Questionnaire`はこの3つと同列の中核データドメインではなく、Phase 1で質問を公開し回答をSourceへ取り込むための支援ドメインです。質問、アンケート、回答進捗の責務と集約は[Phase 1 アンケートドメイン設計](questionnaire-domain-design.md)で定義します。
+
 ```mermaid
 flowchart LR
-    UI[LINE / Web / iOS / Android] --> A[Account]
+    UI[LINE / Web / iOS / Android] --> Q[Questionnaire]
+    Q -->|resolve respondent| A[Account]
+    Q -->|answers| S[Source]
     EXT[外部サービス] -->|本人の同意| A
     A -->|owns / manages| S[Source]
     A -->|owns / manages| B[Brain]
@@ -289,6 +293,7 @@ MCPの具体的な接続モデルやツール設計は後続で検討します�
 | 1 | AccountとBrainの利用体験を確定する | 完了（Phase 1の範囲） |
 | 2 | Brain内部の分類とAccess Labelの初期セットを検証する | 完了 |
 | 3 | Sourceドメインを設計し、Brain Itemの由来を確定する | 一部完了（ドメイン境界、由来の必須性、根拠のエッジまで） |
+| 3.1 | Phase 1のQuestionnaireドメインを設計する | 完了（論理モデル） |
 | 4 | AIによる推定と本人確認の流れを設計する | 未着手 |
 | 5 | MCP接続、権限、監査の詳細を設計する | 未着手 |
 | 6 | 永続化と検索方式を選定する | 一部（利用する基盤のみ確定） |
@@ -296,5 +301,7 @@ MCPの具体的な接続モデルやツール設計は後続で検討します�
 step 1は、Phase 1に必要な範囲（対応チャネルと入力形式、チャネルの役割分担、ログイン手段と復旧方針、質問の作成主体と版管理）を確定させたことで完了とみなします。詳細は[プロジェクト概要 §4](project-overview.md#4-想定する利用体験)と[§5](project-overview.md#5-アカウントと本人識別)にあります。
 
 step 3は当初「質問・回答のドメインを設計する」としていましたが、日記とアンケートの回答に加えて購買履歴や移動履歴も取り込む前提が加わったため、取り込み元を限定しないSourceドメインの設計へ置き換えました。この文書の[§5](#5-source-domain)と[§6](#6-ドメイン間の関係)で、Source domainの責務、Source Recordの粒度とkind、Brain Itemとの多重度、由来の必須性、本人の操作の切り分けを確定しています。根拠を表現するエッジは[根拠・反証・改訂のエッジ設計](evidence-edge-design.md)で確定しました。原本と派生の区別、外部連携時のAccess Label既定値は未決のため、一部完了とします。
+
+step 3.1では、Phase 1の質問配信と回答保存に必要なQuestion、Survey、SurveyResponseの集約、状態、不変条件、Account / Sourceとの関係を[Phase 1 アンケートドメイン設計](questionnaire-domain-design.md)で確定しました。D1の物理モデルとAPI契約はstep 6の後続作業です。
 
 step 6は、利用するCloudflareコンポーネントの選定だけが[インフラ・システム構成](infrastructure-architecture.md)で確定しています。テーブル定義、Embeddingのインデックス構成、メディアの参照方式は未設計です。

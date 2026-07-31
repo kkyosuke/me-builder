@@ -8,7 +8,8 @@ me-builderは、さまざまな質問への回答を蓄積し、その人らし�
 
 - [プロジェクト概要](docs/project-overview.md) — 目的、MVP、Phase 1の入力体験とログイン手段
 - [Phase 1 アンケート体験設計](docs/questionnaire-experience.md) — 一覧、回答、回答内容、LINE通知、リッチメニューのUIと遷移
-- [ドメイン設計](docs/domain-design.md) — Account / Brain / Sourceの責務・境界、設計順序と進捗
+- [Phase 1 アンケートドメイン設計](docs/questionnaire-domain-design.md) — 質問、アンケート、回答進捗の集約とAccount / Sourceとの関係
+- [ドメイン設計](docs/domain-design.md) — Account / Brain / Sourceの責務・境界、Questionnaireの位置づけ、設計順序と進捗
 - [Brainのラベル・アクセス制御設計](docs/brain-access-label-design.md) — ラベルと公開制御のSSoT
 - [Brain内部情報の分類](docs/brain-content-taxonomy.md) — Brain Item分類のSSoT
 - [根拠・反証・改訂のエッジ設計](docs/evidence-edge-design.md) — Source RecordとBrain Itemを結ぶエッジのSSoT
