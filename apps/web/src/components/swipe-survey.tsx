@@ -9,6 +9,7 @@ import {
 } from "react";
 import { createChoiceAnswer, createSkipAnswer, summarizeAnswers } from "../survey/answers";
 import { fetchSurveyQuestions } from "../survey/questions";
+import { getParameterSummary, scoreRelationshipPriority } from "../survey/relationship-priority";
 import {
   type DragOffset,
   SWIPE_TRANSITION_MS,
@@ -118,22 +119,35 @@ function SurveyComplete({
   onRestart: () => void;
 }) {
   const { answered, skipped } = summarizeAnswers(answers);
+  const profile = scoreRelationshipPriority(answers);
 
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-3 rounded-3xl border border-slate-700 bg-slate-800 p-6 text-center">
+    <div className="flex h-full flex-col items-center justify-center gap-2 rounded-3xl border border-slate-700 bg-slate-800 p-4 text-center">
       {/* shrink-0 が無いと、縦の flex の中で高さだけが縮んでアイコンが潰れます。 */}
       <CircleCheck className="size-12 shrink-0 text-emerald-400" aria-hidden="true" />
-      <p className="text-xl font-bold">今日のアンケートは終わりです</p>
+      <p className="text-lg font-bold">回答から見える現在の傾向</p>
       <p className="text-sm text-slate-400">
         {`${answered} 問に回答し、${skipped} 問をあとで回答にしました。`}
       </p>
-      <p className="text-xs text-slate-500">
-        回答の保存はまだ実装されていません（サーバー連携は後続で対応します）。
+      <div className="grid w-full grid-cols-2 gap-2">
+        {profile.parameters.map((parameter) => (
+          <div key={parameter.id} className="rounded-xl bg-slate-900/70 p-2">
+            <p className="text-xs text-slate-400">{parameter.label}</p>
+            <p className="font-semibold text-sky-300">
+              {parameter.score === null ? "—" : `${parameter.score} / 100`}
+            </p>
+            <p className="text-xs text-slate-300">{getParameterSummary(parameter)}</p>
+            <p className="text-[10px] text-slate-500">{`回答充足度 ${parameter.coverage}%`}</p>
+          </div>
+        ))}
+      </div>
+      <p className="text-[10px] text-slate-500">
+        回答と結果のサーバー保存はまだ実装されていません。
       </p>
       <button
         type="button"
         onClick={onRestart}
-        className="mt-2 inline-flex items-center gap-2 rounded-xl bg-sky-500 px-5 py-2.5 text-sm font-semibold text-slate-900 transition-colors hover:bg-sky-400"
+        className="inline-flex items-center gap-2 rounded-xl bg-sky-500 px-5 py-2 text-sm font-semibold text-slate-900 transition-colors hover:bg-sky-400"
       >
         <RotateCcw className="size-4" aria-hidden="true" />
         もう一度
@@ -291,7 +305,7 @@ export function SwipeSurvey() {
   return (
     <section className="flex flex-col gap-4">
       <header className="flex items-baseline justify-between">
-        <h2 className="text-lg font-bold">今日のアンケート</h2>
+        <h2 className="text-lg font-bold">自分と相手の優先・境界線</h2>
         <p className="text-sm text-slate-400" aria-live="polite">
           {`${finished ? total : Math.min(index + 1, total)} / ${total}`}
         </p>

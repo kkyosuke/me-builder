@@ -1,6 +1,8 @@
 import {
   BookOpen,
   Calculator,
+  CircleCheck,
+  CircleX,
   Clock,
   Coffee,
   Heart,
@@ -38,6 +40,8 @@ const ICONS: Record<SurveyIconName, LucideIcon> = {
   calculator: Calculator,
   coffee: Coffee,
   clock: Clock,
+  "circle-check": CircleCheck,
+  "circle-x": CircleX,
 };
 
 export function SurveyIcon({

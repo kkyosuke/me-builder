@@ -28,7 +28,9 @@ export type SurveyIconName =
   | "heart"
   | "calculator"
   | "coffee"
-  | "clock";
+  | "clock"
+  | "circle-check"
+  | "circle-x";
 
 /** スワイプの方向。左右の 2 択に対応します。 */
 export type SwipeDirection = "left" | "right";

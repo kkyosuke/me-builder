@@ -18,6 +18,7 @@
 | [Phase 1 アンケートドメイン設計](../docs/questionnaire-domain-design.md) | Question、Survey、SurveyResponseの集約、状態、不変条件、Account / Sourceとの関係 |
 | [人間関係の価値観アンケート候補](../docs/relationship-values-questionnaire.md) | 人間関係で違いが問題になりやすい価値観の分類、質問作成時の原則 |
 | [人間関係の価値観 Yes／No質問集](../docs/relationship-values-yes-no-question-bank.md) | 人間関係の各話題についてYes／Noで回答できる質問候補 |
+| [「自分と相手の優先・境界線」パラメータ変換設計](../docs/relationship-priority-parameter-design.md) | 最初のアンケートの回答を4パラメータへ変換する重み、計算式、表示条件 |
 | [ドメイン設計](../docs/domain-design.md) | Account / Brain / Sourceの責務・境界、Questionnaireの位置づけ、ドメイン間の関係、設計順序と進捗 |
 | [Brain内部情報の分類](../docs/brain-content-taxonomy.md) | Brain Itemの分類名、定義、具体例、分類とは別に持つ共通属性、意思決定での利用方法 |
 | [根拠・反証・改訂のエッジ設計](../docs/evidence-edge-design.md) | Source RecordとBrain Itemを結ぶエッジの種類と属性、Confidenceとの関係、外部への開示粒度、改訂された旧版の扱い |
