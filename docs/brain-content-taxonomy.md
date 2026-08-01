@@ -243,7 +243,7 @@ Derivationは1つのBrain Itemにつき1つの値を持ちます。
 
 ### Revision
 
-Revisionは改訂のエッジで表します。改訂で置き換えられた旧版を保持するか、検索の対象に含めるか、どのAccess Policyで開示するかは[根拠・反証・改訂のエッジ設計 §7](evidence-edge-design.md#7-改訂された旧版の扱い)をSSoTとします。
+Revisionは改訂のエッジで表します。改訂で置き換えられた旧版を保持するか、検索の対象に含めるか、どのAccess Policyで開示するかは[根拠・反証・改訂のエッジ設計 §7](evidence-edge-design.md#7-改訂された旧版の扱い)をSSoTとします。Source Recordの削除・撤回がBrain Itemへ及ぼす影響は[Source Recordのライフサイクル設計](source-record-lifecycle-design.md)で扱います。
 
 ## 5. Access Labelとの関係
 

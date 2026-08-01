@@ -4,7 +4,7 @@
 
 この文書は、Phase 1のアンケートを公開し、本人の回答を継続的に保存するためのQuestionnaire domainを定義します。質問と版、アンケート、回答進捗の集約境界、状態遷移、不変条件、およびAccount / Source domainとの関係を所有します。
 
-画面と遷移は[Phase 1 アンケート体験設計](questionnaire-experience.md)、Account / Brain / Sourceの境界は[ドメイン設計](domain-design.md)、Source Recordの改訂関係は[根拠・反証・改訂のエッジ設計](evidence-edge-design.md)を正とします。
+画面と遷移は[Phase 1 アンケート体験設計](questionnaire-experience.md)、Account / Brain / Sourceの境界は[ドメイン設計](domain-design.md)、Source Recordの改訂関係は[根拠・反証・改訂のエッジ設計](evidence-edge-design.md)、原本の不変性と訂正・削除の波及は[Source Recordのライフサイクル設計](source-record-lifecycle-design.md)を正とします。
 
 この文書では、D1のテーブル、カラム、インデックス、APIスキーマ、セッションの実装方式を決めません。ここで定義する論理モデルを、次の永続化設計とAPI設計の入力にします。
 
@@ -222,7 +222,7 @@ Answerは次の意味を持ちます。
 
 削除したSurvey QuestionのAnswerを現在有効な回答から外し、Source domainへ対応するSource Recordの削除を依頼します。SurveyResponseの回答状態は残ったAnswerから再計算します。
 
-Source Recordの物理的な消去時期と、改訂された旧版を内部でどこまで保持するかはSource domainの未決事項であり、この文書では決めません。少なくとも削除後の回答を通常の回答内容表示、Brain Itemの新規導出、MCP提供には使いません。
+Source Recordの削除後に残すtombstoneと改訂された旧版の扱いは[Source Recordのライフサイクル設計](source-record-lifecycle-design.md)を正とします。物理的な消去時期は未決であり、この文書では決めません。
 
 #### あとで回答
 
@@ -235,7 +235,7 @@ Source Recordの物理的な消去時期と、改訂された旧版を内部で�
 - Answerが参照するQuestion VersionはSurvey Questionが固定した版と一致する
 - Answerが参照するChoice IDはそのQuestion Versionに存在する
 - Answerは必ず同じAccountに属するSource Recordと対応する
-- 新規回答、修正、削除はSurveyの受付中だけ許可する
+- 新規回答と修正はSurveyの受付中だけ許可する。削除は受付終了後も許可する
 - 回答主体は検証済みAccountから解決し、クライアント指定のAccount IDを使わない
 
 ## 8. Source domainとの関係
@@ -258,6 +258,7 @@ Questionnaire domainから作るSource Recordには、少なくとも次の意�
 - 既定Access Labelは`private`
 - Phase 1ではBrain Itemがなくてもよい
 - 修正時はSource Record間の改訂関係を作る
+- 削除時はSource Recordのライフサイクル規則に従う
 
 SurveyResponseの更新とSource Recordの作成に片方だけ成功した状態を正常とはみなしません。どのトランザクション境界や再試行方式で一貫性を守るかは永続化設計で決めます。
 
