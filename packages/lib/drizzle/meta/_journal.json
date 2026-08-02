@@ -15,6 +15,13 @@
       "when": 1785544817288,
       "tag": "0001_optimal_madame_hydra",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1785788943855,
+      "tag": "0002_marvelous_hex",
+      "breakpoints": true
     }
   ]
 }

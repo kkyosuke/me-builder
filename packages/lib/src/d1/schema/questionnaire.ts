@@ -9,6 +9,7 @@ import {
 } from "drizzle-orm/sqlite-core";
 import { accounts } from "./account";
 import { baseSchema, lifecycleSchema } from "./base";
+import { sourceRecords } from "./source";
 
 export const questions = sqliteTable("questions", {
   ...baseSchema,
@@ -131,7 +132,9 @@ export const surveyAnswers = sqliteTable(
     questionVersion: integer("question_version").notNull(),
     choiceId: text("choice_id").notNull(),
     acceptedAt: integer("accepted_at", { mode: "timestamp" }).notNull(),
-    sourceRecordId: text("source_record_id").notNull(),
+    sourceRecordId: text("source_record_id")
+      .notNull()
+      .references(() => sourceRecords.id),
   },
   (table) => [
     foreignKey({

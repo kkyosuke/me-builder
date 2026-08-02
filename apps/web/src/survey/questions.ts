@@ -1,3 +1,4 @@
+import * as v from "valibot";
 import {
   MONEY_VALUES_QUESTIONS,
   MONEY_VALUES_SCORING_CONFIG,
@@ -9,7 +10,7 @@ import {
   scoreRelationshipPriority,
 } from "./definitions/relationship-priority";
 import type { ParameterProfile } from "./parameter-scoring";
-import type { SurveyInteraction, SurveyQuestion } from "./types";
+import { type SurveyInteraction, type SurveyQuestion, SurveyQuestionsSchema } from "./types";
 
 export interface SurveyDefinition {
   id: string;
@@ -25,7 +26,7 @@ const SURVEY_DEFINITIONS: SurveyDefinition[] = [
     id: "relationship-priority",
     title: "自分と相手の優先・境界線",
     description: "頼まれごとや意思決定で、自分と相手をどう尊重するかを見ます。",
-    questions: RELATIONSHIP_PRIORITY_QUESTIONS,
+    questions: v.parse(SurveyQuestionsSchema, RELATIONSHIP_PRIORITY_QUESTIONS),
     balancedLabel: RELATIONSHIP_PRIORITY_SCORING_CONFIG.balancedLabel,
     score: scoreRelationshipPriority,
   },
@@ -33,7 +34,7 @@ const SURVEY_DEFINITIONS: SurveyDefinition[] = [
     id: "money-values",
     title: "お金と消費",
     description: "貯蓄、支出、共有、公平性、リスクに関する傾向を見ます。",
-    questions: MONEY_VALUES_QUESTIONS,
+    questions: v.parse(SurveyQuestionsSchema, MONEY_VALUES_QUESTIONS),
     balancedLabel: MONEY_VALUES_SCORING_CONFIG.balancedLabel,
     score: scoreMoneyValues,
   },
@@ -50,7 +51,7 @@ const SURVEY_DEFINITIONS: SurveyDefinition[] = [
  * `definitions/relationship-priority.ts`にまとめ、公開済みの版を後から書き換えません。
  */
 export async function fetchSurveyQuestions(): Promise<SurveyQuestion[]> {
-  return RELATIONSHIP_PRIORITY_QUESTIONS;
+  return v.parse(SurveyQuestionsSchema, RELATIONSHIP_PRIORITY_QUESTIONS);
 }
 
 /** 現在公開しているアンケート定義の一覧。 */

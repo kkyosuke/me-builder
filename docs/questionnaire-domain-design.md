@@ -6,7 +6,7 @@
 
 画面と遷移は[Phase 1 アンケート体験設計](questionnaire-experience.md)、Account / Brain / Sourceの境界は[ドメイン設計](domain-design.md)、Source Recordの改訂関係は[根拠・反証・改訂のエッジ設計](evidence-edge-design.md)、原本の不変性と訂正・削除の波及は[Source Recordのライフサイクル設計](source-record-lifecycle-design.md)を正とします。
 
-この文書では、D1のテーブル、カラム、インデックス、APIスキーマ、セッションの実装方式を決めません。ここで定義する論理モデルを、次の永続化設計とAPI設計の入力にします。
+この文書では、D1のテーブル、カラム、インデックス、APIスキーマ、セッションの実装方式を定義しません。ここで定義する論理モデルを永続化設計とAPI設計の入力とし、D1への現在の写像は[`packages/lib`のschema](../packages/lib/src/d1/schema/questionnaire.ts)を正とします。
 
 ## 2. 結論
 
@@ -296,12 +296,11 @@ SurveyResponseの更新とSource Recordの作成に片方だけ成功した状�
 
 ## 11. 次に決めること
 
-この論理モデルを前提に、次の順序で具体化します。
+この論理モデルのD1テーブル、制約、インデックス、マイグレーションは具体化済みです。残る項目を次の順序で具体化します。
 
-1. D1のテーブル、制約、インデックス、マイグレーション
-2. サーバー発行セッションによる継続リクエストの本人確認
-3. 質問取得、一覧取得、回答保存、修正、削除のAPI契約
-4. Source Record作成とSurveyResponse更新の一貫性、再送、競合制御
-5. 運営がQuestion VersionとSurveyを登録・公開する手順
+1. サーバー発行セッションによる継続リクエストの本人確認
+2. 質問取得、一覧取得、回答保存、修正、削除のAPI契約
+3. Source Record作成とSurveyResponse更新の一貫性、再送、競合制御
+4. 運営がQuestion VersionとSurveyを登録・公開する手順
 
 対象者セグメント、複数選択、自由記述、画像回答、質問のランダム化、回答期限後の修正受付、回答途中Surveyの自動失効は後続で設計します。
