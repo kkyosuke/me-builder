@@ -1,5 +1,12 @@
+import * as v from "valibot";
 import { type Question, findQuestionVersion } from "./question";
-import { type QuestionnaireResult, failure, isNonEmpty, isValidDate, success } from "./types";
+import {
+  CreateSurveyInputSchema,
+  PublishSurveyInputSchema,
+  SurveyTimestampInputSchema,
+  ValidDateSchema,
+} from "./schema";
+import { type QuestionnaireResult, failure, success, validate } from "./types";
 
 export type SurveyState = "draft" | "published" | "withdrawn";
 export type SurveyAvailability = "unavailable" | "before-open" | "open" | "closed" | "withdrawn";
@@ -46,38 +53,10 @@ function findCatalogVersion(catalog: readonly Question[], surveyQuestion: Survey
 
 /** 順序を固定したdraft Surveyを作成します。 */
 export function createSurvey(input: CreateSurveyInput): QuestionnaireResult<Survey> {
-  if (!isNonEmpty(input.id) || !isNonEmpty(input.title)) {
-    return failure("invalid-input", "SurveyのIDとタイトルは空にできません");
+  const validated = validate(CreateSurveyInputSchema, input);
+  if (!validated.ok) {
+    return validated;
   }
-  if (!isValidDate(input.opensAt) || (input.closesAt && !isValidDate(input.closesAt))) {
-    return failure("invalid-input", "Surveyの受付期間が不正です");
-  }
-  if (input.closesAt && input.closesAt.getTime() <= input.opensAt.getTime()) {
-    return failure("invalid-input", "受付終了時点は受付開始時点より後にしてください");
-  }
-  if (input.questions.length === 0) {
-    return failure("invalid-input", "Surveyには1件以上の質問が必要です");
-  }
-
-  const surveyQuestionIds = new Set<string>();
-  const questionIds = new Set<string>();
-  for (const question of input.questions) {
-    if (!isNonEmpty(question.id) || !isNonEmpty(question.questionId)) {
-      return failure("invalid-input", "Survey QuestionのIDは空にできません");
-    }
-    if (!Number.isSafeInteger(question.questionVersion) || question.questionVersion < 1) {
-      return failure("invalid-input", "Question Versionは1以上の整数である必要があります");
-    }
-    if (surveyQuestionIds.has(question.id)) {
-      return failure("invalid-input", "Survey Question IDは重複できません");
-    }
-    if (questionIds.has(question.questionId)) {
-      return failure("invalid-input", "同じQuestionを1つのSurveyへ重複して追加できません");
-    }
-    surveyQuestionIds.add(question.id);
-    questionIds.add(question.questionId);
-  }
-
   return success({
     id: input.id,
     title: input.title,
@@ -94,11 +73,12 @@ export function publishSurvey(
   catalog: readonly Question[],
   publishedAt: Date,
 ): QuestionnaireResult<Survey> {
+  const validated = validate(PublishSurveyInputSchema, { survey, catalog, at: publishedAt });
+  if (!validated.ok) {
+    return validated;
+  }
   if (survey.state !== "draft") {
     return failure("invalid-transition", `${survey.state}のSurveyは公開できません`);
-  }
-  if (!isValidDate(publishedAt)) {
-    return failure("invalid-input", "公開時点が不正です");
   }
   for (const surveyQuestion of survey.questions) {
     const version = findCatalogVersion(catalog, surveyQuestion);
@@ -112,21 +92,30 @@ export function publishSurvey(
       );
     }
   }
-  return success({ ...survey, state: "published", publishedAt: publishedAt.toISOString() });
+  return success({
+    ...survey,
+    state: "published",
+    publishedAt: publishedAt.toISOString(),
+  });
 }
 
 export function withdrawSurvey(survey: Survey, withdrawnAt: Date): QuestionnaireResult<Survey> {
+  const validated = validate(SurveyTimestampInputSchema, { survey, at: withdrawnAt });
+  if (!validated.ok) {
+    return validated;
+  }
   if (survey.state !== "published") {
     return failure("invalid-transition", `${survey.state}のSurveyは公開停止できません`);
   }
-  if (!isValidDate(withdrawnAt)) {
-    return failure("invalid-input", "公開停止時点が不正です");
-  }
-  return success({ ...survey, state: "withdrawn", withdrawnAt: withdrawnAt.toISOString() });
+  return success({
+    ...survey,
+    state: "withdrawn",
+    withdrawnAt: withdrawnAt.toISOString(),
+  });
 }
 
 export function getSurveyAvailability(survey: Survey, at: Date): SurveyAvailability {
-  if (survey.state === "draft" || !isValidDate(at)) {
+  if (survey.state === "draft" || !v.is(ValidDateSchema, at)) {
     return "unavailable";
   }
   if (survey.state === "withdrawn") {

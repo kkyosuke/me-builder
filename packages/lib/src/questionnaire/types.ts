@@ -1,3 +1,5 @@
+import * as v from "valibot";
+
 /** Questionnaire domain で共通して使う失敗理由。 */
 export type QuestionnaireErrorCode =
   | "invalid-input"
@@ -30,10 +32,13 @@ export function failure<T>(code: QuestionnaireErrorCode, message: string): Quest
   return { ok: false, error: { code, message } };
 }
 
-export function isNonEmpty(value: string): boolean {
-  return value.trim().length > 0;
-}
-
-export function isValidDate(value: Date): boolean {
-  return !Number.isNaN(value.getTime());
+export function validate<TSchema extends v.GenericSchema>(
+  schema: TSchema,
+  input: unknown,
+): QuestionnaireResult<v.InferOutput<TSchema>> {
+  const result = v.safeParse(schema, input);
+  if (!result.success) {
+    return failure("invalid-input", result.issues[0]?.message ?? "入力値が不正です");
+  }
+  return success(result.output);
 }

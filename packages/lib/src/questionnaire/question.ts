@@ -1,4 +1,10 @@
-import { type QuestionnaireResult, failure, isNonEmpty, isValidDate, success } from "./types";
+import {
+  AddQuestionVersionInputSchema,
+  CreateQuestionInputSchema,
+  QuestionVersionContentSchema,
+  QuestionVersionTransitionInputSchema,
+} from "./schema";
+import { type QuestionnaireResult, failure, success, validate } from "./types";
 
 export type QuestionVersionState = "draft" | "approved" | "retired";
 
@@ -43,28 +49,11 @@ function createDraftVersion(
   version: number,
   content: QuestionVersionContent,
 ): QuestionnaireResult<QuestionVersion> {
-  if (!Number.isSafeInteger(version) || version < 1) {
-    return failure("invalid-input", "Question Versionは1以上の整数である必要があります");
+  const validated = validate(QuestionVersionContentSchema, content);
+  if (!validated.ok) {
+    return validated;
   }
-  if (!isNonEmpty(content.text)) {
-    return failure("invalid-input", "質問文は空にできません");
-  }
-  if (content.hint !== undefined && !isNonEmpty(content.hint)) {
-    return failure("invalid-input", "補足文を指定する場合は空にできません");
-  }
-
   const [first, second] = content.choices;
-  if (
-    !isNonEmpty(first.id) ||
-    !isNonEmpty(second.id) ||
-    !isNonEmpty(first.label) ||
-    !isNonEmpty(second.label)
-  ) {
-    return failure("invalid-input", "ChoiceのIDと表示文言は空にできません");
-  }
-  if (first.id === second.id) {
-    return failure("invalid-input", "Choice IDはQuestion Version内で重複できません");
-  }
 
   return success({
     version,
@@ -81,8 +70,9 @@ export function createQuestion(
   id: string,
   content: QuestionVersionContent,
 ): QuestionnaireResult<Question> {
-  if (!isNonEmpty(id)) {
-    return failure("invalid-input", "Question IDは空にできません");
+  const validated = validate(CreateQuestionInputSchema, { id, content });
+  if (!validated.ok) {
+    return validated;
   }
   const version = createDraftVersion(1, content);
   if (!version.ok) {
@@ -96,12 +86,19 @@ export function addQuestionVersion(
   question: Question,
   content: QuestionVersionContent,
 ): QuestionnaireResult<Question> {
-  const nextVersion = Math.max(...question.versions.map((version) => version.version)) + 1;
+  const validated = validate(AddQuestionVersionInputSchema, { question, content });
+  if (!validated.ok) {
+    return validated;
+  }
+  const nextVersion = Math.max(...question.versions.map(({ version }) => version)) + 1;
   const version = createDraftVersion(nextVersion, content);
   if (!version.ok) {
     return version;
   }
-  return success({ ...question, versions: [...question.versions, version.value] });
+  return success({
+    ...question,
+    versions: [...question.versions, version.value],
+  });
 }
 
 function transitionQuestionVersion(
@@ -111,8 +108,13 @@ function transitionQuestionVersion(
   next: QuestionVersionState,
   at: Date,
 ): QuestionnaireResult<Question> {
-  if (!isValidDate(at)) {
-    return failure("invalid-input", "状態変更時点が不正です");
+  const validated = validate(QuestionVersionTransitionInputSchema, {
+    question,
+    version: versionNumber,
+    at,
+  });
+  if (!validated.ok) {
+    return validated;
   }
   const target = question.versions.find((version) => version.version === versionNumber);
   if (!target) {

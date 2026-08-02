@@ -1,11 +1,12 @@
 import type { Question } from "./question";
+import { RecordSurveyAnswerInputSchema, SurveyInteractionInputSchema } from "./schema";
 import {
   type Survey,
   findSurveyQuestion,
   findSurveyQuestionVersion,
   getSurveyAvailability,
 } from "./survey";
-import { type QuestionnaireResult, failure, isNonEmpty, isValidDate, success } from "./types";
+import { type QuestionnaireResult, failure, success, validate } from "./types";
 
 export type Respondent = Readonly<{
   accountId: string;
@@ -91,12 +92,6 @@ export type DeleteAnswerResult =
   | { outcome: "unchanged"; response: SurveyResponse };
 
 function prepareResponse(input: SurveyInteractionInput): QuestionnaireResult<SurveyResponse> {
-  if (!isNonEmpty(input.respondent.accountId)) {
-    return failure("invalid-input", "Account IDは空にできません");
-  }
-  if (!isValidDate(input.at)) {
-    return failure("invalid-input", "操作時点が不正です");
-  }
   if (input.respondent.status !== "active") {
     return failure("account-inactive", "有効なAccountだけが回答できます");
   }
@@ -115,7 +110,7 @@ function prepareResponse(input: SurveyInteractionInput): QuestionnaireResult<Sur
     }
     return success(input.response);
   }
-  if (!input.responseId || !isNonEmpty(input.responseId)) {
+  if (!input.responseId) {
     return failure("invalid-input", "最初の操作にはResponse IDが必要です");
   }
   return success({
@@ -144,12 +139,13 @@ export function getResponseStatus(
 export function recordSurveyAnswer(
   input: RecordSurveyAnswerInput,
 ): QuestionnaireResult<RecordAnswerResult> {
+  const validated = validate(RecordSurveyAnswerInputSchema, input);
+  if (!validated.ok) {
+    return validated;
+  }
   const prepared = prepareResponse(input);
   if (!prepared.ok) {
     return prepared;
-  }
-  if (!isNonEmpty(input.choiceId) || !isNonEmpty(input.sourceRecordId)) {
-    return failure("invalid-input", "Choice IDとSource Record IDは空にできません");
   }
 
   const surveyQuestion = findSurveyQuestion(input.survey, input.surveyQuestionId);
@@ -213,6 +209,10 @@ export function recordSurveyAnswer(
 export function deferSurveyQuestion(
   input: SurveyInteractionInput,
 ): QuestionnaireResult<DeferQuestionResult> {
+  const validated = validate(SurveyInteractionInputSchema, input);
+  if (!validated.ok) {
+    return validated;
+  }
   const prepared = prepareResponse(input);
   if (!prepared.ok) {
     return prepared;
@@ -242,6 +242,10 @@ export function deferSurveyQuestion(
 export function deleteSurveyAnswer(
   input: SurveyInteractionInput,
 ): QuestionnaireResult<DeleteAnswerResult> {
+  const validated = validate(SurveyInteractionInputSchema, input);
+  if (!validated.ok) {
+    return validated;
+  }
   const prepared = prepareResponse(input);
   if (!prepared.ok) {
     return prepared;
