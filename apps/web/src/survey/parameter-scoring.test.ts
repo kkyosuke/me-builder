@@ -1,6 +1,8 @@
+import * as v from "valibot";
 import { describe, expect, it } from "vitest";
 import {
   type ParameterScoringConfig,
+  ParameterScoringConfigSchema,
   getParameterSummary,
   scoreParameters,
 } from "./parameter-scoring";
@@ -153,6 +155,10 @@ describe("scoreParameters", () => {
     ).toThrow("minimumCoverageは0〜1にしてください");
   });
 
+  it("Valibotスキーマで有効な設定を検証できること", () => {
+    expect(() => v.parse(ParameterScoringConfigSchema, CONFIG)).not.toThrow();
+  });
+
   it("未知のパラメータを参照する設定を受け付けないこと", () => {
     expect(() =>
       scoreParameters([], {
@@ -161,7 +167,7 @@ describe("scoreParameters", () => {
           "q-invalid": { questionVersion: 1, weights: { unknown: 1 } },
         },
       } as unknown as ParameterScoringConfig<TestParameterId>),
-    ).toThrow("未知のparameter idです: unknown");
+    ).toThrow("questionsのweightsに未知のparameter idがあります");
   });
 
   it("質問の重みがないパラメータを受け付けないこと", () => {
@@ -172,6 +178,6 @@ describe("scoreParameters", () => {
           "q-plan": { questionVersion: 2, weights: { planning: 1 } },
         },
       }),
-    ).toThrow("質問の重みがないparameter idです: flexibility");
+    ).toThrow("質問の重みがないparameter idがあります");
   });
 });

@@ -1,3 +1,4 @@
+import * as v from "valibot";
 import type { SurveyAnswer } from "./types";
 
 type ParameterBand = "low" | "balanced" | "high" | "insufficient";
@@ -42,65 +43,92 @@ export interface ParameterProfile<ParameterId extends string> {
   parameters: ScoredParameter<ParameterId>[];
 }
 
-function validateConfig<ParameterId extends string>(
-  config: ParameterScoringConfig<ParameterId>,
-): void {
-  if (!Number.isInteger(config.version) || config.version < 1) {
-    throw new Error("scoring versionは1以上の整数にしてください");
-  }
-  if (
-    !Number.isFinite(config.minimumCoverage) ||
-    config.minimumCoverage < 0 ||
-    config.minimumCoverage > 1
-  ) {
-    throw new Error("minimumCoverageは0〜1にしてください");
-  }
-  if (
-    !Number.isFinite(config.lowMaximum) ||
-    !Number.isFinite(config.highMinimum) ||
-    config.lowMaximum < 0 ||
-    config.highMinimum > 100 ||
-    config.lowMaximum >= config.highMinimum
-  ) {
-    throw new Error("スコア境界は0〜100の範囲でlowMaximum < highMinimumにしてください");
-  }
-  const parameterIds = config.parameters.map(({ id }) => id);
-  if (parameterIds.length === 0) {
-    throw new Error("parametersを1件以上設定してください");
-  }
-  if (new Set(parameterIds).size !== parameterIds.length) {
-    throw new Error("parameter idが重複しています");
-  }
-  const choiceScoreValues = Object.values(config.choiceScores);
-  if (
-    choiceScoreValues.length === 0 ||
-    Math.max(...choiceScoreValues.map(Math.abs)) === 0 ||
-    choiceScoreValues.some((score) => !Number.isFinite(score) || score < -1 || score > 1)
-  ) {
-    throw new Error("choiceScoresは-1〜1の有限な値と、0以外の値を持つ必要があります");
-  }
+const VERSION_MESSAGE = "versionは1以上の整数にしてください";
+const CHOICE_SCORES_MESSAGE = "choiceScoresは-1〜1の有限な値と、0以外の値を持つ必要があります";
+const SCORE_BOUNDARIES_MESSAGE = "スコア境界は0〜100の範囲でlowMaximum < highMinimumにしてください";
 
-  const knownParameterIds = new Set<string>(parameterIds);
-  const weightedParameterIds = new Set<string>();
-  for (const { questionVersion, weights } of Object.values(config.questions)) {
-    if (!Number.isInteger(questionVersion) || questionVersion < 1) {
-      throw new Error("questionVersionは1以上の整数にしてください");
-    }
-    for (const [parameterId, weight] of Object.entries(weights)) {
-      if (!knownParameterIds.has(parameterId)) {
-        throw new Error(`未知のparameter idです: ${parameterId}`);
-      }
-      if (!Number.isFinite(weight) || weight === 0) {
-        throw new Error("weightは0以外の有限な値にしてください");
-      }
-      weightedParameterIds.add(parameterId);
-    }
-  }
-  const unweightedParameterId = parameterIds.find((id) => !weightedParameterIds.has(id));
-  if (unweightedParameterId) {
-    throw new Error(`質問の重みがないparameter idです: ${unweightedParameterId}`);
-  }
-}
+const VersionSchema = v.pipe(
+  v.number(VERSION_MESSAGE),
+  v.integer(VERSION_MESSAGE),
+  v.minValue(1, VERSION_MESSAGE),
+);
+const ChoiceScoreSchema = v.pipe(
+  v.number(CHOICE_SCORES_MESSAGE),
+  v.finite(CHOICE_SCORES_MESSAGE),
+  v.minValue(-1, CHOICE_SCORES_MESSAGE),
+  v.maxValue(1, CHOICE_SCORES_MESSAGE),
+);
+const WeightSchema = v.pipe(
+  v.number("weightは0以外の有限な値にしてください"),
+  v.finite("weightは0以外の有限な値にしてください"),
+  v.check((weight) => weight !== 0, "weightは0以外の有限な値にしてください"),
+);
+const ScoreBoundarySchema = v.pipe(
+  v.number(SCORE_BOUNDARIES_MESSAGE),
+  v.finite(SCORE_BOUNDARIES_MESSAGE),
+  v.minValue(0, SCORE_BOUNDARIES_MESSAGE),
+  v.maxValue(100, SCORE_BOUNDARIES_MESSAGE),
+);
+
+/** アンケート固有のスコアリング設定が共通の不変条件を満たすことを検証します。 */
+export const ParameterScoringConfigSchema = v.pipe(
+  v.object({
+    version: VersionSchema,
+    parameters: v.pipe(
+      v.array(
+        v.object({
+          id: v.string(),
+          label: v.string(),
+          lowLabel: v.string(),
+          highLabel: v.string(),
+        }),
+      ),
+      v.nonEmpty("parametersを1件以上設定してください"),
+      v.check(
+        (parameters) => new Set(parameters.map(({ id }) => id)).size === parameters.length,
+        "parameter idが重複しています",
+      ),
+    ),
+    choiceScores: v.pipe(
+      v.record(v.string(), ChoiceScoreSchema),
+      v.check(
+        (choiceScores) =>
+          Object.values(choiceScores).length > 0 &&
+          Object.values(choiceScores).some((score) => score !== 0),
+        CHOICE_SCORES_MESSAGE,
+      ),
+    ),
+    questions: v.record(
+      v.string(),
+      v.object({
+        questionVersion: VersionSchema,
+        weights: v.record(v.string(), WeightSchema),
+      }),
+    ),
+    minimumCoverage: v.pipe(
+      v.number("minimumCoverageは0〜1にしてください"),
+      v.finite("minimumCoverageは0〜1にしてください"),
+      v.minValue(0, "minimumCoverageは0〜1にしてください"),
+      v.maxValue(1, "minimumCoverageは0〜1にしてください"),
+    ),
+    lowMaximum: ScoreBoundarySchema,
+    highMinimum: ScoreBoundarySchema,
+    balancedLabel: v.string(),
+  }),
+  v.check(({ lowMaximum, highMinimum }) => lowMaximum < highMinimum, SCORE_BOUNDARIES_MESSAGE),
+  v.check(({ parameters, questions }) => {
+    const parameterIds = new Set(parameters.map(({ id }) => id));
+    return Object.values(questions).every(({ weights }) =>
+      Object.keys(weights).every((parameterId) => parameterIds.has(parameterId)),
+    );
+  }, "questionsのweightsに未知のparameter idがあります"),
+  v.check(({ parameters, questions }) => {
+    const weightedParameterIds = new Set(
+      Object.values(questions).flatMap(({ weights }) => Object.keys(weights)),
+    );
+    return parameters.every(({ id }) => weightedParameterIds.has(id));
+  }, "質問の重みがないparameter idがあります"),
+);
 
 function resolveBand<ParameterId extends string>(
   score: number | null,
@@ -126,7 +154,7 @@ export function scoreParameters<ParameterId extends string>(
   answers: SurveyAnswer[],
   config: ParameterScoringConfig<ParameterId>,
 ): ParameterProfile<ParameterId> {
-  validateConfig(config);
+  v.parse(ParameterScoringConfigSchema, config);
 
   // SurveyResponseと同じく、同じ質問への再回答では最後の回答を現在値として扱います。
   const currentAnswers = new Map(answers.map((answer) => [answer.questionId, answer]));
