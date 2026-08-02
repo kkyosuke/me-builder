@@ -5,7 +5,7 @@ import {
 } from "./parameter-scoring";
 import type { SurveyAnswer, SurveyQuestion } from "./types";
 
-export const RELATIONSHIP_PRIORITY_SCORING_VERSION = 1;
+const RELATIONSHIP_PRIORITY_SCORING_VERSION = 1;
 
 type ParameterId = "priority-balance" | "autonomy" | "boundary-expression" | "support-flexibility";
 

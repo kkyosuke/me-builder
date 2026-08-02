@@ -1,15 +1,15 @@
 import type { SurveyAnswer } from "./types";
 
-export type ParameterBand = "low" | "balanced" | "high" | "insufficient";
+type ParameterBand = "low" | "balanced" | "high" | "insufficient";
 
-export interface ParameterDefinition<ParameterId extends string> {
+interface ParameterDefinition<ParameterId extends string> {
   id: ParameterId;
   label: string;
   lowLabel: string;
   highLabel: string;
 }
 
-export interface QuestionScoringRule<ParameterId extends string> {
+interface QuestionScoringRule<ParameterId extends string> {
   questionVersion: number;
   /** 正なら選択値の正方向、負なら負方向へパラメータを動かします。 */
   weights: Partial<Record<ParameterId, number>>;
