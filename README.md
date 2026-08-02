@@ -11,7 +11,8 @@ me-builderは、さまざまな質問への回答を蓄積し、その人らし�
 - [Phase 1 アンケートドメイン設計](docs/questionnaire-domain-design.md) — 質問、アンケート、回答進捗の集約とAccount / Sourceとの関係
 - [人間関係の価値観アンケート候補](docs/relationship-values-questionnaire.md) — 人間関係で違いが問題になりやすい価値観の分類
 - [人間関係の価値観 Yes／No質問集](docs/relationship-values-yes-no-question-bank.md) — 各話題10問のYes／No質問候補
-- [「自分と相手の優先・境界線」パラメータ変換設計](docs/relationship-priority-parameter-design.md) — 最初のアンケートの決定的なスコア変換規則
+- [アンケート回答のパラメータ変換設計](docs/parameter-scoring-design.md) — アンケート共通の設定形式と計算手順
+- [「自分と相手の優先・境界線」パラメータ変換設計](docs/relationship-priority-parameter-design.md) — 最初のアンケート固有のパラメータ設定
 - [ドメイン設計](docs/domain-design.md) — Account / Brain / Sourceの責務・境界、Questionnaireの位置づけ、設計順序と進捗
 - [Brainのラベル・アクセス制御設計](docs/brain-access-label-design.md) — ラベルと公開制御のSSoT
 - [Brain内部情報の分類](docs/brain-content-taxonomy.md) — Brain Item分類のSSoT

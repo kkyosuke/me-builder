@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { getParameterSummary } from "./parameter-scoring";
 import {
   RELATIONSHIP_PRIORITY_QUESTIONS,
-  getParameterSummary,
+  RELATIONSHIP_PRIORITY_SCORING_CONFIG,
   scoreRelationshipPriority,
 } from "./relationship-priority";
 import type { SurveyAnswer } from "./types";
@@ -139,9 +140,14 @@ describe("scoreRelationshipPriority", () => {
       throw new Error("支援の柔軟性パラメータがありません");
     }
 
-    expect(getParameterSummary(parameter)).toBe("相手のために調整しやすい");
+    expect(getParameterSummary(parameter, RELATIONSHIP_PRIORITY_SCORING_CONFIG.balancedLabel)).toBe(
+      "相手のために調整しやすい",
+    );
     expect(
-      getParameterSummary({ ...parameter, score: null, coverage: 0, band: "insufficient" }),
+      getParameterSummary(
+        { ...parameter, score: null, coverage: 0, band: "insufficient" },
+        RELATIONSHIP_PRIORITY_SCORING_CONFIG.balancedLabel,
+      ),
     ).toBe("回答不足");
   });
 });

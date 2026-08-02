@@ -8,8 +8,12 @@ import {
   useState,
 } from "react";
 import { createChoiceAnswer, createSkipAnswer, summarizeAnswers } from "../survey/answers";
+import { getParameterSummary } from "../survey/parameter-scoring";
 import { fetchSurveyQuestions } from "../survey/questions";
-import { getParameterSummary, scoreRelationshipPriority } from "../survey/relationship-priority";
+import {
+  RELATIONSHIP_PRIORITY_SCORING_CONFIG,
+  scoreRelationshipPriority,
+} from "../survey/relationship-priority";
 import {
   type DragOffset,
   SWIPE_TRANSITION_MS,
@@ -136,7 +140,9 @@ function SurveyComplete({
             <p className="font-semibold text-sky-300">
               {parameter.score === null ? "—" : `${parameter.score} / 100`}
             </p>
-            <p className="text-xs text-slate-300">{getParameterSummary(parameter)}</p>
+            <p className="text-xs text-slate-300">
+              {getParameterSummary(parameter, RELATIONSHIP_PRIORITY_SCORING_CONFIG.balancedLabel)}
+            </p>
             <p className="text-[10px] text-slate-500">{`回答充足度 ${parameter.coverage}%`}</p>
           </div>
         ))}
