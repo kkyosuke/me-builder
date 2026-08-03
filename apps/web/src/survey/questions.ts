@@ -2,13 +2,13 @@ import {
   MONEY_VALUES_QUESTIONS,
   MONEY_VALUES_SCORING_CONFIG,
   scoreMoneyValues,
-} from "./money-values";
-import type { ParameterProfile } from "./parameter-scoring";
-import { RELATIONSHIP_PRIORITY_QUESTIONS } from "./relationship-priority";
+} from "./definitions/money-values";
+import { RELATIONSHIP_PRIORITY_QUESTIONS } from "./definitions/relationship-priority";
 import {
   RELATIONSHIP_PRIORITY_SCORING_CONFIG,
   scoreRelationshipPriority,
-} from "./relationship-priority";
+} from "./definitions/relationship-priority";
+import type { ParameterProfile } from "./parameter-scoring";
 import type { SurveyInteraction, SurveyQuestion } from "./types";
 
 export interface SurveyDefinition {
@@ -47,7 +47,7 @@ const SURVEY_DEFINITIONS: SurveyDefinition[] = [
  * 非同期の取得としてだけ扱い、固定データであることに依存しません。
  *
  * 最初のアンケートは「自分と相手の優先・境界線」の10問です。質問文と変換規則は
- * `relationship-priority.ts`にまとめ、公開済みの版を後から書き換えません。
+ * `definitions/relationship-priority.ts`にまとめ、公開済みの版を後から書き換えません。
  */
 export async function fetchSurveyQuestions(): Promise<SurveyQuestion[]> {
   return RELATIONSHIP_PRIORITY_QUESTIONS;

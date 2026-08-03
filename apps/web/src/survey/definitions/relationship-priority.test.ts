@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { getParameterSummary } from "./parameter-scoring";
+import { getParameterSummary } from "../parameter-scoring";
+import type { SurveyAnswer } from "../types";
 import {
   RELATIONSHIP_PRIORITY_QUESTIONS,
   RELATIONSHIP_PRIORITY_SCORING_CONFIG,
   scoreRelationshipPriority,
 } from "./relationship-priority";
-import type { SurveyAnswer } from "./types";
 
 function answer(questionNumber: number, choiceId: "yes" | "no", version = 1): SurveyAnswer {
   const suffix = String(questionNumber).padStart(2, "0");

@@ -2,8 +2,8 @@ import {
   type ParameterProfile,
   type ParameterScoringConfig,
   scoreParameters,
-} from "./parameter-scoring";
-import type { SurveyInteraction, SurveyQuestion } from "./types";
+} from "../parameter-scoring";
+import type { SurveyInteraction, SurveyQuestion } from "../types";
 
 type ParameterId =
   | "future-preparation"
