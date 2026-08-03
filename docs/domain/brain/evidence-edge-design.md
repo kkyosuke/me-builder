@@ -4,7 +4,7 @@
 
 Source RecordとBrain Itemを結ぶエッジと、Source Record同士・Brain Item同士を結ぶエッジの種類、属性、外部への開示範囲を定義します。
 
-[ドメイン設計 §6](domain-design.md#6-ドメイン間の関係)がSource RecordとBrain Itemの多重度と由来の必須性を確定したのに対し、この文書はその関係を実際に表現するエッジそのものを扱います。
+[ドメイン設計 §6](../domain-design.md#6-ドメイン間の関係)がSource RecordとBrain Itemの多重度と由来の必須性を確定したのに対し、この文書はその関係を実際に表現するエッジそのものを扱います。
 
 所有する概念:
 
@@ -17,11 +17,11 @@ Source RecordとBrain Itemを結ぶエッジと、Source Record同士・Brain It
 
 | 概念 | SSoT |
 | --- | --- |
-| Source RecordとBrain Itemの多重度、由来の必須性、本人の操作とSource Recordの発生 | [ドメイン設計 §6](domain-design.md#6-ドメイン間の関係) |
-| Source Recordの粒度とkind、Source domainの責務 | [ドメイン設計 §5](domain-design.md#5-source-domain) |
+| Source RecordとBrain Itemの多重度、由来の必須性、本人の操作とSource Recordの発生 | [ドメイン設計 §6](../domain-design.md#6-ドメイン間の関係) |
+| Source Recordの粒度とkind、Source domainの責務 | [ドメイン設計 §5](../domain-design.md#5-source-domain) |
 | Brain Itemの分類と共通属性（`Evidence`、`Derivation`、`Confidence`、`Revision`） | [Brain内部情報の分類](brain-content-taxonomy.md) |
 | Access Label、Access Policy、Access Profile、不変条件 | [Brainのラベル・アクセス制御設計](brain-access-label-design.md) |
-| Source Recordの不変性、訂正・削除・撤回とBrain Itemへの波及 | [Source Recordのライフサイクル設計](source-record-lifecycle-design.md) |
+| Source Recordの不変性、訂正・削除・撤回とBrain Itemへの波及 | [Source Recordのライフサイクル設計](../source/source-record-lifecycle-design.md) |
 
 この文書では、Confidenceの具体的な算出方法と永続化方式を決めません（[§8](#8-この文書で決めていないこと)）。
 
@@ -45,7 +45,7 @@ flowchart LR
     SR3 -->|反証| BI2
 ```
 
-矢印は意味の向き（何が何を支え、何が何を置き換えるか）です。実装上どちら側がもう一方を指すかは[ドメイン設計 §6](domain-design.md#sourceの所有者と依存方向)の依存方向に従い、Brain Item → Source Recordの単方向です。
+矢印は意味の向き（何が何を支え、何が何を置き換えるか）です。実装上どちら側がもう一方を指すかは[ドメイン設計 §6](../domain-design.md#sourceの所有者と依存方向)の依存方向に従い、Brain Item → Source Recordの単方向です。
 
 ## 3. エッジの種類
 
@@ -58,7 +58,7 @@ flowchart LR
 | 改訂（Source Record間） | Source Record → Source Record | 0..N | 必須。MVPで先に必要なのはこちら |
 | 改訂（Brain Item間） | Brain Item → Brain Item | 0..N | Brain Itemの導出を始めるPhase 2以降 |
 
-根拠の多重度「1..N（必須）」は[ドメイン設計 §6](domain-design.md#source-recordとbrain-itemの対応)で確定済みのものです。
+根拠の多重度「1..N（必須）」は[ドメイン設計 §6](../domain-design.md#source-recordとbrain-itemの対応)で確定済みのものです。
 
 ### 根拠を1つの関係へ統合する
 
@@ -84,11 +84,11 @@ flowchart LR
 
 根拠:
 
-- [プロジェクト概要 §9](project-overview.md#9-mvpの範囲)がMVPへ含める「回答履歴、修正、削除」は、Source Record側の話です
-- [プロジェクト概要 §11](project-overview.md#11-段階的な進め方)より、Phase 1にはBrain Itemが存在しません。Brain Item間の改訂が必要になるのは、Brain Itemを導出するPhase 2以降です
-- [ドメイン設計 §6](domain-design.md#sourceの所有者と依存方向)の依存方向はBrain → Sourceの単方向です。Source Record間の改訂をBrain Item側の関係として表すことはできません
+- [プロジェクト概要 §9](../../product/project-overview.md#9-mvpの範囲)がMVPへ含める「回答履歴、修正、削除」は、Source Record側の話です
+- [プロジェクト概要 §11](../../product/project-overview.md#11-段階的な進め方)より、Phase 1にはBrain Itemが存在しません。Brain Item間の改訂が必要になるのは、Brain Itemを導出するPhase 2以降です
+- [ドメイン設計 §6](../domain-design.md#sourceの所有者と依存方向)の依存方向はBrain → Sourceの単方向です。Source Record間の改訂をBrain Item側の関係として表すことはできません
 
-Source Recordを訂正・削除したときの原本と派生への波及は、[Source Recordのライフサイクル設計](source-record-lifecycle-design.md)で扱います。
+Source Recordを訂正・削除したときの原本と派生への波及は、[Source Recordのライフサイクル設計](../source/source-record-lifecycle-design.md)で扱います。
 
 ### `conflicts_with`をMVPへ含めない
 
@@ -127,7 +127,7 @@ Source Recordを訂正・削除したときの原本と派生への波及は、[
 | 候補 | 採らない理由 |
 | --- | --- |
 | 強度（寄与の強さ） | 文書上の根拠がありません。[Brain内部情報の分類 §3](brain-content-taxonomy.md#3-各分類の詳細)のPreferenceが持つ「強さ」はBrain Itemの属性であって、エッジの属性ではありません。加えて、AI由来のスカラーをエッジへ焼き込むと、「エッジがSSoTでConfidenceは派生値」という[§5](#5-confidenceとエッジの関係)の設計の論拠そのものを弱めます |
-| 作成者（本人 / AI） | 本人はエッジを直接作りません。[ドメイン設計 §6](domain-design.md#本人の操作とsource-recordの発生)より、本人の操作が生むのはSource Recordか、Confirmationの更新だけです。値域は結局`ai` / `deterministic`になり、導出方法と重複します |
+| 作成者（本人 / AI） | 本人はエッジを直接作りません。[ドメイン設計 §6](../domain-design.md#本人の操作とsource-recordの発生)より、本人の操作が生むのはSource Recordか、Confirmationの更新だけです。値域は結局`ai` / `deterministic`になり、導出方法と重複します |
 
 ## 5. Confidenceとエッジの関係
 
@@ -140,7 +140,7 @@ Source Recordを訂正・削除したときの原本と派生への波及は、[
 
 Confidenceの具体的な算出方法、閾値、提示のタイミングとUIはこの文書では決めません（[§8](#8-この文書で決めていないこと)）。
 
-Source Recordの削除時に古いConfidenceの開示を止めるタイミング、再計算後のBrain Item、監査ログへ記録済みのConfidenceの扱いは[Source Recordのライフサイクル設計 §5](source-record-lifecycle-design.md#5-brain-itemへの波及)をSSoTとします。
+Source Recordの削除時に古いConfidenceの開示を止めるタイミング、再計算後のBrain Item、監査ログへ記録済みのConfidenceの扱いは[Source Recordのライフサイクル設計 §5](../source/source-record-lifecycle-design.md#5-brain-itemへの波及)をSSoTとします。
 
 ## 6. 外部への開示
 
@@ -159,9 +159,9 @@ Source Recordの削除時に古いConfidenceの開示を止めるタイミング
 
 **確定**: `get_evidence`は反証を返しません。
 
-根拠: [プロジェクト概要 §3.2](project-overview.md#32-mcpでエージェントへ提供する)の`get_evidence`の定義は「生成内容の根拠となった回答を確認する」であり、反証はその範囲外です。加えて[Brainのラベル・アクセス制御設計 §9](brain-access-label-design.md#9-不変条件)の「非公開情報の存在自体を許可されていない接続先へ示さない」により、反証の件数も、反証が欠落していることも示せません。
+根拠: [プロジェクト概要 §3.2](../../product/project-overview.md#32-mcpでエージェントへ提供する)の`get_evidence`の定義は「生成内容の根拠となった回答を確認する」であり、反証はその範囲外です。加えて[Brainのラベル・アクセス制御設計 §9](brain-access-label-design.md#9-不変条件)の「非公開情報の存在自体を許可されていない接続先へ示さない」により、反証の件数も、反証が欠落していることも示せません。
 
-`get_evidence`は[プロジェクト概要 §9](project-overview.md#9-mvpの範囲)のMVPの範囲には入っておらず、[§3.2](project-overview.md#32-mcpでエージェントへ提供する)の初期のMCP機能候補です。根拠表示を活用するのは[§11](project-overview.md#11-段階的な進め方)のPhase 3です。
+`get_evidence`は[プロジェクト概要 §9](../../product/project-overview.md#9-mvpの範囲)のMVPの範囲には入っておらず、[§3.2](../../product/project-overview.md#32-mcpでエージェントへ提供する)の初期のMCP機能候補です。根拠表示を活用するのは[§11](../../product/project-overview.md#11-段階的な進め方)のPhase 3です。
 
 ### 原則4と不変条件の衝突をどう解いたか
 
@@ -169,10 +169,10 @@ Confidenceを外部へ開示するかどうかは、2つの要求が衝突しま
 
 | 要求 | 内容 | Confidenceの開示への向き |
 | --- | --- | --- |
-| [プロジェクト概要 §13](project-overview.md#13-現時点のプロダクト原則)の原則4 | 分身であることと、回答の根拠・不確かさを明示する | 開示を要求する |
+| [プロジェクト概要 §13](../../product/project-overview.md#13-現時点のプロダクト原則)の原則4 | 分身であることと、回答の根拠・不確かさを明示する | 開示を要求する |
 | [Brainのラベル・アクセス制御設計 §9](brain-access-label-design.md#9-不変条件)の6項目め | 非公開情報の存在自体を、許可されていない接続先へ示さない | 開示に反対する |
 
-- 開示しない場合の損失: 外部エージェントが分身の自己申告を確定した事実として扱います。[プロジェクト概要 §13](project-overview.md#13-現時点のプロダクト原則)の原則2「本人の回答とAIの推定を混同しない」も同時に破れます
+- 開示しない場合の損失: 外部エージェントが分身の自己申告を確定した事実として扱います。[プロジェクト概要 §13](../../product/project-overview.md#13-現時点のプロダクト原則)の原則2「本人の回答とAIの推定を混同しない」も同時に破れます
 - 開示する場合の損失: 同じ問い合わせを繰り返したときのConfidenceの低下から「見えない反証が増えた」と推測でき、非公開のSource Recordの存在が間接的に漏れます
 
 **確定**: 原則4を優先します。開示を粗い3段階に丸めることで、段階の境界をまたがない変動は観測できなくなり、漏洩を減らせます。
@@ -188,7 +188,7 @@ Confidenceを外部へ開示するかどうかは、2つの要求が衝突しま
 **確定**: 改訂の履歴を残すために、追加の仕組みは設けません。
 
 - 「いつ改訂したか」は、改訂エッジの生成時点（[§4](#4-エッジの属性)）が表します
-- 「本人が何と言って書き直したか」は、訂正が生むSource Record（[ドメイン設計 §6](domain-design.md#本人の操作とsource-recordの発生)）が表します
+- 「本人が何と言って書き直したか」は、訂正が生むSource Record（[ドメイン設計 §6](../domain-design.md#本人の操作とsource-recordの発生)）が表します
 
 **確定**: 旧版の開示条件は、その版が属する改訂鎖上の全版のうち、最も厳しいAccess Policyとします。
 

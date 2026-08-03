@@ -4,7 +4,7 @@
 
 この文書は、Phase 1でユーザーがLINEからアンケートを見つけ、LIFF上で回答し、回答内容を確認できるまでのUIと画面遷移を定義します。アンケート一覧、LINE通知、リッチメニューからの導線、および回答時の例外状態を所有します。
 
-質問の作成主体と版管理、LINEとWebの役割、本人識別の原則は[プロジェクト概要](project-overview.md#4-想定する利用体験)を正とします。Question、Survey、SurveyResponseの集約と状態は[Phase 1 アンケートドメイン設計](questionnaire-domain-design.md)を正とします。データベース、APIスキーマ、配信基盤の実装方式はこの文書では定義しません。
+質問の作成主体と版管理、LINEとWebの役割、本人識別の原則は[プロジェクト概要](../product/project-overview.md#4-想定する利用体験)を正とします。Question、Survey、SurveyResponseの集約と状態は[Phase 1 アンケートドメイン設計](questionnaire-domain-design.md)を正とします。データベース、APIスキーマ、配信基盤の実装方式はこの文書では定義しません。
 
 ## 2. 結論
 
@@ -87,7 +87,7 @@ flowchart TD
 
 回答を修正する場合は、回答時点の質問の版を表示します。公開後に質問が改訂されても、既存回答の意味を別の質問文へ付け替えません。
 
-回答を削除する操作には確認を挟み、削除した質問を未回答として扱います。他の回答が残っていればアンケート全体は回答途中、残っていなければ未回答へ戻ります。回答状態とSource Recordとの関係は[Phase 1 アンケートドメイン設計](questionnaire-domain-design.md#7-surveyresponse-aggregate)、回答の修正・削除で原本と履歴をどう扱うかは[Source Recordのライフサイクル設計](source-record-lifecycle-design.md)を正とします。
+回答を削除する操作には確認を挟み、削除した質問を未回答として扱います。他の回答が残っていればアンケート全体は回答途中、残っていなければ未回答へ戻ります。回答状態とSource Recordとの関係は[Phase 1 アンケートドメイン設計](questionnaire-domain-design.md#7-surveyresponse-aggregate)、回答の修正・削除で原本と履歴をどう扱うかは[Source Recordのライフサイクル設計](../domain/source/source-record-lifecycle-design.md)を正とします。
 
 ## 6. LINE通知
 

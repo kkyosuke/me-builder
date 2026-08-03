@@ -16,12 +16,12 @@ Source Recordを原本としてどう保持し、訂正、削除、取り消し�
 
 | 概念 | SSoT |
 | --- | --- |
-| Source Recordの粒度とkind、Source domainの責務 | [ドメイン設計 §5](domain-design.md#5-source-domain) |
-| Source RecordとBrain Itemの多重度、由来の必須性 | [ドメイン設計 §6](domain-design.md#6-ドメイン間の関係) |
-| 根拠、反証、改訂のエッジの種類と属性 | [根拠・反証・改訂のエッジ設計](evidence-edge-design.md) |
-| 改訂鎖のAccess PolicyとConfidenceの開示 | [根拠・反証・改訂のエッジ設計 §5](evidence-edge-design.md#5-confidenceとエッジの関係)と[§7](evidence-edge-design.md#7-改訂された旧版の扱い) |
-| Access Label、Access Policy、Access Profile | [Brainのラベル・アクセス制御設計](brain-access-label-design.md) |
-| 物理削除・論理削除の実装方式、保存期間 | [プロジェクト概要 §12](project-overview.md#12-今後決めること) |
+| Source Recordの粒度とkind、Source domainの責務 | [ドメイン設計 §5](../domain-design.md#5-source-domain) |
+| Source RecordとBrain Itemの多重度、由来の必須性 | [ドメイン設計 §6](../domain-design.md#6-ドメイン間の関係) |
+| 根拠、反証、改訂のエッジの種類と属性 | [根拠・反証・改訂のエッジ設計](../brain/evidence-edge-design.md) |
+| 改訂鎖のAccess PolicyとConfidenceの開示 | [根拠・反証・改訂のエッジ設計 §5](../brain/evidence-edge-design.md#5-confidenceとエッジの関係)と[§7](../brain/evidence-edge-design.md#7-改訂された旧版の扱い) |
+| Access Label、Access Policy、Access Profile | [Brainのラベル・アクセス制御設計](../brain/brain-access-label-design.md) |
+| 物理削除・論理削除の実装方式、保存期間 | [プロジェクト概要 §12](../../product/project-overview.md#12-今後決めること) |
 
 ## 2. 全体像
 
@@ -46,8 +46,8 @@ flowchart LR
 
 根拠:
 
-- 本人の訂正が新しい命題内容を持ち込む操作であることは、[ドメイン設計 §6](domain-design.md#本人の操作とsource-recordの発生)で確定している
-- Source Record間の改訂エッジはMVPで必須であり、旧版の保持も[根拠・反証・改訂のエッジ設計 §7](evidence-edge-design.md#7-改訂された旧版の扱い)で確定している
+- 本人の訂正が新しい命題内容を持ち込む操作であることは、[ドメイン設計 §6](../domain-design.md#本人の操作とsource-recordの発生)で確定している
+- Source Record間の改訂エッジはMVPで必須であり、旧版の保持も[根拠・反証・改訂のエッジ設計 §7](../brain/evidence-edge-design.md#7-改訂された旧版の扱い)で確定している
 - 上書きすると、本人がいつ、どの内容から主張を変えたかを改訂鎖で説明できない
 
 採らなかった代替案:
@@ -71,7 +71,7 @@ tombstoneをどのデータ構造で表すか、本文を物理的に消すか�
 根拠:
 
 - Source Record自体を消すと、改訂鎖とBrain Itemの過去の来歴を説明できない
-- 削除後も本文を根拠や検索へ使うと、[プロジェクト概要 §8](project-overview.md#8-プライバシーと安全性)の削除の約束を満たせない
+- 削除後も本文を根拠や検索へ使うと、[プロジェクト概要 §8](../../product/project-overview.md#8-プライバシーと安全性)の削除の約束を満たせない
 - 開示制約まで消すと、非公開だった途中の版を削除して過去の公開版を開示できるようになる
 
 採らなかった代替案:
@@ -85,7 +85,7 @@ tombstoneをどのデータ構造で表すか、本文を物理的に消すか�
 
 **確定**: 有効な根拠が0件になったBrain Itemは無効化し、通常の検索と外部開示から外します。Brain Itemと削除済みSource Recordの根拠エッジは、過去の来歴として保持します。
 
-[ドメイン設計 §6](domain-design.md#source-recordとbrain-itemの対応)の「すべてのBrain Itemは1件以上のSource Recordを根拠として持つ」という不変条件は維持されます。無効化後も根拠エッジは残りますが、削除済みSource Recordは有効な根拠として利用できません。通常の検索と外部開示に利用できるBrain Itemは、1件以上の削除されていない根拠を必要とします。
+[ドメイン設計 §6](../domain-design.md#source-recordとbrain-itemの対応)の「すべてのBrain Itemは1件以上のSource Recordを根拠として持つ」という不変条件は維持されます。無効化後も根拠エッジは残りますが、削除済みSource Recordは有効な根拠として利用できません。通常の検索と外部開示に利用できるBrain Itemは、1件以上の削除されていない根拠を必要とします。
 
 採らなかった代替案:
 
@@ -104,7 +104,7 @@ Confidenceの具体的な算出方法、閾値、処理基盤は決めません�
 
 **確定**: Source Recordを削除しても、監査ログへ記録済みの過去の開示Confidenceは削除しません。
 
-削除は将来の検索、根拠利用、開示を止める操作です。過去に何を開示したかという監査事実まで消すと、[根拠・反証・改訂のエッジ設計 §5](evidence-edge-design.md#5-confidenceとエッジの関係)が要求する開示時点の再現ができません。監査ログは開示したConfidenceと対象の識別に必要な情報を保持しますが、削除されたSource Recordの本文を保持する場所にはしません。
+削除は将来の検索、根拠利用、開示を止める操作です。過去に何を開示したかという監査事実まで消すと、[根拠・反証・改訂のエッジ設計 §5](../brain/evidence-edge-design.md#5-confidenceとエッジの関係)が要求する開示時点の再現ができません。監査ログは開示したConfidenceと対象の識別に必要な情報を保持しますが、削除されたSource Recordの本文を保持する場所にはしません。
 
 採らなかった代替案:
 
@@ -133,7 +133,7 @@ Confidenceの具体的な算出方法、閾値、処理基盤は決めません�
 | 撤回 | 当時書いた事実は残すが、現在はその内容を支持しない | 時間制限なし | 撤回を表す新しいSource Recordと改訂エッジを作り、元の日記を旧版にする |
 | 削除 | 保存されている内容を今後利用させない | Webから対象を選ぶ。時間制限なし | [§4](#4-削除とtombstone)の削除済みtombstoneになる |
 
-撤回は削除ではないため、元の日記と撤回後のSource Recordを本人の履歴とエクスポートに含めます。改訂で置き換えられた元の日記は、[根拠・反証・改訂のエッジ設計 §7](evidence-edge-design.md#7-改訂された旧版の扱い)に従って通常の検索から外します。
+撤回は削除ではないため、元の日記と撤回後のSource Recordを本人の履歴とエクスポートに含めます。改訂で置き換えられた元の日記は、[根拠・反証・改訂のエッジ設計 §7](../brain/evidence-edge-design.md#7-改訂された旧版の扱い)に従って通常の検索から外します。
 
 根拠:
 

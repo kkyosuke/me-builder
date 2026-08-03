@@ -102,7 +102,7 @@ export async function linkIdentity(
 /**
  * 既存の identity が期待した Account に属していることを確認します。
  *
- * 別の Account に属している場合は、[ドメイン設計](../../../../docs/domain-design.md)の
+ * 別の Account に属している場合は、[ドメイン設計](../../../../../docs/domain/domain-design.md)の
  * 「同じ外部ログインIDを複数の有効なAccountへ重複して紐づけない」に従って拒否します。
  */
 function assertSameAccount(
@@ -134,7 +134,7 @@ function isUniqueViolation(err: unknown): boolean {
  *    Account へ `line_login` を追加して紐づける
  * 3. どちらも無ければ `undefined` を返す。**新規 Account は作りません。**
  *    アカウント作成の起点は LINE 公式アカウントの友だち追加であり
- *    ([プロジェクト概要 §5](../../../../docs/project-overview.md#5-アカウントと本人識別))、
+ *    ([プロジェクト概要 §5](../../../../../docs/product/project-overview.md#5-アカウントと本人識別))、
  *    userId が一致しない構成での紐づけ手段は別途設計します
  */
 export async function resolveAccountByLineLogin(
@@ -213,7 +213,7 @@ export async function upsertIdentity(
   } catch (err: unknown) {
     if (isUniqueViolation(err)) {
       // providerAccountId は本人識別子なのでログへ出さない
-      // ([プロジェクト概要 §8](../../../../docs/project-overview.md#8-プライバシーと安全性))
+      // ([プロジェクト概要 §8](../../../../../docs/product/project-overview.md#8-プライバシーと安全性))
       logger.warn(
         { err, provider: input.provider },
         "Unique constraint violation during upsert, fetching existing identity",

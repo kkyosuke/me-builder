@@ -16,8 +16,8 @@ me-builderに登場するキャラクターの名前、役割、外見設定、�
 ### 所有しない概念
 
 - キャラクターを画面上でどう配置・演出するか（UI・体験設計）
-- ユーザーの分身そのものの仕様（[プロジェクト概要](project-overview.md)、[ドメイン設計](domain-design.md)）
-- アセットの配信方法やストレージ（[インフラ・システム構成](infrastructure-architecture.md)）
+- ユーザーの分身そのものの仕様（[プロジェクト概要](../product/project-overview.md)、[ドメイン設計](../domain/domain-design.md)）
+- アセットの配信方法やストレージ（[インフラ・システム構成](../architecture/infrastructure-architecture.md)）
 
 ## 2. キャラクター一覧
 
@@ -70,8 +70,8 @@ flowchart LR
 
 | ファイル | 内容 |
 | --- | --- |
-| [utushi-three-view.png](assets/characters/utushi-three-view.png) | 三面図（正面・側面・背面） |
-| [utushi-expression-sheet.png](assets/characters/utushi-expression-sheet.png) | 表情差分、全身、鏡と模様のクローズアップ、配色・モチーフ一覧 |
+| [utushi-three-view.png](../assets/characters/utushi-three-view.png) | 三面図（正面・側面・背面） |
+| [utushi-expression-sheet.png](../assets/characters/utushi-expression-sheet.png) | 表情差分、全身、鏡と模様のクローズアップ、配色・モチーフ一覧 |
 
 ## 4. ミラ
 
@@ -112,9 +112,9 @@ flowchart LR
 
 | ファイル | 内容 |
 | --- | --- |
-| [mira-three-view.png](assets/characters/mira-three-view.png) | 三面図（正面・側面・背面） |
-| [mira-expression-sheet.png](assets/characters/mira-expression-sheet.png) | 表情差分、全身、羽とペンダントのクローズアップ、配色・モチーフ一覧 |
-| [mira-expression-sheet-with-book.png](assets/characters/mira-expression-sheet-with-book.png) | 魔法書を持つバージョンの表情差分、全身、小物一覧 |
+| [mira-three-view.png](../assets/characters/mira-three-view.png) | 三面図（正面・側面・背面） |
+| [mira-expression-sheet.png](../assets/characters/mira-expression-sheet.png) | 表情差分、全身、羽とペンダントのクローズアップ、配色・モチーフ一覧 |
+| [mira-expression-sheet-with-book.png](../assets/characters/mira-expression-sheet-with-book.png) | 魔法書を持つバージョンの表情差分、全身、小物一覧 |
 
 ## 5. サービスビジュアル
 
@@ -137,8 +137,8 @@ flowchart LR
 
 | ファイル | 内容 |
 | --- | --- |
-| [app-icon.png](assets/app-icon.png) | アイコン用の正方形画像 |
-| [banner.png](assets/banner.png) | バナー用の横長画像 |
+| [app-icon.png](../assets/app-icon.png) | アイコン用の正方形画像 |
+| [banner.png](../assets/banner.png) | バナー用の横長画像 |
 
 ## 6. アセットの置き場所と命名規則
 

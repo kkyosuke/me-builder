@@ -78,7 +78,7 @@
 - **LINE Webhook 自動登録および日記の受付返信**:
   - API サーバー起動時 (`src/index.ts`) または CLI スクリプト (`bun run register:webhook`) の実行時、`LINE_CHANNEL_ACCESS_TOKEN` および `LINE_WEBHOOK_URL` (または `BASE_URL`) が環境変数として与えられている場合、公式 SDK (`@line/bot-sdk`) の `MessagingApiClient.setWebhookEndpoint` を用いて自動的に LINE Messaging API へ Webhook Endpoint URL を登録・更新します。
   - Webhook 受信メッセージは Cloudflare Queues 経由で Queue Worker (`apps/worker`) に配信され、`replyToken` を使用して `MessagingApiClient.replyMessage` により受け付けた旨を返信します。**送られた本文をオウム返ししません。**
-  - 返信には「今日のアンケート」への導線として LIFF の URL (`https://liff.line.me/{LIFF_ID}`) を添えます。LINE 内から Web を開く主導線であり、設計は [プロジェクト概要 §4](../../docs/project-overview.md#4-想定する利用体験) を正とします。文面の組み立ては `apps/worker` の `buildReplyText` に集約します。
+  - 返信には「今日のアンケート」への導線として LIFF の URL (`https://liff.line.me/{LIFF_ID}`) を添えます。LINE 内から Web を開く主導線であり、設計は [プロジェクト概要 §4](../../docs/product/project-overview.md#4-想定する利用体験) を正とします。文面の組み立ては `apps/worker` の `buildReplyText` に集約します。
   - テキストメッセージは**既定で日記として扱い**、アンケートのリンクを求めるキーワード (`アンケート` など) だけを例外として切り出します。判定は `apps/worker` の `classifyLineText` に集約し、`survey-request` / `diary` の union で返します。
     - キーワードの判定は **NFKC 正規化・前後の空白除去・ひらがなからカタカナへの寄せの後で完全一致**させます。部分一致は採りません。部分一致にすると「今日は会社でアンケートに答えた」のような日記本文がコマンドとして飲み込まれ、蓄積の量を担う日記が記録されなくなります。
     - `survey-request` の返信はアンケートへのリンクだけを返します。`diary` の返信は従来どおり受け付けた旨とリンクを返します（日記の返信はアンケートへの主要な再訪導線なので、キーワードの追加でも変えません）。
@@ -97,7 +97,7 @@
   - UI は **Tailwind CSS** のユーティリティと **lucide-react** のアイコンだけで組みます。他の UI コンポーネントライブラリ、アニメーションライブラリ、ジェスチャーライブラリ (framer-motion, react-spring, react-tinder-card 等) は導入しません。スワイプなどの操作は Pointer Events と CSS transform / transition で実装します。
   - Tailwind は `@tailwindcss/vite` プラグインとして読み込み、PostCSS 設定ファイルは持ちません。`src/index.css` は `@import "tailwindcss"` と基礎スタイルだけを持ち、**コンポーネント固有の素の CSS やクラス定義を増やしません**（要素セレクタが以降のコンポーネントへ暗黙に効くため）。
   - アニメーションは `prefers-reduced-motion: reduce` を尊重します。移動そのものを止めるのではなく、指の操作への追従は残し、自動で動く演出を省きます。
-  - 操作手段をポインタだけに依存させません。LINE 内 (LIFF) の主導線に加えて外部ブラウザの導線も維持しているため ([プロジェクト概要 §4](../../docs/project-overview.md#4-想定する利用体験))、同じ操作をボタンとキーボードでも行える状態を保ちます。
+  - 操作手段をポインタだけに依存させません。LINE 内 (LIFF) の主導線に加えて外部ブラウザの導線も維持しているため ([プロジェクト概要 §4](../../docs/product/project-overview.md#4-想定する利用体験))、同じ操作をボタンとキーボードでも行える状態を保ちます。
 
 - **スワイプアンケートの画面 (`apps/web`)**:
   - 質問の取得は `apps/web/src/survey/` の 1 つの関数へ閉じ込め、コンポーネントは非同期の取得としてだけ扱います。質問配信・回答保存のサーバー実装はここを差し替える形で追加します。
@@ -106,22 +106,22 @@
   - 判定や座標計算 (しきい値、傾き、transform) は純粋関数として `apps/web/src/survey/` に置き、DOM を用意せず単体テストできる状態にします。
 
 - **Web UI の LIFF 初期化 (`apps/web`)**:
-  - LINE 内から Web を開く主導線は LIFF です。導線の設計と根拠は [プロジェクト概要 §4](../../docs/project-overview.md#4-想定する利用体験) を正とし、このルールには再掲しません。
+  - LINE 内から Web を開く主導線は LIFF です。導線の設計と根拠は [プロジェクト概要 §4](../../docs/product/project-overview.md#4-想定する利用体験) を正とし、このルールには再掲しません。
   - LIFF ID は `VITE_LIFF_ID` として与え、`apps/web/src/config` の Valibot スキーマ経由で optional な `liffId` として取得します。SDK を呼ぶコードから `import.meta.env` を直接読まないこと。
   - `@line/liff` の呼び出しは `apps/web/src/liff/` に閉じ込め、React コンポーネントから SDK を直接呼ばないこと。コンポーネントは初期化結果の状態オブジェクトだけを受け取ります。
   - `VITE_LIFF_ID` が未設定の場合は、LIFF 初期化を `logger` へのログ出力とともに安全にスキップし、LIFF なしの画面を表示します（LINE Webhook 自動登録と同じ「環境変数が未設定なら安全にスキップする」方針）。
   - `liff.init` の失敗時、および外部ブラウザで開かれた場合 (`liff.isInClient()` が false) も画面を白にせず、状態を画面へ表示します。LIFF の初期化結果を画面表示の前提条件にしないこと。
-  - LINE の `userId` は本人識別子です。**画面表示もログ出力も行わず**、表示は `displayName` と `pictureUrl` に限ります ([プロジェクト概要 §8](../../docs/project-overview.md#8-プライバシーと安全性))。ID トークンおよびアクセストークンもログへ出力しません。
+  - LINE の `userId` は本人識別子です。**画面表示もログ出力も行わず**、表示は `displayName` と `pictureUrl` に限ります ([プロジェクト概要 §8](../../docs/product/project-overview.md#8-プライバシーと安全性))。ID トークンおよびアクセストークンもログへ出力しません。
 
 - **LIFF の ID トークン検証と Account の解決**:
   - **クライアントから送られてきた識別子は受け付けません。** `liff.getProfile()` が返す値そのものは LINE から取得した本物ですが、サーバー側では「LINE の API が返した値の転送」と「手で書かれた値」を区別できないため、`userId` を識別子として使うと他人になりすませます。本人の識別子は必ず ID トークンの検証で得た `sub` を使います。
   - 用途で使い分けます。**画面表示**（`displayName` / `pictureUrl`）は `liff.getProfile()` の値でよく（嘘をつけても本人の画面の表示が変わるだけ）、**本人の識別・認可**は検証済みの `sub` だけを使います。検証は `packages/lib` の `line.idToken.verify`（LINE の `POST /oauth2/v2.1/verify` へ委譲）で行い、`aud` が LINE Login チャネル ID と一致することを受け取り側でも確認します。
   - エンドポイントは `POST /api/line/liff/session`。
   - Account の解決は `d1.action.account.resolveAccountByLineLogin` に集約します。`line_login` の identity → 同じ値の `line` の identity（同一プロバイダーなら userId が一致する）の順に探し、後者で見つかった場合は `line_login` を同じ Account へ紐づけます。
-  - **どちらも見つからない場合は Account を作らず 404 を返します。** アカウント作成の起点は LINE 公式アカウントの友だち追加です（[プロジェクト概要 §5](../../docs/project-overview.md#5-アカウントと本人識別)）。userId が一致しない構成での紐づけ手段は未設計です。
+  - **どちらも見つからない場合は Account を作らず 404 を返します。** アカウント作成の起点は LINE 公式アカウントの友だち追加です（[プロジェクト概要 §5](../../docs/product/project-overview.md#5-アカウントと本人識別)）。userId が一致しない構成での紐づけ手段は未設計です。
   - 既存の Account へログイン手段を追加するのは `d1.action.account.linkIdentity` です。`upsertIdentity` は見つからなければ新規 Account を作るため、この用途に使ってはいけません。
   - `LINE_LOGIN_CHANNEL_ID` は `apps/api` へ配布します。未設定の場合は `LIFF_ID` の接頭辞から補完します。ID トークン・アクセストークン・`sub` はレスポンスにもログにも含めません。
-  - **`accountId` をクライアントへ返しません。** セッションとトークンの管理方式は[ドメイン設計](../../docs/domain-design.md)で未決定であり、返すと後続リクエストで「クライアントが送ってきた `accountId`」を信頼する実装を誘発します。返すのは表示に使う `displayName` / `pictureUrl` だけです。
+  - **`accountId` をクライアントへ返しません。** セッションとトークンの管理方式は[ドメイン設計](../../docs/domain/domain-design.md)で未決定であり、返すと後続リクエストで「クライアントが送ってきた `accountId`」を信頼する実装を誘発します。返すのは表示に使う `displayName` / `pictureUrl` だけです。
   - **LIFF の ID トークンには `nonce` を設定できません**（`liff.login()` に nonce のパラメータがない）。そのためリプレイを nonce で防げず、代わりに `line.idToken.verify` の `maxAgeSeconds` で受け入れる発行後の経過時間を絞れるようにしています。既定は LIFF の ID トークンの有効期間と同じ 1 時間（LINE 側の検証より厳しくしない）で、検証成功時に経過秒数だけをログへ出力するので、実際の分布を見てから絞れます。恒久的な対策はサーバー発行のセッションであり、方式が決まってから対応します。
 
 - **LIFF アプリのエンドポイント URL の自動登録**:
@@ -137,4 +137,4 @@
 - `node_modules`, `.bun`, `dist` などのインストール生成物およびビルド成果物は絶対にコミットに含まないこと。
 - 新規ファイル追加時は [`.gitignore`](../../.gitignore) の除外ルールを満たしているか事前に確認すること。
 - 変更後は必ず `git diff --check` を実行して不要な末尾空白や構文エラーがないか確認すること。
-- PR作成時は [PR作成手順書](../../docs/pull-request-guidelines.md) に従い、タイトルの命名規約 (`<type>(<scope>): <説明>`) および PR テンプレート ([`.github/PULL_REQUEST_TEMPLATE.md`](../../.github/PULL_REQUEST_TEMPLATE.md)) に沿って作成すること。
+- PR作成時は [PR作成手順書](../../docs/development/pull-request-guidelines.md) に従い、タイトルの命名規約 (`<type>(<scope>): <説明>`) および PR テンプレート ([`.github/PULL_REQUEST_TEMPLATE.md`](../../.github/PULL_REQUEST_TEMPLATE.md)) に沿って作成すること。

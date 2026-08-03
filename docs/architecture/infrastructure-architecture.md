@@ -17,10 +17,10 @@ me-builderの開発基盤および全体アーキテクチャにおいて、イ�
 
 ### 所有しない概念
 
-- `Account`、`Brain`、`Source` のドメイン境界や責務の定義 — [ドメイン設計](domain-design.md)
-- ラベルの分類・定義およびMCPアクセス許可規則 — [Brainのラベル・アクセス制御設計](brain-access-label-design.md)
-- Brain Itemの分類名および具体例 — [Brain内部情報の分類](brain-content-taxonomy.md)
-- プロジェクトの目標、MVP範囲、全体ロードマップ — [プロジェクト概要](project-overview.md)
+- `Account`、`Brain`、`Source` のドメイン境界や責務の定義 — [ドメイン設計](../domain/domain-design.md)
+- ラベルの分類・定義およびMCPアクセス許可規則 — [Brainのラベル・アクセス制御設計](../domain/brain/brain-access-label-design.md)
+- Brain Itemの分類名および具体例 — [Brain内部情報の分類](../domain/brain/brain-content-taxonomy.md)
+- プロジェクトの目標、MVP範囲、全体ロードマップ — [プロジェクト概要](../product/project-overview.md)
 - 具体的なデータベーステーブル定義、GraphQL/REST/MCPツール等の個別スキーマ詳細
 
 ## 3. インフラ・システム構成の全体像
@@ -115,7 +115,7 @@ flowchart TD
 
 4. **非同期 Webhook メッセージ処理**
    - Webhook リクエスト（LINE 等）は API サーバーで受信後、直ちに `Cloudflare Queues` へ投入され 200/202 応答を返却します。
-   - バックグラウンドの Queue Worker (`apps/worker`) がキューから非同期バッチメッセージを取り出し順次処理します。LINE メッセージイベントを受信した場合、`replyToken` を用いて LINE Messaging API (`@line/bot-sdk`) 経由で受け付けた旨を返信します。返信の内容は[開発運用ルール](../.agents/rules/development.md)を正とします。
+   - バックグラウンドの Queue Worker (`apps/worker`) がキューから非同期バッチメッセージを取り出し順次処理します。LINE メッセージイベントを受信した場合、`replyToken` を用いて LINE Messaging API (`@line/bot-sdk`) 経由で受け付けた旨を返信します。返信の内容は[開発運用ルール](../../.agents/rules/development.md)を正とします。
 
 ## 6. 開発・運用環境方針
 
@@ -166,9 +166,9 @@ flowchart TD
 
 ## 7. 関連ドキュメント
 
-- [Agent向けガイド](../.agents/README.md)
-- [開発運用ルール](../.agents/rules/development.md)
-- [プロジェクト概要](project-overview.md)
-- [ドメイン設計](domain-design.md)
-- [Brain内部情報の分類](brain-content-taxonomy.md)
-- [Brainのラベル・アクセス制御設計](brain-access-label-design.md)
+- [Agent向けガイド](../../.agents/README.md)
+- [開発運用ルール](../../.agents/rules/development.md)
+- [プロジェクト概要](../product/project-overview.md)
+- [ドメイン設計](../domain/domain-design.md)
+- [Brain内部情報の分類](../domain/brain/brain-content-taxonomy.md)
+- [Brainのラベル・アクセス制御設計](../domain/brain/brain-access-label-design.md)

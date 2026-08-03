@@ -4,7 +4,7 @@
 
 この文書は、アンケート「お金と消費」に固有のパラメータ、質問ごとの重み、表示設定を所有します。
 
-共通の設定形式と計算手順は[アンケート回答のパラメータ変換設計](parameter-scoring-design.md)、質問文は[人間関係の価値観 Yes／No質問集 §3.3](relationship-values-yes-no-question-bank.md#33-お金と消費)を正とします。
+共通の設定形式と計算手順は[アンケート回答のパラメータ変換設計](parameter-scoring-design.md)、質問文は[人間関係の価値観 Yes／No質問集 §3.3](../content/relationship-values-yes-no-question-bank.md#33-お金と消費)を正とします。
 
 ## 2. パラメータ
 

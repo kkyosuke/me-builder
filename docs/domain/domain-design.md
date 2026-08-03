@@ -4,7 +4,7 @@
 
 me-builderの中核となる`Account`、`Brain`、`Source`の責務、境界、関係と、Phase 1の入力を担う`Questionnaire`の位置づけを整理します。
 
-Questionnaireの詳細な論理モデルは[Phase 1 アンケートドメイン設計](questionnaire-domain-design.md)を正とします。データベース、API、認証製品、LLM、MCPの具体的な実装方式はこの文書では決定しません。
+Questionnaireの詳細な論理モデルは[Phase 1 アンケートドメイン設計](../questionnaire/questionnaire-domain-design.md)を正とします。データベース、API、認証製品、LLM、MCPの具体的な実装方式はこの文書では決定しません。
 
 ## 2. 中核となる3つのドメイン
 
@@ -18,7 +18,7 @@ Questionnaireの詳細な論理モデルは[Phase 1 アンケートドメイン�
 
 `Source`を`Brain`から分ける理由は、Brainが担当する問いが「その人らしさを構成する情報」だからです。交通系ICカードの乗車履歴や購買明細そのものは、その人らしさを構成する情報ではありません。そこから導出されたBehavior PatternやPreferenceがBrainの中身になります。日記やアンケートの回答も同じく、Brain Itemそのものではなく、Brain Itemの元になるデータとして扱います。
 
-`Questionnaire`はこの3つと同列の中核データドメインではなく、Phase 1で質問を公開し回答をSourceへ取り込むための支援ドメインです。質問、アンケート、回答進捗の責務と集約は[Phase 1 アンケートドメイン設計](questionnaire-domain-design.md)で定義します。
+`Questionnaire`はこの3つと同列の中核データドメインではなく、Phase 1で質問を公開し回答をSourceへ取り込むための支援ドメインです。質問、アンケート、回答進捗の責務と集約は[Phase 1 アンケートドメイン設計](../questionnaire/questionnaire-domain-design.md)で定義します。
 
 ```mermaid
 flowchart LR
@@ -75,7 +75,7 @@ OAuth通信、パスワード検証、トークン発行などは認証基盤の
 - 1つのAccountが複数Brainを管理する機能の提供時期
 - 取り込みの同意を取得・撤回するUIと同意の記録方式
 
-Phase 1で提供するログイン手段と復旧方針は[プロジェクト概要 §5](project-overview.md#5-アカウントと本人識別)で決定しています。
+Phase 1で提供するログイン手段と復旧方針は[プロジェクト概要 §5](../product/project-overview.md#5-アカウントと本人識別)で決定しています。
 
 ## 4. Brain domain
 
@@ -95,7 +95,7 @@ Brain domainは「その人らしさを何で構成し、どの用途へ提供�
 
 ### Brain内部の大分類
 
-Brainの中身をすべてMemoryへ入れず、役割に応じて分類します。分類名、定義、具体例、分類とは別に持つ共通属性、意思決定での利用方法は、SSoTである[Brain内部情報の分類](brain-content-taxonomy.md)で定義します。この文書では分類を重複して定義しません。
+Brainの中身をすべてMemoryへ入れず、役割に応じて分類します。分類名、定義、具体例、分類とは別に持つ共通属性、意思決定での利用方法は、SSoTである[Brain内部情報の分類](brain/brain-content-taxonomy.md)で定義します。この文書では分類を重複して定義しません。
 
 ### Brainが守るルール
 
@@ -131,7 +131,7 @@ Source domainは「その人に関する生のデータを、どこから、ど�
 
 Source Recordから何を導き、どう分類し、どの用途へ提供するかは[Brain domain](#4-brain-domain)の責務です。R2やD1などの保存技術、外部サービスのAPI通信は、Source domainの外側にある技術的な仕組みとして扱います。
 
-Source Recordの不変性、訂正・削除・撤回と、派生したBrain Itemへの波及は[Source Recordのライフサイクル設計](source-record-lifecycle-design.md)をSSoTとします。
+Source Recordの不変性、訂正・削除・撤回と、派生したBrain Itemへの波及は[Source Recordのライフサイクル設計](source/source-record-lifecycle-design.md)をSSoTとします。
 
 ### Source Recordの粒度
 
@@ -154,7 +154,7 @@ Source Recordの不変性、訂正・削除・撤回と、派生したBrain Item
 
 ### Source Recordのkind
 
-kindは「どこから来たデータか」だけを表します。「そのデータからどうやってBrain Itemを導いたか」はkindではなく、Brain Item側の導出方法が持ちます（[Brain内部情報の分類 §4](brain-content-taxonomy.md#4-分類とは別に持つ共通属性)）。
+kindは「どこから来たデータか」だけを表します。「そのデータからどうやってBrain Itemを導いたか」はkindではなく、Brain Item側の導出方法が持ちます（[Brain内部情報の分類 §4](brain/brain-content-taxonomy.md#4-分類とは別に持つ共通属性)）。
 
 | kind | 内容 |
 | --- | --- |
@@ -166,7 +166,7 @@ kindは「どこから来たデータか」だけを表します。「そのデ�
 ### Sourceが守るルール
 
 - Source Recordは必ず1つのAccountに属する
-- Source Recordの既定Access Labelは`private`とする（[Brainのラベル・アクセス制御設計 §6](brain-access-label-design.md#6-ラベル付与)）
+- Source Recordの既定Access Labelは`private`とする（[Brainのラベル・アクセス制御設計 §6](brain/brain-access-label-design.md#6-ラベル付与)）
 - Brain Itemを持たないSource Recordを許容する
 - SourceはBrainを参照しない
 - 本人の同意があるSource Connectorだけが外部サービスから取り込む
@@ -217,15 +217,15 @@ MVPでは、1つのAccountが1つのBrainを利用する体験を基本としま
 
 **確定**: Source RecordとBrain Itemの対応はM:Nです。
 
-根拠: 複数の日記から1つのValueを導出する必要があり、[Brain内部情報の分類 §4](brain-content-taxonomy.md#4-分類とは別に持つ共通属性)のConfidenceは「いくつの、どの根拠に基づくか」に依存します。1つのSource Recordから複数のBrain Itemが導かれることもあります。
+根拠: 複数の日記から1つのValueを導出する必要があり、[Brain内部情報の分類 §4](brain/brain-content-taxonomy.md#4-分類とは別に持つ共通属性)のConfidenceは「いくつの、どの根拠に基づくか」に依存します。1つのSource Recordから複数のBrain Itemが導かれることもあります。
 
 **確定**: すべてのBrain Itemは、1件以上のSource Recordを根拠として持ちます。由来のないBrain Itemを作りません。
 
 根拠:
 
-- [Brain内部情報の分類 §4](brain-content-taxonomy.md#4-分類とは別に持つ共通属性)は共通属性として由来を必須とし、「由来なし」という値をどこにも用意していない
-- [プロジェクト概要 §13](project-overview.md#13-現時点のプロダクト原則)の原則2「本人の回答とAIの推定を混同しない」を満たすには、両方が同じ軸に載っている必要がある
-- [プロジェクト概要 §3.2](project-overview.md#32-mcpでエージェントへ提供する)の`get_evidence`は、由来を持たないBrain Itemがあると全域で定義されない
+- [Brain内部情報の分類 §4](brain/brain-content-taxonomy.md#4-分類とは別に持つ共通属性)は共通属性として由来を必須とし、「由来なし」という値をどこにも用意していない
+- [プロジェクト概要 §13](../product/project-overview.md#13-現時点のプロダクト原則)の原則2「本人の回答とAIの推定を混同しない」を満たすには、両方が同じ軸に載っている必要がある
+- [プロジェクト概要 §3.2](../product/project-overview.md#32-mcpでエージェントへ提供する)の`get_evidence`は、由来を持たないBrain Itemがあると全域で定義されない
 
 **確定**: Brain Itemを持たないSource Recordを許容します。Phase 1は入力から蓄積までにAIを使わないため、これが既定の状態です。
 
@@ -234,7 +234,7 @@ MVPでは、1つのAccountが1つのBrainを利用する体験を基本としま
 | Source Record → Brain Item | 0..N |
 | Brain Item → Source Record | 1..N |
 
-導出されたBrain Itemの既定Access Labelは`unclassified`です（[Brainのラベル・アクセス制御設計 §6](brain-access-label-design.md#6-ラベル付与)）。
+導出されたBrain Itemの既定Access Labelは`unclassified`です（[Brainのラベル・アクセス制御設計 §6](brain/brain-access-label-design.md#6-ラベル付与)）。
 
 ### 本人の操作とSource Recordの発生
 
@@ -249,17 +249,17 @@ MVPでは、1つのAccountが1つのBrainを利用する体験を基本としま
 
 根拠:
 
-- [Brain内部情報の分類 §4](brain-content-taxonomy.md#4-分類とは別に持つ共通属性)はConfirmationを「本人が確認・却下したかを示す」と主体つきで定義している。承認・却下は既存の命題に対する本人の態度であり、新しい内容ではない
-- [Brainのラベル・アクセス制御設計 §8](brain-access-label-design.md#8-派生情報の扱い)は「機微な元情報から安全な表現を作る場合は、新しいBrain Itemとして本人が承認する」としている。内容が変わるときは新しいBrain Itemを作り、確認だけならConfirmationを更新する、という同じ切り分けになっている
+- [Brain内部情報の分類 §4](brain/brain-content-taxonomy.md#4-分類とは別に持つ共通属性)はConfirmationを「本人が確認・却下したかを示す」と主体つきで定義している。承認・却下は既存の命題に対する本人の態度であり、新しい内容ではない
+- [Brainのラベル・アクセス制御設計 §8](brain/brain-access-label-design.md#8-派生情報の扱い)は「機微な元情報から安全な表現を作る場合は、新しいBrain Itemとして本人が承認する」としている。内容が変わるときは新しいBrain Itemを作り、確認だけならConfirmationを更新する、という同じ切り分けになっている
 
 ### 根拠を表現するエッジ
 
-**確定**: この対応を実際に表現するエッジは、根拠、反証、改訂の3関係です。エッジの種類、属性、外部への開示範囲、改訂された旧版の扱いは[根拠・反証・改訂のエッジ設計](evidence-edge-design.md)をSSoTとします。この文書では定義を重複させません。
+**確定**: この対応を実際に表現するエッジは、根拠、反証、改訂の3関係です。エッジの種類、属性、外部への開示範囲、改訂された旧版の扱いは[根拠・反証・改訂のエッジ設計](brain/evidence-edge-design.md)をSSoTとします。この文書では定義を重複させません。
 
 ### この関係で決めていないこと
 
 - 外部連携時のAccess Label既定値の詳細
-- Confidenceの具体的な算出方法と、本人の認識との乖離をどう見せるか（エッジ集合からの派生値であることと、開示した値を記録することは[根拠・反証・改訂のエッジ設計 §5](evidence-edge-design.md#5-confidenceとエッジの関係)で確定）
+- Confidenceの具体的な算出方法と、本人の認識との乖離をどう見せるか（エッジ集合からの派生値であることと、開示した値を記録することは[根拠・反証・改訂のエッジ設計 §5](brain/evidence-edge-design.md#5-confidenceとエッジの関係)で確定）
 
 ## 7. ラベルによる用途分離
 
@@ -273,7 +273,7 @@ MVPでは、1つのAccountが1つのBrainを利用する体験を基本としま
 
 たとえば仕事用MCPにはWork Access Profileを適用し、`work`が明示された情報だけを検索対象にします。
 
-詳細は[Brainのラベル・アクセス制御設計](brain-access-label-design.md)で扱います。Source Recordへ付けるAccess Labelも同じ文書で扱います。
+詳細は[Brainのラベル・アクセス制御設計](brain/brain-access-label-design.md)で扱います。Source Recordへ付けるAccess Labelも同じ文書で扱います。
 
 ## 8. MCP利用時の原則
 
@@ -298,10 +298,10 @@ MCPの具体的な接続モデルやツール設計は後続で検討します�
 | 5 | MCP接続、権限、監査の詳細を設計する | 未着手 |
 | 6 | 永続化と検索方式を選定する | 一部（利用する基盤、Questionnaire / SourceのD1 schemaまで） |
 
-step 1は、Phase 1に必要な範囲（対応チャネルと入力形式、チャネルの役割分担、ログイン手段と復旧方針、質問の作成主体と版管理）を確定させたことで完了とみなします。詳細は[プロジェクト概要 §4](project-overview.md#4-想定する利用体験)と[§5](project-overview.md#5-アカウントと本人識別)にあります。
+step 1は、Phase 1に必要な範囲（対応チャネルと入力形式、チャネルの役割分担、ログイン手段と復旧方針、質問の作成主体と版管理）を確定させたことで完了とみなします。詳細は[プロジェクト概要 §4](../product/project-overview.md#4-想定する利用体験)と[§5](../product/project-overview.md#5-アカウントと本人識別)にあります。
 
-step 3は当初「質問・回答のドメインを設計する」としていましたが、日記とアンケートの回答に加えて購買履歴や移動履歴も取り込む前提が加わったため、取り込み元を限定しないSourceドメインの設計へ置き換えました。この文書の[§5](#5-source-domain)と[§6](#6-ドメイン間の関係)で、Source domainの責務、Source Recordの粒度とkind、Brain Itemとの多重度、由来の必須性、本人の操作の切り分けを確定しています。根拠を表現するエッジは[根拠・反証・改訂のエッジ設計](evidence-edge-design.md)、原本の不変性と訂正・削除の波及は[Source Recordのライフサイクル設計](source-record-lifecycle-design.md)で確定しました。外部連携時のAccess Label既定値は未決のため、一部完了とします。
+step 3は当初「質問・回答のドメインを設計する」としていましたが、日記とアンケートの回答に加えて購買履歴や移動履歴も取り込む前提が加わったため、取り込み元を限定しないSourceドメインの設計へ置き換えました。この文書の[§5](#5-source-domain)と[§6](#6-ドメイン間の関係)で、Source domainの責務、Source Recordの粒度とkind、Brain Itemとの多重度、由来の必須性、本人の操作の切り分けを確定しています。根拠を表現するエッジは[根拠・反証・改訂のエッジ設計](brain/evidence-edge-design.md)、原本の不変性と訂正・削除の波及は[Source Recordのライフサイクル設計](source/source-record-lifecycle-design.md)で確定しました。外部連携時のAccess Label既定値は未決のため、一部完了とします。
 
-step 3.1では、Phase 1の質問配信と回答保存に必要なQuestion、Survey、SurveyResponseの集約、状態、不変条件、Account / Sourceとの関係を[Phase 1 アンケートドメイン設計](questionnaire-domain-design.md)で確定しました。D1の物理モデルはstep 6で具体化済みで、API契約は後続作業です。
+step 3.1では、Phase 1の質問配信と回答保存に必要なQuestion、Survey、SurveyResponseの集約、状態、不変条件、Account / Sourceとの関係を[Phase 1 アンケートドメイン設計](../questionnaire/questionnaire-domain-design.md)で確定しました。D1の物理モデルはstep 6で具体化済みで、API契約は後続作業です。
 
-step 6は、利用するCloudflareコンポーネントの選定が[インフラ・システム構成](infrastructure-architecture.md)で確定し、QuestionnaireとSource RecordのD1 schemaを具体化しました。Brain Item、各エッジの完全な永続化、Embeddingのインデックス構成、メディアの参照方式は未設計です。
+step 6は、利用するCloudflareコンポーネントの選定が[インフラ・システム構成](../architecture/infrastructure-architecture.md)で確定し、QuestionnaireとSource RecordのD1 schemaを具体化しました。Brain Item、各エッジの完全な永続化、Embeddingのインデックス構成、メディアの参照方式は未設計です。

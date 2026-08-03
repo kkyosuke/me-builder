@@ -214,7 +214,7 @@ AIが推定したValue / Motivationと本人が明言したValue / Motivationで
 
 ### EvidenceとDerivationに分けた理由
 
-以前は由来を`Source`という1つの共通属性で表し、「本人入力」「インポート」「AI推定」を同じ値の候補としていました。これは2つの軸を混ぜています。「本人入力」「インポート」はデータがどこから来たかであり、「AI推定」はそのデータから何をどう導いたかです。取り込み元を限定しない[Source domain](domain-design.md#5-source-domain)を置いたため、次のように分けます。
+以前は由来を`Source`という1つの共通属性で表し、「本人入力」「インポート」「AI推定」を同じ値の候補としていました。これは2つの軸を混ぜています。「本人入力」「インポート」はデータがどこから来たかであり、「AI推定」はそのデータから何をどう導いたかです。取り込み元を限定しない[Source domain](../domain-design.md#5-source-domain)を置いたため、次のように分けます。
 
 | 以前の値 | 実際に表していたこと | 新しい置き場所 |
 | --- | --- | --- |
@@ -224,7 +224,7 @@ AIが推定したValue / Motivationと本人が明言したValue / Motivationで
 
 ### Evidence
 
-すべてのBrain Itemは、1件以上のSource Recordを根拠として持ちます。Source RecordとBrain Itemの多重度、由来の必須性、本人の操作がSource Recordを生むかどうかは[ドメイン設計 §6](domain-design.md#6-ドメイン間の関係)をSSoTとします。根拠を表現するエッジの種類と属性は[根拠・反証・改訂のエッジ設計](evidence-edge-design.md)をSSoTとします。
+すべてのBrain Itemは、1件以上のSource Recordを根拠として持ちます。Source RecordとBrain Itemの多重度、由来の必須性、本人の操作がSource Recordを生むかどうかは[ドメイン設計 §6](../domain-design.md#6-ドメイン間の関係)をSSoTとします。根拠を表現するエッジの種類と属性は[根拠・反証・改訂のエッジ設計](evidence-edge-design.md)をSSoTとします。
 
 ### Derivation
 
@@ -243,7 +243,7 @@ Derivationは1つのBrain Itemにつき1つの値を持ちます。
 
 ### Revision
 
-Revisionは改訂のエッジで表します。改訂で置き換えられた旧版を保持するか、検索の対象に含めるか、どのAccess Policyで開示するかは[根拠・反証・改訂のエッジ設計 §7](evidence-edge-design.md#7-改訂された旧版の扱い)をSSoTとします。Source Recordの削除・撤回がBrain Itemへ及ぼす影響は[Source Recordのライフサイクル設計](source-record-lifecycle-design.md)で扱います。
+Revisionは改訂のエッジで表します。改訂で置き換えられた旧版を保持するか、検索の対象に含めるか、どのAccess Policyで開示するかは[根拠・反証・改訂のエッジ設計 §7](evidence-edge-design.md#7-改訂された旧版の扱い)をSSoTとします。Source Recordの削除・撤回がBrain Itemへ及ぼす影響は[Source Recordのライフサイクル設計](../source/source-record-lifecycle-design.md)で扱います。
 
 ## 5. Access Labelとの関係
 

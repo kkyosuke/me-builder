@@ -7,7 +7,7 @@ import { logger } from "@me-builder/shared";
  * クライアントから送られてきたプロフィールは（値そのものが本物であっても）サーバー側では
  * 検証できないため、識別子としては受け付けません。本人の識別子は検証で得た `sub` だけを
  * 使います。`sub` と ID トークンは戻り値にもログにも含めません
- * ([プロジェクト概要 §8](../../../../docs/project-overview.md#8-プライバシーと安全性))。
+ * ([プロジェクト概要 §8](../../../../docs/product/project-overview.md#8-プライバシーと安全性))。
  *
  * この層は HTTP を知りません。ステータスコードへの変換は controller が行います。
  */
@@ -62,7 +62,7 @@ export async function createLiffSession({
 
   if (!resolved) {
     // アカウント作成の起点は LINE 公式アカウントの友だち追加
-    // ([プロジェクト概要 §5](../../../../docs/project-overview.md#5-アカウントと本人識別))。
+    // ([プロジェクト概要 §5](../../../../docs/product/project-overview.md#5-アカウントと本人識別))。
     // Messaging API と LINE Login で userId が一致しない構成での紐づけ手段は別途設計する。
     logger.info("No account found for the verified LINE Login identity");
     return { type: "account-not-found" };
