@@ -136,7 +136,7 @@ function SurveyComplete({
   const profile = survey.score(interactions);
 
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-2 rounded-3xl border border-slate-700 bg-slate-800 p-4 text-center">
+    <div className="flex min-h-80 flex-col items-center justify-center gap-2 rounded-3xl border border-slate-700 bg-slate-800 p-4 text-center">
       {/* shrink-0 が無いと、縦の flex の中で高さだけが縮んでアイコンが潰れます。 */}
       <CircleCheck className="size-12 shrink-0 text-emerald-400" aria-hidden="true" />
       <p className="text-lg font-bold">回答から見える現在の傾向</p>
@@ -331,8 +331,8 @@ export function SwipeSurvey({
         )}
       </div>
 
-      {/* カードの重なり。高さを固定して、カードを絶対配置で重ねます。 */}
-      <div ref={stackRef} className="relative h-80">
+      {/* 回答中だけ高さを固定してカードを重ね、完了後は結果の項目数に応じて伸ばします。 */}
+      <div ref={stackRef} className={finished ? "relative" : "relative h-80"}>
         {finished && <SurveyComplete interactions={interactions} survey={survey} />}
         {questions?.slice(index, index + VISIBLE_STACK_SIZE).map((question, offset) => (
           <SwipeCard
