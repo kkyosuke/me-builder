@@ -1,3 +1,4 @@
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
 import {
   type DragOffset,
@@ -21,9 +22,51 @@ interface SwipeCardProps {
   cardWidth: number;
   threshold: number;
   reducedMotion: boolean;
+  disabled: boolean;
+  onSelect: (direction: SwipeDirection) => void;
   onPointerDown?: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onPointerMove?: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onPointerUp?: (event: ReactPointerEvent<HTMLDivElement>) => void;
+}
+
+/** カード内の選択ボタン。押下時は親カードのドラッグを開始しません。 */
+function CardChoiceButton({
+  question,
+  direction,
+  disabled,
+  onSelect,
+}: {
+  question: SurveyQuestion;
+  direction: SwipeDirection;
+  disabled: boolean;
+  onSelect: (direction: SwipeDirection) => void;
+}) {
+  const choice = direction === "left" ? question.left : question.right;
+  const isLeft = direction === "left";
+
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onPointerDown={(event) => event.stopPropagation()}
+      onClick={(event) => {
+        event.stopPropagation();
+        onSelect(direction);
+      }}
+      className={`flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-2xl border px-3 py-3 text-sm leading-tight font-semibold transition-colors disabled:opacity-40 ${
+        isLeft
+          ? "border-indigo-400/40 bg-indigo-400/10 text-indigo-200 hover:bg-indigo-400/20"
+          : "border-sky-400/40 bg-sky-400/10 text-sky-200 hover:bg-sky-400/20"
+      }`}
+    >
+      {isLeft && <ArrowLeft className="size-4 shrink-0" aria-hidden="true" />}
+      <span className="flex flex-col items-center gap-1">
+        <SurveyIcon name={choice.icon} className="size-4" />
+        {choice.label}
+      </span>
+      {!isLeft && <ArrowRight className="size-4 shrink-0" aria-hidden="true" />}
+    </button>
+  );
 }
 
 /** 選択予告のオーバーレイ。ドラッグ量に応じて濃くなります。 */
@@ -64,6 +107,8 @@ export function SwipeCard({
   cardWidth,
   threshold,
   reducedMotion,
+  disabled,
+  onSelect,
   onPointerDown,
   onPointerMove,
   onPointerUp,
@@ -114,16 +159,19 @@ export function SwipeCard({
       <div>
         {question.hint && <p className="mb-4 text-sm text-slate-400">{question.hint}</p>}
 
-        {/* 選択肢はスワイプ前から見えている必要があるため、カード下部にも並べます。 */}
-        <div className="flex items-stretch gap-3 border-t border-slate-700 pt-4 text-sm">
-          <div className="flex flex-1 items-center gap-2 text-indigo-300">
-            <SurveyIcon name={question.left.icon} className="size-5 shrink-0" />
-            <span>{question.left.label}</span>
-          </div>
-          <div className="flex flex-1 items-center justify-end gap-2 text-right text-sky-300">
-            <span>{question.right.label}</span>
-            <SurveyIcon name={question.right.icon} className="size-5 shrink-0" />
-          </div>
+        <div className="flex gap-3 border-t border-slate-700 pt-4">
+          <CardChoiceButton
+            question={question}
+            direction="left"
+            disabled={disabled || !isFront}
+            onSelect={onSelect}
+          />
+          <CardChoiceButton
+            question={question}
+            direction="right"
+            disabled={disabled || !isFront}
+            onSelect={onSelect}
+          />
         </div>
       </div>
     </div>

@@ -1,12 +1,4 @@
-import {
-  ArrowLeft,
-  ArrowRight,
-  CircleCheck,
-  Keyboard,
-  RotateCcw,
-  SkipForward,
-  Sparkles,
-} from "lucide-react";
+import { CircleCheck, Keyboard, RotateCcw, SkipForward, Sparkles } from "lucide-react";
 import {
   type PointerEvent as ReactPointerEvent,
   type RefObject,
@@ -32,8 +24,7 @@ import {
   resolveSwipeDirection,
   resolveSwipeThreshold,
 } from "../survey/swipe";
-import type { SurveyInteraction, SurveyQuestion, SwipeDirection } from "../survey/types";
-import { SurveyIcon } from "./survey-icon";
+import type { SurveyInteraction, SwipeDirection } from "../survey/types";
 import { SwipeCard } from "./swipe-card";
 
 /** 回答の確定に使える操作。スワイプ以外の手段も同じ関数へ流します。 */
@@ -81,47 +72,6 @@ function useCardWidth(): [RefObject<HTMLDivElement>, number] {
   }, []);
 
   return [ref, width];
-}
-
-/** 選択ボタン。スワイプできない環境でも同じ回答ができるようにします。 */
-function ChoiceButton({
-  question,
-  direction,
-  disabled,
-  onSelect,
-}: {
-  question: SurveyQuestion;
-  direction: SwipeDirection;
-  disabled: boolean;
-  onSelect: (direction: SwipeDirection) => void;
-}) {
-  const choice = direction === "left" ? question.left : question.right;
-  const isLeft = direction === "left";
-
-  return (
-    <button
-      type="button"
-      onClick={() => onSelect(direction)}
-      disabled={disabled}
-      // min-w-0 が無いと、ラベルの最小幅の分だけ横へはみ出します。
-      className={`flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-2xl border px-3 py-3 text-sm leading-tight font-semibold transition-colors disabled:opacity-40 ${
-        isLeft
-          ? "border-indigo-400/40 bg-indigo-400/10 text-indigo-200 hover:bg-indigo-400/20"
-          : "border-sky-400/40 bg-sky-400/10 text-sky-200 hover:bg-sky-400/20"
-      }`}
-    >
-      {isLeft && <ArrowLeft className="size-4 shrink-0" aria-hidden="true" />}
-      {/*
-       * アイコンとラベルを縦に積みます。横並びにすると狭い画面でラベルが折り返され、
-       * 日本語が語中で割れて読みにくくなります。長いラベルは切り詰めずに折り返します。
-       */}
-      <span className="flex flex-col items-center gap-1">
-        <SurveyIcon name={choice.icon} className="size-4" />
-        {choice.label}
-      </span>
-      {!isLeft && <ArrowRight className="size-4 shrink-0" aria-hidden="true" />}
-    </button>
-  );
 }
 
 /** 全問終わったときの表示。 */
@@ -347,6 +297,8 @@ export function SwipeSurvey({
             cardWidth={cardWidth}
             threshold={threshold}
             reducedMotion={reducedMotion}
+            disabled={isBusy}
+            onSelect={commit}
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
@@ -376,16 +328,6 @@ export function SwipeSurvey({
 
       {current && (
         <div className="flex flex-col gap-3">
-          <div className="flex gap-3">
-            <ChoiceButton question={current} direction="left" disabled={isBusy} onSelect={commit} />
-            <ChoiceButton
-              question={current}
-              direction="right"
-              disabled={isBusy}
-              onSelect={commit}
-            />
-          </div>
-
           <button
             type="button"
             onClick={() => commit("skip")}
@@ -396,10 +338,13 @@ export function SwipeSurvey({
             あとで回答する
           </button>
 
-          <p className="flex flex-wrap items-center justify-center gap-x-2 text-center text-xs text-slate-500">
-            <Keyboard className="size-4 shrink-0" aria-hidden="true" />
-            スワイプ / ← → で回答、↓ であとで回答
-          </p>
+          <div className="space-y-1 text-center text-xs text-slate-500">
+            <p>「はい」「いいえ」をタップ、またはカードを左右にスワイプ</p>
+            <p className="flex flex-wrap items-center justify-center gap-x-2">
+              <Keyboard className="size-4 shrink-0" aria-hidden="true" />
+              キーボードは ← → で回答、↓ であとで回答
+            </p>
+          </div>
         </div>
       )}
     </section>
