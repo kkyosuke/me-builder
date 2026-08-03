@@ -18,7 +18,7 @@ export const SWIPE_TRANSITION_MS = 260;
 export const VISIBLE_STACK_SIZE = 3;
 
 /** タップとドラッグを区別する移動量。小さな指ぶれはタップとして扱います。 */
-export const TAP_SLOP_PX = 8;
+const TAP_SLOP_PX = 8;
 
 /** 幅を測る前（初回描画や測定失敗）に使う想定カード幅。 */
 const FALLBACK_CARD_WIDTH = 320;
