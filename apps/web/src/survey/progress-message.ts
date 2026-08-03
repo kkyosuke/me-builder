@@ -13,7 +13,7 @@ export const PROGRESS_MESSAGES: Record<ProgressMilestone, readonly string[]> = {
   ],
 };
 
-/** 回答済みの問数から、現在表示する応援メッセージの段階を返します。 */
+/** 回答済みの問数から、到達直後の1問だけ表示する応援メッセージの段階を返します。 */
 export function resolveProgressMilestone(
   answeredCount: number,
   total: number,
@@ -22,11 +22,12 @@ export function resolveProgressMilestone(
     return null;
   }
 
-  const progress = answeredCount / total;
-  if (progress >= 0.8) {
+  const halfwayCount = Math.ceil(total * 0.5);
+  const almostDoneCount = Math.ceil(total * 0.8);
+  if (answeredCount === almostDoneCount) {
     return "almost-done";
   }
-  if (progress >= 0.5) {
+  if (answeredCount === halfwayCount) {
     return "halfway";
   }
   return null;

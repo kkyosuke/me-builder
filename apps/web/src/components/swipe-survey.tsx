@@ -216,8 +216,9 @@ export function SwipeSurvey({
     if (isBusy) {
       return;
     }
-    // 途中で指が要素の外へ出てもイベントを受け取り続けます。
-    event.currentTarget.setPointerCapture(event.pointerId);
+    // 押した子要素でキャプチャすることで、ボタン上からのスワイプと通常のクリックを両立します。
+    const captureTarget = event.target instanceof Element ? event.target : event.currentTarget;
+    captureTarget.setPointerCapture(event.pointerId);
     dragStart.current = { x: event.clientX, y: event.clientY, pointerId: event.pointerId };
     setDrag({ dx: 0, dy: 0 });
   };

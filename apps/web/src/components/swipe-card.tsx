@@ -1,5 +1,5 @@
 import { ArrowLeft, ArrowRight } from "lucide-react";
-import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
+import { type CSSProperties, type PointerEvent as ReactPointerEvent, useRef } from "react";
 import {
   type DragOffset,
   SWIPE_TRANSITION_MS,
@@ -29,7 +29,10 @@ interface SwipeCardProps {
   onPointerUp?: (event: ReactPointerEvent<HTMLDivElement>) => void;
 }
 
-/** カード内の選択ボタン。押下時は親カードのドラッグを開始しません。 */
+/** タップとドラッグを区別する移動量。小さな指ぶれはタップとして扱います。 */
+const TAP_SLOP_PX = 8;
+
+/** カード内の選択ボタン。ボタン上から始めたスワイプは親カードへ伝えます。 */
 function CardChoiceButton({
   question,
   direction,
@@ -43,14 +46,27 @@ function CardChoiceButton({
 }) {
   const choice = direction === "left" ? question.left : question.right;
   const isLeft = direction === "left";
+  const pointerStart = useRef<{ x: number; y: number } | null>(null);
 
   return (
     <button
       type="button"
       disabled={disabled}
-      onPointerDown={(event) => event.stopPropagation()}
+      onPointerDown={(event) => {
+        pointerStart.current = { x: event.clientX, y: event.clientY };
+      }}
+      onPointerCancel={() => {
+        pointerStart.current = null;
+      }}
       onClick={(event) => {
         event.stopPropagation();
+        const start = pointerStart.current;
+        pointerStart.current = null;
+        if (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) > TAP_SLOP_PX) {
+          // ドラッグ後に生成される click で、ボタン回答が重複しないようにします。
+          event.preventDefault();
+          return;
+        }
         onSelect(direction);
       }}
       className={`flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-2xl border px-3 py-3 text-sm leading-tight font-semibold transition-colors disabled:opacity-40 ${

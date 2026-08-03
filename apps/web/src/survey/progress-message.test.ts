@@ -10,15 +10,21 @@ describe("resolveProgressMilestone", () => {
     expect(resolveProgressMilestone(4, 10)).toBeNull();
   });
 
-  it("半分から残り2割より前までは折り返し文言を使う", () => {
+  it("半分へ到達した直後の1問だけ折り返し文言を使う", () => {
     expect(resolveProgressMilestone(5, 10)).toBe("halfway");
-    expect(resolveProgressMilestone(7, 10)).toBe("halfway");
+    expect(resolveProgressMilestone(6, 10)).toBeNull();
+    expect(resolveProgressMilestone(7, 10)).toBeNull();
   });
 
-  it("残り2割以下では終盤文言を使い、完了後は表示しない", () => {
+  it("残り2割へ到達した直後の1問だけ終盤文言を使う", () => {
     expect(resolveProgressMilestone(8, 10)).toBe("almost-done");
-    expect(resolveProgressMilestone(9, 10)).toBe("almost-done");
+    expect(resolveProgressMilestone(9, 10)).toBeNull();
     expect(resolveProgressMilestone(10, 10)).toBeNull();
+  });
+
+  it("問数に端数がある場合は各割合へ到達した最初の問数で表示する", () => {
+    expect(resolveProgressMilestone(3, 5)).toBe("halfway");
+    expect(resolveProgressMilestone(4, 5)).toBe("almost-done");
   });
 
   it("全体が0問ならメッセージを表示しない", () => {
