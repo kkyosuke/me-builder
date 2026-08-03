@@ -296,12 +296,12 @@ MCPの具体的な接続モデルやツール設計は後続で検討します�
 | 3.1 | Phase 1のQuestionnaireドメインを設計する | 完了（論理モデル） |
 | 4 | AIによる推定と本人確認の流れを設計する | 未着手 |
 | 5 | MCP接続、権限、監査の詳細を設計する | 未着手 |
-| 6 | 永続化と検索方式を選定する | 一部（利用する基盤のみ確定） |
+| 6 | 永続化と検索方式を選定する | 一部（利用する基盤、Questionnaire / SourceのD1 schemaまで） |
 
 step 1は、Phase 1に必要な範囲（対応チャネルと入力形式、チャネルの役割分担、ログイン手段と復旧方針、質問の作成主体と版管理）を確定させたことで完了とみなします。詳細は[プロジェクト概要 §4](project-overview.md#4-想定する利用体験)と[§5](project-overview.md#5-アカウントと本人識別)にあります。
 
 step 3は当初「質問・回答のドメインを設計する」としていましたが、日記とアンケートの回答に加えて購買履歴や移動履歴も取り込む前提が加わったため、取り込み元を限定しないSourceドメインの設計へ置き換えました。この文書の[§5](#5-source-domain)と[§6](#6-ドメイン間の関係)で、Source domainの責務、Source Recordの粒度とkind、Brain Itemとの多重度、由来の必須性、本人の操作の切り分けを確定しています。根拠を表現するエッジは[根拠・反証・改訂のエッジ設計](evidence-edge-design.md)、原本の不変性と訂正・削除の波及は[Source Recordのライフサイクル設計](source-record-lifecycle-design.md)で確定しました。外部連携時のAccess Label既定値は未決のため、一部完了とします。
 
-step 3.1では、Phase 1の質問配信と回答保存に必要なQuestion、Survey、SurveyResponseの集約、状態、不変条件、Account / Sourceとの関係を[Phase 1 アンケートドメイン設計](questionnaire-domain-design.md)で確定しました。D1の物理モデルとAPI契約はstep 6の後続作業です。
+step 3.1では、Phase 1の質問配信と回答保存に必要なQuestion、Survey、SurveyResponseの集約、状態、不変条件、Account / Sourceとの関係を[Phase 1 アンケートドメイン設計](questionnaire-domain-design.md)で確定しました。D1の物理モデルはstep 6で具体化済みで、API契約は後続作業です。
 
-step 6は、利用するCloudflareコンポーネントの選定だけが[インフラ・システム構成](infrastructure-architecture.md)で確定しています。テーブル定義、Embeddingのインデックス構成、メディアの参照方式は未設計です。
+step 6は、利用するCloudflareコンポーネントの選定が[インフラ・システム構成](infrastructure-architecture.md)で確定し、QuestionnaireとSource RecordのD1 schemaを具体化しました。Brain Item、各エッジの完全な永続化、Embeddingのインデックス構成、メディアの参照方式は未設計です。

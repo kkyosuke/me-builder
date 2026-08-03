@@ -68,6 +68,9 @@ function insertFixture() {
   db.insert(schema.surveyResponses)
     .values({ id: "response-1", accountId: "account-1", surveyId: "survey-1" })
     .run();
+  db.insert(schema.sourceRecords)
+    .values({ id: "source-1", accountId: "account-1", kind: "user_input" })
+    .run();
 
   return { db, opensAt };
 }
