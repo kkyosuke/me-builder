@@ -3,8 +3,7 @@ import { integer, text } from "drizzle-orm/sqlite-core";
 /**
  * Common base schema columns for D1 database tables.
  */
-export const baseSchema = {
-  id: text("id").primaryKey(), // UUID
+export const lifecycleSchema = {
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .$defaultFn(() => new Date()),
@@ -14,4 +13,9 @@ export const baseSchema = {
     .$onUpdateFn(() => new Date()),
   deletedAt: integer("deleted_at", { mode: "timestamp" }),
   isDeleted: integer("is_deleted", { mode: "boolean" }).notNull().default(false),
+};
+
+export const baseSchema = {
+  id: text("id").primaryKey(), // UUID
+  ...lifecycleSchema,
 };

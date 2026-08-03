@@ -37,20 +37,23 @@ export type SwipeDirection = "left" | "right";
 
 /** 1 つの選択肢。`SurveyQuestion` 経由で参照するため、単体では公開しません。 */
 interface SurveyChoice {
-  /** 回答として記録する値。表示文言（`label`）とは分けます。 */
-  value: string;
+  /** 回答として記録するChoiceの識別子。表示文言（`label`）とは分けます。 */
+  choiceId: string;
   label: string;
   icon: SurveyIconName;
 }
 
 /** 1 問 1 画面で表示する質問。 */
 export interface SurveyQuestion {
-  id: string;
+  /** Survey内の項目を識別するID。 */
+  surveyQuestionId: string;
+  /** Surveyをまたいで同じ質問を追跡するID。 */
+  questionId: string;
   /**
    * 質問の版。公開済みの質問文は書き換えず、改訂は新しい版として追加し、既存の回答は
    * 回答した時点の版を指し続けます（[プロジェクト概要 §4](../../../../docs/project-overview.md#4-想定する利用体験)）。
    */
-  version: number;
+  questionVersion: number;
   text: string;
   /** 補足。1 問 1 画面なので短く保ちます。 */
   hint?: string;
@@ -58,26 +61,24 @@ export interface SurveyQuestion {
   right: SurveyChoice;
 }
 
-/**
- * 1 問に対する回答。
- *
- * スキップ（あとで回答）も回答の入力形式の 1 つです
- * （[プロジェクト概要 §3.1](../../../../docs/project-overview.md#31-多様な質問に回答する)）。
- * 「選択しなかった」と「まだ表示していない」を区別できるよう、状態ではなく union で表現します。
- */
-export type SurveyAnswer =
-  | {
-      kind: "choice";
-      questionId: string;
-      questionVersion: number;
-      /** 選んだ選択肢の `value` */
-      value: string;
-      direction: SwipeDirection;
-      answeredAt: string;
-    }
-  | {
-      kind: "skipped";
-      questionId: string;
-      questionVersion: number;
-      answeredAt: string;
-    };
+/** 1問に対する現在の回答。 */
+export type SurveyAnswer = {
+  kind: "answer";
+  surveyQuestionId: string;
+  questionId: string;
+  questionVersion: number;
+  choiceId: string;
+  direction: SwipeDirection;
+  /** 現在は画面での確定時刻。API接続後はサーバーが受理した時刻を使います。 */
+  acceptedAt: string;
+};
+
+/** 「あとで回答」は回答内容ではなく、SurveyResponse上の進捗です。 */
+export type DeferredQuestion = {
+  kind: "deferred";
+  surveyQuestionId: string;
+  deferredAt: string;
+};
+
+/** 回答画面で発生する、回答または延期の操作。 */
+export type SurveyInteraction = SurveyAnswer | DeferredQuestion;

@@ -7,7 +7,11 @@ import {
   useRef,
   useState,
 } from "react";
-import { createChoiceAnswer, createSkipAnswer, summarizeAnswers } from "../survey/answers";
+import {
+  createDeferredQuestion,
+  createSurveyAnswer,
+  summarizeInteractions,
+} from "../survey/answers";
 import { getParameterSummary } from "../survey/parameter-scoring";
 import { fetchSurveyQuestions } from "../survey/questions";
 import {
@@ -22,7 +26,7 @@ import {
   resolveSwipeDirection,
   resolveSwipeThreshold,
 } from "../survey/swipe";
-import type { SurveyAnswer, SurveyQuestion, SwipeDirection } from "../survey/types";
+import type { SurveyInteraction, SurveyQuestion, SwipeDirection } from "../survey/types";
 import { SurveyIcon } from "./survey-icon";
 import { SwipeCard } from "./swipe-card";
 
@@ -116,14 +120,14 @@ function ChoiceButton({
 
 /** 全問終わったときの表示。 */
 function SurveyComplete({
-  answers,
+  interactions,
   onRestart,
 }: {
-  answers: SurveyAnswer[];
+  interactions: SurveyInteraction[];
   onRestart: () => void;
 }) {
-  const { answered, skipped } = summarizeAnswers(answers);
-  const profile = scoreRelationshipPriority(answers);
+  const { answered, deferred } = summarizeInteractions(interactions);
+  const profile = scoreRelationshipPriority(interactions);
 
   return (
     <div className="flex h-full flex-col items-center justify-center gap-2 rounded-3xl border border-slate-700 bg-slate-800 p-4 text-center">
@@ -131,7 +135,7 @@ function SurveyComplete({
       <CircleCheck className="size-12 shrink-0 text-emerald-400" aria-hidden="true" />
       <p className="text-lg font-bold">回答から見える現在の傾向</p>
       <p className="text-sm text-slate-400">
-        {`${answered} 問に回答し、${skipped} 問をあとで回答にしました。`}
+        {`${answered} 問に回答し、${deferred} 問をあとで回答にしました。`}
       </p>
       <div className="grid w-full grid-cols-2 gap-2">
         {profile.parameters.map((parameter) => (
@@ -173,7 +177,7 @@ function SurveyComplete({
 export function SwipeSurvey() {
   const [questions, setQuestions] = useState<SurveyQuestion[] | null>(null);
   const [index, setIndex] = useState(0);
-  const [answers, setAnswers] = useState<SurveyAnswer[]>([]);
+  const [interactions, setInteractions] = useState<SurveyInteraction[]>([]);
   const [drag, setDrag] = useState<DragOffset | null>(null);
   const [flyOut, setFlyOut] = useState<SwipeDirection | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -225,11 +229,11 @@ export function SwipeSurvey() {
         return;
       }
 
-      const answer =
+      const interaction =
         action === "skip"
-          ? createSkipAnswer(current, new Date())
-          : createChoiceAnswer(current, action, new Date());
-      setAnswers((previous) => [...previous, answer]);
+          ? createDeferredQuestion(current, new Date())
+          : createSurveyAnswer(current, action, new Date());
+      setInteractions((previous) => [...previous, interaction]);
       setDrag(null);
 
       // スキップは方向を持たないので飛ばさず、すぐ次の質問へ進めます。
@@ -265,7 +269,7 @@ export function SwipeSurvey() {
 
   const restart = useCallback(() => {
     setIndex(0);
-    setAnswers([]);
+    setInteractions([]);
     setDrag(null);
     setFlyOut(null);
   }, []);
@@ -341,11 +345,11 @@ export function SwipeSurvey() {
           </p>
         )}
 
-        {finished && <SurveyComplete answers={answers} onRestart={restart} />}
+        {finished && <SurveyComplete interactions={interactions} onRestart={restart} />}
 
         {questions?.slice(index, index + VISIBLE_STACK_SIZE).map((question, offset) => (
           <SwipeCard
-            key={`${question.id}-v${question.version}`}
+            key={`${question.surveyQuestionId}-v${question.questionVersion}`}
             question={question}
             depth={offset}
             drag={offset === 0 ? drag : null}

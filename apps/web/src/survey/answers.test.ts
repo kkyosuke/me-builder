@@ -1,85 +1,88 @@
 import { describe, expect, it } from "vitest";
-import { createChoiceAnswer, createSkipAnswer, summarizeAnswers } from "./answers";
+import { createDeferredQuestion, createSurveyAnswer, summarizeInteractions } from "./answers";
 import { fetchSurveyQuestions } from "./questions";
 import type { SurveyQuestion } from "./types";
 
 const QUESTION: SurveyQuestion = {
-  id: "q-test",
-  version: 3,
+  surveyQuestionId: "sq-test",
+  questionId: "q-test",
+  questionVersion: 3,
   text: "テストの質問",
-  left: { value: "left-value", label: "左", icon: "house" },
-  right: { value: "right-value", label: "右", icon: "mountain" },
+  left: { choiceId: "left-value", label: "左", icon: "house" },
+  right: { choiceId: "right-value", label: "右", icon: "mountain" },
 };
 
 const ANSWERED_AT = new Date("2026-07-28T00:00:00.000Z");
 
-describe("createChoiceAnswer", () => {
-  it("左右それぞれの選択肢の value を記録すること", () => {
-    expect(createChoiceAnswer(QUESTION, "left", ANSWERED_AT)).toEqual({
-      kind: "choice",
+describe("createSurveyAnswer", () => {
+  it("左右それぞれの選択肢のChoice IDを記録すること", () => {
+    expect(createSurveyAnswer(QUESTION, "left", ANSWERED_AT)).toEqual({
+      kind: "answer",
+      surveyQuestionId: "sq-test",
       questionId: "q-test",
       questionVersion: 3,
-      value: "left-value",
+      choiceId: "left-value",
       direction: "left",
-      answeredAt: "2026-07-28T00:00:00.000Z",
+      acceptedAt: "2026-07-28T00:00:00.000Z",
     });
-    expect(createChoiceAnswer(QUESTION, "right", ANSWERED_AT)).toMatchObject({
-      value: "right-value",
+    expect(createSurveyAnswer(QUESTION, "right", ANSWERED_AT)).toMatchObject({
+      choiceId: "right-value",
       direction: "right",
     });
   });
 
   it("回答した時点の質問の版を持つこと", () => {
     // 公開済みの質問文は書き換えず、改訂は新しい版として追加される
-    expect(createChoiceAnswer(QUESTION, "left", ANSWERED_AT).questionVersion).toBe(
-      QUESTION.version,
+    expect(createSurveyAnswer(QUESTION, "left", ANSWERED_AT).questionVersion).toBe(
+      QUESTION.questionVersion,
     );
   });
 });
 
-describe("createSkipAnswer", () => {
-  it("スキップを選択と区別できる形で記録すること", () => {
-    const answer = createSkipAnswer(QUESTION, ANSWERED_AT);
+describe("createDeferredQuestion", () => {
+  it("あとで回答を回答内容と区別できる形で記録すること", () => {
+    const deferred = createDeferredQuestion(QUESTION, ANSWERED_AT);
 
-    expect(answer).toEqual({
-      kind: "skipped",
-      questionId: "q-test",
-      questionVersion: 3,
-      answeredAt: "2026-07-28T00:00:00.000Z",
+    expect(deferred).toEqual({
+      kind: "deferred",
+      surveyQuestionId: "sq-test",
+      deferredAt: "2026-07-28T00:00:00.000Z",
     });
-    expect(answer).not.toHaveProperty("value");
+    expect(deferred).not.toHaveProperty("choiceId");
   });
 });
 
-describe("summarizeAnswers", () => {
-  it("回答とスキップの件数を分けて数えること", () => {
-    const answers = [
-      createChoiceAnswer(QUESTION, "left", ANSWERED_AT),
-      createSkipAnswer(QUESTION, ANSWERED_AT),
-      createChoiceAnswer(QUESTION, "right", ANSWERED_AT),
+describe("summarizeInteractions", () => {
+  it("回答と延期の件数を分けて数えること", () => {
+    const interactions = [
+      createSurveyAnswer(QUESTION, "left", ANSWERED_AT),
+      createDeferredQuestion(QUESTION, ANSWERED_AT),
+      createSurveyAnswer(QUESTION, "right", ANSWERED_AT),
     ];
 
-    expect(summarizeAnswers(answers)).toEqual({ answered: 2, skipped: 1 });
+    expect(summarizeInteractions(interactions)).toEqual({ answered: 2, deferred: 1 });
   });
 
   it("1 問も回答していなければ 0 件になること", () => {
-    expect(summarizeAnswers([])).toEqual({ answered: 0, skipped: 0 });
+    expect(summarizeInteractions([])).toEqual({ answered: 0, deferred: 0 });
   });
 });
 
 describe("fetchSurveyQuestions", () => {
-  it("質問を取得でき、id が重複していないこと", async () => {
+  it("質問を取得でき、Survey Question IDが重複していないこと", async () => {
     const questions = await fetchSurveyQuestions();
 
     expect(questions.length).toBeGreaterThan(0);
-    expect(new Set(questions.map((question) => question.id)).size).toBe(questions.length);
+    expect(new Set(questions.map(({ surveyQuestionId }) => surveyQuestionId)).size).toBe(
+      questions.length,
+    );
   });
 
   it("すべての質問が左右 2 つの選択肢と版を持つこと", async () => {
     for (const question of await fetchSurveyQuestions()) {
       expect(question.text).not.toBe("");
-      expect(question.version).toBeGreaterThanOrEqual(1);
-      expect(question.left.value).not.toBe(question.right.value);
+      expect(question.questionVersion).toBeGreaterThanOrEqual(1);
+      expect(question.left.choiceId).not.toBe(question.right.choiceId);
     }
   });
 });

@@ -7,26 +7,30 @@ import {
 } from "./relationship-priority";
 import type { SurveyAnswer } from "./types";
 
-function answer(questionNumber: number, value: "yes" | "no", version = 1): SurveyAnswer {
+function answer(questionNumber: number, choiceId: "yes" | "no", version = 1): SurveyAnswer {
+  const suffix = String(questionNumber).padStart(2, "0");
   return {
-    kind: "choice",
-    questionId: `q-relationship-priority-${String(questionNumber).padStart(2, "0")}`,
+    kind: "answer",
+    surveyQuestionId: `sq-relationship-priority-${suffix}`,
+    questionId: `q-relationship-priority-${suffix}`,
     questionVersion: version,
-    value,
-    direction: value === "yes" ? "right" : "left",
-    answeredAt: "2026-08-01T00:00:00.000Z",
+    choiceId,
+    direction: choiceId === "yes" ? "right" : "left",
+    acceptedAt: "2026-08-01T00:00:00.000Z",
   };
 }
 
 describe("RELATIONSHIP_PRIORITY_QUESTIONS", () => {
   it("version 1のYes／No質問を10問持つこと", () => {
     expect(RELATIONSHIP_PRIORITY_QUESTIONS).toHaveLength(10);
-    expect(new Set(RELATIONSHIP_PRIORITY_QUESTIONS.map(({ id }) => id)).size).toBe(10);
+    expect(
+      new Set(RELATIONSHIP_PRIORITY_QUESTIONS.map(({ surveyQuestionId }) => surveyQuestionId)).size,
+    ).toBe(10);
 
     for (const question of RELATIONSHIP_PRIORITY_QUESTIONS) {
-      expect(question.version).toBe(1);
-      expect(question.left.value).toBe("no");
-      expect(question.right.value).toBe("yes");
+      expect(question.questionVersion).toBe(1);
+      expect(question.left.choiceId).toBe("no");
+      expect(question.right.choiceId).toBe("yes");
     }
   });
 });
@@ -99,14 +103,13 @@ describe("scoreRelationshipPriority", () => {
     expect(profile.parameters.every(({ band }) => band === "insufficient")).toBe(true);
   });
 
-  it("未知の質問、スキップ、異なる質問版を計算へ含めないこと", () => {
+  it("未知の質問、延期、異なる質問版を計算へ含めないこと", () => {
     const profile = scoreRelationshipPriority([
       answer(1, "yes", 2),
       {
-        kind: "skipped",
-        questionId: "q-relationship-priority-02",
-        questionVersion: 1,
-        answeredAt: "2026-08-01T00:00:00.000Z",
+        kind: "deferred",
+        surveyQuestionId: "sq-relationship-priority-02",
+        deferredAt: "2026-08-01T00:00:00.000Z",
       },
       {
         ...answer(1, "yes"),

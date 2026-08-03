@@ -3,7 +3,7 @@ import {
   type ParameterScoringConfig,
   scoreParameters,
 } from "./parameter-scoring";
-import type { SurveyAnswer, SurveyQuestion } from "./types";
+import type { SurveyInteraction, SurveyQuestion } from "./types";
 
 const RELATIONSHIP_PRIORITY_SCORING_VERSION = 1;
 
@@ -11,77 +11,87 @@ type ParameterId = "priority-balance" | "autonomy" | "boundary-expression" | "su
 
 export type RelationshipPriorityProfile = ParameterProfile<ParameterId>;
 
-const NO_CHOICE = { value: "no", label: "いいえ", icon: "circle-x" } as const;
-const YES_CHOICE = { value: "yes", label: "はい", icon: "circle-check" } as const;
+const NO_CHOICE = { choiceId: "no", label: "いいえ", icon: "circle-x" } as const;
+const YES_CHOICE = { choiceId: "yes", label: "はい", icon: "circle-check" } as const;
 
 /** 最初に公開する「自分と相手の優先・境界線」10問のversion 1。 */
 export const RELATIONSHIP_PRIORITY_QUESTIONS: SurveyQuestion[] = [
   {
-    id: "q-relationship-priority-01",
-    version: 1,
+    surveyQuestionId: "sq-relationship-priority-01",
+    questionId: "q-relationship-priority-01",
+    questionVersion: 1,
     text: "相手から頼まれても、自分に余裕がなければ断りたい。",
     left: NO_CHOICE,
     right: YES_CHOICE,
   },
   {
-    id: "q-relationship-priority-02",
-    version: 1,
+    surveyQuestionId: "sq-relationship-priority-02",
+    questionId: "q-relationship-priority-02",
+    questionVersion: 1,
     text: "自分の予定より、相手が困っていることを優先したい。",
     left: NO_CHOICE,
     right: YES_CHOICE,
   },
   {
-    id: "q-relationship-priority-03",
-    version: 1,
+    surveyQuestionId: "sq-relationship-priority-03",
+    questionId: "q-relationship-priority-03",
+    questionVersion: 1,
     text: "相手に合わせるために、自分の希望を変えることが多い。",
     left: NO_CHOICE,
     right: YES_CHOICE,
   },
   {
-    id: "q-relationship-priority-04",
-    version: 1,
+    surveyQuestionId: "sq-relationship-priority-04",
+    questionId: "q-relationship-priority-04",
+    questionVersion: 1,
     text: "断るときは、詳しい理由を説明するべきだと思う。",
     left: NO_CHOICE,
     right: YES_CHOICE,
   },
   {
-    id: "q-relationship-priority-05",
-    version: 1,
+    surveyQuestionId: "sq-relationship-priority-05",
+    questionId: "q-relationship-priority-05",
+    questionVersion: 1,
     text: "相手が一人で決めたことでも、本人の選択として尊重できる。",
     left: NO_CHOICE,
     right: YES_CHOICE,
   },
   {
-    id: "q-relationship-priority-06",
-    version: 1,
+    surveyQuestionId: "sq-relationship-priority-06",
+    questionId: "q-relationship-priority-06",
+    questionVersion: 1,
     text: "大切な決断は、自分に関することでも相手へ相談したい。",
     left: NO_CHOICE,
     right: YES_CHOICE,
   },
   {
-    id: "q-relationship-priority-07",
-    version: 1,
+    surveyQuestionId: "sq-relationship-priority-07",
+    questionId: "q-relationship-priority-07",
+    questionVersion: 1,
     text: "自分が我慢すれば済むことは、相手に言わずに我慢しやすい。",
     left: NO_CHOICE,
     right: YES_CHOICE,
   },
   {
-    id: "q-relationship-priority-08",
-    version: 1,
+    surveyQuestionId: "sq-relationship-priority-08",
+    questionId: "q-relationship-priority-08",
+    questionVersion: 1,
     text: "相手の機嫌が悪くても、自分の責任だとは限らないと思える。",
     left: NO_CHOICE,
     right: YES_CHOICE,
   },
   {
-    id: "q-relationship-priority-09",
-    version: 1,
+    surveyQuestionId: "sq-relationship-priority-09",
+    questionId: "q-relationship-priority-09",
+    questionVersion: 1,
     text: "相手を支えるためなら、一時的に自分の予定を減らしてもよい。",
     left: NO_CHOICE,
     right: YES_CHOICE,
   },
   {
-    id: "q-relationship-priority-10",
-    version: 1,
+    surveyQuestionId: "sq-relationship-priority-10",
+    questionId: "q-relationship-priority-10",
+    questionVersion: 1,
     text: "相手の期待に応えられないときでも、自分を優先してよいと思う。",
     left: NO_CHOICE,
     right: YES_CHOICE,
@@ -163,11 +173,13 @@ export const RELATIONSHIP_PRIORITY_SCORING_CONFIG = {
 
 /**
  * 10問の回答を、版管理された決定的な重み付き変換で4パラメータへ変換します。
- * 未知の質問、スキップ、version 1以外の回答は計算へ含めません。
+ * 未知の質問、延期、version 1以外の回答は計算へ含めません。
  */
-export function scoreRelationshipPriority(answers: SurveyAnswer[]): RelationshipPriorityProfile {
+export function scoreRelationshipPriority(
+  interactions: SurveyInteraction[],
+): RelationshipPriorityProfile {
   return scoreParameters(
-    answers,
+    interactions,
     RELATIONSHIP_PRIORITY_QUESTIONS,
     RELATIONSHIP_PRIORITY_SCORING_CONFIG,
   );

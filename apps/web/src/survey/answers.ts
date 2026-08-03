@@ -1,4 +1,10 @@
-import type { SurveyAnswer, SurveyQuestion, SwipeDirection } from "./types";
+import type {
+  DeferredQuestion,
+  SurveyAnswer,
+  SurveyInteraction,
+  SurveyQuestion,
+  SwipeDirection,
+} from "./types";
 
 /**
  * 回答の組み立てと集計。
@@ -8,37 +14,43 @@ import type { SurveyAnswer, SurveyQuestion, SwipeDirection } from "./types";
  */
 
 /** 選んだ方向から、記録する回答を組み立てます。 */
-export function createChoiceAnswer(
+export function createSurveyAnswer(
   question: SurveyQuestion,
   direction: SwipeDirection,
-  answeredAt: Date,
+  acceptedAt: Date,
 ): SurveyAnswer {
   const choice = direction === "left" ? question.left : question.right;
   return {
-    kind: "choice",
-    questionId: question.id,
+    kind: "answer",
+    surveyQuestionId: question.surveyQuestionId,
+    questionId: question.questionId,
     // 回答は、回答した時点の質問の版を指し続けます。
-    questionVersion: question.version,
-    value: choice.value,
+    questionVersion: question.questionVersion,
+    choiceId: choice.choiceId,
     direction,
-    answeredAt: answeredAt.toISOString(),
+    acceptedAt: acceptedAt.toISOString(),
   };
 }
 
-/** スキップ（あとで回答）を記録する回答を組み立てます。 */
-export function createSkipAnswer(question: SurveyQuestion, answeredAt: Date): SurveyAnswer {
+/** 「あとで回答」の進捗を組み立てます。 */
+export function createDeferredQuestion(
+  question: SurveyQuestion,
+  deferredAt: Date,
+): DeferredQuestion {
   return {
-    kind: "skipped",
-    questionId: question.id,
-    questionVersion: question.version,
-    answeredAt: answeredAt.toISOString(),
+    kind: "deferred",
+    surveyQuestionId: question.surveyQuestionId,
+    deferredAt: deferredAt.toISOString(),
   };
 }
 
 /** 完了表示で使う内訳。 */
-export function summarizeAnswers(answers: SurveyAnswer[]): { answered: number; skipped: number } {
+export function summarizeInteractions(interactions: SurveyInteraction[]): {
+  answered: number;
+  deferred: number;
+} {
   return {
-    answered: answers.filter((answer) => answer.kind === "choice").length,
-    skipped: answers.filter((answer) => answer.kind === "skipped").length,
+    answered: interactions.filter(({ kind }) => kind === "answer").length,
+    deferred: interactions.filter(({ kind }) => kind === "deferred").length,
   };
 }
