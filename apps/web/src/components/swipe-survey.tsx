@@ -128,13 +128,9 @@ function ChoiceButton({
 function SurveyComplete({
   interactions,
   survey,
-  onBack,
-  onRestart,
 }: {
   interactions: SurveyInteraction[];
   survey: SurveyDefinition;
-  onBack: () => void;
-  onRestart: () => void;
 }) {
   const { answered, deferred } = summarizeInteractions(interactions);
   const profile = survey.score(interactions);
@@ -164,23 +160,6 @@ function SurveyComplete({
       <p className="text-[10px] text-slate-500">
         回答と結果のサーバー保存はまだ実装されていません。
       </p>
-      <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={onBack}
-          className="rounded-xl border border-slate-600 px-4 py-2 text-sm text-slate-300 transition-colors hover:bg-slate-700"
-        >
-          一覧へ
-        </button>
-        <button
-          type="button"
-          onClick={onRestart}
-          className="inline-flex items-center gap-2 rounded-xl bg-sky-500 px-4 py-2 text-sm font-semibold text-slate-900 transition-colors hover:bg-sky-400"
-        >
-          <RotateCcw className="size-4" aria-hidden="true" />
-          もう一度
-        </button>
-      </div>
     </div>
   );
 }
@@ -354,14 +333,7 @@ export function SwipeSurvey({
 
       {/* カードの重なり。高さを固定して、カードを絶対配置で重ねます。 */}
       <div ref={stackRef} className="relative h-80">
-        {finished && (
-          <SurveyComplete
-            interactions={interactions}
-            survey={survey}
-            onBack={onBack}
-            onRestart={restart}
-          />
-        )}
+        {finished && <SurveyComplete interactions={interactions} survey={survey} />}
         {questions?.slice(index, index + VISIBLE_STACK_SIZE).map((question, offset) => (
           <SwipeCard
             key={`${question.surveyQuestionId}-v${question.questionVersion}`}
@@ -378,6 +350,26 @@ export function SwipeSurvey({
           />
         ))}
       </div>
+
+      {finished && (
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={onBack}
+            className="flex-1 rounded-2xl border border-slate-600 px-4 py-3 text-sm font-semibold text-slate-300 transition-colors hover:bg-slate-800"
+          >
+            一覧へ
+          </button>
+          <button
+            type="button"
+            onClick={restart}
+            className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-sky-500 px-4 py-3 text-sm font-semibold text-slate-900 transition-colors hover:bg-sky-400"
+          >
+            <RotateCcw className="size-4" aria-hidden="true" />
+            もう一度
+          </button>
+        </div>
+      )}
 
       {current && (
         <div className="flex flex-col gap-3">
