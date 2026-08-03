@@ -4,9 +4,9 @@
 
 この文書は、Phase 1のアンケートを公開し、本人の回答を継続的に保存するためのQuestionnaire domainを定義します。質問と版、アンケート、回答進捗の集約境界、状態遷移、不変条件、およびAccount / Source domainとの関係を所有します。
 
-画面と遷移は[Phase 1 アンケート体験設計](questionnaire-experience.md)、Account / Brain / Sourceの境界は[ドメイン設計](domain-design.md)、Source Recordの改訂関係は[根拠・反証・改訂のエッジ設計](evidence-edge-design.md)、原本の不変性と訂正・削除の波及は[Source Recordのライフサイクル設計](source-record-lifecycle-design.md)を正とします。
+画面と遷移は[Phase 1 アンケート体験設計](questionnaire-experience.md)、Account / Brain / Sourceの境界は[ドメイン設計](../domain/domain-design.md)、Source Recordの改訂関係は[根拠・反証・改訂のエッジ設計](../domain/brain/evidence-edge-design.md)、原本の不変性と訂正・削除の波及は[Source Recordのライフサイクル設計](../domain/source/source-record-lifecycle-design.md)を正とします。
 
-この文書では、D1のテーブル、カラム、インデックス、APIスキーマ、セッションの実装方式を定義しません。ここで定義する論理モデルを永続化設計とAPI設計の入力とし、D1への現在の写像は[`packages/lib`のschema](../packages/lib/src/d1/schema/questionnaire.ts)を正とします。
+この文書では、D1のテーブル、カラム、インデックス、APIスキーマ、セッションの実装方式を定義しません。ここで定義する論理モデルを永続化設計とAPI設計の入力とし、D1への現在の写像は[`packages/lib`のschema](../../packages/lib/src/d1/schema/questionnaire.ts)を正とします。
 
 ## 2. 結論
 
@@ -222,7 +222,7 @@ Answerは次の意味を持ちます。
 
 削除したSurvey QuestionのAnswerを現在有効な回答から外し、Source domainへ対応するSource Recordの削除を依頼します。SurveyResponseの回答状態は残ったAnswerから再計算します。
 
-Source Recordの削除後に残すtombstoneと改訂された旧版の扱いは[Source Recordのライフサイクル設計](source-record-lifecycle-design.md)を正とします。物理的な消去時期は未決であり、この文書では決めません。
+Source Recordの削除後に残すtombstoneと改訂された旧版の扱いは[Source Recordのライフサイクル設計](../domain/source/source-record-lifecycle-design.md)を正とします。物理的な消去時期は未決であり、この文書では決めません。
 
 #### あとで回答
 
@@ -240,7 +240,7 @@ Source Recordの削除後に残すtombstoneと改訂された旧版の扱いは[
 
 ## 8. Source domainとの関係
 
-1問の回答を1件のSource Recordとする粒度は[ドメイン設計 §5](domain-design.md#source-recordの粒度)を正とします。
+1問の回答を1件のSource Recordとする粒度は[ドメイン設計 §5](../domain/domain-design.md#source-recordの粒度)を正とします。
 
 Questionnaire domainから作るSource Recordには、少なくとも次の意味を再現できる情報が必要です。
 

@@ -68,7 +68,7 @@ export async function postLiffSession(c: Context<AppEnv>): Promise<Response> {
   switch (outcome.type) {
     case "resolved":
       // accountId は返さない。セッション管理の方式が未決定
-      // ([ドメイン設計](../../../../docs/domain-design.md)) のうちにクライアントへ渡すと、
+      // ([ドメイン設計](../../../../docs/domain/domain-design.md)) のうちにクライアントへ渡すと、
       // 後続リクエストで「クライアントが送ってきた accountId」を信頼する実装を誘発する。
       return c.json({
         displayName: outcome.session.displayName,

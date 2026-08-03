@@ -12,7 +12,7 @@ updated_at: 2026-07-27T22:17:57.563106+00:00
 
 ## 背景
 
-Phase 1 の入力は「日記（LINE）」と「スワイプアンケート（Web）」の 2 本立てで確定している（[プロジェクト概要 §4](../../docs/project-overview.md#4-想定する利用体験)）。Web 側は issue 11 / 12 で LIFF の初期化と ID トークン検証まで通ったが、**肝心の回答画面がまだ無い**。`apps/web` は `/api/health` を叩くだけのスケルトンで、`src/index.css` に素の CSS と CSS 変数がある状態。
+Phase 1 の入力は「日記（LINE）」と「スワイプアンケート（Web）」の 2 本立てで確定している（[プロジェクト概要 §4](../../docs/product/project-overview.md#4-想定する利用体験)）。Web 側は issue 11 / 12 で LIFF の初期化と ID トークン検証まで通ったが、**肝心の回答画面がまだ無い**。`apps/web` は `/api/health` を叩くだけのスケルトンで、`src/index.css` に素の CSS と CSS 変数がある状態。
 
 ## 確定した方針
 

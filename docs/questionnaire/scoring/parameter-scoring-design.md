@@ -4,7 +4,7 @@
 
 この文書は、アンケート回答を複数のパラメータへ決定的に変換する共通方式を定義します。アンケートごとに与える設定、共通の計算手順、入力の検証、出力、版管理を所有します。
 
-最初のアンケート固有のパラメータと重みは[「自分と相手の優先・境界線」パラメータ変換設計](relationship-priority-parameter-design.md)を正とします。Question / Survey / Answerは[Phase 1 アンケートドメイン設計](questionnaire-domain-design.md)、Brain Itemの分類と`Confidence`は[Brain内部情報の分類](brain-content-taxonomy.md)を正とします。
+最初のアンケート固有のパラメータと重みは[「自分と相手の優先・境界線」パラメータ変換設計](relationship-priority-parameter-design.md)を正とします。Question / Survey / Answerは[Phase 1 アンケートドメイン設計](../questionnaire-domain-design.md)、Brain Itemの分類と`Confidence`は[Brain内部情報の分類](../../domain/brain/brain-content-taxonomy.md)を正とします。
 
 ## 2. 結論
 

@@ -4,7 +4,7 @@
 
 この文書は、最初のアンケート「自分と相手の優先・境界線」に固有のパラメータ、質問ごとの重み、表示設定、現在の実装範囲を所有します。
 
-共通の設定形式と計算手順は[アンケート回答のパラメータ変換設計](parameter-scoring-design.md)、質問文は[人間関係の価値観 Yes／No質問集 §3.1](relationship-values-yes-no-question-bank.md#31-自分と相手の優先境界線)、Question / Survey / Answerの責務は[Phase 1 アンケートドメイン設計](questionnaire-domain-design.md)を正とします。他の話題の設定、統計的な学習、Brain Itemとしての永続化、Brainの`Confidence`算出はこの文書では定義しません。
+共通の設定形式と計算手順は[アンケート回答のパラメータ変換設計](parameter-scoring-design.md)、質問文は[人間関係の価値観 Yes／No質問集 §3.1](../content/relationship-values-yes-no-question-bank.md#31-自分と相手の優先境界線)、Question / Survey / Answerの責務は[Phase 1 アンケートドメイン設計](../questionnaire-domain-design.md)を正とします。他の話題の設定、統計的な学習、Brain Itemとしての永続化、Brainの`Confidence`算出はこの文書では定義しません。
 
 ## 2. 結論
 

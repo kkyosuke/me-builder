@@ -39,7 +39,7 @@ export async function processLineWebhook(
  * LINE の userId に対応する Account を用意します。
  *
  * アカウント作成の起点は LINE 公式アカウントの友だち追加です
- * ([プロジェクト概要 §5](../../../../../docs/project-overview.md#5-アカウントと本人識別))。
+ * ([プロジェクト概要 §5](../../../../../docs/product/project-overview.md#5-アカウントと本人識別))。
  * follow イベントと、友だちであることが確かなメッセージ受信時のみ呼び出します。
  *
  * 失敗しても返信は行うため、例外は握りつぶしてログだけ残します。
@@ -66,7 +66,7 @@ async function ensureAccountIdentity(
  *
  * トークへ送られたテキストは既定で日記として扱い、アンケートのリンクを求めるキーワードだけを
  * 例外として切り出します。LINE は日記の入力とアンケートのリンク配信を担当します
- * ([プロジェクト概要 §4](../../../../../docs/project-overview.md#4-想定する利用体験))。
+ * ([プロジェクト概要 §4](../../../../../docs/product/project-overview.md#4-想定する利用体験))。
  */
 export type LineTextIntent = "survey-request" | "diary";
 

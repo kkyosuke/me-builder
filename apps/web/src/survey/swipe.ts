@@ -108,7 +108,7 @@ export function resolveStackLayer(depth: number): {
  * キーボード操作の対応。
  *
  * スワイプ以外の操作手段を必ず用意します。LINE 内は LIFF ですが外部ブラウザの導線も
- * 維持しているため（[プロジェクト概要 §4](../../../../docs/project-overview.md#4-想定する利用体験)）、
+ * 維持しているため（[プロジェクト概要 §4](../../../../docs/product/project-overview.md#4-想定する利用体験)）、
  * ポインタが無い環境でも同じ操作ができる必要があります。
  */
 export function resolveKeyAction(key: string): SwipeDirection | "skip" | null {

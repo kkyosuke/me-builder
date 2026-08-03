@@ -6,21 +6,9 @@ me-builderは、さまざまな質問への回答を蓄積し、その人らし�
 
 ## ドキュメント
 
-- [プロジェクト概要](docs/project-overview.md) — 目的、MVP、Phase 1の入力体験とログイン手段
-- [Phase 1 アンケート体験設計](docs/questionnaire-experience.md) — 一覧、回答、回答内容、LINE通知、リッチメニューのUIと遷移
-- [Phase 1 アンケートドメイン設計](docs/questionnaire-domain-design.md) — 質問、アンケート、回答進捗の集約とAccount / Sourceとの関係
-- [人間関係の価値観アンケート候補](docs/relationship-values-questionnaire.md) — 人間関係で違いが問題になりやすい価値観の分類
-- [人間関係の価値観 Yes／No質問集](docs/relationship-values-yes-no-question-bank.md) — 各話題10問のYes／No質問候補
-- [アンケート回答のパラメータ変換設計](docs/parameter-scoring-design.md) — アンケート共通の設定形式と計算手順
-- [「自分と相手の優先・境界線」パラメータ変換設計](docs/relationship-priority-parameter-design.md) — 最初のアンケート固有のパラメータ設定
-- [「お金と消費」パラメータ変換設計](docs/money-values-parameter-design.md) — 2つ目のアンケート固有のパラメータ設定
-- [ドメイン設計](docs/domain-design.md) — Account / Brain / Sourceの責務・境界、Questionnaireの位置づけ、設計順序と進捗
-- [Brainのラベル・アクセス制御設計](docs/brain-access-label-design.md) — ラベルと公開制御のSSoT
-- [Brain内部情報の分類](docs/brain-content-taxonomy.md) — Brain Item分類のSSoT
-- [根拠・反証・改訂のエッジ設計](docs/evidence-edge-design.md) — Source RecordとBrain Itemを結ぶエッジのSSoT
-- [Source Recordのライフサイクル設計](docs/source-record-lifecycle-design.md) — 原本の不変性、訂正・削除・撤回と派生への波及のSSoT
-- [インフラ・システム構成](docs/infrastructure-architecture.md) — Cloudflare全域を採用した開発基盤と技術スタックのSSoT
-- [キャラクターデザイン](docs/character-design.md) — うつし・ミラの設定とデザインアセットのSSoT
+- [ドキュメントガイド](docs/README.md) — ディレクトリ構造、文書の探し方、全ドキュメントへの入口
+- [プロジェクト概要](docs/product/project-overview.md) — 目的、MVP、Phase 1の入力体験とログイン手段
+- [ドメイン設計](docs/domain/domain-design.md) — Account / Brain / Sourceの責務・境界、Questionnaireの位置づけ、設計順序と進捗
 - [Agent向けガイド](.agents/README.md) — ドキュメント運用・設計スコープのルール
 
 ## 現在のフェーズ
@@ -30,4 +18,4 @@ me-builderは、さまざまな質問への回答を蓄積し、その人らし�
 1. 多様な形式の質問に回答し、自分を表すデータを蓄積できること
 2. 蓄積した回答を、権限管理されたMCP経由でエージェントに提供できること
 
-Phaseの構成とPhase 1の利用体験は[プロジェクト概要](docs/project-overview.md)を参照してください。
+Phaseの構成とPhase 1の利用体験は[プロジェクト概要](docs/product/project-overview.md)を参照してください。

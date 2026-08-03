@@ -5,7 +5,7 @@ import { logger } from "@me-builder/shared";
  * 画面へ表示してよいプロフィール項目だけを持つ型。
  *
  * LINE の `userId` は本人識別子のため、画面表示もログ出力も行いません。
- * 詳細は [プロジェクト概要 §8](../../../../docs/project-overview.md#8-プライバシーと安全性) を参照してください。
+ * 詳細は [プロジェクト概要 §8](../../../../docs/product/project-overview.md#8-プライバシーと安全性) を参照してください。
  */
 interface LiffDisplayProfile {
   displayName: string;

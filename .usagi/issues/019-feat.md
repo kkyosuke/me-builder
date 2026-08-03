@@ -18,7 +18,7 @@ issue #17 でスワイプアンケートの回答 UI を実装したが、質問
 
 ## ドメイン設計で確定したこと
 
-[Phase 1 アンケートドメイン設計](../../docs/questionnaire-domain-design.md)で、サーバー実装の前提となる次の事項を確定した。
+[Phase 1 アンケートドメイン設計](../../docs/questionnaire/questionnaire-domain-design.md)で、サーバー実装の前提となる次の事項を確定した。
 
 - `Question`、`Survey`、`SurveyResponse` の3集約
 - SurveyはapprovedのQuestion Versionを固定して参照し、公開後は変更しない

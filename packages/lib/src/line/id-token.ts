@@ -13,7 +13,7 @@ import { logger } from "@me-builder/shared";
  * 使い、送られてきた `userId` を識別子として受け付けません。
  *
  * ID トークン・アクセストークン・`sub` はログへ出力しません
- * ([プロジェクト概要 §8](../../../../docs/project-overview.md#8-プライバシーと安全性))。
+ * ([プロジェクト概要 §8](../../../../docs/product/project-overview.md#8-プライバシーと安全性))。
  */
 
 const VERIFY_ENDPOINT = "https://api.line.me/oauth2/v2.1/verify";
