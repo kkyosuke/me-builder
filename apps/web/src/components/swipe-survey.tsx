@@ -335,7 +335,7 @@ export function SwipeSurvey({
       </div>
 
       {/* 回答中だけ高さを固定してカードを重ね、完了後は結果の項目数に応じて伸ばします。 */}
-      <div ref={stackRef} className={finished ? "relative" : "relative h-80"}>
+      <div ref={stackRef} className={finished ? "relative" : "relative mb-3 h-80"}>
         {finished && <SurveyComplete interactions={interactions} survey={survey} />}
         {questions?.slice(index, index + VISIBLE_STACK_SIZE).map((question, offset) => (
           <SwipeCard
