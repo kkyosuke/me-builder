@@ -5,7 +5,7 @@ const PositiveIntegerSchema = v.pipe(v.number(), v.safeInteger(), v.minValue(1))
 const TimestampSchema = v.pipe(v.string(), v.isoTimestamp());
 
 /** カードへ表示するアイコンの識別子。 */
-export const SurveyIconNameSchema = v.picklist([
+const SurveyIconNameSchema = v.picklist([
   "house",
   "mountain",
   "book",
@@ -27,7 +27,7 @@ export const SurveyIconNameSchema = v.picklist([
 /** スワイプの方向。左右の2択に対応します。 */
 export const SwipeDirectionSchema = v.picklist(["left", "right"]);
 
-export const SurveyChoiceSchema = v.object({
+const SurveyChoiceSchema = v.object({
   choiceId: NonEmptyStringSchema,
   label: NonEmptyStringSchema,
   icon: SurveyIconNameSchema,
@@ -63,10 +63,7 @@ export const DeferredQuestionSchema = v.object({
   deferredAt: TimestampSchema,
 });
 
-export const SurveyInteractionSchema = v.variant("kind", [
-  SurveyAnswerSchema,
-  DeferredQuestionSchema,
-]);
+const SurveyInteractionSchema = v.variant("kind", [SurveyAnswerSchema, DeferredQuestionSchema]);
 export const SurveyQuestionsSchema = v.array(SurveyQuestionSchema);
 
 export type SurveyIconName = v.InferOutput<typeof SurveyIconNameSchema>;
