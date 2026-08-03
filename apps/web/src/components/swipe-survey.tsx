@@ -13,11 +13,7 @@ import {
   summarizeInteractions,
 } from "../survey/answers";
 import { getParameterSummary } from "../survey/parameter-scoring";
-import { fetchSurveyQuestions } from "../survey/questions";
-import {
-  RELATIONSHIP_PRIORITY_SCORING_CONFIG,
-  scoreRelationshipPriority,
-} from "../survey/relationship-priority";
+import { type SurveyDefinition, fetchSurveyDefinitions } from "../survey/questions";
 import {
   type DragOffset,
   SWIPE_TRANSITION_MS,
@@ -121,13 +117,17 @@ function ChoiceButton({
 /** 全問終わったときの表示。 */
 function SurveyComplete({
   interactions,
+  survey,
+  onBack,
   onRestart,
 }: {
   interactions: SurveyInteraction[];
+  survey: SurveyDefinition;
+  onBack: () => void;
   onRestart: () => void;
 }) {
   const { answered, deferred } = summarizeInteractions(interactions);
-  const profile = scoreRelationshipPriority(interactions);
+  const profile = survey.score(interactions);
 
   return (
     <div className="flex h-full flex-col items-center justify-center gap-2 rounded-3xl border border-slate-700 bg-slate-800 p-4 text-center">
@@ -145,7 +145,7 @@ function SurveyComplete({
               {parameter.score === null ? "—" : `${parameter.score} / 100`}
             </p>
             <p className="text-xs text-slate-300">
-              {getParameterSummary(parameter, RELATIONSHIP_PRIORITY_SCORING_CONFIG.balancedLabel)}
+              {getParameterSummary(parameter, survey.balancedLabel)}
             </p>
             <p className="text-[10px] text-slate-500">{`回答充足度 ${parameter.coverage}%`}</p>
           </div>
@@ -154,14 +154,23 @@ function SurveyComplete({
       <p className="text-[10px] text-slate-500">
         回答と結果のサーバー保存はまだ実装されていません。
       </p>
-      <button
-        type="button"
-        onClick={onRestart}
-        className="inline-flex items-center gap-2 rounded-xl bg-sky-500 px-5 py-2 text-sm font-semibold text-slate-900 transition-colors hover:bg-sky-400"
-      >
-        <RotateCcw className="size-4" aria-hidden="true" />
-        もう一度
-      </button>
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={onBack}
+          className="rounded-xl border border-slate-600 px-4 py-2 text-sm text-slate-300 transition-colors hover:bg-slate-700"
+        >
+          一覧へ
+        </button>
+        <button
+          type="button"
+          onClick={onRestart}
+          className="inline-flex items-center gap-2 rounded-xl bg-sky-500 px-4 py-2 text-sm font-semibold text-slate-900 transition-colors hover:bg-sky-400"
+        >
+          <RotateCcw className="size-4" aria-hidden="true" />
+          もう一度
+        </button>
+      </div>
     </div>
   );
 }
@@ -175,7 +184,8 @@ function SurveyComplete({
  * どちらでも操作できる状態を保ちます。
  */
 export function SwipeSurvey() {
-  const [questions, setQuestions] = useState<SurveyQuestion[] | null>(null);
+  const [surveys, setSurveys] = useState<SurveyDefinition[] | null>(null);
+  const [selectedSurveyId, setSelectedSurveyId] = useState<string | null>(null);
   const [index, setIndex] = useState(0);
   const [interactions, setInteractions] = useState<SurveyInteraction[]>([]);
   const [drag, setDrag] = useState<DragOffset | null>(null);
@@ -193,10 +203,10 @@ export function SwipeSurvey() {
 
   useEffect(() => {
     let cancelled = false;
-    fetchSurveyQuestions()
+    fetchSurveyDefinitions()
       .then((loaded) => {
         if (!cancelled) {
-          setQuestions(loaded);
+          setSurveys(loaded);
         }
       })
       .catch((err: unknown) => {
@@ -209,6 +219,9 @@ export function SwipeSurvey() {
       cancelled = true;
     };
   }, []);
+
+  const survey = surveys?.find(({ id }) => id === selectedSurveyId) ?? null;
+  const questions = survey?.questions ?? null;
 
   useEffect(
     () => () => {
@@ -274,6 +287,14 @@ export function SwipeSurvey() {
     setFlyOut(null);
   }, []);
 
+  const selectSurvey = useCallback((surveyId: string | null) => {
+    setSelectedSurveyId(surveyId);
+    setIndex(0);
+    setInteractions([]);
+    setDrag(null);
+    setFlyOut(null);
+  }, []);
+
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (isBusy) {
       return;
@@ -312,10 +333,53 @@ export function SwipeSurvey() {
   const finished = questions !== null && index >= total;
   const answeredCount = finished ? total : index;
 
+  if (loadError) {
+    return (
+      <section className="flex h-80 items-center justify-center rounded-3xl border border-slate-700 bg-slate-800 p-6 text-center text-sm text-red-400">
+        {`アンケートを読み込めませんでした: ${loadError}`}
+      </section>
+    );
+  }
+
+  if (surveys === null) {
+    return (
+      <section className="flex h-80 items-center justify-center rounded-3xl border border-slate-700 bg-slate-800 p-6 text-sm text-slate-400">
+        アンケートを読み込んでいます...
+      </section>
+    );
+  }
+
+  if (!survey) {
+    return (
+      <section className="flex flex-col gap-4">
+        <header>
+          <h2 className="text-lg font-bold">アンケートを選ぶ</h2>
+          <p className="mt-1 text-sm text-slate-400">今の自分に近い答えを選んでください。</p>
+        </header>
+        <div className="grid gap-3">
+          {surveys.map((candidate) => (
+            <button
+              key={candidate.id}
+              type="button"
+              onClick={() => selectSurvey(candidate.id)}
+              className="rounded-2xl border border-slate-700 bg-slate-800 p-4 text-left transition-colors hover:border-sky-500/60 hover:bg-slate-800/80"
+            >
+              <span className="font-semibold text-sky-300">{candidate.title}</span>
+              <span className="mt-1 block text-sm text-slate-400">{candidate.description}</span>
+              <span className="mt-2 block text-xs text-slate-500">
+                {`${candidate.questions.length}問・Yes / No`}
+              </span>
+            </button>
+          ))}
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="flex flex-col gap-4">
       <header className="flex items-baseline justify-between">
-        <h2 className="text-lg font-bold">自分と相手の優先・境界線</h2>
+        <h2 className="text-lg font-bold">{survey.title}</h2>
         <p className="text-sm text-slate-400" aria-live="polite">
           {`${finished ? total : Math.min(index + 1, total)} / ${total}`}
         </p>
@@ -333,20 +397,14 @@ export function SwipeSurvey() {
 
       {/* カードの重なり。高さを固定して、カードを絶対配置で重ねます。 */}
       <div ref={stackRef} className="relative h-80">
-        {loadError && (
-          <p className="flex h-full items-center justify-center rounded-3xl border border-slate-700 bg-slate-800 p-6 text-center text-sm text-red-400">
-            {`質問を読み込めませんでした: ${loadError}`}
-          </p>
+        {finished && (
+          <SurveyComplete
+            interactions={interactions}
+            survey={survey}
+            onBack={() => selectSurvey(null)}
+            onRestart={restart}
+          />
         )}
-
-        {!loadError && questions === null && (
-          <p className="flex h-full items-center justify-center rounded-3xl border border-slate-700 bg-slate-800 p-6 text-sm text-slate-400">
-            質問を読み込んでいます...
-          </p>
-        )}
-
-        {finished && <SurveyComplete interactions={interactions} onRestart={restart} />}
-
         {questions?.slice(index, index + VISIBLE_STACK_SIZE).map((question, offset) => (
           <SwipeCard
             key={`${question.surveyQuestionId}-v${question.questionVersion}`}
