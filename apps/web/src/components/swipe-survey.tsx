@@ -1,9 +1,18 @@
-import { ArrowLeft, ArrowRight, CircleCheck, Keyboard, RotateCcw, SkipForward } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  CircleCheck,
+  Keyboard,
+  RotateCcw,
+  SkipForward,
+  Sparkles,
+} from "lucide-react";
 import {
   type PointerEvent as ReactPointerEvent,
   type RefObject,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -13,7 +22,8 @@ import {
   summarizeInteractions,
 } from "../survey/answers";
 import { getParameterSummary } from "../survey/parameter-scoring";
-import { type SurveyDefinition, fetchSurveyDefinitions } from "../survey/questions";
+import { pickProgressMessage, resolveProgressMilestone } from "../survey/progress-message";
+import type { SurveyDefinition } from "../survey/questions";
 import {
   type DragOffset,
   SWIPE_TRANSITION_MS,
@@ -183,14 +193,17 @@ function SurveyComplete({
  * 外部ブラウザの導線も維持しているため（[プロジェクト概要 §4](../../../../docs/product/project-overview.md#4-想定する利用体験)）、
  * どちらでも操作できる状態を保ちます。
  */
-export function SwipeSurvey() {
-  const [surveys, setSurveys] = useState<SurveyDefinition[] | null>(null);
-  const [selectedSurveyId, setSelectedSurveyId] = useState<string | null>(null);
+export function SwipeSurvey({
+  survey,
+  onBack,
+}: {
+  survey: SurveyDefinition;
+  onBack: () => void;
+}) {
   const [index, setIndex] = useState(0);
   const [interactions, setInteractions] = useState<SurveyInteraction[]>([]);
   const [drag, setDrag] = useState<DragOffset | null>(null);
   const [flyOut, setFlyOut] = useState<SwipeDirection | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
 
   const reducedMotion = useReducedMotion();
   const [stackRef, cardWidth] = useCardWidth();
@@ -201,27 +214,7 @@ export function SwipeSurvey() {
   /** 飛ばしている間の待ちタイマー。アンマウント時に解除します。 */
   const advanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    fetchSurveyDefinitions()
-      .then((loaded) => {
-        if (!cancelled) {
-          setSurveys(loaded);
-        }
-      })
-      .catch((err: unknown) => {
-        // 取得に失敗しても画面を白くせず、状態を表示します。
-        if (!cancelled) {
-          setLoadError(err instanceof Error ? err.message : String(err));
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const survey = surveys?.find(({ id }) => id === selectedSurveyId) ?? null;
-  const questions = survey?.questions ?? null;
+  const questions = survey.questions;
 
   useEffect(
     () => () => {
@@ -287,14 +280,6 @@ export function SwipeSurvey() {
     setFlyOut(null);
   }, []);
 
-  const selectSurvey = useCallback((surveyId: string | null) => {
-    setSelectedSurveyId(surveyId);
-    setIndex(0);
-    setInteractions([]);
-    setDrag(null);
-    setFlyOut(null);
-  }, []);
-
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (isBusy) {
       return;
@@ -329,52 +314,15 @@ export function SwipeSurvey() {
     setDrag(null);
   };
 
-  const total = questions?.length ?? 0;
-  const finished = questions !== null && index >= total;
+  const total = questions.length;
+  const finished = index >= total;
   const answeredCount = finished ? total : index;
-
-  if (loadError) {
-    return (
-      <section className="flex h-80 items-center justify-center rounded-3xl border border-slate-700 bg-slate-800 p-6 text-center text-sm text-red-400">
-        {`アンケートを読み込めませんでした: ${loadError}`}
-      </section>
-    );
-  }
-
-  if (surveys === null) {
-    return (
-      <section className="flex h-80 items-center justify-center rounded-3xl border border-slate-700 bg-slate-800 p-6 text-sm text-slate-400">
-        アンケートを読み込んでいます...
-      </section>
-    );
-  }
-
-  if (!survey) {
-    return (
-      <section className="flex flex-col gap-4">
-        <header>
-          <h2 className="text-lg font-bold">アンケートを選ぶ</h2>
-          <p className="mt-1 text-sm text-slate-400">今の自分に近い答えを選んでください。</p>
-        </header>
-        <div className="grid gap-3">
-          {surveys.map((candidate) => (
-            <button
-              key={candidate.id}
-              type="button"
-              onClick={() => selectSurvey(candidate.id)}
-              className="rounded-2xl border border-slate-700 bg-slate-800 p-4 text-left transition-colors hover:border-sky-500/60 hover:bg-slate-800/80"
-            >
-              <span className="font-semibold text-sky-300">{candidate.title}</span>
-              <span className="mt-1 block text-sm text-slate-400">{candidate.description}</span>
-              <span className="mt-2 block text-xs text-slate-500">
-                {`${candidate.questions.length}問・Yes / No`}
-              </span>
-            </button>
-          ))}
-        </div>
-      </section>
-    );
-  }
+  const progressMilestone = resolveProgressMilestone(answeredCount, total);
+  // 同じ段階にいる間は文言を固定し、回答のたびにちらつかないようにします。
+  const progressMessage = useMemo(
+    () => (progressMilestone ? pickProgressMessage(progressMilestone) : null),
+    [progressMilestone],
+  );
 
   return (
     <section className="flex flex-col gap-4">
@@ -395,13 +343,22 @@ export function SwipeSurvey() {
         />
       </div>
 
+      <div className="min-h-10" aria-live="polite">
+        {progressMessage && (
+          <p className="flex items-center gap-2 rounded-xl bg-sky-400/10 px-3 py-2 text-sm text-sky-200">
+            <Sparkles className="size-4 shrink-0" aria-hidden="true" />
+            {progressMessage}
+          </p>
+        )}
+      </div>
+
       {/* カードの重なり。高さを固定して、カードを絶対配置で重ねます。 */}
       <div ref={stackRef} className="relative h-80">
         {finished && (
           <SurveyComplete
             interactions={interactions}
             survey={survey}
-            onBack={() => selectSurvey(null)}
+            onBack={onBack}
             onRestart={restart}
           />
         )}
