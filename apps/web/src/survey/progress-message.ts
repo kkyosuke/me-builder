@@ -1,4 +1,4 @@
-export type ProgressMilestone = "halfway" | "almost-done";
+export type ProgressMilestone = "halfway" | "almost-done" | "complete";
 
 export const PROGRESS_MESSAGES: Record<ProgressMilestone, readonly string[]> = {
   halfway: [
@@ -11,6 +11,11 @@ export const PROGRESS_MESSAGES: Record<ProgressMilestone, readonly string[]> = {
     "ゴールが見えてきました。残りわずかです！",
     "ここまでおつかれさま。もうひと息です。",
   ],
+  complete: [
+    "お疲れさまでした。すべての質問への回答が完了しました！",
+    "最後まで回答いただき、ありがとうございました。",
+    "回答完了です。ここまで本当にお疲れさまでした！",
+  ],
 };
 
 /** 回答済みの問数から、到達直後の1問だけ表示する応援メッセージの段階を返します。 */
@@ -18,8 +23,11 @@ export function resolveProgressMilestone(
   answeredCount: number,
   total: number,
 ): ProgressMilestone | null {
-  if (total <= 0 || answeredCount >= total) {
+  if (total <= 0) {
     return null;
+  }
+  if (answeredCount >= total) {
+    return "complete";
   }
 
   const halfwayCount = Math.ceil(total * 0.5);

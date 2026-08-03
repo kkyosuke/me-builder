@@ -5,6 +5,7 @@ import {
   SWIPE_TRANSITION_MS,
   buildDragTransform,
   buildFlyOutTransform,
+  isTapGesture,
   resolveChoiceProgress,
   resolveStackLayer,
 } from "../survey/swipe";
@@ -27,10 +28,8 @@ interface SwipeCardProps {
   onPointerDown?: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onPointerMove?: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onPointerUp?: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  onPointerCancel?: (event: ReactPointerEvent<HTMLDivElement>) => void;
 }
-
-/** タップとドラッグを区別する移動量。小さな指ぶれはタップとして扱います。 */
-const TAP_SLOP_PX = 8;
 
 /** カード内の選択ボタン。ボタン上から始めたスワイプは親カードへ伝えます。 */
 function CardChoiceButton({
@@ -62,7 +61,7 @@ function CardChoiceButton({
         event.stopPropagation();
         const start = pointerStart.current;
         pointerStart.current = null;
-        if (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) > TAP_SLOP_PX) {
+        if (start && !isTapGesture({ dx: event.clientX - start.x, dy: event.clientY - start.y })) {
           // ドラッグ後に生成される click で、ボタン回答が重複しないようにします。
           event.preventDefault();
           return;
@@ -128,6 +127,7 @@ export function SwipeCard({
   onPointerDown,
   onPointerMove,
   onPointerUp,
+  onPointerCancel,
 }: SwipeCardProps) {
   const isFront = depth === 0;
   const layer = resolveStackLayer(depth);
@@ -163,7 +163,7 @@ export function SwipeCard({
       onPointerDown={isFront ? onPointerDown : undefined}
       onPointerMove={isFront ? onPointerMove : undefined}
       onPointerUp={isFront ? onPointerUp : undefined}
-      onPointerCancel={isFront ? onPointerUp : undefined}
+      onPointerCancel={isFront ? onPointerCancel : undefined}
     >
       {pendingDirection && (
         <ChoiceOverlay question={question} direction={pendingDirection} progress={progress} />

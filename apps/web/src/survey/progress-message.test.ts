@@ -19,7 +19,10 @@ describe("resolveProgressMilestone", () => {
   it("残り2割へ到達した直後の1問だけ終盤文言を使う", () => {
     expect(resolveProgressMilestone(8, 10)).toBe("almost-done");
     expect(resolveProgressMilestone(9, 10)).toBeNull();
-    expect(resolveProgressMilestone(10, 10)).toBeNull();
+  });
+
+  it("全問への回答後は完了文言を使う", () => {
+    expect(resolveProgressMilestone(10, 10)).toBe("complete");
   });
 
   it("問数に端数がある場合は各割合へ到達した最初の問数で表示する", () => {
@@ -38,5 +41,6 @@ describe("pickProgressMessage", () => {
     expect(pickProgressMessage("almost-done", () => 0.999)).toBe(
       PROGRESS_MESSAGES["almost-done"][PROGRESS_MESSAGES["almost-done"].length - 1],
     );
+    expect(pickProgressMessage("complete", () => 0.5)).toBe(PROGRESS_MESSAGES.complete[1]);
   });
 });

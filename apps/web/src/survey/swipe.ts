@@ -17,6 +17,9 @@ export const SWIPE_TRANSITION_MS = 260;
 /** 表示するカードの重なりの枚数（最前面を含む）。 */
 export const VISIBLE_STACK_SIZE = 3;
 
+/** タップとドラッグを区別する移動量。小さな指ぶれはタップとして扱います。 */
+export const TAP_SLOP_PX = 8;
+
 /** 幅を測る前（初回描画や測定失敗）に使う想定カード幅。 */
 const FALLBACK_CARD_WIDTH = 320;
 
@@ -33,6 +36,11 @@ const MAX_VERTICAL_OFFSET = 72;
 export interface DragOffset {
   dx: number;
   dy: number;
+}
+
+/** 押下位置からの移動量が、選択ボタンのタップとして扱える範囲か判定します。 */
+export function isTapGesture(offset: DragOffset): boolean {
+  return Math.hypot(offset.dx, offset.dy) <= TAP_SLOP_PX;
 }
 
 const clamp = (value: number, min: number, max: number): number =>
@@ -72,6 +80,15 @@ export function resolveSwipeDirection(dx: number, threshold: number): SwipeDirec
     return null;
   }
   return dx > 0 ? "right" : "left";
+}
+
+/** ポインターを離したときの回答方向。キャンセル時は移動量にかかわらず確定しません。 */
+export function resolveSwipeRelease(
+  dx: number,
+  threshold: number,
+  cancelled = false,
+): SwipeDirection | null {
+  return cancelled ? null : resolveSwipeDirection(dx, threshold);
 }
 
 /** ドラッグ中のカードの transform。 */

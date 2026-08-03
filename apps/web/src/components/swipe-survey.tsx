@@ -21,7 +21,7 @@ import {
   SWIPE_TRANSITION_MS,
   VISIBLE_STACK_SIZE,
   resolveKeyAction,
-  resolveSwipeDirection,
+  resolveSwipeRelease,
   resolveSwipeThreshold,
 } from "../survey/swipe";
 import type { SurveyInteraction, SwipeDirection } from "../survey/types";
@@ -231,14 +231,14 @@ export function SwipeSurvey({
     setDrag({ dx: event.clientX - start.x, dy: event.clientY - start.y });
   };
 
-  const onPointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+  const finishPointer = (event: ReactPointerEvent<HTMLDivElement>, cancelled: boolean) => {
     const start = dragStart.current;
     if (!start || start.pointerId !== event.pointerId) {
       return;
     }
     dragStart.current = null;
 
-    const direction = resolveSwipeDirection(event.clientX - start.x, threshold);
+    const direction = resolveSwipeRelease(event.clientX - start.x, threshold, cancelled);
     if (direction) {
       commit(direction);
       return;
@@ -246,6 +246,9 @@ export function SwipeSurvey({
     // しきい値未満なので元位置へ戻します（transition が効きます）。
     setDrag(null);
   };
+
+  const onPointerUp = (event: ReactPointerEvent<HTMLDivElement>) => finishPointer(event, false);
+  const onPointerCancel = (event: ReactPointerEvent<HTMLDivElement>) => finishPointer(event, true);
 
   const total = questions.length;
   const finished = index >= total;
@@ -303,6 +306,7 @@ export function SwipeSurvey({
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
+            onPointerCancel={onPointerCancel}
           />
         ))}
       </div>
