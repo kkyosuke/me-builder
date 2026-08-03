@@ -6,7 +6,7 @@ import {
   getParameterSummary,
   scoreParameters,
 } from "./parameter-scoring";
-import type { SurveyAnswer } from "./types";
+import type { SurveyAnswer, SurveyQuestion } from "./types";
 
 type TestParameterId = "planning" | "flexibility";
 
@@ -32,6 +32,23 @@ const CONFIG = {
   balancedLabel: "状況による",
 } as const satisfies ParameterScoringConfig<TestParameterId>;
 
+const QUESTIONS: SurveyQuestion[] = [
+  {
+    id: "q-plan",
+    version: 2,
+    text: "計画を立てたい。",
+    left: { value: "no", label: "いいえ", icon: "circle-x" },
+    right: { value: "yes", label: "はい", icon: "circle-check" },
+  },
+  {
+    id: "q-change",
+    version: 1,
+    text: "予定の変更を楽しめる。",
+    left: { value: "no", label: "いいえ", icon: "circle-x" },
+    right: { value: "yes", label: "はい", icon: "circle-check" },
+  },
+];
+
 function answer(questionId: string, questionVersion: number, value: string): SurveyAnswer {
   return {
     kind: "choice",
@@ -47,6 +64,7 @@ describe("scoreParameters", () => {
   it("設定した選択値、質問版、重みから複数パラメータを計算すること", () => {
     const profile = scoreParameters(
       [answer("q-plan", 2, "yes"), answer("q-change", 1, "no")],
+      QUESTIONS,
       CONFIG,
     );
 
@@ -76,7 +94,7 @@ describe("scoreParameters", () => {
   });
 
   it("設定したminimumCoverageに足りない軸だけを回答不足にすること", () => {
-    const profile = scoreParameters([answer("q-plan", 2, "yes")], CONFIG);
+    const profile = scoreParameters([answer("q-plan", 2, "yes")], QUESTIONS, CONFIG);
 
     expect(profile.parameters).toEqual([
       expect.objectContaining({ id: "planning", score: null, coverage: 50, band: "insufficient" }),
@@ -92,6 +110,7 @@ describe("scoreParameters", () => {
   it("中立の選択値を回答済みとして数え、中央のスコアにすること", () => {
     const profile = scoreParameters(
       [answer("q-plan", 2, "neutral"), answer("q-change", 1, "neutral")],
+      QUESTIONS,
       CONFIG,
     );
 
@@ -110,6 +129,7 @@ describe("scoreParameters", () => {
         answer("q-plan", 1, "yes"),
         answer("q-change", 1, "unknown-choice"),
       ],
+      QUESTIONS,
       CONFIG,
     );
 
@@ -121,6 +141,7 @@ describe("scoreParameters", () => {
   it("同じ質問への再回答では最後の選択を使うこと", () => {
     const profile = scoreParameters(
       [answer("q-plan", 2, "no"), answer("q-change", 1, "no"), answer("q-plan", 2, "yes")],
+      QUESTIONS,
       CONFIG,
     );
 
@@ -138,6 +159,7 @@ describe("scoreParameters", () => {
           answeredAt: "2026-08-02T00:01:00.000Z",
         },
       ],
+      QUESTIONS,
       CONFIG,
     );
 
@@ -148,7 +170,7 @@ describe("scoreParameters", () => {
 
   it("不正な共通設定を受け付けないこと", () => {
     expect(() =>
-      scoreParameters([], {
+      scoreParameters([], QUESTIONS, {
         ...CONFIG,
         minimumCoverage: 1.1,
       }),
@@ -161,7 +183,7 @@ describe("scoreParameters", () => {
 
   it("未知のパラメータを参照する設定を受け付けないこと", () => {
     expect(() =>
-      scoreParameters([], {
+      scoreParameters([], QUESTIONS, {
         ...CONFIG,
         questions: {
           "q-invalid": { questionVersion: 1, weights: { unknown: 1 } },
@@ -172,12 +194,50 @@ describe("scoreParameters", () => {
 
   it("質問の重みがないパラメータを受け付けないこと", () => {
     expect(() =>
-      scoreParameters([], {
+      scoreParameters([], QUESTIONS, {
         ...CONFIG,
         questions: {
           "q-plan": { questionVersion: 2, weights: { planning: 1 } },
         },
       }),
     ).toThrow("質問の重みがないparameter idがあります");
+  });
+
+  it("質問定義と設定のQuestion IDが一致しなければ拒否すること", () => {
+    expect(() =>
+      scoreParameters(
+        [],
+        QUESTIONS.map((question) =>
+          question.id === "q-plan" ? { ...question, id: "q-typo" } : question,
+        ),
+        CONFIG,
+      ),
+    ).toThrow("質問定義とスコアリング設定のQuestion IDが一致しません");
+  });
+
+  it("質問定義と設定のQuestion Versionが一致しなければ拒否すること", () => {
+    expect(() =>
+      scoreParameters(
+        [],
+        QUESTIONS.map((question) =>
+          question.id === "q-plan" ? { ...question, version: 3 } : question,
+        ),
+        CONFIG,
+      ),
+    ).toThrow("質問定義とスコアリング設定のQuestion Versionが一致しません");
+  });
+
+  it("質問の選択値がchoiceScoresになければ拒否すること", () => {
+    expect(() =>
+      scoreParameters(
+        [],
+        QUESTIONS.map((question) =>
+          question.id === "q-plan"
+            ? { ...question, right: { ...question.right, value: "unknown-choice" } }
+            : question,
+        ),
+        CONFIG,
+      ),
+    ).toThrow("質問の選択値がchoiceScoresに定義されていません");
   });
 });

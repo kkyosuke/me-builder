@@ -1,5 +1,5 @@
 import * as v from "valibot";
-import type { SurveyAnswer } from "./types";
+import type { SurveyAnswer, SurveyQuestion } from "./types";
 
 type ParameterBand = "low" | "balanced" | "high" | "insufficient";
 
@@ -130,6 +130,52 @@ export const ParameterScoringConfigSchema = v.pipe(
   }, "質問の重みがないparameter idがあります"),
 );
 
+const SurveyQuestionScoringSchema = v.pipe(
+  v.object({
+    questions: v.pipe(
+      v.array(
+        v.object({
+          id: v.string(),
+          version: VersionSchema,
+          left: v.object({ value: v.string() }),
+          right: v.object({ value: v.string() }),
+        }),
+      ),
+      v.check(
+        (questions) => new Set(questions.map(({ id }) => id)).size === questions.length,
+        "question idが重複しています",
+      ),
+      v.check(
+        (questions) => questions.every(({ left, right }) => left.value !== right.value),
+        "同じ質問の選択値は重複できません",
+      ),
+    ),
+    config: ParameterScoringConfigSchema,
+  }),
+  v.check(({ questions, config }) => {
+    const questionIds = new Set(questions.map(({ id }) => id));
+    const configuredQuestionIds = Object.keys(config.questions);
+    return (
+      questionIds.size === configuredQuestionIds.length &&
+      configuredQuestionIds.every((questionId) => questionIds.has(questionId))
+    );
+  }, "質問定義とスコアリング設定のQuestion IDが一致しません"),
+  v.check(({ questions, config }) => {
+    const questionVersions = new Map(questions.map(({ id, version }) => [id, version]));
+    return Object.entries(config.questions).every(
+      ([questionId, rule]) => questionVersions.get(questionId) === rule.questionVersion,
+    );
+  }, "質問定義とスコアリング設定のQuestion Versionが一致しません"),
+  v.check(
+    ({ questions, config }) =>
+      questions.every(
+        ({ left, right }) =>
+          left.value in config.choiceScores && right.value in config.choiceScores,
+      ),
+    "質問の選択値がchoiceScoresに定義されていません",
+  ),
+);
+
 function resolveBand<ParameterId extends string>(
   score: number | null,
   config: ParameterScoringConfig<ParameterId>,
@@ -147,14 +193,15 @@ function resolveBand<ParameterId extends string>(
 }
 
 /**
- * 設定と現在の回答から、アンケートに依存しない同じ手順でパラメータを計算します。
+ * 質問定義、設定、現在の回答から、アンケートに依存しない同じ手順でパラメータを計算します。
  * 未知の質問・選択肢、スキップ、設定と異なる質問版は計算へ含めません。
  */
 export function scoreParameters<ParameterId extends string>(
   answers: SurveyAnswer[],
+  questions: readonly SurveyQuestion[],
   config: ParameterScoringConfig<ParameterId>,
 ): ParameterProfile<ParameterId> {
-  v.parse(ParameterScoringConfigSchema, config);
+  v.parse(SurveyQuestionScoringSchema, { questions, config });
 
   // SurveyResponseと同じく、同じ質問への再回答では最後の回答を現在値として扱います。
   const currentAnswers = new Map(answers.map((answer) => [answer.questionId, answer]));

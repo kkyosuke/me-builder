@@ -166,5 +166,9 @@ export const RELATIONSHIP_PRIORITY_SCORING_CONFIG = {
  * 未知の質問、スキップ、version 1以外の回答は計算へ含めません。
  */
 export function scoreRelationshipPriority(answers: SurveyAnswer[]): RelationshipPriorityProfile {
-  return scoreParameters(answers, RELATIONSHIP_PRIORITY_SCORING_CONFIG);
+  return scoreParameters(
+    answers,
+    RELATIONSHIP_PRIORITY_QUESTIONS,
+    RELATIONSHIP_PRIORITY_SCORING_CONFIG,
+  );
 }
