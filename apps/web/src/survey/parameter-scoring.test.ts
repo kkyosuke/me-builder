@@ -34,29 +34,32 @@ const CONFIG = {
 
 const QUESTIONS: SurveyQuestion[] = [
   {
-    id: "q-plan",
-    version: 2,
+    surveyQuestionId: "sq-plan",
+    questionId: "q-plan",
+    questionVersion: 2,
     text: "計画を立てたい。",
-    left: { value: "no", label: "いいえ", icon: "circle-x" },
-    right: { value: "yes", label: "はい", icon: "circle-check" },
+    left: { choiceId: "no", label: "いいえ", icon: "circle-x" },
+    right: { choiceId: "yes", label: "はい", icon: "circle-check" },
   },
   {
-    id: "q-change",
-    version: 1,
+    surveyQuestionId: "sq-change",
+    questionId: "q-change",
+    questionVersion: 1,
     text: "予定の変更を楽しめる。",
-    left: { value: "no", label: "いいえ", icon: "circle-x" },
-    right: { value: "yes", label: "はい", icon: "circle-check" },
+    left: { choiceId: "no", label: "いいえ", icon: "circle-x" },
+    right: { choiceId: "yes", label: "はい", icon: "circle-check" },
   },
 ];
 
-function answer(questionId: string, questionVersion: number, value: string): SurveyAnswer {
+function answer(questionId: string, questionVersion: number, choiceId: string): SurveyAnswer {
   return {
-    kind: "choice",
+    kind: "answer",
+    surveyQuestionId: questionId.replace(/^q-/, "sq-"),
     questionId,
     questionVersion,
-    value,
+    choiceId,
     direction: "right",
-    answeredAt: "2026-08-02T00:00:00.000Z",
+    acceptedAt: "2026-08-02T00:00:00.000Z",
   };
 }
 
@@ -148,15 +151,13 @@ describe("scoreParameters", () => {
     expect(profile.parameters[0]).toMatchObject({ score: 100, coverage: 100 });
   });
 
-  it("同じ質問への最後の回答がスキップなら以前の選択を使わないこと", () => {
+  it("延期を回答として計算しないこと", () => {
     const profile = scoreParameters(
       [
-        answer("q-plan", 2, "yes"),
         {
-          kind: "skipped",
-          questionId: "q-plan",
-          questionVersion: 2,
-          answeredAt: "2026-08-02T00:01:00.000Z",
+          kind: "deferred",
+          surveyQuestionId: "sq-plan",
+          deferredAt: "2026-08-02T00:01:00.000Z",
         },
       ],
       QUESTIONS,
@@ -208,7 +209,7 @@ describe("scoreParameters", () => {
       scoreParameters(
         [],
         QUESTIONS.map((question) =>
-          question.id === "q-plan" ? { ...question, id: "q-typo" } : question,
+          question.questionId === "q-plan" ? { ...question, questionId: "q-typo" } : question,
         ),
         CONFIG,
       ),
@@ -220,7 +221,7 @@ describe("scoreParameters", () => {
       scoreParameters(
         [],
         QUESTIONS.map((question) =>
-          question.id === "q-plan" ? { ...question, version: 3 } : question,
+          question.questionId === "q-plan" ? { ...question, questionVersion: 3 } : question,
         ),
         CONFIG,
       ),
@@ -232,8 +233,8 @@ describe("scoreParameters", () => {
       scoreParameters(
         [],
         QUESTIONS.map((question) =>
-          question.id === "q-plan"
-            ? { ...question, right: { ...question.right, value: "unknown-choice" } }
+          question.questionId === "q-plan"
+            ? { ...question, right: { ...question.right, choiceId: "unknown-choice" } }
             : question,
         ),
         CONFIG,
