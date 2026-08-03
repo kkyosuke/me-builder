@@ -4,11 +4,13 @@ import {
   VISIBLE_STACK_SIZE,
   buildDragTransform,
   buildFlyOutTransform,
+  isTapGesture,
   resolveCardRotationDeg,
   resolveChoiceProgress,
   resolveKeyAction,
   resolveStackLayer,
   resolveSwipeDirection,
+  resolveSwipeRelease,
   resolveSwipeThreshold,
 } from "./swipe";
 
@@ -44,6 +46,31 @@ describe("resolveSwipeDirection", () => {
     expect(resolveSwipeDirection(threshold, threshold)).toBe("right");
     expect(resolveSwipeDirection(-threshold, threshold)).toBe("left");
     expect(resolveSwipeDirection(500, threshold)).toBe("right");
+  });
+});
+
+describe("isTapGesture", () => {
+  it("小さな指ぶれはタップとして扱うこと", () => {
+    expect(isTapGesture({ dx: 0, dy: 0 })).toBe(true);
+    expect(isTapGesture({ dx: 4, dy: 4 })).toBe(true);
+    expect(isTapGesture({ dx: 8, dy: 0 })).toBe(true);
+  });
+
+  it("横または縦へ大きく動かした操作はタップとして扱わないこと", () => {
+    expect(isTapGesture({ dx: 9, dy: 0 })).toBe(false);
+    expect(isTapGesture({ dx: 0, dy: 9 })).toBe(false);
+  });
+});
+
+describe("resolveSwipeRelease", () => {
+  it("通常終了ではしきい値以上のスワイプを確定すること", () => {
+    expect(resolveSwipeRelease(100, 80)).toBe("right");
+    expect(resolveSwipeRelease(-100, 80)).toBe("left");
+  });
+
+  it("ポインター操作がキャンセルされた場合は回答を確定しないこと", () => {
+    expect(resolveSwipeRelease(100, 80, true)).toBeNull();
+    expect(resolveSwipeRelease(-100, 80, true)).toBeNull();
   });
 });
 

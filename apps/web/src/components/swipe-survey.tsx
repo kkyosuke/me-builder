@@ -1,9 +1,10 @@
-import { ArrowLeft, ArrowRight, CircleCheck, Keyboard, RotateCcw, SkipForward } from "lucide-react";
+import { CircleCheck, Keyboard, RotateCcw, SkipForward, Sparkles } from "lucide-react";
 import {
   type PointerEvent as ReactPointerEvent,
   type RefObject,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -13,17 +14,17 @@ import {
   summarizeInteractions,
 } from "../survey/answers";
 import { getParameterSummary } from "../survey/parameter-scoring";
-import { type SurveyDefinition, fetchSurveyDefinitions } from "../survey/questions";
+import { pickProgressMessage, resolveProgressMilestone } from "../survey/progress-message";
+import type { SurveyDefinition } from "../survey/questions";
 import {
   type DragOffset,
   SWIPE_TRANSITION_MS,
   VISIBLE_STACK_SIZE,
   resolveKeyAction,
-  resolveSwipeDirection,
+  resolveSwipeRelease,
   resolveSwipeThreshold,
 } from "../survey/swipe";
-import type { SurveyInteraction, SurveyQuestion, SwipeDirection } from "../survey/types";
-import { SurveyIcon } from "./survey-icon";
+import type { SurveyInteraction, SwipeDirection } from "../survey/types";
 import { SwipeCard } from "./swipe-card";
 
 /** 回答の確定に使える操作。スワイプ以外の手段も同じ関数へ流します。 */
@@ -73,71 +74,28 @@ function useCardWidth(): [RefObject<HTMLDivElement>, number] {
   return [ref, width];
 }
 
-/** 選択ボタン。スワイプできない環境でも同じ回答ができるようにします。 */
-function ChoiceButton({
-  question,
-  direction,
-  disabled,
-  onSelect,
-}: {
-  question: SurveyQuestion;
-  direction: SwipeDirection;
-  disabled: boolean;
-  onSelect: (direction: SwipeDirection) => void;
-}) {
-  const choice = direction === "left" ? question.left : question.right;
-  const isLeft = direction === "left";
-
-  return (
-    <button
-      type="button"
-      onClick={() => onSelect(direction)}
-      disabled={disabled}
-      // min-w-0 が無いと、ラベルの最小幅の分だけ横へはみ出します。
-      className={`flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-2xl border px-3 py-3 text-sm leading-tight font-semibold transition-colors disabled:opacity-40 ${
-        isLeft
-          ? "border-indigo-400/40 bg-indigo-400/10 text-indigo-200 hover:bg-indigo-400/20"
-          : "border-sky-400/40 bg-sky-400/10 text-sky-200 hover:bg-sky-400/20"
-      }`}
-    >
-      {isLeft && <ArrowLeft className="size-4 shrink-0" aria-hidden="true" />}
-      {/*
-       * アイコンとラベルを縦に積みます。横並びにすると狭い画面でラベルが折り返され、
-       * 日本語が語中で割れて読みにくくなります。長いラベルは切り詰めずに折り返します。
-       */}
-      <span className="flex flex-col items-center gap-1">
-        <SurveyIcon name={choice.icon} className="size-4" />
-        {choice.label}
-      </span>
-      {!isLeft && <ArrowRight className="size-4 shrink-0" aria-hidden="true" />}
-    </button>
-  );
-}
-
 /** 全問終わったときの表示。 */
 function SurveyComplete({
   interactions,
   survey,
-  onBack,
-  onRestart,
 }: {
   interactions: SurveyInteraction[];
   survey: SurveyDefinition;
-  onBack: () => void;
-  onRestart: () => void;
 }) {
   const { answered, deferred } = summarizeInteractions(interactions);
   const profile = survey.score(interactions);
 
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-2 rounded-3xl border border-slate-700 bg-slate-800 p-4 text-center">
-      {/* shrink-0 が無いと、縦の flex の中で高さだけが縮んでアイコンが潰れます。 */}
-      <CircleCheck className="size-12 shrink-0 text-emerald-400" aria-hidden="true" />
-      <p className="text-lg font-bold">回答から見える現在の傾向</p>
-      <p className="text-sm text-slate-400">
-        {`${answered} 問に回答し、${deferred} 問をあとで回答にしました。`}
-      </p>
-      <div className="grid w-full grid-cols-2 gap-2">
+    <div className="min-h-80 rounded-3xl border border-slate-700 bg-slate-800 p-5 text-center">
+      <div className="flex flex-col items-center gap-2">
+        <CircleCheck className="size-12 text-emerald-400" aria-hidden="true" />
+        <p className="text-lg font-bold">回答から見える現在の傾向</p>
+        <p className="text-sm text-slate-400">
+          {`${answered} 問に回答し、${deferred} 問をあとで回答にしました。`}
+        </p>
+      </div>
+
+      <div className="mt-4 grid w-full grid-cols-2 gap-2">
         {profile.parameters.map((parameter) => (
           <div key={parameter.id} className="rounded-xl bg-slate-900/70 p-2">
             <p className="text-xs text-slate-400">{parameter.label}</p>
@@ -151,26 +109,10 @@ function SurveyComplete({
           </div>
         ))}
       </div>
-      <p className="text-[10px] text-slate-500">
+
+      <p className="mt-4 border-t border-slate-700 pt-3 text-[10px] text-slate-500">
         回答と結果のサーバー保存はまだ実装されていません。
       </p>
-      <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={onBack}
-          className="rounded-xl border border-slate-600 px-4 py-2 text-sm text-slate-300 transition-colors hover:bg-slate-700"
-        >
-          一覧へ
-        </button>
-        <button
-          type="button"
-          onClick={onRestart}
-          className="inline-flex items-center gap-2 rounded-xl bg-sky-500 px-4 py-2 text-sm font-semibold text-slate-900 transition-colors hover:bg-sky-400"
-        >
-          <RotateCcw className="size-4" aria-hidden="true" />
-          もう一度
-        </button>
-      </div>
     </div>
   );
 }
@@ -183,14 +125,17 @@ function SurveyComplete({
  * 外部ブラウザの導線も維持しているため（[プロジェクト概要 §4](../../../../docs/product/project-overview.md#4-想定する利用体験)）、
  * どちらでも操作できる状態を保ちます。
  */
-export function SwipeSurvey() {
-  const [surveys, setSurveys] = useState<SurveyDefinition[] | null>(null);
-  const [selectedSurveyId, setSelectedSurveyId] = useState<string | null>(null);
+export function SwipeSurvey({
+  survey,
+  onBack,
+}: {
+  survey: SurveyDefinition;
+  onBack: () => void;
+}) {
   const [index, setIndex] = useState(0);
   const [interactions, setInteractions] = useState<SurveyInteraction[]>([]);
   const [drag, setDrag] = useState<DragOffset | null>(null);
   const [flyOut, setFlyOut] = useState<SwipeDirection | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
 
   const reducedMotion = useReducedMotion();
   const [stackRef, cardWidth] = useCardWidth();
@@ -201,27 +146,7 @@ export function SwipeSurvey() {
   /** 飛ばしている間の待ちタイマー。アンマウント時に解除します。 */
   const advanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    fetchSurveyDefinitions()
-      .then((loaded) => {
-        if (!cancelled) {
-          setSurveys(loaded);
-        }
-      })
-      .catch((err: unknown) => {
-        // 取得に失敗しても画面を白くせず、状態を表示します。
-        if (!cancelled) {
-          setLoadError(err instanceof Error ? err.message : String(err));
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const survey = surveys?.find(({ id }) => id === selectedSurveyId) ?? null;
-  const questions = survey?.questions ?? null;
+  const questions = survey.questions;
 
   useEffect(
     () => () => {
@@ -287,20 +212,13 @@ export function SwipeSurvey() {
     setFlyOut(null);
   }, []);
 
-  const selectSurvey = useCallback((surveyId: string | null) => {
-    setSelectedSurveyId(surveyId);
-    setIndex(0);
-    setInteractions([]);
-    setDrag(null);
-    setFlyOut(null);
-  }, []);
-
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (isBusy) {
       return;
     }
-    // 途中で指が要素の外へ出てもイベントを受け取り続けます。
-    event.currentTarget.setPointerCapture(event.pointerId);
+    // 押した子要素でキャプチャすることで、ボタン上からのスワイプと通常のクリックを両立します。
+    const captureTarget = event.target instanceof Element ? event.target : event.currentTarget;
+    captureTarget.setPointerCapture(event.pointerId);
     dragStart.current = { x: event.clientX, y: event.clientY, pointerId: event.pointerId };
     setDrag({ dx: 0, dy: 0 });
   };
@@ -313,14 +231,14 @@ export function SwipeSurvey() {
     setDrag({ dx: event.clientX - start.x, dy: event.clientY - start.y });
   };
 
-  const onPointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+  const finishPointer = (event: ReactPointerEvent<HTMLDivElement>, cancelled: boolean) => {
     const start = dragStart.current;
     if (!start || start.pointerId !== event.pointerId) {
       return;
     }
     dragStart.current = null;
 
-    const direction = resolveSwipeDirection(event.clientX - start.x, threshold);
+    const direction = resolveSwipeRelease(event.clientX - start.x, threshold, cancelled);
     if (direction) {
       commit(direction);
       return;
@@ -329,52 +247,18 @@ export function SwipeSurvey() {
     setDrag(null);
   };
 
-  const total = questions?.length ?? 0;
-  const finished = questions !== null && index >= total;
+  const onPointerUp = (event: ReactPointerEvent<HTMLDivElement>) => finishPointer(event, false);
+  const onPointerCancel = (event: ReactPointerEvent<HTMLDivElement>) => finishPointer(event, true);
+
+  const total = questions.length;
+  const finished = index >= total;
   const answeredCount = finished ? total : index;
-
-  if (loadError) {
-    return (
-      <section className="flex h-80 items-center justify-center rounded-3xl border border-slate-700 bg-slate-800 p-6 text-center text-sm text-red-400">
-        {`アンケートを読み込めませんでした: ${loadError}`}
-      </section>
-    );
-  }
-
-  if (surveys === null) {
-    return (
-      <section className="flex h-80 items-center justify-center rounded-3xl border border-slate-700 bg-slate-800 p-6 text-sm text-slate-400">
-        アンケートを読み込んでいます...
-      </section>
-    );
-  }
-
-  if (!survey) {
-    return (
-      <section className="flex flex-col gap-4">
-        <header>
-          <h2 className="text-lg font-bold">アンケートを選ぶ</h2>
-          <p className="mt-1 text-sm text-slate-400">今の自分に近い答えを選んでください。</p>
-        </header>
-        <div className="grid gap-3">
-          {surveys.map((candidate) => (
-            <button
-              key={candidate.id}
-              type="button"
-              onClick={() => selectSurvey(candidate.id)}
-              className="rounded-2xl border border-slate-700 bg-slate-800 p-4 text-left transition-colors hover:border-sky-500/60 hover:bg-slate-800/80"
-            >
-              <span className="font-semibold text-sky-300">{candidate.title}</span>
-              <span className="mt-1 block text-sm text-slate-400">{candidate.description}</span>
-              <span className="mt-2 block text-xs text-slate-500">
-                {`${candidate.questions.length}問・Yes / No`}
-              </span>
-            </button>
-          ))}
-        </div>
-      </section>
-    );
-  }
+  const progressMilestone = resolveProgressMilestone(answeredCount, total);
+  // 同じ段階にいる間は文言を固定し、回答のたびにちらつかないようにします。
+  const progressMessage = useMemo(
+    () => (progressMilestone ? pickProgressMessage(progressMilestone) : null),
+    [progressMilestone],
+  );
 
   return (
     <section className="flex flex-col gap-4">
@@ -395,16 +279,18 @@ export function SwipeSurvey() {
         />
       </div>
 
-      {/* カードの重なり。高さを固定して、カードを絶対配置で重ねます。 */}
-      <div ref={stackRef} className="relative h-80">
-        {finished && (
-          <SurveyComplete
-            interactions={interactions}
-            survey={survey}
-            onBack={() => selectSurvey(null)}
-            onRestart={restart}
-          />
+      <div className="min-h-10" aria-live="polite">
+        {progressMessage && (
+          <p className="flex items-center gap-2 rounded-xl bg-sky-400/10 px-3 py-2 text-sm text-sky-200">
+            <Sparkles className="size-4 shrink-0" aria-hidden="true" />
+            {progressMessage}
+          </p>
         )}
+      </div>
+
+      {/* 回答中だけ高さを固定してカードを重ね、完了後は結果の項目数に応じて伸ばします。 */}
+      <div ref={stackRef} className={finished ? "relative" : "relative mb-3 h-80"}>
+        {finished && <SurveyComplete interactions={interactions} survey={survey} />}
         {questions?.slice(index, index + VISIBLE_STACK_SIZE).map((question, offset) => (
           <SwipeCard
             key={`${question.surveyQuestionId}-v${question.questionVersion}`}
@@ -415,25 +301,38 @@ export function SwipeSurvey() {
             cardWidth={cardWidth}
             threshold={threshold}
             reducedMotion={reducedMotion}
+            disabled={isBusy}
+            onSelect={commit}
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
+            onPointerCancel={onPointerCancel}
           />
         ))}
       </div>
 
+      {finished && (
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={onBack}
+            className="flex-1 rounded-2xl border border-slate-600 px-4 py-3 text-sm font-semibold text-slate-300 transition-colors hover:bg-slate-800"
+          >
+            一覧へ
+          </button>
+          <button
+            type="button"
+            onClick={restart}
+            className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-sky-500 px-4 py-3 text-sm font-semibold text-slate-900 transition-colors hover:bg-sky-400"
+          >
+            <RotateCcw className="size-4" aria-hidden="true" />
+            もう一度
+          </button>
+        </div>
+      )}
+
       {current && (
         <div className="flex flex-col gap-3">
-          <div className="flex gap-3">
-            <ChoiceButton question={current} direction="left" disabled={isBusy} onSelect={commit} />
-            <ChoiceButton
-              question={current}
-              direction="right"
-              disabled={isBusy}
-              onSelect={commit}
-            />
-          </div>
-
           <button
             type="button"
             onClick={() => commit("skip")}
@@ -444,10 +343,13 @@ export function SwipeSurvey() {
             あとで回答する
           </button>
 
-          <p className="flex flex-wrap items-center justify-center gap-x-2 text-center text-xs text-slate-500">
-            <Keyboard className="size-4 shrink-0" aria-hidden="true" />
-            スワイプ / ← → で回答、↓ であとで回答
-          </p>
+          <div className="space-y-1 text-center text-xs text-slate-500">
+            <p>「はい」「いいえ」をタップ、またはカードを左右にスワイプ</p>
+            <p className="flex flex-wrap items-center justify-center gap-x-2">
+              <Keyboard className="size-4 shrink-0" aria-hidden="true" />
+              キーボードは ← → で回答、↓ であとで回答
+            </p>
+          </div>
         </div>
       )}
     </section>
