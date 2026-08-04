@@ -45,6 +45,7 @@
 - **Web UI (`apps/web`) のカスタムドメイン**:
   - `apps/web` は Cloudflare **Pages** で配信するため、Workers (`api` / `mcp` / `worker`) のように `wrangler.toml` の `routes` で DNS レコードを自動作成できません。ドメインのプロジェクト登録と DNS の CNAME 作成は [`scripts/setup-pages-domain.ts`](../../scripts/setup-pages-domain.ts) が行い、`apps/web` の `deploy:preview` / `deploy:production` から呼び出します。
   - 対象ドメインは `BASE_DOMAIN` を使い、スクリプト側にハードコードしません。CNAME の宛先は preview がブランチエイリアス、production がプロジェクト既定のホストです。
+  - preview CDがPRへ投稿する完了コメントには、各サービスのカスタムドメインに加えて、`CLOUDFLARE_ACCOUNT_ID`から組み立てたCloudflare DashboardのWorkers & Pages管理画面へのリンクを掲載します。
   - このスクリプトは `CLOUDFLARE_API_TOKEN` に Zone:Read / DNS:Edit の権限を必要とします。権限や環境変数が足りない場合は警告を出して**デプロイを止めずにスキップ**します（DNS の設定漏れでデプロイ自体を失敗させない）。
 - **Web UI (`apps/web`) の環境変数**:
   - Vite がクライアントバンドルへ埋め込むのは `VITE_` 接頭辞付きの環境変数だけです。変数を追加した場合は [`apps/web/.env.example`](../../apps/web/.env.example) へ必ず追記します。

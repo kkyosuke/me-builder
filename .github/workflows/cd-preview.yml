@@ -114,6 +114,7 @@ jobs:
           script: |
             const issue_number = context.issue.number;
             const identifier = '<!-- preview-deploy-comment -->';
+            const cloudflareDashboardUrl = `https://dash.cloudflare.com/${process.env.CLOUDFLARE_ACCOUNT_ID}/workers-and-pages`;
 
             // 1. 既存のプレビューデプロイコメントを削除 (古いコメントを削除して再投稿)
             const comments = await github.rest.issues.listComments({
@@ -143,6 +144,7 @@ jobs:
             | 🖥️ **Web UI** | https://stg.kagami.kyosuke.dev |
             | ⚡ **API Server** | https://api.stg.kagami.kyosuke.dev |
             | 🤖 **MCP Server** | https://mcp.stg.kagami.kyosuke.dev |
+            | ☁️ **Cloudflare Dashboard** | ${cloudflareDashboardUrl} |
             `;
 
             await github.rest.issues.createComment({
