@@ -3,15 +3,14 @@ import { logger } from "@me-builder/shared";
 import type { Context } from "hono";
 import * as v from "valibot";
 import { getConfig } from "../config";
-import { createLiffSession } from "../logic/liff-session";
-import { receiveLineWebhook } from "../logic/line-webhook";
+import { LiffSessionRequestSchema, LiffSessionResponseSchema } from "../contract/line/liff-session";
 import {
   AccountNotFoundErrorSchema,
-  LiffSessionRequestSchema,
-  LiffSessionResponseSchema,
   ServiceUnavailableErrorSchema,
   UnauthorizedErrorSchema,
-} from "../openapi";
+} from "../contract/shared/errors";
+import { createLiffSession } from "../logic/liff-session";
+import { receiveLineWebhook } from "../logic/line-webhook";
 import type { AppEnv } from "../types";
 
 /**

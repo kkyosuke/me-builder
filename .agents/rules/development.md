@@ -143,7 +143,7 @@
 - **Web UI のHTTP通信基盤 (`apps/web`)**:
   - `fetch` の直接呼び出しは `apps/web/src/infrastructure/http-client.ts` に閉じ込めます。各featureのAPI adapterは共通HTTPクライアントを介して通信します。
   - 共通HTTPクライアントはベースURLとパスの解決、およびWeb標準の `fetch` 実行だけを担当します。エンドポイント固有のヘッダー、レスポンス検証、HTTPステータスからドメイン・画面表示用結果への変換は各featureの `infrastructure/` が担当します。
-  - Web UIが利用するAPIの型はOpenAPIから `apps/web/src/generated/api.ts` へ生成し、直接編集しません。生成方法と契約の所有範囲は[アンケートAPI契約](../../docs/development/questionnaire-api.md#6-openapiとweb型の生成)を参照します。
+  - Web UIが利用するAPIの型はOpenAPIから `apps/web/src/generated/api.ts` へ生成し、直接編集しません。生成方法とAPI ServerのHTTP契約の配置は[API契約とクライアント型の生成](../../docs/development/api-contract-generation.md)を参照します。
 
 - **LIFF の ID トークン検証と Account の解決**:
   - **クライアントから送られてきた識別子は受け付けません。** `liff.getProfile()` が返す値そのものは LINE から取得した本物ですが、サーバー側では「LINE の API が返した値の転送」と「手で書かれた値」を区別できないため、`userId` を識別子として使うと他人になりすませます。本人の識別子は必ず ID トークンの検証で得た `sub` を使います。

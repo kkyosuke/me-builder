@@ -4,14 +4,12 @@ import { openAPIRouteHandler } from "hono-openapi";
 import { cors } from "hono/cors";
 import * as v from "valibot";
 import { getConfig } from "./config";
+import { liffSessionRoute } from "./contract/line/liff-session";
+import { openApiOptions } from "./contract/openapi";
+import { InternalServerErrorSchema } from "./contract/shared/errors";
+import { surveyListRoute } from "./contract/survey/list";
 import { postLiffSession, postLineWebhook } from "./controller/line";
 import { getSurveys } from "./controller/survey";
-import {
-  InternalServerErrorSchema,
-  liffSessionRoute,
-  openApiOptions,
-  surveyListRoute,
-} from "./openapi";
 import type { AppEnv } from "./types";
 
 const app = new Hono<AppEnv>();

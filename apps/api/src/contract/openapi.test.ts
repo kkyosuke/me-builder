@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
-import { app } from "./app";
+import { app } from "../app";
 
 describe("GET /api/openapi.json", () => {
   it("Web UIが利用するAPI契約をOpenAPI 3.1として公開する", async () => {
@@ -35,7 +35,7 @@ describe("GET /api/openapi.json", () => {
     });
 
     const generatedDocument = JSON.parse(
-      await readFile(new URL("../openapi.json", import.meta.url), "utf8"),
+      await readFile(new URL("../../openapi.json", import.meta.url), "utf8"),
     );
     expect(document).toEqual(generatedDocument);
   });

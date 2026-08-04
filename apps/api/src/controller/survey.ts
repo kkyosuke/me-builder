@@ -3,13 +3,13 @@ import { logger } from "@me-builder/shared";
 import type { Context } from "hono";
 import * as v from "valibot";
 import { getConfig } from "../config";
-import { getSurveyList } from "../logic/survey-list";
 import {
   AccountNotFoundErrorSchema,
   ServiceUnavailableErrorSchema,
-  SurveyListResponseSchema,
   UnauthorizedErrorSchema,
-} from "../openapi";
+} from "../contract/shared/errors";
+import { SurveyListResponseSchema } from "../contract/survey/list";
+import { getSurveyList } from "../logic/survey-list";
 import type { AppEnv } from "../types";
 
 function bearerToken(authorization: string | undefined): string | undefined {
