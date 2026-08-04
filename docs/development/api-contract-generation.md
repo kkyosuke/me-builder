@@ -25,10 +25,8 @@ Valibot schemaとroute metadataは、単一の`openapi.ts`へ集約せず、`con
 ```text
 apps/api/src/
 ├── contract/                    # 機械可読なHTTP契約
-│   ├── line/
-│   │   └── liff-session.ts      # LIFFセッションのschema・route metadata
-│   ├── survey/
-│   │   └── list.ts              # アンケート一覧のschema・route metadata
+│   ├── <feature-name>/
+│   │   └── <endpoint-name>.ts   # 機能ごとのschema・route metadata
 │   ├── shared/
 │   │   └── errors.ts            # 複数機能で共有するエラー契約
 │   └── openapi.ts               # API情報・security schemeなど文書全体の設定
