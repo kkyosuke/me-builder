@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { getParameterSummary } from "../parameter-scoring";
-import type { SurveyAnswer } from "../types";
+import type { SurveyAnswer } from "../model";
+import { getParameterSummary } from "../scoring";
 import {
   RELATIONSHIP_PRIORITY_QUESTIONS,
   RELATIONSHIP_PRIORITY_SCORING_CONFIG,

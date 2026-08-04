@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createDeferredQuestion, createSurveyAnswer, summarizeInteractions } from "./answers";
-import { fetchSurveyDefinitions, fetchSurveyQuestions } from "./questions";
-import type { SurveyQuestion } from "./types";
+import { fetchSurveyDefinitions, fetchSurveyQuestions } from "./infrastructure/local-definitions";
+import type { SurveyQuestion } from "./model";
 
 const QUESTION: SurveyQuestion = {
   surveyQuestionId: "sq-test",

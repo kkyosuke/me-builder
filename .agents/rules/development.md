@@ -103,19 +103,53 @@
   - アニメーションは `prefers-reduced-motion: reduce` を尊重します。移動そのものを止めるのではなく、指の操作への追従は残し、自動で動く演出を省きます。
   - 操作手段をポインタだけに依存させません。LINE 内 (LIFF) の主導線に加えて外部ブラウザの導線も維持しているため ([プロジェクト概要 §4](../../docs/product/project-overview.md#4-想定する利用体験))、同じ操作をボタンとキーボードでも行える状態を保ちます。
 
+- **Web UI のディレクトリ構成 (`apps/web/src`)**:
+
+  ```text
+  apps/web/src/
+  ├── feature/
+  │   ├── liff/
+  │   │   ├── infrastructure/
+  │   │   │   ├── liff-client.ts
+  │   │   │   └── session-api.ts
+  │   │   ├── model.ts
+  │   │   └── index.ts
+  │   └── survey/
+  │       ├── infrastructure/
+  │       │   ├── survey-api.ts
+  │       │   └── local-definitions.ts
+  │       ├── components/
+  │       ├── definitions/
+  │       ├── answers.ts
+  │       ├── scoring.ts
+  │       └── model.ts
+  ├── infrastructure/
+  │   └── http-client.ts
+  ├── config/
+  ├── components/
+  ├── App.tsx
+  └── main.tsx
+  ```
+
+  `feature/` は機能固有のモデル・UI・外部接続を所有します。ルートの `components/` はfeatureに依存しない共通UI、`infrastructure/` は複数featureから利用する技術基盤だけを所有します。
+
 - **スワイプアンケートの画面 (`apps/web`)**:
-  - 質問の取得は `apps/web/src/survey/` の 1 つの関数へ閉じ込め、コンポーネントは非同期の取得としてだけ扱います。質問配信・回答保存のサーバー実装はここを差し替える形で追加します。
-  - 質問・回答の型は `apps/web` に閉じ、`packages/shared` へ置きません。共有すると「サーバーとのスキーマ」を確定したことになり、[設計スコープのルール §2](design-scope.md) が後続設計へ延期している範囲へ踏み込みます。共有先はサーバー実装の時点で判断します。
-  - 質問データは JSON のまま扱える形に保ちます。アイコンはコンポーネントではなく名前で持ち、名前からコンポーネントへの対応は表示層に置きます。
-  - 判定や座標計算 (しきい値、傾き、transform) は純粋関数として `apps/web/src/survey/` に置き、DOM を用意せず単体テストできる状態にします。
+  - Survey機能は `apps/web/src/feature/survey/` に置きます。質問の取得は `infrastructure/local-definitions.ts`、一覧APIとの通信は `infrastructure/survey-api.ts` に閉じ込め、コンポーネントは非同期の取得としてだけ扱います。質問配信・回答保存のサーバー実装はこの境界を差し替える形で追加します。
+  - 質問・回答の型は `apps/web/src/feature/survey/model.ts` に閉じ、`packages/shared` へ置きません。共有すると「サーバーとのスキーマ」を確定したことになり、[設計スコープのルール §2](design-scope.md) が後続設計へ延期している範囲へ踏み込みます。共有先はサーバー実装の時点で判断します。
+  - 質問データは JSON のまま扱える形に保ちます。アイコンはコンポーネントではなく名前で持ち、名前からコンポーネントへの対応は `apps/web/src/feature/survey/components/` に置きます。
+  - 判定や座標計算 (しきい値、傾き、transform) は純粋関数として `apps/web/src/feature/survey/` に置き、DOM を用意せず単体テストできる状態にします。
 
 - **Web UI の LIFF 初期化 (`apps/web`)**:
   - LINE 内から Web を開く主導線は LIFF です。導線の設計と根拠は [プロジェクト概要 §4](../../docs/product/project-overview.md#4-想定する利用体験) を正とし、このルールには再掲しません。
   - LIFF ID は `VITE_LIFF_ID` として与え、`apps/web/src/config` の Valibot スキーマ経由で optional な `liffId` として取得します。SDK を呼ぶコードから `import.meta.env` を直接読まないこと。
-  - `@line/liff` の呼び出しは `apps/web/src/liff/` に閉じ込め、React コンポーネントから SDK を直接呼ばないこと。コンポーネントは初期化結果の状態オブジェクトだけを受け取ります。
+  - LIFF機能は `apps/web/src/feature/liff/` に置きます。`@line/liff` の呼び出しは `infrastructure/liff-client.ts`、セッションAPIとの通信は `infrastructure/session-api.ts` に閉じ込め、React コンポーネントから SDK やAPIを直接呼ばないこと。コンポーネントは初期化結果の状態オブジェクトだけを受け取ります。
   - `VITE_LIFF_ID` が未設定の場合は、LIFF 初期化を `logger` へのログ出力とともに安全にスキップし、LIFF なしの画面を表示します（LINE Webhook 自動登録と同じ「環境変数が未設定なら安全にスキップする」方針）。
   - `liff.init` の失敗時、および外部ブラウザで開かれた場合 (`liff.isInClient()` が false) も画面を白にせず、状態を画面へ表示します。LIFF の初期化結果を画面表示の前提条件にしないこと。
   - LINE の `userId` は本人識別子です。**画面表示もログ出力も行わず**、表示は `displayName` と `pictureUrl` に限ります ([プロジェクト概要 §8](../../docs/product/project-overview.md#8-プライバシーと安全性))。ID トークンおよびアクセストークンもログへ出力しません。
+
+- **Web UI のHTTP通信基盤 (`apps/web`)**:
+  - `fetch` の直接呼び出しは `apps/web/src/infrastructure/http-client.ts` に閉じ込めます。各featureのAPI adapterは共通HTTPクライアントを介して通信します。
+  - 共通HTTPクライアントはベースURLとパスの解決、およびWeb標準の `fetch` 実行だけを担当します。エンドポイント固有のヘッダー、レスポンス検証、HTTPステータスからドメイン・画面表示用結果への変換は各featureの `infrastructure/` が担当します。
 
 - **LIFF の ID トークン検証と Account の解決**:
   - **クライアントから送られてきた識別子は受け付けません。** `liff.getProfile()` が返す値そのものは LINE から取得した本物ですが、サーバー側では「LINE の API が返した値の転送」と「手で書かれた値」を区別できないため、`userId` を識別子として使うと他人になりすませます。本人の識別子は必ず ID トークンの検証で得た `sub` を使います。

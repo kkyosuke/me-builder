@@ -1,12 +1,12 @@
 import * as v from "valibot";
 import { describe, expect, it } from "vitest";
+import type { SurveyAnswer, SurveyQuestion } from "./model";
 import {
   type ParameterScoringConfig,
   ParameterScoringConfigSchema,
   getParameterSummary,
   scoreParameters,
-} from "./parameter-scoring";
-import type { SurveyAnswer, SurveyQuestion } from "./types";
+} from "./scoring";
 
 type TestParameterId = "planning" | "flexibility";
 

@@ -8,14 +8,11 @@ import {
   useRef,
   useState,
 } from "react";
-import {
-  createDeferredQuestion,
-  createSurveyAnswer,
-  summarizeInteractions,
-} from "../survey/answers";
-import { getParameterSummary } from "../survey/parameter-scoring";
-import { pickProgressMessage, resolveProgressMilestone } from "../survey/progress-message";
-import type { SurveyDefinition } from "../survey/questions";
+import { createDeferredQuestion, createSurveyAnswer, summarizeInteractions } from "../answers";
+import type { SurveyDefinition } from "../infrastructure/local-definitions";
+import type { SurveyInteraction, SwipeDirection } from "../model";
+import { pickProgressMessage, resolveProgressMilestone } from "../progress-message";
+import { getParameterSummary } from "../scoring";
 import {
   type DragOffset,
   SWIPE_TRANSITION_MS,
@@ -23,8 +20,7 @@ import {
   resolveKeyAction,
   resolveSwipeRelease,
   resolveSwipeThreshold,
-} from "../survey/swipe";
-import type { SurveyInteraction, SwipeDirection } from "../survey/types";
+} from "../swipe";
 import { SwipeCard } from "./swipe-card";
 
 /** 回答の確定に使える操作。スワイプ以外の手段も同じ関数へ流します。 */

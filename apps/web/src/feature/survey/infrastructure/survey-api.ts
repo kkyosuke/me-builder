@@ -1,4 +1,5 @@
 import * as v from "valibot";
+import { createHttpClient } from "../../../infrastructure/http-client";
 
 const SurveyListItemSchema = v.object({
   id: v.pipe(v.string(), v.nonEmpty()),
@@ -23,8 +24,7 @@ export async function fetchSurveyList(
   apiUrl: string | undefined,
   idToken: string,
 ): Promise<SurveyListItem[]> {
-  const endpoint = `${(apiUrl ?? "").replace(/\/$/, "")}/api/surveys`;
-  const response = await fetch(endpoint, {
+  const response = await createHttpClient(apiUrl).request("/api/surveys", {
     headers: { Authorization: `Bearer ${idToken}` },
   });
 

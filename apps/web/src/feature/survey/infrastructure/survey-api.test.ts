@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchSurveyList } from "./list";
+import { fetchSurveyList } from "./survey-api";
 
 const API_URL = "https://api.stg.kagami.kyosuke.dev";
 

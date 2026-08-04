@@ -1,4 +1,4 @@
-import type { SwipeDirection } from "./types";
+import type { SwipeDirection } from "./model";
 
 /**
  * スワイプの見た目と判定を決める純粋関数。

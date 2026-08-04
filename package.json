@@ -14,7 +14,7 @@
     "deploy:preview": "bun --filter '*' deploy:preview",
     "deploy:production": "bun --filter '*' deploy:production",
     "lint:exports": "knip",
-    "lint:md": "markdownlint-cli2 '**/*.md' '#**/node_modules/**' '#**/.bun/**' '#**/dist/**'",
+    "lint:md": "markdownlint-cli2 '**/*.md' '#**/node_modules/**' '#**/.bun/**' '#**/dist/**' '#**/.claude/**'",
     "lint:md:links": "find . -name '*.md' -not -path '*/node_modules/*' -not -path '*/.bun/*' -exec markdown-link-check -q -c mlc_config.json {} \\;",
     "postinstall": "lefthook install"
   },
