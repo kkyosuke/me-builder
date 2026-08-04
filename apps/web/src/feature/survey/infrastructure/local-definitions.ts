@@ -3,14 +3,14 @@ import {
   MONEY_VALUES_QUESTIONS,
   MONEY_VALUES_SCORING_CONFIG,
   scoreMoneyValues,
-} from "../definitions/money-values";
-import { RELATIONSHIP_PRIORITY_QUESTIONS } from "../definitions/relationship-priority";
+} from "../model/definitions/money-values";
+import { RELATIONSHIP_PRIORITY_QUESTIONS } from "../model/definitions/relationship-priority";
 import {
   RELATIONSHIP_PRIORITY_SCORING_CONFIG,
   scoreRelationshipPriority,
-} from "../definitions/relationship-priority";
-import { type SurveyInteraction, type SurveyQuestion, SurveyQuestionsSchema } from "../model";
-import type { ParameterProfile } from "../scoring";
+} from "../model/definitions/relationship-priority";
+import type { ParameterProfile } from "../model/scoring";
+import { type SurveyInteraction, type SurveyQuestion, SurveyQuestionsSchema } from "../model/types";
 
 export interface SurveyDefinition {
   id: string;

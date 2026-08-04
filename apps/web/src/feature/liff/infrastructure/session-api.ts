@@ -1,6 +1,6 @@
 import { logger } from "@me-builder/shared";
 import { createHttpClient } from "../../../infrastructure/http-client";
-import type { LiffSessionState } from "../model";
+import type { LiffSessionState } from "../model/types";
 import { getLiffIdToken } from "./liff-client";
 
 const toMessage = (error: unknown): string =>

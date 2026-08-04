@@ -1,6 +1,6 @@
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { type CSSProperties, type PointerEvent as ReactPointerEvent, useRef } from "react";
-import type { SurveyQuestion, SwipeDirection } from "../model";
+import type { SurveyQuestion, SwipeDirection } from "../../model/types";
 import {
   type DragOffset,
   SWIPE_TRANSITION_MS,

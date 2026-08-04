@@ -23,9 +23,11 @@ export type SurveyListItem = v.InferOutput<typeof SurveyListItemSchema>;
 export async function fetchSurveyList(
   apiUrl: string | undefined,
   idToken: string,
+  signal?: AbortSignal,
 ): Promise<SurveyListItem[]> {
   const response = await createHttpClient(apiUrl).request("/api/surveys", {
     headers: { Authorization: `Bearer ${idToken}` },
+    ...(signal ? { signal } : {}),
   });
 
   if (!response.ok) {

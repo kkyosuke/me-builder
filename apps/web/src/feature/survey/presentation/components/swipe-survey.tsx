@@ -8,11 +8,15 @@ import {
   useRef,
   useState,
 } from "react";
-import { createDeferredQuestion, createSurveyAnswer, summarizeInteractions } from "../answers";
-import type { SurveyDefinition } from "../infrastructure/local-definitions";
-import type { SurveyInteraction, SwipeDirection } from "../model";
+import type { SurveyDefinition } from "../../infrastructure/local-definitions";
+import {
+  createDeferredQuestion,
+  createSurveyAnswer,
+  summarizeInteractions,
+} from "../../model/answers";
+import { getParameterSummary } from "../../model/scoring";
+import type { SurveyInteraction, SwipeDirection } from "../../model/types";
 import { pickProgressMessage, resolveProgressMilestone } from "../progress-message";
-import { getParameterSummary } from "../scoring";
 import {
   type DragOffset,
   SWIPE_TRANSITION_MS,
@@ -85,7 +89,7 @@ function SurveyComplete({
     <div className="min-h-80 rounded-3xl border border-slate-700 bg-slate-800 p-5 text-center">
       <div className="flex flex-col items-center gap-2">
         <CircleCheck className="size-12 text-emerald-400" aria-hidden="true" />
-        <p className="text-lg font-bold">回答から見える現在の傾向</p>
+        <p className="text-lg font-bold">未保存の選択から見える現在の傾向</p>
         <p className="text-sm text-slate-400">
           {`${answered} 問に回答し、${deferred} 問をあとで回答にしました。`}
         </p>
@@ -106,8 +110,8 @@ function SurveyComplete({
         ))}
       </div>
 
-      <p className="mt-4 border-t border-slate-700 pt-3 text-[10px] text-slate-500">
-        回答と結果のサーバー保存はまだ実装されていません。
+      <p className="mt-4 border-t border-slate-700 pt-3 text-xs font-semibold text-amber-200">
+        この内容はサーバーへ保存されていません。画面を離れると失われます。
       </p>
     </div>
   );

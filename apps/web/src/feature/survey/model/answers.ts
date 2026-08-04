@@ -5,8 +5,8 @@ import type {
   SurveyInteraction,
   SurveyQuestion,
   SwipeDirection,
-} from "./model";
-import { DeferredQuestionSchema, SurveyAnswerSchema, SwipeDirectionSchema } from "./model";
+} from "./types";
+import { DeferredQuestionSchema, SurveyAnswerSchema, SwipeDirectionSchema } from "./types";
 
 /**
  * 回答の組み立てと集計。

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { SurveyAnswer } from "../model";
+import type { SurveyAnswer } from "../types";
 import {
   MONEY_VALUES_QUESTIONS,
   MONEY_VALUES_SCORING_CONFIG,

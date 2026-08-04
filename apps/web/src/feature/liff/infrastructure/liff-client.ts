@@ -1,6 +1,6 @@
 import liff from "@line/liff";
 import { logger } from "@me-builder/shared";
-import type { LiffState } from "../model";
+import type { LiffState } from "../model/types";
 
 const toMessage = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);

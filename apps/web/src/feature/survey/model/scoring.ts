@@ -1,5 +1,5 @@
 import * as v from "valibot";
-import type { SurveyAnswer, SurveyInteraction, SurveyQuestion } from "./model";
+import type { SurveyAnswer, SurveyInteraction, SurveyQuestion } from "./types";
 
 type ParameterBand = "low" | "balanced" | "high" | "insufficient";
 

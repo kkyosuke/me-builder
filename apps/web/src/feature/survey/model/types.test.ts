@@ -1,6 +1,6 @@
 import * as v from "valibot";
 import { describe, expect, it } from "vitest";
-import { SurveyAnswerSchema, SurveyQuestionSchema } from "./model";
+import { SurveyAnswerSchema, SurveyQuestionSchema } from "./types";
 
 describe("SurveyQuestionSchema", () => {
   it("左右が同じChoice IDの質問を拒否する", () => {

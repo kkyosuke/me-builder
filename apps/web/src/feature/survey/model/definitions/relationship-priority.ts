@@ -1,5 +1,5 @@
-import type { SurveyInteraction, SurveyQuestion } from "../model";
 import { type ParameterProfile, type ParameterScoringConfig, scoreParameters } from "../scoring";
+import type { SurveyInteraction, SurveyQuestion } from "../types";
 
 const RELATIONSHIP_PRIORITY_SCORING_VERSION = 1;
 

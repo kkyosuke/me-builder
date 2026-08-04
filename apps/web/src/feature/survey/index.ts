@@ -1,4 +1,4 @@
-export { SwipeSurvey } from "./components/swipe-survey";
+export { SwipeSurvey } from "./presentation/components/swipe-survey";
 export {
   fetchSurveyDefinitions,
   fetchSurveyQuestions,
