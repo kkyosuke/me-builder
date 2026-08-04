@@ -67,6 +67,7 @@ docs/
 
 - [インフラ・システム構成](architecture/infrastructure-architecture.md) — Cloudflareを利用するシステム構成とサービス配置
 - [キャラクターデザイン](design/character-design.md) — うつし・ミラの設定とデザインアセット
+- [アンケートseed運用](development/questionnaire-seed.md) — アンケートをD1へ登録するseedの配置、実行、更新、検証方法
 - [PR作成手順書](development/pull-request-guidelines.md) — PRタイトル、概要、作成前の準備と検証手順
 
 ## ドキュメントを更新する

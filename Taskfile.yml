@@ -87,6 +87,21 @@ tasks:
     cmds:
       - bun --filter @me-builder/lib db:migrate:production
 
+  db:seed:local:
+    desc: 'Seed questionnaires into the local D1 database'
+    cmds:
+      - bun --filter @me-builder/lib db:seed:local
+
+  db:seed:preview:
+    desc: 'Seed questionnaires into the preview D1 database'
+    cmds:
+      - bun --filter @me-builder/lib db:seed:preview
+
+  db:seed:production:
+    desc: 'Seed questionnaires into the production D1 database'
+    cmds:
+      - bun --filter @me-builder/lib db:seed:production
+
   deploy:preview:
     desc: 'Deploy all applications to preview environment via Wrangler'
     cmds:
