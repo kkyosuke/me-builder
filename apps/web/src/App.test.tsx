@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
   initializeLiff: vi.fn(),
   getLiffIdToken: vi.fn(),
   fetchSurveyList: vi.fn(),
-  fetchSurveyDefinitions: vi.fn(),
+  fetchSurveyDefinition: vi.fn(),
 }));
 
 vi.mock("./config", () => ({
@@ -22,7 +22,7 @@ vi.mock("./feature/liff", () => ({
 }));
 vi.mock("./feature/survey", () => ({
   fetchSurveyList: mocks.fetchSurveyList,
-  fetchSurveyDefinitions: mocks.fetchSurveyDefinitions,
+  fetchSurveyDefinition: mocks.fetchSurveyDefinition,
   SwipeSurvey: ({ survey }: { survey: SurveyDefinition }) => <p>{`回答UI: ${survey.title}`}</p>,
 }));
 
@@ -60,7 +60,7 @@ describe("App", () => {
     });
     mocks.getLiffIdToken.mockReturnValue("dummy.id.token");
     mocks.fetchSurveyList.mockResolvedValue([survey()]);
-    mocks.fetchSurveyDefinitions.mockResolvedValue([definition]);
+    mocks.fetchSurveyDefinition.mockResolvedValue(definition);
   });
 
   afterEach(() => cleanup());
@@ -70,7 +70,7 @@ describe("App", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: /テストアンケート/ }));
 
-    expect(screen.getByText("回答UI: テストアンケート")).toBeTruthy();
+    expect(await screen.findByText("回答UI: テストアンケート")).toBeTruthy();
     expect(screen.getByText(/この回答はサーバーへ保存されません/)).toBeTruthy();
   });
 
@@ -109,14 +109,16 @@ describe("App", () => {
     expect(screen.queryByText(/回答UI:/)).toBeNull();
   });
 
-  it("ローカル定義がないアンケートを選ぶと未対応の案内へ進む", async () => {
-    mocks.fetchSurveyDefinitions.mockResolvedValue([]);
+  it("ローカルのスコア設定がないアンケートを選ぶと未対応の案内へ進む", async () => {
+    mocks.fetchSurveyDefinition.mockResolvedValue(undefined);
     render(<App />);
 
     fireEvent.click(await screen.findByRole("button", { name: /テストアンケート/ }));
 
     expect(
-      screen.getByRole("heading", { name: "このアンケートは現在のアプリでは未対応です" }),
+      await screen.findByRole("heading", {
+        name: "このアンケートは現在のアプリでは未対応です",
+      }),
     ).toBeTruthy();
   });
 
@@ -133,7 +135,7 @@ describe("App", () => {
     expect(await screen.findByRole("button", { name: /テストアンケート/ })).toBeTruthy();
     expect(mocks.initializeLiff).toHaveBeenCalledTimes(2);
     expect(mocks.fetchSurveyList).toHaveBeenCalledTimes(2);
-    expect(mocks.fetchSurveyDefinitions).toHaveBeenCalledTimes(2);
+    expect(mocks.fetchSurveyDefinition).not.toHaveBeenCalled();
   });
 
   it("Strict Modeでも一覧取得を多重実行しない", async () => {

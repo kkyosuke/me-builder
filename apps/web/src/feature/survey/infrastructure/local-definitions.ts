@@ -1,51 +1,31 @@
-import * as v from "valibot";
-import {
-  MONEY_VALUES_QUESTIONS,
-  MONEY_VALUES_SCORING_CONFIG,
-  scoreMoneyValues,
-} from "../model/definitions/money-values";
-import { RELATIONSHIP_PRIORITY_QUESTIONS } from "../model/definitions/relationship-priority";
+import { MONEY_VALUES_SCORING_CONFIG, scoreMoneyValues } from "../model/definitions/money-values";
 import {
   RELATIONSHIP_PRIORITY_SCORING_CONFIG,
   scoreRelationshipPriority,
 } from "../model/definitions/relationship-priority";
 import type { SurveyDefinition } from "../model/survey-definition";
-import { type SurveyQuestion, SurveyQuestionsSchema } from "../model/types";
+import type { SurveyQuestion } from "../model/types";
 
-const SURVEY_DEFINITIONS: SurveyDefinition[] = [
-  {
-    id: "relationship-priority",
-    title: "自分と相手の優先・境界線",
-    description: "頼まれごとや意思決定で、自分と相手をどう尊重するかを見ます。",
-    questions: v.parse(SurveyQuestionsSchema, RELATIONSHIP_PRIORITY_QUESTIONS),
+type LocalSurveyPresentation = Pick<SurveyDefinition, "balancedLabel" | "score">;
+
+/** スコア関数と表示メタデータだけをローカルに残し、配信内容は詳細APIを正とします。 */
+const LOCAL_PRESENTATION: Record<string, LocalSurveyPresentation> = {
+  "relationship-priority": {
     balancedLabel: RELATIONSHIP_PRIORITY_SCORING_CONFIG.balancedLabel,
     score: scoreRelationshipPriority,
   },
-  {
-    id: "money-values",
-    title: "お金と消費",
-    description: "貯蓄、支出、共有、公平性、リスクに関する傾向を見ます。",
-    questions: v.parse(SurveyQuestionsSchema, MONEY_VALUES_QUESTIONS),
+  "money-values": {
     balancedLabel: MONEY_VALUES_SCORING_CONFIG.balancedLabel,
     score: scoreMoneyValues,
   },
-];
+};
 
-/**
- * 質問の取得。
- *
- * **今はフロント側の固定データを返します。** 質問配信と回答保存のサーバー実装は後続で、
- * 差し替え先をこのモジュールに閉じるため関数として切り出しています。呼び出し側は
- * 非同期の取得としてだけ扱い、固定データであることに依存しません。
- *
- * 最初のアンケートは「自分と相手の優先・境界線」の10問です。質問文と変換規則は
- * `definitions/relationship-priority.ts`にまとめ、公開済みの版を後から書き換えません。
- */
-export async function fetchSurveyQuestions(): Promise<SurveyQuestion[]> {
-  return v.parse(SurveyQuestionsSchema, RELATIONSHIP_PRIORITY_QUESTIONS);
-}
-
-/** 現在公開しているアンケート定義の一覧。 */
-export async function fetchSurveyDefinitions(): Promise<SurveyDefinition[]> {
-  return SURVEY_DEFINITIONS;
+export function combineSurveyDefinition(input: {
+  id: string;
+  title: string;
+  description: string;
+  questions: SurveyQuestion[];
+}): SurveyDefinition | undefined {
+  const presentation = LOCAL_PRESENTATION[input.id];
+  return presentation ? { ...input, ...presentation } : undefined;
 }

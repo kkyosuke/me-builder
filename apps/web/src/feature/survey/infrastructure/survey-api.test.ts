@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchSurveyList } from "./survey-api";
+import { fetchSurveyDefinition, fetchSurveyList } from "./survey-api";
 
 const API_URL = "https://api.stg.kagami.kyosuke.dev";
 
@@ -58,5 +58,72 @@ describe("fetchSurveyList", () => {
     );
 
     await expect(fetchSurveyList(API_URL, "dummy.id.token")).rejects.toThrow();
+  });
+});
+
+describe("fetchSurveyDefinition", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("詳細APIのQuestion VersionとChoiceを回答画面の左右へ変換する", async () => {
+    const fetchMock = vi.fn(async () =>
+      Response.json({
+        id: "relationship-priority",
+        title: "API title",
+        description: "API description",
+        opensAt: "2026-08-04T00:00:00.000Z",
+        closesAt: null,
+        questions: [
+          {
+            surveyQuestionId: "sq-1",
+            questionId: "q-1",
+            questionVersion: 2,
+            text: "API question",
+            hint: null,
+            choices: [
+              { choiceId: "no", label: "いいえ", presentation: { icon: "circle-x" } },
+              { choiceId: "yes", label: "はい", presentation: { icon: "circle-check" } },
+            ],
+          },
+        ],
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const definition = await fetchSurveyDefinition(
+      API_URL,
+      "dummy.id.token",
+      "relationship-priority",
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(`${API_URL}/api/surveys/relationship-priority`, {
+      headers: { Authorization: "Bearer dummy.id.token" },
+    });
+    expect(definition).toMatchObject({
+      title: "API title",
+      questions: [
+        {
+          questionVersion: 2,
+          text: "API question",
+          left: { choiceId: "no", icon: "circle-x" },
+          right: { choiceId: "yes", icon: "circle-check" },
+        },
+      ],
+    });
+  });
+
+  it.each([
+    [401, "本人確認に失敗しました"],
+    [404, "現在公開されていません"],
+    [409, "受付を終了しました"],
+  ])("HTTP %sを画面表示用エラーへ変換する", async (status, message) => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(null, { status })),
+    );
+    await expect(
+      fetchSurveyDefinition(API_URL, "dummy.id.token", "relationship-priority"),
+    ).rejects.toThrow(message);
   });
 });

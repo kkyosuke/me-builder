@@ -5,7 +5,7 @@ import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { describe, expect, it } from "vitest";
 import type { D1Client } from "../client";
 import * as schema from "../schema";
-import { listVisibleSurveys } from "./questionnaire";
+import { findOpenSurveyDetail, listVisibleSurveys } from "./questionnaire";
 
 function createTestDb(): D1Client {
   const sqlite = new Database(":memory:");
@@ -166,5 +166,69 @@ describe("listVisibleSurveys", () => {
       answeredCount: 2,
       questionCount: 2,
     });
+  });
+});
+
+describe("findOpenSurveyDetail", () => {
+  it("Surveyが固定したQuestion VersionとChoiceを位置順に返す", async () => {
+    const db = createTestDb();
+    await insertSurvey(db, { id: "survey-detail" });
+
+    const result = await findOpenSurveyDetail(
+      db,
+      "survey-detail",
+      new Date("2026-08-03T00:00:00Z"),
+    );
+
+    expect(result).toEqual({
+      type: "found",
+      survey: expect.objectContaining({
+        id: "survey-detail",
+        questions: [
+          expect.objectContaining({
+            surveyQuestionId: "survey-detail-sq1",
+            questionId: "survey-detail-q1",
+            questionVersion: 1,
+            text: "survey-detail-q1の質問",
+            choices: [
+              { choiceId: "no", label: "いいえ", presentation: {} },
+              { choiceId: "yes", label: "はい", presentation: {} },
+            ],
+          }),
+          expect.objectContaining({ surveyQuestionId: "survey-detail-sq2" }),
+        ],
+      }),
+    });
+  });
+
+  it.each([
+    { id: "missing", setup: undefined },
+    { id: "draft", setup: { id: "draft", state: "draft" as const } },
+    {
+      id: "before-open",
+      setup: { id: "before-open", opensAt: new Date("2026-08-04T00:00:00Z") },
+    },
+    { id: "withdrawn", setup: { id: "withdrawn", state: "withdrawn" as const } },
+  ])("存在しない・非公開状態をnot-foundへ寄せる: $id", async ({ id, setup }) => {
+    const db = createTestDb();
+    if (setup) {
+      await insertSurvey(db, setup);
+    }
+
+    await expect(findOpenSurveyDetail(db, id, new Date("2026-08-03T00:00:00Z"))).resolves.toEqual({
+      type: "not-found",
+    });
+  });
+
+  it("受付終了をclosedとして区別する", async () => {
+    const db = createTestDb();
+    await insertSurvey(db, {
+      id: "closed-detail",
+      closesAt: new Date("2026-08-02T00:00:00Z"),
+    });
+
+    await expect(
+      findOpenSurveyDetail(db, "closed-detail", new Date("2026-08-03T00:00:00Z")),
+    ).resolves.toEqual({ type: "closed" });
   });
 });

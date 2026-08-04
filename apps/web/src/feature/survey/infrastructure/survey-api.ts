@@ -1,11 +1,16 @@
 import * as v from "valibot";
 import type { operations } from "../../../generated/api";
 import { createHttpClient } from "../../../infrastructure/http-client";
+import type { SurveyDefinition } from "../model/survey-definition";
 import type { SurveyListItem } from "../model/survey-list-item";
+import { SurveyQuestionsSchema } from "../model/types";
+import { combineSurveyDefinition } from "./local-definitions";
 
 type ApiSurveyListResponse =
   operations["listSurveys"]["responses"][200]["content"]["application/json"];
 type ApiSurveyListItem = ApiSurveyListResponse["surveys"][number];
+type ApiSurveyDetailResponse =
+  operations["getSurveyDetail"]["responses"][200]["content"]["application/json"];
 
 const SurveyListItemSchema = v.object({
   id: v.pipe(v.string(), v.nonEmpty()),
@@ -58,4 +63,95 @@ export async function fetchSurveyList(
 
   const body: ApiSurveyListResponse = v.parse(SurveyListResponseSchema, await response.json());
   return body.surveys.map(toSurveyListItem);
+}
+
+const ApiSurveyDetailSchema = v.object({
+  id: v.pipe(v.string(), v.nonEmpty()),
+  title: v.pipe(v.string(), v.nonEmpty()),
+  description: v.pipe(v.string(), v.nonEmpty()),
+  opensAt: v.pipe(v.string(), v.isoTimestamp()),
+  closesAt: v.nullable(v.pipe(v.string(), v.isoTimestamp())),
+  questions: v.array(
+    v.object({
+      surveyQuestionId: v.pipe(v.string(), v.nonEmpty()),
+      questionId: v.pipe(v.string(), v.nonEmpty()),
+      questionVersion: v.pipe(v.number(), v.safeInteger(), v.minValue(1)),
+      text: v.pipe(v.string(), v.nonEmpty()),
+      hint: v.nullable(v.pipe(v.string(), v.nonEmpty())),
+      choices: v.pipe(
+        v.array(
+          v.object({
+            choiceId: v.pipe(v.string(), v.nonEmpty()),
+            label: v.pipe(v.string(), v.nonEmpty()),
+            presentation: v.object({ icon: v.pipe(v.string(), v.nonEmpty()) }),
+          }),
+        ),
+        v.length(2),
+      ),
+    }),
+  ),
+}) satisfies v.GenericSchema<ApiSurveyDetailResponse>;
+
+/** LIFF IDトークンで本人確認し、D1で公開された質問を回答画面の定義へ変換する。 */
+export async function fetchSurveyDefinition(
+  apiUrl: string | undefined,
+  idToken: string,
+  surveyId: string,
+  signal?: AbortSignal,
+): Promise<SurveyDefinition | undefined> {
+  const response = await createHttpClient(apiUrl).request(
+    `/api/surveys/${encodeURIComponent(surveyId)}`,
+    {
+      headers: { Authorization: `Bearer ${idToken}` },
+      ...(signal ? { signal } : {}),
+    },
+  );
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error("本人確認に失敗しました。LINEから開き直してください。");
+    }
+    if (response.status === 404) {
+      throw new Error("このアンケートは現在公開されていません。");
+    }
+    if (response.status === 409) {
+      throw new Error("このアンケートは受付を終了しました。");
+    }
+    throw new Error(`アンケート詳細の取得に失敗しました (HTTP ${response.status})`);
+  }
+
+  const body = v.parse(ApiSurveyDetailSchema, await response.json());
+  const questions = v.parse(
+    SurveyQuestionsSchema,
+    body.questions.map((question) => {
+      const [left, right] = question.choices;
+      if (!left || !right) {
+        throw new Error("アンケートの選択肢が不足しています。");
+      }
+      return {
+        surveyQuestionId: question.surveyQuestionId,
+        questionId: question.questionId,
+        questionVersion: question.questionVersion,
+        text: question.text,
+        ...(question.hint ? { hint: question.hint } : {}),
+        left: {
+          choiceId: left.choiceId,
+          label: left.label,
+          icon: left.presentation.icon,
+        },
+        right: {
+          choiceId: right.choiceId,
+          label: right.label,
+          icon: right.presentation.icon,
+        },
+      };
+    }),
+  );
+
+  return combineSurveyDefinition({
+    id: body.id,
+    title: body.title,
+    description: body.description,
+    questions,
+  });
 }

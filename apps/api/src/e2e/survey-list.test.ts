@@ -147,10 +147,10 @@ async function insertAnswers(
   }
 }
 
-async function request(idToken?: string): Promise<Response> {
+async function request(idToken?: string, path = "/api/surveys"): Promise<Response> {
   const init: RequestInit = idToken ? { headers: { Authorization: `Bearer ${idToken}` } } : {};
 
-  return await app.request("/api/surveys", init, {
+  return await app.request(path, init, {
     DB: database,
     LINE_LOGIN_CHANNEL_ID: "1234567890",
     ENVIRONMENT: "test",
@@ -242,5 +242,64 @@ describe("GET /api/surveys local D1 E2E", () => {
       error: "Account not found",
       reason: "friendship_required",
     });
+  });
+});
+
+describe("GET /api/surveys/:surveyId local D1 E2E", () => {
+  beforeEach(async () => {
+    miniflare = new Miniflare({
+      compatibilityDate: "2026-07-29",
+      modules: true,
+      script: "export default { fetch() { return new Response('ok') } }",
+      d1Databases: { DB: "survey-detail-e2e" },
+    });
+    database = (await miniflare.getD1Database("DB")) as D1Database;
+    await prepareDatabase(database);
+    mockLineVerification();
+  });
+
+  afterEach(async () => {
+    vi.unstubAllGlobals();
+    await miniflare.dispose();
+  });
+
+  it("seedのSurveyからQuestion VersionとChoiceを位置順に返す", async () => {
+    const response = await request("known-token", "/api/surveys/relationship-priority");
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      id: string;
+      questions: Array<{
+        surveyQuestionId: string;
+        questionVersion: number;
+        choices: Array<{ choiceId: string; presentation: { icon: string } }>;
+      }>;
+    };
+    expect(body.id).toBe("relationship-priority");
+    expect(body.questions).toHaveLength(10);
+    expect(body.questions[0]).toMatchObject({
+      surveyQuestionId: "sq-relationship-priority-01",
+      questionVersion: 1,
+      choices: [
+        { choiceId: "no", presentation: { icon: "circle-x" } },
+        { choiceId: "yes", presentation: { icon: "circle-check" } },
+      ],
+    });
+  });
+
+  it("存在しないSurveyを404、受付終了したSurveyを409にする", async () => {
+    const missing = await request("known-token", "/api/surveys/missing");
+    expect(missing.status).toBe(404);
+    expect(await missing.json()).toEqual({
+      error: "Survey not found",
+      reason: "survey_not_found",
+    });
+
+    await database
+      .prepare("UPDATE surveys SET closes_at = ? WHERE id = ?")
+      .bind(timestamp, "relationship-priority")
+      .run();
+    const closed = await request("known-token", "/api/surveys/relationship-priority");
+    expect(closed.status).toBe(409);
+    expect(await closed.json()).toEqual({ error: "Survey closed", reason: "survey_closed" });
   });
 });
