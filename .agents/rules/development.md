@@ -45,6 +45,7 @@
 - **Web UI (`apps/web`) のカスタムドメイン**:
   - `apps/web` は Cloudflare **Pages** で配信するため、Workers (`api` / `mcp` / `worker`) のように `wrangler.toml` の `routes` で DNS レコードを自動作成できません。ドメインのプロジェクト登録と DNS の CNAME 作成は [`scripts/setup-pages-domain.ts`](../../scripts/setup-pages-domain.ts) が行い、`apps/web` の `deploy:preview` / `deploy:production` から呼び出します。
   - 対象ドメインは `BASE_DOMAIN` を使い、スクリプト側にハードコードしません。CNAME の宛先は preview がブランチエイリアス、production がプロジェクト既定のホストです。
+  - preview CDがPRへ投稿する完了コメントには、各サービスのカスタムドメインに加えて、`CLOUDFLARE_ACCOUNT_ID`から組み立てたCloudflare DashboardのWorkers & Pages管理画面へのリンクを掲載します。生のURLではなくMarkdownのリンク記法（`[表示テキスト](URL)`）で書き、表示テキストはサービスがホスト名、Dashboardが遷移先を表す文言にします。
   - このスクリプトは `CLOUDFLARE_API_TOKEN` に Zone:Read / DNS:Edit の権限を必要とします。権限や環境変数が足りない場合は警告を出して**デプロイを止めずにスキップ**します（DNS の設定漏れでデプロイ自体を失敗させない）。
 - **Web UI (`apps/web`) の環境変数**:
   - Vite がクライアントバンドルへ埋め込むのは `VITE_` 接頭辞付きの環境変数だけです。変数を追加した場合は [`apps/web/.env.example`](../../apps/web/.env.example) へ必ず追記します。
@@ -86,14 +87,14 @@
     - キーワードの判定は **NFKC 正規化・前後の空白除去・ひらがなからカタカナへの寄せの後で完全一致**させます。部分一致は採りません。部分一致にすると「今日は会社でアンケートに答えた」のような日記本文がコマンドとして飲み込まれ、蓄積の量を担う日記が記録されなくなります。
     - `survey-request` の返信はアンケートへのリンクだけを返します。`diary` の返信は従来どおり受け付けた旨とリンクを返します（日記の返信はアンケートへの主要な再訪導線なので、キーワードの追加でも変えません）。
     - 日記の本文はログへ出力せず、判定結果 (`intent`) だけを残します。
-  - `LIFF_ID` は `apps/worker` へ配布します。秘密情報ではありませんが、GitHub Environment の変数を単一の出所とするため CD ワークフローから `wrangler secret put` で配布します (wrangler には後から var を投入するコマンドがありません)。未設定の場合はリンクを省き、受け付けた旨だけを返します。
+  - `LIFF_ID` は `apps/worker` へ配布します。秘密情報ではありませんが、GitHub Environment の変数を単一の出所とするため、CDワークフローが一時的なsecretファイルを作り、`wrangler deploy --secrets-file`でコードと同じWorker Versionへ配布します。未設定の場合はリンクを省き、受け付けた旨だけを返します。
   - 環境変数が未設定の場合は自動登録および返信処理がログ出力とともに安全にスキップされます。
 
 - **LINE Webhook の署名検証 (`x-line-signature`)**:
   - `POST /api/line/webhook` は、Queue 投入前に必ず `x-line-signature` ヘッダを検証します。検証は公式 SDK (`@line/bot-sdk`) の `validateSignature` (HMAC-SHA256 + timing-safe 比較) に委譲し、`packages/lib` の `line.webhook.verifySignature` として提供します。
   - 検証は **受信した生のリクエストボディ文字列** に対して行います。`c.req.json()` の結果を再度 `JSON.stringify` するとバイト列が変わり検証が壊れるため、`await c.req.text()` で取得した文字列を検証し、通過後に `JSON.parse` してください。
   - ヘッダ欠落・署名不一致は `401 Unauthorized` を返し、Queue 投入・LINE 返信・D1 書き込みのいずれも行いません。拒否時は `logger.warn` で構造化ログを出力しますが、**署名値およびチャネルシークレットそのものはログに含めません**。
-  - チャネルシークレットは `LINE_CHANNEL_SECRET` として `apps/api` にのみ配布します (Cloudflare は `wrangler secret put` / CD ワークフロー、ローカルは `.env`)。`wrangler.toml` の `[vars]` には置きません。
+  - チャネルシークレットは `LINE_CHANNEL_SECRET` として`apps/api`にのみ配布します（CloudflareはCDの`wrangler deploy --secrets-file`、ローカルは`.env`）。`wrangler.toml`の`[vars]`には置きません。CDはsecretをコードと同じWorker Versionへ原子的にアップロードし、デプロイ後の`wrangler secret put`は実行しません。
   - `LINE_CHANNEL_SECRET` は **必須** です。未設定の場合は環境 (`local` / `preview` / `production`) を問わず署名検証をスキップせず、`logger.error` を出力したうえで全ての Webhook リクエストを 401 で拒否します。ローカルで Webhook 受信と返信の動作確認を行う場合も `.env` にチャネルシークレットを設定してください。
 
 - **Web UI のデザインシステム (`apps/web`)**:

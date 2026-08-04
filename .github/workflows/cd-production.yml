@@ -48,33 +48,36 @@ jobs:
 
       - name: Deploy to Cloudflare Production
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
-        run: task deploy:production
-
-      - name: Sync Secrets to Cloudflare Workers (Production)
-        if: ${{ env.CLOUDFLARE_API_TOKEN != '' && env.LINE_CHANNEL_ACCESS_TOKEN != '' }}
-        run: |
-          echo "${LINE_CHANNEL_ACCESS_TOKEN}" | bun --cwd apps/api wrangler secret put LINE_CHANNEL_ACCESS_TOKEN --env production
-          echo "${LINE_CHANNEL_ACCESS_TOKEN}" | bun --cwd apps/worker wrangler secret put LINE_CHANNEL_ACCESS_TOKEN --env production
-
-      # LIFF ID は秘密情報ではないが、GitHub Environment の変数を単一の出所にするため
-      # wrangler secret として配布する (wrangler には var を後から入れるコマンドがない)。
-      - name: Sync LIFF ID to Cloudflare Workers (Production)
-        if: ${{ env.CLOUDFLARE_API_TOKEN != '' && vars.LIFF_ID != '' }}
-        run: |
-          echo "${{ vars.LIFF_ID }}" | bun --cwd apps/worker wrangler secret put LIFF_ID --env production
-          echo "${{ vars.LIFF_ID }}" | bun --cwd apps/api wrangler secret put LIFF_ID --env production
-
-      # x-line-signature の検証を行う apps/api にのみチャネルシークレットを配布する。
-      # 未設定だと環境を問わず全ての Webhook リクエストが 401 になるため、
-      # 設定漏れをエラーとして扱いデプロイを失敗させる
-      - name: Sync LINE Channel Secret to Cloudflare Workers (Production)
-        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
+        env:
+          LIFF_ID: ${{ vars.LIFF_ID }}
         run: |
           if [ -z "${LINE_CHANNEL_SECRET}" ]; then
             echo "::error::LINE_CHANNEL_SECRET が GitHub Secrets に設定されていません。x-line-signature の検証に必須です。"
             exit 1
           fi
-          echo "${LINE_CHANNEL_SECRET}" | bun --cwd apps/api wrangler secret put LINE_CHANNEL_SECRET --env production
+
+          umask 077
+          secrets_dir="$(mktemp -d "${RUNNER_TEMP}/worker-secrets.XXXXXX")"
+          api_secrets_file="${secrets_dir}/api.json"
+          worker_secrets_file="${secrets_dir}/worker.json"
+          trap 'rm -f "${api_secrets_file}" "${worker_secrets_file}"; rmdir "${secrets_dir}"' EXIT
+
+          API_SECRETS_FILE="${api_secrets_file}" WORKER_SECRETS_FILE="${worker_secrets_file}" bun -e '
+            const optionalSecrets = Object.fromEntries(
+              [["LINE_CHANNEL_ACCESS_TOKEN", process.env.LINE_CHANNEL_ACCESS_TOKEN], ["LIFF_ID", process.env.LIFF_ID]]
+                .filter(([, value]) => value),
+            );
+            await Bun.write(process.env.API_SECRETS_FILE, JSON.stringify({
+              LINE_CHANNEL_SECRET: process.env.LINE_CHANNEL_SECRET,
+              ...optionalSecrets,
+            }));
+            await Bun.write(process.env.WORKER_SECRETS_FILE, JSON.stringify(optionalSecrets));
+          '
+
+          bun --cwd apps/api wrangler deploy --env production --secrets-file "${api_secrets_file}"
+          bun --cwd apps/worker wrangler deploy --env production --secrets-file "${worker_secrets_file}"
+          bun --filter @me-builder/mcp deploy:production
+          bun --filter @me-builder/web deploy:production
 
       - name: Register LINE Webhook (Production)
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' && env.LINE_CHANNEL_ACCESS_TOKEN != '' }}
