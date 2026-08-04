@@ -72,3 +72,5 @@ LINEのIDトークン検証エンドポイントだけは外部通信を行わ�
 テストごとに独立したインメモリD1を作り、終了時にMiniflareを破棄します。開発者の`.wrangler/state`やpreview、productionのD1は使用しません。
 
 単独で実行する場合は`bun --cwd apps/api test:e2e`を使います。通常の`task ci`にも含まれます。
+
+OpenAPIとWeb UI用TypeScript型の共通運用は[API契約とクライアント型の生成](api-contract-generation.md)を参照します。

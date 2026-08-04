@@ -62,9 +62,14 @@ tasks:
       - bun run test
 
   ci:
-    desc: 'Run full CI checks locally (lint, typecheck, test, build)'
+    desc: 'Run full CI checks locally (generated files, lint, typecheck, test, build)'
     cmds:
       - bun run ci
+
+  generate:api:
+    desc: 'Generate OpenAPI document and Web API types'
+    cmds:
+      - bun run generate:api
 
   db:setup:
     desc: 'Automatically create missing remote D1 databases and update wrangler.toml files'

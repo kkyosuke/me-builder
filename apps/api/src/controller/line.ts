@@ -1,7 +1,14 @@
 import { d1 } from "@me-builder/lib";
 import { logger } from "@me-builder/shared";
 import type { Context } from "hono";
+import * as v from "valibot";
 import { getConfig } from "../config";
+import { LiffSessionRequestSchema, LiffSessionResponseSchema } from "../contract/line/liff-session";
+import {
+  AccountNotFoundErrorSchema,
+  ServiceUnavailableErrorSchema,
+  UnauthorizedErrorSchema,
+} from "../contract/shared/errors";
 import { createLiffSession } from "../logic/liff-session";
 import { receiveLineWebhook } from "../logic/line-webhook";
 import type { AppEnv } from "../types";
@@ -47,13 +54,13 @@ export async function postLiffSession(c: Context<AppEnv>): Promise<Response> {
 
   if (!c.env?.DB) {
     logger.error({ path: c.req.path }, "DB binding is not configured");
-    return c.json({ error: "Service Unavailable" }, 503);
+    return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   }
 
   let idToken: string | undefined;
   try {
-    const body = (await c.req.json()) as { idToken?: unknown };
-    idToken = typeof body.idToken === "string" ? body.idToken : undefined;
+    const body = v.safeParse(LiffSessionRequestSchema, await c.req.json());
+    idToken = body.success ? body.output.idToken : undefined;
   } catch {
     // JSON でないボディは「ID トークンが無い」と同じ扱いにする
     idToken = undefined;
@@ -70,14 +77,22 @@ export async function postLiffSession(c: Context<AppEnv>): Promise<Response> {
       // accountId は返さない。セッション管理の方式が未決定
       // ([ドメイン設計](../../../../docs/domain/domain-design.md)) のうちにクライアントへ渡すと、
       // 後続リクエストで「クライアントが送ってきた accountId」を信頼する実装を誘発する。
-      return c.json({
-        displayName: outcome.session.displayName,
-        pictureUrl: outcome.session.pictureUrl,
-      });
+      return c.json(
+        v.parse(LiffSessionResponseSchema, {
+          displayName: outcome.session.displayName,
+          pictureUrl: outcome.session.pictureUrl,
+        }),
+      );
     case "account-not-found":
-      return c.json({ error: "Account not found", reason: "friendship_required" }, 404);
+      return c.json(
+        v.parse(AccountNotFoundErrorSchema, {
+          error: "Account not found",
+          reason: "friendship_required",
+        }),
+        404,
+      );
     case "not-configured":
     case "unauthenticated":
-      return c.json({ error: "Unauthorized" }, 401);
+      return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
   }
 }
