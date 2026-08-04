@@ -9,17 +9,8 @@ import {
   RELATIONSHIP_PRIORITY_SCORING_CONFIG,
   scoreRelationshipPriority,
 } from "../model/definitions/relationship-priority";
-import type { ParameterProfile } from "../model/scoring";
-import { type SurveyInteraction, type SurveyQuestion, SurveyQuestionsSchema } from "../model/types";
-
-export interface SurveyDefinition {
-  id: string;
-  title: string;
-  description: string;
-  questions: SurveyQuestion[];
-  balancedLabel: string;
-  score: (interactions: SurveyInteraction[]) => ParameterProfile<string>;
-}
+import type { SurveyDefinition } from "../model/survey-definition";
+import { type SurveyQuestion, SurveyQuestionsSchema } from "../model/types";
 
 const SURVEY_DEFINITIONS: SurveyDefinition[] = [
   {

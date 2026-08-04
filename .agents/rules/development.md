@@ -108,40 +108,25 @@
   ```text
   apps/web/src/
   ├── feature/
-  │   ├── liff/
-  │   │   ├── infrastructure/
-  │   │   │   ├── liff-client.ts
-  │   │   │   └── session-api.ts
-  │   │   ├── model/
-  │   │   │   └── types.ts
-  │   │   └── index.ts
-  │   └── survey/
-  │       ├── infrastructure/
-  │       │   ├── survey-api.ts
-  │       │   └── local-definitions.ts
-  │       ├── model/
-  │       │   ├── definitions/
-  │       │   ├── answers.ts
-  │       │   ├── scoring.ts
-  │       │   └── types.ts
-  │       ├── presentation/
-  │       │   ├── components/
-  │       │   ├── progress-message.ts
-  │       │   └── swipe.ts
-  │       └── index.ts
+  │   └── <feature-name>/
+  │       ├── model/            # 型・状態・純粋なビジネスロジック
+  │       ├── presentation/     # React UI・UI操作ロジック
+  │       │   └── components/
+  │       ├── infrastructure/   # API・SDK・ストレージなどのadapter
+  │       └── index.ts          # feature外へ公開するAPI
   ├── infrastructure/
-  │   └── http-client.ts
-  ├── config/
-  ├── components/
+  │   └── <shared-adapter>.ts   # feature横断の技術基盤
+  ├── config/                   # 環境設定の読込・検証
+  ├── components/               # feature非依存の共通UI
   ├── App.tsx
   └── main.tsx
   ```
 
-  各featureは、型と純粋なロジックを `model/`、React UIとUI操作ロジックを `presentation/`、API・SDK・ローカルデータとの接続を `infrastructure/`、feature外へ公開する要素を `index.ts` に置きます。必要な層だけを作り、空の層は用意しません。ルートの `components/` はfeatureに依存しない共通UI、`infrastructure/` は複数featureから利用する技術基盤だけを所有します。
+  各featureは、型と純粋なロジックを `model/`、React UIとUI操作ロジックを `presentation/`、API・SDK・ローカルデータとの接続を `infrastructure/`、feature外へ公開する要素を `index.ts` に置きます。`presentation/` と `infrastructure/` は `model/` に依存できますが、`model/` から他の層へは依存しません。feature外からは原則として `index.ts` 経由で参照します。必要な層だけを作り、空の層は用意しません。ルートの `components/` はfeatureに依存しない共通UI、`infrastructure/` は複数featureから利用する技術基盤だけを所有します。
 
 - **スワイプアンケートの画面 (`apps/web`)**:
   - Survey機能は `apps/web/src/feature/survey/` に置きます。質問の取得は `infrastructure/local-definitions.ts`、一覧APIとの通信は `infrastructure/survey-api.ts` に閉じ込め、コンポーネントは非同期の取得としてだけ扱います。質問配信・回答保存のサーバー実装はこの境界を差し替える形で追加します。
-  - 質問・回答の型は `apps/web/src/feature/survey/model/types.ts` に閉じ、`packages/shared` へ置きません。共有すると「サーバーとのスキーマ」を確定したことになり、[設計スコープのルール §2](design-scope.md) が後続設計へ延期している範囲へ踏み込みます。共有先はサーバー実装の時点で判断します。
+  - 質問・回答などのSurveyモデルは `apps/web/src/feature/survey/model/` に閉じ、`packages/shared` へ置きません。共有すると「サーバーとのスキーマ」を確定したことになり、[設計スコープのルール §2](design-scope.md) が後続設計へ延期している範囲へ踏み込みます。共有先はサーバー実装の時点で判断します。
   - 質問データは JSON のまま扱える形に保ちます。アイコンはコンポーネントではなく名前で持ち、名前からコンポーネントへの対応は `apps/web/src/feature/survey/presentation/components/` に置きます。
   - 判定や座標計算 (しきい値、傾き、transform) は純粋関数として `apps/web/src/feature/survey/presentation/` に置き、DOM を用意せず単体テストできる状態にします。
 

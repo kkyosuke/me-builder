@@ -4,7 +4,7 @@ import { createHttpClient } from "./http-client";
 describe("createHttpClient", () => {
   it("ベースURLとパスを結合してfetchへ委譲する", async () => {
     const fetchImplementation = vi.fn(async () => new Response(null, { status: 204 }));
-    const client = createHttpClient("https://api.example.com/", fetchImplementation);
+    const client = createHttpClient("https://api.example.com///", fetchImplementation);
     const init = { headers: { Authorization: "Bearer token" } };
 
     const response = await client.request("api/surveys", init);
@@ -20,5 +20,17 @@ describe("createHttpClient", () => {
     await client.request("/api/surveys");
 
     expect(fetchImplementation).toHaveBeenCalledWith("/api/surveys", undefined);
+  });
+
+  it("パス先頭のスラッシュを1つに正規化する", async () => {
+    const fetchImplementation = vi.fn(async () => new Response());
+    const client = createHttpClient("https://api.example.com", fetchImplementation);
+
+    await client.request("///api/surveys");
+
+    expect(fetchImplementation).toHaveBeenCalledWith(
+      "https://api.example.com/api/surveys",
+      undefined,
+    );
   });
 });

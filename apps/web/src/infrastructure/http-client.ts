@@ -7,11 +7,11 @@ export function createHttpClient(
   baseUrl: string | undefined,
   fetchImplementation: typeof globalThis.fetch = globalThis.fetch,
 ): HttpClient {
-  const normalizedBaseUrl = (baseUrl ?? "").replace(/\/$/, "");
+  const normalizedBaseUrl = (baseUrl ?? "").replace(/\/+$/, "");
 
   return {
     request(path, init) {
-      const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+      const normalizedPath = `/${path.replace(/^\/+/, "")}`;
       return fetchImplementation(`${normalizedBaseUrl}${normalizedPath}`, init);
     },
   };

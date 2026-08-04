@@ -8,13 +8,13 @@ import {
   useRef,
   useState,
 } from "react";
-import type { SurveyDefinition } from "../../infrastructure/local-definitions";
 import {
   createDeferredQuestion,
   createSurveyAnswer,
   summarizeInteractions,
 } from "../../model/answers";
 import { getParameterSummary } from "../../model/scoring";
+import type { SurveyDefinition } from "../../model/survey-definition";
 import type { SurveyInteraction, SwipeDirection } from "../../model/types";
 import { pickProgressMessage, resolveProgressMilestone } from "../progress-message";
 import {
@@ -122,7 +122,7 @@ function SurveyComplete({
  *
  * 1 問 1 画面で、カードを縦に重ねて最前面をドラッグします。スワイプ以外に選択ボタンと
  * キーボード（←／→、↓ であとで回答）でも回答できます。LINE 内は LIFF が主導線ですが
- * 外部ブラウザの導線も維持しているため（[プロジェクト概要 §4](../../../../docs/product/project-overview.md#4-想定する利用体験)）、
+ * 外部ブラウザの導線も維持しているため（[プロジェクト概要 §4](../../../../../../../docs/product/project-overview.md#4-想定する利用体験)）、
  * どちらでも操作できる状態を保ちます。
  */
 export function SwipeSurvey({
