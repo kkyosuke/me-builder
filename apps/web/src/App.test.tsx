@@ -4,8 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
-import type { SurveyListItem } from "./survey/list";
-import type { SurveyDefinition } from "./survey/questions";
+import type { SurveyDefinition, SurveyListItem } from "./feature/survey";
 
 const mocks = vi.hoisted(() => ({
   initializeLiff: vi.fn(),
@@ -17,15 +16,13 @@ const mocks = vi.hoisted(() => ({
 vi.mock("./config", () => ({
   config: { liffId: "test-liff-id", apiUrl: "https://api.example.com" },
 }));
-vi.mock("./liff", () => ({
+vi.mock("./feature/liff", () => ({
   initializeLiff: mocks.initializeLiff,
   getLiffIdToken: mocks.getLiffIdToken,
 }));
-vi.mock("./survey/list", () => ({ fetchSurveyList: mocks.fetchSurveyList }));
-vi.mock("./survey/questions", () => ({
+vi.mock("./feature/survey", () => ({
+  fetchSurveyList: mocks.fetchSurveyList,
   fetchSurveyDefinitions: mocks.fetchSurveyDefinitions,
-}));
-vi.mock("./components/swipe-survey", () => ({
   SwipeSurvey: ({ survey }: { survey: SurveyDefinition }) => <p>{`回答UI: ${survey.title}`}</p>,
 }));
 

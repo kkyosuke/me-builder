@@ -3,23 +3,14 @@ import {
   MONEY_VALUES_QUESTIONS,
   MONEY_VALUES_SCORING_CONFIG,
   scoreMoneyValues,
-} from "./definitions/money-values";
-import { RELATIONSHIP_PRIORITY_QUESTIONS } from "./definitions/relationship-priority";
+} from "../model/definitions/money-values";
+import { RELATIONSHIP_PRIORITY_QUESTIONS } from "../model/definitions/relationship-priority";
 import {
   RELATIONSHIP_PRIORITY_SCORING_CONFIG,
   scoreRelationshipPriority,
-} from "./definitions/relationship-priority";
-import type { ParameterProfile } from "./parameter-scoring";
-import { type SurveyInteraction, type SurveyQuestion, SurveyQuestionsSchema } from "./types";
-
-export interface SurveyDefinition {
-  id: string;
-  title: string;
-  description: string;
-  questions: SurveyQuestion[];
-  balancedLabel: string;
-  score: (interactions: SurveyInteraction[]) => ParameterProfile<string>;
-}
+} from "../model/definitions/relationship-priority";
+import type { SurveyDefinition } from "../model/survey-definition";
+import { type SurveyQuestion, SurveyQuestionsSchema } from "../model/types";
 
 const SURVEY_DEFINITIONS: SurveyDefinition[] = [
   {

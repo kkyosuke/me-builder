@@ -5,7 +5,7 @@ import {
   ParameterScoringConfigSchema,
   getParameterSummary,
   scoreParameters,
-} from "./parameter-scoring";
+} from "./scoring";
 import type { SurveyAnswer, SurveyQuestion } from "./types";
 
 type TestParameterId = "planning" | "flexibility";

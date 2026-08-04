@@ -1,5 +1,6 @@
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { type CSSProperties, type PointerEvent as ReactPointerEvent, useRef } from "react";
+import type { SurveyQuestion, SwipeDirection } from "../../model/types";
 import {
   type DragOffset,
   SWIPE_TRANSITION_MS,
@@ -8,8 +9,7 @@ import {
   isTapGesture,
   resolveChoiceProgress,
   resolveStackLayer,
-} from "../survey/swipe";
-import type { SurveyQuestion, SwipeDirection } from "../survey/types";
+} from "../swipe";
 import { SurveyIcon } from "./survey-icon";
 
 interface SwipeCardProps {

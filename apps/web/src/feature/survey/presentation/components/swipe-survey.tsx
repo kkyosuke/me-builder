@@ -12,10 +12,11 @@ import {
   createDeferredQuestion,
   createSurveyAnswer,
   summarizeInteractions,
-} from "../survey/answers";
-import { getParameterSummary } from "../survey/parameter-scoring";
-import { pickProgressMessage, resolveProgressMilestone } from "../survey/progress-message";
-import type { SurveyDefinition } from "../survey/questions";
+} from "../../model/answers";
+import { getParameterSummary } from "../../model/scoring";
+import type { SurveyDefinition } from "../../model/survey-definition";
+import type { SurveyInteraction, SwipeDirection } from "../../model/types";
+import { pickProgressMessage, resolveProgressMilestone } from "../progress-message";
 import {
   type DragOffset,
   SWIPE_TRANSITION_MS,
@@ -23,8 +24,7 @@ import {
   resolveKeyAction,
   resolveSwipeRelease,
   resolveSwipeThreshold,
-} from "../survey/swipe";
-import type { SurveyInteraction, SwipeDirection } from "../survey/types";
+} from "../swipe";
 import { SwipeCard } from "./swipe-card";
 
 /** 回答の確定に使える操作。スワイプ以外の手段も同じ関数へ流します。 */
@@ -122,7 +122,7 @@ function SurveyComplete({
  *
  * 1 問 1 画面で、カードを縦に重ねて最前面をドラッグします。スワイプ以外に選択ボタンと
  * キーボード（←／→、↓ であとで回答）でも回答できます。LINE 内は LIFF が主導線ですが
- * 外部ブラウザの導線も維持しているため（[プロジェクト概要 §4](../../../../docs/product/project-overview.md#4-想定する利用体験)）、
+ * 外部ブラウザの導線も維持しているため（[プロジェクト概要 §4](../../../../../../../docs/product/project-overview.md#4-想定する利用体験)）、
  * どちらでも操作できる状態を保ちます。
  */
 export function SwipeSurvey({

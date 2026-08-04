@@ -17,7 +17,7 @@ import {
   Users,
   Zap,
 } from "lucide-react";
-import type { SurveyIconName } from "../survey/types";
+import type { SurveyIconName } from "../../model/types";
 
 /**
  * アイコン名から lucide-react のコンポーネントへの対応。

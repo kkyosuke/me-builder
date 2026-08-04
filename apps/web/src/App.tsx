@@ -1,10 +1,14 @@
 import { ArrowLeft, ArrowRight, ClipboardList, Info, RotateCw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { SwipeSurvey } from "./components/swipe-survey";
 import { config } from "./config";
-import { getLiffIdToken, initializeLiff } from "./liff";
-import { type SurveyListItem, fetchSurveyList } from "./survey/list";
-import { type SurveyDefinition, fetchSurveyDefinitions } from "./survey/questions";
+import { getLiffIdToken, initializeLiff } from "./feature/liff";
+import {
+  type SurveyDefinition,
+  type SurveyListItem,
+  SwipeSurvey,
+  fetchSurveyDefinitions,
+  fetchSurveyList,
+} from "./feature/survey";
 
 const STATUS_LABELS: Record<SurveyListItem["responseStatus"], string> = {
   unanswered: "未回答",

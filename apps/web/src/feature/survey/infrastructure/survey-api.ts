@@ -1,4 +1,6 @@
 import * as v from "valibot";
+import { createHttpClient } from "../../../infrastructure/http-client";
+import type { SurveyListItem } from "../model/survey-list-item";
 
 const SurveyListItemSchema = v.object({
   id: v.pipe(v.string(), v.nonEmpty()),
@@ -16,16 +18,13 @@ const SurveyListResponseSchema = v.object({
   surveys: v.array(SurveyListItemSchema),
 });
 
-export type SurveyListItem = v.InferOutput<typeof SurveyListItemSchema>;
-
 /** LIFF IDトークンで本人確認し、回答進捗を含むアンケート一覧を取得する。 */
 export async function fetchSurveyList(
   apiUrl: string | undefined,
   idToken: string,
   signal?: AbortSignal,
 ): Promise<SurveyListItem[]> {
-  const endpoint = `${(apiUrl ?? "").replace(/\/$/, "")}/api/surveys`;
-  const response = await fetch(endpoint, {
+  const response = await createHttpClient(apiUrl).request("/api/surveys", {
     headers: { Authorization: `Bearer ${idToken}` },
     ...(signal ? { signal } : {}),
   });
