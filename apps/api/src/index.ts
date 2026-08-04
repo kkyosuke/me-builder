@@ -4,6 +4,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { config, getConfig } from "./config";
 import { postLiffSession, postLineWebhook } from "./controller/line";
+import { getSurveys } from "./controller/survey";
 import type { AppEnv } from "./types";
 
 const app = new Hono<AppEnv>();
@@ -55,6 +56,9 @@ app.post("/api/line/webhook", postLineWebhook);
 // 受け付けるのは ID トークンだけ。クライアントから送られてきた userId は
 // サーバー側で検証できないため識別子として使わない (なりすましを防ぐ)。
 app.post("/api/line/liff/session", postLiffSession);
+
+// LIFF ID トークンで本人確認し、Accountごとの回答進捗を含むアンケート一覧を返す。
+app.get("/api/surveys", getSurveys);
 
 // ルート
 app.get("/", (c) => {

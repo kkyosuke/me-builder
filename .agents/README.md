@@ -30,6 +30,7 @@
 | [インフラ・システム構成](../docs/architecture/infrastructure-architecture.md) | Cloudflareを全面的に採用したインフラ基盤、システム構成、サービス配置 |
 | [キャラクターデザイン](../docs/design/character-design.md) | うつし・ミラの名前、役割、外見設定、デザインアセットの置き場所と命名規則 |
 | [アンケートseed運用](../docs/development/questionnaire-seed.md) | Question、Question Version、Choice、SurveyをD1へ登録するseedの配置、実行、更新、検証方法 |
+| [アンケートAPI契約](../docs/development/questionnaire-api.md) | Web UIとAPI Server間のアンケートAPIのパス、認証、入出力、エラー契約 |
 | [PR作成手順書](../docs/development/pull-request-guidelines.md) | PRタイトルの命名規則、概要の書き方、作成前の準備・検証手順 |
 
 この表は各文書へのナビゲーションです。概念の定義そのものはリンク先だけに記載します。

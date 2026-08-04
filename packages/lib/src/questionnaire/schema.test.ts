@@ -23,6 +23,7 @@ describe("Questionnaire Valibot schemas", () => {
     const result = v.safeParse(CreateSurveyInputSchema, {
       id: "survey-1",
       title: "アンケート",
+      description: "アンケートの説明",
       opensAt: new Date("2026-08-02T00:00:00Z"),
       closesAt: new Date("2026-08-01T00:00:00Z"),
       questions: [

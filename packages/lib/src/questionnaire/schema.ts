@@ -79,6 +79,7 @@ export const CreateSurveyInputSchema = v.pipe(
   v.object({
     id: NonEmptyStringSchema,
     title: NonEmptyStringSchema,
+    description: NonEmptyStringSchema,
     opensAt: ValidDateSchema,
     closesAt: v.optional(ValidDateSchema),
     questions: v.pipe(v.array(SurveyQuestionInputSchema), v.minLength(1)),
@@ -109,6 +110,7 @@ export const SurveySchema = v.pipe(
   v.object({
     id: NonEmptyStringSchema,
     title: NonEmptyStringSchema,
+    description: NonEmptyStringSchema,
     opensAt: TimestampSchema,
     closesAt: v.optional(TimestampSchema),
     state: v.picklist(["draft", "published", "withdrawn"]),

@@ -32,6 +32,8 @@ seedはmigration適用後に明示的に実行します。アプリの起動や�
 
 `INSERT OR IGNORE`は同じ主キーの既存行を変更しません。そのため再実行前には、既存行がseedの期待内容と一致しているかを確認します。意図しない差分がある場合、SQLの上書き更新で解消せず、Question VersionまたはSurveyを新しく作ります。
 
+スキーマ拡張で既存行に新しい必須項目を追加した場合だけ、空の初期値を正式な値へ補完する条件付き`UPSERT`を許可します。既に値がある行は更新対象にせず、公開済み内容の変更には使いません。
+
 ## 4. 登録するアンケート
 
 現在のseedは次の公開済みSurveyを登録します。
@@ -41,7 +43,7 @@ seedはmigration適用後に明示的に実行します。アプリの起動や�
 | `relationship-priority` | 自分と相手の優先・境界線 | すべてversion 1 | 2026-08-04 00:00:00 UTC |
 | `money-values` | お金と消費 | すべてversion 1 | 2026-08-04 00:00:00 UTC |
 
-どちらも終了日時を持たず、Question Versionは`approved`、Surveyは`published`として登録します。Choiceの`presentation`にはWeb表示用のアイコン名をJSONで保持します。
+どちらも終了日時を持たず、Question Versionは`approved`、Surveyは`published`として登録します。Surveyには一覧表示用の短い説明を持たせ、Choiceの`presentation`にはWeb表示用のアイコン名をJSONで保持します。
 
 ## 5. 実行方法
 

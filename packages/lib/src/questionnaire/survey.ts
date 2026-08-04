@@ -21,6 +21,7 @@ export type SurveyQuestion = Readonly<{
 export type Survey = Readonly<{
   id: string;
   title: string;
+  description: string;
   opensAt: string;
   closesAt?: string;
   state: SurveyState;
@@ -38,6 +39,7 @@ export type SurveyQuestionInput = {
 export type CreateSurveyInput = {
   id: string;
   title: string;
+  description: string;
   opensAt: Date;
   closesAt?: Date;
   questions: readonly SurveyQuestionInput[];
@@ -60,6 +62,7 @@ export function createSurvey(input: CreateSurveyInput): QuestionnaireResult<Surv
   return success({
     id: input.id,
     title: input.title,
+    description: input.description,
     opensAt: input.opensAt.toISOString(),
     ...(input.closesAt ? { closesAt: input.closesAt.toISOString() } : {}),
     state: "draft",

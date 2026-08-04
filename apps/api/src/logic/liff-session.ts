@@ -68,7 +68,7 @@ export async function createLiffSession({
     return { type: "account-not-found" };
   }
 
-  logger.info({ accountId: resolved.account.id }, "Resolved account for the LIFF session");
+  logger.info("Resolved account for the LIFF session");
 
   return {
     type: "resolved",

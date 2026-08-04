@@ -35,6 +35,7 @@ function publishedSurvey(catalog: readonly Question[]): Survey {
   const created = createSurvey({
     id: "survey-1",
     title: "今日のアンケート",
+    description: "今日の価値観を確認します。",
     opensAt: new Date("2026-08-01T00:00:00Z"),
     closesAt: new Date("2026-08-02T00:00:00Z"),
     questions: [
