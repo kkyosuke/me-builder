@@ -17,7 +17,7 @@ flowchart LR
     D --> A[Survey API]
 ```
 
-seedはmigration適用後に明示的に実行します。アプリの起動や通常のデプロイに暗黙で組み込まず、特にproductionでは実行対象と差分を確認してから適用します。
+seedは必ずmigration適用後に実行します。localでは開発者が明示的に実行し、previewとproductionでは登録漏れを防ぐためCDがmigration直後に適用します。CDへ入る変更は、SQL差分と対象環境をレビューしてからマージします。
 
 ## 3. seedの原則
 
@@ -32,6 +32,8 @@ seedはmigration適用後に明示的に実行します。アプリの起動や�
 
 `INSERT OR IGNORE`は同じ主キーの既存行を変更しません。そのため再実行前には、既存行がseedの期待内容と一致しているかを確認します。意図しない差分がある場合、SQLの上書き更新で解消せず、Question VersionまたはSurveyを新しく作ります。
 
+スキーマ拡張で既存行に新しい必須項目を追加した場合だけ、空の初期値を正式な値へ補完する条件付き`UPSERT`を許可します。既に値がある行は更新対象にせず、公開済み内容の変更には使いません。
+
 ## 4. 登録するアンケート
 
 現在のseedは次の公開済みSurveyを登録します。
@@ -41,7 +43,7 @@ seedはmigration適用後に明示的に実行します。アプリの起動や�
 | `relationship-priority` | 自分と相手の優先・境界線 | すべてversion 1 | 2026-08-04 00:00:00 UTC |
 | `money-values` | お金と消費 | すべてversion 1 | 2026-08-04 00:00:00 UTC |
 
-どちらも終了日時を持たず、Question Versionは`approved`、Surveyは`published`として登録します。Choiceの`presentation`にはWeb表示用のアイコン名をJSONで保持します。
+どちらも終了日時を持たず、Question Versionは`approved`、Surveyは`published`として登録します。Surveyには一覧表示用の短い説明を持たせ、Choiceの`presentation`にはWeb表示用のアイコン名をJSONで保持します。
 
 ## 5. 実行方法
 
@@ -61,7 +63,7 @@ task db:migrate:production
 task db:seed:production
 ```
 
-previewとproductionはリモートD1を変更します。実行前に`packages/lib/wrangler.toml`のdatabase名とID、およびSQL差分を確認します。
+previewとproductionではCDがmigration直後に同じseedを自動適用します。上記コマンドは手動での再適用や復旧確認に使用します。リモートD1へ手動実行する場合は、事前に`packages/lib/wrangler.toml`のdatabase名とID、およびSQL差分を確認します。
 
 ```mermaid
 flowchart TD
@@ -100,7 +102,7 @@ SQL末尾の検証クエリは、現在のseedだけを適用した場合に次�
 2. Question VersionとChoiceを`approved`として追加する
 3. 新しいSurvey IDと固定した質問順を追加する
 4. localへ適用し、再実行と取得結果を検証する
-5. previewへ適用し、APIとWebから確認する
-6. productionの対象DBと差分を確認して適用する
+5. マージ後、preview CDの適用結果をAPIとWebから確認する
+6. production CDの対象DBと適用結果を確認する
 
 公開済みの内容を改訂するときは、既存のSQL行を書き換えて既存DBへ反映させようとしてはいけません。新しいQuestion VersionとSurveyを追記し、過去の回答が参照する版を残します。

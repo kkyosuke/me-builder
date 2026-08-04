@@ -22,6 +22,13 @@
       "when": 1785788943855,
       "tag": "0002_marvelous_hex",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1785808438264,
+      "tag": "0003_square_power_pack",
+      "breakpoints": true
     }
   ]
 }

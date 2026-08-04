@@ -51,6 +51,7 @@ function insertFixture() {
     .values({
       id: "survey-1",
       title: "アンケート",
+      description: "アンケートの説明",
       opensAt,
       state: "published",
       publishedAt: opensAt,

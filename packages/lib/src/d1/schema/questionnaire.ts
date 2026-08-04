@@ -66,6 +66,8 @@ export const questionChoices = sqliteTable(
 export const surveys = sqliteTable("surveys", {
   ...baseSchema,
   title: text("title").notNull(),
+  // 既存D1へ列を追加した直後だけ空文字になり、questionnaire seedが正式な説明へ補完する。
+  description: text("description").notNull().default(""),
   opensAt: integer("opens_at", { mode: "timestamp" }).notNull(),
   closesAt: integer("closes_at", { mode: "timestamp" }),
   state: text("state", { enum: ["draft", "published", "withdrawn"] }).notNull(),

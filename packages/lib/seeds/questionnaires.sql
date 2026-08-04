@@ -2,8 +2,9 @@
 --
 -- Apply the schema migrations before executing this file. This seed is intentionally
 -- separate from Drizzle migrations because questionnaire content has its own
--- publication lifecycle. Existing rows are never updated: revise published content
--- by adding a new Question Version and a new Survey instead.
+-- publication lifecycle. Existing published content is not updated. The only UPSERT
+-- below fills the description column added after the initial seed, and only while empty.
+-- Revise published content by adding a new Question Version and a new Survey instead.
 --
 -- Timestamp: 2026-08-04T00:00:00.000Z (Unix seconds, as used by Drizzle timestamp mode).
 
@@ -28,6 +29,7 @@ INSERT OR IGNORE INTO questions (id, created_at, updated_at, is_deleted) VALUES
   ('q-money-08', 1785801600, 1785801600, 0),
   ('q-money-09', 1785801600, 1785801600, 0),
   ('q-money-10', 1785801600, 1785801600, 0);
+--> statement-breakpoint
 
 INSERT OR IGNORE INTO question_versions (
   created_at,
@@ -60,6 +62,7 @@ INSERT OR IGNORE INTO question_versions (
   (1785801600, 1785801600, 0, 'q-money-08', 1, 'approved', '投資には、元本割れの可能性があっても挑戦したい。', 'single_choice', 1785801600),
   (1785801600, 1785801600, 0, 'q-money-09', 1, 'approved', '家事や時間の負担が多い人は、生活費の負担が少なくてもよいと思う。', 'single_choice', 1785801600),
   (1785801600, 1785801600, 0, 'q-money-10', 1, 'approved', '家計を一緒にする場合でも、自由に使える個人のお金を残したい。', 'single_choice', 1785801600);
+--> statement-breakpoint
 
 INSERT OR IGNORE INTO question_choices (
   created_at,
@@ -92,6 +95,7 @@ WHERE id IN (
   'q-money-01', 'q-money-02', 'q-money-03', 'q-money-04', 'q-money-05',
   'q-money-06', 'q-money-07', 'q-money-08', 'q-money-09', 'q-money-10'
 );
+--> statement-breakpoint
 
 INSERT OR IGNORE INTO question_choices (
   created_at,
@@ -124,19 +128,25 @@ WHERE id IN (
   'q-money-01', 'q-money-02', 'q-money-03', 'q-money-04', 'q-money-05',
   'q-money-06', 'q-money-07', 'q-money-08', 'q-money-09', 'q-money-10'
 );
+--> statement-breakpoint
 
-INSERT OR IGNORE INTO surveys (
+INSERT INTO surveys (
   id,
   created_at,
   updated_at,
   is_deleted,
   title,
+  description,
   opens_at,
   state,
   published_at
 ) VALUES
-  ('relationship-priority', 1785801600, 1785801600, 0, '自分と相手の優先・境界線', 1785801600, 'published', 1785801600),
-  ('money-values', 1785801600, 1785801600, 0, 'お金と消費', 1785801600, 'published', 1785801600);
+  ('relationship-priority', 1785801600, 1785801600, 0, '自分と相手の優先・境界線', '頼まれごとや意思決定で、自分と相手をどう尊重するかを見ます。', 1785801600, 'published', 1785801600),
+  ('money-values', 1785801600, 1785801600, 0, 'お金と消費', '貯蓄、支出、共有、公平性、リスクに関する傾向を見ます。', 1785801600, 'published', 1785801600)
+ON CONFLICT(id) DO UPDATE SET
+  description = excluded.description
+WHERE surveys.description = '';
+--> statement-breakpoint
 
 INSERT OR IGNORE INTO survey_questions (
   id,
@@ -168,11 +178,12 @@ INSERT OR IGNORE INTO survey_questions (
   ('sq-money-08', 1785801600, 1785801600, 0, 'money-values', 'q-money-08', 1, 7),
   ('sq-money-09', 1785801600, 1785801600, 0, 'money-values', 'q-money-09', 1, 8),
   ('sq-money-10', 1785801600, 1785801600, 0, 'money-values', 'q-money-10', 1, 9);
+--> statement-breakpoint
 
 -- Expected result: survey_count=2, question_version_count=20,
 -- choice_count=40, survey_question_count=20.
 SELECT
-  (SELECT COUNT(*) FROM surveys WHERE id IN ('relationship-priority', 'money-values') AND state = 'published' AND is_deleted = 0) AS survey_count,
+  (SELECT COUNT(*) FROM surveys WHERE id IN ('relationship-priority', 'money-values') AND state = 'published' AND description <> '' AND is_deleted = 0) AS survey_count,
   (SELECT COUNT(*) FROM question_versions WHERE version = 1 AND state = 'approved' AND is_deleted = 0 AND (question_id LIKE 'q-relationship-priority-%' OR question_id LIKE 'q-money-%')) AS question_version_count,
   (SELECT COUNT(*) FROM question_choices WHERE question_version = 1 AND is_deleted = 0 AND (question_id LIKE 'q-relationship-priority-%' OR question_id LIKE 'q-money-%')) AS choice_count,
   (SELECT COUNT(*) FROM survey_questions WHERE survey_id IN ('relationship-priority', 'money-values') AND is_deleted = 0) AS survey_question_count;

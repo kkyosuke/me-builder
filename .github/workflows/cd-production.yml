@@ -42,6 +42,10 @@ jobs:
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
         run: task db:migrate:production
 
+      - name: Apply Questionnaire Seed (Production)
+        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
+        run: task db:seed:production
+
       - name: Deploy to Cloudflare Production
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
         run: task deploy:production

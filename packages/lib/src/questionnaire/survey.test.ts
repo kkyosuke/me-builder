@@ -24,6 +24,7 @@ function createDraftSurvey() {
   const result = createSurvey({
     id: "daily-2026-08-01",
     title: "今日のアンケート",
+    description: "今日の価値観を確認します。",
     opensAt: new Date("2026-08-01T00:00:00Z"),
     closesAt: new Date("2026-08-02T00:00:00Z"),
     questions: [
@@ -52,12 +53,14 @@ describe("Survey aggregate", () => {
     const empty = createSurvey({
       id: "empty",
       title: "empty",
+      description: "empty survey",
       opensAt: new Date("2026-08-01T00:00:00Z"),
       questions: [],
     });
     const duplicate = createSurvey({
       id: "duplicate",
       title: "duplicate",
+      description: "duplicate survey",
       opensAt: new Date("2026-08-01T00:00:00Z"),
       questions: [
         { id: "sq-1", questionId: "q1", questionVersion: 1 },
@@ -67,6 +70,7 @@ describe("Survey aggregate", () => {
     const invalidPeriod = createSurvey({
       id: "period",
       title: "period",
+      description: "period survey",
       opensAt: new Date("2026-08-02T00:00:00Z"),
       closesAt: new Date("2026-08-01T00:00:00Z"),
       questions: [{ id: "sq-1", questionId: "q1", questionVersion: 1 }],
@@ -114,6 +118,7 @@ describe("Survey aggregate", () => {
     const survey = createSurvey({
       id: "survey",
       title: "survey",
+      description: "retired question survey",
       opensAt: new Date("2026-08-01T00:00:00Z"),
       questions: [{ id: "sq-1", questionId: "q1", questionVersion: 1 }],
     });
