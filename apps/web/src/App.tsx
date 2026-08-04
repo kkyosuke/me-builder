@@ -6,9 +6,10 @@ import {
   type SurveyDefinition,
   type SurveyListItem,
   SwipeSurvey,
-  fetchSurveyDefinitions,
+  fetchSurveyDefinition,
   fetchSurveyList,
 } from "./feature/survey";
+import { OperationError } from "./infrastructure/errors";
 
 const STATUS_LABELS: Record<SurveyListItem["responseStatus"], string> = {
   unanswered: "未回答",
@@ -125,7 +126,7 @@ function SurveyDetail({ survey, onBack }: { survey: SurveyDefinition; onBack: ()
   );
 }
 
-type GuidanceKind = "closed" | "answered" | "in-progress" | "unsupported";
+type GuidanceKind = "closed" | "answered" | "in-progress" | "unsupported" | "load-error";
 
 const GUIDANCE: Record<GuidanceKind, { title: string; message: string }> = {
   closed: {
@@ -146,6 +147,10 @@ const GUIDANCE: Record<GuidanceKind, { title: string; message: string }> = {
     title: "このアンケートは現在のアプリでは未対応です",
     message:
       "一覧には表示されていますが、回答画面の準備ができていません。対応までしばらくお待ちください。",
+  },
+  "load-error": {
+    title: "アンケートを読み込めませんでした",
+    message: "通信状態を確認して、アンケート一覧からもう一度開いてください。",
   },
 };
 
@@ -170,13 +175,7 @@ function Guidance({ kind, onBack }: { kind: GuidanceKind; onBack: () => void }) 
   );
 }
 
-function resolveSurveyDestination(
-  survey: SurveyListItem,
-  definition: SurveyDefinition | undefined,
-): "answer" | GuidanceKind {
-  if (!definition) {
-    return "unsupported";
-  }
+function resolveSurveyDestination(survey: SurveyListItem): "answer" | GuidanceKind {
   if (survey.responseStatus === "answered") {
     return "answered";
   }
@@ -191,13 +190,18 @@ function resolveSurveyDestination(
 
 export function App() {
   const [surveys, setSurveys] = useState<SurveyListItem[] | null>(null);
-  const [surveyDefinitions, setSurveyDefinitions] = useState<SurveyDefinition[]>([]);
   const [selectedSurvey, setSelectedSurvey] = useState<SurveyListItem | null>(null);
+  const [selectedDefinition, setSelectedDefinition] = useState<SurveyDefinition | null>(null);
+  const [detailState, setDetailState] = useState<"idle" | "loading" | "unsupported" | "error">(
+    "idle",
+  );
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const mounted = useRef(false);
   const loading = useRef(false);
   const request = useRef<AbortController | null>(null);
+  const detailRequest = useRef<AbortController | null>(null);
+  const idToken = useRef<string | null>(null);
 
   const loadSurveys = useCallback(async (): Promise<void> => {
     if (loading.current) {
@@ -228,18 +232,15 @@ export function App() {
         );
       }
 
-      const idToken = getLiffIdToken();
-      if (!idToken) {
+      const currentIdToken = getLiffIdToken();
+      if (!currentIdToken) {
         throw new Error("IDトークンを取得できませんでした。LINEから開き直してください。");
       }
+      idToken.current = currentIdToken;
 
-      const [loadedSurveys, definitions] = await Promise.all([
-        fetchSurveyList(config.apiUrl, idToken, controller.signal),
-        fetchSurveyDefinitions(),
-      ]);
+      const loadedSurveys = await fetchSurveyList(config.apiUrl, currentIdToken, controller.signal);
       if (mounted.current && !controller.signal.aborted) {
         setSurveys(loadedSurveys);
-        setSurveyDefinitions(definitions);
       }
     } catch (error) {
       if (mounted.current && !controller.signal.aborted) {
@@ -267,15 +268,71 @@ export function App() {
       active = false;
       mounted.current = false;
       request.current?.abort();
+      detailRequest.current?.abort();
       loading.current = false;
     };
   }, [loadSurveys]);
 
+  const openSurvey = useCallback(async (survey: SurveyListItem): Promise<void> => {
+    setSelectedSurvey(survey);
+    setSelectedDefinition(null);
+    const destination = resolveSurveyDestination(survey);
+    if (destination !== "answer") {
+      setDetailState("idle");
+      return;
+    }
+
+    const currentIdToken = idToken.current;
+    if (!currentIdToken) {
+      setDetailState("error");
+      return;
+    }
+    detailRequest.current?.abort();
+    const controller = new AbortController();
+    detailRequest.current = controller;
+    setDetailState("loading");
+    try {
+      const definition = await fetchSurveyDefinition(
+        config.apiUrl,
+        currentIdToken,
+        survey.id,
+        controller.signal,
+      );
+      if (!controller.signal.aborted && mounted.current) {
+        setSelectedDefinition(definition ?? null);
+        setDetailState(definition ? "idle" : "unsupported");
+      }
+    } catch (error) {
+      if (!controller.signal.aborted && mounted.current) {
+        if (error instanceof OperationError && error.code === "SURVEY_UNAVAILABLE") {
+          setDetailState("unsupported");
+        } else if (error instanceof OperationError && error.code === "SURVEY_CLOSED") {
+          setSelectedSurvey({ ...survey, availability: "closed" });
+          setDetailState("idle");
+        } else {
+          setDetailState("error");
+        }
+      }
+    }
+  }, []);
+
   if (selectedSurvey) {
-    const definition = surveyDefinitions.find(({ id }) => id === selectedSurvey.id);
-    const destination = resolveSurveyDestination(selectedSurvey, definition);
-    if (destination === "answer" && definition) {
-      return <SurveyDetail survey={definition} onBack={() => setSelectedSurvey(null)} />;
+    const destination = resolveSurveyDestination(selectedSurvey);
+    if (destination === "answer" && selectedDefinition) {
+      return <SurveyDetail survey={selectedDefinition} onBack={() => setSelectedSurvey(null)} />;
+    }
+    if (destination === "answer" && detailState === "loading") {
+      return (
+        <main className="mx-auto min-h-dvh w-full max-w-2xl px-4 py-8 text-center text-sm text-slate-400 sm:px-8">
+          アンケートを読み込んでいます...
+        </main>
+      );
+    }
+    if (destination === "answer" && detailState === "unsupported") {
+      return <Guidance kind="unsupported" onBack={() => setSelectedSurvey(null)} />;
+    }
+    if (destination === "answer" && detailState === "error") {
+      return <Guidance kind="load-error" onBack={() => setSelectedSurvey(null)} />;
     }
     if (destination !== "answer") {
       return <Guidance kind={destination} onBack={() => setSelectedSurvey(null)} />;
@@ -287,7 +344,7 @@ export function App() {
       surveys={surveys}
       loadError={loadError}
       isLoading={isLoading}
-      onOpenSurvey={setSelectedSurvey}
+      onOpenSurvey={(survey) => void openSurvey(survey)}
       onRetry={() => void loadSurveys()}
     />
   );

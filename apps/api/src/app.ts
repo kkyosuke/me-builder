@@ -7,9 +7,10 @@ import { getConfig } from "./config";
 import { liffSessionRoute } from "./contract/line/liff-session";
 import { openApiOptions } from "./contract/openapi";
 import { InternalServerErrorSchema } from "./contract/shared/errors";
+import { surveyDetailRoute } from "./contract/survey/detail";
 import { surveyListRoute } from "./contract/survey/list";
 import { postLiffSession, postLineWebhook } from "./controller/line";
-import { getSurveys } from "./controller/survey";
+import { getSurvey, getSurveys } from "./controller/survey";
 import type { AppEnv } from "./types";
 
 const app = new Hono<AppEnv>();
@@ -55,6 +56,7 @@ app.post("/api/line/webhook", postLineWebhook);
 app.post("/api/line/liff/session", liffSessionRoute, postLiffSession);
 
 app.get("/api/surveys", surveyListRoute, getSurveys);
+app.get("/api/surveys/:surveyId", surveyDetailRoute, getSurvey);
 
 // Web UIの型生成にも使う、機械可読なAPI契約。
 app.get("/api/openapi.json", openAPIRouteHandler(app, openApiOptions));

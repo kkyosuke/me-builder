@@ -1,0 +1,54 @@
+# API契約の正: docs/development/questionnaire-api.md
+# 実行するテスト: apps/api/src/e2e/survey-list.test.ts
+cases:
+  - id: LIST-001
+    in:
+      method: GET
+      path: /api/surveys
+      authorization: Bearer known-token
+      setup:
+        - migrationとquestionnaire seedを適用
+        - money-valuesへ1問、relationship-priorityへ10問の回答を登録
+    out:
+      status: 200
+      body:
+        surveys:
+          money-values:
+            responseStatus: in-progress
+            answeredCount: 1
+            questionCount: 10
+          relationship-priority:
+            responseStatus: answered
+            answeredCount: 10
+            questionCount: 10
+
+  - id: LIST-002
+    in:
+      method: GET
+      path: /api/surveys
+      authorization: null
+    out:
+      status: 401
+      body:
+        error: Unauthorized
+
+  - id: LIST-003
+    in:
+      method: GET
+      path: /api/surveys
+      authorization: Bearer invalid-token
+    out:
+      status: 401
+      body:
+        error: Unauthorized
+
+  - id: LIST-004
+    in:
+      method: GET
+      path: /api/surveys
+      authorization: Bearer unknown-token
+    out:
+      status: 404
+      body:
+        error: Account not found
+        reason: friendship_required

@@ -5,12 +5,13 @@ import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import type { SurveyDefinition, SurveyListItem } from "./feature/survey";
+import { OperationError } from "./infrastructure/errors";
 
 const mocks = vi.hoisted(() => ({
   initializeLiff: vi.fn(),
   getLiffIdToken: vi.fn(),
   fetchSurveyList: vi.fn(),
-  fetchSurveyDefinitions: vi.fn(),
+  fetchSurveyDefinition: vi.fn(),
 }));
 
 vi.mock("./config", () => ({
@@ -22,7 +23,7 @@ vi.mock("./feature/liff", () => ({
 }));
 vi.mock("./feature/survey", () => ({
   fetchSurveyList: mocks.fetchSurveyList,
-  fetchSurveyDefinitions: mocks.fetchSurveyDefinitions,
+  fetchSurveyDefinition: mocks.fetchSurveyDefinition,
   SwipeSurvey: ({ survey }: { survey: SurveyDefinition }) => <p>{`回答UI: ${survey.title}`}</p>,
 }));
 
@@ -60,7 +61,7 @@ describe("App", () => {
     });
     mocks.getLiffIdToken.mockReturnValue("dummy.id.token");
     mocks.fetchSurveyList.mockResolvedValue([survey()]);
-    mocks.fetchSurveyDefinitions.mockResolvedValue([definition]);
+    mocks.fetchSurveyDefinition.mockResolvedValue(definition);
   });
 
   afterEach(() => cleanup());
@@ -70,7 +71,7 @@ describe("App", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: /テストアンケート/ }));
 
-    expect(screen.getByText("回答UI: テストアンケート")).toBeTruthy();
+    expect(await screen.findByText("回答UI: テストアンケート")).toBeTruthy();
     expect(screen.getByText(/この回答はサーバーへ保存されません/)).toBeTruthy();
   });
 
@@ -109,15 +110,35 @@ describe("App", () => {
     expect(screen.queryByText(/回答UI:/)).toBeNull();
   });
 
-  it("ローカル定義がないアンケートを選ぶと未対応の案内へ進む", async () => {
-    mocks.fetchSurveyDefinitions.mockResolvedValue([]);
+  it("ローカルのスコア設定がないアンケートを選ぶと未対応の案内へ進む", async () => {
+    mocks.fetchSurveyDefinition.mockResolvedValue(undefined);
     render(<App />);
 
     fireEvent.click(await screen.findByRole("button", { name: /テストアンケート/ }));
 
     expect(
-      screen.getByRole("heading", { name: "このアンケートは現在のアプリでは未対応です" }),
+      await screen.findByRole("heading", {
+        name: "このアンケートは現在のアプリでは未対応です",
+      }),
     ).toBeTruthy();
+  });
+
+  it.each([
+    {
+      code: "SURVEY_UNAVAILABLE",
+      heading: "このアンケートは現在のアプリでは未対応です",
+    },
+    {
+      code: "SURVEY_CLOSED",
+      heading: "このアンケートは受付を終了しました",
+    },
+  ])("詳細取得の$codeを対応する案内へ変換する", async ({ code, heading }) => {
+    mocks.fetchSurveyDefinition.mockRejectedValue(new OperationError("detail error", { code }));
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /テストアンケート/ }));
+
+    expect(await screen.findByRole("heading", { name: heading })).toBeTruthy();
   });
 
   it("一覧取得失敗後の再試行でLIFF初期化と一覧取得を同じ順序で再実行する", async () => {
@@ -133,7 +154,7 @@ describe("App", () => {
     expect(await screen.findByRole("button", { name: /テストアンケート/ })).toBeTruthy();
     expect(mocks.initializeLiff).toHaveBeenCalledTimes(2);
     expect(mocks.fetchSurveyList).toHaveBeenCalledTimes(2);
-    expect(mocks.fetchSurveyDefinitions).toHaveBeenCalledTimes(2);
+    expect(mocks.fetchSurveyDefinition).not.toHaveBeenCalled();
   });
 
   it("Strict Modeでも一覧取得を多重実行しない", async () => {
