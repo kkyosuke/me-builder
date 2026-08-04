@@ -1,4 +1,4 @@
-import { and, asc, countDistinct, desc, eq, lte } from "drizzle-orm";
+import { and, asc, count, desc, eq, lte } from "drizzle-orm";
 import type { D1Client } from "../client";
 import { surveyAnswers, surveyQuestions, surveyResponses, surveys } from "../schema/questionnaire";
 
@@ -35,8 +35,8 @@ export async function listVisibleSurveys(
       description: surveys.description,
       opensAt: surveys.opensAt,
       closesAt: surveys.closesAt,
-      questionCount: countDistinct(surveyQuestions.id),
-      answeredCount: countDistinct(surveyAnswers.id),
+      questionCount: count(surveyQuestions.id),
+      answeredCount: count(surveyAnswers.id),
     })
     .from(surveys)
     .innerJoin(
@@ -55,6 +55,7 @@ export async function listVisibleSurveys(
       surveyAnswers,
       and(
         eq(surveyAnswers.surveyResponseId, surveyResponses.id),
+        eq(surveyAnswers.surveyQuestionId, surveyQuestions.id),
         eq(surveyAnswers.isDeleted, false),
       ),
     )

@@ -33,7 +33,7 @@ async function applyMigrations(db: D1Database): Promise<void> {
 
 async function applySeed(db: D1Database, sql: string): Promise<void> {
   const statements = sql
-    .split(";")
+    .split("--> statement-breakpoint")
     .map((statement) => statement.trim())
     .filter(Boolean);
 

@@ -29,6 +29,7 @@ INSERT OR IGNORE INTO questions (id, created_at, updated_at, is_deleted) VALUES
   ('q-money-08', 1785801600, 1785801600, 0),
   ('q-money-09', 1785801600, 1785801600, 0),
   ('q-money-10', 1785801600, 1785801600, 0);
+--> statement-breakpoint
 
 INSERT OR IGNORE INTO question_versions (
   created_at,
@@ -61,6 +62,7 @@ INSERT OR IGNORE INTO question_versions (
   (1785801600, 1785801600, 0, 'q-money-08', 1, 'approved', '投資には、元本割れの可能性があっても挑戦したい。', 'single_choice', 1785801600),
   (1785801600, 1785801600, 0, 'q-money-09', 1, 'approved', '家事や時間の負担が多い人は、生活費の負担が少なくてもよいと思う。', 'single_choice', 1785801600),
   (1785801600, 1785801600, 0, 'q-money-10', 1, 'approved', '家計を一緒にする場合でも、自由に使える個人のお金を残したい。', 'single_choice', 1785801600);
+--> statement-breakpoint
 
 INSERT OR IGNORE INTO question_choices (
   created_at,
@@ -93,6 +95,7 @@ WHERE id IN (
   'q-money-01', 'q-money-02', 'q-money-03', 'q-money-04', 'q-money-05',
   'q-money-06', 'q-money-07', 'q-money-08', 'q-money-09', 'q-money-10'
 );
+--> statement-breakpoint
 
 INSERT OR IGNORE INTO question_choices (
   created_at,
@@ -125,6 +128,7 @@ WHERE id IN (
   'q-money-01', 'q-money-02', 'q-money-03', 'q-money-04', 'q-money-05',
   'q-money-06', 'q-money-07', 'q-money-08', 'q-money-09', 'q-money-10'
 );
+--> statement-breakpoint
 
 INSERT INTO surveys (
   id,
@@ -142,6 +146,7 @@ INSERT INTO surveys (
 ON CONFLICT(id) DO UPDATE SET
   description = excluded.description
 WHERE surveys.description = '';
+--> statement-breakpoint
 
 INSERT OR IGNORE INTO survey_questions (
   id,
@@ -173,6 +178,7 @@ INSERT OR IGNORE INTO survey_questions (
   ('sq-money-08', 1785801600, 1785801600, 0, 'money-values', 'q-money-08', 1, 7),
   ('sq-money-09', 1785801600, 1785801600, 0, 'money-values', 'q-money-09', 1, 8),
   ('sq-money-10', 1785801600, 1785801600, 0, 'money-values', 'q-money-10', 1, 9);
+--> statement-breakpoint
 
 -- Expected result: survey_count=2, question_version_count=20,
 -- choice_count=40, survey_question_count=20.

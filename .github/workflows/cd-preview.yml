@@ -51,6 +51,10 @@ jobs:
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
         run: task db:migrate:preview
 
+      - name: Apply Questionnaire Seed (Preview)
+        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
+        run: task db:seed:preview
+
       - name: Deploy to Cloudflare Preview
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
         run: task deploy:preview
