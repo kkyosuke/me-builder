@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { initializeLiff, verifyLiffSession } from "./index";
+import { getLiffIdToken, initializeLiff, verifyLiffSession } from "./index";
 
 const mockLiff = vi.hoisted(() => ({
   init: vi.fn(),
@@ -154,5 +154,21 @@ describe("verifyLiffSession", () => {
     });
 
     expect(await verifyLiffSession(API_URL)).toMatchObject({ status: "error" });
+  });
+});
+
+describe("getLiffIdToken", () => {
+  it("LIFF SDKのIDトークンを返すこと", () => {
+    mockLiff.getIDToken.mockReturnValue("dummy.id.token");
+
+    expect(getLiffIdToken()).toBe("dummy.id.token");
+  });
+
+  it("IDトークンを取得できない場合はnullを返すこと", () => {
+    mockLiff.getIDToken.mockImplementation(() => {
+      throw new Error("LIFF is not initialized");
+    });
+
+    expect(getLiffIdToken()).toBeNull();
   });
 });

@@ -41,6 +41,16 @@ export type LiffSessionState =
 const toMessage = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
 
+/** 初期化済みのLIFF SDKから、API認証に使うIDトークンを取得する。 */
+export function getLiffIdToken(): string | null {
+  try {
+    return liff.getIDToken();
+  } catch (error) {
+    logger.warn(`ID トークンを取得できませんでした: ${toMessage(error)}`);
+    return null;
+  }
+}
+
 /**
  * LIFF を初期化し、ログイン状態に応じた表示用の状態を返します。
  *
@@ -98,13 +108,7 @@ export async function initializeLiff(liffId: string | undefined): Promise<LiffSt
  * 検証できないため、識別子は署名付きの ID トークンで渡します。トークンはログへ出力しません。
  */
 export async function verifyLiffSession(apiUrl: string | undefined): Promise<LiffSessionState> {
-  let token: string | null;
-  try {
-    token = liff.getIDToken();
-  } catch (error) {
-    logger.warn(`ID トークンを取得できませんでした: ${toMessage(error)}`);
-    return { status: "error", message: "ID トークンを取得できませんでした" };
-  }
+  const token = getLiffIdToken();
 
   if (!token) {
     // openid スコープが無い場合、liff.getIDToken() は null を返す

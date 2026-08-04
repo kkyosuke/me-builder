@@ -2,15 +2,22 @@ import { ArrowLeft, ArrowRight, ClipboardList } from "lucide-react";
 import { useEffect, useState } from "react";
 import { SwipeSurvey } from "./components/swipe-survey";
 import { config } from "./config";
-import { initializeLiff, verifyLiffSession } from "./liff";
+import { getLiffIdToken, initializeLiff } from "./liff";
+import { type SurveyListItem, fetchSurveyList } from "./survey/list";
 import { type SurveyDefinition, fetchSurveyDefinitions } from "./survey/questions";
+
+const STATUS_LABELS: Record<SurveyListItem["responseStatus"], string> = {
+  unanswered: "未回答",
+  "in-progress": "回答途中",
+  answered: "回答済み",
+};
 
 function Home({
   surveys,
   loadError,
   onOpenSurvey,
 }: {
-  surveys: SurveyDefinition[] | null;
+  surveys: SurveyListItem[] | null;
   loadError: string | null;
   onOpenSurvey: (surveyId: string) => void;
 }) {
@@ -33,6 +40,11 @@ function Home({
             アンケートを読み込んでいます...
           </p>
         )}
+        {!loadError && surveys?.length === 0 && (
+          <p className="col-span-2 rounded-3xl border border-slate-700 bg-slate-800 p-6 text-center text-sm text-slate-400">
+            回答できるアンケートはありません。
+          </p>
+        )}
         {surveys?.map((survey) => (
           <button
             key={survey.id}
@@ -51,9 +63,15 @@ function Home({
             </span>
             <span className="mt-auto flex items-end justify-between gap-2 pt-5">
               <span>
-                <span className="block text-xs text-slate-500">{survey.questions.length}問</span>
+                <span className="block text-xs text-slate-500">
+                  {survey.responseStatus === "in-progress"
+                    ? `${survey.answeredCount} / ${survey.questionCount}問`
+                    : `${survey.questionCount}問`}
+                </span>
                 <span className="mt-1 inline-flex rounded-full bg-amber-400/10 px-2 py-1 text-xs font-semibold text-amber-300">
-                  未回答
+                  {survey.availability === "closed"
+                    ? "受付終了"
+                    : STATUS_LABELS[survey.responseStatus]}
                 </span>
               </span>
               <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-sky-400 text-slate-900 transition group-hover:translate-x-0.5">
@@ -85,39 +103,55 @@ function SurveyDetail({ survey, onBack }: { survey: SurveyDefinition; onBack: ()
 }
 
 export function App() {
-  const [surveys, setSurveys] = useState<SurveyDefinition[] | null>(null);
+  const [surveys, setSurveys] = useState<SurveyListItem[] | null>(null);
+  const [surveyDefinitions, setSurveyDefinitions] = useState<SurveyDefinition[]>([]);
   const [selectedSurveyId, setSelectedSurveyId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    fetchSurveyDefinitions()
-      .then((loaded) => {
-        if (!cancelled) {
-          setSurveys(loaded);
+
+    async function loadSurveys(): Promise<void> {
+      try {
+        const liffState = await initializeLiff(config.liffId);
+        if (liffState.status !== "ready") {
+          if (liffState.status === "login-required") {
+            return;
+          }
+          throw new Error(
+            liffState.status === "error"
+              ? liffState.message
+              : "LINEからアンケート画面を開いてください。",
+          );
         }
-      })
-      .catch((error: unknown) => {
+
+        const idToken = getLiffIdToken();
+        if (!idToken) {
+          throw new Error("IDトークンを取得できませんでした。LINEから開き直してください。");
+        }
+
+        const [loadedSurveys, definitions] = await Promise.all([
+          fetchSurveyList(config.apiUrl, idToken),
+          fetchSurveyDefinitions(),
+        ]);
+        if (!cancelled) {
+          setSurveys(loadedSurveys);
+          setSurveyDefinitions(definitions);
+        }
+      } catch (error) {
         if (!cancelled) {
           setLoadError(error instanceof Error ? error.message : String(error));
         }
-      });
+      }
+    }
+
+    void loadSurveys();
     return () => {
       cancelled = true;
     };
   }, []);
 
-  useEffect(() => {
-    // 画面から開発用の接続表示を外しても、LINE 内のログインとサーバー側の本人確認は維持します。
-    void initializeLiff(config.liffId).then((state) => {
-      if (state.status === "ready") {
-        return verifyLiffSession(config.apiUrl);
-      }
-      return undefined;
-    });
-  }, []);
-
-  const selectedSurvey = surveys?.find(({ id }) => id === selectedSurveyId);
+  const selectedSurvey = surveyDefinitions.find(({ id }) => id === selectedSurveyId);
 
   return selectedSurvey ? (
     <SurveyDetail survey={selectedSurvey} onBack={() => setSelectedSurveyId(null)} />
