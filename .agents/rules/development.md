@@ -30,6 +30,9 @@
     - `task db:migrate:local` (または `task db:migrate`): D1 データベースマイグレーションのローカル適用
     - `task db:migrate:preview`: プレビュー環境への D1 データベースマイグレーション適用
     - `task db:migrate:production`: 本番環境への D1 データベースマイグレーション適用
+    - `task db:seed:local`: ローカルD1へアンケートseedを適用
+    - `task db:seed:preview`: プレビューD1へアンケートseedを適用
+    - `task db:seed:production`: 本番D1へアンケートseedを明示的に適用
     - `task deploy:preview`: D1 マイグレーション適用および全アプリのプレビュー環境へのデプロイ (`wrangler deploy --env preview`, `wrangler pages deploy`)
     - `task deploy:production`: D1 マイグレーション適用および全アプリの本番環境へのデプロイ (`wrangler deploy --env production`, `wrangler pages deploy`)
   - **CI/CD ワークフロー構造 (`.github/workflows/ci-*.yml`, `.github/workflows/cd-*.yml`)**:
