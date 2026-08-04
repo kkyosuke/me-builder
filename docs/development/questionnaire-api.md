@@ -72,3 +72,36 @@ LINEのIDトークン検証エンドポイントだけは外部通信を行わ�
 テストごとに独立したインメモリD1を作り、終了時にMiniflareを破棄します。開発者の`.wrangler/state`やpreview、productionのD1は使用しません。
 
 単独で実行する場合は`bun --cwd apps/api test:e2e`を使います。通常の`task ci`にも含まれます。
+
+## 6. OpenAPIとWeb型の生成
+
+人が判断する認証・エラー・利用条件はこの文書が所有します。機械可読なHTTP schemaは[`apps/api/src/openapi.ts`](../../apps/api/src/openapi.ts)のValibot schemaを正とし、API controllerも同じschemaで入出力を検証します。
+
+OpenAPI documentとWeb用TypeScript型は次の流れで生成します。生成物は直接編集しません。
+
+```mermaid
+flowchart LR
+  Schema[API Valibot schema] --> OpenAPI[apps/api/openapi.json]
+  OpenAPI --> Types[apps/web/src/generated/api.ts]
+  Types --> Adapter[feature infrastructure adapter]
+  Adapter --> Model[feature model]
+```
+
+```text
+apps/
+├── api/
+│   ├── src/openapi.ts        # 機械可読なHTTP schema
+│   └── openapi.json          # 生成物
+└── web/src/
+    ├── generated/api.ts      # 生成物
+    └── feature/*/infrastructure/
+                               # 生成DTOをfeature modelへ変換
+```
+
+両方の生成物はルートで次を実行して更新します。
+
+```bash
+task generate:api
+```
+
+API Serverは同じdocumentを`GET /api/openapi.json`でも公開します。`task ci`とGitHub Actionsは再生成後にGit差分が残らないことを検査するため、schema変更時は生成物も同じcommitへ含めます。

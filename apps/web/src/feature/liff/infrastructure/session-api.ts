@@ -1,10 +1,14 @@
 import { logger } from "@me-builder/shared";
+import type { operations } from "../../../generated/api";
 import { createHttpClient } from "../../../infrastructure/http-client";
 import type { LiffSessionState } from "../model/types";
 import { getLiffIdToken } from "./liff-client";
 
 const toMessage = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
+
+type LiffSessionRequest =
+  operations["verifyLiffSession"]["requestBody"]["content"]["application/json"];
 
 /** IDトークンをAPIへ送り、サーバー側で本人性を検証してAccountを解決させる。 */
 export async function verifyLiffSession(apiUrl: string | undefined): Promise<LiffSessionState> {
@@ -19,10 +23,11 @@ export async function verifyLiffSession(apiUrl: string | undefined): Promise<Lif
   }
 
   try {
+    const body: LiffSessionRequest = { idToken: token };
     const response = await createHttpClient(apiUrl).request("/api/line/liff/session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ idToken: token }),
+      body: JSON.stringify(body),
     });
 
     if (response.status === 404) {

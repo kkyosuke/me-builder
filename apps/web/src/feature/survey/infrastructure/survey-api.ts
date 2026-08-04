@@ -1,6 +1,11 @@
 import * as v from "valibot";
+import type { operations } from "../../../generated/api";
 import { createHttpClient } from "../../../infrastructure/http-client";
 import type { SurveyListItem } from "../model/survey-list-item";
+
+type ApiSurveyListResponse =
+  operations["listSurveys"]["responses"][200]["content"]["application/json"];
+type ApiSurveyListItem = ApiSurveyListResponse["surveys"][number];
 
 const SurveyListItemSchema = v.object({
   id: v.pipe(v.string(), v.nonEmpty()),
@@ -16,6 +21,18 @@ const SurveyListItemSchema = v.object({
 
 const SurveyListResponseSchema = v.object({
   surveys: v.array(SurveyListItemSchema),
+}) satisfies v.GenericSchema<ApiSurveyListResponse>;
+
+const toSurveyListItem = (item: ApiSurveyListItem): SurveyListItem => ({
+  id: item.id,
+  title: item.title,
+  description: item.description,
+  opensAt: item.opensAt,
+  closesAt: item.closesAt,
+  availability: item.availability,
+  responseStatus: item.responseStatus,
+  answeredCount: item.answeredCount,
+  questionCount: item.questionCount,
 });
 
 /** LIFF IDトークンで本人確認し、回答進捗を含むアンケート一覧を取得する。 */
@@ -39,5 +56,6 @@ export async function fetchSurveyList(
     throw new Error(`アンケート一覧の取得に失敗しました (HTTP ${response.status})`);
   }
 
-  return v.parse(SurveyListResponseSchema, await response.json()).surveys;
+  const body: ApiSurveyListResponse = v.parse(SurveyListResponseSchema, await response.json());
+  return body.surveys.map(toSurveyListItem);
 }

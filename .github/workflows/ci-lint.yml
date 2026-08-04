@@ -31,6 +31,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-bun-workspace
+      - name: Generated API Contract Check
+        run: bun run check:generated
       - name: Biome Lint & Format Check
         run: bun run lint
       - name: Unused Exports Check (Knip)

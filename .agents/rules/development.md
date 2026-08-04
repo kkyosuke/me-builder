@@ -26,6 +26,7 @@
     - `task lint`: Biome によるコード Lint / フォーマット検証
     - `task lint:fix`: Biome によるコード Lint / フォーマットの自動修復
     - `task test`: Vitest による全テスト実行
+    - `task generate:api`: APIのOpenAPI documentとWeb UI用TypeScript型を再生成
     - `task ci`: CI で実行される全検証（lint, typecheck, test, build）の一括ローカル実行
     - `task db:migrate:local` (または `task db:migrate`): D1 データベースマイグレーションのローカル適用
     - `task db:migrate:preview`: プレビュー環境への D1 データベースマイグレーション適用
@@ -116,6 +117,7 @@
   │       └── index.ts          # feature外へ公開するAPI
   ├── infrastructure/
   │   └── <shared-adapter>.ts   # feature横断の技術基盤
+  ├── generated/                # API契約などから生成したコード（直接編集禁止）
   ├── config/                   # 環境設定の読込・検証
   ├── components/               # feature非依存の共通UI
   ├── App.tsx
@@ -141,6 +143,7 @@
 - **Web UI のHTTP通信基盤 (`apps/web`)**:
   - `fetch` の直接呼び出しは `apps/web/src/infrastructure/http-client.ts` に閉じ込めます。各featureのAPI adapterは共通HTTPクライアントを介して通信します。
   - 共通HTTPクライアントはベースURLとパスの解決、およびWeb標準の `fetch` 実行だけを担当します。エンドポイント固有のヘッダー、レスポンス検証、HTTPステータスからドメイン・画面表示用結果への変換は各featureの `infrastructure/` が担当します。
+  - Web UIが利用するAPIの型はOpenAPIから `apps/web/src/generated/api.ts` へ生成し、直接編集しません。生成方法と契約の所有範囲は[アンケートAPI契約](../../docs/development/questionnaire-api.md#6-openapiとweb型の生成)を参照します。
 
 - **LIFF の ID トークン検証と Account の解決**:
   - **クライアントから送られてきた識別子は受け付けません。** `liff.getProfile()` が返す値そのものは LINE から取得した本物ですが、サーバー側では「LINE の API が返した値の転送」と「手で書かれた値」を区別できないため、`userId` を識別子として使うと他人になりすませます。本人の識別子は必ず ID トークンの検証で得た `sub` を使います。
