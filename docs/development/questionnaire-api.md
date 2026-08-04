@@ -62,3 +62,13 @@ Authorization: Bearer <LIFF ID token>
 | `500` | 未処理のサーバーエラー | `{ "error": "Internal Server Error" }` |
 
 認証失敗の詳細、トークン、`sub`、Account IDはレスポンスへ含めません。
+
+## 5. ローカルE2Eテスト
+
+アンケート一覧APIのE2Eテストは`apps/api/src/e2e/survey-list.test.ts`に置きます。Miniflareが提供するローカルD1へ本番と同じmigrationとアンケートseedを適用し、Honoの`app.request`へD1 bindingとして渡します。
+
+LINEのIDトークン検証エンドポイントだけは外部通信を行わず、検証成功・失敗のHTTP応答へ差し替えます。Honoのルーティング、Bearerヘッダーの解釈、Account解決、Drizzleのクエリ、D1上の回答進捗集計、JSONレスポンスはモックしません。
+
+テストごとに独立したインメモリD1を作り、終了時にMiniflareを破棄します。開発者の`.wrangler/state`やpreview、productionのD1は使用しません。
+
+単独で実行する場合は`bun --cwd apps/api test:e2e`を使います。通常の`task ci`にも含まれます。
