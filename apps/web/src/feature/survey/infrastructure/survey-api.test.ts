@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { SurveyDetailError } from "../model/survey-detail-error";
+import {
+  AuthenticationError,
+  OperationError,
+  UnknownError,
+  ValidationError,
+} from "../../../infrastructure/errors";
 import { fetchSurveyDefinition, fetchSurveyList } from "./survey-api";
 
 const API_URL = "https://api.stg.kagami.kyosuke.dev";
@@ -115,11 +120,11 @@ describe("fetchSurveyDefinition", () => {
   });
 
   it.each([
-    [401, "authentication-required"],
-    [404, "survey-unavailable"],
-    [409, "operation-not-allowed"],
-    [500, "unknown"],
-  ] as const)("HTTP %sを理由付きの詳細取得エラーへ変換する", async (status, reason) => {
+    [401, AuthenticationError, "AUTHENTICATION_REQUIRED"],
+    [404, OperationError, "SURVEY_UNAVAILABLE"],
+    [409, OperationError, "SURVEY_CLOSED"],
+    [500, UnknownError, "SURVEY_DETAIL_REQUEST_FAILED"],
+  ] as const)("HTTP %sを汎用エラーとcodeへ変換する", async (status, ErrorType, code) => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => new Response(null, { status })),
@@ -128,8 +133,8 @@ describe("fetchSurveyDefinition", () => {
       await fetchSurveyDefinition(API_URL, "dummy.id.token", "relationship-priority");
       throw new Error("詳細取得が成功してしまいました");
     } catch (error) {
-      expect(error).toBeInstanceOf(SurveyDetailError);
-      expect(error).toMatchObject({ reason, status });
+      expect(error).toBeInstanceOf(ErrorType);
+      expect(error).toMatchObject({ code, status });
     }
   });
 
@@ -143,8 +148,8 @@ describe("fetchSurveyDefinition", () => {
       await fetchSurveyDefinition(API_URL, "dummy.id.token", "relationship-priority");
       throw new Error("不正なレスポンスを受け入れてしまいました");
     } catch (error) {
-      expect(error).toBeInstanceOf(SurveyDetailError);
-      expect(error).toMatchObject({ reason: "invalid-response" });
+      expect(error).toBeInstanceOf(ValidationError);
+      expect(error).toMatchObject({ code: "SURVEY_DETAIL_INVALID_RESPONSE" });
     }
   });
 });

@@ -4,12 +4,12 @@ import { config } from "./config";
 import { getLiffIdToken, initializeLiff } from "./feature/liff";
 import {
   type SurveyDefinition,
-  SurveyDetailError,
   type SurveyListItem,
   SwipeSurvey,
   fetchSurveyDefinition,
   fetchSurveyList,
 } from "./feature/survey";
+import { OperationError } from "./infrastructure/errors";
 
 const STATUS_LABELS: Record<SurveyListItem["responseStatus"], string> = {
   unanswered: "未回答",
@@ -304,9 +304,9 @@ export function App() {
       }
     } catch (error) {
       if (!controller.signal.aborted && mounted.current) {
-        if (error instanceof SurveyDetailError && error.reason === "survey-unavailable") {
+        if (error instanceof OperationError && error.code === "SURVEY_UNAVAILABLE") {
           setDetailState("unsupported");
-        } else if (error instanceof SurveyDetailError && error.reason === "operation-not-allowed") {
+        } else if (error instanceof OperationError && error.code === "SURVEY_CLOSED") {
           setSelectedSurvey({ ...survey, availability: "closed" });
           setDetailState("idle");
         } else {

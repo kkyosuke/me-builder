@@ -31,7 +31,6 @@
 | [キャラクターデザイン](../docs/design/character-design.md) | うつし・ミラの名前、役割、外見設定、デザインアセットの置き場所と命名規則 |
 | [アンケートseed運用](../docs/development/questionnaire-seed.md) | Question、Question Version、Choice、SurveyをD1へ登録するseedの配置、実行、更新、検証方法 |
 | [アンケートAPI契約](../docs/development/questionnaire-api.md) | Web UIとAPI Server間のアンケートAPIのパス、認証、入出力、エラー契約 |
-| [アンケートAPI E2Eケースマップ](../apps/api/src/e2e/README.md) | アンケートAPIのE2EケースID、リクエスト、前提条件、期待レスポンスの対応 |
 | [API契約とクライアント型の生成](../docs/development/api-contract-generation.md) | API ServerのHTTP契約の配置、OpenAPI documentとWeb UI用TypeScript型の生成運用 |
 | [PR作成手順書](../docs/development/pull-request-guidelines.md) | PRタイトルの命名規則、概要の書き方、作成前の準備・検証手順 |
 

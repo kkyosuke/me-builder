@@ -1,8 +1,13 @@
 import * as v from "valibot";
 import type { operations } from "../../../generated/api";
+import {
+  AuthenticationError,
+  OperationError,
+  UnknownError,
+  ValidationError,
+} from "../../../infrastructure/errors";
 import { createHttpClient } from "../../../infrastructure/http-client";
 import type { SurveyDefinition } from "../model/survey-definition";
-import { SurveyDetailError } from "../model/survey-detail-error";
 import type { SurveyListItem } from "../model/survey-list-item";
 import { SurveyQuestionsSchema } from "../model/types";
 import { combineSurveyDefinition } from "./local-definitions";
@@ -110,38 +115,35 @@ export async function fetchSurveyDefinition(
 
   if (!response.ok) {
     if (response.status === 401) {
-      throw new SurveyDetailError(
-        "authentication-required",
-        "本人確認に失敗しました。LINEから開き直してください。",
-        { status: response.status },
-      );
+      throw new AuthenticationError("本人確認に失敗しました。LINEから開き直してください。", {
+        code: "AUTHENTICATION_REQUIRED",
+        status: response.status,
+      });
     }
     if (response.status === 404) {
-      throw new SurveyDetailError(
-        "survey-unavailable",
-        "このアンケートは現在公開されていません。",
-        { status: response.status },
-      );
+      throw new OperationError("このアンケートは現在公開されていません。", {
+        code: "SURVEY_UNAVAILABLE",
+        status: response.status,
+      });
     }
     if (response.status === 409) {
-      throw new SurveyDetailError(
-        "operation-not-allowed",
-        "受付終了のため、新しい回答は開始できません。",
-        { status: response.status },
-      );
+      throw new OperationError("受付終了のため、新しい回答は開始できません。", {
+        code: "SURVEY_CLOSED",
+        status: response.status,
+      });
     }
-    throw new SurveyDetailError(
-      "unknown",
-      `アンケート詳細の取得に失敗しました (HTTP ${response.status})`,
-      { status: response.status },
-    );
+    throw new UnknownError(`アンケート詳細の取得に失敗しました (HTTP ${response.status})`, {
+      code: "SURVEY_DETAIL_REQUEST_FAILED",
+      status: response.status,
+    });
   }
 
   let body: ApiSurveyDetailResponse;
   try {
     body = v.parse(ApiSurveyDetailSchema, await response.json());
   } catch (error) {
-    throw new SurveyDetailError("invalid-response", "アンケート詳細のレスポンスが不正です。", {
+    throw new ValidationError("アンケート詳細のレスポンスが不正です。", {
+      code: "SURVEY_DETAIL_INVALID_RESPONSE",
       cause: error,
     });
   }
@@ -175,11 +177,10 @@ export async function fetchSurveyDefinition(
       }),
     );
   } catch (error) {
-    throw new SurveyDetailError(
-      "invalid-response",
-      "アンケート詳細を回答画面の形式へ変換できません。",
-      { cause: error },
-    );
+    throw new ValidationError("アンケート詳細を回答画面の形式へ変換できません。", {
+      code: "SURVEY_DETAIL_INVALID_RESPONSE",
+      cause: error,
+    });
   }
 
   return combineSurveyDefinition({

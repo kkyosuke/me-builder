@@ -109,7 +109,7 @@ Surveyが`published`かつ削除されておらず、サーバー時刻が受付
 
 アンケートAPIのE2Eテストは`apps/api/src/e2e/`に置きます。Miniflareが提供するローカルD1へ本番と同じmigrationとアンケートseedを適用し、Honoの`app.request`へD1 bindingとして渡します。
 
-どのリクエストがどの期待レスポンスへ対応するかは、テストと同じ場所にある[アンケートAPI E2Eケースマップ](../../apps/api/src/e2e/README.md)から確認できます。ケースマップはテストの索引であり、APIの正式な契約はこの文書を正とします。
+各テストの入力と期待出力は、テストと同じ場所にある[`survey-list.case.yaml`](../../apps/api/src/e2e/survey-list.case.yaml)と[`survey-detail.case.yaml`](../../apps/api/src/e2e/survey-detail.case.yaml)へ`id`、`in`、`out`の形で記録します。caseファイルはテストの索引であり、APIの正式な契約はこの文書を正とします。
 
 LINEのIDトークン検証エンドポイントだけは外部通信を行わず、検証成功・失敗のHTTP応答へ差し替えます。Honoのルーティング、Bearerヘッダーの解釈、Account解決、Drizzleのクエリ、D1上の回答進捗集計、JSONレスポンスはモックしません。
 

@@ -5,20 +5,13 @@ import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import type { SurveyDefinition, SurveyListItem } from "./feature/survey";
+import { OperationError } from "./infrastructure/errors";
 
 const mocks = vi.hoisted(() => ({
   initializeLiff: vi.fn(),
   getLiffIdToken: vi.fn(),
   fetchSurveyList: vi.fn(),
   fetchSurveyDefinition: vi.fn(),
-  SurveyDetailError: class SurveyDetailError extends Error {
-    readonly reason: string;
-
-    constructor(reason: string, message: string) {
-      super(message);
-      this.reason = reason;
-    }
-  },
 }));
 
 vi.mock("./config", () => ({
@@ -31,7 +24,6 @@ vi.mock("./feature/liff", () => ({
 vi.mock("./feature/survey", () => ({
   fetchSurveyList: mocks.fetchSurveyList,
   fetchSurveyDefinition: mocks.fetchSurveyDefinition,
-  SurveyDetailError: mocks.SurveyDetailError,
   SwipeSurvey: ({ survey }: { survey: SurveyDefinition }) => <p>{`回答UI: ${survey.title}`}</p>,
 }));
 
@@ -133,17 +125,15 @@ describe("App", () => {
 
   it.each([
     {
-      reason: "survey-unavailable",
+      code: "SURVEY_UNAVAILABLE",
       heading: "このアンケートは現在のアプリでは未対応です",
     },
     {
-      reason: "operation-not-allowed",
+      code: "SURVEY_CLOSED",
       heading: "このアンケートは受付を終了しました",
     },
-  ])("詳細取得の$reasonを対応する案内へ変換する", async ({ reason, heading }) => {
-    mocks.fetchSurveyDefinition.mockRejectedValue(
-      new mocks.SurveyDetailError(reason, "detail error"),
-    );
+  ])("詳細取得の$codeを対応する案内へ変換する", async ({ code, heading }) => {
+    mocks.fetchSurveyDefinition.mockRejectedValue(new OperationError("detail error", { code }));
     render(<App />);
 
     fireEvent.click(await screen.findByRole("button", { name: /テストアンケート/ }));
