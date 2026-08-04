@@ -142,12 +142,12 @@ jobs:
 
             プルリクエストの最新コミット (\`${context.sha.substring(0, 7)}\`) のビルド・デプロイが成功しました。
 
-            | サービス | デプロイ URL |
+            | サービス | リンク |
             | --- | --- |
-            | 🖥️ **Web UI** | https://stg.kagami.kyosuke.dev |
-            | ⚡ **API Server** | https://api.stg.kagami.kyosuke.dev |
-            | 🤖 **MCP Server** | https://mcp.stg.kagami.kyosuke.dev |
-            | ☁️ **Cloudflare Dashboard** | ${cloudflareDashboardUrl} |
+            | 🖥️ **Web UI** | [stg.kagami.kyosuke.dev](https://stg.kagami.kyosuke.dev) |
+            | ⚡ **API Server** | [api.stg.kagami.kyosuke.dev](https://api.stg.kagami.kyosuke.dev) |
+            | 🤖 **MCP Server** | [mcp.stg.kagami.kyosuke.dev](https://mcp.stg.kagami.kyosuke.dev) |
+            | ☁️ **Cloudflare Dashboard** | [Workers & Pages を開く](${cloudflareDashboardUrl}) |
             `;
 
             await github.rest.issues.createComment({
