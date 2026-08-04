@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { SurveyDetailError } from "../model/survey-detail-error";
 import { fetchSurveyDefinition, fetchSurveyList } from "./survey-api";
 
 const API_URL = "https://api.stg.kagami.kyosuke.dev";
@@ -114,16 +115,36 @@ describe("fetchSurveyDefinition", () => {
   });
 
   it.each([
-    [401, "本人確認に失敗しました"],
-    [404, "現在公開されていません"],
-    [409, "受付を終了しました"],
-  ])("HTTP %sを画面表示用エラーへ変換する", async (status, message) => {
+    [401, "authentication-required"],
+    [404, "survey-unavailable"],
+    [409, "operation-not-allowed"],
+    [500, "unknown"],
+  ] as const)("HTTP %sを理由付きの詳細取得エラーへ変換する", async (status, reason) => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => new Response(null, { status })),
     );
-    await expect(
-      fetchSurveyDefinition(API_URL, "dummy.id.token", "relationship-priority"),
-    ).rejects.toThrow(message);
+    try {
+      await fetchSurveyDefinition(API_URL, "dummy.id.token", "relationship-priority");
+      throw new Error("詳細取得が成功してしまいました");
+    } catch (error) {
+      expect(error).toBeInstanceOf(SurveyDetailError);
+      expect(error).toMatchObject({ reason, status });
+    }
+  });
+
+  it("APIレスポンスを回答画面へ変換する前に検証する", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Response.json({ id: "broken" })),
+    );
+
+    try {
+      await fetchSurveyDefinition(API_URL, "dummy.id.token", "relationship-priority");
+      throw new Error("不正なレスポンスを受け入れてしまいました");
+    } catch (error) {
+      expect(error).toBeInstanceOf(SurveyDetailError);
+      expect(error).toMatchObject({ reason: "invalid-response" });
+    }
   });
 });

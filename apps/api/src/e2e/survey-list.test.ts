@@ -175,7 +175,7 @@ describe("GET /api/surveys local D1 E2E", () => {
     await miniflare.dispose();
   });
 
-  it("migrationとseedからAccount別の回答進捗を返すこと", async () => {
+  it("LIST-001: migrationとseedからAccount別の回答進捗を返すこと", async () => {
     const initialResponse = await request("known-token");
     expect(initialResponse.status).toBe(200);
 
@@ -220,21 +220,21 @@ describe("GET /api/surveys local D1 E2E", () => {
     });
   });
 
-  it("Bearerトークンが無い場合は401を返すこと", async () => {
+  it("LIST-002: Bearerトークンが無い場合は401を返すこと", async () => {
     const response = await request();
 
     expect(response.status).toBe(401);
     expect(await response.json()).toEqual({ error: "Unauthorized" });
   });
 
-  it("LINEがIDトークンを検証できない場合は401を返すこと", async () => {
+  it("LIST-003: LINEがIDトークンを検証できない場合は401を返すこと", async () => {
     const response = await request("invalid-token");
 
     expect(response.status).toBe(401);
     expect(await response.json()).toEqual({ error: "Unauthorized" });
   });
 
-  it("検証済みの本人に対応するAccountが無い場合は404を返すこと", async () => {
+  it("LIST-004: 検証済みの本人に対応するAccountが無い場合は404を返すこと", async () => {
     const response = await request("unknown-token");
 
     expect(response.status).toBe(404);
@@ -263,7 +263,7 @@ describe("GET /api/surveys/:surveyId local D1 E2E", () => {
     await miniflare.dispose();
   });
 
-  it("seedのSurveyからQuestion VersionとChoiceを位置順に返す", async () => {
+  it("DETAIL-001: seedのSurveyからQuestion VersionとChoiceを位置順に返す", async () => {
     const response = await request("known-token", "/api/surveys/relationship-priority");
     expect(response.status).toBe(200);
     const body = (await response.json()) as {
@@ -286,14 +286,16 @@ describe("GET /api/surveys/:surveyId local D1 E2E", () => {
     });
   });
 
-  it("存在しないSurveyを404、受付終了したSurveyを409にする", async () => {
+  it("DETAIL-002: 存在しないSurveyを404にする", async () => {
     const missing = await request("known-token", "/api/surveys/missing");
     expect(missing.status).toBe(404);
     expect(await missing.json()).toEqual({
       error: "Survey not found",
       reason: "survey_not_found",
     });
+  });
 
+  it("DETAIL-003: 受付終了したSurveyを409にする", async () => {
     await database
       .prepare("UPDATE surveys SET closes_at = ? WHERE id = ?")
       .bind(timestamp, "relationship-priority")

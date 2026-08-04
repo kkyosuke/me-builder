@@ -2,6 +2,7 @@ import * as v from "valibot";
 import type { operations } from "../../../generated/api";
 import { createHttpClient } from "../../../infrastructure/http-client";
 import type { SurveyDefinition } from "../model/survey-definition";
+import { SurveyDetailError } from "../model/survey-detail-error";
 import type { SurveyListItem } from "../model/survey-list-item";
 import { SurveyQuestionsSchema } from "../model/types";
 import { combineSurveyDefinition } from "./local-definitions";
@@ -109,44 +110,77 @@ export async function fetchSurveyDefinition(
 
   if (!response.ok) {
     if (response.status === 401) {
-      throw new Error("本人確認に失敗しました。LINEから開き直してください。");
+      throw new SurveyDetailError(
+        "authentication-required",
+        "本人確認に失敗しました。LINEから開き直してください。",
+        { status: response.status },
+      );
     }
     if (response.status === 404) {
-      throw new Error("このアンケートは現在公開されていません。");
+      throw new SurveyDetailError(
+        "survey-unavailable",
+        "このアンケートは現在公開されていません。",
+        { status: response.status },
+      );
     }
     if (response.status === 409) {
-      throw new Error("このアンケートは受付を終了しました。");
+      throw new SurveyDetailError(
+        "operation-not-allowed",
+        "受付終了のため、新しい回答は開始できません。",
+        { status: response.status },
+      );
     }
-    throw new Error(`アンケート詳細の取得に失敗しました (HTTP ${response.status})`);
+    throw new SurveyDetailError(
+      "unknown",
+      `アンケート詳細の取得に失敗しました (HTTP ${response.status})`,
+      { status: response.status },
+    );
   }
 
-  const body = v.parse(ApiSurveyDetailSchema, await response.json());
-  const questions = v.parse(
-    SurveyQuestionsSchema,
-    body.questions.map((question) => {
-      const [left, right] = question.choices;
-      if (!left || !right) {
-        throw new Error("アンケートの選択肢が不足しています。");
-      }
-      return {
-        surveyQuestionId: question.surveyQuestionId,
-        questionId: question.questionId,
-        questionVersion: question.questionVersion,
-        text: question.text,
-        ...(question.hint ? { hint: question.hint } : {}),
-        left: {
-          choiceId: left.choiceId,
-          label: left.label,
-          icon: left.presentation.icon,
-        },
-        right: {
-          choiceId: right.choiceId,
-          label: right.label,
-          icon: right.presentation.icon,
-        },
-      };
-    }),
-  );
+  let body: ApiSurveyDetailResponse;
+  try {
+    body = v.parse(ApiSurveyDetailSchema, await response.json());
+  } catch (error) {
+    throw new SurveyDetailError("invalid-response", "アンケート詳細のレスポンスが不正です。", {
+      cause: error,
+    });
+  }
+
+  let questions: SurveyDefinition["questions"];
+  try {
+    questions = v.parse(
+      SurveyQuestionsSchema,
+      body.questions.map((question) => {
+        const [left, right] = question.choices;
+        if (!left || !right) {
+          throw new Error("アンケートの選択肢が不足しています。");
+        }
+        return {
+          surveyQuestionId: question.surveyQuestionId,
+          questionId: question.questionId,
+          questionVersion: question.questionVersion,
+          text: question.text,
+          ...(question.hint ? { hint: question.hint } : {}),
+          left: {
+            choiceId: left.choiceId,
+            label: left.label,
+            icon: left.presentation.icon,
+          },
+          right: {
+            choiceId: right.choiceId,
+            label: right.label,
+            icon: right.presentation.icon,
+          },
+        };
+      }),
+    );
+  } catch (error) {
+    throw new SurveyDetailError(
+      "invalid-response",
+      "アンケート詳細を回答画面の形式へ変換できません。",
+      { cause: error },
+    );
+  }
 
   return combineSurveyDefinition({
     id: body.id,

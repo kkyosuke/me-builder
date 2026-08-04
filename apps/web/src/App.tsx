@@ -4,6 +4,7 @@ import { config } from "./config";
 import { getLiffIdToken, initializeLiff } from "./feature/liff";
 import {
   type SurveyDefinition,
+  SurveyDetailError,
   type SurveyListItem,
   SwipeSurvey,
   fetchSurveyDefinition,
@@ -301,9 +302,16 @@ export function App() {
         setSelectedDefinition(definition ?? null);
         setDetailState(definition ? "idle" : "unsupported");
       }
-    } catch {
+    } catch (error) {
       if (!controller.signal.aborted && mounted.current) {
-        setDetailState("error");
+        if (error instanceof SurveyDetailError && error.reason === "survey-unavailable") {
+          setDetailState("unsupported");
+        } else if (error instanceof SurveyDetailError && error.reason === "operation-not-allowed") {
+          setSelectedSurvey({ ...survey, availability: "closed" });
+          setDetailState("idle");
+        } else {
+          setDetailState("error");
+        }
       }
     }
   }, []);

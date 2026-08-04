@@ -11,6 +11,14 @@ const mocks = vi.hoisted(() => ({
   getLiffIdToken: vi.fn(),
   fetchSurveyList: vi.fn(),
   fetchSurveyDefinition: vi.fn(),
+  SurveyDetailError: class SurveyDetailError extends Error {
+    readonly reason: string;
+
+    constructor(reason: string, message: string) {
+      super(message);
+      this.reason = reason;
+    }
+  },
 }));
 
 vi.mock("./config", () => ({
@@ -23,6 +31,7 @@ vi.mock("./feature/liff", () => ({
 vi.mock("./feature/survey", () => ({
   fetchSurveyList: mocks.fetchSurveyList,
   fetchSurveyDefinition: mocks.fetchSurveyDefinition,
+  SurveyDetailError: mocks.SurveyDetailError,
   SwipeSurvey: ({ survey }: { survey: SurveyDefinition }) => <p>{`回答UI: ${survey.title}`}</p>,
 }));
 
@@ -120,6 +129,26 @@ describe("App", () => {
         name: "このアンケートは現在のアプリでは未対応です",
       }),
     ).toBeTruthy();
+  });
+
+  it.each([
+    {
+      reason: "survey-unavailable",
+      heading: "このアンケートは現在のアプリでは未対応です",
+    },
+    {
+      reason: "operation-not-allowed",
+      heading: "このアンケートは受付を終了しました",
+    },
+  ])("詳細取得の$reasonを対応する案内へ変換する", async ({ reason, heading }) => {
+    mocks.fetchSurveyDefinition.mockRejectedValue(
+      new mocks.SurveyDetailError(reason, "detail error"),
+    );
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /テストアンケート/ }));
+
+    expect(await screen.findByRole("heading", { name: heading })).toBeTruthy();
   });
 
   it("一覧取得失敗後の再試行でLIFF初期化と一覧取得を同じ順序で再実行する", async () => {

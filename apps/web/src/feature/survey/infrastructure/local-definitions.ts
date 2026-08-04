@@ -8,7 +8,10 @@ import type { SurveyQuestion } from "../model/types";
 
 type LocalSurveyPresentation = Pick<SurveyDefinition, "balancedLabel" | "score">;
 
-/** スコア関数と表示メタデータだけをローカルに残し、配信内容は詳細APIを正とします。 */
+/**
+ * スコア関数と表示メタデータだけをローカルに残し、配信内容は詳細APIを正とします。
+ * スコア設定を版付きでAPI配信するか、サーバーが計算結果を返す段階でこの対応表は不要になります。
+ */
 const LOCAL_PRESENTATION: Record<string, LocalSurveyPresentation> = {
   "relationship-priority": {
     balancedLabel: RELATIONSHIP_PRIORITY_SCORING_CONFIG.balancedLabel,
