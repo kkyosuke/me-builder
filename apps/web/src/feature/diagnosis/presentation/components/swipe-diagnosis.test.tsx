@@ -9,8 +9,6 @@ const diagnosis: DiagnosisDefinition = {
   id: "diagnosis-1",
   title: "保存テスト",
   description: "説明",
-  balancedLabel: "中間",
-  score: () => ({ scoringVersion: 1, parameters: [] }),
   questions: [
     {
       diagnosisQuestionId: "dq-1",
@@ -174,7 +172,7 @@ describe("SwipeDiagnosis answer persistence", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "あとで回答する" }));
 
-    expect(await screen.findByText("保存した回答から見える現在の傾向")).toBeTruthy();
+    expect(await screen.findByText("今回の回答はここまでです")).toBeTruthy();
     expect(onComplete).not.toHaveBeenCalled();
   });
 });

@@ -30,7 +30,7 @@ describe("getDiagnosisAnswers", () => {
     );
 
     expect(findAnswers).toHaveBeenCalledWith(db, "account-1", "diagnosis-1", at);
-    expect(result).toEqual({ type: "resolved", diagnosis });
+    expect(result).toEqual({ type: "resolved", diagnosis: { ...diagnosis, scoring: null } });
   });
 
   it("回答がない場合はdiagnosis-answers-not-foundへ変換する", async () => {

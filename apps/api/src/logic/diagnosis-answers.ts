@@ -1,4 +1,5 @@
 import { d1 } from "@me-builder/lib";
+import { scoreDiagnosisAnswers } from "./diagnosis-scoring";
 import { createLiffSession } from "./liff-session";
 
 type DiagnosisAnswers = Extract<
@@ -7,7 +8,12 @@ type DiagnosisAnswers = Extract<
 >["diagnosis"];
 
 export type DiagnosisAnswersOutcome =
-  | { type: "resolved"; diagnosis: DiagnosisAnswers }
+  | {
+      type: "resolved";
+      diagnosis: DiagnosisAnswers & {
+        scoring: ReturnType<typeof scoreDiagnosisAnswers>;
+      };
+    }
   | { type: "diagnosis-answers-not-found" }
   | { type: "not-configured" }
   | { type: "unauthenticated"; reason: string }
@@ -42,7 +48,14 @@ export async function getDiagnosisAnswers(
   }
 
   const result = await dependencies.findAnswers(db, session.session.accountId, diagnosisId, at);
-  return result.type === "found"
-    ? { type: "resolved", diagnosis: result.diagnosis }
-    : { type: "diagnosis-answers-not-found" };
+  if (result.type !== "found") {
+    return { type: "diagnosis-answers-not-found" };
+  }
+  return {
+    type: "resolved",
+    diagnosis: {
+      ...result.diagnosis,
+      scoring: scoreDiagnosisAnswers(result.diagnosis.id, result.diagnosis.answers),
+    },
+  };
 }

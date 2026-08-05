@@ -236,6 +236,13 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
           choiceLabel: "いいえ",
         },
       ],
+      scoring: {
+        scoringVersion: 1,
+        balancedLabel: "状況に応じて調整",
+        parameters: expect.arrayContaining([
+          expect.objectContaining({ id: "priority-balance", coverage: 33, score: null }),
+        ]),
+      },
     });
   });
 

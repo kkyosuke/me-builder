@@ -145,9 +145,9 @@ Diagnosisが`published`かつ削除されておらず、サーバー時刻が受
 
 ### `GET /api/diagnoses/{diagnosisId}/answers`
 
-本人が保存した現在有効な回答を、回答時点のQuestion VersionとChoiceとともに返します。受付終了後も回答内容を確認できるよう、Diagnosisが公開済みで受付開始後なら`closesAt`を過ぎていても取得できます。
+本人が保存した現在有効な回答を、回答時点のQuestion VersionとChoice、およびAPIが計算した傾向とともに返します。受付終了後も回答内容を確認できるよう、Diagnosisが公開済みで受付開始後なら`closesAt`を過ぎていても取得できます。
 
-回答はDiagnosis Questionの`position`順で返します。質問文と選択肢ラベルはAnswerが保持するQuestion ID / Question Version / Choice IDから解決し、現在の最新版へ暗黙に置き換えません。Account ID、DiagnosisResponse ID、Source Record IDは返しません。
+回答はDiagnosis Questionの`position`順で返します。質問文と選択肢ラベルはAnswerが保持するQuestion ID / Question Version / Choice IDから解決し、現在の最新版へ暗黙に置き換えません。採点はAPIが版付きの診断固有設定で行い、Web UIは計算し直しません。Account ID、DiagnosisResponse ID、Source Record IDは返しません。
 
 ```json
 {
@@ -167,9 +167,26 @@ Diagnosisが`published`かつ削除されておらず、サーバー時刻が受
       "choiceLabel": "はい",
       "acceptedAt": "2026-08-05T00:00:00.000Z"
     }
-  ]
+  ],
+  "scoring": {
+    "scoringVersion": 1,
+    "balancedLabel": "状況に応じて調整",
+    "parameters": [
+      {
+        "id": "priority-balance",
+        "label": "自分／相手の優先",
+        "lowLabel": "相手を優先しやすい",
+        "highLabel": "自分の余裕を優先しやすい",
+        "score": 75,
+        "coverage": 100,
+        "band": "high"
+      }
+    ]
+  }
 }
 ```
+
+`scoring`は、採点設定版、中央帯の表示名、計算済みパラメータを一体で返します。採点設定をまだ持たないDiagnosisでは`null`とし、回答内容の閲覧は妨げません。これによりDiagnosisの一覧・質問追加はWeb UIのリリースや診断ID対応表の更新を前提にしません。
 
 回答内容取得固有のエラーは次のとおりです。
 

@@ -107,10 +107,6 @@ export function useDiagnosisDetail({ idToken, onProgress }: UseDiagnosisDetailOp
         ]);
         await minimumLoading;
         if (!controller.signal.aborted && mounted.current) {
-          if (!definition) {
-            setState({ status: "success", data: { type: "guidance", kind: "unsupported" } });
-            return;
-          }
           const restored = savedResult
             ? restoreDiagnosisProgress(definition.questions, savedResult.answers)
             : undefined;

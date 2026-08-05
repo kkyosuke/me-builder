@@ -293,7 +293,7 @@ describe("fetchDiagnosisResult", () => {
     );
   });
 
-  it("保存済み回答を取得して傾向プロフィールへ変換する", async () => {
+  it("保存済み回答とAPIで計算済みの傾向を取得する", async () => {
     const fetchMock = vi.fn(async () =>
       Response.json({
         id: "relationship-priority",
@@ -311,6 +311,21 @@ describe("fetchDiagnosisResult", () => {
           choiceLabel: "はい",
           acceptedAt: "2026-08-05T00:00:00.000Z",
         })),
+        scoring: {
+          scoringVersion: 2,
+          balancedLabel: "中間",
+          parameters: [
+            {
+              id: "priority",
+              label: "優先傾向",
+              lowLabel: "相手を優先",
+              highLabel: "自分を優先",
+              score: 75,
+              coverage: 100,
+              band: "high",
+            },
+          ],
+        },
       }),
     );
     vi.stubGlobal("fetch", fetchMock);
@@ -325,10 +340,10 @@ describe("fetchDiagnosisResult", () => {
     );
     expect(result).toMatchObject({
       id: "relationship-priority",
-      profile: { scoringVersion: 1 },
+      scoring: { scoringVersion: 2 },
     });
     expect(result?.answers[0]).toMatchObject({ choiceLabel: "はい" });
-    expect(result?.profile.parameters).toHaveLength(4);
+    expect(result?.scoring?.parameters).toHaveLength(1);
   });
 
   it.each([

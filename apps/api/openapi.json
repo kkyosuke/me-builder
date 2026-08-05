@@ -538,7 +538,7 @@
         ],
         "responses": {
           "200": {
-            "description": "質問文・選択肢・回答日時を含む本人の回答内容",
+            "description": "質問文・選択肢・回答日時・計算済み傾向を含む本人の回答内容",
             "content": {
               "application/json": {
                 "schema": {
@@ -616,6 +616,83 @@
                         ]
                       },
                       "minItems": 1
+                    },
+                    "scoring": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "scoringVersion": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 9007199254740991
+                            },
+                            "balancedLabel": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "parameters": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "label": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "lowLabel": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "highLabel": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "score": {
+                                    "anyOf": [
+                                      {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 100
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "coverage": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 100
+                                  },
+                                  "band": {
+                                    "enum": ["low", "balanced", "high", "insufficient"],
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "label",
+                                  "lowLabel",
+                                  "highLabel",
+                                  "score",
+                                  "coverage",
+                                  "band"
+                                ]
+                              },
+                              "minItems": 1
+                            }
+                          },
+                          "required": ["scoringVersion", "balancedLabel", "parameters"]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     }
                   },
                   "required": [
@@ -625,7 +702,8 @@
                     "responseStatus",
                     "answeredCount",
                     "questionCount",
-                    "answers"
+                    "answers",
+                    "scoring"
                   ]
                 }
               }

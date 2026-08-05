@@ -100,8 +100,6 @@ const definition: DiagnosisDefinition = {
   title: "テスト診断",
   description: "説明",
   questions: [],
-  balancedLabel: "中間",
-  score: () => ({ scoringVersion: 1, parameters: [] }),
 };
 
 const result: DiagnosisResult = {
@@ -122,8 +120,7 @@ const result: DiagnosisResult = {
       acceptedAt: "2026-08-05T00:00:00.000Z",
     },
   ],
-  balancedLabel: "中間",
-  profile: { scoringVersion: 1, parameters: [] },
+  scoring: { scoringVersion: 1, balancedLabel: "中間", parameters: [] },
 };
 
 function diagnosis(overrides: Partial<DiagnosisListItem> = {}): DiagnosisListItem {
@@ -439,17 +436,24 @@ describe("App", () => {
     expect(mocks.fetchDiagnosisDefinition).not.toHaveBeenCalled();
   });
 
-  it("ローカルのスコア設定がない診断を選ぶと未対応の案内へ進む", async () => {
-    mocks.fetchDiagnosisDefinition.mockResolvedValue(undefined);
+  it("FEに診断IDの定義がなくてもAPIの詳細で回答画面を開く", async () => {
+    mocks.fetchDiagnosisList.mockResolvedValue([diagnosis({ id: "new-diagnosis" })]);
+    mocks.fetchDiagnosisDefinition.mockResolvedValue({
+      ...definition,
+      id: "new-diagnosis",
+      title: "API追加診断",
+    });
     render(<App />);
 
     fireEvent.click(await screen.findByRole("button", { name: /テスト診断/ }));
 
-    expect(
-      await screen.findByRole("heading", {
-        name: "この診断は現在のアプリでは未対応です",
-      }),
-    ).toBeTruthy();
+    expect(await screen.findByText("回答UI: API追加診断")).toBeTruthy();
+    expect(mocks.fetchDiagnosisDefinition).toHaveBeenCalledWith(
+      "https://api.example.com",
+      "dummy.id.token",
+      "new-diagnosis",
+      expect.any(AbortSignal),
+    );
   });
 
   it.each([

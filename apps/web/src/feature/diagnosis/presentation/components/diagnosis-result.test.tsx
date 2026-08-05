@@ -12,9 +12,9 @@ const result: DiagnosisResult = {
   responseStatus: "answered",
   answeredCount: 1,
   questionCount: 1,
-  balancedLabel: "状況に応じて調整",
-  profile: {
+  scoring: {
     scoringVersion: 1,
+    balancedLabel: "状況に応じて調整",
     parameters: [
       {
         id: "priority",
@@ -76,5 +76,13 @@ describe("DiagnosisResultView", () => {
     fireEvent.click(screen.getByRole("button", { name: "診断一覧" }));
 
     expect(onBack).toHaveBeenCalledOnce();
+  });
+
+  it("採点設定がない診断でも回答内容を表示できる", () => {
+    render(<DiagnosisResultView result={{ ...result, scoring: null }} onBack={vi.fn()} />);
+
+    expect(screen.getByText(/傾向がまだ設定されていません/)).toBeTruthy();
+    expect(screen.getByText("回答内容（1件）")).toBeTruthy();
+    expect(screen.queryByRole("group", { name: "回答から見える傾向の一覧" })).toBeNull();
   });
 });

@@ -21,7 +21,6 @@ import {
   summarizeInteractions,
 } from "../../model/answers";
 import type { DiagnosisDefinition } from "../../model/diagnosis-definition";
-import { getParameterSummary } from "../../model/scoring";
 import type { DiagnosisAnswer, DiagnosisInteraction, SwipeDirection } from "../../model/types";
 import { pickProgressMessage, resolveProgressMilestone } from "../progress-message";
 import {
@@ -90,37 +89,19 @@ function useCardWidth(): [RefObject<HTMLDivElement>, number] {
 /** 全問終わったときの表示。 */
 function DiagnosisComplete({
   interactions,
-  diagnosis,
 }: {
   interactions: DiagnosisInteraction[];
-  diagnosis: DiagnosisDefinition;
 }) {
   const { answered, deferred } = summarizeInteractions(interactions);
-  const profile = diagnosis.score(interactions);
 
   return (
     <div className="min-h-80 rounded-3xl border border-slate-700 bg-slate-800 p-5 text-center">
       <div className="flex flex-col items-center gap-2">
         <CircleCheck className="size-12 text-emerald-400" aria-hidden="true" />
-        <p className="text-lg font-bold">保存した回答から見える現在の傾向</p>
+        <p className="text-lg font-bold">今回の回答はここまでです</p>
         <p className="text-sm text-slate-400">
           {`${answered} 問に回答し、${deferred} 問をあとで回答にしました。`}
         </p>
-      </div>
-
-      <div className="mt-4 grid w-full grid-cols-2 gap-2">
-        {profile.parameters.map((parameter) => (
-          <div key={parameter.id} className="rounded-xl bg-slate-900/70 p-2">
-            <p className="text-xs text-slate-400">{parameter.label}</p>
-            <p className="font-semibold text-sky-300">
-              {parameter.score === null ? "—" : `${parameter.score} / 100`}
-            </p>
-            <p className="text-xs text-slate-300">
-              {getParameterSummary(parameter, diagnosis.balancedLabel)}
-            </p>
-            <p className="text-[10px] text-slate-500">{`回答充足度 ${parameter.coverage}%`}</p>
-          </div>
-        ))}
       </div>
 
       {deferred > 0 && (
@@ -465,7 +446,7 @@ export function SwipeDiagnosis({
         )}
         {isOpeningResult && <ResultOpeningPending />}
         {finished && backgroundSaves.length === 0 && !isOpeningResult && (
-          <DiagnosisComplete interactions={interactions} diagnosis={diagnosis} />
+          <DiagnosisComplete interactions={interactions} />
         )}
         {questions?.slice(index, index + VISIBLE_STACK_SIZE).map((question, offset) => (
           <SwipeCard

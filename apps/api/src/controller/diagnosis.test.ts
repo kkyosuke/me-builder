@@ -282,6 +282,7 @@ describe("GET /api/diagnoses/:diagnosisId/answers", () => {
         responseStatus: "answered",
         answeredCount: 1,
         questionCount: 1,
+        scoring: null,
         answers: [
           {
             diagnosisQuestionId: "dq-1",
@@ -303,6 +304,7 @@ describe("GET /api/diagnoses/:diagnosisId/answers", () => {
       id: "diagnosis-1",
       responseStatus: "answered",
       answers: [{ choiceLabel: "はい" }],
+      scoring: null,
     });
     expect(getDiagnosisAnswers).toHaveBeenCalledWith(
       expect.objectContaining({ diagnosisId: "diagnosis-1", idToken: "dummy.id.token" }),

@@ -127,8 +127,8 @@
   各featureは、型と純粋なロジックを `model/`、React UIとUI操作ロジックを `presentation/`、API・SDK・ローカルデータとの接続を `infrastructure/`、feature外へ公開する要素を `index.ts` に置きます。`presentation/` と `infrastructure/` は `model/` に依存できますが、`model/` から他の層へは依存しません。feature外からは原則として `index.ts` 経由で参照します。必要な層だけを作り、空の層は用意しません。ルートの `components/` はfeatureに依存しない共通UI、`infrastructure/` は複数featureから利用する技術基盤だけを所有します。
 
 - **スワイプ診断の画面 (`apps/web`)**:
-  - Diagnosis機能は `apps/web/src/feature/diagnosis/` に置きます。質問の取得は `infrastructure/local-definitions.ts`、一覧APIとの通信は `infrastructure/diagnosis-api.ts` に閉じ込め、コンポーネントは非同期の取得としてだけ扱います。質問配信・回答保存のサーバー実装はこの境界を差し替える形で追加します。
-  - 質問・回答などのDiagnosisモデルは `apps/web/src/feature/diagnosis/model/` に閉じ、`packages/shared` へ置きません。共有すると「サーバーとのスキーマ」を確定したことになり、[設計スコープのルール §2](design-scope.md) が後続設計へ延期している範囲へ踏み込みます。共有先はサーバー実装の時点で判断します。
+  - Diagnosis機能は `apps/web/src/feature/diagnosis/` に置きます。一覧・質問・保存済み回答は `infrastructure/diagnosis-api.ts` でAPIから取得し、コンポーネントは取得元や採点方法を知りません。
+  - 診断一覧、質問、診断IDと採点設定の対応表をWeb UIへ重複定義しません。採点はAPI Serverが所有し、Web UIは計算済み結果だけを表示します。APIから受け取った質問・回答などの画面用モデルは `apps/web/src/feature/diagnosis/model/` に閉じます。
   - 質問データは JSON のまま扱える形に保ちます。アイコンはコンポーネントではなく名前で持ち、名前からコンポーネントへの対応は `apps/web/src/feature/diagnosis/presentation/components/` に置きます。
   - 判定や座標計算 (しきい値、傾き、transform) は純粋関数として `apps/web/src/feature/diagnosis/presentation/` に置き、DOM を用意せず単体テストできる状態にします。
 
