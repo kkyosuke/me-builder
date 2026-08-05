@@ -15,7 +15,7 @@ describe("useMinimumLoading", () => {
   });
 
   it("loading終了後も最小表示時間までは表示を維持する", () => {
-    const { result, rerender } = renderHook(({ isLoading }) => useMinimumLoading(isLoading, 300), {
+    const { result, rerender } = renderHook(({ isLoading }) => useMinimumLoading(isLoading), {
       initialProps: { isLoading: true },
     });
 
@@ -26,18 +26,18 @@ describe("useMinimumLoading", () => {
     });
     expect(result.current).toBe(true);
 
-    act(() => vi.advanceTimersByTime(199));
+    act(() => vi.advanceTimersByTime(299));
     expect(result.current).toBe(true);
     act(() => vi.advanceTimersByTime(1));
     expect(result.current).toBe(false);
   });
 
   it("最小表示時間を過ぎたloadingには終了後の待ち時間を加えない", () => {
-    const { result, rerender } = renderHook(({ isLoading }) => useMinimumLoading(isLoading, 300), {
+    const { result, rerender } = renderHook(({ isLoading }) => useMinimumLoading(isLoading), {
       initialProps: { isLoading: true },
     });
 
-    act(() => vi.advanceTimersByTime(400));
+    act(() => vi.advanceTimersByTime(500));
     act(() => rerender({ isLoading: false }));
     act(() => vi.runOnlyPendingTimers());
 
