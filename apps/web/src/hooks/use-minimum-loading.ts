@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-export const DEFAULT_MINIMUM_LOADING_MS = 400;
+const DEFAULT_MINIMUM_LOADING_MS = 400;
 
 /** loadingが表示された後、指定時間が経過するまでは表示を維持する。 */
 export function useMinimumLoading(
