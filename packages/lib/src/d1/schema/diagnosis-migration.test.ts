@@ -137,4 +137,36 @@ describe("Diagnosis D1 migration", () => {
 
     sqlite.close();
   });
+
+  it("既存Diagnosisを保持したまま一覧表示順を追加する", () => {
+    const sqlite = new Database(":memory:");
+    sqlite.pragma("foreign_keys = ON");
+
+    for (const filename of [
+      "0000_abnormal_bullseye.sql",
+      "0001_optimal_madame_hydra.sql",
+      "0002_marvelous_hex.sql",
+      "0003_square_power_pack.sql",
+      "0004_puzzling_la_nuit.sql",
+      "0005_rename_diagnosis.sql",
+      "0006_grey_krista_starr.sql",
+    ]) {
+      applyMigration(sqlite, filename);
+    }
+    sqlite.exec(`
+      INSERT INTO diagnoses (
+        id, created_at, updated_at, title, description, opens_at, state, published_at
+      ) VALUES ('diagnosis-existing', 1, 1, '既存診断', '説明', 1, 'published', 1);
+    `);
+
+    applyMigration(sqlite, "0007_lethal_killraven.sql");
+
+    expect(sqlite.prepare("SELECT id, display_order FROM diagnoses").get()).toEqual({
+      id: "diagnosis-existing",
+      display_order: 0,
+    });
+    expect(sqlite.pragma("foreign_key_check")).toEqual([]);
+
+    sqlite.close();
+  });
 });

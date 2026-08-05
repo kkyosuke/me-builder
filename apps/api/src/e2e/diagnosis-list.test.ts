@@ -185,12 +185,15 @@ describe("GET /api/diagnoses local D1 E2E", () => {
       diagnoses: Array<{
         id: string;
         description: string;
+        displayOrder: number;
         responseStatus: string;
         answeredCount: number;
         questionCount: number;
+        lastAnsweredAt: string | null;
       }>;
     };
     expect(initialBody.diagnoses).toHaveLength(3);
+    expect(initialBody.diagnoses.map(({ displayOrder }) => displayOrder)).toEqual([10, 20, 30]);
     expect(initialBody.diagnoses.every(({ description }) => description.length > 0)).toBe(true);
     expect(
       initialBody.diagnoses.every(({ responseStatus }) => responseStatus === "unanswered"),
@@ -207,6 +210,7 @@ describe("GET /api/diagnoses local D1 E2E", () => {
         responseStatus: string;
         answeredCount: number;
         questionCount: number;
+        lastAnsweredAt: string | null;
       }>;
     };
 
@@ -214,12 +218,14 @@ describe("GET /api/diagnoses local D1 E2E", () => {
       responseStatus: "in-progress",
       answeredCount: 1,
       questionCount: 10,
+      lastAnsweredAt: expect.any(String),
     });
     expect(progressedBody.diagnoses.find(({ id }) => id === "relationship-priority")).toMatchObject(
       {
         responseStatus: "answered",
         answeredCount: 10,
         questionCount: 10,
+        lastAnsweredAt: expect.any(String),
       },
     );
   });

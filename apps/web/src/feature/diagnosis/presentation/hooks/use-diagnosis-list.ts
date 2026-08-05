@@ -72,7 +72,9 @@ export function useDiagnosisList({
   const updateProgress = useCallback(
     (
       diagnosisId: string,
-      progress: Pick<DiagnosisListItem, "responseStatus" | "answeredCount" | "questionCount">,
+      progress: Pick<DiagnosisListItem, "responseStatus" | "answeredCount" | "questionCount"> & {
+        lastAnsweredAt?: string;
+      },
     ) => {
       setState((current) =>
         current.status === "success"

@@ -30,10 +30,12 @@ const DiagnosisListItemSchema = v.object({
   description: v.pipe(v.string(), v.nonEmpty()),
   opensAt: v.pipe(v.string(), v.isoTimestamp()),
   closesAt: v.nullable(v.pipe(v.string(), v.isoTimestamp())),
+  displayOrder: v.pipe(v.number(), v.safeInteger(), v.minValue(0)),
   availability: v.picklist(["open", "closed"]),
   responseStatus: v.picklist(["unanswered", "in-progress", "answered"]),
   answeredCount: v.pipe(v.number(), v.safeInteger(), v.minValue(0)),
   questionCount: v.pipe(v.number(), v.safeInteger(), v.minValue(1)),
+  lastAnsweredAt: v.nullable(v.pipe(v.string(), v.isoTimestamp())),
 });
 
 const DiagnosisListResponseSchema = v.object({
@@ -46,10 +48,12 @@ const toDiagnosisListItem = (item: ApiDiagnosisListItem): DiagnosisListItem => (
   description: item.description,
   opensAt: item.opensAt,
   closesAt: item.closesAt,
+  displayOrder: item.displayOrder,
   availability: item.availability,
   responseStatus: item.responseStatus,
   answeredCount: item.answeredCount,
   questionCount: item.questionCount,
+  lastAnsweredAt: item.lastAnsweredAt,
 });
 
 /** LIFF IDトークンで本人確認し、回答進捗を含む診断一覧を取得する。 */

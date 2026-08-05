@@ -14,7 +14,9 @@ export function resolveDiagnosisDestination(diagnosis: DiagnosisListItem): Diagn
 
 export function applySavedProgress(
   diagnosis: DiagnosisListItem,
-  progress: Pick<DiagnosisListItem, "responseStatus" | "answeredCount" | "questionCount">,
+  progress: Pick<DiagnosisListItem, "responseStatus" | "answeredCount" | "questionCount"> & {
+    lastAnsweredAt?: string;
+  },
 ): DiagnosisListItem {
   // バックグラウンド保存のレスポンス順が前後しても進捗を巻き戻さない。
   const answeredCount = Math.max(diagnosis.answeredCount, progress.answeredCount);
@@ -24,5 +26,9 @@ export function applySavedProgress(
     responseStatus: answeredCount === questionCount ? "answered" : "in-progress",
     answeredCount,
     questionCount,
+    lastAnsweredAt:
+      progress.lastAnsweredAt && progress.lastAnsweredAt > (diagnosis.lastAnsweredAt ?? "")
+        ? progress.lastAnsweredAt
+        : diagnosis.lastAnsweredAt,
   };
 }

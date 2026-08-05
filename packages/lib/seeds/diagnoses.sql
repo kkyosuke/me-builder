@@ -270,20 +270,25 @@ INSERT INTO diagnoses (
   title,
   description,
   scoring_config_id,
+  display_order,
   opens_at,
   state,
   published_at
 ) VALUES
-  ('relationship-priority', 1785801600, 1785801600, 0, '自分と相手の優先・境界線', '頼まれごとや意思決定で、自分と相手をどう尊重するかを見ます。', 'relationship-priority-v1', 1785801600, 'published', 1785801600),
-  ('money-values', 1785801600, 1785801600, 0, 'お金と消費', '貯蓄、支出、共有、公平性、リスクに関する傾向を見ます。', 'money-values-v1', 1785801600, 'published', 1785801600),
-  ('leisure-style', 1785974400, 1785974400, 0, 'インドア・アウトドアと余暇', '休日の過ごし方、体験、趣味の共有、活動量に関する傾向を見ます。', 'leisure-style-v1', 1785801600, 'published', 1785974400)
+  ('relationship-priority', 1785801600, 1785801600, 0, '自分と相手の優先・境界線', '頼まれごとや意思決定で、自分と相手をどう尊重するかを見ます。', 'relationship-priority-v1', 10, 1785801600, 'published', 1785801600),
+  ('money-values', 1785801600, 1785801600, 0, 'お金と消費', '貯蓄、支出、共有、公平性、リスクに関する傾向を見ます。', 'money-values-v1', 20, 1785801600, 'published', 1785801600),
+  ('leisure-style', 1785974400, 1785974400, 0, 'インドア・アウトドアと余暇', '休日の過ごし方、体験、趣味の共有、活動量に関する傾向を見ます。', 'leisure-style-v1', 30, 1785801600, 'published', 1785974400)
 ON CONFLICT(id) DO UPDATE SET
   description = CASE
     WHEN diagnoses.description = '' THEN excluded.description
     ELSE diagnoses.description
   END,
-  scoring_config_id = COALESCE(diagnoses.scoring_config_id, excluded.scoring_config_id)
-WHERE diagnoses.description = '' OR diagnoses.scoring_config_id IS NULL;
+  scoring_config_id = COALESCE(diagnoses.scoring_config_id, excluded.scoring_config_id),
+  display_order = CASE
+    WHEN diagnoses.display_order = 0 THEN excluded.display_order
+    ELSE diagnoses.display_order
+  END
+WHERE diagnoses.description = '' OR diagnoses.scoring_config_id IS NULL OR diagnoses.display_order = 0;
 --> statement-breakpoint
 
 INSERT OR IGNORE INTO diagnosis_questions (

@@ -11,10 +11,12 @@ const DiagnosisListItemSchema = v.object({
   description: NonEmptyStringSchema,
   opensAt: TimestampSchema,
   closesAt: v.nullable(TimestampSchema),
+  displayOrder: v.pipe(v.number(), v.safeInteger(), v.minValue(0)),
   availability: v.picklist(["open", "closed"]),
   responseStatus: v.picklist(["unanswered", "in-progress", "answered"]),
   answeredCount: v.pipe(v.number(), v.safeInteger(), v.minValue(0)),
   questionCount: v.pipe(v.number(), v.safeInteger(), v.minValue(1)),
+  lastAnsweredAt: v.nullable(TimestampSchema),
 });
 
 export const DiagnosisListResponseSchema = v.object({

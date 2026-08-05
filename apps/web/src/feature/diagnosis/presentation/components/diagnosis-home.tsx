@@ -1,13 +1,88 @@
-import { ArrowRight, ClipboardList, RotateCw, Trash2 } from "lucide-react";
+import { ArrowRight, ChevronDown, ClipboardList, RotateCw, Trash2 } from "lucide-react";
+import { useState } from "react";
 import { LoadingState } from "../../../../components/loading-state";
 import type { AsyncState } from "../../../../model/async-state";
 import type { DiagnosisListItem } from "../../model/diagnosis-list-item";
+import { buildDiagnosisListSections } from "../../model/diagnosis-list-sections";
 
 const STATUS_LABELS: Record<DiagnosisListItem["responseStatus"], string> = {
   unanswered: "未回答",
   "in-progress": "回答途中",
   answered: "回答済み",
 };
+
+function DiagnosisCard({
+  diagnosis,
+  onOpenDiagnosis,
+}: {
+  diagnosis: DiagnosisListItem;
+  onOpenDiagnosis: (diagnosis: DiagnosisListItem) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onOpenDiagnosis(diagnosis)}
+      className="group flex min-h-64 flex-col rounded-3xl border border-slate-700 bg-slate-800 p-4 text-left shadow-xl shadow-slate-950/20 transition hover:-translate-y-1 hover:border-sky-400/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400 sm:p-5"
+    >
+      <span className="flex size-11 items-center justify-center rounded-2xl bg-sky-400/10 text-sky-300">
+        <ClipboardList className="size-5" aria-hidden="true" />
+      </span>
+      <span className="mt-5 text-lg leading-snug font-bold text-slate-50">{diagnosis.title}</span>
+      <span className="mt-2 line-clamp-3 text-xs leading-relaxed text-slate-400 sm:text-sm">
+        {diagnosis.description}
+      </span>
+      <span className="mt-auto flex items-end justify-between gap-2 pt-5">
+        <span>
+          <span className="block text-xs text-slate-500">
+            {diagnosis.responseStatus === "in-progress"
+              ? `${diagnosis.answeredCount} / ${diagnosis.questionCount}問`
+              : `${diagnosis.questionCount}問`}
+          </span>
+          <span className="mt-1 inline-flex rounded-full bg-amber-400/10 px-2 py-1 text-xs font-semibold text-amber-300">
+            {diagnosis.availability === "closed"
+              ? "受付終了"
+              : STATUS_LABELS[diagnosis.responseStatus]}
+          </span>
+        </span>
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-sky-400 text-slate-900 transition group-hover:translate-x-0.5">
+          <ArrowRight className="size-4" aria-hidden="true" />
+        </span>
+      </span>
+    </button>
+  );
+}
+
+function DiagnosisSection({
+  id,
+  title,
+  diagnoses,
+  onOpenDiagnosis,
+}: {
+  id: string;
+  title: string;
+  diagnoses: DiagnosisListItem[];
+  onOpenDiagnosis: (diagnosis: DiagnosisListItem) => void;
+}) {
+  if (diagnoses.length === 0) return null;
+
+  return (
+    <section aria-labelledby={id}>
+      <h2 id={id} className="mb-3 text-base font-bold text-slate-100">
+        {title}
+        <span className="ml-2 text-sm font-normal text-slate-500">{diagnoses.length}件</span>
+      </h2>
+      <div className="grid grid-cols-2 gap-3 sm:gap-4">
+        {diagnoses.map((diagnosis) => (
+          <DiagnosisCard
+            key={diagnosis.id}
+            diagnosis={diagnosis}
+            onOpenDiagnosis={onOpenDiagnosis}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
 
 export function DiagnosisHome({
   diagnoses,
@@ -24,6 +99,10 @@ export function DiagnosisHome({
   resetState: AsyncState<string>;
   onResetDiagnosisData: () => void;
 }) {
+  const [isAnsweredOpen, setIsAnsweredOpen] = useState(false);
+  const sections =
+    diagnoses.status === "success" ? buildDiagnosisListSections(diagnoses.data) : null;
+
   return (
     <main className="mx-auto min-h-dvh w-full max-w-2xl px-4 py-8 sm:px-8">
       <header className="mb-8">
@@ -32,9 +111,9 @@ export function DiagnosisHome({
         <p className="mt-2 text-sm text-slate-400">答えたいカードを選んでください。</p>
       </header>
 
-      <section aria-label="診断一覧" className="grid grid-cols-2 gap-3 sm:gap-4">
+      <section aria-label="診断一覧" className="space-y-8">
         {diagnoses.status === "error" && (
-          <div className="col-span-full rounded-3xl border border-red-400/30 bg-red-400/10 p-6 text-center text-sm text-red-300">
+          <div className="rounded-3xl border border-red-400/30 bg-red-400/10 p-6 text-center text-sm text-red-300">
             <p>{`診断を読み込めませんでした: ${diagnoses.message}`}</p>
             <button
               type="button"
@@ -50,46 +129,59 @@ export function DiagnosisHome({
           <LoadingState variant="panel" message="診断を読み込んでいます..." />
         )}
         {diagnoses.status === "success" && diagnoses.data.length === 0 && (
-          <p className="col-span-full rounded-3xl border border-slate-700 bg-slate-800 p-6 text-center text-sm text-slate-400">
+          <p className="rounded-3xl border border-slate-700 bg-slate-800 p-6 text-center text-sm text-slate-400">
             回答できる診断はありません。
           </p>
         )}
-        {diagnoses.status === "success" &&
-          diagnoses.data.map((diagnosis) => (
-            <button
-              key={diagnosis.id}
-              type="button"
-              onClick={() => onOpenDiagnosis(diagnosis)}
-              className="group flex min-h-64 flex-col rounded-3xl border border-slate-700 bg-slate-800 p-4 text-left shadow-xl shadow-slate-950/20 transition hover:-translate-y-1 hover:border-sky-400/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400 sm:p-5"
-            >
-              <span className="flex size-11 items-center justify-center rounded-2xl bg-sky-400/10 text-sky-300">
-                <ClipboardList className="size-5" aria-hidden="true" />
-              </span>
-              <span className="mt-5 text-lg leading-snug font-bold text-slate-50">
-                {diagnosis.title}
-              </span>
-              <span className="mt-2 line-clamp-3 text-xs leading-relaxed text-slate-400 sm:text-sm">
-                {diagnosis.description}
-              </span>
-              <span className="mt-auto flex items-end justify-between gap-2 pt-5">
-                <span>
-                  <span className="block text-xs text-slate-500">
-                    {diagnosis.responseStatus === "in-progress"
-                      ? `${diagnosis.answeredCount} / ${diagnosis.questionCount}問`
-                      : `${diagnosis.questionCount}問`}
+        {sections && (
+          <>
+            <DiagnosisSection
+              id="diagnosis-section-in-progress"
+              title="回答途中"
+              diagnoses={sections.inProgress}
+              onOpenDiagnosis={onOpenDiagnosis}
+            />
+            <DiagnosisSection
+              id="diagnosis-section-unanswered"
+              title="未回答"
+              diagnoses={sections.unanswered}
+              onOpenDiagnosis={onOpenDiagnosis}
+            />
+            {sections.answered.length > 0 && (
+              <section aria-labelledby="diagnosis-section-answered">
+                <button
+                  type="button"
+                  aria-expanded={isAnsweredOpen}
+                  aria-controls="answered-diagnoses"
+                  onClick={() => setIsAnsweredOpen((current) => !current)}
+                  className="flex w-full items-center justify-between rounded-2xl border border-slate-700 bg-slate-800/60 px-4 py-3 text-left transition hover:border-slate-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400"
+                >
+                  <span id="diagnosis-section-answered" className="font-bold text-slate-100">
+                    回答済み
+                    <span className="ml-2 text-sm font-normal text-slate-500">
+                      {sections.answered.length}件
+                    </span>
                   </span>
-                  <span className="mt-1 inline-flex rounded-full bg-amber-400/10 px-2 py-1 text-xs font-semibold text-amber-300">
-                    {diagnosis.availability === "closed"
-                      ? "受付終了"
-                      : STATUS_LABELS[diagnosis.responseStatus]}
-                  </span>
-                </span>
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-sky-400 text-slate-900 transition group-hover:translate-x-0.5">
-                  <ArrowRight className="size-4" aria-hidden="true" />
-                </span>
-              </span>
-            </button>
-          ))}
+                  <ChevronDown
+                    className={`size-5 text-slate-400 transition-transform ${isAnsweredOpen ? "rotate-180" : ""}`}
+                    aria-hidden="true"
+                  />
+                </button>
+                {isAnsweredOpen && (
+                  <div id="answered-diagnoses" className="mt-3 grid grid-cols-2 gap-3 sm:gap-4">
+                    {sections.answered.map((diagnosis) => (
+                      <DiagnosisCard
+                        key={diagnosis.id}
+                        diagnosis={diagnosis}
+                        onOpenDiagnosis={onOpenDiagnosis}
+                      />
+                    ))}
+                  </div>
+                )}
+              </section>
+            )}
+          </>
+        )}
       </section>
 
       {canResetDiagnosisData && (

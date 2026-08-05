@@ -33,10 +33,12 @@ Authorization: Bearer <LIFF ID token>
       "description": "頼まれごとや意思決定で、自分と相手をどう尊重するかを見ます。",
       "opensAt": "2026-08-04T00:00:00.000Z",
       "closesAt": null,
+      "displayOrder": 10,
       "availability": "open",
       "responseStatus": "unanswered",
       "answeredCount": 0,
-      "questionCount": 10
+      "questionCount": 10,
+      "lastAnsweredAt": null
     }
   ]
 }
@@ -50,7 +52,7 @@ Authorization: Bearer <LIFF ID token>
 | `in-progress` | 1件以上かつ`questionCount`未満 |
 | `answered` | `answeredCount`と`questionCount`が一致 |
 
-同じ公開時点の場合にもレスポンス順が変動しないよう、公開時点の降順、Diagnosis IDの昇順で返します。
+`displayOrder`は運営が設定した一覧表示順で、小さい値を先に扱います。`lastAnsweredAt`は本人の現在有効なAnswerのうち最新の回答日時で、回答がなければ`null`です。一覧画面は[Phase 1 診断体験設計](../diagnosis/diagnosis-experience.md#3-画面と責務)に従って分類・並び替えるため、このAPIの配列順には依存しません。APIは表示順、Diagnosis IDの昇順で安定して返します。
 
 ## 4. 診断詳細
 
