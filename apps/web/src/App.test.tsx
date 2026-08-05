@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
-import type { SurveyDefinition, SurveyListItem } from "./feature/survey";
+import type { SurveyAnswer, SurveyDefinition, SurveyListItem } from "./feature/survey";
 import { OperationError } from "./infrastructure/errors";
 
 const mocks = vi.hoisted(() => ({
@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   getLiffIdToken: vi.fn(),
   fetchSurveyList: vi.fn(),
   fetchSurveyDefinition: vi.fn(),
+  saveSurveyAnswer: vi.fn(),
 }));
 
 vi.mock("./config", () => ({
@@ -24,7 +25,34 @@ vi.mock("./feature/liff", () => ({
 vi.mock("./feature/survey", () => ({
   fetchSurveyList: mocks.fetchSurveyList,
   fetchSurveyDefinition: mocks.fetchSurveyDefinition,
-  SwipeSurvey: ({ survey }: { survey: SurveyDefinition }) => <p>{`回答UI: ${survey.title}`}</p>,
+  saveSurveyAnswer: mocks.saveSurveyAnswer,
+  SwipeSurvey: ({
+    survey,
+    onSaveAnswer,
+  }: {
+    survey: SurveyDefinition;
+    onSaveAnswer: (answer: SurveyAnswer) => Promise<unknown>;
+  }) => (
+    <div>
+      <p>{`回答UI: ${survey.title}`}</p>
+      <button
+        type="button"
+        onClick={() =>
+          void onSaveAnswer({
+            kind: "answer",
+            surveyQuestionId: "sq-1",
+            questionId: "q-1",
+            questionVersion: 1,
+            choiceId: "yes",
+            direction: "right",
+            acceptedAt: "2026-08-05T00:00:00.000Z",
+          })
+        }
+      >
+        テスト回答
+      </button>
+    </div>
+  ),
 }));
 
 const definition: SurveyDefinition = {
@@ -62,17 +90,37 @@ describe("App", () => {
     mocks.getLiffIdToken.mockReturnValue("dummy.id.token");
     mocks.fetchSurveyList.mockResolvedValue([survey()]);
     mocks.fetchSurveyDefinition.mockResolvedValue(definition);
+    mocks.saveSurveyAnswer.mockResolvedValue({
+      outcome: "created",
+      answer: { acceptedAt: "2026-08-05T00:00:01.000Z" },
+      progress: { responseStatus: "in-progress", answeredCount: 1, questionCount: 10 },
+    });
   });
 
   afterEach(() => cleanup());
 
-  it("受付中かつ未回答なら回答画面へ進み、未保存であることを表示する", async () => {
+  it("受付中かつ未回答なら回答画面へ進み、1問ずつ保存することを表示する", async () => {
     render(<App />);
 
     fireEvent.click(await screen.findByRole("button", { name: /テストアンケート/ }));
 
     expect(await screen.findByText("回答UI: テストアンケート")).toBeTruthy();
-    expect(screen.getByText(/この回答はサーバーへ保存されません/)).toBeTruthy();
+    expect(screen.getByText(/回答は1問ずつ保存されます/)).toBeTruthy();
+  });
+
+  it("回答UIの選択を保存APIへ接続する", async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: /テストアンケート/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "テスト回答" }));
+    await waitFor(() =>
+      expect(mocks.saveSurveyAnswer).toHaveBeenCalledWith(
+        "https://api.example.com",
+        "dummy.id.token",
+        "survey-1",
+        "sq-1",
+        "yes",
+      ),
+    );
   });
 
   it.each([

@@ -1,4 +1,11 @@
-import { CircleCheck, Keyboard, RotateCcw, SkipForward, Sparkles } from "lucide-react";
+import {
+  CircleCheck,
+  Keyboard,
+  LoaderCircle,
+  RotateCcw,
+  SkipForward,
+  Sparkles,
+} from "lucide-react";
 import {
   type PointerEvent as ReactPointerEvent,
   type RefObject,
@@ -15,7 +22,7 @@ import {
 } from "../../model/answers";
 import { getParameterSummary } from "../../model/scoring";
 import type { SurveyDefinition } from "../../model/survey-definition";
-import type { SurveyInteraction, SwipeDirection } from "../../model/types";
+import type { SurveyAnswer, SurveyInteraction, SwipeDirection } from "../../model/types";
 import { pickProgressMessage, resolveProgressMilestone } from "../progress-message";
 import {
   type DragOffset,
@@ -29,6 +36,12 @@ import { SwipeCard } from "./swipe-card";
 
 /** 回答の確定に使える操作。スワイプ以外の手段も同じ関数へ流します。 */
 type SurveyAction = SwipeDirection | "skip";
+
+type BackgroundSave = {
+  answer: SurveyAnswer;
+  state: "saving" | "failed";
+  message?: string;
+};
 
 /** `prefers-reduced-motion: reduce` を購読します。 */
 function useReducedMotion(): boolean {
@@ -89,7 +102,7 @@ function SurveyComplete({
     <div className="min-h-80 rounded-3xl border border-slate-700 bg-slate-800 p-5 text-center">
       <div className="flex flex-col items-center gap-2">
         <CircleCheck className="size-12 text-emerald-400" aria-hidden="true" />
-        <p className="text-lg font-bold">未保存の選択から見える現在の傾向</p>
+        <p className="text-lg font-bold">保存した回答から見える現在の傾向</p>
         <p className="text-sm text-slate-400">
           {`${answered} 問に回答し、${deferred} 問をあとで回答にしました。`}
         </p>
@@ -110,9 +123,63 @@ function SurveyComplete({
         ))}
       </div>
 
-      <p className="mt-4 border-t border-slate-700 pt-3 text-xs font-semibold text-amber-200">
-        この内容はサーバーへ保存されていません。画面を離れると失われます。
-      </p>
+      {deferred > 0 && (
+        <p className="mt-4 border-t border-slate-700 pt-3 text-xs font-semibold text-amber-200">
+          「あとで回答」の選択はまだ保存されません。
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** 全問の操作後、バックグラウンド保存が完了するまで結果を確定させないための表示。 */
+function SaveCompletionPending({
+  saves,
+  onRetry,
+}: {
+  saves: BackgroundSave[];
+  onRetry: (answer: SurveyAnswer) => void;
+}) {
+  const failed = saves.filter(({ state }) => state === "failed");
+  const savingCount = saves.length - failed.length;
+  const retryFailed = () => {
+    for (const { answer } of failed) {
+      onRetry(answer);
+    }
+  };
+
+  return (
+    <div className="flex min-h-80 flex-col items-center justify-center gap-4 rounded-3xl border border-slate-700 bg-slate-800 p-5 text-center">
+      {savingCount > 0 && (
+        <LoaderCircle
+          className="size-12 animate-spin text-sky-300 motion-reduce:animate-none"
+          aria-hidden="true"
+        />
+      )}
+      <div>
+        <p className="text-lg font-bold">
+          {failed.length > 0 ? "保存できなかった回答があります" : "回答を保存しています"}
+        </p>
+        <p className="mt-2 text-sm text-slate-400">
+          {savingCount > 0
+            ? `残り ${savingCount} 件の保存が終わるまでお待ちください。`
+            : "保存に成功すると結果を表示します。"}
+        </p>
+      </div>
+      {failed.length > 0 && (
+        <div className="w-full rounded-xl border border-red-400/30 bg-red-400/10 p-3 text-sm text-red-200">
+          <p>{failed[0]?.message ?? "回答を保存できませんでした。"}</p>
+          <button
+            type="button"
+            className="mt-3 inline-flex items-center justify-center gap-2 rounded-lg bg-red-200 px-4 py-2 font-semibold text-slate-950 disabled:opacity-40"
+            disabled={savingCount > 0}
+            onClick={retryFailed}
+          >
+            <RotateCcw className="size-4" aria-hidden="true" />
+            保存を再試行
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -128,14 +195,17 @@ function SurveyComplete({
 export function SwipeSurvey({
   survey,
   onBack,
+  onSaveAnswer,
 }: {
   survey: SurveyDefinition;
   onBack: () => void;
+  onSaveAnswer: (answer: SurveyAnswer) => Promise<{ acceptedAt: string }>;
 }) {
   const [index, setIndex] = useState(0);
   const [interactions, setInteractions] = useState<SurveyInteraction[]>([]);
   const [drag, setDrag] = useState<DragOffset | null>(null);
   const [flyOut, setFlyOut] = useState<SwipeDirection | null>(null);
+  const [backgroundSaves, setBackgroundSaves] = useState<BackgroundSave[]>([]);
 
   const reducedMotion = useReducedMotion();
   const [stackRef, cardWidth] = useCardWidth();
@@ -145,6 +215,8 @@ export function SwipeSurvey({
   const dragStart = useRef<{ x: number; y: number; pointerId: number } | null>(null);
   /** 飛ばしている間の待ちタイマー。アンマウント時に解除します。 */
   const advanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Reactの状態反映前に同じ質問へ二重操作されることを同期的に止めます。 */
+  const actionPending = useRef(false);
 
   const questions = survey.questions;
 
@@ -160,35 +232,94 @@ export function SwipeSurvey({
   const current = questions?.[index];
   const isBusy = flyOut !== null;
 
-  /** スワイプ・ボタン・キーボードのすべてがここへ集まります。 */
-  const commit = useCallback(
-    (action: SurveyAction) => {
-      if (!current || isBusy) {
-        return;
-      }
-
-      const interaction =
-        action === "skip"
-          ? createDeferredQuestion(current, new Date())
-          : createSurveyAnswer(current, action, new Date());
-      setInteractions((previous) => [...previous, interaction]);
-      setDrag(null);
-
-      // スキップは方向を持たないので飛ばさず、すぐ次の質問へ進めます。
-      // `prefers-reduced-motion` のときも飛ばすアニメーションを省いて即座に進めます。
-      if (action === "skip" || reducedMotion) {
+  const advance = useCallback(
+    (direction: SwipeDirection) => {
+      if (reducedMotion) {
         setIndex((previous) => previous + 1);
+        queueMicrotask(() => {
+          actionPending.current = false;
+        });
         return;
       }
-
-      setFlyOut(action);
+      setFlyOut(direction);
       advanceTimer.current = setTimeout(() => {
         setIndex((previous) => previous + 1);
         setFlyOut(null);
         advanceTimer.current = null;
+        actionPending.current = false;
       }, SWIPE_TRANSITION_MS);
     },
-    [current, isBusy, reducedMotion],
+    [reducedMotion],
+  );
+
+  const persistAnswer = useCallback(
+    async (answer: SurveyAnswer) => {
+      setBackgroundSaves((previous) => {
+        const next = { answer, state: "saving" as const };
+        return previous.some(
+          ({ answer: pending }) => pending.surveyQuestionId === answer.surveyQuestionId,
+        )
+          ? previous.map((pending) =>
+              pending.answer.surveyQuestionId === answer.surveyQuestionId ? next : pending,
+            )
+          : [...previous, next];
+      });
+      try {
+        const saved = await onSaveAnswer(answer);
+        setInteractions((previous) =>
+          previous.map((interaction) =>
+            interaction.kind === "answer" &&
+            interaction.surveyQuestionId === answer.surveyQuestionId
+              ? { ...interaction, acceptedAt: saved.acceptedAt }
+              : interaction,
+          ),
+        );
+        setBackgroundSaves((previous) =>
+          previous.filter(
+            ({ answer: pending }) => pending.surveyQuestionId !== answer.surveyQuestionId,
+          ),
+        );
+      } catch (error) {
+        setBackgroundSaves((previous) =>
+          previous.map((pending) =>
+            pending.answer.surveyQuestionId === answer.surveyQuestionId
+              ? {
+                  answer,
+                  state: "failed",
+                  message: error instanceof Error ? error.message : "回答を保存できませんでした。",
+                }
+              : pending,
+          ),
+        );
+      }
+    },
+    [onSaveAnswer],
+  );
+
+  /** スワイプ・ボタン・キーボードのすべてがここへ集まります。 */
+  const commit = useCallback(
+    (action: SurveyAction) => {
+      if (!current || isBusy || actionPending.current) {
+        return;
+      }
+
+      actionPending.current = true;
+      setDrag(null);
+
+      if (action === "skip") {
+        setInteractions((previous) => [...previous, createDeferredQuestion(current, new Date())]);
+        setIndex((previous) => previous + 1);
+        queueMicrotask(() => {
+          actionPending.current = false;
+        });
+        return;
+      }
+      const answer = createSurveyAnswer(current, action, new Date());
+      setInteractions((previous) => [...previous, answer]);
+      advance(action);
+      void persistAnswer(answer);
+    },
+    [advance, current, isBusy, persistAnswer],
   );
 
   useEffect(() => {
@@ -204,13 +335,6 @@ export function SwipeSurvey({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [commit]);
-
-  const restart = useCallback(() => {
-    setIndex(0);
-    setInteractions([]);
-    setDrag(null);
-    setFlyOut(null);
-  }, []);
 
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (isBusy) {
@@ -274,7 +398,7 @@ export function SwipeSurvey({
           className="h-full rounded-full bg-sky-400"
           style={{
             width: total === 0 ? "0%" : `${(answeredCount / total) * 100}%`,
-            transition: reducedMotion ? undefined : "width 260ms ease-out",
+            transition: reducedMotion ? undefined : `width ${SWIPE_TRANSITION_MS}ms ease-out`,
           }}
         />
       </div>
@@ -290,7 +414,15 @@ export function SwipeSurvey({
 
       {/* 回答中だけ高さを固定してカードを重ね、完了後は結果の項目数に応じて伸ばします。 */}
       <div ref={stackRef} className={finished ? "relative" : "relative mb-3 h-80"}>
-        {finished && <SurveyComplete interactions={interactions} survey={survey} />}
+        {finished && backgroundSaves.length > 0 && (
+          <SaveCompletionPending
+            saves={backgroundSaves}
+            onRetry={(answer) => void persistAnswer(answer)}
+          />
+        )}
+        {finished && backgroundSaves.length === 0 && (
+          <SurveyComplete interactions={interactions} survey={survey} />
+        )}
         {questions?.slice(index, index + VISIBLE_STACK_SIZE).map((question, offset) => (
           <SwipeCard
             key={`${question.surveyQuestionId}-v${question.questionVersion}`}
@@ -312,23 +444,13 @@ export function SwipeSurvey({
       </div>
 
       {finished && (
-        <div className="flex gap-3">
-          <button
-            type="button"
-            onClick={onBack}
-            className="flex-1 rounded-2xl border border-slate-600 px-4 py-3 text-sm font-semibold text-slate-300 transition-colors hover:bg-slate-800"
-          >
-            一覧へ
-          </button>
-          <button
-            type="button"
-            onClick={restart}
-            className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-sky-500 px-4 py-3 text-sm font-semibold text-slate-900 transition-colors hover:bg-sky-400"
-          >
-            <RotateCcw className="size-4" aria-hidden="true" />
-            もう一度
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={onBack}
+          className="w-full rounded-2xl border border-slate-600 px-4 py-3 text-sm font-semibold text-slate-300 transition-colors hover:bg-slate-800"
+        >
+          一覧へ
+        </button>
       )}
 
       {current && (

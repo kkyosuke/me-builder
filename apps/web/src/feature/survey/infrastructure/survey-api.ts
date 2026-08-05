@@ -17,6 +17,8 @@ type ApiSurveyListResponse =
 type ApiSurveyListItem = ApiSurveyListResponse["surveys"][number];
 type ApiSurveyDetailResponse =
   operations["getSurveyDetail"]["responses"][200]["content"]["application/json"];
+type ApiSaveSurveyAnswerResponse =
+  operations["saveSurveyAnswer"]["responses"][200]["content"]["application/json"];
 
 const SurveyListItemSchema = v.object({
   id: v.pipe(v.string(), v.nonEmpty()),
@@ -189,4 +191,96 @@ export async function fetchSurveyDefinition(
     description: body.description,
     questions,
   });
+}
+
+const SaveSurveyAnswerResponseSchema = v.object({
+  outcome: v.picklist(["created", "unchanged"]),
+  answer: v.object({
+    surveyQuestionId: v.pipe(v.string(), v.nonEmpty()),
+    questionId: v.pipe(v.string(), v.nonEmpty()),
+    questionVersion: v.pipe(v.number(), v.safeInteger(), v.minValue(1)),
+    choiceId: v.pipe(v.string(), v.nonEmpty()),
+    acceptedAt: v.pipe(v.string(), v.isoTimestamp()),
+  }),
+  progress: v.object({
+    responseStatus: v.picklist(["unanswered", "in-progress", "answered"]),
+    answeredCount: v.pipe(v.number(), v.safeInteger(), v.minValue(0)),
+    questionCount: v.pipe(v.number(), v.safeInteger(), v.minValue(1)),
+  }),
+}) satisfies v.GenericSchema<ApiSaveSurveyAnswerResponse>;
+
+export type SaveSurveyAnswerResult = v.InferOutput<typeof SaveSurveyAnswerResponseSchema>;
+
+/** 1問分のChoice IDを保存し、サーバーが確定した回答時点と最新進捗を返す。 */
+export async function saveSurveyAnswer(
+  apiUrl: string | undefined,
+  idToken: string,
+  surveyId: string,
+  surveyQuestionId: string,
+  choiceId: string,
+  signal?: AbortSignal,
+): Promise<SaveSurveyAnswerResult> {
+  const response = await createHttpClient(apiUrl).request(
+    `/api/surveys/${encodeURIComponent(surveyId)}/answers/${encodeURIComponent(surveyQuestionId)}`,
+    {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${idToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ choiceId }),
+      ...(signal ? { signal } : {}),
+    },
+  );
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new AuthenticationError("本人確認に失敗しました。LINEから開き直してください。", {
+        code: "AUTHENTICATION_REQUIRED",
+        status: response.status,
+      });
+    }
+    if (response.status === 404) {
+      throw new OperationError("このアンケートは現在公開されていません。", {
+        code: "SURVEY_UNAVAILABLE",
+        status: response.status,
+      });
+    }
+    if (response.status === 409) {
+      let reason: string | undefined;
+      try {
+        reason = ((await response.json()) as { reason?: string }).reason;
+      } catch {
+        // エラー本文が壊れていてもHTTP statusから安全な案内へ変換します。
+      }
+      throw new OperationError(
+        reason === "answer_change_requires_revision"
+          ? "すでに別の回答が保存されています。回答の修正機能をお待ちください。"
+          : "受付終了のため、回答を保存できませんでした。",
+        {
+          code: reason === "answer_change_requires_revision" ? "ANSWER_CONFLICT" : "SURVEY_CLOSED",
+          status: response.status,
+        },
+      );
+    }
+    if (response.status === 422) {
+      throw new ValidationError("選択した回答はこのアンケートでは利用できません。", {
+        code: "INVALID_SURVEY_ANSWER",
+        status: response.status,
+      });
+    }
+    throw new UnknownError(`回答の保存に失敗しました (HTTP ${response.status})`, {
+      code: "SURVEY_ANSWER_REQUEST_FAILED",
+      status: response.status,
+    });
+  }
+
+  try {
+    return v.parse(SaveSurveyAnswerResponseSchema, await response.json());
+  } catch (error) {
+    throw new ValidationError("回答保存のレスポンスが不正です。", {
+      code: "SURVEY_ANSWER_INVALID_RESPONSE",
+      cause: error,
+    });
+  }
 }

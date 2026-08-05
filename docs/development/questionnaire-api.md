@@ -94,7 +94,54 @@ Surveyが`published`かつ削除されておらず、サーバー時刻が受付
 
 認証・基盤の共通エラーは次節に従います。
 
-## 5. エラー
+## 5. アンケート回答保存
+
+### `PUT /api/surveys/{surveyId}/answers/{surveyQuestionId}`
+
+本人が受付中のSurveyに含まれる1問へ初めて回答し、Answerと対応するSource Recordを保存します。リクエストではChoice IDだけを受け取り、Account、Question ID、Question Version、回答時点はサーバーが確定します。
+
+```json
+{ "choiceId": "yes" }
+```
+
+初回回答時にAccountとSurveyの組み合わせに対応するSurveyResponseを作成します。SurveyResponse、本人入力のSource Record、Answerは1つのD1トランザクション境界で保存し、部分的に残しません。成功時はSource Record ID、SurveyResponse ID、Account IDを公開せず、保存した回答と最新進捗を返します。
+
+```json
+{
+  "outcome": "created",
+  "answer": {
+    "surveyQuestionId": "sq-relationship-priority-01",
+    "questionId": "q-relationship-priority-01",
+    "questionVersion": 1,
+    "choiceId": "yes",
+    "acceptedAt": "2026-08-05T00:00:00.000Z"
+  },
+  "progress": {
+    "responseStatus": "in-progress",
+    "answeredCount": 1,
+    "questionCount": 10
+  }
+}
+```
+
+このパスはSurvey Questionをリソースとする冪等な`PUT`です。同じ本人が同じSurvey QuestionとChoice IDを通信再送・二重タップ・並行リクエストで繰り返した場合、2件目以降は新しいAnswer、Source Record、SurveyResponseを作らず、`outcome`を`unchanged`として既存Answerと現在の進捗を`200`で返します。`acceptedAt`も初回受付時点から変えません。Idempotency Keyは要求しません。
+
+異なるChoice IDが既に保存されている場合、このAPIでは上書きせず`409 answer_change_requires_revision`を返します。回答修正はSource Recordの改訂を伴う別機能として扱い、このAPIの範囲には含めません。
+
+回答保存固有のエラーは次のとおりです。
+
+| HTTP | 条件 | レスポンス |
+| --- | --- | --- |
+| `400` | JSONでない、または`choiceId`がない・空 | `{ "error": "Invalid request" }` |
+| `404` | Surveyが存在しない、公開前、公開停止、または削除済み | `{ "error": "Survey not found", "reason": "survey_not_found" }` |
+| `409` | Surveyが受付終了済み | `{ "error": "Survey closed", "reason": "survey_closed" }` |
+| `409` | 同じ質問へ異なるChoice IDを保存済み | `{ "error": "Answer already exists", "reason": "answer_change_requires_revision" }` |
+| `422` | Survey QuestionがSurveyにない | `{ "error": "Invalid answer", "reason": "survey_question_not_found" }` |
+| `422` | Choice IDがSurvey固定のQuestion Versionにない | `{ "error": "Invalid answer", "reason": "choice_not_found" }` |
+
+認証・基盤の共通エラーは次節に従います。
+
+## 6. エラー
 
 | HTTP | 条件 | レスポンス |
 | --- | --- | --- |
@@ -105,11 +152,11 @@ Surveyが`published`かつ削除されておらず、サーバー時刻が受付
 
 認証失敗の詳細、トークン、`sub`、Account IDはレスポンスへ含めません。
 
-## 6. ローカルE2Eテスト
+## 7. ローカルE2Eテスト
 
 アンケートAPIのE2Eテストは`apps/api/src/e2e/`に置きます。Miniflareが提供するローカルD1へ本番と同じmigrationとアンケートseedを適用し、Honoの`app.request`へD1 bindingとして渡します。
 
-各テストの入力と期待出力は、テストと同じ場所にある[`survey-list.case.yaml`](../../apps/api/src/e2e/survey-list.case.yaml)と[`survey-detail.case.yaml`](../../apps/api/src/e2e/survey-detail.case.yaml)へ`id`、`in`、`out`の形で記録します。caseファイルはテストの索引であり、APIの正式な契約はこの文書を正とします。
+各テストの入力と期待出力は、`apps/api/src/e2e/case/`の`*.case.ts`へ`id`、`name`、`in`、`out`を持つオブジェクトとして記録します。caseファイルはテストの索引であり、APIの正式な契約はこの文書を正とします。
 
 LINEのIDトークン検証エンドポイントだけは外部通信を行わず、検証成功・失敗のHTTP応答へ差し替えます。Honoのルーティング、Bearerヘッダーの解釈、Account解決、Drizzleのクエリ、D1上の回答進捗集計、JSONレスポンスはモックしません。
 

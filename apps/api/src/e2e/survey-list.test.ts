@@ -4,6 +4,8 @@ import type { D1Database } from "@cloudflare/workers-types";
 import { Miniflare } from "miniflare";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { app } from "../index";
+import { surveyDetailCases } from "./case/survey-detail.case";
+import { surveyListCases } from "./case/survey-list.case";
 
 const repositoryRoot = path.resolve(__dirname, "../../../..");
 const migrationsDirectory = path.join(repositoryRoot, "packages/lib/drizzle");
@@ -175,7 +177,7 @@ describe("GET /api/surveys local D1 E2E", () => {
     await miniflare.dispose();
   });
 
-  it("LIST-001: migrationとseedからAccount別の回答進捗を返すこと", async () => {
+  it(`${surveyListCases.progress.id}: ${surveyListCases.progress.name}`, async () => {
     const initialResponse = await request("known-token");
     expect(initialResponse.status).toBe(200);
 
@@ -220,21 +222,21 @@ describe("GET /api/surveys local D1 E2E", () => {
     });
   });
 
-  it("LIST-002: Bearerトークンが無い場合は401を返すこと", async () => {
+  it(`${surveyListCases.missingAuthorization.id}: ${surveyListCases.missingAuthorization.name}`, async () => {
     const response = await request();
 
     expect(response.status).toBe(401);
     expect(await response.json()).toEqual({ error: "Unauthorized" });
   });
 
-  it("LIST-003: LINEがIDトークンを検証できない場合は401を返すこと", async () => {
+  it(`${surveyListCases.invalidToken.id}: ${surveyListCases.invalidToken.name}`, async () => {
     const response = await request("invalid-token");
 
     expect(response.status).toBe(401);
     expect(await response.json()).toEqual({ error: "Unauthorized" });
   });
 
-  it("LIST-004: 検証済みの本人に対応するAccountが無い場合は404を返すこと", async () => {
+  it(`${surveyListCases.accountNotFound.id}: ${surveyListCases.accountNotFound.name}`, async () => {
     const response = await request("unknown-token");
 
     expect(response.status).toBe(404);
@@ -263,7 +265,7 @@ describe("GET /api/surveys/:surveyId local D1 E2E", () => {
     await miniflare.dispose();
   });
 
-  it("DETAIL-001: seedのSurveyからQuestion VersionとChoiceを位置順に返す", async () => {
+  it(`${surveyDetailCases.available.id}: ${surveyDetailCases.available.name}`, async () => {
     const response = await request("known-token", "/api/surveys/relationship-priority");
     expect(response.status).toBe(200);
     const body = (await response.json()) as {
@@ -286,7 +288,7 @@ describe("GET /api/surveys/:surveyId local D1 E2E", () => {
     });
   });
 
-  it("DETAIL-002: 存在しないSurveyを404にする", async () => {
+  it(`${surveyDetailCases.notFound.id}: ${surveyDetailCases.notFound.name}`, async () => {
     const missing = await request("known-token", "/api/surveys/missing");
     expect(missing.status).toBe(404);
     expect(await missing.json()).toEqual({
@@ -295,7 +297,7 @@ describe("GET /api/surveys/:surveyId local D1 E2E", () => {
     });
   });
 
-  it("DETAIL-003: 受付終了したSurveyを409にする", async () => {
+  it(`${surveyDetailCases.closed.id}: ${surveyDetailCases.closed.name}`, async () => {
     await database
       .prepare("UPDATE surveys SET closes_at = ? WHERE id = ?")
       .bind(timestamp, "relationship-priority")
