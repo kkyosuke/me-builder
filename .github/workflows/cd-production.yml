@@ -20,6 +20,7 @@ jobs:
       LINE_LOGIN_CHANNEL_ID: ${{ vars.LINE_LOGIN_CHANNEL_ID }}
       LINE_LOGIN_CHANNEL_SECRET: ${{ secrets.LINE_LOGIN_CHANNEL_SECRET }}
       BASE_DOMAIN: ${{ vars.BASE_DOMAIN }}
+      VITE_ENVIRONMENT: production
       VITE_BASE_DOMAIN: ${{ vars.BASE_DOMAIN }}
       # Vite は GitHub Actions 上のビルドで値を埋め込むため、LIFF ID は Pages 側ではなくここで渡す。
       # 未設定の場合は LIFF 初期化がスキップされる (画面は壊れない)。

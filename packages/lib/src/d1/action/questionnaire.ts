@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, lte } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, lte, or } from "drizzle-orm";
 import type { D1Client } from "../client";
 import {
   questionChoices,
@@ -10,7 +10,7 @@ import {
   surveyResponses,
   surveys,
 } from "../schema/questionnaire";
-import { sourceRecords } from "../schema/source";
+import { sourceRecordRevisions, sourceRecords } from "../schema/source";
 
 export type SurveyListAvailability = "open" | "closed";
 export type SurveyListResponseStatus = "unanswered" | "in-progress" | "answered";
@@ -95,6 +95,13 @@ export type SurveyAnswers = Readonly<{
 
 export type SurveyAnswersResult = { type: "found"; survey: SurveyAnswers } | { type: "not-found" };
 
+export type DeletedAccountSurveyData = Readonly<{
+  deletedResponseCount: number;
+  deletedAnswerCount: number;
+  deletedDeferredQuestionCount: number;
+  deletedSourceRecordCount: number;
+}>;
+
 type PersistedAnswer = {
   surveyQuestionId: string;
   questionId: string;
@@ -110,6 +117,72 @@ function isUniqueViolation(error: unknown): boolean {
     message.includes("D1_ERROR") ||
     message.includes("SQLITE_CONSTRAINT")
   );
+}
+
+/**
+ * 開発環境で回答フローをやり直すため、本人のアンケート回答由来データを物理削除します。
+ * 呼び出し可能な環境の制限はAPI境界が担当します。
+ */
+export async function deleteAccountSurveyData(
+  db: D1Client,
+  accountId: string,
+): Promise<DeletedAccountSurveyData> {
+  const responseRows = await db
+    .select({ id: surveyResponses.id })
+    .from(surveyResponses)
+    .where(eq(surveyResponses.accountId, accountId));
+  const responseIds = responseRows.map(({ id }) => id);
+  if (responseIds.length === 0) {
+    return {
+      deletedResponseCount: 0,
+      deletedAnswerCount: 0,
+      deletedDeferredQuestionCount: 0,
+      deletedSourceRecordCount: 0,
+    };
+  }
+
+  const [answerRows, deferredRows] = await Promise.all([
+    db
+      .select({ id: surveyAnswers.id, sourceRecordId: surveyAnswers.sourceRecordId })
+      .from(surveyAnswers)
+      .where(inArray(surveyAnswers.surveyResponseId, responseIds)),
+    db
+      .select({ id: surveyDeferredQuestions.id })
+      .from(surveyDeferredQuestions)
+      .where(inArray(surveyDeferredQuestions.surveyResponseId, responseIds)),
+  ]);
+  const sourceRecordIds = [...new Set(answerRows.map(({ sourceRecordId }) => sourceRecordId))];
+  const deleteResponseData = [
+    db.delete(surveyAnswers).where(inArray(surveyAnswers.surveyResponseId, responseIds)),
+    db
+      .delete(surveyDeferredQuestions)
+      .where(inArray(surveyDeferredQuestions.surveyResponseId, responseIds)),
+    db.delete(surveyResponses).where(inArray(surveyResponses.id, responseIds)),
+  ] as const;
+
+  if (sourceRecordIds.length === 0) {
+    await db.batch(deleteResponseData);
+  } else {
+    await db.batch([
+      db
+        .delete(sourceRecordRevisions)
+        .where(
+          or(
+            inArray(sourceRecordRevisions.previousSourceRecordId, sourceRecordIds),
+            inArray(sourceRecordRevisions.nextSourceRecordId, sourceRecordIds),
+          ),
+        ),
+      ...deleteResponseData,
+      db.delete(sourceRecords).where(inArray(sourceRecords.id, sourceRecordIds)),
+    ]);
+  }
+
+  return {
+    deletedResponseCount: responseIds.length,
+    deletedAnswerCount: answerRows.length,
+    deletedDeferredQuestionCount: deferredRows.length,
+    deletedSourceRecordCount: sourceRecordIds.length,
+  };
 }
 
 async function findSurveyResponseId(

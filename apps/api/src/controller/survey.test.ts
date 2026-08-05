@@ -1,22 +1,31 @@
 import type { D1Database } from "@cloudflare/workers-types";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { app } from "../index";
+import type { ResetDevelopmentSurveyDataOutcome } from "../logic/dev-survey-reset";
 import type { SaveSurveyAnswerOutcome } from "../logic/survey-answer";
 import type { SurveyAnswersOutcome } from "../logic/survey-answers";
 import type { SurveyDetailOutcome } from "../logic/survey-detail";
 import type { SurveyListOutcome } from "../logic/survey-list";
 
-const { getSurveyList, getSurveyDetail, getSurveyAnswers, saveSurveyAnswer } = vi.hoisted(() => ({
+const {
+  getSurveyList,
+  getSurveyDetail,
+  getSurveyAnswers,
+  saveSurveyAnswer,
+  resetDevelopmentSurveyData,
+} = vi.hoisted(() => ({
   getSurveyList: vi.fn(),
   getSurveyDetail: vi.fn(),
   getSurveyAnswers: vi.fn(),
   saveSurveyAnswer: vi.fn(),
+  resetDevelopmentSurveyData: vi.fn(),
 }));
 
 vi.mock("../logic/survey-list", () => ({ getSurveyList }));
 vi.mock("../logic/survey-detail", () => ({ getSurveyDetail }));
 vi.mock("../logic/survey-answers", () => ({ getSurveyAnswers }));
 vi.mock("../logic/survey-answer", () => ({ saveSurveyAnswer }));
+vi.mock("../logic/dev-survey-reset", () => ({ resetDevelopmentSurveyData }));
 
 const dummyDb = {} as D1Database;
 const LIFF_ID = "2010850319-Yl63upAR";
@@ -33,6 +42,8 @@ const outcome = (value: SurveyListOutcome) => getSurveyList.mockResolvedValue(va
 const detailOutcome = (value: SurveyDetailOutcome) => getSurveyDetail.mockResolvedValue(value);
 const answerOutcome = (value: SaveSurveyAnswerOutcome) => saveSurveyAnswer.mockResolvedValue(value);
 const answersOutcome = (value: SurveyAnswersOutcome) => getSurveyAnswers.mockResolvedValue(value);
+const resetOutcome = (value: ResetDevelopmentSurveyDataOutcome) =>
+  resetDevelopmentSurveyData.mockResolvedValue(value);
 
 describe("GET /api/surveys", () => {
   beforeEach(() => {
@@ -314,5 +325,65 @@ describe("GET /api/surveys/:surveyId/answers", () => {
     const response = await get(false);
     expect(response.status).toBe(503);
     expect(getSurveyAnswers).not.toHaveBeenCalled();
+  });
+});
+
+describe("DELETE /api/dev/survey-data", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const remove = (environment = "preview", withDb = true) =>
+    app.request(
+      "/api/dev/survey-data",
+      { method: "DELETE", headers: { Authorization: "Bearer dummy.id.token" } },
+      { LIFF_ID, ENVIRONMENT: environment, ...(withDb ? { DB: dummyDb } : {}) },
+    );
+
+  it("previewではresolvedを200と削除件数へ変換する", async () => {
+    resetOutcome({
+      type: "resolved",
+      deletedResponseCount: 2,
+      deletedAnswerCount: 12,
+      deletedDeferredQuestionCount: 1,
+      deletedSourceRecordCount: 12,
+    });
+
+    const response = await remove();
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      deletedResponseCount: 2,
+      deletedAnswerCount: 12,
+      deletedDeferredQuestionCount: 1,
+      deletedSourceRecordCount: 12,
+    });
+    expect(resetDevelopmentSurveyData).toHaveBeenCalledWith(
+      expect.objectContaining({ idToken: "dummy.id.token", lineLoginChannelId: "2010850319" }),
+    );
+  });
+
+  it.each(["production", "staging"])("%sでは404にして削除処理を呼ばない", async (environment) => {
+    const response = await remove(environment);
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ error: "Not Found" });
+    expect(resetDevelopmentSurveyData).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["account-not-found", 404, { error: "Account not found", reason: "friendship_required" }],
+    ["unauthenticated", 401, { error: "Unauthorized" }],
+  ] as const)("%sをHTTP %sへ変換する", async (type, status, body) => {
+    resetOutcome(type === "unauthenticated" ? { type, reason: "invalid" } : { type });
+    const response = await remove();
+    expect(response.status).toBe(status);
+    expect(await response.json()).toEqual(body);
+  });
+
+  it("開発環境でもDB bindingが無ければ503を返す", async () => {
+    const response = await remove("preview", false);
+    expect(response.status).toBe(503);
+    expect(resetDevelopmentSurveyData).not.toHaveBeenCalled();
   });
 });

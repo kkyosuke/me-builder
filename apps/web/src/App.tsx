@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, ClipboardList, Info, RotateCw } from "lucide-react";
+import { ArrowLeft, ArrowRight, ClipboardList, Info, RotateCw, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { config } from "./config";
 import { getLiffIdToken, initializeLiff } from "./feature/liff";
@@ -12,6 +12,7 @@ import {
   fetchSurveyDefinition,
   fetchSurveyList,
   fetchSurveyResult,
+  resetDevelopmentSurveyData,
   saveSurveyAnswer,
 } from "./feature/survey";
 import { OperationError } from "./infrastructure/errors";
@@ -22,18 +23,32 @@ const STATUS_LABELS: Record<SurveyListItem["responseStatus"], string> = {
   answered: "回答済み",
 };
 
+const DEVELOPMENT_ENVIRONMENTS = new Set(["development", "local", "preview", "test"]);
+
+type ResetState =
+  | { type: "idle" }
+  | { type: "loading" }
+  | { type: "success"; message: string }
+  | { type: "error"; message: string };
+
 function Home({
   surveys,
   loadError,
   isLoading,
   onOpenSurvey,
   onRetry,
+  canResetSurveyData,
+  resetState,
+  onResetSurveyData,
 }: {
   surveys: SurveyListItem[] | null;
   loadError: string | null;
   isLoading: boolean;
   onOpenSurvey: (survey: SurveyListItem) => void;
   onRetry: () => void;
+  canResetSurveyData: boolean;
+  resetState: ResetState;
+  onResetSurveyData: () => void;
 }) {
   return (
     <main className="mx-auto min-h-dvh w-full max-w-2xl px-4 py-8 sm:px-8">
@@ -107,6 +122,41 @@ function Home({
           </button>
         ))}
       </section>
+
+      {canResetSurveyData && (
+        <section
+          aria-labelledby="development-tools-heading"
+          className="mt-8 rounded-2xl border border-dashed border-rose-400/30 bg-rose-400/5 p-4"
+        >
+          <p className="text-xs font-semibold tracking-wider text-rose-300">DEV ONLY</p>
+          <h2 id="development-tools-heading" className="mt-1 text-sm font-bold text-slate-100">
+            開発用データ操作
+          </h2>
+          <p className="mt-2 text-xs leading-relaxed text-slate-400">
+            ログイン中ユーザーの回答、回答進捗、保留、回答由来データを削除します。アンケート定義は残ります。
+          </p>
+          <button
+            type="button"
+            onClick={onResetSurveyData}
+            disabled={resetState.type === "loading"}
+            className="mt-3 inline-flex items-center justify-center gap-2 rounded-xl border border-rose-400/40 px-4 py-2 text-sm font-semibold text-rose-200 transition hover:bg-rose-400/10 disabled:cursor-wait disabled:opacity-60"
+          >
+            {resetState.type === "loading" ? (
+              <RotateCw className="size-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <Trash2 className="size-4" aria-hidden="true" />
+            )}
+            {resetState.type === "loading" ? "削除しています..." : "回答データを全削除"}
+          </button>
+          {(resetState.type === "success" || resetState.type === "error") && (
+            <output
+              className={`mt-3 block text-xs ${resetState.type === "success" ? "text-emerald-300" : "text-rose-300"}`}
+            >
+              {resetState.message}
+            </output>
+          )}
+        </section>
+      )}
     </main>
   );
 }
@@ -228,6 +278,7 @@ export function App() {
   );
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [resetState, setResetState] = useState<ResetState>({ type: "idle" });
   const mounted = useRef(false);
   const loading = useRef(false);
   const request = useRef<AbortController | null>(null);
@@ -438,6 +489,46 @@ export function App() {
     }
   }, [selectedDefinition]);
 
+  const resetSurveyData = useCallback(async (): Promise<void> => {
+    if (
+      !window.confirm(
+        "ログイン中ユーザーのアンケート回答データをすべて削除します。この操作は取り消せません。続けますか？",
+      )
+    ) {
+      return;
+    }
+    const currentIdToken = idToken.current;
+    if (!currentIdToken) {
+      setResetState({
+        type: "error",
+        message: "本人確認情報を取得できませんでした。LINEから開き直してください。",
+      });
+      return;
+    }
+
+    setResetState({ type: "loading" });
+    try {
+      const deleted = await resetDevelopmentSurveyData(config.apiUrl, currentIdToken);
+      setSelectedSurvey(null);
+      setSelectedDefinition(null);
+      setSelectedResult(null);
+      await loadSurveys();
+      const deletedCount = deleted.deletedAnswerCount + deleted.deletedDeferredQuestionCount;
+      setResetState({
+        type: "success",
+        message:
+          deletedCount === 0
+            ? "削除対象の回答データはありませんでした。"
+            : `回答データを削除しました（回答・保留 ${deletedCount}件）。`,
+      });
+    } catch (error) {
+      setResetState({
+        type: "error",
+        message: error instanceof Error ? error.message : "回答データを削除できませんでした。",
+      });
+    }
+  }, [loadSurveys]);
+
   if (selectedSurvey) {
     const destination = resolveSurveyDestination(selectedSurvey);
     if (destination === "result" && selectedResult) {
@@ -478,6 +569,9 @@ export function App() {
       isLoading={isLoading}
       onOpenSurvey={(survey) => void openSurvey(survey)}
       onRetry={() => void loadSurveys()}
+      canResetSurveyData={DEVELOPMENT_ENVIRONMENTS.has(config.environment)}
+      resetState={resetState}
+      onResetSurveyData={() => void resetSurveyData()}
     />
   );
 }

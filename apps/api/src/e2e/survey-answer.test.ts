@@ -92,6 +92,14 @@ async function getAnswers(): Promise<Response> {
   );
 }
 
+async function deleteSurveyData(environment = "test"): Promise<Response> {
+  return app.request(
+    "/api/dev/survey-data",
+    { method: "DELETE", headers: { Authorization: "Bearer known-token" } },
+    { ...env(), ENVIRONMENT: environment },
+  );
+}
+
 async function listRelationshipSurvey(): Promise<{
   responseStatus: string;
   answeredCount: number;
@@ -237,5 +245,39 @@ describe("PUT /api/surveys/:surveyId/answers/:surveyQuestionId local D1 E2E", ()
       error: "Survey answers not found",
       reason: "survey_answers_not_found",
     });
+  });
+
+  it(`${surveyAnswerCases.resetDevelopmentData.id}: ${surveyAnswerCases.resetDevelopmentData.name}`, async () => {
+    await putAnswer("sq-relationship-priority-01", "yes");
+    await putAnswer("sq-relationship-priority-02", "no");
+
+    const response = await deleteSurveyData();
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      deletedResponseCount: 1,
+      deletedAnswerCount: 2,
+      deletedDeferredQuestionCount: 0,
+      deletedSourceRecordCount: 2,
+    });
+    expect(await countRows("survey_responses")).toBe(0);
+    expect(await countRows("source_records")).toBe(0);
+    expect(await countRows("survey_answers")).toBe(0);
+    expect(await listRelationshipSurvey()).toMatchObject({
+      responseStatus: "unanswered",
+      answeredCount: 0,
+    });
+  });
+
+  it(`${surveyAnswerCases.rejectProductionReset.id}: ${surveyAnswerCases.rejectProductionReset.name}`, async () => {
+    await putAnswer("sq-relationship-priority-01", "yes");
+
+    const response = await deleteSurveyData("production");
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ error: "Not Found" });
+    expect(await countRows("survey_responses")).toBe(1);
+    expect(await countRows("source_records")).toBe(1);
+    expect(await countRows("survey_answers")).toBe(1);
   });
 });

@@ -179,7 +179,26 @@ Surveyが`published`かつ削除されておらず、サーバー時刻が受付
 
 回答途中でも保存済みの回答は返し、`responseStatus`と件数で未完了であることを表します。Web UIは回答済みから回答内容画面へ遷移しますが、再開機能でも同じ取得結果を利用できます。
 
-## 7. エラー
+## 7. 開発環境の回答データリセット
+
+### `DELETE /api/dev/survey-data`
+
+開発時に同じAccountで回答フローを繰り返し確認できるよう、本人のアンケート回答データを物理削除します。`development`、`local`、`preview`、`test`環境だけで利用でき、`production`を含むそれ以外の環境では`404`を返して削除処理を実行しません。
+
+削除対象は本人のSurveyResponse、Answer、「あとで回答」、Answerが作成したSource Recordとその改訂関係です。Survey、Question、Choiceなどのアンケート定義、Account、他のAccountのデータ、アンケート回答以外のSource Recordは削除しません。クライアントからAccount IDは受け取らず、他のアンケートAPIと同じ認証境界で本人を解決します。
+
+```json
+{
+  "deletedResponseCount": 2,
+  "deletedAnswerCount": 12,
+  "deletedDeferredQuestionCount": 1,
+  "deletedSourceRecordCount": 12
+}
+```
+
+削除対象がない場合も各件数を`0`として`200`を返します。Web UIは同じ開発環境だけに確認付きの操作を表示し、成功後にアンケート一覧を再取得します。API側の環境制限を認可境界とし、UIの非表示だけには依存しません。
+
+## 8. エラー
 
 | HTTP | 条件 | レスポンス |
 | --- | --- | --- |
@@ -190,7 +209,7 @@ Surveyが`published`かつ削除されておらず、サーバー時刻が受付
 
 認証失敗の詳細、トークン、`sub`、Account IDはレスポンスへ含めません。
 
-## 8. ローカルE2Eテスト
+## 9. ローカルE2Eテスト
 
 アンケートAPIのE2Eテストは`apps/api/src/e2e/`に置きます。Miniflareが提供するローカルD1へ本番と同じmigrationとアンケートseedを適用し、Honoの`app.request`へD1 bindingとして渡します。
 
