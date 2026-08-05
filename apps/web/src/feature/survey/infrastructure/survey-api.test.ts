@@ -5,7 +5,7 @@ import {
   UnknownError,
   ValidationError,
 } from "../../../infrastructure/errors";
-import { fetchSurveyDefinition, fetchSurveyList } from "./survey-api";
+import { fetchSurveyDefinition, fetchSurveyList, saveSurveyAnswer } from "./survey-api";
 
 const API_URL = "https://api.stg.kagami.kyosuke.dev";
 
@@ -64,6 +64,75 @@ describe("fetchSurveyList", () => {
     );
 
     await expect(fetchSurveyList(API_URL, "dummy.id.token")).rejects.toThrow();
+  });
+});
+
+describe("saveSurveyAnswer", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("BearerトークンとChoice IDでPUTし保存結果を返す", async () => {
+    const fetchMock = vi.fn(async () =>
+      Response.json({
+        outcome: "created",
+        answer: {
+          surveyQuestionId: "sq-1",
+          questionId: "q-1",
+          questionVersion: 1,
+          choiceId: "yes",
+          acceptedAt: "2026-08-05T00:00:00.000Z",
+        },
+        progress: { responseStatus: "in-progress", answeredCount: 1, questionCount: 10 },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await saveSurveyAnswer(
+      API_URL,
+      "dummy.id.token",
+      "relationship-priority",
+      "sq-1",
+      "yes",
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${API_URL}/api/surveys/relationship-priority/answers/sq-1`,
+      {
+        method: "PUT",
+        headers: {
+          Authorization: "Bearer dummy.id.token",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ choiceId: "yes" }),
+      },
+    );
+    expect(result).toMatchObject({
+      outcome: "created",
+      answer: { acceptedAt: "2026-08-05T00:00:00.000Z" },
+      progress: { answeredCount: 1 },
+    });
+  });
+
+  it.each([
+    [401, undefined, AuthenticationError, "AUTHENTICATION_REQUIRED"],
+    [404, undefined, OperationError, "SURVEY_UNAVAILABLE"],
+    [409, { reason: "survey_closed" }, OperationError, "SURVEY_CLOSED"],
+    [409, { reason: "answer_change_requires_revision" }, OperationError, "ANSWER_CONFLICT"],
+    [422, undefined, ValidationError, "INVALID_SURVEY_ANSWER"],
+    [500, undefined, UnknownError, "SURVEY_ANSWER_REQUEST_FAILED"],
+  ] as const)("HTTP %sをcode %sへ変換する", async (status, body, ErrorType, code) => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => (body ? Response.json(body, { status }) : new Response(null, { status }))),
+    );
+    try {
+      await saveSurveyAnswer(API_URL, "token", "survey", "sq", "yes");
+      throw new Error("回答保存が成功してしまいました");
+    } catch (error) {
+      expect(error).toBeInstanceOf(ErrorType);
+      expect(error).toMatchObject({ code, status });
+    }
   });
 });
 

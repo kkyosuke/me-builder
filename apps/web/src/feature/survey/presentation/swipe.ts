@@ -12,7 +12,7 @@ import type { SwipeDirection } from "../model/types";
 export const MAX_CARD_ROTATION_DEG = 14;
 
 /** 飛ばす／元位置へ戻すアニメーションの長さ（ms）。`prefers-reduced-motion` では使いません。 */
-export const SWIPE_TRANSITION_MS = 260;
+export const SWIPE_TRANSITION_MS = 300;
 
 /** 表示するカードの重なりの枚数（最前面を含む）。 */
 export const VISIBLE_STACK_SIZE = 3;

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   MAX_CARD_ROTATION_DEG,
+  SWIPE_TRANSITION_MS,
   VISIBLE_STACK_SIZE,
   buildDragTransform,
   buildFlyOutTransform,
@@ -15,6 +16,12 @@ import {
 } from "./swipe";
 
 const CARD_WIDTH = 360;
+
+describe("SWIPE_TRANSITION_MS", () => {
+  it("回答カードの退場と次の質問への切り替えを 0.3 秒にそろえること", () => {
+    expect(SWIPE_TRANSITION_MS).toBe(300);
+  });
+});
 
 describe("resolveSwipeThreshold", () => {
   it("カード幅に比例したしきい値を返すこと", () => {

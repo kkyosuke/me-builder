@@ -3,11 +3,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { config } from "./config";
 import { getLiffIdToken, initializeLiff } from "./feature/liff";
 import {
+  type SurveyAnswer,
   type SurveyDefinition,
   type SurveyListItem,
   SwipeSurvey,
   fetchSurveyDefinition,
   fetchSurveyList,
+  saveSurveyAnswer,
 } from "./feature/survey";
 import { OperationError } from "./infrastructure/errors";
 
@@ -106,7 +108,15 @@ function Home({
   );
 }
 
-function SurveyDetail({ survey, onBack }: { survey: SurveyDefinition; onBack: () => void }) {
+function SurveyDetail({
+  survey,
+  onBack,
+  onSaveAnswer,
+}: {
+  survey: SurveyDefinition;
+  onBack: () => void;
+  onSaveAnswer: Parameters<typeof SwipeSurvey>[0]["onSaveAnswer"];
+}) {
   return (
     <main className="mx-auto min-h-dvh w-full max-w-2xl px-4 py-5 sm:px-8 sm:py-8">
       <button
@@ -118,10 +128,10 @@ function SurveyDetail({ survey, onBack }: { survey: SurveyDefinition; onBack: ()
         アンケート一覧
       </button>
 
-      <p className="mb-4 rounded-2xl border border-amber-300/30 bg-amber-300/10 px-4 py-3 text-sm leading-relaxed text-amber-100">
-        この回答はサーバーへ保存されません。現在は回答操作と傾向表示を試すための画面です。
+      <p className="mb-4 rounded-2xl border border-sky-300/30 bg-sky-300/10 px-4 py-3 text-sm leading-relaxed text-sky-100">
+        回答は1問ずつ保存されます。保存に失敗した場合は、選択を保ったまま再試行できます。
       </p>
-      <SwipeSurvey survey={survey} onBack={onBack} />
+      <SwipeSurvey survey={survey} onBack={onBack} onSaveAnswer={onSaveAnswer} />
     </main>
   );
 }
@@ -316,10 +326,47 @@ export function App() {
     }
   }, []);
 
+  const persistAnswer = useCallback(
+    async (answer: SurveyAnswer) => {
+      const currentIdToken = idToken.current;
+      if (!currentIdToken || !selectedDefinition) {
+        throw new Error("本人確認情報を取得できませんでした。LINEから開き直してください。");
+      }
+      const result = await saveSurveyAnswer(
+        config.apiUrl,
+        currentIdToken,
+        selectedDefinition.id,
+        answer.surveyQuestionId,
+        answer.choiceId,
+      );
+      setSurveys(
+        (current) =>
+          current?.map((survey) =>
+            survey.id === selectedDefinition.id
+              ? {
+                  ...survey,
+                  responseStatus: result.progress.responseStatus,
+                  answeredCount: result.progress.answeredCount,
+                  questionCount: result.progress.questionCount,
+                }
+              : survey,
+          ) ?? null,
+      );
+      return { acceptedAt: result.answer.acceptedAt };
+    },
+    [selectedDefinition],
+  );
+
   if (selectedSurvey) {
     const destination = resolveSurveyDestination(selectedSurvey);
     if (destination === "answer" && selectedDefinition) {
-      return <SurveyDetail survey={selectedDefinition} onBack={() => setSelectedSurvey(null)} />;
+      return (
+        <SurveyDetail
+          survey={selectedDefinition}
+          onBack={() => setSelectedSurvey(null)}
+          onSaveAnswer={persistAnswer}
+        />
+      );
     }
     if (destination === "answer" && detailState === "loading") {
       return (

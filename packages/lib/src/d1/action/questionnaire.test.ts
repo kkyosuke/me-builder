@@ -5,12 +5,21 @@ import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { describe, expect, it } from "vitest";
 import type { D1Client } from "../client";
 import * as schema from "../schema";
-import { findOpenSurveyDetail, listVisibleSurveys } from "./questionnaire";
+import { findOpenSurveyDetail, listVisibleSurveys, saveSurveyAnswer } from "./questionnaire";
 
 function createTestDb(): D1Client {
   const sqlite = new Database(":memory:");
   sqlite.pragma("foreign_keys = ON");
   const db = drizzle(sqlite, { schema });
+  Object.assign(db, {
+    batch: async (queries: Array<PromiseLike<unknown>>) => {
+      const results: unknown[] = [];
+      for (const query of queries) {
+        results.push(await query);
+      }
+      return results;
+    },
+  });
   migrate(db, { migrationsFolder: path.resolve(__dirname, "../../../drizzle") });
   return db as unknown as D1Client;
 }
@@ -230,5 +239,163 @@ describe("findOpenSurveyDetail", () => {
     await expect(
       findOpenSurveyDetail(db, "closed-detail", new Date("2026-08-03T00:00:00Z")),
     ).resolves.toEqual({ type: "closed" });
+  });
+});
+
+describe("saveSurveyAnswer", () => {
+  it("初回回答でSurveyResponse・Source Record・Answerを作成し進捗を返す", async () => {
+    const db = createTestDb();
+    await db.insert(schema.accounts).values({ id: "account-save" });
+    await insertSurvey(db, { id: "save-target" });
+    const at = new Date("2026-08-03T00:00:00Z");
+
+    const result = await saveSurveyAnswer(db, {
+      accountId: "account-save",
+      surveyId: "save-target",
+      surveyQuestionId: "save-target-sq1",
+      choiceId: "yes",
+      at,
+    });
+
+    expect(result).toMatchObject({
+      type: "saved",
+      outcome: "created",
+      answer: {
+        surveyQuestionId: "save-target-sq1",
+        questionId: "save-target-q1",
+        questionVersion: 1,
+        choiceId: "yes",
+        acceptedAt: at.toISOString(),
+      },
+      progress: { responseStatus: "in-progress", answeredCount: 1, questionCount: 2 },
+    });
+    expect(await db.select().from(schema.surveyResponses)).toHaveLength(1);
+    expect(await db.select().from(schema.sourceRecords)).toMatchObject([
+      { accountId: "account-save", kind: "user_input", accessLabel: "private" },
+    ]);
+    expect(await db.select().from(schema.surveyAnswers)).toHaveLength(1);
+  });
+
+  it("同じChoiceの再送では行とacceptedAtを増やさずunchangedを返す", async () => {
+    const db = createTestDb();
+    await db.insert(schema.accounts).values({ id: "account-retry" });
+    await insertSurvey(db, { id: "retry-target" });
+    const firstAt = new Date("2026-08-03T00:00:00Z");
+    const input = {
+      accountId: "account-retry",
+      surveyId: "retry-target",
+      surveyQuestionId: "retry-target-sq1",
+      choiceId: "yes",
+    };
+    await saveSurveyAnswer(db, { ...input, at: firstAt });
+
+    const retried = await saveSurveyAnswer(db, {
+      ...input,
+      at: new Date("2026-08-03T01:00:00Z"),
+    });
+
+    expect(retried).toMatchObject({
+      type: "saved",
+      outcome: "unchanged",
+      answer: { acceptedAt: firstAt.toISOString() },
+    });
+    expect(await db.select().from(schema.surveyResponses)).toHaveLength(1);
+    expect(await db.select().from(schema.sourceRecords)).toHaveLength(1);
+    expect(await db.select().from(schema.surveyAnswers)).toHaveLength(1);
+  });
+
+  it("異なるChoiceの再送を修正せずconflictにする", async () => {
+    const db = createTestDb();
+    await db.insert(schema.accounts).values({ id: "account-conflict" });
+    await insertSurvey(db, { id: "conflict-target" });
+    const base = {
+      accountId: "account-conflict",
+      surveyId: "conflict-target",
+      surveyQuestionId: "conflict-target-sq1",
+      at: new Date("2026-08-03T00:00:00Z"),
+    };
+    await saveSurveyAnswer(db, { ...base, choiceId: "yes" });
+
+    await expect(saveSurveyAnswer(db, { ...base, choiceId: "no" })).resolves.toEqual({
+      type: "answer-conflict",
+    });
+    expect(await db.select().from(schema.sourceRecords)).toHaveLength(1);
+    expect((await db.select().from(schema.surveyAnswers))[0]?.choiceId).toBe("yes");
+  });
+
+  it("全問保存後にansweredを返す", async () => {
+    const db = createTestDb();
+    await db.insert(schema.accounts).values({ id: "account-complete" });
+    await insertSurvey(db, { id: "complete-target" });
+    const base = {
+      accountId: "account-complete",
+      surveyId: "complete-target",
+      choiceId: "yes",
+      at: new Date("2026-08-03T00:00:00Z"),
+    };
+    await saveSurveyAnswer(db, {
+      ...base,
+      surveyQuestionId: "complete-target-sq1",
+    });
+    const result = await saveSurveyAnswer(db, {
+      ...base,
+      surveyQuestionId: "complete-target-sq2",
+    });
+    expect(result).toMatchObject({
+      type: "saved",
+      progress: { responseStatus: "answered", answeredCount: 2, questionCount: 2 },
+    });
+  });
+
+  it.each([
+    {
+      name: "存在しないSurvey",
+      input: { surveyId: "missing", surveyQuestionId: "sq", choiceId: "yes" },
+      expected: "survey-not-found",
+    },
+    {
+      name: "Survey外の質問",
+      input: { surveyId: "validation-target", surveyQuestionId: "missing", choiceId: "yes" },
+      expected: "survey-question-not-found",
+    },
+    {
+      name: "Question Version外のChoice",
+      input: {
+        surveyId: "validation-target",
+        surveyQuestionId: "validation-target-sq1",
+        choiceId: "maybe",
+      },
+      expected: "choice-not-found",
+    },
+  ])("$nameを$expectedにする", async ({ input, expected }) => {
+    const db = createTestDb();
+    await db.insert(schema.accounts).values({ id: "account-validation" });
+    await insertSurvey(db, { id: "validation-target" });
+    const result = await saveSurveyAnswer(db, {
+      accountId: "account-validation",
+      at: new Date("2026-08-03T00:00:00Z"),
+      ...input,
+    });
+    expect(result.type).toBe(expected);
+    expect(await db.select().from(schema.sourceRecords)).toHaveLength(0);
+  });
+
+  it("受付終了後は何も保存しない", async () => {
+    const db = createTestDb();
+    await db.insert(schema.accounts).values({ id: "account-closed" });
+    await insertSurvey(db, {
+      id: "closed-save",
+      closesAt: new Date("2026-08-02T00:00:00Z"),
+    });
+    const result = await saveSurveyAnswer(db, {
+      accountId: "account-closed",
+      surveyId: "closed-save",
+      surveyQuestionId: "closed-save-sq1",
+      choiceId: "yes",
+      at: new Date("2026-08-03T00:00:00Z"),
+    });
+    expect(result).toEqual({ type: "survey-closed" });
+    expect(await db.select().from(schema.surveyResponses)).toHaveLength(0);
+    expect(await db.select().from(schema.sourceRecords)).toHaveLength(0);
   });
 });

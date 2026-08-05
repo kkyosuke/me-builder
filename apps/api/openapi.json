@@ -525,6 +525,309 @@
           }
         ]
       }
+    },
+    "/api/surveys/{surveyId}/answers/{surveyQuestionId}": {
+      "put": {
+        "operationId": "saveSurveyAnswer",
+        "tags": ["Survey"],
+        "summary": "アンケートの1問へ初回回答を保存する",
+        "security": [
+          {
+            "liffIdToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "kind": "schema",
+                "type": "object",
+                "expects": "Object",
+                "async": false,
+                "entries": {
+                  "choiceId": {
+                    "kind": "schema",
+                    "type": "string",
+                    "expects": "string",
+                    "async": false,
+                    "~standard": {
+                      "version": 1,
+                      "vendor": "valibot"
+                    },
+                    "pipe": [
+                      {
+                        "kind": "schema",
+                        "type": "string",
+                        "expects": "string",
+                        "async": false,
+                        "~standard": {
+                          "version": 1,
+                          "vendor": "valibot"
+                        }
+                      },
+                      {
+                        "kind": "validation",
+                        "type": "non_empty",
+                        "async": false,
+                        "expects": "!0"
+                      }
+                    ]
+                  }
+                },
+                "~standard": {
+                  "version": 1,
+                  "vendor": "valibot"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "保存済み回答と現在の進捗",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "outcome": {
+                      "enum": ["created", "unchanged"],
+                      "type": "string"
+                    },
+                    "answer": {
+                      "type": "object",
+                      "properties": {
+                        "surveyQuestionId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "questionId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "questionVersion": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        },
+                        "choiceId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "acceptedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "surveyQuestionId",
+                        "questionId",
+                        "questionVersion",
+                        "choiceId",
+                        "acceptedAt"
+                      ]
+                    },
+                    "progress": {
+                      "type": "object",
+                      "properties": {
+                        "responseStatus": {
+                          "enum": ["unanswered", "in-progress", "answered"],
+                          "type": "string"
+                        },
+                        "answeredCount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "questionCount": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "required": ["responseStatus", "answeredCount", "questionCount"]
+                    }
+                  },
+                  "required": ["outcome", "answer", "progress"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "リクエストJSONが不正",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Invalid request"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "LIFF IDトークンを検証できない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Unauthorized"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "対応するAccountがない、またはSurveyが公開されていない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "error": {
+                          "const": "Account not found"
+                        },
+                        "reason": {
+                          "const": "friendship_required"
+                        }
+                      },
+                      "required": ["error", "reason"]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "error": {
+                          "const": "Survey not found"
+                        },
+                        "reason": {
+                          "const": "survey_not_found"
+                        }
+                      },
+                      "required": ["error", "reason"]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "受付終了、または回答修正が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "error": {
+                          "const": "Survey closed"
+                        },
+                        "reason": {
+                          "const": "survey_closed"
+                        }
+                      },
+                      "required": ["error", "reason"]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "error": {
+                          "const": "Answer already exists"
+                        },
+                        "reason": {
+                          "const": "answer_change_requires_revision"
+                        }
+                      },
+                      "required": ["error", "reason"]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Survey QuestionまたはChoiceが不正",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Invalid answer"
+                    },
+                    "reason": {
+                      "enum": ["survey_question_not_found", "choice_not_found"],
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "未処理のサーバーエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Internal Server Error"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "D1 bindingが設定されていない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Service Unavailable"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "surveyId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "surveyQuestionId",
+            "required": true
+          }
+        ]
+      }
     }
   }
 }

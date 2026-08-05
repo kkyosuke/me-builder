@@ -55,6 +55,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/surveys/{surveyId}/answers/{surveyQuestionId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** アンケートの1問へ初回回答を保存する */
+    put: operations["saveSurveyAnswer"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -317,6 +334,154 @@ export interface operations {
             error: "Survey closed";
             /** @constant */
             reason: "survey_closed";
+          };
+        };
+      };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
+          };
+        };
+      };
+      /** @description D1 bindingが設定されていない */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Service Unavailable";
+          };
+        };
+      };
+    };
+  };
+  saveSurveyAnswer: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        surveyId: string;
+        surveyQuestionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": Record<string, never>;
+      };
+    };
+    responses: {
+      /** @description 保存済み回答と現在の進捗 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @enum {string} */
+            outcome: "created" | "unchanged";
+            answer: {
+              surveyQuestionId: string;
+              questionId: string;
+              questionVersion: number;
+              choiceId: string;
+              /** Format: date-time */
+              acceptedAt: string;
+            };
+            progress: {
+              /** @enum {string} */
+              responseStatus: "unanswered" | "in-progress" | "answered";
+              answeredCount: number;
+              questionCount: number;
+            };
+          };
+        };
+      };
+      /** @description リクエストJSONが不正 */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Invalid request";
+          };
+        };
+      };
+      /** @description LIFF IDトークンを検証できない */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Unauthorized";
+          };
+        };
+      };
+      /** @description 対応するAccountがない、またはSurveyが公開されていない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | {
+                /** @constant */
+                error: "Account not found";
+                /** @constant */
+                reason: "friendship_required";
+              }
+            | {
+                /** @constant */
+                error: "Survey not found";
+                /** @constant */
+                reason: "survey_not_found";
+              };
+        };
+      };
+      /** @description 受付終了、または回答修正が必要 */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | {
+                /** @constant */
+                error: "Survey closed";
+                /** @constant */
+                reason: "survey_closed";
+              }
+            | {
+                /** @constant */
+                error: "Answer already exists";
+                /** @constant */
+                reason: "answer_change_requires_revision";
+              };
+        };
+      };
+      /** @description Survey QuestionまたはChoiceが不正 */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Invalid answer";
+            /** @enum {string} */
+            reason: "survey_question_not_found" | "choice_not_found";
           };
         };
       };
