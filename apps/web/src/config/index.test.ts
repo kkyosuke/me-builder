@@ -6,10 +6,15 @@ import { WebConfigSchema, getWebConfig } from "./index";
 // テストから差し替えられないため、CI で `VITE_LIFF_ID` が設定されているかどうかで
 // 結果が変わるテストを書いてはいけません。
 describe("getWebConfig & WebConfigSchema", () => {
-  it("Valibot スキーマでデフォルト値が正しく補完されること", () => {
+  it("環境変数未設定時はenvironmentを補完しないこと", () => {
     const parsed = v.parse(WebConfigSchema, {});
-    expect(parsed.environment).toBe("development");
+    expect(parsed.environment).toBeUndefined();
     expect(parsed.liffId).toBeUndefined();
+  });
+
+  it("ENVIRONMENT未設定時はNODE_ENVがdevelopmentでも開発環境にしないこと", () => {
+    const conf = getWebConfig({ ENVIRONMENT: undefined, NODE_ENV: "development" });
+    expect(conf.environment).toBeUndefined();
   });
 
   it("BASE_DOMAIN から UI URL および API URL が自動補完されること", () => {

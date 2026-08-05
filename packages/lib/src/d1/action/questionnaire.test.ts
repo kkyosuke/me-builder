@@ -14,17 +14,38 @@ import {
   saveSurveyAnswer,
 } from "./questionnaire";
 
-function createTestDb(): D1Client {
+type DbExecutionObserver = {
+  onBatch?: () => void;
+  onQuery?: (insideBatch: boolean) => void;
+};
+
+function createTestDb(observer?: DbExecutionObserver): D1Client {
   const sqlite = new Database(":memory:");
   sqlite.pragma("foreign_keys = ON");
-  const db = drizzle(sqlite, { schema });
+  let batchDepth = 0;
+  const db = drizzle(sqlite, {
+    schema,
+    ...(observer?.onQuery
+      ? {
+          logger: {
+            logQuery: () => observer.onQuery?.(batchDepth > 0),
+          },
+        }
+      : {}),
+  });
   Object.assign(db, {
     batch: async (queries: Array<PromiseLike<unknown>>) => {
-      const results: unknown[] = [];
-      for (const query of queries) {
-        results.push(await query);
+      observer?.onBatch?.();
+      batchDepth += 1;
+      try {
+        const results: unknown[] = [];
+        for (const query of queries) {
+          results.push(await query);
+        }
+        return results;
+      } finally {
+        batchDepth -= 1;
       }
-      return results;
     },
   });
   migrate(db, { migrationsFolder: path.resolve(__dirname, "../../../drizzle") });
@@ -392,6 +413,40 @@ describe("deleteAccountSurveyData", () => {
       deletedDeferredQuestionCount: 0,
       deletedSourceRecordCount: 0,
     });
+  });
+
+  it("削除対象の抽出を含む全SQLを1回のatomic batch内で実行する", async () => {
+    let tracking = false;
+    let batchCount = 0;
+    const queryContexts: boolean[] = [];
+    const db = createTestDb({
+      onBatch: () => {
+        if (tracking) {
+          batchCount += 1;
+        }
+      },
+      onQuery: (insideBatch) => {
+        if (tracking) {
+          queryContexts.push(insideBatch);
+        }
+      },
+    });
+    await db.insert(schema.accounts).values({ id: "atomic-reset-owner" });
+    await insertSurvey(db, { id: "atomic-reset-target" });
+    await saveSurveyAnswer(db, {
+      accountId: "atomic-reset-owner",
+      surveyId: "atomic-reset-target",
+      surveyQuestionId: "atomic-reset-target-sq1",
+      choiceId: "yes",
+      at: new Date("2026-08-03T00:00:00Z"),
+    });
+
+    tracking = true;
+    await deleteAccountSurveyData(db, "atomic-reset-owner");
+
+    expect(batchCount).toBe(1);
+    expect(queryContexts.length).toBeGreaterThan(0);
+    expect(queryContexts.every((insideBatch) => insideBatch)).toBe(true);
   });
 });
 

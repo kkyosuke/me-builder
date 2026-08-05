@@ -14,7 +14,7 @@ import { OperationError } from "./infrastructure/errors";
 
 const mocks = vi.hoisted(() => ({
   config: {
-    environment: "development",
+    environment: "development" as string | undefined,
     liffId: "test-liff-id",
     apiUrl: "https://api.example.com",
   },
@@ -190,6 +190,14 @@ describe("App", () => {
 
   it("production環境では開発用データ操作を表示しない", async () => {
     mocks.config.environment = "production";
+    render(<App />);
+
+    await screen.findByRole("button", { name: /テストアンケート/ });
+    expect(screen.queryByRole("button", { name: "回答データを全削除" })).toBeNull();
+  });
+
+  it("環境変数未設定では開発用データ操作を表示しない", async () => {
+    mocks.config.environment = undefined;
     render(<App />);
 
     await screen.findByRole("button", { name: /テストアンケート/ });

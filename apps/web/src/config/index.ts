@@ -21,7 +21,8 @@ export function getWebConfig(env?: Record<string, string | undefined>): WebConfi
     );
   };
 
-  const rawEnvironment = getEnv("ENVIRONMENT") || getEnv("NODE_ENV");
+  // 開発用データ操作の判定に使うため、NODE_ENVから暗黙補完しません。
+  const rawEnvironment = getEnv("ENVIRONMENT");
   const rawBaseDomain = getEnv("BASE_DOMAIN");
   let rawBaseUrl = getEnv("BASE_URL");
   let rawApiUrl = getEnv("API_URL");

@@ -569,7 +569,9 @@ export function App() {
       isLoading={isLoading}
       onOpenSurvey={(survey) => void openSurvey(survey)}
       onRetry={() => void loadSurveys()}
-      canResetSurveyData={DEVELOPMENT_ENVIRONMENTS.has(config.environment)}
+      canResetSurveyData={
+        config.environment !== undefined && DEVELOPMENT_ENVIRONMENTS.has(config.environment)
+      }
       resetState={resetState}
       onResetSurveyData={() => void resetSurveyData()}
     />
