@@ -2,17 +2,20 @@ import type { D1Database } from "@cloudflare/workers-types";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { app } from "../index";
 import type { SaveSurveyAnswerOutcome } from "../logic/survey-answer";
+import type { SurveyAnswersOutcome } from "../logic/survey-answers";
 import type { SurveyDetailOutcome } from "../logic/survey-detail";
 import type { SurveyListOutcome } from "../logic/survey-list";
 
-const { getSurveyList, getSurveyDetail, saveSurveyAnswer } = vi.hoisted(() => ({
+const { getSurveyList, getSurveyDetail, getSurveyAnswers, saveSurveyAnswer } = vi.hoisted(() => ({
   getSurveyList: vi.fn(),
   getSurveyDetail: vi.fn(),
+  getSurveyAnswers: vi.fn(),
   saveSurveyAnswer: vi.fn(),
 }));
 
 vi.mock("../logic/survey-list", () => ({ getSurveyList }));
 vi.mock("../logic/survey-detail", () => ({ getSurveyDetail }));
+vi.mock("../logic/survey-answers", () => ({ getSurveyAnswers }));
 vi.mock("../logic/survey-answer", () => ({ saveSurveyAnswer }));
 
 const dummyDb = {} as D1Database;
@@ -29,6 +32,7 @@ function request(env: Record<string, unknown> = {}, authorization = "Bearer dumm
 const outcome = (value: SurveyListOutcome) => getSurveyList.mockResolvedValue(value);
 const detailOutcome = (value: SurveyDetailOutcome) => getSurveyDetail.mockResolvedValue(value);
 const answerOutcome = (value: SaveSurveyAnswerOutcome) => saveSurveyAnswer.mockResolvedValue(value);
+const answersOutcome = (value: SurveyAnswersOutcome) => getSurveyAnswers.mockResolvedValue(value);
 
 describe("GET /api/surveys", () => {
   beforeEach(() => {
@@ -239,5 +243,76 @@ describe("GET /api/surveys/:surveyId", () => {
     const res = await app.request("/api/surveys/survey-1", {}, { LIFF_ID });
     expect(res.status).toBe(503);
     expect(getSurveyDetail).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET /api/surveys/:surveyId/answers", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const get = (withDb = true) =>
+    app.request(
+      "/api/surveys/survey-1/answers",
+      { headers: { Authorization: "Bearer dummy.id.token" } },
+      { LIFF_ID, ...(withDb ? { DB: dummyDb } : {}) },
+    );
+
+  it("resolvedを200と回答内容へ変換する", async () => {
+    answersOutcome({
+      type: "resolved",
+      survey: {
+        id: "survey-1",
+        title: "タイトル",
+        description: "説明",
+        responseStatus: "answered",
+        answeredCount: 1,
+        questionCount: 1,
+        answers: [
+          {
+            surveyQuestionId: "sq-1",
+            questionId: "q-1",
+            questionVersion: 1,
+            questionText: "質問",
+            choiceId: "yes",
+            choiceLabel: "はい",
+            acceptedAt: "2026-08-05T00:00:00.000Z",
+          },
+        ],
+      },
+    });
+
+    const response = await get();
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      id: "survey-1",
+      responseStatus: "answered",
+      answers: [{ choiceLabel: "はい" }],
+    });
+    expect(getSurveyAnswers).toHaveBeenCalledWith(
+      expect.objectContaining({ surveyId: "survey-1", idToken: "dummy.id.token" }),
+    );
+  });
+
+  it.each([
+    [
+      "survey-answers-not-found",
+      404,
+      { error: "Survey answers not found", reason: "survey_answers_not_found" },
+    ],
+    ["account-not-found", 404, { error: "Account not found", reason: "friendship_required" }],
+    ["unauthenticated", 401, { error: "Unauthorized" }],
+  ] as const)("%sをHTTP %sへ変換する", async (type, status, body) => {
+    answersOutcome(type === "unauthenticated" ? { type, reason: "invalid" } : { type });
+    const response = await get();
+    expect(response.status).toBe(status);
+    expect(await response.json()).toEqual(body);
+  });
+
+  it("DB bindingが無ければ503を返す", async () => {
+    const response = await get(false);
+    expect(response.status).toBe(503);
+    expect(getSurveyAnswers).not.toHaveBeenCalled();
   });
 });

@@ -16,12 +16,17 @@ import {
   SaveSurveyAnswerResponseSchema,
 } from "../contract/survey/answer";
 import {
+  SurveyAnswersNotFoundErrorSchema,
+  SurveyAnswersResponseSchema,
+} from "../contract/survey/answers";
+import {
   SurveyClosedErrorSchema,
   SurveyDetailResponseSchema,
   SurveyNotFoundErrorSchema,
 } from "../contract/survey/detail";
 import { SurveyListResponseSchema } from "../contract/survey/list";
 import { saveSurveyAnswer } from "../logic/survey-answer";
+import { getSurveyAnswers } from "../logic/survey-answers";
 import { getSurveyDetail } from "../logic/survey-detail";
 import { getSurveyList } from "../logic/survey-list";
 import type { AppEnv } from "../types";
@@ -170,6 +175,45 @@ export async function putSurveyAnswer(c: Context<AppEnv>): Promise<Response> {
           reason: "answer_change_requires_revision",
         }),
         409,
+      );
+    case "account-not-found":
+      return c.json(
+        v.parse(AccountNotFoundErrorSchema, {
+          error: "Account not found",
+          reason: "friendship_required",
+        }),
+        404,
+      );
+    case "not-configured":
+    case "unauthenticated":
+      return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
+  }
+}
+
+/** `GET /api/surveys/:surveyId/answers` — 本人が保存した回答内容を返す。 */
+export async function getSurveyAnswerContents(c: Context<AppEnv>): Promise<Response> {
+  if (!c.env?.DB) {
+    logger.error({ path: c.req.path }, "DB binding is not configured");
+    return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
+  }
+
+  const outcome = await getSurveyAnswers({
+    surveyId: c.req.param("surveyId") ?? "",
+    idToken: bearerToken(c.req.header("authorization")),
+    lineLoginChannelId: getConfig(c.env).lineLoginChannelId,
+    db: d1.client.create(c.env.DB),
+  });
+
+  switch (outcome.type) {
+    case "resolved":
+      return c.json(v.parse(SurveyAnswersResponseSchema, outcome.survey));
+    case "survey-answers-not-found":
+      return c.json(
+        v.parse(SurveyAnswersNotFoundErrorSchema, {
+          error: "Survey answers not found",
+          reason: "survey_answers_not_found",
+        }),
+        404,
       );
     case "account-not-found":
       return c.json(

@@ -4,7 +4,12 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
-import type { SurveyAnswer, SurveyDefinition, SurveyListItem } from "./feature/survey";
+import type {
+  SurveyAnswer,
+  SurveyDefinition,
+  SurveyListItem,
+  SurveyResult,
+} from "./feature/survey";
 import { OperationError } from "./infrastructure/errors";
 
 const mocks = vi.hoisted(() => ({
@@ -12,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   getLiffIdToken: vi.fn(),
   fetchSurveyList: vi.fn(),
   fetchSurveyDefinition: vi.fn(),
+  fetchSurveyResult: vi.fn(),
   saveSurveyAnswer: vi.fn(),
 }));
 
@@ -25,13 +31,16 @@ vi.mock("./feature/liff", () => ({
 vi.mock("./feature/survey", () => ({
   fetchSurveyList: mocks.fetchSurveyList,
   fetchSurveyDefinition: mocks.fetchSurveyDefinition,
+  fetchSurveyResult: mocks.fetchSurveyResult,
   saveSurveyAnswer: mocks.saveSurveyAnswer,
   SwipeSurvey: ({
     survey,
     onSaveAnswer,
+    onComplete,
   }: {
     survey: SurveyDefinition;
     onSaveAnswer: (answer: SurveyAnswer) => Promise<unknown>;
+    onComplete: () => void;
   }) => (
     <div>
       <p>{`回答UI: ${survey.title}`}</p>
@@ -51,7 +60,13 @@ vi.mock("./feature/survey", () => ({
       >
         テスト回答
       </button>
+      <button type="button" onClick={onComplete}>
+        テスト完了
+      </button>
     </div>
+  ),
+  SurveyResultView: ({ result }: { result: SurveyResult }) => (
+    <div>{`結果UI: ${result.title} (${result.answers.length}件)`}</div>
   ),
 }));
 
@@ -62,6 +77,28 @@ const definition: SurveyDefinition = {
   questions: [],
   balancedLabel: "中間",
   score: () => ({ scoringVersion: 1, parameters: [] }),
+};
+
+const result: SurveyResult = {
+  id: "survey-1",
+  title: "テストアンケート",
+  description: "説明",
+  responseStatus: "answered",
+  answeredCount: 10,
+  questionCount: 10,
+  answers: [
+    {
+      surveyQuestionId: "sq-1",
+      questionId: "q-1",
+      questionVersion: 1,
+      questionText: "質問",
+      choiceId: "yes",
+      choiceLabel: "はい",
+      acceptedAt: "2026-08-05T00:00:00.000Z",
+    },
+  ],
+  balancedLabel: "中間",
+  profile: { scoringVersion: 1, parameters: [] },
 };
 
 function survey(overrides: Partial<SurveyListItem> = {}): SurveyListItem {
@@ -90,6 +127,7 @@ describe("App", () => {
     mocks.getLiffIdToken.mockReturnValue("dummy.id.token");
     mocks.fetchSurveyList.mockResolvedValue([survey()]);
     mocks.fetchSurveyDefinition.mockResolvedValue(definition);
+    mocks.fetchSurveyResult.mockResolvedValue(result);
     mocks.saveSurveyAnswer.mockResolvedValue({
       outcome: "created",
       answer: { acceptedAt: "2026-08-05T00:00:01.000Z" },
@@ -123,25 +161,26 @@ describe("App", () => {
     );
   });
 
+  it("全回答の保存完了後は保存済み回答を取得して結果画面へ進む", async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: /テストアンケート/ }));
+
+    fireEvent.click(await screen.findByRole("button", { name: "テスト完了" }));
+
+    expect(await screen.findByText("結果UI: テストアンケート (1件)")).toBeTruthy();
+    expect(mocks.fetchSurveyResult).toHaveBeenCalledWith(
+      "https://api.example.com",
+      "dummy.id.token",
+      "survey-1",
+      expect.any(AbortSignal),
+    );
+  });
+
   it.each([
     {
       name: "受付終了かつ未回答",
       item: survey({ availability: "closed" }),
       heading: "このアンケートは受付を終了しました",
-    },
-    {
-      name: "回答済み",
-      item: survey({ responseStatus: "answered", answeredCount: 10 }),
-      heading: "回答内容画面は現在準備中です",
-    },
-    {
-      name: "受付終了後の回答済み",
-      item: survey({
-        availability: "closed",
-        responseStatus: "answered",
-        answeredCount: 10,
-      }),
-      heading: "回答内容画面は現在準備中です",
     },
     {
       name: "回答途中",
@@ -156,6 +195,25 @@ describe("App", () => {
 
     expect(screen.getByRole("heading", { name: heading })).toBeTruthy();
     expect(screen.queryByText(/回答UI:/)).toBeNull();
+  });
+
+  it.each([
+    survey({ responseStatus: "answered", answeredCount: 10 }),
+    survey({ availability: "closed", responseStatus: "answered", answeredCount: 10 }),
+  ])("回答済みなら受付状態にかかわらず保存済み結果を表示する", async (item) => {
+    mocks.fetchSurveyList.mockResolvedValue([item]);
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /テストアンケート/ }));
+
+    expect(await screen.findByText("結果UI: テストアンケート (1件)")).toBeTruthy();
+    expect(mocks.fetchSurveyResult).toHaveBeenCalledWith(
+      "https://api.example.com",
+      "dummy.id.token",
+      "survey-1",
+      expect.any(AbortSignal),
+    );
+    expect(mocks.fetchSurveyDefinition).not.toHaveBeenCalled();
   });
 
   it("ローカルのスコア設定がないアンケートを選ぶと未対応の案内へ進む", async () => {

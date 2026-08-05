@@ -75,6 +75,26 @@ export type SaveSurveyAnswerResult =
   | { type: "choice-not-found" }
   | { type: "answer-conflict" };
 
+export type SurveyAnswers = Readonly<{
+  id: string;
+  title: string;
+  description: string;
+  responseStatus: SurveyListResponseStatus;
+  answeredCount: number;
+  questionCount: number;
+  answers: Array<{
+    surveyQuestionId: string;
+    questionId: string;
+    questionVersion: number;
+    questionText: string;
+    choiceId: string;
+    choiceLabel: string;
+    acceptedAt: string;
+  }>;
+}>;
+
+export type SurveyAnswersResult = { type: "found"; survey: SurveyAnswers } | { type: "not-found" };
+
 type PersistedAnswer = {
   surveyQuestionId: string;
   questionId: string;
@@ -443,6 +463,115 @@ export async function findOpenSurveyDetail(
       opensAt: survey.opensAt.toISOString(),
       closesAt: survey.closesAt?.toISOString() ?? null,
       questions,
+    },
+  };
+}
+
+/** 本人の現在有効な回答を、回答時点のQuestion VersionとChoiceで取得します。 */
+export async function findSurveyAnswers(
+  db: D1Client,
+  accountId: string,
+  surveyId: string,
+  at: Date,
+): Promise<SurveyAnswersResult> {
+  const response = await db
+    .select({
+      responseId: surveyResponses.id,
+      id: surveys.id,
+      title: surveys.title,
+      description: surveys.description,
+      opensAt: surveys.opensAt,
+      state: surveys.state,
+      surveyIsDeleted: surveys.isDeleted,
+    })
+    .from(surveyResponses)
+    .innerJoin(surveys, eq(surveys.id, surveyResponses.surveyId))
+    .where(
+      and(
+        eq(surveyResponses.accountId, accountId),
+        eq(surveyResponses.surveyId, surveyId),
+        eq(surveyResponses.isDeleted, false),
+      ),
+    )
+    .get();
+
+  if (
+    !response ||
+    response.surveyIsDeleted ||
+    response.state !== "published" ||
+    response.opensAt.getTime() > at.getTime()
+  ) {
+    return { type: "not-found" };
+  }
+
+  const [questionCountRow, rows] = await Promise.all([
+    db
+      .select({ value: count(surveyQuestions.id) })
+      .from(surveyQuestions)
+      .where(and(eq(surveyQuestions.surveyId, surveyId), eq(surveyQuestions.isDeleted, false)))
+      .get(),
+    db
+      .select({
+        surveyQuestionId: surveyAnswers.surveyQuestionId,
+        questionId: surveyAnswers.questionId,
+        questionVersion: surveyAnswers.questionVersion,
+        questionText: questionVersions.text,
+        choiceId: surveyAnswers.choiceId,
+        choiceLabel: questionChoices.label,
+        acceptedAt: surveyAnswers.acceptedAt,
+      })
+      .from(surveyAnswers)
+      .innerJoin(
+        surveyQuestions,
+        and(
+          eq(surveyQuestions.id, surveyAnswers.surveyQuestionId),
+          eq(surveyQuestions.surveyId, surveyId),
+        ),
+      )
+      .innerJoin(
+        questionVersions,
+        and(
+          eq(questionVersions.questionId, surveyAnswers.questionId),
+          eq(questionVersions.version, surveyAnswers.questionVersion),
+        ),
+      )
+      .innerJoin(
+        questionChoices,
+        and(
+          eq(questionChoices.questionId, surveyAnswers.questionId),
+          eq(questionChoices.questionVersion, surveyAnswers.questionVersion),
+          eq(questionChoices.choiceId, surveyAnswers.choiceId),
+        ),
+      )
+      .where(
+        and(
+          eq(surveyAnswers.surveyResponseId, response.responseId),
+          eq(surveyAnswers.isDeleted, false),
+          eq(surveyQuestions.isDeleted, false),
+        ),
+      )
+      .orderBy(asc(surveyQuestions.position)),
+  ]);
+
+  if (rows.length === 0) {
+    return { type: "not-found" };
+  }
+
+  const questionCount = questionCountRow?.value ?? 0;
+  const answeredCount = rows.length;
+  return {
+    type: "found",
+    survey: {
+      id: response.id,
+      title: response.title,
+      description: response.description,
+      responseStatus: answeredCount === questionCount ? "answered" : "in-progress",
+      answeredCount,
+      questionCount,
+      answers: rows.map((answer) => ({
+        ...answer,
+        acceptedAt: answer.acceptedAt.toISOString(),
+      })),
     },
   };
 }

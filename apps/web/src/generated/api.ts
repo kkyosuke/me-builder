@@ -55,6 +55,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/surveys/{surveyId}/answers": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** 本人が保存したアンケート回答内容を取得する */
+    get: operations["getSurveyAnswers"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/surveys/{surveyId}/answers/{surveyQuestionId}": {
     parameters: {
       query?: never;
@@ -335,6 +352,103 @@ export interface operations {
             /** @constant */
             reason: "survey_closed";
           };
+        };
+      };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
+          };
+        };
+      };
+      /** @description D1 bindingが設定されていない */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Service Unavailable";
+          };
+        };
+      };
+    };
+  };
+  getSurveyAnswers: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        surveyId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 質問文・選択肢・回答日時を含む本人の回答内容 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            id: string;
+            title: string;
+            description: string;
+            /** @enum {string} */
+            responseStatus: "in-progress" | "answered";
+            answeredCount: number;
+            questionCount: number;
+            answers: {
+              surveyQuestionId: string;
+              questionId: string;
+              questionVersion: number;
+              questionText: string;
+              choiceId: string;
+              choiceLabel: string;
+              /** Format: date-time */
+              acceptedAt: string;
+            }[];
+          };
+        };
+      };
+      /** @description LIFF IDトークンを検証できない */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Unauthorized";
+          };
+        };
+      };
+      /** @description 対応するAccount、Survey、または回答がない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | {
+                /** @constant */
+                error: "Account not found";
+                /** @constant */
+                reason: "friendship_required";
+              }
+            | {
+                /** @constant */
+                error: "Survey answers not found";
+                /** @constant */
+                reason: "survey_answers_not_found";
+              };
         };
       };
       /** @description 未処理のサーバーエラー */

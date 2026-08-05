@@ -526,6 +526,207 @@
         ]
       }
     },
+    "/api/surveys/{surveyId}/answers": {
+      "get": {
+        "operationId": "getSurveyAnswers",
+        "tags": ["Survey"],
+        "summary": "本人が保存したアンケート回答内容を取得する",
+        "security": [
+          {
+            "liffIdToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "質問文・選択肢・回答日時を含む本人の回答内容",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "description": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "responseStatus": {
+                      "enum": ["in-progress", "answered"],
+                      "type": "string"
+                    },
+                    "answeredCount": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "questionCount": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "answers": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "surveyQuestionId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "questionId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "questionVersion": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          "questionText": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "choiceId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "choiceLabel": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "acceptedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "surveyQuestionId",
+                          "questionId",
+                          "questionVersion",
+                          "questionText",
+                          "choiceId",
+                          "choiceLabel",
+                          "acceptedAt"
+                        ]
+                      },
+                      "minItems": 1
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "title",
+                    "description",
+                    "responseStatus",
+                    "answeredCount",
+                    "questionCount",
+                    "answers"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "LIFF IDトークンを検証できない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Unauthorized"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "対応するAccount、Survey、または回答がない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "error": {
+                          "const": "Account not found"
+                        },
+                        "reason": {
+                          "const": "friendship_required"
+                        }
+                      },
+                      "required": ["error", "reason"]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "error": {
+                          "const": "Survey answers not found"
+                        },
+                        "reason": {
+                          "const": "survey_answers_not_found"
+                        }
+                      },
+                      "required": ["error", "reason"]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "未処理のサーバーエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Internal Server Error"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "D1 bindingが設定されていない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Service Unavailable"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "surveyId",
+            "required": true
+          }
+        ]
+      }
+    },
     "/api/surveys/{surveyId}/answers/{surveyQuestionId}": {
       "put": {
         "operationId": "saveSurveyAnswer",

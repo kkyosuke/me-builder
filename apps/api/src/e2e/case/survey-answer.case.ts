@@ -71,4 +71,43 @@ export const surveyAnswerCases = {
       },
     },
   },
+  getContents: {
+    id: "ANSWER-005",
+    name: "保存済み回答を質問文と選択肢ラベル付きで取得すること",
+    in: {
+      method: "GET",
+      path: "/api/surveys/relationship-priority/answers",
+      authorization: "Bearer known-token",
+      setup: ["1問目へchoiceId=yes、2問目へchoiceId=noを保存"],
+    },
+    out: {
+      status: 200,
+      body: {
+        responseStatus: "in-progress",
+        answeredCount: 2,
+        questionCount: 10,
+        answers: [
+          { surveyQuestionId: "sq-relationship-priority-01", choiceLabel: "はい" },
+          { surveyQuestionId: "sq-relationship-priority-02", choiceLabel: "いいえ" },
+        ],
+      },
+    },
+  },
+  missingContents: {
+    id: "ANSWER-006",
+    name: "本人の回答がない場合は回答内容を返さないこと",
+    in: {
+      method: "GET",
+      path: "/api/surveys/relationship-priority/answers",
+      authorization: "Bearer known-token",
+      setup: ["回答を保存しない"],
+    },
+    out: {
+      status: 404,
+      body: {
+        error: "Survey answers not found",
+        reason: "survey_answers_not_found",
+      },
+    },
+  },
 } as const satisfies Readonly<Record<string, E2eCase>>;

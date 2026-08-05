@@ -84,6 +84,14 @@ async function putAnswer(surveyQuestionId: string, choiceId = "yes"): Promise<Re
   );
 }
 
+async function getAnswers(): Promise<Response> {
+  return app.request(
+    "/api/surveys/relationship-priority/answers",
+    { headers: { Authorization: "Bearer known-token" } },
+    env(),
+  );
+}
+
 async function listRelationshipSurvey(): Promise<{
   responseStatus: string;
   answeredCount: number;
@@ -190,6 +198,44 @@ describe("PUT /api/surveys/:surveyId/answers/:surveyQuestionId local D1 E2E", ()
     expect(await listRelationshipSurvey()).toMatchObject({
       responseStatus: "answered",
       answeredCount: 10,
+    });
+  });
+
+  it(`${surveyAnswerCases.getContents.id}: ${surveyAnswerCases.getContents.name}`, async () => {
+    await putAnswer("sq-relationship-priority-01", "yes");
+    await putAnswer("sq-relationship-priority-02", "no");
+
+    const response = await getAnswers();
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      id: "relationship-priority",
+      responseStatus: "in-progress",
+      answeredCount: 2,
+      questionCount: 10,
+      answers: [
+        {
+          surveyQuestionId: "sq-relationship-priority-01",
+          questionId: "q-relationship-priority-01",
+          questionVersion: 1,
+          choiceId: "yes",
+          choiceLabel: "はい",
+        },
+        {
+          surveyQuestionId: "sq-relationship-priority-02",
+          choiceId: "no",
+          choiceLabel: "いいえ",
+        },
+      ],
+    });
+  });
+
+  it(`${surveyAnswerCases.missingContents.id}: ${surveyAnswerCases.missingContents.name}`, async () => {
+    const response = await getAnswers();
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({
+      error: "Survey answers not found",
+      reason: "survey_answers_not_found",
     });
   });
 });
