@@ -11,6 +11,7 @@ import {
   SwipeSurvey,
   fetchSurveyDefinition,
   fetchSurveyList,
+  fetchSurveyProgress,
   fetchSurveyResult,
   resetDevelopmentSurveyData,
   restoreSurveyProgress,
@@ -205,7 +206,8 @@ type GuidanceKind = "closed" | "unsupported" | "load-error";
 const GUIDANCE: Record<GuidanceKind, { title: string; message: string }> = {
   closed: {
     title: "このアンケートは受付を終了しました",
-    message: "未回答のため、新しく回答を始めることはできません。アンケート一覧へお戻りください。",
+    message:
+      "回答期間が終了したため、新しく回答を始めたり、途中から再開したりすることはできません。アンケート一覧へお戻りください。",
   },
   unsupported: {
     title: "このアンケートは現在のアプリでは未対応です",
@@ -281,6 +283,7 @@ export function App() {
   const request = useRef<AbortController | null>(null);
   const detailRequest = useRef<AbortController | null>(null);
   const idToken = useRef<string | null>(null);
+  const pendingSurveySaves = useRef(new Map<string, Set<Promise<void>>>());
 
   const loadSurveys = useCallback(async (): Promise<void> => {
     if (loading.current) {
@@ -373,6 +376,13 @@ export function App() {
     detailRequest.current = controller;
     setDetailState("loading");
     try {
+      const pendingSaves = pendingSurveySaves.current.get(survey.id);
+      if (pendingSaves && pendingSaves.size > 0) {
+        await Promise.all([...pendingSaves]);
+        if (controller.signal.aborted) {
+          return;
+        }
+      }
       if (destination === "result") {
         const result = await fetchSurveyResult(
           config.apiUrl,
@@ -387,9 +397,7 @@ export function App() {
       } else {
         const [definition, savedResult] = await Promise.all([
           fetchSurveyDefinition(config.apiUrl, currentIdToken, survey.id, controller.signal),
-          survey.responseStatus === "in-progress"
-            ? fetchSurveyResult(config.apiUrl, currentIdToken, survey.id, controller.signal)
-            : Promise.resolve(undefined),
+          fetchSurveyProgress(config.apiUrl, currentIdToken, survey.id, controller.signal),
         ]);
         if (!controller.signal.aborted && mounted.current) {
           const restored =
@@ -421,22 +429,37 @@ export function App() {
       if (!currentIdToken || !selectedDefinition) {
         throw new Error("本人確認情報を取得できませんでした。LINEから開き直してください。");
       }
-      const result = await saveSurveyAnswer(
+      const saveRequest = saveSurveyAnswer(
         config.apiUrl,
         currentIdToken,
         selectedDefinition.id,
         answer.surveyQuestionId,
         answer.choiceId,
       );
-      setSurveys(
-        (current) =>
-          current?.map((survey) =>
-            survey.id === selectedDefinition.id
-              ? applySavedProgress(survey, result.progress)
-              : survey,
-          ) ?? null,
+      const settledSave = saveRequest.then(
+        () => undefined,
+        () => undefined,
       );
-      return { acceptedAt: result.answer.acceptedAt };
+      const pendingSaves = pendingSurveySaves.current.get(selectedDefinition.id) ?? new Set();
+      pendingSaves.add(settledSave);
+      pendingSurveySaves.current.set(selectedDefinition.id, pendingSaves);
+      try {
+        const result = await saveRequest;
+        setSurveys(
+          (current) =>
+            current?.map((survey) =>
+              survey.id === selectedDefinition.id
+                ? applySavedProgress(survey, result.progress)
+                : survey,
+            ) ?? null,
+        );
+        return { acceptedAt: result.answer.acceptedAt };
+      } finally {
+        pendingSaves.delete(settledSave);
+        if (pendingSaves.size === 0) {
+          pendingSurveySaves.current.delete(selectedDefinition.id);
+        }
+      }
     },
     [selectedDefinition],
   );

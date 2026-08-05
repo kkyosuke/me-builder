@@ -2,6 +2,7 @@ export { SwipeSurvey } from "./presentation/components/swipe-survey";
 export {
   fetchSurveyDefinition,
   fetchSurveyList,
+  fetchSurveyProgress,
   fetchSurveyResult,
   resetDevelopmentSurveyData,
   saveSurveyAnswer,

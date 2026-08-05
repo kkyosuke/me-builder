@@ -313,11 +313,11 @@ const SurveyAnswersResponseSchema = v.object({
   ),
 }) satisfies v.GenericSchema<ApiSurveyAnswersResponse>;
 
-/** 本人が保存した回答内容を取得し、版付きローカル設定で表示結果を再計算する。 */
-export async function fetchSurveyResult(
+async function requestSurveyResult(
   apiUrl: string | undefined,
   idToken: string,
   surveyId: string,
+  allowMissing: boolean,
   signal?: AbortSignal,
 ): Promise<SurveyResult | undefined> {
   const response = await createHttpClient(apiUrl).request(
@@ -336,6 +336,9 @@ export async function fetchSurveyResult(
       });
     }
     if (response.status === 404) {
+      if (allowMissing) {
+        return undefined;
+      }
       throw new OperationError("保存済みの回答を確認できませんでした。", {
         code: "SURVEY_ANSWERS_NOT_FOUND",
         status: response.status,
@@ -358,6 +361,26 @@ export async function fetchSurveyResult(
   }
 
   return combineSurveyResult(body);
+}
+
+/** 本人が保存した回答内容を取得し、版付きローカル設定で表示結果を再計算する。 */
+export async function fetchSurveyResult(
+  apiUrl: string | undefined,
+  idToken: string,
+  surveyId: string,
+  signal?: AbortSignal,
+): Promise<SurveyResult | undefined> {
+  return requestSurveyResult(apiUrl, idToken, surveyId, false, signal);
+}
+
+/** 回答画面の開始時に現在回答を取得する。回答がまだなければ`undefined`を返す。 */
+export async function fetchSurveyProgress(
+  apiUrl: string | undefined,
+  idToken: string,
+  surveyId: string,
+  signal?: AbortSignal,
+): Promise<SurveyResult | undefined> {
+  return requestSurveyResult(apiUrl, idToken, surveyId, true, signal);
 }
 
 const ResetDevelopmentSurveyDataResponseSchema = v.object({
