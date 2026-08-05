@@ -17,7 +17,6 @@ export async function processLineWebhook(
 
   const events = line.webhook.parseEvents(payload);
   const apiClient = line.client.create(workerConfig.lineChannelAccessToken);
-  const generateAiText = createAiTextGenerator(workerConfig);
 
   for (const event of events) {
     const providerAccountId = event.source?.userId;
@@ -34,13 +33,7 @@ export async function processLineWebhook(
       // ここで Account を補完する。友だち追加より前から利用しているユーザーや、
       // follow イベントの処理に失敗したユーザーが Web 側で本人確認できなくなるのを防ぐ。
       await ensureAccountIdentity(db, providerAccountId, "message");
-      await handleTextMessage(
-        event.replyToken,
-        event.message.text,
-        apiClient,
-        workerConfig.liffId,
-        generateAiText,
-      );
+      await handleTextMessage(event.replyToken, event.message.text, apiClient, workerConfig);
     }
   }
 }
@@ -191,32 +184,104 @@ function createAiTextGenerator(workerConfig: WorkerConfig): GenerateAiText | und
   return (prompt) => generateText(client, workerConfig.geminiModel, prompt);
 }
 
+function getMissingAiConfiguration(workerConfig: WorkerConfig): string[] {
+  const missingConfiguration: string[] = [];
+  if (!workerConfig.googleAiStudioApiKey) {
+    missingConfiguration.push("GOOGLE_AI_STUDIO_API_KEY");
+  }
+  if (!workerConfig.cloudflareAiGatewayToken) {
+    missingConfiguration.push("CLOUDFLARE_AIG_TOKEN");
+  }
+  return missingConfiguration;
+}
+
+function redactKnownSecrets(message: string, secrets: Array<string | undefined>): string {
+  let redacted = message;
+  for (const secret of secrets) {
+    if (secret) {
+      redacted = redacted.replaceAll(secret, "[REDACTED]");
+    }
+  }
+  return redacted;
+}
+
+function buildAiErrorLogContext(error: unknown, workerConfig: WorkerConfig) {
+  const errorRecord =
+    typeof error === "object" && error !== null ? (error as Record<string, unknown>) : undefined;
+  const rawMessage = error instanceof Error ? error.message : String(error);
+  const errorMessage = redactKnownSecrets(rawMessage, [
+    workerConfig.googleAiStudioApiKey,
+    workerConfig.cloudflareAiGatewayToken,
+  ]);
+
+  return {
+    provider: "google-ai-studio",
+    gateway: "cloudflare-ai-gateway",
+    model: workerConfig.geminiModel,
+    errorName: error instanceof Error ? error.name : "UnknownError",
+    errorMessage,
+    errorStatus: errorRecord?.status ?? errorRecord?.statusCode,
+    errorCode: errorRecord?.code,
+  };
+}
+
 async function handleTextMessage(
   replyToken: string,
   messageText: string,
   apiClient: ReturnType<typeof line.client.create>,
-  liffId?: string,
-  generateAiText?: GenerateAiText,
+  workerConfig: WorkerConfig,
 ): Promise<void> {
   const intent = classifyLineText(messageText);
-  let replyText = buildReplyText(messageText, liffId);
+  let replyText = buildReplyText(messageText, workerConfig.liffId);
   let aiResponded = false;
 
-  if (intent === "ai-chat" && generateAiText) {
+  if (intent === "ai-chat") {
     const prompt = extractAiPrompt(messageText);
     if (prompt) {
-      try {
-        const generatedText = await generateAiText(prompt);
-        const aiReplyText = generatedText ? buildAiReplyText(generatedText) : undefined;
-        if (aiReplyText) {
-          replyText = aiReplyText;
-          aiResponded = true;
-        }
-      } catch (error) {
+      const missingConfiguration = getMissingAiConfiguration(workerConfig);
+      const generateAiText = createAiTextGenerator(workerConfig);
+
+      if (!generateAiText) {
         logger.error(
-          { error: error instanceof Error ? error.message : String(error) },
-          "[Gemini] Failed to generate a LINE reply",
+          {
+            provider: "google-ai-studio",
+            gateway: "cloudflare-ai-gateway",
+            model: workerConfig.geminiModel,
+            reason: "missing_configuration",
+            missingConfiguration,
+          },
+          "[Gemini] AI connection is not configured",
         );
+      } else {
+        const startedAt = Date.now();
+        try {
+          const generatedText = await generateAiText(prompt);
+          const aiReplyText = generatedText ? buildAiReplyText(generatedText) : undefined;
+          if (aiReplyText) {
+            replyText = aiReplyText;
+            aiResponded = true;
+          } else {
+            logger.warn(
+              {
+                provider: "google-ai-studio",
+                gateway: "cloudflare-ai-gateway",
+                model: workerConfig.geminiModel,
+                reason: "empty_response",
+                durationMs: Date.now() - startedAt,
+              },
+              "[Gemini] AI request returned an empty response",
+            );
+          }
+        } catch (error) {
+          logger.error(
+            {
+              ...buildAiErrorLogContext(error, workerConfig),
+              reason: "api_error",
+              durationMs: Date.now() - startedAt,
+            },
+            "[Gemini] Failed to generate a LINE reply",
+          );
+        }
       }
     }
   }
@@ -233,7 +298,7 @@ async function handleTextMessage(
     });
     logger.info(
       // 本文は日記そのものなのでログへ出さず、判定結果だけを残します。
-      { replyToken, intent, hasLiffLink: Boolean(liffId), aiResponded },
+      { replyToken, intent, hasLiffLink: Boolean(workerConfig.liffId), aiResponded },
       "[LINE Reply] Reply sent successfully via LINE Messaging API",
     );
   } catch (error) {
