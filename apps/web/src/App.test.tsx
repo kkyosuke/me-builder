@@ -32,18 +32,22 @@ const mocks = vi.hoisted(() => ({
 vi.mock("./config", () => ({
   config: mocks.config,
 }));
-vi.mock("./feature/liff", () => ({
+vi.mock("./feature/liff/infrastructure/liff-client", () => ({
   initializeLiff: mocks.initializeLiff,
   getLiffIdToken: mocks.getLiffIdToken,
 }));
-vi.mock("./feature/survey", () => ({
+vi.mock("./feature/survey/infrastructure/survey-api", () => ({
   fetchSurveyList: mocks.fetchSurveyList,
   fetchSurveyDefinition: mocks.fetchSurveyDefinition,
   fetchSurveyProgress: mocks.fetchSurveyProgress,
   fetchSurveyResult: mocks.fetchSurveyResult,
   saveSurveyAnswer: mocks.saveSurveyAnswer,
   resetDevelopmentSurveyData: mocks.resetDevelopmentSurveyData,
+}));
+vi.mock("./feature/survey/model/answers", () => ({
   restoreSurveyProgress: mocks.restoreSurveyProgress,
+}));
+vi.mock("./feature/survey/presentation/components/swipe-survey", () => ({
   SwipeSurvey: ({
     survey,
     initialAnswers,
@@ -84,6 +88,8 @@ vi.mock("./feature/survey", () => ({
       </button>
     </div>
   ),
+}));
+vi.mock("./feature/survey/presentation/components/survey-result", () => ({
   SurveyResultView: ({ result }: { result: SurveyResult }) => (
     <div>{`結果UI: ${result.title} (${result.answers.length}件)`}</div>
   ),
