@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
@@ -32,18 +32,22 @@ const mocks = vi.hoisted(() => ({
 vi.mock("./config", () => ({
   config: mocks.config,
 }));
-vi.mock("./feature/liff", () => ({
+vi.mock("./feature/liff/infrastructure/liff-client", () => ({
   initializeLiff: mocks.initializeLiff,
   getLiffIdToken: mocks.getLiffIdToken,
 }));
-vi.mock("./feature/survey", () => ({
+vi.mock("./feature/survey/infrastructure/survey-api", () => ({
   fetchSurveyList: mocks.fetchSurveyList,
   fetchSurveyDefinition: mocks.fetchSurveyDefinition,
   fetchSurveyProgress: mocks.fetchSurveyProgress,
   fetchSurveyResult: mocks.fetchSurveyResult,
   saveSurveyAnswer: mocks.saveSurveyAnswer,
   resetDevelopmentSurveyData: mocks.resetDevelopmentSurveyData,
+}));
+vi.mock("./feature/survey/model/answers", () => ({
   restoreSurveyProgress: mocks.restoreSurveyProgress,
+}));
+vi.mock("./feature/survey/presentation/components/swipe-survey", () => ({
   SwipeSurvey: ({
     survey,
     initialAnswers,
@@ -84,6 +88,8 @@ vi.mock("./feature/survey", () => ({
       </button>
     </div>
   ),
+}));
+vi.mock("./feature/survey/presentation/components/survey-result", () => ({
   SurveyResultView: ({ result }: { result: SurveyResult }) => (
     <div>{`結果UI: ${result.title} (${result.answers.length}件)`}</div>
   ),
@@ -177,6 +183,7 @@ describe("App", () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     cleanup();
     vi.restoreAllMocks();
   });
@@ -194,6 +201,26 @@ describe("App", () => {
       "survey-1",
       expect.any(AbortSignal),
     );
+  });
+
+  it("詳細取得が即時完了してもloadingを400ms表示する", async () => {
+    render(<App />);
+    const openSurvey = await screen.findByRole("button", { name: /テストアンケート/ });
+    vi.useFakeTimers();
+
+    fireEvent.click(openSurvey);
+    expect(screen.getByText("アンケートを読み込んでいます...")).toBeTruthy();
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      vi.advanceTimersByTime(399);
+    });
+
+    expect(screen.getByText("アンケートを読み込んでいます...")).toBeTruthy();
+    expect(screen.queryByText("回答UI: テストアンケート")).toBeNull();
+
+    await act(async () => vi.advanceTimersByTime(1));
+    expect(screen.getByText("回答UI: テストアンケート")).toBeTruthy();
   });
 
   it("dev環境では確認後に本人の回答データを全削除し、一覧を再取得する", async () => {
