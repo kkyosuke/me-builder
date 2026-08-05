@@ -4,8 +4,8 @@ import type { D1Database } from "@cloudflare/workers-types";
 import { Miniflare } from "miniflare";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { app } from "../index";
-import { surveyDetailCases } from "./survey-detail.case";
-import { surveyListCases } from "./survey-list.case";
+import { surveyDetailCases } from "./case/survey-detail.case";
+import { surveyListCases } from "./case/survey-list.case";
 
 const repositoryRoot = path.resolve(__dirname, "../../../..");
 const migrationsDirectory = path.join(repositoryRoot, "packages/lib/drizzle");
