@@ -110,4 +110,66 @@ export const surveyAnswerCases = {
       },
     },
   },
+  resetDevelopmentData: {
+    id: "ANSWER-007",
+    name: "test環境で本人の回答由来データを全削除すること",
+    in: {
+      method: "DELETE",
+      path: "/api/dev/survey-data",
+      authorization: "Bearer known-token",
+      setup: ["2問分の回答を保存", "ENVIRONMENT=test"],
+    },
+    out: {
+      status: 200,
+      body: {
+        deletedResponseCount: 1,
+        deletedAnswerCount: 2,
+        deletedDeferredQuestionCount: 0,
+        deletedSourceRecordCount: 2,
+        list: { responseStatus: "unanswered", answeredCount: 0 },
+      },
+    },
+  },
+  rejectProductionReset: {
+    id: "ANSWER-008",
+    name: "production環境では回答データを削除しないこと",
+    in: {
+      method: "DELETE",
+      path: "/api/dev/survey-data",
+      authorization: "Bearer known-token",
+      setup: ["1問分の回答を保存", "ENVIRONMENT=production"],
+    },
+    out: {
+      status: 404,
+      body: { error: "Not Found", persistedCounts: { surveyAnswers: 1 } },
+    },
+  },
+  rejectUnconfiguredReset: {
+    id: "ANSWER-009",
+    name: "ENVIRONMENT未設定では回答データを削除しないこと",
+    in: {
+      method: "DELETE",
+      path: "/api/dev/survey-data",
+      authorization: "Bearer known-token",
+      setup: ["1問分の回答を保存", "ENVIRONMENT bindingなし"],
+    },
+    out: {
+      status: 404,
+      body: { error: "Not Found", persistedCounts: { surveyAnswers: 1 } },
+    },
+  },
+  concurrentSaveAndReset: {
+    id: "ANSWER-010",
+    name: "回答保存とリセットが競合してもSource Recordを孤立させないこと",
+    in: {
+      method: "PUT + DELETE",
+      path: "/api/surveys/relationship-priority/answers/{surveyQuestionId} + /api/dev/survey-data",
+      authorization: "Bearer known-token",
+      setup: ["1問分の回答を保存", "2問目の保存とリセットを同時実行"],
+    },
+    out: {
+      status: 200,
+      body: { orphanedSourceRecords: 0, sourceRecordCountEqualsAnswerCount: true },
+    },
+  },
 } as const satisfies Readonly<Record<string, E2eCase>>;

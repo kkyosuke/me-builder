@@ -22,6 +22,8 @@ type ApiSaveSurveyAnswerResponse =
   operations["saveSurveyAnswer"]["responses"][200]["content"]["application/json"];
 type ApiSurveyAnswersResponse =
   operations["getSurveyAnswers"]["responses"][200]["content"]["application/json"];
+type ApiResetDevelopmentSurveyDataResponse =
+  operations["resetDevelopmentSurveyData"]["responses"][200]["content"]["application/json"];
 
 const SurveyListItemSchema = v.object({
   id: v.pipe(v.string(), v.nonEmpty()),
@@ -356,4 +358,54 @@ export async function fetchSurveyResult(
   }
 
   return combineSurveyResult(body);
+}
+
+const ResetDevelopmentSurveyDataResponseSchema = v.object({
+  deletedResponseCount: v.pipe(v.number(), v.safeInteger(), v.minValue(0)),
+  deletedAnswerCount: v.pipe(v.number(), v.safeInteger(), v.minValue(0)),
+  deletedDeferredQuestionCount: v.pipe(v.number(), v.safeInteger(), v.minValue(0)),
+  deletedSourceRecordCount: v.pipe(v.number(), v.safeInteger(), v.minValue(0)),
+}) satisfies v.GenericSchema<ApiResetDevelopmentSurveyDataResponse>;
+
+export type ResetDevelopmentSurveyDataResult = v.InferOutput<
+  typeof ResetDevelopmentSurveyDataResponseSchema
+>;
+
+/** 開発環境で、本人のアンケート回答由来データを全削除する。 */
+export async function resetDevelopmentSurveyData(
+  apiUrl: string | undefined,
+  idToken: string,
+): Promise<ResetDevelopmentSurveyDataResult> {
+  const response = await createHttpClient(apiUrl).request("/api/dev/survey-data", {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${idToken}` },
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new AuthenticationError("本人確認に失敗しました。LINEから開き直してください。", {
+        code: "AUTHENTICATION_REQUIRED",
+        status: response.status,
+      });
+    }
+    if (response.status === 404) {
+      throw new OperationError("この環境では回答データを削除できません。", {
+        code: "DEVELOPMENT_RESET_UNAVAILABLE",
+        status: response.status,
+      });
+    }
+    throw new UnknownError(`回答データの削除に失敗しました (HTTP ${response.status})`, {
+      code: "DEVELOPMENT_RESET_REQUEST_FAILED",
+      status: response.status,
+    });
+  }
+
+  try {
+    return v.parse(ResetDevelopmentSurveyDataResponseSchema, await response.json());
+  } catch (error) {
+    throw new ValidationError("回答データ削除のレスポンスが不正です。", {
+      code: "DEVELOPMENT_RESET_INVALID_RESPONSE",
+      cause: error,
+    });
+  }
 }

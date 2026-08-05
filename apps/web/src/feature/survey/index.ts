@@ -3,6 +3,7 @@ export {
   fetchSurveyDefinition,
   fetchSurveyList,
   fetchSurveyResult,
+  resetDevelopmentSurveyData,
   saveSurveyAnswer,
 } from "./infrastructure/survey-api";
 export type { SurveyDefinition } from "./model/survey-definition";

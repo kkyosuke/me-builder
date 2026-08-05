@@ -24,12 +24,19 @@ import {
   SurveyDetailResponseSchema,
   SurveyNotFoundErrorSchema,
 } from "../contract/survey/detail";
+import {
+  DevelopmentRouteNotFoundErrorSchema,
+  ResetDevelopmentSurveyDataResponseSchema,
+} from "../contract/survey/dev-reset";
 import { SurveyListResponseSchema } from "../contract/survey/list";
+import { resetDevelopmentSurveyData } from "../logic/dev-survey-reset";
 import { saveSurveyAnswer } from "../logic/survey-answer";
 import { getSurveyAnswers } from "../logic/survey-answers";
 import { getSurveyDetail } from "../logic/survey-detail";
 import { getSurveyList } from "../logic/survey-list";
 import type { AppEnv } from "../types";
+
+const DEVELOPMENT_ENVIRONMENTS = new Set(["development", "local", "preview", "test"]);
 
 function bearerToken(authorization: string | undefined): string | undefined {
   const match = authorization?.trim().match(/^Bearer\s+([^\s]+)$/i);
@@ -215,6 +222,41 @@ export async function getSurveyAnswerContents(c: Context<AppEnv>): Promise<Respo
         }),
         404,
       );
+    case "account-not-found":
+      return c.json(
+        v.parse(AccountNotFoundErrorSchema, {
+          error: "Account not found",
+          reason: "friendship_required",
+        }),
+        404,
+      );
+    case "not-configured":
+    case "unauthenticated":
+      return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
+  }
+}
+
+/** `DELETE /api/dev/survey-data` — 開発環境で本人の回答由来データを全削除する。 */
+export async function deleteDevelopmentSurveyData(c: Context<AppEnv>): Promise<Response> {
+  const explicitEnvironment = c.env?.ENVIRONMENT?.trim();
+  if (!explicitEnvironment || !DEVELOPMENT_ENVIRONMENTS.has(explicitEnvironment)) {
+    return c.json(v.parse(DevelopmentRouteNotFoundErrorSchema, { error: "Not Found" }), 404);
+  }
+  const currentConfig = getConfig(c.env);
+  if (!c.env?.DB) {
+    logger.error({ path: c.req.path }, "DB binding is not configured");
+    return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
+  }
+
+  const outcome = await resetDevelopmentSurveyData({
+    idToken: bearerToken(c.req.header("authorization")),
+    lineLoginChannelId: currentConfig.lineLoginChannelId,
+    db: d1.client.create(c.env.DB),
+  });
+
+  switch (outcome.type) {
+    case "resolved":
+      return c.json(v.parse(ResetDevelopmentSurveyDataResponseSchema, outcome));
     case "account-not-found":
       return c.json(
         v.parse(AccountNotFoundErrorSchema, {

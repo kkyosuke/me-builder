@@ -10,9 +10,11 @@ import { InternalServerErrorSchema } from "./contract/shared/errors";
 import { saveSurveyAnswerRoute } from "./contract/survey/answer";
 import { surveyAnswersRoute } from "./contract/survey/answers";
 import { surveyDetailRoute } from "./contract/survey/detail";
+import { resetDevelopmentSurveyDataRoute } from "./contract/survey/dev-reset";
 import { surveyListRoute } from "./contract/survey/list";
 import { postLiffSession, postLineWebhook } from "./controller/line";
 import {
+  deleteDevelopmentSurveyData,
   getSurvey,
   getSurveyAnswerContents,
   getSurveys,
@@ -66,6 +68,7 @@ app.get("/api/surveys", surveyListRoute, getSurveys);
 app.get("/api/surveys/:surveyId", surveyDetailRoute, getSurvey);
 app.get("/api/surveys/:surveyId/answers", surveyAnswersRoute, getSurveyAnswerContents);
 app.put("/api/surveys/:surveyId/answers/:surveyQuestionId", saveSurveyAnswerRoute, putSurveyAnswer);
+app.delete("/api/dev/survey-data", resetDevelopmentSurveyDataRoute, deleteDevelopmentSurveyData);
 
 // Web UIの型生成にも使う、機械可読なAPI契約。
 app.get("/api/openapi.json", openAPIRouteHandler(app, openApiOptions));

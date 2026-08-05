@@ -1,28 +1,51 @@
 import path from "node:path";
 import Database from "better-sqlite3";
+import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { describe, expect, it } from "vitest";
 import type { D1Client } from "../client";
 import * as schema from "../schema";
 import {
+  deleteAccountSurveyData,
   findOpenSurveyDetail,
   findSurveyAnswers,
   listVisibleSurveys,
   saveSurveyAnswer,
 } from "./questionnaire";
 
-function createTestDb(): D1Client {
+type DbExecutionObserver = {
+  onBatch?: () => void;
+  onQuery?: (insideBatch: boolean) => void;
+};
+
+function createTestDb(observer?: DbExecutionObserver): D1Client {
   const sqlite = new Database(":memory:");
   sqlite.pragma("foreign_keys = ON");
-  const db = drizzle(sqlite, { schema });
+  let batchDepth = 0;
+  const db = drizzle(sqlite, {
+    schema,
+    ...(observer?.onQuery
+      ? {
+          logger: {
+            logQuery: () => observer.onQuery?.(batchDepth > 0),
+          },
+        }
+      : {}),
+  });
   Object.assign(db, {
     batch: async (queries: Array<PromiseLike<unknown>>) => {
-      const results: unknown[] = [];
-      for (const query of queries) {
-        results.push(await query);
+      observer?.onBatch?.();
+      batchDepth += 1;
+      try {
+        const results: unknown[] = [];
+        for (const query of queries) {
+          results.push(await query);
+        }
+        return results;
+      } finally {
+        batchDepth -= 1;
       }
-      return results;
     },
   });
   migrate(db, { migrationsFolder: path.resolve(__dirname, "../../../drizzle") });
@@ -314,6 +337,116 @@ describe("findSurveyAnswers", () => {
     await expect(
       findSurveyAnswers(db, "another", "private-result", new Date("2026-08-03T00:00:00Z")),
     ).resolves.toEqual({ type: "not-found" });
+  });
+});
+
+describe("deleteAccountSurveyData", () => {
+  it("本人の回答由来データだけを物理削除し、定義・他人・無関係なSourceを残す", async () => {
+    const db = createTestDb();
+    await db.insert(schema.accounts).values([{ id: "reset-owner" }, { id: "reset-other" }]);
+    await insertSurvey(db, { id: "reset-target" });
+    const base = {
+      surveyId: "reset-target",
+      surveyQuestionId: "reset-target-sq1",
+      choiceId: "yes",
+      at: new Date("2026-08-03T00:00:00Z"),
+    };
+    await saveSurveyAnswer(db, { ...base, accountId: "reset-owner" });
+    await saveSurveyAnswer(db, { ...base, accountId: "reset-other" });
+
+    const ownerResponse = await db
+      .select({ id: schema.surveyResponses.id })
+      .from(schema.surveyResponses)
+      .where(eq(schema.surveyResponses.accountId, "reset-owner"))
+      .get();
+    const ownerAnswer = await db
+      .select({ sourceRecordId: schema.surveyAnswers.sourceRecordId })
+      .from(schema.surveyAnswers)
+      .where(eq(schema.surveyAnswers.surveyResponseId, ownerResponse?.id ?? ""))
+      .get();
+    expect(ownerResponse).toBeTruthy();
+    expect(ownerAnswer).toBeTruthy();
+
+    await db.insert(schema.surveyDeferredQuestions).values({
+      id: "reset-deferred",
+      surveyResponseId: ownerResponse?.id ?? "",
+      surveyQuestionId: "reset-target-sq2",
+      deferredAt: new Date("2026-08-03T00:01:00Z"),
+    });
+    await db.insert(schema.sourceRecords).values({
+      id: "unrelated-source",
+      accountId: "reset-owner",
+      kind: "user_input",
+    });
+    await db.insert(schema.sourceRecordRevisions).values({
+      id: "answer-revision",
+      previousSourceRecordId: ownerAnswer?.sourceRecordId ?? "",
+      nextSourceRecordId: "unrelated-source",
+      derivationMethod: "deterministic",
+    });
+
+    await expect(deleteAccountSurveyData(db, "reset-owner")).resolves.toEqual({
+      deletedResponseCount: 1,
+      deletedAnswerCount: 1,
+      deletedDeferredQuestionCount: 1,
+      deletedSourceRecordCount: 1,
+    });
+
+    expect(await db.select().from(schema.surveys)).toHaveLength(1);
+    expect(await db.select().from(schema.accounts)).toHaveLength(2);
+    expect(await db.select().from(schema.surveyResponses)).toMatchObject([
+      { accountId: "reset-other" },
+    ]);
+    expect(await db.select().from(schema.surveyAnswers)).toHaveLength(1);
+    expect(await db.select().from(schema.surveyDeferredQuestions)).toHaveLength(0);
+    expect(await db.select().from(schema.sourceRecords)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "unrelated-source", accountId: "reset-owner" }),
+        expect.objectContaining({ accountId: "reset-other" }),
+      ]),
+    );
+    expect(await db.select().from(schema.sourceRecordRevisions)).toHaveLength(0);
+
+    await expect(deleteAccountSurveyData(db, "reset-owner")).resolves.toEqual({
+      deletedResponseCount: 0,
+      deletedAnswerCount: 0,
+      deletedDeferredQuestionCount: 0,
+      deletedSourceRecordCount: 0,
+    });
+  });
+
+  it("削除対象の抽出を含む全SQLを1回のatomic batch内で実行する", async () => {
+    let tracking = false;
+    let batchCount = 0;
+    const queryContexts: boolean[] = [];
+    const db = createTestDb({
+      onBatch: () => {
+        if (tracking) {
+          batchCount += 1;
+        }
+      },
+      onQuery: (insideBatch) => {
+        if (tracking) {
+          queryContexts.push(insideBatch);
+        }
+      },
+    });
+    await db.insert(schema.accounts).values({ id: "atomic-reset-owner" });
+    await insertSurvey(db, { id: "atomic-reset-target" });
+    await saveSurveyAnswer(db, {
+      accountId: "atomic-reset-owner",
+      surveyId: "atomic-reset-target",
+      surveyQuestionId: "atomic-reset-target-sq1",
+      choiceId: "yes",
+      at: new Date("2026-08-03T00:00:00Z"),
+    });
+
+    tracking = true;
+    await deleteAccountSurveyData(db, "atomic-reset-owner");
+
+    expect(batchCount).toBe(1);
+    expect(queryContexts.length).toBeGreaterThan(0);
+    expect(queryContexts.every((insideBatch) => insideBatch)).toBe(true);
   });
 });
 

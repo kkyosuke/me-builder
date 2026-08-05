@@ -92,6 +92,15 @@ async function getAnswers(): Promise<Response> {
   );
 }
 
+async function deleteSurveyData(environment: string | undefined): Promise<Response> {
+  const { ENVIRONMENT: _, ...baseEnv } = env();
+  return app.request(
+    "/api/dev/survey-data",
+    { method: "DELETE", headers: { Authorization: "Bearer known-token" } },
+    { ...baseEnv, ...(environment === undefined ? {} : { ENVIRONMENT: environment }) },
+  );
+}
+
 async function listRelationshipSurvey(): Promise<{
   responseStatus: string;
   answeredCount: number;
@@ -237,5 +246,74 @@ describe("PUT /api/surveys/:surveyId/answers/:surveyQuestionId local D1 E2E", ()
       error: "Survey answers not found",
       reason: "survey_answers_not_found",
     });
+  });
+
+  it(`${surveyAnswerCases.resetDevelopmentData.id}: ${surveyAnswerCases.resetDevelopmentData.name}`, async () => {
+    await putAnswer("sq-relationship-priority-01", "yes");
+    await putAnswer("sq-relationship-priority-02", "no");
+
+    const response = await deleteSurveyData("test");
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      deletedResponseCount: 1,
+      deletedAnswerCount: 2,
+      deletedDeferredQuestionCount: 0,
+      deletedSourceRecordCount: 2,
+    });
+    expect(await countRows("survey_responses")).toBe(0);
+    expect(await countRows("source_records")).toBe(0);
+    expect(await countRows("survey_answers")).toBe(0);
+    expect(await listRelationshipSurvey()).toMatchObject({
+      responseStatus: "unanswered",
+      answeredCount: 0,
+    });
+  });
+
+  it(`${surveyAnswerCases.rejectProductionReset.id}: ${surveyAnswerCases.rejectProductionReset.name}`, async () => {
+    await putAnswer("sq-relationship-priority-01", "yes");
+
+    const response = await deleteSurveyData("production");
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ error: "Not Found" });
+    expect(await countRows("survey_responses")).toBe(1);
+    expect(await countRows("source_records")).toBe(1);
+    expect(await countRows("survey_answers")).toBe(1);
+  });
+
+  it(`${surveyAnswerCases.rejectUnconfiguredReset.id}: ${surveyAnswerCases.rejectUnconfiguredReset.name}`, async () => {
+    await putAnswer("sq-relationship-priority-01", "yes");
+
+    const response = await deleteSurveyData(undefined);
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ error: "Not Found" });
+    expect(await countRows("survey_responses")).toBe(1);
+    expect(await countRows("source_records")).toBe(1);
+    expect(await countRows("survey_answers")).toBe(1);
+  });
+
+  it(`${surveyAnswerCases.concurrentSaveAndReset.id}: ${surveyAnswerCases.concurrentSaveAndReset.name}`, async () => {
+    await putAnswer("sq-relationship-priority-01", "yes");
+
+    const [saved, reset] = await Promise.all([
+      putAnswer("sq-relationship-priority-02", "no"),
+      deleteSurveyData("test"),
+    ]);
+
+    expect(saved.status).toBe(200);
+    expect(reset.status).toBe(200);
+    const orphaned = await database
+      .prepare(
+        `SELECT COUNT(*) AS count
+         FROM source_records AS source
+         LEFT JOIN survey_answers AS answer ON answer.source_record_id = source.id
+         WHERE source.account_id = ? AND source.kind = 'user_input' AND answer.id IS NULL`,
+      )
+      .bind("account-answer-e2e")
+      .first<{ count: number }>();
+    expect(orphaned?.count ?? 0).toBe(0);
+    expect(await countRows("source_records")).toBe(await countRows("survey_answers"));
   });
 });

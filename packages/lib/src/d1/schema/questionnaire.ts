@@ -136,7 +136,7 @@ export const surveyAnswers = sqliteTable(
     acceptedAt: integer("accepted_at", { mode: "timestamp" }).notNull(),
     sourceRecordId: text("source_record_id")
       .notNull()
-      .references(() => sourceRecords.id),
+      .references(() => sourceRecords.id, { onDelete: "cascade" }),
   },
   (table) => [
     foreignKey({

@@ -13,16 +13,22 @@ import type {
 import { OperationError } from "./infrastructure/errors";
 
 const mocks = vi.hoisted(() => ({
+  config: {
+    environment: "development" as string | undefined,
+    liffId: "test-liff-id",
+    apiUrl: "https://api.example.com",
+  },
   initializeLiff: vi.fn(),
   getLiffIdToken: vi.fn(),
   fetchSurveyList: vi.fn(),
   fetchSurveyDefinition: vi.fn(),
   fetchSurveyResult: vi.fn(),
   saveSurveyAnswer: vi.fn(),
+  resetDevelopmentSurveyData: vi.fn(),
 }));
 
 vi.mock("./config", () => ({
-  config: { liffId: "test-liff-id", apiUrl: "https://api.example.com" },
+  config: mocks.config,
 }));
 vi.mock("./feature/liff", () => ({
   initializeLiff: mocks.initializeLiff,
@@ -33,6 +39,7 @@ vi.mock("./feature/survey", () => ({
   fetchSurveyDefinition: mocks.fetchSurveyDefinition,
   fetchSurveyResult: mocks.fetchSurveyResult,
   saveSurveyAnswer: mocks.saveSurveyAnswer,
+  resetDevelopmentSurveyData: mocks.resetDevelopmentSurveyData,
   SwipeSurvey: ({
     survey,
     onSaveAnswer,
@@ -119,6 +126,7 @@ function survey(overrides: Partial<SurveyListItem> = {}): SurveyListItem {
 describe("App", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.config.environment = "development";
     mocks.initializeLiff.mockResolvedValue({
       status: "ready",
       inClient: true,
@@ -133,9 +141,18 @@ describe("App", () => {
       answer: { acceptedAt: "2026-08-05T00:00:01.000Z" },
       progress: { responseStatus: "in-progress", answeredCount: 1, questionCount: 10 },
     });
+    mocks.resetDevelopmentSurveyData.mockResolvedValue({
+      deletedResponseCount: 1,
+      deletedAnswerCount: 10,
+      deletedDeferredQuestionCount: 0,
+      deletedSourceRecordCount: 10,
+    });
   });
 
-  afterEach(() => cleanup());
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
 
   it("受付中かつ未回答なら回答画面へ進み、1問ずつ保存することを表示する", async () => {
     render(<App />);
@@ -144,6 +161,47 @@ describe("App", () => {
 
     expect(await screen.findByText("回答UI: テストアンケート")).toBeTruthy();
     expect(screen.getByText(/回答は1問ずつ保存されます/)).toBeTruthy();
+  });
+
+  it("dev環境では確認後に本人の回答データを全削除し、一覧を再取得する", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "回答データを全削除" }));
+
+    await waitFor(() =>
+      expect(mocks.resetDevelopmentSurveyData).toHaveBeenCalledWith(
+        "https://api.example.com",
+        "dummy.id.token",
+      ),
+    );
+    expect(await screen.findByText("回答データを削除しました（回答・保留 10件）。")).toBeTruthy();
+    expect(mocks.fetchSurveyList).toHaveBeenCalledTimes(2);
+  });
+
+  it("dev環境の回答データ削除を確認でキャンセルできる", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(false);
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "回答データを全削除" }));
+
+    expect(mocks.resetDevelopmentSurveyData).not.toHaveBeenCalled();
+  });
+
+  it("production環境では開発用データ操作を表示しない", async () => {
+    mocks.config.environment = "production";
+    render(<App />);
+
+    await screen.findByRole("button", { name: /テストアンケート/ });
+    expect(screen.queryByRole("button", { name: "回答データを全削除" })).toBeNull();
+  });
+
+  it("環境変数未設定では開発用データ操作を表示しない", async () => {
+    mocks.config.environment = undefined;
+    render(<App />);
+
+    await screen.findByRole("button", { name: /テストアンケート/ });
+    expect(screen.queryByRole("button", { name: "回答データを全削除" })).toBeNull();
   });
 
   it("回答UIの選択を保存APIへ接続する", async () => {

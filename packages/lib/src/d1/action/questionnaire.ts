@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, lte } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, lte } from "drizzle-orm";
 import type { D1Client } from "../client";
 import {
   questionChoices,
@@ -95,6 +95,13 @@ export type SurveyAnswers = Readonly<{
 
 export type SurveyAnswersResult = { type: "found"; survey: SurveyAnswers } | { type: "not-found" };
 
+export type DeletedAccountSurveyData = Readonly<{
+  deletedResponseCount: number;
+  deletedAnswerCount: number;
+  deletedDeferredQuestionCount: number;
+  deletedSourceRecordCount: number;
+}>;
+
 type PersistedAnswer = {
   surveyQuestionId: string;
   questionId: string;
@@ -110,6 +117,52 @@ function isUniqueViolation(error: unknown): boolean {
     message.includes("D1_ERROR") ||
     message.includes("SQLITE_CONSTRAINT")
   );
+}
+
+/**
+ * 開発環境で回答フローをやり直すため、本人のアンケート回答由来データを物理削除します。
+ * 呼び出し可能な環境の制限はAPI境界が担当します。
+ */
+export async function deleteAccountSurveyData(
+  db: D1Client,
+  accountId: string,
+): Promise<DeletedAccountSurveyData> {
+  const ownedResponseIds = db
+    .select({ id: surveyResponses.id })
+    .from(surveyResponses)
+    .where(eq(surveyResponses.accountId, accountId));
+  const answerSourceRecordIds = db
+    .select({ id: surveyAnswers.sourceRecordId })
+    .from(surveyAnswers)
+    .where(inArray(surveyAnswers.surveyResponseId, ownedResponseIds));
+
+  // D1のbatchは単一のatomic transactionとして直列実行される。
+  // Source Record削除時のcascadeでAnswerと改訂関係も同じ境界内から除去する。
+  const [answerCountRows, deletedSourceRecords, deletedDeferredQuestions, deletedResponses] =
+    await db.batch([
+      db
+        .select({ value: count(surveyAnswers.id) })
+        .from(surveyAnswers)
+        .where(inArray(surveyAnswers.surveyResponseId, ownedResponseIds)),
+      db.delete(sourceRecords).where(inArray(sourceRecords.id, answerSourceRecordIds)).returning({
+        id: sourceRecords.id,
+      }),
+      db
+        .delete(surveyDeferredQuestions)
+        .where(inArray(surveyDeferredQuestions.surveyResponseId, ownedResponseIds))
+        .returning({ id: surveyDeferredQuestions.id }),
+      db
+        .delete(surveyResponses)
+        .where(eq(surveyResponses.accountId, accountId))
+        .returning({ id: surveyResponses.id }),
+    ]);
+
+  return {
+    deletedResponseCount: deletedResponses.length,
+    deletedAnswerCount: answerCountRows[0]?.value ?? 0,
+    deletedDeferredQuestionCount: deletedDeferredQuestions.length,
+    deletedSourceRecordCount: deletedSourceRecords.length,
+  };
 }
 
 async function findSurveyResponseId(
