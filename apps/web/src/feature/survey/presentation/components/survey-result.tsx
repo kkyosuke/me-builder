@@ -1,4 +1,4 @@
-import { ArrowLeft, CheckCircle2, Clock3, Sparkles } from "lucide-react";
+import { ArrowLeft, CheckCircle2, ChevronDown, Clock3, Sparkles } from "lucide-react";
 import { getParameterSummary } from "../../model/scoring";
 import type { SurveyResult } from "../../model/survey-result";
 
@@ -83,34 +83,39 @@ export function SurveyResultView({
         </div>
       </section>
 
-      <section aria-labelledby="answers-heading" className="mt-7 pb-8">
-        <h2 id="answers-heading" className="text-lg font-bold text-slate-50">
-          回答内容
-        </h2>
-        <ol className="mt-3 space-y-3">
-          {result.answers.map((answer, index) => (
-            <li
-              key={answer.surveyQuestionId}
-              className="rounded-2xl border border-slate-700 bg-slate-800 p-4"
-            >
-              <div className="flex gap-3">
-                <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-slate-700 text-xs font-bold text-slate-300">
-                  {index + 1}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm leading-relaxed text-slate-200">{answer.questionText}</p>
-                  <p className="mt-3 inline-flex rounded-full bg-sky-400/10 px-3 py-1 text-sm font-semibold text-sky-200">
-                    {answer.choiceLabel}
-                  </p>
-                  <p className="mt-3 flex items-center gap-1.5 text-xs text-slate-500">
-                    <Clock3 className="size-3.5" aria-hidden="true" />
-                    <time dateTime={answer.acceptedAt}>{formatAcceptedAt(answer.acceptedAt)}</time>
-                  </p>
+      <section aria-label="回答内容" className="mt-7 pb-8">
+        <details className="group rounded-2xl border border-slate-700 bg-slate-800">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-2xl px-4 py-4 font-bold text-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400">
+            <span>{`回答内容（${result.answers.length}件）`}</span>
+            <ChevronDown
+              className="size-5 shrink-0 text-slate-400 transition-transform group-open:rotate-180"
+              aria-hidden="true"
+            />
+          </summary>
+          <ol className="space-y-3 border-t border-slate-700 p-3 sm:p-4">
+            {result.answers.map((answer, index) => (
+              <li key={answer.surveyQuestionId} className="rounded-xl bg-slate-900/60 p-4">
+                <div className="flex gap-3">
+                  <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-slate-700 text-xs font-bold text-slate-300">
+                    {index + 1}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm leading-relaxed text-slate-200">{answer.questionText}</p>
+                    <p className="mt-3 inline-flex rounded-full bg-sky-400/10 px-3 py-1 text-sm font-semibold text-sky-200">
+                      {answer.choiceLabel}
+                    </p>
+                    <p className="mt-3 flex items-center gap-1.5 text-xs text-slate-500">
+                      <Clock3 className="size-3.5" aria-hidden="true" />
+                      <time dateTime={answer.acceptedAt}>
+                        {formatAcceptedAt(answer.acceptedAt)}
+                      </time>
+                    </p>
+                  </div>
                 </div>
-              </div>
-            </li>
-          ))}
-        </ol>
+              </li>
+            ))}
+          </ol>
+        </details>
       </section>
     </main>
   );

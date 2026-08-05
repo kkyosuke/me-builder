@@ -43,15 +43,23 @@ const result: SurveyResult = {
 describe("SurveyResultView", () => {
   afterEach(() => cleanup());
 
-  it("傾向スコアと保存済みの回答内容を表示する", () => {
+  it("傾向スコアを表示し、保存済みの回答内容は初期状態で折りたたむ", () => {
     render(<SurveyResultView result={result} onBack={vi.fn()} />);
 
     expect(screen.getByRole("heading", { name: "価値観アンケート" })).toBeTruthy();
     expect(screen.getByText("優先傾向")).toBeTruthy();
     expect(screen.getByText("自分を優先")).toBeTruthy();
+    expect(screen.getByText("1 / 1問に回答")).toBeTruthy();
+
+    const summary = screen.getByText("回答内容（1件）");
+    const details = summary.closest("details");
+    expect(details?.open).toBe(false);
+
+    fireEvent.click(summary);
+
+    expect(details?.open).toBe(true);
     expect(screen.getByText("自分の余裕を優先したい。")).toBeTruthy();
     expect(screen.getByText("はい")).toBeTruthy();
-    expect(screen.getByText("1 / 1問に回答")).toBeTruthy();
   });
 
   it("一覧へ戻る操作を通知する", () => {

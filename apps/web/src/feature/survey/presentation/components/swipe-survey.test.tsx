@@ -65,7 +65,7 @@ describe("SwipeSurvey answer persistence", () => {
     await waitFor(() => expect(onSaveAnswer).toHaveBeenCalledTimes(2));
   });
 
-  it("最後のカード後は未完了の保存を待ってから結果を表示する", async () => {
+  it("最後のカード後は未完了の保存を待ち、旧結果を挟まず結果取得へ進む", async () => {
     let resolveSave: ((value: { acceptedAt: string }) => void) | undefined;
     const onSaveAnswer = vi.fn(
       () =>
@@ -93,7 +93,8 @@ describe("SwipeSurvey answer persistence", () => {
     await act(async () => {
       resolveSave?.({ acceptedAt: "2026-08-05T00:00:01.000Z" });
     });
-    expect(await screen.findByText("保存した回答から見える現在の傾向")).toBeTruthy();
+    expect(await screen.findByText("回答結果を準備しています")).toBeTruthy();
+    expect(screen.queryByText("保存した回答から見える現在の傾向")).toBeNull();
     expect(onComplete).toHaveBeenCalledOnce();
   });
 
@@ -119,7 +120,8 @@ describe("SwipeSurvey answer persistence", () => {
     fireEvent.click(screen.getByRole("button", { name: "保存を再試行" }));
     await waitFor(() => expect(onSaveAnswer).toHaveBeenCalledTimes(2));
     expect(onSaveAnswer.mock.calls[1]?.[0]).toEqual(onSaveAnswer.mock.calls[0]?.[0]);
-    expect(await screen.findByText("保存した回答から見える現在の傾向")).toBeTruthy();
+    expect(await screen.findByText("回答結果を準備しています")).toBeTruthy();
+    expect(screen.queryByText("保存した回答から見える現在の傾向")).toBeNull();
     expect(onComplete).toHaveBeenCalledOnce();
   });
 

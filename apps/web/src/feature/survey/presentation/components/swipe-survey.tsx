@@ -184,6 +184,22 @@ function SaveCompletionPending({
   );
 }
 
+/** 全回答の保存後、保存済みデータによる結果画面を取得している間の表示。 */
+function ResultOpeningPending() {
+  return (
+    <div className="flex min-h-80 flex-col items-center justify-center gap-4 rounded-3xl border border-slate-700 bg-slate-800 p-5 text-center">
+      <LoaderCircle
+        className="size-12 animate-spin text-sky-300 motion-reduce:animate-none"
+        aria-hidden="true"
+      />
+      <div>
+        <p className="text-lg font-bold">回答結果を準備しています</p>
+        <p className="mt-2 text-sm text-slate-400">保存した回答を読み込んでいます。</p>
+      </div>
+    </div>
+  );
+}
+
 /**
  * スワイプアンケートの本体。
  *
@@ -382,6 +398,7 @@ export function SwipeSurvey({
   const finished = index >= total;
   const allAnswered =
     interactions.filter((interaction) => interaction.kind === "answer").length === total;
+  const isOpeningResult = finished && allAnswered && backgroundSaves.length === 0;
   const answeredCount = finished ? total : index;
   const progressMilestone = resolveProgressMilestone(answeredCount, total);
   // 同じ段階にいる間は文言を固定し、回答のたびにちらつかないようにします。
@@ -434,7 +451,8 @@ export function SwipeSurvey({
             onRetry={(answer) => void persistAnswer(answer)}
           />
         )}
-        {finished && backgroundSaves.length === 0 && (
+        {isOpeningResult && <ResultOpeningPending />}
+        {finished && backgroundSaves.length === 0 && !isOpeningResult && (
           <SurveyComplete interactions={interactions} survey={survey} />
         )}
         {questions?.slice(index, index + VISIBLE_STACK_SIZE).map((question, offset) => (
