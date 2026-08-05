@@ -1,6 +1,6 @@
 ---
 number: 17
-title: feat(web): Web にスワイプアンケートの回答 UI を実装する
+title: feat(web): Web にスワイプ診断の回答 UI を実装する
 status: done
 priority: high
 labels: [web, ui]
@@ -12,7 +12,7 @@ updated_at: 2026-07-27T22:17:57.563106+00:00
 
 ## 背景
 
-Phase 1 の入力は「日記（LINE）」と「スワイプアンケート（Web）」の 2 本立てで確定している（[プロジェクト概要 §4](../../docs/product/project-overview.md#4-想定する利用体験)）。Web 側は issue 11 / 12 で LIFF の初期化と ID トークン検証まで通ったが、**肝心の回答画面がまだ無い**。`apps/web` は `/api/health` を叩くだけのスケルトンで、`src/index.css` に素の CSS と CSS 変数がある状態。
+Phase 1 の入力は「日記（LINE）」と「スワイプ診断（Web）」の 2 本立てで確定している（[プロジェクト概要 §4](../../docs/product/project-overview.md#4-想定する利用体験)）。Web 側は issue 11 / 12 で LIFF の初期化と ID トークン検証まで通ったが、**肝心の回答画面がまだ無い**。`apps/web` は `/api/health` を叩くだけのスケルトンで、`src/index.css` に素の CSS と CSS 変数がある状態。
 
 ## 確定した方針
 
@@ -29,22 +29,22 @@ Phase 1 の入力は「日記（LINE）」と「スワイプアンケート（We
 理由:
 
 - `index.css` の CSS 変数の色はすべて Tailwind 既定パレットと同値（`#0f172a` = `slate-900`、`#1e293b` = `slate-800`、`#38bdf8` = `sky-400`、`#34d399` = `emerald-400`）。1:1 で置き換えられ、見た目が変わらない
-- `button { ... }` のような**要素セレクタ**が残ると、以降に追加するすべてのコンポーネントのボタンへ暗黙に効く。スワイプアンケートは選択ボタンを持つため、併存させると原因の分かりにくい上書きを抱え込む
+- `button { ... }` のような**要素セレクタ**が残ると、以降に追加するすべてのコンポーネントのボタンへ暗黙に効く。スワイプ診断は選択ボタンを持つため、併存させると原因の分かりにくい上書きを抱え込む
 - Tailwind v4 のユーティリティに `.container` があり、既存の `.container` クラスと名前が衝突する。レイヤーの優先順位に頼った共存は脆い
 
 ### 型の置き場所
 
-**質問・回答の型は `apps/web/src/survey/` に閉じる。`packages/shared` へは置かない。**
+**質問・回答の型は `apps/web/src/diagnosis/` に閉じる。`packages/shared` へは置かない。**
 
-理由: `packages/shared` へ置くと、アプリ間で共有する契約＝サーバーとのスキーマを確定したことになる。[設計スコープのルール §2](../../.agents/rules/design-scope.md) は「質問（アンケート）の具体的なエンティティや集約」と「API、イベントの具体的なスキーマ」を後続設計へ延期しており、それに反する。共有先はサーバー連携を実装する時点（issue 19）で判断する。
+理由: `packages/shared` へ置くと、アプリ間で共有する契約＝サーバーとのスキーマを確定したことになる。[設計スコープのルール §2](../../.agents/rules/design-scope.md) は「質問（診断）の具体的なエンティティや集約」と「API、イベントの具体的なスキーマ」を後続設計へ延期しており、それに反する。共有先はサーバー連携を実装する時点（issue 19）で判断する。
 
 ## やったこと
 
 1. `bun add tailwindcss @tailwindcss/vite lucide-react --cwd apps/web`（[開発運用ルール §2](../../.agents/rules/development.md)）
 2. `vite.config.ts` へ `@tailwindcss/vite` を追加し、`index.css` を `@import "tailwindcss"` + `@layer base` へ置き換え。`App.tsx` の既存 2 カード（LIFF / API health）と inline style をユーティリティクラスへ移行
-3. `src/survey/` を追加
+3. `src/diagnosis/` を追加
    - `types.ts`: 質問・選択肢・回答の型。回答は「選択」と「スキップ」の union。質問は版 (`version`) を持ち、回答は回答時点の版を指す
-   - `questions.ts`: `fetchSurveyQuestions()` と 6 問のモック。**後でサーバー実装へ差し替えるモジュール境界**
+   - `questions.ts`: `fetchDiagnosisQuestions()` と 6 問のモック。**後でサーバー実装へ差し替えるモジュール境界**
    - `swipe.ts`: しきい値・傾き・transform・キー割り当ての純粋関数
    - `answers.ts`: 回答の組み立てと集計
    - `swipe.test.ts` / `answers.test.ts`: DOM を用意しない単体テスト
@@ -56,7 +56,7 @@ Phase 1 の入力は「日記（LINE）」と「スワイプアンケート（We
    - スキップは方向を持たないのでカードを飛ばさず即座に進む
    - 進捗（何問目 / 全何問）とプログレスバー、完了表示（回答数 / スキップ数、やり直し）
    - `prefers-reduced-motion: reduce` で飛ばすアニメーションと transition を省く
-5. アイコンはアイコン名の union → lucide コンポーネントのレジストリ（`survey-icon.tsx`）を表示層に置き、質問データを JSON のまま保った
+5. アイコンはアイコン名の union → lucide コンポーネントのレジストリ（`diagnosis-icon.tsx`）を表示層に置き、質問データを JSON のまま保った
 
 ## 実機相当の確認で見つけて直した表示の問題
 

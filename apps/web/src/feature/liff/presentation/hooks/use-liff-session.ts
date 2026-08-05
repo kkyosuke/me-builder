@@ -11,9 +11,7 @@ export function useLiffSession() {
     }
     if (liffState.status !== "ready") {
       throw new Error(
-        liffState.status === "error"
-          ? liffState.message
-          : "LINEからアンケート画面を開いてください。",
+        liffState.status === "error" ? liffState.message : "LINEから診断画面を開いてください。",
       );
     }
 

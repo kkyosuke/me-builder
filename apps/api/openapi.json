@@ -130,11 +130,11 @@
         }
       }
     },
-    "/api/surveys": {
+    "/api/diagnoses": {
       "get": {
-        "operationId": "listSurveys",
-        "tags": ["Survey"],
-        "summary": "回答進捗を含むアンケート一覧を取得する",
+        "operationId": "listDiagnoses",
+        "tags": ["Diagnosis"],
+        "summary": "回答進捗を含む診断一覧を取得する",
         "security": [
           {
             "liffIdToken": []
@@ -142,13 +142,13 @@
         ],
         "responses": {
           "200": {
-            "description": "アンケート一覧",
+            "description": "診断一覧",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "surveys": {
+                    "diagnoses": {
                       "type": "array",
                       "items": {
                         "type": "object",
@@ -213,7 +213,7 @@
                       }
                     }
                   },
-                  "required": ["surveys"]
+                  "required": ["diagnoses"]
                 }
               }
             }
@@ -288,11 +288,11 @@
         }
       }
     },
-    "/api/surveys/{surveyId}": {
+    "/api/diagnoses/{diagnosisId}": {
       "get": {
-        "operationId": "getSurveyDetail",
-        "tags": ["Survey"],
-        "summary": "新規回答用のアンケート詳細を取得する",
+        "operationId": "getDiagnosisDetail",
+        "tags": ["Diagnosis"],
+        "summary": "新規回答用の診断詳細を取得する",
         "security": [
           {
             "liffIdToken": []
@@ -300,7 +300,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Question VersionとChoiceを含むアンケート詳細",
+            "description": "Question VersionとChoiceを含む診断詳細",
             "content": {
               "application/json": {
                 "schema": {
@@ -338,7 +338,7 @@
                       "items": {
                         "type": "object",
                         "properties": {
-                          "surveyQuestionId": {
+                          "diagnosisQuestionId": {
                             "type": "string",
                             "minLength": 1
                           },
@@ -395,7 +395,7 @@
                           }
                         },
                         "required": [
-                          "surveyQuestionId",
+                          "diagnosisQuestionId",
                           "questionId",
                           "questionVersion",
                           "text",
@@ -428,7 +428,7 @@
             }
           },
           "404": {
-            "description": "対応するAccountがない、またはSurveyが公開されていない",
+            "description": "対応するAccountがない、またはDiagnosisが公開されていない",
             "content": {
               "application/json": {
                 "schema": {
@@ -449,10 +449,10 @@
                       "type": "object",
                       "properties": {
                         "error": {
-                          "const": "Survey not found"
+                          "const": "Diagnosis not found"
                         },
                         "reason": {
-                          "const": "survey_not_found"
+                          "const": "diagnosis_not_found"
                         }
                       },
                       "required": ["error", "reason"]
@@ -463,17 +463,17 @@
             }
           },
           "409": {
-            "description": "Surveyの受付が終了している",
+            "description": "Diagnosisの受付が終了している",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
                     "error": {
-                      "const": "Survey closed"
+                      "const": "Diagnosis closed"
                     },
                     "reason": {
-                      "const": "survey_closed"
+                      "const": "diagnosis_closed"
                     }
                   },
                   "required": ["error", "reason"]
@@ -520,17 +520,17 @@
               "type": "string"
             },
             "in": "path",
-            "name": "surveyId",
+            "name": "diagnosisId",
             "required": true
           }
         ]
       }
     },
-    "/api/surveys/{surveyId}/answers": {
+    "/api/diagnoses/{diagnosisId}/answers": {
       "get": {
-        "operationId": "getSurveyAnswers",
-        "tags": ["Survey"],
-        "summary": "本人が保存したアンケート回答内容を取得する",
+        "operationId": "getDiagnosisAnswers",
+        "tags": ["Diagnosis"],
+        "summary": "本人が保存した診断回答内容を取得する",
         "security": [
           {
             "liffIdToken": []
@@ -575,7 +575,7 @@
                       "items": {
                         "type": "object",
                         "properties": {
-                          "surveyQuestionId": {
+                          "diagnosisQuestionId": {
                             "type": "string",
                             "minLength": 1
                           },
@@ -606,7 +606,7 @@
                           }
                         },
                         "required": [
-                          "surveyQuestionId",
+                          "diagnosisQuestionId",
                           "questionId",
                           "questionVersion",
                           "questionText",
@@ -648,7 +648,7 @@
             }
           },
           "404": {
-            "description": "対応するAccount、Survey、または回答がない",
+            "description": "対応するAccount、Diagnosis、または回答がない",
             "content": {
               "application/json": {
                 "schema": {
@@ -669,10 +669,10 @@
                       "type": "object",
                       "properties": {
                         "error": {
-                          "const": "Survey answers not found"
+                          "const": "Diagnosis answers not found"
                         },
                         "reason": {
-                          "const": "survey_answers_not_found"
+                          "const": "diagnosis_answers_not_found"
                         }
                       },
                       "required": ["error", "reason"]
@@ -721,17 +721,17 @@
               "type": "string"
             },
             "in": "path",
-            "name": "surveyId",
+            "name": "diagnosisId",
             "required": true
           }
         ]
       }
     },
-    "/api/surveys/{surveyId}/answers/{surveyQuestionId}": {
+    "/api/diagnoses/{diagnosisId}/answers/{diagnosisQuestionId}": {
       "put": {
-        "operationId": "saveSurveyAnswer",
-        "tags": ["Survey"],
-        "summary": "アンケートの1問へ初回回答を保存する",
+        "operationId": "saveDiagnosisAnswer",
+        "tags": ["Diagnosis"],
+        "summary": "診断の1問へ初回回答を保存する",
         "security": [
           {
             "liffIdToken": []
@@ -799,7 +799,7 @@
                     "answer": {
                       "type": "object",
                       "properties": {
-                        "surveyQuestionId": {
+                        "diagnosisQuestionId": {
                           "type": "string",
                           "minLength": 1
                         },
@@ -822,7 +822,7 @@
                         }
                       },
                       "required": [
-                        "surveyQuestionId",
+                        "diagnosisQuestionId",
                         "questionId",
                         "questionVersion",
                         "choiceId",
@@ -888,7 +888,7 @@
             }
           },
           "404": {
-            "description": "対応するAccountがない、またはSurveyが公開されていない",
+            "description": "対応するAccountがない、またはDiagnosisが公開されていない",
             "content": {
               "application/json": {
                 "schema": {
@@ -909,10 +909,10 @@
                       "type": "object",
                       "properties": {
                         "error": {
-                          "const": "Survey not found"
+                          "const": "Diagnosis not found"
                         },
                         "reason": {
-                          "const": "survey_not_found"
+                          "const": "diagnosis_not_found"
                         }
                       },
                       "required": ["error", "reason"]
@@ -932,10 +932,10 @@
                       "type": "object",
                       "properties": {
                         "error": {
-                          "const": "Survey closed"
+                          "const": "Diagnosis closed"
                         },
                         "reason": {
-                          "const": "survey_closed"
+                          "const": "diagnosis_closed"
                         }
                       },
                       "required": ["error", "reason"]
@@ -958,7 +958,7 @@
             }
           },
           "422": {
-            "description": "Survey QuestionまたはChoiceが不正",
+            "description": "Diagnosis QuestionまたはChoiceが不正",
             "content": {
               "application/json": {
                 "schema": {
@@ -968,7 +968,7 @@
                       "const": "Invalid answer"
                     },
                     "reason": {
-                      "enum": ["survey_question_not_found", "choice_not_found"],
+                      "enum": ["diagnosis_question_not_found", "choice_not_found"],
                       "type": "string"
                     }
                   },
@@ -1016,7 +1016,7 @@
               "type": "string"
             },
             "in": "path",
-            "name": "surveyId",
+            "name": "diagnosisId",
             "required": true
           },
           {
@@ -1024,17 +1024,17 @@
               "type": "string"
             },
             "in": "path",
-            "name": "surveyQuestionId",
+            "name": "diagnosisQuestionId",
             "required": true
           }
         ]
       }
     },
-    "/api/dev/survey-data": {
+    "/api/dev/diagnosis-data": {
       "delete": {
-        "operationId": "resetDevelopmentSurveyData",
+        "operationId": "resetDevelopmentDiagnosisData",
         "tags": ["Development"],
-        "summary": "開発環境で本人のアンケート回答データを全削除する",
+        "summary": "開発環境で本人の診断回答データを全削除する",
         "security": [
           {
             "liffIdToken": []

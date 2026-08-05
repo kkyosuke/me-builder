@@ -82,19 +82,19 @@ describe("Worker Queue Handler", () => {
       provider: "line",
       providerAccountId: "test-user",
     });
-    // 送られた本文はオウム返しせず、受け付けた旨とアンケートへの LIFF リンクを返す
+    // 送られた本文はオウム返しせず、受け付けた旨と診断への LIFF リンクを返す
     expect(mockReplyMessage).toHaveBeenCalledWith({
       replyToken: "tok",
       messages: [
         {
           type: "text",
-          text: "受け付けました。\n今日のアンケートに答える\nhttps://liff.line.me/1234567890-abcdefgh",
+          text: "受け付けました。\n今日の診断に答える\nhttps://liff.line.me/1234567890-abcdefgh",
         },
       ],
     });
   });
 
-  it("replies with the survey link when the text asks for the survey", async () => {
+  it("replies with the diagnosis link when the text asks for the diagnosis", async () => {
     const message = {
       id: "msg-124",
       timestamp: new Date("2026-07-25T12:00:00Z"),
@@ -108,7 +108,7 @@ describe("Worker Queue Handler", () => {
             {
               type: "message",
               replyToken: "tok",
-              message: { type: "text", text: "アンケート" },
+              message: { type: "text", text: "診断" },
               source: { type: "user", userId: "test-user" },
             },
           ],
@@ -132,13 +132,13 @@ describe("Worker Queue Handler", () => {
       liffId: "1234567890-abcdefgh",
     });
 
-    // 日記の受付返信ではなく、アンケートのリンクだけを返す
+    // 日記の受付返信ではなく、診断のリンクだけを返す
     expect(mockReplyMessage).toHaveBeenCalledWith({
       replyToken: "tok",
       messages: [
         {
           type: "text",
-          text: "今日のアンケートに答える\nhttps://liff.line.me/1234567890-abcdefgh",
+          text: "今日の診断に答える\nhttps://liff.line.me/1234567890-abcdefgh",
         },
       ],
     });

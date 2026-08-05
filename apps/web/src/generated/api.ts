@@ -21,15 +21,15 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/api/surveys": {
+  "/api/diagnoses": {
     parameters: {
       query?: never;
       header?: never;
       path?: never;
       cookie?: never;
     };
-    /** 回答進捗を含むアンケート一覧を取得する */
-    get: operations["listSurveys"];
+    /** 回答進捗を含む診断一覧を取得する */
+    get: operations["listDiagnoses"];
     put?: never;
     post?: never;
     delete?: never;
@@ -38,15 +38,15 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/api/surveys/{surveyId}": {
+  "/api/diagnoses/{diagnosisId}": {
     parameters: {
       query?: never;
       header?: never;
       path?: never;
       cookie?: never;
     };
-    /** 新規回答用のアンケート詳細を取得する */
-    get: operations["getSurveyDetail"];
+    /** 新規回答用の診断詳細を取得する */
+    get: operations["getDiagnosisDetail"];
     put?: never;
     post?: never;
     delete?: never;
@@ -55,15 +55,15 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/api/surveys/{surveyId}/answers": {
+  "/api/diagnoses/{diagnosisId}/answers": {
     parameters: {
       query?: never;
       header?: never;
       path?: never;
       cookie?: never;
     };
-    /** 本人が保存したアンケート回答内容を取得する */
-    get: operations["getSurveyAnswers"];
+    /** 本人が保存した診断回答内容を取得する */
+    get: operations["getDiagnosisAnswers"];
     put?: never;
     post?: never;
     delete?: never;
@@ -72,7 +72,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/api/surveys/{surveyId}/answers/{surveyQuestionId}": {
+  "/api/diagnoses/{diagnosisId}/answers/{diagnosisQuestionId}": {
     parameters: {
       query?: never;
       header?: never;
@@ -80,8 +80,8 @@ export interface paths {
       cookie?: never;
     };
     get?: never;
-    /** アンケートの1問へ初回回答を保存する */
-    put: operations["saveSurveyAnswer"];
+    /** 診断の1問へ初回回答を保存する */
+    put: operations["saveDiagnosisAnswer"];
     post?: never;
     delete?: never;
     options?: never;
@@ -89,7 +89,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/api/dev/survey-data": {
+  "/api/dev/diagnosis-data": {
     parameters: {
       query?: never;
       header?: never;
@@ -99,8 +99,8 @@ export interface paths {
     get?: never;
     put?: never;
     post?: never;
-    /** 開発環境で本人のアンケート回答データを全削除する */
-    delete: operations["resetDevelopmentSurveyData"];
+    /** 開発環境で本人の診断回答データを全削除する */
+    delete: operations["resetDevelopmentDiagnosisData"];
     options?: never;
     head?: never;
     patch?: never;
@@ -198,7 +198,7 @@ export interface operations {
       };
     };
   };
-  listSurveys: {
+  listDiagnoses: {
     parameters: {
       query?: never;
       header?: never;
@@ -207,14 +207,14 @@ export interface operations {
     };
     requestBody?: never;
     responses: {
-      /** @description アンケート一覧 */
+      /** @description 診断一覧 */
       200: {
         headers: {
           [name: string]: unknown;
         };
         content: {
           "application/json": {
-            surveys: {
+            diagnoses: {
               id: string;
               title: string;
               description: string;
@@ -283,18 +283,18 @@ export interface operations {
       };
     };
   };
-  getSurveyDetail: {
+  getDiagnosisDetail: {
     parameters: {
       query?: never;
       header?: never;
       path: {
-        surveyId: string;
+        diagnosisId: string;
       };
       cookie?: never;
     };
     requestBody?: never;
     responses: {
-      /** @description Question VersionとChoiceを含むアンケート詳細 */
+      /** @description Question VersionとChoiceを含む診断詳細 */
       200: {
         headers: {
           [name: string]: unknown;
@@ -308,7 +308,7 @@ export interface operations {
             opensAt: string;
             closesAt: string | null;
             questions: {
-              surveyQuestionId: string;
+              diagnosisQuestionId: string;
               questionId: string;
               questionVersion: number;
               text: string;
@@ -336,7 +336,7 @@ export interface operations {
           };
         };
       };
-      /** @description 対応するAccountがない、またはSurveyが公開されていない */
+      /** @description 対応するAccountがない、またはDiagnosisが公開されていない */
       404: {
         headers: {
           [name: string]: unknown;
@@ -351,13 +351,13 @@ export interface operations {
               }
             | {
                 /** @constant */
-                error: "Survey not found";
+                error: "Diagnosis not found";
                 /** @constant */
-                reason: "survey_not_found";
+                reason: "diagnosis_not_found";
               };
         };
       };
-      /** @description Surveyの受付が終了している */
+      /** @description Diagnosisの受付が終了している */
       409: {
         headers: {
           [name: string]: unknown;
@@ -365,9 +365,9 @@ export interface operations {
         content: {
           "application/json": {
             /** @constant */
-            error: "Survey closed";
+            error: "Diagnosis closed";
             /** @constant */
-            reason: "survey_closed";
+            reason: "diagnosis_closed";
           };
         };
       };
@@ -397,12 +397,12 @@ export interface operations {
       };
     };
   };
-  getSurveyAnswers: {
+  getDiagnosisAnswers: {
     parameters: {
       query?: never;
       header?: never;
       path: {
-        surveyId: string;
+        diagnosisId: string;
       };
       cookie?: never;
     };
@@ -423,7 +423,7 @@ export interface operations {
             answeredCount: number;
             questionCount: number;
             answers: {
-              surveyQuestionId: string;
+              diagnosisQuestionId: string;
               questionId: string;
               questionVersion: number;
               questionText: string;
@@ -447,7 +447,7 @@ export interface operations {
           };
         };
       };
-      /** @description 対応するAccount、Survey、または回答がない */
+      /** @description 対応するAccount、Diagnosis、または回答がない */
       404: {
         headers: {
           [name: string]: unknown;
@@ -462,9 +462,9 @@ export interface operations {
               }
             | {
                 /** @constant */
-                error: "Survey answers not found";
+                error: "Diagnosis answers not found";
                 /** @constant */
-                reason: "survey_answers_not_found";
+                reason: "diagnosis_answers_not_found";
               };
         };
       };
@@ -494,13 +494,13 @@ export interface operations {
       };
     };
   };
-  saveSurveyAnswer: {
+  saveDiagnosisAnswer: {
     parameters: {
       query?: never;
       header?: never;
       path: {
-        surveyId: string;
-        surveyQuestionId: string;
+        diagnosisId: string;
+        diagnosisQuestionId: string;
       };
       cookie?: never;
     };
@@ -520,7 +520,7 @@ export interface operations {
             /** @enum {string} */
             outcome: "created" | "unchanged";
             answer: {
-              surveyQuestionId: string;
+              diagnosisQuestionId: string;
               questionId: string;
               questionVersion: number;
               choiceId: string;
@@ -560,7 +560,7 @@ export interface operations {
           };
         };
       };
-      /** @description 対応するAccountがない、またはSurveyが公開されていない */
+      /** @description 対応するAccountがない、またはDiagnosisが公開されていない */
       404: {
         headers: {
           [name: string]: unknown;
@@ -575,9 +575,9 @@ export interface operations {
               }
             | {
                 /** @constant */
-                error: "Survey not found";
+                error: "Diagnosis not found";
                 /** @constant */
-                reason: "survey_not_found";
+                reason: "diagnosis_not_found";
               };
         };
       };
@@ -590,9 +590,9 @@ export interface operations {
           "application/json":
             | {
                 /** @constant */
-                error: "Survey closed";
+                error: "Diagnosis closed";
                 /** @constant */
-                reason: "survey_closed";
+                reason: "diagnosis_closed";
               }
             | {
                 /** @constant */
@@ -602,7 +602,7 @@ export interface operations {
               };
         };
       };
-      /** @description Survey QuestionまたはChoiceが不正 */
+      /** @description Diagnosis QuestionまたはChoiceが不正 */
       422: {
         headers: {
           [name: string]: unknown;
@@ -612,7 +612,7 @@ export interface operations {
             /** @constant */
             error: "Invalid answer";
             /** @enum {string} */
-            reason: "survey_question_not_found" | "choice_not_found";
+            reason: "diagnosis_question_not_found" | "choice_not_found";
           };
         };
       };
@@ -642,7 +642,7 @@ export interface operations {
       };
     };
   };
-  resetDevelopmentSurveyData: {
+  resetDevelopmentDiagnosisData: {
     parameters: {
       query?: never;
       header?: never;

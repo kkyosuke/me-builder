@@ -8,7 +8,7 @@ me-builderは、さまざまな質問への回答を蓄積し、その人らし�
 
 - [ドキュメントガイド](docs/README.md) — ディレクトリ構造、文書の探し方、全ドキュメントへの入口
 - [プロジェクト概要](docs/product/project-overview.md) — 目的、MVP、Phase 1の入力体験とログイン手段
-- [ドメイン設計](docs/domain/domain-design.md) — Account / Brain / Sourceの責務・境界、Questionnaireの位置づけ、設計順序と進捗
+- [ドメイン設計](docs/domain/domain-design.md) — Account / Brain / Sourceの責務・境界、Diagnosisの位置づけ、設計順序と進捗
 - [Agent向けガイド](.agents/README.md) — ドキュメント運用・設計スコープのルール
 
 ## 現在のフェーズ

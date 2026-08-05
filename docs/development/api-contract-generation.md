@@ -16,7 +16,7 @@
 - ドメインの状態と不変条件
 - Web UIのfeature内部構造
 
-各APIの意味は、たとえばアンケートなら[アンケートAPI契約](questionnaire-api.md)を正とします。ドメイン規則は[ドメイン設計](../domain/domain-design.md)、Web UIの構造は[開発運用ルール](../../.agents/rules/development.md)を参照します。
+各APIの意味は、たとえば診断なら[診断API契約](diagnosis-api.md)を正とします。ドメイン規則は[ドメイン設計](../domain/domain-design.md)、Web UIの構造は[開発運用ルール](../../.agents/rules/development.md)を参照します。
 
 ## 2. API ServerのHTTP契約
 

@@ -2,9 +2,9 @@
 
 ## 1. この文書の目的
 
-me-builderの中核となる`Account`、`Brain`、`Source`の責務、境界、関係と、Phase 1の入力を担う`Questionnaire`の位置づけを整理します。
+me-builderの中核となる`Account`、`Brain`、`Source`の責務、境界、関係と、Phase 1の入力を担う`Diagnosis`の位置づけを整理します。
 
-Questionnaireの詳細な論理モデルは[Phase 1 アンケートドメイン設計](../questionnaire/questionnaire-domain-design.md)を正とします。データベース、API、認証製品、LLM、MCPの具体的な実装方式はこの文書では決定しません。
+Diagnosisの詳細な論理モデルは[Phase 1 診断ドメイン設計](../diagnosis/diagnosis-domain-design.md)を正とします。データベース、API、認証製品、LLM、MCPの具体的な実装方式はこの文書では決定しません。
 
 ## 2. 中核となる3つのドメイン
 
@@ -16,13 +16,13 @@ Questionnaireの詳細な論理モデルは[Phase 1 アンケートドメイン�
 
 `Account`はログインする利用主体です。`Brain`は分身を構成する頭脳です。`Source`はBrainの材料になる生データの取り込み元と原本です。この3つを同一の概念にはしません。
 
-`Source`を`Brain`から分ける理由は、Brainが担当する問いが「その人らしさを構成する情報」だからです。交通系ICカードの乗車履歴や購買明細そのものは、その人らしさを構成する情報ではありません。そこから導出されたBehavior PatternやPreferenceがBrainの中身になります。日記やアンケートの回答も同じく、Brain Itemそのものではなく、Brain Itemの元になるデータとして扱います。
+`Source`を`Brain`から分ける理由は、Brainが担当する問いが「その人らしさを構成する情報」だからです。交通系ICカードの乗車履歴や購買明細そのものは、その人らしさを構成する情報ではありません。そこから導出されたBehavior PatternやPreferenceがBrainの中身になります。日記や診断の回答も同じく、Brain Itemそのものではなく、Brain Itemの元になるデータとして扱います。
 
-`Questionnaire`はこの3つと同列の中核データドメインではなく、Phase 1で質問を公開し回答をSourceへ取り込むための支援ドメインです。質問、アンケート、回答進捗の責務と集約は[Phase 1 アンケートドメイン設計](../questionnaire/questionnaire-domain-design.md)で定義します。
+`Diagnosis`はこの3つと同列の中核データドメインではなく、Phase 1で質問を公開し回答をSourceへ取り込むための支援ドメインです。質問、診断、回答進捗の責務と集約は[Phase 1 診断ドメイン設計](../diagnosis/diagnosis-domain-design.md)で定義します。
 
 ```mermaid
 flowchart LR
-    UI[LINE / Web / iOS / Android] --> Q[Questionnaire]
+    UI[LINE / Web / iOS / Android] --> Q[Diagnosis]
     Q -->|resolve respondent| A[Account]
     Q -->|answers| S[Source]
     EXT[外部サービス] -->|本人の同意| A
@@ -140,7 +140,7 @@ Source Recordの不変性、訂正・削除・撤回と、派生したBrain Item
 | 取り込み元 | 1件のSource Record |
 | --- | --- |
 | 日記（LINE） | 日記1通 |
-| スワイプアンケート（Web） | 回答1問 |
+| スワイプ診断（Web） | 回答1問 |
 | 交通系ICカードの履歴 | 乗車1件 |
 | 購買履歴 | 取引1件 |
 | 本人の直接記述 | 1回の保存操作 |
@@ -158,7 +158,7 @@ kindは「どこから来たデータか」だけを表します。「そのデ�
 
 | kind | 内容 |
 | --- | --- |
-| 本人入力 | 本人がme-builderへ直接入力したもの（日記、アンケートの回答、Brain Itemの新規記述・訂正） |
+| 本人入力 | 本人がme-builderへ直接入力したもの（日記、診断の回答、Brain Itemの新規記述・訂正） |
 | インポート | 本人の同意に基づき外部サービスから取り込んだもの（購買履歴、移動履歴など） |
 
 どのサービスから取り込んだかは、kindではなくSource Connectorが識別します。取り込み元が増えてもkindはこの2つで足ります。AI推定はkindに含めません。
@@ -293,15 +293,15 @@ MCPの具体的な接続モデルやツール設計は後続で検討します�
 | 1 | AccountとBrainの利用体験を確定する | 完了（Phase 1の範囲） |
 | 2 | Brain内部の分類とAccess Labelの初期セットを検証する | 完了 |
 | 3 | Sourceドメインを設計し、Brain Itemの由来を確定する | 一部完了（ドメイン境界、由来、エッジ、原本のライフサイクルまで） |
-| 3.1 | Phase 1のQuestionnaireドメインを設計する | 完了（論理モデル） |
+| 3.1 | Phase 1のDiagnosisドメインを設計する | 完了（論理モデル） |
 | 4 | AIによる推定と本人確認の流れを設計する | 未着手 |
 | 5 | MCP接続、権限、監査の詳細を設計する | 未着手 |
-| 6 | 永続化と検索方式を選定する | 一部（利用する基盤、Questionnaire / SourceのD1 schemaまで） |
+| 6 | 永続化と検索方式を選定する | 一部（利用する基盤、Diagnosis / SourceのD1 schemaまで） |
 
 step 1は、Phase 1に必要な範囲（対応チャネルと入力形式、チャネルの役割分担、ログイン手段と復旧方針、質問の作成主体と版管理）を確定させたことで完了とみなします。詳細は[プロジェクト概要 §4](../product/project-overview.md#4-想定する利用体験)と[§5](../product/project-overview.md#5-アカウントと本人識別)にあります。
 
-step 3は当初「質問・回答のドメインを設計する」としていましたが、日記とアンケートの回答に加えて購買履歴や移動履歴も取り込む前提が加わったため、取り込み元を限定しないSourceドメインの設計へ置き換えました。この文書の[§5](#5-source-domain)と[§6](#6-ドメイン間の関係)で、Source domainの責務、Source Recordの粒度とkind、Brain Itemとの多重度、由来の必須性、本人の操作の切り分けを確定しています。根拠を表現するエッジは[根拠・反証・改訂のエッジ設計](brain/evidence-edge-design.md)、原本の不変性と訂正・削除の波及は[Source Recordのライフサイクル設計](source/source-record-lifecycle-design.md)で確定しました。外部連携時のAccess Label既定値は未決のため、一部完了とします。
+step 3は当初「質問・回答のドメインを設計する」としていましたが、日記と診断の回答に加えて購買履歴や移動履歴も取り込む前提が加わったため、取り込み元を限定しないSourceドメインの設計へ置き換えました。この文書の[§5](#5-source-domain)と[§6](#6-ドメイン間の関係)で、Source domainの責務、Source Recordの粒度とkind、Brain Itemとの多重度、由来の必須性、本人の操作の切り分けを確定しています。根拠を表現するエッジは[根拠・反証・改訂のエッジ設計](brain/evidence-edge-design.md)、原本の不変性と訂正・削除の波及は[Source Recordのライフサイクル設計](source/source-record-lifecycle-design.md)で確定しました。外部連携時のAccess Label既定値は未決のため、一部完了とします。
 
-step 3.1では、Phase 1の質問配信と回答保存に必要なQuestion、Survey、SurveyResponseの集約、状態、不変条件、Account / Sourceとの関係を[Phase 1 アンケートドメイン設計](../questionnaire/questionnaire-domain-design.md)で確定しました。D1の物理モデルはstep 6で具体化済みで、API契約は後続作業です。
+step 3.1では、Phase 1の質問配信と回答保存に必要なQuestion、Diagnosis、DiagnosisResponseの集約、状態、不変条件、Account / Sourceとの関係を[Phase 1 診断ドメイン設計](../diagnosis/diagnosis-domain-design.md)で確定しました。D1の物理モデルはstep 6で具体化済みで、API契約は後続作業です。
 
-step 6は、利用するCloudflareコンポーネントの選定が[インフラ・システム構成](../architecture/infrastructure-architecture.md)で確定し、QuestionnaireとSource RecordのD1 schemaを具体化しました。Brain Item、各エッジの完全な永続化、Embeddingのインデックス構成、メディアの参照方式は未設計です。
+step 6は、利用するCloudflareコンポーネントの選定が[インフラ・システム構成](../architecture/infrastructure-architecture.md)で確定し、DiagnosisとSource RecordのD1 schemaを具体化しました。Brain Item、各エッジの完全な永続化、Embeddingのインデックス構成、メディアの参照方式は未設計です。

@@ -4,22 +4,22 @@ import { openAPIRouteHandler } from "hono-openapi";
 import { cors } from "hono/cors";
 import * as v from "valibot";
 import { getConfig } from "./config";
+import { saveDiagnosisAnswerRoute } from "./contract/diagnosis/answer";
+import { diagnosisAnswersRoute } from "./contract/diagnosis/answers";
+import { diagnosisDetailRoute } from "./contract/diagnosis/detail";
+import { resetDevelopmentDiagnosisDataRoute } from "./contract/diagnosis/dev-reset";
+import { diagnosisListRoute } from "./contract/diagnosis/list";
 import { liffSessionRoute } from "./contract/line/liff-session";
 import { openApiOptions } from "./contract/openapi";
 import { InternalServerErrorSchema } from "./contract/shared/errors";
-import { saveSurveyAnswerRoute } from "./contract/survey/answer";
-import { surveyAnswersRoute } from "./contract/survey/answers";
-import { surveyDetailRoute } from "./contract/survey/detail";
-import { resetDevelopmentSurveyDataRoute } from "./contract/survey/dev-reset";
-import { surveyListRoute } from "./contract/survey/list";
-import { postLiffSession, postLineWebhook } from "./controller/line";
 import {
-  deleteDevelopmentSurveyData,
-  getSurvey,
-  getSurveyAnswerContents,
-  getSurveys,
-  putSurveyAnswer,
-} from "./controller/survey";
+  deleteDevelopmentDiagnosisData,
+  getDiagnoses,
+  getDiagnosis,
+  getDiagnosisAnswerContents,
+  putDiagnosisAnswer,
+} from "./controller/diagnosis";
+import { postLiffSession, postLineWebhook } from "./controller/line";
 import type { AppEnv } from "./types";
 
 const app = new Hono<AppEnv>();
@@ -64,11 +64,19 @@ app.post("/api/line/webhook", postLineWebhook);
 // クライアント指定のuserIdではなく、検証済みIDトークンからAccountを解決する。
 app.post("/api/line/liff/session", liffSessionRoute, postLiffSession);
 
-app.get("/api/surveys", surveyListRoute, getSurveys);
-app.get("/api/surveys/:surveyId", surveyDetailRoute, getSurvey);
-app.get("/api/surveys/:surveyId/answers", surveyAnswersRoute, getSurveyAnswerContents);
-app.put("/api/surveys/:surveyId/answers/:surveyQuestionId", saveSurveyAnswerRoute, putSurveyAnswer);
-app.delete("/api/dev/survey-data", resetDevelopmentSurveyDataRoute, deleteDevelopmentSurveyData);
+app.get("/api/diagnoses", diagnosisListRoute, getDiagnoses);
+app.get("/api/diagnoses/:diagnosisId", diagnosisDetailRoute, getDiagnosis);
+app.get("/api/diagnoses/:diagnosisId/answers", diagnosisAnswersRoute, getDiagnosisAnswerContents);
+app.put(
+  "/api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId",
+  saveDiagnosisAnswerRoute,
+  putDiagnosisAnswer,
+);
+app.delete(
+  "/api/dev/diagnosis-data",
+  resetDevelopmentDiagnosisDataRoute,
+  deleteDevelopmentDiagnosisData,
+);
 
 // Web UIの型生成にも使う、機械可読なAPI契約。
 app.get("/api/openapi.json", openAPIRouteHandler(app, openApiOptions));

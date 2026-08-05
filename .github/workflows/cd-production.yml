@@ -43,7 +43,7 @@ jobs:
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
         run: task db:migrate:production
 
-      - name: Apply Questionnaire Seed (Production)
+      - name: Apply Diagnosis Seed (Production)
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
         run: task db:seed:production
 
