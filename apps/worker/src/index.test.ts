@@ -1,6 +1,7 @@
 import type { D1Database } from "@cloudflare/workers-types";
 import type { Message, MessageBatch, WebhookQueueMessage } from "@me-builder/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { getWorkerConfig } from "./config";
 import worker from "./index";
 import { handleQueueBatch } from "./logic/webhook";
 
@@ -71,11 +72,15 @@ describe("Worker Queue Handler", () => {
 
     const mockDb = {} as unknown as d1.Client;
 
-    await handleQueueBatch(batch, mockDb, {
-      environment: "test",
-      lineChannelAccessToken: "test-token",
-      liffId: "1234567890-abcdefgh",
-    });
+    await handleQueueBatch(
+      batch,
+      mockDb,
+      getWorkerConfig({
+        ENVIRONMENT: "test",
+        LINE_CHANNEL_ACCESS_TOKEN: "test-token",
+        LIFF_ID: "1234567890-abcdefgh",
+      }),
+    );
     expect(mockAck).toHaveBeenCalledOnce();
     // follow を取り逃していても、メッセージ受信時に Account を補完する
     expect(d1.action.account.upsertIdentity).toHaveBeenCalledWith(mockDb, {
@@ -126,11 +131,15 @@ describe("Worker Queue Handler", () => {
       retryAll: vi.fn(),
     } as unknown as MessageBatch<WebhookQueueMessage>;
 
-    await handleQueueBatch(batch, {} as unknown as d1.Client, {
-      environment: "test",
-      lineChannelAccessToken: "test-token",
-      liffId: "1234567890-abcdefgh",
-    });
+    await handleQueueBatch(
+      batch,
+      {} as unknown as d1.Client,
+      getWorkerConfig({
+        ENVIRONMENT: "test",
+        LINE_CHANNEL_ACCESS_TOKEN: "test-token",
+        LIFF_ID: "1234567890-abcdefgh",
+      }),
+    );
 
     // 日記の受付返信ではなく、診断のリンクだけを返す
     expect(mockReplyMessage).toHaveBeenCalledWith({

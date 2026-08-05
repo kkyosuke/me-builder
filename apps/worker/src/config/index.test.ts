@@ -1,6 +1,10 @@
 import * as v from "valibot";
 import { describe, expect, it } from "vitest";
-import { WorkerConfigSchema, getWorkerConfig } from "./index";
+import {
+  DEFAULT_CLOUDFLARE_AI_GATEWAY_BASE_URL,
+  WorkerConfigSchema,
+  getWorkerConfig,
+} from "./index";
 
 describe("Worker Config", () => {
   it("WorkerConfigSchema defaults environment to development", () => {
@@ -20,11 +24,27 @@ describe("Worker Config", () => {
     expect(config.baseUrl).toBe("https://worker.stg.kagami.kyosuke.dev");
     expect(config.apiUrl).toBe("https://api.stg.kagami.kyosuke.dev");
     expect(config.lineChannelAccessToken).toBe("test-token-123");
+    expect(config.cloudflareAiGatewayBaseUrl).toBe(DEFAULT_CLOUDFLARE_AI_GATEWAY_BASE_URL);
+    expect(config.geminiModel).toBe("gemini-2.5-flash");
   });
 
   it("LIFF_ID を設定すると liffId が取得され、未設定・空文字なら undefined になること", () => {
     expect(getWorkerConfig({ LIFF_ID: "1234567890-abcdefgh" }).liffId).toBe("1234567890-abcdefgh");
     expect(getWorkerConfig({}).liffId).toBeUndefined();
     expect(getWorkerConfig({ LIFF_ID: "  " }).liffId).toBeUndefined();
+  });
+
+  it("Cloudflare AI Gateway と Gemini の設定を取得すること", () => {
+    const config = getWorkerConfig({
+      GOOGLE_AI_STUDIO_API_KEY: "google-key",
+      CLOUDFLARE_AIG_TOKEN: "gateway-token",
+      CF_AI_GATEWAY_BASE_URL: "https://gateway.example.com/google-ai-studio",
+      GEMINI_MODEL: "gemini-test-model",
+    });
+
+    expect(config.googleAiStudioApiKey).toBe("google-key");
+    expect(config.cloudflareAiGatewayToken).toBe("gateway-token");
+    expect(config.cloudflareAiGatewayBaseUrl).toBe("https://gateway.example.com/google-ai-studio");
+    expect(config.geminiModel).toBe("gemini-test-model");
   });
 });

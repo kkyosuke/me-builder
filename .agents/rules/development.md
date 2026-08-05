@@ -80,6 +80,12 @@
 - **環境設定管理 (`src/config/`)**:
   - `@me-builder/shared` が提供する `getEnv` 関数を用いて、Cloudflare Workers Bindings (`c.env`) およびローカル環境 (`process.env`) の差分を吸収し、生の環境変数を取得・URL 補完・Valibot パースを行い設定オブジェクトを組み立てて返却します。
 
+- **Cloudflare AI Gateway 経由の Gemini 接続**:
+  - Google AI Studio の呼び出しは `apps/worker/src/infrastructure/gemini-client.ts` に閉じ込め、`@google/genai` の `GoogleGenAI` を Cloudflare AI Gateway の Google AI Studio provider URL へ接続します。
+  - `GOOGLE_AI_STUDIO_API_KEY` と `CLOUDFLARE_AIG_TOKEN` は Worker の Secret として配布します。クライアントバンドル、`wrangler.toml` の `[vars]`、ログへ出力してはいけません。
+  - Gateway URL は `CF_AI_GATEWAY_BASE_URL`、モデルは `GEMINI_MODEL` で上書きできます。未指定時は設定層の既定値を利用します。
+  - ローカルの接続確認は `apps/worker/.env.example` を参照して環境変数を設定し、`bun --cwd apps/worker run check:gemini` を実行します。プロンプトはコマンド末尾の引数で変更できます。
+
 - **LINE Webhook 自動登録および日記の受付返信**:
   - API サーバー起動時 (`src/index.ts`) または CLI スクリプト (`bun run register:webhook`) の実行時、`LINE_CHANNEL_ACCESS_TOKEN` および `LINE_WEBHOOK_URL` (または `BASE_URL`) が環境変数として与えられている場合、公式 SDK (`@line/bot-sdk`) の `MessagingApiClient.setWebhookEndpoint` を用いて自動的に LINE Messaging API へ Webhook Endpoint URL を登録・更新します。
   - Webhook 受信メッセージは Cloudflare Queues 経由で Queue Worker (`apps/worker`) に配信され、`replyToken` を使用して `MessagingApiClient.replyMessage` により受け付けた旨を返信します。**送られた本文をオウム返ししません。**
