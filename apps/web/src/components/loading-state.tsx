@@ -9,7 +9,7 @@ export function LoadingState({
 }) {
   const className =
     variant === "page"
-      ? "mx-auto flex min-h-dvh w-full max-w-2xl items-start justify-center gap-2 px-4 py-8 text-center text-sm text-slate-400 sm:px-8"
+      ? "mx-auto flex min-h-dvh w-full max-w-2xl items-center justify-center gap-2 px-4 py-8 text-center text-sm text-slate-400 sm:px-8"
       : "col-span-full flex items-center justify-center gap-2 rounded-3xl border border-slate-700 bg-slate-800 p-6 text-center text-sm text-slate-400";
 
   return (
