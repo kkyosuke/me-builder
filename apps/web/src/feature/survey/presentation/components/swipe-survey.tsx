@@ -309,7 +309,7 @@ export function SwipeSurvey({
           className="h-full rounded-full bg-sky-400"
           style={{
             width: total === 0 ? "0%" : `${(answeredCount / total) * 100}%`,
-            transition: reducedMotion ? undefined : "width 260ms ease-out",
+            transition: reducedMotion ? undefined : `width ${SWIPE_TRANSITION_MS}ms ease-out`,
           }}
         />
       </div>
