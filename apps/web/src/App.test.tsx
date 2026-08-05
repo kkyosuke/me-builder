@@ -22,9 +22,11 @@ const mocks = vi.hoisted(() => ({
   getLiffIdToken: vi.fn(),
   fetchSurveyList: vi.fn(),
   fetchSurveyDefinition: vi.fn(),
+  fetchSurveyProgress: vi.fn(),
   fetchSurveyResult: vi.fn(),
   saveSurveyAnswer: vi.fn(),
   resetDevelopmentSurveyData: vi.fn(),
+  restoreSurveyProgress: vi.fn(),
 }));
 
 vi.mock("./config", () => ({
@@ -37,20 +39,30 @@ vi.mock("./feature/liff", () => ({
 vi.mock("./feature/survey", () => ({
   fetchSurveyList: mocks.fetchSurveyList,
   fetchSurveyDefinition: mocks.fetchSurveyDefinition,
+  fetchSurveyProgress: mocks.fetchSurveyProgress,
   fetchSurveyResult: mocks.fetchSurveyResult,
   saveSurveyAnswer: mocks.saveSurveyAnswer,
   resetDevelopmentSurveyData: mocks.resetDevelopmentSurveyData,
+  restoreSurveyProgress: mocks.restoreSurveyProgress,
   SwipeSurvey: ({
     survey,
+    initialAnswers,
+    onBack,
     onSaveAnswer,
     onComplete,
   }: {
     survey: SurveyDefinition;
+    initialAnswers?: SurveyAnswer[];
+    onBack: () => void;
     onSaveAnswer: (answer: SurveyAnswer) => Promise<unknown>;
     onComplete: () => void;
   }) => (
     <div>
       <p>{`回答UI: ${survey.title}`}</p>
+      <p>{`復元済み: ${initialAnswers?.length ?? 0}件`}</p>
+      <button type="button" onClick={onBack}>
+        テスト一覧へ戻る
+      </button>
       <button
         type="button"
         onClick={() =>
@@ -135,6 +147,7 @@ describe("App", () => {
     mocks.getLiffIdToken.mockReturnValue("dummy.id.token");
     mocks.fetchSurveyList.mockResolvedValue([survey()]);
     mocks.fetchSurveyDefinition.mockResolvedValue(definition);
+    mocks.fetchSurveyProgress.mockResolvedValue(undefined);
     mocks.fetchSurveyResult.mockResolvedValue(result);
     mocks.saveSurveyAnswer.mockResolvedValue({
       outcome: "created",
@@ -147,6 +160,20 @@ describe("App", () => {
       deletedDeferredQuestionCount: 0,
       deletedSourceRecordCount: 10,
     });
+    mocks.restoreSurveyProgress.mockImplementation(
+      (_questions: SurveyDefinition["questions"], answers: SurveyResult["answers"]) => ({
+        answers: answers.map((answer) => ({
+          kind: "answer" as const,
+          surveyQuestionId: answer.surveyQuestionId,
+          questionId: answer.questionId,
+          questionVersion: answer.questionVersion,
+          choiceId: answer.choiceId,
+          direction: "right" as const,
+          acceptedAt: answer.acceptedAt,
+        })),
+        unansweredQuestions: [],
+      }),
+    );
   });
 
   afterEach(() => {
@@ -161,6 +188,12 @@ describe("App", () => {
 
     expect(await screen.findByText("回答UI: テストアンケート")).toBeTruthy();
     expect(screen.getByText(/回答は1問ずつ保存されます/)).toBeTruthy();
+    expect(mocks.fetchSurveyProgress).toHaveBeenCalledWith(
+      "https://api.example.com",
+      "dummy.id.token",
+      "survey-1",
+      expect.any(AbortSignal),
+    );
   });
 
   it("dev環境では確認後に本人の回答データを全削除し、一覧を再取得する", async () => {
@@ -234,25 +267,134 @@ describe("App", () => {
     );
   });
 
-  it.each([
-    {
-      name: "受付終了かつ未回答",
-      item: survey({ availability: "closed" }),
-      heading: "このアンケートは受付を終了しました",
-    },
-    {
-      name: "回答途中",
-      item: survey({ responseStatus: "in-progress", answeredCount: 3 }),
-      heading: "回答の再開機能は現在準備中です",
-    },
-  ])("$name では新規回答を始めず案内へ進む", async ({ item, heading }) => {
+  it("受付終了かつ未回答では新規回答を始めず案内へ進む", async () => {
+    const item = survey({ availability: "closed" });
     mocks.fetchSurveyList.mockResolvedValue([item]);
     render(<App />);
 
     fireEvent.click(await screen.findByRole("button", { name: /テストアンケート/ }));
 
-    expect(screen.getByRole("heading", { name: heading })).toBeTruthy();
+    expect(
+      screen.getByRole("heading", { name: "このアンケートは受付を終了しました" }),
+    ).toBeTruthy();
+    expect(screen.getByText(/回答期間が終了したため/)).toBeTruthy();
     expect(screen.queryByText(/回答UI:/)).toBeNull();
+  });
+
+  it("回答途中では質問詳細と保存済み回答を取得して回答画面を再開する", async () => {
+    const item = survey({ responseStatus: "in-progress", answeredCount: 1 });
+    mocks.fetchSurveyList.mockResolvedValue([item]);
+    mocks.fetchSurveyDefinition.mockResolvedValue({
+      ...definition,
+      questions: [
+        {
+          surveyQuestionId: "sq-1",
+          questionId: "q-1",
+          questionVersion: 1,
+          text: "質問",
+          left: { choiceId: "no", label: "いいえ", icon: "circle-x" },
+          right: { choiceId: "yes", label: "はい", icon: "circle-check" },
+        },
+      ],
+    });
+    mocks.fetchSurveyProgress.mockResolvedValue({
+      ...result,
+      responseStatus: "in-progress",
+      answeredCount: 1,
+      questionCount: 10,
+    });
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /テストアンケート/ }));
+
+    expect(await screen.findByText("回答UI: テストアンケート")).toBeTruthy();
+    expect(screen.getByText("復元済み: 1件")).toBeTruthy();
+    expect(mocks.fetchSurveyDefinition).toHaveBeenCalledWith(
+      "https://api.example.com",
+      "dummy.id.token",
+      "survey-1",
+      expect.any(AbortSignal),
+    );
+    expect(mocks.fetchSurveyProgress).toHaveBeenCalledWith(
+      "https://api.example.com",
+      "dummy.id.token",
+      "survey-1",
+      expect.any(AbortSignal),
+    );
+  });
+
+  it("一覧が未回答のままでもサーバーに保存済みの回答があれば復元する", async () => {
+    mocks.fetchSurveyDefinition.mockResolvedValue({
+      ...definition,
+      questions: [
+        {
+          surveyQuestionId: "sq-1",
+          questionId: "q-1",
+          questionVersion: 1,
+          text: "質問",
+          left: { choiceId: "no", label: "いいえ", icon: "circle-x" },
+          right: { choiceId: "yes", label: "はい", icon: "circle-check" },
+        },
+      ],
+    });
+    mocks.fetchSurveyProgress.mockResolvedValue({
+      ...result,
+      responseStatus: "in-progress",
+      answeredCount: 1,
+      questionCount: 10,
+    });
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /テストアンケート/ }));
+
+    expect(await screen.findByText("復元済み: 1件")).toBeTruthy();
+    expect(mocks.restoreSurveyProgress).toHaveBeenCalledOnce();
+  });
+
+  it("直前のバックグラウンド保存を待ってから現在回答を再取得する", async () => {
+    let resolveSave: ((value: unknown) => void) | undefined;
+    mocks.saveSurveyAnswer.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveSave = resolve;
+        }),
+    );
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /テストアンケート/ }));
+    await screen.findByText("回答UI: テストアンケート");
+    expect(mocks.fetchSurveyProgress).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "テスト回答" }));
+    fireEvent.click(screen.getByRole("button", { name: "テスト一覧へ戻る" }));
+    fireEvent.click(await screen.findByRole("button", { name: /テストアンケート/ }));
+
+    await Promise.resolve();
+    expect(mocks.fetchSurveyProgress).toHaveBeenCalledTimes(1);
+
+    resolveSave?.({
+      outcome: "created",
+      answer: { acceptedAt: "2026-08-05T00:00:01.000Z" },
+      progress: { responseStatus: "in-progress", answeredCount: 1, questionCount: 10 },
+    });
+    await waitFor(() => expect(mocks.fetchSurveyProgress).toHaveBeenCalledTimes(2));
+  });
+
+  it("受付終了した回答途中アンケートは再開せず案内へ進む", async () => {
+    mocks.fetchSurveyList.mockResolvedValue([
+      survey({ availability: "closed", responseStatus: "in-progress", answeredCount: 1 }),
+    ]);
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /テストアンケート/ }));
+
+    expect(
+      screen.getByRole("heading", { name: "このアンケートは受付を終了しました" }),
+    ).toBeTruthy();
+    expect(screen.getByText(/途中から再開したりすることはできません/)).toBeTruthy();
+    expect(mocks.fetchSurveyDefinition).not.toHaveBeenCalled();
+    expect(mocks.fetchSurveyProgress).not.toHaveBeenCalled();
+    expect(mocks.fetchSurveyResult).not.toHaveBeenCalled();
   });
 
   it.each([

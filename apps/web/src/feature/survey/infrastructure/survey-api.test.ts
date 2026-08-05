@@ -8,6 +8,7 @@ import {
 import {
   fetchSurveyDefinition,
   fetchSurveyList,
+  fetchSurveyProgress,
   fetchSurveyResult,
   resetDevelopmentSurveyData,
   saveSurveyAnswer,
@@ -273,6 +274,18 @@ describe("fetchSurveyDefinition", () => {
 describe("fetchSurveyResult", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it("回答画面用の取得では404を未回答として扱う", async () => {
+    const fetchMock = vi.fn(async () => new Response(null, { status: 404 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      fetchSurveyProgress(API_URL, "dummy.id.token", "relationship-priority"),
+    ).resolves.toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledWith(`${API_URL}/api/surveys/relationship-priority/answers`, {
+      headers: { Authorization: "Bearer dummy.id.token" },
+    });
   });
 
   it("保存済み回答を取得して傾向プロフィールへ変換する", async () => {

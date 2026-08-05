@@ -41,6 +41,42 @@ const twoQuestionSurvey: SurveyDefinition = {
 afterEach(() => cleanup());
 
 describe("SwipeSurvey answer persistence", () => {
+  it("保存済みの質問を飛ばして最初の未回答から再開する", async () => {
+    const onSaveAnswer = vi.fn().mockResolvedValue({
+      acceptedAt: "2026-08-05T00:00:02.000Z",
+    });
+    const onComplete = vi.fn();
+    render(
+      <SwipeSurvey
+        survey={twoQuestionSurvey}
+        initialAnswers={[
+          {
+            kind: "answer",
+            surveyQuestionId: "sq-1",
+            questionId: "q-1",
+            questionVersion: 1,
+            choiceId: "yes",
+            direction: "right",
+            acceptedAt: "2026-08-05T00:00:01.000Z",
+          },
+        ]}
+        onBack={vi.fn()}
+        onSaveAnswer={onSaveAnswer}
+        onComplete={onComplete}
+      />,
+    );
+
+    expect(screen.queryByText("保存する質問")).toBeNull();
+    expect(screen.getByText("次の質問")).toBeTruthy();
+    expect(screen.getByText("2 / 2")).toBeTruthy();
+
+    fireEvent.keyDown(window, { key: "ArrowRight" });
+
+    await waitFor(() => expect(onSaveAnswer).toHaveBeenCalledOnce());
+    expect(onSaveAnswer.mock.calls[0]?.[0]).toMatchObject({ surveyQuestionId: "sq-2" });
+    await waitFor(() => expect(onComplete).toHaveBeenCalledOnce());
+  });
+
   it("保存をバックグラウンドで続けながら次の質問へ進める", async () => {
     const onSaveAnswer = vi.fn(() => new Promise<{ acceptedAt: string }>(() => undefined));
     render(

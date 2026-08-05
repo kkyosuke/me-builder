@@ -11,8 +11,10 @@ import {
   SwipeSurvey,
   fetchSurveyDefinition,
   fetchSurveyList,
+  fetchSurveyProgress,
   fetchSurveyResult,
   resetDevelopmentSurveyData,
+  restoreSurveyProgress,
   saveSurveyAnswer,
 } from "./feature/survey";
 import { OperationError } from "./infrastructure/errors";
@@ -163,11 +165,13 @@ function Home({
 
 function SurveyDetail({
   survey,
+  initialAnswers,
   onBack,
   onSaveAnswer,
   onComplete,
 }: {
   survey: SurveyDefinition;
+  initialAnswers: SurveyAnswer[];
   onBack: () => void;
   onSaveAnswer: Parameters<typeof SwipeSurvey>[0]["onSaveAnswer"];
   onComplete: Parameters<typeof SwipeSurvey>[0]["onComplete"];
@@ -188,6 +192,7 @@ function SurveyDetail({
       </p>
       <SwipeSurvey
         survey={survey}
+        initialAnswers={initialAnswers}
         onBack={onBack}
         onSaveAnswer={onSaveAnswer}
         onComplete={onComplete}
@@ -196,17 +201,13 @@ function SurveyDetail({
   );
 }
 
-type GuidanceKind = "closed" | "in-progress" | "unsupported" | "load-error";
+type GuidanceKind = "closed" | "unsupported" | "load-error";
 
 const GUIDANCE: Record<GuidanceKind, { title: string; message: string }> = {
   closed: {
     title: "このアンケートは受付を終了しました",
-    message: "未回答のため、新しく回答を始めることはできません。アンケート一覧へお戻りください。",
-  },
-  "in-progress": {
-    title: "回答の再開機能は現在準備中です",
     message:
-      "回答途中のアンケートです。続きから再開する機能が未実装のため、第1問から新しい回答を開始しません。",
+      "回答期間が終了したため、新しく回答を始めたり、途中から再開したりすることはできません。アンケート一覧へお戻りください。",
   },
   unsupported: {
     title: "このアンケートは現在のアプリでは未対応です",
@@ -244,9 +245,6 @@ function resolveSurveyDestination(survey: SurveyListItem): "answer" | "result" |
   if (survey.responseStatus === "answered") {
     return "result";
   }
-  if (survey.responseStatus === "in-progress") {
-    return "in-progress";
-  }
   if (survey.availability === "closed") {
     return "closed";
   }
@@ -273,6 +271,7 @@ export function App() {
   const [selectedSurvey, setSelectedSurvey] = useState<SurveyListItem | null>(null);
   const [selectedDefinition, setSelectedDefinition] = useState<SurveyDefinition | null>(null);
   const [selectedResult, setSelectedResult] = useState<SurveyResult | null>(null);
+  const [initialAnswers, setInitialAnswers] = useState<SurveyAnswer[]>([]);
   const [detailState, setDetailState] = useState<"idle" | "loading" | "unsupported" | "error">(
     "idle",
   );
@@ -284,6 +283,7 @@ export function App() {
   const request = useRef<AbortController | null>(null);
   const detailRequest = useRef<AbortController | null>(null);
   const idToken = useRef<string | null>(null);
+  const pendingSurveySaves = useRef(new Map<string, Set<Promise<void>>>());
 
   const loadSurveys = useCallback(async (): Promise<void> => {
     if (loading.current) {
@@ -359,6 +359,7 @@ export function App() {
     setSelectedSurvey(survey);
     setSelectedDefinition(null);
     setSelectedResult(null);
+    setInitialAnswers([]);
     const destination = resolveSurveyDestination(survey);
     if (destination !== "answer" && destination !== "result") {
       setDetailState("idle");
@@ -375,6 +376,13 @@ export function App() {
     detailRequest.current = controller;
     setDetailState("loading");
     try {
+      const pendingSaves = pendingSurveySaves.current.get(survey.id);
+      if (pendingSaves && pendingSaves.size > 0) {
+        await Promise.all([...pendingSaves]);
+        if (controller.signal.aborted) {
+          return;
+        }
+      }
       if (destination === "result") {
         const result = await fetchSurveyResult(
           config.apiUrl,
@@ -387,14 +395,17 @@ export function App() {
           setDetailState(result ? "idle" : "unsupported");
         }
       } else {
-        const definition = await fetchSurveyDefinition(
-          config.apiUrl,
-          currentIdToken,
-          survey.id,
-          controller.signal,
-        );
+        const [definition, savedResult] = await Promise.all([
+          fetchSurveyDefinition(config.apiUrl, currentIdToken, survey.id, controller.signal),
+          fetchSurveyProgress(config.apiUrl, currentIdToken, survey.id, controller.signal),
+        ]);
         if (!controller.signal.aborted && mounted.current) {
+          const restored =
+            definition && savedResult
+              ? restoreSurveyProgress(definition.questions, savedResult.answers)
+              : undefined;
           setSelectedDefinition(definition ?? null);
+          setInitialAnswers(restored?.answers ?? []);
           setDetailState(definition ? "idle" : "unsupported");
         }
       }
@@ -418,22 +429,37 @@ export function App() {
       if (!currentIdToken || !selectedDefinition) {
         throw new Error("本人確認情報を取得できませんでした。LINEから開き直してください。");
       }
-      const result = await saveSurveyAnswer(
+      const saveRequest = saveSurveyAnswer(
         config.apiUrl,
         currentIdToken,
         selectedDefinition.id,
         answer.surveyQuestionId,
         answer.choiceId,
       );
-      setSurveys(
-        (current) =>
-          current?.map((survey) =>
-            survey.id === selectedDefinition.id
-              ? applySavedProgress(survey, result.progress)
-              : survey,
-          ) ?? null,
+      const settledSave = saveRequest.then(
+        () => undefined,
+        () => undefined,
       );
-      return { acceptedAt: result.answer.acceptedAt };
+      const pendingSaves = pendingSurveySaves.current.get(selectedDefinition.id) ?? new Set();
+      pendingSaves.add(settledSave);
+      pendingSurveySaves.current.set(selectedDefinition.id, pendingSaves);
+      try {
+        const result = await saveRequest;
+        setSurveys(
+          (current) =>
+            current?.map((survey) =>
+              survey.id === selectedDefinition.id
+                ? applySavedProgress(survey, result.progress)
+                : survey,
+            ) ?? null,
+        );
+        return { acceptedAt: result.answer.acceptedAt };
+      } finally {
+        pendingSaves.delete(settledSave);
+        if (pendingSaves.size === 0) {
+          pendingSurveySaves.current.delete(selectedDefinition.id);
+        }
+      }
     },
     [selectedDefinition],
   );
@@ -512,6 +538,7 @@ export function App() {
       setSelectedSurvey(null);
       setSelectedDefinition(null);
       setSelectedResult(null);
+      setInitialAnswers([]);
       await loadSurveys();
       const deletedCount = deleted.deletedAnswerCount + deleted.deletedDeferredQuestionCount;
       setResetState({
@@ -538,6 +565,7 @@ export function App() {
       return (
         <SurveyDetail
           survey={selectedDefinition}
+          initialAnswers={initialAnswers}
           onBack={() => setSelectedSurvey(null)}
           onSaveAnswer={persistAnswer}
           onComplete={() => void openCompletedResult()}
