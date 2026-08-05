@@ -190,7 +190,7 @@ describe("GET /api/diagnoses local D1 E2E", () => {
         questionCount: number;
       }>;
     };
-    expect(initialBody.diagnoses).toHaveLength(2);
+    expect(initialBody.diagnoses).toHaveLength(3);
     expect(initialBody.diagnoses.every(({ description }) => description.length > 0)).toBe(true);
     expect(
       initialBody.diagnoses.every(({ responseStatus }) => responseStatus === "unanswered"),
@@ -287,6 +287,26 @@ describe("GET /api/diagnoses/:diagnosisId local D1 E2E", () => {
         { choiceId: "no", label: "いいえ" },
         { choiceId: "yes", label: "はい" },
       ],
+    });
+  });
+
+  it("インドア・アウトドアと余暇の10問をseedから返すこと", async () => {
+    const response = await request("known-token", "/api/diagnoses/leisure-style");
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      id: string;
+      title: string;
+      questions: Array<{ diagnosisQuestionId: string; text: string }>;
+    };
+
+    expect(body).toMatchObject({
+      id: "leisure-style",
+      title: "インドア・アウトドアと余暇",
+    });
+    expect(body.questions).toHaveLength(10);
+    expect(body.questions[0]).toMatchObject({
+      diagnosisQuestionId: "dq-leisure-style-01",
+      text: "予定のない休日は、家で過ごすより外へ出たい。",
     });
   });
 

@@ -301,6 +301,31 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
     }
   });
 
+  it("インドア・アウトドアと余暇の回答を4つのパラメータへ採点する", async () => {
+    for (let index = 1; index <= 10; index += 1) {
+      const suffix = String(index).padStart(2, "0");
+      const response = await putAnswer(`dq-leisure-style-${suffix}`, "yes", "leisure-style");
+      expect(response.status).toBe(200);
+    }
+
+    const response = await getAnswers("leisure-style");
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      id: "leisure-style",
+      scoring: {
+        scoringVersion: 1,
+        balancedLabel: "状況に応じて楽しむ",
+        parameters: [
+          expect.objectContaining({ id: "outdoor-preference", score: 67, coverage: 100 }),
+          expect.objectContaining({ id: "experience-openness", score: 100, coverage: 100 }),
+          expect.objectContaining({ id: "shared-leisure", score: 60, coverage: 100 }),
+          expect.objectContaining({ id: "activity-level", score: 100, coverage: 100 }),
+        ],
+      },
+    });
+  });
+
   it(`${diagnosisAnswerCases.missingContents.id}: ${diagnosisAnswerCases.missingContents.name}`, async () => {
     const response = await getAnswers();
     expect(response.status).toBe(404);

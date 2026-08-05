@@ -6,7 +6,8 @@
 -- only fills migration-added fields while they are empty or NULL.
 -- Revise published content by adding a new Question Version and a new Diagnosis instead.
 --
--- Timestamp: 2026-08-04T00:00:00.000Z (Unix seconds, as used by Drizzle timestamp mode).
+-- Timestamps: 2026-08-04T00:00:00.000Z for the initial diagnoses and
+-- 2026-08-06T00:00:00.000Z for leisure-style (Unix seconds, Drizzle timestamp mode).
 
 INSERT OR IGNORE INTO questions (id, created_at, updated_at, is_deleted) VALUES
   ('q-relationship-priority-01', 1785801600, 1785801600, 0),
@@ -28,7 +29,17 @@ INSERT OR IGNORE INTO questions (id, created_at, updated_at, is_deleted) VALUES
   ('q-money-07', 1785801600, 1785801600, 0),
   ('q-money-08', 1785801600, 1785801600, 0),
   ('q-money-09', 1785801600, 1785801600, 0),
-  ('q-money-10', 1785801600, 1785801600, 0);
+  ('q-money-10', 1785801600, 1785801600, 0),
+  ('q-leisure-style-01', 1785974400, 1785974400, 0),
+  ('q-leisure-style-02', 1785974400, 1785974400, 0),
+  ('q-leisure-style-03', 1785974400, 1785974400, 0),
+  ('q-leisure-style-04', 1785974400, 1785974400, 0),
+  ('q-leisure-style-05', 1785974400, 1785974400, 0),
+  ('q-leisure-style-06', 1785974400, 1785974400, 0),
+  ('q-leisure-style-07', 1785974400, 1785974400, 0),
+  ('q-leisure-style-08', 1785974400, 1785974400, 0),
+  ('q-leisure-style-09', 1785974400, 1785974400, 0),
+  ('q-leisure-style-10', 1785974400, 1785974400, 0);
 --> statement-breakpoint
 
 INSERT OR IGNORE INTO question_versions (
@@ -61,7 +72,17 @@ INSERT OR IGNORE INTO question_versions (
   (1785801600, 1785801600, 0, 'q-money-07', 1, 'approved', '借金やローンの状況は、交際の早い段階で共有してほしい。', 'single_choice', 1785801600),
   (1785801600, 1785801600, 0, 'q-money-08', 1, 'approved', '投資には、元本割れの可能性があっても挑戦したい。', 'single_choice', 1785801600),
   (1785801600, 1785801600, 0, 'q-money-09', 1, 'approved', '家事や時間の負担が多い人は、生活費の負担が少なくてもよいと思う。', 'single_choice', 1785801600),
-  (1785801600, 1785801600, 0, 'q-money-10', 1, 'approved', '家計を一緒にする場合でも、自由に使える個人のお金を残したい。', 'single_choice', 1785801600);
+  (1785801600, 1785801600, 0, 'q-money-10', 1, 'approved', '家計を一緒にする場合でも、自由に使える個人のお金を残したい。', 'single_choice', 1785801600),
+  (1785974400, 1785974400, 0, 'q-leisure-style-01', 1, 'approved', '予定のない休日は、家で過ごすより外へ出たい。', 'single_choice', 1785974400),
+  (1785974400, 1785974400, 0, 'q-leisure-style-02', 1, 'approved', '休日は、休息より新しい体験を優先したい。', 'single_choice', 1785974400),
+  (1785974400, 1785974400, 0, 'q-leisure-style-03', 1, 'approved', '趣味は、パートナーと一緒に楽しみたい。', 'single_choice', 1785974400),
+  (1785974400, 1785974400, 0, 'q-leisure-style-04', 1, 'approved', '相手が興味を持つ趣味なら、自分も一度は試したい。', 'single_choice', 1785974400),
+  (1785974400, 1785974400, 0, 'q-leisure-style-05', 1, 'approved', '旅行は、観光地を多く回りたい。', 'single_choice', 1785974400),
+  (1785974400, 1785974400, 0, 'q-leisure-style-06', 1, 'approved', '長期休暇には、家で休むより旅行へ行きたい。', 'single_choice', 1785974400),
+  (1785974400, 1785974400, 0, 'q-leisure-style-07', 1, 'approved', '運動やスポーツを、休日の予定に入れたい。', 'single_choice', 1785974400),
+  (1785974400, 1785974400, 0, 'q-leisure-style-08', 1, 'approved', '外出にお金を使うより、家で楽しむためにお金を使いたい。', 'single_choice', 1785974400),
+  (1785974400, 1785974400, 0, 'q-leisure-style-09', 1, 'approved', '休日を別々に過ごしても平気だ。', 'single_choice', 1785974400),
+  (1785974400, 1785974400, 0, 'q-leisure-style-10', 1, 'approved', '混雑していても、人気のイベントへ出かけたい。', 'single_choice', 1785974400);
 --> statement-breakpoint
 
 INSERT OR IGNORE INTO question_choices (
@@ -75,8 +96,8 @@ INSERT OR IGNORE INTO question_choices (
   position
 )
 SELECT
-  1785801600,
-  1785801600,
+  CASE WHEN id LIKE 'q-leisure-style-%' THEN 1785974400 ELSE 1785801600 END,
+  CASE WHEN id LIKE 'q-leisure-style-%' THEN 1785974400 ELSE 1785801600 END,
   0,
   id,
   1,
@@ -91,7 +112,11 @@ WHERE id IN (
   'q-relationship-priority-07', 'q-relationship-priority-08',
   'q-relationship-priority-09', 'q-relationship-priority-10',
   'q-money-01', 'q-money-02', 'q-money-03', 'q-money-04', 'q-money-05',
-  'q-money-06', 'q-money-07', 'q-money-08', 'q-money-09', 'q-money-10'
+  'q-money-06', 'q-money-07', 'q-money-08', 'q-money-09', 'q-money-10',
+  'q-leisure-style-01', 'q-leisure-style-02', 'q-leisure-style-03',
+  'q-leisure-style-04', 'q-leisure-style-05', 'q-leisure-style-06',
+  'q-leisure-style-07', 'q-leisure-style-08', 'q-leisure-style-09',
+  'q-leisure-style-10'
 );
 --> statement-breakpoint
 
@@ -106,8 +131,8 @@ INSERT OR IGNORE INTO question_choices (
   position
 )
 SELECT
-  1785801600,
-  1785801600,
+  CASE WHEN id LIKE 'q-leisure-style-%' THEN 1785974400 ELSE 1785801600 END,
+  CASE WHEN id LIKE 'q-leisure-style-%' THEN 1785974400 ELSE 1785801600 END,
   0,
   id,
   1,
@@ -122,7 +147,11 @@ WHERE id IN (
   'q-relationship-priority-07', 'q-relationship-priority-08',
   'q-relationship-priority-09', 'q-relationship-priority-10',
   'q-money-01', 'q-money-02', 'q-money-03', 'q-money-04', 'q-money-05',
-  'q-money-06', 'q-money-07', 'q-money-08', 'q-money-09', 'q-money-10'
+  'q-money-06', 'q-money-07', 'q-money-08', 'q-money-09', 'q-money-10',
+  'q-leisure-style-01', 'q-leisure-style-02', 'q-leisure-style-03',
+  'q-leisure-style-04', 'q-leisure-style-05', 'q-leisure-style-06',
+  'q-leisure-style-07', 'q-leisure-style-08', 'q-leisure-style-09',
+  'q-leisure-style-10'
 );
 --> statement-breakpoint
 
@@ -198,6 +227,38 @@ INSERT OR IGNORE INTO diagnosis_scoring_configs (
       "highMinimum":65,
       "balancedLabel":"状況に応じて調整"
     }'
+  ),
+  (
+    'leisure-style-v1',
+    1785974400,
+    1785974400,
+    0,
+    1,
+    '{
+      "parameters": [
+        {"id":"outdoor-preference","label":"外出志向","lowLabel":"家で過ごすことを好む","highLabel":"外へ出ることを好む"},
+        {"id":"experience-openness","label":"体験への開放性","lowLabel":"慣れた過ごし方を好む","highLabel":"新しい体験を好む"},
+        {"id":"shared-leisure","label":"余暇の共有","lowLabel":"それぞれの時間を重視","highLabel":"一緒に楽しむことを重視"},
+        {"id":"activity-level","label":"活動量","lowLabel":"ゆったり過ごす","highLabel":"活動的に過ごす"}
+      ],
+      "choiceScores": {"yes":1,"no":-1},
+      "questions": {
+        "q-leisure-style-01":{"questionVersion":1,"weights":{"outdoor-preference":1}},
+        "q-leisure-style-02":{"questionVersion":1,"weights":{"experience-openness":1,"activity-level":0.5}},
+        "q-leisure-style-03":{"questionVersion":1,"weights":{"shared-leisure":1}},
+        "q-leisure-style-04":{"questionVersion":1,"weights":{"experience-openness":0.5,"shared-leisure":0.5}},
+        "q-leisure-style-05":{"questionVersion":1,"weights":{"experience-openness":0.5,"activity-level":1}},
+        "q-leisure-style-06":{"questionVersion":1,"weights":{"outdoor-preference":1,"activity-level":0.5}},
+        "q-leisure-style-07":{"questionVersion":1,"weights":{"activity-level":1}},
+        "q-leisure-style-08":{"questionVersion":1,"weights":{"outdoor-preference":-1}},
+        "q-leisure-style-09":{"questionVersion":1,"weights":{"shared-leisure":-1}},
+        "q-leisure-style-10":{"questionVersion":1,"weights":{"experience-openness":0.5,"activity-level":0.5}}
+      },
+      "minimumCoverage":0.6,
+      "lowMaximum":35,
+      "highMinimum":65,
+      "balancedLabel":"状況に応じて楽しむ"
+    }'
   );
 --> statement-breakpoint
 
@@ -214,7 +275,8 @@ INSERT INTO diagnoses (
   published_at
 ) VALUES
   ('relationship-priority', 1785801600, 1785801600, 0, '自分と相手の優先・境界線', '頼まれごとや意思決定で、自分と相手をどう尊重するかを見ます。', 'relationship-priority-v1', 1785801600, 'published', 1785801600),
-  ('money-values', 1785801600, 1785801600, 0, 'お金と消費', '貯蓄、支出、共有、公平性、リスクに関する傾向を見ます。', 'money-values-v1', 1785801600, 'published', 1785801600)
+  ('money-values', 1785801600, 1785801600, 0, 'お金と消費', '貯蓄、支出、共有、公平性、リスクに関する傾向を見ます。', 'money-values-v1', 1785801600, 'published', 1785801600),
+  ('leisure-style', 1785974400, 1785974400, 0, 'インドア・アウトドアと余暇', '休日の過ごし方、体験、趣味の共有、活動量に関する傾向を見ます。', 'leisure-style-v1', 1785801600, 'published', 1785974400)
 ON CONFLICT(id) DO UPDATE SET
   description = CASE
     WHEN diagnoses.description = '' THEN excluded.description
@@ -253,14 +315,24 @@ INSERT OR IGNORE INTO diagnosis_questions (
   ('dq-money-07', 1785801600, 1785801600, 0, 'money-values', 'q-money-07', 1, 6),
   ('dq-money-08', 1785801600, 1785801600, 0, 'money-values', 'q-money-08', 1, 7),
   ('dq-money-09', 1785801600, 1785801600, 0, 'money-values', 'q-money-09', 1, 8),
-  ('dq-money-10', 1785801600, 1785801600, 0, 'money-values', 'q-money-10', 1, 9);
+  ('dq-money-10', 1785801600, 1785801600, 0, 'money-values', 'q-money-10', 1, 9),
+  ('dq-leisure-style-01', 1785974400, 1785974400, 0, 'leisure-style', 'q-leisure-style-01', 1, 0),
+  ('dq-leisure-style-02', 1785974400, 1785974400, 0, 'leisure-style', 'q-leisure-style-02', 1, 1),
+  ('dq-leisure-style-03', 1785974400, 1785974400, 0, 'leisure-style', 'q-leisure-style-03', 1, 2),
+  ('dq-leisure-style-04', 1785974400, 1785974400, 0, 'leisure-style', 'q-leisure-style-04', 1, 3),
+  ('dq-leisure-style-05', 1785974400, 1785974400, 0, 'leisure-style', 'q-leisure-style-05', 1, 4),
+  ('dq-leisure-style-06', 1785974400, 1785974400, 0, 'leisure-style', 'q-leisure-style-06', 1, 5),
+  ('dq-leisure-style-07', 1785974400, 1785974400, 0, 'leisure-style', 'q-leisure-style-07', 1, 6),
+  ('dq-leisure-style-08', 1785974400, 1785974400, 0, 'leisure-style', 'q-leisure-style-08', 1, 7),
+  ('dq-leisure-style-09', 1785974400, 1785974400, 0, 'leisure-style', 'q-leisure-style-09', 1, 8),
+  ('dq-leisure-style-10', 1785974400, 1785974400, 0, 'leisure-style', 'q-leisure-style-10', 1, 9);
 --> statement-breakpoint
 
--- Expected result: diagnosis_count=2, question_version_count=20,
--- choice_count=40, diagnosis_question_count=20, scoring_config_count=2.
+-- Expected result: diagnosis_count=3, question_version_count=30,
+-- choice_count=60, diagnosis_question_count=30, scoring_config_count=3.
 SELECT
-  (SELECT COUNT(*) FROM diagnoses WHERE id IN ('relationship-priority', 'money-values') AND state = 'published' AND description <> '' AND is_deleted = 0) AS diagnosis_count,
-  (SELECT COUNT(*) FROM question_versions WHERE version = 1 AND state = 'approved' AND is_deleted = 0 AND (question_id LIKE 'q-relationship-priority-%' OR question_id LIKE 'q-money-%')) AS question_version_count,
-  (SELECT COUNT(*) FROM question_choices WHERE question_version = 1 AND is_deleted = 0 AND (question_id LIKE 'q-relationship-priority-%' OR question_id LIKE 'q-money-%')) AS choice_count,
-  (SELECT COUNT(*) FROM diagnosis_questions WHERE diagnosis_id IN ('relationship-priority', 'money-values') AND is_deleted = 0) AS diagnosis_question_count,
-  (SELECT COUNT(*) FROM diagnosis_scoring_configs WHERE id IN ('relationship-priority-v1', 'money-values-v1') AND version = 1 AND is_deleted = 0) AS scoring_config_count;
+  (SELECT COUNT(*) FROM diagnoses WHERE id IN ('relationship-priority', 'money-values', 'leisure-style') AND state = 'published' AND description <> '' AND is_deleted = 0) AS diagnosis_count,
+  (SELECT COUNT(*) FROM question_versions WHERE version = 1 AND state = 'approved' AND is_deleted = 0 AND (question_id LIKE 'q-relationship-priority-%' OR question_id LIKE 'q-money-%' OR question_id LIKE 'q-leisure-style-%')) AS question_version_count,
+  (SELECT COUNT(*) FROM question_choices WHERE question_version = 1 AND is_deleted = 0 AND (question_id LIKE 'q-relationship-priority-%' OR question_id LIKE 'q-money-%' OR question_id LIKE 'q-leisure-style-%')) AS choice_count,
+  (SELECT COUNT(*) FROM diagnosis_questions WHERE diagnosis_id IN ('relationship-priority', 'money-values', 'leisure-style') AND is_deleted = 0) AS diagnosis_question_count,
+  (SELECT COUNT(*) FROM diagnosis_scoring_configs WHERE id IN ('relationship-priority-v1', 'money-values-v1', 'leisure-style-v1') AND version = 1 AND is_deleted = 0) AS scoring_config_count;
