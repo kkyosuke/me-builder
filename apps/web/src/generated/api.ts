@@ -316,9 +316,6 @@ export interface operations {
               choices: {
                 choiceId: string;
                 label: string;
-                presentation: {
-                  [key: string]: string;
-                };
               }[];
             }[];
           };
@@ -408,7 +405,7 @@ export interface operations {
     };
     requestBody?: never;
     responses: {
-      /** @description 質問文・選択肢・回答日時を含む本人の回答内容 */
+      /** @description 質問文・選択肢・回答日時・計算済み傾向を含む本人の回答内容 */
       200: {
         headers: {
           [name: string]: unknown;
@@ -432,6 +429,20 @@ export interface operations {
               /** Format: date-time */
               acceptedAt: string;
             }[];
+            scoring: {
+              scoringVersion: number;
+              balancedLabel: string;
+              parameters: {
+                id: string;
+                label: string;
+                lowLabel: string;
+                highLabel: string;
+                score: number | null;
+                coverage: number;
+                /** @enum {string} */
+                band: "low" | "balanced" | "high" | "insufficient";
+              }[];
+            } | null;
           };
         };
       };

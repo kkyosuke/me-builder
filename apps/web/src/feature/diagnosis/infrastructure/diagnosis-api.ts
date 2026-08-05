@@ -11,7 +11,6 @@ import type { DiagnosisDefinition } from "../model/diagnosis-definition";
 import type { DiagnosisListItem } from "../model/diagnosis-list-item";
 import type { DiagnosisResult } from "../model/diagnosis-result";
 import { DiagnosisQuestionsSchema } from "../model/types";
-import { combineDiagnosisDefinition, combineDiagnosisResult } from "./local-definitions";
 
 type ApiDiagnosisListResponse =
   operations["listDiagnoses"]["responses"][200]["content"]["application/json"];
@@ -99,7 +98,6 @@ const ApiDiagnosisDetailSchema = v.object({
           v.object({
             choiceId: v.pipe(v.string(), v.nonEmpty()),
             label: v.pipe(v.string(), v.nonEmpty()),
-            presentation: v.object({ icon: v.pipe(v.string(), v.nonEmpty()) }),
           }),
         ),
         v.length(2),
@@ -114,7 +112,7 @@ export async function fetchDiagnosisDefinition(
   idToken: string,
   diagnosisId: string,
   signal?: AbortSignal,
-): Promise<DiagnosisDefinition | undefined> {
+): Promise<DiagnosisDefinition> {
   const response = await createHttpClient(apiUrl).request(
     `/api/diagnoses/${encodeURIComponent(diagnosisId)}`,
     {
@@ -176,12 +174,10 @@ export async function fetchDiagnosisDefinition(
           left: {
             choiceId: left.choiceId,
             label: left.label,
-            icon: left.presentation.icon,
           },
           right: {
             choiceId: right.choiceId,
             label: right.label,
-            icon: right.presentation.icon,
           },
         };
       }),
@@ -193,12 +189,12 @@ export async function fetchDiagnosisDefinition(
     });
   }
 
-  return combineDiagnosisDefinition({
+  return {
     id: body.id,
     title: body.title,
     description: body.description,
     questions,
-  });
+  };
 }
 
 const SaveDiagnosisAnswerResponseSchema = v.object({
@@ -315,6 +311,26 @@ const DiagnosisAnswersResponseSchema = v.object({
     ),
     v.minLength(1),
   ),
+  scoring: v.nullable(
+    v.object({
+      scoringVersion: v.pipe(v.number(), v.safeInteger(), v.minValue(1)),
+      balancedLabel: v.pipe(v.string(), v.nonEmpty()),
+      parameters: v.pipe(
+        v.array(
+          v.object({
+            id: v.pipe(v.string(), v.nonEmpty()),
+            label: v.pipe(v.string(), v.nonEmpty()),
+            lowLabel: v.pipe(v.string(), v.nonEmpty()),
+            highLabel: v.pipe(v.string(), v.nonEmpty()),
+            score: v.nullable(v.pipe(v.number(), v.safeInteger(), v.minValue(0), v.maxValue(100))),
+            coverage: v.pipe(v.number(), v.safeInteger(), v.minValue(0), v.maxValue(100)),
+            band: v.picklist(["low", "balanced", "high", "insufficient"]),
+          }),
+        ),
+        v.minLength(1),
+      ),
+    }),
+  ),
 }) satisfies v.GenericSchema<ApiDiagnosisAnswersResponse>;
 
 async function requestDiagnosisResult(
@@ -364,10 +380,10 @@ async function requestDiagnosisResult(
     });
   }
 
-  return combineDiagnosisResult(body);
+  return body;
 }
 
-/** 本人が保存した回答内容を取得し、版付きローカル設定で表示結果を再計算する。 */
+/** 本人が保存した回答内容とAPIで計算済みの傾向を取得する。 */
 export async function fetchDiagnosisResult(
   apiUrl: string | undefined,
   idToken: string,

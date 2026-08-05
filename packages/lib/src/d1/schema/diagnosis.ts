@@ -63,11 +63,19 @@ export const questionChoices = sqliteTable(
   ],
 );
 
+/** 公開後も同じ診断結果を再現するための、不変な版付き採点設定。 */
+export const diagnosisScoringConfigs = sqliteTable("diagnosis_scoring_configs", {
+  ...baseSchema,
+  version: integer("version").notNull(),
+  definition: text("definition", { mode: "json" }).notNull().$type<unknown>(),
+});
+
 export const diagnoses = sqliteTable("diagnoses", {
   ...baseSchema,
   title: text("title").notNull(),
   // 既存D1へ列を追加した直後だけ空文字になり、diagnosis seedが正式な説明へ補完する。
   description: text("description").notNull().default(""),
+  scoringConfigId: text("scoring_config_id").references(() => diagnosisScoringConfigs.id),
   opensAt: integer("opens_at", { mode: "timestamp" }).notNull(),
   closesAt: integer("closes_at", { mode: "timestamp" }),
   state: text("state", { enum: ["draft", "published", "withdrawn"] }).notNull(),

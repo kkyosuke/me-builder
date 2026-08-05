@@ -1,13 +1,21 @@
 import { d1 } from "@me-builder/lib";
+import { logger } from "@me-builder/shared";
+import { scoreDiagnosisAnswers } from "./diagnosis-scoring";
 import { createLiffSession } from "./liff-session";
 
-type DiagnosisAnswers = Extract<
+type StoredDiagnosisAnswers = Extract<
   Awaited<ReturnType<typeof d1.action.diagnosis.findDiagnosisAnswers>>,
   { type: "found" }
 >["diagnosis"];
+type DiagnosisAnswers = Omit<StoredDiagnosisAnswers, "scoringConfig">;
 
 export type DiagnosisAnswersOutcome =
-  | { type: "resolved"; diagnosis: DiagnosisAnswers }
+  | {
+      type: "resolved";
+      diagnosis: DiagnosisAnswers & {
+        scoring: ReturnType<typeof scoreDiagnosisAnswers>;
+      };
+    }
   | { type: "diagnosis-answers-not-found" }
   | { type: "not-configured" }
   | { type: "unauthenticated"; reason: string }
@@ -42,7 +50,28 @@ export async function getDiagnosisAnswers(
   }
 
   const result = await dependencies.findAnswers(db, session.session.accountId, diagnosisId, at);
-  return result.type === "found"
-    ? { type: "resolved", diagnosis: result.diagnosis }
-    : { type: "diagnosis-answers-not-found" };
+  if (result.type !== "found") {
+    return { type: "diagnosis-answers-not-found" };
+  }
+  const { scoringConfig, ...diagnosis } = result.diagnosis;
+  let scoring: ReturnType<typeof scoreDiagnosisAnswers> = null;
+  try {
+    scoring = scoreDiagnosisAnswers(result.diagnosis.answers, scoringConfig);
+  } catch (error) {
+    logger.error(
+      {
+        diagnosisId,
+        scoringConfigId: scoringConfig?.id,
+        reason: error instanceof Error ? error.message : "unknown error",
+      },
+      "Diagnosis scoring config is invalid; returning answers without scoring",
+    );
+  }
+  return {
+    type: "resolved",
+    diagnosis: {
+      ...diagnosis,
+      scoring,
+    },
+  };
 }

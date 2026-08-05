@@ -1,6 +1,6 @@
 import { ArrowLeft, CheckCircle2, ChevronDown, Clock3, Sparkles } from "lucide-react";
 import type { DiagnosisResult } from "../../model/diagnosis-result";
-import { getParameterSummary } from "../../model/scoring";
+import { getParameterSummary } from "../parameter-summary";
 
 function formatAcceptedAt(value: string): string {
   return new Intl.DateTimeFormat("ja-JP", {
@@ -19,6 +19,8 @@ export function DiagnosisResultView({
   result: DiagnosisResult;
   onBack: () => void;
 }) {
+  const scoring = result.scoring;
+
   return (
     <main className="mx-auto min-h-dvh w-full max-w-2xl px-4 py-5 sm:px-8 sm:py-8">
       <button
@@ -41,63 +43,71 @@ export function DiagnosisResultView({
           </div>
         </div>
         <p className="mt-4 text-sm leading-relaxed text-slate-300">
-          回答から見える現在の傾向です。どちら側にも良し悪しはなく、医療的な診断ではありません。
+          {scoring
+            ? "回答から見える現在の傾向です。どちら側にも良し悪しはなく、医療的な診断ではありません。"
+            : "保存した回答内容を確認できます。医療的な診断ではありません。"}
         </p>
         <p className="mt-3 text-xs text-slate-400">
           {`${result.answeredCount} / ${result.questionCount}問に回答`}
         </p>
       </header>
 
-      <section aria-labelledby="profile-heading" className="mt-5">
-        <h2
-          id="profile-heading"
-          className="flex items-center gap-2 text-lg font-bold text-slate-50"
-        >
-          <Sparkles className="size-5 text-sky-300" aria-hidden="true" />
-          回答から見える傾向
-        </h2>
-        <fieldset
-          aria-label="回答から見える傾向の一覧"
-          className="mt-3 min-w-0 divide-y divide-slate-700 rounded-2xl border border-slate-700 bg-slate-800 px-4"
-        >
-          {result.profile.parameters.map((parameter) => (
-            <div key={parameter.id} className="py-3.5">
-              <div className="flex items-center justify-between gap-3">
-                <h3 className="text-sm font-semibold text-slate-200">{parameter.label}</h3>
-                <p className="text-xs font-semibold text-sky-200">
-                  {getParameterSummary(parameter, result.balancedLabel)}
-                </p>
-              </div>
-              <div
-                role="meter"
-                aria-label={`${parameter.label}の傾向`}
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuenow={parameter.score ?? undefined}
-                aria-valuetext={getParameterSummary(parameter, result.balancedLabel)}
-                className="relative mt-3 h-2 rounded-full bg-gradient-to-r from-indigo-400/70 via-slate-600 to-sky-300/70"
-              >
-                <span
-                  className="absolute left-1/2 top-1/2 h-4 w-px -translate-x-1/2 -translate-y-1/2 bg-slate-300/70"
-                  aria-hidden="true"
-                />
-                {parameter.score !== null && (
+      {scoring ? (
+        <section aria-labelledby="profile-heading" className="mt-5">
+          <h2
+            id="profile-heading"
+            className="flex items-center gap-2 text-lg font-bold text-slate-50"
+          >
+            <Sparkles className="size-5 text-sky-300" aria-hidden="true" />
+            回答から見える傾向
+          </h2>
+          <fieldset
+            aria-label="回答から見える傾向の一覧"
+            className="mt-3 min-w-0 divide-y divide-slate-700 rounded-2xl border border-slate-700 bg-slate-800 px-4"
+          >
+            {scoring.parameters.map((parameter) => (
+              <div key={parameter.id} className="py-3.5">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-sm font-semibold text-slate-200">{parameter.label}</h3>
+                  <p className="text-xs font-semibold text-sky-200">
+                    {getParameterSummary(parameter, scoring.balancedLabel)}
+                  </p>
+                </div>
+                <div
+                  role="meter"
+                  aria-label={`${parameter.label}の傾向`}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={parameter.score ?? undefined}
+                  aria-valuetext={getParameterSummary(parameter, scoring.balancedLabel)}
+                  className="relative mt-3 h-2 rounded-full bg-gradient-to-r from-indigo-400/70 via-slate-600 to-sky-300/70"
+                >
                   <span
-                    className="absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-slate-900 bg-white shadow"
-                    style={{ left: `${parameter.score}%` }}
+                    className="absolute left-1/2 top-1/2 h-4 w-px -translate-x-1/2 -translate-y-1/2 bg-slate-300/70"
                     aria-hidden="true"
                   />
-                )}
+                  {parameter.score !== null && (
+                    <span
+                      className="absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-slate-900 bg-white shadow"
+                      style={{ left: `${parameter.score}%` }}
+                      aria-hidden="true"
+                    />
+                  )}
+                </div>
+                <div className="mt-1.5 flex items-start justify-between gap-3 text-[11px] leading-tight text-slate-400">
+                  <span>{parameter.lowLabel}</span>
+                  <span className="text-right">{parameter.highLabel}</span>
+                </div>
+                <p className="mt-1 text-[10px] text-slate-500">{`回答充足度 ${parameter.coverage}%`}</p>
               </div>
-              <div className="mt-1.5 flex items-start justify-between gap-3 text-[11px] leading-tight text-slate-400">
-                <span>{parameter.lowLabel}</span>
-                <span className="text-right">{parameter.highLabel}</span>
-              </div>
-              <p className="mt-1 text-[10px] text-slate-500">{`回答充足度 ${parameter.coverage}%`}</p>
-            </div>
-          ))}
-        </fieldset>
-      </section>
+            ))}
+          </fieldset>
+        </section>
+      ) : (
+        <p className="mt-5 rounded-2xl border border-slate-700 bg-slate-800 p-4 text-sm text-slate-300">
+          この診断には、回答から見える傾向がまだ設定されていません。回答内容は確認できます。
+        </p>
+      )}
 
       <section aria-label="回答内容" className="mt-7 pb-8">
         <details className="group rounded-2xl border border-slate-700 bg-slate-800">

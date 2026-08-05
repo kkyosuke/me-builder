@@ -1,5 +1,3 @@
-import type { ParameterProfile } from "./scoring";
-
 export interface DiagnosisResultAnswer {
   diagnosisQuestionId: string;
   questionId: string;
@@ -10,7 +8,23 @@ export interface DiagnosisResultAnswer {
   acceptedAt: string;
 }
 
-/** 保存済み回答と、それらから決定的に再計算した表示用プロフィール。 */
+export interface ScoredParameter {
+  id: string;
+  label: string;
+  lowLabel: string;
+  highLabel: string;
+  score: number | null;
+  coverage: number;
+  band: "low" | "balanced" | "high" | "insufficient";
+}
+
+interface DiagnosisScoring {
+  scoringVersion: number;
+  balancedLabel: string;
+  parameters: ScoredParameter[];
+}
+
+/** APIが返す保存済み回答と計算済みの表示用プロフィール。 */
 export interface DiagnosisResult {
   id: string;
   title: string;
@@ -19,6 +33,5 @@ export interface DiagnosisResult {
   answeredCount: number;
   questionCount: number;
   answers: DiagnosisResultAnswer[];
-  balancedLabel: string;
-  profile: ParameterProfile<string>;
+  scoring: DiagnosisScoring | null;
 }

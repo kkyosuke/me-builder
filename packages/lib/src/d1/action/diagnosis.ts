@@ -6,6 +6,7 @@ import {
   diagnosisDeferredQuestions,
   diagnosisQuestions,
   diagnosisResponses,
+  diagnosisScoringConfigs,
   questionChoices,
   questions as questionRoots,
   questionVersions,
@@ -42,7 +43,6 @@ export type DiagnosisDetail = Readonly<{
     choices: Array<{
       choiceId: string;
       label: string;
-      presentation: Record<string, string>;
     }>;
   }>;
 }>;
@@ -82,6 +82,16 @@ export type DiagnosisAnswers = Readonly<{
   responseStatus: DiagnosisListResponseStatus;
   answeredCount: number;
   questionCount: number;
+  scoringConfig: {
+    id: string;
+    version: number;
+    definition: unknown;
+    questions: Array<{
+      questionId: string;
+      questionVersion: number;
+      choiceIds: string[];
+    }>;
+  } | null;
   answers: Array<{
     diagnosisQuestionId: string;
     questionId: string;
@@ -473,7 +483,6 @@ export async function findOpenDiagnosisDetail(
       hint: questionVersions.hint,
       choiceId: questionChoices.choiceId,
       choiceLabel: questionChoices.label,
-      choicePresentation: questionChoices.presentation,
     })
     .from(diagnosisQuestions)
     .innerJoin(
@@ -507,7 +516,6 @@ export async function findOpenDiagnosisDetail(
     const choice = {
       choiceId: row.choiceId,
       label: row.choiceLabel,
-      presentation: row.choicePresentation ?? {},
     };
     if (previous?.diagnosisQuestionId === row.diagnosisQuestionId) {
       previous.choices.push(choice);
@@ -552,9 +560,19 @@ export async function findDiagnosisAnswers(
       opensAt: diagnoses.opensAt,
       state: diagnoses.state,
       diagnosisIsDeleted: diagnoses.isDeleted,
+      scoringConfigId: diagnosisScoringConfigs.id,
+      scoringConfigVersion: diagnosisScoringConfigs.version,
+      scoringConfigDefinition: diagnosisScoringConfigs.definition,
     })
     .from(diagnosisResponses)
     .innerJoin(diagnoses, eq(diagnoses.id, diagnosisResponses.diagnosisId))
+    .leftJoin(
+      diagnosisScoringConfigs,
+      and(
+        eq(diagnosisScoringConfigs.id, diagnoses.scoringConfigId),
+        eq(diagnosisScoringConfigs.isDeleted, false),
+      ),
+    )
     .where(
       and(
         eq(diagnosisResponses.accountId, accountId),
@@ -573,7 +591,7 @@ export async function findDiagnosisAnswers(
     return { type: "not-found" };
   }
 
-  const [questionCountRow, rows] = await Promise.all([
+  const [questionCountRow, scoringQuestionRows, rows] = await Promise.all([
     db
       .select({ value: count(diagnosisQuestions.id) })
       .from(diagnosisQuestions)
@@ -584,6 +602,43 @@ export async function findDiagnosisAnswers(
         ),
       )
       .get(),
+    db
+      .select({
+        questionId: diagnosisQuestions.questionId,
+        questionVersion: diagnosisQuestions.questionVersion,
+        choiceId: questionChoices.choiceId,
+      })
+      .from(diagnosisQuestions)
+      .innerJoin(
+        questionRoots,
+        and(
+          eq(questionRoots.id, diagnosisQuestions.questionId),
+          eq(questionRoots.isDeleted, false),
+        ),
+      )
+      .innerJoin(
+        questionVersions,
+        and(
+          eq(questionVersions.questionId, diagnosisQuestions.questionId),
+          eq(questionVersions.version, diagnosisQuestions.questionVersion),
+          eq(questionVersions.isDeleted, false),
+        ),
+      )
+      .innerJoin(
+        questionChoices,
+        and(
+          eq(questionChoices.questionId, diagnosisQuestions.questionId),
+          eq(questionChoices.questionVersion, diagnosisQuestions.questionVersion),
+          eq(questionChoices.isDeleted, false),
+        ),
+      )
+      .where(
+        and(
+          eq(diagnosisQuestions.diagnosisId, diagnosisId),
+          eq(diagnosisQuestions.isDeleted, false),
+        ),
+      )
+      .orderBy(asc(diagnosisQuestions.position), asc(questionChoices.position)),
     db
       .select({
         diagnosisQuestionId: diagnosisAnswers.diagnosisQuestionId,
@@ -633,6 +688,19 @@ export async function findDiagnosisAnswers(
 
   const questionCount = questionCountRow?.value ?? 0;
   const answeredCount = rows.length;
+  const scoringQuestions: NonNullable<DiagnosisAnswers["scoringConfig"]>["questions"] = [];
+  for (const row of scoringQuestionRows) {
+    const previous = scoringQuestions.at(-1);
+    if (previous?.questionId === row.questionId) {
+      previous.choiceIds.push(row.choiceId);
+    } else {
+      scoringQuestions.push({
+        questionId: row.questionId,
+        questionVersion: row.questionVersion,
+        choiceIds: [row.choiceId],
+      });
+    }
+  }
   return {
     type: "found",
     diagnosis: {
@@ -642,6 +710,17 @@ export async function findDiagnosisAnswers(
       responseStatus: answeredCount === questionCount ? "answered" : "in-progress",
       answeredCount,
       questionCount,
+      scoringConfig:
+        response.scoringConfigId &&
+        response.scoringConfigVersion !== null &&
+        response.scoringConfigDefinition !== null
+          ? {
+              id: response.scoringConfigId,
+              version: response.scoringConfigVersion,
+              definition: response.scoringConfigDefinition,
+              questions: scoringQuestions,
+            }
+          : null,
       answers: rows.map((answer) => ({
         ...answer,
         acceptedAt: answer.acceptedAt.toISOString(),

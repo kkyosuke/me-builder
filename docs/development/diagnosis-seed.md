@@ -2,7 +2,7 @@
 
 ## 1. この文書の目的
 
-この文書は、運営がQuestion、Question Version、Choice、DiagnosisをCloudflare D1へ登録するseedの配置、実行、更新、検証方法を所有します。
+この文書は、運営がQuestion、Question Version、Choice、Diagnosis、版付き採点設定をCloudflare D1へ登録するseedの配置、実行、更新、検証方法を所有します。
 
 Question、Diagnosisの状態と不変条件は[Phase 1 診断ドメイン設計](../diagnosis/diagnosis-domain-design.md)、質問文は[診断の質問集](../diagnosis/content/relationship-values-yes-no-question-bank.md)、回答からパラメータへの変換は[診断回答のパラメータ変換設計](../diagnosis/scoring/parameter-scoring-design.md)を正とします。この文書は、質問内容、スコアリング設定、D1スキーマを所有しません。
 
@@ -28,7 +28,8 @@ seedは必ずmigration適用後に実行します。localでは開発者が明�
 - 公開済みDiagnosisのタイトル、受付期間、質問、版、順序を更新しない
 - 公開内容を変える場合は、新しいDiagnosis IDで登録する
 - `created_at`などの日時はDrizzleの`timestamp` modeに合わせたUnix秒で記録する
-- スコアリング設定はseed SQLへ重複させず、各スコアリング設計と実装を正とする
+- 採点設定の意味と計算規則は各スコアリング設計を正とし、実行時の設定値をseedから版付きの不変な行として登録する
+- 公開済みDiagnosisが参照する採点設定行を更新せず、変更時は新しい設定IDとversionを追加する
 
 `INSERT OR IGNORE`は同じ主キーの既存行を変更しません。そのため再実行前には、既存行がseedの期待内容と一致しているかを確認します。意図しない差分がある場合、SQLの上書き更新で解消せず、Question VersionまたはDiagnosisを新しく作ります。
 
@@ -43,7 +44,7 @@ seedは必ずmigration適用後に実行します。localでは開発者が明�
 | `relationship-priority` | 自分と相手の優先・境界線 | すべてversion 1 | 2026-08-04 00:00:00 UTC |
 | `money-values` | お金と消費 | すべてversion 1 | 2026-08-04 00:00:00 UTC |
 
-どちらも終了日時を持たず、Question Versionは`approved`、Diagnosisは`published`として登録します。Diagnosisには一覧表示用の短い説明を持たせ、Choiceの`presentation`にはWeb表示用のアイコン名をJSONで保持します。
+どちらも終了日時を持たず、Question Versionは`approved`、Diagnosisは`published`として登録します。Diagnosisには一覧表示用の短い説明と版付き採点設定への参照を持たせます。Choiceは「いいえ」「はい」の2件です。
 
 ## 5. 実行方法
 
@@ -84,6 +85,7 @@ SQL末尾の検証クエリは、現在のseedだけを適用した場合に次�
 | Question Version | 20 |
 | Choice | 40 |
 | Diagnosis Question | 20 |
+| Diagnosis Scoring Config | 2 |
 
 件数だけでなく、次も確認します。
 
@@ -91,8 +93,11 @@ SQL末尾の検証クエリは、現在のseedだけを適用した場合に次�
 - 1つのDiagnosisにposition 0から9までの10問がある
 - 各Question Versionが`approved`である
 - 各Question Versionにposition 0の「いいえ」とposition 1の「はい」がある
+- 各Diagnosisが対応するversion 1の採点設定を参照している
 - seedを2回実行しても件数と内容が変わらない
-- Webの固定定義とQuestion ID、Question Version、Choice ID、表示順が一致する
+- 採点設定とQuestion ID、Question Version、Choice IDが一致する
+
+`task ci`はseedを適用したローカルD1に対し、採点設定を参照する全Diagnosisへ回答保存・回答内容取得を行います。採点設定と質問定義が一致せず計算結果を返せない場合はE2Eテストを失敗させ、preview・productionへの適用前に停止します。
 
 ## 7. 追加・改訂手順
 
@@ -100,9 +105,10 @@ SQL末尾の検証クエリは、現在のseedだけを適用した場合に次�
 
 1. Question IDとQuestion Versionを決める
 2. Question VersionとChoiceを`approved`として追加する
-3. 新しいDiagnosis IDと固定した質問順を追加する
-4. localへ適用し、再実行と取得結果を検証する
-5. マージ後、preview CDの適用結果をAPIとWebから確認する
-6. production CDの対象DBと適用結果を確認する
+3. 新しいIDとversionで採点設定を追加する
+4. 新しいDiagnosis ID、採点設定への参照、固定した質問順を追加する
+5. localへ適用し、再実行と取得結果を検証する
+6. マージ後、preview CDの適用結果をAPIとWebから確認する
+7. production CDの対象DBと適用結果を確認する
 
 公開済みの内容を改訂するときは、既存のSQL行を書き換えて既存DBへ反映させようとしてはいけません。新しいQuestion VersionとDiagnosisを追記し、過去の回答が参照する版を残します。

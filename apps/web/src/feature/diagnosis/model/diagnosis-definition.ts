@@ -1,5 +1,4 @@
-import type { ParameterProfile } from "./scoring";
-import type { DiagnosisInteraction, DiagnosisQuestion } from "./types";
+import type { DiagnosisQuestion } from "./types";
 
 /** 画面へ渡す診断定義。取得元に依存しないfeature内のモデルとして扱う。 */
 export interface DiagnosisDefinition {
@@ -7,6 +6,4 @@ export interface DiagnosisDefinition {
   title: string;
   description: string;
   questions: DiagnosisQuestion[];
-  balancedLabel: string;
-  score: (interactions: DiagnosisInteraction[]) => ParameterProfile<string>;
 }

@@ -96,4 +96,45 @@ describe("Diagnosis D1 migration", () => {
 
     sqlite.close();
   });
+
+  it("既存Diagnosisを保持したまま版付き採点設定を参照可能にする", () => {
+    const sqlite = new Database(":memory:");
+    sqlite.pragma("foreign_keys = ON");
+
+    for (const filename of [
+      "0000_abnormal_bullseye.sql",
+      "0001_optimal_madame_hydra.sql",
+      "0002_marvelous_hex.sql",
+      "0003_square_power_pack.sql",
+      "0004_puzzling_la_nuit.sql",
+      "0005_rename_diagnosis.sql",
+    ]) {
+      applyMigration(sqlite, filename);
+    }
+    sqlite.exec(`
+      INSERT INTO diagnoses (
+        id, created_at, updated_at, title, description, opens_at, state, published_at
+      ) VALUES ('diagnosis-existing', 1, 1, '既存診断', '説明', 1, 'published', 1);
+    `);
+
+    applyMigration(sqlite, "0006_grey_krista_starr.sql");
+
+    expect(sqlite.prepare("SELECT id, scoring_config_id FROM diagnoses").get()).toEqual({
+      id: "diagnosis-existing",
+      scoring_config_id: null,
+    });
+
+    sqlite.exec(`
+      INSERT INTO diagnosis_scoring_configs (
+        id, created_at, updated_at, version, definition
+      ) VALUES ('scoring-v1', 1, 1, 1, '{}');
+      UPDATE diagnoses SET scoring_config_id = 'scoring-v1' WHERE id = 'diagnosis-existing';
+    `);
+    expect(sqlite.prepare("SELECT scoring_config_id FROM diagnoses").get()).toEqual({
+      scoring_config_id: "scoring-v1",
+    });
+    expect(sqlite.pragma("foreign_key_check")).toEqual([]);
+
+    sqlite.close();
+  });
 });

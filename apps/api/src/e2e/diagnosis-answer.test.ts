@@ -69,9 +69,13 @@ const env = () => ({
   ENVIRONMENT: "test",
 });
 
-async function putAnswer(diagnosisQuestionId: string, choiceId = "yes"): Promise<Response> {
+async function putAnswer(
+  diagnosisQuestionId: string,
+  choiceId = "yes",
+  diagnosisId = "relationship-priority",
+): Promise<Response> {
   return app.request(
-    `/api/diagnoses/relationship-priority/answers/${diagnosisQuestionId}`,
+    `/api/diagnoses/${diagnosisId}/answers/${diagnosisQuestionId}`,
     {
       method: "PUT",
       headers: {
@@ -84,9 +88,9 @@ async function putAnswer(diagnosisQuestionId: string, choiceId = "yes"): Promise
   );
 }
 
-async function getAnswers(): Promise<Response> {
+async function getAnswers(diagnosisId = "relationship-priority"): Promise<Response> {
   return app.request(
-    "/api/diagnoses/relationship-priority/answers",
+    `/api/diagnoses/${diagnosisId}/answers`,
     { headers: { Authorization: "Bearer known-token" } },
     env(),
   );
@@ -236,7 +240,65 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
           choiceLabel: "いいえ",
         },
       ],
+      scoring: {
+        scoringVersion: 1,
+        balancedLabel: "状況に応じて調整",
+        parameters: expect.arrayContaining([
+          expect.objectContaining({ id: "priority-balance", coverage: 33, score: null }),
+        ]),
+      },
     });
+  });
+
+  it("seedで参照される全採点設定がQuestion ID・Version・Choiceと一致する", async () => {
+    const rows = await database
+      .prepare(
+        `SELECT
+           d.id AS diagnosis_id,
+           dq.id AS diagnosis_question_id,
+           qc.choice_id
+         FROM diagnoses AS d
+         INNER JOIN diagnosis_scoring_configs AS sc
+           ON sc.id = d.scoring_config_id AND sc.is_deleted = 0
+         INNER JOIN diagnosis_questions AS dq
+           ON dq.diagnosis_id = d.id AND dq.is_deleted = 0
+         INNER JOIN question_choices AS qc
+           ON qc.question_id = dq.question_id
+          AND qc.question_version = dq.question_version
+          AND qc.is_deleted = 0
+         WHERE d.state = 'published' AND d.is_deleted = 0
+         ORDER BY d.id, dq.position, qc.position`,
+      )
+      .all<{
+        diagnosis_id: string;
+        diagnosis_question_id: string;
+        choice_id: string;
+      }>();
+    const targets = new Map<string, { diagnosisQuestionId: string; choiceId: string }>();
+    for (const row of rows.results) {
+      if (!targets.has(row.diagnosis_id)) {
+        targets.set(row.diagnosis_id, {
+          diagnosisQuestionId: row.diagnosis_question_id,
+          choiceId: row.choice_id,
+        });
+      }
+    }
+    expect(targets.size).toBeGreaterThan(0);
+
+    for (const [diagnosisId, target] of targets) {
+      const saved = await putAnswer(target.diagnosisQuestionId, target.choiceId, diagnosisId);
+      expect(saved.status).toBe(200);
+
+      const response = await getAnswers(diagnosisId);
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({
+        id: diagnosisId,
+        scoring: {
+          scoringVersion: expect.any(Number),
+          parameters: expect.any(Array),
+        },
+      });
+    }
   });
 
   it(`${diagnosisAnswerCases.missingContents.id}: ${diagnosisAnswerCases.missingContents.name}`, async () => {

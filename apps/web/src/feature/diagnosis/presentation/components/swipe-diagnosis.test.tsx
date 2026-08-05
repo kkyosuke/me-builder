@@ -9,16 +9,14 @@ const diagnosis: DiagnosisDefinition = {
   id: "diagnosis-1",
   title: "保存テスト",
   description: "説明",
-  balancedLabel: "中間",
-  score: () => ({ scoringVersion: 1, parameters: [] }),
   questions: [
     {
       diagnosisQuestionId: "dq-1",
       questionId: "q-1",
       questionVersion: 1,
       text: "保存する質問",
-      left: { choiceId: "no", label: "いいえ", icon: "circle-x" },
-      right: { choiceId: "yes", label: "はい", icon: "circle-check" },
+      left: { choiceId: "no", label: "いいえ" },
+      right: { choiceId: "yes", label: "はい" },
     },
   ],
 };
@@ -32,8 +30,8 @@ const twoQuestionDiagnosis: DiagnosisDefinition = {
       questionId: "q-2",
       questionVersion: 1,
       text: "次の質問",
-      left: { choiceId: "no", label: "いいえ", icon: "circle-x" },
-      right: { choiceId: "yes", label: "はい", icon: "circle-check" },
+      left: { choiceId: "no", label: "いいえ" },
+      right: { choiceId: "yes", label: "はい" },
     },
   ],
 };
@@ -174,7 +172,7 @@ describe("SwipeDiagnosis answer persistence", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "あとで回答する" }));
 
-    expect(await screen.findByText("保存した回答から見える現在の傾向")).toBeTruthy();
+    expect(await screen.findByText("今回の回答はここまでです")).toBeTruthy();
     expect(onComplete).not.toHaveBeenCalled();
   });
 });

@@ -19,20 +19,7 @@ export const diagnosisDetailCases = {
         firstQuestion: {
           diagnosisQuestionId: "dq-relationship-priority-01",
           questionVersion: 1,
-          choices: [
-            {
-              choiceId: "no",
-              presentation: {
-                icon: "circle-x",
-              },
-            },
-            {
-              choiceId: "yes",
-              presentation: {
-                icon: "circle-check",
-              },
-            },
-          ],
+          choices: [{ choiceId: "no" }, { choiceId: "yes" }],
         },
       },
     },

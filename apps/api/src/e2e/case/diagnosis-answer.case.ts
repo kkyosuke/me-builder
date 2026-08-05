@@ -73,7 +73,7 @@ export const diagnosisAnswerCases = {
   },
   getContents: {
     id: "ANSWER-005",
-    name: "保存済み回答を質問文と選択肢ラベル付きで取得すること",
+    name: "保存済み回答を質問文・選択肢ラベル・計算済み傾向付きで取得すること",
     in: {
       method: "GET",
       path: "/api/diagnoses/relationship-priority/answers",
@@ -90,6 +90,7 @@ export const diagnosisAnswerCases = {
           { diagnosisQuestionId: "dq-relationship-priority-01", choiceLabel: "はい" },
           { diagnosisQuestionId: "dq-relationship-priority-02", choiceLabel: "いいえ" },
         ],
+        scoring: { scoringVersion: 1, parameterCount: 4 },
       },
     },
   },

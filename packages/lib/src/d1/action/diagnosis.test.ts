@@ -75,6 +75,7 @@ async function insertDiagnosis(
     state?: "draft" | "published" | "withdrawn";
     opensAt?: Date;
     closesAt?: Date;
+    scoringConfigId?: string;
   },
 ) {
   const questionIds = [`${input.id}-q1`, `${input.id}-q2`];
@@ -85,6 +86,7 @@ async function insertDiagnosis(
     id: input.id,
     title: `${input.id} title`,
     description: `${input.id} description`,
+    ...(input.scoringConfigId ? { scoringConfigId: input.scoringConfigId } : {}),
     opensAt: input.opensAt ?? new Date("2026-08-01T00:00:00Z"),
     ...(input.closesAt ? { closesAt: input.closesAt } : {}),
     state: input.state ?? "published",
@@ -228,8 +230,8 @@ describe("findOpenDiagnosisDetail", () => {
             questionVersion: 1,
             text: "diagnosis-detail-q1の質問",
             choices: [
-              { choiceId: "no", label: "いいえ", presentation: {} },
-              { choiceId: "yes", label: "はい", presentation: {} },
+              { choiceId: "no", label: "いいえ" },
+              { choiceId: "yes", label: "はい" },
             ],
           }),
           expect.objectContaining({ diagnosisQuestionId: "diagnosis-detail-sq2" }),
@@ -273,12 +275,22 @@ describe("findOpenDiagnosisDetail", () => {
 });
 
 describe("findDiagnosisAnswers", () => {
-  it("受付終了後も本人の回答を質問順・回答時点の文言で返す", async () => {
+  it("受付終了後も本人の回答とDiagnosisが固定した採点設定を返す", async () => {
     const db = createTestDb();
     await db.insert(schema.accounts).values({ id: "account-result" });
+    const scoringDefinition = {
+      parameters: [{ id: "parameter", label: "項目" }],
+      choiceScores: { yes: 1, no: -1 },
+    };
+    await db.insert(schema.diagnosisScoringConfigs).values({
+      id: "result-scoring-v2",
+      version: 2,
+      definition: scoringDefinition,
+    });
     await insertDiagnosis(db, {
       id: "result-target",
       closesAt: new Date("2026-08-04T00:00:00Z"),
+      scoringConfigId: "result-scoring-v2",
     });
     const base = {
       accountId: "account-result",
@@ -307,6 +319,23 @@ describe("findDiagnosisAnswers", () => {
         responseStatus: "answered",
         answeredCount: 2,
         questionCount: 2,
+        scoringConfig: {
+          id: "result-scoring-v2",
+          version: 2,
+          definition: scoringDefinition,
+          questions: [
+            {
+              questionId: "result-target-q1",
+              questionVersion: 1,
+              choiceIds: ["no", "yes"],
+            },
+            {
+              questionId: "result-target-q2",
+              questionVersion: 1,
+              choiceIds: ["no", "yes"],
+            },
+          ],
+        },
         answers: [
           expect.objectContaining({
             diagnosisQuestionId: "result-target-sq1",
