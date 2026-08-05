@@ -247,6 +247,8 @@ describe("Worker Queue Handler", () => {
       getWorkerConfig({
         ENVIRONMENT: "test",
         LINE_CHANNEL_ACCESS_TOKEN: "test-token",
+        GOOGLE_AI_STUDIO_API_KEY: "",
+        CLOUDFLARE_AIG_TOKEN: "",
       }),
     );
 
