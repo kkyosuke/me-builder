@@ -49,7 +49,8 @@ async function prepareDatabase(db: D1Database): Promise<void> {
 
   const seed = await readFile(diagnosisSeed, "utf8");
   await applySeed(db, seed);
-  // seedの再実行でも同じ初期状態を維持できることをE2Eの前提として確認する。
+  // 運営が表示順を変更した場合も、seedの再実行で正式値へ戻ることを確認する。
+  await db.prepare("UPDATE diagnoses SET display_order = 999").run();
   await applySeed(db, seed);
 
   await db

@@ -284,11 +284,10 @@ ON CONFLICT(id) DO UPDATE SET
     ELSE diagnoses.description
   END,
   scoring_config_id = COALESCE(diagnoses.scoring_config_id, excluded.scoring_config_id),
-  display_order = CASE
-    WHEN diagnoses.display_order = 0 THEN excluded.display_order
-    ELSE diagnoses.display_order
-  END
-WHERE diagnoses.description = '' OR diagnoses.scoring_config_id IS NULL OR diagnoses.display_order = 0;
+  display_order = excluded.display_order
+WHERE diagnoses.description = ''
+  OR diagnoses.scoring_config_id IS NULL
+  OR diagnoses.display_order <> excluded.display_order;
 --> statement-breakpoint
 
 INSERT OR IGNORE INTO diagnosis_questions (
