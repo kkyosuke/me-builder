@@ -1,6 +1,9 @@
 import { d1, line } from "@me-builder/lib";
 import { logger } from "@me-builder/shared";
 import type { WorkerConfig } from "../../config";
+import { createGeminiClient, generateText } from "../../infrastructure/gemini-client";
+
+type GenerateAiText = (prompt: string) => Promise<string | undefined>;
 
 export async function processLineWebhook(
   payload: unknown,
@@ -14,6 +17,7 @@ export async function processLineWebhook(
 
   const events = line.webhook.parseEvents(payload);
   const apiClient = line.client.create(workerConfig.lineChannelAccessToken);
+  const generateAiText = createAiTextGenerator(workerConfig);
 
   for (const event of events) {
     const providerAccountId = event.source?.userId;
@@ -30,7 +34,13 @@ export async function processLineWebhook(
       // ここで Account を補完する。友だち追加より前から利用しているユーザーや、
       // follow イベントの処理に失敗したユーザーが Web 側で本人確認できなくなるのを防ぐ。
       await ensureAccountIdentity(db, providerAccountId, "message");
-      await handleTextMessage(event.replyToken, event.message.text, apiClient, workerConfig.liffId);
+      await handleTextMessage(
+        event.replyToken,
+        event.message.text,
+        apiClient,
+        workerConfig.liffId,
+        generateAiText,
+      );
     }
   }
 }
@@ -64,11 +74,11 @@ async function ensureAccountIdentity(
 /**
  * テキストメッセージの意図。
  *
- * トークへ送られたテキストは既定で日記として扱い、診断のリンクを求めるキーワードだけを
- * 例外として切り出します。LINE は日記の入力と診断のリンク配信を担当します
+ * トークへ送られたテキストは既定で日記として扱い、診断のリンクを求めるキーワードと
+ * 明示的な `AI:` 接続確認だけを例外として切り出します。LINE は日記の入力と診断のリンク配信を担当します
  * ([プロジェクト概要 §4](../../../../../docs/product/project-overview.md#4-想定する利用体験))。
  */
-export type LineTextIntent = "diagnosis-request" | "diary";
+export type LineTextIntent = "diagnosis-request" | "ai-chat" | "diary";
 
 /**
  * 診断のリンクを求めるキーワード。
@@ -107,7 +117,16 @@ export function classifyLineText(text: string): LineTextIntent {
   const isDiagnosisRequest = DIAGNOSIS_KEYWORDS.some(
     (keyword) => normalizeMessageText(keyword) === normalized,
   );
-  return isDiagnosisRequest ? "diagnosis-request" : "diary";
+  if (isDiagnosisRequest) {
+    return "diagnosis-request";
+  }
+  return extractAiPrompt(text) === undefined ? "diary" : "ai-chat";
+}
+
+/** `AI: 質問` 形式の接続確認メッセージから、Geminiへ渡す質問だけを取り出します。 */
+export function extractAiPrompt(text: string): string | undefined {
+  const match = text.trim().match(/^ai\s*[:：]\s*(.*)$/is);
+  return match?.[1]?.trim();
 }
 
 /** 「今日の診断」への導線。タップすると LINE 内で Web が開きます。 */
@@ -132,6 +151,12 @@ export function buildReplyText(messageText: string, liffId?: string): string {
     return buildDiagnosisLink(liffId);
   }
 
+  if (classifyLineText(messageText) === "ai-chat") {
+    return extractAiPrompt(messageText)
+      ? "いまはAIに接続できません。時間をおいてもう一度お試しください。"
+      : "`AI:` の後に質問を入力してください。";
+  }
+
   const received = "受け付けました。";
   if (!liffId) {
     return received;
@@ -139,25 +164,76 @@ export function buildReplyText(messageText: string, liffId?: string): string {
   return `${received}\n${buildDiagnosisLink(liffId)}`;
 }
 
+const LINE_TEXT_MESSAGE_MAX_LENGTH = 5000;
+
+/** Geminiの応答をLINEのテキスト上限に収めます。 */
+export function buildAiReplyText(generatedText: string): string | undefined {
+  const text = generatedText.trim();
+  if (!text) {
+    return undefined;
+  }
+
+  const truncated = text.slice(0, LINE_TEXT_MESSAGE_MAX_LENGTH);
+  const lastCodeUnit = truncated.charCodeAt(truncated.length - 1);
+  return lastCodeUnit >= 0xd800 && lastCodeUnit <= 0xdbff ? truncated.slice(0, -1) : truncated;
+}
+
+function createAiTextGenerator(workerConfig: WorkerConfig): GenerateAiText | undefined {
+  if (!workerConfig.googleAiStudioApiKey || !workerConfig.cloudflareAiGatewayToken) {
+    return undefined;
+  }
+
+  const client = createGeminiClient({
+    googleAiStudioApiKey: workerConfig.googleAiStudioApiKey,
+    cloudflareAiGatewayToken: workerConfig.cloudflareAiGatewayToken,
+    cloudflareAiGatewayBaseUrl: workerConfig.cloudflareAiGatewayBaseUrl,
+  });
+  return (prompt) => generateText(client, workerConfig.geminiModel, prompt);
+}
+
 async function handleTextMessage(
   replyToken: string,
   messageText: string,
   apiClient: ReturnType<typeof line.client.create>,
   liffId?: string,
+  generateAiText?: GenerateAiText,
 ): Promise<void> {
+  const intent = classifyLineText(messageText);
+  let replyText = buildReplyText(messageText, liffId);
+  let aiResponded = false;
+
+  if (intent === "ai-chat" && generateAiText) {
+    const prompt = extractAiPrompt(messageText);
+    if (prompt) {
+      try {
+        const generatedText = await generateAiText(prompt);
+        const aiReplyText = generatedText ? buildAiReplyText(generatedText) : undefined;
+        if (aiReplyText) {
+          replyText = aiReplyText;
+          aiResponded = true;
+        }
+      } catch (error) {
+        logger.error(
+          { error: error instanceof Error ? error.message : String(error) },
+          "[Gemini] Failed to generate a LINE reply",
+        );
+      }
+    }
+  }
+
   try {
     await apiClient.replyMessage({
       replyToken,
       messages: [
         {
           type: "text",
-          text: buildReplyText(messageText, liffId),
+          text: replyText,
         },
       ],
     });
     logger.info(
       // 本文は日記そのものなのでログへ出さず、判定結果だけを残します。
-      { replyToken, intent: classifyLineText(messageText), hasLiffLink: Boolean(liffId) },
+      { replyToken, intent, hasLiffLink: Boolean(liffId), aiResponded },
       "[LINE Reply] Reply sent successfully via LINE Messaging API",
     );
   } catch (error) {

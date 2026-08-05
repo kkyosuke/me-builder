@@ -14,13 +14,14 @@ async function processWebhookMessage(
   db: d1.Client,
   workerConfig?: WorkerConfig,
 ): Promise<void> {
-  const messages = line.webhook.extractMessages(message.body.payload);
+  const messageCount = line.webhook.extractMessages(message.body.payload).length;
   logger.info(
     {
       id: message.id,
       timestamp: message.timestamp,
-      event: message.body,
-      messages: messages.length > 0 ? messages : undefined,
+      source: message.body.source,
+      receivedAt: message.body.receivedAt,
+      messageCount,
     },
     "Processing webhook message from queue",
   );

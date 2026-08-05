@@ -126,7 +126,8 @@ flowchart TD
 5. **外部LLMの呼び出し**
    - Google AI Studio の Gemini を利用する処理は、Queue Worker から Cloudflare AI Gateway を経由して呼び出します。
    - Google AI Studio API key と AI Gateway token は Worker の Secret として保持し、Web UI、APIレスポンス、ログへ露出させません。
-   - モデルへ渡す入力、生成結果の用途、保存方法は機能ごとの設計で決定し、このインフラ構成では規定しません。
+   - 接続確認では、LINEへ `AI: 質問` と明示して送った本文だけをモデルへ渡し、生成結果を同じトークへ返信します。通常の日記と診断要求はモデルへ送りません。
+   - モデルへ渡した本文と生成結果はアプリケーションログおよびデータベースへ保存しません。
 
 ## 6. 開発・運用環境方針
 

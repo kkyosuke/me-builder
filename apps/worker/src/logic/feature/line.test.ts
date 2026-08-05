@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildReplyText, classifyLineText } from "./line";
+import { buildAiReplyText, buildReplyText, classifyLineText, extractAiPrompt } from "./line";
 
 const LIFF_ID = "1234567890-abcdefgh";
 const DIARY_TEXT = "今日は散歩をして、久しぶりに本を読んだ。";
@@ -29,6 +29,28 @@ describe("classifyLineText", () => {
   it("通常のテキストは日記として扱うこと", () => {
     expect(classifyLineText(DIARY_TEXT)).toBe("diary");
     expect(classifyLineText("")).toBe("diary");
+  });
+
+  it("`AI:` で始まるテキストをAIチャットとして扱うこと", () => {
+    expect(classifyLineText("AI: こんにちは")).toBe("ai-chat");
+    expect(classifyLineText("ai：今日の天気を教えて")).toBe("ai-chat");
+  });
+});
+
+describe("extractAiPrompt", () => {
+  it("接頭辞を除いた質問を返し、通常のテキストには反応しないこと", () => {
+    expect(extractAiPrompt("AI:  こんにちは ")).toBe("こんにちは");
+    expect(extractAiPrompt("ai：今日の天気を教えて")).toBe("今日の天気を教えて");
+    expect(extractAiPrompt(DIARY_TEXT)).toBeUndefined();
+  });
+});
+
+describe("buildAiReplyText", () => {
+  it("応答を整形し、LINEの上限へ収めること", () => {
+    expect(buildAiReplyText("  Geminiからの返信  ")).toBe("Geminiからの返信");
+    expect(buildAiReplyText("a".repeat(5001))).toHaveLength(5000);
+    expect(buildAiReplyText("🍎".repeat(2501))).toHaveLength(5000);
+    expect(buildAiReplyText("  ")).toBeUndefined();
   });
 });
 
@@ -66,6 +88,16 @@ describe("buildReplyText", () => {
 
     it("送られた本文をオウム返ししないこと", () => {
       expect(buildReplyText(DIARY_TEXT, LIFF_ID)).not.toContain(DIARY_TEXT);
+    });
+  });
+
+  describe("AIチャットが送られたとき", () => {
+    it("質問が空なら入力方法を案内すること", () => {
+      expect(buildReplyText("AI:", LIFF_ID)).toContain("`AI:` の後に質問");
+    });
+
+    it("AI接続が利用できない場合の案内を返すこと", () => {
+      expect(buildReplyText("AI: こんにちは", LIFF_ID)).toContain("いまはAIに接続できません");
     });
   });
 

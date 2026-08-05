@@ -7,6 +7,16 @@ import { handleQueueBatch } from "./logic/webhook";
 
 import { d1, line } from "@me-builder/lib";
 
+const { mockGenerateContent } = vi.hoisted(() => ({
+  mockGenerateContent: vi.fn().mockResolvedValue({ text: "AIからの返信" }),
+}));
+
+vi.mock("@google/genai", () => ({
+  GoogleGenAI: class {
+    models = { generateContent: mockGenerateContent };
+  },
+}));
+
 const mockReplyMessage = vi.fn().mockResolvedValue({});
 vi.spyOn(line.client, "create").mockReturnValue({
   replyMessage: mockReplyMessage,
@@ -36,6 +46,7 @@ vi.spyOn(d1.action.account, "upsertIdentity").mockResolvedValue({
 describe("Worker Queue Handler", () => {
   beforeEach(() => {
     mockReplyMessage.mockClear();
+    mockGenerateContent.mockClear();
   });
   it("processes queue batch and acknowledges messages", async () => {
     const mockAck = vi.fn();
@@ -151,6 +162,59 @@ describe("Worker Queue Handler", () => {
         },
       ],
     });
+  });
+
+  it("`AI:` に続く質問をGeminiへ送り、生成結果を返信すること", async () => {
+    const message = {
+      id: "msg-ai",
+      timestamp: new Date("2026-07-25T12:00:00Z"),
+      attempts: 1,
+      body: {
+        id: "evt-ai",
+        source: "line",
+        receivedAt: "2026-07-25T12:00:00Z",
+        payload: {
+          events: [
+            {
+              type: "message",
+              replyToken: "ai-reply-token",
+              message: { type: "text", text: "AI: Cloudflareとは？" },
+              source: { type: "user", userId: "test-user" },
+            },
+          ],
+        },
+      },
+      ack: vi.fn(),
+      retry: vi.fn(),
+    } as Message<WebhookQueueMessage>;
+    const batch = {
+      queue: "me-builder-webhook-queue-local",
+      messages: [message],
+      metadata: {},
+      ackAll: vi.fn(),
+      retryAll: vi.fn(),
+    } as unknown as MessageBatch<WebhookQueueMessage>;
+
+    await handleQueueBatch(
+      batch,
+      {} as unknown as d1.Client,
+      getWorkerConfig({
+        ENVIRONMENT: "test",
+        LINE_CHANNEL_ACCESS_TOKEN: "test-token",
+        GOOGLE_AI_STUDIO_API_KEY: "google-key",
+        CLOUDFLARE_AIG_TOKEN: "gateway-token",
+      }),
+    );
+
+    expect(mockGenerateContent).toHaveBeenCalledWith({
+      model: "gemini-3.5-flash-lite",
+      contents: "Cloudflareとは？",
+    });
+    expect(mockReplyMessage).toHaveBeenCalledWith({
+      replyToken: "ai-reply-token",
+      messages: [{ type: "text", text: "AIからの返信" }],
+    });
+    expect(message.ack).toHaveBeenCalledOnce();
   });
 
   it("fetch handler returns worker status", async () => {
