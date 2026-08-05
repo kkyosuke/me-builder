@@ -48,8 +48,15 @@ describe("SurveyResultView", () => {
 
     expect(screen.getByRole("heading", { name: "価値観アンケート" })).toBeTruthy();
     expect(screen.getByText("優先傾向")).toBeTruthy();
-    expect(screen.getByText("自分を優先")).toBeTruthy();
+    expect(screen.getByText("相手を優先")).toBeTruthy();
+    expect(screen.getAllByText("自分を優先")).toHaveLength(2);
     expect(screen.getByText("1 / 1問に回答")).toBeTruthy();
+
+    const trendList = screen.getByRole("group", { name: "回答から見える傾向の一覧" });
+    const trendMeter = screen.getByRole("meter", { name: "優先傾向の傾向" });
+    expect(trendList.contains(trendMeter)).toBe(true);
+    expect(trendMeter.getAttribute("aria-valuenow")).toBe("75");
+    expect(trendMeter.getAttribute("aria-valuetext")).toBe("自分を優先");
 
     const summary = screen.getByText("回答内容（1件）");
     const details = summary.closest("details");
