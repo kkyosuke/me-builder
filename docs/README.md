@@ -54,6 +54,7 @@ docs/
 - [診断回答のパラメータ変換設計](diagnosis/scoring/parameter-scoring-design.md) — 共通の設定形式、計算手順、版管理、追加手順
 - [「自分と相手の優先・境界線」パラメータ変換設計](diagnosis/scoring/relationship-priority-parameter-design.md) — 最初の診断固有のパラメータ、重み、表示設定
 - [「お金と消費」パラメータ変換設計](diagnosis/scoring/money-values-parameter-design.md) — 2つ目の診断固有のパラメータ、重み、表示設定
+- [「インドア・アウトドアと余暇」パラメータ変換設計](diagnosis/scoring/leisure-style-parameter-design.md) — 3つ目の診断固有のパラメータ、重み、表示設定
 
 ### ドメインを設計する
 

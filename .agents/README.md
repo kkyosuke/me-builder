@@ -22,6 +22,7 @@
 | [診断回答のパラメータ変換設計](../docs/diagnosis/scoring/parameter-scoring-design.md) | 診断固有の設定形式、共通の計算手順、版管理、追加手順 |
 | [「自分と相手の優先・境界線」パラメータ変換設計](../docs/diagnosis/scoring/relationship-priority-parameter-design.md) | 最初の診断固有の4パラメータ、質問ごとの重み、表示設定 |
 | [「お金と消費」パラメータ変換設計](../docs/diagnosis/scoring/money-values-parameter-design.md) | 2つ目の診断固有の5パラメータ、質問ごとの重み、表示設定 |
+| [「インドア・アウトドアと余暇」パラメータ変換設計](../docs/diagnosis/scoring/leisure-style-parameter-design.md) | 3つ目の診断固有の4パラメータ、質問ごとの重み、表示設定 |
 | [ドメイン設計](../docs/domain/domain-design.md) | Account / Brain / Sourceの責務・境界、Diagnosisの位置づけ、ドメイン間の関係、設計順序と進捗 |
 | [Brain内部情報の分類](../docs/domain/brain/brain-content-taxonomy.md) | Brain Itemの分類名、定義、具体例、分類とは別に持つ共通属性、意思決定での利用方法 |
 | [根拠・反証・改訂のエッジ設計](../docs/domain/brain/evidence-edge-design.md) | Source RecordとBrain Itemを結ぶエッジの種類と属性、Confidenceとの関係、外部への開示粒度、改訂された旧版の扱い |

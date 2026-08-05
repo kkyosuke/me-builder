@@ -306,7 +306,7 @@
 - 算出規則と、結果に使用した質問を本人が確認できるようにする
 - 回答数が足りない場合や回答が食い違う場合は、無理にラベルを付けない
 
-最初の「自分と相手の優先・境界線」については、[パラメータ変換設計](../scoring/relationship-priority-parameter-design.md)で質問と傾向軸の対応、計算式、表示条件を定義しています。他の話題の対応は、質問の審査と合わせて後続で定義します。
+公開済み診断の質問と傾向軸の対応、計算式、表示条件は、[自分と相手の優先・境界線](../scoring/relationship-priority-parameter-design.md)、[お金と消費](../scoring/money-values-parameter-design.md)、[インドア・アウトドアと余暇](../scoring/leisure-style-parameter-design.md)の各パラメータ変換設計を正とします。他の話題の対応は、質問の審査と合わせて後続で定義します。
 
 ## 5. 公開単位
 
