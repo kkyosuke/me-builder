@@ -9,10 +9,12 @@
     "build": "bun build src/index.ts --outdir ./dist --target bun",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --dir .",
+    "check:gemini": "bun scripts/check-gemini.ts",
     "deploy:preview": "wrangler deploy --env preview",
     "deploy:production": "wrangler deploy --env production"
   },
   "dependencies": {
+    "@google/genai": "^2.15.0",
     "@me-builder/lib": "workspace:*",
     "@me-builder/shared": "workspace:*",
     "valibot": "^1.4.2"

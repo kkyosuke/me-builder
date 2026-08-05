@@ -24,6 +24,8 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
       LINE_CHANNEL_SECRET: ${{ secrets.LINE_CHANNEL_SECRET }}
+      GOOGLE_AI_STUDIO_API_KEY: ${{ secrets.GOOGLE_AI_STUDIO_API_KEY }}
+      CLOUDFLARE_AIG_TOKEN: ${{ secrets.CLOUDFLARE_AIG_TOKEN }}
       # LIFF Server API は LINE Login チャネルのチャネルアクセストークンを要求する。
       # LINE_LOGIN_CHANNEL_ID は未設定でも LIFF ID の接頭辞から補完される。
       LINE_LOGIN_CHANNEL_ID: ${{ vars.LINE_LOGIN_CHANNEL_ID }}
@@ -73,15 +75,23 @@ jobs:
           trap 'rm -f "${api_secrets_file}" "${worker_secrets_file}"; rmdir "${secrets_dir}"' EXIT
 
           API_SECRETS_FILE="${api_secrets_file}" WORKER_SECRETS_FILE="${worker_secrets_file}" bun -e '
+            const sharedSecrets = [["LINE_CHANNEL_ACCESS_TOKEN", process.env.LINE_CHANNEL_ACCESS_TOKEN], ["LIFF_ID", process.env.LIFF_ID]];
             const optionalSecrets = Object.fromEntries(
-              [["LINE_CHANNEL_ACCESS_TOKEN", process.env.LINE_CHANNEL_ACCESS_TOKEN], ["LIFF_ID", process.env.LIFF_ID]]
+              sharedSecrets
+                .filter(([, value]) => value),
+            );
+            const workerOnlySecrets = Object.fromEntries(
+              [["GOOGLE_AI_STUDIO_API_KEY", process.env.GOOGLE_AI_STUDIO_API_KEY], ["CLOUDFLARE_AIG_TOKEN", process.env.CLOUDFLARE_AIG_TOKEN]]
                 .filter(([, value]) => value),
             );
             await Bun.write(process.env.API_SECRETS_FILE, JSON.stringify({
               LINE_CHANNEL_SECRET: process.env.LINE_CHANNEL_SECRET,
               ...optionalSecrets,
             }));
-            await Bun.write(process.env.WORKER_SECRETS_FILE, JSON.stringify(optionalSecrets));
+            await Bun.write(process.env.WORKER_SECRETS_FILE, JSON.stringify({
+              ...optionalSecrets,
+              ...workerOnlySecrets,
+            }));
           '
 
           bun --cwd apps/api wrangler deploy --env preview --secrets-file "${api_secrets_file}"
