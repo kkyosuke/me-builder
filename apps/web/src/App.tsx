@@ -198,6 +198,21 @@ function resolveSurveyDestination(survey: SurveyListItem): "answer" | GuidanceKi
   return "answer";
 }
 
+function applySavedProgress(
+  survey: SurveyListItem,
+  progress: Pick<SurveyListItem, "responseStatus" | "answeredCount" | "questionCount">,
+): SurveyListItem {
+  // バックグラウンド保存のレスポンス順が前後しても進捗を巻き戻しません。
+  const answeredCount = Math.max(survey.answeredCount, progress.answeredCount);
+  const questionCount = progress.questionCount;
+  return {
+    ...survey,
+    responseStatus: answeredCount === questionCount ? "answered" : "in-progress",
+    answeredCount,
+    questionCount,
+  };
+}
+
 export function App() {
   const [surveys, setSurveys] = useState<SurveyListItem[] | null>(null);
   const [selectedSurvey, setSelectedSurvey] = useState<SurveyListItem | null>(null);
@@ -343,12 +358,7 @@ export function App() {
         (current) =>
           current?.map((survey) =>
             survey.id === selectedDefinition.id
-              ? {
-                  ...survey,
-                  responseStatus: result.progress.responseStatus,
-                  answeredCount: result.progress.answeredCount,
-                  questionCount: result.progress.questionCount,
-                }
+              ? applySavedProgress(survey, result.progress)
               : survey,
           ) ?? null,
       );
