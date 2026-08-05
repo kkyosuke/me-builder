@@ -1,4 +1,5 @@
 import { d1 } from "@me-builder/lib";
+import { logger } from "@me-builder/shared";
 import { scoreDiagnosisAnswers } from "./diagnosis-scoring";
 import { createLiffSession } from "./liff-session";
 
@@ -53,11 +54,24 @@ export async function getDiagnosisAnswers(
     return { type: "diagnosis-answers-not-found" };
   }
   const { scoringConfig, ...diagnosis } = result.diagnosis;
+  let scoring: ReturnType<typeof scoreDiagnosisAnswers> = null;
+  try {
+    scoring = scoreDiagnosisAnswers(result.diagnosis.answers, scoringConfig);
+  } catch (error) {
+    logger.error(
+      {
+        diagnosisId,
+        scoringConfigId: scoringConfig?.id,
+        reason: error instanceof Error ? error.message : "unknown error",
+      },
+      "Diagnosis scoring config is invalid; returning answers without scoring",
+    );
+  }
   return {
     type: "resolved",
     diagnosis: {
       ...diagnosis,
-      scoring: scoreDiagnosisAnswers(result.diagnosis.answers, scoringConfig),
+      scoring,
     },
   };
 }

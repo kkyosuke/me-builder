@@ -52,6 +52,51 @@ describe("getDiagnosisAnswers", () => {
     expect(result).toEqual({ type: "diagnosis-answers-not-found" });
   });
 
+  it("採点設定が不正でも保存済み回答を返す", async () => {
+    const diagnosis = {
+      id: "diagnosis-1",
+      title: "タイトル",
+      description: "説明",
+      responseStatus: "in-progress" as const,
+      answeredCount: 1,
+      questionCount: 2,
+      scoringConfig: {
+        id: "invalid-config",
+        version: 1,
+        definition: {},
+        questions: [],
+      },
+      answers: [
+        {
+          diagnosisQuestionId: "dq-1",
+          questionId: "q-1",
+          questionVersion: 1,
+          questionText: "質問",
+          choiceId: "yes",
+          choiceLabel: "はい",
+          acceptedAt: "2026-08-05T00:00:00.000Z",
+        },
+      ],
+    };
+
+    const result = await getDiagnosisAnswers(
+      { diagnosisId: "diagnosis-1", idToken: "token", lineLoginChannelId: "channel", db, at },
+      {
+        createSession: vi.fn().mockResolvedValue({
+          type: "resolved",
+          session: { accountId: "account-1" },
+        }),
+        findAnswers: vi.fn().mockResolvedValue({ type: "found", diagnosis }),
+      },
+    );
+
+    const { scoringConfig: _, ...expectedDiagnosis } = diagnosis;
+    expect(result).toEqual({
+      type: "resolved",
+      diagnosis: { ...expectedDiagnosis, scoring: null },
+    });
+  });
+
   it("本人確認できない場合は回答を取得しない", async () => {
     const findAnswers = vi.fn();
     const session = { type: "unauthenticated" as const, reason: "invalid" };
