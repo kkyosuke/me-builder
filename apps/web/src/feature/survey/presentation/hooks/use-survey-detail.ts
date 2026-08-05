@@ -15,6 +15,11 @@ import type { SurveyResult } from "../../model/survey-result";
 import type { SurveyAnswer } from "../../model/types";
 import { useSurveyAnswerSaver } from "./use-survey-answer-saver";
 
+const MINIMUM_LOADING_MS = 400;
+
+const waitForMinimumLoading = (): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, MINIMUM_LOADING_MS));
+
 export type GuidanceKind = "closed" | "unsupported" | "load-error";
 
 export type SurveyDetailContent =
@@ -71,6 +76,7 @@ export function useSurveyDetail({ idToken, onProgress }: UseSurveyDetailOptions)
       const controller = new AbortController();
       request.current = controller;
       setState({ status: "loading" });
+      const minimumLoading = waitForMinimumLoading();
       try {
         await answerSaver.waitForPendingSaves(survey.id);
         if (controller.signal.aborted) {
@@ -84,6 +90,7 @@ export function useSurveyDetail({ idToken, onProgress }: UseSurveyDetailOptions)
             survey.id,
             controller.signal,
           );
+          await minimumLoading;
           if (!controller.signal.aborted && mounted.current) {
             setState(
               result
@@ -98,6 +105,7 @@ export function useSurveyDetail({ idToken, onProgress }: UseSurveyDetailOptions)
           fetchSurveyDefinition(config.apiUrl, idToken, survey.id, controller.signal),
           fetchSurveyProgress(config.apiUrl, idToken, survey.id, controller.signal),
         ]);
+        await minimumLoading;
         if (!controller.signal.aborted && mounted.current) {
           if (!definition) {
             setState({ status: "success", data: { type: "guidance", kind: "unsupported" } });
@@ -113,6 +121,7 @@ export function useSurveyDetail({ idToken, onProgress }: UseSurveyDetailOptions)
           });
         }
       } catch (error) {
+        await minimumLoading;
         if (controller.signal.aborted || !mounted.current) {
           return;
         }
@@ -156,6 +165,7 @@ export function useSurveyDetail({ idToken, onProgress }: UseSurveyDetailOptions)
     const controller = new AbortController();
     request.current = controller;
     setState({ status: "loading" });
+    const minimumLoading = waitForMinimumLoading();
     const completedProgress = {
       responseStatus: "answered" as const,
       answeredCount: definition.questions.length,
@@ -168,6 +178,7 @@ export function useSurveyDetail({ idToken, onProgress }: UseSurveyDetailOptions)
         definition.id,
         controller.signal,
       );
+      await minimumLoading;
       if (controller.signal.aborted || !mounted.current) {
         return;
       }
@@ -178,6 +189,7 @@ export function useSurveyDetail({ idToken, onProgress }: UseSurveyDetailOptions)
           : { status: "success", data: { type: "guidance", kind: "unsupported" } },
       );
     } catch (error) {
+      await minimumLoading;
       if (!controller.signal.aborted && mounted.current) {
         onProgress(definition.id, completedProgress);
         setState({

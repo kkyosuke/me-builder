@@ -11,7 +11,6 @@ import {
   useSurveyDetail,
   useSurveyList,
 } from "./feature/survey";
-import { useMinimumLoading } from "./hooks/use-minimum-loading";
 
 const DEVELOPMENT_ENVIRONMENTS = new Set(["development", "local", "preview", "test"]);
 
@@ -19,14 +18,13 @@ export function App() {
   const liffSession = useLiffSession();
   const surveys = useSurveyList({ acquireIdToken: liffSession.acquireIdToken });
   const detail = useSurveyDetail({ idToken: surveys.idToken, onProgress: surveys.updateProgress });
-  const showDetailLoading = useMinimumLoading(detail.state.status === "loading");
   const handleReset = useCallback(async () => {
     detail.close();
     await surveys.load();
   }, [detail.close, surveys.load]);
   const reset = useResetSurveyData({ idToken: surveys.idToken, onReset: handleReset });
 
-  if (showDetailLoading) {
+  if (detail.state.status === "loading") {
     return <LoadingState message="アンケートを読み込んでいます..." />;
   }
   if (detail.state.status === "error") {

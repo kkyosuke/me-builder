@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
@@ -183,6 +183,7 @@ describe("App", () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     cleanup();
     vi.restoreAllMocks();
   });
@@ -200,6 +201,26 @@ describe("App", () => {
       "survey-1",
       expect.any(AbortSignal),
     );
+  });
+
+  it("詳細取得が即時完了してもloadingを400ms表示する", async () => {
+    render(<App />);
+    const openSurvey = await screen.findByRole("button", { name: /テストアンケート/ });
+    vi.useFakeTimers();
+
+    fireEvent.click(openSurvey);
+    expect(screen.getByText("アンケートを読み込んでいます...")).toBeTruthy();
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      vi.advanceTimersByTime(399);
+    });
+
+    expect(screen.getByText("アンケートを読み込んでいます...")).toBeTruthy();
+    expect(screen.queryByText("回答UI: テストアンケート")).toBeNull();
+
+    await act(async () => vi.advanceTimersByTime(1));
+    expect(screen.getByText("回答UI: テストアンケート")).toBeTruthy();
   });
 
   it("dev環境では確認後に本人の回答データを全削除し、一覧を再取得する", async () => {
