@@ -2,7 +2,7 @@ import * as v from "valibot";
 
 export const DEFAULT_CLOUDFLARE_AI_GATEWAY_BASE_URL =
   "https://gateway.ai.cloudflare.com/v1/8e0b10ee5263d2f699a93dbe3ee97da0/default/google-ai-studio";
-export const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
+export const DEFAULT_GEMINI_MODEL = "gemini-3.5-flash-lite";
 
 export const WorkerConfigSchema = v.object({
   environment: v.optional(v.string(), "development"),

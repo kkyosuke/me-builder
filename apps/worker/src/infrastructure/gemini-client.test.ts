@@ -32,11 +32,11 @@ describe("Gemini client", () => {
     const generateContent = vi.fn().mockResolvedValue({ text: "Cloudflare is ..." });
     const client = { models: { generateContent } } as unknown as GoogleGenAI;
 
-    await expect(generateText(client, "gemini-2.5-flash", "What is Cloudflare?")).resolves.toBe(
-      "Cloudflare is ...",
-    );
+    await expect(
+      generateText(client, "gemini-3.5-flash-lite", "What is Cloudflare?"),
+    ).resolves.toBe("Cloudflare is ...");
     expect(generateContent).toHaveBeenCalledWith({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.5-flash-lite",
       contents: "What is Cloudflare?",
     });
   });
