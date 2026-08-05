@@ -43,7 +43,14 @@ afterEach(() => cleanup());
 describe("SwipeSurvey answer persistence", () => {
   it("保存をバックグラウンドで続けながら次の質問へ進める", async () => {
     const onSaveAnswer = vi.fn(() => new Promise<{ acceptedAt: string }>(() => undefined));
-    render(<SwipeSurvey survey={twoQuestionSurvey} onBack={vi.fn()} onSaveAnswer={onSaveAnswer} />);
+    render(
+      <SwipeSurvey
+        survey={twoQuestionSurvey}
+        onBack={vi.fn()}
+        onSaveAnswer={onSaveAnswer}
+        onComplete={vi.fn()}
+      />,
+    );
 
     const currentAnswerButton = screen
       .getAllByRole<HTMLButtonElement>("button", { name: /はい/ })
@@ -66,18 +73,28 @@ describe("SwipeSurvey answer persistence", () => {
           resolveSave = resolve;
         }),
     );
-    render(<SwipeSurvey survey={survey} onBack={vi.fn()} onSaveAnswer={onSaveAnswer} />);
+    const onComplete = vi.fn();
+    render(
+      <SwipeSurvey
+        survey={survey}
+        onBack={vi.fn()}
+        onSaveAnswer={onSaveAnswer}
+        onComplete={onComplete}
+      />,
+    );
 
     fireEvent.click(screen.getByRole("button", { name: /はい/ }));
 
     expect(await screen.findByText("回答を保存しています")).toBeTruthy();
     expect(screen.queryByText("保存した回答から見える現在の傾向")).toBeNull();
     expect(onSaveAnswer).toHaveBeenCalledTimes(1);
+    expect(onComplete).not.toHaveBeenCalled();
 
     await act(async () => {
       resolveSave?.({ acceptedAt: "2026-08-05T00:00:01.000Z" });
     });
     expect(await screen.findByText("保存した回答から見える現在の傾向")).toBeTruthy();
+    expect(onComplete).toHaveBeenCalledOnce();
   });
 
   it("保存失敗時は全問の操作後に同じ回答を再試行する", async () => {
@@ -85,7 +102,15 @@ describe("SwipeSurvey answer persistence", () => {
       .fn()
       .mockRejectedValueOnce(new Error("通信に失敗しました"))
       .mockResolvedValueOnce({ acceptedAt: "2026-08-05T00:00:01.000Z" });
-    render(<SwipeSurvey survey={survey} onBack={vi.fn()} onSaveAnswer={onSaveAnswer} />);
+    const onComplete = vi.fn();
+    render(
+      <SwipeSurvey
+        survey={survey}
+        onBack={vi.fn()}
+        onSaveAnswer={onSaveAnswer}
+        onComplete={onComplete}
+      />,
+    );
 
     fireEvent.click(screen.getByRole("button", { name: /はい/ }));
     expect(await screen.findByText("通信に失敗しました")).toBeTruthy();
@@ -95,5 +120,23 @@ describe("SwipeSurvey answer persistence", () => {
     await waitFor(() => expect(onSaveAnswer).toHaveBeenCalledTimes(2));
     expect(onSaveAnswer.mock.calls[1]?.[0]).toEqual(onSaveAnswer.mock.calls[0]?.[0]);
     expect(await screen.findByText("保存した回答から見える現在の傾向")).toBeTruthy();
+    expect(onComplete).toHaveBeenCalledOnce();
+  });
+
+  it("あとで回答が残る場合は回答結果への遷移を通知しない", async () => {
+    const onComplete = vi.fn();
+    render(
+      <SwipeSurvey
+        survey={survey}
+        onBack={vi.fn()}
+        onSaveAnswer={vi.fn()}
+        onComplete={onComplete}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "あとで回答する" }));
+
+    expect(await screen.findByText("保存した回答から見える現在の傾向")).toBeTruthy();
+    expect(onComplete).not.toHaveBeenCalled();
   });
 });

@@ -196,10 +196,12 @@ export function SwipeSurvey({
   survey,
   onBack,
   onSaveAnswer,
+  onComplete,
 }: {
   survey: SurveyDefinition;
   onBack: () => void;
   onSaveAnswer: (answer: SurveyAnswer) => Promise<{ acceptedAt: string }>;
+  onComplete: () => void;
 }) {
   const [index, setIndex] = useState(0);
   const [interactions, setInteractions] = useState<SurveyInteraction[]>([]);
@@ -217,6 +219,8 @@ export function SwipeSurvey({
   const advanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Reactの状態反映前に同じ質問へ二重操作されることを同期的に止めます。 */
   const actionPending = useRef(false);
+  /** 保存完了後の結果遷移を再描画で重複通知しないようにします。 */
+  const completionNotified = useRef(false);
 
   const questions = survey.questions;
 
@@ -376,6 +380,8 @@ export function SwipeSurvey({
 
   const total = questions.length;
   const finished = index >= total;
+  const allAnswered =
+    interactions.filter((interaction) => interaction.kind === "answer").length === total;
   const answeredCount = finished ? total : index;
   const progressMilestone = resolveProgressMilestone(answeredCount, total);
   // 同じ段階にいる間は文言を固定し、回答のたびにちらつかないようにします。
@@ -383,6 +389,14 @@ export function SwipeSurvey({
     () => (progressMilestone ? pickProgressMessage(progressMilestone) : null),
     [progressMilestone],
   );
+
+  useEffect(() => {
+    if (!finished || !allAnswered || backgroundSaves.length > 0 || completionNotified.current) {
+      return;
+    }
+    completionNotified.current = true;
+    onComplete();
+  }, [allAnswered, backgroundSaves.length, finished, onComplete]);
 
   return (
     <section className="flex flex-col gap-4">

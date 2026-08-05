@@ -36,9 +36,11 @@ vi.mock("./feature/survey", () => ({
   SwipeSurvey: ({
     survey,
     onSaveAnswer,
+    onComplete,
   }: {
     survey: SurveyDefinition;
     onSaveAnswer: (answer: SurveyAnswer) => Promise<unknown>;
+    onComplete: () => void;
   }) => (
     <div>
       <p>{`回答UI: ${survey.title}`}</p>
@@ -57,6 +59,9 @@ vi.mock("./feature/survey", () => ({
         }
       >
         テスト回答
+      </button>
+      <button type="button" onClick={onComplete}>
+        テスト完了
       </button>
     </div>
   ),
@@ -153,6 +158,21 @@ describe("App", () => {
         "sq-1",
         "yes",
       ),
+    );
+  });
+
+  it("全回答の保存完了後は保存済み回答を取得して結果画面へ進む", async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: /テストアンケート/ }));
+
+    fireEvent.click(await screen.findByRole("button", { name: "テスト完了" }));
+
+    expect(await screen.findByText("結果UI: テストアンケート (1件)")).toBeTruthy();
+    expect(mocks.fetchSurveyResult).toHaveBeenCalledWith(
+      "https://api.example.com",
+      "dummy.id.token",
+      "survey-1",
+      expect.any(AbortSignal),
     );
   });
 

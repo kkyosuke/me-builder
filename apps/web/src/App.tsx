@@ -115,10 +115,12 @@ function SurveyDetail({
   survey,
   onBack,
   onSaveAnswer,
+  onComplete,
 }: {
   survey: SurveyDefinition;
   onBack: () => void;
   onSaveAnswer: Parameters<typeof SwipeSurvey>[0]["onSaveAnswer"];
+  onComplete: Parameters<typeof SwipeSurvey>[0]["onComplete"];
 }) {
   return (
     <main className="mx-auto min-h-dvh w-full max-w-2xl px-4 py-5 sm:px-8 sm:py-8">
@@ -134,7 +136,12 @@ function SurveyDetail({
       <p className="mb-4 rounded-2xl border border-sky-300/30 bg-sky-300/10 px-4 py-3 text-sm leading-relaxed text-sky-100">
         回答は1問ずつ保存されます。保存に失敗した場合は、選択を保ったまま再試行できます。
       </p>
-      <SwipeSurvey survey={survey} onBack={onBack} onSaveAnswer={onSaveAnswer} />
+      <SwipeSurvey
+        survey={survey}
+        onBack={onBack}
+        onSaveAnswer={onSaveAnswer}
+        onComplete={onComplete}
+      />
     </main>
   );
 }
@@ -380,6 +387,57 @@ export function App() {
     [selectedDefinition],
   );
 
+  const openCompletedResult = useCallback(async (): Promise<void> => {
+    const currentIdToken = idToken.current;
+    const definition = selectedDefinition;
+    if (!currentIdToken || !definition) {
+      setDetailState("error");
+      return;
+    }
+
+    detailRequest.current?.abort();
+    const controller = new AbortController();
+    detailRequest.current = controller;
+    setDetailState("loading");
+    try {
+      const result = await fetchSurveyResult(
+        config.apiUrl,
+        currentIdToken,
+        definition.id,
+        controller.signal,
+      );
+      if (controller.signal.aborted || !mounted.current) {
+        return;
+      }
+      setSelectedResult(result ?? null);
+      setDetailState(result ? "idle" : "unsupported");
+      setSelectedSurvey((current) =>
+        current?.id === definition.id
+          ? {
+              ...current,
+              responseStatus: "answered",
+              answeredCount: definition.questions.length,
+              questionCount: definition.questions.length,
+            }
+          : current,
+      );
+    } catch {
+      if (!controller.signal.aborted && mounted.current) {
+        setDetailState("error");
+        setSelectedSurvey((current) =>
+          current?.id === definition.id
+            ? {
+                ...current,
+                responseStatus: "answered",
+                answeredCount: definition.questions.length,
+                questionCount: definition.questions.length,
+              }
+            : current,
+        );
+      }
+    }
+  }, [selectedDefinition]);
+
   if (selectedSurvey) {
     const destination = resolveSurveyDestination(selectedSurvey);
     if (destination === "result" && selectedResult) {
@@ -391,6 +449,7 @@ export function App() {
           survey={selectedDefinition}
           onBack={() => setSelectedSurvey(null)}
           onSaveAnswer={persistAnswer}
+          onComplete={() => void openCompletedResult()}
         />
       );
     }
