@@ -1,2 +1,2 @@
 export * as account from "./account";
-export * as questionnaire from "./questionnaire";
+export * as diagnosis from "./diagnosis";

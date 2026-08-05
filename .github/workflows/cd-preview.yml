@@ -52,7 +52,7 @@ jobs:
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
         run: task db:migrate:preview
 
-      - name: Apply Questionnaire Seed (Preview)
+      - name: Apply Diagnosis Seed (Preview)
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
         run: task db:seed:preview
 

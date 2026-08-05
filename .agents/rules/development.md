@@ -31,9 +31,9 @@
     - `task db:migrate:local` (または `task db:migrate`): D1 データベースマイグレーションのローカル適用
     - `task db:migrate:preview`: プレビュー環境への D1 データベースマイグレーション適用
     - `task db:migrate:production`: 本番環境への D1 データベースマイグレーション適用
-    - `task db:seed:local`: ローカルD1へアンケートseedを適用
-    - `task db:seed:preview`: プレビューD1へアンケートseedを適用
-    - `task db:seed:production`: 本番D1へアンケートseedを明示的に適用
+    - `task db:seed:local`: ローカルD1へ診断seedを適用
+    - `task db:seed:preview`: プレビューD1へ診断seedを適用
+    - `task db:seed:production`: 本番D1へ診断seedを明示的に適用
     - `task deploy:preview`: D1 マイグレーション適用および全アプリのプレビュー環境へのデプロイ (`wrangler deploy --env preview`, `wrangler pages deploy`)
     - `task deploy:production`: D1 マイグレーション適用および全アプリの本番環境へのデプロイ (`wrangler deploy --env production`, `wrangler pages deploy`)
   - **CI/CD ワークフロー構造 (`.github/workflows/ci-*.yml`, `.github/workflows/cd-*.yml`)**:
@@ -83,10 +83,10 @@
 - **LINE Webhook 自動登録および日記の受付返信**:
   - API サーバー起動時 (`src/index.ts`) または CLI スクリプト (`bun run register:webhook`) の実行時、`LINE_CHANNEL_ACCESS_TOKEN` および `LINE_WEBHOOK_URL` (または `BASE_URL`) が環境変数として与えられている場合、公式 SDK (`@line/bot-sdk`) の `MessagingApiClient.setWebhookEndpoint` を用いて自動的に LINE Messaging API へ Webhook Endpoint URL を登録・更新します。
   - Webhook 受信メッセージは Cloudflare Queues 経由で Queue Worker (`apps/worker`) に配信され、`replyToken` を使用して `MessagingApiClient.replyMessage` により受け付けた旨を返信します。**送られた本文をオウム返ししません。**
-  - 返信には「今日のアンケート」への導線として LIFF の URL (`https://liff.line.me/{LIFF_ID}`) を添えます。LINE 内から Web を開く主導線であり、設計は [プロジェクト概要 §4](../../docs/product/project-overview.md#4-想定する利用体験) を正とします。文面の組み立ては `apps/worker` の `buildReplyText` に集約します。
-  - テキストメッセージは**既定で日記として扱い**、アンケートのリンクを求めるキーワード (`アンケート` など) だけを例外として切り出します。判定は `apps/worker` の `classifyLineText` に集約し、`survey-request` / `diary` の union で返します。
-    - キーワードの判定は **NFKC 正規化・前後の空白除去・ひらがなからカタカナへの寄せの後で完全一致**させます。部分一致は採りません。部分一致にすると「今日は会社でアンケートに答えた」のような日記本文がコマンドとして飲み込まれ、蓄積の量を担う日記が記録されなくなります。
-    - `survey-request` の返信はアンケートへのリンクだけを返します。`diary` の返信は従来どおり受け付けた旨とリンクを返します（日記の返信はアンケートへの主要な再訪導線なので、キーワードの追加でも変えません）。
+  - 返信には「今日の診断」への導線として LIFF の URL (`https://liff.line.me/{LIFF_ID}`) を添えます。LINE 内から Web を開く主導線であり、設計は [プロジェクト概要 §4](../../docs/product/project-overview.md#4-想定する利用体験) を正とします。文面の組み立ては `apps/worker` の `buildReplyText` に集約します。
+  - テキストメッセージは**既定で日記として扱い**、診断のリンクを求めるキーワード (`診断` など) だけを例外として切り出します。判定は `apps/worker` の `classifyLineText` に集約し、`diagnosis-request` / `diary` の union で返します。
+    - キーワードの判定は **NFKC 正規化・前後の空白除去・ひらがなからカタカナへの寄せの後で完全一致**させます。部分一致は採りません。部分一致にすると「今日は会社で診断に答えた」のような日記本文がコマンドとして飲み込まれ、蓄積の量を担う日記が記録されなくなります。
+    - `diagnosis-request` の返信は診断へのリンクだけを返します。`diary` の返信は従来どおり受け付けた旨とリンクを返します（日記の返信は診断への主要な再訪導線なので、キーワードの追加でも変えません）。
     - 日記の本文はログへ出力せず、判定結果 (`intent`) だけを残します。
   - `LIFF_ID` は `apps/worker` へ配布します。秘密情報ではありませんが、GitHub Environment の変数を単一の出所とするため、CDワークフローが一時的なsecretファイルを作り、`wrangler deploy --secrets-file`でコードと同じWorker Versionへ配布します。未設定の場合はリンクを省き、受け付けた旨だけを返します。
   - 環境変数が未設定の場合は自動登録および返信処理がログ出力とともに安全にスキップされます。
@@ -126,11 +126,11 @@
 
   各featureは、型と純粋なロジックを `model/`、React UIとUI操作ロジックを `presentation/`、API・SDK・ローカルデータとの接続を `infrastructure/`、feature外へ公開する要素を `index.ts` に置きます。`presentation/` と `infrastructure/` は `model/` に依存できますが、`model/` から他の層へは依存しません。feature外からは原則として `index.ts` 経由で参照します。必要な層だけを作り、空の層は用意しません。ルートの `components/` はfeatureに依存しない共通UI、`infrastructure/` は複数featureから利用する技術基盤だけを所有します。
 
-- **スワイプアンケートの画面 (`apps/web`)**:
-  - Survey機能は `apps/web/src/feature/survey/` に置きます。質問の取得は `infrastructure/local-definitions.ts`、一覧APIとの通信は `infrastructure/survey-api.ts` に閉じ込め、コンポーネントは非同期の取得としてだけ扱います。質問配信・回答保存のサーバー実装はこの境界を差し替える形で追加します。
-  - 質問・回答などのSurveyモデルは `apps/web/src/feature/survey/model/` に閉じ、`packages/shared` へ置きません。共有すると「サーバーとのスキーマ」を確定したことになり、[設計スコープのルール §2](design-scope.md) が後続設計へ延期している範囲へ踏み込みます。共有先はサーバー実装の時点で判断します。
-  - 質問データは JSON のまま扱える形に保ちます。アイコンはコンポーネントではなく名前で持ち、名前からコンポーネントへの対応は `apps/web/src/feature/survey/presentation/components/` に置きます。
-  - 判定や座標計算 (しきい値、傾き、transform) は純粋関数として `apps/web/src/feature/survey/presentation/` に置き、DOM を用意せず単体テストできる状態にします。
+- **スワイプ診断の画面 (`apps/web`)**:
+  - Diagnosis機能は `apps/web/src/feature/diagnosis/` に置きます。質問の取得は `infrastructure/local-definitions.ts`、一覧APIとの通信は `infrastructure/diagnosis-api.ts` に閉じ込め、コンポーネントは非同期の取得としてだけ扱います。質問配信・回答保存のサーバー実装はこの境界を差し替える形で追加します。
+  - 質問・回答などのDiagnosisモデルは `apps/web/src/feature/diagnosis/model/` に閉じ、`packages/shared` へ置きません。共有すると「サーバーとのスキーマ」を確定したことになり、[設計スコープのルール §2](design-scope.md) が後続設計へ延期している範囲へ踏み込みます。共有先はサーバー実装の時点で判断します。
+  - 質問データは JSON のまま扱える形に保ちます。アイコンはコンポーネントではなく名前で持ち、名前からコンポーネントへの対応は `apps/web/src/feature/diagnosis/presentation/components/` に置きます。
+  - 判定や座標計算 (しきい値、傾き、transform) は純粋関数として `apps/web/src/feature/diagnosis/presentation/` に置き、DOM を用意せず単体テストできる状態にします。
 
 - **Web UI の LIFF 初期化 (`apps/web`)**:
   - LINE 内から Web を開く主導線は LIFF です。導線の設計と根拠は [プロジェクト概要 §4](../../docs/product/project-overview.md#4-想定する利用体験) を正とし、このルールには再掲しません。

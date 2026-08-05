@@ -13,8 +13,8 @@ describe("GET /api/openapi.json", () => {
 
     expect(response.status).toBe(200);
     expect(document.openapi).toBe("3.1.0");
-    expect(document.paths["/api/surveys"]?.get).toBeDefined();
-    expect(document.paths["/api/surveys/{surveyId}/answers"]?.get).toBeDefined();
+    expect(document.paths["/api/diagnoses"]?.get).toBeDefined();
+    expect(document.paths["/api/diagnoses/{diagnosisId}/answers"]?.get).toBeDefined();
     expect(document.paths["/api/line/liff/session"]?.post).toBeDefined();
     expect(document.paths["/api/line/liff/session"]?.post).toMatchObject({
       requestBody: {

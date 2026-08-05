@@ -9,7 +9,7 @@
     ".": "./src/index.ts",
     "./line": "./src/line/index.ts",
     "./d1": "./src/d1/index.ts",
-    "./questionnaire": "./src/questionnaire/index.ts"
+    "./diagnosis": "./src/diagnosis/index.ts"
   },
   "scripts": {
     "build": "tsc --noEmit",
@@ -20,9 +20,9 @@
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "db:migrate:preview": "wrangler d1 migrations apply DB --env preview --remote",
     "db:migrate:production": "wrangler d1 migrations apply DB --env production --remote",
-    "db:seed:local": "wrangler d1 execute DB --local --file=seeds/questionnaires.sql",
-    "db:seed:preview": "wrangler d1 execute DB --env preview --remote --file=seeds/questionnaires.sql",
-    "db:seed:production": "wrangler d1 execute DB --env production --remote --file=seeds/questionnaires.sql"
+    "db:seed:local": "wrangler d1 execute DB --local --file=seeds/diagnoses.sql",
+    "db:seed:preview": "wrangler d1 execute DB --env preview --remote --file=seeds/diagnoses.sql",
+    "db:seed:production": "wrangler d1 execute DB --env production --remote --file=seeds/diagnoses.sql"
   },
   "dependencies": {
     "@line/bot-sdk": "^11.2.0",

@@ -5,11 +5,11 @@ import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import type {
-  SurveyAnswer,
-  SurveyDefinition,
-  SurveyListItem,
-  SurveyResult,
-} from "./feature/survey";
+  DiagnosisAnswer,
+  DiagnosisDefinition,
+  DiagnosisListItem,
+  DiagnosisResult,
+} from "./feature/diagnosis";
 import { OperationError } from "./infrastructure/errors";
 
 const mocks = vi.hoisted(() => ({
@@ -20,13 +20,13 @@ const mocks = vi.hoisted(() => ({
   },
   initializeLiff: vi.fn(),
   getLiffIdToken: vi.fn(),
-  fetchSurveyList: vi.fn(),
-  fetchSurveyDefinition: vi.fn(),
-  fetchSurveyProgress: vi.fn(),
-  fetchSurveyResult: vi.fn(),
-  saveSurveyAnswer: vi.fn(),
-  resetDevelopmentSurveyData: vi.fn(),
-  restoreSurveyProgress: vi.fn(),
+  fetchDiagnosisList: vi.fn(),
+  fetchDiagnosisDefinition: vi.fn(),
+  fetchDiagnosisProgress: vi.fn(),
+  fetchDiagnosisResult: vi.fn(),
+  saveDiagnosisAnswer: vi.fn(),
+  resetDevelopmentDiagnosisData: vi.fn(),
+  restoreDiagnosisProgress: vi.fn(),
 }));
 
 vi.mock("./config", () => ({
@@ -36,33 +36,33 @@ vi.mock("./feature/liff/infrastructure/liff-client", () => ({
   initializeLiff: mocks.initializeLiff,
   getLiffIdToken: mocks.getLiffIdToken,
 }));
-vi.mock("./feature/survey/infrastructure/survey-api", () => ({
-  fetchSurveyList: mocks.fetchSurveyList,
-  fetchSurveyDefinition: mocks.fetchSurveyDefinition,
-  fetchSurveyProgress: mocks.fetchSurveyProgress,
-  fetchSurveyResult: mocks.fetchSurveyResult,
-  saveSurveyAnswer: mocks.saveSurveyAnswer,
-  resetDevelopmentSurveyData: mocks.resetDevelopmentSurveyData,
+vi.mock("./feature/diagnosis/infrastructure/diagnosis-api", () => ({
+  fetchDiagnosisList: mocks.fetchDiagnosisList,
+  fetchDiagnosisDefinition: mocks.fetchDiagnosisDefinition,
+  fetchDiagnosisProgress: mocks.fetchDiagnosisProgress,
+  fetchDiagnosisResult: mocks.fetchDiagnosisResult,
+  saveDiagnosisAnswer: mocks.saveDiagnosisAnswer,
+  resetDevelopmentDiagnosisData: mocks.resetDevelopmentDiagnosisData,
 }));
-vi.mock("./feature/survey/model/answers", () => ({
-  restoreSurveyProgress: mocks.restoreSurveyProgress,
+vi.mock("./feature/diagnosis/model/answers", () => ({
+  restoreDiagnosisProgress: mocks.restoreDiagnosisProgress,
 }));
-vi.mock("./feature/survey/presentation/components/swipe-survey", () => ({
-  SwipeSurvey: ({
-    survey,
+vi.mock("./feature/diagnosis/presentation/components/swipe-diagnosis", () => ({
+  SwipeDiagnosis: ({
+    diagnosis,
     initialAnswers,
     onBack,
     onSaveAnswer,
     onComplete,
   }: {
-    survey: SurveyDefinition;
-    initialAnswers?: SurveyAnswer[];
+    diagnosis: DiagnosisDefinition;
+    initialAnswers?: DiagnosisAnswer[];
     onBack: () => void;
-    onSaveAnswer: (answer: SurveyAnswer) => Promise<unknown>;
+    onSaveAnswer: (answer: DiagnosisAnswer) => Promise<unknown>;
     onComplete: () => void;
   }) => (
     <div>
-      <p>{`回答UI: ${survey.title}`}</p>
+      <p>{`回答UI: ${diagnosis.title}`}</p>
       <p>{`復元済み: ${initialAnswers?.length ?? 0}件`}</p>
       <button type="button" onClick={onBack}>
         テスト一覧へ戻る
@@ -72,7 +72,7 @@ vi.mock("./feature/survey/presentation/components/swipe-survey", () => ({
         onClick={() =>
           void onSaveAnswer({
             kind: "answer",
-            surveyQuestionId: "sq-1",
+            diagnosisQuestionId: "dq-1",
             questionId: "q-1",
             questionVersion: 1,
             choiceId: "yes",
@@ -89,31 +89,31 @@ vi.mock("./feature/survey/presentation/components/swipe-survey", () => ({
     </div>
   ),
 }));
-vi.mock("./feature/survey/presentation/components/survey-result", () => ({
-  SurveyResultView: ({ result }: { result: SurveyResult }) => (
+vi.mock("./feature/diagnosis/presentation/components/diagnosis-result", () => ({
+  DiagnosisResultView: ({ result }: { result: DiagnosisResult }) => (
     <div>{`結果UI: ${result.title} (${result.answers.length}件)`}</div>
   ),
 }));
 
-const definition: SurveyDefinition = {
-  id: "survey-1",
-  title: "テストアンケート",
+const definition: DiagnosisDefinition = {
+  id: "diagnosis-1",
+  title: "テスト診断",
   description: "説明",
   questions: [],
   balancedLabel: "中間",
   score: () => ({ scoringVersion: 1, parameters: [] }),
 };
 
-const result: SurveyResult = {
-  id: "survey-1",
-  title: "テストアンケート",
+const result: DiagnosisResult = {
+  id: "diagnosis-1",
+  title: "テスト診断",
   description: "説明",
   responseStatus: "answered",
   answeredCount: 10,
   questionCount: 10,
   answers: [
     {
-      surveyQuestionId: "sq-1",
+      diagnosisQuestionId: "dq-1",
       questionId: "q-1",
       questionVersion: 1,
       questionText: "質問",
@@ -126,10 +126,10 @@ const result: SurveyResult = {
   profile: { scoringVersion: 1, parameters: [] },
 };
 
-function survey(overrides: Partial<SurveyListItem> = {}): SurveyListItem {
+function diagnosis(overrides: Partial<DiagnosisListItem> = {}): DiagnosisListItem {
   return {
-    id: "survey-1",
-    title: "テストアンケート",
+    id: "diagnosis-1",
+    title: "テスト診断",
     description: "説明",
     opensAt: "2026-08-04T00:00:00.000Z",
     closesAt: null,
@@ -151,26 +151,26 @@ describe("App", () => {
       profile: { displayName: "テスト" },
     });
     mocks.getLiffIdToken.mockReturnValue("dummy.id.token");
-    mocks.fetchSurveyList.mockResolvedValue([survey()]);
-    mocks.fetchSurveyDefinition.mockResolvedValue(definition);
-    mocks.fetchSurveyProgress.mockResolvedValue(undefined);
-    mocks.fetchSurveyResult.mockResolvedValue(result);
-    mocks.saveSurveyAnswer.mockResolvedValue({
+    mocks.fetchDiagnosisList.mockResolvedValue([diagnosis()]);
+    mocks.fetchDiagnosisDefinition.mockResolvedValue(definition);
+    mocks.fetchDiagnosisProgress.mockResolvedValue(undefined);
+    mocks.fetchDiagnosisResult.mockResolvedValue(result);
+    mocks.saveDiagnosisAnswer.mockResolvedValue({
       outcome: "created",
       answer: { acceptedAt: "2026-08-05T00:00:01.000Z" },
       progress: { responseStatus: "in-progress", answeredCount: 1, questionCount: 10 },
     });
-    mocks.resetDevelopmentSurveyData.mockResolvedValue({
+    mocks.resetDevelopmentDiagnosisData.mockResolvedValue({
       deletedResponseCount: 1,
       deletedAnswerCount: 10,
       deletedDeferredQuestionCount: 0,
       deletedSourceRecordCount: 10,
     });
-    mocks.restoreSurveyProgress.mockImplementation(
-      (_questions: SurveyDefinition["questions"], answers: SurveyResult["answers"]) => ({
+    mocks.restoreDiagnosisProgress.mockImplementation(
+      (_questions: DiagnosisDefinition["questions"], answers: DiagnosisResult["answers"]) => ({
         answers: answers.map((answer) => ({
           kind: "answer" as const,
-          surveyQuestionId: answer.surveyQuestionId,
+          diagnosisQuestionId: answer.diagnosisQuestionId,
           questionId: answer.questionId,
           questionVersion: answer.questionVersion,
           choiceId: answer.choiceId,
@@ -191,36 +191,36 @@ describe("App", () => {
   it("受付中かつ未回答なら回答画面へ進み、1問ずつ保存することを表示する", async () => {
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("button", { name: /テストアンケート/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /テスト診断/ }));
 
-    expect(await screen.findByText("回答UI: テストアンケート")).toBeTruthy();
+    expect(await screen.findByText("回答UI: テスト診断")).toBeTruthy();
     expect(screen.getByText(/回答は1問ずつ保存されます/)).toBeTruthy();
-    expect(mocks.fetchSurveyProgress).toHaveBeenCalledWith(
+    expect(mocks.fetchDiagnosisProgress).toHaveBeenCalledWith(
       "https://api.example.com",
       "dummy.id.token",
-      "survey-1",
+      "diagnosis-1",
       expect.any(AbortSignal),
     );
   });
 
   it("詳細取得が即時完了してもloadingを400ms表示する", async () => {
     render(<App />);
-    const openSurvey = await screen.findByRole("button", { name: /テストアンケート/ });
+    const openDiagnosis = await screen.findByRole("button", { name: /テスト診断/ });
     vi.useFakeTimers();
 
-    fireEvent.click(openSurvey);
-    expect(screen.getByText("アンケートを読み込んでいます...")).toBeTruthy();
+    fireEvent.click(openDiagnosis);
+    expect(screen.getByText("診断を読み込んでいます...")).toBeTruthy();
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();
       vi.advanceTimersByTime(399);
     });
 
-    expect(screen.getByText("アンケートを読み込んでいます...")).toBeTruthy();
-    expect(screen.queryByText("回答UI: テストアンケート")).toBeNull();
+    expect(screen.getByText("診断を読み込んでいます...")).toBeTruthy();
+    expect(screen.queryByText("回答UI: テスト診断")).toBeNull();
 
     await act(async () => vi.advanceTimersByTime(1));
-    expect(screen.getByText("回答UI: テストアンケート")).toBeTruthy();
+    expect(screen.getByText("回答UI: テスト診断")).toBeTruthy();
   });
 
   it("dev環境では確認後に本人の回答データを全削除し、一覧を再取得する", async () => {
@@ -230,13 +230,13 @@ describe("App", () => {
     fireEvent.click(await screen.findByRole("button", { name: "回答データを全削除" }));
 
     await waitFor(() =>
-      expect(mocks.resetDevelopmentSurveyData).toHaveBeenCalledWith(
+      expect(mocks.resetDevelopmentDiagnosisData).toHaveBeenCalledWith(
         "https://api.example.com",
         "dummy.id.token",
       ),
     );
     expect(await screen.findByText("回答データを削除しました（回答・保留 10件）。")).toBeTruthy();
-    expect(mocks.fetchSurveyList).toHaveBeenCalledTimes(2);
+    expect(mocks.fetchDiagnosisList).toHaveBeenCalledTimes(2);
   });
 
   it("dev環境の回答データ削除を確認でキャンセルできる", async () => {
@@ -245,14 +245,14 @@ describe("App", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "回答データを全削除" }));
 
-    expect(mocks.resetDevelopmentSurveyData).not.toHaveBeenCalled();
+    expect(mocks.resetDevelopmentDiagnosisData).not.toHaveBeenCalled();
   });
 
   it("production環境では開発用データ操作を表示しない", async () => {
     mocks.config.environment = "production";
     render(<App />);
 
-    await screen.findByRole("button", { name: /テストアンケート/ });
+    await screen.findByRole("button", { name: /テスト診断/ });
     expect(screen.queryByRole("button", { name: "回答データを全削除" })).toBeNull();
   });
 
@@ -260,20 +260,20 @@ describe("App", () => {
     mocks.config.environment = undefined;
     render(<App />);
 
-    await screen.findByRole("button", { name: /テストアンケート/ });
+    await screen.findByRole("button", { name: /テスト診断/ });
     expect(screen.queryByRole("button", { name: "回答データを全削除" })).toBeNull();
   });
 
   it("回答UIの選択を保存APIへ接続する", async () => {
     render(<App />);
-    fireEvent.click(await screen.findByRole("button", { name: /テストアンケート/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /テスト診断/ }));
     fireEvent.click(await screen.findByRole("button", { name: "テスト回答" }));
     await waitFor(() =>
-      expect(mocks.saveSurveyAnswer).toHaveBeenCalledWith(
+      expect(mocks.saveDiagnosisAnswer).toHaveBeenCalledWith(
         "https://api.example.com",
         "dummy.id.token",
-        "survey-1",
-        "sq-1",
+        "diagnosis-1",
+        "dq-1",
         "yes",
       ),
     );
@@ -281,41 +281,39 @@ describe("App", () => {
 
   it("全回答の保存完了後は保存済み回答を取得して結果画面へ進む", async () => {
     render(<App />);
-    fireEvent.click(await screen.findByRole("button", { name: /テストアンケート/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /テスト診断/ }));
 
     fireEvent.click(await screen.findByRole("button", { name: "テスト完了" }));
 
-    expect(await screen.findByText("結果UI: テストアンケート (1件)")).toBeTruthy();
-    expect(mocks.fetchSurveyResult).toHaveBeenCalledWith(
+    expect(await screen.findByText("結果UI: テスト診断 (1件)")).toBeTruthy();
+    expect(mocks.fetchDiagnosisResult).toHaveBeenCalledWith(
       "https://api.example.com",
       "dummy.id.token",
-      "survey-1",
+      "diagnosis-1",
       expect.any(AbortSignal),
     );
   });
 
   it("受付終了かつ未回答では新規回答を始めず案内へ進む", async () => {
-    const item = survey({ availability: "closed" });
-    mocks.fetchSurveyList.mockResolvedValue([item]);
+    const item = diagnosis({ availability: "closed" });
+    mocks.fetchDiagnosisList.mockResolvedValue([item]);
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("button", { name: /テストアンケート/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /テスト診断/ }));
 
-    expect(
-      screen.getByRole("heading", { name: "このアンケートは受付を終了しました" }),
-    ).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "この診断は受付を終了しました" })).toBeTruthy();
     expect(screen.getByText(/回答期間が終了したため/)).toBeTruthy();
     expect(screen.queryByText(/回答UI:/)).toBeNull();
   });
 
   it("回答途中では質問詳細と保存済み回答を取得して回答画面を再開する", async () => {
-    const item = survey({ responseStatus: "in-progress", answeredCount: 1 });
-    mocks.fetchSurveyList.mockResolvedValue([item]);
-    mocks.fetchSurveyDefinition.mockResolvedValue({
+    const item = diagnosis({ responseStatus: "in-progress", answeredCount: 1 });
+    mocks.fetchDiagnosisList.mockResolvedValue([item]);
+    mocks.fetchDiagnosisDefinition.mockResolvedValue({
       ...definition,
       questions: [
         {
-          surveyQuestionId: "sq-1",
+          diagnosisQuestionId: "dq-1",
           questionId: "q-1",
           questionVersion: 1,
           text: "質問",
@@ -324,7 +322,7 @@ describe("App", () => {
         },
       ],
     });
-    mocks.fetchSurveyProgress.mockResolvedValue({
+    mocks.fetchDiagnosisProgress.mockResolvedValue({
       ...result,
       responseStatus: "in-progress",
       answeredCount: 1,
@@ -332,30 +330,30 @@ describe("App", () => {
     });
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("button", { name: /テストアンケート/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /テスト診断/ }));
 
-    expect(await screen.findByText("回答UI: テストアンケート")).toBeTruthy();
+    expect(await screen.findByText("回答UI: テスト診断")).toBeTruthy();
     expect(screen.getByText("復元済み: 1件")).toBeTruthy();
-    expect(mocks.fetchSurveyDefinition).toHaveBeenCalledWith(
+    expect(mocks.fetchDiagnosisDefinition).toHaveBeenCalledWith(
       "https://api.example.com",
       "dummy.id.token",
-      "survey-1",
+      "diagnosis-1",
       expect.any(AbortSignal),
     );
-    expect(mocks.fetchSurveyProgress).toHaveBeenCalledWith(
+    expect(mocks.fetchDiagnosisProgress).toHaveBeenCalledWith(
       "https://api.example.com",
       "dummy.id.token",
-      "survey-1",
+      "diagnosis-1",
       expect.any(AbortSignal),
     );
   });
 
   it("一覧が未回答のままでもサーバーに保存済みの回答があれば復元する", async () => {
-    mocks.fetchSurveyDefinition.mockResolvedValue({
+    mocks.fetchDiagnosisDefinition.mockResolvedValue({
       ...definition,
       questions: [
         {
-          surveyQuestionId: "sq-1",
+          diagnosisQuestionId: "dq-1",
           questionId: "q-1",
           questionVersion: 1,
           text: "質問",
@@ -364,7 +362,7 @@ describe("App", () => {
         },
       ],
     });
-    mocks.fetchSurveyProgress.mockResolvedValue({
+    mocks.fetchDiagnosisProgress.mockResolvedValue({
       ...result,
       responseStatus: "in-progress",
       answeredCount: 1,
@@ -372,15 +370,15 @@ describe("App", () => {
     });
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("button", { name: /テストアンケート/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /テスト診断/ }));
 
     expect(await screen.findByText("復元済み: 1件")).toBeTruthy();
-    expect(mocks.restoreSurveyProgress).toHaveBeenCalledOnce();
+    expect(mocks.restoreDiagnosisProgress).toHaveBeenCalledOnce();
   });
 
   it("直前のバックグラウンド保存を待ってから現在回答を再取得する", async () => {
     let resolveSave: ((value: unknown) => void) | undefined;
-    mocks.saveSurveyAnswer.mockImplementation(
+    mocks.saveDiagnosisAnswer.mockImplementation(
       () =>
         new Promise((resolve) => {
           resolveSave = resolve;
@@ -388,106 +386,104 @@ describe("App", () => {
     );
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("button", { name: /テストアンケート/ }));
-    await screen.findByText("回答UI: テストアンケート");
-    expect(mocks.fetchSurveyProgress).toHaveBeenCalledTimes(1);
+    fireEvent.click(await screen.findByRole("button", { name: /テスト診断/ }));
+    await screen.findByText("回答UI: テスト診断");
+    expect(mocks.fetchDiagnosisProgress).toHaveBeenCalledTimes(1);
 
     fireEvent.click(screen.getByRole("button", { name: "テスト回答" }));
     fireEvent.click(screen.getByRole("button", { name: "テスト一覧へ戻る" }));
-    fireEvent.click(await screen.findByRole("button", { name: /テストアンケート/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /テスト診断/ }));
 
     await Promise.resolve();
-    expect(mocks.fetchSurveyProgress).toHaveBeenCalledTimes(1);
+    expect(mocks.fetchDiagnosisProgress).toHaveBeenCalledTimes(1);
 
     resolveSave?.({
       outcome: "created",
       answer: { acceptedAt: "2026-08-05T00:00:01.000Z" },
       progress: { responseStatus: "in-progress", answeredCount: 1, questionCount: 10 },
     });
-    await waitFor(() => expect(mocks.fetchSurveyProgress).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(mocks.fetchDiagnosisProgress).toHaveBeenCalledTimes(2));
   });
 
-  it("受付終了した回答途中アンケートは再開せず案内へ進む", async () => {
-    mocks.fetchSurveyList.mockResolvedValue([
-      survey({ availability: "closed", responseStatus: "in-progress", answeredCount: 1 }),
+  it("受付終了した回答途中診断は再開せず案内へ進む", async () => {
+    mocks.fetchDiagnosisList.mockResolvedValue([
+      diagnosis({ availability: "closed", responseStatus: "in-progress", answeredCount: 1 }),
     ]);
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("button", { name: /テストアンケート/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /テスト診断/ }));
 
-    expect(
-      screen.getByRole("heading", { name: "このアンケートは受付を終了しました" }),
-    ).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "この診断は受付を終了しました" })).toBeTruthy();
     expect(screen.getByText(/途中から再開したりすることはできません/)).toBeTruthy();
-    expect(mocks.fetchSurveyDefinition).not.toHaveBeenCalled();
-    expect(mocks.fetchSurveyProgress).not.toHaveBeenCalled();
-    expect(mocks.fetchSurveyResult).not.toHaveBeenCalled();
+    expect(mocks.fetchDiagnosisDefinition).not.toHaveBeenCalled();
+    expect(mocks.fetchDiagnosisProgress).not.toHaveBeenCalled();
+    expect(mocks.fetchDiagnosisResult).not.toHaveBeenCalled();
   });
 
   it.each([
-    survey({ responseStatus: "answered", answeredCount: 10 }),
-    survey({ availability: "closed", responseStatus: "answered", answeredCount: 10 }),
+    diagnosis({ responseStatus: "answered", answeredCount: 10 }),
+    diagnosis({ availability: "closed", responseStatus: "answered", answeredCount: 10 }),
   ])("回答済みなら受付状態にかかわらず保存済み結果を表示する", async (item) => {
-    mocks.fetchSurveyList.mockResolvedValue([item]);
+    mocks.fetchDiagnosisList.mockResolvedValue([item]);
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("button", { name: /テストアンケート/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /テスト診断/ }));
 
-    expect(await screen.findByText("結果UI: テストアンケート (1件)")).toBeTruthy();
-    expect(mocks.fetchSurveyResult).toHaveBeenCalledWith(
+    expect(await screen.findByText("結果UI: テスト診断 (1件)")).toBeTruthy();
+    expect(mocks.fetchDiagnosisResult).toHaveBeenCalledWith(
       "https://api.example.com",
       "dummy.id.token",
-      "survey-1",
+      "diagnosis-1",
       expect.any(AbortSignal),
     );
-    expect(mocks.fetchSurveyDefinition).not.toHaveBeenCalled();
+    expect(mocks.fetchDiagnosisDefinition).not.toHaveBeenCalled();
   });
 
-  it("ローカルのスコア設定がないアンケートを選ぶと未対応の案内へ進む", async () => {
-    mocks.fetchSurveyDefinition.mockResolvedValue(undefined);
+  it("ローカルのスコア設定がない診断を選ぶと未対応の案内へ進む", async () => {
+    mocks.fetchDiagnosisDefinition.mockResolvedValue(undefined);
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("button", { name: /テストアンケート/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /テスト診断/ }));
 
     expect(
       await screen.findByRole("heading", {
-        name: "このアンケートは現在のアプリでは未対応です",
+        name: "この診断は現在のアプリでは未対応です",
       }),
     ).toBeTruthy();
   });
 
   it.each([
     {
-      code: "SURVEY_UNAVAILABLE",
-      heading: "このアンケートは現在のアプリでは未対応です",
+      code: "DIAGNOSIS_UNAVAILABLE",
+      heading: "この診断は現在のアプリでは未対応です",
     },
     {
-      code: "SURVEY_CLOSED",
-      heading: "このアンケートは受付を終了しました",
+      code: "DIAGNOSIS_CLOSED",
+      heading: "この診断は受付を終了しました",
     },
   ])("詳細取得の$codeを対応する案内へ変換する", async ({ code, heading }) => {
-    mocks.fetchSurveyDefinition.mockRejectedValue(new OperationError("detail error", { code }));
+    mocks.fetchDiagnosisDefinition.mockRejectedValue(new OperationError("detail error", { code }));
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("button", { name: /テストアンケート/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /テスト診断/ }));
 
     expect(await screen.findByRole("heading", { name: heading })).toBeTruthy();
   });
 
   it("一覧取得失敗後の再試行でLIFF初期化と一覧取得を同じ順序で再実行する", async () => {
-    mocks.fetchSurveyList
+    mocks.fetchDiagnosisList
       .mockRejectedValueOnce(new Error("network down"))
-      .mockResolvedValueOnce([survey()]);
+      .mockResolvedValueOnce([diagnosis()]);
     render(<App />);
 
     const retry = await screen.findByRole("button", { name: "再試行" });
     fireEvent.click(retry);
     fireEvent.click(retry);
 
-    expect(await screen.findByRole("button", { name: /テストアンケート/ })).toBeTruthy();
+    expect(await screen.findByRole("button", { name: /テスト診断/ })).toBeTruthy();
     expect(mocks.initializeLiff).toHaveBeenCalledTimes(2);
-    expect(mocks.fetchSurveyList).toHaveBeenCalledTimes(2);
-    expect(mocks.fetchSurveyDefinition).not.toHaveBeenCalled();
+    expect(mocks.fetchDiagnosisList).toHaveBeenCalledTimes(2);
+    expect(mocks.fetchDiagnosisDefinition).not.toHaveBeenCalled();
   });
 
   it("Strict Modeでも一覧取得を多重実行しない", async () => {
@@ -497,21 +493,21 @@ describe("App", () => {
       </StrictMode>,
     );
 
-    expect(await screen.findByRole("button", { name: /テストアンケート/ })).toBeTruthy();
+    expect(await screen.findByRole("button", { name: /テスト診断/ })).toBeTruthy();
     expect(mocks.initializeLiff).toHaveBeenCalledTimes(1);
-    expect(mocks.fetchSurveyList).toHaveBeenCalledTimes(1);
+    expect(mocks.fetchDiagnosisList).toHaveBeenCalledTimes(1);
   });
 
   it("アンマウント時に進行中の一覧リクエストを中断する", async () => {
     let signal: AbortSignal | undefined;
-    mocks.fetchSurveyList.mockImplementation(
+    mocks.fetchDiagnosisList.mockImplementation(
       (_apiUrl: string, _token: string, receivedSignal: AbortSignal) => {
         signal = receivedSignal;
-        return new Promise<SurveyListItem[]>(() => undefined);
+        return new Promise<DiagnosisListItem[]>(() => undefined);
       },
     );
     const view = render(<App />);
-    await waitFor(() => expect(mocks.fetchSurveyList).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(mocks.fetchDiagnosisList).toHaveBeenCalledTimes(1));
 
     view.unmount();
 

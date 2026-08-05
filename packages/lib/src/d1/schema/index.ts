@@ -1,4 +1,4 @@
 export * from "./base";
 export * from "./account";
-export * from "./questionnaire";
+export * from "./diagnosis";
 export * from "./source";

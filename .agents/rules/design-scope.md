@@ -9,7 +9,7 @@
 - Account、Brain、Sourceの責務・境界とドメイン間の関係
 - Phase 1の対応チャネルと入力形式、チャネルの役割分担
 - Phase 1のログイン手段と復旧方針
-- Phase 1のQuestion、Survey、SurveyResponseの集約、状態、不変条件、Account / Sourceとの関係
+- Phase 1のQuestion、Diagnosis、DiagnosisResponseの集約、状態、不変条件、Account / Sourceとの関係
 - Brain内部情報の大分類と、分類とは別に持つ共通属性
 - Source Recordの粒度とkind、Brain Itemの由来（Evidence / Derivation）
 - Source RecordとBrain Itemを結ぶ根拠・反証・改訂のエッジの種類と属性、その外部への開示粒度

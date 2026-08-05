@@ -64,28 +64,35 @@ async function ensureAccountIdentity(
 /**
  * テキストメッセージの意図。
  *
- * トークへ送られたテキストは既定で日記として扱い、アンケートのリンクを求めるキーワードだけを
- * 例外として切り出します。LINE は日記の入力とアンケートのリンク配信を担当します
+ * トークへ送られたテキストは既定で日記として扱い、診断のリンクを求めるキーワードだけを
+ * 例外として切り出します。LINE は日記の入力と診断のリンク配信を担当します
  * ([プロジェクト概要 §4](../../../../../docs/product/project-overview.md#4-想定する利用体験))。
  */
-export type LineTextIntent = "survey-request" | "diary";
+export type LineTextIntent = "diagnosis-request" | "diary";
 
 /**
- * アンケートのリンクを求めるキーワード。
+ * 診断のリンクを求めるキーワード。
  *
  * 判定は正規化後の**完全一致**で行い、部分一致は採りません。部分一致にすると
- * 「今日は会社でアンケートに答えた」のような日記本文がコマンドとして飲み込まれ、
+ * 「今日は会社で診断に答えた」のような日記本文がコマンドとして飲み込まれ、
  * 記録されるべき日記が返信だけになります。日記は蓄積の量を担う主要な入力なので、
  * 取りこぼしよりも誤判定を避ける側へ寄せます。取りこぼしは常設の導線で補います。
  */
-const SURVEY_KEYWORDS = ["アンケート", "今日のアンケート", "きょうのアンケート"];
+const DIAGNOSIS_KEYWORDS = [
+  "診断",
+  "しんだん",
+  "今日の診断",
+  "今日のしんだん",
+  "きょうの診断",
+  "きょうのしんだん",
+];
 
 /**
  * 表記ゆれを吸収します。
  *
- * - NFKC 正規化で全角英数・半角カナ (`ｱﾝｹｰﾄ`)・全角スペースを揃える
+ * - NFKC 正規化で全角英数・全角スペースを揃える
  * - 前後の空白を落とす（コピー＆ペーストや予測変換で付きやすい）
- * - ひらがなをカタカナへ寄せて `あんけーと` を同じ表記にする
+ * - ひらがなをカタカナへ寄せて `しんだん` の表記ゆれを揃える
  */
 function normalizeMessageText(text: string): string {
   return text
@@ -97,39 +104,39 @@ function normalizeMessageText(text: string): string {
 /** テキストメッセージの意図を判定します。 */
 export function classifyLineText(text: string): LineTextIntent {
   const normalized = normalizeMessageText(text);
-  const isSurveyRequest = SURVEY_KEYWORDS.some(
+  const isDiagnosisRequest = DIAGNOSIS_KEYWORDS.some(
     (keyword) => normalizeMessageText(keyword) === normalized,
   );
-  return isSurveyRequest ? "survey-request" : "diary";
+  return isDiagnosisRequest ? "diagnosis-request" : "diary";
 }
 
-/** 「今日のアンケート」への導線。タップすると LINE 内で Web が開きます。 */
-function buildSurveyLink(liffId: string): string {
-  return `今日のアンケートに答える\nhttps://liff.line.me/${liffId}`;
+/** 「今日の診断」への導線。タップすると LINE 内で Web が開きます。 */
+function buildDiagnosisLink(liffId: string): string {
+  return `今日の診断に答える\nhttps://liff.line.me/${liffId}`;
 }
 
 /**
  * 受信したテキストに対する返信文を組み立てます。
  *
- * - 「アンケート」と送られた場合はアンケート (LIFF) のリンクを返す
- * - それ以外（＝日記）は受け付けた旨と、あわせて「今日のアンケート」への導線を返す。
- *   日記の返信はアンケートへの主要な再訪導線なので、キーワードの追加でも変えません
+ * - 「診断」と送られた場合は診断 (LIFF) のリンクを返す
+ * - それ以外（＝日記）は受け付けた旨と、あわせて「今日の診断」への導線を返す。
+ *   日記の返信は診断への主要な再訪導線なので、キーワードの追加でも変えません
  * - `LIFF_ID` 未設定時はリンクを省く（環境変数が未設定なら安全にスキップする既存方針）
  */
 export function buildReplyText(messageText: string, liffId?: string): string {
-  if (classifyLineText(messageText) === "survey-request") {
+  if (classifyLineText(messageText) === "diagnosis-request") {
     if (!liffId) {
       // リンクを出せない理由は利用者に関係がないため、設定の話はせず案内だけ返します。
-      return "いまはアンケートのリンクをお渡しできません。時間をおいてもう一度お試しください。";
+      return "いまは診断のリンクをお渡しできません。時間をおいてもう一度お試しください。";
     }
-    return buildSurveyLink(liffId);
+    return buildDiagnosisLink(liffId);
   }
 
   const received = "受け付けました。";
   if (!liffId) {
     return received;
   }
-  return `${received}\n${buildSurveyLink(liffId)}`;
+  return `${received}\n${buildDiagnosisLink(liffId)}`;
 }
 
 async function handleTextMessage(
