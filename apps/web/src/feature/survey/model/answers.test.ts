@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { createDeferredQuestion, createSurveyAnswer, summarizeInteractions } from "./answers";
+import {
+  createDeferredQuestion,
+  createSurveyAnswer,
+  restoreSurveyProgress,
+  summarizeInteractions,
+} from "./answers";
 import type { SurveyQuestion } from "./types";
 
 const QUESTION: SurveyQuestion = {
@@ -64,5 +69,59 @@ describe("summarizeInteractions", () => {
 
   it("1 問も回答していなければ 0 件になること", () => {
     expect(summarizeInteractions([])).toEqual({ answered: 0, deferred: 0 });
+  });
+});
+
+describe("restoreSurveyProgress", () => {
+  const SECOND_QUESTION: SurveyQuestion = {
+    ...QUESTION,
+    surveyQuestionId: "sq-second",
+    questionId: "q-second",
+    text: "2問目",
+  };
+
+  it("保存済み回答を復元し、最初の未回答を含む質問だけを表示順で返す", () => {
+    const restored = restoreSurveyProgress(
+      [QUESTION, SECOND_QUESTION],
+      [
+        {
+          surveyQuestionId: QUESTION.surveyQuestionId,
+          questionId: QUESTION.questionId,
+          questionVersion: QUESTION.questionVersion,
+          questionText: QUESTION.text,
+          choiceId: QUESTION.right.choiceId,
+          choiceLabel: QUESTION.right.label,
+          acceptedAt: ANSWERED_AT.toISOString(),
+        },
+      ],
+    );
+
+    expect(restored.answers).toEqual([
+      expect.objectContaining({
+        surveyQuestionId: "sq-test",
+        choiceId: "right-value",
+        direction: "right",
+      }),
+    ]);
+    expect(restored.unansweredQuestions).toEqual([SECOND_QUESTION]);
+  });
+
+  it("配信中の質問に存在しない保存済み回答は復元しない", () => {
+    expect(() =>
+      restoreSurveyProgress(
+        [QUESTION],
+        [
+          {
+            surveyQuestionId: "sq-unknown",
+            questionId: "q-unknown",
+            questionVersion: 1,
+            questionText: "不明な質問",
+            choiceId: "yes",
+            choiceLabel: "はい",
+            acceptedAt: ANSWERED_AT.toISOString(),
+          },
+        ],
+      ),
+    ).toThrow("配信対象外");
   });
 });

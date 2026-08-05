@@ -210,17 +210,19 @@ function ResultOpeningPending() {
  */
 export function SwipeSurvey({
   survey,
+  initialAnswers = [],
   onBack,
   onSaveAnswer,
   onComplete,
 }: {
   survey: SurveyDefinition;
+  initialAnswers?: SurveyAnswer[];
   onBack: () => void;
   onSaveAnswer: (answer: SurveyAnswer) => Promise<{ acceptedAt: string }>;
   onComplete: () => void;
 }) {
   const [index, setIndex] = useState(0);
-  const [interactions, setInteractions] = useState<SurveyInteraction[]>([]);
+  const [interactions, setInteractions] = useState<SurveyInteraction[]>(initialAnswers);
   const [drag, setDrag] = useState<DragOffset | null>(null);
   const [flyOut, setFlyOut] = useState<SwipeDirection | null>(null);
   const [backgroundSaves, setBackgroundSaves] = useState<BackgroundSave[]>([]);
@@ -238,7 +240,15 @@ export function SwipeSurvey({
   /** 保存完了後の結果遷移を再描画で重複通知しないようにします。 */
   const completionNotified = useRef(false);
 
-  const questions = survey.questions;
+  const answeredQuestionIds = useMemo(
+    () => new Set(initialAnswers.map(({ surveyQuestionId }) => surveyQuestionId)),
+    [initialAnswers],
+  );
+  const questions = useMemo(
+    () =>
+      survey.questions.filter(({ surveyQuestionId }) => !answeredQuestionIds.has(surveyQuestionId)),
+    [answeredQuestionIds, survey.questions],
+  );
 
   useEffect(
     () => () => {
@@ -394,12 +404,12 @@ export function SwipeSurvey({
   const onPointerUp = (event: ReactPointerEvent<HTMLDivElement>) => finishPointer(event, false);
   const onPointerCancel = (event: ReactPointerEvent<HTMLDivElement>) => finishPointer(event, true);
 
-  const total = questions.length;
-  const finished = index >= total;
+  const total = survey.questions.length;
+  const finished = index >= questions.length;
   const allAnswered =
     interactions.filter((interaction) => interaction.kind === "answer").length === total;
   const isOpeningResult = finished && allAnswered && backgroundSaves.length === 0;
-  const answeredCount = finished ? total : index;
+  const answeredCount = Math.min(initialAnswers.length + index, total);
   const progressMilestone = resolveProgressMilestone(answeredCount, total);
   // 同じ段階にいる間は文言を固定し、回答のたびにちらつかないようにします。
   const progressMessage = useMemo(
@@ -420,7 +430,7 @@ export function SwipeSurvey({
       <header className="flex items-baseline justify-between">
         <h2 className="text-lg font-bold">{survey.title}</h2>
         <p className="text-sm text-slate-400" aria-live="polite">
-          {`${finished ? total : Math.min(index + 1, total)} / ${total}`}
+          {`${finished ? total : Math.min(answeredCount + 1, total)} / ${total}`}
         </p>
       </header>
 
