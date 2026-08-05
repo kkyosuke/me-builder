@@ -81,6 +81,10 @@ describe("DiagnosisResultView", () => {
   it("採点設定がない診断でも回答内容を表示できる", () => {
     render(<DiagnosisResultView result={{ ...result, scoring: null }} onBack={vi.fn()} />);
 
+    expect(
+      screen.getByText("保存した回答内容を確認できます。医療的な診断ではありません。"),
+    ).toBeTruthy();
+    expect(screen.queryByText(/回答から見える現在の傾向です/)).toBeNull();
     expect(screen.getByText(/傾向がまだ設定されていません/)).toBeTruthy();
     expect(screen.getByText("回答内容（1件）")).toBeTruthy();
     expect(screen.queryByRole("group", { name: "回答から見える傾向の一覧" })).toBeNull();

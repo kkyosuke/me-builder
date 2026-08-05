@@ -2,10 +2,11 @@ import { d1 } from "@me-builder/lib";
 import { scoreDiagnosisAnswers } from "./diagnosis-scoring";
 import { createLiffSession } from "./liff-session";
 
-type DiagnosisAnswers = Extract<
+type StoredDiagnosisAnswers = Extract<
   Awaited<ReturnType<typeof d1.action.diagnosis.findDiagnosisAnswers>>,
   { type: "found" }
 >["diagnosis"];
+type DiagnosisAnswers = Omit<StoredDiagnosisAnswers, "scoringConfig">;
 
 export type DiagnosisAnswersOutcome =
   | {
@@ -51,11 +52,12 @@ export async function getDiagnosisAnswers(
   if (result.type !== "found") {
     return { type: "diagnosis-answers-not-found" };
   }
+  const { scoringConfig, ...diagnosis } = result.diagnosis;
   return {
     type: "resolved",
     diagnosis: {
-      ...result.diagnosis,
-      scoring: scoreDiagnosisAnswers(result.diagnosis.id, result.diagnosis.answers),
+      ...diagnosis,
+      scoring: scoreDiagnosisAnswers(result.diagnosis.answers, scoringConfig),
     },
   };
 }

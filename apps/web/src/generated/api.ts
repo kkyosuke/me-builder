@@ -316,9 +316,6 @@ export interface operations {
               choices: {
                 choiceId: string;
                 label: string;
-                presentation: {
-                  [key: string]: string;
-                };
               }[];
             }[];
           };

@@ -98,7 +98,6 @@ const ApiDiagnosisDetailSchema = v.object({
           v.object({
             choiceId: v.pipe(v.string(), v.nonEmpty()),
             label: v.pipe(v.string(), v.nonEmpty()),
-            presentation: v.object({ icon: v.pipe(v.string(), v.nonEmpty()) }),
           }),
         ),
         v.length(2),
@@ -175,12 +174,10 @@ export async function fetchDiagnosisDefinition(
           left: {
             choiceId: left.choiceId,
             label: left.label,
-            icon: left.presentation.icon,
           },
           right: {
             choiceId: right.choiceId,
             label: right.label,
-            icon: right.presentation.icon,
           },
         };
       }),

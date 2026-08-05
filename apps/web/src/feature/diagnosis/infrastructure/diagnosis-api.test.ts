@@ -207,8 +207,8 @@ describe("fetchDiagnosisDefinition", () => {
             text: "API question",
             hint: null,
             choices: [
-              { choiceId: "no", label: "いいえ", presentation: { icon: "circle-x" } },
-              { choiceId: "yes", label: "はい", presentation: { icon: "circle-check" } },
+              { choiceId: "no", label: "いいえ" },
+              { choiceId: "yes", label: "はい" },
             ],
           },
         ],
@@ -231,8 +231,8 @@ describe("fetchDiagnosisDefinition", () => {
         {
           questionVersion: 2,
           text: "API question",
-          left: { choiceId: "no", icon: "circle-x" },
-          right: { choiceId: "yes", icon: "circle-check" },
+          left: { choiceId: "no" },
+          right: { choiceId: "yes" },
         },
       ],
     });

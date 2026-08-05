@@ -14,6 +14,7 @@ describe("getDiagnosisAnswers", () => {
       responseStatus: "answered" as const,
       answeredCount: 1,
       questionCount: 1,
+      scoringConfig: null,
       answers: [],
     };
     const findAnswers = vi.fn().mockResolvedValue({ type: "found", diagnosis });
@@ -30,7 +31,11 @@ describe("getDiagnosisAnswers", () => {
     );
 
     expect(findAnswers).toHaveBeenCalledWith(db, "account-1", "diagnosis-1", at);
-    expect(result).toEqual({ type: "resolved", diagnosis: { ...diagnosis, scoring: null } });
+    const { scoringConfig: _, ...expectedDiagnosis } = diagnosis;
+    expect(result).toEqual({
+      type: "resolved",
+      diagnosis: { ...expectedDiagnosis, scoring: null },
+    });
   });
 
   it("回答がない場合はdiagnosis-answers-not-foundへ変換する", async () => {

@@ -12,8 +12,8 @@ const QUESTION: DiagnosisQuestion = {
   questionId: "q-test",
   questionVersion: 3,
   text: "テストの質問",
-  left: { choiceId: "left-value", label: "左", icon: "house" },
-  right: { choiceId: "right-value", label: "右", icon: "mountain" },
+  left: { choiceId: "left-value", label: "左" },
+  right: { choiceId: "right-value", label: "右" },
 };
 
 const ANSWERED_AT = new Date("2026-07-28T00:00:00.000Z");

@@ -1,90 +1,94 @@
 import { describe, expect, it } from "vitest";
 import { scoreDiagnosisAnswers } from "./diagnosis-scoring";
 
-const answer = (questionId: string, choiceId = "yes", questionVersion = 1) => ({
+const CONFIG = {
+  version: 3,
+  definition: {
+    parameters: [
+      { id: "planning", label: "計画性", lowLabel: "即興", highLabel: "計画的" },
+      { id: "flexibility", label: "柔軟性", lowLabel: "予定を守る", highLabel: "変更を楽しむ" },
+    ],
+    choiceScores: { yes: 1, neutral: 0, no: -1 },
+    questions: {
+      "q-plan": { questionVersion: 2, weights: { planning: 1, flexibility: -0.5 } },
+      "q-change": { questionVersion: 1, weights: { planning: -1, flexibility: 1 } },
+    },
+    minimumCoverage: 0.6,
+    lowMaximum: 35,
+    highMinimum: 65,
+    balancedLabel: "状況による",
+  },
+} as const;
+
+const answer = (questionId: string, questionVersion: number, choiceId: string) => ({
   questionId,
   questionVersion,
   choiceId,
 });
 
 describe("scoreDiagnosisAnswers", () => {
-  it("診断IDに対応する版付きプロフィールを計算する", () => {
-    const answers = Array.from({ length: 10 }, (_, index) =>
-      answer(`q-relationship-priority-${String(index + 1).padStart(2, "0")}`),
+  it("DBから取得した設定版と重みでプロフィールを計算する", () => {
+    const scoring = scoreDiagnosisAnswers(
+      [answer("q-plan", 2, "yes"), answer("q-change", 1, "no")],
+      CONFIG,
     );
 
-    const scoring = scoreDiagnosisAnswers("relationship-priority", answers);
-
-    expect(scoring).toMatchObject({
-      scoringVersion: 1,
-      balancedLabel: "状況に応じて調整",
+    expect(scoring).toEqual({
+      scoringVersion: 3,
+      balancedLabel: "状況による",
+      parameters: [
+        {
+          id: "planning",
+          label: "計画性",
+          lowLabel: "即興",
+          highLabel: "計画的",
+          score: 100,
+          coverage: 100,
+          band: "high",
+        },
+        {
+          id: "flexibility",
+          label: "柔軟性",
+          lowLabel: "予定を守る",
+          highLabel: "変更を楽しむ",
+          score: 0,
+          coverage: 100,
+          band: "low",
+        },
+      ],
     });
-    expect(scoring?.parameters).toEqual([
-      expect.objectContaining({ id: "priority-balance", score: 33, coverage: 100, band: "low" }),
-      expect.objectContaining({ id: "autonomy", score: 56, coverage: 100, band: "balanced" }),
-      expect.objectContaining({
-        id: "boundary-expression",
-        score: 60,
-        coverage: 100,
-        band: "balanced",
-      }),
-      expect.objectContaining({
-        id: "support-flexibility",
-        score: 67,
-        coverage: 100,
-        band: "high",
-      }),
-    ]);
   });
 
-  it("お金と消費の全問Yesを既存の5パラメータへ変換する", () => {
-    const answers = Array.from({ length: 10 }, (_, index) =>
-      answer(`q-money-${String(index + 1).padStart(2, "0")}`),
+  it("質問版や選択値が設定と一致しない回答を採点に含めない", () => {
+    const scoring = scoreDiagnosisAnswers(
+      [answer("q-plan", 1, "yes"), answer("q-change", 1, "unknown")],
+      CONFIG,
     );
-
-    const scoring = scoreDiagnosisAnswers("money-values", answers);
-
-    expect(scoring?.parameters).toEqual([
-      expect.objectContaining({ id: "future-preparation", score: 50, coverage: 100 }),
-      expect.objectContaining({ id: "financial-sharing", score: 67, coverage: 100 }),
-      expect.objectContaining({ id: "fairness-flexibility", score: 50, coverage: 100 }),
-      expect.objectContaining({ id: "durable-value", score: 40, coverage: 100 }),
-      expect.objectContaining({ id: "risk-tolerance", score: 75, coverage: 100 }),
-    ]);
-  });
-
-  it("回答充足率が閾値未満の軸は断定しない", () => {
-    const scoring = scoreDiagnosisAnswers("money-values", [answer("q-money-01")]);
 
     expect(
-      scoring?.parameters.every(({ score, band }) => score === null && band === "insufficient"),
+      scoring?.parameters.every(({ score, coverage }) => score === null && coverage === 0),
     ).toBe(true);
   });
 
-  it("未知の選択肢と設定版に一致しない回答を採点に含めない", () => {
-    const scoring = scoreDiagnosisAnswers("money-values", [
-      answer("q-money-01", "unknown"),
-      answer("q-money-02", "yes", 2),
-    ]);
-
-    expect(scoring?.parameters.every(({ coverage }) => coverage === 0)).toBe(true);
-  });
-
   it("同じ質問へ複数回答がある場合は最後の回答を現在値にする", () => {
-    const fixedAnswers = [2, 3, 7, 9].map((number) =>
-      answer(`q-relationship-priority-${String(number).padStart(2, "0")}`, "no"),
+    const scoring = scoreDiagnosisAnswers(
+      [answer("q-plan", 2, "no"), answer("q-change", 1, "no"), answer("q-plan", 2, "yes")],
+      CONFIG,
     );
-    const scoring = scoreDiagnosisAnswers("relationship-priority", [
-      answer("q-relationship-priority-01", "no"),
-      ...fixedAnswers,
-      answer("q-relationship-priority-10"),
-      answer("q-relationship-priority-01"),
-    ]);
 
-    expect(scoring?.parameters[0]).toMatchObject({ score: 100, coverage: 100, band: "high" });
+    expect(scoring?.parameters[0]).toMatchObject({ score: 100, coverage: 100 });
   });
 
   it("採点設定がない診断はnullを返す", () => {
-    expect(scoreDiagnosisAnswers("new-diagnosis", [answer("q-new-01")])).toBeNull();
+    expect(scoreDiagnosisAnswers([answer("q-plan", 2, "yes")], null)).toBeNull();
+  });
+
+  it("DB上の採点設定が不正なら拒否する", () => {
+    expect(() =>
+      scoreDiagnosisAnswers([], {
+        ...CONFIG,
+        definition: { ...CONFIG.definition, minimumCoverage: 2 },
+      }),
+    ).toThrow();
   });
 });

@@ -6,6 +6,7 @@ import {
   diagnosisDeferredQuestions,
   diagnosisQuestions,
   diagnosisResponses,
+  diagnosisScoringConfigs,
   questionChoices,
   questions as questionRoots,
   questionVersions,
@@ -42,7 +43,6 @@ export type DiagnosisDetail = Readonly<{
     choices: Array<{
       choiceId: string;
       label: string;
-      presentation: Record<string, string>;
     }>;
   }>;
 }>;
@@ -82,6 +82,11 @@ export type DiagnosisAnswers = Readonly<{
   responseStatus: DiagnosisListResponseStatus;
   answeredCount: number;
   questionCount: number;
+  scoringConfig: {
+    id: string;
+    version: number;
+    definition: unknown;
+  } | null;
   answers: Array<{
     diagnosisQuestionId: string;
     questionId: string;
@@ -473,7 +478,6 @@ export async function findOpenDiagnosisDetail(
       hint: questionVersions.hint,
       choiceId: questionChoices.choiceId,
       choiceLabel: questionChoices.label,
-      choicePresentation: questionChoices.presentation,
     })
     .from(diagnosisQuestions)
     .innerJoin(
@@ -507,7 +511,6 @@ export async function findOpenDiagnosisDetail(
     const choice = {
       choiceId: row.choiceId,
       label: row.choiceLabel,
-      presentation: row.choicePresentation ?? {},
     };
     if (previous?.diagnosisQuestionId === row.diagnosisQuestionId) {
       previous.choices.push(choice);
@@ -552,9 +555,19 @@ export async function findDiagnosisAnswers(
       opensAt: diagnoses.opensAt,
       state: diagnoses.state,
       diagnosisIsDeleted: diagnoses.isDeleted,
+      scoringConfigId: diagnosisScoringConfigs.id,
+      scoringConfigVersion: diagnosisScoringConfigs.version,
+      scoringConfigDefinition: diagnosisScoringConfigs.definition,
     })
     .from(diagnosisResponses)
     .innerJoin(diagnoses, eq(diagnoses.id, diagnosisResponses.diagnosisId))
+    .leftJoin(
+      diagnosisScoringConfigs,
+      and(
+        eq(diagnosisScoringConfigs.id, diagnoses.scoringConfigId),
+        eq(diagnosisScoringConfigs.isDeleted, false),
+      ),
+    )
     .where(
       and(
         eq(diagnosisResponses.accountId, accountId),
@@ -642,6 +655,16 @@ export async function findDiagnosisAnswers(
       responseStatus: answeredCount === questionCount ? "answered" : "in-progress",
       answeredCount,
       questionCount,
+      scoringConfig:
+        response.scoringConfigId &&
+        response.scoringConfigVersion !== null &&
+        response.scoringConfigDefinition !== null
+          ? {
+              id: response.scoringConfigId,
+              version: response.scoringConfigVersion,
+              definition: response.scoringConfigDefinition,
+            }
+          : null,
       answers: rows.map((answer) => ({
         ...answer,
         acceptedAt: answer.acceptedAt.toISOString(),

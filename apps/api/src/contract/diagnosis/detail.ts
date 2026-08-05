@@ -8,7 +8,6 @@ const TimestampSchema = v.pipe(v.string(), v.isoTimestamp());
 const DiagnosisChoiceSchema = v.object({
   choiceId: NonEmptyStringSchema,
   label: NonEmptyStringSchema,
-  presentation: v.record(v.string(), v.string()),
 });
 
 const DiagnosisQuestionSchema = v.object({
@@ -17,7 +16,7 @@ const DiagnosisQuestionSchema = v.object({
   questionVersion: v.pipe(v.number(), v.safeInteger(), v.minValue(1)),
   text: NonEmptyStringSchema,
   hint: v.nullable(NonEmptyStringSchema),
-  choices: v.pipe(v.array(DiagnosisChoiceSchema), v.minLength(2)),
+  choices: v.pipe(v.array(DiagnosisChoiceSchema), v.length(2)),
 });
 
 export const DiagnosisDetailResponseSchema = v.object({

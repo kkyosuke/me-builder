@@ -1,3 +1,5 @@
+import * as v from "valibot";
+
 type ParameterBand = "low" | "balanced" | "high" | "insufficient";
 
 type ScoredParameter = Readonly<{
@@ -22,251 +24,90 @@ type ScoringAnswer = Readonly<{
   choiceId: string;
 }>;
 
-type ParameterDefinition<ParameterId extends string> = Readonly<{
-  id: ParameterId;
-  label: string;
-  lowLabel: string;
-  highLabel: string;
-}>;
-
-type QuestionScoringRule<ParameterId extends string> = Readonly<{
-  questionVersion: number;
-  weights: Partial<Record<ParameterId, number>>;
-}>;
-
-type ParameterScoringConfig<ParameterId extends string> = Readonly<{
+type StoredScoringConfig = Readonly<{
   version: number;
-  parameters: readonly ParameterDefinition<ParameterId>[];
-  choiceScores: Readonly<Record<string, number>>;
-  questions: Readonly<Record<string, QuestionScoringRule<ParameterId>>>;
-  minimumCoverage: number;
-  lowMaximum: number;
-  highMinimum: number;
-  balancedLabel: string;
+  definition: unknown;
 }>;
 
-type RelationshipPriorityParameter =
-  | "priority-balance"
-  | "autonomy"
-  | "boundary-expression"
-  | "support-flexibility";
+const VersionSchema = v.pipe(v.number(), v.safeInteger(), v.minValue(1));
+const NonEmptyStringSchema = v.pipe(v.string(), v.nonEmpty());
+const ChoiceScoreSchema = v.pipe(v.number(), v.finite(), v.minValue(-1), v.maxValue(1));
+const WeightSchema = v.pipe(
+  v.number(),
+  v.finite(),
+  v.check((weight) => weight !== 0, "weightは0にできません"),
+);
+const ScoreBoundarySchema = v.pipe(v.number(), v.finite(), v.minValue(0), v.maxValue(100));
 
-const RELATIONSHIP_PRIORITY_SCORING = {
-  version: 1,
-  choiceScores: { yes: 1, no: -1 },
-  parameters: [
-    {
-      id: "priority-balance",
-      label: "自分／相手の優先",
-      lowLabel: "相手を優先しやすい",
-      highLabel: "自分の余裕を優先しやすい",
-    },
-    {
-      id: "autonomy",
-      label: "自律／相談",
-      lowLabel: "相談・共有を重視",
-      highLabel: "個人の判断を尊重",
-    },
-    {
-      id: "boundary-expression",
-      label: "境界の表明",
-      lowLabel: "内側で調整しやすい",
-      highLabel: "境界を伝えやすい",
-    },
-    {
-      id: "support-flexibility",
-      label: "支援の柔軟性",
-      lowLabel: "自分の予定を守りやすい",
-      highLabel: "相手のために調整しやすい",
-    },
-  ],
-  questions: {
-    "q-relationship-priority-01": {
-      questionVersion: 1,
-      weights: { "priority-balance": 1, "boundary-expression": 1 },
-    },
-    "q-relationship-priority-02": {
-      questionVersion: 1,
-      weights: { "priority-balance": -1, "support-flexibility": 1 },
-    },
-    "q-relationship-priority-03": {
-      questionVersion: 1,
-      weights: { "priority-balance": -1, "boundary-expression": -1 },
-    },
-    "q-relationship-priority-04": { questionVersion: 1, weights: { autonomy: -1 } },
-    "q-relationship-priority-05": { questionVersion: 1, weights: { autonomy: 1 } },
-    "q-relationship-priority-06": { questionVersion: 1, weights: { autonomy: -1 } },
-    "q-relationship-priority-07": {
-      questionVersion: 1,
-      weights: { "priority-balance": -1, "boundary-expression": -1 },
-    },
-    "q-relationship-priority-08": {
-      questionVersion: 1,
-      weights: { autonomy: 1, "boundary-expression": 1 },
-    },
-    "q-relationship-priority-09": {
-      questionVersion: 1,
-      weights: { "priority-balance": -1, "support-flexibility": 1 },
-    },
-    "q-relationship-priority-10": {
-      questionVersion: 1,
-      weights: {
-        "priority-balance": 1,
-        autonomy: 0.5,
-        "boundary-expression": 1,
-        "support-flexibility": -1,
-      },
-    },
-  },
-  minimumCoverage: 0.6,
-  lowMaximum: 35,
-  highMinimum: 65,
-  balancedLabel: "状況に応じて調整",
-} as const satisfies ParameterScoringConfig<RelationshipPriorityParameter>;
+const ScoringConfigSchema = v.pipe(
+  v.object({
+    version: VersionSchema,
+    parameters: v.pipe(
+      v.array(
+        v.object({
+          id: NonEmptyStringSchema,
+          label: NonEmptyStringSchema,
+          lowLabel: NonEmptyStringSchema,
+          highLabel: NonEmptyStringSchema,
+        }),
+      ),
+      v.minLength(1),
+      v.check(
+        (parameters) => new Set(parameters.map(({ id }) => id)).size === parameters.length,
+        "parameter idが重複しています",
+      ),
+    ),
+    choiceScores: v.pipe(
+      v.record(NonEmptyStringSchema, ChoiceScoreSchema),
+      v.check(
+        (choiceScores) =>
+          Object.values(choiceScores).length > 0 &&
+          Object.values(choiceScores).some((score) => score !== 0),
+        "choiceScoresには0以外の値が必要です",
+      ),
+    ),
+    questions: v.record(
+      NonEmptyStringSchema,
+      v.object({
+        questionVersion: VersionSchema,
+        weights: v.record(NonEmptyStringSchema, WeightSchema),
+      }),
+    ),
+    minimumCoverage: v.pipe(v.number(), v.finite(), v.minValue(0), v.maxValue(1)),
+    lowMaximum: ScoreBoundarySchema,
+    highMinimum: ScoreBoundarySchema,
+    balancedLabel: NonEmptyStringSchema,
+  }),
+  v.check(
+    ({ lowMaximum, highMinimum }) => lowMaximum < highMinimum,
+    "lowMaximumはhighMinimum未満にしてください",
+  ),
+  v.check(({ parameters, questions }) => {
+    const parameterIds = new Set(parameters.map(({ id }) => id));
+    return Object.values(questions).every(({ weights }) =>
+      Object.keys(weights).every((parameterId) => parameterIds.has(parameterId)),
+    );
+  }, "questionsが未知のparameter idを参照しています"),
+  v.check(({ parameters, questions }) => {
+    const weightedParameterIds = new Set(
+      Object.values(questions).flatMap(({ weights }) => Object.keys(weights)),
+    );
+    return parameters.every(({ id }) => weightedParameterIds.has(id));
+  }, "重みが設定されていないparameterがあります"),
+);
 
-type MoneyValuesParameter =
-  | "future-preparation"
-  | "financial-sharing"
-  | "fairness-flexibility"
-  | "durable-value"
-  | "risk-tolerance";
+type ScoringConfig = v.InferOutput<typeof ScoringConfigSchema>;
 
-const MONEY_VALUES_SCORING = {
-  version: 1,
-  choiceScores: { yes: 1, no: -1 },
-  parameters: [
-    {
-      id: "future-preparation",
-      label: "将来への備え",
-      lowLabel: "今の楽しみに使いやすい",
-      highLabel: "将来への備えを重視",
-    },
-    {
-      id: "financial-sharing",
-      label: "お金の共有",
-      lowLabel: "個人の裁量を重視",
-      highLabel: "相談・情報共有を重視",
-    },
-    {
-      id: "fairness-flexibility",
-      label: "負担の公平性",
-      lowLabel: "同額負担を公平と感じやすい",
-      highLabel: "状況に応じた負担を重視",
-    },
-    {
-      id: "durable-value",
-      label: "支出の価値",
-      lowLabel: "体験・気持ちへの支出を重視",
-      highLabel: "長く使える価値を重視",
-    },
-    {
-      id: "risk-tolerance",
-      label: "リスク許容",
-      lowLabel: "損失回避を重視",
-      highLabel: "リスクを取れる",
-    },
-  ],
-  questions: {
-    "q-money-01": {
-      questionVersion: 1,
-      weights: { "future-preparation": 1, "risk-tolerance": -0.5 },
-    },
-    "q-money-02": {
-      questionVersion: 1,
-      weights: { "future-preparation": -1, "durable-value": -0.5, "risk-tolerance": 0.5 },
-    },
-    "q-money-03": { questionVersion: 1, weights: { "financial-sharing": 1 } },
-    "q-money-04": { questionVersion: 1, weights: { "fairness-flexibility": -1 } },
-    "q-money-05": {
-      questionVersion: 1,
-      weights: { "future-preparation": 0.5, "durable-value": 1 },
-    },
-    "q-money-06": {
-      questionVersion: 1,
-      weights: { "future-preparation": -0.5, "durable-value": -1 },
-    },
-    "q-money-07": { questionVersion: 1, weights: { "financial-sharing": 1 } },
-    "q-money-08": { questionVersion: 1, weights: { "risk-tolerance": 1 } },
-    "q-money-09": { questionVersion: 1, weights: { "fairness-flexibility": 1 } },
-    "q-money-10": { questionVersion: 1, weights: { "financial-sharing": -1 } },
-  },
-  minimumCoverage: 0.6,
-  lowMaximum: 35,
-  highMinimum: 65,
-  balancedLabel: "状況に応じて調整",
-} as const satisfies ParameterScoringConfig<MoneyValuesParameter>;
-
-function assertValidScoringConfig<ParameterId extends string>(
-  config: ParameterScoringConfig<ParameterId>,
-): void {
-  const parameterIds = config.parameters.map(({ id }) => id);
-  const knownParameterIds = new Set<string>(parameterIds);
-  const choiceScores = Object.values(config.choiceScores);
-  const weightedParameterIds = new Set<string>();
-  const validBoundary = (value: number) => Number.isFinite(value) && value >= 0 && value <= 100;
-
-  if (!Number.isInteger(config.version) || config.version < 1) {
-    throw new Error("scoring version must be a positive integer");
-  }
-  if (parameterIds.length === 0 || knownParameterIds.size !== parameterIds.length) {
-    throw new Error("scoring parameters must have unique IDs");
-  }
-  if (
-    choiceScores.length === 0 ||
-    choiceScores.every((score) => score === 0) ||
-    choiceScores.some((score) => !Number.isFinite(score) || score < -1 || score > 1)
-  ) {
-    throw new Error("choice scores must contain a non-zero finite value between -1 and 1");
-  }
-  for (const rule of Object.values(config.questions) as QuestionScoringRule<ParameterId>[]) {
-    if (!Number.isInteger(rule.questionVersion) || rule.questionVersion < 1) {
-      throw new Error("question version must be a positive integer");
-    }
-    for (const [parameterId, weight] of Object.entries(rule.weights)) {
-      if (!knownParameterIds.has(parameterId)) {
-        throw new Error(`unknown scoring parameter: ${parameterId}`);
-      }
-      if (typeof weight !== "number" || !Number.isFinite(weight) || weight === 0) {
-        throw new Error(`scoring weight must be a non-zero finite number: ${parameterId}`);
-      }
-      weightedParameterIds.add(parameterId);
-    }
-  }
-  if (parameterIds.some((parameterId) => !weightedParameterIds.has(parameterId))) {
-    throw new Error("every scoring parameter must have at least one weight");
-  }
-  if (
-    !Number.isFinite(config.minimumCoverage) ||
-    config.minimumCoverage < 0 ||
-    config.minimumCoverage > 1
-  ) {
-    throw new Error("minimum coverage must be between 0 and 1");
-  }
-  if (
-    !validBoundary(config.lowMaximum) ||
-    !validBoundary(config.highMinimum) ||
-    config.lowMaximum >= config.highMinimum
-  ) {
-    throw new Error("scoring boundaries must be ordered between 0 and 100");
-  }
-}
-
-assertValidScoringConfig(RELATIONSHIP_PRIORITY_SCORING);
-assertValidScoringConfig(MONEY_VALUES_SCORING);
-
-function resolveBand<ParameterId extends string>(
-  score: number | null,
-  config: ParameterScoringConfig<ParameterId>,
-): ParameterBand {
+function resolveBand(score: number | null, config: ScoringConfig): ParameterBand {
   if (score === null) return "insufficient";
   if (score <= config.lowMaximum) return "low";
   if (score >= config.highMinimum) return "high";
   return "balanced";
 }
 
-function scoreParameters<ParameterId extends string>(
+function scoreParameters(
   answers: readonly ScoringAnswer[],
-  config: ParameterScoringConfig<ParameterId>,
+  config: ScoringConfig,
 ): DiagnosisScoring {
   const currentAnswers = new Map(answers.map((answer) => [answer.questionId, answer]));
   const maximumChoiceMagnitude = Math.max(...Object.values(config.choiceScores).map(Math.abs));
@@ -276,10 +117,7 @@ function scoreParameters<ParameterId extends string>(
     let answeredWeight = 0;
     let weightedSum = 0;
 
-    for (const [questionId, rule] of Object.entries(config.questions) as [
-      string,
-      QuestionScoringRule<ParameterId>,
-    ][]) {
+    for (const [questionId, rule] of Object.entries(config.questions)) {
       const weight = rule.weights[parameter.id];
       if (weight === undefined) continue;
 
@@ -314,17 +152,15 @@ function scoreParameters<ParameterId extends string>(
   };
 }
 
-/** 診断固有の採点設定をAPI内へ閉じ込め、FEへは計算済み結果だけを返します。 */
+/** Diagnosisが参照するDB上の版付き設定から、保存済み回答の傾向を計算します。 */
 export function scoreDiagnosisAnswers(
-  diagnosisId: string,
   answers: readonly ScoringAnswer[],
+  storedConfig: StoredScoringConfig | null,
 ): DiagnosisScoring | null {
-  switch (diagnosisId) {
-    case "relationship-priority":
-      return scoreParameters(answers, RELATIONSHIP_PRIORITY_SCORING);
-    case "money-values":
-      return scoreParameters(answers, MONEY_VALUES_SCORING);
-    default:
-      return null;
-  }
+  if (!storedConfig) return null;
+  const config = v.parse(ScoringConfigSchema, {
+    ...v.parse(v.record(v.string(), v.unknown()), storedConfig.definition),
+    version: storedConfig.version,
+  });
+  return scoreParameters(answers, config);
 }

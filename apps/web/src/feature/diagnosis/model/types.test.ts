@@ -10,8 +10,8 @@ describe("DiagnosisQuestionSchema", () => {
         questionId: "question-1",
         questionVersion: 1,
         text: "どちらですか？",
-        left: { choiceId: "same", label: "左", icon: "house" },
-        right: { choiceId: "same", label: "右", icon: "mountain" },
+        left: { choiceId: "same", label: "左" },
+        right: { choiceId: "same", label: "右" },
       }),
     ).toThrow(/Choice ID/);
   });

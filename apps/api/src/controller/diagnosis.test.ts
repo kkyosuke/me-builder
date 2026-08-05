@@ -217,8 +217,8 @@ describe("GET /api/diagnoses/:diagnosisId", () => {
             text: "質問",
             hint: null,
             choices: [
-              { choiceId: "no", label: "いいえ", presentation: {} },
-              { choiceId: "yes", label: "はい", presentation: {} },
+              { choiceId: "no", label: "いいえ" },
+              { choiceId: "yes", label: "はい" },
             ],
           },
         ],

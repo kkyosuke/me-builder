@@ -314,8 +314,8 @@ describe("App", () => {
           questionId: "q-1",
           questionVersion: 1,
           text: "質問",
-          left: { choiceId: "no", label: "いいえ", icon: "circle-x" },
-          right: { choiceId: "yes", label: "はい", icon: "circle-check" },
+          left: { choiceId: "no", label: "いいえ" },
+          right: { choiceId: "yes", label: "はい" },
         },
       ],
     });
@@ -354,8 +354,8 @@ describe("App", () => {
           questionId: "q-1",
           questionVersion: 1,
           text: "質問",
-          left: { choiceId: "no", label: "いいえ", icon: "circle-x" },
-          right: { choiceId: "yes", label: "はい", icon: "circle-check" },
+          left: { choiceId: "no", label: "いいえ" },
+          right: { choiceId: "yes", label: "はい" },
         },
       ],
     });

@@ -15,8 +15,8 @@ const diagnosis: DiagnosisDefinition = {
       questionId: "q-1",
       questionVersion: 1,
       text: "保存する質問",
-      left: { choiceId: "no", label: "いいえ", icon: "circle-x" },
-      right: { choiceId: "yes", label: "はい", icon: "circle-check" },
+      left: { choiceId: "no", label: "いいえ" },
+      right: { choiceId: "yes", label: "はい" },
     },
   ],
 };
@@ -30,8 +30,8 @@ const twoQuestionDiagnosis: DiagnosisDefinition = {
       questionId: "q-2",
       questionVersion: 1,
       text: "次の質問",
-      left: { choiceId: "no", label: "いいえ", icon: "circle-x" },
-      right: { choiceId: "yes", label: "はい", icon: "circle-check" },
+      left: { choiceId: "no", label: "いいえ" },
+      right: { choiceId: "yes", label: "はい" },
     },
   ],
 };

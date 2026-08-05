@@ -43,7 +43,9 @@ export function DiagnosisResultView({
           </div>
         </div>
         <p className="mt-4 text-sm leading-relaxed text-slate-300">
-          回答から見える現在の傾向です。どちら側にも良し悪しはなく、医療的な診断ではありません。
+          {scoring
+            ? "回答から見える現在の傾向です。どちら側にも良し悪しはなく、医療的な診断ではありません。"
+            : "保存した回答内容を確認できます。医療的な診断ではありません。"}
         </p>
         <p className="mt-3 text-xs text-slate-400">
           {`${result.answeredCount} / ${result.questionCount}問に回答`}

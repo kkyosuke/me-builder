@@ -2,8 +2,8 @@
 --
 -- Apply the schema migrations before executing this file. This seed is intentionally
 -- separate from Drizzle migrations because diagnosis content has its own
--- publication lifecycle. Existing published content is not updated. The only UPSERT
--- below fills the description column added after the initial seed, and only while empty.
+-- publication lifecycle. Existing published content is not rewritten. The UPSERT below
+-- only fills migration-added fields while they are empty or NULL.
 -- Revise published content by adding a new Question Version and a new Diagnosis instead.
 --
 -- Timestamp: 2026-08-04T00:00:00.000Z (Unix seconds, as used by Drizzle timestamp mode).
@@ -72,8 +72,7 @@ INSERT OR IGNORE INTO question_choices (
   question_version,
   choice_id,
   label,
-  position,
-  presentation
+  position
 )
 SELECT
   1785801600,
@@ -83,8 +82,7 @@ SELECT
   1,
   'no',
   'いいえ',
-  0,
-  '{"icon":"circle-x"}'
+  0
 FROM questions
 WHERE id IN (
   'q-relationship-priority-01', 'q-relationship-priority-02',
@@ -105,8 +103,7 @@ INSERT OR IGNORE INTO question_choices (
   question_version,
   choice_id,
   label,
-  position,
-  presentation
+  position
 )
 SELECT
   1785801600,
@@ -116,8 +113,7 @@ SELECT
   1,
   'yes',
   'はい',
-  1,
-  '{"icon":"circle-check"}'
+  1
 FROM questions
 WHERE id IN (
   'q-relationship-priority-01', 'q-relationship-priority-02',
@@ -130,6 +126,81 @@ WHERE id IN (
 );
 --> statement-breakpoint
 
+INSERT OR IGNORE INTO diagnosis_scoring_configs (
+  id,
+  created_at,
+  updated_at,
+  is_deleted,
+  version,
+  definition
+) VALUES
+  (
+    'relationship-priority-v1',
+    1785801600,
+    1785801600,
+    0,
+    1,
+    '{
+      "parameters": [
+        {"id":"priority-balance","label":"自分／相手の優先","lowLabel":"相手を優先しやすい","highLabel":"自分の余裕を優先しやすい"},
+        {"id":"autonomy","label":"自律／相談","lowLabel":"相談・共有を重視","highLabel":"個人の判断を尊重"},
+        {"id":"boundary-expression","label":"境界の表明","lowLabel":"内側で調整しやすい","highLabel":"境界を伝えやすい"},
+        {"id":"support-flexibility","label":"支援の柔軟性","lowLabel":"自分の予定を守りやすい","highLabel":"相手のために調整しやすい"}
+      ],
+      "choiceScores": {"yes":1,"no":-1},
+      "questions": {
+        "q-relationship-priority-01":{"questionVersion":1,"weights":{"priority-balance":1,"boundary-expression":1}},
+        "q-relationship-priority-02":{"questionVersion":1,"weights":{"priority-balance":-1,"support-flexibility":1}},
+        "q-relationship-priority-03":{"questionVersion":1,"weights":{"priority-balance":-1,"boundary-expression":-1}},
+        "q-relationship-priority-04":{"questionVersion":1,"weights":{"autonomy":-1}},
+        "q-relationship-priority-05":{"questionVersion":1,"weights":{"autonomy":1}},
+        "q-relationship-priority-06":{"questionVersion":1,"weights":{"autonomy":-1}},
+        "q-relationship-priority-07":{"questionVersion":1,"weights":{"priority-balance":-1,"boundary-expression":-1}},
+        "q-relationship-priority-08":{"questionVersion":1,"weights":{"autonomy":1,"boundary-expression":1}},
+        "q-relationship-priority-09":{"questionVersion":1,"weights":{"priority-balance":-1,"support-flexibility":1}},
+        "q-relationship-priority-10":{"questionVersion":1,"weights":{"priority-balance":1,"autonomy":0.5,"boundary-expression":1,"support-flexibility":-1}}
+      },
+      "minimumCoverage":0.6,
+      "lowMaximum":35,
+      "highMinimum":65,
+      "balancedLabel":"状況に応じて調整"
+    }'
+  ),
+  (
+    'money-values-v1',
+    1785801600,
+    1785801600,
+    0,
+    1,
+    '{
+      "parameters": [
+        {"id":"future-preparation","label":"将来への備え","lowLabel":"今の楽しみに使いやすい","highLabel":"将来への備えを重視"},
+        {"id":"financial-sharing","label":"お金の共有","lowLabel":"個人の裁量を重視","highLabel":"相談・情報共有を重視"},
+        {"id":"fairness-flexibility","label":"負担の公平性","lowLabel":"同額負担を公平と感じやすい","highLabel":"状況に応じた負担を重視"},
+        {"id":"durable-value","label":"支出の価値","lowLabel":"体験・気持ちへの支出を重視","highLabel":"長く使える価値を重視"},
+        {"id":"risk-tolerance","label":"リスク許容","lowLabel":"損失回避を重視","highLabel":"リスクを取れる"}
+      ],
+      "choiceScores": {"yes":1,"no":-1},
+      "questions": {
+        "q-money-01":{"questionVersion":1,"weights":{"future-preparation":1,"risk-tolerance":-0.5}},
+        "q-money-02":{"questionVersion":1,"weights":{"future-preparation":-1,"durable-value":-0.5,"risk-tolerance":0.5}},
+        "q-money-03":{"questionVersion":1,"weights":{"financial-sharing":1}},
+        "q-money-04":{"questionVersion":1,"weights":{"fairness-flexibility":-1}},
+        "q-money-05":{"questionVersion":1,"weights":{"future-preparation":0.5,"durable-value":1}},
+        "q-money-06":{"questionVersion":1,"weights":{"future-preparation":-0.5,"durable-value":-1}},
+        "q-money-07":{"questionVersion":1,"weights":{"financial-sharing":1}},
+        "q-money-08":{"questionVersion":1,"weights":{"risk-tolerance":1}},
+        "q-money-09":{"questionVersion":1,"weights":{"fairness-flexibility":1}},
+        "q-money-10":{"questionVersion":1,"weights":{"financial-sharing":-1}}
+      },
+      "minimumCoverage":0.6,
+      "lowMaximum":35,
+      "highMinimum":65,
+      "balancedLabel":"状況に応じて調整"
+    }'
+  );
+--> statement-breakpoint
+
 INSERT INTO diagnoses (
   id,
   created_at,
@@ -137,15 +208,20 @@ INSERT INTO diagnoses (
   is_deleted,
   title,
   description,
+  scoring_config_id,
   opens_at,
   state,
   published_at
 ) VALUES
-  ('relationship-priority', 1785801600, 1785801600, 0, '自分と相手の優先・境界線', '頼まれごとや意思決定で、自分と相手をどう尊重するかを見ます。', 1785801600, 'published', 1785801600),
-  ('money-values', 1785801600, 1785801600, 0, 'お金と消費', '貯蓄、支出、共有、公平性、リスクに関する傾向を見ます。', 1785801600, 'published', 1785801600)
+  ('relationship-priority', 1785801600, 1785801600, 0, '自分と相手の優先・境界線', '頼まれごとや意思決定で、自分と相手をどう尊重するかを見ます。', 'relationship-priority-v1', 1785801600, 'published', 1785801600),
+  ('money-values', 1785801600, 1785801600, 0, 'お金と消費', '貯蓄、支出、共有、公平性、リスクに関する傾向を見ます。', 'money-values-v1', 1785801600, 'published', 1785801600)
 ON CONFLICT(id) DO UPDATE SET
-  description = excluded.description
-WHERE diagnoses.description = '';
+  description = CASE
+    WHEN diagnoses.description = '' THEN excluded.description
+    ELSE diagnoses.description
+  END,
+  scoring_config_id = COALESCE(diagnoses.scoring_config_id, excluded.scoring_config_id)
+WHERE diagnoses.description = '' OR diagnoses.scoring_config_id IS NULL;
 --> statement-breakpoint
 
 INSERT OR IGNORE INTO diagnosis_questions (
@@ -181,9 +257,10 @@ INSERT OR IGNORE INTO diagnosis_questions (
 --> statement-breakpoint
 
 -- Expected result: diagnosis_count=2, question_version_count=20,
--- choice_count=40, diagnosis_question_count=20.
+-- choice_count=40, diagnosis_question_count=20, scoring_config_count=2.
 SELECT
   (SELECT COUNT(*) FROM diagnoses WHERE id IN ('relationship-priority', 'money-values') AND state = 'published' AND description <> '' AND is_deleted = 0) AS diagnosis_count,
   (SELECT COUNT(*) FROM question_versions WHERE version = 1 AND state = 'approved' AND is_deleted = 0 AND (question_id LIKE 'q-relationship-priority-%' OR question_id LIKE 'q-money-%')) AS question_version_count,
   (SELECT COUNT(*) FROM question_choices WHERE question_version = 1 AND is_deleted = 0 AND (question_id LIKE 'q-relationship-priority-%' OR question_id LIKE 'q-money-%')) AS choice_count,
-  (SELECT COUNT(*) FROM diagnosis_questions WHERE diagnosis_id IN ('relationship-priority', 'money-values') AND is_deleted = 0) AS diagnosis_question_count;
+  (SELECT COUNT(*) FROM diagnosis_questions WHERE diagnosis_id IN ('relationship-priority', 'money-values') AND is_deleted = 0) AS diagnosis_question_count,
+  (SELECT COUNT(*) FROM diagnosis_scoring_configs WHERE id IN ('relationship-priority-v1', 'money-values-v1') AND version = 1 AND is_deleted = 0) AS scoring_config_count;

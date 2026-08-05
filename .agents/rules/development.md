@@ -129,7 +129,7 @@
 - **スワイプ診断の画面 (`apps/web`)**:
   - Diagnosis機能は `apps/web/src/feature/diagnosis/` に置きます。一覧・質問・保存済み回答は `infrastructure/diagnosis-api.ts` でAPIから取得し、コンポーネントは取得元や採点方法を知りません。
   - 診断一覧、質問、診断IDと採点設定の対応表をWeb UIへ重複定義しません。採点はAPI Serverが所有し、Web UIは計算済み結果だけを表示します。APIから受け取った質問・回答などの画面用モデルは `apps/web/src/feature/diagnosis/model/` に閉じます。
-  - 質問データは JSON のまま扱える形に保ちます。アイコンはコンポーネントではなく名前で持ち、名前からコンポーネントへの対応は `apps/web/src/feature/diagnosis/presentation/components/` に置きます。
+  - Phase 1の回答選択肢は「いいえ」「はい」の2件とし、Choice IDとラベルをAPIから取得します。選択肢固有のアイコン対応表をWeb UIへ持ちません。
   - 判定や座標計算 (しきい値、傾き、transform) は純粋関数として `apps/web/src/feature/diagnosis/presentation/` に置き、DOM を用意せず単体テストできる状態にします。
 
 - **Web UI の LIFF 初期化 (`apps/web`)**:

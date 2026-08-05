@@ -1,4 +1,3 @@
-import { ArrowLeft, ArrowRight } from "lucide-react";
 import { type CSSProperties, type PointerEvent as ReactPointerEvent, useRef } from "react";
 import type { DiagnosisQuestion, SwipeDirection } from "../../model/types";
 import {
@@ -10,7 +9,6 @@ import {
   resolveChoiceProgress,
   resolveStackLayer,
 } from "../swipe";
-import { DiagnosisIcon } from "./diagnosis-icon";
 
 interface SwipeCardProps {
   question: DiagnosisQuestion;
@@ -74,12 +72,7 @@ function CardChoiceButton({
           : "border-sky-400/40 bg-sky-400/10 text-sky-200 hover:bg-sky-400/20"
       }`}
     >
-      {isLeft && <ArrowLeft className="size-4 shrink-0" aria-hidden="true" />}
-      <span className="flex flex-col items-center gap-1">
-        <DiagnosisIcon name={choice.icon} className="size-4" />
-        {choice.label}
-      </span>
-      {!isLeft && <ArrowRight className="size-4 shrink-0" aria-hidden="true" />}
+      {choice.label}
     </button>
   );
 }
@@ -108,7 +101,6 @@ function ChoiceOverlay({
       style={{ opacity: progress }}
       aria-hidden="true"
     >
-      <DiagnosisIcon name={choice.icon} className="size-5" />
       {choice.label}
     </div>
   );

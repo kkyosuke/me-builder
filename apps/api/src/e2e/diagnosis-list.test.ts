@@ -275,7 +275,7 @@ describe("GET /api/diagnoses/:diagnosisId local D1 E2E", () => {
       questions: Array<{
         diagnosisQuestionId: string;
         questionVersion: number;
-        choices: Array<{ choiceId: string; presentation: { icon: string } }>;
+        choices: Array<{ choiceId: string; label: string }>;
       }>;
     };
     expect(body.id).toBe("relationship-priority");
@@ -284,8 +284,8 @@ describe("GET /api/diagnoses/:diagnosisId local D1 E2E", () => {
       diagnosisQuestionId: "dq-relationship-priority-01",
       questionVersion: 1,
       choices: [
-        { choiceId: "no", presentation: { icon: "circle-x" } },
-        { choiceId: "yes", presentation: { icon: "circle-check" } },
+        { choiceId: "no", label: "いいえ" },
+        { choiceId: "yes", label: "はい" },
       ],
     });
   });

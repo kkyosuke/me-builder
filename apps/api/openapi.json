@@ -378,20 +378,12 @@
                                 "label": {
                                   "type": "string",
                                   "minLength": 1
-                                },
-                                "presentation": {
-                                  "type": "object",
-                                  "propertyNames": {
-                                    "type": "string"
-                                  },
-                                  "additionalProperties": {
-                                    "type": "string"
-                                  }
                                 }
                               },
-                              "required": ["choiceId", "label", "presentation"]
+                              "required": ["choiceId", "label"]
                             },
-                            "minItems": 2
+                            "minItems": 2,
+                            "maxItems": 2
                           }
                         },
                         "required": [
