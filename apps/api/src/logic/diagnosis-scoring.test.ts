@@ -3,6 +3,10 @@ import { scoreDiagnosisAnswers } from "./diagnosis-scoring";
 
 const CONFIG = {
   version: 3,
+  questions: [
+    { questionId: "q-plan", questionVersion: 2, choiceIds: ["yes", "neutral", "no"] },
+    { questionId: "q-change", questionVersion: 1, choiceIds: ["yes", "neutral", "no"] },
+  ],
   definition: {
     parameters: [
       { id: "planning", label: "計画性", lowLabel: "即興", highLabel: "計画的" },
@@ -90,5 +94,28 @@ describe("scoreDiagnosisAnswers", () => {
         definition: { ...CONFIG.definition, minimumCoverage: 2 },
       }),
     ).toThrow();
+  });
+
+  it.each([
+    {
+      name: "Question IDに過不足がある",
+      questions: CONFIG.questions.slice(0, 1),
+    },
+    {
+      name: "Question Versionが異なる",
+      questions: CONFIG.questions.map((question) =>
+        question.questionId === "q-plan" ? { ...question, questionVersion: 1 } : question,
+      ),
+    },
+    {
+      name: "選択値がchoiceScoresにない",
+      questions: CONFIG.questions.map((question) =>
+        question.questionId === "q-plan"
+          ? { ...question, choiceIds: [...question.choiceIds, "unknown"] }
+          : question,
+      ),
+    },
+  ])("質問定義と一致しない採点設定を拒否する: $name", ({ questions }) => {
+    expect(() => scoreDiagnosisAnswers([], { ...CONFIG, questions })).toThrow();
   });
 });

@@ -323,6 +323,18 @@ describe("findDiagnosisAnswers", () => {
           id: "result-scoring-v2",
           version: 2,
           definition: scoringDefinition,
+          questions: [
+            {
+              questionId: "result-target-q1",
+              questionVersion: 1,
+              choiceIds: ["no", "yes"],
+            },
+            {
+              questionId: "result-target-q2",
+              questionVersion: 1,
+              choiceIds: ["no", "yes"],
+            },
+          ],
         },
         answers: [
           expect.objectContaining({

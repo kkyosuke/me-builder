@@ -27,6 +27,11 @@ type ScoringAnswer = Readonly<{
 type StoredScoringConfig = Readonly<{
   version: number;
   definition: unknown;
+  questions: readonly Readonly<{
+    questionId: string;
+    questionVersion: number;
+    choiceIds: readonly string[];
+  }>[];
 }>;
 
 const VersionSchema = v.pipe(v.number(), v.safeInteger(), v.minValue(1));
@@ -98,6 +103,56 @@ const ScoringConfigSchema = v.pipe(
 
 type ScoringConfig = v.InferOutput<typeof ScoringConfigSchema>;
 
+const DiagnosisQuestionScoringSchema = v.pipe(
+  v.object({
+    questions: v.pipe(
+      v.array(
+        v.object({
+          questionId: NonEmptyStringSchema,
+          questionVersion: VersionSchema,
+          choiceIds: v.pipe(
+            v.array(NonEmptyStringSchema),
+            v.minLength(1),
+            v.check(
+              (choiceIds) => new Set(choiceIds).size === choiceIds.length,
+              "同じ質問のchoice idが重複しています",
+            ),
+          ),
+        }),
+      ),
+      v.check(
+        (questions) =>
+          new Set(questions.map(({ questionId }) => questionId)).size === questions.length,
+        "question idが重複しています",
+      ),
+    ),
+    config: ScoringConfigSchema,
+  }),
+  v.check(({ questions, config }) => {
+    const questionIds = new Set(questions.map(({ questionId }) => questionId));
+    const configuredQuestionIds = Object.keys(config.questions);
+    return (
+      questionIds.size === configuredQuestionIds.length &&
+      configuredQuestionIds.every((questionId) => questionIds.has(questionId))
+    );
+  }, "質問定義と採点設定のQuestion IDが一致しません"),
+  v.check(({ questions, config }) => {
+    const questionVersions = new Map(
+      questions.map(({ questionId, questionVersion }) => [questionId, questionVersion]),
+    );
+    return Object.entries(config.questions).every(
+      ([questionId, rule]) => questionVersions.get(questionId) === rule.questionVersion,
+    );
+  }, "質問定義と採点設定のQuestion Versionが一致しません"),
+  v.check(
+    ({ questions, config }) =>
+      questions.every(({ choiceIds }) =>
+        choiceIds.every((choiceId) => Object.hasOwn(config.choiceScores, choiceId)),
+      ),
+    "質問の選択値がchoiceScoresに定義されていません",
+  ),
+);
+
 function resolveBand(score: number | null, config: ScoringConfig): ParameterBand {
   if (score === null) return "insufficient";
   if (score <= config.lowMaximum) return "low";
@@ -162,5 +217,6 @@ export function scoreDiagnosisAnswers(
     ...v.parse(v.record(v.string(), v.unknown()), storedConfig.definition),
     version: storedConfig.version,
   });
+  v.parse(DiagnosisQuestionScoringSchema, { questions: storedConfig.questions, config });
   return scoreParameters(answers, config);
 }
