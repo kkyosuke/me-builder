@@ -1,8 +1,13 @@
 import { getEnv } from "@me-builder/shared";
 import * as v from "valibot";
-import { type WorkerConfig, WorkerConfigSchema } from "./schema";
+import {
+  DEFAULT_CLOUDFLARE_AI_GATEWAY_BASE_URL,
+  DEFAULT_GEMINI_MODEL,
+  type WorkerConfig,
+  WorkerConfigSchema,
+} from "./schema";
 
-export { WorkerConfigSchema, type WorkerConfig };
+export { DEFAULT_CLOUDFLARE_AI_GATEWAY_BASE_URL, WorkerConfigSchema, type WorkerConfig };
 
 /**
  * Worker アプリケーションの環境設定を取得・パースして返却します。
@@ -35,6 +40,11 @@ export function getWorkerConfig(env?: Record<string, unknown>): WorkerConfig {
   const rawLineChannelAccessToken = getEnv("LINE_CHANNEL_ACCESS_TOKEN", env);
   // 空文字は「未設定」として扱い、返信にリンクを添えないようにします。
   const rawLiffId = getEnv("LIFF_ID", env)?.trim() || undefined;
+  const rawGoogleAiStudioApiKey = getEnv("GOOGLE_AI_STUDIO_API_KEY", env)?.trim() || undefined;
+  const rawCloudflareAiGatewayToken = getEnv("CLOUDFLARE_AIG_TOKEN", env)?.trim() || undefined;
+  const rawCloudflareAiGatewayBaseUrl =
+    getEnv("CF_AI_GATEWAY_BASE_URL", env)?.trim() || DEFAULT_CLOUDFLARE_AI_GATEWAY_BASE_URL;
+  const rawGeminiModel = getEnv("GEMINI_MODEL", env)?.trim() || DEFAULT_GEMINI_MODEL;
 
   const rawConfig = {
     environment: rawEnvironment,
@@ -43,6 +53,10 @@ export function getWorkerConfig(env?: Record<string, unknown>): WorkerConfig {
     apiUrl: rawApiUrl,
     lineChannelAccessToken: rawLineChannelAccessToken,
     liffId: rawLiffId,
+    googleAiStudioApiKey: rawGoogleAiStudioApiKey,
+    cloudflareAiGatewayToken: rawCloudflareAiGatewayToken,
+    cloudflareAiGatewayBaseUrl: rawCloudflareAiGatewayBaseUrl,
+    geminiModel: rawGeminiModel,
   };
 
   return v.parse(WorkerConfigSchema, rawConfig);

@@ -53,8 +53,11 @@ flowchart TD
             Queues[("Cloudflare Queues<br/>(Webhook Message Queue)")]
             DO["Cloudflare Durable Objects<br/>(Stateful / Realtime Session)"]
             WorkersAI["Cloudflare Workers AI<br/>(Embedding / LLM Inference)"]
+            AIGateway["Cloudflare AI Gateway<br/>(LLM Proxy / Observability)"]
         end
     end
+
+    Gemini["Google AI Studio<br/>(Gemini)"]
 
     Web --> CF_Sec
     LINE --> CF_Sec
@@ -66,6 +69,8 @@ flowchart TD
 
     WorkersAPI --> Queues
     Queues --> WorkersWorker
+    WorkersWorker --> AIGateway
+    AIGateway --> Gemini
 
     WorkersAPI --> D1
     WorkersAPI --> R2
@@ -79,7 +84,7 @@ flowchart TD
     WorkersMCP --> KV
 
     classDef cfFill fill:#f6821f,stroke:#333,stroke-width:1px,color:#fff;
-    class Pages,WorkersAPI,WorkersMCP,WorkersWorker,D1,Vectorize,R2,KV,Queues,DO,WorkersAI cfFill;
+    class Pages,WorkersAPI,WorkersMCP,WorkersWorker,D1,Vectorize,R2,KV,Queues,DO,WorkersAI,AIGateway cfFill;
 ```
 
 ## 4. コンポーネント別の役割と選定
@@ -97,6 +102,7 @@ flowchart TD
 | **キー・バリュー / キャッシュ** | **Cloudflare KV** | 低遅延グローバルキー・バリューストア。認証トークン、一時セッション、アクセス制御キャッシュ、レート制限カウントを保持。 |
 | **状態管理 / ドメイン協調** | **Cloudflare Durable Objects** | 厳格な単一整合性が求められるリアルタイムセッション制御や、MCP接続状態の排他制御・ステートフルな協調を処理。 |
 | **AI / 推論基盤** | **Cloudflare Workers AI** | エッジ上でのテキスト Embedding 生成（ベクトル化）および軽量 AI モデル推論の実行。外部 LLM サービス呼び出し時は Workers 経由で安全にプロキシ通信。 |
+| **外部LLMゲートウェイ** | **Cloudflare AI Gateway** | Queue Worker から Google AI Studio の Gemini を呼び出す際の統一経路。Gateway の認証、可観測性、利用量管理を担い、Google API key をクライアントへ公開しない。 |
 | **セキュリティ & ネットワーク** | **Cloudflare Access / WAF** | DDoS防御、WAFルール適用、SSL/TLS証明書管理、管理画面等へのゼロトラストアクセス制御（Cloudflare Access）。 |
 
 ## 5. データ連携フロー原則
@@ -116,6 +122,13 @@ flowchart TD
 4. **非同期 Webhook メッセージ処理**
    - Webhook リクエスト（LINE 等）は API サーバーで受信後、直ちに `Cloudflare Queues` へ投入され 200/202 応答を返却します。
    - バックグラウンドの Queue Worker (`apps/worker`) がキューから非同期バッチメッセージを取り出し順次処理します。LINE メッセージイベントを受信した場合、`replyToken` を用いて LINE Messaging API (`@line/bot-sdk`) 経由で受け付けた旨を返信します。返信の内容は[開発運用ルール](../../.agents/rules/development.md)を正とします。
+
+5. **外部LLMの呼び出し**
+   - Google AI Studio の Gemini を利用する処理は、Queue Worker から Cloudflare AI Gateway を経由して呼び出します。
+   - Google AI Studio API key と AI Gateway token は Worker の Secret として保持し、Web UI、APIレスポンス、ログへ露出させません。
+   - 接続確認では、LINEへ `AI: 質問` と明示して送った本文だけをモデルへ渡し、生成結果を同じトークへ返信します。通常の日記と診断要求はモデルへ送りません。
+   - モデルへ渡した本文と生成結果はアプリケーションログおよびデータベースへ保存しません。
+   - 接続確認の失敗時は、設定不足、空応答、API例外を区別できる構造化ログを出力します。モデルへ渡した本文、生成結果、Google API key、AI Gateway token はエラーログにも含めません。
 
 ## 6. 開発・運用環境方針
 
