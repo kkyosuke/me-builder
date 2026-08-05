@@ -141,7 +141,45 @@ Surveyが`published`かつ削除されておらず、サーバー時刻が受付
 
 認証・基盤の共通エラーは次節に従います。
 
-## 6. エラー
+## 6. 回答内容取得
+
+### `GET /api/surveys/{surveyId}/answers`
+
+本人が保存した現在有効な回答を、回答時点のQuestion VersionとChoiceとともに返します。受付終了後も回答内容を確認できるよう、Surveyが公開済みで受付開始後なら`closesAt`を過ぎていても取得できます。
+
+回答はSurvey Questionの`position`順で返します。質問文と選択肢ラベルはAnswerが保持するQuestion ID / Question Version / Choice IDから解決し、現在の最新版へ暗黙に置き換えません。Account ID、SurveyResponse ID、Source Record IDは返しません。
+
+```json
+{
+  "id": "relationship-priority",
+  "title": "自分と相手の優先・境界線",
+  "description": "頼まれごとや意思決定で、自分と相手をどう尊重するかを見ます。",
+  "responseStatus": "answered",
+  "answeredCount": 10,
+  "questionCount": 10,
+  "answers": [
+    {
+      "surveyQuestionId": "sq-relationship-priority-01",
+      "questionId": "q-relationship-priority-01",
+      "questionVersion": 1,
+      "questionText": "相手から頼まれても、自分に余裕がなければ断りたい。",
+      "choiceId": "yes",
+      "choiceLabel": "はい",
+      "acceptedAt": "2026-08-05T00:00:00.000Z"
+    }
+  ]
+}
+```
+
+回答内容取得固有のエラーは次のとおりです。
+
+| HTTP | 条件 | レスポンス |
+| --- | --- | --- |
+| `404` | Surveyが存在しない、公開前、公開停止、削除済み、または本人の回答がない | `{ "error": "Survey answers not found", "reason": "survey_answers_not_found" }` |
+
+回答途中でも保存済みの回答は返し、`responseStatus`と件数で未完了であることを表します。Web UIは回答済みから回答内容画面へ遷移しますが、再開機能でも同じ取得結果を利用できます。
+
+## 7. エラー
 
 | HTTP | 条件 | レスポンス |
 | --- | --- | --- |
@@ -152,7 +190,7 @@ Surveyが`published`かつ削除されておらず、サーバー時刻が受付
 
 認証失敗の詳細、トークン、`sub`、Account IDはレスポンスへ含めません。
 
-## 7. ローカルE2Eテスト
+## 8. ローカルE2Eテスト
 
 アンケートAPIのE2Eテストは`apps/api/src/e2e/`に置きます。Miniflareが提供するローカルD1へ本番と同じmigrationとアンケートseedを適用し、Honoの`app.request`へD1 bindingとして渡します。
 

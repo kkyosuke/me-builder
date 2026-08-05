@@ -11,8 +11,8 @@ import { DeferredQuestionSchema, SurveyAnswerSchema, SwipeDirectionSchema } from
 /**
  * 回答の組み立てと集計。
  *
- * **保存はまだ行いません。** 回答をどこへどの粒度で保存するかは、質問配信・回答保存の
- * サーバー実装とあわせて決めます。ここでは画面が持つ回答の形だけを確定させます。
+ * 保存処理そのものはinfrastructure層へ委譲し、ここでは画面が送受信する回答の形だけを
+ * 組み立てます。
  */
 
 /** 選んだ方向から、記録する回答を組み立てます。 */

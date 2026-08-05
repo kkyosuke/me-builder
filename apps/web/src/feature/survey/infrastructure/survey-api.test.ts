@@ -5,7 +5,12 @@ import {
   UnknownError,
   ValidationError,
 } from "../../../infrastructure/errors";
-import { fetchSurveyDefinition, fetchSurveyList, saveSurveyAnswer } from "./survey-api";
+import {
+  fetchSurveyDefinition,
+  fetchSurveyList,
+  fetchSurveyResult,
+  saveSurveyAnswer,
+} from "./survey-api";
 
 const API_URL = "https://api.stg.kagami.kyosuke.dev";
 
@@ -219,6 +224,65 @@ describe("fetchSurveyDefinition", () => {
     } catch (error) {
       expect(error).toBeInstanceOf(ValidationError);
       expect(error).toMatchObject({ code: "SURVEY_DETAIL_INVALID_RESPONSE" });
+    }
+  });
+});
+
+describe("fetchSurveyResult", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("保存済み回答を取得して傾向プロフィールへ変換する", async () => {
+    const fetchMock = vi.fn(async () =>
+      Response.json({
+        id: "relationship-priority",
+        title: "自分と相手の優先・境界線",
+        description: "説明",
+        responseStatus: "answered",
+        answeredCount: 10,
+        questionCount: 10,
+        answers: Array.from({ length: 10 }, (_, index) => ({
+          surveyQuestionId: `sq-relationship-priority-${String(index + 1).padStart(2, "0")}`,
+          questionId: `q-relationship-priority-${String(index + 1).padStart(2, "0")}`,
+          questionVersion: 1,
+          questionText: `質問${index + 1}`,
+          choiceId: "yes",
+          choiceLabel: "はい",
+          acceptedAt: "2026-08-05T00:00:00.000Z",
+        })),
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await fetchSurveyResult(API_URL, "dummy.id.token", "relationship-priority");
+
+    expect(fetchMock).toHaveBeenCalledWith(`${API_URL}/api/surveys/relationship-priority/answers`, {
+      headers: { Authorization: "Bearer dummy.id.token" },
+    });
+    expect(result).toMatchObject({
+      id: "relationship-priority",
+      profile: { scoringVersion: 1 },
+    });
+    expect(result?.answers[0]).toMatchObject({ choiceLabel: "はい" });
+    expect(result?.profile.parameters).toHaveLength(4);
+  });
+
+  it.each([
+    [401, AuthenticationError, "AUTHENTICATION_REQUIRED"],
+    [404, OperationError, "SURVEY_ANSWERS_NOT_FOUND"],
+    [500, UnknownError, "SURVEY_ANSWERS_REQUEST_FAILED"],
+  ] as const)("HTTP %sを汎用エラーとcodeへ変換する", async (status, ErrorType, code) => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(null, { status })),
+    );
+    try {
+      await fetchSurveyResult(API_URL, "dummy.id.token", "relationship-priority");
+      throw new Error("回答内容取得が成功してしまいました");
+    } catch (error) {
+      expect(error).toBeInstanceOf(ErrorType);
+      expect(error).toMatchObject({ code, status });
     }
   });
 });

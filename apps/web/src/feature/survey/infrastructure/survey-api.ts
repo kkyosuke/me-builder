@@ -9,8 +9,9 @@ import {
 import { createHttpClient } from "../../../infrastructure/http-client";
 import type { SurveyDefinition } from "../model/survey-definition";
 import type { SurveyListItem } from "../model/survey-list-item";
+import type { SurveyResult } from "../model/survey-result";
 import { SurveyQuestionsSchema } from "../model/types";
-import { combineSurveyDefinition } from "./local-definitions";
+import { combineSurveyDefinition, combineSurveyResult } from "./local-definitions";
 
 type ApiSurveyListResponse =
   operations["listSurveys"]["responses"][200]["content"]["application/json"];
@@ -19,6 +20,8 @@ type ApiSurveyDetailResponse =
   operations["getSurveyDetail"]["responses"][200]["content"]["application/json"];
 type ApiSaveSurveyAnswerResponse =
   operations["saveSurveyAnswer"]["responses"][200]["content"]["application/json"];
+type ApiSurveyAnswersResponse =
+  operations["getSurveyAnswers"]["responses"][200]["content"]["application/json"];
 
 const SurveyListItemSchema = v.object({
   id: v.pipe(v.string(), v.nonEmpty()),
@@ -283,4 +286,74 @@ export async function saveSurveyAnswer(
       cause: error,
     });
   }
+}
+
+const SurveyAnswersResponseSchema = v.object({
+  id: v.pipe(v.string(), v.nonEmpty()),
+  title: v.pipe(v.string(), v.nonEmpty()),
+  description: v.pipe(v.string(), v.nonEmpty()),
+  responseStatus: v.picklist(["in-progress", "answered"]),
+  answeredCount: v.pipe(v.number(), v.safeInteger(), v.minValue(0)),
+  questionCount: v.pipe(v.number(), v.safeInteger(), v.minValue(1)),
+  answers: v.pipe(
+    v.array(
+      v.object({
+        surveyQuestionId: v.pipe(v.string(), v.nonEmpty()),
+        questionId: v.pipe(v.string(), v.nonEmpty()),
+        questionVersion: v.pipe(v.number(), v.safeInteger(), v.minValue(1)),
+        questionText: v.pipe(v.string(), v.nonEmpty()),
+        choiceId: v.pipe(v.string(), v.nonEmpty()),
+        choiceLabel: v.pipe(v.string(), v.nonEmpty()),
+        acceptedAt: v.pipe(v.string(), v.isoTimestamp()),
+      }),
+    ),
+    v.minLength(1),
+  ),
+}) satisfies v.GenericSchema<ApiSurveyAnswersResponse>;
+
+/** 本人が保存した回答内容を取得し、版付きローカル設定で表示結果を再計算する。 */
+export async function fetchSurveyResult(
+  apiUrl: string | undefined,
+  idToken: string,
+  surveyId: string,
+  signal?: AbortSignal,
+): Promise<SurveyResult | undefined> {
+  const response = await createHttpClient(apiUrl).request(
+    `/api/surveys/${encodeURIComponent(surveyId)}/answers`,
+    {
+      headers: { Authorization: `Bearer ${idToken}` },
+      ...(signal ? { signal } : {}),
+    },
+  );
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new AuthenticationError("本人確認に失敗しました。LINEから開き直してください。", {
+        code: "AUTHENTICATION_REQUIRED",
+        status: response.status,
+      });
+    }
+    if (response.status === 404) {
+      throw new OperationError("保存済みの回答を確認できませんでした。", {
+        code: "SURVEY_ANSWERS_NOT_FOUND",
+        status: response.status,
+      });
+    }
+    throw new UnknownError(`回答内容の取得に失敗しました (HTTP ${response.status})`, {
+      code: "SURVEY_ANSWERS_REQUEST_FAILED",
+      status: response.status,
+    });
+  }
+
+  let body: ApiSurveyAnswersResponse;
+  try {
+    body = v.parse(SurveyAnswersResponseSchema, await response.json());
+  } catch (error) {
+    throw new ValidationError("回答内容のレスポンスが不正です。", {
+      code: "SURVEY_ANSWERS_INVALID_RESPONSE",
+      cause: error,
+    });
+  }
+
+  return combineSurveyResult(body);
 }

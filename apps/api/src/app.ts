@@ -8,10 +8,16 @@ import { liffSessionRoute } from "./contract/line/liff-session";
 import { openApiOptions } from "./contract/openapi";
 import { InternalServerErrorSchema } from "./contract/shared/errors";
 import { saveSurveyAnswerRoute } from "./contract/survey/answer";
+import { surveyAnswersRoute } from "./contract/survey/answers";
 import { surveyDetailRoute } from "./contract/survey/detail";
 import { surveyListRoute } from "./contract/survey/list";
 import { postLiffSession, postLineWebhook } from "./controller/line";
-import { getSurvey, getSurveys, putSurveyAnswer } from "./controller/survey";
+import {
+  getSurvey,
+  getSurveyAnswerContents,
+  getSurveys,
+  putSurveyAnswer,
+} from "./controller/survey";
 import type { AppEnv } from "./types";
 
 const app = new Hono<AppEnv>();
@@ -58,6 +64,7 @@ app.post("/api/line/liff/session", liffSessionRoute, postLiffSession);
 
 app.get("/api/surveys", surveyListRoute, getSurveys);
 app.get("/api/surveys/:surveyId", surveyDetailRoute, getSurvey);
+app.get("/api/surveys/:surveyId/answers", surveyAnswersRoute, getSurveyAnswerContents);
 app.put("/api/surveys/:surveyId/answers/:surveyQuestionId", saveSurveyAnswerRoute, putSurveyAnswer);
 
 // Web UIの型生成にも使う、機械可読なAPI契約。

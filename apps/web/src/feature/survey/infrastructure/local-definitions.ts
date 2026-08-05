@@ -4,6 +4,7 @@ import {
   scoreRelationshipPriority,
 } from "../model/definitions/relationship-priority";
 import type { SurveyDefinition } from "../model/survey-definition";
+import type { SurveyResult, SurveyResultAnswer } from "../model/survey-result";
 import type { SurveyQuestion } from "../model/types";
 
 type LocalSurveyPresentation = Pick<SurveyDefinition, "balancedLabel" | "score">;
@@ -31,4 +32,28 @@ export function combineSurveyDefinition(input: {
 }): SurveyDefinition | undefined {
   const presentation = LOCAL_PRESENTATION[input.id];
   return presentation ? { ...input, ...presentation } : undefined;
+}
+
+export function combineSurveyResult(
+  input: Omit<SurveyResult, "balancedLabel" | "profile">,
+): SurveyResult | undefined {
+  const presentation = LOCAL_PRESENTATION[input.id];
+  if (!presentation) {
+    return undefined;
+  }
+  const interactions = input.answers.map((answer: SurveyResultAnswer) => ({
+    kind: "answer" as const,
+    surveyQuestionId: answer.surveyQuestionId,
+    questionId: answer.questionId,
+    questionVersion: answer.questionVersion,
+    choiceId: answer.choiceId,
+    // スコアはChoice IDを使うため方向は計算に影響しません。
+    direction: "right" as const,
+    acceptedAt: answer.acceptedAt,
+  }));
+  return {
+    ...input,
+    balancedLabel: presentation.balancedLabel,
+    profile: presentation.score(interactions),
+  };
 }

@@ -5,7 +5,12 @@ import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { describe, expect, it } from "vitest";
 import type { D1Client } from "../client";
 import * as schema from "../schema";
-import { findOpenSurveyDetail, listVisibleSurveys, saveSurveyAnswer } from "./questionnaire";
+import {
+  findOpenSurveyDetail,
+  findSurveyAnswers,
+  listVisibleSurveys,
+  saveSurveyAnswer,
+} from "./questionnaire";
 
 function createTestDb(): D1Client {
   const sqlite = new Database(":memory:");
@@ -239,6 +244,76 @@ describe("findOpenSurveyDetail", () => {
     await expect(
       findOpenSurveyDetail(db, "closed-detail", new Date("2026-08-03T00:00:00Z")),
     ).resolves.toEqual({ type: "closed" });
+  });
+});
+
+describe("findSurveyAnswers", () => {
+  it("受付終了後も本人の回答を質問順・回答時点の文言で返す", async () => {
+    const db = createTestDb();
+    await db.insert(schema.accounts).values({ id: "account-result" });
+    await insertSurvey(db, {
+      id: "result-target",
+      closesAt: new Date("2026-08-04T00:00:00Z"),
+    });
+    const base = {
+      accountId: "account-result",
+      surveyId: "result-target",
+      choiceId: "yes",
+      at: new Date("2026-08-03T00:00:00Z"),
+    };
+    await saveSurveyAnswer(db, { ...base, surveyQuestionId: "result-target-sq2" });
+    await saveSurveyAnswer(db, {
+      ...base,
+      surveyQuestionId: "result-target-sq1",
+      choiceId: "no",
+    });
+
+    const result = await findSurveyAnswers(
+      db,
+      "account-result",
+      "result-target",
+      new Date("2026-08-05T00:00:00Z"),
+    );
+
+    expect(result).toEqual({
+      type: "found",
+      survey: expect.objectContaining({
+        id: "result-target",
+        responseStatus: "answered",
+        answeredCount: 2,
+        questionCount: 2,
+        answers: [
+          expect.objectContaining({
+            surveyQuestionId: "result-target-sq1",
+            questionText: "result-target-q1の質問",
+            choiceId: "no",
+            choiceLabel: "いいえ",
+          }),
+          expect.objectContaining({
+            surveyQuestionId: "result-target-sq2",
+            choiceId: "yes",
+            choiceLabel: "はい",
+          }),
+        ],
+      }),
+    });
+  });
+
+  it("本人の回答がない場合はnot-foundを返す", async () => {
+    const db = createTestDb();
+    await db.insert(schema.accounts).values([{ id: "owner" }, { id: "another" }]);
+    await insertSurvey(db, { id: "private-result" });
+    await saveSurveyAnswer(db, {
+      accountId: "owner",
+      surveyId: "private-result",
+      surveyQuestionId: "private-result-sq1",
+      choiceId: "yes",
+      at: new Date("2026-08-03T00:00:00Z"),
+    });
+
+    await expect(
+      findSurveyAnswers(db, "another", "private-result", new Date("2026-08-03T00:00:00Z")),
+    ).resolves.toEqual({ type: "not-found" });
   });
 });
 
