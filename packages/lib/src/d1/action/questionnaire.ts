@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, inArray, lte, or } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, lte } from "drizzle-orm";
 import type { D1Client } from "../client";
 import {
   questionChoices,
@@ -10,7 +10,7 @@ import {
   surveyResponses,
   surveys,
 } from "../schema/questionnaire";
-import { sourceRecordRevisions, sourceRecords } from "../schema/source";
+import { sourceRecords } from "../schema/source";
 
 export type SurveyListAvailability = "open" | "closed";
 export type SurveyListResponseStatus = "unanswered" | "in-progress" | "answered";
@@ -127,61 +127,41 @@ export async function deleteAccountSurveyData(
   db: D1Client,
   accountId: string,
 ): Promise<DeletedAccountSurveyData> {
-  const responseRows = await db
+  const ownedResponseIds = db
     .select({ id: surveyResponses.id })
     .from(surveyResponses)
     .where(eq(surveyResponses.accountId, accountId));
-  const responseIds = responseRows.map(({ id }) => id);
-  if (responseIds.length === 0) {
-    return {
-      deletedResponseCount: 0,
-      deletedAnswerCount: 0,
-      deletedDeferredQuestionCount: 0,
-      deletedSourceRecordCount: 0,
-    };
-  }
+  const answerSourceRecordIds = db
+    .select({ id: surveyAnswers.sourceRecordId })
+    .from(surveyAnswers)
+    .where(inArray(surveyAnswers.surveyResponseId, ownedResponseIds));
 
-  const [answerRows, deferredRows] = await Promise.all([
-    db
-      .select({ id: surveyAnswers.id, sourceRecordId: surveyAnswers.sourceRecordId })
-      .from(surveyAnswers)
-      .where(inArray(surveyAnswers.surveyResponseId, responseIds)),
-    db
-      .select({ id: surveyDeferredQuestions.id })
-      .from(surveyDeferredQuestions)
-      .where(inArray(surveyDeferredQuestions.surveyResponseId, responseIds)),
-  ]);
-  const sourceRecordIds = [...new Set(answerRows.map(({ sourceRecordId }) => sourceRecordId))];
-  const deleteResponseData = [
-    db.delete(surveyAnswers).where(inArray(surveyAnswers.surveyResponseId, responseIds)),
-    db
-      .delete(surveyDeferredQuestions)
-      .where(inArray(surveyDeferredQuestions.surveyResponseId, responseIds)),
-    db.delete(surveyResponses).where(inArray(surveyResponses.id, responseIds)),
-  ] as const;
-
-  if (sourceRecordIds.length === 0) {
-    await db.batch(deleteResponseData);
-  } else {
+  // D1のbatchは単一のatomic transactionとして直列実行される。
+  // Source Record削除時のcascadeでAnswerと改訂関係も同じ境界内から除去する。
+  const [answerCountRows, deletedSourceRecords, deletedDeferredQuestions, deletedResponses] =
     await db.batch([
       db
-        .delete(sourceRecordRevisions)
-        .where(
-          or(
-            inArray(sourceRecordRevisions.previousSourceRecordId, sourceRecordIds),
-            inArray(sourceRecordRevisions.nextSourceRecordId, sourceRecordIds),
-          ),
-        ),
-      ...deleteResponseData,
-      db.delete(sourceRecords).where(inArray(sourceRecords.id, sourceRecordIds)),
+        .select({ value: count(surveyAnswers.id) })
+        .from(surveyAnswers)
+        .where(inArray(surveyAnswers.surveyResponseId, ownedResponseIds)),
+      db.delete(sourceRecords).where(inArray(sourceRecords.id, answerSourceRecordIds)).returning({
+        id: sourceRecords.id,
+      }),
+      db
+        .delete(surveyDeferredQuestions)
+        .where(inArray(surveyDeferredQuestions.surveyResponseId, ownedResponseIds))
+        .returning({ id: surveyDeferredQuestions.id }),
+      db
+        .delete(surveyResponses)
+        .where(eq(surveyResponses.accountId, accountId))
+        .returning({ id: surveyResponses.id }),
     ]);
-  }
 
   return {
-    deletedResponseCount: responseIds.length,
-    deletedAnswerCount: answerRows.length,
-    deletedDeferredQuestionCount: deferredRows.length,
-    deletedSourceRecordCount: sourceRecordIds.length,
+    deletedResponseCount: deletedResponses.length,
+    deletedAnswerCount: answerCountRows[0]?.value ?? 0,
+    deletedDeferredQuestionCount: deletedDeferredQuestions.length,
+    deletedSourceRecordCount: deletedSourceRecords.length,
   };
 }
 

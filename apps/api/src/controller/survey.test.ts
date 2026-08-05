@@ -333,11 +333,15 @@ describe("DELETE /api/dev/survey-data", () => {
     vi.clearAllMocks();
   });
 
-  const remove = (environment = "preview", withDb = true) =>
+  const remove = (environment: string | undefined, withDb = true) =>
     app.request(
       "/api/dev/survey-data",
       { method: "DELETE", headers: { Authorization: "Bearer dummy.id.token" } },
-      { LIFF_ID, ENVIRONMENT: environment, ...(withDb ? { DB: dummyDb } : {}) },
+      {
+        LIFF_ID,
+        ...(environment === undefined ? {} : { ENVIRONMENT: environment }),
+        ...(withDb ? { DB: dummyDb } : {}),
+      },
     );
 
   it("previewではresolvedを200と削除件数へ変換する", async () => {
@@ -349,7 +353,7 @@ describe("DELETE /api/dev/survey-data", () => {
       deletedSourceRecordCount: 12,
     });
 
-    const response = await remove();
+    const response = await remove("preview");
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
@@ -371,12 +375,23 @@ describe("DELETE /api/dev/survey-data", () => {
     expect(resetDevelopmentSurveyData).not.toHaveBeenCalled();
   });
 
+  it.each([undefined, ""])(
+    "ENVIRONMENTが%sなら404にして削除処理を呼ばない",
+    async (environment) => {
+      const response = await remove(environment);
+
+      expect(response.status).toBe(404);
+      expect(await response.json()).toEqual({ error: "Not Found" });
+      expect(resetDevelopmentSurveyData).not.toHaveBeenCalled();
+    },
+  );
+
   it.each([
     ["account-not-found", 404, { error: "Account not found", reason: "friendship_required" }],
     ["unauthenticated", 401, { error: "Unauthorized" }],
   ] as const)("%sをHTTP %sへ変換する", async (type, status, body) => {
     resetOutcome(type === "unauthenticated" ? { type, reason: "invalid" } : { type });
-    const response = await remove();
+    const response = await remove("preview");
     expect(response.status).toBe(status);
     expect(await response.json()).toEqual(body);
   });

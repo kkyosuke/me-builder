@@ -238,10 +238,11 @@ export async function getSurveyAnswerContents(c: Context<AppEnv>): Promise<Respo
 
 /** `DELETE /api/dev/survey-data` — 開発環境で本人の回答由来データを全削除する。 */
 export async function deleteDevelopmentSurveyData(c: Context<AppEnv>): Promise<Response> {
-  const currentConfig = getConfig(c.env);
-  if (!DEVELOPMENT_ENVIRONMENTS.has(currentConfig.environment)) {
+  const explicitEnvironment = c.env?.ENVIRONMENT?.trim();
+  if (!explicitEnvironment || !DEVELOPMENT_ENVIRONMENTS.has(explicitEnvironment)) {
     return c.json(v.parse(DevelopmentRouteNotFoundErrorSchema, { error: "Not Found" }), 404);
   }
+  const currentConfig = getConfig(c.env);
   if (!c.env?.DB) {
     logger.error({ path: c.req.path }, "DB binding is not configured");
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);

@@ -20,10 +20,10 @@ export const sourceRecordRevisions = sqliteTable(
     ...baseSchema,
     previousSourceRecordId: text("previous_source_record_id")
       .notNull()
-      .references(() => sourceRecords.id),
+      .references(() => sourceRecords.id, { onDelete: "cascade" }),
     nextSourceRecordId: text("next_source_record_id")
       .notNull()
-      .references(() => sourceRecords.id),
+      .references(() => sourceRecords.id, { onDelete: "cascade" }),
     derivationMethod: text("derivation_method", {
       enum: ["ai", "deterministic"],
     }).notNull(),

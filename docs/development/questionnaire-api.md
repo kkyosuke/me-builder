@@ -183,9 +183,11 @@ Surveyが`published`かつ削除されておらず、サーバー時刻が受付
 
 ### `DELETE /api/dev/survey-data`
 
-開発時に同じAccountで回答フローを繰り返し確認できるよう、本人のアンケート回答データを物理削除します。`development`、`local`、`preview`、`test`環境だけで利用でき、`production`を含むそれ以外の環境では`404`を返して削除処理を実行しません。
+開発時に同じAccountで回答フローを繰り返し確認できるよう、本人のアンケート回答データを物理削除します。`ENVIRONMENT` bindingに`development`、`local`、`preview`、`test`のいずれかが明示されている環境だけで利用できます。bindingの未設定・空文字・未知値・`production`では`404`を返して削除処理を実行しません。
 
 削除対象は本人のSurveyResponse、Answer、「あとで回答」、Answerが作成したSource Recordとその改訂関係です。Survey、Question、Choiceなどのアンケート定義、Account、他のAccountのデータ、アンケート回答以外のSource Recordは削除しません。クライアントからAccount IDは受け取らず、他のアンケートAPIと同じ認証境界で本人を解決します。
+
+対象の抽出と削除は1つのD1 atomic batchで実行します。回答保存もatomic batchであるため、同じAccountのバックグラウンド保存とリセットが競合しても両処理の途中状態は混在しません。保存が先ならその回答由来データまで削除し、リセットが先なら保存結果一式を残すことで、Answerだけ、またはSource Recordだけが孤立する状態を作りません。
 
 ```json
 {

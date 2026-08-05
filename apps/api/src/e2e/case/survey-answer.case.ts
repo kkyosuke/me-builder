@@ -144,4 +144,32 @@ export const surveyAnswerCases = {
       body: { error: "Not Found", persistedCounts: { surveyAnswers: 1 } },
     },
   },
+  rejectUnconfiguredReset: {
+    id: "ANSWER-009",
+    name: "ENVIRONMENT未設定では回答データを削除しないこと",
+    in: {
+      method: "DELETE",
+      path: "/api/dev/survey-data",
+      authorization: "Bearer known-token",
+      setup: ["1問分の回答を保存", "ENVIRONMENT bindingなし"],
+    },
+    out: {
+      status: 404,
+      body: { error: "Not Found", persistedCounts: { surveyAnswers: 1 } },
+    },
+  },
+  concurrentSaveAndReset: {
+    id: "ANSWER-010",
+    name: "回答保存とリセットが競合してもSource Recordを孤立させないこと",
+    in: {
+      method: "PUT + DELETE",
+      path: "/api/surveys/relationship-priority/answers/{surveyQuestionId} + /api/dev/survey-data",
+      authorization: "Bearer known-token",
+      setup: ["1問分の回答を保存", "2問目の保存とリセットを同時実行"],
+    },
+    out: {
+      status: 200,
+      body: { orphanedSourceRecords: 0, sourceRecordCountEqualsAnswerCount: true },
+    },
+  },
 } as const satisfies Readonly<Record<string, E2eCase>>;
