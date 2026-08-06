@@ -7,7 +7,7 @@
 ### 所有する概念
 
 - 日記チャットの実行時コンポーネントとデータフロー
-- Conversation Session、Session Summary、Context Packageの物理モデル
+- Conversation Session、Chat Turn、Context Packageの物理モデル
 - Source Record、会話メッセージ、Brain Itemを保存するD1テーブル
 - AI入力、プロンプト、構造化出力
 - 入力前から送信時までのガードレール
@@ -65,7 +65,7 @@ flowchart TD
     GW -->|検証結果| DO
     DO -->|受領応答・finalをretry key付きpush| LINE
     DO -->|状態と時刻| D1
-    CRON[Cron Trigger] -->|期限削除・outbox再照合| D1
+    CRON[Cron Trigger] -->|outbox再照合・復旧漏れ検出| D1
     CRON -->|同期差分確認| V
     TQ --> DLQ[Chat Turn DLQ]
 ```
@@ -78,7 +78,7 @@ flowchart TD
 | ingest Worker | 冪等な原本保存、Account解決、Coordinator通知 | 会話順序の独自判断、AI生成 |
 | Coordinator | Account内の順序、連投集約、Session、Turn lease、外部I/Oのoutboxと締切 | 原本やBrain Itemの正本保持 |
 | generate Worker | Context構築、安全判定、prompt実行、出力検証 | Account IDや権限をモデルへ決めさせること |
-| Cron Worker | 期限削除、Vectorize outboxの再照合、復旧漏れ検出 | 会話順序の調停、AI生成 |
+| Cron Worker | Vectorize outboxの再照合、復旧漏れ検出 | 会話順序の調停、AI生成 |
 | D1 | 原本、Session、message、Brain Item、処理状態 | 会話の実行lock |
 | Vectorize | 確認済みBrain Itemの候補検索 | 認可、削除状態、確認状態の最終判定 |
 
@@ -93,13 +93,12 @@ flowchart TD
 - Queueのat-least-once配送を前提に、外部event IDとTurn IDを一意制約に使う
 - Accountを条件に含まない本文取得APIを作らない
 
-既存の`source_records.original_ref`へ`line:{event ID}`を保存し、`(account_id, original_ref)`へ削除状態にかかわらない一意indexを追加します。削除済みeventの再配送でも原本を作り直しません。
+既存の`source_records` schema自体は変更しません。LINE eventから決定的なSource Record IDを生成し、会話側の`(channel, channel_event_id)`一意制約と組み合わせてWebhook再配送を冪等に扱います。
 
 ```mermaid
 erDiagram
     accounts ||--o{ conversation_sessions : owns
     conversation_sessions ||--o{ conversation_messages : contains
-    conversation_sessions ||--o| session_summaries : has
     conversation_sessions ||--o{ chat_turns : processes
     source_records ||--|| source_record_text_payloads : stores
     source_records ||--o| conversation_messages : appears_as
@@ -127,60 +126,89 @@ erDiagram
 
 ### 4.3 `conversation_sessions`
 
-| 列 | 用途 |
-| --- | --- |
-| `id`, `account_id` | PKと所有者FK |
-| `status` | `active` / `closed` |
-| `started_at` | 最初のuser発言時刻 |
-| `last_user_message_at`, `last_assistant_message_at` | 6時間境界 |
-| `hard_close_at` | `started_at`から24時間後 |
-| `closed_at`, `close_reason` | 終了時刻と`explicit` / `inactive` / `hard_cap` |
-| `next_sequence` | Session内message採番 |
-| `created_at`, `updated_at` | lifecycle |
+一続きの会話文脈を表します。終了済みSessionもチャット履歴の復元対象として保持します。
+
+| 列 | 必須 | 用途 |
+| --- | --- | --- |
+| `id` | yes | PK。SessionのUUID |
+| `account_id` | yes | 所有者FK。Accountをまたいだ履歴取得を防ぐ検索条件 |
+| `status` | yes | `active`: 継続中、`closed`: 終了済み |
+| `started_at` | yes | 最初のuser発言時刻。24時間hard capの基準 |
+| `last_user_message_at` | yes | 最後のuser発言時刻。6時間無操作の判定に使う |
+| `last_assistant_message_at` | no | 最後にassistant messageを作成した時刻 |
+| `closed_at` | no | Sessionを閉じた時刻 |
+| `close_reason` | no | `explicit`: 応答による明示終了、`inactive`: 6時間無操作、`hard_cap`: 24時間上限 |
+| `next_sequence` | yes | 次に追加するmessageのSession内連番 |
+| `created_at`, `updated_at` | yes | 作成・最終更新時刻 |
+| `deleted_at`, `is_deleted` | no / yes | 共通lifecycle列。初期段階ではSession削除に使わない |
 
 `account_id`ごとに`status = active`のSessionを最大1件とする部分一意indexを置きます。Session更新とmessage追加は同じD1 batchで確定します。
 
 ### 4.4 `conversation_messages`
 
-| 列 | 用途 |
-| --- | --- |
-| `id`, `session_id`, `sequence` | PK、Session FK、単調増加番号 |
-| `role` | `user` / `assistant` |
-| `kind` | `message` / `receipt` / `safety` / `error` |
-| `source_record_id` | userの場合に必須 |
-| `assistant_body` | assistantの場合だけ保持 |
-| `channel`, `channel_event_id` | channelとuser eventの冪等キー |
-| `turn_id` | assistant応答を生成したTurn |
-| `sent_at`, `created_at` | 送信要求受理時刻と作成時刻 |
+userとassistantを同じ時系列で復元するための履歴です。user原文はSource Recordを参照し、assistant本文だけをこのtableに保持します。
 
-一意制約は`(channel, channel_event_id)`と`(session_id, sequence)`へ置きます。`assistant_body`とSession SummaryはSession終了後24時間を過ぎ、処理中Turnがないことを確認して物理削除します。ユーザー原文であるSource Recordは含めません。削除はinactiveなDOのalarmに依存させず、Cron Triggerが期限到来行を小分けに処理します。処理は冪等にし、削除期限超過件数と最古の超過時間を監視します。
+| 列 | 必須 | 用途 |
+| --- | --- | --- |
+| `id` | yes | PK。messageのUUID |
+| `session_id` | yes | 所属SessionのFK |
+| `sequence` | yes | Session内でuserとassistantを通した単調増加番号 |
+| `role` | yes | `user` / `assistant`。本文の取得元を決める |
+| `source_record_id` | no | userの場合に使用。本人の原文を持つSource RecordへのFK |
+| `assistant_body` | no | assistantの場合に使用。配送retryとチャット履歴復元のため保持する |
+| `channel` | yes | 入出力チャネル。初期段階は`line` |
+| `channel_event_id` | no | user eventの冪等キー。Webhook再配送時の重複を防ぐ |
+| `turn_id` | no | assistant応答を生成したTurn ID |
+| `sent_at` | no | user messageではチャネル上の受付時刻。assistantの配送完了時刻への利用は後続対応 |
+| `created_at`, `updated_at` | yes | 作成・最終更新時刻 |
+| `deleted_at`, `is_deleted` | no / yes | 訂正・削除されたmessageをContextから除外するlifecycle列 |
 
-### 4.5 `session_summaries`
+`role = user`では`source_record_id`を使い、`role = assistant`では`assistant_body`を使います。初期段階ではmessage種別を利用する表示・集計がないため`kind`は持ちません。必要になった段階で追加します。
 
-| 列 | 用途 |
-| --- | --- |
-| `session_id` | PK、Sessionごとに現行版1件 |
-| `summary_json` | schema検証済みの構造化要約 |
-| `covered_through_sequence` | 要約済みの最終sequence |
-| `source_message_ids_json` | 要約根拠 |
-| `prompt_version`, `revision` | 生成規則と楽観的更新 |
-| `created_at`, `updated_at` | lifecycle |
+一意制約は`(channel, channel_event_id)`と`(session_id, sequence)`へ置きます。チャット履歴を復元できるよう、`assistant_body`はSession終了後も保持し、経過時間による自動削除の対象にしません。本人による会話の削除など、明示的な削除操作にはmessageのlifecycleを通して従います。
 
-要約は出来事、感情、選択と本人が述べた理由、訂正、求める対話、未回答の問い、記録ゴール、提示済み助言への反応を別fieldで持ちます。自由形式の出力をそのまま保存せず、schemaと根拠IDを検証します。
+### 4.5 `chat_turns`
 
-### 4.6 `chat_turns`
+1回のAI生成とLINE最終応答を追跡する処理単位です。1.5秒以内の連投は同じTurnへまとめます。
 
-| 列 | 用途 |
-| --- | --- |
-| `id`, `session_id` | PKとSession FK。IDはQueue冪等キーにも使う |
-| `from_sequence`, `through_sequence` | 対象user message範囲 |
-| `status` | `queued` / `generating` / `validated` / `delivery_pending` / `delivered` / `delivery_unknown` / `failed` |
-| `prompt_version`, `model`, `safety_route` | 実行構成。本文を含めない |
-| `attempt_count`, `failure_stage` | 再試行と失敗箇所 |
-| `received_at`, `generation_started_at` | 受付と生成開始 |
-| `first_reply_requested_at`, `final_reply_requested_at` | SLO計測点 |
-| `response_message_id` | 検証済みassistant message |
-| `created_at`, `updated_at` | lifecycle |
+| 列 | 必須 | 用途 |
+| --- | --- | --- |
+| `id` | yes | PK。Chat Turn Queueの冪等キーにも使う |
+| `session_id` | yes | 対象SessionのFK |
+| `from_sequence` | yes | Turnに含む最初のuser message sequence |
+| `through_sequence` | yes | Turnに含む最後のuser message sequence |
+| `generation_epoch` | yes | Coordinatorが発行する世代番号。古いQueue配送・生成結果を無効化する |
+| `status` | yes | 下記の生成・配送状態 |
+| `prompt_version` | yes | 使用したsystem promptの版 |
+| `model` | yes | 使用したGeminiモデル |
+| `end_session` | yes | 応答配送後にSessionを明示終了するか |
+| `attempt_count` | yes | 生成処理を開始した回数 |
+| `failure_stage` | no | 終端失敗した処理段階。本文や例外messageは入れない |
+| `received_at` | yes | Turn内で最初のuser messageを受け付けた時刻 |
+| `generation_started_at` | no | 生成開始時刻 |
+| `first_reply_requested_at` | no | 受領応答要求の計測点。実際の配送状態との統合は後続対応 |
+| `final_reply_requested_at` | no | assistant messageを確定し、最終応答配送を開始した時刻 |
+| `response_message_id` | no | 生成済みassistant messageのID。retry時の再生成・重複保存を防ぐ |
+| `created_at`, `updated_at` | yes | 作成・最終更新時刻 |
+| `deleted_at`, `is_deleted` | no / yes | 共通lifecycle列。初期段階ではTurn削除に使わない |
+
+初期段階では安全性経路を永続化・集計しないため`safety_route`は持ちません。監視・監査要件を決めた段階で追加します。
+
+```mermaid
+stateDiagram-v2
+    [*] --> queued: Turn作成・Queue投入
+    queued --> generating: lease取得・生成開始
+    generating --> generating: 一時失敗後のQueue retry
+    generating --> delivery_pending: assistant message保存
+    delivery_pending --> delivery_pending: LINE配送retry
+    delivery_pending --> delivered: LINEが応答を受理
+    generating --> failed: 生成を継続できない
+    delivery_pending --> failed: 失敗案内を配送して終了
+    delivered --> [*]
+    failed --> [*]
+```
+
+`validated`と`delivery_unknown`は後続の配送状態精緻化に備えた予約値で、初期実装では遷移させません。`generation_epoch`とCoordinatorのleaseはD1の`status`とは別に、同じTurnを複数consumerが同時生成しないために使います。
 
 prompt本文、Context Package、未検証のモデル出力は保存しません。同じTurnをQueueが再配送しても新しい応答を送らないようにします。
 
@@ -272,7 +300,7 @@ Coordinatorは採番直前に[体験設計の境界](../product/diary-chat-exper
 - 24時間のhard cap後のmessageは必ず新しいSessionへ入れる
 - 終了と新規Session作成をAccount単位で直列化する
 
-Durable Objectのalarmは、未完了outbox、次Turn、Session終了のうち最も早い時刻を1件だけ設定します。alarm handlerはローカルSQLiteと必要なD1行を再読込し、複数回実行されても同じ結果にします。Session終了後24時間の本文削除は全Accountを走査するCron Triggerが所有し、DO alarmへ混在させません。
+Durable Objectのalarmは、未完了outbox、次Turn、Session終了のうち最も早い時刻を1件だけ設定します。alarm handlerはローカルSQLiteと必要なD1行を再読込し、複数回実行されても同じ結果にします。Session終了を理由とした本文の自動削除は行いません。
 
 ## 6. Context Package
 
@@ -282,7 +310,6 @@ Context Packageはgenerate WorkerがAI呼び出しごとにD1から作り直し�
 flowchart LR
     M[現在Turn] --> C[Context Builder]
     R[直近20 message] --> C
-    S[Session Summary] --> C
     B[Brain Item候補] --> A[Access再検証]
     E[Source Record候補] --> A
     A --> C
@@ -290,14 +317,13 @@ flowchart LR
     T --> P[Prompt Renderer]
 ```
 
-1. 現在Sessionと直近20messageをD1から取得する
-2. 20件より前を覆う現行Session Summaryを取得する
-3. 現在Turnから検索文を作り、現在Accountの`owner_scope`をfilterに指定してVectorizeを検索する
-4. filter適用後の集合から確認済みBrain Item候補を上位取得する
-5. D1でAccount、`confirmed`、`active`、有効期間、Access Policy、削除状態を再検証する
-6. 再検証を通過した上位5件を選び、必要なEvidenceのSource Recordを最大3件取得する
-7. 訂正済み旧版、削除済み、撤回済み、拒否済みを除外する
-8. 各要素へ種類、時点、確認状態、根拠IDを付ける
+1. 現在Sessionと直近messageをD1から取得する。件数は`CHAT_CONTEXT_MESSAGE_LIMIT`で管理し、初期値は20とする
+2. 現在Turnから検索文を作り、現在Accountの`owner_scope`をfilterに指定してVectorizeを検索する
+3. filter適用後の集合から確認済みBrain Item候補を上位取得する
+4. D1でAccount、`confirmed`、`active`、有効期間、Access Policy、削除状態を再検証する
+5. 再検証を通過した上位5件を選び、必要なEvidenceのSource Recordを最大3件取得する
+6. 訂正済み旧版、削除済み、撤回済み、拒否済みを除外する
+7. 各要素へ種類、時点、確認状態、根拠IDを付ける
 
 `owner_scope`は環境別Secretを鍵とする`HMAC(account_id)`から作り、Vectorizeのmetadata indexまたはnamespaceへ保存します。生のAccount IDは保存しません。filterはtopKより前に適用し、他Accountの候補に検索枠を消費させません。Vectorizeのmetadataは候補を絞る用途に限定し、認可の根拠にはしないため、D1再検証は必ず残します。
 
@@ -308,8 +334,7 @@ flowchart LR
 | 区分 | 上限の目安 |
 | --- | --- |
 | system規則と出力schema | 3,000 token |
-| 現在Turnと直近原文 | 10,000 token |
-| Session Summary | 3,000 token |
+| 現在Turnと直近原文 | 13,000 token |
 | Brain ItemとEvidence | 6,000 token |
 | 境界情報と安全分類 | 2,000 token |
 
@@ -377,11 +402,9 @@ system promptは次の順で固定し、Git管理する`prompt_version`を付け
 
 応答内の`safety`は監視と出力制限の自己申告に使います。事前の安全分類より低いrouteを返しても安全水準を下げず、アプリケーションが常に厳しい方を採用します。
 
-### 7.4 Session Summary
+### 7.4 長期会話の圧縮（後続対応）
 
-Summary更新は原文が20messageを超えたときだけ行います。既存summary、今回移すmessage、訂正・削除eventを入力し、全体を作り直します。差分文字列を直接編集させません。
-
-各主張は`source_message_ids`と`speaker`を必須にします。本人の発言、assistantの提案、AI推定を分け、矛盾を勝手に統合しません。
+初期段階では専用tableを設けず、Contextには`CHAT_CONTEXT_MESSAGE_LIMIT`件（初期値20）のmessageを使います。それ以前の文脈が必要になった段階で、訂正・削除の反映方法と根拠追跡を別途設計します。
 
 ### 7.5 Brain Item候補
 
@@ -505,7 +528,7 @@ Summary更新は原文が20messageを超えたときだけ行います。既存s
 
 ## 11. 観測と監査
 
-計測するのは各処理段階のlatency、38秒初回返信率、30秒deadline違反、90秒final率、receipt率、retry、DLQ、DO outboxの滞留時間、`delivery_unknown`、Vectorize同期遅延、削除期限超過、重複抑止、schema違反、安全route、token数、モデル別失敗率です。
+計測するのは各処理段階のlatency、38秒初回返信率、30秒deadline違反、90秒final率、receipt率、retry、DLQ、DO outboxの滞留時間、`delivery_unknown`、Vectorize同期遅延、明示的な削除要求の反映遅延、重複抑止、schema違反、安全route、token数、モデル別失敗率です。
 
 logへ出せる識別子は環境、Queue message ID、Turn ID、Session IDの一方向hash、prompt version、処理段階です。Account ID、LINE user ID、reply token、日記本文、Context Package、生成本文、Brain Item本文は出しません。
 
@@ -524,12 +547,10 @@ logへ出せる識別子は環境、Queue message ID、Turn ID、Session IDの�
 - 古いgeneration epochの完了結果を保存・送信しない
 - 6時間、24時間、明示終了、日付またぎのSession境界
 - 削除、訂正、撤回後の内容がContext Packageへ入らない
-- Session終了後24時間の削除jobがinactiveなAccountにも適用される
 - D1 restore後に削除が再適用されるまで通常受付を再開しない
 - Vectorizeが`owner_scope`をtopK前にfilterし、他Accountの候補を返さない
 - Vectorize候補をD1再検証し、同じscope内でも利用不可のItemを除外する
 - Vectorize upsert・deleteの失敗と長時間`submitted`をoutboxとreconciliationで回復する
-- 20message超過時にsummaryと原文が欠落・重複しない
 - schema外出力、存在しないEvidence ID、質問過多を送信しない
 - Webhook Queueを遅延・停止させても30秒までにreceiptのpush要求が受理される
 - receipt、final、失敗案内をtimeoutさせ、同じLINE retry keyでだけ再試行する
@@ -556,10 +577,10 @@ prompt versionを本番へ出す条件はschema準拠100%、越権した記憶�
 
 製品ロードマップのPhaseとは分け、次の単位で進めます。
 
-1. **原本とSession**: D1 schema、冪等保存、Session境界、Cronによるpayload削除
+1. **原本とSession**: D1 schema、冪等保存、Session境界、明示的な削除操作への追従
 2. **会話Coordinator**: Account単位DO、ローカルSQLite、連投、Turn state、outbox、2 QueueとDLQ
 3. **安全な通常応答**: Queue非依存のreceipt、Context、prompt、構造化出力、30秒・90秒deadline
-4. **Session Summary**: 20message超過時の要約と訂正反映
+4. **長期会話の圧縮**: 20message超過時の文脈保持と訂正反映
 5. **Brain Item候補**: Evidence付きpending候補、本人確認、却下、改訂
 6. **記憶を使う助言**: Vectorize outbox、`owner_scope` filter、D1再認可、Evidence取得
 7. **段階公開**: fixture、shadow、内部Account、少数公開、全体公開

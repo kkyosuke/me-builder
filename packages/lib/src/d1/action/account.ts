@@ -165,6 +165,27 @@ export async function resolveAccountByLineLogin(
   return { account: byMessagingApi.account, identity };
 }
 
+/** Accountに紐づく有効なMessaging API identityを配送時に解決する。 */
+export async function findLineIdentityByAccountId(
+  db: D1Client,
+  accountId: string,
+): Promise<string | undefined> {
+  const identity = await db
+    .select({ providerAccountId: accountIdentities.providerAccountId })
+    .from(accountIdentities)
+    .innerJoin(accounts, eq(accountIdentities.accountId, accounts.id))
+    .where(
+      and(
+        eq(accountIdentities.accountId, accountId),
+        eq(accountIdentities.provider, "line"),
+        eq(accountIdentities.isDeleted, false),
+        eq(accounts.isDeleted, false),
+      ),
+    )
+    .get();
+  return identity?.providerAccountId;
+}
+
 /**
  * Upserts accounts and account_identities records in D1 based on provider identity.
  * Uses a single JOIN query to fetch existing identity & account, and D1 batching for new insertions.

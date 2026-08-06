@@ -50,4 +50,16 @@ describe("Source D1 schema", () => {
         .run(),
     ).toThrow(/FOREIGN KEY constraint failed/);
   });
+
+  it("Source Recordと1対1のテキスト原本を保存する", () => {
+    const db = createTestDb();
+    db.insert(schema.accounts).values({ id: "account-1" }).run();
+    db.insert(schema.sourceRecords)
+      .values({ id: "source-1", accountId: "account-1", kind: "user_input" })
+      .run();
+    db.insert(schema.sourceRecordTextPayloads)
+      .values({ sourceRecordId: "source-1", body: "日記本文", contentHash: "sha256" })
+      .run();
+    expect(db.select().from(schema.sourceRecordTextPayloads).get()?.body).toBe("日記本文");
+  });
 });
