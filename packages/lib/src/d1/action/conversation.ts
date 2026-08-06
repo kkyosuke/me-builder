@@ -25,6 +25,16 @@ async function sha256(value: string): Promise<string> {
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
+function changedRowCount(result: unknown): number {
+  if (typeof result !== "object" || result === null) return 0;
+  if ("meta" in result && typeof result.meta === "object" && result.meta !== null) {
+    const changes = "changes" in result.meta ? result.meta.changes : undefined;
+    if (typeof changes === "number") return changes;
+  }
+  const changes = "changes" in result ? result.changes : undefined;
+  return typeof changes === "number" ? changes : 0;
+}
+
 /** LINE eventを不変なSource Recordとして冪等に保存する。 */
 export async function storeLineTextSource(
   db: D1Client,
@@ -327,7 +337,7 @@ export async function markTurnGenerating(db: D1Client, turnId: string): Promise<
         inArray(chatTurns.status, ["queued", "generating", "delivery_pending"]),
       ),
     );
-  return (result.meta.changes ?? 0) > 0;
+  return changedRowCount(result) > 0;
 }
 
 export async function saveAssistantResponse(
@@ -447,7 +457,7 @@ export async function closeExpiredSessions(db: D1Client, now = new Date()): Prom
         lte(conversationSessions.lastUserMessageAt, inactiveCutoff),
       ),
     );
-  return (hardCapResult.meta.changes ?? 0) + (inactiveResult.meta.changes ?? 0);
+  return changedRowCount(hardCapResult) + changedRowCount(inactiveResult);
 }
 
 export async function markTurnDelivered(db: D1Client, turnId: string): Promise<void> {
