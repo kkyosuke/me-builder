@@ -1,15 +1,21 @@
 const cssFiles = Array.from(new Bun.Glob("assets/*.css").scanSync({ cwd: "dist", absolute: true }));
 
-if (cssFiles.length !== 1) {
-  throw new Error(`CSS build artifact must be exactly one file, received ${cssFiles.length}.`);
+if (cssFiles.length === 0) {
+  throw new Error("CSS build artifact was not generated.");
 }
 
-const css = await Bun.file(cssFiles[0]).text();
+const cssArtifacts = await Promise.all(
+  cssFiles.map(async (file) => ({ file, css: await Bun.file(file).text() })),
+);
 
-if (/@layer\s+(?:theme|base|components|utilities)\b/.test(css)) {
-  throw new Error("LIFF-incompatible Cascade Layers remain in the CSS build artifact.");
+for (const { file, css } of cssArtifacts) {
+  if (/@layer\b/.test(css)) {
+    throw new Error(`LIFF-incompatible Cascade Layers remain in ${file}.`);
+  }
 }
 
-if (!css.includes("--color-slate-900:#") || !css.includes(".flex{display:flex}")) {
+const combinedCss = cssArtifacts.map(({ css }) => css).join("\n");
+
+if (!combinedCss.includes("--color-slate-900:#") || !combinedCss.includes(".flex{display:flex}")) {
   throw new Error("LIFF-compatible color fallbacks or core utilities are missing from CSS.");
 }

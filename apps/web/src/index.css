@@ -1,5 +1,5 @@
 /*
- * LIFF 内の古い WebView でも読み込めるよう、Cascade Layers を付ける
+ * LIFF 内の古い WebView でも読み込めるよう、Cascade Layers を残さず、
  * tailwindcss/index.css ではなく、各レイヤーのソースを宣言順に直接読み込みます。
  */
 @import "tailwindcss/theme.css";

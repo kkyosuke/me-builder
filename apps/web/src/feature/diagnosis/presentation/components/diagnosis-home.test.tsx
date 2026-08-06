@@ -69,4 +69,33 @@ describe("DiagnosisHome", () => {
     expect(within(answeredCard).queryByText("回答済み")).toBeNull();
     expect(within(answeredCard).queryByText(/10\/10|10問/)).toBeNull();
   });
+
+  it("診断ごとのサムネイルと未知の診断用フォールバックを表示する", () => {
+    render(
+      <DiagnosisHome
+        diagnoses={{
+          status: "success",
+          data: [
+            diagnosis({ id: "money-values", title: "お金の診断" }),
+            diagnosis({ id: "new-diagnosis", title: "新しい診断", displayOrder: 2 }),
+          ],
+        }}
+        onOpenDiagnosis={vi.fn()}
+        onRetry={vi.fn()}
+        canResetDiagnosisData={false}
+        resetState={{ status: "idle" }}
+        onResetDiagnosisData={vi.fn()}
+      />,
+    );
+
+    const moneyCard = screen.getByRole("button", { name: /お金の診断/ });
+    const fallbackCard = screen.getByRole("button", { name: /新しい診断/ });
+
+    expect(moneyCard.querySelector("img")?.getAttribute("src")).toBe(
+      "/images/diagnoses/money-values.jpg",
+    );
+    expect(fallbackCard.querySelector("img")?.getAttribute("src")).toBe(
+      "/images/diagnoses/default.jpg",
+    );
+  });
 });
