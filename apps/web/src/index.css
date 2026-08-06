@@ -1,4 +1,10 @@
-@import "tailwindcss";
+/*
+ * LIFF 内の古い WebView でも読み込めるよう、Cascade Layers を残さず、
+ * tailwindcss/index.css ではなく、各レイヤーのソースを宣言順に直接読み込みます。
+ */
+@import "tailwindcss/theme.css";
+@import "tailwindcss/preflight.css";
+@import "tailwindcss/utilities.css";
 
 /*
  * デザインシステムは Tailwind CSS のユーティリティに寄せ、素の CSS は
@@ -14,19 +20,17 @@
     Cantarell, sans-serif;
 }
 
-@layer base {
-  /*
-   * 確定したカードを画面外へ飛ばすため、横方向にはみ出した分で横スクロールが
-   * 生まれないようにします。`clip` はスクロールコンテナを作らないので `hidden` より副作用が小さく、
-   * `html` と `body` の両方へ指定しないと片方だけでは実際のスクロールが残ります。
-   */
-  html,
-  body {
-    @apply overflow-x-clip;
-  }
+/*
+ * 確定したカードを画面外へ飛ばすため、横方向にはみ出した分で横スクロールが
+ * 生まれないようにします。`clip` はスクロールコンテナを作らないので `hidden` より副作用が小さく、
+ * `html` と `body` の両方へ指定しないと片方だけでは実際のスクロールが残ります。
+ */
+html,
+body {
+  @apply overflow-x-clip;
+}
 
-  body {
-    /* overscroll: スワイプ中に LINE 内ブラウザの引っ張り更新が割り込まないよう抑えます。 */
-    @apply min-h-dvh overscroll-y-contain bg-slate-900 font-sans text-slate-50 antialiased;
-  }
+body {
+  /* overscroll: スワイプ中に LINE 内ブラウザの引っ張り更新が割り込まないよう抑えます。 */
+  @apply min-h-dvh overscroll-y-contain bg-slate-900 font-sans text-slate-50 antialiased;
 }
