@@ -193,8 +193,8 @@ describe("GET /api/diagnoses local D1 E2E", () => {
         lastAnsweredAt: string | null;
       }>;
     };
-    expect(initialBody.diagnoses).toHaveLength(3);
-    expect(initialBody.diagnoses.map(({ displayOrder }) => displayOrder)).toEqual([10, 20, 30]);
+    expect(initialBody.diagnoses).toHaveLength(4);
+    expect(initialBody.diagnoses.map(({ displayOrder }) => displayOrder)).toEqual([10, 20, 30, 40]);
     expect(initialBody.diagnoses.every(({ description }) => description.length > 0)).toBe(true);
     expect(
       initialBody.diagnoses.every(({ responseStatus }) => responseStatus === "unanswered"),
@@ -314,6 +314,23 @@ describe("GET /api/diagnoses/:diagnosisId local D1 E2E", () => {
     expect(body.questions[0]).toMatchObject({
       diagnosisQuestionId: "dq-leisure-style-01",
       text: "予定のない休日は、家で過ごすより外へ出たい。",
+    });
+  });
+
+  it("時間と予定の10問をseedから返すこと", async () => {
+    const response = await request("known-token", "/api/diagnoses/time-planning");
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      id: string;
+      title: string;
+      questions: Array<{ diagnosisQuestionId: string; text: string }>;
+    };
+
+    expect(body).toMatchObject({ id: "time-planning", title: "時間と予定" });
+    expect(body.questions).toHaveLength(10);
+    expect(body.questions[0]).toMatchObject({
+      diagnosisQuestionId: "dq-time-planning-01",
+      text: "休日の予定は、前日までに決めておきたい。",
     });
   });
 

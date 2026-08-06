@@ -7,7 +7,8 @@
 -- Revise published content by adding a new Question Version and a new Diagnosis instead.
 --
 -- Timestamps: 2026-08-04T00:00:00.000Z for the initial diagnoses and
--- 2026-08-06T00:00:00.000Z for leisure-style (Unix seconds, Drizzle timestamp mode).
+-- 2026-08-06T00:00:00.000Z for leisure-style and time-planning
+-- (Unix seconds, Drizzle timestamp mode).
 
 INSERT OR IGNORE INTO questions (id, created_at, updated_at, is_deleted) VALUES
   ('q-relationship-priority-01', 1785801600, 1785801600, 0),
@@ -39,7 +40,17 @@ INSERT OR IGNORE INTO questions (id, created_at, updated_at, is_deleted) VALUES
   ('q-leisure-style-07', 1785974400, 1785974400, 0),
   ('q-leisure-style-08', 1785974400, 1785974400, 0),
   ('q-leisure-style-09', 1785974400, 1785974400, 0),
-  ('q-leisure-style-10', 1785974400, 1785974400, 0);
+  ('q-leisure-style-10', 1785974400, 1785974400, 0),
+  ('q-time-planning-01', 1785974400, 1785974400, 0),
+  ('q-time-planning-02', 1785974400, 1785974400, 0),
+  ('q-time-planning-03', 1785974400, 1785974400, 0),
+  ('q-time-planning-04', 1785974400, 1785974400, 0),
+  ('q-time-planning-05', 1785974400, 1785974400, 0),
+  ('q-time-planning-06', 1785974400, 1785974400, 0),
+  ('q-time-planning-07', 1785974400, 1785974400, 0),
+  ('q-time-planning-08', 1785974400, 1785974400, 0),
+  ('q-time-planning-09', 1785974400, 1785974400, 0),
+  ('q-time-planning-10', 1785974400, 1785974400, 0);
 --> statement-breakpoint
 
 INSERT OR IGNORE INTO question_versions (
@@ -82,7 +93,17 @@ INSERT OR IGNORE INTO question_versions (
   (1785974400, 1785974400, 0, 'q-leisure-style-07', 1, 'approved', '運動やスポーツを、休日の予定に入れたい。', 'single_choice', 1785974400),
   (1785974400, 1785974400, 0, 'q-leisure-style-08', 1, 'approved', '外出にお金を使うより、家で楽しむためにお金を使いたい。', 'single_choice', 1785974400),
   (1785974400, 1785974400, 0, 'q-leisure-style-09', 1, 'approved', '休日を別々に過ごしても平気だ。', 'single_choice', 1785974400),
-  (1785974400, 1785974400, 0, 'q-leisure-style-10', 1, 'approved', '混雑していても、人気のイベントへ出かけたい。', 'single_choice', 1785974400);
+  (1785974400, 1785974400, 0, 'q-leisure-style-10', 1, 'approved', '混雑していても、人気のイベントへ出かけたい。', 'single_choice', 1785974400),
+  (1785974400, 1785974400, 0, 'q-time-planning-01', 1, 'approved', '休日の予定は、前日までに決めておきたい。', 'single_choice', 1785974400),
+  (1785974400, 1785974400, 0, 'q-time-planning-02', 1, 'approved', '急な誘いでも、予定が空いていれば参加したい。', 'single_choice', 1785974400),
+  (1785974400, 1785974400, 0, 'q-time-planning-03', 1, 'approved', '待ち合わせに10分遅れる場合は、必ず連絡してほしい。', 'single_choice', 1785974400),
+  (1785974400, 1785974400, 0, 'q-time-planning-04', 1, 'approved', '一緒に過ごす予定は、一人の予定より優先したい。', 'single_choice', 1785974400),
+  (1785974400, 1785974400, 0, 'q-time-planning-05', 1, 'approved', '予定の変更が続くと、相手への信頼が下がる。', 'single_choice', 1785974400),
+  (1785974400, 1785974400, 0, 'q-time-planning-06', 1, 'approved', '旅行では、行程を事前に細かく決めたい。', 'single_choice', 1785974400),
+  (1785974400, 1785974400, 0, 'q-time-planning-07', 1, 'approved', '予定どおりに進まなくても、その場で楽しめる。', 'single_choice', 1785974400),
+  (1785974400, 1785974400, 0, 'q-time-planning-08', 1, 'approved', '約束の時間より早く着くように行動したい。', 'single_choice', 1785974400),
+  (1785974400, 1785974400, 0, 'q-time-planning-09', 1, 'approved', '忙しい時期でも、定期的に会う日を決めておきたい。', 'single_choice', 1785974400),
+  (1785974400, 1785974400, 0, 'q-time-planning-10', 1, 'approved', '何もしない時間も、一緒に過ごす大切な予定だと思う。', 'single_choice', 1785974400);
 --> statement-breakpoint
 
 INSERT OR IGNORE INTO question_choices (
@@ -96,8 +117,8 @@ INSERT OR IGNORE INTO question_choices (
   position
 )
 SELECT
-  CASE WHEN id LIKE 'q-leisure-style-%' THEN 1785974400 ELSE 1785801600 END,
-  CASE WHEN id LIKE 'q-leisure-style-%' THEN 1785974400 ELSE 1785801600 END,
+  CASE WHEN id LIKE 'q-leisure-style-%' OR id LIKE 'q-time-planning-%' THEN 1785974400 ELSE 1785801600 END,
+  CASE WHEN id LIKE 'q-leisure-style-%' OR id LIKE 'q-time-planning-%' THEN 1785974400 ELSE 1785801600 END,
   0,
   id,
   1,
@@ -116,7 +137,12 @@ WHERE id IN (
   'q-leisure-style-01', 'q-leisure-style-02', 'q-leisure-style-03',
   'q-leisure-style-04', 'q-leisure-style-05', 'q-leisure-style-06',
   'q-leisure-style-07', 'q-leisure-style-08', 'q-leisure-style-09',
-  'q-leisure-style-10'
+  'q-leisure-style-10',
+  'q-time-planning-01', 'q-time-planning-02',
+  'q-time-planning-03', 'q-time-planning-04',
+  'q-time-planning-05', 'q-time-planning-06',
+  'q-time-planning-07', 'q-time-planning-08',
+  'q-time-planning-09', 'q-time-planning-10'
 );
 --> statement-breakpoint
 
@@ -131,8 +157,8 @@ INSERT OR IGNORE INTO question_choices (
   position
 )
 SELECT
-  CASE WHEN id LIKE 'q-leisure-style-%' THEN 1785974400 ELSE 1785801600 END,
-  CASE WHEN id LIKE 'q-leisure-style-%' THEN 1785974400 ELSE 1785801600 END,
+  CASE WHEN id LIKE 'q-leisure-style-%' OR id LIKE 'q-time-planning-%' THEN 1785974400 ELSE 1785801600 END,
+  CASE WHEN id LIKE 'q-leisure-style-%' OR id LIKE 'q-time-planning-%' THEN 1785974400 ELSE 1785801600 END,
   0,
   id,
   1,
@@ -151,7 +177,12 @@ WHERE id IN (
   'q-leisure-style-01', 'q-leisure-style-02', 'q-leisure-style-03',
   'q-leisure-style-04', 'q-leisure-style-05', 'q-leisure-style-06',
   'q-leisure-style-07', 'q-leisure-style-08', 'q-leisure-style-09',
-  'q-leisure-style-10'
+  'q-leisure-style-10',
+  'q-time-planning-01', 'q-time-planning-02',
+  'q-time-planning-03', 'q-time-planning-04',
+  'q-time-planning-05', 'q-time-planning-06',
+  'q-time-planning-07', 'q-time-planning-08',
+  'q-time-planning-09', 'q-time-planning-10'
 );
 --> statement-breakpoint
 
@@ -259,6 +290,38 @@ INSERT OR IGNORE INTO diagnosis_scoring_configs (
       "highMinimum":65,
       "balancedLabel":"状況に応じて楽しむ"
     }'
+  ),
+  (
+    'time-planning-v1',
+    1785974400,
+    1785974400,
+    0,
+    1,
+    '{
+      "parameters": [
+        {"id":"advance-planning","label":"事前計画","lowLabel":"直前やその場で決めたい","highLabel":"前もって決めたい"},
+        {"id":"spontaneous-flexibility","label":"予定変更への柔軟性","lowLabel":"決めた予定を保ちたい","highLabel":"その場の変化を楽しめる"},
+        {"id":"time-reliability","label":"時間と約束","lowLabel":"時間の幅を広く捉える","highLabel":"時間と連絡を明確にしたい"},
+        {"id":"shared-time-priority","label":"一緒の時間","lowLabel":"個人の予定を優先しやすい","highLabel":"一緒に過ごす時間を確保したい"}
+      ],
+      "choiceScores": {"yes":1,"no":-1},
+      "questions": {
+        "q-time-planning-01":{"questionVersion":1,"weights":{"advance-planning":1}},
+        "q-time-planning-02":{"questionVersion":1,"weights":{"spontaneous-flexibility":1}},
+        "q-time-planning-03":{"questionVersion":1,"weights":{"time-reliability":1}},
+        "q-time-planning-04":{"questionVersion":1,"weights":{"shared-time-priority":1}},
+        "q-time-planning-05":{"questionVersion":1,"weights":{"time-reliability":0.5,"spontaneous-flexibility":-0.5}},
+        "q-time-planning-06":{"questionVersion":1,"weights":{"advance-planning":1}},
+        "q-time-planning-07":{"questionVersion":1,"weights":{"spontaneous-flexibility":1}},
+        "q-time-planning-08":{"questionVersion":1,"weights":{"time-reliability":1}},
+        "q-time-planning-09":{"questionVersion":1,"weights":{"advance-planning":0.5,"shared-time-priority":1}},
+        "q-time-planning-10":{"questionVersion":1,"weights":{"shared-time-priority":1}}
+      },
+      "minimumCoverage":0.6,
+      "lowMaximum":35,
+      "highMinimum":65,
+      "balancedLabel":"状況に応じて予定を決める"
+    }'
   );
 --> statement-breakpoint
 
@@ -277,7 +340,8 @@ INSERT INTO diagnoses (
 ) VALUES
   ('relationship-priority', 1785801600, 1785801600, 0, '自分と相手の優先・境界線', '頼まれごとや意思決定で、自分と相手をどう尊重するかを見ます。', 'relationship-priority-v1', 10, 1785801600, 'published', 1785801600),
   ('money-values', 1785801600, 1785801600, 0, 'お金と消費', '貯蓄、支出、共有、公平性、リスクに関する傾向を見ます。', 'money-values-v1', 20, 1785801600, 'published', 1785801600),
-  ('leisure-style', 1785974400, 1785974400, 0, 'インドア・アウトドアと余暇', '休日の過ごし方、体験、趣味の共有、活動量に関する傾向を見ます。', 'leisure-style-v1', 30, 1785801600, 'published', 1785974400)
+  ('leisure-style', 1785974400, 1785974400, 0, 'インドア・アウトドアと余暇', '休日の過ごし方、体験、趣味の共有、活動量に関する傾向を見ます。', 'leisure-style-v1', 30, 1785801600, 'published', 1785974400),
+  ('time-planning', 1785974400, 1785974400, 0, '時間と予定', '予定の立て方、変更への柔軟性、時間の約束、一緒の時間に関する傾向を見ます。', 'time-planning-v1', 40, 1785801600, 'published', 1785974400)
 ON CONFLICT(id) DO UPDATE SET
   description = CASE
     WHEN diagnoses.description = '' THEN excluded.description
@@ -329,14 +393,24 @@ INSERT OR IGNORE INTO diagnosis_questions (
   ('dq-leisure-style-07', 1785974400, 1785974400, 0, 'leisure-style', 'q-leisure-style-07', 1, 6),
   ('dq-leisure-style-08', 1785974400, 1785974400, 0, 'leisure-style', 'q-leisure-style-08', 1, 7),
   ('dq-leisure-style-09', 1785974400, 1785974400, 0, 'leisure-style', 'q-leisure-style-09', 1, 8),
-  ('dq-leisure-style-10', 1785974400, 1785974400, 0, 'leisure-style', 'q-leisure-style-10', 1, 9);
+  ('dq-leisure-style-10', 1785974400, 1785974400, 0, 'leisure-style', 'q-leisure-style-10', 1, 9),
+  ('dq-time-planning-01', 1785974400, 1785974400, 0, 'time-planning', 'q-time-planning-01', 1, 0),
+  ('dq-time-planning-02', 1785974400, 1785974400, 0, 'time-planning', 'q-time-planning-02', 1, 1),
+  ('dq-time-planning-03', 1785974400, 1785974400, 0, 'time-planning', 'q-time-planning-03', 1, 2),
+  ('dq-time-planning-04', 1785974400, 1785974400, 0, 'time-planning', 'q-time-planning-04', 1, 3),
+  ('dq-time-planning-05', 1785974400, 1785974400, 0, 'time-planning', 'q-time-planning-05', 1, 4),
+  ('dq-time-planning-06', 1785974400, 1785974400, 0, 'time-planning', 'q-time-planning-06', 1, 5),
+  ('dq-time-planning-07', 1785974400, 1785974400, 0, 'time-planning', 'q-time-planning-07', 1, 6),
+  ('dq-time-planning-08', 1785974400, 1785974400, 0, 'time-planning', 'q-time-planning-08', 1, 7),
+  ('dq-time-planning-09', 1785974400, 1785974400, 0, 'time-planning', 'q-time-planning-09', 1, 8),
+  ('dq-time-planning-10', 1785974400, 1785974400, 0, 'time-planning', 'q-time-planning-10', 1, 9);
 --> statement-breakpoint
 
--- Expected result: diagnosis_count=3, question_version_count=30,
--- choice_count=60, diagnosis_question_count=30, scoring_config_count=3.
+-- Expected result: diagnosis_count=4, question_version_count=40,
+-- choice_count=80, diagnosis_question_count=40, scoring_config_count=4.
 SELECT
-  (SELECT COUNT(*) FROM diagnoses WHERE id IN ('relationship-priority', 'money-values', 'leisure-style') AND state = 'published' AND description <> '' AND is_deleted = 0) AS diagnosis_count,
-  (SELECT COUNT(*) FROM question_versions WHERE version = 1 AND state = 'approved' AND is_deleted = 0 AND (question_id LIKE 'q-relationship-priority-%' OR question_id LIKE 'q-money-%' OR question_id LIKE 'q-leisure-style-%')) AS question_version_count,
-  (SELECT COUNT(*) FROM question_choices WHERE question_version = 1 AND is_deleted = 0 AND (question_id LIKE 'q-relationship-priority-%' OR question_id LIKE 'q-money-%' OR question_id LIKE 'q-leisure-style-%')) AS choice_count,
-  (SELECT COUNT(*) FROM diagnosis_questions WHERE diagnosis_id IN ('relationship-priority', 'money-values', 'leisure-style') AND is_deleted = 0) AS diagnosis_question_count,
-  (SELECT COUNT(*) FROM diagnosis_scoring_configs WHERE id IN ('relationship-priority-v1', 'money-values-v1', 'leisure-style-v1') AND version = 1 AND is_deleted = 0) AS scoring_config_count;
+  (SELECT COUNT(*) FROM diagnoses WHERE id IN ('relationship-priority', 'money-values', 'leisure-style', 'time-planning') AND state = 'published' AND description <> '' AND is_deleted = 0) AS diagnosis_count,
+  (SELECT COUNT(*) FROM question_versions WHERE version = 1 AND state = 'approved' AND is_deleted = 0 AND (question_id LIKE 'q-relationship-priority-%' OR question_id LIKE 'q-money-%' OR question_id LIKE 'q-leisure-style-%' OR question_id LIKE 'q-time-planning-%')) AS question_version_count,
+  (SELECT COUNT(*) FROM question_choices WHERE question_version = 1 AND is_deleted = 0 AND (question_id LIKE 'q-relationship-priority-%' OR question_id LIKE 'q-money-%' OR question_id LIKE 'q-leisure-style-%' OR question_id LIKE 'q-time-planning-%')) AS choice_count,
+  (SELECT COUNT(*) FROM diagnosis_questions WHERE diagnosis_id IN ('relationship-priority', 'money-values', 'leisure-style', 'time-planning') AND is_deleted = 0) AS diagnosis_question_count,
+  (SELECT COUNT(*) FROM diagnosis_scoring_configs WHERE id IN ('relationship-priority-v1', 'money-values-v1', 'leisure-style-v1', 'time-planning-v1') AND version = 1 AND is_deleted = 0) AS scoring_config_count;

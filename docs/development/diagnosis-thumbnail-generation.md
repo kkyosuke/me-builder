@@ -1,0 +1,55 @@
+# 診断サムネイル生成
+
+## 1. この文書の目的
+
+この文書は、診断一覧で使用する画像サムネイルの生成プロンプトと配置方法を所有します。
+
+診断一覧の画面要件は[Phase 1 診断体験設計](../diagnosis/diagnosis-experience.md)、診断内容と質問は[人間関係の価値観 Yes／No質問集](../diagnosis/content/relationship-values-yes-no-question-bank.md)を正とします。この文書は、画面レイアウト、診断内容、採点方法を所有しません。
+
+## 2. 配置と参照
+
+生成した画像は`apps/web/public/images/diagnoses/<Diagnosis ID>.jpg`へ配置し、Web UIの診断IDと画像パスの対応へ追加します。カードで16:9表示するため、重要な被写体は画像中央へ置き、端に寄せません。
+
+```text
+apps/web/public/images/diagnoses/
+├── default.jpg
+├── relationship-priority.jpg
+├── money-values.jpg
+├── leisure-style.jpg
+└── time-planning.jpg
+```
+
+## 3. 共通スタイル
+
+- 16:9の横長構図
+- 深いネイビーの背景
+- スレートブルー、暖かいクリーム、コーラル、少量のゴールド
+- マットな紙または柔らかなクレイの質感を持つ、立体的なペーパーカット表現
+- 柔らかなスタジオ照明と穏やかな雰囲気
+- 文字、ロゴ、透かし、ブランド記号を含めない
+
+## 4. 「時間と予定」生成プロンプト
+
+次のプロンプトを画像生成モデルへそのまま渡します。モデル側で指定できる場合は16:9を選びます。
+
+```text
+Use case: stylized-concept
+Asset type: 16:9 diagnosis card thumbnail for a web application
+Primary request: Create a polished 3D paper-cut/clay-style illustration representing time, schedules, advance planning, spontaneous changes, and shared time.
+Scene/backdrop: A calm abstract planning scene with a large central clock, a simple calendar made only of blank tiles, and two gently branching paths that reconnect, suggesting both planned and flexible ways of spending time.
+Subject: A balanced relationship between a clock, calendar, route markers, and two matching seats or cups that suggest making time together; no people required.
+Style/medium: Soft layered 3D paper-cut / clay render matching a premium editorial app illustration.
+Composition/framing: Wide 16:9, centered, clear silhouettes, important objects away from edges, suitable for a small card crop.
+Lighting/mood: Warm soft studio lighting, calm, cooperative, welcoming.
+Color palette: Deep navy background, muted slate blue, warm cream, coral accents, small golden accents; consistent with the existing me-builder diagnosis thumbnails.
+Materials/textures: Matte paper and soft clay, subtle depth and shadows.
+Constraints: No text, no letters, no numbers, no logos, no watermark, no brand marks. Do not show readable calendar dates. Avoid making planning or spontaneity look superior.
+```
+
+## 5. 新しい診断へ展開する手順
+
+1. §4の`Primary request`、`Scene/backdrop`、`Subject`を新しい診断のテーマへ置き換える
+2. §3の共通スタイルと`Composition/framing`、`Constraints`を維持する
+3. 生成物を16:9のJPEGとしてDiagnosis IDのファイル名で配置する
+4. 小さいカード表示でも主題を判別でき、文字や透かしがないことを確認する
+5. Web UIの対応表とサムネイル表示テストを更新する

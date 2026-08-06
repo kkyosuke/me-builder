@@ -9,6 +9,7 @@ const diagnosisThumbnails: Record<string, string> = {
   "relationship-priority": "/images/diagnoses/relationship-priority.jpg",
   "money-values": "/images/diagnoses/money-values.jpg",
   "leisure-style": "/images/diagnoses/leisure-style.jpg",
+  "time-planning": "/images/diagnoses/time-planning.jpg",
 };
 
 function getDiagnosisThumbnail(diagnosisId: string) {

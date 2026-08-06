@@ -44,6 +44,7 @@ seedは必ずmigration適用後に実行します。localでは開発者が明�
 | 10 | `relationship-priority` | 自分と相手の優先・境界線 | すべてversion 1 | 2026-08-04 00:00:00 UTC |
 | 20 | `money-values` | お金と消費 | すべてversion 1 | 2026-08-04 00:00:00 UTC |
 | 30 | `leisure-style` | インドア・アウトドアと余暇 | すべてversion 1 | 2026-08-04 00:00:00 UTC |
+| 40 | `time-planning` | 時間と予定 | すべてversion 1 | 2026-08-04 00:00:00 UTC |
 
 いずれも終了日時を持たず、Question Versionは`approved`、Diagnosisは`published`として登録します。Diagnosisには一覧表示用の短い説明、表示順、版付き採点設定への参照を持たせます。Choiceは「いいえ」「はい」の2件です。表示順は診断内容ではなく一覧上の優先順位として変更でき、将来の差し込みに備えて10刻みで設定します。
 
@@ -82,11 +83,11 @@ SQL末尾の検証クエリは、現在のseedだけを適用した場合に次�
 
 | 項目 | 期待値 |
 | --- | ---: |
-| Diagnosis | 3 |
-| Question Version | 30 |
-| Choice | 60 |
-| Diagnosis Question | 30 |
-| Diagnosis Scoring Config | 3 |
+| Diagnosis | 4 |
+| Question Version | 40 |
+| Choice | 80 |
+| Diagnosis Question | 40 |
+| Diagnosis Scoring Config | 4 |
 
 件数だけでなく、次も確認します。
 

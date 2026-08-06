@@ -326,6 +326,31 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
     });
   });
 
+  it("時間と予定の回答を4つのパラメータへ採点する", async () => {
+    for (let index = 1; index <= 10; index += 1) {
+      const suffix = String(index).padStart(2, "0");
+      const response = await putAnswer(`dq-time-planning-${suffix}`, "yes", "time-planning");
+      expect(response.status).toBe(200);
+    }
+
+    const response = await getAnswers("time-planning");
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      id: "time-planning",
+      scoring: {
+        scoringVersion: 1,
+        balancedLabel: "状況に応じて予定を決める",
+        parameters: [
+          expect.objectContaining({ id: "advance-planning", score: 100, coverage: 100 }),
+          expect.objectContaining({ id: "spontaneous-flexibility", score: 80, coverage: 100 }),
+          expect.objectContaining({ id: "time-reliability", score: 100, coverage: 100 }),
+          expect.objectContaining({ id: "shared-time-priority", score: 100, coverage: 100 }),
+        ],
+      },
+    });
+  });
+
   it(`${diagnosisAnswerCases.missingContents.id}: ${diagnosisAnswerCases.missingContents.name}`, async () => {
     const response = await getAnswers();
     expect(response.status).toBe(404);
