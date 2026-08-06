@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "712fe6a1-47c4-4a6a-a7b1-052fbb5bdd88",
+  "id": "2610c9a1-ea38-4cf6-a6a1-cf6bc52d50cf",
   "prevId": "c377e8e2-9c72-439d-85bd-645c76b2ec31",
   "tables": {
     "account_identities": {
@@ -231,13 +231,6 @@
           "notNull": true,
           "autoincrement": false
         },
-        "safety_route": {
-          "name": "safety_route",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "end_session": {
           "name": "end_session",
           "type": "integer",
@@ -379,13 +372,6 @@
         },
         "role": {
           "name": "role",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "kind": {
-          "name": "kind",
           "type": "text",
           "primaryKey": false,
           "notNull": true,

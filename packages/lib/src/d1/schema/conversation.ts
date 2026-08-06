@@ -39,8 +39,9 @@ export const conversationMessages = sqliteTable(
       .references(() => conversationSessions.id),
     sequence: integer("sequence").notNull(),
     role: text("role", { enum: ["user", "assistant"] }).notNull(),
-    kind: text("kind", { enum: ["message", "receipt", "safety", "error"] }).notNull(),
+    // TODO: 表示や集計でmessage種別が必要になった段階でkindを追加する。
     sourceRecordId: text("source_record_id").references(() => sourceRecords.id),
+    /** チャット履歴の復元に使うため、Session終了後も保持する。 */
     assistantBody: text("assistant_body"),
     channel: text("channel").notNull(),
     channelEventId: text("channel_event_id"),
@@ -80,7 +81,7 @@ export const chatTurns = sqliteTable(
       .default("queued"),
     promptVersion: text("prompt_version").notNull(),
     model: text("model").notNull(),
-    safetyRoute: text("safety_route"),
+    // TODO: 安全性経路の監視・監査要件を定義した段階でsafety_routeを追加する。
     endSession: integer("end_session", { mode: "boolean" }).notNull().default(false),
     attemptCount: integer("attempt_count").notNull().default(0),
     failureStage: text("failure_stage"),

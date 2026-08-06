@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import type { D1Client } from "../client";
 import {
@@ -194,7 +194,6 @@ export async function attachMessagesToTurn(
     sessionId: session.id,
     sequence: fromSequence + index,
     role: "user" as const,
-    kind: "message" as const,
     sourceRecordId: input.sourceRecordId,
     assistantBody: null,
     channel: "line",
@@ -442,8 +441,6 @@ export async function saveAssistantResponse(
   input: {
     turnId: string;
     body: string;
-    kind: "message" | "safety" | "error";
-    safetyRoute: string;
     endSession: boolean;
   },
 ): Promise<string> {
@@ -474,7 +471,6 @@ export async function saveAssistantResponse(
       sessionId: session.id,
       sequence: session.nextSequence,
       role: "assistant",
-      kind: input.kind,
       assistantBody: input.body,
       channel: "line",
       turnId: input.turnId,
@@ -490,7 +486,6 @@ export async function saveAssistantResponse(
       .set({
         status: "delivery_pending",
         responseMessageId: messageId,
-        safetyRoute: input.safetyRoute,
         endSession: input.endSession,
         finalReplyRequestedAt: now,
         updatedAt: now,
@@ -503,11 +498,10 @@ export async function saveAssistantResponse(
 export async function getPendingAssistantResponse(
   db: D1Client,
   turnId: string,
-): Promise<{ body: string; safetyRoute: string; endSession: boolean } | undefined> {
+): Promise<{ body: string; endSession: boolean } | undefined> {
   const row = await db
     .select({
       body: conversationMessages.assistantBody,
-      safetyRoute: chatTurns.safetyRoute,
       endSession: chatTurns.endSession,
     })
     .from(chatTurns)
@@ -517,7 +511,6 @@ export async function getPendingAssistantResponse(
   return row?.body
     ? {
         body: row.body,
-        safetyRoute: row.safetyRoute ?? "normal",
         endSession: row.endSession,
       }
     : undefined;
@@ -575,51 +568,4 @@ export async function markTurnFailed(
     .update(chatTurns)
     .set({ status: "failed", failureStage, updatedAt: new Date() })
     .where(eq(chatTurns.id, turnId));
-}
-
-/** Session終了24時間後のassistant本文を小分けに削除する。 */
-export async function purgeExpiredConversationBodies(
-  db: D1Client,
-  now = new Date(),
-): Promise<number> {
-  const cutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-  const expiredSessions = await db
-    .select({ id: conversationSessions.id })
-    .from(conversationSessions)
-    .where(
-      and(eq(conversationSessions.status, "closed"), lte(conversationSessions.closedAt, cutoff)),
-    );
-  if (expiredSessions.length > 0) {
-    await db.delete(sessionSummaries).where(
-      inArray(
-        sessionSummaries.sessionId,
-        expiredSessions.map(({ id }) => id),
-      ),
-    );
-  }
-  const expired = await db
-    .select({ id: conversationMessages.id })
-    .from(conversationMessages)
-    .innerJoin(conversationSessions, eq(conversationMessages.sessionId, conversationSessions.id))
-    .where(
-      and(
-        eq(conversationSessions.status, "closed"),
-        lte(conversationSessions.closedAt, cutoff),
-        eq(conversationMessages.role, "assistant"),
-        isNotNull(conversationMessages.assistantBody),
-      ),
-    )
-    .orderBy(asc(conversationMessages.createdAt))
-    .limit(100);
-  if (expired.length === 0) return 0;
-  await db
-    .update(conversationMessages)
-    .set({ assistantBody: null, updatedAt: now })
-    .where(
-      inArray(
-        conversationMessages.id,
-        expired.map(({ id }) => id),
-      ),
-    );
-  return expired.length;
 }
