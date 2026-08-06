@@ -65,7 +65,7 @@ flowchart TD
     GW -->|検証結果| DO
     DO -->|受領応答・finalをretry key付きpush| LINE
     DO -->|状態と時刻| D1
-    CRON[Cron Trigger] -->|outbox再照合・復旧漏れ検出| D1
+    CRON[Cron Trigger] -->|期限切れSession終了| D1
     CRON -->|同期差分確認| V
     TQ --> DLQ[Chat Turn DLQ]
 ```
@@ -78,7 +78,7 @@ flowchart TD
 | ingest Worker | 冪等な原本保存、Account解決、Coordinator通知 | 会話順序の独自判断、AI生成 |
 | Coordinator | Account内の順序、連投集約、Session、Turn lease、外部I/Oのoutboxと締切 | 原本やBrain Itemの正本保持 |
 | generate Worker | Context構築、安全判定、prompt実行、出力検証 | Account IDや権限をモデルへ決めさせること |
-| Cron Worker | Vectorize outboxの再照合、復旧漏れ検出 | 会話順序の調停、AI生成 |
+| Cron Worker | 期限切れSessionの終了 | 会話順序の調停、AI生成、本文削除 |
 | D1 | 原本、Session、message、Brain Item、処理状態 | 会話の実行lock |
 | Vectorize | 確認済みBrain Itemの候補検索 | 認可、削除状態、確認状態の最終判定 |
 
@@ -120,16 +120,11 @@ sequenceDiagram
 
 ### 3.2 Cron Triggerの意図
 
-Cron Triggerは会話生成やBrain Item候補生成には使いません。新しいmessageが来ないAccountも含め、D1全体から期限到来データを定期的に処理するために使います。InactiveなDurable Objectは起動しているとは限らないため、この責務をDOのalarmだけに持たせません。
+Cron Triggerは会話生成やBrain Item候補生成には使いません。新しいmessageが来ないAccountも含め、D1全体から期限切れSessionを定期的に閉じるために使います。InactiveなDurable Objectは起動しているとは限らないため、この責務をDOのalarmだけに持たせません。
 
 現在は15分ごとに次を実行します。
 
-| 処理 | 対象 | 保持するもの |
-| --- | --- | --- |
-| Session終了 | 6時間無操作、または開始から24時間経過したactive Session | Session、message、Source Record |
-| 一時的な会話文脈の削除 | Session終了から24時間経過したassistant本文とSession Summary | ユーザー原文であるSource Recordと会話のメタデータ |
-
-各処理は同じ対象を再実行しても結果が変わらないよう冪等にし、assistant本文は1回あたり最大100件を処理します。本文削除のデータ境界は[4.4 `conversation_messages`](#44-conversation_messages)、Session終了との役割分担は[5.3 Session境界](#53-session境界)を正とします。
+6時間無操作、または開始から24時間経過した`active` Sessionを`closed`へ変更します。同じ対象を再実行しても結果が変わらないよう冪等にします。チャット履歴を復元できるよう、ユーザー原文とassistant本文はCronで削除しません。Session終了との役割分担は[5.3 Session境界](#53-session境界)を正とします。
 
 ## 4. D1データモデル
 
@@ -214,7 +209,7 @@ userとassistantを同じ時系列で復元するための履歴です。user原
 
 `role = user`では`source_record_id`を使い、`role = assistant`では`assistant_body`を使います。初期段階ではmessage種別を利用する表示・集計がないため`kind`は持ちません。必要になった段階で追加します。
 
-一意制約は`(channel, channel_event_id)`と`(session_id, sequence)`へ置きます。チャット履歴を復元できるよう、`assistant_body`はSession終了後も保持し、経過時間による自動削除の対象にしません。本人による会話の削除など、明示的な削除操作にはmessageのlifecycleを通して従います。
+一意制約は`(channel, channel_event_id)`と`(session_id, sequence)`へ置きます。チャット履歴を復元できるよう、`assistant_body`はSession終了後も保持し、経過時間やCronによる自動削除の対象にしません。本人による会話の削除など、明示的な削除操作にはmessageのlifecycleを通して従います。
 
 ### 4.5 `chat_turns`
 
@@ -287,20 +282,35 @@ confirmedへの変更、改訂、削除、撤回では、Brain Itemの利用可�
 
 ### 4.9 ConversationCoordinatorのローカルSQLite
 
-DOのローカルSQLiteは、D1と外部サービスをまたぐ処理の調停状態を保持します。
+DOのローカルSQLiteはAccount内の連投と生成leaseだけを調停します。会話履歴のSSoTにはせず、履歴復元はD1から行います。schemaとqueryはDrizzleのDurable SQLite driverを通します。
 
-| 状態 | 用途 |
+| table / 列 | 用途 |
 | --- | --- |
-| accepted message | event ID、任意のSource Record ID、受付時刻、予約済みSession ID・sequence、receipt状態、D1会話反映状態。event IDを一意にする |
-| coordinator state | 現在Session ID、次のsequence、generation epoch、処理中Turn ID、D1書込中outbox ID、次のdeadline |
-| pending turn | 対象message ID、generation epoch、lease、状態 |
-| outbox | D1反映、Turn Queue投入、LINE送信の意図、試行回数、次回試行時刻 |
+| `accepted_messages.event_id` | Webhook再配送を重複受付しないためのPK |
+| `accepted_messages.account_id` | 同じDOが対象とするAccount。D1保存時の所有者照合にも渡す |
+| `accepted_messages.source_record_id` | D1へ保存済みのユーザー原文を会話へ結ぶID |
+| `accepted_messages.received_at` | 連投内の順序とTurnの受付時刻 |
+| `accepted_messages.status` | `pending` → `attaching` → `attached`。D1反映途中の再開位置 |
+| `coordinator_state.singleton` | 状態行を1件に固定するPK。値は常に`1` |
+| `coordinator_state.generation_epoch` | Turn作成ごとに増加する世代番号 |
+| `local_turns.turn_id` | D1の`chat_turns.id`に対応するPK |
+| `local_turns.generation_epoch` | Queue messageとleaseの世代照合 |
+| `local_turns.status` | `pending_queue` / `queued` / `generating` / `delivered` / `failed` |
+| `local_turns.lease_token` | 生成を取得したconsumerだけが完了できる一時token |
+| `local_turns.hard_deadline_at` | 生成leaseの90秒上限。期限切れ時は再Queue投入する |
 
-RPCは最初にローカルSQLite transactionで状態とoutboxを確定してから応答します。Session選択とsequence予約も同じtransactionで行い、D1の読取後に外部I/Oを挟んで採番しません。D1書込outboxはAccount内で1件ずつdispatchし、外部I/O中に別のRPCが来ても、`D1書込中outbox ID`がある間は次の書込を開始しません。
+```mermaid
+stateDiagram-v2
+    [*] --> pending_queue: D1へTurn保存
+    pending_queue --> queued: Chat Turn Queue投入成功
+    queued --> generating: consumerがlease取得
+    generating --> queued: 一時失敗でlease解放
+    generating --> pending_queue: lease期限切れをalarmが検出
+    generating --> delivered: LINE配送完了
+    generating --> failed: 失敗案内を配送して終了
+```
 
-D1、Queue、LINEを呼び出した後は、対象行のgeneration epochとleaseが現在も一致するときだけ完了へ進めます。外部呼び出しが失敗またはDOが再起動しても、alarmが未完了outboxを再開します。D1側はevent IDと予約済みsequenceを一意制約で守り、`next_sequence`と最終時刻を単調増加する更新にします。外部側の一意キーはevent ID、Turn ID、LINE retry keyを使い、再開による重複を防ぎます。
-
-現在Sessionとnext sequenceのローカル値は調停用projectionであり、履歴のSSoTはD1です。初回起動、migration後、restore後にprojectionが未初期化なら、ローカル状態を`initializing`にしてD1とのreconciliationを1件だけ実行します。その間の受付はaccepted messageとして永続化して待たせ、D1外部I/Oを`blockConcurrencyWhile()`で囲みません。
+D1、Queue、LINEを呼び出した後は、Turn ID、generation epoch、lease tokenが現在値と一致するときだけ完了へ進めます。Queue投入前は`pending_queue`として残し、alarmから同じTurn IDを再投入します。D1側のevent ID・sequence一意制約と組み合わせ、DO再起動やQueue再配送でも履歴と応答を重複させません。
 
 ### 4.10 index
 
@@ -349,7 +359,7 @@ Coordinatorは採番直前に[体験設計の境界](../product/diary-chat-exper
 - 24時間のhard cap後のmessageは必ず新しいSessionへ入れる
 - 終了と新規Session作成をAccount単位で直列化する
 
-Durable Objectのalarmは、未完了outbox、次Turn、Session終了のうち最も早い時刻を1件だけ設定します。alarm handlerはローカルSQLiteと必要なD1行を再読込し、複数回実行されても同じ結果にします。Session終了を理由とした本文の自動削除は行いません。
+Durable Objectのalarmは、Queue未投入Turn、次Turn、生成lease期限のうち最も早い時刻を1件だけ設定します。alarm handlerはローカルSQLiteと必要なD1行を再読込し、複数回実行されても同じ結果にします。6時間無操作と24時間hard capによるSession終了は、inactiveなAccountも対象にできるCron Triggerが所有します。Session終了を理由とした本文の自動削除は行いません。
 
 ## 6. Context Package
 
@@ -548,7 +558,7 @@ system promptは次の順で固定し、Git管理する`prompt_version`を付け
 
 - Webhookの`replyToken`は一度しか使えず安全なretry keyを付けられないため、受領応答とfinalはどちらもpushで送る
 - `replyToken`はQueue、DO、D1へ渡さず、保存もlog出力もしない
-- pushは初回要求から必ず`X-Line-Retry-Key`を付ける。受領応答は先頭event ID、finalと失敗案内はTurn IDとmessage kindから、環境別Secretを用いて決定的なUUIDを作る
+- pushは初回要求から必ず`X-Line-Retry-Key`を付ける。受領応答は先頭event ID、finalと失敗案内はTurn IDと応答種別から、環境別Secretを用いて決定的なUUIDを作る
 - 連投を1Turnにした場合、1応答を対象message全件の初回返信として記録する
 - 送信直前にTurn leaseとSessionを再確認する
 
@@ -577,7 +587,7 @@ system promptは次の順で固定し、Git管理する`prompt_version`を付け
 
 ## 11. 観測と監査
 
-計測するのは各処理段階のlatency、38秒初回返信率、30秒deadline違反、90秒final率、receipt率、retry、DLQ、DO outboxの滞留時間、`delivery_unknown`、Vectorize同期遅延、明示的な削除要求の反映遅延、重複抑止、schema違反、安全route、token数、モデル別失敗率です。
+初期段階で計測するのは各処理段階のlatency、38秒初回返信率、30秒deadline違反、90秒final率、receipt率、retry、DLQ、DOの`pending_queue`滞留時間、重複抑止、schema違反、token数、モデル別失敗率です。安全性経路の集計は、保存する分類と監査要件を決めた後に追加します。
 
 logへ出せる識別子は環境、Queue message ID、Turn ID、Session IDの一方向hash、prompt version、処理段階です。Account ID、LINE user ID、reply token、日記本文、Context Package、生成本文、Brain Item本文は出しません。
 
@@ -596,6 +606,7 @@ logへ出せる識別子は環境、Queue message ID、Turn ID、Session IDの�
 - 古いgeneration epochの完了結果を保存・送信しない
 - 6時間、24時間、明示終了、日付またぎのSession境界
 - 削除、訂正、撤回後の内容がContext Packageへ入らない
+- Cronによる6時間無操作・24時間hard capのSession終了がinactiveなAccountにも適用される
 - D1 restore後に削除が再適用されるまで通常受付を再開しない
 - Vectorizeが`owner_scope`をtopK前にfilterし、他Accountの候補を返さない
 - Vectorize候補をD1再検証し、同じscope内でも利用不可のItemを除外する
@@ -626,7 +637,7 @@ prompt versionを本番へ出す条件はschema準拠100%、越権した記憶�
 
 製品ロードマップのPhaseとは分け、次の単位で進めます。
 
-1. **原本とSession**: D1 schema、冪等保存、Session境界、明示的な削除操作への追従
+1. **原本とSession**: D1 schema、冪等保存、Session境界、Cronによる期限切れSession終了、明示的な削除操作への追従
 2. **会話Coordinator**: Account単位DO、ローカルSQLite、連投、Turn state、outbox、2 QueueとDLQ
 3. **安全な通常応答**: Queue非依存のreceipt、Context、prompt、構造化出力、30秒・90秒deadline
 4. **長期会話の圧縮**: 20message超過時の文脈保持と訂正反映

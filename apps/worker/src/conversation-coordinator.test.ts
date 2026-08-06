@@ -14,9 +14,11 @@ function createCoordinator() {
       }
       const statement = sqlite.prepare(query);
       const rows = statement.reader ? (statement.all(...params) as T[]) : [];
+      const rawRows = statement.reader ? (statement.raw(true).all(...params) as unknown[][]) : [];
       if (!statement.reader) statement.run(...params);
       return {
         toArray: () => rows,
+        raw: () => ({ toArray: () => rawRows }),
         one: () => {
           const row = rows[0];
           if (!row) throw new Error("Expected one row");

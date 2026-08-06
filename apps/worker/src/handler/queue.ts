@@ -1,7 +1,6 @@
-import { d1 } from "@me-builder/lib";
 import type { MessageBatch, WebhookQueueMessage } from "@me-builder/shared";
 import { logger } from "@me-builder/shared";
-import { getWorkerConfig } from "../config";
+import { getCloudflareBindings, getWorkerConfig } from "../config";
 import { handleQueueBatch } from "../logic/webhook";
 import type { Env } from "../types";
 
@@ -11,9 +10,9 @@ export async function queueHandler(
 ): Promise<void> {
   try {
     const workerConfig = getWorkerConfig(env as unknown as Record<string, unknown>);
-    const db = d1.client.create(env.DB);
+    const cf = getCloudflareBindings(env);
     logger.info({ environment: workerConfig.environment }, "Worker queue handler triggered");
-    await handleQueueBatch(batch, db, workerConfig);
+    await handleQueueBatch(batch, cf.d1, workerConfig);
   } catch (err) {
     logger.error(
       {

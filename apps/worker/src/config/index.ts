@@ -13,6 +13,7 @@ export {
   WorkerConfigSchema,
   type WorkerConfig,
 };
+export { type CloudflareBindings, getCloudflareBindings } from "./cloudflare";
 
 /**
  * Worker アプリケーションの環境設定を取得・パースして返却します。
