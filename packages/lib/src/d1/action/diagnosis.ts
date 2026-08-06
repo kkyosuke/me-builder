@@ -77,6 +77,20 @@ export type SaveDiagnosisAnswerResult =
   | { type: "choice-not-found" }
   | { type: "answer-conflict" };
 
+export type DeferDiagnosisQuestionResult =
+  | {
+      type: "deferred";
+      outcome: "created" | "unchanged";
+      deferredQuestion: {
+        diagnosisQuestionId: string;
+        deferredAt: string;
+      };
+    }
+  | { type: "diagnosis-not-found" }
+  | { type: "diagnosis-closed" }
+  | { type: "diagnosis-question-not-found" }
+  | { type: "question-already-answered" };
+
 export type DiagnosisAnswers = Readonly<{
   id: string;
   title: string;
@@ -220,6 +234,142 @@ async function findPersistedAnswer(
       ),
     )
     .get();
+}
+
+async function findDeferredQuestion(
+  db: D1Client,
+  responseId: string,
+  diagnosisQuestionId: string,
+): Promise<{ diagnosisQuestionId: string; deferredAt: Date } | undefined> {
+  return await db
+    .select({
+      diagnosisQuestionId: diagnosisDeferredQuestions.diagnosisQuestionId,
+      deferredAt: diagnosisDeferredQuestions.deferredAt,
+    })
+    .from(diagnosisDeferredQuestions)
+    .where(
+      and(
+        eq(diagnosisDeferredQuestions.diagnosisResponseId, responseId),
+        eq(diagnosisDeferredQuestions.diagnosisQuestionId, diagnosisQuestionId),
+        eq(diagnosisDeferredQuestions.isDeleted, false),
+      ),
+    )
+    .get();
+}
+
+function deferredResult(
+  deferredQuestion: { diagnosisQuestionId: string; deferredAt: Date },
+  outcome: "created" | "unchanged",
+): DeferDiagnosisQuestionResult {
+  return {
+    type: "deferred",
+    outcome,
+    deferredQuestion: {
+      diagnosisQuestionId: deferredQuestion.diagnosisQuestionId,
+      deferredAt: deferredQuestion.deferredAt.toISOString(),
+    },
+  };
+}
+
+/** 受付中Diagnosisの未回答の1問を、再送可能な「あとで回答」として保存します。 */
+export async function deferDiagnosisQuestion(
+  db: D1Client,
+  input: {
+    accountId: string;
+    diagnosisId: string;
+    diagnosisQuestionId: string;
+    at: Date;
+  },
+): Promise<DeferDiagnosisQuestionResult> {
+  const diagnosis = await db
+    .select({
+      state: diagnoses.state,
+      opensAt: diagnoses.opensAt,
+      closesAt: diagnoses.closesAt,
+      isDeleted: diagnoses.isDeleted,
+    })
+    .from(diagnoses)
+    .where(eq(diagnoses.id, input.diagnosisId))
+    .get();
+  if (
+    !diagnosis ||
+    diagnosis.isDeleted ||
+    diagnosis.state !== "published" ||
+    diagnosis.opensAt.getTime() > input.at.getTime()
+  ) {
+    return { type: "diagnosis-not-found" };
+  }
+  if (diagnosis.closesAt && diagnosis.closesAt.getTime() <= input.at.getTime()) {
+    return { type: "diagnosis-closed" };
+  }
+
+  const diagnosisQuestion = await db
+    .select({ id: diagnosisQuestions.id })
+    .from(diagnosisQuestions)
+    .where(
+      and(
+        eq(diagnosisQuestions.id, input.diagnosisQuestionId),
+        eq(diagnosisQuestions.diagnosisId, input.diagnosisId),
+        eq(diagnosisQuestions.isDeleted, false),
+      ),
+    )
+    .get();
+  if (!diagnosisQuestion) {
+    return { type: "diagnosis-question-not-found" };
+  }
+
+  const observedResponseId = await findDiagnosisResponseId(db, input.accountId, input.diagnosisId);
+  if (observedResponseId) {
+    if (await findPersistedAnswer(db, observedResponseId, input.diagnosisQuestionId)) {
+      return { type: "question-already-answered" };
+    }
+    const existing = await findDeferredQuestion(db, observedResponseId, input.diagnosisQuestionId);
+    if (existing) {
+      return deferredResult(existing, "unchanged");
+    }
+  }
+
+  const responseId = observedResponseId ?? crypto.randomUUID();
+  const deferredAt = new Date(Math.floor(input.at.getTime() / 1000) * 1000);
+  const deferredQuestion = { diagnosisQuestionId: diagnosisQuestion.id, deferredAt };
+  try {
+    await db.batch([
+      db
+        .insert(diagnosisResponses)
+        .values({ id: responseId, accountId: input.accountId, diagnosisId: input.diagnosisId })
+        .onConflictDoNothing(),
+      db.insert(diagnosisDeferredQuestions).values({
+        id: crypto.randomUUID(),
+        diagnosisResponseId: responseId,
+        diagnosisQuestionId: diagnosisQuestion.id,
+        deferredAt,
+      }),
+    ]);
+  } catch (error) {
+    if (!isUniqueViolation(error)) {
+      throw error;
+    }
+    const concurrentResponseId = await findDiagnosisResponseId(
+      db,
+      input.accountId,
+      input.diagnosisId,
+    );
+    if (concurrentResponseId) {
+      if (await findPersistedAnswer(db, concurrentResponseId, input.diagnosisQuestionId)) {
+        return { type: "question-already-answered" };
+      }
+      const concurrent = await findDeferredQuestion(
+        db,
+        concurrentResponseId,
+        input.diagnosisQuestionId,
+      );
+      if (concurrent) {
+        return deferredResult(concurrent, "unchanged");
+      }
+    }
+    throw error;
+  }
+  return deferredResult(deferredQuestion, "created");
 }
 
 async function buildSaveResult(

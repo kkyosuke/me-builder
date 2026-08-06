@@ -89,6 +89,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/diagnoses/{diagnosisId}/deferred-questions/{diagnosisQuestionId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** 診断の未回答の1問をあとで回答として保存する */
+    put: operations["deferDiagnosisQuestion"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/dev/diagnosis-data": {
     parameters: {
       query?: never;
@@ -626,6 +643,129 @@ export interface operations {
             error: "Invalid answer";
             /** @enum {string} */
             reason: "diagnosis_question_not_found" | "choice_not_found";
+          };
+        };
+      };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
+          };
+        };
+      };
+      /** @description D1 bindingが設定されていない */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Service Unavailable";
+          };
+        };
+      };
+    };
+  };
+  deferDiagnosisQuestion: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        diagnosisId: string;
+        diagnosisQuestionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 保存済みの延期操作 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @enum {string} */
+            outcome: "created" | "unchanged";
+            deferredQuestion: {
+              diagnosisQuestionId: string;
+              /** Format: date-time */
+              deferredAt: string;
+            };
+          };
+        };
+      };
+      /** @description LIFF IDトークンを検証できない */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Unauthorized";
+          };
+        };
+      };
+      /** @description 対応するAccountがない、またはDiagnosisが公開されていない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | {
+                /** @constant */
+                error: "Account not found";
+                /** @constant */
+                reason: "friendship_required";
+              }
+            | {
+                /** @constant */
+                error: "Diagnosis not found";
+                /** @constant */
+                reason: "diagnosis_not_found";
+              };
+        };
+      };
+      /** @description 受付終了、または対象の質問へ回答済み */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | {
+                /** @constant */
+                error: "Diagnosis closed";
+                /** @constant */
+                reason: "diagnosis_closed";
+              }
+            | {
+                /** @constant */
+                error: "Question already answered";
+                /** @constant */
+                reason: "question_already_answered";
+              };
+        };
+      };
+      /** @description Diagnosis Questionが不正 */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Invalid deferred question";
+            /** @constant */
+            reason: "diagnosis_question_not_found";
           };
         };
       };

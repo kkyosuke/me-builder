@@ -6,6 +6,7 @@ import {
   ValidationError,
 } from "../../../infrastructure/errors";
 import {
+  deferDiagnosisQuestion,
   fetchDiagnosisDefinition,
   fetchDiagnosisList,
   fetchDiagnosisProgress,
@@ -183,6 +184,56 @@ describe("saveDiagnosisAnswer", () => {
     try {
       await saveDiagnosisAnswer(API_URL, "token", "diagnosis", "sq", "yes");
       throw new Error("回答保存が成功してしまいました");
+    } catch (error) {
+      expect(error).toBeInstanceOf(ErrorType);
+      expect(error).toMatchObject({ code, status });
+    }
+  });
+});
+
+describe("deferDiagnosisQuestion", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("BearerトークンでPUTし、延期結果を返す", async () => {
+    const deferred = {
+      outcome: "created",
+      deferredQuestion: {
+        diagnosisQuestionId: "dq-1",
+        deferredAt: "2026-08-06T00:00:00.000Z",
+      },
+    };
+    const fetchMock = vi.fn(async () => Response.json(deferred));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      deferDiagnosisQuestion(API_URL, "dummy.id.token", "relationship-priority", "dq-1"),
+    ).resolves.toEqual(deferred);
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${API_URL}/api/diagnoses/relationship-priority/deferred-questions/dq-1`,
+      {
+        method: "PUT",
+        headers: { Authorization: "Bearer dummy.id.token" },
+      },
+    );
+  });
+
+  it.each([
+    [401, undefined, AuthenticationError, "AUTHENTICATION_REQUIRED"],
+    [404, undefined, OperationError, "DIAGNOSIS_UNAVAILABLE"],
+    [409, { reason: "diagnosis_closed" }, OperationError, "DIAGNOSIS_CLOSED"],
+    [409, { reason: "question_already_answered" }, OperationError, "ANSWER_CONFLICT"],
+    [422, undefined, ValidationError, "INVALID_DIAGNOSIS_QUESTION"],
+    [500, undefined, UnknownError, "DIAGNOSIS_DEFER_REQUEST_FAILED"],
+  ] as const)("HTTP %sをcode %sへ変換する", async (status, body, ErrorType, code) => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => (body ? Response.json(body, { status }) : new Response(null, { status }))),
+    );
+    try {
+      await deferDiagnosisQuestion(API_URL, "token", "diagnosis", "dq-1");
+      throw new Error("あとで回答の保存が成功してしまいました");
     } catch (error) {
       expect(error).toBeInstanceOf(ErrorType);
       expect(error).toMatchObject({ code, status });

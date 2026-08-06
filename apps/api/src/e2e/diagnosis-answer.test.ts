@@ -96,6 +96,17 @@ async function getAnswers(diagnosisId = "relationship-priority"): Promise<Respon
   );
 }
 
+async function deferQuestion(
+  diagnosisQuestionId: string,
+  diagnosisId = "relationship-priority",
+): Promise<Response> {
+  return app.request(
+    `/api/diagnoses/${diagnosisId}/deferred-questions/${diagnosisQuestionId}`,
+    { method: "PUT", headers: { Authorization: "Bearer known-token" } },
+    env(),
+  );
+}
+
 async function deleteDiagnosisData(environment: string | undefined): Promise<Response> {
   const { ENVIRONMENT: _, ...baseEnv } = env();
   return app.request(
@@ -124,7 +135,13 @@ async function listRelationshipDiagnosis(): Promise<{
   return diagnosis;
 }
 
-async function countRows(table: "diagnosis_responses" | "source_records" | "diagnosis_answers") {
+async function countRows(
+  table:
+    | "diagnosis_responses"
+    | "source_records"
+    | "diagnosis_answers"
+    | "diagnosis_deferred_questions",
+) {
   const result = await database.prepare(`SELECT COUNT(*) AS count FROM ${table}`).first<{
     count: number;
   }>();
@@ -163,6 +180,34 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
     expect(await countRows("diagnosis_responses")).toBe(1);
     expect(await countRows("source_records")).toBe(1);
     expect(await countRows("diagnosis_answers")).toBe(1);
+  });
+
+  it("あとで回答を冪等に保存し、同じ質問への回答時に延期を解消する", async () => {
+    const responses = await Promise.all([
+      deferQuestion("dq-relationship-priority-01"),
+      deferQuestion("dq-relationship-priority-01"),
+    ]);
+    expect(responses.map(({ status }) => status)).toEqual([200, 200]);
+    const bodies = (await Promise.all(responses.map((response) => response.json()))) as Array<{
+      outcome: string;
+      deferredQuestion: { deferredAt: string };
+    }>;
+    expect(bodies.map(({ outcome }) => outcome).sort()).toEqual(["created", "unchanged"]);
+    expect(
+      new Set(bodies.map(({ deferredQuestion }) => deferredQuestion.deferredAt)),
+    ).toHaveProperty("size", 1);
+    expect(await countRows("diagnosis_deferred_questions")).toBe(1);
+    expect(await countRows("diagnosis_answers")).toBe(0);
+    expect(await listRelationshipDiagnosis()).toMatchObject({
+      responseStatus: "unanswered",
+      answeredCount: 0,
+    });
+
+    expect((await putAnswer("dq-relationship-priority-01")).status).toBe(200);
+    const activeDeferred = await database
+      .prepare("SELECT COUNT(*) AS count FROM diagnosis_deferred_questions WHERE is_deleted = 0")
+      .first<{ count: number }>();
+    expect(activeDeferred?.count).toBe(0);
   });
 
   it(`${diagnosisAnswerCases.idempotentRetry.id}: ${diagnosisAnswerCases.idempotentRetry.name}`, async () => {

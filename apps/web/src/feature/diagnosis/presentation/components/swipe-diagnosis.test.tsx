@@ -60,6 +60,7 @@ describe("SwipeDiagnosis answer persistence", () => {
         ]}
         onBack={vi.fn()}
         onSaveAnswer={onSaveAnswer}
+        onDeferQuestion={vi.fn()}
         onComplete={onComplete}
       />,
     );
@@ -82,6 +83,7 @@ describe("SwipeDiagnosis answer persistence", () => {
         diagnosis={twoQuestionDiagnosis}
         onBack={vi.fn()}
         onSaveAnswer={onSaveAnswer}
+        onDeferQuestion={vi.fn()}
         onComplete={vi.fn()}
       />,
     );
@@ -113,6 +115,7 @@ describe("SwipeDiagnosis answer persistence", () => {
         diagnosis={diagnosis}
         onBack={vi.fn()}
         onSaveAnswer={onSaveAnswer}
+        onDeferQuestion={vi.fn()}
         onComplete={onComplete}
       />,
     );
@@ -143,6 +146,7 @@ describe("SwipeDiagnosis answer persistence", () => {
         diagnosis={diagnosis}
         onBack={vi.fn()}
         onSaveAnswer={onSaveAnswer}
+        onDeferQuestion={vi.fn()}
         onComplete={onComplete}
       />,
     );
@@ -159,20 +163,46 @@ describe("SwipeDiagnosis answer persistence", () => {
     expect(onComplete).toHaveBeenCalledOnce();
   });
 
-  it("あとで回答が残る場合は回答結果への遷移を通知しない", async () => {
+  it("あとで回答を保存し、成功後は一覧へ戻る", async () => {
     const onComplete = vi.fn();
+    const onBack = vi.fn();
+    const onDeferQuestion = vi.fn().mockResolvedValue(undefined);
     render(
       <SwipeDiagnosis
         diagnosis={diagnosis}
-        onBack={vi.fn()}
+        onBack={onBack}
         onSaveAnswer={vi.fn()}
+        onDeferQuestion={onDeferQuestion}
         onComplete={onComplete}
       />,
     );
 
     fireEvent.click(screen.getByRole("button", { name: "あとで回答する" }));
 
-    expect(await screen.findByText("今回の回答はここまでです")).toBeTruthy();
+    await waitFor(() => expect(onDeferQuestion).toHaveBeenCalledWith("dq-1"));
+    // 実際の親は保存成功時に画面を閉じるため、完了表示へは進まない。
     expect(onComplete).not.toHaveBeenCalled();
+  });
+
+  it("あとで回答の保存失敗時は同じ質問の操作を再試行できる", async () => {
+    const onDeferQuestion = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("通信失敗"))
+      .mockResolvedValueOnce(undefined);
+    render(
+      <SwipeDiagnosis
+        diagnosis={diagnosis}
+        onBack={vi.fn()}
+        onSaveAnswer={vi.fn()}
+        onDeferQuestion={onDeferQuestion}
+        onComplete={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "あとで回答する" }));
+    expect((await screen.findByRole("alert")).textContent).toContain("保存できませんでした");
+
+    fireEvent.click(screen.getByRole("button", { name: "あとで回答する" }));
+    await waitFor(() => expect(onDeferQuestion).toHaveBeenCalledTimes(2));
   });
 });

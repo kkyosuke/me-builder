@@ -6,6 +6,7 @@ import * as v from "valibot";
 import { getConfig } from "./config";
 import { saveDiagnosisAnswerRoute } from "./contract/diagnosis/answer";
 import { diagnosisAnswersRoute } from "./contract/diagnosis/answers";
+import { deferDiagnosisQuestionRoute } from "./contract/diagnosis/deferred-question";
 import { diagnosisDetailRoute } from "./contract/diagnosis/detail";
 import { resetDevelopmentDiagnosisDataRoute } from "./contract/diagnosis/dev-reset";
 import { diagnosisListRoute } from "./contract/diagnosis/list";
@@ -18,6 +19,7 @@ import {
   getDiagnosis,
   getDiagnosisAnswerContents,
   putDiagnosisAnswer,
+  putDiagnosisDeferredQuestion,
 } from "./controller/diagnosis";
 import { postLiffSession, postLineWebhook } from "./controller/line";
 import type { AppEnv } from "./types";
@@ -71,6 +73,11 @@ app.put(
   "/api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId",
   saveDiagnosisAnswerRoute,
   putDiagnosisAnswer,
+);
+app.put(
+  "/api/diagnoses/:diagnosisId/deferred-questions/:diagnosisQuestionId",
+  deferDiagnosisQuestionRoute,
+  putDiagnosisDeferredQuestion,
 );
 app.delete(
   "/api/dev/diagnosis-data",

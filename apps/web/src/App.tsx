@@ -58,6 +58,7 @@ export function App() {
           initialAnswers={detailContent.initialAnswers}
           onBack={detail.close}
           onSaveAnswer={detail.saveAnswer}
+          onDeferQuestion={detail.deferQuestion}
           onComplete={() => void detail.openCompletedResult()}
         />
       );

@@ -15,6 +15,11 @@ import {
   DiagnosisAnswersResponseSchema,
 } from "../contract/diagnosis/answers";
 import {
+  DeferDiagnosisQuestionResponseSchema,
+  InvalidDeferredQuestionErrorSchema,
+  QuestionAlreadyAnsweredErrorSchema,
+} from "../contract/diagnosis/deferred-question";
+import {
   DiagnosisClosedErrorSchema,
   DiagnosisDetailResponseSchema,
   DiagnosisNotFoundErrorSchema,
@@ -32,6 +37,7 @@ import {
 import { resetDevelopmentDiagnosisData } from "../logic/dev-diagnosis-reset";
 import { saveDiagnosisAnswer } from "../logic/diagnosis-answer";
 import { getDiagnosisAnswers } from "../logic/diagnosis-answers";
+import { deferDiagnosisQuestion } from "../logic/diagnosis-deferred-question";
 import { getDiagnosisDetail } from "../logic/diagnosis-detail";
 import { getDiagnosisList } from "../logic/diagnosis-list";
 import type { AppEnv } from "../types";
@@ -186,6 +192,70 @@ export async function putDiagnosisAnswer(c: Context<AppEnv>): Promise<Response> 
         v.parse(AnswerConflictErrorSchema, {
           error: "Answer already exists",
           reason: "answer_change_requires_revision",
+        }),
+        409,
+      );
+    case "account-not-found":
+      return c.json(
+        v.parse(AccountNotFoundErrorSchema, {
+          error: "Account not found",
+          reason: "friendship_required",
+        }),
+        404,
+      );
+    case "not-configured":
+    case "unauthenticated":
+      return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
+  }
+}
+
+/** `PUT /api/diagnoses/:diagnosisId/deferred-questions/:diagnosisQuestionId` — 延期を保存する。 */
+export async function putDiagnosisDeferredQuestion(c: Context<AppEnv>): Promise<Response> {
+  if (!c.env?.DB) {
+    logger.error({ path: c.req.path }, "DB binding is not configured");
+    return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
+  }
+
+  const outcome = await deferDiagnosisQuestion({
+    diagnosisId: c.req.param("diagnosisId") ?? "",
+    diagnosisQuestionId: c.req.param("diagnosisQuestionId") ?? "",
+    idToken: bearerToken(c.req.header("authorization")),
+    lineLoginChannelId: getConfig(c.env).lineLoginChannelId,
+    db: d1.client.create(c.env.DB),
+  });
+
+  switch (outcome.type) {
+    case "deferred":
+      return c.json(v.parse(DeferDiagnosisQuestionResponseSchema, outcome));
+    case "diagnosis-not-found":
+      return c.json(
+        v.parse(DiagnosisNotFoundErrorSchema, {
+          error: "Diagnosis not found",
+          reason: "diagnosis_not_found",
+        }),
+        404,
+      );
+    case "diagnosis-closed":
+      return c.json(
+        v.parse(DiagnosisClosedErrorSchema, {
+          error: "Diagnosis closed",
+          reason: "diagnosis_closed",
+        }),
+        409,
+      );
+    case "diagnosis-question-not-found":
+      return c.json(
+        v.parse(InvalidDeferredQuestionErrorSchema, {
+          error: "Invalid deferred question",
+          reason: "diagnosis_question_not_found",
+        }),
+        422,
+      );
+    case "question-already-answered":
+      return c.json(
+        v.parse(QuestionAlreadyAnsweredErrorSchema, {
+          error: "Question already answered",
+          reason: "question_already_answered",
         }),
         409,
       );

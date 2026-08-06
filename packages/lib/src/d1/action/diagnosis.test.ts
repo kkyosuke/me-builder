@@ -7,12 +7,106 @@ import { describe, expect, it } from "vitest";
 import type { D1Client } from "../client";
 import * as schema from "../schema";
 import {
+  deferDiagnosisQuestion,
   deleteAccountDiagnosisData,
   findDiagnosisAnswers,
   findOpenDiagnosisDetail,
   listVisibleDiagnoses,
   saveDiagnosisAnswer,
 } from "./diagnosis";
+
+describe("deferDiagnosisQuestion", () => {
+  it("未回答の質問を保存し、再送時は初回の時刻を保つ", async () => {
+    const db = createTestDb();
+    await db.insert(schema.accounts).values({ id: "defer-account" });
+    await insertDiagnosis(db, { id: "defer-target" });
+    const input = {
+      accountId: "defer-account",
+      diagnosisId: "defer-target",
+      diagnosisQuestionId: "defer-target-sq1",
+      at: new Date("2026-08-06T00:00:00.987Z"),
+    };
+
+    await expect(deferDiagnosisQuestion(db, input)).resolves.toEqual({
+      type: "deferred",
+      outcome: "created",
+      deferredQuestion: {
+        diagnosisQuestionId: "defer-target-sq1",
+        deferredAt: "2026-08-06T00:00:00.000Z",
+      },
+    });
+    await expect(
+      deferDiagnosisQuestion(db, { ...input, at: new Date("2026-08-06T01:00:00Z") }),
+    ).resolves.toEqual({
+      type: "deferred",
+      outcome: "unchanged",
+      deferredQuestion: {
+        diagnosisQuestionId: "defer-target-sq1",
+        deferredAt: "2026-08-06T00:00:00.000Z",
+      },
+    });
+
+    const records = await db.select().from(schema.diagnosisDeferredQuestions);
+    expect(records).toHaveLength(1);
+  });
+
+  it("回答済みの質問は延期せず、回答保存は既存の延期を解消する", async () => {
+    const db = createTestDb();
+    await db.insert(schema.accounts).values({ id: "defer-answer-account" });
+    await insertDiagnosis(db, { id: "defer-answer-target" });
+    const base = {
+      accountId: "defer-answer-account",
+      diagnosisId: "defer-answer-target",
+      diagnosisQuestionId: "defer-answer-target-sq1",
+      at: new Date("2026-08-06T00:00:00Z"),
+    };
+
+    await deferDiagnosisQuestion(db, base);
+    await saveDiagnosisAnswer(db, { ...base, choiceId: "yes" });
+    await expect(
+      deferDiagnosisQuestion(db, { ...base, at: new Date("2026-08-06T01:00:00Z") }),
+    ).resolves.toEqual({ type: "question-already-answered" });
+
+    const active = await db
+      .select()
+      .from(schema.diagnosisDeferredQuestions)
+      .where(eq(schema.diagnosisDeferredQuestions.isDeleted, false));
+    expect(active).toHaveLength(0);
+  });
+
+  it("公開状態・受付期間・Diagnosis Questionを検証する", async () => {
+    const db = createTestDb();
+    await db.insert(schema.accounts).values({ id: "defer-validation-account" });
+    await insertDiagnosis(db, {
+      id: "defer-closed",
+      closesAt: new Date("2026-08-05T00:00:00Z"),
+    });
+    const base = {
+      accountId: "defer-validation-account",
+      diagnosisId: "defer-closed",
+      diagnosisQuestionId: "defer-closed-sq1",
+      at: new Date("2026-08-06T00:00:00Z"),
+    };
+
+    await expect(deferDiagnosisQuestion(db, base)).resolves.toEqual({
+      type: "diagnosis-closed",
+    });
+    await expect(
+      deferDiagnosisQuestion(db, {
+        ...base,
+        diagnosisId: "missing",
+      }),
+    ).resolves.toEqual({ type: "diagnosis-not-found" });
+    await expect(
+      deferDiagnosisQuestion(db, {
+        ...base,
+        diagnosisId: "defer-closed",
+        diagnosisQuestionId: "missing",
+        at: new Date("2026-08-04T00:00:00Z"),
+      }),
+    ).resolves.toEqual({ type: "diagnosis-question-not-found" });
+  });
+});
 
 type DbExecutionObserver = {
   onBatch?: () => void;
