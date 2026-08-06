@@ -33,13 +33,15 @@
 | 関心 | 採用する仕組み | 理由 |
 | --- | --- | --- |
 | 原本と利用可否のSSoT | D1 | Source Record、Brain Item、権限、削除状態を一貫して判定するため |
-| Account内の会話順序 | Durable Object | 連投、応答中の追加発言、Session境界を直列化するため |
+| Account内の会話順序 | Durable ObjectのローカルSQLite | 連投、応答中の追加発言、Session境界、外部I/O前後の状態遷移をAccount単位で調停するため |
 | 非同期配送と再試行 | Cloudflare Queues | Webhook受付とAI生成を分離するため |
 | LLM呼び出し | AI Gateway経由のGemini | 既存経路を維持し、本文なしで利用量と遅延を観測するため |
-| 意味検索 | Vectorize | 確認済みBrain Itemの関連候補を絞るため |
+| 意味検索 | Vectorize | Accountを仮名化した検索scope内で、確認済みBrain Itemの関連候補を絞るため |
 | 原文取得 | D1 | Access Policyと削除状態を最終判定するため |
 
-Durable Objectは`ConversationCoordinator`とし、`accountId`から決定的に1インスタンスを選びます。全Accountを1つのObjectへ集約しません。Objectには未処理message ID、処理中Turn、返信締切だけを置き、日記本文やBrain ItemのSSoTにはしません。
+Durable Objectは`ConversationCoordinator`とし、`accountId`から決定的に1インスタンスを選びます。全Accountを1つのObjectへ集約しません。ObjectのローカルSQLiteには未処理message ID、処理中Turn、世代番号、outbox、締切を永続化します。日記本文やBrain ItemのSSoTにはしません。
+
+DOが直列化するのはローカルSQLite上の状態遷移です。D1、Queue、LINE、AI Gatewayなどの外部I/Oを`await`している間まで自動的に直列化・transaction化されるとは扱いません。外部I/Oの前に意図をローカルSQLiteへ確定し、完了後に同じ世代番号を確認して結果を反映します。`blockConcurrencyWhile()`はschema初期化に限り、D1やAI呼び出しを囲みません。
 
 Cloudflare Agents SDKは最初の実装では採用しません。LINEはWebhookとPushによる非同期チャネルであり、WebSocket同期状態や別のメッセージストアを加えるとD1との二重管理になります。Webチャット、再開可能なstreaming、複雑なscheduleが必要になった時点で再評価します。
 
@@ -48,7 +50,8 @@ Cloudflare Agents SDKは最初の実装では採用しません。LINEはWebhook
 ```mermaid
 flowchart TD
     LINE[LINE Messaging API] --> API[API Worker]
-    API -->|署名検証・受付| WQ[Webhook Queue]
+    API -->|Account解決・RPC: receipt予約| DO
+    API -->|日記eventはreplyTokenを除外して投入| WQ[Webhook Queue]
     API -.->|待機表示| LINE
     WQ --> IW[Queue Worker: ingest]
     IW -->|原本保存・Account解決| D1[(D1)]
@@ -60,8 +63,10 @@ flowchart TD
     GW -->|本文ログ無効| AIG[AI Gateway]
     AIG --> GEMINI[Gemini]
     GW -->|検証結果| DO
-    DO -->|reply または push| LINE
+    DO -->|受領応答・finalをretry key付きpush| LINE
     DO -->|状態と時刻| D1
+    CRON[Cron Trigger] -->|期限削除・outbox再照合| D1
+    CRON -->|同期差分確認| V
     TQ --> DLQ[Chat Turn DLQ]
 ```
 
@@ -69,10 +74,11 @@ flowchart TD
 
 | コンポーネント | 行うこと | 行わないこと |
 | --- | --- | --- |
-| API Worker | LINE署名検証、event ID付与、待機表示、Queue投入 | 本文解釈、Session更新、AI呼び出し |
+| API Worker | LINE署名検証、event ID付与、決定的なcommand routing、Account解決、日記の受領応答予約、待機表示、Queue投入 | 日記本文の意味解釈、Session更新、AI呼び出し |
 | ingest Worker | 冪等な原本保存、Account解決、Coordinator通知 | 会話順序の独自判断、AI生成 |
-| Coordinator | Account内の順序、連投集約、Session、Turn lease、返信締切 | 原本やBrain Itemの正本保持 |
+| Coordinator | Account内の順序、連投集約、Session、Turn lease、外部I/Oのoutboxと締切 | 原本やBrain Itemの正本保持 |
 | generate Worker | Context構築、安全判定、prompt実行、出力検証 | Account IDや権限をモデルへ決めさせること |
+| Cron Worker | 期限削除、Vectorize outboxの再照合、復旧漏れ検出 | 会話順序の調停、AI生成 |
 | D1 | 原本、Session、message、Brain Item、処理状態 | 会話の実行lock |
 | Vectorize | 確認済みBrain Itemの候補検索 | 認可、削除状態、確認状態の最終判定 |
 
@@ -98,6 +104,7 @@ erDiagram
     source_records ||--|| source_record_text_payloads : stores
     source_records ||--o| conversation_messages : appears_as
     accounts ||--o{ brain_items : owns
+    brain_items ||--o{ vector_index_jobs : indexes
     brain_items ||--o{ brain_item_evidence_edges : has
     source_records ||--o{ brain_item_evidence_edges : evidence
     brain_items ||--o{ brain_item_confirmations : receives
@@ -116,7 +123,7 @@ erDiagram
 | `content_hash` | text | 破損検知用。検索や本人識別には使わない |
 | `created_at` | integer | 受付時刻 |
 
-削除時は同じD1 batch内でpayload行を物理削除し、`source_records`をtombstoneへ更新します。参照関係は残しますが本文は残しません。
+削除時は同じD1 batch内でpayload行を物理削除し、`source_records`をtombstoneへ更新します。参照関係は残しますが本文は残しません。ここでいう物理削除は稼働中DBからの削除を指します。D1 Time Travelの管理下にある復旧履歴はproviderの保持期間まで残り得るため、利用者向けの保存説明では区別します。Time Travel restoreはmaintenance modeで行い、restore前に現行DBから暗号化した削除対象IDのrepair manifestを一時退避し、restore直後に削除を再適用して検証してから通常受付を再開します。manifestは復旧確認後に削除します。
 
 ### 4.3 `conversation_sessions`
 
@@ -146,7 +153,7 @@ erDiagram
 | `turn_id` | assistant応答を生成したTurn |
 | `sent_at`, `created_at` | 送信要求受理時刻と作成時刻 |
 
-一意制約は`(channel, channel_event_id)`と`(session_id, sequence)`へ置きます。`assistant_body`とSession SummaryはSession終了後24時間を過ぎ、処理中Turnがないことを確認して物理削除します。ユーザー原文であるSource Recordは含めません。
+一意制約は`(channel, channel_event_id)`と`(session_id, sequence)`へ置きます。`assistant_body`とSession SummaryはSession終了後24時間を過ぎ、処理中Turnがないことを確認して物理削除します。ユーザー原文であるSource Recordは含めません。削除はinactiveなDOのalarmに依存させず、Cron Triggerが期限到来行を小分けに処理します。処理は冪等にし、削除期限超過件数と最古の超過時間を監視します。
 
 ### 4.5 `session_summaries`
 
@@ -167,7 +174,7 @@ erDiagram
 | --- | --- |
 | `id`, `session_id` | PKとSession FK。IDはQueue冪等キーにも使う |
 | `from_sequence`, `through_sequence` | 対象user message範囲 |
-| `status` | `queued` / `generating` / `validated` / `delivery_started` / `delivered` / `failed` |
+| `status` | `queued` / `generating` / `validated` / `delivery_pending` / `delivered` / `delivery_unknown` / `failed` |
 | `prompt_version`, `model`, `safety_route` | 実行構成。本文を含めない |
 | `attempt_count`, `failure_stage` | 再試行と失敗箇所 |
 | `received_at`, `generation_started_at` | 受付と生成開始 |
@@ -179,13 +186,46 @@ prompt本文、Context Package、未検証のモデル出力は保存しませ�
 
 ### 4.7 Brain Item関連
 
-`brain_items`は`id`、`account_id`、`category`、本人が確認できる`statement`、分類固有の`attributes_json`、`derivation`、`confirmation`、`status`、有効期間、`stability`、Access Policy、nullableな`confidence`、lifecycleを持ちます。
+`brain_items`は`id`、`account_id`、`category`、本人が確認できる`statement`、分類固有の`attributes_json`、`derivation`、`confirmation`、`status`、有効期間、`stability`、Access Policy、`confidence_json`、lifecycleを持ちます。`confidence_json`自体は必須とし、算出前は`{"state":"uncomputed"}`、後続設計で算出できるようになった後だけ`{"state":"computed","value":...}`を保存します。
 
 `brain_item_evidence_edges`はBrain ItemとSource Recordを結び、relation、evidence role、derivation methodを保持します。`brain_item_confirmations`は本人の確認、却下、再確認を追記し、`brain_items.confirmation`を現在値として更新します。`brain_item_revisions`は置き換え前後を結びます。
 
-AI候補は`confirmation = pending`としてのみ保存し、助言やVectorize検索には使いません。本人が確認したときだけ`confirmed`へ更新し、Vectorizeへ非同期投入します。Confidenceの算出方法はこの設計では決めず、未算出値を検索順位に使いません。
+AI候補は`confirmation = pending`としてのみ保存し、助言やVectorize検索には使いません。本人が確認したときだけ`confirmed`へ更新し、同じD1 batchでVectorize同期jobをoutboxへ追加します。Confidenceの算出方法はこの設計では決めず、`uncomputed`を検索順位に使いません。
 
-### 4.8 index
+### 4.8 `vector_index_jobs`
+
+Vectorizeは非同期更新であるため、D1を正とするoutboxを置きます。
+
+| 列 | 用途 |
+| --- | --- |
+| `id`, `brain_item_id`, `item_revision` | PK、対象Item、更新版 |
+| `operation` | `upsert` / `delete` |
+| `owner_scope` | Account IDを直接含まない検索scope |
+| `status` | `pending` / `submitted` / `applied` / `failed` |
+| `mutation_id` | Vectorizeが返した非同期mutation ID |
+| `attempt_count`, `next_attempt_at`, `failure_code` | retry管理。本文を含めない |
+| `created_at`, `updated_at` | lifecycle |
+
+confirmedへの変更、改訂、削除、撤回では、Brain Itemの利用可否変更とjob追加を同じD1 batchで確定します。Queue consumerはItem ID、revision、operationを使って冪等にupsertまたはdeleteし、mutation IDを保存します。Cron Triggerは長時間`pending` / `submitted`のjobとD1・Vectorize間の差分を再照合し、DLQから復旧します。削除時はD1で先に利用不可にするため、Vectorizeに古いvectorが残る間も検索後のD1再認可で利用されません。
+
+### 4.9 ConversationCoordinatorのローカルSQLite
+
+DOのローカルSQLiteは、D1と外部サービスをまたぐ処理の調停状態を保持します。
+
+| 状態 | 用途 |
+| --- | --- |
+| accepted message | event ID、任意のSource Record ID、受付時刻、予約済みSession ID・sequence、receipt状態、D1会話反映状態。event IDを一意にする |
+| coordinator state | 現在Session ID、次のsequence、generation epoch、処理中Turn ID、D1書込中outbox ID、次のdeadline |
+| pending turn | 対象message ID、generation epoch、lease、状態 |
+| outbox | D1反映、Turn Queue投入、LINE送信の意図、試行回数、次回試行時刻 |
+
+RPCは最初にローカルSQLite transactionで状態とoutboxを確定してから応答します。Session選択とsequence予約も同じtransactionで行い、D1の読取後に外部I/Oを挟んで採番しません。D1書込outboxはAccount内で1件ずつdispatchし、外部I/O中に別のRPCが来ても、`D1書込中outbox ID`がある間は次の書込を開始しません。
+
+D1、Queue、LINEを呼び出した後は、対象行のgeneration epochとleaseが現在も一致するときだけ完了へ進めます。外部呼び出しが失敗またはDOが再起動しても、alarmが未完了outboxを再開します。D1側はevent IDと予約済みsequenceを一意制約で守り、`next_sequence`と最終時刻を単調増加する更新にします。外部側の一意キーはevent ID、Turn ID、LINE retry keyを使い、再開による重複を防ぎます。
+
+現在Sessionとnext sequenceのローカル値は調停用projectionであり、履歴のSSoTはD1です。初回起動、migration後、restore後にprojectionが未初期化なら、ローカル状態を`initializing`にしてD1とのreconciliationを1件だけ実行します。その間の受付はaccepted messageとして永続化して待たせ、D1外部I/Oを`blockConcurrencyWhile()`で囲みません。
+
+### 4.10 index
 
 - `conversation_sessions(account_id, status)`
 - `source_records(account_id, original_ref)` unique where `original_ref` is not null
@@ -194,23 +234,34 @@ AI候補は`confirmation = pending`としてのみ保存し、助言やVectorize
 - `chat_turns(status, created_at)`と`chat_turns(session_id, through_sequence)`
 - `brain_items(account_id, confirmation, status, category)`
 - `brain_item_evidence_edges(brain_item_id)`と`(source_record_id)`
+- `vector_index_jobs(status, next_attempt_at)`と`(brain_item_id, item_revision, operation)` unique
 
 ## 5. メッセージ処理とSession制御
 
 ### 5.1 受付から原本保存
 
 1. API Workerがraw bodyでLINE署名を検証する
-2. text eventをWebhook Queueへ投入し、channel event IDを冪等キーにする
-3. ingest WorkerがAccountを解決する。client由来のAccount IDは受け付けない
-4. 処理済みeventなら保存と返信を増やさずackする
-5. Source RecordとpayloadをD1 batchで保存する
-6. AccountのCoordinatorへSource Record ID、event ID、受付時刻を通知する
-7. CoordinatorがSessionを選び、採番とconversation message追加をD1 batchで確定する
-8. D1保存とCoordinator受付後にWebhook Queueをackする
+2. 決定的な完全一致command routingを行う。日記なら署名済みchannel identityからAccountを解決し、event IDと受付時刻だけをCoordinatorへ通知して受領応答を予約する
+3. 日記eventからreply tokenを除外してWebhook Queueへ投入し、channel event IDを冪等キーにする
+4. ingest WorkerがAccountを再解決する。client由来のAccount IDは受け付けない
+5. Source Record IDをAccountとchannel event IDから決定的に作り、Source RecordとpayloadをD1 batchで`INSERT ... ON CONFLICT DO NOTHING`する
+6. 新規保存か既存eventかにかかわらず、AccountのCoordinatorへSource Record ID、event ID、受付時刻を通知する
+7. Coordinatorはevent IDを一意キーとして既存のaccepted messageへSource Record IDを結び、D1反映outboxをローカルSQLite transactionへ保存する。再通知なら既存状態を返す
+8. CoordinatorがSessionを選び、採番とconversation message追加をevent IDで冪等なD1 batchとして実行する
+9. D1反映後、Coordinatorがaccepted messageを`attached`へ進める。失敗時はoutboxとalarmから再試行する
+10. Source RecordのD1保存とCoordinatorのローカル永続化が成功した後にWebhook Queueをackする
+
+受領応答予約とQueue投入は同じ署名検証結果から独立に開始します。受領応答予約の一時失敗は30秒deadlineまでevent IDを変えずにAPI Workerの`waitUntil`内で再試行し、Queue投入を取り消しません。Webhookへの成功応答はQueue投入成功を条件とし、受領応答予約の失敗は日記保存を失敗させずSLO違反として記録します。
+
+既存Source Recordの検出だけを理由に処理を打ち切りません。D1保存後かつCoordinator通知前の失敗ではQueue再配送が必ず同じRPCを再実行し、Coordinator通知後かつD1会話反映前の失敗ではDOのoutboxが処理を再開します。これにより、原本だけ存在して会話へ入らない中間状態を終端状態にしません。
 
 ### 5.2 連投とTurn
 
-Coordinatorは最初の未処理messageから1.5秒待ち、その間のuser messageを1Turnへまとめます。生成開始後に届いたmessageは次のTurnへ送ります。Accountごとの生成中Turnは最大1件とし、古い応答が新しい話題を追い越すことを防ぎます。
+Coordinatorは最初の未処理messageから1.5秒待ち、その間のuser messageを1Turnへまとめます。生成開始後に届いたmessageは次のTurnへ送ります。Accountごとの`inflight_turn_id`は最大1件とし、Turn作成ごとに`generation_epoch`を単調増加させます。
+
+Chat Turn Queueへ渡すのはTurn IDとgeneration epochだけです。generate Workerは処理開始時にCoordinatorの`acquireGeneration`を呼び、`inflight_turn_id`が空でepochが現在値と一致する場合だけ期限付きleaseを取得します。Queueが同じTurnを同時配送しても、leaseを得られるconsumerは1つだけです。Workerは長い処理の節目でleaseを更新しますが90秒のhard deadlineは延長できません。AI Gatewayへの各requestにはlease失効前のtimeoutとabortを設定し、1回目が終了またはtimeoutする前に2回目を開始しません。
+
+完了通知時にTurn ID、generation epoch、leaseがDOの現在値と一致しなければ、生成結果を保存・送信せず破棄します。`inflight_turn_id`は生成完了では解放せず、finalの送信要求が受理されるか、90秒で`failed` / `delivery_unknown`になるまで保持します。次Turnを開始するときはepochを進めてから新しいleaseを発行し、旧epochのLINE outboxも以後retryしません。D1やAI Gatewayの応答待ち中に新しいmessageが届いてもDOは受付を続け、現在Turnの後へ積みます。これにより一人につきAI生成を1つに制限し、遅延した古い生成結果や送信retryが新しい会話へ割り込みません。
 
 ### 5.3 Session境界
 
@@ -221,7 +272,7 @@ Coordinatorは採番直前に[体験設計の境界](../product/diary-chat-exper
 - 24時間のhard cap後のmessageは必ず新しいSessionへ入れる
 - 終了と新規Session作成をAccount単位で直列化する
 
-Durable Objectのalarmは、返信締切、次Turn、Session終了のうち最も早い時刻を1件だけ設定します。alarm handlerはD1を再読込し、複数回実行されても同じ結果にします。
+Durable Objectのalarmは、未完了outbox、次Turn、Session終了のうち最も早い時刻を1件だけ設定します。alarm handlerはローカルSQLiteと必要なD1行を再読込し、複数回実行されても同じ結果にします。Session終了後24時間の本文削除は全Accountを走査するCron Triggerが所有し、DO alarmへ混在させません。
 
 ## 6. Context Package
 
@@ -241,13 +292,14 @@ flowchart LR
 
 1. 現在Sessionと直近20messageをD1から取得する
 2. 20件より前を覆う現行Session Summaryを取得する
-3. 現在Turnから検索文を作り、Vectorizeで確認済みBrain Item候補を得る
-4. D1でAccount、`confirmed`、`active`、有効期間、Access Policy、削除状態を再検証する
-5. 上位5件を選び、必要なEvidenceのSource Recordを最大3件取得する
-6. 訂正済み旧版、削除済み、撤回済み、拒否済みを除外する
-7. 各要素へ種類、時点、確認状態、根拠IDを付ける
+3. 現在Turnから検索文を作り、現在Accountの`owner_scope`をfilterに指定してVectorizeを検索する
+4. filter適用後の集合から確認済みBrain Item候補を上位取得する
+5. D1でAccount、`confirmed`、`active`、有効期間、Access Policy、削除状態を再検証する
+6. 再検証を通過した上位5件を選び、必要なEvidenceのSource Recordを最大3件取得する
+7. 訂正済み旧版、削除済み、撤回済み、拒否済みを除外する
+8. 各要素へ種類、時点、確認状態、根拠IDを付ける
 
-Vectorizeのmetadataは候補IDを得る用途に限定し、認可の根拠にしません。
+`owner_scope`は環境別Secretを鍵とする`HMAC(account_id)`から作り、Vectorizeのmetadata indexまたはnamespaceへ保存します。生のAccount IDは保存しません。filterはtopKより前に適用し、他Accountの候補に検索枠を消費させません。Vectorizeのmetadataは候補を絞る用途に限定し、認可の根拠にはしないため、D1再検証は必ず残します。
 
 ### token budget
 
@@ -407,26 +459,30 @@ Summary更新は原文が20messageを超えたときだけ行います。既存s
 
 | 経過 | 目標 |
 | --- | --- |
-| 0〜3秒 | 署名検証、Queue投入、待機表示 |
-| 0〜6秒 | ingest、原本保存、Coordinator受付 |
-| 6〜8秒 | 連投集約、Turn確定 |
+| 0〜3秒 | 署名検証、Account解決、Coordinatorへの受領応答予約、Queue投入、待機表示 |
+| 1.5秒 | Coordinatorが連投をまとめ、受領応答のpushを開始 |
+| 0〜6秒 | ingest、原本保存、Coordinatorへの原本通知 |
+| 6〜8秒 | Turn確定 |
 | 8〜25秒 | 安全分類、Context、AI生成、検証 |
-| 25秒 | final未確定なら受領応答を送る |
-| 30秒 | 初回返信送信要求の内部deadline |
+| 30秒 | 受領応答の送信要求がLINEに受理される内部deadline |
 | 38秒 | 体験設計上のSLO |
 | 90秒 | finalまたは失敗案内の内部上限 |
 
-30秒を内部deadlineとし、外部APIやQueueの揺らぎに8秒残します。待機表示は初回返信へ数えません。
+受領応答の予約はWebhook Queueを経由させません。API Workerは署名済みchannel identityからAccountを解決し、本文を渡さずにevent IDと受付時刻だけをAccountのCoordinatorへRPCします。Coordinatorは1.5秒間の予約をまとめ、対象event ID全件の初回返信として1件の受領応答を送ります。これにより、QueueやAI生成が遅延しても初回返信経路は影響を受けません。
 
-### 9.2 replyとpush
+30秒を内部deadlineとし、LINE APIの揺らぎに8秒残します。待機表示は初回返信へ数えません。LINEまたは自システムの障害で30秒までに送信要求が受理されなければSLO違反として記録し、38秒を過ぎた後も送信処理自体は放棄しません。
 
-- 25秒までにfinalができた場合は最新の有効なreply tokenで送る
-- 間に合わなければ同じtokenで内容に依存しない受領応答を送る
-- 受領応答後のfinalは、解決済みLINE identityへpushする
+### 9.2 LINE配送とreply token
+
+- Webhookの`replyToken`は一度しか使えず安全なretry keyを付けられないため、受領応答とfinalはどちらもpushで送る
+- `replyToken`はQueue、DO、D1へ渡さず、保存もlog出力もしない
+- pushは初回要求から必ず`X-Line-Retry-Key`を付ける。受領応答は先頭event ID、finalと失敗案内はTurn IDとmessage kindから、環境別Secretを用いて決定的なUUIDを作る
 - 連投を1Turnにした場合、1応答を対象message全件の初回返信として記録する
 - 送信直前にTurn leaseとSessionを再確認する
 
-送信前に`delivery_started`をD1へ記録します。再配送時に同じreplyを自動再送しません。pushでchannelの冪等キーを使える場合はTurn IDから作ります。送信結果不明時は過剰送信を避け、要確認状態にします。
+送信内容、宛先のchannel identity参照、retry keyをDOのoutboxへ確定してからpushします。2xxは`delivered`、同じretry keyが既に受理されたことを示す409も`delivered`として扱います。timeoutまたは5xxは、同じ宛先・本文・retry keyかつ同じgeneration epochである間だけ再試行し、4xxはretryしません。retry keyを変えたり本文を変えて再送してはいけません。
+
+受領応答のretryはfinal送信開始時に止め、finalまたは失敗案内のretryは90秒で止めます。90秒時点で結果不明なら`delivery_unknown`として運用通知し、次Turnへ進む前に旧epochのoutboxを終端化します。異なるキーによる自動再送は行いません。これにより、LINE側で既に受理済みだった通信の配送時間までは制御できないものの、自システムが古い応答を後から再送して割り込ませることは防ぎます。
 
 ### 9.3 retryとDLQ
 
@@ -434,7 +490,8 @@ Summary更新は原文が20messageを超えたときだけ行います。既存s
 - AI生成は同一Turnで最大2回。schema修正か一時的provider失敗だけを再試行する
 - safety block、入力不正、Access拒否はretryしない
 - rate limitと一時的5xxはjitter付きbackoffでretryする
-- 30秒前に受領応答へ、90秒で失敗案内へ切り替える
+- 受領応答はQueue retryと独立して30秒まで同じretry keyで再試行する
+- AI生成は90秒で打ち切り、失敗案内をfinalとは別の固定retry keyでpushする
 - DLQ再処理は本文をlogへ出さず、Turn IDとfailure stageから行う
 
 ## 10. AI Gatewayと秘密情報
@@ -448,7 +505,7 @@ Summary更新は原文が20messageを超えたときだけ行います。既存s
 
 ## 11. 観測と監査
 
-計測するのは各処理段階のlatency、38秒初回返信率、30秒deadline違反、90秒final率、receipt率、retry、DLQ、重複抑止、schema違反、安全route、token数、モデル別失敗率です。
+計測するのは各処理段階のlatency、38秒初回返信率、30秒deadline違反、90秒final率、receipt率、retry、DLQ、DO outboxの滞留時間、`delivery_unknown`、Vectorize同期遅延、削除期限超過、重複抑止、schema違反、安全route、token数、モデル別失敗率です。
 
 logへ出せる識別子は環境、Queue message ID、Turn ID、Session IDの一方向hash、prompt version、処理段階です。Account ID、LINE user ID、reply token、日記本文、Context Package、生成本文、Brain Item本文は出しません。
 
@@ -459,13 +516,24 @@ logへ出せる識別子は環境、Queue message ID、Turn ID、Session IDの�
 ### 自動テスト
 
 - Webhook再配送でSource Recordと返信が増えない
+- Source Record保存後かつCoordinator通知前に失敗しても、再配送で会話へ取り込まれる
+- Coordinator受付後かつD1会話反映前に停止しても、DO再起動後にoutboxから反映される
+- D1書込中に別messageを受け付けても、予約sequenceが重複せずSessionの`next_sequence`が巻き戻らない
 - 連投が順序どおりまとまり、生成開始後の発言は次Turnになる
+- 外部D1・AI呼び出し中に次の受付が割り込んでも、同一Accountで生成中Turnが2件にならない
+- 古いgeneration epochの完了結果を保存・送信しない
 - 6時間、24時間、明示終了、日付またぎのSession境界
 - 削除、訂正、撤回後の内容がContext Packageへ入らない
-- 他AccountのVectorize候補をD1再検証で除外する
+- Session終了後24時間の削除jobがinactiveなAccountにも適用される
+- D1 restore後に削除が再適用されるまで通常受付を再開しない
+- Vectorizeが`owner_scope`をtopK前にfilterし、他Accountの候補を返さない
+- Vectorize候補をD1再検証し、同じscope内でも利用不可のItemを除外する
+- Vectorize upsert・deleteの失敗と長時間`submitted`をoutboxとreconciliationで回復する
 - 20message超過時にsummaryと原文が欠落・重複しない
 - schema外出力、存在しないEvidence ID、質問過多を送信しない
-- 25秒でreceiptへ、90秒で終端状態へ移る
+- Webhook Queueを遅延・停止させても30秒までにreceiptのpush要求が受理される
+- receipt、final、失敗案内をtimeoutさせ、同じLINE retry keyでだけ再試行する
+- 90秒でfinalまたは失敗案内の配送outboxを確定する
 - Queue再配送、DO再起動、alarm再実行でもTurnが重複しない
 - AI Gatewayのpayload loggingとcacheが無効になる
 
@@ -488,12 +556,12 @@ prompt versionを本番へ出す条件はschema準拠100%、越権した記憶�
 
 製品ロードマップのPhaseとは分け、次の単位で進めます。
 
-1. **原本とSession**: D1 schema、冪等保存、Session境界、payload削除
-2. **会話Coordinator**: Account単位DO、連投、Turn state、2 QueueとDLQ
-3. **安全な通常応答**: Context、prompt、構造化出力、30秒・90秒deadline
+1. **原本とSession**: D1 schema、冪等保存、Session境界、Cronによるpayload削除
+2. **会話Coordinator**: Account単位DO、ローカルSQLite、連投、Turn state、outbox、2 QueueとDLQ
+3. **安全な通常応答**: Queue非依存のreceipt、Context、prompt、構造化出力、30秒・90秒deadline
 4. **Session Summary**: 20message超過時の要約と訂正反映
 5. **Brain Item候補**: Evidence付きpending候補、本人確認、却下、改訂
-6. **記憶を使う助言**: confirmed itemのVectorize投入、D1再認可、Evidence取得
+6. **記憶を使う助言**: Vectorize outbox、`owner_scope` filter、D1再認可、Evidence取得
 7. **段階公開**: fixture、shadow、内部Account、少数公開、全体公開
 
 各単位はfeature flagで無効化できます。AIを停止しても日記原本を保存し、保存結果を返せる状態を維持します。
@@ -502,7 +570,10 @@ prompt versionを本番へ出す条件はschema準拠100%、越権した記憶�
 
 - Queuesはat-least-once配送のため、[Delivery guarantees](https://developers.cloudflare.com/queues/reference/delivery-guarantees/)に従って冪等化する
 - 複数のD1書き込みは、失敗時に一括rollbackされる[D1 batch](https://developers.cloudflare.com/d1/worker-api/d1-database/#batch)を使う
-- Durable Objectは[論理的な調停単位ごとに分ける指針](https://developers.cloudflare.com/durable-objects/best-practices/rules-of-durable-objects/)に従ってAccount単位にする
+- Durable Objectは[論理的な調停単位と外部I/Oの規則](https://developers.cloudflare.com/durable-objects/best-practices/rules-of-durable-objects/)に従い、Account単位のローカル状態遷移だけを直列化する
+- Vectorizeは[metadata filterがtopK前に適用される仕様](https://developers.cloudflare.com/vectorize/reference/metadata-filtering/)と[更新が非同期である仕様](https://developers.cloudflare.com/vectorize/reference/client-api/)を前提にする
+- LINEのpushは[retry keyによる安全な再試行](https://developers.line.biz/ja/docs/messaging-api/retrying-api-request/)に従う
+- D1の削除説明と復旧手順は[Time Travelの保持・restore仕様](https://developers.cloudflare.com/d1/reference/time-travel/)を前提にする
 - AI Gatewayは[本文logを無効にできる仕様](https://developers.cloudflare.com/changelog/product/ai-gateway/)に従い、metadataだけを記録する
 - Geminiは[Structured outputs](https://ai.google.dev/gemini-api/docs/structured-output)を使い、アプリケーションでもschema検証する
 
