@@ -23,6 +23,8 @@ me-builderの開発基盤および全体アーキテクチャにおいて、イ�
 - プロジェクトの目標、MVP範囲、全体ロードマップ — [プロジェクト概要](../product/project-overview.md)
 - 具体的なデータベーステーブル定義、GraphQL/REST/MCPツール等の個別スキーマ詳細
 
+日記チャットにおける各コンポーネントの連携、物理データモデル、AI実行、安全制御は[日記チャット実装設計](diary-chat-implementation-design.md)を正とします。
+
 ## 3. インフラ・システム構成の全体像
 
 me-builderは、全コンポーネントが Cloudflare のグローバルエッジネットワーク上で動作するサーバーレス・エッジファースト構成を採用します。
@@ -185,3 +187,4 @@ flowchart TD
 - [ドメイン設計](../domain/domain-design.md)
 - [Brain内部情報の分類](../domain/brain/brain-content-taxonomy.md)
 - [Brainのラベル・アクセス制御設計](../domain/brain/brain-access-label-design.md)
+- [日記チャット実装設計](diary-chat-implementation-design.md)

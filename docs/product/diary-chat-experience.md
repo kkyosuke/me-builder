@@ -545,12 +545,7 @@ Phaseごとの目的と提供順序は[プロジェクト概要 §11](project-ov
 ## 14. この文書で決めていないこと
 
 - 声かけの既定時刻、曜日、通知UI、配信基盤
-- Conversation SessionとSession Summaryの物理的な保存モデル
-- AIが次の質問を選ぶ入力、出力、プロンプト
-- Brain Item候補を生成する処理とConfidenceの算出方法
 - 本人確認画面をLINE内とWebのどちらへ置くか
-- 会話から参照する記憶の検索・ランキング方式
-- 1件の長文を分割するときのサイズと、Context Packageのトークン配分
-- 最終応答までの上限時間、タイムアウト、再試行、非同期送信の実装方式
-- 助言品質と本人らしさを評価する具体的なテストセット
-- 高リスクな相談に対する検出・応答・エスカレーション設計
+- Confidenceの算出方法
+
+Conversation SessionとSession Summaryの物理モデル、プロンプト、Context Packageのtoken配分、記憶検索、応答期限、ガードレール、評価方法は[日記チャット実装設計](../architecture/diary-chat-implementation-design.md)を正とします。
