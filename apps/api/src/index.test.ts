@@ -134,9 +134,48 @@ describe("POST /api/line/webhook signature verification", () => {
 });
 
 describe("API Server Webhook Queue", () => {
-  it("1対1のテキストでは10秒のローディングを開始してからQueueへ投入する", async () => {
+  it("1対1のテキストでは60秒のローディングを開始してからQueueへ投入する", async () => {
     const apiClient = line.client.create("test-token");
     const showLoadingAnimation = vi.spyOn(apiClient, "showLoadingAnimation").mockResolvedValue({});
+    vi.spyOn(line.client, "create").mockReturnValue(apiClient);
+    const { queue, send } = createMockQueue();
+    const waitUntil = vi.fn();
+    const body = JSON.stringify({
+      events: [
+        {
+          type: "message",
+          source: { type: "user", userId: "U1" },
+          message: { type: "text", id: "message-id", text: "診断" },
+        },
+      ],
+    });
+
+    const res = await app.request(
+      "/api/line/webhook",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-line-signature": sign(body) },
+        body,
+      },
+      {
+        WEBHOOK_QUEUE: queue,
+        LINE_CHANNEL_ACCESS_TOKEN: "test-token",
+        LINE_CHANNEL_SECRET: CHANNEL_SECRET,
+      },
+      { waitUntil, passThroughOnException: vi.fn(), props: {} },
+    );
+
+    expect(res.status).toBe(200);
+    expect(showLoadingAnimation).toHaveBeenCalledWith({ chatId: "U1", loadingSeconds: 60 });
+    expect(waitUntil).toHaveBeenCalledOnce();
+    expect(showLoadingAnimation.mock.invocationCallOrder[0]).toBeLessThan(
+      send.mock.invocationCallOrder[0] ?? 0,
+    );
+  });
+
+  it("ExecutionContextがないローカル実行でもローディング開始後にQueueへ投入する", async () => {
+    const apiClient = line.client.create("test-token");
+    vi.spyOn(apiClient, "showLoadingAnimation").mockResolvedValue({});
     vi.spyOn(line.client, "create").mockReturnValue(apiClient);
     const { queue, send } = createMockQueue();
     const body = JSON.stringify({
@@ -164,10 +203,7 @@ describe("API Server Webhook Queue", () => {
     );
 
     expect(res.status).toBe(200);
-    expect(showLoadingAnimation).toHaveBeenCalledWith({ chatId: "U1", loadingSeconds: 10 });
-    expect(showLoadingAnimation.mock.invocationCallOrder[0]).toBeLessThan(
-      send.mock.invocationCallOrder[0] ?? 0,
-    );
+    expect(send).toHaveBeenCalledOnce();
   });
 
   it("POST /api/line/webhook enqueues event to WEBHOOK_QUEUE if binding is provided", async () => {

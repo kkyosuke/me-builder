@@ -20,6 +20,8 @@ export type ReceiveLineWebhookParams = {
   queue: Queue<WebhookQueueMessage> | undefined;
   /** 1対1トークへチャットローディングを表示する。未設定時は安全にスキップする */
   startChatLoading?: ((chatId: string) => Promise<unknown>) | undefined;
+  /** チャットローディングの完了をWebhook応答後まで待機させる */
+  waitUntil?: ((promise: Promise<unknown>) => void) | undefined;
 };
 
 export type LineWebhookOutcome =
@@ -69,6 +71,7 @@ export async function receiveLineWebhook({
   channelSecret,
   queue,
   startChatLoading,
+  waitUntil,
 }: ReceiveLineWebhookParams): Promise<LineWebhookOutcome> {
   // 未設定の場合は環境を問わず検証をスキップせず拒否する
   if (!channelSecret) {
@@ -114,19 +117,21 @@ export async function receiveLineWebhook({
 
   const chatIds = extractOneToOneTextChatIds(payload);
 
-  if (startChatLoading) {
-    await Promise.all(
-      chatIds.map(async (chatId) => {
-        try {
-          await startChatLoading(chatId);
-        } catch (error) {
-          // userIdは本人識別子なのでログへ含めない。ローディング失敗でも本処理は継続する。
-          logger.warn(
-            { errorName: error instanceof Error ? error.name : "UnknownError" },
-            "Failed to start LINE chat loading animation",
-          );
-        }
-      }),
+  if (startChatLoading && waitUntil) {
+    waitUntil(
+      Promise.all(
+        chatIds.map(async (chatId) => {
+          try {
+            await startChatLoading(chatId);
+          } catch (error) {
+            // userIdは本人識別子なのでログへ含めない。ローディング失敗でも本処理は継続する。
+            logger.warn(
+              { errorName: error instanceof Error ? error.name : "UnknownError" },
+              "Failed to start LINE chat loading animation",
+            );
+          }
+        }),
+      ),
     );
   }
 

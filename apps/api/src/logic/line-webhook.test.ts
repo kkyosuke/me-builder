@@ -20,7 +20,10 @@ function textEvent(text: string, source: Record<string, string> = { type: "user"
 
 function receive(
   events: unknown[],
-  options: { startChatLoading?: (chatId: string) => Promise<unknown> } = {},
+  options: {
+    startChatLoading?: (chatId: string) => Promise<unknown>;
+    waitUntil?: (promise: Promise<unknown>) => void;
+  } = {},
 ) {
   const body = JSON.stringify({ events });
   const send = vi.fn().mockResolvedValue(undefined);
@@ -37,6 +40,7 @@ function receive(
       channelSecret: CHANNEL_SECRET,
       queue,
       startChatLoading: options.startChatLoading,
+      waitUntil: options.waitUntil ?? ((promise) => void promise),
     }),
   };
 }
@@ -45,19 +49,15 @@ describe("receiveLineWebhook chat loading", () => {
   it.each(["診断", "AI: 今日の気分を整理して"])(
     "1対1のテキスト「%s」ではQueue投入前にローディングを開始する",
     async (text) => {
-      const order: string[] = [];
-      const startChatLoading = vi.fn(async () => {
-        order.push("loading");
-      });
+      const startChatLoading = vi.fn().mockResolvedValue({});
       const { send, result } = receive([textEvent(text)], { startChatLoading });
-      send.mockImplementation(async () => {
-        order.push("queue");
-      });
 
       await result;
 
       expect(startChatLoading).toHaveBeenCalledWith("U1");
-      expect(order).toEqual(["loading", "queue"]);
+      expect(startChatLoading.mock.invocationCallOrder[0]).toBeLessThan(
+        send.mock.invocationCallOrder[0] ?? 0,
+      );
     },
   );
 
@@ -93,6 +93,20 @@ describe("receiveLineWebhook chat loading", () => {
     const { send, result } = receive([textEvent("診断")], { startChatLoading });
 
     await expect(result).resolves.toMatchObject({ type: "accepted", queued: true });
+    expect(send).toHaveBeenCalledOnce();
+  });
+
+  it("ローディングAPIの完了を待たずにQueueへ投入する", async () => {
+    const startChatLoading = vi.fn(() => new Promise(() => {}));
+    const waitUntil = vi.fn();
+    const { send, result } = receive([textEvent("AI: 質問")], {
+      startChatLoading,
+      waitUntil,
+    });
+
+    await expect(result).resolves.toMatchObject({ type: "accepted", queued: true });
+    expect(startChatLoading).toHaveBeenCalledOnce();
+    expect(waitUntil).toHaveBeenCalledOnce();
     expect(send).toHaveBeenCalledOnce();
   });
 });
