@@ -6,6 +6,9 @@
 @import "tailwindcss/preflight.css";
 @import "tailwindcss/utilities.css";
 
+/* Tailwindのdark variantをOS設定ではなく、利用者が選んだテーマで切り替えます。 */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /*
  * デザインシステムは Tailwind CSS のユーティリティに寄せ、素の CSS は
  * ここの基礎スタイルだけに留めます。移行前の CSS 変数の色は Tailwind の
@@ -32,5 +35,5 @@ body {
 
 body {
   /* overscroll: スワイプ中に LINE 内ブラウザの引っ張り更新が割り込まないよう抑えます。 */
-  @apply min-h-dvh overscroll-y-contain bg-slate-900 font-sans text-slate-50 antialiased;
+  @apply min-h-dvh overscroll-y-contain bg-slate-50 font-sans text-slate-950 antialiased dark:bg-slate-900 dark:text-slate-50;
 }

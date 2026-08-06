@@ -95,17 +95,17 @@ function DiagnosisComplete({
   const { answered, deferred } = summarizeInteractions(interactions);
 
   return (
-    <div className="min-h-80 rounded-3xl border border-slate-700 bg-slate-800 p-5 text-center">
+    <div className="min-h-80 rounded-3xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-5 text-center">
       <div className="flex flex-col items-center gap-2">
         <CircleCheck className="size-12 text-emerald-400" aria-hidden="true" />
         <p className="text-lg font-bold">今回の回答はここまでです</p>
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-slate-600 dark:text-slate-400">
           {`${answered} 問に回答し、${deferred} 問をあとで回答にしました。`}
         </p>
       </div>
 
       {deferred > 0 && (
-        <p className="mt-4 border-t border-slate-700 pt-3 text-xs font-semibold text-amber-200">
+        <p className="mt-4 border-t border-slate-200 dark:border-slate-700 pt-3 text-xs font-semibold text-amber-700 dark:text-amber-200">
           「あとで回答」の選択はまだ保存されません。
         </p>
       )}
@@ -130,10 +130,10 @@ function SaveCompletionPending({
   };
 
   return (
-    <div className="flex min-h-80 flex-col items-center justify-center gap-4 rounded-3xl border border-slate-700 bg-slate-800 p-5 text-center">
+    <div className="flex min-h-80 flex-col items-center justify-center gap-4 rounded-3xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-5 text-center">
       {savingCount > 0 && (
         <LoaderCircle
-          className="size-12 animate-spin text-sky-300 motion-reduce:animate-none"
+          className="size-12 animate-spin text-sky-700 dark:text-sky-300 motion-reduce:animate-none"
           aria-hidden="true"
         />
       )}
@@ -141,14 +141,14 @@ function SaveCompletionPending({
         <p className="text-lg font-bold">
           {failed.length > 0 ? "保存できなかった回答があります" : "回答を保存しています"}
         </p>
-        <p className="mt-2 text-sm text-slate-400">
+        <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
           {savingCount > 0
             ? `残り ${savingCount} 件の保存が終わるまでお待ちください。`
             : "保存に成功すると結果を表示します。"}
         </p>
       </div>
       {failed.length > 0 && (
-        <div className="w-full rounded-xl border border-red-400/30 bg-red-400/10 p-3 text-sm text-red-200">
+        <div className="w-full rounded-xl border border-red-400/30 bg-red-400/10 p-3 text-sm text-red-700 dark:text-red-200">
           <p>{failed[0]?.message ?? "回答を保存できませんでした。"}</p>
           <button
             type="button"
@@ -168,14 +168,16 @@ function SaveCompletionPending({
 /** 全回答の保存後、保存済みデータによる結果画面を取得している間の表示。 */
 function ResultOpeningPending() {
   return (
-    <div className="flex min-h-80 flex-col items-center justify-center gap-4 rounded-3xl border border-slate-700 bg-slate-800 p-5 text-center">
+    <div className="flex min-h-80 flex-col items-center justify-center gap-4 rounded-3xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-5 text-center">
       <LoaderCircle
-        className="size-12 animate-spin text-sky-300 motion-reduce:animate-none"
+        className="size-12 animate-spin text-sky-700 dark:text-sky-300 motion-reduce:animate-none"
         aria-hidden="true"
       />
       <div>
         <p className="text-lg font-bold">回答結果を準備しています</p>
-        <p className="mt-2 text-sm text-slate-400">保存した回答を読み込んでいます。</p>
+        <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+          保存した回答を読み込んでいます。
+        </p>
       </div>
     </div>
   );
@@ -412,12 +414,12 @@ export function SwipeDiagnosis({
     <section className="flex flex-col gap-4">
       <header className="flex items-baseline justify-between">
         <h2 className="text-lg font-bold">{diagnosis.title}</h2>
-        <p className="text-sm text-slate-400" aria-live="polite">
+        <p className="text-sm text-slate-600 dark:text-slate-400" aria-live="polite">
           {`${finished ? total : Math.min(answeredCount + 1, total)} / ${total}`}
         </p>
       </header>
 
-      <div className="h-1.5 overflow-hidden rounded-full bg-slate-700">
+      <div className="h-1.5 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
         <div
           className="h-full rounded-full bg-sky-400"
           style={{
@@ -429,7 +431,7 @@ export function SwipeDiagnosis({
 
       <div className="min-h-10" aria-live="polite">
         {progressMessage && (
-          <p className="flex items-center gap-2 rounded-xl bg-sky-400/10 px-3 py-2 text-sm text-sky-200">
+          <p className="flex items-center gap-2 rounded-xl bg-sky-400/10 px-3 py-2 text-sm text-sky-700 dark:text-sky-200">
             <Sparkles className="size-4 shrink-0" aria-hidden="true" />
             {progressMessage}
           </p>
@@ -472,7 +474,7 @@ export function SwipeDiagnosis({
         <button
           type="button"
           onClick={onBack}
-          className="w-full rounded-2xl border border-slate-600 px-4 py-3 text-sm font-semibold text-slate-300 transition-colors hover:bg-slate-800"
+          className="w-full rounded-2xl border border-slate-300 dark:border-slate-600 px-4 py-3 text-sm font-semibold text-slate-700 dark:text-slate-300 transition-colors hover:bg-slate-100 dark:hover:bg-slate-800"
         >
           一覧へ
         </button>
@@ -484,7 +486,7 @@ export function SwipeDiagnosis({
             type="button"
             onClick={() => commit("skip")}
             disabled={isBusy}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-700 px-4 py-2.5 text-sm text-slate-400 transition-colors hover:bg-slate-800 disabled:opacity-40"
+            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 dark:border-slate-700 px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400 transition-colors hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40"
           >
             <SkipForward className="size-4" aria-hidden="true" />
             あとで回答する

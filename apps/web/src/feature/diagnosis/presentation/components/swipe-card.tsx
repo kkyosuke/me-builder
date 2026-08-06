@@ -68,8 +68,8 @@ function CardChoiceButton({
       }}
       className={`flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-2xl border px-3 py-3 text-sm leading-tight font-semibold transition-colors disabled:opacity-40 ${
         isLeft
-          ? "border-indigo-400/40 bg-indigo-400/10 text-indigo-200 hover:bg-indigo-400/20"
-          : "border-sky-400/40 bg-sky-400/10 text-sky-200 hover:bg-sky-400/20"
+          ? "border-indigo-400/40 bg-indigo-400/10 text-indigo-700 dark:text-indigo-200 hover:bg-indigo-400/20"
+          : "border-sky-400/40 bg-sky-400/10 text-sky-700 dark:text-sky-200 hover:bg-sky-400/20"
       }`}
     >
       {choice.label}
@@ -95,8 +95,8 @@ function ChoiceOverlay({
       // 左へスワイプ中は右上、右へスワイプ中は左上へ出して、指で隠れない位置に置きます。
       className={`pointer-events-none absolute top-6 flex items-center gap-2 rounded-xl border-2 px-3 py-2 text-lg font-bold ${
         isLeft
-          ? "right-5 rotate-12 border-indigo-400 text-indigo-300"
-          : "left-5 -rotate-12 border-sky-400 text-sky-300"
+          ? "right-5 rotate-12 border-indigo-400 text-indigo-700 dark:text-indigo-300"
+          : "left-5 -rotate-12 border-sky-400 text-sky-700 dark:text-sky-300"
       }`}
       style={{ opacity: progress }}
       aria-hidden="true"
@@ -148,7 +148,7 @@ export function SwipeCard({
 
   return (
     <div
-      className={`absolute inset-0 flex flex-col justify-between rounded-3xl border border-slate-700 bg-slate-800 p-6 shadow-2xl shadow-slate-950/50 select-none ${
+      className={`absolute inset-0 flex flex-col justify-between rounded-3xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-6 shadow-2xl shadow-slate-950/50 select-none ${
         isFront ? "cursor-grab touch-none active:cursor-grabbing" : "pointer-events-none"
       }`}
       style={style}
@@ -162,12 +162,16 @@ export function SwipeCard({
       )}
 
       {/* 上部は選択予告のオーバーレイが出る帯なので、質問文はその下から始めます。 */}
-      <p className="pt-14 text-xl leading-relaxed font-bold text-slate-50">{question.text}</p>
+      <p className="pt-14 text-xl leading-relaxed font-bold text-slate-950 dark:text-slate-50">
+        {question.text}
+      </p>
 
       <div>
-        {question.hint && <p className="mb-4 text-sm text-slate-400">{question.hint}</p>}
+        {question.hint && (
+          <p className="mb-4 text-sm text-slate-600 dark:text-slate-400">{question.hint}</p>
+        )}
 
-        <div className="flex gap-3 border-t border-slate-700 pt-4">
+        <div className="flex gap-3 border-t border-slate-200 dark:border-slate-700 pt-4">
           <CardChoiceButton
             question={question}
             direction="left"
