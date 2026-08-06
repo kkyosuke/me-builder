@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "bun --watch src/index.ts",
     "dev:wrangler": "wrangler dev --env local",
-    "build": "bun build src/index.ts --outdir ./dist --target bun",
+    "build": "bun build src/index.ts --outdir ./dist --target bun --external cloudflare:workers",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --dir .",
     "check:gemini": "bun scripts/check-gemini.ts",
@@ -21,6 +21,8 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260724.1",
-    "@types/bun": "latest"
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/bun": "latest",
+    "better-sqlite3": "^13.0.1"
   }
 }

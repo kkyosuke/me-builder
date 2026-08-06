@@ -7,4 +7,11 @@ export interface WebhookQueueMessage {
   payload: unknown;
 }
 
+/** AI生成Queueには本文やAccount識別子を含めず、D1のTurnだけを参照させる。 */
+export interface ChatTurnQueueMessage {
+  type: "chat-turn";
+  turnId: string;
+  generationEpoch: number;
+}
+
 export type { Queue, Message, MessageBatch };

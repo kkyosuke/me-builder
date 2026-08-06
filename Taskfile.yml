@@ -76,6 +76,16 @@ tasks:
     cmds:
       - bun scripts/setup-d1.ts
 
+  queues:setup:preview:
+    desc: 'Create diary chat Queues and DLQs for preview if missing'
+    cmds:
+      - bun scripts/setup-chat-queues.ts preview
+
+  queues:setup:production:
+    desc: 'Create diary chat Queues and DLQs for production if missing'
+    cmds:
+      - bun scripts/setup-chat-queues.ts production
+
   db:migrate:local:
     aliases: [db:migrate]
     desc: 'Apply D1 database migrations locally'
