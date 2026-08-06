@@ -24,6 +24,7 @@
 | [「自分と相手の優先・境界線」パラメータ変換設計](../docs/diagnosis/scoring/relationship-priority-parameter-design.md) | 最初の診断固有の4パラメータ、質問ごとの重み、表示設定 |
 | [「お金と消費」パラメータ変換設計](../docs/diagnosis/scoring/money-values-parameter-design.md) | 2つ目の診断固有の5パラメータ、質問ごとの重み、表示設定 |
 | [「インドア・アウトドアと余暇」パラメータ変換設計](../docs/diagnosis/scoring/leisure-style-parameter-design.md) | 3つ目の診断固有の4パラメータ、質問ごとの重み、表示設定 |
+| [「時間と予定」パラメータ変換設計](../docs/diagnosis/scoring/time-planning-parameter-design.md) | 4つ目の診断固有の4パラメータ、質問ごとの重み、表示設定 |
 | [ドメイン設計](../docs/domain/domain-design.md) | Account / Brain / Sourceの責務・境界、Diagnosisの位置づけ、ドメイン間の関係、設計順序と進捗 |
 | [Brain内部情報の分類](../docs/domain/brain/brain-content-taxonomy.md) | Brain Itemの分類名、定義、具体例、分類とは別に持つ共通属性、意思決定での利用方法 |
 | [根拠・反証・改訂のエッジ設計](../docs/domain/brain/evidence-edge-design.md) | Source RecordとBrain Itemを結ぶエッジの種類と属性、Confidenceとの関係、外部への開示粒度、改訂された旧版の扱い |
@@ -32,6 +33,7 @@
 | [インフラ・システム構成](../docs/architecture/infrastructure-architecture.md) | Cloudflareを全面的に採用したインフラ基盤、システム構成、サービス配置 |
 | [キャラクターデザイン](../docs/design/character-design.md) | うつし・ミラの名前、役割、外見設定、デザインアセットの置き場所と命名規則 |
 | [診断seed運用](../docs/development/diagnosis-seed.md) | Question、Question Version、Choice、DiagnosisをD1へ登録するseedの配置、実行、更新、検証方法 |
+| [診断サムネイル生成](../docs/development/diagnosis-thumbnail-generation.md) | 診断一覧用サムネイルの生成プロンプト、共通スタイル、配置手順 |
 | [診断API契約](../docs/development/diagnosis-api.md) | Web UIとAPI Server間の診断APIのパス、認証、入出力、エラー契約 |
 | [API契約とクライアント型の生成](../docs/development/api-contract-generation.md) | API ServerのHTTP契約の配置、OpenAPI documentとWeb UI用TypeScript型の生成運用 |
 | [PR作成手順書](../docs/development/pull-request-guidelines.md) | PRタイトルの命名規則、概要の書き方、作成前の準備・検証手順 |

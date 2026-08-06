@@ -76,7 +76,7 @@ describe("DiagnosisHome", () => {
         diagnoses={{
           status: "success",
           data: [
-            diagnosis({ id: "money-values", title: "お金の診断" }),
+            diagnosis({ id: "time-planning", title: "時間と予定" }),
             diagnosis({ id: "new-diagnosis", title: "新しい診断", displayOrder: 2 }),
           ],
         }}
@@ -88,11 +88,11 @@ describe("DiagnosisHome", () => {
       />,
     );
 
-    const moneyCard = screen.getByRole("button", { name: /お金の診断/ });
+    const timePlanningCard = screen.getByRole("button", { name: /時間と予定/ });
     const fallbackCard = screen.getByRole("button", { name: /新しい診断/ });
 
-    expect(moneyCard.querySelector("img")?.getAttribute("src")).toBe(
-      "/images/diagnoses/money-values.jpg",
+    expect(timePlanningCard.querySelector("img")?.getAttribute("src")).toBe(
+      "/images/diagnoses/time-planning.jpg",
     );
     expect(fallbackCard.querySelector("img")?.getAttribute("src")).toBe(
       "/images/diagnoses/default.jpg",
