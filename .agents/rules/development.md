@@ -89,6 +89,7 @@
 - **LINE Webhook 自動登録および日記の受付返信**:
   - API サーバー起動時 (`src/index.ts`) または CLI スクリプト (`bun run register:webhook`) の実行時、`LINE_CHANNEL_ACCESS_TOKEN` および `LINE_WEBHOOK_URL` (または `BASE_URL`) が環境変数として与えられている場合、公式 SDK (`@line/bot-sdk`) の `MessagingApiClient.setWebhookEndpoint` を用いて自動的に LINE Messaging API へ Webhook Endpoint URL を登録・更新します。
   - Webhook 受信メッセージは Cloudflare Queues 経由で Queue Worker (`apps/worker`) に配信され、`replyToken` を使用して `MessagingApiClient.replyMessage` により受け付けた旨を返信します。**送られた本文をオウム返ししません。**
+  - 署名検証に成功した1対1トークのテキストメッセージでは、API ServerがQueue投入前に`MessagingApiClient.showLoadingAnimation`を呼び、60秒のチャットローディングを表示します。診断、日記、AIチャットを受信側で重複判定せず、いずれも同じ待機表示にします。グループトークと非テキストイベントは対象外です。ローディングAPIの完了はQueue投入前に待たず、Cloudflare Workersでは`executionCtx.waitUntil`へ渡してWebhook応答のクリティカルパスから外します。ローディングAPIの失敗はQueue投入を止めず、本人識別子である`userId`をログへ出力しません（[LINE公式ガイド](https://developers.line.biz/en/docs/messaging-api/use-loading-indicator/)）。
   - 返信には「今日の診断」への導線として LIFF の URL (`https://liff.line.me/{LIFF_ID}`) を添えます。LINE 内から Web を開く主導線であり、設計は [プロジェクト概要 §4](../../docs/product/project-overview.md#4-想定する利用体験) を正とします。文面の組み立ては `apps/worker` の `buildReplyText` に集約します。
   - テキストメッセージは**既定で日記として扱い**、診断のリンクを求めるキーワード (`診断` など) だけを例外として切り出します。判定は `apps/worker` の `classifyLineText` に集約し、`diagnosis-request` / `diary` の union で返します。
     - キーワードの判定は **NFKC 正規化・前後の空白除去・ひらがなからカタカナへの寄せの後で完全一致**させます。部分一致は採りません。部分一致にすると「今日は会社で診断に答えた」のような日記本文がコマンドとして飲み込まれ、蓄積の量を担う日記が記録されなくなります。
