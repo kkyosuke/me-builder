@@ -130,10 +130,12 @@ function diagnosis(overrides: Partial<DiagnosisListItem> = {}): DiagnosisListIte
     description: "説明",
     opensAt: "2026-08-04T00:00:00.000Z",
     closesAt: null,
+    displayOrder: 10,
     availability: "open",
     responseStatus: "unanswered",
     answeredCount: 0,
     questionCount: 10,
+    lastAnsweredAt: null,
     ...overrides,
   };
 }
@@ -424,6 +426,10 @@ describe("App", () => {
     mocks.fetchDiagnosisList.mockResolvedValue([item]);
     render(<App />);
 
+    const answeredSection = await screen.findByRole("button", { name: /回答済み.*1件/ });
+    expect(answeredSection.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByRole("button", { name: /テスト診断/ })).toBeNull();
+    fireEvent.click(answeredSection);
     fireEvent.click(await screen.findByRole("button", { name: /テスト診断/ }));
 
     expect(await screen.findByText("結果UI: テスト診断 (1件)")).toBeTruthy();

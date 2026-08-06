@@ -76,6 +76,8 @@ export const diagnoses = sqliteTable("diagnoses", {
   // 既存D1へ列を追加した直後だけ空文字になり、diagnosis seedが正式な説明へ補完する。
   description: text("description").notNull().default(""),
   scoringConfigId: text("scoring_config_id").references(() => diagnosisScoringConfigs.id),
+  // 既存D1へ列を追加した直後だけ0になり、diagnosis seedが正式な表示順へ補完する。
+  displayOrder: integer("display_order").notNull().default(0),
   opensAt: integer("opens_at", { mode: "timestamp" }).notNull(),
   closesAt: integer("closes_at", { mode: "timestamp" }),
   state: text("state", { enum: ["draft", "published", "withdrawn"] }).notNull(),

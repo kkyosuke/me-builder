@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, inArray, lte } from "drizzle-orm";
+import { and, asc, count, eq, inArray, lte, max } from "drizzle-orm";
 import type { D1Client } from "../client";
 import {
   diagnoses,
@@ -22,10 +22,12 @@ export type DiagnosisListItem = Readonly<{
   description: string;
   opensAt: string;
   closesAt: string | null;
+  displayOrder: number;
   availability: DiagnosisListAvailability;
   responseStatus: DiagnosisListResponseStatus;
   answeredCount: number;
   questionCount: number;
+  lastAnsweredAt: string | null;
 }>;
 
 export type DiagnosisDetail = Readonly<{
@@ -747,8 +749,10 @@ export async function listVisibleDiagnoses(
       description: diagnoses.description,
       opensAt: diagnoses.opensAt,
       closesAt: diagnoses.closesAt,
+      displayOrder: diagnoses.displayOrder,
       questionCount: count(diagnosisQuestions.id),
       answeredCount: count(diagnosisAnswers.id),
+      lastAnsweredAt: max(diagnosisAnswers.acceptedAt),
     })
     .from(diagnoses)
     .innerJoin(
@@ -787,9 +791,9 @@ export async function listVisibleDiagnoses(
       diagnoses.description,
       diagnoses.opensAt,
       diagnoses.closesAt,
-      diagnoses.publishedAt,
+      diagnoses.displayOrder,
     )
-    .orderBy(desc(diagnoses.publishedAt), asc(diagnoses.id));
+    .orderBy(asc(diagnoses.displayOrder), asc(diagnoses.id));
 
   return rows.map((row) => {
     const responseStatus: DiagnosisListResponseStatus =
@@ -805,10 +809,12 @@ export async function listVisibleDiagnoses(
       description: row.description,
       opensAt: row.opensAt.toISOString(),
       closesAt: row.closesAt?.toISOString() ?? null,
+      displayOrder: row.displayOrder,
       availability: row.closesAt && row.closesAt.getTime() <= at.getTime() ? "closed" : "open",
       responseStatus,
       answeredCount: row.answeredCount,
       questionCount: row.questionCount,
+      lastAnsweredAt: row.lastAnsweredAt?.toISOString() ?? null,
     };
   });
 }

@@ -25,7 +25,7 @@ seedは必ずmigration適用後に実行します。localでは開発者が明�
 - SQLは再実行できるようにし、既存行を上書きしない
 - 公開済みQuestion Versionの質問文、Choice、状態を更新しない
 - 質問内容を変える場合は、同じQuestionへ新しいversionを追加する
-- 公開済みDiagnosisのタイトル、受付期間、質問、版、順序を更新しない
+- 公開済みDiagnosisのタイトル、受付期間、質問、版、質問順を更新しない
 - 公開内容を変える場合は、新しいDiagnosis IDで登録する
 - `created_at`などの日時はDrizzleの`timestamp` modeに合わせたUnix秒で記録する
 - 採点設定の意味と計算規則は各スコアリング設計を正とし、実行時の設定値をseedから版付きの不変な行として登録する
@@ -39,13 +39,13 @@ seedは必ずmigration適用後に実行します。localでは開発者が明�
 
 現在のseedは次の公開済みDiagnosisを登録します。
 
-| Diagnosis ID | タイトル | Question Version | 受付開始 |
-| --- | --- | --- | --- |
-| `relationship-priority` | 自分と相手の優先・境界線 | すべてversion 1 | 2026-08-04 00:00:00 UTC |
-| `money-values` | お金と消費 | すべてversion 1 | 2026-08-04 00:00:00 UTC |
-| `leisure-style` | インドア・アウトドアと余暇 | すべてversion 1 | 2026-08-04 00:00:00 UTC |
+| 表示順 | Diagnosis ID | タイトル | Question Version | 受付開始 |
+| ---: | --- | --- | --- | --- |
+| 10 | `relationship-priority` | 自分と相手の優先・境界線 | すべてversion 1 | 2026-08-04 00:00:00 UTC |
+| 20 | `money-values` | お金と消費 | すべてversion 1 | 2026-08-04 00:00:00 UTC |
+| 30 | `leisure-style` | インドア・アウトドアと余暇 | すべてversion 1 | 2026-08-04 00:00:00 UTC |
 
-いずれも終了日時を持たず、Question Versionは`approved`、Diagnosisは`published`として登録します。Diagnosisには一覧表示用の短い説明と版付き採点設定への参照を持たせます。Choiceは「いいえ」「はい」の2件です。
+いずれも終了日時を持たず、Question Versionは`approved`、Diagnosisは`published`として登録します。Diagnosisには一覧表示用の短い説明、表示順、版付き採点設定への参照を持たせます。Choiceは「いいえ」「はい」の2件です。表示順は診断内容ではなく一覧上の優先順位として変更でき、将来の差し込みに備えて10刻みで設定します。
 
 ## 5. 実行方法
 
@@ -95,6 +95,7 @@ SQL末尾の検証クエリは、現在のseedだけを適用した場合に次�
 - 各Question Versionが`approved`である
 - 各Question Versionにposition 0の「いいえ」とposition 1の「はい」がある
 - 各Diagnosisが対応するversion 1の採点設定を参照している
+- 各Diagnosisの表示順が登録表と一致する
 - seedを2回実行しても件数と内容が変わらない
 - 採点設定とQuestion ID、Question Version、Choice IDが一致する
 

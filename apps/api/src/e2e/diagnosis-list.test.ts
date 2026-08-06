@@ -49,7 +49,8 @@ async function prepareDatabase(db: D1Database): Promise<void> {
 
   const seed = await readFile(diagnosisSeed, "utf8");
   await applySeed(db, seed);
-  // seedの再実行でも同じ初期状態を維持できることをE2Eの前提として確認する。
+  // 運営が表示順を変更した場合も、seedの再実行で正式値へ戻ることを確認する。
+  await db.prepare("UPDATE diagnoses SET display_order = 999").run();
   await applySeed(db, seed);
 
   await db
@@ -185,12 +186,15 @@ describe("GET /api/diagnoses local D1 E2E", () => {
       diagnoses: Array<{
         id: string;
         description: string;
+        displayOrder: number;
         responseStatus: string;
         answeredCount: number;
         questionCount: number;
+        lastAnsweredAt: string | null;
       }>;
     };
     expect(initialBody.diagnoses).toHaveLength(3);
+    expect(initialBody.diagnoses.map(({ displayOrder }) => displayOrder)).toEqual([10, 20, 30]);
     expect(initialBody.diagnoses.every(({ description }) => description.length > 0)).toBe(true);
     expect(
       initialBody.diagnoses.every(({ responseStatus }) => responseStatus === "unanswered"),
@@ -207,6 +211,7 @@ describe("GET /api/diagnoses local D1 E2E", () => {
         responseStatus: string;
         answeredCount: number;
         questionCount: number;
+        lastAnsweredAt: string | null;
       }>;
     };
 
@@ -214,12 +219,14 @@ describe("GET /api/diagnoses local D1 E2E", () => {
       responseStatus: "in-progress",
       answeredCount: 1,
       questionCount: 10,
+      lastAnsweredAt: expect.any(String),
     });
     expect(progressedBody.diagnoses.find(({ id }) => id === "relationship-priority")).toMatchObject(
       {
         responseStatus: "answered",
         answeredCount: 10,
         questionCount: 10,
+        lastAnsweredAt: expect.any(String),
       },
     );
   });

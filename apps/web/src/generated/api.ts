@@ -221,12 +221,14 @@ export interface operations {
               /** Format: date-time */
               opensAt: string;
               closesAt: string | null;
+              displayOrder: number;
               /** @enum {string} */
               availability: "open" | "closed";
               /** @enum {string} */
               responseStatus: "unanswered" | "in-progress" | "answered";
               answeredCount: number;
               questionCount: number;
+              lastAnsweredAt: string | null;
             }[];
           };
         };

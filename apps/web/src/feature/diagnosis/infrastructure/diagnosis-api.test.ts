@@ -31,10 +31,12 @@ describe("fetchDiagnosisList", () => {
             description: "説明",
             opensAt: "2026-08-04T00:00:00.000Z",
             closesAt: null,
+            displayOrder: 10,
             availability: "open",
             responseStatus: "in-progress",
             answeredCount: 3,
             questionCount: 10,
+            lastAnsweredAt: "2026-08-05T00:00:00.000Z",
           },
         ],
       }),
@@ -48,8 +50,10 @@ describe("fetchDiagnosisList", () => {
     });
     expect(diagnoses[0]).toMatchObject({
       id: "relationship-priority",
+      displayOrder: 10,
       responseStatus: "in-progress",
       answeredCount: 3,
+      lastAnsweredAt: "2026-08-05T00:00:00.000Z",
     });
   });
 

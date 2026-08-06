@@ -8,10 +8,12 @@ const diagnosis: DiagnosisListItem = {
   description: "説明",
   opensAt: "2026-08-05T00:00:00.000Z",
   closesAt: null,
+  displayOrder: 10,
   availability: "open",
   responseStatus: "unanswered",
   answeredCount: 0,
   questionCount: 10,
+  lastAnsweredAt: null,
 };
 
 describe("resolveDiagnosisDestination", () => {
@@ -46,7 +48,12 @@ describe("applySavedProgress", () => {
         responseStatus: "answered",
         answeredCount: 10,
         questionCount: 10,
+        lastAnsweredAt: "2026-08-06T00:00:00.000Z",
       }),
-    ).toMatchObject({ responseStatus: "answered", answeredCount: 10 });
+    ).toMatchObject({
+      responseStatus: "answered",
+      answeredCount: 10,
+      lastAnsweredAt: "2026-08-06T00:00:00.000Z",
+    });
   });
 });

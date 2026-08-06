@@ -12,7 +12,9 @@ export function useDiagnosisAnswerSaver({
   idToken: string | null;
   onProgress: (
     diagnosisId: string,
-    progress: Pick<DiagnosisListItem, "responseStatus" | "answeredCount" | "questionCount">,
+    progress: Pick<DiagnosisListItem, "responseStatus" | "answeredCount" | "questionCount"> & {
+      lastAnsweredAt?: string;
+    },
   ) => void;
 }) {
   const pendingSaves = useRef(new Map<string, Set<Promise<void>>>());
@@ -45,7 +47,10 @@ export function useDiagnosisAnswerSaver({
       pendingSaves.current.set(definition.id, saves);
       try {
         const result = await saveRequest;
-        onProgress(definition.id, result.progress);
+        onProgress(definition.id, {
+          ...result.progress,
+          lastAnsweredAt: result.answer.acceptedAt,
+        });
         return { acceptedAt: result.answer.acceptedAt };
       } finally {
         saves.delete(settledSave);

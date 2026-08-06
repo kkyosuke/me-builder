@@ -5,8 +5,10 @@ export interface DiagnosisListItem {
   description: string;
   opensAt: string;
   closesAt: string | null;
+  displayOrder: number;
   availability: "open" | "closed";
   responseStatus: "unanswered" | "in-progress" | "answered";
   answeredCount: number;
   questionCount: number;
+  lastAnsweredAt: string | null;
 }

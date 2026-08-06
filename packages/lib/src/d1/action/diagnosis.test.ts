@@ -76,6 +76,7 @@ async function insertDiagnosis(
     opensAt?: Date;
     closesAt?: Date;
     scoringConfigId?: string;
+    displayOrder?: number;
   },
 ) {
   const questionIds = [`${input.id}-q1`, `${input.id}-q2`];
@@ -87,6 +88,7 @@ async function insertDiagnosis(
     title: `${input.id} title`,
     description: `${input.id} description`,
     ...(input.scoringConfigId ? { scoringConfigId: input.scoringConfigId } : {}),
+    displayOrder: input.displayOrder ?? 0,
     opensAt: input.opensAt ?? new Date("2026-08-01T00:00:00Z"),
     ...(input.closesAt ? { closesAt: input.closesAt } : {}),
     state: input.state ?? "published",
@@ -107,10 +109,11 @@ describe("listVisibleDiagnoses", () => {
   it("公開済み・受付開始後だけを一覧へ返し、受付終了を区別する", async () => {
     const db = createTestDb();
     await db.insert(schema.accounts).values({ id: "account-1" });
-    await insertDiagnosis(db, { id: "open" });
+    await insertDiagnosis(db, { id: "open", displayOrder: 20 });
     await insertDiagnosis(db, {
       id: "closed",
       closesAt: new Date("2026-08-02T00:00:00Z"),
+      displayOrder: 10,
     });
     await insertDiagnosis(db, {
       id: "before-open",
@@ -125,10 +128,12 @@ describe("listVisibleDiagnoses", () => {
       expect.objectContaining({
         id: "closed",
         description: "closed description",
+        displayOrder: 10,
         availability: "closed",
         responseStatus: "unanswered",
         answeredCount: 0,
         questionCount: 2,
+        lastAnsweredAt: null,
       }),
       expect.objectContaining({ id: "open", availability: "open" }),
     ]);
@@ -178,7 +183,7 @@ describe("listVisibleDiagnoses", () => {
         questionId: "diagnosis-b-q2",
         questionVersion: 1,
         choiceId: "no",
-        acceptedAt: new Date("2026-08-02T00:00:00Z"),
+        acceptedAt: new Date("2026-08-02T12:00:00Z"),
         sourceRecordId: "source-b2",
       },
       {
@@ -199,11 +204,13 @@ describe("listVisibleDiagnoses", () => {
       responseStatus: "in-progress",
       answeredCount: 1,
       questionCount: 2,
+      lastAnsweredAt: "2026-08-02T00:00:00.000Z",
     });
     expect(result.find(({ id }) => id === "diagnosis-b")).toMatchObject({
       responseStatus: "answered",
       answeredCount: 2,
       questionCount: 2,
+      lastAnsweredAt: "2026-08-02T12:00:00.000Z",
     });
   });
 });
