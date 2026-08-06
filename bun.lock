@@ -93,6 +93,7 @@
         "@types/better-sqlite3": "^7.6.13",
         "@types/bun": "latest",
         "better-sqlite3": "^13.0.1",
+        "miniflare": "4.20260722.0",
       },
     },
     "packages/lib": {

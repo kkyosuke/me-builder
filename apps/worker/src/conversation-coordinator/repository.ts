@@ -1,7 +1,15 @@
 import { and, asc, count, eq, inArray, lte, min, notInArray, sql } from "drizzle-orm";
 import { type DrizzleSqliteDODatabase, drizzle } from "drizzle-orm/durable-sqlite";
 import type { AcceptedDiaryMessage } from ".";
-import { acceptedMessages, coordinatorSchema, coordinatorState, localTurns } from "./schema";
+import {
+  acceptedMessages,
+  attachBatchMessages,
+  attachBatches,
+  coordinatorIdentity,
+  coordinatorSchema,
+  coordinatorState,
+  localTurns,
+} from "./schema";
 
 type CoordinatorDatabase = DrizzleSqliteDODatabase<typeof coordinatorSchema>;
 
@@ -28,6 +36,20 @@ export class ConversationCoordinatorRepository {
         singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
         generation_epoch INTEGER NOT NULL DEFAULT 0
       );
+      CREATE TABLE IF NOT EXISTS coordinator_identity (
+        singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+        account_id TEXT NOT NULL UNIQUE
+      );
+      CREATE TABLE IF NOT EXISTS attach_batches (
+        id TEXT PRIMARY KEY,
+        generation_epoch INTEGER NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS attach_batch_messages (
+        event_id TEXT PRIMARY KEY REFERENCES accepted_messages(event_id) ON DELETE CASCADE,
+        batch_id TEXT NOT NULL REFERENCES attach_batches(id) ON DELETE CASCADE
+      );
+      CREATE INDEX IF NOT EXISTS attach_batch_message_batch_idx
+        ON attach_batch_messages(batch_id);
       CREATE TABLE IF NOT EXISTS local_turns (
         turn_id TEXT PRIMARY KEY,
         generation_epoch INTEGER NOT NULL,
@@ -42,16 +64,32 @@ export class ConversationCoordinatorRepository {
       .values({ singleton: 1, generationEpoch: 0 })
       .onConflictDoNothing()
       .run();
+    this.recoverUnbatchedAttachingMessages();
   }
 
-  hasAcceptedMessage(eventId: string): boolean {
-    return Boolean(
-      this.db
-        .select({ eventId: acceptedMessages.eventId })
-        .from(acceptedMessages)
-        .where(eq(acceptedMessages.eventId, eventId))
-        .get(),
-    );
+  bindAccount(accountId: string): boolean {
+    const existing = this.db
+      .select({ accountId: coordinatorIdentity.accountId })
+      .from(coordinatorIdentity)
+      .where(eq(coordinatorIdentity.singleton, 1))
+      .get();
+    if (existing) return existing.accountId === accountId;
+    const legacyAccountId = this.db
+      .select({ accountId: acceptedMessages.accountId })
+      .from(acceptedMessages)
+      .limit(1)
+      .get()?.accountId;
+    const boundAccountId = legacyAccountId ?? accountId;
+    this.db.insert(coordinatorIdentity).values({ singleton: 1, accountId: boundAccountId }).run();
+    return boundAccountId === accountId;
+  }
+
+  findAcceptedMessage(eventId: string) {
+    return this.db
+      .select()
+      .from(acceptedMessages)
+      .where(eq(acceptedMessages.eventId, eventId))
+      .get();
   }
 
   addAcceptedMessage(input: AcceptedDiaryMessage): void {
@@ -162,13 +200,73 @@ export class ConversationCoordinatorRepository {
     return this.db
       .select()
       .from(acceptedMessages)
-      .where(inArray(acceptedMessages.status, ["pending", "attaching"]))
+      .where(eq(acceptedMessages.status, "pending"))
       .orderBy(asc(acceptedMessages.receivedAt), asc(acceptedMessages.eventId))
       .all();
   }
 
+  findAttachBatch() {
+    const batch = this.db
+      .select()
+      .from(attachBatches)
+      .orderBy(asc(attachBatches.generationEpoch))
+      .limit(1)
+      .get();
+    if (!batch) return undefined;
+    const messages = this.db
+      .select({ message: acceptedMessages })
+      .from(attachBatchMessages)
+      .innerJoin(acceptedMessages, eq(attachBatchMessages.eventId, acceptedMessages.eventId))
+      .where(eq(attachBatchMessages.batchId, batch.id))
+      .orderBy(asc(acceptedMessages.receivedAt), asc(acceptedMessages.eventId))
+      .all()
+      .map(({ message }) => message);
+    if (messages.length === 0) throw new Error("Attach batch exists without messages");
+    return { ...batch, messages };
+  }
+
+  createAttachBatch(eventIds: string[], generationEpoch: number): string {
+    if (eventIds.length === 0) throw new Error("Cannot create an empty attach batch");
+    const batchId = crypto.randomUUID();
+    this.db.transaction((tx) => {
+      tx.insert(attachBatches).values({ id: batchId, generationEpoch }).run();
+      tx.insert(attachBatchMessages)
+        .values(eventIds.map((eventId) => ({ eventId, batchId })))
+        .run();
+      tx.update(acceptedMessages)
+        .set({ status: "attaching" })
+        .where(
+          and(inArray(acceptedMessages.eventId, eventIds), eq(acceptedMessages.status, "pending")),
+        )
+        .run();
+    });
+    return batchId;
+  }
+
+  completeAttachBatch(
+    batchId: string,
+    eventIds: string[],
+    turn?: { turnId: string; generationEpoch: number },
+  ): void {
+    this.db.transaction((tx) => {
+      if (turn) {
+        tx.insert(localTurns)
+          .values({ ...turn, status: "pending_queue" })
+          .onConflictDoNothing()
+          .run();
+      }
+      tx.update(acceptedMessages)
+        .set({ status: "attached" })
+        .where(inArray(acceptedMessages.eventId, eventIds))
+        .run();
+      tx.delete(attachBatchMessages).where(eq(attachBatchMessages.batchId, batchId)).run();
+      tx.delete(attachBatches).where(eq(attachBatches.id, batchId)).run();
+    });
+  }
+
   nextGenerationEpoch(): number {
-    return this.db.transaction((tx) => {
+    let nextGenerationEpoch: number | undefined;
+    this.db.transaction((tx) => {
       const current = tx
         .select({ generationEpoch: coordinatorState.generationEpoch })
         .from(coordinatorState)
@@ -180,32 +278,12 @@ export class ConversationCoordinatorRepository {
         .set({ generationEpoch: next })
         .where(eq(coordinatorState.singleton, 1))
         .run();
-      return next;
+      nextGenerationEpoch = next;
     });
-  }
-
-  markMessagesAttaching(eventIds: string[]): void {
-    this.db
-      .update(acceptedMessages)
-      .set({ status: "attaching" })
-      .where(inArray(acceptedMessages.eventId, eventIds))
-      .run();
-  }
-
-  markMessagesAttached(eventIds: string[]): void {
-    this.db
-      .update(acceptedMessages)
-      .set({ status: "attached" })
-      .where(inArray(acceptedMessages.eventId, eventIds))
-      .run();
-  }
-
-  addPendingTurn(turnId: string, generationEpoch: number): void {
-    this.db
-      .insert(localTurns)
-      .values({ turnId, generationEpoch, status: "pending_queue" })
-      .onConflictDoNothing()
-      .run();
+    if (nextGenerationEpoch === undefined) {
+      throw new Error("Coordinator generation epoch was not updated");
+    }
+    return nextGenerationEpoch;
   }
 
   markTurnQueued(turnId: string): void {
@@ -227,7 +305,24 @@ export class ConversationCoordinatorRepository {
       .from(localTurns)
       .where(eq(localTurns.status, "pending_queue"))
       .get()?.value;
-    return (acceptedCount ?? 0) > 0 || (turnCount ?? 0) > 0;
+    const batchCount = this.db.select({ value: count() }).from(attachBatches).get()?.value;
+    return (acceptedCount ?? 0) > 0 || (turnCount ?? 0) > 0 || (batchCount ?? 0) > 0;
+  }
+
+  cleanupTerminalState(attachedBefore: number): void {
+    this.db.transaction((tx) => {
+      tx.delete(localTurns)
+        .where(inArray(localTurns.status, ["delivered", "failed"]))
+        .run();
+      tx.delete(acceptedMessages)
+        .where(
+          and(
+            eq(acceptedMessages.status, "attached"),
+            lte(acceptedMessages.receivedAt, attachedBefore),
+          ),
+        )
+        .run();
+    });
   }
 
   earliestLeaseDeadline(): number | null {
@@ -237,6 +332,27 @@ export class ConversationCoordinatorRepository {
         .from(localTurns)
         .where(eq(localTurns.status, "generating"))
         .get()?.value ?? null
+    );
+  }
+
+  private recoverUnbatchedAttachingMessages(): void {
+    if (this.db.select({ value: count() }).from(attachBatches).get()?.value) return;
+    const messages = this.db
+      .select({ eventId: acceptedMessages.eventId })
+      .from(acceptedMessages)
+      .where(eq(acceptedMessages.status, "attaching"))
+      .orderBy(asc(acceptedMessages.receivedAt), asc(acceptedMessages.eventId))
+      .all();
+    if (messages.length === 0) return;
+    const generationEpoch = this.db
+      .select({ generationEpoch: coordinatorState.generationEpoch })
+      .from(coordinatorState)
+      .where(eq(coordinatorState.singleton, 1))
+      .get()?.generationEpoch;
+    if (generationEpoch === undefined) throw new Error("Coordinator state is not initialized");
+    this.createAttachBatch(
+      messages.map(({ eventId }) => eventId),
+      generationEpoch,
     );
   }
 }

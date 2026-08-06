@@ -1,6 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 import { d1 } from "@me-builder/lib";
-import type { ChatTurnQueueMessage } from "@me-builder/shared";
+import { type ChatTurnQueueMessage, logger } from "@me-builder/shared";
 import { DEFAULT_GEMINI_MODEL, getCloudflareBindings } from "../config";
 import type { CloudflareBindings } from "../config";
 import type { Env } from "../types";
@@ -8,6 +8,8 @@ import { ConversationCoordinatorRepository } from "./repository";
 
 const COALESCE_MS = 1_500;
 const LEASE_MS = 90_000;
+const ALARM_RETRY_MS = 30_000;
+const ACCEPTED_MESSAGE_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 export type AcceptedDiaryMessage = {
   accountId: string;
@@ -33,7 +35,20 @@ export class ConversationCoordinator extends DurableObject<Env> {
   }
 
   async acceptMessage(input: AcceptedDiaryMessage): Promise<{ accepted: boolean }> {
-    if (this.repository.hasAcceptedMessage(input.eventId)) return { accepted: false };
+    if (!this.repository.bindAccount(input.accountId)) {
+      throw new Error("Conversation coordinator cannot accept messages from another account");
+    }
+    const existing = this.repository.findAcceptedMessage(input.eventId);
+    if (existing) {
+      if (
+        existing.accountId !== input.accountId ||
+        existing.sourceRecordId !== input.sourceRecordId ||
+        existing.receivedAt !== new Date(input.receivedAt).getTime()
+      ) {
+        throw new Error("Accepted diary event conflicts with its persisted coordinator input");
+      }
+      return { accepted: false };
+    }
 
     this.repository.addAcceptedMessage(input);
     const alarm = await this.ctx.storage.getAlarm();
@@ -87,12 +102,14 @@ export class ConversationCoordinator extends DurableObject<Env> {
       return false;
     }
     this.repository.completeGeneration(turnId);
+    this.cleanupTerminalState();
     await this.schedulePendingWork();
     return true;
   }
 
   async failGeneration(turnId: string, generationEpoch: number, leaseToken: string): Promise<void> {
     this.repository.failGeneration(turnId, generationEpoch, leaseToken);
+    this.cleanupTerminalState();
     await this.schedulePendingWork();
   }
 
@@ -105,35 +122,66 @@ export class ConversationCoordinator extends DurableObject<Env> {
   }
 
   async alarm(): Promise<void> {
+    try {
+      await this.processAlarm();
+    } catch (error) {
+      logger.error(
+        {
+          errorName: error instanceof Error ? error.name : "UnknownError",
+          errorMessage: error instanceof Error ? error.message : String(error),
+        },
+        "Conversation coordinator alarm failed; retry scheduled",
+      );
+      await this.ctx.storage.setAlarm(Date.now() + ALARM_RETRY_MS);
+    }
+  }
+
+  private async processAlarm(): Promise<void> {
+    this.cleanupTerminalState();
     this.repository.expireGenerationLeases(Date.now());
     for (const turn of this.repository.listPendingQueueTurns()) {
       await this.enqueueTurn(turn.turnId, turn.generationEpoch);
     }
 
-    const pending = this.repository.listPendingMessages();
-    if (pending.length === 0) {
+    let batch = this.repository.findAttachBatch();
+    if (!batch) {
+      const pending = this.repository.listPendingMessages();
+      if (pending.length > 0) {
+        const generationEpoch = this.repository.nextGenerationEpoch();
+        this.repository.createAttachBatch(
+          pending.map(({ eventId }) => eventId),
+          generationEpoch,
+        );
+        batch = this.repository.findAttachBatch();
+      }
+    }
+    if (!batch) {
       await this.schedulePendingWork();
       return;
     }
 
-    const generationEpoch = this.repository.nextGenerationEpoch();
-    const eventIds = pending.map(({ eventId }) => eventId);
-    this.repository.markMessagesAttaching(eventIds);
-
     const attached = await d1.action.conversation.attachMessagesToTurn(
       this.cf.d1,
-      pending.map((item) => ({
+      batch.messages.map((item) => ({
         eventId: item.eventId,
         accountId: item.accountId,
         sourceRecordId: item.sourceRecordId,
         receivedAt: new Date(item.receivedAt),
       })),
-      generationEpoch,
+      batch.generationEpoch,
       this.env.GEMINI_MODEL ?? DEFAULT_GEMINI_MODEL,
     );
-    this.repository.addPendingTurn(attached.turnId, attached.generationEpoch);
-    this.repository.markMessagesAttached(eventIds);
-    await this.enqueueTurn(attached.turnId, attached.generationEpoch);
+    const isCurrentGeneration = attached.generationEpoch === batch.generationEpoch;
+    this.repository.completeAttachBatch(
+      batch.id,
+      batch.messages.map(({ eventId }) => eventId),
+      isCurrentGeneration
+        ? { turnId: attached.turnId, generationEpoch: attached.generationEpoch }
+        : undefined,
+    );
+    if (isCurrentGeneration) {
+      await this.enqueueTurn(attached.turnId, attached.generationEpoch);
+    }
     await this.schedulePendingWork();
   }
 
@@ -154,5 +202,9 @@ export class ConversationCoordinator extends DurableObject<Env> {
     if (currentAlarm === null || desiredAlarm < currentAlarm) {
       await this.ctx.storage.setAlarm(desiredAlarm);
     }
+  }
+
+  private cleanupTerminalState(): void {
+    this.repository.cleanupTerminalState(Date.now() - ACCEPTED_MESSAGE_RETENTION_MS);
   }
 }

@@ -19,6 +19,29 @@ export const coordinatorState = sqliteTable("coordinator_state", {
   generationEpoch: integer("generation_epoch").notNull().default(0),
 });
 
+export const coordinatorIdentity = sqliteTable("coordinator_identity", {
+  singleton: integer("singleton").primaryKey(),
+  accountId: text("account_id").notNull().unique(),
+});
+
+export const attachBatches = sqliteTable("attach_batches", {
+  id: text("id").primaryKey(),
+  generationEpoch: integer("generation_epoch").notNull(),
+});
+
+export const attachBatchMessages = sqliteTable(
+  "attach_batch_messages",
+  {
+    eventId: text("event_id")
+      .primaryKey()
+      .references(() => acceptedMessages.eventId, { onDelete: "cascade" }),
+    batchId: text("batch_id")
+      .notNull()
+      .references(() => attachBatches.id, { onDelete: "cascade" }),
+  },
+  (table) => [index("attach_batch_message_batch_idx").on(table.batchId)],
+);
+
 export const localTurns = sqliteTable("local_turns", {
   turnId: text("turn_id").primaryKey(),
   generationEpoch: integer("generation_epoch").notNull(),
@@ -31,6 +54,9 @@ export const localTurns = sqliteTable("local_turns", {
 
 export const coordinatorSchema = {
   acceptedMessages,
+  attachBatches,
+  attachBatchMessages,
+  coordinatorIdentity,
   coordinatorState,
   localTurns,
 };

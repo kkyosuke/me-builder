@@ -291,8 +291,12 @@ DOのローカルSQLiteはAccount内の連投と生成leaseだけを調停しま
 | `accepted_messages.source_record_id` | D1へ保存済みのユーザー原文を会話へ結ぶID |
 | `accepted_messages.received_at` | 連投内の順序とTurnの受付時刻 |
 | `accepted_messages.status` | `pending` → `attaching` → `attached`。D1反映途中の再開位置 |
+| `coordinator_identity.account_id` | DOを最初に受け付けたAccountへ固定し、異なるAccountの混入を拒否する |
 | `coordinator_state.singleton` | 状態行を1件に固定するPK。値は常に`1` |
 | `coordinator_state.generation_epoch` | Turn作成ごとに増加する世代番号 |
+| `attach_batches.id` | D1反映を再試行する固定batchのPK |
+| `attach_batches.generation_epoch` | batchが作成するTurnの世代番号 |
+| `attach_batch_messages.event_id` | batch作成後に届いたmessageを再試行へ混ぜないための固定構成 |
 | `local_turns.turn_id` | D1の`chat_turns.id`に対応するPK |
 | `local_turns.generation_epoch` | Queue messageとleaseの世代照合 |
 | `local_turns.status` | `pending_queue` / `queued` / `generating` / `delivered` / `failed` |
@@ -310,7 +314,9 @@ stateDiagram-v2
     generating --> failed: 失敗案内を配送して終了
 ```
 
-D1、Queue、LINEを呼び出した後は、Turn ID、generation epoch、lease tokenが現在値と一致するときだけ完了へ進めます。Queue投入前は`pending_queue`として残し、alarmから同じTurn IDを再投入します。D1側のevent ID・sequence一意制約と組み合わせ、DO再起動やQueue再配送でも履歴と応答を重複させません。
+D1反映を始める前に対象event IDとgeneration epochを固定batchとして保存します。D1の成功応答を受け取る前に停止しても同じbatchだけを再試行し、後着messageは次のTurnへ残します。D1が返したepochがbatchと異なる場合は保持期間後に再送された既存Turnとみなし、生成Queueへ再投入しません。
+
+D1、Queue、LINEを呼び出した後は、Turn ID、generation epoch、lease tokenが現在値と一致するときだけ完了へ進めます。Queue投入前は`pending_queue`として残し、alarmから同じTurn IDを再投入します。D1側のevent ID・sequence一意制約と組み合わせ、DO再起動やQueue再配送でも履歴と応答を重複させません。終端化した`local_turns`は削除し、`attached`のevent IDは30日間の冪等期間を経て削除します。
 
 ### 4.10 index
 
@@ -359,7 +365,7 @@ Coordinatorは採番直前に[体験設計の境界](../product/diary-chat-exper
 - 24時間のhard cap後のmessageは必ず新しいSessionへ入れる
 - 終了と新規Session作成をAccount単位で直列化する
 
-Durable Objectのalarmは、Queue未投入Turn、次Turn、生成lease期限のうち最も早い時刻を1件だけ設定します。alarm handlerはローカルSQLiteと必要なD1行を再読込し、複数回実行されても同じ結果にします。6時間無操作と24時間hard capによるSession終了は、inactiveなAccountも対象にできるCron Triggerが所有します。Session終了を理由とした本文の自動削除は行いません。
+Durable Objectのalarmは、Queue未投入Turn、次Turn、生成lease期限のうち最も早い時刻を1件だけ設定します。alarm handlerはローカルSQLiteと必要なD1行を再読込し、複数回実行されても同じ結果にします。外部I/Oが失敗した場合は30秒後のalarmを明示的に再設定し、Cloudflareの自動retry上限を越えても未処理状態を残しません。6時間無操作と24時間hard capによるSession終了は、inactiveなAccountも対象にできるCron Triggerが所有します。Session終了を理由とした本文の自動削除は行いません。
 
 ## 6. Context Package
 
