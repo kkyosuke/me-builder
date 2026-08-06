@@ -15,7 +15,7 @@
 | [README](../README.md) | プロジェクトの短い入口と文書リンク |
 | [ドキュメントガイド](../docs/README.md) | `docs/` のディレクトリ構造、文書の探し方、全ドキュメントへの入口 |
 | [プロジェクト概要](../docs/product/project-overview.md) | 目的、主要要件、MVP、ロードマップ、Phase 1の入力体験とログイン手段 |
-| [日記チャット体験設計](../docs/product/diary-chat-experience.md) | 日々の声かけから出来事と行動原理を探り、蓄積した記憶を使って助言する対話体験 |
+| [日記チャット体験設計](../docs/product/diary-chat-experience.md) | 日々の声かけから出来事と行動原理を探り、記憶を使って助言する対話体験と応答時間 |
 | [Phase 1 診断体験設計](../docs/diagnosis/diagnosis-experience.md) | 診断一覧、回答、回答内容、LINE通知、リッチメニューのUIと遷移、縦切りの完了条件 |
 | [Phase 1 診断ドメイン設計](../docs/diagnosis/diagnosis-domain-design.md) | Question、Diagnosis、DiagnosisResponseの集約、状態、不変条件、Account / Sourceとの関係 |
 | [人間関係の価値観診断候補](../docs/diagnosis/content/relationship-values-diagnosis.md) | 人間関係で違いが問題になりやすい価値観の分類、質問作成時の原則 |
