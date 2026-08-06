@@ -48,7 +48,6 @@ export async function processChatTurnMessage(
         }
       : await generateDiaryChatResponse(context.messages, workerConfig, controller.signal, {
           currentUserMessageIds: context.currentUserMessageIds,
-          ...(context.summary ? { summary: context.summary } : {}),
         }).then((generated) => ({
           reply: generated.reply,
           endSession: generated.end_session,

@@ -122,7 +122,6 @@ export async function generateDiaryChatResponse(
   signal?: AbortSignal,
   context?: {
     currentUserMessageIds?: string[];
-    summary?: { summaryJson: string; coveredThroughSequence: number };
   },
 ): Promise<DiaryChatResponse> {
   const safetyRoute = classifySafety(messages, context?.currentUserMessageIds);
@@ -139,12 +138,6 @@ export async function generateDiaryChatResponse(
   const contents = JSON.stringify({
     context_package: {
       safety_route: safetyRoute,
-      session_summary: context?.summary
-        ? {
-            covered_through_sequence: context.summary.coveredThroughSequence,
-            summary: JSON.parse(context.summary.summaryJson) as unknown,
-          }
-        : null,
       messages: messages.map(({ id, role, body }) => ({ id, role, body })),
     },
   });
