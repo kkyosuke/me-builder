@@ -5,12 +5,6 @@ import type { AsyncState } from "../../../../model/async-state";
 import type { DiagnosisListItem } from "../../model/diagnosis-list-item";
 import { buildDiagnosisListSections } from "../../model/diagnosis-list-sections";
 
-const STATUS_LABELS: Record<DiagnosisListItem["responseStatus"], string> = {
-  unanswered: "未回答",
-  "in-progress": "回答途中",
-  answered: "回答済み",
-};
-
 function DiagnosisCard({
   diagnosis,
   onOpenDiagnosis,
@@ -22,30 +16,27 @@ function DiagnosisCard({
     <button
       type="button"
       onClick={() => onOpenDiagnosis(diagnosis)}
-      className="group flex min-h-64 flex-col rounded-3xl border border-slate-700 bg-slate-800 p-4 text-left shadow-xl shadow-slate-950/20 transition hover:-translate-y-1 hover:border-sky-400/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400 sm:p-5"
+      className="group flex min-h-48 flex-col rounded-2xl border border-slate-700 bg-slate-800 p-3 text-left shadow-lg shadow-slate-950/20 transition hover:-translate-y-0.5 hover:border-sky-400/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400 sm:p-4"
     >
-      <span className="flex size-11 items-center justify-center rounded-2xl bg-sky-400/10 text-sky-300">
-        <ClipboardList className="size-5" aria-hidden="true" />
+      <span className="flex size-9 items-center justify-center rounded-xl bg-sky-400/10 text-sky-300">
+        <ClipboardList className="size-4" aria-hidden="true" />
       </span>
-      <span className="mt-5 text-lg leading-snug font-bold text-slate-50">{diagnosis.title}</span>
-      <span className="mt-2 line-clamp-3 text-xs leading-relaxed text-slate-400 sm:text-sm">
+      <span className="mt-3 text-base leading-snug font-bold text-slate-50">{diagnosis.title}</span>
+      <span className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-slate-400">
         {diagnosis.description}
       </span>
-      <span className="mt-auto flex items-end justify-between gap-2 pt-5">
-        <span>
-          <span className="block text-xs text-slate-500">
-            {diagnosis.responseStatus === "in-progress"
-              ? `${diagnosis.answeredCount} / ${diagnosis.questionCount}問`
-              : `${diagnosis.questionCount}問`}
-          </span>
-          <span className="mt-1 inline-flex rounded-full bg-amber-400/10 px-2 py-1 text-xs font-semibold text-amber-300">
-            {diagnosis.availability === "closed"
-              ? "受付終了"
-              : STATUS_LABELS[diagnosis.responseStatus]}
-          </span>
+      <span className="mt-auto flex items-center justify-between gap-2 pt-3">
+        <span className="flex min-h-6 items-center gap-2 text-xs text-slate-500">
+          {diagnosis.responseStatus === "in-progress" &&
+            `${diagnosis.answeredCount}/${diagnosis.questionCount}`}
+          {diagnosis.availability === "closed" && (
+            <span className="inline-flex rounded-full bg-amber-400/10 px-2 py-1 font-semibold text-amber-300">
+              受付終了
+            </span>
+          )}
         </span>
-        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-sky-400 text-slate-900 transition group-hover:translate-x-0.5">
-          <ArrowRight className="size-4" aria-hidden="true" />
+        <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-sky-400 text-slate-900 transition group-hover:translate-x-0.5">
+          <ArrowRight className="size-3.5" aria-hidden="true" />
         </span>
       </span>
     </button>
