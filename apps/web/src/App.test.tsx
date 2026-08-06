@@ -143,6 +143,9 @@ function diagnosis(overrides: Partial<DiagnosisListItem> = {}): DiagnosisListIte
 describe("App", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.localStorage.clear();
+    document.documentElement.className = "";
+    document.documentElement.style.colorScheme = "";
     mocks.config.environment = "development";
     mocks.initializeLiff.mockResolvedValue({
       status: "ready",
@@ -179,6 +182,29 @@ describe("App", () => {
         unansweredQuestions: [],
       }),
     );
+  });
+
+  it("既存のダークテーマを初期表示し、ライトテーマへ切り替えて保存する", async () => {
+    render(<App />);
+
+    const toggle = screen.getByRole("button", { name: "ライトモードに切り替える" });
+    await waitFor(() => expect(document.documentElement.classList.contains("dark")).toBe(true));
+
+    fireEvent.click(toggle);
+
+    expect(screen.getByRole("button", { name: "ダークモードに切り替える" })).toBeTruthy();
+    expect(document.documentElement.classList.contains("light")).toBe(true);
+    expect(document.documentElement.classList.contains("dark")).toBe(false);
+    expect(window.localStorage.getItem("me-builder-color-theme")).toBe("light");
+  });
+
+  it("保存したライトテーマを次回表示でも復元する", async () => {
+    window.localStorage.setItem("me-builder-color-theme", "light");
+
+    render(<App />);
+
+    expect(screen.getByRole("button", { name: "ダークモードに切り替える" })).toBeTruthy();
+    await waitFor(() => expect(document.documentElement.classList.contains("light")).toBe(true));
   });
 
   afterEach(() => {

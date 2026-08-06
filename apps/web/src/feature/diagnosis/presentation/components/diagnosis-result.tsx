@@ -26,28 +26,32 @@ export function DiagnosisResultView({
       <button
         type="button"
         onClick={onBack}
-        className="mb-5 inline-flex items-center gap-2 rounded-xl px-2 py-2 text-sm font-semibold text-slate-300 transition hover:bg-slate-800 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400"
+        className="mb-5 inline-flex items-center gap-2 rounded-xl px-2 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 transition hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-950 dark:hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400"
       >
         <ArrowLeft className="size-4" aria-hidden="true" />
         診断一覧
       </button>
 
-      <header className="rounded-3xl border border-sky-300/20 bg-slate-800 p-5 shadow-xl shadow-slate-950/20 sm:p-6">
+      <header className="rounded-3xl border border-sky-300/20 bg-white dark:bg-slate-800 p-5 shadow-xl shadow-slate-950/20 sm:p-6">
         <div className="flex items-center gap-3">
-          <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-400/10 text-emerald-300">
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-400/10 text-emerald-700 dark:text-emerald-300">
             <CheckCircle2 className="size-6" aria-hidden="true" />
           </span>
           <div>
-            <p className="text-xs font-semibold tracking-wider text-sky-300">回答結果</p>
-            <h1 className="mt-1 text-xl font-bold text-slate-50">{result.title}</h1>
+            <p className="text-xs font-semibold tracking-wider text-sky-700 dark:text-sky-300">
+              回答結果
+            </p>
+            <h1 className="mt-1 text-xl font-bold text-slate-950 dark:text-slate-50">
+              {result.title}
+            </h1>
           </div>
         </div>
-        <p className="mt-4 text-sm leading-relaxed text-slate-300">
+        <p className="mt-4 text-sm leading-relaxed text-slate-700 dark:text-slate-300">
           {scoring
             ? "回答から見える現在の傾向です。どちら側にも良し悪しはなく、医療的な診断ではありません。"
             : "保存した回答内容を確認できます。医療的な診断ではありません。"}
         </p>
-        <p className="mt-3 text-xs text-slate-400">
+        <p className="mt-3 text-xs text-slate-600 dark:text-slate-400">
           {`${result.answeredCount} / ${result.questionCount}問に回答`}
         </p>
       </header>
@@ -56,20 +60,22 @@ export function DiagnosisResultView({
         <section aria-labelledby="profile-heading" className="mt-5">
           <h2
             id="profile-heading"
-            className="flex items-center gap-2 text-lg font-bold text-slate-50"
+            className="flex items-center gap-2 text-lg font-bold text-slate-950 dark:text-slate-50"
           >
-            <Sparkles className="size-5 text-sky-300" aria-hidden="true" />
+            <Sparkles className="size-5 text-sky-700 dark:text-sky-300" aria-hidden="true" />
             回答から見える傾向
           </h2>
           <fieldset
             aria-label="回答から見える傾向の一覧"
-            className="mt-3 min-w-0 divide-y divide-slate-700 rounded-2xl border border-slate-700 bg-slate-800 px-4"
+            className="mt-3 min-w-0 divide-y divide-slate-200 dark:divide-slate-700 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4"
           >
             {scoring.parameters.map((parameter) => (
               <div key={parameter.id} className="py-3.5">
                 <div className="flex items-center justify-between gap-3">
-                  <h3 className="text-sm font-semibold text-slate-200">{parameter.label}</h3>
-                  <p className="text-xs font-semibold text-sky-200">
+                  <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                    {parameter.label}
+                  </h3>
+                  <p className="text-xs font-semibold text-sky-700 dark:text-sky-200">
                     {getParameterSummary(parameter, scoring.balancedLabel)}
                   </p>
                 </div>
@@ -80,21 +86,21 @@ export function DiagnosisResultView({
                   aria-valuemax={100}
                   aria-valuenow={parameter.score ?? undefined}
                   aria-valuetext={getParameterSummary(parameter, scoring.balancedLabel)}
-                  className="relative mt-3 h-2 rounded-full bg-gradient-to-r from-indigo-400/70 via-slate-600 to-sky-300/70"
+                  className="relative mt-3 h-2 rounded-full bg-gradient-to-r from-indigo-400/70 via-slate-300 dark:via-slate-600 to-sky-300/70"
                 >
                   <span
-                    className="absolute left-1/2 top-1/2 h-4 w-px -translate-x-1/2 -translate-y-1/2 bg-slate-300/70"
+                    className="absolute left-1/2 top-1/2 h-4 w-px -translate-x-1/2 -translate-y-1/2 bg-slate-600/70 dark:bg-slate-300/70"
                     aria-hidden="true"
                   />
                   {parameter.score !== null && (
                     <span
-                      className="absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-slate-900 bg-white shadow"
+                      className="absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white dark:border-slate-900 bg-white shadow"
                       style={{ left: `${parameter.score}%` }}
                       aria-hidden="true"
                     />
                   )}
                 </div>
-                <div className="mt-1.5 flex items-start justify-between gap-3 text-[11px] leading-tight text-slate-400">
+                <div className="mt-1.5 flex items-start justify-between gap-3 text-[11px] leading-tight text-slate-600 dark:text-slate-400">
                   <span>{parameter.lowLabel}</span>
                   <span className="text-right">{parameter.highLabel}</span>
                 </div>
@@ -104,30 +110,35 @@ export function DiagnosisResultView({
           </fieldset>
         </section>
       ) : (
-        <p className="mt-5 rounded-2xl border border-slate-700 bg-slate-800 p-4 text-sm text-slate-300">
+        <p className="mt-5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 text-sm text-slate-700 dark:text-slate-300">
           この診断には、回答から見える傾向がまだ設定されていません。回答内容は確認できます。
         </p>
       )}
 
       <section aria-label="回答内容" className="mt-7 pb-8">
-        <details className="group rounded-2xl border border-slate-700 bg-slate-800">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-2xl px-4 py-4 font-bold text-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400">
+        <details className="group rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-2xl px-4 py-4 font-bold text-slate-950 dark:text-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400">
             <span>{`回答内容（${result.answers.length}件）`}</span>
             <ChevronDown
-              className="size-5 shrink-0 text-slate-400 transition-transform group-open:rotate-180"
+              className="size-5 shrink-0 text-slate-600 dark:text-slate-400 transition-transform group-open:rotate-180"
               aria-hidden="true"
             />
           </summary>
-          <ol className="space-y-3 border-t border-slate-700 p-3 sm:p-4">
+          <ol className="space-y-3 border-t border-slate-200 dark:border-slate-700 p-3 sm:p-4">
             {result.answers.map((answer, index) => (
-              <li key={answer.diagnosisQuestionId} className="rounded-xl bg-slate-900/60 p-4">
+              <li
+                key={answer.diagnosisQuestionId}
+                className="rounded-xl bg-slate-100/60 dark:bg-slate-900/60 p-4"
+              >
                 <div className="flex gap-3">
-                  <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-slate-700 text-xs font-bold text-slate-300">
+                  <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-slate-200 dark:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-300">
                     {index + 1}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm leading-relaxed text-slate-200">{answer.questionText}</p>
-                    <p className="mt-3 inline-flex rounded-full bg-sky-400/10 px-3 py-1 text-sm font-semibold text-sky-200">
+                    <p className="text-sm leading-relaxed text-slate-800 dark:text-slate-200">
+                      {answer.questionText}
+                    </p>
+                    <p className="mt-3 inline-flex rounded-full bg-sky-400/10 px-3 py-1 text-sm font-semibold text-sky-700 dark:text-sky-200">
                       {answer.choiceLabel}
                     </p>
                     <p className="mt-3 flex items-center gap-1.5 text-xs text-slate-500">

@@ -22,10 +22,14 @@ export function DiagnosisGuidance({ kind, onBack }: { kind: GuidanceKind; onBack
   const content = GUIDANCE[kind];
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-2xl items-center px-4 py-8 sm:px-8">
-      <section className="w-full rounded-3xl border border-slate-700 bg-slate-800 p-6 text-center shadow-xl shadow-slate-950/20">
-        <Info className="mx-auto size-12 text-sky-300" aria-hidden="true" />
-        <h1 className="mt-4 text-xl font-bold text-slate-50">{content.title}</h1>
-        <p className="mt-3 text-sm leading-relaxed text-slate-300">{content.message}</p>
+      <section className="w-full rounded-3xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-6 text-center shadow-xl shadow-slate-950/20">
+        <Info className="mx-auto size-12 text-sky-700 dark:text-sky-300" aria-hidden="true" />
+        <h1 className="mt-4 text-xl font-bold text-slate-950 dark:text-slate-50">
+          {content.title}
+        </h1>
+        <p className="mt-3 text-sm leading-relaxed text-slate-700 dark:text-slate-300">
+          {content.message}
+        </p>
         <button
           type="button"
           onClick={onBack}

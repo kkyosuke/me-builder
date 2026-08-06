@@ -26,7 +26,7 @@ function DiagnosisCard({
     <button
       type="button"
       onClick={() => onOpenDiagnosis(diagnosis)}
-      className="group flex min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-700 bg-slate-800 text-left shadow-lg shadow-slate-950/20 transition hover:-translate-y-0.5 hover:border-sky-400/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400"
+      className="group flex min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white text-left shadow-lg shadow-slate-950/20 transition hover:-translate-y-0.5 hover:border-sky-400/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400 dark:border-slate-700 dark:bg-slate-800"
     >
       <img
         src={getDiagnosisThumbnail(diagnosis.id)}
@@ -37,10 +37,10 @@ function DiagnosisCard({
         className="aspect-video w-full object-cover"
       />
       <span className="flex flex-1 flex-col p-3">
-        <span className="line-clamp-2 text-sm leading-snug font-bold text-slate-50 sm:text-base">
+        <span className="line-clamp-2 text-sm leading-snug font-bold text-slate-950 sm:text-base dark:text-slate-50">
           {diagnosis.title}
         </span>
-        <span className="mt-1 line-clamp-2 text-xs leading-relaxed text-slate-400">
+        <span className="mt-1 line-clamp-2 text-xs leading-relaxed text-slate-600 dark:text-slate-400">
           {diagnosis.description}
         </span>
         <span className="mt-auto flex items-center justify-between gap-2 pt-2.5">
@@ -48,7 +48,7 @@ function DiagnosisCard({
             {diagnosis.responseStatus === "in-progress" &&
               `${diagnosis.answeredCount}/${diagnosis.questionCount}`}
             {diagnosis.availability === "closed" && (
-              <span className="inline-flex rounded-full bg-amber-400/10 px-2 py-1 font-semibold text-amber-300">
+              <span className="inline-flex rounded-full bg-amber-400/10 px-2 py-1 font-semibold text-amber-700 dark:text-amber-300">
                 受付終了
               </span>
             )}
@@ -77,7 +77,7 @@ function DiagnosisSection({
 
   return (
     <section aria-labelledby={id}>
-      <h2 id={id} className="mb-3 text-base font-bold text-slate-100">
+      <h2 id={id} className="mb-3 text-base font-bold text-slate-900 dark:text-slate-100">
         {title}
         <span className="ml-2 text-sm font-normal text-slate-500">{diagnoses.length}件</span>
       </h2>
@@ -116,14 +116,18 @@ export function DiagnosisHome({
   return (
     <main className="mx-auto min-h-dvh w-full max-w-2xl px-4 py-8 sm:px-8">
       <header className="mb-8">
-        <p className="text-sm font-semibold tracking-wider text-sky-300">me-builder</p>
-        <h1 className="mt-2 text-3xl font-bold text-slate-50">診断</h1>
-        <p className="mt-2 text-sm text-slate-400">答えたいカードを選んでください。</p>
+        <p className="text-sm font-semibold tracking-wider text-sky-700 dark:text-sky-300">
+          me-builder
+        </p>
+        <h1 className="mt-2 text-3xl font-bold text-slate-950 dark:text-slate-50">診断</h1>
+        <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+          答えたいカードを選んでください。
+        </p>
       </header>
 
       <section aria-label="診断一覧" className="space-y-8">
         {diagnoses.status === "error" && (
-          <div className="rounded-3xl border border-red-400/30 bg-red-400/10 p-6 text-center text-sm text-red-300">
+          <div className="rounded-3xl border border-red-400/30 bg-red-400/10 p-6 text-center text-sm text-red-700 dark:text-red-300">
             <p>{`診断を読み込めませんでした: ${diagnoses.message}`}</p>
             <button
               type="button"
@@ -139,7 +143,7 @@ export function DiagnosisHome({
           <LoadingState variant="panel" message="診断を読み込んでいます..." />
         )}
         {diagnoses.status === "success" && diagnoses.data.length === 0 && (
-          <p className="rounded-3xl border border-slate-700 bg-slate-800 p-6 text-center text-sm text-slate-400">
+          <p className="rounded-3xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-6 text-center text-sm text-slate-600 dark:text-slate-400">
             回答できる診断はありません。
           </p>
         )}
@@ -164,16 +168,19 @@ export function DiagnosisHome({
                   aria-expanded={isAnsweredOpen}
                   aria-controls="answered-diagnoses"
                   onClick={() => setIsAnsweredOpen((current) => !current)}
-                  className="flex w-full items-center justify-between rounded-2xl border border-slate-700 bg-slate-800/60 px-4 py-3 text-left transition hover:border-slate-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400"
+                  className="flex w-full items-center justify-between rounded-2xl border border-slate-200 dark:border-slate-700 bg-white/60 dark:bg-slate-800/60 px-4 py-3 text-left transition hover:border-slate-300 dark:hover:border-slate-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400"
                 >
-                  <span id="diagnosis-section-answered" className="font-bold text-slate-100">
+                  <span
+                    id="diagnosis-section-answered"
+                    className="font-bold text-slate-900 dark:text-slate-100"
+                  >
                     回答済み
                     <span className="ml-2 text-sm font-normal text-slate-500">
                       {sections.answered.length}件
                     </span>
                   </span>
                   <ChevronDown
-                    className={`size-5 text-slate-400 transition-transform ${isAnsweredOpen ? "rotate-180" : ""}`}
+                    className={`size-5 text-slate-600 dark:text-slate-400 transition-transform ${isAnsweredOpen ? "rotate-180" : ""}`}
                     aria-hidden="true"
                   />
                 </button>
@@ -199,18 +206,23 @@ export function DiagnosisHome({
           aria-labelledby="development-tools-heading"
           className="mt-8 rounded-2xl border border-dashed border-rose-400/30 bg-rose-400/5 p-4"
         >
-          <p className="text-xs font-semibold tracking-wider text-rose-300">DEV ONLY</p>
-          <h2 id="development-tools-heading" className="mt-1 text-sm font-bold text-slate-100">
+          <p className="text-xs font-semibold tracking-wider text-rose-700 dark:text-rose-300">
+            DEV ONLY
+          </p>
+          <h2
+            id="development-tools-heading"
+            className="mt-1 text-sm font-bold text-slate-900 dark:text-slate-100"
+          >
             開発用データ操作
           </h2>
-          <p className="mt-2 text-xs leading-relaxed text-slate-400">
+          <p className="mt-2 text-xs leading-relaxed text-slate-600 dark:text-slate-400">
             ログイン中ユーザーの回答、回答進捗、保留、回答由来データを削除します。診断定義は残ります。
           </p>
           <button
             type="button"
             onClick={onResetDiagnosisData}
             disabled={resetState.status === "loading"}
-            className="mt-3 inline-flex items-center justify-center gap-2 rounded-xl border border-rose-400/40 px-4 py-2 text-sm font-semibold text-rose-200 transition hover:bg-rose-400/10 disabled:cursor-wait disabled:opacity-60"
+            className="mt-3 inline-flex items-center justify-center gap-2 rounded-xl border border-rose-400/40 px-4 py-2 text-sm font-semibold text-rose-700 dark:text-rose-200 transition hover:bg-rose-400/10 disabled:cursor-wait disabled:opacity-60"
           >
             {resetState.status === "loading" ? (
               <RotateCw
@@ -224,7 +236,11 @@ export function DiagnosisHome({
           </button>
           {(resetState.status === "success" || resetState.status === "error") && (
             <output
-              className={`mt-3 block text-xs ${resetState.status === "success" ? "text-emerald-300" : "text-rose-300"}`}
+              className={`mt-3 block text-xs ${
+                resetState.status === "success"
+                  ? "text-emerald-700 dark:text-emerald-300"
+                  : "text-rose-700 dark:text-rose-300"
+              }`}
             >
               {resetState.status === "success" ? resetState.data : resetState.message}
             </output>

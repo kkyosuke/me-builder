@@ -11,10 +11,12 @@ import {
   useResetDiagnosisData,
 } from "./feature/diagnosis";
 import { useLiffSession } from "./feature/liff";
+import { ColorThemeToggle, useColorTheme } from "./feature/theme";
 
 const DEVELOPMENT_ENVIRONMENTS = new Set(["development", "local", "preview", "test"]);
 
 export function App() {
+  const colorTheme = useColorTheme();
   const liffSession = useLiffSession();
   const diagnoses = useDiagnosisList({ acquireIdToken: liffSession.acquireIdToken });
   const detail = useDiagnosisDetail({
@@ -27,32 +29,7 @@ export function App() {
   }, [detail.close, diagnoses.load]);
   const reset = useResetDiagnosisData({ idToken: diagnoses.idToken, onReset: handleReset });
 
-  if (detail.state.status === "loading") {
-    return <LoadingState message="診断を読み込んでいます..." />;
-  }
-  if (detail.state.status === "error") {
-    return <DiagnosisGuidance kind="load-error" onBack={detail.close} />;
-  }
-  if (detail.state.status === "success") {
-    const content = detail.state.data;
-    if (content.type === "result") {
-      return <DiagnosisResultView result={content.result} onBack={detail.close} />;
-    }
-    if (content.type === "answer") {
-      return (
-        <DiagnosisDetailScreen
-          diagnosis={content.diagnosis}
-          initialAnswers={content.initialAnswers}
-          onBack={detail.close}
-          onSaveAnswer={detail.saveAnswer}
-          onComplete={() => void detail.openCompletedResult()}
-        />
-      );
-    }
-    return <DiagnosisGuidance kind={content.kind} onBack={detail.close} />;
-  }
-
-  return (
+  let content = (
     <DiagnosisHome
       diagnoses={diagnoses.state}
       onOpenDiagnosis={(diagnosis) => void detail.open(diagnosis)}
@@ -63,5 +40,37 @@ export function App() {
       resetState={reset.state}
       onResetDiagnosisData={() => void reset.reset()}
     />
+  );
+
+  if (detail.state.status === "loading") {
+    content = <LoadingState message="診断を読み込んでいます..." />;
+  } else if (detail.state.status === "error") {
+    content = <DiagnosisGuidance kind="load-error" onBack={detail.close} />;
+  } else if (detail.state.status === "success") {
+    const detailContent = detail.state.data;
+    if (detailContent.type === "result") {
+      content = <DiagnosisResultView result={detailContent.result} onBack={detail.close} />;
+    }
+    if (detailContent.type === "answer") {
+      content = (
+        <DiagnosisDetailScreen
+          diagnosis={detailContent.diagnosis}
+          initialAnswers={detailContent.initialAnswers}
+          onBack={detail.close}
+          onSaveAnswer={detail.saveAnswer}
+          onComplete={() => void detail.openCompletedResult()}
+        />
+      );
+    }
+    if (detailContent.type === "guidance") {
+      content = <DiagnosisGuidance kind={detailContent.kind} onBack={detail.close} />;
+    }
+  }
+
+  return (
+    <>
+      <ColorThemeToggle theme={colorTheme.theme} onToggle={colorTheme.toggleTheme} />
+      {content}
+    </>
   );
 }
