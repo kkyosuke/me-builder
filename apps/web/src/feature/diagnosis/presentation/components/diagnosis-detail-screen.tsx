@@ -8,12 +8,14 @@ export function DiagnosisDetailScreen({
   initialAnswers,
   onBack,
   onSaveAnswer,
+  onDeferQuestion,
   onComplete,
 }: {
   diagnosis: DiagnosisDefinition;
   initialAnswers: DiagnosisAnswer[];
   onBack: () => void;
   onSaveAnswer: Parameters<typeof SwipeDiagnosis>[0]["onSaveAnswer"];
+  onDeferQuestion: Parameters<typeof SwipeDiagnosis>[0]["onDeferQuestion"];
   onComplete: Parameters<typeof SwipeDiagnosis>[0]["onComplete"];
 }) {
   return (
@@ -35,6 +37,7 @@ export function DiagnosisDetailScreen({
         initialAnswers={initialAnswers}
         onBack={onBack}
         onSaveAnswer={onSaveAnswer}
+        onDeferQuestion={onDeferQuestion}
         onComplete={onComplete}
       />
     </main>

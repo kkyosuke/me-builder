@@ -143,7 +143,36 @@ Diagnosisが`published`かつ削除されておらず、サーバー時刻が受
 
 認証・基盤の共通エラーは次節に従います。
 
-## 6. 回答内容取得
+## 6. 「あとで回答」の保存
+
+### `PUT /api/diagnoses/{diagnosisId}/deferred-questions/{diagnosisQuestionId}`
+
+本人が受付中のDiagnosisに含まれる未回答の1問を「あとで回答」として保存します。リクエストボディは受け取りません。初回操作時にDiagnosisResponseがなければ作成し、延期記録と同じD1トランザクション境界で保存します。延期はAnswerではないため、回答数と回答状態は変えません。
+
+同じ質問への再送は新しい延期記録を作らず、初回の`deferredAt`を保ったまま`outcome: "unchanged"`を返します。保存後にその質問へ回答した場合は回答保存と同じ境界で延期記録を無効化します。
+
+```json
+{
+  "outcome": "created",
+  "deferredQuestion": {
+    "diagnosisQuestionId": "dq-relationship-priority-01",
+    "deferredAt": "2026-08-06T00:00:00.000Z"
+  }
+}
+```
+
+延期保存固有のエラーは次のとおりです。
+
+| HTTP | 条件 | レスポンス |
+| --- | --- | --- |
+| `404` | Diagnosisが存在しない、公開前、公開停止、または削除済み | `{ "error": "Diagnosis not found", "reason": "diagnosis_not_found" }` |
+| `409` | Diagnosisが受付終了済み | `{ "error": "Diagnosis closed", "reason": "diagnosis_closed" }` |
+| `409` | 対象の質問へ回答済み | `{ "error": "Question already answered", "reason": "question_already_answered" }` |
+| `422` | Diagnosis QuestionがDiagnosisにない | `{ "error": "Invalid deferred question", "reason": "diagnosis_question_not_found" }` |
+
+認証・基盤の共通エラーは回答保存APIと同じです。
+
+## 7. 回答内容取得
 
 ### `GET /api/diagnoses/{diagnosisId}/answers`
 
@@ -198,7 +227,7 @@ Diagnosisが`published`かつ削除されておらず、サーバー時刻が受
 
 回答途中でも保存済みの回答は返し、`responseStatus`と件数で未完了であることを表します。Web UIは回答済みから回答内容画面へ遷移しますが、再開機能でも同じ取得結果を利用できます。
 
-## 7. 開発環境の回答データリセット
+## 8. 開発環境の回答データリセット
 
 ### `DELETE /api/dev/diagnosis-data`
 
@@ -219,7 +248,7 @@ Diagnosisが`published`かつ削除されておらず、サーバー時刻が受
 
 削除対象がない場合も各件数を`0`として`200`を返します。Web UIは環境変数に同じ開発環境が明示されている場合だけ確認付きの操作を表示し、未設定時は表示しません。成功後は診断一覧を再取得します。API側の環境制限を認可境界とし、UIの非表示だけには依存しません。
 
-## 8. エラー
+## 9. エラー
 
 | HTTP | 条件 | レスポンス |
 | --- | --- | --- |
@@ -230,7 +259,7 @@ Diagnosisが`published`かつ削除されておらず、サーバー時刻が受
 
 認証失敗の詳細、トークン、`sub`、Account IDはレスポンスへ含めません。
 
-## 9. ローカルE2Eテスト
+## 10. ローカルE2Eテスト
 
 診断APIのE2Eテストは`apps/api/src/e2e/`に置きます。Miniflareが提供するローカルD1へ本番と同じmigrationと診断seedを適用し、Honoの`app.request`へD1 bindingとして渡します。
 

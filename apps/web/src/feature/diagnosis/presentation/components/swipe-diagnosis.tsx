@@ -15,11 +15,7 @@ import {
   useRef,
   useState,
 } from "react";
-import {
-  createDeferredQuestion,
-  createDiagnosisAnswer,
-  summarizeInteractions,
-} from "../../model/answers";
+import { createDiagnosisAnswer, summarizeInteractions } from "../../model/answers";
 import type { DiagnosisDefinition } from "../../model/diagnosis-definition";
 import type { DiagnosisAnswer, DiagnosisInteraction, SwipeDirection } from "../../model/types";
 import { pickProgressMessage, resolveProgressMilestone } from "../progress-message";
@@ -196,12 +192,14 @@ export function SwipeDiagnosis({
   initialAnswers = [],
   onBack,
   onSaveAnswer,
+  onDeferQuestion,
   onComplete,
 }: {
   diagnosis: DiagnosisDefinition;
   initialAnswers?: DiagnosisAnswer[];
   onBack: () => void;
   onSaveAnswer: (answer: DiagnosisAnswer) => Promise<{ acceptedAt: string }>;
+  onDeferQuestion: (diagnosisQuestionId: string) => Promise<void>;
   onComplete: () => void;
 }) {
   const [index, setIndex] = useState(0);
@@ -209,6 +207,7 @@ export function SwipeDiagnosis({
   const [drag, setDrag] = useState<DragOffset | null>(null);
   const [flyOut, setFlyOut] = useState<SwipeDirection | null>(null);
   const [backgroundSaves, setBackgroundSaves] = useState<BackgroundSave[]>([]);
+  const [deferState, setDeferState] = useState<"idle" | "saving" | "failed">("idle");
 
   const reducedMotion = useReducedMotion();
   const [stackRef, cardWidth] = useCardWidth();
@@ -245,7 +244,7 @@ export function SwipeDiagnosis({
   );
 
   const current = questions?.[index];
-  const isBusy = flyOut !== null;
+  const isBusy = flyOut !== null || deferState === "saving";
 
   const advance = useCallback(
     (direction: SwipeDirection) => {
@@ -322,9 +321,9 @@ export function SwipeDiagnosis({
       setDrag(null);
 
       if (action === "skip") {
-        setInteractions((previous) => [...previous, createDeferredQuestion(current, new Date())]);
-        setIndex((previous) => previous + 1);
-        queueMicrotask(() => {
+        setDeferState("saving");
+        void onDeferQuestion(current.diagnosisQuestionId).catch(() => {
+          setDeferState("failed");
           actionPending.current = false;
         });
         return;
@@ -334,7 +333,7 @@ export function SwipeDiagnosis({
       advance(action);
       void persistAnswer(answer);
     },
-    [advance, current, isBusy, persistAnswer],
+    [advance, current, isBusy, onDeferQuestion, persistAnswer],
   );
 
   useEffect(() => {
@@ -482,6 +481,14 @@ export function SwipeDiagnosis({
 
       {current && (
         <div className="flex flex-col gap-3">
+          {deferState === "failed" && (
+            <p
+              className="rounded-xl border border-red-400/30 bg-red-400/10 px-3 py-2 text-sm text-red-700 dark:text-red-300"
+              role="alert"
+            >
+              あとで回答を保存できませんでした。同じ操作を再試行するか、一覧へ戻ってください。
+            </p>
+          )}
           <button
             type="button"
             onClick={() => commit("skip")}
@@ -489,7 +496,7 @@ export function SwipeDiagnosis({
             className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 dark:border-slate-700 px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400 transition-colors hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40"
           >
             <SkipForward className="size-4" aria-hidden="true" />
-            あとで回答する
+            {deferState === "saving" ? "保存しています..." : "あとで回答する"}
           </button>
 
           <div className="space-y-1 text-center text-xs text-slate-500">

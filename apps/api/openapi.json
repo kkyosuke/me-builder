@@ -1118,6 +1118,206 @@
         ]
       }
     },
+    "/api/diagnoses/{diagnosisId}/deferred-questions/{diagnosisQuestionId}": {
+      "put": {
+        "operationId": "deferDiagnosisQuestion",
+        "tags": ["Diagnosis"],
+        "summary": "診断の未回答の1問をあとで回答として保存する",
+        "security": [
+          {
+            "liffIdToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "保存済みの延期操作",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "outcome": {
+                      "enum": ["created", "unchanged"],
+                      "type": "string"
+                    },
+                    "deferredQuestion": {
+                      "type": "object",
+                      "properties": {
+                        "diagnosisQuestionId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "deferredAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": ["diagnosisQuestionId", "deferredAt"]
+                    }
+                  },
+                  "required": ["outcome", "deferredQuestion"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "LIFF IDトークンを検証できない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Unauthorized"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "対応するAccountがない、またはDiagnosisが公開されていない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "error": {
+                          "const": "Account not found"
+                        },
+                        "reason": {
+                          "const": "friendship_required"
+                        }
+                      },
+                      "required": ["error", "reason"]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "error": {
+                          "const": "Diagnosis not found"
+                        },
+                        "reason": {
+                          "const": "diagnosis_not_found"
+                        }
+                      },
+                      "required": ["error", "reason"]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "受付終了、または対象の質問へ回答済み",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "error": {
+                          "const": "Diagnosis closed"
+                        },
+                        "reason": {
+                          "const": "diagnosis_closed"
+                        }
+                      },
+                      "required": ["error", "reason"]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "error": {
+                          "const": "Question already answered"
+                        },
+                        "reason": {
+                          "const": "question_already_answered"
+                        }
+                      },
+                      "required": ["error", "reason"]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Diagnosis Questionが不正",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Invalid deferred question"
+                    },
+                    "reason": {
+                      "const": "diagnosis_question_not_found"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "未処理のサーバーエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Internal Server Error"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "D1 bindingが設定されていない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Service Unavailable"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "diagnosisId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "diagnosisQuestionId",
+            "required": true
+          }
+        ]
+      }
+    },
     "/api/dev/diagnosis-data": {
       "delete": {
         "operationId": "resetDevelopmentDiagnosisData",

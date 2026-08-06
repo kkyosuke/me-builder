@@ -4,6 +4,7 @@ import { app } from "../index";
 import type { ResetDevelopmentDiagnosisDataOutcome } from "../logic/dev-diagnosis-reset";
 import type { SaveDiagnosisAnswerOutcome } from "../logic/diagnosis-answer";
 import type { DiagnosisAnswersOutcome } from "../logic/diagnosis-answers";
+import type { DeferDiagnosisQuestionOutcome } from "../logic/diagnosis-deferred-question";
 import type { DiagnosisDetailOutcome } from "../logic/diagnosis-detail";
 import type { DiagnosisListOutcome } from "../logic/diagnosis-list";
 
@@ -12,12 +13,14 @@ const {
   getDiagnosisDetail,
   getDiagnosisAnswers,
   saveDiagnosisAnswer,
+  deferDiagnosisQuestion,
   resetDevelopmentDiagnosisData,
 } = vi.hoisted(() => ({
   getDiagnosisList: vi.fn(),
   getDiagnosisDetail: vi.fn(),
   getDiagnosisAnswers: vi.fn(),
   saveDiagnosisAnswer: vi.fn(),
+  deferDiagnosisQuestion: vi.fn(),
   resetDevelopmentDiagnosisData: vi.fn(),
 }));
 
@@ -25,6 +28,7 @@ vi.mock("../logic/diagnosis-list", () => ({ getDiagnosisList }));
 vi.mock("../logic/diagnosis-detail", () => ({ getDiagnosisDetail }));
 vi.mock("../logic/diagnosis-answers", () => ({ getDiagnosisAnswers }));
 vi.mock("../logic/diagnosis-answer", () => ({ saveDiagnosisAnswer }));
+vi.mock("../logic/diagnosis-deferred-question", () => ({ deferDiagnosisQuestion }));
 vi.mock("../logic/dev-diagnosis-reset", () => ({ resetDevelopmentDiagnosisData }));
 
 const dummyDb = {} as D1Database;
@@ -43,6 +47,8 @@ const detailOutcome = (value: DiagnosisDetailOutcome) =>
   getDiagnosisDetail.mockResolvedValue(value);
 const answerOutcome = (value: SaveDiagnosisAnswerOutcome) =>
   saveDiagnosisAnswer.mockResolvedValue(value);
+const deferOutcome = (value: DeferDiagnosisQuestionOutcome) =>
+  deferDiagnosisQuestion.mockResolvedValue(value);
 const answersOutcome = (value: DiagnosisAnswersOutcome) =>
   getDiagnosisAnswers.mockResolvedValue(value);
 const resetOutcome = (value: ResetDevelopmentDiagnosisDataOutcome) =>
@@ -192,6 +198,75 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId", () => {
     const response = await put(undefined, false);
     expect(response.status).toBe(503);
     expect(saveDiagnosisAnswer).not.toHaveBeenCalled();
+  });
+});
+
+describe("PUT /api/diagnoses/:diagnosisId/deferred-questions/:diagnosisQuestionId", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const put = (withDb = true) =>
+    app.request(
+      "/api/diagnoses/diagnosis-1/deferred-questions/dq-1",
+      { method: "PUT", headers: { Authorization: "Bearer dummy.id.token" } },
+      { LIFF_ID, ...(withDb ? { DB: dummyDb } : {}) },
+    );
+
+  it("deferredを200と保存結果へ変換する", async () => {
+    deferOutcome({
+      type: "deferred",
+      outcome: "created",
+      deferredQuestion: {
+        diagnosisQuestionId: "dq-1",
+        deferredAt: "2026-08-06T00:00:00.000Z",
+      },
+    });
+
+    const response = await put();
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      outcome: "created",
+      deferredQuestion: {
+        diagnosisQuestionId: "dq-1",
+        deferredAt: "2026-08-06T00:00:00.000Z",
+      },
+    });
+    expect(deferDiagnosisQuestion).toHaveBeenCalledWith(
+      expect.objectContaining({
+        diagnosisId: "diagnosis-1",
+        diagnosisQuestionId: "dq-1",
+        idToken: "dummy.id.token",
+      }),
+    );
+  });
+
+  it.each([
+    ["diagnosis-not-found", 404, { error: "Diagnosis not found", reason: "diagnosis_not_found" }],
+    ["diagnosis-closed", 409, { error: "Diagnosis closed", reason: "diagnosis_closed" }],
+    [
+      "diagnosis-question-not-found",
+      422,
+      { error: "Invalid deferred question", reason: "diagnosis_question_not_found" },
+    ],
+    [
+      "question-already-answered",
+      409,
+      { error: "Question already answered", reason: "question_already_answered" },
+    ],
+    ["unauthenticated", 401, { error: "Unauthorized" }],
+  ] as const)("%sをHTTP %sへ変換する", async (type, status, body) => {
+    deferOutcome(type === "unauthenticated" ? { type, reason: "invalid" } : { type });
+    const response = await put();
+    expect(response.status).toBe(status);
+    expect(await response.json()).toEqual(body);
+  });
+
+  it("DB bindingが無ければ503を返す", async () => {
+    const response = await put(false);
+    expect(response.status).toBe(503);
+    expect(deferDiagnosisQuestion).not.toHaveBeenCalled();
   });
 });
 

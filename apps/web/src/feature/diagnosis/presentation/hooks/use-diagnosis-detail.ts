@@ -3,6 +3,7 @@ import { config } from "../../../../config";
 import { OperationError } from "../../../../infrastructure/errors";
 import type { AsyncState } from "../../../../model/async-state";
 import {
+  deferDiagnosisQuestion,
   fetchDiagnosisDefinition,
   fetchDiagnosisProgress,
   fetchDiagnosisResult,
@@ -151,6 +152,18 @@ export function useDiagnosisDetail({ idToken, onProgress }: UseDiagnosisDetailOp
     [answerSaver.save, idToken],
   );
 
+  const deferQuestion = useCallback(
+    async (diagnosisQuestionId: string): Promise<void> => {
+      const definition = selectedDefinition.current;
+      if (!idToken || !definition) {
+        throw new Error("本人確認情報を取得できませんでした。LINEから開き直してください。");
+      }
+      await deferDiagnosisQuestion(config.apiUrl, idToken, definition.id, diagnosisQuestionId);
+      close();
+    },
+    [close, idToken],
+  );
+
   const openCompletedResult = useCallback(async (): Promise<void> => {
     const definition = selectedDefinition.current;
     if (!idToken || !definition) {
@@ -200,5 +213,5 @@ export function useDiagnosisDetail({ idToken, onProgress }: UseDiagnosisDetailOp
     }
   }, [idToken, onProgress]);
 
-  return { state, open, close, saveAnswer, openCompletedResult };
+  return { state, open, close, saveAnswer, deferQuestion, openCompletedResult };
 }

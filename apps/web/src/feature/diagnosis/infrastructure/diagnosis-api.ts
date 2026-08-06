@@ -19,6 +19,8 @@ type ApiDiagnosisDetailResponse =
   operations["getDiagnosisDetail"]["responses"][200]["content"]["application/json"];
 type ApiSaveDiagnosisAnswerResponse =
   operations["saveDiagnosisAnswer"]["responses"][200]["content"]["application/json"];
+type ApiDeferDiagnosisQuestionResponse =
+  operations["deferDiagnosisQuestion"]["responses"][200]["content"]["application/json"];
 type ApiDiagnosisAnswersResponse =
   operations["getDiagnosisAnswers"]["responses"][200]["content"]["application/json"];
 type ApiResetDevelopmentDiagnosisDataResponse =
@@ -289,6 +291,83 @@ export async function saveDiagnosisAnswer(
   } catch (error) {
     throw new ValidationError("回答保存のレスポンスが不正です。", {
       code: "DIAGNOSIS_ANSWER_INVALID_RESPONSE",
+      cause: error,
+    });
+  }
+}
+
+const DeferDiagnosisQuestionResponseSchema = v.object({
+  outcome: v.picklist(["created", "unchanged"]),
+  deferredQuestion: v.object({
+    diagnosisQuestionId: v.pipe(v.string(), v.nonEmpty()),
+    deferredAt: v.pipe(v.string(), v.isoTimestamp()),
+  }),
+}) satisfies v.GenericSchema<ApiDeferDiagnosisQuestionResponse>;
+
+/** 未回答の1問を「あとで回答」として保存する。 */
+export async function deferDiagnosisQuestion(
+  apiUrl: string | undefined,
+  idToken: string,
+  diagnosisId: string,
+  diagnosisQuestionId: string,
+  signal?: AbortSignal,
+): Promise<ApiDeferDiagnosisQuestionResponse> {
+  const response = await createHttpClient(apiUrl).request(
+    `/api/diagnoses/${encodeURIComponent(diagnosisId)}/deferred-questions/${encodeURIComponent(diagnosisQuestionId)}`,
+    {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${idToken}` },
+      ...(signal ? { signal } : {}),
+    },
+  );
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new AuthenticationError("本人確認に失敗しました。LINEから開き直してください。", {
+        code: "AUTHENTICATION_REQUIRED",
+        status: response.status,
+      });
+    }
+    if (response.status === 404) {
+      throw new OperationError("この診断は現在公開されていません。", {
+        code: "DIAGNOSIS_UNAVAILABLE",
+        status: response.status,
+      });
+    }
+    if (response.status === 409) {
+      let reason: string | undefined;
+      try {
+        reason = ((await response.json()) as { reason?: string }).reason;
+      } catch {
+        // エラー本文が壊れていてもHTTP statusから安全な案内へ変換します。
+      }
+      throw new OperationError(
+        reason === "question_already_answered"
+          ? "この質問にはすでに回答済みです。一覧から開き直してください。"
+          : "受付終了のため、あとで回答を保存できませんでした。",
+        {
+          code: reason === "question_already_answered" ? "ANSWER_CONFLICT" : "DIAGNOSIS_CLOSED",
+          status: response.status,
+        },
+      );
+    }
+    if (response.status === 422) {
+      throw new ValidationError("この質問はあとで回答にできません。", {
+        code: "INVALID_DIAGNOSIS_QUESTION",
+        status: response.status,
+      });
+    }
+    throw new UnknownError(`あとで回答の保存に失敗しました (HTTP ${response.status})`, {
+      code: "DIAGNOSIS_DEFER_REQUEST_FAILED",
+      status: response.status,
+    });
+  }
+
+  try {
+    return v.parse(DeferDiagnosisQuestionResponseSchema, await response.json());
+  } catch (error) {
+    throw new ValidationError("あとで回答のレスポンスが不正です。", {
+      code: "DIAGNOSIS_DEFER_INVALID_RESPONSE",
       cause: error,
     });
   }
