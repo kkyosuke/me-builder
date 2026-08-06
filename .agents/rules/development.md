@@ -107,7 +107,7 @@
 
 - **Web UI のデザインシステム (`apps/web`)**:
   - UI は **Tailwind CSS** のユーティリティと **lucide-react** のアイコンだけで組みます。他の UI コンポーネントライブラリ、アニメーションライブラリ、ジェスチャーライブラリ (framer-motion, react-spring, react-tinder-card 等) は導入しません。スワイプなどの操作は Pointer Events と CSS transform / transition で実装します。
-  - Tailwind は `@tailwindcss/vite` プラグインとして読み込み、PostCSS 設定ファイルは持ちません。`src/index.css` はTailwindと基礎スタイルだけを持ち、**コンポーネント固有の素の CSS やクラス定義を増やしません**（要素セレクタが以降のコンポーネントへ暗黙に効くため）。LIFF内の古いWebViewがCascade Layersをブロックごと無視することを避けるため、`tailwindcss/index.css` は使わず、`theme.css`、`preflight.css`、`utilities.css` をこの順で直接読み込み、Viteの後処理で全ての `@layer` を展開します。
+  - Tailwind は `@tailwindcss/vite` プラグインとして読み込み、PostCSS 設定ファイルは持ちません。`src/index.css` はTailwindと基礎スタイルだけを持ち、**コンポーネント固有の素の CSS やクラス定義を増やしません**（要素セレクタが以降のコンポーネントへ暗黙に効くため）。LIFF内の古いWebViewがCascade Layersをブロックごと無視することを避けるため、`tailwindcss/index.css` は使わず、`theme.css`、`preflight.css`、`utilities.css` をこの順で直接読み込み、ビルド後処理で全ての `@layer` を展開します。後処理後のCSSは内容から新しいファイル名を採番し、LIFFブラウザに変換前のCSSがキャッシュされないようにします。
   - アニメーションは `prefers-reduced-motion: reduce` を尊重します。移動そのものを止めるのではなく、指の操作への追従は残し、自動で動く演出を省きます。
   - 操作手段をポインタだけに依存させません。LINE 内 (LIFF) の主導線に加えて外部ブラウザの導線も維持しているため ([プロジェクト概要 §4](../../docs/product/project-overview.md#4-想定する利用体験))、同じ操作をボタンとキーボードでも行える状態を保ちます。
 

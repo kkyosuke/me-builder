@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --port 5173",
-    "build": "tsc && vite build && bun scripts/check-liff-css.ts",
+    "build": "tsc && vite build && bun scripts/make-liff-css-compatible.ts && bun scripts/check-liff-css.ts",
     "generate:api": "openapi-typescript ../api/openapi.json -o src/generated/api.ts && biome format --write src/generated/api.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --dir .",
