@@ -7,7 +7,7 @@
 ### 所有する概念
 
 - 日記チャットの実行時コンポーネントとデータフロー
-- Conversation Session、Session Summary、Context Packageの物理モデル
+- Conversation Session、Chat Turn、Context Packageの物理モデル
 - Source Record、会話メッセージ、Brain Itemを保存するD1テーブル
 - AI入力、プロンプト、構造化出力
 - 入力前から送信時までのガードレール
@@ -93,13 +93,12 @@ flowchart TD
 - Queueのat-least-once配送を前提に、外部event IDとTurn IDを一意制約に使う
 - Accountを条件に含まない本文取得APIを作らない
 
-既存の`source_records.original_ref`へ`line:{event ID}`を保存し、`(account_id, original_ref)`へ削除状態にかかわらない一意indexを追加します。削除済みeventの再配送でも原本を作り直しません。
+既存の`source_records` schema自体は変更しません。LINE eventから決定的なSource Record IDを生成し、会話側の`(channel, channel_event_id)`一意制約と組み合わせてWebhook再配送を冪等に扱います。
 
 ```mermaid
 erDiagram
     accounts ||--o{ conversation_sessions : owns
     conversation_sessions ||--o{ conversation_messages : contains
-    conversation_sessions ||--o| session_summaries : has
     conversation_sessions ||--o{ chat_turns : processes
     source_records ||--|| source_record_text_payloads : stores
     source_records ||--o| conversation_messages : appears_as
@@ -137,7 +136,6 @@ erDiagram
 | `started_at` | yes | 最初のuser発言時刻。24時間hard capの基準 |
 | `last_user_message_at` | yes | 最後のuser発言時刻。6時間無操作の判定に使う |
 | `last_assistant_message_at` | no | 最後にassistant messageを作成した時刻 |
-| `hard_close_at` | yes | `started_at`から24時間後。Session終了判定に使う |
 | `closed_at` | no | Sessionを閉じた時刻 |
 | `close_reason` | no | `explicit`: 応答による明示終了、`inactive`: 6時間無操作、`hard_cap`: 24時間上限 |
 | `next_sequence` | yes | 次に追加するmessageのSession内連番 |
@@ -169,20 +167,7 @@ userとassistantを同じ時系列で復元するための履歴です。user原
 
 一意制約は`(channel, channel_event_id)`と`(session_id, sequence)`へ置きます。チャット履歴を復元できるよう、`assistant_body`はSession終了後も保持し、自動削除の対象にしません。
 
-### 4.5 `session_summaries`
-
-| 列 | 用途 |
-| --- | --- |
-| `session_id` | PK、Sessionごとに現行版1件 |
-| `summary_json` | schema検証済みの構造化要約 |
-| `covered_through_sequence` | 要約済みの最終sequence |
-| `source_message_ids_json` | 要約根拠 |
-| `prompt_version`, `revision` | 生成規則と楽観的更新 |
-| `created_at`, `updated_at` | lifecycle |
-
-要約は出来事、感情、選択と本人が述べた理由、訂正、求める対話、未回答の問い、記録ゴール、提示済み助言への反応を別fieldで持ちます。自由形式の出力をそのまま保存せず、schemaと根拠IDを検証します。
-
-### 4.6 `chat_turns`
+### 4.5 `chat_turns`
 
 1回のAI生成とLINE最終応答を追跡する処理単位です。1.5秒以内の連投は同じTurnへまとめます。
 
@@ -325,7 +310,6 @@ Context Packageはgenerate WorkerがAI呼び出しごとにD1から作り直し�
 flowchart LR
     M[現在Turn] --> C[Context Builder]
     R[直近20 message] --> C
-    S[Session Summary] --> C
     B[Brain Item候補] --> A[Access再検証]
     E[Source Record候補] --> A
     A --> C
@@ -334,13 +318,12 @@ flowchart LR
 ```
 
 1. 現在Sessionと直近20messageをD1から取得する
-2. 20件より前を覆う現行Session Summaryを取得する
-3. 現在Turnから検索文を作り、現在Accountの`owner_scope`をfilterに指定してVectorizeを検索する
-4. filter適用後の集合から確認済みBrain Item候補を上位取得する
-5. D1でAccount、`confirmed`、`active`、有効期間、Access Policy、削除状態を再検証する
-6. 再検証を通過した上位5件を選び、必要なEvidenceのSource Recordを最大3件取得する
-7. 訂正済み旧版、削除済み、撤回済み、拒否済みを除外する
-8. 各要素へ種類、時点、確認状態、根拠IDを付ける
+2. 現在Turnから検索文を作り、現在Accountの`owner_scope`をfilterに指定してVectorizeを検索する
+3. filter適用後の集合から確認済みBrain Item候補を上位取得する
+4. D1でAccount、`confirmed`、`active`、有効期間、Access Policy、削除状態を再検証する
+5. 再検証を通過した上位5件を選び、必要なEvidenceのSource Recordを最大3件取得する
+6. 訂正済み旧版、削除済み、撤回済み、拒否済みを除外する
+7. 各要素へ種類、時点、確認状態、根拠IDを付ける
 
 `owner_scope`は環境別Secretを鍵とする`HMAC(account_id)`から作り、Vectorizeのmetadata indexまたはnamespaceへ保存します。生のAccount IDは保存しません。filterはtopKより前に適用し、他Accountの候補に検索枠を消費させません。Vectorizeのmetadataは候補を絞る用途に限定し、認可の根拠にはしないため、D1再検証は必ず残します。
 
@@ -351,8 +334,7 @@ flowchart LR
 | 区分 | 上限の目安 |
 | --- | --- |
 | system規則と出力schema | 3,000 token |
-| 現在Turnと直近原文 | 10,000 token |
-| Session Summary | 3,000 token |
+| 現在Turnと直近原文 | 13,000 token |
 | Brain ItemとEvidence | 6,000 token |
 | 境界情報と安全分類 | 2,000 token |
 
@@ -420,11 +402,9 @@ system promptは次の順で固定し、Git管理する`prompt_version`を付け
 
 応答内の`safety`は監視と出力制限の自己申告に使います。事前の安全分類より低いrouteを返しても安全水準を下げず、アプリケーションが常に厳しい方を採用します。
 
-### 7.4 Session Summary
+### 7.4 長期会話の圧縮（後続対応）
 
-Summary更新は原文が20messageを超えたときだけ行います。既存summary、今回移すmessage、訂正・削除eventを入力し、全体を作り直します。差分文字列を直接編集させません。
-
-各主張は`source_message_ids`と`speaker`を必須にします。本人の発言、assistantの提案、AI推定を分け、矛盾を勝手に統合しません。
+初期段階では専用tableを設けず、Contextには直近20messageを使います。20message以前の文脈が必要になった段階で、訂正・削除の反映方法と根拠追跡を別途設計します。
 
 ### 7.5 Brain Item候補
 
@@ -572,7 +552,6 @@ logへ出せる識別子は環境、Queue message ID、Turn ID、Session IDの�
 - Vectorizeが`owner_scope`をtopK前にfilterし、他Accountの候補を返さない
 - Vectorize候補をD1再検証し、同じscope内でも利用不可のItemを除外する
 - Vectorize upsert・deleteの失敗と長時間`submitted`をoutboxとreconciliationで回復する
-- 20message超過時にsummaryと原文が欠落・重複しない
 - schema外出力、存在しないEvidence ID、質問過多を送信しない
 - Webhook Queueを遅延・停止させても30秒までにreceiptのpush要求が受理される
 - receipt、final、失敗案内をtimeoutさせ、同じLINE retry keyでだけ再試行する
@@ -602,7 +581,7 @@ prompt versionを本番へ出す条件はschema準拠100%、越権した記憶�
 1. **原本とSession**: D1 schema、冪等保存、Session境界、Cronによるpayload削除
 2. **会話Coordinator**: Account単位DO、ローカルSQLite、連投、Turn state、outbox、2 QueueとDLQ
 3. **安全な通常応答**: Queue非依存のreceipt、Context、prompt、構造化出力、30秒・90秒deadline
-4. **Session Summary**: 20message超過時の要約と訂正反映
+4. **長期会話の圧縮**: 20message超過時の文脈保持と訂正反映
 5. **Brain Item候補**: Evidence付きpending候補、本人確認、却下、改訂
 6. **記憶を使う助言**: Vectorize outbox、`owner_scope` filter、D1再認可、Evidence取得
 7. **段階公開**: fixture、shadow、内部Account、少数公開、全体公開

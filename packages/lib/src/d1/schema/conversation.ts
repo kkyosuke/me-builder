@@ -4,6 +4,19 @@ import { accounts } from "./account";
 import { baseSchema } from "./base";
 import { sourceRecords } from "./source";
 
+/** D1に保存するテキスト原本。既存のSource Record schema自体は変更しない。 */
+export const sourceRecordTextPayloads = sqliteTable("source_record_text_payloads", {
+  sourceRecordId: text("source_record_id")
+    .primaryKey()
+    .references(() => sourceRecords.id, { onDelete: "cascade" }),
+  body: text("body").notNull(),
+  contentType: text("content_type").notNull().default("text/plain"),
+  contentHash: text("content_hash").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
 export const conversationSessions = sqliteTable(
   "conversation_sessions",
   {
@@ -17,7 +30,6 @@ export const conversationSessions = sqliteTable(
     startedAt: integer("started_at", { mode: "timestamp" }).notNull(),
     lastUserMessageAt: integer("last_user_message_at", { mode: "timestamp" }).notNull(),
     lastAssistantMessageAt: integer("last_assistant_message_at", { mode: "timestamp" }),
-    hardCloseAt: integer("hard_close_at", { mode: "timestamp" }).notNull(),
     closedAt: integer("closed_at", { mode: "timestamp" }),
     closeReason: text("close_reason", { enum: ["explicit", "inactive", "hard_cap"] }),
     nextSequence: integer("next_sequence").notNull().default(1),
@@ -100,20 +112,3 @@ export const chatTurns = sqliteTable(
     ),
   ],
 );
-
-export const sessionSummaries = sqliteTable("session_summaries", {
-  sessionId: text("session_id")
-    .primaryKey()
-    .references(() => conversationSessions.id, { onDelete: "cascade" }),
-  summaryJson: text("summary_json").notNull(),
-  coveredThroughSequence: integer("covered_through_sequence").notNull(),
-  sourceMessageIdsJson: text("source_message_ids_json").notNull(),
-  promptVersion: text("prompt_version").notNull(),
-  revision: integer("revision").notNull().default(1),
-  createdAt: integer("created_at", { mode: "timestamp" })
-    .notNull()
-    .$defaultFn(() => new Date()),
-  updatedAt: integer("updated_at", { mode: "timestamp" })
-    .notNull()
-    .$defaultFn(() => new Date()),
-});

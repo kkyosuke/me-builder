@@ -1,11 +1,10 @@
-import { and, asc, desc, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import type { D1Client } from "../client";
 import {
   chatTurns,
   conversationMessages,
   conversationSessions,
-  sessionSummaries,
   sourceRecordTextPayloads,
   sourceRecords,
 } from "../schema";
@@ -147,19 +146,23 @@ export async function attachMessagesToTurn(
     )
     .get();
 
-  const sessionExpired =
-    session &&
-    (lastReceivedAt.getTime() - session.lastUserMessageAt.getTime() >= SESSION_INACTIVITY_MS ||
-      lastReceivedAt >= session.hardCloseAt);
+  const sessionHardCapAt = session
+    ? new Date(session.startedAt.getTime() + SESSION_HARD_CAP_MS)
+    : undefined;
   const writes: BatchItem<"sqlite">[] = [];
-  if (sessionExpired && session) {
+  if (
+    session &&
+    sessionHardCapAt &&
+    (lastReceivedAt.getTime() - session.lastUserMessageAt.getTime() >= SESSION_INACTIVITY_MS ||
+      lastReceivedAt >= sessionHardCapAt)
+  ) {
     writes.push(
       db
         .update(conversationSessions)
         .set({
           status: "closed",
           closedAt: lastReceivedAt,
-          closeReason: lastReceivedAt >= session.hardCloseAt ? "hard_cap" : "inactive",
+          closeReason: lastReceivedAt >= sessionHardCapAt ? "hard_cap" : "inactive",
           updatedAt: lastReceivedAt,
         })
         .where(eq(conversationSessions.id, session.id)),
@@ -175,7 +178,6 @@ export async function attachMessagesToTurn(
       startedAt: firstReceivedAt,
       lastUserMessageAt: lastReceivedAt,
       lastAssistantMessageAt: null,
-      hardCloseAt: new Date(firstReceivedAt.getTime() + SESSION_HARD_CAP_MS),
       closedAt: null,
       closeReason: null,
       nextSequence: 1,
@@ -243,103 +245,6 @@ export type ConversationContextMessage = {
   sequence: number;
 };
 
-export type ConversationSessionSummary = {
-  summaryJson: string;
-  coveredThroughSequence: number;
-};
-
-/** 直近20件より前の本文を、根拠ID付きの決定的なSession Summaryへ圧縮する。 */
-export async function refreshTurnSummary(db: D1Client, turnId: string): Promise<void> {
-  const turn = await db
-    .select({
-      sessionId: chatTurns.sessionId,
-      fromSequence: chatTurns.fromSequence,
-      throughSequence: chatTurns.throughSequence,
-    })
-    .from(chatTurns)
-    .where(eq(chatTurns.id, turnId))
-    .get();
-  if (!turn) return;
-  const coveredThroughSequence = Math.min(turn.throughSequence - 20, turn.fromSequence - 1);
-  if (coveredThroughSequence < 1) return;
-  const existing = await db
-    .select({
-      coveredThroughSequence: sessionSummaries.coveredThroughSequence,
-      summaryJson: sessionSummaries.summaryJson,
-    })
-    .from(sessionSummaries)
-    .where(eq(sessionSummaries.sessionId, turn.sessionId))
-    .get();
-  if ((existing?.coveredThroughSequence ?? 0) >= coveredThroughSequence) return;
-
-  const rows = await db
-    .select({
-      id: conversationMessages.id,
-      role: conversationMessages.role,
-      sequence: conversationMessages.sequence,
-      assistantBody: conversationMessages.assistantBody,
-      userBody: sourceRecordTextPayloads.body,
-    })
-    .from(conversationMessages)
-    .leftJoin(sourceRecords, eq(conversationMessages.sourceRecordId, sourceRecords.id))
-    .leftJoin(
-      sourceRecordTextPayloads,
-      eq(sourceRecords.id, sourceRecordTextPayloads.sourceRecordId),
-    )
-    .where(
-      and(
-        eq(conversationMessages.sessionId, turn.sessionId),
-        gt(conversationMessages.sequence, existing?.coveredThroughSequence ?? 0),
-        lte(conversationMessages.sequence, coveredThroughSequence),
-        eq(conversationMessages.isDeleted, false),
-      ),
-    )
-    .orderBy(asc(conversationMessages.sequence));
-  let previousClaims: Array<{
-    speaker: "user" | "assistant";
-    text: string;
-    source_message_ids: string[];
-  }> = [];
-  if (existing) {
-    try {
-      const parsed = JSON.parse(existing.summaryJson) as { claims?: typeof previousClaims };
-      previousClaims = Array.isArray(parsed.claims) ? parsed.claims : [];
-    } catch {
-      previousClaims = [];
-    }
-  }
-  const newClaims = rows.flatMap((row) => {
-    const body = row.role === "user" ? row.userBody : row.assistantBody;
-    return body
-      ? [{ speaker: row.role, text: body.slice(0, 300), source_message_ids: [row.id] }]
-      : [];
-  });
-  const claims = [...previousClaims, ...newClaims];
-  const now = new Date();
-  await db
-    .insert(sessionSummaries)
-    .values({
-      sessionId: turn.sessionId,
-      summaryJson: JSON.stringify({ claims }),
-      coveredThroughSequence,
-      sourceMessageIdsJson: JSON.stringify(claims.flatMap((claim) => claim.source_message_ids)),
-      promptVersion: DIARY_CHAT_PROMPT_VERSION,
-      createdAt: now,
-      updatedAt: now,
-    })
-    .onConflictDoUpdate({
-      target: sessionSummaries.sessionId,
-      set: {
-        summaryJson: JSON.stringify({ claims }),
-        coveredThroughSequence,
-        sourceMessageIdsJson: JSON.stringify(claims.flatMap((claim) => claim.source_message_ids)),
-        promptVersion: DIARY_CHAT_PROMPT_VERSION,
-        revision: sql`${sessionSummaries.revision} + 1`,
-        updatedAt: now,
-      },
-    });
-}
-
 /** Turnと同じSessionの直近messageを、Account所有権を含むjoinで取得する。 */
 export async function getTurnContext(
   db: D1Client,
@@ -349,7 +254,6 @@ export async function getTurnContext(
       accountId: string;
       messages: ConversationContextMessage[];
       currentUserMessageIds: string[];
-      summary?: ConversationSessionSummary;
     }
   | undefined
 > {
@@ -365,16 +269,6 @@ export async function getTurnContext(
     .where(eq(chatTurns.id, turnId))
     .get();
   if (!turn) return undefined;
-
-  await refreshTurnSummary(db, turnId);
-  const summary = await db
-    .select({
-      summaryJson: sessionSummaries.summaryJson,
-      coveredThroughSequence: sessionSummaries.coveredThroughSequence,
-    })
-    .from(sessionSummaries)
-    .where(eq(sessionSummaries.sessionId, turn.sessionId))
-    .get();
 
   const rows = await db
     .select({
@@ -414,7 +308,6 @@ export async function getTurnContext(
           role === "user" && sequence >= turn.fromSequence && sequence <= turn.throughSequence,
       )
       .map(({ id }) => id),
-    ...(summary ? { summary } : {}),
   };
 }
 
@@ -534,11 +427,15 @@ export async function closeTurnSession(db: D1Client, turnId: string): Promise<vo
 
 export async function closeExpiredSessions(db: D1Client, now = new Date()): Promise<number> {
   const inactiveCutoff = new Date(now.getTime() - SESSION_INACTIVITY_MS);
+  const hardCapCutoff = new Date(now.getTime() - SESSION_HARD_CAP_MS);
   const hardCapResult = await db
     .update(conversationSessions)
     .set({ status: "closed", closeReason: "hard_cap", closedAt: now, updatedAt: now })
     .where(
-      and(eq(conversationSessions.status, "active"), lte(conversationSessions.hardCloseAt, now)),
+      and(
+        eq(conversationSessions.status, "active"),
+        lte(conversationSessions.startedAt, hardCapCutoff),
+      ),
     );
   const inactiveResult = await db
     .update(conversationSessions)

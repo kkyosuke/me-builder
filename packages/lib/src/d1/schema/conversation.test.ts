@@ -22,7 +22,6 @@ describe("Diary chat D1 schema", () => {
       status: "active" as const,
       startedAt: new Date(0),
       lastUserMessageAt: new Date(0),
-      hardCloseAt: new Date(86_400_000),
     };
     db.insert(schema.conversationSessions)
       .values({ id: "session-1", ...values })
@@ -35,7 +34,7 @@ describe("Diary chat D1 schema", () => {
     ).toThrow(/UNIQUE constraint failed/);
   });
 
-  it("LINE eventのSource Recordと会話messageを冪等キーで重複させない", () => {
+  it("LINE eventの会話messageを冪等キーで重複させない", () => {
     const db = createTestDb();
     db.insert(schema.accounts).values({ id: "account-1" }).run();
     db.insert(schema.sourceRecords)
@@ -46,25 +45,12 @@ describe("Diary chat D1 schema", () => {
         originalRef: "line:event-1",
       })
       .run();
-    expect(() =>
-      db
-        .insert(schema.sourceRecords)
-        .values({
-          id: "source-2",
-          accountId: "account-1",
-          kind: "user_input",
-          originalRef: "line:event-1",
-        })
-        .run(),
-    ).toThrow(/UNIQUE constraint failed/);
-
     db.insert(schema.conversationSessions)
       .values({
         id: "session-1",
         accountId: "account-1",
         startedAt: new Date(0),
         lastUserMessageAt: new Date(0),
-        hardCloseAt: new Date(86_400_000),
       })
       .run();
     db.insert(schema.conversationMessages)
