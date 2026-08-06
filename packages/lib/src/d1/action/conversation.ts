@@ -249,6 +249,7 @@ export type ConversationContextMessage = {
 export async function getTurnContext(
   db: D1Client,
   turnId: string,
+  messageLimit: number,
 ): Promise<
   | {
       accountId: string;
@@ -293,7 +294,7 @@ export async function getTurnContext(
       ),
     )
     .orderBy(desc(conversationMessages.sequence))
-    .limit(Math.max(20, turn.throughSequence - turn.fromSequence + 1));
+    .limit(Math.max(messageLimit, turn.throughSequence - turn.fromSequence + 1));
 
   const messages = rows.reverse().flatMap((row) => {
     const body = row.role === "user" ? row.userBody : row.assistantBody;

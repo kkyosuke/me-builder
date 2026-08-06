@@ -317,7 +317,7 @@ flowchart LR
     T --> P[Prompt Renderer]
 ```
 
-1. 現在Sessionと直近20messageをD1から取得する
+1. 現在Sessionと直近messageをD1から取得する。件数は`CHAT_CONTEXT_MESSAGE_LIMIT`で管理し、初期値は20とする
 2. 現在Turnから検索文を作り、現在Accountの`owner_scope`をfilterに指定してVectorizeを検索する
 3. filter適用後の集合から確認済みBrain Item候補を上位取得する
 4. D1でAccount、`confirmed`、`active`、有効期間、Access Policy、削除状態を再検証する
@@ -404,7 +404,7 @@ system promptは次の順で固定し、Git管理する`prompt_version`を付け
 
 ### 7.4 長期会話の圧縮（後続対応）
 
-初期段階では専用tableを設けず、Contextには直近20messageを使います。20message以前の文脈が必要になった段階で、訂正・削除の反映方法と根拠追跡を別途設計します。
+初期段階では専用tableを設けず、Contextには`CHAT_CONTEXT_MESSAGE_LIMIT`件（初期値20）のmessageを使います。それ以前の文脈が必要になった段階で、訂正・削除の反映方法と根拠追跡を別途設計します。
 
 ### 7.5 Brain Item候補
 
