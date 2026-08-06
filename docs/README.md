@@ -44,6 +44,7 @@ docs/
 ### プロダクト全体を知る
 
 - [プロジェクト概要](product/project-overview.md) — 目的、主要要件、MVP、ロードマップ、Phase 1の入力体験とログイン手段
+- [日記チャット体験設計](product/diary-chat-experience.md) — 日々の声かけから出来事と行動原理を探り、記憶を使って助言する対話体験と応答時間
 
 ### 診断を設計する
 
