@@ -1,6 +1,7 @@
 import { getEnv } from "@me-builder/shared";
 import * as v from "valibot";
 import {
+  DEFAULT_CHAT_CONTEXT_MESSAGE_LIMIT,
   DEFAULT_CLOUDFLARE_AI_GATEWAY_BASE_URL,
   DEFAULT_GEMINI_MODEL,
   type WorkerConfig,
@@ -9,6 +10,7 @@ import {
 
 export {
   DEFAULT_CLOUDFLARE_AI_GATEWAY_BASE_URL,
+  DEFAULT_CHAT_CONTEXT_MESSAGE_LIMIT,
   DEFAULT_GEMINI_MODEL,
   WorkerConfigSchema,
   type WorkerConfig,
@@ -53,6 +55,7 @@ export function getWorkerConfig(env?: Record<string, unknown>): WorkerConfig {
   const rawGeminiModel = getEnv("GEMINI_MODEL", env)?.trim() || DEFAULT_GEMINI_MODEL;
   const rawChatEnabled = getEnv("CHAT_ENABLED", env)?.trim().toLowerCase() !== "false";
   const rawChatDeliverySecret = getEnv("CHAT_DELIVERY_SECRET", env)?.trim() || undefined;
+  const rawChatContextMessageLimit = getEnv("CHAT_CONTEXT_MESSAGE_LIMIT", env)?.trim();
 
   const rawConfig = {
     environment: rawEnvironment,
@@ -67,6 +70,9 @@ export function getWorkerConfig(env?: Record<string, unknown>): WorkerConfig {
     geminiModel: rawGeminiModel,
     chatEnabled: rawChatEnabled,
     chatDeliverySecret: rawChatDeliverySecret,
+    chatContextMessageLimit: rawChatContextMessageLimit
+      ? Number(rawChatContextMessageLimit)
+      : DEFAULT_CHAT_CONTEXT_MESSAGE_LIMIT,
   };
 
   return v.parse(WorkerConfigSchema, rawConfig);

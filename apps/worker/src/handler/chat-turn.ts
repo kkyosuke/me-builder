@@ -11,7 +11,11 @@ export async function processChatTurnMessage(
   workerConfig: WorkerConfig,
 ): Promise<void> {
   const db = cf.d1;
-  const context = await d1.action.conversation.getTurnContext(db, message.body.turnId);
+  const context = await d1.action.conversation.getTurnContext(
+    db,
+    message.body.turnId,
+    workerConfig.chatContextMessageLimit,
+  );
   if (!context) {
     logger.warn({ turnId: message.body.turnId }, "Chat turn was not found");
     message.ack();
