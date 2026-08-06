@@ -127,33 +127,47 @@ erDiagram
 
 ### 4.3 `conversation_sessions`
 
-| 列 | 用途 |
-| --- | --- |
-| `id`, `account_id` | PKと所有者FK |
-| `status` | `active` / `closed` |
-| `started_at` | 最初のuser発言時刻 |
-| `last_user_message_at`, `last_assistant_message_at` | 6時間境界 |
-| `hard_close_at` | `started_at`から24時間後 |
-| `closed_at`, `close_reason` | 終了時刻と`explicit` / `inactive` / `hard_cap` |
-| `next_sequence` | Session内message採番 |
-| `created_at`, `updated_at` | lifecycle |
+一続きの会話文脈を表します。終了済みSessionもチャット履歴の復元対象として保持します。
+
+| 列 | 必須 | 用途 |
+| --- | --- | --- |
+| `id` | yes | PK。SessionのUUID |
+| `account_id` | yes | 所有者FK。Accountをまたいだ履歴取得を防ぐ検索条件 |
+| `status` | yes | `active`: 継続中、`closed`: 終了済み |
+| `started_at` | yes | 最初のuser発言時刻。24時間hard capの基準 |
+| `last_user_message_at` | yes | 最後のuser発言時刻。6時間無操作の判定に使う |
+| `last_assistant_message_at` | no | 最後にassistant messageを作成した時刻 |
+| `hard_close_at` | yes | `started_at`から24時間後。Session終了判定に使う |
+| `closed_at` | no | Sessionを閉じた時刻 |
+| `close_reason` | no | `explicit`: 応答による明示終了、`inactive`: 6時間無操作、`hard_cap`: 24時間上限 |
+| `next_sequence` | yes | 次に追加するmessageのSession内連番 |
+| `created_at`, `updated_at` | yes | 作成・最終更新時刻 |
+| `deleted_at`, `is_deleted` | no / yes | 共通lifecycle列。初期段階ではSession削除に使わない |
 
 `account_id`ごとに`status = active`のSessionを最大1件とする部分一意indexを置きます。Session更新とmessage追加は同じD1 batchで確定します。
 
 ### 4.4 `conversation_messages`
 
-| 列 | 用途 |
-| --- | --- |
-| `id`, `session_id`, `sequence` | PK、Session FK、単調増加番号 |
-| `role` | `user` / `assistant` |
-| `kind` | `message` / `receipt` / `safety` / `error` |
-| `source_record_id` | userの場合に必須 |
-| `assistant_body` | assistantの場合だけ保持 |
-| `channel`, `channel_event_id` | channelとuser eventの冪等キー |
-| `turn_id` | assistant応答を生成したTurn |
-| `sent_at`, `created_at` | 送信要求受理時刻と作成時刻 |
+userとassistantを同じ時系列で復元するための履歴です。user原文はSource Recordを参照し、assistant本文だけをこのtableに保持します。
 
-一意制約は`(channel, channel_event_id)`と`(session_id, sequence)`へ置きます。`assistant_body`とSession SummaryはSession終了後24時間を過ぎ、処理中Turnがないことを確認して物理削除します。ユーザー原文であるSource Recordは含めません。削除はinactiveなDOのalarmに依存させず、Cron Triggerが期限到来行を小分けに処理します。処理は冪等にし、削除期限超過件数と最古の超過時間を監視します。
+| 列 | 必須 | 用途 |
+| --- | --- | --- |
+| `id` | yes | PK。messageのUUID |
+| `session_id` | yes | 所属SessionのFK |
+| `sequence` | yes | Session内でuserとassistantを通した単調増加番号 |
+| `role` | yes | `user` / `assistant`。本文の取得元を決める |
+| `source_record_id` | no | userの場合に使用。本人の原文を持つSource RecordへのFK |
+| `assistant_body` | no | assistantの場合に使用。配送retryとチャット履歴復元のため保持する |
+| `channel` | yes | 入出力チャネル。初期段階は`line` |
+| `channel_event_id` | no | user eventの冪等キー。Webhook再配送時の重複を防ぐ |
+| `turn_id` | no | assistant応答を生成したTurn ID |
+| `sent_at` | no | user messageではチャネル上の受付時刻。assistantの配送完了時刻への利用は後続対応 |
+| `created_at`, `updated_at` | yes | 作成・最終更新時刻 |
+| `deleted_at`, `is_deleted` | no / yes | 訂正・削除されたmessageをContextから除外するlifecycle列 |
+
+`role = user`では`source_record_id`を使い、`role = assistant`では`assistant_body`を使います。初期段階ではmessage種別を利用する表示・集計がないため`kind`は持ちません。必要になった段階で追加します。
+
+一意制約は`(channel, channel_event_id)`と`(session_id, sequence)`へ置きます。チャット履歴を復元できるよう、`assistant_body`はSession終了後も保持し、自動削除の対象にしません。
 
 ### 4.5 `session_summaries`
 
@@ -170,17 +184,46 @@ erDiagram
 
 ### 4.6 `chat_turns`
 
-| 列 | 用途 |
-| --- | --- |
-| `id`, `session_id` | PKとSession FK。IDはQueue冪等キーにも使う |
-| `from_sequence`, `through_sequence` | 対象user message範囲 |
-| `status` | `queued` / `generating` / `validated` / `delivery_pending` / `delivered` / `delivery_unknown` / `failed` |
-| `prompt_version`, `model`, `safety_route` | 実行構成。本文を含めない |
-| `attempt_count`, `failure_stage` | 再試行と失敗箇所 |
-| `received_at`, `generation_started_at` | 受付と生成開始 |
-| `first_reply_requested_at`, `final_reply_requested_at` | SLO計測点 |
-| `response_message_id` | 検証済みassistant message |
-| `created_at`, `updated_at` | lifecycle |
+1回のAI生成とLINE最終応答を追跡する処理単位です。1.5秒以内の連投は同じTurnへまとめます。
+
+| 列 | 必須 | 用途 |
+| --- | --- | --- |
+| `id` | yes | PK。Chat Turn Queueの冪等キーにも使う |
+| `session_id` | yes | 対象SessionのFK |
+| `from_sequence` | yes | Turnに含む最初のuser message sequence |
+| `through_sequence` | yes | Turnに含む最後のuser message sequence |
+| `generation_epoch` | yes | Coordinatorが発行する世代番号。古いQueue配送・生成結果を無効化する |
+| `status` | yes | 下記の生成・配送状態 |
+| `prompt_version` | yes | 使用したsystem promptの版 |
+| `model` | yes | 使用したGeminiモデル |
+| `end_session` | yes | 応答配送後にSessionを明示終了するか |
+| `attempt_count` | yes | 生成処理を開始した回数 |
+| `failure_stage` | no | 終端失敗した処理段階。本文や例外messageは入れない |
+| `received_at` | yes | Turn内で最初のuser messageを受け付けた時刻 |
+| `generation_started_at` | no | 生成開始時刻 |
+| `first_reply_requested_at` | no | 受領応答要求の計測点。実際の配送状態との統合は後続対応 |
+| `final_reply_requested_at` | no | assistant messageを確定し、最終応答配送を開始した時刻 |
+| `response_message_id` | no | 生成済みassistant messageのID。retry時の再生成・重複保存を防ぐ |
+| `created_at`, `updated_at` | yes | 作成・最終更新時刻 |
+| `deleted_at`, `is_deleted` | no / yes | 共通lifecycle列。初期段階ではTurn削除に使わない |
+
+初期段階では安全性経路を永続化・集計しないため`safety_route`は持ちません。監視・監査要件を決めた段階で追加します。
+
+```mermaid
+stateDiagram-v2
+    [*] --> queued: Turn作成・Queue投入
+    queued --> generating: lease取得・生成開始
+    generating --> generating: 一時失敗後のQueue retry
+    generating --> delivery_pending: assistant message保存
+    delivery_pending --> delivery_pending: LINE配送retry
+    delivery_pending --> delivered: LINEが応答を受理
+    generating --> failed: 生成を継続できない
+    delivery_pending --> failed: 失敗案内を配送して終了
+    delivered --> [*]
+    failed --> [*]
+```
+
+`validated`と`delivery_unknown`は後続の配送状態精緻化に備えた予約値で、初期実装では遷移させません。`generation_epoch`とCoordinatorのleaseはD1の`status`とは別に、同じTurnを複数consumerが同時生成しないために使います。
 
 prompt本文、Context Package、未検証のモデル出力は保存しません。同じTurnをQueueが再配送しても新しい応答を送らないようにします。
 
