@@ -1,4 +1,4 @@
-import { d1 } from "@me-builder/lib";
+import { d1, line } from "@me-builder/lib";
 import { logger } from "@me-builder/shared";
 import type { Context } from "hono";
 import * as v from "valibot";
@@ -23,6 +23,9 @@ import type { AppEnv } from "../types";
 /** `POST /api/line/webhook` — 署名を検証して Queue へ投入する。 */
 export async function postLineWebhook(c: Context<AppEnv>): Promise<Response> {
   const currentConfig = getConfig(c.env);
+  const lineClient = currentConfig.lineChannelAccessToken
+    ? line.client.create(currentConfig.lineChannelAccessToken)
+    : undefined;
 
   // 署名検証は生のリクエストボディ文字列に対して行う必要があるため、text() で取得する
   const rawBody = await c.req.text();
@@ -32,6 +35,9 @@ export async function postLineWebhook(c: Context<AppEnv>): Promise<Response> {
     signature: c.req.header("x-line-signature"),
     channelSecret: currentConfig.lineChannelSecret,
     queue: currentConfig.webhookQueue,
+    startChatLoading: lineClient
+      ? (chatId) => lineClient.showLoadingAnimation({ chatId, loadingSeconds: 10 })
+      : undefined,
   });
 
   switch (outcome.type) {

@@ -1,8 +1,13 @@
 import { createHmac } from "node:crypto";
-import { describe, expect, it, vi } from "vitest";
+import { line } from "@me-builder/lib";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { app } from "./index";
 
 const CHANNEL_SECRET = "test-channel-secret";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 /** LINE Platform と同じ手順 (HMAC-SHA256 → Base64) で署名を生成します。 */
 function sign(body: string, channelSecret = CHANNEL_SECRET): string {
@@ -129,6 +134,42 @@ describe("POST /api/line/webhook signature verification", () => {
 });
 
 describe("API Server Webhook Queue", () => {
+  it("1対1のテキストでは10秒のローディングを開始してからQueueへ投入する", async () => {
+    const apiClient = line.client.create("test-token");
+    const showLoadingAnimation = vi.spyOn(apiClient, "showLoadingAnimation").mockResolvedValue({});
+    vi.spyOn(line.client, "create").mockReturnValue(apiClient);
+    const { queue, send } = createMockQueue();
+    const body = JSON.stringify({
+      events: [
+        {
+          type: "message",
+          source: { type: "user", userId: "U1" },
+          message: { type: "text", id: "message-id", text: "診断" },
+        },
+      ],
+    });
+
+    const res = await app.request(
+      "/api/line/webhook",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-line-signature": sign(body) },
+        body,
+      },
+      {
+        WEBHOOK_QUEUE: queue,
+        LINE_CHANNEL_ACCESS_TOKEN: "test-token",
+        LINE_CHANNEL_SECRET: CHANNEL_SECRET,
+      },
+    );
+
+    expect(res.status).toBe(200);
+    expect(showLoadingAnimation).toHaveBeenCalledWith({ chatId: "U1", loadingSeconds: 10 });
+    expect(showLoadingAnimation.mock.invocationCallOrder[0]).toBeLessThan(
+      send.mock.invocationCallOrder[0] ?? 0,
+    );
+  });
+
   it("POST /api/line/webhook enqueues event to WEBHOOK_QUEUE if binding is provided", async () => {
     const { queue, send } = createMockQueue();
     const body = JSON.stringify({ events: [{ type: "message", text: "hello" }] });
