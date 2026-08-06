@@ -104,8 +104,9 @@ describe("Worker", () => {
         CHAT_DELIVERY_SECRET: "delivery-secret",
       }),
       {
-        DB: {} as D1Database,
-        CONVERSATION_COORDINATOR: coordinatorNamespace,
+        d1: db,
+        do: { conversation: coordinatorNamespace },
+        queue: { chatTurn: undefined },
       },
     );
 
