@@ -1,18 +1,21 @@
 import { line } from "@me-builder/lib";
 import type { d1 } from "@me-builder/lib";
 import {
+  type ChatTurnQueueMessage,
   type Message,
   type MessageBatch,
   type WebhookQueueMessage,
   logger,
 } from "@me-builder/shared";
-import type { WorkerConfig } from "../config";
+import { type CloudflareBindings, type WorkerConfig, getWorkerConfig } from "../config";
+import { processChatTurnMessage } from "../handler/chat-turn";
 import { processLineWebhook } from "./feature/line";
 
 async function processWebhookMessage(
   message: Message<WebhookQueueMessage>,
   db: d1.Client,
   workerConfig?: WorkerConfig,
+  cf?: CloudflareBindings,
 ): Promise<void> {
   const messageCount = line.webhook.extractMessages(message.body.payload).length;
   logger.info(
@@ -28,7 +31,12 @@ async function processWebhookMessage(
 
   switch (message.body.source) {
     case "line":
-      await processLineWebhook(message.body.payload, db, workerConfig);
+      await processLineWebhook(
+        message.body.payload,
+        db,
+        workerConfig ?? getWorkerConfig(),
+        cf?.do.conversation,
+      );
       break;
     default:
       logger.warn({ source: message.body.source }, "Unknown webhook source");
@@ -39,9 +47,10 @@ async function processWebhookMessage(
 }
 
 export async function handleQueueBatch(
-  batch: MessageBatch<WebhookQueueMessage>,
+  batch: MessageBatch<WebhookQueueMessage | ChatTurnQueueMessage>,
   db: d1.Client,
   workerConfig?: WorkerConfig,
+  cf?: CloudflareBindings,
 ): Promise<void> {
   logger.info(
     {
@@ -53,7 +62,12 @@ export async function handleQueueBatch(
 
   for (const message of batch.messages) {
     try {
-      await processWebhookMessage(message, db, workerConfig);
+      if ("type" in message.body && message.body.type === "chat-turn") {
+        if (!cf || !workerConfig) throw new Error("Chat turn bindings are not configured");
+        await processChatTurnMessage(message as Message<ChatTurnQueueMessage>, cf, workerConfig);
+      } else {
+        await processWebhookMessage(message as Message<WebhookQueueMessage>, db, workerConfig, cf);
+      }
     } catch (err) {
       logger.error(
         {

@@ -12,6 +12,8 @@ export interface Env {
   CLOUDFLARE_AIG_TOKEN?: string;
   CF_AI_GATEWAY_BASE_URL?: string;
   GEMINI_MODEL?: string;
+  CHAT_ENABLED?: string;
+  CHAT_DELIVERY_SECRET?: string;
   CONVERSATION_COORDINATOR?: DurableObjectNamespace<ConversationCoordinator>;
   CHAT_TURN_QUEUE?: Queue<ChatTurnQueueMessage>;
   DB: D1Database;

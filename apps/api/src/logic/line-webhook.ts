@@ -65,6 +65,36 @@ function extractOneToOneTextChatIds(payload: unknown): string[] {
   return [...chatIds];
 }
 
+/** 一度しか使えないreplyTokenを非同期境界の外へ持ち出さない。 */
+export function removeDiaryReplyTokens(payload: unknown): unknown {
+  if (
+    !payload ||
+    typeof payload !== "object" ||
+    !Array.isArray((payload as { events?: unknown }).events)
+  ) {
+    return payload;
+  }
+  return {
+    ...(payload as Record<string, unknown>),
+    events: (payload as { events: unknown[] }).events.map((event) => {
+      if (!event || typeof event !== "object") return event;
+      const eventRecord = event as Record<string, unknown>;
+      const message = eventRecord.message;
+      const isDiagnosis =
+        eventRecord.type === "message" &&
+        message &&
+        typeof message === "object" &&
+        (message as Record<string, unknown>).type === "text" &&
+        typeof (message as Record<string, unknown>).text === "string" &&
+        line.text.classify((message as Record<string, unknown>).text as string) ===
+          "diagnosis-request";
+      if (isDiagnosis) return event;
+      const { replyToken: _replyToken, ...safeEvent } = eventRecord;
+      return safeEvent;
+    }),
+  };
+}
+
 export async function receiveLineWebhook({
   rawBody,
   signature,
@@ -102,14 +132,14 @@ export async function receiveLineWebhook({
     id: crypto.randomUUID(),
     source: "line",
     receivedAt: new Date().toISOString(),
-    payload,
+    payload: removeDiaryReplyTokens(payload),
   };
 
   const messages = line.webhook.extractMessages(payload);
 
   if (!queue) {
     logger.warn(
-      { id: event.id, source: event.source, messages: messages.length > 0 ? messages : undefined },
+      { id: event.id, source: event.source, messageCount: messages.length },
       "WEBHOOK_QUEUE binding not configured, skipping queue push",
     );
     return { type: "accepted", id: event.id, queued: false };
@@ -137,7 +167,7 @@ export async function receiveLineWebhook({
 
   await queue.send(event);
   logger.info(
-    { id: event.id, source: event.source, messages: messages.length > 0 ? messages : undefined },
+    { id: event.id, source: event.source, messageCount: messages.length },
     "Webhook event queued to WEBHOOK_QUEUE",
   );
 

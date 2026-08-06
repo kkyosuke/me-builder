@@ -19,6 +19,8 @@ export const WorkerConfigSchema = v.object({
     DEFAULT_CLOUDFLARE_AI_GATEWAY_BASE_URL,
   ),
   geminiModel: v.optional(v.string(), DEFAULT_GEMINI_MODEL),
+  chatEnabled: v.optional(v.boolean(), true),
+  chatDeliverySecret: v.optional(v.string()),
 });
 
 export type WorkerConfig = v.InferOutput<typeof WorkerConfigSchema>;

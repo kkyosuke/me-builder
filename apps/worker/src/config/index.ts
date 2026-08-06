@@ -51,6 +51,8 @@ export function getWorkerConfig(env?: Record<string, unknown>): WorkerConfig {
   const rawCloudflareAiGatewayBaseUrl =
     getEnv("CF_AI_GATEWAY_BASE_URL", env)?.trim() || DEFAULT_CLOUDFLARE_AI_GATEWAY_BASE_URL;
   const rawGeminiModel = getEnv("GEMINI_MODEL", env)?.trim() || DEFAULT_GEMINI_MODEL;
+  const rawChatEnabled = getEnv("CHAT_ENABLED", env)?.trim().toLowerCase() !== "false";
+  const rawChatDeliverySecret = getEnv("CHAT_DELIVERY_SECRET", env)?.trim() || undefined;
 
   const rawConfig = {
     environment: rawEnvironment,
@@ -63,6 +65,8 @@ export function getWorkerConfig(env?: Record<string, unknown>): WorkerConfig {
     cloudflareAiGatewayToken: rawCloudflareAiGatewayToken,
     cloudflareAiGatewayBaseUrl: rawCloudflareAiGatewayBaseUrl,
     geminiModel: rawGeminiModel,
+    chatEnabled: rawChatEnabled,
+    chatDeliverySecret: rawChatDeliverySecret,
   };
 
   return v.parse(WorkerConfigSchema, rawConfig);

@@ -1,7 +1,7 @@
 import { createHmac } from "node:crypto";
 import type { Queue, WebhookQueueMessage } from "@me-builder/shared";
 import { describe, expect, it, vi } from "vitest";
-import { receiveLineWebhook } from "./line-webhook";
+import { receiveLineWebhook, removeDiaryReplyTokens } from "./line-webhook";
 
 const CHANNEL_SECRET = "test-channel-secret";
 
@@ -46,6 +46,17 @@ function receive(
 }
 
 describe("receiveLineWebhook chat loading", () => {
+  it("QueueへreplyTokenを渡さない", async () => {
+    const { send, result } = receive([textEvent("日記")]);
+    await result;
+    expect(send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          events: [expect.not.objectContaining({ replyToken: expect.anything() })],
+        }),
+      }),
+    );
+  });
   it.each(["診断", "AI: 今日の気分を整理して"])(
     "1対1のテキスト「%s」ではQueue投入前にローディングを開始する",
     async (text) => {
@@ -108,5 +119,24 @@ describe("receiveLineWebhook chat loading", () => {
     expect(startChatLoading).toHaveBeenCalledOnce();
     expect(waitUntil).toHaveBeenCalledOnce();
     expect(send).toHaveBeenCalledOnce();
+  });
+});
+
+describe("removeDiaryReplyTokens", () => {
+  it("eventの他の値を保ったままreplyTokenだけを除く", () => {
+    expect(removeDiaryReplyTokens({ events: [textEvent("本文")] })).toEqual({
+      events: [
+        expect.objectContaining({
+          type: "message",
+          message: expect.objectContaining({ text: "本文" }),
+        }),
+      ],
+    });
+  });
+
+  it("診断commandの同期返信用replyTokenは保つ", () => {
+    expect(removeDiaryReplyTokens({ events: [textEvent("診断")] })).toEqual({
+      events: [expect.objectContaining({ replyToken: "reply-token" })],
+    });
   });
 });

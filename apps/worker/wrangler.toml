@@ -10,6 +10,10 @@ enabled = true
 queue = "me-builder-webhook-queue-local"
 dead_letter_queue = "me-builder-webhook-dlq-local"
 
+[[queues.consumers]]
+queue = "me-builder-chat-turn-queue-local"
+dead_letter_queue = "me-builder-chat-turn-dlq-local"
+
 [[queues.producers]]
 queue = "me-builder-chat-turn-queue-local"
 binding = "CHAT_TURN_QUEUE"
@@ -45,6 +49,10 @@ name = "me-builder-worker-local"
 queue = "me-builder-webhook-queue-local"
 dead_letter_queue = "me-builder-webhook-dlq-local"
 
+[[env.local.queues.consumers]]
+queue = "me-builder-chat-turn-queue-local"
+dead_letter_queue = "me-builder-chat-turn-dlq-local"
+
 [[env.local.queues.producers]]
 queue = "me-builder-chat-turn-queue-local"
 binding = "CHAT_TURN_QUEUE"
@@ -71,6 +79,10 @@ name = "me-builder-worker-preview"
 queue = "me-builder-webhook-queue-preview"
 dead_letter_queue = "me-builder-webhook-dlq-preview"
 
+[[env.preview.queues.consumers]]
+queue = "me-builder-chat-turn-queue-preview"
+dead_letter_queue = "me-builder-chat-turn-dlq-preview"
+
 [[env.preview.queues.producers]]
 queue = "me-builder-chat-turn-queue-preview"
 binding = "CHAT_TURN_QUEUE"
@@ -96,6 +108,10 @@ name = "me-builder-worker-production"
 [[env.production.queues.consumers]]
 queue = "me-builder-webhook-queue-production"
 dead_letter_queue = "me-builder-webhook-dlq-production"
+
+[[env.production.queues.consumers]]
+queue = "me-builder-chat-turn-queue-production"
+dead_letter_queue = "me-builder-chat-turn-dlq-production"
 
 [[env.production.queues.producers]]
 queue = "me-builder-chat-turn-queue-production"

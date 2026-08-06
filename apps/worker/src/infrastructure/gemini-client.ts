@@ -19,9 +19,36 @@ export function createGeminiClient(
       baseUrl: config.cloudflareAiGatewayBaseUrl,
       headers: {
         "cf-aig-authorization": `Bearer ${config.cloudflareAiGatewayToken}`,
+        "cf-aig-collect-log-payload": "false",
+        "cf-aig-cache-ttl": "0",
       },
     },
   });
+}
+
+export async function generateStructuredText(
+  client: GoogleGenAI,
+  input: {
+    model: string;
+    contents: string;
+    systemInstruction: string;
+    responseJsonSchema: Record<string, unknown>;
+    maxOutputTokens: number;
+    signal?: AbortSignal;
+  },
+): Promise<string | undefined> {
+  const response = await client.models.generateContent({
+    model: input.model,
+    contents: input.contents,
+    config: {
+      systemInstruction: input.systemInstruction,
+      responseMimeType: "application/json",
+      responseJsonSchema: input.responseJsonSchema,
+      maxOutputTokens: input.maxOutputTokens,
+      ...(input.signal ? { abortSignal: input.signal } : {}),
+    },
+  });
+  return response.text;
 }
 
 /** 指定した Gemini モデルへテキスト生成を依頼し、応答本文を返します。 */

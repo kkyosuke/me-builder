@@ -1,18 +1,10 @@
 name: CD / Preview
 
 on:
-  pull_request:
-    branches:
-      - main
-    types:
-      - opened
-      - synchronize
-      - reopened
+  workflow_dispatch:
 
 permissions:
   contents: read
-  pull-requests: write
-  issues: write
 
 jobs:
   deploy-preview:
@@ -26,6 +18,7 @@ jobs:
       LINE_CHANNEL_SECRET: ${{ secrets.LINE_CHANNEL_SECRET }}
       GOOGLE_AI_STUDIO_API_KEY: ${{ secrets.GOOGLE_AI_STUDIO_API_KEY }}
       CLOUDFLARE_AIG_TOKEN: ${{ secrets.CLOUDFLARE_AIG_TOKEN }}
+      CHAT_DELIVERY_SECRET: ${{ secrets.CHAT_DELIVERY_SECRET }}
       # LIFF Server API は LINE Login チャネルのチャネルアクセストークンを要求する。
       # LINE_LOGIN_CHANNEL_ID は未設定でも LIFF ID の接頭辞から補完される。
       LINE_LOGIN_CHANNEL_ID: ${{ vars.LINE_LOGIN_CHANNEL_ID }}
@@ -58,6 +51,10 @@ jobs:
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
         run: task db:migrate:preview
 
+      - name: Ensure Diary Chat Queues (Preview)
+        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
+        run: task queues:setup:preview
+
       - name: Apply Diagnosis Seed (Preview)
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
         run: task db:seed:preview
@@ -69,6 +66,10 @@ jobs:
         run: |
           if [ -z "${LINE_CHANNEL_SECRET}" ]; then
             echo "::error::LINE_CHANNEL_SECRET が GitHub Secrets に設定されていません。x-line-signature の検証に必須です。"
+            exit 1
+          fi
+          if [ -z "${CHAT_DELIVERY_SECRET}" ]; then
+            echo "::error::CHAT_DELIVERY_SECRET が GitHub Secrets に設定されていません。日記チャットの重複配送防止に必須です。"
             exit 1
           fi
 
@@ -85,7 +86,7 @@ jobs:
                 .filter(([, value]) => value),
             );
             const workerOnlySecrets = Object.fromEntries(
-              [["GOOGLE_AI_STUDIO_API_KEY", process.env.GOOGLE_AI_STUDIO_API_KEY], ["CLOUDFLARE_AIG_TOKEN", process.env.CLOUDFLARE_AIG_TOKEN]]
+              [["GOOGLE_AI_STUDIO_API_KEY", process.env.GOOGLE_AI_STUDIO_API_KEY], ["CLOUDFLARE_AIG_TOKEN", process.env.CLOUDFLARE_AIG_TOKEN], ["CHAT_DELIVERY_SECRET", process.env.CHAT_DELIVERY_SECRET]]
                 .filter(([, value]) => value),
             );
             await Bun.write(process.env.API_SECRETS_FILE, JSON.stringify({
@@ -123,51 +124,3 @@ jobs:
         if: ${{ env.CLOUDFLARE_API_TOKEN == '' }}
         run: |
           echo "::warning::CLOUDFLARE_API_TOKEN が GitHub Secrets に設定されていないためデプロイをスキップしました。"
-
-      - name: Comment Preview Deployment on PR
-        uses: actions/github-script@v7
-        if: github.event_name == 'pull_request'
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const issue_number = context.issue.number;
-            const identifier = '<!-- preview-deploy-comment -->';
-            const cloudflareDashboardUrl = `https://dash.cloudflare.com/${process.env.CLOUDFLARE_ACCOUNT_ID}/workers-and-pages`;
-
-            // 1. 既存のプレビューデプロイコメントを削除 (古いコメントを削除して再投稿)
-            const comments = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: issue_number,
-            });
-
-            for (const comment of comments.data) {
-              if (comment.body && comment.body.includes(identifier)) {
-                await github.rest.issues.deleteComment({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  comment_id: comment.id,
-                });
-              }
-            }
-
-            // 2. 新しいプレビュー完了コメントを投稿
-            const body = `${identifier}
-            ### 🚀 プレビュー環境へのデプロイが完了しました！
-
-            プルリクエストの最新コミット (\`${context.sha.substring(0, 7)}\`) のビルド・デプロイが成功しました。
-
-            | サービス | リンク |
-            | --- | --- |
-            | 🖥️ **Web UI** | [stg.kagami.kyosuke.dev](https://stg.kagami.kyosuke.dev) |
-            | ⚡ **API Server** | [api.stg.kagami.kyosuke.dev](https://api.stg.kagami.kyosuke.dev) |
-            | 🤖 **MCP Server** | [mcp.stg.kagami.kyosuke.dev](https://mcp.stg.kagami.kyosuke.dev) |
-            | ☁️ **Cloudflare Dashboard** | [Workers & Pages を開く](${cloudflareDashboardUrl}) |
-            `;
-
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: issue_number,
-              body: body,
-            });

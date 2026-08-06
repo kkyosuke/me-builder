@@ -1,9 +1,7 @@
 name: CD / Production
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
 
 jobs:
   deploy-production:
@@ -17,6 +15,7 @@ jobs:
       LINE_CHANNEL_SECRET: ${{ secrets.LINE_CHANNEL_SECRET }}
       GOOGLE_AI_STUDIO_API_KEY: ${{ secrets.GOOGLE_AI_STUDIO_API_KEY }}
       CLOUDFLARE_AIG_TOKEN: ${{ secrets.CLOUDFLARE_AIG_TOKEN }}
+      CHAT_DELIVERY_SECRET: ${{ secrets.CHAT_DELIVERY_SECRET }}
       # LIFF Server API は LINE Login チャネルのチャネルアクセストークンを要求する。
       # LINE_LOGIN_CHANNEL_ID は未設定でも LIFF ID の接頭辞から補完される。
       LINE_LOGIN_CHANNEL_ID: ${{ vars.LINE_LOGIN_CHANNEL_ID }}
@@ -49,6 +48,10 @@ jobs:
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
         run: task db:migrate:production
 
+      - name: Ensure Diary Chat Queues (Production)
+        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
+        run: task queues:setup:production
+
       - name: Apply Diagnosis Seed (Production)
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
         run: task db:seed:production
@@ -60,6 +63,10 @@ jobs:
         run: |
           if [ -z "${LINE_CHANNEL_SECRET}" ]; then
             echo "::error::LINE_CHANNEL_SECRET が GitHub Secrets に設定されていません。x-line-signature の検証に必須です。"
+            exit 1
+          fi
+          if [ -z "${CHAT_DELIVERY_SECRET}" ]; then
+            echo "::error::CHAT_DELIVERY_SECRET が GitHub Secrets に設定されていません。日記チャットの重複配送防止に必須です。"
             exit 1
           fi
 
@@ -76,7 +83,7 @@ jobs:
                 .filter(([, value]) => value),
             );
             const workerOnlySecrets = Object.fromEntries(
-              [["GOOGLE_AI_STUDIO_API_KEY", process.env.GOOGLE_AI_STUDIO_API_KEY], ["CLOUDFLARE_AIG_TOKEN", process.env.CLOUDFLARE_AIG_TOKEN]]
+              [["GOOGLE_AI_STUDIO_API_KEY", process.env.GOOGLE_AI_STUDIO_API_KEY], ["CLOUDFLARE_AIG_TOKEN", process.env.CLOUDFLARE_AIG_TOKEN], ["CHAT_DELIVERY_SECRET", process.env.CHAT_DELIVERY_SECRET]]
                 .filter(([, value]) => value),
             );
             await Bun.write(process.env.API_SECRETS_FILE, JSON.stringify({

@@ -18,6 +18,7 @@
     "@google/genai": "^2.15.0",
     "@me-builder/lib": "workspace:*",
     "@me-builder/shared": "workspace:*",
+    "@valibot/to-json-schema": "1.7.1",
     "drizzle-orm": "^0.38.4",
     "valibot": "^1.4.2"
   },
