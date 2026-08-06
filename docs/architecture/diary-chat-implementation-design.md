@@ -82,6 +82,55 @@ flowchart TD
 | D1 | 原本、Session、message、Brain Item、処理状態 | 会話の実行lock |
 | Vectorize | 確認済みBrain Itemの候補検索 | 認可、削除状態、確認状態の最終判定 |
 
+### 3.1 Queueを使う意図と処理フロー
+
+Queueは会話順序を決めるためではなく、Webhook受付、原本保存、AI生成を分離し、一時障害時に各段階を再試行できるようにするために使います。Account内の順序、連投の集約、同じTurnの多重生成防止は`ConversationCoordinator`が担当します。Queueの配送順やexactly-once性には依存しません。
+
+```mermaid
+sequenceDiagram
+    participant API as API Worker
+    participant WQ as Webhook Queue
+    participant IW as ingest Worker
+    participant D1
+    participant DO as ConversationCoordinator
+    participant TQ as Chat Turn Queue
+    participant GW as generate Worker
+
+    API->>WQ: 署名検証済みeventを投入
+    WQ->>IW: at-least-once配送
+    IW->>D1: Source Recordを冪等保存
+    IW->>DO: event IDとSource Record IDを通知
+    DO->>DO: Account単位で連投を集約しTurnを採番
+    DO->>D1: Session・message・Turnを冪等保存
+    DO->>TQ: Turn IDとgeneration epochを投入
+    TQ->>GW: at-least-once配送
+    GW->>DO: generation leaseを取得
+    GW->>D1: Context取得・生成結果保存
+    GW->>DO: 完了を通知
+```
+
+2つのQueueの責務は次のように分けます。
+
+| Queue | 区切る処理 | ackの条件 | 再配送時の守り |
+| --- | --- | --- | --- |
+| Webhook Queue | LINE Webhook受付と原本・会話への取り込み | Source Recordの保存とCoordinatorへの通知が完了したとき | channel event IDとSource Record IDで冪等化する |
+| Chat Turn Queue | 会話への取り込みとAI生成・LINE最終応答 | 対象Turnの生成・配送処理が完了したとき | Turn ID、generation epoch、Coordinatorのleaseで多重生成を防ぐ |
+
+処理不能なmessageを無制限に通常Queueへ戻さないよう、両QueueにDLQを設定します。Chat Turn Queueへ本文、Account ID、LINEの`replyToken`は渡さず、生成に必要なデータはconsumerがTurn IDを使ってD1から取得します。受付からTurn作成までの詳細は[5.1 受付から原本保存](#51-受付から原本保存)、生成順序の詳細は[5.2 連投とTurn](#52-連投とturn)を正とします。
+
+### 3.2 Cron Triggerの意図
+
+Cron Triggerは会話生成やBrain Item候補生成には使いません。新しいmessageが来ないAccountも含め、D1全体から期限到来データを定期的に処理するために使います。InactiveなDurable Objectは起動しているとは限らないため、この責務をDOのalarmだけに持たせません。
+
+現在は15分ごとに次を実行します。
+
+| 処理 | 対象 | 保持するもの |
+| --- | --- | --- |
+| Session終了 | 6時間無操作、または開始から24時間経過したactive Session | Session、message、Source Record |
+| 一時的な会話文脈の削除 | Session終了から24時間経過したassistant本文とSession Summary | ユーザー原文であるSource Recordと会話のメタデータ |
+
+各処理は同じ対象を再実行しても結果が変わらないよう冪等にし、assistant本文は1回あたり最大100件を処理します。本文削除のデータ境界は[4.4 `conversation_messages`](#44-conversation_messages)、Session終了との役割分担は[5.3 Session境界](#53-session境界)を正とします。
+
 ## 4. D1データモデル
 
 ### 4.1 原則
