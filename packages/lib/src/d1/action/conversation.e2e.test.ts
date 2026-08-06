@@ -13,6 +13,7 @@ import {
   getPendingAssistantResponse,
   getTurnContext,
   markTurnDelivered,
+  markTurnFailed,
   markTurnGenerating,
   saveAssistantResponse,
   storeLineTextSource,
@@ -94,12 +95,28 @@ describe("Diary conversation persistence flow", () => {
         endSession: true,
       }),
     ).resolves.toBe(responseMessageId);
-    await expect(getPendingAssistantResponse(db, attached.turnId)).resolves.toEqual({
+    await expect(
+      getPendingAssistantResponse(db, { accountId: account.id, turnId: attached.turnId }),
+    ).resolves.toEqual({
       body: "疲れている中でも散歩できたんだね。今は少し休めそう？",
       endSession: true,
     });
+    const { account: anotherAccount } = await upsertIdentity(db, {
+      provider: "line",
+      providerAccountId: "U_another_diary_user",
+    });
+    await expect(
+      getPendingAssistantResponse(db, {
+        accountId: anotherAccount.id,
+        turnId: attached.turnId,
+      }),
+    ).resolves.toBeUndefined();
 
-    await markTurnDelivered(db, attached.turnId);
+    await expect(markTurnDelivered(db, attached.turnId)).resolves.toBe(true);
+    await expect(markTurnFailed(db, attached.turnId, "stale_delivery_failure")).resolves.toBe(
+      false,
+    );
+    await expect(markTurnGenerating(db, attached.turnId)).resolves.toBe(false);
     await closeTurnSession(db, attached.turnId);
 
     const storedTurn = await db
@@ -123,5 +140,37 @@ describe("Diary conversation persistence flow", () => {
       { body: "今日は少し疲れた" },
       { body: "それでも散歩できた" },
     ]);
+  });
+
+  it("異なるSessionへ保存済みのeventを同じTurnとして再attachしない", async () => {
+    const db = createTestDb();
+    const { account } = await upsertIdentity(db, {
+      provider: "line",
+      providerAccountId: "U_session_boundary",
+    });
+    const first = await storeLineTextSource(db, {
+      accountId: account.id,
+      eventId: "old-session-event",
+      body: "ここで一度終わります",
+      receivedAt: new Date("2026-08-07T00:00:00.000Z"),
+    });
+    const firstTurn = await attachMessagesToTurn(db, [first], 1, "test-model");
+    await closeTurnSession(db, firstTurn.turnId);
+
+    const second = await storeLineTextSource(db, {
+      accountId: account.id,
+      eventId: "new-session-event",
+      body: "新しい会話を始めます",
+      receivedAt: new Date("2026-08-07T00:01:00.000Z"),
+    });
+    const secondTurn = await attachMessagesToTurn(db, [second], 2, "test-model");
+    expect(secondTurn.sessionId).not.toBe(firstTurn.sessionId);
+    await expect(markTurnGenerating(db, secondTurn.turnId)).resolves.toBe(true);
+    await expect(markTurnFailed(db, secondTurn.turnId, "generation_exhausted")).resolves.toBe(true);
+    await expect(markTurnDelivered(db, secondTurn.turnId)).resolves.toBe(false);
+
+    await expect(attachMessagesToTurn(db, [first, second], 3, "test-model")).rejects.toThrow(
+      "Existing conversation messages span multiple chat turns",
+    );
   });
 });

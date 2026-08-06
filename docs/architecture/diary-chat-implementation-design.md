@@ -65,7 +65,7 @@ flowchart TD
     GW -->|検証結果| DO
     DO -->|受領応答・finalをretry key付きpush| LINE
     DO -->|状態と時刻| D1
-    CRON[Cron Trigger] -->|期限削除・outbox再照合| D1
+    CRON[Cron Trigger] -->|outbox再照合・復旧漏れ検出| D1
     CRON -->|同期差分確認| V
     TQ --> DLQ[Chat Turn DLQ]
 ```
@@ -78,7 +78,7 @@ flowchart TD
 | ingest Worker | 冪等な原本保存、Account解決、Coordinator通知 | 会話順序の独自判断、AI生成 |
 | Coordinator | Account内の順序、連投集約、Session、Turn lease、外部I/Oのoutboxと締切 | 原本やBrain Itemの正本保持 |
 | generate Worker | Context構築、安全判定、prompt実行、出力検証 | Account IDや権限をモデルへ決めさせること |
-| Cron Worker | 期限削除、Vectorize outboxの再照合、復旧漏れ検出 | 会話順序の調停、AI生成 |
+| Cron Worker | Vectorize outboxの再照合、復旧漏れ検出 | 会話順序の調停、AI生成 |
 | D1 | 原本、Session、message、Brain Item、処理状態 | 会話の実行lock |
 | Vectorize | 確認済みBrain Itemの候補検索 | 認可、削除状態、確認状態の最終判定 |
 
@@ -165,7 +165,7 @@ userとassistantを同じ時系列で復元するための履歴です。user原
 
 `role = user`では`source_record_id`を使い、`role = assistant`では`assistant_body`を使います。初期段階ではmessage種別を利用する表示・集計がないため`kind`は持ちません。必要になった段階で追加します。
 
-一意制約は`(channel, channel_event_id)`と`(session_id, sequence)`へ置きます。チャット履歴を復元できるよう、`assistant_body`はSession終了後も保持し、自動削除の対象にしません。
+一意制約は`(channel, channel_event_id)`と`(session_id, sequence)`へ置きます。チャット履歴を復元できるよう、`assistant_body`はSession終了後も保持し、経過時間による自動削除の対象にしません。本人による会話の削除など、明示的な削除操作にはmessageのlifecycleを通して従います。
 
 ### 4.5 `chat_turns`
 
@@ -300,7 +300,7 @@ Coordinatorは採番直前に[体験設計の境界](../product/diary-chat-exper
 - 24時間のhard cap後のmessageは必ず新しいSessionへ入れる
 - 終了と新規Session作成をAccount単位で直列化する
 
-Durable Objectのalarmは、未完了outbox、次Turn、Session終了のうち最も早い時刻を1件だけ設定します。alarm handlerはローカルSQLiteと必要なD1行を再読込し、複数回実行されても同じ結果にします。Session終了後24時間の本文削除は全Accountを走査するCron Triggerが所有し、DO alarmへ混在させません。
+Durable Objectのalarmは、未完了outbox、次Turn、Session終了のうち最も早い時刻を1件だけ設定します。alarm handlerはローカルSQLiteと必要なD1行を再読込し、複数回実行されても同じ結果にします。Session終了を理由とした本文の自動削除は行いません。
 
 ## 6. Context Package
 
@@ -528,7 +528,7 @@ system promptは次の順で固定し、Git管理する`prompt_version`を付け
 
 ## 11. 観測と監査
 
-計測するのは各処理段階のlatency、38秒初回返信率、30秒deadline違反、90秒final率、receipt率、retry、DLQ、DO outboxの滞留時間、`delivery_unknown`、Vectorize同期遅延、削除期限超過、重複抑止、schema違反、安全route、token数、モデル別失敗率です。
+計測するのは各処理段階のlatency、38秒初回返信率、30秒deadline違反、90秒final率、receipt率、retry、DLQ、DO outboxの滞留時間、`delivery_unknown`、Vectorize同期遅延、明示的な削除要求の反映遅延、重複抑止、schema違反、安全route、token数、モデル別失敗率です。
 
 logへ出せる識別子は環境、Queue message ID、Turn ID、Session IDの一方向hash、prompt version、処理段階です。Account ID、LINE user ID、reply token、日記本文、Context Package、生成本文、Brain Item本文は出しません。
 
@@ -547,7 +547,6 @@ logへ出せる識別子は環境、Queue message ID、Turn ID、Session IDの�
 - 古いgeneration epochの完了結果を保存・送信しない
 - 6時間、24時間、明示終了、日付またぎのSession境界
 - 削除、訂正、撤回後の内容がContext Packageへ入らない
-- Session終了後24時間の削除jobがinactiveなAccountにも適用される
 - D1 restore後に削除が再適用されるまで通常受付を再開しない
 - Vectorizeが`owner_scope`をtopK前にfilterし、他Accountの候補を返さない
 - Vectorize候補をD1再検証し、同じscope内でも利用不可のItemを除外する
@@ -578,7 +577,7 @@ prompt versionを本番へ出す条件はschema準拠100%、越権した記憶�
 
 製品ロードマップのPhaseとは分け、次の単位で進めます。
 
-1. **原本とSession**: D1 schema、冪等保存、Session境界、Cronによるpayload削除
+1. **原本とSession**: D1 schema、冪等保存、Session境界、明示的な削除操作への追従
 2. **会話Coordinator**: Account単位DO、ローカルSQLite、連投、Turn state、outbox、2 QueueとDLQ
 3. **安全な通常応答**: Queue非依存のreceipt、Context、prompt、構造化出力、30秒・90秒deadline
 4. **長期会話の圧縮**: 20message超過時の文脈保持と訂正反映

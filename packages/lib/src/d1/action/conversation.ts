@@ -109,6 +109,9 @@ export async function attachMessagesToTurn(
   }
 
   const eventIds = inputs.map((input) => input.eventId);
+  if (new Set(eventIds).size !== eventIds.length) {
+    throw new Error("A chat turn cannot contain duplicate channel events");
+  }
   const existingMessages = await db
     .select()
     .from(conversationMessages)
@@ -120,10 +123,41 @@ export async function attachMessagesToTurn(
     );
 
   if (existingMessages.length === inputs.length) {
+    const messagesByEventId = new Map(
+      existingMessages.map((message) => [message.channelEventId, message]),
+    );
+    if (
+      messagesByEventId.size !== inputs.length ||
+      inputs.some((input) => {
+        const message = messagesByEventId.get(input.eventId);
+        return (
+          !message || message.role !== "user" || message.sourceRecordId !== input.sourceRecordId
+        );
+      })
+    ) {
+      throw new Error("Existing conversation messages do not match the requested channel events");
+    }
+
     const ordered = [...existingMessages].sort((a, b) => a.sequence - b.sequence);
     const first = ordered[0];
     const last = ordered.at(-1);
     if (!first || !last) throw new Error("Existing conversation messages are incomplete");
+    if (
+      ordered.some(
+        (message, index) =>
+          message.sessionId !== first.sessionId || message.sequence !== first.sequence + index,
+      )
+    ) {
+      throw new Error("Existing conversation messages span multiple chat turns");
+    }
+    const existingSession = await db
+      .select({ accountId: conversationSessions.accountId })
+      .from(conversationSessions)
+      .where(eq(conversationSessions.id, first.sessionId))
+      .get();
+    if (existingSession?.accountId !== accountId) {
+      throw new Error("Existing conversation messages belong to another account");
+    }
     const existingTurn = await db
       .select()
       .from(chatTurns)
@@ -331,12 +365,7 @@ export async function markTurnGenerating(db: D1Client, turnId: string): Promise<
       attemptCount: sql`${chatTurns.attemptCount} + 1`,
       updatedAt: new Date(),
     })
-    .where(
-      and(
-        eq(chatTurns.id, turnId),
-        inArray(chatTurns.status, ["queued", "generating", "delivery_pending"]),
-      ),
-    );
+    .where(and(eq(chatTurns.id, turnId), inArray(chatTurns.status, ["queued", "generating"])));
   return changedRowCount(result) > 0;
 }
 
@@ -401,7 +430,7 @@ export async function saveAssistantResponse(
 
 export async function getPendingAssistantResponse(
   db: D1Client,
-  turnId: string,
+  input: { accountId: string; turnId: string },
 ): Promise<{ body: string; endSession: boolean } | undefined> {
   const row = await db
     .select({
@@ -409,8 +438,16 @@ export async function getPendingAssistantResponse(
       endSession: chatTurns.endSession,
     })
     .from(chatTurns)
-    .innerJoin(conversationMessages, eq(chatTurns.responseMessageId, conversationMessages.id))
-    .where(eq(chatTurns.id, turnId))
+    .innerJoin(conversationSessions, eq(chatTurns.sessionId, conversationSessions.id))
+    .innerJoin(
+      conversationMessages,
+      and(
+        eq(chatTurns.responseMessageId, conversationMessages.id),
+        eq(conversationMessages.sessionId, chatTurns.sessionId),
+        eq(conversationMessages.turnId, chatTurns.id),
+      ),
+    )
+    .where(and(eq(chatTurns.id, input.turnId), eq(conversationSessions.accountId, input.accountId)))
     .get();
   return row?.body
     ? {
@@ -460,20 +497,24 @@ export async function closeExpiredSessions(db: D1Client, now = new Date()): Prom
   return changedRowCount(hardCapResult) + changedRowCount(inactiveResult);
 }
 
-export async function markTurnDelivered(db: D1Client, turnId: string): Promise<void> {
-  await db
+export async function markTurnDelivered(db: D1Client, turnId: string): Promise<boolean> {
+  const result = await db
     .update(chatTurns)
     .set({ status: "delivered", updatedAt: new Date() })
-    .where(eq(chatTurns.id, turnId));
+    .where(and(eq(chatTurns.id, turnId), eq(chatTurns.status, "delivery_pending")));
+  return changedRowCount(result) > 0;
 }
 
 export async function markTurnFailed(
   db: D1Client,
   turnId: string,
   failureStage: string,
-): Promise<void> {
-  await db
+): Promise<boolean> {
+  const result = await db
     .update(chatTurns)
     .set({ status: "failed", failureStage, updatedAt: new Date() })
-    .where(eq(chatTurns.id, turnId));
+    .where(
+      and(eq(chatTurns.id, turnId), inArray(chatTurns.status, ["generating", "delivery_pending"])),
+    );
+  return changedRowCount(result) > 0;
 }
