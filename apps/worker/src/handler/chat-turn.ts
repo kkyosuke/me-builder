@@ -18,8 +18,7 @@ export async function processChatTurnMessage(
     return;
   }
 
-  if (!cf.do.conversation)
-    throw new Error("CONVERSATION_COORDINATOR binding is not configured");
+  if (!cf.do.conversation) throw new Error("CONVERSATION_COORDINATOR binding is not configured");
   const coordinator = cf.do.conversation.getByName(context.accountId);
   const lease = await coordinator.acquireGeneration(
     message.body.turnId,
