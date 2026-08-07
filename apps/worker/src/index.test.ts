@@ -312,7 +312,7 @@ describe("Worker Queue Handler", () => {
     const req = new Request("http://localhost/");
     const res = await worker.fetch(req, { ENVIRONMENT: "test", DB: {} as unknown as D1Database });
     expect(res.status).toBe(200);
-    const data = await res.json();
+    const data = (await res.json()) as { status: string; service: string };
     expect(data.status).toBe("ok");
     expect(data.service).toBe("me-builder-worker");
   });

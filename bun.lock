@@ -85,11 +85,15 @@
         "@google/genai": "^2.15.0",
         "@me-builder/lib": "workspace:*",
         "@me-builder/shared": "workspace:*",
+        "drizzle-orm": "^0.38.4",
         "valibot": "^1.4.2",
       },
       "devDependencies": {
         "@cloudflare/workers-types": "^5.20260724.1",
+        "@types/better-sqlite3": "^7.6.13",
         "@types/bun": "latest",
+        "better-sqlite3": "^13.0.1",
+        "miniflare": "4.20260722.0",
       },
     },
     "packages/lib": {

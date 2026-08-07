@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNull, lte, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import type { D1Client } from "../client";
 import {
@@ -122,62 +122,63 @@ export async function attachMessagesToTurn(
       ),
     );
 
-  if (existingMessages.length === inputs.length) {
-    const messagesByEventId = new Map(
-      existingMessages.map((message) => [message.channelEventId, message]),
-    );
+  if (existingMessages.length > 0) {
+    const inputsByEventId = new Map(inputs.map((input) => [input.eventId, input]));
     if (
-      messagesByEventId.size !== inputs.length ||
-      inputs.some((input) => {
-        const message = messagesByEventId.get(input.eventId);
-        return (
-          !message || message.role !== "user" || message.sourceRecordId !== input.sourceRecordId
-        );
+      existingMessages.some((message) => {
+        const input = inputsByEventId.get(message.channelEventId ?? "");
+        return !input || message.role !== "user" || message.sourceRecordId !== input.sourceRecordId;
       })
     ) {
       throw new Error("Existing conversation messages do not match the requested channel events");
     }
-
-    const ordered = [...existingMessages].sort((a, b) => a.sequence - b.sequence);
-    const first = ordered[0];
-    const last = ordered.at(-1);
-    if (!first || !last) throw new Error("Existing conversation messages are incomplete");
-    if (
-      ordered.some(
-        (message, index) =>
-          message.sessionId !== first.sessionId || message.sequence !== first.sequence + index,
-      )
-    ) {
-      throw new Error("Existing conversation messages span multiple chat turns");
-    }
-    const existingSession = await db
-      .select({ accountId: conversationSessions.accountId })
+    const sessionIds = [...new Set(existingMessages.map(({ sessionId }) => sessionId))];
+    const existingSessions = await db
+      .select({ id: conversationSessions.id, accountId: conversationSessions.accountId })
       .from(conversationSessions)
-      .where(eq(conversationSessions.id, first.sessionId))
-      .get();
-    if (existingSession?.accountId !== accountId) {
+      .where(inArray(conversationSessions.id, sessionIds));
+    if (
+      existingSessions.length !== sessionIds.length ||
+      existingSessions.some((session) => session.accountId !== accountId)
+    ) {
       throw new Error("Existing conversation messages belong to another account");
     }
-    const existingTurn = await db
-      .select()
-      .from(chatTurns)
-      .where(
-        and(
-          eq(chatTurns.sessionId, first.sessionId),
-          eq(chatTurns.fromSequence, first.sequence),
-          eq(chatTurns.throughSequence, last.sequence),
-        ),
-      )
-      .get();
-    if (!existingTurn) throw new Error("Conversation messages exist without their chat turn");
-    return {
-      turnId: existingTurn.id,
-      sessionId: existingTurn.sessionId,
-      generationEpoch: existingTurn.generationEpoch,
-    };
-  }
-  if (existingMessages.length > 0) {
-    throw new Error("Partially attached chat turn requires operator reconciliation");
+
+    if (existingMessages.length === inputs.length) {
+      const existingTurns = [];
+      for (const message of existingMessages) {
+        const turn = await db
+          .select()
+          .from(chatTurns)
+          .where(
+            and(
+              eq(chatTurns.sessionId, message.sessionId),
+              lte(chatTurns.fromSequence, message.sequence),
+              gte(chatTurns.throughSequence, message.sequence),
+            ),
+          )
+          .get();
+        if (!turn) throw new Error("Conversation messages exist without their chat turn");
+        existingTurns.push(turn);
+      }
+      const existingTurn = existingTurns.sort(
+        (left, right) => left.generationEpoch - right.generationEpoch,
+      )[0];
+      if (!existingTurn) throw new Error("Existing conversation messages are incomplete");
+      return {
+        turnId: existingTurn.id,
+        sessionId: existingTurn.sessionId,
+        generationEpoch: existingTurn.generationEpoch,
+      };
+    }
+
+    const attachedEventIds = new Set(existingMessages.map(({ channelEventId }) => channelEventId));
+    return attachMessagesToTurn(
+      db,
+      inputs.filter(({ eventId }) => !attachedEventIds.has(eventId)),
+      generationEpoch,
+      model,
+    );
   }
 
   const firstReceivedAt = new Date(Math.min(...inputs.map((input) => input.receivedAt.getTime())));

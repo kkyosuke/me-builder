@@ -41,6 +41,10 @@ jobs:
       - name: Run CI Verification
         run: bun run ci
 
+      - name: Ensure Queues (Production)
+        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
+        run: task queues:setup:production
+
       - name: Apply D1 Migrations (Production)
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
         run: task db:migrate:production

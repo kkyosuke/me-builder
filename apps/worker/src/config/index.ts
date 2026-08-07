@@ -7,7 +7,13 @@ import {
   WorkerConfigSchema,
 } from "./schema";
 
-export { DEFAULT_CLOUDFLARE_AI_GATEWAY_BASE_URL, WorkerConfigSchema, type WorkerConfig };
+export {
+  DEFAULT_CLOUDFLARE_AI_GATEWAY_BASE_URL,
+  DEFAULT_GEMINI_MODEL,
+  WorkerConfigSchema,
+  type WorkerConfig,
+};
+export { type CloudflareBindings, getCloudflareBindings } from "./cloudflare";
 
 /**
  * Worker アプリケーションの環境設定を取得・パースして返却します。
