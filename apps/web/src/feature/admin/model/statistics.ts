@@ -1,4 +1,4 @@
-export type StatisticsSection<T> =
+type StatisticsSection<T> =
   | ({ status: "available" } & T)
   | { status: "unavailable"; reason: "not-configured" | "upstream-error" };
 
