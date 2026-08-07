@@ -16,8 +16,8 @@ export async function queueHandler(
   } catch (err) {
     logger.error(
       {
-        err,
         queue: batch.queue,
+        errorName: err instanceof Error ? err.name : "UnknownError",
       },
       "Unhandled exception in worker queue handler",
     );

@@ -13,6 +13,7 @@ import {
   createLineRetryKey,
   getLineDeliveryFailureKind,
   pushLineTextWithRetryKey,
+  replyLineText,
 } from "../infrastructure/line-delivery";
 import type { Env } from "../types";
 import { ConversationCoordinatorRepository } from "./repository";
@@ -22,18 +23,28 @@ const LEASE_MS = 90_000;
 const ALARM_RETRY_MS = 30_000;
 const ACCEPTED_MESSAGE_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 const DELIVERY_RETRY_MS = 2_000;
+/** LINEのreplyTokenの有効時間。期限切れのtokenでreplyを試さずpushへ回すために使う。 */
+const REPLY_TOKEN_TTL_MS = 60_000;
 
 export type AcceptedDiaryMessage = {
   accountId: string;
   sourceRecordId: string;
   eventId: string;
   receivedAt: string;
+  /** finalをpushではなくreplyで返すための一度きりのtoken。保存もlog出力もしない。 */
+  replyToken?: string;
 };
 
 /** Account単位で連投と生成leaseを調停するDurable Object。本文の正本はD1にだけ置く。 */
 export class ConversationCoordinator extends DurableObject<Env> {
   private readonly repository: ConversationCoordinatorRepository;
   private readonly cf: CloudflareBindings;
+  /**
+   * replyTokenはDO storageにもD1にも書かず、このinstanceのmemoryにだけ置く。
+   * evictionで失われてもfinalはpushへフォールバックするため、耐久性は要求しない。
+   */
+  private readonly replyTokensByEventId = new Map<string, { token: string; expiresAt: number }>();
+  private readonly replyTokensByTurnId = new Map<string, { token: string; expiresAt: number }>();
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -59,6 +70,12 @@ export class ConversationCoordinator extends DurableObject<Env> {
     }
 
     this.repository.addAcceptedMessage(input);
+    if (input.replyToken) {
+      this.replyTokensByEventId.set(input.eventId, {
+        token: input.replyToken,
+        expiresAt: new Date(input.receivedAt).getTime() + REPLY_TOKEN_TTL_MS,
+      });
+    }
     const desiredAlarm = Date.now() + COALESCE_MS;
     const currentAlarm = await this.ctx.storage.getAlarm();
     if (currentAlarm === null || desiredAlarm < currentAlarm) {
@@ -197,6 +214,15 @@ export class ConversationCoordinator extends DurableObject<Env> {
     this.repository.releaseGeneration(turnId, generationEpoch, leaseToken);
   }
 
+  /**
+   * 先行Turnの生成待ちでQueueのretryを使い切ったTurnを引き取る。
+   * ここでackさせないとDLQへ落ち、利用者には何も届かないまま終わってしまう。
+   */
+  async requeueTurn(turnId: string, generationEpoch: number): Promise<void> {
+    this.repository.requeueTurn(turnId, generationEpoch);
+    await this.schedulePendingWork();
+  }
+
   async alarm(): Promise<void> {
     try {
       await this.processAlarm();
@@ -260,10 +286,34 @@ export class ConversationCoordinator extends DurableObject<Env> {
         ? { turnId: attached.turnId, generationEpoch: attached.generationEpoch }
         : undefined,
     );
+    this.adoptReplyToken(
+      batch.messages.map(({ eventId }) => eventId),
+      isCurrentGeneration ? attached.turnId : undefined,
+    );
     if (isCurrentGeneration) {
       await this.enqueueTurn(attached.turnId, attached.generationEpoch);
     }
     await this.schedulePendingWork();
+  }
+
+  /** 連投をまとめたTurnには、期限内で最も新しいreplyTokenを1つだけ引き継ぐ。 */
+  private adoptReplyToken(eventIds: string[], turnId: string | undefined): void {
+    const now = Date.now();
+    let freshest: { token: string; expiresAt: number } | undefined;
+    for (const eventId of eventIds) {
+      const held = this.replyTokensByEventId.get(eventId);
+      this.replyTokensByEventId.delete(eventId);
+      if (!held || held.expiresAt <= now) continue;
+      if (!freshest || held.expiresAt > freshest.expiresAt) freshest = held;
+    }
+    if (turnId && freshest) this.replyTokensByTurnId.set(turnId, freshest);
+  }
+
+  /** finalのreplyTokenを一度だけ払い出す。払い出した時点で破棄し、二重replyを構造的に防ぐ。 */
+  private takeReplyToken(turnId: string): string | undefined {
+    const held = this.replyTokensByTurnId.get(turnId);
+    this.replyTokensByTurnId.delete(turnId);
+    return held && held.expiresAt > Date.now() ? held.token : undefined;
   }
 
   private async enqueueTurn(turnId: string, generationEpoch: number): Promise<void> {
@@ -291,6 +341,13 @@ export class ConversationCoordinator extends DurableObject<Env> {
 
   private cleanupTerminalState(): void {
     this.repository.cleanupTerminalState(Date.now() - ACCEPTED_MESSAGE_RETENTION_MS);
+    const now = Date.now();
+    for (const [key, held] of this.replyTokensByEventId) {
+      if (held.expiresAt <= now) this.replyTokensByEventId.delete(key);
+    }
+    for (const [key, held] of this.replyTokensByTurnId) {
+      if (held.expiresAt <= now) this.replyTokensByTurnId.delete(key);
+    }
   }
 
   private currentLeaseDeadline(turnId: string): number {
@@ -319,6 +376,22 @@ export class ConversationCoordinator extends DurableObject<Env> {
     }
     if (!this.env.LINE_CHANNEL_ACCESS_TOKEN)
       throw new Error("LINE channel token is not configured");
+    // finalはreplyで返せればmessageを消費しない。replyTokenは一度きりなので、
+    // 払い出しに失敗してもretryせず、retry key付きpushへ一方向にフォールバックする。
+    if (delivery.kind === "final" && delivery.turnId) {
+      const replyToken = this.takeReplyToken(delivery.turnId);
+      if (
+        replyToken &&
+        (await replyLineText({
+          channelAccessToken: this.env.LINE_CHANNEL_ACCESS_TOKEN,
+          replyToken,
+          text: delivery.body,
+        }))
+      ) {
+        this.repository.markDeliveryStatus(delivery.id, "delivered");
+        return;
+      }
+    }
     try {
       await pushLineTextWithRetryKey({
         channelAccessToken: this.env.LINE_CHANNEL_ACCESS_TOKEN,

@@ -222,6 +222,21 @@ export class ConversationCoordinatorRepository {
       .run();
   }
 
+  /** 生成待ちのままQueueのretryを使い切ったTurnを、alarmから再投入できる状態へ戻す。 */
+  requeueTurn(turnId: string, generationEpoch: number): void {
+    this.db
+      .update(localTurns)
+      .set({ status: "pending_queue", leaseToken: null, hardDeadlineAt: null })
+      .where(
+        and(
+          eq(localTurns.turnId, turnId),
+          eq(localTurns.generationEpoch, generationEpoch),
+          notInArray(localTurns.status, ["delivered", "failed", "generating"]),
+        ),
+      )
+      .run();
+  }
+
   listPendingQueueTurns() {
     return this.db
       .select({ turnId: localTurns.turnId, generationEpoch: localTurns.generationEpoch })

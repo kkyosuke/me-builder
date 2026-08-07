@@ -5,6 +5,11 @@ import type { CloudflareBindings, WorkerConfig } from "../config";
 import { generateDiaryChatResponse } from "../logic/diary-chat";
 import { appendDiagnosisLink } from "../logic/feature/line";
 
+/** wrangler.tomlのmax_retriesと揃える。これを超えるとDLQへ落ちるため、その前に引き取る。 */
+const MAX_BUSY_ATTEMPTS = 5;
+/** 先行Turnのlease(90秒)を待てるだけの間隔にする。2秒刻みではlease中に使い切ってしまう。 */
+const BUSY_RETRY_DELAY_SECONDS = 20;
+
 export async function processChatTurnMessage(
   message: Message<ChatTurnQueueMessage>,
   cf: CloudflareBindings,
@@ -29,8 +34,22 @@ export async function processChatTurnMessage(
     message.body.generationEpoch,
   );
   if (!lease.acquired) {
-    if (lease.reason === "busy") message.retry({ delaySeconds: 2 });
-    else message.ack();
+    if (lease.reason !== "busy") {
+      message.ack();
+      return;
+    }
+    if (message.attempts < MAX_BUSY_ATTEMPTS) {
+      message.retry({ delaySeconds: BUSY_RETRY_DELAY_SECONDS });
+      return;
+    }
+    // 先行Turnの生成は最大90秒かかる。retryを使い切ってもDLQへ落とさず、
+    // Coordinatorへ差し戻して先行Turnの完了後にalarmから再投入させる。
+    await coordinator.requeueTurn(message.body.turnId, message.body.generationEpoch);
+    logger.warn(
+      { turnId: message.body.turnId },
+      "Chat turn was requeued after waiting for a lease",
+    );
+    message.ack();
     return;
   }
 

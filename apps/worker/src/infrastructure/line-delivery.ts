@@ -1,4 +1,5 @@
 import { line } from "@me-builder/lib";
+import { logger } from "@me-builder/shared";
 
 export function isAcceptedLineRetryConflict(error: unknown): boolean {
   return typeof error === "object" && error !== null && "status" in error && error.status === 409;
@@ -32,6 +33,30 @@ export async function createLineRetryKey(secret: string, value: string): Promise
   signature[8] = ((signature[8] ?? 0) & 0x3f) | 0x80;
   const hex = [...signature].map((byte) => byte.toString(16).padStart(2, "0")).join("");
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+/**
+ * replyTokenで返信する。tokenは一度きりでretry keyも付けられないため、
+ * 失敗しても再試行せず、呼び出し側がpushへフォールバックできるよう真偽値だけを返す。
+ */
+export async function replyLineText(input: {
+  channelAccessToken: string;
+  replyToken: string;
+  text: string;
+}): Promise<boolean> {
+  try {
+    await line.client.create(input.channelAccessToken).replyMessage({
+      replyToken: input.replyToken,
+      messages: [{ type: "text", text: input.text }],
+    });
+    return true;
+  } catch (error) {
+    logger.warn(
+      { errorName: error instanceof Error ? error.name : "UnknownError" },
+      "LINE reply failed; falling back to push",
+    );
+    return false;
+  }
 }
 
 export async function pushLineTextWithRetryKey(input: {

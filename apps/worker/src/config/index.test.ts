@@ -52,7 +52,14 @@ describe("Worker Config", () => {
 
   it("日記チャットのContext message件数を環境変数から取得すること", () => {
     expect(getWorkerConfig({ CHAT_CONTEXT_MESSAGE_LIMIT: "12" }).chatContextMessageLimit).toBe(12);
-    expect(() => getWorkerConfig({ CHAT_CONTEXT_MESSAGE_LIMIT: "0" })).toThrow();
-    expect(() => getWorkerConfig({ CHAT_CONTEXT_MESSAGE_LIMIT: "invalid" })).toThrow();
+  });
+
+  it("Context message件数が不正なら既定値へ落とし、Worker全体を止めないこと", () => {
+    // ここでthrowすると日記以外のqueue処理まで巻き添えで停止してしまう。
+    for (const invalid of ["0", "-1", "1.5", "invalid"]) {
+      expect(getWorkerConfig({ CHAT_CONTEXT_MESSAGE_LIMIT: invalid }).chatContextMessageLimit).toBe(
+        DEFAULT_CHAT_CONTEXT_MESSAGE_LIMIT,
+      );
+    }
   });
 });

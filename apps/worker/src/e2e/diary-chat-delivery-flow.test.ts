@@ -40,6 +40,7 @@ let miniflare: Miniflare;
 let database: D1Database;
 let client: d1.Client;
 let mockPushMessage: ReturnType<typeof vi.fn>;
+let mockReplyMessage: ReturnType<typeof vi.fn>;
 
 async function applyMigrations(db: D1Database): Promise<void> {
   const migrations = (await readdir(migrationsDirectory))
@@ -129,7 +130,7 @@ function createQueueMessage(
   };
 }
 
-async function ingestDiary(text: string, suffix: string) {
+async function ingestDiary(text: string, suffix: string, replyToken?: string) {
   const queued: ChatTurnQueueMessage[] = [];
   const harness = createCoordinator(async (message) => {
     queued.push(message);
@@ -151,6 +152,7 @@ async function ingestDiary(text: string, suffix: string) {
           timestamp: new Date(receivedAt).getTime(),
           message: { type: "text", id: `line-message-${suffix}`, text },
           source: { type: "user", userId: providerAccountId },
+          ...(replyToken ? { replyToken } : {}),
         },
       ],
     },
@@ -192,8 +194,10 @@ describe("LINE diary chat delivery E2E", () => {
       }),
     });
     mockPushMessage = vi.fn().mockResolvedValue({});
+    mockReplyMessage = vi.fn().mockResolvedValue({});
     vi.spyOn(line.client, "create").mockReturnValue({
       pushMessage: mockPushMessage,
+      replyMessage: mockReplyMessage,
     } as unknown as ReturnType<typeof line.client.create>);
   });
 
@@ -248,6 +252,53 @@ describe("LINE diary chat delivery E2E", () => {
     await expect(
       coordinator.acquireGeneration(queuedTurn.turnId, queuedTurn.generationEpoch),
     ).resolves.toEqual({ acquired: false, reason: "stale" });
+  });
+
+  it("replyTokenがあればfinalをreplyで返し、pushを消費しない", async () => {
+    const { bindings, providerAccountId, queuedTurn } = await ingestDiary(
+      "今日は早起きできた",
+      "reply-token",
+      "reply-token-1",
+    );
+
+    await processChatTurnMessage(createQueueMessage(queuedTurn), bindings, workerConfig);
+
+    expect(mockReplyMessage).toHaveBeenCalledOnce();
+    expect(mockReplyMessage.mock.calls[0]?.[0]).toEqual({
+      replyToken: "reply-token-1",
+      messages: [
+        {
+          type: "text",
+          text: `${generatedReply}\n\n今日の診断に答える\nhttps://liff.line.me/${liffId}`,
+        },
+      ],
+    });
+    expect(mockPushMessage).not.toHaveBeenCalled();
+    expect(JSON.stringify(queuedTurn)).not.toContain("reply-token-1");
+    expect(JSON.stringify(queuedTurn)).not.toContain(providerAccountId);
+    const turns = await client.select().from(d1.schema.chatTurns);
+    expect(turns).toEqual([
+      expect.objectContaining({ id: queuedTurn.turnId, status: "delivered" }),
+    ]);
+  });
+
+  it("replyが失敗したらretry key付きpushへフォールバックし、replyは再試行しない", async () => {
+    const { bindings, providerAccountId, queuedTurn } = await ingestDiary(
+      "今日は買い物に行った",
+      "reply-fallback",
+      "reply-token-2",
+    );
+    mockReplyMessage.mockRejectedValue(Object.assign(new Error("invalid token"), { status: 400 }));
+
+    await processChatTurnMessage(createQueueMessage(queuedTurn), bindings, workerConfig);
+
+    expect(mockReplyMessage).toHaveBeenCalledOnce();
+    expect(mockPushMessage).toHaveBeenCalledOnce();
+    expect(mockPushMessage.mock.calls[0]?.[0]?.to).toBe(providerAccountId);
+    const turns = await client.select().from(d1.schema.chatTurns);
+    expect(turns).toEqual([
+      expect.objectContaining({ id: queuedTurn.turnId, status: "delivered" }),
+    ]);
   });
 
   it("LINEが同じretry keyを409で拒否しても配送済みとして完了する", async () => {

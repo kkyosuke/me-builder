@@ -75,36 +75,6 @@ function routeLineTextEvents(payload: unknown): NonNullable<WebhookQueueMessage[
   };
 }
 
-/** 一度しか使えないreplyTokenを非同期境界の外へ持ち出さない。 */
-export function removeDiaryReplyTokens(payload: unknown): unknown {
-  if (
-    !payload ||
-    typeof payload !== "object" ||
-    !Array.isArray((payload as { events?: unknown }).events)
-  ) {
-    return payload;
-  }
-  return {
-    ...(payload as Record<string, unknown>),
-    events: (payload as { events: unknown[] }).events.map((event) => {
-      if (!event || typeof event !== "object") return event;
-      const eventRecord = event as Record<string, unknown>;
-      const message = eventRecord.message;
-      const isDiagnosis =
-        eventRecord.type === "message" &&
-        message &&
-        typeof message === "object" &&
-        (message as Record<string, unknown>).type === "text" &&
-        typeof (message as Record<string, unknown>).text === "string" &&
-        line.text.classify((message as Record<string, unknown>).text as string) ===
-          "diagnosis-request";
-      if (isDiagnosis) return event;
-      const { replyToken: _replyToken, ...safeEvent } = eventRecord;
-      return safeEvent;
-    }),
-  };
-}
-
 export async function receiveLineWebhook({
   rawBody,
   signature,
@@ -142,7 +112,9 @@ export async function receiveLineWebhook({
     id: crypto.randomUUID(),
     source: "line",
     receivedAt: new Date().toISOString(),
-    payload: removeDiaryReplyTokens(payload),
+    // replyTokenは日記のfinalをpushではなくreplyで返すために残す。
+    // D1へは保存せず、logへも出さず、Coordinatorが払い出した時点で破棄する。
+    payload,
     routing: routeLineTextEvents(payload),
   };
 

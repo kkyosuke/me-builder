@@ -70,10 +70,12 @@ export async function handleQueueBatch(
         await processWebhookMessage(message as Message<WebhookQueueMessage>, db, workerConfig, cf);
       }
     } catch (err) {
+      // errをそのまま載せると、SDKの例外が抱えるrequest/response bodyから
+      // 日記本文やContext Packageがlogへ流出しうる。識別できる情報だけを残す。
       logger.error(
         {
-          err,
           messageId: message.id,
+          errorName: err instanceof Error ? err.name : "UnknownError",
         },
         "Error processing webhook message in worker",
       );

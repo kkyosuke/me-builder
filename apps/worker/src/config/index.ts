@@ -1,4 +1,4 @@
-import { getEnv } from "@me-builder/shared";
+import { getEnv, logger } from "@me-builder/shared";
 import * as v from "valibot";
 import {
   DEFAULT_CHAT_CONTEXT_MESSAGE_LIMIT,
@@ -16,6 +16,20 @@ export {
   type WorkerConfig,
 };
 export { type CloudflareBindings, getCloudflareBindings } from "./cloudflare";
+
+/**
+ * 設定値の書き間違いでWorker全体が起動不能にならないよう、不正値は既定値へ落とす。
+ * ここでNaNを通すとschema検証で例外になり、日記以外のqueue処理まで巻き込んで止まる。
+ */
+function parsePositiveInteger(raw: string | undefined, fallback: number): number {
+  if (!raw) return fallback;
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    logger.warn({ fallback }, "Ignored an invalid CHAT_CONTEXT_MESSAGE_LIMIT and used the default");
+    return fallback;
+  }
+  return parsed;
+}
 
 /**
  * Worker アプリケーションの環境設定を取得・パースして返却します。
@@ -70,9 +84,10 @@ export function getWorkerConfig(env?: Record<string, unknown>): WorkerConfig {
     geminiModel: rawGeminiModel,
     chatEnabled: rawChatEnabled,
     chatDeliverySecret: rawChatDeliverySecret,
-    chatContextMessageLimit: rawChatContextMessageLimit
-      ? Number(rawChatContextMessageLimit)
-      : DEFAULT_CHAT_CONTEXT_MESSAGE_LIMIT,
+    chatContextMessageLimit: parsePositiveInteger(
+      rawChatContextMessageLimit,
+      DEFAULT_CHAT_CONTEXT_MESSAGE_LIMIT,
+    ),
   };
 
   return v.parse(WorkerConfigSchema, rawConfig);

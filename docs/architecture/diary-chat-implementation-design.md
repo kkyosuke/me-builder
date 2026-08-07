@@ -50,7 +50,7 @@ Cloudflare Agents SDKは最初の実装では採用しません。LINEはWebhook
 ```mermaid
 flowchart TD
     LINE[LINE Messaging API] --> API[API Worker]
-    API -->|日記eventはreplyTokenを除外して投入| WQ[Webhook Queue]
+    API -->|日記eventをreplyToken付きで投入| WQ[Webhook Queue]
     API -.->|待機表示| LINE
     WQ --> IW[Queue Worker: ingest]
     IW -->|原本保存・Account解決| D1[(D1)]
@@ -341,7 +341,7 @@ D1、Queue、LINEを呼び出した後は、Turn ID、generation epoch、lease t
 
 1. API Workerがraw bodyでLINE署名を検証する
 2. 決定的な完全一致command routingを行い、1対1トークのテキストではLINEの待機表示を開始する
-3. 日記eventからreply tokenを除外してWebhook Queueへ投入し、channel event IDを冪等キーにする
+3. 日記eventをreply token付きでWebhook Queueへ投入し、channel event IDを冪等キーにする
 4. ingest WorkerがAccountを再解決する。client由来のAccount IDは受け付けない
 5. Source Record IDをAccountとchannel event IDから決定的に作り、Source RecordとpayloadをD1 batchで`INSERT ... ON CONFLICT DO NOTHING`する
 6. 新規保存か既存eventかにかかわらず、AccountのCoordinatorへSource Record ID、event ID、受付時刻を通知する
@@ -562,8 +562,11 @@ system promptは次の順で固定し、Git管理する`prompt_version`を付け
 
 ### 9.2 LINE配送とreply token
 
-- 日記のfinalは安全なretry keyを付けられるpushで送る
-- `replyToken`はQueue、DO、D1へ渡さず、保存もlog出力もしない
+- 日記のfinalは`replyToken`があればreplyで返し、無い・期限切れ・失敗の場合だけpushへフォールバックする。replyはmessage課金の対象外なので、通常経路ではpushを消費しない
+- `replyToken`はWebhook Queueのpayloadで運び、CoordinatorのmemoryにだけTurn単位で保持する。D1とDO storageへは保存せず、logへも出さず、払い出した時点で破棄する
+- Coordinatorのmemoryはevictionで失われうるが、その場合はpushへフォールバックするため耐久性は要求しない
+- `replyToken`には`X-Line-Retry-Key`を付けられないため、replyは失敗しても再試行しない。冪等性はフォールバック先のpushのretry keyだけで担保する
+- 連投を1Turnにまとめた場合、期限内で最も新しい`replyToken`を1つだけ引き継ぐ
 - pushは初回要求から必ず`X-Line-Retry-Key`を付ける。finalと失敗案内はTurn IDと応答種別から、環境別Secretを用いて決定的なUUIDを作る
 - 送信直前にTurn leaseとSessionを再確認する
 
@@ -579,6 +582,7 @@ finalまたは失敗案内のretryは90秒で止めます。90秒時点で結果
 - rate limitと一時的5xxはjitter付きbackoffでretryする
 - AI生成は90秒で打ち切り、失敗案内をfinalとは別の固定retry keyでpushする
 - DLQ再処理は本文をlogへ出さず、Turn IDとfailure stageから行う
+- 先行Turnの生成待ちで`busy`が続く場合はQueueのretry上限までは待ち、上限に達したTurnはDLQへ落とさずCoordinatorへ差し戻して`pending_queue`から再投入する
 
 ## 10. AI Gatewayと秘密情報
 

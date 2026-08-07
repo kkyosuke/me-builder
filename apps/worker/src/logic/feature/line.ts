@@ -125,6 +125,7 @@ export async function processLineWebhook(
       sourceRecordId: source.sourceRecordId,
       eventId,
       receivedAt: receivedAt.toISOString(),
+      ...(event.replyToken ? { replyToken: event.replyToken } : {}),
     });
     logger.info({ intent }, "LINE diary source saved and accepted by coordinator");
   }
