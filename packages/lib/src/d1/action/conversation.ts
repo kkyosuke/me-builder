@@ -272,7 +272,6 @@ export async function attachMessagesToTurn(
       promptVersion: DIARY_CHAT_PROMPT_VERSION,
       model,
       receivedAt: firstReceivedAt,
-      firstReplyRequestedAt: now,
       createdAt: now,
       updatedAt: now,
     }),
@@ -370,6 +369,30 @@ export async function markTurnGenerating(db: D1Client, turnId: string): Promise<
   return changedRowCount(result) > 0;
 }
 
+export async function getTurnStatus(
+  db: D1Client,
+  turnId: string,
+): Promise<(typeof chatTurns.$inferSelect)["status"] | undefined> {
+  return db
+    .select({ status: chatTurns.status })
+    .from(chatTurns)
+    .where(eq(chatTurns.id, turnId))
+    .get()
+    .then((row) => row?.status);
+}
+
+/** 配送直前にTurnが属するSessionの有効性を再確認する。 */
+export async function isTurnSessionActive(db: D1Client, turnId: string): Promise<boolean> {
+  return Boolean(
+    await db
+      .select({ id: chatTurns.id })
+      .from(chatTurns)
+      .innerJoin(conversationSessions, eq(chatTurns.sessionId, conversationSessions.id))
+      .where(and(eq(chatTurns.id, turnId), eq(conversationSessions.status, "active")))
+      .get(),
+  );
+}
+
 export async function saveAssistantResponse(
   db: D1Client,
   input: {
@@ -448,7 +471,13 @@ export async function getPendingAssistantResponse(
         eq(conversationMessages.turnId, chatTurns.id),
       ),
     )
-    .where(and(eq(chatTurns.id, input.turnId), eq(conversationSessions.accountId, input.accountId)))
+    .where(
+      and(
+        eq(chatTurns.id, input.turnId),
+        eq(chatTurns.status, "delivery_pending"),
+        eq(conversationSessions.accountId, input.accountId),
+      ),
+    )
     .get();
   return row?.body
     ? {
@@ -503,7 +532,14 @@ export async function markTurnDelivered(db: D1Client, turnId: string): Promise<b
     .update(chatTurns)
     .set({ status: "delivered", updatedAt: new Date() })
     .where(and(eq(chatTurns.id, turnId), eq(chatTurns.status, "delivery_pending")));
-  return changedRowCount(result) > 0;
+  if (changedRowCount(result) > 0) return true;
+  return Boolean(
+    await db
+      .select({ id: chatTurns.id })
+      .from(chatTurns)
+      .where(and(eq(chatTurns.id, turnId), eq(chatTurns.status, "delivered")))
+      .get(),
+  );
 }
 
 export async function markTurnFailed(
@@ -517,5 +553,12 @@ export async function markTurnFailed(
     .where(
       and(eq(chatTurns.id, turnId), inArray(chatTurns.status, ["generating", "delivery_pending"])),
     );
-  return changedRowCount(result) > 0;
+  if (changedRowCount(result) > 0) return true;
+  return Boolean(
+    await db
+      .select({ id: chatTurns.id })
+      .from(chatTurns)
+      .where(and(eq(chatTurns.id, turnId), eq(chatTurns.status, "failed")))
+      .get(),
+  );
 }

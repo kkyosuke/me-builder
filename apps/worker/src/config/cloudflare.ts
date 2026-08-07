@@ -1,4 +1,5 @@
 import { d1 } from "@me-builder/lib";
+import type { ChatTurnQueueMessage, Queue } from "@me-builder/shared";
 import type { Env } from "../types";
 
 export type CloudflareBindings = {
@@ -7,7 +8,7 @@ export type CloudflareBindings = {
     conversation: Env["CONVERSATION_COORDINATOR"];
   };
   queue: {
-    chatTurn: Env["CHAT_TURN_QUEUE"];
+    chatTurn: Queue<ChatTurnQueueMessage> | undefined;
   };
 };
 

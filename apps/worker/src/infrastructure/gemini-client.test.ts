@@ -23,6 +23,8 @@ describe("Gemini client", () => {
         baseUrl: "https://gateway.example.com/google-ai-studio",
         headers: {
           "cf-aig-authorization": "Bearer gateway-token",
+          "cf-aig-collect-log-payload": "false",
+          "cf-aig-cache-ttl": "0",
         },
       },
     });

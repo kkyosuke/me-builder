@@ -110,3 +110,14 @@ describe("receiveLineWebhook chat loading", () => {
     expect(send).toHaveBeenCalledOnce();
   });
 });
+
+describe("replyTokenの受け渡し", () => {
+  it("日記のfinalをreplyで返せるようreplyTokenをQueueへ残す", async () => {
+    const { send, result } = receive([textEvent("本文")]);
+    await result;
+    const queued = send.mock.calls[0]?.[0] as WebhookQueueMessage;
+    expect((queued.payload as { events: { replyToken?: string }[] }).events[0]?.replyToken).toBe(
+      "reply-token",
+    );
+  });
+});

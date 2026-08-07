@@ -26,6 +26,7 @@ jobs:
       LINE_CHANNEL_SECRET: ${{ secrets.LINE_CHANNEL_SECRET }}
       GOOGLE_AI_STUDIO_API_KEY: ${{ secrets.GOOGLE_AI_STUDIO_API_KEY }}
       CLOUDFLARE_AIG_TOKEN: ${{ secrets.CLOUDFLARE_AIG_TOKEN }}
+      CHAT_DELIVERY_SECRET: ${{ secrets.CHAT_DELIVERY_SECRET }}
       # LIFF Server API は LINE Login チャネルのチャネルアクセストークンを要求する。
       # LINE_LOGIN_CHANNEL_ID は未設定でも LIFF ID の接頭辞から補完される。
       LINE_LOGIN_CHANNEL_ID: ${{ vars.LINE_LOGIN_CHANNEL_ID }}
@@ -71,6 +72,10 @@ jobs:
             echo "::error::LINE_CHANNEL_SECRET が GitHub Secrets に設定されていません。x-line-signature の検証に必須です。"
             exit 1
           fi
+          if [ -z "${CHAT_DELIVERY_SECRET}" ]; then
+            echo "::error::CHAT_DELIVERY_SECRET が GitHub Secrets に設定されていません。日記チャットの重複配送防止に必須です。"
+            exit 1
+          fi
 
           umask 077
           secrets_dir="$(mktemp -d "${RUNNER_TEMP}/worker-secrets.XXXXXX")"
@@ -85,7 +90,7 @@ jobs:
                 .filter(([, value]) => value),
             );
             const workerOnlySecrets = Object.fromEntries(
-              [["GOOGLE_AI_STUDIO_API_KEY", process.env.GOOGLE_AI_STUDIO_API_KEY], ["CLOUDFLARE_AIG_TOKEN", process.env.CLOUDFLARE_AIG_TOKEN]]
+              [["GOOGLE_AI_STUDIO_API_KEY", process.env.GOOGLE_AI_STUDIO_API_KEY], ["CLOUDFLARE_AIG_TOKEN", process.env.CLOUDFLARE_AIG_TOKEN], ["CHAT_DELIVERY_SECRET", process.env.CHAT_DELIVERY_SECRET]]
                 .filter(([, value]) => value),
             );
             await Bun.write(process.env.API_SECRETS_FILE, JSON.stringify({
@@ -98,8 +103,8 @@ jobs:
             }));
           '
 
-          bun --cwd apps/api wrangler deploy --env preview --secrets-file "${api_secrets_file}"
           bun --cwd apps/worker wrangler deploy --env preview --secrets-file "${worker_secrets_file}"
+          bun --cwd apps/api wrangler deploy --env preview --secrets-file "${api_secrets_file}"
           bun --filter @me-builder/mcp deploy:preview
           bun --filter @me-builder/web deploy:preview
 
@@ -110,6 +115,10 @@ jobs:
           BASE_DOMAIN: ${{ vars.BASE_DOMAIN }}
         run: |
           bun --cwd apps/api scripts/register-webhook.ts
+
+      - name: Verify Gemini Connectivity (Preview)
+        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
+        run: bun --cwd apps/worker run check:gemini "Reply with OK."
 
       # デプロイ済みの URL を LIFF アプリのエンドポイント URL へ反映する
       - name: Register LIFF Endpoint (Preview)

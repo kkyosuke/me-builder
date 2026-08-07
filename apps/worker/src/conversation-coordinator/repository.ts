@@ -10,8 +10,11 @@ import {
   coordinatorIdentity,
   coordinatorSchema,
   coordinatorState,
+  deliveryOutbox,
   localTurns,
 } from "./schema";
+
+export type DeliveryOutboxRow = typeof deliveryOutbox.$inferSelect;
 
 type CoordinatorDatabase = DrizzleSqliteDODatabase<typeof coordinatorSchema>;
 
@@ -49,6 +52,14 @@ export class ConversationCoordinatorRepository {
     return boundAccountId === accountId;
   }
 
+  getBoundAccountId(): string | undefined {
+    return this.db
+      .select({ accountId: coordinatorIdentity.accountId })
+      .from(coordinatorIdentity)
+      .where(eq(coordinatorIdentity.singleton, 1))
+      .get()?.accountId;
+  }
+
   findAcceptedMessage(eventId: string) {
     return this.db
       .select()
@@ -67,6 +78,65 @@ export class ConversationCoordinatorRepository {
         receivedAt: new Date(input.receivedAt).getTime(),
       })
       .run();
+  }
+
+  findTurnDelivery(turnId: string, generationEpoch: number, kind: "final" | "failure") {
+    return this.db
+      .select()
+      .from(deliveryOutbox)
+      .where(
+        and(
+          eq(deliveryOutbox.turnId, turnId),
+          eq(deliveryOutbox.generationEpoch, generationEpoch),
+          eq(deliveryOutbox.kind, kind),
+        ),
+      )
+      .get();
+  }
+
+  createDelivery(outbox: typeof deliveryOutbox.$inferInsert): DeliveryOutboxRow {
+    this.db.insert(deliveryOutbox).values(outbox).onConflictDoNothing().run();
+    const persisted = this.db
+      .select()
+      .from(deliveryOutbox)
+      .where(eq(deliveryOutbox.id, outbox.id))
+      .get();
+    if (!persisted) throw new Error("Delivery outbox could not be persisted");
+    return persisted;
+  }
+
+  listPendingDeliveries() {
+    return this.db
+      .select()
+      .from(deliveryOutbox)
+      .where(eq(deliveryOutbox.status, "pending"))
+      .orderBy(asc(deliveryOutbox.createdAt))
+      .all();
+  }
+
+  markDeliveryStatus(
+    id: string,
+    status: "delivered" | "permanent_failure" | "delivery_unknown",
+  ): void {
+    this.db.update(deliveryOutbox).set({ status }).where(eq(deliveryOutbox.id, id)).run();
+  }
+
+  expirePendingDeliveries(now: number): void {
+    this.db
+      .update(deliveryOutbox)
+      .set({ status: "delivery_unknown" })
+      .where(and(eq(deliveryOutbox.status, "pending"), lte(deliveryOutbox.deadlineAt, now)))
+      .run();
+  }
+
+  earliestDeliveryDeadline(): number | null {
+    return (
+      this.db
+        .select({ value: min(deliveryOutbox.deadlineAt) })
+        .from(deliveryOutbox)
+        .where(eq(deliveryOutbox.status, "pending"))
+        .get()?.value ?? null
+    );
   }
 
   findTurn(turnId: string) {
@@ -149,6 +219,21 @@ export class ConversationCoordinatorRepository {
       .update(localTurns)
       .set({ status: "pending_queue", leaseToken: null, hardDeadlineAt: null })
       .where(and(eq(localTurns.status, "generating"), lte(localTurns.hardDeadlineAt, now)))
+      .run();
+  }
+
+  /** 生成待ちのままQueueのretryを使い切ったTurnを、alarmから再投入できる状態へ戻す。 */
+  requeueTurn(turnId: string, generationEpoch: number): void {
+    this.db
+      .update(localTurns)
+      .set({ status: "pending_queue", leaseToken: null, hardDeadlineAt: null })
+      .where(
+        and(
+          eq(localTurns.turnId, turnId),
+          eq(localTurns.generationEpoch, generationEpoch),
+          notInArray(localTurns.status, ["delivered", "failed", "generating"]),
+        ),
+      )
       .run();
   }
 
@@ -275,6 +360,17 @@ export class ConversationCoordinatorRepository {
   }
 
   cleanupTerminalState(attachedBefore: number): void {
+    const expiredOutboxIds = this.db
+      .select({ id: deliveryOutbox.id })
+      .from(deliveryOutbox)
+      .where(
+        and(
+          inArray(deliveryOutbox.status, ["delivered", "permanent_failure", "delivery_unknown"]),
+          lte(deliveryOutbox.createdAt, attachedBefore),
+        ),
+      )
+      .all()
+      .map(({ id }) => id);
     this.db.transaction((tx) => {
       tx.delete(localTurns)
         .where(inArray(localTurns.status, ["delivered", "failed"]))
@@ -287,6 +383,9 @@ export class ConversationCoordinatorRepository {
           ),
         )
         .run();
+      if (expiredOutboxIds.length > 0) {
+        tx.delete(deliveryOutbox).where(inArray(deliveryOutbox.id, expiredOutboxIds)).run();
+      }
     });
   }
 

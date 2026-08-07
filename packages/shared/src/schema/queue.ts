@@ -5,6 +5,13 @@ export interface WebhookQueueMessage {
   source: string;
   receivedAt: string;
   payload: unknown;
+  /** APIで確定したrouting。省略形はdeploy中に残る旧messageとの互換用。 */
+  routing?: {
+    lineTextEvents: Array<{
+      eventId: string;
+      intent: "diagnosis-request" | "diary";
+    }>;
+  };
 }
 
 /** AI生成Queueには本文やAccount識別子を含めず、D1のTurnだけを参照させる。 */

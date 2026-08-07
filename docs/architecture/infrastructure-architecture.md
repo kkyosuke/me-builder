@@ -123,7 +123,7 @@ flowchart TD
 
 4. **非同期 Webhook メッセージ処理**
    - Webhook リクエスト（LINE 等）は API サーバーで受信後、直ちに `Cloudflare Queues` へ投入され 200/202 応答を返却します。
-   - バックグラウンドの Queue Worker (`apps/worker`) がキューから非同期バッチメッセージを取り出し順次処理します。LINE日記メッセージの受領応答、最終応答、応答期限、再試行は[日記チャット実装設計](diary-chat-implementation-design.md#9-38秒sloと配送)を正とします。
+   - バックグラウンドの Queue Worker (`apps/worker`) がキューから非同期バッチメッセージを取り出し順次処理します。LINE日記メッセージの最終応答、応答期限、再試行は[日記チャット実装設計](diary-chat-implementation-design.md#9-38秒sloと配送)を正とします。
 
 5. **外部LLMの呼び出し**
    - Google AI Studio の Gemini を利用する処理は、Queue Worker から Cloudflare AI Gateway を経由して呼び出します。

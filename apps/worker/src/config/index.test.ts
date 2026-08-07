@@ -1,6 +1,7 @@
 import * as v from "valibot";
 import { describe, expect, it } from "vitest";
 import {
+  DEFAULT_CHAT_CONTEXT_MESSAGE_LIMIT,
   DEFAULT_CLOUDFLARE_AI_GATEWAY_BASE_URL,
   WorkerConfigSchema,
   getWorkerConfig,
@@ -26,6 +27,7 @@ describe("Worker Config", () => {
     expect(config.lineChannelAccessToken).toBe("test-token-123");
     expect(config.cloudflareAiGatewayBaseUrl).toBe(DEFAULT_CLOUDFLARE_AI_GATEWAY_BASE_URL);
     expect(config.geminiModel).toBe("gemini-3.5-flash-lite");
+    expect(config.chatContextMessageLimit).toBe(DEFAULT_CHAT_CONTEXT_MESSAGE_LIMIT);
   });
 
   it("LIFF_ID を設定すると liffId が取得され、未設定・空文字なら undefined になること", () => {
@@ -46,5 +48,18 @@ describe("Worker Config", () => {
     expect(config.cloudflareAiGatewayToken).toBe("gateway-token");
     expect(config.cloudflareAiGatewayBaseUrl).toBe("https://gateway.example.com/google-ai-studio");
     expect(config.geminiModel).toBe("gemini-test-model");
+  });
+
+  it("日記チャットのContext message件数を環境変数から取得すること", () => {
+    expect(getWorkerConfig({ CHAT_CONTEXT_MESSAGE_LIMIT: "12" }).chatContextMessageLimit).toBe(12);
+  });
+
+  it("Context message件数が不正なら既定値へ落とし、Worker全体を止めないこと", () => {
+    // ここでthrowすると日記以外のqueue処理まで巻き添えで停止してしまう。
+    for (const invalid of ["0", "-1", "1.5", "invalid"]) {
+      expect(getWorkerConfig({ CHAT_CONTEXT_MESSAGE_LIMIT: invalid }).chatContextMessageLimit).toBe(
+        DEFAULT_CHAT_CONTEXT_MESSAGE_LIMIT,
+      );
+    }
   });
 });

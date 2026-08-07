@@ -61,11 +61,36 @@ export const localTurns = sqliteTable("local_turns", {
   hardDeadlineAt: integer("hard_deadline_at"),
 });
 
+export const deliveryOutbox = sqliteTable(
+  "delivery_outbox",
+  {
+    id: text("id").primaryKey(),
+    kind: text("kind", { enum: ["final", "failure"] }).notNull(),
+    turnId: text("turn_id"),
+    generationEpoch: integer("generation_epoch"),
+    target: text("target").notNull(),
+    body: text("body").notNull(),
+    retryKey: text("retry_key").notNull(),
+    status: text("status", {
+      enum: ["pending", "delivered", "permanent_failure", "delivery_unknown"],
+    })
+      .notNull()
+      .default("pending"),
+    deadlineAt: integer("deadline_at").notNull(),
+    createdAt: integer("created_at").notNull(),
+  },
+  (table) => [
+    index("delivery_outbox_status_deadline_idx").on(table.status, table.deadlineAt),
+    index("delivery_outbox_turn_idx").on(table.turnId, table.generationEpoch),
+  ],
+);
+
 export const coordinatorSchema = {
   acceptedMessages,
   attachBatches,
   attachBatchMessages,
   coordinatorIdentity,
   coordinatorState,
+  deliveryOutbox,
   localTurns,
 };

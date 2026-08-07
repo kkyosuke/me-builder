@@ -65,6 +65,16 @@ function extractOneToOneTextChatIds(payload: unknown): string[] {
   return [...chatIds];
 }
 
+function routeLineTextEvents(payload: unknown): NonNullable<WebhookQueueMessage["routing"]> {
+  return {
+    lineTextEvents: line.webhook.parseEvents(payload).flatMap((event) => {
+      if (event.type !== "message" || !event.message || event.message.type !== "text") return [];
+      const eventId = event.webhookEventId ?? event.message.id;
+      return eventId ? [{ eventId, intent: line.text.classify(event.message.text) }] : [];
+    }),
+  };
+}
+
 export async function receiveLineWebhook({
   rawBody,
   signature,
@@ -102,18 +112,13 @@ export async function receiveLineWebhook({
     id: crypto.randomUUID(),
     source: "line",
     receivedAt: new Date().toISOString(),
+    // replyTokenは日記のfinalをpushではなくreplyで返すために残す。
+    // D1へは保存せず、logへも出さず、Coordinatorが払い出した時点で破棄する。
     payload,
+    routing: routeLineTextEvents(payload),
   };
 
   const messages = line.webhook.extractMessages(payload);
-
-  if (!queue) {
-    logger.warn(
-      { id: event.id, source: event.source, messages: messages.length > 0 ? messages : undefined },
-      "WEBHOOK_QUEUE binding not configured, skipping queue push",
-    );
-    return { type: "accepted", id: event.id, queued: false };
-  }
 
   const chatIds = extractOneToOneTextChatIds(payload);
 
@@ -135,9 +140,17 @@ export async function receiveLineWebhook({
     );
   }
 
+  if (!queue) {
+    logger.warn(
+      { id: event.id, source: event.source, messageCount: messages.length },
+      "WEBHOOK_QUEUE binding not configured, skipping queue push",
+    );
+    return { type: "accepted", id: event.id, queued: false };
+  }
+
   await queue.send(event);
   logger.info(
-    { id: event.id, source: event.source, messages: messages.length > 0 ? messages : undefined },
+    { id: event.id, source: event.source, messageCount: messages.length },
     "Webhook event queued to WEBHOOK_QUEUE",
   );
 

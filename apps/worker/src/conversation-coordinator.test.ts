@@ -276,3 +276,44 @@ describe("ConversationCoordinator generation lease", () => {
     if (lease.acquired) expect(lease.leaseToken).not.toBe("old-token");
   });
 });
+
+describe("ConversationCoordinator requeue", () => {
+  it("lease待ちで差し戻したTurnをalarmの再投入対象へ戻す", async () => {
+    const { coordinator, sql } = createCoordinator();
+    sql.exec(
+      "INSERT INTO local_turns(turn_id, generation_epoch, status) VALUES (?, ?, 'queued')",
+      "turn-1",
+      1,
+    );
+
+    await coordinator.requeueTurn("turn-1", 1);
+
+    expect(
+      sql
+        .exec<{ status: string }>("SELECT status FROM local_turns WHERE turn_id = ?", "turn-1")
+        .one().status,
+    ).toBe("pending_queue");
+  });
+
+  it("生成中や配送済みのTurnは差し戻さない", async () => {
+    const { coordinator, sql } = createCoordinator();
+    sql.exec(
+      `INSERT INTO local_turns(turn_id, generation_epoch, status, lease_token, hard_deadline_at)
+       VALUES ('turn-1', 1, 'generating', 'token', 9999999999999),
+              ('turn-2', 2, 'delivered', NULL, NULL)`,
+    );
+
+    await coordinator.requeueTurn("turn-1", 1);
+    await coordinator.requeueTurn("turn-2", 2);
+
+    const rows = sql
+      .exec<{ turn_id: string; status: string }>(
+        "SELECT turn_id, status FROM local_turns ORDER BY turn_id",
+      )
+      .toArray();
+    expect(rows).toEqual([
+      { turn_id: "turn-1", status: "generating" },
+      { turn_id: "turn-2", status: "delivered" },
+    ]);
+  });
+});

@@ -61,7 +61,27 @@ async function register(config: LineClientConfig): Promise<{ success: boolean; m
       endpoint: url,
     });
 
-    const msg = `[LINE Webhook] LINE Messaging API SDK により Webhook URL を正常に登録しました: ${url}`;
+    const configured = await apiClient.getWebhookEndpoint();
+    if (configured.endpoint !== url) {
+      const msg = "[LINE Webhook] 登録後の Webhook URL が要求した URL と一致しません。";
+      logger.error(msg);
+      return { success: false, message: msg };
+    }
+    if (!configured.active) {
+      const msg =
+        "[LINE Webhook] Webhook が無効です。LINE Developers コンソールで Webhook の利用を有効にしてください。";
+      logger.error(msg);
+      return { success: false, message: msg };
+    }
+
+    const tested = await apiClient.testWebhookEndpoint({ endpoint: url });
+    if (!tested.success || tested.statusCode !== 200) {
+      const msg = `[LINE Webhook] LINE Platform から Webhook URL への疎通確認に失敗しました (status=${tested.statusCode}, reason=${tested.reason})。`;
+      logger.error(msg);
+      return { success: false, message: msg };
+    }
+
+    const msg = `[LINE Webhook] Webhook URL の登録・有効化・疎通を確認しました: ${url}`;
     logger.info(msg);
     return { success: true, message: msg };
   } catch (error) {

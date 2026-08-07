@@ -12,6 +12,6 @@ line.webhook
     if (result.success) {
       logger.info("[Script] Registration process completed successfully.");
     } else {
-      logger.info(`[Script] Registration process ended with message: ${result.message}`);
+      throw new Error(`[Script] Registration process failed: ${result.message}`);
     }
   });
