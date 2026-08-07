@@ -17,6 +17,7 @@ vi.spyOn(d1.action.account, "upsertIdentity").mockResolvedValue({
   account: {
     id: "account-1",
     status: "active",
+    role: "user",
     createdAt: new Date(),
     updatedAt: new Date(),
     deletedAt: null,

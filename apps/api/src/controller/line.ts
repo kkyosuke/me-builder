@@ -84,6 +84,7 @@ export async function postLiffSession(c: Context<AppEnv>): Promise<Response> {
     idToken,
     lineLoginChannelId: currentConfig.lineLoginChannelId,
     db: d1.client.create(c.env.DB),
+    adminLineUserIds: currentConfig.adminLineUserIds,
   });
 
   switch (outcome.type) {

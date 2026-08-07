@@ -22,7 +22,7 @@ describe("getDiagnosisDetail", () => {
       {
         createSession: vi.fn().mockResolvedValue({
           type: "resolved",
-          session: { accountId: "account-1" },
+          session: { accountId: "account-1", role: "user" },
         }),
         findOpenDiagnosisDetail,
       },
@@ -41,7 +41,7 @@ describe("getDiagnosisDetail", () => {
       {
         createSession: vi.fn().mockResolvedValue({
           type: "resolved",
-          session: { accountId: "account-1" },
+          session: { accountId: "account-1", role: "user" },
         }),
         findOpenDiagnosisDetail: vi.fn().mockResolvedValue({ type: resultType }),
       },

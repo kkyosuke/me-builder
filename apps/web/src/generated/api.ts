@@ -21,6 +21,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/admin/statistics": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** GeminiとLINEの当月利用統計を取得する */
+    get: operations["getAdminStatistics"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/diagnoses": {
     parameters: {
       query?: never;
@@ -172,6 +189,126 @@ export interface operations {
           "application/json": {
             /** @constant */
             error: "Unauthorized";
+          };
+        };
+      };
+      /** @description 対応するAccountが存在しない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Account not found";
+            /** @constant */
+            reason: "friendship_required";
+          };
+        };
+      };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
+          };
+        };
+      };
+      /** @description D1 bindingが設定されていない */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Service Unavailable";
+          };
+        };
+      };
+    };
+  };
+  getAdminStatistics: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 管理者向け利用統計 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            period: {
+              /** Format: date-time */
+              start: string;
+              /** Format: date-time */
+              end: string;
+            };
+            /** Format: date-time */
+            fetchedAt: string;
+            gemini:
+              | {
+                  /** @constant */
+                  status: "available";
+                  estimatedCostUsd: number;
+                  requestCount: number;
+                  inputTokens: number;
+                  outputTokens: number;
+                }
+              | {
+                  /** @constant */
+                  status: "unavailable";
+                  /** @enum {string} */
+                  reason: "not-configured" | "upstream-error";
+                };
+            line:
+              | {
+                  /** @constant */
+                  status: "available";
+                  billableMessages: number;
+                  monthlyLimit: number | null;
+                  replyMessages: number;
+                }
+              | {
+                  /** @constant */
+                  status: "unavailable";
+                  /** @enum {string} */
+                  reason: "not-configured" | "upstream-error";
+                };
+          };
+        };
+      };
+      /** @description LIFF IDトークンを検証できない */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Unauthorized";
+          };
+        };
+      };
+      /** @description 管理者権限がない */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Forbidden";
           };
         };
       };

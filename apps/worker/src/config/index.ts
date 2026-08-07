@@ -70,6 +70,10 @@ export function getWorkerConfig(env?: Record<string, unknown>): WorkerConfig {
   const rawChatEnabled = getEnv("CHAT_ENABLED", env)?.trim().toLowerCase() !== "false";
   const rawChatDeliverySecret = getEnv("CHAT_DELIVERY_SECRET", env)?.trim() || undefined;
   const rawChatContextMessageLimit = getEnv("CHAT_CONTEXT_MESSAGE_LIMIT", env)?.trim();
+  const adminLineUserIds = (getEnv("ADMIN_LINE_USER_IDS", env) ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
 
   const rawConfig = {
     environment: rawEnvironment,
@@ -88,6 +92,7 @@ export function getWorkerConfig(env?: Record<string, unknown>): WorkerConfig {
       rawChatContextMessageLimit,
       DEFAULT_CHAT_CONTEXT_MESSAGE_LIMIT,
     ),
+    adminLineUserIds,
   };
 
   return v.parse(WorkerConfigSchema, rawConfig);

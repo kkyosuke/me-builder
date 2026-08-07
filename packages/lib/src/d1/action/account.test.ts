@@ -57,6 +57,28 @@ describe("upsertIdentity", () => {
     expect(result2.account.id).toBe(result1.account.id);
     expect(result2.identity.id).toBe(result1.identity.id);
   });
+
+  it("運用設定でadminを指定した新規・既存identityを管理者にすること", async () => {
+    const db = createTestDb();
+    const created = await upsertIdentity(db, {
+      provider: "line",
+      providerAccountId: "U_admin_new",
+      role: "admin",
+    });
+    expect(created.account.role).toBe("admin");
+
+    const existing = await upsertIdentity(db, {
+      provider: "line",
+      providerAccountId: "U_promote_later",
+    });
+    expect(existing.account.role).toBe("user");
+    const promoted = await upsertIdentity(db, {
+      provider: "line",
+      providerAccountId: "U_promote_later",
+      role: "admin",
+    });
+    expect(promoted.account.role).toBe("admin");
+  });
 });
 
 describe("linkIdentity", () => {
@@ -182,5 +204,14 @@ describe("resolveAccountByLineLogin", () => {
     expect(second?.account.id).toBe(followed.account.id);
     expect(second?.identity.id).toBe(first?.identity.id);
     expect(await db.select().from(schema.accountIdentities).all()).toHaveLength(2);
+  });
+
+  it("既存Accountを管理者として解決した場合にroleを昇格すること", async () => {
+    const db = createTestDb();
+    await upsertIdentity(db, { provider: "line", providerAccountId: "U_admin" });
+
+    const resolved = await resolveAccountByLineLogin(db, "U_admin", "admin");
+
+    expect(resolved?.account.role).toBe("admin");
   });
 });

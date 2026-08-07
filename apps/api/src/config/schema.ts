@@ -16,6 +16,11 @@ export const ConfigSchema = v.object({
   liffId: v.optional(v.string()),
   /** LINE Login チャネル ID。ID トークンの `aud` の期待値として使います。 */
   lineLoginChannelId: v.optional(v.string()),
+  /** カンマ区切りの設定値を解析した、管理者として扱うLINE user ID。 */
+  adminLineUserIds: v.optional(v.array(v.string()), []),
+  cloudflareAccountId: v.optional(v.string()),
+  cloudflareAiGatewayId: v.optional(v.string(), "default"),
+  cloudflareAnalyticsApiToken: v.optional(v.string()),
   webhookQueueName: v.optional(v.string()),
   webhookQueue: v.optional(
     v.custom<Queue<WebhookQueueMessage>>(

@@ -130,6 +130,225 @@
         }
       }
     },
+    "/api/admin/statistics": {
+      "get": {
+        "operationId": "getAdminStatistics",
+        "tags": ["Admin"],
+        "summary": "GeminiとLINEの当月利用統計を取得する",
+        "security": [
+          {
+            "liffIdToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "管理者向け利用統計",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "period": {
+                      "type": "object",
+                      "properties": {
+                        "start": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "end": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": ["start", "end"]
+                    },
+                    "fetchedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "gemini": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "status": {
+                              "const": "available"
+                            },
+                            "estimatedCostUsd": {
+                              "type": "number"
+                            },
+                            "requestCount": {
+                              "type": "number"
+                            },
+                            "inputTokens": {
+                              "type": "number"
+                            },
+                            "outputTokens": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "estimatedCostUsd",
+                            "requestCount",
+                            "inputTokens",
+                            "outputTokens"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "status": {
+                              "const": "unavailable"
+                            },
+                            "reason": {
+                              "enum": ["not-configured", "upstream-error"],
+                              "type": "string"
+                            }
+                          },
+                          "required": ["status", "reason"]
+                        }
+                      ]
+                    },
+                    "line": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "status": {
+                              "const": "available"
+                            },
+                            "billableMessages": {
+                              "type": "number"
+                            },
+                            "monthlyLimit": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "replyMessages": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "billableMessages",
+                            "monthlyLimit",
+                            "replyMessages"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "status": {
+                              "const": "unavailable"
+                            },
+                            "reason": {
+                              "enum": ["not-configured", "upstream-error"],
+                              "type": "string"
+                            }
+                          },
+                          "required": ["status", "reason"]
+                        }
+                      ]
+                    }
+                  },
+                  "required": ["period", "fetchedAt", "gemini", "line"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "LIFF IDトークンを検証できない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Unauthorized"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "管理者権限がない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Forbidden"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "対応するAccountが存在しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Account not found"
+                    },
+                    "reason": {
+                      "const": "friendship_required"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "未処理のサーバーエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Internal Server Error"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "D1 bindingが設定されていない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Service Unavailable"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/diagnoses": {
       "get": {
         "operationId": "listDiagnoses",

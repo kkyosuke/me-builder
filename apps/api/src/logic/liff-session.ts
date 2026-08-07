@@ -17,11 +17,13 @@ export type LiffSessionParams = {
   /** LINE Login チャネル ID (ID トークンの `aud` の期待値) */
   lineLoginChannelId: string | undefined;
   db: d1.Client;
+  adminLineUserIds?: readonly string[];
 };
 
 /** 表示に使ってよい情報だけを持つ、解決済みのセッション。 */
 type ResolvedLiffSession = {
   accountId: string;
+  role: "user" | "admin";
   displayName?: string | undefined;
   pictureUrl?: string | undefined;
 };
@@ -40,6 +42,7 @@ export async function createLiffSession({
   idToken,
   lineLoginChannelId,
   db,
+  adminLineUserIds = [],
 }: LiffSessionParams): Promise<LiffSessionOutcome> {
   if (!lineLoginChannelId) {
     logger.error("LINE Login channel id is not configured, cannot verify the id token");
@@ -58,7 +61,11 @@ export async function createLiffSession({
     return { type: "unauthenticated", reason: verified.reason };
   }
 
-  const resolved = await d1.action.account.resolveAccountByLineLogin(db, verified.claims.sub);
+  const resolved = await d1.action.account.resolveAccountByLineLogin(
+    db,
+    verified.claims.sub,
+    adminLineUserIds.includes(verified.claims.sub) ? "admin" : "user",
+  );
 
   if (!resolved) {
     // アカウント作成の起点は LINE 公式アカウントの友だち追加
@@ -74,6 +81,7 @@ export async function createLiffSession({
     type: "resolved",
     session: {
       accountId: resolved.account.id,
+      role: resolved.account.role,
       displayName: verified.claims.name,
       pictureUrl: verified.claims.picture,
     },

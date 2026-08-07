@@ -19,6 +19,7 @@ export function createGeminiClient(
       baseUrl: config.cloudflareAiGatewayBaseUrl,
       headers: {
         "cf-aig-authorization": `Bearer ${config.cloudflareAiGatewayToken}`,
+        // 日記本文・AI応答本文をGatewayへ保存せず、token数やcostなどのmetadataだけを残す。
         "cf-aig-collect-log-payload": "false",
         "cf-aig-cache-ttl": "0",
       },
