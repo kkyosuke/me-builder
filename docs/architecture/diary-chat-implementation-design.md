@@ -565,7 +565,9 @@ system promptは次の順で固定し、Git管理する`prompt_version`を付け
 - 日記のfinalは`replyToken`があればreplyで返し、無い・期限切れ・失敗の場合だけpushへフォールバックする。replyはmessage課金の対象外なので、通常経路ではpushを消費しない
 - `replyToken`はWebhook Queueのpayloadで運び、CoordinatorのmemoryにだけTurn単位で保持する。D1とDO storageへは保存せず、logへも出さず、払い出した時点で破棄する
 - Coordinatorのmemoryはevictionで失われうるが、その場合はpushへフォールバックするため耐久性は要求しない
-- `replyToken`には`X-Line-Retry-Key`を付けられないため、replyは失敗しても再試行しない。冪等性はフォールバック先のpushのretry keyだけで担保する
+- `replyToken`には`X-Line-Retry-Key`を付けられないが、tokenが一度しか使えずLINEが再送を弾くため、同じtokenでのreply再試行自体は二重送信にならない。失敗の扱いは応答で分ける
+  - LINEが4xxで拒否した場合は到達していないことが確定しているので、tokenを破棄してpushへフォールバックする
+  - 応答が得られず到達を判別できない場合はpushへ切り替えず、tokenを保持したまま同じreplyを再試行する。ここでpushへ切り替えると、replyが実は受理されていたときに二重に届く
 - 連投を1Turnにまとめた場合、期限内で最も新しい`replyToken`を1つだけ引き継ぐ
 - pushは初回要求から必ず`X-Line-Retry-Key`を付ける。finalと失敗案内はTurn IDと応答種別から、環境別Secretを用いて決定的なUUIDを作る
 - 送信直前にTurn leaseとSessionを再確認する

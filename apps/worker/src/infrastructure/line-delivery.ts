@@ -36,26 +36,34 @@ export async function createLineRetryKey(secret: string, value: string): Promise
 }
 
 /**
- * replyTokenで返信する。tokenは一度きりでretry keyも付けられないため、
- * 失敗しても再試行せず、呼び出し側がpushへフォールバックできるよう真偽値だけを返す。
+ * replyTokenでの返信結果。
+ *
+ * - `delivered`: LINEが受理した
+ * - `rejected`: LINEが4xxで拒否した。到達していないことが確定しているのでpushへ回してよい
+ * - `unknown`: 応答が得られず到達したか判別できない。replyTokenは一度しか使えず、
+ *   同じtokenでの再送はLINE側で弾かれるため、pushへ切り替えず同じtokenで再試行する
  */
+export type LineReplyOutcome = "delivered" | "rejected" | "unknown";
+
 export async function replyLineText(input: {
   channelAccessToken: string;
   replyToken: string;
   text: string;
-}): Promise<boolean> {
+}): Promise<LineReplyOutcome> {
   try {
     await line.client.create(input.channelAccessToken).replyMessage({
       replyToken: input.replyToken,
       messages: [{ type: "text", text: input.text }],
     });
-    return true;
+    return "delivered";
   } catch (error) {
+    // 4xxはLINEが受け取った上で拒否した証拠なので、pushへ回しても二重にならない。
+    const outcome = getLineDeliveryFailureKind(error) === "permanent" ? "rejected" : "unknown";
     logger.warn(
-      { errorName: error instanceof Error ? error.name : "UnknownError" },
-      "LINE reply failed; falling back to push",
+      { outcome, errorName: error instanceof Error ? error.name : "UnknownError" },
+      "LINE reply did not succeed",
     );
-    return false;
+    return outcome;
   }
 }
 

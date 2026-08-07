@@ -130,6 +130,57 @@ function createQueueMessage(
   };
 }
 
+async function turnStatus(turnId: string): Promise<string | undefined> {
+  const turns = await client.select().from(d1.schema.chatTurns);
+  return turns.find((turn) => turn.id === turnId)?.status;
+}
+
+type DiaryEventInput = {
+  text: string;
+  replyToken?: string;
+  /** replyTokenの有効期限はここを基準に決まるので、期限切れの検証はこの値をずらす。 */
+  receivedAgoMs?: number;
+};
+
+async function ingestDiaryEvents(events: DiaryEventInput[], suffix: string) {
+  const queued: ChatTurnQueueMessage[] = [];
+  const harness = createCoordinator(async (message) => {
+    queued.push(message);
+  });
+  await harness.ready();
+  const namespace = {
+    getByName: vi.fn(() => harness.coordinator),
+  } as unknown as NonNullable<Env["CONVERSATION_COORDINATOR"]>;
+  const providerAccountId = `U_diary_delivery_${suffix}`;
+
+  await processLineWebhook(
+    {
+      events: events.map((event, index) => ({
+        type: "message",
+        webhookEventId: `diary-delivery-event-${suffix}-${index}`,
+        timestamp: Date.now() - (event.receivedAgoMs ?? 2_000),
+        message: { type: "text", id: `line-message-${suffix}-${index}`, text: event.text },
+        source: { type: "user", userId: providerAccountId },
+        ...(event.replyToken ? { replyToken: event.replyToken } : {}),
+      })),
+    },
+    client,
+    workerConfig,
+    namespace,
+  );
+  await harness.runAlarm();
+
+  expect(queued).toHaveLength(1);
+  const queuedTurn = queued[0];
+  if (!queuedTurn) throw new Error("Expected a queued chat turn");
+  const bindings: CloudflareBindings = {
+    d1: client,
+    do: { conversation: namespace },
+    queue: { chatTurn: undefined },
+  };
+  return { bindings, coordinator: harness.coordinator, harness, providerAccountId, queuedTurn };
+}
+
 async function ingestDiary(text: string, suffix: string, replyToken?: string) {
   const queued: ChatTurnQueueMessage[] = [];
   const harness = createCoordinator(async (message) => {
@@ -282,7 +333,7 @@ describe("LINE diary chat delivery E2E", () => {
     ]);
   });
 
-  it("replyが失敗したらretry key付きpushへフォールバックし、replyは再試行しない", async () => {
+  it("LINEがreplyを4xxで拒否したらretry key付きpushへフォールバックする", async () => {
     const { bindings, providerAccountId, queuedTurn } = await ingestDiary(
       "今日は買い物に行った",
       "reply-fallback",
@@ -299,6 +350,101 @@ describe("LINE diary chat delivery E2E", () => {
     expect(turns).toEqual([
       expect.objectContaining({ id: queuedTurn.turnId, status: "delivered" }),
     ]);
+  });
+
+  it("replyの到達が判別できないときはpushへ切り替えず同じreplyTokenで再送する", async () => {
+    const { bindings, queuedTurn } = await ingestDiary(
+      "今日は写真を撮った",
+      "reply-unknown",
+      "reply-token-3",
+    );
+    // statusを持たない失敗はネットワーク断であり、LINEへ届いたか判別できない。
+    mockReplyMessage.mockRejectedValueOnce(new Error("network unreachable"));
+
+    await expect(
+      processChatTurnMessage(createQueueMessage(queuedTurn), bindings, workerConfig),
+    ).rejects.toThrow();
+
+    // ここでpushしてしまうと、replyが実は届いていた場合に二重に届く。
+    expect(mockPushMessage).not.toHaveBeenCalled();
+    expect(await turnStatus(queuedTurn.turnId)).toBe("delivery_pending");
+
+    await processChatTurnMessage(createQueueMessage(queuedTurn, 2), bindings, workerConfig);
+
+    expect(mockReplyMessage).toHaveBeenCalledTimes(2);
+    expect(mockReplyMessage.mock.calls[1]?.[0]?.replyToken).toBe("reply-token-3");
+    expect(mockPushMessage).not.toHaveBeenCalled();
+    expect(await turnStatus(queuedTurn.turnId)).toBe("delivered");
+  });
+
+  it("連投を1Turnにまとめたら、最新のreplyTokenでreplyを1通だけ返す", async () => {
+    const { bindings, queuedTurn } = await ingestDiaryEvents(
+      [
+        { text: "今日は疲れた", replyToken: "reply-token-old", receivedAgoMs: 5_000 },
+        { text: "でも夕飯は作れた", replyToken: "reply-token-new", receivedAgoMs: 1_000 },
+      ],
+      "coalesced",
+    );
+
+    await processChatTurnMessage(createQueueMessage(queuedTurn), bindings, workerConfig);
+
+    expect(mockReplyMessage).toHaveBeenCalledOnce();
+    expect(mockReplyMessage.mock.calls[0]?.[0]?.replyToken).toBe("reply-token-new");
+    expect(mockPushMessage).not.toHaveBeenCalled();
+    const prompt = mockGenerateContent.mock.calls[0]?.[0]?.contents;
+    expect(JSON.parse(prompt).context_package.messages).toEqual([
+      expect.objectContaining({ body: "今日は疲れた" }),
+      expect.objectContaining({ body: "でも夕飯は作れた" }),
+    ]);
+  });
+
+  it("replyTokenが期限切れならreplyを試さずpushで返す", async () => {
+    const { bindings, providerAccountId, queuedTurn } = await ingestDiaryEvents(
+      [{ text: "今日は昼寝した", replyToken: "reply-token-expired", receivedAgoMs: 120_000 }],
+      "reply-expired",
+    );
+
+    await processChatTurnMessage(createQueueMessage(queuedTurn), bindings, workerConfig);
+
+    expect(mockReplyMessage).not.toHaveBeenCalled();
+    expect(mockPushMessage).toHaveBeenCalledOnce();
+    expect(mockPushMessage.mock.calls[0]?.[0]?.to).toBe(providerAccountId);
+    expect(await turnStatus(queuedTurn.turnId)).toBe("delivered");
+  });
+
+  it("replyTokenをD1にもQueue messageにも残さない", async () => {
+    const replyToken = "reply-token-secret";
+    const { bindings, queuedTurn } = await ingestDiary("今日は掃除した", "no-persist", replyToken);
+
+    await processChatTurnMessage(createQueueMessage(queuedTurn), bindings, workerConfig);
+
+    expect(JSON.stringify(queuedTurn)).not.toContain(replyToken);
+    const dump = JSON.stringify([
+      await client.select().from(d1.schema.chatTurns),
+      await client.select().from(d1.schema.conversationMessages),
+      await client.select().from(d1.schema.conversationSessions),
+      await client.select().from(d1.schema.sourceRecordTextPayloads),
+    ]);
+    expect(dump).not.toContain(replyToken);
+  });
+
+  it("失敗案内はreplyを使わず固定retry key付きpushで送る", async () => {
+    const { bindings, queuedTurn } = await ingestDiary(
+      "今日は眠れなかった",
+      "failure-uses-push",
+      "reply-token-4",
+    );
+    mockGenerateContent.mockRejectedValue(new Error("gemini unavailable"));
+
+    await processChatTurnMessage(createQueueMessage(queuedTurn, 3), bindings, workerConfig);
+
+    // 失敗案内はfinalではないので、finalのreplyTokenを消費してはいけない。
+    expect(mockReplyMessage).not.toHaveBeenCalled();
+    expect(mockPushMessage).toHaveBeenCalledOnce();
+    expect(mockPushMessage.mock.calls[0]?.[0]?.messages?.[0]?.text).toContain(
+      "うまく返事をまとめられませんでした",
+    );
+    expect(await turnStatus(queuedTurn.turnId)).toBe("failed");
   });
 
   it("LINEが同じretry keyを409で拒否しても配送済みとして完了する", async () => {

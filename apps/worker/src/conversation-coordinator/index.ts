@@ -309,11 +309,22 @@ export class ConversationCoordinator extends DurableObject<Env> {
     if (turnId && freshest) this.replyTokensByTurnId.set(turnId, freshest);
   }
 
-  /** finalのreplyTokenを一度だけ払い出す。払い出した時点で破棄し、二重replyを構造的に防ぐ。 */
-  private takeReplyToken(turnId: string): string | undefined {
+  /**
+   * finalのreplyTokenを参照する。結果が判明するまでは破棄しない。
+   * 到達不明のまま破棄するとpushへ切り替わり、二重に届きうるため。
+   */
+  private peekReplyToken(turnId: string): string | undefined {
     const held = this.replyTokensByTurnId.get(turnId);
+    if (!held) return undefined;
+    if (held.expiresAt <= Date.now()) {
+      this.replyTokensByTurnId.delete(turnId);
+      return undefined;
+    }
+    return held.token;
+  }
+
+  private discardReplyToken(turnId: string): void {
     this.replyTokensByTurnId.delete(turnId);
-    return held && held.expiresAt > Date.now() ? held.token : undefined;
   }
 
   private async enqueueTurn(turnId: string, generationEpoch: number): Promise<void> {
@@ -376,20 +387,28 @@ export class ConversationCoordinator extends DurableObject<Env> {
     }
     if (!this.env.LINE_CHANNEL_ACCESS_TOKEN)
       throw new Error("LINE channel token is not configured");
-    // finalはreplyで返せればmessageを消費しない。replyTokenは一度きりなので、
-    // 払い出しに失敗してもretryせず、retry key付きpushへ一方向にフォールバックする。
+    // finalはreplyで返せればmessageを消費しない。
     if (delivery.kind === "final" && delivery.turnId) {
-      const replyToken = this.takeReplyToken(delivery.turnId);
-      if (
-        replyToken &&
-        (await replyLineText({
+      const replyToken = this.peekReplyToken(delivery.turnId);
+      if (replyToken) {
+        const outcome = await replyLineText({
           channelAccessToken: this.env.LINE_CHANNEL_ACCESS_TOKEN,
           replyToken,
           text: delivery.body,
-        }))
-      ) {
-        this.repository.markDeliveryStatus(delivery.id, "delivered");
-        return;
+        });
+        if (outcome === "delivered") {
+          this.discardReplyToken(delivery.turnId);
+          this.repository.markDeliveryStatus(delivery.id, "delivered");
+          return;
+        }
+        if (outcome === "unknown") {
+          // 到達したか判別できない。ここでpushへ切り替えると二重に届きうるが、
+          // replyTokenは一度しか使えず同じtokenの再送はLINEが弾くため、reply再試行は安全。
+          await this.scheduleDeliveryRetry(delivery.deadlineAt);
+          throw new Error("LINE reply outcome is unknown; retrying the same reply token");
+        }
+        // rejectedはLINEが4xxで拒否した証拠なので、到達していない。pushへ回す。
+        this.discardReplyToken(delivery.turnId);
       }
     }
     try {
