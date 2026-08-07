@@ -107,6 +107,10 @@ jobs:
         run: |
           bun --cwd apps/api scripts/register-webhook.ts
 
+      - name: Verify Gemini Connectivity (Production)
+        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
+        run: bun --cwd apps/worker run check:gemini "Reply with OK."
+
       # デプロイ済みの URL を LIFF アプリのエンドポイント URL へ反映する
       - name: Register LIFF Endpoint (Production)
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' && env.LINE_LOGIN_CHANNEL_SECRET != '' }}

@@ -91,6 +91,7 @@
 
 - **LINE Webhook 自動登録および日記の受付返信**:
   - API サーバー起動時 (`src/index.ts`) または CLI スクリプト (`bun run register:webhook`) の実行時、`LINE_CHANNEL_ACCESS_TOKEN` および `LINE_WEBHOOK_URL` (または `BASE_URL`) が環境変数として与えられている場合、公式 SDK (`@line/bot-sdk`) の `MessagingApiClient.setWebhookEndpoint` を用いて自動的に LINE Messaging API へ Webhook Endpoint URL を登録・更新します。
+  - CDの登録処理は、登録後のURL一致、Webhookの有効化状態、LINE Platformから登録URLへの疎通を公式SDKで検証し、いずれかが不成立ならデプロイを失敗させます。また、Workerのデプロイ後にGeminiへの最小リクエストを実行し、Secret・AI Gateway・モデルの接続不良をデプロイ成功として扱いません。応答本文やSecretはログへ出力しません。
   - Webhook受信メッセージは決定的なcommand routing後にCloudflare Queues経由でQueue Worker (`apps/worker`) へ配信します。診断commandの返信は既存の`replyToken`経路を使い、日記の受領応答と最終応答は[日記チャット実装設計](../../docs/architecture/diary-chat-implementation-design.md#9-38秒sloと配送)を正とします。**送られた本文をオウム返ししません。**
   - 署名検証に成功した1対1トークのテキストメッセージでは、API ServerがQueue投入前に`MessagingApiClient.showLoadingAnimation`を呼び、60秒のチャットローディングを表示します。診断、日記、AIチャットを受信側で重複判定せず、いずれも同じ待機表示にします。グループトークと非テキストイベントは対象外です。ローディングAPIの完了はQueue投入前に待たず、Cloudflare Workersでは`executionCtx.waitUntil`へ渡してWebhook応答のクリティカルパスから外します。ローディングAPIの失敗はQueue投入を止めず、本人識別子である`userId`をログへ出力しません（[LINE公式ガイド](https://developers.line.biz/en/docs/messaging-api/use-loading-indicator/)）。
   - 返信には「今日の診断」への導線として LIFF の URL (`https://liff.line.me/{LIFF_ID}`) を添えます。LINE 内から Web を開く主導線であり、設計は [プロジェクト概要 §4](../../docs/product/project-overview.md#4-想定する利用体験) を正とします。文面の組み立ては `apps/worker` の `buildReplyText` に集約します。

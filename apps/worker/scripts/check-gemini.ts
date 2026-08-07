@@ -15,5 +15,9 @@ const client = createGeminiClient({
 });
 const contents = process.argv.slice(2).join(" ") || "What is Cloudflare?";
 const text = await generateText(client, config.geminiModel, contents);
+if (!text?.trim()) throw new Error("Gemini connectivity check returned no text");
 
-logger.info({ model: config.geminiModel, text }, "Gemini connectivity check completed");
+logger.info(
+  { model: config.geminiModel, outputLength: text.length },
+  "Gemini connectivity check completed",
+);
