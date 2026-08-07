@@ -34,21 +34,6 @@ export async function createLineRetryKey(secret: string, value: string): Promise
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
-export async function pushLineText(input: {
-  channelAccessToken: string;
-  deliverySecret: string;
-  to: string;
-  text: string;
-  retryIdentity: string;
-}): Promise<void> {
-  return pushLineTextWithRetryKey({
-    channelAccessToken: input.channelAccessToken,
-    to: input.to,
-    text: input.text,
-    retryKey: await createLineRetryKey(input.deliverySecret, input.retryIdentity),
-  });
-}
-
 export async function pushLineTextWithRetryKey(input: {
   channelAccessToken: string;
   to: string;

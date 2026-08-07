@@ -1,5 +1,10 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
   "ignore": ["apps/web/src/generated/**"],
-  "ignoreDependencies": ["cloudflare"]
+  "ignoreDependencies": ["cloudflare"],
+  "workspaces": {
+    "apps/worker": {
+      "entry": ["src/**/*.test.ts"]
+    }
+  }
 }
