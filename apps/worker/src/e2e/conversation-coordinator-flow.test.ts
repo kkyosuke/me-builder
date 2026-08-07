@@ -10,9 +10,11 @@ import { ConversationCoordinator } from "../conversation-coordinator";
 import type { Env } from "../types";
 
 const migrationsDirectory = path.resolve(__dirname, "../../../../packages/lib/drizzle");
+type StoredLineSource = Awaited<ReturnType<typeof d1.action.conversation.storeLineTextSource>>;
 
 let miniflare: Miniflare;
 let database: D1Database;
+let client: d1.Client;
 
 async function applyMigrations(db: D1Database): Promise<void> {
   const migrations = (await readdir(migrationsDirectory))
@@ -71,10 +73,41 @@ function createCoordinator(send: (message: ChatTurnQueueMessage) => Promise<void
     CHAT_TURN_QUEUE: { send },
     GEMINI_MODEL: "test-model",
   } as unknown as Env;
-  return { coordinator: new ConversationCoordinator(ctx, env), sql };
+  const coordinator = new ConversationCoordinator(ctx, env);
+  return {
+    coordinator,
+    getAlarm: () => alarm,
+    runAlarm: async () => {
+      alarm = null;
+      await coordinator.alarm();
+    },
+    sql,
+  };
 }
 
-describe("ConversationCoordinator D1 recovery E2E", () => {
+async function storeSource(
+  providerAccountId: string,
+  eventId: string,
+  body: string,
+  receivedAt: Date,
+): Promise<StoredLineSource> {
+  const { account } = await d1.action.account.upsertIdentity(client, {
+    provider: "line",
+    providerAccountId,
+  });
+  return d1.action.conversation.storeLineTextSource(client, {
+    accountId: account.id,
+    eventId,
+    body,
+    receivedAt,
+  });
+}
+
+function acceptedInput(source: StoredLineSource) {
+  return { ...source, receivedAt: source.receivedAt.toISOString() };
+}
+
+describe("ConversationCoordinator D1 E2E", () => {
   beforeEach(async () => {
     miniflare = new Miniflare({
       compatibilityDate: "2026-07-29",
@@ -84,6 +117,7 @@ describe("ConversationCoordinator D1 recovery E2E", () => {
     });
     database = (await miniflare.getD1Database("DB")) as D1Database;
     await applyMigrations(database);
+    client = d1.client.create(database);
   });
 
   afterEach(async () => {
@@ -91,30 +125,73 @@ describe("ConversationCoordinator D1 recovery E2E", () => {
     await miniflare.dispose();
   });
 
-  it("D1反映後に停止しても固定batchだけを復旧し、後着messageを次Turnへ送る", async () => {
-    const client = d1.client.create(database);
-    const { account } = await d1.action.account.upsertIdentity(client, {
-      provider: "line",
-      providerAccountId: "U_coordinator_e2e",
-    });
-    const first = await d1.action.conversation.storeLineTextSource(client, {
-      accountId: account.id,
-      eventId: "event-1",
-      body: "最初のメッセージ",
-      receivedAt: new Date("2026-08-07T00:00:00.000Z"),
-    });
-    const second = await d1.action.conversation.storeLineTextSource(client, {
-      accountId: account.id,
-      eventId: "event-2",
-      body: "後から届いたメッセージ",
-      receivedAt: new Date("2026-08-07T00:00:02.000Z"),
-    });
+  it("連投を1つのTurnへまとめ、生成leaseの完了まで処理する", async () => {
+    const first = await storeSource(
+      "U_coalescing_e2e",
+      "coalescing-event-1",
+      "今日は少し疲れた",
+      new Date("2026-08-07T00:00:00.000Z"),
+    );
+    const second = await storeSource(
+      "U_coalescing_e2e",
+      "coalescing-event-2",
+      "それでも散歩できた",
+      new Date("2026-08-07T00:00:01.000Z"),
+    );
     const queued: ChatTurnQueueMessage[] = [];
-    const { coordinator, sql } = createCoordinator(async (message) => {
+    const { coordinator, runAlarm } = createCoordinator(async (message) => {
       queued.push(message);
     });
 
-    await coordinator.acceptMessage({ ...first, receivedAt: first.receivedAt.toISOString() });
+    await coordinator.acceptMessage(acceptedInput(first));
+    await coordinator.acceptMessage(acceptedInput(second));
+    await runAlarm();
+
+    expect(queued).toHaveLength(1);
+    const queuedTurn = queued[0];
+    if (!queuedTurn) throw new Error("Expected a queued turn");
+    const context = await d1.action.conversation.getTurnContext(client, queuedTurn.turnId, 20);
+    expect(context?.messages.map(({ body }) => body)).toEqual([
+      "今日は少し疲れた",
+      "それでも散歩できた",
+    ]);
+    const lease = await coordinator.acquireGeneration(
+      queuedTurn.turnId,
+      queuedTurn.generationEpoch,
+    );
+    expect(lease.acquired).toBe(true);
+    if (!lease.acquired) throw new Error("Expected a generation lease");
+    await expect(
+      coordinator.completeGeneration(
+        queuedTurn.turnId,
+        queuedTurn.generationEpoch,
+        lease.leaseToken,
+      ),
+    ).resolves.toBe(true);
+    await expect(
+      coordinator.acquireGeneration(queuedTurn.turnId, queuedTurn.generationEpoch),
+    ).resolves.toEqual({ acquired: false, reason: "stale" });
+  });
+
+  it("D1反映後に停止しても固定batchだけを復旧し、後着messageを次Turnへ送る", async () => {
+    const first = await storeSource(
+      "U_recovery_e2e",
+      "recovery-event-1",
+      "最初のメッセージ",
+      new Date("2026-08-07T00:00:00.000Z"),
+    );
+    const second = await storeSource(
+      "U_recovery_e2e",
+      "recovery-event-2",
+      "後から届いたメッセージ",
+      new Date("2026-08-07T00:00:02.000Z"),
+    );
+    const queued: ChatTurnQueueMessage[] = [];
+    const { coordinator, runAlarm, sql } = createCoordinator(async (message) => {
+      queued.push(message);
+    });
+
+    await coordinator.acceptMessage(acceptedInput(first));
     sql.exec("UPDATE coordinator_state SET generation_epoch = 1 WHERE singleton = 1");
     sql.exec("UPDATE accepted_messages SET status = 'attaching' WHERE event_id = ?", first.eventId);
     sql.exec("INSERT INTO attach_batches(id, generation_epoch) VALUES ('batch-1', 1)");
@@ -128,11 +205,11 @@ describe("ConversationCoordinator D1 recovery E2E", () => {
       1,
       "test-model",
     );
-    await coordinator.acceptMessage({ ...second, receivedAt: second.receivedAt.toISOString() });
+    await coordinator.acceptMessage(acceptedInput(second));
 
-    await coordinator.alarm();
-    await coordinator.alarm();
-    await coordinator.alarm();
+    await runAlarm();
+    await runAlarm();
+    await runAlarm();
 
     expect(queued).toHaveLength(2);
     expect(queued[0]).toEqual({
@@ -145,7 +222,193 @@ describe("ConversationCoordinator D1 recovery E2E", () => {
       .select({ channelEventId: d1.schema.conversationMessages.channelEventId })
       .from(d1.schema.conversationMessages)
       .orderBy(d1.schema.conversationMessages.sequence);
-    expect(messages.map(({ channelEventId }) => channelEventId)).toEqual(["event-1", "event-2"]);
+    expect(messages.map(({ channelEventId }) => channelEventId)).toEqual([
+      "recovery-event-1",
+      "recovery-event-2",
+    ]);
+    expect(await client.select().from(d1.schema.chatTurns)).toHaveLength(2);
+  });
+
+  it("Queue投入が一時失敗してもalarmから同じTurnだけを再投入する", async () => {
+    const source = await storeSource(
+      "U_queue_retry_e2e",
+      "queue-retry-event",
+      "あとで返信してほしい",
+      new Date("2026-08-07T00:00:00.000Z"),
+    );
+    const queued: ChatTurnQueueMessage[] = [];
+    let attempt = 0;
+    const { coordinator, getAlarm, runAlarm } = createCoordinator(async (message) => {
+      attempt += 1;
+      if (attempt === 1) throw new Error("temporary queue outage");
+      queued.push(message);
+    });
+    await coordinator.acceptMessage(acceptedInput(source));
+
+    const beforeFailure = Date.now();
+    await runAlarm();
+    expect(getAlarm()).toBeGreaterThanOrEqual(beforeFailure + 30_000);
+    await runAlarm();
+
+    expect(attempt).toBe(2);
+    expect(queued).toHaveLength(1);
+    expect(await client.select().from(d1.schema.chatTurns)).toHaveLength(1);
+    expect(await client.select().from(d1.schema.conversationMessages)).toHaveLength(1);
+  });
+
+  it("保持期間後に再送されたeventから既存Turnを再生成しない", async () => {
+    const source = await storeSource(
+      "U_old_event_e2e",
+      "old-event",
+      "古いメッセージ",
+      new Date("2026-01-01T00:00:00.000Z"),
+    );
+    const queued: ChatTurnQueueMessage[] = [];
+    const { coordinator, runAlarm, sql } = createCoordinator(async (message) => {
+      queued.push(message);
+    });
+    await coordinator.acceptMessage(acceptedInput(source));
+    await runAlarm();
+    await runAlarm();
+    expect(
+      sql.exec<{ count: number }>("SELECT COUNT(*) AS count FROM accepted_messages").one().count,
+    ).toBe(0);
+
+    await expect(coordinator.acceptMessage(acceptedInput(source))).resolves.toEqual({
+      accepted: true,
+    });
+    await runAlarm();
+
+    expect(queued).toHaveLength(1);
+    expect(await client.select().from(d1.schema.chatTurns)).toHaveLength(1);
+    expect(await client.select().from(d1.schema.conversationMessages)).toHaveLength(1);
+  });
+
+  it("保持期間後の古いeventと新着eventが混在しても新着だけを次Turnへ送る", async () => {
+    const oldSource = await storeSource(
+      "U_mixed_replay_e2e",
+      "mixed-old-event",
+      "保存済みの古いメッセージ",
+      new Date("2026-01-01T00:00:00.000Z"),
+    );
+    const freshSource = await storeSource(
+      "U_mixed_replay_e2e",
+      "mixed-fresh-event",
+      "本当の新着メッセージ",
+      new Date("2026-08-07T00:00:02.000Z"),
+    );
+    const queued: ChatTurnQueueMessage[] = [];
+    const { coordinator, runAlarm } = createCoordinator(async (message) => {
+      queued.push(message);
+    });
+    await coordinator.acceptMessage(acceptedInput(oldSource));
+    await runAlarm();
+    await runAlarm();
+
+    await coordinator.acceptMessage(acceptedInput(oldSource));
+    await coordinator.acceptMessage(acceptedInput(freshSource));
+    await runAlarm();
+
+    expect(queued).toHaveLength(2);
+    expect(await client.select().from(d1.schema.chatTurns)).toHaveLength(2);
+    const messages = await client
+      .select({ channelEventId: d1.schema.conversationMessages.channelEventId })
+      .from(d1.schema.conversationMessages)
+      .orderBy(d1.schema.conversationMessages.sequence);
+    expect(messages.map(({ channelEventId }) => channelEventId)).toEqual([
+      "mixed-old-event",
+      "mixed-fresh-event",
+    ]);
+  });
+
+  it("異なるAccountのmessageを同じCoordinatorへ混入させない", async () => {
+    const first = await storeSource(
+      "U_account_a_e2e",
+      "account-a-event",
+      "Account Aのメッセージ",
+      new Date("2026-08-07T00:00:00.000Z"),
+    );
+    const second = await storeSource(
+      "U_account_b_e2e",
+      "account-b-event",
+      "Account Bのメッセージ",
+      new Date("2026-08-07T00:00:01.000Z"),
+    );
+    const queued: ChatTurnQueueMessage[] = [];
+    const { coordinator, runAlarm } = createCoordinator(async (message) => {
+      queued.push(message);
+    });
+
+    await coordinator.acceptMessage(acceptedInput(first));
+    await expect(coordinator.acceptMessage(acceptedInput(second))).rejects.toThrow(
+      "another account",
+    );
+    await runAlarm();
+
+    expect(queued).toHaveLength(1);
+    const messages = await client.select().from(d1.schema.conversationMessages);
+    expect(messages).toHaveLength(1);
+    expect(messages[0]?.channelEventId).toBe("account-a-event");
+  });
+
+  it("同じeventのWebhook再配送を1回だけD1とQueueへ反映する", async () => {
+    const source = await storeSource(
+      "U_duplicate_e2e",
+      "duplicate-event",
+      "重複してはいけないメッセージ",
+      new Date("2026-08-07T00:00:00.000Z"),
+    );
+    const queued: ChatTurnQueueMessage[] = [];
+    const { coordinator, runAlarm } = createCoordinator(async (message) => {
+      queued.push(message);
+    });
+
+    await expect(coordinator.acceptMessage(acceptedInput(source))).resolves.toEqual({
+      accepted: true,
+    });
+    await expect(coordinator.acceptMessage(acceptedInput(source))).resolves.toEqual({
+      accepted: false,
+    });
+    await runAlarm();
+    await runAlarm();
+
+    expect(queued).toHaveLength(1);
+    expect(await client.select().from(d1.schema.chatTurns)).toHaveLength(1);
+    expect(await client.select().from(d1.schema.conversationMessages)).toHaveLength(1);
+  });
+
+  it("生成leaseのalarmより新着messageの連投待ちを優先する", async () => {
+    const first = await storeSource(
+      "U_alarm_priority_e2e",
+      "alarm-priority-event-1",
+      "最初のメッセージ",
+      new Date("2026-08-07T00:00:00.000Z"),
+    );
+    const second = await storeSource(
+      "U_alarm_priority_e2e",
+      "alarm-priority-event-2",
+      "生成中に届いたメッセージ",
+      new Date("2026-08-07T00:00:02.000Z"),
+    );
+    const queued: ChatTurnQueueMessage[] = [];
+    const { coordinator, getAlarm, runAlarm } = createCoordinator(async (message) => {
+      queued.push(message);
+    });
+    await coordinator.acceptMessage(acceptedInput(first));
+    await runAlarm();
+    const firstTurn = queued[0];
+    if (!firstTurn) throw new Error("Expected the first queued turn");
+    const lease = await coordinator.acquireGeneration(firstTurn.turnId, firstTurn.generationEpoch);
+    if (!lease.acquired) throw new Error("Expected a generation lease");
+
+    await coordinator.acceptMessage(acceptedInput(second));
+
+    const nextAlarm = getAlarm();
+    expect(nextAlarm).not.toBeNull();
+    expect(nextAlarm).toBeLessThan(lease.hardDeadlineAt);
+    expect(nextAlarm).toBeLessThanOrEqual(Date.now() + 1_500);
+    await runAlarm();
+    expect(queued).toHaveLength(2);
     expect(await client.select().from(d1.schema.chatTurns)).toHaveLength(2);
   });
 });

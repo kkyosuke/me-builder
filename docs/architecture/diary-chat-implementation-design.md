@@ -314,7 +314,7 @@ stateDiagram-v2
     generating --> failed: 失敗案内を配送して終了
 ```
 
-D1反映を始める前に対象event IDとgeneration epochを固定batchとして保存します。D1の成功応答を受け取る前に停止しても同じbatchだけを再試行し、後着messageは次のTurnへ残します。D1が返したepochがbatchと異なる場合は保持期間後に再送された既存Turnとみなし、生成Queueへ再投入しません。
+D1反映を始める前に対象event IDとgeneration epochを固定batchとして保存します。D1の成功応答を受け取る前に停止しても同じbatchだけを再試行し、後着messageは次のTurnへ残します。D1が返したepochがbatchと異なる場合は保持期間後に再送された既存Turnとみなし、生成Queueへ再投入しません。既存Turnの一部だけ、または複数の既存Turnにまたがるeventが再送された場合も、新しいTurnを作らず既存epochとして扱います。保存済みeventと未保存eventが同じbatchに混在する場合は、AccountとSource Recordの対応を検証したうえで未保存eventだけを新しいTurnへ追加します。
 
 D1、Queue、LINEを呼び出した後は、Turn ID、generation epoch、lease tokenが現在値と一致するときだけ完了へ進めます。Queue投入前は`pending_queue`として残し、alarmから同じTurn IDを再投入します。D1側のevent ID・sequence一意制約と組み合わせ、DO再起動やQueue再配送でも履歴と応答を重複させません。終端化した`local_turns`は削除し、`attached`のevent IDは30日間の冪等期間を経て削除します。
 

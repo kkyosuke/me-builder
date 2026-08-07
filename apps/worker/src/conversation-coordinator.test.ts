@@ -130,6 +130,39 @@ describe("ConversationCoordinator recovery", () => {
     expect(getAlarm()).toBe(Date.now() + 30_000);
   });
 
+  it("alarmの再試行より早い生成lease期限を上書きしない", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-07T00:00:00.000Z"));
+    const { coordinator, getAlarm, sql } = createCoordinator({
+      DB: {} as Env["DB"],
+      CHAT_TURN_QUEUE: {
+        send: vi.fn(),
+      } as unknown as NonNullable<Env["CHAT_TURN_QUEUE"]>,
+    });
+    const leaseDeadline = Date.now() + 5_000;
+    sql.exec(
+      `INSERT INTO local_turns(turn_id, generation_epoch, status, lease_token, hard_deadline_at)
+       VALUES (?, ?, 'generating', ?, ?)`,
+      "turn-1",
+      1,
+      "lease-1",
+      leaseDeadline,
+    );
+    await coordinator.acceptMessage({
+      accountId: "account-1",
+      sourceRecordId: "source-1",
+      eventId: "event-1",
+      receivedAt: new Date().toISOString(),
+    });
+    vi.spyOn(d1.action.conversation, "attachMessagesToTurn").mockRejectedValue(
+      new Error("temporary D1 outage"),
+    );
+
+    await coordinator.alarm();
+
+    expect(getAlarm()).toBe(leaseDeadline);
+  });
+
   it("最初に固定したAccount以外のmessageを拒否する", async () => {
     const { coordinator } = createCoordinator();
     const input = {

@@ -142,7 +142,7 @@ describe("Diary conversation persistence flow", () => {
     ]);
   });
 
-  it("異なるSessionへ保存済みのeventを同じTurnとして再attachしない", async () => {
+  it("異なるSessionへ保存済みのeventがまとめて再送されても新しいTurnを作らない", async () => {
     const db = createTestDb();
     const { account } = await upsertIdentity(db, {
       provider: "line",
@@ -169,8 +169,63 @@ describe("Diary conversation persistence flow", () => {
     await expect(markTurnFailed(db, secondTurn.turnId, "generation_exhausted")).resolves.toBe(true);
     await expect(markTurnDelivered(db, secondTurn.turnId)).resolves.toBe(false);
 
-    await expect(attachMessagesToTurn(db, [first, second], 3, "test-model")).rejects.toThrow(
-      "Existing conversation messages span multiple chat turns",
+    await expect(attachMessagesToTurn(db, [first, second], 3, "test-model")).resolves.toEqual(
+      firstTurn,
     );
+    expect(await db.select().from(schema.chatTurns)).toHaveLength(2);
+  });
+
+  it("複数messageからなる既存Turnの一部だけが再送されても新しいTurnを作らない", async () => {
+    const db = createTestDb();
+    const { account } = await upsertIdentity(db, {
+      provider: "line",
+      providerAccountId: "U_partial_turn_replay",
+    });
+    const first = await storeLineTextSource(db, {
+      accountId: account.id,
+      eventId: "coalesced-event-1",
+      body: "一つ目",
+      receivedAt: new Date("2026-08-07T00:00:00.000Z"),
+    });
+    const second = await storeLineTextSource(db, {
+      accountId: account.id,
+      eventId: "coalesced-event-2",
+      body: "二つ目",
+      receivedAt: new Date("2026-08-07T00:00:01.000Z"),
+    });
+    const originalTurn = await attachMessagesToTurn(db, [first, second], 1, "test-model");
+
+    await expect(attachMessagesToTurn(db, [first], 2, "test-model")).resolves.toEqual(originalTurn);
+    expect(await db.select().from(schema.chatTurns)).toHaveLength(1);
+  });
+
+  it("保存済みeventと未保存eventが混在した場合は未保存分だけを新Turnへattachする", async () => {
+    const db = createTestDb();
+    const { account } = await upsertIdentity(db, {
+      provider: "line",
+      providerAccountId: "U_partial_replay",
+    });
+    const existing = await storeLineTextSource(db, {
+      accountId: account.id,
+      eventId: "existing-event",
+      body: "保存済みのメッセージ",
+      receivedAt: new Date("2026-08-07T00:00:00.000Z"),
+    });
+    const existingTurn = await attachMessagesToTurn(db, [existing], 1, "test-model");
+    const fresh = await storeLineTextSource(db, {
+      accountId: account.id,
+      eventId: "fresh-event",
+      body: "新着メッセージ",
+      receivedAt: new Date("2026-08-07T00:00:02.000Z"),
+    });
+
+    const freshTurn = await attachMessagesToTurn(db, [existing, fresh], 2, "test-model");
+
+    expect(freshTurn.turnId).not.toBe(existingTurn.turnId);
+    expect(freshTurn.generationEpoch).toBe(2);
+    const context = await getTurnContext(db, freshTurn.turnId, 20);
+    expect(context?.currentUserMessageIds).toHaveLength(1);
+    expect(context?.messages.at(-1)?.body).toBe("新着メッセージ");
+    expect(await db.select().from(schema.conversationMessages)).toHaveLength(2);
   });
 });

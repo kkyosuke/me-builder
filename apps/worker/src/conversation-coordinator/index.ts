@@ -51,8 +51,11 @@ export class ConversationCoordinator extends DurableObject<Env> {
     }
 
     this.repository.addAcceptedMessage(input);
-    const alarm = await this.ctx.storage.getAlarm();
-    if (alarm === null) await this.ctx.storage.setAlarm(Date.now() + COALESCE_MS);
+    const desiredAlarm = Date.now() + COALESCE_MS;
+    const currentAlarm = await this.ctx.storage.getAlarm();
+    if (currentAlarm === null || desiredAlarm < currentAlarm) {
+      await this.ctx.storage.setAlarm(desiredAlarm);
+    }
     return { accepted: true };
   }
 
@@ -132,7 +135,11 @@ export class ConversationCoordinator extends DurableObject<Env> {
         },
         "Conversation coordinator alarm failed; retry scheduled",
       );
-      await this.ctx.storage.setAlarm(Date.now() + ALARM_RETRY_MS);
+      const retryAt = Date.now() + ALARM_RETRY_MS;
+      const leaseDeadline = this.repository.earliestLeaseDeadline();
+      await this.ctx.storage.setAlarm(
+        leaseDeadline === null ? retryAt : Math.min(retryAt, leaseDeadline),
+      );
     }
   }
 
@@ -194,9 +201,14 @@ export class ConversationCoordinator extends DurableObject<Env> {
   }
 
   private async schedulePendingWork(): Promise<void> {
-    const desiredAlarm = this.repository.hasPendingWork()
-      ? Date.now() + COALESCE_MS
-      : this.repository.earliestLeaseDeadline();
+    const pendingAlarm = this.repository.hasPendingWork() ? Date.now() + COALESCE_MS : null;
+    const leaseDeadline = this.repository.earliestLeaseDeadline();
+    const desiredAlarm =
+      pendingAlarm === null
+        ? leaseDeadline
+        : leaseDeadline === null
+          ? pendingAlarm
+          : Math.min(pendingAlarm, leaseDeadline);
     if (desiredAlarm === null) return;
     const currentAlarm = await this.ctx.storage.getAlarm();
     if (currentAlarm === null || desiredAlarm < currentAlarm) {
