@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { createLineRetryKey, isAcceptedLineRetryConflict } from "./line-delivery";
+import {
+  createLineRetryKey,
+  getLineDeliveryFailureKind,
+  isAcceptedLineRetryConflict,
+} from "./line-delivery";
 
 describe("createLineRetryKey", () => {
   it("同じSecretと配送identityから同じUUIDを生成する", async () => {
@@ -13,6 +17,15 @@ describe("createLineRetryKey", () => {
     await expect(createLineRetryKey("secret", "receipt:event-1")).resolves.not.toBe(
       await createLineRetryKey("secret", "final:event-1"),
     );
+  });
+});
+
+describe("getLineDeliveryFailureKind", () => {
+  it("恒久的な4xxと再試行可能なtimeout・5xxを分ける", () => {
+    expect(getLineDeliveryFailureKind({ status: 400 })).toBe("permanent");
+    expect(getLineDeliveryFailureKind({ status: 429 })).toBe("transient");
+    expect(getLineDeliveryFailureKind({ status: 500 })).toBe("transient");
+    expect(getLineDeliveryFailureKind(new Error("timeout"))).toBe("transient");
   });
 });
 

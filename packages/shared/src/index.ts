@@ -8,5 +8,6 @@ export interface UserProfile {
 export const APP_NAME = "me-builder";
 
 export * from "./schema/queue";
+export * from "./schema/conversation-coordinator";
 export * from "./utils/env";
 export * from "./utils/logger";

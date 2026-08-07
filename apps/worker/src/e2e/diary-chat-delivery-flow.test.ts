@@ -1,6 +1,6 @@
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
-import type { D1Database, DurableObjectNamespace } from "@cloudflare/workers-types";
+import type { D1Database } from "@cloudflare/workers-types";
 import { d1, line } from "@me-builder/lib";
 import type { ChatTurnQueueMessage, Message } from "@me-builder/shared";
 import Database from "better-sqlite3";
@@ -99,6 +99,8 @@ function createCoordinator(send: (message: ChatTurnQueueMessage) => Promise<void
     DB: database,
     CHAT_TURN_QUEUE: { send },
     GEMINI_MODEL: "test-model",
+    LINE_CHANNEL_ACCESS_TOKEN: "line-token",
+    CHAT_DELIVERY_SECRET: "delivery-secret",
   } as unknown as Env;
   const coordinator = new ConversationCoordinator(ctx, env);
   return {
@@ -133,9 +135,10 @@ async function ingestDiary(text: string, suffix: string) {
   await harness.ready();
   const namespace = {
     getByName: vi.fn(() => harness.coordinator),
-  } as unknown as DurableObjectNamespace<ConversationCoordinator>;
+  } as unknown as NonNullable<Env["CONVERSATION_COORDINATOR"]>;
   const providerAccountId = `U_diary_delivery_${suffix}`;
   const eventId = `diary-delivery-event-${suffix}`;
+  const receivedAt = new Date(Date.now() - 2_000).toISOString();
 
   await processLineWebhook(
     {
@@ -143,7 +146,7 @@ async function ingestDiary(text: string, suffix: string) {
         {
           type: "message",
           webhookEventId: eventId,
-          timestamp: new Date("2026-08-07T00:00:00.000Z").getTime(),
+          timestamp: new Date(receivedAt).getTime(),
           message: { type: "text", id: `line-message-${suffix}`, text },
           source: { type: "user", userId: providerAccountId },
         },
@@ -153,6 +156,15 @@ async function ingestDiary(text: string, suffix: string) {
     workerConfig,
     namespace,
   );
+  const resolved = await d1.action.account.upsertIdentity(client, {
+    provider: "line",
+    providerAccountId,
+  });
+  await harness.coordinator.reserveReceipt({
+    accountId: resolved.account.id,
+    eventId,
+    receivedAt,
+  });
   await harness.runAlarm();
 
   expect(queued).toHaveLength(1);
@@ -261,8 +273,45 @@ describe("LINE diary chat delivery E2E", () => {
     ]);
   });
 
+  it("生成完了時にleaseが失効していればassistant応答を保存も配送もしない", async () => {
+    const { bindings, coordinator, queuedTurn } = await ingestDiary(
+      "今日は長く考えていた",
+      "expired-lease",
+    );
+    vi.spyOn(coordinator, "isGenerationLeaseActive").mockResolvedValue(false);
+    const message = createQueueMessage(queuedTurn);
+
+    await expect(processChatTurnMessage(message, bindings, workerConfig)).rejects.toThrow(
+      "Generation lease expired before response persistence",
+    );
+
+    const messages = await client.select().from(d1.schema.conversationMessages);
+    expect(messages).toEqual([expect.objectContaining({ role: "user", assistantBody: null })]);
+    expect(mockPushMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it("生成中にSessionが閉じていれば生成も最終配送も行わない", async () => {
+    const { bindings, queuedTurn } = await ingestDiary("今日は区切りをつけたい", "closed-session");
+    await client
+      .update(d1.schema.conversationSessions)
+      .set({ status: "closed", closedAt: new Date(), closeReason: "inactive" });
+    const message = createQueueMessage(queuedTurn);
+
+    await processChatTurnMessage(message, bindings, workerConfig);
+
+    expect(message.ack).toHaveBeenCalledOnce();
+    expect(mockGenerateContent).not.toHaveBeenCalled();
+    expect(mockPushMessage).toHaveBeenCalledTimes(1);
+    await expect(client.select().from(d1.schema.chatTurns)).resolves.toEqual([
+      expect.objectContaining({ status: "failed", failureStage: "closed_session" }),
+    ]);
+  });
+
   it("最終attemptの生成失敗では固定retry keyの失敗案内を配送してTurnをfailedにする", async () => {
-    const { bindings, queuedTurn } = await ingestDiary("今日はうまく話せない", "failure");
+    const { bindings, coordinator, queuedTurn } = await ingestDiary(
+      "今日はうまく話せない",
+      "failure",
+    );
     mockGenerateContent.mockRejectedValue(new Error("provider unavailable"));
     const message = createQueueMessage(queuedTurn, 2);
 
@@ -280,5 +329,66 @@ describe("LINE diary chat delivery E2E", () => {
         ],
       }),
     );
+    await expect(
+      coordinator.deliverTurn({
+        turnId: queuedTurn.turnId,
+        generationEpoch: queuedTurn.generationEpoch,
+        leaseToken: "obsolete-token",
+        kind: "final",
+        text: generatedReply,
+      }),
+    ).resolves.toEqual({ status: "superseded" });
+    expect(mockPushMessage).toHaveBeenCalledTimes(2);
+  });
+
+  it("失敗案内の一時障害後はAIを再生成せず同じoutboxだけを再配送する", async () => {
+    const { bindings, queuedTurn } = await ingestDiary(
+      "今日は言葉が出てこない",
+      "failure-transient",
+    );
+    mockGenerateContent.mockRejectedValue(new Error("provider unavailable"));
+    mockPushMessage.mockRejectedValueOnce({ status: 503 }).mockResolvedValue({});
+    const first = createQueueMessage(queuedTurn, 2);
+
+    await expect(processChatTurnMessage(first, bindings, workerConfig)).rejects.toThrow(
+      "provider unavailable",
+    );
+    const retry = createQueueMessage(queuedTurn, 3);
+    await processChatTurnMessage(retry, bindings, workerConfig);
+
+    expect(mockGenerateContent).toHaveBeenCalledOnce();
+    expect(retry.ack).toHaveBeenCalledOnce();
+    const failureCalls = mockPushMessage.mock.calls.slice(1);
+    expect(failureCalls).toHaveLength(2);
+    expect(failureCalls[0]?.[0]).toEqual(failureCalls[1]?.[0]);
+    expect(failureCalls[0]?.[1]).toBe(failureCalls[1]?.[1]);
+  });
+
+  it("LINEの一時障害後も永続化済みoutboxの同じ本文とretry keyだけで再送する", async () => {
+    const { bindings, coordinator, queuedTurn } = await ingestDiary(
+      "今日は雨だった",
+      "transient-retry",
+    );
+    const deliverTurn = vi.spyOn(coordinator, "deliverTurn");
+    mockPushMessage.mockRejectedValueOnce({ status: 503 }).mockResolvedValue({});
+    const first = createQueueMessage(queuedTurn, 1);
+
+    await expect(processChatTurnMessage(first, bindings, workerConfig)).rejects.toEqual({
+      status: 503,
+    });
+    const firstDelivery = deliverTurn.mock.calls[0]?.[0];
+    if (!firstDelivery) throw new Error("Expected the first delivery reservation");
+    await expect(coordinator.deliverTurn(firstDelivery)).resolves.toEqual({
+      status: "lease_expired",
+    });
+    expect(mockPushMessage).toHaveBeenCalledTimes(2);
+    const retry = createQueueMessage(queuedTurn, 2);
+    await processChatTurnMessage(retry, bindings, workerConfig);
+
+    expect(retry.ack).toHaveBeenCalledOnce();
+    const finalCalls = mockPushMessage.mock.calls.slice(1);
+    expect(finalCalls).toHaveLength(2);
+    expect(finalCalls[0]?.[0]).toEqual(finalCalls[1]?.[0]);
+    expect(finalCalls[0]?.[1]).toBe(finalCalls[1]?.[1]);
   });
 });

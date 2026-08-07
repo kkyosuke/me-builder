@@ -4,11 +4,12 @@ import { line } from "./index";
 
 vi.mock("@line/bot-sdk", () => {
   const setWebhookEndpointMock = vi.fn();
+  function MessagingApiClientMock(this: { setWebhookEndpoint: typeof setWebhookEndpointMock }) {
+    this.setWebhookEndpoint = setWebhookEndpointMock;
+  }
   return {
     messagingApi: {
-      MessagingApiClient: vi.fn().mockImplementation(() => ({
-        setWebhookEndpoint: setWebhookEndpointMock,
-      })),
+      MessagingApiClient: vi.fn(MessagingApiClientMock),
     },
   };
 });

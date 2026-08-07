@@ -1,8 +1,11 @@
-import type { D1Database, DurableObjectNamespace, Queue } from "@cloudflare/workers-types";
+import type { Queue } from "@cloudflare/workers-types";
 import type { ChatTurnQueueMessage } from "@me-builder/shared";
-import type { ConversationCoordinator } from "./conversation-coordinator";
 
-export interface Env {
+/** Wrangler生成bindingに、dashboardから配布するSecretとQueue本文型だけを重ねる。 */
+export type Env = Omit<
+  WorkerBindings,
+  "CHAT_TURN_QUEUE" | "CONVERSATION_COORDINATOR" | "ENVIRONMENT"
+> & {
   ENVIRONMENT?: string;
   BASE_DOMAIN?: string;
   BASE_URL?: string;
@@ -14,7 +17,8 @@ export interface Env {
   GEMINI_MODEL?: string;
   CHAT_ENABLED?: string;
   CHAT_DELIVERY_SECRET?: string;
-  CONVERSATION_COORDINATOR?: DurableObjectNamespace<ConversationCoordinator>;
+  CHAT_CONTEXT_MESSAGE_LIMIT?: string;
+  LIFF_ID?: string;
   CHAT_TURN_QUEUE?: Queue<ChatTurnQueueMessage>;
-  DB: D1Database;
-}
+  CONVERSATION_COORDINATOR?: WorkerBindings["CONVERSATION_COORDINATOR"];
+};

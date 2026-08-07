@@ -1,5 +1,10 @@
-import { line } from "@me-builder/lib";
-import { type Queue, type WebhookQueueMessage, logger } from "@me-builder/shared";
+import { d1, line } from "@me-builder/lib";
+import {
+  type ConversationCoordinatorNamespace,
+  type Queue,
+  type WebhookQueueMessage,
+  logger,
+} from "@me-builder/shared";
 
 /**
  * LINE Webhook を受理し、Cloudflare Queues へ投入します。
@@ -22,6 +27,8 @@ export type ReceiveLineWebhookParams = {
   startChatLoading?: ((chatId: string) => Promise<unknown>) | undefined;
   /** チャットローディングの完了をWebhook応答後まで待機させる */
   waitUntil?: ((promise: Promise<unknown>) => void) | undefined;
+  db?: d1.Client | undefined;
+  coordinator?: ConversationCoordinatorNamespace | undefined;
 };
 
 export type LineWebhookOutcome =
@@ -65,6 +72,16 @@ function extractOneToOneTextChatIds(payload: unknown): string[] {
   return [...chatIds];
 }
 
+function routeLineTextEvents(payload: unknown): NonNullable<WebhookQueueMessage["routing"]> {
+  return {
+    lineTextEvents: line.webhook.parseEvents(payload).flatMap((event) => {
+      if (event.type !== "message" || !event.message || event.message.type !== "text") return [];
+      const eventId = event.webhookEventId ?? event.message.id;
+      return eventId ? [{ eventId, intent: line.text.classify(event.message.text) }] : [];
+    }),
+  };
+}
+
 /** 一度しか使えないreplyTokenを非同期境界の外へ持ち出さない。 */
 export function removeDiaryReplyTokens(payload: unknown): unknown {
   if (
@@ -102,6 +119,8 @@ export async function receiveLineWebhook({
   queue,
   startChatLoading,
   waitUntil,
+  db,
+  coordinator,
 }: ReceiveLineWebhookParams): Promise<LineWebhookOutcome> {
   // 未設定の場合は環境を問わず検証をスキップせず拒否する
   if (!channelSecret) {
@@ -133,19 +152,38 @@ export async function receiveLineWebhook({
     source: "line",
     receivedAt: new Date().toISOString(),
     payload: removeDiaryReplyTokens(payload),
+    routing: routeLineTextEvents(payload),
   };
 
   const messages = line.webhook.extractMessages(payload);
 
-  if (!queue) {
-    logger.warn(
-      { id: event.id, source: event.source, messageCount: messages.length },
-      "WEBHOOK_QUEUE binding not configured, skipping queue push",
-    );
-    return { type: "accepted", id: event.id, queued: false };
-  }
-
   const chatIds = extractOneToOneTextChatIds(payload);
+
+  if (db && coordinator && waitUntil) {
+    const reservations = line.webhook.parseEvents(payload).flatMap((webhookEvent) => {
+      if (
+        webhookEvent.type !== "message" ||
+        !webhookEvent.message ||
+        webhookEvent.message.type !== "text" ||
+        webhookEvent.source?.type !== "user" ||
+        !webhookEvent.source.userId ||
+        line.text.classify(webhookEvent.message.text) === "diagnosis-request"
+      ) {
+        return [];
+      }
+      const eventId = webhookEvent.webhookEventId ?? webhookEvent.message.id;
+      return eventId
+        ? [
+            {
+              eventId,
+              providerAccountId: webhookEvent.source.userId,
+              receivedAt: new Date(webhookEvent.timestamp).toISOString(),
+            },
+          ]
+        : [];
+    });
+    waitUntil(reserveReceipts(reservations, db, coordinator));
+  }
 
   if (startChatLoading && waitUntil) {
     waitUntil(
@@ -165,6 +203,14 @@ export async function receiveLineWebhook({
     );
   }
 
+  if (!queue) {
+    logger.warn(
+      { id: event.id, source: event.source, messageCount: messages.length },
+      "WEBHOOK_QUEUE binding not configured, skipping queue push",
+    );
+    return { type: "accepted", id: event.id, queued: false };
+  }
+
   await queue.send(event);
   logger.info(
     { id: event.id, source: event.source, messageCount: messages.length },
@@ -172,4 +218,46 @@ export async function receiveLineWebhook({
   );
 
   return { type: "accepted", id: event.id, queued: true };
+}
+
+async function reserveReceipts(
+  reservations: Array<{ eventId: string; providerAccountId: string; receivedAt: string }>,
+  db: d1.Client,
+  coordinator: ConversationCoordinatorNamespace,
+): Promise<void> {
+  const reservationsByProvider = new Map<string, typeof reservations>();
+  for (const reservation of reservations) {
+    const grouped = reservationsByProvider.get(reservation.providerAccountId) ?? [];
+    grouped.push(reservation);
+    reservationsByProvider.set(reservation.providerAccountId, grouped);
+  }
+  await Promise.all(
+    [...reservationsByProvider].map(async ([providerAccountId, providerReservations]) => {
+      const deadline = Date.now() + 30_000;
+      while (true) {
+        try {
+          const resolved = await d1.action.account.upsertIdentity(db, {
+            provider: "line",
+            providerAccountId,
+          });
+          const stub = coordinator.getByName(resolved.account.id);
+          await Promise.all(
+            providerReservations.map(({ eventId, receivedAt }) =>
+              stub.reserveReceipt({ accountId: resolved.account.id, eventId, receivedAt }),
+            ),
+          );
+          return;
+        } catch (error) {
+          if (Date.now() + 1_000 >= deadline) {
+            logger.warn(
+              { errorName: error instanceof Error ? error.name : "UnknownError" },
+              "Failed to reserve LINE receipt before its deadline",
+            );
+            return;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 1_000));
+        }
+      }
+    }),
+  );
 }

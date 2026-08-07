@@ -1,11 +1,22 @@
-import type { DurableObjectNamespace } from "@cloudflare/workers-types";
 import { d1, line } from "@me-builder/lib";
-import { logger } from "@me-builder/shared";
+import {
+  type ConversationCoordinatorNamespace,
+  type WebhookQueueMessage,
+  logger,
+} from "@me-builder/shared";
+import * as v from "valibot";
 import type { WorkerConfig } from "../../config";
-import type { ConversationCoordinator } from "../../conversation-coordinator";
-import { pushLineText } from "../../infrastructure/line-delivery";
 
 export const classifyLineText = line.text.classify;
+
+const LineRoutingSchema = v.object({
+  lineTextEvents: v.array(
+    v.object({
+      eventId: v.string(),
+      intent: v.picklist(["diagnosis-request", "diary"]),
+    }),
+  ),
+});
 
 function buildDiagnosisLink(liffId: string): string {
   return `今日の診断に答える\nhttps://liff.line.me/${liffId}`;
@@ -34,9 +45,18 @@ export async function processLineWebhook(
   payload: unknown,
   db: d1.Client,
   workerConfig: WorkerConfig,
-  coordinatorNamespace?: DurableObjectNamespace<ConversationCoordinator>,
+  coordinatorNamespace?: ConversationCoordinatorNamespace,
+  routing?: WebhookQueueMessage["routing"],
 ): Promise<void> {
   const events = line.webhook.parseEvents(payload);
+  const parsedRouting = routing ? v.safeParse(LineRoutingSchema, routing) : undefined;
+  if (parsedRouting && !parsedRouting.success) {
+    logger.warn({ reason: "invalid_line_routing" }, "Rejected invalid LINE command routing");
+    return;
+  }
+  const routedIntents = parsedRouting?.success
+    ? new Map(parsedRouting.output.lineTextEvents.map(({ eventId, intent }) => [eventId, intent]))
+    : undefined;
 
   for (const event of events) {
     const providerAccountId = event.source?.userId;
@@ -44,10 +64,16 @@ export async function processLineWebhook(
       await ensureAccountIdentity(db, providerAccountId, "follow");
       continue;
     }
-    if (event.type !== "message" || event.message.type !== "text" || !providerAccountId) continue;
+    if (
+      event.type !== "message" ||
+      !event.message ||
+      event.message.type !== "text" ||
+      event.source?.type !== "user" ||
+      !providerAccountId
+    ) {
+      continue;
+    }
 
-    const resolved = await ensureAccountIdentity(db, providerAccountId, "message");
-    if (!resolved) throw new Error("LINE account could not be resolved");
     const eventId = getLineEventId(event);
     if (!eventId) {
       logger.warn(
@@ -58,6 +84,12 @@ export async function processLineWebhook(
     }
 
     const intent = classifyLineText(event.message.text);
+    if (routedIntents && routedIntents.get(eventId) !== intent) {
+      logger.warn({ intent }, "Rejected LINE event with inconsistent command routing");
+      continue;
+    }
+    const resolved = await ensureAccountIdentity(db, providerAccountId, "message");
+    if (!resolved) throw new Error("LINE account could not be resolved");
     if (intent === "diagnosis-request") {
       if (!workerConfig.lineChannelAccessToken || !event.replyToken) {
         logger.warn({ intent }, "LINE diagnosis reply is not configured");
@@ -79,7 +111,6 @@ export async function processLineWebhook(
     });
     if (!workerConfig.chatEnabled || !coordinatorNamespace) {
       logger.warn({ reason: "chat_not_configured" }, "Diary saved without AI chat processing");
-      await deliverInitialResponse(providerAccountId, eventId, event.message.text, workerConfig);
       continue;
     }
 
@@ -90,34 +121,8 @@ export async function processLineWebhook(
       eventId,
       receivedAt: receivedAt.toISOString(),
     });
-    await deliverInitialResponse(providerAccountId, eventId, event.message.text, workerConfig);
     logger.info({ intent }, "LINE diary source saved and accepted by coordinator");
   }
-}
-
-async function deliverInitialResponse(
-  providerAccountId: string,
-  eventId: string,
-  messageText: string,
-  workerConfig: WorkerConfig,
-): Promise<void> {
-  if (!workerConfig.lineChannelAccessToken || !workerConfig.chatDeliverySecret) {
-    logger.warn(
-      {
-        hasChannelAccessToken: Boolean(workerConfig.lineChannelAccessToken),
-        hasDeliverySecret: Boolean(workerConfig.chatDeliverySecret),
-      },
-      "LINE push delivery is not configured",
-    );
-    return;
-  }
-  await pushLineText({
-    channelAccessToken: workerConfig.lineChannelAccessToken,
-    deliverySecret: workerConfig.chatDeliverySecret,
-    to: providerAccountId,
-    text: buildReplyText(messageText, workerConfig.liffId),
-    retryIdentity: `receipt:${eventId}`,
-  });
 }
 
 async function ensureAccountIdentity(

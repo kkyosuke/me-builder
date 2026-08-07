@@ -42,7 +42,7 @@ describe("POST /api/line/webhook signature verification", () => {
     expect(data.status).toBe("ok");
     expect(data.queued).toBe(true);
     expect(send).toHaveBeenCalledOnce();
-    expect(send.mock.calls[0][0]).toMatchObject({
+    expect(send.mock.calls[0]?.[0]).toMatchObject({
       source: "line",
       payload: { events: [{ type: "message", text: "hello" }] },
     });
@@ -225,7 +225,7 @@ describe("API Server Webhook Queue", () => {
     expect(data.status).toBe("ok");
     expect(data.queued).toBe(true);
     expect(send).toHaveBeenCalledOnce();
-    expect(send.mock.calls[0][0]).toMatchObject({
+    expect(send.mock.calls[0]?.[0]).toMatchObject({
       source: "line",
       payload: { events: [{ type: "message", text: "hello" }] },
     });

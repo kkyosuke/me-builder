@@ -36,6 +36,7 @@ async function processWebhookMessage(
         db,
         workerConfig ?? getWorkerConfig(),
         cf?.do.conversation,
+        message.body.routing,
       );
       break;
     default:

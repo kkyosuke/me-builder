@@ -1,4 +1,4 @@
-import { and, asc, count, eq, inArray, lte, min, notInArray } from "drizzle-orm";
+import { and, asc, count, eq, inArray, isNull, lte, min, notInArray } from "drizzle-orm";
 import { type DrizzleSqliteDODatabase, drizzle } from "drizzle-orm/durable-sqlite";
 import { migrate } from "drizzle-orm/durable-sqlite/migrator";
 import type { AcceptedDiaryMessage } from ".";
@@ -10,8 +10,12 @@ import {
   coordinatorIdentity,
   coordinatorSchema,
   coordinatorState,
+  deliveryOutbox,
   localTurns,
+  receiptReservations,
 } from "./schema";
+
+export type DeliveryOutboxRow = typeof deliveryOutbox.$inferSelect;
 
 type CoordinatorDatabase = DrizzleSqliteDODatabase<typeof coordinatorSchema>;
 
@@ -49,6 +53,14 @@ export class ConversationCoordinatorRepository {
     return boundAccountId === accountId;
   }
 
+  getBoundAccountId(): string | undefined {
+    return this.db
+      .select({ accountId: coordinatorIdentity.accountId })
+      .from(coordinatorIdentity)
+      .where(eq(coordinatorIdentity.singleton, 1))
+      .get()?.accountId;
+  }
+
   findAcceptedMessage(eventId: string) {
     return this.db
       .select()
@@ -67,6 +79,116 @@ export class ConversationCoordinatorRepository {
         receivedAt: new Date(input.receivedAt).getTime(),
       })
       .run();
+  }
+
+  addReceiptReservation(eventId: string, receivedAt: number): boolean {
+    if (
+      this.db
+        .select()
+        .from(receiptReservations)
+        .where(eq(receiptReservations.eventId, eventId))
+        .get()
+    ) {
+      return false;
+    }
+    this.db.insert(receiptReservations).values({ eventId, receivedAt }).onConflictDoNothing().run();
+    return true;
+  }
+
+  listUnassignedReceiptReservations() {
+    return this.db
+      .select()
+      .from(receiptReservations)
+      .where(isNull(receiptReservations.outboxId))
+      .orderBy(asc(receiptReservations.receivedAt), asc(receiptReservations.eventId))
+      .all();
+  }
+
+  earliestUnassignedReceiptAt(): number | null {
+    return (
+      this.db
+        .select({ value: min(receiptReservations.receivedAt) })
+        .from(receiptReservations)
+        .where(isNull(receiptReservations.outboxId))
+        .get()?.value ?? null
+    );
+  }
+
+  assignReceiptOutbox(eventIds: string[], outbox: typeof deliveryOutbox.$inferInsert): void {
+    this.db.transaction((tx) => {
+      tx.insert(deliveryOutbox).values(outbox).onConflictDoNothing().run();
+      tx.update(receiptReservations)
+        .set({ outboxId: outbox.id })
+        .where(inArray(receiptReservations.eventId, eventIds))
+        .run();
+    });
+  }
+
+  findTurnDelivery(turnId: string, generationEpoch: number, kind: "final" | "failure") {
+    return this.db
+      .select()
+      .from(deliveryOutbox)
+      .where(
+        and(
+          eq(deliveryOutbox.turnId, turnId),
+          eq(deliveryOutbox.generationEpoch, generationEpoch),
+          eq(deliveryOutbox.kind, kind),
+        ),
+      )
+      .get();
+  }
+
+  createDelivery(outbox: typeof deliveryOutbox.$inferInsert): DeliveryOutboxRow {
+    this.db.insert(deliveryOutbox).values(outbox).onConflictDoNothing().run();
+    const persisted = this.db
+      .select()
+      .from(deliveryOutbox)
+      .where(eq(deliveryOutbox.id, outbox.id))
+      .get();
+    if (!persisted) throw new Error("Delivery outbox could not be persisted");
+    return persisted;
+  }
+
+  listPendingDeliveries() {
+    return this.db
+      .select()
+      .from(deliveryOutbox)
+      .where(eq(deliveryOutbox.status, "pending"))
+      .orderBy(asc(deliveryOutbox.createdAt))
+      .all();
+  }
+
+  markDeliveryStatus(
+    id: string,
+    status: "delivered" | "permanent_failure" | "delivery_unknown",
+  ): void {
+    this.db.update(deliveryOutbox).set({ status }).where(eq(deliveryOutbox.id, id)).run();
+  }
+
+  expirePendingDeliveries(now: number): void {
+    this.db
+      .update(deliveryOutbox)
+      .set({ status: "delivery_unknown" })
+      .where(and(eq(deliveryOutbox.status, "pending"), lte(deliveryOutbox.deadlineAt, now)))
+      .run();
+  }
+
+  stopPendingReceiptDeliveries(): void {
+    this.db
+      .update(deliveryOutbox)
+      .set({ status: "permanent_failure" })
+      .where(and(eq(deliveryOutbox.kind, "receipt"), eq(deliveryOutbox.status, "pending")))
+      .run();
+  }
+
+  earliestDeliveryDeadline(): number | null {
+    return (
+      this.db
+        .select({ value: min(deliveryOutbox.deadlineAt) })
+        .from(deliveryOutbox)
+        .where(eq(deliveryOutbox.status, "pending"))
+        .get()?.value ?? null
+    );
   }
 
   findTurn(turnId: string) {
@@ -275,6 +397,17 @@ export class ConversationCoordinatorRepository {
   }
 
   cleanupTerminalState(attachedBefore: number): void {
+    const expiredOutboxIds = this.db
+      .select({ id: deliveryOutbox.id })
+      .from(deliveryOutbox)
+      .where(
+        and(
+          inArray(deliveryOutbox.status, ["delivered", "permanent_failure", "delivery_unknown"]),
+          lte(deliveryOutbox.createdAt, attachedBefore),
+        ),
+      )
+      .all()
+      .map(({ id }) => id);
     this.db.transaction((tx) => {
       tx.delete(localTurns)
         .where(inArray(localTurns.status, ["delivered", "failed"]))
@@ -287,6 +420,12 @@ export class ConversationCoordinatorRepository {
           ),
         )
         .run();
+      if (expiredOutboxIds.length > 0) {
+        tx.delete(receiptReservations)
+          .where(inArray(receiptReservations.outboxId, expiredOutboxIds))
+          .run();
+        tx.delete(deliveryOutbox).where(inArray(deliveryOutbox.id, expiredOutboxIds)).run();
+      }
     });
   }
 

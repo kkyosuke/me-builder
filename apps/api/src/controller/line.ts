@@ -38,16 +38,16 @@ export async function postLineWebhook(c: Context<AppEnv>): Promise<Response> {
     startChatLoading: lineClient
       ? (chatId) => lineClient.showLoadingAnimation({ chatId, loadingSeconds: 60 })
       : undefined,
-    waitUntil: lineClient
-      ? (promise) => {
-          try {
-            c.executionCtx.waitUntil(promise);
-          } catch {
-            // BunのローカルサーバーにはExecutionContextがない。Promiseの失敗はlogic側で処理する。
-            void promise;
-          }
-        }
-      : undefined,
+    waitUntil: (promise) => {
+      try {
+        c.executionCtx.waitUntil(promise);
+      } catch {
+        // BunのローカルサーバーにはExecutionContextがない。Promiseの失敗はlogic側で処理する。
+        void promise;
+      }
+    },
+    db: c.env?.DB ? d1.client.create(c.env.DB) : undefined,
+    coordinator: c.env?.CONVERSATION_COORDINATOR,
   });
 
   switch (outcome.type) {

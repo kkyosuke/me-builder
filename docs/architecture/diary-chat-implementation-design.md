@@ -282,7 +282,7 @@ confirmedへの変更、改訂、削除、撤回では、Brain Itemの利用可�
 
 ### 4.9 ConversationCoordinatorのローカルSQLite
 
-DOのローカルSQLiteはAccount内の連投と生成leaseだけを調停します。会話履歴のSSoTにはせず、履歴復元はD1から行います。schemaとqueryはDrizzleのDurable SQLite driverを通します。
+DOのローカルSQLiteはAccount内の連投、生成lease、LINE配送outboxを調停します。会話履歴のSSoTにはせず、履歴復元はD1から行います。schemaとqueryはDrizzleのDurable SQLite driverを通します。
 
 | table / 列 | 用途 |
 | --- | --- |
@@ -302,6 +302,15 @@ DOのローカルSQLiteはAccount内の連投と生成leaseだけを調停しま
 | `local_turns.status` | `pending_queue` / `queued` / `generating` / `delivered` / `failed` |
 | `local_turns.lease_token` | 生成を取得したconsumerだけが完了できる一時token |
 | `local_turns.hard_deadline_at` | 生成leaseの90秒上限。期限切れ時は再Queue投入する |
+| `receipt_reservations.event_id` | Queueと独立して予約した受領応答の冪等キー |
+| `receipt_reservations.received_at` | 1.5秒の連投集約と30秒deadlineの起点 |
+| `receipt_reservations.outbox_id` | 受領応答をまとめた配送outboxへの参照。未割当は`null` |
+| `delivery_outbox.id` | LINE retry keyの生成元にも使う配送単位のPK |
+| `delivery_outbox.kind` | `receipt` / `final` / `failure` |
+| `delivery_outbox.turn_id`, `generation_epoch` | finalと失敗案内を現在Turn・世代へ固定する。receiptでは`null` |
+| `delivery_outbox.target`, `body`, `retry_key` | 再送時にも変更しない宛先、本文、LINE retry key |
+| `delivery_outbox.status` | `pending` / `delivered` / `permanent_failure` / `delivery_unknown` |
+| `delivery_outbox.deadline_at`, `created_at` | 自動retryの上限と保持期間の基準 |
 
 ```mermaid
 stateDiagram-v2
@@ -325,6 +334,7 @@ D1、Queue、LINEを呼び出した後は、Turn ID、generation epoch、lease t
 - `conversation_messages(session_id, sequence)`
 - `conversation_messages(channel, channel_event_id)` unique
 - `chat_turns(status, created_at)`と`chat_turns(session_id, through_sequence)`
+- DOの`accepted_messages(status, received_at)`、`receipt_reservations(outbox_id)`、`delivery_outbox(status, deadline_at)`、`delivery_outbox(turn_id, generation_epoch)`
 - `brain_items(account_id, confirmation, status, category)`
 - `brain_item_evidence_edges(brain_item_id)`と`(source_record_id)`
 - `vector_index_jobs(status, next_attempt_at)`と`(brain_item_id, item_revision, operation)` unique
@@ -558,7 +568,7 @@ system promptは次の順で固定し、Git管理する`prompt_version`を付け
 
 受領応答の予約はWebhook Queueを経由させません。API Workerは署名済みchannel identityからAccountを解決し、本文を渡さずにevent IDと受付時刻だけをAccountのCoordinatorへRPCします。Coordinatorは1.5秒間の予約をまとめ、対象event ID全件の初回返信として1件の受領応答を送ります。これにより、QueueやAI生成が遅延しても初回返信経路は影響を受けません。
 
-30秒を内部deadlineとし、LINE APIの揺らぎに8秒残します。待機表示は初回返信へ数えません。LINEまたは自システムの障害で30秒までに送信要求が受理されなければSLO違反として記録し、38秒を過ぎた後も送信処理自体は放棄しません。
+30秒を内部deadlineとし、LINE APIの揺らぎに8秒残します。待機表示は初回返信へ数えません。LINEまたは自システムの障害で30秒までに送信要求が受理されなければ、`delivery_unknown`としてSLO違反を記録し、同じ受領応答の自動retryを停止します。
 
 ### 9.2 LINE配送とreply token
 

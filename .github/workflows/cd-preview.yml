@@ -103,8 +103,8 @@ jobs:
             }));
           '
 
-          bun --cwd apps/api wrangler deploy --env preview --secrets-file "${api_secrets_file}"
           bun --cwd apps/worker wrangler deploy --env preview --secrets-file "${worker_secrets_file}"
+          bun --cwd apps/api wrangler deploy --env preview --secrets-file "${api_secrets_file}"
           bun --filter @me-builder/mcp deploy:preview
           bun --filter @me-builder/web deploy:preview
 

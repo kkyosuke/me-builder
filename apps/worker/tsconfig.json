@@ -3,5 +3,6 @@
   "compilerOptions": {
     "types": ["bun", "@cloudflare/workers-types"]
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*"],
+  "exclude": ["src/runtime-e2e/**/*"]
 }

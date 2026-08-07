@@ -1,9 +1,8 @@
-import type { D1Database, DurableObjectNamespace } from "@cloudflare/workers-types";
+import type { D1Database } from "@cloudflare/workers-types";
 import { d1, line } from "@me-builder/lib";
 import type { Message, MessageBatch, WebhookQueueMessage } from "@me-builder/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getWorkerConfig } from "./config";
-import type { ConversationCoordinator } from "./conversation-coordinator";
 import worker from "./index";
 import { handleQueueBatch } from "./logic/webhook";
 
@@ -53,6 +52,14 @@ function createBatch(text: string): {
       id: "queue-envelope-1",
       source: "line",
       receivedAt: "2026-08-06T12:00:00Z",
+      routing: {
+        lineTextEvents: [
+          {
+            eventId: "webhook-event-1",
+            intent: line.text.classify(text),
+          },
+        ],
+      },
       payload: {
         events: [
           {
@@ -82,7 +89,7 @@ function createBatch(text: string): {
 
 const coordinatorNamespace = {
   getByName: vi.fn(() => ({ acceptMessage: mockAcceptMessage })),
-} as unknown as DurableObjectNamespace<ConversationCoordinator>;
+} as unknown as NonNullable<import("./types").Env["CONVERSATION_COORDINATOR"]>;
 
 describe("Worker", () => {
   beforeEach(() => {
@@ -92,7 +99,7 @@ describe("Worker", () => {
     vi.mocked(d1.action.conversation.storeLineTextSource).mockClear();
   });
 
-  it("日記を原本保存してCoordinatorへ渡し、pushで受付を返す", async () => {
+  it("日記を原本保存してCoordinatorへ渡し、受付配送はAPI側の予約へ委ねる", async () => {
     const { batch, message } = createBatch("今日は散歩した");
     const db = {} as d1.Client;
     await handleQueueBatch(
@@ -121,13 +128,7 @@ describe("Worker", () => {
     expect(mockAcceptMessage).toHaveBeenCalledWith(
       expect.objectContaining({ accountId: "account-1", sourceRecordId: "source-1" }),
     );
-    expect(mockPushMessage).toHaveBeenCalledWith(
-      expect.objectContaining({
-        to: "line-user",
-        messages: [expect.objectContaining({ text: expect.stringContaining("受け付けました") })],
-      }),
-      expect.stringMatching(/^[0-9a-f-]{36}$/),
-    );
+    expect(mockPushMessage).not.toHaveBeenCalled();
     expect(message.ack).toHaveBeenCalledOnce();
   });
 
@@ -148,6 +149,19 @@ describe("Worker", () => {
       replyToken: "reply-token-1",
       messages: [{ type: "text", text: expect.stringContaining("liff.line.me/123-liff") }],
     });
+  });
+
+  it("API routingとWorkerの再判定が不一致なら保存も返信もしない", async () => {
+    const { batch, message } = createBatch("今日は散歩した");
+    message.body.routing = {
+      lineTextEvents: [{ eventId: "webhook-event-1", intent: "diagnosis-request" }],
+    };
+
+    await handleQueueBatch(batch, {} as d1.Client, getWorkerConfig({ ENVIRONMENT: "test" }));
+
+    expect(d1.action.conversation.storeLineTextSource).not.toHaveBeenCalled();
+    expect(mockReplyMessage).not.toHaveBeenCalled();
+    expect(message.ack).toHaveBeenCalledOnce();
   });
 
   it("fetch handlerがWorker状態を返す", async () => {

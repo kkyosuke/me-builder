@@ -4,6 +4,18 @@ export function isAcceptedLineRetryConflict(error: unknown): boolean {
   return typeof error === "object" && error !== null && "status" in error && error.status === 409;
 }
 
+export function getLineDeliveryFailureKind(error: unknown): "permanent" | "transient" {
+  if (typeof error !== "object" || error === null || !("status" in error)) return "transient";
+  const status = error.status;
+  return typeof status === "number" &&
+    status >= 400 &&
+    status < 500 &&
+    status !== 409 &&
+    status !== 429
+    ? "permanent"
+    : "transient";
+}
+
 /** LINEのX-Line-Retry-Keyとして使える決定的UUIDをHMACから作る。 */
 export async function createLineRetryKey(secret: string, value: string): Promise<string> {
   const key = await crypto.subtle.importKey(
@@ -29,11 +41,25 @@ export async function pushLineText(input: {
   text: string;
   retryIdentity: string;
 }): Promise<void> {
+  return pushLineTextWithRetryKey({
+    channelAccessToken: input.channelAccessToken,
+    to: input.to,
+    text: input.text,
+    retryKey: await createLineRetryKey(input.deliverySecret, input.retryIdentity),
+  });
+}
+
+export async function pushLineTextWithRetryKey(input: {
+  channelAccessToken: string;
+  to: string;
+  text: string;
+  retryKey: string;
+}): Promise<void> {
   const apiClient = line.client.create(input.channelAccessToken);
   try {
     await apiClient.pushMessage(
       { to: input.to, messages: [{ type: "text", text: input.text }] },
-      await createLineRetryKey(input.deliverySecret, input.retryIdentity),
+      input.retryKey,
     );
   } catch (error) {
     // 同じretry keyが既に受理されている場合、LINEは409を返す。配送成功として扱う。
