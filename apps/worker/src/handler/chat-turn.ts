@@ -41,10 +41,10 @@ export async function processChatTurnMessage(
   );
   try {
     await d1.action.conversation.markTurnGenerating(db, message.body.turnId);
-    const pendingResponse = await d1.action.conversation.getPendingAssistantResponse(
-      db,
-      message.body.turnId,
-    );
+    const pendingResponse = await d1.action.conversation.getPendingAssistantResponse(db, {
+      accountId: context.accountId,
+      turnId: message.body.turnId,
+    });
     const response = pendingResponse
       ? {
           reply: pendingResponse.body,

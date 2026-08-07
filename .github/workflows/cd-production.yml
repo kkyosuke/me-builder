@@ -1,7 +1,9 @@
 name: CD / Production
 
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - main
 
 jobs:
   deploy-production:
@@ -47,10 +49,6 @@ jobs:
       - name: Apply D1 Migrations (Production)
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
         run: task db:migrate:production
-
-      - name: Ensure Diary Chat Queues (Production)
-        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
-        run: task queues:setup:production
 
       - name: Apply Diagnosis Seed (Production)
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}

@@ -1,10 +1,18 @@
 name: CD / Preview
 
 on:
-  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
 
 permissions:
   contents: read
+  pull-requests: write
+  issues: write
 
 jobs:
   deploy-preview:
@@ -50,10 +58,6 @@ jobs:
       - name: Apply D1 Migrations (Preview)
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
         run: task db:migrate:preview
-
-      - name: Ensure Diary Chat Queues (Preview)
-        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
-        run: task queues:setup:preview
 
       - name: Apply Diagnosis Seed (Preview)
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
@@ -124,3 +128,51 @@ jobs:
         if: ${{ env.CLOUDFLARE_API_TOKEN == '' }}
         run: |
           echo "::warning::CLOUDFLARE_API_TOKEN が GitHub Secrets に設定されていないためデプロイをスキップしました。"
+
+      - name: Comment Preview Deployment on PR
+        uses: actions/github-script@v7
+        if: github.event_name == 'pull_request'
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const issue_number = context.issue.number;
+            const identifier = '<!-- preview-deploy-comment -->';
+            const cloudflareDashboardUrl = `https://dash.cloudflare.com/${process.env.CLOUDFLARE_ACCOUNT_ID}/workers-and-pages`;
+
+            // 1. 既存のプレビューデプロイコメントを削除 (古いコメントを削除して再投稿)
+            const comments = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue_number,
+            });
+
+            for (const comment of comments.data) {
+              if (comment.body && comment.body.includes(identifier)) {
+                await github.rest.issues.deleteComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: comment.id,
+                });
+              }
+            }
+
+            // 2. 新しいプレビュー完了コメントを投稿
+            const body = `${identifier}
+            ### 🚀 プレビュー環境へのデプロイが完了しました！
+
+            プルリクエストの最新コミット (\`${context.sha.substring(0, 7)}\`) のビルド・デプロイが成功しました。
+
+            | サービス | リンク |
+            | --- | --- |
+            | 🖥️ **Web UI** | [stg.kagami.kyosuke.dev](https://stg.kagami.kyosuke.dev) |
+            | ⚡ **API Server** | [api.stg.kagami.kyosuke.dev](https://api.stg.kagami.kyosuke.dev) |
+            | 🤖 **MCP Server** | [mcp.stg.kagami.kyosuke.dev](https://mcp.stg.kagami.kyosuke.dev) |
+            | ☁️ **Cloudflare Dashboard** | [Workers & Pages を開く](${cloudflareDashboardUrl}) |
+            `;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue_number,
+              body: body,
+            });
