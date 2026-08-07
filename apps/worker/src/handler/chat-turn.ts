@@ -3,6 +3,7 @@ import type { ChatTurnQueueMessage, Message } from "@me-builder/shared";
 import { logger } from "@me-builder/shared";
 import type { CloudflareBindings, WorkerConfig } from "../config";
 import { generateDiaryChatResponse } from "../logic/diary-chat";
+import { appendDiagnosisLink } from "../logic/feature/line";
 
 export async function processChatTurnMessage(
   message: Message<ChatTurnQueueMessage>,
@@ -151,7 +152,7 @@ export async function processChatTurnMessage(
       generationEpoch: message.body.generationEpoch,
       leaseToken: lease.leaseToken,
       kind: "final",
-      text: response.reply,
+      text: appendDiagnosisLink(response.reply, workerConfig.liffId),
     });
     if (delivery.status === "lease_expired") {
       throw new Error("Generation lease expired before final delivery was reserved");

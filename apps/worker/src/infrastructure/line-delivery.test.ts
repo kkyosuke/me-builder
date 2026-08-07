@@ -14,8 +14,8 @@ describe("createLineRetryKey", () => {
   });
 
   it("配送identityが違えば別のkeyにする", async () => {
-    await expect(createLineRetryKey("secret", "receipt:event-1")).resolves.not.toBe(
-      await createLineRetryKey("secret", "final:event-1"),
+    await expect(createLineRetryKey("secret", "final:turn-1")).resolves.not.toBe(
+      await createLineRetryKey("secret", "final:turn-2"),
     );
   });
 });

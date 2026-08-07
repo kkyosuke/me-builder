@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildReplyText, classifyLineText } from "./line";
+import { appendDiagnosisLink, buildDiagnosisReplyText, classifyLineText } from "./line";
 
 const LIFF_ID = "1234567890-abcdefgh";
 const DIARY_TEXT = "今日は散歩をして、久しぶりに本を読んだ。";
@@ -18,18 +18,29 @@ describe("classifyLineText", () => {
   });
 });
 
-describe("buildReplyText", () => {
+describe("LINE reply formatting", () => {
   it("診断要求にはLIFFリンクだけを返す", () => {
-    expect(buildReplyText("診断", LIFF_ID)).toBe(
+    expect(buildDiagnosisReplyText(LIFF_ID)).toBe(
       `今日の診断に答える\nhttps://liff.line.me/${LIFF_ID}`,
     );
   });
 
-  it("日記には受付とfinalを待つ案内を返し、本文をオウム返ししない", () => {
-    const result = buildReplyText(DIARY_TEXT, LIFF_ID);
-    expect(result).toContain("受け付けました");
-    expect(result).toContain("少し考えてから返事をするね");
-    expect(result).toContain(`https://liff.line.me/${LIFF_ID}`);
-    expect(result).not.toContain(DIARY_TEXT);
+  it("AI回答の末尾にLIFFリンクを付ける", () => {
+    expect(appendDiagnosisLink("返事です。", LIFF_ID)).toBe(
+      `返事です。\n\n今日の診断に答える\nhttps://liff.line.me/${LIFF_ID}`,
+    );
+  });
+
+  it("LIFF IDがなければAI回答を変更しない", () => {
+    expect(appendDiagnosisLink("返事です。")).toBe("返事です。");
+  });
+
+  it("LINEの文字数上限内でAI回答を調整し、末尾のリンクを残す", () => {
+    const formatted = appendDiagnosisLink("😊".repeat(5_000), LIFF_ID);
+
+    expect(Array.from(formatted)).toHaveLength(5_000);
+    expect(formatted.endsWith(`\n\n今日の診断に答える\nhttps://liff.line.me/${LIFF_ID}`)).toBe(
+      true,
+    );
   });
 });

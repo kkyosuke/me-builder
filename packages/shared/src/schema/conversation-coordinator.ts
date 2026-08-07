@@ -1,9 +1,3 @@
-export type ReceiptReservation = {
-  accountId: string;
-  eventId: string;
-  receivedAt: string;
-};
-
 export type TurnDeliveryKind = "final" | "failure";
 
 export type TurnDeliveryRequest = {
@@ -32,7 +26,6 @@ export interface ConversationCoordinatorRpc {
     eventId: string;
     receivedAt: string;
   }): Promise<{ accepted: boolean }>;
-  reserveReceipt(input: ReceiptReservation): Promise<{ accepted: boolean }>;
   acquireGeneration(turnId: string, generationEpoch: number): Promise<GenerationLease>;
   isGenerationLeaseActive(
     turnId: string,

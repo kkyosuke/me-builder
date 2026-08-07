@@ -272,7 +272,6 @@ export async function attachMessagesToTurn(
       promptVersion: DIARY_CHAT_PROMPT_VERSION,
       model,
       receivedAt: firstReceivedAt,
-      firstReplyRequestedAt: now,
       createdAt: now,
       updatedAt: now,
     }),

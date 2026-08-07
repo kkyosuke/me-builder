@@ -9,6 +9,8 @@ import type { WorkerConfig } from "../../config";
 
 export const classifyLineText = line.text.classify;
 
+const LINE_TEXT_MAX_LENGTH = 5_000;
+
 const LineRoutingSchema = v.object({
   lineTextEvents: v.array(
     v.object({
@@ -22,15 +24,18 @@ function buildDiagnosisLink(liffId: string): string {
   return `今日の診断に答える\nhttps://liff.line.me/${liffId}`;
 }
 
-/** 日記の初回応答。AIのfinalは別のChat Turn Queueから送る。 */
-export function buildReplyText(messageText: string, liffId?: string): string {
-  if (classifyLineText(messageText) === "diagnosis-request") {
-    return liffId
-      ? buildDiagnosisLink(liffId)
-      : "いまは診断のリンクをお渡しできません。時間をおいてもう一度お試しください。";
-  }
-  const received = "受け付けました。少し考えてから返事をするね。";
-  return liffId ? `${received}\n${buildDiagnosisLink(liffId)}` : received;
+/** AIの回答本文はD1の正本に保ち、チャネル固有の診断導線は配送時だけ末尾へ付ける。 */
+export function appendDiagnosisLink(reply: string, liffId?: string): string {
+  if (!liffId) return reply;
+  const suffix = `\n\n${buildDiagnosisLink(liffId)}`;
+  const availableReplyLength = LINE_TEXT_MAX_LENGTH - Array.from(suffix).length;
+  return `${Array.from(reply).slice(0, Math.max(0, availableReplyLength)).join("")}${suffix}`;
+}
+
+export function buildDiagnosisReplyText(liffId?: string): string {
+  return liffId
+    ? buildDiagnosisLink(liffId)
+    : "いまは診断のリンクをお渡しできません。時間をおいてもう一度お試しください。";
 }
 
 function getLineEventId(event: {
@@ -97,7 +102,7 @@ export async function processLineWebhook(
       }
       await line.client.create(workerConfig.lineChannelAccessToken).replyMessage({
         replyToken: event.replyToken,
-        messages: [{ type: "text", text: buildReplyText(event.message.text, workerConfig.liffId) }],
+        messages: [{ type: "text", text: buildDiagnosisReplyText(workerConfig.liffId) }],
       });
       continue;
     }

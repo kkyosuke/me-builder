@@ -1,4 +1,4 @@
-import { and, asc, count, eq, inArray, isNull, lte, min, notInArray } from "drizzle-orm";
+import { and, asc, count, eq, inArray, lte, min, notInArray } from "drizzle-orm";
 import { type DrizzleSqliteDODatabase, drizzle } from "drizzle-orm/durable-sqlite";
 import { migrate } from "drizzle-orm/durable-sqlite/migrator";
 import type { AcceptedDiaryMessage } from ".";
@@ -12,7 +12,6 @@ import {
   coordinatorState,
   deliveryOutbox,
   localTurns,
-  receiptReservations,
 } from "./schema";
 
 export type DeliveryOutboxRow = typeof deliveryOutbox.$inferSelect;
@@ -81,49 +80,6 @@ export class ConversationCoordinatorRepository {
       .run();
   }
 
-  addReceiptReservation(eventId: string, receivedAt: number): boolean {
-    if (
-      this.db
-        .select()
-        .from(receiptReservations)
-        .where(eq(receiptReservations.eventId, eventId))
-        .get()
-    ) {
-      return false;
-    }
-    this.db.insert(receiptReservations).values({ eventId, receivedAt }).onConflictDoNothing().run();
-    return true;
-  }
-
-  listUnassignedReceiptReservations() {
-    return this.db
-      .select()
-      .from(receiptReservations)
-      .where(isNull(receiptReservations.outboxId))
-      .orderBy(asc(receiptReservations.receivedAt), asc(receiptReservations.eventId))
-      .all();
-  }
-
-  earliestUnassignedReceiptAt(): number | null {
-    return (
-      this.db
-        .select({ value: min(receiptReservations.receivedAt) })
-        .from(receiptReservations)
-        .where(isNull(receiptReservations.outboxId))
-        .get()?.value ?? null
-    );
-  }
-
-  assignReceiptOutbox(eventIds: string[], outbox: typeof deliveryOutbox.$inferInsert): void {
-    this.db.transaction((tx) => {
-      tx.insert(deliveryOutbox).values(outbox).onConflictDoNothing().run();
-      tx.update(receiptReservations)
-        .set({ outboxId: outbox.id })
-        .where(inArray(receiptReservations.eventId, eventIds))
-        .run();
-    });
-  }
-
   findTurnDelivery(turnId: string, generationEpoch: number, kind: "final" | "failure") {
     return this.db
       .select()
@@ -170,14 +126,6 @@ export class ConversationCoordinatorRepository {
       .update(deliveryOutbox)
       .set({ status: "delivery_unknown" })
       .where(and(eq(deliveryOutbox.status, "pending"), lte(deliveryOutbox.deadlineAt, now)))
-      .run();
-  }
-
-  stopPendingReceiptDeliveries(): void {
-    this.db
-      .update(deliveryOutbox)
-      .set({ status: "permanent_failure" })
-      .where(and(eq(deliveryOutbox.kind, "receipt"), eq(deliveryOutbox.status, "pending")))
       .run();
   }
 
@@ -421,9 +369,6 @@ export class ConversationCoordinatorRepository {
         )
         .run();
       if (expiredOutboxIds.length > 0) {
-        tx.delete(receiptReservations)
-          .where(inArray(receiptReservations.outboxId, expiredOutboxIds))
-          .run();
         tx.delete(deliveryOutbox).where(inArray(deliveryOutbox.id, expiredOutboxIds)).run();
       }
     });

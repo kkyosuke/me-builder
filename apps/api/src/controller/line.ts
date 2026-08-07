@@ -46,8 +46,6 @@ export async function postLineWebhook(c: Context<AppEnv>): Promise<Response> {
         void promise;
       }
     },
-    db: c.env?.DB ? d1.client.create(c.env.DB) : undefined,
-    coordinator: c.env?.CONVERSATION_COORDINATOR,
   });
 
   switch (outcome.type) {

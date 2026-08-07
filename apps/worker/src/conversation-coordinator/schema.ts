@@ -61,21 +61,11 @@ export const localTurns = sqliteTable("local_turns", {
   hardDeadlineAt: integer("hard_deadline_at"),
 });
 
-export const receiptReservations = sqliteTable(
-  "receipt_reservations",
-  {
-    eventId: text("event_id").primaryKey(),
-    receivedAt: integer("received_at").notNull(),
-    outboxId: text("outbox_id"),
-  },
-  (table) => [index("receipt_reservation_outbox_idx").on(table.outboxId)],
-);
-
 export const deliveryOutbox = sqliteTable(
   "delivery_outbox",
   {
     id: text("id").primaryKey(),
-    kind: text("kind", { enum: ["receipt", "final", "failure"] }).notNull(),
+    kind: text("kind", { enum: ["final", "failure"] }).notNull(),
     turnId: text("turn_id"),
     generationEpoch: integer("generation_epoch"),
     target: text("target").notNull(),
@@ -103,5 +93,4 @@ export const coordinatorSchema = {
   coordinatorState,
   deliveryOutbox,
   localTurns,
-  receiptReservations,
 };

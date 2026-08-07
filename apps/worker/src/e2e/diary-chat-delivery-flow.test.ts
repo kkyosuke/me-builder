@@ -25,6 +25,7 @@ vi.mock("@google/genai", () => ({
 
 const migrationsDirectory = path.resolve(__dirname, "../../../../packages/lib/drizzle");
 const generatedReply = "散歩できたことが、少し心に残っているんだね。どんな景色だった？";
+const liffId = "1234567890-diary-test";
 const workerConfig = getWorkerConfig({
   ENVIRONMENT: "test",
   LINE_CHANNEL_ACCESS_TOKEN: "line-token",
@@ -32,6 +33,7 @@ const workerConfig = getWorkerConfig({
   GOOGLE_AI_STUDIO_API_KEY: "google-key",
   CLOUDFLARE_AIG_TOKEN: "gateway-token",
   CHAT_CONTEXT_MESSAGE_LIMIT: "20",
+  LIFF_ID: liffId,
 });
 
 let miniflare: Miniflare;
@@ -156,15 +158,6 @@ async function ingestDiary(text: string, suffix: string) {
     workerConfig,
     namespace,
   );
-  const resolved = await d1.action.account.upsertIdentity(client, {
-    provider: "line",
-    providerAccountId,
-  });
-  await harness.coordinator.reserveReceipt({
-    accountId: resolved.account.id,
-    eventId,
-    receivedAt,
-  });
   await harness.runAlarm();
 
   expect(queued).toHaveLength(1);
@@ -242,18 +235,16 @@ describe("LINE diary chat delivery E2E", () => {
       expect.objectContaining({ role: "user", assistantBody: null }),
       expect.objectContaining({ role: "assistant", assistantBody: generatedReply }),
     ]);
-    expect(mockPushMessage).toHaveBeenCalledTimes(2);
-    expect(mockPushMessage.mock.calls[0]?.[0]).toEqual(
-      expect.objectContaining({
-        to: providerAccountId,
-        messages: [expect.objectContaining({ text: expect.stringContaining("受け付けました") })],
-      }),
-    );
-    expect(mockPushMessage.mock.calls[1]?.[0]).toEqual({
+    expect(mockPushMessage).toHaveBeenCalledOnce();
+    expect(mockPushMessage.mock.calls[0]?.[0]).toEqual({
       to: providerAccountId,
-      messages: [{ type: "text", text: generatedReply }],
+      messages: [
+        {
+          type: "text",
+          text: `${generatedReply}\n\n今日の診断に答える\nhttps://liff.line.me/${liffId}`,
+        },
+      ],
     });
-    expect(mockPushMessage.mock.calls[0]?.[1]).not.toBe(mockPushMessage.mock.calls[1]?.[1]);
     await expect(
       coordinator.acquireGeneration(queuedTurn.turnId, queuedTurn.generationEpoch),
     ).resolves.toEqual({ acquired: false, reason: "stale" });
@@ -287,7 +278,7 @@ describe("LINE diary chat delivery E2E", () => {
 
     const messages = await client.select().from(d1.schema.conversationMessages);
     expect(messages).toEqual([expect.objectContaining({ role: "user", assistantBody: null })]);
-    expect(mockPushMessage).toHaveBeenCalledTimes(1);
+    expect(mockPushMessage).not.toHaveBeenCalled();
   });
 
   it("生成中にSessionが閉じていれば生成も最終配送も行わない", async () => {
@@ -301,7 +292,7 @@ describe("LINE diary chat delivery E2E", () => {
 
     expect(message.ack).toHaveBeenCalledOnce();
     expect(mockGenerateContent).not.toHaveBeenCalled();
-    expect(mockPushMessage).toHaveBeenCalledTimes(1);
+    expect(mockPushMessage).not.toHaveBeenCalled();
     await expect(client.select().from(d1.schema.chatTurns)).resolves.toEqual([
       expect.objectContaining({ status: "failed", failureStage: "closed_session" }),
     ]);
@@ -322,7 +313,7 @@ describe("LINE diary chat delivery E2E", () => {
     await expect(client.select().from(d1.schema.chatTurns)).resolves.toEqual([
       expect.objectContaining({ status: "failed", failureStage: "generation_or_delivery" }),
     ]);
-    expect(mockPushMessage.mock.calls[1]?.[0]).toEqual(
+    expect(mockPushMessage.mock.calls[0]?.[0]).toEqual(
       expect.objectContaining({
         messages: [
           expect.objectContaining({ text: expect.stringContaining("返事をまとめられません") }),
@@ -338,7 +329,7 @@ describe("LINE diary chat delivery E2E", () => {
         text: generatedReply,
       }),
     ).resolves.toEqual({ status: "superseded" });
-    expect(mockPushMessage).toHaveBeenCalledTimes(2);
+    expect(mockPushMessage).toHaveBeenCalledOnce();
   });
 
   it("失敗案内の一時障害後はAIを再生成せず同じoutboxだけを再配送する", async () => {
@@ -358,7 +349,7 @@ describe("LINE diary chat delivery E2E", () => {
 
     expect(mockGenerateContent).toHaveBeenCalledOnce();
     expect(retry.ack).toHaveBeenCalledOnce();
-    const failureCalls = mockPushMessage.mock.calls.slice(1);
+    const failureCalls = mockPushMessage.mock.calls;
     expect(failureCalls).toHaveLength(2);
     expect(failureCalls[0]?.[0]).toEqual(failureCalls[1]?.[0]);
     expect(failureCalls[0]?.[1]).toBe(failureCalls[1]?.[1]);
@@ -381,12 +372,12 @@ describe("LINE diary chat delivery E2E", () => {
     await expect(coordinator.deliverTurn(firstDelivery)).resolves.toEqual({
       status: "lease_expired",
     });
-    expect(mockPushMessage).toHaveBeenCalledTimes(2);
+    expect(mockPushMessage).toHaveBeenCalledOnce();
     const retry = createQueueMessage(queuedTurn, 2);
     await processChatTurnMessage(retry, bindings, workerConfig);
 
     expect(retry.ack).toHaveBeenCalledOnce();
-    const finalCalls = mockPushMessage.mock.calls.slice(1);
+    const finalCalls = mockPushMessage.mock.calls;
     expect(finalCalls).toHaveLength(2);
     expect(finalCalls[0]?.[0]).toEqual(finalCalls[1]?.[0]);
     expect(finalCalls[0]?.[1]).toBe(finalCalls[1]?.[1]);

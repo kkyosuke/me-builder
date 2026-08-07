@@ -3,7 +3,6 @@ import { d1 } from "@me-builder/lib";
 import {
   type ChatTurnQueueMessage,
   type GenerationLease,
-  type ReceiptReservation,
   type TurnDeliveryRequest,
   type TurnDeliveryResult,
   logger,
@@ -22,7 +21,6 @@ const COALESCE_MS = 1_500;
 const LEASE_MS = 90_000;
 const ALARM_RETRY_MS = 30_000;
 const ACCEPTED_MESSAGE_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
-const RECEIPT_DEADLINE_MS = 30_000;
 const DELIVERY_RETRY_MS = 2_000;
 
 export type AcceptedDiaryMessage = {
@@ -69,17 +67,6 @@ export class ConversationCoordinator extends DurableObject<Env> {
     return { accepted: true };
   }
 
-  async reserveReceipt(input: ReceiptReservation): Promise<{ accepted: boolean }> {
-    if (!this.repository.bindAccount(input.accountId)) {
-      throw new Error("Conversation coordinator cannot reserve receipts for another account");
-    }
-    const receivedAt = new Date(input.receivedAt).getTime();
-    if (!Number.isFinite(receivedAt)) throw new Error("Receipt reservation time is invalid");
-    const accepted = this.repository.addReceiptReservation(input.eventId, receivedAt);
-    if (accepted) await this.schedulePendingWork();
-    return { accepted };
-  }
-
   async deliverTurn(input: TurnDeliveryRequest): Promise<TurnDeliveryResult> {
     const existing = this.repository.findTurnDelivery(
       input.turnId,
@@ -108,8 +95,6 @@ export class ConversationCoordinator extends DurableObject<Env> {
     ) {
       return { status: "lease_expired" };
     }
-    this.repository.stopPendingReceiptDeliveries();
-
     let delivery = existing;
     if (!delivery) {
       const target = await d1.action.account.findLineIdentityByAccountId(
@@ -234,18 +219,6 @@ export class ConversationCoordinator extends DurableObject<Env> {
   private async processAlarm(): Promise<void> {
     this.cleanupTerminalState();
     this.repository.expirePendingDeliveries(Date.now());
-    await this.prepareReceiptDelivery();
-    for (const delivery of this.repository
-      .listPendingDeliveries()
-      .filter(({ kind }) => kind === "receipt")) {
-      try {
-        await this.sendDelivery(delivery);
-      } catch (error) {
-        if (delivery.deadlineAt > Date.now() && getLineDeliveryFailureKind(error) === "transient") {
-          await this.scheduleDeliveryRetry(delivery.deadlineAt);
-        }
-      }
-    }
     this.repository.expireGenerationLeases(Date.now());
     for (const turn of this.repository.listPendingQueueTurns()) {
       await this.enqueueTurn(turn.turnId, turn.generationEpoch);
@@ -304,10 +277,8 @@ export class ConversationCoordinator extends DurableObject<Env> {
   private async schedulePendingWork(): Promise<void> {
     const pendingAlarm = this.repository.hasPendingWork() ? Date.now() + COALESCE_MS : null;
     const leaseDeadline = this.repository.earliestLeaseDeadline();
-    const receiptAt = this.repository.earliestUnassignedReceiptAt();
-    const receiptAlarm = receiptAt === null ? null : receiptAt + COALESCE_MS;
     const deliveryDeadline = this.repository.earliestDeliveryDeadline();
-    const candidates = [pendingAlarm, leaseDeadline, receiptAlarm, deliveryDeadline].filter(
+    const candidates = [pendingAlarm, leaseDeadline, deliveryDeadline].filter(
       (value): value is number => value !== null,
     );
     const desiredAlarm = candidates.length > 0 ? Math.min(...candidates) : null;
@@ -324,46 +295,6 @@ export class ConversationCoordinator extends DurableObject<Env> {
 
   private currentLeaseDeadline(turnId: string): number {
     return this.repository.findTurn(turnId)?.hardDeadlineAt ?? Date.now();
-  }
-
-  private async prepareReceiptDelivery(): Promise<void> {
-    const reservations = this.repository.listUnassignedReceiptReservations();
-    if (
-      reservations.length === 0 ||
-      (reservations[0]?.receivedAt ?? Date.now()) + COALESCE_MS > Date.now()
-    ) {
-      return;
-    }
-    const accountId = this.repository.getBoundAccountId();
-    const target = accountId
-      ? await d1.action.account.findLineIdentityByAccountId(this.cf.d1, accountId)
-      : undefined;
-    if (!target || !this.env.CHAT_DELIVERY_SECRET) {
-      throw new Error("LINE receipt delivery is not configured");
-    }
-    const first = reservations[0];
-    if (!first) return;
-    const retryIdentity = `receipt:${first.eventId}`;
-    const receivedAt = first.receivedAt;
-    const coalescedReservations = reservations.filter(
-      ({ receivedAt: candidateReceivedAt }) => candidateReceivedAt <= receivedAt + COALESCE_MS,
-    );
-    const body = this.env.LIFF_ID
-      ? `受け付けました。少し考えてから返事をするね。\n今日の診断に答える\nhttps://liff.line.me/${this.env.LIFF_ID}`
-      : "受け付けました。少し考えてから返事をするね。";
-    this.repository.assignReceiptOutbox(
-      coalescedReservations.map(({ eventId }) => eventId),
-      {
-        id: retryIdentity,
-        kind: "receipt",
-        target,
-        body,
-        retryKey: await createLineRetryKey(this.env.CHAT_DELIVERY_SECRET, retryIdentity),
-        status: "pending",
-        deadlineAt: receivedAt + RECEIPT_DEADLINE_MS,
-        createdAt: Date.now(),
-      },
-    );
   }
 
   private async sendTurnDelivery(

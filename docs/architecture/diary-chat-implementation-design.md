@@ -50,7 +50,6 @@ Cloudflare Agents SDKは最初の実装では採用しません。LINEはWebhook
 ```mermaid
 flowchart TD
     LINE[LINE Messaging API] --> API[API Worker]
-    API -->|Account解決・RPC: receipt予約| DO
     API -->|日記eventはreplyTokenを除外して投入| WQ[Webhook Queue]
     API -.->|待機表示| LINE
     WQ --> IW[Queue Worker: ingest]
@@ -63,7 +62,7 @@ flowchart TD
     GW -->|本文ログ無効| AIG[AI Gateway]
     AIG --> GEMINI[Gemini]
     GW -->|検証結果| DO
-    DO -->|受領応答・finalをretry key付きpush| LINE
+    DO -->|finalをretry key付きpush| LINE
     DO -->|状態と時刻| D1
     CRON[Cron Trigger] -->|期限切れSession終了| D1
     CRON -->|同期差分確認| V
@@ -74,7 +73,7 @@ flowchart TD
 
 | コンポーネント | 行うこと | 行わないこと |
 | --- | --- | --- |
-| API Worker | LINE署名検証、event ID付与、決定的なcommand routing、Account解決、日記の受領応答予約、待機表示、Queue投入 | 日記本文の意味解釈、Session更新、AI呼び出し |
+| API Worker | LINE署名検証、event ID付与、決定的なcommand routing、待機表示、Queue投入 | 日記本文の意味解釈、Session更新、AI呼び出し |
 | ingest Worker | 冪等な原本保存、Account解決、Coordinator通知 | 会話順序の独自判断、AI生成 |
 | Coordinator | Account内の順序、連投集約、Session、Turn lease、外部I/Oのoutboxと締切 | 原本やBrain Itemの正本保持 |
 | generate Worker | Context構築、安全判定、prompt実行、出力検証 | Account IDや権限をモデルへ決めさせること |
@@ -230,7 +229,7 @@ userとassistantを同じ時系列で復元するための履歴です。user原
 | `failure_stage` | no | 終端失敗した処理段階。本文や例外messageは入れない |
 | `received_at` | yes | Turn内で最初のuser messageを受け付けた時刻 |
 | `generation_started_at` | no | 生成開始時刻 |
-| `first_reply_requested_at` | no | 受領応答要求の計測点。実際の配送状態との統合は後続対応 |
+| `first_reply_requested_at` | no | 旧受領応答の計測列。新規Turnでは利用しない |
 | `final_reply_requested_at` | no | assistant messageを確定し、最終応答配送を開始した時刻 |
 | `response_message_id` | no | 生成済みassistant messageのID。retry時の再生成・重複保存を防ぐ |
 | `created_at`, `updated_at` | yes | 作成・最終更新時刻 |
@@ -302,12 +301,9 @@ DOのローカルSQLiteはAccount内の連投、生成lease、LINE配送outbox�
 | `local_turns.status` | `pending_queue` / `queued` / `generating` / `delivered` / `failed` |
 | `local_turns.lease_token` | 生成を取得したconsumerだけが完了できる一時token |
 | `local_turns.hard_deadline_at` | 生成leaseの90秒上限。期限切れ時は再Queue投入する |
-| `receipt_reservations.event_id` | Queueと独立して予約した受領応答の冪等キー |
-| `receipt_reservations.received_at` | 1.5秒の連投集約と30秒deadlineの起点 |
-| `receipt_reservations.outbox_id` | 受領応答をまとめた配送outboxへの参照。未割当は`null` |
 | `delivery_outbox.id` | LINE retry keyの生成元にも使う配送単位のPK |
-| `delivery_outbox.kind` | `receipt` / `final` / `failure` |
-| `delivery_outbox.turn_id`, `generation_epoch` | finalと失敗案内を現在Turn・世代へ固定する。receiptでは`null` |
+| `delivery_outbox.kind` | `final` / `failure` |
+| `delivery_outbox.turn_id`, `generation_epoch` | finalと失敗案内を現在Turn・世代へ固定する |
 | `delivery_outbox.target`, `body`, `retry_key` | 再送時にも変更しない宛先、本文、LINE retry key |
 | `delivery_outbox.status` | `pending` / `delivered` / `permanent_failure` / `delivery_unknown` |
 | `delivery_outbox.deadline_at`, `created_at` | 自動retryの上限と保持期間の基準 |
@@ -334,7 +330,7 @@ D1、Queue、LINEを呼び出した後は、Turn ID、generation epoch、lease t
 - `conversation_messages(session_id, sequence)`
 - `conversation_messages(channel, channel_event_id)` unique
 - `chat_turns(status, created_at)`と`chat_turns(session_id, through_sequence)`
-- DOの`accepted_messages(status, received_at)`、`receipt_reservations(outbox_id)`、`delivery_outbox(status, deadline_at)`、`delivery_outbox(turn_id, generation_epoch)`
+- DOの`accepted_messages(status, received_at)`、`delivery_outbox(status, deadline_at)`、`delivery_outbox(turn_id, generation_epoch)`
 - `brain_items(account_id, confirmation, status, category)`
 - `brain_item_evidence_edges(brain_item_id)`と`(source_record_id)`
 - `vector_index_jobs(status, next_attempt_at)`と`(brain_item_id, item_revision, operation)` unique
@@ -344,7 +340,7 @@ D1、Queue、LINEを呼び出した後は、Turn ID、generation epoch、lease t
 ### 5.1 受付から原本保存
 
 1. API Workerがraw bodyでLINE署名を検証する
-2. 決定的な完全一致command routingを行う。日記なら署名済みchannel identityからAccountを解決し、event IDと受付時刻だけをCoordinatorへ通知して受領応答を予約する
+2. 決定的な完全一致command routingを行い、1対1トークのテキストではLINEの待機表示を開始する
 3. 日記eventからreply tokenを除外してWebhook Queueへ投入し、channel event IDを冪等キーにする
 4. ingest WorkerがAccountを再解決する。client由来のAccount IDは受け付けない
 5. Source Record IDをAccountとchannel event IDから決定的に作り、Source RecordとpayloadをD1 batchで`INSERT ... ON CONFLICT DO NOTHING`する
@@ -353,8 +349,6 @@ D1、Queue、LINEを呼び出した後は、Turn ID、generation epoch、lease t
 8. CoordinatorがSessionを選び、採番とconversation message追加をevent IDで冪等なD1 batchとして実行する
 9. D1反映後、Coordinatorがaccepted messageを`attached`へ進める。失敗時はoutboxとalarmから再試行する
 10. Source RecordのD1保存とCoordinatorのローカル永続化が成功した後にWebhook Queueをackする
-
-受領応答予約とQueue投入は同じ署名検証結果から独立に開始します。受領応答予約の一時失敗は30秒deadlineまでevent IDを変えずにAPI Workerの`waitUntil`内で再試行し、Queue投入を取り消しません。Webhookへの成功応答はQueue投入成功を条件とし、受領応答予約の失敗は日記保存を失敗させずSLO違反として記録します。
 
 既存Source Recordの検出だけを理由に処理を打ち切りません。D1保存後かつCoordinator通知前の失敗ではQueue再配送が必ず同じRPCを再実行し、Coordinator通知後かつD1会話反映前の失敗ではDOのoutboxが処理を再開します。これにより、原本だけ存在して会話へ入らない中間状態を終端状態にしません。
 
@@ -557,30 +551,25 @@ system promptは次の順で固定し、Git管理する`prompt_version`を付け
 
 | 経過 | 目標 |
 | --- | --- |
-| 0〜3秒 | 署名検証、Account解決、Coordinatorへの受領応答予約、Queue投入、待機表示 |
-| 1.5秒 | Coordinatorが連投をまとめ、受領応答のpushを開始 |
+| 0〜3秒 | 署名検証、Queue投入、待機表示 |
 | 0〜6秒 | ingest、原本保存、Coordinatorへの原本通知 |
 | 6〜8秒 | Turn確定 |
 | 8〜25秒 | 安全分類、Context、AI生成、検証 |
-| 30秒 | 受領応答の送信要求がLINEに受理される内部deadline |
 | 38秒 | 体験設計上のSLO |
 | 90秒 | finalまたは失敗案内の内部上限 |
 
-受領応答の予約はWebhook Queueを経由させません。API Workerは署名済みchannel identityからAccountを解決し、本文を渡さずにevent IDと受付時刻だけをAccountのCoordinatorへRPCします。Coordinatorは1.5秒間の予約をまとめ、対象event ID全件の初回返信として1件の受領応答を送ります。これにより、QueueやAI生成が遅延しても初回返信経路は影響を受けません。
-
-30秒を内部deadlineとし、LINE APIの揺らぎに8秒残します。待機表示は初回返信へ数えません。LINEまたは自システムの障害で30秒までに送信要求が受理されなければ、`delivery_unknown`としてSLO違反を記録し、同じ受領応答の自動retryを停止します。
+待機中であることは`showLoadingAnimation`で示し、独立した受領応答Pushは送りません。AIの最終回答には、`LIFF_ID`が設定されている場合だけ「今日の診断に答える」とLIFF URLを末尾へ付けます。D1の`assistant_body`は生成本文だけを正本として保持し、チャネル固有の導線は配送時に付加します。
 
 ### 9.2 LINE配送とreply token
 
-- Webhookの`replyToken`は一度しか使えず安全なretry keyを付けられないため、受領応答とfinalはどちらもpushで送る
+- 日記のfinalは安全なretry keyを付けられるpushで送る
 - `replyToken`はQueue、DO、D1へ渡さず、保存もlog出力もしない
-- pushは初回要求から必ず`X-Line-Retry-Key`を付ける。受領応答は先頭event ID、finalと失敗案内はTurn IDと応答種別から、環境別Secretを用いて決定的なUUIDを作る
-- 連投を1Turnにした場合、1応答を対象message全件の初回返信として記録する
+- pushは初回要求から必ず`X-Line-Retry-Key`を付ける。finalと失敗案内はTurn IDと応答種別から、環境別Secretを用いて決定的なUUIDを作る
 - 送信直前にTurn leaseとSessionを再確認する
 
 送信内容、宛先のchannel identity参照、retry keyをDOのoutboxへ確定してからpushします。2xxは`delivered`、同じretry keyが既に受理されたことを示す409も`delivered`として扱います。timeoutまたは5xxは、同じ宛先・本文・retry keyかつ同じgeneration epochである間だけ再試行し、4xxはretryしません。retry keyを変えたり本文を変えて再送してはいけません。
 
-受領応答のretryはfinal送信開始時に止め、finalまたは失敗案内のretryは90秒で止めます。90秒時点で結果不明なら`delivery_unknown`として運用通知し、次Turnへ進む前に旧epochのoutboxを終端化します。異なるキーによる自動再送は行いません。これにより、LINE側で既に受理済みだった通信の配送時間までは制御できないものの、自システムが古い応答を後から再送して割り込ませることは防ぎます。
+finalまたは失敗案内のretryは90秒で止めます。90秒時点で結果不明なら`delivery_unknown`として運用通知し、次Turnへ進む前に旧epochのoutboxを終端化します。異なるキーによる自動再送は行いません。これにより、LINE側で既に受理済みだった通信の配送時間までは制御できないものの、自システムが古い応答を後から再送して割り込ませることは防ぎます。
 
 ### 9.3 retryとDLQ
 
@@ -588,7 +577,6 @@ system promptは次の順で固定し、Git管理する`prompt_version`を付け
 - AI生成は同一Turnで最大2回。schema修正か一時的provider失敗だけを再試行する
 - safety block、入力不正、Access拒否はretryしない
 - rate limitと一時的5xxはjitter付きbackoffでretryする
-- 受領応答はQueue retryと独立して30秒まで同じretry keyで再試行する
 - AI生成は90秒で打ち切り、失敗案内をfinalとは別の固定retry keyでpushする
 - DLQ再処理は本文をlogへ出さず、Turn IDとfailure stageから行う
 
@@ -603,7 +591,7 @@ system promptは次の順で固定し、Git管理する`prompt_version`を付け
 
 ## 11. 観測と監査
 
-初期段階で計測するのは各処理段階のlatency、38秒初回返信率、30秒deadline違反、90秒final率、receipt率、retry、DLQ、DOの`pending_queue`滞留時間、重複抑止、schema違反、token数、モデル別失敗率です。安全性経路の集計は、保存する分類と監査要件を決めた後に追加します。
+初期段階で計測するのは各処理段階のlatency、38秒final率、90秒final率、retry、DLQ、DOの`pending_queue`滞留時間、重複抑止、schema違反、token数、モデル別失敗率です。安全性経路の集計は、保存する分類と監査要件を決めた後に追加します。
 
 logへ出せる識別子は環境、Queue message ID、Turn ID、Session IDの一方向hash、prompt version、処理段階です。Account ID、LINE user ID、reply token、日記本文、Context Package、生成本文、Brain Item本文は出しません。
 
@@ -628,8 +616,8 @@ logへ出せる識別子は環境、Queue message ID、Turn ID、Session IDの�
 - Vectorize候補をD1再検証し、同じscope内でも利用不可のItemを除外する
 - Vectorize upsert・deleteの失敗と長時間`submitted`をoutboxとreconciliationで回復する
 - schema外出力、存在しないEvidence ID、質問過多を送信しない
-- Webhook Queueを遅延・停止させても30秒までにreceiptのpush要求が受理される
-- receipt、final、失敗案内をtimeoutさせ、同じLINE retry keyでだけ再試行する
+- finalと失敗案内をtimeoutさせ、同じLINE retry keyでだけ再試行する
+- LIFF ID設定時はfinalの末尾に診断リンクを付け、D1のassistant本文には混ぜない
 - 90秒でfinalまたは失敗案内の配送outboxを確定する
 - Queue再配送、DO再起動、alarm再実行でもTurnが重複しない
 - AI Gatewayのpayload loggingとcacheが無効になる
@@ -655,7 +643,7 @@ prompt versionを本番へ出す条件はschema準拠100%、越権した記憶�
 
 1. **原本とSession**: D1 schema、冪等保存、Session境界、Cronによる期限切れSession終了、明示的な削除操作への追従
 2. **会話Coordinator**: Account単位DO、ローカルSQLite、連投、Turn state、outbox、2 QueueとDLQ
-3. **安全な通常応答**: Queue非依存のreceipt、Context、prompt、構造化出力、30秒・90秒deadline
+3. **安全な通常応答**: 待機表示、Context、prompt、構造化出力、90秒deadline
 4. **長期会話の圧縮**: 20message超過時の文脈保持と訂正反映
 5. **Brain Item候補**: Evidence付きpending候補、本人確認、却下、改訂
 6. **記憶を使う助言**: Vectorize outbox、`owner_scope` filter、D1再認可、Evidence取得
