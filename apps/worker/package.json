@@ -9,7 +9,7 @@
     "build": "bun build src/index.ts --outdir ./dist --target bun --external cloudflare:workers --loader .sql:text",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --dir .",
-    "db:generate": "drizzle-kit generate && biome check --write --unsafe drizzle",
+    "do:generate": "drizzle-kit generate && biome check --write --unsafe drizzle",
     "check:gemini": "bun scripts/check-gemini.ts",
     "deploy:preview": "wrangler deploy --env preview",
     "deploy:production": "wrangler deploy --env production"
