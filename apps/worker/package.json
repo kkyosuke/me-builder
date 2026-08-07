@@ -6,9 +6,10 @@
   "scripts": {
     "dev": "bun --watch src/index.ts",
     "dev:wrangler": "wrangler dev --env local",
-    "build": "bun build src/index.ts --outdir ./dist --target bun --external cloudflare:workers",
+    "build": "bun build src/index.ts --outdir ./dist --target bun --external cloudflare:workers --loader .sql:text",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --dir .",
+    "db:generate": "drizzle-kit generate && biome check --write --unsafe drizzle",
     "check:gemini": "bun scripts/check-gemini.ts",
     "deploy:preview": "wrangler deploy --env preview",
     "deploy:production": "wrangler deploy --env production"
@@ -25,6 +26,7 @@
     "@types/better-sqlite3": "^7.6.13",
     "@types/bun": "latest",
     "better-sqlite3": "^13.0.1",
+    "drizzle-kit": "^0.30.2",
     "miniflare": "4.20260722.0"
   }
 }

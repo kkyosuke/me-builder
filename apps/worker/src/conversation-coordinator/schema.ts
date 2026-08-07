@@ -1,4 +1,5 @@
-import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { sql } from "drizzle-orm";
+import { check, index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 export const acceptedMessages = sqliteTable(
   "accepted_messages",
@@ -14,15 +15,23 @@ export const acceptedMessages = sqliteTable(
   (table) => [index("accepted_message_status_received_idx").on(table.status, table.receivedAt)],
 );
 
-export const coordinatorState = sqliteTable("coordinator_state", {
-  singleton: integer("singleton").primaryKey(),
-  generationEpoch: integer("generation_epoch").notNull().default(0),
-});
+export const coordinatorState = sqliteTable(
+  "coordinator_state",
+  {
+    singleton: integer("singleton").primaryKey(),
+    generationEpoch: integer("generation_epoch").notNull().default(0),
+  },
+  (table) => [check("coordinator_state_singleton_check", sql`${table.singleton} = 1`)],
+);
 
-export const coordinatorIdentity = sqliteTable("coordinator_identity", {
-  singleton: integer("singleton").primaryKey(),
-  accountId: text("account_id").notNull().unique(),
-});
+export const coordinatorIdentity = sqliteTable(
+  "coordinator_identity",
+  {
+    singleton: integer("singleton").primaryKey(),
+    accountId: text("account_id").notNull().unique(),
+  },
+  (table) => [check("coordinator_identity_singleton_check", sql`${table.singleton} = 1`)],
+);
 
 export const attachBatches = sqliteTable("attach_batches", {
   id: text("id").primaryKey(),

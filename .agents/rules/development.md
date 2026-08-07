@@ -33,6 +33,7 @@
     - `task db:migrate:production`: 本番環境への D1 データベースマイグレーション適用
     - `task queues:setup:preview`: プレビュー環境のChat Turn QueueとDLQを冪等に作成
     - `task queues:setup:production`: 本番環境のChat Turn QueueとDLQを冪等に作成
+    - `bun --cwd apps/worker db:generate`: ConversationCoordinatorのDrizzle schemaからDurable SQLite migrationを生成
     - `task db:seed:local`: ローカルD1へ診断seedを適用
     - `task db:seed:preview`: プレビューD1へ診断seedを適用
     - `task db:seed:production`: 本番D1へ診断seedを明示的に適用

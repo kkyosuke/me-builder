@@ -1,6 +1,8 @@
-import { and, asc, count, eq, inArray, lte, min, notInArray, sql } from "drizzle-orm";
+import { and, asc, count, eq, inArray, lte, min, notInArray } from "drizzle-orm";
 import { type DrizzleSqliteDODatabase, drizzle } from "drizzle-orm/durable-sqlite";
+import { migrate } from "drizzle-orm/durable-sqlite/migrator";
 import type { AcceptedDiaryMessage } from ".";
+import migrations from "../../drizzle/migrations.js";
 import {
   acceptedMessages,
   attachBatchMessages,
@@ -20,45 +22,8 @@ export class ConversationCoordinatorRepository {
     this.db = drizzle(storage, { schema: coordinatorSchema });
   }
 
-  initialize(): void {
-    this.db.run(
-      sql.raw(`
-      CREATE TABLE IF NOT EXISTS accepted_messages (
-        event_id TEXT PRIMARY KEY,
-        account_id TEXT NOT NULL,
-        source_record_id TEXT NOT NULL,
-        received_at INTEGER NOT NULL,
-        status TEXT NOT NULL DEFAULT 'pending'
-      );
-      CREATE INDEX IF NOT EXISTS accepted_message_status_received_idx
-        ON accepted_messages(status, received_at);
-      CREATE TABLE IF NOT EXISTS coordinator_state (
-        singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
-        generation_epoch INTEGER NOT NULL DEFAULT 0
-      );
-      CREATE TABLE IF NOT EXISTS coordinator_identity (
-        singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
-        account_id TEXT NOT NULL UNIQUE
-      );
-      CREATE TABLE IF NOT EXISTS attach_batches (
-        id TEXT PRIMARY KEY,
-        generation_epoch INTEGER NOT NULL
-      );
-      CREATE TABLE IF NOT EXISTS attach_batch_messages (
-        event_id TEXT PRIMARY KEY REFERENCES accepted_messages(event_id) ON DELETE CASCADE,
-        batch_id TEXT NOT NULL REFERENCES attach_batches(id) ON DELETE CASCADE
-      );
-      CREATE INDEX IF NOT EXISTS attach_batch_message_batch_idx
-        ON attach_batch_messages(batch_id);
-      CREATE TABLE IF NOT EXISTS local_turns (
-        turn_id TEXT PRIMARY KEY,
-        generation_epoch INTEGER NOT NULL,
-        status TEXT NOT NULL,
-        lease_token TEXT,
-        hard_deadline_at INTEGER
-      );
-    `),
-    );
+  async initialize(): Promise<void> {
+    await migrate(this.db, migrations);
     this.db
       .insert(coordinatorState)
       .values({ singleton: 1, generationEpoch: 0 })
