@@ -20,7 +20,7 @@ for (const queueName of queueNames) {
     new Response(processResult.stderr).text(),
   ]);
   const output = `${stdout}\n${stderr}`;
-  if (exitCode !== 0 && !/already exists|code.*10020/i.test(output)) {
+  if (exitCode !== 0 && !/already exists|already taken|code:\s*(?:10020|11009)/i.test(output)) {
     throw new Error(`Failed to create Queue ${queueName}: ${output.trim()}`);
   }
   console.info(exitCode === 0 ? `Created ${queueName}` : `Queue already exists: ${queueName}`);
