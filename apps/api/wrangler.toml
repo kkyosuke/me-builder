@@ -44,8 +44,7 @@ database_id = "me-builder-db-local-id"
 [[env.local.durable_objects.bindings]]
 name = "CONVERSATION_COORDINATOR"
 class_name = "ConversationCoordinator"
-script_name = "me-builder-worker"
-environment = "local"
+script_name = "me-builder-worker-local"
 
 [env.local.vars]
 ENVIRONMENT = "local"
@@ -68,8 +67,7 @@ database_id = "ef439301-0199-4c78-af5e-91fcc5be63bd"
 [[env.preview.durable_objects.bindings]]
 name = "CONVERSATION_COORDINATOR"
 class_name = "ConversationCoordinator"
-script_name = "me-builder-worker"
-environment = "preview"
+script_name = "me-builder-worker-preview"
 
 [env.preview.vars]
 ENVIRONMENT = "preview"
@@ -92,8 +90,7 @@ database_id = "6d11180b-3286-4b69-bd63-c7b60d768be1"
 [[env.production.durable_objects.bindings]]
 name = "CONVERSATION_COORDINATOR"
 class_name = "ConversationCoordinator"
-script_name = "me-builder-worker"
-environment = "production"
+script_name = "me-builder-worker-production"
 
 [env.production.vars]
 ENVIRONMENT = "production"
