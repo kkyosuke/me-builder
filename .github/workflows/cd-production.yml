@@ -134,7 +134,7 @@ jobs:
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' && env.LINE_CHANNEL_ACCESS_TOKEN != '' }}
         env:
           LIFF_ID: ${{ vars.LIFF_ID }}
-        run: bun --cwd apps/api run register:rich-menu:production
+        run: bun run --cwd apps/api register:rich-menu:production
 
 
 

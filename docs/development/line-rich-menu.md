@@ -43,8 +43,8 @@ LINEの画像要件は[Messaging API reference](https://developers.line.biz/en/r
 ローカルから対象環境へ明示的に登録する場合は次を実行します。
 
 ```bash
-bun --cwd apps/api run register:rich-menu:preview
-bun --cwd apps/api run register:rich-menu:production
+bun run --cwd apps/api register:rich-menu:preview
+bun run --cwd apps/api register:rich-menu:production
 ```
 
 preview / productionのCDでは、WebとLIFF Endpointの登録後に同じ処理を自動実行します。LIFF Endpoint登録を完了できない場合は後続のリッチメニュー登録へ進まず、設定が不足している場合やLINE APIが失敗した場合は、リンク切れのメニューを公開済みとして扱わずジョブを失敗させます。

@@ -89,12 +89,12 @@ tasks:
   line:rich-menu:preview:
     desc: 'Register the preview LINE rich menu as the default'
     cmds:
-      - bun --cwd apps/api run register:rich-menu:preview
+      - bun run --cwd apps/api register:rich-menu:preview
 
   line:rich-menu:production:
     desc: 'Register the production LINE rich menu as the default'
     cmds:
-      - bun --cwd apps/api run register:rich-menu:production
+      - bun run --cwd apps/api register:rich-menu:production
 
   db:migrate:local:
     aliases: [db:migrate]
