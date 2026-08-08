@@ -260,6 +260,7 @@ describe("listVisibleDiagnoses", () => {
     await db.insert(schema.diagnosisAnswers).values([
       {
         id: "answer-a1",
+        accountId: "account-1",
         diagnosisResponseId: "response-a",
         diagnosisQuestionId: "diagnosis-a-sq1",
         questionId: "diagnosis-a-q1",
@@ -270,6 +271,7 @@ describe("listVisibleDiagnoses", () => {
       },
       {
         id: "answer-b1",
+        accountId: "account-1",
         diagnosisResponseId: "response-b",
         diagnosisQuestionId: "diagnosis-b-sq1",
         questionId: "diagnosis-b-q1",
@@ -280,6 +282,7 @@ describe("listVisibleDiagnoses", () => {
       },
       {
         id: "answer-b2",
+        accountId: "account-1",
         diagnosisResponseId: "response-b",
         diagnosisQuestionId: "diagnosis-b-sq2",
         questionId: "diagnosis-b-q2",
@@ -290,6 +293,7 @@ describe("listVisibleDiagnoses", () => {
       },
       {
         id: "answer-other",
+        accountId: "account-2",
         diagnosisResponseId: "response-other",
         diagnosisQuestionId: "diagnosis-a-sq2",
         questionId: "diagnosis-a-q2",
@@ -509,6 +513,7 @@ describe("deleteAccountDiagnosisData", () => {
 
     await db.insert(schema.diagnosisDeferredQuestions).values({
       id: "reset-deferred",
+      accountId: "reset-owner",
       diagnosisResponseId: ownerResponse?.id ?? "",
       diagnosisQuestionId: "reset-target-sq2",
       deferredAt: new Date("2026-08-03T00:01:00Z"),
@@ -520,6 +525,7 @@ describe("deleteAccountDiagnosisData", () => {
     });
     await db.insert(schema.sourceRecordRevisions).values({
       id: "answer-revision",
+      accountId: "reset-owner",
       previousSourceRecordId: ownerAnswer?.sourceRecordId ?? "",
       nextSourceRecordId: "unrelated-source",
       derivationMethod: "deterministic",

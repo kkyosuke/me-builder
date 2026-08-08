@@ -142,6 +142,7 @@ export async function storeLineTextSource(
       .insert(sourceRecordTextPayloads)
       .values({
         sourceRecordId,
+        accountId: input.accountId,
         body: input.body,
         contentType: "text/plain",
         contentHash: await sha256(input.body),
@@ -334,6 +335,7 @@ export async function attachMessagesToTurn(
   const sortedInputs = [...inputs].sort((a, b) => a.receivedAt.getTime() - b.receivedAt.getTime());
   const userMessages = sortedInputs.map((input, index) => ({
     id: crypto.randomUUID(),
+    accountId,
     sessionId: session.id,
     sequence: fromSequence + index,
     role: "user" as const,
@@ -366,6 +368,7 @@ export async function attachMessagesToTurn(
       .where(eq(conversationSessions.id, session.id)),
     db.insert(chatTurns).values({
       id: turnId,
+      accountId,
       sessionId: session.id,
       fromSequence,
       throughSequence,
@@ -414,7 +417,13 @@ export async function getTurnContext(
       throughSequence: chatTurns.throughSequence,
     })
     .from(chatTurns)
-    .innerJoin(conversationSessions, eq(chatTurns.sessionId, conversationSessions.id))
+    .innerJoin(
+      conversationSessions,
+      and(
+        eq(chatTurns.sessionId, conversationSessions.id),
+        eq(chatTurns.accountId, conversationSessions.accountId),
+      ),
+    )
     .where(eq(chatTurns.id, turnId))
     .get();
   if (!turn) return undefined;
@@ -428,14 +437,24 @@ export async function getTurnContext(
       userBody: sourceRecordTextPayloads.body,
     })
     .from(conversationMessages)
-    .leftJoin(sourceRecords, eq(conversationMessages.sourceRecordId, sourceRecords.id))
+    .leftJoin(
+      sourceRecords,
+      and(
+        eq(conversationMessages.sourceRecordId, sourceRecords.id),
+        eq(conversationMessages.accountId, sourceRecords.accountId),
+      ),
+    )
     .leftJoin(
       sourceRecordTextPayloads,
-      eq(sourceRecords.id, sourceRecordTextPayloads.sourceRecordId),
+      and(
+        eq(sourceRecords.id, sourceRecordTextPayloads.sourceRecordId),
+        eq(sourceRecords.accountId, sourceRecordTextPayloads.accountId),
+      ),
     )
     .where(
       and(
         eq(conversationMessages.sessionId, turn.sessionId),
+        eq(conversationMessages.accountId, turn.accountId),
         lte(conversationMessages.sequence, turn.throughSequence),
         eq(conversationMessages.isDeleted, false),
         or(isNull(sourceRecords.id), eq(sourceRecords.accountId, turn.accountId)),
@@ -530,6 +549,7 @@ export async function saveAssistantResponse(
   await db.batch([
     db.insert(conversationMessages).values({
       id: messageId,
+      accountId: session.accountId,
       sessionId: session.id,
       sequence: session.nextSequence,
       role: "assistant",
@@ -567,18 +587,26 @@ export async function getPendingAssistantResponse(
       endSession: chatTurns.endSession,
     })
     .from(chatTurns)
-    .innerJoin(conversationSessions, eq(chatTurns.sessionId, conversationSessions.id))
+    .innerJoin(
+      conversationSessions,
+      and(
+        eq(chatTurns.sessionId, conversationSessions.id),
+        eq(chatTurns.accountId, conversationSessions.accountId),
+      ),
+    )
     .innerJoin(
       conversationMessages,
       and(
         eq(chatTurns.responseMessageId, conversationMessages.id),
         eq(conversationMessages.sessionId, chatTurns.sessionId),
+        eq(conversationMessages.accountId, chatTurns.accountId),
         eq(conversationMessages.turnId, chatTurns.id),
       ),
     )
     .where(
       and(
         eq(chatTurns.id, input.turnId),
+        eq(chatTurns.accountId, input.accountId),
         eq(chatTurns.status, "delivery_pending"),
         eq(conversationSessions.accountId, input.accountId),
       ),

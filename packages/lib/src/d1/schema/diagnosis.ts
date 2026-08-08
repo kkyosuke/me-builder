@@ -127,6 +127,7 @@ export const diagnosisResponses = sqliteTable(
     revision: integer("revision").notNull().default(0),
   },
   (table) => [
+    uniqueIndex("diagnosis_response_account_identity_idx").on(table.id, table.accountId),
     uniqueIndex("diagnosis_response_account_active_idx")
       .on(table.accountId, table.diagnosisId)
       .where(sql`is_deleted = 0`),
@@ -138,9 +139,10 @@ export const diagnosisBrainProjectionRequests = sqliteTable(
   "diagnosis_brain_projection_requests",
   {
     ...baseSchema,
-    diagnosisResponseId: text("diagnosis_response_id")
+    accountId: text("account_id")
       .notNull()
-      .references(() => diagnosisResponses.id, { onDelete: "cascade" }),
+      .references(() => accounts.id),
+    diagnosisResponseId: text("diagnosis_response_id").notNull(),
     responseRevision: integer("response_revision").notNull(),
     status: text("status", { enum: ["pending", "applied", "failed"] }).notNull(),
     attemptCount: integer("attempt_count").notNull().default(0),
@@ -148,6 +150,10 @@ export const diagnosisBrainProjectionRequests = sqliteTable(
     failureCode: text("failure_code"),
   },
   (table) => [
+    foreignKey({
+      columns: [table.diagnosisResponseId, table.accountId],
+      foreignColumns: [diagnosisResponses.id, diagnosisResponses.accountId],
+    }).onDelete("cascade"),
     uniqueIndex("diagnosis_brain_projection_revision_idx").on(
       table.diagnosisResponseId,
       table.responseRevision,
@@ -197,9 +203,10 @@ export const diagnosisAnswers = sqliteTable(
   "diagnosis_answers",
   {
     ...baseSchema,
-    diagnosisResponseId: text("diagnosis_response_id")
+    accountId: text("account_id")
       .notNull()
-      .references(() => diagnosisResponses.id),
+      .references(() => accounts.id),
+    diagnosisResponseId: text("diagnosis_response_id").notNull(),
     diagnosisQuestionId: text("diagnosis_question_id")
       .notNull()
       .references(() => diagnosisQuestions.id),
@@ -207,11 +214,17 @@ export const diagnosisAnswers = sqliteTable(
     questionVersion: integer("question_version").notNull(),
     choiceId: text("choice_id").notNull(),
     acceptedAt: integer("accepted_at", { mode: "timestamp" }).notNull(),
-    sourceRecordId: text("source_record_id")
-      .notNull()
-      .references(() => sourceRecords.id, { onDelete: "cascade" }),
+    sourceRecordId: text("source_record_id").notNull(),
   },
   (table) => [
+    foreignKey({
+      columns: [table.diagnosisResponseId, table.accountId],
+      foreignColumns: [diagnosisResponses.id, diagnosisResponses.accountId],
+    }),
+    foreignKey({
+      columns: [table.sourceRecordId, table.accountId],
+      foreignColumns: [sourceRecords.id, sourceRecords.accountId],
+    }).onDelete("cascade"),
     foreignKey({
       columns: [table.questionId, table.questionVersion, table.choiceId],
       foreignColumns: [
@@ -231,15 +244,20 @@ export const diagnosisDeferredQuestions = sqliteTable(
   "diagnosis_deferred_questions",
   {
     ...baseSchema,
-    diagnosisResponseId: text("diagnosis_response_id")
+    accountId: text("account_id")
       .notNull()
-      .references(() => diagnosisResponses.id),
+      .references(() => accounts.id),
+    diagnosisResponseId: text("diagnosis_response_id").notNull(),
     diagnosisQuestionId: text("diagnosis_question_id")
       .notNull()
       .references(() => diagnosisQuestions.id),
     deferredAt: integer("deferred_at", { mode: "timestamp" }).notNull(),
   },
   (table) => [
+    foreignKey({
+      columns: [table.diagnosisResponseId, table.accountId],
+      foreignColumns: [diagnosisResponses.id, diagnosisResponses.accountId],
+    }),
     uniqueIndex("diagnosis_deferred_question_active_idx")
       .on(table.diagnosisResponseId, table.diagnosisQuestionId)
       .where(sql`is_deleted = 0`),

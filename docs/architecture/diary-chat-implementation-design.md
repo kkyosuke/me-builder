@@ -266,6 +266,8 @@ prompt本文、Context Package、未検証のモデル出力は保存しませ�
 
 `brain_item_evidence_edges`はBrain ItemとSource Recordを結び、relation、evidence role、derivation methodを保持します。`brain_item_confirmations`は本人の確認、却下、再確認を追記し、`brain_items.confirmation`を現在値として更新します。`brain_item_revisions`は置き換え前後を結びます。
 
+Brain Itemを含むAccount所有データのquery境界と複合外部キーは、[Accountデータ分離設計](account-data-isolation.md)を正とします。
+
 AI候補は`confirmation = pending`としてのみ保存し、助言やVectorize検索には使いません。本人が確認したときだけ`confirmed`へ更新し、同じD1 batchでVectorize同期jobをoutboxへ追加します。Confidenceの算出方法はこの設計では決めず、`uncomputed`を検索順位に使いません。
 
 ### 4.8 `vector_index_jobs`

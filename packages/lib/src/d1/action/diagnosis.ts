@@ -495,6 +495,7 @@ export async function deferDiagnosisQuestion(
         .onConflictDoNothing(),
       db.insert(diagnosisDeferredQuestions).values({
         id: crypto.randomUUID(),
+        accountId: input.accountId,
         diagnosisResponseId: responseId,
         diagnosisQuestionId: diagnosisQuestion.id,
         deferredAt,
@@ -730,6 +731,7 @@ async function saveDiagnosisAnswerWithRevisionRetry(
       }),
       db.insert(diagnosisAnswers).values({
         id: answerId,
+        accountId: input.accountId,
         diagnosisResponseId: responseId,
         diagnosisQuestionId: answer.diagnosisQuestionId,
         questionId: answer.questionId,
@@ -750,6 +752,7 @@ async function saveDiagnosisAnswerWithRevisionRetry(
         ),
       db.insert(diagnosisBrainProjectionRequests).values({
         id: projectionRequestId,
+        accountId: input.accountId,
         diagnosisResponseId: responseId,
         responseRevision,
         status: "pending",
