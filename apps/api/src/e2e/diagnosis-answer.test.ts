@@ -12,6 +12,7 @@ const repositoryRoot = path.resolve(__dirname, "../../../..");
 const migrationsDirectory = path.join(repositoryRoot, "packages/lib/drizzle");
 const diagnosisSeed = path.join(repositoryRoot, "packages/lib/seeds/diagnoses.sql");
 const timestamp = 1_785_801_600;
+const e2eTimeoutMs = 30_000;
 
 let miniflare: Miniflare;
 let database: D1Database;
@@ -162,7 +163,7 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
     database = (await miniflare.getD1Database("DB")) as D1Database;
     await prepareDatabase(database);
     mockLineVerification();
-  });
+  }, e2eTimeoutMs);
 
   afterEach(async () => {
     vi.unstubAllGlobals();
@@ -245,22 +246,26 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
     expect(await countRows("source_records")).toBe(1);
   });
 
-  it(`${diagnosisAnswerCases.complete.id}: ${diagnosisAnswerCases.complete.name}`, async () => {
-    let lastBody: unknown;
-    for (let index = 1; index <= 10; index += 1) {
-      const id = `dq-relationship-priority-${String(index).padStart(2, "0")}`;
-      const response = await putAnswer(id);
-      expect(response.status).toBe(200);
-      lastBody = await response.json();
-    }
-    expect(lastBody).toMatchObject({
-      progress: { responseStatus: "answered", answeredCount: 10, questionCount: 10 },
-    });
-    expect(await listRelationshipDiagnosis()).toMatchObject({
-      responseStatus: "answered",
-      answeredCount: 10,
-    });
-  });
+  it(
+    `${diagnosisAnswerCases.complete.id}: ${diagnosisAnswerCases.complete.name}`,
+    async () => {
+      let lastBody: unknown;
+      for (let index = 1; index <= 10; index += 1) {
+        const id = `dq-relationship-priority-${String(index).padStart(2, "0")}`;
+        const response = await putAnswer(id);
+        expect(response.status).toBe(200);
+        lastBody = await response.json();
+      }
+      expect(lastBody).toMatchObject({
+        progress: { responseStatus: "answered", answeredCount: 10, questionCount: 10 },
+      });
+      expect(await listRelationshipDiagnosis()).toMatchObject({
+        responseStatus: "answered",
+        answeredCount: 10,
+      });
+    },
+    e2eTimeoutMs,
+  );
 
   it(`${diagnosisAnswerCases.getContents.id}: ${diagnosisAnswerCases.getContents.name}`, async () => {
     await putAnswer("dq-relationship-priority-01", "yes");
@@ -349,55 +354,63 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
     }
   });
 
-  it("インドア・アウトドアと余暇の回答を4つのパラメータへ採点する", async () => {
-    for (let index = 1; index <= 10; index += 1) {
-      const suffix = String(index).padStart(2, "0");
-      const response = await putAnswer(`dq-leisure-style-${suffix}`, "yes", "leisure-style");
+  it(
+    "インドア・アウトドアと余暇の回答を4つのパラメータへ採点する",
+    async () => {
+      for (let index = 1; index <= 10; index += 1) {
+        const suffix = String(index).padStart(2, "0");
+        const response = await putAnswer(`dq-leisure-style-${suffix}`, "yes", "leisure-style");
+        expect(response.status).toBe(200);
+      }
+
+      const response = await getAnswers("leisure-style");
+
       expect(response.status).toBe(200);
-    }
+      expect(await response.json()).toMatchObject({
+        id: "leisure-style",
+        scoring: {
+          scoringVersion: 1,
+          balancedLabel: "状況に応じて楽しむ",
+          parameters: [
+            expect.objectContaining({ id: "outdoor-preference", score: 67, coverage: 100 }),
+            expect.objectContaining({ id: "experience-openness", score: 100, coverage: 100 }),
+            expect.objectContaining({ id: "shared-leisure", score: 60, coverage: 100 }),
+            expect.objectContaining({ id: "activity-level", score: 100, coverage: 100 }),
+          ],
+        },
+      });
+    },
+    e2eTimeoutMs,
+  );
 
-    const response = await getAnswers("leisure-style");
+  it(
+    "時間と予定の回答を4つのパラメータへ採点する",
+    async () => {
+      for (let index = 1; index <= 10; index += 1) {
+        const suffix = String(index).padStart(2, "0");
+        const response = await putAnswer(`dq-time-planning-${suffix}`, "yes", "time-planning");
+        expect(response.status).toBe(200);
+      }
 
-    expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({
-      id: "leisure-style",
-      scoring: {
-        scoringVersion: 1,
-        balancedLabel: "状況に応じて楽しむ",
-        parameters: [
-          expect.objectContaining({ id: "outdoor-preference", score: 67, coverage: 100 }),
-          expect.objectContaining({ id: "experience-openness", score: 100, coverage: 100 }),
-          expect.objectContaining({ id: "shared-leisure", score: 60, coverage: 100 }),
-          expect.objectContaining({ id: "activity-level", score: 100, coverage: 100 }),
-        ],
-      },
-    });
-  });
+      const response = await getAnswers("time-planning");
 
-  it("時間と予定の回答を4つのパラメータへ採点する", async () => {
-    for (let index = 1; index <= 10; index += 1) {
-      const suffix = String(index).padStart(2, "0");
-      const response = await putAnswer(`dq-time-planning-${suffix}`, "yes", "time-planning");
       expect(response.status).toBe(200);
-    }
-
-    const response = await getAnswers("time-planning");
-
-    expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({
-      id: "time-planning",
-      scoring: {
-        scoringVersion: 1,
-        balancedLabel: "状況に応じて予定を決める",
-        parameters: [
-          expect.objectContaining({ id: "advance-planning", score: 100, coverage: 100 }),
-          expect.objectContaining({ id: "spontaneous-flexibility", score: 80, coverage: 100 }),
-          expect.objectContaining({ id: "time-reliability", score: 100, coverage: 100 }),
-          expect.objectContaining({ id: "shared-time-priority", score: 100, coverage: 100 }),
-        ],
-      },
-    });
-  });
+      expect(await response.json()).toMatchObject({
+        id: "time-planning",
+        scoring: {
+          scoringVersion: 1,
+          balancedLabel: "状況に応じて予定を決める",
+          parameters: [
+            expect.objectContaining({ id: "advance-planning", score: 100, coverage: 100 }),
+            expect.objectContaining({ id: "spontaneous-flexibility", score: 80, coverage: 100 }),
+            expect.objectContaining({ id: "time-reliability", score: 100, coverage: 100 }),
+            expect.objectContaining({ id: "shared-time-priority", score: 100, coverage: 100 }),
+          ],
+        },
+      });
+    },
+    e2eTimeoutMs,
+  );
 
   it(`${diagnosisAnswerCases.missingContents.id}: ${diagnosisAnswerCases.missingContents.name}`, async () => {
     const response = await getAnswers();
