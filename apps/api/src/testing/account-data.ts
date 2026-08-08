@@ -7,14 +7,36 @@ import {
 } from "@me-builder/lib";
 
 const actions = {
-  "diagnosis.deleteAccountData": d1.action.diagnosis.deleteAccountDiagnosisData,
-  "diagnosis.deferQuestion": d1.action.diagnosis.deferDiagnosisQuestion,
-  "diagnosis.saveAnswer": d1.action.diagnosis.saveDiagnosisAnswer,
-  "diagnosis.findAnswers": d1.action.diagnosis.findDiagnosisAnswers,
-  "diagnosis.listVisible": d1.action.diagnosis.listVisibleDiagnoses,
-  "source.hasActive": d1.action.source.hasActiveSourceRecords,
-  "diagnosisProjection.processLatest":
-    d1.action.diagnosisBrainProjection.processLatestDiagnosisBrainProjection,
+  "diagnosis.deleteAccountData": (db: d1.Client, accountId: string) =>
+    d1.action.diagnosis.deleteAccountDiagnosisData(db, accountId),
+  "diagnosis.deferQuestion": (
+    db: d1.Client,
+    accountId: string,
+    input: Omit<Parameters<typeof d1.action.diagnosis.deferDiagnosisQuestion>[1], "accountId">,
+  ) => d1.action.diagnosis.deferDiagnosisQuestion(db, { ...input, accountId }),
+  "diagnosis.saveAnswer": (
+    db: d1.Client,
+    accountId: string,
+    input: Omit<Parameters<typeof d1.action.diagnosis.saveDiagnosisAnswer>[1], "accountId">,
+  ) => d1.action.diagnosis.saveDiagnosisAnswer(db, { ...input, accountId }),
+  "diagnosis.findAnswers": (db: d1.Client, accountId: string, diagnosisId: string, at: Date) =>
+    d1.action.diagnosis.findDiagnosisAnswers(db, accountId, diagnosisId, at),
+  "diagnosis.listVisible": (db: d1.Client, accountId: string, at: Date) =>
+    d1.action.diagnosis.listVisibleDiagnoses(db, accountId, at),
+  "source.hasActive": (db: d1.Client, accountId: string) =>
+    d1.action.source.hasActiveSourceRecords(db, accountId),
+  "diagnosisProjection.processLatest": (
+    db: d1.Client,
+    accountId: string,
+    diagnosisId: string,
+    at?: Date,
+  ) =>
+    d1.action.diagnosisBrainProjection.processLatestDiagnosisBrainProjection(
+      db,
+      accountId,
+      diagnosisId,
+      at,
+    ),
 } as const;
 
 /** APIのD1 fixtureを既存E2Eから段階移行するためのtest専用RPC adapter。 */
@@ -32,6 +54,7 @@ export function createD1AccountDataTestNamespace(db: d1.Client): AccountDataName
           if (!action) throw new Error(`Unsupported AccountData test operation: ${operation}`);
           return (await (action as unknown as (...input: unknown[]) => Promise<unknown>)(
             db,
+            accountId,
             ...args,
           )) as AccountDataResult<TOperation>;
         },

@@ -69,11 +69,11 @@ const defaultDependencies: Dependencies = {
   createSession: createLiffSession,
   listVisibleDiagnoses: (accountData, accountId, at) => {
     if (!accountData) throw new Error("ACCOUNT_DATA binding is not configured");
-    return accountDataFor(accountData, accountId).execute("diagnosis.listVisible", accountId, at);
+    return accountDataFor(accountData, accountId).execute("diagnosis.listVisible", at);
   },
   hasActiveSourceRecords: (accountData, accountId) => {
     if (!accountData) throw new Error("ACCOUNT_DATA binding is not configured");
-    return accountDataFor(accountData, accountId).execute("source.hasActive", accountId);
+    return accountDataFor(accountData, accountId).execute("source.hasActive");
   },
   summary: DUMMY_SUMMARY,
 };

@@ -30,7 +30,7 @@ const defaultDependencies: Dependencies = {
   createSession: createLiffSession,
   deleteDiagnosisData: (accountData, accountId) => {
     if (!accountData) throw new Error("ACCOUNT_DATA binding is not configured");
-    return accountDataFor(accountData, accountId).execute("diagnosis.deleteAccountData", accountId);
+    return accountDataFor(accountData, accountId).execute("diagnosis.deleteAccountData");
   },
 };
 

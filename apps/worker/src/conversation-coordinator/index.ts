@@ -279,7 +279,6 @@ export class ConversationCoordinator extends DurableObject<Env> {
       "conversation.attachMessagesToTurn",
       batch.messages.map((item) => ({
         eventId: item.eventId,
-        accountId: item.accountId,
         sourceRecordId: item.sourceRecordId,
         receivedAt: new Date(item.receivedAt),
       })),

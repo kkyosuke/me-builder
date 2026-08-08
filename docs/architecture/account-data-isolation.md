@@ -38,14 +38,16 @@ flowchart LR
 
 ## 3. データの区分
 
-| 区分 | 例 | `account_id` | 参照規則 |
+| 区分 | 例 | 保存先 | 参照規則 |
 | --- | --- | --- | --- |
 | 全Account共通 | Account Identity、Question、Diagnosis、Scoring Config | 共有D1 | 公開状態など各ドメインの条件で参照 |
 | Account所有root | Source Record、Conversation Session、Diagnosis Response、Brain Item | AccountData SQLite | Objectに固定したAccountだけを保存 |
 | Account所有descendant | payload、message、turn、answer、edge、revision、projection request | AccountData SQLite | 所有rootと同じObject内で参照 |
 | 全体運用 | 管理者統計、配送先解決 | 共有D1 | 原文・Brain Item本文を保存しない |
 
-AccountData SQLite内でも`account_id`を各所有行へ保存します。Objectの物理分離を第一境界とし、Object identity、各行の`account_id`、複合外部キーの3つを一致させます。これはmigration、backup、誤routingの検出にも使うsecurity invariantです。
+AccountData SQLiteでは、Object identityとAccount所有rootだけが`account_id`を持つことを原則とします。descendantの所有者はrootへの外部キーから一意に決まるため、同じ`account_id`を重複保存しません。Objectの物理分離を第一境界、Object identityとrootの`account_id`一致を誤routing検出の第二境界とします。
+
+移行期間中の既知の例外として、既存の共有D1 actionとschemaを再利用するBrainのedge、revision、labelとDiagnosis Brain projection headには、本変更以前から存在する`account_id`が残ります。これは認可境界として利用せず、AccountData専用schemaへ分離した時点で親への外部キーへ置き換えます。Conversation、Source、Diagnosis回答のdescendantへ移行専用の`account_id`は追加しません。
 
 ## 4. 不変条件
 
@@ -61,10 +63,10 @@ AccountData SQLite内でも`account_id`を各所有行へ保存します。Objec
 ### 4.2 書き込み
 
 1. Account所有rootは`account_id NOT NULL`とAccountData内のsingleton Accountへの外部キーを持ちます。
-2. Account所有descendantは`account_id NOT NULL`を持ち、所有rootへ`(parent_id, account_id)`の複合外部キーを張ります。
-3. 同じ行を複合外部キーから参照するrootには`UNIQUE(id, account_id)`を置きます。
-4. 循環参照のため複合外部キーを表現できないConversation MessageとChat Turnの相互参照は、insert/update triggerで`account_id`一致を強制します。
-5. AccountData repositoryはObjectへ固定した同じ`account_id`を、同一transactionで作るすべてのdescendantへ明示的に書き込みます。
+2. Account所有descendantは原則として`account_id`を持たず、所有rootまたは同じaggregateの親へ通常の外部キーを張ります。移行中の既知の例外は[データの区分](#3-データの区分)だけで管理します。
+3. 2つのAccount所有rootを結ぶ関係も、同じAccountData Object内に片方のAccountしか存在しないため、両方のroot IDへの外部キーで混在を防ぎます。
+4. Conversation MessageとChat Turnの循環参照は、両方を同じObject内に作成してから参照を復元します。
+5. AccountData repositoryはdescendantへ所有者を重複転記せず、rootの所有者とObject identityだけを検証します。
 
 ### 4.3 全Accountを扱う処理
 
@@ -95,7 +97,7 @@ erDiagram
     accounts ||--o{ diagnosis_brain_projection_heads : owns
 ```
 
-関係tableが2つのAccount所有rootを結ぶ場合、両方の複合外部キーが同じ`account_id`列を使います。これにより、Source RecordとBrain Item、Diagnosis ResponseとSource Recordなどを別Account間で結べません。
+関係tableが2つのAccount所有rootを結ぶ場合も、両rootは同じAccountData Object内にしか存在しません。通常の外部キーでSource RecordとBrain Item、Diagnosis ResponseとSource Recordを結び、別ObjectのIDは参照先そのものが存在しないため関連付けられません。
 
 ## 6. Storageとmodule境界
 
@@ -120,20 +122,20 @@ Conversation Coordinatorは連投調停、generation lease、配送outboxだけ�
 
 1. 既存の親子関係から`account_id`を比較し、既に混在していればmigrationを失敗させる
 2. Accountごとに同じAccountData Objectを決定し、rootとdescendantを同じObjectへcopyする
-3. copy後に行数、ID集合、`account_id`、`PRAGMA foreign_key_check`を照合する
+3. copy後に行数、ID集合、rootの`account_id`、`PRAGMA foreign_key_check`を照合する
 4. 読み取りをAccountDataへ切り替えてから、共有D1へのAccount所有データ書き込みを停止する
 5. rollback期間後に共有D1のAccount所有tableを削除する
 6. 異なるAccountを同じObjectへ渡すnegative testと、共有D1から原文を取得できないtestを追加する
 
 現在の移行期間は、AccountDataへの最初のRPCで旧共有D1からそのAccountの所有行をlazy copyします。公開Diagnosis catalogを先に同期し、Source、Brain、Diary、Diagnosisの親子順に1つのSQLite transactionへ保存します。Conversation MessageとChat Turnの循環参照は一度NULLでcopyし、両方のrootを作成してから復元します。完了時刻を`account_data_identity.legacy_imported_at`へ保存し、失敗時は完了扱いにせず次のRPCで再試行します。
 
-deployは、Account境界migrationを共有D1へ適用して全descendantの`account_id`を確定した後、Worker、APIの順に行います。移行完了Account数とcopy失敗を監視し、全対象Accountの照合が終わるまで共有D1の旧tableを削除しません。
+共有D1のdescendantへ移行専用の`account_id`を追加してはいけません。copy対象は既存の親子関係から導出し、別Accountのrootを参照する既存行はAccountData側の外部キー検証で移行を失敗させます。deploy時は旧書き込みと最初のlazy copyが競合しないようAccount所有データへの書き込みを停止してからWorker、APIを切り替えます。移行完了Account数とcopy失敗を監視し、全対象Accountの照合が終わるまで共有D1の旧tableを削除しません。
+
+descendantの`account_id`を削除するcontract migrationは、AccountDataへの切り替えを含むdeployと同時に適用しません。切り替え済みのWorkerとAPIが本番で稼働し、共有D1へAccount所有データを書かないことを確認した後のstacked deployで適用します。これにより、migrationが先に適用される時間帯に旧アプリケーションが削除済み列へ書き込む事態を防ぎます。
 
 不一致行を削除したり、片方の所有者へ自動的に寄せたりしてmigrationを成功させてはいけません。混在が見つかった場合は、データごとの正しい所有者を調査してからrepairします。
 
-Conversation MessageまたはChat Turnを将来のmigrationでtable再作成する場合は、相互参照のAccount一致を検証するtriggerも同じmigration内で再作成します。Drizzle schemaだけではこの循環参照triggerを表現していないため、AccountData用の生成SQLから脱落していないことをnegative testで確認します。
-
-新規環境では共有D1にAccount所有tableを作らず、AccountDataだけを利用します。既存環境の移行完了までは共有D1側の複合外部キーとtriggerを安全網として維持します。
+新規環境では共有D1にAccount所有tableを作らず、AccountDataだけを利用します。既存環境の共有D1 schemaはlazy copyの入力としてだけ維持し、AccountData向けに列やtriggerを追加しません。
 
 ## 8. 変更時チェックリスト
 
@@ -141,10 +143,9 @@ Conversation MessageまたはChat Turnを将来のmigrationでtable再作成す�
 - [ ] Account所有tableを共有D1ではなくAccountData schemaへ追加したか
 - [ ] AccountData Objectが認証済み`account_id`から選ばれているか
 - [ ] Object identityと異なる`account_id`をRPCで拒否するか
-- [ ] Account所有descendant自身にも`account_id`があるか
-- [ ] Account所有table間の参照が`(id, account_id)`で固定されているか
+- [ ] descendantへ新しい`account_id`を重複追加していないか。既知の移行例外を増やしていないか
+- [ ] Account所有table間の参照が同じObject内の外部キーで固定されているか
 - [ ] API・Worker・MCPがAccountDataのraw SQLite clientを取得できないか
 - [ ] 全Account処理がAccountData RPCから分離され、原文を集約していないか
 - [ ] migrationが既存の混在を検出し、copy後のID集合と外部キーを検証するか
-- [ ] Conversation MessageまたはChat Turnを再作成した場合、Account境界triggerも再作成したか
 - [ ] 別Accountを使うnegative testがあるか

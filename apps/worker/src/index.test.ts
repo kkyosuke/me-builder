@@ -125,7 +125,6 @@ describe("Worker", () => {
       "account-1",
       "conversation.storeLineTextSource",
       expect.objectContaining({
-        accountId: "account-1",
         eventId: "webhook-event-1",
         body: "今日は散歩した",
       }),

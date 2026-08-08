@@ -12,6 +12,7 @@ import type { Env } from "../types";
 
 const migrationsDirectory = path.resolve(__dirname, "../../../../packages/lib/drizzle");
 type StoredLineSource = Awaited<ReturnType<typeof d1.action.conversation.storeLineTextSource>>;
+type StoredAccountLineSource = StoredLineSource & { accountId: string };
 
 let miniflare: Miniflare;
 let database: D1Database;
@@ -92,20 +93,21 @@ async function storeSource(
   eventId: string,
   body: string,
   receivedAt: Date,
-): Promise<StoredLineSource> {
+): Promise<StoredAccountLineSource> {
   const { account } = await d1.action.account.upsertIdentity(client, {
     provider: "line",
     providerAccountId,
   });
-  return d1.action.conversation.storeLineTextSource(client, {
+  const source = await d1.action.conversation.storeLineTextSource(client, {
     accountId: account.id,
     eventId,
     body,
     receivedAt,
   });
+  return { ...source, accountId: account.id };
 }
 
-function acceptedInput(source: StoredLineSource) {
+function acceptedInput(source: StoredAccountLineSource) {
   return { ...source, receivedAt: source.receivedAt.toISOString() };
 }
 
@@ -203,6 +205,7 @@ describe("ConversationCoordinator D1 E2E", () => {
     );
     const firstTurn = await d1.action.conversation.attachMessagesToTurn(
       client,
+      first.accountId,
       [first],
       1,
       "test-model",

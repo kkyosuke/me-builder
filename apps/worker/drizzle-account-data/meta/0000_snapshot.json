@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "ead925f7-aa16-49f5-a251-731f1de8f8da",
+  "id": "8bc44ef1-e42a-40c2-830f-6f98028e8185",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "account_data_identity": {
@@ -19,6 +19,13 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false
+        },
+        "legacy_imported_at": {
+          "name": "legacy_imported_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         }
       },
@@ -710,13 +717,6 @@
           "autoincrement": false,
           "default": false
         },
-        "account_id": {
-          "name": "account_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
         "session_id": {
           "name": "session_id",
           "type": "text",
@@ -824,6 +824,13 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "delivery_metric_token": {
+          "name": "delivery_metric_token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         }
       },
       "indexes": {
@@ -839,21 +846,12 @@
         }
       },
       "foreignKeys": {
-        "chat_turns_account_id_accounts_id_fk": {
-          "name": "chat_turns_account_id_accounts_id_fk",
-          "tableFrom": "chat_turns",
-          "tableTo": "accounts",
-          "columnsFrom": ["account_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "chat_turns_session_id_account_id_conversation_sessions_id_account_id_fk": {
-          "name": "chat_turns_session_id_account_id_conversation_sessions_id_account_id_fk",
+        "chat_turns_session_id_conversation_sessions_id_fk": {
+          "name": "chat_turns_session_id_conversation_sessions_id_fk",
           "tableFrom": "chat_turns",
           "tableTo": "conversation_sessions",
-          "columnsFrom": ["session_id", "account_id"],
-          "columnsTo": ["id", "account_id"],
+          "columnsFrom": ["session_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -900,13 +898,6 @@
           "notNull": true,
           "autoincrement": false,
           "default": false
-        },
-        "account_id": {
-          "name": "account_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
         },
         "session_id": {
           "name": "session_id",
@@ -973,11 +964,6 @@
         }
       },
       "indexes": {
-        "conversation_message_account_identity_idx": {
-          "name": "conversation_message_account_identity_idx",
-          "columns": ["id", "account_id"],
-          "isUnique": true
-        },
         "conversation_message_session_sequence_idx": {
           "name": "conversation_message_session_sequence_idx",
           "columns": ["session_id", "sequence"],
@@ -991,30 +977,21 @@
         }
       },
       "foreignKeys": {
-        "conversation_messages_account_id_accounts_id_fk": {
-          "name": "conversation_messages_account_id_accounts_id_fk",
+        "conversation_messages_session_id_conversation_sessions_id_fk": {
+          "name": "conversation_messages_session_id_conversation_sessions_id_fk",
           "tableFrom": "conversation_messages",
-          "tableTo": "accounts",
-          "columnsFrom": ["account_id"],
+          "tableTo": "conversation_sessions",
+          "columnsFrom": ["session_id"],
           "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "conversation_messages_session_id_account_id_conversation_sessions_id_account_id_fk": {
-          "name": "conversation_messages_session_id_account_id_conversation_sessions_id_account_id_fk",
-          "tableFrom": "conversation_messages",
-          "tableTo": "conversation_sessions",
-          "columnsFrom": ["session_id", "account_id"],
-          "columnsTo": ["id", "account_id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "conversation_messages_source_record_id_account_id_source_records_id_account_id_fk": {
-          "name": "conversation_messages_source_record_id_account_id_source_records_id_account_id_fk",
+        "conversation_messages_source_record_id_source_records_id_fk": {
+          "name": "conversation_messages_source_record_id_source_records_id_fk",
           "tableFrom": "conversation_messages",
           "tableTo": "source_records",
-          "columnsFrom": ["source_record_id", "account_id"],
-          "columnsTo": ["id", "account_id"],
+          "columnsFrom": ["source_record_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1112,6 +1089,38 @@
           "notNull": false,
           "autoincrement": false
         },
+        "conversation_policy_id": {
+          "name": "conversation_policy_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'reflective'"
+        },
+        "reply_opportunity_count": {
+          "name": "reply_opportunity_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "reply_count": {
+          "name": "reply_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "awaiting_reply": {
+          "name": "awaiting_reply",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
         "next_sequence": {
           "name": "next_sequence",
           "type": "integer",
@@ -1122,11 +1131,6 @@
         }
       },
       "indexes": {
-        "conversation_session_account_identity_idx": {
-          "name": "conversation_session_account_identity_idx",
-          "columns": ["id", "account_id"],
-          "isUnique": true
-        },
         "conversation_session_account_status_idx": {
           "name": "conversation_session_account_status_idx",
           "columns": ["account_id", "status"],
@@ -1164,13 +1168,6 @@
           "notNull": true,
           "autoincrement": false
         },
-        "account_id": {
-          "name": "account_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
         "body": {
           "name": "body",
           "type": "text",
@@ -1203,21 +1200,12 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "source_record_text_payloads_account_id_accounts_id_fk": {
-          "name": "source_record_text_payloads_account_id_accounts_id_fk",
-          "tableFrom": "source_record_text_payloads",
-          "tableTo": "accounts",
-          "columnsFrom": ["account_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "source_record_text_payloads_source_record_id_account_id_source_records_id_account_id_fk": {
-          "name": "source_record_text_payloads_source_record_id_account_id_source_records_id_account_id_fk",
+        "source_record_text_payloads_source_record_id_source_records_id_fk": {
+          "name": "source_record_text_payloads_source_record_id_source_records_id_fk",
           "tableFrom": "source_record_text_payloads",
           "tableTo": "source_records",
-          "columnsFrom": ["source_record_id", "account_id"],
-          "columnsTo": ["id", "account_id"],
+          "columnsFrom": ["source_record_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1386,13 +1374,6 @@
           "autoincrement": false,
           "default": false
         },
-        "account_id": {
-          "name": "account_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
         "diagnosis_response_id": {
           "name": "diagnosis_response_id",
           "type": "text",
@@ -1457,11 +1438,11 @@
         }
       },
       "foreignKeys": {
-        "diagnosis_answers_account_id_accounts_id_fk": {
-          "name": "diagnosis_answers_account_id_accounts_id_fk",
+        "diagnosis_answers_diagnosis_response_id_diagnosis_responses_id_fk": {
+          "name": "diagnosis_answers_diagnosis_response_id_diagnosis_responses_id_fk",
           "tableFrom": "diagnosis_answers",
-          "tableTo": "accounts",
-          "columnsFrom": ["account_id"],
+          "tableTo": "diagnosis_responses",
+          "columnsFrom": ["diagnosis_response_id"],
           "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
@@ -1475,21 +1456,12 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "diagnosis_answers_diagnosis_response_id_account_id_diagnosis_responses_id_account_id_fk": {
-          "name": "diagnosis_answers_diagnosis_response_id_account_id_diagnosis_responses_id_account_id_fk",
-          "tableFrom": "diagnosis_answers",
-          "tableTo": "diagnosis_responses",
-          "columnsFrom": ["diagnosis_response_id", "account_id"],
-          "columnsTo": ["id", "account_id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "diagnosis_answers_source_record_id_account_id_source_records_id_account_id_fk": {
-          "name": "diagnosis_answers_source_record_id_account_id_source_records_id_account_id_fk",
+        "diagnosis_answers_source_record_id_source_records_id_fk": {
+          "name": "diagnosis_answers_source_record_id_source_records_id_fk",
           "tableFrom": "diagnosis_answers",
           "tableTo": "source_records",
-          "columnsFrom": ["source_record_id", "account_id"],
-          "columnsTo": ["id", "account_id"],
+          "columnsFrom": ["source_record_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1690,13 +1662,6 @@
           "autoincrement": false,
           "default": false
         },
-        "account_id": {
-          "name": "account_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
         "diagnosis_response_id": {
           "name": "diagnosis_response_id",
           "type": "text",
@@ -1755,21 +1720,12 @@
         }
       },
       "foreignKeys": {
-        "diagnosis_brain_projection_requests_account_id_accounts_id_fk": {
-          "name": "diagnosis_brain_projection_requests_account_id_accounts_id_fk",
-          "tableFrom": "diagnosis_brain_projection_requests",
-          "tableTo": "accounts",
-          "columnsFrom": ["account_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "diagnosis_brain_projection_requests_diagnosis_response_id_account_id_diagnosis_responses_id_account_id_fk": {
-          "name": "diagnosis_brain_projection_requests_diagnosis_response_id_account_id_diagnosis_responses_id_account_id_fk",
+        "diagnosis_brain_projection_requests_diagnosis_response_id_diagnosis_responses_id_fk": {
+          "name": "diagnosis_brain_projection_requests_diagnosis_response_id_diagnosis_responses_id_fk",
           "tableFrom": "diagnosis_brain_projection_requests",
           "tableTo": "diagnosis_responses",
-          "columnsFrom": ["diagnosis_response_id", "account_id"],
-          "columnsTo": ["id", "account_id"],
+          "columnsFrom": ["diagnosis_response_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1817,13 +1773,6 @@
           "autoincrement": false,
           "default": false
         },
-        "account_id": {
-          "name": "account_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
         "diagnosis_response_id": {
           "name": "diagnosis_response_id",
           "type": "text",
@@ -1855,11 +1804,11 @@
         }
       },
       "foreignKeys": {
-        "diagnosis_deferred_questions_account_id_accounts_id_fk": {
-          "name": "diagnosis_deferred_questions_account_id_accounts_id_fk",
+        "diagnosis_deferred_questions_diagnosis_response_id_diagnosis_responses_id_fk": {
+          "name": "diagnosis_deferred_questions_diagnosis_response_id_diagnosis_responses_id_fk",
           "tableFrom": "diagnosis_deferred_questions",
-          "tableTo": "accounts",
-          "columnsFrom": ["account_id"],
+          "tableTo": "diagnosis_responses",
+          "columnsFrom": ["diagnosis_response_id"],
           "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
@@ -1870,15 +1819,6 @@
           "tableTo": "diagnosis_questions",
           "columnsFrom": ["diagnosis_question_id"],
           "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "diagnosis_deferred_questions_diagnosis_response_id_account_id_diagnosis_responses_id_account_id_fk": {
-          "name": "diagnosis_deferred_questions_diagnosis_response_id_account_id_diagnosis_responses_id_account_id_fk",
-          "tableFrom": "diagnosis_deferred_questions",
-          "tableTo": "diagnosis_responses",
-          "columnsFrom": ["diagnosis_response_id", "account_id"],
-          "columnsTo": ["id", "account_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2065,11 +2005,6 @@
         }
       },
       "indexes": {
-        "diagnosis_response_account_identity_idx": {
-          "name": "diagnosis_response_account_identity_idx",
-          "columns": ["id", "account_id"],
-          "isUnique": true
-        },
         "diagnosis_response_account_active_idx": {
           "name": "diagnosis_response_account_active_idx",
           "columns": ["account_id", "diagnosis_id"],
@@ -2465,13 +2400,6 @@
           "autoincrement": false,
           "default": false
         },
-        "account_id": {
-          "name": "account_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
         "previous_source_record_id": {
           "name": "previous_source_record_id",
           "type": "text",
@@ -2502,30 +2430,21 @@
         }
       },
       "foreignKeys": {
-        "source_record_revisions_account_id_accounts_id_fk": {
-          "name": "source_record_revisions_account_id_accounts_id_fk",
-          "tableFrom": "source_record_revisions",
-          "tableTo": "accounts",
-          "columnsFrom": ["account_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "source_record_revisions_previous_source_record_id_account_id_source_records_id_account_id_fk": {
-          "name": "source_record_revisions_previous_source_record_id_account_id_source_records_id_account_id_fk",
+        "source_record_revisions_previous_source_record_id_source_records_id_fk": {
+          "name": "source_record_revisions_previous_source_record_id_source_records_id_fk",
           "tableFrom": "source_record_revisions",
           "tableTo": "source_records",
-          "columnsFrom": ["previous_source_record_id", "account_id"],
-          "columnsTo": ["id", "account_id"],
+          "columnsFrom": ["previous_source_record_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "source_record_revisions_next_source_record_id_account_id_source_records_id_account_id_fk": {
-          "name": "source_record_revisions_next_source_record_id_account_id_source_records_id_account_id_fk",
+        "source_record_revisions_next_source_record_id_source_records_id_fk": {
+          "name": "source_record_revisions_next_source_record_id_source_records_id_fk",
           "tableFrom": "source_record_revisions",
           "tableTo": "source_records",
-          "columnsFrom": ["next_source_record_id", "account_id"],
-          "columnsTo": ["id", "account_id"],
+          "columnsFrom": ["next_source_record_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }

@@ -31,10 +31,34 @@ function createRepository() {
     sql,
     transactionSync: <T>(callback: () => T) => sqlite.transaction(callback)(),
   } as unknown as DurableObjectStorage;
-  return new AccountDataRepository(storage);
+  return Object.assign(new AccountDataRepository(storage), {
+    columnNames: (table: string) =>
+      sql
+        .exec<{ name: string }>(`PRAGMA table_info(${table})`)
+        .toArray()
+        .map(({ name }) => name),
+  });
 }
 
 describe("AccountDataRepository", () => {
+  it("前回追加したdescendantの冗長なaccount_idをAccountDataへ持ち込まない", async () => {
+    const repository = createRepository();
+    await repository.initialize();
+
+    const descendantTables = [
+      "source_record_text_payloads",
+      "source_record_revisions",
+      "conversation_messages",
+      "chat_turns",
+      "diagnosis_answers",
+      "diagnosis_deferred_questions",
+      "diagnosis_brain_projection_requests",
+    ];
+    for (const table of descendantTables) {
+      expect(repository.columnNames(table), table).not.toContain("account_id");
+    }
+  });
+
   it("Objectを最初のAccountへ固定し、異なるAccountを拒否する", async () => {
     const repository = createRepository();
     await repository.initialize();
@@ -84,6 +108,7 @@ describe("AccountDataRepository", () => {
     });
     const turn = await d1.action.conversation.attachMessagesToTurn(
       legacy.client,
+      "account-1",
       [source],
       1,
       "test-model",

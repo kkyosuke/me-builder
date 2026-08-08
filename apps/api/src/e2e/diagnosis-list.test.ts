@@ -132,16 +132,15 @@ async function insertAnswers(
       db
         .prepare(
           `INSERT INTO diagnosis_answers (
-             id, created_at, updated_at, is_deleted, account_id, diagnosis_response_id,
+             id, created_at, updated_at, is_deleted, diagnosis_response_id,
              diagnosis_question_id, question_id, question_version, choice_id,
              accepted_at, source_record_id
-           ) VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?, 'yes', ?, ?)`,
+           ) VALUES (?, ?, ?, 0, ?, ?, ?, ?, 'yes', ?, ?)`,
         )
         .bind(
           `answer-${responseId}-${index}`,
           timestamp,
           timestamp,
-          "account-e2e",
           responseId,
           question.id,
           question.question_id,

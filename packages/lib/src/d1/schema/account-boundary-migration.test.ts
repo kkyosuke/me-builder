@@ -24,8 +24,8 @@ function applyMigration(sqlite: Database.Database, filename: string) {
   sqlite.exec(readFileSync(path.join(migrationsDirectory, filename), "utf8"));
 }
 
-describe("Account boundary migration", () => {
-  it("既存のAccount所有行へ所有者をbackfillして制約を有効にする", () => {
+describe("Account boundary migration lifecycle", () => {
+  it("既存の混在検証後にdescendantのaccount_idを削除してデータを保持する", () => {
     const sqlite = new Database(":memory:");
     sqlite.pragma("foreign_keys = ON");
     for (const filename of migrationsBeforeAccountBoundary) applyMigration(sqlite, filename);
@@ -87,6 +87,7 @@ describe("Account boundary migration", () => {
     `);
 
     applyMigration(sqlite, "0013_majestic_giant_man.sql");
+    applyMigration(sqlite, "0014_sharp_hercules.sql");
 
     for (const table of [
       "source_record_revisions",
@@ -97,10 +98,29 @@ describe("Account boundary migration", () => {
       "diagnosis_deferred_questions",
       "diagnosis_brain_projection_requests",
     ]) {
-      expect(sqlite.prepare(`SELECT account_id FROM ${table}`).pluck().all()).toEqual([
-        "account-1",
-      ]);
+      const columns = sqlite.pragma(`table_info(${table})`) as Array<{ name: string }>;
+      expect(
+        columns.map(({ name }) => name),
+        table,
+      ).not.toContain("account_id");
+      expect(sqlite.prepare(`SELECT COUNT(*) FROM ${table}`).pluck().get(), table).toBe(1);
     }
+    expect(
+      sqlite
+        .prepare("SELECT name FROM sqlite_master WHERE type = 'trigger' AND name LIKE '%account%'")
+        .pluck()
+        .all(),
+    ).toEqual([]);
+    expect(sqlite.prepare("SELECT account_id FROM source_records").pluck().all()).toEqual([
+      "account-1",
+      "account-1",
+    ]);
+    expect(sqlite.prepare("SELECT account_id FROM conversation_sessions").pluck().all()).toEqual([
+      "account-1",
+    ]);
+    expect(sqlite.prepare("SELECT account_id FROM diagnosis_responses").pluck().all()).toEqual([
+      "account-1",
+    ]);
     expect(sqlite.pragma("foreign_key_check")).toEqual([]);
     sqlite.close();
   });

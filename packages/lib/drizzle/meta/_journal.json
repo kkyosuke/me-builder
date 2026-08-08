@@ -99,6 +99,13 @@
       "when": 1786188962515,
       "tag": "0013_majestic_giant_man",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1786195339168,
+      "tag": "0014_sharp_hercules",
+      "breakpoints": true
     }
   ]
 }

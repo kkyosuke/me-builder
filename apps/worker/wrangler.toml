@@ -107,7 +107,7 @@ class_name = "AccountData"
 [[env.preview.d1_databases]]
 binding = "DB"
 database_name = "me-builder-db-preview"
-database_id = "ef439301-0199-4c78-af5e-91fcc5be63bd"
+database_id = "28fa7981-1638-406a-beea-a0269d6c41d4"
 
 [env.preview.vars]
 ENVIRONMENT = "preview"

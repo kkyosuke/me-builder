@@ -102,10 +102,10 @@ export async function processChatTurnMessage(
     return true;
   };
   try {
-    const pendingResponse = await accountData.execute("conversation.getPendingAssistantResponse", {
-      accountId: context.accountId,
-      turnId: message.body.turnId,
-    });
+    const pendingResponse = await accountData.execute(
+      "conversation.getPendingAssistantResponse",
+      message.body.turnId,
+    );
     if (
       !pendingResponse &&
       !(await accountData.execute("conversation.markTurnGenerating", message.body.turnId))

@@ -1,44 +1,73 @@
-import type * as brain from "./d1/action/brain";
 import type * as conversation from "./d1/action/conversation";
 import type * as diagnosis from "./d1/action/diagnosis";
 import type * as diagnosisBrainProjection from "./d1/action/diagnosis-brain-projection";
 import type * as source from "./d1/action/source";
 
+type ActionResult<T> = T extends (...args: never[]) => infer TResult ? Awaited<TResult> : never;
+type WithoutAccountId<T> = T extends { accountId: unknown } ? Omit<T, "accountId"> : never;
 type WithoutDatabase<T> = T extends (...args: infer TArgs) => unknown
   ? TArgs extends [unknown, ...infer TRest]
     ? TRest
     : never
   : never;
-type ActionResult<T> = T extends (...args: never[]) => infer TResult ? Awaited<TResult> : never;
+type RpcAction<TArgs extends unknown[], TAction extends (...args: never[]) => unknown> = (
+  ...args: TArgs
+) => ReturnType<TAction>;
+type DomainAction<TAction extends (...args: never[]) => unknown> = RpcAction<
+  WithoutDatabase<TAction>,
+  TAction
+>;
 
 export type AccountDataActions = {
-  "brain.save": typeof brain.saveBrainItem;
-  "brain.find": typeof brain.findBrainItemForAccount;
-  "source.hasActive": typeof source.hasActiveSourceRecords;
-  "conversation.storeLineTextSource": typeof conversation.storeLineTextSource;
-  "conversation.attachMessagesToTurn": typeof conversation.attachMessagesToTurn;
-  "conversation.getTurnContext": typeof conversation.getTurnContext;
-  "conversation.markTurnGenerating": typeof conversation.markTurnGenerating;
-  "conversation.getTurnStatus": typeof conversation.getTurnStatus;
-  "conversation.isTurnSessionActive": typeof conversation.isTurnSessionActive;
-  "conversation.saveAssistantResponse": typeof conversation.saveAssistantResponse;
-  "conversation.getPendingAssistantResponse": typeof conversation.getPendingAssistantResponse;
-  "conversation.closeTurnSession": typeof conversation.closeTurnSession;
-  "conversation.closeExpiredSessions": typeof conversation.closeExpiredSessions;
-  "conversation.markTurnDelivered": typeof conversation.markTurnDelivered;
-  "conversation.markTurnFailed": typeof conversation.markTurnFailed;
-  "diagnosis.deleteAccountData": typeof diagnosis.deleteAccountDiagnosisData;
-  "diagnosis.deferQuestion": typeof diagnosis.deferDiagnosisQuestion;
-  "diagnosis.saveAnswer": typeof diagnosis.saveDiagnosisAnswer;
-  "diagnosis.findAnswers": typeof diagnosis.findDiagnosisAnswers;
-  "diagnosis.listVisible": typeof diagnosis.listVisibleDiagnoses;
-  "diagnosisProjection.processRequest": typeof diagnosisBrainProjection.processDiagnosisBrainProjectionRequest;
-  "diagnosisProjection.processLatest": typeof diagnosisBrainProjection.processLatestDiagnosisBrainProjection;
-  "diagnosisProjection.processPending": typeof diagnosisBrainProjection.processPendingDiagnosisBrainProjections;
+  "source.hasActive": RpcAction<[], typeof source.hasActiveSourceRecords>;
+  "conversation.storeLineTextSource": RpcAction<
+    [WithoutAccountId<Parameters<typeof conversation.storeLineTextSource>[1]>],
+    typeof conversation.storeLineTextSource
+  >;
+  "conversation.attachMessagesToTurn": RpcAction<
+    [
+      inputs: Parameters<typeof conversation.attachMessagesToTurn>[2],
+      generationEpoch: number,
+      model: string,
+      promptVersion: string,
+      conversationPolicyIds?: readonly string[],
+    ],
+    typeof conversation.attachMessagesToTurn
+  >;
+  "conversation.getTurnContext": DomainAction<typeof conversation.getTurnContext>;
+  "conversation.markTurnGenerating": DomainAction<typeof conversation.markTurnGenerating>;
+  "conversation.getTurnStatus": DomainAction<typeof conversation.getTurnStatus>;
+  "conversation.isTurnSessionActive": DomainAction<typeof conversation.isTurnSessionActive>;
+  "conversation.saveAssistantResponse": DomainAction<typeof conversation.saveAssistantResponse>;
+  "conversation.getPendingAssistantResponse": RpcAction<
+    [turnId: string],
+    typeof conversation.getPendingAssistantResponse
+  >;
+  "conversation.closeTurnSession": DomainAction<typeof conversation.closeTurnSession>;
+  "conversation.markTurnDelivered": DomainAction<typeof conversation.markTurnDelivered>;
+  "conversation.markTurnFailed": DomainAction<typeof conversation.markTurnFailed>;
+  "diagnosis.deleteAccountData": RpcAction<[], typeof diagnosis.deleteAccountDiagnosisData>;
+  "diagnosis.deferQuestion": RpcAction<
+    [WithoutAccountId<Parameters<typeof diagnosis.deferDiagnosisQuestion>[1]>],
+    typeof diagnosis.deferDiagnosisQuestion
+  >;
+  "diagnosis.saveAnswer": RpcAction<
+    [WithoutAccountId<Parameters<typeof diagnosis.saveDiagnosisAnswer>[1]>],
+    typeof diagnosis.saveDiagnosisAnswer
+  >;
+  "diagnosis.findAnswers": RpcAction<
+    [diagnosisId: string, at: Date],
+    typeof diagnosis.findDiagnosisAnswers
+  >;
+  "diagnosis.listVisible": RpcAction<[at: Date], typeof diagnosis.listVisibleDiagnoses>;
+  "diagnosisProjection.processLatest": RpcAction<
+    [diagnosisId: string, at?: Date],
+    typeof diagnosisBrainProjection.processLatestDiagnosisBrainProjection
+  >;
 };
 
 export type AccountDataOperation = keyof AccountDataActions;
-export type AccountDataArgs<TOperation extends AccountDataOperation> = WithoutDatabase<
+export type AccountDataArgs<TOperation extends AccountDataOperation> = Parameters<
   AccountDataActions[TOperation]
 >;
 export type AccountDataResult<TOperation extends AccountDataOperation> = ActionResult<

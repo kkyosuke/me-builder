@@ -1,38 +1,21 @@
 import { sql } from "drizzle-orm";
-import {
-  foreignKey,
-  index,
-  integer,
-  sqliteTable,
-  text,
-  uniqueIndex,
-} from "drizzle-orm/sqlite-core";
+import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 import { accounts } from "./account";
 import { baseSchema } from "./base";
 import { sourceRecords } from "./source";
 
 /** D1に保存するテキスト原本。 */
-export const sourceRecordTextPayloads = sqliteTable(
-  "source_record_text_payloads",
-  {
-    sourceRecordId: text("source_record_id").primaryKey(),
-    accountId: text("account_id")
-      .notNull()
-      .references(() => accounts.id),
-    body: text("body").notNull(),
-    contentType: text("content_type").notNull().default("text/plain"),
-    contentHash: text("content_hash").notNull(),
-    createdAt: integer("created_at", { mode: "timestamp" })
-      .notNull()
-      .$defaultFn(() => new Date()),
-  },
-  (table) => [
-    foreignKey({
-      columns: [table.sourceRecordId, table.accountId],
-      foreignColumns: [sourceRecords.id, sourceRecords.accountId],
-    }).onDelete("cascade"),
-  ],
-);
+export const sourceRecordTextPayloads = sqliteTable("source_record_text_payloads", {
+  sourceRecordId: text("source_record_id")
+    .primaryKey()
+    .references(() => sourceRecords.id, { onDelete: "cascade" }),
+  body: text("body").notNull(),
+  contentType: text("content_type").notNull().default("text/plain"),
+  contentHash: text("content_hash").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
 
 export const conversationSessions = sqliteTable(
   "conversation_sessions",
@@ -56,7 +39,6 @@ export const conversationSessions = sqliteTable(
     nextSequence: integer("next_sequence").notNull().default(1),
   },
   (table) => [
-    uniqueIndex("conversation_session_account_identity_idx").on(table.id, table.accountId),
     index("conversation_session_account_status_idx").on(table.accountId, table.status),
     uniqueIndex("conversation_session_active_account_idx")
       .on(table.accountId)
@@ -68,14 +50,13 @@ export const conversationMessages = sqliteTable(
   "conversation_messages",
   {
     ...baseSchema,
-    accountId: text("account_id")
+    sessionId: text("session_id")
       .notNull()
-      .references(() => accounts.id),
-    sessionId: text("session_id").notNull(),
+      .references(() => conversationSessions.id),
     sequence: integer("sequence").notNull(),
     role: text("role", { enum: ["user", "assistant"] }).notNull(),
     // TODO: 表示や集計でmessage種別が必要になった段階でkindを追加する。
-    sourceRecordId: text("source_record_id"),
+    sourceRecordId: text("source_record_id").references(() => sourceRecords.id),
     /** チャット履歴の復元に使うため、Session終了後も保持する。 */
     assistantBody: text("assistant_body"),
     channel: text("channel").notNull(),
@@ -84,15 +65,6 @@ export const conversationMessages = sqliteTable(
     sentAt: integer("sent_at", { mode: "timestamp" }),
   },
   (table) => [
-    foreignKey({
-      columns: [table.sessionId, table.accountId],
-      foreignColumns: [conversationSessions.id, conversationSessions.accountId],
-    }),
-    foreignKey({
-      columns: [table.sourceRecordId, table.accountId],
-      foreignColumns: [sourceRecords.id, sourceRecords.accountId],
-    }),
-    uniqueIndex("conversation_message_account_identity_idx").on(table.id, table.accountId),
     uniqueIndex("conversation_message_session_sequence_idx").on(table.sessionId, table.sequence),
     uniqueIndex("conversation_message_channel_event_idx")
       .on(table.channel, table.channelEventId)
@@ -104,10 +76,9 @@ export const chatTurns = sqliteTable(
   "chat_turns",
   {
     ...baseSchema,
-    accountId: text("account_id")
+    sessionId: text("session_id")
       .notNull()
-      .references(() => accounts.id),
-    sessionId: text("session_id").notNull(),
+      .references(() => conversationSessions.id),
     fromSequence: integer("from_sequence").notNull(),
     throughSequence: integer("through_sequence").notNull(),
     generationEpoch: integer("generation_epoch").notNull(),
@@ -138,10 +109,6 @@ export const chatTurns = sqliteTable(
     deliveryMetricToken: text("delivery_metric_token"),
   },
   (table) => [
-    foreignKey({
-      columns: [table.sessionId, table.accountId],
-      foreignColumns: [conversationSessions.id, conversationSessions.accountId],
-    }),
     index("chat_turn_status_created_idx").on(table.status, table.createdAt),
     uniqueIndex("chat_turn_session_range_idx").on(
       table.sessionId,
