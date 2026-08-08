@@ -25,7 +25,6 @@ jobs:
       # LINE_LOGIN_CHANNEL_ID は未設定でも LIFF ID の接頭辞から補完される。
       LINE_LOGIN_CHANNEL_ID: ${{ vars.LINE_LOGIN_CHANNEL_ID }}
       LINE_LOGIN_CHANNEL_SECRET: ${{ secrets.LINE_LOGIN_CHANNEL_SECRET }}
-      LIFF_ID: ${{ vars.LIFF_ID }}
       BASE_DOMAIN: ${{ vars.BASE_DOMAIN }}
       VITE_ENVIRONMENT: production
       VITE_BASE_DOMAIN: ${{ vars.BASE_DOMAIN }}
@@ -129,6 +128,8 @@ jobs:
 
       - name: Register LINE Rich Menu (Production)
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' && env.LINE_CHANNEL_ACCESS_TOKEN != '' }}
+        env:
+          LIFF_ID: ${{ vars.LIFF_ID }}
         run: bun --cwd apps/api run register:rich-menu:production
 
 
