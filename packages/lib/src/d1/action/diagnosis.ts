@@ -131,6 +131,14 @@ export type DeletedAccountDiagnosisData = Readonly<{
   deletedSourceRecordCount: number;
 }>;
 
+type SaveDiagnosisAnswerInput = {
+  accountId: string;
+  diagnosisId: string;
+  diagnosisQuestionId: string;
+  choiceId: string;
+  at: Date;
+};
+
 type PersistedAnswer = {
   diagnosisQuestionId: string;
   questionId: string;
@@ -436,13 +444,14 @@ async function buildSaveResult(
  */
 export async function saveDiagnosisAnswer(
   db: D1Client,
-  input: {
-    accountId: string;
-    diagnosisId: string;
-    diagnosisQuestionId: string;
-    choiceId: string;
-    at: Date;
-  },
+  input: SaveDiagnosisAnswerInput,
+): Promise<SaveDiagnosisAnswerResult> {
+  return saveDiagnosisAnswerWithRevisionRetry(db, input);
+}
+
+async function saveDiagnosisAnswerWithRevisionRetry(
+  db: D1Client,
+  input: SaveDiagnosisAnswerInput,
 ): Promise<SaveDiagnosisAnswerResult> {
   const diagnosis = await db
     .select({
@@ -605,20 +614,35 @@ export async function saveDiagnosisAnswer(
     if (!isUniqueViolation(error)) {
       throw error;
     }
-    const concurrentResponseId = await findDiagnosisResponseId(
-      db,
-      input.accountId,
-      input.diagnosisId,
-    );
-    const concurrent = concurrentResponseId
-      ? await findPersistedAnswer(db, concurrentResponseId, input.diagnosisQuestionId)
+    const concurrentResponse = await db
+      .select({ id: diagnosisResponses.id, revision: diagnosisResponses.revision })
+      .from(diagnosisResponses)
+      .where(
+        and(
+          eq(diagnosisResponses.accountId, input.accountId),
+          eq(diagnosisResponses.diagnosisId, input.diagnosisId),
+          eq(diagnosisResponses.isDeleted, false),
+        ),
+      )
+      .get();
+    const concurrent = concurrentResponse
+      ? await findPersistedAnswer(db, concurrentResponse.id, input.diagnosisQuestionId)
       : undefined;
-    if (!concurrent || !concurrentResponseId) {
-      throw error;
+    if (concurrent && concurrentResponse) {
+      return concurrent.choiceId === input.choiceId
+        ? buildSaveResult(db, input.diagnosisId, concurrentResponse.id, concurrent, "unchanged")
+        : { type: "answer-conflict" };
     }
-    return concurrent.choiceId === input.choiceId
-      ? buildSaveResult(db, input.diagnosisId, concurrentResponseId, concurrent, "unchanged")
-      : { type: "answer-conflict" };
+
+    // 異なる質問の回答が先に同じrevisionを確保した場合だけ、最新revisionから保存をやり直す。
+    // response作成競合ではIDが、既存responseのCAS競合ではrevisionが進むため判別できる。
+    if (
+      concurrentResponse &&
+      (concurrentResponse.id !== responseId || concurrentResponse.revision > observedRevision)
+    ) {
+      return saveDiagnosisAnswerWithRevisionRetry(db, input);
+    }
+    throw error;
   }
 
   return buildSaveResult(db, input.diagnosisId, responseId, answer, "created");
