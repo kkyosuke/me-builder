@@ -12,8 +12,19 @@ function create(channelAccessToken: string): messagingApi.MessagingApiClient {
   });
 }
 
+/**
+ * 画像などのバイナリを扱う LINE Messaging API クライアントを生成します。
+ */
+function createBlob(channelAccessToken: string): messagingApi.MessagingApiBlobClient {
+  return new messagingApi.MessagingApiBlobClient({
+    channelAccessToken,
+  });
+}
+
 export const client: {
   create: (channelAccessToken: string) => messagingApi.MessagingApiClient;
+  createBlob: (channelAccessToken: string) => messagingApi.MessagingApiBlobClient;
 } = {
   create,
+  createBlob,
 };

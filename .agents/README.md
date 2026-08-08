@@ -37,6 +37,7 @@
 | [キャラクターデザイン](../docs/design/character-design.md) | うつし・ミラの名前、役割、外見設定、デザインアセットの置き場所と命名規則 |
 | [診断seed運用](../docs/development/diagnosis-seed.md) | Question、Question Version、Choice、DiagnosisをD1へ登録するseedの配置、実行、更新、検証方法 |
 | [診断サムネイル生成](../docs/development/diagnosis-thumbnail-generation.md) | 診断一覧用サムネイルの生成プロンプト、共通スタイル、配置手順 |
+| [LINEリッチメニュー運用](../docs/development/line-rich-menu.md) | Messaging APIによるリッチメニューの登録、画像更新、CD運用 |
 | [診断API契約](../docs/development/diagnosis-api.md) | Web UIとAPI Server間の診断APIのパス、認証、入出力、エラー契約 |
 | [API契約とクライアント型の生成](../docs/development/api-contract-generation.md) | API ServerのHTTP契約の配置、OpenAPI documentとWeb UI用TypeScript型の生成運用 |
 | [PR作成手順書](../docs/development/pull-request-guidelines.md) | PRタイトルの命名規則、概要の書き方、作成前の準備・検証手順 |

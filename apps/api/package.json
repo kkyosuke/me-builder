@@ -14,6 +14,8 @@
     "test:e2e": "vitest run --dir src/e2e",
     "check:analytics": "bun scripts/check-ai-gateway-analytics.ts",
     "register:webhook": "bun scripts/register-webhook.ts",
+    "register:rich-menu:preview": "bun scripts/register-rich-menu.ts preview",
+    "register:rich-menu:production": "bun scripts/register-rich-menu.ts production",
     "deploy:preview": "wrangler deploy --env preview",
     "deploy:production": "wrangler deploy --env production"
   },

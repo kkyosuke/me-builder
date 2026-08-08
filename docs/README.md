@@ -74,6 +74,7 @@ docs/
 - [キャラクターデザイン](design/character-design.md) — うつし・ミラの設定とデザインアセット
 - [診断seed運用](development/diagnosis-seed.md) — 診断をD1へ登録するseedの配置、実行、更新、検証方法
 - [診断サムネイル生成](development/diagnosis-thumbnail-generation.md) — 診断一覧用サムネイルの生成プロンプトと配置手順
+- [LINEリッチメニュー運用](development/line-rich-menu.md) — Messaging APIによるリッチメニューの登録、画像更新、CD運用
 - [診断API契約](development/diagnosis-api.md) — Web UIとAPI Server間の診断API契約
 - [API契約とクライアント型の生成](development/api-contract-generation.md) — HTTP契約の配置とOpenAPI・Web UI用型の生成運用
 - [PR作成手順書](development/pull-request-guidelines.md) — PRタイトル、概要、作成前の準備と検証手順
