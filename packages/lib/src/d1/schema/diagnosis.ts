@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   foreignKey,
+  index,
   integer,
   primaryKey,
   sqliteTable,
@@ -9,6 +10,7 @@ import {
 } from "drizzle-orm/sqlite-core";
 import { accounts } from "./account";
 import { baseSchema, lifecycleSchema } from "./base";
+import { brainItems } from "./brain";
 import { sourceRecords } from "./source";
 
 export const questions = sqliteTable("questions", {
@@ -122,11 +124,72 @@ export const diagnosisResponses = sqliteTable(
     diagnosisId: text("diagnosis_id")
       .notNull()
       .references(() => diagnoses.id),
+    revision: integer("revision").notNull().default(0),
   },
   (table) => [
     uniqueIndex("diagnosis_response_account_active_idx")
       .on(table.accountId, table.diagnosisId)
       .where(sql`is_deleted = 0`),
+  ],
+);
+
+/** Answer更新と同じatomic batchで登録するBrain Item projection要求。 */
+export const diagnosisBrainProjectionRequests = sqliteTable(
+  "diagnosis_brain_projection_requests",
+  {
+    ...baseSchema,
+    diagnosisResponseId: text("diagnosis_response_id")
+      .notNull()
+      .references(() => diagnosisResponses.id, { onDelete: "cascade" }),
+    responseRevision: integer("response_revision").notNull(),
+    status: text("status", { enum: ["pending", "applied", "failed"] }).notNull(),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    nextAttemptAt: integer("next_attempt_at", { mode: "timestamp" }).notNull(),
+    failureCode: text("failure_code"),
+  },
+  (table) => [
+    uniqueIndex("diagnosis_brain_projection_revision_idx").on(
+      table.diagnosisResponseId,
+      table.responseRevision,
+    ),
+    index("diagnosis_brain_projection_pending_idx")
+      .on(table.status, table.nextAttemptAt)
+      .where(sql`status IN ('pending', 'failed') AND is_deleted = 0`),
+  ],
+);
+
+/** 診断パラメータprojectionの現在有効なBrain Itemを指すhead。 */
+export const diagnosisBrainProjectionHeads = sqliteTable(
+  "diagnosis_brain_projection_heads",
+  {
+    ...baseSchema,
+    accountId: text("account_id")
+      .notNull()
+      .references(() => accounts.id),
+    diagnosisId: text("diagnosis_id")
+      .notNull()
+      .references(() => diagnoses.id),
+    scoringConfigId: text("scoring_config_id")
+      .notNull()
+      .references(() => diagnosisScoringConfigs.id),
+    scoringConfigVersion: integer("scoring_config_version").notNull(),
+    parameterId: text("parameter_id").notNull(),
+    currentBrainItemId: text("current_brain_item_id").notNull(),
+    contentSignature: text("content_signature").notNull(),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.currentBrainItemId, table.accountId],
+      foreignColumns: [brainItems.id, brainItems.accountId],
+      name: "diagnosis_brain_projection_head_item_account_fk",
+    }),
+    uniqueIndex("diagnosis_brain_projection_identity_idx").on(
+      table.accountId,
+      table.diagnosisId,
+      table.scoringConfigId,
+      table.scoringConfigVersion,
+      table.parameterId,
+    ),
   ],
 );
 
