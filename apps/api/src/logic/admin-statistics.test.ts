@@ -12,7 +12,7 @@ const base = {
   lineChannelAccessToken: "line-token",
   cloudflareAccountId: "cf-account",
   cloudflareAiGatewayId: "default",
-  cloudflareAnalyticsApiToken: "cf-token",
+  cloudflareAppApiToken: "cf-token",
   now: new Date("2026-08-08T03:00:00.000Z"),
 };
 

@@ -63,7 +63,7 @@ export function getWorkerConfig(env?: Record<string, unknown>): WorkerConfig {
   // 空文字は「未設定」として扱い、返信にリンクを添えないようにします。
   const rawLiffId = getEnv("LIFF_ID", env)?.trim() || undefined;
   const rawGoogleAiStudioApiKey = getEnv("GOOGLE_AI_STUDIO_API_KEY", env)?.trim() || undefined;
-  const rawCloudflareAiGatewayToken = getEnv("CLOUDFLARE_AIG_TOKEN", env)?.trim() || undefined;
+  const rawCloudflareAiGatewayToken = getEnv("CLOUDFLARE_APP_API_TOKEN", env)?.trim() || undefined;
   const rawCloudflareAiGatewayBaseUrl =
     getEnv("CF_AI_GATEWAY_BASE_URL", env)?.trim() || DEFAULT_CLOUDFLARE_AI_GATEWAY_BASE_URL;
   const rawGeminiModel = getEnv("GEMINI_MODEL", env)?.trim() || DEFAULT_GEMINI_MODEL;

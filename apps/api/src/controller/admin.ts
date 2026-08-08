@@ -31,7 +31,7 @@ export async function getStatistics(c: Context<AppEnv>): Promise<Response> {
     lineChannelAccessToken: config.lineChannelAccessToken,
     cloudflareAccountId: config.cloudflareAccountId,
     cloudflareAiGatewayId: config.cloudflareAiGatewayId,
-    cloudflareAnalyticsApiToken: config.cloudflareAnalyticsApiToken,
+    cloudflareAppApiToken: config.cloudflareAppApiToken,
   });
   switch (outcome.type) {
     case "resolved":

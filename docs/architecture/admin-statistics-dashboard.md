@@ -48,7 +48,7 @@ flowchart LR
     API --> A
 ```
 
-外部サービスのtokenは必要なServerだけに配布し、Web UIへ返しません。Cloudflareのtokenは、Workerが生成リクエストに使う`CLOUDFLARE_AIG_TOKEN`、API Serverが統計参照に使う`CLOUDFLARE_ANALYTICS_API_TOKEN`、CDだけがインフラ構築に使う`CLOUDFLARE_DEPLOY_API_TOKEN`へ分離し、兼用しません。
+外部サービスのtokenは必要なServerだけに配布し、Web UIへ返しません。Cloudflareのtokenは、アプリがAI Gatewayの実行とAnalytics参照に使う`CLOUDFLARE_APP_API_TOKEN`と、CDだけがインフラ構築に使う`CLOUDFLARE_DEPLOY_API_TOKEN`へ分離します。前者には`AI Gateway Run`と`Account Analytics Read`、後者にはデプロイに必要な権限だけを付与します。
 
 ## 5. 取得失敗時の扱い
 

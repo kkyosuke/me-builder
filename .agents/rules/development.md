@@ -85,7 +85,7 @@
 
 - **Cloudflare AI Gateway 経由の Gemini 接続**:
   - Google AI Studio の呼び出しは `apps/worker/src/infrastructure/gemini-client.ts` に閉じ込め、`@google/genai` の `GoogleGenAI` を Cloudflare AI Gateway の Google AI Studio provider URL へ接続します。
-  - アプリ実行用の `GOOGLE_AI_STUDIO_API_KEY` と `CLOUDFLARE_AIG_TOKEN` は Worker の Secret、統計参照用の `CLOUDFLARE_ANALYTICS_API_TOKEN` はAPI ServerのSecretとして配布します。インフラ構築用の `CLOUDFLARE_DEPLOY_API_TOKEN` と兼用せず、クライアントバンドル、`wrangler.toml` の `[vars]`、ログへ出力してはいけません。
+  - `CLOUDFLARE_APP_API_TOKEN`はアプリ用tokenとしてAI Gatewayの実行とAnalytics参照に共用し、WorkerとAPI ServerのSecretとして配布します。Google AI Studioの認証には別途`GOOGLE_AI_STUDIO_API_KEY`をWorkerへ配布します。インフラ構築用の`CLOUDFLARE_DEPLOY_API_TOKEN`とは兼用せず、いずれもクライアントバンドル、`wrangler.toml`の`[vars]`、ログへ出力してはいけません。
   - Gateway URL は `CF_AI_GATEWAY_BASE_URL`、モデルは `GEMINI_MODEL` で上書きできます。未指定時は設定層の既定値を利用します。
   - ローカルの接続確認は `apps/worker/.env.example` を参照して環境変数を設定し、`bun --cwd apps/worker run check:gemini` を実行します。プロンプトはコマンド末尾の引数で変更できます。
 

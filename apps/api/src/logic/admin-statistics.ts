@@ -33,7 +33,7 @@ type Params = {
   lineChannelAccessToken: string | undefined;
   cloudflareAccountId: string | undefined;
   cloudflareAiGatewayId: string;
-  cloudflareAnalyticsApiToken: string | undefined;
+  cloudflareAppApiToken: string | undefined;
   now?: Date;
   getAiUsage?: typeof fetchAiGatewayUsage;
   getLineUsage?: typeof fetchLineUsage;
@@ -65,9 +65,9 @@ export async function getAdminStatistics(params: Params): Promise<AdminStatistic
   const now = params.now ?? new Date();
   const start = startOfJstMonth(now);
   const geminiPromise =
-    params.cloudflareAnalyticsApiToken && params.cloudflareAccountId
+    params.cloudflareAppApiToken && params.cloudflareAccountId
       ? (params.getAiUsage ?? fetchAiGatewayUsage)({
-          apiToken: params.cloudflareAnalyticsApiToken,
+          apiToken: params.cloudflareAppApiToken,
           accountId: params.cloudflareAccountId,
           gatewayId: params.cloudflareAiGatewayId,
           start,

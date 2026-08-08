@@ -31,7 +31,7 @@ const workerConfig = getWorkerConfig({
   LINE_CHANNEL_ACCESS_TOKEN: "line-token",
   CHAT_DELIVERY_SECRET: "delivery-secret",
   GOOGLE_AI_STUDIO_API_KEY: "google-key",
-  CLOUDFLARE_AIG_TOKEN: "gateway-token",
+  CLOUDFLARE_APP_API_TOKEN: "gateway-token",
   CHAT_CONTEXT_MESSAGE_LIMIT: "20",
   LIFF_ID: liffId,
 });
