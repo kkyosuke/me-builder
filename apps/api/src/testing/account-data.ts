@@ -12,6 +12,7 @@ const actions = {
   "diagnosis.saveAnswer": d1.action.diagnosis.saveDiagnosisAnswer,
   "diagnosis.findAnswers": d1.action.diagnosis.findDiagnosisAnswers,
   "diagnosis.listVisible": d1.action.diagnosis.listVisibleDiagnoses,
+  "source.hasActive": d1.action.source.hasActiveSourceRecords,
   "diagnosisProjection.processLatest":
     d1.action.diagnosisBrainProjection.processLatestDiagnosisBrainProjection,
 } as const;

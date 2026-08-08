@@ -82,7 +82,7 @@ export async function processChatTurnMessage(
           "generation_or_delivery",
         ))
       ) {
-        throw new Error("Failed LINE notice could not be reflected in D1");
+        throw new Error("Failed LINE notice could not be reflected in AccountData");
       }
     } else if (failureDelivery.status === "permanent_failure") {
       await accountData.execute(
@@ -217,7 +217,7 @@ export async function processChatTurnMessage(
       return;
     }
     if (!(await accountData.execute("conversation.markTurnDelivered", message.body.turnId))) {
-      throw new Error("Delivered LINE response could not be reflected in D1");
+      throw new Error("Delivered LINE response could not be reflected in AccountData");
     }
     if (response.endSession) {
       await accountData.execute("conversation.closeTurnSession", message.body.turnId);

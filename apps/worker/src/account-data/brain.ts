@@ -4,4 +4,5 @@ import { d1 } from "@me-builder/lib";
 export const brainActions = {
   "brain.save": d1.action.brain.saveBrainItem,
   "brain.find": d1.action.brain.findBrainItemForAccount,
+  "source.hasActive": d1.action.source.hasActiveSourceRecords,
 } as const;

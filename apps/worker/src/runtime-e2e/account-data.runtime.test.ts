@@ -1,13 +1,24 @@
-import { runInDurableObject } from "cloudflare:test";
+import { type D1Migration, applyD1Migrations, runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import type { AccountData } from "../account-data";
 
 describe("AccountData Workers runtime E2E", () => {
+  beforeAll(async () => {
+    const runtimeEnv = env as typeof env & { TEST_D1_MIGRATIONS: D1Migration[] };
+    await applyD1Migrations(runtimeEnv.DB, runtimeEnv.TEST_D1_MIGRATIONS);
+  });
+
   it("Accountごとに異なるSQLiteへ保存し、既知のIDでも他Accountから参照できない", async () => {
     const firstAccountId = crypto.randomUUID();
     const secondAccountId = crypto.randomUUID();
     const eventId = crypto.randomUUID();
+    const now = Date.now();
+    await env.DB.prepare(
+      "INSERT INTO accounts (id, created_at, updated_at) VALUES (?, ?, ?), (?, ?, ?)",
+    )
+      .bind(firstAccountId, now, now, secondAccountId, now, now)
+      .run();
     const first = env.ACCOUNT_DATA.getByName(firstAccountId);
     const second = env.ACCOUNT_DATA.getByName(secondAccountId);
 

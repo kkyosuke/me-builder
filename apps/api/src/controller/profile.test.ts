@@ -1,4 +1,5 @@
 import type { D1Database } from "@cloudflare/workers-types";
+import type { AccountDataNamespace } from "@me-builder/lib";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { app } from "../index";
 import type { ProfileSummaryOutcome } from "../logic/profile-summary";
@@ -7,13 +8,17 @@ const { getProfileSummary } = vi.hoisted(() => ({ getProfileSummary: vi.fn() }))
 vi.mock("../logic/profile-summary", () => ({ getProfileSummary }));
 
 const dummyDb = {} as D1Database;
+const dummyAccountData = {} as AccountDataNamespace;
 const outcome = (value: ProfileSummaryOutcome) => getProfileSummary.mockResolvedValue(value);
 
 function request(withDb = true) {
   return app.request(
     "/api/profile-summary",
     { headers: { Authorization: "Bearer dummy.id.token" } },
-    { LIFF_ID: "2010850319-Yl63upAR", ...(withDb ? { DB: dummyDb } : {}) },
+    {
+      LIFF_ID: "2010850319-Yl63upAR",
+      ...(withDb ? { DB: dummyDb, ACCOUNT_DATA: dummyAccountData } : {}),
+    },
   );
 }
 

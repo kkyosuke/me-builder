@@ -2,6 +2,7 @@ import type * as brain from "./d1/action/brain";
 import type * as conversation from "./d1/action/conversation";
 import type * as diagnosis from "./d1/action/diagnosis";
 import type * as diagnosisBrainProjection from "./d1/action/diagnosis-brain-projection";
+import type * as source from "./d1/action/source";
 
 type WithoutDatabase<T> = T extends (...args: infer TArgs) => unknown
   ? TArgs extends [unknown, ...infer TRest]
@@ -13,6 +14,7 @@ type ActionResult<T> = T extends (...args: never[]) => infer TResult ? Awaited<T
 export type AccountDataActions = {
   "brain.save": typeof brain.saveBrainItem;
   "brain.find": typeof brain.findBrainItemForAccount;
+  "source.hasActive": typeof source.hasActiveSourceRecords;
   "conversation.storeLineTextSource": typeof conversation.storeLineTextSource;
   "conversation.attachMessagesToTurn": typeof conversation.attachMessagesToTurn;
   "conversation.getTurnContext": typeof conversation.getTurnContext;

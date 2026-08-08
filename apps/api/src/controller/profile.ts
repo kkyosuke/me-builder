@@ -17,8 +17,8 @@ function bearerToken(authorization: string | undefined): string | undefined {
 }
 
 export async function getProfileSummaryContents(c: Context<AppEnv>): Promise<Response> {
-  if (!c.env?.DB) {
-    logger.error({ path: c.req.path }, "DB binding is not configured");
+  if (!c.env?.DB || !c.env.ACCOUNT_DATA) {
+    logger.error({ path: c.req.path }, "Profile storage binding is not configured");
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   }
 
@@ -26,6 +26,7 @@ export async function getProfileSummaryContents(c: Context<AppEnv>): Promise<Res
     idToken: bearerToken(c.req.header("authorization")),
     lineLoginChannelId: getConfig(c.env).lineLoginChannelId,
     db: d1.client.create(c.env.DB),
+    accountData: c.env.ACCOUNT_DATA,
   });
 
   switch (outcome.type) {

@@ -1,0 +1,1 @@
+ALTER TABLE `account_data_identity` ADD `legacy_imported_at` integer;

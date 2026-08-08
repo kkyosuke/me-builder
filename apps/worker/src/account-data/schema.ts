@@ -8,6 +8,7 @@ export const accountDataIdentity = sqliteTable(
   {
     singleton: integer("singleton").primaryKey(),
     accountId: text("account_id").notNull().unique(),
+    legacyImportedAt: integer("legacy_imported_at", { mode: "timestamp" }),
   },
   (table) => [check("account_data_identity_singleton_check", sql`${table.singleton} = 1`)],
 );
