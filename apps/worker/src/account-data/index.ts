@@ -46,13 +46,20 @@ function assertAccountArguments(
 
 /** 1 AccountのSource / Brain / Diagnosis / Diaryを1つのprivate SQLiteに保存する。 */
 export class AccountData extends DurableObject<Env> {
+  private readonly accountId: string;
   private readonly repository: AccountDataRepository;
   private legacyImport: Promise<void> | undefined;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
+    const accountId = ctx.id.name;
+    if (!accountId) throw new Error("AccountData must be addressed by account name");
+    this.accountId = accountId;
     this.repository = new AccountDataRepository(ctx.storage);
-    ctx.blockConcurrencyWhile(async () => this.repository.initialize());
+    ctx.blockConcurrencyWhile(async () => {
+      await this.repository.initialize();
+      this.repository.bindAccount(accountId);
+    });
   }
 
   async execute<TOperation extends AccountDataOperation>(
@@ -60,6 +67,9 @@ export class AccountData extends DurableObject<Env> {
     operation: TOperation,
     ...args: AccountDataArgs<TOperation>
   ): Promise<AccountDataResult<TOperation>> {
+    if (accountId !== this.accountId) {
+      throw new Error("AccountData RPC account does not match object name");
+    }
     this.repository.bindAccount(accountId);
     assertAccountArguments(accountId, args);
     if (!this.legacyImport) this.legacyImport = this.importLegacyAccountData(accountId);

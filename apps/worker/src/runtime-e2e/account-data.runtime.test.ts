@@ -22,6 +22,19 @@ describe("AccountData Workers runtime E2E", () => {
     const first = env.ACCOUNT_DATA.getByName(firstAccountId);
     const second = env.ACCOUNT_DATA.getByName(secondAccountId);
 
+    await runInDurableObject(first, async (instance: AccountData, state) => {
+      expect(
+        state.storage.sql
+          .exec<{ account_id: string }>(
+            "SELECT account_id FROM account_data_identity WHERE singleton = 1",
+          )
+          .one().account_id,
+      ).toBe(firstAccountId);
+      await expect(instance.execute(secondAccountId, "source.hasActive")).rejects.toThrow(
+        "AccountData RPC account does not match object name",
+      );
+    });
+
     const source = await first.execute(firstAccountId, "conversation.storeLineTextSource", {
       accountId: firstAccountId,
       eventId,
@@ -49,8 +62,5 @@ describe("AccountData Workers runtime E2E", () => {
           .toArray(),
       ).toEqual([]);
     });
-    // 同一Objectへの別Account指定拒否はrepository unit testで検証する。
-    // Workers test poolはDO RPCのrejectを捕捉後もunhandled rejectionとして報告するため、
-    // runtime testでは2 Objectの物理分離に集中する。
   });
 });
