@@ -143,6 +143,7 @@ function diagnosis(overrides: Partial<DiagnosisListItem> = {}): DiagnosisListIte
 describe("App", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.history.replaceState({}, "", "/");
     window.localStorage.clear();
     document.documentElement.className = "";
     document.documentElement.style.colorScheme = "";
@@ -205,6 +206,35 @@ describe("App", () => {
 
     expect(screen.getByRole("button", { name: "ダークモードに切り替える" })).toBeTruthy();
     await waitFor(() => expect(document.documentElement.classList.contains("light")).toBe(true));
+  });
+
+  it("/meでは準備中画面を表示し、診断データを取得しない", () => {
+    window.history.replaceState({}, "", "/me");
+
+    render(<App />);
+
+    expect(screen.getByText("私を知る")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "準備中です" })).toBeTruthy();
+    expect(mocks.initializeLiff).not.toHaveBeenCalled();
+    expect(mocks.fetchDiagnosisList).not.toHaveBeenCalled();
+  });
+
+  it("LIFF初期化前にliff.stateへ保持された/meでも準備中画面を表示する", () => {
+    window.history.replaceState({}, "", "/?liff.state=%2Fme");
+
+    render(<App />);
+
+    expect(screen.getByRole("heading", { name: "準備中です" })).toBeTruthy();
+    expect(mocks.fetchDiagnosisList).not.toHaveBeenCalled();
+  });
+
+  it("/diagnosisでは診断一覧を表示する", async () => {
+    window.history.replaceState({}, "", "/diagnosis");
+
+    render(<App />);
+
+    expect(await screen.findByRole("button", { name: /テスト診断/ })).toBeTruthy();
+    expect(mocks.fetchDiagnosisList).toHaveBeenCalledOnce();
   });
 
   afterEach(() => {
