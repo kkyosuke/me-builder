@@ -1,6 +1,10 @@
 import { and, asc, eq, inArray, lte } from "drizzle-orm";
-import { projectDiagnosisParameters } from "../../diagnosis/scoring";
+import {
+  InvalidDiagnosisScoringConfigError,
+  projectDiagnosisParameters,
+} from "../../diagnosis/scoring";
 import type { D1Client } from "../client";
+import { brainItemEvidenceEdges } from "../schema/brain";
 import {
   diagnoses,
   diagnosisAnswers,
@@ -14,18 +18,24 @@ import {
 import { sourceRecords } from "../schema/source";
 import { saveBrainItem } from "./brain";
 
+const PROCESSING_LEASE_MILLISECONDS = 5 * 60 * 1000;
+
 export type ProcessDiagnosisBrainProjectionsResult = Readonly<{
   processed: number;
   applied: number;
   skippedIncomplete: number;
+  skippedInvalidConfig: number;
   failed: number;
 }>;
 
 type ProjectionRequest = Readonly<{
   id: string;
   diagnosisResponseId: string;
+  status: typeof diagnosisBrainProjectionRequests.$inferSelect.status;
   attemptCount: number;
 }>;
+
+type ClaimedProjectionRequest = ProjectionRequest;
 
 async function loadProjectionInput(db: D1Client, diagnosisResponseId: string) {
   const response = await db
@@ -176,14 +186,62 @@ async function saveProjection(
       ),
     )
     .get();
-  if (head?.contentSignature === projection.contentSignature) return;
+  if (head?.contentSignature === projection.contentSignature) {
+    const existingEvidence = await db
+      .select({ sourceRecordId: brainItemEvidenceEdges.sourceRecordId })
+      .from(brainItemEvidenceEdges)
+      .where(
+        and(
+          eq(brainItemEvidenceEdges.brainItemId, head.currentBrainItemId),
+          eq(brainItemEvidenceEdges.accountId, input.accountId),
+          eq(brainItemEvidenceEdges.relation, "supports"),
+          eq(brainItemEvidenceEdges.isDeleted, false),
+        ),
+      );
+    const existingSourceRecordIds = new Set(
+      existingEvidence.map(({ sourceRecordId }) => sourceRecordId),
+    );
+    const missingSourceRecordIds = projection.evidenceSourceRecordIds.filter(
+      (sourceRecordId) => !existingSourceRecordIds.has(sourceRecordId),
+    );
+    const [firstMissingSourceRecordId, ...remainingMissingSourceRecordIds] = missingSourceRecordIds;
+    if (firstMissingSourceRecordId) {
+      const insertEvidence = (sourceRecordId: string) =>
+        db
+          .insert(brainItemEvidenceEdges)
+          .values({
+            id: crypto.randomUUID(),
+            accountId: input.accountId,
+            brainItemId: head.currentBrainItemId,
+            sourceRecordId,
+            relation: "supports",
+            isDerivationTrigger: true,
+            derivationMethod: "deterministic",
+            generatedAt: at,
+            createdAt: at,
+            updatedAt: at,
+          })
+          .onConflictDoNothing();
+      await db.batch([
+        insertEvidence(firstMissingSourceRecordId),
+        ...remainingMissingSourceRecordIds.map(insertEvidence),
+      ]);
+    }
+    return;
+  }
 
   const brainItemId = crypto.randomUUID();
   const updateHead = head
     ? db
         .update(diagnosisBrainProjectionHeads)
         .set({ currentBrainItemId: brainItemId, contentSignature: projection.contentSignature })
-        .where(eq(diagnosisBrainProjectionHeads.id, head.id))
+        .where(
+          and(
+            eq(diagnosisBrainProjectionHeads.id, head.id),
+            eq(diagnosisBrainProjectionHeads.currentBrainItemId, head.currentBrainItemId),
+            eq(diagnosisBrainProjectionHeads.contentSignature, head.contentSignature),
+          ),
+        )
     : db.insert(diagnosisBrainProjectionHeads).values({
         id: crypto.randomUUID(),
         accountId: input.accountId,
@@ -232,7 +290,8 @@ async function saveProjection(
       ...(head
         ? {
             supersedes: {
-              revisionId: crypto.randomUUID(),
+              // 同じ旧版からの並行置換は同じPKになり、一方のatomic batchをrollbackする。
+              revisionId: `diagnosis-projection:${head.id}:${head.currentBrainItemId}`,
               brainItemId: head.currentBrainItemId,
               derivationMethod: "deterministic" as const,
             },
@@ -244,28 +303,82 @@ async function saveProjection(
   if (result.type !== "saved") throw new Error(`Brain Itemを保存できません: ${result.type}`);
 }
 
-async function applyRequest(db: D1Client, request: ProjectionRequest, at: Date) {
+async function applyRequest(db: D1Client, request: ClaimedProjectionRequest, at: Date) {
   const input = await loadProjectionInput(db, request.diagnosisResponseId);
   if (!input || input.type === "incomplete") {
-    await db
-      .update(diagnosisBrainProjectionRequests)
-      .set({ status: "applied", attemptCount: request.attemptCount + 1, updatedAt: at })
-      .where(eq(diagnosisBrainProjectionRequests.id, request.id));
     return input ? "skipped-incomplete" : "applied";
   }
   for (const projection of input.projections) {
     await saveProjection(db, input, projection, at);
   }
+  return "applied";
+}
+
+async function claimRequest(
+  db: D1Client,
+  request: ProjectionRequest,
+  at: Date,
+): Promise<ClaimedProjectionRequest | null> {
+  if (request.status === "applied") return null;
+  const attemptCount = request.attemptCount + 1;
+  const [claimed] = await db
+    .update(diagnosisBrainProjectionRequests)
+    .set({
+      attemptCount,
+      nextAttemptAt: new Date(at.getTime() + PROCESSING_LEASE_MILLISECONDS),
+      updatedAt: at,
+    })
+    .where(
+      and(
+        eq(diagnosisBrainProjectionRequests.id, request.id),
+        eq(diagnosisBrainProjectionRequests.status, request.status),
+        eq(diagnosisBrainProjectionRequests.attemptCount, request.attemptCount),
+        lte(diagnosisBrainProjectionRequests.nextAttemptAt, at),
+        eq(diagnosisBrainProjectionRequests.isDeleted, false),
+      ),
+    )
+    .returning({ id: diagnosisBrainProjectionRequests.id });
+  return claimed ? { ...request, attemptCount } : null;
+}
+
+async function completeRequest(db: D1Client, request: ClaimedProjectionRequest, at: Date) {
+  await db
+    .update(diagnosisBrainProjectionRequests)
+    .set({ status: "applied", failureCode: null, updatedAt: at })
+    .where(
+      and(
+        eq(diagnosisBrainProjectionRequests.id, request.id),
+        eq(diagnosisBrainProjectionRequests.status, request.status),
+        eq(diagnosisBrainProjectionRequests.attemptCount, request.attemptCount),
+        eq(diagnosisBrainProjectionRequests.isDeleted, false),
+      ),
+    );
+}
+
+async function failRequest(
+  db: D1Client,
+  request: ClaimedProjectionRequest,
+  error: unknown,
+  at: Date,
+) {
+  const failureCode =
+    error instanceof Error && error.name !== "Error" ? error.name : "retryable-projection-error";
   await db
     .update(diagnosisBrainProjectionRequests)
     .set({
-      status: "applied",
-      attemptCount: request.attemptCount + 1,
-      failureCode: null,
+      status: "failed",
+      nextAttemptAt: new Date(at.getTime() + PROCESSING_LEASE_MILLISECONDS),
+      failureCode,
       updatedAt: at,
     })
-    .where(eq(diagnosisBrainProjectionRequests.id, request.id));
-  return "applied";
+    .where(
+      and(
+        eq(diagnosisBrainProjectionRequests.id, request.id),
+        eq(diagnosisBrainProjectionRequests.status, request.status),
+        eq(diagnosisBrainProjectionRequests.attemptCount, request.attemptCount),
+        eq(diagnosisBrainProjectionRequests.isDeleted, false),
+      ),
+    );
 }
 
 /** 指定されたprojection要求を処理します。回答保存直後のbest-effort実行に使用します。 */
@@ -278,6 +391,7 @@ export async function processDiagnosisBrainProjectionRequest(
     .select({
       id: diagnosisBrainProjectionRequests.id,
       diagnosisResponseId: diagnosisBrainProjectionRequests.diagnosisResponseId,
+      status: diagnosisBrainProjectionRequests.status,
       attemptCount: diagnosisBrainProjectionRequests.attemptCount,
     })
     .from(diagnosisBrainProjectionRequests)
@@ -285,6 +399,7 @@ export async function processDiagnosisBrainProjectionRequest(
       and(
         eq(diagnosisBrainProjectionRequests.id, requestId),
         inArray(diagnosisBrainProjectionRequests.status, ["pending", "failed"]),
+        lte(diagnosisBrainProjectionRequests.nextAttemptAt, at),
         eq(diagnosisBrainProjectionRequests.isDeleted, false),
       ),
     );
@@ -300,6 +415,7 @@ export async function processPendingDiagnosisBrainProjections(
     .select({
       id: diagnosisBrainProjectionRequests.id,
       diagnosisResponseId: diagnosisBrainProjectionRequests.diagnosisResponseId,
+      status: diagnosisBrainProjectionRequests.status,
       attemptCount: diagnosisBrainProjectionRequests.attemptCount,
     })
     .from(diagnosisBrainProjectionRequests)
@@ -322,25 +438,31 @@ async function processRequests(
 ): Promise<ProcessDiagnosisBrainProjectionsResult> {
   let applied = 0;
   let skippedIncomplete = 0;
+  let skippedInvalidConfig = 0;
   let failed = 0;
   for (const request of requests) {
+    const claimedRequest = await claimRequest(db, request, at);
+    if (!claimedRequest) continue;
     try {
-      const result = await applyRequest(db, request, at);
+      const result = await applyRequest(db, claimedRequest, at);
+      await completeRequest(db, claimedRequest, at);
       if (result === "skipped-incomplete") skippedIncomplete += 1;
       else applied += 1;
     } catch (error) {
-      failed += 1;
-      await db
-        .update(diagnosisBrainProjectionRequests)
-        .set({
-          status: "failed",
-          attemptCount: request.attemptCount + 1,
-          nextAttemptAt: new Date(at.getTime() + 5 * 60 * 1000),
-          failureCode: error instanceof Error ? error.name : "unknown",
-          updatedAt: at,
-        })
-        .where(eq(diagnosisBrainProjectionRequests.id, request.id));
+      if (error instanceof InvalidDiagnosisScoringConfigError) {
+        await completeRequest(db, claimedRequest, at);
+        skippedInvalidConfig += 1;
+      } else {
+        await failRequest(db, claimedRequest, error, at);
+        failed += 1;
+      }
     }
   }
-  return { processed: requests.length, applied, skippedIncomplete, failed };
+  return {
+    processed: applied + skippedIncomplete + skippedInvalidConfig + failed,
+    applied,
+    skippedIncomplete,
+    skippedInvalidConfig,
+    failed,
+  };
 }

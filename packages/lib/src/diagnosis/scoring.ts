@@ -124,6 +124,15 @@ const ScoringConfigSchema = v.pipe(
 
 type ScoringConfig = v.InferOutput<typeof ScoringConfigSchema>;
 
+/** 永続化済みの採点設定がprojection可能な契約を満たさない場合の恒久エラー。 */
+export class InvalidDiagnosisScoringConfigError extends Error {
+  override readonly name = "InvalidDiagnosisScoringConfigError";
+
+  constructor(cause: unknown) {
+    super("診断の採点設定が不正です", { cause });
+  }
+}
+
 const DiagnosisQuestionScoringSchema = v.pipe(
   v.object({
     questions: v.pipe(
@@ -234,12 +243,17 @@ export function scoreDiagnosisAnswers(
   storedConfig: StoredScoringConfig | null,
 ): DiagnosisScoring | null {
   if (!storedConfig) return null;
-  const config = v.parse(ScoringConfigSchema, {
-    ...v.parse(v.record(v.string(), v.unknown()), storedConfig.definition),
-    version: storedConfig.version,
-  });
-  v.parse(DiagnosisQuestionScoringSchema, { questions: storedConfig.questions, config });
-  return scoreParameters(answers, config);
+  try {
+    const config = v.parse(ScoringConfigSchema, {
+      ...v.parse(v.record(v.string(), v.unknown()), storedConfig.definition),
+      version: storedConfig.version,
+    });
+    v.parse(DiagnosisQuestionScoringSchema, { questions: storedConfig.questions, config });
+    return scoreParameters(answers, config);
+  } catch (error) {
+    if (error instanceof v.ValiError) throw new InvalidDiagnosisScoringConfigError(error);
+    throw error;
+  }
 }
 
 /** 完了した診断のParameter ProfileをEvidence付きBrain Item入力へ変換します。 */
@@ -252,10 +266,16 @@ export function projectDiagnosisParameters(input: {
   const scoring = scoreDiagnosisAnswers(input.answers, input.storedConfig);
   if (!scoring) return [];
 
-  const config = v.parse(ScoringConfigSchema, {
-    ...v.parse(v.record(v.string(), v.unknown()), input.storedConfig.definition),
-    version: input.storedConfig.version,
-  });
+  let config: ScoringConfig;
+  try {
+    config = v.parse(ScoringConfigSchema, {
+      ...v.parse(v.record(v.string(), v.unknown()), input.storedConfig.definition),
+      version: input.storedConfig.version,
+    });
+  } catch (error) {
+    if (error instanceof v.ValiError) throw new InvalidDiagnosisScoringConfigError(error);
+    throw error;
+  }
   const currentAnswers = new Map(input.answers.map((answer) => [answer.questionId, answer]));
 
   return scoring.parameters.flatMap((parameter): DiagnosisParameterProjection[] => {
@@ -291,7 +311,7 @@ export function projectDiagnosisParameters(input: {
         statement,
         attributes,
         evidenceSourceRecordIds,
-        contentSignature: JSON.stringify({ statement, attributes, evidenceSourceRecordIds }),
+        contentSignature: JSON.stringify({ statement, attributes }),
       },
     ];
   });
