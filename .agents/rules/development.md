@@ -177,7 +177,7 @@
   - `LINE_LOGIN_CHANNEL_SECRET` は Secret、`LINE_LOGIN_CHANNEL_ID` は変数として GitHub Environment へ置きます。チャネル ID が未設定の場合は LIFF ID の接頭辞 (`{チャネルID}-{ランダム}`) から補完します。
   - 更新対象は `LIFF_ID` が一致するアプリ、無ければ `description`（`me-builder-web (preview)` など）が一致するアプリです。どちらも無ければ新規作成し、発行された LIFF ID をログへ出力します。環境名はビルド時の値ではなく引数で渡します（preview と production で同じ description を掴まないため）。
   - **scope は `openid` と `profile` を必ず設定します。** `openid` が無いと `liff.getIDToken()` が ID トークンを返さず、サーバー側で本人性を検証できません（[LIFF リファレンス](https://developers.line.biz/en/reference/liff/#get-id-token)）。エンドポイント URL の更新時にも scope を毎回送り、手で外された場合に次のデプロイで復旧できるようにします。
-  - 環境変数が未設定の場合は警告を出して安全にスキップします。チャネルシークレットとチャネルアクセストークンはログへ出力せず、トークンエンドポイントのレスポンス本文も転記しません。
+  - 共通ライブラリは環境変数が未設定の場合に警告と失敗結果を返します。運営用の`register-liff.ts`はその結果を非ゼロ終了に変換し、CDが後続の公開処理へ進まないようにします。チャネルシークレットとチャネルアクセストークンはログへ出力せず、トークンエンドポイントのレスポンス本文も転記しません。
 
 ## 5. コミット・Git 運用ルール
 

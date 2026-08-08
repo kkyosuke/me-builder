@@ -5,6 +5,10 @@ on:
     branches:
       - main
 
+concurrency:
+  group: cd-production-environment
+  cancel-in-progress: false
+
 jobs:
   deploy-production:
     name: Deploy Production Environment
@@ -125,6 +129,12 @@ jobs:
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' && env.LINE_LOGIN_CHANNEL_SECRET != '' }}
         run: |
           bun --cwd apps/web scripts/register-liff.ts production
+
+      - name: Register LINE Rich Menu (Production)
+        if: ${{ env.CLOUDFLARE_API_TOKEN != '' && env.LINE_CHANNEL_ACCESS_TOKEN != '' }}
+        env:
+          LIFF_ID: ${{ vars.LIFF_ID }}
+        run: bun run --cwd apps/api register:rich-menu:production
 
 
 

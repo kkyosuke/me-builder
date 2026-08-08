@@ -22,19 +22,17 @@ const endpointUrl = config.baseUrl?.replace(/\/$/, "");
 
 logger.info(`[Script] Executing LIFF endpoint registration for ${targetEnv}...`);
 
-line.liff
-  .registerEndpoint({
-    channelId: process.env.LINE_LOGIN_CHANNEL_ID,
-    channelSecret: process.env.LINE_LOGIN_CHANNEL_SECRET,
-    liffId: config.liffId,
-    endpointUrl,
-    description: `me-builder-web (${targetEnv})`,
-    viewType: "full",
-  })
-  .then((result) => {
-    if (result.success) {
-      logger.info(`[Script] LIFF registration completed. LIFF ID: ${result.liffId}`);
-    } else {
-      logger.info(`[Script] LIFF registration ended with message: ${result.message}`);
-    }
-  });
+const result = await line.liff.registerEndpoint({
+  channelId: process.env.LINE_LOGIN_CHANNEL_ID,
+  channelSecret: process.env.LINE_LOGIN_CHANNEL_SECRET,
+  liffId: config.liffId,
+  endpointUrl,
+  description: `me-builder-web (${targetEnv})`,
+  viewType: "full",
+});
+
+if (!result.success) {
+  throw new Error(`[Script] LIFF registration failed: ${result.message}`);
+}
+
+logger.info(`[Script] LIFF registration completed. LIFF ID: ${result.liffId}`);
