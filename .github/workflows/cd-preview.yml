@@ -1,18 +1,12 @@
 name: CD / Preview
 
 on:
-  pull_request:
-    branches:
-      - main
-    types:
-      - opened
-      - synchronize
-      - reopened
+  # PR では自動デプロイしない。プレビュー環境は共有 (stg.kagami.kyosuke.dev) のため、
+  # 反映したいときだけ Actions 画面または `gh workflow run` でブランチを指定して手動実行する。
+  workflow_dispatch:
 
 permissions:
   contents: read
-  pull-requests: write
-  issues: write
 
 jobs:
   deploy-preview:
@@ -142,50 +136,19 @@ jobs:
         run: |
           echo "::warning::CLOUDFLARE_DEPLOY_API_TOKEN が GitHub Secrets に設定されていないためデプロイをスキップしました。"
 
-      - name: Comment Preview Deployment on PR
-        uses: actions/github-script@v7
-        if: github.event_name == 'pull_request'
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const issue_number = context.issue.number;
-            const identifier = '<!-- preview-deploy-comment -->';
-            const cloudflareDashboardUrl = `https://dash.cloudflare.com/${process.env.CLOUDFLARE_ACCOUNT_ID}/workers-and-pages`;
-
-            // 1. 既存のプレビューデプロイコメントを削除 (古いコメントを削除して再投稿)
-            const comments = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: issue_number,
-            });
-
-            for (const comment of comments.data) {
-              if (comment.body && comment.body.includes(identifier)) {
-                await github.rest.issues.deleteComment({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  comment_id: comment.id,
-                });
-              }
-            }
-
-            // 2. 新しいプレビュー完了コメントを投稿
-            const body = `${identifier}
-            ### 🚀 プレビュー環境へのデプロイが完了しました！
-
-            プルリクエストの最新コミット (\`${context.sha.substring(0, 7)}\`) のビルド・デプロイが成功しました。
-
-            | サービス | リンク |
-            | --- | --- |
-            | 🖥️ **Web UI** | [stg.kagami.kyosuke.dev](https://stg.kagami.kyosuke.dev) |
-            | ⚡ **API Server** | [api.stg.kagami.kyosuke.dev](https://api.stg.kagami.kyosuke.dev) |
-            | 🤖 **MCP Server** | [mcp.stg.kagami.kyosuke.dev](https://mcp.stg.kagami.kyosuke.dev) |
-            | ☁️ **Cloudflare Dashboard** | [Workers & Pages を開く](${cloudflareDashboardUrl}) |
-            `;
-
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: issue_number,
-              body: body,
-            });
+      # 手動実行のため PR へコメントせず、実行結果のサマリーへリンクを出力する
+      - name: Publish Deployment Summary
+        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
+        run: |
+          {
+            echo "### 🚀 プレビュー環境へのデプロイが完了しました！"
+            echo
+            echo "ブランチ \`${GITHUB_REF_NAME}\` のコミット (\`${GITHUB_SHA:0:7}\`) のビルド・デプロイが成功しました。"
+            echo
+            echo "| サービス | リンク |"
+            echo "| --- | --- |"
+            echo "| 🖥️ **Web UI** | [stg.kagami.kyosuke.dev](https://stg.kagami.kyosuke.dev) |"
+            echo "| ⚡ **API Server** | [api.stg.kagami.kyosuke.dev](https://api.stg.kagami.kyosuke.dev) |"
+            echo "| 🤖 **MCP Server** | [mcp.stg.kagami.kyosuke.dev](https://mcp.stg.kagami.kyosuke.dev) |"
+            echo "| ☁️ **Cloudflare Dashboard** | [Workers & Pages を開く](https://dash.cloudflare.com/${CLOUDFLARE_ACCOUNT_ID}/workers-and-pages) |"
+          } >> "${GITHUB_STEP_SUMMARY}"
