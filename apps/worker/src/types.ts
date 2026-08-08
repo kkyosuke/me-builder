@@ -1,10 +1,11 @@
 import type { Queue } from "@cloudflare/workers-types";
+import type { AccountDataNamespace } from "@me-builder/lib";
 import type { ChatTurnQueueMessage } from "@me-builder/shared";
 
 /** Wrangler生成bindingに、dashboardから配布するSecretとQueue本文型だけを重ねる。 */
 export type Env = Omit<
   WorkerBindings,
-  "CHAT_TURN_QUEUE" | "CONVERSATION_COORDINATOR" | "ENVIRONMENT"
+  "CHAT_TURN_QUEUE" | "CONVERSATION_COORDINATOR" | "ACCOUNT_DATA" | "ENVIRONMENT"
 > & {
   ENVIRONMENT?: string;
   BASE_DOMAIN?: string;
@@ -21,4 +22,5 @@ export type Env = Omit<
   LIFF_ID?: string;
   CHAT_TURN_QUEUE?: Queue<ChatTurnQueueMessage>;
   CONVERSATION_COORDINATOR?: WorkerBindings["CONVERSATION_COORDINATOR"];
+  ACCOUNT_DATA?: AccountDataNamespace;
 };

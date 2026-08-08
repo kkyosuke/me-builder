@@ -31,7 +31,7 @@ describe("getDiagnosisList", () => {
       { createSession, listVisibleDiagnoses },
     );
 
-    expect(listVisibleDiagnoses).toHaveBeenCalledWith(db, "account-1", at);
+    expect(listVisibleDiagnoses).toHaveBeenCalledWith(undefined, "account-1", at);
     expect(result).toEqual({ type: "resolved", diagnoses });
   });
 

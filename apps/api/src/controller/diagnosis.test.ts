@@ -1,4 +1,5 @@
 import type { D1Database } from "@cloudflare/workers-types";
+import type { AccountDataNamespace } from "@me-builder/lib";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { app } from "../index";
 import type { ResetDevelopmentDiagnosisDataOutcome } from "../logic/dev-diagnosis-reset";
@@ -32,13 +33,14 @@ vi.mock("../logic/diagnosis-deferred-question", () => ({ deferDiagnosisQuestion 
 vi.mock("../logic/dev-diagnosis-reset", () => ({ resetDevelopmentDiagnosisData }));
 
 const dummyDb = {} as D1Database;
+const dummyAccountData = {} as AccountDataNamespace;
 const LIFF_ID = "2010850319-Yl63upAR";
 
 function request(env: Record<string, unknown> = {}, authorization = "Bearer dummy.id.token") {
   return app.request(
     "/api/diagnoses",
     { headers: { Authorization: authorization } },
-    { LIFF_ID, DB: dummyDb, ...env },
+    { LIFF_ID, DB: dummyDb, ACCOUNT_DATA: dummyAccountData, ...env },
   );
 }
 
@@ -133,7 +135,7 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId", () => {
         },
         body,
       },
-      { LIFF_ID, ...(withDb ? { DB: dummyDb } : {}) },
+      { LIFF_ID, ...(withDb ? { DB: dummyDb, ACCOUNT_DATA: dummyAccountData } : {}) },
     );
 
   it("savedを200と保存結果へ変換する", async () => {
@@ -210,7 +212,7 @@ describe("PUT /api/diagnoses/:diagnosisId/deferred-questions/:diagnosisQuestionI
     app.request(
       "/api/diagnoses/diagnosis-1/deferred-questions/dq-1",
       { method: "PUT", headers: { Authorization: "Bearer dummy.id.token" } },
-      { LIFF_ID, ...(withDb ? { DB: dummyDb } : {}) },
+      { LIFF_ID, ...(withDb ? { DB: dummyDb, ACCOUNT_DATA: dummyAccountData } : {}) },
     );
 
   it("deferredを200と保存結果へ変換する", async () => {
@@ -303,7 +305,7 @@ describe("GET /api/diagnoses/:diagnosisId", () => {
     const res = await app.request(
       "/api/diagnoses/diagnosis-1",
       { headers: { Authorization: "Bearer dummy.id.token" } },
-      { LIFF_ID, DB: dummyDb },
+      { LIFF_ID, DB: dummyDb, ACCOUNT_DATA: dummyAccountData },
     );
 
     expect(res.status).toBe(200);
@@ -322,7 +324,7 @@ describe("GET /api/diagnoses/:diagnosisId", () => {
     const res = await app.request(
       "/api/diagnoses/diagnosis-1",
       { headers: { Authorization: "Bearer dummy.id.token" } },
-      { LIFF_ID, DB: dummyDb },
+      { LIFF_ID, DB: dummyDb, ACCOUNT_DATA: dummyAccountData },
     );
     expect(res.status).toBe(status);
     expect(await res.json()).toEqual(body);
@@ -344,7 +346,7 @@ describe("GET /api/diagnoses/:diagnosisId/answers", () => {
     app.request(
       "/api/diagnoses/diagnosis-1/answers",
       { headers: { Authorization: "Bearer dummy.id.token" } },
-      { LIFF_ID, ...(withDb ? { DB: dummyDb } : {}) },
+      { LIFF_ID, ...(withDb ? { DB: dummyDb, ACCOUNT_DATA: dummyAccountData } : {}) },
     );
 
   it("resolvedを200と回答内容へ変換する", async () => {
@@ -420,7 +422,7 @@ describe("DELETE /api/dev/diagnosis-data", () => {
       {
         LIFF_ID,
         ...(environment === undefined ? {} : { ENVIRONMENT: environment }),
-        ...(withDb ? { DB: dummyDb } : {}),
+        ...(withDb ? { DB: dummyDb, ACCOUNT_DATA: dummyAccountData } : {}),
       },
     );
 

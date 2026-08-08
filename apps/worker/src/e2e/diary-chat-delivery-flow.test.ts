@@ -16,6 +16,7 @@ import type { CloudflareBindings } from "../config";
 import { ConversationCoordinator } from "../conversation-coordinator";
 import { processChatTurnMessage } from "../handler/chat-turn";
 import { queueHandler } from "../handler/queue";
+import { createD1AccountDataTestNamespace } from "../testing/account-data";
 import type { Env } from "../types";
 
 const { mockGenerateContent } = vi.hoisted(() => ({
@@ -105,6 +106,7 @@ function createCoordinator(send: (message: ChatTurnQueueMessage) => Promise<void
   } as unknown as DurableObjectState;
   const env = {
     DB: database,
+    ACCOUNT_DATA: createD1AccountDataTestNamespace(client),
     CHAT_TURN_QUEUE: { send },
     GEMINI_MODEL: "test-model",
     LINE_CHANNEL_ACCESS_TOKEN: "line-token",
@@ -150,6 +152,7 @@ type DiaryEventInput = {
 async function enqueueLineEvents(
   events: unknown[],
   namespace: NonNullable<Env["CONVERSATION_COORDINATOR"]>,
+  accountData: NonNullable<Env["ACCOUNT_DATA"]>,
 ): Promise<void> {
   const payload = { events };
   const message: Message<WebhookQueueMessage> = {
@@ -190,6 +193,7 @@ async function enqueueLineEvents(
   await queueHandler(batch, {
     DB: database,
     CONVERSATION_COORDINATOR: namespace,
+    ACCOUNT_DATA: accountData,
     ENVIRONMENT: "test",
     LINE_CHANNEL_ACCESS_TOKEN: "line-token",
     CHAT_DELIVERY_SECRET: "delivery-secret",
@@ -213,6 +217,7 @@ async function ingestDiaryEvents(events: DiaryEventInput[], suffix: string) {
     getByName: vi.fn(() => harness.coordinator),
   } as unknown as NonNullable<Env["CONVERSATION_COORDINATOR"]>;
   const providerAccountId = `U_diary_delivery_${suffix}`;
+  const accountData = createD1AccountDataTestNamespace(client);
 
   await enqueueLineEvents(
     events.map((event, index) => ({
@@ -224,6 +229,7 @@ async function ingestDiaryEvents(events: DiaryEventInput[], suffix: string) {
       ...(event.replyToken ? { replyToken: event.replyToken } : {}),
     })),
     namespace,
+    accountData,
   );
   await harness.runAlarm();
 
@@ -232,7 +238,7 @@ async function ingestDiaryEvents(events: DiaryEventInput[], suffix: string) {
   if (!queuedTurn) throw new Error("Expected a queued chat turn");
   const bindings: CloudflareBindings = {
     d1: client,
-    do: { conversation: namespace },
+    do: { conversation: namespace, accountData },
     queue: { chatTurn: undefined },
   };
   return { bindings, coordinator: harness.coordinator, harness, providerAccountId, queuedTurn };
@@ -250,6 +256,7 @@ async function ingestDiary(text: string, suffix: string, replyToken?: string) {
   const providerAccountId = `U_diary_delivery_${suffix}`;
   const eventId = `diary-delivery-event-${suffix}`;
   const receivedAt = new Date(Date.now() - 2_000).toISOString();
+  const accountData = createD1AccountDataTestNamespace(client);
 
   await enqueueLineEvents(
     [
@@ -263,6 +270,7 @@ async function ingestDiary(text: string, suffix: string, replyToken?: string) {
       },
     ],
     namespace,
+    accountData,
   );
   await harness.runAlarm();
 
@@ -271,7 +279,7 @@ async function ingestDiary(text: string, suffix: string, replyToken?: string) {
   if (!queuedTurn) throw new Error("Expected a queued chat turn");
   const bindings: CloudflareBindings = {
     d1: client,
-    do: { conversation: namespace },
+    do: { conversation: namespace, accountData },
     queue: { chatTurn: undefined },
   };
   return { bindings, coordinator: harness.coordinator, providerAccountId, queuedTurn };

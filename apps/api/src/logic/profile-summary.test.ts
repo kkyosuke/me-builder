@@ -1,8 +1,9 @@
-import type { d1 } from "@me-builder/lib";
+import type { AccountDataNamespace, d1 } from "@me-builder/lib";
 import { describe, expect, it, vi } from "vitest";
 import { getProfileSummary } from "./profile-summary";
 
 const db = {} as d1.Client;
+const accountData = {} as AccountDataNamespace;
 const summary = {
   generatedAt: "2026-08-08T12:00:00.000Z",
   headline: "まとめ",
@@ -30,12 +31,16 @@ describe("getProfileSummary", () => {
     const deps = dependencies([{ availability: "open", responseStatus: "unanswered" }]);
 
     const result = await getProfileSummary(
-      { idToken: "token", lineLoginChannelId: "channel", db },
+      { idToken: "token", lineLoginChannelId: "channel", db, accountData },
       deps as never,
     );
 
     expect(result).toMatchObject({ type: "resolved", nextAction: "diagnosis" });
-    expect(deps.listVisibleDiagnoses).toHaveBeenCalledWith(db, "account-1", expect.any(Date));
+    expect(deps.listVisibleDiagnoses).toHaveBeenCalledWith(
+      accountData,
+      "account-1",
+      expect.any(Date),
+    );
   });
 
   it("回答できる診断がなければチャットを次の行動にする", async () => {
@@ -45,7 +50,7 @@ describe("getProfileSummary", () => {
     ]);
 
     const result = await getProfileSummary(
-      { idToken: "token", lineLoginChannelId: "channel", db },
+      { idToken: "token", lineLoginChannelId: "channel", db, accountData },
       deps as never,
     );
 
@@ -57,7 +62,7 @@ describe("getProfileSummary", () => {
     deps.hasActiveSourceRecords.mockResolvedValue(false);
 
     const result = await getProfileSummary(
-      { idToken: "token", lineLoginChannelId: "channel", db },
+      { idToken: "token", lineLoginChannelId: "channel", db, accountData },
       deps as never,
     );
 
@@ -69,7 +74,7 @@ describe("getProfileSummary", () => {
     deps.createSession.mockResolvedValue({ type: "unauthenticated", reason: "invalid" } as never);
 
     const result = await getProfileSummary(
-      { idToken: undefined, lineLoginChannelId: "channel", db },
+      { idToken: undefined, lineLoginChannelId: "channel", db, accountData },
       deps as never,
     );
 

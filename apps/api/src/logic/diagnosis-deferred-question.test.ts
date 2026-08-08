@@ -31,7 +31,7 @@ describe("deferDiagnosisQuestion", () => {
       },
     );
 
-    expect(deferQuestion).toHaveBeenCalledWith(db, {
+    expect(deferQuestion).toHaveBeenCalledWith(undefined, "account-1", {
       accountId: "account-1",
       diagnosisId: "diagnosis-1",
       diagnosisQuestionId: "dq-1",

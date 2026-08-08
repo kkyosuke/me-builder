@@ -7,6 +7,7 @@ import Database from "better-sqlite3";
 import { Miniflare } from "miniflare";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ConversationCoordinator } from "../conversation-coordinator";
+import { createD1AccountDataTestNamespace } from "../testing/account-data";
 import type { Env } from "../types";
 
 const migrationsDirectory = path.resolve(__dirname, "../../../../packages/lib/drizzle");
@@ -70,6 +71,7 @@ function createCoordinator(send: (message: ChatTurnQueueMessage) => Promise<void
   } as unknown as DurableObjectState;
   const env = {
     DB: database,
+    ACCOUNT_DATA: createD1AccountDataTestNamespace(client),
     CHAT_TURN_QUEUE: { send },
     GEMINI_MODEL: "test-model",
   } as unknown as Env;
@@ -215,6 +217,7 @@ describe("ConversationCoordinator D1 E2E", () => {
     expect(queued).toHaveLength(2);
     expect(queued[0]).toEqual({
       type: "chat-turn",
+      accountId: first.accountId,
       turnId: firstTurn.turnId,
       generationEpoch: 1,
     });

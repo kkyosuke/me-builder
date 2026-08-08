@@ -26,7 +26,7 @@ describe("resetDevelopmentDiagnosisData", () => {
       },
     );
 
-    expect(deleteDiagnosisData).toHaveBeenCalledWith(db, "account-1");
+    expect(deleteDiagnosisData).toHaveBeenCalledWith(undefined, "account-1");
     expect(result).toEqual({ type: "resolved", ...deleted });
   });
 

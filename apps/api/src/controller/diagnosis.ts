@@ -51,8 +51,8 @@ function bearerToken(authorization: string | undefined): string | undefined {
 
 /** `GET /api/diagnoses` — 回答進捗を含む、表示可能な診断一覧を返す。 */
 export async function getDiagnoses(c: Context<AppEnv>): Promise<Response> {
-  if (!c.env?.DB) {
-    logger.error({ path: c.req.path }, "DB binding is not configured");
+  if (!c.env?.DB || !c.env.ACCOUNT_DATA) {
+    logger.error({ path: c.req.path }, "Diagnosis storage binding is not configured");
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   }
 
@@ -60,6 +60,7 @@ export async function getDiagnoses(c: Context<AppEnv>): Promise<Response> {
     idToken: bearerToken(c.req.header("authorization")),
     lineLoginChannelId: getConfig(c.env).lineLoginChannelId,
     db: d1.client.create(c.env.DB),
+    ...(c.env.ACCOUNT_DATA ? { accountData: c.env.ACCOUNT_DATA } : {}),
   });
 
   switch (outcome.type) {
@@ -128,8 +129,8 @@ export async function getDiagnosis(c: Context<AppEnv>): Promise<Response> {
 
 /** `PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId` — 本人の初回回答を保存する。 */
 export async function putDiagnosisAnswer(c: Context<AppEnv>): Promise<Response> {
-  if (!c.env?.DB) {
-    logger.error({ path: c.req.path }, "DB binding is not configured");
+  if (!c.env?.DB || !c.env.ACCOUNT_DATA) {
+    logger.error({ path: c.req.path }, "Diagnosis storage binding is not configured");
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   }
 
@@ -151,6 +152,7 @@ export async function putDiagnosisAnswer(c: Context<AppEnv>): Promise<Response> 
     idToken: bearerToken(c.req.header("authorization")),
     lineLoginChannelId: getConfig(c.env).lineLoginChannelId,
     db: d1.client.create(c.env.DB),
+    accountData: c.env.ACCOUNT_DATA,
     scheduleProjection: (task) => {
       try {
         const executionContext = c.executionCtx;
@@ -219,8 +221,8 @@ export async function putDiagnosisAnswer(c: Context<AppEnv>): Promise<Response> 
 
 /** `PUT /api/diagnoses/:diagnosisId/deferred-questions/:diagnosisQuestionId` — 延期を保存する。 */
 export async function putDiagnosisDeferredQuestion(c: Context<AppEnv>): Promise<Response> {
-  if (!c.env?.DB) {
-    logger.error({ path: c.req.path }, "DB binding is not configured");
+  if (!c.env?.DB || !c.env.ACCOUNT_DATA) {
+    logger.error({ path: c.req.path }, "Diagnosis storage binding is not configured");
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   }
 
@@ -230,6 +232,7 @@ export async function putDiagnosisDeferredQuestion(c: Context<AppEnv>): Promise<
     idToken: bearerToken(c.req.header("authorization")),
     lineLoginChannelId: getConfig(c.env).lineLoginChannelId,
     db: d1.client.create(c.env.DB),
+    accountData: c.env.ACCOUNT_DATA,
   });
 
   switch (outcome.type) {
@@ -283,8 +286,8 @@ export async function putDiagnosisDeferredQuestion(c: Context<AppEnv>): Promise<
 
 /** `GET /api/diagnoses/:diagnosisId/answers` — 本人が保存した回答内容を返す。 */
 export async function getDiagnosisAnswerContents(c: Context<AppEnv>): Promise<Response> {
-  if (!c.env?.DB) {
-    logger.error({ path: c.req.path }, "DB binding is not configured");
+  if (!c.env?.DB || !c.env.ACCOUNT_DATA) {
+    logger.error({ path: c.req.path }, "Diagnosis storage binding is not configured");
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   }
 
@@ -293,6 +296,7 @@ export async function getDiagnosisAnswerContents(c: Context<AppEnv>): Promise<Re
     idToken: bearerToken(c.req.header("authorization")),
     lineLoginChannelId: getConfig(c.env).lineLoginChannelId,
     db: d1.client.create(c.env.DB),
+    accountData: c.env.ACCOUNT_DATA,
   });
 
   switch (outcome.type) {
@@ -327,8 +331,8 @@ export async function deleteDevelopmentDiagnosisData(c: Context<AppEnv>): Promis
     return c.json(v.parse(DevelopmentRouteNotFoundErrorSchema, { error: "Not Found" }), 404);
   }
   const currentConfig = getConfig(c.env);
-  if (!c.env?.DB) {
-    logger.error({ path: c.req.path }, "DB binding is not configured");
+  if (!c.env?.DB || !c.env.ACCOUNT_DATA) {
+    logger.error({ path: c.req.path }, "Diagnosis storage binding is not configured");
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   }
 
@@ -336,6 +340,7 @@ export async function deleteDevelopmentDiagnosisData(c: Context<AppEnv>): Promis
     idToken: bearerToken(c.req.header("authorization")),
     lineLoginChannelId: currentConfig.lineLoginChannelId,
     db: d1.client.create(c.env.DB),
+    accountData: c.env.ACCOUNT_DATA,
   });
 
   switch (outcome.type) {

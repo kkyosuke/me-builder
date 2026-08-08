@@ -1,5 +1,10 @@
-import { cloudflareTest } from "@cloudflare/vitest-pool-workers";
+import { fileURLToPath } from "node:url";
+import { cloudflareTest, readD1Migrations } from "@cloudflare/vitest-pool-workers";
 import { defineConfig } from "vitest/config";
+
+const sharedD1Migrations = await readD1Migrations(
+  fileURLToPath(new URL("../../packages/lib/drizzle", import.meta.url)),
+);
 
 export default defineConfig({
   plugins: [
@@ -9,6 +14,7 @@ export default defineConfig({
         bindings: {
           LINE_CHANNEL_ACCESS_TOKEN: "runtime-test-token",
           CHAT_DELIVERY_SECRET: "runtime-test-delivery-secret",
+          TEST_D1_MIGRATIONS: sharedD1Migrations,
         },
       },
     }),

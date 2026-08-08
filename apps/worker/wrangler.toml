@@ -23,17 +23,22 @@ binding = "CHAT_TURN_QUEUE"
 name = "CONVERSATION_COORDINATOR"
 class_name = "ConversationCoordinator"
 
+[[durable_objects.bindings]]
+name = "ACCOUNT_DATA"
+class_name = "AccountData"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["ConversationCoordinator"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["AccountData"]
 
 [[rules]]
 type = "Text"
 globs = ["**/*.sql"]
 fallthrough = true
-
-[triggers]
-crons = ["*/15 * * * *"]
 
 [[d1_databases]]
 binding = "DB"
@@ -63,8 +68,9 @@ binding = "CHAT_TURN_QUEUE"
 name = "CONVERSATION_COORDINATOR"
 class_name = "ConversationCoordinator"
 
-[env.local.triggers]
-crons = ["*/15 * * * *"]
+[[env.local.durable_objects.bindings]]
+name = "ACCOUNT_DATA"
+class_name = "AccountData"
 
 [[env.local.d1_databases]]
 binding = "DB"
@@ -94,8 +100,9 @@ binding = "CHAT_TURN_QUEUE"
 name = "CONVERSATION_COORDINATOR"
 class_name = "ConversationCoordinator"
 
-[env.preview.triggers]
-crons = ["*/15 * * * *"]
+[[env.preview.durable_objects.bindings]]
+name = "ACCOUNT_DATA"
+class_name = "AccountData"
 
 [[env.preview.d1_databases]]
 binding = "DB"
@@ -125,8 +132,9 @@ binding = "CHAT_TURN_QUEUE"
 name = "CONVERSATION_COORDINATOR"
 class_name = "ConversationCoordinator"
 
-[env.production.triggers]
-crons = ["*/15 * * * *"]
+[[env.production.durable_objects.bindings]]
+name = "ACCOUNT_DATA"
+class_name = "AccountData"
 
 [[env.production.d1_databases]]
 binding = "DB"

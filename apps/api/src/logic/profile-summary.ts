@@ -1,4 +1,4 @@
-import { d1 } from "@me-builder/lib";
+import { type AccountDataNamespace, accountDataFor, type d1 } from "@me-builder/lib";
 import { createLiffSession } from "./liff-session";
 
 const DUMMY_SUMMARY = {
@@ -47,34 +47,48 @@ type Params = {
   idToken: string | undefined;
   lineLoginChannelId: string | undefined;
   db: d1.Client;
+  accountData?: AccountDataNamespace;
   at?: Date;
 };
 
 type Dependencies = {
   createSession: typeof createLiffSession;
-  listVisibleDiagnoses: typeof d1.action.diagnosis.listVisibleDiagnoses;
-  hasActiveSourceRecords: typeof d1.action.source.hasActiveSourceRecords;
+  listVisibleDiagnoses: (
+    accountData: AccountDataNamespace | undefined,
+    accountId: string,
+    at: Date,
+  ) => ReturnType<typeof d1.action.diagnosis.listVisibleDiagnoses>;
+  hasActiveSourceRecords: (
+    accountData: AccountDataNamespace | undefined,
+    accountId: string,
+  ) => ReturnType<typeof d1.action.source.hasActiveSourceRecords>;
   summary: typeof DUMMY_SUMMARY | null;
 };
 
 const defaultDependencies: Dependencies = {
   createSession: createLiffSession,
-  listVisibleDiagnoses: d1.action.diagnosis.listVisibleDiagnoses,
-  hasActiveSourceRecords: d1.action.source.hasActiveSourceRecords,
+  listVisibleDiagnoses: (accountData, accountId, at) => {
+    if (!accountData) throw new Error("ACCOUNT_DATA binding is not configured");
+    return accountDataFor(accountData, accountId).execute("diagnosis.listVisible", accountId, at);
+  },
+  hasActiveSourceRecords: (accountData, accountId) => {
+    if (!accountData) throw new Error("ACCOUNT_DATA binding is not configured");
+    return accountDataFor(accountData, accountId).execute("source.hasActive", accountId);
+  },
   summary: DUMMY_SUMMARY,
 };
 
 /** 本人のまとめを返し、実際の診断進捗だけから次の行動を決める。 */
 export async function getProfileSummary(
-  { idToken, lineLoginChannelId, db, at = new Date() }: Params,
+  { idToken, lineLoginChannelId, db, accountData, at = new Date() }: Params,
   dependencies: Dependencies = defaultDependencies,
 ): Promise<ProfileSummaryOutcome> {
   const session = await dependencies.createSession({ idToken, lineLoginChannelId, db });
   if (session.type !== "resolved") return session;
 
   const [diagnoses, hasRecords] = await Promise.all([
-    dependencies.listVisibleDiagnoses(db, session.session.accountId, at),
-    dependencies.hasActiveSourceRecords(db, session.session.accountId),
+    dependencies.listVisibleDiagnoses(accountData, session.session.accountId, at),
+    dependencies.hasActiveSourceRecords(accountData, session.session.accountId),
   ]);
   const hasAnswerableDiagnosis = diagnoses.some(
     ({ availability, responseStatus }) => availability === "open" && responseStatus !== "answered",

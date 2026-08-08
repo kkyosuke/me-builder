@@ -1,4 +1,4 @@
-import { d1, line } from "@me-builder/lib";
+import { type AccountDataNamespace, accountDataFor, d1, line } from "@me-builder/lib";
 import {
   type ConversationCoordinatorNamespace,
   type WebhookQueueMessage,
@@ -41,6 +41,7 @@ export async function processLineWebhook(
   db: d1.Client,
   workerConfig: WorkerConfig,
   coordinatorNamespace?: ConversationCoordinatorNamespace,
+  accountDataNamespace?: AccountDataNamespace,
   routing?: WebhookQueueMessage["routing"],
 ): Promise<void> {
   const events = line.webhook.parseEvents(payload);
@@ -98,12 +99,16 @@ export async function processLineWebhook(
     }
 
     const receivedAt = new Date(event.timestamp);
-    const source = await d1.action.conversation.storeLineTextSource(db, {
-      accountId: resolved.account.id,
-      eventId,
-      body: event.message.text,
-      receivedAt,
-    });
+    if (!accountDataNamespace) throw new Error("ACCOUNT_DATA binding is not configured");
+    const source = await accountDataFor(accountDataNamespace, resolved.account.id).execute(
+      "conversation.storeLineTextSource",
+      {
+        accountId: resolved.account.id,
+        eventId,
+        body: event.message.text,
+        receivedAt,
+      },
+    );
     if (!workerConfig.chatEnabled || !coordinatorNamespace) {
       logger.warn({ reason: "chat_not_configured" }, "Diary saved without AI chat processing");
       continue;

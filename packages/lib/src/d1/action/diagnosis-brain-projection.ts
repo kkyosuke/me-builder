@@ -89,7 +89,8 @@ async function loadProjectionInput(db: D1Client, diagnosisResponseId: string) {
           eq(diagnosisQuestions.isDeleted, false),
         ),
       )
-      .orderBy(asc(diagnosisQuestions.position), asc(questionChoices.position)),
+      .orderBy(asc(diagnosisQuestions.position), asc(questionChoices.position))
+      .all(),
     db
       .select({
         diagnosisQuestionId: diagnosisAnswers.diagnosisQuestionId,
@@ -107,7 +108,8 @@ async function loadProjectionInput(db: D1Client, diagnosisResponseId: string) {
           eq(diagnosisAnswers.isDeleted, false),
           eq(sourceRecords.isDeleted, false),
         ),
-      ),
+      )
+      .all(),
   ]);
 
   const diagnosisQuestionIds = new Set(
@@ -198,7 +200,8 @@ async function saveProjection(
           eq(brainItemEvidenceEdges.relation, "supports"),
           eq(brainItemEvidenceEdges.isDeleted, false),
         ),
-      );
+      )
+      .all();
     const existingSourceRecordIds = new Set(
       existingEvidence.map(({ sourceRecordId }) => sourceRecordId),
     );
@@ -338,7 +341,8 @@ async function claimRequest(
         eq(diagnosisBrainProjectionRequests.isDeleted, false),
       ),
     )
-    .returning({ id: diagnosisBrainProjectionRequests.id });
+    .returning({ id: diagnosisBrainProjectionRequests.id })
+    .all();
   return claimed ? { ...request, attemptCount } : null;
 }
 
@@ -353,7 +357,8 @@ async function completeRequest(db: D1Client, request: ClaimedProjectionRequest, 
         eq(diagnosisBrainProjectionRequests.attemptCount, request.attemptCount),
         eq(diagnosisBrainProjectionRequests.isDeleted, false),
       ),
-    );
+    )
+    .run();
 }
 
 async function completeOlderRequests(db: D1Client, request: ClaimedProjectionRequest, at: Date) {
@@ -367,7 +372,8 @@ async function completeOlderRequests(db: D1Client, request: ClaimedProjectionReq
         inArray(diagnosisBrainProjectionRequests.status, ["pending", "failed"]),
         eq(diagnosisBrainProjectionRequests.isDeleted, false),
       ),
-    );
+    )
+    .run();
 }
 
 async function failRequest(
@@ -393,7 +399,8 @@ async function failRequest(
         eq(diagnosisBrainProjectionRequests.attemptCount, request.attemptCount),
         eq(diagnosisBrainProjectionRequests.isDeleted, false),
       ),
-    );
+    )
+    .run();
 }
 
 /** 指定されたprojection要求を処理します。回答保存直後のbest-effort実行に使用します。 */
@@ -418,7 +425,8 @@ export async function processDiagnosisBrainProjectionRequest(
         lte(diagnosisBrainProjectionRequests.nextAttemptAt, at),
         eq(diagnosisBrainProjectionRequests.isDeleted, false),
       ),
-    );
+    )
+    .all();
   return processRequests(db, requests, at);
 }
 
@@ -453,7 +461,8 @@ export async function processLatestDiagnosisBrainProjection(
       ),
     )
     .orderBy(desc(diagnosisBrainProjectionRequests.responseRevision))
-    .limit(1);
+    .limit(1)
+    .all();
   return processRequests(db, requests, at);
 }
 
@@ -479,7 +488,8 @@ export async function processPendingDiagnosisBrainProjections(
       ),
     )
     .orderBy(asc(diagnosisBrainProjectionRequests.nextAttemptAt))
-    .limit(limit);
+    .limit(limit)
+    .all();
   return processRequests(db, requests, at);
 }
 

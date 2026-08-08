@@ -49,7 +49,28 @@ function createCoordinator(env: Partial<Env> = {}) {
     storage,
     blockConcurrencyWhile: (callback: () => Promise<void>) => callback(),
   } as unknown as DurableObjectState;
-  const coordinator = new ConversationCoordinator(ctx, env as Env);
+  const accountData = {
+    getByName: () => ({
+      execute: (_accountId: string, operation: string, ...args: unknown[]) => {
+        if (operation !== "conversation.attachMessagesToTurn") {
+          throw new Error(`Unexpected AccountData operation: ${operation}`);
+        }
+        return d1.action.conversation.attachMessagesToTurn(
+          {} as d1.Client,
+          ...(args as Parameters<typeof d1.action.conversation.attachMessagesToTurn> extends [
+            unknown,
+            ...infer TRest,
+          ]
+            ? TRest
+            : never),
+        );
+      },
+    }),
+  } as unknown as NonNullable<Env["ACCOUNT_DATA"]>;
+  const coordinator = new ConversationCoordinator(ctx, {
+    ACCOUNT_DATA: accountData,
+    ...env,
+  } as Env);
   return { coordinator, sql, getAlarm: () => alarm };
 }
 

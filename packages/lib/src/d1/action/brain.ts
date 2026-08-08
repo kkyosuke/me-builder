@@ -86,7 +86,8 @@ export async function saveBrainItem(
         eq(sourceRecords.accountId, input.item.accountId),
         eq(sourceRecords.isDeleted, false),
       ),
-    );
+    )
+    .all();
   if (ownedSources.length !== sourceRecordIds.length) return { type: "source-account-mismatch" };
 
   if (input.supersedes) {

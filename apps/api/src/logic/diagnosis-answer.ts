@@ -1,4 +1,4 @@
-import { d1 } from "@me-builder/lib";
+import { type AccountDataNamespace, accountDataFor, type d1 } from "@me-builder/lib";
 import { logger } from "@me-builder/shared";
 import { createLiffSession } from "./liff-session";
 
@@ -25,20 +25,41 @@ type SaveDiagnosisAnswerParams = {
   idToken: string | undefined;
   lineLoginChannelId: string | undefined;
   db: d1.Client;
+  accountData?: AccountDataNamespace;
   at?: Date;
   scheduleProjection?: (task: () => Promise<void>) => void;
 };
 
 type Dependencies = {
   createSession: typeof createLiffSession;
-  saveAnswer: typeof d1.action.diagnosis.saveDiagnosisAnswer;
-  processLatestProjection?: typeof d1.action.diagnosisBrainProjection.processLatestDiagnosisBrainProjection;
+  saveAnswer: (
+    accountData: AccountDataNamespace | undefined,
+    accountId: string,
+    input: Parameters<typeof d1.action.diagnosis.saveDiagnosisAnswer>[1],
+  ) => ReturnType<typeof d1.action.diagnosis.saveDiagnosisAnswer>;
+  processLatestProjection?: (
+    accountData: AccountDataNamespace | undefined,
+    accountId: string,
+    diagnosisId: string,
+    at: Date,
+  ) => ReturnType<typeof d1.action.diagnosisBrainProjection.processLatestDiagnosisBrainProjection>;
 };
 
 const defaultDependencies: Dependencies = {
   createSession: createLiffSession,
-  saveAnswer: d1.action.diagnosis.saveDiagnosisAnswer,
-  processLatestProjection: d1.action.diagnosisBrainProjection.processLatestDiagnosisBrainProjection,
+  saveAnswer: (accountData, accountId, input) => {
+    if (!accountData) throw new Error("ACCOUNT_DATA binding is not configured");
+    return accountDataFor(accountData, accountId).execute("diagnosis.saveAnswer", input);
+  },
+  processLatestProjection: (accountData, accountId, diagnosisId, at) => {
+    if (!accountData) throw new Error("ACCOUNT_DATA binding is not configured");
+    return accountDataFor(accountData, accountId).execute(
+      "diagnosisProjection.processLatest",
+      accountId,
+      diagnosisId,
+      at,
+    );
+  },
 };
 
 /** 本人確認結果からAccountを解決し、その本人の1問分の回答だけを保存します。 */
@@ -50,6 +71,7 @@ export async function saveDiagnosisAnswer(
     idToken,
     lineLoginChannelId,
     db,
+    accountData,
     at = new Date(),
     scheduleProjection,
   }: SaveDiagnosisAnswerParams,
@@ -59,7 +81,7 @@ export async function saveDiagnosisAnswer(
   if (session.type !== "resolved") {
     return session;
   }
-  const result = await dependencies.saveAnswer(db, {
+  const result = await dependencies.saveAnswer(accountData, session.session.accountId, {
     accountId: session.session.accountId,
     diagnosisId,
     diagnosisQuestionId,
@@ -71,7 +93,7 @@ export async function saveDiagnosisAnswer(
       try {
         await (
           dependencies.processLatestProjection ?? defaultDependencies.processLatestProjection
-        )?.(db, session.session.accountId, diagnosisId, at);
+        )?.(accountData, session.session.accountId, diagnosisId, at);
       } catch (error) {
         logger.error(
           {
