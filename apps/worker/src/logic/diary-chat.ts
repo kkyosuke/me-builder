@@ -3,7 +3,11 @@ import { toJsonSchema } from "@valibot/to-json-schema";
 import * as v from "valibot";
 import type { WorkerConfig } from "../config";
 import { createGeminiClient, generateStructuredText } from "../infrastructure/gemini-client";
-import { DIARY_CHAT_SYSTEM_PROMPT } from "../prompt/diary-chat";
+import {
+  DEFAULT_DIARY_CHAT_PROMPT_OPTIONS,
+  type DiaryChatPromptOptions,
+  buildDiaryChatSystemPrompt,
+} from "../prompt/diary-chat";
 
 const ModeSchema = v.picklist(["listen", "explore", "organize", "advise", "close"]);
 const SafetyRouteSchema = v.picklist([
@@ -116,6 +120,7 @@ export async function generateDiaryChatResponse(
   signal?: AbortSignal,
   context?: {
     currentUserMessageIds?: string[];
+    prompt?: DiaryChatPromptOptions;
   },
 ): Promise<DiaryChatResponse> {
   const safetyRoute = classifySafety(messages, context?.currentUserMessageIds);
@@ -140,7 +145,9 @@ export async function generateDiaryChatResponse(
     const raw = await generateStructuredText(client, {
       model: workerConfig.geminiModel,
       contents,
-      systemInstruction: DIARY_CHAT_SYSTEM_PROMPT,
+      systemInstruction: buildDiaryChatSystemPrompt(
+        context?.prompt ?? DEFAULT_DIARY_CHAT_PROMPT_OPTIONS,
+      ),
       responseJsonSchema: schema,
       maxOutputTokens: 2_000,
       ...(signal ? { signal } : {}),

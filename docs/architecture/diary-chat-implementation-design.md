@@ -441,7 +441,7 @@ system promptは次の順で固定し、Git管理する`prompt_version`を付け
 
 会話データはsystem promptへ文字列連結せず、`context_package`というJSON値としてuser入力側へ置きます。区切り文字だけに依存せず、role分離、schema検証、tool非公開を併用します。
 
-system promptの本文と`prompt_version`は[`apps/worker/src/prompt/diary-chat.ts`](../../apps/worker/src/prompt/diary-chat.ts)をSSoTとします。会話の調子を変更するときは同ファイルの「会話と質問の方針」を編集し、振る舞いが変わる変更では`prompt_version`も更新します。生成処理とTurn作成処理は同じ定数を参照し、本文と記録上の版がずれないようにします。
+system promptの本文と`prompt_version`は[`apps/worker/src/prompt/diary-chat.ts`](../../apps/worker/src/prompt/diary-chat.ts)をSSoTとします。アプリケーションが管理する信頼済み入力として、会話の目的を`objective`、話し方と質問方法を`conversationGuidance`へ独立して渡し、役割、優先順位、記憶、助言、安全、出力の固定規則と合成します。user本文や取得した記憶をこれらの指示へ流用しません。固定規則または既定値の振る舞いが変わる変更では`prompt_version`も更新します。生成処理とTurn作成処理は同じ定数を参照し、本文と記録上の版がずれないようにします。
 
 ### 7.3 構造化出力
 
