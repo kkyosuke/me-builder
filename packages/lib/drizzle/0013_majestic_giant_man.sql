@@ -30,11 +30,12 @@ CREATE TABLE `__new_chat_turns` (
 	`first_reply_requested_at` integer,
 	`final_reply_requested_at` integer,
 	`response_message_id` text,
+	`delivery_metric_token` text,
 	FOREIGN KEY (`account_id`) REFERENCES `accounts`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`session_id`,`account_id`) REFERENCES `conversation_sessions`(`id`,`account_id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
-INSERT INTO `__new_chat_turns`("id", "created_at", "updated_at", "deleted_at", "is_deleted", "account_id", "session_id", "from_sequence", "through_sequence", "generation_epoch", "status", "prompt_version", "model", "end_session", "attempt_count", "failure_stage", "received_at", "generation_started_at", "first_reply_requested_at", "final_reply_requested_at", "response_message_id") SELECT turns."id", turns."created_at", turns."updated_at", turns."deleted_at", turns."is_deleted", sessions."account_id", turns."session_id", turns."from_sequence", turns."through_sequence", turns."generation_epoch", turns."status", turns."prompt_version", turns."model", turns."end_session", turns."attempt_count", turns."failure_stage", turns."received_at", turns."generation_started_at", turns."first_reply_requested_at", turns."final_reply_requested_at", turns."response_message_id" FROM `chat_turns` turns INNER JOIN `conversation_sessions` sessions ON sessions."id" = turns."session_id";--> statement-breakpoint
+INSERT INTO `__new_chat_turns`("id", "created_at", "updated_at", "deleted_at", "is_deleted", "account_id", "session_id", "from_sequence", "through_sequence", "generation_epoch", "status", "prompt_version", "model", "end_session", "attempt_count", "failure_stage", "received_at", "generation_started_at", "first_reply_requested_at", "final_reply_requested_at", "response_message_id", "delivery_metric_token") SELECT turns."id", turns."created_at", turns."updated_at", turns."deleted_at", turns."is_deleted", sessions."account_id", turns."session_id", turns."from_sequence", turns."through_sequence", turns."generation_epoch", turns."status", turns."prompt_version", turns."model", turns."end_session", turns."attempt_count", turns."failure_stage", turns."received_at", turns."generation_started_at", turns."first_reply_requested_at", turns."final_reply_requested_at", turns."response_message_id", turns."delivery_metric_token" FROM `chat_turns` turns INNER JOIN `conversation_sessions` sessions ON sessions."id" = turns."session_id";--> statement-breakpoint
 DROP TABLE `chat_turns`;--> statement-breakpoint
 ALTER TABLE `__new_chat_turns` RENAME TO `chat_turns`;--> statement-breakpoint
 PRAGMA foreign_keys=ON;--> statement-breakpoint

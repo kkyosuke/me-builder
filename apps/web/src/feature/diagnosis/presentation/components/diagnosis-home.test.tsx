@@ -25,6 +25,23 @@ function diagnosis(overrides: Partial<DiagnosisListItem>): DiagnosisListItem {
 describe("DiagnosisHome", () => {
   afterEach(() => cleanup());
 
+  it("主ナビゲーションで診断を現在位置として表示する", () => {
+    render(
+      <DiagnosisHome
+        diagnoses={{ status: "success", data: [] }}
+        onOpenDiagnosis={vi.fn()}
+        onRetry={vi.fn()}
+        canResetDiagnosisData={false}
+        resetState={{ status: "idle" }}
+        onResetDiagnosisData={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("link", { name: "診断" }).getAttribute("aria-current")).toBe("page");
+    expect(screen.getByRole("link", { name: "わたし" }).getAttribute("href")).toBe("/me");
+    expect(screen.getByRole("link", { name: "わたし" }).getAttribute("aria-current")).toBeNull();
+  });
+
   it("回答途中のカードだけに進捗を x/x 形式で表示する", () => {
     render(
       <DiagnosisHome

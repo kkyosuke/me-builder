@@ -6,6 +6,7 @@ import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { describe, expect, it } from "vitest";
 import type { D1Client } from "../client";
 import * as schema from "../schema";
+import { saveBrainItem } from "./brain";
 import {
   deferDiagnosisQuestion,
   deleteAccountDiagnosisData,
@@ -14,6 +15,7 @@ import {
   listVisibleDiagnoses,
   saveDiagnosisAnswer,
 } from "./diagnosis";
+import { processLatestDiagnosisBrainProjection } from "./diagnosis-brain-projection";
 
 describe("deferDiagnosisQuestion", () => {
   it("未回答の質問を保存し、再送時は初回の時刻を保つ", async () => {
@@ -110,7 +112,7 @@ describe("deferDiagnosisQuestion", () => {
 
 type DbExecutionObserver = {
   onBatch?: () => void;
-  onQuery?: (insideBatch: boolean) => void;
+  onQuery?: (insideBatch: boolean, parameterCount: number) => void;
 };
 
 function createTestDb(observer?: DbExecutionObserver): D1Client {
@@ -122,7 +124,8 @@ function createTestDb(observer?: DbExecutionObserver): D1Client {
     ...(observer?.onQuery
       ? {
           logger: {
-            logQuery: () => observer.onQuery?.(batchDepth > 0),
+            logQuery: (_query: string, params: unknown[]) =>
+              observer.onQuery?.(batchDepth > 0, params.length),
           },
         }
       : {}),
@@ -131,12 +134,17 @@ function createTestDb(observer?: DbExecutionObserver): D1Client {
     batch: async (queries: Array<PromiseLike<unknown>>) => {
       observer?.onBatch?.();
       batchDepth += 1;
+      sqlite.exec("BEGIN");
       try {
         const results: unknown[] = [];
         for (const query of queries) {
           results.push(await query);
         }
+        sqlite.exec("COMMIT");
         return results;
+      } catch (error) {
+        sqlite.exec("ROLLBACK");
+        throw error;
       } finally {
         batchDepth -= 1;
       }
@@ -528,6 +536,7 @@ describe("deleteAccountDiagnosisData", () => {
       deletedAnswerCount: 1,
       deletedDeferredQuestionCount: 1,
       deletedSourceRecordCount: 1,
+      deletedBrainItemCount: 0,
     });
 
     expect(await db.select().from(schema.diagnoses)).toHaveLength(1);
@@ -550,10 +559,381 @@ describe("deleteAccountDiagnosisData", () => {
       deletedAnswerCount: 0,
       deletedDeferredQuestionCount: 0,
       deletedSourceRecordCount: 0,
+      deletedBrainItemCount: 0,
     });
   });
 
-  it("削除対象の抽出を含む全SQLを1回のatomic batch内で実行する", async () => {
+  it("診断projection一式を物理削除し、同分類の日記由来Brain Itemは残す", async () => {
+    const db = createTestDb();
+    const at = new Date("2026-08-08T00:00:00Z");
+    await db.insert(schema.accounts).values({ id: "projection-reset-owner" });
+    await db.insert(schema.diagnosisScoringConfigs).values({
+      id: "projection-reset-scoring",
+      version: 1,
+      definition: {
+        parameters: [
+          {
+            id: "planning",
+            label: "計画性",
+            lowLabel: "即興的",
+            highLabel: "計画的",
+          },
+        ],
+        choiceScores: { yes: 1, no: -1 },
+        questions: {
+          "projection-reset-q1": { questionVersion: 1, weights: { planning: 1 } },
+          "projection-reset-q2": { questionVersion: 1, weights: { planning: 1 } },
+        },
+        minimumCoverage: 0.6,
+        lowMaximum: 35,
+        highMinimum: 65,
+        balancedLabel: "状況による",
+      },
+    });
+    await insertDiagnosis(db, {
+      id: "projection-reset",
+      scoringConfigId: "projection-reset-scoring",
+    });
+    for (const position of [1, 2]) {
+      await saveDiagnosisAnswer(db, {
+        accountId: "projection-reset-owner",
+        diagnosisId: "projection-reset",
+        diagnosisQuestionId: `projection-reset-sq${position}`,
+        choiceId: "yes",
+        at,
+      });
+    }
+    await processLatestDiagnosisBrainProjection(
+      db,
+      "projection-reset-owner",
+      "projection-reset",
+      at,
+    );
+
+    const head = await db.select().from(schema.diagnosisBrainProjectionHeads).get();
+    const answerSources = await db
+      .select({ id: schema.diagnosisAnswers.sourceRecordId })
+      .from(schema.diagnosisAnswers);
+    expect(head).toBeTruthy();
+    expect(answerSources).toHaveLength(2);
+    const revisedBrainItemId = "projection-reset-revised-item";
+    await expect(
+      saveBrainItem(
+        db,
+        {
+          at: new Date(at.getTime() + 1000),
+          item: {
+            id: revisedBrainItemId,
+            accountId: "projection-reset-owner",
+            category: "preference",
+            statement: "計画性は計画的な傾向が強い",
+            attributes: { origin: "diagnosis-test-revision" },
+            derivation: "deterministic",
+            confirmation: "pending",
+            status: "active",
+            stability: "changeable",
+            sensitivity: "normal",
+            externallyShareable: false,
+            confidence: { state: "uncomputed" },
+          },
+          evidence: answerSources.map(({ id }, index) => ({
+            id: `projection-reset-revised-evidence-${index}`,
+            sourceRecordId: id,
+            relation: "supports" as const,
+            isDerivationTrigger: true,
+            derivationMethod: "deterministic" as const,
+            generatedAt: at,
+          })),
+          accessLabels: [
+            {
+              id: "projection-reset-revised-access",
+              label: "unclassified",
+              confirmation: "pending",
+              assignedBy: "system",
+            },
+          ],
+          topicLabels: [{ id: "projection-reset-revised-topic", label: "planning" }],
+          supersedes: {
+            revisionId: "projection-reset-revision",
+            brainItemId: head?.currentBrainItemId ?? "",
+            derivationMethod: "deterministic",
+          },
+        },
+        [
+          db
+            .update(schema.diagnosisBrainProjectionHeads)
+            .set({ currentBrainItemId: revisedBrainItemId })
+            .where(eq(schema.diagnosisBrainProjectionHeads.id, head?.id ?? "")),
+        ],
+      ),
+    ).resolves.toMatchObject({ type: "saved" });
+
+    await db.insert(schema.sourceRecords).values({
+      id: "diary-source",
+      accountId: "projection-reset-owner",
+      kind: "user_input",
+    });
+    await saveBrainItem(db, {
+      at,
+      item: {
+        id: "diary-brain-item",
+        accountId: "projection-reset-owner",
+        category: "preference",
+        statement: "日記から得られた傾向",
+        attributes: { origin: "diary" },
+        derivation: "ai",
+        confirmation: "pending",
+        status: "active",
+        stability: "changeable",
+        sensitivity: "normal",
+        externallyShareable: false,
+        confidence: { state: "uncomputed" },
+      },
+      evidence: [
+        {
+          id: "diary-evidence",
+          sourceRecordId: "diary-source",
+          relation: "supports",
+          isDerivationTrigger: true,
+          derivationMethod: "ai",
+          generatedAt: at,
+        },
+      ],
+      accessLabels: [
+        {
+          id: "diary-access",
+          label: "unclassified",
+          confirmation: "pending",
+          assignedBy: "system",
+        },
+      ],
+      topicLabels: [{ id: "diary-topic", label: "daily-life" }],
+    });
+
+    await expect(deleteAccountDiagnosisData(db, "projection-reset-owner")).resolves.toEqual({
+      deletedResponseCount: 1,
+      deletedAnswerCount: 2,
+      deletedDeferredQuestionCount: 0,
+      deletedSourceRecordCount: 2,
+      deletedBrainItemCount: 2,
+    });
+
+    expect(await db.select().from(schema.diagnosisBrainProjectionHeads)).toHaveLength(0);
+    expect(await db.select().from(schema.diagnosisBrainProjectionRequests)).toHaveLength(0);
+    expect(await db.select().from(schema.diagnosisResponses)).toHaveLength(0);
+    expect(await db.select().from(schema.diagnosisAnswers)).toHaveLength(0);
+    expect(await db.select().from(schema.brainItemRevisions)).toHaveLength(0);
+    expect(await db.select().from(schema.brainItems)).toMatchObject([
+      { id: "diary-brain-item", category: "preference" },
+    ]);
+    expect(await db.select().from(schema.brainItemEvidenceEdges)).toMatchObject([
+      { id: "diary-evidence", sourceRecordId: "diary-source" },
+    ]);
+    expect(await db.select().from(schema.brainItemAccessLabels)).toMatchObject([
+      { id: "diary-access" },
+    ]);
+    expect(await db.select().from(schema.brainItemTopicLabels)).toMatchObject([
+      { id: "diary-topic" },
+    ]);
+    expect(await db.select().from(schema.sourceRecords)).toMatchObject([{ id: "diary-source" }]);
+  });
+
+  it("対象解決後にprojectionが完了しても再解決して削除する", async () => {
+    const db = createTestDb();
+    const at = new Date("2026-08-08T00:00:00Z");
+    await db.insert(schema.accounts).values({ id: "concurrent-reset-owner" });
+    await db.insert(schema.diagnosisScoringConfigs).values({
+      id: "concurrent-reset-scoring",
+      version: 1,
+      definition: {},
+    });
+    await insertDiagnosis(db, {
+      id: "concurrent-reset",
+      scoringConfigId: "concurrent-reset-scoring",
+    });
+    await saveDiagnosisAnswer(db, {
+      accountId: "concurrent-reset-owner",
+      diagnosisId: "concurrent-reset",
+      diagnosisQuestionId: "concurrent-reset-sq1",
+      choiceId: "yes",
+      at,
+    });
+    const answer = await db
+      .select({ sourceRecordId: schema.diagnosisAnswers.sourceRecordId })
+      .from(schema.diagnosisAnswers)
+      .get();
+    expect(answer).toBeTruthy();
+
+    const originalBatch = db.batch.bind(db);
+    let injectedProjection = false;
+    let injectingProjection = false;
+    let resetBatchCount = 0;
+    Object.assign(db, {
+      batch: async (queries: Parameters<D1Client["batch"]>[0]) => {
+        if (!injectedProjection) {
+          injectedProjection = true;
+          injectingProjection = true;
+          await saveBrainItem(db, {
+            at,
+            item: {
+              id: "concurrent-reset-brain",
+              accountId: "concurrent-reset-owner",
+              category: "preference",
+              statement: "競合中に生成された診断傾向",
+              attributes: { origin: "diagnosis" },
+              derivation: "deterministic",
+              confirmation: "pending",
+              status: "active",
+              stability: "changeable",
+              sensitivity: "normal",
+              externallyShareable: false,
+              confidence: { state: "uncomputed" },
+            },
+            evidence: [
+              {
+                id: "concurrent-reset-evidence",
+                sourceRecordId: answer?.sourceRecordId ?? "",
+                relation: "supports",
+                isDerivationTrigger: true,
+                derivationMethod: "deterministic",
+                generatedAt: at,
+              },
+            ],
+            accessLabels: [
+              {
+                id: "concurrent-reset-access",
+                label: "unclassified",
+                confirmation: "pending",
+                assignedBy: "system",
+              },
+            ],
+          });
+          await db.insert(schema.diagnosisBrainProjectionHeads).values({
+            id: "concurrent-reset-head",
+            accountId: "concurrent-reset-owner",
+            diagnosisId: "concurrent-reset",
+            scoringConfigId: "concurrent-reset-scoring",
+            scoringConfigVersion: 1,
+            parameterId: "planning",
+            currentBrainItemId: "concurrent-reset-brain",
+            contentSignature: "concurrent-reset-signature",
+          });
+          injectingProjection = false;
+        }
+        if (!injectingProjection) resetBatchCount += 1;
+        return originalBatch(queries);
+      },
+    });
+
+    await expect(deleteAccountDiagnosisData(db, "concurrent-reset-owner")).resolves.toEqual({
+      deletedResponseCount: 1,
+      deletedAnswerCount: 1,
+      deletedDeferredQuestionCount: 0,
+      deletedSourceRecordCount: 1,
+      deletedBrainItemCount: 1,
+    });
+    expect(resetBatchCount).toBe(2);
+    expect(await db.select().from(schema.brainItems)).toHaveLength(0);
+    expect(await db.select().from(schema.sourceRecords)).toHaveLength(0);
+    expect(await db.select().from(schema.diagnosisResponses)).toHaveLength(0);
+  });
+
+  it("100件を超える診断projectionもD1のparameter上限内で削除する", async () => {
+    let tracking = false;
+    const parameterCounts: number[] = [];
+    const db = createTestDb({
+      onQuery: (_insideBatch, parameterCount) => {
+        if (tracking) parameterCounts.push(parameterCount);
+      },
+    });
+    const at = new Date("2026-08-08T00:00:00Z");
+    await db.insert(schema.accounts).values({ id: "large-reset-owner" });
+    await db.insert(schema.diagnosisScoringConfigs).values({
+      id: "large-reset-scoring",
+      version: 1,
+      definition: {},
+    });
+    await insertDiagnosis(db, {
+      id: "large-reset",
+      scoringConfigId: "large-reset-scoring",
+    });
+    await saveDiagnosisAnswer(db, {
+      accountId: "large-reset-owner",
+      diagnosisId: "large-reset",
+      diagnosisQuestionId: "large-reset-sq1",
+      choiceId: "yes",
+      at,
+    });
+    const answer = await db
+      .select({ sourceRecordId: schema.diagnosisAnswers.sourceRecordId })
+      .from(schema.diagnosisAnswers)
+      .get();
+    expect(answer).toBeTruthy();
+
+    const brainItemIds = Array.from({ length: 101 }, (_, index) => `large-brain-${index}`);
+    await db.insert(schema.brainItems).values(
+      brainItemIds.map((id) => ({
+        id,
+        accountId: "large-reset-owner",
+        category: "preference",
+        statement: `${id} statement`,
+        attributes: { origin: "diagnosis" },
+        derivation: "deterministic" as const,
+        confirmation: "pending" as const,
+        status: "active" as const,
+        stability: "changeable" as const,
+        sensitivity: "normal",
+        externallyShareable: false,
+        confidence: { state: "uncomputed" },
+      })),
+    );
+    await db.insert(schema.brainItemEvidenceEdges).values(
+      brainItemIds.map((brainItemId, index) => ({
+        id: `large-evidence-${index}`,
+        accountId: "large-reset-owner",
+        brainItemId,
+        sourceRecordId: answer?.sourceRecordId ?? "",
+        relation: "supports" as const,
+        isDerivationTrigger: true,
+        derivationMethod: "deterministic" as const,
+        generatedAt: at,
+      })),
+    );
+    await db.insert(schema.brainItemAccessLabels).values(
+      brainItemIds.map((brainItemId, index) => ({
+        id: `large-access-${index}`,
+        accountId: "large-reset-owner",
+        brainItemId,
+        label: "unclassified",
+        confirmation: "pending" as const,
+        assignedBy: "system" as const,
+      })),
+    );
+    await db.insert(schema.diagnosisBrainProjectionHeads).values(
+      brainItemIds.map((currentBrainItemId, index) => ({
+        id: `large-head-${index}`,
+        accountId: "large-reset-owner",
+        diagnosisId: "large-reset",
+        scoringConfigId: "large-reset-scoring",
+        scoringConfigVersion: 1,
+        parameterId: `parameter-${index}`,
+        currentBrainItemId,
+        contentSignature: `signature-${index}`,
+      })),
+    );
+
+    tracking = true;
+    await expect(deleteAccountDiagnosisData(db, "large-reset-owner")).resolves.toMatchObject({
+      deletedBrainItemCount: 101,
+      deletedSourceRecordCount: 1,
+    });
+
+    expect(Math.max(...parameterCounts)).toBeLessThanOrEqual(100);
+    expect(await db.select().from(schema.brainItems)).toHaveLength(0);
+    expect(await db.select().from(schema.diagnosisBrainProjectionHeads)).toHaveLength(0);
+  });
+
+  it("projection対象を解決した後の物理削除を1回のatomic batchで実行する", async () => {
     let tracking = false;
     let batchCount = 0;
     const queryContexts: boolean[] = [];
@@ -584,7 +964,8 @@ describe("deleteAccountDiagnosisData", () => {
 
     expect(batchCount).toBe(1);
     expect(queryContexts.length).toBeGreaterThan(0);
-    expect(queryContexts.every((insideBatch) => insideBatch)).toBe(true);
+    expect(queryContexts).toContain(false);
+    expect(queryContexts).toContain(true);
   });
 });
 

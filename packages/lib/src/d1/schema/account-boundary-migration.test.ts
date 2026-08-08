@@ -17,6 +17,7 @@ const migrationsBeforeAccountBoundary = [
   "0009_salty_puppet_master.sql",
   "0010_rare_goblin_queen.sql",
   "0011_sad_the_phantom.sql",
+  "0012_curvy_marten_broadcloak.sql",
 ] as const;
 
 function applyMigration(sqlite: Database.Database, filename: string) {
@@ -85,7 +86,7 @@ describe("Account boundary migration", () => {
       ) VALUES ('request-1', 1, 1, 'response-1', 1, 'pending', 1);
     `);
 
-    applyMigration(sqlite, "0012_gray_venom.sql");
+    applyMigration(sqlite, "0013_majestic_giant_man.sql");
 
     for (const table of [
       "source_record_revisions",
@@ -121,7 +122,9 @@ describe("Account boundary migration", () => {
       ) VALUES ('message-1', 1, 1, 'session-1', 1, 'user', 'source-2', 'line');
     `);
 
-    expect(() => applyMigration(sqlite, "0012_gray_venom.sql")).toThrow(/CHECK constraint failed/);
+    expect(() => applyMigration(sqlite, "0013_majestic_giant_man.sql")).toThrow(
+      /CHECK constraint failed/,
+    );
     sqlite.close();
   });
 });

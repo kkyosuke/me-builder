@@ -491,6 +491,7 @@ const ResetDevelopmentDiagnosisDataResponseSchema = v.object({
   deletedAnswerCount: v.pipe(v.number(), v.safeInteger(), v.minValue(0)),
   deletedDeferredQuestionCount: v.pipe(v.number(), v.safeInteger(), v.minValue(0)),
   deletedSourceRecordCount: v.pipe(v.number(), v.safeInteger(), v.minValue(0)),
+  deletedBrainItemCount: v.pipe(v.number(), v.safeInteger(), v.minValue(0)),
 }) satisfies v.GenericSchema<ApiResetDevelopmentDiagnosisDataResponse>;
 
 export type ResetDevelopmentDiagnosisDataResult = v.InferOutput<

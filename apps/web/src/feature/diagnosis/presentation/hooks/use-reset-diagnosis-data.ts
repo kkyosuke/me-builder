@@ -15,7 +15,7 @@ export function useResetDiagnosisData({
   const reset = useCallback(async (): Promise<void> => {
     if (
       !window.confirm(
-        "ログイン中ユーザーの診断回答データをすべて削除します。この操作は取り消せません。続けますか？",
+        "ログイン中ユーザーの診断回答と、診断から生成されたBrain Itemをすべて削除します。この操作は取り消せません。続けますか？",
       )
     ) {
       return;
@@ -32,13 +32,16 @@ export function useResetDiagnosisData({
     try {
       const deleted = await resetDevelopmentDiagnosisData(config.apiUrl, idToken);
       await onReset();
-      const deletedCount = deleted.deletedAnswerCount + deleted.deletedDeferredQuestionCount;
+      const deletedCount =
+        deleted.deletedAnswerCount +
+        deleted.deletedDeferredQuestionCount +
+        deleted.deletedBrainItemCount;
       setState({
         status: "success",
         data:
           deletedCount === 0
             ? "削除対象の回答データはありませんでした。"
-            : `回答データを削除しました（回答・保留 ${deletedCount}件）。`,
+            : `診断由来データを削除しました（回答・保留・Brain Item ${deletedCount}件）。`,
       });
     } catch (error) {
       setState({

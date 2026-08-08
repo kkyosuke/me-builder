@@ -11,6 +11,7 @@ describe("resetDevelopmentDiagnosisData", () => {
       deletedAnswerCount: 12,
       deletedDeferredQuestionCount: 1,
       deletedSourceRecordCount: 12,
+      deletedBrainItemCount: 4,
     };
     const deleteDiagnosisData = vi.fn().mockResolvedValue(deleted);
 

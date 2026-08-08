@@ -1,6 +1,7 @@
 import { ArrowRight, ChevronDown, RotateCw, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { LoadingState } from "../../../../components/loading-state";
+import { MainNavigation } from "../../../../components/main-navigation";
 import type { AsyncState } from "../../../../model/async-state";
 import type { DiagnosisListItem } from "../../model/diagnosis-list-item";
 import { buildDiagnosisListSections } from "../../model/diagnosis-list-sections";
@@ -115,7 +116,7 @@ export function DiagnosisHome({
     diagnoses.status === "success" ? buildDiagnosisListSections(diagnoses.data) : null;
 
   return (
-    <main className="mx-auto min-h-dvh w-full max-w-2xl px-4 py-8 sm:px-8">
+    <main className="mx-auto min-h-dvh w-full max-w-2xl px-4 py-8 pb-28 sm:px-8">
       <header className="mb-8">
         <p className="text-sm font-semibold tracking-wider text-sky-700 dark:text-sky-300">
           me-builder
@@ -217,7 +218,8 @@ export function DiagnosisHome({
             開発用データ操作
           </h2>
           <p className="mt-2 text-xs leading-relaxed text-slate-600 dark:text-slate-400">
-            ログイン中ユーザーの回答、回答進捗、保留、回答由来データを削除します。診断定義は残ります。
+            ログイン中ユーザーの回答、回答進捗、保留、回答由来Source Record、診断から生成されたBrain
+            Itemを削除します。診断定義と日記由来データは残ります。
           </p>
           <button
             type="button"
@@ -248,6 +250,7 @@ export function DiagnosisHome({
           )}
         </section>
       )}
+      <MainNavigation current="diagnosis" />
     </main>
   );
 }

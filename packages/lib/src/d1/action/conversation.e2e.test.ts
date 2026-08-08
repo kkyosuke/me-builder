@@ -66,10 +66,19 @@ describe("Diary conversation persistence flow", () => {
         receivedAt: firstReceivedAt,
       }),
     ).resolves.toEqual(first);
-    const attached = await attachMessagesToTurn(db, [second, first], 1, "test-model");
-    await expect(attachMessagesToTurn(db, [first, second], 1, "test-model")).resolves.toEqual(
-      attached,
+    const attached = await attachMessagesToTurn(
+      db,
+      [second, first],
+      1,
+      "test-model",
+      "test-prompt",
     );
+    await expect(
+      attachMessagesToTurn(db, [first, second], 1, "test-model", "test-prompt"),
+    ).resolves.toEqual(attached);
+    expect(await db.select().from(schema.chatTurns)).toEqual([
+      expect.objectContaining({ promptVersion: "test-prompt" }),
+    ]);
 
     const context = await getTurnContext(db, attached.turnId, 20);
     expect(context).toMatchObject({
@@ -154,7 +163,7 @@ describe("Diary conversation persistence flow", () => {
       body: "ここで一度終わります",
       receivedAt: new Date("2026-08-07T00:00:00.000Z"),
     });
-    const firstTurn = await attachMessagesToTurn(db, [first], 1, "test-model");
+    const firstTurn = await attachMessagesToTurn(db, [first], 1, "test-model", "test-prompt");
     await closeTurnSession(db, firstTurn.turnId);
 
     const second = await storeLineTextSource(db, {
@@ -163,15 +172,15 @@ describe("Diary conversation persistence flow", () => {
       body: "新しい会話を始めます",
       receivedAt: new Date("2026-08-07T00:01:00.000Z"),
     });
-    const secondTurn = await attachMessagesToTurn(db, [second], 2, "test-model");
+    const secondTurn = await attachMessagesToTurn(db, [second], 2, "test-model", "test-prompt");
     expect(secondTurn.sessionId).not.toBe(firstTurn.sessionId);
     await expect(markTurnGenerating(db, secondTurn.turnId)).resolves.toBe(true);
     await expect(markTurnFailed(db, secondTurn.turnId, "generation_exhausted")).resolves.toBe(true);
     await expect(markTurnDelivered(db, secondTurn.turnId)).resolves.toBe(false);
 
-    await expect(attachMessagesToTurn(db, [first, second], 3, "test-model")).resolves.toEqual(
-      firstTurn,
-    );
+    await expect(
+      attachMessagesToTurn(db, [first, second], 3, "test-model", "test-prompt"),
+    ).resolves.toEqual(firstTurn);
     expect(await db.select().from(schema.chatTurns)).toHaveLength(2);
   });
 
@@ -193,9 +202,17 @@ describe("Diary conversation persistence flow", () => {
       body: "二つ目",
       receivedAt: new Date("2026-08-07T00:00:01.000Z"),
     });
-    const originalTurn = await attachMessagesToTurn(db, [first, second], 1, "test-model");
+    const originalTurn = await attachMessagesToTurn(
+      db,
+      [first, second],
+      1,
+      "test-model",
+      "test-prompt",
+    );
 
-    await expect(attachMessagesToTurn(db, [first], 2, "test-model")).resolves.toEqual(originalTurn);
+    await expect(
+      attachMessagesToTurn(db, [first], 2, "test-model", "test-prompt"),
+    ).resolves.toEqual(originalTurn);
     expect(await db.select().from(schema.chatTurns)).toHaveLength(1);
   });
 
@@ -211,7 +228,7 @@ describe("Diary conversation persistence flow", () => {
       body: "保存済みのメッセージ",
       receivedAt: new Date("2026-08-07T00:00:00.000Z"),
     });
-    const existingTurn = await attachMessagesToTurn(db, [existing], 1, "test-model");
+    const existingTurn = await attachMessagesToTurn(db, [existing], 1, "test-model", "test-prompt");
     const fresh = await storeLineTextSource(db, {
       accountId: account.id,
       eventId: "fresh-event",
@@ -219,7 +236,13 @@ describe("Diary conversation persistence flow", () => {
       receivedAt: new Date("2026-08-07T00:00:02.000Z"),
     });
 
-    const freshTurn = await attachMessagesToTurn(db, [existing, fresh], 2, "test-model");
+    const freshTurn = await attachMessagesToTurn(
+      db,
+      [existing, fresh],
+      2,
+      "test-model",
+      "test-prompt",
+    );
 
     expect(freshTurn.turnId).not.toBe(existingTurn.turnId);
     expect(freshTurn.generationEpoch).toBe(2);
@@ -227,5 +250,73 @@ describe("Diary conversation persistence flow", () => {
     expect(context?.currentUserMessageIds).toHaveLength(1);
     expect(context?.messages.at(-1)?.body).toBe("新着メッセージ");
     expect(await db.select().from(schema.conversationMessages)).toHaveLength(2);
+  });
+
+  it("配送済み応答への次のuser messageをSessionの返信実績として数える", async () => {
+    const db = createTestDb();
+    const { account } = await upsertIdentity(db, {
+      provider: "line",
+      providerAccountId: "U_policy_reply",
+    });
+    const first = await storeLineTextSource(db, {
+      accountId: account.id,
+      eventId: "policy-event-1",
+      body: "今日は少し疲れた",
+      receivedAt: new Date("2026-08-07T00:00:00.000Z"),
+    });
+    const firstTurn = await attachMessagesToTurn(db, [first], 1, "test-model", "test-prompt", [
+      "reflective",
+    ]);
+    await markTurnGenerating(db, firstTurn.turnId);
+    await saveAssistantResponse(db, {
+      turnId: firstTurn.turnId,
+      body: "疲れた一日だったんだね。",
+      endSession: false,
+    });
+    await expect(
+      Promise.all([
+        markTurnDelivered(db, firstTurn.turnId),
+        markTurnDelivered(db, firstTurn.turnId),
+      ]),
+    ).resolves.toEqual([true, true]);
+
+    expect(
+      await db
+        .select()
+        .from(schema.conversationSessions)
+        .where(eq(schema.conversationSessions.id, firstTurn.sessionId))
+        .get(),
+    ).toMatchObject({
+      conversationPolicyId: "reflective",
+      replyOpportunityCount: 1,
+      replyCount: 0,
+      awaitingReply: true,
+    });
+
+    const reply = await storeLineTextSource(db, {
+      accountId: account.id,
+      eventId: "policy-event-2",
+      body: "うん、でも少し休めた",
+      receivedAt: new Date("2026-08-07T00:01:00.000Z"),
+    });
+    const replyTurn = await attachMessagesToTurn(db, [reply], 2, "test-model", "test-prompt", [
+      "reflective",
+    ]);
+
+    expect(replyTurn.sessionId).toBe(firstTurn.sessionId);
+    expect(await getTurnContext(db, replyTurn.turnId, 20)).toMatchObject({
+      conversationPolicyId: "reflective",
+    });
+    expect(
+      await db
+        .select()
+        .from(schema.conversationSessions)
+        .where(eq(schema.conversationSessions.id, firstTurn.sessionId))
+        .get(),
+    ).toMatchObject({
+      replyOpportunityCount: 1,
+      replyCount: 1,
+      awaitingReply: false,
+    });
   });
 });

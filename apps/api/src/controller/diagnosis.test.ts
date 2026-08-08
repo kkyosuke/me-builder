@@ -431,6 +431,7 @@ describe("DELETE /api/dev/diagnosis-data", () => {
       deletedAnswerCount: 12,
       deletedDeferredQuestionCount: 1,
       deletedSourceRecordCount: 12,
+      deletedBrainItemCount: 4,
     });
 
     const response = await remove("preview");
@@ -441,6 +442,7 @@ describe("DELETE /api/dev/diagnosis-data", () => {
       deletedAnswerCount: 12,
       deletedDeferredQuestionCount: 1,
       deletedSourceRecordCount: 12,
+      deletedBrainItemCount: 4,
     });
     expect(resetDevelopmentDiagnosisData).toHaveBeenCalledWith(
       expect.objectContaining({ idToken: "dummy.id.token", lineLoginChannelId: "2010850319" }),

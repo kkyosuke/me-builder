@@ -127,6 +127,7 @@ export const diagnosisAnswerCases = {
         deletedAnswerCount: 2,
         deletedDeferredQuestionCount: 0,
         deletedSourceRecordCount: 2,
+        deletedBrainItemCount: 0,
         list: { responseStatus: "unanswered", answeredCount: 0 },
       },
     },
