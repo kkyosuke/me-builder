@@ -69,9 +69,16 @@ describe("ProfileSummaryScreen", () => {
   it("生成失敗時に再試行できる", () => {
     const onRetry = vi.fn();
     render(
-      <ProfileSummaryScreen state={{ status: "error", message: "failed" }} onRetry={onRetry} />,
+      <ProfileSummaryScreen
+        state={{ status: "error", message: "LINEから開き直してください。" }}
+        onRetry={onRetry}
+      />,
     );
 
+    expect(screen.getByText("LINEから開き直してください。")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "診断一覧を見る" }).getAttribute("href")).toBe(
+      "/diagnosis",
+    );
     fireEvent.click(screen.getByRole("button", { name: "再試行" }));
     expect(onRetry).toHaveBeenCalledOnce();
   });

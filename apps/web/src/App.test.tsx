@@ -257,6 +257,20 @@ describe("App", () => {
     expect(mocks.fetchDiagnosisList).not.toHaveBeenCalled();
   });
 
+  it("Strict Modeでもまとめ取得を多重実行しない", async () => {
+    window.history.replaceState({}, "", "/me");
+
+    render(
+      <StrictMode>
+        <App />
+      </StrictMode>,
+    );
+
+    expect(await screen.findByRole("heading", { name: "見通しを持って動く" })).toBeTruthy();
+    expect(mocks.initializeLiff).toHaveBeenCalledTimes(1);
+    expect(mocks.fetchProfileSummary).toHaveBeenCalledTimes(1);
+  });
+
   it("/diagnosisでは診断一覧を表示する", async () => {
     window.history.replaceState({}, "", "/diagnosis");
 

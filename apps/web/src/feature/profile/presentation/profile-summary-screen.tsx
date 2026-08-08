@@ -220,6 +220,9 @@ export function ProfileSummaryScreen({
       {state.status === "error" && (
         <section className="mt-8 rounded-3xl border border-red-400/30 bg-red-400/10 p-6 text-center">
           <p className="text-sm text-red-700 dark:text-red-300">まとめを表示できませんでした。</p>
+          <p className="mt-2 text-sm leading-relaxed text-slate-700 dark:text-slate-300">
+            {state.message}
+          </p>
           <button
             type="button"
             onClick={onRetry}
@@ -228,6 +231,12 @@ export function ProfileSummaryScreen({
             <RefreshCw className="size-4" aria-hidden="true" />
             再試行
           </button>
+          <a
+            href="/diagnosis"
+            className="mt-4 block text-sm font-semibold text-sky-700 underline underline-offset-4 dark:text-sky-300"
+          >
+            診断一覧を見る
+          </a>
         </section>
       )}
       {state.status === "success" && (
