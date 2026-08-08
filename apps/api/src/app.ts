@@ -13,6 +13,7 @@ import { resetDevelopmentDiagnosisDataRoute } from "./contract/diagnosis/dev-res
 import { diagnosisListRoute } from "./contract/diagnosis/list";
 import { liffSessionRoute } from "./contract/line/liff-session";
 import { openApiOptions } from "./contract/openapi";
+import { profileSummaryRoute } from "./contract/profile/summary";
 import { InternalServerErrorSchema } from "./contract/shared/errors";
 import { getStatistics } from "./controller/admin";
 import {
@@ -24,6 +25,7 @@ import {
   putDiagnosisDeferredQuestion,
 } from "./controller/diagnosis";
 import { postLiffSession, postLineWebhook } from "./controller/line";
+import { getProfileSummaryContents } from "./controller/profile";
 import type { AppEnv } from "./types";
 
 const app = new Hono<AppEnv>();
@@ -69,6 +71,8 @@ app.post("/api/line/webhook", postLineWebhook);
 app.post("/api/line/liff/session", liffSessionRoute, postLiffSession);
 
 app.get("/api/admin/statistics", adminStatisticsRoute, getStatistics);
+
+app.get("/api/profile-summary", profileSummaryRoute, getProfileSummaryContents);
 
 app.get("/api/diagnoses", diagnosisListRoute, getDiagnoses);
 app.get("/api/diagnoses/:diagnosisId", diagnosisDetailRoute, getDiagnosis);

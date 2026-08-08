@@ -27,6 +27,7 @@ const mocks = vi.hoisted(() => ({
   saveDiagnosisAnswer: vi.fn(),
   resetDevelopmentDiagnosisData: vi.fn(),
   restoreDiagnosisProgress: vi.fn(),
+  fetchProfileSummary: vi.fn(),
 }));
 
 vi.mock("./config", () => ({
@@ -46,6 +47,9 @@ vi.mock("./feature/diagnosis/infrastructure/diagnosis-api", () => ({
 }));
 vi.mock("./feature/diagnosis/model/answers", () => ({
   restoreDiagnosisProgress: mocks.restoreDiagnosisProgress,
+}));
+vi.mock("./feature/profile/infrastructure/profile-api", () => ({
+  fetchProfileSummary: mocks.fetchProfileSummary,
 }));
 vi.mock("./feature/diagnosis/presentation/components/swipe-diagnosis", () => ({
   SwipeDiagnosis: ({
@@ -170,6 +174,26 @@ describe("App", () => {
       deletedSourceRecordCount: 10,
       deletedBrainItemCount: 4,
     });
+    mocks.fetchProfileSummary.mockResolvedValue({
+      summary: {
+        generatedAt: "2026-08-08T12:00:00.000Z",
+        headline: "最近の記録から、こんなあなたらしさが見えています",
+        insights: [
+          {
+            key: "prepare",
+            label: "見通しを持って動く",
+            description: "説明",
+            evidenceCount: 2,
+            sources: ["diagnosis", "diary"],
+          },
+        ],
+        recordCount: 2,
+        diagnosisCount: 1,
+        diaryCount: 1,
+        latestRecordedAt: "2026-08-08T11:45:00.000Z",
+      },
+      nextAction: "diagnosis",
+    });
     mocks.restoreDiagnosisProgress.mockImplementation(
       (_questions: DiagnosisDefinition["questions"], answers: DiagnosisResult["answers"]) => ({
         answers: answers.map((answer) => ({
@@ -216,7 +240,12 @@ describe("App", () => {
 
     expect(await screen.findByRole("heading", { name: "わたしのまとめ" })).toBeTruthy();
     expect(await screen.findByRole("heading", { name: "見通しを持って動く" })).toBeTruthy();
-    expect(mocks.initializeLiff).not.toHaveBeenCalled();
+    expect(mocks.initializeLiff).toHaveBeenCalled();
+    expect(mocks.fetchProfileSummary).toHaveBeenCalledWith(
+      "https://api.example.com",
+      "dummy.id.token",
+      expect.any(AbortSignal),
+    );
     expect(mocks.fetchDiagnosisList).not.toHaveBeenCalled();
   });
 
@@ -227,6 +256,20 @@ describe("App", () => {
 
     expect(await screen.findByRole("heading", { name: "わたしのまとめ" })).toBeTruthy();
     expect(mocks.fetchDiagnosisList).not.toHaveBeenCalled();
+  });
+
+  it("Strict Modeでもまとめ取得を多重実行しない", async () => {
+    window.history.replaceState({}, "", "/me");
+
+    render(
+      <StrictMode>
+        <App />
+      </StrictMode>,
+    );
+
+    expect(await screen.findByRole("heading", { name: "見通しを持って動く" })).toBeTruthy();
+    expect(mocks.initializeLiff).toHaveBeenCalledTimes(1);
+    expect(mocks.fetchProfileSummary).toHaveBeenCalledTimes(1);
   });
 
   it("/diagnosisでは診断一覧を表示する", async () => {
