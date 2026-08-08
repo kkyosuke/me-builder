@@ -14,10 +14,6 @@ on:
       - synchronize
       - reopened
 
-concurrency:
-  group: cd-preview-environment
-  cancel-in-progress: false
-
 permissions:
   contents: read
   # デプロイ完了コメントを PR へ投稿するために必要
