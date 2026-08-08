@@ -61,7 +61,7 @@ describe("line.richMenu.registerDefault", () => {
     expect(mocks.createClient).not.toHaveBeenCalled();
   });
 
-  it("全面を診断 LIFF へ遷移する1ボタンとして登録すること", async () => {
+  it("左右を私の傾向と診断一覧へ遷移する2ボタンとして登録すること", async () => {
     const result = await richMenu.registerDefault(params);
 
     expect(result).toMatchObject({ success: true, richMenuId: "richmenu-new" });
@@ -73,7 +73,15 @@ describe("line.richMenu.registerDefault", () => {
         chatBarText: "メニューを開く",
         areas: [
           {
-            bounds: { x: 0, y: 0, width: 2500, height: 843 },
+            bounds: { x: 0, y: 0, width: 1250, height: 843 },
+            action: {
+              type: "uri",
+              label: "私を知る",
+              uri: "https://liff.line.me/1234567890-AbCdEfGh/profile",
+            },
+          },
+          {
+            bounds: { x: 1250, y: 0, width: 1250, height: 843 },
             action: {
               type: "uri",
               label: "診断を行う",

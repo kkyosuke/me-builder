@@ -4,6 +4,7 @@ import { client } from "./client";
 
 const MENU_WIDTH = 2500;
 const MENU_HEIGHT = 843;
+const MENU_HALF_WIDTH = MENU_WIDTH / 2;
 
 export type RegisterDefaultRichMenuParams = {
   channelAccessToken?: string | undefined;
@@ -27,7 +28,15 @@ function createDefinition(name: string, liffId: string): messagingApi.RichMenuRe
     chatBarText: "メニューを開く",
     areas: [
       {
-        bounds: { x: 0, y: 0, width: MENU_WIDTH, height: MENU_HEIGHT },
+        bounds: { x: 0, y: 0, width: MENU_HALF_WIDTH, height: MENU_HEIGHT },
+        action: {
+          type: "uri",
+          label: "私を知る",
+          uri: `https://liff.line.me/${liffId}/profile`,
+        },
+      },
+      {
+        bounds: { x: MENU_HALF_WIDTH, y: 0, width: MENU_HALF_WIDTH, height: MENU_HEIGHT },
         action: {
           type: "uri",
           label: "診断を行う",
@@ -72,7 +81,7 @@ const toMessage = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
 
 /**
- * 「診断を行う」1ボタンのリッチメニューを作成し、全ユーザーの既定値にします。
+ * 「私を知る」「診断を行う」の2ボタンのリッチメニューを作成し、全ユーザーの既定値にします。
  *
  * 同じ設定版と画像が登録済みなら再利用します。新しい版を既定値にした後、同じ接頭辞を持つ
  * 旧版だけを削除するため、preview / production や他用途のメニューには触れません。

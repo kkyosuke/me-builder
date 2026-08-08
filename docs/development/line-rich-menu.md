@@ -20,14 +20,14 @@ sequenceDiagram
     Script->>Script: 画像とメニュー定義のSHA-256から版を生成
     Script->>LINE: リッチメニュー一覧を取得
     alt 同じ設定版と画像がない
-        Script->>LINE: 全面1領域のメニューを作成
+        Script->>LINE: 左右2領域のメニューを作成
         Script->>LINE: JPEG画像をアップロード
     end
     Script->>LINE: 対象メニューを既定に設定
     Script->>LINE: 同じ環境・用途の旧版だけを削除
 ```
 
-画像は[`apps/api/assets/rich-menu-diagnosis.jpg`](../../apps/api/assets/rich-menu-diagnosis.jpg)を使います。2500×843pxのJPEGで、全面を1つのURI actionにします。遷移先は`https://liff.line.me/{LIFF_ID}`であり、Account IDや認証トークンを含めません。
+画像は[`apps/api/assets/rich-menu-main.jpg`](../../apps/api/assets/rich-menu-main.jpg)を使います。2500×843pxのJPEGで、左半分を「私を知る」、右半分を「診断を行う」のURI actionにします。左は`https://liff.line.me/{LIFF_ID}/profile`、右は`https://liff.line.me/{LIFF_ID}`へ遷移し、Account IDや認証トークンを含めません。項目の役割は[Phase 1 診断体験設計 §7](../diagnosis/diagnosis-experience.md#7-リッチメニュー)を正とします。
 
 LINEの画像要件は[Messaging API reference](https://developers.line.biz/en/reference/messaging-api/#upload-rich-menu-image)を確認します。現在のアセットは幅800〜2500px、高さ250px以上、縦横比1.45以上、1MB以下という要件を満たします。
 
