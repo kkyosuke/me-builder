@@ -11,7 +11,6 @@ import {
 
 const SESSION_INACTIVITY_MS = 6 * 60 * 60 * 1000;
 const SESSION_HARD_CAP_MS = 24 * 60 * 60 * 1000;
-export const DIARY_CHAT_PROMPT_VERSION = "diary-chat-v1";
 
 export type StoredLineSource = {
   sourceRecordId: string;
@@ -99,9 +98,13 @@ export async function attachMessagesToTurn(
   inputs: AttachMessageInput[],
   generationEpoch: number,
   model: string,
+  promptVersion: string,
 ): Promise<AttachedTurn> {
   if (inputs.length === 0) {
     throw new Error("Cannot create a chat turn without messages");
+  }
+  if (!promptVersion.trim()) {
+    throw new Error("A chat turn must record its prompt version");
   }
   const accountId = inputs[0]?.accountId;
   if (!accountId || inputs.some((input) => input.accountId !== accountId)) {
@@ -178,6 +181,7 @@ export async function attachMessagesToTurn(
       inputs.filter(({ eventId }) => !attachedEventIds.has(eventId)),
       generationEpoch,
       model,
+      promptVersion,
     );
   }
 
@@ -269,7 +273,7 @@ export async function attachMessagesToTurn(
       throughSequence,
       generationEpoch,
       status: "queued",
-      promptVersion: DIARY_CHAT_PROMPT_VERSION,
+      promptVersion,
       model,
       receivedAt: firstReceivedAt,
       createdAt: now,

@@ -204,6 +204,7 @@ describe("ConversationCoordinator D1 E2E", () => {
       [first],
       1,
       "test-model",
+      "test-prompt",
     );
     await coordinator.acceptMessage(acceptedInput(second));
 

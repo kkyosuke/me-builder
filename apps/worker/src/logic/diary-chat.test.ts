@@ -32,7 +32,15 @@ describe("diary chat guardrails", () => {
     ]);
     expect(route).toBe("self_harm_possible");
     expect(buildSafetyFallback(route)).toMatchObject({
+      main_question_count: 1,
       safety: { route: "self_harm_possible", restricted_advice: true },
+    });
+  });
+
+  it("通常時のfallbackへ会話継続だけの質問を付けない", () => {
+    expect(buildSafetyFallback("normal")).toMatchObject({
+      main_question_count: 0,
+      safety: { route: "normal", restricted_advice: false },
     });
   });
 
