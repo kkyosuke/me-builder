@@ -58,8 +58,8 @@ Yesを`+1`、Noを`-1`へ変換します。正の重みはYesが高い側へ、�
 
 - Web UIの診断一覧から選択して回答できる
 - 完了画面で5パラメータと回答充足度を表示する
-- 回答と結果はサーバーへ保存しない
+- Answerと版付き採点設定はD1へ保存し、回答画面向けのParameter Profileは回答内容の取得時に再計算する
 - 家計診断、返済能力、投資適性、相性を判定しない
-- パラメータをBrain Itemとして作成しない
+- 回答済みになった後、[共通のprojection](parameter-scoring-design.md#8-brain-itemへのprojection)で5パラメータを5件の`Preference` Brain Itemとして保存する
 
 教師となる正解データがないため、設定版1では機械学習を使用しません。妥当性の検証と将来の学習モデルへ移行する条件は[最初の診断の設計 §7](relationship-priority-parameter-design.md#7-機械学習へ移行する条件)と同じです。

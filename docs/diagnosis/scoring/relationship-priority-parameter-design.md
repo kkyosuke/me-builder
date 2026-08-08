@@ -81,7 +81,7 @@ coverage = 6 ÷ 6 = 100%
 
 ## 6. 実装境界
 
-現在は、Web UIが回答内容APIから取得した保存済み回答を使い、回答完了画面と回答内容画面で結果を計算・表示します。
+現在は、Web UIが回答内容APIから取得した保存済み回答を使い、回答完了画面と回答内容画面で結果を表示します。回答済みになったDiagnosisResponseは、[共通のBrain Item projection](parameter-scoring-design.md#8-brain-itemへのprojection)によって4パラメータを4件の`Preference`へ変換します。具体的な保存例は[共通設計 §8.5](parameter-scoring-design.md#85-具体例-自分と相手の優先境界線)を参照してください。
 
 ```mermaid
 flowchart LR
@@ -90,15 +90,14 @@ flowchart LR
     D1 --> S[共通エンジン + version 1設定]
     S --> P[4パラメータのスコアとcoverage]
     P --> U[本人の完了画面]
+    P --> B[4件のPreference Brain Item]
 ```
 
-- Answerはサーバーへ保存し、計算済みの結果は保存しない
-- パラメータをBrain Itemとして作成しない
+- Answerはサーバーへ保存し、回答画面向けのParameter Profileは取得時に再計算する
+- Parameter Profileを独立したレコードとしては保存せず、パラメータごとの命題をBrain Itemとして保存する
 - 相性、人物の良し悪し、安全性を判定しない
 - 結果には「回答から見える現在の傾向」であることを表示する
 - 再回答時は、現在の回答だけから再計算する
-
-サーバー保存を追加するときは、10件のAnswerをSource Recordとして保持し、パラメータはそれらを根拠に`deterministic`で導出するBrain Itemとして扱うのが候補です。その集約・永続化・改訂時の再計算は後続設計で決定します。
 
 ## 7. 機械学習へ移行する条件
 
