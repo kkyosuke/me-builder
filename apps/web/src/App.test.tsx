@@ -208,23 +208,23 @@ describe("App", () => {
     await waitFor(() => expect(document.documentElement.classList.contains("light")).toBe(true));
   });
 
-  it("/meでは準備中画面を表示し、診断データを取得しない", () => {
+  it("/meでは診断・日記レコードから生成したまとめを表示し、診断一覧は取得しない", async () => {
     window.history.replaceState({}, "", "/me");
 
     render(<App />);
 
-    expect(screen.getByText("私を知る")).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "準備中です" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "わたしのまとめ" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "見通しを持って動く" })).toBeTruthy();
     expect(mocks.initializeLiff).not.toHaveBeenCalled();
     expect(mocks.fetchDiagnosisList).not.toHaveBeenCalled();
   });
 
-  it("LIFF初期化前にliff.stateへ保持された/meでも準備中画面を表示する", () => {
+  it("LIFF初期化前にliff.stateへ保持された/meでもまとめ画面を表示する", async () => {
     window.history.replaceState({}, "", "/?liff.state=%2Fme");
 
     render(<App />);
 
-    expect(screen.getByRole("heading", { name: "準備中です" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "わたしのまとめ" })).toBeTruthy();
     expect(mocks.fetchDiagnosisList).not.toHaveBeenCalled();
   });
 
