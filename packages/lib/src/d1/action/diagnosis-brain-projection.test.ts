@@ -8,6 +8,7 @@ import type { D1Client } from "../client";
 import * as schema from "../schema";
 import {
   processDiagnosisBrainProjectionRequest,
+  processLatestDiagnosisBrainProjection,
   processPendingDiagnosisBrainProjections,
 } from "./diagnosis-brain-projection";
 
@@ -145,8 +146,17 @@ describe("Diagnosis Brain projection", () => {
   it("回答済み診断からpendingのBrain ItemとEvidenceを作る", async () => {
     const db = createTestDb();
     const at = await insertFixture(db, true);
+    await db.insert(schema.diagnosisBrainProjectionRequests).values({
+      id: "request-old",
+      diagnosisResponseId: "response-1",
+      responseRevision: 1,
+      status: "pending",
+      nextAttemptAt: at,
+    });
 
-    await expect(processDiagnosisBrainProjectionRequest(db, "request-1", at)).resolves.toEqual({
+    await expect(
+      processLatestDiagnosisBrainProjection(db, "account-1", "diagnosis-1", at),
+    ).resolves.toEqual({
       processed: 1,
       applied: 1,
       skippedIncomplete: 0,
@@ -175,10 +185,8 @@ describe("Diagnosis Brain projection", () => {
     expect(
       await db
         .select({ status: schema.diagnosisBrainProjectionRequests.status })
-        .from(schema.diagnosisBrainProjectionRequests)
-        .where(eq(schema.diagnosisBrainProjectionRequests.id, "request-1"))
-        .get(),
-    ).toEqual({ status: "applied" });
+        .from(schema.diagnosisBrainProjectionRequests),
+    ).toEqual([{ status: "applied" }, { status: "applied" }]);
   });
 
   it("回答途中ならItemを作らず正常終了する", async () => {

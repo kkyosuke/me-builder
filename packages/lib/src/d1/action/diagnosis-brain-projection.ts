@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, lte } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, lt, lte } from "drizzle-orm";
 import {
   InvalidDiagnosisScoringConfigError,
   projectDiagnosisParameters,
@@ -32,6 +32,7 @@ type ProjectionRequest = Readonly<{
   id: string;
   diagnosisResponseId: string;
   status: typeof diagnosisBrainProjectionRequests.$inferSelect.status;
+  responseRevision: number;
   attemptCount: number;
 }>;
 
@@ -355,6 +356,20 @@ async function completeRequest(db: D1Client, request: ClaimedProjectionRequest, 
     );
 }
 
+async function completeOlderRequests(db: D1Client, request: ClaimedProjectionRequest, at: Date) {
+  await db
+    .update(diagnosisBrainProjectionRequests)
+    .set({ status: "applied", failureCode: null, updatedAt: at })
+    .where(
+      and(
+        eq(diagnosisBrainProjectionRequests.diagnosisResponseId, request.diagnosisResponseId),
+        lt(diagnosisBrainProjectionRequests.responseRevision, request.responseRevision),
+        inArray(diagnosisBrainProjectionRequests.status, ["pending", "failed"]),
+        eq(diagnosisBrainProjectionRequests.isDeleted, false),
+      ),
+    );
+}
+
 async function failRequest(
   db: D1Client,
   request: ClaimedProjectionRequest,
@@ -392,6 +407,7 @@ export async function processDiagnosisBrainProjectionRequest(
       id: diagnosisBrainProjectionRequests.id,
       diagnosisResponseId: diagnosisBrainProjectionRequests.diagnosisResponseId,
       status: diagnosisBrainProjectionRequests.status,
+      responseRevision: diagnosisBrainProjectionRequests.responseRevision,
       attemptCount: diagnosisBrainProjectionRequests.attemptCount,
     })
     .from(diagnosisBrainProjectionRequests)
@@ -406,6 +422,41 @@ export async function processDiagnosisBrainProjectionRequest(
   return processRequests(db, requests, at);
 }
 
+/** AccountとDiagnosisに対する最新のprojection要求だけを処理します。 */
+export async function processLatestDiagnosisBrainProjection(
+  db: D1Client,
+  accountId: string,
+  diagnosisId: string,
+  at = new Date(),
+): Promise<ProcessDiagnosisBrainProjectionsResult> {
+  const requests = await db
+    .select({
+      id: diagnosisBrainProjectionRequests.id,
+      diagnosisResponseId: diagnosisBrainProjectionRequests.diagnosisResponseId,
+      status: diagnosisBrainProjectionRequests.status,
+      responseRevision: diagnosisBrainProjectionRequests.responseRevision,
+      attemptCount: diagnosisBrainProjectionRequests.attemptCount,
+    })
+    .from(diagnosisBrainProjectionRequests)
+    .innerJoin(
+      diagnosisResponses,
+      eq(diagnosisResponses.id, diagnosisBrainProjectionRequests.diagnosisResponseId),
+    )
+    .where(
+      and(
+        eq(diagnosisResponses.accountId, accountId),
+        eq(diagnosisResponses.diagnosisId, diagnosisId),
+        eq(diagnosisResponses.isDeleted, false),
+        inArray(diagnosisBrainProjectionRequests.status, ["pending", "failed"]),
+        lte(diagnosisBrainProjectionRequests.nextAttemptAt, at),
+        eq(diagnosisBrainProjectionRequests.isDeleted, false),
+      ),
+    )
+    .orderBy(desc(diagnosisBrainProjectionRequests.responseRevision))
+    .limit(1);
+  return processRequests(db, requests, at);
+}
+
 /** 未処理のprojection要求を再試行します。 */
 export async function processPendingDiagnosisBrainProjections(
   db: D1Client,
@@ -416,6 +467,7 @@ export async function processPendingDiagnosisBrainProjections(
       id: diagnosisBrainProjectionRequests.id,
       diagnosisResponseId: diagnosisBrainProjectionRequests.diagnosisResponseId,
       status: diagnosisBrainProjectionRequests.status,
+      responseRevision: diagnosisBrainProjectionRequests.responseRevision,
       attemptCount: diagnosisBrainProjectionRequests.attemptCount,
     })
     .from(diagnosisBrainProjectionRequests)
@@ -446,11 +498,13 @@ async function processRequests(
     try {
       const result = await applyRequest(db, claimedRequest, at);
       await completeRequest(db, claimedRequest, at);
+      await completeOlderRequests(db, claimedRequest, at);
       if (result === "skipped-incomplete") skippedIncomplete += 1;
       else applied += 1;
     } catch (error) {
       if (error instanceof InvalidDiagnosisScoringConfigError) {
         await completeRequest(db, claimedRequest, at);
+        await completeOlderRequests(db, claimedRequest, at);
         skippedInvalidConfig += 1;
       } else {
         await failRequest(db, claimedRequest, error, at);
