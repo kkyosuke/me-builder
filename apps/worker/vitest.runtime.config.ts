@@ -1,7 +1,10 @@
+import { fileURLToPath } from "node:url";
 import { cloudflareTest, readD1Migrations } from "@cloudflare/vitest-pool-workers";
 import { defineConfig } from "vitest/config";
 
-const sharedD1Migrations = await readD1Migrations("../../packages/lib/drizzle");
+const sharedD1Migrations = await readD1Migrations(
+  fileURLToPath(new URL("../../packages/lib/drizzle", import.meta.url)),
+);
 
 export default defineConfig({
   plugins: [

@@ -1,4 +1,3 @@
-import { d1 } from "@me-builder/lib";
 import { sql } from "drizzle-orm";
 import { check, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
@@ -12,6 +11,3 @@ export const accountDataIdentity = sqliteTable(
   },
   (table) => [check("account_data_identity_singleton_check", sql`${table.singleton} = 1`)],
 );
-
-// AccountData内の所有FKが参照するlocal owner row。外部Identityは共有D1だけに置く。
-export const accounts = d1.schema.accounts;
