@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { scoreDiagnosisAnswers } from "./diagnosis-scoring";
+import { projectDiagnosisParameters, scoreDiagnosisAnswers } from "./scoring";
 
 const CONFIG = {
   version: 3,
@@ -117,5 +117,52 @@ describe("scoreDiagnosisAnswers", () => {
     },
   ])("質問定義と一致しない採点設定を拒否する: $name", ({ questions }) => {
     expect(() => scoreDiagnosisAnswers([], { ...CONFIG, questions })).toThrow();
+  });
+});
+
+describe("projectDiagnosisParameters", () => {
+  it("パラメータごとにstatementと寄与したSource Recordを組み立てる", () => {
+    const projections = projectDiagnosisParameters({
+      diagnosisId: "diagnosis-1",
+      scoringConfigId: "scoring-1",
+      answers: [
+        { ...answer("q-plan", 2, "yes"), sourceRecordId: "source-plan" },
+        { ...answer("q-change", 1, "no"), sourceRecordId: "source-change" },
+      ],
+      storedConfig: CONFIG,
+    });
+
+    expect(projections).toEqual([
+      expect.objectContaining({
+        parameterId: "planning",
+        statement: "計画性は「計画的」の傾向がある",
+        attributes: {
+          diagnosisId: "diagnosis-1",
+          scoringConfigId: "scoring-1",
+          scoringVersion: 3,
+          parameterId: "planning",
+          score: 100,
+          coverage: 100,
+          band: "high",
+        },
+        evidenceSourceRecordIds: ["source-change", "source-plan"],
+      }),
+      expect.objectContaining({
+        parameterId: "flexibility",
+        statement: "柔軟性は「予定を守る」の傾向がある",
+        evidenceSourceRecordIds: ["source-change", "source-plan"],
+      }),
+    ]);
+  });
+
+  it("回答不足のパラメータはprojectionしない", () => {
+    expect(
+      projectDiagnosisParameters({
+        diagnosisId: "diagnosis-1",
+        scoringConfigId: "scoring-1",
+        answers: [{ ...answer("q-plan", 1, "yes"), sourceRecordId: "source-plan" }],
+        storedConfig: CONFIG,
+      }),
+    ).toEqual([]);
   });
 });
