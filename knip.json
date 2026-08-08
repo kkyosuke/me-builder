@@ -4,7 +4,7 @@
   "ignoreDependencies": ["cloudflare"],
   "workspaces": {
     "apps/worker": {
-      "entry": ["src/**/*.test.ts", "drizzle*.config.ts"]
+      "entry": ["src/**/*.test.ts", "src/account-data/drizzle-schema.ts", "drizzle*.config.ts"]
     }
   }
 }

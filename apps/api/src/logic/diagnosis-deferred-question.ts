@@ -31,7 +31,7 @@ type Dependencies = {
   deferQuestion: (
     accountData: AccountDataNamespace | undefined,
     accountId: string,
-    input: Parameters<typeof d1.action.diagnosis.deferDiagnosisQuestion>[1],
+    input: Omit<Parameters<typeof d1.action.diagnosis.deferDiagnosisQuestion>[1], "accountId">,
   ) => ReturnType<typeof d1.action.diagnosis.deferDiagnosisQuestion>;
 };
 
@@ -61,7 +61,6 @@ export async function deferDiagnosisQuestion(
     return session;
   }
   return dependencies.deferQuestion(accountData, session.session.accountId, {
-    accountId: session.session.accountId,
     diagnosisId,
     diagnosisQuestionId,
     at,

@@ -103,7 +103,6 @@ export async function processLineWebhook(
     const source = await accountDataFor(accountDataNamespace, resolved.account.id).execute(
       "conversation.storeLineTextSource",
       {
-        accountId: resolved.account.id,
         eventId,
         body: event.message.text,
         receivedAt,

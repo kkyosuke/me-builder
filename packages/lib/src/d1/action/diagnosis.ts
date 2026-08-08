@@ -244,7 +244,7 @@ async function deleteAccountDiagnosisDataOnce(
       .where(eq(diagnosisBrainProjectionHeads.accountId, accountId)),
   ];
 
-  // Revisionは同じID一覧を2回bindするため、49件ずつならaccountIdと合わせて99 parametersになる。
+  // Revisionは同じID一覧を2回bindするため、SQLiteのparameter上限内で分割する。
   for (const brainItemIdChunk of projectionBrainItemIdChunks) {
     statements.push(
       db
@@ -495,7 +495,6 @@ export async function deferDiagnosisQuestion(
         .onConflictDoNothing(),
       db.insert(diagnosisDeferredQuestions).values({
         id: crypto.randomUUID(),
-        accountId: input.accountId,
         diagnosisResponseId: responseId,
         diagnosisQuestionId: diagnosisQuestion.id,
         deferredAt,
@@ -731,7 +730,6 @@ async function saveDiagnosisAnswerWithRevisionRetry(
       }),
       db.insert(diagnosisAnswers).values({
         id: answerId,
-        accountId: input.accountId,
         diagnosisResponseId: responseId,
         diagnosisQuestionId: answer.diagnosisQuestionId,
         questionId: answer.questionId,
@@ -752,7 +750,6 @@ async function saveDiagnosisAnswerWithRevisionRetry(
         ),
       db.insert(diagnosisBrainProjectionRequests).values({
         id: projectionRequestId,
-        accountId: input.accountId,
         diagnosisResponseId: responseId,
         responseRevision,
         status: "pending",

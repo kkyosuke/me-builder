@@ -46,6 +46,7 @@ docs/
 - [プロジェクト概要](product/project-overview.md) — 目的、主要要件、MVP、ロードマップ、Phase 1の入力体験とログイン手段
 - [全体画面遷移設計](product/screen-navigation.md) — LINEとWebをまたぐ入口と、利用者・管理者向け画面の全体遷移
 - [自分の傾向サマリー体験設計](product/profile-summary-experience.md) — 複数の診断回答を横断して本人の現在の傾向を表示する画面と要約規則
+- [相性診断・うつし共有体験設計](product/compatibility-experience.md) — 招待リンクとLINE共有、双方の同意、相性一覧、「私について」と「2人について」、共有終了
 - [ストレスの手がかりとAIセルフケア相談体験設計](product/self-care-ai-consultation-experience.md) — 自分用のセルフケア情報、AI相談、安全上の切り替え
 - [日記チャット体験設計](product/diary-chat-experience.md) — 日々の声かけから出来事と行動原理を探り、記憶を使って助言する対話体験と応答時間
 

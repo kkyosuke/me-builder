@@ -5,7 +5,7 @@ import {
   type AccountDataResult,
   d1,
 } from "@me-builder/lib";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import type { Env } from "../types";
 import { brainActions } from "./brain";
 import { diagnosisActions } from "./diagnosis";
@@ -21,28 +21,6 @@ const actions = {
   ...diagnosisActions,
   ...diaryActions,
 } as const;
-
-function assertAccountArguments(
-  accountId: string,
-  value: unknown,
-  seen = new WeakSet<object>(),
-): void {
-  if (Array.isArray(value)) {
-    if (seen.has(value)) return;
-    seen.add(value);
-    for (const item of value) assertAccountArguments(accountId, item, seen);
-    return;
-  }
-  if (value === null || typeof value !== "object" || value instanceof Date) return;
-  if (seen.has(value)) return;
-  seen.add(value);
-  for (const [key, nested] of Object.entries(value)) {
-    if (key === "accountId" && nested !== accountId) {
-      throw new Error("AccountData operation contains another account");
-    }
-    assertAccountArguments(accountId, nested, seen);
-  }
-}
 
 /** 1 AccountのSource / Brain / Diagnosis / Diaryを1つのprivate SQLiteに保存する。 */
 export class AccountData extends DurableObject<Env> {
@@ -67,11 +45,21 @@ export class AccountData extends DurableObject<Env> {
     operation: TOperation,
     ...args: AccountDataArgs<TOperation>
   ): Promise<AccountDataResult<TOperation>> {
+    if (typeof accountId !== "string" || accountId.length === 0) {
+      throw new Error("AccountData account is required");
+    }
     if (accountId !== this.accountId) {
       throw new Error("AccountData RPC account does not match object name");
     }
+    const action = (actions as Partial<Record<AccountDataOperation, unknown>>)[operation];
+    if (typeof action !== "function") throw new Error("Unsupported AccountData operation");
+    const boundAction = action as (
+      db: d1.Client,
+      boundAccountId: string,
+      ...actionArgs: AccountDataArgs<TOperation>
+    ) => Promise<AccountDataResult<TOperation>>;
+
     this.repository.bindAccount(accountId);
-    assertAccountArguments(accountId, args);
     if (!this.legacyImport) this.legacyImport = this.importLegacyAccountData(accountId);
     try {
       await this.legacyImport;
@@ -81,11 +69,7 @@ export class AccountData extends DurableObject<Env> {
     }
     if (operation.startsWith("diagnosis")) await this.syncDiagnosisCatalog();
 
-    const action = actions[operation] as unknown as (
-      db: d1.Client,
-      ...actionArgs: AccountDataArgs<TOperation>
-    ) => Promise<AccountDataResult<TOperation>>;
-    const result = await action(this.repository.client, ...args);
+    const result = await boundAction(this.repository.client, accountId, ...args);
     await this.scheduleMaintenance();
     return result;
   }
@@ -161,12 +145,28 @@ export class AccountData extends DurableObject<Env> {
       shared
         .select()
         .from(d1.schema.sourceRecordTextPayloads)
-        .where(eq(d1.schema.sourceRecordTextPayloads.accountId, accountId))
+        .where(
+          inArray(
+            d1.schema.sourceRecordTextPayloads.sourceRecordId,
+            shared
+              .select({ id: d1.schema.sourceRecords.id })
+              .from(d1.schema.sourceRecords)
+              .where(eq(d1.schema.sourceRecords.accountId, accountId)),
+          ),
+        )
         .all(),
       shared
         .select()
         .from(d1.schema.sourceRecordRevisions)
-        .where(eq(d1.schema.sourceRecordRevisions.accountId, accountId))
+        .where(
+          inArray(
+            d1.schema.sourceRecordRevisions.previousSourceRecordId,
+            shared
+              .select({ id: d1.schema.sourceRecords.id })
+              .from(d1.schema.sourceRecords)
+              .where(eq(d1.schema.sourceRecords.accountId, accountId)),
+          ),
+        )
         .all(),
       shared
         .select()
@@ -201,12 +201,28 @@ export class AccountData extends DurableObject<Env> {
       shared
         .select()
         .from(d1.schema.conversationMessages)
-        .where(eq(d1.schema.conversationMessages.accountId, accountId))
+        .where(
+          inArray(
+            d1.schema.conversationMessages.sessionId,
+            shared
+              .select({ id: d1.schema.conversationSessions.id })
+              .from(d1.schema.conversationSessions)
+              .where(eq(d1.schema.conversationSessions.accountId, accountId)),
+          ),
+        )
         .all(),
       shared
         .select()
         .from(d1.schema.chatTurns)
-        .where(eq(d1.schema.chatTurns.accountId, accountId))
+        .where(
+          inArray(
+            d1.schema.chatTurns.sessionId,
+            shared
+              .select({ id: d1.schema.conversationSessions.id })
+              .from(d1.schema.conversationSessions)
+              .where(eq(d1.schema.conversationSessions.accountId, accountId)),
+          ),
+        )
         .all(),
       shared
         .select()
@@ -216,17 +232,41 @@ export class AccountData extends DurableObject<Env> {
       shared
         .select()
         .from(d1.schema.diagnosisAnswers)
-        .where(eq(d1.schema.diagnosisAnswers.accountId, accountId))
+        .where(
+          inArray(
+            d1.schema.diagnosisAnswers.diagnosisResponseId,
+            shared
+              .select({ id: d1.schema.diagnosisResponses.id })
+              .from(d1.schema.diagnosisResponses)
+              .where(eq(d1.schema.diagnosisResponses.accountId, accountId)),
+          ),
+        )
         .all(),
       shared
         .select()
         .from(d1.schema.diagnosisDeferredQuestions)
-        .where(eq(d1.schema.diagnosisDeferredQuestions.accountId, accountId))
+        .where(
+          inArray(
+            d1.schema.diagnosisDeferredQuestions.diagnosisResponseId,
+            shared
+              .select({ id: d1.schema.diagnosisResponses.id })
+              .from(d1.schema.diagnosisResponses)
+              .where(eq(d1.schema.diagnosisResponses.accountId, accountId)),
+          ),
+        )
         .all(),
       shared
         .select()
         .from(d1.schema.diagnosisBrainProjectionRequests)
-        .where(eq(d1.schema.diagnosisBrainProjectionRequests.accountId, accountId))
+        .where(
+          inArray(
+            d1.schema.diagnosisBrainProjectionRequests.diagnosisResponseId,
+            shared
+              .select({ id: d1.schema.diagnosisResponses.id })
+              .from(d1.schema.diagnosisResponses)
+              .where(eq(d1.schema.diagnosisResponses.accountId, accountId)),
+          ),
+        )
         .all(),
       shared
         .select()

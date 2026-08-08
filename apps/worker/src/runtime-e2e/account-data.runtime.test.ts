@@ -36,7 +36,6 @@ describe("AccountData Workers runtime E2E", () => {
     });
 
     const source = await first.execute(firstAccountId, "conversation.storeLineTextSource", {
-      accountId: firstAccountId,
       eventId,
       body: "private diary",
       receivedAt: new Date(),

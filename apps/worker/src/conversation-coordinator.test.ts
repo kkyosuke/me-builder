@@ -51,13 +51,15 @@ function createCoordinator(env: Partial<Env> = {}) {
   } as unknown as DurableObjectState;
   const accountData = {
     getByName: () => ({
-      execute: (_accountId: string, operation: string, ...args: unknown[]) => {
+      execute: (accountId: string, operation: string, ...args: unknown[]) => {
         if (operation !== "conversation.attachMessagesToTurn") {
           throw new Error(`Unexpected AccountData operation: ${operation}`);
         }
         return d1.action.conversation.attachMessagesToTurn(
           {} as d1.Client,
+          accountId,
           ...(args as Parameters<typeof d1.action.conversation.attachMessagesToTurn> extends [
+            unknown,
             unknown,
             ...infer TRest,
           ]
@@ -113,7 +115,7 @@ describe("ConversationCoordinator recovery", () => {
       .mockResolvedValueOnce({ turnId: "turn-2", sessionId: "session-1", generationEpoch: 2 });
 
     await coordinator.alarm();
-    expect(attach.mock.calls[0]?.[1].map(({ eventId }) => eventId)).toEqual(["event-1"]);
+    expect(attach.mock.calls[0]?.[2].map(({ eventId }) => eventId)).toEqual(["event-1"]);
     expect(
       sql
         .exec<{ status: string }>(
@@ -124,7 +126,7 @@ describe("ConversationCoordinator recovery", () => {
     ).toBe("pending");
 
     await coordinator.alarm();
-    expect(attach.mock.calls[1]?.[1].map(({ eventId }) => eventId)).toEqual(["event-2"]);
+    expect(attach.mock.calls[1]?.[2].map(({ eventId }) => eventId)).toEqual(["event-2"]);
     expect(send).toHaveBeenCalledTimes(2);
   });
 
