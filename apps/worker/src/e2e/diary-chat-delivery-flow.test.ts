@@ -2,7 +2,12 @@ import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import type { D1Database } from "@cloudflare/workers-types";
 import { d1, line } from "@me-builder/lib";
-import type { ChatTurnQueueMessage, Message } from "@me-builder/shared";
+import type {
+  ChatTurnQueueMessage,
+  Message,
+  MessageBatch,
+  WebhookQueueMessage,
+} from "@me-builder/shared";
 import Database from "better-sqlite3";
 import { Miniflare } from "miniflare";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -10,7 +15,7 @@ import { getWorkerConfig } from "../config";
 import type { CloudflareBindings } from "../config";
 import { ConversationCoordinator } from "../conversation-coordinator";
 import { processChatTurnMessage } from "../handler/chat-turn";
-import { processLineWebhook } from "../logic/feature/line";
+import { queueHandler } from "../handler/queue";
 import type { Env } from "../types";
 
 const { mockGenerateContent } = vi.hoisted(() => ({
@@ -142,6 +147,62 @@ type DiaryEventInput = {
   receivedAgoMs?: number;
 };
 
+async function enqueueLineEvents(
+  events: unknown[],
+  namespace: NonNullable<Env["CONVERSATION_COORDINATOR"]>,
+): Promise<void> {
+  const payload = { events };
+  const message: Message<WebhookQueueMessage> = {
+    id: crypto.randomUUID(),
+    timestamp: new Date(),
+    attempts: 1,
+    body: {
+      id: crypto.randomUUID(),
+      source: "line",
+      receivedAt: new Date().toISOString(),
+      payload,
+      routing: {
+        lineTextEvents: events.flatMap((value) => {
+          if (!value || typeof value !== "object") return [];
+          const event = value as {
+            webhookEventId?: string;
+            message?: { type?: string; id?: string; text?: string };
+          };
+          if (event.message?.type !== "text" || !event.message.text) return [];
+          const eventId = event.webhookEventId ?? event.message.id;
+          return eventId ? [{ eventId, intent: line.text.classify(event.message.text) }] : [];
+        }),
+      },
+    },
+    ack: vi.fn(),
+    retry: vi.fn(),
+  };
+  const batch: MessageBatch<WebhookQueueMessage | ChatTurnQueueMessage> = {
+    queue: "me-builder-webhook-queue-e2e",
+    messages: [message],
+    metadata: {
+      metrics: { backlogCount: 1, backlogBytes: 0 },
+    },
+    ackAll: vi.fn(),
+    retryAll: vi.fn(),
+  };
+
+  await queueHandler(batch, {
+    DB: database,
+    CONVERSATION_COORDINATOR: namespace,
+    ENVIRONMENT: "test",
+    LINE_CHANNEL_ACCESS_TOKEN: "line-token",
+    CHAT_DELIVERY_SECRET: "delivery-secret",
+    GOOGLE_AI_STUDIO_API_KEY: "google-key",
+    CLOUDFLARE_APP_API_TOKEN: "gateway-token",
+    CHAT_CONTEXT_MESSAGE_LIMIT: "20",
+    LIFF_ID: liffId,
+  });
+
+  expect(message.ack).toHaveBeenCalledOnce();
+  expect(message.retry).not.toHaveBeenCalled();
+}
+
 async function ingestDiaryEvents(events: DiaryEventInput[], suffix: string) {
   const queued: ChatTurnQueueMessage[] = [];
   const harness = createCoordinator(async (message) => {
@@ -153,19 +214,15 @@ async function ingestDiaryEvents(events: DiaryEventInput[], suffix: string) {
   } as unknown as NonNullable<Env["CONVERSATION_COORDINATOR"]>;
   const providerAccountId = `U_diary_delivery_${suffix}`;
 
-  await processLineWebhook(
-    {
-      events: events.map((event, index) => ({
-        type: "message",
-        webhookEventId: `diary-delivery-event-${suffix}-${index}`,
-        timestamp: Date.now() - (event.receivedAgoMs ?? 2_000),
-        message: { type: "text", id: `line-message-${suffix}-${index}`, text: event.text },
-        source: { type: "user", userId: providerAccountId },
-        ...(event.replyToken ? { replyToken: event.replyToken } : {}),
-      })),
-    },
-    client,
-    workerConfig,
+  await enqueueLineEvents(
+    events.map((event, index) => ({
+      type: "message",
+      webhookEventId: `diary-delivery-event-${suffix}-${index}`,
+      timestamp: Date.now() - (event.receivedAgoMs ?? 2_000),
+      message: { type: "text", id: `line-message-${suffix}-${index}`, text: event.text },
+      source: { type: "user", userId: providerAccountId },
+      ...(event.replyToken ? { replyToken: event.replyToken } : {}),
+    })),
     namespace,
   );
   await harness.runAlarm();
@@ -194,21 +251,17 @@ async function ingestDiary(text: string, suffix: string, replyToken?: string) {
   const eventId = `diary-delivery-event-${suffix}`;
   const receivedAt = new Date(Date.now() - 2_000).toISOString();
 
-  await processLineWebhook(
-    {
-      events: [
-        {
-          type: "message",
-          webhookEventId: eventId,
-          timestamp: new Date(receivedAt).getTime(),
-          message: { type: "text", id: `line-message-${suffix}`, text },
-          source: { type: "user", userId: providerAccountId },
-          ...(replyToken ? { replyToken } : {}),
-        },
-      ],
-    },
-    client,
-    workerConfig,
+  await enqueueLineEvents(
+    [
+      {
+        type: "message",
+        webhookEventId: eventId,
+        timestamp: new Date(receivedAt).getTime(),
+        message: { type: "text", id: `line-message-${suffix}`, text },
+        source: { type: "user", userId: providerAccountId },
+        ...(replyToken ? { replyToken } : {}),
+      },
+    ],
     namespace,
   );
   await harness.runAlarm();
