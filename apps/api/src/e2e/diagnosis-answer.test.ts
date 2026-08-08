@@ -415,11 +415,12 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
   it(
     "会話と感情表現の回答を5つのパラメータへ採点する",
     async () => {
+      const highSideQuestionIndexes = new Set([1, 2, 3, 4, 6]);
       for (let index = 1; index <= 10; index += 1) {
         const suffix = String(index).padStart(2, "0");
         const response = await putAnswer(
           `dq-conversation-emotion-${suffix}`,
-          "yes",
+          highSideQuestionIndexes.has(index) ? "yes" : "no",
           "conversation-emotion",
         );
         expect(response.status).toBe(200);
@@ -434,11 +435,11 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
           scoringVersion: 1,
           balancedLabel: "状況に応じて伝え方を選ぶ",
           parameters: [
-            expect.objectContaining({ id: "empathetic-reception", score: 100, coverage: 100 }),
-            expect.objectContaining({ id: "verbal-affection", score: 100, coverage: 100 }),
-            expect.objectContaining({ id: "direct-communication", score: 100, coverage: 100 }),
-            expect.objectContaining({ id: "active-support", score: 100, coverage: 100 }),
-            expect.objectContaining({ id: "emotional-openness", score: 100, coverage: 100 }),
+            expect.objectContaining({ id: "empathetic-reception", score: 75, coverage: 100 }),
+            expect.objectContaining({ id: "verbal-affection", score: 75, coverage: 100 }),
+            expect.objectContaining({ id: "direct-communication", score: 75, coverage: 100 }),
+            expect.objectContaining({ id: "active-support", score: 75, coverage: 100 }),
+            expect.objectContaining({ id: "emotional-openness", score: 75, coverage: 100 }),
           ],
         },
       });

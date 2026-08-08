@@ -119,12 +119,12 @@ INSERT OR IGNORE INTO question_versions (
   (1786233600, 1786233600, 0, 'q-conversation-emotion-02', 1, 'approved', '好意や感謝は、行動だけでなく言葉でも伝えてほしい。', 'single_choice', 1786233600),
   (1786233600, 1786233600, 0, 'q-conversation-emotion-03', 1, 'approved', '不満は、気づいた時点ですぐ伝えたい。', 'single_choice', 1786233600),
   (1786233600, 1786233600, 0, 'q-conversation-emotion-04', 1, 'approved', '落ち込んでいるときは、そっとしておくより声をかけてほしい。', 'single_choice', 1786233600),
-  (1786233600, 1786233600, 0, 'q-conversation-emotion-05', 1, 'approved', '相手の話に同意できなくても、気持ちには共感できると思う。', 'single_choice', 1786233600),
+  (1786233600, 1786233600, 0, 'q-conversation-emotion-05', 1, 'approved', '落ち込んでいるときは、声をかけてもらうより、一人で過ごして気持ちを整理したい。', 'single_choice', 1786233600),
   (1786233600, 1786233600, 0, 'q-conversation-emotion-06', 1, 'approved', '自分の弱さや不安を、パートナーへ見せられる。', 'single_choice', 1786233600),
-  (1786233600, 1786233600, 0, 'q-conversation-emotion-07', 1, 'approved', 'うれしかったことは、小さなことでも相手へ共有したい。', 'single_choice', 1786233600),
-  (1786233600, 1786233600, 0, 'q-conversation-emotion-08', 1, 'approved', '「察してほしい」と思うより、希望を言葉で伝えたい。', 'single_choice', 1786233600),
-  (1786233600, 1786233600, 0, 'q-conversation-emotion-09', 1, 'approved', '相手が話している間は、助言せず最後まで聞きたい。', 'single_choice', 1786233600),
-  (1786233600, 1786233600, 0, 'q-conversation-emotion-10', 1, 'approved', '愛情を感じるには、定期的に言葉で確認することが必要だ。', 'single_choice', 1786233600);
+  (1786233600, 1786233600, 0, 'q-conversation-emotion-07', 1, 'approved', '弱さや不安は、相手に話す前に、まず自分の中で整理したい。', 'single_choice', 1786233600),
+  (1786233600, 1786233600, 0, 'q-conversation-emotion-08', 1, 'approved', '希望はすぐ言葉にせず、相手の様子やタイミングを見て伝えたい。', 'single_choice', 1786233600),
+  (1786233600, 1786233600, 0, 'q-conversation-emotion-09', 1, 'approved', '悩みを話したときは、気持ちへの共感より具体的な解決策を一緒に考えてほしい。', 'single_choice', 1786233600),
+  (1786233600, 1786233600, 0, 'q-conversation-emotion-10', 1, 'approved', '愛情は言葉で確かめなくても、行動や態度から感じ取れれば十分だ。', 'single_choice', 1786233600);
 --> statement-breakpoint
 
 INSERT OR IGNORE INTO question_choices (
@@ -368,18 +368,18 @@ INSERT OR IGNORE INTO diagnosis_scoring_configs (
         {"id":"active-support","label":"落ち込んだときの支援","lowLabel":"そっと見守ることを重視","highLabel":"声をかけることを重視"},
         {"id":"emotional-openness","label":"感情の共有","lowLabel":"自分の中で整理しやすい","highLabel":"相手と共有しやすい"}
       ],
-      "choiceScores": {"yes":1,"no":-1},
+      "choiceScores": {"yes":1,"no":0},
       "questions": {
-        "q-conversation-emotion-01":{"questionVersion":1,"weights":{"empathetic-reception":1,"active-support":0.5}},
+        "q-conversation-emotion-01":{"questionVersion":1,"weights":{"empathetic-reception":1}},
         "q-conversation-emotion-02":{"questionVersion":1,"weights":{"verbal-affection":1}},
         "q-conversation-emotion-03":{"questionVersion":1,"weights":{"direct-communication":1}},
         "q-conversation-emotion-04":{"questionVersion":1,"weights":{"active-support":1}},
-        "q-conversation-emotion-05":{"questionVersion":1,"weights":{"empathetic-reception":1,"emotional-openness":0.5}},
+        "q-conversation-emotion-05":{"questionVersion":1,"weights":{"active-support":-1}},
         "q-conversation-emotion-06":{"questionVersion":1,"weights":{"emotional-openness":1}},
-        "q-conversation-emotion-07":{"questionVersion":1,"weights":{"emotional-openness":1}},
-        "q-conversation-emotion-08":{"questionVersion":1,"weights":{"direct-communication":1}},
-        "q-conversation-emotion-09":{"questionVersion":1,"weights":{"empathetic-reception":0.5}},
-        "q-conversation-emotion-10":{"questionVersion":1,"weights":{"verbal-affection":1}}
+        "q-conversation-emotion-07":{"questionVersion":1,"weights":{"emotional-openness":-1}},
+        "q-conversation-emotion-08":{"questionVersion":1,"weights":{"direct-communication":-1}},
+        "q-conversation-emotion-09":{"questionVersion":1,"weights":{"empathetic-reception":-1}},
+        "q-conversation-emotion-10":{"questionVersion":1,"weights":{"verbal-affection":-1}}
       },
       "minimumCoverage":0.6,
       "lowMaximum":35,
