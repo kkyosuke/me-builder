@@ -1,4 +1,5 @@
 import { d1 } from "@me-builder/lib";
+import { logger } from "@me-builder/shared";
 import { createLiffSession } from "./liff-session";
 
 type SavedAnswer = Extract<
@@ -25,16 +26,19 @@ type SaveDiagnosisAnswerParams = {
   lineLoginChannelId: string | undefined;
   db: d1.Client;
   at?: Date;
+  scheduleProjection?: (task: () => Promise<void>) => void;
 };
 
 type Dependencies = {
   createSession: typeof createLiffSession;
   saveAnswer: typeof d1.action.diagnosis.saveDiagnosisAnswer;
+  processLatestProjection?: typeof d1.action.diagnosisBrainProjection.processLatestDiagnosisBrainProjection;
 };
 
 const defaultDependencies: Dependencies = {
   createSession: createLiffSession,
   saveAnswer: d1.action.diagnosis.saveDiagnosisAnswer,
+  processLatestProjection: d1.action.diagnosisBrainProjection.processLatestDiagnosisBrainProjection,
 };
 
 /** 本人確認結果からAccountを解決し、その本人の1問分の回答だけを保存します。 */
@@ -47,6 +51,7 @@ export async function saveDiagnosisAnswer(
     lineLoginChannelId,
     db,
     at = new Date(),
+    scheduleProjection,
   }: SaveDiagnosisAnswerParams,
   dependencies: Dependencies = defaultDependencies,
 ): Promise<SaveDiagnosisAnswerOutcome> {
@@ -54,11 +59,31 @@ export async function saveDiagnosisAnswer(
   if (session.type !== "resolved") {
     return session;
   }
-  return dependencies.saveAnswer(db, {
+  const result = await dependencies.saveAnswer(db, {
     accountId: session.session.accountId,
     diagnosisId,
     diagnosisQuestionId,
     choiceId,
     at,
   });
+  if (result.type === "saved" && result.progress.responseStatus === "answered") {
+    const task = async () => {
+      try {
+        await (
+          dependencies.processLatestProjection ?? defaultDependencies.processLatestProjection
+        )?.(db, session.session.accountId, diagnosisId, at);
+      } catch (error) {
+        logger.error(
+          {
+            diagnosisId,
+            reason: error instanceof Error ? error.name : "unknown",
+          },
+          "Diagnosis Brain projection failed; scheduled retry will recover it",
+        );
+      }
+    };
+    if (scheduleProjection) scheduleProjection(task);
+    else void task();
+  }
+  return result;
 }

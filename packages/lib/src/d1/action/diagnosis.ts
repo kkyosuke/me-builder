@@ -3,6 +3,7 @@ import type { D1Client } from "../client";
 import {
   diagnoses,
   diagnosisAnswers,
+  diagnosisBrainProjectionRequests,
   diagnosisDeferredQuestions,
   diagnosisQuestions,
   diagnosisResponses,
@@ -523,6 +524,17 @@ export async function saveDiagnosisAnswer(
   }
 
   const responseId = observedResponseId ?? crypto.randomUUID();
+  const observedRevision = observedResponseId
+    ? ((
+        await db
+          .select({ revision: diagnosisResponses.revision })
+          .from(diagnosisResponses)
+          .where(eq(diagnosisResponses.id, observedResponseId))
+          .get()
+      )?.revision ?? 0)
+    : 0;
+  const responseRevision = observedRevision + 1;
+  const projectionRequestId = crypto.randomUUID();
   const sourceRecordId = crypto.randomUUID();
   const answerId = crypto.randomUUID();
   // D1のtimestamp modeは秒精度なので、初回レスポンスと再送レスポンスを同じ値に揃えます。
@@ -539,8 +551,22 @@ export async function saveDiagnosisAnswer(
     await db.batch([
       db
         .insert(diagnosisResponses)
-        .values({ id: responseId, accountId: input.accountId, diagnosisId: input.diagnosisId })
+        .values({
+          id: responseId,
+          accountId: input.accountId,
+          diagnosisId: input.diagnosisId,
+          revision: observedRevision,
+        })
         .onConflictDoNothing(),
+      db
+        .update(diagnosisResponses)
+        .set({ revision: responseRevision, updatedAt: acceptedAt })
+        .where(
+          and(
+            eq(diagnosisResponses.id, responseId),
+            eq(diagnosisResponses.revision, observedRevision),
+          ),
+        ),
       db.insert(sourceRecords).values({
         id: sourceRecordId,
         accountId: input.accountId,
@@ -567,6 +593,13 @@ export async function saveDiagnosisAnswer(
             eq(diagnosisDeferredQuestions.isDeleted, false),
           ),
         ),
+      db.insert(diagnosisBrainProjectionRequests).values({
+        id: projectionRequestId,
+        diagnosisResponseId: responseId,
+        responseRevision,
+        status: "pending",
+        nextAttemptAt: acceptedAt,
+      }),
     ]);
   } catch (error) {
     if (!isUniqueViolation(error)) {

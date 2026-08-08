@@ -151,6 +151,14 @@ export async function putDiagnosisAnswer(c: Context<AppEnv>): Promise<Response> 
     idToken: bearerToken(c.req.header("authorization")),
     lineLoginChannelId: getConfig(c.env).lineLoginChannelId,
     db: d1.client.create(c.env.DB),
+    scheduleProjection: (task) => {
+      try {
+        const executionContext = c.executionCtx;
+        executionContext.waitUntil(task());
+      } catch {
+        // BunのローカルサーバーにはExecutionContextがない。scheduled Workerが回収する。
+      }
+    },
   });
 
   switch (outcome.type) {
