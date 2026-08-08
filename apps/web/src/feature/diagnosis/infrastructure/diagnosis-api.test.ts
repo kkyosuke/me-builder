@@ -90,6 +90,7 @@ describe("resetDevelopmentDiagnosisData", () => {
       deletedAnswerCount: 12,
       deletedDeferredQuestionCount: 1,
       deletedSourceRecordCount: 12,
+      deletedBrainItemCount: 4,
     };
     const fetchMock = vi.fn(async () => Response.json(deleted));
     vi.stubGlobal("fetch", fetchMock);

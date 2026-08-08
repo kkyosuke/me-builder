@@ -218,7 +218,8 @@ export function DiagnosisHome({
             開発用データ操作
           </h2>
           <p className="mt-2 text-xs leading-relaxed text-slate-600 dark:text-slate-400">
-            ログイン中ユーザーの回答、回答進捗、保留、回答由来データを削除します。診断定義は残ります。
+            ログイン中ユーザーの回答、回答進捗、保留、回答由来Source Record、診断から生成されたBrain
+            Itemを削除します。診断定義と日記由来データは残ります。
           </p>
           <button
             type="button"

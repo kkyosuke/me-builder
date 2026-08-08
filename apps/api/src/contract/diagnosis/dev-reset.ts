@@ -9,6 +9,7 @@ export const ResetDevelopmentDiagnosisDataResponseSchema = v.object({
   deletedAnswerCount: CountSchema,
   deletedDeferredQuestionCount: CountSchema,
   deletedSourceRecordCount: CountSchema,
+  deletedBrainItemCount: CountSchema,
 });
 
 export const DevelopmentRouteNotFoundErrorSchema = v.object({
