@@ -2,13 +2,13 @@ import {
   ArrowRight,
   BookHeart,
   Brain,
-  CalendarDays,
   ClipboardCheck,
   NotebookPen,
   RefreshCw,
   Sparkles,
 } from "lucide-react";
 import { LoadingState } from "../../../components/loading-state";
+import { MainNavigation } from "../../../components/main-navigation";
 import type { AsyncState } from "../../../model/async-state";
 import type { ProfileRecordSource, ProfileSummary } from "../model/profile-summary";
 
@@ -199,28 +199,7 @@ export function ProfileSummaryScreen({
         </>
       )}
 
-      <nav
-        aria-label="メインナビゲーション"
-        className="fixed inset-x-0 bottom-0 z-10 border-t border-slate-200 bg-white/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur dark:border-slate-700 dark:bg-slate-900/95"
-      >
-        <div className="mx-auto grid max-w-2xl grid-cols-2 gap-2">
-          <a
-            href="/diagnosis"
-            className="flex min-h-12 items-center justify-center gap-2 rounded-xl text-sm font-semibold text-slate-600 dark:text-slate-300"
-          >
-            <CalendarDays className="size-5" aria-hidden="true" />
-            診断
-          </a>
-          <a
-            href="/me"
-            aria-current="page"
-            className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-sky-400/15 text-sm font-bold text-sky-800 dark:text-sky-200"
-          >
-            <Brain className="size-5" aria-hidden="true" />
-            わたし
-          </a>
-        </div>
-      </nav>
+      <MainNavigation current="me" />
     </main>
   );
 }
