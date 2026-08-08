@@ -23,7 +23,7 @@ const DEFAULT_DIARY_CHAT_CONVERSATION_GUIDANCE = `質問しない応答を既定
 短い日記、完了報告、区切りや終了を示す発言には、無理に質問を付け加えないでください。
 main_question_countはreplyに実際に含めた主質問の数と一致させ、質問がなければ0にしてください。`;
 
-export const DIARY_CHAT_CONVERSATION_POLICIES = {
+const DIARY_CHAT_CONVERSATION_POLICIES = {
   reflective: {
     guidance: DEFAULT_DIARY_CHAT_CONVERSATION_GUIDANCE,
   },
