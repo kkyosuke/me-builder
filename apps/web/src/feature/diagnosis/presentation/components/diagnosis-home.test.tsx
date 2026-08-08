@@ -40,6 +40,11 @@ describe("DiagnosisHome", () => {
     expect(screen.getByRole("link", { name: "診断" }).getAttribute("aria-current")).toBe("page");
     expect(screen.getByRole("link", { name: "わたし" }).getAttribute("href")).toBe("/me");
     expect(screen.getByRole("link", { name: "わたし" }).getAttribute("aria-current")).toBeNull();
+    expect(
+      within(screen.getByRole("navigation", { name: "メインナビゲーション" }))
+        .getAllByRole("link")
+        .map((link) => link.textContent),
+    ).toEqual(["わたし", "診断"]);
   });
 
   it("回答途中のカードだけに進捗を x/x 形式で表示する", () => {

@@ -1,21 +1,12 @@
-import { useCallback } from "react";
+import { Suspense, lazy } from "react";
 import { LoadingState } from "./components/loading-state";
-import { config } from "./config";
-import { AdminStatisticsScreen, useAdminStatistics } from "./feature/admin";
-import {
-  DiagnosisDetailScreen,
-  DiagnosisGuidance,
-  DiagnosisHome,
-  DiagnosisResultView,
-  useDiagnosisDetail,
-  useDiagnosisList,
-  useResetDiagnosisData,
-} from "./feature/diagnosis";
-import { useLiffSession } from "./feature/liff";
-import { ProfileSummaryScreen, useProfileSummary } from "./feature/profile";
+import { RouteErrorBoundary } from "./components/route-error-boundary";
 import { ColorThemeToggle, useColorTheme } from "./feature/theme";
+import { loadAdminApplication, loadDiagnosisApplication, loadProfileApplication } from "./routes";
 
-const DEVELOPMENT_ENVIRONMENTS = new Set(["development", "local", "preview", "test"]);
+const AdminApplication = lazy(loadAdminApplication);
+const DiagnosisApplication = lazy(loadDiagnosisApplication);
+const ProfileApplication = lazy(loadProfileApplication);
 
 function resolveRequestedPathname(): string {
   if (typeof window === "undefined") {
@@ -32,94 +23,26 @@ function resolveRequestedPathname(): string {
   return liffState.split(/[?#]/, 1)[0] ?? window.location.pathname;
 }
 
-function DiagnosisApplication() {
-  const liffSession = useLiffSession();
-  const diagnoses = useDiagnosisList({ acquireIdToken: liffSession.acquireIdToken });
-  const detail = useDiagnosisDetail({
-    idToken: diagnoses.idToken,
-    onProgress: diagnoses.updateProgress,
-  });
-  const handleReset = useCallback(async () => {
-    detail.close();
-    await diagnoses.load();
-  }, [detail.close, diagnoses.load]);
-  const reset = useResetDiagnosisData({ idToken: diagnoses.idToken, onReset: handleReset });
-
-  let content = (
-    <DiagnosisHome
-      diagnoses={diagnoses.state}
-      onOpenDiagnosis={(diagnosis) => void detail.open(diagnosis)}
-      onRetry={() => void diagnoses.load()}
-      canResetDiagnosisData={
-        config.environment !== undefined && DEVELOPMENT_ENVIRONMENTS.has(config.environment)
-      }
-      resetState={reset.state}
-      onResetDiagnosisData={() => void reset.reset()}
-    />
-  );
-
-  if (detail.state.status === "loading") {
-    content = <LoadingState message="診断を読み込んでいます..." />;
-  } else if (detail.state.status === "error") {
-    content = <DiagnosisGuidance kind="load-error" onBack={detail.close} />;
-  } else if (detail.state.status === "success") {
-    const detailContent = detail.state.data;
-    if (detailContent.type === "result") {
-      content = <DiagnosisResultView result={detailContent.result} onBack={detail.close} />;
-    }
-    if (detailContent.type === "answer") {
-      content = (
-        <DiagnosisDetailScreen
-          diagnosis={detailContent.diagnosis}
-          initialAnswers={detailContent.initialAnswers}
-          onBack={detail.close}
-          onSaveAnswer={detail.saveAnswer}
-          onDeferQuestion={detail.deferQuestion}
-          onComplete={() => void detail.openCompletedResult()}
-        />
-      );
-    }
-    if (detailContent.type === "guidance") {
-      content = <DiagnosisGuidance kind={detailContent.kind} onBack={detail.close} />;
-    }
-  }
-
-  return content;
-}
-
-function AdminApplication() {
-  const liffSession = useLiffSession();
-  const statistics = useAdminStatistics(liffSession.acquireIdToken);
-  return (
-    <AdminStatisticsScreen
-      state={statistics.state}
-      isRefreshing={statistics.isRefreshing}
-      onReload={() => void statistics.reload()}
-    />
-  );
-}
-
-function ProfileApplication() {
-  const liffSession = useLiffSession();
-  const summary = useProfileSummary({ acquireIdToken: liffSession.acquireIdToken });
-  return <ProfileSummaryScreen state={summary.state} onRetry={() => void summary.reload()} />;
-}
-
 export function App() {
   const colorTheme = useColorTheme();
   const pathname = resolveRequestedPathname();
   const isAdminPath = pathname.startsWith("/admin");
   const isMePath = pathname === "/me" || pathname.startsWith("/me/");
+
   return (
     <>
       <ColorThemeToggle theme={colorTheme.theme} onToggle={colorTheme.toggleTheme} />
-      {isAdminPath ? (
-        <AdminApplication />
-      ) : isMePath ? (
-        <ProfileApplication />
-      ) : (
-        <DiagnosisApplication />
-      )}
+      <RouteErrorBoundary>
+        <Suspense fallback={<LoadingState message="画面を読み込んでいます..." />}>
+          {isAdminPath ? (
+            <AdminApplication />
+          ) : isMePath ? (
+            <ProfileApplication />
+          ) : (
+            <DiagnosisApplication />
+          )}
+        </Suspense>
+      </RouteErrorBoundary>
     </>
   );
 }

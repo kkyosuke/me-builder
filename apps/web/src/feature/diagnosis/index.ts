@@ -1,3 +1,4 @@
+export { default as DiagnosisApplication } from "./presentation/diagnosis-application";
 export { DiagnosisDetailScreen } from "./presentation/components/diagnosis-detail-screen";
 export { DiagnosisGuidance } from "./presentation/components/diagnosis-guidance";
 export { DiagnosisHome } from "./presentation/components/diagnosis-home";
