@@ -8,7 +8,7 @@ if (targetEnv !== "preview" && targetEnv !== "production") {
   throw new Error("Usage: bun scripts/register-rich-menu.ts <preview|production>");
 }
 
-const imageFile = Bun.file(new URL("../assets/rich-menu-diagnosis.jpg", import.meta.url));
+const imageFile = Bun.file(new URL("../assets/rich-menu-main.jpg", import.meta.url));
 const imageBytes = await imageFile.arrayBuffer();
 
 logger.info(`[Script] Executing LINE rich menu registration for ${targetEnv}...`);

@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "047b8cba-9fdf-47fc-8198-5c99130c1b07",
-  "prevId": "5f12712d-ffc9-4210-a7a6-4e0e17feec23",
+  "id": "2428923d-0c6e-4173-9b14-52a796b45362",
+  "prevId": "047b8cba-9fdf-47fc-8198-5c99130c1b07",
   "tables": {
     "account_identities": {
       "name": "account_identities",
@@ -866,6 +866,13 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "delivery_metric_token": {
+          "name": "delivery_metric_token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         }
       },
       "indexes": {
@@ -1123,6 +1130,38 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "conversation_policy_id": {
+          "name": "conversation_policy_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'reflective'"
+        },
+        "reply_opportunity_count": {
+          "name": "reply_opportunity_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "reply_count": {
+          "name": "reply_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "awaiting_reply": {
+          "name": "awaiting_reply",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
         },
         "next_sequence": {
           "name": "next_sequence",

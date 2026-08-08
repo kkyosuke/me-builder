@@ -21,7 +21,7 @@ pre-push:
     typecheck:
       run: bun run typecheck
     test:
-      run: bun run test
+      run: bun run test:pre-push
 
 commit-msg:
   commands:

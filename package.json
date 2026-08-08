@@ -11,6 +11,7 @@
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "test": "vitest run && bun --filter @me-builder/worker test:runtime",
+    "test:pre-push": "vitest run --exclude '**/{e2e/**,runtime-e2e/**,*.e2e.test.*}'",
     "ci": "bun run check:generated && bun run lint && bun run typecheck && bun run test && bun run build",
     "task": "task",
     "deploy:preview": "bun --filter '*' deploy:preview",

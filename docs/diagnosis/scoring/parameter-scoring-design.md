@@ -211,6 +211,121 @@ Answer保存と同じ原子的な処理へ、冪等なprojection要求を登録�
 
 projection要求の再配送では現在状態を再評価します。回答途中なら正常終了し、回答済みなら同じ冪等キーで保存します。採点設定がない、または設定検証に失敗したDiagnosisではBrain Itemを作りません。
 
+### 8.5 具体例: 「自分と相手の優先・境界線」
+
+以下は、設定版1の10問すべてへ回答した場合に、どのデータがどのBrain Itemへ変換されるかを示す具体例です。パラメータ、重み、両端の意味は[診断固有の設計](relationship-priority-parameter-design.md)を正とし、ここではprojectionの結果だけを説明します。
+
+#### 入力例
+
+| Question | 回答 | 回答時に作成済みの原本 |
+| --- | --- | --- |
+| 1 | Yes | `source-q1` |
+| 2 | No | `source-q2` |
+| 3 | No | `source-q3` |
+| 4 | No | `source-q4` |
+| 5 | Yes | `source-q5` |
+| 6 | No | `source-q6` |
+| 7 | No | `source-q7` |
+| 8 | Yes | `source-q8` |
+| 9 | No | `source-q9` |
+| 10 | Yes | `source-q10` |
+
+1つのAnswerごとに1つのSource Recordがすでに存在します。projectionはこの10件をコピーせず、現在有効なAnswerと対応するSource Record IDを読み取ります。
+
+#### 変換結果
+
+この入力から、診断全体を要約した1件ではなく、計算可能な4パラメータに対応する4件のBrain Itemを保存します。
+
+| Parameter ID | score / band | 保存するstatement | EvidenceにするSource Record |
+| --- | --- | --- | --- |
+| `priority-balance` | `100 / high` | 自分／相手の優先は「自分の余裕を優先しやすい」の傾向がある | `source-q1`, `source-q2`, `source-q3`, `source-q7`, `source-q9`, `source-q10` |
+| `autonomy` | `100 / high` | 自律／相談は「個人の判断を尊重」の傾向がある | `source-q4`, `source-q5`, `source-q6`, `source-q8`, `source-q10` |
+| `boundary-expression` | `100 / high` | 境界の表明は「境界を伝えやすい」の傾向がある | `source-q1`, `source-q3`, `source-q7`, `source-q8`, `source-q10` |
+| `support-flexibility` | `0 / low` | 支援の柔軟性は「自分の予定を守りやすい」の傾向がある | `source-q2`, `source-q9`, `source-q10` |
+
+あるパラメータの重みを持たないQuestionは、そのBrain ItemのEvidenceに含めません。同じSource Recordが複数のパラメータへ寄与する場合は、複数のBrain Itemと結ばれます。
+
+```mermaid
+flowchart TB
+    A["10 Answer<br/>Yes / No"] --> S["設定版1で決定的に採点<br/>choice score × weight"]
+    R["10 Source Record<br/>1 Answer = 1 原本"] --> E["Parameterごとに<br/>寄与した原本だけを選択"]
+    S --> P1["Preference 1<br/>自分／相手の優先<br/>100 / high"]
+    S --> P2["Preference 2<br/>自律／相談<br/>100 / high"]
+    S --> P3["Preference 3<br/>境界の表明<br/>100 / high"]
+    S --> P4["Preference 4<br/>支援の柔軟性<br/>0 / low"]
+    E -->|6 edges| P1
+    E -->|5 edges| P2
+    E -->|5 edges| P3
+    E -->|3 edges| P4
+```
+
+#### 1件の保存内容
+
+`priority-balance`から作るBrain Itemは、概念上は次の内容です。IDと日時は実行時に決まります。
+
+```yaml
+brain_item:
+  id: <generated-brain-item-id>
+  category: preference
+  statement: 自分／相手の優先は「自分の余裕を優先しやすい」の傾向がある
+  attributes:
+    diagnosisId: relationship-priority
+    scoringConfigId: relationship-priority-v1
+    scoringVersion: 1
+    parameterId: priority-balance
+    score: 100
+    coverage: 100
+    band: high
+  derivation: deterministic
+  confirmation: pending
+  confidence:
+    state: uncomputed
+  stability: changeable
+  sensitivity: normal
+  externallyShareable: false
+  status: active
+  validFrom: <projection日時>
+
+access_label:
+  label: unclassified
+  confirmation: pending
+  assignedBy: system
+```
+
+このBrain Itemには、表に挙げた6件のSource RecordそれぞれからEvidence edgeを1件ずつ張ります。各edgeは`relation = supports`、`isDerivationTrigger = true`、`derivationMethod = deterministic`を持ちます。
+
+`pending`と`unclassified`で保存するため、診断完了だけで本人確認済みになったり、外部共有可能になったりはしません。また、Answer本文、診断全体を断定する人物像、相性や良し悪しはBrain Itemへ保存しません。
+
+#### 再回答時
+
+再回答によって`priority-balance`のstatementまたはattributesが変わる場合、旧Brain Itemを上書きしません。旧Itemを`superseded`、新Itemを`active`として保存し、旧Itemから新ItemへRevisionを結びます。再計算後もstatementとattributesが同じならItemを増やさず、新しく根拠になったSource RecordとのEvidenceだけを補います。
+
+### 8.6 診断完了直後の実行
+
+利用者から見た動作は診断完了直後の生成です。外部Queueは使用しません。D1のprojection要求は、回答保存とBrain Item保存を疎結合にし、一時障害時にも処理を失わないための内部レコードです。
+
+```mermaid
+sequenceDiagram
+    participant U as 利用者
+    participant API as API Server
+    participant D1 as D1
+    participant P as Projection処理
+    participant C as Scheduled retry
+
+    U->>API: 最後のAnswerを保存
+    API->>D1: Answer + Source Record + response revision + pending要求
+    D1-->>API: atomic batch成功（回答済み）
+    API-->>U: 診断完了を返す
+    API->>P: waitUntilで即時実行
+    P->>D1: 現在の全Answerと採点設定を再読込
+    P->>D1: Brain Item + Evidence + Access Labelを保存
+    P->>D1: 要求をappliedへ更新
+    alt 一時障害で即時実行に失敗
+        C->>D1: 期限到来したfailed要求を取得
+        C->>P: 同じprojectionを再実行
+    end
+```
+
 ## 9. 現在の実装境界
 
 `diagnosis_scoring_configs`が設定版と設定JSONを保持し、公開済みDiagnosisの`scoring_config_id`は変更しません。API ServerはDBから取得した設定をValibotで検証し、AnswerのQuestion ID、Question Version、Choice IDから表示のたびに結果を再計算します。

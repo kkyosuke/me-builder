@@ -26,6 +26,7 @@
     - `task lint`: Biome によるコード Lint / フォーマット検証
     - `task lint:fix`: Biome によるコード Lint / フォーマットの自動修復
     - `task test`: Vitest による全テスト実行
+    - `bun run test:pre-push`: pre-push向けにE2Eを除外したテスト実行
     - `task generate:api`: APIのOpenAPI documentとWeb UI用TypeScript型を再生成
     - `task ci`: CI で実行される全検証（lint, typecheck, test, build）の一括ローカル実行
     - `task db:migrate:local` (または `task db:migrate`): D1 データベースマイグレーションのローカル適用
@@ -49,6 +50,7 @@
     - `main` ブランチマージ時には `cd-production.yml` が全検証後に Cloudflare 本番環境へ自動デプロイします。
     - リポジトリのチェックアウト、Bun のセットアップ、`actions/cache@v4` によるキャッシュ、および `bun install --frozen-lockfile` の一連の処理は GitHub Composite Action ([.github/actions/setup-bun-workspace](file:///Users/kyosuke/git/github.com/KKyosuke/me-builder/.github/actions/setup-bun-workspace/action.yml)) に共通化されています。
   - パッケージの追加・削除はルートから `bun add <package> --cwd <workspace-dir>`（例: `bun add @line/liff --cwd apps/web`）を使用し、個別ディレクトリで `npm install` を実行しないこと。ルートで引数なしに `bun add <package>` を実行するとルートの `package.json` に入ってしまうため、対象ワークスペースを必ず指定します。
+  - pre-pushではブランチ名、型、E2E以外のテストを検証します。ローカルD1などを使うE2Eはpushの必須条件にせず、`task test`と`task ci`、GitHub Actionsでは引き続き実行します。
 - **Web UI (`apps/web`) のカスタムドメイン**:
   - `apps/web` は Cloudflare **Pages** で配信するため、Workers (`api` / `mcp` / `worker`) のように `wrangler.toml` の `routes` で DNS レコードを自動作成できません。ドメインのプロジェクト登録と DNS の CNAME 作成は [`scripts/setup-pages-domain.ts`](../../scripts/setup-pages-domain.ts) が行い、`apps/web` の `deploy:preview` / `deploy:production` から呼び出します。
   - 対象ドメインは `BASE_DOMAIN` を使い、スクリプト側にハードコードしません。CNAME の宛先は preview がブランチエイリアス、production がプロジェクト既定のホストです。

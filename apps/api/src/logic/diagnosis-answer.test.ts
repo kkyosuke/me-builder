@@ -70,4 +70,55 @@ describe("saveDiagnosisAnswer", () => {
     expect(result).toEqual(session);
     expect(saveAnswer).not.toHaveBeenCalled();
   });
+
+  it("全問回答済みになったときprojection要求をbest-effortで処理する", async () => {
+    const scheduleProjection = vi.fn((task: () => Promise<void>) => void task());
+    const processLatestProjection = vi.fn().mockResolvedValue({
+      processed: 1,
+      applied: 1,
+      skippedIncomplete: 0,
+      skippedInvalidConfig: 0,
+      failed: 0,
+    });
+    const saved = {
+      type: "saved" as const,
+      outcome: "created" as const,
+      answer: {
+        diagnosisQuestionId: "dq-2",
+        questionId: "q-2",
+        questionVersion: 1,
+        choiceId: "yes",
+        acceptedAt: at.toISOString(),
+      },
+      progress: {
+        responseStatus: "answered" as const,
+        answeredCount: 2,
+        questionCount: 2,
+      },
+    };
+
+    await saveDiagnosisAnswer(
+      {
+        diagnosisId: "diagnosis-1",
+        diagnosisQuestionId: "dq-2",
+        choiceId: "yes",
+        idToken: "token",
+        lineLoginChannelId: "channel",
+        db,
+        at,
+        scheduleProjection,
+      },
+      {
+        createSession: vi.fn().mockResolvedValue({
+          type: "resolved",
+          session: { accountId: "account-1", role: "user" },
+        }),
+        saveAnswer: vi.fn().mockResolvedValue(saved),
+        processLatestProjection,
+      },
+    );
+
+    expect(processLatestProjection).toHaveBeenCalledWith(db, "account-1", "diagnosis-1", at);
+    expect(scheduleProjection).toHaveBeenCalledOnce();
+  });
 });

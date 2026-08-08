@@ -59,6 +59,6 @@ Yesを`+1`、Noを`-1`へ変換します。正の重みはYesが高い側へ、�
 - 完了画面で4パラメータと回答充足度を表示する
 - Answerと版付き採点設定はD1へ保存し、パラメータは回答内容の取得時にAPI Serverで再計算する
 - 体力、社交性、関係の親密さ、相性を判定しない
-- パラメータをBrain Itemとして作成しない
+- 回答済みになった後、[共通のprojection](parameter-scoring-design.md#8-brain-itemへのprojection)で4パラメータを4件の`Preference` Brain Itemとして保存する
 
 教師となる正解データがないため、設定版1では機械学習を使用しません。妥当性の検証と将来の学習モデルへ移行する条件は[最初の診断の設計 §7](relationship-priority-parameter-design.md#7-機械学習へ移行する条件)と同じです。

@@ -687,6 +687,69 @@ describe("saveDiagnosisAnswer", () => {
     });
   });
 
+  it("異なる質問の同時回答でrevisionが先に進んでも最新revisionから保存を再試行する", async () => {
+    const db = createTestDb();
+    await db.insert(schema.accounts).values({ id: "account-revision-race" });
+    await insertDiagnosis(db, { id: "revision-race-target" });
+    await insertQuestion(db, "revision-race-target-q3");
+    await db.insert(schema.diagnosisQuestions).values({
+      id: "revision-race-target-sq3",
+      diagnosisId: "revision-race-target",
+      questionId: "revision-race-target-q3",
+      questionVersion: 1,
+      position: 2,
+    });
+    const base = {
+      accountId: "account-revision-race",
+      diagnosisId: "revision-race-target",
+      choiceId: "yes",
+      at: new Date("2026-08-03T00:00:00Z"),
+    };
+    await saveDiagnosisAnswer(db, {
+      ...base,
+      diagnosisQuestionId: "revision-race-target-sq1",
+    });
+
+    const originalBatch = db.batch.bind(db);
+    let injectConcurrentAnswer = true;
+    Object.assign(db, {
+      batch: async (queries: Array<PromiseLike<unknown>>) => {
+        if (injectConcurrentAnswer) {
+          injectConcurrentAnswer = false;
+          await saveDiagnosisAnswer(db, {
+            ...base,
+            diagnosisQuestionId: "revision-race-target-sq2",
+          });
+          // D1のatomic batchでは、競合した側の書き込みはこの一意制約違反とともにrollbackされる。
+          throw new Error(
+            "UNIQUE constraint failed: diagnosis_brain_projection_requests.diagnosis_response_id, diagnosis_brain_projection_requests.response_revision",
+          );
+        }
+        return originalBatch(queries as never);
+      },
+    });
+
+    await expect(
+      saveDiagnosisAnswer(db, {
+        ...base,
+        diagnosisQuestionId: "revision-race-target-sq3",
+      }),
+    ).resolves.toMatchObject({
+      type: "saved",
+      outcome: "created",
+      progress: { responseStatus: "answered", answeredCount: 3, questionCount: 3 },
+    });
+
+    expect(await db.select().from(schema.diagnosisAnswers)).toHaveLength(3);
+    expect(await db.select().from(schema.sourceRecords)).toHaveLength(3);
+    expect(await db.select().from(schema.diagnosisResponses)).toMatchObject([{ revision: 3 }]);
+    expect(
+      (await db.select().from(schema.diagnosisBrainProjectionRequests))
+        .map(({ responseRevision }) => responseRevision)
+        .sort((left, right) => left - right),
+    ).toEqual([1, 2, 3]);
+  });
+
   it.each([
     {
       name: "存在しないDiagnosis",
