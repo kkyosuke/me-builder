@@ -71,6 +71,13 @@
       "when": 1786143949671,
       "tag": "0009_salty_puppet_master",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1786173742055,
+      "tag": "0010_rare_goblin_queen",
+      "breakpoints": true
     }
   ]
 }
