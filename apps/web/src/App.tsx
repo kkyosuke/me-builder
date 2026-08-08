@@ -12,9 +12,25 @@ import {
   useResetDiagnosisData,
 } from "./feature/diagnosis";
 import { useLiffSession } from "./feature/liff";
+import { ProfileComingSoonScreen } from "./feature/profile";
 import { ColorThemeToggle, useColorTheme } from "./feature/theme";
 
 const DEVELOPMENT_ENVIRONMENTS = new Set(["development", "local", "preview", "test"]);
+
+function resolveRequestedPathname(): string {
+  if (typeof window === "undefined") {
+    return "/diagnosis";
+  }
+  if (window.location.pathname !== "/") {
+    return window.location.pathname;
+  }
+
+  const liffState = new URLSearchParams(window.location.search).get("liff.state");
+  if (!liffState?.startsWith("/")) {
+    return window.location.pathname;
+  }
+  return liffState.split(/[?#]/, 1)[0] ?? window.location.pathname;
+}
 
 function DiagnosisApplication() {
   const liffSession = useLiffSession();
@@ -85,12 +101,19 @@ function AdminApplication() {
 
 export function App() {
   const colorTheme = useColorTheme();
-  const isAdminPath =
-    typeof window !== "undefined" && window.location.pathname.startsWith("/admin");
+  const pathname = resolveRequestedPathname();
+  const isAdminPath = pathname.startsWith("/admin");
+  const isMePath = pathname === "/me" || pathname.startsWith("/me/");
   return (
     <>
       <ColorThemeToggle theme={colorTheme.theme} onToggle={colorTheme.toggleTheme} />
-      {isAdminPath ? <AdminApplication /> : <DiagnosisApplication />}
+      {isAdminPath ? (
+        <AdminApplication />
+      ) : isMePath ? (
+        <ProfileComingSoonScreen />
+      ) : (
+        <DiagnosisApplication />
+      )}
     </>
   );
 }
