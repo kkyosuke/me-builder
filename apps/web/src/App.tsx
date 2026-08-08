@@ -100,7 +100,8 @@ function AdminApplication() {
 }
 
 function ProfileApplication() {
-  const summary = useProfileSummary();
+  const liffSession = useLiffSession();
+  const summary = useProfileSummary({ acquireIdToken: liffSession.acquireIdToken });
   return <ProfileSummaryScreen state={summary.state} onRetry={() => void summary.reload()} />;
 }
 

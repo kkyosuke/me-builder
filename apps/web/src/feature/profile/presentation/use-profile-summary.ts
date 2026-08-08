@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { config } from "../../../config";
 import type { AsyncState } from "../../../model/async-state";
-import { loadProfileRecords } from "../infrastructure/dummy-profile-records";
-import { generateProfileSummary } from "../model/generate-profile-summary";
-import type { ProfileSummary } from "../model/profile-summary";
+import { fetchProfileSummary } from "../infrastructure/profile-api";
+import type { ProfileSummaryResult } from "../model/profile-summary";
 
-export function useProfileSummary() {
-  const [state, setState] = useState<AsyncState<ProfileSummary>>({ status: "loading" });
+export function useProfileSummary({
+  acquireIdToken,
+}: {
+  acquireIdToken: (signal: AbortSignal) => Promise<string | null>;
+}) {
+  const [state, setState] = useState<AsyncState<ProfileSummaryResult>>({ status: "loading" });
   const request = useRef<AbortController | null>(null);
 
   const load = useCallback(async () => {
@@ -14,10 +18,10 @@ export function useProfileSummary() {
     request.current = controller;
     setState({ status: "loading" });
     try {
-      const records = await loadProfileRecords(controller.signal);
-      if (!controller.signal.aborted) {
-        setState({ status: "success", data: generateProfileSummary(records) });
-      }
+      const idToken = await acquireIdToken(controller.signal);
+      if (!idToken || controller.signal.aborted) return;
+      const result = await fetchProfileSummary(config.apiUrl, idToken, controller.signal);
+      if (!controller.signal.aborted) setState({ status: "success", data: result });
     } catch (error) {
       if (!controller.signal.aborted) {
         setState({
@@ -26,7 +30,7 @@ export function useProfileSummary() {
         });
       }
     }
-  }, []);
+  }, [acquireIdToken]);
 
   useEffect(() => {
     void load();
