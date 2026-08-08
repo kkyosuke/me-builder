@@ -2,10 +2,35 @@ import { d1 } from "@me-builder/lib";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { type DrizzleSqliteDODatabase, drizzle } from "drizzle-orm/durable-sqlite";
 import { migrate } from "drizzle-orm/durable-sqlite/migrator";
-import migrations from "../../drizzle-account-data/migrations.js";
+import migrations from "../../drizzle/account-data/migrations.js";
 import { accountDataIdentity } from "./schema";
 
-const accountDataSchema = { ...d1.schema, accountDataIdentity };
+const accountDataSchema = {
+  accountDataIdentity,
+  accounts: d1.schema.accounts,
+  brainItemAccessLabels: d1.schema.brainItemAccessLabels,
+  brainItemEvidenceEdges: d1.schema.brainItemEvidenceEdges,
+  brainItemRevisions: d1.schema.brainItemRevisions,
+  brainItemTopicLabels: d1.schema.brainItemTopicLabels,
+  brainItems: d1.schema.brainItems,
+  chatTurns: d1.schema.chatTurns,
+  conversationMessages: d1.schema.conversationMessages,
+  conversationSessions: d1.schema.conversationSessions,
+  sourceRecordTextPayloads: d1.schema.sourceRecordTextPayloads,
+  diagnoses: d1.schema.diagnoses,
+  diagnosisAnswers: d1.schema.diagnosisAnswers,
+  diagnosisBrainProjectionHeads: d1.schema.diagnosisBrainProjectionHeads,
+  diagnosisBrainProjectionRequests: d1.schema.diagnosisBrainProjectionRequests,
+  diagnosisDeferredQuestions: d1.schema.diagnosisDeferredQuestions,
+  diagnosisQuestions: d1.schema.diagnosisQuestions,
+  diagnosisResponses: d1.schema.diagnosisResponses,
+  diagnosisScoringConfigs: d1.schema.diagnosisScoringConfigs,
+  questionChoices: d1.schema.questionChoices,
+  questionVersions: d1.schema.questionVersions,
+  questions: d1.schema.questions,
+  sourceRecordRevisions: d1.schema.sourceRecordRevisions,
+  sourceRecords: d1.schema.sourceRecords,
+};
 const SESSION_INACTIVITY_MS = 6 * 60 * 60 * 1000;
 const SESSION_HARD_CAP_MS = 24 * 60 * 60 * 1000;
 type AccountDataDatabase = DrizzleSqliteDODatabase<typeof accountDataSchema>;

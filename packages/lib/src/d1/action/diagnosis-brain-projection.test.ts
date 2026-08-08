@@ -95,7 +95,6 @@ async function insertFixture(db: D1Client, complete: boolean) {
     });
     await db.insert(schema.diagnosisAnswers).values({
       id: `answer-${position}`,
-      accountId: "account-1",
       diagnosisResponseId: "response-1",
       diagnosisQuestionId: `diagnosis-question-${position}`,
       questionId: `question-${position}`,
@@ -107,7 +106,6 @@ async function insertFixture(db: D1Client, complete: boolean) {
   }
   await db.insert(schema.diagnosisBrainProjectionRequests).values({
     id: "request-1",
-    accountId: "account-1",
     diagnosisResponseId: "response-1",
     responseRevision: answeredPositions.length,
     status: "pending",
@@ -122,7 +120,6 @@ async function insertProjectionRequest(
 ) {
   await db.insert(schema.diagnosisBrainProjectionRequests).values({
     id: input.id,
-    accountId: "account-1",
     diagnosisResponseId: "response-1",
     responseRevision: input.responseRevision,
     status: "pending",
@@ -151,7 +148,6 @@ describe("Diagnosis Brain projection", () => {
     const at = await insertFixture(db, true);
     await db.insert(schema.diagnosisBrainProjectionRequests).values({
       id: "request-old",
-      accountId: "account-1",
       diagnosisResponseId: "response-1",
       responseRevision: 1,
       status: "pending",

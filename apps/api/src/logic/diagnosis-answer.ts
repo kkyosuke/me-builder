@@ -35,7 +35,7 @@ type Dependencies = {
   saveAnswer: (
     accountData: AccountDataNamespace | undefined,
     accountId: string,
-    input: Parameters<typeof d1.action.diagnosis.saveDiagnosisAnswer>[1],
+    input: Omit<Parameters<typeof d1.action.diagnosis.saveDiagnosisAnswer>[1], "accountId">,
   ) => ReturnType<typeof d1.action.diagnosis.saveDiagnosisAnswer>;
   processLatestProjection?: (
     accountData: AccountDataNamespace | undefined,
@@ -55,7 +55,6 @@ const defaultDependencies: Dependencies = {
     if (!accountData) throw new Error("ACCOUNT_DATA binding is not configured");
     return accountDataFor(accountData, accountId).execute(
       "diagnosisProjection.processLatest",
-      accountId,
       diagnosisId,
       at,
     );
@@ -82,7 +81,6 @@ export async function saveDiagnosisAnswer(
     return session;
   }
   const result = await dependencies.saveAnswer(accountData, session.session.accountId, {
-    accountId: session.session.accountId,
     diagnosisId,
     diagnosisQuestionId,
     choiceId,

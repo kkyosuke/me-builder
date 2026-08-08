@@ -68,13 +68,14 @@ describe("Diary conversation persistence flow", () => {
     ).resolves.toEqual(first);
     const attached = await attachMessagesToTurn(
       db,
+      account.id,
       [second, first],
       1,
       "test-model",
       "test-prompt",
     );
     await expect(
-      attachMessagesToTurn(db, [first, second], 1, "test-model", "test-prompt"),
+      attachMessagesToTurn(db, account.id, [first, second], 1, "test-model", "test-prompt"),
     ).resolves.toEqual(attached);
     expect(await db.select().from(schema.chatTurns)).toEqual([
       expect.objectContaining({ promptVersion: "test-prompt" }),
@@ -104,23 +105,10 @@ describe("Diary conversation persistence flow", () => {
         endSession: true,
       }),
     ).resolves.toBe(responseMessageId);
-    await expect(
-      getPendingAssistantResponse(db, { accountId: account.id, turnId: attached.turnId }),
-    ).resolves.toEqual({
+    await expect(getPendingAssistantResponse(db, account.id, attached.turnId)).resolves.toEqual({
       body: "疲れている中でも散歩できたんだね。今は少し休めそう？",
       endSession: true,
     });
-    const { account: anotherAccount } = await upsertIdentity(db, {
-      provider: "line",
-      providerAccountId: "U_another_diary_user",
-    });
-    await expect(
-      getPendingAssistantResponse(db, {
-        accountId: anotherAccount.id,
-        turnId: attached.turnId,
-      }),
-    ).resolves.toBeUndefined();
-
     await expect(markTurnDelivered(db, attached.turnId)).resolves.toBe(true);
     await expect(markTurnFailed(db, attached.turnId, "stale_delivery_failure")).resolves.toBe(
       false,
@@ -163,7 +151,14 @@ describe("Diary conversation persistence flow", () => {
       body: "ここで一度終わります",
       receivedAt: new Date("2026-08-07T00:00:00.000Z"),
     });
-    const firstTurn = await attachMessagesToTurn(db, [first], 1, "test-model", "test-prompt");
+    const firstTurn = await attachMessagesToTurn(
+      db,
+      account.id,
+      [first],
+      1,
+      "test-model",
+      "test-prompt",
+    );
     await closeTurnSession(db, firstTurn.turnId);
 
     const second = await storeLineTextSource(db, {
@@ -172,14 +167,21 @@ describe("Diary conversation persistence flow", () => {
       body: "新しい会話を始めます",
       receivedAt: new Date("2026-08-07T00:01:00.000Z"),
     });
-    const secondTurn = await attachMessagesToTurn(db, [second], 2, "test-model", "test-prompt");
+    const secondTurn = await attachMessagesToTurn(
+      db,
+      account.id,
+      [second],
+      2,
+      "test-model",
+      "test-prompt",
+    );
     expect(secondTurn.sessionId).not.toBe(firstTurn.sessionId);
     await expect(markTurnGenerating(db, secondTurn.turnId)).resolves.toBe(true);
     await expect(markTurnFailed(db, secondTurn.turnId, "generation_exhausted")).resolves.toBe(true);
     await expect(markTurnDelivered(db, secondTurn.turnId)).resolves.toBe(false);
 
     await expect(
-      attachMessagesToTurn(db, [first, second], 3, "test-model", "test-prompt"),
+      attachMessagesToTurn(db, account.id, [first, second], 3, "test-model", "test-prompt"),
     ).resolves.toEqual(firstTurn);
     expect(await db.select().from(schema.chatTurns)).toHaveLength(2);
   });
@@ -204,6 +206,7 @@ describe("Diary conversation persistence flow", () => {
     });
     const originalTurn = await attachMessagesToTurn(
       db,
+      account.id,
       [first, second],
       1,
       "test-model",
@@ -211,7 +214,7 @@ describe("Diary conversation persistence flow", () => {
     );
 
     await expect(
-      attachMessagesToTurn(db, [first], 2, "test-model", "test-prompt"),
+      attachMessagesToTurn(db, account.id, [first], 2, "test-model", "test-prompt"),
     ).resolves.toEqual(originalTurn);
     expect(await db.select().from(schema.chatTurns)).toHaveLength(1);
   });
@@ -228,7 +231,14 @@ describe("Diary conversation persistence flow", () => {
       body: "保存済みのメッセージ",
       receivedAt: new Date("2026-08-07T00:00:00.000Z"),
     });
-    const existingTurn = await attachMessagesToTurn(db, [existing], 1, "test-model", "test-prompt");
+    const existingTurn = await attachMessagesToTurn(
+      db,
+      account.id,
+      [existing],
+      1,
+      "test-model",
+      "test-prompt",
+    );
     const fresh = await storeLineTextSource(db, {
       accountId: account.id,
       eventId: "fresh-event",
@@ -238,6 +248,7 @@ describe("Diary conversation persistence flow", () => {
 
     const freshTurn = await attachMessagesToTurn(
       db,
+      account.id,
       [existing, fresh],
       2,
       "test-model",
@@ -264,9 +275,15 @@ describe("Diary conversation persistence flow", () => {
       body: "今日は少し疲れた",
       receivedAt: new Date("2026-08-07T00:00:00.000Z"),
     });
-    const firstTurn = await attachMessagesToTurn(db, [first], 1, "test-model", "test-prompt", [
-      "reflective",
-    ]);
+    const firstTurn = await attachMessagesToTurn(
+      db,
+      account.id,
+      [first],
+      1,
+      "test-model",
+      "test-prompt",
+      ["reflective"],
+    );
     await markTurnGenerating(db, firstTurn.turnId);
     await saveAssistantResponse(db, {
       turnId: firstTurn.turnId,
@@ -299,9 +316,15 @@ describe("Diary conversation persistence flow", () => {
       body: "うん、でも少し休めた",
       receivedAt: new Date("2026-08-07T00:01:00.000Z"),
     });
-    const replyTurn = await attachMessagesToTurn(db, [reply], 2, "test-model", "test-prompt", [
-      "reflective",
-    ]);
+    const replyTurn = await attachMessagesToTurn(
+      db,
+      account.id,
+      [reply],
+      2,
+      "test-model",
+      "test-prompt",
+      ["reflective"],
+    );
 
     expect(replyTurn.sessionId).toBe(firstTurn.sessionId);
     expect(await getTurnContext(db, replyTurn.turnId, 20)).toMatchObject({

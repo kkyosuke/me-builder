@@ -26,7 +26,6 @@ describe("Source D1 schema", () => {
     db.insert(schema.sourceRecordRevisions)
       .values({
         id: "revision-1",
-        accountId: "account-1",
         previousSourceRecordId: "source-v1",
         nextSourceRecordId: "source-v2",
         derivationMethod: "deterministic",
@@ -44,7 +43,6 @@ describe("Source D1 schema", () => {
         .insert(schema.sourceRecordRevisions)
         .values({
           id: "revision-invalid",
-          accountId: "missing-account",
           previousSourceRecordId: "missing-v1",
           nextSourceRecordId: "missing-v2",
           derivationMethod: "deterministic",
@@ -62,7 +60,6 @@ describe("Source D1 schema", () => {
     db.insert(schema.sourceRecordTextPayloads)
       .values({
         sourceRecordId: "source-1",
-        accountId: "account-1",
         body: "日記本文",
         contentHash: "sha256",
       })
@@ -70,29 +67,8 @@ describe("Source D1 schema", () => {
     expect(db.select().from(schema.sourceRecordTextPayloads).get()?.body).toBe("日記本文");
   });
 
-  it("別AccountのSource Record同士を改訂関係で結べない", () => {
-    const db = createTestDb();
-    db.insert(schema.accounts)
-      .values([{ id: "account-1" }, { id: "account-2" }])
-      .run();
-    db.insert(schema.sourceRecords)
-      .values([
-        { id: "source-1", accountId: "account-1", kind: "user_input" },
-        { id: "source-2", accountId: "account-2", kind: "user_input" },
-      ])
-      .run();
-
-    expect(() =>
-      db
-        .insert(schema.sourceRecordRevisions)
-        .values({
-          id: "cross-account-revision",
-          accountId: "account-1",
-          previousSourceRecordId: "source-1",
-          nextSourceRecordId: "source-2",
-          derivationMethod: "deterministic",
-        })
-        .run(),
-    ).toThrow(/FOREIGN KEY constraint failed/);
+  it("Source descendantへaccountIdを重複定義しない", () => {
+    expect("accountId" in schema.sourceRecordRevisions).toBe(false);
+    expect("accountId" in schema.sourceRecordTextPayloads).toBe(false);
   });
 });

@@ -1,6 +1,7 @@
 CREATE TABLE `account_data_identity` (
 	`singleton` integer PRIMARY KEY NOT NULL,
 	`account_id` text NOT NULL,
+	`legacy_imported_at` integer,
 	CONSTRAINT "account_data_identity_singleton_check" CHECK("account_data_identity"."singleton" = 1)
 );
 --> statement-breakpoint
@@ -108,7 +109,6 @@ CREATE TABLE `chat_turns` (
 	`updated_at` integer NOT NULL,
 	`deleted_at` integer,
 	`is_deleted` integer DEFAULT false NOT NULL,
-	`account_id` text NOT NULL,
 	`session_id` text NOT NULL,
 	`from_sequence` integer NOT NULL,
 	`through_sequence` integer NOT NULL,
@@ -124,8 +124,8 @@ CREATE TABLE `chat_turns` (
 	`first_reply_requested_at` integer,
 	`final_reply_requested_at` integer,
 	`response_message_id` text,
-	FOREIGN KEY (`account_id`) REFERENCES `accounts`(`id`) ON UPDATE no action ON DELETE no action,
-	FOREIGN KEY (`session_id`,`account_id`) REFERENCES `conversation_sessions`(`id`,`account_id`) ON UPDATE no action ON DELETE no action
+	`delivery_metric_token` text,
+	FOREIGN KEY (`session_id`) REFERENCES `conversation_sessions`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
 CREATE INDEX `chat_turn_status_created_idx` ON `chat_turns` (`status`,`created_at`);--> statement-breakpoint
@@ -136,7 +136,6 @@ CREATE TABLE `conversation_messages` (
 	`updated_at` integer NOT NULL,
 	`deleted_at` integer,
 	`is_deleted` integer DEFAULT false NOT NULL,
-	`account_id` text NOT NULL,
 	`session_id` text NOT NULL,
 	`sequence` integer NOT NULL,
 	`role` text NOT NULL,
@@ -146,12 +145,10 @@ CREATE TABLE `conversation_messages` (
 	`channel_event_id` text,
 	`turn_id` text,
 	`sent_at` integer,
-	FOREIGN KEY (`account_id`) REFERENCES `accounts`(`id`) ON UPDATE no action ON DELETE no action,
-	FOREIGN KEY (`session_id`,`account_id`) REFERENCES `conversation_sessions`(`id`,`account_id`) ON UPDATE no action ON DELETE no action,
-	FOREIGN KEY (`source_record_id`,`account_id`) REFERENCES `source_records`(`id`,`account_id`) ON UPDATE no action ON DELETE no action
+	FOREIGN KEY (`session_id`) REFERENCES `conversation_sessions`(`id`) ON UPDATE no action ON DELETE no action,
+	FOREIGN KEY (`source_record_id`) REFERENCES `source_records`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `conversation_message_account_identity_idx` ON `conversation_messages` (`id`,`account_id`);--> statement-breakpoint
 CREATE UNIQUE INDEX `conversation_message_session_sequence_idx` ON `conversation_messages` (`session_id`,`sequence`);--> statement-breakpoint
 CREATE UNIQUE INDEX `conversation_message_channel_event_idx` ON `conversation_messages` (`channel`,`channel_event_id`) WHERE "conversation_messages"."channel_event_id" is not null;--> statement-breakpoint
 CREATE TABLE `conversation_sessions` (
@@ -167,22 +164,23 @@ CREATE TABLE `conversation_sessions` (
 	`last_assistant_message_at` integer,
 	`closed_at` integer,
 	`close_reason` text,
+	`conversation_policy_id` text DEFAULT 'reflective' NOT NULL,
+	`reply_opportunity_count` integer DEFAULT 0 NOT NULL,
+	`reply_count` integer DEFAULT 0 NOT NULL,
+	`awaiting_reply` integer DEFAULT false NOT NULL,
 	`next_sequence` integer DEFAULT 1 NOT NULL,
 	FOREIGN KEY (`account_id`) REFERENCES `accounts`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `conversation_session_account_identity_idx` ON `conversation_sessions` (`id`,`account_id`);--> statement-breakpoint
 CREATE INDEX `conversation_session_account_status_idx` ON `conversation_sessions` (`account_id`,`status`);--> statement-breakpoint
 CREATE UNIQUE INDEX `conversation_session_active_account_idx` ON `conversation_sessions` (`account_id`) WHERE "conversation_sessions"."status" = 'active';--> statement-breakpoint
 CREATE TABLE `source_record_text_payloads` (
 	`source_record_id` text PRIMARY KEY NOT NULL,
-	`account_id` text NOT NULL,
 	`body` text NOT NULL,
 	`content_type` text DEFAULT 'text/plain' NOT NULL,
 	`content_hash` text NOT NULL,
 	`created_at` integer NOT NULL,
-	FOREIGN KEY (`account_id`) REFERENCES `accounts`(`id`) ON UPDATE no action ON DELETE no action,
-	FOREIGN KEY (`source_record_id`,`account_id`) REFERENCES `source_records`(`id`,`account_id`) ON UPDATE no action ON DELETE cascade
+	FOREIGN KEY (`source_record_id`) REFERENCES `source_records`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
 CREATE TABLE `diagnoses` (
@@ -209,7 +207,6 @@ CREATE TABLE `diagnosis_answers` (
 	`updated_at` integer NOT NULL,
 	`deleted_at` integer,
 	`is_deleted` integer DEFAULT false NOT NULL,
-	`account_id` text NOT NULL,
 	`diagnosis_response_id` text NOT NULL,
 	`diagnosis_question_id` text NOT NULL,
 	`question_id` text NOT NULL,
@@ -217,10 +214,9 @@ CREATE TABLE `diagnosis_answers` (
 	`choice_id` text NOT NULL,
 	`accepted_at` integer NOT NULL,
 	`source_record_id` text NOT NULL,
-	FOREIGN KEY (`account_id`) REFERENCES `accounts`(`id`) ON UPDATE no action ON DELETE no action,
+	FOREIGN KEY (`diagnosis_response_id`) REFERENCES `diagnosis_responses`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`diagnosis_question_id`) REFERENCES `diagnosis_questions`(`id`) ON UPDATE no action ON DELETE no action,
-	FOREIGN KEY (`diagnosis_response_id`,`account_id`) REFERENCES `diagnosis_responses`(`id`,`account_id`) ON UPDATE no action ON DELETE no action,
-	FOREIGN KEY (`source_record_id`,`account_id`) REFERENCES `source_records`(`id`,`account_id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`source_record_id`) REFERENCES `source_records`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`question_id`,`question_version`,`choice_id`) REFERENCES `question_choices`(`question_id`,`question_version`,`choice_id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
@@ -252,15 +248,13 @@ CREATE TABLE `diagnosis_brain_projection_requests` (
 	`updated_at` integer NOT NULL,
 	`deleted_at` integer,
 	`is_deleted` integer DEFAULT false NOT NULL,
-	`account_id` text NOT NULL,
 	`diagnosis_response_id` text NOT NULL,
 	`response_revision` integer NOT NULL,
 	`status` text NOT NULL,
 	`attempt_count` integer DEFAULT 0 NOT NULL,
 	`next_attempt_at` integer NOT NULL,
 	`failure_code` text,
-	FOREIGN KEY (`account_id`) REFERENCES `accounts`(`id`) ON UPDATE no action ON DELETE no action,
-	FOREIGN KEY (`diagnosis_response_id`,`account_id`) REFERENCES `diagnosis_responses`(`id`,`account_id`) ON UPDATE no action ON DELETE cascade
+	FOREIGN KEY (`diagnosis_response_id`) REFERENCES `diagnosis_responses`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `diagnosis_brain_projection_revision_idx` ON `diagnosis_brain_projection_requests` (`diagnosis_response_id`,`response_revision`);--> statement-breakpoint
@@ -271,13 +265,11 @@ CREATE TABLE `diagnosis_deferred_questions` (
 	`updated_at` integer NOT NULL,
 	`deleted_at` integer,
 	`is_deleted` integer DEFAULT false NOT NULL,
-	`account_id` text NOT NULL,
 	`diagnosis_response_id` text NOT NULL,
 	`diagnosis_question_id` text NOT NULL,
 	`deferred_at` integer NOT NULL,
-	FOREIGN KEY (`account_id`) REFERENCES `accounts`(`id`) ON UPDATE no action ON DELETE no action,
-	FOREIGN KEY (`diagnosis_question_id`) REFERENCES `diagnosis_questions`(`id`) ON UPDATE no action ON DELETE no action,
-	FOREIGN KEY (`diagnosis_response_id`,`account_id`) REFERENCES `diagnosis_responses`(`id`,`account_id`) ON UPDATE no action ON DELETE no action
+	FOREIGN KEY (`diagnosis_response_id`) REFERENCES `diagnosis_responses`(`id`) ON UPDATE no action ON DELETE no action,
+	FOREIGN KEY (`diagnosis_question_id`) REFERENCES `diagnosis_questions`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `diagnosis_deferred_question_active_idx` ON `diagnosis_deferred_questions` (`diagnosis_response_id`,`diagnosis_question_id`) WHERE is_deleted = 0;--> statement-breakpoint
@@ -311,7 +303,6 @@ CREATE TABLE `diagnosis_responses` (
 	FOREIGN KEY (`diagnosis_id`) REFERENCES `diagnoses`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `diagnosis_response_account_identity_idx` ON `diagnosis_responses` (`id`,`account_id`);--> statement-breakpoint
 CREATE UNIQUE INDEX `diagnosis_response_account_active_idx` ON `diagnosis_responses` (`account_id`,`diagnosis_id`) WHERE is_deleted = 0;--> statement-breakpoint
 CREATE TABLE `diagnosis_scoring_configs` (
 	`id` text PRIMARY KEY NOT NULL,
@@ -371,13 +362,11 @@ CREATE TABLE `source_record_revisions` (
 	`updated_at` integer NOT NULL,
 	`deleted_at` integer,
 	`is_deleted` integer DEFAULT false NOT NULL,
-	`account_id` text NOT NULL,
 	`previous_source_record_id` text NOT NULL,
 	`next_source_record_id` text NOT NULL,
 	`derivation_method` text NOT NULL,
-	FOREIGN KEY (`account_id`) REFERENCES `accounts`(`id`) ON UPDATE no action ON DELETE no action,
-	FOREIGN KEY (`previous_source_record_id`,`account_id`) REFERENCES `source_records`(`id`,`account_id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`next_source_record_id`,`account_id`) REFERENCES `source_records`(`id`,`account_id`) ON UPDATE no action ON DELETE cascade
+	FOREIGN KEY (`previous_source_record_id`) REFERENCES `source_records`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`next_source_record_id`) REFERENCES `source_records`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `source_record_revision_pair_idx` ON `source_record_revisions` (`previous_source_record_id`,`next_source_record_id`);--> statement-breakpoint
@@ -395,11 +384,3 @@ CREATE TABLE `source_records` (
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `source_record_id_account_idx` ON `source_records` (`id`,`account_id`);
---> statement-breakpoint
-CREATE TRIGGER `chat_turn_response_account_insert` BEFORE INSERT ON `chat_turns` WHEN NEW.`response_message_id` IS NOT NULL AND NOT EXISTS (SELECT 1 FROM `conversation_messages` WHERE `id` = NEW.`response_message_id` AND `account_id` = NEW.`account_id`) BEGIN SELECT RAISE(ABORT, 'account boundary violation'); END;
---> statement-breakpoint
-CREATE TRIGGER `chat_turn_response_account_update` BEFORE UPDATE OF `response_message_id`, `account_id` ON `chat_turns` WHEN NEW.`response_message_id` IS NOT NULL AND NOT EXISTS (SELECT 1 FROM `conversation_messages` WHERE `id` = NEW.`response_message_id` AND `account_id` = NEW.`account_id`) BEGIN SELECT RAISE(ABORT, 'account boundary violation'); END;
---> statement-breakpoint
-CREATE TRIGGER `conversation_message_turn_account_insert` BEFORE INSERT ON `conversation_messages` WHEN NEW.`turn_id` IS NOT NULL AND NOT EXISTS (SELECT 1 FROM `chat_turns` WHERE `id` = NEW.`turn_id` AND `account_id` = NEW.`account_id`) BEGIN SELECT RAISE(ABORT, 'account boundary violation'); END;
---> statement-breakpoint
-CREATE TRIGGER `conversation_message_turn_account_update` BEFORE UPDATE OF `turn_id`, `account_id` ON `conversation_messages` WHEN NEW.`turn_id` IS NOT NULL AND NOT EXISTS (SELECT 1 FROM `chat_turns` WHERE `id` = NEW.`turn_id` AND `account_id` = NEW.`account_id`) BEGIN SELECT RAISE(ABORT, 'account boundary violation'); END;

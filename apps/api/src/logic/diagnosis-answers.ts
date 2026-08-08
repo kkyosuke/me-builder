@@ -44,12 +44,7 @@ const defaultDependencies: Dependencies = {
   createSession: createLiffSession,
   findAnswers: (accountData, accountId, diagnosisId, at) => {
     if (!accountData) throw new Error("ACCOUNT_DATA binding is not configured");
-    return accountDataFor(accountData, accountId).execute(
-      "diagnosis.findAnswers",
-      accountId,
-      diagnosisId,
-      at,
-    );
+    return accountDataFor(accountData, accountId).execute("diagnosis.findAnswers", diagnosisId, at);
   },
 };
 
