@@ -66,7 +66,7 @@ export async function processLineWebhook(
   for (const event of events) {
     const providerAccountId = event.source?.userId;
     if (event.type === "follow") {
-      await ensureAccountIdentity(db, providerAccountId, "follow");
+      await ensureAccountIdentity(db, providerAccountId, "follow", workerConfig);
       continue;
     }
     if (
@@ -93,7 +93,7 @@ export async function processLineWebhook(
       logger.warn({ intent }, "Rejected LINE event with inconsistent command routing");
       continue;
     }
-    const resolved = await ensureAccountIdentity(db, providerAccountId, "message");
+    const resolved = await ensureAccountIdentity(db, providerAccountId, "message", workerConfig);
     if (!resolved) throw new Error("LINE account could not be resolved");
     if (intent === "diagnosis-request") {
       if (!workerConfig.lineChannelAccessToken || !event.replyToken) {
@@ -135,12 +135,14 @@ async function ensureAccountIdentity(
   db: d1.Client,
   providerAccountId: string | undefined,
   trigger: "follow" | "message",
+  workerConfig: WorkerConfig,
 ): Promise<Awaited<ReturnType<typeof d1.action.account.upsertIdentity>> | undefined> {
   if (!providerAccountId) return undefined;
   try {
     const resolved = await d1.action.account.upsertIdentity(db, {
       provider: "line",
       providerAccountId,
+      role: workerConfig.adminLineUserIds.includes(providerAccountId) ? "admin" : "user",
     });
     logger.info({ trigger }, "LINE Account identity ensured");
     return resolved;

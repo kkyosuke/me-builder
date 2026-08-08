@@ -50,7 +50,7 @@
   - `apps/web` は Cloudflare **Pages** で配信するため、Workers (`api` / `mcp` / `worker`) のように `wrangler.toml` の `routes` で DNS レコードを自動作成できません。ドメインのプロジェクト登録と DNS の CNAME 作成は [`scripts/setup-pages-domain.ts`](../../scripts/setup-pages-domain.ts) が行い、`apps/web` の `deploy:preview` / `deploy:production` から呼び出します。
   - 対象ドメインは `BASE_DOMAIN` を使い、スクリプト側にハードコードしません。CNAME の宛先は preview がブランチエイリアス、production がプロジェクト既定のホストです。
   - preview CDがPRへ投稿する完了コメントには、各サービスのカスタムドメインに加えて、`CLOUDFLARE_ACCOUNT_ID`から組み立てたCloudflare DashboardのWorkers & Pages管理画面へのリンクを掲載します。生のURLではなくMarkdownのリンク記法（`[表示テキスト](URL)`）で書き、表示テキストはサービスがホスト名、Dashboardが遷移先を表す文言にします。
-  - このスクリプトは `CLOUDFLARE_API_TOKEN` に Zone:Read / DNS:Edit の権限を必要とします。権限や環境変数が足りない場合は警告を出して**デプロイを止めずにスキップ**します（DNS の設定漏れでデプロイ自体を失敗させない）。
+  - このスクリプトは実行時の `CLOUDFLARE_API_TOKEN` に Zone:Read / DNS:Edit の権限を必要とします。GitHub Actionsではインフラ専用Secret `CLOUDFLARE_DEPLOY_API_TOKEN` をこの標準環境変数名へマッピングします。権限や環境変数が足りない場合は警告を出して**デプロイを止めずにスキップ**します（DNS の設定漏れでデプロイ自体を失敗させない）。
 - **Web UI (`apps/web`) の環境変数**:
   - Vite がクライアントバンドルへ埋め込むのは `VITE_` 接頭辞付きの環境変数だけです。変数を追加した場合は [`apps/web/.env.example`](../../apps/web/.env.example) へ必ず追記します。
   - バンドルへ埋め込まれた値は閲覧者から参照できます。チャネルシークレットや API キーなどのシークレットを `VITE_` 変数へ置いてはいけません。秘匿が必要な値はサーバー側 (`apps/api`) の環境変数として配布します。
@@ -85,7 +85,8 @@
 
 - **Cloudflare AI Gateway 経由の Gemini 接続**:
   - Google AI Studio の呼び出しは `apps/worker/src/infrastructure/gemini-client.ts` に閉じ込め、`@google/genai` の `GoogleGenAI` を Cloudflare AI Gateway の Google AI Studio provider URL へ接続します。
-  - `GOOGLE_AI_STUDIO_API_KEY` と `CLOUDFLARE_AIG_TOKEN` は Worker の Secret として配布します。クライアントバンドル、`wrangler.toml` の `[vars]`、ログへ出力してはいけません。
+  - `CLOUDFLARE_APP_API_TOKEN`はアプリ用tokenとしてAI Gatewayの実行とAnalytics参照に共用し、WorkerとAPI ServerのSecretとして配布します。Google AI Studioの認証には別途`GOOGLE_AI_STUDIO_API_KEY`をWorkerへ配布します。インフラ構築用の`CLOUDFLARE_DEPLOY_API_TOKEN`とは兼用せず、いずれもクライアントバンドル、`wrangler.toml`の`[vars]`、ログへ出力してはいけません。
+  - CDはGemini生成に加えてAI Gateway AnalyticsのGraphQL取得も実行し、`CLOUDFLARE_APP_API_TOKEN`の`AI Gateway Run`と`Account Analytics Read`をそれぞれ検証します。
   - Gateway URL は `CF_AI_GATEWAY_BASE_URL`、モデルは `GEMINI_MODEL` で上書きできます。未指定時は設定層の既定値を利用します。
   - ローカルの接続確認は `apps/worker/.env.example` を参照して環境変数を設定し、`bun --cwd apps/worker run check:gemini` を実行します。プロンプトはコマンド末尾の引数で変更できます。
 

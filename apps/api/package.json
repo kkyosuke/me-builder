@@ -12,6 +12,7 @@
     "types:check": "WRANGLER_LOG=none wrangler types src/worker-configuration.d.ts --env-interface ApiBindings --env preview --include-runtime false --check",
     "test": "vitest run --dir .",
     "test:e2e": "vitest run --dir src/e2e",
+    "check:analytics": "bun scripts/check-ai-gateway-analytics.ts",
     "register:webhook": "bun scripts/register-webhook.ts",
     "deploy:preview": "wrangler deploy --env preview",
     "deploy:production": "wrangler deploy --env production"

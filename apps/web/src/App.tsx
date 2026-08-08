@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import { LoadingState } from "./components/loading-state";
 import { config } from "./config";
+import { AdminStatisticsScreen, useAdminStatistics } from "./feature/admin";
 import {
   DiagnosisDetailScreen,
   DiagnosisGuidance,
@@ -15,8 +16,7 @@ import { ColorThemeToggle, useColorTheme } from "./feature/theme";
 
 const DEVELOPMENT_ENVIRONMENTS = new Set(["development", "local", "preview", "test"]);
 
-export function App() {
-  const colorTheme = useColorTheme();
+function DiagnosisApplication() {
   const liffSession = useLiffSession();
   const diagnoses = useDiagnosisList({ acquireIdToken: liffSession.acquireIdToken });
   const detail = useDiagnosisDetail({
@@ -68,10 +68,29 @@ export function App() {
     }
   }
 
+  return content;
+}
+
+function AdminApplication() {
+  const liffSession = useLiffSession();
+  const statistics = useAdminStatistics(liffSession.acquireIdToken);
+  return (
+    <AdminStatisticsScreen
+      state={statistics.state}
+      isRefreshing={statistics.isRefreshing}
+      onReload={() => void statistics.reload()}
+    />
+  );
+}
+
+export function App() {
+  const colorTheme = useColorTheme();
+  const isAdminPath =
+    typeof window !== "undefined" && window.location.pathname.startsWith("/admin");
   return (
     <>
       <ColorThemeToggle theme={colorTheme.theme} onToggle={colorTheme.toggleTheme} />
-      {content}
+      {isAdminPath ? <AdminApplication /> : <DiagnosisApplication />}
     </>
   );
 }

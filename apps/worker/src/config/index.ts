@@ -63,13 +63,17 @@ export function getWorkerConfig(env?: Record<string, unknown>): WorkerConfig {
   // 空文字は「未設定」として扱い、返信にリンクを添えないようにします。
   const rawLiffId = getEnv("LIFF_ID", env)?.trim() || undefined;
   const rawGoogleAiStudioApiKey = getEnv("GOOGLE_AI_STUDIO_API_KEY", env)?.trim() || undefined;
-  const rawCloudflareAiGatewayToken = getEnv("CLOUDFLARE_AIG_TOKEN", env)?.trim() || undefined;
+  const rawCloudflareAiGatewayToken = getEnv("CLOUDFLARE_APP_API_TOKEN", env)?.trim() || undefined;
   const rawCloudflareAiGatewayBaseUrl =
     getEnv("CF_AI_GATEWAY_BASE_URL", env)?.trim() || DEFAULT_CLOUDFLARE_AI_GATEWAY_BASE_URL;
   const rawGeminiModel = getEnv("GEMINI_MODEL", env)?.trim() || DEFAULT_GEMINI_MODEL;
   const rawChatEnabled = getEnv("CHAT_ENABLED", env)?.trim().toLowerCase() !== "false";
   const rawChatDeliverySecret = getEnv("CHAT_DELIVERY_SECRET", env)?.trim() || undefined;
   const rawChatContextMessageLimit = getEnv("CHAT_CONTEXT_MESSAGE_LIMIT", env)?.trim();
+  const adminLineUserIds = (getEnv("ADMIN_LINE_USER_IDS", env) ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
 
   const rawConfig = {
     environment: rawEnvironment,
@@ -88,6 +92,7 @@ export function getWorkerConfig(env?: Record<string, unknown>): WorkerConfig {
       rawChatContextMessageLimit,
       DEFAULT_CHAT_CONTEXT_MESSAGE_LIMIT,
     ),
+    adminLineUserIds,
   };
 
   return v.parse(WorkerConfigSchema, rawConfig);

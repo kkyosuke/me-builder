@@ -18,6 +18,8 @@ export type IdentityProvider = "line" | "line_login" | "google";
 export type UpsertIdentityInput = {
   provider: IdentityProvider;
   providerAccountId: string;
+  /** 運用設定で明示されたidentityだけに指定する。クライアント入力を渡さないこと。 */
+  role?: "user" | "admin";
 };
 
 export type UpsertIdentityResult = {
@@ -47,6 +49,19 @@ async function findByIdentity(
       ),
     )
     .get();
+}
+
+async function applyRequestedRole(
+  db: D1Client,
+  found: UpsertIdentityResult,
+  role: "user" | "admin" | undefined,
+): Promise<UpsertIdentityResult> {
+  if (role !== "admin" || found.account.role === "admin") return found;
+  await db
+    .update(accounts)
+    .set({ role: "admin", updatedAt: new Date() })
+    .where(eq(accounts.id, found.account.id));
+  return { ...found, account: { ...found.account, role: "admin" } };
 }
 
 /**
@@ -140,10 +155,11 @@ function isUniqueViolation(err: unknown): boolean {
 export async function resolveAccountByLineLogin(
   db: D1Client,
   sub: string,
+  role: "user" | "admin" = "user",
 ): Promise<UpsertIdentityResult | undefined> {
   const byLogin = await findByIdentity(db, "line_login", sub);
   if (byLogin) {
-    return byLogin;
+    return await applyRequestedRole(db, byLogin, role);
   }
 
   const byMessagingApi = await findByIdentity(db, "line", sub);
@@ -162,7 +178,7 @@ export async function resolveAccountByLineLogin(
     "Linked line_login identity to the account found by the Messaging API userId",
   );
 
-  return { account: byMessagingApi.account, identity };
+  return await applyRequestedRole(db, { account: byMessagingApi.account, identity }, role);
 }
 
 /** Accountに紐づく有効なMessaging API identityを配送時に解決する。 */
@@ -200,7 +216,7 @@ export async function upsertIdentity(
   const found = await findByIdentity(db, input.provider, input.providerAccountId);
 
   if (found) {
-    return found;
+    return await applyRequestedRole(db, found, input.role);
   }
 
   // Create new account & identity link atomically using D1 batch
@@ -208,6 +224,7 @@ export async function upsertIdentity(
   const account: typeof accounts.$inferSelect = {
     id: accountId,
     status: "active",
+    role: input.role ?? "user",
     createdAt: now,
     updatedAt: now,
     deletedAt: null,

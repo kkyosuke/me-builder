@@ -26,6 +26,7 @@ export const WorkerConfigSchema = v.object({
     v.pipe(v.number(), v.integer(), v.minValue(1)),
     DEFAULT_CHAT_CONTEXT_MESSAGE_LIMIT,
   ),
+  adminLineUserIds: v.optional(v.array(v.string()), []),
 });
 
 export type WorkerConfig = v.InferOutput<typeof WorkerConfigSchema>;

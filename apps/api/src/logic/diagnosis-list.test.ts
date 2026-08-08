@@ -9,7 +9,7 @@ describe("getDiagnosisList", () => {
   it("検証済みAccountのIDだけを使って一覧を取得すること", async () => {
     const createSession = vi.fn().mockResolvedValue({
       type: "resolved",
-      session: { accountId: "account-1" },
+      session: { accountId: "account-1", role: "user" },
     });
     const diagnoses = [
       {

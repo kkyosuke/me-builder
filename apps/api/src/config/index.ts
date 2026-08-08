@@ -41,6 +41,10 @@ export function getConfig(env?: Record<string, unknown>): ApiConfig {
     channelId: getEnv("LINE_LOGIN_CHANNEL_ID", env)?.trim() || undefined,
     liffId: rawLiffId,
   });
+  const adminLineUserIds = (getEnv("ADMIN_LINE_USER_IDS", env) ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
 
   const rawConfig = {
     port: rawPort,
@@ -54,6 +58,10 @@ export function getConfig(env?: Record<string, unknown>): ApiConfig {
     webhookQueue: rawWebhookQueue,
     liffId: rawLiffId,
     lineLoginChannelId: rawLineLoginChannelId,
+    adminLineUserIds,
+    cloudflareAccountId: getEnv("CLOUDFLARE_ACCOUNT_ID", env)?.trim() || undefined,
+    cloudflareAiGatewayId: getEnv("CLOUDFLARE_AI_GATEWAY_ID", env)?.trim() || "default",
+    cloudflareAppApiToken: getEnv("CLOUDFLARE_APP_API_TOKEN", env)?.trim() || undefined,
   };
 
   return v.parse(ConfigSchema, rawConfig);

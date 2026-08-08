@@ -39,7 +39,7 @@ describe("Worker Config", () => {
   it("Cloudflare AI Gateway と Gemini の設定を取得すること", () => {
     const config = getWorkerConfig({
       GOOGLE_AI_STUDIO_API_KEY: "google-key",
-      CLOUDFLARE_AIG_TOKEN: "gateway-token",
+      CLOUDFLARE_APP_API_TOKEN: "gateway-token",
       CF_AI_GATEWAY_BASE_URL: "https://gateway.example.com/google-ai-studio",
       GEMINI_MODEL: "gemini-test-model",
     });

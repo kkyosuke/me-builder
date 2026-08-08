@@ -5,7 +5,7 @@ import { createGeminiClient, generateText } from "../src/infrastructure/gemini-c
 const config = getWorkerConfig();
 
 if (!config.googleAiStudioApiKey || !config.cloudflareAiGatewayToken) {
-  throw new Error("GOOGLE_AI_STUDIO_API_KEY and CLOUDFLARE_AIG_TOKEN are required");
+  throw new Error("GOOGLE_AI_STUDIO_API_KEY and CLOUDFLARE_APP_API_TOKEN are required");
 }
 
 const client = createGeminiClient({

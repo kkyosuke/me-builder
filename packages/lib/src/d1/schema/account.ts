@@ -10,6 +10,9 @@ export const accounts = sqliteTable("accounts", {
   status: text("status", { enum: ["active"] })
     .notNull()
     .default("active"),
+  role: text("role", { enum: ["user", "admin"] })
+    .notNull()
+    .default("user"),
 });
 
 /**

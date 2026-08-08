@@ -24,7 +24,7 @@ describe("getDiagnosisAnswers", () => {
       {
         createSession: vi.fn().mockResolvedValue({
           type: "resolved",
-          session: { accountId: "account-1" },
+          session: { accountId: "account-1", role: "user" },
         }),
         findAnswers,
       },
@@ -44,7 +44,7 @@ describe("getDiagnosisAnswers", () => {
       {
         createSession: vi.fn().mockResolvedValue({
           type: "resolved",
-          session: { accountId: "account-1" },
+          session: { accountId: "account-1", role: "user" },
         }),
         findAnswers: vi.fn().mockResolvedValue({ type: "not-found" }),
       },
@@ -84,7 +84,7 @@ describe("getDiagnosisAnswers", () => {
       {
         createSession: vi.fn().mockResolvedValue({
           type: "resolved",
-          session: { accountId: "account-1" },
+          session: { accountId: "account-1", role: "user" },
         }),
         findAnswers: vi.fn().mockResolvedValue({ type: "found", diagnosis }),
       },

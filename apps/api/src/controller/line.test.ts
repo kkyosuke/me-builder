@@ -36,6 +36,7 @@ describe("POST /api/line/liff/session", () => {
       type: "resolved",
       session: {
         accountId: "acc-1",
+        role: "user",
         displayName: "うつし",
         pictureUrl: "https://example.com/p.jpg",
       },
@@ -80,7 +81,7 @@ describe("POST /api/line/liff/session", () => {
   });
 
   it("DB バインディングが無い場合は logic を呼ばず 503 を返すこと", async () => {
-    outcome({ type: "resolved", session: { accountId: "acc-1" } });
+    outcome({ type: "resolved", session: { accountId: "acc-1", role: "user" } });
 
     const res = await app.request(
       "/api/line/liff/session",

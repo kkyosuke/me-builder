@@ -5,6 +5,10 @@ export const UnauthorizedErrorSchema = v.object({
   error: v.literal("Unauthorized"),
 });
 
+export const ForbiddenErrorSchema = v.object({
+  error: v.literal("Forbidden"),
+});
+
 export const AccountNotFoundErrorSchema = v.object({
   error: v.literal("Account not found"),
   reason: v.literal("friendship_required"),

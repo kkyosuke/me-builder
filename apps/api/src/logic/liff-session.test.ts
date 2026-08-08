@@ -83,6 +83,7 @@ describe("createLiffSession", () => {
       type: "resolved",
       session: {
         accountId: followed.account.id,
+        role: "user",
         displayName: "うつし",
         pictureUrl: "https://example.com/picture.jpg",
       },
