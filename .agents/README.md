@@ -15,6 +15,8 @@
 | [README](../README.md) | プロジェクトの短い入口と文書リンク |
 | [ドキュメントガイド](../docs/README.md) | `docs/` のディレクトリ構造、文書の探し方、全ドキュメントへの入口 |
 | [プロジェクト概要](../docs/product/project-overview.md) | 目的、主要要件、MVP、ロードマップ、Phase 1の入力体験とログイン手段 |
+| [自分の傾向サマリー体験設計](../docs/product/profile-summary-experience.md) | 複数の診断回答を横断して本人の現在の傾向を表示する画面、要約規則、導線、状態、完了条件 |
+| [ストレスの手がかりとAIセルフケア相談体験設計](../docs/product/self-care-ai-consultation-experience.md) | 本人向けの負荷の手がかり、早期サイン、対処、相談先の表示とAI相談、安全上の切り替え |
 | [日記チャット体験設計](../docs/product/diary-chat-experience.md) | 日々の声かけから出来事と行動原理を探り、記憶を使って助言する対話体験と応答時間 |
 | [日記チャット実装設計](../docs/architecture/diary-chat-implementation-design.md) | 日記チャットのD1モデル、Cloudflare実行基盤、プロンプト、ガードレール、応答期限 |
 | [管理者向け統計ダッシュボード設計](../docs/architecture/admin-statistics-dashboard.md) | 管理者認可、Gemini・LINE統計の項目、取得元、障害時の表示 |
