@@ -5,6 +5,10 @@ on:
     branches:
       - main
 
+concurrency:
+  group: cd-production-environment
+  cancel-in-progress: false
+
 jobs:
   deploy-production:
     name: Deploy Production Environment

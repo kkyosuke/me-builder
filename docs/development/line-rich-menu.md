@@ -47,7 +47,9 @@ bun --cwd apps/api run register:rich-menu:preview
 bun --cwd apps/api run register:rich-menu:production
 ```
 
-preview / productionのCDでは、WebとLIFF Endpointの登録後に同じ処理を自動実行します。設定が不足している場合やLINE APIが失敗した場合は、リンク切れのメニューを公開済みとして扱わずジョブを失敗させます。
+preview / productionのCDでは、WebとLIFF Endpointの登録後に同じ処理を自動実行します。LIFF Endpoint登録を完了できない場合は後続のリッチメニュー登録へ進まず、設定が不足している場合やLINE APIが失敗した場合は、リンク切れのメニューを公開済みとして扱わずジョブを失敗させます。
+
+CDはpreviewとproductionそれぞれの環境単位で直列実行します。リッチメニューの旧版と新版が並行して既定値を書き換えたり、別実行のメニューを削除したりしないためです。
 
 ## 4. 更新と復旧
 
