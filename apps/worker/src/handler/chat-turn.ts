@@ -3,7 +3,6 @@ import type { ChatTurnQueueMessage, Message } from "@me-builder/shared";
 import { logger } from "@me-builder/shared";
 import type { CloudflareBindings, WorkerConfig } from "../config";
 import { generateDiaryChatResponse } from "../logic/diary-chat";
-import { appendDiagnosisLink } from "../logic/feature/line";
 
 /** wrangler.tomlのmax_retriesと揃える。これを超えるとDLQへ落ちるため、その前に引き取る。 */
 const MAX_BUSY_ATTEMPTS = 5;
@@ -171,7 +170,7 @@ export async function processChatTurnMessage(
       generationEpoch: message.body.generationEpoch,
       leaseToken: lease.leaseToken,
       kind: "final",
-      text: appendDiagnosisLink(response.reply, workerConfig.liffId),
+      text: response.reply,
     });
     if (delivery.status === "lease_expired") {
       throw new Error("Generation lease expired before final delivery was reserved");

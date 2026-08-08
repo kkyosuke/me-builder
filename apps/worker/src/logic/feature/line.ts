@@ -9,8 +9,6 @@ import type { WorkerConfig } from "../../config";
 
 export const classifyLineText = line.text.classify;
 
-const LINE_TEXT_MAX_LENGTH = 5_000;
-
 const LineRoutingSchema = v.object({
   lineTextEvents: v.array(
     v.object({
@@ -22,14 +20,6 @@ const LineRoutingSchema = v.object({
 
 function buildDiagnosisLink(liffId: string): string {
   return `今日の診断に答える\nhttps://liff.line.me/${liffId}`;
-}
-
-/** AIの回答本文はD1の正本に保ち、チャネル固有の診断導線は配送時だけ末尾へ付ける。 */
-export function appendDiagnosisLink(reply: string, liffId?: string): string {
-  if (!liffId) return reply;
-  const suffix = `\n\n${buildDiagnosisLink(liffId)}`;
-  const availableReplyLength = LINE_TEXT_MAX_LENGTH - Array.from(suffix).length;
-  return `${Array.from(reply).slice(0, Math.max(0, availableReplyLength)).join("")}${suffix}`;
 }
 
 export function buildDiagnosisReplyText(liffId?: string): string {
