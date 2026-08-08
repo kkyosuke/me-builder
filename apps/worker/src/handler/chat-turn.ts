@@ -3,6 +3,10 @@ import type { ChatTurnQueueMessage, Message } from "@me-builder/shared";
 import { logger } from "@me-builder/shared";
 import type { CloudflareBindings, WorkerConfig } from "../config";
 import { generateDiaryChatResponse } from "../logic/diary-chat";
+import {
+  DEFAULT_DIARY_CHAT_PROMPT_OPTIONS,
+  getDiaryChatConversationGuidance,
+} from "../prompt/diary-chat";
 
 /** wrangler.tomlのmax_retriesと揃える。これを超えるとDLQへ落ちるため、その前に引き取る。 */
 const MAX_BUSY_ATTEMPTS = 5;
@@ -137,6 +141,10 @@ export async function processChatTurnMessage(
         }
       : await generateDiaryChatResponse(context.messages, workerConfig, controller.signal, {
           currentUserMessageIds: context.currentUserMessageIds,
+          prompt: {
+            objective: DEFAULT_DIARY_CHAT_PROMPT_OPTIONS.objective,
+            conversationGuidance: getDiaryChatConversationGuidance(context.conversationPolicyId),
+          },
         }).then((generated) => ({
           reply: generated.reply,
           endSession: generated.end_session,

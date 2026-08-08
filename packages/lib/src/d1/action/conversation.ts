@@ -11,6 +11,80 @@ import {
 
 const SESSION_INACTIVITY_MS = 6 * 60 * 60 * 1000;
 const SESSION_HARD_CAP_MS = 24 * 60 * 60 * 1000;
+const CONVERSATION_POLICY_EXPLORATION_RATE = 0.2;
+
+export type ConversationPolicyStat = {
+  policyId: string;
+  replyOpportunityCount: number;
+  replyCount: number;
+};
+
+function randomItem<T>(items: readonly T[], random: () => number): T {
+  const item = items[Math.min(items.length - 1, Math.floor(random() * items.length))];
+  if (item === undefined) throw new Error("Cannot select an item from an empty list");
+  return item;
+}
+
+/** 未試行方針と探索を優先し、それ以外では本人の返信率が最も高い方針を選ぶ。 */
+export function chooseConversationPolicyId(
+  policyIds: readonly string[],
+  stats: readonly ConversationPolicyStat[],
+  random: () => number = Math.random,
+): string {
+  if (policyIds.length === 0 || new Set(policyIds).size !== policyIds.length) {
+    throw new Error("Conversation policy IDs must be a non-empty unique list");
+  }
+  const statsByPolicyId = new Map(stats.map((stat) => [stat.policyId, stat]));
+  const untried = policyIds.filter(
+    (policyId) => (statsByPolicyId.get(policyId)?.replyOpportunityCount ?? 0) === 0,
+  );
+  if (untried.length > 0) return randomItem(untried, random);
+  if (random() < CONVERSATION_POLICY_EXPLORATION_RATE) return randomItem(policyIds, random);
+
+  const highestReplyRate = Math.max(
+    ...policyIds.map((policyId) => {
+      const stat = statsByPolicyId.get(policyId);
+      return stat ? stat.replyCount / stat.replyOpportunityCount : 0;
+    }),
+  );
+  const bestPolicyIds = policyIds.filter((policyId) => {
+    const stat = statsByPolicyId.get(policyId);
+    return stat ? stat.replyCount / stat.replyOpportunityCount === highestReplyRate : false;
+  });
+  return randomItem(bestPolicyIds, random);
+}
+
+async function selectConversationPolicyId(
+  db: D1Client,
+  accountId: string,
+  policyIds: readonly string[],
+): Promise<string> {
+  const sessions = await db
+    .select({
+      policyId: conversationSessions.conversationPolicyId,
+      replyOpportunityCount: conversationSessions.replyOpportunityCount,
+      replyCount: conversationSessions.replyCount,
+    })
+    .from(conversationSessions)
+    .where(
+      and(
+        eq(conversationSessions.accountId, accountId),
+        inArray(conversationSessions.conversationPolicyId, [...policyIds]),
+      ),
+    );
+  const aggregate = new Map<string, ConversationPolicyStat>();
+  for (const session of sessions) {
+    const current = aggregate.get(session.policyId) ?? {
+      policyId: session.policyId,
+      replyOpportunityCount: 0,
+      replyCount: 0,
+    };
+    current.replyOpportunityCount += session.replyOpportunityCount;
+    current.replyCount += session.replyCount;
+    aggregate.set(session.policyId, current);
+  }
+  return chooseConversationPolicyId(policyIds, [...aggregate.values()]);
+}
 
 export type StoredLineSource = {
   sourceRecordId: string;
@@ -99,12 +173,20 @@ export async function attachMessagesToTurn(
   generationEpoch: number,
   model: string,
   promptVersion: string,
+  conversationPolicyIds: readonly string[] = ["reflective"],
 ): Promise<AttachedTurn> {
   if (inputs.length === 0) {
     throw new Error("Cannot create a chat turn without messages");
   }
   if (!promptVersion.trim()) {
     throw new Error("A chat turn must record its prompt version");
+  }
+  if (
+    conversationPolicyIds.length === 0 ||
+    conversationPolicyIds.some((policyId) => !policyId.trim()) ||
+    new Set(conversationPolicyIds).size !== conversationPolicyIds.length
+  ) {
+    throw new Error("Conversation policy IDs must be a non-empty unique list");
   }
   const accountId = inputs[0]?.accountId;
   if (!accountId || inputs.some((input) => input.accountId !== accountId)) {
@@ -182,6 +264,7 @@ export async function attachMessagesToTurn(
       generationEpoch,
       model,
       promptVersion,
+      conversationPolicyIds,
     );
   }
 
@@ -220,6 +303,11 @@ export async function attachMessagesToTurn(
   }
 
   if (!session) {
+    const conversationPolicyId = await selectConversationPolicyId(
+      db,
+      accountId,
+      conversationPolicyIds,
+    );
     session = {
       id: crypto.randomUUID(),
       accountId,
@@ -229,6 +317,10 @@ export async function attachMessagesToTurn(
       lastAssistantMessageAt: null,
       closedAt: null,
       closeReason: null,
+      conversationPolicyId,
+      replyOpportunityCount: 0,
+      replyCount: 0,
+      awaitingReply: false,
       nextSequence: 1,
       createdAt: firstReceivedAt,
       updatedAt: lastReceivedAt,
@@ -264,7 +356,13 @@ export async function attachMessagesToTurn(
     db.insert(conversationMessages).values(userMessages),
     db
       .update(conversationSessions)
-      .set({ nextSequence: throughSequence + 1, lastUserMessageAt: lastReceivedAt, updatedAt: now })
+      .set({
+        nextSequence: throughSequence + 1,
+        lastUserMessageAt: lastReceivedAt,
+        awaitingReply: false,
+        replyCount: sql`${conversationSessions.replyCount} + CASE WHEN ${conversationSessions.awaitingReply} THEN 1 ELSE 0 END`,
+        updatedAt: now,
+      })
       .where(eq(conversationSessions.id, session.id)),
     db.insert(chatTurns).values({
       id: turnId,
@@ -301,6 +399,7 @@ export async function getTurnContext(
 ): Promise<
   | {
       accountId: string;
+      conversationPolicyId: string;
       messages: ConversationContextMessage[];
       currentUserMessageIds: string[];
     }
@@ -310,6 +409,7 @@ export async function getTurnContext(
     .select({
       sessionId: chatTurns.sessionId,
       accountId: conversationSessions.accountId,
+      conversationPolicyId: conversationSessions.conversationPolicyId,
       fromSequence: chatTurns.fromSequence,
       throughSequence: chatTurns.throughSequence,
     })
@@ -350,6 +450,7 @@ export async function getTurnContext(
   });
   return {
     accountId: turn.accountId,
+    conversationPolicyId: turn.conversationPolicyId,
     messages,
     currentUserMessageIds: messages
       .filter(
@@ -532,10 +633,53 @@ export async function closeExpiredSessions(db: D1Client, now = new Date()): Prom
 }
 
 export async function markTurnDelivered(db: D1Client, turnId: string): Promise<boolean> {
-  const result = await db
-    .update(chatTurns)
-    .set({ status: "delivered", updatedAt: new Date() })
-    .where(and(eq(chatTurns.id, turnId), eq(chatTurns.status, "delivery_pending")));
+  const turn = await db
+    .select({
+      sessionId: chatTurns.sessionId,
+      status: chatTurns.status,
+      endSession: chatTurns.endSession,
+    })
+    .from(chatTurns)
+    .where(eq(chatTurns.id, turnId))
+    .get();
+  if (!turn) return false;
+  if (turn.status === "delivered") return true;
+  if (turn.status !== "delivery_pending") return false;
+
+  const now = new Date();
+  const deliveryMetricToken = crypto.randomUUID();
+  const writes: BatchItem<"sqlite">[] = [
+    db
+      .update(chatTurns)
+      .set({ status: "delivered", deliveryMetricToken, updatedAt: now })
+      .where(and(eq(chatTurns.id, turnId), eq(chatTurns.status, "delivery_pending"))),
+  ];
+  if (!turn.endSession) {
+    writes.push(
+      db
+        .update(conversationSessions)
+        .set({
+          replyOpportunityCount: sql`${conversationSessions.replyOpportunityCount} + 1`,
+          awaitingReply: true,
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(conversationSessions.id, turn.sessionId),
+            sql`EXISTS (
+              SELECT 1 FROM ${chatTurns}
+              WHERE ${chatTurns.id} = ${turnId}
+                AND ${chatTurns.deliveryMetricToken} = ${deliveryMetricToken}
+            )`,
+          ),
+        ),
+    );
+  }
+  const [firstWrite, ...remainingWrites] = writes;
+  if (!firstWrite) return false;
+  const results = await db.batch([firstWrite, ...remainingWrites]);
+  const result = results[0];
+  if (!result) return false;
   if (changedRowCount(result) > 0) return true;
   return Boolean(
     await db

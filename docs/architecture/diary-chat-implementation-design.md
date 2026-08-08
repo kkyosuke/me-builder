@@ -181,6 +181,10 @@ erDiagram
 | `last_assistant_message_at` | no | 最後にassistant messageを作成した時刻 |
 | `closed_at` | no | Sessionを閉じた時刻 |
 | `close_reason` | no | `explicit`: 応答による明示終了、`inactive`: 6時間無操作、`hard_cap`: 24時間上限 |
+| `conversation_policy_id` | yes | Session中に固定する、レビュー済みの話し方・質問方法のID |
+| `reply_opportunity_count` | yes | 終了応答を除く、本人へ配送できたassistant応答数 |
+| `reply_count` | yes | 配送後、同じSession内で次のuser発言を受け取った回数 |
+| `awaiting_reply` | yes | 最新の配送済みassistant応答が返信計測待ちか |
 | `next_sequence` | yes | 次に追加するmessageのSession内連番 |
 | `created_at`, `updated_at` | yes | 作成・最終更新時刻 |
 | `deleted_at`, `is_deleted` | no / yes | 共通lifecycle列。初期段階ではSession削除に使わない |
@@ -232,6 +236,7 @@ userとassistantを同じ時系列で復元するための履歴です。user原
 | `first_reply_requested_at` | no | 旧受領応答の計測列。新規Turnでは利用しない |
 | `final_reply_requested_at` | no | assistant messageを確定し、最終応答配送を開始した時刻 |
 | `response_message_id` | no | 生成済みassistant messageのID。retry時の再生成・重複保存を防ぐ |
+| `delivery_metric_token` | no | 配送完了の並行処理で返信機会を一度だけ計上する一時token |
 | `created_at`, `updated_at` | yes | 作成・最終更新時刻 |
 | `deleted_at`, `is_deleted` | no / yes | 共通lifecycle列。初期段階ではTurn削除に使わない |
 
@@ -443,7 +448,32 @@ system promptは次の順で固定し、Git管理する`prompt_version`を付け
 
 system promptの本文と`prompt_version`は[`apps/worker/src/prompt/diary-chat.ts`](../../apps/worker/src/prompt/diary-chat.ts)をSSoTとします。アプリケーションが管理する信頼済み入力として、会話の目的を`objective`、話し方と質問方法を`conversationGuidance`へ独立して渡し、役割、優先順位、記憶、助言、安全、出力の固定規則と合成します。user本文や取得した記憶をこれらの指示へ流用しません。固定規則または既定値の振る舞いが変わる変更では`prompt_version`も更新します。生成処理とTurn作成処理は同じ定数を参照し、本文と記録上の版がずれないようにします。
 
-### 7.3 構造化出力
+### 7.3 会話方針の選択と返信率
+
+話し方・質問方法は、コードレビュー済みの`reflective`、`curious`、`structured`から選び、同じSession内では変更しません。自由生成した方針やuser本文を方針として採用せず、安全、記憶、助言、出力の固定規則はすべての方針で共通にします。不明な方針IDは`reflective`へ戻します。
+
+本人ごとの返信率は、終了を意図しないassistant応答がLINEへ配送された時点を1回の返信機会とし、その後同じSession内でuser発言を受け取った場合を1回の返信として計算します。配送失敗と`end_session = true`の応答は返信機会へ含めず、6時間無操作または24時間上限を越えた後の発言を前Sessionへの返信として数えません。
+
+新しいSessionでは、返信機会がない未試行方針をランダムに優先します。すべて試行済みなら80%は`reply_count / reply_opportunity_count`が最大の方針を選び、20%は候補全体からランダムに選んで探索を継続します。同率の方針はランダムに選びます。返信率はAccount内だけで集計し、他Accountの実績や本文を利用しません。
+
+```mermaid
+flowchart TD
+    A[新しいSession] --> B[Account内の方針別返信率を集計]
+    B --> C{未試行方針があるか}
+    C -->|yes| D[未試行からランダム選択]
+    C -->|no| E{20%の探索か}
+    E -->|yes| F[全候補からランダム選択]
+    E -->|no| G[返信率最大の方針を選択]
+    D --> H[Session中は方針を固定]
+    F --> H
+    G --> H
+    H --> I[assistant応答を配送]
+    I --> J{同じSessionでuser返信}
+    J -->|yes| K[返信機会と返信を加算]
+    J -->|no| L[返信機会だけを保持]
+```
+
+### 7.4 構造化出力
 
 実装時はValibotをSSoTとし、Geminiへ対応するJSON Schemaを生成します。
 
@@ -473,11 +503,11 @@ system promptの本文と`prompt_version`は[`apps/worker/src/prompt/diary-chat.
 
 応答内の`safety`は監視と出力制限の自己申告に使います。事前の安全分類より低いrouteを返しても安全水準を下げず、アプリケーションが常に厳しい方を採用します。
 
-### 7.4 長期会話の圧縮（後続対応）
+### 7.5 長期会話の圧縮（後続対応）
 
 初期段階では専用tableを設けず、Contextには`CHAT_CONTEXT_MESSAGE_LIMIT`件（初期値20）のmessageを使います。それ以前の文脈が必要になった段階で、訂正・削除の反映方法と根拠追跡を別途設計します。
 
-### 7.5 Brain Item候補
+### 7.6 Brain Item候補
 
 - 明示された事実はMemory候補にできる
 - Value、Motivation、Preference、Decision Criterion、Constraintの解釈は`is_inference = true`にする

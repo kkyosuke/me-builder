@@ -251,4 +251,72 @@ describe("Diary conversation persistence flow", () => {
     expect(context?.messages.at(-1)?.body).toBe("新着メッセージ");
     expect(await db.select().from(schema.conversationMessages)).toHaveLength(2);
   });
+
+  it("配送済み応答への次のuser messageをSessionの返信実績として数える", async () => {
+    const db = createTestDb();
+    const { account } = await upsertIdentity(db, {
+      provider: "line",
+      providerAccountId: "U_policy_reply",
+    });
+    const first = await storeLineTextSource(db, {
+      accountId: account.id,
+      eventId: "policy-event-1",
+      body: "今日は少し疲れた",
+      receivedAt: new Date("2026-08-07T00:00:00.000Z"),
+    });
+    const firstTurn = await attachMessagesToTurn(db, [first], 1, "test-model", "test-prompt", [
+      "reflective",
+    ]);
+    await markTurnGenerating(db, firstTurn.turnId);
+    await saveAssistantResponse(db, {
+      turnId: firstTurn.turnId,
+      body: "疲れた一日だったんだね。",
+      endSession: false,
+    });
+    await expect(
+      Promise.all([
+        markTurnDelivered(db, firstTurn.turnId),
+        markTurnDelivered(db, firstTurn.turnId),
+      ]),
+    ).resolves.toEqual([true, true]);
+
+    expect(
+      await db
+        .select()
+        .from(schema.conversationSessions)
+        .where(eq(schema.conversationSessions.id, firstTurn.sessionId))
+        .get(),
+    ).toMatchObject({
+      conversationPolicyId: "reflective",
+      replyOpportunityCount: 1,
+      replyCount: 0,
+      awaitingReply: true,
+    });
+
+    const reply = await storeLineTextSource(db, {
+      accountId: account.id,
+      eventId: "policy-event-2",
+      body: "うん、でも少し休めた",
+      receivedAt: new Date("2026-08-07T00:01:00.000Z"),
+    });
+    const replyTurn = await attachMessagesToTurn(db, [reply], 2, "test-model", "test-prompt", [
+      "reflective",
+    ]);
+
+    expect(replyTurn.sessionId).toBe(firstTurn.sessionId);
+    expect(await getTurnContext(db, replyTurn.turnId, 20)).toMatchObject({
+      conversationPolicyId: "reflective",
+    });
+    expect(
+      await db
+        .select()
+        .from(schema.conversationSessions)
+        .where(eq(schema.conversationSessions.id, firstTurn.sessionId))
+        .get(),
+    ).toMatchObject({
+      replyOpportunityCount: 1,
+      replyCount: 1,
+      awaitingReply: false,
+    });
+  });
 });

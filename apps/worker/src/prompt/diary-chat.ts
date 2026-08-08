@@ -2,7 +2,7 @@
  * 日記チャットの振る舞いを変えた場合は、この版も更新します。
  * Chat Turnへ保存され、応答を生成したpromptを追跡するために使われます。
  */
-export const DIARY_CHAT_PROMPT_VERSION = "diary-chat-v3";
+export const DIARY_CHAT_PROMPT_VERSION = "diary-chat-v4";
 
 /**
  * user本文ではなく、アプリケーションが管理する信頼済みの指示だけを渡します。
@@ -22,6 +22,37 @@ const DEFAULT_DIARY_CHAT_CONVERSATION_GUIDANCE = `質問しない応答を既定
 質問する場合も主質問は最大1つにし、既に答えたことを聞き直さず、拒否や終了の意思を尊重してください。
 短い日記、完了報告、区切りや終了を示す発言には、無理に質問を付け加えないでください。
 main_question_countはreplyに実際に含めた主質問の数と一致させ、質問がなければ0にしてください。`;
+
+const DIARY_CHAT_CONVERSATION_POLICIES = {
+  reflective: {
+    guidance: DEFAULT_DIARY_CHAT_CONVERSATION_GUIDANCE,
+  },
+  curious: {
+    guidance: `短い共感を最初に伝え、本人が話を広げたい余地があるときは、具体的で答えやすい主質問を1つだけ添えてください。
+質問への回答直後は、まず受け止めと理解の言語化を行い、連続して質問しないでください。
+完了報告、区切り、終了の意思がある場合は質問せずに応答を完結させてください。
+main_question_countはreplyに実際に含めた主質問の数と一致させ、質問がなければ0にしてください。`,
+  },
+  structured: {
+    guidance: `本人の発言から出来事、気持ち、選択、理由を区別し、短く整理して返してください。
+情報が足りない場合も、まず分かっている範囲を整理し、理解に大きく影響する不足がある場合だけ主質問を1つ添えてください。
+箇条書きや分析的な見出しを多用せず、自然な会話として返してください。
+main_question_countはreplyに実際に含めた主質問の数と一致させ、質問がなければ0にしてください。`,
+  },
+} as const;
+
+export type DiaryChatConversationPolicyId = keyof typeof DIARY_CHAT_CONVERSATION_POLICIES;
+
+export const DIARY_CHAT_CONVERSATION_POLICY_IDS = Object.keys(
+  DIARY_CHAT_CONVERSATION_POLICIES,
+) as DiaryChatConversationPolicyId[];
+
+export function getDiaryChatConversationGuidance(policyId: string): string {
+  if (policyId in DIARY_CHAT_CONVERSATION_POLICIES) {
+    return DIARY_CHAT_CONVERSATION_POLICIES[policyId as DiaryChatConversationPolicyId].guidance;
+  }
+  return DIARY_CHAT_CONVERSATION_POLICIES.reflective.guidance;
+}
 
 export const DEFAULT_DIARY_CHAT_PROMPT_OPTIONS: DiaryChatPromptOptions = {
   objective: DEFAULT_DIARY_CHAT_OBJECTIVE,
