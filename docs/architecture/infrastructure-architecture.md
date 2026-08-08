@@ -166,7 +166,9 @@ flowchart TD
     - ルートの `bun dev` または `wrangler dev --env local` によりローカルエミュレーション実行。
   - **プレビュー環境 (`Preview`)**:
     - `wrangler.toml` 内の `env.preview` ターゲット（`me-builder-api-preview`, `me-builder-mcp-preview`, `me-builder-web`）。
-    - 全 PR で共有する単一の検証環境。プルリクエストでは自動デプロイせず、`CD / Preview` ワークフロー（`workflow_dispatch`）でデプロイ対象ブランチを指定して手動実行したときのみ `wrangler deploy --env preview` / `wrangler pages deploy` を実行。
+    - 全 PR で共有する単一の検証環境。プルリクエストの作成・更新だけでは自動デプロイせず、`CD / Preview` ワークフローが次のいずれかで起動したときのみ `wrangler deploy --env preview` / `wrangler pages deploy` を実行。
+      - ブランチを指定した手動実行 (`workflow_dispatch`)
+      - `deploy` ラベルが付いた PR（ラベル付与時と、その後の push）
     - **カスタムドメイン・ルーティング配置**:
       - UI (`apps/web`): `stg.kagami.kyosuke.dev`
       - API (`apps/api`): `api.stg.kagami.kyosuke.dev`

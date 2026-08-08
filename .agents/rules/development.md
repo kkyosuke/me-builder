@@ -42,14 +42,17 @@
   - **CI/CD ワークフロー構造 (`.github/workflows/ci-*.yml`, `.github/workflows/cd-*.yml`)**:
     - CI ワークフローはコンポーネントごとの個別の YAML ファイルに分離されています (`ci-lint.yml`, `ci-shared.yml`, `ci-api.yml`, `ci-mcp.yml`, `ci-worker.yml`, `ci-ui.yml`)。
     - CD ワークフローはプレビュー・本番デプロイ用に分離されています (`cd-preview.yml`, `cd-production.yml`)。
-    - `cd-preview.yml` は `workflow_dispatch` のみで起動します。PR の作成・更新では**デプロイしません**（プレビューは共有環境のため、PR ごとの自動デプロイで上書きし合うのを避ける）。プレビューへ反映したいときは Actions 画面でブランチを選ぶか `gh workflow run cd-preview.yml --ref <branch>` で手動実行します。
+    - `cd-preview.yml` は PR の作成・更新だけでは**デプロイしません**（プレビューは全 PR 共有の単一環境のため、自動デプロイで上書きし合うのを避ける）。デプロイされるのは次の 2 通りだけです。
+      - Actions 画面でブランチを選ぶか `gh workflow run cd-preview.yml --ref <branch>` で手動実行したとき (`workflow_dispatch`)
+      - PR に `deploy` ラベルが付いているとき（ラベル付与時と、その後の push）。ラベルを外せば以降の push ではデプロイされませんが、**すでにデプロイ済みの環境は元に戻りません**。
+    - 共有環境の取り合いを避けるため `concurrency: cd-preview` で直列化しています。実行中のデプロイは中断せず、待機中の実行だけが新しいものへ置き換わります。
     - `main` ブランチマージ時には `cd-production.yml` が全検証後に Cloudflare 本番環境へ自動デプロイします。
     - リポジトリのチェックアウト、Bun のセットアップ、`actions/cache@v4` によるキャッシュ、および `bun install --frozen-lockfile` の一連の処理は GitHub Composite Action ([.github/actions/setup-bun-workspace](file:///Users/kyosuke/git/github.com/KKyosuke/me-builder/.github/actions/setup-bun-workspace/action.yml)) に共通化されています。
   - パッケージの追加・削除はルートから `bun add <package> --cwd <workspace-dir>`（例: `bun add @line/liff --cwd apps/web`）を使用し、個別ディレクトリで `npm install` を実行しないこと。ルートで引数なしに `bun add <package>` を実行するとルートの `package.json` に入ってしまうため、対象ワークスペースを必ず指定します。
 - **Web UI (`apps/web`) のカスタムドメイン**:
   - `apps/web` は Cloudflare **Pages** で配信するため、Workers (`api` / `mcp` / `worker`) のように `wrangler.toml` の `routes` で DNS レコードを自動作成できません。ドメインのプロジェクト登録と DNS の CNAME 作成は [`scripts/setup-pages-domain.ts`](../../scripts/setup-pages-domain.ts) が行い、`apps/web` の `deploy:preview` / `deploy:production` から呼び出します。
   - 対象ドメインは `BASE_DOMAIN` を使い、スクリプト側にハードコードしません。CNAME の宛先は preview がブランチエイリアス、production がプロジェクト既定のホストです。
-  - preview CDが実行サマリー（`$GITHUB_STEP_SUMMARY`）へ出力する完了メッセージには、各サービスのカスタムドメインに加えて、`CLOUDFLARE_ACCOUNT_ID`から組み立てたCloudflare DashboardのWorkers & Pages管理画面へのリンクを掲載します。生のURLではなくMarkdownのリンク記法（`[表示テキスト](URL)`）で書き、表示テキストはサービスがホスト名、Dashboardが遷移先を表す文言にします。
+  - preview CDが実行サマリー（`$GITHUB_STEP_SUMMARY`）へ出力する完了メッセージ、および `deploy` ラベル経由の実行でPRへ投稿する完了コメントには、各サービスのカスタムドメインに加えて、`CLOUDFLARE_ACCOUNT_ID`から組み立てたCloudflare DashboardのWorkers & Pages管理画面へのリンクを掲載します。生のURLではなくMarkdownのリンク記法（`[表示テキスト](URL)`）で書き、表示テキストはサービスがホスト名、Dashboardが遷移先を表す文言にします。
   - このスクリプトは実行時の `CLOUDFLARE_API_TOKEN` に Zone:Read / DNS:Edit の権限を必要とします。GitHub Actionsではインフラ専用Secret `CLOUDFLARE_DEPLOY_API_TOKEN` をこの標準環境変数名へマッピングします。権限や環境変数が足りない場合は警告を出して**デプロイを止めずにスキップ**します（DNS の設定漏れでデプロイ自体を失敗させない）。
 - **Web UI (`apps/web`) の環境変数**:
   - Vite がクライアントバンドルへ埋め込むのは `VITE_` 接頭辞付きの環境変数だけです。変数を追加した場合は [`apps/web/.env.example`](../../apps/web/.env.example) へ必ず追記します。
