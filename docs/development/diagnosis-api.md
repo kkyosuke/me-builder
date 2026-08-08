@@ -250,7 +250,9 @@ Diagnosis、Question、Choiceなどの診断定義、Account、他のAccountの�
 
 この物理削除は開発用リセットだけの挙動です。本番のドメイン上の削除は[Source Recordのライフサイクル設計](../domain/source/source-record-lifecycle-design.md#4-削除とtombstone)に従い、Source Recordをtombstoneへ遷移させてBrain Itemへ波及させます。
 
-Projection Headと改訂鎖から削除対象のBrain Itemを解決した後、物理削除は1つのD1 atomic batchで実行します。回答保存もatomic batchであり、外部キー制約も維持するため、同じAccountのバックグラウンド保存やprojectionとリセットが競合しても途中状態は残りません。競合によって対象解決後に新しい参照が作られた場合、リセット側のbatchは全体をロールバックします。
+Projection Headと改訂鎖から削除対象のBrain Itemを解決した後、物理削除は1つのD1 atomic batchで実行します。D1のbound parameters上限を超えないよう、Brain Itemは49件ずつ同じbatch内で削除します。
+
+回答保存もatomic batchであり、外部キー制約も維持するため、同じAccountのバックグラウンドprojectionとリセットが競合しても途中状態は残りません。対象解決後に新しいEvidenceが作られて外部キー違反になった場合はbatch全体をロールバックし、最新のProjection Headから対象を解決し直して最大3回までリセットを再試行します。
 
 ```json
 {

@@ -1,4 +1,4 @@
-import { and, asc, count, eq, inArray, lte, max, or, sql } from "drizzle-orm";
+import { and, asc, count, eq, inArray, lte, max, or } from "drizzle-orm";
 import type { D1Client } from "../client";
 import {
   brainItemAccessLabels,
@@ -165,7 +165,10 @@ function isUniqueViolation(error: unknown): boolean {
   );
 }
 
-const REVISION_LOOKUP_CHUNK_SIZE = 50;
+const RESET_DELETE_CHUNK_SIZE = 49;
+const RESET_MAX_ATTEMPTS = 3;
+
+type D1BatchStatement = Parameters<D1Client["batch"]>[0][number];
 
 function chunks<T>(values: readonly T[], size: number): T[][] {
   const result: T[][] = [];
@@ -188,21 +191,20 @@ async function findDiagnosisProjectionBrainItemIds(
   let frontier = [...brainItemIds];
 
   while (frontier.length > 0) {
-    const revisions = (
-      await Promise.all(
-        chunks(frontier, REVISION_LOOKUP_CHUNK_SIZE).map((brainItemIdChunk) =>
-          db
-            .select({ brainItemId: brainItemRevisions.previousBrainItemId })
-            .from(brainItemRevisions)
-            .where(
-              and(
-                eq(brainItemRevisions.accountId, accountId),
-                inArray(brainItemRevisions.nextBrainItemId, brainItemIdChunk),
-              ),
+    const revisions: Array<{ brainItemId: string }> = [];
+    for (const brainItemIdChunk of chunks(frontier, RESET_DELETE_CHUNK_SIZE)) {
+      revisions.push(
+        ...(await db
+          .select({ brainItemId: brainItemRevisions.previousBrainItemId })
+          .from(brainItemRevisions)
+          .where(
+            and(
+              eq(brainItemRevisions.accountId, accountId),
+              inArray(brainItemRevisions.nextBrainItemId, brainItemIdChunk),
             ),
-        ),
-      )
-    ).flat();
+          )),
+      );
+    }
     frontier = revisions
       .map(({ brainItemId }) => brainItemId)
       .filter((brainItemId) => !brainItemIds.has(brainItemId));
@@ -210,6 +212,122 @@ async function findDiagnosisProjectionBrainItemIds(
   }
 
   return [...brainItemIds];
+}
+
+function isForeignKeyViolation(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes("FOREIGN KEY constraint failed");
+}
+
+async function deleteAccountDiagnosisDataOnce(
+  db: D1Client,
+  accountId: string,
+): Promise<DeletedAccountDiagnosisData> {
+  const projectionBrainItemIds = await findDiagnosisProjectionBrainItemIds(db, accountId);
+  const projectionBrainItemIdChunks = chunks(projectionBrainItemIds, RESET_DELETE_CHUNK_SIZE);
+  const ownedResponseIds = db
+    .select({ id: diagnosisResponses.id })
+    .from(diagnosisResponses)
+    .where(eq(diagnosisResponses.accountId, accountId));
+  const answerSourceRecordIds = db
+    .select({ id: diagnosisAnswers.sourceRecordId })
+    .from(diagnosisAnswers)
+    .where(inArray(diagnosisAnswers.diagnosisResponseId, ownedResponseIds));
+
+  const statements: D1BatchStatement[] = [
+    db
+      .select({ value: count(diagnosisAnswers.id) })
+      .from(diagnosisAnswers)
+      .where(inArray(diagnosisAnswers.diagnosisResponseId, ownedResponseIds)),
+    db
+      .delete(diagnosisBrainProjectionHeads)
+      .where(eq(diagnosisBrainProjectionHeads.accountId, accountId)),
+  ];
+
+  // Revisionは同じID一覧を2回bindするため、49件ずつならaccountIdと合わせて99 parametersになる。
+  for (const brainItemIdChunk of projectionBrainItemIdChunks) {
+    statements.push(
+      db
+        .delete(brainItemAccessLabels)
+        .where(
+          and(
+            eq(brainItemAccessLabels.accountId, accountId),
+            inArray(brainItemAccessLabels.brainItemId, brainItemIdChunk),
+          ),
+        ),
+      db
+        .delete(brainItemTopicLabels)
+        .where(
+          and(
+            eq(brainItemTopicLabels.accountId, accountId),
+            inArray(brainItemTopicLabels.brainItemId, brainItemIdChunk),
+          ),
+        ),
+      db
+        .delete(brainItemEvidenceEdges)
+        .where(
+          and(
+            eq(brainItemEvidenceEdges.accountId, accountId),
+            inArray(brainItemEvidenceEdges.brainItemId, brainItemIdChunk),
+          ),
+        ),
+      db
+        .delete(brainItemRevisions)
+        .where(
+          and(
+            eq(brainItemRevisions.accountId, accountId),
+            or(
+              inArray(brainItemRevisions.previousBrainItemId, brainItemIdChunk),
+              inArray(brainItemRevisions.nextBrainItemId, brainItemIdChunk),
+            ),
+          ),
+        ),
+    );
+  }
+  for (const brainItemIdChunk of projectionBrainItemIdChunks) {
+    statements.push(
+      db
+        .delete(brainItems)
+        .where(and(eq(brainItems.accountId, accountId), inArray(brainItems.id, brainItemIdChunk))),
+    );
+  }
+
+  const sourceRecordResultIndex = statements.length;
+  statements.push(
+    db.delete(sourceRecords).where(inArray(sourceRecords.id, answerSourceRecordIds)).returning({
+      id: sourceRecords.id,
+    }),
+  );
+  const deferredQuestionResultIndex = statements.length;
+  statements.push(
+    db
+      .delete(diagnosisDeferredQuestions)
+      .where(inArray(diagnosisDeferredQuestions.diagnosisResponseId, ownedResponseIds))
+      .returning({ id: diagnosisDeferredQuestions.id }),
+  );
+  const responseResultIndex = statements.length;
+  statements.push(
+    db
+      .delete(diagnosisResponses)
+      .where(eq(diagnosisResponses.accountId, accountId))
+      .returning({ id: diagnosisResponses.id }),
+  );
+
+  const [firstStatement, ...remainingStatements] = statements;
+  if (!firstStatement) throw new Error("診断データ削除statementがありません");
+  const results = await db.batch([firstStatement, ...remainingStatements]);
+  const answerCountRows = results[0] as Array<{ value: number }>;
+  const deletedSourceRecords = results[sourceRecordResultIndex] as Array<{ id: string }>;
+  const deletedDeferredQuestions = results[deferredQuestionResultIndex] as Array<{ id: string }>;
+  const deletedResponses = results[responseResultIndex] as Array<{ id: string }>;
+
+  return {
+    deletedResponseCount: deletedResponses.length,
+    deletedAnswerCount: answerCountRows[0]?.value ?? 0,
+    deletedDeferredQuestionCount: deletedDeferredQuestions.length,
+    deletedSourceRecordCount: deletedSourceRecords.length,
+    deletedBrainItemCount: projectionBrainItemIds.length,
+  };
 }
 
 /**
@@ -220,104 +338,14 @@ export async function deleteAccountDiagnosisData(
   db: D1Client,
   accountId: string,
 ): Promise<DeletedAccountDiagnosisData> {
-  const projectionBrainItemIds = await findDiagnosisProjectionBrainItemIds(db, accountId);
-  const ownedResponseIds = db
-    .select({ id: diagnosisResponses.id })
-    .from(diagnosisResponses)
-    .where(eq(diagnosisResponses.accountId, accountId));
-  const answerSourceRecordIds = db
-    .select({ id: diagnosisAnswers.sourceRecordId })
-    .from(diagnosisAnswers)
-    .where(inArray(diagnosisAnswers.diagnosisResponseId, ownedResponseIds));
-
-  const ownedProjectionBrainItems =
-    projectionBrainItemIds.length > 0
-      ? and(eq(brainItems.accountId, accountId), inArray(brainItems.id, projectionBrainItemIds))
-      : sql`false`;
-  const ownedProjectionBrainItemReferences =
-    projectionBrainItemIds.length > 0
-      ? and(
-          eq(brainItemEvidenceEdges.accountId, accountId),
-          inArray(brainItemEvidenceEdges.brainItemId, projectionBrainItemIds),
-        )
-      : sql`false`;
-
-  // D1のbatchは単一のatomic transactionとして直列実行される。
-  // FKの子から削除し、診断以外のSource RecordとBrain Itemには触れない。
-  const [
-    answerCountRows,
-    ,
-    ,
-    ,
-    ,
-    ,
-    deletedBrainItems,
-    deletedSourceRecords,
-    deletedDeferredQuestions,
-    deletedResponses,
-  ] = await db.batch([
-    db
-      .select({ value: count(diagnosisAnswers.id) })
-      .from(diagnosisAnswers)
-      .where(inArray(diagnosisAnswers.diagnosisResponseId, ownedResponseIds)),
-    db
-      .delete(diagnosisBrainProjectionHeads)
-      .where(eq(diagnosisBrainProjectionHeads.accountId, accountId)),
-    db
-      .delete(brainItemAccessLabels)
-      .where(
-        projectionBrainItemIds.length > 0
-          ? and(
-              eq(brainItemAccessLabels.accountId, accountId),
-              inArray(brainItemAccessLabels.brainItemId, projectionBrainItemIds),
-            )
-          : sql`false`,
-      ),
-    db
-      .delete(brainItemTopicLabels)
-      .where(
-        projectionBrainItemIds.length > 0
-          ? and(
-              eq(brainItemTopicLabels.accountId, accountId),
-              inArray(brainItemTopicLabels.brainItemId, projectionBrainItemIds),
-            )
-          : sql`false`,
-      ),
-    db.delete(brainItemEvidenceEdges).where(ownedProjectionBrainItemReferences),
-    db
-      .delete(brainItemRevisions)
-      .where(
-        projectionBrainItemIds.length > 0
-          ? and(
-              eq(brainItemRevisions.accountId, accountId),
-              or(
-                inArray(brainItemRevisions.previousBrainItemId, projectionBrainItemIds),
-                inArray(brainItemRevisions.nextBrainItemId, projectionBrainItemIds),
-              ),
-            )
-          : sql`false`,
-      ),
-    db.delete(brainItems).where(ownedProjectionBrainItems).returning({ id: brainItems.id }),
-    db.delete(sourceRecords).where(inArray(sourceRecords.id, answerSourceRecordIds)).returning({
-      id: sourceRecords.id,
-    }),
-    db
-      .delete(diagnosisDeferredQuestions)
-      .where(inArray(diagnosisDeferredQuestions.diagnosisResponseId, ownedResponseIds))
-      .returning({ id: diagnosisDeferredQuestions.id }),
-    db
-      .delete(diagnosisResponses)
-      .where(eq(diagnosisResponses.accountId, accountId))
-      .returning({ id: diagnosisResponses.id }),
-  ]);
-
-  return {
-    deletedResponseCount: deletedResponses.length,
-    deletedAnswerCount: answerCountRows[0]?.value ?? 0,
-    deletedDeferredQuestionCount: deletedDeferredQuestions.length,
-    deletedSourceRecordCount: deletedSourceRecords.length,
-    deletedBrainItemCount: deletedBrainItems.length,
-  };
+  for (let attempt = 1; attempt <= RESET_MAX_ATTEMPTS; attempt += 1) {
+    try {
+      return await deleteAccountDiagnosisDataOnce(db, accountId);
+    } catch (error) {
+      if (!isForeignKeyViolation(error) || attempt === RESET_MAX_ATTEMPTS) throw error;
+    }
+  }
+  throw new Error("診断データ削除の再試行回数を超過しました");
 }
 
 async function findDiagnosisResponseId(
