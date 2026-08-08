@@ -31,7 +31,7 @@ Accountの責務は[ドメイン設計](../domain/domain-design.md)、実行基�
 | Gemini | 入力・出力token数 | Cloudflare AI Gateway Analytics | cache済みと未cacheを合算 |
 | LINE | 課金対象送信数 | Messaging API quota consumption | reply messageは含まれない |
 | LINE | 当月送信上限 | Messaging API quota | 上限なしのplanではその状態を表示 |
-| LINE | 返信送信数 | Messaging API delivery/reply | 日別の成功数を当月分集計 |
+| LINE | 返信送信数（前日まで） | Messaging API delivery/reply | 集計未完了の当日を除き、日別の成功数を当月分集計 |
 
 「LINEメッセージ数」という単一の値にはまとめません。現在のme-builderが主に使うreply messageは課金対象送信数に含まれず、同じ名称で表示すると費用判断を誤るためです。
 

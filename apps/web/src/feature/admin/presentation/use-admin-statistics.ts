@@ -13,7 +13,11 @@ export function useAdminStatistics(
       setState({ status: "loading" });
       try {
         const token = await acquireIdToken(signal);
-        if (!token || signal.aborted) return;
+        if (signal.aborted) return;
+        if (!token) {
+          setState({ status: "error", message: "LINEから管理者画面を開いてください。" });
+          return;
+        }
         const statistics = await fetchAdminStatistics(config.apiUrl, token, signal);
         if (!signal.aborted) setState({ status: "success", data: statistics });
       } catch (error) {

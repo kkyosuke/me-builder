@@ -81,7 +81,7 @@ function Line({ value }: { value: AdminStatistics["line"] }) {
             label="当月送信上限"
             value={value.monthlyLimit === null ? "上限なし" : number.format(value.monthlyLimit)}
           />
-          <Metric label="返信送信数" value={number.format(value.replyMessages)} />
+          <Metric label="返信送信数（前日まで）" value={number.format(value.replyMessages)} />
         </dl>
       )}
       <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">

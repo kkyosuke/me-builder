@@ -18,7 +18,7 @@ async function getJson(url: string, token: string, fetcher: Fetcher): Promise<un
   return await response.json();
 }
 
-function jstMonthDates(now: Date): string[] {
+function jstMonthDatesThroughYesterday(now: Date): string[] {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Tokyo",
     year: "numeric",
@@ -31,7 +31,7 @@ function jstMonthDates(now: Date): string[] {
   const month = value("month");
   const day = Number(value("day"));
   return Array.from(
-    { length: day },
+    { length: Math.max(0, day - 1) },
     (_, index) => `${year}${month}${String(index + 1).padStart(2, "0")}`,
   );
 }
@@ -52,7 +52,7 @@ export async function fetchLineUsage(params: {
   const [quotaBody, consumptionBody, ...deliveries] = await Promise.all([
     getJson(`${baseUrl}/quota`, params.channelAccessToken, fetcher),
     getJson(`${baseUrl}/quota/consumption`, params.channelAccessToken, fetcher),
-    ...jstMonthDates(params.now).map((date) =>
+    ...jstMonthDatesThroughYesterday(params.now).map((date) =>
       getJson(`${baseUrl}/delivery/reply?date=${date}`, params.channelAccessToken, fetcher),
     ),
   ]);
