@@ -1,10 +1,11 @@
 import { Brain, CalendarDays } from "lucide-react";
+import { preloadMainApplication } from "../routes";
 
 type MainNavigationItem = "diagnosis" | "me";
 
 const items = [
-  { id: "diagnosis", href: "/diagnosis", label: "診断", icon: CalendarDays },
   { id: "me", href: "/me", label: "わたし", icon: Brain },
+  { id: "diagnosis", href: "/diagnosis", label: "診断", icon: CalendarDays },
 ] as const;
 
 /** 一般利用者向けルート画面で、同じ位置と順序を保つ主ナビゲーション。 */
@@ -18,11 +19,16 @@ export function MainNavigation({ current }: { current: MainNavigationItem }) {
         {items.map((item) => {
           const isCurrent = item.id === current;
           const Icon = item.icon;
+          const preloadDestination = () => {
+            if (!isCurrent) preloadMainApplication(item.id);
+          };
           return (
             <a
               key={item.id}
               href={item.href}
               aria-current={isCurrent ? "page" : undefined}
+              onPointerEnter={preloadDestination}
+              onFocus={preloadDestination}
               className={`flex min-h-12 items-center justify-center gap-2 rounded-xl text-sm ${
                 isCurrent
                   ? "bg-sky-400/15 font-bold text-sky-800 dark:text-sky-200"

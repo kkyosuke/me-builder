@@ -119,7 +119,7 @@ export function DiagnosisHome({
     <main className="mx-auto min-h-dvh w-full max-w-2xl px-4 py-8 pb-28 sm:px-8">
       <header className="mb-8">
         <p className="text-sm font-semibold tracking-wider text-sky-700 dark:text-sky-300">
-          me-builder
+          私をさがす
         </p>
         <h1 className="mt-2 text-3xl font-bold text-slate-950 dark:text-slate-50">診断</h1>
         <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
