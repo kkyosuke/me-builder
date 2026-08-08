@@ -77,6 +77,8 @@ MCPへは、可能な限り写真や音声などの原本ではなく、本人�
 
 ## 4. 想定する利用体験
 
+LINEとWebをまたぐ入口、Webの主ナビゲーション、診断・本人向け情報・AI相談・管理者画面の接続は[全体画面遷移設計](screen-navigation.md)を正とします。
+
 ```mermaid
 flowchart LR
     U[ユーザー] --> C[LINE / Web / iOS / Android]

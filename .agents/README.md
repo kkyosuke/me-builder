@@ -15,6 +15,7 @@
 | [README](../README.md) | プロジェクトの短い入口と文書リンク |
 | [ドキュメントガイド](../docs/README.md) | `docs/` のディレクトリ構造、文書の探し方、全ドキュメントへの入口 |
 | [プロジェクト概要](../docs/product/project-overview.md) | 目的、主要要件、MVP、ロードマップ、Phase 1の入力体験とログイン手段 |
+| [全体画面遷移設計](../docs/product/screen-navigation.md) | LINEとWebをまたぐ入口、主ナビゲーション、診断・傾向・セルフケア・AI相談・管理者画面の接続 |
 | [自分の傾向サマリー体験設計](../docs/product/profile-summary-experience.md) | 複数の診断回答を横断して本人の現在の傾向を表示する画面、要約規則、導線、状態、完了条件 |
 | [ストレスの手がかりとAIセルフケア相談体験設計](../docs/product/self-care-ai-consultation-experience.md) | 本人向けの負荷の手がかり、早期サイン、対処、相談先の表示とAI相談、安全上の切り替え |
 | [日記チャット体験設計](../docs/product/diary-chat-experience.md) | 日々の声かけから出来事と行動原理を探り、記憶を使って助言する対話体験と応答時間 |
