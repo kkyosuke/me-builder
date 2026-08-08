@@ -952,6 +952,7 @@ export interface operations {
             deletedAnswerCount: number;
             deletedDeferredQuestionCount: number;
             deletedSourceRecordCount: number;
+            deletedBrainItemCount: number;
           };
         };
       };

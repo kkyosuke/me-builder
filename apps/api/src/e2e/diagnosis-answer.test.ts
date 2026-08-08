@@ -417,6 +417,7 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
       deletedAnswerCount: 2,
       deletedDeferredQuestionCount: 0,
       deletedSourceRecordCount: 2,
+      deletedBrainItemCount: 0,
     });
     expect(await countRows("diagnosis_responses")).toBe(0);
     expect(await countRows("source_records")).toBe(0);

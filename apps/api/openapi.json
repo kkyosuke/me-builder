@@ -1574,13 +1574,19 @@
                       "type": "integer",
                       "minimum": 0,
                       "maximum": 9007199254740991
+                    },
+                    "deletedBrainItemCount": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
                     }
                   },
                   "required": [
                     "deletedResponseCount",
                     "deletedAnswerCount",
                     "deletedDeferredQuestionCount",
-                    "deletedSourceRecordCount"
+                    "deletedSourceRecordCount",
+                    "deletedBrainItemCount"
                   ]
                 }
               }

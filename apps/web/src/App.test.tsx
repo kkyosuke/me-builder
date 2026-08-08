@@ -168,6 +168,7 @@ describe("App", () => {
       deletedAnswerCount: 10,
       deletedDeferredQuestionCount: 0,
       deletedSourceRecordCount: 10,
+      deletedBrainItemCount: 4,
     });
     mocks.restoreDiagnosisProgress.mockImplementation(
       (_questions: DiagnosisDefinition["questions"], answers: DiagnosisResult["answers"]) => ({
@@ -290,7 +291,9 @@ describe("App", () => {
         "dummy.id.token",
       ),
     );
-    expect(await screen.findByText("回答データを削除しました（回答・保留 10件）。")).toBeTruthy();
+    expect(
+      await screen.findByText("診断由来データを削除しました（回答・保留・Brain Item 14件）。"),
+    ).toBeTruthy();
     expect(mocks.fetchDiagnosisList).toHaveBeenCalledTimes(2);
   });
 
