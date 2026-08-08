@@ -4,5 +4,5 @@ export default defineConfig({
   dialect: "sqlite",
   driver: "durable-sqlite",
   schema: "./src/conversation-coordinator/schema.ts",
-  out: "./drizzle",
+  out: "./drizzle/conversation-coordinator",
 });

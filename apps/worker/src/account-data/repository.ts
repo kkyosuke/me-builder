@@ -2,7 +2,7 @@ import { d1 } from "@me-builder/lib";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { type DrizzleSqliteDODatabase, drizzle } from "drizzle-orm/durable-sqlite";
 import { migrate } from "drizzle-orm/durable-sqlite/migrator";
-import migrations from "../../drizzle-account-data/migrations.js";
+import migrations from "../../drizzle/account-data/migrations.js";
 import { accountDataIdentity } from "./schema";
 
 const accountDataSchema = {

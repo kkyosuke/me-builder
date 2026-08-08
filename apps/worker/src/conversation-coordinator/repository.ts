@@ -2,7 +2,7 @@ import { and, asc, count, eq, inArray, lte, min, notInArray } from "drizzle-orm"
 import { type DrizzleSqliteDODatabase, drizzle } from "drizzle-orm/durable-sqlite";
 import { migrate } from "drizzle-orm/durable-sqlite/migrator";
 import type { AcceptedDiaryMessage } from ".";
-import migrations from "../../drizzle/migrations.js";
+import migrations from "../../drizzle/conversation-coordinator/migrations.js";
 import {
   acceptedMessages,
   attachBatchMessages,

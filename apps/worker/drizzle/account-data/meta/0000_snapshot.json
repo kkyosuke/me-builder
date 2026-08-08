@@ -1,47 +1,18 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "2428923d-0c6e-4173-9b14-52a796b45362",
-  "prevId": "047b8cba-9fdf-47fc-8198-5c99130c1b07",
+  "id": "ffa29e63-b5a2-4979-baea-96b05902bceb",
+  "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
-    "account_identities": {
-      "name": "account_identities",
+    "account_data_identity": {
+      "name": "account_data_identity",
       "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
+        "singleton": {
+          "name": "singleton",
+          "type": "integer",
           "primaryKey": true,
           "notNull": true,
           "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "deleted_at": {
-          "name": "deleted_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "is_deleted": {
-          "name": "is_deleted",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": false
         },
         "account_id": {
           "name": "account_id",
@@ -50,43 +21,30 @@
           "notNull": true,
           "autoincrement": false
         },
-        "provider": {
-          "name": "provider",
-          "type": "text",
+        "legacy_imported_at": {
+          "name": "legacy_imported_at",
+          "type": "integer",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "provider_account_id": {
-          "name": "provider_account_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "autoincrement": false
         }
       },
       "indexes": {
-        "provider_account_active_idx": {
-          "name": "provider_account_active_idx",
-          "columns": ["provider", "provider_account_id"],
-          "isUnique": true,
-          "where": "is_deleted = 0"
+        "account_data_identity_account_id_unique": {
+          "name": "account_data_identity_account_id_unique",
+          "columns": ["account_id"],
+          "isUnique": true
         }
       },
-      "foreignKeys": {
-        "account_identities_account_id_accounts_id_fk": {
-          "name": "account_identities_account_id_accounts_id_fk",
-          "tableFrom": "account_identities",
-          "tableTo": "accounts",
-          "columnsFrom": ["account_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraints": {
+        "account_data_identity_singleton_check": {
+          "name": "account_data_identity_singleton_check",
+          "value": "\"account_data_identity\".\"singleton\" = 1"
+        }
+      }
     },
     "accounts": {
       "name": "accounts",
