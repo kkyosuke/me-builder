@@ -26,6 +26,12 @@ describe("Diary chat D1 schema", () => {
     db.insert(schema.conversationSessions)
       .values({ id: "session-1", ...values })
       .run();
+    expect(db.select().from(schema.conversationSessions).get()).toMatchObject({
+      conversationPolicyId: "reflective",
+      replyOpportunityCount: 0,
+      replyCount: 0,
+      awaitingReply: false,
+    });
     expect(() =>
       db
         .insert(schema.conversationSessions)

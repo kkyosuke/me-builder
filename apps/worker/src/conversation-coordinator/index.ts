@@ -15,7 +15,10 @@ import {
   pushLineTextWithRetryKey,
   replyLineText,
 } from "../infrastructure/line-delivery";
-import { DIARY_CHAT_PROMPT_VERSION } from "../prompt/diary-chat";
+import {
+  DIARY_CHAT_CONVERSATION_POLICY_IDS,
+  DIARY_CHAT_PROMPT_VERSION,
+} from "../prompt/diary-chat";
 import type { Env } from "../types";
 import { ConversationCoordinatorRepository } from "./repository";
 
@@ -279,6 +282,7 @@ export class ConversationCoordinator extends DurableObject<Env> {
       batch.generationEpoch,
       this.env.GEMINI_MODEL ?? DEFAULT_GEMINI_MODEL,
       DIARY_CHAT_PROMPT_VERSION,
+      DIARY_CHAT_CONVERSATION_POLICY_IDS,
     );
     const isCurrentGeneration = attached.generationEpoch === batch.generationEpoch;
     this.repository.completeAttachBatch(

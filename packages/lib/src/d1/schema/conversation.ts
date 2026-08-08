@@ -32,6 +32,10 @@ export const conversationSessions = sqliteTable(
     lastAssistantMessageAt: integer("last_assistant_message_at", { mode: "timestamp" }),
     closedAt: integer("closed_at", { mode: "timestamp" }),
     closeReason: text("close_reason", { enum: ["explicit", "inactive", "hard_cap"] }),
+    conversationPolicyId: text("conversation_policy_id").notNull().default("reflective"),
+    replyOpportunityCount: integer("reply_opportunity_count").notNull().default(0),
+    replyCount: integer("reply_count").notNull().default(0),
+    awaitingReply: integer("awaiting_reply", { mode: "boolean" }).notNull().default(false),
     nextSequence: integer("next_sequence").notNull().default(1),
   },
   (table) => [
@@ -102,6 +106,7 @@ export const chatTurns = sqliteTable(
     firstReplyRequestedAt: integer("first_reply_requested_at", { mode: "timestamp" }),
     finalReplyRequestedAt: integer("final_reply_requested_at", { mode: "timestamp" }),
     responseMessageId: text("response_message_id"),
+    deliveryMetricToken: text("delivery_metric_token"),
   },
   (table) => [
     index("chat_turn_status_created_idx").on(table.status, table.createdAt),

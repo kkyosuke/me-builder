@@ -3,6 +3,7 @@ import {
   DIARY_CHAT_PROMPT_VERSION,
   DIARY_CHAT_SYSTEM_PROMPT,
   buildDiaryChatSystemPrompt,
+  getDiaryChatConversationGuidance,
 } from "./diary-chat";
 
 describe("diary chat prompt", () => {
@@ -31,5 +32,13 @@ describe("diary chat prompt", () => {
     expect(() =>
       buildDiaryChatSystemPrompt({ objective: " ", conversationGuidance: "短く返す" }),
     ).toThrow();
+  });
+
+  it("承認済み方針を切り替え、不明な方針は既定へ戻す", () => {
+    expect(getDiaryChatConversationGuidance("curious")).toContain("具体的で答えやすい主質問");
+    expect(getDiaryChatConversationGuidance("structured")).toContain("出来事、気持ち、選択、理由");
+    expect(getDiaryChatConversationGuidance("unknown")).toBe(
+      getDiaryChatConversationGuidance("reflective"),
+    );
   });
 });
