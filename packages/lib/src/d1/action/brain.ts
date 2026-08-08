@@ -144,3 +144,21 @@ export async function saveBrainItem(
   await db.batch([firstStatement, ...statements.slice(1), ...additionalStatements]);
   return { type: "saved", brainItemId };
 }
+
+/** 認証済みAccountの所有物としてBrain Itemを取得する。 */
+export async function findBrainItemForAccount(
+  db: D1Client,
+  input: Readonly<{ accountId: string; brainItemId: string }>,
+) {
+  return db
+    .select()
+    .from(brainItems)
+    .where(
+      and(
+        eq(brainItems.id, input.brainItemId),
+        eq(brainItems.accountId, input.accountId),
+        eq(brainItems.isDeleted, false),
+      ),
+    )
+    .get();
+}

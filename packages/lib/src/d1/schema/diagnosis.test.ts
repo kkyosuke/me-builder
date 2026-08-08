@@ -96,6 +96,7 @@ describe("Diagnosis D1 schema", () => {
         .insert(schema.diagnosisAnswers)
         .values({
           id: "answer-invalid",
+          accountId: "account-1",
           diagnosisResponseId: "response-1",
           diagnosisQuestionId: "diagnosis-question-1",
           questionId: "question-1",
@@ -110,6 +111,7 @@ describe("Diagnosis D1 schema", () => {
     db.insert(schema.diagnosisAnswers)
       .values({
         id: "answer-1",
+        accountId: "account-1",
         diagnosisResponseId: "response-1",
         diagnosisQuestionId: "diagnosis-question-1",
         questionId: "question-1",
@@ -121,5 +123,30 @@ describe("Diagnosis D1 schema", () => {
       .run();
 
     expect(db.select().from(schema.diagnosisAnswers).all()).toHaveLength(1);
+  });
+
+  it("別AccountのSource RecordをDiagnosis Responseへ混在させない", () => {
+    const { db, opensAt } = insertFixture();
+    db.insert(schema.accounts).values({ id: "account-2" }).run();
+    db.insert(schema.sourceRecords)
+      .values({ id: "source-2", accountId: "account-2", kind: "user_input" })
+      .run();
+
+    expect(() =>
+      db
+        .insert(schema.diagnosisAnswers)
+        .values({
+          id: "cross-account-answer",
+          accountId: "account-1",
+          diagnosisResponseId: "response-1",
+          diagnosisQuestionId: "diagnosis-question-1",
+          questionId: "question-1",
+          questionVersion: 1,
+          choiceId: "left",
+          acceptedAt: opensAt,
+          sourceRecordId: "source-2",
+        })
+        .run(),
+    ).toThrow(/FOREIGN KEY constraint failed/);
   });
 });

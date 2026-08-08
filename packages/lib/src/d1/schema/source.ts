@@ -1,4 +1,4 @@
-import { sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { foreignKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 import { accounts } from "./account";
 import { baseSchema } from "./base";
 
@@ -25,17 +25,24 @@ export const sourceRecordRevisions = sqliteTable(
   "source_record_revisions",
   {
     ...baseSchema,
-    previousSourceRecordId: text("previous_source_record_id")
+    accountId: text("account_id")
       .notNull()
-      .references(() => sourceRecords.id, { onDelete: "cascade" }),
-    nextSourceRecordId: text("next_source_record_id")
-      .notNull()
-      .references(() => sourceRecords.id, { onDelete: "cascade" }),
+      .references(() => accounts.id),
+    previousSourceRecordId: text("previous_source_record_id").notNull(),
+    nextSourceRecordId: text("next_source_record_id").notNull(),
     derivationMethod: text("derivation_method", {
       enum: ["ai", "deterministic"],
     }).notNull(),
   },
   (table) => [
+    foreignKey({
+      columns: [table.previousSourceRecordId, table.accountId],
+      foreignColumns: [sourceRecords.id, sourceRecords.accountId],
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.nextSourceRecordId, table.accountId],
+      foreignColumns: [sourceRecords.id, sourceRecords.accountId],
+    }).onDelete("cascade"),
     uniqueIndex("source_record_revision_pair_idx").on(
       table.previousSourceRecordId,
       table.nextSourceRecordId,

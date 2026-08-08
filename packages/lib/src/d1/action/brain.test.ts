@@ -5,7 +5,7 @@ import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { describe, expect, it } from "vitest";
 import type { D1Client } from "../client";
 import * as schema from "../schema";
-import { type SaveBrainItemInput, saveBrainItem } from "./brain";
+import { type SaveBrainItemInput, findBrainItemForAccount, saveBrainItem } from "./brain";
 
 function createTestDb(): D1Client {
   const sqlite = new Database(":memory:");
@@ -114,5 +114,33 @@ describe("saveBrainItem", () => {
       type: "source-account-mismatch",
     });
     await expect(db.select().from(schema.brainItems)).resolves.toHaveLength(0);
+  });
+});
+
+describe("findBrainItemForAccount", () => {
+  it("認証済みAccountに属するBrain Itemだけを返す", async () => {
+    const db = createTestDb();
+    await db.insert(schema.accounts).values([{ id: "account-1" }, { id: "account-2" }]);
+    await db.insert(schema.brainItems).values({
+      id: "brain-1",
+      accountId: "account-1",
+      category: "preference",
+      statement: "Account 1だけの命題",
+      attributes: {},
+      derivation: "deterministic",
+      confirmation: "pending",
+      status: "active",
+      stability: "changeable",
+      sensitivity: "normal",
+      externallyShareable: false,
+      confidence: { state: "uncomputed" },
+    });
+
+    await expect(
+      findBrainItemForAccount(db, { accountId: "account-1", brainItemId: "brain-1" }),
+    ).resolves.toMatchObject({ id: "brain-1", accountId: "account-1" });
+    await expect(
+      findBrainItemForAccount(db, { accountId: "account-2", brainItemId: "brain-1" }),
+    ).resolves.toBeUndefined();
   });
 });
