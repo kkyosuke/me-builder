@@ -30,7 +30,7 @@ describe("getDiagnosisAnswers", () => {
       },
     );
 
-    expect(findAnswers).toHaveBeenCalledWith(db, "account-1", "diagnosis-1", at);
+    expect(findAnswers).toHaveBeenCalledWith(undefined, "account-1", "diagnosis-1", at);
     const { scoringConfig: _, ...expectedDiagnosis } = diagnosis;
     expect(result).toEqual({
       type: "resolved",

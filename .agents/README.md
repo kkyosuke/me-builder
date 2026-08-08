@@ -19,7 +19,7 @@
 | [自分の傾向サマリー体験設計](../docs/product/profile-summary-experience.md) | 複数の診断回答を横断して本人の現在の傾向を表示する画面、要約規則、導線、状態、完了条件 |
 | [ストレスの手がかりとAIセルフケア相談体験設計](../docs/product/self-care-ai-consultation-experience.md) | 本人向けの負荷の手がかり、早期サイン、対処、相談先の表示とAI相談、安全上の切り替え |
 | [日記チャット体験設計](../docs/product/diary-chat-experience.md) | 日々の声かけから出来事と行動原理を探り、記憶を使って助言する対話体験と応答時間 |
-| [日記チャット実装設計](../docs/architecture/diary-chat-implementation-design.md) | 日記チャットのD1モデル、Cloudflare実行基盤、プロンプト、ガードレール、応答期限 |
+| [日記チャット実装設計](../docs/architecture/diary-chat-implementation-design.md) | 日記チャットのAccountDataモデル、Cloudflare実行基盤、プロンプト、ガードレール、応答期限 |
 | [管理者向け統計ダッシュボード設計](../docs/architecture/admin-statistics-dashboard.md) | 管理者認可、Gemini・LINE統計の項目、取得元、障害時の表示 |
 | [Phase 1 診断体験設計](../docs/diagnosis/diagnosis-experience.md) | 診断一覧、回答、回答内容、LINE通知、リッチメニューのUIと遷移、縦切りの完了条件 |
 | [Phase 1 診断ドメイン設計](../docs/diagnosis/diagnosis-domain-design.md) | Question、Diagnosis、DiagnosisResponseの集約、状態、不変条件、Account / Sourceとの関係 |
@@ -36,8 +36,8 @@
 | [Source Recordのライフサイクル設計](../docs/domain/source/source-record-lifecycle-design.md) | Source Recordの不変性、訂正・削除・取り消し・撤回、Brain Itemへの波及、エクスポート範囲 |
 | [Brainのラベル・アクセス制御設計](../docs/domain/brain/brain-access-label-design.md) | Topic Label、Access Label、Access Profile、MCP提供時の原則、Source Recordの既定ラベル |
 | [インフラ・システム構成](../docs/architecture/infrastructure-architecture.md) | Cloudflareを全面的に採用したインフラ基盤、システム構成、サービス配置 |
-| [Accountデータ分離設計](../docs/architecture/account-data-isolation.md) | D1におけるAccount所有データの識別、query境界、複合外部キー、migration規則 |
-| [日記チャット実装設計](../docs/architecture/diary-chat-implementation-design.md) | 日記チャットのD1モデル、実行基盤、プロンプト、ガードレール、応答期限 |
+| [Accountデータ分離設計](../docs/architecture/account-data-isolation.md) | 1 Account = 1 AccountData DO、内部module、共有D1境界、migration規則 |
+| [日記チャット実装設計](../docs/architecture/diary-chat-implementation-design.md) | 日記チャットのAccountDataモデル、実行基盤、プロンプト、ガードレール、応答期限 |
 | [キャラクターデザイン](../docs/design/character-design.md) | うつし・ミラの名前、役割、外見設定、デザインアセットの置き場所と命名規則 |
 | [診断seed運用](../docs/development/diagnosis-seed.md) | Question、Question Version、Choice、DiagnosisをD1へ登録するseedの配置、実行、更新、検証方法 |
 | [診断サムネイル生成](../docs/development/diagnosis-thumbnail-generation.md) | 診断一覧用サムネイルの生成プロンプト、共通スタイル、配置手順 |

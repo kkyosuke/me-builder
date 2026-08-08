@@ -1,9 +1,11 @@
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import type { D1Database } from "@cloudflare/workers-types";
+import { d1 } from "@me-builder/lib";
 import { Miniflare } from "miniflare";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { app } from "../index";
+import { createD1AccountDataTestNamespace } from "../testing/account-data";
 import { diagnosisAnswerCases } from "./case/diagnosis-answer.case";
 
 const repositoryRoot = path.resolve(__dirname, "../../../..");
@@ -65,6 +67,7 @@ function mockLineVerification(): void {
 
 const env = () => ({
   DB: database,
+  ACCOUNT_DATA: createD1AccountDataTestNamespace(d1.client.create(database)),
   LINE_LOGIN_CHANNEL_ID: "1234567890",
   ENVIRONMENT: "test",
 });

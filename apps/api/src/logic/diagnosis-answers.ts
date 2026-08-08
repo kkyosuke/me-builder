@@ -1,4 +1,4 @@
-import { d1 } from "@me-builder/lib";
+import { type AccountDataNamespace, accountDataFor, type d1 } from "@me-builder/lib";
 import { logger } from "@me-builder/shared";
 import { scoreDiagnosisAnswers } from "./diagnosis-scoring";
 import { createLiffSession } from "./liff-session";
@@ -26,22 +26,36 @@ type Params = {
   idToken: string | undefined;
   lineLoginChannelId: string | undefined;
   db: d1.Client;
+  accountData?: AccountDataNamespace;
   at?: Date;
 };
 
 type Dependencies = {
   createSession: typeof createLiffSession;
-  findAnswers: typeof d1.action.diagnosis.findDiagnosisAnswers;
+  findAnswers: (
+    accountData: AccountDataNamespace | undefined,
+    accountId: string,
+    diagnosisId: string,
+    at: Date,
+  ) => ReturnType<typeof d1.action.diagnosis.findDiagnosisAnswers>;
 };
 
 const defaultDependencies: Dependencies = {
   createSession: createLiffSession,
-  findAnswers: d1.action.diagnosis.findDiagnosisAnswers,
+  findAnswers: (accountData, accountId, diagnosisId, at) => {
+    if (!accountData) throw new Error("ACCOUNT_DATA binding is not configured");
+    return accountDataFor(accountData, accountId).execute(
+      "diagnosis.findAnswers",
+      accountId,
+      diagnosisId,
+      at,
+    );
+  },
 };
 
 /** 本人確認後に、指定Diagnosisへ保存された本人の回答内容を取得します。 */
 export async function getDiagnosisAnswers(
-  { diagnosisId, idToken, lineLoginChannelId, db, at = new Date() }: Params,
+  { diagnosisId, idToken, lineLoginChannelId, db, accountData, at = new Date() }: Params,
   dependencies: Dependencies = defaultDependencies,
 ): Promise<DiagnosisAnswersOutcome> {
   const session = await dependencies.createSession({ idToken, lineLoginChannelId, db });
@@ -49,7 +63,12 @@ export async function getDiagnosisAnswers(
     return session;
   }
 
-  const result = await dependencies.findAnswers(db, session.session.accountId, diagnosisId, at);
+  const result = await dependencies.findAnswers(
+    accountData,
+    session.session.accountId,
+    diagnosisId,
+    at,
+  );
   if (result.type !== "found") {
     return { type: "diagnosis-answers-not-found" };
   }

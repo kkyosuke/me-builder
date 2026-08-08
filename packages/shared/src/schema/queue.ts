@@ -14,9 +14,10 @@ export interface WebhookQueueMessage {
   };
 }
 
-/** AI生成Queueには本文やAccount識別子を含めず、D1のTurnだけを参照させる。 */
+/** AI生成Queueには本文を含めず、認証済みAccountのData ObjectとTurnだけを参照させる。 */
 export interface ChatTurnQueueMessage {
   type: "chat-turn";
+  accountId: string;
   turnId: string;
   generationEpoch: number;
 }

@@ -98,16 +98,6 @@ async function sha256(value: string): Promise<string> {
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-function changedRowCount(result: unknown): number {
-  if (typeof result !== "object" || result === null) return 0;
-  if ("meta" in result && typeof result.meta === "object" && result.meta !== null) {
-    const changes = "changes" in result.meta ? result.meta.changes : undefined;
-    if (typeof changes === "number") return changes;
-  }
-  const changes = "changes" in result ? result.changes : undefined;
-  return typeof changes === "number" ? changes : 0;
-}
-
 /** LINE eventを不変なSource Recordとして冪等に保存する。 */
 export async function storeLineTextSource(
   db: D1Client,
@@ -206,7 +196,8 @@ export async function attachMessagesToTurn(
         eq(conversationMessages.channel, "line"),
         inArray(conversationMessages.channelEventId, eventIds),
       ),
-    );
+    )
+    .all();
 
   if (existingMessages.length > 0) {
     const inputsByEventId = new Map(inputs.map((input) => [input.eventId, input]));
@@ -222,7 +213,8 @@ export async function attachMessagesToTurn(
     const existingSessions = await db
       .select({ id: conversationSessions.id, accountId: conversationSessions.accountId })
       .from(conversationSessions)
-      .where(inArray(conversationSessions.id, sessionIds));
+      .where(inArray(conversationSessions.id, sessionIds))
+      .all();
     if (
       existingSessions.length !== sessionIds.length ||
       existingSessions.some((session) => session.accountId !== accountId)
@@ -461,7 +453,8 @@ export async function getTurnContext(
       ),
     )
     .orderBy(desc(conversationMessages.sequence))
-    .limit(Math.max(messageLimit, turn.throughSequence - turn.fromSequence + 1));
+    .limit(Math.max(messageLimit, turn.throughSequence - turn.fromSequence + 1))
+    .all();
 
   const messages = rows.reverse().flatMap((row) => {
     const body = row.role === "user" ? row.userBody : row.assistantBody;
@@ -481,7 +474,7 @@ export async function getTurnContext(
 }
 
 export async function markTurnGenerating(db: D1Client, turnId: string): Promise<boolean> {
-  const result = await db
+  const updated = await db
     .update(chatTurns)
     .set({
       status: "generating",
@@ -489,20 +482,22 @@ export async function markTurnGenerating(db: D1Client, turnId: string): Promise<
       attemptCount: sql`${chatTurns.attemptCount} + 1`,
       updatedAt: new Date(),
     })
-    .where(and(eq(chatTurns.id, turnId), inArray(chatTurns.status, ["queued", "generating"])));
-  return changedRowCount(result) > 0;
+    .where(and(eq(chatTurns.id, turnId), inArray(chatTurns.status, ["queued", "generating"])))
+    .returning({ id: chatTurns.id })
+    .all();
+  return updated.length > 0;
 }
 
 export async function getTurnStatus(
   db: D1Client,
   turnId: string,
 ): Promise<(typeof chatTurns.$inferSelect)["status"] | undefined> {
-  return db
+  const row = await db
     .select({ status: chatTurns.status })
     .from(chatTurns)
     .where(eq(chatTurns.id, turnId))
-    .get()
-    .then((row) => row?.status);
+    .get();
+  return row?.status;
 }
 
 /** 配送直前にTurnが属するSessionの有効性を再確認する。 */
@@ -633,13 +628,14 @@ export async function closeTurnSession(db: D1Client, turnId: string): Promise<vo
     .set({ status: "closed", closeReason: "explicit", closedAt: now, updatedAt: now })
     .where(
       and(eq(conversationSessions.id, turn.sessionId), eq(conversationSessions.status, "active")),
-    );
+    )
+    .run();
 }
 
 export async function closeExpiredSessions(db: D1Client, now = new Date()): Promise<number> {
   const inactiveCutoff = new Date(now.getTime() - SESSION_INACTIVITY_MS);
   const hardCapCutoff = new Date(now.getTime() - SESSION_HARD_CAP_MS);
-  const hardCapResult = await db
+  const hardCapRows = await db
     .update(conversationSessions)
     .set({ status: "closed", closeReason: "hard_cap", closedAt: now, updatedAt: now })
     .where(
@@ -647,8 +643,10 @@ export async function closeExpiredSessions(db: D1Client, now = new Date()): Prom
         eq(conversationSessions.status, "active"),
         lte(conversationSessions.startedAt, hardCapCutoff),
       ),
-    );
-  const inactiveResult = await db
+    )
+    .returning({ id: conversationSessions.id })
+    .all();
+  const inactiveRows = await db
     .update(conversationSessions)
     .set({ status: "closed", closeReason: "inactive", closedAt: now, updatedAt: now })
     .where(
@@ -656,8 +654,10 @@ export async function closeExpiredSessions(db: D1Client, now = new Date()): Prom
         eq(conversationSessions.status, "active"),
         lte(conversationSessions.lastUserMessageAt, inactiveCutoff),
       ),
-    );
-  return changedRowCount(hardCapResult) + changedRowCount(inactiveResult);
+    )
+    .returning({ id: conversationSessions.id })
+    .all();
+  return hardCapRows.length + inactiveRows.length;
 }
 
 export async function markTurnDelivered(db: D1Client, turnId: string): Promise<boolean> {
@@ -705,10 +705,7 @@ export async function markTurnDelivered(db: D1Client, turnId: string): Promise<b
   }
   const [firstWrite, ...remainingWrites] = writes;
   if (!firstWrite) return false;
-  const results = await db.batch([firstWrite, ...remainingWrites]);
-  const result = results[0];
-  if (!result) return false;
-  if (changedRowCount(result) > 0) return true;
+  await db.batch([firstWrite, ...remainingWrites]);
   return Boolean(
     await db
       .select({ id: chatTurns.id })
@@ -723,13 +720,15 @@ export async function markTurnFailed(
   turnId: string,
   failureStage: string,
 ): Promise<boolean> {
-  const result = await db
+  const updated = await db
     .update(chatTurns)
     .set({ status: "failed", failureStage, updatedAt: new Date() })
     .where(
       and(eq(chatTurns.id, turnId), inArray(chatTurns.status, ["generating", "delivery_pending"])),
-    );
-  if (changedRowCount(result) > 0) return true;
+    )
+    .returning({ id: chatTurns.id })
+    .all();
+  if (updated.length > 0) return true;
   return Boolean(
     await db
       .select({ id: chatTurns.id })

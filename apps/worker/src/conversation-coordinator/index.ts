@@ -1,5 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
-import { d1 } from "@me-builder/lib";
+import { accountDataFor, d1 } from "@me-builder/lib";
 import {
   type ChatTurnQueueMessage,
   type GenerationLease,
@@ -271,8 +271,12 @@ export class ConversationCoordinator extends DurableObject<Env> {
       return;
     }
 
-    const attached = await d1.action.conversation.attachMessagesToTurn(
-      this.cf.d1,
+    const accountId = this.repository.getBoundAccountId();
+    if (!accountId || !this.cf.do.accountData) {
+      throw new Error("AccountData binding or bound Account is not configured");
+    }
+    const attached = await accountDataFor(this.cf.do.accountData, accountId).execute(
+      "conversation.attachMessagesToTurn",
       batch.messages.map((item) => ({
         eventId: item.eventId,
         accountId: item.accountId,
@@ -336,7 +340,9 @@ export class ConversationCoordinator extends DurableObject<Env> {
   private async enqueueTurn(turnId: string, generationEpoch: number): Promise<void> {
     const queue = this.cf.queue.chatTurn;
     if (!queue) throw new Error("CHAT_TURN_QUEUE binding is not configured");
-    const message: ChatTurnQueueMessage = { type: "chat-turn", turnId, generationEpoch };
+    const accountId = this.repository.getBoundAccountId();
+    if (!accountId) throw new Error("Conversation coordinator is not bound to an Account");
+    const message: ChatTurnQueueMessage = { type: "chat-turn", accountId, turnId, generationEpoch };
     await queue.send(message);
     this.repository.markTurnQueued(turnId);
   }

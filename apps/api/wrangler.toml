@@ -21,6 +21,11 @@ binding = "DB"
 database_name = "me-builder-db-local"
 database_id = "me-builder-db-local-id"
 
+[[durable_objects.bindings]]
+name = "ACCOUNT_DATA"
+class_name = "AccountData"
+script_name = "me-builder-worker-local"
+
 [vars]
 ENVIRONMENT = "local"
 
@@ -35,6 +40,11 @@ binding = "WEBHOOK_QUEUE"
 binding = "DB"
 database_name = "me-builder-db-local"
 database_id = "me-builder-db-local-id"
+
+[[env.local.durable_objects.bindings]]
+name = "ACCOUNT_DATA"
+class_name = "AccountData"
+script_name = "me-builder-worker-local"
 
 [env.local.vars]
 ENVIRONMENT = "local"
@@ -54,6 +64,11 @@ binding = "DB"
 database_name = "me-builder-db-preview"
 database_id = "ef439301-0199-4c78-af5e-91fcc5be63bd"
 
+[[env.preview.durable_objects.bindings]]
+name = "ACCOUNT_DATA"
+class_name = "AccountData"
+script_name = "me-builder-worker-preview"
+
 [env.preview.vars]
 ENVIRONMENT = "preview"
 
@@ -71,6 +86,11 @@ binding = "WEBHOOK_QUEUE"
 binding = "DB"
 database_name = "me-builder-db-production"
 database_id = "6d11180b-3286-4b69-bd63-c7b60d768be1"
+
+[[env.production.durable_objects.bindings]]
+name = "ACCOUNT_DATA"
+class_name = "AccountData"
+script_name = "me-builder-worker-production"
 
 [env.production.vars]
 ENVIRONMENT = "production"

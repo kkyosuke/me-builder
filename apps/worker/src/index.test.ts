@@ -9,6 +9,12 @@ import { handleQueueBatch } from "./logic/webhook";
 const mockPushMessage = vi.fn().mockResolvedValue({});
 const mockReplyMessage = vi.fn().mockResolvedValue({});
 const mockAcceptMessage = vi.fn().mockResolvedValue({ accepted: true });
+const mockAccountDataExecute = vi.fn().mockResolvedValue({
+  sourceRecordId: "source-1",
+  accountId: "account-1",
+  eventId: "webhook-event-1",
+  receivedAt: new Date("2026-08-06T12:00:00Z"),
+});
 vi.spyOn(line.client, "create").mockReturnValue({
   pushMessage: mockPushMessage,
   replyMessage: mockReplyMessage,
@@ -33,12 +39,6 @@ vi.spyOn(d1.action.account, "upsertIdentity").mockResolvedValue({
     deletedAt: null,
     isDeleted: false,
   },
-});
-vi.spyOn(d1.action.conversation, "storeLineTextSource").mockResolvedValue({
-  sourceRecordId: "source-1",
-  accountId: "account-1",
-  eventId: "webhook-event-1",
-  receivedAt: new Date("2026-08-06T12:00:00Z"),
 });
 
 function createBatch(text: string): {
@@ -91,13 +91,16 @@ function createBatch(text: string): {
 const coordinatorNamespace = {
   getByName: vi.fn(() => ({ acceptMessage: mockAcceptMessage })),
 } as unknown as NonNullable<import("./types").Env["CONVERSATION_COORDINATOR"]>;
+const accountDataNamespace = {
+  getByName: vi.fn(() => ({ execute: mockAccountDataExecute })),
+} as unknown as NonNullable<import("./types").Env["ACCOUNT_DATA"]>;
 
 describe("Worker", () => {
   beforeEach(() => {
     mockPushMessage.mockClear();
     mockReplyMessage.mockClear();
     mockAcceptMessage.mockClear();
-    vi.mocked(d1.action.conversation.storeLineTextSource).mockClear();
+    mockAccountDataExecute.mockClear();
   });
 
   it("日記を原本保存してCoordinatorへ渡し、受付配送はAPI側の予約へ委ねる", async () => {
@@ -113,13 +116,14 @@ describe("Worker", () => {
       }),
       {
         d1: db,
-        do: { conversation: coordinatorNamespace },
+        do: { conversation: coordinatorNamespace, accountData: accountDataNamespace },
         queue: { chatTurn: undefined },
       },
     );
 
-    expect(d1.action.conversation.storeLineTextSource).toHaveBeenCalledWith(
-      db,
+    expect(mockAccountDataExecute).toHaveBeenCalledWith(
+      "account-1",
+      "conversation.storeLineTextSource",
       expect.objectContaining({
         accountId: "account-1",
         eventId: "webhook-event-1",
@@ -145,7 +149,7 @@ describe("Worker", () => {
         LIFF_ID: "123-liff",
       }),
     );
-    expect(d1.action.conversation.storeLineTextSource).not.toHaveBeenCalled();
+    expect(mockAccountDataExecute).not.toHaveBeenCalled();
     expect(mockReplyMessage).toHaveBeenCalledWith({
       replyToken: "reply-token-1",
       messages: [{ type: "text", text: expect.stringContaining("liff.line.me/123-liff") }],
@@ -160,7 +164,7 @@ describe("Worker", () => {
 
     await handleQueueBatch(batch, {} as d1.Client, getWorkerConfig({ ENVIRONMENT: "test" }));
 
-    expect(d1.action.conversation.storeLineTextSource).not.toHaveBeenCalled();
+    expect(mockAccountDataExecute).not.toHaveBeenCalled();
     expect(mockReplyMessage).not.toHaveBeenCalled();
     expect(message.ack).toHaveBeenCalledOnce();
   });

@@ -1,4 +1,4 @@
-import { d1 } from "@me-builder/lib";
+import { accountDataFor } from "@me-builder/lib";
 import type { ChatTurnQueueMessage, Message } from "@me-builder/shared";
 import { logger } from "@me-builder/shared";
 import type { CloudflareBindings, WorkerConfig } from "../config";
@@ -18,9 +18,10 @@ export async function processChatTurnMessage(
   cf: CloudflareBindings,
   workerConfig: WorkerConfig,
 ): Promise<void> {
-  const db = cf.d1;
-  const context = await d1.action.conversation.getTurnContext(
-    db,
+  if (!cf.do.accountData) throw new Error("ACCOUNT_DATA binding is not configured");
+  const accountData = accountDataFor(cf.do.accountData, message.body.accountId);
+  const context = await accountData.execute(
+    "conversation.getTurnContext",
     message.body.turnId,
     workerConfig.chatContextMessageLimit,
   );
@@ -31,7 +32,10 @@ export async function processChatTurnMessage(
   }
 
   if (!cf.do.conversation) throw new Error("CONVERSATION_COORDINATOR binding is not configured");
-  const coordinator = cf.do.conversation.getByName(context.accountId);
+  if (context.accountId !== message.body.accountId) {
+    throw new Error("Chat turn belongs to another AccountData Object");
+  }
+  const coordinator = cf.do.conversation.getByName(message.body.accountId);
   const lease = await coordinator.acquireGeneration(
     message.body.turnId,
     message.body.generationEpoch,
@@ -72,8 +76,8 @@ export async function processChatTurnMessage(
     });
     if (failureDelivery.status === "delivered") {
       if (
-        !(await d1.action.conversation.markTurnFailed(
-          db,
+        !(await accountData.execute(
+          "conversation.markTurnFailed",
           message.body.turnId,
           "generation_or_delivery",
         ))
@@ -81,7 +85,11 @@ export async function processChatTurnMessage(
         throw new Error("Failed LINE notice could not be reflected in D1");
       }
     } else if (failureDelivery.status === "permanent_failure") {
-      await d1.action.conversation.markTurnFailed(db, message.body.turnId, "failure_delivery");
+      await accountData.execute(
+        "conversation.markTurnFailed",
+        message.body.turnId,
+        "failure_delivery",
+      );
     } else {
       return false;
     }
@@ -94,15 +102,18 @@ export async function processChatTurnMessage(
     return true;
   };
   try {
-    const pendingResponse = await d1.action.conversation.getPendingAssistantResponse(db, {
+    const pendingResponse = await accountData.execute("conversation.getPendingAssistantResponse", {
       accountId: context.accountId,
       turnId: message.body.turnId,
     });
     if (
       !pendingResponse &&
-      !(await d1.action.conversation.markTurnGenerating(db, message.body.turnId))
+      !(await accountData.execute("conversation.markTurnGenerating", message.body.turnId))
     ) {
-      const turnStatus = await d1.action.conversation.getTurnStatus(db, message.body.turnId);
+      const turnStatus = await accountData.execute(
+        "conversation.getTurnStatus",
+        message.body.turnId,
+      );
       if (turnStatus === "delivered") {
         await coordinator.completeGeneration(
           message.body.turnId,
@@ -119,8 +130,12 @@ export async function processChatTurnMessage(
       message.ack();
       return;
     }
-    if (!(await d1.action.conversation.isTurnSessionActive(db, message.body.turnId))) {
-      await d1.action.conversation.markTurnFailed(db, message.body.turnId, "closed_session");
+    if (!(await accountData.execute("conversation.isTurnSessionActive", message.body.turnId))) {
+      await accountData.execute(
+        "conversation.markTurnFailed",
+        message.body.turnId,
+        "closed_session",
+      );
       await coordinator.failGeneration(
         message.body.turnId,
         message.body.generationEpoch,
@@ -156,14 +171,18 @@ export async function processChatTurnMessage(
         lease.leaseToken,
       );
       if (!leaseIsActive) throw new Error("Generation lease expired before response persistence");
-      await d1.action.conversation.saveAssistantResponse(db, {
+      await accountData.execute("conversation.saveAssistantResponse", {
         turnId: message.body.turnId,
         body: response.reply,
         endSession: response.endSession,
       });
     }
-    if (!(await d1.action.conversation.isTurnSessionActive(db, message.body.turnId))) {
-      await d1.action.conversation.markTurnFailed(db, message.body.turnId, "closed_session");
+    if (!(await accountData.execute("conversation.isTurnSessionActive", message.body.turnId))) {
+      await accountData.execute(
+        "conversation.markTurnFailed",
+        message.body.turnId,
+        "closed_session",
+      );
       await coordinator.failGeneration(
         message.body.turnId,
         message.body.generationEpoch,
@@ -184,7 +203,11 @@ export async function processChatTurnMessage(
       throw new Error("Generation lease expired before final delivery was reserved");
     }
     if (delivery.status === "superseded" || delivery.status === "permanent_failure") {
-      await d1.action.conversation.markTurnFailed(db, message.body.turnId, "final_delivery");
+      await accountData.execute(
+        "conversation.markTurnFailed",
+        message.body.turnId,
+        "final_delivery",
+      );
       await coordinator.failGeneration(
         message.body.turnId,
         message.body.generationEpoch,
@@ -193,11 +216,11 @@ export async function processChatTurnMessage(
       message.ack();
       return;
     }
-    if (!(await d1.action.conversation.markTurnDelivered(db, message.body.turnId))) {
+    if (!(await accountData.execute("conversation.markTurnDelivered", message.body.turnId))) {
       throw new Error("Delivered LINE response could not be reflected in D1");
     }
     if (response.endSession) {
-      await d1.action.conversation.closeTurnSession(db, message.body.turnId);
+      await accountData.execute("conversation.closeTurnSession", message.body.turnId);
     }
     const completed = await coordinator.completeGeneration(
       message.body.turnId,

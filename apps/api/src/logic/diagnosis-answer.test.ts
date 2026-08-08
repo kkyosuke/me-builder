@@ -42,7 +42,7 @@ describe("saveDiagnosisAnswer", () => {
         saveAnswer,
       },
     );
-    expect(saveAnswer).toHaveBeenCalledWith(db, {
+    expect(saveAnswer).toHaveBeenCalledWith(undefined, "account-1", {
       accountId: "account-1",
       diagnosisId: "diagnosis-1",
       diagnosisQuestionId: "dq-1",
@@ -118,7 +118,7 @@ describe("saveDiagnosisAnswer", () => {
       },
     );
 
-    expect(processLatestProjection).toHaveBeenCalledWith(db, "account-1", "diagnosis-1", at);
+    expect(processLatestProjection).toHaveBeenCalledWith(undefined, "account-1", "diagnosis-1", at);
     expect(scheduleProjection).toHaveBeenCalledOnce();
   });
 });

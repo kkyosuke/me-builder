@@ -818,7 +818,8 @@ export async function findOpenDiagnosisDetail(
     })
     .from(diagnoses)
     .where(eq(diagnoses.id, diagnosisId))
-    .limit(1);
+    .limit(1)
+    .all();
 
   if (
     !diagnosis ||
@@ -866,7 +867,8 @@ export async function findOpenDiagnosisDetail(
     .where(
       and(eq(diagnosisQuestions.diagnosisId, diagnosisId), eq(diagnosisQuestions.isDeleted, false)),
     )
-    .orderBy(asc(diagnosisQuestions.position), asc(questionChoices.position));
+    .orderBy(asc(diagnosisQuestions.position), asc(questionChoices.position))
+    .all();
 
   const questions: DiagnosisDetail["questions"] = [];
   for (const row of rows) {
@@ -996,7 +998,8 @@ export async function findDiagnosisAnswers(
           eq(diagnosisQuestions.isDeleted, false),
         ),
       )
-      .orderBy(asc(diagnosisQuestions.position), asc(questionChoices.position)),
+      .orderBy(asc(diagnosisQuestions.position), asc(questionChoices.position))
+      .all(),
     db
       .select({
         diagnosisQuestionId: diagnosisAnswers.diagnosisQuestionId,
@@ -1037,7 +1040,8 @@ export async function findDiagnosisAnswers(
           eq(diagnosisQuestions.isDeleted, false),
         ),
       )
-      .orderBy(asc(diagnosisQuestions.position)),
+      .orderBy(asc(diagnosisQuestions.position))
+      .all(),
   ]);
 
   if (rows.length === 0) {
@@ -1149,7 +1153,8 @@ export async function listVisibleDiagnoses(
       diagnoses.closesAt,
       diagnoses.displayOrder,
     )
-    .orderBy(asc(diagnoses.displayOrder), asc(diagnoses.id));
+    .orderBy(asc(diagnoses.displayOrder), asc(diagnoses.id))
+    .all();
 
   return rows.map((row) => {
     const responseStatus: DiagnosisListResponseStatus =
