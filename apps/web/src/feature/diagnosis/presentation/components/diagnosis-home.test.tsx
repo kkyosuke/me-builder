@@ -37,6 +37,9 @@ describe("DiagnosisHome", () => {
       />,
     );
 
+    expect(screen.getByText("私をさがす")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "診断" })).toBeTruthy();
+    expect(screen.queryByText("me-builder")).toBeNull();
     expect(screen.getByRole("link", { name: "診断" }).getAttribute("aria-current")).toBe("page");
     expect(screen.getByRole("link", { name: "わたし" }).getAttribute("href")).toBe("/me");
     expect(screen.getByRole("link", { name: "わたし" }).getAttribute("aria-current")).toBeNull();
