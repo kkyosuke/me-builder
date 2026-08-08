@@ -14,7 +14,7 @@ Accountの責務は[ドメイン設計](../domain/domain-design.md)、実行基�
 
 - 管理者画面の表示可否だけで認可せず、`/api/admin/`配下のAPIが検証済みLINE IDトークンからAccountを解決して`admin`を確認する
 - roleはクライアントから変更できるAPIを提供しない
-- 最初の管理者はD1への明示的な運用操作で付与する
+- `ADMIN_LINE_USER_IDS`に含まれる検証済みLINE user IDは、Accountの新規作成時に`admin`を付与し、既存Accountなら次回のLIFF認証またはLINE Webhook受信時に`admin`へ昇格する
 - `admin`は統計閲覧を許可するが、日記本文や診断回答など本人データの閲覧権限を含まない
 - 未認証は`401`、Account未解決は`404`、管理者でないAccountは`403`とする
 

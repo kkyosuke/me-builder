@@ -93,8 +93,9 @@ function Line({ value }: { value: AdminStatistics["line"] }) {
 
 export function AdminStatisticsScreen({
   state,
+  isRefreshing = false,
   onReload,
-}: { state: AsyncState<AdminStatistics>; onReload: () => void }) {
+}: { state: AsyncState<AdminStatistics>; isRefreshing?: boolean; onReload: () => void }) {
   if (state.status === "loading" || state.status === "idle")
     return <LoadingState message="統計情報を読み込んでいます..." />;
   if (state.status === "error")
@@ -121,10 +122,12 @@ export function AdminStatisticsScreen({
           <button
             type="button"
             onClick={onReload}
+            disabled={isRefreshing}
+            aria-label={isRefreshing ? "統計情報を更新中" : undefined}
             className="flex items-center gap-2 rounded-full border border-slate-300 px-4 py-2 text-sm dark:border-slate-600"
           >
-            <RefreshCw className="size-4" />
-            更新
+            <RefreshCw className={`size-4 ${isRefreshing ? "animate-spin" : ""}`} />
+            {isRefreshing ? "更新中..." : "更新"}
           </button>
         </div>
         <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">

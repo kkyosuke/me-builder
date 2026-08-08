@@ -125,6 +125,10 @@ jobs:
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
         run: bun --cwd apps/worker run check:gemini "Reply with OK."
 
+      - name: Verify AI Gateway Analytics Connectivity (Preview)
+        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
+        run: bun --cwd apps/api run check:analytics
+
       # デプロイ済みの URL を LIFF アプリのエンドポイント URL へ反映する
       - name: Register LIFF Endpoint (Preview)
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' && env.LINE_LOGIN_CHANNEL_SECRET != '' }}

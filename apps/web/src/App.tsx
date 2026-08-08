@@ -75,7 +75,11 @@ function AdminApplication() {
   const liffSession = useLiffSession();
   const statistics = useAdminStatistics(liffSession.acquireIdToken);
   return (
-    <AdminStatisticsScreen state={statistics.state} onReload={() => void statistics.reload()} />
+    <AdminStatisticsScreen
+      state={statistics.state}
+      isRefreshing={statistics.isRefreshing}
+      onReload={() => void statistics.reload()}
+    />
   );
 }
 

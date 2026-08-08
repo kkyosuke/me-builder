@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { config } from "../../../config";
 import type { AsyncState } from "../../../model/async-state";
 import { fetchAdminStatistics } from "../infrastructure/admin-api";
@@ -8,9 +8,12 @@ export function useAdminStatistics(
   acquireIdToken: (signal: AbortSignal) => Promise<string | null>,
 ) {
   const [state, setState] = useState<AsyncState<AdminStatistics>>({ status: "loading" });
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const activeController = useRef<AbortController | null>(null);
   const load = useCallback(
-    async (signal: AbortSignal) => {
-      setState({ status: "loading" });
+    async (signal: AbortSignal, showLoading: boolean) => {
+      if (showLoading) setState({ status: "loading" });
+      else setIsRefreshing(true);
       try {
         const token = await acquireIdToken(signal);
         if (signal.aborted) return;
@@ -27,6 +30,8 @@ export function useAdminStatistics(
             message: error instanceof Error ? error.message : "統計情報を取得できませんでした。",
           });
         }
+      } finally {
+        if (!signal.aborted) setIsRefreshing(false);
       }
     },
     [acquireIdToken],
@@ -34,9 +39,17 @@ export function useAdminStatistics(
 
   useEffect(() => {
     const controller = new AbortController();
-    void load(controller.signal);
-    return () => controller.abort();
+    activeController.current = controller;
+    void load(controller.signal, true);
+    return () => activeController.current?.abort();
   }, [load]);
 
-  return { state, reload: () => load(new AbortController().signal) };
+  const reload = useCallback(() => {
+    activeController.current?.abort();
+    const controller = new AbortController();
+    activeController.current = controller;
+    return load(controller.signal, false);
+  }, [load]);
+
+  return { state, isRefreshing, reload };
 }
