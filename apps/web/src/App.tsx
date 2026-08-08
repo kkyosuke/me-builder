@@ -12,7 +12,7 @@ import {
   useResetDiagnosisData,
 } from "./feature/diagnosis";
 import { useLiffSession } from "./feature/liff";
-import { ProfileComingSoonScreen } from "./feature/profile";
+import { ProfileSummaryScreen, useProfileSummary } from "./feature/profile";
 import { ColorThemeToggle, useColorTheme } from "./feature/theme";
 
 const DEVELOPMENT_ENVIRONMENTS = new Set(["development", "local", "preview", "test"]);
@@ -99,6 +99,11 @@ function AdminApplication() {
   );
 }
 
+function ProfileApplication() {
+  const summary = useProfileSummary();
+  return <ProfileSummaryScreen state={summary.state} onRetry={() => void summary.reload()} />;
+}
+
 export function App() {
   const colorTheme = useColorTheme();
   const pathname = resolveRequestedPathname();
@@ -110,7 +115,7 @@ export function App() {
       {isAdminPath ? (
         <AdminApplication />
       ) : isMePath ? (
-        <ProfileComingSoonScreen />
+        <ProfileApplication />
       ) : (
         <DiagnosisApplication />
       )}
