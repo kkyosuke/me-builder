@@ -27,7 +27,7 @@ sequenceDiagram
     Script->>LINE: 同じ環境・用途の旧版だけを削除
 ```
 
-画像は[`apps/api/assets/rich-menu-main.jpg`](../../apps/api/assets/rich-menu-main.jpg)を使います。2500×843pxのJPEGで、左半分を「私を知る」、右半分を「診断を行う」のURI actionにします。左は`https://liff.line.me/{LIFF_ID}/profile`、右は`https://liff.line.me/{LIFF_ID}`へ遷移し、Account IDや認証トークンを含めません。項目の役割は[Phase 1 診断体験設計 §7](../diagnosis/diagnosis-experience.md#7-リッチメニュー)を正とします。
+画像は[`apps/api/assets/rich-menu-main.jpg`](../../apps/api/assets/rich-menu-main.jpg)を使います。2500×843pxのJPEGで、左半分を「私を知る」、右半分を「診断を行う」のURI actionにします。左は`https://liff.line.me/{LIFF_ID}/me`、右は`https://liff.line.me/{LIFF_ID}/diagnosis`へ遷移し、Account IDや認証トークンを含めません。項目の役割は[Phase 1 診断体験設計 §7](../diagnosis/diagnosis-experience.md#7-リッチメニュー)を正とします。
 
 LINEの画像要件は[Messaging API reference](https://developers.line.biz/en/reference/messaging-api/#upload-rich-menu-image)を確認します。現在のアセットは幅800〜2500px、高さ250px以上、縦横比1.45以上、1MB以下という要件を満たします。
 

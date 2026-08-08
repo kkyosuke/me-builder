@@ -77,7 +77,7 @@ describe("line.richMenu.registerDefault", () => {
             action: {
               type: "uri",
               label: "私を知る",
-              uri: "https://liff.line.me/1234567890-AbCdEfGh/profile",
+              uri: "https://liff.line.me/1234567890-AbCdEfGh/me",
             },
           },
           {
@@ -85,7 +85,7 @@ describe("line.richMenu.registerDefault", () => {
             action: {
               type: "uri",
               label: "診断を行う",
-              uri: "https://liff.line.me/1234567890-AbCdEfGh",
+              uri: "https://liff.line.me/1234567890-AbCdEfGh/diagnosis",
             },
           },
         ],

@@ -32,7 +32,7 @@ function createDefinition(name: string, liffId: string): messagingApi.RichMenuRe
         action: {
           type: "uri",
           label: "私を知る",
-          uri: `https://liff.line.me/${liffId}/profile`,
+          uri: `https://liff.line.me/${liffId}/me`,
         },
       },
       {
@@ -40,7 +40,7 @@ function createDefinition(name: string, liffId: string): messagingApi.RichMenuRe
         action: {
           type: "uri",
           label: "診断を行う",
-          uri: `https://liff.line.me/${liffId}`,
+          uri: `https://liff.line.me/${liffId}/diagnosis`,
         },
       },
     ],
