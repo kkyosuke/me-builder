@@ -1,11 +1,16 @@
 name: CD / Preview
 
 on:
+  # プレビューは共有環境 (stg.kagami.kyosuke.dev) のため、全 PR で自動デプロイはしない。
+  # デプロイするのは次の 2 通りだけ。
+  #   1. Actions 画面 / `gh workflow run` でブランチを指定した手動実行
+  #   2. `deploy` ラベルが付いた PR (ラベル付与時と、その後の push)
+  workflow_dispatch:
   pull_request:
     branches:
       - main
     types:
-      - opened
+      - labeled
       - synchronize
       - reopened
 
@@ -15,12 +20,23 @@ concurrency:
 
 permissions:
   contents: read
+  # デプロイ完了コメントを PR へ投稿するために必要
   pull-requests: write
-  issues: write
+
+# 共有環境への同時デプロイを直列化する。実行中のデプロイは途中で止めず、
+# 待機中の実行だけが新しいものへ置き換わる。
+concurrency:
+  group: cd-preview
+  cancel-in-progress: false
 
 jobs:
   deploy-preview:
     name: Deploy Preview Environment
+    # 手動実行は無条件。PR 起因の場合は `deploy` ラベルが付いているときだけ。
+    # `synchronize` でも同じ条件を見るため、ラベルを剥がせば以降の push ではデプロイされない。
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.pull_request.labels.*.name, 'deploy')
     runs-on: ubuntu-latest
     environment: dev
     env:
@@ -152,15 +168,37 @@ jobs:
         run: |
           echo "::warning::CLOUDFLARE_DEPLOY_API_TOKEN が GitHub Secrets に設定されていないためデプロイをスキップしました。"
 
+      # 手動実行では紐づく PR が無いため、まず実行サマリーへリンクを出力する
+      - name: Publish Deployment Summary
+        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
+        env:
+          DEPLOY_REF: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.ref || github.ref_name }}
+          DEPLOY_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+        run: |
+          {
+            echo "### 🚀 プレビュー環境へのデプロイが完了しました！"
+            echo
+            echo "ブランチ \`${DEPLOY_REF}\` のコミット (\`${DEPLOY_SHA:0:7}\`) のビルド・デプロイが成功しました。"
+            echo
+            echo "| サービス | リンク |"
+            echo "| --- | --- |"
+            echo "| 🖥️ **Web UI** | [stg.kagami.kyosuke.dev](https://stg.kagami.kyosuke.dev) |"
+            echo "| ⚡ **API Server** | [api.stg.kagami.kyosuke.dev](https://api.stg.kagami.kyosuke.dev) |"
+            echo "| 🤖 **MCP Server** | [mcp.stg.kagami.kyosuke.dev](https://mcp.stg.kagami.kyosuke.dev) |"
+            echo "| ☁️ **Cloudflare Dashboard** | [Workers & Pages を開く](https://dash.cloudflare.com/${CLOUDFLARE_ACCOUNT_ID}/workers-and-pages) |"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      # `deploy` ラベル経由の実行では、同じ内容を PR へコメントする
       - name: Comment Preview Deployment on PR
         uses: actions/github-script@v7
-        if: github.event_name == 'pull_request'
+        if: ${{ github.event_name == 'pull_request' && env.CLOUDFLARE_API_TOKEN != '' }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const issue_number = context.issue.number;
             const identifier = '<!-- preview-deploy-comment -->';
             const cloudflareDashboardUrl = `https://dash.cloudflare.com/${process.env.CLOUDFLARE_ACCOUNT_ID}/workers-and-pages`;
+            const headSha = context.payload.pull_request.head.sha;
 
             // 1. 既存のプレビューデプロイコメントを削除 (古いコメントを削除して再投稿)
             const comments = await github.rest.issues.listComments({
@@ -183,7 +221,7 @@ jobs:
             const body = `${identifier}
             ### 🚀 プレビュー環境へのデプロイが完了しました！
 
-            プルリクエストの最新コミット (\`${context.sha.substring(0, 7)}\`) のビルド・デプロイが成功しました。
+            \`deploy\` ラベルが付いているため、最新コミット (\`${headSha.substring(0, 7)}\`) のビルド・デプロイを実行しました。
 
             | サービス | リンク |
             | --- | --- |
@@ -191,6 +229,8 @@ jobs:
             | ⚡ **API Server** | [api.stg.kagami.kyosuke.dev](https://api.stg.kagami.kyosuke.dev) |
             | 🤖 **MCP Server** | [mcp.stg.kagami.kyosuke.dev](https://mcp.stg.kagami.kyosuke.dev) |
             | ☁️ **Cloudflare Dashboard** | [Workers & Pages を開く](${cloudflareDashboardUrl}) |
+
+            > プレビューは全 PR 共有の単一環境です。ラベルを外しても環境は元に戻りません。
             `;
 
             await github.rest.issues.createComment({
