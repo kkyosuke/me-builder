@@ -128,8 +128,91 @@ coverage = 回答済み重み ÷ そのパラメータの全重み
 
 新しい計算関数は作りません。新しい設定と、その設定を検証するテストだけを追加します。
 
-## 8. 現在の実装境界
+## 8. Brain Itemへのprojection
+
+全問へ回答して`DiagnosisResponse`が回答済みになったとき、Parameter ProfileをBrain domainへprojectionします。DiagnosisのAnswerとSource Recordは原本であり、Brain Itemはそれらから再生成できる派生情報です。Brain Itemの分類と共通属性は[Brain内部情報の分類](../../domain/brain/brain-content-taxonomy.md)、根拠エッジの属性は[根拠・反証・改訂のエッジ設計](../../domain/brain/evidence-edge-design.md)を正とします。
+
+```mermaid
+flowchart LR
+    subgraph INPUT["入力: D1に保存済みの原本と設定"]
+        DR["DiagnosisResponse<br/>Account / Diagnosis / 回答状態"]
+        A["現在有効なAnswer × N<br/>Question ID / Version / Choice ID"]
+        SR["Source Record × N<br/>1 Answer = 1 原本"]
+        C["版付き採点設定<br/>設定ID・版 / 回答値 / 重み<br/>Parameter / ラベル / 境界"]
+        Q["projection要求<br/>DiagnosisResponse / 回答revision"]
+        DR --> A
+        A -.->|対応済み| SR
+        DR --> Q
+    end
+
+    subgraph TRANSFORM["決定的な変換: 中間値は保存しない"]
+        V["現在状態を再読込<br/>回答済み・版・所有Accountを検証"]
+        S["パラメータごとに集計<br/>choiceScore × weight<br/>→ score / coverage / band"]
+        P["Parameter Profile<br/>計算時だけ存在"]
+        G{"scoreを計算できるか"}
+        V --> S --> P --> G
+    end
+
+    subgraph BRAIN["Brain domainへ格納"]
+        B["Brain Item × Parameter<br/>Preference / 本人向けの文<br/>Diagnosis・設定版・Parameter<br/>score・coverage・band<br/>pending / deterministic"]
+        E["Evidence edge × 寄与Answer<br/>Source Record → Brain Item<br/>根拠 / 導出契機 / deterministic"]
+        R["内容変更時のRevision<br/>旧Brain Item → 新Brain Item"]
+    end
+
+    Q --> V
+    A --> V
+    C --> V
+    G -->|Yes: 1 Parameter = 1 Item| B
+    G -->|No: insufficient| X["格納しない"]
+    SR --> E --> B
+    B -.->|再回答で内容が変化| R
+```
+
+実線の入力・出力は保存する概念です。`Parameter Profile`は変換中だけの値であり、そのまま保存しません。Answerに対応するSource Recordはprojection時に作るのではなく、回答保存時点ですでに原本として存在します。
+
+### 8.1 作成単位と内容
+
+計算可能なパラメータ1件につき、Brain Itemを1件作ります。診断全体を1件へまとめると、パラメータごとに異なる根拠、確認、改訂を扱えないためです。
+
+| 格納先と要素 | 診断結果から設定する値 |
+| --- | --- |
+| Brain Item: 分類 | `Preference` |
+| Brain Item: 本人が確認できる文 | `{パラメータ表示名}は「{帯域の表示名}」の傾向がある` |
+| Brain Item: 分類固有属性 | Diagnosis ID、採点設定IDと版、Parameter ID、score、coverage、band |
+| Brain Item: Derivation | `deterministic` |
+| Brain Item: Confirmation | `pending` |
+| Brain Item: Confidence | `uncomputed` |
+| Brain Item: Stability | 変化しやすい |
+| Brain Item: Access Label | `unclassified` |
+| Brain Item: 状態 | `active` |
+| Evidence edge: 接続先 | 採点へ寄与したAnswerに対応するSource Record → Brain Item |
+| Evidence edge: 属性 | 根拠、導出契機、`deterministic`、生成時点 |
+| Revision: 接続先 | 内容が変わった場合のみ、旧Brain Item → 新Brain Item |
+
+帯域の表示名は、`low`では`lowLabel`、`balanced`では`balancedLabel`、`high`では`highLabel`を使用します。`score = null`または`band = insufficient`のパラメータはBrain Itemにしません。`coverage`は計算の充足率であり、Brain ItemのConfidenceへ転用しません。
+
+診断への回答は本人の入力ですが、Parameter Profileはその回答から導出した命題です。結果画面などで本人が明示的に承認するまでは`pending`とし、助言、Vectorize、MCP提供には使用しません。
+
+### 8.2 Evidence
+
+各Brain Itemには、そのパラメータの0以外の重みを持つQuestionへ現在有効なAnswerが対応づけているSource Recordを、導出契機の根拠として結びます。エッジのrelationは根拠、evidence roleは導出契機、derivation methodは`deterministic`です。
+
+採点に寄与しないQuestionのSource Recordを根拠へ含めません。Brain ItemとEvidenceの所有Accountが一致しない場合はprojectionを行いません。
+
+### 8.3 冪等性と再計算
+
+同じAccount、Diagnosis、採点設定版、Parameter IDの組み合わせは、同じprojection単位として扱います。通信再送や処理再試行で同じBrain ItemとEvidenceを増やしません。
+
+回答修正または削除後に再び回答済みになった場合は、現在有効なAnswerだけで再計算します。内容が変わる場合は既存Brain Itemを上書きせず、新しいBrain Itemを作って改訂関係を結びます。内容が同じ場合は新しい版を作りません。根拠がなくなったItemの利用可否は[Source Recordのライフサイクル設計](../../domain/source/source-record-lifecycle-design.md)に従います。
+
+### 8.4 実行境界
+
+Answer保存と同じ原子的な処理へ、冪等なprojection要求を登録します。projection処理は要求を受け取った時点のD1を読み直し、全問回答済みであることを確認してから計算・保存します。最後の回答リクエストが完了を推測して直接Itemを作る方式にはしません。並行して別のQuestionへ回答された場合や一時障害時にも、再実行によって収束させるためです。
+
+projection要求の再配送では現在状態を再評価します。回答途中なら正常終了し、回答済みなら同じ冪等キーで保存します。採点設定がない、または設定検証に失敗したDiagnosisではBrain Itemを作りません。
+
+## 9. 現在の実装境界
 
 `diagnosis_scoring_configs`が設定版と設定JSONを保持し、公開済みDiagnosisの`scoring_config_id`は変更しません。API ServerはDBから取得した設定をValibotで検証し、AnswerのQuestion ID、Question Version、Choice IDから表示のたびに結果を再計算します。
 
-計算済みParameter Profile自体は保存せず、クライアントの算出値も正として扱いません。採点設定を持たないDiagnosisでは回答内容だけを返し、Brain Itemの生成、改訂時の再計算は行いません。
+クライアントの算出値は正として扱いません。Brain Item projectionはサーバー側で同じ共通スコアリングエンジンと版付き採点設定を使用します。採点設定を持たないDiagnosisでは回答内容だけを返し、Brain Itemを生成しません。
