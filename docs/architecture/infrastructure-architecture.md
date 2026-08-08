@@ -134,7 +134,7 @@ flowchart TD
 
 ## 6. 開発・運用環境方針
 
-開発基盤には **Bun Workspaces** を用いたモノレポ構造（`apps/web`, `apps/api`, `apps/mcp`, `apps/worker`）を採用し、ローカル開発・PRプレビュー・本番環境で一貫した開発体験と安全なデプロイを実現します。
+開発基盤には **Bun Workspaces** を用いたモノレポ構造（`apps/web`, `apps/api`, `apps/mcp`, `apps/worker`）を採用し、ローカル開発・プレビュー・本番環境で一貫した開発体験と安全なデプロイを実現します。
 
 - **モノレポ構成 (`Bun Workspaces`)**:
 
@@ -164,9 +164,11 @@ flowchart TD
   - **ローカル開発環境 (`Local`)**:
     - `wrangler.toml` 内の `env.local` ターゲット（`me-builder-api-local`, `me-builder-mcp-local`, `me-builder-web-local`）。
     - ルートの `bun dev` または `wrangler dev --env local` によりローカルエミュレーション実行。
-  - **プレビュー環境 (`PR Preview`)**:
+  - **プレビュー環境 (`Preview`)**:
     - `wrangler.toml` 内の `env.preview` ターゲット（`me-builder-api-preview`, `me-builder-mcp-preview`, `me-builder-web`）。
-    - プルリクエスト作成時、GitHub Actions / CI 経由で `wrangler deploy --env preview` または `wrangler pages deploy` を実行し、検証用プレビュー環境へ独立デプロイ。
+    - 全 PR で共有する単一の検証環境。プルリクエストの作成・更新だけでは自動デプロイせず、`CD / Preview` ワークフローが次のいずれかで起動したときのみ `wrangler deploy --env preview` / `wrangler pages deploy` を実行。
+      - ブランチを指定した手動実行 (`workflow_dispatch`)
+      - `deploy` ラベルが付いた PR（ラベル付与時と、その後の push）
     - **カスタムドメイン・ルーティング配置**:
       - UI (`apps/web`): `stg.kagami.kyosuke.dev`
       - API (`apps/api`): `api.stg.kagami.kyosuke.dev`
