@@ -412,6 +412,40 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
     e2eTimeoutMs,
   );
 
+  it(
+    "会話と感情表現の回答を5つのパラメータへ採点する",
+    async () => {
+      for (let index = 1; index <= 10; index += 1) {
+        const suffix = String(index).padStart(2, "0");
+        const response = await putAnswer(
+          `dq-conversation-emotion-${suffix}`,
+          "yes",
+          "conversation-emotion",
+        );
+        expect(response.status).toBe(200);
+      }
+
+      const response = await getAnswers("conversation-emotion");
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({
+        id: "conversation-emotion",
+        scoring: {
+          scoringVersion: 1,
+          balancedLabel: "状況に応じて伝え方を選ぶ",
+          parameters: [
+            expect.objectContaining({ id: "empathetic-reception", score: 100, coverage: 100 }),
+            expect.objectContaining({ id: "verbal-affection", score: 100, coverage: 100 }),
+            expect.objectContaining({ id: "direct-communication", score: 100, coverage: 100 }),
+            expect.objectContaining({ id: "active-support", score: 100, coverage: 100 }),
+            expect.objectContaining({ id: "emotional-openness", score: 100, coverage: 100 }),
+          ],
+        },
+      });
+    },
+    e2eTimeoutMs,
+  );
+
   it(`${diagnosisAnswerCases.missingContents.id}: ${diagnosisAnswerCases.missingContents.name}`, async () => {
     const response = await getAnswers();
     expect(response.status).toBe(404);

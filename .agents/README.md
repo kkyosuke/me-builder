@@ -30,6 +30,7 @@
 | [「お金と消費」パラメータ変換設計](../docs/diagnosis/scoring/money-values-parameter-design.md) | 2つ目の診断固有の5パラメータ、質問ごとの重み、表示設定 |
 | [「インドア・アウトドアと余暇」パラメータ変換設計](../docs/diagnosis/scoring/leisure-style-parameter-design.md) | 3つ目の診断固有の4パラメータ、質問ごとの重み、表示設定 |
 | [「時間と予定」パラメータ変換設計](../docs/diagnosis/scoring/time-planning-parameter-design.md) | 4つ目の診断固有の4パラメータ、質問ごとの重み、表示設定 |
+| [「会話と感情表現」パラメータ変換設計](../docs/diagnosis/scoring/conversation-emotion-parameter-design.md) | 5つ目の診断固有の5パラメータ、質問ごとの重み、表示設定 |
 | [ドメイン設計](../docs/domain/domain-design.md) | Account / Brain / Sourceの責務・境界、Diagnosisの位置づけ、ドメイン間の関係、設計順序と進捗 |
 | [Brain内部情報の分類](../docs/domain/brain/brain-content-taxonomy.md) | Brain Itemの分類名、定義、具体例、分類とは別に持つ共通属性、意思決定での利用方法 |
 | [根拠・反証・改訂のエッジ設計](../docs/domain/brain/evidence-edge-design.md) | Source RecordとBrain Itemを結ぶエッジの種類と属性、Confidenceとの関係、外部への開示粒度、改訂された旧版の扱い |

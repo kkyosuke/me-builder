@@ -93,8 +93,9 @@ describe("DiagnosisHome", () => {
         diagnoses={{
           status: "success",
           data: [
+            diagnosis({ id: "conversation-emotion", title: "会話と感情表現" }),
             diagnosis({ id: "time-planning", title: "時間と予定" }),
-            diagnosis({ id: "new-diagnosis", title: "新しい診断", displayOrder: 2 }),
+            diagnosis({ id: "new-diagnosis", title: "新しい診断", displayOrder: 3 }),
           ],
         }}
         onOpenDiagnosis={vi.fn()}
@@ -105,9 +106,13 @@ describe("DiagnosisHome", () => {
       />,
     );
 
+    const conversationEmotionCard = screen.getByRole("button", { name: /会話と感情表現/ });
     const timePlanningCard = screen.getByRole("button", { name: /時間と予定/ });
     const fallbackCard = screen.getByRole("button", { name: /新しい診断/ });
 
+    expect(conversationEmotionCard.querySelector("img")?.getAttribute("src")).toBe(
+      "/images/diagnoses/conversation-emotion.jpg",
+    );
     expect(timePlanningCard.querySelector("img")?.getAttribute("src")).toBe(
       "/images/diagnoses/time-planning.jpg",
     );
