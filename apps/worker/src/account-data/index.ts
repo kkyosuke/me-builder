@@ -8,6 +8,7 @@ import {
 import { eq, inArray } from "drizzle-orm";
 import type { Env } from "../types";
 import { brainActions } from "./brain";
+import { compatibilityActions } from "./compatibility";
 import { diagnosisActions } from "./diagnosis";
 import { diaryActions } from "./diary";
 import {
@@ -51,6 +52,20 @@ export class AccountData extends DurableObject<Env> {
     if (accountId !== this.accountId) {
       throw new Error("AccountData RPC account does not match object name");
     }
+    this.repository.bindAccount(accountId);
+    if (operation.startsWith("compatibility.")) {
+      const action = (compatibilityActions as Partial<Record<AccountDataOperation, unknown>>)[
+        operation
+      ];
+      if (typeof action !== "function") throw new Error("Unsupported AccountData operation");
+      const boundAction = action as (
+        repository: AccountDataRepository,
+        boundAccountId: string,
+        ...actionArgs: AccountDataArgs<TOperation>
+      ) => AccountDataResult<TOperation>;
+      return boundAction(this.repository, accountId, ...args);
+    }
+
     const action = (actions as Partial<Record<AccountDataOperation, unknown>>)[operation];
     if (typeof action !== "function") throw new Error("Unsupported AccountData operation");
     const boundAction = action as (
@@ -59,7 +74,6 @@ export class AccountData extends DurableObject<Env> {
       ...actionArgs: AccountDataArgs<TOperation>
     ) => Promise<AccountDataResult<TOperation>>;
 
-    this.repository.bindAccount(accountId);
     if (!this.legacyImport) this.legacyImport = this.importLegacyAccountData(accountId);
     try {
       await this.legacyImport;

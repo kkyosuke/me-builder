@@ -1,3 +1,9 @@
+import type {
+  ActivateCompatibilityReferenceResult,
+  CompatibilityReference,
+  CompatibilityReferenceRole,
+  ReserveCompatibilityReferenceResult,
+} from "./compatibility-data";
 import type * as conversation from "./d1/action/conversation";
 import type * as diagnosis from "./d1/action/diagnosis";
 import type * as diagnosisBrainProjection from "./d1/action/diagnosis-brain-projection";
@@ -19,6 +25,25 @@ type DomainAction<TAction extends (...args: never[]) => unknown> = RpcAction<
 >;
 
 export type AccountDataActions = {
+  "compatibility.addOutgoingReference": (
+    input: Readonly<{ relationshipId: string; createdAt: Date }>,
+  ) => Promise<CompatibilityReference>;
+  "compatibility.reserveIncomingReference": (
+    input: Readonly<{ relationshipId: string; partnerAccountId: string; createdAt: Date }>,
+  ) => Promise<ReserveCompatibilityReferenceResult>;
+  "compatibility.activateReference": (
+    input: Readonly<{
+      relationshipId: string;
+      partnerAccountId: string;
+      role: CompatibilityReferenceRole;
+      updatedAt: Date;
+    }>,
+  ) => Promise<ActivateCompatibilityReferenceResult>;
+  "compatibility.endReference": (
+    relationshipId: string,
+    endedAt: Date,
+  ) => Promise<CompatibilityReference | null>;
+  "compatibility.listVisibleReferences": () => Promise<readonly CompatibilityReference[]>;
   "source.hasActive": RpcAction<[], typeof source.hasActiveSourceRecords>;
   "conversation.storeLineTextSource": RpcAction<
     [WithoutAccountId<Parameters<typeof conversation.storeLineTextSource>[1]>],

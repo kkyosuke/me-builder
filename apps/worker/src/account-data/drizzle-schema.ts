@@ -3,4 +3,4 @@ export * from "../../../../packages/lib/src/d1/schema/brain";
 export * from "../../../../packages/lib/src/d1/schema/conversation";
 export * from "../../../../packages/lib/src/d1/schema/diagnosis";
 export * from "../../../../packages/lib/src/d1/schema/source";
-export { accountDataIdentity } from "./schema";
+export { accountDataIdentity, compatibilityReferences } from "./schema";
