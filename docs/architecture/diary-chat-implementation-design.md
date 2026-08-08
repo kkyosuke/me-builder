@@ -558,7 +558,7 @@ system promptは次の順で固定し、Git管理する`prompt_version`を付け
 | 38秒 | 体験設計上のSLO |
 | 90秒 | finalまたは失敗案内の内部上限 |
 
-待機中であることは`showLoadingAnimation`で示し、独立した受領応答Pushは送りません。AIの最終回答には、`LIFF_ID`が設定されている場合だけ「今日の診断に答える」とLIFF URLを末尾へ付けます。D1の`assistant_body`は生成本文だけを正本として保持し、チャネル固有の導線は配送時に付加します。
+待機中であることは`showLoadingAnimation`で示し、独立した受領応答Pushは送りません。AIの最終回答は生成本文だけを配送し、診断導線を付加しません。D1の`assistant_body`にも同じ生成本文を正本として保持します。
 
 ### 9.2 LINE配送とreply token
 
@@ -623,7 +623,7 @@ logへ出せる識別子は環境、Queue message ID、Turn ID、Session IDの�
 - Vectorize upsert・deleteの失敗と長時間`submitted`をoutboxとreconciliationで回復する
 - schema外出力、存在しないEvidence ID、質問過多を送信しない
 - finalと失敗案内をtimeoutさせ、同じLINE retry keyでだけ再試行する
-- LIFF ID設定時はfinalの末尾に診断リンクを付け、D1のassistant本文には混ぜない
+- finalに診断リンクを付加せず、D1のassistant本文と同じ生成本文を配送する
 - 90秒でfinalまたは失敗案内の配送outboxを確定する
 - Queue再配送、DO再起動、alarm再実行でもTurnが重複しない
 - AI Gatewayのpayload loggingとcacheが無効になる

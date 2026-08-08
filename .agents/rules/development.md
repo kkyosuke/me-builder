@@ -98,12 +98,12 @@
   - CDの登録処理は、登録後のURL一致、Webhookの有効化状態、LINE Platformから登録URLへの疎通を公式SDKで検証し、いずれかが不成立ならデプロイを失敗させます。また、Workerのデプロイ後にGeminiへの最小リクエストを実行し、Secret・AI Gateway・モデルの接続不良をデプロイ成功として扱いません。応答本文やSecretはログへ出力しません。
   - Webhook受信メッセージは決定的なcommand routing後にCloudflare Queues経由でQueue Worker (`apps/worker`) へ配信します。診断commandの返信は既存の`replyToken`経路を使い、日記の最終応答は[日記チャット実装設計](../../docs/architecture/diary-chat-implementation-design.md#9-38秒sloと配送)を正とします。**送られた本文をオウム返ししません。**
   - 署名検証に成功した1対1トークのテキストメッセージでは、API ServerがQueue投入前に`MessagingApiClient.showLoadingAnimation`を呼び、60秒のチャットローディングを表示します。診断、日記、AIチャットを受信側で重複判定せず、いずれも同じ待機表示にします。グループトークと非テキストイベントは対象外です。ローディングAPIの完了はQueue投入前に待たず、Cloudflare Workersでは`executionCtx.waitUntil`へ渡してWebhook応答のクリティカルパスから外します。ローディングAPIの失敗はQueue投入を止めず、本人識別子である`userId`をログへ出力しません（[LINE公式ガイド](https://developers.line.biz/en/docs/messaging-api/use-loading-indicator/)）。
-  - 日記では独立した受付Pushを送らず、`showLoadingAnimation`の後にAIの最終応答をPushします。最終応答には「今日の診断」への導線として LIFF の URL (`https://liff.line.me/{LIFF_ID}`) を末尾へ添えます。LINE 内から Web を開く主導線であり、設計は [プロジェクト概要 §4](../../docs/product/project-overview.md#4-想定する利用体験) を正とします。D1のassistant本文には導線を混ぜず、配送時の文面組み立てを`apps/worker`のLINE featureへ集約します。
+  - 日記では独立した受付Pushを送らず、`showLoadingAnimation`の後にAIの最終応答をPushします。最終応答には診断導線を付加しません。LINE 内から Web を開く主導線はリッチメニューであり、設計は [Phase 1 診断体験設計 §7](../../docs/diagnosis/diagnosis-experience.md#7-リッチメニュー) を正とします。
   - テキストメッセージは**既定で日記として扱い**、診断のリンクを求めるキーワード (`診断` など) だけを例外として切り出します。判定は`packages/lib`の`classifyLineText`へ集約し、API WorkerがQueue投入前に実行します。Queue Workerは渡された`diagnosis-request` / `diary`のunionをschema検証し、同じ関数で再判定して不一致なら処理しません。
     - キーワードの判定は **NFKC 正規化・前後の空白除去・ひらがなからカタカナへの寄せの後で完全一致**させます。部分一致は採りません。部分一致にすると「今日は会社で診断に答えた」のような日記本文がコマンドとして飲み込まれ、蓄積の量を担う日記が記録されなくなります。
-    - `diagnosis-request` の返信は診断へのリンクだけを返します。`diary` は待機表示後、AIの最終応答末尾に診断リンクを付けます。
+    - `diagnosis-request` の返信は診断へのリンクだけを返します。`diary` は待機表示後、診断リンクを付けずにAIの最終応答を返します。
     - 日記の本文はログへ出力せず、判定結果 (`intent`) だけを残します。
-  - `LIFF_ID` は `apps/worker` へ配布します。秘密情報ではありませんが、GitHub Environment の変数を単一の出所とするため、CDワークフローが一時的なsecretファイルを作り、`wrangler deploy --secrets-file`でコードと同じWorker Versionへ配布します。未設定の場合は最終応答からリンクだけを省きます。
+  - `LIFF_ID` は `apps/worker` へ配布します。秘密情報ではありませんが、GitHub Environment の変数を単一の出所とするため、CDワークフローが一時的なsecretファイルを作り、`wrangler deploy --secrets-file`でコードと同じWorker Versionへ配布します。未設定の場合は`diagnosis-request`へリンクを利用できない旨を返信します。
   - 環境変数が未設定の場合は自動登録および返信処理がログ出力とともに安全にスキップされます。
 
 - **LINE Webhook の署名検証 (`x-line-signature`)**:

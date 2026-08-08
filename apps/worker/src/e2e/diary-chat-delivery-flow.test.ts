@@ -296,7 +296,7 @@ describe("LINE diary chat delivery E2E", () => {
       messages: [
         {
           type: "text",
-          text: `${generatedReply}\n\n今日の診断に答える\nhttps://liff.line.me/${liffId}`,
+          text: generatedReply,
         },
       ],
     });
@@ -320,7 +320,7 @@ describe("LINE diary chat delivery E2E", () => {
       messages: [
         {
           type: "text",
-          text: `${generatedReply}\n\n今日の診断に答える\nhttps://liff.line.me/${liffId}`,
+          text: generatedReply,
         },
       ],
     });
