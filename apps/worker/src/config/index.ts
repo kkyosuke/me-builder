@@ -3,6 +3,7 @@ import * as v from "valibot";
 import {
   DEFAULT_CHAT_CONTEXT_MESSAGE_LIMIT,
   DEFAULT_CLOUDFLARE_AI_GATEWAY_BASE_URL,
+  DEFAULT_GEMINI_IMAGE_MODEL,
   DEFAULT_GEMINI_MODEL,
   type WorkerConfig,
   WorkerConfigSchema,
@@ -67,6 +68,8 @@ export function getWorkerConfig(env?: Record<string, unknown>): WorkerConfig {
   const rawCloudflareAiGatewayBaseUrl =
     getEnv("CF_AI_GATEWAY_BASE_URL", env)?.trim() || DEFAULT_CLOUDFLARE_AI_GATEWAY_BASE_URL;
   const rawGeminiModel = getEnv("GEMINI_MODEL", env)?.trim() || DEFAULT_GEMINI_MODEL;
+  const rawGeminiImageModel =
+    getEnv("GEMINI_IMAGE_MODEL", env)?.trim() || DEFAULT_GEMINI_IMAGE_MODEL;
   const rawChatEnabled = getEnv("CHAT_ENABLED", env)?.trim().toLowerCase() !== "false";
   const rawChatDeliverySecret = getEnv("CHAT_DELIVERY_SECRET", env)?.trim() || undefined;
   const rawChatContextMessageLimit = getEnv("CHAT_CONTEXT_MESSAGE_LIMIT", env)?.trim();
@@ -86,6 +89,7 @@ export function getWorkerConfig(env?: Record<string, unknown>): WorkerConfig {
     cloudflareAiGatewayToken: rawCloudflareAiGatewayToken,
     cloudflareAiGatewayBaseUrl: rawCloudflareAiGatewayBaseUrl,
     geminiModel: rawGeminiModel,
+    geminiImageModel: rawGeminiImageModel,
     chatEnabled: rawChatEnabled,
     chatDeliverySecret: rawChatDeliverySecret,
     chatContextMessageLimit: parsePositiveInteger(

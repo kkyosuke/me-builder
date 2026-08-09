@@ -1,4 +1,17 @@
 import type {
+  AcquireAvatarTaskResult,
+  AvatarCandidateRecord,
+  AvatarJobRecord,
+  AvatarQueueOperation,
+  AvatarState,
+  CreateAvatarJobInput,
+  CreateAvatarJobResult,
+  PendingAvatarEnqueue,
+  ResolveAvatarImageResult,
+  SelectAvatarCandidateResult,
+  StartAvatarGenerationResult,
+} from "./avatar";
+import type {
   ActivateCompatibilityReferenceResult,
   CompatibilityReference,
   CompatibilityReferenceRole,
@@ -61,6 +74,47 @@ export type AccountDataActions = {
     endedAt: Date,
   ) => Promise<CompatibilityReference | null>;
   "compatibility.listVisibleReferences": () => Promise<readonly CompatibilityReference[]>;
+  "avatar.getState": (at?: Date) => Promise<AvatarState>;
+  "avatar.createJob": (input: CreateAvatarJobInput) => Promise<CreateAvatarJobResult>;
+  "avatar.failJob": (jobId: string, errorCode: string, at?: Date) => Promise<void>;
+  "avatar.markEnqueued": (
+    jobId: string,
+    operation: AvatarQueueOperation,
+    at?: Date,
+  ) => Promise<void>;
+  "avatar.startGeneration": (jobId: string, at?: Date) => Promise<StartAvatarGenerationResult>;
+  "avatar.cancelJob": (jobId: string, at?: Date) => Promise<AvatarJobRecord | null>;
+  "avatar.selectCandidate": (
+    candidateId: string,
+    at?: Date,
+  ) => Promise<SelectAvatarCandidateResult>;
+  "avatar.deleteCurrent": (at?: Date) => Promise<{ previousObjectKey: string | null }>;
+  "avatar.resolveImage": (imageId: string, at?: Date) => Promise<ResolveAvatarImageResult>;
+  "avatar.acquireTask": (
+    jobId: string,
+    operation: AvatarQueueOperation,
+    leaseExpiresAt: Date,
+    at?: Date,
+  ) => Promise<AcquireAvatarTaskResult>;
+  "avatar.finishPersonCheck": (
+    jobId: string,
+    hasPerson: boolean,
+    at?: Date,
+  ) => Promise<AvatarJobRecord | null>;
+  "avatar.addCandidate": (candidate: AvatarCandidateRecord) => Promise<boolean>;
+  "avatar.finishGeneration": (
+    jobId: string,
+    model: string,
+    at?: Date,
+  ) => Promise<AvatarJobRecord | null>;
+  "avatar.releaseTask": (
+    jobId: string,
+    operation: AvatarQueueOperation,
+    terminal: boolean,
+    errorCode: string,
+    at?: Date,
+  ) => Promise<void>;
+  "avatar.listPendingEnqueues": (at?: Date) => Promise<PendingAvatarEnqueue[]>;
   "source.hasActive": RpcAction<[], typeof source.hasActiveSourceRecords>;
   "conversation.storeLineTextSource": RpcAction<
     [WithoutAccountId<Parameters<typeof conversation.storeLineTextSource>[1]>],

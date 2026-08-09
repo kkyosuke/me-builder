@@ -1,6 +1,7 @@
 import { line } from "@me-builder/lib";
 import type { d1 } from "@me-builder/lib";
 import {
+  type AvatarQueueMessage,
   type ChatTurnQueueMessage,
   type DiaryBrainCheckpointQueueMessage,
   type Message,
@@ -10,6 +11,7 @@ import {
   toSafeOperationalErrorFields,
 } from "@me-builder/shared";
 import { type CloudflareBindings, type WorkerConfig, getWorkerConfig } from "../config";
+import { processAvatarMessage } from "../handler/avatar";
 import { processChatTurnMessage } from "../handler/chat-turn";
 import { processDiaryBrainCheckpointMessage } from "../handler/diary-brain-checkpoint";
 import { processLineWebhook } from "./feature/line";
@@ -106,7 +108,10 @@ async function processWebhookMessage(
 
 export async function handleQueueBatch(
   batch: MessageBatch<
-    WebhookQueueMessage | ChatTurnQueueMessage | DiaryBrainCheckpointQueueMessage
+    | WebhookQueueMessage
+    | ChatTurnQueueMessage
+    | DiaryBrainCheckpointQueueMessage
+    | AvatarQueueMessage
   >,
   db: d1.Client,
   workerConfig?: WorkerConfig,
@@ -124,7 +129,10 @@ export async function handleQueueBatch(
 
   for (const message of batch.messages) {
     try {
-      if ("type" in message.body && message.body.type === "chat-turn") {
+      if ("type" in message.body && message.body.type === "avatar") {
+        if (!cf || !workerConfig) throw new Error("Avatar bindings are not configured");
+        await processAvatarMessage(message as Message<AvatarQueueMessage>, cf, workerConfig);
+      } else if ("type" in message.body && message.body.type === "chat-turn") {
         if (!cf || !workerConfig) throw new Error("Chat turn bindings are not configured");
         await processChatTurnMessage(message as Message<ChatTurnQueueMessage>, cf, workerConfig);
       } else if ("type" in message.body && message.body.type === "diary-brain-checkpoint") {

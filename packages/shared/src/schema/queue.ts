@@ -38,4 +38,12 @@ export interface DiaryBrainCheckpointQueueMessage {
   checkpointId: string;
 }
 
+/** Avatar Queueには画像本文や外部の本人識別子を含めず、AccountDataとJobだけを参照させる。 */
+export interface AvatarQueueMessage {
+  type: "avatar";
+  operation: "person-check" | "generate";
+  accountId: string;
+  jobId: string;
+}
+
 export type { Queue, Message, MessageBatch };

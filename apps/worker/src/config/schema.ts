@@ -3,6 +3,7 @@ import * as v from "valibot";
 export const DEFAULT_CLOUDFLARE_AI_GATEWAY_BASE_URL =
   "https://gateway.ai.cloudflare.com/v1/8e0b10ee5263d2f699a93dbe3ee97da0/default/google-ai-studio";
 export const DEFAULT_GEMINI_MODEL = "gemini-3.5-flash-lite";
+export const DEFAULT_GEMINI_IMAGE_MODEL = "gemini-2.5-flash-image";
 export const DEFAULT_CHAT_CONTEXT_MESSAGE_LIMIT = 20;
 
 export const WorkerConfigSchema = v.object({
@@ -20,6 +21,7 @@ export const WorkerConfigSchema = v.object({
     DEFAULT_CLOUDFLARE_AI_GATEWAY_BASE_URL,
   ),
   geminiModel: v.optional(v.string(), DEFAULT_GEMINI_MODEL),
+  geminiImageModel: v.optional(v.string(), DEFAULT_GEMINI_IMAGE_MODEL),
   chatEnabled: v.optional(v.boolean(), true),
   chatDeliverySecret: v.optional(v.string()),
   chatContextMessageLimit: v.optional(

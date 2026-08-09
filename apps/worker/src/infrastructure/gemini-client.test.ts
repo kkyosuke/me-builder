@@ -1,6 +1,11 @@
 import type { GoogleGenAI, GoogleGenAIOptions } from "@google/genai";
 import { describe, expect, it, vi } from "vitest";
-import { createGeminiClient, generateText } from "./gemini-client";
+import {
+  createGeminiClient,
+  detectPerson,
+  generateAvatarImage,
+  generateText,
+} from "./gemini-client";
 
 describe("Gemini client", () => {
   it("Cloudflare AI Gateway の URL と認証ヘッダーを SDK に設定すること", () => {
@@ -41,5 +46,62 @@ describe("Gemini client", () => {
       model: "gemini-3.5-flash-lite",
       contents: "What is Cloudflare?",
     });
+  });
+
+  it("人物の有無だけをstructured outputで判定すること", async () => {
+    const generateContent = vi.fn().mockResolvedValue({ text: '{"hasPerson":true}' });
+    const client = { models: { generateContent } } as unknown as GoogleGenAI;
+
+    await expect(
+      detectPerson(client, {
+        model: "gemini-person-model",
+        bytes: new Uint8Array([1, 2, 3]),
+        mimeType: "image/webp",
+      }),
+    ).resolves.toBe(true);
+    expect(generateContent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: "gemini-person-model",
+        config: expect.objectContaining({ responseMimeType: "application/json" }),
+        contents: [
+          expect.objectContaining({
+            parts: expect.arrayContaining([
+              { inlineData: { data: "AQID", mimeType: "image/webp" } },
+            ]),
+          }),
+        ],
+      }),
+    );
+  });
+
+  it("画像生成モデルから返された画像だけを候補として復号すること", async () => {
+    const generateContent = vi.fn().mockResolvedValue({
+      candidates: [
+        {
+          content: {
+            parts: [{ text: "ignored" }, { inlineData: { data: "BAUG", mimeType: "image/png" } }],
+          },
+        },
+      ],
+    });
+    const client = { models: { generateContent } } as unknown as GoogleGenAI;
+
+    await expect(
+      generateAvatarImage(client, {
+        model: "gemini-image-model",
+        bytes: new Uint8Array([1, 2, 3]),
+        mimeType: "image/webp",
+        style: "test-style",
+      }),
+    ).resolves.toEqual({ bytes: new Uint8Array([4, 5, 6]), mimeType: "image/png" });
+    expect(generateContent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: "gemini-image-model",
+        config: {
+          responseModalities: ["IMAGE"],
+          imageConfig: { aspectRatio: "1:1", imageSize: "1K" },
+        },
+      }),
+    );
   });
 });

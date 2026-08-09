@@ -2,6 +2,7 @@ import { d1 } from "@me-builder/lib";
 import Database from "better-sqlite3";
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
+import { avatarActions, listPendingAvatarObjectDeletions } from "./avatar";
 import { AccountDataRepository, type LegacyAccountDataSnapshot } from "./repository";
 
 function createRepository() {
@@ -54,10 +55,182 @@ describe("AccountDataRepository", () => {
       "diagnosis_answers",
       "diagnosis_deferred_questions",
       "diagnosis_brain_projection_requests",
+      "avatar_jobs",
+      "avatar_candidates",
+      "avatar_profile",
+      "avatar_object_deletions",
+      "avatar_generation_events",
     ];
     for (const table of descendantTables) {
       expect(repository.columnNames(table), table).not.toContain("account_id");
     }
+  });
+
+  it("新規生成をAccountごとに24時間3件までに制限し、同じジョブの再試行は数えない", async () => {
+    const repository = createRepository();
+    await repository.initialize();
+    repository.bindAccount("account-1");
+    const accountId = "account-1";
+    const base = new Date("2026-08-09T00:00:00.000Z");
+
+    for (let index = 0; index < 4; index += 1) {
+      const at = new Date(base.getTime() + index * 60_000);
+      const jobId = `rate-job-${index}`;
+      await avatarActions["avatar.createJob"](repository.client, accountId, {
+        id: jobId,
+        referenceObjectKey: `reference-${index}.webp`,
+        referenceContentType: "image/webp",
+        createdAt: at,
+        expiresAt: new Date(at.getTime() + 24 * 60 * 60 * 1000),
+      });
+      await avatarActions["avatar.finishPersonCheck"](
+        repository.client,
+        accountId,
+        jobId,
+        true,
+        at,
+      );
+      const started = await avatarActions["avatar.startGeneration"](
+        repository.client,
+        accountId,
+        jobId,
+        at,
+      );
+      if (index < 3) {
+        expect(started).toMatchObject({ type: "accepted" });
+        await avatarActions["avatar.cancelJob"](repository.client, accountId, jobId, at);
+      } else {
+        expect(started).toEqual({
+          type: "rate-limited",
+          retryAt: new Date("2026-08-10T00:00:00.000Z"),
+        });
+      }
+    }
+  });
+
+  it("人物判定から候補選択までをAccount単位で永続化する", async () => {
+    const repository = createRepository();
+    await repository.initialize();
+    repository.bindAccount("account-1");
+    const accountId = "account-1";
+    const createdAt = new Date("2026-08-09T00:00:00.000Z");
+    const jobId = "job-1";
+
+    const created = await avatarActions["avatar.createJob"](repository.client, accountId, {
+      id: jobId,
+      referenceObjectKey: "accounts/account-1/avatar/jobs/job-1/reference.webp",
+      referenceContentType: "image/webp",
+      createdAt,
+      expiresAt: new Date("2026-08-10T00:00:00.000Z"),
+    });
+    expect(created).toMatchObject({
+      type: "created",
+      job: { status: "checking", pendingOperation: "person-check", queuePending: true },
+    });
+    await expect(
+      avatarActions["avatar.listPendingEnqueues"](repository.client, accountId, createdAt),
+    ).resolves.toEqual([{ jobId, operation: "person-check" }]);
+
+    await avatarActions["avatar.markEnqueued"](
+      repository.client,
+      accountId,
+      jobId,
+      "person-check",
+      new Date("2026-08-09T00:00:01.000Z"),
+    );
+    const personLease = await avatarActions["avatar.acquireTask"](
+      repository.client,
+      accountId,
+      jobId,
+      "person-check",
+      new Date("2026-08-09T00:10:00.000Z"),
+      new Date("2026-08-09T00:00:02.000Z"),
+    );
+    expect(personLease).toMatchObject({ type: "acquired", job: { attemptCount: 1 } });
+    await avatarActions["avatar.finishPersonCheck"](
+      repository.client,
+      accountId,
+      jobId,
+      true,
+      new Date("2026-08-09T00:00:03.000Z"),
+    );
+
+    const accepted = await avatarActions["avatar.startGeneration"](
+      repository.client,
+      accountId,
+      jobId,
+      new Date("2026-08-09T00:00:04.000Z"),
+    );
+    expect(accepted).toMatchObject({
+      type: "accepted",
+      job: { status: "accepted", pendingOperation: "generate", queuePending: true },
+    });
+    const generationLease = await avatarActions["avatar.acquireTask"](
+      repository.client,
+      accountId,
+      jobId,
+      "generate",
+      new Date("2026-08-09T00:10:05.000Z"),
+      new Date("2026-08-09T00:00:05.000Z"),
+    );
+    expect(generationLease).toMatchObject({
+      type: "acquired",
+      job: { status: "generating", attemptCount: 1 },
+    });
+
+    const candidate = {
+      id: "candidate-1",
+      jobId,
+      objectKey: "accounts/account-1/avatar/jobs/job-1/candidates/candidate-1.webp",
+      contentType: "image/webp",
+      createdAt: new Date("2026-08-09T00:00:06.000Z"),
+      expiresAt: new Date("2026-08-16T00:00:06.000Z"),
+      selectedAt: null,
+    };
+    await expect(
+      avatarActions["avatar.addCandidate"](repository.client, accountId, candidate),
+    ).resolves.toBe(true);
+    await avatarActions["avatar.finishGeneration"](
+      repository.client,
+      accountId,
+      jobId,
+      "gemini-image-model",
+      new Date("2026-08-09T00:00:07.000Z"),
+    );
+    const selected = await avatarActions["avatar.selectCandidate"](
+      repository.client,
+      accountId,
+      candidate.id,
+      new Date("2026-08-09T00:00:08.000Z"),
+    );
+    expect(selected).toMatchObject({
+      type: "selected",
+      state: {
+        currentCandidate: { id: candidate.id },
+        latestJob: { status: "selected" },
+      },
+    });
+    await expect(
+      listPendingAvatarObjectDeletions(repository.client, new Date("2026-08-17T00:00:00.000Z")),
+    ).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          objectKey: "accounts/account-1/avatar/jobs/job-1/reference.webp",
+        }),
+      ]),
+    );
+    await expect(
+      avatarActions["avatar.resolveImage"](
+        repository.client,
+        accountId,
+        candidate.id,
+        new Date("2026-08-17T00:00:00.000Z"),
+      ),
+    ).resolves.toEqual({
+      type: "resolved",
+      objectKey: candidate.objectKey,
+      contentType: "image/webp",
+    });
   });
 
   it("Objectを最初のAccountへ固定し、異なるAccountを拒否する", async () => {

@@ -6,14 +6,26 @@ import {
   type ReserveCompatibilityReferenceResult,
   d1,
 } from "@me-builder/lib";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull } from "drizzle-orm";
 import { type DrizzleSqliteDODatabase, drizzle } from "drizzle-orm/durable-sqlite";
 import { migrate } from "drizzle-orm/durable-sqlite/migrator";
 import migrations from "../../drizzle/account-data/migrations.js";
+import {
+  avatarCandidates,
+  avatarGenerationEvents,
+  avatarJobs,
+  avatarObjectDeletions,
+  avatarProfile,
+} from "./avatar-schema";
 import { accountDataIdentity, compatibilityReferences } from "./schema";
 
 const accountDataSchema = {
   accountDataIdentity,
+  avatarCandidates,
+  avatarGenerationEvents,
+  avatarJobs,
+  avatarObjectDeletions,
+  avatarProfile,
   compatibilityReferences,
   accounts: d1.schema.accounts,
   brainItemAccessLabels: d1.schema.brainItemAccessLabels,
@@ -699,6 +711,19 @@ export class AccountDataRepository {
       .orderBy(asc(d1.schema.diaryBrainCheckpoints.nextAttemptAt))
       .limit(1)
       .get();
+    const avatarQueue = this.database
+      .select({ nextEnqueueAt: avatarJobs.nextEnqueueAt })
+      .from(avatarJobs)
+      .where(and(eq(avatarJobs.queuePending, true), isNotNull(avatarJobs.nextEnqueueAt)))
+      .orderBy(asc(avatarJobs.nextEnqueueAt))
+      .limit(1)
+      .get();
+    const avatarDeletion = this.database
+      .select({ deleteAfter: avatarObjectDeletions.deleteAfter })
+      .from(avatarObjectDeletions)
+      .orderBy(asc(avatarObjectDeletions.deleteAfter))
+      .limit(1)
+      .get();
     const candidates = [
       session
         ? Math.min(
@@ -708,6 +733,8 @@ export class AccountDataRepository {
         : null,
       projection?.nextAttemptAt.getTime() ?? null,
       diaryBrainCheckpoint?.nextAttemptAt.getTime() ?? null,
+      avatarQueue?.nextEnqueueAt?.getTime() ?? null,
+      avatarDeletion?.deleteAfter.getTime() ?? null,
     ].filter((value): value is number => value !== null);
     return candidates.length > 0 ? Math.min(...candidates) : null;
   }

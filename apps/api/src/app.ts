@@ -5,6 +5,15 @@ import { cors } from "hono/cors";
 import * as v from "valibot";
 import { getConfig } from "./config";
 import { adminStatisticsRoute } from "./contract/admin/statistics";
+import {
+  cancelAvatarJobRoute,
+  deleteAvatarRoute,
+  getAvatarImageRoute,
+  getAvatarRoute,
+  selectAvatarRoute,
+  startAvatarGenerationRoute,
+  uploadAvatarRoute,
+} from "./contract/avatar";
 import { developmentBrainItemsRoute } from "./contract/brain/dev-list";
 import { saveDiagnosisAnswerRoute } from "./contract/diagnosis/answer";
 import { diagnosisAnswersRoute } from "./contract/diagnosis/answers";
@@ -18,6 +27,15 @@ import { profileSummaryRoute } from "./contract/profile/summary";
 import { InternalServerErrorSchema } from "./contract/shared/errors";
 import { getStatistics } from "./controller/admin";
 import { getDevelopmentBrainItems } from "./controller/brain";
+import {
+  deleteAvatarContents,
+  deleteAvatarJob,
+  getAvatarContents,
+  getAvatarImageContents,
+  postAvatarGeneration,
+  postAvatarUpload,
+  putAvatar,
+} from "./controller/avatar";
 import {
   deleteDevelopmentDiagnosisData,
   getDiagnoses,
@@ -77,6 +95,14 @@ app.get("/api/admin/statistics", adminStatisticsRoute, getStatistics);
 app.get("/api/profile-summary", profileSummaryRoute, getProfileSummaryContents);
 
 app.get("/api/dev/brain-items", developmentBrainItemsRoute, getDevelopmentBrainItems);
+
+app.get("/api/avatar", getAvatarRoute, getAvatarContents);
+app.post("/api/avatar/uploads", uploadAvatarRoute, postAvatarUpload);
+app.post("/api/avatar/jobs/:jobId/generation", startAvatarGenerationRoute, postAvatarGeneration);
+app.delete("/api/avatar/jobs/:jobId", cancelAvatarJobRoute, deleteAvatarJob);
+app.put("/api/avatar", selectAvatarRoute, putAvatar);
+app.delete("/api/avatar", deleteAvatarRoute, deleteAvatarContents);
+app.get("/api/avatar/images/:imageId", getAvatarImageRoute, getAvatarImageContents);
 
 app.get("/api/diagnoses", diagnosisListRoute, getDiagnoses);
 app.get("/api/diagnoses/:diagnosisId", diagnosisDetailRoute, getDiagnosis);

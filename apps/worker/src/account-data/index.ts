@@ -10,6 +10,12 @@ import {
 import { logger } from "@me-builder/shared";
 import { eq, inArray } from "drizzle-orm";
 import type { Env } from "../types";
+import {
+  avatarActions,
+  listPendingAvatarObjectDeletions,
+  markAvatarObjectDeleted,
+  retryAvatarObjectDeletion,
+} from "./avatar";
 import { brainActions } from "./brain";
 import { compatibilityActions } from "./compatibility";
 import { diagnosisActions } from "./diagnosis";
@@ -21,6 +27,7 @@ import {
 } from "./repository";
 
 const actions = {
+  ...avatarActions,
   ...brainActions,
   ...diagnosisActions,
   ...diaryActions,
@@ -125,6 +132,45 @@ export class AccountData extends DurableObject<Env> {
           );
           if (!dispatched) {
             throw new Error("Diary Brain checkpoint dispatch state could not be recorded");
+          }
+        }
+        if (this.env.AVATAR_QUEUE) {
+          const pending = await avatarActions["avatar.listPendingEnqueues"](
+            this.repository.client,
+            this.accountId,
+          );
+          for (const item of pending) {
+            await this.env.AVATAR_QUEUE.send({
+              type: "avatar",
+              accountId: this.accountId,
+              jobId: item.jobId,
+              operation: item.operation,
+            });
+            await avatarActions["avatar.markEnqueued"](
+              this.repository.client,
+              this.accountId,
+              item.jobId,
+              item.operation,
+            );
+          }
+        }
+        if (this.env.AVATAR_BUCKET) {
+          const deletions = await listPendingAvatarObjectDeletions(this.repository.client);
+          for (const deletion of deletions) {
+            try {
+              await this.env.AVATAR_BUCKET.delete(deletion.objectKey);
+              await markAvatarObjectDeleted(this.repository.client, deletion.objectKey);
+            } catch (error) {
+              await retryAvatarObjectDeletion(
+                this.repository.client,
+                deletion.objectKey,
+                deletion.attemptCount,
+              );
+              logger.warn(
+                { errorName: error instanceof Error ? error.name : "UnknownError" },
+                "Avatar R2 deletion failed; AccountData alarm will retry",
+              );
+            }
           }
         }
         await this.scheduleMaintenance();

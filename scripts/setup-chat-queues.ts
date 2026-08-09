@@ -9,6 +9,8 @@ const queueNames = [
   `me-builder-brain-checkpoint-queue-${environment}`,
   `me-builder-brain-checkpoint-dlq-${environment}`,
   `me-builder-webhook-dlq-${environment}`,
+  `me-builder-avatar-queue-${environment}`,
+  `me-builder-avatar-dlq-${environment}`,
 ];
 
 for (const queueName of queueNames) {
@@ -27,3 +29,21 @@ for (const queueName of queueNames) {
   }
   console.info(exitCode === 0 ? `Created ${queueName}` : `Queue already exists: ${queueName}`);
 }
+
+const bucketName = `me-builder-avatar-${environment}`;
+const bucketProcess = Bun.spawn(
+  ["bun", "--cwd", "apps/worker", "wrangler", "r2", "bucket", "create", bucketName],
+  { stdout: "pipe", stderr: "pipe", env: process.env },
+);
+const [bucketExitCode, bucketStdout, bucketStderr] = await Promise.all([
+  bucketProcess.exited,
+  new Response(bucketProcess.stdout).text(),
+  new Response(bucketProcess.stderr).text(),
+]);
+const bucketOutput = `${bucketStdout}\n${bucketStderr}`;
+if (bucketExitCode !== 0 && !/already exists|already taken/i.test(bucketOutput)) {
+  throw new Error(`Failed to create R2 bucket ${bucketName}: ${bucketOutput.trim()}`);
+}
+console.info(
+  bucketExitCode === 0 ? `Created ${bucketName}` : `R2 bucket already exists: ${bucketName}`,
+);

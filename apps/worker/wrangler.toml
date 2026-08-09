@@ -21,6 +21,11 @@ queue = "me-builder-brain-checkpoint-queue-local"
 dead_letter_queue = "me-builder-brain-checkpoint-dlq-local"
 max_retries = 5
 
+[[queues.consumers]]
+queue = "me-builder-avatar-queue-local"
+dead_letter_queue = "me-builder-avatar-dlq-local"
+max_retries = 3
+
 [[queues.producers]]
 queue = "me-builder-chat-turn-queue-local"
 binding = "CHAT_TURN_QUEUE"
@@ -28,6 +33,17 @@ binding = "CHAT_TURN_QUEUE"
 [[queues.producers]]
 queue = "me-builder-brain-checkpoint-queue-local"
 binding = "BRAIN_CHECKPOINT_QUEUE"
+
+[[queues.producers]]
+queue = "me-builder-avatar-queue-local"
+binding = "AVATAR_QUEUE"
+
+[[r2_buckets]]
+binding = "AVATAR_BUCKET"
+bucket_name = "me-builder-avatar-local"
+
+[images]
+binding = "IMAGES"
 
 [[durable_objects.bindings]]
 name = "CONVERSATION_COORDINATOR"
@@ -84,6 +100,11 @@ queue = "me-builder-brain-checkpoint-queue-local"
 dead_letter_queue = "me-builder-brain-checkpoint-dlq-local"
 max_retries = 5
 
+[[env.local.queues.consumers]]
+queue = "me-builder-avatar-queue-local"
+dead_letter_queue = "me-builder-avatar-dlq-local"
+max_retries = 3
+
 [[env.local.queues.producers]]
 queue = "me-builder-chat-turn-queue-local"
 binding = "CHAT_TURN_QUEUE"
@@ -91,6 +112,17 @@ binding = "CHAT_TURN_QUEUE"
 [[env.local.queues.producers]]
 queue = "me-builder-brain-checkpoint-queue-local"
 binding = "BRAIN_CHECKPOINT_QUEUE"
+
+[[env.local.queues.producers]]
+queue = "me-builder-avatar-queue-local"
+binding = "AVATAR_QUEUE"
+
+[[env.local.r2_buckets]]
+binding = "AVATAR_BUCKET"
+bucket_name = "me-builder-avatar-local"
+
+[env.local.images]
+binding = "IMAGES"
 
 [[env.local.durable_objects.bindings]]
 name = "CONVERSATION_COORDINATOR"
@@ -130,6 +162,11 @@ queue = "me-builder-brain-checkpoint-queue-preview"
 dead_letter_queue = "me-builder-brain-checkpoint-dlq-preview"
 max_retries = 5
 
+[[env.preview.queues.consumers]]
+queue = "me-builder-avatar-queue-preview"
+dead_letter_queue = "me-builder-avatar-dlq-preview"
+max_retries = 3
+
 [[env.preview.queues.producers]]
 queue = "me-builder-chat-turn-queue-preview"
 binding = "CHAT_TURN_QUEUE"
@@ -137,6 +174,17 @@ binding = "CHAT_TURN_QUEUE"
 [[env.preview.queues.producers]]
 queue = "me-builder-brain-checkpoint-queue-preview"
 binding = "BRAIN_CHECKPOINT_QUEUE"
+
+[[env.preview.queues.producers]]
+queue = "me-builder-avatar-queue-preview"
+binding = "AVATAR_QUEUE"
+
+[[env.preview.r2_buckets]]
+binding = "AVATAR_BUCKET"
+bucket_name = "me-builder-avatar-preview"
+
+[env.preview.images]
+binding = "IMAGES"
 
 [[env.preview.durable_objects.bindings]]
 name = "CONVERSATION_COORDINATOR"
@@ -176,6 +224,11 @@ queue = "me-builder-brain-checkpoint-queue-production"
 dead_letter_queue = "me-builder-brain-checkpoint-dlq-production"
 max_retries = 5
 
+[[env.production.queues.consumers]]
+queue = "me-builder-avatar-queue-production"
+dead_letter_queue = "me-builder-avatar-dlq-production"
+max_retries = 3
+
 [[env.production.queues.producers]]
 queue = "me-builder-chat-turn-queue-production"
 binding = "CHAT_TURN_QUEUE"
@@ -183,6 +236,17 @@ binding = "CHAT_TURN_QUEUE"
 [[env.production.queues.producers]]
 queue = "me-builder-brain-checkpoint-queue-production"
 binding = "BRAIN_CHECKPOINT_QUEUE"
+
+[[env.production.queues.producers]]
+queue = "me-builder-avatar-queue-production"
+binding = "AVATAR_QUEUE"
+
+[[env.production.r2_buckets]]
+binding = "AVATAR_BUCKET"
+bucket_name = "me-builder-avatar-production"
+
+[env.production.images]
+binding = "IMAGES"
 
 [[env.production.durable_objects.bindings]]
 name = "CONVERSATION_COORDINATOR"

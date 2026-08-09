@@ -16,6 +16,17 @@ enabled = true
 queue = "me-builder-webhook-queue-local"
 binding = "WEBHOOK_QUEUE"
 
+[[queues.producers]]
+queue = "me-builder-avatar-queue-local"
+binding = "AVATAR_QUEUE"
+
+[[r2_buckets]]
+binding = "AVATAR_BUCKET"
+bucket_name = "me-builder-avatar-local"
+
+[images]
+binding = "IMAGES"
+
 [[d1_databases]]
 binding = "DB"
 database_name = "me-builder-db-local"
@@ -40,6 +51,17 @@ name = "me-builder-api-local"
 [[env.local.queues.producers]]
 queue = "me-builder-webhook-queue-local"
 binding = "WEBHOOK_QUEUE"
+
+[[env.local.queues.producers]]
+queue = "me-builder-avatar-queue-local"
+binding = "AVATAR_QUEUE"
+
+[[env.local.r2_buckets]]
+binding = "AVATAR_BUCKET"
+bucket_name = "me-builder-avatar-local"
+
+[env.local.images]
+binding = "IMAGES"
 
 [[env.local.d1_databases]]
 binding = "DB"
@@ -69,6 +91,17 @@ routes = [
 queue = "me-builder-webhook-queue-preview"
 binding = "WEBHOOK_QUEUE"
 
+[[env.preview.queues.producers]]
+queue = "me-builder-avatar-queue-preview"
+binding = "AVATAR_QUEUE"
+
+[[env.preview.r2_buckets]]
+binding = "AVATAR_BUCKET"
+bucket_name = "me-builder-avatar-preview"
+
+[env.preview.images]
+binding = "IMAGES"
+
 [[env.preview.d1_databases]]
 binding = "DB"
 database_name = "me-builder-db-preview"
@@ -96,6 +129,17 @@ routes = [
 [[env.production.queues.producers]]
 queue = "me-builder-webhook-queue-production"
 binding = "WEBHOOK_QUEUE"
+
+[[env.production.queues.producers]]
+queue = "me-builder-avatar-queue-production"
+binding = "AVATAR_QUEUE"
+
+[[env.production.r2_buckets]]
+binding = "AVATAR_BUCKET"
+bucket_name = "me-builder-avatar-production"
+
+[env.production.images]
+binding = "IMAGES"
 
 [[env.production.d1_databases]]
 binding = "DB"
