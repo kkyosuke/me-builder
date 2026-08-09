@@ -87,7 +87,7 @@ Brain domainは「その人らしさを何で構成し、どの用途へ提供�
 
 - 1人分のBrainを作成・管理する
 - 記憶、価値観、判断基準などをBrain内部で分類する
-- Brain Itemの根拠（どのSource Recordに基づくか）と導出方法（AIか決定的な変換か）を区別する
+- Brain Itemの根拠（どのSource Recordに基づくか）と導出方法（AI推定かルールベース変換か）を区別する
 - 情報が変化した時点や一時的な状態を区別する
 - 情報へ用途別のAccess Labelを付ける
 - MCP接続へ提供できる情報をAccess Profileで制限する
@@ -246,13 +246,13 @@ MVPでは、1つのAccountが1つのBrainを利用する体験を基本としま
 | --- | --- | --- |
 | 新規記述 | 生む | 新しいBrain Itemの根拠になる |
 | 訂正 | 生む | 訂正後の内容の根拠になる |
-| 承認 | 生まない | Confirmationを更新する |
-| 却下 | 生まない | Confirmationを更新する |
+| 同意 | 生まない | 状態を変更しない。必要なら操作記録だけを残す |
+| 否定 | 生まない | 対象を`invalidated`にして利用対象から外す |
 
 根拠:
 
-- [Brain内部情報の分類 §4](brain/brain-content-taxonomy.md#4-分類とは別に持つ共通属性)はConfirmationを「本人が確認・却下したかを示す」と主体つきで定義している。承認・却下は既存の命題に対する本人の態度であり、新しい内容ではない
-- [Brainのラベル・アクセス制御設計 §8](brain/brain-access-label-design.md#8-派生情報の扱い)は「機微な元情報から安全な表現を作る場合は、新しいBrain Itemとして本人が承認する」としている。内容が変わるときは新しいBrain Itemを作り、確認だけならConfirmationを更新する、という同じ切り分けになっている
+- 同意・否定は既存の命題に対する本人の態度であり、新しい命題内容ではないため、Source Recordを生まない
+- 訂正や理由の追加は新しい命題内容を持つためSource Recordを生み、新しいBrain ItemまたはEvidenceの根拠になる
 
 ### 根拠を表現するエッジ
 
@@ -296,9 +296,9 @@ MCPの具体的な接続モデルやツール設計は後続で検討します�
 | 2 | Brain内部の分類とAccess Labelの初期セットを検証する | 完了 |
 | 3 | Sourceドメインを設計し、Brain Itemの由来を確定する | 一部完了（ドメイン境界、由来、エッジ、原本のライフサイクルまで） |
 | 3.1 | Phase 1のDiagnosisドメインを設計する | 完了（論理モデル） |
-| 4 | AIによる推定と本人確認の流れを設計する | 未着手 |
+| 4 | Source RecordからBrain Itemを生成し、本人の訂正を反映する流れを設計する | 完了（診断と日記からの生成、登録、訂正の共通方式） |
 | 5 | MCP接続、権限、監査の詳細を設計する | 未着手 |
-| 6 | 永続化と検索方式を選定する | 一部（利用する基盤、Diagnosis / SourceのD1 schemaまで） |
+| 6 | 永続化と検索方式を選定する | 一部（Brain ItemとEvidenceを含むAccountData schemaまで） |
 
 step 1は、Phase 1に必要な範囲（対応チャネルと入力形式、チャネルの役割分担、ログイン手段と復旧方針、質問の作成主体と版管理）を確定させたことで完了とみなします。詳細は[プロジェクト概要 §4](../product/project-overview.md#4-想定する利用体験)と[§5](../product/project-overview.md#5-アカウントと本人識別)にあります。
 
@@ -306,4 +306,6 @@ step 3は当初「質問・回答のドメインを設計する」としてい�
 
 step 3.1では、Phase 1の質問配信と回答保存に必要なQuestion、Diagnosis、DiagnosisResponseの集約、状態、不変条件、Account / Sourceとの関係を[Phase 1 診断ドメイン設計](../diagnosis/diagnosis-domain-design.md)で確定しました。D1の物理モデルはstep 6で具体化済みで、API契約は後続作業です。
 
-step 6は、利用するCloudflareコンポーネントの選定が[インフラ・システム構成](../architecture/infrastructure-architecture.md)で確定し、DiagnosisとSource RecordのD1 schemaを具体化しました。Brain Item、各エッジの完全な永続化、Embeddingのインデックス構成、メディアの参照方式は未設計です。
+step 4は、Source RecordからBrain Itemを生成する共通入出力と、診断・日記それぞれの登録、利用開始、本人による否定・修正、改訂を[Brain Item生成設計](brain/brain-item-generation-design.md)で確定しました。
+
+step 6は、利用するCloudflareコンポーネントの選定が[インフラ・システム構成](../architecture/infrastructure-architecture.md)で確定し、AccountData上のDiagnosis、Source Record、Brain Item、Evidence、Revision、Access Labelのschemaを具体化しました。Vectorize同期jobは実装設計に留まり、物理schemaは未実装です。メディアの参照方式も後続設計です。

@@ -623,7 +623,6 @@ describe("deleteAccountDiagnosisData", () => {
             statement: "計画性は計画的な傾向が強い",
             attributes: { origin: "diagnosis-test-revision" },
             derivation: "deterministic",
-            confirmation: "pending",
             status: "active",
             stability: "changeable",
             sensitivity: "normal",
@@ -642,7 +641,6 @@ describe("deleteAccountDiagnosisData", () => {
             {
               id: "projection-reset-revised-access",
               label: "unclassified",
-              confirmation: "pending",
               assignedBy: "system",
             },
           ],
@@ -676,7 +674,6 @@ describe("deleteAccountDiagnosisData", () => {
         statement: "日記から得られた傾向",
         attributes: { origin: "diary" },
         derivation: "ai",
-        confirmation: "pending",
         status: "active",
         stability: "changeable",
         sensitivity: "normal",
@@ -697,7 +694,6 @@ describe("deleteAccountDiagnosisData", () => {
         {
           id: "diary-access",
           label: "unclassified",
-          confirmation: "pending",
           assignedBy: "system",
         },
       ],
@@ -776,7 +772,6 @@ describe("deleteAccountDiagnosisData", () => {
               statement: "競合中に生成された診断傾向",
               attributes: { origin: "diagnosis" },
               derivation: "deterministic",
-              confirmation: "pending",
               status: "active",
               stability: "changeable",
               sensitivity: "normal",
@@ -797,7 +792,6 @@ describe("deleteAccountDiagnosisData", () => {
               {
                 id: "concurrent-reset-access",
                 label: "unclassified",
-                confirmation: "pending",
                 assignedBy: "system",
               },
             ],
@@ -873,7 +867,6 @@ describe("deleteAccountDiagnosisData", () => {
         statement: `${id} statement`,
         attributes: { origin: "diagnosis" },
         derivation: "deterministic" as const,
-        confirmation: "pending" as const,
         status: "active" as const,
         stability: "changeable" as const,
         sensitivity: "normal",
@@ -899,7 +892,6 @@ describe("deleteAccountDiagnosisData", () => {
         accountId: "large-reset-owner",
         brainItemId,
         label: "unclassified",
-        confirmation: "pending" as const,
         assignedBy: "system" as const,
       })),
     );

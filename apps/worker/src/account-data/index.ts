@@ -7,6 +7,7 @@ import {
   compatibilityDataFor,
   d1,
 } from "@me-builder/lib";
+import { logger } from "@me-builder/shared";
 import { eq, inArray } from "drizzle-orm";
 import type { Env } from "../types";
 import { brainActions } from "./brain";
@@ -25,11 +26,14 @@ const actions = {
   ...diaryActions,
 } as const;
 
+const ALARM_RETRY_MS = 30_000;
+
 /** 1 AccountのSource / Brain / Diagnosis / Diaryを1つのprivate SQLiteに保存する。 */
 export class AccountData extends DurableObject<Env> {
   private readonly accountId: string;
   private readonly repository: AccountDataRepository;
   private legacyImport: Promise<void> | undefined;
+  private operationTail: Promise<void> = Promise.resolve();
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -38,8 +42,13 @@ export class AccountData extends DurableObject<Env> {
     this.accountId = accountId;
     this.repository = new AccountDataRepository(ctx.storage);
     ctx.blockConcurrencyWhile(async () => {
-      await this.repository.initialize();
-      this.repository.bindAccount(accountId);
+      try {
+        await this.repository.initialize();
+        this.repository.bindAccount(accountId);
+      } catch (error) {
+        logAccountDataFailure("initialization", error);
+        throw error;
+      }
     });
   }
 
@@ -48,57 +57,102 @@ export class AccountData extends DurableObject<Env> {
     operation: TOperation,
     ...args: AccountDataArgs<TOperation>
   ): Promise<AccountDataResult<TOperation>> {
-    if (typeof accountId !== "string" || accountId.length === 0) {
-      throw new Error("AccountData account is required");
-    }
-    if (accountId !== this.accountId) {
-      throw new Error("AccountData RPC account does not match object name");
-    }
-    this.repository.bindAccount(accountId);
-    if (operation === "compatibility.listVisibleReferences") {
-      return (await this.listVisibleCompatibilityReferences()) as AccountDataResult<TOperation>;
-    }
-    if (operation.startsWith("compatibility.")) {
-      const action = (compatibilityActions as Partial<Record<AccountDataOperation, unknown>>)[
-        operation
-      ];
+    return this.runExclusive(async () => {
+      if (typeof accountId !== "string" || accountId.length === 0) {
+        throw new Error("AccountData account is required");
+      }
+      if (accountId !== this.accountId) {
+        throw new Error("AccountData RPC account does not match object name");
+      }
+      this.repository.bindAccount(accountId);
+      if (operation === "compatibility.listVisibleReferences") {
+        return (await this.listVisibleCompatibilityReferences()) as AccountDataResult<TOperation>;
+      }
+      if (operation.startsWith("compatibility.")) {
+        const action = (compatibilityActions as Partial<Record<AccountDataOperation, unknown>>)[
+          operation
+        ];
+        if (typeof action !== "function") throw new Error("Unsupported AccountData operation");
+        const boundAction = action as (
+          repository: AccountDataRepository,
+          boundAccountId: string,
+          ...actionArgs: AccountDataArgs<TOperation>
+        ) => AccountDataResult<TOperation>;
+        return boundAction(this.repository, accountId, ...args);
+      }
+
+      const action = (actions as Partial<Record<AccountDataOperation, unknown>>)[operation];
       if (typeof action !== "function") throw new Error("Unsupported AccountData operation");
       const boundAction = action as (
-        repository: AccountDataRepository,
+        db: d1.Client,
         boundAccountId: string,
         ...actionArgs: AccountDataArgs<TOperation>
-      ) => AccountDataResult<TOperation>;
-      return boundAction(this.repository, accountId, ...args);
-    }
+      ) => Promise<AccountDataResult<TOperation>>;
 
-    const action = (actions as Partial<Record<AccountDataOperation, unknown>>)[operation];
-    if (typeof action !== "function") throw new Error("Unsupported AccountData operation");
-    const boundAction = action as (
-      db: d1.Client,
-      boundAccountId: string,
-      ...actionArgs: AccountDataArgs<TOperation>
-    ) => Promise<AccountDataResult<TOperation>>;
-
-    if (!this.legacyImport) this.legacyImport = this.importLegacyAccountData(accountId);
-    try {
-      await this.legacyImport;
-    } catch (error) {
-      this.legacyImport = undefined;
-      throw error;
-    }
-    if (operation.startsWith("diagnosis")) await this.syncDiagnosisCatalog();
-
-    const result = await boundAction(this.repository.client, accountId, ...args);
-    await this.scheduleMaintenance();
-    return result;
+      if (!this.legacyImport) this.legacyImport = this.importLegacyAccountData(accountId);
+      try {
+        await this.legacyImport;
+      } catch (error) {
+        this.legacyImport = undefined;
+        logAccountDataFailure("legacy_import", error, operation);
+        throw error;
+      }
+      if (operation.startsWith("diagnosis")) await this.syncDiagnosisCatalog();
+      let result: AccountDataResult<TOperation>;
+      try {
+        result = await boundAction(this.repository.client, accountId, ...args);
+      } catch (error) {
+        logAccountDataFailure("action", error, operation);
+        throw error;
+      }
+      try {
+        await this.scheduleMaintenance();
+      } catch (error) {
+        logAccountDataFailure("maintenance", error, operation);
+        throw error;
+      }
+      return result;
+    });
   }
 
   async alarm(): Promise<void> {
-    await d1.action.conversation.closeExpiredSessions(this.repository.client);
-    await d1.action.diagnosisBrainProjection.processPendingDiagnosisBrainProjections(
-      this.repository.client,
-    );
-    await this.scheduleMaintenance();
+    await this.runExclusive(async () => {
+      try {
+        await d1.action.conversation.closeExpiredSessions(this.repository.client);
+        await d1.action.diagnosisBrainProjection.processPendingDiagnosisBrainProjections(
+          this.repository.client,
+        );
+        const checkpointIds = await d1.action.conversation.claimDueDiaryBrainCheckpointIds(
+          this.repository.client,
+          this.accountId,
+        );
+        if (checkpointIds.length > 0 && !this.env.BRAIN_CHECKPOINT_QUEUE) {
+          throw new Error("BRAIN_CHECKPOINT_QUEUE binding is required for diary Brain checkpoints");
+        }
+        for (const checkpointId of checkpointIds) {
+          await this.env.BRAIN_CHECKPOINT_QUEUE?.send({
+            type: "diary-brain-checkpoint",
+            accountId: this.accountId,
+            checkpointId,
+          });
+          const dispatched = await d1.action.conversation.markDiaryBrainCheckpointDispatched(
+            this.repository.client,
+            this.accountId,
+            checkpointId,
+          );
+          if (!dispatched) {
+            throw new Error("Diary Brain checkpoint dispatch state could not be recorded");
+          }
+        }
+        await this.scheduleMaintenance();
+      } catch (error) {
+        logger.error(
+          { errorName: error instanceof Error ? error.name : "UnknownError" },
+          "AccountData alarm failed; retry scheduled",
+        );
+        await this.scheduleMaintenanceRetry();
+      }
+    });
   }
 
   /** 一覧projectionをCompatibilityDataの現在状態へ同期してから返す。 */
@@ -362,4 +416,44 @@ export class AccountData extends DurableObject<Env> {
     const current = await this.ctx.storage.getAlarm();
     if (current === null || desired < current) await this.ctx.storage.setAlarm(desired);
   }
+
+  private async scheduleMaintenanceRetry(): Promise<void> {
+    const retryAt = Date.now() + ALARM_RETRY_MS;
+    const desired = this.repository.nextMaintenanceAt();
+    await this.ctx.storage.setAlarm(desired === null ? retryAt : Math.max(retryAt, desired));
+  }
+
+  private async runExclusive<TResult>(operation: () => Promise<TResult>): Promise<TResult> {
+    const previous = this.operationTail;
+    let release: () => void = () => undefined;
+    this.operationTail = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await previous;
+    try {
+      return await operation();
+    } finally {
+      release();
+    }
+  }
+}
+
+function logAccountDataFailure(
+  phase: "initialization" | "legacy_import" | "action" | "maintenance",
+  error: unknown,
+  operation?: string,
+): void {
+  const errorCode =
+    error && typeof error === "object" && "code" in error
+      ? String((error as { code: unknown }).code)
+      : undefined;
+  logger.error(
+    {
+      phase,
+      ...(operation ? { operation } : {}),
+      errorName: error instanceof Error ? error.name : "UnknownError",
+      ...(errorCode ? { errorCode } : {}),
+    },
+    "AccountData operation failed",
+  );
 }

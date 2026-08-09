@@ -12,8 +12,29 @@
     {
       "idx": 1,
       "version": "6",
-      "when": 1786232172001,
-      "tag": "0001_eminent_black_crow",
+      "when": 1786237023391,
+      "tag": "0001_famous_lila_cheney",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1786240705836,
+      "tag": "0002_wealthy_cloak",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1786243557706,
+      "tag": "0003_futuristic_white_queen",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1786270180000,
+      "tag": "0004_compatibility_references",
       "breakpoints": true
     }
   ]

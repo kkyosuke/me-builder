@@ -24,6 +24,8 @@ const accountDataSchema = {
   chatTurns: d1.schema.chatTurns,
   conversationMessages: d1.schema.conversationMessages,
   conversationSessions: d1.schema.conversationSessions,
+  diaryBrainCheckpointItems: d1.schema.diaryBrainCheckpointItems,
+  diaryBrainCheckpoints: d1.schema.diaryBrainCheckpoints,
   sourceRecordTextPayloads: d1.schema.sourceRecordTextPayloads,
   diagnoses: d1.schema.diagnoses,
   diagnosisAnswers: d1.schema.diagnosisAnswers,
@@ -685,6 +687,18 @@ export class AccountDataRepository {
       .orderBy(asc(d1.schema.diagnosisBrainProjectionRequests.nextAttemptAt))
       .limit(1)
       .get();
+    const diaryBrainCheckpoint = this.database
+      .select({ nextAttemptAt: d1.schema.diaryBrainCheckpoints.nextAttemptAt })
+      .from(d1.schema.diaryBrainCheckpoints)
+      .where(
+        and(
+          inArray(d1.schema.diaryBrainCheckpoints.status, ["pending", "queued"]),
+          eq(d1.schema.diaryBrainCheckpoints.isDeleted, false),
+        ),
+      )
+      .orderBy(asc(d1.schema.diaryBrainCheckpoints.nextAttemptAt))
+      .limit(1)
+      .get();
     const candidates = [
       session
         ? Math.min(
@@ -693,6 +707,7 @@ export class AccountDataRepository {
           )
         : null,
       projection?.nextAttemptAt.getTime() ?? null,
+      diaryBrainCheckpoint?.nextAttemptAt.getTime() ?? null,
     ].filter((value): value is number => value !== null);
     return candidates.length > 0 ? Math.min(...candidates) : null;
   }

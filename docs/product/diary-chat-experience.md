@@ -28,6 +28,7 @@
 | Phase 1の対応チャネル、入力形式、LINEとWebの役割分担 | [プロジェクト概要](project-overview.md) |
 | Phaseごとの目的、提供順序、ロードマップ | [プロジェクト概要 §11](project-overview.md#11-段階的な進め方) |
 | Brain Itemの分類と各分類の意味 | [Brain内部情報の分類](../domain/brain/brain-content-taxonomy.md) |
+| 診断と日記に共通するBrain Item生成の入出力と登録タイミング | [Brain Item生成設計](../domain/brain/brain-item-generation-design.md) |
 | Source Recordの粒度とSource / Brain間の関係 | [ドメイン設計](../domain/domain-design.md) |
 | Source RecordとBrain Itemを結ぶ根拠、反証、改訂 | [根拠・反証・改訂のエッジ設計](../domain/brain/evidence-edge-design.md) |
 | 日記の送信取り消し、訂正、撤回、削除 | [Source Recordのライフサイクル設計](../domain/source/source-record-lifecycle-design.md) |
@@ -193,28 +194,26 @@ flowchart TD
 
 本人の各発言は、本人が話した原文としてSource Recordへ保存します。日記1通を1件のSource Recordとする粒度は[ドメイン設計 §5](../domain/domain-design.md#source-recordの粒度)に従い、AIが会話全体を要約した文章で原文を置き換えません。
 
-AIが会話から見つけた記憶や行動原理は、原文とは別のBrain Item候補として扱います。
+AIが会話から見つけた記憶や行動原理は、原文とは別のBrain Itemとして扱います。AIによる推定は、本人が明言した内容と区別できる属性を持たせます。
 
 ```mermaid
 flowchart LR
-    C[会話中の本人の発言] --> S[Source Records]
-    S --> E[その日の出来事を整理]
-    S --> P[行動原理の候補を推定]
-    E --> M[Memory候補]
-    P --> B[Value / Decision System等の候補]
-    M --> Q{本人が確認}
-    B --> Q
-    Q -->|同意| V[確認済みBrain Item]
-    Q -->|修正| R[本人の修正を新しい根拠として反映]
-    Q -->|否定| X[却下して助言に使わない]
-    Q -->|保留| H[未確認のまま区別して保持]
+    C[会話中の本人の発言] -->|原本保存| S[Source Records]
+    C -->|出来事を変換| M[Memory Brain Item]
+    C -->|行動原理をAI変換| B[Value / Decision System等のBrain Item]
+    S -.->|Evidence依存| M
+    S -.->|Evidence依存| B
+    M --> U[生成時から利用可能]
+    B --> U
+    U -->|本人が修正| R[修正を新しい根拠として反映]
+    U -->|本人が否定| X[無効化して以後使わない]
 ```
 
-すべてのBrain Itemが1件以上のSource Recordを根拠に持つこと、本人の承認・却下自体はSource Recordを生まないことは[ドメイン設計 §6](../domain/domain-design.md#6-ドメイン間の関係)に従います。
+実線は保存・変換の処理、破線は保存後のEvidence依存を表します。すべてのBrain Itemが1件以上のSource Recordを根拠に持つこと、本人の同意・否定自体はSource Recordを生まないことは[ドメイン設計 §6](../domain/domain-design.md#6-ドメイン間の関係)に従います。変換とEvidence edgeの区別は[Brain Item生成設計 §2](../domain/brain/brain-item-generation-design.md#2-結論)を正とします。
 
-### 確認は会話の終わりに短く行う
+### 生成した内容は会話の区切りで短く提示する
 
-会話中のたびに「保存しますか」と聞くと対話が途切れるため、原文は既定で日記として保存し、導出した記憶や行動原理の候補だけを会話の区切りで確認します。
+Brain Itemの保存許可は毎回尋ねません。原文は既定で日記として保存し、導出した記憶や行動原理は会話の区切りで提示して、違う場合に訂正・否定できるようにします。
 
 ```text
 今日の記録としては、
@@ -224,7 +223,7 @@ flowchart LR
 と残しておこうと思う。違うところはある？
 ```
 
-確認を毎日必須にはしません。新しい行動原理の候補がない日や、ユーザーが疲れている日は、出来事の記録だけで終えます。
+提示を毎日必須にはしません。新しい行動原理がない日や、ユーザーが疲れている日は、出来事の記録だけで終えます。応答しなかったことを同意とは解釈せず、Brain ItemはEvidence、Derivation、Confidenceを保ったまま利用します。
 
 ## 7. 蓄積した情報を使った助言
 
@@ -243,10 +242,10 @@ flowchart LR
 助言は次の順に組み立てます。情報の意味と優先順位の詳細は[Brain内部情報の分類 §6](../domain/brain/brain-content-taxonomy.md#6-意思決定の組み立て方)に従います。
 
 1. 今回の会話で本人が語った状況と、助言を求める目的
-2. 本人が確認したConstraint、Goal、Decision Criterion
-3. 本人が確認したValue / Motivation、Preference、過去のDecision Record
+2. 根拠が明確なConstraint、Goal、Decision Criterion
+3. Value / Motivation、Preference、過去のDecision Record
 4. 最近のCurrent State
-5. 未確認の推定は、役立つ可能性があり、かつ仮説だと明示できる場合だけ補助的に使う
+5. AIによる推定は、役立つ可能性があり、かつ仮説だと明示できる場合だけ補助的に使う
 
 現在の状況と過去の情報が食い違う場合は、過去の情報を優先しません。「以前はこうだったが、今も同じか」を確認します。
 
@@ -333,7 +332,7 @@ AIへ一連の会話として渡す範囲を、論理的な`Conversation Session
 
 現在のSessionでは、直近20メッセージまでを原文のままAIへ渡します。ここでいう1メッセージは、ユーザーまたはチャットが1回送信した単位です。
 
-20メッセージを越えた場合は、古い部分を作業用の`Session Summary`へ畳み、直近20メッセージと一緒に渡します。Session Summaryは会話を続けるための一時的な文脈であり、本人の原文、Source Record、確認済みBrain Itemのいずれにも置き換わりません。
+20メッセージを越えた場合は、古い部分を作業用の`Session Summary`へ畳み、直近20メッセージと一緒に渡します。Session Summaryは会話を続けるための一時的な文脈であり、本人の原文、Source Record、Brain Itemのいずれにも置き換わりません。
 
 Session Summaryには次の内容を残します。
 
@@ -345,7 +344,7 @@ Session Summaryには次の内容を残します。
 - まだ回答されていない問いと、現在の記録ゴール
 - 既に提示した助言と、それに対する本人の反応
 
-要約時には、推定と本人の発言を同じ事実として統合しません。誰が述べた内容か、本人が確認したか、否定したかを区別します。
+要約時には、推定と本人の発言を同じ事実として統合しません。誰が述べた内容か、AIによる推定か、本人が否定したかを区別します。
 
 本人が発言を訂正・削除・撤回した場合は、次のAI呼び出しより前にSession Summaryへ反映し、変更前の要約を以後の文脈へ使いません。
 
@@ -356,16 +355,16 @@ Session Summaryには次の内容を残します。
 終了した過去Sessionの全文を、毎回AIへ渡しません。現在の会話に関係する情報を次の順で検索し、必要最小限だけを追加します。
 
 1. 本人が現在の会話で明示的に参照した過去の出来事
-2. 現在の話題と一致する、本人確認済みのBrain Item
+2. 現在の話題と一致するBrain Item
 3. 有効なGoal、Constraint、Decision Criterion
 4. 最近のCurrent Stateと、過去のDecision Record
 5. Brain Itemの意味を確認するために必要なSource Recordの一部
 
-1回のAI入力へ追加する過去情報は、本人確認済みBrain Itemを最大5件、Source Recordの原文を最大3件とします。件数内へ収まらない場合は、現在の状況との関連性、現在も有効か、本人確認済みかを優先して選びます。
+1回のAI入力へ追加する過去情報は、Brain Itemを最大5件、Source Recordの原文を最大3件とします。件数内へ収まらない場合は、現在の状況との関連性、現在も有効か、EvidenceとConfidenceを優先して選びます。
 
-未確認のBrain Itemは、現在の発言と照合する仮説が必要な場合だけ、未確認であることを明示して最大1件まで追加できます。却下済み、削除済み、撤回済み、Access Policyで利用できない情報は追加しません。
+AI推定のBrain Itemは推定であることをContext Packageで明示します。無効化済み、削除済み、撤回済み、Access Policyで利用できない情報は追加しません。
 
-Context PackageはAI呼び出しごとに現在の削除状態、Confirmation、Access Policyを評価して作ります。以前のターンで作ったContext Packageを、そのまま次のターンへ再利用しません。Context Packageの内容を運用ログへ出力しないことは[§11](#11-安全性とプライバシー)に従います。
+Context PackageはAI呼び出しごとに現在のstatus、Derivation、Confidence、削除状態、Access Policyを評価して作ります。以前のターンで作ったContext Packageを、そのまま次のターンへ再利用しません。Context Packageの内容を運用ログへ出力しないことは[§11](#11-安全性とプライバシー)に従います。
 
 ```mermaid
 flowchart LR
@@ -373,7 +372,7 @@ flowchart LR
     CS --> R[直近20メッセージの原文]
     CS --> S[古い部分のSession Summary]
     U --> Q[関連する過去情報を検索]
-    Q --> B[確認済みBrain Item 最大5件]
+    Q --> B[Brain Item 最大5件]
     Q --> E[必要なSource Record 最大3件]
     R --> P[AIへ渡すContext Package]
     S --> P
@@ -382,7 +381,7 @@ flowchart LR
     P --> A[応答生成]
 ```
 
-AIへ渡す各情報には、種類、発言または記録の時点、本人確認状態、根拠の識別子を添えます。モデルが現在の発言、過去の原文、AIの要約、確認済みの行動原理を区別できる形にします。
+AIへ渡す各情報には、種類、発言または記録の時点、Derivation、Confidence、根拠の識別子を添えます。モデルが現在の発言、過去の原文、AIの要約、ルールベース変換とAI推定による行動原理を区別できる形にします。
 
 ### 連続送信と遅延応答
 
@@ -496,9 +495,9 @@ AIへ渡す各情報には、種類、発言または記録の時点、本人確
 
 Phaseごとの目的と提供順序は[プロジェクト概要 §11](project-overview.md#11-段階的な進め方)を正とし、この文書では再定義しません。
 
-この文書の目標体験は、同節のPhase 3「自分とのチャット」を、Phase 1の日記入力と接続したものです。成立には、Phase 1で蓄積したSource Recordと、[プロジェクト概要 §12](project-overview.md#12-今後決めること)に挙げられているBrain Itemの導出・本人確認が必要です。
+この文書の目標体験は、同節のPhase 3「自分とのチャット」を、Phase 1の日記入力と接続したものです。成立には、Phase 1で蓄積したSource Recordと、[プロジェクト概要 §12](project-overview.md#12-今後決めること)に挙げられているBrain Itemの導出・訂正が必要です。
 
-本人確認の体験が成立する前に、未確認の推定だけで「本人らしい助言」を返しません。
+AI推定だけを根拠に「本人らしい」と断定した助言を返しません。AI推定を使う場合は、推定であることと根拠を示し、本人が否定・訂正できる形にします。
 
 ## 13. 完了条件と評価指標
 
@@ -510,9 +509,9 @@ Phaseごとの目的と提供順序は[プロジェクト概要 §11](project-ov
 - 明示的な終了・拒否がない限り、出来事、現在の状態、選択、次の意図のいずれか1つを具体化するまで記録ゴールを保つ
 - 明示終了、6時間の無操作、開始から24時間の規則でConversation Sessionを一意に区切れる
 - 現在Sessionの原文、Session Summary、過去の記憶を区別したContext Packageを作れる
-- 過去情報の件数上限、本人確認状態、Access Policyを守ってAI入力を構成できる
+- 過去情報の件数上限、Derivation、Confidence、Access Policyを守ってAI入力を構成できる
 - 出来事、選択理由、背景となる経験を区別して記録できる
-- 行動原理の推定を仮説として提示し、同意、修正、否定、保留を受け付けられる
+- 行動原理の推定を仮説として提示し、修正、否定を受け付けられる
 - 助言する前に、共感・整理・助言のどれを本人が求めているか合わせられる
 - 助言に使った記憶または行動原理を本人が確認できる
 - 根拠がない場合に、本人らしいと装った助言をしない
@@ -540,7 +539,7 @@ Phaseごとの目的と提供順序は[プロジェクト概要 §11](project-ov
 ## 14. この文書で決めていないこと
 
 - 声かけの既定時刻、曜日、通知UI、配信基盤
-- 本人確認画面をLINE内とWebのどちらへ置くか
+- Brain Itemを訂正・否定する画面をLINE内とWebのどちらへ置くか
 - Confidenceの算出方法
 
 Conversation SessionとSession Summaryの物理モデル、プロンプト、Context Packageのtoken配分、記憶検索、応答期限、ガードレール、評価方法は[日記チャット実装設計](../architecture/diary-chat-implementation-design.md)を正とします。

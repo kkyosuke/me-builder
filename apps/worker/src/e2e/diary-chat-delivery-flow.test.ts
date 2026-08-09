@@ -239,7 +239,7 @@ async function ingestDiaryEvents(events: DiaryEventInput[], suffix: string) {
   const bindings: CloudflareBindings = {
     d1: client,
     do: { conversation: namespace, accountData },
-    queue: { chatTurn: undefined },
+    queue: { chatTurn: undefined, brainCheckpoint: undefined },
   };
   return { bindings, coordinator: harness.coordinator, harness, providerAccountId, queuedTurn };
 }
@@ -280,7 +280,7 @@ async function ingestDiary(text: string, suffix: string, replyToken?: string) {
   const bindings: CloudflareBindings = {
     d1: client,
     do: { conversation: namespace, accountData },
-    queue: { chatTurn: undefined },
+    queue: { chatTurn: undefined, brainCheckpoint: undefined },
   };
   return { bindings, coordinator: harness.coordinator, providerAccountId, queuedTurn };
 }
@@ -350,6 +350,10 @@ describe("LINE diary chat delivery E2E", () => {
     expect(messages).toEqual([
       expect.objectContaining({ role: "user", assistantBody: null }),
       expect.objectContaining({ role: "assistant", assistantBody: generatedReply }),
+    ]);
+    expect(await client.select().from(d1.schema.brainItems)).toEqual([]);
+    expect(await client.select().from(d1.schema.diaryBrainCheckpoints)).toEqual([
+      expect.objectContaining({ status: "pending", fromSequence: 1, throughSequence: 1 }),
     ]);
     expect(mockPushMessage).toHaveBeenCalledOnce();
     expect(mockPushMessage.mock.calls[0]?.[0]).toEqual({

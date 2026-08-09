@@ -58,7 +58,7 @@ docs/
 - [Phase 1 診断ドメイン設計](diagnosis/diagnosis-domain-design.md) — Question、Diagnosis、DiagnosisResponseの集約、状態、不変条件、Account / Sourceとの関係
 - [人間関係の価値観診断候補](diagnosis/content/relationship-values-diagnosis.md) — 価値観の分類と質問作成時の原則
 - [人間関係の価値観 Yes／No質問集](diagnosis/content/relationship-values-yes-no-question-bank.md) — Yes／Noで回答できる質問候補
-- [診断回答のパラメータ変換設計](diagnosis/scoring/parameter-scoring-design.md) — 共通の設定形式、計算手順、Brain Item projectionと具体的な保存例、版管理、追加手順
+- [診断回答のパラメータ変換設計](diagnosis/scoring/parameter-scoring-design.md) — 共通の設定形式、計算手順、版管理、追加手順
 - [「自分と相手の優先・境界線」パラメータ変換設計](diagnosis/scoring/relationship-priority-parameter-design.md) — 最初の診断固有のパラメータ、重み、表示設定
 - [「お金と消費」パラメータ変換設計](diagnosis/scoring/money-values-parameter-design.md) — 2つ目の診断固有のパラメータ、重み、表示設定
 - [「インドア・アウトドアと余暇」パラメータ変換設計](diagnosis/scoring/leisure-style-parameter-design.md) — 3つ目の診断固有のパラメータ、重み、表示設定
@@ -69,6 +69,7 @@ docs/
 
 - [ドメイン設計](domain/domain-design.md) — Account / Brain / Sourceの責務・境界、Diagnosisの位置づけ、設計順序と進捗
 - [Brain内部情報の分類](domain/brain/brain-content-taxonomy.md) — Brain Itemの分類、共通属性、意思決定での利用方法
+- [Brain Item生成設計](domain/brain/brain-item-generation-design.md) — Source RecordからBrain Itemを生成する共通入出力、診断と日記の差分、登録タイミング
 - [Brainのラベル・アクセス制御設計](domain/brain/brain-access-label-design.md) — Topic Label、Access Label、Access Profile、MCP提供時の原則
 - [根拠・反証・改訂のエッジ設計](domain/brain/evidence-edge-design.md) — Source RecordとBrain Itemを結ぶエッジ
 - [Source Recordのライフサイクル設計](domain/source/source-record-lifecycle-design.md) — 不変性、訂正、削除、取り消し、撤回、エクスポート

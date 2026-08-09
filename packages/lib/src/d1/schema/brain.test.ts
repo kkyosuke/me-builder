@@ -34,7 +34,6 @@ function insertItemFixture() {
         statement: "予定は事前に決める傾向がある",
         attributes: { sourceKind: "diary" },
         derivation: "ai",
-        confirmation: "pending",
         status: "active",
         stability: "changeable",
         sensitivity: "normal",
@@ -47,7 +46,6 @@ function insertItemFixture() {
         statement: "別AccountのItem",
         attributes: {},
         derivation: "ai",
-        confirmation: "pending",
         status: "active",
         stability: "stable",
         sensitivity: "normal",
@@ -80,7 +78,6 @@ describe("Brain D1 schema", () => {
           accountId: "account-1",
           brainItemId: "brain-1",
           label: "work",
-          confirmation: "confirmed",
           assignedBy: "owner",
         },
         {
@@ -88,7 +85,6 @@ describe("Brain D1 schema", () => {
           accountId: "account-1",
           brainItemId: "brain-1",
           label: "private",
-          confirmation: "confirmed",
           assignedBy: "owner",
         },
       ])

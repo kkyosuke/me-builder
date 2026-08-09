@@ -1,18 +1,47 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "9d51a347-0a5d-4153-96f9-88ca7d320034",
-  "prevId": "ffa29e63-b5a2-4979-baea-96b05902bceb",
+  "id": "30325ad2-687b-4f94-b853-7c1cab1a5d5f",
+  "prevId": "a67cf8b9-29ce-40fc-929f-08f58f459aa6",
   "tables": {
-    "account_data_identity": {
-      "name": "account_data_identity",
+    "account_identities": {
+      "name": "account_identities",
       "columns": {
-        "singleton": {
-          "name": "singleton",
-          "type": "integer",
+        "id": {
+          "name": "id",
+          "type": "text",
           "primaryKey": true,
           "notNull": true,
           "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "is_deleted": {
+          "name": "is_deleted",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
         },
         "account_id": {
           "name": "account_id",
@@ -21,30 +50,43 @@
           "notNull": true,
           "autoincrement": false
         },
-        "legacy_imported_at": {
-          "name": "legacy_imported_at",
-          "type": "integer",
+        "provider": {
+          "name": "provider",
+          "type": "text",
           "primaryKey": false,
-          "notNull": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "provider_account_id": {
+          "name": "provider_account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
           "autoincrement": false
         }
       },
       "indexes": {
-        "account_data_identity_account_id_unique": {
-          "name": "account_data_identity_account_id_unique",
-          "columns": ["account_id"],
-          "isUnique": true
+        "provider_account_active_idx": {
+          "name": "provider_account_active_idx",
+          "columns": ["provider", "provider_account_id"],
+          "isUnique": true,
+          "where": "is_deleted = 0"
         }
       },
-      "foreignKeys": {},
+      "foreignKeys": {
+        "account_identities_account_id_accounts_id_fk": {
+          "name": "account_identities_account_id_accounts_id_fk",
+          "tableFrom": "account_identities",
+          "tableTo": "accounts",
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {
-        "account_data_identity_singleton_check": {
-          "name": "account_data_identity_singleton_check",
-          "value": "\"account_data_identity\".\"singleton\" = 1"
-        }
-      }
+      "checkConstraints": {}
     },
     "accounts": {
       "name": "accounts",
@@ -1135,6 +1177,162 @@
           "tableFrom": "conversation_sessions",
           "tableTo": "accounts",
           "columnsFrom": ["account_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "diary_brain_checkpoints": {
+      "name": "diary_brain_checkpoints",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "is_deleted": {
+          "name": "is_deleted",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "session_id": {
+          "name": "session_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "from_sequence": {
+          "name": "from_sequence",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "through_sequence": {
+          "name": "through_sequence",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "first_message_at": {
+          "name": "first_message_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "last_message_at": {
+          "name": "last_message_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "due_at": {
+          "name": "due_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "next_attempt_at": {
+          "name": "next_attempt_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'pending'"
+        },
+        "attempt_count": {
+          "name": "attempt_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "applied_at": {
+          "name": "applied_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "diary_brain_checkpoint_pending_session_idx": {
+          "name": "diary_brain_checkpoint_pending_session_idx",
+          "columns": ["session_id"],
+          "isUnique": true,
+          "where": "\"diary_brain_checkpoints\".\"status\" = 'pending' AND \"diary_brain_checkpoints\".\"is_deleted\" = 0"
+        },
+        "diary_brain_checkpoint_due_idx": {
+          "name": "diary_brain_checkpoint_due_idx",
+          "columns": ["status", "next_attempt_at", "is_deleted"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "diary_brain_checkpoints_account_id_accounts_id_fk": {
+          "name": "diary_brain_checkpoints_account_id_accounts_id_fk",
+          "tableFrom": "diary_brain_checkpoints",
+          "tableTo": "accounts",
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "diary_brain_checkpoints_session_id_conversation_sessions_id_fk": {
+          "name": "diary_brain_checkpoints_session_id_conversation_sessions_id_fk",
+          "tableFrom": "diary_brain_checkpoints",
+          "tableTo": "conversation_sessions",
+          "columnsFrom": ["session_id"],
           "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"

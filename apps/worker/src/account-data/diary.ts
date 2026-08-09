@@ -28,6 +28,53 @@ export const diaryActions = {
       ? Rest
       : never
   ) => d1.action.conversation.getTurnContext(db, ...args),
+  "conversation.claimDueDiaryBrainCheckpoints": (db: d1.Client, accountId: string, at?: Date) =>
+    d1.action.conversation.claimDueDiaryBrainCheckpointIds(db, accountId, at),
+  "conversation.getDiaryBrainCheckpointContext": (
+    db: d1.Client,
+    accountId: string,
+    checkpointId: string,
+  ) => d1.action.conversation.getDiaryBrainCheckpointContext(db, accountId, checkpointId),
+  "conversation.applyDiaryBrainCheckpoint": (
+    db: d1.Client,
+    accountId: string,
+    checkpointId: string,
+    expectedThroughSequence: number,
+    promptVersion: string,
+    candidates: readonly { statement: string; sourceMessageIds: readonly string[] }[],
+    at?: Date,
+  ) =>
+    d1.action.conversation.applyDiaryBrainCheckpoint(
+      db,
+      accountId,
+      checkpointId,
+      expectedThroughSequence,
+      promptVersion,
+      candidates,
+      at,
+    ),
+  "conversation.getDiaryBrainCheckpointDevelopmentNotification": (
+    db: d1.Client,
+    accountId: string,
+    checkpointId: string,
+  ) =>
+    d1.action.conversation.getDiaryBrainCheckpointDevelopmentNotification(
+      db,
+      accountId,
+      checkpointId,
+    ),
+  "conversation.markDiaryBrainCheckpointDevelopmentNotificationSent": (
+    db: d1.Client,
+    accountId: string,
+    checkpointId: string,
+    at?: Date,
+  ) =>
+    d1.action.conversation.markDiaryBrainCheckpointDevelopmentNotificationSent(
+      db,
+      accountId,
+      checkpointId,
+      at,
+    ),
   "conversation.markTurnGenerating": (db: d1.Client, _accountId: string, turnId: string) =>
     d1.action.conversation.markTurnGenerating(db, turnId),
   "conversation.getTurnStatus": (db: d1.Client, _accountId: string, turnId: string) =>

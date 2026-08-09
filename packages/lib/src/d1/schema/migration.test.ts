@@ -61,6 +61,7 @@ describe("D1 clean baseline migration", () => {
       "source_record_text_payloads",
       "conversation_messages",
       "chat_turns",
+      "diary_brain_checkpoint_items",
       "diagnosis_answers",
       "diagnosis_deferred_questions",
       "diagnosis_brain_projection_requests",

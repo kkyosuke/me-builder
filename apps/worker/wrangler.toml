@@ -15,9 +15,18 @@ queue = "me-builder-chat-turn-queue-local"
 dead_letter_queue = "me-builder-chat-turn-dlq-local"
 max_retries = 5
 
+[[queues.consumers]]
+queue = "me-builder-brain-checkpoint-queue-local"
+dead_letter_queue = "me-builder-brain-checkpoint-dlq-local"
+max_retries = 5
+
 [[queues.producers]]
 queue = "me-builder-chat-turn-queue-local"
 binding = "CHAT_TURN_QUEUE"
+
+[[queues.producers]]
+queue = "me-builder-brain-checkpoint-queue-local"
+binding = "BRAIN_CHECKPOINT_QUEUE"
 
 [[durable_objects.bindings]]
 name = "CONVERSATION_COORDINATOR"
@@ -68,9 +77,18 @@ queue = "me-builder-chat-turn-queue-local"
 dead_letter_queue = "me-builder-chat-turn-dlq-local"
 max_retries = 5
 
+[[env.local.queues.consumers]]
+queue = "me-builder-brain-checkpoint-queue-local"
+dead_letter_queue = "me-builder-brain-checkpoint-dlq-local"
+max_retries = 5
+
 [[env.local.queues.producers]]
 queue = "me-builder-chat-turn-queue-local"
 binding = "CHAT_TURN_QUEUE"
+
+[[env.local.queues.producers]]
+queue = "me-builder-brain-checkpoint-queue-local"
+binding = "BRAIN_CHECKPOINT_QUEUE"
 
 [[env.local.durable_objects.bindings]]
 name = "CONVERSATION_COORDINATOR"
@@ -104,9 +122,18 @@ queue = "me-builder-chat-turn-queue-preview"
 dead_letter_queue = "me-builder-chat-turn-dlq-preview"
 max_retries = 5
 
+[[env.preview.queues.consumers]]
+queue = "me-builder-brain-checkpoint-queue-preview"
+dead_letter_queue = "me-builder-brain-checkpoint-dlq-preview"
+max_retries = 5
+
 [[env.preview.queues.producers]]
 queue = "me-builder-chat-turn-queue-preview"
 binding = "CHAT_TURN_QUEUE"
+
+[[env.preview.queues.producers]]
+queue = "me-builder-brain-checkpoint-queue-preview"
+binding = "BRAIN_CHECKPOINT_QUEUE"
 
 [[env.preview.durable_objects.bindings]]
 name = "CONVERSATION_COORDINATOR"
@@ -140,9 +167,18 @@ queue = "me-builder-chat-turn-queue-production"
 dead_letter_queue = "me-builder-chat-turn-dlq-production"
 max_retries = 5
 
+[[env.production.queues.consumers]]
+queue = "me-builder-brain-checkpoint-queue-production"
+dead_letter_queue = "me-builder-brain-checkpoint-dlq-production"
+max_retries = 5
+
 [[env.production.queues.producers]]
 queue = "me-builder-chat-turn-queue-production"
 binding = "CHAT_TURN_QUEUE"
+
+[[env.production.queues.producers]]
+queue = "me-builder-brain-checkpoint-queue-production"
+binding = "BRAIN_CHECKPOINT_QUEUE"
 
 [[env.production.durable_objects.bindings]]
 name = "CONVERSATION_COORDINATOR"

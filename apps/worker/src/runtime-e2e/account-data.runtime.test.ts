@@ -62,4 +62,38 @@ describe("AccountData Workers runtime E2E", () => {
       ).toEqual([]);
     });
   });
+
+  it("既存Brainデータを持つ配布済み0003 schemaへ0004を追記できる", async () => {
+    const accountId = crypto.randomUUID();
+    const stub = env.ACCOUNT_DATA.getByName(accountId);
+
+    await runInDurableObject(stub, async (instance: AccountData, state) => {
+      state.storage.sql.exec(
+        "INSERT INTO brain_items (id, created_at, updated_at, is_deleted, account_id, category, statement, attributes_json, derivation, status, stability, sensitivity, externally_shareable, confidence_json) VALUES ('brain-1', 1, 1, 0, ?, 'memory', '散歩した', '{}', 'ai', 'active', 'stable', 'private', 0, '{}')",
+        accountId,
+      );
+      state.storage.sql.exec(
+        "INSERT INTO brain_item_access_labels (id, created_at, updated_at, is_deleted, account_id, brain_item_id, label, assigned_by) VALUES ('label-1', 1, 1, 0, ?, 'brain-1', 'private', 'system')",
+        accountId,
+      );
+
+      state.storage.sql.exec("DROP TABLE compatibility_references");
+      state.storage.sql.exec("DELETE FROM __drizzle_migrations WHERE created_at = 1786270180000");
+
+      const repository = Reflect.get(instance, "repository") as { initialize(): Promise<void> };
+      await expect(repository.initialize()).resolves.toBeUndefined();
+      expect(
+        state.storage.sql
+          .exec<{ name: string }>(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'compatibility_references'",
+          )
+          .one().name,
+      ).toBe("compatibility_references");
+      expect(
+        state.storage.sql
+          .exec<{ statement: string }>("SELECT statement FROM brain_items WHERE id = 'brain-1'")
+          .one().statement,
+      ).toBe("散歩した");
+    });
+  });
 });

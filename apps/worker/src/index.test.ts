@@ -117,7 +117,7 @@ describe("Worker", () => {
       {
         d1: db,
         do: { conversation: coordinatorNamespace, accountData: accountDataNamespace },
-        queue: { chatTurn: undefined },
+        queue: { chatTurn: undefined, brainCheckpoint: undefined },
       },
     );
 

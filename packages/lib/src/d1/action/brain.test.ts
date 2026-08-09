@@ -31,7 +31,6 @@ function createInput(overrides: Partial<SaveBrainItemInput> = {}): SaveBrainItem
       statement: "日記から見える傾向",
       attributes: { sourceKind: "diary" },
       derivation: "ai",
-      confirmation: "pending",
       status: "active",
       stability: "changeable",
       sensitivity: "normal",
@@ -52,7 +51,6 @@ function createInput(overrides: Partial<SaveBrainItemInput> = {}): SaveBrainItem
       {
         id: "access-1",
         label: "unclassified",
-        confirmation: "pending",
         assignedBy: "system",
       },
     ],
@@ -128,7 +126,6 @@ describe("findBrainItemForAccount", () => {
       statement: "Account 1だけの命題",
       attributes: {},
       derivation: "deterministic",
-      confirmation: "pending",
       status: "active",
       stability: "changeable",
       sensitivity: "normal",

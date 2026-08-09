@@ -1,6 +1,10 @@
 import { d1 } from "@me-builder/lib";
 import type { AccountDataNamespace } from "@me-builder/lib";
-import type { ChatTurnQueueMessage, Queue } from "@me-builder/shared";
+import type {
+  ChatTurnQueueMessage,
+  DiaryBrainCheckpointQueueMessage,
+  Queue,
+} from "@me-builder/shared";
 import type { Env } from "../types";
 
 export type CloudflareBindings = {
@@ -11,6 +15,7 @@ export type CloudflareBindings = {
   };
   queue: {
     chatTurn: Queue<ChatTurnQueueMessage> | undefined;
+    brainCheckpoint: Queue<DiaryBrainCheckpointQueueMessage> | undefined;
   };
 };
 
@@ -24,6 +29,7 @@ export function getCloudflareBindings(env: Env): CloudflareBindings {
     },
     queue: {
       chatTurn: env.CHAT_TURN_QUEUE,
+      brainCheckpoint: env.BRAIN_CHECKPOINT_QUEUE,
     },
   };
 }

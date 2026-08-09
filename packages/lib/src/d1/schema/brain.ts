@@ -11,7 +11,7 @@ import { accounts } from "./account";
 import { baseSchema } from "./base";
 import { sourceRecords } from "./source";
 
-/** Source Recordから導出され、本人が確認できるBrainの命題。 */
+/** Source Recordから導出されたBrainの命題。 */
 export const brainItems = sqliteTable(
   "brain_items",
   {
@@ -23,9 +23,6 @@ export const brainItems = sqliteTable(
     statement: text("statement").notNull(),
     attributes: text("attributes_json", { mode: "json" }).notNull().$type<unknown>(),
     derivation: text("derivation", { enum: ["ai", "deterministic"] }).notNull(),
-    confirmation: text("confirmation", {
-      enum: ["pending", "confirmed", "rejected"],
-    }).notNull(),
     status: text("status", { enum: ["active", "superseded", "invalidated"] }).notNull(),
     validFrom: integer("valid_from", { mode: "timestamp" }),
     validTo: integer("valid_to", { mode: "timestamp" }),
@@ -37,12 +34,7 @@ export const brainItems = sqliteTable(
     confidence: text("confidence_json", { mode: "json" }).notNull().$type<unknown>(),
   },
   (table) => [
-    index("brain_item_lookup_idx").on(
-      table.accountId,
-      table.confirmation,
-      table.status,
-      table.category,
-    ),
+    index("brain_item_lookup_idx").on(table.accountId, table.status, table.category),
     // EvidenceとRevisionがItemの所有Accountを含む複合FKで参照する。
     uniqueIndex("brain_item_id_account_idx").on(table.id, table.accountId),
   ],
@@ -120,7 +112,6 @@ export const brainItemAccessLabels = sqliteTable(
     accountId: text("account_id").notNull(),
     brainItemId: text("brain_item_id").notNull(),
     label: text("label").notNull(),
-    confirmation: text("confirmation", { enum: ["pending", "confirmed"] }).notNull(),
     assignedBy: text("assigned_by", { enum: ["system", "owner"] }).notNull(),
   },
   (table) => [
@@ -132,12 +123,7 @@ export const brainItemAccessLabels = sqliteTable(
     uniqueIndex("brain_item_access_label_active_idx")
       .on(table.brainItemId, table.label)
       .where(sql`is_deleted = 0`),
-    index("brain_item_access_label_lookup_idx").on(
-      table.accountId,
-      table.label,
-      table.confirmation,
-      table.isDeleted,
-    ),
+    index("brain_item_access_label_lookup_idx").on(table.accountId, table.label, table.isDeleted),
   ],
 );
 

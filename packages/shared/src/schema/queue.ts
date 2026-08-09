@@ -22,4 +22,11 @@ export interface ChatTurnQueueMessage {
   generationEpoch: number;
 }
 
+/** 本文を含めず、AccountDataに保存済みの会話checkpointだけを参照する。 */
+export interface DiaryBrainCheckpointQueueMessage {
+  type: "diary-brain-checkpoint";
+  accountId: string;
+  checkpointId: string;
+}
+
 export type { Queue, Message, MessageBatch };
