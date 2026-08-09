@@ -156,6 +156,7 @@ describe("findProfileSummaryDiaryData", () => {
       { id: "source-2", accountId: "account-1", kind: "user_input" },
       { id: "source-3", accountId: "account-1", kind: "user_input" },
       { id: "source-4", accountId: "account-1", kind: "user_input" },
+      { id: "source-non-diary", accountId: "account-1", kind: "user_input" },
       { id: "source-other", accountId: "account-2", kind: "user_input" },
     ]);
     const dates = ["2026-08-01", "2026-08-02", "2026-08-03", "2026-08-04"];
@@ -174,6 +175,20 @@ describe("findProfileSummaryDiaryData", () => {
         externallyShareable: false,
         confidence: { state: "uncomputed" },
       })),
+      {
+        id: "memory-non-diary",
+        accountId: "account-1",
+        category: "memory",
+        statement: "日記以外から生成した出来事",
+        attributes: { sourceKind: "import" },
+        derivation: "ai",
+        status: "active",
+        validFrom: new Date("2026-08-06T00:00:00Z"),
+        stability: "stable",
+        sensitivity: "normal",
+        externallyShareable: false,
+        confidence: { state: "uncomputed" },
+      },
       {
         id: "memory-other",
         accountId: "account-2",
@@ -197,6 +212,12 @@ describe("findProfileSummaryDiaryData", () => {
         label: "diary",
       })),
       {
+        id: "topic-non-diary",
+        accountId: "account-1",
+        brainItemId: "memory-non-diary",
+        label: "diary",
+      },
+      {
         id: "topic-other",
         accountId: "account-2",
         brainItemId: "memory-other",
@@ -219,6 +240,16 @@ describe("findProfileSummaryDiaryData", () => {
         accountId: "account-1",
         brainItemId: "memory-4",
         sourceRecordId: "source-3",
+        relation: "supports",
+        isDerivationTrigger: true,
+        derivationMethod: "ai",
+        generatedAt: new Date("2026-08-09T00:00:00Z"),
+      },
+      {
+        id: "evidence-non-diary",
+        accountId: "account-1",
+        brainItemId: "memory-non-diary",
+        sourceRecordId: "source-non-diary",
         relation: "supports",
         isDerivationTrigger: true,
         derivationMethod: "ai",

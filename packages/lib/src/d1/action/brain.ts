@@ -1,4 +1,4 @@
-import { and, asc, countDistinct, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, countDistinct, desc, eq, inArray, sql } from "drizzle-orm";
 import type { D1Client } from "../client";
 import {
   brainItemAccessLabels,
@@ -187,6 +187,7 @@ export async function findProfileSummaryDiaryData(
     eq(brainItems.derivation, "ai"),
     eq(brainItems.status, "active"),
     eq(brainItems.isDeleted, false),
+    sql`json_extract(${brainItems.attributes}, '$.sourceKind') = 'diary'`,
     eq(brainItemTopicLabels.accountId, accountId),
     eq(brainItemTopicLabels.label, "diary"),
     eq(brainItemTopicLabels.isDeleted, false),

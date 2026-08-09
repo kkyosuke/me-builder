@@ -82,6 +82,7 @@ export default function DiagnosisApplication() {
         <DiagnosisResultView
           result={detailContent.result}
           onBack={closeDetail}
+          showProfileSummaryLink={!resultOpenedFromProfile}
           {...profileResultBack}
         />
       );

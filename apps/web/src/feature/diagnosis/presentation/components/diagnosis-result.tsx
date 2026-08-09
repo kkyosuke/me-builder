@@ -1,4 +1,4 @@
-import { ArrowLeft, CheckCircle2, ChevronDown, Clock3, Sparkles } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, ChevronDown, Clock3, Sparkles } from "lucide-react";
 import type { DiagnosisResult } from "../../model/diagnosis-result";
 import { getParameterSummary } from "../parameter-summary";
 
@@ -17,11 +17,13 @@ export function DiagnosisResultView({
   onBack,
   backHref,
   backLabel = "診断一覧",
+  showProfileSummaryLink = false,
 }: {
   result: DiagnosisResult;
   onBack: () => void;
   backHref?: string;
   backLabel?: string;
+  showProfileSummaryLink?: boolean;
 }) {
   const scoring = result.scoring;
   const backClassName =
@@ -163,6 +165,16 @@ export function DiagnosisResultView({
           </ol>
         </details>
       </section>
+
+      {showProfileSummaryLink && (
+        <a
+          href="/me"
+          className="mb-8 flex items-center justify-between rounded-xl bg-sky-400 px-4 py-3 text-sm font-bold text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400"
+        >
+          わたしの傾向を見る
+          <ArrowRight className="size-4" aria-hidden="true" />
+        </a>
+      )}
     </main>
   );
 }

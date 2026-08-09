@@ -78,6 +78,14 @@ describe("DiagnosisResultView", () => {
     expect(onBack).toHaveBeenCalledOnce();
   });
 
+  it("通常の回答結果からわたしの傾向へ進める", () => {
+    render(<DiagnosisResultView result={result} onBack={vi.fn()} showProfileSummaryLink={true} />);
+
+    expect(screen.getByRole("link", { name: "わたしの傾向を見る" }).getAttribute("href")).toBe(
+      "/me",
+    );
+  });
+
   it("サマリーから開いた結果ではわたしの傾向へのリンクを表示する", () => {
     render(
       <DiagnosisResultView
