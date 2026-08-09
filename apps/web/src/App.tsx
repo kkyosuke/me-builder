@@ -1,18 +1,26 @@
 import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { LoadingState } from "./components/loading-state";
 import { RouteErrorBoundary } from "./components/route-error-boundary";
-import {
-  type AvatarSelection,
-  AvatarSettingsScreen,
-  ProfileMenuButton,
-  ProfileSettingsScreen,
-} from "./feature/profile-settings";
+import type { AvatarSelection } from "./feature/profile-settings/model/avatar";
+import { ProfileMenuButton } from "./feature/profile-settings/presentation/components/profile-menu-button";
 import { useColorTheme } from "./feature/theme";
-import { loadAdminApplication, loadDiagnosisApplication, loadProfileApplication } from "./routes";
+import {
+  loadAdminApplication,
+  loadAvatarSettingsScreen,
+  loadDiagnosisApplication,
+  loadProfileApplication,
+  loadProfileSettingsScreen,
+  preloadAvatarSettingsScreen,
+  preloadMainApplication,
+  preloadProfileSettingsScreen,
+  scheduleIdlePreloadAfter,
+} from "./routes";
 
 const AdminApplication = lazy(loadAdminApplication);
 const DiagnosisApplication = lazy(loadDiagnosisApplication);
 const ProfileApplication = lazy(loadProfileApplication);
+const ProfileSettingsScreen = lazy(loadProfileSettingsScreen);
+const AvatarSettingsScreen = lazy(loadAvatarSettingsScreen);
 
 type ProfileView = "closed" | "profile" | "avatar";
 
@@ -94,6 +102,23 @@ export function App() {
     }
   }, [profileView]);
 
+  useEffect(() => {
+    if (isAdminPath) return;
+
+    return scheduleIdlePreloadAfter(
+      isMePath ? loadProfileApplication : loadDiagnosisApplication,
+      () => {
+        preloadMainApplication(isMePath ? "diagnosis" : "me");
+        preloadProfileSettingsScreen();
+      },
+    );
+  }, [isAdminPath, isMePath]);
+
+  useEffect(() => {
+    if (profileView !== "profile") return;
+    return scheduleIdlePreloadAfter(loadProfileSettingsScreen, preloadAvatarSettingsScreen);
+  }, [profileView]);
+
   const openProfile = () => {
     shouldRestoreProfileButtonFocus.current = true;
     window.history.pushState({ [PROFILE_HISTORY_STATE_KEY]: "profile" }, "", "/profile");
@@ -130,7 +155,12 @@ export function App() {
   return (
     <>
       {!isAdminPath && profileView === "closed" && (
-        <ProfileMenuButton ref={profileButtonRef} avatar={avatar} onOpen={openProfile} />
+        <ProfileMenuButton
+          ref={profileButtonRef}
+          avatar={avatar}
+          onOpen={openProfile}
+          onPreload={preloadProfileSettingsScreen}
+        />
       )}
       <div ref={applicationContentRef} aria-hidden={profileView !== "closed" ? true : undefined}>
         <RouteErrorBoundary>
@@ -146,23 +176,39 @@ export function App() {
         </RouteErrorBoundary>
       </div>
       {profileView === "profile" && (
-        <ProfileSettingsScreen
-          avatar={avatar}
-          theme={colorTheme.theme}
-          onBack={closeProfile}
-          onOpenAvatar={openAvatar}
-          onThemeChange={colorTheme.setTheme}
-        />
+        <RouteErrorBoundary>
+          <Suspense
+            fallback={
+              <LoadingState message="プロフィールを読み込んでいます..." variant="overlay" />
+            }
+          >
+            <ProfileSettingsScreen
+              avatar={avatar}
+              theme={colorTheme.theme}
+              onBack={closeProfile}
+              onOpenAvatar={openAvatar}
+              onThemeChange={colorTheme.setTheme}
+            />
+          </Suspense>
+        </RouteErrorBoundary>
       )}
       {profileView === "avatar" && (
-        <AvatarSettingsScreen
-          currentAvatar={avatar}
-          onBack={closeAvatar}
-          onSave={(nextAvatar) => {
-            setAvatar(nextAvatar);
-            closeAvatar();
-          }}
-        />
+        <RouteErrorBoundary>
+          <Suspense
+            fallback={
+              <LoadingState message="アバター設定を読み込んでいます..." variant="overlay" />
+            }
+          >
+            <AvatarSettingsScreen
+              currentAvatar={avatar}
+              onBack={closeAvatar}
+              onSave={(nextAvatar) => {
+                setAvatar(nextAvatar);
+                closeAvatar();
+              }}
+            />
+          </Suspense>
+        </RouteErrorBoundary>
       )}
     </>
   );
