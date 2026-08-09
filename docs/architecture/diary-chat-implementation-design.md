@@ -278,7 +278,7 @@ prompt本文、Context Package、未検証のモデル出力は保存しませ�
 | `development_notification_sent_at` | no | 開発環境の確認Push完了時刻 |
 | `created_at`, `updated_at`, `deleted_at`, `is_deleted` | yes / no / yes | lifecycle |
 
-同じSessionの`pending`は最大1件とします。新しいuser messageをTurnへ取り込むtransactionで、発言ごとに現在の期限を評価します。期限前なら範囲を延長し、期限以後なら既存範囲を`queued`へ固定して新しい`pending`を作ります。明示終了時は期限を現在時刻へ進めます。
+同じSessionの`pending`は最大1件とします。新しいuser messageをTurnへ取り込むtransactionで、発言ごとに現在の期限とuser message 10件の範囲上限を評価します。期限前かつ上限以内なら範囲を延長し、期限以後または追加すると上限を超える場合は既存範囲を`queued`へ固定して新しい`pending`を作ります。Memory変換では削除・撤回されていないuser原文だけを最大10message、各5,000文字まで読み、assistant本文は入力へ含めません。明示終了時は期限を現在時刻へ進めます。
 
 Alarmは期限到来した`pending`またはQueue投入に失敗した`queued`だけをclaimし、指数バックオフ付きの投入leaseとして`next_attempt_at`を進めます。Queue投入が失敗した場合は永続化済みの次回試行時刻からAlarmを明示的に再設定し、プラットフォームの自動retry上限を越えても処理を再開できるようにします。QueueがIDを受理したら`dispatched`へ進め、以後はAlarmの対象にしません。送信後・状態更新前に停止した場合だけlease後に重複投入され得ますが、checkpoint IDと適用transactionで多重適用を防ぎます。`dispatched`後のAI一時失敗はQueue自身の再配送とDLQで扱い、Alarmと二重に再投入しません。Workerは固定範囲を読み直し、Brain Item一式、`diary_brain_checkpoint_items`、`applied`への遷移を同じtransactionで確定します。JSONまたは出力envelope全体が不正な場合は再配送し、envelope内の個別候補だけがschema・Evidence・候補間重複の検証に失敗した場合は、安全な理由コードをerror logへ残してその候補だけを登録対象から外します。AlarmとRPC actionはAccountData Object内で直列化します。
 
@@ -305,7 +305,7 @@ stateDiagram-v2
 
 Brain Itemを含むAccount所有データのquery境界は、[Accountデータ分離設計](account-data-isolation.md)を正とします。
 
-検証を通過したBrain Itemは`active`として保存し、同じAccountData SQLite transactionでVectorize同期jobをoutboxへ追加します。本人の同意を登録や利用開始の条件にはしません。AI推定は`derivation = ai`として区別し、Confidenceの算出前を表す`uncomputed`を検索順位に使いません。
+検証を通過したBrain Itemは`active`として保存します。本人の同意を登録の条件にはしません。Vectorize同期jobと検索利用は後続実装であり、導入時にはBrain Item作成と同じAccountData SQLite transactionでoutboxへ追加します。AI推定は`derivation = ai`として区別し、Confidenceの算出前を表す`uncomputed`を検索順位に使いません。
 
 ### 4.8 `vector_index_jobs`
 
@@ -321,7 +321,7 @@ Vectorizeは非同期更新であるため、AccountDataを正とするoutboxを
 | `attempt_count`, `next_attempt_at`, `failure_code` | retry管理。本文を含めない |
 | `created_at`, `updated_at` | lifecycle |
 
-Brain Itemの作成、改訂、無効化、削除、撤回では、Brain Itemの利用可否変更とjob追加を同じAccountData SQLite transactionで確定します。Queue consumerはItem ID、revision、operationを使って冪等にupsertまたはdeleteし、mutation IDを保存します。AccountData alarmは長時間`pending` / `submitted`のjobとVectorize間の差分を再照合し、DLQから復旧します。削除時はAccountDataで先に利用不可にするため、Vectorizeに古いvectorが残る間も検索後のAccountData再認可で利用されません。
+以下はVectorize同期を実装するときの境界です。Brain Itemの作成、改訂、無効化、削除、撤回では、Brain Itemの利用可否変更とjob追加を同じAccountData SQLite transactionで確定します。Queue consumerはItem ID、revision、operationを使って冪等にupsertまたはdeleteし、mutation IDを保存します。AccountData alarmは長時間`pending` / `submitted`のjobとVectorize間の差分を再照合し、DLQから復旧します。削除時はAccountDataで先に利用不可にするため、Vectorizeに古いvectorが残る間も検索後のAccountData再認可で利用されません。
 
 ### 4.9 ConversationCoordinatorのローカルSQLite
 
@@ -541,7 +541,7 @@ flowchart TD
 
 日記候補の入力、起動条件、検証、Brain Item登録、否定・修正、重複・改訂は[Brain Item生成設計 §7](../domain/brain/brain-item-generation-design.md#7-日記チャットからの生成)を正とします。
 
-Brain Item抽出は会話返信とは別のsystem prompt、prompt version、Valibot schemaを使います。AccountData alarmがChat Turn QueueへIDだけを送り、consumerがチェックポイント範囲の会話を読み直してGeminiへ渡します。JSON・出力envelope不正またはproviderの一時失敗はQueueを失敗させて再試行し、個別候補のschema・Evidence・重複違反は理由コードだけをlogへ残して候補単位で除外します。安全経路または正常な空配列は0件として適用します。候補の保存はAccountData actionだけが行い、モデルへDBや外部I/Oのtoolを公開しません。
+Brain Item抽出は会話返信とは別のsystem prompt、prompt version、Valibot schemaを使います。AccountData alarmがChat Turn QueueへIDだけを送り、consumerが削除・撤回されていないuser messageを最大10件、各5,000文字まで読み直してGeminiへ渡します。上限超過本文はSource Recordとして保持したまま変換対象から外します。JSON・出力envelope不正またはproviderの一時失敗はQueueを失敗させて再試行し、個別候補のschema・Evidence・重複違反、空白statement、根拠user message本文にそのまま含まれないstatementは理由コードだけをlogへ残して候補単位で除外します。安全経路または正常な空配列は0件として適用します。候補の保存はAccountData actionだけが行い、モデルへDBや外部I/Oのtoolを公開しません。
 
 ## 8. ガードレール
 

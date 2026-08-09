@@ -240,15 +240,15 @@ sequenceDiagram
 
 AIへ渡す入力は、AccountDataから取得した次の情報です。
 
-- 未処理チェックポイントの範囲に含まれるuser / assistant message
-- 各user messageのmessage ID・Source Record ID
+- 未処理チェックポイントの範囲に含まれる、削除・撤回されていないuser message
+- 各user messageのmessage ID。Source Record IDはモデルへ渡さず、保存時にAccountDataが解決する
 - Brain Item抽出専用のprompt versionと事前安全分類
 
 Source Record本文はモデルへの入力には含めますが、モデルの出力をそのまま保存命令として信用しません。モデルが返したSource message IDを、アプリケーションが現在AccountのConversation messageとSource Recordへ解決します。
 
 ### 7.2 AIの候補出力
 
-AIは会話応答とは独立して、本人が明示した出来事を表す`Memory`を1チェックポイント最大3件提案します。現在の実装では`Memory`かつ`is_inference = false`の候補だけを受け付けます。上限は1回の構造化出力と保存負荷を制限するための安全弁であり、明示的な出来事を1件に固定するドメイン上の理由はありません。
+AIは会話応答とは独立して、本人が明示した出来事を表す`Memory`を1チェックポイント最大3件提案します。現在の実装では`Memory`かつ`is_inference = false`であり、`statement`がすべての根拠user message本文にそのまま含まれる候補だけを受け付けます。自由な言い換えを許すと、構造検証だけでは発言にない内容を除外できないため、最初の縦切りでは連続した原文の抜き出しに限定します。上限は1回の構造化出力と保存負荷を制限するための安全弁であり、明示的な出来事を1件に固定するドメイン上の理由はありません。
 
 ```json
 {
@@ -298,6 +298,8 @@ Brain Item生成はTurnごとの返信経路から分離します。未処理の
 - assistant応答が`end_session = true`で明示終了を決めた
 
 実行時刻は「最初の未処理発言 + 30分」と「最後の未処理発言 + 10分」の早い方です。AccountDataはAlarmだけに期限判定を依存せず、新着取込時にも各発言の受信時刻と現在の期限を比較します。期限以後の発言は新しいチェックポイントへ入れるため、Alarmが遅延した場合や1つの取込batchが複数の期限をまたぐ場合も、10分・30分の境界は後ろへ伸びません。
+
+1チェックポイントはuser messageを最大10件、1messageを最大5,000文字とします。新しいuser発言を加えると件数上限を超える場合は既存範囲をその時点で固定し、その発言から次のチェックポイントを開始します。文字数上限を超える原文はSource Recordとして保持しますが、このAI変換の入力とEvidence候補から除外します。Memoryはuser原文から直接抜き出すため、assistant本文も入力へ含めません。これにより削除・撤回済みuser発言の内容がassistant応答を経由して再流入することも防ぎます。時間だけで区切ると短時間の大量連投が無制限なAI入力になるため、件数と文字数の両方で入力を有界にします。
 
 6時間無操作と24時間上限はConversation Sessionを閉じる境界であり、Brain Item生成を待つための時間ではありません。Session境界には、会話文脈・順序・返信率の集計範囲を限定し、無期限に会話を伸ばさない役割があります。Brain Item生成はより短いチェックポイントで進むため、一覧など後続UIから早い段階で利用できます。
 
@@ -370,6 +372,7 @@ AIの意味的重複判定だけで既存Itemを上書きしません。同義�
 - AccountData alarmからIDのみを渡すQueue処理
 - 抽出専用`brain_item_candidates`出力schema
 - 通常安全route、`Memory`、非推定、1チェックポイント最大3件への制限
+- 原文中の連続した文言だけを受け付ける根拠検証と、user message 10件・1件5,000文字の入力上限
 - 候補のAccount・チェックポイント範囲・Evidence・安全性検証
 - Brain Item、Evidence、Access Label、チェックポイント完了を一括保存するAccountData action
 - Brain ItemとAccess LabelからConfirmationを除くschema migrationと既存projectionの追従

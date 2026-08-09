@@ -19,6 +19,8 @@ const SESSION_INACTIVITY_MS = 6 * 60 * 60 * 1000;
 const SESSION_HARD_CAP_MS = 24 * 60 * 60 * 1000;
 const BRAIN_CHECKPOINT_INACTIVITY_MS = 10 * 60 * 1000;
 const BRAIN_CHECKPOINT_HARD_CAP_MS = 30 * 60 * 1000;
+const BRAIN_CHECKPOINT_MAX_USER_MESSAGES = 10;
+const BRAIN_CHECKPOINT_MAX_USER_MESSAGE_CHARS = 5_000;
 const BRAIN_CHECKPOINT_DISPATCH_RETRY_BASE_MS = 30 * 1000;
 const BRAIN_CHECKPOINT_DISPATCH_RETRY_MAX_MS = 15 * 60 * 1000;
 const CONVERSATION_POLICY_EXPLORATION_RATE = 0.2;
@@ -368,6 +370,23 @@ export async function attachMessagesToTurn(
       ),
     )
     .get();
+  const pendingBrainUserMessageCount = pendingBrainCheckpoint
+    ? (
+        await db
+          .select({ id: conversationMessages.id })
+          .from(conversationMessages)
+          .where(
+            and(
+              eq(conversationMessages.sessionId, session.id),
+              gte(conversationMessages.sequence, pendingBrainCheckpoint.fromSequence),
+              lte(conversationMessages.sequence, pendingBrainCheckpoint.throughSequence),
+              eq(conversationMessages.role, "user"),
+              eq(conversationMessages.isDeleted, false),
+            ),
+          )
+          .all()
+      ).length
+    : 0;
 
   const checkpointWrites: BatchItem<"sqlite">[] = [];
   type CheckpointDraft = {
@@ -379,6 +398,7 @@ export async function attachMessagesToTurn(
     lastMessageAt: Date;
     dueAt: Date;
     status: "pending" | "queued";
+    userMessageCount: number;
     createdAt: Date;
   };
   const checkpointDrafts: CheckpointDraft[] = [];
@@ -392,12 +412,22 @@ export async function attachMessagesToTurn(
         lastMessageAt: pendingBrainCheckpoint.lastMessageAt,
         dueAt: pendingBrainCheckpoint.dueAt,
         status: "pending",
+        userMessageCount: pendingBrainUserMessageCount,
         createdAt: pendingBrainCheckpoint.createdAt,
       }
     : undefined;
   for (const [index, input] of sortedInputs.entries()) {
     const sequence = fromSequence + index;
-    if (checkpointDraft && input.receivedAt.getTime() >= checkpointDraft.dueAt.getTime()) {
+    const reachedTimeBoundary =
+      checkpointDraft && input.receivedAt.getTime() >= checkpointDraft.dueAt.getTime();
+    const reachedMessageBoundary =
+      checkpointDraft && checkpointDraft.userMessageCount >= BRAIN_CHECKPOINT_MAX_USER_MESSAGES;
+    if (checkpointDraft && (reachedTimeBoundary || reachedMessageBoundary)) {
+      if (reachedMessageBoundary) {
+        checkpointDraft.dueAt = new Date(
+          Math.min(checkpointDraft.dueAt.getTime(), input.receivedAt.getTime()),
+        );
+      }
       checkpointDraft.status = "queued";
       checkpointDrafts.push(checkpointDraft);
       checkpointDraft = undefined;
@@ -412,11 +442,13 @@ export async function attachMessagesToTurn(
         lastMessageAt: input.receivedAt,
         dueAt: diaryBrainCheckpointDueAt(input.receivedAt, input.receivedAt),
         status: "pending",
+        userMessageCount: 1,
         createdAt: now,
       };
       continue;
     }
     checkpointDraft.throughSequence = sequence;
+    checkpointDraft.userMessageCount += 1;
     checkpointDraft.firstMessageAt = new Date(
       Math.min(checkpointDraft.firstMessageAt.getTime(), input.receivedAt.getTime()),
     );
@@ -727,14 +759,18 @@ export async function getDiaryBrainCheckpointContext(
         gte(conversationMessages.sequence, checkpoint.fromSequence),
         lte(conversationMessages.sequence, checkpoint.throughSequence),
         eq(conversationMessages.isDeleted, false),
-        or(isNull(sourceRecords.id), eq(sourceRecords.accountId, accountId)),
+        eq(conversationMessages.role, "user"),
+        eq(sourceRecords.accountId, accountId),
+        eq(sourceRecords.isDeleted, false),
       ),
     )
     .orderBy(conversationMessages.sequence)
     .all();
   const messages = rows.flatMap((row) => {
     const body = row.role === "user" ? row.userBody : row.assistantBody;
-    return body ? [{ id: row.id, role: row.role, body, sequence: row.sequence }] : [];
+    return body && body.length <= BRAIN_CHECKPOINT_MAX_USER_MESSAGE_CHARS
+      ? [{ id: row.id, role: row.role, body, sequence: row.sequence }]
+      : [];
   });
   return {
     checkpointId,
@@ -780,9 +816,17 @@ export async function applyDiaryBrainCheckpoint(
     if (acceptedCandidateKeys.has(candidateKey)) continue;
     acceptedCandidateKeys.add(candidateKey);
     const sources = await db
-      .select({ id: sourceRecords.id, createdAt: sourceRecords.createdAt })
+      .select({
+        id: sourceRecords.id,
+        createdAt: sourceRecords.createdAt,
+        body: sourceRecordTextPayloads.body,
+      })
       .from(conversationMessages)
       .innerJoin(sourceRecords, eq(conversationMessages.sourceRecordId, sourceRecords.id))
+      .innerJoin(
+        sourceRecordTextPayloads,
+        eq(sourceRecords.id, sourceRecordTextPayloads.sourceRecordId),
+      )
       .where(
         and(
           eq(conversationMessages.sessionId, checkpoint.sessionId),
@@ -795,7 +839,14 @@ export async function applyDiaryBrainCheckpoint(
         ),
       )
       .all();
-    if (sources.length !== messageIds.length) {
+    if (
+      sources.length !== messageIds.length ||
+      sources.some(
+        ({ body }) =>
+          body.length > BRAIN_CHECKPOINT_MAX_USER_MESSAGE_CHARS ||
+          !body.includes(candidate.statement.trim()),
+      )
+    ) {
       throw new Error("Diary Brain candidate evidence validation failed");
     }
     const brainItemId = crypto.randomUUID();

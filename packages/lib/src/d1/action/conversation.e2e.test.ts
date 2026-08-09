@@ -142,6 +142,7 @@ describe("Diary conversation persistence flow", () => {
       account.id,
       checkpoint?.id ?? "",
     );
+    expect(checkpointContext?.messages.every(({ role }) => role === "user")).toBe(true);
     await expect(
       applyDiaryBrainCheckpoint(
         db,
@@ -162,6 +163,21 @@ describe("Diary conversation persistence flow", () => {
         [{ statement: "範囲外の根拠", sourceMessageIds: ["outside-message"] }],
       ),
     ).rejects.toThrow("evidence validation failed");
+    await expect(
+      applyDiaryBrainCheckpoint(
+        db,
+        account.id,
+        checkpoint?.id ?? "",
+        checkpointContext?.throughSequence ?? 0,
+        "diary-brain-test",
+        [
+          {
+            statement: "発言していない出来事",
+            sourceMessageIds: checkpointContext?.sourceMessageIds.slice(0, 1) ?? [],
+          },
+        ],
+      ),
+    ).rejects.toThrow("evidence validation failed");
     await expect(db.select().from(schema.brainItems)).resolves.toHaveLength(0);
     expect(
       db
@@ -179,7 +195,7 @@ describe("Diary conversation persistence flow", () => {
         "diary-brain-test",
         [
           {
-            statement: "少し疲れていた",
+            statement: "今日は少し疲れた",
             sourceMessageIds: checkpointContext?.sourceMessageIds.slice(0, 1) ?? [],
           },
           {
@@ -187,7 +203,7 @@ describe("Diary conversation persistence flow", () => {
             sourceMessageIds: checkpointContext?.sourceMessageIds.slice(1, 2) ?? [],
           },
           {
-            statement: " 少し疲れていた ",
+            statement: " 今日は少し疲れた ",
             sourceMessageIds: checkpointContext?.sourceMessageIds.slice(0, 1) ?? [],
           },
         ],
@@ -195,7 +211,7 @@ describe("Diary conversation persistence flow", () => {
     ).resolves.toEqual({
       candidates: [
         {
-          statement: "少し疲れていた",
+          statement: "今日は少し疲れた",
           sourceMessageIds: checkpointContext?.sourceMessageIds.slice(0, 1) ?? [],
         },
         {
@@ -209,7 +225,7 @@ describe("Diary conversation persistence flow", () => {
         expect.objectContaining({
           accountId: account.id,
           category: "memory",
-          statement: "少し疲れていた",
+          statement: "今日は少し疲れた",
           derivation: "ai",
           status: "active",
         }),
@@ -231,7 +247,7 @@ describe("Diary conversation persistence flow", () => {
     ).resolves.toEqual({
       candidates: [
         {
-          statement: "少し疲れていた",
+          statement: "今日は少し疲れた",
           sourceMessageIds: checkpointContext?.sourceMessageIds.slice(0, 1) ?? [],
         },
         {
@@ -594,6 +610,109 @@ describe("Diary conversation persistence flow", () => {
       expect.objectContaining({ fromSequence: 2, throughSequence: 2, status: "queued" }),
       expect.objectContaining({ fromSequence: 3, throughSequence: 3, status: "pending" }),
     ]);
+  });
+
+  it("10件のuser messageごとにcheckpointを分割して入力を有界にする", async () => {
+    const db = createTestDb();
+    const { account } = await upsertIdentity(db, {
+      provider: "line",
+      providerAccountId: "U_brain_message_boundary",
+    });
+    const startedAt = new Date("2026-08-07T00:00:00.000Z");
+    for (let index = 0; index < 11; index += 1) {
+      const source = await storeLineTextSource(db, {
+        accountId: account.id,
+        eventId: `brain-message-boundary-${index}`,
+        body: `発言${index + 1}`,
+        receivedAt: new Date(startedAt.getTime() + index * 1000),
+      });
+      const turn = await attachMessagesToTurn(
+        db,
+        account.id,
+        [source],
+        index + 1,
+        "test-model",
+        "test-prompt",
+      );
+      await markTurnGenerating(db, turn.turnId);
+      await saveAssistantResponse(db, {
+        turnId: turn.turnId,
+        body: `応答${index + 1}`,
+        endSession: false,
+      });
+    }
+
+    await expect(
+      db
+        .select()
+        .from(schema.diaryBrainCheckpoints)
+        .orderBy(schema.diaryBrainCheckpoints.fromSequence),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        fromSequence: 1,
+        throughSequence: 19,
+        status: "queued",
+        nextAttemptAt: new Date(startedAt.getTime() + 10 * 1000),
+      }),
+      expect.objectContaining({ fromSequence: 21, throughSequence: 21, status: "pending" }),
+    ]);
+  });
+
+  it("削除済み・上限超過のSource RecordをBrain変換の入力とEvidence候補から除外する", async () => {
+    const db = createTestDb();
+    const { account } = await upsertIdentity(db, {
+      provider: "line",
+      providerAccountId: "U_brain_deleted_source",
+    });
+    const receivedAt = new Date("2026-08-07T00:00:00.000Z");
+    const source = await storeLineTextSource(db, {
+      accountId: account.id,
+      eventId: "brain-deleted-source",
+      body: "削除後はAIへ渡さない本文",
+      receivedAt,
+    });
+    const firstTurn = await attachMessagesToTurn(
+      db,
+      account.id,
+      [source],
+      1,
+      "test-model",
+      "test-prompt",
+    );
+    await markTurnGenerating(db, firstTurn.turnId);
+    await saveAssistantResponse(db, {
+      turnId: firstTurn.turnId,
+      body: "削除対象の内容を含むassistant応答",
+      endSession: false,
+    });
+    const retainedSource = await storeLineTextSource(db, {
+      accountId: account.id,
+      eventId: "brain-retained-source",
+      body: "残す発言",
+      receivedAt: new Date(receivedAt.getTime() + 60 * 1000),
+    });
+    await attachMessagesToTurn(db, account.id, [retainedSource], 2, "test-model", "test-prompt");
+    const oversizedSource = await storeLineTextSource(db, {
+      accountId: account.id,
+      eventId: "brain-oversized-source",
+      body: "長".repeat(5_001),
+      receivedAt: new Date(receivedAt.getTime() + 2 * 60 * 1000),
+    });
+    await attachMessagesToTurn(db, account.id, [oversizedSource], 3, "test-model", "test-prompt");
+    await db
+      .update(schema.sourceRecords)
+      .set({ isDeleted: true, deletedAt: new Date(), updatedAt: new Date() })
+      .where(eq(schema.sourceRecords.id, source.sourceRecordId));
+    const [checkpoint] = await db.select().from(schema.diaryBrainCheckpoints);
+    const claimedAt = new Date(receivedAt.getTime() + 12 * 60 * 1000);
+    await claimDueDiaryBrainCheckpointIds(db, account.id, claimedAt);
+    await markDiaryBrainCheckpointDispatched(db, account.id, checkpoint?.id ?? "", claimedAt);
+
+    await expect(
+      getDiaryBrainCheckpointContext(db, account.id, checkpoint?.id ?? ""),
+    ).resolves.toMatchObject({
+      messages: [expect.objectContaining({ role: "user", body: "残す発言" })],
+    });
   });
 
   it("最後の発言から10分間新着がなければBrain checkpointを起動する", async () => {
