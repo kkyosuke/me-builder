@@ -152,6 +152,9 @@ export async function handleQueueBatch(
           service: "worker",
           environment: workerConfig?.environment ?? "unknown",
           traceId: "traceId" in message.body ? (message.body.traceId ?? message.id) : message.id,
+          ...("traceIds" in message.body && message.body.traceIds?.length
+            ? { traceIds: message.body.traceIds }
+            : {}),
           queue: batch.queue,
           queueMessageId: message.id,
           attempt: message.attempts,

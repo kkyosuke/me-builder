@@ -253,7 +253,12 @@ export class ConversationCoordinator extends DurableObject<Env> {
     this.repository.expirePendingDeliveries(Date.now());
     this.repository.expireGenerationLeases(Date.now());
     for (const turn of this.repository.listPendingQueueTurns()) {
-      await this.enqueueTurn(turn.turnId, turn.generationEpoch, turn.traceId ?? undefined);
+      await this.enqueueTurn(
+        turn.turnId,
+        turn.generationEpoch,
+        turn.traceId ?? undefined,
+        turn.traceIds ?? undefined,
+      );
     }
 
     let batch = this.repository.findAttachBatch();
@@ -290,8 +295,10 @@ export class ConversationCoordinator extends DurableObject<Env> {
       DIARY_CHAT_CONVERSATION_POLICY_IDS,
     );
     const isCurrentGeneration = attached.generationEpoch === batch.generationEpoch;
-    const traceId =
-      [...batch.messages].reverse().find((message) => message.traceId)?.traceId ?? undefined;
+    const traceIds = [
+      ...new Set(batch.messages.flatMap((message) => (message.traceId ? [message.traceId] : []))),
+    ];
+    const traceId = traceIds.at(-1);
     this.repository.completeAttachBatch(
       batch.id,
       batch.messages.map(({ eventId }) => eventId),
@@ -300,6 +307,7 @@ export class ConversationCoordinator extends DurableObject<Env> {
             turnId: attached.turnId,
             generationEpoch: attached.generationEpoch,
             ...(traceId ? { traceId } : {}),
+            ...(traceIds.length > 0 ? { traceIds } : {}),
           }
         : undefined,
     );
@@ -308,7 +316,7 @@ export class ConversationCoordinator extends DurableObject<Env> {
       isCurrentGeneration ? attached.turnId : undefined,
     );
     if (isCurrentGeneration) {
-      await this.enqueueTurn(attached.turnId, attached.generationEpoch, traceId);
+      await this.enqueueTurn(attached.turnId, attached.generationEpoch, traceId, traceIds);
     }
     await this.schedulePendingWork();
   }
@@ -348,6 +356,7 @@ export class ConversationCoordinator extends DurableObject<Env> {
     turnId: string,
     generationEpoch: number,
     traceId?: string,
+    traceIds?: string[],
   ): Promise<void> {
     const queue = this.cf.queue.chatTurn;
     if (!queue) throw new Error("CHAT_TURN_QUEUE binding is not configured");
@@ -356,6 +365,7 @@ export class ConversationCoordinator extends DurableObject<Env> {
     const message: ChatTurnQueueMessage = {
       type: "chat-turn",
       ...(traceId ? { traceId } : {}),
+      ...(traceIds && traceIds.length > 0 ? { traceIds } : {}),
       accountId,
       turnId,
       generationEpoch,

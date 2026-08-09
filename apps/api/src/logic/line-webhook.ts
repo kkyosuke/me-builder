@@ -1,5 +1,10 @@
 import { line } from "@me-builder/lib";
-import { type Queue, type WebhookQueueMessage, logger } from "@me-builder/shared";
+import {
+  type Queue,
+  type WebhookQueueMessage,
+  logger,
+  toSafeOperationalErrorFields,
+} from "@me-builder/shared";
 
 /**
  * LINE Webhook を受理し、Cloudflare Queues へ投入します。
@@ -159,7 +164,31 @@ export async function receiveLineWebhook({
     return { type: "accepted", id: event.id, queued: false };
   }
 
-  await queue.send(event);
+  try {
+    await queue.send(event);
+  } catch (error) {
+    logger.error(
+      {
+        event: "line.webhook.failed",
+        service: "api",
+        traceId,
+        component: "line-webhook",
+        outcome: "failed",
+        disposition: "http-error",
+        source: event.source,
+        messageCount: messages.length,
+        ...toSafeOperationalErrorFields(error, {
+          code: "WEBHOOK_QUEUE_SEND_FAILED",
+          category: "dependency",
+          stage: "queue.send",
+          retryable: true,
+          dependency: "cloudflare-queue",
+        }),
+      },
+      "Webhook event could not be queued",
+    );
+    throw error;
+  }
   logger.info(
     {
       event: "line.webhook.accepted",

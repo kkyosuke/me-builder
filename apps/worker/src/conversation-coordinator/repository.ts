@@ -244,6 +244,7 @@ export class ConversationCoordinatorRepository {
         turnId: localTurns.turnId,
         generationEpoch: localTurns.generationEpoch,
         traceId: localTurns.traceId,
+        traceIds: localTurns.traceIds,
       })
       .from(localTurns)
       .where(eq(localTurns.status, "pending_queue"))
@@ -301,7 +302,7 @@ export class ConversationCoordinatorRepository {
   completeAttachBatch(
     batchId: string,
     eventIds: string[],
-    turn?: { turnId: string; generationEpoch: number; traceId?: string },
+    turn?: { turnId: string; generationEpoch: number; traceId?: string; traceIds?: string[] },
   ): void {
     this.db.transaction((tx) => {
       if (turn) {

@@ -155,6 +155,7 @@ describe("ConversationCoordinator D1 E2E", () => {
     const queuedTurn = queued[0];
     if (!queuedTurn) throw new Error("Expected a queued turn");
     expect(queuedTurn.traceId).toBe("trace-second");
+    expect(queuedTurn.traceIds).toEqual(["trace-first", "trace-second"]);
     const context = await d1.action.conversation.getTurnContext(client, queuedTurn.turnId, 20);
     expect(context?.messages.map(({ body }) => body)).toEqual([
       "今日は少し疲れた",

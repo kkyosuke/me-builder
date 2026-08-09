@@ -102,6 +102,7 @@ export type StoredLineSource = {
   sourceRecordId: string;
   eventId: string;
   receivedAt: Date;
+  traceId?: string;
 };
 
 async function sha256(value: string): Promise<string> {
@@ -112,7 +113,13 @@ async function sha256(value: string): Promise<string> {
 /** LINE eventを不変なSource Recordとして冪等に保存する。 */
 export async function storeLineTextSource(
   db: D1Client,
-  input: { accountId: string; eventId: string; body: string; receivedAt: Date },
+  input: {
+    accountId: string;
+    eventId: string;
+    body: string;
+    receivedAt: Date;
+    traceId?: string;
+  },
 ): Promise<StoredLineSource> {
   const originalRef = `line:${input.eventId}`;
   const existing = await db
@@ -155,6 +162,7 @@ export async function storeLineTextSource(
     sourceRecordId,
     eventId: input.eventId,
     receivedAt: input.receivedAt,
+    ...(input.traceId ? { traceId: input.traceId } : {}),
   };
 }
 

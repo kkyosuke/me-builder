@@ -20,6 +20,7 @@ export async function processChatTurnMessage(
 ): Promise<void> {
   const startedAt = Date.now();
   const traceId = message.body.traceId ?? message.id;
+  const traceIds = [...new Set(message.body.traceIds?.length ? message.body.traceIds : [traceId])];
   if (!cf.do.accountData) throw new Error("ACCOUNT_DATA binding is not configured");
   const accountData = accountDataFor(cf.do.accountData, message.body.accountId);
   const context = await accountData.execute(
@@ -238,6 +239,7 @@ export async function processChatTurnMessage(
           environment: workerConfig.environment,
           component: "chat-turn",
           traceId,
+          traceIds,
           queueMessageId: message.id,
           messageType: "chat-turn",
           attempt: message.attempts,
@@ -258,6 +260,7 @@ export async function processChatTurnMessage(
         environment: workerConfig.environment,
         component: "chat-turn",
         traceId,
+        traceIds,
         queueMessageId: message.id,
         messageType: "chat-turn",
         attempt: message.attempts,

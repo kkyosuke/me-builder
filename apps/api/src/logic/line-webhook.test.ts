@@ -1,5 +1,5 @@
 import { createHmac } from "node:crypto";
-import type { Queue, WebhookQueueMessage } from "@me-builder/shared";
+import { type Queue, type WebhookQueueMessage, logger } from "@me-builder/shared";
 import { describe, expect, it, vi } from "vitest";
 import { receiveLineWebhook } from "./line-webhook";
 
@@ -23,10 +23,13 @@ function receive(
   options: {
     startChatLoading?: (chatId: string) => Promise<unknown>;
     waitUntil?: (promise: Promise<unknown>) => void;
+    sendError?: Error;
   } = {},
 ) {
   const body = JSON.stringify({ events });
-  const send = vi.fn().mockResolvedValue(undefined);
+  const send = options.sendError
+    ? vi.fn().mockRejectedValue(options.sendError)
+    : vi.fn().mockResolvedValue(undefined);
   const queue: Queue<WebhookQueueMessage> = {
     send,
     sendBatch: vi.fn(),
@@ -128,5 +131,28 @@ describe("replyTokenの受け渡し", () => {
 
     expect(queued.traceId).toBe(queued.id);
     expect(outcome).toMatchObject({ type: "accepted", id: queued.traceId });
+  });
+
+  it("Queue投入失敗を相関IDと安全な原因分類で終端記録する", async () => {
+    const errorLog = vi.spyOn(logger, "error").mockImplementation(() => undefined);
+    const queueError = new Error("本文やSDK responseを含みうる内容");
+    const { send, result } = receive([textEvent("本文")], { sendError: queueError });
+
+    await expect(result).rejects.toThrow("本文やSDK responseを含みうる内容");
+    const queued = send.mock.calls[0]?.[0] as WebhookQueueMessage;
+    expect(errorLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "line.webhook.failed",
+        traceId: queued.traceId,
+        stage: "queue.send",
+        errorCode: "WEBHOOK_QUEUE_SEND_FAILED",
+        errorCategory: "dependency",
+        retryable: true,
+        dependency: "cloudflare-queue",
+      }),
+      "Webhook event could not be queued",
+    );
+    expect(JSON.stringify(errorLog.mock.calls)).not.toContain("本文やSDK response");
+    errorLog.mockRestore();
   });
 });

@@ -56,6 +56,7 @@ export const localTurns = sqliteTable("local_turns", {
   turnId: text("turn_id").primaryKey(),
   generationEpoch: integer("generation_epoch").notNull(),
   traceId: text("trace_id"),
+  traceIds: text("trace_ids", { mode: "json" }).$type<string[]>(),
   status: text("status", {
     enum: ["pending_queue", "queued", "generating", "delivered", "failed"],
   }).notNull(),

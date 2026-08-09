@@ -60,6 +60,12 @@ async function applyMigrations(db: D1Database): Promise<void> {
       .filter(Boolean);
     for (const statement of statements) await db.prepare(statement).run();
   }
+  // 共有D1をAccountData互換adapterとして使うfixtureにも、DO固有の相関表を用意する。
+  await db
+    .prepare(
+      "CREATE TABLE source_trace_contexts (source_record_id text NOT NULL, trace_id text NOT NULL, PRIMARY KEY(source_record_id, trace_id), FOREIGN KEY(source_record_id) REFERENCES source_records(id) ON DELETE CASCADE)",
+    )
+    .run();
 }
 
 function createCoordinator(send: (message: ChatTurnQueueMessage) => Promise<void>) {
@@ -343,11 +349,13 @@ describe("LINE diary chat delivery E2E", () => {
     expect(message.ack).toHaveBeenCalledOnce();
     expect(message.retry).not.toHaveBeenCalled();
     expect(queuedTurn.traceId).toBe(traceId);
+    expect(queuedTurn.traceIds).toEqual([traceId]);
     expect(infoLog).toHaveBeenCalledWith(
       expect.objectContaining({
         event: "queue.message.completed",
         component: "chat-turn",
         traceId,
+        traceIds: [traceId],
         outcome: "succeeded",
         disposition: "ack",
         stage: "line.deliver",

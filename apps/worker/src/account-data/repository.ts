@@ -10,7 +10,7 @@ import { and, asc, eq, inArray } from "drizzle-orm";
 import { type DrizzleSqliteDODatabase, drizzle } from "drizzle-orm/durable-sqlite";
 import { migrate } from "drizzle-orm/durable-sqlite/migrator";
 import migrations from "../../drizzle/account-data/migrations.js";
-import { accountDataIdentity, compatibilityReferences } from "./schema";
+import { accountDataIdentity, compatibilityReferences, sourceTraceContexts } from "./schema";
 
 const accountDataSchema = {
   accountDataIdentity,
@@ -40,6 +40,7 @@ const accountDataSchema = {
   questions: d1.schema.questions,
   sourceRecordRevisions: d1.schema.sourceRecordRevisions,
   sourceRecords: d1.schema.sourceRecords,
+  sourceTraceContexts,
 };
 const SESSION_INACTIVITY_MS = 6 * 60 * 60 * 1000;
 const SESSION_HARD_CAP_MS = 24 * 60 * 60 * 1000;

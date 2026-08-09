@@ -21,6 +21,8 @@ export interface ChatTurnQueueMessage {
   type: "chat-turn";
   /** Webhookから引き継ぐ相関ID。省略形は既存messageとの互換用。 */
   traceId?: string;
+  /** 連投を1つのTurnへ統合した場合の全相関ID。省略形は既存messageとの互換用。 */
+  traceIds?: string[];
   accountId: string;
   turnId: string;
   generationEpoch: number;
