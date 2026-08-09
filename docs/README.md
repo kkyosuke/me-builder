@@ -61,6 +61,7 @@ docs/
 - [「お金と消費」パラメータ変換設計](diagnosis/scoring/money-values-parameter-design.md) — 2つ目の診断固有のパラメータ、重み、表示設定
 - [「インドア・アウトドアと余暇」パラメータ変換設計](diagnosis/scoring/leisure-style-parameter-design.md) — 3つ目の診断固有のパラメータ、重み、表示設定
 - [「時間と予定」パラメータ変換設計](diagnosis/scoring/time-planning-parameter-design.md) — 4つ目の診断固有のパラメータ、重み、表示設定
+- [「会話と感情表現」パラメータ変換設計](diagnosis/scoring/conversation-emotion-parameter-design.md) — 5つ目の診断固有のパラメータ、重み、表示設定
 
 ### ドメインを設計する
 

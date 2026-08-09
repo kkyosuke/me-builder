@@ -16,7 +16,8 @@ apps/web/public/images/diagnoses/
 ├── relationship-priority.jpg
 ├── money-values.jpg
 ├── leisure-style.jpg
-└── time-planning.jpg
+├── time-planning.jpg
+└── conversation-emotion.jpg
 ```
 
 ## 3. 共通スタイル
@@ -46,7 +47,23 @@ Materials/textures: Matte paper and soft clay, subtle depth and shadows.
 Constraints: No text, no letters, no numbers, no logos, no watermark, no brand marks. Do not show readable calendar dates. Avoid making planning or spontaneity look superior.
 ```
 
-## 5. 新しい診断へ展開する手順
+## 5. 「会話と感情表現」生成プロンプト
+
+```text
+Use case: stylized-concept
+Asset type: 16:9 diagnosis card thumbnail for a web application
+Primary request: Create a polished 3D paper-cut/clay-style illustration representing conversation, emotional expression, empathy, attentive listening, and sharing feelings in a close relationship.
+Scene/backdrop: A calm abstract communication scene with two balanced speech bubbles facing each other, a softly glowing heart-shaped form between them, and gentle layered wave shapes suggesting listening and emotional exchange.
+Subject: Two equal abstract figures or matching seats in conversation, with balanced speech bubbles and subtle symbols of listening and emotional sharing; neither side should dominate; no realistic people required.
+Style/medium: Soft layered 3D paper-cut / clay render matching a premium editorial app illustration.
+Composition/framing: Wide 16:9, centered, clear silhouettes, important objects away from edges, suitable for a small card crop.
+Lighting/mood: Warm soft studio lighting, calm, empathetic, welcoming.
+Color palette: Deep navy background, muted slate blue, warm cream, coral accents, small golden accents; consistent with the existing me-builder diagnosis thumbnails.
+Materials/textures: Matte paper and soft clay, subtle depth and shadows.
+Constraints: No text, no letters, no numbers, no logos, no watermark, no brand marks. Avoid making verbal expression, quiet support, advice, or empathy look superior to another communication style.
+```
+
+## 6. 新しい診断へ展開する手順
 
 1. §4の`Primary request`、`Scene/backdrop`、`Subject`を新しい診断のテーマへ置き換える
 2. §3の共通スタイルと`Composition/framing`、`Constraints`を維持する

@@ -196,8 +196,10 @@ describe("GET /api/diagnoses local D1 E2E", () => {
         lastAnsweredAt: string | null;
       }>;
     };
-    expect(initialBody.diagnoses).toHaveLength(4);
-    expect(initialBody.diagnoses.map(({ displayOrder }) => displayOrder)).toEqual([10, 20, 30, 40]);
+    expect(initialBody.diagnoses).toHaveLength(5);
+    expect(initialBody.diagnoses.map(({ displayOrder }) => displayOrder)).toEqual([
+      10, 20, 30, 40, 50,
+    ]);
     expect(initialBody.diagnoses.every(({ description }) => description.length > 0)).toBe(true);
     expect(
       initialBody.diagnoses.every(({ responseStatus }) => responseStatus === "unanswered"),
