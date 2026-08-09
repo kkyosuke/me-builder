@@ -100,7 +100,7 @@ AIによる人物像の生成や、異なるパラメータを1つの性格タ�
 
 ### 4.6 開発環境のBrain Item確認
 
-`development`、`local`、`preview`、`test`では、生成処理を確認するため「わたしのまとめ」の末尾に本人のactive Brain Item一覧を表示します。statement、分類、AIまたは決定的な導出、作成日時、EvidenceのSource Record IDを表示し、0件も「追加されたBrain Itemはありません」と明示します。チェックポイントの処理状態はBrain Itemの状態ではないため、`pending` Itemとしては表示しません。
+`development`、`local`、`preview`、`test`では、生成処理を確認するため「わたしのまとめ」の末尾に本人のactive Brain Item一覧を表示します。LINE内のLIFFと外部ブラウザで表示条件を変えません。statement、分類、AIまたは決定的な導出、作成日時、EvidenceのSource Record IDを表示し、0件も「追加されたBrain Itemはありません」と明示します。チェックポイントの処理状態はBrain Itemの状態ではないため、`pending` Itemとしては表示しません。
 
 この一覧は本人確認済みAccountのデータだけを専用の開発APIから読み、最大100件を新しい順に表示します。ProductionではUIを構築せず、APIも404を返します。否定・修正などの操作はこの確認一覧へ混ぜず、後続の本人向け体験として設計します。
 

@@ -366,7 +366,7 @@ describe("App", () => {
     );
 
     expect(await screen.findByRole("heading", { name: "見通しを持って動く" })).toBeTruthy();
-    expect(mocks.initializeLiff).toHaveBeenCalledTimes(2);
+    expect(mocks.initializeLiff).toHaveBeenCalledTimes(1);
     expect(mocks.fetchProfileSummary).toHaveBeenCalledTimes(1);
     expect(mocks.fetchDevelopmentBrainItems).toHaveBeenCalledTimes(1);
   });
@@ -714,7 +714,7 @@ describe("App", () => {
     expect(await screen.findByRole("heading", { name: heading })).toBeTruthy();
   });
 
-  it("一覧取得失敗後の再試行でLIFF初期化と一覧取得を同じ順序で再実行する", async () => {
+  it("一覧取得失敗後の再試行では初期化済みLIFFを再利用する", async () => {
     mocks.fetchDiagnosisList
       .mockRejectedValueOnce(new Error("network down"))
       .mockResolvedValueOnce([diagnosis()]);
@@ -725,7 +725,7 @@ describe("App", () => {
     fireEvent.click(retry);
 
     expect(await screen.findByRole("button", { name: /テスト診断/ })).toBeTruthy();
-    expect(mocks.initializeLiff).toHaveBeenCalledTimes(2);
+    expect(mocks.initializeLiff).toHaveBeenCalledTimes(1);
     expect(mocks.fetchDiagnosisList).toHaveBeenCalledTimes(2);
     expect(mocks.fetchDiagnosisDefinition).not.toHaveBeenCalled();
   });

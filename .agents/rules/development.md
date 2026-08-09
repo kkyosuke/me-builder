@@ -188,6 +188,7 @@
   - LIFF Server API は **LINE Login チャネル** のチャネルアクセストークンを要求します (Messaging API チャネルのトークンでは操作できません)。トークンは client credentials で発行し、有効期間が短くて発行数の上限がないステートレストークンを優先します。
   - `LINE_LOGIN_CHANNEL_SECRET` は Secret、`LINE_LOGIN_CHANNEL_ID` は変数として GitHub Environment へ置きます。チャネル ID が未設定の場合は LIFF ID の接頭辞 (`{チャネルID}-{ランダム}`) から補完します。
   - 更新対象は `LIFF_ID` が一致するアプリ、無ければ `description`（`me-builder-web (preview)` など）が一致するアプリです。どちらも無ければ新規作成し、発行された LIFF ID をログへ出力します。環境名はビルド時の値ではなく引数で渡します（preview と production で同じ description を掴まないため）。
+  - リッチメニューのLIFF URLにはデプロイしたコミットの短縮SHAをクエリとして付けます。LINE内WebViewが同じLIFF URLの古い画面セッションを再利用し続けないための表示版であり、本人識別や認可には使用しません。
   - **scope は `openid` と `profile` を必ず設定します。** `openid` が無いと `liff.getIDToken()` が ID トークンを返さず、サーバー側で本人性を検証できません（[LIFF リファレンス](https://developers.line.biz/en/reference/liff/#get-id-token)）。エンドポイント URL の更新時にも scope を毎回送り、手で外された場合に次のデプロイで復旧できるようにします。
   - 共通ライブラリは環境変数が未設定の場合に警告と失敗結果を返します。運営用の`register-liff.ts`はその結果を非ゼロ終了に変換し、CDが後続の公開処理へ進まないようにします。チャネルシークレットとチャネルアクセストークンはログへ出力せず、トークンエンドポイントのレスポンス本文も転記しません。
 

@@ -16,6 +16,7 @@ logger.info(`[Script] Executing LINE rich menu registration for ${targetEnv}...`
 const result = await line.richMenu.registerDefault({
   channelAccessToken: config.lineChannelAccessToken,
   liffId: config.liffId,
+  clientVersion: process.env.GITHUB_SHA?.slice(0, 12),
   namePrefix: `me-builder-diagnosis-${targetEnv}`,
   image: new Blob([imageBytes], { type: "image/jpeg" }),
 });

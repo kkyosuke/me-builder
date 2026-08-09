@@ -37,6 +37,31 @@ describe("useLiffSession", () => {
     expect(mocks.initializeLiff).toHaveBeenCalledWith("test-liff-id");
   });
 
+  it("同じ画面から同時に認証を要求してもLIFF初期化を共有する", async () => {
+    let resolveInitialization: ((state: unknown) => void) | undefined;
+    mocks.initializeLiff.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveInitialization = resolve;
+        }),
+    );
+    const { result } = renderHook(() => useLiffSession());
+
+    const first = result.current.acquireIdToken(new AbortController().signal);
+    const second = result.current.acquireIdToken(new AbortController().signal);
+    expect(mocks.initializeLiff).toHaveBeenCalledTimes(1);
+
+    resolveInitialization?.({
+      status: "ready",
+      inClient: true,
+      profile: { displayName: "テスト" },
+    });
+    await expect(Promise.all([first, second])).resolves.toEqual([
+      "dummy.id.token",
+      "dummy.id.token",
+    ]);
+  });
+
   it("ログイン遷移中はAPI取得を続行しない", async () => {
     mocks.initializeLiff.mockResolvedValue({ status: "login-required" });
     const { result } = renderHook(() => useLiffSession());
