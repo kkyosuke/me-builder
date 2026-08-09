@@ -13,6 +13,17 @@ export const compatibilityActions = {
     accountId: string,
     input: Readonly<{ relationshipId: string; partnerAccountId: string; createdAt: Date }>,
   ) => repository.reserveIncomingCompatibilityReference(accountId, input),
+  "compatibility.reserveOutgoingReference": (
+    repository: AccountDataRepository,
+    accountId: string,
+    input: Readonly<{ relationshipId: string; partnerAccountId: string; updatedAt: Date }>,
+  ) => repository.reserveOutgoingCompatibilityReference(accountId, input),
+  "compatibility.releaseReservation": (
+    repository: AccountDataRepository,
+    accountId: string,
+    relationshipId: string,
+    releasedAt: Date,
+  ) => repository.releaseCompatibilityReservation(accountId, relationshipId, releasedAt),
   "compatibility.activateReference": (
     repository: AccountDataRepository,
     accountId: string,

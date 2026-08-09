@@ -94,12 +94,12 @@ export class CompatibilityDataRepository {
 
   getInvitationPreview(viewerAccountId: string, at: Date): CompatibilityInvitationPreview | null {
     this.expirePending(at);
-    return createCompatibilityInvitationPreview(this.readRelationship(), viewerAccountId);
+    return createCompatibilityInvitationPreview(this.readRelationship(), viewerAccountId, at);
   }
 
   getInvitationAcceptanceContext(at: Date): CompatibilityInvitationAcceptanceContext | null {
     this.expirePending(at);
-    return createCompatibilityInvitationAcceptanceContext(this.readRelationship());
+    return createCompatibilityInvitationAcceptanceContext(this.readRelationship(), at);
   }
 
   acceptInvitation(

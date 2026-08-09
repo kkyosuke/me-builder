@@ -87,14 +87,16 @@ describe("compatibility data domain", () => {
   it("期限と招待previewを純粋な状態変換として扱う", () => {
     const relationship = pendingRelationship();
 
-    expect(createCompatibilityInvitationPreview(relationship, "account-invitee")).toEqual({
+    expect(
+      createCompatibilityInvitationPreview(relationship, "account-invitee", createdAt),
+    ).toEqual({
       id: relationshipId,
       inviterDisplayName: "送信者",
       offeredDiagnosisIds: ["diagnosis-1", "diagnosis-2"],
       expiresAt,
       isOwnInvitation: false,
     });
-    expect(createCompatibilityInvitationAcceptanceContext(relationship)).toEqual({
+    expect(createCompatibilityInvitationAcceptanceContext(relationship, createdAt)).toEqual({
       inviterAccountId: "account-inviter",
       offeredDiagnosisIds: ["diagnosis-1", "diagnosis-2"],
       expiresAt,
@@ -104,7 +106,11 @@ describe("compatibility data domain", () => {
     );
     const expired = expireCompatibilityRelationship(relationship, expiresAt);
     expect(expired.status).toBe("expired");
-    expect(createCompatibilityInvitationPreview(expired, "account-invitee")).toBeNull();
+    expect(createCompatibilityInvitationPreview(expired, "account-invitee", expiresAt)).toBeNull();
+    expect(
+      createCompatibilityInvitationPreview(relationship, "account-invitee", expiresAt),
+    ).toBeNull();
+    expect(createCompatibilityInvitationAcceptanceContext(relationship, expiresAt)).toBeNull();
   });
 
   it("承諾・閲覧・終了の状態遷移と認可を判定する", () => {
@@ -144,6 +150,24 @@ describe("compatibility data domain", () => {
       outcome: "ended",
       relationship: { status: "ended", endedByAccountId: "account-inviter", endedAt },
     });
+  });
+
+  it("永続状態がpendingのままでも期限後の承諾をドメインで拒否する", () => {
+    const relationship = pendingRelationship();
+    expect(
+      decideCompatibilityInvitationAcceptance(
+        relationship,
+        {
+          inviteeAccountId: "account-invitee",
+          inviteeDisplayName: "受信者",
+          acceptedThemes: [{ diagnosisId: "diagnosis-1", resultFingerprint: "c".repeat(64) }],
+        },
+        expiresAt,
+      ),
+    ).toEqual({ outcome: "expired" });
+    expect(
+      decideCompatibilityInvitationCancellation(relationship, "account-inviter", expiresAt),
+    ).toEqual({ outcome: "unavailable" });
   });
 
   it("取消は送信者だけに許可する", () => {

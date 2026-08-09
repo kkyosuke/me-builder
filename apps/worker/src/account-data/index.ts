@@ -106,7 +106,7 @@ export class AccountData extends DurableObject<Env> {
     const namespace = this.env.COMPATIBILITY_DATA;
     if (!namespace) throw new Error("CompatibilityData binding is required");
 
-    const references = this.repository.listVisibleCompatibilityReferences(this.accountId);
+    const references = this.repository.listReconciliableCompatibilityReferences(this.accountId);
     for (const reference of references) {
       const relationshipData = compatibilityDataFor(namespace, reference.relationshipId);
       const relationship = await relationshipData.getRelationship(this.accountId);
@@ -118,16 +118,19 @@ export class AccountData extends DurableObject<Env> {
         if (!partnerAccountId) {
           throw new Error("Accepted compatibility relationship must have both participants");
         }
-        this.repository.activateCompatibilityReference(this.accountId, {
+        const activation = this.repository.activateCompatibilityReference(this.accountId, {
           relationshipId: reference.relationshipId,
           partnerAccountId,
           role: reference.role,
           updatedAt: new Date(),
         });
+        if (activation.outcome === "conflict") {
+          throw new Error("Accepted compatibility relationship conflicts with another reference");
+        }
         continue;
       }
 
-      if (reference.status === "pending") {
+      if (reference.status === "pending" || reference.status === "reserved") {
         const preview = await relationshipData.getInvitationPreview(this.accountId);
         if (preview) continue;
       }

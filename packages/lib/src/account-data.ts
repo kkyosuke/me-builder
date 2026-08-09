@@ -2,6 +2,7 @@ import type {
   ActivateCompatibilityReferenceResult,
   CompatibilityReference,
   CompatibilityReferenceRole,
+  ReleaseCompatibilityReservationResult,
   ReserveCompatibilityReferenceResult,
 } from "./compatibility-data";
 import type * as conversation from "./d1/action/conversation";
@@ -31,6 +32,13 @@ export type AccountDataActions = {
   "compatibility.reserveIncomingReference": (
     input: Readonly<{ relationshipId: string; partnerAccountId: string; createdAt: Date }>,
   ) => Promise<ReserveCompatibilityReferenceResult>;
+  "compatibility.reserveOutgoingReference": (
+    input: Readonly<{ relationshipId: string; partnerAccountId: string; updatedAt: Date }>,
+  ) => Promise<ReserveCompatibilityReferenceResult>;
+  "compatibility.releaseReservation": (
+    relationshipId: string,
+    releasedAt: Date,
+  ) => Promise<ReleaseCompatibilityReservationResult>;
   "compatibility.activateReference": (
     input: Readonly<{
       relationshipId: string;

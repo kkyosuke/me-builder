@@ -14,7 +14,7 @@
 
 各`AccountData`には、自分の一覧を組み立て、同じ相手との重複関係を防ぐための`compatibility_references`だけを保存します。共有D1には相性関係、表示名、同意、診断結果を保存しません。
 
-相性関係の入力検証、招待期限の判定、状態遷移、冪等性、閲覧可否、previewへの変換は`packages/lib`のランタイム非依存なドメインロジックが所有します。`apps/worker`はDurable Objectとprivate SQLiteのadapterとして、現在状態の読込、ドメインロジックが返した決定結果の保存、alarm設定だけを担当します。CloudflareやDrizzleへ依存するコードを`packages/lib`へ持ち込みません。
+相性関係の入力検証、招待期限の判定、状態遷移、冪等性、閲覧可否、previewへの変換、および双方のAccountDataを同じ順序で予約する承諾オーケストレーションは`packages/lib`のランタイム非依存なロジックが所有します。`apps/worker`はDurable Objectとprivate SQLiteのadapterとして、現在状態の読込、ドメインロジックが返した決定結果の保存、alarm設定だけを担当します。CloudflareやDrizzleへ依存するコードを`packages/lib`へ持ち込みません。
 
 ```mermaid
 flowchart LR
@@ -105,7 +105,7 @@ erDiagram
 | `status` | `pending`、`reserved`、`active`、`ended` |
 | `created_at` / `updated_at` | ローカルprojectionの更新時刻 |
 
-`reserved`または`active`の`partner_account_id`へ部分一意indexを置き、同じ相手との承諾処理をAccountData Object内で直列化します。`reserved`は別DO更新の途中だけに使い、相性一覧には表示しません。`ended`は監査と冪等な再試行のため保持しますが、通常一覧から除外します。
+`reserved`または`active`の`partner_account_id`へ部分一意indexを置き、同じ相手との承諾処理をAccountData Object内で直列化します。`reserved`は送信者・受信者の双方で別DO更新の途中だけに使い、相性一覧には表示しません。`ended`は監査と冪等な再試行のため保持しますが、通常一覧から除外します。
 
 ## 6. 状態遷移と整合性
 
@@ -124,13 +124,14 @@ stateDiagram-v2
 承諾は複数DOをまたぐため、単一transactionとは扱いません。APIの実装順序を次に固定します。
 
 1. CompatibilityDataからpending招待を読み、送信者と期限を確認する
-2. 受信者AccountDataへ`reserved`参照を作り、同じ相手との既存関係を排除する
-3. CompatibilityDataをcompare-and-setで`accepted`へ更新し、受信者の同意を保存する
-4. 双方のAccountData参照を`active`へ更新する
+2. `packages/lib`の承諾オーケストレーターがAccount IDの辞書順で双方のAccountDataを呼び、送信者の既存`pending`参照と受信者の新規参照を同じ相手の`reserved`へ遷移させる
+3. どちらかの予約が競合または失敗した場合、先に作成した予約を解放して承諾を中止する
+4. CompatibilityDataをcompare-and-setで`accepted`へ更新し、受信者の同意を保存する
+5. 双方のAccountData参照を`active`へ更新する
 
-同じ入力の再試行は成功済み状態を返します。2の後に失敗した予約は取消でき、3の後に4が失敗した場合は同じ承諾または一覧取得でprojectionを再同期します。CompatibilityDataの状態を権限判定の正とし、AccountData参照だけで相手の結果を開示しません。
+双方を同じ順序で予約することで、AからBとBからAへの招待が同時に承諾されても片方だけを成立させます。同じ入力の再試行は成功済み状態を返します。予約後に失敗した場合は、受信者の一時参照を削除し、送信者参照を`pending`へ戻して再試行可能にします。CompatibilityData更新後に`active`化が失敗した場合は、同じ承諾または一覧取得でprojectionを再同期します。CompatibilityDataの状態を権限判定の正とし、AccountData参照だけで相手の結果を開示しません。
 
-AccountDataの一覧RPCは、`pending`と`active`の参照を返す前に各CompatibilityDataの現在状態を照合します。期限切れ、取消済み、終了済みなど正本と一致しない参照は`ended`へ同期して一覧から除外します。alarmはCompatibilityDataだけを終端化し、別DOへの通知成功を期限切れの成立条件にしません。
+AccountDataの一覧RPCは、内部的に`pending`、`reserved`、`active`の参照を取得し、各CompatibilityDataの現在状態を照合します。acceptedになった`reserved`は`active`へ復旧し、CompatibilityDataがまだpendingの`reserved`は進行中の予約として一覧へ出さず保持します。期限切れ、取消済み、終了済みなど正本と一致しない参照は`ended`へ同期して一覧から除外します。同期後に利用者へ返すのは`pending`と`active`だけです。alarmはCompatibilityDataだけを終端化し、別DOへの通知成功を期限切れの成立条件にしません。
 
 招待作成、確認、承諾、取消、共有終了の判定時刻はCompatibilityData自身の時計を使います。公開RPCから`created_at`、`expires_at`、`accepted_at`などの判定時刻を受け取らず、呼び出し側が過去または未来の時刻を指定して状態遷移を変えられないようにします。Repositoryテストだけは状態機械を決定的に検証するため明示時刻を渡せます。
 
@@ -140,7 +141,7 @@ AccountDataの一覧RPCは、`pending`と`active`の参照を返す前に各Comp
 - 招待IDは256 bitの暗号学的乱数をhex表現にし、URLへAccount IDを含めない
 - 招待を開いただけでは受信者Account ID、表示名、閲覧履歴を保存しない
 - pending招待だけを送信者が取り消せる
-- pendingかつ期限内の招待だけを、送信者本人ではない1 Accountが承諾できる
+- ドメインの各判断関数が現在時刻と期限を比較し、pendingかつ期限内の招待だけを表示・承諾・取消できる
 - 状態遷移と期限判定にはCompatibilityDataが取得した現在時刻だけを使う
 - 承諾テーマは提示テーマの1件以上の部分集合にする
 - accepted関係だけを参加者が終了できる
@@ -148,6 +149,7 @@ AccountDataの一覧RPCは、`pending`と`active`の参照を返す前に各Comp
 - CompatibilityData RPCはraw SQLite clientを公開しない
 - 招待previewへAccount ID、結果指紋、同意時刻を含めない
 - AccountData参照は一覧projectionであり、相性シートの閲覧権限に使わない
+- 承諾前に双方のAccountDataを同じ順序で予約し、同じ2人のaccepted関係を重複作成しない
 - 共有終了、回答変更、回答削除後は保存済みの古い比較内容を返さない
 
 ## 8. Migrationと運用

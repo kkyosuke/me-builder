@@ -190,7 +190,7 @@
       "checkConstraints": {
         "compatibility_reference_state_check": {
           "name": "compatibility_reference_state_check",
-          "value": "(\"compatibility_references\".\"status\" = 'pending' and \"compatibility_references\".\"role\" = 'inviter' and \"compatibility_references\".\"partner_account_id\" is null) or (\"compatibility_references\".\"status\" = 'reserved' and \"compatibility_references\".\"role\" = 'invitee' and \"compatibility_references\".\"partner_account_id\" is not null) or (\"compatibility_references\".\"status\" = 'active' and \"compatibility_references\".\"partner_account_id\" is not null) or \"compatibility_references\".\"status\" = 'ended'"
+          "value": "(\"compatibility_references\".\"status\" = 'pending' and \"compatibility_references\".\"role\" = 'inviter' and \"compatibility_references\".\"partner_account_id\" is null) or (\"compatibility_references\".\"status\" = 'reserved' and \"compatibility_references\".\"partner_account_id\" is not null) or (\"compatibility_references\".\"status\" = 'active' and \"compatibility_references\".\"partner_account_id\" is not null) or \"compatibility_references\".\"status\" = 'ended'"
         }
       }
     },

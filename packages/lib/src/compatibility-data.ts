@@ -182,6 +182,11 @@ export type ReserveCompatibilityReferenceResult = Readonly<{
   reference: CompatibilityReference;
 }>;
 
+export type ReleaseCompatibilityReservationResult = Readonly<{
+  outcome: "released" | "unchanged";
+  reference: CompatibilityReference | null;
+}>;
+
 export type ActivateCompatibilityReferenceResult = Readonly<{
   outcome: "activated" | "unchanged" | "conflict";
   reference: CompatibilityReference;

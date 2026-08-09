@@ -36,6 +36,15 @@ function assertThemes(themes: readonly CompatibilityThemeFingerprint[]): void {
   }
 }
 
+function isCompatibilityInvitationExpired(
+  relationship: CompatibilityRelationship,
+  at: Date,
+): boolean {
+  assertValidDate(at, "at");
+  assertValidDate(relationship.expiresAt, "expiresAt");
+  return relationship.expiresAt.getTime() <= at.getTime();
+}
+
 function sameThemes(
   left: readonly CompatibilityThemeConsent[],
   right: readonly CompatibilityThemeFingerprint[],
@@ -100,8 +109,7 @@ export function expireCompatibilityRelationship(
   relationship: CompatibilityRelationship,
   at: Date,
 ): CompatibilityRelationship {
-  assertValidDate(at, "at");
-  if (relationship.status !== "pending" || relationship.expiresAt.getTime() > at.getTime()) {
+  if (relationship.status !== "pending" || !isCompatibilityInvitationExpired(relationship, at)) {
     return relationship;
   }
   return { ...relationship, status: "expired", updatedAt: at };
@@ -110,9 +118,13 @@ export function expireCompatibilityRelationship(
 export function createCompatibilityInvitationPreview(
   relationship: CompatibilityRelationship | null,
   viewerAccountId: string,
+  at: Date,
 ): CompatibilityInvitationPreview | null {
   assertNonEmpty(viewerAccountId, "viewerAccountId");
-  if (relationship?.status !== "pending") return null;
+  assertValidDate(at, "at");
+  if (relationship?.status !== "pending" || isCompatibilityInvitationExpired(relationship, at)) {
+    return null;
+  }
   return {
     id: relationship.id,
     inviterDisplayName: relationship.inviterDisplayName,
@@ -124,8 +136,12 @@ export function createCompatibilityInvitationPreview(
 
 export function createCompatibilityInvitationAcceptanceContext(
   relationship: CompatibilityRelationship | null,
+  at: Date,
 ): CompatibilityInvitationAcceptanceContext | null {
-  if (relationship?.status !== "pending") return null;
+  assertValidDate(at, "at");
+  if (relationship?.status !== "pending" || isCompatibilityInvitationExpired(relationship, at)) {
+    return null;
+  }
   return {
     inviterAccountId: relationship.inviterAccountId,
     offeredDiagnosisIds: relationship.offeredThemes.map(({ diagnosisId }) => diagnosisId),
@@ -144,10 +160,16 @@ export function decideCompatibilityInvitationAcceptance(
   assertThemes(input.acceptedThemes);
   assertValidDate(acceptedAt, "acceptedAt");
   if (!relationship) return { outcome: "unavailable" };
+  if (
+    relationship.status === "expired" ||
+    (relationship.status === "pending" &&
+      isCompatibilityInvitationExpired(relationship, acceptedAt))
+  ) {
+    return { outcome: "expired" };
+  }
   if (relationship.inviterAccountId === input.inviteeAccountId) {
     return { outcome: "self-invite" };
   }
-  if (relationship.status === "expired") return { outcome: "expired" };
   if (relationship.status === "accepted") {
     if (
       relationship.inviteeAccountId === input.inviteeAccountId &&
@@ -194,6 +216,12 @@ export function decideCompatibilityInvitationCancellation(
   if (!relationship) return { outcome: "unavailable" };
   if (relationship.inviterAccountId !== actorAccountId) return { outcome: "forbidden" };
   if (relationship.status === "cancelled") return { outcome: "unchanged", relationship };
+  if (
+    relationship.status === "expired" ||
+    (relationship.status === "pending" && isCompatibilityInvitationExpired(relationship, at))
+  ) {
+    return { outcome: "unavailable" };
+  }
   if (relationship.status !== "pending") return { outcome: "unavailable" };
   return {
     outcome: "cancelled",

@@ -2,6 +2,7 @@ import {
   type ActivateCompatibilityReferenceResult,
   type CompatibilityReference,
   type CompatibilityReferenceRole,
+  type ReleaseCompatibilityReservationResult,
   type ReserveCompatibilityReferenceResult,
   d1,
 } from "@me-builder/lib";
@@ -443,6 +444,86 @@ export class AccountDataRepository {
     return { outcome: "reserved", reference };
   }
 
+  reserveOutgoingCompatibilityReference(
+    accountId: string,
+    input: Readonly<{ relationshipId: string; partnerAccountId: string; updatedAt: Date }>,
+  ): ReserveCompatibilityReferenceResult {
+    const existing = this.database
+      .select()
+      .from(compatibilityReferences)
+      .where(eq(compatibilityReferences.relationshipId, input.relationshipId))
+      .get();
+    if (!existing) {
+      throw new Error("Outgoing compatibility reference to reserve was not found");
+    }
+    if (
+      existing.accountId !== accountId ||
+      existing.role !== "inviter" ||
+      existing.status === "ended" ||
+      (existing.partnerAccountId !== null && existing.partnerAccountId !== input.partnerAccountId)
+    ) {
+      return { outcome: "conflict", reference: existing };
+    }
+    if (
+      (existing.status === "reserved" || existing.status === "active") &&
+      existing.partnerAccountId === input.partnerAccountId
+    ) {
+      return { outcome: "unchanged", reference: existing };
+    }
+
+    const competing = this.findOpenCompatibilityReference(input.partnerAccountId);
+    if (competing) return { outcome: "conflict", reference: competing };
+    this.database
+      .update(compatibilityReferences)
+      .set({
+        partnerAccountId: input.partnerAccountId,
+        status: "reserved",
+        updatedAt: input.updatedAt,
+      })
+      .where(eq(compatibilityReferences.relationshipId, input.relationshipId))
+      .run();
+    const reference = this.database
+      .select()
+      .from(compatibilityReferences)
+      .where(eq(compatibilityReferences.relationshipId, input.relationshipId))
+      .get();
+    if (!reference) throw new Error("Reserved outgoing compatibility reference was not persisted");
+    return { outcome: "reserved", reference };
+  }
+
+  releaseCompatibilityReservation(
+    accountId: string,
+    relationshipId: string,
+    releasedAt: Date,
+  ): ReleaseCompatibilityReservationResult {
+    const existing = this.database
+      .select()
+      .from(compatibilityReferences)
+      .where(eq(compatibilityReferences.relationshipId, relationshipId))
+      .get();
+    if (!existing || existing.accountId !== accountId || existing.status !== "reserved") {
+      return { outcome: "unchanged", reference: existing ?? null };
+    }
+
+    if (existing.role === "invitee") {
+      this.database
+        .delete(compatibilityReferences)
+        .where(eq(compatibilityReferences.relationshipId, relationshipId))
+        .run();
+      return { outcome: "released", reference: null };
+    }
+
+    this.database
+      .update(compatibilityReferences)
+      .set({ partnerAccountId: null, status: "pending", updatedAt: releasedAt })
+      .where(eq(compatibilityReferences.relationshipId, relationshipId))
+      .run();
+    return {
+      outcome: "released",
+      reference: { ...existing, partnerAccountId: null, status: "pending", updatedAt: releasedAt },
+    };
+  }
+
   activateCompatibilityReference(
     accountId: string,
     input: Readonly<{
@@ -524,6 +605,20 @@ export class AccountDataRepository {
         and(
           eq(compatibilityReferences.accountId, accountId),
           inArray(compatibilityReferences.status, ["pending", "active"]),
+        ),
+      )
+      .orderBy(asc(compatibilityReferences.createdAt))
+      .all();
+  }
+
+  listReconciliableCompatibilityReferences(accountId: string): CompatibilityReference[] {
+    return this.database
+      .select()
+      .from(compatibilityReferences)
+      .where(
+        and(
+          eq(compatibilityReferences.accountId, accountId),
+          inArray(compatibilityReferences.status, ["pending", "reserved", "active"]),
         ),
       )
       .orderBy(asc(compatibilityReferences.createdAt))

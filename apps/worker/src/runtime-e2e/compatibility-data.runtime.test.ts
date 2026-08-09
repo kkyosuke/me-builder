@@ -1,6 +1,10 @@
 import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
-import { accountDataFor, createCompatibilityRelationshipId } from "@me-builder/lib";
+import {
+  acceptCompatibilityInvitationWithReferences,
+  accountDataFor,
+  createCompatibilityRelationshipId,
+} from "@me-builder/lib";
 import { describe, expect, it } from "vitest";
 import type { CompatibilityData } from "../compatibility-data";
 
@@ -110,5 +114,112 @@ describe("CompatibilityData Workers runtime E2E", () => {
     await relationship.cancelInvitation(relationshipId, inviterAccountId);
 
     await expect(inviter.execute("compatibility.listVisibleReferences")).resolves.toEqual([]);
+  });
+
+  it("accepted更新後に残ったreserved参照を一覧取得でactiveへ復旧する", async () => {
+    const relationshipId = createCompatibilityRelationshipId();
+    const inviterAccountId = crypto.randomUUID();
+    const inviteeAccountId = crypto.randomUUID();
+    const relationship = env.COMPATIBILITY_DATA.getByName(relationshipId);
+    const inviter = accountDataFor(env.ACCOUNT_DATA, inviterAccountId);
+    const invitee = accountDataFor(env.ACCOUNT_DATA, inviteeAccountId);
+
+    await relationship.createInvitation(relationshipId, {
+      inviterAccountId,
+      inviterDisplayName: "送信者",
+      offeredThemes: [{ diagnosisId: "diagnosis-1", resultFingerprint: "a".repeat(64) }],
+    });
+    await inviter.execute("compatibility.addOutgoingReference", {
+      relationshipId,
+      createdAt: new Date(),
+    });
+    await inviter.execute("compatibility.reserveOutgoingReference", {
+      relationshipId,
+      partnerAccountId: inviteeAccountId,
+      updatedAt: new Date(),
+    });
+    await invitee.execute("compatibility.reserveIncomingReference", {
+      relationshipId,
+      partnerAccountId: inviterAccountId,
+      createdAt: new Date(),
+    });
+    await relationship.acceptInvitation(relationshipId, {
+      inviteeAccountId,
+      inviteeDisplayName: "受信者",
+      acceptedThemes: [{ diagnosisId: "diagnosis-1", resultFingerprint: "b".repeat(64) }],
+    });
+
+    await expect(invitee.execute("compatibility.listVisibleReferences")).resolves.toEqual([
+      expect.objectContaining({ relationshipId, status: "active" }),
+    ]);
+    await expect(inviter.execute("compatibility.listVisibleReferences")).resolves.toEqual([
+      expect.objectContaining({ relationshipId, status: "active" }),
+    ]);
+  });
+
+  it("逆向きの招待を同時承諾しても同じAccountペアを1関係だけacceptedにする", async () => {
+    const accountA = crypto.randomUUID();
+    const accountB = crypto.randomUUID();
+    const relationshipAtoB = createCompatibilityRelationshipId();
+    const relationshipBtoA = createCompatibilityRelationshipId();
+    const aData = accountDataFor(env.ACCOUNT_DATA, accountA);
+    const bData = accountDataFor(env.ACCOUNT_DATA, accountB);
+    const aToB = env.COMPATIBILITY_DATA.getByName(relationshipAtoB);
+    const bToA = env.COMPATIBILITY_DATA.getByName(relationshipBtoA);
+
+    await Promise.all([
+      aToB.createInvitation(relationshipAtoB, {
+        inviterAccountId: accountA,
+        inviterDisplayName: "A",
+        offeredThemes: [{ diagnosisId: "diagnosis-1", resultFingerprint: "a".repeat(64) }],
+      }),
+      bToA.createInvitation(relationshipBtoA, {
+        inviterAccountId: accountB,
+        inviterDisplayName: "B",
+        offeredThemes: [{ diagnosisId: "diagnosis-1", resultFingerprint: "b".repeat(64) }],
+      }),
+      aData.execute("compatibility.addOutgoingReference", {
+        relationshipId: relationshipAtoB,
+        createdAt: new Date(),
+      }),
+      bData.execute("compatibility.addOutgoingReference", {
+        relationshipId: relationshipBtoA,
+        createdAt: new Date(),
+      }),
+    ]);
+
+    const results = await Promise.all([
+      acceptCompatibilityInvitationWithReferences(
+        env.ACCOUNT_DATA,
+        env.COMPATIBILITY_DATA,
+        relationshipAtoB,
+        {
+          inviteeAccountId: accountB,
+          inviteeDisplayName: "B",
+          acceptedThemes: [{ diagnosisId: "diagnosis-1", resultFingerprint: "b".repeat(64) }],
+        },
+      ),
+      acceptCompatibilityInvitationWithReferences(
+        env.ACCOUNT_DATA,
+        env.COMPATIBILITY_DATA,
+        relationshipBtoA,
+        {
+          inviteeAccountId: accountA,
+          inviteeDisplayName: "A",
+          acceptedThemes: [{ diagnosisId: "diagnosis-1", resultFingerprint: "a".repeat(64) }],
+        },
+      ),
+    ]);
+
+    expect(results.map(({ outcome }) => outcome).sort()).toEqual(["accepted", "duplicate"]);
+    const [aReferences, bReferences] = await Promise.all([
+      aData.execute("compatibility.listVisibleReferences"),
+      bData.execute("compatibility.listVisibleReferences"),
+    ]);
+    const aActive = aReferences.filter(({ status }) => status === "active");
+    const bActive = bReferences.filter(({ status }) => status === "active");
+    expect(aActive).toHaveLength(1);
+    expect(bActive).toHaveLength(1);
+    expect(aActive[0]?.relationshipId).toBe(bActive[0]?.relationshipId);
   });
 });

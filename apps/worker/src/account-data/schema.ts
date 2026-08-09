@@ -30,7 +30,7 @@ export const compatibilityReferences = sqliteTable(
   (table) => [
     check(
       "compatibility_reference_state_check",
-      sql`(${table.status} = 'pending' and ${table.role} = 'inviter' and ${table.partnerAccountId} is null) or (${table.status} = 'reserved' and ${table.role} = 'invitee' and ${table.partnerAccountId} is not null) or (${table.status} = 'active' and ${table.partnerAccountId} is not null) or ${table.status} = 'ended'`,
+      sql`(${table.status} = 'pending' and ${table.role} = 'inviter' and ${table.partnerAccountId} is null) or (${table.status} = 'reserved' and ${table.partnerAccountId} is not null) or (${table.status} = 'active' and ${table.partnerAccountId} is not null) or ${table.status} = 'ended'`,
     ),
     uniqueIndex("compatibility_reference_active_partner_idx")
       .on(table.partnerAccountId)

@@ -154,6 +154,59 @@ describe("AccountDataRepository", () => {
     });
   });
 
+  it("送受信を問わず同じ相手の予約を1件に制限し、予約を再試行可能に解放する", async () => {
+    const repository = createRepository();
+    await repository.initialize();
+    repository.bindAccount("account-1");
+    const at = new Date("2026-08-09T00:00:00.000Z");
+    repository.addOutgoingCompatibilityReference("account-1", {
+      relationshipId: "relationship-outgoing",
+      createdAt: at,
+    });
+
+    expect(
+      repository.reserveOutgoingCompatibilityReference("account-1", {
+        relationshipId: "relationship-outgoing",
+        partnerAccountId: "account-2",
+        updatedAt: at,
+      }),
+    ).toMatchObject({
+      outcome: "reserved",
+      reference: { role: "inviter", partnerAccountId: "account-2", status: "reserved" },
+    });
+    expect(
+      repository.reserveIncomingCompatibilityReference("account-1", {
+        relationshipId: "relationship-incoming",
+        partnerAccountId: "account-2",
+        createdAt: at,
+      }),
+    ).toMatchObject({
+      outcome: "conflict",
+      reference: { relationshipId: "relationship-outgoing" },
+    });
+    expect(repository.listVisibleCompatibilityReferences("account-1")).toEqual([]);
+    expect(repository.listReconciliableCompatibilityReferences("account-1")).toEqual([
+      expect.objectContaining({ relationshipId: "relationship-outgoing", status: "reserved" }),
+    ]);
+
+    expect(
+      repository.releaseCompatibilityReservation("account-1", "relationship-outgoing", at),
+    ).toMatchObject({
+      outcome: "released",
+      reference: { partnerAccountId: null, status: "pending" },
+    });
+    expect(
+      repository.reserveIncomingCompatibilityReference("account-1", {
+        relationshipId: "relationship-incoming",
+        partnerAccountId: "account-2",
+        createdAt: at,
+      }).outcome,
+    ).toBe("reserved");
+    expect(
+      repository.releaseCompatibilityReservation("account-1", "relationship-incoming", at),
+    ).toEqual({ outcome: "released", reference: null });
+  });
+
   it("共有D1由来のDiary循環参照を一度だけcopyして復元する", async () => {
     const legacy = createRepository();
     const target = createRepository();
