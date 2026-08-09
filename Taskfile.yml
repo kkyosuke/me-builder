@@ -86,6 +86,16 @@ tasks:
     cmds:
       - bun scripts/setup-chat-queues.ts production
 
+  access:setup:preview:
+    desc: 'Protect preview OpenAPI and Swagger UI routes with Cloudflare Access'
+    cmds:
+      - bun scripts/setup-api-docs-access.ts preview
+
+  access:setup:production:
+    desc: 'Protect production OpenAPI and Swagger UI routes with Cloudflare Access'
+    cmds:
+      - bun scripts/setup-api-docs-access.ts production
+
   line:rich-menu:preview:
     desc: 'Register the preview LINE rich menu as the default'
     cmds:
@@ -130,6 +140,7 @@ tasks:
   deploy:preview:
     desc: 'Deploy all applications to preview environment via Wrangler'
     cmds:
+      - task: access:setup:preview
       - bun --filter @me-builder/worker deploy:preview
       - bun --filter @me-builder/api deploy:preview
       - bun --filter @me-builder/mcp deploy:preview
@@ -138,6 +149,7 @@ tasks:
   deploy:production:
     desc: 'Deploy all applications to production environment via Wrangler'
     cmds:
+      - task: access:setup:production
       - bun --filter @me-builder/worker deploy:production
       - bun --filter @me-builder/api deploy:production
       - bun --filter @me-builder/mcp deploy:production
