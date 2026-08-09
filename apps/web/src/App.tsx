@@ -33,9 +33,10 @@ export function App() {
   const colorTheme = useColorTheme();
   const pathname = resolveRequestedPathname();
   const isAdminPath = pathname.startsWith("/admin");
-  const isMePath = pathname === "/me" || pathname.startsWith("/me/");
+  const isDirectProfilePath = pathname === "/profile" || pathname.startsWith("/profile/");
+  const isMePath = pathname === "/me" || pathname.startsWith("/me/") || isDirectProfilePath;
   const [profileView, setProfileView] = useState<"closed" | "profile" | "avatar">(
-    pathname === "/profile" || pathname.startsWith("/profile/") ? "profile" : "closed",
+    isDirectProfilePath ? "profile" : "closed",
   );
   const [avatar, setAvatar] = useState<AvatarSelection | null>(null);
 
@@ -59,7 +60,12 @@ export function App() {
         <ProfileSettingsScreen
           avatar={avatar}
           theme={colorTheme.theme}
-          onBack={() => setProfileView("closed")}
+          onBack={() => {
+            if (isDirectProfilePath) {
+              window.history.replaceState({}, "", "/me");
+            }
+            setProfileView("closed");
+          }}
           onOpenAvatar={() => setProfileView("avatar")}
           onThemeChange={colorTheme.setTheme}
         />

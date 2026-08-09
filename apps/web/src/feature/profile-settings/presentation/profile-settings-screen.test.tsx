@@ -20,6 +20,7 @@ describe("ProfileSettingsScreen", () => {
 
     expect(screen.getByRole("heading", { name: "プロフィール" })).toBeTruthy();
     expect(screen.getByText("未設定")).toBeTruthy();
+    expect(screen.getByRole("radiogroup", { name: "表示テーマ" })).toBeTruthy();
     expect((screen.getByRole("radio", { name: /ダーク/ }) as HTMLInputElement).checked).toBe(true);
   });
 

@@ -251,6 +251,19 @@ describe("App", () => {
     expect(screen.getByText("星空")).toBeTruthy();
   });
 
+  it("/profileの直接表示を閉じるとわたしのまとめへ戻る", async () => {
+    window.history.replaceState({}, "", "/profile");
+    render(<App />);
+
+    expect(screen.getByRole("heading", { name: "プロフィール" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "プロフィールを閉じる" }));
+
+    expect(window.location.pathname).toBe("/me");
+    expect(screen.queryByRole("heading", { name: "プロフィール" })).toBeNull();
+    expect(await screen.findByRole("heading", { name: "わたしのまとめ" })).toBeTruthy();
+    expect(mocks.fetchDiagnosisList).not.toHaveBeenCalled();
+  });
+
   it("/meでは診断・日記レコードから生成したまとめを表示し、診断一覧は取得しない", async () => {
     window.history.replaceState({}, "", "/me");
 

@@ -103,11 +103,7 @@ export function ProfileSettingsScreen({
           >
             表示
           </h2>
-          <div
-            role="radiogroup"
-            aria-labelledby="theme-setting-heading"
-            className="mt-3 grid gap-3 sm:grid-cols-2"
-          >
+          <div role="radiogroup" aria-label="表示テーマ" className="mt-3 grid gap-3 sm:grid-cols-2">
             {themes.map((item) => {
               const Icon = item.icon;
               const selected = theme === item.id;

@@ -9,7 +9,6 @@ import type { ColorTheme } from "../../model/color-theme";
 export function useColorTheme(): {
   theme: ColorTheme;
   setTheme: (theme: ColorTheme) => void;
-  toggleTheme: () => void;
 } {
   const [theme, setTheme] = useState(readColorTheme);
 
@@ -22,9 +21,5 @@ export function useColorTheme(): {
     setTheme(next);
   }, []);
 
-  const toggleTheme = useCallback(() => {
-    selectTheme(theme === "dark" ? "light" : "dark");
-  }, [selectTheme, theme]);
-
-  return { theme, setTheme: selectTheme, toggleTheme };
+  return { theme, setTheme: selectTheme };
 }
