@@ -267,7 +267,6 @@ async function saveProjection(
         statement: projection.statement,
         attributes: projection.attributes,
         derivation: "deterministic",
-        confirmation: "pending",
         status: "active",
         validFrom: at,
         stability: "changeable",
@@ -287,7 +286,6 @@ async function saveProjection(
         {
           id: crypto.randomUUID(),
           label: "unclassified",
-          confirmation: "pending",
           assignedBy: "system",
         },
       ],

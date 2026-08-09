@@ -169,7 +169,6 @@ describe("Diagnosis Brain projection", () => {
         category: "preference",
         statement: "計画性は「計画的」の傾向がある",
         derivation: "deterministic",
-        confirmation: "pending",
         status: "active",
       }),
     ]);
@@ -178,7 +177,6 @@ describe("Diagnosis Brain projection", () => {
       expect.objectContaining({
         accountId: "account-1",
         label: "unclassified",
-        confirmation: "pending",
         assignedBy: "system",
       }),
     ]);

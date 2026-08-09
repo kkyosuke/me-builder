@@ -153,6 +153,7 @@ export async function processChatTurnMessage(
       ? {
           reply: pendingResponse.body,
           endSession: pendingResponse.endSession,
+          brainItemCandidate: undefined,
         }
       : await generateDiaryChatResponse(context.messages, workerConfig, controller.signal, {
           currentUserMessageIds: context.currentUserMessageIds,
@@ -163,6 +164,12 @@ export async function processChatTurnMessage(
         }).then((generated) => ({
           reply: generated.reply,
           endSession: generated.end_session,
+          brainItemCandidate: generated.brain_item_candidates[0]
+            ? {
+                statement: generated.brain_item_candidates[0].statement,
+                sourceMessageIds: generated.brain_item_candidates[0].source_message_ids,
+              }
+            : undefined,
         }));
     if (!pendingResponse) {
       const leaseIsActive = await coordinator.isGenerationLeaseActive(
@@ -175,6 +182,7 @@ export async function processChatTurnMessage(
         turnId: message.body.turnId,
         body: response.reply,
         endSession: response.endSession,
+        ...(response.brainItemCandidate ? { brainItemCandidate: response.brainItemCandidate } : {}),
       });
     }
     if (!(await accountData.execute("conversation.isTurnSessionActive", message.body.turnId))) {

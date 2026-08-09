@@ -249,7 +249,7 @@ Source Record本文はモデルへの入力には含めますが、モデルの�
 
 ### 7.2 AIの候補出力
 
-AIは返信本文とは別に、1Turn最大3件の候補を提案します。
+完成形では、AIは返信本文とは別に1Turn最大3件の候補を提案します。現在の実装は安全な最初の縦切りとして、本人が明示した出来事を表す`Memory`を最大1件、`is_inference = false`の場合だけ受け付けます。
 
 ```json
 {
@@ -300,7 +300,7 @@ AIは返信本文とは別に、1Turn最大3件の候補を提案します。
 
 ### 7.3 登録タイミング
 
-候補は毎Turn機械的に保存しません。会話の区切りで、assistantの返信本文が内容を本人へ提示するときだけBrain Itemとして登録し、その時点から利用可能にします。
+候補は毎Turn機械的に保存しません。現在の実装上のトリガーは、通常の安全routeでAIが現在Turnを根拠にした有効な`Memory`候補を返し、同じassistant返信でその内容を本人へ提示することです。候補がある場合はassistant応答の保存時にBrain Itemとして登録し、その時点から利用可能にします。
 
 ```mermaid
 sequenceDiagram
@@ -315,15 +315,14 @@ sequenceDiagram
     W->>AI: 会話とSource message ID
     AI-->>W: reply + Brain Item候補
     W->>W: schema・Account・Evidence・安全性を検証
-    W->>AD: assistant応答 + Brain Item + Evidence + Access Label + Vectorize同期job
+    W->>AD: assistant応答 + Brain Item + Evidence + Access Label
     AD-->>W: atomic commit
     W->>LINE: 候補を含む返信を配送
-    alt 配送が恒久失敗
-        W->>AD: この応答で提示予定だった候補をinvalidatedへ変更
-    end
 ```
 
 assistant応答だけ保存できてBrain Itemが失われる状態、またはBrain Itemだけ保存できてどの提示に対応するか分からない状態を作らないため、Turn結果と候補一式をAccountDataの同じtransactionで保存します。LINE配送は外部I/Oなのでtransactionには含めません。対応するassistant応答を配送できなかった場合は、提示されなかったBrain Itemを`invalidated`へ変更し、検索対象から外します。
+
+配送の恒久失敗に連動する`invalidated`化は後続実装です。現時点ではTurnと候補のatomic保存までを保証します。
 
 AI生成が失敗した場合、安全経路へ切り替えた場合、候補がすべて検証不合格だった場合も、日記のSource Recordと通常の会話応答は保持します。Brain Itemが0件のTurnを正常系として扱います。
 
@@ -359,20 +358,27 @@ AIの意味的重複判定だけで既存Itemを上書きしません。同義�
 
 ## 9. 実装境界
 
-診断回答からBrain ItemとEvidence edgeを作るprojectionは実装済みですが、現在の物理schemaと保存処理には旧設計の`confirmation = pending`が残っています。本設計へ合わせるには、Confirmation列・index・保存入力を廃止し、生成時の`active` Itemをそのまま利用対象にするmigrationとテスト変更が必要です。
+診断回答からBrain ItemとEvidence edgeを作るprojectionは実装済みです。旧設計の`confirmation`列・index・保存入力は削除し、診断と日記のどちらも生成時から`active`に統一しています。
 
-日記チャットはSource Record保存、Session、AI返信、LINE配送と、汎用のBrain Item保存処理まで実装済みですが、次は未実装です。
+日記チャットで実装済みの範囲:
 
 - `brain_item_candidates`を含むAI出力schema
-- 候補のAccount・Evidence・安全性検証
+- 通常安全route、`Memory`、非推定、1Turn最大1件への制限
+- 候補のAccount・現在Turn・Evidence・安全性検証
 - assistant応答と候補を一括保存するAccountData action
-- Brain ItemからConfirmationを除くschema migrationと既存projectionの追従
+- Brain ItemとAccess LabelからConfirmationを除くschema migrationと既存projectionの追従
+- 再配送時にassistant応答とBrain Itemを重複作成しない冪等性
+
+次は未実装です。
+
 - 提示したItemと否定・修正操作の対応づけ
 - 否定による無効化、修正、改訂
 - 既存Brain Itemとの重複判定とEvidence追加
+- AI解釈を伴う分類と1Turn複数Item
+- LINE配送の恒久失敗に伴うItemの無効化
 - active ItemのVectorize同期と日記助言への利用
 
-最初の縦切りは、1つのTurnからMemoryを最大1件生成し、保存、Vectorize同期、否定による無効化までを通します。その後、AI解釈を伴う分類、複数Item、修正、重複統合の順に広げます。
+最初の縦切りとして、1つのTurnからMemoryを最大1件生成し、Evidence付きで保存するところまでを実装しています。次にVectorize同期と否定による無効化を通し、その後、AI解釈を伴う分類、複数Item、修正、重複統合の順に広げます。
 
 ## 10. 後続で決めること
 

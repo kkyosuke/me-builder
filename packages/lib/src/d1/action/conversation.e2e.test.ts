@@ -95,8 +95,12 @@ describe("Diary conversation persistence flow", () => {
     await expect(markTurnGenerating(db, attached.turnId)).resolves.toBe(true);
     const responseMessageId = await saveAssistantResponse(db, {
       turnId: attached.turnId,
-      body: "疲れている中でも散歩できたんだね。今は少し休めそう？",
+      body: "疲れている中でも散歩できたことを記録したよ。今は少し休めそう？",
       endSession: true,
+      brainItemCandidate: {
+        statement: "疲れていたが散歩できた",
+        sourceMessageIds: context?.currentUserMessageIds ?? [],
+      },
     });
     await expect(
       saveAssistantResponse(db, {
@@ -106,9 +110,22 @@ describe("Diary conversation persistence flow", () => {
       }),
     ).resolves.toBe(responseMessageId);
     await expect(getPendingAssistantResponse(db, account.id, attached.turnId)).resolves.toEqual({
-      body: "疲れている中でも散歩できたんだね。今は少し休めそう？",
+      body: "疲れている中でも散歩できたことを記録したよ。今は少し休めそう？",
       endSession: true,
     });
+    await expect(db.select().from(schema.brainItems)).resolves.toEqual([
+      expect.objectContaining({
+        accountId: account.id,
+        category: "memory",
+        statement: "疲れていたが散歩できた",
+        derivation: "ai",
+        status: "active",
+      }),
+    ]);
+    await expect(db.select().from(schema.brainItemEvidenceEdges)).resolves.toHaveLength(2);
+    await expect(db.select().from(schema.brainItemAccessLabels)).resolves.toEqual([
+      expect.objectContaining({ label: "unclassified", assignedBy: "system" }),
+    ]);
     await expect(markTurnDelivered(db, attached.turnId)).resolves.toBe(true);
     await expect(markTurnFailed(db, attached.turnId, "stale_delivery_failure")).resolves.toBe(
       false,
