@@ -21,12 +21,18 @@ type TargetEnvironment = "preview" | "production";
 
 interface CloudflareResponse<T> {
   success: boolean;
-  errors?: { code: number; message: string }[];
+  errors?: CloudflareApiIssue[];
+  messages?: CloudflareApiIssue[];
   result: T;
   result_info?: {
     page?: number;
     total_pages?: number;
   };
+}
+
+interface CloudflareApiIssue {
+  code?: number | string;
+  message?: string;
 }
 
 interface AccessApplication {
@@ -140,9 +146,24 @@ function createApiClient(accountId: string, apiToken: string, fetchImpl: typeof 
     }
 
     if (!response.ok || !body.success) {
-      const detail = body.errors?.map((error) => `${error.code}: ${error.message}`).join(", ");
+      const issues = [...(body.errors ?? []), ...(body.messages ?? [])];
+      const detail = issues
+        .map((issue) => {
+          const code = issue.code === undefined ? undefined : String(issue.code);
+          const message = issue.message?.trim();
+          return [code, message].filter(Boolean).join(": ");
+        })
+        .filter(Boolean)
+        .join(", ");
+      const method = init?.method ?? "GET";
+      const accessSetupHint =
+        method === "POST" &&
+        path === "/access/apps" &&
+        issues.some((issue) => String(issue.code) === "1010")
+          ? " Verify that the account's Zero Trust organization is initialized and the API token has Access: Apps and Policies Write."
+          : "";
       throw new Error(
-        `Cloudflare API ${init?.method ?? "GET"} ${path} failed (${detail || response.status})`,
+        `Cloudflare API ${method} ${path} failed (${detail || response.status}).${accessSetupHint}`,
       );
     }
 
@@ -177,33 +198,42 @@ export async function setupApiDocsAccess(params: SetupApiDocsAccessParams): Prom
   const callApi = createApiClient(accountId, apiToken, params.fetch ?? globalThis.fetch);
   const hostname = resolveApiHostname(baseDomain);
   const name = applicationName(params.environment);
+  const payload = applicationPayload(params.environment, hostname);
   const applications = await listAll<AccessApplication>(callApi, "/access/apps");
-  const matches = applications.filter((application) => application.name === name);
+  const matches = applications.filter(
+    (application) => application.name === name || application.domain === payload.domain,
+  );
   if (matches.length > 1) {
-    throw new Error(`Multiple Cloudflare Access applications named ${name} exist`);
+    throw new Error(
+      `Multiple Cloudflare Access applications match ${name} or ${payload.domain}; review them in the Cloudflare Dashboard`,
+    );
   }
 
-  const payload = applicationPayload(params.environment, hostname);
-  const application = matches[0]
-    ? (
-        await callApi<AccessApplication>(`/access/apps/${matches[0].id}`, {
-          method: "PUT",
-          body: JSON.stringify(payload),
-        })
-      ).result
-    : (
-        await callApi<AccessApplication>("/access/apps", {
-          method: "POST",
-          body: JSON.stringify(payload),
-        })
-      ).result;
+  let application: AccessApplication;
+  let policies: AccessPolicy[];
+  if (matches[0]) {
+    policies = await listAll<AccessPolicy>(callApi, `/access/apps/${matches[0].id}/policies`);
+    const unmanagedPolicies = policies.filter((policy) => policy.name !== POLICY_NAME);
+    if (unmanagedPolicies.length > 0) {
+      throw new Error(
+        `Unmanaged policies exist on ${matches[0].name}: ${unmanagedPolicies.map((policy) => policy.name).join(", ")}`,
+      );
+    }
 
-  const policies = await listAll<AccessPolicy>(callApi, `/access/apps/${application.id}/policies`);
-  const unmanagedPolicies = policies.filter((policy) => policy.name !== POLICY_NAME);
-  if (unmanagedPolicies.length > 0) {
-    throw new Error(
-      `Unmanaged policies exist on ${name}: ${unmanagedPolicies.map((policy) => policy.name).join(", ")}`,
-    );
+    application = (
+      await callApi<AccessApplication>(`/access/apps/${matches[0].id}`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      })
+    ).result;
+  } else {
+    application = (
+      await callApi<AccessApplication>("/access/apps", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      })
+    ).result;
+    policies = await listAll<AccessPolicy>(callApi, `/access/apps/${application.id}/policies`);
   }
 
   const managedPolicies = policies.filter((policy) => policy.name === POLICY_NAME);
