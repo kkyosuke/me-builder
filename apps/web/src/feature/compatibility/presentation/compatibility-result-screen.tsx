@@ -114,7 +114,8 @@ export function CompatibilityResultScreen({
         </button>
       </div>
 
-      <div {...sectionSwipe.handlers} className="mt-5 touch-pan-y overflow-hidden">
+      {/* 外側を8px広げて各パネルへ同量を戻し、スワイプ中だけ内容間に16pxの間隔を作る。 */}
+      <div {...sectionSwipe.handlers} className="-mx-2 mt-5 touch-pan-y overflow-hidden">
         <div
           data-testid="compatibility-section-track"
           className={`flex w-[200%] items-start will-change-transform ${isDragging ? "" : "transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"}`}
@@ -128,7 +129,7 @@ export function CompatibilityResultScreen({
             role="tabpanel"
             aria-labelledby="compatibility-people-tab"
             aria-hidden={result.state.section !== "people"}
-            className="w-1/2 shrink-0 space-y-4"
+            className="w-1/2 shrink-0 space-y-4 px-2"
           >
             <CompatibilityPersonSheet person={partner} isMe={false} />
             <CompatibilityPersonSheet person={me} isMe />
@@ -139,7 +140,7 @@ export function CompatibilityResultScreen({
             role="tabpanel"
             aria-labelledby="compatibility-pair-tab"
             aria-hidden={result.state.section !== "pair"}
-            className="w-1/2 shrink-0"
+            className="w-1/2 shrink-0 px-2"
           >
             <CompatibilityPairSheet me={me} partner={partner} />
           </div>
