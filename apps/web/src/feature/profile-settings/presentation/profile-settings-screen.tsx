@@ -1,4 +1,5 @@
 import { ArrowLeft, ChevronRight, Moon, Sparkles, Sun } from "lucide-react";
+import { useEffect, useRef } from "react";
 import type { ColorTheme } from "../../theme/model/color-theme";
 import { type AvatarSelection, getAvatarName } from "../model/avatar";
 import { AvatarPreview } from "./components/avatar-preview";
@@ -33,11 +34,23 @@ export function ProfileSettingsScreen({
   onOpenAvatar: () => void;
   onThemeChange: (theme: ColorTheme) => void;
 }) {
+  const backButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    backButtonRef.current?.focus();
+  }, []);
+
   return (
-    <div className="fixed inset-0 z-[60] overflow-y-auto bg-slate-50 dark:bg-slate-900">
+    <dialog
+      open
+      aria-modal="true"
+      aria-labelledby="profile-settings-title"
+      className="fixed inset-0 z-[60] m-0 h-auto max-h-none w-auto max-w-none overflow-y-auto border-0 bg-slate-50 p-0 dark:bg-slate-900"
+    >
       <header className="sticky top-0 z-10 border-b border-slate-200/80 bg-white/90 backdrop-blur dark:border-slate-700 dark:bg-slate-900/90">
         <div className="mx-auto flex min-h-16 max-w-2xl items-center px-4 sm:px-8">
           <button
+            ref={backButtonRef}
             type="button"
             onClick={onBack}
             className="inline-flex size-11 items-center justify-center rounded-full text-slate-600 transition hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:text-slate-300 dark:hover:bg-slate-800"
@@ -45,7 +58,12 @@ export function ProfileSettingsScreen({
           >
             <ArrowLeft className="size-5" aria-hidden="true" />
           </button>
-          <h1 className="ml-2 text-lg font-bold text-slate-950 dark:text-white">プロフィール</h1>
+          <h1
+            id="profile-settings-title"
+            className="ml-2 text-lg font-bold text-slate-950 dark:text-white"
+          >
+            プロフィール
+          </h1>
         </div>
       </header>
 
@@ -151,6 +169,6 @@ export function ProfileSettingsScreen({
           </p>
         </section>
       </main>
-    </div>
+    </dialog>
   );
 }

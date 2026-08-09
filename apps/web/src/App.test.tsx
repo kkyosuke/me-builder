@@ -243,6 +243,7 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: /アバターを設定/ }));
 
     expect(screen.getByRole("heading", { name: "アバター設定" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("checkbox", { name: /外部AIサービスへ送信/ }));
     fireEvent.change(screen.getByLabelText(/画像をアップロード/), {
       target: { files: [new File(["selfie"], "selfie.png", { type: "image/png" })] },
     });
@@ -254,6 +255,33 @@ describe("App", () => {
 
     expect(screen.getByRole("heading", { name: "プロフィール" })).toBeTruthy();
     expect(screen.getByText("星空")).toBeTruthy();
+  });
+
+  it("プロフィールとアバター設定をブラウザ履歴で戻れる", async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "プロフィールを開く" }));
+    expect(window.location.pathname).toBe("/profile");
+    expect(screen.getByRole("dialog", { name: "プロフィール" })).toBeTruthy();
+    const background = screen.getByRole("dialog", { name: "プロフィール" }).previousElementSibling;
+    expect(background?.getAttribute("aria-hidden")).toBe("true");
+    expect(background?.hasAttribute("inert")).toBe(true);
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "プロフィールを閉じる" }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /アバターを設定/ }));
+    expect(window.location.pathname).toBe("/profile/avatar");
+    expect(screen.getByRole("dialog", { name: "アバター設定" })).toBeTruthy();
+
+    act(() => window.history.back());
+    await waitFor(() => expect(window.location.pathname).toBe("/profile"));
+    expect(screen.getByRole("dialog", { name: "プロフィール" })).toBeTruthy();
+
+    act(() => window.history.back());
+    await waitFor(() => expect(window.location.pathname).toBe("/"));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "プロフィールを開く" }));
   });
 
   it("/profileの直接表示を閉じるとわたしのまとめへ戻る", async () => {
