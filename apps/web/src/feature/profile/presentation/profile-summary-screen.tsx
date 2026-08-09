@@ -3,6 +3,8 @@ import {
   BookHeart,
   Brain,
   ClipboardCheck,
+  History,
+  LoaderCircle,
   MessageCircleHeart,
   NotebookPen,
   RefreshCw,
@@ -14,7 +16,9 @@ import type { AsyncState } from "../../../model/async-state";
 import type {
   ProfileRecordSource,
   ProfileSummary,
+  ProfileSummaryRegenerationReason,
   ProfileSummaryResult,
+  ProfileSummaryVersioning,
 } from "../model/profile-summary";
 
 const sourceLabels: Record<ProfileRecordSource, string> = {
@@ -28,6 +32,145 @@ function formatDate(value: string): string {
     month: "numeric",
     day: "numeric",
   }).format(new Date(value));
+}
+
+function formatDateTime(value: string): string {
+  return new Intl.DateTimeFormat("ja-JP", {
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
+const regenerationReasonLabels: Record<ProfileSummaryRegenerationReason, string> = {
+  diagnosis: "診断が増えました",
+  brain: "日記・記録が増えました",
+  elapsed: "前回の生成から時間が経ちました",
+};
+
+function VersionSelector({
+  versioning,
+  onSelectVersion,
+}: {
+  versioning: ProfileSummaryVersioning;
+  onSelectVersion?: (versionId: string) => void;
+}) {
+  return (
+    <label className="w-full sm:w-auto">
+      <span className="mb-1 block text-xs font-semibold text-slate-500 dark:text-slate-400">
+        表示する版
+      </span>
+      <select
+        value={versioning.selectedVersionId}
+        onChange={(event) => onSelectVersion?.(event.currentTarget.value)}
+        disabled={!onSelectVersion || versioning.versions.length <= 1}
+        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400 disabled:cursor-not-allowed disabled:opacity-70 sm:min-w-44 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+      >
+        {versioning.versions.map((version) => (
+          <option key={version.id} value={version.id}>
+            {`${version.sequence === null ? "最新版" : `第${version.sequence}版`}・${formatDate(version.generatedAt)}`}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function VersionGenerationPanel({
+  versioning,
+  onRegenerate,
+}: {
+  versioning: ProfileSummaryVersioning;
+  onRegenerate?: () => void;
+}) {
+  const selected =
+    versioning.versions.find(({ id }) => id === versioning.selectedVersionId) ??
+    versioning.versions[0];
+  if (!selected) return null;
+
+  const isWorking =
+    versioning.generation.status === "queued" || versioning.generation.status === "generating";
+  const canRequest =
+    selected.isLatest && versioning.generation.canRegenerate && !isWorking && onRegenerate;
+
+  return (
+    <section
+      aria-label="まとめの版と更新"
+      className="mt-5 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-start gap-3">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-200">
+            <History className="size-5" aria-hidden="true" />
+          </span>
+          <div>
+            <p className="text-sm font-bold text-slate-900 dark:text-slate-100">
+              {selected.sequence === null ? "現在のまとめ" : `第${selected.sequence}版`}
+            </p>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              {`${selected.generationMethod === "ai" ? "AI生成" : "現在の集計"}・${formatDateTime(selected.generatedAt)}`}
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onRegenerate}
+          disabled={!canRequest}
+          className="inline-flex items-center gap-2 rounded-xl bg-sky-400 px-4 py-2.5 text-sm font-bold text-slate-950 transition hover:bg-sky-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
+        >
+          {isWorking ? (
+            <LoaderCircle
+              className="size-4 animate-spin motion-reduce:animate-none"
+              aria-hidden="true"
+            />
+          ) : (
+            <RefreshCw className="size-4" aria-hidden="true" />
+          )}
+          {isWorking ? "新しい版を作成中" : "まとめを更新"}
+        </button>
+      </div>
+
+      {!selected.isLatest && (
+        <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-800 dark:bg-amber-950/50 dark:text-amber-200">
+          過去の版を表示中です。更新するには最新版へ戻ってください。
+        </p>
+      )}
+
+      {selected.isLatest && versioning.generation.reasons.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-2" aria-label="再生成できる理由">
+          {versioning.generation.reasons.map((reason) => (
+            <span
+              key={reason}
+              className="rounded-full bg-sky-50 px-2.5 py-1 text-xs font-semibold text-sky-800 dark:bg-sky-950 dark:text-sky-200"
+            >
+              {regenerationReasonLabels[reason]}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {isWorking && (
+        <output className="mt-3 block text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+          新しい版を作成しています。完了するまで、現在の版や過去の版を確認できます。
+        </output>
+      )}
+      {versioning.generation.status === "failed" && (
+        <p className="mt-3 text-xs leading-relaxed text-red-700 dark:text-red-300" role="alert">
+          {versioning.generation.message ??
+            "新しい版を作成できませんでした。現在の版を残したまま再試行できます。"}
+        </p>
+      )}
+      {selected.isLatest &&
+        versioning.generation.status === "idle" &&
+        versioning.generation.reasons.length === 0 && (
+          <p className="mt-3 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+            新しい診断や日記の情報が増えるか、前回から時間が経つと更新できます。
+          </p>
+        )}
+    </section>
+  );
 }
 
 function SummaryContent({ summary }: { summary: ProfileSummary }) {
@@ -193,24 +336,45 @@ function NextAction({ action }: { action: ProfileSummaryResult["nextAction"] }) 
 
 export function ProfileSummaryScreen({
   state,
+  versioning,
   onRetry,
+  onSelectVersion,
+  onRegenerate,
 }: {
   state: AsyncState<ProfileSummaryResult>;
+  versioning?: ProfileSummaryVersioning;
   onRetry: () => void;
+  onSelectVersion?: (versionId: string) => void;
+  onRegenerate?: () => void;
 }) {
   return (
     <main className="mx-auto min-h-dvh w-full max-w-2xl px-4 py-8 pb-28 sm:px-8">
-      <header>
-        <p className="text-sm font-semibold tracking-wider text-sky-700 dark:text-sky-300">
-          私を知る
-        </p>
-        <h1 className="mt-2 text-3xl font-bold text-slate-950 dark:text-slate-50">
-          わたしのまとめ
-        </h1>
-        <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-          診断と日記の記録をつなげて、今のあなたらしさを振り返ります。
-        </p>
+      <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+        <div>
+          <p className="text-sm font-semibold tracking-wider text-sky-700 dark:text-sky-300">
+            私を知る
+          </p>
+          <h1 className="mt-2 text-3xl font-bold text-slate-950 dark:text-slate-50">
+            わたしのまとめ
+          </h1>
+          <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+            これまでの診断と記録から見える、今のあなたです。
+          </p>
+        </div>
+        {versioning && (
+          <VersionSelector
+            versioning={versioning}
+            {...(onSelectVersion ? { onSelectVersion } : {})}
+          />
+        )}
       </header>
+
+      {versioning && (
+        <VersionGenerationPanel
+          versioning={versioning}
+          {...(onRegenerate ? { onRegenerate } : {})}
+        />
+      )}
 
       {state.status === "loading" && (
         <div className="mt-8">
