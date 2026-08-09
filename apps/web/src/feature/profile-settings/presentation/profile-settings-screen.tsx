@@ -46,9 +46,6 @@ export function ProfileSettingsScreen({
             <ArrowLeft className="size-5" aria-hidden="true" />
           </button>
           <h1 className="ml-2 text-lg font-bold text-slate-950 dark:text-white">プロフィール</h1>
-          <span className="ml-auto rounded-full bg-violet-100 px-2.5 py-1 text-xs font-bold text-violet-700 dark:bg-violet-400/15 dark:text-violet-200">
-            Preview
-          </span>
         </div>
       </header>
 

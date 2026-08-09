@@ -243,7 +243,12 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: /アバターを設定/ }));
 
     expect(screen.getByRole("heading", { name: "アバター設定" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "ダミー候補を表示" }));
+    fireEvent.change(screen.getByLabelText(/画像をアップロード/), {
+      target: { files: [new File(["selfie"], "selfie.png", { type: "image/png" })] },
+    });
+    expect((await screen.findAllByText("selfie.png")).length).toBeGreaterThan(0);
+    expect(await screen.findByText("人物を確認できました")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "ダミー変換を開始" }));
     fireEvent.click(screen.getByRole("button", { name: "星空を選択" }));
     fireEvent.click(screen.getByRole("button", { name: "このアバターに設定" }));
 
