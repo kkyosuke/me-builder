@@ -76,6 +76,7 @@ export class ConversationCoordinatorRepository {
         accountId: input.accountId,
         sourceRecordId: input.sourceRecordId,
         receivedAt: new Date(input.receivedAt).getTime(),
+        traceId: input.traceId,
       })
       .run();
   }
@@ -239,7 +240,11 @@ export class ConversationCoordinatorRepository {
 
   listPendingQueueTurns() {
     return this.db
-      .select({ turnId: localTurns.turnId, generationEpoch: localTurns.generationEpoch })
+      .select({
+        turnId: localTurns.turnId,
+        generationEpoch: localTurns.generationEpoch,
+        traceId: localTurns.traceId,
+      })
       .from(localTurns)
       .where(eq(localTurns.status, "pending_queue"))
       .orderBy(asc(localTurns.generationEpoch))
@@ -296,7 +301,7 @@ export class ConversationCoordinatorRepository {
   completeAttachBatch(
     batchId: string,
     eventIds: string[],
-    turn?: { turnId: string; generationEpoch: number },
+    turn?: { turnId: string; generationEpoch: number; traceId?: string },
   ): void {
     this.db.transaction((tx) => {
       if (turn) {

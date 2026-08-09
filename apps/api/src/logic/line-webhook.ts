@@ -108,8 +108,10 @@ export async function receiveLineWebhook({
     );
   }
 
+  const traceId = crypto.randomUUID();
   const event: WebhookQueueMessage = {
-    id: crypto.randomUUID(),
+    id: traceId,
+    traceId,
     source: "line",
     receivedAt: new Date().toISOString(),
     // replyTokenは日記のfinalをpushではなくreplyで返すために残す。
@@ -142,7 +144,16 @@ export async function receiveLineWebhook({
 
   if (!queue) {
     logger.warn(
-      { id: event.id, source: event.source, messageCount: messages.length },
+      {
+        event: "line.webhook.accepted",
+        service: "api",
+        traceId,
+        component: "line-webhook",
+        outcome: "degraded",
+        disposition: "not-queued",
+        source: event.source,
+        messageCount: messages.length,
+      },
       "WEBHOOK_QUEUE binding not configured, skipping queue push",
     );
     return { type: "accepted", id: event.id, queued: false };
@@ -150,7 +161,16 @@ export async function receiveLineWebhook({
 
   await queue.send(event);
   logger.info(
-    { id: event.id, source: event.source, messageCount: messages.length },
+    {
+      event: "line.webhook.accepted",
+      service: "api",
+      traceId,
+      component: "line-webhook",
+      outcome: "succeeded",
+      disposition: "queued",
+      source: event.source,
+      messageCount: messages.length,
+    },
     "Webhook event queued to WEBHOOK_QUEUE",
   );
 

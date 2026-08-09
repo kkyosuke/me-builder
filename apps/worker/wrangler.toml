@@ -9,6 +9,7 @@ enabled = true
 [[queues.consumers]]
 queue = "me-builder-webhook-queue-local"
 dead_letter_queue = "me-builder-webhook-dlq-local"
+max_retries = 3
 
 [[queues.consumers]]
 queue = "me-builder-chat-turn-queue-local"
@@ -71,6 +72,7 @@ name = "me-builder-worker-local"
 [[env.local.queues.consumers]]
 queue = "me-builder-webhook-queue-local"
 dead_letter_queue = "me-builder-webhook-dlq-local"
+max_retries = 3
 
 [[env.local.queues.consumers]]
 queue = "me-builder-chat-turn-queue-local"
@@ -116,6 +118,7 @@ name = "me-builder-worker-preview"
 [[env.preview.queues.consumers]]
 queue = "me-builder-webhook-queue-preview"
 dead_letter_queue = "me-builder-webhook-dlq-preview"
+max_retries = 3
 
 [[env.preview.queues.consumers]]
 queue = "me-builder-chat-turn-queue-preview"
@@ -161,6 +164,7 @@ name = "me-builder-worker-production"
 [[env.production.queues.consumers]]
 queue = "me-builder-webhook-queue-production"
 dead_letter_queue = "me-builder-webhook-dlq-production"
+max_retries = 3
 
 [[env.production.queues.consumers]]
 queue = "me-builder-chat-turn-queue-production"

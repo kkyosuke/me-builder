@@ -120,4 +120,13 @@ describe("replyTokenの受け渡し", () => {
       "reply-token",
     );
   });
+
+  it("APIで発行した相関IDをWebhook Queueへ渡す", async () => {
+    const { send, result } = receive([textEvent("本文")]);
+    const outcome = await result;
+    const queued = send.mock.calls[0]?.[0] as WebhookQueueMessage;
+
+    expect(queued.traceId).toBe(queued.id);
+    expect(outcome).toMatchObject({ type: "accepted", id: queued.traceId });
+  });
 });

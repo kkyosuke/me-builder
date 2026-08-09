@@ -11,3 +11,4 @@ export * from "./schema/queue";
 export * from "./schema/conversation-coordinator";
 export * from "./utils/env";
 export * from "./utils/logger";
+export * from "./utils/operational-error";

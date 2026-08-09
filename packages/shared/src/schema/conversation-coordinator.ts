@@ -25,6 +25,8 @@ export interface ConversationCoordinatorRpc {
     sourceRecordId: string;
     eventId: string;
     receivedAt: string;
+    /** フローを後続Queueまで追跡する相関ID。省略形は旧callerとの互換用。 */
+    traceId?: string;
   }): Promise<{ accepted: boolean }>;
   acquireGeneration(turnId: string, generationEpoch: number): Promise<GenerationLease>;
   isGenerationLeaseActive(

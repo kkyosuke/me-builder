@@ -147,13 +147,14 @@ describe("ConversationCoordinator D1 E2E", () => {
       queued.push(message);
     });
 
-    await coordinator.acceptMessage(acceptedInput(first));
-    await coordinator.acceptMessage(acceptedInput(second));
+    await coordinator.acceptMessage({ ...acceptedInput(first), traceId: "trace-first" });
+    await coordinator.acceptMessage({ ...acceptedInput(second), traceId: "trace-second" });
     await runAlarm();
 
     expect(queued).toHaveLength(1);
     const queuedTurn = queued[0];
     if (!queuedTurn) throw new Error("Expected a queued turn");
+    expect(queuedTurn.traceId).toBe("trace-second");
     const context = await d1.action.conversation.getTurnContext(client, queuedTurn.turnId, 20);
     expect(context?.messages.map(({ body }) => body)).toEqual([
       "今日は少し疲れた",

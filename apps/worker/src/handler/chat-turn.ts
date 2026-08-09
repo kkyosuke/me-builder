@@ -18,6 +18,8 @@ export async function processChatTurnMessage(
   cf: CloudflareBindings,
   workerConfig: WorkerConfig,
 ): Promise<void> {
+  const startedAt = Date.now();
+  const traceId = message.body.traceId ?? message.id;
   if (!cf.do.accountData) throw new Error("ACCOUNT_DATA binding is not configured");
   const accountData = accountDataFor(cf.do.accountData, message.body.accountId);
   const context = await accountData.execute(
@@ -230,12 +232,42 @@ export async function processChatTurnMessage(
     message.ack();
     if (!completed) {
       logger.warn(
-        { turnId: message.body.turnId },
+        {
+          event: "queue.message.completed",
+          service: "worker",
+          environment: workerConfig.environment,
+          component: "chat-turn",
+          traceId,
+          queueMessageId: message.id,
+          messageType: "chat-turn",
+          attempt: message.attempts,
+          outcome: "degraded",
+          disposition: "ack",
+          stage: "line.deliver",
+          resultCode: "GENERATION_LEASE_EXPIRED_AFTER_DELIVERY",
+          durationMs: Date.now() - startedAt,
+        },
         "Final delivery succeeded after the generation lease expired",
       );
       return;
     }
-    logger.info({ turnId: message.body.turnId }, "Diary chat response delivered");
+    logger.info(
+      {
+        event: "queue.message.completed",
+        service: "worker",
+        environment: workerConfig.environment,
+        component: "chat-turn",
+        traceId,
+        queueMessageId: message.id,
+        messageType: "chat-turn",
+        attempt: message.attempts,
+        outcome: "succeeded",
+        disposition: "ack",
+        stage: "line.deliver",
+        durationMs: Date.now() - startedAt,
+      },
+      "Diary chat turn completed",
+    );
   } catch (error) {
     if ((message.attempts >= 2 || controller.signal.aborted) && !failureDeliveryAttempted) {
       try {
@@ -249,13 +281,6 @@ export async function processChatTurnMessage(
       message.body.turnId,
       message.body.generationEpoch,
       lease.leaseToken,
-    );
-    logger.error(
-      {
-        turnId: message.body.turnId,
-        errorName: error instanceof Error ? error.name : "UnknownError",
-      },
-      "Diary chat turn failed",
     );
     throw error;
   } finally {
