@@ -524,6 +524,31 @@ export class AccountDataRepository {
     };
   }
 
+  hasCompatibilityReservation(
+    accountId: string,
+    input: Readonly<{
+      relationshipId: string;
+      partnerAccountId: string;
+      role: CompatibilityReferenceRole;
+    }>,
+  ): boolean {
+    return Boolean(
+      this.database
+        .select({ relationshipId: compatibilityReferences.relationshipId })
+        .from(compatibilityReferences)
+        .where(
+          and(
+            eq(compatibilityReferences.relationshipId, input.relationshipId),
+            eq(compatibilityReferences.accountId, accountId),
+            eq(compatibilityReferences.partnerAccountId, input.partnerAccountId),
+            eq(compatibilityReferences.role, input.role),
+            inArray(compatibilityReferences.status, ["reserved", "active"]),
+          ),
+        )
+        .get(),
+    );
+  }
+
   activateCompatibilityReference(
     accountId: string,
     input: Readonly<{

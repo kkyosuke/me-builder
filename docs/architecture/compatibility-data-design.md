@@ -126,10 +126,11 @@ stateDiagram-v2
 1. CompatibilityDataからpending招待を読み、送信者と期限を確認する
 2. `packages/lib`の承諾オーケストレーターがAccount IDの辞書順で双方のAccountDataを呼び、送信者の既存`pending`参照と受信者の新規参照を同じ相手の`reserved`へ遷移させる
 3. どちらかの予約が競合または失敗した場合、先に作成した予約を解放して承諾を中止する
-4. CompatibilityDataをcompare-and-setで`accepted`へ更新し、受信者の同意を保存する
-5. 双方のAccountData参照を`active`へ更新する
+4. CompatibilityDataが双方のAccountDataに同じ関係・相手・roleの`reserved`または`active`参照があることを検証する
+5. CompatibilityDataをcompare-and-setで`accepted`へ更新し、受信者の同意を保存する
+6. 双方のAccountData参照を`active`へ更新する
 
-双方を同じ順序で予約することで、AからBとBからAへの招待が同時に承諾されても片方だけを成立させます。同じ入力の再試行は成功済み状態を返します。予約後に失敗した場合は、受信者の一時参照を削除し、送信者参照を`pending`へ戻して再試行可能にします。CompatibilityData更新後に`active`化が失敗した場合は、同じ承諾または一覧取得でprojectionを再同期します。CompatibilityDataの状態を権限判定の正とし、AccountData参照だけで相手の結果を開示しません。
+双方を同じ順序で予約することで、AからBとBからAへの招待が同時に承諾されても片方だけを成立させます。CompatibilityDataの承諾RPC自身も双方の予約を検証し、オーケストレーターを迂回した直接呼び出しではpendingをacceptedへ遷移させません。同じ入力の再試行は成功済み状態を返します。予約RPCの保存後に応答だけ失われた場合を含め、CompatibilityData更新前に失敗したときは今回の関係について双方へ冪等な解放を試み、受信者の一時参照を削除し、送信者参照を`pending`へ戻します。CompatibilityData更新後に`active`化が失敗した場合は、同じ承諾または一覧取得でprojectionを再同期します。CompatibilityDataの状態を権限判定の正とし、AccountData参照だけで相手の結果を開示しません。
 
 AccountDataの一覧RPCは、内部的に`pending`、`reserved`、`active`の参照を取得し、各CompatibilityDataの現在状態を照合します。acceptedになった`reserved`は`active`へ復旧し、CompatibilityDataがまだpendingの`reserved`は進行中の予約として一覧へ出さず保持します。期限切れ、取消済み、終了済みなど正本と一致しない参照は`ended`へ同期して一覧から除外します。同期後に利用者へ返すのは`pending`と`active`だけです。alarmはCompatibilityDataだけを終端化し、別DOへの通知成功を期限切れの成立条件にしません。
 
@@ -150,6 +151,7 @@ AccountDataの一覧RPCは、内部的に`pending`、`reserved`、`active`の参
 - 招待previewへAccount ID、結果指紋、同意時刻を含めない
 - AccountData参照は一覧projectionであり、相性シートの閲覧権限に使わない
 - 承諾前に双方のAccountDataを同じ順序で予約し、同じ2人のaccepted関係を重複作成しない
+- CompatibilityDataは双方の予約を確認できないpending招待の承諾を拒否する
 - 共有終了、回答変更、回答削除後は保存済みの古い比較内容を返さない
 
 ## 8. Migrationと運用

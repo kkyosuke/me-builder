@@ -188,6 +188,20 @@ describe("AccountDataRepository", () => {
     expect(repository.listReconciliableCompatibilityReferences("account-1")).toEqual([
       expect.objectContaining({ relationshipId: "relationship-outgoing", status: "reserved" }),
     ]);
+    expect(
+      repository.hasCompatibilityReservation("account-1", {
+        relationshipId: "relationship-outgoing",
+        partnerAccountId: "account-2",
+        role: "inviter",
+      }),
+    ).toBe(true);
+    expect(
+      repository.hasCompatibilityReservation("account-1", {
+        relationshipId: "relationship-outgoing",
+        partnerAccountId: "account-other",
+        role: "inviter",
+      }),
+    ).toBe(false);
 
     expect(
       repository.releaseCompatibilityReservation("account-1", "relationship-outgoing", at),
@@ -195,6 +209,13 @@ describe("AccountDataRepository", () => {
       outcome: "released",
       reference: { partnerAccountId: null, status: "pending" },
     });
+    expect(
+      repository.hasCompatibilityReservation("account-1", {
+        relationshipId: "relationship-outgoing",
+        partnerAccountId: "account-2",
+        role: "inviter",
+      }),
+    ).toBe(false);
     expect(
       repository.reserveIncomingCompatibilityReference("account-1", {
         relationshipId: "relationship-incoming",

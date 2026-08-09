@@ -1,7 +1,8 @@
 import { DurableObject } from "cloudflare:workers";
-import type {
-  AcceptCompatibilityInvitationInput,
-  CreateCompatibilityInvitationInput,
+import {
+  type AcceptCompatibilityInvitationInput,
+  type CreateCompatibilityInvitationInput,
+  accountDataFor,
 } from "@me-builder/lib";
 import type { Env } from "../types";
 import { CompatibilityDataRepository } from "./repository";
@@ -42,6 +43,26 @@ export class CompatibilityData extends DurableObject<Env> {
 
   async acceptInvitation(relationshipId: string, input: AcceptCompatibilityInvitationInput) {
     this.assertRouting(relationshipId);
+    const context = this.repository.getInvitationAcceptanceContext(new Date());
+    if (context && context.inviterAccountId !== input.inviteeAccountId) {
+      const namespace = this.env.ACCOUNT_DATA;
+      if (!namespace) throw new Error("AccountData binding is required");
+      const inviter = accountDataFor(namespace, context.inviterAccountId);
+      const invitee = accountDataFor(namespace, input.inviteeAccountId);
+      const [inviterReserved, inviteeReserved] = await Promise.all([
+        inviter.execute("compatibility.hasReservation", {
+          relationshipId,
+          partnerAccountId: input.inviteeAccountId,
+          role: "inviter",
+        }),
+        invitee.execute("compatibility.hasReservation", {
+          relationshipId,
+          partnerAccountId: context.inviterAccountId,
+          role: "invitee",
+        }),
+      ]);
+      if (!inviterReserved || !inviteeReserved) return { outcome: "unreserved" as const };
+    }
     const result = this.repository.acceptInvitation(input, new Date());
     if (result.outcome === "accepted" || result.outcome === "unchanged") {
       await this.ctx.storage.deleteAlarm();

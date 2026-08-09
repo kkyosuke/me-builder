@@ -11,11 +11,15 @@ import type { CompatibilityData } from "../compatibility-data";
 describe("CompatibilityData Workers runtime E2E", () => {
   it("関係ごとのSQLiteへ招待と同意を保存し、別名でroutingされたRPCを拒否する", async () => {
     const relationshipId = createCompatibilityRelationshipId();
+    const inviterAccountId = crypto.randomUUID();
+    const inviteeAccountId = crypto.randomUUID();
     const stub = env.COMPATIBILITY_DATA.getByName(relationshipId);
+    const inviter = accountDataFor(env.ACCOUNT_DATA, inviterAccountId);
+    const invitee = accountDataFor(env.ACCOUNT_DATA, inviteeAccountId);
 
     await expect(
       stub.createInvitation(relationshipId, {
-        inviterAccountId: crypto.randomUUID(),
+        inviterAccountId,
         inviterDisplayName: "送信者",
         offeredThemes: [
           {
@@ -37,18 +41,37 @@ describe("CompatibilityData Workers runtime E2E", () => {
     expect(invitation).not.toHaveProperty("inviterAccountId");
     expect(invitation).not.toHaveProperty("resultFingerprint");
 
-    await expect(
-      stub.acceptInvitation(relationshipId, {
-        inviteeAccountId: crypto.randomUUID(),
-        inviteeDisplayName: "受信者",
-        acceptedThemes: [
-          {
-            diagnosisId: "diagnosis-1",
-            resultFingerprint: "b".repeat(64),
-          },
-        ],
-      }),
-    ).resolves.toMatchObject({ outcome: "accepted", relationship: { status: "accepted" } });
+    const acceptance = {
+      inviteeAccountId,
+      inviteeDisplayName: "受信者",
+      acceptedThemes: [
+        {
+          diagnosisId: "diagnosis-1",
+          resultFingerprint: "b".repeat(64),
+        },
+      ],
+    } as const;
+    await expect(stub.acceptInvitation(relationshipId, acceptance)).resolves.toEqual({
+      outcome: "unreserved",
+    });
+    await inviter.execute("compatibility.addOutgoingReference", {
+      relationshipId,
+      createdAt: new Date(),
+    });
+    await inviter.execute("compatibility.reserveOutgoingReference", {
+      relationshipId,
+      partnerAccountId: inviteeAccountId,
+      updatedAt: new Date(),
+    });
+    await invitee.execute("compatibility.reserveIncomingReference", {
+      relationshipId,
+      partnerAccountId: inviterAccountId,
+      createdAt: new Date(),
+    });
+    await expect(stub.acceptInvitation(relationshipId, acceptance)).resolves.toMatchObject({
+      outcome: "accepted",
+      relationship: { status: "accepted" },
+    });
 
     await runInDurableObject(stub, async (instance: CompatibilityData, state) => {
       expect(
@@ -68,6 +91,7 @@ describe("CompatibilityData Workers runtime E2E", () => {
     const inviteeAccountId = crypto.randomUUID();
     const relationship = env.COMPATIBILITY_DATA.getByName(relationshipId);
     const inviter = accountDataFor(env.ACCOUNT_DATA, inviterAccountId);
+    const invitee = accountDataFor(env.ACCOUNT_DATA, inviteeAccountId);
 
     await relationship.createInvitation(relationshipId, {
       inviterAccountId,
@@ -76,6 +100,16 @@ describe("CompatibilityData Workers runtime E2E", () => {
     });
     await inviter.execute("compatibility.addOutgoingReference", {
       relationshipId,
+      createdAt: new Date(),
+    });
+    await inviter.execute("compatibility.reserveOutgoingReference", {
+      relationshipId,
+      partnerAccountId: inviteeAccountId,
+      updatedAt: new Date(),
+    });
+    await invitee.execute("compatibility.reserveIncomingReference", {
+      relationshipId,
+      partnerAccountId: inviterAccountId,
       createdAt: new Date(),
     });
     await relationship.acceptInvitation(relationshipId, {

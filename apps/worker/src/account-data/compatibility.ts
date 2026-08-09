@@ -24,6 +24,15 @@ export const compatibilityActions = {
     relationshipId: string,
     releasedAt: Date,
   ) => repository.releaseCompatibilityReservation(accountId, relationshipId, releasedAt),
+  "compatibility.hasReservation": (
+    repository: AccountDataRepository,
+    accountId: string,
+    input: Readonly<{
+      relationshipId: string;
+      partnerAccountId: string;
+      role: CompatibilityReferenceRole;
+    }>,
+  ) => repository.hasCompatibilityReservation(accountId, input),
   "compatibility.activateReference": (
     repository: AccountDataRepository,
     accountId: string,

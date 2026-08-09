@@ -39,6 +39,13 @@ export type AccountDataActions = {
     relationshipId: string,
     releasedAt: Date,
   ) => Promise<ReleaseCompatibilityReservationResult>;
+  "compatibility.hasReservation": (
+    input: Readonly<{
+      relationshipId: string;
+      partnerAccountId: string;
+      role: CompatibilityReferenceRole;
+    }>,
+  ) => Promise<boolean>;
   "compatibility.activateReference": (
     input: Readonly<{
       relationshipId: string;

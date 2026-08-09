@@ -82,7 +82,7 @@ export type AcceptCompatibilityInvitationResult =
       relationship: CompatibilityRelationship;
     }>
   | Readonly<{
-      outcome: "self-invite" | "expired" | "unavailable" | "invalid-themes";
+      outcome: "self-invite" | "expired" | "unavailable" | "invalid-themes" | "unreserved";
     }>;
 
 export type CancelCompatibilityInvitationResult =

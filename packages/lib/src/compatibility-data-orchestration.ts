@@ -126,18 +126,16 @@ export async function acceptCompatibilityInvitationWithReferences(
     input.inviteeAccountId,
     at,
   );
-  const completed: ReservationStep[] = [];
   try {
     for (const step of steps) {
       const reservation = await step.reserve();
       if (reservation.outcome === "conflict") {
-        await releaseReservations(completed);
+        await releaseReservations(steps);
         return { outcome: "duplicate" };
       }
-      completed.push(step);
     }
   } catch (error) {
-    await releaseReservations(completed);
+    await releaseReservations(steps);
     throw error;
   }
 
