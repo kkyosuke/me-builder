@@ -1,7 +1,7 @@
 /**
  * OpenAPI documentとSwagger UI用パスをCloudflare Accessで保護します。
  *
- *   node --import tsx scripts/setup-api-docs-access.ts <preview|production>
+ *   bun scripts/setup-api-docs-access.ts <preview|production>
  *
  * 必要な環境変数:
  *   - CLOUDFLARE_ACCOUNT_ID
@@ -155,8 +155,15 @@ function createApiClient(accountId: string, apiToken: string, fetchImpl: typeof 
         })
         .filter(Boolean)
         .join(", ");
+      const method = init?.method ?? "GET";
+      const accessSetupHint =
+        method === "POST" &&
+        path === "/access/apps" &&
+        issues.some((issue) => String(issue.code) === "1010")
+          ? " Verify that the account's Zero Trust organization is initialized and the API token has Access: Apps and Policies Write."
+          : "";
       throw new Error(
-        `Cloudflare API ${init?.method ?? "GET"} ${path} failed (${detail || response.status})`,
+        `Cloudflare API ${method} ${path} failed (${detail || response.status}).${accessSetupHint}`,
       );
     }
 
@@ -266,14 +273,6 @@ async function main(): Promise<void> {
   });
 }
 
-const entryPoint = process.argv[1];
-if (
-  import.meta.main ||
-  (entryPoint !== undefined &&
-    new URL(import.meta.url).pathname === new URL(entryPoint, "file:").pathname)
-) {
-  main().catch((error: unknown) => {
-    console.error(error);
-    process.exitCode = 1;
-  });
+if (import.meta.main) {
+  await main();
 }

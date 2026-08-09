@@ -89,12 +89,12 @@ tasks:
   access:setup:preview:
     desc: 'Protect preview OpenAPI and Swagger UI routes with Cloudflare Access'
     cmds:
-      - node --import tsx scripts/setup-api-docs-access.ts preview
+      - bun scripts/setup-api-docs-access.ts preview
 
   access:setup:production:
     desc: 'Protect production OpenAPI and Swagger UI routes with Cloudflare Access'
     cmds:
-      - node --import tsx scripts/setup-api-docs-access.ts production
+      - bun scripts/setup-api-docs-access.ts production
 
   line:rich-menu:preview:
     desc: 'Register the preview LINE rich menu as the default'

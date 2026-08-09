@@ -175,6 +175,8 @@ describe("setup-api-docs-access", () => {
         allowedEmails: ["dev@example.com"],
         fetch: fetchMock,
       }),
-    ).rejects.toThrow("Cloudflare API POST /access/apps failed (1010)");
+    ).rejects.toThrow(
+      "Cloudflare API POST /access/apps failed (1010). Verify that the account's Zero Trust organization is initialized",
+    );
   });
 });
