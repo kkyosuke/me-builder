@@ -249,7 +249,7 @@ Source Record本文はモデルへの入力には含めますが、モデルの�
 
 ### 7.2 AIの候補出力
 
-完成形では、AIは返信本文とは別に1Turn最大3件の候補を提案します。現在の実装は安全な最初の縦切りとして、本人が明示した出来事を表す`Memory`を最大1件、`is_inference = false`の場合だけ受け付けます。
+AIは返信本文とは別に、本人が明示した出来事を表す`Memory`を1Turn最大3件提案します。現在の実装では`is_inference = false`の候補だけを受け付けます。上限は1 Turnの構造化出力と保存負荷を制限するための安全弁であり、1件に固定するドメイン上の理由はありません。
 
 ```json
 {
@@ -363,22 +363,23 @@ AIの意味的重複判定だけで既存Itemを上書きしません。同義�
 日記チャットで実装済みの範囲:
 
 - `brain_item_candidates`を含むAI出力schema
-- 通常安全route、`Memory`、非推定、1Turn最大1件への制限
+- 通常安全route、`Memory`、非推定、1Turn最大3件への制限
 - 候補のAccount・現在Turn・Evidence・安全性検証
 - assistant応答と候補を一括保存するAccountData action
 - Brain ItemとAccess LabelからConfirmationを除くschema migrationと既存projectionの追従
 - 再配送時にassistant応答とBrain Itemを重複作成しない冪等性
+- dev / development / local環境の返信に、追加対象のItemとEvidence message IDを表示
 
 次は未実装です。
 
 - 提示したItemと否定・修正操作の対応づけ
 - 否定による無効化、修正、改訂
 - 既存Brain Itemとの重複判定とEvidence追加
-- AI解釈を伴う分類と1Turn複数Item
+- AI解釈を伴う分類
 - LINE配送の恒久失敗に伴うItemの無効化
 - active ItemのVectorize同期と日記助言への利用
 
-最初の縦切りとして、1つのTurnからMemoryを最大1件生成し、Evidence付きで保存するところまでを実装しています。次にVectorize同期と否定による無効化を通し、その後、AI解釈を伴う分類、複数Item、修正、重複統合の順に広げます。
+最初の縦切りとして、1つのTurnからMemoryを最大3件生成し、Evidence付きで保存するところまでを実装しています。次にVectorize同期と否定による無効化を通し、その後、AI解釈を伴う分類、修正、重複統合の順に広げます。
 
 ## 10. 後続で決めること
 

@@ -2,7 +2,7 @@ import { accountDataFor } from "@me-builder/lib";
 import type { ChatTurnQueueMessage, Message } from "@me-builder/shared";
 import { logger } from "@me-builder/shared";
 import type { CloudflareBindings, WorkerConfig } from "../config";
-import { generateDiaryChatResponse } from "../logic/diary-chat";
+import { appendDevelopmentBrainItemSummary, generateDiaryChatResponse } from "../logic/diary-chat";
 import {
   DEFAULT_DIARY_CHAT_PROMPT_OPTIONS,
   getDiaryChatConversationGuidance,
@@ -153,7 +153,7 @@ export async function processChatTurnMessage(
       ? {
           reply: pendingResponse.body,
           endSession: pendingResponse.endSession,
-          brainItemCandidate: undefined,
+          brainItemCandidates: undefined,
         }
       : await generateDiaryChatResponse(context.messages, workerConfig, controller.signal, {
           currentUserMessageIds: context.currentUserMessageIds,
@@ -161,16 +161,21 @@ export async function processChatTurnMessage(
             objective: DEFAULT_DIARY_CHAT_PROMPT_OPTIONS.objective,
             conversationGuidance: getDiaryChatConversationGuidance(context.conversationPolicyId),
           },
-        }).then((generated) => ({
-          reply: generated.reply,
-          endSession: generated.end_session,
-          brainItemCandidate: generated.brain_item_candidates[0]
-            ? {
-                statement: generated.brain_item_candidates[0].statement,
-                sourceMessageIds: generated.brain_item_candidates[0].source_message_ids,
-              }
-            : undefined,
-        }));
+        }).then((generated) => {
+          const brainItemCandidates = generated.brain_item_candidates.map((candidate) => ({
+            statement: candidate.statement,
+            sourceMessageIds: candidate.source_message_ids,
+          }));
+          return {
+            reply: appendDevelopmentBrainItemSummary(
+              generated.reply,
+              generated.brain_item_candidates,
+              workerConfig.environment,
+            ),
+            endSession: generated.end_session,
+            brainItemCandidates,
+          };
+        });
     if (!pendingResponse) {
       const leaseIsActive = await coordinator.isGenerationLeaseActive(
         message.body.turnId,
@@ -182,7 +187,9 @@ export async function processChatTurnMessage(
         turnId: message.body.turnId,
         body: response.reply,
         endSession: response.endSession,
-        ...(response.brainItemCandidate ? { brainItemCandidate: response.brainItemCandidate } : {}),
+        ...(response.brainItemCandidates
+          ? { brainItemCandidates: response.brainItemCandidates }
+          : {}),
       });
     }
     if (!(await accountData.execute("conversation.isTurnSessionActive", message.body.turnId))) {

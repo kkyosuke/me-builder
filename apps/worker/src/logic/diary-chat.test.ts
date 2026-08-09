@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  appendDevelopmentBrainItemSummary,
   buildSafetyFallback,
   classifySafety,
   stricterSafetyRoute,
@@ -66,6 +67,26 @@ describe("diary chat guardrails", () => {
 
     expect(validateDiaryChatResponse(raw, "normal", ["message-1"])?.brain_item_candidates).toEqual(
       [],
+    );
+  });
+
+  it("development環境では追加対象を返信へ表示する", () => {
+    expect(
+      appendDevelopmentBrainItemSummary(
+        "受け取ったよ。",
+        [
+          {
+            category: "memory",
+            statement: "公園を散歩した",
+            source_message_ids: ["message-1"],
+            is_inference: false,
+          },
+        ],
+        "development",
+      ),
+    ).toContain("[dev] 追加したBrain Item\n- 1. Memory: 公園を散歩した");
+    expect(appendDevelopmentBrainItemSummary("受け取ったよ。", [], "production")).toBe(
+      "受け取ったよ。",
     );
   });
 

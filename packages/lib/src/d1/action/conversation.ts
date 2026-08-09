@@ -2,13 +2,16 @@ import { and, desc, eq, gte, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import type { D1Client } from "../client";
 import {
+  brainItemAccessLabels,
+  brainItemEvidenceEdges,
+  brainItemTopicLabels,
+  brainItems,
   chatTurns,
   conversationMessages,
   conversationSessions,
   sourceRecordTextPayloads,
   sourceRecords,
 } from "../schema";
-import { saveBrainItem } from "./brain";
 
 const SESSION_INACTIVITY_MS = 6 * 60 * 60 * 1000;
 const SESSION_HARD_CAP_MS = 24 * 60 * 60 * 1000;
@@ -495,10 +498,10 @@ export async function saveAssistantResponse(
     turnId: string;
     body: string;
     endSession: boolean;
-    brainItemCandidate?: {
+    brainItemCandidates?: readonly {
       statement: string;
       sourceMessageIds: readonly string[];
-    };
+    }[];
   },
 ): Promise<string> {
   const turn = await db
@@ -550,93 +553,100 @@ export async function saveAssistantResponse(
       .where(eq(chatTurns.id, input.turnId)),
   ];
 
-  const candidate = input.brainItemCandidate;
-  const uniqueSourceMessageIds = candidate ? [...new Set(candidate.sourceMessageIds)] : [];
-  const sourceMessages =
-    candidate?.statement.trim() &&
-    uniqueSourceMessageIds.length > 0 &&
-    uniqueSourceMessageIds.length === candidate.sourceMessageIds.length
-      ? await db
-          .select({
-            messageId: conversationMessages.id,
-            sourceRecordId: sourceRecords.id,
-            sourceCreatedAt: sourceRecords.createdAt,
-          })
-          .from(conversationMessages)
-          .innerJoin(sourceRecords, eq(conversationMessages.sourceRecordId, sourceRecords.id))
-          .where(
-            and(
-              eq(conversationMessages.sessionId, turn.sessionId),
-              eq(conversationMessages.role, "user"),
-              inArray(conversationMessages.id, uniqueSourceMessageIds),
-              gte(conversationMessages.sequence, turn.fromSequence),
-              lte(conversationMessages.sequence, turn.throughSequence),
-              eq(conversationMessages.isDeleted, false),
-              eq(sourceRecords.accountId, session.accountId),
-              eq(sourceRecords.isDeleted, false),
-            ),
-          )
-          .all()
-      : [];
-
-  if (candidate && sourceMessages.length === uniqueSourceMessageIds.length) {
-    const brainItemId = crypto.randomUUID();
-    const validFrom = new Date(
-      Math.min(...sourceMessages.map(({ sourceCreatedAt }) => sourceCreatedAt.getTime())),
-    );
-    const result = await saveBrainItem(
-      db,
-      {
-        at: now,
-        item: {
-          id: brainItemId,
-          accountId: session.accountId,
-          category: "memory",
-          statement: candidate.statement.trim(),
-          attributes: {
-            sourceKind: "diary",
-            sessionId: session.id,
-            turnId: input.turnId,
-            responseMessageId: messageId,
-            promptVersion: turn.promptVersion,
-            model: turn.model,
-            isInference: false,
-          },
-          derivation: "ai",
-          status: "active",
-          validFrom,
-          stability: "stable",
-          sensitivity: "normal",
-          externallyShareable: false,
-          confidence: { state: "uncomputed" },
-        },
-        evidence: sourceMessages.map(({ sourceRecordId }) => ({
-          id: crypto.randomUUID(),
-          sourceRecordId,
-          relation: "supports" as const,
-          isDerivationTrigger: true,
-          derivationMethod: "ai" as const,
-          generatedAt: now,
-        })),
-        accessLabels: [
-          {
-            id: crypto.randomUUID(),
-            label: "unclassified",
-            assignedBy: "system",
-          },
-        ],
-        topicLabels: [{ id: crypto.randomUUID(), label: "diary" }],
-      },
-      responseStatements,
-    );
-    if (result.type !== "saved") {
-      throw new Error(`Diary Brain Itemを保存できません: ${result.type}`);
+  const candidateStatements: BatchItem<"sqlite">[] = [];
+  for (const candidate of (input.brainItemCandidates ?? []).slice(0, 3)) {
+    const uniqueSourceMessageIds = [...new Set(candidate.sourceMessageIds)];
+    if (
+      !candidate.statement.trim() ||
+      uniqueSourceMessageIds.length === 0 ||
+      uniqueSourceMessageIds.length !== candidate.sourceMessageIds.length
+    ) {
+      continue;
     }
-  } else {
-    const [firstStatement, ...remainingStatements] = responseStatements;
-    if (!firstStatement) throw new Error("Assistant response did not produce any D1 writes");
-    await db.batch([firstStatement, ...remainingStatements]);
+    const sourceMessages = await db
+      .select({
+        sourceRecordId: sourceRecords.id,
+        sourceCreatedAt: sourceRecords.createdAt,
+      })
+      .from(conversationMessages)
+      .innerJoin(sourceRecords, eq(conversationMessages.sourceRecordId, sourceRecords.id))
+      .where(
+        and(
+          eq(conversationMessages.sessionId, turn.sessionId),
+          eq(conversationMessages.role, "user"),
+          inArray(conversationMessages.id, uniqueSourceMessageIds),
+          gte(conversationMessages.sequence, turn.fromSequence),
+          lte(conversationMessages.sequence, turn.throughSequence),
+          eq(conversationMessages.isDeleted, false),
+          eq(sourceRecords.accountId, session.accountId),
+          eq(sourceRecords.isDeleted, false),
+        ),
+      )
+      .all();
+    if (sourceMessages.length !== uniqueSourceMessageIds.length) continue;
+
+    const brainItemId = crypto.randomUUID();
+    const lifecycle = { createdAt: now, updatedAt: now };
+    candidateStatements.push(
+      db.insert(brainItems).values({
+        id: brainItemId,
+        accountId: session.accountId,
+        category: "memory",
+        statement: candidate.statement.trim(),
+        attributes: {
+          sourceKind: "diary",
+          sessionId: session.id,
+          turnId: input.turnId,
+          responseMessageId: messageId,
+          promptVersion: turn.promptVersion,
+          model: turn.model,
+          isInference: false,
+        },
+        derivation: "ai",
+        status: "active",
+        validFrom: new Date(
+          Math.min(...sourceMessages.map(({ sourceCreatedAt }) => sourceCreatedAt.getTime())),
+        ),
+        stability: "stable",
+        sensitivity: "normal",
+        externallyShareable: false,
+        confidence: { state: "uncomputed" },
+        ...lifecycle,
+      }),
+      ...sourceMessages.map(({ sourceRecordId }) =>
+        db.insert(brainItemEvidenceEdges).values({
+          id: crypto.randomUUID(),
+          accountId: session.accountId,
+          brainItemId,
+          sourceRecordId,
+          relation: "supports",
+          isDerivationTrigger: true,
+          derivationMethod: "ai",
+          generatedAt: now,
+          ...lifecycle,
+        }),
+      ),
+      db.insert(brainItemAccessLabels).values({
+        id: crypto.randomUUID(),
+        accountId: session.accountId,
+        brainItemId,
+        label: "unclassified",
+        assignedBy: "system",
+        ...lifecycle,
+      }),
+      db.insert(brainItemTopicLabels).values({
+        id: crypto.randomUUID(),
+        accountId: session.accountId,
+        brainItemId,
+        label: "diary",
+        ...lifecycle,
+      }),
+    );
   }
+  const statements = [...candidateStatements, ...responseStatements];
+  const [firstStatement, ...remainingStatements] = statements;
+  if (!firstStatement) throw new Error("Assistant response did not produce any D1 writes");
+  await db.batch([firstStatement, ...remainingStatements]);
   return messageId;
 }
 

@@ -37,7 +37,7 @@ const DiaryChatResponseSchema = v.strictObject({
     route: SafetyRouteSchema,
     restricted_advice: v.boolean(),
   }),
-  brain_item_candidates: v.optional(v.pipe(v.array(BrainItemCandidateSchema), v.maxLength(1)), []),
+  brain_item_candidates: v.optional(v.pipe(v.array(BrainItemCandidateSchema), v.maxLength(3)), []),
 });
 
 export type DiaryChatResponse = v.InferOutput<typeof DiaryChatResponseSchema>;
@@ -137,6 +137,25 @@ export function buildSafetyFallback(route: SafetyRoute): DiaryChatResponse {
     safety: { route, restricted_advice: route !== "normal" },
     brain_item_candidates: [],
   };
+}
+
+/** ローカル開発時だけ、保存対象のBrain Itemを会話上で確認できるようにする。 */
+export function appendDevelopmentBrainItemSummary(
+  reply: string,
+  candidates: readonly v.InferOutput<typeof BrainItemCandidateSchema>[],
+  environment: string,
+): string {
+  if (!["dev", "development", "local"].includes(environment)) return reply;
+  const summary =
+    candidates.length === 0
+      ? "- 追加なし"
+      : candidates
+          .map(
+            (candidate, index) =>
+              `- ${index + 1}. Memory: ${candidate.statement} (evidence: ${candidate.source_message_ids.join(", ")})`,
+          )
+          .join("\n");
+  return `${reply}\n\n[dev] 追加したBrain Item\n${summary}`;
 }
 
 export async function generateDiaryChatResponse(

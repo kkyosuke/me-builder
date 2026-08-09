@@ -97,10 +97,16 @@ describe("Diary conversation persistence flow", () => {
       turnId: attached.turnId,
       body: "疲れている中でも散歩できたことを記録したよ。今は少し休めそう？",
       endSession: true,
-      brainItemCandidate: {
-        statement: "疲れていたが散歩できた",
-        sourceMessageIds: context?.currentUserMessageIds ?? [],
-      },
+      brainItemCandidates: [
+        {
+          statement: "少し疲れていた",
+          sourceMessageIds: context?.currentUserMessageIds.slice(0, 1) ?? [],
+        },
+        {
+          statement: "散歩できた",
+          sourceMessageIds: context?.currentUserMessageIds.slice(1, 2) ?? [],
+        },
+      ],
     });
     await expect(
       saveAssistantResponse(db, {
@@ -113,19 +119,27 @@ describe("Diary conversation persistence flow", () => {
       body: "疲れている中でも散歩できたことを記録したよ。今は少し休めそう？",
       endSession: true,
     });
-    await expect(db.select().from(schema.brainItems)).resolves.toEqual([
-      expect.objectContaining({
-        accountId: account.id,
-        category: "memory",
-        statement: "疲れていたが散歩できた",
-        derivation: "ai",
-        status: "active",
-      }),
-    ]);
+    await expect(db.select().from(schema.brainItems)).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          accountId: account.id,
+          category: "memory",
+          statement: "少し疲れていた",
+          derivation: "ai",
+          status: "active",
+        }),
+        expect.objectContaining({
+          accountId: account.id,
+          category: "memory",
+          statement: "散歩できた",
+          derivation: "ai",
+          status: "active",
+        }),
+      ]),
+    );
+    await expect(db.select().from(schema.brainItems)).resolves.toHaveLength(2);
     await expect(db.select().from(schema.brainItemEvidenceEdges)).resolves.toHaveLength(2);
-    await expect(db.select().from(schema.brainItemAccessLabels)).resolves.toEqual([
-      expect.objectContaining({ label: "unclassified", assignedBy: "system" }),
-    ]);
+    await expect(db.select().from(schema.brainItemAccessLabels)).resolves.toHaveLength(2);
     await expect(markTurnDelivered(db, attached.turnId)).resolves.toBe(true);
     await expect(markTurnFailed(db, attached.turnId, "stale_delivery_failure")).resolves.toBe(
       false,
