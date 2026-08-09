@@ -28,17 +28,14 @@ describe("Compatibility flow", () => {
     expect(screen.queryByText("返事待ち")).toBeNull();
   });
 
-  it("共有テーマを確認してから招待リンクを発行する", async () => {
+  it("振る舞い・考え方をすべて共有し、詳細は共有せずに招待リンクを発行する", async () => {
     render(<CompatibilityShareScreen person={me} />);
 
-    expect(screen.getByRole("heading", { name: "私について" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "共有する振る舞い・考え方" })).toBeTruthy();
+    expect(screen.getByText("3件すべて共有")).toBeTruthy();
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    expect(screen.getByText(/日記やLINEの会話から得た記憶/)).toBeTruthy();
     const issueButton = screen.getByRole("button", { name: "招待リンクを発行" });
-    for (const checkbox of screen.getAllByRole("checkbox")) fireEvent.click(checkbox);
-    expect((issueButton as HTMLButtonElement).disabled).toBe(true);
-    expect(screen.getByText("共有するテーマを1つ以上選んでください。")).toBeTruthy();
-
-    fireEvent.click(screen.getByRole("checkbox", { name: /予定の立て方/ }));
-    expect((issueButton as HTMLButtonElement).disabled).toBe(false);
     fireEvent.click(issueButton);
 
     expect(screen.getByText("招待リンクを発行しました")).toBeTruthy();
@@ -47,11 +44,14 @@ describe("Compatibility flow", () => {
     expect(await screen.findByRole("button", { name: "コピーしました" })).toBeTruthy();
   });
 
-  it("受信者が自分の共有内容を選んで明示的に承諾する", () => {
+  it("受信者が自分の共有内容と共有されない詳細を確認して承諾する", () => {
     render(<CompatibilityInvitationScreen inviter={aoi} recipient={me} />);
 
     expect(screen.getByText("あおいさんから招待が届いています")).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "私について" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "共有する振る舞い・考え方" })).toBeTruthy();
+    expect(screen.getByText("3件すべて共有")).toBeTruthy();
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    expect(screen.getByText(/日記や会話から得た記憶/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "相性を見てみる" }));
 
     expect(
@@ -64,8 +64,9 @@ describe("Compatibility flow", () => {
     render(<CompatibilityResultScreen me={me} partner={aoi} />);
 
     expect(screen.getByRole("heading", { name: "2人の相性シート" })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "わたしについて" })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "あおいさんについて" })).toBeTruthy();
+    expect(
+      screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent),
+    ).toEqual(["あおいさんについて", "わたしについて"]);
 
     fireEvent.click(screen.getByRole("tab", { name: "2人について" }));
     expect(screen.getByRole("heading", { name: "一緒に大切にできそうなこと" })).toBeTruthy();

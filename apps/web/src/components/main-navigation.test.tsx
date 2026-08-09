@@ -21,6 +21,12 @@ describe("MainNavigation", () => {
   it("移動先へポインターまたはフォーカスを向けた時だけ先読みする", () => {
     render(<MainNavigation current="me" />);
 
+    expect(screen.getAllByRole("link").map((link) => link.textContent)).toEqual([
+      "わたし",
+      "診断",
+      "相性",
+    ]);
+
     fireEvent.pointerEnter(screen.getByRole("link", { name: "わたし" }));
     expect(mocks.preloadMainApplication).not.toHaveBeenCalled();
 

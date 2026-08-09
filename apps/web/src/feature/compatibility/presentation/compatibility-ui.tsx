@@ -1,5 +1,4 @@
 import { ArrowLeft } from "lucide-react";
-import { Check } from "lucide-react";
 import type { CompatibilityPerson, CompatibilityTheme } from "../model/compatibility";
 
 export function CompatibilityAvatar({
@@ -53,40 +52,14 @@ export function DemoNotice() {
   );
 }
 
-export function ThemeSelectionCard({
-  theme,
-  selected,
-  onChange,
-}: {
-  theme: CompatibilityTheme;
-  selected: boolean;
-  onChange: (selected: boolean) => void;
-}) {
+export function ThemePreviewCard({ theme }: { theme: CompatibilityTheme }) {
   return (
-    <label
-      className={`block cursor-pointer rounded-2xl border p-4 transition-colors ${
-        selected
-          ? "border-rose-300 bg-rose-50 dark:border-rose-700 dark:bg-rose-950/30"
-          : "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800"
-      }`}
-    >
+    <article className="rounded-2xl border border-rose-300 bg-rose-50 p-4 dark:border-rose-700 dark:bg-rose-950/30">
       <span className="flex items-start gap-3">
-        <input
-          type="checkbox"
-          checked={selected}
-          onChange={(event) => onChange(event.target.checked)}
-          className="sr-only"
-        />
         <span
           aria-hidden="true"
-          className={`mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-lg border ${
-            selected
-              ? "border-rose-500 bg-rose-500 text-white"
-              : "border-slate-300 text-transparent dark:border-slate-600"
-          }`}
-        >
-          <Check className="size-4" />
-        </span>
+          className="mt-2 block size-2 shrink-0 rounded-full bg-rose-500 shadow-[0_0_0_4px_rgba(244,63,94,0.12)]"
+        />
         <span className="min-w-0">
           <span className="block font-bold text-slate-950 dark:text-slate-50">{theme.title}</span>
           <span className="mt-1 block text-sm leading-relaxed text-slate-700 dark:text-slate-300">
@@ -105,6 +78,6 @@ export function ThemeSelectionCard({
           </span>
         </span>
       </span>
-    </label>
+    </article>
   );
 }

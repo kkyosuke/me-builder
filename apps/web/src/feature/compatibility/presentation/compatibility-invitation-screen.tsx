@@ -5,7 +5,7 @@ import {
   CompatibilityAvatar,
   CompatibilityBackHeader,
   DemoNotice,
-  ThemeSelectionCard,
+  ThemePreviewCard,
 } from "./compatibility-ui";
 
 export function CompatibilityInvitationScreen({
@@ -15,9 +15,6 @@ export function CompatibilityInvitationScreen({
   inviter: CompatibilityPerson;
   recipient: CompatibilityPerson;
 }) {
-  const [selectedThemeIds, setSelectedThemeIds] = useState(() =>
-    recipient.themes.map((theme) => theme.id),
-  );
   const [accepted, setAccepted] = useState(false);
 
   if (accepted) {
@@ -28,10 +25,10 @@ export function CompatibilityInvitationScreen({
             <CheckCircle2 className="size-8" aria-hidden="true" />
           </span>
           <h1 className="mt-5 text-2xl font-bold text-slate-950 dark:text-slate-50">
-            あおいさんとの相性シートを作りました
+            {inviter.name}さんとの相性シートを作りました
           </h1>
           <p className="mt-3 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-            選んだテーマの範囲で、2人の共通点や違いを見てみましょう。
+            共有された振る舞い・考え方から、2人の共通点や違いを見てみましょう。
           </p>
           <a
             href="/compatibility/demo"
@@ -46,7 +43,6 @@ export function CompatibilityInvitationScreen({
     );
   }
 
-  const selectedCount = selectedThemeIds.length;
   return (
     <main className="mx-auto min-h-dvh w-full max-w-2xl px-4 py-6 pb-12 sm:px-8">
       <CompatibilityBackHeader href="/compatibility" label="閉じる" />
@@ -59,7 +55,7 @@ export function CompatibilityInvitationScreen({
           </span>
         </div>
         <p className="mt-5 text-sm font-semibold text-violet-700 dark:text-violet-300">
-          あおいさんから招待が届いています
+          {inviter.name}さんから招待が届いています
         </p>
         <h1 className="mt-1 text-2xl font-bold text-slate-950 dark:text-slate-50">
           2人の相性を見てみませんか？
@@ -74,36 +70,25 @@ export function CompatibilityInvitationScreen({
           <div>
             <p className="flex items-center gap-1.5 text-xs font-bold text-slate-500">
               <UserCheck className="size-4" aria-hidden="true" />
-              あおいさんに見える内容
+              {inviter.name}さんに見える内容
             </p>
             <h2
               id="recipient-preview-heading"
               className="mt-1 text-xl font-bold text-slate-950 dark:text-slate-50"
             >
-              私について
+              共有する振る舞い・考え方
             </h2>
           </div>
           <span className="text-sm font-bold text-rose-700 dark:text-rose-300">
-            {selectedCount}件を共有
+            {recipient.themes.length}件すべて共有
           </span>
         </div>
         <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-          共有したくないテーマは外せます。あおいさんも同じように内容を確認済みです。
+          診断から見える傾向をすべて共有します。{inviter.name}さんも同じ範囲を確認済みです。
         </p>
         <div className="mt-4 space-y-3">
           {recipient.themes.map((theme) => (
-            <ThemeSelectionCard
-              key={theme.id}
-              theme={theme}
-              selected={selectedThemeIds.includes(theme.id)}
-              onChange={(selected) =>
-                setSelectedThemeIds((current) =>
-                  selected
-                    ? [...current, theme.id]
-                    : current.filter((themeId) => themeId !== theme.id),
-                )
-              }
-            />
+            <ThemePreviewCard key={theme.id} theme={theme} />
           ))}
         </div>
       </section>
@@ -114,24 +99,18 @@ export function CompatibilityInvitationScreen({
           承諾する前に
         </h2>
         <p className="mt-2 text-sm leading-relaxed text-emerald-900 dark:text-emerald-200">
-          生の回答、日記、自由記述は共有されません。承諾すると双方の相性一覧へ追加され、共有はどちらからでも終了できます。
+          具体的な回答、日記や会話から得た記憶、自由記述は共有されません。承諾すると双方の相性一覧へ追加され、共有はどちらからでも終了できます。
         </p>
       </section>
 
       <button
         type="button"
-        disabled={selectedCount === 0}
         onClick={() => setAccepted(true)}
-        className="mt-8 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-rose-400 px-5 py-3 font-bold text-rose-950 shadow-lg shadow-rose-500/20 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 disabled:shadow-none dark:disabled:bg-slate-700"
+        className="mt-8 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-rose-400 px-5 py-3 font-bold text-rose-950 shadow-lg shadow-rose-500/20"
       >
         <HeartHandshake className="size-5" aria-hidden="true" />
         相性を見てみる
       </button>
-      {selectedCount === 0 && (
-        <p className="mt-3 text-center text-sm font-semibold text-red-700 dark:text-red-300">
-          共有するテーマを1つ以上選んでください。
-        </p>
-      )}
       <a
         href="/compatibility"
         className="mt-3 flex min-h-11 items-center justify-center text-sm font-bold text-slate-500"

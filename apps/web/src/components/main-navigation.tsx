@@ -4,9 +4,9 @@ import { preloadMainApplication } from "../routes";
 type MainNavigationItem = "compatibility" | "diagnosis" | "me";
 
 const items = [
+  { id: "me", href: "/me", label: "わたし", icon: Brain },
   { id: "diagnosis", href: "/diagnosis", label: "診断", icon: CalendarDays },
   { id: "compatibility", href: "/compatibility", label: "相性", icon: HeartHandshake },
-  { id: "me", href: "/me", label: "わたし", icon: Brain },
 ] as const;
 
 /** 一般利用者向けルート画面で、同じ位置と順序を保つ主ナビゲーション。 */

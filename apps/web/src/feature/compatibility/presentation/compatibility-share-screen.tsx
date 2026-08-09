@@ -6,24 +6,13 @@ import {
   CompatibilityAvatar,
   CompatibilityBackHeader,
   DemoNotice,
-  ThemeSelectionCard,
+  ThemePreviewCard,
 } from "./compatibility-ui";
 
 type ShareState = "editing" | "issued" | "copied";
 
 export function CompatibilityShareScreen({ person }: { person: CompatibilityPerson }) {
-  const [selectedThemeIds, setSelectedThemeIds] = useState(() =>
-    person.themes.map((theme) => theme.id),
-  );
   const [shareState, setShareState] = useState<ShareState>("editing");
-  const selectedThemes = person.themes.filter((theme) => selectedThemeIds.includes(theme.id));
-
-  const toggleTheme = (themeId: string, selected: boolean) => {
-    setShareState("editing");
-    setSelectedThemeIds((current) =>
-      selected ? [...current, themeId] : current.filter((id) => id !== themeId),
-    );
-  };
 
   const copyLink = async () => {
     await navigator.clipboard?.writeText(demoInvitationUrl).catch(() => undefined);
@@ -45,32 +34,27 @@ export function CompatibilityShareScreen({ person }: { person: CompatibilityPers
         </div>
       </div>
       <p className="mt-4 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-        相手に見せる「私について」を確認してから、1人用の招待リンクを発行します。
+        診断から見える振る舞い・考え方の傾向をすべて共有します。相手に見える内容を確認してから、1人用の招待リンクを発行します。
       </p>
 
       <section aria-labelledby="themes-heading" className="mt-8">
         <div className="flex items-end justify-between gap-3">
           <div>
-            <p className="text-xs font-bold text-slate-500">相手に見える内容</p>
+            <p className="text-xs font-bold text-slate-500">相手に見える「私について」</p>
             <h2
               id="themes-heading"
               className="mt-1 text-xl font-bold text-slate-950 dark:text-slate-50"
             >
-              私について
+              共有する振る舞い・考え方
             </h2>
           </div>
           <span className="text-sm font-bold text-rose-700 dark:text-rose-300">
-            {selectedThemes.length}件を共有
+            {person.themes.length}件すべて共有
           </span>
         </div>
         <div className="mt-4 space-y-3">
           {person.themes.map((theme) => (
-            <ThemeSelectionCard
-              key={theme.id}
-              theme={theme}
-              selected={selectedThemeIds.includes(theme.id)}
-              onChange={(selected) => toggleTheme(theme.id, selected)}
-            />
+            <ThemePreviewCard key={theme.id} theme={theme} />
           ))}
         </div>
       </section>
@@ -78,17 +62,17 @@ export function CompatibilityShareScreen({ person }: { person: CompatibilityPers
       <section className="mt-8 rounded-3xl border border-emerald-300/40 bg-emerald-50 p-5 dark:border-emerald-700/40 dark:bg-emerald-950/30">
         <h2 className="flex items-center gap-2 font-bold text-emerald-950 dark:text-emerald-100">
           <ShieldCheck className="size-5" aria-hidden="true" />
-          共有されないもの
+          共有されない詳細
         </h2>
         <ul className="mt-3 space-y-2 text-sm leading-relaxed text-emerald-900 dark:text-emerald-200">
           <li className="flex gap-2">
-            <span aria-hidden="true">・</span>診断で選んだ生の回答
+            <span aria-hidden="true">・</span>診断で選んだ具体的な回答
           </li>
           <li className="flex gap-2">
-            <span aria-hidden="true">・</span>日記やLINEで話した内容
+            <span aria-hidden="true">・</span>日記やLINEの会話から得た記憶
           </li>
           <li className="flex gap-2">
-            <span aria-hidden="true">・</span>ここで選んでいないテーマ
+            <span aria-hidden="true">・</span>自由記述や会話そのものの内容
           </li>
         </ul>
         <p className="mt-4 flex items-start gap-2 border-t border-emerald-300/40 pt-4 text-xs leading-relaxed text-emerald-800 dark:text-emerald-300">
@@ -100,9 +84,8 @@ export function CompatibilityShareScreen({ person }: { person: CompatibilityPers
       {shareState === "editing" ? (
         <button
           type="button"
-          disabled={selectedThemes.length === 0}
           onClick={() => setShareState("issued")}
-          className="mt-8 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-rose-400 px-5 py-3 font-bold text-rose-950 shadow-lg shadow-rose-500/20 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 disabled:shadow-none dark:disabled:bg-slate-700"
+          className="mt-8 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-rose-400 px-5 py-3 font-bold text-rose-950 shadow-lg shadow-rose-500/20"
         >
           <Send className="size-5" aria-hidden="true" />
           招待リンクを発行
@@ -147,11 +130,6 @@ export function CompatibilityShareScreen({ person }: { person: CompatibilityPers
         </section>
       )}
 
-      {selectedThemes.length === 0 && (
-        <p className="mt-3 text-center text-sm font-semibold text-red-700 dark:text-red-300">
-          共有するテーマを1つ以上選んでください。
-        </p>
-      )}
       <DemoNotice />
     </main>
   );

@@ -62,10 +62,12 @@ function PersonSheet({ person, isMe }: { person: CompatibilityPerson; isMe: bool
 function AxisComparison({
   theme,
   mePosition,
+  partnerName,
   partnerPosition,
 }: {
   theme: CompatibilityTheme;
   mePosition: number;
+  partnerName: string;
   partnerPosition: number;
 }) {
   return (
@@ -74,7 +76,7 @@ function AxisComparison({
       <div className="mt-3 space-y-3">
         {[
           { label: "わたし", position: mePosition, color: "bg-sky-500" },
-          { label: "あおいさん", position: partnerPosition, color: "bg-violet-500" },
+          { label: `${partnerName}さん`, position: partnerPosition, color: "bg-violet-500" },
         ].map((person) => (
           <div key={person.label} className="grid grid-cols-[5rem_1fr] items-center gap-2">
             <span className="text-xs font-bold text-slate-600 dark:text-slate-300">
@@ -119,6 +121,7 @@ function PairSheet({ me, partner }: { me: CompatibilityPerson; partner: Compatib
         <AxisComparison
           theme={planning}
           mePosition={planning.position}
+          partnerName={partner.name}
           partnerPosition={partnerPlanning.position}
         />
       </section>
@@ -134,6 +137,7 @@ function PairSheet({ me, partner }: { me: CompatibilityPerson; partner: Compatib
         <AxisComparison
           theme={holiday}
           mePosition={holiday.position}
+          partnerName={partner.name}
           partnerPosition={partnerHoliday.position}
         />
         <p className="mt-4 rounded-xl bg-white/70 px-4 py-3 text-sm font-semibold text-amber-950 dark:bg-slate-900/50 dark:text-amber-100">
@@ -197,12 +201,12 @@ export function CompatibilityResultScreen({
     <main className="mx-auto min-h-dvh w-full max-w-2xl px-4 py-6 pb-12 sm:px-8">
       <CompatibilityBackHeader />
       <div className="mt-5 flex items-center gap-3">
-        <CompatibilityAvatar person={me} size="lg" />
-        <span className="text-xl font-bold text-slate-400">×</span>
         <CompatibilityAvatar person={partner} size="lg" />
+        <span className="text-xl font-bold text-slate-400">×</span>
+        <CompatibilityAvatar person={me} size="lg" />
       </div>
       <p className="mt-5 text-sm font-semibold tracking-wider text-rose-700 dark:text-rose-300">
-        わたし × あおいさん
+        {partner.name}さん × わたし
       </p>
       <h1 className="mt-1 text-3xl font-bold text-slate-950 dark:text-slate-50">2人の相性シート</h1>
       <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
@@ -237,8 +241,8 @@ export function CompatibilityResultScreen({
       <div className="mt-5">
         {section === "people" ? (
           <div className="space-y-4">
-            <PersonSheet person={me} isMe />
             <PersonSheet person={partner} isMe={false} />
+            <PersonSheet person={me} isMe />
           </div>
         ) : (
           <PairSheet me={me} partner={partner} />
