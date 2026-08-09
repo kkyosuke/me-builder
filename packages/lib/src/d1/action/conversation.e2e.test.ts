@@ -186,6 +186,10 @@ describe("Diary conversation persistence flow", () => {
             statement: "散歩できた",
             sourceMessageIds: checkpointContext?.sourceMessageIds.slice(1, 2) ?? [],
           },
+          {
+            statement: " 少し疲れていた ",
+            sourceMessageIds: checkpointContext?.sourceMessageIds.slice(0, 1) ?? [],
+          },
         ],
       ),
     ).resolves.toEqual({

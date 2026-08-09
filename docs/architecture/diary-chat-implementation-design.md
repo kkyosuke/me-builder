@@ -280,7 +280,7 @@ prompt本文、Context Package、未検証のモデル出力は保存しませ�
 
 同じSessionの`pending`は最大1件とします。新しいuser messageをTurnへ取り込むtransactionで、発言ごとに現在の期限を評価します。期限前なら範囲を延長し、期限以後なら既存範囲を`queued`へ固定して新しい`pending`を作ります。明示終了時は期限を現在時刻へ進めます。
 
-Alarmは期限到来した`pending`またはQueue投入に失敗した`queued`だけをclaimし、指数バックオフ付きの投入leaseとして`next_attempt_at`を進めます。QueueがIDを受理したら`dispatched`へ進め、以後はAlarmの対象にしません。送信後・状態更新前に停止した場合だけlease後に重複投入され得ますが、checkpoint IDと適用transactionで多重適用を防ぎます。`dispatched`後のAI一時失敗はQueue自身の再配送とDLQで扱い、Alarmと二重に再投入しません。Workerは固定範囲を読み直し、Brain Item一式、`diary_brain_checkpoint_items`、`applied`への遷移を同じtransactionで確定します。明示的な候補0件だけを`applied`とし、schemaまたはEvidence違反は適用せず再配送します。AlarmとRPC actionはAccountData Object内で直列化します。
+Alarmは期限到来した`pending`またはQueue投入に失敗した`queued`だけをclaimし、指数バックオフ付きの投入leaseとして`next_attempt_at`を進めます。Queue投入が失敗した場合は永続化済みの次回試行時刻からAlarmを明示的に再設定し、プラットフォームの自動retry上限を越えても処理を再開できるようにします。QueueがIDを受理したら`dispatched`へ進め、以後はAlarmの対象にしません。送信後・状態更新前に停止した場合だけlease後に重複投入され得ますが、checkpoint IDと適用transactionで多重適用を防ぎます。`dispatched`後のAI一時失敗はQueue自身の再配送とDLQで扱い、Alarmと二重に再投入しません。Workerは固定範囲を読み直し、Brain Item一式、`diary_brain_checkpoint_items`、`applied`への遷移を同じtransactionで確定します。JSONまたは出力envelope全体が不正な場合は再配送し、envelope内の個別候補だけがschema・Evidence・候補間重複の検証に失敗した場合は、安全な理由コードをerror logへ残してその候補だけを登録対象から外します。AlarmとRPC actionはAccountData Object内で直列化します。
 
 ```mermaid
 stateDiagram-v2
@@ -541,7 +541,7 @@ flowchart TD
 
 日記候補の入力、起動条件、検証、Brain Item登録、否定・修正、重複・改訂は[Brain Item生成設計 §7](../domain/brain/brain-item-generation-design.md#7-日記チャットからの生成)を正とします。
 
-Brain Item抽出は会話返信とは別のsystem prompt、prompt version、Valibot schemaを使います。AccountData alarmがChat Turn QueueへIDだけを送り、consumerがチェックポイント範囲の会話を読み直してGeminiへ渡します。schema不正またはproviderの一時失敗はQueueを失敗させて再試行し、安全経路または正常な空配列は0件として適用します。候補の保存はAccountData actionだけが行い、モデルへDBや外部I/Oのtoolを公開しません。
+Brain Item抽出は会話返信とは別のsystem prompt、prompt version、Valibot schemaを使います。AccountData alarmがChat Turn QueueへIDだけを送り、consumerがチェックポイント範囲の会話を読み直してGeminiへ渡します。JSON・出力envelope不正またはproviderの一時失敗はQueueを失敗させて再試行し、個別候補のschema・Evidence・重複違反は理由コードだけをlogへ残して候補単位で除外します。安全経路または正常な空配列は0件として適用します。候補の保存はAccountData actionだけが行い、モデルへDBや外部I/Oのtoolを公開しません。
 
 ## 8. ガードレール
 
@@ -555,7 +555,7 @@ Brain Item抽出は会話返信とは別のsystem prompt、prompt version、Vali
 | 生成前 | 危機・高risk分類、token上限、rate limit | safety routeか保存のみへ切替 |
 | 生成中 | system prompt、toolなし、構造化出力、provider safety | blockを定型応答へ変換 |
 | 出力後 | schema、根拠ID、質問数、長さ、禁止表現 | 1回修正後、fallback |
-| 保存前 | 候補重複、推定表示、Access Label、安全経路 | 不正候補だけ破棄 |
+| 保存前 | 候補schema、Evidence、候補間重複、Access Label、安全経路 | 本文やIDを含まない理由logを残し、不正候補だけ破棄 |
 | 送信時 | Turn lease、送信状態、reply/push | 重複送信を抑止 |
 
 ### 8.2 Prompt Injectionと情報流出

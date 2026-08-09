@@ -7,6 +7,7 @@ import {
   compatibilityDataFor,
   d1,
 } from "@me-builder/lib";
+import { logger } from "@me-builder/shared";
 import { eq, inArray } from "drizzle-orm";
 import type { Env } from "../types";
 import { brainActions } from "./brain";
@@ -24,6 +25,8 @@ const actions = {
   ...diagnosisActions,
   ...diaryActions,
 } as const;
+
+const ALARM_RETRY_MS = 30_000;
 
 /** 1 AccountのSource / Brain / Diagnosis / Diaryを1つのprivate SQLiteに保存する。 */
 export class AccountData extends DurableObject<Env> {
@@ -97,33 +100,41 @@ export class AccountData extends DurableObject<Env> {
 
   async alarm(): Promise<void> {
     await this.runExclusive(async () => {
-      await d1.action.conversation.closeExpiredSessions(this.repository.client);
-      await d1.action.diagnosisBrainProjection.processPendingDiagnosisBrainProjections(
-        this.repository.client,
-      );
-      const checkpointIds = await d1.action.conversation.claimDueDiaryBrainCheckpointIds(
-        this.repository.client,
-        this.accountId,
-      );
-      if (checkpointIds.length > 0 && !this.env.CHAT_TURN_QUEUE) {
-        throw new Error("CHAT_TURN_QUEUE binding is required for diary Brain checkpoints");
-      }
-      for (const checkpointId of checkpointIds) {
-        await this.env.CHAT_TURN_QUEUE?.send({
-          type: "diary-brain-checkpoint",
-          accountId: this.accountId,
-          checkpointId,
-        });
-        const dispatched = await d1.action.conversation.markDiaryBrainCheckpointDispatched(
+      try {
+        await d1.action.conversation.closeExpiredSessions(this.repository.client);
+        await d1.action.diagnosisBrainProjection.processPendingDiagnosisBrainProjections(
+          this.repository.client,
+        );
+        const checkpointIds = await d1.action.conversation.claimDueDiaryBrainCheckpointIds(
           this.repository.client,
           this.accountId,
-          checkpointId,
         );
-        if (!dispatched) {
-          throw new Error("Diary Brain checkpoint dispatch state could not be recorded");
+        if (checkpointIds.length > 0 && !this.env.CHAT_TURN_QUEUE) {
+          throw new Error("CHAT_TURN_QUEUE binding is required for diary Brain checkpoints");
         }
+        for (const checkpointId of checkpointIds) {
+          await this.env.CHAT_TURN_QUEUE?.send({
+            type: "diary-brain-checkpoint",
+            accountId: this.accountId,
+            checkpointId,
+          });
+          const dispatched = await d1.action.conversation.markDiaryBrainCheckpointDispatched(
+            this.repository.client,
+            this.accountId,
+            checkpointId,
+          );
+          if (!dispatched) {
+            throw new Error("Diary Brain checkpoint dispatch state could not be recorded");
+          }
+        }
+        await this.scheduleMaintenance();
+      } catch (error) {
+        logger.error(
+          { errorName: error instanceof Error ? error.name : "UnknownError" },
+          "AccountData alarm failed; retry scheduled",
+        );
+        await this.scheduleMaintenanceRetry();
       }
-      await this.scheduleMaintenance();
     });
   }
 
@@ -387,6 +398,12 @@ export class AccountData extends DurableObject<Env> {
     if (desired === null) return;
     const current = await this.ctx.storage.getAlarm();
     if (current === null || desired < current) await this.ctx.storage.setAlarm(desired);
+  }
+
+  private async scheduleMaintenanceRetry(): Promise<void> {
+    const retryAt = Date.now() + ALARM_RETRY_MS;
+    const desired = this.repository.nextMaintenanceAt();
+    await this.ctx.storage.setAlarm(desired === null ? retryAt : Math.max(retryAt, desired));
   }
 
   private async runExclusive<TResult>(operation: () => Promise<TResult>): Promise<TResult> {

@@ -766,7 +766,8 @@ export async function applyDiaryBrainCheckpoint(
   if (candidates.length > 3) throw new Error("Diary Brain candidates exceed the limit");
   const statements: BatchItem<"sqlite">[] = [];
   const appliedCandidates: DiaryBrainCheckpointCandidate[] = [];
-  for (const [position, candidate] of candidates.entries()) {
+  const acceptedCandidateKeys = new Set<string>();
+  for (const candidate of candidates) {
     const messageIds = [...new Set(candidate.sourceMessageIds)];
     if (
       !candidate.statement.trim() ||
@@ -775,6 +776,9 @@ export async function applyDiaryBrainCheckpoint(
     ) {
       throw new Error("Diary Brain candidate validation failed");
     }
+    const candidateKey = `${candidate.statement.trim()}\u0000${[...messageIds].sort().join("\u0000")}`;
+    if (acceptedCandidateKeys.has(candidateKey)) continue;
+    acceptedCandidateKeys.add(candidateKey);
     const sources = await db
       .select({ id: sourceRecords.id, createdAt: sourceRecords.createdAt })
       .from(conversationMessages)
@@ -850,7 +854,7 @@ export async function applyDiaryBrainCheckpoint(
         id: crypto.randomUUID(),
         checkpointId,
         brainItemId,
-        position,
+        position: appliedCandidates.length,
         ...lifecycle,
       }),
     );

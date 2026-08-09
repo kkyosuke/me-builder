@@ -1,4 +1,5 @@
 import type { ConversationContextMessage } from "@me-builder/lib";
+import { logger } from "@me-builder/shared";
 import { toJsonSchema } from "@valibot/to-json-schema";
 import * as v from "valibot";
 import type { WorkerConfig } from "../config";
@@ -19,6 +20,9 @@ const CandidateSchema = v.strictObject({
 });
 const ResponseSchema = v.strictObject({
   brain_item_candidates: v.pipe(v.array(CandidateSchema), v.maxLength(3)),
+});
+const ResponseEnvelopeSchema = v.strictObject({
+  brain_item_candidates: v.pipe(v.array(v.unknown()), v.maxLength(3)),
 });
 
 export type DiaryBrainCandidate = v.InferOutput<typeof CandidateSchema>;
@@ -44,17 +48,40 @@ export function validateDiaryBrainCandidates(
   } catch {
     return undefined;
   }
-  const parsed = v.safeParse(ResponseSchema, json);
+  const parsed = v.safeParse(ResponseEnvelopeSchema, json);
   if (!parsed.success) return undefined;
   const allowed = new Set(sourceMessageIds);
-  for (const candidate of parsed.output.brain_item_candidates) {
+  const accepted: DiaryBrainCandidate[] = [];
+  const acceptedKeys = new Set<string>();
+  for (const [candidateIndex, rawCandidate] of parsed.output.brain_item_candidates.entries()) {
+    const candidateResult = v.safeParse(CandidateSchema, rawCandidate);
+    if (!candidateResult.success) {
+      logRejectedCandidate(candidateIndex, "schema");
+      continue;
+    }
+    const candidate = candidateResult.output;
     const unique = new Set(candidate.source_message_ids);
-    const isValid =
-      unique.size === candidate.source_message_ids.length &&
-      candidate.source_message_ids.every((id) => allowed.has(id));
-    if (!isValid) return undefined;
+    if (unique.size !== candidate.source_message_ids.length) {
+      logRejectedCandidate(candidateIndex, "duplicate_evidence");
+      continue;
+    }
+    if (!candidate.source_message_ids.every((id) => allowed.has(id))) {
+      logRejectedCandidate(candidateIndex, "outside_checkpoint_evidence");
+      continue;
+    }
+    const candidateKey = `${candidate.statement.trim()}\u0000${[...unique].sort().join("\u0000")}`;
+    if (acceptedKeys.has(candidateKey)) {
+      logRejectedCandidate(candidateIndex, "duplicate_candidate");
+      continue;
+    }
+    acceptedKeys.add(candidateKey);
+    accepted.push(candidate);
   }
-  return parsed.output.brain_item_candidates;
+  return accepted;
+}
+
+function logRejectedCandidate(candidateIndex: number, validationReason: string): void {
+  logger.error({ candidateIndex, validationReason }, "Skipped invalid Diary Brain candidate");
 }
 
 export async function generateDiaryBrainCandidates(

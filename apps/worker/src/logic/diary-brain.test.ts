@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { logger } from "@me-builder/shared";
+import { describe, expect, it, vi } from "vitest";
 import { getWorkerConfig } from "../config";
 import {
   buildDevelopmentBrainItemMessage,
@@ -27,7 +28,8 @@ describe("diary Brain checkpoint", () => {
     expect(validateDiaryBrainCandidates(raw, ["message-1", "message-2"])).toHaveLength(2);
   });
 
-  it("checkpoint外のmessageを参照する出力全体を再試行対象にする", () => {
+  it("checkpoint外のmessageを参照する候補だけをlog付きで破棄する", () => {
+    const log = vi.spyOn(logger, "error").mockImplementation(() => undefined);
     const raw = JSON.stringify({
       brain_item_candidates: [
         {
@@ -38,7 +40,44 @@ describe("diary Brain checkpoint", () => {
         },
       ],
     });
-    expect(validateDiaryBrainCandidates(raw, ["message-1"])).toBeUndefined();
+    expect(validateDiaryBrainCandidates(raw, ["message-1"])).toEqual([]);
+    expect(log).toHaveBeenCalledWith(
+      { candidateIndex: 0, validationReason: "outside_checkpoint_evidence" },
+      "Skipped invalid Diary Brain candidate",
+    );
+    log.mockRestore();
+  });
+
+  it("同一候補が複数ある場合は最初の1件だけを受け入れる", () => {
+    const log = vi.spyOn(logger, "error").mockImplementation(() => undefined);
+    const duplicate = {
+      category: "memory",
+      statement: "公園を散歩した",
+      source_message_ids: ["message-1"],
+      is_inference: false,
+    };
+    const raw = JSON.stringify({
+      brain_item_candidates: [
+        duplicate,
+        duplicate,
+        {
+          category: "memory",
+          statement: "夕食を作った",
+          source_message_ids: ["message-2"],
+          is_inference: false,
+        },
+      ],
+    });
+
+    expect(validateDiaryBrainCandidates(raw, ["message-1", "message-2"])).toEqual([
+      duplicate,
+      expect.objectContaining({ statement: "夕食を作った" }),
+    ]);
+    expect(log).toHaveBeenCalledWith(
+      { candidateIndex: 1, validationReason: "duplicate_candidate" },
+      "Skipped invalid Diary Brain candidate",
+    );
+    log.mockRestore();
   });
 
   it("AIが明示した候補0件だけは正常な0件として受け入れる", () => {
