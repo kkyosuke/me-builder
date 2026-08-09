@@ -1,9 +1,9 @@
 import type { D1Database } from "@cloudflare/workers-types";
-import type { AccountDataNamespace } from "@me-builder/lib";
+import type { AccountDataNamespace, CompatibilityDataNamespace } from "@me-builder/lib";
 import type { Queue, WebhookQueueMessage } from "@me-builder/shared";
 
 /** Wrangler生成bindingに、SecretとQueueの公開契約だけを重ねる。 */
-type Env = Omit<ApiBindings, "DB" | "WEBHOOK_QUEUE" | "ACCOUNT_DATA"> & {
+type Env = Omit<ApiBindings, "DB" | "WEBHOOK_QUEUE" | "ACCOUNT_DATA" | "COMPATIBILITY_DATA"> & {
   ENVIRONMENT?: string;
   LINE_CHANNEL_ACCESS_TOKEN?: string;
   LINE_CHANNEL_SECRET?: string;
@@ -18,6 +18,7 @@ type Env = Omit<ApiBindings, "DB" | "WEBHOOK_QUEUE" | "ACCOUNT_DATA"> & {
   WEBHOOK_QUEUE?: Queue<WebhookQueueMessage>;
   DB?: D1Database;
   ACCOUNT_DATA?: AccountDataNamespace;
+  COMPATIBILITY_DATA?: CompatibilityDataNamespace;
 };
 
 export type AppEnv = { Bindings: Env };
