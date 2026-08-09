@@ -15,6 +15,13 @@
       "when": 1786237022676,
       "tag": "0001_many_lady_deathstrike",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1786240705115,
+      "tag": "0002_purple_shatterstar",
+      "breakpoints": true
     }
   ]
 }

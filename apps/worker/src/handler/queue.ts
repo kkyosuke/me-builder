@@ -1,11 +1,18 @@
-import type { ChatTurnQueueMessage, MessageBatch, WebhookQueueMessage } from "@me-builder/shared";
+import type {
+  ChatTurnQueueMessage,
+  DiaryBrainCheckpointQueueMessage,
+  MessageBatch,
+  WebhookQueueMessage,
+} from "@me-builder/shared";
 import { logger } from "@me-builder/shared";
 import { getCloudflareBindings, getWorkerConfig } from "../config";
 import { handleQueueBatch } from "../logic/webhook";
 import type { Env } from "../types";
 
 export async function queueHandler(
-  batch: MessageBatch<WebhookQueueMessage | ChatTurnQueueMessage>,
+  batch: MessageBatch<
+    WebhookQueueMessage | ChatTurnQueueMessage | DiaryBrainCheckpointQueueMessage
+  >,
   env: Env,
 ): Promise<void> {
   try {

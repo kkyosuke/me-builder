@@ -18,16 +18,6 @@ const SafetyRouteSchema = v.picklist([
   "imminent_danger",
   "abuse_or_violence",
 ]);
-const BrainItemCandidateSchema = v.strictObject({
-  category: v.literal("memory"),
-  statement: v.pipe(v.string(), v.minLength(1), v.maxLength(1000)),
-  source_message_ids: v.pipe(
-    v.array(v.pipe(v.string(), v.minLength(1))),
-    v.minLength(1),
-    v.maxLength(20),
-  ),
-  is_inference: v.literal(false),
-});
 const DiaryChatResponseSchema = v.strictObject({
   mode: ModeSchema,
   reply: v.pipe(v.string(), v.minLength(1), v.maxLength(5000)),
@@ -37,7 +27,6 @@ const DiaryChatResponseSchema = v.strictObject({
     route: SafetyRouteSchema,
     restricted_advice: v.boolean(),
   }),
-  brain_item_candidates: v.optional(v.pipe(v.array(BrainItemCandidateSchema), v.maxLength(3)), []),
 });
 
 export type DiaryChatResponse = v.InferOutput<typeof DiaryChatResponseSchema>;
@@ -88,7 +77,6 @@ export function stricterSafetyRoute(first: SafetyRoute, second: SafetyRoute): Sa
 export function validateDiaryChatResponse(
   raw: string,
   preclassifiedRoute: SafetyRoute,
-  currentUserMessageIds: readonly string[] = [],
 ): DiaryChatResponse | undefined {
   let json: unknown;
   try {
@@ -99,24 +87,12 @@ export function validateDiaryChatResponse(
   const parsed = v.safeParse(DiaryChatResponseSchema, json);
   if (!parsed.success) return undefined;
   const safetyRoute = stricterSafetyRoute(preclassifiedRoute, parsed.output.safety.route);
-  const allowedSourceMessageIds = new Set(currentUserMessageIds);
-  const brainItemCandidates =
-    safetyRoute === "normal"
-      ? parsed.output.brain_item_candidates.filter(({ source_message_ids: sourceMessageIds }) => {
-          const uniqueIds = new Set(sourceMessageIds);
-          return (
-            uniqueIds.size === sourceMessageIds.length &&
-            sourceMessageIds.every((id) => allowedSourceMessageIds.has(id))
-          );
-        })
-      : [];
   return {
     ...parsed.output,
     safety: {
       route: safetyRoute,
       restricted_advice: parsed.output.safety.restricted_advice || safetyRoute !== "normal",
     },
-    brain_item_candidates: brainItemCandidates,
   };
 }
 
@@ -135,27 +111,7 @@ export function buildSafetyFallback(route: SafetyRoute): DiaryChatResponse {
     main_question_count: requiresSafetyConfirmation ? 1 : 0,
     end_session: false,
     safety: { route, restricted_advice: route !== "normal" },
-    brain_item_candidates: [],
   };
-}
-
-/** ローカル開発時だけ、保存対象のBrain Itemを会話上で確認できるようにする。 */
-export function appendDevelopmentBrainItemSummary(
-  reply: string,
-  candidates: readonly v.InferOutput<typeof BrainItemCandidateSchema>[],
-  environment: string,
-): string {
-  if (!["dev", "development", "local"].includes(environment)) return reply;
-  const summary =
-    candidates.length === 0
-      ? "- 追加なし"
-      : candidates
-          .map(
-            (candidate, index) =>
-              `- ${index + 1}. Memory: ${candidate.statement} (evidence: ${candidate.source_message_ids.join(", ")})`,
-          )
-          .join("\n");
-  return `${reply}\n\n[dev] 追加したBrain Item\n${summary}`;
 }
 
 export async function generateDiaryChatResponse(
@@ -196,9 +152,7 @@ export async function generateDiaryChatResponse(
       maxOutputTokens: 2_000,
       ...(signal ? { signal } : {}),
     });
-    const validated = raw
-      ? validateDiaryChatResponse(raw, safetyRoute, context?.currentUserMessageIds)
-      : undefined;
+    const validated = raw ? validateDiaryChatResponse(raw, safetyRoute) : undefined;
     if (validated) return validated;
   }
   return buildSafetyFallback(safetyRoute);

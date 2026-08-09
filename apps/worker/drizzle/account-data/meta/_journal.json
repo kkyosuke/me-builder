@@ -15,6 +15,13 @@
       "when": 1786237023391,
       "tag": "0001_famous_lila_cheney",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1786240705836,
+      "tag": "0002_wealthy_cloak",
+      "breakpoints": true
     }
   ]
 }

@@ -2,6 +2,7 @@ import { line } from "@me-builder/lib";
 import type { d1 } from "@me-builder/lib";
 import {
   type ChatTurnQueueMessage,
+  type DiaryBrainCheckpointQueueMessage,
   type Message,
   type MessageBatch,
   type WebhookQueueMessage,
@@ -9,6 +10,7 @@ import {
 } from "@me-builder/shared";
 import { type CloudflareBindings, type WorkerConfig, getWorkerConfig } from "../config";
 import { processChatTurnMessage } from "../handler/chat-turn";
+import { processDiaryBrainCheckpointMessage } from "../handler/diary-brain-checkpoint";
 import { processLineWebhook } from "./feature/line";
 
 async function processWebhookMessage(
@@ -49,7 +51,9 @@ async function processWebhookMessage(
 }
 
 export async function handleQueueBatch(
-  batch: MessageBatch<WebhookQueueMessage | ChatTurnQueueMessage>,
+  batch: MessageBatch<
+    WebhookQueueMessage | ChatTurnQueueMessage | DiaryBrainCheckpointQueueMessage
+  >,
   db: d1.Client,
   workerConfig?: WorkerConfig,
   cf?: CloudflareBindings,
@@ -67,6 +71,13 @@ export async function handleQueueBatch(
       if ("type" in message.body && message.body.type === "chat-turn") {
         if (!cf || !workerConfig) throw new Error("Chat turn bindings are not configured");
         await processChatTurnMessage(message as Message<ChatTurnQueueMessage>, cf, workerConfig);
+      } else if ("type" in message.body && message.body.type === "diary-brain-checkpoint") {
+        if (!cf || !workerConfig) throw new Error("Diary Brain bindings are not configured");
+        await processDiaryBrainCheckpointMessage(
+          message as Message<DiaryBrainCheckpointQueueMessage>,
+          cf,
+          workerConfig,
+        );
       } else {
         await processWebhookMessage(message as Message<WebhookQueueMessage>, db, workerConfig, cf);
       }

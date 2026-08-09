@@ -35,6 +35,28 @@ export type AccountDataActions = {
     typeof conversation.attachMessagesToTurn
   >;
   "conversation.getTurnContext": DomainAction<typeof conversation.getTurnContext>;
+  "conversation.listDueDiaryBrainCheckpoints": RpcAction<
+    [at?: Date],
+    typeof conversation.listDueDiaryBrainCheckpointIds
+  >;
+  "conversation.deferDiaryBrainCheckpoint": RpcAction<
+    [checkpointId: string, at?: Date],
+    typeof conversation.deferDiaryBrainCheckpoint
+  >;
+  "conversation.getDiaryBrainCheckpointContext": RpcAction<
+    [checkpointId: string],
+    typeof conversation.getDiaryBrainCheckpointContext
+  >;
+  "conversation.applyDiaryBrainCheckpoint": RpcAction<
+    [
+      checkpointId: string,
+      expectedThroughSequence: number,
+      promptVersion: string,
+      candidates: readonly conversation.DiaryBrainCheckpointCandidate[],
+      at?: Date,
+    ],
+    typeof conversation.applyDiaryBrainCheckpoint
+  >;
   "conversation.markTurnGenerating": DomainAction<typeof conversation.markTurnGenerating>;
   "conversation.getTurnStatus": DomainAction<typeof conversation.getTurnStatus>;
   "conversation.isTurnSessionActive": DomainAction<typeof conversation.isTurnSessionActive>;

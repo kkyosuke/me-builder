@@ -325,26 +325,6 @@ describe("LINE diary chat delivery E2E", () => {
       "success",
     );
     const message = createQueueMessage(queuedTurn);
-    mockGenerateContent.mockImplementationOnce(async (request) => {
-      const currentMessageId = JSON.parse(request.contents).context_package.messages[0].id;
-      return {
-        text: JSON.stringify({
-          mode: "organize",
-          reply: generatedReply,
-          main_question_count: 1,
-          end_session: false,
-          safety: { route: "normal", restricted_advice: false },
-          brain_item_candidates: [
-            {
-              category: "memory",
-              statement: "公園を散歩できた",
-              source_message_ids: [currentMessageId],
-              is_inference: false,
-            },
-          ],
-        }),
-      };
-    });
 
     await processChatTurnMessage(message, bindings, workerConfig);
 
@@ -371,16 +351,9 @@ describe("LINE diary chat delivery E2E", () => {
       expect.objectContaining({ role: "user", assistantBody: null }),
       expect.objectContaining({ role: "assistant", assistantBody: generatedReply }),
     ]);
-    expect(await client.select().from(d1.schema.brainItems)).toEqual([
-      expect.objectContaining({
-        category: "memory",
-        statement: "公園を散歩できた",
-        derivation: "ai",
-        status: "active",
-      }),
-    ]);
-    expect(await client.select().from(d1.schema.brainItemEvidenceEdges)).toEqual([
-      expect.objectContaining({ relation: "supports", derivationMethod: "ai" }),
+    expect(await client.select().from(d1.schema.brainItems)).toEqual([]);
+    expect(await client.select().from(d1.schema.diaryBrainCheckpoints)).toEqual([
+      expect.objectContaining({ status: "pending", fromSequence: 1, throughSequence: 1 }),
     ]);
     expect(mockPushMessage).toHaveBeenCalledOnce();
     expect(mockPushMessage.mock.calls[0]?.[0]).toEqual({

@@ -79,6 +79,25 @@ export class AccountData extends DurableObject<Env> {
     await d1.action.diagnosisBrainProjection.processPendingDiagnosisBrainProjections(
       this.repository.client,
     );
+    const checkpointIds = await d1.action.conversation.listDueDiaryBrainCheckpointIds(
+      this.repository.client,
+      this.accountId,
+    );
+    if (checkpointIds.length > 0 && !this.env.CHAT_TURN_QUEUE) {
+      throw new Error("CHAT_TURN_QUEUE binding is required for diary Brain checkpoints");
+    }
+    for (const checkpointId of checkpointIds) {
+      await this.env.CHAT_TURN_QUEUE?.send({
+        type: "diary-brain-checkpoint",
+        accountId: this.accountId,
+        checkpointId,
+      });
+      await d1.action.conversation.deferDiaryBrainCheckpoint(
+        this.repository.client,
+        this.accountId,
+        checkpointId,
+      );
+    }
     await this.scheduleMaintenance();
   }
 

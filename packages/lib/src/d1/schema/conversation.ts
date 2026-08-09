@@ -117,3 +117,34 @@ export const chatTurns = sqliteTable(
     ),
   ],
 );
+
+/** 複数Turnをまとめ、無操作または最大待機時間でBrain Itemへ変換する範囲。 */
+export const diaryBrainCheckpoints = sqliteTable(
+  "diary_brain_checkpoints",
+  {
+    ...baseSchema,
+    accountId: text("account_id")
+      .notNull()
+      .references(() => accounts.id),
+    sessionId: text("session_id")
+      .notNull()
+      .references(() => conversationSessions.id),
+    fromSequence: integer("from_sequence").notNull(),
+    throughSequence: integer("through_sequence").notNull(),
+    firstMessageAt: integer("first_message_at", { mode: "timestamp" }).notNull(),
+    lastMessageAt: integer("last_message_at", { mode: "timestamp" }).notNull(),
+    dueAt: integer("due_at", { mode: "timestamp" }).notNull(),
+    nextAttemptAt: integer("next_attempt_at", { mode: "timestamp" }).notNull(),
+    status: text("status", { enum: ["pending", "applied"] })
+      .notNull()
+      .default("pending"),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    appliedAt: integer("applied_at", { mode: "timestamp" }),
+  },
+  (table) => [
+    uniqueIndex("diary_brain_checkpoint_pending_session_idx")
+      .on(table.sessionId)
+      .where(sql`${table.status} = 'pending' AND ${table.isDeleted} = 0`),
+    index("diary_brain_checkpoint_due_idx").on(table.status, table.nextAttemptAt, table.isDeleted),
+  ],
+);

@@ -143,7 +143,7 @@ async function replaceAnswerSources(db: D1Client, at: Date, choiceId: "yes" | "n
 }
 
 describe("Diagnosis Brain projection", () => {
-  it("回答済み診断からpendingのBrain ItemとEvidenceを作る", async () => {
+  it("回答済み診断からactiveなBrain ItemとEvidenceを作る", async () => {
     const db = createTestDb();
     const at = await insertFixture(db, true);
     await db.insert(schema.diagnosisBrainProjectionRequests).values({

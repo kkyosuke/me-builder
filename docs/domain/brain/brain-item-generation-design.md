@@ -77,7 +77,7 @@ Evidence edgeは変換器ではありません。Source Recordは原本の識別
 | 時点 | 診断 | 日記 |
 | --- | --- | --- |
 | 原本の登録 | Answer保存と同じ原子的処理 | LINE eventのingest時 |
-| Brain Itemの登録・利用可能化 | 回答済みを検出したprojection処理 | 本人へ内容を提示するassistant応答の保存時 |
+| Brain Itemの登録・利用可能化 | 回答済みを検出したprojection処理 | 会話チェックポイントの非同期projection処理 |
 
 Brain Itemは生成時点から`active`であり、本人の同意を利用開始の条件にしません。助言、Vectorize検索、MCP提供に使えるかは、Evidence、Derivation、Confidence、Access Policy、削除・撤回状態から用途ごとに評価します。AI推定は本人の事実として断定せず、利用時にも推定であることを区別します。
 
@@ -89,7 +89,7 @@ Brain Itemは生成時点から`active`であり、本人の同意を利用開�
 type BrainItemGenerationInput = {
   accountId: string
   trigger: {
-    kind: "diagnosis_completed" | "diary_turn_completed"
+    kind: "diagnosis_completed" | "diary_brain_checkpoint_due"
     id: string
     revision: number
   }
@@ -172,15 +172,15 @@ Brain Itemの`derivation`は導出契機になったEvidence edgeから集計し
 | 観点 | 診断回答 | 日記チャット |
 | --- | --- | --- |
 | 原本の単位 | 1 Answer = 1 Source Record | 1 user発言 = 1 Source Record |
-| 生成開始条件 | `DiagnosisResponse`が回答済み | 会話の区切りで候補を本人へ提示する応答を作る |
-| 変換方法 | 版付き設定によるルールベース計算 | 構造化出力を使うAI推定 |
-| 主な追加入力 | Question、Choice、採点設定 | 現在Turn、現在Sessionの会話、既存Brain Item候補 |
-| 作成単位 | 計算可能なParameterごとに1件 | 意味的に独立した命題ごとに1件、1Turn最大3件 |
-| 分類 | 最初は`Preference` | 会話に現れた分類 |
+| 生成開始条件 | `DiagnosisResponse`が回答済み | 10分無操作、最初の未処理発言から30分、または明示終了 |
+| 変換方法 | 版付き設定によるルールベース計算 | 構造化出力を使うAI抽出 |
+| 主な追加入力 | Question、Choice、採点設定 | 未処理チェックポイント範囲の会話 |
+| 作成単位 | 計算可能なParameterごとに1件 | 意味的に独立した命題ごとに1件、1チェックポイント最大3件 |
+| 分類 | 最初は`Preference` | 現在は`Memory` |
 | Derivation | `deterministic` | `ai` |
 | Evidence | Parameterへ寄与したAnswerのSource Record | 候補が参照したuser messageのSource Record |
 | 利用開始 | 生成時点 | 生成時点。ただしAI推定として区別する |
-| 登録失敗時 | projection要求から再試行 | Turn結果を再生成せず、保存意図から再試行 |
+| 登録失敗時 | projection要求から再試行 | チェックポイントを未処理のままQueueから再試行 |
 
 ## 6. 診断回答からの生成
 
@@ -240,39 +240,30 @@ sequenceDiagram
 
 AIへ渡す入力は、AccountDataから取得した次の情報です。
 
-- 現在Turnに含まれるuser messageと、それぞれのmessage ID・Source Record ID
-- 現在Sessionの直近メッセージ
-- prompt versionと事前安全分類
-- 重複確認に必要な、同じAccountのactiveなBrain Item候補
+- 未処理チェックポイントの範囲に含まれるuser / assistant message
+- 各user messageのmessage ID・Source Record ID
+- Brain Item抽出専用のprompt versionと事前安全分類
 
 Source Record本文はモデルへの入力には含めますが、モデルの出力をそのまま保存命令として信用しません。モデルが返したSource message IDを、アプリケーションが現在AccountのConversation messageとSource Recordへ解決します。
 
 ### 7.2 AIの候補出力
 
-AIは返信本文とは別に、本人が明示した出来事を表す`Memory`を1Turn最大3件提案します。現在の実装では`is_inference = false`の候補だけを受け付けます。上限は1 Turnの構造化出力と保存負荷を制限するための安全弁であり、1件に固定するドメイン上の理由はありません。
+AIは会話応答とは独立して、本人が明示した出来事を表す`Memory`を1チェックポイント最大3件提案します。現在の実装では`Memory`かつ`is_inference = false`の候補だけを受け付けます。上限は1回の構造化出力と保存負荷を制限するための安全弁であり、明示的な出来事を1件に固定するドメイン上の理由はありません。
 
 ```json
 {
-  "reply": "今日の記録としては、予定を延期して品質を優先したことが残りそう。違うところはある？",
-  "end_session": false,
   "brain_item_candidates": [
     {
-      "category": "Memory",
+      "category": "memory",
       "statement": "公開予定を一週間延期した",
       "source_message_ids": ["message-1"],
       "is_inference": false
-    },
-    {
-      "category": "Value / Motivation",
-      "statement": "期限より利用者が安心できる品質を優先した",
-      "source_message_ids": ["message-1", "message-2"],
-      "is_inference": true
     }
   ]
 }
 ```
 
-候補には、本人へ提示できる1つの命題と根拠message IDだけを含めます。Access Label、Confidence、Evidence edgeの属性をモデルに決めさせず、アプリケーションが共通規則で設定します。
+候補には、独立した1つの命題と根拠message IDだけを含めます。Access Label、Confidence、Evidence edgeの属性をモデルに決めさせず、アプリケーションが共通規則で設定します。
 
 次の候補は破棄します。
 
@@ -280,18 +271,18 @@ AIは返信本文とは別に、本人が明示した出来事を表す`Memory`�
 - 根拠が0件
 - safety routeが候補生成を禁止する
 - 発言にない内容を事実として追加している
-- 1回の出来事から安定した性格や行動パターンを断定している
+- 性格、価値観、好み、動機、意図、安定した行動パターンを推定している
 - 空のstatement、未定義分類、上限を超えた候補
 
-明示された出来事はMemory候補にできます。解釈を含むValue / Motivation、Preference、Decision Systemなどは`is_inference = true`を必須とします。
+明示された出来事はMemory候補にできます。解釈を含むValue / Motivation、Preference、Decision Systemなどは、推定の確認体験を設計するまで日記から生成しません。
 
 検証を通過した日記候補は、共通出力へ次のように写します。
 
 | 出力 | 値 |
 | --- | --- |
-| `category` | 検証済みの候補分類 |
+| `category` | `memory` |
 | `statement` | 候補のstatement |
-| `attributes` | `sourceKind = diary`、Session ID、Turn ID、prompt version、`isInference` |
+| `attributes` | `sourceKind = diary`、Session ID、checkpoint ID、prompt version、`isInference = false` |
 | `derivation` | `ai` |
 | `validFrom` | 根拠になった発言の時点。複数ある場合は候補が表す期間に合わせる |
 | Evidence | `source_message_ids`から解決したSource Record |
@@ -300,35 +291,46 @@ AIは返信本文とは別に、本人が明示した出来事を表す`Memory`�
 
 ### 7.3 登録タイミング
 
-候補は毎Turn機械的に保存しません。現在の実装上のトリガーは、通常の安全routeでAIが現在Turnを根拠にした有効な`Memory`候補を返し、同じassistant返信でその内容を本人へ提示することです。候補がある場合はassistant応答の保存時にBrain Itemとして登録し、その時点から利用可能にします。
+Brain Item生成はTurnごとの返信経路から分離します。未処理のuser発言を最初に受け付けるとチェックポイントを作り、同じSessionに発言が続く間はその範囲を延長します。次のいずれかを満たした時点で生成を起動します。
+
+- 最後の未処理user発言から10分間、新しい発言がない
+- 最初の未処理user発言から30分経過した
+- assistant応答が`end_session = true`で明示終了を決めた
+
+実行時刻は「最初の未処理発言 + 30分」と「最後の未処理発言 + 10分」の早い方です。発言が続いても30分ごとに一度区切るため、Brain Itemが長時間作られない状態を避けます。
+
+6時間無操作と24時間上限はConversation Sessionを閉じる境界であり、Brain Item生成を待つための時間ではありません。Session境界には、会話文脈・順序・返信率の集計範囲を限定し、無期限に会話を伸ばさない役割があります。Brain Item生成はより短いチェックポイントで進むため、一覧など後続UIから早い段階で利用できます。
 
 ```mermaid
 sequenceDiagram
     participant U as 利用者
-    participant W as Generate Worker
-    participant AI as AI Gateway
     participant AD as AccountData
-    participant LINE as LINE
+    participant A as Alarm
+    participant Q as Queue
+    participant W as Brain Worker
+    participant AI as AI Gateway
 
-    U->>W: 日記message
-    W->>AD: Source Recordを保存済みとしてContext取得
+    U->>AD: user message + Source Record
+    AD->>AD: checkpointを作成・延長
+    A->>Q: account ID + checkpoint ID
+    Q->>W: IDのみを配送
+    W->>AD: checkpoint範囲の会話を再読込
     W->>AI: 会話とSource message ID
-    AI-->>W: reply + Brain Item候補
+    AI-->>W: Brain Item候補
     W->>W: schema・Account・Evidence・安全性を検証
-    W->>AD: assistant応答 + Brain Item + Evidence + Access Label
+    W->>AD: Brain Item + Evidence + Access Label + checkpoint完了
     AD-->>W: atomic commit
-    W->>LINE: 候補を含む返信を配送
 ```
 
-assistant応答だけ保存できてBrain Itemが失われる状態、またはBrain Itemだけ保存できてどの提示に対応するか分からない状態を作らないため、Turn結果と候補一式をAccountDataの同じtransactionで保存します。LINE配送は外部I/Oなのでtransactionには含めません。対応するassistant応答を配送できなかった場合は、提示されなかったBrain Itemを`invalidated`へ変更し、検索対象から外します。
+Queueには本文を含めず、Account IDとcheckpoint IDだけを渡します。WorkerはAccountDataから会話を読み直し、Brain Item、Evidence edge、Access Label、チェックポイント完了を同じtransactionで保存します。Queueの重複配送では完了済みチェックポイントを再適用しません。
 
-配送の恒久失敗に連動する`invalidated`化は後続実装です。現時点ではTurnと候補のatomic保存までを保証します。
+AI生成やschema検証が一時失敗した場合はチェックポイントを未処理のまま再試行します。安全経路へ切り替えた場合、またはAIが有効な候補なしと正常に判断した場合は0件でチェックポイントを完了します。いずれの場合もSource Recordと通常の会話応答は保持され、会話返信の成功・配送状態はBrain Itemの登録条件にしません。
 
-AI生成が失敗した場合、安全経路へ切り替えた場合、候補がすべて検証不合格だった場合も、日記のSource Recordと通常の会話応答は保持します。Brain Itemが0件のTurnを正常系として扱います。
+`pending`はBrain Itemの状態ではなく、未処理チェックポイントの処理状態です。生成されたBrain Itemは本人確認を待たず最初から`active`です。dev / development / local環境だけは、バックグラウンド処理後に追加したItemとEvidence message IDを確認用LINE Pushで通知します。本番の会話にはこの通知を出しません。
 
 ### 7.4 本人の訂正・否定
 
-候補提示後の本人操作は次のように扱います。
+生成後のBrain Itemに対する本人操作は次のように扱います。
 
 | 本人の応答 | Source Record | Brain Item |
 | --- | --- | --- |
@@ -340,7 +342,7 @@ AI生成が失敗した場合、安全経路へ切り替えた場合、候補が
 
 「そう」「違う」「あとで」のような純粋なフィードバック操作は新しい命題内容を持たないため、Source Recordを作りません。ただし会話の順序と監査に必要な操作記録は保持します。否定がどのBrain Itemを指すか解決できない場合は自動的に無効化せず、対象を聞き返します。現在の会話保存経路はすべてのuser messageをSource Recordにするため、日記Brain Item実装時にフィードバック操作を区別できるよう変更が必要です。
 
-複数のBrain Itemを同時に提示した場合、否定や修正がどのItemを指すか一意に解決できなければ一括変更しません。対象を1つだけ聞き返すか、Itemごとに本人が選べるUIを使います。
+複数のBrain Itemが対象になり得る場合、否定や修正がどのItemを指すか一意に解決できなければ一括変更しません。対象を1つだけ聞き返すか、Itemごとに本人が選べるUIを使います。
 
 ## 8. 重複、Evidence追加、改訂
 
@@ -362,24 +364,25 @@ AIの意味的重複判定だけで既存Itemを上書きしません。同義�
 
 日記チャットで実装済みの範囲:
 
-- `brain_item_candidates`を含むAI出力schema
-- 通常安全route、`Memory`、非推定、1Turn最大3件への制限
-- 候補のAccount・現在Turn・Evidence・安全性検証
-- assistant応答と候補を一括保存するAccountData action
+- 10分無操作、30分上限、明示終了によるチェックポイント作成・延長・起動
+- AccountData alarmからIDのみを渡すQueue処理
+- 抽出専用`brain_item_candidates`出力schema
+- 通常安全route、`Memory`、非推定、1チェックポイント最大3件への制限
+- 候補のAccount・チェックポイント範囲・Evidence・安全性検証
+- Brain Item、Evidence、Access Label、チェックポイント完了を一括保存するAccountData action
 - Brain ItemとAccess LabelからConfirmationを除くschema migrationと既存projectionの追従
-- 再配送時にassistant応答とBrain Itemを重複作成しない冪等性
-- dev / development / local環境の返信に、追加対象のItemとEvidence message IDを表示
+- Queue再配送時にBrain Itemを重複作成しない冪等性
+- dev / development / local環境の処理後Pushに、追加したItemとEvidence message IDを表示
 
 次は未実装です。
 
-- 提示したItemと否定・修正操作の対応づけ
+- Itemと否定・修正操作の対応づけ
 - 否定による無効化、修正、改訂
 - 既存Brain Itemとの重複判定とEvidence追加
 - AI解釈を伴う分類
-- LINE配送の恒久失敗に伴うItemの無効化
 - active ItemのVectorize同期と日記助言への利用
 
-最初の縦切りとして、1つのTurnからMemoryを最大3件生成し、Evidence付きで保存するところまでを実装しています。次にVectorize同期と否定による無効化を通し、その後、AI解釈を伴う分類、修正、重複統合の順に広げます。
+最初の縦切りとして、会話チェックポイントからMemoryを最大3件生成し、Evidence付きで保存するところまでを実装しています。次にVectorize同期と否定による無効化を通し、その後、AI解釈を伴う分類、修正、重複統合の順に広げます。
 
 ## 10. 後続で決めること
 
