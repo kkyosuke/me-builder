@@ -16,6 +16,7 @@
 const API_BASE = "https://api.cloudflare.com/client/v4";
 const SESSION_DURATION = "24h";
 const POLICY_NAME = "Allow me-builder API docs developers";
+const USER_AGENT = "me-builder-api-docs-access/1.0";
 
 type TargetEnvironment = "preview" | "production";
 
@@ -134,6 +135,7 @@ function createApiClient(accountId: string, apiToken: string, fetchImpl: typeof 
       headers: {
         Authorization: `Bearer ${apiToken}`,
         "Content-Type": "application/json",
+        "User-Agent": USER_AGENT,
         ...init?.headers,
       },
     });

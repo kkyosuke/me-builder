@@ -114,6 +114,7 @@
   - PreviewとProductionへのデプロイ前に`task access:setup:preview`または`task access:setup:production`を実行し、[インフラ・システム構成](../../docs/architecture/infrastructure-architecture.md#61-apiドキュメントのcloudflare-access境界)で定めたパスだけを保護します。
   - 許可する開発者メールアドレスはGitHub Environment変数`CLOUDFLARE_ACCESS_ALLOWED_EMAILS`へカンマ区切りで設定します。空、または不正なメールアドレスを含む場合は設定処理とデプロイを失敗させます。
   - `CLOUDFLARE_DEPLOY_API_TOKEN`には、既存のデプロイ権限に加えて`Access: Apps and Policies Write`を付与します。Access APIエラーを警告へ変換せず、保護できない状態でデプロイを続行しません。
+  - Cloudflare APIへのリクエストには用途を識別できる固定の`User-Agent`を設定します。Bunの既定User-Agentをそのまま使うとCloudflareのBrowser Integrity CheckによってError 1010で拒否されるため、削除しないでください。
   - スクリプトは環境ごとのApplication名、または保護対象のOpenAPI documentと同じドメインを持つ既存Applicationを管理対象として解決します。既存Applicationを更新する前にpolicyを検査し、管理していないpolicyが存在する場合は、意図しないAllow条件を温存しないよう自動削除・更新せず停止します。複数のApplicationが管理対象候補になる場合も自動統合せず停止し、Cloudflare Dashboardで内容を確認してから解消してください。
 
 - **LINE Webhook の署名検証 (`x-line-signature`)**:
