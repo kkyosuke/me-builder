@@ -5,6 +5,18 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ProfileSummary, ProfileSummaryVersioning } from "../model/profile-summary";
 import { ProfileSummaryScreen } from "./profile-summary-screen";
 
+function firePointer(
+  target: Element,
+  type: "pointerdown" | "pointerup",
+  values: { button?: number; clientX: number; clientY: number; pointerId: number },
+) {
+  const event = new Event(type, { bubbles: true });
+  for (const [key, value] of Object.entries({ isPrimary: true, ...values })) {
+    Object.defineProperty(event, key, { value });
+  }
+  fireEvent(target, event);
+}
+
 const summary: ProfileSummary = {
   generatedAt: "2026-08-08T12:00:00.000Z",
   headline: "最近の記録から、こんなあなたらしさが見えています",
@@ -80,7 +92,7 @@ describe("ProfileSummaryScreen", () => {
     expect(screen.queryByRole("link", { name: "未回答の診断を見る" })).toBeNull();
   });
 
-  it("右上で過去版を選択し、最新版を再生成できる", () => {
+  it("カードスタックから過去版を選び、新しい版の生成をボタンでも要求できる", () => {
     const onSelectVersion = vi.fn();
     const onRegenerate = vi.fn();
     render(
@@ -93,22 +105,75 @@ describe("ProfileSummaryScreen", () => {
       />,
     );
 
-    const selector = screen.getByLabelText("表示する版");
-    expect(screen.getByRole("option", { name: /第3版/ })).toBeTruthy();
-    expect(screen.getByRole("option", { name: /第2版/ })).toBeTruthy();
+    expect(screen.queryByRole("combobox")).toBeNull();
+    expect(screen.getByLabelText("第3版、1/2")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "第3版を表示" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "第2版を表示" })).toBeTruthy();
     expect(screen.getByText(/AI生成/)).toBeTruthy();
-    expect(screen.getByText("診断が増えました")).toBeTruthy();
-    expect(screen.getByText("日記・記録が増えました")).toBeTruthy();
-    expect(screen.getByText("前回の生成から時間が経ちました")).toBeTruthy();
+    expect(screen.getByText(/診断が増えました・日記・記録が増えました/)).toBeTruthy();
 
-    fireEvent.change(selector, { target: { value: "version-2" } });
-    fireEvent.click(screen.getByRole("button", { name: "まとめを更新" }));
+    fireEvent.click(screen.getByRole("button", { name: "第2版を表示" }));
+    fireEvent.click(screen.getByRole("button", { name: "新しい私を見る" }));
 
     expect(onSelectVersion).toHaveBeenCalledWith("version-2");
     expect(onRegenerate).toHaveBeenCalledOnce();
   });
 
-  it("過去版では再生成を無効にし、生成中も現在の版を閲覧できると伝える", () => {
+  it("左右のスワイプで版を移動し、右スワイプで新しい版を生成する", () => {
+    const onSelectVersion = vi.fn();
+    const onRegenerate = vi.fn();
+    const { rerender } = render(
+      <ProfileSummaryScreen
+        state={{ status: "success", data: { summary, nextAction: "chat" } }}
+        versioning={versioning}
+        onRetry={vi.fn()}
+        onSelectVersion={onSelectVersion}
+        onRegenerate={onRegenerate}
+      />,
+    );
+
+    const latestCard = screen.getByLabelText("第3版、1/2");
+    firePointer(latestCard, "pointerdown", {
+      button: 0,
+      clientX: 100,
+      clientY: 10,
+      pointerId: 1,
+    });
+    firePointer(latestCard, "pointerup", { clientX: 0, clientY: 12, pointerId: 1 });
+    expect(onSelectVersion).toHaveBeenCalledWith("version-2");
+
+    firePointer(latestCard, "pointerdown", {
+      button: 0,
+      clientX: 0,
+      clientY: 10,
+      pointerId: 2,
+    });
+    firePointer(latestCard, "pointerup", { clientX: 100, clientY: 12, pointerId: 2 });
+    expect(onRegenerate).toHaveBeenCalledOnce();
+
+    rerender(
+      <ProfileSummaryScreen
+        state={{ status: "success", data: { summary, nextAction: "chat" } }}
+        versioning={{ ...versioning, selectedVersionId: "version-2" }}
+        onRetry={vi.fn()}
+        onSelectVersion={onSelectVersion}
+        onRegenerate={onRegenerate}
+      />,
+    );
+
+    const pastCard = screen.getByLabelText("第2版、2/2");
+    firePointer(pastCard, "pointerdown", {
+      button: 0,
+      clientX: 0,
+      clientY: 10,
+      pointerId: 3,
+    });
+    firePointer(pastCard, "pointerup", { clientX: 100, clientY: 12, pointerId: 3 });
+    expect(onSelectVersion).toHaveBeenLastCalledWith("version-3");
+    expect(screen.queryByRole("button", { name: "新しい私を見る" })).toBeNull();
+  });
+
+  it("過去版では生成操作を隠し、生成中も現在の版を閲覧できると伝える", () => {
     const { rerender } = render(
       <ProfileSummaryScreen
         state={{ status: "success", data: { summary, nextAction: "chat" } }}
@@ -119,12 +184,8 @@ describe("ProfileSummaryScreen", () => {
       />,
     );
 
-    expect(
-      screen.getByText("過去の版を表示中です。更新するには最新版へ戻ってください。"),
-    ).toBeTruthy();
-    expect(screen.getByRole("button", { name: "まとめを更新" }).hasAttribute("disabled")).toBe(
-      true,
-    );
+    expect(screen.getByText("左右のスワイプで版を移動")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "新しい私を見る" })).toBeNull();
 
     rerender(
       <ProfileSummaryScreen
@@ -140,9 +201,7 @@ describe("ProfileSummaryScreen", () => {
     );
 
     expect(screen.getByRole("status").textContent).toContain("現在の版や過去の版を確認できます");
-    expect(screen.getByRole("button", { name: "新しい版を作成中" }).hasAttribute("disabled")).toBe(
-      true,
-    );
+    expect(screen.queryByRole("button", { name: "新しい私を見る" })).toBeNull();
   });
 
   it("まとめがなければ診断とLINEの会話を案内する", () => {
