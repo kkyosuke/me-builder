@@ -295,7 +295,7 @@ stateDiagram-v2
     applied --> [*]
 ```
 
-`diary_brain_checkpoint_items`はcheckpointと実際に保存されたBrain Itemを生成順に結ぶ永続的な対応表です。開発環境の確認Pushはこの対応とEvidence edgeから内容を再構築します。Brain Item適用後にPushだけ失敗しても、Queue再配送でItemを再生成せず通知だけを同じretry keyで再送します。
+`diary_brain_checkpoint_items`はcheckpointと実際に保存されたBrain Itemを生成順に結ぶ永続的な対応表です。local / preview環境の確認Pushはこの対応とEvidence edgeから内容を再構築します。Brain Item適用後にPushだけ失敗しても、Queue再配送でItemを再生成せず通知だけを同じretry keyで再送します。productionでは確認Pushを送りません。
 
 ### 4.7 Brain Item関連
 

@@ -7,6 +7,7 @@ import { createGeminiClient, generateStructuredText } from "../infrastructure/ge
 import { classifySafety } from "./diary-chat";
 
 export const DIARY_BRAIN_PROMPT_VERSION = "diary-brain-v1";
+const BRAIN_ITEM_NOTIFICATION_ENVIRONMENTS = new Set(["dev", "development", "local", "preview"]);
 
 const CandidateSchema = v.strictObject({
   category: v.literal("memory"),
@@ -142,7 +143,7 @@ export function buildDevelopmentBrainItemMessage(
   candidates: readonly { statement: string; sourceMessageIds: readonly string[] }[],
   environment: string,
 ): string | undefined {
-  if (!["dev", "development", "local"].includes(environment)) return undefined;
+  if (!BRAIN_ITEM_NOTIFICATION_ENVIRONMENTS.has(environment)) return undefined;
   const summary =
     candidates.length === 0
       ? "- 追加なし"

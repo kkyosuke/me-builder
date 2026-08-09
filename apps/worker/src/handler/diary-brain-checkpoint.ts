@@ -74,7 +74,6 @@ async function sendDevelopmentNotification(
     candidates: readonly { statement: string; sourceMessageIds: readonly string[] }[];
   },
 ): Promise<void> {
-  if (!["dev", "development", "local"].includes(workerConfig.environment)) return;
   const result =
     appliedResult ??
     (await accountData.execute(

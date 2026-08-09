@@ -152,6 +152,9 @@ describe("diary Brain checkpoint", () => {
     expect(buildDevelopmentBrainItemMessage(candidates, "development")).toContain(
       "[dev] 追加したBrain Item\n- 1. Memory: 公園を散歩した",
     );
+    expect(buildDevelopmentBrainItemMessage(candidates, "preview")).toContain(
+      "[dev] 追加したBrain Item\n- 1. Memory: 公園を散歩した",
+    );
     expect(buildDevelopmentBrainItemMessage(candidates, "production")).toBeUndefined();
   });
 
