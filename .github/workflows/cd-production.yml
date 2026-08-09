@@ -24,6 +24,7 @@ jobs:
       CLOUDFLARE_APP_API_TOKEN: ${{ secrets.CLOUDFLARE_APP_API_TOKEN }}
       CHAT_DELIVERY_SECRET: ${{ secrets.CHAT_DELIVERY_SECRET }}
       CLOUDFLARE_AI_GATEWAY_ID: ${{ vars.CLOUDFLARE_AI_GATEWAY_ID }}
+      CLOUDFLARE_ACCESS_ALLOWED_EMAILS: ${{ vars.CLOUDFLARE_ACCESS_ALLOWED_EMAILS }}
       ADMIN_LINE_USER_IDS: ${{ secrets.ADMIN_LINE_USER_IDS }}
       # LIFF Server API は LINE Login チャネルのチャネルアクセストークンを要求する。
       # LINE_LOGIN_CHANNEL_ID は未設定でも LIFF ID の接頭辞から補完される。
@@ -48,6 +49,10 @@ jobs:
 
       - name: Run CI Verification
         run: bun run ci
+
+      - name: Protect API Documentation with Cloudflare Access (Production)
+        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
+        run: task access:setup:production
 
       - name: Ensure Queues (Production)
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}

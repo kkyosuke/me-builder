@@ -34,6 +34,8 @@
     - `task db:migrate:production`: 本番環境への D1 データベースマイグレーション適用
     - `task queues:setup:preview`: プレビュー環境のChat Turn QueueとDLQを冪等に作成
     - `task queues:setup:production`: 本番環境のChat Turn QueueとDLQを冪等に作成
+    - `task access:setup:preview`: プレビュー環境のOpenAPI documentとSwagger UI用パスをCloudflare Accessで保護
+    - `task access:setup:production`: 本番環境のOpenAPI documentとSwagger UI用パスをCloudflare Accessで保護
     - `bun --cwd apps/worker do:generate`: AccountDataとConversationCoordinatorのDrizzle schemaから、それぞれ`apps/worker/drizzle/<durable-object>/`へDurable SQLite migrationを生成
     - `task db:seed:local`: ローカルD1へ診断seedを適用
     - `task db:seed:preview`: プレビューD1へ診断seedを適用
@@ -107,6 +109,12 @@
     - 日記の本文はログへ出力せず、判定結果 (`intent`) だけを残します。
   - `LIFF_ID` は `apps/worker` へ配布します。秘密情報ではありませんが、GitHub Environment の変数を単一の出所とするため、CDワークフローが一時的なsecretファイルを作り、`wrangler deploy --secrets-file`でコードと同じWorker Versionへ配布します。未設定の場合は`diagnosis-request`へリンクを利用できない旨を返信します。
   - 環境変数が未設定の場合は自動登録および返信処理がログ出力とともに安全にスキップされます。
+
+- **APIドキュメントのCloudflare Access設定**:
+  - PreviewとProductionへのデプロイ前に`task access:setup:preview`または`task access:setup:production`を実行し、[インフラ・システム構成](../../docs/architecture/infrastructure-architecture.md#61-apiドキュメントのcloudflare-access境界)で定めたパスだけを保護します。
+  - 許可する開発者メールアドレスはGitHub Environment変数`CLOUDFLARE_ACCESS_ALLOWED_EMAILS`へカンマ区切りで設定します。空、または不正なメールアドレスを含む場合は設定処理とデプロイを失敗させます。
+  - `CLOUDFLARE_DEPLOY_API_TOKEN`には、既存のデプロイ権限に加えて`Access: Apps and Policies Write`を付与します。Access APIエラーを警告へ変換せず、保護できない状態でデプロイを続行しません。
+  - スクリプトが管理していないpolicyが同名Applicationに存在する場合は、意図しないAllow条件を温存しないよう自動削除せず停止します。Cloudflare Dashboardで内容を確認してから解消してください。
 
 - **LINE Webhook の署名検証 (`x-line-signature`)**:
   - `POST /api/line/webhook` は、Queue 投入前に必ず `x-line-signature` ヘッダを検証します。検証は公式 SDK (`@line/bot-sdk`) の `validateSignature` (HMAC-SHA256 + timing-safe 比較) に委譲し、`packages/lib` の `line.webhook.verifySignature` として提供します。
