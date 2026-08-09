@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ProfileSummary, ProfileSummaryVersioning } from "../model/profile-summary";
 import { ProfileSummaryScreen } from "./profile-summary-screen";
@@ -61,7 +61,10 @@ const versioning: ProfileSummaryVersioning = {
 };
 
 describe("ProfileSummaryScreen", () => {
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
 
   it("生成したまとめ、根拠、入力範囲を表示する", () => {
     render(
@@ -136,6 +139,7 @@ describe("ProfileSummaryScreen", () => {
   });
 
   it("左右のスワイプで版を移動し、右スワイプで新しい版を生成する", () => {
+    vi.useFakeTimers();
     const onSelectVersion = vi.fn();
     const onRegenerate = vi.fn();
     const { rerender } = render(
@@ -156,6 +160,9 @@ describe("ProfileSummaryScreen", () => {
       pointerId: 1,
     });
     firePointer(latestCard, "pointerup", { clientX: 0, clientY: 12, pointerId: 1 });
+    expect(onSelectVersion).not.toHaveBeenCalled();
+    expect(latestCard.getAttribute("style")).toContain("translate3d(-115%");
+    act(() => vi.advanceTimersByTime(280));
     expect(onSelectVersion).toHaveBeenCalledWith("version-2");
 
     firePointer(latestCard, "pointerdown", {
@@ -165,6 +172,9 @@ describe("ProfileSummaryScreen", () => {
       pointerId: 2,
     });
     firePointer(latestCard, "pointerup", { clientX: 100, clientY: 12, pointerId: 2 });
+    expect(screen.getByText("新しい版を追加しています")).toBeTruthy();
+    expect(onRegenerate).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(280));
     expect(onRegenerate).toHaveBeenCalledOnce();
 
     rerender(
@@ -185,6 +195,7 @@ describe("ProfileSummaryScreen", () => {
       pointerId: 3,
     });
     firePointer(pastCard, "pointerup", { clientX: 100, clientY: 12, pointerId: 3 });
+    act(() => vi.advanceTimersByTime(280));
     expect(onSelectVersion).toHaveBeenLastCalledWith("version-3");
     expect(screen.queryByRole("button", { name: "新しい私を見る" })).toBeNull();
   });
@@ -216,6 +227,7 @@ describe("ProfileSummaryScreen", () => {
       />,
     );
 
+    expect(screen.getByText("新しい版を作成中")).toBeTruthy();
     expect(screen.getByRole("status").textContent).toContain("現在の版や過去の版を確認できます");
     expect(screen.queryByRole("button", { name: "新しい私を見る" })).toBeNull();
   });

@@ -10,7 +10,13 @@ import {
   RefreshCw,
   Sparkles,
 } from "lucide-react";
-import { type ReactNode, type PointerEvent as ReactPointerEvent, useRef, useState } from "react";
+import {
+  type ReactNode,
+  type PointerEvent as ReactPointerEvent,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { LoadingState } from "../../../components/loading-state";
 import { MainNavigation } from "../../../components/main-navigation";
 import type { AsyncState } from "../../../model/async-state";
@@ -46,6 +52,27 @@ function versionLabel(sequence: number | null): string {
   return sequence === null ? "最新版" : `第${sequence}版`;
 }
 
+const CARD_TRANSITION_MS = 280;
+
+type CardTransition =
+  | Readonly<{ type: "select"; direction: -1 | 1; versionId: string }>
+  | Readonly<{ type: "regenerate"; direction: 1 }>;
+
+function useReducedMotion(): boolean {
+  const [reduced, setReduced] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setReduced(query.matches);
+    const onChange = (event: MediaQueryListEvent) => setReduced(event.matches);
+    query.addEventListener("change", onChange);
+    return () => query.removeEventListener("change", onChange);
+  }, []);
+
+  return reduced;
+}
+
 function SummaryCardStack({
   versioning,
   onSelectVersion,
@@ -58,7 +85,19 @@ function SummaryCardStack({
   children: ReactNode;
 }) {
   const dragStart = useRef<{ x: number; y: number; pointerId: number } | null>(null);
+  const transitionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [dragX, setDragX] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const [transition, setTransition] = useState<CardTransition | null>(null);
+  const reducedMotion = useReducedMotion();
+
+  useEffect(
+    () => () => {
+      if (transitionTimer.current) clearTimeout(transitionTimer.current);
+    },
+    [],
+  );
+
   const selected =
     versioning.versions.find(({ id }) => id === versioning.selectedVersionId) ??
     versioning.versions[0];
@@ -70,12 +109,21 @@ function SummaryCardStack({
   const canRegenerate = Boolean(
     selected.isLatest && versioning.generation.canRegenerate && !isWorking && onRegenerate,
   );
-  const canSwipe = Boolean(onSelectVersion && versioning.versions.length > 1) || canRegenerate;
+  const canSwipe =
+    !transition && (Boolean(onSelectVersion && versioning.versions.length > 1) || canRegenerate);
+  const olderVersion = versioning.versions[selectedIndex + 1];
+  const transitionVersion =
+    transition?.type === "select"
+      ? versioning.versions.find(({ id }) => id === transition.versionId)
+      : undefined;
+  const revealedVersion = transitionVersion ?? olderVersion;
+  const hasGenerationCard = canRegenerate || isWorking || transition?.type === "regenerate";
 
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (!canSwipe || (event.button !== 0 && event.pointerType !== "touch")) return;
     event.currentTarget.setPointerCapture?.(event.pointerId);
     dragStart.current = { x: event.clientX, y: event.clientY, pointerId: event.pointerId };
+    setIsDragging(true);
   };
 
   const onPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -88,11 +136,14 @@ function SummaryCardStack({
     const start = dragStart.current;
     if (!start || start.pointerId !== event.pointerId) return;
     dragStart.current = null;
-    setDragX(0);
+    setIsDragging(false);
     if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
-    if (cancelled) return;
+    if (cancelled) {
+      setDragX(0);
+      return;
+    }
 
     const action = resolveProfileSummarySwipe({
       deltaX: event.clientX - start.x,
@@ -100,8 +151,33 @@ function SummaryCardStack({
       versioning,
       canRegenerate,
     });
-    if (action.type === "select") onSelectVersion?.(action.versionId);
-    if (action.type === "regenerate") onRegenerate?.();
+    if (action.type === "none") {
+      setDragX(0);
+      return;
+    }
+
+    const nextTransition: CardTransition =
+      action.type === "select"
+        ? {
+            type: "select",
+            direction: event.clientX - start.x < 0 ? -1 : 1,
+            versionId: action.versionId,
+          }
+        : { type: "regenerate", direction: 1 };
+    const complete = () => {
+      if (nextTransition.type === "select") onSelectVersion?.(nextTransition.versionId);
+      if (nextTransition.type === "regenerate") onRegenerate?.();
+      setTransition(null);
+      setDragX(0);
+      transitionTimer.current = null;
+    };
+
+    if (reducedMotion) {
+      complete();
+      return;
+    }
+    setTransition(nextTransition);
+    transitionTimer.current = setTimeout(complete, CARD_TRANSITION_MS);
   };
 
   const reasonText = versioning.generation.reasons
@@ -112,25 +188,50 @@ function SummaryCardStack({
     <section aria-label="今のわたしの版" aria-roledescription="カルーセル" className="mt-8">
       <div className="relative pb-4">
         {versioning.versions.length > 1 && (
-          <>
-            <div
-              aria-hidden="true"
-              className="absolute inset-x-5 top-3 bottom-1 rounded-3xl border border-violet-200 bg-violet-100/70 dark:border-violet-800 dark:bg-violet-950/60"
-            />
-            <div
-              aria-hidden="true"
-              className="absolute inset-x-3 top-1.5 bottom-2.5 rounded-3xl border border-sky-200 bg-sky-100/80 dark:border-sky-800 dark:bg-sky-950/70"
-            />
-          </>
+          <div
+            aria-hidden="true"
+            className="absolute inset-x-5 top-3 bottom-1 rounded-3xl border border-violet-200 bg-violet-100/70 dark:border-violet-800 dark:bg-violet-950/60"
+          />
         )}
 
-        {canRegenerate && (
-          <div className="absolute inset-y-4 left-0 right-8 flex items-center rounded-3xl bg-gradient-to-r from-violet-600 to-sky-500 px-3 text-white shadow-lg">
+        {revealedVersion && (
+          <div
+            aria-hidden="true"
+            className="absolute inset-x-3 top-1.5 bottom-2.5 flex items-start justify-end rounded-3xl border border-sky-200 bg-gradient-to-br from-sky-100 to-violet-100 p-4 text-right shadow-md transition-transform duration-300 ease-out motion-reduce:transition-none dark:border-sky-800 dark:from-sky-950 dark:to-violet-950"
+            style={{
+              transform:
+                transition?.type === "select"
+                  ? "translate3d(0, 0, 0) scale(1)"
+                  : "translate3d(0, 8px, 0) scale(0.96)",
+            }}
+          >
+            <div>
+              <p className="text-xs font-bold text-violet-700 dark:text-violet-300">
+                {versionLabel(revealedVersion.sequence)}
+              </p>
+              <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">過去の私</p>
+            </div>
+          </div>
+        )}
+
+        {hasGenerationCard && (
+          <div
+            aria-hidden="true"
+            className={`absolute flex items-center rounded-3xl bg-gradient-to-r from-violet-600 to-sky-500 px-3 text-white shadow-lg transition-all duration-300 ease-out motion-reduce:transition-none ${transition?.type === "regenerate" ? "inset-x-0 top-0 bottom-4 z-[5] scale-100" : isWorking ? "inset-x-3 top-1.5 bottom-2.5 scale-[0.96]" : "inset-y-4 left-0 right-8 scale-100"}`}
+          >
             <div className="flex w-full items-center gap-3">
               <Sparkles className="size-5 shrink-0" aria-hidden="true" />
               <div>
-                <p className="text-sm font-bold">新しい私を見る</p>
-                <p className="mt-1 text-[11px] text-white/80">右へスワイプして生成</p>
+                <p className="text-sm font-bold">
+                  {transition?.type === "regenerate"
+                    ? "新しい版を追加しています"
+                    : isWorking
+                      ? "新しい版を作成中"
+                      : "新しい私を見る"}
+                </p>
+                {!isWorking && transition?.type !== "regenerate" && (
+                  <p className="mt-1 text-[11px] text-white/80">右へスワイプして生成</p>
+                )}
               </div>
             </div>
           </div>
@@ -138,8 +239,12 @@ function SummaryCardStack({
 
         <div
           aria-label={`${versionLabel(selected.sequence)}、${selectedIndex + 1}/${versioning.versions.length}`}
-          className={`relative z-10 select-none transition-transform duration-200 ease-out motion-reduce:transition-none ${canRegenerate ? "ml-8 w-[calc(100%-2rem)]" : "w-full"} ${canSwipe ? "cursor-grab touch-pan-y active:cursor-grabbing" : ""}`}
-          style={{ transform: `translate3d(${dragX}px, 0, 0) rotate(${dragX / 60}deg)` }}
+          className={`relative z-10 select-none transition-transform ease-out motion-reduce:transition-none ${isDragging ? "duration-0" : "duration-300"} ${canRegenerate ? "ml-8 w-[calc(100%-2rem)]" : "w-full"} ${canSwipe ? "cursor-grab touch-pan-y active:cursor-grabbing" : ""}`}
+          style={{
+            transform: transition
+              ? `translate3d(${transition.direction * 115}%, 0, 0) rotate(${transition.direction * 8}deg)`
+              : `translate3d(${dragX}px, 0, 0) rotate(${dragX / 60}deg)`,
+          }}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={(event) => finishPointer(event, false)}
@@ -156,7 +261,7 @@ function SummaryCardStack({
             type="button"
             aria-label={`${versionLabel(version.sequence)}を表示`}
             aria-pressed={version.id === selected.id}
-            disabled={!onSelectVersion || version.id === selected.id}
+            disabled={!onSelectVersion || version.id === selected.id || Boolean(transition)}
             onClick={() => onSelectVersion?.(version.id)}
             className={`rounded-full transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400 ${version.id === selected.id ? "h-2.5 w-7 bg-sky-500" : "size-2.5 bg-slate-300 hover:bg-slate-400 dark:bg-slate-600"}`}
           >
@@ -177,6 +282,7 @@ function SummaryCardStack({
           <button
             type="button"
             onClick={onRegenerate}
+            disabled={Boolean(transition)}
             className="inline-flex items-center gap-1.5 rounded-full bg-violet-100 px-3 py-1.5 font-bold text-violet-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 dark:bg-violet-950 dark:text-violet-200"
           >
             <Sparkles className="size-3.5" aria-hidden="true" />
