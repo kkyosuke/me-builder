@@ -140,7 +140,6 @@ describe("Worker", () => {
       expect.objectContaining({
         eventId: "webhook-event-1",
         body: "今日は散歩した",
-        traceId: "trace-1",
       }),
     );
     expect(mockAcceptMessage).toHaveBeenCalledWith(

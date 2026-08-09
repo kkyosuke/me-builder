@@ -164,7 +164,6 @@ export async function processLineWebhook(
           eventId,
           body: event.message.text,
           receivedAt,
-          ...(traceId ? { traceId } : {}),
         },
       );
     } catch (error) {

@@ -243,7 +243,6 @@ export class ConversationCoordinatorRepository {
       .select({
         turnId: localTurns.turnId,
         generationEpoch: localTurns.generationEpoch,
-        traceId: localTurns.traceId,
         traceIds: localTurns.traceIds,
       })
       .from(localTurns)
@@ -302,7 +301,7 @@ export class ConversationCoordinatorRepository {
   completeAttachBatch(
     batchId: string,
     eventIds: string[],
-    turn?: { turnId: string; generationEpoch: number; traceId?: string; traceIds?: string[] },
+    turn?: { turnId: string; generationEpoch: number; traceIds?: string[] },
   ): void {
     this.db.transaction((tx) => {
       if (turn) {

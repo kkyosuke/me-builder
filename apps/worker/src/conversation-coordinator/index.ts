@@ -3,6 +3,7 @@ import { accountDataFor, d1 } from "@me-builder/lib";
 import {
   type ChatTurnQueueMessage,
   type GenerationLease,
+  MAX_CHAT_TURN_TRACE_IDS,
   type TurnDeliveryRequest,
   type TurnDeliveryResult,
   logger,
@@ -23,6 +24,8 @@ import type { Env } from "../types";
 import { ConversationCoordinatorRepository } from "./repository";
 
 const COALESCE_MS = 1_500;
+/** Queue payloadと終端logを有界に保つため、1 Turnへまとめる入力数を制限する。 */
+const MAX_MESSAGES_PER_TURN = MAX_CHAT_TURN_TRACE_IDS;
 const LEASE_MS = 90_000;
 const ALARM_RETRY_MS = 30_000;
 const ACCEPTED_MESSAGE_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
@@ -253,12 +256,7 @@ export class ConversationCoordinator extends DurableObject<Env> {
     this.repository.expirePendingDeliveries(Date.now());
     this.repository.expireGenerationLeases(Date.now());
     for (const turn of this.repository.listPendingQueueTurns()) {
-      await this.enqueueTurn(
-        turn.turnId,
-        turn.generationEpoch,
-        turn.traceId ?? undefined,
-        turn.traceIds ?? undefined,
-      );
+      await this.enqueueTurn(turn.turnId, turn.generationEpoch, turn.traceIds ?? undefined);
     }
 
     let batch = this.repository.findAttachBatch();
@@ -267,7 +265,7 @@ export class ConversationCoordinator extends DurableObject<Env> {
       if (pending.length > 0) {
         const generationEpoch = this.repository.nextGenerationEpoch();
         this.repository.createAttachBatch(
-          pending.map(({ eventId }) => eventId),
+          pending.slice(0, MAX_MESSAGES_PER_TURN).map(({ eventId }) => eventId),
           generationEpoch,
         );
         batch = this.repository.findAttachBatch();
@@ -298,7 +296,6 @@ export class ConversationCoordinator extends DurableObject<Env> {
     const traceIds = [
       ...new Set(batch.messages.flatMap((message) => (message.traceId ? [message.traceId] : []))),
     ];
-    const traceId = traceIds.at(-1);
     this.repository.completeAttachBatch(
       batch.id,
       batch.messages.map(({ eventId }) => eventId),
@@ -306,7 +303,6 @@ export class ConversationCoordinator extends DurableObject<Env> {
         ? {
             turnId: attached.turnId,
             generationEpoch: attached.generationEpoch,
-            ...(traceId ? { traceId } : {}),
             ...(traceIds.length > 0 ? { traceIds } : {}),
           }
         : undefined,
@@ -316,7 +312,7 @@ export class ConversationCoordinator extends DurableObject<Env> {
       isCurrentGeneration ? attached.turnId : undefined,
     );
     if (isCurrentGeneration) {
-      await this.enqueueTurn(attached.turnId, attached.generationEpoch, traceId, traceIds);
+      await this.enqueueTurn(attached.turnId, attached.generationEpoch, traceIds);
     }
     await this.schedulePendingWork();
   }
@@ -355,13 +351,13 @@ export class ConversationCoordinator extends DurableObject<Env> {
   private async enqueueTurn(
     turnId: string,
     generationEpoch: number,
-    traceId?: string,
     traceIds?: string[],
   ): Promise<void> {
     const queue = this.cf.queue.chatTurn;
     if (!queue) throw new Error("CHAT_TURN_QUEUE binding is not configured");
     const accountId = this.repository.getBoundAccountId();
     if (!accountId) throw new Error("Conversation coordinator is not bound to an Account");
+    const traceId = traceIds?.at(-1);
     const message: ChatTurnQueueMessage = {
       type: "chat-turn",
       ...(traceId ? { traceId } : {}),

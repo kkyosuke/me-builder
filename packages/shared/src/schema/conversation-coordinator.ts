@@ -29,6 +29,7 @@ export interface ConversationCoordinatorRpc {
     traceId?: string;
   }): Promise<{ accepted: boolean }>;
   acquireGeneration(turnId: string, generationEpoch: number): Promise<GenerationLease>;
+  requeueTurn(turnId: string, generationEpoch: number): Promise<void>;
   isGenerationLeaseActive(
     turnId: string,
     generationEpoch: number,

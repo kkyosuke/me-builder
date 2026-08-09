@@ -1,5 +1,8 @@
 import type { Message, MessageBatch, Queue } from "@cloudflare/workers-types";
 
+/** D1の100 bind parameter制限内で、1 Turnのmessage insertと相関IDを有界に保つ。 */
+export const MAX_CHAT_TURN_TRACE_IDS = 6;
+
 export interface WebhookQueueMessage {
   id: string;
   /** API受付から後続の非同期処理まで引き継ぐ。省略形は既存messageとの互換用。 */

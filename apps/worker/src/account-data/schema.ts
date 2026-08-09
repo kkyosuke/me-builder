@@ -1,15 +1,6 @@
 import { sql } from "drizzle-orm";
-import {
-  check,
-  index,
-  integer,
-  primaryKey,
-  sqliteTable,
-  text,
-  uniqueIndex,
-} from "drizzle-orm/sqlite-core";
+import { check, index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 import { accounts } from "../../../../packages/lib/src/d1/schema/account";
-import { sourceRecords } from "../../../../packages/lib/src/d1/schema/source";
 
 /** 1つのAccountData Objectを最初に利用したAccountへ永続的に固定する。 */
 export const accountDataIdentity = sqliteTable(
@@ -20,18 +11,6 @@ export const accountDataIdentity = sqliteTable(
     legacyImportedAt: integer("legacy_imported_at", { mode: "timestamp" }),
   },
   (table) => [check("account_data_identity_singleton_check", sql`${table.singleton} = 1`)],
-);
-
-/** Source保存を起点のWebhook受付へ関連付ける。再配送では同じ組を冪等に保持する。 */
-export const sourceTraceContexts = sqliteTable(
-  "source_trace_contexts",
-  {
-    sourceRecordId: text("source_record_id")
-      .notNull()
-      .references(() => sourceRecords.id, { onDelete: "cascade" }),
-    traceId: text("trace_id").notNull(),
-  },
-  (table) => [primaryKey({ columns: [table.sourceRecordId, table.traceId] })],
 );
 
 /** 相性関係の正本を複製せず、本人の一覧と重複防止に必要な参照だけを持つ。 */

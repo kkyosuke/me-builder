@@ -1,22 +1,12 @@
 import { d1 } from "@me-builder/lib";
-import { sourceTraceContexts } from "./schema";
 
 /** Diary source, session, message and turn operations owned by one AccountData Object. */
 export const diaryActions = {
-  "conversation.storeLineTextSource": async (
+  "conversation.storeLineTextSource": (
     db: d1.Client,
     accountId: string,
     input: Omit<Parameters<typeof d1.action.conversation.storeLineTextSource>[1], "accountId">,
-  ) => {
-    const source = await d1.action.conversation.storeLineTextSource(db, { ...input, accountId });
-    if (input.traceId) {
-      await db
-        .insert(sourceTraceContexts)
-        .values({ sourceRecordId: source.sourceRecordId, traceId: input.traceId })
-        .onConflictDoNothing();
-    }
-    return source;
-  },
+  ) => d1.action.conversation.storeLineTextSource(db, { ...input, accountId }),
   "conversation.attachMessagesToTurn": (
     db: d1.Client,
     accountId: string,

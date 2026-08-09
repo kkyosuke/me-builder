@@ -2,7 +2,7 @@ import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import type { D1Database } from "@cloudflare/workers-types";
 import { d1 } from "@me-builder/lib";
-import type { ChatTurnQueueMessage } from "@me-builder/shared";
+import { type ChatTurnQueueMessage, MAX_CHAT_TURN_TRACE_IDS } from "@me-builder/shared";
 import Database from "better-sqlite3";
 import { Miniflare } from "miniflare";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -177,6 +177,43 @@ describe("ConversationCoordinator D1 E2E", () => {
     await expect(
       coordinator.acquireGeneration(queuedTurn.turnId, queuedTurn.generationEpoch),
     ).resolves.toEqual({ acquired: false, reason: "stale" });
+  });
+
+  it("1 TurnのtraceIdsを上限内に保ち、超過した入力を次Turnへ残す", async () => {
+    const sourceCount = MAX_CHAT_TURN_TRACE_IDS + 1;
+    const sources: StoredAccountLineSource[] = [];
+    for (let index = 0; index < sourceCount; index += 1) {
+      sources.push(
+        await storeSource(
+          "U_trace_limit_e2e",
+          `trace-limit-event-${index}`,
+          `message-${index}`,
+          new Date(Date.UTC(2026, 7, 7, 0, 0, index)),
+        ),
+      );
+    }
+    const queued: ChatTurnQueueMessage[] = [];
+    const { coordinator, getAlarm, runAlarm } = createCoordinator(async (message) => {
+      queued.push(message);
+    });
+    for (const [index, source] of sources.entries()) {
+      await coordinator.acceptMessage({ ...acceptedInput(source), traceId: `trace-${index}` });
+    }
+
+    await runAlarm();
+
+    expect(queued).toHaveLength(1);
+    expect(queued[0]?.traceIds).toEqual(
+      Array.from({ length: MAX_CHAT_TURN_TRACE_IDS }, (_, index) => `trace-${index}`),
+    );
+    expect(queued[0]?.traceId).toBe(`trace-${MAX_CHAT_TURN_TRACE_IDS - 1}`);
+    expect(getAlarm()).not.toBeNull();
+    const context = await d1.action.conversation.getTurnContext(
+      client,
+      queued[0]?.turnId ?? "",
+      sourceCount,
+    );
+    expect(context?.messages).toHaveLength(MAX_CHAT_TURN_TRACE_IDS);
   });
 
   it("D1反映後に停止しても固定batchだけを復旧し、後着messageを次Turnへ送る", async () => {

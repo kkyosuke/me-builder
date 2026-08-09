@@ -1,1 +1,0 @@
-ALTER TABLE `local_turns` ADD `trace_ids` text;

@@ -60,12 +60,6 @@ async function applyMigrations(db: D1Database): Promise<void> {
       .filter(Boolean);
     for (const statement of statements) await db.prepare(statement).run();
   }
-  // 共有D1をAccountData互換adapterとして使うfixtureにも、DO固有の相関表を用意する。
-  await db
-    .prepare(
-      "CREATE TABLE source_trace_contexts (source_record_id text NOT NULL, trace_id text NOT NULL, PRIMARY KEY(source_record_id, trace_id), FOREIGN KEY(source_record_id) REFERENCES source_records(id) ON DELETE CASCADE)",
-    )
-    .run();
 }
 
 function createCoordinator(send: (message: ChatTurnQueueMessage) => Promise<void>) {
@@ -360,7 +354,7 @@ describe("LINE diary chat delivery E2E", () => {
         disposition: "ack",
         stage: "line.deliver",
       }),
-      "Diary chat turn completed",
+      "Chat turn queue message completed",
     );
     expect(JSON.stringify(queuedTurn)).not.toContain(diaryText);
     expect(JSON.stringify(queuedTurn)).not.toContain(providerAccountId);
@@ -458,11 +452,23 @@ describe("LINE diary chat delivery E2E", () => {
     // statusを持たない失敗はネットワーク断であり、LINEへ届いたか判別できない。
     mockReplyMessage.mockRejectedValueOnce(new Error("network unreachable"));
 
-    await expect(
-      processChatTurnMessage(createQueueMessage(queuedTurn), bindings, workerConfig),
-    ).rejects.toThrow();
+    const first = createQueueMessage(queuedTurn);
+    const errorLog = vi.spyOn(logger, "error");
+    await processChatTurnMessage(first, bindings, workerConfig);
 
     // ここでpushしてしまうと、replyが実は届いていた場合に二重に届く。
+    expect(first.retry).toHaveBeenCalledOnce();
+    expect(first.ack).not.toHaveBeenCalled();
+    expect(errorLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "queue.message.failed",
+        errorCode: "LINE_FINAL_DELIVERY_FAILED",
+        stage: "line.deliver",
+        retryable: true,
+        disposition: "retry",
+      }),
+      "Chat turn queue message failed",
+    );
     expect(mockPushMessage).not.toHaveBeenCalled();
     expect(await turnStatus(queuedTurn.turnId)).toBe("delivery_pending");
 
@@ -566,10 +572,10 @@ describe("LINE diary chat delivery E2E", () => {
     vi.spyOn(coordinator, "isGenerationLeaseActive").mockResolvedValue(false);
     const message = createQueueMessage(queuedTurn);
 
-    await expect(processChatTurnMessage(message, bindings, workerConfig)).rejects.toThrow(
-      "Generation lease expired before response persistence",
-    );
+    await processChatTurnMessage(message, bindings, workerConfig);
 
+    expect(message.retry).toHaveBeenCalledOnce();
+    expect(message.ack).not.toHaveBeenCalled();
     const messages = await client.select().from(d1.schema.conversationMessages);
     expect(messages).toEqual([expect.objectContaining({ role: "user", assistantBody: null })]);
     expect(mockPushMessage).not.toHaveBeenCalled();
@@ -635,9 +641,9 @@ describe("LINE diary chat delivery E2E", () => {
     mockPushMessage.mockRejectedValueOnce({ status: 503 }).mockResolvedValue({});
     const first = createQueueMessage(queuedTurn, 2);
 
-    await expect(processChatTurnMessage(first, bindings, workerConfig)).rejects.toThrow(
-      "provider unavailable",
-    );
+    await processChatTurnMessage(first, bindings, workerConfig);
+    expect(first.retry).toHaveBeenCalledOnce();
+    expect(first.ack).not.toHaveBeenCalled();
     const retry = createQueueMessage(queuedTurn, 3);
     await processChatTurnMessage(retry, bindings, workerConfig);
 
@@ -658,9 +664,9 @@ describe("LINE diary chat delivery E2E", () => {
     mockPushMessage.mockRejectedValueOnce({ status: 503 }).mockResolvedValue({});
     const first = createQueueMessage(queuedTurn, 1);
 
-    await expect(processChatTurnMessage(first, bindings, workerConfig)).rejects.toEqual({
-      status: 503,
-    });
+    await processChatTurnMessage(first, bindings, workerConfig);
+    expect(first.retry).toHaveBeenCalledOnce();
+    expect(first.ack).not.toHaveBeenCalled();
     const firstDelivery = deliverTurn.mock.calls[0]?.[0];
     if (!firstDelivery) throw new Error("Expected the first delivery reservation");
     await expect(coordinator.deliverTurn(firstDelivery)).resolves.toEqual({

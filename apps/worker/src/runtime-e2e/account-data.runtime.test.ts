@@ -13,7 +13,6 @@ describe("AccountData Workers runtime E2E", () => {
     const firstAccountId = crypto.randomUUID();
     const secondAccountId = crypto.randomUUID();
     const eventId = crypto.randomUUID();
-    const traceId = crypto.randomUUID();
     const now = Date.now();
     await env.DB.prepare(
       "INSERT INTO accounts (id, created_at, updated_at) VALUES (?, ?, ?), (?, ?, ?)",
@@ -40,7 +39,6 @@ describe("AccountData Workers runtime E2E", () => {
       eventId,
       body: "private diary",
       receivedAt: new Date(),
-      traceId,
     });
 
     await runInDurableObject(first, async (_instance: AccountData, state) => {
@@ -52,14 +50,6 @@ describe("AccountData Workers runtime E2E", () => {
           )
           .one().body,
       ).toBe("private diary");
-      expect(
-        state.storage.sql
-          .exec<{ trace_id: string }>(
-            "SELECT trace_id FROM source_trace_contexts WHERE source_record_id = ?",
-            source.sourceRecordId,
-          )
-          .one().trace_id,
-      ).toBe(traceId);
     });
     await runInDurableObject(second, async (_instance: AccountData, state) => {
       expect(
@@ -73,7 +63,7 @@ describe("AccountData Workers runtime E2E", () => {
     });
   });
 
-  it("既存Brainデータを持つ配布済み0003 schemaへ後続migrationを追記できる", async () => {
+  it("既存Brainデータを持つ配布済み0003 schemaへ0004を追記できる", async () => {
     const accountId = crypto.randomUUID();
     const stub = env.ACCOUNT_DATA.getByName(accountId);
 
@@ -88,8 +78,7 @@ describe("AccountData Workers runtime E2E", () => {
       );
 
       state.storage.sql.exec("DROP TABLE compatibility_references");
-      state.storage.sql.exec("DROP TABLE source_trace_contexts");
-      state.storage.sql.exec("DELETE FROM __drizzle_migrations WHERE created_at >= 1786270180000");
+      state.storage.sql.exec("DELETE FROM __drizzle_migrations WHERE created_at = 1786270180000");
 
       const repository = Reflect.get(instance, "repository") as { initialize(): Promise<void> };
       await expect(repository.initialize()).resolves.toBeUndefined();
@@ -100,13 +89,6 @@ describe("AccountData Workers runtime E2E", () => {
           )
           .one().name,
       ).toBe("compatibility_references");
-      expect(
-        state.storage.sql
-          .exec<{ name: string }>(
-            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'source_trace_contexts'",
-          )
-          .one().name,
-      ).toBe("source_trace_contexts");
       expect(
         state.storage.sql
           .exec<{ statement: string }>("SELECT statement FROM brain_items WHERE id = 'brain-1'")
