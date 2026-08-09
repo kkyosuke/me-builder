@@ -5,6 +5,7 @@ import type {
   ReleaseCompatibilityReservationResult,
   ReserveCompatibilityReferenceResult,
 } from "./compatibility-data";
+import type * as brain from "./d1/action/brain";
 import type * as conversation from "./d1/action/conversation";
 import type * as diagnosis from "./d1/action/diagnosis";
 import type * as diagnosisBrainProjection from "./d1/action/diagnosis-brain-projection";
@@ -26,6 +27,7 @@ type DomainAction<TAction extends (...args: never[]) => unknown> = RpcAction<
 >;
 
 export type AccountDataActions = {
+  "brain.listActive": RpcAction<[], typeof brain.listActiveBrainItems>;
   "compatibility.addOutgoingReference": (
     input: Readonly<{ relationshipId: string; createdAt: Date }>,
   ) => Promise<CompatibilityReference>;

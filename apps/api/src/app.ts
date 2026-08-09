@@ -5,6 +5,7 @@ import { cors } from "hono/cors";
 import * as v from "valibot";
 import { getConfig } from "./config";
 import { adminStatisticsRoute } from "./contract/admin/statistics";
+import { developmentBrainItemsRoute } from "./contract/brain/dev-list";
 import { saveDiagnosisAnswerRoute } from "./contract/diagnosis/answer";
 import { diagnosisAnswersRoute } from "./contract/diagnosis/answers";
 import { deferDiagnosisQuestionRoute } from "./contract/diagnosis/deferred-question";
@@ -16,6 +17,7 @@ import { openApiOptions } from "./contract/openapi";
 import { profileSummaryRoute } from "./contract/profile/summary";
 import { InternalServerErrorSchema } from "./contract/shared/errors";
 import { getStatistics } from "./controller/admin";
+import { getDevelopmentBrainItems } from "./controller/brain";
 import {
   deleteDevelopmentDiagnosisData,
   getDiagnoses,
@@ -73,6 +75,8 @@ app.post("/api/line/liff/session", liffSessionRoute, postLiffSession);
 app.get("/api/admin/statistics", adminStatisticsRoute, getStatistics);
 
 app.get("/api/profile-summary", profileSummaryRoute, getProfileSummaryContents);
+
+app.get("/api/dev/brain-items", developmentBrainItemsRoute, getDevelopmentBrainItems);
 
 app.get("/api/diagnoses", diagnosisListRoute, getDiagnoses);
 app.get("/api/diagnoses/:diagnosisId", diagnosisDetailRoute, getDiagnosis);

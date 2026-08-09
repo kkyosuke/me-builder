@@ -313,6 +313,8 @@ Brain Itemを含むAccount所有データのquery境界は、[Accountデータ�
 
 検証を通過したBrain Itemは`active`として保存します。本人の同意を登録の条件にはしません。Vectorize同期jobと検索利用は後続実装であり、導入時にはBrain Item作成と同じAccountData SQLite transactionでoutboxへ追加します。AI推定は`derivation = ai`として区別し、Confidenceの算出前を表す`uncomputed`を検索順位に使いません。
 
+開発用の確認一覧は、本人確認済みAccountに対する`brain.listActive`だけをAccountData RPCへ公開し、activeかつ未削除のItemと未削除Evidenceを最大100件返します。APIの`GET /api/dev/brain-items`とWeb UIの表示は`development` / `local` / `preview` / `test`だけで有効にし、Productionでは404かつUI非表示とします。クライアントからAccount IDを受け取りません。
+
 ### 4.8 `vector_index_jobs`
 
 Vectorizeは非同期更新であるため、AccountDataを正とするoutboxを置きます。

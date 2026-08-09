@@ -16,6 +16,7 @@ describe("GET /api/openapi.json", () => {
     expect(document.paths["/api/diagnoses"]?.get).toBeDefined();
     expect(document.paths["/api/diagnoses/{diagnosisId}/answers"]?.get).toBeDefined();
     expect(document.paths["/api/line/liff/session"]?.post).toBeDefined();
+    expect(document.paths["/api/dev/brain-items"]?.get).toBeDefined();
     expect(document.paths["/api/line/liff/session"]?.post).toMatchObject({
       requestBody: {
         required: true,

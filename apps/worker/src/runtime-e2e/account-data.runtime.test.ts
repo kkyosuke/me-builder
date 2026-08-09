@@ -61,6 +61,31 @@ describe("AccountData Workers runtime E2E", () => {
           .toArray(),
       ).toEqual([]);
     });
+
+    await runInDurableObject(first, async (_instance: AccountData, state) => {
+      state.storage.sql.exec(
+        "INSERT INTO brain_items (id, created_at, updated_at, is_deleted, account_id, category, statement, attributes_json, derivation, status, stability, sensitivity, externally_shareable, confidence_json) VALUES ('visible-brain', ?, ?, 0, ?, 'memory', 'private diary', '{}', 'ai', 'active', 'stable', 'private', 0, '{}')",
+        now,
+        now,
+        firstAccountId,
+      );
+      state.storage.sql.exec(
+        "INSERT INTO brain_item_evidence_edges (id, created_at, updated_at, is_deleted, account_id, brain_item_id, source_record_id, relation, is_derivation_trigger, derivation_method, generated_at) VALUES ('visible-evidence', ?, ?, 0, ?, 'visible-brain', ?, 'supports', 1, 'ai', ?)",
+        now,
+        now,
+        firstAccountId,
+        source.sourceRecordId,
+        now,
+      );
+    });
+    await expect(first.execute(firstAccountId, "brain.listActive")).resolves.toMatchObject({
+      items: [{ id: "visible-brain", evidence: [{ sourceRecordId: source.sourceRecordId }] }],
+      truncated: false,
+    });
+    await expect(second.execute(secondAccountId, "brain.listActive")).resolves.toEqual({
+      items: [],
+      truncated: false,
+    });
   });
 
   it("既存Brainデータを持つ配布済み0003 schemaへ0004を追記できる", async () => {
