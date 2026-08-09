@@ -14,6 +14,7 @@ me-builderの開発基盤および全体アーキテクチャにおいて、イ�
 - 各 Cloudflare コンポーネント（Pages, Workers, D1, Vectorize, R2, KV, Durable Objects, Workers AI）の役割と配置
 - フロントエンド、API、MCPサーバー、ストレージ間のデータフロー
 - 開発・プレビュー・本番環境のインフラ運用方針
+- Cloudflare Accessで保護する運用エンドポイントと、公開を維持するエンドポイントの境界
 
 ### 所有しない概念
 
@@ -180,6 +181,33 @@ flowchart TD
       - UI (`apps/web`): `kagami.kyosuke.dev`
       - API (`apps/api`): `api.kagami.kyosuke.dev`
       - MCP (`apps/mcp`): `mcp.kagami.kyosuke.dev`
+
+### 6.1 APIドキュメントのCloudflare Access境界
+
+PreviewとProductionでは、APIドキュメントを利用者向けAPIとは別のCloudflare Access Applicationで保護します。ApplicationはAPIホスト全体ではなく、次のパスだけを対象にします。
+
+| パス | Access | 用途 |
+| --- | --- | --- |
+| `/api/openapi.json` | 必須 | 機械可読なOpenAPI document |
+| `/api/docs`、`/api/docs/*` | 必須 | Swagger UIを提供する場合の画面と配下のアセット |
+| `/api/health` | 不要 | 外形監視と死活確認 |
+
+```mermaid
+flowchart LR
+    Client[Request] --> Edge[Cloudflare Edge]
+    Edge -->|/api/openapi.json<br/>/api/docs/*| Access[Cloudflare Access]
+    Access -->|許可された開発者| API[API Worker]
+    Access -->|未認証・対象外| Deny[拒否]
+    Edge -->|/api/health| API
+```
+
+AccessのAllow policyは、IdPが検証した個別メールアドレスまたは開発者グループを対象にし、`Everyone`を指定しません。対象外の主体はAccessのdeny-by-defaultで拒否します。PreviewとProductionはホスト名が異なるため環境ごとにApplicationを持ちますが、同じアクセス境界を適用します。
+
+診断・プロフィール等の利用者向けAPIとLINE WebhookはこのApplicationへ含めません。それぞれが所有するLIFF IDトークン認証またはLINE署名検証を継続します。LocalではCloudflare Accessを経由せず、生成・検証作業から直接OpenAPI documentへアクセスできます。
+
+Access ApplicationとAllow policyが作成され、許可された開発者と未認証リクエストの両方を確認できるまでは、Swagger UIをPreviewまたはProductionへ公開しません。
+
+Applicationとpolicyは`scripts/setup-api-docs-access.ts`で冪等に作成・更新し、CDでAPI Serverのデプロイ前に適用します。許可対象やAPI token権限などの実行設定は[開発運用ルール](../../.agents/rules/development.md#apiドキュメントのcloudflare-access設定)を正とします。
 
 ## 7. 関連ドキュメント
 

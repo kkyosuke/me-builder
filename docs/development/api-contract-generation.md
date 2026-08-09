@@ -58,4 +58,6 @@ flowchart LR
 task generate:api
 ```
 
-API Serverは同じdocumentを`GET /api/openapi.json`でも公開します。`task ci`とGitHub Actionsは再生成後にGit差分が残らないことを検査するため、contract変更時は生成物も同じcommitへ含めます。
+API Serverは同じdocumentを`GET /api/openapi.json`でも提供します。PreviewとProductionでの公開範囲は[インフラ・システム構成のAPIドキュメント用Cloudflare Access境界](../architecture/infrastructure-architecture.md#61-apiドキュメントのcloudflare-access境界)に従います。リポジトリ内の生成処理は`apps/api/openapi.json`を直接入力とするため、Cloudflare Accessには依存しません。
+
+`task ci`とGitHub Actionsは再生成後にGit差分が残らないことを検査するため、contract変更時は生成物も同じcommitへ含めます。
