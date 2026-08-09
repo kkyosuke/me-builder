@@ -202,15 +202,14 @@ Current Stateには有効期限を設け、期限切れの状態を恒久的なP
 | Access Policy | Access Label、機微度、外部提供可否などを使って利用範囲を制御する |
 | Sensitivity | 機微度を表す |
 | Evidence | 導出の根拠になったSource Recordを示す。1件以上を必ず持つ |
-| Derivation | その導出がAIによる推定か、決定的な変換かを示す |
+| Derivation | その導出がAIによる推定か、同じ入力から同じ結果を作るルールベース変換かを示す |
 | Confidence | 確信度や推定の強さを示す |
-| Confirmation | 本人が確認・却下したかを示す |
 | Valid Time | いつの時点で有効だったかを示す |
 | Stability | 一時的、変化しやすい、安定的を区別する |
 | Revision | 修正や撤回の履歴を追えるようにする |
 | Topic Label | 検索・整理に使う。アクセス制御には使わない |
 
-AIが推定したValue / Motivationと本人が明言したValue / Motivationでは、同じ分類でも信頼性が異なります。分類だけでなく、Evidence、Derivation、Confidence、本人の確認状態を評価します。Source Recordからの生成と本人確認は[Brain Item生成設計](brain-item-generation-design.md)を正とします。
+AIが推定したValue / Motivationと本人が明言したValue / Motivationでは、同じ分類でも信頼性が異なります。分類だけでなく、Evidence、Derivation、Confidence、訂正・撤回状態を評価します。Source Recordからの生成と本人のフィードバック反映は[Brain Item生成設計](brain-item-generation-design.md)を正とします。
 
 ### EvidenceとDerivationに分けた理由
 
@@ -233,9 +232,9 @@ Derivationは1つのBrain Itemにつき1つの値を持ちます。
 | 値 | 意味 | 例 |
 | --- | --- | --- |
 | `ai` | 事前に何が導かれるか決まっていない解釈 | 日記の本文からValue / Motivationを推定する |
-| `deterministic` | 何を導出したいか逆算して設計された、決定的な変換 | 診断の選択肢からPreferenceを作る、乗車履歴を集計する |
+| `deterministic` | 何を導出したいか逆算して設計されたルールベース変換。同じ入力と設定版から同じ結果を作る | 診断の選択肢からPreferenceを作る、乗車履歴を集計する |
 
-`deterministic`は、設計時に「ロジック」と呼んでいたものと同じ意味です。診断は何を導出したいかを逆算して質問と選択肢を設計するため決定的な変換になり、日記などの自由記述は事前に何が出るか分からないため`ai`になります。
+`deterministic`は、設計時に「ロジック」と呼んでいたものと同じ意味です。診断は何を導出したいかを逆算して質問と選択肢を設計するためルールベース変換になり、日記などの自由記述は事前に何が出るか分からないため`ai`になります。
 
 - Derivationは入力の種類ではなく、導出ごとに付きます。同じ乗車履歴から「平日朝7時台の乗車が多い」（集計なので`deterministic`）と「朝型である」（解釈なので`ai`）の両方が導出されえます
 - 根拠が混在し、`ai`の導出が1件でも混ざる場合、そのBrain ItemのDerivationは`ai`とします。[Brainのラベル・アクセス制御設計 §9](brain-access-label-design.md#9-不変条件)の「拒否ルールは許可ルールより優先する」と同じく、安全側へ固定します

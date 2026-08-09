@@ -21,7 +21,7 @@
 | 会話目的、質問規則、Sessionの論理境界、文脈へ含める件数 | [日記チャット体験設計](../product/diary-chat-experience.md) |
 | Account、Brain、Sourceの責務 | [ドメイン設計](../domain/domain-design.md) |
 | Brain Itemの分類と共通属性 | [Brain内部情報の分類](../domain/brain/brain-content-taxonomy.md) |
-| 日記からBrain Itemを生成する論理入出力、登録、本人確認 | [Brain Item生成設計](../domain/brain/brain-item-generation-design.md) |
+| 日記からBrain Itemを生成する論理入出力、登録、否定・修正 | [Brain Item生成設計](../domain/brain/brain-item-generation-design.md) |
 | 根拠、反証、改訂 | [根拠・反証・改訂のエッジ設計](../domain/brain/evidence-edge-design.md) |
 | Source Recordの訂正、削除、撤回 | [Source Recordのライフサイクル設計](../domain/source/source-record-lifecycle-design.md) |
 | Access Labelと外部提供 | [Brainのラベル・アクセス制御設計](../domain/brain/brain-access-label-design.md) |
@@ -37,7 +37,7 @@
 | Account内の会話順序 | Durable ObjectのローカルSQLite | 連投、応答中の追加発言、Session境界、外部I/O前後の状態遷移をAccount単位で調停するため |
 | 非同期配送と再試行 | Cloudflare Queues | Webhook受付とAI生成を分離するため |
 | LLM呼び出し | AI Gateway経由のGemini | 既存経路を維持し、本文なしで利用量と遅延を観測するため |
-| 意味検索 | Vectorize | Accountを仮名化した検索scope内で、確認済みBrain Itemの関連候補を絞るため |
+| 意味検索 | Vectorize | Accountを仮名化した検索scope内で、利用可能なBrain Itemの関連候補を絞るため |
 | 原文取得 | AccountData RPC | raw databaseを公開せず、選択済みAccount Object内でAccess Policyと削除状態を最終判定するため |
 
 どちらのDurable Objectも認証で解決した`accountId`から決定的に1インスタンスを選び、全Accountを1つのObjectへ集約しません。`AccountData`はBrain／Diagnosis／Diary moduleを1つのprivate SQLite上に持ちます。`ConversationCoordinator`のSQLiteは未処理message ID、処理中Turn、世代番号、配送outbox、締切だけを永続化し、日記本文やBrain ItemのSSoTにはしません。
@@ -81,7 +81,7 @@ flowchart TD
 | generate Worker | Context構築、安全判定、prompt実行、出力検証 | Account IDや権限をモデルへ決めさせること |
 | AccountData | 原本、Session、message、Brain Item、Diagnosis回答、Account内maintenance | 会話の実行lock、他Accountのデータ保持 |
 | 共有D1 | Identity解決、公開Question・Diagnosis catalog | Account所有原文、Brain Item本文 |
-| Vectorize | 確認済みBrain Itemの候補検索 | 認可、削除状態、確認状態の最終判定 |
+| Vectorize | 利用可能なBrain Itemの候補検索 | 認可、削除・撤回・無効化状態の最終判定 |
 
 ### 3.1 Queueを使う意図と処理フロー
 
@@ -149,7 +149,6 @@ erDiagram
     brain_items ||--o{ vector_index_jobs : indexes
     brain_items ||--o{ brain_item_evidence_edges : has
     source_records ||--o{ brain_item_evidence_edges : evidence
-    brain_items ||--o{ brain_item_confirmations : receives
     brain_items ||--o{ brain_item_revisions : revises
 ```
 
@@ -262,13 +261,13 @@ prompt本文、Context Package、未検証のモデル出力は保存しませ�
 
 ### 4.7 Brain Item関連
 
-`brain_items`は`id`、`account_id`、`category`、本人が確認できる`statement`、分類固有の`attributes_json`、`derivation`、`confirmation`、`status`、有効期間、`stability`、Access Policy、`confidence_json`、lifecycleを持ちます。`confidence_json`自体は必須とし、算出前は`{"state":"uncomputed"}`、後続設計で算出できるようになった後だけ`{"state":"computed","value":...}`を保存します。
+`brain_items`は`id`、`account_id`、`category`、根拠をたどれる`statement`、分類固有の`attributes_json`、`derivation`、`status`、有効期間、`stability`、Access Policy、`confidence_json`、lifecycleを持ちます。`confidence_json`自体は必須とし、算出前は`{"state":"uncomputed"}`、後続設計で算出できるようになった後だけ`{"state":"computed","value":...}`を保存します。
 
-`brain_item_evidence_edges`はBrain ItemとSource Recordを結び、relation、evidence role、derivation methodを保持します。`brain_item_confirmations`は本人の確認、却下、再確認を追記し、`brain_items.confirmation`を現在値として更新します。`brain_item_revisions`は置き換え前後を結びます。
+`brain_item_evidence_edges`はBrain ItemとSource Recordを結び、relation、evidence role、derivation methodを保持します。Evidence edgeは変換処理ではなく、生成後のBrain ItemがどのSource Recordに依存するかを表す関係です。`brain_item_revisions`は置き換え前後を結びます。本人による否定はBrain Itemを`invalidated`にし、訂正は新しいSource Recordと改訂版を作ります。
 
 Brain Itemを含むAccount所有データのquery境界は、[Accountデータ分離設計](account-data-isolation.md)を正とします。
 
-AI候補は`confirmation = pending`としてのみ保存し、助言やVectorize検索には使いません。本人が確認したときだけ`confirmed`へ更新し、同じAccountData SQLite transactionでVectorize同期jobをoutboxへ追加します。Confidenceの算出方法はこの設計では決めず、`uncomputed`を検索順位に使いません。
+検証を通過したBrain Itemは`active`として保存し、同じAccountData SQLite transactionでVectorize同期jobをoutboxへ追加します。本人の同意を登録や利用開始の条件にはしません。AI推定は`derivation = ai`として区別し、Confidenceの算出前を表す`uncomputed`を検索順位に使いません。
 
 ### 4.8 `vector_index_jobs`
 
@@ -284,7 +283,7 @@ Vectorizeは非同期更新であるため、AccountDataを正とするoutboxを
 | `attempt_count`, `next_attempt_at`, `failure_code` | retry管理。本文を含めない |
 | `created_at`, `updated_at` | lifecycle |
 
-confirmedへの変更、改訂、削除、撤回では、Brain Itemの利用可否変更とjob追加を同じAccountData SQLite transactionで確定します。Queue consumerはItem ID、revision、operationを使って冪等にupsertまたはdeleteし、mutation IDを保存します。AccountData alarmは長時間`pending` / `submitted`のjobとVectorize間の差分を再照合し、DLQから復旧します。削除時はAccountDataで先に利用不可にするため、Vectorizeに古いvectorが残る間も検索後のAccountData再認可で利用されません。
+Brain Itemの作成、改訂、無効化、削除、撤回では、Brain Itemの利用可否変更とjob追加を同じAccountData SQLite transactionで確定します。Queue consumerはItem ID、revision、operationを使って冪等にupsertまたはdeleteし、mutation IDを保存します。AccountData alarmは長時間`pending` / `submitted`のjobとVectorize間の差分を再照合し、DLQから復旧します。削除時はAccountDataで先に利用不可にするため、Vectorizeに古いvectorが残る間も検索後のAccountData再認可で利用されません。
 
 ### 4.9 ConversationCoordinatorのローカルSQLite
 
@@ -338,7 +337,7 @@ AccountData、Queue、LINEを呼び出した後は、Turn ID、generation epoch�
 - `conversation_messages(channel, channel_event_id)` unique
 - `chat_turns(status, created_at)`と`chat_turns(session_id, through_sequence)`
 - DOの`accepted_messages(status, received_at)`、`delivery_outbox(status, deadline_at)`、`delivery_outbox(turn_id, generation_epoch)`
-- `brain_items(account_id, confirmation, status, category)`
+- `brain_items(account_id, status, category)`
 - `brain_item_evidence_edges(brain_item_id)`と`(source_record_id)`
 - `vector_index_jobs(status, next_attempt_at)`と`(brain_item_id, item_revision, operation)` unique
 
@@ -395,11 +394,11 @@ flowchart LR
 
 1. 現在Sessionと直近messageをAccountDataから取得する。件数は`CHAT_CONTEXT_MESSAGE_LIMIT`で管理し、初期値は20とする
 2. 現在Turnから検索文を作り、現在Accountの`owner_scope`をfilterに指定してVectorizeを検索する
-3. filter適用後の集合から確認済みBrain Item候補を上位取得する
-4. AccountDataで`confirmed`、`active`、有効期間、Access Policy、削除状態を再検証する
+3. filter適用後の集合からBrain Item候補を上位取得する
+4. AccountDataで`active`、有効期間、Access Policy、削除・撤回・無効化状態を再検証する
 5. 再検証を通過した上位5件を選び、必要なEvidenceのSource Recordを最大3件取得する
 6. 訂正済み旧版、削除済み、撤回済み、拒否済みを除外する
-7. 各要素へ種類、時点、確認状態、根拠IDを付ける
+7. 各要素へ種類、時点、Derivation、Confidence、根拠IDを付ける
 
 `owner_scope`は環境別Secretを鍵とする`HMAC(account_id)`から作り、Vectorizeのmetadata indexまたはnamespaceへ保存します。生のAccount IDは保存しません。filterはtopKより前に適用し、他Accountの候補に検索枠を消費させません。Vectorizeのmetadataは候補を絞る用途に限定し、認可の根拠にはしないため、AccountData再検証は必ず残します。
 
@@ -490,8 +489,7 @@ flowchart TD
       "category": "Memory",
       "statement": "今日、予定していた作業を延期した",
       "source_message_ids": ["message-id"],
-      "is_inference": false,
-      "confirmation_question": null
+      "is_inference": false
     }
   ],
   "safety": {
@@ -511,7 +509,7 @@ flowchart TD
 
 ### 7.6 Brain Item候補
 
-日記候補の入力、検証、`pending`登録、本人確認、重複・改訂は[Brain Item生成設計 §7](../domain/brain/brain-item-generation-design.md#7-日記チャットからの生成)を正とします。この文書は、その論理出力をGeminiのJSON Schemaへ表現し、Turn処理とAccountData transactionへ接続する実装方式だけを扱います。
+日記候補の入力、検証、Brain Item登録、否定・修正、重複・改訂は[Brain Item生成設計 §7](../domain/brain/brain-item-generation-design.md#7-日記チャットからの生成)を正とします。この文書は、その論理出力をGeminiのJSON Schemaへ表現し、Turn処理とAccountData transactionへ接続する実装方式だけを扱います。
 
 ## 8. ガードレール
 
@@ -521,7 +519,7 @@ flowchart TD
 | --- | --- | --- |
 | 受付前 | LINE署名、event ID、対応event、入力size | 拒否または保存のみ。AIへ渡さない |
 | 保存時 | Account解決、AccountData一意制約、既定`private` | Queueをretry。重複原本を作らない |
-| 検索前 | Account、削除、Confirmation、Access Policy | 候補を除外する |
+| 検索前 | Account、status、削除・撤回、Access Policy | 候補を除外する |
 | 生成前 | 危機・高risk分類、token上限、rate limit | safety routeか保存のみへ切替 |
 | 生成中 | system prompt、toolなし、構造化出力、provider safety | blockを定型応答へ変換 |
 | 出力後 | schema、根拠ID、質問数、長さ、禁止表現 | 1回修正後、fallback |
@@ -541,10 +539,10 @@ flowchart TD
 ### 8.3 Memory Poisoning
 
 - Source Recordは本人の発言として保存するが、客観的真実とは扱わない
-- AI抽出は`pending`から開始する
-- 推定候補は本人が否定できる確認質問にする
-- `confirmed`への変更は明示的な本人発言か確認UI操作だけで行う
-- 既存の確認済みItemと矛盾する候補を自動上書きしない
+- AI推定は`derivation = ai`として本人の明言やルールベース変換と区別する
+- 推定内容は本人が否定・修正できる提示にする
+- Evidenceがない候補や、1回の出来事から安定した性格を断定する候補は保存しない
+- 既存Itemと矛盾する候補を自動上書きしない
 - 却下、訂正、撤回を次のContext Packageへ即時反映する
 
 ### 8.4 安全経路
@@ -565,8 +563,8 @@ flowchart TD
 ### 8.5 助言の制約
 
 - 共感だけを求めているときは助言しない
-- 確認済みBrain Itemを使うときは「以前話していた〜を踏まえると」のように根拠を示す
-- 未確認候補を助言の前提にしない
+- Brain Itemを使うときは「以前話していた〜を踏まえると」のように根拠を示し、AI推定なら断定しない
+- AI推定だけを、本人の確定した事実として助言の前提にしない
 - 選択肢とtrade-offを示し、本人の決定を代行しない
 - 高risk領域では一般情報と専門家への確認を分ける
 - Context Packageにない記憶を作らない
@@ -629,7 +627,7 @@ finalまたは失敗案内のretryは90秒で止めます。90秒時点で結果
 
 logへ出せる識別子は環境、Queue message ID、Turn ID、Session IDの一方向hash、prompt version、処理段階です。Account ID、LINE user ID、reply token、日記本文、Context Package、生成本文、Brain Item本文は出しません。
 
-過去情報を助言へ使った事実は本文ではなく、Brain Item ID、Source Record ID、利用時点のConfirmationとAccess Policyを`purpose = diary_chat`の監査recordへ残します。
+過去情報を助言へ使った事実は本文ではなく、Brain Item ID、Source Record ID、利用時点のstatus、Derivation、Confidence、Access Policyを`purpose = diary_chat`の監査recordへ残します。
 
 ## 12. テストと評価
 
@@ -679,7 +677,7 @@ prompt versionを本番へ出す条件はschema準拠100%、越権した記憶�
 2. **会話Coordinator**: Account単位DO、ローカルSQLite、連投、Turn state、outbox、2 QueueとDLQ
 3. **安全な通常応答**: 待機表示、Context、prompt、構造化出力、90秒deadline
 4. **長期会話の圧縮**: 20message超過時の文脈保持と訂正反映
-5. **Brain Item候補**: Evidence付きpending候補、本人確認、却下、改訂
+5. **Brain Item生成**: Evidence付きItem、Vectorize同期、否定による無効化、改訂
 6. **記憶を使う助言**: Vectorize outbox、`owner_scope` filter、AccountData再認可、Evidence取得
 7. **段階公開**: fixture、shadow、内部Account、少数公開、全体公開
 

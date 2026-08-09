@@ -127,7 +127,7 @@ Source Recordを訂正・削除したときの原本と派生への波及は、[
 | 候補 | 採らない理由 |
 | --- | --- |
 | 強度（寄与の強さ） | 文書上の根拠がありません。[Brain内部情報の分類 §3](brain-content-taxonomy.md#3-各分類の詳細)のPreferenceが持つ「強さ」はBrain Itemの属性であって、エッジの属性ではありません。加えて、AI由来のスカラーをエッジへ焼き込むと、「エッジがSSoTでConfidenceは派生値」という[§5](#5-confidenceとエッジの関係)の設計の論拠そのものを弱めます |
-| 作成者（本人 / AI） | 本人はエッジを直接作りません。[ドメイン設計 §6](../domain-design.md#本人の操作とsource-recordの発生)より、本人の操作が生むのはSource Recordか、Confirmationの更新だけです。値域は結局`ai` / `deterministic`になり、導出方法と重複します |
+| 作成者（本人 / AI） | 本人はエッジを直接作りません。[ドメイン設計 §6](../domain-design.md#本人の操作とsource-recordの発生)より、本人の新しい記述や訂正がSource Recordとなり、アプリケーションの変換処理がエッジを作ります。値域は結局`ai` / `deterministic`になり、導出方法と重複します |
 
 ## 5. Confidenceとエッジの関係
 
