@@ -1,7 +1,7 @@
 /**
  * OpenAPI documentとSwagger UI用パスをCloudflare Accessで保護します。
  *
- *   bun scripts/setup-api-docs-access.ts <preview|production>
+ *   node --import tsx scripts/setup-api-docs-access.ts <preview|production>
  *
  * 必要な環境変数:
  *   - CLOUDFLARE_ACCOUNT_ID
@@ -16,7 +16,6 @@
 const API_BASE = "https://api.cloudflare.com/client/v4";
 const SESSION_DURATION = "24h";
 const POLICY_NAME = "Allow me-builder API docs developers";
-const USER_AGENT = "me-builder-api-docs-access/1.0";
 
 type TargetEnvironment = "preview" | "production";
 
@@ -135,7 +134,6 @@ function createApiClient(accountId: string, apiToken: string, fetchImpl: typeof 
       headers: {
         Authorization: `Bearer ${apiToken}`,
         "Content-Type": "application/json",
-        "User-Agent": USER_AGENT,
         ...init?.headers,
       },
     });
@@ -268,6 +266,14 @@ async function main(): Promise<void> {
   });
 }
 
-if (import.meta.main) {
-  await main();
+const entryPoint = process.argv[1];
+if (
+  import.meta.main ||
+  (entryPoint !== undefined &&
+    new URL(import.meta.url).pathname === new URL(entryPoint, "file:").pathname)
+) {
+  main().catch((error: unknown) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
 }

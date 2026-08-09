@@ -44,9 +44,6 @@ describe("setup-api-docs-access", () => {
     const applicationRequest = fetchMock.mock.calls[1];
     expect(String(applicationRequest?.[0]).endsWith("/accounts/account-1/access/apps")).toBe(true);
     expect(applicationRequest?.[1]?.method).toBe("POST");
-    expect(applicationRequest?.[1]?.headers).toMatchObject({
-      "User-Agent": "me-builder-api-docs-access/1.0",
-    });
     const application = JSON.parse(String(applicationRequest?.[1]?.body));
     expect(application.destinations).toEqual([
       { type: "public", uri: "api.stg.example.com/api/openapi.json" },
