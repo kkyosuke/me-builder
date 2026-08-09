@@ -81,7 +81,7 @@ coverage = 6 ÷ 6 = 100%
 
 ## 6. 実装境界
 
-現在は、Web UIが回答内容APIから取得した保存済み回答を使い、回答完了画面と回答内容画面で結果を表示します。回答済みになったDiagnosisResponseは、[共通のBrain Item projection](parameter-scoring-design.md#8-brain-itemへのprojection)によって4パラメータを4件の`Preference`へ変換します。具体的な保存例は[共通設計 §8.5](parameter-scoring-design.md#85-具体例-自分と相手の優先境界線)を参照してください。
+現在は、Web UIが回答内容APIから取得した保存済み回答を使い、回答完了画面と回答内容画面で結果を表示します。回答済みになったDiagnosisResponseは、[共通のBrain Item生成](../../domain/brain/brain-item-generation-design.md#6-診断回答からの生成)によって4パラメータを4件の`Preference`へ変換します。
 
 ```mermaid
 flowchart LR

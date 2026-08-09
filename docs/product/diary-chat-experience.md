@@ -28,6 +28,7 @@
 | Phase 1の対応チャネル、入力形式、LINEとWebの役割分担 | [プロジェクト概要](project-overview.md) |
 | Phaseごとの目的、提供順序、ロードマップ | [プロジェクト概要 §11](project-overview.md#11-段階的な進め方) |
 | Brain Itemの分類と各分類の意味 | [Brain内部情報の分類](../domain/brain/brain-content-taxonomy.md) |
+| 診断と日記に共通するBrain Item生成の入出力と登録タイミング | [Brain Item生成設計](../domain/brain/brain-item-generation-design.md) |
 | Source Recordの粒度とSource / Brain間の関係 | [ドメイン設計](../domain/domain-design.md) |
 | Source RecordとBrain Itemを結ぶ根拠、反証、改訂 | [根拠・反証・改訂のエッジ設計](../domain/brain/evidence-edge-design.md) |
 | 日記の送信取り消し、訂正、撤回、削除 | [Source Recordのライフサイクル設計](../domain/source/source-record-lifecycle-design.md) |

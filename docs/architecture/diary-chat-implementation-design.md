@@ -21,6 +21,7 @@
 | 会話目的、質問規則、Sessionの論理境界、文脈へ含める件数 | [日記チャット体験設計](../product/diary-chat-experience.md) |
 | Account、Brain、Sourceの責務 | [ドメイン設計](../domain/domain-design.md) |
 | Brain Itemの分類と共通属性 | [Brain内部情報の分類](../domain/brain/brain-content-taxonomy.md) |
+| 日記からBrain Itemを生成する論理入出力、登録、本人確認 | [Brain Item生成設計](../domain/brain/brain-item-generation-design.md) |
 | 根拠、反証、改訂 | [根拠・反証・改訂のエッジ設計](../domain/brain/evidence-edge-design.md) |
 | Source Recordの訂正、削除、撤回 | [Source Recordのライフサイクル設計](../domain/source/source-record-lifecycle-design.md) |
 | Access Labelと外部提供 | [Brainのラベル・アクセス制御設計](../domain/brain/brain-access-label-design.md) |
@@ -510,13 +511,7 @@ flowchart TD
 
 ### 7.6 Brain Item候補
 
-- 明示された事実はMemory候補にできる
-- Value、Motivation、Preference、Decision Criterion、Constraintの解釈は`is_inference = true`にする
-- 1回の選択から安定的な性格や行動原理を断定しない
-- 現在AccountのSource message IDがなければ破棄する
-- 同義のactive itemがあれば新規作成せず、Evidence追加か確認質問にする
-- 機微な候補は`private`かつ外部提供不可から始める
-- 本人確認前は助言、Vectorize、MCP提供に使わない
+日記候補の入力、検証、`pending`登録、本人確認、重複・改訂は[Brain Item生成設計 §7](../domain/brain/brain-item-generation-design.md#7-日記チャットからの生成)を正とします。この文書は、その論理出力をGeminiのJSON Schemaへ表現し、Turn処理とAccountData transactionへ接続する実装方式だけを扱います。
 
 ## 8. ガードレール
 

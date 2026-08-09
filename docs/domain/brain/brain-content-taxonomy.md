@@ -210,7 +210,7 @@ Current Stateには有効期限を設け、期限切れの状態を恒久的なP
 | Revision | 修正や撤回の履歴を追えるようにする |
 | Topic Label | 検索・整理に使う。アクセス制御には使わない |
 
-AIが推定したValue / Motivationと本人が明言したValue / Motivationでは、同じ分類でも信頼性が異なります。分類だけでなく、Evidence、Derivation、Confidence、本人の確認状態を評価します。具体的な推定・確認モデルは後続で設計します。
+AIが推定したValue / Motivationと本人が明言したValue / Motivationでは、同じ分類でも信頼性が異なります。分類だけでなく、Evidence、Derivation、Confidence、本人の確認状態を評価します。Source Recordからの生成と本人確認は[Brain Item生成設計](brain-item-generation-design.md)を正とします。
 
 ### EvidenceとDerivationに分けた理由
 

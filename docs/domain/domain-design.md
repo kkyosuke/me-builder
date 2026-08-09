@@ -296,9 +296,9 @@ MCPの具体的な接続モデルやツール設計は後続で検討します�
 | 2 | Brain内部の分類とAccess Labelの初期セットを検証する | 完了 |
 | 3 | Sourceドメインを設計し、Brain Itemの由来を確定する | 一部完了（ドメイン境界、由来、エッジ、原本のライフサイクルまで） |
 | 3.1 | Phase 1のDiagnosisドメインを設計する | 完了（論理モデル） |
-| 4 | AIによる推定と本人確認の流れを設計する | 未着手 |
+| 4 | AIによる推定と本人確認の流れを設計する | 完了（診断と日記からの生成、登録、確認の共通方式） |
 | 5 | MCP接続、権限、監査の詳細を設計する | 未着手 |
-| 6 | 永続化と検索方式を選定する | 一部（利用する基盤、Diagnosis / SourceのD1 schemaまで） |
+| 6 | 永続化と検索方式を選定する | 一部（Brain ItemとEvidenceを含むAccountData schemaまで） |
 
 step 1は、Phase 1に必要な範囲（対応チャネルと入力形式、チャネルの役割分担、ログイン手段と復旧方針、質問の作成主体と版管理）を確定させたことで完了とみなします。詳細は[プロジェクト概要 §4](../product/project-overview.md#4-想定する利用体験)と[§5](../product/project-overview.md#5-アカウントと本人識別)にあります。
 
@@ -306,4 +306,6 @@ step 3は当初「質問・回答のドメインを設計する」としてい�
 
 step 3.1では、Phase 1の質問配信と回答保存に必要なQuestion、Diagnosis、DiagnosisResponseの集約、状態、不変条件、Account / Sourceとの関係を[Phase 1 診断ドメイン設計](../diagnosis/diagnosis-domain-design.md)で確定しました。D1の物理モデルはstep 6で具体化済みで、API契約は後続作業です。
 
-step 6は、利用するCloudflareコンポーネントの選定が[インフラ・システム構成](../architecture/infrastructure-architecture.md)で確定し、DiagnosisとSource RecordのD1 schemaを具体化しました。Brain Item、各エッジの完全な永続化、Embeddingのインデックス構成、メディアの参照方式は未設計です。
+step 4は、Source RecordからBrain Itemを生成する共通入出力と、診断・日記それぞれの登録、本人確認、改訂を[Brain Item生成設計](brain/brain-item-generation-design.md)で確定しました。
+
+step 6は、利用するCloudflareコンポーネントの選定が[インフラ・システム構成](../architecture/infrastructure-architecture.md)で確定し、AccountData上のDiagnosis、Source Record、Brain Item、Evidence、Revision、Access Labelのschemaを具体化しました。Confirmation履歴とVectorize同期jobは実装設計に留まり、物理schemaは未実装です。メディアの参照方式も後続設計です。
