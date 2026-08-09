@@ -43,7 +43,7 @@
     - `task deploy:preview`: D1 マイグレーション適用および全アプリのプレビュー環境へのデプロイ (`wrangler deploy --env preview`, `wrangler pages deploy`)
     - `task deploy:production`: D1 マイグレーション適用および全アプリの本番環境へのデプロイ (`wrangler deploy --env production`, `wrangler pages deploy`)
   - **CI/CD ワークフロー構造 (`.github/workflows/ci-*.yml`, `.github/workflows/cd-*.yml`)**:
-    - CI ワークフローはコンポーネントごとの個別の YAML ファイルに分離されています (`ci-lint.yml`, `ci-shared.yml`, `ci-api.yml`, `ci-mcp.yml`, `ci-worker.yml`, `ci-ui.yml`)。
+    - CI ワークフローはコンポーネントごとの個別の YAML ファイルに分離されています (`ci-lint.yml`, `ci-shared.yml`, `ci-api.yml`, `ci-mcp.yml`, `ci-worker.yml`, `ci-ui.yml`)。加えて、PRに`e2e`ラベルを付けたときと、そのラベルが付いたまま追加のpushをしたときは、`ci-e2e.yml`がE2EとWorker runtime E2Eを含むテストを実行します。
     - CD ワークフローはプレビュー・本番デプロイ用に分離されています (`cd-preview.yml`, `cd-production.yml`)。
     - `cd-preview.yml` は PR の作成・更新だけでは**デプロイしません**（プレビューは全 PR 共有の単一環境のため、自動デプロイで上書きし合うのを避ける）。デプロイされるのは次の 2 通りだけです。
       - Actions 画面でブランチを選ぶか `gh workflow run cd-preview.yml --ref <branch>` で手動実行したとき (`workflow_dispatch`)
@@ -61,7 +61,7 @@
 - **Web UI (`apps/web`) の環境変数**:
   - Vite がクライアントバンドルへ埋め込むのは `VITE_` 接頭辞付きの環境変数だけです。変数を追加した場合は [`apps/web/.env.example`](../../apps/web/.env.example) へ必ず追記します。
   - バンドルへ埋め込まれた値は閲覧者から参照できます。チャネルシークレットや API キーなどのシークレットを `VITE_` 変数へ置いてはいけません。秘匿が必要な値はサーバー側 (`apps/api`) の環境変数として配布します。
-  - `VITE_` 変数はビルド時にバンドルへ埋め込まれます。CD ワークフローは GitHub Actions 上で `bun run ci`（Vite ビルド）を実行し、`wrangler pages deploy dist` でビルド済みアセットのみをアップロードするため、**値の設定先は GitHub Actions の変数**（`cd-preview.yml` / `cd-production.yml` の `env:` に `${{ vars.* }}` として記述、環境は preview が `dev` / production が `prd`）です。Cloudflare Pages プロジェクト側の環境変数は Pages Functions の実行時にしか効かず、この構成ではバンドルへ反映されません。
+  - `VITE_` 変数はビルド時にバンドルへ埋め込まれます。CD ワークフローは GitHub Actions 上で、preview は `bun --filter @me-builder/web build`、production は全検証を兼ねた `bun run ci` によりViteビルドを実行し、`wrangler pages deploy dist` でビルド済みアセットのみをアップロードします。そのため、**値の設定先は GitHub Actions の変数**（`cd-preview.yml` / `cd-production.yml` の `env:` に `${{ vars.* }}` として記述、環境は preview が `dev` / production が `prd`）です。Cloudflare Pages プロジェクト側の環境変数は Pages Functions の実行時にしか効かず、この構成ではバンドルへ反映されません。
   - GitHub Environment の変数名には `VITE_` 接頭辞を付けず、ワークフロー側で `VITE_` 付きの環境変数へマップします（例: `VITE_BASE_DOMAIN: ${{ vars.BASE_DOMAIN }}`、`VITE_LIFF_ID: ${{ vars.LIFF_ID }}`）。
   - 変数を追加した場合は `cd-preview.yml` と `cd-production.yml` の両方へ渡し、環境ごとに異なる値を GitHub Environment の変数として設定します。
 
