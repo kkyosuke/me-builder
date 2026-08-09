@@ -15,7 +15,7 @@ import { CompatibilityShareScreen } from "./compatibility-share-screen";
 
 function firePointer(
   target: Element,
-  type: "pointerdown" | "pointerup",
+  type: "pointerdown" | "pointermove" | "pointerup",
   values: { button?: number; clientX: number; clientY: number; pointerId: number },
 ) {
   const event = new Event(type, { bubbles: true });
@@ -102,6 +102,12 @@ describe("Compatibility flow", () => {
       clientY: 100,
       pointerId: 1,
     });
+    firePointer(peoplePanel, "pointermove", {
+      clientX: 130,
+      clientY: 104,
+      pointerId: 1,
+    });
+    expect(screen.getByTestId("compatibility-section-track").style.transform).toContain("-50px");
     firePointer(peoplePanel, "pointerup", {
       clientX: 100,
       clientY: 108,
@@ -109,6 +115,9 @@ describe("Compatibility flow", () => {
     });
     expect(screen.getByRole("heading", { name: "一緒に大切にできそうなこと" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "話してみたい違い" })).toBeTruthy();
+    expect(screen.getByTestId("compatibility-tab-indicator").style.transform).toBe(
+      "translate3d(100%, 0, 0)",
+    );
 
     const pairPanel = screen.getByRole("tabpanel");
     firePointer(pairPanel, "pointerdown", {

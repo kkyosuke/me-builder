@@ -1,4 +1,5 @@
 import { ShieldCheck } from "lucide-react";
+import { useEffect, useRef } from "react";
 import type { CompatibilityPerson } from "../model/compatibility";
 import {
   CompatibilityPairSheet,
@@ -21,9 +22,21 @@ export function CompatibilityResultScreen({
 }) {
   const result = useCompatibilityResult();
   const sectionSwipe = useCompatibilitySectionSwipe({
-    showPair: () => result.showSection("pair"),
-    showPeople: () => result.showSection("people"),
+    section: result.state.section,
+    showSection: result.showSection,
   });
+  const peoplePanelRef = useRef<HTMLDivElement>(null);
+  const pairPanelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    peoplePanelRef.current?.toggleAttribute("inert", result.state.section !== "people");
+    pairPanelRef.current?.toggleAttribute("inert", result.state.section !== "pair");
+  }, [result.state.section]);
+
+  const sectionIndex = result.state.section === "people" ? 0 : 1;
+  const dragOffset = sectionSwipe.dragOffset ?? 0;
+  const indicatorPosition = sectionIndex - dragOffset / sectionSwipe.viewportWidth;
+  const isDragging = sectionSwipe.dragOffset !== null;
 
   if (result.state.sharing === "ended") {
     return (
@@ -67,18 +80,24 @@ export function CompatibilityResultScreen({
       </p>
 
       <div
-        className="mt-7 grid grid-cols-2 rounded-2xl bg-slate-100 p-1 dark:bg-slate-800"
+        className="relative mt-7 grid grid-cols-2 rounded-2xl bg-slate-100 p-1 dark:bg-slate-800"
         role="tablist"
         aria-label="相性シートの内容"
       >
+        <span
+          aria-hidden="true"
+          data-testid="compatibility-tab-indicator"
+          className={`pointer-events-none absolute inset-y-1 left-1 w-[calc(50%-0.25rem)] rounded-xl bg-white shadow dark:bg-slate-700 ${isDragging ? "" : "transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"}`}
+          style={{ transform: `translate3d(${indicatorPosition * 100}%, 0, 0)` }}
+        />
         <button
           id="compatibility-people-tab"
           type="button"
           role="tab"
-          aria-controls="compatibility-section-panel"
+          aria-controls="compatibility-people-panel"
           aria-selected={result.state.section === "people"}
           onClick={() => result.showSection("people")}
-          className={`min-h-11 rounded-xl px-3 text-sm font-bold ${result.state.section === "people" ? "bg-white text-slate-950 shadow dark:bg-slate-700 dark:text-white" : "text-slate-500 dark:text-slate-400"}`}
+          className={`relative z-[1] min-h-11 rounded-xl px-3 text-sm font-bold transition-colors duration-300 motion-reduce:transition-none ${result.state.section === "people" ? "text-slate-950 dark:text-white" : "text-slate-500 dark:text-slate-400"}`}
         >
           それぞれについて
         </button>
@@ -86,32 +105,45 @@ export function CompatibilityResultScreen({
           id="compatibility-pair-tab"
           type="button"
           role="tab"
-          aria-controls="compatibility-section-panel"
+          aria-controls="compatibility-pair-panel"
           aria-selected={result.state.section === "pair"}
           onClick={() => result.showSection("pair")}
-          className={`min-h-11 rounded-xl px-3 text-sm font-bold ${result.state.section === "pair" ? "bg-white text-slate-950 shadow dark:bg-slate-700 dark:text-white" : "text-slate-500 dark:text-slate-400"}`}
+          className={`relative z-[1] min-h-11 rounded-xl px-3 text-sm font-bold transition-colors duration-300 motion-reduce:transition-none ${result.state.section === "pair" ? "text-slate-950 dark:text-white" : "text-slate-500 dark:text-slate-400"}`}
         >
           2人について
         </button>
       </div>
 
-      <div
-        {...sectionSwipe}
-        id="compatibility-section-panel"
-        role="tabpanel"
-        aria-labelledby={
-          result.state.section === "people" ? "compatibility-people-tab" : "compatibility-pair-tab"
-        }
-        className="mt-5 touch-pan-y"
-      >
-        {result.state.section === "people" ? (
-          <div className="space-y-4">
+      <div {...sectionSwipe.handlers} className="mt-5 touch-pan-y overflow-hidden">
+        <div
+          data-testid="compatibility-section-track"
+          className={`flex w-[200%] items-start will-change-transform ${isDragging ? "" : "transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"}`}
+          style={{
+            transform: `translate3d(calc(${-sectionIndex * 50}% + ${dragOffset}px), 0, 0)`,
+          }}
+        >
+          <div
+            ref={peoplePanelRef}
+            id="compatibility-people-panel"
+            role="tabpanel"
+            aria-labelledby="compatibility-people-tab"
+            aria-hidden={result.state.section !== "people"}
+            className="w-1/2 shrink-0 space-y-4"
+          >
             <CompatibilityPersonSheet person={partner} isMe={false} />
             <CompatibilityPersonSheet person={me} isMe />
           </div>
-        ) : (
-          <CompatibilityPairSheet me={me} partner={partner} />
-        )}
+          <div
+            ref={pairPanelRef}
+            id="compatibility-pair-panel"
+            role="tabpanel"
+            aria-labelledby="compatibility-pair-tab"
+            aria-hidden={result.state.section !== "pair"}
+            className="w-1/2 shrink-0"
+          >
+            <CompatibilityPairSheet me={me} partner={partner} />
+          </div>
+        </div>
       </div>
 
       <section className="mt-8 border-t border-slate-200 pt-6 dark:border-slate-700">
