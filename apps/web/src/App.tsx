@@ -8,9 +8,15 @@ import {
   ProfileSettingsScreen,
 } from "./feature/profile-settings";
 import { useColorTheme } from "./feature/theme";
-import { loadAdminApplication, loadDiagnosisApplication, loadProfileApplication } from "./routes";
+import {
+  loadAdminApplication,
+  loadCompatibilityApplication,
+  loadDiagnosisApplication,
+  loadProfileApplication,
+} from "./routes";
 
 const AdminApplication = lazy(loadAdminApplication);
+const CompatibilityApplication = lazy(loadCompatibilityApplication);
 const DiagnosisApplication = lazy(loadDiagnosisApplication);
 const ProfileApplication = lazy(loadProfileApplication);
 
@@ -60,6 +66,8 @@ export function App() {
   const shouldRestoreProfileButtonFocus = useRef(false);
   const { pathname, profileView } = navigation;
   const isAdminPath = pathname.startsWith("/admin");
+  const isCompatibilityPath =
+    pathname === "/compatibility" || pathname.startsWith("/compatibility/");
   const isMePath = pathname === "/me" || pathname.startsWith("/me/");
   const [avatar, setAvatar] = useState<AvatarSelection | null>(null);
 
@@ -137,6 +145,8 @@ export function App() {
           <Suspense fallback={<LoadingState message="画面を読み込んでいます..." />}>
             {isAdminPath ? (
               <AdminApplication />
+            ) : isCompatibilityPath ? (
+              <CompatibilityApplication />
             ) : isMePath ? (
               <ProfileApplication />
             ) : (

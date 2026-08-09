@@ -29,5 +29,8 @@ describe("MainNavigation", () => {
     fireEvent.focus(diagnosisLink);
     expect(mocks.preloadMainApplication).toHaveBeenNthCalledWith(1, "diagnosis");
     expect(mocks.preloadMainApplication).toHaveBeenNthCalledWith(2, "diagnosis");
+
+    fireEvent.pointerEnter(screen.getByRole("link", { name: "相性" }));
+    expect(mocks.preloadMainApplication).toHaveBeenNthCalledWith(3, "compatibility");
   });
 });

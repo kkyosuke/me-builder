@@ -47,7 +47,7 @@ describe("DiagnosisHome", () => {
       within(screen.getByRole("navigation", { name: "メインナビゲーション" }))
         .getAllByRole("link")
         .map((link) => link.textContent),
-    ).toEqual(["わたし", "診断"]);
+    ).toEqual(["診断", "相性", "わたし"]);
   });
 
   it("回答途中のカードだけに進捗を x/x 形式で表示する", () => {
