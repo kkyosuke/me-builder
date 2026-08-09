@@ -3,11 +3,14 @@ import {
   type AccountDataArgs,
   type AccountDataOperation,
   type AccountDataResult,
+  type CompatibilityReference,
+  compatibilityDataFor,
   d1,
 } from "@me-builder/lib";
 import { eq, inArray } from "drizzle-orm";
 import type { Env } from "../types";
 import { brainActions } from "./brain";
+import { compatibilityActions } from "./compatibility";
 import { diagnosisActions } from "./diagnosis";
 import { diaryActions } from "./diary";
 import {
@@ -53,6 +56,23 @@ export class AccountData extends DurableObject<Env> {
       if (accountId !== this.accountId) {
         throw new Error("AccountData RPC account does not match object name");
       }
+      this.repository.bindAccount(accountId);
+      if (operation === "compatibility.listVisibleReferences") {
+        return (await this.listVisibleCompatibilityReferences()) as AccountDataResult<TOperation>;
+      }
+      if (operation.startsWith("compatibility.")) {
+        const action = (compatibilityActions as Partial<Record<AccountDataOperation, unknown>>)[
+          operation
+        ];
+        if (typeof action !== "function") throw new Error("Unsupported AccountData operation");
+        const boundAction = action as (
+          repository: AccountDataRepository,
+          boundAccountId: string,
+          ...actionArgs: AccountDataArgs<TOperation>
+        ) => AccountDataResult<TOperation>;
+        return boundAction(this.repository, accountId, ...args);
+      }
+
       const action = (actions as Partial<Record<AccountDataOperation, unknown>>)[operation];
       if (typeof action !== "function") throw new Error("Unsupported AccountData operation");
       const boundAction = action as (
@@ -61,7 +81,6 @@ export class AccountData extends DurableObject<Env> {
         ...actionArgs: AccountDataArgs<TOperation>
       ) => Promise<AccountDataResult<TOperation>>;
 
-      this.repository.bindAccount(accountId);
       if (!this.legacyImport) this.legacyImport = this.importLegacyAccountData(accountId);
       try {
         await this.legacyImport;
@@ -70,7 +89,6 @@ export class AccountData extends DurableObject<Env> {
         throw error;
       }
       if (operation.startsWith("diagnosis")) await this.syncDiagnosisCatalog();
-
       const result = await boundAction(this.repository.client, accountId, ...args);
       await this.scheduleMaintenance();
       return result;
@@ -107,6 +125,48 @@ export class AccountData extends DurableObject<Env> {
       }
       await this.scheduleMaintenance();
     });
+  }
+
+  /** 一覧projectionをCompatibilityDataの現在状態へ同期してから返す。 */
+  private async listVisibleCompatibilityReferences(): Promise<readonly CompatibilityReference[]> {
+    const namespace = this.env.COMPATIBILITY_DATA;
+    if (!namespace) throw new Error("CompatibilityData binding is required");
+
+    const references = this.repository.listReconciliableCompatibilityReferences(this.accountId);
+    for (const reference of references) {
+      const relationshipData = compatibilityDataFor(namespace, reference.relationshipId);
+      const relationship = await relationshipData.getRelationship(this.accountId);
+      if (relationship) {
+        const partnerAccountId =
+          relationship.inviterAccountId === this.accountId
+            ? relationship.inviteeAccountId
+            : relationship.inviterAccountId;
+        if (!partnerAccountId) {
+          throw new Error("Accepted compatibility relationship must have both participants");
+        }
+        const activation = this.repository.activateCompatibilityReference(this.accountId, {
+          relationshipId: reference.relationshipId,
+          partnerAccountId,
+          role: reference.role,
+          updatedAt: new Date(),
+        });
+        if (activation.outcome === "conflict") {
+          throw new Error("Accepted compatibility relationship conflicts with another reference");
+        }
+        continue;
+      }
+
+      if (reference.status === "pending" || reference.status === "reserved") {
+        const preview = await relationshipData.getInvitationPreview(this.accountId);
+        if (preview) continue;
+      }
+      this.repository.endCompatibilityReference(
+        this.accountId,
+        reference.relationshipId,
+        new Date(),
+      );
+    }
+    return this.repository.listVisibleCompatibilityReferences(this.accountId);
   }
 
   private async syncDiagnosisCatalog(): Promise<void> {

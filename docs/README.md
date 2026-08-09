@@ -78,6 +78,7 @@ docs/
 
 - [インフラ・システム構成](architecture/infrastructure-architecture.md) — Cloudflareを利用するシステム構成とサービス配置
 - [Accountデータ分離設計](architecture/account-data-isolation.md) — 1 Account = 1 AccountData DO、内部module、共有D1境界、migration規則
+- [相性共有データ実装設計](architecture/compatibility-data-design.md) — 1関係 = 1 CompatibilityData DO、Account別一覧参照、同意指紋、状態遷移
 - [日記チャット実装設計](architecture/diary-chat-implementation-design.md) — 日記チャットのAccountDataモデル、実行基盤、プロンプト、ガードレール、応答期限
 - [管理者向け統計ダッシュボード設計](architecture/admin-statistics-dashboard.md) — 管理者認可とGemini・LINEの利用統計
 - [キャラクターデザイン](design/character-design.md) — うつし・ミラの設定とデザインアセット

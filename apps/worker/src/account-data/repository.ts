@@ -1,12 +1,20 @@
-import { d1 } from "@me-builder/lib";
+import {
+  type ActivateCompatibilityReferenceResult,
+  type CompatibilityReference,
+  type CompatibilityReferenceRole,
+  type ReleaseCompatibilityReservationResult,
+  type ReserveCompatibilityReferenceResult,
+  d1,
+} from "@me-builder/lib";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { type DrizzleSqliteDODatabase, drizzle } from "drizzle-orm/durable-sqlite";
 import { migrate } from "drizzle-orm/durable-sqlite/migrator";
 import migrations from "../../drizzle/account-data/migrations.js";
-import { accountDataIdentity } from "./schema";
+import { accountDataIdentity, compatibilityReferences } from "./schema";
 
 const accountDataSchema = {
   accountDataIdentity,
+  compatibilityReferences,
   accounts: d1.schema.accounts,
   brainItemAccessLabels: d1.schema.brainItemAccessLabels,
   brainItemEvidenceEdges: d1.schema.brainItemEvidenceEdges,
@@ -366,6 +374,295 @@ export class AccountDataRepository {
           .run();
       }
     });
+  }
+
+  addOutgoingCompatibilityReference(
+    accountId: string,
+    input: Readonly<{ relationshipId: string; createdAt: Date }>,
+  ): CompatibilityReference {
+    const existing = this.database
+      .select()
+      .from(compatibilityReferences)
+      .where(eq(compatibilityReferences.relationshipId, input.relationshipId))
+      .get();
+    if (existing) {
+      if (
+        existing.accountId !== accountId ||
+        existing.role !== "inviter" ||
+        existing.status !== "pending" ||
+        existing.partnerAccountId !== null
+      ) {
+        throw new Error("Compatibility reference conflicts with persisted outgoing invitation");
+      }
+      return existing;
+    }
+
+    const reference = {
+      relationshipId: input.relationshipId,
+      accountId,
+      role: "inviter" as const,
+      partnerAccountId: null,
+      status: "pending" as const,
+      createdAt: input.createdAt,
+      updatedAt: input.createdAt,
+    };
+    this.database.insert(compatibilityReferences).values(reference).run();
+    return reference;
+  }
+
+  reserveIncomingCompatibilityReference(
+    accountId: string,
+    input: Readonly<{ relationshipId: string; partnerAccountId: string; createdAt: Date }>,
+  ): ReserveCompatibilityReferenceResult {
+    const existing = this.database
+      .select()
+      .from(compatibilityReferences)
+      .where(eq(compatibilityReferences.relationshipId, input.relationshipId))
+      .get();
+    if (existing) {
+      if (
+        existing.accountId === accountId &&
+        existing.role === "invitee" &&
+        existing.partnerAccountId === input.partnerAccountId &&
+        (existing.status === "reserved" || existing.status === "active")
+      ) {
+        return { outcome: "unchanged", reference: existing };
+      }
+      return { outcome: "conflict", reference: existing };
+    }
+
+    const competing = this.findOpenCompatibilityReference(input.partnerAccountId);
+    if (competing) return { outcome: "conflict", reference: competing };
+    const reference = {
+      relationshipId: input.relationshipId,
+      accountId,
+      role: "invitee" as const,
+      partnerAccountId: input.partnerAccountId,
+      status: "reserved" as const,
+      createdAt: input.createdAt,
+      updatedAt: input.createdAt,
+    };
+    this.database.insert(compatibilityReferences).values(reference).run();
+    return { outcome: "reserved", reference };
+  }
+
+  reserveOutgoingCompatibilityReference(
+    accountId: string,
+    input: Readonly<{ relationshipId: string; partnerAccountId: string; updatedAt: Date }>,
+  ): ReserveCompatibilityReferenceResult {
+    const existing = this.database
+      .select()
+      .from(compatibilityReferences)
+      .where(eq(compatibilityReferences.relationshipId, input.relationshipId))
+      .get();
+    if (!existing) {
+      throw new Error("Outgoing compatibility reference to reserve was not found");
+    }
+    if (
+      existing.accountId !== accountId ||
+      existing.role !== "inviter" ||
+      existing.status === "ended" ||
+      (existing.partnerAccountId !== null && existing.partnerAccountId !== input.partnerAccountId)
+    ) {
+      return { outcome: "conflict", reference: existing };
+    }
+    if (
+      (existing.status === "reserved" || existing.status === "active") &&
+      existing.partnerAccountId === input.partnerAccountId
+    ) {
+      return { outcome: "unchanged", reference: existing };
+    }
+
+    const competing = this.findOpenCompatibilityReference(input.partnerAccountId);
+    if (competing) return { outcome: "conflict", reference: competing };
+    this.database
+      .update(compatibilityReferences)
+      .set({
+        partnerAccountId: input.partnerAccountId,
+        status: "reserved",
+        updatedAt: input.updatedAt,
+      })
+      .where(eq(compatibilityReferences.relationshipId, input.relationshipId))
+      .run();
+    const reference = this.database
+      .select()
+      .from(compatibilityReferences)
+      .where(eq(compatibilityReferences.relationshipId, input.relationshipId))
+      .get();
+    if (!reference) throw new Error("Reserved outgoing compatibility reference was not persisted");
+    return { outcome: "reserved", reference };
+  }
+
+  releaseCompatibilityReservation(
+    accountId: string,
+    relationshipId: string,
+    releasedAt: Date,
+  ): ReleaseCompatibilityReservationResult {
+    const existing = this.database
+      .select()
+      .from(compatibilityReferences)
+      .where(eq(compatibilityReferences.relationshipId, relationshipId))
+      .get();
+    if (!existing || existing.accountId !== accountId || existing.status !== "reserved") {
+      return { outcome: "unchanged", reference: existing ?? null };
+    }
+
+    if (existing.role === "invitee") {
+      this.database
+        .delete(compatibilityReferences)
+        .where(eq(compatibilityReferences.relationshipId, relationshipId))
+        .run();
+      return { outcome: "released", reference: null };
+    }
+
+    this.database
+      .update(compatibilityReferences)
+      .set({ partnerAccountId: null, status: "pending", updatedAt: releasedAt })
+      .where(eq(compatibilityReferences.relationshipId, relationshipId))
+      .run();
+    return {
+      outcome: "released",
+      reference: { ...existing, partnerAccountId: null, status: "pending", updatedAt: releasedAt },
+    };
+  }
+
+  hasCompatibilityReservation(
+    accountId: string,
+    input: Readonly<{
+      relationshipId: string;
+      partnerAccountId: string;
+      role: CompatibilityReferenceRole;
+    }>,
+  ): boolean {
+    return Boolean(
+      this.database
+        .select({ relationshipId: compatibilityReferences.relationshipId })
+        .from(compatibilityReferences)
+        .where(
+          and(
+            eq(compatibilityReferences.relationshipId, input.relationshipId),
+            eq(compatibilityReferences.accountId, accountId),
+            eq(compatibilityReferences.partnerAccountId, input.partnerAccountId),
+            eq(compatibilityReferences.role, input.role),
+            inArray(compatibilityReferences.status, ["reserved", "active"]),
+          ),
+        )
+        .get(),
+    );
+  }
+
+  activateCompatibilityReference(
+    accountId: string,
+    input: Readonly<{
+      relationshipId: string;
+      partnerAccountId: string;
+      role: CompatibilityReferenceRole;
+      updatedAt: Date;
+    }>,
+  ): ActivateCompatibilityReferenceResult {
+    const existing = this.database
+      .select()
+      .from(compatibilityReferences)
+      .where(eq(compatibilityReferences.relationshipId, input.relationshipId))
+      .get();
+    if (!existing || existing.accountId !== accountId || existing.role !== input.role) {
+      throw new Error("Compatibility reference to activate was not found");
+    }
+    if (existing.status === "active" && existing.partnerAccountId === input.partnerAccountId) {
+      return { outcome: "unchanged", reference: existing };
+    }
+    if (
+      existing.status === "ended" ||
+      (existing.partnerAccountId !== null && existing.partnerAccountId !== input.partnerAccountId)
+    ) {
+      return { outcome: "conflict", reference: existing };
+    }
+    const competing = this.findOpenCompatibilityReference(input.partnerAccountId);
+    if (competing && competing.relationshipId !== input.relationshipId) {
+      return { outcome: "conflict", reference: competing };
+    }
+
+    this.database
+      .update(compatibilityReferences)
+      .set({
+        partnerAccountId: input.partnerAccountId,
+        status: "active",
+        updatedAt: input.updatedAt,
+      })
+      .where(eq(compatibilityReferences.relationshipId, input.relationshipId))
+      .run();
+    const reference = this.database
+      .select()
+      .from(compatibilityReferences)
+      .where(eq(compatibilityReferences.relationshipId, input.relationshipId))
+      .get();
+    if (!reference) throw new Error("Activated compatibility reference was not persisted");
+    return { outcome: "activated", reference };
+  }
+
+  endCompatibilityReference(
+    accountId: string,
+    relationshipId: string,
+    endedAt: Date,
+  ): CompatibilityReference | null {
+    const existing = this.database
+      .select()
+      .from(compatibilityReferences)
+      .where(eq(compatibilityReferences.relationshipId, relationshipId))
+      .get();
+    if (!existing || existing.accountId !== accountId) return null;
+    if (existing.status === "ended") return existing;
+    this.database
+      .update(compatibilityReferences)
+      .set({ status: "ended", updatedAt: endedAt })
+      .where(eq(compatibilityReferences.relationshipId, relationshipId))
+      .run();
+    return {
+      ...existing,
+      status: "ended",
+      updatedAt: endedAt,
+    };
+  }
+
+  listVisibleCompatibilityReferences(accountId: string): CompatibilityReference[] {
+    return this.database
+      .select()
+      .from(compatibilityReferences)
+      .where(
+        and(
+          eq(compatibilityReferences.accountId, accountId),
+          inArray(compatibilityReferences.status, ["pending", "active"]),
+        ),
+      )
+      .orderBy(asc(compatibilityReferences.createdAt))
+      .all();
+  }
+
+  listReconciliableCompatibilityReferences(accountId: string): CompatibilityReference[] {
+    return this.database
+      .select()
+      .from(compatibilityReferences)
+      .where(
+        and(
+          eq(compatibilityReferences.accountId, accountId),
+          inArray(compatibilityReferences.status, ["pending", "reserved", "active"]),
+        ),
+      )
+      .orderBy(asc(compatibilityReferences.createdAt))
+      .all();
+  }
+
+  private findOpenCompatibilityReference(partnerAccountId: string) {
+    return this.database
+      .select()
+      .from(compatibilityReferences)
+      .where(
+        and(
+          eq(compatibilityReferences.partnerAccountId, partnerAccountId),
+          inArray(compatibilityReferences.status, ["reserved", "active"]),
+        ),
+      )
+      .get();
   }
 
   /** Active diary sessionと未処理projectionのうち、最も早いmaintenance時刻を返す。 */

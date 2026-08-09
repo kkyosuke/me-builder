@@ -22,7 +22,7 @@ export function createD1AccountDataTestNamespace(db: d1.Client): AccountDataName
           ...args: AccountDataArgs<TOperation>
         ): Promise<AccountDataResult<TOperation>> {
           if (accountId !== name) throw new Error("AccountData test routing mismatch");
-          const action = actions[operation];
+          const action = (actions as Partial<Record<AccountDataOperation, unknown>>)[operation];
           if (!action) throw new Error(`Unsupported AccountData test operation: ${operation}`);
           return (await (action as unknown as (...input: unknown[]) => Promise<unknown>)(
             db,
