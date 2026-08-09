@@ -17,7 +17,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { LoadingState } from "../../../components/loading-state";
 import { MainNavigation } from "../../../components/main-navigation";
 import type { AsyncState } from "../../../model/async-state";
 import type {
@@ -52,7 +51,63 @@ function versionLabel(sequence: number | null): string {
   return sequence === null ? "最新版" : `第${sequence}版`;
 }
 
-const CARD_TRANSITION_MS = 280;
+function SummarySkeleton() {
+  return (
+    <output aria-label="わたしのまとめを読み込み中" className="block" aria-live="polite">
+      <span className="sr-only">わたしのまとめを読み込んでいます</span>
+      <div aria-hidden="true" className="animate-pulse motion-reduce:animate-none">
+        <div className="relative mt-8 pb-4">
+          <div className="absolute inset-x-5 top-3 bottom-1 rounded-3xl bg-violet-100 dark:bg-violet-950/60" />
+          <div className="absolute inset-x-3 top-1.5 bottom-2.5 rounded-3xl bg-sky-100 dark:bg-sky-950/70" />
+          <div className="relative rounded-3xl border border-slate-200 bg-white p-5 shadow-xl shadow-slate-950/10 sm:p-6 dark:border-slate-700 dark:bg-slate-800">
+            <div className="flex items-start gap-3">
+              <div className="size-12 shrink-0 rounded-2xl bg-slate-200 dark:bg-slate-700" />
+              <div className="flex-1">
+                <div className="h-3 w-20 rounded-full bg-slate-200 dark:bg-slate-700" />
+                <div className="mt-3 h-5 w-4/5 rounded-full bg-slate-200 dark:bg-slate-700" />
+              </div>
+            </div>
+            <div className="mt-5 space-y-3">
+              {["first", "second", "third"].map((key, index) => (
+                <div key={key} className="rounded-2xl bg-slate-100 p-4 dark:bg-slate-900/60">
+                  <div className="flex items-center gap-2">
+                    <div className="size-6 rounded-full bg-slate-300 dark:bg-slate-700" />
+                    <div
+                      className={`h-4 rounded-full bg-slate-300 dark:bg-slate-700 ${index === 1 ? "w-2/5" : "w-3/5"}`}
+                    />
+                  </div>
+                  <div className="mt-3 h-3 w-full rounded-full bg-slate-200 dark:bg-slate-700" />
+                  <div className="mt-2 h-3 w-4/5 rounded-full bg-slate-200 dark:bg-slate-700" />
+                </div>
+              ))}
+            </div>
+            <div className="mt-5 grid grid-cols-3 gap-3 border-t border-slate-200 pt-4 dark:border-slate-700">
+              {["diagnosis", "diary", "latest"].map((key) => (
+                <div
+                  key={key}
+                  className="mx-auto h-8 w-16 rounded-xl bg-slate-200 dark:bg-slate-700"
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 h-3 w-5/6 rounded-full bg-slate-200 dark:bg-slate-700" />
+        <div className="mt-8 h-5 w-40 rounded-full bg-slate-200 dark:bg-slate-700" />
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          {["diagnosis", "diary"].map((key) => (
+            <div
+              key={key}
+              className="h-28 rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800"
+            />
+          ))}
+        </div>
+      </div>
+    </output>
+  );
+}
+
+const CARD_TRANSITION_MS = 300;
 
 type CardTransition =
   | Readonly<{ type: "select"; direction: -1 | 1; versionId: string }>
@@ -87,7 +142,7 @@ function SummaryCardStack({
   const dragStart = useRef<{ x: number; y: number; pointerId: number } | null>(null);
   const transitionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [dragX, setDragX] = useState(0);
-  const [isDragging, setIsDragging] = useState(false);
+  const [isReturning, setIsReturning] = useState(false);
   const [transition, setTransition] = useState<CardTransition | null>(null);
   const reducedMotion = useReducedMotion();
 
@@ -106,6 +161,7 @@ function SummaryCardStack({
   const selectedIndex = versioning.versions.findIndex(({ id }) => id === selected.id);
   const isWorking =
     versioning.generation.status === "queued" || versioning.generation.status === "generating";
+  const showsGenerationCard = isWorking && selected.isLatest;
   const canRegenerate = Boolean(
     selected.isLatest && versioning.generation.canRegenerate && !isWorking && onRegenerate,
   );
@@ -117,13 +173,13 @@ function SummaryCardStack({
       ? versioning.versions.find(({ id }) => id === transition.versionId)
       : undefined;
   const revealedVersion = transitionVersion ?? olderVersion;
-  const hasGenerationCard = canRegenerate || isWorking || transition?.type === "regenerate";
+  const hasGenerationCard = canRegenerate || transition?.type === "regenerate";
 
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (!canSwipe || (event.button !== 0 && event.pointerType !== "touch")) return;
     event.currentTarget.setPointerCapture?.(event.pointerId);
     dragStart.current = { x: event.clientX, y: event.clientY, pointerId: event.pointerId };
-    setIsDragging(true);
+    setIsReturning(false);
   };
 
   const onPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -136,11 +192,11 @@ function SummaryCardStack({
     const start = dragStart.current;
     if (!start || start.pointerId !== event.pointerId) return;
     dragStart.current = null;
-    setIsDragging(false);
     if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
     if (cancelled) {
+      setIsReturning(true);
       setDragX(0);
       return;
     }
@@ -152,6 +208,7 @@ function SummaryCardStack({
       canRegenerate,
     });
     if (action.type === "none") {
+      setIsReturning(true);
       setDragX(0);
       return;
     }
@@ -217,7 +274,7 @@ function SummaryCardStack({
         {hasGenerationCard && (
           <div
             aria-hidden="true"
-            className={`absolute flex items-center rounded-3xl bg-gradient-to-r from-violet-600 to-sky-500 px-3 text-white shadow-lg transition-all duration-300 ease-out motion-reduce:transition-none ${transition?.type === "regenerate" ? "inset-x-0 top-0 bottom-4 z-[5] scale-100" : isWorking ? "inset-x-3 top-1.5 bottom-2.5 scale-[0.96]" : "inset-y-4 left-0 right-8 scale-100"}`}
+            className={`absolute flex items-center rounded-3xl bg-gradient-to-r from-violet-600 to-sky-500 px-3 text-white shadow-lg transition-all duration-300 ease-out motion-reduce:transition-none ${transition?.type === "regenerate" ? "inset-x-0 top-0 bottom-4 z-[5] scale-100" : "inset-y-4 left-0 right-8 scale-100"}`}
           >
             <div className="flex w-full items-center gap-3">
               <Sparkles className="size-5 shrink-0" aria-hidden="true" />
@@ -225,11 +282,9 @@ function SummaryCardStack({
                 <p className="text-sm font-bold">
                   {transition?.type === "regenerate"
                     ? "新しい版を追加しています"
-                    : isWorking
-                      ? "新しい版を作成中"
-                      : "新しい私を見る"}
+                    : "新しい私を見る"}
                 </p>
-                {!isWorking && transition?.type !== "regenerate" && (
+                {transition?.type !== "regenerate" && (
                   <p className="mt-1 text-[11px] text-white/80">右へスワイプして生成</p>
                 )}
               </div>
@@ -238,8 +293,12 @@ function SummaryCardStack({
         )}
 
         <div
-          aria-label={`${versionLabel(selected.sequence)}、${selectedIndex + 1}/${versioning.versions.length}`}
-          className={`relative z-10 select-none transition-transform ease-out motion-reduce:transition-none ${isDragging ? "duration-0" : "duration-300"} ${canRegenerate ? "ml-8 w-[calc(100%-2rem)]" : "w-full"} ${canSwipe ? "cursor-grab touch-pan-y active:cursor-grabbing" : ""}`}
+          aria-label={
+            showsGenerationCard
+              ? `新しい版を作成中、${selectedIndex + 1}/${versioning.versions.length}`
+              : `${versionLabel(selected.sequence)}、${selectedIndex + 1}/${versioning.versions.length}`
+          }
+          className={`relative z-10 select-none transition-transform ease-out motion-reduce:transition-none ${transition || isReturning ? "duration-300" : "duration-0"} ${canRegenerate ? "ml-8 w-[calc(100%-2rem)]" : "w-full"} ${canSwipe ? "cursor-grab touch-pan-y active:cursor-grabbing" : ""}`}
           style={{
             transform: transition
               ? `translate3d(${transition.direction * 115}%, 0, 0) rotate(${transition.direction * 8}deg)`
@@ -250,7 +309,37 @@ function SummaryCardStack({
           onPointerUp={(event) => finishPointer(event, false)}
           onPointerCancel={(event) => finishPointer(event, true)}
         >
-          {children}
+          {showsGenerationCard ? (
+            <section className="flex min-h-[28rem] flex-col items-center justify-center rounded-3xl border border-violet-300/40 bg-gradient-to-br from-violet-50 via-white to-sky-50 p-8 text-center shadow-xl shadow-slate-950/10 dark:from-violet-950/50 dark:via-slate-800 dark:to-sky-950/40">
+              <span className="flex size-16 items-center justify-center rounded-3xl bg-violet-500/15 text-violet-700 dark:text-violet-300">
+                <LoaderCircle
+                  className="size-8 animate-spin motion-reduce:animate-none"
+                  aria-hidden="true"
+                />
+              </span>
+              <p className="mt-5 text-xs font-semibold tracking-wider text-violet-700 dark:text-violet-300">
+                新しい私
+              </p>
+              <h2 className="mt-2 text-xl font-bold text-slate-950 dark:text-slate-50">
+                新しい版を作成中
+              </h2>
+              <p className="mt-3 max-w-sm text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                診断と日記・記録から、今のあなたをまとめています。完了まで少しお待ちください。
+              </p>
+              {reasonText && (
+                <p className="mt-5 rounded-full bg-violet-100 px-4 py-2 text-xs text-violet-800 dark:bg-violet-950 dark:text-violet-200">
+                  {reasonText}
+                </p>
+              )}
+              {versioning.versions.length > 1 && (
+                <p className="mt-6 text-xs text-slate-500 dark:text-slate-400">
+                  左へスワイプすると、過去の版を確認できます
+                </p>
+              )}
+            </section>
+          ) : (
+            children
+          )}
         </div>
       </div>
 
@@ -564,11 +653,7 @@ export function ProfileSummaryScreen({
         </p>
       </header>
 
-      {state.status === "loading" && (
-        <div className="mt-8">
-          <LoadingState variant="panel" message="記録からまとめを作っています..." />
-        </div>
-      )}
+      {state.status === "loading" && <SummarySkeleton />}
       {state.status === "error" && (
         <section className="mt-8 rounded-3xl border border-red-400/30 bg-red-400/10 p-6 text-center">
           <p className="text-sm text-red-700 dark:text-red-300">まとめを表示できませんでした。</p>
