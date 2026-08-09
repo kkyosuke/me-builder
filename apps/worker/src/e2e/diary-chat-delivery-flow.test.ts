@@ -239,7 +239,7 @@ async function ingestDiaryEvents(events: DiaryEventInput[], suffix: string) {
   const bindings: CloudflareBindings = {
     d1: client,
     do: { conversation: namespace, accountData },
-    queue: { chatTurn: undefined },
+    queue: { chatTurn: undefined, brainCheckpoint: undefined },
   };
   return { bindings, coordinator: harness.coordinator, harness, providerAccountId, queuedTurn };
 }
@@ -280,7 +280,7 @@ async function ingestDiary(text: string, suffix: string, replyToken?: string) {
   const bindings: CloudflareBindings = {
     d1: client,
     do: { conversation: namespace, accountData },
-    queue: { chatTurn: undefined },
+    queue: { chatTurn: undefined, brainCheckpoint: undefined },
   };
   return { bindings, coordinator: harness.coordinator, providerAccountId, queuedTurn };
 }

@@ -14,7 +14,8 @@ export type CloudflareBindings = {
     accountData?: AccountDataNamespace;
   };
   queue: {
-    chatTurn: Queue<ChatTurnQueueMessage | DiaryBrainCheckpointQueueMessage> | undefined;
+    chatTurn: Queue<ChatTurnQueueMessage> | undefined;
+    brainCheckpoint: Queue<DiaryBrainCheckpointQueueMessage> | undefined;
   };
 };
 
@@ -28,6 +29,7 @@ export function getCloudflareBindings(env: Env): CloudflareBindings {
     },
     queue: {
       chatTurn: env.CHAT_TURN_QUEUE,
+      brainCheckpoint: env.BRAIN_CHECKPOINT_QUEUE,
     },
   };
 }

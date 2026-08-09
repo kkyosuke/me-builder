@@ -10,6 +10,7 @@ describe("AccountData alarm", () => {
     const now = new Date("2026-08-09T00:00:00.000Z").getTime();
     const nextAttemptAt = now + 60_000;
     const setAlarm = vi.fn(async () => undefined);
+    const chatTurnSend = vi.fn(async () => undefined);
     vi.spyOn(Date, "now").mockReturnValue(now);
     vi.spyOn(logger, "error").mockImplementation(() => undefined);
     vi.spyOn(d1.action.conversation, "closeExpiredSessions").mockResolvedValue(0);
@@ -37,7 +38,8 @@ describe("AccountData alarm", () => {
       },
       ctx: { storage: { setAlarm } },
       env: {
-        CHAT_TURN_QUEUE: {
+        CHAT_TURN_QUEUE: { send: chatTurnSend },
+        BRAIN_CHECKPOINT_QUEUE: {
           send: async () => {
             throw new Error("temporary queue outage");
           },
@@ -46,6 +48,7 @@ describe("AccountData alarm", () => {
     });
 
     await expect(instance.alarm()).resolves.toBeUndefined();
+    expect(chatTurnSend).not.toHaveBeenCalled();
     expect(setAlarm).toHaveBeenCalledWith(nextAttemptAt);
     expect(logger.error).toHaveBeenCalledWith(
       { errorName: "Error" },

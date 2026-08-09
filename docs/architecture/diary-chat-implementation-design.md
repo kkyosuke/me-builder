@@ -59,6 +59,10 @@ flowchart TD
     IW -->|RPC: accept| DO[ConversationCoordinator DO<br/>Accountごと]
     DO -->|Turn投入| TQ[Chat Turn Queue]
     TQ --> GW[Queue Worker: generate]
+    AD -->|alarm: checkpoint投入| BQ[Brain Checkpoint Queue]
+    BQ --> BW[Queue Worker: Brain変換]
+    BW -->|checkpoint取得・適用| AD
+    BW -->|抽出prompt| AIG
     GW -->|Context Package| AD
     GW -->|候補検索| V[Vectorize]
     GW -->|本文ログ無効| AIG[AI Gateway]
@@ -69,6 +73,7 @@ flowchart TD
     AD -->|alarm: Session終了・projection retry| AD
     CRON -->|同期差分確認| V
     TQ --> DLQ[Chat Turn DLQ]
+    BQ --> BDLQ[Brain Checkpoint DLQ]
 ```
 
 `apps/worker`はQueue名で`ingest`と`generate`を振り分けます。`ConversationCoordinator`も同じWorkerからexportし、デプロイ単位を増やしません。
@@ -112,14 +117,15 @@ sequenceDiagram
     GW->>DO: 完了を通知
 ```
 
-2つのQueueの責務は次のように分けます。
+3つのQueueの責務は次のように分けます。通常返信をBrain変換より優先できるよう、両者は物理Queueを分離し、互いのAI呼び出しや再配送でhead-of-line blockingを起こさない構成にします。
 
 | Queue | 区切る処理 | ackの条件 | 再配送時の守り |
 | --- | --- | --- | --- |
 | Webhook Queue | LINE Webhook受付と原本・会話への取り込み | Source Recordの保存とCoordinatorへの通知が完了したとき | channel event IDとSource Record IDで冪等化する |
-| Chat Turn Queue | TurnのAI生成・LINE最終応答、およびBrain checkpointのAI変換 | Turnは生成・配送完了時、checkpointはAccountDataへの適用完了時 | message種別ごとにTurn leaseまたはcheckpoint状態で多重適用を防ぐ |
+| Chat Turn Queue | TurnのAI生成・LINE最終応答 | 生成・配送が完了したとき | Turn leaseで多重生成・配送を防ぐ |
+| Brain Checkpoint Queue | 期限を迎えたcheckpointのAI変換 | AccountDataへの適用が完了したとき | checkpoint状態とIDで多重適用を防ぐ |
 
-処理不能なmessageを無制限に通常Queueへ戻さないよう、両QueueにDLQを設定します。Chat Turn Queueへ本文やLINEの`replyToken`は渡しません。Turn処理はAccount ID、Turn ID、generation epoch、Brain処理はAccount ID、checkpoint IDだけを渡し、consumerはAccountDataから対象を読み直します。Account IDは認可済みrouting keyであり、data access自体はAccountData Object identityでも再検証します。受付からTurn作成までの詳細は[5.1 受付から原本保存](#51-受付から原本保存)、生成順序の詳細は[5.2 連投とTurn](#52-連投とturn)を正とします。
+処理不能なmessageを無制限に通常Queueへ戻さないよう、各QueueにDLQを設定します。Chat Turn QueueとBrain Checkpoint Queueへ本文やLINEの`replyToken`は渡しません。Turn処理はAccount ID、Turn ID、generation epoch、Brain処理はAccount ID、checkpoint IDだけを渡し、consumerはAccountDataから対象を読み直します。Account IDは認可済みrouting keyであり、data access自体はAccountData Object identityでも再検証します。受付からTurn作成までの詳細は[5.1 受付から原本保存](#51-受付から原本保存)、生成順序の詳細は[5.2 連投とTurn](#52-連投とturn)を正とします。
 
 ### 3.2 AccountData alarmの意図
 
@@ -541,7 +547,7 @@ flowchart TD
 
 日記候補の入力、起動条件、検証、Brain Item登録、否定・修正、重複・改訂は[Brain Item生成設計 §7](../domain/brain/brain-item-generation-design.md#7-日記チャットからの生成)を正とします。
 
-Brain Item抽出は会話返信とは別のsystem prompt、prompt version、Valibot schemaを使います。AccountData alarmがChat Turn QueueへIDだけを送り、consumerが削除・撤回されていないuser messageを最大10件、各5,000文字まで読み直してGeminiへ渡します。上限超過本文はSource Recordとして保持したまま変換対象から外します。JSON・出力envelope不正またはproviderの一時失敗はQueueを失敗させて再試行し、個別候補のschema・Evidence・重複違反、空白statement、根拠user message本文にそのまま含まれないstatementは理由コードだけをlogへ残して候補単位で除外します。安全経路または正常な空配列は0件として適用します。候補の保存はAccountData actionだけが行い、モデルへDBや外部I/Oのtoolを公開しません。
+Brain Item抽出は会話返信とは別のsystem prompt、prompt version、Valibot schemaを使います。AccountData alarmがBrain Checkpoint QueueへIDだけを送り、consumerが削除・撤回されていないuser messageを最大10件、各5,000文字まで読み直してGeminiへ渡します。Chat Turn Queueと物理的に分離するため、Brain変換のAI待ちや再配送は通常返信を待たせません。上限超過本文はSource Recordとして保持したまま変換対象から外します。JSON・出力envelope不正またはproviderの一時失敗はQueueを失敗させて再試行し、個別候補のschema・Evidence・重複違反、空白statement、根拠user message本文にそのまま含まれないstatementは理由コードだけをlogへ残して候補単位で除外します。安全経路または正常な空配列は0件として適用します。候補の保存はAccountData actionだけが行い、モデルへDBや外部I/Oのtoolを公開しません。
 
 ## 8. ガードレール
 
@@ -636,7 +642,7 @@ finalまたは失敗案内のretryは90秒で止めます。90秒時点で結果
 
 ### 9.3 retryとDLQ
 
-- Webhook QueueとChat Turn QueueにDLQを設定する
+- Webhook Queue、Chat Turn Queue、Brain Checkpoint Queueに個別のDLQを設定する
 - AI生成は同一Turnで最大2回。schema修正か一時的provider失敗だけを再試行する
 - safety block、入力不正、Access拒否はretryしない
 - rate limitと一時的5xxはjitter付きbackoffでretryする

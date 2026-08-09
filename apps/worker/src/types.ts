@@ -6,6 +6,7 @@ import type { ChatTurnQueueMessage, DiaryBrainCheckpointQueueMessage } from "@me
 export type Env = Omit<
   WorkerBindings,
   | "CHAT_TURN_QUEUE"
+  | "BRAIN_CHECKPOINT_QUEUE"
   | "CONVERSATION_COORDINATOR"
   | "ACCOUNT_DATA"
   | "COMPATIBILITY_DATA"
@@ -24,7 +25,8 @@ export type Env = Omit<
   CHAT_DELIVERY_SECRET?: string;
   CHAT_CONTEXT_MESSAGE_LIMIT?: string;
   LIFF_ID?: string;
-  CHAT_TURN_QUEUE?: Queue<ChatTurnQueueMessage | DiaryBrainCheckpointQueueMessage>;
+  CHAT_TURN_QUEUE?: Queue<ChatTurnQueueMessage>;
+  BRAIN_CHECKPOINT_QUEUE?: Queue<DiaryBrainCheckpointQueueMessage>;
   CONVERSATION_COORDINATOR?: WorkerBindings["CONVERSATION_COORDINATOR"];
   ACCOUNT_DATA?: AccountDataNamespace;
   COMPATIBILITY_DATA?: CompatibilityDataNamespace;

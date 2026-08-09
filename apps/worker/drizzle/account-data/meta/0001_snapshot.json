@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "29c92dab-4d00-467a-b93e-c2b61b614d4b",
+  "id": "9d51a347-0a5d-4153-96f9-88ca7d320034",
   "prevId": "ffa29e63-b5a2-4979-baea-96b05902bceb",
   "tables": {
     "account_data_identity": {
@@ -108,92 +108,6 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "compatibility_references": {
-      "name": "compatibility_references",
-      "columns": {
-        "relationship_id": {
-          "name": "relationship_id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "account_id": {
-          "name": "account_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "role": {
-          "name": "role",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "partner_account_id": {
-          "name": "partner_account_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "compatibility_reference_active_partner_idx": {
-          "name": "compatibility_reference_active_partner_idx",
-          "columns": ["partner_account_id"],
-          "isUnique": true,
-          "where": "\"compatibility_references\".\"status\" in ('reserved', 'active')"
-        },
-        "compatibility_reference_status_updated_idx": {
-          "name": "compatibility_reference_status_updated_idx",
-          "columns": ["status", "updated_at"],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "compatibility_references_account_id_accounts_id_fk": {
-          "name": "compatibility_references_account_id_accounts_id_fk",
-          "tableFrom": "compatibility_references",
-          "tableTo": "accounts",
-          "columnsFrom": ["account_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {
-        "compatibility_reference_state_check": {
-          "name": "compatibility_reference_state_check",
-          "value": "(\"compatibility_references\".\"status\" = 'pending' and \"compatibility_references\".\"role\" = 'inviter' and \"compatibility_references\".\"partner_account_id\" is null) or (\"compatibility_references\".\"status\" = 'reserved' and \"compatibility_references\".\"partner_account_id\" is not null) or (\"compatibility_references\".\"status\" = 'active' and \"compatibility_references\".\"partner_account_id\" is not null) or \"compatibility_references\".\"status\" = 'ended'"
-        }
-      }
-    },
     "brain_item_access_labels": {
       "name": "brain_item_access_labels",
       "columns": {
@@ -254,13 +168,6 @@
           "notNull": true,
           "autoincrement": false
         },
-        "confirmation": {
-          "name": "confirmation",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
         "assigned_by": {
           "name": "assigned_by",
           "type": "text",
@@ -278,7 +185,7 @@
         },
         "brain_item_access_label_lookup_idx": {
           "name": "brain_item_access_label_lookup_idx",
-          "columns": ["account_id", "label", "confirmation", "is_deleted"],
+          "columns": ["account_id", "label", "is_deleted"],
           "isUnique": false
         }
       },
@@ -679,13 +586,6 @@
           "notNull": true,
           "autoincrement": false
         },
-        "confirmation": {
-          "name": "confirmation",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
         "status": {
           "name": "status",
           "type": "text",
@@ -740,7 +640,7 @@
       "indexes": {
         "brain_item_lookup_idx": {
           "name": "brain_item_lookup_idx",
-          "columns": ["account_id", "confirmation", "status", "category"],
+          "columns": ["account_id", "status", "category"],
           "isUnique": false
         },
         "brain_item_id_account_idx": {

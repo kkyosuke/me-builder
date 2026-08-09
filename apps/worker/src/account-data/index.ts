@@ -42,8 +42,13 @@ export class AccountData extends DurableObject<Env> {
     this.accountId = accountId;
     this.repository = new AccountDataRepository(ctx.storage);
     ctx.blockConcurrencyWhile(async () => {
-      await this.repository.initialize();
-      this.repository.bindAccount(accountId);
+      try {
+        await this.repository.initialize();
+        this.repository.bindAccount(accountId);
+      } catch (error) {
+        logAccountDataFailure("initialization", error);
+        throw error;
+      }
     });
   }
 
@@ -89,11 +94,23 @@ export class AccountData extends DurableObject<Env> {
         await this.legacyImport;
       } catch (error) {
         this.legacyImport = undefined;
+        logAccountDataFailure("legacy_import", error, operation);
         throw error;
       }
       if (operation.startsWith("diagnosis")) await this.syncDiagnosisCatalog();
-      const result = await boundAction(this.repository.client, accountId, ...args);
-      await this.scheduleMaintenance();
+      let result: AccountDataResult<TOperation>;
+      try {
+        result = await boundAction(this.repository.client, accountId, ...args);
+      } catch (error) {
+        logAccountDataFailure("action", error, operation);
+        throw error;
+      }
+      try {
+        await this.scheduleMaintenance();
+      } catch (error) {
+        logAccountDataFailure("maintenance", error, operation);
+        throw error;
+      }
       return result;
     });
   }
@@ -109,11 +126,11 @@ export class AccountData extends DurableObject<Env> {
           this.repository.client,
           this.accountId,
         );
-        if (checkpointIds.length > 0 && !this.env.CHAT_TURN_QUEUE) {
-          throw new Error("CHAT_TURN_QUEUE binding is required for diary Brain checkpoints");
+        if (checkpointIds.length > 0 && !this.env.BRAIN_CHECKPOINT_QUEUE) {
+          throw new Error("BRAIN_CHECKPOINT_QUEUE binding is required for diary Brain checkpoints");
         }
         for (const checkpointId of checkpointIds) {
-          await this.env.CHAT_TURN_QUEUE?.send({
+          await this.env.BRAIN_CHECKPOINT_QUEUE?.send({
             type: "diary-brain-checkpoint",
             accountId: this.accountId,
             checkpointId,
@@ -419,4 +436,24 @@ export class AccountData extends DurableObject<Env> {
       release();
     }
   }
+}
+
+function logAccountDataFailure(
+  phase: "initialization" | "legacy_import" | "action" | "maintenance",
+  error: unknown,
+  operation?: string,
+): void {
+  const errorCode =
+    error && typeof error === "object" && "code" in error
+      ? String((error as { code: unknown }).code)
+      : undefined;
+  logger.error(
+    {
+      phase,
+      ...(operation ? { operation } : {}),
+      errorName: error instanceof Error ? error.name : "UnknownError",
+      ...(errorCode ? { errorCode } : {}),
+    },
+    "AccountData operation failed",
+  );
 }

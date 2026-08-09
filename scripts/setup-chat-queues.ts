@@ -6,6 +6,8 @@ if (environment !== "preview" && environment !== "production") {
 const queueNames = [
   `me-builder-chat-turn-queue-${environment}`,
   `me-builder-chat-turn-dlq-${environment}`,
+  `me-builder-brain-checkpoint-queue-${environment}`,
+  `me-builder-brain-checkpoint-dlq-${environment}`,
   `me-builder-webhook-dlq-${environment}`,
 ];
 

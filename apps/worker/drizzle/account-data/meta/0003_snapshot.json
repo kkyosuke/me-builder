@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "7f6da91b-ae92-476c-b0e9-fb9b0e02c620",
-  "prevId": "9d51a347-0a5d-4153-96f9-88ca7d320034",
+  "id": "95c2ee82-5c60-494a-b0ac-1e1ed4bb721c",
+  "prevId": "7f6da91b-ae92-476c-b0e9-fb9b0e02c620",
   "tables": {
     "account_data_identity": {
       "name": "account_data_identity",
@@ -1144,6 +1144,103 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
+    "diary_brain_checkpoint_items": {
+      "name": "diary_brain_checkpoint_items",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "is_deleted": {
+          "name": "is_deleted",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "checkpoint_id": {
+          "name": "checkpoint_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "brain_item_id": {
+          "name": "brain_item_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "position": {
+          "name": "position",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "diary_brain_checkpoint_item_position_idx": {
+          "name": "diary_brain_checkpoint_item_position_idx",
+          "columns": ["checkpoint_id", "position"],
+          "isUnique": true
+        },
+        "diary_brain_checkpoint_item_brain_idx": {
+          "name": "diary_brain_checkpoint_item_brain_idx",
+          "columns": ["brain_item_id"],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "diary_brain_checkpoint_items_checkpoint_id_diary_brain_checkpoints_id_fk": {
+          "name": "diary_brain_checkpoint_items_checkpoint_id_diary_brain_checkpoints_id_fk",
+          "tableFrom": "diary_brain_checkpoint_items",
+          "tableTo": "diary_brain_checkpoints",
+          "columnsFrom": ["checkpoint_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "diary_brain_checkpoint_items_brain_item_id_brain_items_id_fk": {
+          "name": "diary_brain_checkpoint_items_brain_item_id_brain_items_id_fk",
+          "tableFrom": "diary_brain_checkpoint_items",
+          "tableTo": "brain_items",
+          "columnsFrom": ["brain_item_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "diary_brain_checkpoints": {
       "name": "diary_brain_checkpoints",
       "columns": {
@@ -1257,6 +1354,13 @@
         },
         "applied_at": {
           "name": "applied_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "development_notification_sent_at": {
+          "name": "development_notification_sent_at",
           "type": "integer",
           "primaryKey": false,
           "notNull": false,
