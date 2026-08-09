@@ -1,7 +1,13 @@
-import { Suspense, lazy } from "react";
+import { Suspense, lazy, useState } from "react";
 import { LoadingState } from "./components/loading-state";
 import { RouteErrorBoundary } from "./components/route-error-boundary";
-import { ColorThemeToggle, useColorTheme } from "./feature/theme";
+import {
+  type AvatarSelection,
+  AvatarSettingsScreen,
+  ProfileMenuButton,
+  ProfileSettingsScreen,
+} from "./feature/profile-settings";
+import { useColorTheme } from "./feature/theme";
 import { loadAdminApplication, loadDiagnosisApplication, loadProfileApplication } from "./routes";
 
 const AdminApplication = lazy(loadAdminApplication);
@@ -28,10 +34,16 @@ export function App() {
   const pathname = resolveRequestedPathname();
   const isAdminPath = pathname.startsWith("/admin");
   const isMePath = pathname === "/me" || pathname.startsWith("/me/");
+  const [profileView, setProfileView] = useState<"closed" | "profile" | "avatar">(
+    pathname === "/profile" || pathname.startsWith("/profile/") ? "profile" : "closed",
+  );
+  const [avatar, setAvatar] = useState<AvatarSelection | null>(null);
 
   return (
     <>
-      <ColorThemeToggle theme={colorTheme.theme} onToggle={colorTheme.toggleTheme} />
+      {!isAdminPath && profileView === "closed" && (
+        <ProfileMenuButton avatar={avatar} onOpen={() => setProfileView("profile")} />
+      )}
       <RouteErrorBoundary>
         <Suspense fallback={<LoadingState message="画面を読み込んでいます..." />}>
           {isAdminPath ? (
@@ -43,6 +55,25 @@ export function App() {
           )}
         </Suspense>
       </RouteErrorBoundary>
+      {profileView === "profile" && (
+        <ProfileSettingsScreen
+          avatar={avatar}
+          theme={colorTheme.theme}
+          onBack={() => setProfileView("closed")}
+          onOpenAvatar={() => setProfileView("avatar")}
+          onThemeChange={colorTheme.setTheme}
+        />
+      )}
+      {profileView === "avatar" && (
+        <AvatarSettingsScreen
+          currentAvatar={avatar}
+          onBack={() => setProfileView("profile")}
+          onSave={(nextAvatar) => {
+            setAvatar(nextAvatar);
+            setProfileView("profile");
+          }}
+        />
+      )}
     </>
   );
 }

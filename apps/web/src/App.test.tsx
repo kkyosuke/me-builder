@@ -210,15 +210,17 @@ describe("App", () => {
     );
   });
 
-  it("既存のダークテーマを初期表示し、ライトテーマへ切り替えて保存する", async () => {
+  it("右上からプロフィールを開き、ライトテーマへ切り替えて保存する", async () => {
     render(<App />);
 
-    const toggle = screen.getByRole("button", { name: "ライトモードに切り替える" });
+    fireEvent.click(screen.getByRole("button", { name: "プロフィールを開く" }));
+    expect(screen.getByRole("heading", { name: "プロフィール" })).toBeTruthy();
+    const lightTheme = screen.getByRole("radio", { name: /ライト/ });
     await waitFor(() => expect(document.documentElement.classList.contains("dark")).toBe(true));
 
-    fireEvent.click(toggle);
+    fireEvent.click(lightTheme);
 
-    expect(screen.getByRole("button", { name: "ダークモードに切り替える" })).toBeTruthy();
+    expect((lightTheme as HTMLInputElement).checked).toBe(true);
     expect(document.documentElement.classList.contains("light")).toBe(true);
     expect(document.documentElement.classList.contains("dark")).toBe(false);
     expect(window.localStorage.getItem("me-builder-color-theme")).toBe("light");
@@ -229,8 +231,24 @@ describe("App", () => {
 
     render(<App />);
 
-    expect(screen.getByRole("button", { name: "ダークモードに切り替える" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "プロフィールを開く" }));
+    expect((screen.getByRole("radio", { name: /ライト/ }) as HTMLInputElement).checked).toBe(true);
     await waitFor(() => expect(document.documentElement.classList.contains("light")).toBe(true));
+  });
+
+  it("ダミー候補からアバターを設定してプロフィールへ戻る", async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "プロフィールを開く" }));
+    fireEvent.click(screen.getByRole("button", { name: /アバターを設定/ }));
+
+    expect(screen.getByRole("heading", { name: "アバター設定" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "ダミー候補を表示" }));
+    fireEvent.click(screen.getByRole("button", { name: "星空を選択" }));
+    fireEvent.click(screen.getByRole("button", { name: "このアバターに設定" }));
+
+    expect(screen.getByRole("heading", { name: "プロフィール" })).toBeTruthy();
+    expect(screen.getByText("星空")).toBeTruthy();
   });
 
   it("/meでは診断・日記レコードから生成したまとめを表示し、診断一覧は取得しない", async () => {

@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
 
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { AdminStatisticsScreen } from "./admin-statistics-screen";
 
 describe("AdminStatisticsScreen", () => {
+  afterEach(cleanup);
+
   it("LINE返信数が前日までの集計であることを表示する", () => {
     render(
       <AdminStatisticsScreen

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ProfileSummary } from "../model/profile-summary";
 import { ProfileSummaryScreen } from "./profile-summary-screen";
 
@@ -24,6 +24,8 @@ const summary: ProfileSummary = {
 };
 
 describe("ProfileSummaryScreen", () => {
+  afterEach(cleanup);
+
   it("生成したまとめ、根拠、入力範囲を表示する", () => {
     render(
       <ProfileSummaryScreen
