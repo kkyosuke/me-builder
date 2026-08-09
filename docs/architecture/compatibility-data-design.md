@@ -14,6 +14,8 @@
 
 各`AccountData`には、自分の一覧を組み立て、同じ相手との重複関係を防ぐための`compatibility_references`だけを保存します。共有D1には相性関係、表示名、同意、診断結果を保存しません。
 
+相性関係の入力検証、招待期限の判定、状態遷移、冪等性、閲覧可否、previewへの変換は`packages/lib`のランタイム非依存なドメインロジックが所有します。`apps/worker`はDurable Objectとprivate SQLiteのadapterとして、現在状態の読込、ドメインロジックが返した決定結果の保存、alarm設定だけを担当します。CloudflareやDrizzleへ依存するコードを`packages/lib`へ持ち込みません。
+
 ```mermaid
 flowchart LR
     API[API Server] -->|認証済みAccount ID| A[AccountData A]
@@ -23,6 +25,14 @@ flowchart LR
     B -->|relation参照のみ| BR[(private SQLite)]
     C --> CR[(private SQLite<br/>招待・表示名snapshot・同意指紋)]
     API --> D1[(共有D1<br/>公開Diagnosis catalogのみ)]
+```
+
+```mermaid
+flowchart LR
+    RPC[CompatibilityData RPC] --> REPO[Worker SQLite adapter]
+    REPO -->|現在状態とcommand| DOMAIN[packages/lib<br/>相性ドメインロジック]
+    DOMAIN -->|状態遷移の決定結果| REPO
+    REPO --> SQLITE[(CompatibilityData<br/>private SQLite)]
 ```
 
 ## 3. データ分類

@@ -1,17 +1,22 @@
-import type {
-  AcceptCompatibilityInvitationInput,
-  AcceptCompatibilityInvitationResult,
-  CancelCompatibilityInvitationResult,
-  CompatibilityInvitationAcceptanceContext,
-  CompatibilityInvitationPreview,
-  CompatibilityRelationship,
-  CompatibilityThemeConsent,
-  CompatibilityThemeFingerprint,
-  CreateCompatibilityInvitationInput,
-  CreateCompatibilityInvitationResult,
-  EndCompatibilityRelationshipResult,
+import {
+  type AcceptCompatibilityInvitationInput,
+  type AcceptCompatibilityInvitationResult,
+  type CancelCompatibilityInvitationResult,
+  type CompatibilityInvitationAcceptanceContext,
+  type CompatibilityInvitationPreview,
+  type CompatibilityRelationship,
+  type CreateCompatibilityInvitationInput,
+  type CreateCompatibilityInvitationResult,
+  type EndCompatibilityRelationshipResult,
+  createCompatibilityInvitationAcceptanceContext,
+  createCompatibilityInvitationPreview,
+  decideCompatibilityInvitationAcceptance,
+  decideCompatibilityInvitationCancellation,
+  decideCompatibilityInvitationCreation,
+  decideCompatibilityRelationshipEnd,
+  expireCompatibilityRelationship,
+  getAcceptedCompatibilityRelationship,
 } from "@me-builder/lib";
-import { COMPATIBILITY_INVITATION_TTL_MS } from "@me-builder/lib";
 import { asc, eq } from "drizzle-orm";
 import { type DrizzleSqliteDODatabase, drizzle } from "drizzle-orm/durable-sqlite";
 import { migrate } from "drizzle-orm/durable-sqlite/migrator";
@@ -24,37 +29,6 @@ import {
 } from "./schema";
 
 type CompatibilityDatabase = DrizzleSqliteDODatabase<typeof compatibilityDataSchema>;
-
-function assertNonEmpty(value: string, field: string): void {
-  if (value.trim().length === 0) throw new Error(`${field} is required`);
-}
-
-function assertThemes(themes: readonly CompatibilityThemeFingerprint[]): void {
-  if (themes.length === 0) throw new Error("At least one compatibility theme is required");
-  const diagnosisIds = new Set<string>();
-  for (const theme of themes) {
-    assertNonEmpty(theme.diagnosisId, "diagnosisId");
-    if (!/^[a-f0-9]{64}$/.test(theme.resultFingerprint)) {
-      throw new Error("Compatibility result fingerprint must be a SHA-256 hex digest");
-    }
-    if (diagnosisIds.has(theme.diagnosisId)) {
-      throw new Error("Compatibility themes must not contain duplicate diagnoses");
-    }
-    diagnosisIds.add(theme.diagnosisId);
-  }
-}
-
-function sameThemes(
-  left: readonly CompatibilityThemeConsent[],
-  right: readonly CompatibilityThemeFingerprint[],
-): boolean {
-  if (left.length !== right.length) return false;
-  const byDiagnosis = new Map(left.map((theme) => [theme.diagnosisId, theme]));
-  return right.every((theme) => {
-    const other = byDiagnosis.get(theme.diagnosisId);
-    return other?.resultFingerprint === theme.resultFingerprint;
-  });
-}
 
 export class CompatibilityDataRepository {
   private readonly db: CompatibilityDatabase;
@@ -72,146 +46,90 @@ export class CompatibilityDataRepository {
     input: CreateCompatibilityInvitationInput,
     createdAt: Date,
   ): CreateCompatibilityInvitationResult {
-    assertNonEmpty(relationshipId, "relationshipId");
-    if (!/^[a-f0-9]{64}$/.test(relationshipId)) {
-      throw new Error("Compatibility relationship id must be a 256-bit hex token");
-    }
-    assertNonEmpty(input.inviterAccountId, "inviterAccountId");
-    assertNonEmpty(input.inviterDisplayName, "inviterDisplayName");
-    assertThemes(input.offeredThemes);
-    const expiresAt = new Date(createdAt.getTime() + COMPATIBILITY_INVITATION_TTL_MS);
-
     const existing = this.readRelationship();
-    if (existing) {
-      if (
-        existing.id !== relationshipId ||
-        existing.inviterAccountId !== input.inviterAccountId ||
-        existing.inviterDisplayName !== input.inviterDisplayName.trim() ||
-        !sameThemes(existing.offeredThemes, input.offeredThemes)
-      ) {
-        throw new Error("Compatibility invitation conflicts with persisted relationship");
-      }
-      return { outcome: "unchanged", relationship: existing };
-    }
+    const decision = decideCompatibilityInvitationCreation(
+      existing,
+      relationshipId,
+      input,
+      createdAt,
+    );
+    if (decision.outcome === "unchanged") return decision;
+    const { relationship } = decision;
 
     this.db.transaction((tx) => {
       tx.insert(compatibilityRelationships)
         .values({
           singleton: 1,
-          relationshipId,
-          inviterAccountId: input.inviterAccountId,
-          inviteeAccountId: null,
-          inviterDisplayName: input.inviterDisplayName.trim(),
-          inviteeDisplayName: null,
-          status: "pending",
-          expiresAt,
-          acceptedAt: null,
-          cancelledAt: null,
-          endedAt: null,
-          endedByAccountId: null,
-          createdAt,
-          updatedAt: createdAt,
+          relationshipId: relationship.id,
+          inviterAccountId: relationship.inviterAccountId,
+          inviteeAccountId: relationship.inviteeAccountId,
+          inviterDisplayName: relationship.inviterDisplayName,
+          inviteeDisplayName: relationship.inviteeDisplayName,
+          status: relationship.status,
+          expiresAt: relationship.expiresAt,
+          acceptedAt: relationship.acceptedAt,
+          cancelledAt: relationship.cancelledAt,
+          endedAt: relationship.endedAt,
+          endedByAccountId: relationship.endedByAccountId,
+          createdAt: relationship.createdAt,
+          updatedAt: relationship.updatedAt,
         })
         .run();
       tx.insert(compatibilityOfferedThemes)
         .values(
-          input.offeredThemes.map((theme) => ({
-            relationshipId,
+          relationship.offeredThemes.map((theme) => ({
+            relationshipId: relationship.id,
             diagnosisId: theme.diagnosisId,
             resultFingerprint: theme.resultFingerprint,
-            consentedAt: createdAt,
+            consentedAt: theme.consentedAt,
           })),
         )
         .run();
     });
 
-    const relationship = this.readRelationship();
-    if (!relationship) throw new Error("Compatibility invitation was not persisted");
-    return { outcome: "created", relationship };
+    const persisted = this.readRelationship();
+    if (!persisted) throw new Error("Compatibility invitation was not persisted");
+    return { outcome: "created", relationship: persisted };
   }
 
   getInvitationPreview(viewerAccountId: string, at: Date): CompatibilityInvitationPreview | null {
     this.expirePending(at);
-    const relationship = this.readRelationship();
-    if (relationship?.status !== "pending") return null;
-    return {
-      id: relationship.id,
-      inviterDisplayName: relationship.inviterDisplayName,
-      offeredDiagnosisIds: relationship.offeredThemes.map(({ diagnosisId }) => diagnosisId),
-      expiresAt: relationship.expiresAt,
-      isOwnInvitation: relationship.inviterAccountId === viewerAccountId,
-    };
+    return createCompatibilityInvitationPreview(this.readRelationship(), viewerAccountId);
   }
 
   getInvitationAcceptanceContext(at: Date): CompatibilityInvitationAcceptanceContext | null {
     this.expirePending(at);
-    const relationship = this.readRelationship();
-    if (relationship?.status !== "pending") return null;
-    return {
-      inviterAccountId: relationship.inviterAccountId,
-      offeredDiagnosisIds: relationship.offeredThemes.map(({ diagnosisId }) => diagnosisId),
-      expiresAt: relationship.expiresAt,
-    };
+    return createCompatibilityInvitationAcceptanceContext(this.readRelationship());
   }
 
   acceptInvitation(
     input: AcceptCompatibilityInvitationInput,
     acceptedAt: Date,
   ): AcceptCompatibilityInvitationResult {
-    assertNonEmpty(input.inviteeAccountId, "inviteeAccountId");
-    assertNonEmpty(input.inviteeDisplayName, "inviteeDisplayName");
-    assertThemes(input.acceptedThemes);
     this.expirePending(acceptedAt);
     const relationship = this.readRelationship();
-    if (!relationship) return { outcome: "unavailable" };
-    if (relationship.inviterAccountId === input.inviteeAccountId) {
-      return { outcome: "self-invite" };
-    }
-    if (relationship.status === "expired") return { outcome: "expired" };
-    if (relationship.status === "accepted") {
-      if (
-        relationship.inviteeAccountId === input.inviteeAccountId &&
-        relationship.inviteeDisplayName === input.inviteeDisplayName.trim() &&
-        relationship.acceptedThemes.every((theme) =>
-          input.acceptedThemes.some(
-            (candidate) =>
-              candidate.diagnosisId === theme.diagnosisId &&
-              candidate.resultFingerprint === theme.resultFingerprint,
-          ),
-        ) &&
-        relationship.acceptedThemes.length === input.acceptedThemes.length
-      ) {
-        return { outcome: "unchanged", relationship };
-      }
-      return { outcome: "unavailable" };
-    }
-    if (relationship.status !== "pending") return { outcome: "unavailable" };
-
-    const offeredDiagnosisIds = new Set(
-      relationship.offeredThemes.map(({ diagnosisId }) => diagnosisId),
-    );
-    if (input.acceptedThemes.some(({ diagnosisId }) => !offeredDiagnosisIds.has(diagnosisId))) {
-      return { outcome: "invalid-themes" };
-    }
+    const decision = decideCompatibilityInvitationAcceptance(relationship, input, acceptedAt);
+    if (decision.outcome !== "accepted") return decision;
+    const acceptedRelationship = decision.relationship;
 
     this.db.transaction((tx) => {
       tx.insert(compatibilityAcceptedThemes)
         .values(
-          input.acceptedThemes.map((theme) => ({
-            relationshipId: relationship.id,
+          acceptedRelationship.acceptedThemes.map((theme) => ({
+            relationshipId: acceptedRelationship.id,
             diagnosisId: theme.diagnosisId,
             resultFingerprint: theme.resultFingerprint,
-            consentedAt: acceptedAt,
+            consentedAt: theme.consentedAt,
           })),
         )
         .run();
       tx.update(compatibilityRelationships)
         .set({
-          inviteeAccountId: input.inviteeAccountId,
-          inviteeDisplayName: input.inviteeDisplayName.trim(),
-          status: "accepted",
-          acceptedAt,
-          updatedAt: acceptedAt,
+          inviteeAccountId: acceptedRelationship.inviteeAccountId,
+          inviteeDisplayName: acceptedRelationship.inviteeDisplayName,
+          status: acceptedRelationship.status,
+          acceptedAt: acceptedRelationship.acceptedAt,
+          updatedAt: acceptedRelationship.updatedAt,
         })
         .where(eq(compatibilityRelationships.singleton, 1))
         .run();
@@ -225,15 +143,15 @@ export class CompatibilityDataRepository {
   cancelInvitation(actorAccountId: string, at: Date): CancelCompatibilityInvitationResult {
     this.expirePending(at);
     const relationship = this.readRelationship();
-    if (!relationship) return { outcome: "unavailable" };
-    if (relationship.inviterAccountId !== actorAccountId) return { outcome: "forbidden" };
-    if (relationship.status === "cancelled") {
-      return { outcome: "unchanged", relationship };
-    }
-    if (relationship.status !== "pending") return { outcome: "unavailable" };
+    const decision = decideCompatibilityInvitationCancellation(relationship, actorAccountId, at);
+    if (decision.outcome !== "cancelled") return decision;
     this.db
       .update(compatibilityRelationships)
-      .set({ status: "cancelled", cancelledAt: at, updatedAt: at })
+      .set({
+        status: decision.relationship.status,
+        cancelledAt: decision.relationship.cancelledAt,
+        updatedAt: decision.relationship.updatedAt,
+      })
       .where(eq(compatibilityRelationships.singleton, 1))
       .run();
     const cancelled = this.readRelationship();
@@ -243,30 +161,21 @@ export class CompatibilityDataRepository {
 
   getRelationship(actorAccountId: string, at: Date): CompatibilityRelationship | null {
     this.expirePending(at);
-    const relationship = this.readRelationship();
-    if (
-      !relationship ||
-      relationship.status !== "accepted" ||
-      (relationship.inviterAccountId !== actorAccountId &&
-        relationship.inviteeAccountId !== actorAccountId)
-    ) {
-      return null;
-    }
-    return relationship;
+    return getAcceptedCompatibilityRelationship(this.readRelationship(), actorAccountId);
   }
 
   endRelationship(actorAccountId: string, at: Date): EndCompatibilityRelationshipResult {
     const relationship = this.readRelationship();
-    if (!relationship) return { outcome: "not-found" };
-    const isParticipant =
-      relationship.inviterAccountId === actorAccountId ||
-      relationship.inviteeAccountId === actorAccountId;
-    if (!isParticipant) return { outcome: "not-found" };
-    if (relationship.status === "ended") return { outcome: "unchanged", relationship };
-    if (relationship.status !== "accepted") return { outcome: "unavailable" };
+    const decision = decideCompatibilityRelationshipEnd(relationship, actorAccountId, at);
+    if (decision.outcome !== "ended") return decision;
     this.db
       .update(compatibilityRelationships)
-      .set({ status: "ended", endedAt: at, endedByAccountId: actorAccountId, updatedAt: at })
+      .set({
+        status: decision.relationship.status,
+        endedAt: decision.relationship.endedAt,
+        endedByAccountId: decision.relationship.endedByAccountId,
+        updatedAt: decision.relationship.updatedAt,
+      })
       .where(eq(compatibilityRelationships.singleton, 1))
       .run();
     const ended = this.readRelationship();
@@ -275,24 +184,13 @@ export class CompatibilityDataRepository {
   }
 
   expirePending(at: Date): boolean {
-    const relationship = this.db
-      .select({
-        status: compatibilityRelationships.status,
-        expiresAt: compatibilityRelationships.expiresAt,
-      })
-      .from(compatibilityRelationships)
-      .where(eq(compatibilityRelationships.singleton, 1))
-      .get();
-    if (
-      !relationship ||
-      relationship.status !== "pending" ||
-      relationship.expiresAt.getTime() > at.getTime()
-    ) {
-      return false;
-    }
+    const relationship = this.readRelationship();
+    if (!relationship) return false;
+    const expired = expireCompatibilityRelationship(relationship, at);
+    if (expired === relationship) return false;
     this.db
       .update(compatibilityRelationships)
-      .set({ status: "expired", updatedAt: at })
+      .set({ status: expired.status, updatedAt: expired.updatedAt })
       .where(eq(compatibilityRelationships.singleton, 1))
       .run();
     return true;
