@@ -1,4 +1,4 @@
-import type { CompatibilityPerson } from "../model/compatibility";
+import type { CompatibilityListData, CompatibilityPerson } from "../model/compatibility";
 
 export const me: CompatibilityPerson = {
   name: "わたし",
@@ -77,3 +77,16 @@ export const aoi: CompatibilityPerson = {
 };
 
 export const demoInvitationUrl = "https://example.com/compatibility/invitations/demo";
+
+export const compatibilityListData: CompatibilityListData = {
+  owner: me,
+  available: {
+    partner: aoi,
+    comparableThemeCount: 3,
+    href: "/compatibility/demo",
+  },
+  diagnosisWaiting: {
+    name: "はる",
+    href: "/diagnosis",
+  },
+};

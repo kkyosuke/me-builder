@@ -1,12 +1,13 @@
 import { ArrowRight, CheckCircle2, Clock3, RotateCw, Send, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { MainNavigation } from "../../../components/main-navigation";
-import { aoi, me } from "../infrastructure/compatibility-demo";
-import { CompatibilityAvatar, DemoNotice } from "./compatibility-ui";
+import type { CompatibilityListData } from "../model/compatibility";
+import { CompatibilityAvatar, DemoNotice } from "./components/compatibility-ui";
 
-export function CompatibilityListScreen() {
+export function CompatibilityListScreen({ data }: { data: CompatibilityListData }) {
   const [inviteVisible, setInviteVisible] = useState(true);
   const [operationMessage, setOperationMessage] = useState<string | null>(null);
+  const { available, diagnosisWaiting, owner } = data;
   return (
     <main className="mx-auto min-h-dvh w-full max-w-2xl px-4 py-8 pb-28 sm:px-8">
       <header>
@@ -44,9 +45,9 @@ export function CompatibilityListScreen() {
         <article className="mt-3 rounded-3xl border border-rose-200 bg-gradient-to-br from-white to-rose-50 p-5 shadow-lg shadow-slate-950/5 dark:border-rose-900/50 dark:from-slate-800 dark:to-rose-950/30">
           <div className="flex items-center">
             <div className="flex items-center">
-              <CompatibilityAvatar person={me} />
+              <CompatibilityAvatar person={owner} />
               <span className="-mx-1 text-lg font-bold text-slate-400">×</span>
-              <CompatibilityAvatar person={aoi} />
+              <CompatibilityAvatar person={available.partner} />
             </div>
             <div className="ml-4 min-w-0">
               <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-300">
@@ -54,13 +55,15 @@ export function CompatibilityListScreen() {
                 結果あり
               </div>
               <h3 className="mt-1 truncate text-lg font-bold text-slate-950 dark:text-slate-50">
-                あおいさん
+                {available.partner.name}さん
               </h3>
-              <p className="mt-0.5 text-xs text-slate-500">3つのテーマで比較できます</p>
+              <p className="mt-0.5 text-xs text-slate-500">
+                {available.comparableThemeCount}つのテーマで比較できます
+              </p>
             </div>
           </div>
           <a
-            href="/compatibility/demo"
+            href={available.href}
             className="mt-5 flex min-h-11 items-center justify-between rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-bold text-white dark:bg-slate-50 dark:text-slate-950"
           >
             2人の相性シートを見る
@@ -81,7 +84,9 @@ export function CompatibilityListScreen() {
               </span>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-2">
-                  <h3 className="font-bold text-slate-950 dark:text-slate-50">はるさん</h3>
+                  <h3 className="font-bold text-slate-950 dark:text-slate-50">
+                    {diagnosisWaiting.name}さん
+                  </h3>
                   <span className="rounded-full bg-violet-400/15 px-2 py-1 text-xs font-bold text-violet-700 dark:text-violet-300">
                     診断待ち
                   </span>
@@ -90,7 +95,7 @@ export function CompatibilityListScreen() {
                   比較できる内容を、もう一度確認してください。
                 </p>
                 <a
-                  href="/diagnosis"
+                  href={diagnosisWaiting.href}
                   className="mt-3 inline-flex min-h-10 items-center gap-2 text-sm font-bold text-sky-700 dark:text-sky-300"
                 >
                   診断を見る

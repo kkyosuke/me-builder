@@ -15,3 +15,16 @@ export type CompatibilityPerson = {
   color: "sky" | "violet";
   themes: CompatibilityTheme[];
 };
+
+export type CompatibilityListData = {
+  owner: CompatibilityPerson;
+  available: {
+    partner: CompatibilityPerson;
+    comparableThemeCount: number;
+    href: string;
+  };
+  diagnosisWaiting: {
+    name: string;
+    href: string;
+  };
+};

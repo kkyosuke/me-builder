@@ -1,8 +1,13 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
-import { aoi, me } from "../infrastructure/compatibility-demo";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  aoi,
+  compatibilityListData,
+  demoInvitationUrl,
+  me,
+} from "../infrastructure/compatibility-demo";
 import { CompatibilityInvitationScreen } from "./compatibility-invitation-screen";
 import { CompatibilityListScreen } from "./compatibility-list-screen";
 import { CompatibilityResultScreen } from "./compatibility-result-screen";
@@ -12,7 +17,7 @@ describe("Compatibility flow", () => {
   afterEach(cleanup);
 
   it("一覧で結果あり・診断待ち・返事待ちを区別する", () => {
-    render(<CompatibilityListScreen />);
+    render(<CompatibilityListScreen data={compatibilityListData} />);
 
     expect(screen.getByRole("heading", { name: "相性診断" })).toBeTruthy();
     expect(screen.getByText("結果あり")).toBeTruthy();
@@ -29,7 +34,15 @@ describe("Compatibility flow", () => {
   });
 
   it("振る舞い・考え方をすべて共有し、詳細は共有せずに招待リンクを発行する", async () => {
-    render(<CompatibilityShareScreen person={me} />);
+    const copyInvitation = vi.fn().mockResolvedValue(undefined);
+    render(
+      <CompatibilityShareScreen
+        person={me}
+        invitationUrl={demoInvitationUrl}
+        lineShareUrl="https://line.me/R/msg/text/?demo"
+        copyInvitation={copyInvitation}
+      />,
+    );
 
     expect(screen.getByRole("heading", { name: "共有する振る舞い・考え方" })).toBeTruthy();
     expect(screen.getByText("3件すべて共有")).toBeTruthy();
@@ -42,6 +55,7 @@ describe("Compatibility flow", () => {
     expect(screen.getByRole("link", { name: "LINEで送る" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "リンクをコピー" }));
     expect(await screen.findByRole("button", { name: "コピーしました" })).toBeTruthy();
+    expect(copyInvitation).toHaveBeenCalledWith(demoInvitationUrl);
   });
 
   it("受信者が自分の共有内容と共有されない詳細を確認して承諾する", () => {
@@ -51,7 +65,7 @@ describe("Compatibility flow", () => {
     expect(screen.getByRole("heading", { name: "共有する振る舞い・考え方" })).toBeTruthy();
     expect(screen.getByText("3件すべて共有")).toBeTruthy();
     expect(screen.queryByRole("checkbox")).toBeNull();
-    expect(screen.getByText(/日記や会話から得た記憶/)).toBeTruthy();
+    expect(screen.getByText(/日記やLINEの会話から得た記憶/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "相性を見てみる" }));
 
     expect(

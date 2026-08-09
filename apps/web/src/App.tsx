@@ -5,10 +5,12 @@ import type { AvatarSelection } from "./feature/profile-settings/model/avatar";
 import { ProfileMenuButton } from "./feature/profile-settings/presentation/components/profile-menu-button";
 import { useColorTheme } from "./feature/theme";
 import {
+  getIdleMainApplicationRoutes,
   loadAdminApplication,
   loadAvatarSettingsScreen,
   loadCompatibilityApplication,
   loadDiagnosisApplication,
+  loadMainApplication,
   loadProfileApplication,
   loadProfileSettingsScreen,
   preloadAvatarSettingsScreen,
@@ -110,18 +112,15 @@ export function App() {
   useEffect(() => {
     if (isAdminPath) return;
 
-    const loadCurrentApplication =
-      currentMainRoute === "compatibility"
-        ? loadCompatibilityApplication
-        : currentMainRoute === "me"
-          ? loadProfileApplication
-          : loadDiagnosisApplication;
-    return scheduleIdlePreloadAfter(loadCurrentApplication, () => {
-      for (const route of ["diagnosis", "compatibility", "me"] as const) {
-        if (route !== currentMainRoute) preloadMainApplication(route);
-      }
-      preloadProfileSettingsScreen();
-    });
+    return scheduleIdlePreloadAfter(
+      () => loadMainApplication(currentMainRoute),
+      () => {
+        for (const route of getIdleMainApplicationRoutes(currentMainRoute)) {
+          preloadMainApplication(route);
+        }
+        preloadProfileSettingsScreen();
+      },
+    );
   }, [currentMainRoute, isAdminPath]);
 
   useEffect(() => {

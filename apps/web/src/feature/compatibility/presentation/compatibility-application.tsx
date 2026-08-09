@@ -1,29 +1,55 @@
-import { useState } from "react";
-import { aoi, me } from "../infrastructure/compatibility-demo";
-import { CompatibilityInvitationScreen } from "./compatibility-invitation-screen";
+import { Suspense, lazy } from "react";
+import { LoadingState } from "../../../components/loading-state";
+import {
+  aoi,
+  compatibilityListData,
+  demoInvitationUrl,
+  me,
+} from "../infrastructure/compatibility-demo";
+import {
+  copyCompatibilityInvitation,
+  createLineShareUrl,
+} from "../infrastructure/compatibility-share";
 import { CompatibilityListScreen } from "./compatibility-list-screen";
-import { CompatibilityResultScreen } from "./compatibility-result-screen";
-import { CompatibilityShareScreen } from "./compatibility-share-screen";
+import { useCompatibilityRoute } from "./hooks/use-compatibility-route";
 
-function requestedPathname(): string {
-  if (typeof window === "undefined") return "/compatibility";
-  if (window.location.pathname.startsWith("/compatibility")) return window.location.pathname;
-  const liffState = new URLSearchParams(window.location.search).get("liff.state");
-  if (!liffState?.startsWith("/compatibility")) return window.location.pathname;
-  return liffState.split(/[?#]/, 1)[0] ?? window.location.pathname;
-}
+const CompatibilityInvitationScreen = lazy(() =>
+  import("./compatibility-invitation-screen").then((feature) => ({
+    default: feature.CompatibilityInvitationScreen,
+  })),
+);
+const CompatibilityResultScreen = lazy(() =>
+  import("./compatibility-result-screen").then((feature) => ({
+    default: feature.CompatibilityResultScreen,
+  })),
+);
+const CompatibilityShareScreen = lazy(() =>
+  import("./compatibility-share-screen").then((feature) => ({
+    default: feature.CompatibilityShareScreen,
+  })),
+);
 
 export default function CompatibilityApplication() {
-  const [pathname] = useState(requestedPathname);
+  const route = useCompatibilityRoute();
 
-  if (pathname.startsWith("/compatibility/invitations/")) {
-    return <CompatibilityInvitationScreen inviter={aoi} recipient={me} />;
+  if (route === "list") {
+    return <CompatibilityListScreen data={compatibilityListData} />;
   }
-  if (pathname === "/compatibility/share") {
-    return <CompatibilityShareScreen person={me} />;
-  }
-  if (pathname.startsWith("/compatibility/demo")) {
-    return <CompatibilityResultScreen me={me} partner={aoi} />;
-  }
-  return <CompatibilityListScreen />;
+
+  return (
+    <Suspense fallback={<LoadingState message="相性画面を読み込んでいます..." />}>
+      {route === "invitation" ? (
+        <CompatibilityInvitationScreen inviter={aoi} recipient={me} />
+      ) : route === "share" ? (
+        <CompatibilityShareScreen
+          person={me}
+          invitationUrl={demoInvitationUrl}
+          lineShareUrl={createLineShareUrl(demoInvitationUrl)}
+          copyInvitation={copyCompatibilityInvitation}
+        />
+      ) : (
+        <CompatibilityResultScreen me={me} partner={aoi} />
+      )}
+    </Suspense>
+  );
 }

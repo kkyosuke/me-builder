@@ -1,12 +1,15 @@
-import { ArrowRight, CheckCircle2, HeartHandshake, ShieldCheck, UserCheck } from "lucide-react";
+import { ArrowRight, CheckCircle2, HeartHandshake, UserCheck } from "lucide-react";
 import { useState } from "react";
 import type { CompatibilityPerson } from "../model/compatibility";
+import {
+  CompatibilityDisclosurePreview,
+  CompatibilityPrivacyNotice,
+} from "./components/compatibility-disclosure";
 import {
   CompatibilityAvatar,
   CompatibilityBackHeader,
   DemoNotice,
-  ThemePreviewCard,
-} from "./compatibility-ui";
+} from "./components/compatibility-ui";
 
 export function CompatibilityInvitationScreen({
   inviter,
@@ -65,43 +68,22 @@ export function CompatibilityInvitationScreen({
         </p>
       </section>
 
-      <section aria-labelledby="recipient-preview-heading" className="mt-8">
-        <div className="flex items-end justify-between gap-3">
-          <div>
-            <p className="flex items-center gap-1.5 text-xs font-bold text-slate-500">
-              <UserCheck className="size-4" aria-hidden="true" />
-              {inviter.name}さんに見える内容
-            </p>
-            <h2
-              id="recipient-preview-heading"
-              className="mt-1 text-xl font-bold text-slate-950 dark:text-slate-50"
-            >
-              共有する振る舞い・考え方
-            </h2>
-          </div>
-          <span className="text-sm font-bold text-rose-700 dark:text-rose-300">
-            {recipient.themes.length}件すべて共有
+      <CompatibilityDisclosurePreview
+        eyebrow={
+          <span className="flex items-center gap-1.5">
+            <UserCheck className="size-4" aria-hidden="true" />
+            {inviter.name}さんに見える内容
           </span>
-        </div>
-        <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-          診断から見える傾向をすべて共有します。{inviter.name}さんも同じ範囲を確認済みです。
-        </p>
-        <div className="mt-4 space-y-3">
-          {recipient.themes.map((theme) => (
-            <ThemePreviewCard key={theme.id} theme={theme} />
-          ))}
-        </div>
-      </section>
+        }
+        headingId="recipient-preview-heading"
+        description={`診断から見える傾向をすべて共有します。${inviter.name}さんも同じ範囲を確認済みです。`}
+        themes={recipient.themes}
+      />
 
-      <section className="mt-8 rounded-3xl border border-emerald-300/40 bg-emerald-50 p-5 dark:border-emerald-700/40 dark:bg-emerald-950/30">
-        <h2 className="flex items-center gap-2 font-bold text-emerald-950 dark:text-emerald-100">
-          <ShieldCheck className="size-5" aria-hidden="true" />
-          承諾する前に
-        </h2>
-        <p className="mt-2 text-sm leading-relaxed text-emerald-900 dark:text-emerald-200">
-          具体的な回答、日記や会話から得た記憶、自由記述は共有されません。承諾すると双方の相性一覧へ追加され、共有はどちらからでも終了できます。
-        </p>
-      </section>
+      <CompatibilityPrivacyNotice
+        title="承諾する前に"
+        footer="承諾すると双方の相性一覧へ追加され、共有はどちらからでも終了できます。"
+      />
 
       <button
         type="button"

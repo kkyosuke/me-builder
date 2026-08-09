@@ -52,15 +52,24 @@ export const loadAvatarSettingsScreen = memoizeModuleLoader(() =>
   })),
 );
 
+export function loadMainApplication(route: MainApplicationRoute): Promise<LazyApplicationModule> {
+  if (route === "me") return loadProfileApplication();
+  if (route === "compatibility") return loadCompatibilityApplication();
+  return loadDiagnosisApplication();
+}
+
+/** 現在のタブに隣接する遷移先だけを、自動先読みの対象にする。 */
+export function getIdleMainApplicationRoutes(
+  current: MainApplicationRoute,
+): MainApplicationRoute[] {
+  if (current === "me") return ["diagnosis"];
+  if (current === "compatibility") return ["diagnosis"];
+  return ["me", "compatibility"];
+}
+
 /** タブへの移動意図を検知した時、遷移先のチャンクをすぐ先読みする。 */
 export function preloadMainApplication(route: MainApplicationRoute): void {
-  const load =
-    route === "me"
-      ? loadProfileApplication
-      : route === "compatibility"
-        ? loadCompatibilityApplication
-        : loadDiagnosisApplication;
-  void load().catch(() => undefined);
+  void loadMainApplication(route).catch(() => undefined);
 }
 
 export function preloadProfileSettingsScreen(): void {

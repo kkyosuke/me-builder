@@ -1,5 +1,5 @@
 import { ArrowLeft } from "lucide-react";
-import type { CompatibilityPerson, CompatibilityTheme } from "../model/compatibility";
+import type { CompatibilityPerson, CompatibilityTheme } from "../../model/compatibility";
 
 export function CompatibilityAvatar({
   person,
