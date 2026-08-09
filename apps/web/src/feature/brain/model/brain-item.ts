@@ -1,11 +1,11 @@
-export type BrainItemEvidence = {
+type BrainItemEvidence = {
   sourceRecordId: string;
   relation: "supports" | "contradicts";
   derivationMethod: "ai" | "deterministic";
   generatedAt: string;
 };
 
-export type BrainItem = {
+type BrainItem = {
   id: string;
   category: string;
   statement: string;
