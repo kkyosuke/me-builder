@@ -2,8 +2,11 @@ import type {
   AcceptCompatibilityInvitationInput,
   AcceptCompatibilityInvitationResult,
   CancelCompatibilityInvitationResult,
+  CompatibilityInvitationAcceptanceContext,
+  CompatibilityInvitationPreview,
   CompatibilityRelationship,
   CompatibilityThemeConsent,
+  CompatibilityThemeFingerprint,
   CreateCompatibilityInvitationInput,
   CreateCompatibilityInvitationResult,
   EndCompatibilityRelationshipResult,
@@ -26,7 +29,7 @@ function assertNonEmpty(value: string, field: string): void {
   if (value.trim().length === 0) throw new Error(`${field} is required`);
 }
 
-function assertThemes(themes: readonly CompatibilityThemeConsent[]): void {
+function assertThemes(themes: readonly CompatibilityThemeFingerprint[]): void {
   if (themes.length === 0) throw new Error("At least one compatibility theme is required");
   const diagnosisIds = new Set<string>();
   for (const theme of themes) {
@@ -43,16 +46,13 @@ function assertThemes(themes: readonly CompatibilityThemeConsent[]): void {
 
 function sameThemes(
   left: readonly CompatibilityThemeConsent[],
-  right: readonly CompatibilityThemeConsent[],
+  right: readonly CompatibilityThemeFingerprint[],
 ): boolean {
   if (left.length !== right.length) return false;
   const byDiagnosis = new Map(left.map((theme) => [theme.diagnosisId, theme]));
   return right.every((theme) => {
     const other = byDiagnosis.get(theme.diagnosisId);
-    return (
-      other?.resultFingerprint === theme.resultFingerprint &&
-      other.consentedAt.getTime() === theme.consentedAt.getTime()
-    );
+    return other?.resultFingerprint === theme.resultFingerprint;
   });
 }
 
@@ -70,6 +70,7 @@ export class CompatibilityDataRepository {
   createInvitation(
     relationshipId: string,
     input: CreateCompatibilityInvitationInput,
+    createdAt: Date,
   ): CreateCompatibilityInvitationResult {
     assertNonEmpty(relationshipId, "relationshipId");
     if (!/^[a-f0-9]{64}$/.test(relationshipId)) {
@@ -78,16 +79,7 @@ export class CompatibilityDataRepository {
     assertNonEmpty(input.inviterAccountId, "inviterAccountId");
     assertNonEmpty(input.inviterDisplayName, "inviterDisplayName");
     assertThemes(input.offeredThemes);
-    if (
-      input.offeredThemes.some(
-        ({ consentedAt }) => consentedAt.getTime() !== input.createdAt.getTime(),
-      )
-    ) {
-      throw new Error("Offered theme consent time must match invitation creation time");
-    }
-    if (input.expiresAt.getTime() - input.createdAt.getTime() !== COMPATIBILITY_INVITATION_TTL_MS) {
-      throw new Error("Compatibility invitation must expire 14 days after it is created");
-    }
+    const expiresAt = new Date(createdAt.getTime() + COMPATIBILITY_INVITATION_TTL_MS);
 
     const existing = this.readRelationship();
     if (existing) {
@@ -95,8 +87,6 @@ export class CompatibilityDataRepository {
         existing.id !== relationshipId ||
         existing.inviterAccountId !== input.inviterAccountId ||
         existing.inviterDisplayName !== input.inviterDisplayName.trim() ||
-        existing.createdAt.getTime() !== input.createdAt.getTime() ||
-        existing.expiresAt.getTime() !== input.expiresAt.getTime() ||
         !sameThemes(existing.offeredThemes, input.offeredThemes)
       ) {
         throw new Error("Compatibility invitation conflicts with persisted relationship");
@@ -114,13 +104,13 @@ export class CompatibilityDataRepository {
           inviterDisplayName: input.inviterDisplayName.trim(),
           inviteeDisplayName: null,
           status: "pending",
-          expiresAt: input.expiresAt,
+          expiresAt,
           acceptedAt: null,
           cancelledAt: null,
           endedAt: null,
           endedByAccountId: null,
-          createdAt: input.createdAt,
-          updatedAt: input.createdAt,
+          createdAt,
+          updatedAt: createdAt,
         })
         .run();
       tx.insert(compatibilityOfferedThemes)
@@ -129,7 +119,7 @@ export class CompatibilityDataRepository {
             relationshipId,
             diagnosisId: theme.diagnosisId,
             resultFingerprint: theme.resultFingerprint,
-            consentedAt: theme.consentedAt,
+            consentedAt: createdAt,
           })),
         )
         .run();
@@ -140,24 +130,38 @@ export class CompatibilityDataRepository {
     return { outcome: "created", relationship };
   }
 
-  getInvitation(at: Date): CompatibilityRelationship | null {
+  getInvitationPreview(viewerAccountId: string, at: Date): CompatibilityInvitationPreview | null {
     this.expirePending(at);
     const relationship = this.readRelationship();
-    return relationship?.status === "pending" ? relationship : null;
+    if (relationship?.status !== "pending") return null;
+    return {
+      id: relationship.id,
+      inviterDisplayName: relationship.inviterDisplayName,
+      offeredDiagnosisIds: relationship.offeredThemes.map(({ diagnosisId }) => diagnosisId),
+      expiresAt: relationship.expiresAt,
+      isOwnInvitation: relationship.inviterAccountId === viewerAccountId,
+    };
   }
 
-  acceptInvitation(input: AcceptCompatibilityInvitationInput): AcceptCompatibilityInvitationResult {
+  getInvitationAcceptanceContext(at: Date): CompatibilityInvitationAcceptanceContext | null {
+    this.expirePending(at);
+    const relationship = this.readRelationship();
+    if (relationship?.status !== "pending") return null;
+    return {
+      inviterAccountId: relationship.inviterAccountId,
+      offeredDiagnosisIds: relationship.offeredThemes.map(({ diagnosisId }) => diagnosisId),
+      expiresAt: relationship.expiresAt,
+    };
+  }
+
+  acceptInvitation(
+    input: AcceptCompatibilityInvitationInput,
+    acceptedAt: Date,
+  ): AcceptCompatibilityInvitationResult {
     assertNonEmpty(input.inviteeAccountId, "inviteeAccountId");
     assertNonEmpty(input.inviteeDisplayName, "inviteeDisplayName");
     assertThemes(input.acceptedThemes);
-    if (
-      input.acceptedThemes.some(
-        ({ consentedAt }) => consentedAt.getTime() !== input.acceptedAt.getTime(),
-      )
-    ) {
-      throw new Error("Accepted theme consent time must match invitation acceptance time");
-    }
-    this.expirePending(input.acceptedAt);
+    this.expirePending(acceptedAt);
     const relationship = this.readRelationship();
     if (!relationship) return { outcome: "unavailable" };
     if (relationship.inviterAccountId === input.inviteeAccountId) {
@@ -197,7 +201,7 @@ export class CompatibilityDataRepository {
             relationshipId: relationship.id,
             diagnosisId: theme.diagnosisId,
             resultFingerprint: theme.resultFingerprint,
-            consentedAt: theme.consentedAt,
+            consentedAt: acceptedAt,
           })),
         )
         .run();
@@ -206,8 +210,8 @@ export class CompatibilityDataRepository {
           inviteeAccountId: input.inviteeAccountId,
           inviteeDisplayName: input.inviteeDisplayName.trim(),
           status: "accepted",
-          acceptedAt: input.acceptedAt,
-          updatedAt: input.acceptedAt,
+          acceptedAt,
+          updatedAt: acceptedAt,
         })
         .where(eq(compatibilityRelationships.singleton, 1))
         .run();

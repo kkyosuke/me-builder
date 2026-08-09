@@ -3,6 +3,8 @@ import {
   type AccountDataArgs,
   type AccountDataOperation,
   type AccountDataResult,
+  type CompatibilityReference,
+  compatibilityDataFor,
   d1,
 } from "@me-builder/lib";
 import { eq, inArray } from "drizzle-orm";
@@ -53,6 +55,9 @@ export class AccountData extends DurableObject<Env> {
       throw new Error("AccountData RPC account does not match object name");
     }
     this.repository.bindAccount(accountId);
+    if (operation === "compatibility.listVisibleReferences") {
+      return (await this.listVisibleCompatibilityReferences()) as AccountDataResult<TOperation>;
+    }
     if (operation.startsWith("compatibility.")) {
       const action = (compatibilityActions as Partial<Record<AccountDataOperation, unknown>>)[
         operation
@@ -94,6 +99,45 @@ export class AccountData extends DurableObject<Env> {
       this.repository.client,
     );
     await this.scheduleMaintenance();
+  }
+
+  /** 一覧projectionをCompatibilityDataの現在状態へ同期してから返す。 */
+  private async listVisibleCompatibilityReferences(): Promise<readonly CompatibilityReference[]> {
+    const namespace = this.env.COMPATIBILITY_DATA;
+    if (!namespace) throw new Error("CompatibilityData binding is required");
+
+    const references = this.repository.listVisibleCompatibilityReferences(this.accountId);
+    for (const reference of references) {
+      const relationshipData = compatibilityDataFor(namespace, reference.relationshipId);
+      const relationship = await relationshipData.getRelationship(this.accountId);
+      if (relationship) {
+        const partnerAccountId =
+          relationship.inviterAccountId === this.accountId
+            ? relationship.inviteeAccountId
+            : relationship.inviterAccountId;
+        if (!partnerAccountId) {
+          throw new Error("Accepted compatibility relationship must have both participants");
+        }
+        this.repository.activateCompatibilityReference(this.accountId, {
+          relationshipId: reference.relationshipId,
+          partnerAccountId,
+          role: reference.role,
+          updatedAt: new Date(),
+        });
+        continue;
+      }
+
+      if (reference.status === "pending") {
+        const preview = await relationshipData.getInvitationPreview(this.accountId);
+        if (preview) continue;
+      }
+      this.repository.endCompatibilityReference(
+        this.accountId,
+        reference.relationshipId,
+        new Date(),
+      );
+    }
+    return this.repository.listVisibleCompatibilityReferences(this.accountId);
   }
 
   private async syncDiagnosisCatalog(): Promise<void> {

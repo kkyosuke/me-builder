@@ -46,16 +46,12 @@ function invitationInput() {
       {
         diagnosisId: "diagnosis-1",
         resultFingerprint: firstFingerprint,
-        consentedAt: createdAt,
       },
       {
         diagnosisId: "diagnosis-2",
         resultFingerprint: secondFingerprint,
-        consentedAt: createdAt,
       },
     ],
-    expiresAt,
-    createdAt,
   } as const;
 }
 
@@ -64,8 +60,14 @@ describe("CompatibilityDataRepository", () => {
     const repository = createRepository();
     await repository.initialize();
 
-    expect(repository.createInvitation(relationshipId, invitationInput()).outcome).toBe("created");
-    const retried = repository.createInvitation(relationshipId, invitationInput());
+    expect(repository.createInvitation(relationshipId, invitationInput(), createdAt).outcome).toBe(
+      "created",
+    );
+    const retried = repository.createInvitation(
+      relationshipId,
+      invitationInput(),
+      new Date("2026-08-09T00:01:00.123Z"),
+    );
 
     expect(retried.outcome).toBe("unchanged");
     expect(retried.relationship).toMatchObject({
@@ -78,57 +80,83 @@ describe("CompatibilityDataRepository", () => {
         { diagnosisId: "diagnosis-2", resultFingerprint: secondFingerprint },
       ],
       acceptedThemes: [],
+      createdAt,
+      expiresAt,
     });
+    expect(
+      retried.relationship.offeredThemes.every(({ consentedAt }) => +consentedAt === +createdAt),
+    ).toBe(true);
+  });
+
+  it("招待previewへAccount IDと結果指紋を含めない", async () => {
+    const repository = createRepository();
+    await repository.initialize();
+    repository.createInvitation(relationshipId, invitationInput(), createdAt);
+
+    expect(repository.getInvitationPreview("account-invitee", createdAt)).toEqual({
+      id: relationshipId,
+      inviterDisplayName: "送信者",
+      offeredDiagnosisIds: ["diagnosis-1", "diagnosis-2"],
+      expiresAt,
+      isOwnInvitation: false,
+    });
+    expect(repository.getInvitationPreview("account-inviter", createdAt)?.isOwnInvitation).toBe(
+      true,
+    );
   });
 
   it("送信者本人、空の同意、提示外テーマを承諾させない", async () => {
     const repository = createRepository();
     await repository.initialize();
-    repository.createInvitation(relationshipId, invitationInput());
+    repository.createInvitation(relationshipId, invitationInput(), createdAt);
 
     const acceptedAt = new Date("2026-08-10T00:00:00.000Z");
     expect(
-      repository.acceptInvitation({
-        inviteeAccountId: "account-inviter",
-        inviteeDisplayName: "送信者",
-        acceptedThemes: [
-          {
-            diagnosisId: "diagnosis-1",
-            resultFingerprint: firstFingerprint,
-            consentedAt: acceptedAt,
-          },
-        ],
+      repository.acceptInvitation(
+        {
+          inviteeAccountId: "account-inviter",
+          inviteeDisplayName: "送信者",
+          acceptedThemes: [
+            {
+              diagnosisId: "diagnosis-1",
+              resultFingerprint: firstFingerprint,
+            },
+          ],
+        },
         acceptedAt,
-      }).outcome,
+      ).outcome,
     ).toBe("self-invite");
     expect(() =>
-      repository.acceptInvitation({
-        inviteeAccountId: "account-invitee",
-        inviteeDisplayName: "受信者",
-        acceptedThemes: [],
+      repository.acceptInvitation(
+        {
+          inviteeAccountId: "account-invitee",
+          inviteeDisplayName: "受信者",
+          acceptedThemes: [],
+        },
         acceptedAt,
-      }),
+      ),
     ).toThrow("At least one compatibility theme is required");
     expect(
-      repository.acceptInvitation({
-        inviteeAccountId: "account-invitee",
-        inviteeDisplayName: "受信者",
-        acceptedThemes: [
-          {
-            diagnosisId: "diagnosis-unknown",
-            resultFingerprint: firstFingerprint,
-            consentedAt: acceptedAt,
-          },
-        ],
+      repository.acceptInvitation(
+        {
+          inviteeAccountId: "account-invitee",
+          inviteeDisplayName: "受信者",
+          acceptedThemes: [
+            {
+              diagnosisId: "diagnosis-unknown",
+              resultFingerprint: firstFingerprint,
+            },
+          ],
+        },
         acceptedAt,
-      }).outcome,
+      ).outcome,
     ).toBe("invalid-themes");
   });
 
   it("1人だけが提示テーマの部分集合を承諾し、参加者だけが参照・終了できる", async () => {
     const repository = createRepository();
     await repository.initialize();
-    repository.createInvitation(relationshipId, invitationInput());
+    repository.createInvitation(relationshipId, invitationInput(), createdAt);
     const acceptedAt = new Date("2026-08-10T00:00:00.000Z");
     const acceptance = {
       inviteeAccountId: "account-invitee",
@@ -137,13 +165,11 @@ describe("CompatibilityDataRepository", () => {
         {
           diagnosisId: "diagnosis-2",
           resultFingerprint: "c".repeat(64),
-          consentedAt: acceptedAt,
         },
       ],
-      acceptedAt,
     } as const;
 
-    expect(repository.acceptInvitation(acceptance)).toMatchObject({
+    expect(repository.acceptInvitation(acceptance, acceptedAt)).toMatchObject({
       outcome: "accepted",
       relationship: {
         inviteeAccountId: "account-invitee",
@@ -152,9 +178,12 @@ describe("CompatibilityDataRepository", () => {
         acceptedThemes: [{ diagnosisId: "diagnosis-2" }],
       },
     });
-    expect(repository.acceptInvitation(acceptance).outcome).toBe("unchanged");
+    expect(repository.acceptInvitation(acceptance, acceptedAt).outcome).toBe("unchanged");
     expect(
-      repository.acceptInvitation({ ...acceptance, inviteeAccountId: "account-another" }).outcome,
+      repository.acceptInvitation(
+        { ...acceptance, inviteeAccountId: "account-another" },
+        acceptedAt,
+      ).outcome,
     ).toBe("unavailable");
     expect(repository.getRelationship("account-outsider", acceptedAt)).toBeNull();
     expect(repository.getRelationship("account-invitee", acceptedAt)?.status).toBe("accepted");
@@ -170,22 +199,23 @@ describe("CompatibilityDataRepository", () => {
   it("期限到来時に終端化し、期限後の承諾と取消を拒否する", async () => {
     const repository = createRepository();
     await repository.initialize();
-    repository.createInvitation(relationshipId, invitationInput());
+    repository.createInvitation(relationshipId, invitationInput(), createdAt);
 
-    expect(repository.getInvitation(expiresAt)).toBeNull();
+    expect(repository.getInvitationPreview("account-invitee", expiresAt)).toBeNull();
     expect(
-      repository.acceptInvitation({
-        inviteeAccountId: "account-invitee",
-        inviteeDisplayName: "受信者",
-        acceptedThemes: [
-          {
-            diagnosisId: "diagnosis-1",
-            resultFingerprint: firstFingerprint,
-            consentedAt: expiresAt,
-          },
-        ],
-        acceptedAt: expiresAt,
-      }).outcome,
+      repository.acceptInvitation(
+        {
+          inviteeAccountId: "account-invitee",
+          inviteeDisplayName: "受信者",
+          acceptedThemes: [
+            {
+              diagnosisId: "diagnosis-1",
+              resultFingerprint: firstFingerprint,
+            },
+          ],
+        },
+        expiresAt,
+      ).outcome,
     ).toBe("expired");
     expect(repository.cancelInvitation("account-inviter", expiresAt).outcome).toBe("unavailable");
   });

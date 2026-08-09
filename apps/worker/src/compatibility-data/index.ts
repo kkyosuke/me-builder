@@ -23,44 +23,49 @@ export class CompatibilityData extends DurableObject<Env> {
 
   async createInvitation(relationshipId: string, input: CreateCompatibilityInvitationInput) {
     this.assertRouting(relationshipId);
-    const result = this.repository.createInvitation(relationshipId, input);
+    const result = this.repository.createInvitation(relationshipId, input, new Date());
     if (result.relationship.status === "pending") {
       await this.ctx.storage.setAlarm(result.relationship.expiresAt);
     }
     return result;
   }
 
-  async getInvitation(relationshipId: string, _viewerAccountId: string, at: Date) {
+  async getInvitationPreview(relationshipId: string, viewerAccountId: string) {
     this.assertRouting(relationshipId);
-    return this.repository.getInvitation(at);
+    return this.repository.getInvitationPreview(viewerAccountId, new Date());
+  }
+
+  async getInvitationAcceptanceContext(relationshipId: string) {
+    this.assertRouting(relationshipId);
+    return this.repository.getInvitationAcceptanceContext(new Date());
   }
 
   async acceptInvitation(relationshipId: string, input: AcceptCompatibilityInvitationInput) {
     this.assertRouting(relationshipId);
-    const result = this.repository.acceptInvitation(input);
+    const result = this.repository.acceptInvitation(input, new Date());
     if (result.outcome === "accepted" || result.outcome === "unchanged") {
       await this.ctx.storage.deleteAlarm();
     }
     return result;
   }
 
-  async cancelInvitation(relationshipId: string, actorAccountId: string, at: Date) {
+  async cancelInvitation(relationshipId: string, actorAccountId: string) {
     this.assertRouting(relationshipId);
-    const result = this.repository.cancelInvitation(actorAccountId, at);
+    const result = this.repository.cancelInvitation(actorAccountId, new Date());
     if (result.outcome === "cancelled" || result.outcome === "unchanged") {
       await this.ctx.storage.deleteAlarm();
     }
     return result;
   }
 
-  async getRelationship(relationshipId: string, actorAccountId: string, at: Date) {
+  async getRelationship(relationshipId: string, actorAccountId: string) {
     this.assertRouting(relationshipId);
-    return this.repository.getRelationship(actorAccountId, at);
+    return this.repository.getRelationship(actorAccountId, new Date());
   }
 
-  async endRelationship(relationshipId: string, actorAccountId: string, at: Date) {
+  async endRelationship(relationshipId: string, actorAccountId: string) {
     this.assertRouting(relationshipId);
-    return this.repository.endRelationship(actorAccountId, at);
+    return this.repository.endRelationship(actorAccountId, new Date());
   }
 
   async alarm(): Promise<void> {

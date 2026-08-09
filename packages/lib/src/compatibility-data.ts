@@ -14,6 +14,11 @@ export function createCompatibilityRelationshipId(): string {
   ).join("");
 }
 
+export type CompatibilityThemeFingerprint = Readonly<{
+  diagnosisId: string;
+  resultFingerprint: string;
+}>;
+
 export type CompatibilityThemeConsent = Readonly<{
   diagnosisId: string;
   resultFingerprint: string;
@@ -41,16 +46,29 @@ export type CompatibilityRelationship = Readonly<{
 export type CreateCompatibilityInvitationInput = Readonly<{
   inviterAccountId: string;
   inviterDisplayName: string;
-  offeredThemes: readonly CompatibilityThemeConsent[];
-  expiresAt: Date;
-  createdAt: Date;
+  offeredThemes: readonly CompatibilityThemeFingerprint[];
 }>;
 
 export type AcceptCompatibilityInvitationInput = Readonly<{
   inviteeAccountId: string;
   inviteeDisplayName: string;
-  acceptedThemes: readonly CompatibilityThemeConsent[];
-  acceptedAt: Date;
+  acceptedThemes: readonly CompatibilityThemeFingerprint[];
+}>;
+
+/** 招待確認画面へ渡せる、Account IDと同意指紋を含まない表示用データ。 */
+export type CompatibilityInvitationPreview = Readonly<{
+  id: string;
+  inviterDisplayName: string;
+  offeredDiagnosisIds: readonly string[];
+  expiresAt: Date;
+  isOwnInvitation: boolean;
+}>;
+
+/** 承諾の重複関係確認だけに使う、画面へ返さない内部context。 */
+export type CompatibilityInvitationAcceptanceContext = Readonly<{
+  inviterAccountId: string;
+  offeredDiagnosisIds: readonly string[];
+  expiresAt: Date;
 }>;
 
 export type CreateCompatibilityInvitationResult = Readonly<{
@@ -87,11 +105,13 @@ export interface CompatibilityDataRpc {
     relationshipId: string,
     input: CreateCompatibilityInvitationInput,
   ): Promise<CreateCompatibilityInvitationResult>;
-  getInvitation(
+  getInvitationPreview(
     relationshipId: string,
     viewerAccountId: string,
-    at: Date,
-  ): Promise<CompatibilityRelationship | null>;
+  ): Promise<CompatibilityInvitationPreview | null>;
+  getInvitationAcceptanceContext(
+    relationshipId: string,
+  ): Promise<CompatibilityInvitationAcceptanceContext | null>;
   acceptInvitation(
     relationshipId: string,
     input: AcceptCompatibilityInvitationInput,
@@ -99,17 +119,14 @@ export interface CompatibilityDataRpc {
   cancelInvitation(
     relationshipId: string,
     actorAccountId: string,
-    at: Date,
   ): Promise<CancelCompatibilityInvitationResult>;
   getRelationship(
     relationshipId: string,
     actorAccountId: string,
-    at: Date,
   ): Promise<CompatibilityRelationship | null>;
   endRelationship(
     relationshipId: string,
     actorAccountId: string,
-    at: Date,
   ): Promise<EndCompatibilityRelationshipResult>;
 }
 
@@ -126,20 +143,23 @@ export function compatibilityDataFor(
     createInvitation(input: CreateCompatibilityInvitationInput) {
       return object.createInvitation(relationshipId, input);
     },
-    getInvitation(viewerAccountId: string, at: Date) {
-      return object.getInvitation(relationshipId, viewerAccountId, at);
+    getInvitationPreview(viewerAccountId: string) {
+      return object.getInvitationPreview(relationshipId, viewerAccountId);
+    },
+    getInvitationAcceptanceContext() {
+      return object.getInvitationAcceptanceContext(relationshipId);
     },
     acceptInvitation(input: AcceptCompatibilityInvitationInput) {
       return object.acceptInvitation(relationshipId, input);
     },
-    cancelInvitation(actorAccountId: string, at: Date) {
-      return object.cancelInvitation(relationshipId, actorAccountId, at);
+    cancelInvitation(actorAccountId: string) {
+      return object.cancelInvitation(relationshipId, actorAccountId);
     },
-    getRelationship(actorAccountId: string, at: Date) {
-      return object.getRelationship(relationshipId, actorAccountId, at);
+    getRelationship(actorAccountId: string) {
+      return object.getRelationship(relationshipId, actorAccountId);
     },
-    endRelationship(actorAccountId: string, at: Date) {
-      return object.endRelationship(relationshipId, actorAccountId, at);
+    endRelationship(actorAccountId: string) {
+      return object.endRelationship(relationshipId, actorAccountId);
     },
   };
 }
