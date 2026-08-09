@@ -55,6 +55,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/dev/brain-items": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** 開発環境で本人のactive Brain Item一覧を取得する */
+    get: operations["getDevelopmentBrainItems"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/diagnoses": {
     parameters: {
       query?: never;
@@ -430,6 +447,103 @@ export interface operations {
             /** @constant */
             reason: "friendship_required";
           };
+        };
+      };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
+          };
+        };
+      };
+      /** @description D1 bindingが設定されていない */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Service Unavailable";
+          };
+        };
+      };
+    };
+  };
+  getDevelopmentBrainItems: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 本人のactive Brain ItemとEvidence */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            items: {
+              id: string;
+              category: string;
+              statement: string;
+              /** @enum {string} */
+              derivation: "ai" | "deterministic";
+              /** @constant */
+              status: "active";
+              /** Format: date-time */
+              createdAt: string;
+              evidence: {
+                sourceRecordId: string;
+                /** @enum {string} */
+                relation: "supports" | "contradicts";
+                /** @enum {string} */
+                derivationMethod: "ai" | "deterministic";
+                /** Format: date-time */
+                generatedAt: string;
+              }[];
+            }[];
+            truncated: boolean;
+          };
+        };
+      };
+      /** @description LIFF IDトークンを検証できない */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Unauthorized";
+          };
+        };
+      };
+      /** @description 開発環境ではない、または対応するAccountがない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | {
+                /** @constant */
+                error: "Account not found";
+                /** @constant */
+                reason: "friendship_required";
+              }
+            | {
+                /** @constant */
+                error: "Not Found";
+              };
         };
       };
       /** @description 未処理のサーバーエラー */

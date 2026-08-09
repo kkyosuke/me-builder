@@ -11,6 +11,8 @@ export type RegisterDefaultRichMenuParams = {
   /** メニューの用途と環境を表す接頭辞。旧版の特定にも使います。 */
   namePrefix: string;
   liffId?: string | undefined;
+  /** LINE内WebViewへ新しい表示版を伝えるデプロイ識別子。 */
+  clientVersion?: string | undefined;
   image: Blob;
 };
 
@@ -20,7 +22,17 @@ export type RegisterDefaultRichMenuResult = {
   richMenuId?: string;
 };
 
-function createDefinition(name: string, liffId: string): messagingApi.RichMenuRequest {
+function createLiffUri(liffId: string, path: string, clientVersion?: string): string {
+  const url = new URL(`https://liff.line.me/${liffId}${path}`);
+  if (clientVersion) url.searchParams.set("v", clientVersion);
+  return url.toString();
+}
+
+function createDefinition(
+  name: string,
+  liffId: string,
+  clientVersion?: string,
+): messagingApi.RichMenuRequest {
   return {
     size: { width: MENU_WIDTH, height: MENU_HEIGHT },
     selected: true,
@@ -32,7 +44,7 @@ function createDefinition(name: string, liffId: string): messagingApi.RichMenuRe
         action: {
           type: "uri",
           label: "私を知る",
-          uri: `https://liff.line.me/${liffId}/me`,
+          uri: createLiffUri(liffId, "/me", clientVersion),
         },
       },
       {
@@ -40,15 +52,15 @@ function createDefinition(name: string, liffId: string): messagingApi.RichMenuRe
         action: {
           type: "uri",
           label: "診断を行う",
-          uri: `https://liff.line.me/${liffId}/diagnosis`,
+          uri: createLiffUri(liffId, "/diagnosis", clientVersion),
         },
       },
     ],
   };
 }
 
-async function createVersion(liffId: string, image: Blob): Promise<string> {
-  const { name: _name, ...definition } = createDefinition("", liffId);
+async function createVersion(liffId: string, image: Blob, clientVersion?: string): Promise<string> {
+  const { name: _name, ...definition } = createDefinition("", liffId, clientVersion);
   const definitionBytes = new TextEncoder().encode(JSON.stringify(definition));
   const imageBytes = new Uint8Array(await image.arrayBuffer());
   const versionSource = new Uint8Array(definitionBytes.byteLength + imageBytes.byteLength);
@@ -89,7 +101,7 @@ const toMessage = (error: unknown): string =>
 async function registerDefault(
   params: RegisterDefaultRichMenuParams,
 ): Promise<RegisterDefaultRichMenuResult> {
-  const { channelAccessToken, liffId, image, namePrefix } = params;
+  const { channelAccessToken, liffId, clientVersion, image, namePrefix } = params;
 
   if (!channelAccessToken || !liffId) {
     const message =
@@ -100,7 +112,7 @@ async function registerDefault(
 
   const apiClient = client.create(channelAccessToken);
   const blobClient = client.createBlob(channelAccessToken);
-  const version = await createVersion(liffId, image);
+  const version = await createVersion(liffId, image, clientVersion);
   const name = `${namePrefix}-${version}`;
   let createdRichMenuId: string | undefined;
   let canDeleteCreatedMenu = true;
@@ -114,7 +126,7 @@ async function registerDefault(
         : undefined;
 
     if (!richMenuId) {
-      const created = await apiClient.createRichMenu(createDefinition(name, liffId));
+      const created = await apiClient.createRichMenu(createDefinition(name, liffId, clientVersion));
       richMenuId = created.richMenuId;
       createdRichMenuId = richMenuId;
       await blobClient.setRichMenuImage(richMenuId, image);

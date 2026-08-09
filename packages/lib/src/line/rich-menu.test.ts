@@ -24,6 +24,7 @@ import { richMenu } from "./rich-menu";
 const params = {
   channelAccessToken: "test-channel-token",
   liffId: "1234567890-AbCdEfGh",
+  clientVersion: "5844250fb2d3",
   namePrefix: "me-builder-diagnosis-preview",
   image: new Blob(["image"], { type: "image/jpeg" }),
 };
@@ -77,7 +78,7 @@ describe("line.richMenu.registerDefault", () => {
             action: {
               type: "uri",
               label: "私を知る",
-              uri: "https://liff.line.me/1234567890-AbCdEfGh/me",
+              uri: "https://liff.line.me/1234567890-AbCdEfGh/me?v=5844250fb2d3",
             },
           },
           {
@@ -85,7 +86,7 @@ describe("line.richMenu.registerDefault", () => {
             action: {
               type: "uri",
               label: "診断を行う",
-              uri: "https://liff.line.me/1234567890-AbCdEfGh/diagnosis",
+              uri: "https://liff.line.me/1234567890-AbCdEfGh/diagnosis?v=5844250fb2d3",
             },
           },
         ],
