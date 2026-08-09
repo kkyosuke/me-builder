@@ -27,7 +27,7 @@ describe("diary Brain checkpoint", () => {
     expect(validateDiaryBrainCandidates(raw, ["message-1", "message-2"])).toHaveLength(2);
   });
 
-  it("checkpoint外のmessageを参照する候補だけを破棄する", () => {
+  it("checkpoint外のmessageを参照する出力全体を再試行対象にする", () => {
     const raw = JSON.stringify({
       brain_item_candidates: [
         {
@@ -38,7 +38,13 @@ describe("diary Brain checkpoint", () => {
         },
       ],
     });
-    expect(validateDiaryBrainCandidates(raw, ["message-1"])).toEqual([]);
+    expect(validateDiaryBrainCandidates(raw, ["message-1"])).toBeUndefined();
+  });
+
+  it("AIが明示した候補0件だけは正常な0件として受け入れる", () => {
+    expect(
+      validateDiaryBrainCandidates(JSON.stringify({ brain_item_candidates: [] }), ["message-1"]),
+    ).toEqual([]);
   });
 
   it("development環境だけ追加結果の通知文を作る", () => {

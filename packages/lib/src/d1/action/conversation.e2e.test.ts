@@ -18,6 +18,7 @@ import {
   getTurnContext,
   listDueDiaryBrainCheckpointIds,
   markDiaryBrainCheckpointDevelopmentNotificationSent,
+  markDiaryBrainCheckpointDispatched,
   markTurnDelivered,
   markTurnFailed,
   markTurnGenerating,
@@ -132,6 +133,10 @@ describe("Diary conversation persistence flow", () => {
     await expect(claimDueDiaryBrainCheckpointIds(db, account.id, new Date())).resolves.toEqual([
       checkpoint?.id,
     ]);
+    await expect(
+      markDiaryBrainCheckpointDispatched(db, account.id, checkpoint?.id ?? ""),
+    ).resolves.toBe(true);
+    await expect(listDueDiaryBrainCheckpointIds(db, account.id, new Date())).resolves.toEqual([]);
     const checkpointContext = await getDiaryBrainCheckpointContext(
       db,
       account.id,
@@ -147,6 +152,24 @@ describe("Diary conversation persistence flow", () => {
         [],
       ),
     ).resolves.toBe(false);
+    await expect(
+      applyDiaryBrainCheckpoint(
+        db,
+        account.id,
+        checkpoint?.id ?? "",
+        checkpointContext?.throughSequence ?? 0,
+        "diary-brain-test",
+        [{ statement: "範囲外の根拠", sourceMessageIds: ["outside-message"] }],
+      ),
+    ).rejects.toThrow("evidence validation failed");
+    await expect(db.select().from(schema.brainItems)).resolves.toHaveLength(0);
+    expect(
+      db
+        .select({ status: schema.diaryBrainCheckpoints.status })
+        .from(schema.diaryBrainCheckpoints)
+        .where(eq(schema.diaryBrainCheckpoints.id, checkpoint?.id ?? ""))
+        .get(),
+    ).toEqual({ status: "dispatched" });
     await expect(
       applyDiaryBrainCheckpoint(
         db,
@@ -493,10 +516,6 @@ describe("Diary conversation persistence flow", () => {
       dueAt: new Date(startedAt.getTime() + 30 * 60 * 1000),
     });
 
-    const claimedAt = new Date(startedAt.getTime() + 30 * 60 * 1000);
-    await expect(claimDueDiaryBrainCheckpointIds(db, account.id, claimedAt)).resolves.toEqual([
-      checkpoint?.id,
-    ]);
     const lateSource = await storeLineTextSource(db, {
       accountId: account.id,
       eventId: "brain-hard-cap-late",
@@ -522,6 +541,54 @@ describe("Diary conversation persistence flow", () => {
         throughSequence: 5,
         status: "pending",
       }),
+    ]);
+
+    const claimedAt = new Date(startedAt.getTime() + 31 * 60 * 1000);
+    await expect(claimDueDiaryBrainCheckpointIds(db, account.id, claimedAt)).resolves.toEqual([
+      checkpoint?.id,
+    ]);
+    await expect(
+      markDiaryBrainCheckpointDispatched(db, account.id, checkpoint?.id ?? "", claimedAt),
+    ).resolves.toBe(true);
+    await expect(
+      listDueDiaryBrainCheckpointIds(
+        db,
+        account.id,
+        new Date(startedAt.getTime() + 40 * 60 * 1000),
+      ),
+    ).resolves.toEqual([]);
+  });
+
+  it("1つの取込batchが複数の期限をまたいでもcheckpoint境界を保つ", async () => {
+    const db = createTestDb();
+    const { account } = await upsertIdentity(db, {
+      provider: "line",
+      providerAccountId: "U_brain_batch_boundaries",
+    });
+    const startedAt = new Date("2026-08-07T00:00:00.000Z");
+    const sources = [];
+    for (const [index, offsetMinutes] of [0, 11, 42].entries()) {
+      sources.push(
+        await storeLineTextSource(db, {
+          accountId: account.id,
+          eventId: `brain-batch-boundary-${index}`,
+          body: `発言${index + 1}`,
+          receivedAt: new Date(startedAt.getTime() + offsetMinutes * 60 * 1000),
+        }),
+      );
+    }
+
+    await attachMessagesToTurn(db, account.id, sources, 1, "test-model", "test-prompt");
+
+    await expect(
+      db
+        .select()
+        .from(schema.diaryBrainCheckpoints)
+        .orderBy(schema.diaryBrainCheckpoints.fromSequence),
+    ).resolves.toEqual([
+      expect.objectContaining({ fromSequence: 1, throughSequence: 1, status: "queued" }),
+      expect.objectContaining({ fromSequence: 2, throughSequence: 2, status: "queued" }),
+      expect.objectContaining({ fromSequence: 3, throughSequence: 3, status: "pending" }),
     ]);
   });
 
@@ -555,5 +622,40 @@ describe("Diary conversation persistence flow", () => {
         new Date(receivedAt.getTime() + 10 * 60 * 1000),
       ),
     ).resolves.toEqual([checkpoint?.id]);
+    const firstClaimAt = new Date(receivedAt.getTime() + 10 * 60 * 1000);
+    await expect(claimDueDiaryBrainCheckpointIds(db, account.id, firstClaimAt)).resolves.toEqual([
+      checkpoint?.id,
+    ]);
+    await expect(
+      listDueDiaryBrainCheckpointIds(
+        db,
+        account.id,
+        new Date(firstClaimAt.getTime() + 30 * 1000 - 1),
+      ),
+    ).resolves.toEqual([]);
+    const secondClaimAt = new Date(firstClaimAt.getTime() + 30 * 1000);
+    await expect(claimDueDiaryBrainCheckpointIds(db, account.id, secondClaimAt)).resolves.toEqual([
+      checkpoint?.id,
+    ]);
+    const retried = await db
+      .select()
+      .from(schema.diaryBrainCheckpoints)
+      .where(eq(schema.diaryBrainCheckpoints.id, checkpoint?.id ?? ""))
+      .get();
+    expect(retried).toMatchObject({
+      status: "queued",
+      attemptCount: 2,
+      nextAttemptAt: new Date(secondClaimAt.getTime() + 60 * 1000),
+    });
+    await expect(
+      markDiaryBrainCheckpointDispatched(db, account.id, checkpoint?.id ?? "", secondClaimAt),
+    ).resolves.toBe(true);
+    await expect(
+      listDueDiaryBrainCheckpointIds(
+        db,
+        account.id,
+        new Date(secondClaimAt.getTime() + 60 * 60 * 1000),
+      ),
+    ).resolves.toEqual([]);
   });
 });

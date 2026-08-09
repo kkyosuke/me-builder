@@ -297,7 +297,7 @@ Brain Item生成はTurnごとの返信経路から分離します。未処理の
 - 最初の未処理user発言から30分経過した
 - assistant応答が`end_session = true`で明示終了を決めた
 
-実行時刻は「最初の未処理発言 + 30分」と「最後の未処理発言 + 10分」の早い方です。期限に到達したAlarmは対象範囲を`queued`として先に固定してからQueueへ投入します。その後に届いた発言は新しい`pending`チェックポイントへ入るため、AI処理中や再試行中の発言によって30分の上限が後ろへ伸びることはありません。
+実行時刻は「最初の未処理発言 + 30分」と「最後の未処理発言 + 10分」の早い方です。AccountDataはAlarmだけに期限判定を依存せず、新着取込時にも各発言の受信時刻と現在の期限を比較します。期限以後の発言は新しいチェックポイントへ入れるため、Alarmが遅延した場合や1つの取込batchが複数の期限をまたぐ場合も、10分・30分の境界は後ろへ伸びません。
 
 6時間無操作と24時間上限はConversation Sessionを閉じる境界であり、Brain Item生成を待つための時間ではありません。Session境界には、会話文脈・順序・返信率の集計範囲を限定し、無期限に会話を伸ばさない役割があります。Brain Item生成はより短いチェックポイントで進むため、一覧など後続UIから早い段階で利用できます。
 
@@ -311,9 +311,10 @@ sequenceDiagram
     participant AI as AI Gateway
 
     U->>AD: user message + Source Record
-    AD->>AD: checkpointを作成・延長
-    A->>AD: 期限到来範囲をqueuedとして固定
+    AD->>AD: 期限を評価しcheckpointを作成・延長・固定
+    A->>AD: Queue未投入checkpointをclaim
     A->>Q: account ID + checkpoint ID
+    A->>AD: Queue受理を記録
     Q->>W: IDのみを配送
     W->>AD: checkpoint範囲の会話を再読込
     W->>AI: 会話とSource message ID
@@ -323,11 +324,11 @@ sequenceDiagram
     AD-->>W: atomic commit
 ```
 
-Queueには本文を含めず、Account IDとcheckpoint IDだけを渡します。WorkerはAccountDataから会話を読み直し、Brain Item、Evidence edge、Access Label、チェックポイントと実際に保存したItemの対応、チェックポイント完了を同じtransactionで保存します。AccountDataはalarm、user message取込、Queueからの適用をAccount単位で直列化し、Queueの重複・並行配送でも完了済みチェックポイントを再適用しません。
+Queueには本文を含めず、Account IDとcheckpoint IDだけを渡します。Alarmが回復するのはQueueへの投入が完了していないチェックポイントだけです。Queueが受理した後のAI失敗はQueue自身の再配送とDLQへ委ね、Alarmから同じ処理を増殖させません。WorkerはAccountDataから会話を読み直し、Brain Item、Evidence edge、Access Label、チェックポイントと実際に保存したItemの対応、チェックポイント完了を同じtransactionで保存します。AccountDataはalarm、user message取込、Queueからの適用をAccount単位で直列化し、Queueの重複・並行配送でも完了済みチェックポイントを再適用しません。
 
-AI生成やschema検証が一時失敗した場合は`queued`のまま再試行します。AI設定がない場合に0件を正常扱いできるのはlocal / test環境だけで、本番相当環境では失敗として再試行します。安全経路へ切り替えた場合、またはAIが有効な候補なしと正常に判断した場合は0件でチェックポイントを完了します。いずれの場合もSource Recordと通常の会話応答は保持され、会話返信の成功・配送状態はBrain Itemの登録条件にしません。
+AI生成、schema検証、Evidence検証が一時失敗した場合はQueue messageをackせず再試行します。AIが明示的に候補0件を返した場合と、候補を返したが検証に失敗した場合は区別し、後者を0件完了へ変換しません。AI設定がない場合に0件を正常扱いできるのはlocal / test環境だけで、本番相当環境では失敗として再試行します。安全経路へ切り替えた場合、またはAIが有効な候補なしと正常に判断した場合は0件でチェックポイントを完了します。いずれの場合もSource Recordと通常の会話応答は保持され、会話返信の成功・配送状態はBrain Itemの登録条件にしません。
 
-`pending`と`queued`はBrain Itemの状態ではなく、それぞれ「新着で延長可能」「対象範囲を固定済み」のチェックポイント処理状態です。生成されたBrain Itemは本人確認を待たず最初から`active`です。dev / development / local環境だけは、AI候補ではなく実際に保存したItemとEvidence message ID（0件なら追加なし）を確認用LINE Pushで通知します。適用後にPushだけ失敗した場合は保存済みの対応から同じ通知を再構築し、同じretry keyで再送します。本番の会話にはこの通知を出しません。
+チェックポイントの処理状態はBrain Itemの状態ではありません。生成されたBrain Itemは本人確認を待たず最初から`active`です。dev / development / local環境だけは、AI候補ではなく実際に保存したItemとEvidence message ID（0件なら追加なし）を確認用LINE Pushで通知します。適用後にPushだけ失敗した場合は保存済みの対応から同じ通知を再構築し、同じretry keyで再送します。本番の会話にはこの通知を出しません。物理的な状態遷移は[日記チャット実装設計 §4.6](../../architecture/diary-chat-implementation-design.md#46-diary_brain_checkpoints)を正とします。
 
 ### 7.4 本人の訂正・否定
 

@@ -273,12 +273,27 @@ prompt本文、Context Package、未検証のモデル出力は保存しませ�
 | `from_sequence`, `through_sequence` | yes | 未変換会話の範囲 |
 | `first_message_at`, `last_message_at` | yes | 起動時刻を決める基準 |
 | `due_at`, `next_attempt_at` | yes | 初回期限とQueue再投入可能時刻 |
-| `status` | yes | `pending`: 新着で延長可能、`queued`: 範囲固定・処理待ち、`applied`: 適用済み |
+| `status` | yes | `pending`: 新着で延長可能、`queued`: 範囲固定・Queue投入待ち、`dispatched`: Queue受理済み、`applied`: 適用済み |
 | `attempt_count`, `applied_at` | yes / no | Queue投入回数と適用完了時刻 |
 | `development_notification_sent_at` | no | 開発環境の確認Push完了時刻 |
 | `created_at`, `updated_at`, `deleted_at`, `is_deleted` | yes / no / yes | lifecycle |
 
-同じSessionの`pending`は最大1件とします。新しいuser messageをTurnへ取り込むtransactionで範囲と期限を更新し、明示終了時は期限を現在時刻へ進めます。Alarmは期限到来したcheckpointを`queued`へ遷移させて範囲を固定し、再投入可能時刻を進めてからIDをQueueへ送ります。以後のuser messageは新しい`pending`へ入ります。WorkerはAccountDataから固定範囲を読み直し、Brain Item一式、`diary_brain_checkpoint_items`、`applied`への遷移を同じtransactionで確定します。AIの一時失敗では`queued`を維持し、正常な0件判定では`applied`へ進めます。AlarmとRPC actionはAccountData Object内で直列化します。
+同じSessionの`pending`は最大1件とします。新しいuser messageをTurnへ取り込むtransactionで、発言ごとに現在の期限を評価します。期限前なら範囲を延長し、期限以後なら既存範囲を`queued`へ固定して新しい`pending`を作ります。明示終了時は期限を現在時刻へ進めます。
+
+Alarmは期限到来した`pending`またはQueue投入に失敗した`queued`だけをclaimし、指数バックオフ付きの投入leaseとして`next_attempt_at`を進めます。QueueがIDを受理したら`dispatched`へ進め、以後はAlarmの対象にしません。送信後・状態更新前に停止した場合だけlease後に重複投入され得ますが、checkpoint IDと適用transactionで多重適用を防ぎます。`dispatched`後のAI一時失敗はQueue自身の再配送とDLQで扱い、Alarmと二重に再投入しません。Workerは固定範囲を読み直し、Brain Item一式、`diary_brain_checkpoint_items`、`applied`への遷移を同じtransactionで確定します。明示的な候補0件だけを`applied`とし、schemaまたはEvidence違反は適用せず再配送します。AlarmとRPC actionはAccountData Object内で直列化します。
+
+```mermaid
+stateDiagram-v2
+    [*] --> pending: 最初のuser発言
+    pending --> pending: 期限前の新着で延長
+    pending --> queued: 期限到来または期限後の新着
+    queued --> queued: Queue投入失敗をbackoff後に再試行
+    queued --> dispatched: Queueが受理
+    dispatched --> dispatched: AI・検証失敗をQueueが再配送
+    queued --> applied: 送信直後のmessageが先に適用
+    dispatched --> applied: Item一式を原子的に適用
+    applied --> [*]
+```
 
 `diary_brain_checkpoint_items`はcheckpointと実際に保存されたBrain Itemを生成順に結ぶ永続的な対応表です。開発環境の確認Pushはこの対応とEvidence edgeから内容を再構築します。Brain Item適用後にPushだけ失敗しても、Queue再配送でItemを再生成せず通知だけを同じretry keyで再送します。
 

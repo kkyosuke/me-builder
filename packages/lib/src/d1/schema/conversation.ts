@@ -136,7 +136,7 @@ export const diaryBrainCheckpoints = sqliteTable(
     lastMessageAt: integer("last_message_at", { mode: "timestamp" }).notNull(),
     dueAt: integer("due_at", { mode: "timestamp" }).notNull(),
     nextAttemptAt: integer("next_attempt_at", { mode: "timestamp" }).notNull(),
-    status: text("status", { enum: ["pending", "queued", "applied"] })
+    status: text("status", { enum: ["pending", "queued", "dispatched", "applied"] })
       .notNull()
       .default("pending"),
     attemptCount: integer("attempt_count").notNull().default(0),

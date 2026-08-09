@@ -47,13 +47,14 @@ export function validateDiaryBrainCandidates(
   const parsed = v.safeParse(ResponseSchema, json);
   if (!parsed.success) return undefined;
   const allowed = new Set(sourceMessageIds);
-  return parsed.output.brain_item_candidates.filter((candidate) => {
+  for (const candidate of parsed.output.brain_item_candidates) {
     const unique = new Set(candidate.source_message_ids);
-    return (
+    const isValid =
       unique.size === candidate.source_message_ids.length &&
-      candidate.source_message_ids.every((id) => allowed.has(id))
-    );
-  });
+      candidate.source_message_ids.every((id) => allowed.has(id));
+    if (!isValid) return undefined;
+  }
+  return parsed.output.brain_item_candidates;
 }
 
 export async function generateDiaryBrainCandidates(

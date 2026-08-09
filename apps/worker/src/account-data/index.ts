@@ -96,6 +96,14 @@ export class AccountData extends DurableObject<Env> {
           accountId: this.accountId,
           checkpointId,
         });
+        const dispatched = await d1.action.conversation.markDiaryBrainCheckpointDispatched(
+          this.repository.client,
+          this.accountId,
+          checkpointId,
+        );
+        if (!dispatched) {
+          throw new Error("Diary Brain checkpoint dispatch state could not be recorded");
+        }
       }
       await this.scheduleMaintenance();
     });
