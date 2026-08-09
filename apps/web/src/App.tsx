@@ -13,7 +13,7 @@ import {
   preloadAvatarSettingsScreen,
   preloadMainApplication,
   preloadProfileSettingsScreen,
-  scheduleIdlePreload,
+  scheduleIdlePreloadAfter,
 } from "./routes";
 
 const AdminApplication = lazy(loadAdminApplication);
@@ -105,15 +105,18 @@ export function App() {
   useEffect(() => {
     if (isAdminPath) return;
 
-    return scheduleIdlePreload(() => {
-      preloadMainApplication(isMePath ? "diagnosis" : "me");
-      preloadProfileSettingsScreen();
-    });
+    return scheduleIdlePreloadAfter(
+      isMePath ? loadProfileApplication : loadDiagnosisApplication,
+      () => {
+        preloadMainApplication(isMePath ? "diagnosis" : "me");
+        preloadProfileSettingsScreen();
+      },
+    );
   }, [isAdminPath, isMePath]);
 
   useEffect(() => {
     if (profileView !== "profile") return;
-    return scheduleIdlePreload(preloadAvatarSettingsScreen);
+    return scheduleIdlePreloadAfter(loadProfileSettingsScreen, preloadAvatarSettingsScreen);
   }, [profileView]);
 
   const openProfile = () => {

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { scheduleIdlePreload } from "./routes";
+import { scheduleIdlePreload, scheduleIdlePreloadAfter } from "./routes";
 
 describe("scheduleIdlePreload", () => {
   afterEach(() => {
@@ -58,6 +58,48 @@ describe("scheduleIdlePreload", () => {
     vi.stubGlobal("requestIdleCallback", requestIdleCallback);
 
     scheduleIdlePreload(vi.fn());
+
+    expect(requestIdleCallback).not.toHaveBeenCalled();
+  });
+});
+
+describe("scheduleIdlePreloadAfter", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it("現在のチャンクが読み込み済みになるまでアイドル先読みを予約しない", async () => {
+    vi.spyOn(document, "readyState", "get").mockReturnValue("complete");
+    const requestIdleCallback = vi.fn(() => 1);
+    vi.stubGlobal("requestIdleCallback", requestIdleCallback);
+    vi.stubGlobal("cancelIdleCallback", vi.fn());
+    let finishCurrentLoad: (() => void) | undefined;
+    const currentLoad = new Promise<void>((resolve) => {
+      finishCurrentLoad = resolve;
+    });
+
+    scheduleIdlePreloadAfter(() => currentLoad, vi.fn());
+    expect(requestIdleCallback).not.toHaveBeenCalled();
+
+    finishCurrentLoad?.();
+    await currentLoad;
+    expect(requestIdleCallback).toHaveBeenCalledOnce();
+  });
+
+  it("現在のチャンク取得中に破棄された場合は先読みしない", async () => {
+    vi.spyOn(document, "readyState", "get").mockReturnValue("complete");
+    const requestIdleCallback = vi.fn(() => 1);
+    vi.stubGlobal("requestIdleCallback", requestIdleCallback);
+    let finishCurrentLoad: (() => void) | undefined;
+    const currentLoad = new Promise<void>((resolve) => {
+      finishCurrentLoad = resolve;
+    });
+
+    const cancel = scheduleIdlePreloadAfter(() => currentLoad, vi.fn());
+    cancel();
+    finishCurrentLoad?.();
+    await currentLoad;
 
     expect(requestIdleCallback).not.toHaveBeenCalled();
   });

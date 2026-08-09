@@ -109,3 +109,24 @@ export function scheduleIdlePreload(preload: () => void): () => void {
     if (timeoutId !== undefined) window.clearTimeout(timeoutId);
   };
 }
+
+/** 現在表示するチャンクの取得完了後にだけ、次のチャンクのアイドル先読みを予約する。 */
+export function scheduleIdlePreloadAfter(
+  loadCurrent: () => Promise<unknown>,
+  preload: () => void,
+): () => void {
+  let cancelled = false;
+  let cancelIdlePreload: () => void = () => undefined;
+
+  void loadCurrent()
+    .then(() => {
+      if (cancelled) return;
+      cancelIdlePreload = scheduleIdlePreload(preload);
+    })
+    .catch(() => undefined);
+
+  return () => {
+    cancelled = true;
+    cancelIdlePreload();
+  };
+}
