@@ -233,11 +233,13 @@ function SummaryCardFrame({
 
 function SummaryContent({
   summary,
+  availableDataCounts,
   versioning,
   onSelectVersion,
   onRegenerate,
 }: {
   summary: ProfileSummary;
+  availableDataCounts: Readonly<{ diagnosis: number; diary: number }>;
   versioning?: ProfileSummaryVersioning;
   onSelectVersion?: (versionId: string) => void;
   onRegenerate?: () => void;
@@ -342,13 +344,13 @@ function SummaryContent({
           className="flex items-center gap-2 text-lg font-bold text-slate-950 dark:text-slate-50"
         >
           <Brain className="size-5 text-violet-600 dark:text-violet-300" aria-hidden="true" />
-          まとめに使ったもの
+          まとめに使えるもの
         </h2>
         <div className="mt-3 grid grid-cols-2 gap-3">
           <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800">
             <ClipboardCheck className="size-5 text-sky-600 dark:text-sky-300" aria-hidden="true" />
             <p className="mt-3 font-bold text-slate-900 dark:text-slate-100">診断の回答</p>
-            <p className="mt-1 text-xs text-slate-500">{summary.diagnosisCount}件を参照</p>
+            <p className="mt-1 text-xs text-slate-500">現在 {availableDataCounts.diagnosis}件</p>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800">
             <NotebookPen
@@ -356,7 +358,7 @@ function SummaryContent({
               aria-hidden="true"
             />
             <p className="mt-3 font-bold text-slate-900 dark:text-slate-100">日記の記録</p>
-            <p className="mt-1 text-xs text-slate-500">{summary.diaryCount}件を参照</p>
+            <p className="mt-1 text-xs text-slate-500">現在 {availableDataCounts.diary}件</p>
           </div>
         </div>
       </section>
@@ -427,6 +429,7 @@ function NextAction({ action }: { action: ProfileSummaryResult["nextAction"] }) 
 
 export function ProfileSummaryScreen({
   state,
+  availableDataCounts,
   versioning,
   onRetry,
   onSelectVersion,
@@ -434,6 +437,7 @@ export function ProfileSummaryScreen({
   children,
 }: {
   state: AsyncState<ProfileSummaryResult>;
+  availableDataCounts?: Readonly<{ diagnosis: number; diary: number }>;
   versioning?: ProfileSummaryVersioning;
   onRetry: () => void;
   onSelectVersion?: (versionId: string) => void;
@@ -486,6 +490,12 @@ export function ProfileSummaryScreen({
           {state.data.summary ? (
             <SummaryContent
               summary={state.data.summary}
+              availableDataCounts={
+                availableDataCounts ?? {
+                  diagnosis: state.data.summary.diagnosisCount,
+                  diary: state.data.summary.diaryCount,
+                }
+              }
               {...(versioning ? { versioning } : {})}
               {...(onSelectVersion ? { onSelectVersion } : {})}
               {...(onRegenerate ? { onRegenerate } : {})}

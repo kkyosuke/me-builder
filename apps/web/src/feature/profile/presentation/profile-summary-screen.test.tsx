@@ -76,8 +76,24 @@ describe("ProfileSummaryScreen", () => {
     expect(screen.getByText("診断", { selector: "span" })).toBeTruthy();
     expect(screen.getByText("日記", { selector: "span" })).toBeTruthy();
     expect(screen.getByText("2件")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "まとめに使えるもの" })).toBeTruthy();
+    expect(screen.getAllByText("現在 1件")).toHaveLength(2);
     expect(screen.getByRole("link", { name: "未回答の診断を見る" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "わたし" }).getAttribute("aria-current")).toBe("page");
+  });
+
+  it("表示中の版の参照件数とは別に、現在まとめに使える件数を表示する", () => {
+    render(
+      <ProfileSummaryScreen
+        state={{ status: "success", data: { summary, nextAction: "chat" } }}
+        availableDataCounts={{ diagnosis: 4, diary: 12 }}
+        onRetry={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("現在 4件")).toBeTruthy();
+    expect(screen.getByText("現在 12件")).toBeTruthy();
+    expect(screen.queryByText(/件を参照/)).toBeNull();
   });
 
   it("未回答の診断がなければ毎日の会話を促す", () => {

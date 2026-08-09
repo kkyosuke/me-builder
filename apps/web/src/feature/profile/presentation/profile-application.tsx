@@ -71,6 +71,14 @@ export default function ProfileApplication() {
   return (
     <ProfileSummaryScreen
       state={summary.state}
+      {...(currentSummary
+        ? {
+            availableDataCounts: {
+              diagnosis: currentSummary.diagnosisCount,
+              diary: currentSummary.diaryCount,
+            },
+          }
+        : {})}
       onRetry={() => void summary.reload()}
       {...(versioning ? { versioning } : {})}
       {...(showDevelopmentBrainItems ? { onSelectVersion: setPreviewVersionId } : {})}
