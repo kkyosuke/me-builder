@@ -68,8 +68,10 @@ jobs:
           version: 3.x
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Run CI Verification
-        run: bun run ci
+      # Preview は動作確認用の共有環境なので、E2E の完了を待たずにデプロイする。
+      # Pages へ渡す dist だけをここで生成し、全検証は PR の CI に委ねる。
+      - name: Build Web Deployment Artifact
+        run: bun --filter @me-builder/web build
 
       - name: Protect API Documentation with Cloudflare Access (Preview)
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
