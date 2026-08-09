@@ -1,7 +1,7 @@
 import type { ComponentType } from "react";
 
 type LazyApplicationModule = { default: ComponentType };
-export type MainApplicationRoute = "diagnosis" | "me";
+export type MainApplicationRoute = "compatibility" | "diagnosis" | "me";
 
 function memoizeModuleLoader<Module>(load: () => Promise<Module>): () => Promise<Module> {
   let promise: Promise<Module> | undefined;
@@ -28,6 +28,12 @@ export const loadDiagnosisApplication = memoizeModuleLoader<LazyApplicationModul
   })),
 );
 
+export const loadCompatibilityApplication = memoizeModuleLoader<LazyApplicationModule>(() =>
+  import("./feature/compatibility").then((feature) => ({
+    default: feature.CompatibilityApplication,
+  })),
+);
+
 export const loadProfileApplication = memoizeModuleLoader<LazyApplicationModule>(() =>
   import("./feature/profile").then((feature) => ({
     default: feature.ProfileApplication,
@@ -46,10 +52,24 @@ export const loadAvatarSettingsScreen = memoizeModuleLoader(() =>
   })),
 );
 
+export function loadMainApplication(route: MainApplicationRoute): Promise<LazyApplicationModule> {
+  if (route === "me") return loadProfileApplication();
+  if (route === "compatibility") return loadCompatibilityApplication();
+  return loadDiagnosisApplication();
+}
+
+/** 現在のタブに隣接する遷移先だけを、自動先読みの対象にする。 */
+export function getIdleMainApplicationRoutes(
+  current: MainApplicationRoute,
+): MainApplicationRoute[] {
+  if (current === "me") return ["diagnosis"];
+  if (current === "compatibility") return ["diagnosis"];
+  return ["me", "compatibility"];
+}
+
 /** タブへの移動意図を検知した時、遷移先のチャンクをすぐ先読みする。 */
 export function preloadMainApplication(route: MainApplicationRoute): void {
-  const load = route === "me" ? loadProfileApplication : loadDiagnosisApplication;
-  void load().catch(() => undefined);
+  void loadMainApplication(route).catch(() => undefined);
 }
 
 export function preloadProfileSettingsScreen(): void {

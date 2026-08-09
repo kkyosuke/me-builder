@@ -21,6 +21,12 @@ describe("MainNavigation", () => {
   it("移動先へポインターまたはフォーカスを向けた時だけ先読みする", () => {
     render(<MainNavigation current="me" />);
 
+    expect(screen.getAllByRole("link").map((link) => link.textContent)).toEqual([
+      "わたし",
+      "診断",
+      "相性",
+    ]);
+
     fireEvent.pointerEnter(screen.getByRole("link", { name: "わたし" }));
     expect(mocks.preloadMainApplication).not.toHaveBeenCalled();
 
@@ -29,5 +35,8 @@ describe("MainNavigation", () => {
     fireEvent.focus(diagnosisLink);
     expect(mocks.preloadMainApplication).toHaveBeenNthCalledWith(1, "diagnosis");
     expect(mocks.preloadMainApplication).toHaveBeenNthCalledWith(2, "diagnosis");
+
+    fireEvent.pointerEnter(screen.getByRole("link", { name: "相性" }));
+    expect(mocks.preloadMainApplication).toHaveBeenNthCalledWith(3, "compatibility");
   });
 });

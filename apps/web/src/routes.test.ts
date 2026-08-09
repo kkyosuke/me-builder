@@ -1,7 +1,21 @@
 // @vitest-environment jsdom
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { scheduleIdlePreload, scheduleIdlePreloadAfter } from "./routes";
+import {
+  getIdleMainApplicationRoutes,
+  scheduleIdlePreload,
+  scheduleIdlePreloadAfter,
+} from "./routes";
+
+describe("getIdleMainApplicationRoutes", () => {
+  it.each([
+    ["me", ["diagnosis"]],
+    ["diagnosis", ["me", "compatibility"]],
+    ["compatibility", ["diagnosis"]],
+  ] as const)("%sでは隣接するタブだけを自動先読みする", (current, expected) => {
+    expect(getIdleMainApplicationRoutes(current)).toEqual(expected);
+  });
+});
 
 describe("scheduleIdlePreload", () => {
   afterEach(() => {

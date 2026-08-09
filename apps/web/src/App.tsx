@@ -5,9 +5,12 @@ import type { AvatarSelection } from "./feature/profile-settings/model/avatar";
 import { ProfileMenuButton } from "./feature/profile-settings/presentation/components/profile-menu-button";
 import { useColorTheme } from "./feature/theme";
 import {
+  getIdleMainApplicationRoutes,
   loadAdminApplication,
   loadAvatarSettingsScreen,
+  loadCompatibilityApplication,
   loadDiagnosisApplication,
+  loadMainApplication,
   loadProfileApplication,
   loadProfileSettingsScreen,
   preloadAvatarSettingsScreen,
@@ -17,6 +20,7 @@ import {
 } from "./routes";
 
 const AdminApplication = lazy(loadAdminApplication);
+const CompatibilityApplication = lazy(loadCompatibilityApplication);
 const DiagnosisApplication = lazy(loadDiagnosisApplication);
 const ProfileApplication = lazy(loadProfileApplication);
 const ProfileSettingsScreen = lazy(loadProfileSettingsScreen);
@@ -68,7 +72,10 @@ export function App() {
   const shouldRestoreProfileButtonFocus = useRef(false);
   const { pathname, profileView } = navigation;
   const isAdminPath = pathname.startsWith("/admin");
+  const isCompatibilityPath =
+    pathname === "/compatibility" || pathname.startsWith("/compatibility/");
   const isMePath = pathname === "/me" || pathname.startsWith("/me/");
+  const currentMainRoute = isCompatibilityPath ? "compatibility" : isMePath ? "me" : "diagnosis";
   const [avatar, setAvatar] = useState<AvatarSelection | null>(null);
 
   useEffect(() => {
@@ -106,13 +113,15 @@ export function App() {
     if (isAdminPath) return;
 
     return scheduleIdlePreloadAfter(
-      isMePath ? loadProfileApplication : loadDiagnosisApplication,
+      () => loadMainApplication(currentMainRoute),
       () => {
-        preloadMainApplication(isMePath ? "diagnosis" : "me");
+        for (const route of getIdleMainApplicationRoutes(currentMainRoute)) {
+          preloadMainApplication(route);
+        }
         preloadProfileSettingsScreen();
       },
     );
-  }, [isAdminPath, isMePath]);
+  }, [currentMainRoute, isAdminPath]);
 
   useEffect(() => {
     if (profileView !== "profile") return;
@@ -167,6 +176,8 @@ export function App() {
           <Suspense fallback={<LoadingState message="画面を読み込んでいます..." />}>
             {isAdminPath ? (
               <AdminApplication />
+            ) : isCompatibilityPath ? (
+              <CompatibilityApplication />
             ) : isMePath ? (
               <ProfileApplication />
             ) : (

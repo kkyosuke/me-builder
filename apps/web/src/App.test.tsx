@@ -347,6 +347,28 @@ describe("App", () => {
     expect(mocks.fetchDiagnosisList).toHaveBeenCalledOnce();
   });
 
+  it("/compatibilityでは相性一覧を表示し、診断一覧は取得しない", async () => {
+    window.history.replaceState({}, "", "/compatibility");
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "相性診断" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "相性" }).getAttribute("aria-current")).toBe("page");
+    expect(mocks.fetchDiagnosisList).not.toHaveBeenCalled();
+  });
+
+  it("LIFFの招待リンクから相性の確認画面を直接表示する", async () => {
+    window.history.replaceState({}, "", "/?liff.state=%2Fcompatibility%2Finvitations%2Fdemo");
+
+    render(<App />);
+
+    expect(
+      await screen.findByRole("heading", { name: "2人の相性を見てみませんか？" }),
+    ).toBeTruthy();
+    expect(screen.getByText("あおいさんから招待が届いています")).toBeTruthy();
+    expect(mocks.fetchDiagnosisList).not.toHaveBeenCalled();
+  });
+
   afterEach(() => {
     vi.useRealTimers();
     cleanup();
