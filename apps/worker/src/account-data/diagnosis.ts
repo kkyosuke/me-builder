@@ -16,6 +16,8 @@ export const diagnosisActions = {
   ) => d1.action.diagnosis.saveDiagnosisAnswer(db, { ...input, accountId }),
   "diagnosis.findAnswers": (db: d1.Client, accountId: string, diagnosisId: string, at: Date) =>
     d1.action.diagnosis.findDiagnosisAnswers(db, accountId, diagnosisId, at),
+  "diagnosis.findProfileSummaryData": (db: d1.Client, accountId: string, at: Date) =>
+    d1.action.diagnosis.findProfileSummaryDiagnosisData(db, accountId, at),
   "diagnosis.listVisible": (db: d1.Client, accountId: string, at: Date) =>
     d1.action.diagnosis.listVisibleDiagnoses(db, accountId, at),
   "diagnosisProjection.processLatest": (

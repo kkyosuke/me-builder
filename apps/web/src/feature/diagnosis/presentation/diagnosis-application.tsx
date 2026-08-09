@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { LoadingState } from "../../../components/loading-state";
 import { config } from "../../../config";
 import { useLiffSession } from "../../liff";
@@ -19,10 +19,36 @@ export default function DiagnosisApplication() {
     idToken: diagnoses.idToken,
     onProgress: diagnoses.updateProgress,
   });
-  const handleReset = useCallback(async () => {
+  const searchParams =
+    typeof window === "undefined" ? null : new URLSearchParams(window.location.search);
+  const requestedResultId = searchParams?.get("result")?.trim() || null;
+  const resultOpenedFromProfile =
+    requestedResultId !== null && searchParams?.get("from") === "profile";
+  const profileResultBack = resultOpenedFromProfile
+    ? { backHref: "/me", backLabel: "わたしの傾向" }
+    : {};
+  const openedResultId = useRef<string | null>(null);
+  useEffect(() => {
+    if (!requestedResultId || !diagnoses.idToken || openedResultId.current === requestedResultId) {
+      return;
+    }
+    openedResultId.current = requestedResultId;
+    void detail.openResult(requestedResultId);
+  }, [detail.openResult, diagnoses.idToken, requestedResultId]);
+  const closeDetail = useCallback(() => {
     detail.close();
+    openedResultId.current = null;
+    if (
+      typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).has("result")
+    ) {
+      window.history.replaceState(null, "", "/diagnosis");
+    }
+  }, [detail.close]);
+  const handleReset = useCallback(async () => {
+    closeDetail();
     await diagnoses.load();
-  }, [detail.close, diagnoses.load]);
+  }, [closeDetail, diagnoses.load]);
   const reset = useResetDiagnosisData({ idToken: diagnoses.idToken, onReset: handleReset });
 
   let content = (
@@ -41,18 +67,31 @@ export default function DiagnosisApplication() {
   if (detail.state.status === "loading") {
     content = <LoadingState message="診断を読み込んでいます..." />;
   } else if (detail.state.status === "error") {
-    content = <DiagnosisGuidance kind="load-error" onBack={detail.close} />;
+    content = (
+      <DiagnosisGuidance
+        kind="load-error"
+        onBack={closeDetail}
+        onRetry={() => void detail.retry()}
+        {...profileResultBack}
+      />
+    );
   } else if (detail.state.status === "success") {
     const detailContent = detail.state.data;
     if (detailContent.type === "result") {
-      content = <DiagnosisResultView result={detailContent.result} onBack={detail.close} />;
+      content = (
+        <DiagnosisResultView
+          result={detailContent.result}
+          onBack={closeDetail}
+          {...profileResultBack}
+        />
+      );
     }
     if (detailContent.type === "answer") {
       content = (
         <DiagnosisDetailScreen
           diagnosis={detailContent.diagnosis}
           initialAnswers={detailContent.initialAnswers}
-          onBack={detail.close}
+          onBack={closeDetail}
           onSaveAnswer={detail.saveAnswer}
           onDeferQuestion={detail.deferQuestion}
           onComplete={() => void detail.openCompletedResult()}
@@ -60,7 +99,7 @@ export default function DiagnosisApplication() {
       );
     }
     if (detailContent.type === "guidance") {
-      content = <DiagnosisGuidance kind={detailContent.kind} onBack={detail.close} />;
+      content = <DiagnosisGuidance kind={detailContent.kind} onBack={closeDetail} />;
     }
   }
 

@@ -13,18 +13,49 @@ const summary: ProfileSummary = {
       key: "prepare",
       label: "見通しを持って動く",
       description: "先の段取りが見えると安心して力を発揮できる傾向があります。",
+      evidenceCount: 1,
+      sources: ["diagnosis"],
+    },
+  ],
+  themes: [
+    {
+      diagnosisId: "time-planning",
+      title: "時間と予定",
+      answerCount: 2,
+      lastAnsweredAt: "2026-08-08T11:45:00.000Z",
+      scoring: {
+        balancedLabel: "状況による",
+        parameters: [
+          {
+            id: "planning",
+            label: "計画",
+            lowLabel: "その場で決める",
+            highLabel: "前もって決める",
+            score: 80,
+            coverage: 100,
+            evidenceCount: 1,
+            band: "high",
+          },
+        ],
+      },
+    },
+  ],
+  diaryMemories: [
+    {
+      id: "memory-1",
+      statement: "公開予定を一週間延期した",
+      recordedAt: "2026-08-08T11:50:00.000Z",
       evidenceCount: 2,
-      sources: ["diagnosis", "diary"],
     },
   ],
   recordCount: 2,
   diagnosisCount: 1,
   diaryCount: 1,
-  latestRecordedAt: "2026-08-08T11:45:00.000Z",
+  latestRecordedAt: "2026-08-08T11:50:00.000Z",
 };
 
 describe("ProfileSummaryScreen", () => {
-  afterEach(cleanup);
+  afterEach(() => cleanup());
 
   it("生成したまとめ、根拠、入力範囲を表示する", () => {
     render(
@@ -34,28 +65,36 @@ describe("ProfileSummaryScreen", () => {
       />,
     );
 
-    expect(screen.getByRole("heading", { name: "わたしのまとめ" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "わたしの傾向" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "見通しを持って動く" })).toBeTruthy();
     expect(screen.getByText("診断", { selector: "span" })).toBeTruthy();
-    expect(screen.getByText("日記", { selector: "span" })).toBeTruthy();
     expect(screen.getByText("2件")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "時間と予定" })).toBeTruthy();
+    expect(screen.getByRole("meter", { name: "計画の傾向" })).toBeTruthy();
+    expect(screen.getByText("回答充足度 100%・根拠 1回答")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "回答結果を見る" }).getAttribute("href")).toBe(
+      "/diagnosis?result=time-planning&from=profile",
+    );
     expect(screen.getByRole("link", { name: "未回答の診断を見る" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "日記からの記録" })).toBeTruthy();
+    expect(screen.getByText("公開予定を一週間延期した")).toBeTruthy();
+    expect(screen.getByText("根拠 2発言")).toBeTruthy();
+    expect(screen.getByText("日記・AI抽出")).toBeTruthy();
     expect(screen.getByRole("link", { name: "わたし" }).getAttribute("aria-current")).toBe("page");
   });
 
-  it("未回答の診断がなければ毎日の会話を促す", () => {
+  it("未回答の診断がなければ次の診断導線を表示しない", () => {
     render(
       <ProfileSummaryScreen
-        state={{ status: "success", data: { summary, nextAction: "chat" } }}
+        state={{ status: "success", data: { summary, nextAction: null } }}
         onRetry={vi.fn()}
       />,
     );
 
-    expect(screen.getByText(/毎日の会話で/)).toBeTruthy();
     expect(screen.queryByRole("link", { name: "未回答の診断を見る" })).toBeNull();
   });
 
-  it("まとめがなければ診断とLINEの会話を案内する", () => {
+  it("まとめがなければ診断を案内する", () => {
     render(
       <ProfileSummaryScreen
         state={{ status: "success", data: { summary: null, nextAction: "diagnosis" } }}
@@ -65,7 +104,7 @@ describe("ProfileSummaryScreen", () => {
 
     expect(screen.getByRole("heading", { name: "まだ、わたしのまとめはありません" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "診断を始める" })).toBeTruthy();
-    expect(screen.getByText("LINEで今日のことを話してみる")).toBeTruthy();
+    expect(screen.queryByText("LINEで今日のことを話してみる")).toBeNull();
   });
 
   it("生成失敗時に再試行できる", () => {

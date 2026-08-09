@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, asc, countDistinct, desc, eq, inArray } from "drizzle-orm";
 import type { D1Client } from "../client";
 import {
   brainItemAccessLabels,
@@ -162,4 +162,76 @@ export async function findBrainItemForAccount(
       ),
     )
     .get();
+}
+
+export type ProfileSummaryDiaryMemory = Readonly<{
+  id: string;
+  statement: string;
+  recordedAt: string;
+  evidenceCount: number;
+}>;
+
+export type ProfileSummaryDiaryData = Readonly<{
+  memories: readonly ProfileSummaryDiaryMemory[];
+  memoryCount: number;
+}>;
+
+/** 本人向けサマリーへ表示するactiveな日記Memoryを新しい順で取得する。 */
+export async function findProfileSummaryDiaryData(
+  db: D1Client,
+  accountId: string,
+): Promise<ProfileSummaryDiaryData> {
+  const filters = and(
+    eq(brainItems.accountId, accountId),
+    eq(brainItems.category, "memory"),
+    eq(brainItems.derivation, "ai"),
+    eq(brainItems.status, "active"),
+    eq(brainItems.isDeleted, false),
+    eq(brainItemTopicLabels.accountId, accountId),
+    eq(brainItemTopicLabels.label, "diary"),
+    eq(brainItemTopicLabels.isDeleted, false),
+    eq(brainItemEvidenceEdges.accountId, accountId),
+    eq(brainItemEvidenceEdges.relation, "supports"),
+    eq(brainItemEvidenceEdges.isDeleted, false),
+    eq(sourceRecords.accountId, accountId),
+    eq(sourceRecords.isDeleted, false),
+  );
+  const baseQuery = db
+    .select({
+      id: brainItems.id,
+      statement: brainItems.statement,
+      validFrom: brainItems.validFrom,
+      createdAt: brainItems.createdAt,
+      evidenceCount: countDistinct(brainItemEvidenceEdges.sourceRecordId),
+    })
+    .from(brainItems)
+    .innerJoin(brainItemTopicLabels, eq(brainItemTopicLabels.brainItemId, brainItems.id))
+    .innerJoin(brainItemEvidenceEdges, eq(brainItemEvidenceEdges.brainItemId, brainItems.id))
+    .innerJoin(sourceRecords, eq(sourceRecords.id, brainItemEvidenceEdges.sourceRecordId))
+    .where(filters)
+    .groupBy(brainItems.id);
+  const [rows, countRows] = await Promise.all([
+    baseQuery
+      .orderBy(desc(brainItems.validFrom), desc(brainItems.createdAt), asc(brainItems.id))
+      .limit(3)
+      .all(),
+    db
+      .select({ value: countDistinct(brainItems.id) })
+      .from(brainItems)
+      .innerJoin(brainItemTopicLabels, eq(brainItemTopicLabels.brainItemId, brainItems.id))
+      .innerJoin(brainItemEvidenceEdges, eq(brainItemEvidenceEdges.brainItemId, brainItems.id))
+      .innerJoin(sourceRecords, eq(sourceRecords.id, brainItemEvidenceEdges.sourceRecordId))
+      .where(filters)
+      .all(),
+  ]);
+
+  return {
+    memories: rows.map(({ id, statement, validFrom, createdAt, evidenceCount }) => ({
+      id,
+      statement,
+      recordedAt: (validFrom ?? createdAt).toISOString(),
+      evidenceCount,
+    })),
+    memoryCount: countRows[0]?.value ?? 0,
+  };
 }

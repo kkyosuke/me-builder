@@ -39,6 +39,11 @@ interface UseDiagnosisDetailOptions {
 export function useDiagnosisDetail({ idToken, onProgress }: UseDiagnosisDetailOptions) {
   const [state, setState] = useState<AsyncState<DiagnosisDetailContent>>({ status: "idle" });
   const selectedDefinition = useRef<DiagnosisDefinition | null>(null);
+  const lastOpenRequest = useRef<
+    | { type: "diagnosis"; diagnosis: DiagnosisListItem }
+    | { type: "result"; diagnosisId: string }
+    | null
+  >(null);
   const mounted = useRef(false);
   const request = useRef<AbortController | null>(null);
   const answerSaver = useDiagnosisAnswerSaver({ idToken, onProgress });
@@ -57,8 +62,54 @@ export function useDiagnosisDetail({ idToken, onProgress }: UseDiagnosisDetailOp
     setState({ status: "idle" });
   }, []);
 
+  const openResult = useCallback(
+    async (diagnosisId: string): Promise<void> => {
+      lastOpenRequest.current = { type: "result", diagnosisId };
+      if (!idToken) {
+        setState({
+          status: "error",
+          message: "本人確認情報を取得できませんでした。LINEから開き直してください。",
+        });
+        return;
+      }
+      request.current?.abort();
+      const controller = new AbortController();
+      request.current = controller;
+      setState({ status: "loading" });
+      const minimumLoading = waitForMinimumLoading();
+      try {
+        await answerSaver.waitForPendingSaves(diagnosisId);
+        if (controller.signal.aborted) return;
+        const result = await fetchDiagnosisResult(
+          config.apiUrl,
+          idToken,
+          diagnosisId,
+          controller.signal,
+        );
+        await minimumLoading;
+        if (!controller.signal.aborted && mounted.current) {
+          setState(
+            result
+              ? { status: "success", data: { type: "result", result } }
+              : { status: "success", data: { type: "guidance", kind: "unsupported" } },
+          );
+        }
+      } catch (error) {
+        await minimumLoading;
+        if (!controller.signal.aborted && mounted.current) {
+          setState({
+            status: "error",
+            message: error instanceof Error ? error.message : "診断結果を読み込めませんでした。",
+          });
+        }
+      }
+    },
+    [answerSaver.waitForPendingSaves, idToken],
+  );
+
   const open = useCallback(
     async (diagnosis: DiagnosisListItem): Promise<void> => {
+      lastOpenRequest.current = { type: "diagnosis", diagnosis };
       selectedDefinition.current = null;
       const destination = resolveDiagnosisDestination(diagnosis);
       if (destination === "closed") {
@@ -72,6 +123,10 @@ export function useDiagnosisDetail({ idToken, onProgress }: UseDiagnosisDetailOp
         });
         return;
       }
+      if (destination === "result") {
+        await openResult(diagnosis.id);
+        return;
+      }
 
       request.current?.abort();
       const controller = new AbortController();
@@ -81,24 +136,6 @@ export function useDiagnosisDetail({ idToken, onProgress }: UseDiagnosisDetailOp
       try {
         await answerSaver.waitForPendingSaves(diagnosis.id);
         if (controller.signal.aborted) {
-          return;
-        }
-
-        if (destination === "result") {
-          const result = await fetchDiagnosisResult(
-            config.apiUrl,
-            idToken,
-            diagnosis.id,
-            controller.signal,
-          );
-          await minimumLoading;
-          if (!controller.signal.aborted && mounted.current) {
-            setState(
-              result
-                ? { status: "success", data: { type: "result", result } }
-                : { status: "success", data: { type: "guidance", kind: "unsupported" } },
-            );
-          }
           return;
         }
 
@@ -138,8 +175,18 @@ export function useDiagnosisDetail({ idToken, onProgress }: UseDiagnosisDetailOp
         }
       }
     },
-    [answerSaver.waitForPendingSaves, idToken],
+    [answerSaver.waitForPendingSaves, idToken, openResult],
   );
+
+  const retry = useCallback(async (): Promise<void> => {
+    const previous = lastOpenRequest.current;
+    if (!previous) return;
+    if (previous.type === "result") {
+      await openResult(previous.diagnosisId);
+      return;
+    }
+    await open(previous.diagnosis);
+  }, [open, openResult]);
 
   const saveAnswer = useCallback(
     async (answer: DiagnosisAnswer) => {
@@ -174,6 +221,7 @@ export function useDiagnosisDetail({ idToken, onProgress }: UseDiagnosisDetailOp
       return;
     }
 
+    lastOpenRequest.current = { type: "result", diagnosisId: definition.id };
     request.current?.abort();
     const controller = new AbortController();
     request.current = controller;
@@ -213,5 +261,5 @@ export function useDiagnosisDetail({ idToken, onProgress }: UseDiagnosisDetailOp
     }
   }, [idToken, onProgress]);
 
-  return { state, open, close, saveAnswer, deferQuestion, openCompletedResult };
+  return { state, open, openResult, retry, close, saveAnswer, deferQuestion, openCompletedResult };
 }

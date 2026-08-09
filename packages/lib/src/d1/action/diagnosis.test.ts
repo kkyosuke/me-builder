@@ -12,6 +12,7 @@ import {
   deleteAccountDiagnosisData,
   findDiagnosisAnswers,
   findOpenDiagnosisDetail,
+  findProfileSummaryDiagnosisData,
   listVisibleDiagnoses,
   saveDiagnosisAnswer,
 } from "./diagnosis";
@@ -477,6 +478,66 @@ describe("findDiagnosisAnswers", () => {
     await expect(
       findDiagnosisAnswers(db, "another", "private-result", new Date("2026-08-03T00:00:00Z")),
     ).resolves.toEqual({ type: "not-found" });
+  });
+});
+
+describe("findProfileSummaryDiagnosisData", () => {
+  it("一覧進捗と完了済み診断の回答だけを同じ読み取り単位で返す", async () => {
+    const db = createTestDb();
+    await db.insert(schema.accounts).values({ id: "summary-owner" });
+    await insertDiagnosis(db, { id: "summary-complete", displayOrder: 20 });
+    await insertDiagnosis(db, { id: "summary-progress", displayOrder: 10 });
+    await insertDiagnosis(db, { id: "summary-withdrawn", displayOrder: 30 });
+    for (const position of [1, 2]) {
+      await saveDiagnosisAnswer(db, {
+        accountId: "summary-owner",
+        diagnosisId: "summary-complete",
+        diagnosisQuestionId: `summary-complete-sq${position}`,
+        choiceId: "yes",
+        at: new Date(`2026-08-03T00:0${position}:00Z`),
+      });
+    }
+    await saveDiagnosisAnswer(db, {
+      accountId: "summary-owner",
+      diagnosisId: "summary-progress",
+      diagnosisQuestionId: "summary-progress-sq1",
+      choiceId: "no",
+      at: new Date("2026-08-03T00:03:00Z"),
+    });
+    for (const position of [1, 2]) {
+      await saveDiagnosisAnswer(db, {
+        accountId: "summary-owner",
+        diagnosisId: "summary-withdrawn",
+        diagnosisQuestionId: `summary-withdrawn-sq${position}`,
+        choiceId: "no",
+        at: new Date(`2026-08-03T00:0${position + 3}:00Z`),
+      });
+    }
+    await db
+      .update(schema.diagnoses)
+      .set({ state: "withdrawn" })
+      .where(eq(schema.diagnoses.id, "summary-withdrawn"));
+
+    const result = await findProfileSummaryDiagnosisData(
+      db,
+      "summary-owner",
+      new Date("2026-08-04T00:00:00Z"),
+    );
+
+    expect(result.diagnoses.map(({ id, responseStatus }) => ({ id, responseStatus }))).toEqual([
+      { id: "summary-progress", responseStatus: "in-progress" },
+      { id: "summary-complete", responseStatus: "answered" },
+    ]);
+    expect(result.completedDiagnoses).toMatchObject([
+      {
+        displayOrder: 20,
+        diagnosis: { id: "summary-complete", responseStatus: "answered", answeredCount: 2 },
+      },
+      {
+        displayOrder: 30,
+        diagnosis: { id: "summary-withdrawn", responseStatus: "answered", answeredCount: 2 },
+      },
+    ]);
   });
 });
 

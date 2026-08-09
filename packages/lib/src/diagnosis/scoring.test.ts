@@ -48,6 +48,7 @@ describe("scoreDiagnosisAnswers", () => {
           highLabel: "計画的",
           score: 100,
           coverage: 100,
+          evidenceCount: 2,
           band: "high",
         },
         {
@@ -57,6 +58,7 @@ describe("scoreDiagnosisAnswers", () => {
           highLabel: "変更を楽しむ",
           score: 0,
           coverage: 100,
+          evidenceCount: 2,
           band: "low",
         },
       ],
@@ -80,7 +82,7 @@ describe("scoreDiagnosisAnswers", () => {
       CONFIG,
     );
 
-    expect(scoring?.parameters[0]).toMatchObject({ score: 100, coverage: 100 });
+    expect(scoring?.parameters[0]).toMatchObject({ score: 100, coverage: 100, evidenceCount: 2 });
   });
 
   it("採点設定がない診断はnullを返す", () => {

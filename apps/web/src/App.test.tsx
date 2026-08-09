@@ -94,8 +94,19 @@ vi.mock("./feature/diagnosis/presentation/components/swipe-diagnosis", () => ({
   ),
 }));
 vi.mock("./feature/diagnosis/presentation/components/diagnosis-result", () => ({
-  DiagnosisResultView: ({ result }: { result: DiagnosisResult }) => (
-    <div>{`結果UI: ${result.title} (${result.answers.length}件)`}</div>
+  DiagnosisResultView: ({
+    result,
+    backHref,
+    backLabel,
+  }: {
+    result: DiagnosisResult;
+    backHref?: string;
+    backLabel?: string;
+  }) => (
+    <div>
+      {`結果UI: ${result.title} (${result.answers.length}件)`}
+      {backHref && <a href={backHref}>{backLabel}</a>}
+    </div>
   ),
 }));
 
@@ -183,14 +194,31 @@ describe("App", () => {
             key: "prepare",
             label: "見通しを持って動く",
             description: "説明",
-            evidenceCount: 2,
-            sources: ["diagnosis", "diary"],
+            evidenceCount: 1,
+            sources: ["diagnosis"],
+          },
+        ],
+        themes: [
+          {
+            diagnosisId: "diagnosis-1",
+            title: "テスト診断",
+            answerCount: 2,
+            lastAnsweredAt: "2026-08-08T11:45:00.000Z",
+            scoring: null,
+          },
+        ],
+        diaryMemories: [
+          {
+            id: "memory-1",
+            statement: "公開予定を一週間延期した",
+            recordedAt: "2026-08-08T11:50:00.000Z",
+            evidenceCount: 1,
           },
         ],
         recordCount: 2,
         diagnosisCount: 1,
         diaryCount: 1,
-        latestRecordedAt: "2026-08-08T11:45:00.000Z",
+        latestRecordedAt: "2026-08-08T11:50:00.000Z",
       },
       nextAction: "diagnosis",
     });
@@ -295,17 +323,18 @@ describe("App", () => {
 
     expect(window.location.pathname).toBe("/me");
     expect(screen.queryByRole("heading", { name: "プロフィール" })).toBeNull();
-    expect(await screen.findByRole("heading", { name: "わたしのまとめ" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "わたしの傾向" })).toBeTruthy();
     expect(mocks.fetchDiagnosisList).not.toHaveBeenCalled();
   });
 
-  it("/meでは診断・日記レコードから生成したまとめを表示し、診断一覧は取得しない", async () => {
+  it("/meでは診断回答と日記Memoryから生成した傾向を表示し、診断一覧は取得しない", async () => {
     window.history.replaceState({}, "", "/me");
 
     render(<App />);
 
-    expect(await screen.findByRole("heading", { name: "わたしのまとめ" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "わたしの傾向" })).toBeTruthy();
     expect(await screen.findByRole("heading", { name: "見通しを持って動く" })).toBeTruthy();
+    expect(screen.getByText("公開予定を一週間延期した")).toBeTruthy();
     expect(mocks.initializeLiff).toHaveBeenCalled();
     expect(mocks.fetchProfileSummary).toHaveBeenCalledWith(
       "https://api.example.com",
@@ -320,7 +349,7 @@ describe("App", () => {
 
     render(<App />);
 
-    expect(await screen.findByRole("heading", { name: "わたしのまとめ" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "わたしの傾向" })).toBeTruthy();
     expect(mocks.fetchDiagnosisList).not.toHaveBeenCalled();
   });
 
@@ -367,6 +396,33 @@ describe("App", () => {
     ).toBeTruthy();
     expect(screen.getByText("あおいさんから招待が届いています")).toBeTruthy();
     expect(mocks.fetchDiagnosisList).not.toHaveBeenCalled();
+  });
+
+  it("サマリーの結果リンクから指定診断の回答結果を直接開く", async () => {
+    window.history.replaceState({}, "", "/diagnosis?result=diagnosis-1&from=profile");
+
+    render(<App />);
+
+    expect(await screen.findByText("結果UI: テスト診断 (1件)")).toBeTruthy();
+    expect(mocks.fetchDiagnosisResult).toHaveBeenCalledWith(
+      "https://api.example.com",
+      "dummy.id.token",
+      "diagnosis-1",
+      expect.any(AbortSignal),
+    );
+    expect(screen.getByRole("link", { name: "わたしの傾向" }).getAttribute("href")).toBe("/me");
+  });
+
+  it("指定診断の回答結果を読み込めなかった場合に同じ結果を再試行する", async () => {
+    window.history.replaceState({}, "", "/diagnosis?result=diagnosis-1&from=profile");
+    mocks.fetchDiagnosisResult.mockRejectedValueOnce(new Error("通信に失敗しました"));
+
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "再試行" }));
+
+    expect(await screen.findByText("結果UI: テスト診断 (1件)")).toBeTruthy();
+    expect(mocks.fetchDiagnosisResult).toHaveBeenCalledTimes(2);
   });
 
   afterEach(() => {

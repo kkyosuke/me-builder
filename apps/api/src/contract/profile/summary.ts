@@ -10,13 +10,46 @@ const ProfileInsightSchema = v.object({
   label: NonEmptyStringSchema,
   description: NonEmptyStringSchema,
   evidenceCount: v.pipe(CountSchema, v.minValue(1)),
-  sources: v.pipe(v.array(v.picklist(["diagnosis", "diary"])), v.minLength(1)),
+  sources: v.pipe(v.array(v.literal("diagnosis")), v.minLength(1)),
+});
+
+const ProfileParameterSchema = v.object({
+  id: NonEmptyStringSchema,
+  label: NonEmptyStringSchema,
+  lowLabel: NonEmptyStringSchema,
+  highLabel: NonEmptyStringSchema,
+  score: v.nullable(v.pipe(v.number(), v.safeInteger(), v.minValue(0), v.maxValue(100))),
+  coverage: v.pipe(v.number(), v.safeInteger(), v.minValue(0), v.maxValue(100)),
+  evidenceCount: CountSchema,
+  band: v.picklist(["low", "balanced", "high", "insufficient"]),
+});
+
+const ProfileThemeSchema = v.object({
+  diagnosisId: NonEmptyStringSchema,
+  title: NonEmptyStringSchema,
+  answerCount: CountSchema,
+  lastAnsweredAt: v.pipe(v.string(), v.isoTimestamp()),
+  scoring: v.nullable(
+    v.object({
+      balancedLabel: NonEmptyStringSchema,
+      parameters: v.pipe(v.array(ProfileParameterSchema), v.minLength(1)),
+    }),
+  ),
+});
+
+const ProfileDiaryMemorySchema = v.object({
+  id: NonEmptyStringSchema,
+  statement: NonEmptyStringSchema,
+  recordedAt: v.pipe(v.string(), v.isoTimestamp()),
+  evidenceCount: v.pipe(CountSchema, v.minValue(1)),
 });
 
 const ProfileSummarySchema = v.object({
   generatedAt: v.pipe(v.string(), v.isoTimestamp()),
   headline: NonEmptyStringSchema,
   insights: v.pipe(v.array(ProfileInsightSchema), v.maxLength(3)),
+  themes: v.array(ProfileThemeSchema),
+  diaryMemories: v.pipe(v.array(ProfileDiaryMemorySchema), v.maxLength(3)),
   recordCount: CountSchema,
   diagnosisCount: CountSchema,
   diaryCount: CountSchema,
@@ -25,7 +58,7 @@ const ProfileSummarySchema = v.object({
 
 export const ProfileSummaryResponseSchema = v.object({
   summary: v.nullable(ProfileSummarySchema),
-  nextAction: v.picklist(["diagnosis", "chat"]),
+  nextAction: v.nullable(v.literal("diagnosis")),
 });
 
 export const profileSummaryRoute = describeRoute({

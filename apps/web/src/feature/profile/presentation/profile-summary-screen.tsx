@@ -1,10 +1,9 @@
 import {
   ArrowRight,
   BookHeart,
+  BookOpenText,
   Brain,
   ClipboardCheck,
-  MessageCircleHeart,
-  NotebookPen,
   RefreshCw,
   Sparkles,
 } from "lucide-react";
@@ -12,6 +11,7 @@ import { LoadingState } from "../../../components/loading-state";
 import { MainNavigation } from "../../../components/main-navigation";
 import type { AsyncState } from "../../../model/async-state";
 import type {
+  ProfileParameter,
   ProfileRecordSource,
   ProfileSummary,
   ProfileSummaryResult,
@@ -19,7 +19,6 @@ import type {
 
 const sourceLabels: Record<ProfileRecordSource, string> = {
   diagnosis: "診断",
-  diary: "日記",
 };
 
 function formatDate(value: string): string {
@@ -28,6 +27,13 @@ function formatDate(value: string): string {
     month: "numeric",
     day: "numeric",
   }).format(new Date(value));
+}
+
+function parameterSummary(parameter: ProfileParameter, balancedLabel: string): string {
+  if (parameter.band === "insufficient") return "回答が増えると表示できます";
+  if (parameter.band === "low") return parameter.lowLabel;
+  if (parameter.band === "high") return parameter.highLabel;
+  return balancedLabel;
 }
 
 function SummaryContent({ summary }: { summary: ProfileSummary }) {
@@ -76,7 +82,13 @@ function SummaryContent({ summary }: { summary: ProfileSummary }) {
           ))}
         </ol>
 
-        <dl className="mt-5 grid grid-cols-3 gap-2 border-t border-slate-200/80 pt-4 text-center dark:border-slate-700">
+        <dl className="mt-5 grid grid-cols-2 gap-2 border-t border-slate-200/80 pt-4 text-center sm:grid-cols-4 dark:border-slate-700">
+          <div>
+            <dt className="text-xs text-slate-500">日記</dt>
+            <dd className="mt-1 font-bold text-slate-900 dark:text-slate-100">
+              {summary.diaryCount}件
+            </dd>
+          </div>
           <div>
             <dt className="text-xs text-slate-500">診断</dt>
             <dd className="mt-1 font-bold text-slate-900 dark:text-slate-100">
@@ -84,9 +96,9 @@ function SummaryContent({ summary }: { summary: ProfileSummary }) {
             </dd>
           </div>
           <div>
-            <dt className="text-xs text-slate-500">日記</dt>
+            <dt className="text-xs text-slate-500">回答</dt>
             <dd className="mt-1 font-bold text-slate-900 dark:text-slate-100">
-              {summary.diaryCount}件
+              {summary.recordCount}件
             </dd>
           </div>
           <div>
@@ -102,30 +114,136 @@ function SummaryContent({ summary }: { summary: ProfileSummary }) {
         これは記録の範囲から見える現在のまとめです。あなた自身や健康状態を断定するものではなく、記録が変わると内容も変わります。
       </p>
 
-      <section aria-labelledby="sources-heading" className="mt-8">
-        <h2
-          id="sources-heading"
-          className="flex items-center gap-2 text-lg font-bold text-slate-950 dark:text-slate-50"
-        >
-          <Brain className="size-5 text-violet-600 dark:text-violet-300" aria-hidden="true" />
-          まとめに使ったもの
-        </h2>
-        <div className="mt-3 grid grid-cols-2 gap-3">
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800">
-            <ClipboardCheck className="size-5 text-sky-600 dark:text-sky-300" aria-hidden="true" />
-            <p className="mt-3 font-bold text-slate-900 dark:text-slate-100">診断の回答</p>
-            <p className="mt-1 text-xs text-slate-500">{summary.diagnosisCount}件を参照</p>
+      {summary.themes.length > 0 && (
+        <section aria-labelledby="themes-heading" className="mt-8">
+          <h2
+            id="themes-heading"
+            className="flex items-center gap-2 text-lg font-bold text-slate-950 dark:text-slate-50"
+          >
+            <Brain className="size-5 text-violet-600 dark:text-violet-300" aria-hidden="true" />
+            テーマごとの傾向
+          </h2>
+          <div className="mt-3 space-y-4">
+            {summary.themes.map((theme) => (
+              <article
+                key={theme.diagnosisId}
+                className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800"
+              >
+                <div className="flex items-start gap-3">
+                  <ClipboardCheck
+                    className="mt-0.5 size-5 shrink-0 text-sky-600 dark:text-sky-300"
+                    aria-hidden="true"
+                  />
+                  <div>
+                    <h3 className="font-bold text-slate-900 dark:text-slate-100">{theme.title}</h3>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {`${theme.answerCount}回答・最終回答 ${formatDate(theme.lastAnsweredAt)}`}
+                    </p>
+                  </div>
+                </div>
+
+                {theme.scoring ? (
+                  <div className="mt-4 space-y-4">
+                    {theme.scoring.parameters.map((parameter) => {
+                      const summaryText = parameterSummary(
+                        parameter,
+                        theme.scoring?.balancedLabel ?? "状況による",
+                      );
+                      return (
+                        <div key={parameter.id}>
+                          <div className="flex items-center justify-between gap-3 text-sm">
+                            <p className="font-semibold text-slate-800 dark:text-slate-200">
+                              {parameter.label}
+                            </p>
+                            <p className="text-right text-xs text-sky-700 dark:text-sky-300">
+                              {summaryText}
+                            </p>
+                          </div>
+                          <div
+                            role="meter"
+                            aria-label={`${parameter.label}の傾向`}
+                            aria-valuemin={0}
+                            aria-valuemax={100}
+                            aria-valuenow={parameter.score ?? undefined}
+                            aria-valuetext={summaryText}
+                            className="relative mt-2 h-2 rounded-full bg-gradient-to-r from-indigo-400/70 via-slate-300 to-sky-300/70 dark:via-slate-600"
+                          >
+                            {parameter.score !== null && (
+                              <span
+                                className="absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-sky-600 shadow dark:border-slate-900"
+                                style={{ left: `${parameter.score}%` }}
+                                aria-hidden="true"
+                              />
+                            )}
+                          </div>
+                          <div className="mt-1 flex justify-between gap-3 text-[11px] text-slate-500">
+                            <span>{parameter.lowLabel}</span>
+                            <span className="text-right">{parameter.highLabel}</span>
+                          </div>
+                          <p className="mt-1 text-[10px] text-slate-500">
+                            {`回答充足度 ${parameter.coverage}%・根拠 ${parameter.evidenceCount}回答`}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="mt-4 text-sm text-slate-600 dark:text-slate-400">
+                    回答は保存されていますが、この診断の傾向はまだ設定されていません。
+                  </p>
+                )}
+
+                <a
+                  href={`/diagnosis?result=${encodeURIComponent(theme.diagnosisId)}&from=profile`}
+                  className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-sky-700 underline underline-offset-4 dark:text-sky-300"
+                >
+                  回答結果を見る
+                  <ArrowRight className="size-4" aria-hidden="true" />
+                </a>
+              </article>
+            ))}
           </div>
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800">
-            <NotebookPen
-              className="size-5 text-violet-600 dark:text-violet-300"
+        </section>
+      )}
+
+      {summary.diaryMemories.length > 0 && (
+        <section aria-labelledby="diary-memories-heading" className="mt-8">
+          <h2
+            id="diary-memories-heading"
+            className="flex items-center gap-2 text-lg font-bold text-slate-950 dark:text-slate-50"
+          >
+            <BookOpenText
+              className="size-5 text-emerald-600 dark:text-emerald-300"
               aria-hidden="true"
             />
-            <p className="mt-3 font-bold text-slate-900 dark:text-slate-100">日記の記録</p>
-            <p className="mt-1 text-xs text-slate-500">{summary.diaryCount}件を参照</p>
-          </div>
-        </div>
-      </section>
+            日記からの記録
+          </h2>
+          <p className="mt-2 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+            日記で話した出来事からAIが抽出した記録です。人物像を推定したものではありません。
+          </p>
+          <ol className="mt-3 space-y-3">
+            {summary.diaryMemories.map((memory) => (
+              <li
+                key={memory.id}
+                className="rounded-2xl border border-emerald-200 bg-white p-4 dark:border-emerald-900/60 dark:bg-slate-800"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="rounded-full bg-emerald-100 px-2 py-1 text-[11px] font-semibold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">
+                    日記・AI抽出
+                  </span>
+                  <time dateTime={memory.recordedAt} className="text-xs text-slate-500">
+                    {formatDate(memory.recordedAt)}
+                  </time>
+                </div>
+                <p className="mt-3 text-sm leading-relaxed text-slate-800 dark:text-slate-200">
+                  {memory.statement}
+                </p>
+                <p className="mt-2 text-xs text-slate-500">{`根拠 ${memory.evidenceCount}発言`}</p>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
     </>
   );
 }
@@ -140,7 +258,7 @@ function EmptySummary() {
         まだ、わたしのまとめはありません
       </h2>
       <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-        診断に答えたり、LINEのトークで日々のことを話したりすると、あなたらしさが少しずつ見えてきます。
+        診断に答えると、回答した範囲から現在の傾向を振り返れます。
       </p>
       <a
         href="/diagnosis"
@@ -149,44 +267,31 @@ function EmptySummary() {
         診断を始める
         <ArrowRight className="size-4" aria-hidden="true" />
       </a>
-      <p className="mt-4 flex items-center justify-center gap-2 text-sm font-semibold text-violet-700 dark:text-violet-300">
-        <MessageCircleHeart className="size-5" aria-hidden="true" />
-        LINEで今日のことを話してみる
-      </p>
     </section>
   );
 }
 
-function NextAction({ action }: { action: ProfileSummaryResult["nextAction"] }) {
-  const needsDiagnosis = action === "diagnosis";
+function NextAction() {
   return (
     <section className="mt-8 rounded-3xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800">
       <div className="flex items-start gap-3">
         <span className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-emerald-400/10 text-emerald-700 dark:text-emerald-300">
-          {needsDiagnosis ? (
-            <BookHeart className="size-5" aria-hidden="true" />
-          ) : (
-            <MessageCircleHeart className="size-5" aria-hidden="true" />
-          )}
+          <BookHeart className="size-5" aria-hidden="true" />
         </span>
         <div>
           <h2 className="font-bold text-slate-950 dark:text-slate-50">これからできること</h2>
           <p className="mt-1 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-            {needsDiagnosis
-              ? "まだ答えていない診断があります。回答すると、まとめに新しい一面が加わります。"
-              : "診断はすべて回答済みです。毎日の会話で、あなたのことをもう少し教えてください。"}
+            まだ答えていない診断があります。回答すると、まとめに新しい一面が加わります。
           </p>
         </div>
       </div>
-      {needsDiagnosis && (
-        <a
-          href="/diagnosis"
-          className="mt-4 flex items-center justify-between rounded-xl bg-sky-400 px-4 py-3 text-sm font-bold text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400"
-        >
-          未回答の診断を見る
-          <ArrowRight className="size-4" aria-hidden="true" />
-        </a>
-      )}
+      <a
+        href="/diagnosis"
+        className="mt-4 flex items-center justify-between rounded-xl bg-sky-400 px-4 py-3 text-sm font-bold text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400"
+      >
+        未回答の診断を見る
+        <ArrowRight className="size-4" aria-hidden="true" />
+      </a>
     </section>
   );
 }
@@ -204,11 +309,9 @@ export function ProfileSummaryScreen({
         <p className="text-sm font-semibold tracking-wider text-sky-700 dark:text-sky-300">
           私を知る
         </p>
-        <h1 className="mt-2 text-3xl font-bold text-slate-950 dark:text-slate-50">
-          わたしのまとめ
-        </h1>
+        <h1 className="mt-2 text-3xl font-bold text-slate-950 dark:text-slate-50">わたしの傾向</h1>
         <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-          診断と日記の記録をつなげて、今のあなたらしさを振り返ります。
+          これまでの診断回答と日記から見える、今のあなたです。
         </p>
       </header>
 
@@ -242,7 +345,7 @@ export function ProfileSummaryScreen({
       {state.status === "success" && (
         <>
           {state.data.summary ? <SummaryContent summary={state.data.summary} /> : <EmptySummary />}
-          {state.data.summary && <NextAction action={state.data.nextAction} />}
+          {state.data.summary && state.data.nextAction && <NextAction />}
         </>
       )}
 

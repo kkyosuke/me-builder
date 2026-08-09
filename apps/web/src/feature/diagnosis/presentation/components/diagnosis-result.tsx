@@ -15,22 +15,31 @@ function formatAcceptedAt(value: string): string {
 export function DiagnosisResultView({
   result,
   onBack,
+  backHref,
+  backLabel = "診断一覧",
 }: {
   result: DiagnosisResult;
   onBack: () => void;
+  backHref?: string;
+  backLabel?: string;
 }) {
   const scoring = result.scoring;
+  const backClassName =
+    "mb-5 inline-flex items-center gap-2 rounded-xl px-2 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 transition hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-950 dark:hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400";
 
   return (
     <main className="mx-auto min-h-dvh w-full max-w-2xl px-4 py-5 sm:px-8 sm:py-8">
-      <button
-        type="button"
-        onClick={onBack}
-        className="mb-5 inline-flex items-center gap-2 rounded-xl px-2 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 transition hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-950 dark:hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400"
-      >
-        <ArrowLeft className="size-4" aria-hidden="true" />
-        診断一覧
-      </button>
+      {backHref ? (
+        <a href={backHref} className={backClassName}>
+          <ArrowLeft className="size-4" aria-hidden="true" />
+          {backLabel}
+        </a>
+      ) : (
+        <button type="button" onClick={onBack} className={backClassName}>
+          <ArrowLeft className="size-4" aria-hidden="true" />
+          {backLabel}
+        </button>
+      )}
 
       <header className="rounded-3xl border border-sky-300/20 bg-white dark:bg-slate-800 p-5 shadow-xl shadow-slate-950/20 sm:p-6">
         <div className="flex items-center gap-3">

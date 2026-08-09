@@ -6,7 +6,7 @@ describe("fetchProfileSummary", () => {
 
   it("本人のまとめと次の行動を取得する", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ summary: null, nextAction: "chat" }), {
+      new Response(JSON.stringify({ summary: null, nextAction: null }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
       }),
@@ -15,7 +15,7 @@ describe("fetchProfileSummary", () => {
 
     const result = await fetchProfileSummary("https://api.example.com", "id-token");
 
-    expect(result).toEqual({ summary: null, nextAction: "chat" });
+    expect(result).toEqual({ summary: null, nextAction: null });
     expect(fetchMock).toHaveBeenCalledWith(
       "https://api.example.com/api/profile-summary",
       expect.objectContaining({ headers: { Authorization: "Bearer id-token" } }),

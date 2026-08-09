@@ -394,15 +394,42 @@ export interface operations {
                 label: string;
                 description: string;
                 evidenceCount: number;
-                sources: ("diagnosis" | "diary")[];
+                sources: "diagnosis"[];
+              }[];
+              themes: {
+                diagnosisId: string;
+                title: string;
+                answerCount: number;
+                /** Format: date-time */
+                lastAnsweredAt: string;
+                scoring: {
+                  balancedLabel: string;
+                  parameters: {
+                    id: string;
+                    label: string;
+                    lowLabel: string;
+                    highLabel: string;
+                    score: number | null;
+                    coverage: number;
+                    evidenceCount: number;
+                    /** @enum {string} */
+                    band: "low" | "balanced" | "high" | "insufficient";
+                  }[];
+                } | null;
+              }[];
+              diaryMemories: {
+                id: string;
+                statement: string;
+                /** Format: date-time */
+                recordedAt: string;
+                evidenceCount: number;
               }[];
               recordCount: number;
               diagnosisCount: number;
               diaryCount: number;
               latestRecordedAt: string | null;
             } | null;
-            /** @enum {string} */
-            nextAction: "diagnosis" | "chat";
+            nextAction: "diagnosis" | null;
           };
         };
       };

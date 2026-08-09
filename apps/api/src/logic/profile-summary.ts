@@ -1,43 +1,51 @@
 import { type AccountDataNamespace, accountDataFor, type d1 } from "@me-builder/lib";
+import { logger } from "@me-builder/shared";
+import { scoreDiagnosisAnswers } from "./diagnosis-scoring";
 import { createLiffSession } from "./liff-session";
 
-const DUMMY_SUMMARY = {
-  generatedAt: "2026-08-08T12:00:00.000Z",
-  headline: "最近の記録から、こんなあなたらしさが見えています",
-  insights: [
-    {
-      key: "prepare-first",
-      label: "見通しを持って動く",
-      description: "先の段取りが見えると、安心して力を発揮できる傾向があります。",
-      evidenceCount: 2,
-      sources: ["diagnosis", "diary"] as const,
-    },
-    {
-      key: "own-pace",
-      label: "自分のペースを守る",
-      description: "相手を尊重しながらも、自分の余裕を確かめて選ぶことを大切にしています。",
-      evidenceCount: 2,
-      sources: ["diagnosis"] as const,
-    },
-    {
-      key: "talk-to-organize",
-      label: "話しながら整理する",
-      description: "信頼できる人との対話から、次の一歩を見つけることがあります。",
-      evidenceCount: 2,
-      sources: ["diary"] as const,
-    },
-  ],
-  recordCount: 4,
-  diagnosisCount: 2,
-  diaryCount: 2,
-  latestRecordedAt: "2026-08-08T11:45:00.000Z",
-} as const;
+type ProfileInsight = Readonly<{
+  key: string;
+  label: string;
+  description: string;
+  evidenceCount: number;
+  sources: readonly ["diagnosis"];
+}>;
+
+type ProfileTheme = Readonly<{
+  diagnosisId: string;
+  title: string;
+  answerCount: number;
+  lastAnsweredAt: string;
+  scoring: Readonly<{
+    balancedLabel: string;
+    parameters: NonNullable<ReturnType<typeof scoreDiagnosisAnswers>>["parameters"];
+  }> | null;
+}>;
+
+type ProfileDiaryMemory = Readonly<{
+  id: string;
+  statement: string;
+  recordedAt: string;
+  evidenceCount: number;
+}>;
+
+export type ProfileSummary = Readonly<{
+  generatedAt: string;
+  headline: string;
+  insights: readonly ProfileInsight[];
+  themes: readonly ProfileTheme[];
+  diaryMemories: readonly ProfileDiaryMemory[];
+  recordCount: number;
+  diagnosisCount: number;
+  diaryCount: number;
+  latestRecordedAt: string | null;
+}>;
 
 export type ProfileSummaryOutcome =
   | {
       type: "resolved";
-      summary: typeof DUMMY_SUMMARY | null;
-      nextAction: "diagnosis" | "chat";
+      summary: ProfileSummary | null;
+      nextAction: "diagnosis" | null;
     }
   | { type: "not-configured" }
   | { type: "unauthenticated"; reason: string }
@@ -51,34 +59,177 @@ type Params = {
   at?: Date;
 };
 
+type DiagnosisSummaryData = Awaited<
+  ReturnType<typeof d1.action.diagnosis.findProfileSummaryDiagnosisData>
+>;
+type DiarySummaryData = Awaited<ReturnType<typeof d1.action.brain.findProfileSummaryDiaryData>>;
+
 type Dependencies = {
   createSession: typeof createLiffSession;
-  listVisibleDiagnoses: (
+  findSummaryData: (
     accountData: AccountDataNamespace | undefined,
     accountId: string,
     at: Date,
-  ) => ReturnType<typeof d1.action.diagnosis.listVisibleDiagnoses>;
-  hasActiveSourceRecords: (
+  ) => Promise<DiagnosisSummaryData>;
+  findDiaryData: (
     accountData: AccountDataNamespace | undefined,
     accountId: string,
-  ) => ReturnType<typeof d1.action.source.hasActiveSourceRecords>;
-  summary: typeof DUMMY_SUMMARY | null;
+  ) => Promise<DiarySummaryData>;
 };
 
 const defaultDependencies: Dependencies = {
   createSession: createLiffSession,
-  listVisibleDiagnoses: (accountData, accountId, at) => {
+  findSummaryData: (accountData, accountId, at) => {
     if (!accountData) throw new Error("ACCOUNT_DATA binding is not configured");
-    return accountDataFor(accountData, accountId).execute("diagnosis.listVisible", at);
+    return accountDataFor(accountData, accountId).execute("diagnosis.findProfileSummaryData", at);
   },
-  hasActiveSourceRecords: (accountData, accountId) => {
+  findDiaryData: (accountData, accountId) => {
     if (!accountData) throw new Error("ACCOUNT_DATA binding is not configured");
-    return accountDataFor(accountData, accountId).execute("source.hasActive");
+    return accountDataFor(accountData, accountId).execute("brain.findProfileSummaryDiaryData");
   },
-  summary: DUMMY_SUMMARY,
 };
 
-/** 本人のまとめを返し、実際の診断進捗だけから次の行動を決める。 */
+type InsightCandidate = ProfileInsight & {
+  distance: number;
+  diagnosisDisplayOrder: number;
+  diagnosisId: string;
+  parameterPosition: number;
+  parameterId: string;
+};
+
+function compareIds(left: string, right: string): number {
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
+}
+
+function buildSummary(
+  data: DiagnosisSummaryData,
+  diaryData: DiarySummaryData,
+  at: Date,
+): ProfileSummary | null {
+  if (data.completedDiagnoses.length === 0 && diaryData.memoryCount === 0) return null;
+
+  const candidates: InsightCandidate[] = [];
+  const themes: ProfileTheme[] = [];
+  let hasScoring = false;
+  let hasBalancedParameter = false;
+
+  for (const { displayOrder, diagnosis } of data.completedDiagnoses) {
+    let scoring: ReturnType<typeof scoreDiagnosisAnswers> = null;
+    try {
+      scoring = scoreDiagnosisAnswers(diagnosis.answers, diagnosis.scoringConfig);
+    } catch (error) {
+      logger.error(
+        {
+          diagnosisId: diagnosis.id,
+          scoringConfigId: diagnosis.scoringConfig?.id,
+          reason: error instanceof Error ? error.message : "unknown error",
+        },
+        "Diagnosis scoring config is invalid; excluding it from profile summary",
+      );
+      scoring = null;
+    }
+    const lastAnsweredAt = diagnosis.answers
+      .map(({ acceptedAt }) => acceptedAt)
+      .sort((left, right) => right.localeCompare(left))[0];
+    if (!lastAnsweredAt) throw new Error("完了済み診断に回答がありません");
+    themes.push({
+      diagnosisId: diagnosis.id,
+      title: diagnosis.title,
+      answerCount: diagnosis.answers.length,
+      lastAnsweredAt,
+      scoring: scoring
+        ? { balancedLabel: scoring.balancedLabel, parameters: scoring.parameters }
+        : null,
+    });
+
+    if (scoring) {
+      hasScoring = true;
+      scoring.parameters.forEach((parameter, parameterPosition) => {
+        if (parameter.band === "balanced") hasBalancedParameter = true;
+        if ((parameter.band !== "low" && parameter.band !== "high") || parameter.score === null) {
+          return;
+        }
+        const label = parameter.band === "low" ? parameter.lowLabel : parameter.highLabel;
+        candidates.push({
+          key: `${diagnosis.id}:${parameter.id}`,
+          label,
+          description: `「${label}」傾向があります`,
+          evidenceCount: parameter.evidenceCount,
+          sources: ["diagnosis"],
+          distance: Math.abs(parameter.score - 50),
+          diagnosisDisplayOrder: displayOrder,
+          diagnosisId: diagnosis.id,
+          parameterPosition,
+          parameterId: parameter.id,
+        });
+      });
+    }
+  }
+
+  themes.sort(
+    (left, right) =>
+      right.lastAnsweredAt.localeCompare(left.lastAnsweredAt) ||
+      compareIds(left.diagnosisId, right.diagnosisId),
+  );
+
+  candidates.sort(
+    (left, right) =>
+      right.distance - left.distance ||
+      left.diagnosisDisplayOrder - right.diagnosisDisplayOrder ||
+      compareIds(left.diagnosisId, right.diagnosisId) ||
+      left.parameterPosition - right.parameterPosition ||
+      compareIds(left.parameterId, right.parameterId),
+  );
+
+  const latestDiagnosisRecordedAt = data.completedDiagnoses
+    .flatMap(({ diagnosis }) => diagnosis.answers.map(({ acceptedAt }) => acceptedAt))
+    .sort((left, right) => right.localeCompare(left))[0];
+  const latestRecordedAt = [latestDiagnosisRecordedAt, diaryData.memories[0]?.recordedAt]
+    .filter((value): value is string => value !== undefined)
+    .sort((left, right) => right.localeCompare(left))[0];
+  const insights = candidates
+    .slice(0, 3)
+    .map(
+      ({
+        distance: _distance,
+        diagnosisDisplayOrder: _diagnosisDisplayOrder,
+        diagnosisId: _diagnosisId,
+        parameterPosition: _parameterPosition,
+        parameterId: _parameterId,
+        ...insight
+      }) => insight,
+    );
+
+  const headline =
+    insights.length > 0
+      ? "これまでの回答から、今の傾向が見えています"
+      : hasBalancedParameter
+        ? "回答したテーマでは、状況に応じて選び方を調整する傾向が見えています"
+        : hasScoring
+          ? "回答が増えると、今の傾向を表示できます"
+          : data.completedDiagnoses.length > 0
+            ? "回答は保存されていますが、傾向はまだ表示できません"
+            : "日記から、最近の出来事を振り返れます";
+
+  return {
+    generatedAt: at.toISOString(),
+    headline,
+    insights,
+    themes,
+    diaryMemories: diaryData.memories,
+    recordCount: data.completedDiagnoses.reduce(
+      (count, { diagnosis }) => count + diagnosis.answers.length,
+      0,
+    ),
+    diagnosisCount: data.completedDiagnoses.length,
+    diaryCount: diaryData.memoryCount,
+    latestRecordedAt: latestRecordedAt ?? null,
+  };
+}
+
+/** 本人の完了済み診断を再採点してまとめ、実際の診断進捗から次の行動を決める。 */
 export async function getProfileSummary(
   { idToken, lineLoginChannelId, db, accountData, at = new Date() }: Params,
   dependencies: Dependencies = defaultDependencies,
@@ -86,17 +237,17 @@ export async function getProfileSummary(
   const session = await dependencies.createSession({ idToken, lineLoginChannelId, db });
   if (session.type !== "resolved") return session;
 
-  const [diagnoses, hasRecords] = await Promise.all([
-    dependencies.listVisibleDiagnoses(accountData, session.session.accountId, at),
-    dependencies.hasActiveSourceRecords(accountData, session.session.accountId),
+  const [data, diaryData] = await Promise.all([
+    dependencies.findSummaryData(accountData, session.session.accountId, at),
+    dependencies.findDiaryData(accountData, session.session.accountId),
   ]);
-  const hasAnswerableDiagnosis = diagnoses.some(
+  const hasAnswerableDiagnosis = data.diagnoses.some(
     ({ availability, responseStatus }) => availability === "open" && responseStatus !== "answered",
   );
 
   return {
     type: "resolved",
-    summary: hasRecords ? dependencies.summary : null,
-    nextAction: hasAnswerableDiagnosis ? "diagnosis" : "chat",
+    summary: buildSummary(data, diaryData, at),
+    nextAction: hasAnswerableDiagnosis ? "diagnosis" : null,
   };
 }

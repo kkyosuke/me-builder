@@ -9,6 +9,7 @@ export type ScoredParameter = Readonly<{
   highLabel: string;
   score: number | null;
   coverage: number;
+  evidenceCount: number;
   band: ParameterBand;
 }>;
 
@@ -201,6 +202,7 @@ function scoreParameters(
     let totalWeight = 0;
     let answeredWeight = 0;
     let weightedSum = 0;
+    let evidenceCount = 0;
 
     for (const [questionId, rule] of Object.entries(config.questions)) {
       const weight = rule.weights[parameter.id];
@@ -215,6 +217,7 @@ function scoreParameters(
       if (choiceScore === undefined) continue;
       answeredWeight += comparableWeight;
       weightedSum += choiceScore * weight;
+      evidenceCount += 1;
     }
 
     const coverage = totalWeight === 0 ? 0 : answeredWeight / totalWeight;
@@ -226,6 +229,7 @@ function scoreParameters(
       ...parameter,
       score,
       coverage: Math.round(coverage * 100),
+      evidenceCount,
       band: resolveBand(score, config),
     };
   });

@@ -132,6 +132,16 @@ export type DiagnosisAnswersResult =
   | { type: "found"; diagnosis: DiagnosisAnswers }
   | { type: "not-found" };
 
+export type ProfileSummaryDiagnosisInput = Readonly<{
+  displayOrder: number;
+  diagnosis: DiagnosisAnswers;
+}>;
+
+export type ProfileSummaryDiagnosisData = Readonly<{
+  diagnoses: DiagnosisListItem[];
+  completedDiagnoses: ProfileSummaryDiagnosisInput[];
+}>;
+
 export type DeletedAccountDiagnosisData = Readonly<{
   deletedResponseCount: number;
   deletedAnswerCount: number;
@@ -942,7 +952,7 @@ export async function findDiagnosisAnswers(
   if (
     !response ||
     response.diagnosisIsDeleted ||
-    response.state !== "published" ||
+    (response.state !== "published" && response.state !== "withdrawn") ||
     response.opensAt.getTime() > at.getTime()
   ) {
     return { type: "not-found" };
@@ -1175,4 +1185,48 @@ export async function listVisibleDiagnoses(
       lastAnsweredAt: row.lastAnsweredAt?.toISOString() ?? null,
     };
   });
+}
+
+/**
+ * 本人向けサマリーに必要な診断進捗と、完了済み診断の現在有効な回答を一括取得します。
+ *
+ * 取得途中の欠落を部分的なサマリーとして扱わないため、一覧上は完了済みなのに
+ * 回答内容を取得できない場合は失敗させます。
+ */
+export async function findProfileSummaryDiagnosisData(
+  db: D1Client,
+  accountId: string,
+  at: Date,
+): Promise<ProfileSummaryDiagnosisData> {
+  const visibleDiagnoses = await listVisibleDiagnoses(db, accountId, at);
+  const completedDiagnoses: ProfileSummaryDiagnosisInput[] = [];
+  const responseDiagnoses = await db
+    .select({
+      id: diagnoses.id,
+      displayOrder: diagnoses.displayOrder,
+    })
+    .from(diagnosisResponses)
+    .innerJoin(diagnoses, eq(diagnoses.id, diagnosisResponses.diagnosisId))
+    .where(
+      and(
+        eq(diagnosisResponses.accountId, accountId),
+        eq(diagnosisResponses.isDeleted, false),
+        eq(diagnoses.isDeleted, false),
+        inArray(diagnoses.state, ["published", "withdrawn"]),
+        lte(diagnoses.opensAt, at),
+      ),
+    )
+    .orderBy(asc(diagnoses.displayOrder), asc(diagnoses.id))
+    .all();
+
+  for (const item of responseDiagnoses) {
+    const result = await findDiagnosisAnswers(db, accountId, item.id, at);
+    if (result.type !== "found") {
+      throw new Error("完了済み診断の回答内容を取得できませんでした");
+    }
+    if (result.diagnosis.responseStatus !== "answered") continue;
+    completedDiagnoses.push({ displayOrder: item.displayOrder, diagnosis: result.diagnosis });
+  }
+
+  return { diagnoses: visibleDiagnoses, completedDiagnoses };
 }

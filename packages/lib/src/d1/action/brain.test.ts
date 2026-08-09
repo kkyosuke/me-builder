@@ -5,7 +5,12 @@ import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { describe, expect, it } from "vitest";
 import type { D1Client } from "../client";
 import * as schema from "../schema";
-import { type SaveBrainItemInput, findBrainItemForAccount, saveBrainItem } from "./brain";
+import {
+  type SaveBrainItemInput,
+  findBrainItemForAccount,
+  findProfileSummaryDiaryData,
+  saveBrainItem,
+} from "./brain";
 
 function createTestDb(): D1Client {
   const sqlite = new Database(":memory:");
@@ -139,5 +144,110 @@ describe("findBrainItemForAccount", () => {
     await expect(
       findBrainItemForAccount(db, { accountId: "account-2", brainItemId: "brain-1" }),
     ).resolves.toBeUndefined();
+  });
+});
+
+describe("findProfileSummaryDiaryData", () => {
+  it("本人のactiveな日記Memoryだけを新しい順で最大3件返す", async () => {
+    const db = createTestDb();
+    await db.insert(schema.accounts).values([{ id: "account-1" }, { id: "account-2" }]);
+    await db.insert(schema.sourceRecords).values([
+      { id: "source-1", accountId: "account-1", kind: "user_input" },
+      { id: "source-2", accountId: "account-1", kind: "user_input" },
+      { id: "source-3", accountId: "account-1", kind: "user_input" },
+      { id: "source-4", accountId: "account-1", kind: "user_input" },
+      { id: "source-other", accountId: "account-2", kind: "user_input" },
+    ]);
+    const dates = ["2026-08-01", "2026-08-02", "2026-08-03", "2026-08-04"];
+    await db.insert(schema.brainItems).values([
+      ...dates.map((date, index) => ({
+        id: `memory-${index + 1}`,
+        accountId: "account-1",
+        category: "memory",
+        statement: `日記の出来事${index + 1}`,
+        attributes: { sourceKind: "diary" },
+        derivation: "ai" as const,
+        status: "active" as const,
+        validFrom: new Date(`${date}T00:00:00Z`),
+        stability: "stable" as const,
+        sensitivity: "normal",
+        externallyShareable: false,
+        confidence: { state: "uncomputed" },
+      })),
+      {
+        id: "memory-other",
+        accountId: "account-2",
+        category: "memory",
+        statement: "別Accountの日記",
+        attributes: { sourceKind: "diary" },
+        derivation: "ai",
+        status: "active",
+        validFrom: new Date("2026-08-05T00:00:00Z"),
+        stability: "stable",
+        sensitivity: "normal",
+        externallyShareable: false,
+        confidence: { state: "uncomputed" },
+      },
+    ]);
+    await db.insert(schema.brainItemTopicLabels).values([
+      ...dates.map((_date, index) => ({
+        id: `topic-${index + 1}`,
+        accountId: "account-1",
+        brainItemId: `memory-${index + 1}`,
+        label: "diary",
+      })),
+      {
+        id: "topic-other",
+        accountId: "account-2",
+        brainItemId: "memory-other",
+        label: "diary",
+      },
+    ]);
+    await db.insert(schema.brainItemEvidenceEdges).values([
+      ...dates.map((_date, index) => ({
+        id: `evidence-${index + 1}`,
+        accountId: "account-1",
+        brainItemId: `memory-${index + 1}`,
+        sourceRecordId: `source-${index + 1}`,
+        relation: "supports" as const,
+        isDerivationTrigger: true,
+        derivationMethod: "ai" as const,
+        generatedAt: new Date("2026-08-09T00:00:00Z"),
+      })),
+      {
+        id: "evidence-4-extra",
+        accountId: "account-1",
+        brainItemId: "memory-4",
+        sourceRecordId: "source-3",
+        relation: "supports",
+        isDerivationTrigger: true,
+        derivationMethod: "ai",
+        generatedAt: new Date("2026-08-09T00:00:00Z"),
+      },
+      {
+        id: "evidence-other",
+        accountId: "account-2",
+        brainItemId: "memory-other",
+        sourceRecordId: "source-other",
+        relation: "supports",
+        isDerivationTrigger: true,
+        derivationMethod: "ai",
+        generatedAt: new Date("2026-08-09T00:00:00Z"),
+      },
+    ]);
+
+    await expect(findProfileSummaryDiaryData(db, "account-1")).resolves.toEqual({
+      memories: [
+        {
+          id: "memory-4",
+          statement: "日記の出来事4",
+          recordedAt: "2026-08-04T00:00:00.000Z",
+          evidenceCount: 2,
+        },
+        expect.objectContaining({ id: "memory-3", evidenceCount: 1 }),
+        expect.objectContaining({ id: "memory-2", evidenceCount: 1 }),
+      ],
+      memoryCount: 4,
+    });
   });
 });

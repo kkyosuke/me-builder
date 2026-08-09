@@ -78,6 +78,20 @@ describe("DiagnosisResultView", () => {
     expect(onBack).toHaveBeenCalledOnce();
   });
 
+  it("サマリーから開いた結果ではわたしの傾向へのリンクを表示する", () => {
+    render(
+      <DiagnosisResultView
+        result={result}
+        onBack={vi.fn()}
+        backHref="/me"
+        backLabel="わたしの傾向"
+      />,
+    );
+
+    expect(screen.getByRole("link", { name: "わたしの傾向" }).getAttribute("href")).toBe("/me");
+    expect(screen.queryByRole("button", { name: "診断一覧" })).toBeNull();
+  });
+
   it("採点設定がない診断でも回答内容を表示できる", () => {
     render(<DiagnosisResultView result={{ ...result, scoring: null }} onBack={vi.fn()} />);
 
