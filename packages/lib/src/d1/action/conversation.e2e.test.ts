@@ -10,11 +10,14 @@ import { findLineIdentityByAccountId, upsertIdentity } from "./account";
 import {
   applyDiaryBrainCheckpoint,
   attachMessagesToTurn,
+  claimDueDiaryBrainCheckpointIds,
   closeTurnSession,
   getDiaryBrainCheckpointContext,
+  getDiaryBrainCheckpointDevelopmentNotification,
   getPendingAssistantResponse,
   getTurnContext,
   listDueDiaryBrainCheckpointIds,
+  markDiaryBrainCheckpointDevelopmentNotificationSent,
   markTurnDelivered,
   markTurnFailed,
   markTurnGenerating,
@@ -126,6 +129,9 @@ describe("Diary conversation persistence flow", () => {
     await expect(listDueDiaryBrainCheckpointIds(db, account.id, new Date())).resolves.toEqual([
       checkpoint?.id,
     ]);
+    await expect(claimDueDiaryBrainCheckpointIds(db, account.id, new Date())).resolves.toEqual([
+      checkpoint?.id,
+    ]);
     const checkpointContext = await getDiaryBrainCheckpointContext(
       db,
       account.id,
@@ -159,7 +165,18 @@ describe("Diary conversation persistence flow", () => {
           },
         ],
       ),
-    ).resolves.toBe(true);
+    ).resolves.toEqual({
+      candidates: [
+        {
+          statement: "少し疲れていた",
+          sourceMessageIds: checkpointContext?.sourceMessageIds.slice(0, 1) ?? [],
+        },
+        {
+          statement: "散歩できた",
+          sourceMessageIds: checkpointContext?.sourceMessageIds.slice(1, 2) ?? [],
+        },
+      ],
+    });
     await expect(db.select().from(schema.brainItems)).resolves.toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -181,6 +198,27 @@ describe("Diary conversation persistence flow", () => {
     await expect(db.select().from(schema.brainItems)).resolves.toHaveLength(2);
     await expect(db.select().from(schema.brainItemEvidenceEdges)).resolves.toHaveLength(2);
     await expect(db.select().from(schema.brainItemAccessLabels)).resolves.toHaveLength(2);
+    await expect(db.select().from(schema.diaryBrainCheckpointItems)).resolves.toHaveLength(2);
+    await expect(
+      getDiaryBrainCheckpointDevelopmentNotification(db, account.id, checkpoint?.id ?? ""),
+    ).resolves.toEqual({
+      candidates: [
+        {
+          statement: "少し疲れていた",
+          sourceMessageIds: checkpointContext?.sourceMessageIds.slice(0, 1) ?? [],
+        },
+        {
+          statement: "散歩できた",
+          sourceMessageIds: checkpointContext?.sourceMessageIds.slice(1, 2) ?? [],
+        },
+      ],
+    });
+    await expect(
+      markDiaryBrainCheckpointDevelopmentNotificationSent(db, account.id, checkpoint?.id ?? ""),
+    ).resolves.toBe(true);
+    await expect(
+      getDiaryBrainCheckpointDevelopmentNotification(db, account.id, checkpoint?.id ?? ""),
+    ).resolves.toBeUndefined();
     await expect(markTurnDelivered(db, attached.turnId)).resolves.toBe(true);
     await expect(markTurnFailed(db, attached.turnId, "stale_delivery_failure")).resolves.toBe(
       false,
@@ -454,6 +492,37 @@ describe("Diary conversation persistence flow", () => {
       throughSequence: 4,
       dueAt: new Date(startedAt.getTime() + 30 * 60 * 1000),
     });
+
+    const claimedAt = new Date(startedAt.getTime() + 30 * 60 * 1000);
+    await expect(claimDueDiaryBrainCheckpointIds(db, account.id, claimedAt)).resolves.toEqual([
+      checkpoint?.id,
+    ]);
+    const lateSource = await storeLineTextSource(db, {
+      accountId: account.id,
+      eventId: "brain-hard-cap-late",
+      body: "発言5",
+      receivedAt: new Date(startedAt.getTime() + 31 * 60 * 1000),
+    });
+    await attachMessagesToTurn(db, account.id, [lateSource], 5, "test-model", "test-prompt");
+
+    await expect(
+      db
+        .select()
+        .from(schema.diaryBrainCheckpoints)
+        .orderBy(schema.diaryBrainCheckpoints.createdAt),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        id: checkpoint?.id,
+        fromSequence: 1,
+        throughSequence: 4,
+        status: "queued",
+      }),
+      expect.objectContaining({
+        fromSequence: 5,
+        throughSequence: 5,
+        status: "pending",
+      }),
+    ]);
   });
 
   it("最後の発言から10分間新着がなければBrain checkpointを起動する", async () => {

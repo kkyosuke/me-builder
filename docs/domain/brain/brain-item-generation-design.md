@@ -297,7 +297,7 @@ Brain Item生成はTurnごとの返信経路から分離します。未処理の
 - 最初の未処理user発言から30分経過した
 - assistant応答が`end_session = true`で明示終了を決めた
 
-実行時刻は「最初の未処理発言 + 30分」と「最後の未処理発言 + 10分」の早い方です。発言が続いても30分ごとに一度区切るため、Brain Itemが長時間作られない状態を避けます。
+実行時刻は「最初の未処理発言 + 30分」と「最後の未処理発言 + 10分」の早い方です。期限に到達したAlarmは対象範囲を`queued`として先に固定してからQueueへ投入します。その後に届いた発言は新しい`pending`チェックポイントへ入るため、AI処理中や再試行中の発言によって30分の上限が後ろへ伸びることはありません。
 
 6時間無操作と24時間上限はConversation Sessionを閉じる境界であり、Brain Item生成を待つための時間ではありません。Session境界には、会話文脈・順序・返信率の集計範囲を限定し、無期限に会話を伸ばさない役割があります。Brain Item生成はより短いチェックポイントで進むため、一覧など後続UIから早い段階で利用できます。
 
@@ -312,6 +312,7 @@ sequenceDiagram
 
     U->>AD: user message + Source Record
     AD->>AD: checkpointを作成・延長
+    A->>AD: 期限到来範囲をqueuedとして固定
     A->>Q: account ID + checkpoint ID
     Q->>W: IDのみを配送
     W->>AD: checkpoint範囲の会話を再読込
@@ -322,11 +323,11 @@ sequenceDiagram
     AD-->>W: atomic commit
 ```
 
-Queueには本文を含めず、Account IDとcheckpoint IDだけを渡します。WorkerはAccountDataから会話を読み直し、Brain Item、Evidence edge、Access Label、チェックポイント完了を同じtransactionで保存します。Queueの重複配送では完了済みチェックポイントを再適用しません。
+Queueには本文を含めず、Account IDとcheckpoint IDだけを渡します。WorkerはAccountDataから会話を読み直し、Brain Item、Evidence edge、Access Label、チェックポイントと実際に保存したItemの対応、チェックポイント完了を同じtransactionで保存します。AccountDataはalarm、user message取込、Queueからの適用をAccount単位で直列化し、Queueの重複・並行配送でも完了済みチェックポイントを再適用しません。
 
-AI生成やschema検証が一時失敗した場合はチェックポイントを未処理のまま再試行します。安全経路へ切り替えた場合、またはAIが有効な候補なしと正常に判断した場合は0件でチェックポイントを完了します。いずれの場合もSource Recordと通常の会話応答は保持され、会話返信の成功・配送状態はBrain Itemの登録条件にしません。
+AI生成やschema検証が一時失敗した場合は`queued`のまま再試行します。AI設定がない場合に0件を正常扱いできるのはlocal / test環境だけで、本番相当環境では失敗として再試行します。安全経路へ切り替えた場合、またはAIが有効な候補なしと正常に判断した場合は0件でチェックポイントを完了します。いずれの場合もSource Recordと通常の会話応答は保持され、会話返信の成功・配送状態はBrain Itemの登録条件にしません。
 
-`pending`はBrain Itemの状態ではなく、未処理チェックポイントの処理状態です。生成されたBrain Itemは本人確認を待たず最初から`active`です。dev / development / local環境だけは、バックグラウンド処理後に追加したItemとEvidence message IDを確認用LINE Pushで通知します。本番の会話にはこの通知を出しません。
+`pending`と`queued`はBrain Itemの状態ではなく、それぞれ「新着で延長可能」「対象範囲を固定済み」のチェックポイント処理状態です。生成されたBrain Itemは本人確認を待たず最初から`active`です。dev / development / local環境だけは、AI候補ではなく実際に保存したItemとEvidence message ID（0件なら追加なし）を確認用LINE Pushで通知します。適用後にPushだけ失敗した場合は保存済みの対応から同じ通知を再構築し、同じretry keyで再送します。本番の会話にはこの通知を出しません。
 
 ### 7.4 本人の訂正・否定
 
@@ -364,15 +365,15 @@ AIの意味的重複判定だけで既存Itemを上書きしません。同義�
 
 日記チャットで実装済みの範囲:
 
-- 10分無操作、30分上限、明示終了によるチェックポイント作成・延長・起動
+- 10分無操作、30分上限、明示終了によるチェックポイント作成・延長・範囲固定・起動
 - AccountData alarmからIDのみを渡すQueue処理
 - 抽出専用`brain_item_candidates`出力schema
 - 通常安全route、`Memory`、非推定、1チェックポイント最大3件への制限
 - 候補のAccount・チェックポイント範囲・Evidence・安全性検証
 - Brain Item、Evidence、Access Label、チェックポイント完了を一括保存するAccountData action
 - Brain ItemとAccess LabelからConfirmationを除くschema migrationと既存projectionの追従
-- Queue再配送時にBrain Itemを重複作成しない冪等性
-- dev / development / local環境の処理後Pushに、追加したItemとEvidence message IDを表示
+- Account単位の直列化とcheckpoint状態によって、Queueの並行・再配送時にBrain Itemを重複作成しない冪等性
+- dev / development / local環境の処理後Pushに、実際に追加したItemとEvidence message ID、または追加なしを表示し、Push失敗だけを再送
 
 次は未実装です。
 

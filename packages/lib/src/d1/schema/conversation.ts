@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 import { accounts } from "./account";
 import { baseSchema } from "./base";
+import { brainItems } from "./brain";
 import { sourceRecords } from "./source";
 
 /** D1に保存するテキスト原本。 */
@@ -135,16 +136,38 @@ export const diaryBrainCheckpoints = sqliteTable(
     lastMessageAt: integer("last_message_at", { mode: "timestamp" }).notNull(),
     dueAt: integer("due_at", { mode: "timestamp" }).notNull(),
     nextAttemptAt: integer("next_attempt_at", { mode: "timestamp" }).notNull(),
-    status: text("status", { enum: ["pending", "applied"] })
+    status: text("status", { enum: ["pending", "queued", "applied"] })
       .notNull()
       .default("pending"),
     attemptCount: integer("attempt_count").notNull().default(0),
     appliedAt: integer("applied_at", { mode: "timestamp" }),
+    developmentNotificationSentAt: integer("development_notification_sent_at", {
+      mode: "timestamp",
+    }),
   },
   (table) => [
     uniqueIndex("diary_brain_checkpoint_pending_session_idx")
       .on(table.sessionId)
       .where(sql`${table.status} = 'pending' AND ${table.isDeleted} = 0`),
     index("diary_brain_checkpoint_due_idx").on(table.status, table.nextAttemptAt, table.isDeleted),
+  ],
+);
+
+/** checkpointから実際に作成したBrain Item。dev通知と監査で保存結果を再取得する。 */
+export const diaryBrainCheckpointItems = sqliteTable(
+  "diary_brain_checkpoint_items",
+  {
+    ...baseSchema,
+    checkpointId: text("checkpoint_id")
+      .notNull()
+      .references(() => diaryBrainCheckpoints.id),
+    brainItemId: text("brain_item_id")
+      .notNull()
+      .references(() => brainItems.id),
+    position: integer("position").notNull(),
+  },
+  (table) => [
+    uniqueIndex("diary_brain_checkpoint_item_position_idx").on(table.checkpointId, table.position),
+    uniqueIndex("diary_brain_checkpoint_item_brain_idx").on(table.brainItemId),
   ],
 );

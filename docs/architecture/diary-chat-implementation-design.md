@@ -144,9 +144,11 @@ erDiagram
     conversation_sessions ||--o{ conversation_messages : contains
     conversation_sessions ||--o{ chat_turns : processes
     conversation_sessions ||--o{ diary_brain_checkpoints : checkpoints
+    diary_brain_checkpoints ||--o{ diary_brain_checkpoint_items : produced
     source_records ||--|| source_record_text_payloads : stores
     source_records ||--o| conversation_messages : appears_as
     accounts ||--o{ brain_items : owns
+    brain_items ||--o| diary_brain_checkpoint_items : maps
     brain_items ||--o{ vector_index_jobs : indexes
     brain_items ||--o{ brain_item_evidence_edges : has
     source_records ||--o{ brain_item_evidence_edges : evidence
@@ -271,11 +273,14 @@ prompt本文、Context Package、未検証のモデル出力は保存しませ�
 | `from_sequence`, `through_sequence` | yes | 未変換会話の範囲 |
 | `first_message_at`, `last_message_at` | yes | 起動時刻を決める基準 |
 | `due_at`, `next_attempt_at` | yes | 初回期限とQueue再投入可能時刻 |
-| `status` | yes | `pending`: 未処理、`applied`: 適用済み |
+| `status` | yes | `pending`: 新着で延長可能、`queued`: 範囲固定・処理待ち、`applied`: 適用済み |
 | `attempt_count`, `applied_at` | yes / no | Queue投入回数と適用完了時刻 |
+| `development_notification_sent_at` | no | 開発環境の確認Push完了時刻 |
 | `created_at`, `updated_at`, `deleted_at`, `is_deleted` | yes / no / yes | lifecycle |
 
-同じSessionの`pending`は最大1件とします。新しいuser messageをTurnへ取り込むtransactionで範囲と期限を更新し、明示終了時は期限を現在時刻へ進めます。Alarmは期限到来したIDをQueueへ送り、再投入可能時刻を先へ進めます。WorkerはAccountDataから範囲を読み直し、Brain Item一式と`applied`への遷移を同じtransactionで確定します。AIの一時失敗では`pending`を維持し、正常な0件判定では`applied`へ進めます。
+同じSessionの`pending`は最大1件とします。新しいuser messageをTurnへ取り込むtransactionで範囲と期限を更新し、明示終了時は期限を現在時刻へ進めます。Alarmは期限到来したcheckpointを`queued`へ遷移させて範囲を固定し、再投入可能時刻を進めてからIDをQueueへ送ります。以後のuser messageは新しい`pending`へ入ります。WorkerはAccountDataから固定範囲を読み直し、Brain Item一式、`diary_brain_checkpoint_items`、`applied`への遷移を同じtransactionで確定します。AIの一時失敗では`queued`を維持し、正常な0件判定では`applied`へ進めます。AlarmとRPC actionはAccountData Object内で直列化します。
+
+`diary_brain_checkpoint_items`はcheckpointと実際に保存されたBrain Itemを生成順に結ぶ永続的な対応表です。開発環境の確認Pushはこの対応とEvidence edgeから内容を再構築します。Brain Item適用後にPushだけ失敗しても、Queue再配送でItemを再生成せず通知だけを同じretry keyで再送します。
 
 ### 4.7 Brain Item関連
 
@@ -355,6 +360,7 @@ AccountData、Queue、LINEを呼び出した後は、Turn ID、generation epoch�
 - `conversation_messages(channel, channel_event_id)` unique
 - `chat_turns(status, created_at)`と`chat_turns(session_id, through_sequence)`
 - `diary_brain_checkpoints(account_id, status, next_attempt_at)`と`session_id`ごとの`pending`部分一意index
+- `diary_brain_checkpoint_items(checkpoint_id, position)` uniqueと`brain_item_id` unique
 - DOの`accepted_messages(status, received_at)`、`delivery_outbox(status, deadline_at)`、`delivery_outbox(turn_id, generation_epoch)`
 - `brain_items(account_id, status, category)`
 - `brain_item_evidence_edges(brain_item_id)`と`(source_record_id)`

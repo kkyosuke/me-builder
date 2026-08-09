@@ -16,6 +16,7 @@ const accountDataSchema = {
   chatTurns: d1.schema.chatTurns,
   conversationMessages: d1.schema.conversationMessages,
   conversationSessions: d1.schema.conversationSessions,
+  diaryBrainCheckpointItems: d1.schema.diaryBrainCheckpointItems,
   diaryBrainCheckpoints: d1.schema.diaryBrainCheckpoints,
   sourceRecordTextPayloads: d1.schema.sourceRecordTextPayloads,
   diagnoses: d1.schema.diagnoses,
@@ -394,7 +395,7 @@ export class AccountDataRepository {
       .from(d1.schema.diaryBrainCheckpoints)
       .where(
         and(
-          eq(d1.schema.diaryBrainCheckpoints.status, "pending"),
+          inArray(d1.schema.diaryBrainCheckpoints.status, ["pending", "queued"]),
           eq(d1.schema.diaryBrainCheckpoints.isDeleted, false),
         ),
       )

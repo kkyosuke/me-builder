@@ -90,5 +90,6 @@ describe("Diary chat D1 schema", () => {
     expect("accountId" in schema.sourceRecordTextPayloads).toBe(false);
     expect("accountId" in schema.conversationMessages).toBe(false);
     expect("accountId" in schema.chatTurns).toBe(false);
+    expect("accountId" in schema.diaryBrainCheckpointItems).toBe(false);
   });
 });

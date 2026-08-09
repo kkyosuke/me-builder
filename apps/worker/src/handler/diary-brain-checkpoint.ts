@@ -20,6 +20,13 @@ export async function processDiaryBrainCheckpointMessage(
     message.body.checkpointId,
   );
   if (!context) {
+    await sendDevelopmentNotification(
+      accountData,
+      message.body.accountId,
+      message.body.checkpointId,
+      cf,
+      workerConfig,
+    );
     message.ack();
     return;
   }
@@ -46,16 +53,45 @@ export async function processDiaryBrainCheckpointMessage(
     return;
   }
 
-  const developmentMessage = buildDevelopmentBrainItemMessage(candidates, workerConfig.environment);
+  await sendDevelopmentNotification(
+    accountData,
+    message.body.accountId,
+    context.checkpointId,
+    cf,
+    workerConfig,
+    applied,
+  );
+  message.ack();
+}
+
+async function sendDevelopmentNotification(
+  accountData: ReturnType<typeof accountDataFor>,
+  accountId: string,
+  checkpointId: string,
+  cf: CloudflareBindings,
+  workerConfig: WorkerConfig,
+  appliedResult?: {
+    candidates: readonly { statement: string; sourceMessageIds: readonly string[] }[];
+  },
+): Promise<void> {
+  if (!["dev", "development", "local"].includes(workerConfig.environment)) return;
+  const result =
+    appliedResult ??
+    (await accountData.execute(
+      "conversation.getDiaryBrainCheckpointDevelopmentNotification",
+      checkpointId,
+    ));
+  if (!result) return;
+  const developmentMessage = buildDevelopmentBrainItemMessage(
+    result.candidates,
+    workerConfig.environment,
+  );
   if (
     developmentMessage &&
     workerConfig.lineChannelAccessToken &&
     workerConfig.chatDeliverySecret
   ) {
-    const providerAccountId = await d1.action.account.findLineIdentityByAccountId(
-      cf.d1,
-      message.body.accountId,
-    );
+    const providerAccountId = await d1.action.account.findLineIdentityByAccountId(cf.d1, accountId);
     if (providerAccountId) {
       await pushLineTextWithRetryKey({
         channelAccessToken: workerConfig.lineChannelAccessToken,
@@ -63,10 +99,13 @@ export async function processDiaryBrainCheckpointMessage(
         text: developmentMessage,
         retryKey: await createLineRetryKey(
           workerConfig.chatDeliverySecret,
-          `diary-brain:${context.checkpointId}`,
+          `diary-brain:${checkpointId}`,
         ),
       });
+      await accountData.execute(
+        "conversation.markDiaryBrainCheckpointDevelopmentNotificationSent",
+        checkpointId,
+      );
     }
   }
-  message.ack();
 }

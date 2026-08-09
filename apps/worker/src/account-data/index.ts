@@ -27,6 +27,7 @@ export class AccountData extends DurableObject<Env> {
   private readonly accountId: string;
   private readonly repository: AccountDataRepository;
   private legacyImport: Promise<void> | undefined;
+  private operationTail: Promise<void> = Promise.resolve();
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -45,60 +46,59 @@ export class AccountData extends DurableObject<Env> {
     operation: TOperation,
     ...args: AccountDataArgs<TOperation>
   ): Promise<AccountDataResult<TOperation>> {
-    if (typeof accountId !== "string" || accountId.length === 0) {
-      throw new Error("AccountData account is required");
-    }
-    if (accountId !== this.accountId) {
-      throw new Error("AccountData RPC account does not match object name");
-    }
-    const action = (actions as Partial<Record<AccountDataOperation, unknown>>)[operation];
-    if (typeof action !== "function") throw new Error("Unsupported AccountData operation");
-    const boundAction = action as (
-      db: d1.Client,
-      boundAccountId: string,
-      ...actionArgs: AccountDataArgs<TOperation>
-    ) => Promise<AccountDataResult<TOperation>>;
+    return this.runExclusive(async () => {
+      if (typeof accountId !== "string" || accountId.length === 0) {
+        throw new Error("AccountData account is required");
+      }
+      if (accountId !== this.accountId) {
+        throw new Error("AccountData RPC account does not match object name");
+      }
+      const action = (actions as Partial<Record<AccountDataOperation, unknown>>)[operation];
+      if (typeof action !== "function") throw new Error("Unsupported AccountData operation");
+      const boundAction = action as (
+        db: d1.Client,
+        boundAccountId: string,
+        ...actionArgs: AccountDataArgs<TOperation>
+      ) => Promise<AccountDataResult<TOperation>>;
 
-    this.repository.bindAccount(accountId);
-    if (!this.legacyImport) this.legacyImport = this.importLegacyAccountData(accountId);
-    try {
-      await this.legacyImport;
-    } catch (error) {
-      this.legacyImport = undefined;
-      throw error;
-    }
-    if (operation.startsWith("diagnosis")) await this.syncDiagnosisCatalog();
+      this.repository.bindAccount(accountId);
+      if (!this.legacyImport) this.legacyImport = this.importLegacyAccountData(accountId);
+      try {
+        await this.legacyImport;
+      } catch (error) {
+        this.legacyImport = undefined;
+        throw error;
+      }
+      if (operation.startsWith("diagnosis")) await this.syncDiagnosisCatalog();
 
-    const result = await boundAction(this.repository.client, accountId, ...args);
-    await this.scheduleMaintenance();
-    return result;
+      const result = await boundAction(this.repository.client, accountId, ...args);
+      await this.scheduleMaintenance();
+      return result;
+    });
   }
 
   async alarm(): Promise<void> {
-    await d1.action.conversation.closeExpiredSessions(this.repository.client);
-    await d1.action.diagnosisBrainProjection.processPendingDiagnosisBrainProjections(
-      this.repository.client,
-    );
-    const checkpointIds = await d1.action.conversation.listDueDiaryBrainCheckpointIds(
-      this.repository.client,
-      this.accountId,
-    );
-    if (checkpointIds.length > 0 && !this.env.CHAT_TURN_QUEUE) {
-      throw new Error("CHAT_TURN_QUEUE binding is required for diary Brain checkpoints");
-    }
-    for (const checkpointId of checkpointIds) {
-      await this.env.CHAT_TURN_QUEUE?.send({
-        type: "diary-brain-checkpoint",
-        accountId: this.accountId,
-        checkpointId,
-      });
-      await d1.action.conversation.deferDiaryBrainCheckpoint(
+    await this.runExclusive(async () => {
+      await d1.action.conversation.closeExpiredSessions(this.repository.client);
+      await d1.action.diagnosisBrainProjection.processPendingDiagnosisBrainProjections(
+        this.repository.client,
+      );
+      const checkpointIds = await d1.action.conversation.claimDueDiaryBrainCheckpointIds(
         this.repository.client,
         this.accountId,
-        checkpointId,
       );
-    }
-    await this.scheduleMaintenance();
+      if (checkpointIds.length > 0 && !this.env.CHAT_TURN_QUEUE) {
+        throw new Error("CHAT_TURN_QUEUE binding is required for diary Brain checkpoints");
+      }
+      for (const checkpointId of checkpointIds) {
+        await this.env.CHAT_TURN_QUEUE?.send({
+          type: "diary-brain-checkpoint",
+          accountId: this.accountId,
+          checkpointId,
+        });
+      }
+      await this.scheduleMaintenance();
+    });
   }
 
   private async syncDiagnosisCatalog(): Promise<void> {
@@ -319,5 +319,19 @@ export class AccountData extends DurableObject<Env> {
     if (desired === null) return;
     const current = await this.ctx.storage.getAlarm();
     if (current === null || desired < current) await this.ctx.storage.setAlarm(desired);
+  }
+
+  private async runExclusive<TResult>(operation: () => Promise<TResult>): Promise<TResult> {
+    const previous = this.operationTail;
+    let release: () => void = () => undefined;
+    this.operationTail = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await previous;
+    try {
+      return await operation();
+    } finally {
+      release();
+    }
   }
 }

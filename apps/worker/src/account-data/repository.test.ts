@@ -50,6 +50,7 @@ describe("AccountDataRepository", () => {
       "source_record_revisions",
       "conversation_messages",
       "chat_turns",
+      "diary_brain_checkpoint_items",
       "diagnosis_answers",
       "diagnosis_deferred_questions",
       "diagnosis_brain_projection_requests",

@@ -9,6 +9,7 @@ import {
   chatTurns,
   conversationMessages,
   conversationSessions,
+  diaryBrainCheckpointItems,
   diaryBrainCheckpoints,
   sourceRecordTextPayloads,
   sourceRecords,
@@ -517,6 +518,10 @@ export type DiaryBrainCheckpointCandidate = Readonly<{
   sourceMessageIds: readonly string[];
 }>;
 
+export type DiaryBrainCheckpointApplyResult = Readonly<{
+  candidates: readonly DiaryBrainCheckpointCandidate[];
+}>;
+
 /** Alarm時点で期限を迎えたcheckpointをQueue投入対象として返す。 */
 export async function listDueDiaryBrainCheckpointIds(
   db: D1Client,
@@ -529,7 +534,7 @@ export async function listDueDiaryBrainCheckpointIds(
     .where(
       and(
         eq(diaryBrainCheckpoints.accountId, accountId),
-        eq(diaryBrainCheckpoints.status, "pending"),
+        inArray(diaryBrainCheckpoints.status, ["pending", "queued"]),
         lte(diaryBrainCheckpoints.nextAttemptAt, at),
         eq(diaryBrainCheckpoints.isDeleted, false),
       ),
@@ -540,27 +545,37 @@ export async function listDueDiaryBrainCheckpointIds(
   return rows.map(({ id }) => id);
 }
 
-/** Queueの重複投入を抑えつつ、未完了jobを30秒後に再投入可能にする。 */
-export async function deferDiaryBrainCheckpoint(
+/** 期限到来した範囲をsealし、Queue投入対象としてclaimする。 */
+export async function claimDueDiaryBrainCheckpointIds(
   db: D1Client,
   accountId: string,
-  checkpointId: string,
   at = new Date(),
-): Promise<void> {
-  await db
-    .update(diaryBrainCheckpoints)
-    .set({
-      nextAttemptAt: new Date(at.getTime() + 30_000),
-      attemptCount: sql`${diaryBrainCheckpoints.attemptCount} + 1`,
-      updatedAt: at,
-    })
-    .where(
-      and(
-        eq(diaryBrainCheckpoints.id, checkpointId),
-        eq(diaryBrainCheckpoints.accountId, accountId),
-        eq(diaryBrainCheckpoints.status, "pending"),
-      ),
-    );
+): Promise<string[]> {
+  const dueIds = await listDueDiaryBrainCheckpointIds(db, accountId, at);
+  const claimedIds: string[] = [];
+  for (const checkpointId of dueIds) {
+    const rows = await db
+      .update(diaryBrainCheckpoints)
+      .set({
+        status: "queued",
+        nextAttemptAt: new Date(at.getTime() + 30_000),
+        attemptCount: sql`${diaryBrainCheckpoints.attemptCount} + 1`,
+        updatedAt: at,
+      })
+      .where(
+        and(
+          eq(diaryBrainCheckpoints.id, checkpointId),
+          eq(diaryBrainCheckpoints.accountId, accountId),
+          inArray(diaryBrainCheckpoints.status, ["pending", "queued"]),
+          lte(diaryBrainCheckpoints.nextAttemptAt, at),
+          eq(diaryBrainCheckpoints.isDeleted, false),
+        ),
+      )
+      .returning({ id: diaryBrainCheckpoints.id })
+      .all();
+    if (rows[0]) claimedIds.push(rows[0].id);
+  }
+  return claimedIds;
 }
 
 /** AI変換用に、checkpoint範囲の会話だけをAccount所有権付きで返す。 */
@@ -585,7 +600,7 @@ export async function getDiaryBrainCheckpointContext(
       and(
         eq(diaryBrainCheckpoints.id, checkpointId),
         eq(diaryBrainCheckpoints.accountId, accountId),
-        eq(diaryBrainCheckpoints.status, "pending"),
+        eq(diaryBrainCheckpoints.status, "queued"),
         eq(diaryBrainCheckpoints.isDeleted, false),
       ),
     )
@@ -638,7 +653,7 @@ export async function applyDiaryBrainCheckpoint(
   promptVersion: string,
   candidates: readonly DiaryBrainCheckpointCandidate[],
   at = new Date(),
-): Promise<boolean> {
+): Promise<DiaryBrainCheckpointApplyResult | false> {
   const context = await getDiaryBrainCheckpointContext(db, accountId, checkpointId);
   if (!context || context.throughSequence !== expectedThroughSequence) return false;
   const checkpoint = await db
@@ -648,7 +663,8 @@ export async function applyDiaryBrainCheckpoint(
     .get();
   if (!checkpoint) return false;
   const statements: BatchItem<"sqlite">[] = [];
-  for (const candidate of candidates.slice(0, 3)) {
+  const appliedCandidates: DiaryBrainCheckpointCandidate[] = [];
+  for (const [position, candidate] of candidates.slice(0, 3).entries()) {
     const messageIds = [...new Set(candidate.sourceMessageIds)];
     if (
       !candidate.statement.trim() ||
@@ -726,7 +742,18 @@ export async function applyDiaryBrainCheckpoint(
         label: "diary",
         ...lifecycle,
       }),
+      db.insert(diaryBrainCheckpointItems).values({
+        id: crypto.randomUUID(),
+        checkpointId,
+        brainItemId,
+        position,
+        ...lifecycle,
+      }),
     );
+    appliedCandidates.push({
+      statement: candidate.statement.trim(),
+      sourceMessageIds: messageIds,
+    });
   }
   statements.push(
     db
@@ -736,7 +763,7 @@ export async function applyDiaryBrainCheckpoint(
         and(
           eq(diaryBrainCheckpoints.id, checkpointId),
           eq(diaryBrainCheckpoints.accountId, accountId),
-          eq(diaryBrainCheckpoints.status, "pending"),
+          eq(diaryBrainCheckpoints.status, "queued"),
           eq(diaryBrainCheckpoints.throughSequence, expectedThroughSequence),
         ),
       ),
@@ -744,7 +771,85 @@ export async function applyDiaryBrainCheckpoint(
   const [first, ...rest] = statements;
   if (!first) return false;
   await db.batch([first, ...rest]);
-  return true;
+  return { candidates: appliedCandidates };
+}
+
+/** 未送信のdev通知向けに、実際に保存したItemとEvidence message IDを返す。 */
+export async function getDiaryBrainCheckpointDevelopmentNotification(
+  db: D1Client,
+  accountId: string,
+  checkpointId: string,
+): Promise<DiaryBrainCheckpointApplyResult | undefined> {
+  const checkpoint = await db
+    .select({ id: diaryBrainCheckpoints.id })
+    .from(diaryBrainCheckpoints)
+    .where(
+      and(
+        eq(diaryBrainCheckpoints.id, checkpointId),
+        eq(diaryBrainCheckpoints.accountId, accountId),
+        eq(diaryBrainCheckpoints.status, "applied"),
+        isNull(diaryBrainCheckpoints.developmentNotificationSentAt),
+        eq(diaryBrainCheckpoints.isDeleted, false),
+      ),
+    )
+    .get();
+  if (!checkpoint) return undefined;
+  const items = await db
+    .select({ brainItemId: brainItems.id, statement: brainItems.statement })
+    .from(diaryBrainCheckpointItems)
+    .innerJoin(brainItems, eq(diaryBrainCheckpointItems.brainItemId, brainItems.id))
+    .where(
+      and(
+        eq(diaryBrainCheckpointItems.checkpointId, checkpointId),
+        eq(diaryBrainCheckpointItems.isDeleted, false),
+        eq(brainItems.accountId, accountId),
+      ),
+    )
+    .orderBy(diaryBrainCheckpointItems.position)
+    .all();
+  const result: DiaryBrainCheckpointCandidate[] = [];
+  for (const item of items) {
+    const messages = await db
+      .select({ id: conversationMessages.id })
+      .from(brainItemEvidenceEdges)
+      .innerJoin(
+        conversationMessages,
+        eq(brainItemEvidenceEdges.sourceRecordId, conversationMessages.sourceRecordId),
+      )
+      .where(
+        and(
+          eq(brainItemEvidenceEdges.brainItemId, item.brainItemId),
+          eq(brainItemEvidenceEdges.accountId, accountId),
+          eq(brainItemEvidenceEdges.isDeleted, false),
+        ),
+      )
+      .orderBy(conversationMessages.sequence)
+      .all();
+    result.push({ statement: item.statement, sourceMessageIds: messages.map(({ id }) => id) });
+  }
+  return { candidates: result };
+}
+
+export async function markDiaryBrainCheckpointDevelopmentNotificationSent(
+  db: D1Client,
+  accountId: string,
+  checkpointId: string,
+  at = new Date(),
+): Promise<boolean> {
+  const updated = await db
+    .update(diaryBrainCheckpoints)
+    .set({ developmentNotificationSentAt: at, updatedAt: at })
+    .where(
+      and(
+        eq(diaryBrainCheckpoints.id, checkpointId),
+        eq(diaryBrainCheckpoints.accountId, accountId),
+        eq(diaryBrainCheckpoints.status, "applied"),
+        isNull(diaryBrainCheckpoints.developmentNotificationSentAt),
+      ),
+    )
+    .returning({ id: diaryBrainCheckpoints.id })
+    .all();
+  return updated.length > 0;
 }
 
 export async function markTurnGenerating(db: D1Client, turnId: string): Promise<boolean> {

@@ -62,7 +62,11 @@ export async function generateDiaryBrainCandidates(
   workerConfig: WorkerConfig,
 ): Promise<DiaryBrainCandidate[] | undefined> {
   if (classifySafety(messages, [...sourceMessageIds]) !== "normal") return [];
-  if (!workerConfig.googleAiStudioApiKey || !workerConfig.cloudflareAiGatewayToken) return [];
+  if (!workerConfig.googleAiStudioApiKey || !workerConfig.cloudflareAiGatewayToken) {
+    return ["dev", "development", "local", "test"].includes(workerConfig.environment)
+      ? []
+      : undefined;
+  }
   const client = createGeminiClient({
     googleAiStudioApiKey: workerConfig.googleAiStudioApiKey,
     cloudflareAiGatewayToken: workerConfig.cloudflareAiGatewayToken,
@@ -89,7 +93,7 @@ export async function generateDiaryBrainCandidates(
 }
 
 export function buildDevelopmentBrainItemMessage(
-  candidates: readonly DiaryBrainCandidate[],
+  candidates: readonly { statement: string; sourceMessageIds: readonly string[] }[],
   environment: string,
 ): string | undefined {
   if (!["dev", "development", "local"].includes(environment)) return undefined;
@@ -99,7 +103,7 @@ export function buildDevelopmentBrainItemMessage(
       : candidates
           .map(
             (candidate, index) =>
-              `- ${index + 1}. Memory: ${candidate.statement} (evidence: ${candidate.source_message_ids.join(", ")})`,
+              `- ${index + 1}. Memory: ${candidate.statement} (evidence: ${candidate.sourceMessageIds.join(", ")})`,
           )
           .join("\n");
   return `[dev] 追加したBrain Item\n${summary}`;
