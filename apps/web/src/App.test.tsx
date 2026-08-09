@@ -28,6 +28,7 @@ const mocks = vi.hoisted(() => ({
   resetDevelopmentDiagnosisData: vi.fn(),
   restoreDiagnosisProgress: vi.fn(),
   fetchProfileSummary: vi.fn(),
+  fetchDevelopmentBrainItems: vi.fn(),
 }));
 
 vi.mock("./config", () => ({
@@ -50,6 +51,9 @@ vi.mock("./feature/diagnosis/model/answers", () => ({
 }));
 vi.mock("./feature/profile/infrastructure/profile-api", () => ({
   fetchProfileSummary: mocks.fetchProfileSummary,
+}));
+vi.mock("./feature/brain/infrastructure/brain-api", () => ({
+  fetchDevelopmentBrainItems: mocks.fetchDevelopmentBrainItems,
 }));
 vi.mock("./feature/diagnosis/presentation/components/swipe-diagnosis", () => ({
   SwipeDiagnosis: ({
@@ -194,6 +198,27 @@ describe("App", () => {
       },
       nextAction: "diagnosis",
     });
+    mocks.fetchDevelopmentBrainItems.mockResolvedValue({
+      items: [
+        {
+          id: "brain-1",
+          category: "memory",
+          statement: "公園を散歩した",
+          derivation: "ai",
+          status: "active",
+          createdAt: "2026-08-09T00:00:00.000Z",
+          evidence: [
+            {
+              sourceRecordId: "source-1",
+              relation: "supports",
+              derivationMethod: "ai",
+              generatedAt: "2026-08-09T00:00:01.000Z",
+            },
+          ],
+        },
+      ],
+      truncated: false,
+    });
     mocks.restoreDiagnosisProgress.mockImplementation(
       (_questions: DiagnosisDefinition["questions"], answers: DiagnosisResult["answers"]) => ({
         answers: answers.map((answer) => ({
@@ -312,6 +337,13 @@ describe("App", () => {
       "dummy.id.token",
       expect.any(AbortSignal),
     );
+    expect(await screen.findByRole("heading", { name: "Brain Item一覧" })).toBeTruthy();
+    expect(screen.getByText("公園を散歩した")).toBeTruthy();
+    expect(mocks.fetchDevelopmentBrainItems).toHaveBeenCalledWith(
+      "https://api.example.com",
+      "dummy.id.token",
+      expect.any(AbortSignal),
+    );
     expect(mocks.fetchDiagnosisList).not.toHaveBeenCalled();
   });
 
@@ -336,6 +368,18 @@ describe("App", () => {
     expect(await screen.findByRole("heading", { name: "見通しを持って動く" })).toBeTruthy();
     expect(mocks.initializeLiff).toHaveBeenCalledTimes(1);
     expect(mocks.fetchProfileSummary).toHaveBeenCalledTimes(1);
+    expect(mocks.fetchDevelopmentBrainItems).toHaveBeenCalledTimes(1);
+  });
+
+  it("productionのわたし画面ではBrain Item一覧を取得も表示もしない", async () => {
+    mocks.config.environment = "production";
+    window.history.replaceState({}, "", "/me");
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "わたしのまとめ" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Brain Item一覧" })).toBeNull();
+    expect(mocks.fetchDevelopmentBrainItems).not.toHaveBeenCalled();
   });
 
   it("/diagnosisでは診断一覧を表示する", async () => {
@@ -670,7 +714,7 @@ describe("App", () => {
     expect(await screen.findByRole("heading", { name: heading })).toBeTruthy();
   });
 
-  it("一覧取得失敗後の再試行でLIFF初期化と一覧取得を同じ順序で再実行する", async () => {
+  it("一覧取得失敗後の再試行では初期化済みLIFFを再利用する", async () => {
     mocks.fetchDiagnosisList
       .mockRejectedValueOnce(new Error("network down"))
       .mockResolvedValueOnce([diagnosis()]);
@@ -681,7 +725,7 @@ describe("App", () => {
     fireEvent.click(retry);
 
     expect(await screen.findByRole("button", { name: /テスト診断/ })).toBeTruthy();
-    expect(mocks.initializeLiff).toHaveBeenCalledTimes(2);
+    expect(mocks.initializeLiff).toHaveBeenCalledTimes(1);
     expect(mocks.fetchDiagnosisList).toHaveBeenCalledTimes(2);
     expect(mocks.fetchDiagnosisDefinition).not.toHaveBeenCalled();
   });

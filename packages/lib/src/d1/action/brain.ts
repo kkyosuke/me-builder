@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import type { D1Client } from "../client";
 import {
   brainItemAccessLabels,
@@ -40,6 +40,26 @@ export type SaveBrainItemResult =
         | "source-account-mismatch"
         | "revision-account-mismatch";
     }>;
+
+const DEVELOPMENT_BRAIN_ITEM_LIMIT = 100;
+
+export type ActiveBrainItemList = Readonly<{
+  items: readonly Readonly<{
+    id: string;
+    category: string;
+    statement: string;
+    derivation: "ai" | "deterministic";
+    status: "active";
+    createdAt: Date;
+    evidence: readonly Readonly<{
+      sourceRecordId: string;
+      relation: "supports" | "contradicts";
+      derivationMethod: "ai" | "deterministic";
+      generatedAt: Date;
+    }>[];
+  }>[];
+  truncated: boolean;
+}>;
 
 function hasInvalidOrDuplicateLabels(labels: readonly { label: string }[]): boolean {
   const normalized = labels.map(({ label }) => label.trim());
@@ -162,4 +182,64 @@ export async function findBrainItemForAccount(
       ),
     )
     .get();
+}
+
+/** 開発用の確認画面へ、本人のactiveなBrain Itemと根拠関係だけを新しい順で返す。 */
+export async function listActiveBrainItems(
+  db: D1Client,
+  accountId: string,
+): Promise<ActiveBrainItemList> {
+  const rows = await db
+    .select({
+      id: brainItems.id,
+      category: brainItems.category,
+      statement: brainItems.statement,
+      derivation: brainItems.derivation,
+      status: brainItems.status,
+      createdAt: brainItems.createdAt,
+    })
+    .from(brainItems)
+    .where(
+      and(
+        eq(brainItems.accountId, accountId),
+        eq(brainItems.status, "active"),
+        eq(brainItems.isDeleted, false),
+      ),
+    )
+    .orderBy(desc(brainItems.createdAt), desc(brainItems.id))
+    .limit(DEVELOPMENT_BRAIN_ITEM_LIMIT + 1);
+  const truncated = rows.length > DEVELOPMENT_BRAIN_ITEM_LIMIT;
+  const items = rows.slice(0, DEVELOPMENT_BRAIN_ITEM_LIMIT);
+  const itemIds = items.map(({ id }) => id);
+  const evidenceRows =
+    itemIds.length === 0
+      ? []
+      : await db
+          .select({
+            brainItemId: brainItemEvidenceEdges.brainItemId,
+            sourceRecordId: brainItemEvidenceEdges.sourceRecordId,
+            relation: brainItemEvidenceEdges.relation,
+            derivationMethod: brainItemEvidenceEdges.derivationMethod,
+            generatedAt: brainItemEvidenceEdges.generatedAt,
+          })
+          .from(brainItemEvidenceEdges)
+          .where(
+            and(
+              eq(brainItemEvidenceEdges.accountId, accountId),
+              inArray(brainItemEvidenceEdges.brainItemId, itemIds),
+              eq(brainItemEvidenceEdges.isDeleted, false),
+            ),
+          )
+          .orderBy(brainItemEvidenceEdges.generatedAt, brainItemEvidenceEdges.id);
+
+  return {
+    items: items.map((item) => ({
+      ...item,
+      status: "active" as const,
+      evidence: evidenceRows
+        .filter(({ brainItemId }) => brainItemId === item.id)
+        .map(({ brainItemId: _, ...evidence }) => evidence),
+    })),
+    truncated,
+  };
 }

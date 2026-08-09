@@ -543,6 +543,186 @@
         }
       }
     },
+    "/api/dev/brain-items": {
+      "get": {
+        "operationId": "getDevelopmentBrainItems",
+        "tags": ["Development"],
+        "summary": "開発環境で本人のactive Brain Item一覧を取得する",
+        "security": [
+          {
+            "liffIdToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "本人のactive Brain ItemとEvidence",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "category": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "statement": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "derivation": {
+                            "enum": ["ai", "deterministic"],
+                            "type": "string"
+                          },
+                          "status": {
+                            "const": "active"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "evidence": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "sourceRecordId": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "relation": {
+                                  "enum": ["supports", "contradicts"],
+                                  "type": "string"
+                                },
+                                "derivationMethod": {
+                                  "enum": ["ai", "deterministic"],
+                                  "type": "string"
+                                },
+                                "generatedAt": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                }
+                              },
+                              "required": [
+                                "sourceRecordId",
+                                "relation",
+                                "derivationMethod",
+                                "generatedAt"
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "category",
+                          "statement",
+                          "derivation",
+                          "status",
+                          "createdAt",
+                          "evidence"
+                        ]
+                      }
+                    },
+                    "truncated": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["items", "truncated"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "LIFF IDトークンを検証できない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Unauthorized"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "開発環境ではない、または対応するAccountがない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "error": {
+                          "const": "Account not found"
+                        },
+                        "reason": {
+                          "const": "friendship_required"
+                        }
+                      },
+                      "required": ["error", "reason"]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "error": {
+                          "const": "Not Found"
+                        }
+                      },
+                      "required": ["error"]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "未処理のサーバーエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Internal Server Error"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "D1 bindingが設定されていない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Service Unavailable"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/diagnoses": {
       "get": {
         "operationId": "listDiagnoses",

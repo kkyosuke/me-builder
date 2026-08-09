@@ -5,7 +5,12 @@ import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { describe, expect, it } from "vitest";
 import type { D1Client } from "../client";
 import * as schema from "../schema";
-import { type SaveBrainItemInput, findBrainItemForAccount, saveBrainItem } from "./brain";
+import {
+  type SaveBrainItemInput,
+  findBrainItemForAccount,
+  listActiveBrainItems,
+  saveBrainItem,
+} from "./brain";
 
 function createTestDb(): D1Client {
   const sqlite = new Database(":memory:");
@@ -139,5 +144,57 @@ describe("findBrainItemForAccount", () => {
     await expect(
       findBrainItemForAccount(db, { accountId: "account-2", brainItemId: "brain-1" }),
     ).resolves.toBeUndefined();
+  });
+});
+
+describe("listActiveBrainItems", () => {
+  it("本人のactive ItemとEvidenceだけを新しい順で返す", async () => {
+    const db = createTestDb();
+    await insertAccountsAndSources(db);
+    await saveBrainItem(
+      db,
+      createInput({
+        at: new Date("2026-08-08T00:00:00Z"),
+        item: { ...createInput().item, id: "older-active", statement: "古い記憶" },
+      }),
+    );
+    await saveBrainItem(
+      db,
+      createInput({
+        at: new Date("2026-08-09T00:00:00Z"),
+        item: { ...createInput().item, id: "newer-active", statement: "新しい記憶" },
+        evidence: [
+          {
+            id: "newer-evidence",
+            sourceRecordId: "source-1",
+            relation: "supports",
+            isDerivationTrigger: true,
+            derivationMethod: "ai",
+            generatedAt: new Date("2026-08-09T00:00:00Z"),
+          },
+        ],
+        accessLabels: [{ id: "newer-access", label: "unclassified", assignedBy: "system" }],
+        topicLabels: [{ id: "newer-topic", label: "diary" }],
+      }),
+    );
+    await db.insert(schema.brainItems).values({
+      ...createInput().item,
+      id: "invalidated",
+      statement: "無効な記憶",
+      status: "invalidated",
+    });
+
+    await expect(listActiveBrainItems(db, "account-1")).resolves.toEqual({
+      items: [
+        expect.objectContaining({
+          id: "newer-active",
+          statement: "新しい記憶",
+          status: "active",
+          evidence: [expect.objectContaining({ sourceRecordId: "source-1", relation: "supports" })],
+        }),
+        expect.objectContaining({ id: "older-active", statement: "古い記憶" }),
+      ],
+      truncated: false,
+    });
   });
 });

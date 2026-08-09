@@ -378,6 +378,7 @@ AIの意味的重複判定だけで既存Itemを上書きしません。同義�
 - Brain ItemとAccess LabelからConfirmationを除くschema migrationと既存projectionの追従
 - Account単位の直列化とcheckpoint状態によって、Queueの並行・再配送時にBrain Itemを重複作成しない冪等性
 - dev / development / local環境の処理後Pushに、実際に追加したItemとEvidence message ID、または追加なしを表示し、Push失敗だけを再送
+- dev / development / local / preview / test環境の「わたしのまとめ」に、本人のactive ItemとEvidenceを新しい順で表示する確認一覧
 
 次は未実装です。
 
