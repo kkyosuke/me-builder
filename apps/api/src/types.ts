@@ -1,4 +1,3 @@
-import type { D1Database } from "@cloudflare/workers-types";
 import type { AccountDataNamespace, CompatibilityDataNamespace } from "@me-builder/lib";
 import type { AvatarQueueMessage, Queue, WebhookQueueMessage } from "@me-builder/shared";
 

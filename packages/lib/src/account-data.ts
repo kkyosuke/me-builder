@@ -82,6 +82,11 @@ export type AccountDataActions = {
     operation: AvatarQueueOperation,
     at?: Date,
   ) => Promise<void>;
+  "avatar.recordEnqueueFailure": (
+    jobId: string,
+    operation: AvatarQueueOperation,
+    at?: Date,
+  ) => Promise<void>;
   "avatar.startGeneration": (jobId: string, at?: Date) => Promise<StartAvatarGenerationResult>;
   "avatar.cancelJob": (jobId: string, at?: Date) => Promise<AvatarJobRecord | null>;
   "avatar.selectCandidate": (

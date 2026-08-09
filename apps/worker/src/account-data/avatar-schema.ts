@@ -24,6 +24,7 @@ export const avatarJobs = sqliteTable(
     pendingOperation: text("pending_operation", { enum: ["person-check", "generate"] }),
     queuePending: integer("queue_pending", { mode: "boolean" }).notNull().default(true),
     nextEnqueueAt: integer("next_enqueue_at", { mode: "timestamp" }),
+    enqueueAttemptCount: integer("enqueue_attempt_count").notNull().default(0),
     processingLeaseExpiresAt: integer("processing_lease_expires_at", { mode: "timestamp" }),
     attemptCount: integer("attempt_count").notNull().default(0),
     errorCode: text("error_code"),
@@ -36,6 +37,7 @@ export const avatarJobs = sqliteTable(
     index("avatar_jobs_updated_at_idx").on(table.updatedAt),
     index("avatar_jobs_pending_queue_idx").on(table.queuePending, table.nextEnqueueAt),
     check("avatar_jobs_attempt_count_check", sql`${table.attemptCount} >= 0`),
+    check("avatar_jobs_enqueue_attempt_count_check", sql`${table.enqueueAttemptCount} >= 0`),
   ],
 );
 

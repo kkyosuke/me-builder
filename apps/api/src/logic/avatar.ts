@@ -98,8 +98,8 @@ async function enqueue(
   queue: Queue<AvatarQueueMessage> | undefined,
   body: AvatarQueueMessage,
 ): Promise<void> {
-  if (!queue) return;
   try {
+    if (!queue) throw new Error("Avatar Queue binding is not configured");
     await queue.send(body);
     await accountDataFor(accountData, accountId).execute(
       "avatar.markEnqueued",
@@ -107,6 +107,18 @@ async function enqueue(
       body.operation,
     );
   } catch (error) {
+    try {
+      await accountDataFor(accountData, accountId).execute(
+        "avatar.recordEnqueueFailure",
+        body.jobId,
+        body.operation,
+      );
+    } catch (recordError) {
+      logger.error(
+        { errorName: recordError instanceof Error ? recordError.name : "UnknownError" },
+        "Avatar Queue enqueue failure could not be recorded",
+      );
+    }
     logger.warn(
       { errorName: error instanceof Error ? error.name : "UnknownError" },
       "Avatar Queue enqueue failed; AccountData alarm will retry",
@@ -216,7 +228,7 @@ export async function startAvatarGeneration(
 }
 
 export async function cancelAvatarJob(
-  params: BaseParams & { jobId: string; bucket: AvatarBucket; at?: Date },
+  params: BaseParams & { jobId: string; at?: Date },
   dependencies: AvatarDependencies = defaultDependencies,
 ): Promise<{ type: "cancelled" } | { type: "job-not-found" } | AvatarAuthFailure> {
   const session = await authenticate(params, dependencies);
@@ -227,15 +239,11 @@ export async function cancelAvatarJob(
     params.at,
   );
   if (!job) return { type: "job-not-found" };
-  await params.bucket.delete([
-    job.referenceObjectKey,
-    ...job.candidates.filter(({ selectedAt }) => !selectedAt).map(({ objectKey }) => objectKey),
-  ]);
   return { type: "cancelled" };
 }
 
 export async function selectAvatar(
-  params: BaseParams & { candidateId: string; bucket: AvatarBucket; at?: Date },
+  params: BaseParams & { candidateId: string; at?: Date },
   dependencies: AvatarDependencies = defaultDependencies,
 ): Promise<
   | { type: "selected"; state: PublicAvatarState }
@@ -252,21 +260,19 @@ export async function selectAvatar(
   );
   if (result.type === "not-found") return { type: "candidate-not-found" };
   if (result.type === "invalid-state") return result;
-  if (result.previousObjectKey) await params.bucket.delete(result.previousObjectKey);
   return { type: "selected", state: publicState(result.state) };
 }
 
 export async function deleteAvatar(
-  params: BaseParams & { bucket: AvatarBucket; at?: Date },
+  params: BaseParams & { at?: Date },
   dependencies: AvatarDependencies = defaultDependencies,
 ): Promise<{ type: "deleted" } | AvatarAuthFailure> {
   const session = await authenticate(params, dependencies);
   if (session.type !== "resolved") return session;
-  const result = await accountDataFor(params.accountData, session.accountId).execute(
+  await accountDataFor(params.accountData, session.accountId).execute(
     "avatar.deleteCurrent",
     params.at,
   );
-  if (result.previousObjectKey) await params.bucket.delete(result.previousObjectKey);
   return { type: "deleted" };
 }
 

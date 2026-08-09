@@ -134,12 +134,13 @@ export class AccountData extends DurableObject<Env> {
             throw new Error("Diary Brain checkpoint dispatch state could not be recorded");
           }
         }
-        if (this.env.AVATAR_QUEUE) {
-          const pending = await avatarActions["avatar.listPendingEnqueues"](
-            this.repository.client,
-            this.accountId,
-          );
-          for (const item of pending) {
+        const pending = await avatarActions["avatar.listPendingEnqueues"](
+          this.repository.client,
+          this.accountId,
+        );
+        for (const item of pending) {
+          try {
+            if (!this.env.AVATAR_QUEUE) throw new Error("Avatar Queue binding is not configured");
             await this.env.AVATAR_QUEUE.send({
               type: "avatar",
               accountId: this.accountId,
@@ -151,6 +152,17 @@ export class AccountData extends DurableObject<Env> {
               this.accountId,
               item.jobId,
               item.operation,
+            );
+          } catch (error) {
+            await avatarActions["avatar.recordEnqueueFailure"](
+              this.repository.client,
+              this.accountId,
+              item.jobId,
+              item.operation,
+            );
+            logger.warn(
+              { errorName: error instanceof Error ? error.name : "UnknownError" },
+              "Avatar Queue enqueue failed; AccountData alarm will retry",
             );
           }
         }

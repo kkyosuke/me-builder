@@ -21,6 +21,7 @@ function message(operation: AvatarQueueMessage["operation"], attempts = 1) {
     body: { type: "avatar", operation, accountId: "account-1", jobId: "job-1" },
     attempts,
     ack: vi.fn(),
+    retry: vi.fn(),
   } as unknown as Message<AvatarQueueMessage>;
 }
 
@@ -146,5 +147,24 @@ describe("avatar queue handler", () => {
       "generation_failed",
     );
     expect(queueMessage.ack).toHaveBeenCalledOnce();
+  });
+
+  it("別処理のlease中ならackせずlease期限後へ再配送する", async () => {
+    const retryAt = new Date(Date.now() + 30_000);
+    const execute = vi.fn(async (operation: AccountDataOperation) => {
+      if (operation === "avatar.acquireTask") {
+        return { type: "skip", reason: "leased", retryAt };
+      }
+      return null;
+    });
+    const { cf } = dependencies(execute);
+    const queueMessage = message("generate");
+
+    await processAvatarMessage(queueMessage, cf, config);
+
+    expect(queueMessage.retry).toHaveBeenCalledWith(
+      expect.objectContaining({ delaySeconds: expect.any(Number) }),
+    );
+    expect(queueMessage.ack).not.toHaveBeenCalled();
   });
 });

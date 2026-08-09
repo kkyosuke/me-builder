@@ -194,11 +194,10 @@ export async function postAvatarGeneration(c: Context<AppEnv>): Promise<Response
 }
 
 export async function deleteAvatarJob(c: Context<AppEnv>): Promise<Response> {
-  if (!c.env?.DB || !c.env.ACCOUNT_DATA || !c.env.AVATAR_BUCKET) return unavailable(c);
+  if (!c.env?.DB || !c.env.ACCOUNT_DATA) return unavailable(c);
   const outcome = await cancelAvatarJob({
     ...commonParams(c),
     jobId: pathParam(c, "jobId"),
-    bucket: c.env.AVATAR_BUCKET,
   });
   const auth = authResponse(c, outcome);
   if (auth) return auth;
@@ -209,7 +208,7 @@ export async function deleteAvatarJob(c: Context<AppEnv>): Promise<Response> {
 }
 
 export async function putAvatar(c: Context<AppEnv>): Promise<Response> {
-  if (!c.env?.DB || !c.env.ACCOUNT_DATA || !c.env.AVATAR_BUCKET) return unavailable(c);
+  if (!c.env?.DB || !c.env.ACCOUNT_DATA) return unavailable(c);
   const parsed = v.safeParse(SelectAvatarRequestSchema, await c.req.json().catch(() => null));
   if (!parsed.success) {
     return c.json(
@@ -223,7 +222,6 @@ export async function putAvatar(c: Context<AppEnv>): Promise<Response> {
   const outcome = await selectAvatar({
     ...commonParams(c),
     candidateId: parsed.output.candidateId,
-    bucket: c.env.AVATAR_BUCKET,
   });
   const auth = authResponse(c, outcome);
   if (auth) return auth;
@@ -244,11 +242,8 @@ export async function putAvatar(c: Context<AppEnv>): Promise<Response> {
 }
 
 export async function deleteAvatarContents(c: Context<AppEnv>): Promise<Response> {
-  if (!c.env?.DB || !c.env.ACCOUNT_DATA || !c.env.AVATAR_BUCKET) return unavailable(c);
-  const outcome = await deleteAvatar({
-    ...commonParams(c),
-    bucket: c.env.AVATAR_BUCKET,
-  });
+  if (!c.env?.DB || !c.env.ACCOUNT_DATA) return unavailable(c);
+  const outcome = await deleteAvatar(commonParams(c));
   const auth = authResponse(c, outcome);
   if (auth) return auth;
   return c.body(null, 204);

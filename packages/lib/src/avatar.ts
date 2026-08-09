@@ -32,6 +32,7 @@ export type AvatarJobRecord = {
   pendingOperation: AvatarQueueOperation | null;
   queuePending: boolean;
   nextEnqueueAt: Date | null;
+  enqueueAttemptCount: number;
   processingLeaseExpiresAt: Date | null;
   attemptCount: number;
   errorCode: string | null;
@@ -76,7 +77,8 @@ export type ResolveAvatarImageResult =
 
 export type AcquireAvatarTaskResult =
   | { type: "acquired"; job: AvatarJobRecord }
-  | { type: "skip"; reason: "not-found" | "terminal" | "wrong-operation" | "leased" };
+  | { type: "skip"; reason: "not-found" | "terminal" | "wrong-operation" }
+  | { type: "skip"; reason: "leased"; retryAt: Date };
 
 export type PendingAvatarEnqueue = {
   jobId: string;

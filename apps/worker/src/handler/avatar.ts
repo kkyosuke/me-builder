@@ -54,6 +54,14 @@ export async function processAvatarMessage(
     at,
   );
   if (acquired.type === "skip") {
+    if (acquired.reason === "leased") {
+      const delaySeconds = Math.max(
+        1,
+        Math.ceil((acquired.retryAt.getTime() - at.getTime()) / 1000),
+      );
+      message.retry({ delaySeconds });
+      return;
+    }
     message.ack();
     return;
   }

@@ -87,7 +87,7 @@ avatar_jobs
 ├── status
 ├── reference_object_key
 ├── pending_operation
-├── queue_pending / next_enqueue_at
+├── queue_pending / next_enqueue_at / enqueue_attempt_count
 ├── processing_lease_expires_at
 └── created_at / updated_at / expires_at
 
@@ -104,9 +104,9 @@ avatar_object_deletions
 └── attempt_count / last_error_code
 ```
 
-ジョブ状態は`checking`、`not_person`、`verified`、`accepted`、`generating`、`ready`、`failed`、`cancelled`、`selected`です。人物判定と生成のQueue投入前には`queue_pending`を同じ状態更新で立て、投入成功後に解消します。AccountDataのalarmは未投入状態を再配送します。
+ジョブ状態は`checking`、`not_person`、`verified`、`accepted`、`generating`、`ready`、`failed`、`cancelled`、`selected`です。人物判定と生成のQueue投入前には`queue_pending`を同じ状態更新で立て、投入成功後に解消します。AccountDataのalarmは未投入状態を再配送します。投入失敗は5秒から最大5分まで指数backoffし、参照画像の受付期限を超えたら`queue_enqueue_expired`で`failed`へ終了します。
 
-Workerは処理開始時に短いleaseを取得します。同じジョブIDが再配送された場合、terminal状態または有効なleaseなら処理せずackします。外部処理が一時失敗した場合はleaseを解放してQueue retryへ委ね、規定回数を超えた場合だけ`failed`へ遷移します。
+Workerは処理開始時に短いleaseを取得します。同じジョブIDが再配送された場合、terminal状態なら処理せずackします。有効なleaseがある場合はackせず、lease期限後を指定してQueue retryし、Workerの強制終了でジョブが取り残されないようにします。外部処理が一時失敗した場合はleaseを解放してQueue retryへ委ね、規定回数を超えた場合だけ`failed`へ遷移します。
 
 新しい候補生成は1 Accountにつき24時間で3ジョブまでとし、同じジョブのQueue再配送と失敗後の再試行は追加計上しません。超過時は`429 Too Many Requests`と`Retry-After`、再開可能時刻を返します。環境全体の費用上限はAI Gatewayと生成事業者側にも設定し、アプリのAccount上限だけを予算管理にしません。
 
@@ -132,7 +132,7 @@ accounts/{accountId}/avatar/jobs/{jobId}/candidates/{candidateId}.webp
 
 Bucketは公開しません。候補配信APIはAccountDataで`imageId`の参照権を確認してからR2を読み、`Cache-Control: private, no-store`を返します。
 
-参照画像、期限切れ候補、差し替え・削除された現在値は、AccountDataの削除outboxへ先に記録します。alarmが期限到達後にR2から削除し、失敗時は上限付きbackoffで再試行します。候補を現在値へ設定したときは、その候補の期限削除予定を同じAccountData更新で解除します。
+参照画像、期限切れ候補、差し替え・削除された現在値は、AccountDataの削除outboxへ先に記録します。APIはこのdurableな記録を操作成功の境界とし、同じHTTP応答内のR2削除完了を待ちません。alarmが期限到達後にR2から削除し、失敗時は上限付きbackoffで再試行します。候補を現在値へ設定したときは、その候補の期限削除予定を同じAccountData更新で解除します。
 
 ## 7. AI境界
 

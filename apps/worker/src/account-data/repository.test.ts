@@ -546,4 +546,101 @@ describe("AccountDataRepository", () => {
       await repository.client.select().from(d1.schema.diagnosisBrainProjectionRequests).all(),
     ).toHaveLength(1);
   });
+
+  it("Queue投入失敗をbackoffし、受付期限を超えたらfailedへ終了する", async () => {
+    const repository = createRepository();
+    await repository.initialize();
+    repository.bindAccount("account-1");
+    const accountId = "account-1";
+    const createdAt = new Date("2026-08-09T00:00:00.000Z");
+    const expiresAt = new Date("2026-08-09T00:10:00.000Z");
+    await avatarActions["avatar.createJob"](repository.client, accountId, {
+      id: "enqueue-job",
+      referenceObjectKey: "reference.webp",
+      referenceContentType: "image/webp",
+      createdAt,
+      expiresAt,
+    });
+
+    await avatarActions["avatar.recordEnqueueFailure"](
+      repository.client,
+      accountId,
+      "enqueue-job",
+      "person-check",
+      createdAt,
+    );
+    await expect(
+      avatarActions["avatar.getState"](repository.client, accountId, createdAt),
+    ).resolves.toMatchObject({
+      latestJob: {
+        status: "checking",
+        queuePending: true,
+        enqueueAttemptCount: 1,
+        nextEnqueueAt: new Date("2026-08-09T00:00:05.000Z"),
+      },
+    });
+
+    await avatarActions["avatar.recordEnqueueFailure"](
+      repository.client,
+      accountId,
+      "enqueue-job",
+      "person-check",
+      expiresAt,
+    );
+    await expect(
+      avatarActions["avatar.getState"](repository.client, accountId, expiresAt),
+    ).resolves.toMatchObject({
+      latestJob: {
+        status: "failed",
+        queuePending: false,
+        enqueueAttemptCount: 2,
+        errorCode: "queue_enqueue_expired",
+      },
+    });
+    await expect(
+      listPendingAvatarObjectDeletions(repository.client, expiresAt),
+    ).resolves.toContainEqual(expect.objectContaining({ objectKey: "reference.webp" }));
+  });
+
+  it("有効な処理leaseは期限を返して再配送を失わない", async () => {
+    const repository = createRepository();
+    await repository.initialize();
+    repository.bindAccount("account-1");
+    const accountId = "account-1";
+    const createdAt = new Date("2026-08-09T00:00:00.000Z");
+    const leaseExpiresAt = new Date("2026-08-09T00:10:00.000Z");
+    await avatarActions["avatar.createJob"](repository.client, accountId, {
+      id: "leased-job",
+      referenceObjectKey: "reference.webp",
+      referenceContentType: "image/webp",
+      createdAt,
+      expiresAt: new Date("2026-08-10T00:00:00.000Z"),
+    });
+    await avatarActions["avatar.markEnqueued"](
+      repository.client,
+      accountId,
+      "leased-job",
+      "person-check",
+      createdAt,
+    );
+    await avatarActions["avatar.acquireTask"](
+      repository.client,
+      accountId,
+      "leased-job",
+      "person-check",
+      leaseExpiresAt,
+      createdAt,
+    );
+
+    await expect(
+      avatarActions["avatar.acquireTask"](
+        repository.client,
+        accountId,
+        "leased-job",
+        "person-check",
+        new Date("2026-08-09T00:11:00.000Z"),
+        new Date("2026-08-09T00:01:00.000Z"),
+      ),
+    ).resolves.toEqual({ type: "skip", reason: "leased", retryAt: leaseExpiresAt });
+  });
 });

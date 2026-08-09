@@ -39,6 +39,8 @@ const CANDIDATE_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 const REFERENCE_RETENTION_AFTER_GENERATION_MS = 24 * 60 * 60 * 1000;
 const GENERATION_RATE_WINDOW_MS = 24 * 60 * 60 * 1000;
 const GENERATION_RATE_LIMIT = 3;
+const ENQUEUE_RETRY_BASE_MS = 5_000;
+const ENQUEUE_RETRY_MAX_MS = 5 * 60 * 1000;
 
 async function scheduleObjectDeletions(
   db: AvatarDatabase,
@@ -140,6 +142,7 @@ async function createAvatarJob(
     pendingOperation: "person-check",
     queuePending: true,
     nextEnqueueAt: input.createdAt,
+    enqueueAttemptCount: 0,
     processingLeaseExpiresAt: null,
     attemptCount: 0,
     errorCode: null,
@@ -180,8 +183,79 @@ async function markAvatarEnqueued(
 ): Promise<void> {
   await database(db)
     .update(avatarJobs)
-    .set({ queuePending: false, nextEnqueueAt: null, updatedAt: at })
+    .set({
+      queuePending: false,
+      nextEnqueueAt: null,
+      enqueueAttemptCount: 0,
+      updatedAt: at,
+    })
     .where(and(eq(avatarJobs.id, jobId), eq(avatarJobs.pendingOperation, operation)));
+}
+
+async function recordAvatarEnqueueFailure(
+  db: d1.Client,
+  _accountId: string,
+  jobId: string,
+  operation: AvatarQueueOperation,
+  at = new Date(),
+): Promise<void> {
+  const client = database(db);
+  const existing = await jobRecord(client, jobId);
+  if (
+    !existing ||
+    !existing.queuePending ||
+    existing.pendingOperation !== operation ||
+    !PROCESSING_STATUSES.includes(existing.status)
+  ) {
+    return;
+  }
+
+  const enqueueAttemptCount = existing.enqueueAttemptCount + 1;
+  if (existing.expiresAt <= at) {
+    await client
+      .update(avatarJobs)
+      .set({
+        status: "failed",
+        pendingOperation: null,
+        queuePending: false,
+        nextEnqueueAt: null,
+        enqueueAttemptCount,
+        processingLeaseExpiresAt: null,
+        errorCode: "queue_enqueue_expired",
+        updatedAt: at,
+      })
+      .where(
+        and(
+          eq(avatarJobs.id, jobId),
+          eq(avatarJobs.pendingOperation, operation),
+          eq(avatarJobs.queuePending, true),
+        ),
+      );
+    await scheduleObjectDeletions(client, [
+      { objectKey: existing.referenceObjectKey, deleteAfter: at },
+      ...existing.candidates.map(({ objectKey }) => ({ objectKey, deleteAfter: at })),
+    ]);
+    return;
+  }
+
+  const retryDelay = Math.min(
+    ENQUEUE_RETRY_MAX_MS,
+    2 ** Math.min(enqueueAttemptCount - 1, 10) * ENQUEUE_RETRY_BASE_MS,
+  );
+  await client
+    .update(avatarJobs)
+    .set({
+      enqueueAttemptCount,
+      nextEnqueueAt: new Date(Math.min(existing.expiresAt.getTime(), at.getTime() + retryDelay)),
+      updatedAt: at,
+    })
+    .where(
+      and(
+        eq(avatarJobs.id, jobId),
+        eq(avatarJobs.pendingOperation, operation),
+        eq(avatarJobs.queuePending, true),
+      ),
+    );
 }
 
 async function startAvatarGeneration(
@@ -250,6 +324,7 @@ async function startAvatarGeneration(
       pendingOperation: "generate",
       queuePending: true,
       nextEnqueueAt: requestedAt,
+      enqueueAttemptCount: 0,
       processingLeaseExpiresAt: null,
       attemptCount: 0,
       errorCode: null,
@@ -427,7 +502,7 @@ async function acquireAvatarTask(
   }
   if (job.pendingOperation !== operation) return { type: "skip", reason: "wrong-operation" };
   if (job.processingLeaseExpiresAt && job.processingLeaseExpiresAt > at) {
-    return { type: "skip", reason: "leased" };
+    return { type: "skip", reason: "leased", retryAt: job.processingLeaseExpiresAt };
   }
   if (operation === "person-check" && job.status !== "checking") {
     return { type: "skip", reason: "wrong-operation" };
@@ -635,6 +710,7 @@ export const avatarActions = {
   "avatar.createJob": createAvatarJob,
   "avatar.failJob": failAvatarJob,
   "avatar.markEnqueued": markAvatarEnqueued,
+  "avatar.recordEnqueueFailure": recordAvatarEnqueueFailure,
   "avatar.startGeneration": startAvatarGeneration,
   "avatar.cancelJob": cancelAvatarJob,
   "avatar.selectCandidate": selectAvatarCandidate,
