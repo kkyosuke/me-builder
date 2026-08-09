@@ -111,7 +111,7 @@ flowchart TD
 
 1. **メディア登録とメタデータ保持**
    - ユーザーから投稿されたバイナリデータ（写真・動画・音声）は Cloudflare R2 へ直接保存します。
-   - メディアのメタデータ、所有権、アクセスラベル等の構造化情報は Cloudflare D1 へ記録します。
+   - Account所有メディアのメタデータ、所有権、アクセスラベル等の構造化情報はAccountDataへ記録します。共有D1との境界は[Accountデータ分離設計](account-data-isolation.md)を正とします。
 
 2. **テキストおよびメディアのベクトル化と検索**
    - 新規の回答データや要約テキストは Cloudflare Workers AI を通じて Embedding ベクトルへ変換されます。
