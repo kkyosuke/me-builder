@@ -210,15 +210,17 @@ describe("App", () => {
     );
   });
 
-  it("既存のダークテーマを初期表示し、ライトテーマへ切り替えて保存する", async () => {
+  it("右上からプロフィールを開き、ライトテーマへ切り替えて保存する", async () => {
     render(<App />);
 
-    const toggle = screen.getByRole("button", { name: "ライトモードに切り替える" });
+    fireEvent.click(screen.getByRole("button", { name: "プロフィールを開く" }));
+    expect(screen.getByRole("heading", { name: "プロフィール" })).toBeTruthy();
+    const lightTheme = screen.getByRole("radio", { name: /ライト/ });
     await waitFor(() => expect(document.documentElement.classList.contains("dark")).toBe(true));
 
-    fireEvent.click(toggle);
+    fireEvent.click(lightTheme);
 
-    expect(screen.getByRole("button", { name: "ダークモードに切り替える" })).toBeTruthy();
+    expect((lightTheme as HTMLInputElement).checked).toBe(true);
     expect(document.documentElement.classList.contains("light")).toBe(true);
     expect(document.documentElement.classList.contains("dark")).toBe(false);
     expect(window.localStorage.getItem("me-builder-color-theme")).toBe("light");
@@ -229,8 +231,70 @@ describe("App", () => {
 
     render(<App />);
 
-    expect(screen.getByRole("button", { name: "ダークモードに切り替える" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "プロフィールを開く" }));
+    expect((screen.getByRole("radio", { name: /ライト/ }) as HTMLInputElement).checked).toBe(true);
     await waitFor(() => expect(document.documentElement.classList.contains("light")).toBe(true));
+  });
+
+  it("ダミー候補からアバターを設定してプロフィールへ戻る", async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "プロフィールを開く" }));
+    fireEvent.click(screen.getByRole("button", { name: /アバターを設定/ }));
+
+    expect(screen.getByRole("heading", { name: "アバター設定" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("checkbox", { name: /外部AIサービスへ送信/ }));
+    fireEvent.change(screen.getByLabelText(/画像をアップロード/), {
+      target: { files: [new File(["selfie"], "selfie.png", { type: "image/png" })] },
+    });
+    expect((await screen.findAllByText("selfie.png")).length).toBeGreaterThan(0);
+    expect(await screen.findByText("人物を確認できました")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "ダミー変換を開始" }));
+    fireEvent.click(screen.getByRole("button", { name: "星空を選択" }));
+    fireEvent.click(screen.getByRole("button", { name: "このアバターに設定" }));
+
+    expect(screen.getByRole("heading", { name: "プロフィール" })).toBeTruthy();
+    expect(screen.getByText("星空")).toBeTruthy();
+  });
+
+  it("プロフィールとアバター設定をブラウザ履歴で戻れる", async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "プロフィールを開く" }));
+    expect(window.location.pathname).toBe("/profile");
+    expect(screen.getByRole("dialog", { name: "プロフィール" })).toBeTruthy();
+    const background = screen.getByRole("dialog", { name: "プロフィール" }).previousElementSibling;
+    expect(background?.getAttribute("aria-hidden")).toBe("true");
+    expect(background?.hasAttribute("inert")).toBe(true);
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "プロフィールを閉じる" }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /アバターを設定/ }));
+    expect(window.location.pathname).toBe("/profile/avatar");
+    expect(screen.getByRole("dialog", { name: "アバター設定" })).toBeTruthy();
+
+    act(() => window.history.back());
+    await waitFor(() => expect(window.location.pathname).toBe("/profile"));
+    expect(screen.getByRole("dialog", { name: "プロフィール" })).toBeTruthy();
+
+    act(() => window.history.back());
+    await waitFor(() => expect(window.location.pathname).toBe("/"));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "プロフィールを開く" }));
+  });
+
+  it("/profileの直接表示を閉じるとわたしのまとめへ戻る", async () => {
+    window.history.replaceState({}, "", "/profile");
+    render(<App />);
+
+    expect(screen.getByRole("heading", { name: "プロフィール" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "プロフィールを閉じる" }));
+
+    expect(window.location.pathname).toBe("/me");
+    expect(screen.queryByRole("heading", { name: "プロフィール" })).toBeNull();
+    expect(await screen.findByRole("heading", { name: "わたしのまとめ" })).toBeTruthy();
+    expect(mocks.fetchDiagnosisList).not.toHaveBeenCalled();
   });
 
   it("/meでは診断・日記レコードから生成したまとめを表示し、診断一覧は取得しない", async () => {

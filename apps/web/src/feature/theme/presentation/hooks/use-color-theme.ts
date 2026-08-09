@@ -6,20 +6,20 @@ import {
 } from "../../infrastructure/color-theme-storage";
 import type { ColorTheme } from "../../model/color-theme";
 
-export function useColorTheme(): { theme: ColorTheme; toggleTheme: () => void } {
+export function useColorTheme(): {
+  theme: ColorTheme;
+  setTheme: (theme: ColorTheme) => void;
+} {
   const [theme, setTheme] = useState(readColorTheme);
 
   useEffect(() => {
     applyColorTheme(theme);
   }, [theme]);
 
-  const toggleTheme = useCallback(() => {
-    setTheme((current) => {
-      const next = current === "dark" ? "light" : "dark";
-      saveColorTheme(next);
-      return next;
-    });
+  const selectTheme = useCallback((next: ColorTheme) => {
+    saveColorTheme(next);
+    setTheme(next);
   }, []);
 
-  return { theme, toggleTheme };
+  return { theme, setTheme: selectTheme };
 }
