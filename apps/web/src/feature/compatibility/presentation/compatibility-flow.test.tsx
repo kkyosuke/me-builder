@@ -13,6 +13,18 @@ import { CompatibilityListScreen } from "./compatibility-list-screen";
 import { CompatibilityResultScreen } from "./compatibility-result-screen";
 import { CompatibilityShareScreen } from "./compatibility-share-screen";
 
+function firePointer(
+  target: Element,
+  type: "pointerdown" | "pointerup",
+  values: { button?: number; clientX: number; clientY: number; pointerId: number },
+) {
+  const event = new Event(type, { bubbles: true });
+  for (const [key, value] of Object.entries({ isPrimary: true, ...values })) {
+    Object.defineProperty(event, key, { value });
+  }
+  fireEvent(target, event);
+}
+
 describe("Compatibility flow", () => {
   afterEach(cleanup);
 
@@ -74,7 +86,7 @@ describe("Compatibility flow", () => {
     expect(screen.getByRole("link", { name: "2人の相性シートを見る" })).toBeTruthy();
   });
 
-  it("人物ごとの資料と2人の共通点・違いを切り替える", () => {
+  it("人物ごとの資料と2人の共通点・違いをタブとスワイプで切り替える", () => {
     render(<CompatibilityResultScreen me={me} partner={aoi} />);
 
     expect(screen.getByRole("heading", { name: "2人の相性シート" })).toBeTruthy();
@@ -82,9 +94,37 @@ describe("Compatibility flow", () => {
       screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent),
     ).toEqual(["あおいさんについて", "わたしについて"]);
 
-    fireEvent.click(screen.getByRole("tab", { name: "2人について" }));
+    expect(screen.getByRole("tab", { name: "それぞれについて" })).toBeTruthy();
+    const peoplePanel = screen.getByRole("tabpanel");
+    firePointer(peoplePanel, "pointerdown", {
+      button: 0,
+      clientX: 180,
+      clientY: 100,
+      pointerId: 1,
+    });
+    firePointer(peoplePanel, "pointerup", {
+      clientX: 100,
+      clientY: 108,
+      pointerId: 1,
+    });
     expect(screen.getByRole("heading", { name: "一緒に大切にできそうなこと" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "話してみたい違い" })).toBeTruthy();
+
+    const pairPanel = screen.getByRole("tabpanel");
+    firePointer(pairPanel, "pointerdown", {
+      button: 0,
+      clientX: 100,
+      clientY: 100,
+      pointerId: 2,
+    });
+    firePointer(pairPanel, "pointerup", {
+      clientX: 180,
+      clientY: 108,
+      pointerId: 2,
+    });
+    expect(screen.getByRole("heading", { name: "あおいさんについて" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("tab", { name: "2人について" }));
 
     fireEvent.click(screen.getByRole("button", { name: "共有を終了する" }));
     expect(

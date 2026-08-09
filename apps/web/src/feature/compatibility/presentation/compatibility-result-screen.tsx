@@ -10,6 +10,7 @@ import {
   DemoNotice,
 } from "./components/compatibility-ui";
 import { useCompatibilityResult } from "./hooks/use-compatibility-result";
+import { useCompatibilitySectionSwipe } from "./hooks/use-compatibility-section-swipe";
 
 export function CompatibilityResultScreen({
   me,
@@ -19,6 +20,10 @@ export function CompatibilityResultScreen({
   partner: CompatibilityPerson;
 }) {
   const result = useCompatibilityResult();
+  const sectionSwipe = useCompatibilitySectionSwipe({
+    showPair: () => result.showSection("pair"),
+    showPeople: () => result.showSection("people"),
+  });
 
   if (result.state.sharing === "ended") {
     return (
@@ -67,17 +72,21 @@ export function CompatibilityResultScreen({
         aria-label="相性シートの内容"
       >
         <button
+          id="compatibility-people-tab"
           type="button"
           role="tab"
+          aria-controls="compatibility-section-panel"
           aria-selected={result.state.section === "people"}
           onClick={() => result.showSection("people")}
           className={`min-h-11 rounded-xl px-3 text-sm font-bold ${result.state.section === "people" ? "bg-white text-slate-950 shadow dark:bg-slate-700 dark:text-white" : "text-slate-500 dark:text-slate-400"}`}
         >
-          私について
+          それぞれについて
         </button>
         <button
+          id="compatibility-pair-tab"
           type="button"
           role="tab"
+          aria-controls="compatibility-section-panel"
           aria-selected={result.state.section === "pair"}
           onClick={() => result.showSection("pair")}
           className={`min-h-11 rounded-xl px-3 text-sm font-bold ${result.state.section === "pair" ? "bg-white text-slate-950 shadow dark:bg-slate-700 dark:text-white" : "text-slate-500 dark:text-slate-400"}`}
@@ -86,7 +95,15 @@ export function CompatibilityResultScreen({
         </button>
       </div>
 
-      <div className="mt-5">
+      <div
+        {...sectionSwipe}
+        id="compatibility-section-panel"
+        role="tabpanel"
+        aria-labelledby={
+          result.state.section === "people" ? "compatibility-people-tab" : "compatibility-pair-tab"
+        }
+        className="mt-5 touch-pan-y"
+      >
         {result.state.section === "people" ? (
           <div className="space-y-4">
             <CompatibilityPersonSheet person={partner} isMe={false} />
