@@ -74,6 +74,7 @@
 - **構造化 JSON ログ基盤 (`Pino`)**:
   - モノレポ全体のログ出力基盤として `packages/shared` が `Pino` を用いたロガー機能 (`createLogger`, `logger`) を提供します。
   - 各アプリケーション (`apps/api`, `apps/mcp` 等) やライブラリでのログ出力には `console.log` / `console.error` の代わりに `@me-builder/shared` の `logger` を使用し、構造化 JSON 形式で統一出力します。
+  - イベント名、共通フィールド、例外の安全な分類、Queueの終端ログ、記録禁止情報は[アプリケーション運用ログ設計](../../docs/development/operational-logging.md)を正とします。
 
 ## 4. アプリケーション実装ルール (API / MCP / Web UI)
 

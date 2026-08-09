@@ -50,6 +50,7 @@
 | [LINEリッチメニュー運用](../docs/development/line-rich-menu.md) | Messaging APIによるリッチメニューの登録、画像更新、CD運用 |
 | [診断API契約](../docs/development/diagnosis-api.md) | Web UIとAPI Server間の診断APIのパス、認証、入出力、エラー契約 |
 | [API契約とクライアント型の生成](../docs/development/api-contract-generation.md) | API ServerのHTTP契約の配置、OpenAPI documentとWeb UI用TypeScript型の生成運用 |
+| [アプリケーション運用ログ設計](../docs/development/operational-logging.md) | 運用ログのイベント、相関ID、安全なエラー分類、Queueの終端ログ、記録禁止情報 |
 | [PR作成手順書](../docs/development/pull-request-guidelines.md) | PRタイトルの命名規則、概要の書き方、作成前の準備・検証手順 |
 
 この表は各文書へのナビゲーションです。概念の定義そのものはリンク先だけに記載します。
