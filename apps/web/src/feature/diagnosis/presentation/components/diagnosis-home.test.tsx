@@ -25,6 +25,22 @@ function diagnosis(overrides: Partial<DiagnosisListItem>): DiagnosisListItem {
 describe("DiagnosisHome", () => {
   afterEach(() => cleanup());
 
+  it("診断一覧の取得中はカードのSkeletonを表示する", () => {
+    render(
+      <DiagnosisHome
+        diagnoses={{ status: "loading" }}
+        onOpenDiagnosis={vi.fn()}
+        onRetry={vi.fn()}
+        canResetDiagnosisData={false}
+        resetState={{ status: "idle" }}
+        onResetDiagnosisData={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("status", { name: "診断一覧を読み込み中" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "診断" })).toBeTruthy();
+  });
+
   it("主ナビゲーションで診断を現在位置として表示する", () => {
     render(
       <DiagnosisHome

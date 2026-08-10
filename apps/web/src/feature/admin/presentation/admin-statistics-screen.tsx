@@ -1,5 +1,5 @@
 import { AlertCircle, Bot, MessageCircle, RefreshCw } from "lucide-react";
-import { LoadingState } from "../../../components/loading-state";
+import { SkeletonBlock, SkeletonLoader } from "../../../components/skeleton";
 import type { AsyncState } from "../../../model/async-state";
 import type { AdminStatistics } from "../model/statistics";
 
@@ -91,13 +91,52 @@ function Line({ value }: { value: AdminStatistics["line"] }) {
   );
 }
 
+function StatisticsSkeleton() {
+  return (
+    <main className="mx-auto min-h-dvh w-full max-w-4xl px-4 py-16 sm:px-8">
+      <SkeletonLoader label="統計情報を読み込み中">
+        <header className="mb-6">
+          <SkeletonBlock className="h-4 w-16 rounded-full" />
+          <SkeletonBlock className="mt-3 h-9 w-40 rounded-full" />
+          <SkeletonBlock className="mt-3 h-4 w-56 rounded-full" />
+        </header>
+        <div className="grid gap-5">
+          {[
+            { key: "gemini", metricKeys: ["cost", "request", "input", "output"] },
+            { key: "line", metricKeys: ["billable", "limit", "reply"] },
+          ].map(({ key, metricKeys }) => (
+            <section
+              key={key}
+              className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800"
+            >
+              <div className="flex items-center gap-2">
+                <SkeletonBlock className="size-5 rounded-md" />
+                <SkeletonBlock className="h-5 w-24 rounded-full" />
+              </div>
+              <div
+                className={`mt-4 grid gap-3 ${key === "gemini" ? "grid-cols-2" : "sm:grid-cols-3"}`}
+              >
+                {metricKeys.map((metricKey) => (
+                  <div key={metricKey} className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900">
+                    <SkeletonBlock className="h-3 w-20 rounded-full" />
+                    <SkeletonBlock className="mt-3 h-6 w-24 rounded-full" />
+                  </div>
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
+      </SkeletonLoader>
+    </main>
+  );
+}
+
 export function AdminStatisticsScreen({
   state,
   isRefreshing = false,
   onReload,
 }: { state: AsyncState<AdminStatistics>; isRefreshing?: boolean; onReload: () => void }) {
-  if (state.status === "loading" || state.status === "idle")
-    return <LoadingState message="統計情報を読み込んでいます..." />;
+  if (state.status === "loading" || state.status === "idle") return <StatisticsSkeleton />;
   if (state.status === "error")
     return (
       <main className="mx-auto flex min-h-dvh max-w-xl flex-col items-center justify-center gap-4 px-5 text-center">
