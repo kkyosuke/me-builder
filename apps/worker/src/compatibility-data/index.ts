@@ -4,6 +4,7 @@ import {
   type CreateCompatibilityInvitationInput,
   accountDataFor,
 } from "@me-builder/lib";
+import { logger, toSafeOperationalErrorFields } from "@me-builder/shared";
 import type { Env } from "../types";
 import { CompatibilityDataRepository } from "./repository";
 
@@ -90,7 +91,29 @@ export class CompatibilityData extends DurableObject<Env> {
   }
 
   async alarm(): Promise<void> {
-    this.repository.expirePending(new Date());
+    // 起動ログを止めているため、失敗を記録できる境界はここしかない。
+    // 記録したうえで再送出し、Cloudflareのalarm再試行は従来どおり効かせる。
+    try {
+      this.repository.expirePending(new Date());
+    } catch (error) {
+      logger.error(
+        {
+          event: "alarm.run.failed",
+          service: "worker",
+          component: "compatibility-data",
+          outcome: "failed",
+          disposition: "alarm-retry",
+          ...toSafeOperationalErrorFields(error, {
+            code: "COMPATIBILITY_DATA_ALARM_FAILED",
+            category: "unknown",
+            stage: "alarm.expire-pending",
+            retryable: true,
+          }),
+        },
+        "[CompatibilityData] alarm failed at alarm.expire-pending -> alarm-retry (pending invitations were not expired)",
+      );
+      throw error;
+    }
   }
 
   private assertRouting(relationshipId: string): void {

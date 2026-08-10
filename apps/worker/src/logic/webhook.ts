@@ -4,20 +4,51 @@ import {
   type AvatarQueueMessage,
   type ChatTurnQueueMessage,
   type DiaryBrainCheckpointQueueMessage,
+  type FlowKey,
   type Message,
   type MessageBatch,
   type WebhookQueueMessage,
+  describeQueueMessageResult,
   logger,
+  operationalLogLevel,
   toSafeOperationalErrorFields,
 } from "@me-builder/shared";
 import { type CloudflareBindings, type WorkerConfig, getWorkerConfig } from "../config";
 import { processAvatarMessage } from "../handler/avatar";
-import { processChatTurnMessage } from "../handler/chat-turn";
-import { processDiaryBrainCheckpointMessage } from "../handler/diary-brain-checkpoint";
+import { CHAT_TURN_MAX_ATTEMPTS, processChatTurnMessage } from "../handler/chat-turn";
+import {
+  DIARY_BRAIN_CHECKPOINT_MAX_ATTEMPTS,
+  processDiaryBrainCheckpointMessage,
+} from "../handler/diary-brain-checkpoint";
 import { processLineWebhook } from "./feature/line";
 
 /** max_retries = 3では初回と3回の再試行を合わせて4 attemptsになる。 */
 const WEBHOOK_QUEUE_MAX_ATTEMPTS = 4;
+
+/**
+ * 初回配送を含む最大試行回数。wrangler.tomlのmax_retriesと揃える。
+ * 次の失敗でDLQへ落ちるかを終端ログ1行から判断できるようにするため、処理ごとに持つ。
+ */
+const MAX_ATTEMPTS_BY_FLOW: Record<FlowKey, number | undefined> = {
+  "line-webhook": WEBHOOK_QUEUE_MAX_ATTEMPTS,
+  "chat-turn": CHAT_TURN_MAX_ATTEMPTS,
+  "diary-brain-checkpoint": DIARY_BRAIN_CHECKPOINT_MAX_ATTEMPTS,
+  "queue-dispatch": undefined,
+};
+
+/** どの処理のmessageだったかをログの見出しへ出すため、body形状から処理名を決める。 */
+function flowOf(
+  body:
+    | WebhookQueueMessage
+    | ChatTurnQueueMessage
+    | DiaryBrainCheckpointQueueMessage
+    | AvatarQueueMessage,
+): FlowKey {
+  if (!("type" in body)) return "line-webhook";
+  if (body.type === "chat-turn") return "chat-turn";
+  if (body.type === "diary-brain-checkpoint") return "diary-brain-checkpoint";
+  return "queue-dispatch";
+}
 
 async function processWebhookMessage(
   message: Message<WebhookQueueMessage>,
@@ -48,6 +79,7 @@ async function processWebhookMessage(
           };
 
     message.ack();
+    const durationMs = Date.now() - startedAt;
     const fields = {
       event: "queue.message.completed",
       service: "worker",
@@ -59,16 +91,26 @@ async function processWebhookMessage(
       messageType: "line-webhook",
       attempt: message.attempts,
       outcome: result.outcome,
-      disposition: "ack",
+      disposition: "ack" as const,
       stage: result.stage,
       ...(result.resultCode ? { resultCode: result.resultCode } : {}),
       messageCount,
-      durationMs: Date.now() - startedAt,
+      durationMs,
     };
-    if (result.outcome === "succeeded") {
-      logger.info(fields, "Webhook queue message completed");
+    const description = describeQueueMessageResult({
+      flow: "line-webhook",
+      outcome: result.outcome,
+      disposition: "ack",
+      stage: result.stage,
+      attempt: message.attempts,
+      maxAttempts: WEBHOOK_QUEUE_MAX_ATTEMPTS,
+      durationMs,
+      resultCode: result.resultCode,
+    });
+    if (operationalLogLevel(result.outcome) === "info") {
+      logger.info(fields, description);
     } else {
-      logger.warn(fields, "Webhook queue message completed with a non-success outcome");
+      logger.warn(fields, description);
     }
   } catch (error) {
     const safeError = toSafeOperationalErrorFields(error, {
@@ -84,6 +126,7 @@ async function processWebhookMessage(
       : "ack";
     if (safeError.retryable) message.retry();
     else message.ack();
+    const durationMs = Date.now() - startedAt;
     logger.error(
       {
         event: "queue.message.failed",
@@ -99,9 +142,18 @@ async function processWebhookMessage(
         disposition,
         ...safeError,
         messageCount,
-        durationMs: Date.now() - startedAt,
+        durationMs,
       },
-      "Webhook queue message failed",
+      describeQueueMessageResult({
+        flow: "line-webhook",
+        outcome: "failed",
+        disposition,
+        stage: safeError.stage,
+        attempt: message.attempts,
+        maxAttempts: WEBHOOK_QUEUE_MAX_ATTEMPTS,
+        durationMs,
+        error: safeError,
+      }),
     );
   }
 }
@@ -124,10 +176,11 @@ export async function handleQueueBatch(
       queue: batch.queue,
       count: batch.messages.length,
     },
-    "Received batch from queue",
+    `[Queue dispatch] received ${batch.messages.length} message(s) from ${batch.queue}`,
   );
 
   for (const message of batch.messages) {
+    const startedAt = Date.now();
     try {
       if ("type" in message.body && message.body.type === "avatar") {
         if (!cf || !workerConfig) throw new Error("Avatar bindings are not configured");
@@ -154,11 +207,20 @@ export async function handleQueueBatch(
     } catch (err) {
       // errをそのまま載せると、SDKの例外が抱えるrequest/response bodyから
       // 日記本文やContext Packageがlogへ流出しうる。識別できる情報だけを残す。
+      const safeError = toSafeOperationalErrorFields(err, {
+        code: "UNEXPECTED_QUEUE_MESSAGE_ERROR",
+        category: "unknown",
+        stage: "queue.dispatch",
+        retryable: true,
+      });
+      const flow = flowOf(message.body);
+      const durationMs = Date.now() - startedAt;
       logger.error(
         {
           event: "queue.message.failed",
           service: "worker",
           environment: workerConfig?.environment ?? "unknown",
+          component: flow,
           traceId: "traceId" in message.body ? (message.body.traceId ?? message.id) : message.id,
           ...("traceIds" in message.body && message.body.traceIds?.length
             ? { traceIds: message.body.traceIds }
@@ -168,14 +230,19 @@ export async function handleQueueBatch(
           attempt: message.attempts,
           outcome: "failed",
           disposition: "platform-retry",
-          ...toSafeOperationalErrorFields(err, {
-            code: "UNEXPECTED_QUEUE_MESSAGE_ERROR",
-            category: "unknown",
-            stage: "queue.dispatch",
-            retryable: true,
-          }),
+          ...safeError,
+          durationMs,
         },
-        "Queue message failed",
+        describeQueueMessageResult({
+          flow,
+          outcome: "failed",
+          disposition: "platform-retry",
+          stage: safeError.stage,
+          attempt: message.attempts,
+          maxAttempts: MAX_ATTEMPTS_BY_FLOW[flow],
+          durationMs,
+          error: safeError,
+        }),
       );
       throw err;
     }

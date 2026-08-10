@@ -7,7 +7,7 @@ import {
   compatibilityDataFor,
   d1,
 } from "@me-builder/lib";
-import { logger } from "@me-builder/shared";
+import { logger, toSafeOperationalErrorFields } from "@me-builder/shared";
 import { eq, inArray } from "drizzle-orm";
 import type { Env } from "../types";
 import {
@@ -188,8 +188,20 @@ export class AccountData extends DurableObject<Env> {
         await this.scheduleMaintenance();
       } catch (error) {
         logger.error(
-          { errorName: error instanceof Error ? error.name : "UnknownError" },
-          "AccountData alarm failed; retry scheduled",
+          {
+            event: "alarm.run.failed",
+            service: "worker",
+            component: "account-data",
+            outcome: "failed",
+            disposition: "alarm-retry",
+            ...toSafeOperationalErrorFields(error, {
+              code: "ACCOUNT_DATA_ALARM_FAILED",
+              category: "unknown",
+              stage: "alarm.maintenance",
+              retryable: true,
+            }),
+          },
+          "[AccountData] alarm failed at alarm.maintenance -> alarm-retry (maintenance will be retried on the next alarm)",
         );
         await this.scheduleMaintenanceRetry();
       }

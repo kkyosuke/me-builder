@@ -6,6 +6,12 @@ compatibility_flags = ["nodejs_compat"]
 [observability]
 enabled = true
 
+# Cloudflareが自動で出す起動ログ (Durable Objectのmethod名"execute"、Queue名、alarmの時刻、空のfetch行)
+# はアプリケーションの処理内容を表さず、終端ログを埋もれさせる。結果はアプリケーション側の
+# 終端ログが所有するため、起動ログは出さない。
+[observability.logs]
+invocation_logs = false
+
 [[queues.consumers]]
 queue = "me-builder-webhook-queue-local"
 dead_letter_queue = "me-builder-webhook-dlq-local"

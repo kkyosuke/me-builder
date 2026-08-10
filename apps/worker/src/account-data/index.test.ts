@@ -51,8 +51,16 @@ describe("AccountData alarm", () => {
     expect(chatTurnSend).not.toHaveBeenCalled();
     expect(setAlarm).toHaveBeenCalledWith(nextAttemptAt);
     expect(logger.error).toHaveBeenCalledWith(
-      { errorName: "Error" },
-      "AccountData alarm failed; retry scheduled",
+      expect.objectContaining({
+        event: "alarm.run.failed",
+        component: "account-data",
+        outcome: "failed",
+        disposition: "alarm-retry",
+        errorCode: "ACCOUNT_DATA_ALARM_FAILED",
+        stage: "alarm.maintenance",
+        retryable: true,
+      }),
+      expect.stringContaining("[AccountData] alarm failed at alarm.maintenance -> alarm-retry"),
     );
   });
 });
