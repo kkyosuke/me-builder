@@ -113,6 +113,8 @@ type CardTransition =
   | Readonly<{ type: "select"; direction: -1 | 1; versionId: string }>
   | Readonly<{ type: "regenerate"; direction: 1 }>;
 
+type ProfileSummaryVersion = ProfileSummaryVersioning["versions"][number];
+
 function useReducedMotion(): boolean {
   const [reduced, setReduced] = useState(false);
 
@@ -132,18 +134,19 @@ function SummaryCardStack({
   versioning,
   onSelectVersion,
   onRegenerate,
-  children,
+  renderCard,
 }: {
   versioning: ProfileSummaryVersioning;
   onSelectVersion?: (versionId: string) => void;
   onRegenerate?: () => void;
-  children: ReactNode;
+  renderCard: (version: ProfileSummaryVersion | undefined) => ReactNode;
 }) {
   const dragStart = useRef<{ x: number; y: number; pointerId: number } | null>(null);
   const transitionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [dragX, setDragX] = useState(0);
   const [isReturning, setIsReturning] = useState(false);
   const [transition, setTransition] = useState<CardTransition | null>(null);
+  const [generationCardHeight, setGenerationCardHeight] = useState<number | null>(null);
   const reducedMotion = useReducedMotion();
 
   useEffect(
@@ -167,13 +170,23 @@ function SummaryCardStack({
   );
   const canSwipe =
     !transition && (Boolean(onSelectVersion && versioning.versions.length > 1) || canRegenerate);
-  const olderVersion = versioning.versions[selectedIndex + 1];
+  const adjacentVersion =
+    dragX > 0 ? versioning.versions[selectedIndex - 1] : versioning.versions[selectedIndex + 1];
   const transitionVersion =
     transition?.type === "select"
       ? versioning.versions.find(({ id }) => id === transition.versionId)
       : undefined;
-  const revealedVersion = transitionVersion ?? olderVersion;
+  const revealedVersion = transitionVersion ?? adjacentVersion;
+  const revealedNeedsGenerationOffset = Boolean(
+    revealedVersion?.isLatest && versioning.generation.canRegenerate && !isWorking && onRegenerate,
+  );
+  const showsIncomingCard = Boolean(
+    revealedVersion && (dragX !== 0 || transition?.type === "select"),
+  );
   const hasGenerationCard = canRegenerate || transition?.type === "regenerate";
+  const usesGenerationOffset = canRegenerate || showsGenerationCard;
+  const reservesGenerationStatus =
+    versioning.generation.canRegenerate || versioning.generation.status !== "idle";
 
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (!canSwipe || (event.button !== 0 && event.pointerType !== "touch")) return;
@@ -221,6 +234,9 @@ function SummaryCardStack({
             versionId: action.versionId,
           }
         : { type: "regenerate", direction: 1 };
+    if (nextTransition.type === "regenerate") {
+      setGenerationCardHeight(event.currentTarget.offsetHeight);
+    }
     const complete = () => {
       if (nextTransition.type === "select") onSelectVersion?.(nextTransition.versionId);
       if (nextTransition.type === "regenerate") onRegenerate?.();
@@ -251,10 +267,18 @@ function SummaryCardStack({
           />
         )}
 
-        {revealedVersion && (
+        {versioning.versions.length > 1 && !showsIncomingCard && (
           <div
             aria-hidden="true"
-            className="absolute inset-x-3 top-1.5 bottom-2.5 flex items-start justify-end rounded-3xl border border-sky-200 bg-gradient-to-br from-sky-100 to-violet-100 p-4 text-right shadow-md transition-transform duration-300 ease-out motion-reduce:transition-none dark:border-sky-800 dark:from-sky-950 dark:to-violet-950"
+            className="absolute inset-x-3 top-1.5 bottom-2.5 rounded-3xl border border-sky-200 bg-sky-100/80 dark:border-sky-800 dark:bg-sky-950/70"
+          />
+        )}
+
+        {revealedVersion && showsIncomingCard && (
+          <div
+            aria-hidden="true"
+            data-summary-card-layer="incoming"
+            className={`pointer-events-none absolute z-[5] origin-top transition-all duration-300 ease-out motion-reduce:transition-none ${transition?.type === "select" ? (revealedNeedsGenerationOffset ? "top-0 right-0 left-8" : "inset-x-0 top-0") : "inset-x-3 top-1.5"}`}
             style={{
               transform:
                 transition?.type === "select"
@@ -262,19 +286,14 @@ function SummaryCardStack({
                   : "translate3d(0, 8px, 0) scale(0.96)",
             }}
           >
-            <div>
-              <p className="text-xs font-bold text-violet-700 dark:text-violet-300">
-                {versionLabel(revealedVersion.sequence)}
-              </p>
-              <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">過去の私</p>
-            </div>
+            {renderCard(revealedVersion)}
           </div>
         )}
 
         {hasGenerationCard && (
           <div
             aria-hidden="true"
-            className={`absolute flex items-center rounded-3xl bg-gradient-to-r from-violet-600 to-sky-500 px-3 text-white shadow-lg transition-all duration-300 ease-out motion-reduce:transition-none ${transition?.type === "regenerate" ? "inset-x-0 top-0 bottom-4 z-[5] scale-100" : "inset-y-4 left-0 right-8 scale-100"}`}
+            className={`absolute flex items-center rounded-3xl bg-gradient-to-r from-violet-600 to-sky-500 px-3 text-white shadow-lg transition-all duration-300 ease-out motion-reduce:transition-none ${transition?.type === "regenerate" ? "top-0 right-0 bottom-4 left-8 z-[5] scale-100" : "inset-y-4 left-0 right-8 scale-100"}`}
           >
             <div className="flex w-full items-center gap-3">
               <Sparkles className="size-5 shrink-0" aria-hidden="true" />
@@ -293,16 +312,20 @@ function SummaryCardStack({
         )}
 
         <div
+          data-summary-card-layer="active"
           aria-label={
             showsGenerationCard
               ? `新しい版を作成中、${selectedIndex + 1}/${versioning.versions.length}`
               : `${versionLabel(selected.sequence)}、${selectedIndex + 1}/${versioning.versions.length}`
           }
-          className={`relative z-10 select-none transition-transform ease-out motion-reduce:transition-none ${transition || isReturning ? "duration-300" : "duration-0"} ${canRegenerate ? "ml-8 w-[calc(100%-2rem)]" : "w-full"} ${canSwipe ? "cursor-grab touch-pan-y active:cursor-grabbing" : ""}`}
+          className={`relative z-10 select-none transition-transform ease-out motion-reduce:transition-none ${transition || isReturning ? "duration-300" : "duration-0"} ${usesGenerationOffset ? "ml-8 w-[calc(100%-2rem)]" : "w-full"} ${canSwipe ? "cursor-grab touch-pan-y active:cursor-grabbing" : ""}`}
           style={{
             transform: transition
               ? `translate3d(${transition.direction * 115}%, 0, 0) rotate(${transition.direction * 8}deg)`
               : `translate3d(${dragX}px, 0, 0) rotate(${dragX / 60}deg)`,
+            ...(showsGenerationCard && generationCardHeight
+              ? { height: `${generationCardHeight}px` }
+              : {}),
           }}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
@@ -310,7 +333,9 @@ function SummaryCardStack({
           onPointerCancel={(event) => finishPointer(event, true)}
         >
           {showsGenerationCard ? (
-            <section className="flex min-h-[28rem] flex-col items-center justify-center rounded-3xl border border-violet-300/40 bg-gradient-to-br from-violet-50 via-white to-sky-50 p-8 text-center shadow-xl shadow-slate-950/10 dark:from-violet-950/50 dark:via-slate-800 dark:to-sky-950/40">
+            <section
+              className={`flex flex-col items-center justify-center rounded-3xl border border-violet-300/40 bg-gradient-to-br from-violet-50 via-white to-sky-50 p-8 text-center shadow-xl shadow-slate-950/10 dark:from-violet-950/50 dark:via-slate-800 dark:to-sky-950/40 ${generationCardHeight ? "h-full" : "min-h-[28rem]"}`}
+            >
               <span className="flex size-16 items-center justify-center rounded-3xl bg-violet-500/15 text-violet-700 dark:text-violet-300">
                 <LoaderCircle
                   className="size-8 animate-spin motion-reduce:animate-none"
@@ -338,7 +363,7 @@ function SummaryCardStack({
               )}
             </section>
           ) : (
-            children
+            renderCard(selected)
           )}
         </div>
       </div>
@@ -359,7 +384,7 @@ function SummaryCardStack({
         ))}
       </div>
 
-      <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+      <div className="mt-2 flex min-h-8 flex-wrap items-center justify-between gap-2 text-xs">
         <p className="text-slate-500 dark:text-slate-400">
           {versioning.versions.length > 1
             ? selected.isLatest
@@ -380,24 +405,33 @@ function SummaryCardStack({
         )}
       </div>
 
-      {canRegenerate && reasonText && (
-        <p className="mt-2 text-xs text-violet-700 dark:text-violet-300">{reasonText}</p>
+      {reasonText && (
+        <p
+          aria-hidden={!canRegenerate}
+          className={`mt-2 min-h-4 text-xs text-violet-700 dark:text-violet-300 ${canRegenerate ? "visible" : "invisible"}`}
+        >
+          {reasonText}
+        </p>
       )}
 
-      {isWorking && (
-        <output className="mt-3 flex items-center gap-2 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
-          <LoaderCircle
-            className="size-4 animate-spin motion-reduce:animate-none"
-            aria-hidden="true"
-          />
-          新しい版を作成しています。完了するまで、現在の版や過去の版を確認できます。
-        </output>
-      )}
-      {versioning.generation.status === "failed" && (
-        <p className="mt-3 text-xs leading-relaxed text-red-700 dark:text-red-300" role="alert">
-          {versioning.generation.message ??
-            "新しい版を作成できませんでした。現在の版を残したまま再試行できます。"}
-        </p>
+      {reservesGenerationStatus && (
+        <div className="mt-3 min-h-5">
+          {isWorking && (
+            <output className="flex items-center gap-2 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+              <LoaderCircle
+                className="size-4 animate-spin motion-reduce:animate-none"
+                aria-hidden="true"
+              />
+              新しい版を作成しています。完了するまで、現在の版や過去の版を確認できます。
+            </output>
+          )}
+          {versioning.generation.status === "failed" && (
+            <p className="text-xs leading-relaxed text-red-700 dark:text-red-300" role="alert">
+              {versioning.generation.message ??
+                "新しい版を作成できませんでした。現在の版を残したまま再試行できます。"}
+            </p>
+          )}
+        </div>
       )}
     </section>
   );
@@ -407,22 +441,21 @@ function SummaryCardFrame({
   versioning,
   onSelectVersion,
   onRegenerate,
-  children,
+  renderCard,
 }: {
   versioning?: ProfileSummaryVersioning;
   onSelectVersion?: (versionId: string) => void;
   onRegenerate?: () => void;
-  children: ReactNode;
+  renderCard: (version: ProfileSummaryVersion | undefined) => ReactNode;
 }) {
-  if (!versioning) return <div className="mt-8">{children}</div>;
+  if (!versioning) return <div className="mt-8">{renderCard(undefined)}</div>;
   return (
     <SummaryCardStack
       versioning={versioning}
       {...(onSelectVersion ? { onSelectVersion } : {})}
       {...(onRegenerate ? { onRegenerate } : {})}
-    >
-      {children}
-    </SummaryCardStack>
+      renderCard={renderCard}
+    />
   );
 }
 
@@ -439,8 +472,85 @@ function SummaryContent({
   onSelectVersion?: (versionId: string) => void;
   onRegenerate?: () => void;
 }) {
-  const selectedVersion = versioning?.versions.find(
-    ({ id }) => id === versioning.selectedVersionId,
+  const renderCard = (selectedVersion: ProfileSummaryVersion | undefined) => (
+    <section className="overflow-hidden rounded-3xl border border-sky-300/30 bg-gradient-to-br from-sky-50 via-white to-violet-50 p-5 shadow-xl shadow-slate-950/10 sm:p-6 dark:from-sky-950/40 dark:via-slate-800 dark:to-violet-950/30">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start gap-3">
+          <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-sky-400/15 text-sky-700 dark:text-sky-300">
+            <Sparkles className="size-6" aria-hidden="true" />
+          </span>
+          <div>
+            <p className="text-xs font-semibold tracking-wider text-sky-700 dark:text-sky-300">
+              今のわたし
+            </p>
+            <h2 className="mt-1 text-lg font-bold text-slate-950 dark:text-slate-50">
+              {summary.headline}
+            </h2>
+          </div>
+        </div>
+        {selectedVersion && (
+          <div className="shrink-0 text-right">
+            <p className="inline-flex items-center gap-1 text-xs font-bold text-violet-700 dark:text-violet-300">
+              <History className="size-3.5" aria-hidden="true" />
+              {versionLabel(selectedVersion.sequence)}
+            </p>
+            <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+              {selectedVersion.generationMethod === "ai" ? "AI生成" : "現在の集計"}
+              {`・${formatDate(selectedVersion.generatedAt)}`}
+            </p>
+          </div>
+        )}
+      </div>
+
+      <ol className="mt-5 space-y-3">
+        {summary.insights.map((insight, index) => (
+          <li key={insight.key} className="rounded-2xl bg-white/80 p-4 dark:bg-slate-900/60">
+            <div className="flex items-center gap-2">
+              <span className="flex size-6 items-center justify-center rounded-full bg-sky-500 text-xs font-bold text-white">
+                {index + 1}
+              </span>
+              <h3 className="font-bold text-slate-950 dark:text-slate-50">{insight.label}</h3>
+            </div>
+            <p className="mt-2 text-sm leading-relaxed text-slate-700 dark:text-slate-300">
+              {insight.description}
+            </p>
+            <p className="mt-3 flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
+              <span>根拠</span>
+              {insight.sources.map((source) => (
+                <span
+                  key={source}
+                  className="rounded-full bg-slate-100 px-2 py-1 dark:bg-slate-700"
+                >
+                  {sourceLabels[source]}
+                </span>
+              ))}
+              <span>{`${insight.evidenceCount}件`}</span>
+            </p>
+          </li>
+        ))}
+      </ol>
+
+      <dl className="mt-5 grid grid-cols-3 gap-2 border-t border-slate-200/80 pt-4 text-center dark:border-slate-700">
+        <div>
+          <dt className="text-xs text-slate-500">診断</dt>
+          <dd className="mt-1 font-bold text-slate-900 dark:text-slate-100">
+            {summary.diagnosisCount}件
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs text-slate-500">日記</dt>
+          <dd className="mt-1 font-bold text-slate-900 dark:text-slate-100">
+            {summary.diaryCount}件
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs text-slate-500">最終記録</dt>
+          <dd className="mt-1 text-sm font-bold text-slate-900 dark:text-slate-100">
+            {summary.latestRecordedAt ? formatDate(summary.latestRecordedAt) : "—"}
+          </dd>
+        </div>
+      </dl>
+    </section>
   );
   return (
     <>
@@ -448,86 +558,8 @@ function SummaryContent({
         {...(versioning ? { versioning } : {})}
         {...(onSelectVersion ? { onSelectVersion } : {})}
         {...(onRegenerate ? { onRegenerate } : {})}
-      >
-        <section className="overflow-hidden rounded-3xl border border-sky-300/30 bg-gradient-to-br from-sky-50 via-white to-violet-50 p-5 shadow-xl shadow-slate-950/10 sm:p-6 dark:from-sky-950/40 dark:via-slate-800 dark:to-violet-950/30">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-start gap-3">
-              <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-sky-400/15 text-sky-700 dark:text-sky-300">
-                <Sparkles className="size-6" aria-hidden="true" />
-              </span>
-              <div>
-                <p className="text-xs font-semibold tracking-wider text-sky-700 dark:text-sky-300">
-                  今のわたし
-                </p>
-                <h2 className="mt-1 text-lg font-bold text-slate-950 dark:text-slate-50">
-                  {summary.headline}
-                </h2>
-              </div>
-            </div>
-            {selectedVersion && (
-              <div className="shrink-0 text-right">
-                <p className="inline-flex items-center gap-1 text-xs font-bold text-violet-700 dark:text-violet-300">
-                  <History className="size-3.5" aria-hidden="true" />
-                  {versionLabel(selectedVersion.sequence)}
-                </p>
-                <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
-                  {selectedVersion.generationMethod === "ai" ? "AI生成" : "現在の集計"}
-                  {`・${formatDate(selectedVersion.generatedAt)}`}
-                </p>
-              </div>
-            )}
-          </div>
-
-          <ol className="mt-5 space-y-3">
-            {summary.insights.map((insight, index) => (
-              <li key={insight.key} className="rounded-2xl bg-white/80 p-4 dark:bg-slate-900/60">
-                <div className="flex items-center gap-2">
-                  <span className="flex size-6 items-center justify-center rounded-full bg-sky-500 text-xs font-bold text-white">
-                    {index + 1}
-                  </span>
-                  <h3 className="font-bold text-slate-950 dark:text-slate-50">{insight.label}</h3>
-                </div>
-                <p className="mt-2 text-sm leading-relaxed text-slate-700 dark:text-slate-300">
-                  {insight.description}
-                </p>
-                <p className="mt-3 flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
-                  <span>根拠</span>
-                  {insight.sources.map((source) => (
-                    <span
-                      key={source}
-                      className="rounded-full bg-slate-100 px-2 py-1 dark:bg-slate-700"
-                    >
-                      {sourceLabels[source]}
-                    </span>
-                  ))}
-                  <span>{`${insight.evidenceCount}件`}</span>
-                </p>
-              </li>
-            ))}
-          </ol>
-
-          <dl className="mt-5 grid grid-cols-3 gap-2 border-t border-slate-200/80 pt-4 text-center dark:border-slate-700">
-            <div>
-              <dt className="text-xs text-slate-500">診断</dt>
-              <dd className="mt-1 font-bold text-slate-900 dark:text-slate-100">
-                {summary.diagnosisCount}件
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs text-slate-500">日記</dt>
-              <dd className="mt-1 font-bold text-slate-900 dark:text-slate-100">
-                {summary.diaryCount}件
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs text-slate-500">最終記録</dt>
-              <dd className="mt-1 text-sm font-bold text-slate-900 dark:text-slate-100">
-                {summary.latestRecordedAt ? formatDate(summary.latestRecordedAt) : "—"}
-              </dd>
-            </div>
-          </dl>
-        </section>
-      </SummaryCardFrame>
+        renderCard={renderCard}
+      />
 
       <p className="mt-4 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
         これは記録の範囲から見える現在のまとめです。あなた自身や健康状態を断定するものではなく、記録が変わると内容も変わります。

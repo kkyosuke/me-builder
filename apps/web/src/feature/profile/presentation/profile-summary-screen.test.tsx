@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ProfileSummary, ProfileSummaryVersioning } from "../model/profile-summary";
 import { ProfileSummaryScreen } from "./profile-summary-screen";
@@ -149,7 +150,7 @@ describe("ProfileSummaryScreen", () => {
     vi.useFakeTimers();
     const onSelectVersion = vi.fn();
     const onRegenerate = vi.fn();
-    const { rerender } = render(
+    const { container, rerender } = render(
       <ProfileSummaryScreen
         state={{ status: "success", data: { summary, nextAction: "chat" } }}
         versioning={versioning}
@@ -204,9 +205,50 @@ describe("ProfileSummaryScreen", () => {
       pointerId: 3,
     });
     firePointer(pastCard, "pointerup", { clientX: 100, clientY: 12, pointerId: 3 });
+    const incomingCard = container.querySelector('[data-summary-card-layer="incoming"]');
+    expect(incomingCard?.textContent).toContain("第3版");
+    expect(incomingCard?.textContent).toContain(summary.headline);
+    expect(incomingCard?.className).toContain("left-8");
     act(() => vi.advanceTimersByTime(300));
     expect(onSelectVersion).toHaveBeenLastCalledWith("version-3");
     expect(screen.queryByRole("button", { name: "新しい私を見る" })).toBeNull();
+  });
+
+  it("作成中カードへスワイプ元の高さを引き継ぐ", () => {
+    vi.useFakeTimers();
+
+    function GenerationHarness() {
+      const [status, setStatus] = useState<"idle" | "generating">("idle");
+      return (
+        <ProfileSummaryScreen
+          state={{ status: "success", data: { summary, nextAction: "chat" } }}
+          versioning={{
+            ...versioning,
+            generation: { ...versioning.generation, status },
+          }}
+          onRetry={vi.fn()}
+          onSelectVersion={vi.fn()}
+          onRegenerate={() => setStatus("generating")}
+        />
+      );
+    }
+
+    render(<GenerationHarness />);
+    const latestCard = screen.getByLabelText("第3版、1/2");
+    Object.defineProperty(latestCard, "offsetHeight", { configurable: true, value: 640 });
+    firePointer(latestCard, "pointerdown", {
+      button: 0,
+      clientX: 0,
+      clientY: 10,
+      pointerId: 4,
+    });
+    firePointer(latestCard, "pointerup", { clientX: 100, clientY: 12, pointerId: 4 });
+    act(() => vi.advanceTimersByTime(300));
+
+    const generationCard = screen.getByLabelText("新しい版を作成中、1/2");
+    expect(generationCard.getAttribute("style")).toContain("height: 640px");
+    expect(generationCard.className).toContain("ml-8");
+    expect(generationCard.className).toContain("w-[calc(100%-2rem)]");
   });
 
   it("過去版では生成操作を隠し、生成中も現在の版を閲覧できると伝える", () => {
