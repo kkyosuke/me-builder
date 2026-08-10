@@ -33,10 +33,66 @@ const DUMMY_SUMMARY = {
   latestRecordedAt: "2026-08-08T11:45:00.000Z",
 } as const;
 
+const DUMMY_PROFILE_SUMMARY_READ_MODEL = {
+  versions: [
+    {
+      id: "summary-version-3",
+      sequence: 3,
+      generatedAt: DUMMY_SUMMARY.generatedAt,
+      isLatest: true,
+      generationMethod: "ai" as const,
+      summary: DUMMY_SUMMARY,
+    },
+    {
+      id: "summary-version-2",
+      sequence: 2,
+      generatedAt: "2026-08-01T12:00:00.000Z",
+      isLatest: false,
+      generationMethod: "ai" as const,
+      summary: {
+        ...DUMMY_SUMMARY,
+        generatedAt: "2026-08-01T12:00:00.000Z",
+        headline: "少し前の記録では、こんなあなたらしさが見えていました",
+        insights: DUMMY_SUMMARY.insights.slice(0, 2),
+        recordCount: 3,
+        diagnosisCount: 2,
+        diaryCount: 1,
+        latestRecordedAt: "2026-08-01T11:30:00.000Z",
+      },
+    },
+    {
+      id: "summary-version-1",
+      sequence: 1,
+      generatedAt: "2026-07-24T12:00:00.000Z",
+      isLatest: false,
+      generationMethod: "ai" as const,
+      summary: {
+        ...DUMMY_SUMMARY,
+        generatedAt: "2026-07-24T12:00:00.000Z",
+        headline: "最初の記録から、こんなあなたらしさが見えていました",
+        insights: DUMMY_SUMMARY.insights.slice(0, 1),
+        recordCount: 2,
+        diagnosisCount: 1,
+        diaryCount: 1,
+        latestRecordedAt: "2026-07-24T11:15:00.000Z",
+      },
+    },
+  ],
+  availableDataCounts: { diagnosis: 3, diary: 6 },
+  generation: {
+    status: "idle" as const,
+    canRegenerate: false,
+    reasons: [],
+    message: null,
+  },
+} as const;
+
 export type ProfileSummaryOutcome =
   | {
       type: "resolved";
-      summary: typeof DUMMY_SUMMARY | null;
+      versions: typeof DUMMY_PROFILE_SUMMARY_READ_MODEL.versions | readonly [];
+      availableDataCounts: Readonly<{ diagnosis: number; diary: number }>;
+      generation: typeof DUMMY_PROFILE_SUMMARY_READ_MODEL.generation;
       nextAction: "diagnosis" | "chat";
     }
   | { type: "not-configured" }
@@ -62,7 +118,7 @@ type Dependencies = {
     accountData: AccountDataNamespace | undefined,
     accountId: string,
   ) => ReturnType<typeof d1.action.source.hasActiveSourceRecords>;
-  summary: typeof DUMMY_SUMMARY | null;
+  readModel: typeof DUMMY_PROFILE_SUMMARY_READ_MODEL;
 };
 
 const defaultDependencies: Dependencies = {
@@ -75,7 +131,7 @@ const defaultDependencies: Dependencies = {
     if (!accountData) throw new Error("ACCOUNT_DATA binding is not configured");
     return accountDataFor(accountData, accountId).execute("source.hasActive");
   },
-  summary: DUMMY_SUMMARY,
+  readModel: DUMMY_PROFILE_SUMMARY_READ_MODEL,
 };
 
 /** 本人のまとめを返し、実際の診断進捗だけから次の行動を決める。 */
@@ -96,7 +152,11 @@ export async function getProfileSummary(
 
   return {
     type: "resolved",
-    summary: hasRecords ? dependencies.summary : null,
+    versions: hasRecords ? dependencies.readModel.versions : [],
+    availableDataCounts: hasRecords
+      ? dependencies.readModel.availableDataCounts
+      : { diagnosis: 0, diary: 0 },
+    generation: dependencies.readModel.generation,
     nextAction: hasAnswerableDiagnosis ? "diagnosis" : "chat",
   };
 }

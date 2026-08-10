@@ -397,29 +397,49 @@ export interface operations {
     };
     requestBody?: never;
     responses: {
-      /** @description 本人向けのまとめと、次にできること */
+      /** @description 本人向けの保存済みまとめ版、現在使えるデータ件数、生成状態と次にできること */
       200: {
         headers: {
           [name: string]: unknown;
         };
         content: {
           "application/json": {
-            summary: {
+            versions: {
+              id: string;
+              sequence: number | null;
               /** Format: date-time */
               generatedAt: string;
-              headline: string;
-              insights: {
-                key: string;
-                label: string;
-                description: string;
-                evidenceCount: number;
-                sources: ("diagnosis" | "diary")[];
-              }[];
-              recordCount: number;
-              diagnosisCount: number;
-              diaryCount: number;
-              latestRecordedAt: string | null;
-            } | null;
+              isLatest: boolean;
+              /** @enum {string} */
+              generationMethod: "ai" | "deterministic";
+              summary: {
+                /** Format: date-time */
+                generatedAt: string;
+                headline: string;
+                insights: {
+                  key: string;
+                  label: string;
+                  description: string;
+                  evidenceCount: number;
+                  sources: ("diagnosis" | "diary")[];
+                }[];
+                recordCount: number;
+                diagnosisCount: number;
+                diaryCount: number;
+                latestRecordedAt: string | null;
+              };
+            }[];
+            availableDataCounts: {
+              diagnosis: number;
+              diary: number;
+            };
+            generation: {
+              /** @enum {string} */
+              status: "idle" | "queued" | "generating" | "failed";
+              canRegenerate: boolean;
+              reasons: ("diagnosis" | "brain" | "elapsed")[];
+              message: string | null;
+            };
             /** @enum {string} */
             nextAction: "diagnosis" | "chat";
           };

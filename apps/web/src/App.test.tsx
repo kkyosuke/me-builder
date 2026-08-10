@@ -183,24 +183,49 @@ describe("App", () => {
       deletedSourceRecordCount: 10,
       deletedBrainItemCount: 4,
     });
+    const profileSummary = {
+      generatedAt: "2026-08-08T12:00:00.000Z",
+      headline: "最近の記録から、こんなあなたらしさが見えています",
+      insights: [
+        {
+          key: "prepare",
+          label: "見通しを持って動く",
+          description: "説明",
+          evidenceCount: 2,
+          sources: ["diagnosis", "diary"] as const,
+        },
+      ],
+      recordCount: 2,
+      diagnosisCount: 1,
+      diaryCount: 1,
+      latestRecordedAt: "2026-08-08T11:45:00.000Z",
+    } as const;
     mocks.fetchProfileSummary.mockResolvedValue({
-      summary: {
-        generatedAt: "2026-08-08T12:00:00.000Z",
-        headline: "最近の記録から、こんなあなたらしさが見えています",
-        insights: [
-          {
-            key: "prepare",
-            label: "見通しを持って動く",
-            description: "説明",
-            evidenceCount: 2,
-            sources: ["diagnosis", "diary"],
+      summary: profileSummary,
+      versions: [
+        {
+          id: "version-1",
+          sequence: 2,
+          generatedAt: profileSummary.generatedAt,
+          isLatest: true,
+          generationMethod: "ai",
+          summary: profileSummary,
+        },
+        {
+          id: "version-previous",
+          sequence: 1,
+          generatedAt: "2026-08-01T12:00:00.000Z",
+          isLatest: false,
+          generationMethod: "ai",
+          summary: {
+            ...profileSummary,
+            generatedAt: "2026-08-01T12:00:00.000Z",
+            headline: "過去の記録から見えたあなたらしさ",
           },
-        ],
-        recordCount: 2,
-        diagnosisCount: 1,
-        diaryCount: 1,
-        latestRecordedAt: "2026-08-08T11:45:00.000Z",
-      },
+        },
+      ],
+      availableDataCounts: { diagnosis: 2, diary: 5 },
+      generation: { status: "idle", canRegenerate: false, reasons: [] },
       nextAction: "diagnosis",
     });
     mocks.fetchDevelopmentBrainItems.mockResolvedValue({
@@ -365,6 +390,24 @@ describe("App", () => {
       expect.any(AbortSignal),
     );
     expect(mocks.fetchDiagnosisList).not.toHaveBeenCalled();
+  });
+
+  it("/meではGET APIが返した過去版の本文へ切り替えられる", async () => {
+    window.history.replaceState({}, "", "/me");
+
+    render(<App />);
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "最近の記録から、こんなあなたらしさが見えています",
+      }),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "第1版を表示" }));
+    expect(
+      await screen.findByRole("heading", { name: "過去の記録から見えたあなたらしさ" }),
+    ).toBeTruthy();
+    expect(screen.getByText("現在 2件")).toBeTruthy();
+    expect(screen.getByText("現在 5件")).toBeTruthy();
   });
 
   it("LIFF初期化前にliff.stateへ保持された/meでもまとめ画面を表示する", async () => {
