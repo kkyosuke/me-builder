@@ -80,6 +80,7 @@ function AppContents() {
   const isCompatibilityPath =
     pathname === "/compatibility" || pathname.startsWith("/compatibility/");
   const isMePath = pathname === "/me" || pathname.startsWith("/me/");
+  const isProfileOpen = profileView !== "closed";
   const currentMainRoute = isCompatibilityPath ? "compatibility" : isMePath ? "me" : "diagnosis";
   const [avatar, setAvatar] = useState<AvatarSelection | null>(null);
   const [accountRole, setAccountRole] = useState<"user" | "admin" | null>(null);
@@ -130,12 +131,12 @@ function AppContents() {
   }, [currentMainRoute, isAdminPath]);
 
   useEffect(() => {
-    if (profileView !== "profile") return;
+    if (!isProfileOpen) return;
     return scheduleIdlePreloadAfter(loadProfileSettingsScreen, preloadAvatarSettingsScreen);
-  }, [profileView]);
+  }, [isProfileOpen]);
 
   useEffect(() => {
-    if (profileView !== "profile") return;
+    if (!isProfileOpen) return;
 
     const controller = new AbortController();
     setAccountRole(null);
@@ -156,7 +157,7 @@ function AppContents() {
       controller.abort();
       setAccountRole(null);
     };
-  }, [liffSession.acquireIdToken, profileView]);
+  }, [isProfileOpen, liffSession.acquireIdToken]);
 
   const openProfile = () => {
     shouldRestoreProfileButtonFocus.current = true;
@@ -217,7 +218,7 @@ function AppContents() {
           </Suspense>
         </RouteErrorBoundary>
       </div>
-      {profileView === "profile" && (
+      {isProfileOpen && (
         <RouteErrorBoundary>
           <Suspense
             fallback={
@@ -227,6 +228,8 @@ function AppContents() {
             <ProfileSettingsScreen
               avatar={avatar}
               isAdmin={accountRole === "admin"}
+              isInactive={profileView === "avatar"}
+              linePictureUrl={liffSession.profile?.pictureUrl}
               theme={colorTheme.theme}
               onBack={closeProfile}
               onOpenAvatar={openAvatar}
@@ -239,11 +242,12 @@ function AppContents() {
         <RouteErrorBoundary>
           <Suspense
             fallback={
-              <LoadingState message="アバター設定を読み込んでいます..." variant="overlay" />
+              <LoadingState message="アバター変更を読み込んでいます..." variant="overlay" />
             }
           >
             <AvatarSettingsScreen
               currentAvatar={avatar}
+              linePictureUrl={liffSession.profile?.pictureUrl}
               onBack={closeAvatar}
               onSave={(nextAvatar) => {
                 setAvatar(nextAvatar);
