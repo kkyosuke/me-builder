@@ -1,14 +1,12 @@
 import { useEffect, useState } from "react";
 import {
   type CompatibilityRoute,
-  resolveCompatibilityPathname,
   resolveCompatibilityRoute,
 } from "../../model/compatibility-route";
 
 function currentRoute(): CompatibilityRoute {
   if (typeof window === "undefined") return "list";
-  const pathname = resolveCompatibilityPathname(window.location.pathname, window.location.search);
-  return resolveCompatibilityRoute(pathname);
+  return resolveCompatibilityRoute(window.location.pathname);
 }
 
 export function useCompatibilityRoute(): CompatibilityRoute {

@@ -164,6 +164,12 @@ function diagnosis(overrides: Partial<DiagnosisListItem> = {}): DiagnosisListIte
   };
 }
 
+async function enabledProfileButton(): Promise<HTMLButtonElement> {
+  return (await screen.findByRole("button", {
+    name: "プロフィールを開く",
+  })) as HTMLButtonElement;
+}
+
 describe("App", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -269,7 +275,7 @@ describe("App", () => {
   it("右上からプロフィールを開き、ライトテーマへ切り替えて保存する", async () => {
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "プロフィールを開く" }));
+    fireEvent.click(await enabledProfileButton());
     expect(await screen.findByRole("heading", { name: "プロフィール" })).toBeTruthy();
     const lightTheme = screen.getByRole("radio", { name: /ライト/ });
     await waitFor(() => expect(document.documentElement.classList.contains("dark")).toBe(true));
@@ -287,7 +293,7 @@ describe("App", () => {
 
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "プロフィールを開く" }));
+    fireEvent.click(await enabledProfileButton());
     expect(
       ((await screen.findByRole("radio", { name: /ライト/ })) as HTMLInputElement).checked,
     ).toBe(true);
@@ -298,7 +304,7 @@ describe("App", () => {
     mocks.verifyLiffSession.mockResolvedValue({ status: "verified", role: "admin" });
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "プロフィールを開く" }));
+    fireEvent.click(await enabledProfileButton());
 
     const adminLink = await screen.findByRole("link", { name: /管理者画面を開く/ });
     expect(adminLink.getAttribute("href")).toBe("/admin");
@@ -347,7 +353,7 @@ describe("App", () => {
     });
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "プロフィールを開く" }));
+    fireEvent.click(await enabledProfileButton());
     fireEvent.click(await screen.findByRole("button", { name: /アバターを設定/ }));
 
     expect(await screen.findByRole("heading", { name: "アバター設定" })).toBeTruthy();
@@ -376,14 +382,16 @@ describe("App", () => {
   it("プロフィールとアバター設定をブラウザ履歴で戻れる", async () => {
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "プロフィールを開く" }));
+    fireEvent.click(await enabledProfileButton());
     expect(window.location.pathname).toBe("/profile");
     expect(await screen.findByRole("dialog", { name: "プロフィール" })).toBeTruthy();
     const background = screen.getByRole("dialog", { name: "プロフィール" }).previousElementSibling;
     expect(background?.getAttribute("aria-hidden")).toBe("true");
     expect(background?.hasAttribute("inert")).toBe(true);
-    expect(document.activeElement).toBe(
-      screen.getByRole("button", { name: "プロフィールを閉じる" }),
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole("button", { name: "プロフィールを閉じる" }),
+      ),
     );
 
     fireEvent.click(screen.getByRole("button", { name: /アバターを設定/ }));
@@ -397,7 +405,11 @@ describe("App", () => {
     act(() => window.history.back());
     await waitFor(() => expect(window.location.pathname).toBe("/"));
     expect(screen.queryByRole("dialog")).toBeNull();
-    expect(document.activeElement).toBe(screen.getByRole("button", { name: "プロフィールを開く" }));
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole("button", { name: "プロフィールを開く" }),
+      ),
+    );
   });
 
   it("/profileの直接表示を閉じるとわたしのまとめへ戻る", async () => {
@@ -436,13 +448,56 @@ describe("App", () => {
     expect(mocks.fetchDiagnosisList).not.toHaveBeenCalled();
   });
 
-  it("LIFF初期化前にliff.stateへ保持された/meでもまとめ画面を表示する", async () => {
+  it("liff.stateは直接解釈せずLIFF初期化後に復元されたURLを表示する", async () => {
     window.history.replaceState({}, "", "/?liff.state=%2Fme");
+    mocks.initializeLiff.mockImplementation(async () => {
+      expect(window.location.pathname).toBe("/");
+      window.history.replaceState({}, "", "/me");
+      return {
+        status: "ready",
+        inClient: true,
+        profile: { displayName: "テスト" },
+      };
+    });
 
     render(<App />);
 
     expect(await screen.findByRole("heading", { name: "わたしのまとめ" })).toBeTruthy();
-    expect(mocks.fetchDiagnosisList).not.toHaveBeenCalled();
+    expect(mocks.fetchProfileSummary).toHaveBeenCalled();
+    expect(mocks.initializeLiff).toHaveBeenCalledTimes(1);
+  });
+
+  it("LIFF初期化が完了するまでプロフィール画面へ遷移しない", async () => {
+    let resolveInitialization:
+      | ((state: {
+          status: "ready";
+          inClient: true;
+          profile: { displayName: string };
+        }) => void)
+      | undefined;
+    mocks.initializeLiff.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveInitialization = resolve;
+        }),
+    );
+
+    render(<App />);
+
+    expect(screen.getByText("LINEとの接続を準備しています...")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "プロフィールを開く" })).toBeNull();
+    expect(window.location.pathname).toBe("/");
+
+    await act(async () => {
+      resolveInitialization?.({
+        status: "ready",
+        inClient: true,
+        profile: { displayName: "テスト" },
+      });
+    });
+    fireEvent.click(await enabledProfileButton());
+
+    expect(window.location.pathname).toBe("/profile");
   });
 
   it("Strict Modeでもまとめ取得を多重実行しない", async () => {
@@ -490,8 +545,8 @@ describe("App", () => {
     expect(mocks.fetchDiagnosisList).not.toHaveBeenCalled();
   });
 
-  it("LIFFの招待リンクから相性の確認画面を直接表示する", async () => {
-    window.history.replaceState({}, "", "/?liff.state=%2Fcompatibility%2Finvitations%2Fdemo");
+  it("LIFF初期化後の招待パスから相性の確認画面を直接表示する", async () => {
+    window.history.replaceState({}, "", "/compatibility/invitations/demo");
 
     render(<App />);
 

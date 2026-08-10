@@ -1,13 +1,5 @@
 export type CompatibilityRoute = "invitation" | "list" | "result" | "share";
 
-export function resolveCompatibilityPathname(pathname: string, search: string): string {
-  if (pathname.startsWith("/compatibility")) return pathname;
-
-  const liffState = new URLSearchParams(search).get("liff.state");
-  if (!liffState?.startsWith("/compatibility")) return pathname;
-  return liffState.split(/[?#]/, 1)[0] ?? pathname;
-}
-
 export function resolveCompatibilityRoute(pathname: string): CompatibilityRoute {
   if (pathname.startsWith("/compatibility/invitations/")) return "invitation";
   if (pathname === "/compatibility/share") return "share";

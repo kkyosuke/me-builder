@@ -2,7 +2,7 @@
 
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useLiffSession } from "./use-liff-session";
+import { useLiffSessionState } from "./use-liff-session";
 
 const mocks = vi.hoisted(() => ({
   initializeLiff: vi.fn(),
@@ -17,7 +17,7 @@ vi.mock("../../infrastructure/liff-client", () => ({
   getLiffIdToken: mocks.getLiffIdToken,
 }));
 
-describe("useLiffSession", () => {
+describe("useLiffSessionState", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.initializeLiff.mockResolvedValue({
@@ -29,7 +29,7 @@ describe("useLiffSession", () => {
   });
 
   it("LIFF初期化後にIDトークンを返す", async () => {
-    const { result } = renderHook(() => useLiffSession());
+    const { result } = renderHook(() => useLiffSessionState(false));
 
     await expect(result.current.acquireIdToken(new AbortController().signal)).resolves.toBe(
       "dummy.id.token",
@@ -45,7 +45,7 @@ describe("useLiffSession", () => {
           resolveInitialization = resolve;
         }),
     );
-    const { result } = renderHook(() => useLiffSession());
+    const { result } = renderHook(() => useLiffSessionState(false));
 
     const first = result.current.acquireIdToken(new AbortController().signal);
     const second = result.current.acquireIdToken(new AbortController().signal);
@@ -64,7 +64,7 @@ describe("useLiffSession", () => {
 
   it("ログイン遷移中はAPI取得を続行しない", async () => {
     mocks.initializeLiff.mockResolvedValue({ status: "login-required" });
-    const { result } = renderHook(() => useLiffSession());
+    const { result } = renderHook(() => useLiffSessionState(false));
 
     await expect(result.current.acquireIdToken(new AbortController().signal)).resolves.toBeNull();
     expect(mocks.getLiffIdToken).not.toHaveBeenCalled();
@@ -72,7 +72,7 @@ describe("useLiffSession", () => {
 
   it("IDトークンを取得できなければ表示可能なエラーにする", async () => {
     mocks.getLiffIdToken.mockReturnValue(null);
-    const { result } = renderHook(() => useLiffSession());
+    const { result } = renderHook(() => useLiffSessionState(false));
 
     await expect(result.current.acquireIdToken(new AbortController().signal)).rejects.toThrow(
       "IDトークンを取得できませんでした",

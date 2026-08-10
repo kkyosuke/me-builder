@@ -2,7 +2,7 @@ import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react"
 import { LoadingState } from "./components/loading-state";
 import { RouteErrorBoundary } from "./components/route-error-boundary";
 import { config } from "./config";
-import { useLiffSession } from "./feature/liff";
+import { LiffSessionProvider, useLiffSession } from "./feature/liff";
 import { getLiffIdToken } from "./feature/liff/infrastructure/liff-client";
 import { verifyLiffSession } from "./feature/liff/infrastructure/session-api";
 import { ProfileMenuButton, useAvatarSettings } from "./feature/profile-settings";
@@ -49,18 +49,11 @@ function resolveRequestedPathname(): string {
   if (typeof window === "undefined") {
     return "/diagnosis";
   }
-  if (window.location.pathname !== "/") {
-    return window.location.pathname;
-  }
-
-  const liffState = new URLSearchParams(window.location.search).get("liff.state");
-  if (!liffState?.startsWith("/")) {
-    return window.location.pathname;
-  }
-  return liffState.split(/[?#]/, 1)[0] ?? window.location.pathname;
+  // LIFF SDKが初期化中にliff.stateを実URLへ復元するため、ここでは解釈しない。
+  return window.location.pathname;
 }
 
-export function App() {
+function AppContents() {
   const colorTheme = useColorTheme();
   const liffSession = useLiffSession();
   const [navigation, setNavigation] = useState(() => {
@@ -73,7 +66,7 @@ export function App() {
   });
   const profileButtonRef = useRef<HTMLButtonElement>(null);
   const applicationContentRef = useRef<HTMLDivElement>(null);
-  const shouldRestoreProfileButtonFocus = useRef(false);
+  const previousProfileView = useRef(navigation.profileView);
   const { pathname, profileView } = navigation;
   const isAdminPath = pathname.startsWith("/admin");
   const isCompatibilityPath =
@@ -111,9 +104,34 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    if (profileView !== "closed" || !shouldRestoreProfileButtonFocus.current) return;
-    shouldRestoreProfileButtonFocus.current = false;
-    profileButtonRef.current?.focus();
+    if (liffSession.isInitializing) return;
+
+    // liff.init() が primary redirect の liff.state を実URLへ復元した後にだけ、
+    // そのURLをReact側のナビゲーション状態へ反映する。
+    const requestedPathname = resolveRequestedPathname();
+    const nextProfileView = resolveProfileView(requestedPathname);
+    setNavigation((current) => {
+      const nextNavigation = {
+        pathname: nextProfileView === "closed" ? requestedPathname : current.pathname,
+        profileView: nextProfileView,
+      };
+      return current.pathname === nextNavigation.pathname &&
+        current.profileView === nextNavigation.profileView
+        ? current
+        : nextNavigation;
+    });
+  }, [liffSession.isInitializing]);
+
+  useEffect(() => {
+    const previousView = previousProfileView.current;
+    previousProfileView.current = profileView;
+    if (profileView !== "closed" || previousView === "closed") return;
+    const animationFrame = window.requestAnimationFrame(() => {
+      const profileButton = profileButtonRef.current;
+      if (!profileButton) return;
+      profileButton.focus();
+    });
+    return () => window.cancelAnimationFrame(animationFrame);
   }, [profileView]);
 
   useEffect(() => {
@@ -170,7 +188,6 @@ export function App() {
   }, [liffSession.acquireIdToken, profileView]);
 
   const openProfile = () => {
-    shouldRestoreProfileButtonFocus.current = true;
     window.history.pushState({ [PROFILE_HISTORY_STATE_KEY]: "profile" }, "", "/profile");
     setNavigation((current) => ({ ...current, profileView: "profile" }));
   };
@@ -201,6 +218,10 @@ export function App() {
     window.history.replaceState({}, "", "/profile");
     setNavigation((current) => ({ ...current, profileView: "profile" }));
   };
+
+  if (liffSession.isInitializing) {
+    return <LoadingState message="LINEとの接続を準備しています..." />;
+  }
 
   return (
     <>
@@ -262,5 +283,13 @@ export function App() {
         </RouteErrorBoundary>
       )}
     </>
+  );
+}
+
+export function App() {
+  return (
+    <LiffSessionProvider>
+      <AppContents />
+    </LiffSessionProvider>
   );
 }
