@@ -50,19 +50,55 @@ describe("line.client & line.webhook", () => {
     expect(res2.success).toBe(false);
   });
 
-  it("line.webhook.register calls setWebhookEndpoint on MessagingApiClient", async () => {
+  it("line.webhook.register skips re-registration when the endpoint is already active", async () => {
     const res = await line.webhook.register({
       channelAccessToken: "token-123",
       webhookUrl: "https://example.com/api/line/webhook",
     });
-    expect(res.success).toBe(true);
+    expect(res).toMatchObject({ success: true, skipped: true });
+
+    const clientInstance = (messagingApi.MessagingApiClient as unknown as ReturnType<typeof vi.fn>)
+      .mock.results[0]?.value;
+    expect(clientInstance.getWebhookEndpoint).toHaveBeenCalledOnce();
+    // 登録済みなら書き換えも、LINE Platform からの往復を待つ疎通確認も走らせない。
+    expect(clientInstance.setWebhookEndpoint).not.toHaveBeenCalled();
+    expect(clientInstance.testWebhookEndpoint).not.toHaveBeenCalled();
+  });
+
+  it("line.webhook.register registers and verifies when the endpoint differs", async () => {
+    const clientInstance = line.client.create("token-123");
+    vi.mocked(clientInstance.getWebhookEndpoint).mockResolvedValueOnce({
+      endpoint: "https://old.example.com/api/line/webhook",
+      active: true,
+    });
+
+    const res = await line.webhook.register({
+      channelAccessToken: "token-123",
+      webhookUrl: "https://example.com/api/line/webhook",
+    });
+    expect(res).toMatchObject({ success: true, skipped: false });
+
+    expect(clientInstance.setWebhookEndpoint).toHaveBeenCalledWith({
+      endpoint: "https://example.com/api/line/webhook",
+    });
+    expect(clientInstance.testWebhookEndpoint).toHaveBeenCalledWith({
+      endpoint: "https://example.com/api/line/webhook",
+    });
+  });
+
+  it("line.webhook.register re-verifies an up-to-date endpoint when forceVerify is set", async () => {
+    const res = await line.webhook.register({
+      channelAccessToken: "token-123",
+      webhookUrl: "https://example.com/api/line/webhook",
+      forceVerify: true,
+    });
+    expect(res).toMatchObject({ success: true, skipped: false });
 
     const clientInstance = (messagingApi.MessagingApiClient as unknown as ReturnType<typeof vi.fn>)
       .mock.results[0]?.value;
     expect(clientInstance.setWebhookEndpoint).toHaveBeenCalledWith({
       endpoint: "https://example.com/api/line/webhook",
     });
-    expect(clientInstance.getWebhookEndpoint).toHaveBeenCalledOnce();
     expect(clientInstance.testWebhookEndpoint).toHaveBeenCalledWith({
       endpoint: "https://example.com/api/line/webhook",
     });
@@ -70,10 +106,16 @@ describe("line.client & line.webhook", () => {
 
   it("line.webhook.register rejects an inactive webhook", async () => {
     const clientInstance = line.client.create("token-inactive");
-    vi.mocked(clientInstance.getWebhookEndpoint).mockResolvedValueOnce({
-      endpoint: "https://example.com/api/line/webhook",
-      active: false,
-    });
+    // 事前確認と、登録後の検証の 2 回とも「無効」を返す。
+    vi.mocked(clientInstance.getWebhookEndpoint)
+      .mockResolvedValueOnce({
+        endpoint: "https://example.com/api/line/webhook",
+        active: false,
+      })
+      .mockResolvedValueOnce({
+        endpoint: "https://example.com/api/line/webhook",
+        active: false,
+      });
 
     await expect(
       line.webhook.register({
@@ -98,6 +140,7 @@ describe("line.client & line.webhook", () => {
       line.webhook.register({
         channelAccessToken: "token-unreachable",
         webhookUrl: "https://example.com/api/line/webhook",
+        forceVerify: true,
       }),
     ).resolves.toMatchObject({ success: false });
   });
