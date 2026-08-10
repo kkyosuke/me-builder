@@ -1,8 +1,12 @@
 import * as v from "valibot";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_CHAT_CONTEXT_MESSAGE_LIMIT, WorkerConfigSchema, getWorkerConfig } from "./index";
 
 describe("Worker Config", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("WorkerConfigSchema defaults environment to development", () => {
     const parsed = v.parse(WorkerConfigSchema, {});
     expect(parsed.environment).toBe("development");
@@ -25,6 +29,10 @@ describe("Worker Config", () => {
   });
 
   it("LIFF_ID を設定すると liffId が取得され、未設定・空文字なら undefined になること", () => {
+    // getWorkerConfig は env に無い値を process.env から補うため、
+    // 実行環境の LIFF_ID を消さないと「未設定」の検証にならない。
+    vi.stubEnv("LIFF_ID", undefined);
+
     expect(getWorkerConfig({ LIFF_ID: "1234567890-abcdefgh" }).liffId).toBe("1234567890-abcdefgh");
     expect(getWorkerConfig({}).liffId).toBeUndefined();
     expect(getWorkerConfig({ LIFF_ID: "  " }).liffId).toBeUndefined();
