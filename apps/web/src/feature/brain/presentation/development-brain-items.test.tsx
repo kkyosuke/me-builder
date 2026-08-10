@@ -10,7 +10,10 @@ describe("DevelopmentBrainItems", () => {
   it("一覧の取得中はItemのSkeletonを表示する", () => {
     render(<DevelopmentBrainItems state={{ status: "loading" }} onRetry={vi.fn()} />);
 
-    expect(screen.getByRole("status", { name: "Brain Item一覧を読み込み中" })).toBeTruthy();
+    const skeleton = screen.getByRole("status", { name: "Brain Item一覧を読み込み中" });
+    expect(skeleton.classList.contains("block")).toBe(true);
+    expect(skeleton.classList.contains("mt-5")).toBe(true);
+    expect(skeleton.querySelector(".space-y-3")?.children).toHaveLength(2);
     expect(screen.getByRole("heading", { name: "Brain Item一覧" })).toBeTruthy();
   });
 

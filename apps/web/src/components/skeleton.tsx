@@ -17,7 +17,7 @@ export function SkeletonLoader({
     <output
       aria-label={label}
       aria-busy="true"
-      className={`animate-pulse motion-reduce:animate-none ${className ?? ""}`}
+      className={`block animate-pulse motion-reduce:animate-none ${className ?? ""}`}
     >
       <span className="sr-only">{label}</span>
       <div aria-hidden="true">{children}</div>

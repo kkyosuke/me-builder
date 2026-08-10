@@ -55,21 +55,23 @@ export function DevelopmentBrainItems({
       </div>
 
       {state.status === "loading" && (
-        <SkeletonLoader label="Brain Item一覧を読み込み中" className="mt-5 space-y-3">
-          {["first", "second"].map((key) => (
-            <div
-              key={key}
-              className="rounded-2xl border border-violet-200 bg-white p-4 dark:border-violet-800 dark:bg-slate-900/70"
-            >
-              <div className="flex gap-2">
-                <SkeletonBlock className="h-6 w-20 rounded-full" />
-                <SkeletonBlock className="h-6 w-16 rounded-full" />
+        <SkeletonLoader label="Brain Item一覧を読み込み中" className="mt-5">
+          <div className="space-y-3">
+            {["first", "second"].map((key) => (
+              <div
+                key={key}
+                className="rounded-2xl border border-violet-200 bg-white p-4 dark:border-violet-800 dark:bg-slate-900/70"
+              >
+                <div className="flex gap-2">
+                  <SkeletonBlock className="h-6 w-20 rounded-full" />
+                  <SkeletonBlock className="h-6 w-16 rounded-full" />
+                </div>
+                <SkeletonBlock className="mt-4 h-4 w-4/5 rounded-full" />
+                <SkeletonBlock className="mt-2 h-4 w-3/5 rounded-full" />
+                <SkeletonBlock className="mt-4 h-3 w-28 rounded-full" />
               </div>
-              <SkeletonBlock className="mt-4 h-4 w-4/5 rounded-full" />
-              <SkeletonBlock className="mt-2 h-4 w-3/5 rounded-full" />
-              <SkeletonBlock className="mt-4 h-3 w-28 rounded-full" />
-            </div>
-          ))}
+            ))}
+          </div>
         </SkeletonLoader>
       )}
 
