@@ -1,8 +1,9 @@
 import { type AccountDataNamespace, accountDataFor, d1, line } from "@me-builder/lib";
 import {
   type ConversationCoordinatorNamespace,
+  OperationalError,
   type WebhookQueueMessage,
-  logger,
+  toOperationalError,
 } from "@me-builder/shared";
 import * as v from "valibot";
 import type { WorkerConfig } from "../../config";
@@ -28,6 +29,20 @@ export function buildDiagnosisReplyText(liffId?: string): string {
     : "いまは診断のリンクをお渡しできません。時間をおいてもう一度お試しください。";
 }
 
+export type LineWebhookProcessingResult = {
+  outcome: "succeeded" | "degraded" | "discarded";
+  stage: string;
+  resultCode?: string;
+};
+
+function mergeResult(
+  current: LineWebhookProcessingResult,
+  next: LineWebhookProcessingResult,
+): LineWebhookProcessingResult {
+  const rank = { succeeded: 0, discarded: 1, degraded: 2 } as const;
+  return rank[next.outcome] >= rank[current.outcome] ? next : current;
+}
+
 function getLineEventId(event: {
   webhookEventId?: string;
   message?: { id?: string };
@@ -43,12 +58,17 @@ export async function processLineWebhook(
   coordinatorNamespace?: ConversationCoordinatorNamespace,
   accountDataNamespace?: AccountDataNamespace,
   routing?: WebhookQueueMessage["routing"],
-): Promise<void> {
+  traceId?: string,
+): Promise<LineWebhookProcessingResult> {
   const events = line.webhook.parseEvents(payload);
+  let result: LineWebhookProcessingResult = { outcome: "succeeded", stage: "line.parse" };
   const parsedRouting = routing ? v.safeParse(LineRoutingSchema, routing) : undefined;
   if (parsedRouting && !parsedRouting.success) {
-    logger.warn({ reason: "invalid_line_routing" }, "Rejected invalid LINE command routing");
-    return;
+    return {
+      outcome: "discarded",
+      stage: "routing.validate",
+      resultCode: "INVALID_LINE_ROUTING",
+    };
   }
   const routedIntents = parsedRouting?.success
     ? new Map(parsedRouting.output.lineTextEvents.map(({ eventId, intent }) => [eventId, intent]))
@@ -57,7 +77,8 @@ export async function processLineWebhook(
   for (const event of events) {
     const providerAccountId = event.source?.userId;
     if (event.type === "follow") {
-      await ensureAccountIdentity(db, providerAccountId, "follow", workerConfig);
+      await ensureAccountIdentity(db, providerAccountId, workerConfig);
+      result = mergeResult(result, { outcome: "succeeded", stage: "account.resolve" });
       continue;
     }
     if (
@@ -72,79 +93,140 @@ export async function processLineWebhook(
 
     const eventId = getLineEventId(event);
     if (!eventId) {
-      logger.warn(
-        { intent: classifyLineText(event.message.text) },
-        "LINE text event has no stable event ID",
-      );
+      result = mergeResult(result, {
+        outcome: "degraded",
+        stage: "routing.validate",
+        resultCode: "LINE_EVENT_ID_MISSING",
+      });
       continue;
     }
 
     const intent = classifyLineText(event.message.text);
     if (routedIntents && routedIntents.get(eventId) !== intent) {
-      logger.warn({ intent }, "Rejected LINE event with inconsistent command routing");
+      result = mergeResult(result, {
+        outcome: "discarded",
+        stage: "routing.validate",
+        resultCode: "LINE_ROUTING_MISMATCH",
+      });
       continue;
     }
-    const resolved = await ensureAccountIdentity(db, providerAccountId, "message", workerConfig);
-    if (!resolved) throw new Error("LINE account could not be resolved");
+    const resolved = await ensureAccountIdentity(db, providerAccountId, workerConfig);
+    if (!resolved) {
+      throw new OperationalError({
+        code: "LINE_ACCOUNT_IDENTITY_MISSING",
+        category: "validation",
+        stage: "account.resolve",
+        retryable: false,
+      });
+    }
     if (intent === "diagnosis-request") {
       if (!workerConfig.lineChannelAccessToken || !event.replyToken) {
-        logger.warn({ intent }, "LINE diagnosis reply is not configured");
+        result = mergeResult(result, {
+          outcome: "degraded",
+          stage: "line.reply",
+          resultCode: "LINE_DIAGNOSIS_REPLY_NOT_CONFIGURED",
+        });
         continue;
       }
-      await line.client.create(workerConfig.lineChannelAccessToken).replyMessage({
-        replyToken: event.replyToken,
-        messages: [{ type: "text", text: buildDiagnosisReplyText(workerConfig.liffId) }],
-      });
+      try {
+        await line.client.create(workerConfig.lineChannelAccessToken).replyMessage({
+          replyToken: event.replyToken,
+          messages: [{ type: "text", text: buildDiagnosisReplyText(workerConfig.liffId) }],
+        });
+      } catch (error) {
+        throw toOperationalError(error, {
+          code: "LINE_DIAGNOSIS_REPLY_FAILED",
+          category: "dependency",
+          stage: "line.reply",
+          retryable: true,
+          dependency: "line",
+        });
+      }
+      result = mergeResult(result, { outcome: "succeeded", stage: "line.reply" });
       continue;
     }
 
     const receivedAt = new Date(event.timestamp);
-    if (!accountDataNamespace) throw new Error("ACCOUNT_DATA binding is not configured");
-    const source = await accountDataFor(accountDataNamespace, resolved.account.id).execute(
-      "conversation.storeLineTextSource",
-      {
-        eventId,
-        body: event.message.text,
-        receivedAt,
-      },
-    );
+    if (!accountDataNamespace) {
+      throw new OperationalError({
+        code: "ACCOUNT_DATA_BINDING_MISSING",
+        category: "configuration",
+        stage: "source.store",
+        retryable: true,
+        dependency: "account-data",
+      });
+    }
+    let source: { sourceRecordId: string };
+    try {
+      source = await accountDataFor(accountDataNamespace, resolved.account.id).execute(
+        "conversation.storeLineTextSource",
+        {
+          eventId,
+          body: event.message.text,
+          receivedAt,
+        },
+      );
+    } catch (error) {
+      throw toOperationalError(error, {
+        code: "LINE_SOURCE_STORE_FAILED",
+        category: "dependency",
+        stage: "source.store",
+        retryable: true,
+        dependency: "account-data",
+      });
+    }
     if (!workerConfig.chatEnabled || !coordinatorNamespace) {
-      logger.warn({ reason: "chat_not_configured" }, "Diary saved without AI chat processing");
+      result = mergeResult(result, {
+        outcome: "degraded",
+        stage: "source.store",
+        resultCode: "CHAT_NOT_CONFIGURED",
+      });
       continue;
     }
 
     const coordinator = coordinatorNamespace.getByName(resolved.account.id);
-    await coordinator.acceptMessage({
-      accountId: resolved.account.id,
-      sourceRecordId: source.sourceRecordId,
-      eventId,
-      receivedAt: receivedAt.toISOString(),
-      ...(event.replyToken ? { replyToken: event.replyToken } : {}),
-    });
-    logger.info({ intent }, "LINE diary source saved and accepted by coordinator");
+    try {
+      await coordinator.acceptMessage({
+        accountId: resolved.account.id,
+        sourceRecordId: source.sourceRecordId,
+        eventId,
+        receivedAt: receivedAt.toISOString(),
+        ...(traceId ? { traceId } : {}),
+        ...(event.replyToken ? { replyToken: event.replyToken } : {}),
+      });
+    } catch (error) {
+      throw toOperationalError(error, {
+        code: "CONVERSATION_COORDINATOR_ACCEPT_FAILED",
+        category: "dependency",
+        stage: "chat.accept",
+        retryable: true,
+        dependency: "conversation-coordinator",
+      });
+    }
+    result = mergeResult(result, { outcome: "succeeded", stage: "chat.accept" });
   }
+  return result;
 }
 
 async function ensureAccountIdentity(
   db: d1.Client,
   providerAccountId: string | undefined,
-  trigger: "follow" | "message",
   workerConfig: WorkerConfig,
 ): Promise<Awaited<ReturnType<typeof d1.action.account.upsertIdentity>> | undefined> {
   if (!providerAccountId) return undefined;
   try {
-    const resolved = await d1.action.account.upsertIdentity(db, {
+    return await d1.action.account.upsertIdentity(db, {
       provider: "line",
       providerAccountId,
       role: workerConfig.adminLineUserIds.includes(providerAccountId) ? "admin" : "user",
     });
-    logger.info({ trigger }, "LINE Account identity ensured");
-    return resolved;
   } catch (error) {
-    logger.error(
-      { errorName: error instanceof Error ? error.name : "UnknownError", trigger },
-      "Failed to ensure LINE Account identity",
-    );
-    return undefined;
+    throw toOperationalError(error, {
+      code: "LINE_ACCOUNT_RESOLUTION_FAILED",
+      category: "dependency",
+      stage: "account.resolve",
+      retryable: true,
+      dependency: "d1",
+    });
   }
 }

@@ -42,13 +42,8 @@ export class AccountData extends DurableObject<Env> {
     this.accountId = accountId;
     this.repository = new AccountDataRepository(ctx.storage);
     ctx.blockConcurrencyWhile(async () => {
-      try {
-        await this.repository.initialize();
-        this.repository.bindAccount(accountId);
-      } catch (error) {
-        logAccountDataFailure("initialization", error);
-        throw error;
-      }
+      await this.repository.initialize();
+      this.repository.bindAccount(accountId);
     });
   }
 
@@ -94,23 +89,11 @@ export class AccountData extends DurableObject<Env> {
         await this.legacyImport;
       } catch (error) {
         this.legacyImport = undefined;
-        logAccountDataFailure("legacy_import", error, operation);
         throw error;
       }
       if (operation.startsWith("diagnosis")) await this.syncDiagnosisCatalog();
-      let result: AccountDataResult<TOperation>;
-      try {
-        result = await boundAction(this.repository.client, accountId, ...args);
-      } catch (error) {
-        logAccountDataFailure("action", error, operation);
-        throw error;
-      }
-      try {
-        await this.scheduleMaintenance();
-      } catch (error) {
-        logAccountDataFailure("maintenance", error, operation);
-        throw error;
-      }
+      const result = await boundAction(this.repository.client, accountId, ...args);
+      await this.scheduleMaintenance();
       return result;
     });
   }
@@ -436,24 +419,4 @@ export class AccountData extends DurableObject<Env> {
       release();
     }
   }
-}
-
-function logAccountDataFailure(
-  phase: "initialization" | "legacy_import" | "action" | "maintenance",
-  error: unknown,
-  operation?: string,
-): void {
-  const errorCode =
-    error && typeof error === "object" && "code" in error
-      ? String((error as { code: unknown }).code)
-      : undefined;
-  logger.error(
-    {
-      phase,
-      ...(operation ? { operation } : {}),
-      errorName: error instanceof Error ? error.name : "UnknownError",
-      ...(errorCode ? { errorCode } : {}),
-    },
-    "AccountData operation failed",
-  );
 }

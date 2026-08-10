@@ -1,5 +1,10 @@
 import { line } from "@me-builder/lib";
-import { type Queue, type WebhookQueueMessage, logger } from "@me-builder/shared";
+import {
+  type Queue,
+  type WebhookQueueMessage,
+  logger,
+  toSafeOperationalErrorFields,
+} from "@me-builder/shared";
 
 /**
  * LINE Webhook を受理し、Cloudflare Queues へ投入します。
@@ -108,8 +113,10 @@ export async function receiveLineWebhook({
     );
   }
 
+  const traceId = crypto.randomUUID();
   const event: WebhookQueueMessage = {
-    id: crypto.randomUUID(),
+    id: traceId,
+    traceId,
     source: "line",
     receivedAt: new Date().toISOString(),
     // replyTokenは日記のfinalをpushではなくreplyで返すために残す。
@@ -142,15 +149,57 @@ export async function receiveLineWebhook({
 
   if (!queue) {
     logger.warn(
-      { id: event.id, source: event.source, messageCount: messages.length },
+      {
+        event: "line.webhook.accepted",
+        service: "api",
+        traceId,
+        component: "line-webhook",
+        outcome: "degraded",
+        disposition: "not-queued",
+        source: event.source,
+        messageCount: messages.length,
+      },
       "WEBHOOK_QUEUE binding not configured, skipping queue push",
     );
     return { type: "accepted", id: event.id, queued: false };
   }
 
-  await queue.send(event);
+  try {
+    await queue.send(event);
+  } catch (error) {
+    logger.error(
+      {
+        event: "line.webhook.failed",
+        service: "api",
+        traceId,
+        component: "line-webhook",
+        outcome: "failed",
+        disposition: "http-error",
+        source: event.source,
+        messageCount: messages.length,
+        ...toSafeOperationalErrorFields(error, {
+          code: "WEBHOOK_QUEUE_SEND_FAILED",
+          category: "dependency",
+          stage: "queue.send",
+          retryable: true,
+          dependency: "cloudflare-queue",
+        }),
+      },
+      "Webhook event could not be queued",
+    );
+    throw error;
+  }
   logger.info(
-    { id: event.id, source: event.source, messageCount: messages.length },
+    {
+      event: "line.webhook.accepted",
+      service: "api",
+      traceId,
+      component: "line-webhook",
+      outcome: "succeeded",
+      disposition: "queued",
+      source: event.source,
+      messageCount: messages.length,
+    },
     "Webhook event queued to WEBHOOK_QUEUE",
   );
 

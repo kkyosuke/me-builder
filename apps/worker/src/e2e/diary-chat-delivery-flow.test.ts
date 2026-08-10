@@ -2,11 +2,12 @@ import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import type { D1Database } from "@cloudflare/workers-types";
 import { d1, line } from "@me-builder/lib";
-import type {
-  ChatTurnQueueMessage,
-  Message,
-  MessageBatch,
-  WebhookQueueMessage,
+import {
+  type ChatTurnQueueMessage,
+  type Message,
+  type MessageBatch,
+  type WebhookQueueMessage,
+  logger,
 } from "@me-builder/shared";
 import Database from "better-sqlite3";
 import { Miniflare } from "miniflare";
@@ -153,14 +154,16 @@ async function enqueueLineEvents(
   events: unknown[],
   namespace: NonNullable<Env["CONVERSATION_COORDINATOR"]>,
   accountData: NonNullable<Env["ACCOUNT_DATA"]>,
-): Promise<void> {
+): Promise<string> {
   const payload = { events };
+  const traceId = crypto.randomUUID();
   const message: Message<WebhookQueueMessage> = {
     id: crypto.randomUUID(),
     timestamp: new Date(),
     attempts: 1,
     body: {
       id: crypto.randomUUID(),
+      traceId,
       source: "line",
       receivedAt: new Date().toISOString(),
       payload,
@@ -205,6 +208,7 @@ async function enqueueLineEvents(
 
   expect(message.ack).toHaveBeenCalledOnce();
   expect(message.retry).not.toHaveBeenCalled();
+  return traceId;
 }
 
 async function ingestDiaryEvents(events: DiaryEventInput[], suffix: string) {
@@ -219,7 +223,7 @@ async function ingestDiaryEvents(events: DiaryEventInput[], suffix: string) {
   const providerAccountId = `U_diary_delivery_${suffix}`;
   const accountData = createD1AccountDataTestNamespace(client);
 
-  await enqueueLineEvents(
+  const traceId = await enqueueLineEvents(
     events.map((event, index) => ({
       type: "message",
       webhookEventId: `diary-delivery-event-${suffix}-${index}`,
@@ -241,7 +245,14 @@ async function ingestDiaryEvents(events: DiaryEventInput[], suffix: string) {
     do: { conversation: namespace, accountData },
     queue: { chatTurn: undefined, brainCheckpoint: undefined },
   };
-  return { bindings, coordinator: harness.coordinator, harness, providerAccountId, queuedTurn };
+  return {
+    bindings,
+    coordinator: harness.coordinator,
+    harness,
+    providerAccountId,
+    queuedTurn,
+    traceId,
+  };
 }
 
 async function ingestDiary(text: string, suffix: string, replyToken?: string) {
@@ -258,7 +269,7 @@ async function ingestDiary(text: string, suffix: string, replyToken?: string) {
   const receivedAt = new Date(Date.now() - 2_000).toISOString();
   const accountData = createD1AccountDataTestNamespace(client);
 
-  await enqueueLineEvents(
+  const traceId = await enqueueLineEvents(
     [
       {
         type: "message",
@@ -282,7 +293,7 @@ async function ingestDiary(text: string, suffix: string, replyToken?: string) {
     do: { conversation: namespace, accountData },
     queue: { chatTurn: undefined, brainCheckpoint: undefined },
   };
-  return { bindings, coordinator: harness.coordinator, providerAccountId, queuedTurn };
+  return { bindings, coordinator: harness.coordinator, providerAccountId, queuedTurn, traceId };
 }
 
 describe("LINE diary chat delivery E2E", () => {
@@ -320,16 +331,31 @@ describe("LINE diary chat delivery E2E", () => {
 
   it("原本保存から生成、assistant保存、LINE final配送、Turn完了まで通す", async () => {
     const diaryText = "今日は公園を散歩できた";
-    const { bindings, coordinator, providerAccountId, queuedTurn } = await ingestDiary(
+    const { bindings, coordinator, providerAccountId, queuedTurn, traceId } = await ingestDiary(
       diaryText,
       "success",
     );
     const message = createQueueMessage(queuedTurn);
+    const infoLog = vi.spyOn(logger, "info");
 
     await processChatTurnMessage(message, bindings, workerConfig);
 
     expect(message.ack).toHaveBeenCalledOnce();
     expect(message.retry).not.toHaveBeenCalled();
+    expect(queuedTurn.traceId).toBe(traceId);
+    expect(queuedTurn.traceIds).toEqual([traceId]);
+    expect(infoLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "queue.message.completed",
+        component: "chat-turn",
+        traceId,
+        traceIds: [traceId],
+        outcome: "succeeded",
+        disposition: "ack",
+        stage: "line.deliver",
+      }),
+      "Chat turn queue message completed",
+    );
     expect(JSON.stringify(queuedTurn)).not.toContain(diaryText);
     expect(JSON.stringify(queuedTurn)).not.toContain(providerAccountId);
     expect(mockGenerateContent).toHaveBeenCalledOnce();
@@ -426,11 +452,23 @@ describe("LINE diary chat delivery E2E", () => {
     // statusを持たない失敗はネットワーク断であり、LINEへ届いたか判別できない。
     mockReplyMessage.mockRejectedValueOnce(new Error("network unreachable"));
 
-    await expect(
-      processChatTurnMessage(createQueueMessage(queuedTurn), bindings, workerConfig),
-    ).rejects.toThrow();
+    const first = createQueueMessage(queuedTurn);
+    const errorLog = vi.spyOn(logger, "error");
+    await processChatTurnMessage(first, bindings, workerConfig);
 
     // ここでpushしてしまうと、replyが実は届いていた場合に二重に届く。
+    expect(first.retry).toHaveBeenCalledOnce();
+    expect(first.ack).not.toHaveBeenCalled();
+    expect(errorLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "queue.message.failed",
+        errorCode: "LINE_FINAL_DELIVERY_FAILED",
+        stage: "line.deliver",
+        retryable: true,
+        disposition: "retry",
+      }),
+      "Chat turn queue message failed",
+    );
     expect(mockPushMessage).not.toHaveBeenCalled();
     expect(await turnStatus(queuedTurn.turnId)).toBe("delivery_pending");
 
@@ -534,10 +572,10 @@ describe("LINE diary chat delivery E2E", () => {
     vi.spyOn(coordinator, "isGenerationLeaseActive").mockResolvedValue(false);
     const message = createQueueMessage(queuedTurn);
 
-    await expect(processChatTurnMessage(message, bindings, workerConfig)).rejects.toThrow(
-      "Generation lease expired before response persistence",
-    );
+    await processChatTurnMessage(message, bindings, workerConfig);
 
+    expect(message.retry).toHaveBeenCalledOnce();
+    expect(message.ack).not.toHaveBeenCalled();
     const messages = await client.select().from(d1.schema.conversationMessages);
     expect(messages).toEqual([expect.objectContaining({ role: "user", assistantBody: null })]);
     expect(mockPushMessage).not.toHaveBeenCalled();
@@ -603,9 +641,9 @@ describe("LINE diary chat delivery E2E", () => {
     mockPushMessage.mockRejectedValueOnce({ status: 503 }).mockResolvedValue({});
     const first = createQueueMessage(queuedTurn, 2);
 
-    await expect(processChatTurnMessage(first, bindings, workerConfig)).rejects.toThrow(
-      "provider unavailable",
-    );
+    await processChatTurnMessage(first, bindings, workerConfig);
+    expect(first.retry).toHaveBeenCalledOnce();
+    expect(first.ack).not.toHaveBeenCalled();
     const retry = createQueueMessage(queuedTurn, 3);
     await processChatTurnMessage(retry, bindings, workerConfig);
 
@@ -626,9 +664,9 @@ describe("LINE diary chat delivery E2E", () => {
     mockPushMessage.mockRejectedValueOnce({ status: 503 }).mockResolvedValue({});
     const first = createQueueMessage(queuedTurn, 1);
 
-    await expect(processChatTurnMessage(first, bindings, workerConfig)).rejects.toEqual({
-      status: 503,
-    });
+    await processChatTurnMessage(first, bindings, workerConfig);
+    expect(first.retry).toHaveBeenCalledOnce();
+    expect(first.ack).not.toHaveBeenCalled();
     const firstDelivery = deliverTurn.mock.calls[0]?.[0];
     if (!firstDelivery) throw new Error("Expected the first delivery reservation");
     await expect(coordinator.deliverTurn(firstDelivery)).resolves.toEqual({
