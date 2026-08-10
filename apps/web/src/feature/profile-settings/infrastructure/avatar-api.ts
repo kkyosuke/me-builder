@@ -39,7 +39,7 @@ const AvatarStateSchema = v.object({
   ),
 }) satisfies v.GenericSchema<ApiAvatarState>;
 
-export class AvatarApiError extends Error {
+class AvatarApiError extends Error {
   readonly status: number;
 
   constructor(message: string, status: number) {

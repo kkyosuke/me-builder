@@ -1,8 +1,7 @@
 import type { operations } from "../../../generated/api";
 
 export type AvatarState = operations["getAvatar"]["responses"][200]["content"]["application/json"];
-export type AvatarJob = NonNullable<AvatarState["job"]>;
-export type AvatarJobStatus = AvatarJob["status"];
+type AvatarJob = NonNullable<AvatarState["job"]>;
 
 /** 認証済み画像をブラウザ内で表示するための一時URL。 */
 export type AvatarSelection = {
@@ -10,7 +9,7 @@ export type AvatarSelection = {
   src: string;
 };
 
-export type AvatarCandidate = AvatarSelection & {
+type AvatarCandidate = AvatarSelection & {
   expiresAt: string;
 };
 
