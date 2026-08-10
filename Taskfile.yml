@@ -86,6 +86,16 @@ tasks:
     cmds:
       - bun scripts/setup-chat-queues.ts production
 
+  vectorize:setup:preview:
+    desc: 'Create the preview Brain Vectorize index and metadata index if missing'
+    cmds:
+      - bun scripts/setup-brain-vectorize.ts preview
+
+  vectorize:setup:production:
+    desc: 'Create the production Brain Vectorize index and metadata index if missing'
+    cmds:
+      - bun scripts/setup-brain-vectorize.ts production
+
   access:setup:preview:
     desc: 'Protect preview OpenAPI and Swagger UI routes with Cloudflare Access'
     cmds:

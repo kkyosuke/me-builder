@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_CHAT_CONTEXT_MESSAGE_LIMIT,
   DEFAULT_CLOUDFLARE_AI_GATEWAY_BASE_URL,
+  DEFAULT_GEMINI_EMBEDDING_MODEL,
   WorkerConfigSchema,
   getWorkerConfig,
 } from "./index";
@@ -27,6 +28,7 @@ describe("Worker Config", () => {
     expect(config.lineChannelAccessToken).toBe("test-token-123");
     expect(config.cloudflareAiGatewayBaseUrl).toBe(DEFAULT_CLOUDFLARE_AI_GATEWAY_BASE_URL);
     expect(config.geminiModel).toBe("gemini-3.5-flash-lite");
+    expect(config.geminiEmbeddingModel).toBe(DEFAULT_GEMINI_EMBEDDING_MODEL);
     expect(config.chatContextMessageLimit).toBe(DEFAULT_CHAT_CONTEXT_MESSAGE_LIMIT);
   });
 
@@ -42,12 +44,16 @@ describe("Worker Config", () => {
       CLOUDFLARE_APP_API_TOKEN: "gateway-token",
       CF_AI_GATEWAY_BASE_URL: "https://gateway.example.com/google-ai-studio",
       GEMINI_MODEL: "gemini-test-model",
+      GEMINI_EMBEDDING_MODEL: "embedding-test-model",
+      BRAIN_VECTOR_HMAC_SECRET: "vector-secret",
     });
 
     expect(config.googleAiStudioApiKey).toBe("google-key");
     expect(config.cloudflareAiGatewayToken).toBe("gateway-token");
     expect(config.cloudflareAiGatewayBaseUrl).toBe("https://gateway.example.com/google-ai-studio");
     expect(config.geminiModel).toBe("gemini-test-model");
+    expect(config.geminiEmbeddingModel).toBe("embedding-test-model");
+    expect(config.brainVectorHmacSecret).toBe("vector-secret");
   });
 
   it("日記チャットのContext message件数を環境変数から取得すること", () => {

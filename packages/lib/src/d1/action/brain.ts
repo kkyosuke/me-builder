@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, lte, sql } from "drizzle-orm";
 import type { D1Client } from "../client";
 import {
   brainItemAccessLabels,
@@ -6,6 +6,7 @@ import {
   brainItemRevisions,
   brainItemTopicLabels,
   brainItems,
+  brainVectorSyncJobs,
 } from "../schema/brain";
 import { sourceRecords } from "../schema/source";
 
@@ -42,6 +43,8 @@ export type SaveBrainItemResult =
     }>;
 
 const DEVELOPMENT_BRAIN_ITEM_LIMIT = 100;
+const VECTOR_SYNC_DISPATCH_RETRY_MS = 15 * 60 * 1000;
+const VECTOR_SYNC_FAILURE_RETRY_MS = 60 * 1000;
 
 export type ActiveBrainItemList = Readonly<{
   items: readonly Readonly<{
@@ -127,9 +130,21 @@ export async function saveBrainItem(
 
   const accountId = input.item.accountId;
   const brainItemId = input.item.id;
-  const lifecycle = input.at ? { createdAt: input.at, updatedAt: input.at } : {};
+  const changedAt = input.at ?? new Date();
+  const lifecycle = { createdAt: changedAt, updatedAt: changedAt };
+  const itemRevision = changedAt.getTime();
   const statements: D1BatchStatement[] = [
     db.insert(brainItems).values({ ...input.item, ...lifecycle }),
+    db.insert(brainVectorSyncJobs).values({
+      id: `${brainItemId}:${itemRevision}:upsert`,
+      accountId,
+      brainItemId,
+      itemRevision,
+      operation: "upsert",
+      status: "pending",
+      nextAttemptAt: changedAt,
+      ...lifecycle,
+    }),
     ...input.evidence.map((edge) =>
       db.insert(brainItemEvidenceEdges).values({ ...edge, ...lifecycle, accountId, brainItemId }),
     ),
@@ -145,7 +160,7 @@ export async function saveBrainItem(
     statements.push(
       db
         .update(brainItems)
-        .set({ status: "superseded", updatedAt: input.at })
+        .set({ status: "superseded", updatedAt: changedAt })
         .where(
           and(eq(brainItems.id, input.supersedes.brainItemId), eq(brainItems.accountId, accountId)),
         ),
@@ -157,6 +172,16 @@ export async function saveBrainItem(
         derivationMethod: input.supersedes.derivationMethod,
         ...lifecycle,
       }),
+      db.insert(brainVectorSyncJobs).values({
+        id: `${input.supersedes.brainItemId}:${itemRevision}:delete`,
+        accountId,
+        brainItemId: input.supersedes.brainItemId,
+        itemRevision,
+        operation: "delete",
+        status: "pending",
+        nextAttemptAt: changedAt,
+        ...lifecycle,
+      }),
     );
   }
 
@@ -164,6 +189,166 @@ export async function saveBrainItem(
   if (!firstStatement) throw new Error("Brain Itemの保存statementがありません");
   await db.batch([firstStatement, ...statements.slice(1), ...additionalStatements]);
   return { type: "saved", brainItemId };
+}
+
+export type BrainVectorSyncJob = Readonly<{
+  id: string;
+  brainItemId: string;
+  itemRevision: number;
+}>;
+
+/** Alarm時点で期限を迎えたVector同期jobをclaimする。 */
+export async function claimDueBrainVectorSyncJobs(
+  db: D1Client,
+  accountId: string,
+  at = new Date(),
+): Promise<BrainVectorSyncJob[]> {
+  const due = await db
+    .select({
+      id: brainVectorSyncJobs.id,
+      brainItemId: brainVectorSyncJobs.brainItemId,
+      itemRevision: brainVectorSyncJobs.itemRevision,
+    })
+    .from(brainVectorSyncJobs)
+    .where(
+      and(
+        eq(brainVectorSyncJobs.accountId, accountId),
+        inArray(brainVectorSyncJobs.status, ["pending", "submitted", "failed"]),
+        lte(brainVectorSyncJobs.nextAttemptAt, at),
+        eq(brainVectorSyncJobs.isDeleted, false),
+      ),
+    )
+    .orderBy(asc(brainVectorSyncJobs.nextAttemptAt), asc(brainVectorSyncJobs.id))
+    .limit(10)
+    .all();
+  const claimed: BrainVectorSyncJob[] = [];
+  for (const job of due) {
+    const rows = await db
+      .update(brainVectorSyncJobs)
+      .set({
+        status: "submitted",
+        attemptCount: sql`${brainVectorSyncJobs.attemptCount} + 1`,
+        nextAttemptAt: new Date(at.getTime() + VECTOR_SYNC_DISPATCH_RETRY_MS),
+        failureCode: null,
+        updatedAt: at,
+      })
+      .where(
+        and(
+          eq(brainVectorSyncJobs.id, job.id),
+          eq(brainVectorSyncJobs.accountId, accountId),
+          inArray(brainVectorSyncJobs.status, ["pending", "submitted", "failed"]),
+          lte(brainVectorSyncJobs.nextAttemptAt, at),
+          eq(brainVectorSyncJobs.isDeleted, false),
+        ),
+      )
+      .returning({ id: brainVectorSyncJobs.id })
+      .all();
+    if (rows.length > 0) claimed.push(job);
+  }
+  return claimed;
+}
+
+export type BrainVectorSyncTarget =
+  | Readonly<{
+      action: "upsert";
+      statement: string;
+      category: string;
+      derivation: "ai" | "deterministic";
+    }>
+  | Readonly<{ action: "delete" }>;
+
+/** Queue本文を信頼せず、job所有権とBrain Itemの現在状態から操作を決める。 */
+export async function getBrainVectorSyncTarget(
+  db: D1Client,
+  accountId: string,
+  jobId: string,
+  brainItemId: string,
+  itemRevision: number,
+): Promise<BrainVectorSyncTarget | undefined> {
+  const job = await db
+    .select({ id: brainVectorSyncJobs.id })
+    .from(brainVectorSyncJobs)
+    .where(
+      and(
+        eq(brainVectorSyncJobs.id, jobId),
+        eq(brainVectorSyncJobs.accountId, accountId),
+        eq(brainVectorSyncJobs.brainItemId, brainItemId),
+        eq(brainVectorSyncJobs.itemRevision, itemRevision),
+        inArray(brainVectorSyncJobs.status, ["submitted", "failed"]),
+        eq(brainVectorSyncJobs.isDeleted, false),
+      ),
+    )
+    .get();
+  if (!job) return undefined;
+  const item = await db
+    .select({
+      statement: brainItems.statement,
+      category: brainItems.category,
+      derivation: brainItems.derivation,
+      status: brainItems.status,
+      isDeleted: brainItems.isDeleted,
+    })
+    .from(brainItems)
+    .where(and(eq(brainItems.id, brainItemId), eq(brainItems.accountId, accountId)))
+    .get();
+  if (!item || item.isDeleted || item.status !== "active") return { action: "delete" };
+  return {
+    action: "upsert",
+    statement: item.statement,
+    category: item.category,
+    derivation: item.derivation,
+  };
+}
+
+export async function completeBrainVectorSyncJob(
+  db: D1Client,
+  accountId: string,
+  jobId: string,
+  mutationId: string,
+  at = new Date(),
+): Promise<boolean> {
+  const rows = await db
+    .update(brainVectorSyncJobs)
+    .set({ status: "applied", mutationId, failureCode: null, updatedAt: at })
+    .where(
+      and(
+        eq(brainVectorSyncJobs.id, jobId),
+        eq(brainVectorSyncJobs.accountId, accountId),
+        inArray(brainVectorSyncJobs.status, ["submitted", "failed"]),
+        eq(brainVectorSyncJobs.isDeleted, false),
+      ),
+    )
+    .returning({ id: brainVectorSyncJobs.id })
+    .all();
+  return rows.length > 0;
+}
+
+export async function failBrainVectorSyncJob(
+  db: D1Client,
+  accountId: string,
+  jobId: string,
+  failureCode: string,
+  at = new Date(),
+): Promise<boolean> {
+  const rows = await db
+    .update(brainVectorSyncJobs)
+    .set({
+      status: "failed",
+      failureCode,
+      nextAttemptAt: new Date(at.getTime() + VECTOR_SYNC_FAILURE_RETRY_MS),
+      updatedAt: at,
+    })
+    .where(
+      and(
+        eq(brainVectorSyncJobs.id, jobId),
+        eq(brainVectorSyncJobs.accountId, accountId),
+        eq(brainVectorSyncJobs.status, "submitted"),
+        eq(brainVectorSyncJobs.isDeleted, false),
+      ),
+    )
+    .returning({ id: brainVectorSyncJobs.id })
+    .all();
+  return rows.length > 0;
 }
 
 /** 認証済みAccountの所有物としてBrain Itemを取得する。 */

@@ -88,7 +88,7 @@ describe("AccountData Workers runtime E2E", () => {
     });
   });
 
-  it("既存Brainデータを持つ配布済み0003 schemaへ0004を追記できる", async () => {
+  it("既存Brainデータを持つ配布済み0003 schemaへ後続migrationを追記できる", async () => {
     const accountId = crypto.randomUUID();
     const stub = env.ACCOUNT_DATA.getByName(accountId);
 
@@ -103,7 +103,8 @@ describe("AccountData Workers runtime E2E", () => {
       );
 
       state.storage.sql.exec("DROP TABLE compatibility_references");
-      state.storage.sql.exec("DELETE FROM __drizzle_migrations WHERE created_at = 1786270180000");
+      state.storage.sql.exec("DROP TABLE brain_vector_sync_jobs");
+      state.storage.sql.exec("DELETE FROM __drizzle_migrations WHERE created_at >= 1786270180000");
 
       const repository = Reflect.get(instance, "repository") as { initialize(): Promise<void> };
       await expect(repository.initialize()).resolves.toBeUndefined();
@@ -119,6 +120,13 @@ describe("AccountData Workers runtime E2E", () => {
           .exec<{ statement: string }>("SELECT statement FROM brain_items WHERE id = 'brain-1'")
           .one().statement,
       ).toBe("散歩した");
+      expect(
+        state.storage.sql
+          .exec<{ brain_item_id: string }>(
+            "SELECT brain_item_id FROM brain_vector_sync_jobs WHERE operation = 'upsert'",
+          )
+          .one().brain_item_id,
+      ).toBe("brain-1");
     });
   });
 });

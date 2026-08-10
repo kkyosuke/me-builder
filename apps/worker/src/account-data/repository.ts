@@ -21,6 +21,7 @@ const accountDataSchema = {
   brainItemRevisions: d1.schema.brainItemRevisions,
   brainItemTopicLabels: d1.schema.brainItemTopicLabels,
   brainItems: d1.schema.brainItems,
+  brainVectorSyncJobs: d1.schema.brainVectorSyncJobs,
   chatTurns: d1.schema.chatTurns,
   conversationMessages: d1.schema.conversationMessages,
   conversationSessions: d1.schema.conversationSessions,
@@ -160,6 +161,23 @@ export class AccountDataRepository {
       );
       insertRows(snapshot.brainItems, (row) =>
         this.database.insert(d1.schema.brainItems).values(row),
+      );
+      insertRows(
+        snapshot.brainItems.filter((row) => row.status === "active" && !row.isDeleted),
+        (row) => {
+          const itemRevision = row.updatedAt.getTime();
+          return this.database.insert(d1.schema.brainVectorSyncJobs).values({
+            id: `${row.id}:${itemRevision}:upsert`,
+            accountId: row.accountId,
+            brainItemId: row.id,
+            itemRevision,
+            operation: "upsert",
+            status: "pending",
+            nextAttemptAt: importedAt,
+            createdAt: importedAt,
+            updatedAt: importedAt,
+          });
+        },
       );
       insertRows(snapshot.brainItemEvidenceEdges, (row) =>
         this.database.insert(d1.schema.brainItemEvidenceEdges).values(row),
@@ -699,6 +717,18 @@ export class AccountDataRepository {
       .orderBy(asc(d1.schema.diaryBrainCheckpoints.nextAttemptAt))
       .limit(1)
       .get();
+    const brainVectorSync = this.database
+      .select({ nextAttemptAt: d1.schema.brainVectorSyncJobs.nextAttemptAt })
+      .from(d1.schema.brainVectorSyncJobs)
+      .where(
+        and(
+          inArray(d1.schema.brainVectorSyncJobs.status, ["pending", "submitted", "failed"]),
+          eq(d1.schema.brainVectorSyncJobs.isDeleted, false),
+        ),
+      )
+      .orderBy(asc(d1.schema.brainVectorSyncJobs.nextAttemptAt))
+      .limit(1)
+      .get();
     const candidates = [
       session
         ? Math.min(
@@ -708,6 +738,7 @@ export class AccountDataRepository {
         : null,
       projection?.nextAttemptAt.getTime() ?? null,
       diaryBrainCheckpoint?.nextAttemptAt.getTime() ?? null,
+      brainVectorSync?.nextAttemptAt.getTime() ?? null,
     ].filter((value): value is number => value !== null);
     return candidates.length > 0 ? Math.min(...candidates) : null;
   }

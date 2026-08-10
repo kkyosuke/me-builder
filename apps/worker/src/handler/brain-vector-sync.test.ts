@@ -1,0 +1,130 @@
+import type { AccountDataNamespace, d1 } from "@me-builder/lib";
+import type { BrainVectorSyncQueueMessage, Message } from "@me-builder/shared";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { type CloudflareBindings, getWorkerConfig } from "../config";
+
+const geminiMocks = vi.hoisted(() => ({
+  createGeminiClient: vi.fn(() => ({})),
+  embedDocument: vi.fn(),
+}));
+
+vi.mock("../infrastructure/gemini-client", () => geminiMocks);
+
+import { processBrainVectorSyncMessage } from "./brain-vector-sync";
+
+const queueBody: BrainVectorSyncQueueMessage = {
+  type: "brain-vector-sync",
+  accountId: "account-1",
+  jobId: "job-1",
+  brainItemId: "brain-1",
+  itemRevision: 100,
+};
+
+function createMessage() {
+  return {
+    body: queueBody,
+    ack: vi.fn(),
+  } as unknown as Message<BrainVectorSyncQueueMessage>;
+}
+
+function createBindings(execute: ReturnType<typeof vi.fn>, index: object): CloudflareBindings {
+  const accountData = {
+    getByName: vi.fn(() => ({ execute })),
+  } as unknown as AccountDataNamespace;
+  return {
+    d1: {} as d1.Client,
+    do: { conversation: undefined, accountData },
+    queue: { chatTurn: undefined, brainCheckpoint: undefined },
+    vector: { brain: index as NonNullable<CloudflareBindings["vector"]>["brain"] },
+  };
+}
+
+const config = getWorkerConfig({
+  ENVIRONMENT: "test",
+  GOOGLE_AI_STUDIO_API_KEY: "google-key",
+  CLOUDFLARE_APP_API_TOKEN: "gateway-token",
+  BRAIN_VECTOR_HMAC_SECRET: "scope-secret",
+});
+
+describe("Brain vector sync queue", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("active Itemをembeddingし、仮名scopeだけをmetadataへ保存する", async () => {
+    geminiMocks.embedDocument.mockResolvedValue(Array.from({ length: 768 }, () => 0.1));
+    const execute = vi
+      .fn()
+      .mockResolvedValueOnce({
+        action: "upsert",
+        statement: "公園を散歩した",
+        category: "memory",
+        derivation: "ai",
+      })
+      .mockResolvedValueOnce(true);
+    const upsert = vi.fn(async (vectors) => ({ ids: vectors.map(({ id }: { id: string }) => id) }));
+    const message = createMessage();
+
+    await processBrainVectorSyncMessage(message, createBindings(execute, { upsert }), config);
+
+    expect(upsert).toHaveBeenCalledWith([
+      expect.objectContaining({
+        id: expect.stringMatching(/^[0-9a-f]{64}$/),
+        values: expect.any(Array),
+        metadata: expect.objectContaining({
+          owner_scope: expect.stringMatching(/^[0-9a-f]{64}$/),
+          category: "memory",
+          derivation: "ai",
+          embedding_version: 1,
+          schema_version: 1,
+        }),
+      }),
+    ]);
+    expect(upsert.mock.calls[0]?.[0]?.[0]?.values).toHaveLength(768);
+    const metadata = upsert.mock.calls[0]?.[0]?.[0]?.metadata;
+    expect(JSON.stringify(metadata)).not.toContain("account-1");
+    expect(JSON.stringify(metadata)).not.toContain("brain-1");
+    expect(JSON.stringify(metadata)).not.toContain("公園を散歩した");
+    expect(execute).toHaveBeenLastCalledWith(
+      "account-1",
+      "brain.completeVectorSyncJob",
+      "job-1",
+      expect.stringMatching(/^accepted:/),
+    );
+    expect(message.ack).toHaveBeenCalledOnce();
+  });
+
+  it("処理時に利用不可ならembeddingせず決定的vector IDを削除する", async () => {
+    const execute = vi.fn().mockResolvedValueOnce({ action: "delete" }).mockResolvedValueOnce(true);
+    const deleteByIds = vi.fn(async (ids) => ({ ids }));
+    const message = createMessage();
+
+    await processBrainVectorSyncMessage(message, createBindings(execute, { deleteByIds }), config);
+
+    expect(deleteByIds).toHaveBeenCalledWith([expect.stringMatching(/^[0-9a-f]{64}$/)]);
+    expect(geminiMocks.embedDocument).not.toHaveBeenCalled();
+    expect(message.ack).toHaveBeenCalledOnce();
+  });
+
+  it("Vectorize失敗を本文なしのfailure codeとして記録し、Queue再配送へ返す", async () => {
+    const execute = vi.fn().mockResolvedValueOnce({ action: "delete" }).mockResolvedValueOnce(true);
+    const message = createMessage();
+
+    await expect(
+      processBrainVectorSyncMessage(
+        message,
+        createBindings(execute, {
+          deleteByIds: vi.fn(async () => {
+            throw new TypeError("provider response contained private payload");
+          }),
+        }),
+        config,
+      ),
+    ).rejects.toThrow(TypeError);
+    expect(execute).toHaveBeenLastCalledWith(
+      "account-1",
+      "brain.failVectorSyncJob",
+      "job-1",
+      "TypeError",
+    );
+    expect(message.ack).not.toHaveBeenCalled();
+  });
+});

@@ -55,4 +55,40 @@ describe("AccountData alarm", () => {
       "AccountData alarm failed; retry scheduled",
     );
   });
+
+  it("Vector同期outboxを本文なしで専用Queueへ投入する", async () => {
+    vi.spyOn(d1.action.conversation, "closeExpiredSessions").mockResolvedValue(0);
+    vi.spyOn(
+      d1.action.diagnosisBrainProjection,
+      "processPendingDiagnosisBrainProjections",
+    ).mockResolvedValue({
+      processed: 0,
+      applied: 0,
+      skippedIncomplete: 0,
+      skippedInvalidConfig: 0,
+      failed: 0,
+    });
+    vi.spyOn(d1.action.conversation, "claimDueDiaryBrainCheckpointIds").mockResolvedValue([]);
+    vi.spyOn(d1.action.brain, "claimDueBrainVectorSyncJobs").mockResolvedValue([
+      { id: "job-1", brainItemId: "brain-1", itemRevision: 123 },
+    ]);
+    const send = vi.fn(async () => undefined);
+    const instance = Object.create(AccountData.prototype) as AccountData;
+    Object.assign(instance as unknown as Record<string, unknown>, {
+      accountId: "account-1",
+      operationTail: Promise.resolve(),
+      repository: { client: {}, nextMaintenanceAt: () => null },
+      ctx: { storage: {} },
+      env: { BRAIN_VECTOR_QUEUE: { send } },
+    });
+
+    await expect(instance.alarm()).resolves.toBeUndefined();
+    expect(send).toHaveBeenCalledWith({
+      type: "brain-vector-sync",
+      accountId: "account-1",
+      jobId: "job-1",
+      brainItemId: "brain-1",
+      itemRevision: 123,
+    });
+  });
 });

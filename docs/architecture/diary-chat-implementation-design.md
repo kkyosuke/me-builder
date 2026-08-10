@@ -311,7 +311,7 @@ stateDiagram-v2
 
 Brain Itemを含むAccount所有データのquery境界は、[Accountデータ分離設計](account-data-isolation.md)を正とします。
 
-検証を通過したBrain Itemは`active`として保存します。本人の同意を登録の条件にはしません。Vectorize同期jobと検索利用は後続実装であり、導入時にはBrain Item作成と同じAccountData SQLite transactionでoutboxへ追加します。AI推定は`derivation = ai`として区別し、Confidenceの算出前を表す`uncomputed`を検索順位に使いません。
+検証を通過したBrain Itemは`active`として保存します。本人の同意を登録の条件にはしません。Brain Item作成とVectorize同期job追加は同じAccountData SQLite transactionで確定します。AI推定は`derivation = ai`として区別し、Confidenceの算出前を表す`uncomputed`を検索順位に使いません。
 
 開発用の確認一覧は、本人確認済みAccountに対する`brain.listActive`だけをAccountData RPCへ公開し、activeかつ未削除のItemと未削除Evidenceを最大100件返します。APIの`GET /api/dev/brain-items`とWeb UIの表示は`development` / `local` / `preview` / `test`だけで有効にし、Productionでは404かつUI非表示とします。クライアントからAccount IDを受け取りません。
 
@@ -321,15 +321,38 @@ Vectorizeは非同期更新であるため、AccountDataを正とするoutboxを
 
 | 列 | 用途 |
 | --- | --- |
-| `id`, `brain_item_id`, `item_revision` | PK、対象Item、更新版 |
+| `id`, `account_id`, `brain_item_id`, `item_revision` | PK、対象Account、対象Item、更新版 |
 | `operation` | `upsert` / `delete` |
-| `owner_scope` | Account IDを直接含まない検索scope |
 | `status` | `pending` / `submitted` / `applied` / `failed` |
 | `mutation_id` | Vectorizeが返した非同期mutation ID |
 | `attempt_count`, `next_attempt_at`, `failure_code` | retry管理。本文を含めない |
 | `created_at`, `updated_at` | lifecycle |
 
-以下はVectorize同期を実装するときの境界です。Brain Itemの作成、改訂、無効化、削除、撤回では、Brain Itemの利用可否変更とjob追加を同じAccountData SQLite transactionで確定します。Queue consumerはItem ID、revision、operationを使って冪等にupsertまたはdeleteし、mutation IDを保存します。AccountData alarmは長時間`pending` / `submitted`のjobとVectorize間の差分を再照合し、DLQから復旧します。削除時はAccountDataで先に利用不可にするため、Vectorizeに古いvectorが残る間も検索後のAccountData再認可で利用されません。
+Brain Itemの作成、改訂、無効化、削除、撤回では、Brain Itemの利用可否変更とjob追加を同じAccountData SQLite transactionで確定します。AccountData alarmは`pending` / `failed`または期限切れの`submitted` jobを専用Brain Vector Queueへ送ります。Queue messageはAccount ID、job ID、Item ID、revisionだけを持ち、Brain Item本文を複製しません。
+
+```mermaid
+sequenceDiagram
+    participant AD as AccountData
+    participant Q as Brain Vector Queue
+    participant C as Vector consumer
+    participant G as Gemini Embedding
+    participant V as Vectorize
+    AD->>AD: Brain Item変更 + outbox jobを同一transactionで保存
+    AD->>Q: IDとrevisionだけを送信
+    Q->>C: at-least-once配送
+    C->>AD: jobと現在のBrain Itemを再取得
+    alt 現在もactiveかつ未削除
+        C->>G: statementをembedding
+        C->>V: 決定的vector IDでupsert
+    else superseded / invalidated / deleted
+        C->>V: 決定的vector IDをdelete
+    end
+    C->>AD: mutation IDと適用結果を保存
+```
+
+consumerはQueue messageの`operation`や本文を信頼せず、処理直前にAccountDataの現在状態を再取得します。これにより古い`upsert`配送が、すでに無効化されたItemを復活させません。vector IDはItem IDを環境別SecretでHMACした決定的な値、`owner_scope`はAccount IDを同じSecretで用途分離してHMACした値です。Vectorizeへ保存するmetadataは`owner_scope`、category、derivation、embedding version、schema versionだけとし、生のAccount ID、Item ID、本文、Source Record ID、Evidenceを保存しません。
+
+Vectorizeへのupsertまたはdelete受付後に`applied`とmutation IDを記録します。失敗時は本文を含まないfailure codeだけを保存し、Queue再配送とoutboxの再送期限で回復します。削除時はAccountDataで先に利用不可にするため、Vectorizeに古いvectorが残る間も、検索導入後のAccountData再認可では利用されません。
 
 ### 4.9 ConversationCoordinatorのローカルSQLite
 

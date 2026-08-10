@@ -1,6 +1,7 @@
 import { line } from "@me-builder/lib";
 import type { d1 } from "@me-builder/lib";
 import {
+  type BrainVectorSyncQueueMessage,
   type ChatTurnQueueMessage,
   type DiaryBrainCheckpointQueueMessage,
   type Message,
@@ -9,6 +10,7 @@ import {
   logger,
 } from "@me-builder/shared";
 import { type CloudflareBindings, type WorkerConfig, getWorkerConfig } from "../config";
+import { processBrainVectorSyncMessage } from "../handler/brain-vector-sync";
 import { processChatTurnMessage } from "../handler/chat-turn";
 import { processDiaryBrainCheckpointMessage } from "../handler/diary-brain-checkpoint";
 import { processLineWebhook } from "./feature/line";
@@ -52,7 +54,10 @@ async function processWebhookMessage(
 
 export async function handleQueueBatch(
   batch: MessageBatch<
-    WebhookQueueMessage | ChatTurnQueueMessage | DiaryBrainCheckpointQueueMessage
+    | WebhookQueueMessage
+    | ChatTurnQueueMessage
+    | DiaryBrainCheckpointQueueMessage
+    | BrainVectorSyncQueueMessage
   >,
   db: d1.Client,
   workerConfig?: WorkerConfig,
@@ -75,6 +80,13 @@ export async function handleQueueBatch(
         if (!cf || !workerConfig) throw new Error("Diary Brain bindings are not configured");
         await processDiaryBrainCheckpointMessage(
           message as Message<DiaryBrainCheckpointQueueMessage>,
+          cf,
+          workerConfig,
+        );
+      } else if ("type" in message.body && message.body.type === "brain-vector-sync") {
+        if (!cf || !workerConfig) throw new Error("Brain vector bindings are not configured");
+        await processBrainVectorSyncMessage(
+          message as Message<BrainVectorSyncQueueMessage>,
           cf,
           workerConfig,
         );

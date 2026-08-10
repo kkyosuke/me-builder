@@ -255,6 +255,19 @@ describe("AccountDataRepository", () => {
       body: "legacy response",
       endSession: false,
     });
+    await legacy.client.insert(d1.schema.brainItems).values({
+      id: "legacy-brain-1",
+      accountId: "account-1",
+      category: "memory",
+      statement: "legacy memory",
+      attributes: {},
+      derivation: "ai",
+      status: "active",
+      stability: "stable",
+      sensitivity: "normal",
+      externallyShareable: false,
+      confidence: { state: "uncomputed" },
+    });
 
     const snapshot = {
       account: await legacy.client
@@ -268,7 +281,7 @@ describe("AccountDataRepository", () => {
         .from(d1.schema.sourceRecordTextPayloads)
         .all(),
       sourceRecordRevisions: [],
-      brainItems: [],
+      brainItems: await legacy.client.select().from(d1.schema.brainItems).all(),
       brainItemEvidenceEdges: [],
       brainItemRevisions: [],
       brainItemAccessLabels: [],
@@ -297,6 +310,13 @@ describe("AccountDataRepository", () => {
         expect.objectContaining({ assistantBody: "legacy response", turnId: turn.turnId }),
       ]),
     );
+    expect(await target.client.select().from(d1.schema.brainVectorSyncJobs).all()).toEqual([
+      expect.objectContaining({
+        brainItemId: "legacy-brain-1",
+        operation: "upsert",
+        status: "pending",
+      }),
+    ]);
   });
 
   it("Diagnosis回答・Source・projection requestを同じAccount SQLiteへ保存する", async () => {

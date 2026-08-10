@@ -32,8 +32,10 @@
     - `task db:migrate:local` (または `task db:migrate`): D1 データベースマイグレーションのローカル適用
     - `task db:migrate:preview`: プレビュー環境への D1 データベースマイグレーション適用
     - `task db:migrate:production`: 本番環境への D1 データベースマイグレーション適用
-    - `task queues:setup:preview`: プレビュー環境の日記チャット用Queue（Chat Turn / Brain Checkpoint）と各DLQを冪等に作成
-    - `task queues:setup:production`: 本番環境の日記チャット用Queue（Chat Turn / Brain Checkpoint）と各DLQを冪等に作成
+    - `task queues:setup:preview`: プレビュー環境の日記チャット用Queue（Chat Turn / Brain Checkpoint / Brain Vector）と各DLQを冪等に作成
+    - `task queues:setup:production`: 本番環境の日記チャット用Queue（Chat Turn / Brain Checkpoint / Brain Vector）と各DLQを冪等に作成
+    - `task vectorize:setup:preview`: プレビュー環境のBrain Vectorize indexと`owner_scope` metadata indexを冪等に作成
+    - `task vectorize:setup:production`: 本番環境のBrain Vectorize indexと`owner_scope` metadata indexを冪等に作成
     - `task access:setup:preview`: プレビュー環境のOpenAPI documentとSwagger UI用パスをCloudflare Accessで保護
     - `task access:setup:production`: 本番環境のOpenAPI documentとSwagger UI用パスをCloudflare Accessで保護
     - `bun --cwd apps/worker do:generate`: AccountDataとConversationCoordinatorのDrizzle schemaから、それぞれ`apps/worker/drizzle/<durable-object>/`へDurable SQLite migrationを生成
@@ -94,6 +96,7 @@
 - **Cloudflare AI Gateway 経由の Gemini 接続**:
   - Google AI Studio の呼び出しは `apps/worker/src/infrastructure/gemini-client.ts` に閉じ込め、`@google/genai` の `GoogleGenAI` を Cloudflare AI Gateway の Google AI Studio provider URL へ接続します。
   - `CLOUDFLARE_APP_API_TOKEN`はアプリ用tokenとしてAI Gatewayの実行とAnalytics参照に共用し、WorkerとAPI ServerのSecretとして配布します。Google AI Studioの認証には別途`GOOGLE_AI_STUDIO_API_KEY`をWorkerへ配布します。インフラ構築用の`CLOUDFLARE_DEPLOY_API_TOKEN`とは兼用せず、いずれもクライアントバンドル、`wrangler.toml`の`[vars]`、ログへ出力してはいけません。
+  - Brain ItemのVectorize同期では`BRAIN_VECTOR_HMAC_SECRET`をWorkerだけへ配布します。`CLOUDFLARE_DEPLOY_API_TOKEN`にはQueueとVectorize index / metadata indexを作成できる権限も付与します。
   - CDはGemini生成に加えてAI Gateway AnalyticsのGraphQL取得も実行し、`CLOUDFLARE_APP_API_TOKEN`の`AI Gateway Run`と`Account Analytics Read`をそれぞれ検証します。
   - Gateway URL は `CF_AI_GATEWAY_BASE_URL`、モデルは `GEMINI_MODEL` で上書きできます。未指定時は設定層の既定値を利用します。
   - ローカルの接続確認は `apps/worker/.env.example` を参照して環境変数を設定し、`bun --cwd apps/worker run check:gemini` を実行します。プロンプトはコマンド末尾の引数で変更できます。

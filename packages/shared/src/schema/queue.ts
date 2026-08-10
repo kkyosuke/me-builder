@@ -29,4 +29,13 @@ export interface DiaryBrainCheckpointQueueMessage {
   checkpointId: string;
 }
 
+/** 本文を含めず、AccountDataのVector同期outboxだけを参照する。 */
+export interface BrainVectorSyncQueueMessage {
+  type: "brain-vector-sync";
+  accountId: string;
+  jobId: string;
+  brainItemId: string;
+  itemRevision: number;
+}
+
 export type { Queue, Message, MessageBatch };

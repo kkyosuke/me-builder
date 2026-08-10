@@ -1,5 +1,6 @@
 import path from "node:path";
 import Database from "better-sqlite3";
+import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { describe, expect, it } from "vitest";
@@ -7,7 +8,10 @@ import type { D1Client } from "../client";
 import * as schema from "../schema";
 import {
   type SaveBrainItemInput,
+  claimDueBrainVectorSyncJobs,
+  completeBrainVectorSyncJob,
   findBrainItemForAccount,
+  getBrainVectorSyncTarget,
   listActiveBrainItems,
   saveBrainItem,
 } from "./brain";
@@ -85,6 +89,56 @@ describe("saveBrainItem", () => {
     await expect(db.select().from(schema.brainItemEvidenceEdges)).resolves.toHaveLength(1);
     await expect(db.select().from(schema.brainItemAccessLabels)).resolves.toHaveLength(1);
     await expect(db.select().from(schema.brainItemTopicLabels)).resolves.toHaveLength(1);
+    await expect(db.select().from(schema.brainVectorSyncJobs)).resolves.toEqual([
+      expect.objectContaining({
+        accountId: "account-1",
+        brainItemId: "brain-1",
+        operation: "upsert",
+        status: "pending",
+      }),
+    ]);
+  });
+
+  it("claim後に現在のactive Itemだけを返し、Vectorize受付を記録する", async () => {
+    const db = createTestDb();
+    await insertAccountsAndSources(db);
+    const at = new Date("2026-08-10T00:00:00Z");
+    await saveBrainItem(db, createInput({ at }));
+
+    const jobs = await claimDueBrainVectorSyncJobs(db, "account-1", at);
+    expect(jobs).toEqual([
+      { id: `brain-1:${at.getTime()}:upsert`, brainItemId: "brain-1", itemRevision: at.getTime() },
+    ]);
+    await expect(
+      getBrainVectorSyncTarget(db, "account-1", jobs[0]?.id ?? "", "brain-1", at.getTime()),
+    ).resolves.toEqual({
+      action: "upsert",
+      statement: "日記から見える傾向",
+      category: "preference",
+      derivation: "ai",
+    });
+    await expect(
+      completeBrainVectorSyncJob(db, "account-1", jobs[0]?.id ?? "", "mutation-1", at),
+    ).resolves.toBe(true);
+    await expect(db.select().from(schema.brainVectorSyncJobs)).resolves.toEqual([
+      expect.objectContaining({ status: "applied", mutationId: "mutation-1" }),
+    ]);
+  });
+
+  it("古いupsert jobでも処理時にinvalidatedならdeleteを返す", async () => {
+    const db = createTestDb();
+    await insertAccountsAndSources(db);
+    const at = new Date("2026-08-10T00:00:00Z");
+    await saveBrainItem(db, createInput({ at }));
+    const [job] = await claimDueBrainVectorSyncJobs(db, "account-1", at);
+    await db
+      .update(schema.brainItems)
+      .set({ status: "invalidated", updatedAt: new Date(at.getTime() + 1) })
+      .where(eq(schema.brainItems.id, "brain-1"));
+
+    await expect(
+      getBrainVectorSyncTarget(db, "account-1", job?.id ?? "", "brain-1", at.getTime()),
+    ).resolves.toEqual({ action: "delete" });
   });
 
   it("EvidenceなしではBrain Itemを保存しない", async () => {
