@@ -37,7 +37,7 @@ Accountの責務は[ドメイン設計](../domain/domain-design.md)、実行基�
 
 Geminiの各成功レスポンスについて、Googleが返した`responseId`、model、用途、生成時刻、`usageMetadata`のtoken数と、me-builder内部のAccount IDだけを共有D1へ保存します。prompt、生成本文、LINE user IDなど外部providerの識別子は利用量recordへ保存しません。Account別利用量は管理者だけに返します。`responseId`を一意キーにして同じGoogleレスポンスの再保存を無視し、構造化出力のschema修正などでGoogleへ再生成した場合は別レスポンスとして数えます。
 
-Google由来の`responseId`または入力・出力・合計token数が欠けたレスポンスは、0として補完したり独自IDを発行したりせず保存対象外にします。欠落した項目名だけを運用ログへ記録し、生成済みのユーザー応答は継続します。
+Google由来の`responseId`、入力token数、合計token数が欠けたレスポンスは、0として補完したり独自IDを発行したりせず保存対象外にします。安全フィルター応答などで出力token数だけが省略された場合は、Googleが定義する合計token数から入力・思考・tool実行結果のtoken数を引いて導出します。欠落した項目名だけを運用ログへ記録し、生成済みのユーザー応答は継続します。
 
 Googleの`usageMetadata`はtoken数であり、請求額の確定値ではありません。概算費用は表示せず、確定費用が必要になった場合はCloud Billing Exportを別途設計します。
 

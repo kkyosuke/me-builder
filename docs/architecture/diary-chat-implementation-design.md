@@ -657,7 +657,7 @@ finalまたは失敗案内のretryは90秒で止めます。90秒時点で結果
 - promptとresponse本文をアプリケーションログや独自の永続領域へ保存しない
 - Account ID、LINE user ID、Source Record本文、Brain Item本文をエラーログへ入れない
 - Googleの各成功レスポンスから`responseId`、model、用途、生成時刻、`usageMetadata`のtoken数と内部Account IDだけを共有D1へ冪等保存する
-- Google由来の`responseId`または主要token数が欠けた場合は0や独自IDで補完せず、利用量recordの保存だけをスキップする
+- Google由来の`responseId`、入力token数、合計token数が欠けた場合は0や独自IDで補完せず、利用量recordの保存だけをスキップする。出力token数だけが省略された場合は、Google定義の合計token数から入力・思考・tool実行結果のtoken数を引いて導出する
 - token利用量recordにはprompt、response本文、LINE user IDなど外部providerの識別子を含めない
 - providerのrate limit到達時も日記保存は成功させる
 

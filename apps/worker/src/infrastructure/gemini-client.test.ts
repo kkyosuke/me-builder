@@ -74,7 +74,7 @@ describe("Gemini client", () => {
       "candidatesTokenCount",
       {
         responseId: "response-1",
-        usageMetadata: { promptTokenCount: 10, totalTokenCount: 10 },
+        usageMetadata: { promptTokenCount: 10, totalTokenCount: 9 },
       },
     ],
   ])("%sが欠けても0として保存せず応答本文を返すこと", async (field, response) => {
@@ -93,5 +93,32 @@ describe("Gemini client", () => {
       }),
       "[Gemini usage] skipped at usage.validate -> continue",
     );
+  });
+
+  it("安全フィルター応答で省略された出力token数を導出して保存すること", async () => {
+    const generateContent = vi.fn().mockResolvedValue({
+      responseId: "blocked-response-1",
+      createTime: "2026-08-10T08:00:00.000Z",
+      promptFeedback: { blockReason: "PROHIBITED_CONTENT" },
+      usageMetadata: { promptTokenCount: 10, totalTokenCount: 10 },
+    });
+    const client = { models: { generateContent } } as unknown as GoogleGenAI;
+    const onUsage = vi.fn().mockResolvedValue(undefined);
+    const warning = vi.spyOn(logger, "warn").mockImplementation(() => undefined);
+
+    await expect(generateText(client, "gemini-test", "prompt", onUsage)).resolves.toBeUndefined();
+
+    expect(onUsage).toHaveBeenCalledWith({
+      responseId: "blocked-response-1",
+      model: "gemini-test",
+      promptTokenCount: 10,
+      candidatesTokenCount: 0,
+      thoughtsTokenCount: 0,
+      cachedContentTokenCount: 0,
+      toolUsePromptTokenCount: 0,
+      totalTokenCount: 10,
+      generatedAt: new Date("2026-08-10T08:00:00.000Z"),
+    });
+    expect(warning).not.toHaveBeenCalled();
   });
 });

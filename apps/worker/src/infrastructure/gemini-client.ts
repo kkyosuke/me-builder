@@ -90,12 +90,26 @@ function toGeminiUsage(
   const promptTokenCount = isTokenCount(metadata?.promptTokenCount)
     ? metadata.promptTokenCount
     : undefined;
-  const candidatesTokenCount = isTokenCount(metadata?.candidatesTokenCount)
-    ? metadata.candidatesTokenCount
-    : undefined;
   const totalTokenCount = isTokenCount(metadata?.totalTokenCount)
     ? metadata.totalTokenCount
     : undefined;
+  const thoughtsTokenCount = isTokenCount(metadata?.thoughtsTokenCount)
+    ? metadata.thoughtsTokenCount
+    : 0;
+  const toolUsePromptTokenCount = isTokenCount(metadata?.toolUsePromptTokenCount)
+    ? metadata.toolUsePromptTokenCount
+    : 0;
+  const derivedCandidatesTokenCount =
+    metadata?.candidatesTokenCount === undefined &&
+    promptTokenCount !== undefined &&
+    totalTokenCount !== undefined
+      ? totalTokenCount - promptTokenCount - thoughtsTokenCount - toolUsePromptTokenCount
+      : undefined;
+  const candidatesTokenCount = isTokenCount(metadata?.candidatesTokenCount)
+    ? metadata.candidatesTokenCount
+    : isTokenCount(derivedCandidatesTokenCount)
+      ? derivedCandidatesTokenCount
+      : undefined;
   const missingFields = [
     ...(!responseId ? ["responseId"] : []),
     ...(!metadata ? ["usageMetadata"] : []),
@@ -143,9 +157,9 @@ function toGeminiUsage(
     model: response.modelVersion ?? requestedModel,
     promptTokenCount,
     candidatesTokenCount,
-    thoughtsTokenCount: metadata.thoughtsTokenCount ?? 0,
+    thoughtsTokenCount,
     cachedContentTokenCount: metadata.cachedContentTokenCount ?? 0,
-    toolUsePromptTokenCount: metadata.toolUsePromptTokenCount ?? 0,
+    toolUsePromptTokenCount,
     totalTokenCount,
     generatedAt: Number.isNaN(generatedAt.getTime()) ? new Date() : generatedAt,
   };
