@@ -7,6 +7,7 @@ import {
   type TurnDeliveryRequest,
   type TurnDeliveryResult,
   logger,
+  toSafeOperationalErrorFields,
 } from "@me-builder/shared";
 import { DEFAULT_GEMINI_MODEL, getCloudflareBindings } from "../config";
 import type { CloudflareBindings } from "../config";
@@ -236,12 +237,22 @@ export class ConversationCoordinator extends DurableObject<Env> {
     try {
       await this.processAlarm();
     } catch (error) {
+      // errorMessageにはSDK例外が抱えるresponse bodyが載りうるため、安全な分類だけを残す。
       logger.error(
         {
-          errorName: error instanceof Error ? error.name : "UnknownError",
-          errorMessage: error instanceof Error ? error.message : String(error),
+          event: "alarm.run.failed",
+          service: "worker",
+          component: "conversation-coordinator",
+          outcome: "failed",
+          disposition: "alarm-retry",
+          ...toSafeOperationalErrorFields(error, {
+            code: "CONVERSATION_COORDINATOR_ALARM_FAILED",
+            category: "unknown",
+            stage: "alarm.process",
+            retryable: true,
+          }),
         },
-        "Conversation coordinator alarm failed; retry scheduled",
+        `[Conversation coordinator] alarm failed at alarm.process -> alarm-retry (retrying in ${ALARM_RETRY_MS}ms or at the earliest lease deadline)`,
       );
       const retryAt = Date.now() + ALARM_RETRY_MS;
       const leaseDeadline = this.repository.earliestLeaseDeadline();

@@ -13,6 +13,12 @@ export type OperationalErrorDescriptor = {
   stage: string;
   retryable: boolean;
   dependency?: string;
+  /**
+   * 外部依存が返したHTTP status。
+   * 429と503を区別できないと再試行の是非を判断できないため、statusだけを残す。
+   * 生のresponse bodyは本文やprompt echoを含みうるので載せない。
+   */
+  dependencyStatus?: number;
 };
 
 /**
@@ -25,6 +31,7 @@ export class OperationalError extends Error {
   readonly stage: string;
   readonly retryable: boolean;
   readonly dependency: string | undefined;
+  readonly dependencyStatus: number | undefined;
 
   constructor(descriptor: OperationalErrorDescriptor, cause?: unknown) {
     super(descriptor.code);
@@ -41,6 +48,7 @@ export class OperationalError extends Error {
     this.stage = descriptor.stage;
     this.retryable = descriptor.retryable;
     this.dependency = descriptor.dependency;
+    this.dependencyStatus = descriptor.dependencyStatus;
   }
 }
 
@@ -50,6 +58,7 @@ export type SafeOperationalErrorFields = {
   stage: string;
   retryable: boolean;
   dependency?: string;
+  dependencyStatus?: number;
 };
 
 export function toOperationalError(
@@ -71,5 +80,8 @@ export function toSafeOperationalErrorFields(
     stage: operationalError.stage,
     retryable: operationalError.retryable,
     ...(operationalError.dependency ? { dependency: operationalError.dependency } : {}),
+    ...(operationalError.dependencyStatus === undefined
+      ? {}
+      : { dependencyStatus: operationalError.dependencyStatus }),
   };
 }

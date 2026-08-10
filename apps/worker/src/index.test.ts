@@ -159,7 +159,7 @@ describe("Worker", () => {
         outcome: "succeeded",
         disposition: "ack",
       }),
-      "Webhook queue message completed",
+      expect.stringContaining("[LINE webhook] succeeded at chat.accept -> ack"),
     );
   });
 
@@ -212,7 +212,7 @@ describe("Worker", () => {
     );
     expect(mockInfoLog).toHaveBeenCalledWith(
       expect.objectContaining({ traceId: "queue-envelope-1" }),
-      "Webhook queue message completed",
+      expect.stringContaining("[LINE webhook] succeeded at"),
     );
   });
 
@@ -234,7 +234,7 @@ describe("Worker", () => {
         attempt: 4,
         disposition: "dead-letter",
       }),
-      "Webhook queue message failed",
+      expect.stringContaining("[LINE webhook] failed at source.store -> dead-letter (attempt 4/4"),
     );
   });
 

@@ -1,5 +1,5 @@
 import { type AccountDataNamespace, accountDataFor, type d1 } from "@me-builder/lib";
-import { logger } from "@me-builder/shared";
+import { logger, toSafeOperationalErrorFields } from "@me-builder/shared";
 import { scoreDiagnosisAnswers } from "./diagnosis-scoring";
 import { createLiffSession } from "./liff-session";
 
@@ -72,13 +72,24 @@ export async function getDiagnosisAnswers(
   try {
     scoring = scoreDiagnosisAnswers(result.diagnosis.answers, scoringConfig);
   } catch (error) {
-    logger.error(
+    // reasonへerror.messageを載せると、採点設定や回答の内容がlogへ流出しうる。
+    // ここは採点を諦めて回答閲覧を続ける縮退成功なので、この層が結果を所有して1件記録する。
+    logger.warn(
       {
+        event: "diagnosis.scoring.skipped",
+        service: "api",
+        component: "diagnosis-answers",
         diagnosisId,
         scoringConfigId: scoringConfig?.id,
-        reason: error instanceof Error ? error.message : "unknown error",
+        outcome: "degraded",
+        ...toSafeOperationalErrorFields(error, {
+          code: "DIAGNOSIS_SCORING_CONFIG_INVALID",
+          category: "invariant",
+          stage: "diagnosis.score",
+          retryable: false,
+        }),
       },
-      "Diagnosis scoring config is invalid; returning answers without scoring",
+      `[Diagnosis answers] degraded at diagnosis.score -> answers returned without scoring (diagnosis ${diagnosisId}, DIAGNOSIS_SCORING_CONFIG_INVALID)`,
     );
   }
   return {

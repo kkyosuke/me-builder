@@ -12,6 +12,11 @@ compatibility_flags = ["nodejs_compat"]
 [observability]
 enabled = true
 
+# Cloudflareが自動で出す起動ログはHTTPの結果を表さない。middlewareの終端ログが
+# method、path、status、所要時間を持つため、起動ログは出さない。
+[observability.logs]
+invocation_logs = false
+
 [[queues.producers]]
 queue = "me-builder-webhook-queue-local"
 binding = "WEBHOOK_QUEUE"
