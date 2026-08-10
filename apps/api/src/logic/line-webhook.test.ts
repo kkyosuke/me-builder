@@ -150,7 +150,7 @@ describe("replyTokenの受け渡し", () => {
         retryable: true,
         dependency: "cloudflare-queue",
       }),
-      "Webhook event could not be queued",
+      expect.stringContaining("[LINE webhook] failed at queue.send -> http-error"),
     );
     expect(JSON.stringify(errorLog.mock.calls)).not.toContain("本文やSDK response");
     errorLog.mockRestore();

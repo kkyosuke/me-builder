@@ -29,9 +29,6 @@ export async function getStatistics(c: Context<AppEnv>): Promise<Response> {
     adminLineUserIds: config.adminLineUserIds,
     db: d1.client.create(c.env.DB),
     lineChannelAccessToken: config.lineChannelAccessToken,
-    cloudflareAccountId: config.cloudflareAccountId,
-    cloudflareAiGatewayId: config.cloudflareAiGatewayId,
-    cloudflareAppApiToken: config.cloudflareAppApiToken,
   });
   switch (outcome.type) {
     case "resolved":

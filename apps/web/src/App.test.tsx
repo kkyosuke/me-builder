@@ -497,20 +497,20 @@ describe("App", () => {
     );
   });
 
-  it("詳細取得が即時完了してもloadingを400ms表示する", async () => {
+  it("詳細取得が即時完了してもSkeletonを400ms表示する", async () => {
     render(<App />);
     const openDiagnosis = await screen.findByRole("button", { name: /テスト診断/ });
     vi.useFakeTimers();
 
     fireEvent.click(openDiagnosis);
-    expect(screen.getByText("診断を読み込んでいます...")).toBeTruthy();
+    expect(screen.getByRole("status", { name: "診断詳細を読み込み中" })).toBeTruthy();
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();
       vi.advanceTimersByTime(399);
     });
 
-    expect(screen.getByText("診断を読み込んでいます...")).toBeTruthy();
+    expect(screen.getByRole("status", { name: "診断詳細を読み込み中" })).toBeTruthy();
     expect(screen.queryByText("回答UI: テスト診断")).toBeNull();
 
     await act(async () => vi.advanceTimersByTime(1));

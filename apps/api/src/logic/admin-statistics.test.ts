@@ -10,9 +10,6 @@ const base = {
   adminLineUserIds: [] as string[],
   db,
   lineChannelAccessToken: "line-token",
-  cloudflareAccountId: "cf-account",
-  cloudflareAiGatewayId: "default",
-  cloudflareAppApiToken: "cf-token",
   now: new Date("2026-08-08T03:00:00.000Z"),
 };
 
@@ -22,26 +19,17 @@ function session(role: "user" | "admin"): typeof createLiffSession {
 
 describe("getAdminStatistics", () => {
   it("通常Accountには統計を返さない", async () => {
-    const getAiUsage = vi.fn();
     const outcome = await getAdminStatistics({
       ...base,
       createSession: session("user"),
-      getAiUsage,
     });
     expect(outcome).toEqual({ type: "forbidden" });
-    expect(getAiUsage).not.toHaveBeenCalled();
   });
 
-  it("管理者へGeminiとLINEの当月統計を返す", async () => {
+  it("管理者へGeminiの利用不可状態とLINEの当月統計を返す", async () => {
     const outcome = await getAdminStatistics({
       ...base,
       createSession: session("admin"),
-      getAiUsage: vi.fn().mockResolvedValue({
-        estimatedCostUsd: 0.02,
-        requestCount: 4,
-        inputTokens: 100,
-        outputTokens: 20,
-      }),
       getLineUsage: vi.fn().mockResolvedValue({
         billableMessages: 3,
         monthlyLimit: 5000,
@@ -51,28 +39,23 @@ describe("getAdminStatistics", () => {
     expect(outcome).toMatchObject({
       type: "resolved",
       statistics: {
-        gemini: { status: "available", estimatedCostUsd: 0.02 },
+        gemini: { status: "unavailable", reason: "not-configured" },
         line: { status: "available", billableMessages: 3, replyMessages: 8 },
       },
     });
   });
 
-  it("一方の外部取得失敗でも他方の統計を返す", async () => {
+  it("LINEの取得失敗時もGeminiの利用不可状態を返す", async () => {
     const outcome = await getAdminStatistics({
       ...base,
       createSession: session("admin"),
-      getAiUsage: vi.fn().mockRejectedValue(new Error("Cloudflare unavailable")),
-      getLineUsage: vi.fn().mockResolvedValue({
-        billableMessages: 3,
-        monthlyLimit: null,
-        replyMessages: 8,
-      }),
+      getLineUsage: vi.fn().mockRejectedValue(new Error("LINE unavailable")),
     });
     expect(outcome).toMatchObject({
       type: "resolved",
       statistics: {
-        gemini: { status: "unavailable", reason: "upstream-error" },
-        line: { status: "available" },
+        gemini: { status: "unavailable", reason: "not-configured" },
+        line: { status: "unavailable", reason: "upstream-error" },
       },
     });
   });

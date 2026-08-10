@@ -37,8 +37,7 @@ const workerConfig = getWorkerConfig({
   ENVIRONMENT: "test",
   LINE_CHANNEL_ACCESS_TOKEN: "line-token",
   CHAT_DELIVERY_SECRET: "delivery-secret",
-  GOOGLE_AI_STUDIO_API_KEY: "google-key",
-  CLOUDFLARE_APP_API_TOKEN: "gateway-token",
+  GOOGLE_VERTEX_AI_API_KEY: "google-key",
   CHAT_CONTEXT_MESSAGE_LIMIT: "20",
   LIFF_ID: liffId,
 });
@@ -200,8 +199,7 @@ async function enqueueLineEvents(
     ENVIRONMENT: "test",
     LINE_CHANNEL_ACCESS_TOKEN: "line-token",
     CHAT_DELIVERY_SECRET: "delivery-secret",
-    GOOGLE_AI_STUDIO_API_KEY: "google-key",
-    CLOUDFLARE_APP_API_TOKEN: "gateway-token",
+    GOOGLE_VERTEX_AI_API_KEY: "google-key",
     CHAT_CONTEXT_MESSAGE_LIMIT: "20",
     LIFF_ID: liffId,
   });
@@ -354,7 +352,7 @@ describe("LINE diary chat delivery E2E", () => {
         disposition: "ack",
         stage: "line.deliver",
       }),
-      "Chat turn queue message completed",
+      expect.stringContaining("[Chat turn] succeeded at line.deliver -> ack"),
     );
     expect(JSON.stringify(queuedTurn)).not.toContain(diaryText);
     expect(JSON.stringify(queuedTurn)).not.toContain(providerAccountId);
@@ -467,7 +465,7 @@ describe("LINE diary chat delivery E2E", () => {
         retryable: true,
         disposition: "retry",
       }),
-      "Chat turn queue message failed",
+      expect.stringContaining("[Chat turn] failed at line.deliver -> retry"),
     );
     expect(mockPushMessage).not.toHaveBeenCalled();
     expect(await turnStatus(queuedTurn.turnId)).toBe("delivery_pending");

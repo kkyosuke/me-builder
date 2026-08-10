@@ -59,9 +59,6 @@ export function getConfig(env?: Record<string, unknown>): ApiConfig {
     liffId: rawLiffId,
     lineLoginChannelId: rawLineLoginChannelId,
     adminLineUserIds,
-    cloudflareAccountId: getEnv("CLOUDFLARE_ACCOUNT_ID", env)?.trim() || undefined,
-    cloudflareAiGatewayId: getEnv("CLOUDFLARE_AI_GATEWAY_ID", env)?.trim() || "default",
-    cloudflareAppApiToken: getEnv("CLOUDFLARE_APP_API_TOKEN", env)?.trim() || undefined,
   };
 
   return v.parse(ConfigSchema, rawConfig);

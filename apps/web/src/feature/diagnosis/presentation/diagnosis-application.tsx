@@ -1,10 +1,10 @@
 import { useCallback } from "react";
-import { LoadingState } from "../../../components/loading-state";
 import { config } from "../../../config";
 import { useLiffSession } from "../../liff";
 import { DiagnosisDetailScreen } from "./components/diagnosis-detail-screen";
 import { DiagnosisGuidance } from "./components/diagnosis-guidance";
 import { DiagnosisHome } from "./components/diagnosis-home";
+import { DiagnosisDetailSkeleton } from "./components/diagnosis-loading-skeleton";
 import { DiagnosisResultView } from "./components/diagnosis-result";
 import { useDiagnosisDetail } from "./hooks/use-diagnosis-detail";
 import { useDiagnosisList } from "./hooks/use-diagnosis-list";
@@ -39,7 +39,7 @@ export default function DiagnosisApplication() {
   );
 
   if (detail.state.status === "loading") {
-    content = <LoadingState message="診断を読み込んでいます..." />;
+    content = <DiagnosisDetailSkeleton />;
   } else if (detail.state.status === "error") {
     content = <DiagnosisGuidance kind="load-error" onBack={detail.close} />;
   } else if (detail.state.status === "success") {

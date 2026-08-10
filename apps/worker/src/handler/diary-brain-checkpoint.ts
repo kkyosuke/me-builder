@@ -1,5 +1,15 @@
 import { accountDataFor, d1 } from "@me-builder/lib";
-import type { DiaryBrainCheckpointQueueMessage, Message } from "@me-builder/shared";
+import type {
+  DiaryBrainCheckpointQueueMessage,
+  Message,
+  OperationalOutcome,
+} from "@me-builder/shared";
+import {
+  OperationalError,
+  describeQueueMessageResult,
+  logger,
+  operationalLogLevel,
+} from "@me-builder/shared";
 import type { CloudflareBindings, WorkerConfig } from "../config";
 import { createLineRetryKey, pushLineTextWithRetryKey } from "../infrastructure/line-delivery";
 import {
@@ -8,12 +18,60 @@ import {
   generateDiaryBrainCandidates,
 } from "../logic/diary-brain";
 
+/** wrangler.tomlのmax_retries=5に初回配送を加えた最大試行回数。 */
+export const DIARY_BRAIN_CHECKPOINT_MAX_ATTEMPTS = 6;
+
+/** ack時の終端ログ。失敗はQueue dispatch境界がretry判断とともに1件記録する。 */
+function logCompleted(
+  message: Message<DiaryBrainCheckpointQueueMessage>,
+  workerConfig: WorkerConfig,
+  startedAt: number,
+  details: { outcome: OperationalOutcome; stage: string; resultCode?: string },
+): void {
+  const durationMs = Date.now() - startedAt;
+  const fields = {
+    event: "queue.message.completed",
+    service: "worker",
+    environment: workerConfig.environment,
+    component: "diary-brain-checkpoint",
+    queueMessageId: message.id,
+    messageType: "diary-brain-checkpoint",
+    attempt: message.attempts,
+    outcome: details.outcome,
+    disposition: "ack" as const,
+    stage: details.stage,
+    ...(details.resultCode ? { resultCode: details.resultCode } : {}),
+    durationMs,
+  };
+  const description = describeQueueMessageResult({
+    flow: "diary-brain-checkpoint",
+    outcome: details.outcome,
+    disposition: "ack",
+    stage: details.stage,
+    attempt: message.attempts,
+    maxAttempts: DIARY_BRAIN_CHECKPOINT_MAX_ATTEMPTS,
+    durationMs,
+    resultCode: details.resultCode,
+  });
+  if (operationalLogLevel(details.outcome) === "info") logger.info(fields, description);
+  else logger.warn(fields, description);
+}
+
 export async function processDiaryBrainCheckpointMessage(
   message: Message<DiaryBrainCheckpointQueueMessage>,
   cf: CloudflareBindings,
   workerConfig: WorkerConfig,
 ): Promise<void> {
-  if (!cf.do.accountData) throw new Error("ACCOUNT_DATA binding is not configured");
+  const startedAt = Date.now();
+  if (!cf.do.accountData) {
+    throw new OperationalError({
+      code: "ACCOUNT_DATA_BINDING_MISSING",
+      category: "configuration",
+      stage: "checkpoint.load",
+      retryable: true,
+      dependency: "account-data",
+    });
+  }
   const accountData = accountDataFor(cf.do.accountData, message.body.accountId);
   const context = await accountData.execute(
     "conversation.getDiaryBrainCheckpointContext",
@@ -28,6 +86,11 @@ export async function processDiaryBrainCheckpointMessage(
       workerConfig,
     );
     message.ack();
+    logCompleted(message, workerConfig, startedAt, {
+      outcome: "discarded",
+      stage: "checkpoint.load",
+      resultCode: "DIARY_BRAIN_CHECKPOINT_NOT_PENDING",
+    });
     return;
   }
   const candidates = await generateDiaryBrainCandidates(
@@ -36,7 +99,13 @@ export async function processDiaryBrainCheckpointMessage(
     workerConfig,
   );
   if (!candidates) {
-    throw new Error("Diary Brain candidate generation failed");
+    throw new OperationalError({
+      code: "DIARY_BRAIN_CANDIDATE_GENERATION_FAILED",
+      category: "dependency",
+      stage: "ai.generate",
+      retryable: true,
+      dependency: "google-ai",
+    });
   }
   const applied = await accountData.execute(
     "conversation.applyDiaryBrainCheckpoint",
@@ -50,6 +119,11 @@ export async function processDiaryBrainCheckpointMessage(
   );
   if (!applied) {
     message.ack();
+    logCompleted(message, workerConfig, startedAt, {
+      outcome: "discarded",
+      stage: "checkpoint.apply",
+      resultCode: "DIARY_BRAIN_CHECKPOINT_SUPERSEDED",
+    });
     return;
   }
 
@@ -62,6 +136,10 @@ export async function processDiaryBrainCheckpointMessage(
     applied,
   );
   message.ack();
+  logCompleted(message, workerConfig, startedAt, {
+    outcome: "succeeded",
+    stage: "checkpoint.apply",
+  });
 }
 
 async function sendDevelopmentNotification(
