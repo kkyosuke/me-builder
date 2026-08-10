@@ -26,9 +26,10 @@
     - `task lint`: Biome によるコード Lint / フォーマット検証
     - `task lint:fix`: Biome によるコード Lint / フォーマットの自動修復
     - `task test`: Vitest による全テスト実行
-    - `bun run test:pre-push`: pre-push向けにE2Eを除外したテスト実行
+    - `bun run test:unit`: E2Eを除外したテスト実行（`test:pre-push`は同じもののpre-push向けの別名）
+    - `bun run test:e2e`: E2EとWorker runtime E2Eだけのテスト実行
     - `task generate:api`: APIのOpenAPI documentとWeb UI用TypeScript型を再生成
-    - `task ci`: CI で実行される全検証（lint, typecheck, test, build）の一括ローカル実行
+    - `task ci`: 生成物差分, lint, 未使用export, Markdown lint, typecheck, test（E2Eを含む全体）, build の一括ローカル実行。`cd-production.yml`が本番デプロイ前に実行するものと同じで、リンク切れ確認は含みません（相対リンクは`ci.yml`、外部URLは`scheduled-checks.yml`が担当）
     - `task db:migrate:local` (または `task db:migrate`): D1 データベースマイグレーションのローカル適用
     - `task db:migrate:preview`: プレビュー環境への D1 データベースマイグレーション適用
     - `task db:migrate:production`: 本番環境への D1 データベースマイグレーション適用
@@ -42,19 +43,33 @@
     - `task db:seed:production`: 本番D1へ診断seedを明示的に適用
     - `task deploy:preview`: D1 マイグレーション適用および全アプリのプレビュー環境へのデプロイ (`wrangler deploy --env preview`, `wrangler pages deploy`)
     - `task deploy:production`: D1 マイグレーション適用および全アプリの本番環境へのデプロイ (`wrangler deploy --env production`, `wrangler pages deploy`)
-  - **CI/CD ワークフロー構造 (`.github/workflows/ci-*.yml`, `.github/workflows/cd-*.yml`)**:
-    - CI ワークフローはコンポーネントごとの個別の YAML ファイルに分離されています (`ci-lint.yml`, `ci-shared.yml`, `ci-api.yml`, `ci-mcp.yml`, `ci-worker.yml`, `ci-ui.yml`)。加えて、PRに`e2e`ラベルを付けたときと、そのラベルが付いたまま追加のpushをしたときは、`ci-e2e.yml`がE2EとWorker runtime E2Eを含むテストを実行します。
+  - **CI/CD ワークフロー構造 (`.github/workflows/*.yml`)**:
+    - CI は単一の `ci.yml` (job 名 `Verify`) にまとめています。パッケージごとに job を分けると、1 回の push で 6〜7 個の job がそれぞれ checkout と `bun install` を払い直し、GitHub Actions の課金が job ごとに分単位へ切り上げられるため、実際の検証時間の 2 倍近くを消費します。**検証内容を増やすためにパッケージ単位のワークフローを復活させないでください。**
+    - `ci.yml` は PR (`pull_request`) と手動実行 (`workflow_dispatch`) だけで動きます。`main` への push では CI ワークフローを走らせません。マージ後の検証は `cd-production.yml` の `bun run ci` が担い、同じ検証を二重に課金しません。
+    - `ci.yml` はルートの `bun run test:unit` を実行します。1 プロセスの `vitest run` で `apps/web` を含む全パッケージのテストを流します。パッケージごとに `vitest` を起動し直すより速く済みます。
+    - **E2E は `ci.yml` では実行しません。** E2E (7 ファイル) だけで通常のテスト全体 (106 ファイル) に匹敵する時間がかかるため、`e2e` ラベルが付いた PR で `ci-e2e.yml` が実行します。ラベルが無ければ job ごと skip され、GitHub Actions の課金対象になりません。`main` へマージする直前は `cd-production.yml` の `bun run ci` が E2E を含めて実行するため、E2E を通さずに本番へ出ることはありません。
+    - テストの区分は npm script で表します。`test` が全体、`test:unit` が E2E を除いた分、`test:e2e` が E2E と Worker runtime E2E です。`test:unit` と `test:e2e` は重複も漏れもなく `test` を二分します。**E2E は `e2e/` ディレクトリ配下に置くか `*.e2e.test.*` という名前にしてください**（`test:e2e` はパスに `e2e` を含むかで選別します）。
+    - `ci.yml` は `dorny/paths-filter` で変更領域を判定し、コードが変わっていない PR ではコードの検証を、ドキュメントが変わっていない PR では Markdown lint を飛ばします。トリガー側に `paths:` を書かないため、ワークフロー自体は常に結果を報告します。**どちらのフィルタにも一致しない変更は全検証へ倒します**（列挙から漏れたファイルだけの PR が「1 つも検証せず success」になるのを防ぐため）。
+    - 同じ PR へ続けて push したときは `concurrency` で古い実行を打ち切ります (`cancel-in-progress: true`)。共有環境を触る CD ワークフローだけは打ち切りません。
+    - 外部サービスの応答を待つ検証は `scheduled-checks.yml` (毎週月曜 + 手動実行) に隔離します。対象は Markdown の**外部 URL** のリンク切れ確認と、本番 LINE Webhook への疎通確認 (`register-webhook.ts --force`) です。失敗の原因が外部側の変化であってPRの変更ではないものは、ここへ寄せます。
+    - **相対リンクの切れは PR の変更が直接引き起こす**（ファイル名変更など）ため、`ci.yml` で `bun run lint:md:links:relative` として検証します。外部 URL を除外した設定 (`mlc_config.relative.json`) を使うのでネットワーク待ちがありません。
+    - `lint:md:links` 系は `find ... -print0 | xargs -0 markdown-link-check` の形で書きます。`find -exec` は実行したコマンドの終了ステータスを伝播せず、**リンクが切れていても常に成功してしまいます**。また 1 プロセスへまとめて渡すことでファイル毎の起動コストを避けます (実測 73 秒 → 1 秒)。knip は pipe の先のバイナリを辿れないため、`markdown-link-check` は `knip.json` の `ignoreDependencies` に入れています。
     - CD ワークフローはプレビュー・本番デプロイ用に分離されています (`cd-preview.yml`, `cd-production.yml`)。
     - `cd-preview.yml` は PR の作成・更新だけでは**デプロイしません**（プレビューは全 PR 共有の単一環境のため、自動デプロイで上書きし合うのを避ける）。デプロイされるのは次の 2 通りだけです。
       - Actions 画面でブランチを選ぶか `gh workflow run cd-preview.yml --ref <branch>` で手動実行したとき (`workflow_dispatch`)
       - PR に `deploy` ラベルが付いているとき（ラベル付与時と、その後の push）。ラベルを外せば以降の push ではデプロイされませんが、**すでにデプロイ済みの環境は元に戻りません**。
     - 共有環境の取り合いを避けるため `concurrency: cd-preview` で直列化しています。実行中のデプロイは中断せず、待機中の実行だけが新しいものへ置き換わります。
-    - `reset-preview-migrations.yml` は Actions 画面または `gh workflow run reset-preview-migrations.yml --ref <branch> -f confirmation=reset-preview` からだけ起動します。選択したブランチを基準に Preview D1 のCloudflare予約table以外（`d1_migrations`を含む）と全 Durable Object namespaceを削除し、同じD1 database resourceへD1 migration、診断seedを再適用してWorker / API / MCPを再デプロイします。全Previewデータを復元不能に削除するため確認文字列を必須とし、productionは対象にしません。`cd-preview`と同じconcurrency groupで直列化します。再作成でresource IDが変わった場合は `chore/preview-resource-ids-<run id>` ブランチへcommitしてPRを作成します。
+    - `reset-preview-migrations.yml` は Actions 画面または `gh workflow run reset-preview-migrations.yml --ref <branch> -f confirmation=reset-preview` からだけ起動します。選択したブランチを基準に Preview D1 のCloudflare予約table以外（`d1_migrations`を含む）と全 Durable Object namespaceを削除し、同じD1 database resourceへD1 migration、診断seedを再適用してWorker / API / MCPを再デプロイします。全Previewデータを復元不能に削除するため確認文字列を必須とし、productionは対象にしません。`cd-preview`と同じconcurrency groupで直列化します。実行時に選んだブランチをそのままcheckoutするため、migration・seed・deployとresource IDのcommit先は同じブランチになります（tagからは実行できません）。
+      - 再作成でresource IDが変わったときの反映先は、実行したブランチで変わります。**`main`から実行した場合**は`chore/preview-resource-ids-<run id>`ブランチへcommitしてPRを作成し、同じjobで`bun run ci`が通ったときだけsquash mergeします（`main`はrulesetで直接pushできないため）。検証が落ちたときはPRを開いたまま残します。**それ以外のブランチから実行した場合**は、そのブランチへ直接commitしてpushし、PRは作りません。ブランチの持ち主がそのまま作業を続けられるようにするためで、検証はその人のPRの`ci.yml`が担います。
+      - `GITHUB_TOKEN`で作成したPRは`pull_request`イベントを発火せず`ci.yml`が走らないため、GitHubのauto-mergeではなくjob内の検証をマージ条件にします。
     - `main` ブランチマージ時には `cd-production.yml` が全検証後に Cloudflare 本番環境へ自動デプロイします。
-    - リポジトリのチェックアウト、Bun のセットアップ、`actions/cache@v4` によるキャッシュ、および `bun install --frozen-lockfile` の一連の処理は GitHub Composite Action ([.github/actions/setup-bun-workspace](file:///Users/kyosuke/git/github.com/KKyosuke/me-builder/.github/actions/setup-bun-workspace/action.yml)) に共通化されています。
+    - Bun のセットアップ、キャッシュ、および `bun install --frozen-lockfile` の一連の処理は GitHub Composite Action (`.github/actions/setup-bun-workspace`) に共通化されています。
+    - キャッシュは 2 種類あります。依存キャッシュ (`~/.bun/install/cache`) はルートの `bun.lock` のハッシュをキーにします (`**/bun.lock` はツリー全体を走査するため使いません)。型チェックの incremental 情報 (`**/*.tsbuildinfo`) は復元だけを全ワークフローで行い、保存は `main` の `cd-production.yml` だけが行います。PR ごとに保存するとリポジトリのキャッシュ上限 (10GB) を圧迫し、依存キャッシュが追い出されるためです。
+    - `tsconfig.json` の `incremental` は、この tsbuildinfo キャッシュを効かせるために有効化しています。無効化するとキャッシュが無意味になります。
   - パッケージの追加・削除はルートから `bun add <package> --cwd <workspace-dir>`（例: `bun add @line/liff --cwd apps/web`）を使用し、個別ディレクトリで `npm install` を実行しないこと。ルートで引数なしに `bun add <package>` を実行するとルートの `package.json` に入ってしまうため、対象ワークスペースを必ず指定します。
-  - pre-pushではブランチ名、型、E2E以外のテストを検証します。ローカルD1などを使うE2Eはpushの必須条件にせず、`task test`と`task ci`、GitHub Actionsでは引き続き実行します。
-  - `postinstall`の`lefthook install`はGitHub Actions上でもhookを設置するため、ワークフロー内でcommit / pushするstepには`LEFTHOOK: "0"`を設定してhookを無効化します。hookはローカル開発者向けの検証であり、作成したPRでCIが同じ検証を実行します。
+  - pre-pushではブランチ名、型、E2E以外のテストを検証します。ローカルD1などを使うE2Eはpushの必須条件にせず、`task test`と`task ci`、GitHub Actionsでは`e2e`ラベル付きPRの`ci-e2e.yml`と`cd-production.yml`が実行します。
+  - `postinstall`の`lefthook install`はGitHub Actions上でもhookを設置するため、ワークフロー内でcommit / pushするstepには`LEFTHOOK: "0"`を設定してhookを無効化します。hookはローカル開発者向けの検証であり、ワークフロー側は`bun run ci`などで同じ検証を明示的に実行します。
+  - ワークフローが`GITHUB_TOKEN`で作成したPRは`pull_request`イベントを発火せず、`ci.yml`が起動しません。自動PRをテスト結果で条件付きにマージする場合は、GitHubのauto-mergeやrequired status checksに頼らず、PRを作った同じjobで検証を実行してからマージします。
   - 環境変数を読む設定関数のテストで「未設定ならundefined」を検証する場合は、`vi.stubEnv(<name>, undefined)`で実行環境の値を消します。`getEnv`はCloudflare Workersの`env`に無いキーを`process.env`から補うため、GitHub Actionsのjob levelの`env`が混ざるとローカルだけ通るテストになります。
 - **Web UI (`apps/web`) のカスタムドメイン**:
   - `apps/web` は Cloudflare **Pages** で配信するため、Workers (`api` / `mcp` / `worker`) のように `wrangler.toml` の `routes` で DNS レコードを自動作成できません。ドメインのプロジェクト登録と DNS の CNAME 作成は [`scripts/setup-pages-domain.ts`](../../scripts/setup-pages-domain.ts) が行い、`apps/web` の `deploy:preview` / `deploy:production` から呼び出します。
@@ -102,7 +117,9 @@
 
 - **LINE Webhook 自動登録および日記返信**:
   - API サーバー起動時 (`src/index.ts`) または CLI スクリプト (`bun run register:webhook`) の実行時、`LINE_CHANNEL_ACCESS_TOKEN` および `LINE_WEBHOOK_URL` (または `BASE_URL`) が環境変数として与えられている場合、公式 SDK (`@line/bot-sdk`) の `MessagingApiClient.setWebhookEndpoint` を用いて自動的に LINE Messaging API へ Webhook Endpoint URL を登録・更新します。
-  - CDの登録処理は、登録後のURL一致、Webhookの有効化状態、LINE Platformから登録URLへの疎通を公式SDKで検証し、いずれかが不成立ならデプロイを失敗させます。また、デプロイ前にGeminiへの最小リクエストを実行し、Secret・Vertex AI・モデルの接続不良がある状態をデプロイしません。応答本文やSecretはログへ出力しません。
+  - 登録処理はまず現在の登録状態を問い合わせ、**要求するURLが既に有効な状態で登録済みなら何もしません**。`testWebhookEndpoint`はLINE PlatformがWebhook URLを実際に呼び出して応答を待つため十数秒かかり、URLが変わらないデプロイで毎回実行する価値がないためです。登録内容を書き換えたときだけ、登録後のURL一致、Webhookの有効化状態、LINE Platformから登録URLへの疎通を公式SDKで検証し、いずれかが不成立ならデプロイを失敗させます。URLを変えずに疎通を確かめたいときは `bun --cwd apps/api scripts/register-webhook.ts --force` を使います。
+  - 本番のWebhook URLは環境ごとに固定なので、この短絡によりCDでは疎通確認が事実上走らなくなります。Cloudflare AccessやルーティングでLINE Platformから到達できなくなる劣化を検知するため、`scheduled-checks.yml`が週次で`--force`付きの疎通確認を実行します。
+  - Geminiへの最小リクエストによる接続確認は、`cd-production.yml`でのみデプロイ前に実行し、接続不良がある状態を本番へ出しません。共有の使い捨て環境であるpreviewのCDでは実行しません。応答本文やSecretはログへ出力しません。
   - Webhook受信メッセージは決定的なcommand routing後にCloudflare Queues経由でQueue Worker (`apps/worker`) へ配信します。診断commandの返信は既存の`replyToken`経路を使い、日記の最終応答は[日記チャット実装設計](../../docs/architecture/diary-chat-implementation-design.md#9-38秒sloと配送)を正とします。**送られた本文をオウム返ししません。**
   - 署名検証に成功した1対1トークのテキストメッセージでは、API ServerがQueue投入前に`MessagingApiClient.showLoadingAnimation`を呼び、60秒のチャットローディングを表示します。診断、日記、AIチャットを受信側で重複判定せず、いずれも同じ待機表示にします。グループトークと非テキストイベントは対象外です。ローディングAPIの完了はQueue投入前に待たず、Cloudflare Workersでは`executionCtx.waitUntil`へ渡してWebhook応答のクリティカルパスから外します。ローディングAPIの失敗はQueue投入を止めず、本人識別子である`userId`をログへ出力しません（[LINE公式ガイド](https://developers.line.biz/en/docs/messaging-api/use-loading-indicator/)）。
   - 日記では独立した受付Pushを送らず、`showLoadingAnimation`の後にAIの最終応答をPushします。最終応答には診断導線を付加しません。LINE 内から Web を開く主導線はリッチメニューであり、設計は [Phase 1 診断体験設計 §7](../../docs/diagnosis/diagnosis-experience.md#7-リッチメニュー) を正とします。

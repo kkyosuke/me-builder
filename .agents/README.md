@@ -19,7 +19,7 @@
 | [自分の傾向サマリー体験設計](../docs/product/profile-summary-experience.md) | 複数の診断回答を横断して本人の現在の傾向を表示する画面、要約規則、導線、状態、完了条件 |
 | [相性診断・うつし共有体験設計](../docs/product/compatibility-experience.md) | 1対1の招待リンク、LINE共有、双方の同意、相性一覧、「私について」と「2人について」、共有終了の体験 |
 | [プロフィール設定体験設計](../docs/product/profile-settings-experience.md) | 共通ヘッダー右上の入口、プロフィール画面、アバター設定への接続、ライト・ダークテーマの選択と保存 |
-| [アバター設定体験設計](../docs/product/avatar-experience.md) | 画像アップロード、AIによる候補の非同期生成、候補選択、表示、差し替え・削除の体験と責務境界 |
+| [アバター設定体験設計](../docs/product/avatar-experience.md) | LINEプロフィール画像の初期表示、端末画像の選択・プレビュー・設定、差し替え・削除の体験と責務境界 |
 | [ストレスの手がかりとAIセルフケア相談体験設計](../docs/product/self-care-ai-consultation-experience.md) | 本人向けの負荷の手がかり、早期サイン、対処、相談先の表示とAI相談、安全上の切り替え |
 | [日記チャット体験設計](../docs/product/diary-chat-experience.md) | 日々の声かけから出来事と行動原理を探り、記憶を使って助言する対話体験と応答時間 |
 | [日記チャット実装設計](../docs/architecture/diary-chat-implementation-design.md) | 日記チャットのAccountDataモデル、Cloudflare実行基盤、プロンプト、ガードレール、応答期限 |

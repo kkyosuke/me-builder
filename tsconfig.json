@@ -10,6 +10,9 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "isolatedModules": true,
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    // 前回の型チェック結果 (`<パッケージ>/tsconfig.tsbuildinfo`) を再利用する。
+    // CI では GitHub Actions のキャッシュから復元し、変更が無いパッケージの再チェックを省く。
+    "incremental": true
   }
 }

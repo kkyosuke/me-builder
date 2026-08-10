@@ -45,8 +45,20 @@ jobs:
           version: 3.x
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
+      # PR の CI と同じ検証を、実際にデプロイするツリーへもう一度かける。
+      # main への push で個別の CI ワークフローは走らせないため、これが本番前の唯一の関門。
       - name: Run CI Verification
         run: bun run ci
+
+      # 型チェックの incremental 情報を main のキャッシュとして残す。PR の CI はこれを復元して使う。
+      - name: Save TypeScript build info
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            apps/*/tsconfig.tsbuildinfo
+            packages/*/tsconfig.tsbuildinfo
+            infra/tsconfig.tsbuildinfo
+          key: ${{ runner.os }}-tsbuildinfo-${{ github.sha }}
 
       - name: Verify Vertex AI Connectivity (Production)
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
@@ -113,6 +125,7 @@ jobs:
           bun --filter @me-builder/mcp deploy:production
           bun --filter @me-builder/web deploy:production
 
+      # URL が変わっていなければ現在の登録状態を 1 回問い合わせるだけで終わる。
       - name: Register LINE Webhook (Production)
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' && env.LINE_CHANNEL_ACCESS_TOKEN != '' }}
         env:
