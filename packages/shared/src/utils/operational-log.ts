@@ -43,7 +43,13 @@ export function describeQueueMessageResult(result: QueueMessageResultDescription
     ...(result.durationMs === undefined ? [] : [`${result.durationMs}ms`]),
     ...(result.resultCode ? [result.resultCode] : []),
     ...(result.error ? [result.error.errorCode, `category:${result.error.errorCategory}`] : []),
-    ...(result.error?.dependency ? [`via:${result.error.dependency}`] : []),
+    ...(result.error?.dependency
+      ? [
+          result.error.dependencyStatus === undefined
+            ? `via:${result.error.dependency}`
+            : `via:${result.error.dependency} ${result.error.dependencyStatus}`,
+        ]
+      : []),
   ];
   return `[${FLOW_LABEL[result.flow]}] ${result.outcome} at ${result.stage} -> ${result.disposition} (${details.join(", ")})`;
 }
