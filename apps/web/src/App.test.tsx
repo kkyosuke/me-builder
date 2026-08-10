@@ -265,6 +265,26 @@ describe("App", () => {
     );
   });
 
+  it("未設定時はLINEプロフィール画像を右上アイコンに表示する", async () => {
+    mocks.initializeLiff.mockResolvedValue({
+      status: "ready",
+      inClient: true,
+      profile: {
+        displayName: "テスト",
+        pictureUrl: "https://example.com/line-profile.jpg",
+      },
+    });
+
+    render(<App />);
+
+    const profileButton = await screen.findByRole("button", { name: "プロフィールを開く" });
+    await waitFor(() =>
+      expect(profileButton.querySelector("img")?.getAttribute("src")).toBe(
+        "https://example.com/line-profile.jpg",
+      ),
+    );
+  });
+
   it("右上からプロフィールを開き、ライトテーマへ切り替えて保存する", async () => {
     render(<App />);
 
