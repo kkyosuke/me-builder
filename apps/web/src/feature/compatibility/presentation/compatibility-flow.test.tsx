@@ -2,12 +2,8 @@
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  aoi,
-  compatibilityListData,
-  demoInvitationUrl,
-  me,
-} from "../infrastructure/compatibility-demo";
+import { aoi, compatibilityListData, me } from "../infrastructure/compatibility-demo";
+import type { CompatibilitySharePreview } from "../model/compatibility-share-preview";
 import { CompatibilityInvitationScreen } from "./compatibility-invitation-screen";
 import { CompatibilityListScreen } from "./compatibility-list-screen";
 import { CompatibilityResultScreen } from "./compatibility-result-screen";
@@ -45,29 +41,78 @@ describe("Compatibility flow", () => {
     expect(screen.queryByText("返事待ち")).toBeNull();
   });
 
-  it("振る舞い・考え方をすべて共有し、詳細は共有せずに招待リンクを発行する", async () => {
-    const copyInvitation = vi.fn().mockResolvedValue(undefined);
+  it("APIから取得した振る舞い・考え方をすべて表示し、詳細は共有しない", () => {
+    const preview: CompatibilitySharePreview = {
+      displayName: "うさぎ",
+      previewToken: `csp1.${"a".repeat(64)}`,
+      themes: [
+        {
+          diagnosisId: "daily-life",
+          title: "暮らし方",
+          parameters: [
+            {
+              id: "planning",
+              label: "予定の立て方",
+              lowLabel: "その場で決めたい",
+              highLabel: "早めに決めたい",
+              position: 78,
+              statement: "私は、予定を早めに決めておけると安心します。",
+            },
+            {
+              id: "holiday",
+              label: "休日の過ごし方",
+              lowLabel: "ひとり時間を重視",
+              highLabel: "一緒の時間を重視",
+              position: 68,
+              statement: "私は、一緒に楽しむ時間を大切にしたいです。",
+            },
+          ],
+        },
+      ],
+      canIssueInvitation: true,
+      blockingReasons: [],
+      nextAction: null,
+    };
+    render(
+      <CompatibilityShareScreen state={{ status: "success", data: preview }} onRetry={vi.fn()} />,
+    );
+
+    expect(screen.getByText("うさぎさんから招待")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "暮らし方" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "共有する振る舞い・考え方" })).toBeTruthy();
+    expect(screen.getByText("2件すべて共有")).toBeTruthy();
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    expect(screen.getByText(/日記やLINEの会話から得た記憶/)).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "招待リンク発行は準備中" }).hasAttribute("disabled"),
+    ).toBe(true);
+  });
+
+  it("共有できる診断がなければ診断への導線を表示する", () => {
     render(
       <CompatibilityShareScreen
-        person={me}
-        invitationUrl={demoInvitationUrl}
-        lineShareUrl="https://line.me/R/msg/text/?demo"
-        copyInvitation={copyInvitation}
+        state={{
+          status: "success",
+          data: {
+            displayName: "うさぎ",
+            previewToken: `csp1.${"b".repeat(64)}`,
+            themes: [],
+            canIssueInvitation: false,
+            blockingReasons: ["diagnosis_required"],
+            nextAction: "diagnosis",
+          },
+        }}
+        onRetry={vi.fn()}
       />,
     );
 
-    expect(screen.getByRole("heading", { name: "共有する振る舞い・考え方" })).toBeTruthy();
-    expect(screen.getByText("3件すべて共有")).toBeTruthy();
-    expect(screen.queryByRole("checkbox")).toBeNull();
-    expect(screen.getByText(/日記やLINEの会話から得た記憶/)).toBeTruthy();
-    const issueButton = screen.getByRole("button", { name: "招待リンクを発行" });
-    fireEvent.click(issueButton);
-
-    expect(screen.getByText("招待リンクを発行しました")).toBeTruthy();
-    expect(screen.getByRole("link", { name: "LINEで送る" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "リンクをコピー" }));
-    expect(await screen.findByRole("button", { name: "コピーしました" })).toBeTruthy();
-    expect(copyInvitation).toHaveBeenCalledWith(demoInvitationUrl);
+    expect(screen.getByText(/共有できる診断結果がまだありません。/)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "診断を始める" }).getAttribute("href")).toBe(
+      "/diagnosis",
+    );
+    expect(
+      screen.getByRole("button", { name: "招待リンクを発行できません" }).hasAttribute("disabled"),
+    ).toBe(true);
   });
 
   it("受信者が自分の共有内容と共有されない詳細を確認して承諾する", () => {

@@ -35,6 +35,7 @@ const mocks = vi.hoisted(() => ({
   requestProfileSummaryGeneration: vi.fn(),
   fetchDevelopmentBrainItems: vi.fn(),
   normalizeAvatarImage: vi.fn(),
+  fetchCompatibilitySharePreview: vi.fn(),
 }));
 
 vi.mock("./config", () => ({
@@ -69,6 +70,9 @@ vi.mock("./feature/brain/infrastructure/brain-api", () => ({
 }));
 vi.mock("./feature/profile-settings/model/normalize-avatar-image", () => ({
   normalizeAvatarImage: mocks.normalizeAvatarImage,
+}));
+vi.mock("./feature/compatibility/infrastructure/compatibility-api", () => ({
+  fetchCompatibilitySharePreview: mocks.fetchCompatibilitySharePreview,
 }));
 vi.mock("./feature/diagnosis/presentation/components/swipe-diagnosis", () => ({
   SwipeDiagnosis: ({
@@ -297,6 +301,29 @@ describe("App", () => {
       dataUrl: `data:${file.type};base64,normalized`,
       fileName: file.name,
     }));
+    mocks.fetchCompatibilitySharePreview.mockResolvedValue({
+      displayName: "テスト",
+      previewToken: `csp1.${"a".repeat(64)}`,
+      themes: [
+        {
+          diagnosisId: "daily-life",
+          title: "暮らし方",
+          parameters: [
+            {
+              id: "planning",
+              label: "予定の立て方",
+              lowLabel: "その場で決めたい",
+              highLabel: "早めに決めたい",
+              position: 78,
+              statement: "私は、予定を早めに決めておけると安心します。",
+            },
+          ],
+        },
+      ],
+      canIssueInvitation: true,
+      blockingReasons: [],
+      nextAction: null,
+    });
     mocks.restoreDiagnosisProgress.mockImplementation(
       (_questions: DiagnosisDefinition["questions"], answers: DiagnosisResult["answers"]) => ({
         answers: answers.map((answer) => ({
@@ -747,6 +774,21 @@ describe("App", () => {
 
     expect(await screen.findByRole("heading", { name: "相性診断" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "相性" }).getAttribute("aria-current")).toBe("page");
+    expect(mocks.fetchDiagnosisList).not.toHaveBeenCalled();
+  });
+
+  it("/compatibility/shareでは共有プレビューAPIの内容を表示する", async () => {
+    window.history.replaceState({}, "", "/compatibility/share");
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "うつしをシェア" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "予定の立て方" })).toBeTruthy();
+    expect(mocks.fetchCompatibilitySharePreview).toHaveBeenCalledWith(
+      "https://api.example.com",
+      "dummy.id.token",
+      expect.anything(),
+    );
     expect(mocks.fetchDiagnosisList).not.toHaveBeenCalled();
   });
 
