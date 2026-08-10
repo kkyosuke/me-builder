@@ -180,7 +180,7 @@
   - **どちらも見つからない場合は Account を作らず 404 を返します。** アカウント作成の起点は LINE 公式アカウントの友だち追加です（[プロジェクト概要 §5](../../docs/product/project-overview.md#5-アカウントと本人識別)）。userId が一致しない構成での紐づけ手段は未設計です。
   - 既存の Account へログイン手段を追加するのは `d1.action.account.linkIdentity` です。`upsertIdentity` は見つからなければ新規 Account を作るため、この用途に使ってはいけません。
   - `LINE_LOGIN_CHANNEL_ID` は `apps/api` へ配布します。未設定の場合は `LIFF_ID` の接頭辞から補完します。ID トークン・アクセストークン・`sub` はレスポンスにもログにも含めません。
-  - **`accountId` をクライアントへ返しません。** セッションとトークンの管理方式は[ドメイン設計](../../docs/domain/domain-design.md)で未決定であり、返すと後続リクエストで「クライアントが送ってきた `accountId`」を信頼する実装を誘発します。返すのは表示に使う `displayName` / `pictureUrl` だけです。
+  - **`accountId` をクライアントへ返しません。** セッションとトークンの管理方式は[ドメイン設計](../../docs/domain/domain-design.md)で未決定であり、返すと後続リクエストで「クライアントが送ってきた `accountId`」を信頼する実装を誘発します。返すのは表示に使う `displayName` / `pictureUrl` と、管理者導線の表示に使う検証済みAccountの`role`だけです。`role`は表示判定のための情報であり、管理者API側の認可を省略する根拠にはしません。
   - **LIFF の ID トークンには `nonce` を設定できません**（`liff.login()` に nonce のパラメータがない）。そのためリプレイを nonce で防げず、代わりに `line.idToken.verify` の `maxAgeSeconds` で受け入れる発行後の経過時間を絞れるようにしています。既定は LIFF の ID トークンの有効期間と同じ 1 時間（LINE 側の検証より厳しくしない）で、検証成功時に経過秒数だけをログへ出力するので、実際の分布を見てから絞れます。恒久的な対策はサーバー発行のセッションであり、方式が決まってから対応します。
 
 - **LIFF アプリのエンドポイント URL の自動登録**:

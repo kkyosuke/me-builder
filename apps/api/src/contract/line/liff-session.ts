@@ -10,6 +10,7 @@ export const LiffSessionRequestSchema = v.object({
 });
 
 export const LiffSessionResponseSchema = v.object({
+  role: v.picklist(["user", "admin"]),
   displayName: v.optional(NonEmptyStringSchema),
   pictureUrl: v.optional(v.pipe(v.string(), v.url())),
 });
@@ -34,7 +35,10 @@ export const liffSessionRoute = describeRoute({
     },
   },
   responses: {
-    200: jsonResponse("表示可能なLINEプロフィール", LiffSessionResponseSchema),
+    200: jsonResponse(
+      "表示可能なLINEプロフィールと検証済みAccount role",
+      LiffSessionResponseSchema,
+    ),
     ...authenticatedErrors,
   },
 } satisfies DescribeRouteOptions);

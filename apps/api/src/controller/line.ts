@@ -94,6 +94,7 @@ export async function postLiffSession(c: Context<AppEnv>): Promise<Response> {
       // 後続リクエストで「クライアントが送ってきた accountId」を信頼する実装を誘発する。
       return c.json(
         v.parse(LiffSessionResponseSchema, {
+          role: outcome.session.role,
           displayName: outcome.session.displayName,
           pictureUrl: outcome.session.pictureUrl,
         }),

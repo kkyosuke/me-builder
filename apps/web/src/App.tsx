@@ -1,6 +1,10 @@
 import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { LoadingState } from "./components/loading-state";
 import { RouteErrorBoundary } from "./components/route-error-boundary";
+import { config } from "./config";
+import { useLiffSession } from "./feature/liff";
+import { getLiffIdToken } from "./feature/liff/infrastructure/liff-client";
+import { verifyLiffSession } from "./feature/liff/infrastructure/session-api";
 import type { AvatarSelection } from "./feature/profile-settings/model/avatar";
 import { ProfileMenuButton } from "./feature/profile-settings/presentation/components/profile-menu-button";
 import { useColorTheme } from "./feature/theme";
@@ -59,6 +63,7 @@ function resolveRequestedPathname(): string {
 
 export function App() {
   const colorTheme = useColorTheme();
+  const liffSession = useLiffSession();
   const [navigation, setNavigation] = useState(() => {
     const requestedPathname = resolveRequestedPathname();
     const profileView = resolveProfileView(requestedPathname);
@@ -77,6 +82,7 @@ export function App() {
   const isMePath = pathname === "/me" || pathname.startsWith("/me/");
   const currentMainRoute = isCompatibilityPath ? "compatibility" : isMePath ? "me" : "diagnosis";
   const [avatar, setAvatar] = useState<AvatarSelection | null>(null);
+  const [accountRole, setAccountRole] = useState<"user" | "admin" | null>(null);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -127,6 +133,30 @@ export function App() {
     if (profileView !== "profile") return;
     return scheduleIdlePreloadAfter(loadProfileSettingsScreen, preloadAvatarSettingsScreen);
   }, [profileView]);
+
+  useEffect(() => {
+    if (profileView !== "profile") return;
+
+    const controller = new AbortController();
+    setAccountRole(null);
+    void (async () => {
+      try {
+        const idToken = getLiffIdToken() ?? (await liffSession.acquireIdToken(controller.signal));
+        if (!idToken || controller.signal.aborted) return;
+        const session = await verifyLiffSession(config.apiUrl, idToken, controller.signal);
+        if (!controller.signal.aborted && session.status === "verified") {
+          setAccountRole(session.role);
+        }
+      } catch {
+        // roleを取得できない場合も、管理者導線以外のプロフィール操作は継続する。
+      }
+    })();
+
+    return () => {
+      controller.abort();
+      setAccountRole(null);
+    };
+  }, [liffSession.acquireIdToken, profileView]);
 
   const openProfile = () => {
     shouldRestoreProfileButtonFocus.current = true;
@@ -195,6 +225,7 @@ export function App() {
           >
             <ProfileSettingsScreen
               avatar={avatar}
+              isAdmin={accountRole === "admin"}
               theme={colorTheme.theme}
               onBack={closeProfile}
               onOpenAvatar={openAvatar}

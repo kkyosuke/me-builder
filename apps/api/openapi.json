@@ -40,12 +40,16 @@
         },
         "responses": {
           "200": {
-            "description": "表示可能なLINEプロフィール",
+            "description": "表示可能なLINEプロフィールと検証済みAccount role",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "role": {
+                      "enum": ["user", "admin"],
+                      "type": "string"
+                    },
                     "displayName": {
                       "type": "string",
                       "minLength": 1
@@ -55,7 +59,7 @@
                       "format": "uri"
                     }
                   },
-                  "required": []
+                  "required": ["role"]
                 }
               }
             }
