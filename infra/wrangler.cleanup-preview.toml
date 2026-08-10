@@ -1,0 +1,27 @@
+name = "me-builder-worker-preview"
+main = "src/cleanup-worker.ts"
+compatibility_date = "2026-08-06"
+
+[[durable_objects.bindings]]
+name = "CONVERSATION_COORDINATOR"
+class_name = "ConversationCoordinator"
+
+[[durable_objects.bindings]]
+name = "ACCOUNT_DATA"
+class_name = "AccountData"
+
+[[durable_objects.bindings]]
+name = "COMPATIBILITY_DATA"
+class_name = "CompatibilityData"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["ConversationCoordinator"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["AccountData"]
+
+[[migrations]]
+tag = "v3"
+new_sqlite_classes = ["CompatibilityData"]
