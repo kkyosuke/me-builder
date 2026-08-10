@@ -30,6 +30,7 @@ const mocks = vi.hoisted(() => ({
   restoreDiagnosisProgress: vi.fn(),
   fetchProfileSummary: vi.fn(),
   fetchDevelopmentBrainItems: vi.fn(),
+  normalizeAvatarImage: vi.fn(),
 }));
 
 vi.mock("./config", () => ({
@@ -58,6 +59,9 @@ vi.mock("./feature/profile/infrastructure/profile-api", () => ({
 }));
 vi.mock("./feature/brain/infrastructure/brain-api", () => ({
   fetchDevelopmentBrainItems: mocks.fetchDevelopmentBrainItems,
+}));
+vi.mock("./feature/profile-settings/model/normalize-avatar-image", () => ({
+  normalizeAvatarImage: mocks.normalizeAvatarImage,
 }));
 vi.mock("./feature/diagnosis/presentation/components/swipe-diagnosis", () => ({
   SwipeDiagnosis: ({
@@ -249,6 +253,11 @@ describe("App", () => {
       ],
       truncated: false,
     });
+    mocks.normalizeAvatarImage.mockImplementation(async (file: File) => ({
+      kind: "uploaded",
+      dataUrl: `data:${file.type};base64,normalized`,
+      fileName: file.name,
+    }));
     mocks.restoreDiagnosisProgress.mockImplementation(
       (_questions: DiagnosisDefinition["questions"], answers: DiagnosisResult["answers"]) => ({
         answers: answers.map((answer) => ({
@@ -348,17 +357,19 @@ describe("App", () => {
     fireEvent.change(screen.getByLabelText("画像を選ぶ"), {
       target: { files: [new File(["selfie"], "selfie.png", { type: "image/png" })] },
     });
-    expect(await screen.findByText("selfie.png")).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "設定後のプレビュー" })).toBeTruthy();
+    expect(screen.queryByText("selfie.png")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "この画像を設定" }));
 
     expect(await screen.findByRole("heading", { name: "プロフィール" })).toBeTruthy();
-    expect(screen.getByText("selfie.png")).toBeTruthy();
+    expect(screen.getByText("設定した画像")).toBeTruthy();
+    expect(screen.queryByText("selfie.png")).toBeNull();
     expect(screen.queryByText(/人物を確認/)).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "プロフィールを閉じる" }));
     const profileButton = await screen.findByRole("button", { name: "プロフィールを開く" });
     expect(profileButton.querySelector("img")?.getAttribute("src")).toMatch(
-      /^data:image\/png;base64,/,
+      /^data:image\/png;base64,normalized$/,
     );
   });
 

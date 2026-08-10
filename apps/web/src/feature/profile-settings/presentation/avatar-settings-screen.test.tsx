@@ -1,10 +1,26 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AvatarSettingsScreen } from "./avatar-settings-screen";
 
+const mocks = vi.hoisted(() => ({
+  normalizeAvatarImage: vi.fn(),
+}));
+
+vi.mock("../model/normalize-avatar-image", () => ({
+  normalizeAvatarImage: mocks.normalizeAvatarImage,
+}));
+
 describe("AvatarSettingsScreen", () => {
+  beforeEach(() => {
+    mocks.normalizeAvatarImage.mockImplementation(async (file: File) => ({
+      kind: "uploaded",
+      dataUrl: `data:${file.type};base64,normalized`,
+      fileName: file.name,
+    }));
+  });
+
   afterEach(cleanup);
 
   it("LINE画像を現在値として表示し、選んだ画像を明示操作で設定する", async () => {
@@ -30,14 +46,17 @@ describe("AvatarSettingsScreen", () => {
       target: { files: [new File(["avatar"], "new-avatar.png", { type: "image/png" })] },
     });
 
-    expect(await screen.findByText("new-avatar.png")).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "設定後のプレビュー" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "設定後のプレビュー" })).toBeTruthy();
+    expect(screen.queryByText("new-avatar.png")).toBeNull();
+    expect(mocks.normalizeAvatarImage).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "new-avatar.png" }),
+    );
     expect(onSave).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole("button", { name: "この画像を設定" }));
     expect(onSave).toHaveBeenCalledWith({
       kind: "uploaded",
-      dataUrl: expect.stringMatching(/^data:image\/png;base64,/),
+      dataUrl: "data:image/png;base64,normalized",
       fileName: "new-avatar.png",
     });
   });
@@ -95,9 +114,24 @@ describe("AvatarSettingsScreen", () => {
       />,
     );
 
-    expect(screen.getByText("current.png")).toBeTruthy();
+    expect(screen.getByText("設定した画像")).toBeTruthy();
+    expect(screen.queryByText("current.png")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "LINEの画像に戻す" }));
     expect(onSave).toHaveBeenCalledWith(null);
+  });
+
+  it("画像を処理できない場合は選び直しを案内する", async () => {
+    mocks.normalizeAvatarImage.mockRejectedValueOnce(new Error("decode failed"));
+    render(<AvatarSettingsScreen currentAvatar={null} onBack={vi.fn()} onSave={vi.fn()} />);
+
+    fireEvent.change(screen.getByLabelText("画像を選ぶ"), {
+      target: { files: [new File(["broken"], "broken.png", { type: "image/png" })] },
+    });
+
+    expect((await screen.findByRole("alert")).textContent).toContain(
+      "画像を読み込めませんでした。別の画像を選んでください。",
+    );
+    expect(screen.queryByRole("heading", { name: "設定後のプレビュー" })).toBeNull();
   });
 
   it("LINE画像がない場合はアプリで選んだ画像を削除できる", () => {

@@ -1,6 +1,7 @@
 import { Check, ImagePlus, Info, RotateCcw, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { type AvatarSelection, getAvatarName } from "../model/avatar";
+import { normalizeAvatarImage } from "../model/normalize-avatar-image";
 import { AvatarPreview } from "./components/avatar-preview";
 
 const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -18,28 +19,38 @@ export function AvatarSettingsScreen({
 }) {
   const [selectedImage, setSelectedImage] = useState<AvatarSelection | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
+  const [isPreparingImage, setIsPreparingImage] = useState(false);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const selectionIdRef = useRef(0);
 
   useEffect(() => {
     closeButtonRef.current?.focus();
   }, []);
 
-  const handleFile = (file: File | undefined) => {
+  const handleFile = async (file: File | undefined) => {
     if (!file) return;
+    const selectionId = selectionIdRef.current + 1;
+    selectionIdRef.current = selectionId;
     if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
       setFileError("PNG、JPEG、WebP形式の画像を選んでください。SVGは利用できません。");
       setSelectedImage(null);
+      setIsPreparingImage(false);
       return;
     }
 
     setFileError(null);
-    const reader = new FileReader();
-    reader.addEventListener("load", () => {
-      if (typeof reader.result === "string") {
-        setSelectedImage({ kind: "uploaded", dataUrl: reader.result, fileName: file.name });
+    setSelectedImage(null);
+    setIsPreparingImage(true);
+    try {
+      const normalizedImage = await normalizeAvatarImage(file);
+      if (selectionIdRef.current === selectionId) setSelectedImage(normalizedImage);
+    } catch {
+      if (selectionIdRef.current === selectionId) {
+        setFileError("画像を読み込めませんでした。別の画像を選んでください。");
       }
-    });
-    reader.readAsDataURL(file);
+    } finally {
+      if (selectionIdRef.current === selectionId) setIsPreparingImage(false);
+    }
   };
 
   return (
@@ -111,8 +122,12 @@ export function AvatarSettingsScreen({
                 <ImagePlus className="size-5" aria-hidden="true" />
               </span>
               <span className="min-w-0">
-                <span className="block font-bold text-slate-950 dark:text-white">
-                  {selectedImage ? "別の画像を選ぶ" : "画像を選ぶ"}
+                <span aria-live="polite" className="block font-bold text-slate-950 dark:text-white">
+                  {isPreparingImage
+                    ? "画像を準備しています"
+                    : selectedImage
+                      ? "別の画像を選ぶ"
+                      : "画像を選ぶ"}
                 </span>
                 <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
                   PNG、JPEG、WebPに対応
@@ -123,7 +138,11 @@ export function AvatarSettingsScreen({
                 accept="image/png,image/jpeg,image/webp"
                 className="sr-only"
                 aria-label={selectedImage ? "別の画像を選ぶ" : "画像を選ぶ"}
-                onChange={(event) => handleFile(event.target.files?.[0])}
+                onChange={(event) => {
+                  const file = event.currentTarget.files?.[0];
+                  event.currentTarget.value = "";
+                  void handleFile(file);
+                }}
               />
             </label>
             {fileError && (
@@ -148,11 +167,8 @@ export function AvatarSettingsScreen({
                 <div className="flex justify-center">
                   <AvatarPreview avatar={selectedImage} size="xl" />
                 </div>
-                <p className="mt-4 break-all text-sm font-bold text-slate-950 dark:text-white">
-                  {selectedImage.fileName}
-                </p>
-                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  プロフィールでは円形に切り抜いて表示されます。
+                <p className="mt-4 text-xs text-slate-500 dark:text-slate-400">
+                  画像は中央を正方形に切り抜き、プロフィールでは円形で表示されます。
                 </p>
               </div>
             </section>
@@ -164,7 +180,7 @@ export function AvatarSettingsScreen({
               aria-hidden="true"
             />
             <p className="leading-relaxed">
-              人物判定やAI加工は行いません。現在はUI確認用のため、選んだ画像はサーバーへ送信・保存されず、再読み込みすると
+              現在はUI確認用のため、選んだ画像はサーバーへ送信・保存されず、再読み込みすると
               {linePictureUrl ? "元のLINE画像" : "画像未設定の状態"}に戻ります。
             </p>
           </div>
@@ -173,7 +189,7 @@ export function AvatarSettingsScreen({
         <footer className="shrink-0 space-y-2 border-t border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900 sm:px-6">
           <button
             type="button"
-            disabled={!selectedImage}
+            disabled={!selectedImage || isPreparingImage}
             onClick={() => onSave(selectedImage)}
             className="flex w-full items-center justify-center gap-2 rounded-2xl bg-sky-400 px-5 py-4 font-bold text-slate-950 transition hover:bg-sky-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 disabled:cursor-not-allowed disabled:opacity-40"
           >
