@@ -26,10 +26,15 @@ describe("getAdminStatistics", () => {
     expect(outcome).toEqual({ type: "forbidden" });
   });
 
-  it("管理者へGeminiの利用不可状態とLINEの当月統計を返す", async () => {
+  it("管理者へGeminiとLINEの当月統計を返す", async () => {
     const outcome = await getAdminStatistics({
       ...base,
       createSession: session("admin"),
+      getGeminiUsage: vi.fn().mockResolvedValue({
+        requestCount: 2,
+        inputTokens: 120,
+        outputTokens: 40,
+      }),
       getLineUsage: vi.fn().mockResolvedValue({
         billableMessages: 3,
         monthlyLimit: 5000,
@@ -39,23 +44,48 @@ describe("getAdminStatistics", () => {
     expect(outcome).toMatchObject({
       type: "resolved",
       statistics: {
-        gemini: { status: "unavailable", reason: "not-configured" },
+        gemini: { status: "available", requestCount: 2, inputTokens: 120, outputTokens: 40 },
         line: { status: "available", billableMessages: 3, replyMessages: 8 },
       },
     });
   });
 
-  it("LINEの取得失敗時もGeminiの利用不可状態を返す", async () => {
+  it("LINEの取得失敗時もGeminiの統計を返す", async () => {
     const outcome = await getAdminStatistics({
       ...base,
       createSession: session("admin"),
+      getGeminiUsage: vi.fn().mockResolvedValue({
+        requestCount: 2,
+        inputTokens: 120,
+        outputTokens: 40,
+      }),
       getLineUsage: vi.fn().mockRejectedValue(new Error("LINE unavailable")),
     });
     expect(outcome).toMatchObject({
       type: "resolved",
       statistics: {
-        gemini: { status: "unavailable", reason: "not-configured" },
+        gemini: { status: "available", requestCount: 2, inputTokens: 120, outputTokens: 40 },
         line: { status: "unavailable", reason: "upstream-error" },
+      },
+    });
+  });
+
+  it("Gemini集計の取得失敗時もLINEの統計を返す", async () => {
+    const outcome = await getAdminStatistics({
+      ...base,
+      createSession: session("admin"),
+      getGeminiUsage: vi.fn().mockRejectedValue(new Error("D1 unavailable")),
+      getLineUsage: vi.fn().mockResolvedValue({
+        billableMessages: 3,
+        monthlyLimit: 5000,
+        replyMessages: 8,
+      }),
+    });
+    expect(outcome).toMatchObject({
+      type: "resolved",
+      statistics: {
+        gemini: { status: "unavailable", reason: "upstream-error" },
+        line: { status: "available", billableMessages: 3, replyMessages: 8 },
       },
     });
   });

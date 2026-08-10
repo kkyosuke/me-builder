@@ -1,9 +1,23 @@
-import { GoogleGenAI, type GoogleGenAIOptions } from "@google/genai";
+import { type GenerateContentResponse, GoogleGenAI, type GoogleGenAIOptions } from "@google/genai";
 import { OperationalError, type OperationalErrorDescriptor } from "@me-builder/shared";
 
 export interface GeminiConfig {
   googleVertexAiApiKey: string;
 }
+
+export interface GeminiUsage {
+  responseId: string;
+  model: string;
+  promptTokenCount: number;
+  candidatesTokenCount: number;
+  thoughtsTokenCount: number;
+  cachedContentTokenCount: number;
+  toolUsePromptTokenCount: number;
+  totalTokenCount: number;
+  generatedAt: Date;
+}
+
+export type GeminiUsageRecorder = (usage: GeminiUsage) => Promise<void>;
 
 type GoogleGenAiFactory = (options: GoogleGenAIOptions) => GoogleGenAI;
 
@@ -63,6 +77,26 @@ function classifyGeminiFailure(
   return { code: "GEMINI_CALL_FAILED", category: "dependency" };
 }
 
+function tokenCount(value: number | undefined): number {
+  return Number.isSafeInteger(value) && (value ?? -1) >= 0 ? (value as number) : 0;
+}
+
+function toGeminiUsage(response: GenerateContentResponse, requestedModel: string): GeminiUsage {
+  const metadata = response.usageMetadata;
+  const generatedAt = response.createTime ? new Date(response.createTime) : new Date();
+  return {
+    responseId: response.responseId ?? crypto.randomUUID(),
+    model: response.modelVersion ?? requestedModel,
+    promptTokenCount: tokenCount(metadata?.promptTokenCount),
+    candidatesTokenCount: tokenCount(metadata?.candidatesTokenCount),
+    thoughtsTokenCount: tokenCount(metadata?.thoughtsTokenCount),
+    cachedContentTokenCount: tokenCount(metadata?.cachedContentTokenCount),
+    toolUsePromptTokenCount: tokenCount(metadata?.toolUsePromptTokenCount),
+    totalTokenCount: tokenCount(metadata?.totalTokenCount),
+    generatedAt: Number.isNaN(generatedAt.getTime()) ? new Date() : generatedAt,
+  };
+}
+
 export async function generateStructuredText(
   client: GoogleGenAI,
   input: {
@@ -72,6 +106,7 @@ export async function generateStructuredText(
     responseJsonSchema: Record<string, unknown>;
     maxOutputTokens: number;
     signal?: AbortSignal;
+    onUsage?: GeminiUsageRecorder;
   },
 ): Promise<string | undefined> {
   try {
@@ -86,6 +121,7 @@ export async function generateStructuredText(
         ...(input.signal ? { abortSignal: input.signal } : {}),
       },
     });
+    await input.onUsage?.(toGeminiUsage(response, input.model));
     return response.text;
   } catch (error) {
     throw toGeminiOperationalError(error, "ai.generate");
@@ -97,9 +133,11 @@ export async function generateText(
   client: GoogleGenAI,
   model: string,
   contents: string,
+  onUsage?: GeminiUsageRecorder,
 ): Promise<string | undefined> {
   try {
     const response = await client.models.generateContent({ model, contents });
+    await onUsage?.(toGeminiUsage(response, model));
     return response.text;
   } catch (error) {
     throw toGeminiOperationalError(error, "ai.generate");

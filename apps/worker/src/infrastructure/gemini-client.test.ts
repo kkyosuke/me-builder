@@ -18,15 +18,40 @@ describe("Gemini client", () => {
   });
 
   it("指定したモデルと本文で生成し、応答テキストを返すこと", async () => {
-    const generateContent = vi.fn().mockResolvedValue({ text: "Cloudflare is ..." });
+    const generateContent = vi.fn().mockResolvedValue({
+      text: "Cloudflare is ...",
+      responseId: "response-1",
+      modelVersion: "gemini-3.5-flash-lite-001",
+      createTime: "2026-08-10T08:00:00.000Z",
+      usageMetadata: {
+        promptTokenCount: 10,
+        candidatesTokenCount: 4,
+        thoughtsTokenCount: 2,
+        cachedContentTokenCount: 3,
+        toolUsePromptTokenCount: 1,
+        totalTokenCount: 17,
+      },
+    });
     const client = { models: { generateContent } } as unknown as GoogleGenAI;
+    const onUsage = vi.fn().mockResolvedValue(undefined);
 
     await expect(
-      generateText(client, "gemini-3.5-flash-lite", "What is Cloudflare?"),
+      generateText(client, "gemini-3.5-flash-lite", "What is Cloudflare?", onUsage),
     ).resolves.toBe("Cloudflare is ...");
     expect(generateContent).toHaveBeenCalledWith({
       model: "gemini-3.5-flash-lite",
       contents: "What is Cloudflare?",
+    });
+    expect(onUsage).toHaveBeenCalledWith({
+      responseId: "response-1",
+      model: "gemini-3.5-flash-lite-001",
+      promptTokenCount: 10,
+      candidatesTokenCount: 4,
+      thoughtsTokenCount: 2,
+      cachedContentTokenCount: 3,
+      toolUsePromptTokenCount: 1,
+      totalTokenCount: 17,
+      generatedAt: new Date("2026-08-10T08:00:00.000Z"),
     });
   });
 });

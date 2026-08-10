@@ -6,7 +6,6 @@ export type AdminStatistics = {
   period: { start: string; end: string };
   fetchedAt: string;
   gemini: StatisticsSection<{
-    estimatedCostUsd: number;
     requestCount: number;
     inputTokens: number;
     outputTokens: number;

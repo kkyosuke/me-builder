@@ -4,11 +4,6 @@ import type { AsyncState } from "../../../model/async-state";
 import type { AdminStatistics } from "../model/statistics";
 
 const number = new Intl.NumberFormat("ja-JP");
-const usd = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  minimumFractionDigits: 4,
-});
 
 function Unavailable({ reason }: { reason: "not-configured" | "upstream-error" }) {
   return (
@@ -52,15 +47,14 @@ function Gemini({ value }: { value: AdminStatistics["gemini"] }) {
       {value.status === "unavailable" ? (
         <Unavailable reason={value.reason} />
       ) : (
-        <dl className="grid grid-cols-2 gap-3">
-          <Metric label="概算コスト" value={usd.format(value.estimatedCostUsd)} />
-          <Metric label="リクエスト" value={number.format(value.requestCount)} />
+        <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <Metric label="成功レスポンス" value={number.format(value.requestCount)} />
           <Metric label="入力token" value={number.format(value.inputTokens)} />
           <Metric label="出力token" value={number.format(value.outputTokens)} />
         </dl>
       )}
       <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
-        Vertex AIの利用量集計は現在未対応です。
+        Google Vertex AIレスポンスのusageMetadataを集計しています。
       </p>
     </Card>
   );
@@ -102,7 +96,7 @@ function StatisticsSkeleton() {
         </header>
         <div className="grid gap-5">
           {[
-            { key: "gemini", metricKeys: ["cost", "request", "input", "output"] },
+            { key: "gemini", metricKeys: ["request", "input", "output"] },
             { key: "line", metricKeys: ["billable", "limit", "reply"] },
           ].map(({ key, metricKeys }) => (
             <section
@@ -113,9 +107,7 @@ function StatisticsSkeleton() {
                 <SkeletonBlock className="size-5 rounded-md" />
                 <SkeletonBlock className="h-5 w-24 rounded-full" />
               </div>
-              <div
-                className={`mt-4 grid gap-3 ${key === "gemini" ? "grid-cols-2" : "sm:grid-cols-3"}`}
-              >
+              <div className="mt-4 grid gap-3 sm:grid-cols-3">
                 {metricKeys.map((metricKey) => (
                   <div key={metricKey} className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900">
                     <SkeletonBlock className="h-3 w-20 rounded-full" />

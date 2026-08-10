@@ -12,7 +12,6 @@ const statistics = {
   fetchedAt: "2026-08-08T00:00:00.000Z",
   gemini: {
     status: "available" as const,
-    estimatedCostUsd: 0,
     requestCount: 12,
     inputTokens: 0,
     outputTokens: 0,

@@ -296,7 +296,6 @@ export interface operations {
               | {
                   /** @constant */
                   status: "available";
-                  estimatedCostUsd: number;
                   requestCount: number;
                   inputTokens: number;
                   outputTokens: number;

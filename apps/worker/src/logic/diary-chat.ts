@@ -2,7 +2,11 @@ import type { ConversationContextMessage } from "@me-builder/lib";
 import { toJsonSchema } from "@valibot/to-json-schema";
 import * as v from "valibot";
 import type { WorkerConfig } from "../config";
-import { createGeminiClient, generateStructuredText } from "../infrastructure/gemini-client";
+import {
+  type GeminiUsageRecorder,
+  createGeminiClient,
+  generateStructuredText,
+} from "../infrastructure/gemini-client";
 import {
   DEFAULT_DIARY_CHAT_PROMPT_OPTIONS,
   type DiaryChatPromptOptions,
@@ -121,6 +125,7 @@ export async function generateDiaryChatResponse(
   context?: {
     currentUserMessageIds?: string[];
     prompt?: DiaryChatPromptOptions;
+    onUsage?: GeminiUsageRecorder;
   },
 ): Promise<DiaryChatResponse> {
   const safetyRoute = classifySafety(messages, context?.currentUserMessageIds);
@@ -149,6 +154,7 @@ export async function generateDiaryChatResponse(
       responseJsonSchema: schema,
       maxOutputTokens: 2_000,
       ...(signal ? { signal } : {}),
+      ...(context?.onUsage ? { onUsage: context.onUsage } : {}),
     });
     const validated = raw ? validateDiaryChatResponse(raw, safetyRoute) : undefined;
     if (validated) return validated;

@@ -37,6 +37,7 @@ describe("D1 clean baseline migration", () => {
         "source_records",
         "conversation_sessions",
         "brain_items",
+        "gemini_usage_records",
       ]),
     );
     expect(tableNames).not.toEqual(

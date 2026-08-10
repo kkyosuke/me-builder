@@ -2,7 +2,7 @@
 
 ## 1. 目的
 
-運用者が、外部サービスの利用量をme-builder内で確認できるようにします。現在の自動集計対象はLINE Messaging APIです。Gemini欄はAPI契約を維持しますが、Vertex AI Express Modeへ直接接続する間は信頼できる集計元がないため利用不可として表示します。
+運用者が、外部サービスの利用量をme-builder内で確認できるようにします。対象はVertex AI Express ModeのGeminiとLINE Messaging APIです。
 
 この文書は管理者の認可境界、統計項目、取得元、障害時の表示を所有します。一般利用者の診断体験、各外部サービスの呼び出し処理、データベースの物理設計は所有しません。
 
@@ -26,13 +26,17 @@ Accountの責務は[ドメイン設計](../domain/domain-design.md)、実行基�
 
 | 区分 | 項目 | 取得元 | 注意点 |
 | --- | --- | --- | --- |
+| Gemini | 成功レスポンス数 | Vertex AI `GenerateContentResponse` | `responseId`単位の当月累計 |
+| Gemini | 入力・出力token数 | Vertex AI `usageMetadata` | 入力は`promptTokenCount`、出力は`candidatesTokenCount`を合算 |
 | LINE | 課金対象送信数 | Messaging API quota consumption | reply messageは含まれない |
 | LINE | 当月送信上限 | Messaging API quota | 上限なしのplanではその状態を表示 |
 | LINE | 返信送信数（前日まで） | Messaging API delivery/reply | 集計未完了の当日を除き、日別の成功数を当月分集計 |
 
 「LINEメッセージ数」という単一の値にはまとめません。現在のme-builderが主に使うreply messageは課金対象送信数に含まれず、同じ名称で表示すると費用判断を誤るためです。
 
-Geminiのレスポンスsectionは`status = unavailable`、`reason = not-configured`を返します。Vertex AIの請求・利用量を安全かつ自動で取得する方式を別途設計するまでは、過去のAI Gateway値や不完全な推定値を表示しません。
+Geminiの各成功レスポンスについて、Googleが返した`responseId`、model、用途、生成時刻、`usageMetadata`のtoken数だけを共有D1へ保存します。prompt、生成本文、Account ID、LINE user IDは利用量recordへ保存しません。`responseId`を一意キーにして同じGoogleレスポンスの再保存を無視し、構造化出力のschema修正などでGoogleへ再生成した場合は別レスポンスとして数えます。
+
+Googleの`usageMetadata`はtoken数であり、請求額の確定値ではありません。概算費用は表示せず、確定費用が必要になった場合はCloud Billing Exportを別途設計します。
 
 ## 4. データフロー
 
@@ -40,6 +44,8 @@ Geminiのレスポンスsectionは`status = unavailable`、`reason = not-configu
 flowchart LR
     A[Admin Web UI] -->|LINE ID token| API[Admin Statistics API]
     API -->|resolve Account / require admin| D1[(D1)]
+    W[Queue Worker] -->|responseId + usageMetadata| D1
+    API -->|当月token集計| D1
     API -->|Channel access token| LINE[LINE Messaging API]
     LINE --> API
     API --> A
@@ -49,10 +55,10 @@ flowchart LR
 
 ## 5. 取得失敗時の扱い
 
-- Geminiの集計元が未設定でもLINE統計を取得・表示する
-- 未設定、外部APIエラー、レスポンス不正を区別できる状態を各sectionに返す
+- GeminiのD1集計とLINE外部取得は独立して実行し、一方の失敗で他方を非表示にしない
+- D1エラー、外部APIエラー、レスポンス不正を区別できる状態を各sectionに返す
 - 外部APIのエラー本文やsecretをクライアントへ返さない
-- 統計値は運用判断用であり、請求額の確定値として表示しない
-- 初期版では結果をD1へ保存せず、管理者が画面を開いた時点で取得する
+- token統計はGoogleのレスポンス値を保存するが、請求額として表示しない
+- LINE統計はD1へ保存せず、管理者が画面を開いた時点で取得する
 
-履歴保存、日次snapshot、予算通知、費用上限の自動制御は後続対応とします。
+token利用量recordのretention、日次snapshot、予算通知、費用上限の自動制御は後続対応とします。

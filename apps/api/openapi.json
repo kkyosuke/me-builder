@@ -178,9 +178,6 @@
                             "status": {
                               "const": "available"
                             },
-                            "estimatedCostUsd": {
-                              "type": "number"
-                            },
                             "requestCount": {
                               "type": "number"
                             },
@@ -191,13 +188,7 @@
                               "type": "number"
                             }
                           },
-                          "required": [
-                            "status",
-                            "estimatedCostUsd",
-                            "requestCount",
-                            "inputTokens",
-                            "outputTokens"
-                          ]
+                          "required": ["status", "requestCount", "inputTokens", "outputTokens"]
                         },
                         {
                           "type": "object",
