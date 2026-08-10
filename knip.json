@@ -3,6 +3,9 @@
   "ignore": ["apps/web/src/generated/**"],
   "ignoreDependencies": ["cloudflare"],
   "workspaces": {
+    "apps/web": {
+      "entry": ["e2e/**/*.e2e.ts"]
+    },
     "apps/worker": {
       "entry": ["src/**/*.test.ts", "src/account-data/drizzle-schema.ts", "drizzle*.config.ts"]
     }
