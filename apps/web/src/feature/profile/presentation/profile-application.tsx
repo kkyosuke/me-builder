@@ -17,7 +17,12 @@ export default function ProfileApplication() {
   return (
     <ProfileSummaryScreen state={summary.state} onRetry={() => void summary.reload()}>
       {showDevelopmentBrainItems && (
-        <DevelopmentBrainItems state={brainItems.state} onRetry={() => void brainItems.reload()} />
+        <DevelopmentBrainItems
+          state={brainItems.state}
+          vectorStates={brainItems.vectorStates}
+          onRetry={() => void brainItems.reload()}
+          onVerifyVector={(brainItemId) => void brainItems.verifyVector(brainItemId)}
+        />
       )}
     </ProfileSummaryScreen>
   );

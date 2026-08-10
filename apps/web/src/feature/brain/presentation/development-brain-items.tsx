@@ -1,7 +1,10 @@
-import { ChevronDown, Code2, Database, RefreshCw } from "lucide-react";
+import { ChevronDown, Code2, Database, RefreshCw, ScanSearch } from "lucide-react";
 import { LoadingState } from "../../../components/loading-state";
 import type { AsyncState } from "../../../model/async-state";
-import type { DevelopmentBrainItemsResult } from "../model/brain-item";
+import type {
+  DevelopmentBrainItemsResult,
+  DevelopmentBrainVectorResult,
+} from "../model/brain-item";
 
 const categoryLabels: Record<string, string> = {
   memory: "Memory",
@@ -22,12 +25,71 @@ function formatDateTime(value: string): string {
   }).format(new Date(value));
 }
 
+function vectorStatusLabel(sync: DevelopmentBrainItemsResult["items"][number]["vectorSync"]) {
+  switch (sync.status) {
+    case "not-scheduled":
+      return "Vector未登録";
+    case "pending":
+      return sync.hasEntry ? "Vector更新待ち" : "Vector登録待ち";
+    case "submitted":
+      return sync.hasEntry ? "Vector更新送信中" : "Vector送信中";
+    case "applied":
+      return sync.hasEntry ? "Vector同期受付済み" : "Vector未登録";
+    case "failed":
+      return "Vector再試行中";
+  }
+}
+
+function VectorVerification({
+  state,
+}: {
+  state: AsyncState<DevelopmentBrainVectorResult> | undefined;
+}) {
+  if (!state) return null;
+  if (state.status === "idle") return null;
+  if (state.status === "loading") {
+    return <p className="mt-2 text-xs text-slate-500">Vectorizeを照合しています...</p>;
+  }
+  if (state.status === "error") {
+    return <p className="mt-2 text-xs text-red-700 dark:text-red-300">{state.message}</p>;
+  }
+  if (state.data.state === "not-synced") {
+    return <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">対応表に未登録です。</p>;
+  }
+  if (state.data.state === "missing") {
+    return (
+      <p className="mt-2 text-xs text-red-700 dark:text-red-300">
+        Vectorizeに実体がありません。非同期反映待ち、または同期不整合の可能性があります。
+      </p>
+    );
+  }
+  const metadata = [
+    state.data.metadata.category,
+    state.data.metadata.derivation,
+    state.data.metadata.embeddingVersion
+      ? `embedding v${state.data.metadata.embeddingVersion}`
+      : undefined,
+    state.data.metadata.schemaVersion ? `schema v${state.data.metadata.schemaVersion}` : undefined,
+  ].filter(Boolean);
+  return (
+    <div className="mt-2 rounded-xl bg-emerald-500/10 p-3 text-xs text-emerald-800 dark:text-emerald-200">
+      <p className="font-semibold">{`Vectorizeに実体あり（${state.data.dimensions}次元）`}</p>
+      {metadata.length > 0 && <p className="mt-1">{metadata.join(" / ")}</p>}
+      <p className="mt-1 text-slate-500">{`確認: ${formatDateTime(state.data.checkedAt)}`}</p>
+    </div>
+  );
+}
+
 export function DevelopmentBrainItems({
   state,
+  vectorStates,
   onRetry,
+  onVerifyVector,
 }: {
   state: AsyncState<DevelopmentBrainItemsResult>;
+  vectorStates: Record<string, AsyncState<DevelopmentBrainVectorResult>>;
   onRetry: () => void;
+  onVerifyVector: (brainItemId: string) => void;
 }) {
   return (
     <section
@@ -104,11 +166,46 @@ export function DevelopmentBrainItems({
                   <span className="text-slate-500">
                     {item.derivation === "ai" ? "AI変換" : "決定的な変換"}
                   </span>
+                  <span
+                    className={
+                      item.vectorSync.status === "failed"
+                        ? "rounded-full bg-red-500/15 px-2 py-1 font-semibold text-red-800 dark:text-red-200"
+                        : "rounded-full bg-sky-500/15 px-2 py-1 font-semibold text-sky-800 dark:text-sky-200"
+                    }
+                  >
+                    {vectorStatusLabel(item.vectorSync)}
+                  </span>
                 </div>
                 <p className="mt-3 whitespace-pre-wrap text-sm font-semibold leading-relaxed text-slate-950 dark:text-slate-50">
                   {item.statement}
                 </p>
                 <p className="mt-2 text-xs text-slate-500">{formatDateTime(item.createdAt)}</p>
+
+                <div className="mt-3 border-t border-slate-200 pt-3 dark:border-slate-700">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="text-xs text-slate-500">
+                      <p>{`同期試行 ${item.vectorSync.attemptCount}回`}</p>
+                      {item.vectorSync.failureCode && (
+                        <p className="mt-1 text-red-700 dark:text-red-300">
+                          {`error: ${item.vectorSync.failureCode}`}
+                        </p>
+                      )}
+                      {item.vectorSync.nextAttemptAt && (
+                        <p className="mt-1">{`次回: ${formatDateTime(item.vectorSync.nextAttemptAt)}`}</p>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => onVerifyVector(item.id)}
+                      disabled={vectorStates[item.id]?.status === "loading"}
+                      className="inline-flex items-center gap-2 rounded-xl bg-sky-100 px-3 py-2 text-xs font-semibold text-sky-900 disabled:cursor-wait disabled:opacity-60 dark:bg-sky-900/40 dark:text-sky-100"
+                    >
+                      <ScanSearch className="size-4" aria-hidden="true" />
+                      Vectorizeで実体確認
+                    </button>
+                  </div>
+                  <VectorVerification state={vectorStates[item.id]} />
+                </div>
 
                 <details className="group mt-3 border-t border-slate-200 pt-3 dark:border-slate-700">
                   <summary className="flex cursor-pointer list-none items-center justify-between text-xs font-semibold text-slate-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 dark:text-slate-300">

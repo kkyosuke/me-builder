@@ -21,6 +21,10 @@ binding = "DB"
 database_name = "me-builder-db-local"
 database_id = "me-builder-db-local-id"
 
+[[vectorize]]
+binding = "BRAIN_VECTOR_INDEX"
+index_name = "me-builder-brain-local"
+
 [[durable_objects.bindings]]
 name = "ACCOUNT_DATA"
 class_name = "AccountData"
@@ -45,6 +49,10 @@ binding = "WEBHOOK_QUEUE"
 binding = "DB"
 database_name = "me-builder-db-local"
 database_id = "me-builder-db-local-id"
+
+[[env.local.vectorize]]
+binding = "BRAIN_VECTOR_INDEX"
+index_name = "me-builder-brain-local"
 
 [[env.local.durable_objects.bindings]]
 name = "ACCOUNT_DATA"
@@ -73,6 +81,10 @@ binding = "WEBHOOK_QUEUE"
 binding = "DB"
 database_name = "me-builder-db-preview"
 database_id = "8c25af7d-bc26-4b40-bbb4-1521c4af5a6e"
+
+[[env.preview.vectorize]]
+binding = "BRAIN_VECTOR_INDEX"
+index_name = "me-builder-brain-preview"
 
 [[env.preview.durable_objects.bindings]]
 name = "ACCOUNT_DATA"

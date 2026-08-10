@@ -28,6 +28,10 @@ type DomainAction<TAction extends (...args: never[]) => unknown> = RpcAction<
 
 export type AccountDataActions = {
   "brain.listActive": RpcAction<[], typeof brain.listActiveBrainItems>;
+  "brain.findActiveVectorEntry": RpcAction<
+    [brainItemId: string],
+    typeof brain.findActiveBrainVectorEntry
+  >;
   "brain.getVectorSyncTarget": RpcAction<
     [jobId: string, brainItemId: string, itemRevision: number],
     typeof brain.getBrainVectorSyncTarget

@@ -4,6 +4,8 @@ import { type AppliedBrainVectorSync, d1 } from "@me-builder/lib";
 export const brainActions = {
   "brain.listActive": (db: d1.Client, accountId: string) =>
     d1.action.brain.listActiveBrainItems(db, accountId),
+  "brain.findActiveVectorEntry": (db: d1.Client, accountId: string, brainItemId: string) =>
+    d1.action.brain.findActiveBrainVectorEntry(db, accountId, brainItemId),
   "brain.getVectorSyncTarget": (
     db: d1.Client,
     accountId: string,

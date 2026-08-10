@@ -72,6 +72,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/dev/brain-items/{brainItemId}/vector": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** 開発環境で本人のBrain Itemに対応するVectorize実体を確認する */
+    get: operations["getDevelopmentBrainVector"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/diagnoses": {
     parameters: {
       query?: never;
@@ -501,6 +518,20 @@ export interface operations {
               status: "active";
               /** Format: date-time */
               createdAt: string;
+              vectorSync: {
+                /** @enum {string} */
+                status: "pending" | "submitted" | "applied" | "failed" | "not-scheduled";
+                /** @enum {string} */
+                operation?: "upsert" | "delete";
+                attemptCount: number;
+                /** Format: date-time */
+                updatedAt?: string;
+                /** Format: date-time */
+                nextAttemptAt?: string;
+                failureCode?: string;
+                hasEntry: boolean;
+                entryRevision?: number;
+              };
               evidence: {
                 sourceRecordId: string;
                 /** @enum {string} */
@@ -513,6 +544,111 @@ export interface operations {
             }[];
             truncated: boolean;
           };
+        };
+      };
+      /** @description LIFF IDトークンを検証できない */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Unauthorized";
+          };
+        };
+      };
+      /** @description 開発環境ではない、または対応するAccountがない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | {
+                /** @constant */
+                error: "Account not found";
+                /** @constant */
+                reason: "friendship_required";
+              }
+            | {
+                /** @constant */
+                error: "Not Found";
+              };
+        };
+      };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
+          };
+        };
+      };
+      /** @description D1 bindingが設定されていない */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Service Unavailable";
+          };
+        };
+      };
+    };
+  };
+  getDevelopmentBrainVector: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        brainItemId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description AccountDataの対応表とVectorize実体の照合結果 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | {
+                /** @constant */
+                state: "not-synced";
+                /** Format: date-time */
+                checkedAt: string;
+              }
+            | {
+                /** @constant */
+                state: "missing";
+                entryRevision: number;
+                /** Format: date-time */
+                checkedAt: string;
+              }
+            | {
+                /** @constant */
+                state: "present";
+                entryRevision: number;
+                dimensions: number;
+                metadata: {
+                  category?: string;
+                  /** @enum {string} */
+                  derivation?: "ai" | "deterministic";
+                  embeddingVersion?: number;
+                  schemaVersion?: number;
+                };
+                /** Format: date-time */
+                checkedAt: string;
+              };
         };
       };
       /** @description LIFF IDトークンを検証できない */

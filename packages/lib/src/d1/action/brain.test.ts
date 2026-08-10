@@ -10,6 +10,7 @@ import {
   type SaveBrainItemInput,
   claimDueBrainVectorSyncJobs,
   completeBrainVectorSyncJob,
+  findActiveBrainVectorEntry,
   findBrainItemForAccount,
   getBrainVectorSyncTarget,
   listActiveBrainItems,
@@ -273,6 +274,36 @@ describe("findBrainItemForAccount", () => {
   });
 });
 
+describe("findActiveBrainVectorEntry", () => {
+  it("本人のactive Itemに対応するentryだけを返す", async () => {
+    const db = createTestDb();
+    await insertAccountsAndSources(db);
+    const at = new Date("2026-08-10T00:00:00Z");
+    await saveBrainItem(db, createInput({ at }));
+    const [job] = await claimDueBrainVectorSyncJobs(db, "account-1", at);
+    await completeBrainVectorSyncJob(
+      db,
+      "account-1",
+      job?.id ?? "",
+      { action: "upsert", vectorId: "private-vector-id", itemRevision: at.getTime() },
+      "mutation-1",
+      at,
+    );
+
+    await expect(findActiveBrainVectorEntry(db, "account-1", "brain-1")).resolves.toEqual({
+      vectorId: "private-vector-id",
+      itemRevision: at.getTime(),
+    });
+    await expect(findActiveBrainVectorEntry(db, "account-2", "brain-1")).resolves.toBeUndefined();
+
+    await db
+      .update(schema.brainItems)
+      .set({ status: "invalidated" })
+      .where(eq(schema.brainItems.id, "brain-1"));
+    await expect(findActiveBrainVectorEntry(db, "account-1", "brain-1")).resolves.toBeUndefined();
+  });
+});
+
 describe("listActiveBrainItems", () => {
   it("本人のactive ItemとEvidenceだけを新しい順で返す", async () => {
     const db = createTestDb();
@@ -316,6 +347,12 @@ describe("listActiveBrainItems", () => {
           id: "newer-active",
           statement: "新しい記憶",
           status: "active",
+          vectorSync: expect.objectContaining({
+            status: "pending",
+            operation: "upsert",
+            attemptCount: 0,
+            hasEntry: false,
+          }),
           evidence: [expect.objectContaining({ sourceRecordId: "source-1", relation: "supports" })],
         }),
         expect.objectContaining({ id: "older-active", statement: "古い記憶" }),

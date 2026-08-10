@@ -4,15 +4,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { app } from "../index";
 import type { DevelopmentBrainItemsOutcome } from "../logic/development-brain-items";
 
-const { loadDevelopmentBrainItems } = vi.hoisted(() => ({
+const { loadDevelopmentBrainItems, loadDevelopmentBrainVector } = vi.hoisted(() => ({
   loadDevelopmentBrainItems: vi.fn(),
+  loadDevelopmentBrainVector: vi.fn(),
 }));
 vi.mock("../logic/development-brain-items", () => ({
   getDevelopmentBrainItems: loadDevelopmentBrainItems,
+  getDevelopmentBrainVector: loadDevelopmentBrainVector,
 }));
 
 const dummyDb = {} as D1Database;
 const dummyAccountData = {} as AccountDataNamespace;
+const dummyVectorIndex = {} as ApiBindings["BRAIN_VECTOR_INDEX"];
 const outcome = (value: DevelopmentBrainItemsOutcome) =>
   loadDevelopmentBrainItems.mockResolvedValue(value);
 
@@ -23,7 +26,13 @@ function request(environment = "development", withBindings = true) {
     {
       ENVIRONMENT: environment,
       LIFF_ID: "2010850319-Yl63upAR",
-      ...(withBindings ? { DB: dummyDb, ACCOUNT_DATA: dummyAccountData } : {}),
+      ...(withBindings
+        ? {
+            DB: dummyDb,
+            ACCOUNT_DATA: dummyAccountData,
+            BRAIN_VECTOR_INDEX: dummyVectorIndex,
+          }
+        : {}),
     },
   );
 }
@@ -42,6 +51,14 @@ describe("GET /api/dev/brain-items", () => {
           derivation: "ai",
           status: "active",
           createdAt: new Date("2026-08-09T00:00:00Z"),
+          vectorSync: {
+            status: "applied",
+            operation: "upsert",
+            attemptCount: 1,
+            updatedAt: new Date("2026-08-09T00:01:00Z"),
+            hasEntry: true,
+            entryRevision: 1,
+          },
           evidence: [
             {
               sourceRecordId: "source-1",
@@ -88,5 +105,57 @@ describe("GET /api/dev/brain-items", () => {
   ])("$typeを401へ変換する", async (value) => {
     outcome(value);
     expect((await request()).status).toBe(401);
+  });
+});
+
+describe("GET /api/dev/brain-items/:brainItemId/vector", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("Vectorize実体の確認結果を返す", async () => {
+    loadDevelopmentBrainVector.mockResolvedValue({
+      type: "resolved",
+      result: {
+        state: "present",
+        entryRevision: 12,
+        dimensions: 768,
+        metadata: { category: "memory", derivation: "ai", embeddingVersion: 1, schemaVersion: 1 },
+        checkedAt: new Date("2026-08-10T00:00:00Z"),
+      },
+    });
+
+    const response = await app.request(
+      "/api/dev/brain-items/brain-1/vector",
+      { headers: { Authorization: "Bearer dummy.id.token" } },
+      {
+        ENVIRONMENT: "development",
+        LIFF_ID: "2010850319-Yl63upAR",
+        DB: dummyDb,
+        ACCOUNT_DATA: dummyAccountData,
+        BRAIN_VECTOR_INDEX: dummyVectorIndex,
+      },
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      state: "present",
+      entryRevision: 12,
+      dimensions: 768,
+      metadata: { category: "memory", derivation: "ai", embeddingVersion: 1, schemaVersion: 1 },
+      checkedAt: "2026-08-10T00:00:00.000Z",
+    });
+    expect(loadDevelopmentBrainVector).toHaveBeenCalledWith(
+      expect.objectContaining({ brainItemId: "brain-1", vectorIndex: dummyVectorIndex }),
+    );
+  });
+
+  it("productionではVectorize bindingがなくても404を返す", async () => {
+    const response = await app.request(
+      "/api/dev/brain-items/brain-1/vector",
+      { headers: { Authorization: "Bearer dummy.id.token" } },
+      { ENVIRONMENT: "production" },
+    );
+
+    expect(response.status).toBe(404);
+    expect(loadDevelopmentBrainVector).not.toHaveBeenCalled();
   });
 });

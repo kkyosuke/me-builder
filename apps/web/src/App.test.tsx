@@ -29,6 +29,7 @@ const mocks = vi.hoisted(() => ({
   restoreDiagnosisProgress: vi.fn(),
   fetchProfileSummary: vi.fn(),
   fetchDevelopmentBrainItems: vi.fn(),
+  fetchDevelopmentBrainVector: vi.fn(),
 }));
 
 vi.mock("./config", () => ({
@@ -54,6 +55,7 @@ vi.mock("./feature/profile/infrastructure/profile-api", () => ({
 }));
 vi.mock("./feature/brain/infrastructure/brain-api", () => ({
   fetchDevelopmentBrainItems: mocks.fetchDevelopmentBrainItems,
+  fetchDevelopmentBrainVector: mocks.fetchDevelopmentBrainVector,
 }));
 vi.mock("./feature/diagnosis/presentation/components/swipe-diagnosis", () => ({
   SwipeDiagnosis: ({
@@ -207,6 +209,14 @@ describe("App", () => {
           derivation: "ai",
           status: "active",
           createdAt: "2026-08-09T00:00:00.000Z",
+          vectorSync: {
+            status: "applied",
+            operation: "upsert",
+            attemptCount: 1,
+            updatedAt: "2026-08-09T00:01:00.000Z",
+            hasEntry: true,
+            entryRevision: 1,
+          },
           evidence: [
             {
               sourceRecordId: "source-1",

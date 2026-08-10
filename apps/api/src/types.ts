@@ -3,7 +3,10 @@ import type { AccountDataNamespace, CompatibilityDataNamespace } from "@me-build
 import type { Queue, WebhookQueueMessage } from "@me-builder/shared";
 
 /** Wrangler生成bindingに、SecretとQueueの公開契約だけを重ねる。 */
-type Env = Omit<ApiBindings, "DB" | "WEBHOOK_QUEUE" | "ACCOUNT_DATA" | "COMPATIBILITY_DATA"> & {
+type Env = Omit<
+  ApiBindings,
+  "DB" | "WEBHOOK_QUEUE" | "ACCOUNT_DATA" | "COMPATIBILITY_DATA" | "BRAIN_VECTOR_INDEX"
+> & {
   ENVIRONMENT?: string;
   LINE_CHANNEL_ACCESS_TOKEN?: string;
   LINE_CHANNEL_SECRET?: string;
@@ -19,6 +22,7 @@ type Env = Omit<ApiBindings, "DB" | "WEBHOOK_QUEUE" | "ACCOUNT_DATA" | "COMPATIB
   DB?: D1Database;
   ACCOUNT_DATA?: AccountDataNamespace;
   COMPATIBILITY_DATA?: CompatibilityDataNamespace;
+  BRAIN_VECTOR_INDEX?: ApiBindings["BRAIN_VECTOR_INDEX"];
 };
 
 export type AppEnv = { Bindings: Env };

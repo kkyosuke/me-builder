@@ -55,6 +55,16 @@ export type ActiveBrainItemList = Readonly<{
     derivation: "ai" | "deterministic";
     status: "active";
     createdAt: Date;
+    vectorSync: Readonly<{
+      status: "pending" | "submitted" | "applied" | "failed" | "not-scheduled";
+      operation?: "upsert" | "delete";
+      attemptCount: number;
+      updatedAt?: Date;
+      nextAttemptAt?: Date;
+      failureCode?: string;
+      hasEntry: boolean;
+      entryRevision?: number;
+    }>;
     evidence: readonly Readonly<{
       sourceRecordId: string;
       relation: "supports" | "contradicts";
@@ -525,7 +535,40 @@ export async function findBrainItemForAccount(
     .get();
 }
 
-/** 開発用の確認画面へ、本人のactiveなBrain Itemと根拠関係だけを新しい順で返す。 */
+export type ActiveBrainVectorEntry = Readonly<{
+  vectorId: string;
+  itemRevision: number;
+}>;
+
+/** 開発用の実体確認に必要なvector IDをactive Itemに限って返す。 */
+export async function findActiveBrainVectorEntry(
+  db: D1Client,
+  accountId: string,
+  brainItemId: string,
+): Promise<ActiveBrainVectorEntry | undefined> {
+  return db
+    .select({ vectorId: brainVectorEntries.id, itemRevision: brainVectorEntries.itemRevision })
+    .from(brainVectorEntries)
+    .innerJoin(
+      brainItems,
+      and(
+        eq(brainItems.id, brainVectorEntries.brainItemId),
+        eq(brainItems.accountId, brainVectorEntries.accountId),
+      ),
+    )
+    .where(
+      and(
+        eq(brainVectorEntries.accountId, accountId),
+        eq(brainVectorEntries.brainItemId, brainItemId),
+        eq(brainVectorEntries.isDeleted, false),
+        eq(brainItems.status, "active"),
+        eq(brainItems.isDeleted, false),
+      ),
+    )
+    .get();
+}
+
+/** 開発用の確認画面へ、本人のactiveなBrain Item、根拠、Vector同期状態を返す。 */
 export async function listActiveBrainItems(
   db: D1Client,
   accountId: string,
@@ -552,7 +595,7 @@ export async function listActiveBrainItems(
   const truncated = rows.length > DEVELOPMENT_BRAIN_ITEM_LIMIT;
   const items = rows.slice(0, DEVELOPMENT_BRAIN_ITEM_LIMIT);
   const itemIds = items.map(({ id }) => id);
-  const evidenceRows =
+  const [evidenceRows, vectorJobs, vectorEntries] = await Promise.all([
     itemIds.length === 0
       ? []
       : await db
@@ -571,16 +614,80 @@ export async function listActiveBrainItems(
               eq(brainItemEvidenceEdges.isDeleted, false),
             ),
           )
-          .orderBy(brainItemEvidenceEdges.generatedAt, brainItemEvidenceEdges.id);
+          .orderBy(brainItemEvidenceEdges.generatedAt, brainItemEvidenceEdges.id),
+    itemIds.length === 0
+      ? []
+      : db
+          .select({
+            brainItemId: brainVectorSyncJobs.brainItemId,
+            status: brainVectorSyncJobs.status,
+            operation: brainVectorSyncJobs.operation,
+            attemptCount: brainVectorSyncJobs.attemptCount,
+            updatedAt: brainVectorSyncJobs.updatedAt,
+            nextAttemptAt: brainVectorSyncJobs.nextAttemptAt,
+            failureCode: brainVectorSyncJobs.failureCode,
+          })
+          .from(brainVectorSyncJobs)
+          .where(
+            and(
+              eq(brainVectorSyncJobs.accountId, accountId),
+              inArray(brainVectorSyncJobs.brainItemId, itemIds),
+              eq(brainVectorSyncJobs.isDeleted, false),
+            ),
+          )
+          .orderBy(
+            desc(brainVectorSyncJobs.itemRevision),
+            desc(brainVectorSyncJobs.updatedAt),
+            desc(brainVectorSyncJobs.id),
+          ),
+    itemIds.length === 0
+      ? []
+      : db
+          .select({
+            brainItemId: brainVectorEntries.brainItemId,
+            itemRevision: brainVectorEntries.itemRevision,
+          })
+          .from(brainVectorEntries)
+          .where(
+            and(
+              eq(brainVectorEntries.accountId, accountId),
+              inArray(brainVectorEntries.brainItemId, itemIds),
+              eq(brainVectorEntries.isDeleted, false),
+            ),
+          ),
+  ]);
+
+  const latestVectorJobByItem = new Map<string, (typeof vectorJobs)[number]>();
+  for (const job of vectorJobs) {
+    if (!latestVectorJobByItem.has(job.brainItemId)) {
+      latestVectorJobByItem.set(job.brainItemId, job);
+    }
+  }
+  const vectorEntryByItem = new Map(
+    vectorEntries.map((entry) => [entry.brainItemId, entry] as const),
+  );
 
   return {
-    items: items.map((item) => ({
-      ...item,
-      status: "active" as const,
-      evidence: evidenceRows
-        .filter(({ brainItemId }) => brainItemId === item.id)
-        .map(({ brainItemId: _, ...evidence }) => evidence),
-    })),
+    items: items.map((item) => {
+      const job = latestVectorJobByItem.get(item.id);
+      const entry = vectorEntryByItem.get(item.id);
+      return {
+        ...item,
+        status: "active" as const,
+        vectorSync: {
+          status: job?.status ?? ("not-scheduled" as const),
+          ...(job ? { operation: job.operation, updatedAt: job.updatedAt } : {}),
+          attemptCount: job?.attemptCount ?? 0,
+          ...(job?.status !== "applied" && job ? { nextAttemptAt: job.nextAttemptAt } : {}),
+          ...(job?.failureCode ? { failureCode: job.failureCode } : {}),
+          hasEntry: Boolean(entry),
+          ...(entry ? { entryRevision: entry.itemRevision } : {}),
+        },
+        evidence: evidenceRows
+          .filter(({ brainItemId }) => brainItemId === item.id)
+          .map(({ brainItemId: _, ...evidence }) => evidence),
+      };
+    }),
     truncated,
   };
 }
