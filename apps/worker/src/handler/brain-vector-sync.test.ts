@@ -58,6 +58,7 @@ describe("Brain vector sync queue", () => {
         statement: "公園を散歩した",
         category: "memory",
         derivation: "ai",
+        itemRevision: 100,
       })
       .mockResolvedValueOnce(true);
     const upsert = vi.fn(async (vectors) => ({ ids: vectors.map(({ id }: { id: string }) => id) }));
@@ -87,21 +88,61 @@ describe("Brain vector sync queue", () => {
       "account-1",
       "brain.completeVectorSyncJob",
       "job-1",
+      {
+        action: "upsert",
+        vectorId: expect.stringMatching(/^[0-9a-f]{64}$/),
+        itemRevision: 100,
+      },
       expect.stringMatching(/^accepted:/),
     );
     expect(message.ack).toHaveBeenCalledOnce();
   });
 
   it("処理時に利用不可ならembeddingせず決定的vector IDを削除する", async () => {
-    const execute = vi.fn().mockResolvedValueOnce({ action: "delete" }).mockResolvedValueOnce(true);
+    const execute = vi
+      .fn()
+      .mockResolvedValueOnce({ action: "delete", vectorId: "stored-vector" })
+      .mockResolvedValueOnce(true);
     const deleteByIds = vi.fn(async (ids) => ({ ids }));
     const message = createMessage();
 
     await processBrainVectorSyncMessage(message, createBindings(execute, { deleteByIds }), config);
 
-    expect(deleteByIds).toHaveBeenCalledWith([expect.stringMatching(/^[0-9a-f]{64}$/)]);
+    expect(deleteByIds).toHaveBeenCalledWith(["stored-vector"]);
     expect(geminiMocks.embedDocument).not.toHaveBeenCalled();
     expect(message.ack).toHaveBeenCalledOnce();
+  });
+
+  it("vector IDが変わったupsertでは旧IDも削除する", async () => {
+    geminiMocks.embedDocument.mockResolvedValue(Array.from({ length: 768 }, () => 0.1));
+    const execute = vi
+      .fn()
+      .mockResolvedValueOnce({
+        action: "upsert",
+        statement: "公園を散歩した",
+        category: "memory",
+        derivation: "ai",
+        itemRevision: 100,
+        previousVectorId: "old-vector",
+      })
+      .mockResolvedValueOnce(true);
+    const upsert = vi.fn(async (vectors) => ({ ids: vectors.map(({ id }: { id: string }) => id) }));
+    const deleteByIds = vi.fn(async (ids) => ({ ids }));
+
+    await processBrainVectorSyncMessage(
+      createMessage(),
+      createBindings(execute, { upsert, deleteByIds }),
+      config,
+    );
+
+    expect(deleteByIds).toHaveBeenCalledWith(["old-vector"]);
+    expect(execute).toHaveBeenLastCalledWith(
+      "account-1",
+      "brain.completeVectorSyncJob",
+      "job-1",
+      expect.objectContaining({ action: "upsert", itemRevision: 100 }),
+      expect.stringContaining("accepted:"),
+    );
   });
 
   it("Vectorize失敗を本文なしのfailure codeとして記録し、Queue再配送へ返す", async () => {

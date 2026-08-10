@@ -328,6 +328,8 @@ Vectorizeは非同期更新であるため、AccountDataを正とするoutboxを
 | `attempt_count`, `next_attempt_at`, `failure_code` | retry管理。本文を含めない |
 | `created_at`, `updated_at` | lifecycle |
 
+`brain_vector_entries`はAccountData内だけに置く対応表で、`vector_id`、`brain_item_id`、反映した`item_revision`を保持します。検索結果からBrain Itemへ戻す場合と、現在のSecretから再計算できない旧vectorを削除する場合に使います。本文やEmbedding値は保持しません。
+
 Brain Itemの作成、改訂、無効化、削除、撤回では、Brain Itemの利用可否変更とjob追加を同じAccountData SQLite transactionで確定します。AccountData alarmは`pending` / `failed`または期限切れの`submitted` jobを専用Brain Vector Queueへ送ります。Queue messageはAccount ID、job ID、Item ID、revisionだけを持ち、Brain Item本文を複製しません。
 
 ```mermaid
@@ -347,12 +349,17 @@ sequenceDiagram
     else superseded / invalidated / deleted
         C->>V: 決定的vector IDをdelete
     end
-    C->>AD: mutation IDと適用結果を保存
+    C->>AD: mutation ID、vector ID、適用結果を保存
+    AD->>AD: 現在状態を再確認し、必要なら補正jobをpendingへ戻す
 ```
 
-consumerはQueue messageの`operation`や本文を信頼せず、処理直前にAccountDataの現在状態を再取得します。これにより古い`upsert`配送が、すでに無効化されたItemを復活させません。vector IDはItem IDを環境別SecretでHMACした決定的な値、`owner_scope`はAccount IDを同じSecretで用途分離してHMACした値です。Vectorizeへ保存するmetadataは`owner_scope`、category、derivation、embedding version、schema versionだけとし、生のAccount ID、Item ID、本文、Source Record ID、Evidenceを保存しません。
+consumerはQueue messageの`operation`や本文を信頼せず、処理直前にAccountDataの現在状態を再取得します。さらにVectorize操作後の完了記録をAccountDataで直列化し、開始時からItemの利用可否やrevisionが変わっていれば、現在状態へ収束させる補正jobを同じtransactionで`pending`へ戻します。これにより、古い`upsert`がembedding中にItemを無効化した場合や、Queueが順序を入れ替えて配送した場合も、最後に現在状態を反映する操作が残ります。
+
+vector IDはAccount IDとItem IDの組を環境別SecretでHMACした決定的な値、`owner_scope`はAccount IDを同じSecretで用途分離してHMACした値です。AccountDataにはvector IDとBrain Item IDの対応表を保持し、検索結果の再認可とSecret変更前に作成したvectorの削除に使います。Vectorizeへ保存するmetadataは`owner_scope`、category、derivation、embedding version、schema versionだけとし、生のAccount ID、Item ID、本文、Source Record ID、Evidenceを保存しません。
 
 Vectorizeへのupsertまたはdelete受付後に`applied`とmutation IDを記録します。失敗時は本文を含まないfailure codeだけを保存し、Queue再配送とoutboxの再送期限で回復します。削除時はAccountDataで先に利用不可にするため、Vectorizeに古いvectorが残る間も、検索導入後のAccountData再認可では利用されません。
+
+`BRAIN_VECTOR_HMAC_SECRET`は通常のSecretローテーションだけで単独変更してはいけません。変更時は新しいindexを用意し、AccountDataを正として全active Itemを再同期し、検索先を切り替えた後に旧indexを削除します。緊急失効時も同じ再構築手順を使います。個別Itemの削除ではAccountDataの対応表に保存した旧vector IDを使うため、Secret変更前のvectorも削除できます。
 
 ### 4.9 ConversationCoordinatorのローカルSQLite
 

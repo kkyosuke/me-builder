@@ -103,6 +103,7 @@ describe("AccountData Workers runtime E2E", () => {
       );
 
       state.storage.sql.exec("DROP TABLE compatibility_references");
+      state.storage.sql.exec("DROP TABLE brain_vector_entries");
       state.storage.sql.exec("DROP TABLE brain_vector_sync_jobs");
       state.storage.sql.exec("DELETE FROM __drizzle_migrations WHERE created_at >= 1786270180000");
 
@@ -127,6 +128,13 @@ describe("AccountData Workers runtime E2E", () => {
           )
           .one().brain_item_id,
       ).toBe("brain-1");
+      expect(
+        state.storage.sql
+          .exec<{ name: string }>(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'brain_vector_entries'",
+          )
+          .one().name,
+      ).toBe("brain_vector_entries");
     });
   });
 });

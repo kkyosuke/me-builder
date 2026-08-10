@@ -31,22 +31,37 @@ export async function processBrainVectorSyncMessage(
     const secret = workerConfig.brainVectorHmacSecret;
     if (!index) throw new Error("BRAIN_VECTOR_INDEX binding is not configured");
     if (!secret) throw new Error("BRAIN_VECTOR_HMAC_SECRET is not configured");
-    const vectorId = await createBrainVectorId(secret, message.body.brainItemId);
-    const mutation =
-      target.action === "delete"
-        ? await index.deleteByIds([vectorId])
-        : await upsertBrainVector(
+    const vectorId =
+      target.action === "delete" && target.vectorId
+        ? target.vectorId
+        : await createBrainVectorId(secret, message.body.accountId, message.body.brainItemId);
+    const mutationIds: string[] = [];
+    if (target.action === "delete") {
+      mutationIds.push(mutationIdOf(await index.deleteByIds([vectorId])));
+    } else {
+      mutationIds.push(
+        mutationIdOf(
+          await upsertBrainVector(
             index,
             vectorId,
             message.body.accountId,
             secret,
             target,
             workerConfig,
-          );
+          ),
+        ),
+      );
+      if (target.previousVectorId && target.previousVectorId !== vectorId) {
+        mutationIds.push(mutationIdOf(await index.deleteByIds([target.previousVectorId])));
+      }
+    }
     const completed = await accountData.execute(
       "brain.completeVectorSyncJob",
       message.body.jobId,
-      mutationIdOf(mutation),
+      target.action === "upsert"
+        ? { action: "upsert", vectorId, itemRevision: target.itemRevision }
+        : { action: "delete", vectorId },
+      mutationIds.join(","),
     );
     if (!completed) throw new Error("Brain vector sync completion could not be recorded");
     message.ack();
@@ -70,6 +85,8 @@ async function upsertBrainVector(
     statement: string;
     category: string;
     derivation: "ai" | "deterministic";
+    itemRevision: number;
+    previousVectorId?: string;
   }>,
   workerConfig: WorkerConfig,
 ) {

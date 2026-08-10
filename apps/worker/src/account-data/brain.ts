@@ -1,4 +1,4 @@
-import { d1 } from "@me-builder/lib";
+import { type AppliedBrainVectorSync, d1 } from "@me-builder/lib";
 
 /** Brain Item domain operations owned by one AccountData Object. */
 export const brainActions = {
@@ -15,9 +15,10 @@ export const brainActions = {
     db: d1.Client,
     accountId: string,
     jobId: string,
+    applied: AppliedBrainVectorSync,
     mutationId: string,
     at?: Date,
-  ) => d1.action.brain.completeBrainVectorSyncJob(db, accountId, jobId, mutationId, at),
+  ) => d1.action.brain.completeBrainVectorSyncJob(db, accountId, jobId, applied, mutationId, at),
   "brain.failVectorSyncJob": (
     db: d1.Client,
     accountId: string,

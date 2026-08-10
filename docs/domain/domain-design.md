@@ -308,4 +308,4 @@ step 3.1では、Phase 1の質問配信と回答保存に必要なQuestion、Dia
 
 step 4は、Source RecordからBrain Itemを生成する共通入出力と、診断・日記それぞれの登録、利用開始、本人による否定・修正、改訂を[Brain Item生成設計](brain/brain-item-generation-design.md)で確定しました。
 
-step 6は、利用するCloudflareコンポーネントの選定が[インフラ・システム構成](../architecture/infrastructure-architecture.md)で確定し、AccountData上のDiagnosis、Source Record、Brain Item、Evidence、Revision、Access Labelのschemaを具体化しました。Vectorize同期jobは実装設計に留まり、物理schemaは未実装です。メディアの参照方式も後続設計です。
+step 6は、利用するCloudflareコンポーネントの選定が[インフラ・システム構成](../architecture/infrastructure-architecture.md)で確定し、AccountData上のDiagnosis、Source Record、Brain Item、Evidence、Revision、Access Label、Vectorize同期jobのschemaを具体化しました。Vectorizeの検索利用とメディアの参照方式は後続設計です。

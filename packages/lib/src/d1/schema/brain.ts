@@ -67,6 +67,18 @@ export const brainVectorSyncJobs = sqliteTable(
   ],
 );
 
+/** Vectorizeの仮名IDをAccountData上のBrain Itemへ戻す対応表。 */
+export const brainVectorEntries = sqliteTable(
+  "brain_vector_entries",
+  {
+    ...baseSchema,
+    accountId: text("account_id").notNull(),
+    brainItemId: text("brain_item_id").notNull(),
+    itemRevision: integer("item_revision").notNull(),
+  },
+  (table) => [uniqueIndex("brain_vector_entry_item_idx").on(table.accountId, table.brainItemId)],
+);
+
 /** Source RecordがBrain Itemを支える、または反証する関係。 */
 export const brainItemEvidenceEdges = sqliteTable(
   "brain_item_evidence_edges",

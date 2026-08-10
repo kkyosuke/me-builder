@@ -13,8 +13,12 @@ async function hmacHex(secret: string, value: string): Promise<string> {
 }
 
 /** 同じSecretを使う2用途を入力prefixで分離する。 */
-export function createBrainVectorId(secret: string, brainItemId: string): Promise<string> {
-  return hmacHex(secret, `brain-vector-id\u0000${brainItemId}`);
+export function createBrainVectorId(
+  secret: string,
+  accountId: string,
+  brainItemId: string,
+): Promise<string> {
+  return hmacHex(secret, `brain-vector-id\u0000${accountId}\u0000${brainItemId}`);
 }
 
 export function createBrainOwnerScope(secret: string, accountId: string): Promise<string> {

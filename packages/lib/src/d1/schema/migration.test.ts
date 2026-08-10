@@ -37,6 +37,7 @@ describe("D1 clean baseline migration", () => {
         "source_records",
         "conversation_sessions",
         "brain_items",
+        "brain_vector_entries",
         "brain_vector_sync_jobs",
       ]),
     );

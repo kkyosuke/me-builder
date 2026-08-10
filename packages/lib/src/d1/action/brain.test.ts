@@ -116,12 +116,28 @@ describe("saveBrainItem", () => {
       statement: "日記から見える傾向",
       category: "preference",
       derivation: "ai",
+      itemRevision: at.getTime(),
     });
     await expect(
-      completeBrainVectorSyncJob(db, "account-1", jobs[0]?.id ?? "", "mutation-1", at),
+      completeBrainVectorSyncJob(
+        db,
+        "account-1",
+        jobs[0]?.id ?? "",
+        { action: "upsert", vectorId: "vector-1", itemRevision: at.getTime() },
+        "mutation-1",
+        at,
+      ),
     ).resolves.toBe(true);
     await expect(db.select().from(schema.brainVectorSyncJobs)).resolves.toEqual([
       expect.objectContaining({ status: "applied", mutationId: "mutation-1" }),
+    ]);
+    await expect(db.select().from(schema.brainVectorEntries)).resolves.toEqual([
+      expect.objectContaining({
+        id: "vector-1",
+        accountId: "account-1",
+        brainItemId: "brain-1",
+        itemRevision: at.getTime(),
+      }),
     ]);
   });
 
@@ -139,6 +155,62 @@ describe("saveBrainItem", () => {
     await expect(
       getBrainVectorSyncTarget(db, "account-1", job?.id ?? "", "brain-1", at.getTime()),
     ).resolves.toEqual({ action: "delete" });
+  });
+
+  it("upsert処理中にinvalidatedへ変わった場合はdelete jobを再度pendingにする", async () => {
+    const db = createTestDb();
+    await insertAccountsAndSources(db);
+    const at = new Date("2026-08-10T00:00:00Z");
+    const invalidatedAt = new Date(at.getTime() + 1);
+    const completedAt = new Date(at.getTime() + 2);
+    await saveBrainItem(db, createInput({ at }));
+    const [upsertJob] = await claimDueBrainVectorSyncJobs(db, "account-1", at);
+    await db.batch([
+      db
+        .update(schema.brainItems)
+        .set({ status: "invalidated", updatedAt: invalidatedAt })
+        .where(eq(schema.brainItems.id, "brain-1")),
+      db.insert(schema.brainVectorSyncJobs).values({
+        id: `brain-1:${invalidatedAt.getTime()}:delete`,
+        accountId: "account-1",
+        brainItemId: "brain-1",
+        itemRevision: invalidatedAt.getTime(),
+        operation: "delete",
+        status: "applied",
+        mutationId: "earlier-delete",
+        nextAttemptAt: invalidatedAt,
+        createdAt: invalidatedAt,
+        updatedAt: invalidatedAt,
+      }),
+    ]);
+
+    await expect(
+      completeBrainVectorSyncJob(
+        db,
+        "account-1",
+        upsertJob?.id ?? "",
+        { action: "upsert", vectorId: "late-vector", itemRevision: at.getTime() },
+        "late-upsert",
+        completedAt,
+      ),
+    ).resolves.toBe(true);
+
+    await expect(
+      db
+        .select()
+        .from(schema.brainVectorSyncJobs)
+        .where(eq(schema.brainVectorSyncJobs.operation, "delete")),
+    ).resolves.toEqual([expect.objectContaining({ status: "pending", mutationId: null })]);
+    const [deleteJob] = await claimDueBrainVectorSyncJobs(db, "account-1", completedAt);
+    await expect(
+      getBrainVectorSyncTarget(
+        db,
+        "account-1",
+        deleteJob?.id ?? "",
+        "brain-1",
+        invalidatedAt.getTime(),
+      ),
+    ).resolves.toEqual({ action: "delete", vectorId: "late-vector" });
   });
 
   it("EvidenceなしではBrain Itemを保存しない", async () => {

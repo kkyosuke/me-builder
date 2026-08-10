@@ -43,6 +43,13 @@
       "when": 1786319013353,
       "tag": "0005_melted_moondragon",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1786322282395,
+      "tag": "0006_vengeful_selene",
+      "breakpoints": true
     }
   ]
 }

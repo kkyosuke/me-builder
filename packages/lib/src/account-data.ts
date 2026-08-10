@@ -33,7 +33,7 @@ export type AccountDataActions = {
     typeof brain.getBrainVectorSyncTarget
   >;
   "brain.completeVectorSyncJob": RpcAction<
-    [jobId: string, mutationId: string, at?: Date],
+    [jobId: string, applied: brain.AppliedBrainVectorSync, mutationId: string, at?: Date],
     typeof brain.completeBrainVectorSyncJob
   >;
   "brain.failVectorSyncJob": RpcAction<

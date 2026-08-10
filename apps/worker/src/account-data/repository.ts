@@ -21,6 +21,7 @@ const accountDataSchema = {
   brainItemRevisions: d1.schema.brainItemRevisions,
   brainItemTopicLabels: d1.schema.brainItemTopicLabels,
   brainItems: d1.schema.brainItems,
+  brainVectorEntries: d1.schema.brainVectorEntries,
   brainVectorSyncJobs: d1.schema.brainVectorSyncJobs,
   chatTurns: d1.schema.chatTurns,
   conversationMessages: d1.schema.conversationMessages,
