@@ -1,0 +1,8 @@
+{
+  "ignorePatterns": [
+    {
+      "pattern": "^https?://"
+    }
+  ],
+  "timeout": "30s"
+}

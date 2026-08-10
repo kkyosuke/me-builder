@@ -1,8 +1,8 @@
 name: Scheduled Checks
 
 # 外部サービスの応答を待つ検証をここへ集める。
-# これらが失敗する原因はほぼ常にリンク先の変化であって PR の変更ではないため、
-# PR ごとに実行すると待ち時間と不安定な失敗を毎回払うだけになる。
+# これらが失敗する原因はほぼ常に外部側の変化であって PR の変更ではないため、
+# PR ごと・デプロイごとに実行すると待ち時間を毎回払うだけになる。
 on:
   schedule:
     # 毎週月曜 09:00 JST (00:00 UTC)
@@ -18,14 +18,26 @@ concurrency:
 
 jobs:
   external:
-    name: External Link Check
+    name: External Dependency Checks
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # LINE の疎通確認に本番のチャネルアクセストークンとドメインを使う。
+    environment: prd
+    env:
+      LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+      BASE_DOMAIN: ${{ vars.BASE_DOMAIN }}
     steps:
       - uses: actions/checkout@v4
 
       - uses: ./.github/actions/setup-bun-workspace
 
-      # ドキュメント内の外部 URL を 1 件ずつ取得しにいくため、応答待ちが実行時間の大半を占める。
-      - name: Markdown Link Check
+      # ドキュメント内の外部 URL を取得しにいくため、応答待ちが実行時間の大半を占める。
+      # 相対リンクは PR の `ci.yml` が見るので、ここは外部 URL の劣化検知が目的。
+      - name: Markdown External Link Check
         run: bun run lint:md:links
+
+      # CD は URL が変わらない限り疎通確認を省くため、LINE Platform から本番 Webhook へ
+      # 実際に到達できるかはここで定期的に確かめる (`--force` で疎通確認まで実行する)。
+      - name: Verify Production LINE Webhook Connectivity
+        if: ${{ env.LINE_CHANNEL_ACCESS_TOKEN != '' }}
+        run: bun --cwd apps/api scripts/register-webhook.ts --force

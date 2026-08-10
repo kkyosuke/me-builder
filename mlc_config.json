@@ -2,6 +2,9 @@
   "ignorePatterns": [
     {
       "pattern": "^http://localhost"
+    },
+    {
+      "pattern": "^https://github\\.com/[Kk][Kk]yosuke/me-builder"
     }
   ],
   "timeout": "30s",

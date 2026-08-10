@@ -54,6 +54,9 @@ jobs:
               - '.markdownlintignore'
 
       # 手動実行には比較対象の base が無いため、範囲を絞らず全部検証する。
+      # また、どちらのフィルタにも当たらない変更 (`.nvmrc`, `lefthook.yml` など
+      # 列挙から漏れたファイル) は「1 つも検証せず success」になってしまうため、
+      # 判定できないものは検証する側へ倒す。
       - name: Resolve Verification Scope
         id: scope
         env:
@@ -61,12 +64,16 @@ jobs:
           CODE_CHANGED: ${{ steps.changes.outputs.code }}
           DOCS_CHANGED: ${{ steps.changes.outputs.docs }}
         run: |
-          if [ "${IS_PULL_REQUEST}" = "true" ]; then
-            echo "code=${CODE_CHANGED}" >> "${GITHUB_OUTPUT}"
-            echo "docs=${DOCS_CHANGED}" >> "${GITHUB_OUTPUT}"
-          else
+          if [ "${IS_PULL_REQUEST}" != "true" ]; then
             echo "code=true" >> "${GITHUB_OUTPUT}"
             echo "docs=true" >> "${GITHUB_OUTPUT}"
+          elif [ "${CODE_CHANGED}" != "true" ] && [ "${DOCS_CHANGED}" != "true" ]; then
+            echo "::notice::変更がどのフィルタにも一致しなかったため、全検証を実行します。"
+            echo "code=true" >> "${GITHUB_OUTPUT}"
+            echo "docs=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "code=${CODE_CHANGED}" >> "${GITHUB_OUTPUT}"
+            echo "docs=${DOCS_CHANGED}" >> "${GITHUB_OUTPUT}"
           fi
 
       - uses: ./.github/actions/setup-bun-workspace
@@ -88,16 +95,22 @@ jobs:
         if: steps.scope.outputs.docs == 'true'
         run: bun run lint:md
 
+      # 相対リンクはファイル名変更などで PR の変更が直接壊すため PR で見る。
+      # 外部 URL は応答待ちになるので対象外 (`scheduled-checks.yml` が担当)。
+      - name: Markdown Relative Link Check
+        if: steps.scope.outputs.docs == 'true'
+        run: bun run lint:md:links:relative
+
       - name: Type Check
         if: steps.scope.outputs.code == 'true'
         run: bun run typecheck
 
       # ルートの vitest を 1 プロセスで回すと、パッケージごとに vitest を起動し直すより速く、
       # かつ apps/web のように個別 CI ではテストされていなかったパッケージまで含められる。
-      # E2E と Worker runtime E2E も `bun run test` に含まれる。
+      # E2E と Worker runtime E2E はここでは実行しない (`e2e` ラベル付きの PR で `ci-e2e.yml` が担当)。
       - name: Run Tests
         if: steps.scope.outputs.code == 'true'
-        run: bun run test
+        run: bun run test:unit
 
       - name: Build Check
         if: steps.scope.outputs.code == 'true'

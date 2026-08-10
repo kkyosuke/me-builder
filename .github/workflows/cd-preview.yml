@@ -144,9 +144,11 @@ jobs:
           if bun --cwd apps/api scripts/register-webhook.ts; then
             exit 0
           fi
-          echo "LINE Webhook registration failed; retrying once in 5 seconds."
+          # 1 回目で URL は書き換わっているため、`--force` を付けないと 2 回目は
+          # 「登録済み」と判定して疎通確認をせずに成功してしまう。
+          echo "LINE Webhook registration failed; retrying once with --force in 5 seconds."
           sleep 5
-          bun --cwd apps/api scripts/register-webhook.ts
+          bun --cwd apps/api scripts/register-webhook.ts --force
 
       # デプロイ済みの URL を LIFF アプリのエンドポイント URL へ反映する
       - name: Register LIFF Endpoint (Preview)

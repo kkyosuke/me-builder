@@ -1,0 +1,41 @@
+name: CI / E2E
+
+# E2E は実行時間の大半を占めるため、通常の CI (`ci.yml`) からは外して `e2e` ラベルで明示的に呼ぶ。
+# ラベルが無い PR では job ごと skip され、GitHub Actions の課金対象にならない。
+# `main` へマージする直前の検証としては `cd-production.yml` の `bun run ci` が E2E を含めて実行する。
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - labeled
+      - synchronize
+      - reopened
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-e2e-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    name: End-to-End Tests
+    # 手動実行は無条件。PR 起因の場合は `e2e` ラベルが付いているときだけ。
+    # `synchronize` でも同じ条件を見るため、ラベルを剥がせば以降の push では実行されない。
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.pull_request.labels.*.name, 'e2e')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-bun-workspace
+
+      # `ci.yml` が実行しない E2E と Worker runtime E2E だけを走らせる (検証の重複を作らない)。
+      - name: Run E2E Tests
+        run: bun run test:e2e
