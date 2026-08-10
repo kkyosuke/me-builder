@@ -5,7 +5,7 @@ export interface GeminiConfig {
   googleVertexAiApiKey: string;
 }
 
-export interface GeminiUsage {
+interface GeminiUsage {
   responseId: string;
   model: string;
   promptTokenCount: number;
