@@ -1,4 +1,4 @@
-import { logger } from "@me-builder/shared";
+import { describeHttpResult, logger, toSafeOperationalErrorFields } from "@me-builder/shared";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { config, getMcpConfig } from "./config";
@@ -9,13 +9,23 @@ app.use("*", cors());
 
 // グローバルエラーハンドラー (未捕捉例外を logger.error で出力)
 app.onError((err, c) => {
+  // errをそのまま載せると、SDK例外が抱えるrequest/response bodyがlogへ流出しうる。
   logger.error(
     {
-      err,
+      event: "http.request.failed",
+      service: "mcp",
       method: c.req.method,
       path: c.req.path,
+      status: 500,
+      outcome: "failed",
+      ...toSafeOperationalErrorFields(err, {
+        code: "UNEXPECTED_MCP_ERROR",
+        category: "unknown",
+        stage: "http.handle",
+        retryable: false,
+      }),
     },
-    "Unhandled exception in MCP server",
+    `[MCP] ${c.req.method} ${c.req.path} -> 500 (unhandled exception)`,
   );
   return c.json({ error: "Internal Server Error" }, 500);
 });
@@ -24,13 +34,24 @@ app.onError((err, c) => {
 app.use("*", async (c, next) => {
   const start = Date.now();
   await next();
-  const ms = Date.now() - start;
-  logger.info({
-    method: c.req.method,
-    path: c.req.path,
-    status: c.res.status,
-    responseTimeMs: ms,
-  });
+  const responseTimeMs = Date.now() - start;
+  logger.info(
+    {
+      event: "http.request.completed",
+      service: "mcp",
+      method: c.req.method,
+      path: c.req.path,
+      status: c.res.status,
+      responseTimeMs,
+    },
+    describeHttpResult({
+      service: "MCP",
+      method: c.req.method,
+      path: c.req.path,
+      status: c.res.status,
+      durationMs: responseTimeMs,
+    }),
+  );
 });
 
 // MCP サーバーヘルスチェック

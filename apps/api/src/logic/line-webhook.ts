@@ -90,7 +90,9 @@ export async function receiveLineWebhook({
 }: ReceiveLineWebhookParams): Promise<LineWebhookOutcome> {
   // 未設定の場合は環境を問わず検証をスキップせず拒否する
   if (!channelSecret) {
-    logger.error("LINE_CHANNEL_SECRET is not configured, rejecting LINE webhook request");
+    logger.error(
+      "[LINE webhook] rejected at signature.verify -> 500 (LINE_CHANNEL_SECRET is not configured)",
+    );
     return { type: "secret-not-configured" };
   }
 
@@ -98,7 +100,7 @@ export async function receiveLineWebhook({
     // 署名値・チャネルシークレットそのものはログに残さない
     logger.warn(
       { hasSignatureHeader: Boolean(signature), bodyLength: rawBody.length },
-      "Rejected LINE webhook request with missing or invalid x-line-signature",
+      "[LINE webhook] rejected at signature.verify -> 401 (missing or invalid x-line-signature)",
     );
     return { type: "invalid-signature" };
   }
@@ -109,7 +111,7 @@ export async function receiveLineWebhook({
   } catch {
     logger.warn(
       { bodyLength: rawBody.length },
-      "Received LINE webhook request with a non-JSON body",
+      "[LINE webhook] received a non-JSON body at payload.parse; continuing with an empty payload",
     );
   }
 
@@ -139,7 +141,7 @@ export async function receiveLineWebhook({
             // userIdは本人識別子なのでログへ含めない。ローディング失敗でも本処理は継続する。
             logger.warn(
               { errorName: error instanceof Error ? error.name : "UnknownError" },
-              "Failed to start LINE chat loading animation",
+              "[LINE webhook] could not start the chat loading animation; webhook processing continues",
             );
           }
         }),
@@ -159,7 +161,7 @@ export async function receiveLineWebhook({
         source: event.source,
         messageCount: messages.length,
       },
-      "WEBHOOK_QUEUE binding not configured, skipping queue push",
+      "[LINE webhook] degraded at queue.send -> not-queued (WEBHOOK_QUEUE binding is not configured)",
     );
     return { type: "accepted", id: event.id, queued: false };
   }
@@ -185,7 +187,7 @@ export async function receiveLineWebhook({
           dependency: "cloudflare-queue",
         }),
       },
-      "Webhook event could not be queued",
+      "[LINE webhook] failed at queue.send -> http-error (WEBHOOK_QUEUE_SEND_FAILED, category:dependency, via:cloudflare-queue)",
     );
     throw error;
   }
@@ -200,7 +202,7 @@ export async function receiveLineWebhook({
       source: event.source,
       messageCount: messages.length,
     },
-    "Webhook event queued to WEBHOOK_QUEUE",
+    "[LINE webhook] succeeded at queue.send -> queued (handed off to the Worker with the same traceId)",
   );
 
   return { type: "accepted", id: event.id, queued: true };

@@ -1,4 +1,4 @@
-import { logger } from "@me-builder/shared";
+import { describeHttpResult, logger, toSafeOperationalErrorFields } from "@me-builder/shared";
 import { Hono } from "hono";
 import { openAPIRouteHandler } from "hono-openapi";
 import { cors } from "hono/cors";
@@ -35,13 +35,23 @@ const app = new Hono<AppEnv>();
 app.use("*", cors());
 
 app.onError((err, c) => {
+  // errをそのまま載せると、SDK例外が抱えるrequest/response bodyがlogへ流出しうる。
   logger.error(
     {
-      err,
+      event: "http.request.failed",
+      service: "api",
       method: c.req.method,
       path: c.req.path,
+      status: 500,
+      outcome: "failed",
+      ...toSafeOperationalErrorFields(err, {
+        code: "UNEXPECTED_API_ERROR",
+        category: "unknown",
+        stage: "http.handle",
+        retryable: false,
+      }),
     },
-    "Unhandled exception in API server",
+    `[API] ${c.req.method} ${c.req.path} -> 500 (unhandled exception)`,
   );
   return c.json(v.parse(InternalServerErrorSchema, { error: "Internal Server Error" }), 500);
 });
@@ -49,13 +59,24 @@ app.onError((err, c) => {
 app.use("*", async (c, next) => {
   const start = Date.now();
   await next();
-  const ms = Date.now() - start;
-  logger.info({
-    method: c.req.method,
-    path: c.req.path,
-    status: c.res.status,
-    responseTimeMs: ms,
-  });
+  const responseTimeMs = Date.now() - start;
+  logger.info(
+    {
+      event: "http.request.completed",
+      service: "api",
+      method: c.req.method,
+      path: c.req.path,
+      status: c.res.status,
+      responseTimeMs,
+    },
+    describeHttpResult({
+      service: "API",
+      method: c.req.method,
+      path: c.req.path,
+      status: c.res.status,
+      durationMs: responseTimeMs,
+    }),
+  );
 });
 
 app.get("/api/health", (c) => {

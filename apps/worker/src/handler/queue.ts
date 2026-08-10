@@ -36,7 +36,7 @@ export async function queueHandler(
           retryable: true,
         }),
       },
-      "Queue batch configuration failed",
+      `[Queue dispatch] failed at worker.configure -> platform-retry (queue ${batch.queue}, WORKER_CONFIGURATION_FAILED)`,
     );
     throw error;
   }

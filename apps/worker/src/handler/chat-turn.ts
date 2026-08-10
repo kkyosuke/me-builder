@@ -7,8 +7,11 @@ import {
   type Message,
   OperationalError,
   type OperationalErrorDescriptor,
+  type OperationalOutcome,
   type TurnDeliveryResult,
+  describeQueueMessageResult,
   logger,
+  operationalLogLevel,
   toOperationalError,
   toSafeOperationalErrorFields,
 } from "@me-builder/shared";
@@ -26,10 +29,9 @@ const MAX_BUSY_ATTEMPTS = 5;
 /** 先行Turnのlease(90秒)を待てるだけの間隔にする。2秒刻みではlease中に使い切ってしまう。 */
 const BUSY_RETRY_DELAY_SECONDS = 20;
 
-type TerminalOutcome = "succeeded" | "degraded" | "discarded" | "deferred" | "failed";
 type TerminalDisposition = "ack" | "retry" | "dead-letter";
 type TerminalDetails = {
-  outcome: TerminalOutcome;
+  outcome: OperationalOutcome;
   disposition: TerminalDisposition;
   stage: string;
   resultCode?: string;
@@ -57,6 +59,15 @@ function logTerminal(
   traceFields: ReturnType<typeof createTraceFields>,
   details: TerminalDetails,
 ): void {
+  const durationMs = Date.now() - startedAt;
+  const safeError = details.error
+    ? toSafeOperationalErrorFields(details.error, {
+        code: "UNEXPECTED_CHAT_TURN_ERROR",
+        category: "unknown",
+        stage: details.stage,
+        retryable: true,
+      })
+    : undefined;
   const fields = {
     event:
       details.error || details.outcome === "failed"
@@ -73,23 +84,25 @@ function logTerminal(
     disposition: details.disposition,
     stage: details.stage,
     ...(details.resultCode ? { resultCode: details.resultCode } : {}),
-    ...(details.error
-      ? toSafeOperationalErrorFields(details.error, {
-          code: "UNEXPECTED_CHAT_TURN_ERROR",
-          category: "unknown",
-          stage: details.stage,
-          retryable: true,
-        })
-      : {}),
-    durationMs: Date.now() - startedAt,
+    ...(safeError ?? {}),
+    durationMs,
   };
-  if (details.error || details.outcome === "failed") {
-    logger.error(fields, "Chat turn queue message failed");
-  } else if (details.outcome === "succeeded") {
-    logger.info(fields, "Chat turn queue message completed");
-  } else {
-    logger.warn(fields, "Chat turn queue message completed with a non-success outcome");
-  }
+  const description = describeQueueMessageResult({
+    flow: "chat-turn",
+    outcome: details.outcome,
+    disposition: details.disposition,
+    // 例外があるときは、結果を確定させた工程ではなく失敗した工程をfieldsと揃えて示す。
+    stage: safeError?.stage ?? details.stage,
+    attempt: message.attempts,
+    maxAttempts: CHAT_TURN_MAX_ATTEMPTS,
+    durationMs,
+    resultCode: details.resultCode,
+    error: safeError,
+  });
+  const level = operationalLogLevel(details.outcome, Boolean(details.error));
+  if (level === "error") logger.error(fields, description);
+  else if (level === "info") logger.info(fields, description);
+  else logger.warn(fields, description);
 }
 
 async function atBoundary<T>(
