@@ -4,14 +4,27 @@ import { getProfileSummary } from "./profile-summary";
 
 const db = {} as d1.Client;
 const accountData = {} as AccountDataNamespace;
-const summary = {
-  generatedAt: "2026-08-08T12:00:00.000Z",
-  headline: "まとめ",
-  insights: [],
-  recordCount: 0,
-  diagnosisCount: 0,
-  diaryCount: 0,
-  latestRecordedAt: null,
+const readModel = {
+  versions: [
+    {
+      id: "version-1",
+      sequence: 1,
+      generatedAt: "2026-08-08T12:00:00.000Z",
+      isLatest: true,
+      generationMethod: "ai",
+      summary: {
+        generatedAt: "2026-08-08T12:00:00.000Z",
+        headline: "まとめ",
+        insights: [],
+        recordCount: 0,
+        diagnosisCount: 0,
+        diaryCount: 0,
+        latestRecordedAt: null,
+      },
+    },
+  ],
+  availableDataCounts: { diagnosis: 2, diary: 4 },
+  generation: { status: "idle", canRegenerate: false, reasons: [], message: null },
 } as const;
 
 function dependencies(diagnoses: unknown[]) {
@@ -22,7 +35,7 @@ function dependencies(diagnoses: unknown[]) {
     }),
     listVisibleDiagnoses: vi.fn().mockResolvedValue(diagnoses),
     hasActiveSourceRecords: vi.fn().mockResolvedValue(true),
-    summary,
+    readModel,
   };
 }
 
@@ -66,7 +79,28 @@ describe("getProfileSummary", () => {
       deps as never,
     );
 
-    expect(result).toMatchObject({ type: "resolved", summary: null });
+    expect(result).toMatchObject({
+      type: "resolved",
+      versions: [],
+      availableDataCounts: { diagnosis: 0, diary: 0 },
+      generation: { status: "idle", canRegenerate: false, reasons: [], message: null },
+    });
+  });
+
+  it("ダミーの保存済み版、現在件数、生成状態を返す", async () => {
+    const deps = dependencies([]);
+
+    const result = await getProfileSummary(
+      { idToken: "token", lineLoginChannelId: "channel", db, accountData },
+      deps as never,
+    );
+
+    expect(result).toMatchObject({
+      type: "resolved",
+      versions: [{ id: "version-1", isLatest: true }],
+      availableDataCounts: { diagnosis: 2, diary: 4 },
+      generation: { status: "idle", canRegenerate: false, reasons: [], message: null },
+    });
   });
 
   it("本人を解決できなければ診断進捗を取得しない", async () => {

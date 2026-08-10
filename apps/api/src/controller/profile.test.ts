@@ -28,14 +28,21 @@ describe("GET /api/profile-summary", () => {
   it("生成済みのまとめと次の行動を返す", async () => {
     outcome({
       type: "resolved",
-      summary: null,
+      versions: [],
+      availableDataCounts: { diagnosis: 0, diary: 0 },
+      generation: { status: "idle", canRegenerate: false, reasons: [], message: null },
       nextAction: "diagnosis",
     });
 
     const response = await request();
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ summary: null, nextAction: "diagnosis" });
+    expect(await response.json()).toEqual({
+      versions: [],
+      availableDataCounts: { diagnosis: 0, diary: 0 },
+      generation: { status: "idle", canRegenerate: false, reasons: [], message: null },
+      nextAction: "diagnosis",
+    });
     expect(getProfileSummary).toHaveBeenCalledWith(
       expect.objectContaining({ idToken: "dummy.id.token", lineLoginChannelId: "2010850319" }),
     );

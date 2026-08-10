@@ -21,6 +21,13 @@ export type ProfileSummaryResult = Readonly<{
   nextAction: "diagnosis" | "chat";
 }>;
 
+export type ProfileSummaryReadResult = ProfileSummaryResult &
+  Readonly<{
+    versions: readonly ProfileSummaryVersion[];
+    availableDataCounts: Readonly<{ diagnosis: number; diary: number }>;
+    generation: ProfileSummaryGenerationState;
+  }>;
+
 type ProfileSummaryVersionOption = Readonly<{
   id: string;
   sequence: number | null;
@@ -29,9 +36,12 @@ type ProfileSummaryVersionOption = Readonly<{
   generationMethod: "ai" | "deterministic";
 }>;
 
+export type ProfileSummaryVersion = ProfileSummaryVersionOption &
+  Readonly<{ summary: ProfileSummary }>;
+
 export type ProfileSummaryRegenerationReason = "diagnosis" | "brain" | "elapsed";
 
-type ProfileSummaryGenerationState = Readonly<{
+export type ProfileSummaryGenerationState = Readonly<{
   status: "idle" | "queued" | "generating" | "failed";
   canRegenerate: boolean;
   reasons: readonly ProfileSummaryRegenerationReason[];

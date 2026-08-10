@@ -33,7 +33,9 @@ export async function getProfileSummaryContents(c: Context<AppEnv>): Promise<Res
     case "resolved":
       return c.json(
         v.parse(ProfileSummaryResponseSchema, {
-          summary: outcome.summary,
+          versions: outcome.versions,
+          availableDataCounts: outcome.availableDataCounts,
+          generation: outcome.generation,
           nextAction: outcome.nextAction,
         }),
       );

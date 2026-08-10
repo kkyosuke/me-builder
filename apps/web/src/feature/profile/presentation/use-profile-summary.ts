@@ -2,14 +2,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { config } from "../../../config";
 import type { AsyncState } from "../../../model/async-state";
 import { fetchProfileSummary } from "../infrastructure/profile-api";
-import type { ProfileSummaryResult } from "../model/profile-summary";
+import type { ProfileSummaryReadResult } from "../model/profile-summary";
 
 export function useProfileSummary({
   acquireIdToken,
 }: {
   acquireIdToken: (signal: AbortSignal) => Promise<string | null>;
 }) {
-  const [state, setState] = useState<AsyncState<ProfileSummaryResult>>({ status: "loading" });
+  const [state, setState] = useState<AsyncState<ProfileSummaryReadResult>>({ status: "loading" });
   const mounted = useRef(false);
   const loading = useRef(false);
   const request = useRef<AbortController | null>(null);

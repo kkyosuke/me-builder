@@ -23,8 +23,29 @@ const ProfileSummarySchema = v.object({
   latestRecordedAt: v.nullable(v.pipe(v.string(), v.isoTimestamp())),
 });
 
+const ProfileSummaryVersionSchema = v.object({
+  id: NonEmptyStringSchema,
+  sequence: v.nullable(v.pipe(CountSchema, v.minValue(1))),
+  generatedAt: v.pipe(v.string(), v.isoTimestamp()),
+  isLatest: v.boolean(),
+  generationMethod: v.picklist(["ai", "deterministic"]),
+  summary: ProfileSummarySchema,
+});
+
+const ProfileSummaryGenerationSchema = v.object({
+  status: v.picklist(["idle", "queued", "generating", "failed"]),
+  canRegenerate: v.boolean(),
+  reasons: v.array(v.picklist(["diagnosis", "brain", "elapsed"])),
+  message: v.nullable(NonEmptyStringSchema),
+});
+
 export const ProfileSummaryResponseSchema = v.object({
-  summary: v.nullable(ProfileSummarySchema),
+  versions: v.array(ProfileSummaryVersionSchema),
+  availableDataCounts: v.object({
+    diagnosis: CountSchema,
+    diary: CountSchema,
+  }),
+  generation: ProfileSummaryGenerationSchema,
   nextAction: v.picklist(["diagnosis", "chat"]),
 });
 
@@ -34,7 +55,10 @@ export const profileSummaryRoute = describeRoute({
   summary: "本人の記録から生成したまとめを取得する",
   security: [{ liffIdToken: [] }],
   responses: {
-    200: jsonResponse("本人向けのまとめと、次にできること", ProfileSummaryResponseSchema),
+    200: jsonResponse(
+      "本人向けの保存済みまとめ版、現在使えるデータ件数、生成状態と次にできること",
+      ProfileSummaryResponseSchema,
+    ),
     ...authenticatedErrors,
   },
 } satisfies DescribeRouteOptions);
