@@ -1,12 +1,12 @@
 import path from "node:path";
-import type {
-  AccountDataArgs,
-  AccountDataNamespace,
-  AccountDataOperation,
-  AccountDataResult,
-  accountData,
+import {
+  type AccountDataArgs,
+  type AccountDataNamespace,
+  type AccountDataOperation,
+  type AccountDataResult,
+  D1,
+  DO,
 } from "@me-builder/lib";
-import { accountDataSchema, sharedD1 } from "@me-builder/lib";
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
@@ -16,14 +16,14 @@ import { diaryActions } from "../account-data/diary";
 
 const actions = { ...brainActions, ...diagnosisActions, ...diaryActions } as const;
 
-const MIGRATIONS_FOLDER = path.resolve(__dirname, "../../../../packages/lib/drizzle-account-data");
+const MIGRATIONS_FOLDER = path.resolve(__dirname, "../../../../packages/lib/drizzle-do-account");
 
 export type AccountDataTestStore = Readonly<{
   namespace: AccountDataNamespace;
   /** Account所有tableへ直接assertするためのdatabase。 */
-  db: accountData.Database;
+  db: DO.account.Database;
   /** DOと同じく、共有D1の公開定義をsnapshotとして取り込む。 */
-  syncCatalogFrom(shared: sharedD1.Client): Promise<void>;
+  syncCatalogFrom(shared: D1.shared.Client): Promise<void>;
   /** 生SQLでAccount所有tableを読み書きするfixture・assert用。 */
   raw: Database.Database;
   /** RPCより前にfixtureを入れる場合に、ObjectへAccountを固定する。 */
@@ -38,7 +38,7 @@ export type AccountDataTestStore = Readonly<{
 export function createAccountDataTestStore(): AccountDataTestStore {
   const sqlite = new Database(":memory:");
   sqlite.pragma("foreign_keys = ON");
-  const drizzleDb = drizzle(sqlite, { schema: accountDataSchema });
+  const drizzleDb = drizzle(sqlite, { schema: DO.account.schema });
   Object.assign(drizzleDb, {
     batch: async (queries: readonly PromiseLike<unknown>[]) => {
       const results = [];
@@ -47,7 +47,7 @@ export function createAccountDataTestStore(): AccountDataTestStore {
     },
   });
   migrate(drizzleDb, { migrationsFolder: MIGRATIONS_FOLDER });
-  const db = drizzleDb as unknown as accountData.Database;
+  const db = drizzleDb as unknown as DO.account.Database;
 
   let boundAccountId: string | undefined;
   const bindAccount = (accountId: string) => {
@@ -59,7 +59,7 @@ export function createAccountDataTestStore(): AccountDataTestStore {
     boundAccountId = accountId;
   };
 
-  const syncCatalogFrom = async (shared: sharedD1.Client) => {
+  const syncCatalogFrom = async (shared: D1.shared.Client) => {
     const [
       questions,
       questionVersions,
@@ -68,23 +68,23 @@ export function createAccountDataTestStore(): AccountDataTestStore {
       diagnoses,
       diagnosisQuestions,
     ] = await Promise.all([
-      shared.select().from(sharedD1.schema.questions),
-      shared.select().from(sharedD1.schema.questionVersions),
-      shared.select().from(sharedD1.schema.questionChoices),
-      shared.select().from(sharedD1.schema.diagnosisScoringConfigs),
-      shared.select().from(sharedD1.schema.diagnoses),
-      shared.select().from(sharedD1.schema.diagnosisQuestions),
+      shared.select().from(D1.shared.schema.questions),
+      shared.select().from(D1.shared.schema.questionVersions),
+      shared.select().from(D1.shared.schema.questionChoices),
+      shared.select().from(D1.shared.schema.diagnosisScoringConfigs),
+      shared.select().from(D1.shared.schema.diagnoses),
+      shared.select().from(D1.shared.schema.diagnosisQuestions),
     ]);
-    if (questions.length > 0) await db.insert(accountDataSchema.questions).values(questions);
+    if (questions.length > 0) await db.insert(DO.account.schema.questions).values(questions);
     if (questionVersions.length > 0)
-      await db.insert(accountDataSchema.questionVersions).values(questionVersions);
+      await db.insert(DO.account.schema.questionVersions).values(questionVersions);
     if (questionChoices.length > 0)
-      await db.insert(accountDataSchema.questionChoices).values(questionChoices);
+      await db.insert(DO.account.schema.questionChoices).values(questionChoices);
     if (scoringConfigs.length > 0)
-      await db.insert(accountDataSchema.diagnosisScoringConfigs).values(scoringConfigs);
-    if (diagnoses.length > 0) await db.insert(accountDataSchema.diagnoses).values(diagnoses);
+      await db.insert(DO.account.schema.diagnosisScoringConfigs).values(scoringConfigs);
+    if (diagnoses.length > 0) await db.insert(DO.account.schema.diagnoses).values(diagnoses);
     if (diagnosisQuestions.length > 0)
-      await db.insert(accountDataSchema.diagnosisQuestions).values(diagnosisQuestions);
+      await db.insert(DO.account.schema.diagnosisQuestions).values(diagnosisQuestions);
   };
 
   return {

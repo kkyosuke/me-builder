@@ -1,7 +1,7 @@
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import type { D1Database } from "@cloudflare/workers-types";
-import { accountData, line, sharedD1 } from "@me-builder/lib";
+import { D1, DO, line } from "@me-builder/lib";
 import {
   type ChatTurnQueueMessage,
   type Message,
@@ -44,7 +44,7 @@ const workerConfig = getWorkerConfig({
 
 let miniflare: Miniflare;
 let database: D1Database;
-let client: sharedD1.Client;
+let client: D1.shared.Client;
 let accountDataStore: AccountDataTestStore;
 let mockPushMessage: ReturnType<typeof vi.fn>;
 let mockReplyMessage: ReturnType<typeof vi.fn>;
@@ -139,7 +139,7 @@ function createQueueMessage(
 }
 
 async function turnStatus(turnId: string): Promise<string | undefined> {
-  const turns = await accountDataStore.db.select().from(accountData.schema.chatTurns);
+  const turns = await accountDataStore.db.select().from(DO.account.schema.chatTurns);
   return turns.find((turn) => turn.id === turnId)?.status;
 }
 
@@ -305,7 +305,7 @@ describe("LINE diary chat delivery E2E", () => {
     });
     database = (await miniflare.getD1Database("DB")) as D1Database;
     await applyMigrations(database);
-    client = sharedD1.client.create(database);
+    client = D1.shared.client.create(database);
     accountDataStore = createAccountDataTestStore();
     mockGenerateContent.mockReset().mockResolvedValue({
       text: JSON.stringify({
@@ -364,7 +364,7 @@ describe("LINE diary chat delivery E2E", () => {
       expect.objectContaining({ role: "user", body: diaryText }),
     ]);
 
-    const turns = await accountDataStore.db.select().from(accountData.schema.chatTurns);
+    const turns = await accountDataStore.db.select().from(DO.account.schema.chatTurns);
     expect(turns).toEqual([
       expect.objectContaining({
         id: queuedTurn.turnId,
@@ -374,14 +374,14 @@ describe("LINE diary chat delivery E2E", () => {
     ]);
     const messages = await accountDataStore.db
       .select()
-      .from(accountData.schema.conversationMessages);
+      .from(DO.account.schema.conversationMessages);
     expect(messages).toEqual([
       expect.objectContaining({ role: "user", assistantBody: null }),
       expect.objectContaining({ role: "assistant", assistantBody: generatedReply }),
     ]);
-    expect(await accountDataStore.db.select().from(accountData.schema.brainItems)).toEqual([]);
+    expect(await accountDataStore.db.select().from(DO.account.schema.brainItems)).toEqual([]);
     expect(
-      await accountDataStore.db.select().from(accountData.schema.diaryBrainCheckpoints),
+      await accountDataStore.db.select().from(DO.account.schema.diaryBrainCheckpoints),
     ).toEqual([
       expect.objectContaining({ status: "pending", fromSequence: 1, throughSequence: 1 }),
     ]);
@@ -422,7 +422,7 @@ describe("LINE diary chat delivery E2E", () => {
     expect(mockPushMessage).not.toHaveBeenCalled();
     expect(JSON.stringify(queuedTurn)).not.toContain("reply-token-1");
     expect(JSON.stringify(queuedTurn)).not.toContain(providerAccountId);
-    const turns = await accountDataStore.db.select().from(accountData.schema.chatTurns);
+    const turns = await accountDataStore.db.select().from(DO.account.schema.chatTurns);
     expect(turns).toEqual([
       expect.objectContaining({ id: queuedTurn.turnId, status: "delivered" }),
     ]);
@@ -441,7 +441,7 @@ describe("LINE diary chat delivery E2E", () => {
     expect(mockReplyMessage).toHaveBeenCalledOnce();
     expect(mockPushMessage).toHaveBeenCalledOnce();
     expect(mockPushMessage.mock.calls[0]?.[0]?.to).toBe(providerAccountId);
-    const turns = await accountDataStore.db.select().from(accountData.schema.chatTurns);
+    const turns = await accountDataStore.db.select().from(DO.account.schema.chatTurns);
     expect(turns).toEqual([
       expect.objectContaining({ id: queuedTurn.turnId, status: "delivered" }),
     ]);
@@ -527,10 +527,10 @@ describe("LINE diary chat delivery E2E", () => {
 
     expect(JSON.stringify(queuedTurn)).not.toContain(replyToken);
     const dump = JSON.stringify([
-      await accountDataStore.db.select().from(accountData.schema.chatTurns),
-      await accountDataStore.db.select().from(accountData.schema.conversationMessages),
-      await accountDataStore.db.select().from(accountData.schema.conversationSessions),
-      await accountDataStore.db.select().from(accountData.schema.sourceRecordTextPayloads),
+      await accountDataStore.db.select().from(DO.account.schema.chatTurns),
+      await accountDataStore.db.select().from(DO.account.schema.conversationMessages),
+      await accountDataStore.db.select().from(DO.account.schema.conversationSessions),
+      await accountDataStore.db.select().from(DO.account.schema.sourceRecordTextPayloads),
     ]);
     expect(dump).not.toContain(replyToken);
   });
@@ -563,7 +563,7 @@ describe("LINE diary chat delivery E2E", () => {
 
     expect(message.ack).toHaveBeenCalledOnce();
     expect(message.retry).not.toHaveBeenCalled();
-    await expect(accountDataStore.db.select().from(accountData.schema.chatTurns)).resolves.toEqual([
+    await expect(accountDataStore.db.select().from(DO.account.schema.chatTurns)).resolves.toEqual([
       expect.objectContaining({ status: "delivered" }),
     ]);
   });
@@ -582,7 +582,7 @@ describe("LINE diary chat delivery E2E", () => {
     expect(message.ack).not.toHaveBeenCalled();
     const messages = await accountDataStore.db
       .select()
-      .from(accountData.schema.conversationMessages);
+      .from(DO.account.schema.conversationMessages);
     expect(messages).toEqual([expect.objectContaining({ role: "user", assistantBody: null })]);
     expect(mockPushMessage).not.toHaveBeenCalled();
   });
@@ -590,7 +590,7 @@ describe("LINE diary chat delivery E2E", () => {
   it("生成中にSessionが閉じていれば生成も最終配送も行わない", async () => {
     const { bindings, queuedTurn } = await ingestDiary("今日は区切りをつけたい", "closed-session");
     await accountDataStore.db
-      .update(accountData.schema.conversationSessions)
+      .update(DO.account.schema.conversationSessions)
       .set({ status: "closed", closedAt: new Date(), closeReason: "inactive" });
     const message = createQueueMessage(queuedTurn);
 
@@ -599,7 +599,7 @@ describe("LINE diary chat delivery E2E", () => {
     expect(message.ack).toHaveBeenCalledOnce();
     expect(mockGenerateContent).not.toHaveBeenCalled();
     expect(mockPushMessage).not.toHaveBeenCalled();
-    await expect(accountDataStore.db.select().from(accountData.schema.chatTurns)).resolves.toEqual([
+    await expect(accountDataStore.db.select().from(DO.account.schema.chatTurns)).resolves.toEqual([
       expect.objectContaining({ status: "failed", failureStage: "closed_session" }),
     ]);
   });
@@ -616,7 +616,7 @@ describe("LINE diary chat delivery E2E", () => {
 
     expect(message.ack).toHaveBeenCalledOnce();
     expect(message.retry).not.toHaveBeenCalled();
-    await expect(accountDataStore.db.select().from(accountData.schema.chatTurns)).resolves.toEqual([
+    await expect(accountDataStore.db.select().from(DO.account.schema.chatTurns)).resolves.toEqual([
       expect.objectContaining({ status: "failed", failureStage: "generation_or_delivery" }),
     ]);
     expect(mockPushMessage.mock.calls[0]?.[0]).toEqual(

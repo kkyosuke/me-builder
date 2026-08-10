@@ -1,7 +1,7 @@
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import type { D1Database } from "@cloudflare/workers-types";
-import { sharedD1 } from "@me-builder/lib";
+import { D1 } from "@me-builder/lib";
 import { Miniflare } from "miniflare";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { app } from "../index";
@@ -174,7 +174,7 @@ describe("GET /api/diagnoses local D1 E2E", () => {
     database = (await miniflare.getD1Database("DB")) as D1Database;
     await prepareDatabase(database);
     accountDataStore = createAccountDataTestStore();
-    await accountDataStore.syncCatalogFrom(sharedD1.client.create(database));
+    await accountDataStore.syncCatalogFrom(D1.shared.client.create(database));
     mockLineVerification();
   });
 
@@ -274,7 +274,7 @@ describe("GET /api/diagnoses/:diagnosisId local D1 E2E", () => {
     database = (await miniflare.getD1Database("DB")) as D1Database;
     await prepareDatabase(database);
     accountDataStore = createAccountDataTestStore();
-    await accountDataStore.syncCatalogFrom(sharedD1.client.create(database));
+    await accountDataStore.syncCatalogFrom(D1.shared.client.create(database));
     mockLineVerification();
   });
 

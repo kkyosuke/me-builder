@@ -1,4 +1,4 @@
-import { accountDataFor, sharedD1 } from "@me-builder/lib";
+import { D1, accountDataFor } from "@me-builder/lib";
 import type {
   DiaryBrainCheckpointQueueMessage,
   Message,
@@ -170,7 +170,7 @@ async function sendDevelopmentNotification(
     workerConfig.lineChannelAccessToken &&
     workerConfig.chatDeliverySecret
   ) {
-    const providerAccountId = await sharedD1.action.account.findLineIdentityByAccountId(
+    const providerAccountId = await D1.shared.action.account.findLineIdentityByAccountId(
       cf.d1,
       accountId,
     );

@@ -5,5 +5,5 @@ export default defineConfig({
   dialect: "sqlite",
   driver: "durable-sqlite",
   schema: "./src/account-data/drizzle-schema.ts",
-  out: "../../packages/lib/drizzle-account-data",
+  out: "../../packages/lib/drizzle-do-account",
 });

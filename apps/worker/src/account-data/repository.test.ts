@@ -1,4 +1,4 @@
-import { accountData } from "@me-builder/lib";
+import { DO } from "@me-builder/lib";
 import Database from "better-sqlite3";
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
@@ -77,22 +77,20 @@ describe("AccountDataRepository", () => {
     first.bindAccount("account-1");
     second.bindAccount("account-2");
 
-    const source = await accountData.action.diary.storeLineTextSource(first.client, {
+    const source = await DO.account.action.diary.storeLineTextSource(first.client, {
       accountId: "account-1",
       eventId: "event-1",
       body: "private diary",
       receivedAt: new Date("2026-08-08T00:00:00.000Z"),
     });
 
-    expect(await second.client.select().from(accountData.schema.sourceRecords).all()).toEqual([]);
+    expect(await second.client.select().from(DO.account.schema.sourceRecords).all()).toEqual([]);
     expect(
       await second.client
         .select()
-        .from(accountData.schema.sourceRecordTextPayloads)
+        .from(DO.account.schema.sourceRecordTextPayloads)
         // IDを知っていても別Objectには行そのものがない。
-        .where(
-          eq(accountData.schema.sourceRecordTextPayloads.sourceRecordId, source.sourceRecordId),
-        )
+        .where(eq(DO.account.schema.sourceRecordTextPayloads.sourceRecordId, source.sourceRecordId))
         .get(),
     ).toBeUndefined();
   });
@@ -292,7 +290,7 @@ describe("AccountDataRepository", () => {
       ],
     });
 
-    const saved = await accountData.action.diagnosis.saveDiagnosisAnswer(repository.client, {
+    const saved = await DO.account.action.diagnosis.saveDiagnosisAnswer(repository.client, {
       accountId: "account-1",
       diagnosisId: "diagnosis-1",
       diagnosisQuestionId: "diagnosis-question-1",
@@ -302,12 +300,12 @@ describe("AccountDataRepository", () => {
 
     expect(saved).toMatchObject({ type: "saved", progress: { responseStatus: "answered" } });
     expect(
-      await repository.client.select().from(accountData.schema.sourceRecords).all(),
+      await repository.client.select().from(DO.account.schema.sourceRecords).all(),
     ).toHaveLength(1);
     expect(
       await repository.client
         .select()
-        .from(accountData.schema.diagnosisBrainProjectionRequests)
+        .from(DO.account.schema.diagnosisBrainProjectionRequests)
         .all(),
     ).toHaveLength(1);
   });

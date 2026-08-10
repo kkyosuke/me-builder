@@ -2,42 +2,41 @@ import {
   type ActivateCompatibilityReferenceResult,
   type CompatibilityReference,
   type CompatibilityReferenceRole,
+  D1,
   DIAGNOSIS_CATALOG_ID,
+  DO,
   type ReleaseCompatibilityReservationResult,
   type ReserveCompatibilityReferenceResult,
-  accountData,
-  accountDataSchema,
-  sharedD1,
 } from "@me-builder/lib";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/durable-sqlite";
 import { migrate } from "drizzle-orm/durable-sqlite/migrator";
-import migrations from "../../../../packages/lib/drizzle-account-data/migrations.js";
+import migrations from "../../../../packages/lib/drizzle-do-account/migrations.js";
 
-const { accountDataIdentity, compatibilityReferences, catalogVersions } = accountData.schema;
+const { accountDataIdentity, compatibilityReferences, catalogVersions } = DO.account.schema;
 const SESSION_INACTIVITY_MS = 6 * 60 * 60 * 1000;
 const SESSION_HARD_CAP_MS = 24 * 60 * 60 * 1000;
 type ExecutableStatement = { all(): unknown };
 
 export type DiagnosisCatalogSnapshot = Readonly<{
   version: number;
-  questions: (typeof sharedD1.schema.questions.$inferSelect)[];
-  questionVersions: (typeof sharedD1.schema.questionVersions.$inferSelect)[];
-  questionChoices: (typeof sharedD1.schema.questionChoices.$inferSelect)[];
-  scoringConfigs: (typeof sharedD1.schema.diagnosisScoringConfigs.$inferSelect)[];
-  diagnoses: (typeof sharedD1.schema.diagnoses.$inferSelect)[];
-  diagnosisQuestions: (typeof sharedD1.schema.diagnosisQuestions.$inferSelect)[];
+  questions: (typeof D1.shared.schema.questions.$inferSelect)[];
+  questionVersions: (typeof D1.shared.schema.questionVersions.$inferSelect)[];
+  questionChoices: (typeof D1.shared.schema.questionChoices.$inferSelect)[];
+  scoringConfigs: (typeof D1.shared.schema.diagnosisScoringConfigs.$inferSelect)[];
+  diagnoses: (typeof D1.shared.schema.diagnoses.$inferSelect)[];
+  diagnosisQuestions: (typeof D1.shared.schema.diagnosisQuestions.$inferSelect)[];
 }>;
 
 /** AccountDataのprivate SQLiteを所有し、domain actionへdatabaseだけを渡す。 */
 export class AccountDataRepository {
   private readonly storage: DurableObjectStorage;
-  readonly client: accountData.Database;
+  readonly client: DO.account.Database;
 
   constructor(storage: DurableObjectStorage) {
     this.storage = storage;
-    const database = drizzle(storage, { schema: accountDataSchema });
-    this.client = database as unknown as accountData.Database;
+    const database = drizzle(storage, { schema: DO.account.schema });
+    this.client = database as unknown as DO.account.Database;
     Object.defineProperty(this.client, "batch", {
       configurable: false,
       value: async (statements: ExecutableStatement[]) =>
@@ -45,7 +44,7 @@ export class AccountDataRepository {
     });
   }
 
-  private get database(): accountData.Database {
+  private get database(): DO.account.Database {
     return this.client;
   }
 
@@ -81,19 +80,19 @@ export class AccountDataRepository {
     this.storage.transactionSync(() => {
       for (const row of snapshot.questions) {
         this.database
-          .insert(sharedD1.schema.questions)
+          .insert(D1.shared.schema.questions)
           .values(row)
-          .onConflictDoUpdate({ target: sharedD1.schema.questions.id, set: row })
+          .onConflictDoUpdate({ target: D1.shared.schema.questions.id, set: row })
           .run();
       }
       for (const row of snapshot.questionVersions) {
         this.database
-          .insert(sharedD1.schema.questionVersions)
+          .insert(D1.shared.schema.questionVersions)
           .values(row)
           .onConflictDoUpdate({
             target: [
-              sharedD1.schema.questionVersions.questionId,
-              sharedD1.schema.questionVersions.version,
+              D1.shared.schema.questionVersions.questionId,
+              D1.shared.schema.questionVersions.version,
             ],
             set: row,
           })
@@ -101,13 +100,13 @@ export class AccountDataRepository {
       }
       for (const row of snapshot.questionChoices) {
         this.database
-          .insert(sharedD1.schema.questionChoices)
+          .insert(D1.shared.schema.questionChoices)
           .values(row)
           .onConflictDoUpdate({
             target: [
-              sharedD1.schema.questionChoices.questionId,
-              sharedD1.schema.questionChoices.questionVersion,
-              sharedD1.schema.questionChoices.choiceId,
+              D1.shared.schema.questionChoices.questionId,
+              D1.shared.schema.questionChoices.questionVersion,
+              D1.shared.schema.questionChoices.choiceId,
             ],
             set: row,
           })
@@ -115,23 +114,23 @@ export class AccountDataRepository {
       }
       for (const row of snapshot.scoringConfigs) {
         this.database
-          .insert(sharedD1.schema.diagnosisScoringConfigs)
+          .insert(D1.shared.schema.diagnosisScoringConfigs)
           .values(row)
-          .onConflictDoUpdate({ target: sharedD1.schema.diagnosisScoringConfigs.id, set: row })
+          .onConflictDoUpdate({ target: D1.shared.schema.diagnosisScoringConfigs.id, set: row })
           .run();
       }
       for (const row of snapshot.diagnoses) {
         this.database
-          .insert(sharedD1.schema.diagnoses)
+          .insert(D1.shared.schema.diagnoses)
           .values(row)
-          .onConflictDoUpdate({ target: sharedD1.schema.diagnoses.id, set: row })
+          .onConflictDoUpdate({ target: D1.shared.schema.diagnoses.id, set: row })
           .run();
       }
       for (const row of snapshot.diagnosisQuestions) {
         this.database
-          .insert(sharedD1.schema.diagnosisQuestions)
+          .insert(D1.shared.schema.diagnosisQuestions)
           .values(row)
-          .onConflictDoUpdate({ target: sharedD1.schema.diagnosisQuestions.id, set: row })
+          .onConflictDoUpdate({ target: D1.shared.schema.diagnosisQuestions.id, set: row })
           .run();
       }
       const synced = { catalogId: DIAGNOSIS_CATALOG_ID, version: snapshot.version, updatedAt: at };
@@ -436,37 +435,34 @@ export class AccountDataRepository {
   nextMaintenanceAt(): number | null {
     const session = this.database
       .select({
-        startedAt: accountData.schema.conversationSessions.startedAt,
-        lastUserMessageAt: accountData.schema.conversationSessions.lastUserMessageAt,
+        startedAt: DO.account.schema.conversationSessions.startedAt,
+        lastUserMessageAt: DO.account.schema.conversationSessions.lastUserMessageAt,
       })
-      .from(accountData.schema.conversationSessions)
-      .where(eq(accountData.schema.conversationSessions.status, "active"))
+      .from(DO.account.schema.conversationSessions)
+      .where(eq(DO.account.schema.conversationSessions.status, "active"))
       .get();
     const projection = this.database
-      .select({ nextAttemptAt: accountData.schema.diagnosisBrainProjectionRequests.nextAttemptAt })
-      .from(accountData.schema.diagnosisBrainProjectionRequests)
+      .select({ nextAttemptAt: DO.account.schema.diagnosisBrainProjectionRequests.nextAttemptAt })
+      .from(DO.account.schema.diagnosisBrainProjectionRequests)
       .where(
         and(
-          inArray(accountData.schema.diagnosisBrainProjectionRequests.status, [
-            "pending",
-            "failed",
-          ]),
-          eq(accountData.schema.diagnosisBrainProjectionRequests.isDeleted, false),
+          inArray(DO.account.schema.diagnosisBrainProjectionRequests.status, ["pending", "failed"]),
+          eq(DO.account.schema.diagnosisBrainProjectionRequests.isDeleted, false),
         ),
       )
-      .orderBy(asc(accountData.schema.diagnosisBrainProjectionRequests.nextAttemptAt))
+      .orderBy(asc(DO.account.schema.diagnosisBrainProjectionRequests.nextAttemptAt))
       .limit(1)
       .get();
     const diaryBrainCheckpoint = this.database
-      .select({ nextAttemptAt: accountData.schema.diaryBrainCheckpoints.nextAttemptAt })
-      .from(accountData.schema.diaryBrainCheckpoints)
+      .select({ nextAttemptAt: DO.account.schema.diaryBrainCheckpoints.nextAttemptAt })
+      .from(DO.account.schema.diaryBrainCheckpoints)
       .where(
         and(
-          inArray(accountData.schema.diaryBrainCheckpoints.status, ["pending", "queued"]),
-          eq(accountData.schema.diaryBrainCheckpoints.isDeleted, false),
+          inArray(DO.account.schema.diaryBrainCheckpoints.status, ["pending", "queued"]),
+          eq(DO.account.schema.diaryBrainCheckpoints.isDeleted, false),
         ),
       )
-      .orderBy(asc(accountData.schema.diaryBrainCheckpoints.nextAttemptAt))
+      .orderBy(asc(DO.account.schema.diaryBrainCheckpoints.nextAttemptAt))
       .limit(1)
       .get();
     const candidates = [

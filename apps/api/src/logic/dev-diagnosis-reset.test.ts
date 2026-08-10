@@ -1,8 +1,8 @@
-import type { sharedD1 } from "@me-builder/lib";
+import type { D1 } from "@me-builder/lib";
 import { describe, expect, it, vi } from "vitest";
 import { resetDevelopmentDiagnosisData } from "./dev-diagnosis-reset";
 
-const db = {} as sharedD1.Client;
+const db = {} as D1.shared.Client;
 
 describe("resetDevelopmentDiagnosisData", () => {
   it("本人確認で解決したAccountの診断回答データを削除する", async () => {

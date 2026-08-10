@@ -1,15 +1,15 @@
-import { sharedD1 } from "@me-builder/lib";
+import { D1 } from "@me-builder/lib";
 import { logger, toSafeOperationalErrorFields } from "@me-builder/shared";
 import type { GeminiUsageRecorder } from "./gemini-client";
 
 export function createGeminiUsageRecorder(
-  db: sharedD1.Client,
+  db: D1.shared.Client,
   operation: "diary_chat" | "diary_brain",
   accountId: string,
 ): GeminiUsageRecorder {
   return async (usage) => {
     try {
-      await sharedD1.action.geminiUsage.storeGeminiUsage(db, { ...usage, operation, accountId });
+      await D1.shared.action.geminiUsage.storeGeminiUsage(db, { ...usage, operation, accountId });
     } catch (error) {
       logger.error(
         {

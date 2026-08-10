@@ -4,10 +4,10 @@ import {
   type AccountDataOperation,
   type AccountDataResult,
   type CompatibilityReference,
+  D1,
   DIAGNOSIS_CATALOG_ID,
-  accountData,
+  DO,
   compatibilityDataFor,
-  sharedD1,
 } from "@me-builder/lib";
 import { logger, toSafeOperationalErrorFields } from "@me-builder/shared";
 import { eq } from "drizzle-orm";
@@ -76,7 +76,7 @@ export class AccountData extends DurableObject<Env> {
       const action = (actions as Partial<Record<AccountDataOperation, unknown>>)[operation];
       if (typeof action !== "function") throw new Error("Unsupported AccountData operation");
       const boundAction = action as (
-        db: accountData.Database,
+        db: DO.account.Database,
         boundAccountId: string,
         ...actionArgs: AccountDataArgs<TOperation>
       ) => Promise<AccountDataResult<TOperation>>;
@@ -91,11 +91,11 @@ export class AccountData extends DurableObject<Env> {
   async alarm(): Promise<void> {
     await this.runExclusive(async () => {
       try {
-        await accountData.action.diary.closeExpiredSessions(this.repository.client);
-        await accountData.action.diagnosisBrainProjection.processPendingDiagnosisBrainProjections(
+        await DO.account.action.diary.closeExpiredSessions(this.repository.client);
+        await DO.account.action.diagnosisBrainProjection.processPendingDiagnosisBrainProjections(
           this.repository.client,
         );
-        const checkpointIds = await accountData.action.diary.claimDueDiaryBrainCheckpointIds(
+        const checkpointIds = await DO.account.action.diary.claimDueDiaryBrainCheckpointIds(
           this.repository.client,
           this.accountId,
         );
@@ -108,7 +108,7 @@ export class AccountData extends DurableObject<Env> {
             accountId: this.accountId,
             checkpointId,
           });
-          const dispatched = await accountData.action.diary.markDiaryBrainCheckpointDispatched(
+          const dispatched = await DO.account.action.diary.markDiaryBrainCheckpointDispatched(
             this.repository.client,
             this.accountId,
             checkpointId,
@@ -188,11 +188,11 @@ export class AccountData extends DurableObject<Env> {
    * 版が同じならRPCあたり1行のqueryで済み、定義が増えても操作コストが増えない。
    */
   private async syncDiagnosisCatalog(): Promise<void> {
-    const shared = sharedD1.client.create(this.env.DB);
+    const shared = D1.shared.client.create(this.env.DB);
     const published = await shared
-      .select({ version: sharedD1.schema.catalogVersions.version })
-      .from(sharedD1.schema.catalogVersions)
-      .where(eq(sharedD1.schema.catalogVersions.catalogId, DIAGNOSIS_CATALOG_ID))
+      .select({ version: D1.shared.schema.catalogVersions.version })
+      .from(D1.shared.schema.catalogVersions)
+      .where(eq(D1.shared.schema.catalogVersions.catalogId, DIAGNOSIS_CATALOG_ID))
       .get();
     const version = published?.version ?? 0;
     if (this.repository.isDiagnosisCatalogCurrent(version)) return;
@@ -205,12 +205,12 @@ export class AccountData extends DurableObject<Env> {
       diagnoses,
       diagnosisQuestions,
     ] = await Promise.all([
-      shared.select().from(sharedD1.schema.questions),
-      shared.select().from(sharedD1.schema.questionVersions),
-      shared.select().from(sharedD1.schema.questionChoices),
-      shared.select().from(sharedD1.schema.diagnosisScoringConfigs),
-      shared.select().from(sharedD1.schema.diagnoses),
-      shared.select().from(sharedD1.schema.diagnosisQuestions),
+      shared.select().from(D1.shared.schema.questions),
+      shared.select().from(D1.shared.schema.questionVersions),
+      shared.select().from(D1.shared.schema.questionChoices),
+      shared.select().from(D1.shared.schema.diagnosisScoringConfigs),
+      shared.select().from(D1.shared.schema.diagnoses),
+      shared.select().from(D1.shared.schema.diagnosisQuestions),
     ]);
     this.repository.syncDiagnosisCatalog({
       version,

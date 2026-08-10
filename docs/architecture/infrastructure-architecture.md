@@ -157,7 +157,7 @@ flowchart TD
   - `apps/mcp`: Cloudflare Workers / Bun 上で動作する MCP (Model Context Protocol) サーバー。`apps/mcp/wrangler.toml` により Workers の環境別設定を制御。
   - `apps/worker`: Cloudflare Queues メッセージを非同期処理する Cloudflare Workers ワーカー。`apps/worker/wrangler.toml` により Worker の環境別設定を制御。
   - `packages/shared`: 全アプリケーション間で共有されるドメイン型定義およびユーティリティライブラリ。
-  - `packages/lib`: LINE Messaging API 連携、共有D1（`shared-d1/`）とAccountData Durable Object（`account-data/`）のschema・action（Drizzle ORM）を所有者ごとに分けて提供するライブラリ。境界は[Accountデータ分離設計](account-data-isolation.md)を正とします。
+  - `packages/lib`: LINE Messaging API 連携、共有D1（`d1/shared/`）とAccountData Durable Object（`do/account/`）のschema・action（Drizzle ORM）を所有者ごとに分けて提供するライブラリ。`D1.shared.*`と`DO.account.*`で参照する。境界は[Accountデータ分離設計](account-data-isolation.md)を正とします。
 
 - **環境分類と Wrangler 構成 (`Local` / `Preview` / `Production`)**:
   - **ローカル開発環境 (`Local`)**:

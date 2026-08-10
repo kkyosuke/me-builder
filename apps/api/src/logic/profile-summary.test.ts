@@ -1,8 +1,8 @@
-import type { AccountDataNamespace, sharedD1 } from "@me-builder/lib";
+import type { AccountDataNamespace, D1 } from "@me-builder/lib";
 import { describe, expect, it, vi } from "vitest";
 import { getProfileSummary } from "./profile-summary";
 
-const db = {} as sharedD1.Client;
+const db = {} as D1.shared.Client;
 const accountData = {} as AccountDataNamespace;
 const readModel = {
   versions: [

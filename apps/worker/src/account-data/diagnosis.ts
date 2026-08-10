@@ -1,40 +1,37 @@
-import { accountData } from "@me-builder/lib";
+import { DO } from "@me-builder/lib";
 
 /** Diagnosis answer and derived Brain projection operations owned by one AccountData Object. */
 export const diagnosisActions = {
-  "diagnosis.deleteAccountData": (db: accountData.Database, accountId: string) =>
-    accountData.action.diagnosis.deleteAccountDiagnosisData(db, accountId),
+  "diagnosis.deleteAccountData": (db: DO.account.Database, accountId: string) =>
+    DO.account.action.diagnosis.deleteAccountDiagnosisData(db, accountId),
   "diagnosis.deferQuestion": (
-    db: accountData.Database,
+    db: DO.account.Database,
     accountId: string,
     input: Omit<
-      Parameters<typeof accountData.action.diagnosis.deferDiagnosisQuestion>[1],
+      Parameters<typeof DO.account.action.diagnosis.deferDiagnosisQuestion>[1],
       "accountId"
     >,
-  ) => accountData.action.diagnosis.deferDiagnosisQuestion(db, { ...input, accountId }),
+  ) => DO.account.action.diagnosis.deferDiagnosisQuestion(db, { ...input, accountId }),
   "diagnosis.saveAnswer": (
-    db: accountData.Database,
+    db: DO.account.Database,
     accountId: string,
-    input: Omit<
-      Parameters<typeof accountData.action.diagnosis.saveDiagnosisAnswer>[1],
-      "accountId"
-    >,
-  ) => accountData.action.diagnosis.saveDiagnosisAnswer(db, { ...input, accountId }),
+    input: Omit<Parameters<typeof DO.account.action.diagnosis.saveDiagnosisAnswer>[1], "accountId">,
+  ) => DO.account.action.diagnosis.saveDiagnosisAnswer(db, { ...input, accountId }),
   "diagnosis.findAnswers": (
-    db: accountData.Database,
+    db: DO.account.Database,
     accountId: string,
     diagnosisId: string,
     at: Date,
-  ) => accountData.action.diagnosis.findDiagnosisAnswers(db, accountId, diagnosisId, at),
-  "diagnosis.listVisible": (db: accountData.Database, accountId: string, at: Date) =>
-    accountData.action.diagnosis.listVisibleDiagnoses(db, accountId, at),
+  ) => DO.account.action.diagnosis.findDiagnosisAnswers(db, accountId, diagnosisId, at),
+  "diagnosis.listVisible": (db: DO.account.Database, accountId: string, at: Date) =>
+    DO.account.action.diagnosis.listVisibleDiagnoses(db, accountId, at),
   "diagnosisProjection.processLatest": (
-    db: accountData.Database,
+    db: DO.account.Database,
     accountId: string,
     diagnosisId: string,
     at?: Date,
   ) =>
-    accountData.action.diagnosisBrainProjection.processLatestDiagnosisBrainProjection(
+    DO.account.action.diagnosisBrainProjection.processLatestDiagnosisBrainProjection(
       db,
       accountId,
       diagnosisId,

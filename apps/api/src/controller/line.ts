@@ -1,4 +1,4 @@
-import { line, sharedD1 } from "@me-builder/lib";
+import { D1, line } from "@me-builder/lib";
 import { logger } from "@me-builder/shared";
 import type { Context } from "hono";
 import * as v from "valibot";
@@ -83,7 +83,7 @@ export async function postLiffSession(c: Context<AppEnv>): Promise<Response> {
   const outcome = await createLiffSession({
     idToken,
     lineLoginChannelId: currentConfig.lineLoginChannelId,
-    db: sharedD1.client.create(c.env.DB),
+    db: D1.shared.client.create(c.env.DB),
     adminLineUserIds: currentConfig.adminLineUserIds,
   });
 

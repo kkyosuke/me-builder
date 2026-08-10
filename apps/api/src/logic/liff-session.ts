@@ -1,4 +1,4 @@
-import { line, sharedD1 } from "@me-builder/lib";
+import { D1, line } from "@me-builder/lib";
 import { logger } from "@me-builder/shared";
 
 /**
@@ -16,7 +16,7 @@ export type LiffSessionParams = {
   idToken: string | undefined;
   /** LINE Login チャネル ID (ID トークンの `aud` の期待値) */
   lineLoginChannelId: string | undefined;
-  db: sharedD1.Client;
+  db: D1.shared.Client;
   adminLineUserIds?: readonly string[];
 };
 
@@ -61,7 +61,7 @@ export async function createLiffSession({
     return { type: "unauthenticated", reason: verified.reason };
   }
 
-  const resolved = await sharedD1.action.account.resolveAccountByLineLogin(
+  const resolved = await D1.shared.action.account.resolveAccountByLineLogin(
     db,
     verified.claims.sub,
     adminLineUserIds.includes(verified.claims.sub) ? "admin" : "user",

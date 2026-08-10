@@ -147,12 +147,22 @@ account-data/
 └── schema
 ```
 
-共有ライブラリのschemaとactionも、実行基盤の名前ではなく所有者で分けます。1つの`d1`名前空間へAccountData所有tableと共有D1所有tableが同居すると、module名が保存先を示さなくなり、[データの区分](#3-データの区分)の判定が読めなくなります。
+共有ライブラリのschemaとactionも、保存先ごとに分けます。1つの名前空間へAccountData所有tableと共有D1所有tableが同居すると、参照した名前が保存先を示さなくなり、[データの区分](#3-データの区分)の判定が読めなくなります。
 
 ```text
 packages/lib/src/
-├── shared-d1/        # 共有D1が所有: Account Identity、公開定義、集計projection
-└── account-data/     # AccountDataが所有: Source、Brain、Diary、Diagnosis回答
+├── table/base.ts     # 保存先に依存しない共通column
+├── d1/               # D1が保存するdatabase
+│   └── shared/       # Account Identity、公開定義、集計projection
+└── do/               # Durable Objectが保存するdatabase
+    └── account/      # 1 AccountのSource、Brain、Diary、Diagnosis回答
+```
+
+呼び出し側は`D1.shared.*`と`DO.account.*`で参照します。保存先とdatabaseが参照式に現れるため、どちらを触っているかがコード上で分かります。
+
+```ts
+D1.shared.action.account.resolveAccountByLineLogin(db, sub);
+DO.account.action.diary.storeLineTextSource(db, input);
 ```
 
 AccountDataのactionは、Durable Object SQLite用のdatabase型を引数に取ります。D1 client型へ変換して同じactionを両方の保存先から呼べる状態を作りません。同じ関数が両方から呼べる限り、保存先を間違えてもtypecheckで検出できないためです。

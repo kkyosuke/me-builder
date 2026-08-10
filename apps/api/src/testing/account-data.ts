@@ -4,50 +4,46 @@ import {
   type AccountDataNamespace,
   type AccountDataOperation,
   type AccountDataResult,
-  accountData,
-  accountDataSchema,
-  sharedD1,
+  D1,
+  DO,
 } from "@me-builder/lib";
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 
 const actions = {
-  "diagnosis.deleteAccountData": (db: accountData.Database, accountId: string) =>
-    accountData.action.diagnosis.deleteAccountDiagnosisData(db, accountId),
+  "diagnosis.deleteAccountData": (db: DO.account.Database, accountId: string) =>
+    DO.account.action.diagnosis.deleteAccountDiagnosisData(db, accountId),
   "diagnosis.deferQuestion": (
-    db: accountData.Database,
+    db: DO.account.Database,
     accountId: string,
     input: Omit<
-      Parameters<typeof accountData.action.diagnosis.deferDiagnosisQuestion>[1],
+      Parameters<typeof DO.account.action.diagnosis.deferDiagnosisQuestion>[1],
       "accountId"
     >,
-  ) => accountData.action.diagnosis.deferDiagnosisQuestion(db, { ...input, accountId }),
+  ) => DO.account.action.diagnosis.deferDiagnosisQuestion(db, { ...input, accountId }),
   "diagnosis.saveAnswer": (
-    db: accountData.Database,
+    db: DO.account.Database,
     accountId: string,
-    input: Omit<
-      Parameters<typeof accountData.action.diagnosis.saveDiagnosisAnswer>[1],
-      "accountId"
-    >,
-  ) => accountData.action.diagnosis.saveDiagnosisAnswer(db, { ...input, accountId }),
+    input: Omit<Parameters<typeof DO.account.action.diagnosis.saveDiagnosisAnswer>[1], "accountId">,
+  ) => DO.account.action.diagnosis.saveDiagnosisAnswer(db, { ...input, accountId }),
   "diagnosis.findAnswers": (
-    db: accountData.Database,
+    db: DO.account.Database,
     accountId: string,
     diagnosisId: string,
     at: Date,
-  ) => accountData.action.diagnosis.findDiagnosisAnswers(db, accountId, diagnosisId, at),
-  "diagnosis.listVisible": (db: accountData.Database, accountId: string, at: Date) =>
-    accountData.action.diagnosis.listVisibleDiagnoses(db, accountId, at),
-  "source.hasActive": (db: accountData.Database, accountId: string) =>
-    accountData.action.source.hasActiveSourceRecords(db, accountId),
+  ) => DO.account.action.diagnosis.findDiagnosisAnswers(db, accountId, diagnosisId, at),
+  "diagnosis.listVisible": (db: DO.account.Database, accountId: string, at: Date) =>
+    DO.account.action.diagnosis.listVisibleDiagnoses(db, accountId, at),
+  "source.hasActive": (db: DO.account.Database, accountId: string) =>
+    DO.account.action.source.hasActiveSourceRecords(db, accountId),
   "diagnosisProjection.processLatest": (
-    db: accountData.Database,
+    db: DO.account.Database,
     accountId: string,
     diagnosisId: string,
     at?: Date,
   ) =>
-    accountData.action.diagnosisBrainProjection.processLatestDiagnosisBrainProjection(
+    DO.account.action.diagnosisBrainProjection.processLatestDiagnosisBrainProjection(
       db,
       accountId,
       diagnosisId,
@@ -55,14 +51,14 @@ const actions = {
     ),
 } as const;
 
-const MIGRATIONS_FOLDER = path.resolve(__dirname, "../../../../packages/lib/drizzle-account-data");
+const MIGRATIONS_FOLDER = path.resolve(__dirname, "../../../../packages/lib/drizzle-do-account");
 
 export type AccountDataTestStore = Readonly<{
   namespace: AccountDataNamespace;
   /** Account所有tableへ直接assertするためのdatabase。 */
-  db: accountData.Database;
+  db: DO.account.Database;
   /** DOと同じく、共有D1の公開定義をsnapshotとして取り込む。 */
-  syncCatalogFrom(shared: sharedD1.Client): Promise<void>;
+  syncCatalogFrom(shared: D1.shared.Client): Promise<void>;
   /** 生SQLでAccount所有tableを読み書きするfixture・assert用。 */
   raw: Database.Database;
   /** RPCより前にfixtureを入れる場合に、ObjectへAccountを固定する。 */
@@ -77,7 +73,7 @@ export type AccountDataTestStore = Readonly<{
 export function createAccountDataTestStore(): AccountDataTestStore {
   const sqlite = new Database(":memory:");
   sqlite.pragma("foreign_keys = ON");
-  const drizzleDb = drizzle(sqlite, { schema: accountDataSchema });
+  const drizzleDb = drizzle(sqlite, { schema: DO.account.schema });
   Object.assign(drizzleDb, {
     batch: async (queries: readonly PromiseLike<unknown>[]) => {
       const results = [];
@@ -86,7 +82,7 @@ export function createAccountDataTestStore(): AccountDataTestStore {
     },
   });
   migrate(drizzleDb, { migrationsFolder: MIGRATIONS_FOLDER });
-  const db = drizzleDb as unknown as accountData.Database;
+  const db = drizzleDb as unknown as DO.account.Database;
 
   let boundAccountId: string | undefined;
   const bindAccount = (accountId: string) => {
@@ -98,7 +94,7 @@ export function createAccountDataTestStore(): AccountDataTestStore {
     boundAccountId = accountId;
   };
 
-  const syncCatalogFrom = async (shared: sharedD1.Client) => {
+  const syncCatalogFrom = async (shared: D1.shared.Client) => {
     const [
       questions,
       questionVersions,
@@ -107,23 +103,23 @@ export function createAccountDataTestStore(): AccountDataTestStore {
       diagnoses,
       diagnosisQuestions,
     ] = await Promise.all([
-      shared.select().from(sharedD1.schema.questions),
-      shared.select().from(sharedD1.schema.questionVersions),
-      shared.select().from(sharedD1.schema.questionChoices),
-      shared.select().from(sharedD1.schema.diagnosisScoringConfigs),
-      shared.select().from(sharedD1.schema.diagnoses),
-      shared.select().from(sharedD1.schema.diagnosisQuestions),
+      shared.select().from(D1.shared.schema.questions),
+      shared.select().from(D1.shared.schema.questionVersions),
+      shared.select().from(D1.shared.schema.questionChoices),
+      shared.select().from(D1.shared.schema.diagnosisScoringConfigs),
+      shared.select().from(D1.shared.schema.diagnoses),
+      shared.select().from(D1.shared.schema.diagnosisQuestions),
     ]);
-    if (questions.length > 0) await db.insert(accountDataSchema.questions).values(questions);
+    if (questions.length > 0) await db.insert(DO.account.schema.questions).values(questions);
     if (questionVersions.length > 0)
-      await db.insert(accountDataSchema.questionVersions).values(questionVersions);
+      await db.insert(DO.account.schema.questionVersions).values(questionVersions);
     if (questionChoices.length > 0)
-      await db.insert(accountDataSchema.questionChoices).values(questionChoices);
+      await db.insert(DO.account.schema.questionChoices).values(questionChoices);
     if (scoringConfigs.length > 0)
-      await db.insert(accountDataSchema.diagnosisScoringConfigs).values(scoringConfigs);
-    if (diagnoses.length > 0) await db.insert(accountDataSchema.diagnoses).values(diagnoses);
+      await db.insert(DO.account.schema.diagnosisScoringConfigs).values(scoringConfigs);
+    if (diagnoses.length > 0) await db.insert(DO.account.schema.diagnoses).values(diagnoses);
     if (diagnosisQuestions.length > 0)
-      await db.insert(accountDataSchema.diagnosisQuestions).values(diagnosisQuestions);
+      await db.insert(DO.account.schema.diagnosisQuestions).values(diagnosisQuestions);
   };
 
   const namespace: AccountDataNamespace = {

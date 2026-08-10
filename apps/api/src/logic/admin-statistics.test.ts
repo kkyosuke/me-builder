@@ -1,9 +1,9 @@
-import type { sharedD1 } from "@me-builder/lib";
+import type { D1 } from "@me-builder/lib";
 import { describe, expect, it, vi } from "vitest";
 import { getAdminStatistics } from "./admin-statistics";
 import type { createLiffSession } from "./liff-session";
 
-const db = {} as sharedD1.Client;
+const db = {} as D1.shared.Client;
 const base = {
   idToken: "id-token",
   lineLoginChannelId: "channel",
