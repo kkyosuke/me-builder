@@ -28,7 +28,7 @@ export type CompatibilitySharePreviewOutcome =
   | { type: "unauthenticated"; reason: string }
   | { type: "account-not-found" };
 
-export type CompatibilitySharePreviewBlockingReason =
+type CompatibilitySharePreviewBlockingReason =
   | "display_name_unavailable"
   | "diagnosis_required"
   | "scoring_unavailable"

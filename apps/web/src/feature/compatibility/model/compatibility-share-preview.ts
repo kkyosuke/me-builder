@@ -13,7 +13,7 @@ export type CompatibilitySharePreviewParameter = {
   statement: string;
 };
 
-export type CompatibilitySharePreviewTheme = {
+type CompatibilitySharePreviewTheme = {
   diagnosisId: string;
   title: string;
   parameters: CompatibilitySharePreviewParameter[];
