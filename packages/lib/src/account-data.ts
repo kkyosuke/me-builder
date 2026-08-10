@@ -88,7 +88,6 @@ export type AccountDataActions = {
     at?: Date,
   ) => Promise<void>;
   "avatar.startGeneration": (jobId: string, at?: Date) => Promise<StartAvatarGenerationResult>;
-  "avatar.cancelJob": (jobId: string, at?: Date) => Promise<AvatarJobRecord | null>;
   "avatar.selectCandidate": (
     candidateId: string,
     at?: Date,

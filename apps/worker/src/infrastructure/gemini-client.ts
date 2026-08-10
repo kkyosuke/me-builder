@@ -121,7 +121,7 @@ export async function generateAvatarImage(
     ],
     config: {
       responseModalities: ["IMAGE"],
-      imageConfig: { aspectRatio: "1:1", imageSize: "1K" },
+      imageConfig: { aspectRatio: "1:1" },
     },
   });
   const part = response.candidates?.[0]?.content?.parts?.find(

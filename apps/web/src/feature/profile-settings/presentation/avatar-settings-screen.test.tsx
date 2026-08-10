@@ -17,7 +17,6 @@ function controller(overrides: Partial<AvatarSettingsController> = {}): AvatarSe
     refresh: vi.fn().mockResolvedValue(true),
     upload: vi.fn().mockResolvedValue(true),
     choose: vi.fn().mockResolvedValue(true),
-    cancel: vi.fn().mockResolvedValue(true),
     remove: vi.fn().mockResolvedValue(true),
     ...overrides,
   };

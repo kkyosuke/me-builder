@@ -67,15 +67,13 @@ sequenceDiagram
 | --- | --- | --- | --- |
 | `GET` | `/api/avatar` | 現在値と最新ジョブを取得 | `200` |
 | `POST` | `/api/avatar/uploads` | 同意済み画像を検査・正規化し、人物判定を受け付ける | `202` |
-| `POST` | `/api/avatar/jobs/:jobId/generation` | 旧クライアント互換と失敗後の再試行用に、人物確認済みジョブの候補生成を受け付ける。通常のWebフローでは呼ばない | `202` |
-| `DELETE` | `/api/avatar/jobs/:jobId` | 未確定ジョブを中止する | `204` |
 | `PUT` | `/api/avatar` | 候補1件を現在のアバターへ設定する | `200` |
 | `DELETE` | `/api/avatar` | 現在のアバターを削除する | `204` |
 | `GET` | `/api/avatar/images/:imageId` | 本人が参照可能な画像をprivate R2から配信する | `200` |
 
 アップロードは`multipart/form-data`の`image`と`consent=true`を受け付けます。Webはファイル選択前に外部AI送信と画像利用条件を常時表示し、画像選択を開始操作として`consent=true`を送ります。別のチェックボックスは設けません。最大容量は10 MiB、入力形式はJPEG、PNG、WebPです。`Content-Type`だけでなくmagic bytesとImages bindingのdecode結果を確認し、1024 x 1024以内の正方形WebPへ再encodeしてメタデータを除去します。
 
-実行中の`GET /api/avatar`は`Retry-After: 3`を返します。Webはアバター設定またはプロフィールが表示され、かつタブが表示中の間だけ再取得し、`ready`、`not_person`、`failed`、`cancelled`、`selected`では停止します。`Retry-After`がなければ自動再取得しません。プロフィールでは処理中を「候補を生成中」、`ready`を「候補ができました」と表示します。
+実行中の`GET /api/avatar`は`Retry-After: 3`を返します。Webはアバター設定またはプロフィールが表示され、かつタブが表示中の間だけ再取得し、`ready`、`not_person`、`failed`、`cancelled`、`selected`では停止します。`Retry-After`がなければ自動再取得しません。プロフィールでは処理中を「候補を生成中」、`ready`を「候補ができました」と表示します。利用者がジョブを中止する公開APIやUIは設けません。`cancelled`は人物確認直後のジョブが新規受付で置き換えられた場合にだけ使う内部状態です。
 
 ## 5. AccountDataモデル
 
@@ -110,7 +108,7 @@ avatar_object_deletions
 
 Workerは処理開始時に短いleaseを取得します。同じジョブIDが再配送された場合、terminal状態なら処理せずackします。有効なleaseがある場合はackせず、lease期限後を指定してQueue retryし、Workerの強制終了でジョブが取り残されないようにします。外部処理が一時失敗した場合はleaseを解放してQueue retryへ委ね、規定回数を超えた場合だけ`failed`へ遷移します。
 
-新しい候補生成は1 Accountにつき24時間で3ジョブまでとし、同じジョブのQueue再配送と失敗後の再試行は追加計上しません。自動生成開始時に上限へ達していた場合はジョブを`generation_rate_limited`の`failed`へ遷移させ、Webがエラーと再アップロード導線を表示します。互換APIからの明示再試行では`429 Too Many Requests`と`Retry-After`、再開可能時刻を返します。環境全体の費用上限はAI Gatewayと生成事業者側にも設定し、アプリのAccount上限だけを予算管理にしません。
+新しい候補生成は1 Accountにつき24時間で3ジョブまでとし、同じジョブのQueue再配送は追加計上しません。自動生成開始時に上限へ達していた場合はジョブを`generation_rate_limited`の`failed`へ遷移させ、Webがエラーと再アップロード導線を表示します。環境全体の費用上限はAI Gatewayと生成事業者側にも設定し、アプリのAccount上限だけを予算管理にしません。
 
 ## 6. QueueとR2
 
@@ -140,6 +138,6 @@ Bucketは公開しません。候補配信APIはAccountDataで`imageId`の参照
 
 人物判定はGeminiのmultimodal structured outputを使い、`hasPerson: boolean`だけを採用します。説明文や属性は保存しません。候補生成は画像生成対応モデルへ正規化済み参照画像と固定プロンプトを渡し、1:1画像を最大4件生成します。
 
-AI Gatewayではpayload保存とcacheを無効にします。画像生成モデルは`GEMINI_IMAGE_MODEL`で環境ごとに設定し、未設定時はコードが定義する安定版を使用します。モデル変更は状態やAPI契約を変更せず、生成メタデータへ使用モデルだけを記録します。
+AI Gatewayではpayload保存とcacheを無効にします。画像生成モデルは`GEMINI_IMAGE_MODEL`で環境ごとに設定し、未設定時はコードが定義する安定版を使用します。モデル変更は状態やAPI契約を変更せず、生成メタデータへ使用モデルだけを記録します。モデル固有の固定解像度へ重複する出力サイズ指定は送らず、正方形の縦横比だけを指定して、生成後にCloudflare Imagesで1024px WebPへ正規化します。
 
 候補はdecodeと再encodeを通過したものだけR2へ保存します。1件以上成功すれば`ready`、0件なら`failed`です。候補完成だけで現在のアバターを変更しません。

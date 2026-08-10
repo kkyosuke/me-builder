@@ -17,6 +17,8 @@ describe("GET /api/openapi.json", () => {
     expect(document.paths["/api/diagnoses/{diagnosisId}/answers"]?.get).toBeDefined();
     expect(document.paths["/api/line/liff/session"]?.post).toBeDefined();
     expect(document.paths["/api/dev/brain-items"]?.get).toBeDefined();
+    expect(document.paths["/api/avatar/jobs/{jobId}/generation"]).toBeUndefined();
+    expect(document.paths["/api/avatar/jobs/{jobId}"]).toBeUndefined();
     expect(document.paths["/api/line/liff/session"]?.post).toMatchObject({
       requestBody: {
         required: true,
@@ -40,5 +42,14 @@ describe("GET /api/openapi.json", () => {
       await readFile(new URL("../../openapi.json", import.meta.url), "utf8"),
     );
     expect(document).toEqual(generatedDocument);
+  });
+
+  it.each([
+    ["POST", "/api/avatar/jobs/00000000-0000-4000-8000-000000000001/generation"],
+    ["DELETE", "/api/avatar/jobs/00000000-0000-4000-8000-000000000001"],
+  ])("削除した旧アバターAPIへ%sすると404を返す", async (method, path) => {
+    const response = await app.request(path, { method });
+
+    expect(response.status).toBe(404);
   });
 });

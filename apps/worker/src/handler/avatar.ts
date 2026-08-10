@@ -18,6 +18,27 @@ const STYLES = [
   "清潔感のある3Dイラスト、水面の配色",
 ] as const;
 
+function errorDetails(error: unknown): {
+  errorName: string;
+  errorMessage?: string;
+  errorStatus?: number;
+} {
+  const errorName = error instanceof Error ? error.name : "UnknownError";
+  const errorMessage = error instanceof Error ? error.message.slice(0, 500) : undefined;
+  const errorStatus =
+    typeof error === "object" &&
+    error !== null &&
+    "status" in error &&
+    typeof error.status === "number"
+      ? error.status
+      : undefined;
+  return {
+    errorName,
+    ...(errorMessage ? { errorMessage } : {}),
+    ...(errorStatus !== undefined ? { errorStatus } : {}),
+  };
+}
+
 function stream(bytes: Uint8Array): ReadableStream<Uint8Array> {
   return new Blob([bytes.slice().buffer]).stream();
 }
@@ -167,7 +188,7 @@ export async function processAvatarMessage(
         completed += 1;
       } catch (error) {
         logger.warn(
-          { errorName: error instanceof Error ? error.name : "UnknownError" },
+          { ...errorDetails(error), model: config.geminiImageModel },
           "One avatar candidate generation failed",
         );
       }
@@ -188,7 +209,7 @@ export async function processAvatarMessage(
       {
         operation: message.body.operation,
         attempt: message.attempts,
-        errorName: error instanceof Error ? error.name : "UnknownError",
+        ...errorDetails(error),
       },
       "Avatar processing failed",
     );

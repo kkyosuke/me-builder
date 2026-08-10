@@ -347,16 +347,6 @@ export function AvatarSettingsScreen({
               このアバターに設定
             </button>
           )}
-          {isRunning && (
-            <button
-              type="button"
-              disabled={controller.busy}
-              onClick={() => void controller.cancel()}
-              className="w-full rounded-2xl px-5 py-3 text-sm font-bold text-slate-600 transition hover:bg-slate-100 disabled:opacity-40 dark:text-slate-300 dark:hover:bg-slate-800"
-            >
-              処理を中止
-            </button>
-          )}
           {controller.currentAvatar && (
             <button
               type="button"

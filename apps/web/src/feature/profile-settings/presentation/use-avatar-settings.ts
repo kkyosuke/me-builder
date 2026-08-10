@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { config } from "../../../config";
 import {
   type AvatarStateResult,
-  cancelAvatarJob,
   deleteAvatar,
   fetchAvatarImage,
   fetchAvatarState,
@@ -205,34 +204,6 @@ export function useAvatarSettings({
     [runAction],
   );
 
-  const cancel = useCallback(async (): Promise<boolean> => {
-    const jobId = rawState.current?.job?.id;
-    if (!jobId || busyRef.current) return false;
-    busyRef.current = true;
-    setBusy(true);
-    setErrorMessage(null);
-    request.current?.abort();
-    const controller = new AbortController();
-    request.current = controller;
-    try {
-      const idToken = await resolveToken(controller.signal);
-      await cancelAvatarJob(config.apiUrl, idToken, jobId, controller.signal);
-      if (controller.signal.aborted) return false;
-      const result = await fetchAvatarState(config.apiUrl, idToken, controller.signal);
-      await applyState(result.state, idToken, controller.signal);
-      return !controller.signal.aborted;
-    } catch (error) {
-      if (!controller.signal.aborted && mounted.current) {
-        setErrorMessage(messageFrom(error, "処理を中止できませんでした。"));
-      }
-      return false;
-    } finally {
-      busyRef.current = false;
-      if (request.current === controller) request.current = null;
-      if (mounted.current) setBusy(false);
-    }
-  }, [applyState, resolveToken]);
-
   const remove = useCallback(async (): Promise<boolean> => {
     if (busyRef.current) return false;
     busyRef.current = true;
@@ -320,7 +291,6 @@ export function useAvatarSettings({
     refresh: () => refresh(true),
     upload,
     choose,
-    cancel,
     remove,
   };
 }

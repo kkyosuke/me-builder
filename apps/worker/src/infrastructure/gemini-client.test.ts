@@ -99,7 +99,7 @@ describe("Gemini client", () => {
         model: "gemini-image-model",
         config: {
           responseModalities: ["IMAGE"],
-          imageConfig: { aspectRatio: "1:1", imageSize: "1K" },
+          imageConfig: { aspectRatio: "1:1" },
         },
       }),
     );

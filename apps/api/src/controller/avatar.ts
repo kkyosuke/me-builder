@@ -7,7 +7,6 @@ import {
   AvatarConflictSchema,
   AvatarInvalidRequestSchema,
   AvatarNotFoundSchema,
-  AvatarRateLimitedSchema,
   AvatarSelectionInvalidRequestSchema,
   AvatarStateResponseSchema,
   SelectAvatarRequestSchema,
@@ -19,12 +18,10 @@ import {
 } from "../contract/shared/errors";
 import { AvatarImageError } from "../infrastructure/avatar-image";
 import {
-  cancelAvatarJob,
   deleteAvatar,
   getAvatarImage,
   getAvatarState,
   selectAvatar,
-  startAvatarGeneration,
   uploadAvatarSource,
 } from "../logic/avatar";
 import type { AppEnv } from "../types";
@@ -150,61 +147,6 @@ export async function postAvatarUpload(c: Context<AppEnv>): Promise<Response> {
     }
     throw error;
   }
-}
-
-export async function postAvatarGeneration(c: Context<AppEnv>): Promise<Response> {
-  if (!c.env?.DB || !c.env.ACCOUNT_DATA) return unavailable(c);
-  const outcome = await startAvatarGeneration({
-    ...commonParams(c),
-    jobId: pathParam(c, "jobId"),
-    queue: c.env.AVATAR_QUEUE,
-  });
-  const auth = authResponse(c, outcome);
-  if (auth) return auth;
-  if (outcome.type === "job-not-found") {
-    return c.json(v.parse(AvatarNotFoundSchema, { error: "Avatar not found" }), 404);
-  }
-  if (outcome.type === "invalid-state") {
-    return c.json(
-      v.parse(AvatarConflictSchema, {
-        error: "Avatar state conflict",
-        reason: "invalid_job_state",
-      }),
-      409,
-    );
-  }
-  if (outcome.type === "rate-limited") {
-    const retrySeconds = Math.max(
-      1,
-      Math.ceil((new Date(outcome.retryAt).getTime() - Date.now()) / 1000),
-    );
-    c.header("Retry-After", String(retrySeconds));
-    return c.json(
-      v.parse(AvatarRateLimitedSchema, {
-        error: "Avatar generation rate limited",
-        retryAt: outcome.retryAt,
-      }),
-      429,
-    );
-  }
-  if (outcome.type !== "accepted") throw new Error("Unexpected generation outcome");
-  const state = v.parse(AvatarStateResponseSchema, outcome.state);
-  setPollingHeader(c, state);
-  return c.json(state, 202);
-}
-
-export async function deleteAvatarJob(c: Context<AppEnv>): Promise<Response> {
-  if (!c.env?.DB || !c.env.ACCOUNT_DATA) return unavailable(c);
-  const outcome = await cancelAvatarJob({
-    ...commonParams(c),
-    jobId: pathParam(c, "jobId"),
-  });
-  const auth = authResponse(c, outcome);
-  if (auth) return auth;
-  if (outcome.type === "job-not-found") {
-    return c.json(v.parse(AvatarNotFoundSchema, { error: "Avatar not found" }), 404);
-  }
-  return c.body(null, 204);
 }
 
 export async function putAvatar(c: Context<AppEnv>): Promise<Response> {

@@ -190,58 +190,6 @@ export async function uploadAvatarSource(
   return { type: "accepted", state: publicState(state) };
 }
 
-export async function startAvatarGeneration(
-  params: BaseParams & { jobId: string; queue?: Queue<AvatarQueueMessage>; at?: Date },
-  dependencies: AvatarDependencies = defaultDependencies,
-): Promise<
-  | { type: "accepted"; state: PublicAvatarState }
-  | { type: "job-not-found" }
-  | { type: "rate-limited"; retryAt: string }
-  | { type: "invalid-state" }
-  | AvatarAuthFailure
-> {
-  const session = await authenticate(params, dependencies);
-  if (session.type !== "resolved") return session;
-  const result = await accountDataFor(params.accountData, session.accountId).execute(
-    "avatar.startGeneration",
-    params.jobId,
-    params.at,
-  );
-  if (result.type === "not-found") return { type: "job-not-found" };
-  if (result.type === "rate-limited") {
-    return { type: "rate-limited", retryAt: result.retryAt.toISOString() };
-  }
-  if (result.type === "invalid-state") return { type: "invalid-state" };
-  if (result.job.queuePending) {
-    await enqueue(params.accountData, session.accountId, params.queue, {
-      type: "avatar",
-      operation: "generate",
-      accountId: session.accountId,
-      jobId: params.jobId,
-    });
-  }
-  const state = await accountDataFor(params.accountData, session.accountId).execute(
-    "avatar.getState",
-    params.at,
-  );
-  return { type: "accepted", state: publicState(state) };
-}
-
-export async function cancelAvatarJob(
-  params: BaseParams & { jobId: string; at?: Date },
-  dependencies: AvatarDependencies = defaultDependencies,
-): Promise<{ type: "cancelled" } | { type: "job-not-found" } | AvatarAuthFailure> {
-  const session = await authenticate(params, dependencies);
-  if (session.type !== "resolved") return session;
-  const job = await accountDataFor(params.accountData, session.accountId).execute(
-    "avatar.cancelJob",
-    params.jobId,
-    params.at,
-  );
-  if (!job) return { type: "job-not-found" };
-  return { type: "cancelled" };
-}
-
 export async function selectAvatar(
   params: BaseParams & { candidateId: string; at?: Date },
   dependencies: AvatarDependencies = defaultDependencies,

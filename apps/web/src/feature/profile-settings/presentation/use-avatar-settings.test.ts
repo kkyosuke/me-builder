@@ -9,7 +9,6 @@ const mocks = vi.hoisted(() => ({
   fetchAvatarImage: vi.fn(),
   uploadAvatarSource: vi.fn(),
   selectAvatar: vi.fn(),
-  cancelAvatarJob: vi.fn(),
   deleteAvatar: vi.fn(),
 }));
 

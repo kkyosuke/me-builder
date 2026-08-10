@@ -336,36 +336,6 @@ async function startAvatarGeneration(
   return { type: "accepted", job };
 }
 
-async function cancelAvatarJob(
-  db: d1.Client,
-  _accountId: string,
-  jobId: string,
-  at = new Date(),
-): Promise<AvatarJobRecord | null> {
-  const client = database(db);
-  const existing = await jobRecord(client, jobId);
-  if (!existing) return null;
-  await scheduleObjectDeletions(client, [
-    { objectKey: existing.referenceObjectKey, deleteAfter: at },
-    ...existing.candidates
-      .filter(({ selectedAt }) => !selectedAt)
-      .map(({ objectKey }) => ({ objectKey, deleteAfter: at })),
-  ]);
-  if (!["selected", "expired"].includes(existing.status)) {
-    await client
-      .update(avatarJobs)
-      .set({
-        status: "cancelled",
-        pendingOperation: null,
-        queuePending: false,
-        processingLeaseExpiresAt: null,
-        updatedAt: at,
-      })
-      .where(eq(avatarJobs.id, jobId));
-  }
-  return jobRecord(client, jobId);
-}
-
 async function selectAvatarCandidate(
   db: d1.Client,
   _accountId: string,
@@ -712,7 +682,6 @@ export const avatarActions = {
   "avatar.markEnqueued": markAvatarEnqueued,
   "avatar.recordEnqueueFailure": recordAvatarEnqueueFailure,
   "avatar.startGeneration": startAvatarGeneration,
-  "avatar.cancelJob": cancelAvatarJob,
   "avatar.selectCandidate": selectAvatarCandidate,
   "avatar.deleteCurrent": deleteCurrentAvatar,
   "avatar.resolveImage": resolveAvatarImage,

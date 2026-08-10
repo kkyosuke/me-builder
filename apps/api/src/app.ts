@@ -6,12 +6,10 @@ import * as v from "valibot";
 import { getConfig } from "./config";
 import { adminStatisticsRoute } from "./contract/admin/statistics";
 import {
-  cancelAvatarJobRoute,
   deleteAvatarRoute,
   getAvatarImageRoute,
   getAvatarRoute,
   selectAvatarRoute,
-  startAvatarGenerationRoute,
   uploadAvatarRoute,
 } from "./contract/avatar";
 import { developmentBrainItemsRoute } from "./contract/brain/dev-list";
@@ -28,10 +26,8 @@ import { InternalServerErrorSchema } from "./contract/shared/errors";
 import { getStatistics } from "./controller/admin";
 import {
   deleteAvatarContents,
-  deleteAvatarJob,
   getAvatarContents,
   getAvatarImageContents,
-  postAvatarGeneration,
   postAvatarUpload,
   putAvatar,
 } from "./controller/avatar";
@@ -98,8 +94,6 @@ app.get("/api/dev/brain-items", developmentBrainItemsRoute, getDevelopmentBrainI
 
 app.get("/api/avatar", getAvatarRoute, getAvatarContents);
 app.post("/api/avatar/uploads", uploadAvatarRoute, postAvatarUpload);
-app.post("/api/avatar/jobs/:jobId/generation", startAvatarGenerationRoute, postAvatarGeneration);
-app.delete("/api/avatar/jobs/:jobId", cancelAvatarJobRoute, deleteAvatarJob);
 app.put("/api/avatar", selectAvatarRoute, putAvatar);
 app.delete("/api/avatar", deleteAvatarRoute, deleteAvatarContents);
 app.get("/api/avatar/images/:imageId", getAvatarImageRoute, getAvatarImageContents);

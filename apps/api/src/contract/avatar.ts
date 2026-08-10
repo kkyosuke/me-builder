@@ -68,11 +68,6 @@ export const AvatarConflictSchema = v.object({
   reason: v.literal("invalid_job_state"),
 });
 export const AvatarNotFoundSchema = v.object({ error: v.literal("Avatar not found") });
-export const AvatarRateLimitedSchema = v.object({
-  error: v.literal("Avatar generation rate limited"),
-  retryAt: TimestampSchema,
-});
-
 export const getAvatarRoute = describeRoute({
   operationId: "getAvatar",
   tags: ["Avatar"],
@@ -108,32 +103,6 @@ export const uploadAvatarRoute = describeRoute({
     202: jsonResponse("人物判定を受け付けた状態", AvatarStateResponseSchema),
     ...authenticatedErrors,
     400: jsonResponse("同意または画像が不正", AvatarInvalidRequestSchema),
-  },
-} satisfies DescribeRouteOptions);
-
-export const startAvatarGenerationRoute = describeRoute({
-  operationId: "startAvatarGeneration",
-  tags: ["Avatar"],
-  summary: "人物確認済み画像から候補生成を受け付ける",
-  security: [{ liffIdToken: [] }],
-  responses: {
-    202: jsonResponse("候補生成を受け付けた状態", AvatarStateResponseSchema),
-    ...authenticatedErrors,
-    404: jsonResponse("ジョブがない", AvatarNotFoundSchema),
-    409: jsonResponse("人物確認前など開始できない状態", AvatarConflictSchema),
-    429: jsonResponse("Account単位の生成上限", AvatarRateLimitedSchema),
-  },
-} satisfies DescribeRouteOptions);
-
-export const cancelAvatarJobRoute = describeRoute({
-  operationId: "cancelAvatarJob",
-  tags: ["Avatar"],
-  summary: "未確定のアバタージョブを中止する",
-  security: [{ liffIdToken: [] }],
-  responses: {
-    204: { description: "中止した" },
-    ...authenticatedErrors,
-    404: jsonResponse("ジョブがない", AvatarNotFoundSchema),
   },
 } satisfies DescribeRouteOptions);
 

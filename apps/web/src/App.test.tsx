@@ -34,7 +34,6 @@ const mocks = vi.hoisted(() => ({
   fetchAvatarImage: vi.fn(),
   uploadAvatarSource: vi.fn(),
   selectAvatar: vi.fn(),
-  cancelAvatarJob: vi.fn(),
   deleteAvatar: vi.fn(),
 }));
 
@@ -70,7 +69,6 @@ vi.mock("./feature/profile-settings/infrastructure/avatar-api", () => ({
   fetchAvatarImage: mocks.fetchAvatarImage,
   uploadAvatarSource: mocks.uploadAvatarSource,
   selectAvatar: mocks.selectAvatar,
-  cancelAvatarJob: mocks.cancelAvatarJob,
   deleteAvatar: mocks.deleteAvatar,
 }));
 vi.mock("./feature/diagnosis/presentation/components/swipe-diagnosis", () => ({
@@ -251,7 +249,6 @@ describe("App", () => {
       retryAfterMilliseconds: 3_000,
     });
     mocks.fetchAvatarImage.mockResolvedValue(new Blob(["avatar"], { type: "image/webp" }));
-    mocks.cancelAvatarJob.mockResolvedValue(undefined);
     mocks.deleteAvatar.mockResolvedValue(undefined);
     mocks.restoreDiagnosisProgress.mockImplementation(
       (_questions: DiagnosisDefinition["questions"], answers: DiagnosisResult["answers"]) => ({

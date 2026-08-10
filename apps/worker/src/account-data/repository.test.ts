@@ -98,7 +98,13 @@ describe("AccountDataRepository", () => {
       );
       if (index < 3) {
         expect(started).toMatchObject({ type: "accepted" });
-        await avatarActions["avatar.cancelJob"](repository.client, accountId, jobId, at);
+        await avatarActions["avatar.failJob"](
+          repository.client,
+          accountId,
+          jobId,
+          "test_completed",
+          at,
+        );
       } else {
         expect(started).toEqual({
           type: "rate-limited",

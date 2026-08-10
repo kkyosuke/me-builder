@@ -135,28 +135,6 @@ export async function uploadAvatarSource(
   return parseState(response, "画像のアップロードに失敗しました");
 }
 
-export async function cancelAvatarJob(
-  apiUrl: string | undefined,
-  idToken: string,
-  jobId: string,
-  signal?: AbortSignal,
-): Promise<void> {
-  const response = await createHttpClient(apiUrl).request(
-    `/api/avatar/jobs/${encodeURIComponent(jobId)}`,
-    {
-      method: "DELETE",
-      headers: authorization(idToken),
-      ...(signal ? { signal } : {}),
-    },
-  );
-  if (!response.ok) {
-    throw new AvatarApiError(
-      await errorMessage(response, "処理の中止に失敗しました"),
-      response.status,
-    );
-  }
-}
-
 export async function selectAvatar(
   apiUrl: string | undefined,
   idToken: string,
