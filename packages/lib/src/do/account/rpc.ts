@@ -8,7 +8,7 @@ import type {
 import type * as brain from "./action/brain";
 import type * as diagnosis from "./action/diagnosis";
 import type * as diagnosisBrainProjection from "./action/diagnosis-brain-projection";
-import type * as conversation from "./action/diary";
+import type * as diary from "./action/diary";
 import type * as source from "./action/source";
 
 type ActionResult<T> = T extends (...args: never[]) => infer TResult ? Awaited<TResult> : never;
@@ -63,57 +63,57 @@ export type AccountDataActions = {
   "compatibility.listVisibleReferences": () => Promise<readonly CompatibilityReference[]>;
   "source.hasActive": RpcAction<[], typeof source.hasActiveSourceRecords>;
   "conversation.storeLineTextSource": RpcAction<
-    [WithoutAccountId<Parameters<typeof conversation.storeLineTextSource>[1]>],
-    typeof conversation.storeLineTextSource
+    [WithoutAccountId<Parameters<typeof diary.storeLineTextSource>[1]>],
+    typeof diary.storeLineTextSource
   >;
   "conversation.attachMessagesToTurn": RpcAction<
     [
-      inputs: Parameters<typeof conversation.attachMessagesToTurn>[2],
+      inputs: Parameters<typeof diary.attachMessagesToTurn>[2],
       generationEpoch: number,
       model: string,
       promptVersion: string,
       conversationPolicyIds?: readonly string[],
     ],
-    typeof conversation.attachMessagesToTurn
+    typeof diary.attachMessagesToTurn
   >;
-  "conversation.getTurnContext": DomainAction<typeof conversation.getTurnContext>;
+  "conversation.getTurnContext": DomainAction<typeof diary.getTurnContext>;
   "conversation.claimDueDiaryBrainCheckpoints": RpcAction<
     [at?: Date],
-    typeof conversation.claimDueDiaryBrainCheckpointIds
+    typeof diary.claimDueDiaryBrainCheckpointIds
   >;
   "conversation.getDiaryBrainCheckpointContext": RpcAction<
     [checkpointId: string],
-    typeof conversation.getDiaryBrainCheckpointContext
+    typeof diary.getDiaryBrainCheckpointContext
   >;
   "conversation.applyDiaryBrainCheckpoint": RpcAction<
     [
       checkpointId: string,
       expectedThroughSequence: number,
       promptVersion: string,
-      candidates: readonly conversation.DiaryBrainCheckpointCandidate[],
+      candidates: readonly diary.DiaryBrainCheckpointCandidate[],
       at?: Date,
     ],
-    typeof conversation.applyDiaryBrainCheckpoint
+    typeof diary.applyDiaryBrainCheckpoint
   >;
   "conversation.getDiaryBrainCheckpointDevelopmentNotification": RpcAction<
     [checkpointId: string],
-    typeof conversation.getDiaryBrainCheckpointDevelopmentNotification
+    typeof diary.getDiaryBrainCheckpointDevelopmentNotification
   >;
   "conversation.markDiaryBrainCheckpointDevelopmentNotificationSent": RpcAction<
     [checkpointId: string, at?: Date],
-    typeof conversation.markDiaryBrainCheckpointDevelopmentNotificationSent
+    typeof diary.markDiaryBrainCheckpointDevelopmentNotificationSent
   >;
-  "conversation.markTurnGenerating": DomainAction<typeof conversation.markTurnGenerating>;
-  "conversation.getTurnStatus": DomainAction<typeof conversation.getTurnStatus>;
-  "conversation.isTurnSessionActive": DomainAction<typeof conversation.isTurnSessionActive>;
-  "conversation.saveAssistantResponse": DomainAction<typeof conversation.saveAssistantResponse>;
+  "conversation.markTurnGenerating": DomainAction<typeof diary.markTurnGenerating>;
+  "conversation.getTurnStatus": DomainAction<typeof diary.getTurnStatus>;
+  "conversation.isTurnSessionActive": DomainAction<typeof diary.isTurnSessionActive>;
+  "conversation.saveAssistantResponse": DomainAction<typeof diary.saveAssistantResponse>;
   "conversation.getPendingAssistantResponse": RpcAction<
     [turnId: string],
-    typeof conversation.getPendingAssistantResponse
+    typeof diary.getPendingAssistantResponse
   >;
-  "conversation.closeTurnSession": DomainAction<typeof conversation.closeTurnSession>;
-  "conversation.markTurnDelivered": DomainAction<typeof conversation.markTurnDelivered>;
-  "conversation.markTurnFailed": DomainAction<typeof conversation.markTurnFailed>;
+  "conversation.closeTurnSession": DomainAction<typeof diary.closeTurnSession>;
+  "conversation.markTurnDelivered": DomainAction<typeof diary.markTurnDelivered>;
+  "conversation.markTurnFailed": DomainAction<typeof diary.markTurnFailed>;
   "diagnosis.deleteAccountData": RpcAction<[], typeof diagnosis.deleteAccountDiagnosisData>;
   "diagnosis.deferQuestion": RpcAction<
     [WithoutAccountId<Parameters<typeof diagnosis.deferDiagnosisQuestion>[1]>],

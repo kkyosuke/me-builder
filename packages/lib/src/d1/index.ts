@@ -9,13 +9,13 @@ import * as sharedSchema from "./shared/schema";
  * Account所有データは`DO.account`が持つ。境界は
  * `docs/architecture/account-data-isolation.md`を正とする。
  */
-export const D1 = {
-  shared: {
-    client: { create: createSharedD1Client },
-    action: sharedAction,
-    schema: sharedSchema,
-  },
+const shared = {
+  client: { create: createSharedD1Client },
+  action: sharedAction,
+  schema: sharedSchema,
 };
+
+export const D1 = { shared };
 
 export namespace D1 {
   export namespace shared {

@@ -7,12 +7,12 @@ import { type AccountDataDatabase, accountSchema } from "./account/database";
  * `account`は1 AccountのSource / Brain / Diary / Diagnosis回答のSSoT。
  * 境界は`docs/architecture/account-data-isolation.md`を正とする。
  */
-export const DO = {
-  account: {
-    action: accountAction,
-    schema: accountSchema,
-  },
+const account = {
+  action: accountAction,
+  schema: accountSchema,
 };
+
+export const DO = { account };
 
 export namespace DO {
   export namespace account {

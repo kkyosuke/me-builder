@@ -24,8 +24,8 @@ import {
 } from "../schema/diagnosis";
 import { sourceRecords } from "../schema/source";
 
-export type DiagnosisListAvailability = "open" | "closed";
-export type DiagnosisListResponseStatus = "unanswered" | "in-progress" | "answered";
+type DiagnosisListAvailability = "open" | "closed";
+type DiagnosisListResponseStatus = "unanswered" | "in-progress" | "answered";
 
 export type DiagnosisListItem = Readonly<{
   id: string;
@@ -78,7 +78,7 @@ export type DeferDiagnosisQuestionResult =
   | { type: "diagnosis-question-not-found" }
   | { type: "question-already-answered" };
 
-export type DiagnosisAnswers = Readonly<{
+type DiagnosisAnswers = Readonly<{
   id: string;
   title: string;
   description: string;
