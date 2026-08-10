@@ -2,7 +2,7 @@ import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { LoadingState } from "./components/loading-state";
 import { RouteErrorBoundary } from "./components/route-error-boundary";
 import { config } from "./config";
-import { useLiffSession } from "./feature/liff";
+import { LiffSessionProvider, useLiffSession } from "./feature/liff";
 import { getLiffIdToken } from "./feature/liff/infrastructure/liff-client";
 import { verifyLiffSession } from "./feature/liff/infrastructure/session-api";
 import type { AvatarSelection } from "./feature/profile-settings/model/avatar";
@@ -61,7 +61,7 @@ function resolveRequestedPathname(): string {
   return liffState.split(/[?#]/, 1)[0] ?? window.location.pathname;
 }
 
-export function App() {
+function AppContents() {
   const colorTheme = useColorTheme();
   const liffSession = useLiffSession();
   const [navigation, setNavigation] = useState(() => {
@@ -197,6 +197,7 @@ export function App() {
         <ProfileMenuButton
           ref={profileButtonRef}
           avatar={avatar}
+          linePictureUrl={liffSession.profile?.pictureUrl}
           onOpen={openProfile}
           onPreload={preloadProfileSettingsScreen}
         />
@@ -253,5 +254,13 @@ export function App() {
         </RouteErrorBoundary>
       )}
     </>
+  );
+}
+
+export function App() {
+  return (
+    <LiffSessionProvider>
+      <AppContents />
+    </LiffSessionProvider>
   );
 }
