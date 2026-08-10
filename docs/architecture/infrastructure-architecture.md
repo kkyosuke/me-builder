@@ -139,6 +139,7 @@ flowchart TD
 
   ```text
   me-builder/
+  ├── infra/              # PulumiによるCloudflare基盤リソースとWrangler設定の生成
   ├── Taskfile.yml       # タスクランナー定義 (task dev, task i, task deploy:preview 等)
   ├── package.json       # ルート設定 (workspaces 定義, wrangler devDependency)
   ├── tsconfig.json      # モノレポ共通 TypeScript 設定
@@ -159,7 +160,33 @@ flowchart TD
   - `packages/shared`: 全アプリケーション間で共有されるドメイン型定義およびユーティリティライブラリ。
   - `packages/lib`: LINE Messaging API 連携および Cloudflare D1 データベース操作（Drizzle ORM モジュール）等を提供するヘルパーライブラリ。
 
-- **環境分類と Wrangler 構成 (`Local` / `Preview` / `Production`)**:
+### 6.1 Cloudflareリソースの宣言とデプロイ境界
+
+Cloudflareの基盤リソースは`infra/`のPulumi programをSSoTとします。Pulumiは環境ごとのD1 database、QueueおよびDLQを作成・変更・削除し、stack outputからリポジトリ内の`wrangler.toml`を生成します。リソースIDを手作業でTOMLへ複製しません。
+
+Worker scriptのbundle、Secretの配布、Durable Object migrationとQueue consumerの登録はWranglerが担当します。Durable Object namespaceとmigration履歴はWorker scriptが所有し、独立したPulumiリソースとして作成・削除できないためです。`infra`のライフサイクルコマンドは、この所有関係に従って実行順を制御します。
+
+```mermaid
+flowchart LR
+    Program["infra/ Pulumi program"] --> Up["pulumi up"]
+    Up --> Base["D1 / Queues / DLQs"]
+    Base --> Output["stack output"]
+    Output --> Generate["wrangler.toml生成"]
+    Generate --> Deploy["Wrangler deploy"]
+    Deploy --> Worker["Workers / DO migrations / Queue consumers"]
+
+    Destroy["環境削除"] --> Stop["API・MCP Workerとconsumerを先に削除"]
+    Stop --> Unbind["削除用WorkerでQueue bindingを解除"]
+    Unbind --> QueueWorker["Queue Worker / DOを削除"]
+    QueueWorker --> PulumiDestroy["pulumi destroy"]
+    PulumiDestroy --> Removed["D1 / Queues / DLQsを削除"]
+```
+
+Previewの破壊的な検証はPreview専用stackでのみ行います。削除時はAPI・MCP WorkerとQueue consumerを先に削除し、削除専用の最小Workerを一度デプロイしてproducer bindingも解除します。その後、Queue Workerの削除で所有するDOとmigration履歴を破棄し、`pulumi destroy`でD1・Queue・DLQを削除します。再構築時は`pulumi up`、TOML生成、D1 migration、Workerデプロイの順とします。Productionを破壊対象とするコマンドは提供しません。
+
+GitHub Actionsの手動resetは常に最新`main`を対象にこのライフサイクルを実行し、復旧確認後に新しいD1・Queue IDをmanifestとWrangler TOMLへ反映するPRを自動作成します。通常のPreview CDはデプロイ前にCloudflare上の現在IDを検証・同期するため、自動PRがマージされる前でも古いD1 IDを参照しません。
+
+- **環境分類と Pulumi / Wrangler 構成 (`Local` / `Preview` / `Production`)**:
   - **ローカル開発環境 (`Local`)**:
     - `wrangler.toml` 内の `env.local` ターゲット（`me-builder-api-local`, `me-builder-mcp-local`, `me-builder-web-local`）。
     - ルートの `bun dev` または `wrangler dev --env local` によりローカルエミュレーション実行。
@@ -180,7 +207,7 @@ flowchart TD
       - API (`apps/api`): `api.kagami.kyosuke.dev`
       - MCP (`apps/mcp`): `mcp.kagami.kyosuke.dev`
 
-### 6.1 APIドキュメントのCloudflare Access境界
+### 6.2 APIドキュメントのCloudflare Access境界
 
 PreviewとProductionでは、APIドキュメントを利用者向けAPIとは別のCloudflare Access Applicationで保護します。ApplicationはAPIホスト全体ではなく、次のパスだけを対象にします。
 

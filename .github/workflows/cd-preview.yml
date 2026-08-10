@@ -75,13 +75,13 @@ jobs:
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
         run: bun run --cwd apps/worker check:gemini "Reply with OK."
 
+      - name: Sync Wrangler Configuration with Preview Infrastructure
+        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
+        run: task infra:preview:sync
+
       - name: Protect API Documentation with Cloudflare Access (Preview)
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
         run: task access:setup:preview
-
-      - name: Ensure Queues (Preview)
-        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
-        run: task queues:setup:preview
 
       - name: Apply D1 Migrations (Preview)
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}

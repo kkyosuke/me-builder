@@ -1,0 +1,33 @@
+{
+  "environment": "preview",
+  "database": {
+    "id": "68d8ef16-c42c-4d56-819f-fa02b3b73b47",
+    "name": "me-builder-db-preview"
+  },
+  "queues": {
+    "webhook": {
+      "id": "2b25a021c44c4130b8623ccc7d4e94ff",
+      "name": "me-builder-webhook-queue-preview"
+    },
+    "webhookDeadLetter": {
+      "id": "540777a62f83493ea25c1145477422a2",
+      "name": "me-builder-webhook-dlq-preview"
+    },
+    "chatTurn": {
+      "id": "c1ac8fe440524079b7185574ef8a19c9",
+      "name": "me-builder-chat-turn-queue-preview"
+    },
+    "chatTurnDeadLetter": {
+      "id": "a0d9e3f8d0754de7991f401045186474",
+      "name": "me-builder-chat-turn-dlq-preview"
+    },
+    "brainCheckpoint": {
+      "id": "3b75f18e5d0648acade26e5af2805749",
+      "name": "me-builder-brain-checkpoint-queue-preview"
+    },
+    "brainCheckpointDeadLetter": {
+      "id": "c56c5bd351214d249a59dd6a221756cf",
+      "name": "me-builder-brain-checkpoint-dlq-preview"
+    }
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "name": "@me-builder/infra",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc --noEmit",
+    "check:wrangler": "bun scripts/check-wrangler.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --dir .",
+    "generate:wrangler": "bun scripts/generate-wrangler.ts",
+    "preview:clean": "bun scripts/preview-clean.ts",
+    "preview:destroy": "bun scripts/preview-destroy.ts",
+    "preview:sync": "bun scripts/preview-sync.ts",
+    "preview:up": "bun scripts/preview-up.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.4.5",
+    "vitest": "^4.1.0"
+  },
+  "dependencies": {
+    "@pulumi/cloudflare": "^6.19.0",
+    "@pulumi/pulumi": "^3.256.0"
+  }
+}

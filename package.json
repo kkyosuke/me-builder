@@ -1,12 +1,12 @@
 {
   "name": "me-builder",
   "private": true,
-  "workspaces": ["apps/*", "packages/*"],
+  "workspaces": ["apps/*", "infra", "packages/*"],
   "scripts": {
     "dev": "bun --filter '*' dev",
     "build": "bun --filter '*' build",
     "generate:api": "bun --cwd apps/api generate:openapi && bun --cwd apps/web generate:api",
-    "check:generated": "bun run generate:api && git diff --exit-code -- apps/api/openapi.json apps/web/src/generated/api.ts",
+    "check:generated": "bun --cwd infra check:wrangler && bun run generate:api && git diff --exit-code -- apps/api/openapi.json apps/web/src/generated/api.ts",
     "typecheck": "bun --filter '*' typecheck",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",

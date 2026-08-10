@@ -21,6 +21,8 @@ bun.lockb
 
 # Wrangler / Miniflare のローカル状態とローカルシークレット
 .wrangler
+.pulumi
+.pulumi-state
 .dev.vars
 .dev.vars.*
 !.dev.vars.example
