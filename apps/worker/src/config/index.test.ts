@@ -1,11 +1,6 @@
 import * as v from "valibot";
 import { describe, expect, it } from "vitest";
-import {
-  DEFAULT_CHAT_CONTEXT_MESSAGE_LIMIT,
-  DEFAULT_CLOUDFLARE_AI_GATEWAY_BASE_URL,
-  WorkerConfigSchema,
-  getWorkerConfig,
-} from "./index";
+import { DEFAULT_CHAT_CONTEXT_MESSAGE_LIMIT, WorkerConfigSchema, getWorkerConfig } from "./index";
 
 describe("Worker Config", () => {
   it("WorkerConfigSchema defaults environment to development", () => {
@@ -25,7 +20,6 @@ describe("Worker Config", () => {
     expect(config.baseUrl).toBe("https://worker.stg.kagami.kyosuke.dev");
     expect(config.apiUrl).toBe("https://api.stg.kagami.kyosuke.dev");
     expect(config.lineChannelAccessToken).toBe("test-token-123");
-    expect(config.cloudflareAiGatewayBaseUrl).toBe(DEFAULT_CLOUDFLARE_AI_GATEWAY_BASE_URL);
     expect(config.geminiModel).toBe("gemini-3.5-flash-lite");
     expect(config.chatContextMessageLimit).toBe(DEFAULT_CHAT_CONTEXT_MESSAGE_LIMIT);
   });
@@ -36,17 +30,13 @@ describe("Worker Config", () => {
     expect(getWorkerConfig({ LIFF_ID: "  " }).liffId).toBeUndefined();
   });
 
-  it("Cloudflare AI Gateway と Gemini の設定を取得すること", () => {
+  it("Vertex AI Express Modeの設定を取得すること", () => {
     const config = getWorkerConfig({
-      GOOGLE_AI_STUDIO_API_KEY: "google-key",
-      CLOUDFLARE_APP_API_TOKEN: "gateway-token",
-      CF_AI_GATEWAY_BASE_URL: "https://gateway.example.com/google-ai-studio",
+      GOOGLE_VERTEX_AI_API_KEY: "google-key",
       GEMINI_MODEL: "gemini-test-model",
     });
 
-    expect(config.googleAiStudioApiKey).toBe("google-key");
-    expect(config.cloudflareAiGatewayToken).toBe("gateway-token");
-    expect(config.cloudflareAiGatewayBaseUrl).toBe("https://gateway.example.com/google-ai-studio");
+    expect(config.googleVertexAiApiKey).toBe("google-key");
     expect(config.geminiModel).toBe("gemini-test-model");
   });
 

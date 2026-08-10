@@ -1,30 +1,21 @@
 import { GoogleGenAI, type GoogleGenAIOptions } from "@google/genai";
 import { OperationalError, type OperationalErrorDescriptor } from "@me-builder/shared";
 
-export interface GeminiGatewayConfig {
-  googleAiStudioApiKey: string;
-  cloudflareAiGatewayToken: string;
-  cloudflareAiGatewayBaseUrl: string;
+export interface GeminiConfig {
+  googleVertexAiApiKey: string;
 }
 
 type GoogleGenAiFactory = (options: GoogleGenAIOptions) => GoogleGenAI;
 
-/** Cloudflare AI Gateway 経由で Google AI Studio を呼び出すクライアントを作成します。 */
+/** Vertex AI Express ModeへAPI keyで直接接続するクライアントを作成します。 */
 export function createGeminiClient(
-  config: GeminiGatewayConfig,
+  config: GeminiConfig,
   factory: GoogleGenAiFactory = (options) => new GoogleGenAI(options),
 ): GoogleGenAI {
   return factory({
-    apiKey: config.googleAiStudioApiKey,
-    httpOptions: {
-      baseUrl: config.cloudflareAiGatewayBaseUrl,
-      headers: {
-        "cf-aig-authorization": `Bearer ${config.cloudflareAiGatewayToken}`,
-        // 日記本文・AI応答本文をGatewayへ保存せず、token数やcostなどのmetadataだけを残す。
-        "cf-aig-collect-log-payload": "false",
-        "cf-aig-cache-ttl": "0",
-      },
-    },
+    vertexai: true,
+    apiKey: config.googleVertexAiApiKey,
+    apiVersion: "v1",
   });
 }
 

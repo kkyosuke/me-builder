@@ -11,9 +11,6 @@ type Env = Omit<ApiBindings, "DB" | "WEBHOOK_QUEUE" | "ACCOUNT_DATA" | "COMPATIB
   LIFF_ID?: string;
   LINE_LOGIN_CHANNEL_ID?: string;
   ADMIN_LINE_USER_IDS?: string;
-  CLOUDFLARE_ACCOUNT_ID?: string;
-  CLOUDFLARE_AI_GATEWAY_ID?: string;
-  CLOUDFLARE_APP_API_TOKEN?: string;
   BASE_URL?: string;
   WEBHOOK_QUEUE?: Queue<WebhookQueueMessage>;
   DB?: D1Database;

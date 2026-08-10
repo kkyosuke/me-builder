@@ -91,16 +91,15 @@
 - **環境設定管理 (`src/config/`)**:
   - `@me-builder/shared` が提供する `getEnv` 関数を用いて、Cloudflare Workers Bindings (`c.env`) およびローカル環境 (`process.env`) の差分を吸収し、生の環境変数を取得・URL 補完・Valibot パースを行い設定オブジェクトを組み立てて返却します。
 
-- **Cloudflare AI Gateway 経由の Gemini 接続**:
-  - Google AI Studio の呼び出しは `apps/worker/src/infrastructure/gemini-client.ts` に閉じ込め、`@google/genai` の `GoogleGenAI` を Cloudflare AI Gateway の Google AI Studio provider URL へ接続します。
-  - `CLOUDFLARE_APP_API_TOKEN`はアプリ用tokenとしてAI Gatewayの実行とAnalytics参照に共用し、WorkerとAPI ServerのSecretとして配布します。Google AI Studioの認証には別途`GOOGLE_AI_STUDIO_API_KEY`をWorkerへ配布します。インフラ構築用の`CLOUDFLARE_DEPLOY_API_TOKEN`とは兼用せず、いずれもクライアントバンドル、`wrangler.toml`の`[vars]`、ログへ出力してはいけません。
-  - CDはGemini生成に加えてAI Gateway AnalyticsのGraphQL取得も実行し、`CLOUDFLARE_APP_API_TOKEN`の`AI Gateway Run`と`Account Analytics Read`をそれぞれ検証します。
-  - Gateway URL は `CF_AI_GATEWAY_BASE_URL`、モデルは `GEMINI_MODEL` で上書きできます。未指定時は設定層の既定値を利用します。
-  - ローカルの接続確認は `apps/worker/.env.example` を参照して環境変数を設定し、`bun --cwd apps/worker run check:gemini` を実行します。プロンプトはコマンド末尾の引数で変更できます。
+- **Vertex AI Express Mode の Gemini 接続**:
+  - Vertex AI Express Mode の呼び出しは `apps/worker/src/infrastructure/gemini-client.ts` に閉じ込め、`@google/genai` の `GoogleGenAI` を`vertexai: true`とAPI version `v1`で初期化してGoogleへ直接接続します。
+  - `GOOGLE_VERTEX_AI_API_KEY`はWorker Secretだけに配布し、クライアントバンドル、`wrangler.toml`の`[vars]`、APIレスポンス、ログへ出力してはいけません。
+  - モデルは `GEMINI_MODEL` で上書きできます。未指定時は設定層の既定値を利用します。
+  - ローカルの接続確認は `apps/worker/.env.example` を参照して環境変数を設定し、`bun run --cwd apps/worker check:gemini` を実行します。プロンプトはコマンド末尾の引数で変更できます。
 
 - **LINE Webhook 自動登録および日記返信**:
   - API サーバー起動時 (`src/index.ts`) または CLI スクリプト (`bun run register:webhook`) の実行時、`LINE_CHANNEL_ACCESS_TOKEN` および `LINE_WEBHOOK_URL` (または `BASE_URL`) が環境変数として与えられている場合、公式 SDK (`@line/bot-sdk`) の `MessagingApiClient.setWebhookEndpoint` を用いて自動的に LINE Messaging API へ Webhook Endpoint URL を登録・更新します。
-  - CDの登録処理は、登録後のURL一致、Webhookの有効化状態、LINE Platformから登録URLへの疎通を公式SDKで検証し、いずれかが不成立ならデプロイを失敗させます。また、Workerのデプロイ後にGeminiへの最小リクエストを実行し、Secret・AI Gateway・モデルの接続不良をデプロイ成功として扱いません。応答本文やSecretはログへ出力しません。
+  - CDの登録処理は、登録後のURL一致、Webhookの有効化状態、LINE Platformから登録URLへの疎通を公式SDKで検証し、いずれかが不成立ならデプロイを失敗させます。また、デプロイ前にGeminiへの最小リクエストを実行し、Secret・Vertex AI・モデルの接続不良がある状態をデプロイしません。応答本文やSecretはログへ出力しません。
   - Webhook受信メッセージは決定的なcommand routing後にCloudflare Queues経由でQueue Worker (`apps/worker`) へ配信します。診断commandの返信は既存の`replyToken`経路を使い、日記の最終応答は[日記チャット実装設計](../../docs/architecture/diary-chat-implementation-design.md#9-38秒sloと配送)を正とします。**送られた本文をオウム返ししません。**
   - 署名検証に成功した1対1トークのテキストメッセージでは、API ServerがQueue投入前に`MessagingApiClient.showLoadingAnimation`を呼び、60秒のチャットローディングを表示します。診断、日記、AIチャットを受信側で重複判定せず、いずれも同じ待機表示にします。グループトークと非テキストイベントは対象外です。ローディングAPIの完了はQueue投入前に待たず、Cloudflare Workersでは`executionCtx.waitUntil`へ渡してWebhook応答のクリティカルパスから外します。ローディングAPIの失敗はQueue投入を止めず、本人識別子である`userId`をログへ出力しません（[LINE公式ガイド](https://developers.line.biz/en/docs/messaging-api/use-loading-indicator/)）。
   - 日記では独立した受付Pushを送らず、`showLoadingAnimation`の後にAIの最終応答をPushします。最終応答には診断導線を付加しません。LINE 内から Web を開く主導線はリッチメニューであり、設計は [Phase 1 診断体験設計 §7](../../docs/diagnosis/diagnosis-experience.md#7-リッチメニュー) を正とします。

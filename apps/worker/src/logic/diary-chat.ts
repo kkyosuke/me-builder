@@ -125,14 +125,12 @@ export async function generateDiaryChatResponse(
 ): Promise<DiaryChatResponse> {
   const safetyRoute = classifySafety(messages, context?.currentUserMessageIds);
   if (safetyRoute === "imminent_danger") return buildSafetyFallback(safetyRoute);
-  if (!workerConfig.googleAiStudioApiKey || !workerConfig.cloudflareAiGatewayToken) {
+  if (!workerConfig.googleVertexAiApiKey) {
     return buildSafetyFallback(safetyRoute);
   }
 
   const client = createGeminiClient({
-    googleAiStudioApiKey: workerConfig.googleAiStudioApiKey,
-    cloudflareAiGatewayToken: workerConfig.cloudflareAiGatewayToken,
-    cloudflareAiGatewayBaseUrl: workerConfig.cloudflareAiGatewayBaseUrl,
+    googleVertexAiApiKey: workerConfig.googleVertexAiApiKey,
   });
   const contents = JSON.stringify({
     context_package: {
