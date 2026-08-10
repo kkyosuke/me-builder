@@ -1,6 +1,6 @@
 import { type Environment, parseEnvironment, resourceNames } from "./environment";
 
-export type QueueKey = keyof ReturnType<typeof resourceNames>["queues"];
+type QueueKey = keyof ReturnType<typeof resourceNames>["queues"];
 
 export interface InfrastructureManifest {
   environment: Environment;

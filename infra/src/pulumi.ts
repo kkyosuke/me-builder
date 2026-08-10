@@ -7,7 +7,7 @@ const infraRoot = resolve(import.meta.dir, "..");
 const pulumi = process.env.PULUMI_COMMAND || "pulumi";
 const backend = process.env.PULUMI_BACKEND_URL || `file://${resolve(infraRoot, ".pulumi-state")}`;
 
-export async function selectPreviewStack() {
+async function selectPreviewStack() {
   if (!process.env.PULUMI_BACKEND_URL) {
     await mkdir(resolve(infraRoot, ".pulumi-state"), { recursive: true });
   }

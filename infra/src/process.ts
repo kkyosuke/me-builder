@@ -15,7 +15,7 @@ export async function run(command: string[], options: { stdout?: "inherit" | "pi
   return stdout;
 }
 
-export function processEnv() {
+function processEnv() {
   return {
     ...process.env,
     PULUMI_CONFIG_PASSPHRASE: process.env.PULUMI_CONFIG_PASSPHRASE || "",

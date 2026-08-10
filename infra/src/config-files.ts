@@ -2,7 +2,7 @@ import { resolve } from "node:path";
 import { parseManifest } from "./manifest";
 import { renderWranglerConfigs } from "./wrangler";
 
-export const root = resolve(import.meta.dir, "../..");
+const root = resolve(import.meta.dir, "../..");
 export const configPaths = {
   worker: resolve(root, "apps/worker/wrangler.toml"),
   api: resolve(root, "apps/api/wrangler.toml"),

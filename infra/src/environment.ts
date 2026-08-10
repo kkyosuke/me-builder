@@ -1,4 +1,4 @@
-export const environments = ["preview", "production"] as const;
+const environments = ["preview", "production"] as const;
 
 export type Environment = (typeof environments)[number];
 
