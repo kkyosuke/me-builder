@@ -71,10 +71,6 @@ jobs:
       - name: Build Web Deployment Artifact
         run: bun --filter @me-builder/web build
 
-      - name: Verify Vertex AI Connectivity (Preview)
-        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
-        run: bun run --cwd apps/worker check:gemini "Reply with OK."
-
       - name: Sync Wrangler Configuration with Preview Infrastructure
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
         run: task infra:preview:sync
@@ -136,22 +132,21 @@ jobs:
           bun --filter @me-builder/mcp deploy:preview
           bun --filter @me-builder/web deploy:preview
 
+      # URL が変わっていなければ現在の登録状態を 1 回問い合わせるだけで終わる。
+      # 登録し直したときだけ LINE Platform からの疎通確認まで実行し、
+      # デプロイ直後で Worker がまだ応答しない場合に備えて 1 度だけ再試行する。
       - name: Register LINE Webhook (Preview)
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' && env.LINE_CHANNEL_ACCESS_TOKEN != '' }}
         env:
           LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
           BASE_DOMAIN: ${{ vars.BASE_DOMAIN }}
         run: |
-          for attempt in 1 2 3; do
-            if bun --cwd apps/api scripts/register-webhook.ts; then
-              exit 0
-            fi
-            if [ "${attempt}" -lt 3 ]; then
-              echo "LINE Webhook verification failed (attempt ${attempt}/3); retrying in 15 seconds."
-              sleep 15
-            fi
-          done
-          exit 1
+          if bun --cwd apps/api scripts/register-webhook.ts; then
+            exit 0
+          fi
+          echo "LINE Webhook registration failed; retrying once in 5 seconds."
+          sleep 5
+          bun --cwd apps/api scripts/register-webhook.ts
 
       # デプロイ済みの URL を LIFF アプリのエンドポイント URL へ反映する
       - name: Register LIFF Endpoint (Preview)

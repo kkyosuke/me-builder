@@ -1,0 +1,102 @@
+name: CI
+
+# パッケージごとにワークフローを分けると、1 回の push で 6〜7 個の job が同時に走り、
+# それぞれが checkout と bun install (約 25 秒) を払い直したうえ、GitHub Actions の課金は
+# job ごとに分単位へ切り上げられる。検証内容は変えずに単一 job へまとめ、この固定費を 1 回だけ払う。
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# 同じ PR へ続けて push したとき、古い実行は結果を待たずに捨てる。
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify
+    runs-on: ubuntu-latest
+    # 外部要因でぶら下がった実行が課金され続けるのを防ぐ上限。通常は 5 分以内に終わる。
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      # 変更が無い領域の検証は丸ごと飛ばす (ドキュメントだけの PR で全テストを回さない)。
+      - name: Detect Changed Areas
+        id: changes
+        if: github.event_name == 'pull_request'
+        uses: dorny/paths-filter@v4
+        with:
+          filters: |
+            code:
+              - 'apps/**'
+              - 'packages/**'
+              - 'infra/**'
+              - 'scripts/**'
+              - 'package.json'
+              - 'bun.lock'
+              - 'tsconfig.json'
+              - 'biome.json'
+              - 'knip.json'
+              - 'vitest.config.ts'
+              - 'Taskfile.yml'
+              - '.github/**'
+            docs:
+              - '**/*.md'
+              - '.markdownlint.json'
+              - '.markdownlintignore'
+
+      # 手動実行には比較対象の base が無いため、範囲を絞らず全部検証する。
+      - name: Resolve Verification Scope
+        id: scope
+        env:
+          IS_PULL_REQUEST: ${{ github.event_name == 'pull_request' }}
+          CODE_CHANGED: ${{ steps.changes.outputs.code }}
+          DOCS_CHANGED: ${{ steps.changes.outputs.docs }}
+        run: |
+          if [ "${IS_PULL_REQUEST}" = "true" ]; then
+            echo "code=${CODE_CHANGED}" >> "${GITHUB_OUTPUT}"
+            echo "docs=${DOCS_CHANGED}" >> "${GITHUB_OUTPUT}"
+          else
+            echo "code=true" >> "${GITHUB_OUTPUT}"
+            echo "docs=true" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - uses: ./.github/actions/setup-bun-workspace
+        if: steps.scope.outputs.code == 'true' || steps.scope.outputs.docs == 'true'
+
+      - name: Generated API Contract Check
+        if: steps.scope.outputs.code == 'true'
+        run: bun run check:generated
+
+      - name: Biome Lint & Format Check
+        if: steps.scope.outputs.code == 'true'
+        run: bun run lint
+
+      - name: Unused Exports Check (Knip)
+        if: steps.scope.outputs.code == 'true'
+        run: bun run lint:exports
+
+      - name: Markdown Lint Check
+        if: steps.scope.outputs.docs == 'true'
+        run: bun run lint:md
+
+      - name: Type Check
+        if: steps.scope.outputs.code == 'true'
+        run: bun run typecheck
+
+      # ルートの vitest を 1 プロセスで回すと、パッケージごとに vitest を起動し直すより速く、
+      # かつ apps/web のように個別 CI ではテストされていなかったパッケージまで含められる。
+      # E2E と Worker runtime E2E も `bun run test` に含まれる。
+      - name: Run Tests
+        if: steps.scope.outputs.code == 'true'
+        run: bun run test
+
+      - name: Build Check
+        if: steps.scope.outputs.code == 'true'
+        run: bun run build

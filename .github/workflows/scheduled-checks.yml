@@ -1,0 +1,31 @@
+name: Scheduled Checks
+
+# 外部サービスの応答を待つ検証をここへ集める。
+# これらが失敗する原因はほぼ常にリンク先の変化であって PR の変更ではないため、
+# PR ごとに実行すると待ち時間と不安定な失敗を毎回払うだけになる。
+on:
+  schedule:
+    # 毎週月曜 09:00 JST (00:00 UTC)
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: scheduled-checks
+  cancel-in-progress: true
+
+jobs:
+  external:
+    name: External Link Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-bun-workspace
+
+      # ドキュメント内の外部 URL を 1 件ずつ取得しにいくため、応答待ちが実行時間の大半を占める。
+      - name: Markdown Link Check
+        run: bun run lint:md:links
