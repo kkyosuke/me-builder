@@ -11,6 +11,8 @@ on:
 
 permissions:
   contents: read
+  # dorny/paths-filter が変更ファイル一覧を PR API から取得するために必要。
+  pull-requests: read
 
 # 同じ PR へ続けて push したとき、古い実行は結果を待たずに捨てる。
 concurrency:
