@@ -19,6 +19,6 @@ export type LiffState =
 export type LiffSessionState =
   | { status: "idle" }
   | { status: "verifying" }
-  | { status: "verified" }
+  | { status: "verified"; role: "user" | "admin" }
   | { status: "friendship-required" }
   | { status: "error"; message: string };

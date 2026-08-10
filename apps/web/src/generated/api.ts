@@ -201,13 +201,15 @@ export interface operations {
       };
     };
     responses: {
-      /** @description 表示可能なLINEプロフィール */
+      /** @description 表示可能なLINEプロフィールと検証済みAccount role */
       200: {
         headers: {
           [name: string]: unknown;
         };
         content: {
           "application/json": {
+            /** @enum {string} */
+            role: "user" | "admin";
             displayName?: string;
             /** Format: uri */
             pictureUrl?: string;

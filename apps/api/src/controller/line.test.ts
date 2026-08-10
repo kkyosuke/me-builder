@@ -47,6 +47,7 @@ describe("POST /api/line/liff/session", () => {
     expect(res.status).toBe(200);
     // accountId はクライアントへ返さない (セッション管理の方式が未決定のため)
     expect(await res.json()).toEqual({
+      role: "user",
       displayName: "うつし",
       pictureUrl: "https://example.com/p.jpg",
     });

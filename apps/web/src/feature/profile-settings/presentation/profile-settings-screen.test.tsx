@@ -43,4 +43,34 @@ describe("ProfileSettingsScreen", () => {
     expect(onOpenAvatar).toHaveBeenCalledOnce();
     expect(onThemeChange).toHaveBeenCalledWith("light");
   });
+
+  it("管理者だけに管理者画面へのリンクを表示する", () => {
+    const { rerender } = render(
+      <ProfileSettingsScreen
+        avatar={null}
+        isAdmin={false}
+        theme="dark"
+        onBack={vi.fn()}
+        onOpenAvatar={vi.fn()}
+        onThemeChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole("link", { name: /管理者画面を開く/ })).toBeNull();
+
+    rerender(
+      <ProfileSettingsScreen
+        avatar={null}
+        isAdmin
+        theme="dark"
+        onBack={vi.fn()}
+        onOpenAvatar={vi.fn()}
+        onThemeChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("link", { name: /管理者画面を開く/ }).getAttribute("href")).toBe(
+      "/admin",
+    );
+  });
 });

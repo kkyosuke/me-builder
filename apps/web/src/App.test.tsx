@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
   },
   initializeLiff: vi.fn(),
   getLiffIdToken: vi.fn(),
+  verifyLiffSession: vi.fn(),
   fetchDiagnosisList: vi.fn(),
   fetchDiagnosisDefinition: vi.fn(),
   fetchDiagnosisProgress: vi.fn(),
@@ -37,6 +38,9 @@ vi.mock("./config", () => ({
 vi.mock("./feature/liff/infrastructure/liff-client", () => ({
   initializeLiff: mocks.initializeLiff,
   getLiffIdToken: mocks.getLiffIdToken,
+}));
+vi.mock("./feature/liff/infrastructure/session-api", () => ({
+  verifyLiffSession: mocks.verifyLiffSession,
 }));
 vi.mock("./feature/diagnosis/infrastructure/diagnosis-api", () => ({
   fetchDiagnosisList: mocks.fetchDiagnosisList,
@@ -162,6 +166,7 @@ describe("App", () => {
       profile: { displayName: "テスト" },
     });
     mocks.getLiffIdToken.mockReturnValue("dummy.id.token");
+    mocks.verifyLiffSession.mockResolvedValue({ status: "verified", role: "user" });
     mocks.fetchDiagnosisList.mockResolvedValue([diagnosis()]);
     mocks.fetchDiagnosisDefinition.mockResolvedValue(definition);
     mocks.fetchDiagnosisProgress.mockResolvedValue(undefined);
@@ -261,6 +266,21 @@ describe("App", () => {
       ((await screen.findByRole("radio", { name: /ライト/ })) as HTMLInputElement).checked,
     ).toBe(true);
     await waitFor(() => expect(document.documentElement.classList.contains("light")).toBe(true));
+  });
+
+  it("管理者のプロフィールにだけ管理者画面へのリンクを表示する", async () => {
+    mocks.verifyLiffSession.mockResolvedValue({ status: "verified", role: "admin" });
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "プロフィールを開く" }));
+
+    const adminLink = await screen.findByRole("link", { name: /管理者画面を開く/ });
+    expect(adminLink.getAttribute("href")).toBe("/admin");
+    expect(mocks.verifyLiffSession).toHaveBeenCalledWith(
+      "https://api.example.com",
+      "dummy.id.token",
+      expect.any(AbortSignal),
+    );
   });
 
   it("ダミー候補からアバターを設定してプロフィールへ戻る", async () => {

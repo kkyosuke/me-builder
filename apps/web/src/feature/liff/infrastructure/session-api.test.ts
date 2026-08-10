@@ -20,19 +20,19 @@ describe("verifyLiffSession", () => {
     vi.unstubAllGlobals();
   });
 
-  const mockFetch = (status: number) => {
+  const mockFetch = (status: number, responseBody: unknown = {}) => {
     vi.stubGlobal("fetch", async (url: string, init?: RequestInit) => {
       calls.push({ url, body: typeof init?.body === "string" ? init.body : undefined });
-      return { ok: status >= 200 && status < 300, status };
+      return { ok: status >= 200 && status < 300, status, json: async () => responseBody };
     });
   };
 
-  it("検証に成功すればverifiedを返し、IDトークンをAPIへ送る", async () => {
-    mockFetch(200);
+  it("検証に成功すればrole付きのverifiedを返し、IDトークンをAPIへ送る", async () => {
+    mockFetch(200, { role: "admin", displayName: "管理者" });
 
     const state = await verifyLiffSession(API_URL);
 
-    expect(state).toEqual({ status: "verified" });
+    expect(state).toEqual({ status: "verified", role: "admin" });
     expect(calls[0]?.url).toBe(`${API_URL}/api/line/liff/session`);
     expect(JSON.parse(calls[0]?.body ?? "{}")).toEqual({ idToken: "dummy.id.token" });
   });
