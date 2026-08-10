@@ -59,14 +59,17 @@
       - Actions 画面でブランチを選ぶか `gh workflow run cd-preview.yml --ref <branch>` で手動実行したとき (`workflow_dispatch`)
       - PR に `deploy` ラベルが付いているとき（ラベル付与時と、その後の push）。ラベルを外せば以降の push ではデプロイされませんが、**すでにデプロイ済みの環境は元に戻りません**。
     - 共有環境の取り合いを避けるため `concurrency: cd-preview` で直列化しています。実行中のデプロイは中断せず、待機中の実行だけが新しいものへ置き換わります。
-    - `reset-preview-migrations.yml` は Actions 画面または `gh workflow run reset-preview-migrations.yml --ref <branch> -f confirmation=reset-preview` からだけ起動します。選択したブランチを基準に Preview D1 のCloudflare予約table以外（`d1_migrations`を含む）と全 Durable Object namespaceを削除し、同じD1 database resourceへD1 migration、診断seedを再適用してWorker / API / MCPを再デプロイします。全Previewデータを復元不能に削除するため確認文字列を必須とし、productionは対象にしません。`cd-preview`と同じconcurrency groupで直列化します。再作成でresource IDが変わった場合は `chore/preview-resource-ids-<run id>` ブランチへcommitしてPRを作成します。
+    - `reset-preview-migrations.yml` は Actions 画面または `gh workflow run reset-preview-migrations.yml --ref <branch> -f confirmation=reset-preview` からだけ起動します。選択したブランチを基準に Preview D1 のCloudflare予約table以外（`d1_migrations`を含む）と全 Durable Object namespaceを削除し、同じD1 database resourceへD1 migration、診断seedを再適用してWorker / API / MCPを再デプロイします。全Previewデータを復元不能に削除するため確認文字列を必須とし、productionは対象にしません。`cd-preview`と同じconcurrency groupで直列化します。実行時に選んだブランチをそのままcheckoutするため、migration・seed・deployとresource IDのcommit先は同じブランチになります（tagからは実行できません）。
+      - 再作成でresource IDが変わったときの反映先は、実行したブランチで変わります。**`main`から実行した場合**は`chore/preview-resource-ids-<run id>`ブランチへcommitしてPRを作成し、同じjobで`bun run ci`が通ったときだけsquash mergeします（`main`はrulesetで直接pushできないため）。検証が落ちたときはPRを開いたまま残します。**それ以外のブランチから実行した場合**は、そのブランチへ直接commitしてpushし、PRは作りません。ブランチの持ち主がそのまま作業を続けられるようにするためで、検証はその人のPRの`ci.yml`が担います。
+      - `GITHUB_TOKEN`で作成したPRは`pull_request`イベントを発火せず`ci.yml`が走らないため、GitHubのauto-mergeではなくjob内の検証をマージ条件にします。
     - `main` ブランチマージ時には `cd-production.yml` が全検証後に Cloudflare 本番環境へ自動デプロイします。
     - Bun のセットアップ、キャッシュ、および `bun install --frozen-lockfile` の一連の処理は GitHub Composite Action (`.github/actions/setup-bun-workspace`) に共通化されています。
     - キャッシュは 2 種類あります。依存キャッシュ (`~/.bun/install/cache`) はルートの `bun.lock` のハッシュをキーにします (`**/bun.lock` はツリー全体を走査するため使いません)。型チェックの incremental 情報 (`**/*.tsbuildinfo`) は復元だけを全ワークフローで行い、保存は `main` の `cd-production.yml` だけが行います。PR ごとに保存するとリポジトリのキャッシュ上限 (10GB) を圧迫し、依存キャッシュが追い出されるためです。
     - `tsconfig.json` の `incremental` は、この tsbuildinfo キャッシュを効かせるために有効化しています。無効化するとキャッシュが無意味になります。
   - パッケージの追加・削除はルートから `bun add <package> --cwd <workspace-dir>`（例: `bun add @line/liff --cwd apps/web`）を使用し、個別ディレクトリで `npm install` を実行しないこと。ルートで引数なしに `bun add <package>` を実行するとルートの `package.json` に入ってしまうため、対象ワークスペースを必ず指定します。
   - pre-pushではブランチ名、型、E2E以外のテストを検証します。ローカルD1などを使うE2Eはpushの必須条件にせず、`task test`と`task ci`、GitHub Actionsでは`e2e`ラベル付きPRの`ci-e2e.yml`と`cd-production.yml`が実行します。
-  - `postinstall`の`lefthook install`はGitHub Actions上でもhookを設置するため、ワークフロー内でcommit / pushするstepには`LEFTHOOK: "0"`を設定してhookを無効化します。hookはローカル開発者向けの検証であり、作成したPRでCIが同じ検証を実行します。
+  - `postinstall`の`lefthook install`はGitHub Actions上でもhookを設置するため、ワークフロー内でcommit / pushするstepには`LEFTHOOK: "0"`を設定してhookを無効化します。hookはローカル開発者向けの検証であり、ワークフロー側は`bun run ci`などで同じ検証を明示的に実行します。
+  - ワークフローが`GITHUB_TOKEN`で作成したPRは`pull_request`イベントを発火せず、`ci.yml`が起動しません。自動PRをテスト結果で条件付きにマージする場合は、GitHubのauto-mergeやrequired status checksに頼らず、PRを作った同じjobで検証を実行してからマージします。
   - 環境変数を読む設定関数のテストで「未設定ならundefined」を検証する場合は、`vi.stubEnv(<name>, undefined)`で実行環境の値を消します。`getEnv`はCloudflare Workersの`env`に無いキーを`process.env`から補うため、GitHub Actionsのjob levelの`env`が混ざるとローカルだけ通るテストになります。
 - **Web UI (`apps/web`) のカスタムドメイン**:
   - `apps/web` は Cloudflare **Pages** で配信するため、Workers (`api` / `mcp` / `worker`) のように `wrangler.toml` の `routes` で DNS レコードを自動作成できません。ドメインのプロジェクト登録と DNS の CNAME 作成は [`scripts/setup-pages-domain.ts`](../../scripts/setup-pages-domain.ts) が行い、`apps/web` の `deploy:preview` / `deploy:production` から呼び出します。
