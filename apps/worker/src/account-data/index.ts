@@ -1,5 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 import {
+  type AccountDataActions,
   type AccountDataArgs,
   type AccountDataOperation,
   type AccountDataResult,
@@ -10,12 +11,6 @@ import {
 import { logger, toSafeOperationalErrorFields } from "@me-builder/shared";
 import { eq, inArray } from "drizzle-orm";
 import type { Env } from "../types";
-import {
-  avatarActions,
-  listPendingAvatarObjectDeletions,
-  markAvatarObjectDeleted,
-  retryAvatarObjectDeletion,
-} from "./avatar";
 import { brainActions } from "./brain";
 import { compatibilityActions } from "./compatibility";
 import { diagnosisActions } from "./diagnosis";
@@ -27,7 +22,6 @@ import {
 } from "./repository";
 
 const actions = {
-  ...avatarActions,
   ...brainActions,
   ...diagnosisActions,
   ...diaryActions,
@@ -82,6 +76,11 @@ export class AccountData extends DurableObject<Env> {
         ) => AccountDataResult<TOperation>;
         return boundAction(this.repository, accountId, ...args);
       }
+      if (operation.startsWith("avatar.")) {
+        const result = await this.executeAvatarOperation(operation, args);
+        await this.scheduleMaintenance();
+        return result as AccountDataResult<TOperation>;
+      }
 
       const action = (actions as Partial<Record<AccountDataOperation, unknown>>)[operation];
       if (typeof action !== "function") throw new Error("Unsupported AccountData operation");
@@ -134,51 +133,14 @@ export class AccountData extends DurableObject<Env> {
             throw new Error("Diary Brain checkpoint dispatch state could not be recorded");
           }
         }
-        const pending = await avatarActions["avatar.listPendingEnqueues"](
-          this.repository.client,
-          this.accountId,
-        );
-        for (const item of pending) {
-          try {
-            if (!this.env.AVATAR_QUEUE) throw new Error("Avatar Queue binding is not configured");
-            await this.env.AVATAR_QUEUE.send({
-              type: "avatar",
-              traceId: item.jobId,
-              accountId: this.accountId,
-              jobId: item.jobId,
-              operation: item.operation,
-            });
-            await avatarActions["avatar.markEnqueued"](
-              this.repository.client,
-              this.accountId,
-              item.jobId,
-              item.operation,
-            );
-          } catch (error) {
-            await avatarActions["avatar.recordEnqueueFailure"](
-              this.repository.client,
-              this.accountId,
-              item.jobId,
-              item.operation,
-            );
-            logger.warn(
-              { errorName: error instanceof Error ? error.name : "UnknownError" },
-              "Avatar Queue enqueue failed; AccountData alarm will retry",
-            );
-          }
-        }
         if (this.env.AVATAR_BUCKET) {
-          const deletions = await listPendingAvatarObjectDeletions(this.repository.client);
+          const deletions = await this.repository.listDueAvatarObjectDeletions();
           for (const deletion of deletions) {
             try {
               await this.env.AVATAR_BUCKET.delete(deletion.objectKey);
-              await markAvatarObjectDeleted(this.repository.client, deletion.objectKey);
+              await this.repository.markAvatarObjectDeleted(deletion.objectKey);
             } catch (error) {
-              await retryAvatarObjectDeletion(
-                this.repository.client,
-                deletion.objectKey,
-                deletion.attemptCount,
-              );
+              await this.repository.retryAvatarObjectDeletion(deletion.objectKey);
               logger.warn(
                 { errorName: error instanceof Error ? error.name : "UnknownError" },
                 "Avatar R2 deletion failed; AccountData alarm will retry",
@@ -465,7 +427,7 @@ export class AccountData extends DurableObject<Env> {
   }
 
   private async scheduleMaintenance(): Promise<void> {
-    const desired = this.repository.nextMaintenanceAt();
+    const desired = await this.nextMaintenanceAt();
     if (desired === null) return;
     const current = await this.ctx.storage.getAlarm();
     if (current === null || desired < current) await this.ctx.storage.setAlarm(desired);
@@ -473,8 +435,43 @@ export class AccountData extends DurableObject<Env> {
 
   private async scheduleMaintenanceRetry(): Promise<void> {
     const retryAt = Date.now() + ALARM_RETRY_MS;
-    const desired = this.repository.nextMaintenanceAt();
+    const desired = await this.nextMaintenanceAt();
     await this.ctx.storage.setAlarm(desired === null ? retryAt : Math.max(retryAt, desired));
+  }
+
+  private async nextMaintenanceAt(): Promise<number | null> {
+    const candidates = [
+      this.repository.nextMaintenanceAt(),
+      await this.repository.nextAvatarMaintenanceAt(),
+    ].filter((value): value is number => value !== null);
+    return candidates.length > 0 ? Math.min(...candidates) : null;
+  }
+
+  private async executeAvatarOperation(
+    operation: AccountDataOperation,
+    args: readonly unknown[],
+  ): Promise<unknown> {
+    switch (operation) {
+      case "avatar.getState":
+        return this.repository.getAvatarState();
+      case "avatar.setCurrent":
+        return this.repository.setCurrentAvatar(
+          args[0] as Parameters<AccountDataActions["avatar.setCurrent"]>[0],
+          args[1] as number,
+          args[2] as Date | undefined,
+        );
+      case "avatar.deleteCurrent":
+        return this.repository.deleteCurrentAvatar(args[0] as number, args[1] as Date | undefined);
+      case "avatar.resolveImage":
+        return this.repository.resolveAvatarImage(args[0] as string);
+      case "avatar.scheduleObjectDeletion":
+        return this.repository.scheduleAvatarObjectDeletion(
+          args[0] as string,
+          args[1] as Date | undefined,
+        );
+      default:
+        throw new Error("Unsupported AccountData operation");
+    }
   }
 
   private async runExclusive<TResult>(operation: () => Promise<TResult>): Promise<TResult> {

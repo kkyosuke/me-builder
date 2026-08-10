@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { renderHook } from "@testing-library/react";
+import { renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useLiffSessionState } from "./use-liff-session";
 
@@ -35,6 +35,19 @@ describe("useLiffSessionState", () => {
       "dummy.id.token",
     );
     expect(mocks.initializeLiff).toHaveBeenCalledWith("test-liff-id");
+  });
+
+  it("初期化時にLINEプロフィール画像を画面向けに公開する", async () => {
+    mocks.initializeLiff.mockResolvedValue({
+      status: "ready",
+      inClient: true,
+      profile: { displayName: "テスト", pictureUrl: "https://example.com/line-profile.jpg" },
+    });
+
+    const { result } = renderHook(() => useLiffSessionState());
+
+    await waitFor(() => expect(result.current.isInitializing).toBe(false));
+    expect(result.current.profile?.pictureUrl).toBe("https://example.com/line-profile.jpg");
   });
 
   it("同じ画面から同時に認証を要求してもLIFF初期化を共有する", async () => {

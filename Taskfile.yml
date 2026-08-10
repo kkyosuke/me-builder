@@ -77,12 +77,12 @@ tasks:
       - bun scripts/setup-d1.ts
 
   queues:setup:preview:
-    desc: 'Create chat/avatar Queues, DLQs and avatar R2 bucket for preview if missing'
+    desc: 'Create chat Queues, DLQs and avatar R2 bucket for preview if missing'
     cmds:
       - bun scripts/setup-chat-queues.ts preview
 
   queues:setup:production:
-    desc: 'Create chat/avatar Queues, DLQs and avatar R2 bucket for production if missing'
+    desc: 'Create chat Queues, DLQs and avatar R2 bucket for production if missing'
     cmds:
       - bun scripts/setup-chat-queues.ts production
 

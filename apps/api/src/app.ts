@@ -15,8 +15,7 @@ import {
   deleteAvatarRoute,
   getAvatarImageRoute,
   getAvatarRoute,
-  selectAvatarRoute,
-  uploadAvatarRoute,
+  saveAvatarRoute,
 } from "./contract/avatar";
 import { developmentBrainItemsRoute } from "./contract/brain/dev-list";
 import { saveDiagnosisAnswerRoute } from "./contract/diagnosis/answer";
@@ -34,8 +33,7 @@ import {
   deleteAvatarContents,
   getAvatarContents,
   getAvatarImageContents,
-  postAvatarUpload,
-  putAvatar,
+  postAvatarContents,
 } from "./controller/avatar";
 import { getDevelopmentBrainItems } from "./controller/brain";
 import {
@@ -122,8 +120,7 @@ app.get("/api/profile-summary", profileSummaryRoute, getProfileSummaryContents);
 app.get("/api/dev/brain-items", developmentBrainItemsRoute, getDevelopmentBrainItems);
 
 app.get("/api/avatar", getAvatarRoute, getAvatarContents);
-app.post("/api/avatar/uploads", uploadAvatarRoute, postAvatarUpload);
-app.put("/api/avatar", selectAvatarRoute, putAvatar);
+app.post("/api/avatar", saveAvatarRoute, postAvatarContents);
 app.delete("/api/avatar", deleteAvatarRoute, deleteAvatarContents);
 app.get("/api/avatar/images/:imageId", getAvatarImageRoute, getAvatarImageContents);
 

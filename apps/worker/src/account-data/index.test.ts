@@ -35,6 +35,7 @@ describe("AccountData alarm", () => {
       repository: {
         client: {},
         nextMaintenanceAt: () => nextAttemptAt,
+        nextAvatarMaintenanceAt: async () => null,
       },
       ctx: { storage: { setAlarm } },
       env: {

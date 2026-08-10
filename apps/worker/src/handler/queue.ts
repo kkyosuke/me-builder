@@ -1,5 +1,4 @@
 import type {
-  AvatarQueueMessage,
   ChatTurnQueueMessage,
   DiaryBrainCheckpointQueueMessage,
   MessageBatch,
@@ -13,10 +12,7 @@ import type { Env } from "../types";
 
 export async function queueHandler(
   batch: MessageBatch<
-    | WebhookQueueMessage
-    | ChatTurnQueueMessage
-    | DiaryBrainCheckpointQueueMessage
-    | AvatarQueueMessage
+    WebhookQueueMessage | ChatTurnQueueMessage | DiaryBrainCheckpointQueueMessage
   >,
   env: Env,
 ): Promise<void> {

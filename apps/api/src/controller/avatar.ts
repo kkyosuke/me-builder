@@ -5,12 +5,9 @@ import * as v from "valibot";
 import { getConfig } from "../config";
 import {
   AvatarChangeRateLimitedSchema,
-  AvatarConflictSchema,
   AvatarInvalidRequestSchema,
   AvatarNotFoundSchema,
-  AvatarSelectionInvalidRequestSchema,
   AvatarStateResponseSchema,
-  SelectAvatarRequestSchema,
 } from "../contract/avatar";
 import {
   AccountNotFoundErrorSchema,
@@ -18,13 +15,7 @@ import {
   UnauthorizedErrorSchema,
 } from "../contract/shared/errors";
 import { AvatarImageError } from "../infrastructure/avatar-image";
-import {
-  deleteAvatar,
-  getAvatarImage,
-  getAvatarState,
-  selectAvatar,
-  uploadAvatarSource,
-} from "../logic/avatar";
+import { deleteAvatar, getAvatarImage, getAvatarState, saveAvatar } from "../logic/avatar";
 import type { AppEnv } from "../types";
 
 function bearerToken(authorization: string | undefined): string | undefined {
@@ -81,15 +72,6 @@ function changeRateLimited(c: Context<AppEnv>, retryAt: string): Response {
   );
 }
 
-function setPollingHeader(
-  c: Context<AppEnv>,
-  state: v.InferOutput<typeof AvatarStateResponseSchema>,
-) {
-  if (state.job && ["checking", "verified", "accepted", "generating"].includes(state.job.status)) {
-    c.header("Retry-After", "3");
-  }
-}
-
 export async function getAvatarContents(c: Context<AppEnv>): Promise<Response> {
   if (!c.env?.DB || !c.env.ACCOUNT_DATA) return unavailable(c);
   const outcome = await getAvatarState(commonParams(c));
@@ -97,11 +79,10 @@ export async function getAvatarContents(c: Context<AppEnv>): Promise<Response> {
   if (auth) return auth;
   if (outcome.type !== "resolved") throw new Error("Unexpected avatar state outcome");
   const state = v.parse(AvatarStateResponseSchema, outcome.state);
-  setPollingHeader(c, state);
   return c.json(state);
 }
 
-export async function postAvatarUpload(c: Context<AppEnv>): Promise<Response> {
+export async function postAvatarContents(c: Context<AppEnv>): Promise<Response> {
   if (!c.env?.DB || !c.env.ACCOUNT_DATA || !c.env.AVATAR_BUCKET || !c.env.IMAGES) {
     return unavailable(c);
   }
@@ -117,15 +98,6 @@ export async function postAvatarUpload(c: Context<AppEnv>): Promise<Response> {
       400,
     );
   }
-  if (form.get("consent") !== "true") {
-    return c.json(
-      v.parse(AvatarInvalidRequestSchema, {
-        error: "Invalid avatar request",
-        reason: "consent_required",
-      }),
-      400,
-    );
-  }
   const file = form.get("image");
   if (!(file instanceof File)) {
     return c.json(
@@ -137,19 +109,17 @@ export async function postAvatarUpload(c: Context<AppEnv>): Promise<Response> {
     );
   }
   try {
-    const outcome = await uploadAvatarSource({
+    const outcome = await saveAvatar({
       ...commonParams(c),
       file,
       images: c.env.IMAGES,
       bucket: c.env.AVATAR_BUCKET,
-      queue: c.env.AVATAR_QUEUE,
     });
     const auth = authResponse(c, outcome);
     if (auth) return auth;
-    if (outcome.type !== "accepted") throw new Error("Unexpected avatar upload outcome");
-    const state = v.parse(AvatarStateResponseSchema, outcome.state);
-    setPollingHeader(c, state);
-    return c.json(state, 202);
+    if (outcome.type === "rate-limited") return changeRateLimited(c, outcome.retryAt);
+    if (outcome.type !== "saved") throw new Error("Unexpected avatar upload outcome");
+    return c.json(v.parse(AvatarStateResponseSchema, outcome.state));
   } catch (error) {
     if (error instanceof AvatarImageError) {
       return c.json(
@@ -162,41 +132,6 @@ export async function postAvatarUpload(c: Context<AppEnv>): Promise<Response> {
     }
     throw error;
   }
-}
-
-export async function putAvatar(c: Context<AppEnv>): Promise<Response> {
-  if (!c.env?.DB || !c.env.ACCOUNT_DATA) return unavailable(c);
-  const parsed = v.safeParse(SelectAvatarRequestSchema, await c.req.json().catch(() => null));
-  if (!parsed.success) {
-    return c.json(
-      v.parse(AvatarSelectionInvalidRequestSchema, {
-        error: "Invalid avatar request",
-        reason: "candidate_required",
-      }),
-      400,
-    );
-  }
-  const outcome = await selectAvatar({
-    ...commonParams(c),
-    candidateId: parsed.output.candidateId,
-  });
-  const auth = authResponse(c, outcome);
-  if (auth) return auth;
-  if (outcome.type === "candidate-not-found") {
-    return c.json(v.parse(AvatarNotFoundSchema, { error: "Avatar not found" }), 404);
-  }
-  if (outcome.type === "invalid-state") {
-    return c.json(
-      v.parse(AvatarConflictSchema, {
-        error: "Avatar state conflict",
-        reason: "invalid_job_state",
-      }),
-      409,
-    );
-  }
-  if (outcome.type === "rate-limited") return changeRateLimited(c, outcome.retryAt);
-  if (outcome.type !== "selected") throw new Error("Unexpected avatar selection outcome");
-  return c.json(v.parse(AvatarStateResponseSchema, outcome.state));
 }
 
 export async function deleteAvatarContents(c: Context<AppEnv>): Promise<Response> {

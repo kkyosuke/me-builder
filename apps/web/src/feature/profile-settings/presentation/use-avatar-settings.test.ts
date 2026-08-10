@@ -7,87 +7,56 @@ import { useAvatarSettings } from "./use-avatar-settings";
 const mocks = vi.hoisted(() => ({
   fetchAvatarState: vi.fn(),
   fetchAvatarImage: vi.fn(),
-  uploadAvatarSource: vi.fn(),
-  selectAvatar: vi.fn(),
+  saveAvatar: vi.fn(),
   deleteAvatar: vi.fn(),
 }));
 
 vi.mock("../infrastructure/avatar-api", () => mocks);
 
-const timestamp = "2026-08-10T00:00:00.000Z";
-
-function response(
-  status: "checking" | "verified" | "ready",
-  retryAfterMilliseconds: number | null = 10,
-) {
-  return {
-    state: {
-      currentAvatar: null,
-      job: {
-        id: "00000000-0000-4000-8000-000000000001",
-        status,
-        errorCode: null,
-        createdAt: timestamp,
-        updatedAt: timestamp,
-        expiresAt: timestamp,
-        candidates: [],
-      },
-    },
-    retryAfterMilliseconds,
-  };
-}
+const avatar = {
+  id: "00000000-0000-4000-8000-000000000001",
+  imageUrl: "/api/avatar/images/00000000-0000-4000-8000-000000000001",
+};
 
 describe("useAvatarSettings", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    Object.defineProperty(document, "visibilityState", {
-      configurable: true,
-      value: "visible",
-    });
+    mocks.fetchAvatarState.mockResolvedValue({ currentAvatar: null });
+    mocks.fetchAvatarImage.mockResolvedValue(new Blob(["image"], { type: "image/webp" }));
     Object.defineProperty(URL, "createObjectURL", {
       configurable: true,
       value: vi.fn().mockReturnValue("blob:avatar"),
     });
-    Object.defineProperty(URL, "revokeObjectURL", {
-      configurable: true,
-      value: vi.fn(),
-    });
+    Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: vi.fn() });
   });
 
   afterEach(cleanup);
 
-  it("処理中はRetry-After相当の間隔で再取得し、完了状態で停止する", async () => {
-    mocks.fetchAvatarState
-      .mockResolvedValueOnce(response("checking"))
-      .mockResolvedValueOnce(response("verified"))
-      .mockResolvedValueOnce(response("ready", null));
+  it("初回に現在のアバターを取得する", async () => {
+    mocks.fetchAvatarState.mockResolvedValue({ currentAvatar: avatar });
     const acquireIdToken = vi.fn().mockResolvedValue("id-token");
+    const { result } = renderHook(() => useAvatarSettings({ acquireIdToken, enabled: true }));
 
-    const { result } = renderHook(() =>
-      useAvatarSettings({ acquireIdToken, enabled: true, pollingEnabled: true }),
+    await waitFor(() => expect(result.current.currentAvatar?.src).toBe("blob:avatar"));
+    expect(mocks.fetchAvatarState).toHaveBeenCalledOnce();
+    expect(mocks.fetchAvatarImage).toHaveBeenCalledWith(
+      undefined,
+      "id-token",
+      avatar.imageUrl,
+      expect.any(AbortSignal),
     );
-
-    await waitFor(() => expect(result.current.job?.status).toBe("ready"));
-    expect(mocks.fetchAvatarState).toHaveBeenCalledTimes(3);
-    expect(acquireIdToken).toHaveBeenCalledTimes(3);
-    await act(() => new Promise((resolve) => window.setTimeout(resolve, 25)));
-    expect(mocks.fetchAvatarState).toHaveBeenCalledTimes(3);
   });
 
-  it("設定画面を開いていない間は処理中でもpollingしない", async () => {
-    mocks.fetchAvatarState.mockResolvedValue(response("checking"));
+  it("保存結果を現在値へ即時反映する", async () => {
+    mocks.saveAvatar.mockResolvedValue({ currentAvatar: avatar });
     const acquireIdToken = vi.fn().mockResolvedValue("id-token");
+    const { result } = renderHook(() => useAvatarSettings({ acquireIdToken, enabled: true }));
+    await waitFor(() => expect(result.current.loadStatus).toBe("ready"));
 
-    renderHook(() =>
-      useAvatarSettings({
-        acquireIdToken,
-        enabled: true,
-        pollingEnabled: false,
-      }),
-    );
-
-    await waitFor(() => expect(mocks.fetchAvatarState).toHaveBeenCalledOnce());
-    await act(() => new Promise((resolve) => window.setTimeout(resolve, 25)));
-    expect(mocks.fetchAvatarState).toHaveBeenCalledOnce();
+    const file = new File(["image"], "avatar.png", { type: "image/png" });
+    await act(async () => {
+      await expect(result.current.save(file)).resolves.toBe(true);
+    });
+    await waitFor(() => expect(result.current.currentAvatar?.id).toBe(avatar.id));
   });
 });

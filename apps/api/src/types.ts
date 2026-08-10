@@ -1,10 +1,5 @@
 import type { AccountDataNamespace, CompatibilityDataNamespace } from "@me-builder/lib";
-import type {
-  AvatarQueueMessage,
-  Queue,
-  SafeOperationalErrorFields,
-  WebhookQueueMessage,
-} from "@me-builder/shared";
+import type { Queue, SafeOperationalErrorFields, WebhookQueueMessage } from "@me-builder/shared";
 
 /** Wrangler生成bindingに、SecretとQueueの公開契約だけを重ねる。 */
 type Env = Omit<ApiBindings, "DB" | "WEBHOOK_QUEUE" | "ACCOUNT_DATA" | "COMPATIBILITY_DATA"> & {
@@ -20,7 +15,6 @@ type Env = Omit<ApiBindings, "DB" | "WEBHOOK_QUEUE" | "ACCOUNT_DATA" | "COMPATIB
   CLOUDFLARE_APP_API_TOKEN?: string;
   BASE_URL?: string;
   WEBHOOK_QUEUE?: Queue<WebhookQueueMessage>;
-  AVATAR_QUEUE?: Queue<AvatarQueueMessage>;
   AVATAR_BUCKET?: ApiBindings["AVATAR_BUCKET"];
   IMAGES?: ApiBindings["IMAGES"];
   DB?: ApiBindings["DB"];

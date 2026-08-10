@@ -44,44 +44,6 @@ describe("ProfileSettingsScreen", () => {
     expect(onThemeChange).toHaveBeenCalledWith("light");
   });
 
-  it("アバター候補の生成中であることをプロフィールにも表示する", () => {
-    const onOpenAvatar = vi.fn();
-    render(
-      <ProfileSettingsScreen
-        avatar={null}
-        avatarJobStatus="generating"
-        theme="dark"
-        onBack={vi.fn()}
-        onOpenAvatar={onOpenAvatar}
-        onThemeChange={vi.fn()}
-      />,
-    );
-
-    const avatarButton = screen.getByRole("button", { name: /アバターを生成中/ });
-    expect(screen.getByText("完了すると、ここから候補を選べます")).toBeTruthy();
-    expect(avatarButton.getAttribute("aria-disabled")).toBe("true");
-    fireEvent.click(avatarButton);
-    expect(onOpenAvatar).not.toHaveBeenCalled();
-  });
-
-  it("候補完成時はアバターから候補選択を開ける", () => {
-    const onOpenAvatar = vi.fn();
-    render(
-      <ProfileSettingsScreen
-        avatar={null}
-        avatarJobStatus="ready"
-        theme="dark"
-        onBack={vi.fn()}
-        onOpenAvatar={onOpenAvatar}
-        onThemeChange={vi.fn()}
-      />,
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: /候補ができました/ }));
-    expect(screen.getByText("タップして候補を選んでください")).toBeTruthy();
-    expect(onOpenAvatar).toHaveBeenCalledOnce();
-  });
-
   it("管理者だけに管理者画面へのリンクを表示する", () => {
     const { rerender } = render(
       <ProfileSettingsScreen

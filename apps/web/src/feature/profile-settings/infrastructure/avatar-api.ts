@@ -6,37 +6,8 @@ import type { AvatarState } from "../model/avatar";
 type ApiAvatarState = operations["getAvatar"]["responses"][200]["content"]["application/json"];
 
 const IdSchema = v.pipe(v.string(), v.uuid());
-const TimestampSchema = v.pipe(v.string(), v.isoTimestamp());
 const AvatarStateSchema = v.object({
   currentAvatar: v.nullable(v.object({ id: IdSchema, imageUrl: v.pipe(v.string(), v.nonEmpty()) })),
-  job: v.nullable(
-    v.object({
-      id: IdSchema,
-      status: v.picklist([
-        "checking",
-        "not_person",
-        "verified",
-        "accepted",
-        "generating",
-        "ready",
-        "failed",
-        "cancelled",
-        "selected",
-        "expired",
-      ]),
-      errorCode: v.nullable(v.string()),
-      createdAt: TimestampSchema,
-      updatedAt: TimestampSchema,
-      expiresAt: TimestampSchema,
-      candidates: v.array(
-        v.object({
-          id: IdSchema,
-          imageUrl: v.pipe(v.string(), v.nonEmpty()),
-          expiresAt: TimestampSchema,
-        }),
-      ),
-    }),
-  ),
 }) satisfies v.GenericSchema<ApiAvatarState>;
 
 class AvatarApiError extends Error {
@@ -47,16 +18,6 @@ class AvatarApiError extends Error {
     this.name = "AvatarApiError";
     this.status = status;
   }
-}
-
-export type AvatarStateResult = {
-  state: AvatarState;
-  retryAfterMilliseconds: number | null;
-};
-
-function retryAfterMilliseconds(response: Response): number | null {
-  const seconds = Number(response.headers.get("Retry-After"));
-  return Number.isFinite(seconds) && seconds > 0 ? seconds * 1_000 : null;
 }
 
 async function errorMessage(response: Response, fallback: string): Promise<string> {
@@ -71,30 +32,22 @@ async function errorMessage(response: Response, fallback: string): Promise<strin
     }
     return "処理対象が見つかりませんでした。画面を読み直してください。";
   }
-  if (response.status === 409) return "処理状態が更新されました。画面を読み直してください。";
   if (response.status === 429) {
     const body = await response
       .clone()
       .json()
       .catch(() => null);
-    if (
-      body &&
-      typeof body === "object" &&
-      "error" in body &&
-      body.error === "Avatar change rate limited" &&
-      "retryAt" in body &&
-      typeof body.retryAt === "string"
-    ) {
+    if (body && typeof body === "object" && "retryAt" in body && typeof body.retryAt === "string") {
       const retryAt = new Date(body.retryAt);
       const formatted = Number.isNaN(retryAt.getTime())
         ? body.retryAt
         : retryAt.toLocaleString("ja-JP", { dateStyle: "long", timeStyle: "short" });
       return `アバターは7日間に1回変更できます。次回は${formatted}以降に変更できます。`;
     }
-    return "短時間の生成上限に達しました。しばらく待ってからもう一度お試しください。";
   }
-  if (response.status === 503)
+  if (response.status === 503) {
     return "アバター機能は現在利用できません。時間をおいてお試しください。";
+  }
   if (response.status === 400) {
     const body = await response
       .clone()
@@ -105,18 +58,15 @@ async function errorMessage(response: Response, fallback: string): Promise<strin
     if (reason === "image_too_large") return "画像は10MB以下にしてください。";
     if (reason === "unsupported_image_type") return "PNG、JPEG、WebP形式の画像を選んでください。";
     if (reason === "invalid_image") return "画像を読み取れませんでした。別の画像を選んでください。";
-    if (reason === "consent_required") return "画像を送信する前に同意を確認してください。";
   }
   return `${fallback} (HTTP ${response.status})`;
 }
 
-async function parseState(response: Response, fallback: string): Promise<AvatarStateResult> {
-  if (!response.ok)
+async function parseState(response: Response, fallback: string): Promise<AvatarState> {
+  if (!response.ok) {
     throw new AvatarApiError(await errorMessage(response, fallback), response.status);
-  return {
-    state: v.parse(AvatarStateSchema, await response.json()),
-    retryAfterMilliseconds: retryAfterMilliseconds(response),
-  };
+  }
+  return v.parse(AvatarStateSchema, await response.json());
 }
 
 function authorization(idToken: string): HeadersInit {
@@ -127,7 +77,7 @@ export async function fetchAvatarState(
   apiUrl: string | undefined,
   idToken: string,
   signal?: AbortSignal,
-): Promise<AvatarStateResult> {
+): Promise<AvatarState> {
   const response = await createHttpClient(apiUrl).request("/api/avatar", {
     headers: authorization(idToken),
     ...(signal ? { signal } : {}),
@@ -135,37 +85,21 @@ export async function fetchAvatarState(
   return parseState(response, "アバターの取得に失敗しました");
 }
 
-export async function uploadAvatarSource(
+export async function saveAvatar(
   apiUrl: string | undefined,
   idToken: string,
   file: File,
   signal?: AbortSignal,
-): Promise<AvatarStateResult> {
+): Promise<AvatarState> {
   const form = new FormData();
   form.set("image", file);
-  form.set("consent", "true");
-  const response = await createHttpClient(apiUrl).request("/api/avatar/uploads", {
+  const response = await createHttpClient(apiUrl).request("/api/avatar", {
     method: "POST",
     headers: authorization(idToken),
     body: form,
     ...(signal ? { signal } : {}),
   });
-  return parseState(response, "画像のアップロードに失敗しました");
-}
-
-export async function selectAvatar(
-  apiUrl: string | undefined,
-  idToken: string,
-  candidateId: string,
-  signal?: AbortSignal,
-): Promise<AvatarStateResult> {
-  const response = await createHttpClient(apiUrl).request("/api/avatar", {
-    method: "PUT",
-    headers: { ...authorization(idToken), "Content-Type": "application/json" },
-    body: JSON.stringify({ candidateId }),
-    ...(signal ? { signal } : {}),
-  });
-  return parseState(response, "アバターの設定に失敗しました");
+  return parseState(response, "アバターを保存できませんでした");
 }
 
 export async function deleteAvatar(

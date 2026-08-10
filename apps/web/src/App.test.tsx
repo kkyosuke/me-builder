@@ -32,8 +32,7 @@ const mocks = vi.hoisted(() => ({
   fetchDevelopmentBrainItems: vi.fn(),
   fetchAvatarState: vi.fn(),
   fetchAvatarImage: vi.fn(),
-  uploadAvatarSource: vi.fn(),
-  selectAvatar: vi.fn(),
+  saveAvatar: vi.fn(),
   deleteAvatar: vi.fn(),
 }));
 
@@ -67,8 +66,7 @@ vi.mock("./feature/brain/infrastructure/brain-api", () => ({
 vi.mock("./feature/profile-settings/infrastructure/avatar-api", () => ({
   fetchAvatarState: mocks.fetchAvatarState,
   fetchAvatarImage: mocks.fetchAvatarImage,
-  uploadAvatarSource: mocks.uploadAvatarSource,
-  selectAvatar: mocks.selectAvatar,
+  saveAvatar: mocks.saveAvatar,
   deleteAvatar: mocks.deleteAvatar,
 }));
 vi.mock("./feature/diagnosis/presentation/components/swipe-diagnosis", () => ({
@@ -250,10 +248,7 @@ describe("App", () => {
       ],
       truncated: false,
     });
-    mocks.fetchAvatarState.mockResolvedValue({
-      state: { currentAvatar: null, job: null },
-      retryAfterMilliseconds: 3_000,
-    });
+    mocks.fetchAvatarState.mockResolvedValue({ currentAvatar: null });
     mocks.fetchAvatarImage.mockResolvedValue(new Blob(["avatar"], { type: "image/webp" }));
     mocks.deleteAvatar.mockResolvedValue(undefined);
     mocks.restoreDiagnosisProgress.mockImplementation(
@@ -288,6 +283,26 @@ describe("App", () => {
     expect(window.localStorage.getItem("me-builder-color-theme")).toBe("light");
   });
 
+  it("アバター未設定時はLINEプロフィール画像を初期表示する", async () => {
+    mocks.initializeLiff.mockResolvedValue({
+      status: "ready",
+      inClient: true,
+      profile: {
+        displayName: "テスト",
+        pictureUrl: "https://example.com/line-profile.jpg",
+      },
+    });
+
+    render(<App />);
+
+    const profileButton = await enabledProfileButton();
+    expect(profileButton.querySelector("img")?.getAttribute("src")).toBe(
+      "https://example.com/line-profile.jpg",
+    );
+    fireEvent.click(profileButton);
+    expect(await screen.findByText("LINEプロフィール画像")).toBeTruthy();
+  });
+
   it("保存したライトテーマを次回表示でも復元する", async () => {
     window.localStorage.setItem("me-builder-color-theme", "light");
 
@@ -315,41 +330,10 @@ describe("App", () => {
     );
   });
 
-  it("画像送信後にモーダルを閉じ、完成した候補を選んで設定する", async () => {
-    const timestamp = "2026-08-10T00:00:00.000Z";
-    const jobId = "00000000-0000-4000-8000-000000000001";
-    const candidateId = "00000000-0000-4000-8000-000000000002";
-    const baseJob = {
-      id: jobId,
-      errorCode: null,
-      createdAt: timestamp,
-      updatedAt: timestamp,
-      expiresAt: timestamp,
-      candidates: [],
-    };
-    mocks.uploadAvatarSource.mockResolvedValue({
-      state: {
-        currentAvatar: null,
-        job: {
-          ...baseJob,
-          status: "ready",
-          candidates: [
-            {
-              id: candidateId,
-              imageUrl: `/api/avatar/images/${candidateId}`,
-              expiresAt: timestamp,
-            },
-          ],
-        },
-      },
-      retryAfterMilliseconds: null,
-    });
-    mocks.selectAvatar.mockResolvedValue({
-      state: {
-        currentAvatar: { id: candidateId, imageUrl: `/api/avatar/images/${candidateId}` },
-        job: { ...baseJob, status: "selected" },
-      },
-      retryAfterMilliseconds: 3_000,
+  it("画像をプレビューして保存し、プロフィールへ即時反映する", async () => {
+    const avatarId = "00000000-0000-4000-8000-000000000002";
+    mocks.saveAvatar.mockResolvedValue({
+      currentAvatar: { id: avatarId, imageUrl: `/api/avatar/images/${avatarId}` },
     });
     render(<App />);
 
@@ -361,28 +345,16 @@ describe("App", () => {
     fireEvent.change(screen.getByLabelText("アバター用の画像ファイルを選ぶ"), {
       target: { files: [file] },
     });
-    expect(mocks.uploadAvatarSource).not.toHaveBeenCalled();
-    expect(screen.getByRole("img", { name: "送信する画像のプレビュー" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "この画像で候補を作る" }));
-
-    expect(await screen.findByRole("heading", { name: "プロフィール" })).toBeTruthy();
-    fireEvent.click(await screen.findByRole("button", { name: /候補ができました/ }));
-    expect(await screen.findByRole("heading", { name: "候補から選ぶ" })).toBeTruthy();
-    fireEvent.click(await screen.findByRole("button", { name: "候補1を選択" }));
-    fireEvent.click(screen.getByRole("button", { name: "このアバターに設定" }));
+    expect(mocks.saveAvatar).not.toHaveBeenCalled();
+    expect(screen.getByRole("img", { name: "保存するアバター画像のプレビュー" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
 
     expect(await screen.findByRole("heading", { name: "プロフィール" })).toBeTruthy();
     expect(screen.getByText("設定済み")).toBeTruthy();
-    expect(mocks.uploadAvatarSource).toHaveBeenCalledWith(
+    expect(mocks.saveAvatar).toHaveBeenCalledWith(
       "https://api.example.com",
       "dummy.id.token",
       expect.any(File),
-      expect.any(AbortSignal),
-    );
-    expect(mocks.selectAvatar).toHaveBeenCalledWith(
-      "https://api.example.com",
-      "dummy.id.token",
-      candidateId,
       expect.any(AbortSignal),
     );
   });

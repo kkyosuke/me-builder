@@ -1,24 +1,17 @@
 import type { Queue } from "@cloudflare/workers-types";
 import type { AccountDataNamespace, CompatibilityDataNamespace } from "@me-builder/lib";
-import type {
-  AvatarQueueMessage,
-  ChatTurnQueueMessage,
-  DiaryBrainCheckpointQueueMessage,
-} from "@me-builder/shared";
+import type { ChatTurnQueueMessage, DiaryBrainCheckpointQueueMessage } from "@me-builder/shared";
 
 /** Wrangler生成bindingに、dashboardから配布するSecretとQueue本文型だけを重ねる。 */
 export type Env = Omit<
   WorkerBindings,
   | "CHAT_TURN_QUEUE"
   | "BRAIN_CHECKPOINT_QUEUE"
-  | "AVATAR_QUEUE"
   | "AVATAR_BUCKET"
-  | "IMAGES"
   | "CONVERSATION_COORDINATOR"
   | "ACCOUNT_DATA"
   | "COMPATIBILITY_DATA"
   | "ENVIRONMENT"
-  | "AVATAR_GENERATION_RATE_LIMIT"
 > & {
   ENVIRONMENT?: string;
   BASE_DOMAIN?: string;
@@ -29,17 +22,13 @@ export type Env = Omit<
   CLOUDFLARE_APP_API_TOKEN?: string;
   CF_AI_GATEWAY_BASE_URL?: string;
   GEMINI_MODEL?: string;
-  GEMINI_IMAGE_MODEL?: string;
-  AVATAR_GENERATION_RATE_LIMIT?: string;
   CHAT_ENABLED?: string;
   CHAT_DELIVERY_SECRET?: string;
   CHAT_CONTEXT_MESSAGE_LIMIT?: string;
   LIFF_ID?: string;
   CHAT_TURN_QUEUE?: Queue<ChatTurnQueueMessage>;
   BRAIN_CHECKPOINT_QUEUE?: Queue<DiaryBrainCheckpointQueueMessage>;
-  AVATAR_QUEUE?: Queue<AvatarQueueMessage>;
   AVATAR_BUCKET?: R2Bucket;
-  IMAGES?: ImagesBinding;
   CONVERSATION_COORDINATOR?: WorkerBindings["CONVERSATION_COORDINATOR"];
   ACCOUNT_DATA?: AccountDataNamespace;
   COMPATIBILITY_DATA?: CompatibilityDataNamespace;

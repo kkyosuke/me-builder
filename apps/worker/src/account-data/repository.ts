@@ -1,31 +1,24 @@
 import {
   type ActivateCompatibilityReferenceResult,
+  type AvatarState,
   type CompatibilityReference,
   type CompatibilityReferenceRole,
+  type DeleteCurrentAvatarResult,
   type ReleaseCompatibilityReservationResult,
   type ReserveCompatibilityReferenceResult,
+  type ResolveAvatarImageResult,
+  type SetCurrentAvatarInput,
+  type SetCurrentAvatarResult,
   d1,
 } from "@me-builder/lib";
-import { and, asc, eq, inArray, isNotNull } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { type DrizzleSqliteDODatabase, drizzle } from "drizzle-orm/durable-sqlite";
 import { migrate } from "drizzle-orm/durable-sqlite/migrator";
 import migrations from "../../drizzle/account-data/migrations.js";
-import {
-  avatarCandidates,
-  avatarGenerationEvents,
-  avatarJobs,
-  avatarObjectDeletions,
-  avatarProfile,
-} from "./avatar-schema";
 import { accountDataIdentity, compatibilityReferences } from "./schema";
 
 const accountDataSchema = {
   accountDataIdentity,
-  avatarCandidates,
-  avatarGenerationEvents,
-  avatarJobs,
-  avatarObjectDeletions,
-  avatarProfile,
   compatibilityReferences,
   accounts: d1.schema.accounts,
   brainItemAccessLabels: d1.schema.brainItemAccessLabels,
@@ -55,8 +48,24 @@ const accountDataSchema = {
 };
 const SESSION_INACTIVITY_MS = 6 * 60 * 60 * 1000;
 const SESSION_HARD_CAP_MS = 24 * 60 * 60 * 1000;
+const AVATAR_STORAGE_KEY = "avatar:state";
+const AVATAR_DELETE_RETRY_MS = 30_000;
 type AccountDataDatabase = DrizzleSqliteDODatabase<typeof accountDataSchema>;
 type ExecutableStatement = { all(): unknown };
+
+type StoredAvatarState = {
+  current: {
+    id: string;
+    objectKey: string;
+    contentType: string;
+    updatedAt: string;
+  } | null;
+  pendingObjectDeletions: Array<{
+    objectKey: string;
+    attemptCount: number;
+    nextAttemptAt: string;
+  }>;
+};
 
 export type DiagnosisCatalogSnapshot = Readonly<{
   questions: (typeof d1.schema.questions.$inferSelect)[];
@@ -131,6 +140,127 @@ export class AccountDataRepository {
         .onConflictDoNothing()
         .run();
     });
+  }
+
+  private async readStoredAvatarState(): Promise<StoredAvatarState> {
+    return (
+      (await this.storage.get<StoredAvatarState>(AVATAR_STORAGE_KEY)) ?? {
+        current: null,
+        pendingObjectDeletions: [],
+      }
+    );
+  }
+
+  private async writeStoredAvatarState(state: StoredAvatarState): Promise<void> {
+    await this.storage.put(AVATAR_STORAGE_KEY, state);
+  }
+
+  async getAvatarState(): Promise<AvatarState> {
+    const { current } = await this.readStoredAvatarState();
+    return {
+      currentAvatar: current ? { ...current, updatedAt: new Date(current.updatedAt) } : null,
+    };
+  }
+
+  async setCurrentAvatar(
+    input: SetCurrentAvatarInput,
+    minimumChangeIntervalMs: number,
+    at = new Date(),
+  ): Promise<SetCurrentAvatarResult> {
+    const state = await this.readStoredAvatarState();
+    if (state.current) {
+      const retryAt = new Date(
+        new Date(state.current.updatedAt).getTime() + minimumChangeIntervalMs,
+      );
+      if (minimumChangeIntervalMs > 0 && retryAt > at) {
+        return { type: "rate-limited", retryAt };
+      }
+      if (state.current.objectKey !== input.objectKey) {
+        state.pendingObjectDeletions.push({
+          objectKey: state.current.objectKey,
+          attemptCount: 0,
+          nextAttemptAt: at.toISOString(),
+        });
+      }
+    }
+    state.current = { ...input, updatedAt: at.toISOString() };
+    await this.writeStoredAvatarState(state);
+    return { type: "updated", state: await this.getAvatarState() };
+  }
+
+  async deleteCurrentAvatar(
+    minimumChangeIntervalMs: number,
+    at = new Date(),
+  ): Promise<DeleteCurrentAvatarResult> {
+    const state = await this.readStoredAvatarState();
+    if (!state.current) return { type: "unchanged" };
+    const retryAt = new Date(new Date(state.current.updatedAt).getTime() + minimumChangeIntervalMs);
+    if (minimumChangeIntervalMs > 0 && retryAt > at) {
+      return { type: "rate-limited", retryAt };
+    }
+    state.pendingObjectDeletions.push({
+      objectKey: state.current.objectKey,
+      attemptCount: 0,
+      nextAttemptAt: at.toISOString(),
+    });
+    state.current = null;
+    await this.writeStoredAvatarState(state);
+    return { type: "deleted" };
+  }
+
+  async resolveAvatarImage(imageId: string): Promise<ResolveAvatarImageResult> {
+    const { current } = await this.readStoredAvatarState();
+    if (!current || current.id !== imageId) return { type: "not-found" };
+    return { type: "resolved", objectKey: current.objectKey, contentType: current.contentType };
+  }
+
+  async scheduleAvatarObjectDeletion(objectKey: string, at = new Date()): Promise<void> {
+    const state = await this.readStoredAvatarState();
+    if (state.current?.objectKey === objectKey) return;
+    if (!state.pendingObjectDeletions.some((item) => item.objectKey === objectKey)) {
+      state.pendingObjectDeletions.push({
+        objectKey,
+        attemptCount: 0,
+        nextAttemptAt: at.toISOString(),
+      });
+      await this.writeStoredAvatarState(state);
+    }
+  }
+
+  async listDueAvatarObjectDeletions(
+    at = new Date(),
+  ): Promise<StoredAvatarState["pendingObjectDeletions"]> {
+    const state = await this.readStoredAvatarState();
+    return state.pendingObjectDeletions.filter((item) => new Date(item.nextAttemptAt) <= at);
+  }
+
+  async markAvatarObjectDeleted(objectKey: string): Promise<void> {
+    const state = await this.readStoredAvatarState();
+    state.pendingObjectDeletions = state.pendingObjectDeletions.filter(
+      (item) => item.objectKey !== objectKey,
+    );
+    await this.writeStoredAvatarState(state);
+  }
+
+  async retryAvatarObjectDeletion(objectKey: string, at = new Date()): Promise<void> {
+    const state = await this.readStoredAvatarState();
+    const item = state.pendingObjectDeletions.find(
+      (candidate) => candidate.objectKey === objectKey,
+    );
+    if (!item) return;
+    item.attemptCount += 1;
+    item.nextAttemptAt = new Date(
+      at.getTime() + Math.min(AVATAR_DELETE_RETRY_MS * 2 ** item.attemptCount, 60 * 60 * 1000),
+    ).toISOString();
+    await this.writeStoredAvatarState(state);
+  }
+
+  async nextAvatarMaintenanceAt(): Promise<number | null> {
+    const state = await this.readStoredAvatarState();
+    if (state.pendingObjectDeletions.length === 0) return null;
+    return Math.min(
+      ...state.pendingObjectDeletions.map((item) => new Date(item.nextAttemptAt).getTime()),
+    );
   }
 
   isLegacyImportComplete(): boolean {
@@ -711,19 +841,6 @@ export class AccountDataRepository {
       .orderBy(asc(d1.schema.diaryBrainCheckpoints.nextAttemptAt))
       .limit(1)
       .get();
-    const avatarQueue = this.database
-      .select({ nextEnqueueAt: avatarJobs.nextEnqueueAt })
-      .from(avatarJobs)
-      .where(and(eq(avatarJobs.queuePending, true), isNotNull(avatarJobs.nextEnqueueAt)))
-      .orderBy(asc(avatarJobs.nextEnqueueAt))
-      .limit(1)
-      .get();
-    const avatarDeletion = this.database
-      .select({ deleteAfter: avatarObjectDeletions.deleteAfter })
-      .from(avatarObjectDeletions)
-      .orderBy(asc(avatarObjectDeletions.deleteAfter))
-      .limit(1)
-      .get();
     const candidates = [
       session
         ? Math.min(
@@ -733,8 +850,6 @@ export class AccountDataRepository {
         : null,
       projection?.nextAttemptAt.getTime() ?? null,
       diaryBrainCheckpoint?.nextAttemptAt.getTime() ?? null,
-      avatarQueue?.nextEnqueueAt?.getTime() ?? null,
-      avatarDeletion?.deleteAfter.getTime() ?? null,
     ].filter((value): value is number => value !== null);
     return candidates.length > 0 ? Math.min(...candidates) : null;
   }

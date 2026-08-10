@@ -9,8 +9,6 @@ const queueNames = [
   `me-builder-brain-checkpoint-queue-${environment}`,
   `me-builder-brain-checkpoint-dlq-${environment}`,
   `me-builder-webhook-dlq-${environment}`,
-  `me-builder-avatar-queue-${environment}`,
-  `me-builder-avatar-dlq-${environment}`,
 ];
 
 for (const queueName of queueNames) {

@@ -21,10 +21,6 @@ invocation_logs = false
 queue = "me-builder-webhook-queue-local"
 binding = "WEBHOOK_QUEUE"
 
-[[queues.producers]]
-queue = "me-builder-avatar-queue-local"
-binding = "AVATAR_QUEUE"
-
 [[r2_buckets]]
 binding = "AVATAR_BUCKET"
 bucket_name = "me-builder-avatar-local"
@@ -56,10 +52,6 @@ name = "me-builder-api-local"
 [[env.local.queues.producers]]
 queue = "me-builder-webhook-queue-local"
 binding = "WEBHOOK_QUEUE"
-
-[[env.local.queues.producers]]
-queue = "me-builder-avatar-queue-local"
-binding = "AVATAR_QUEUE"
 
 [[env.local.r2_buckets]]
 binding = "AVATAR_BUCKET"
@@ -96,10 +88,6 @@ routes = [
 queue = "me-builder-webhook-queue-preview"
 binding = "WEBHOOK_QUEUE"
 
-[[env.preview.queues.producers]]
-queue = "me-builder-avatar-queue-preview"
-binding = "AVATAR_QUEUE"
-
 [[env.preview.r2_buckets]]
 binding = "AVATAR_BUCKET"
 bucket_name = "me-builder-avatar-preview"
@@ -134,10 +122,6 @@ routes = [
 [[env.production.queues.producers]]
 queue = "me-builder-webhook-queue-production"
 binding = "WEBHOOK_QUEUE"
-
-[[env.production.queues.producers]]
-queue = "me-builder-avatar-queue-production"
-binding = "AVATAR_QUEUE"
 
 [[env.production.r2_buckets]]
 binding = "AVATAR_BUCKET"

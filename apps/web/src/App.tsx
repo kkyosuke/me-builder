@@ -84,9 +84,11 @@ function AppContents() {
   const avatarController = useAvatarSettings({
     acquireIdToken: acquireAvatarIdToken,
     enabled: !isAdminPath,
-    pollingEnabled: profileView !== "closed",
   });
-  const avatar = avatarController.currentAvatar;
+  const linePictureUrl = liffSession.profile?.pictureUrl;
+  const avatar =
+    avatarController.currentAvatar ??
+    (linePictureUrl ? { id: "line-profile", src: linePictureUrl, source: "line" as const } : null);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -257,7 +259,6 @@ function AppContents() {
           >
             <ProfileSettingsScreen
               avatar={avatar}
-              avatarJobStatus={avatarController.job?.status ?? null}
               inactive={profileView === "avatar"}
               isAdmin={accountRole === "admin"}
               theme={colorTheme.theme}

@@ -1,7 +1,6 @@
 import { line } from "@me-builder/lib";
 import type { d1 } from "@me-builder/lib";
 import {
-  type AvatarQueueMessage,
   type ChatTurnQueueMessage,
   type DiaryBrainCheckpointQueueMessage,
   type FlowKey,
@@ -14,7 +13,6 @@ import {
   toSafeOperationalErrorFields,
 } from "@me-builder/shared";
 import { type CloudflareBindings, type WorkerConfig, getWorkerConfig } from "../config";
-import { AVATAR_MAX_ATTEMPTS, processAvatarMessage } from "../handler/avatar";
 import { CHAT_TURN_MAX_ATTEMPTS, processChatTurnMessage } from "../handler/chat-turn";
 import {
   DIARY_BRAIN_CHECKPOINT_MAX_ATTEMPTS,
@@ -33,22 +31,16 @@ const MAX_ATTEMPTS_BY_FLOW: Record<FlowKey, number | undefined> = {
   "line-webhook": WEBHOOK_QUEUE_MAX_ATTEMPTS,
   "chat-turn": CHAT_TURN_MAX_ATTEMPTS,
   "diary-brain-checkpoint": DIARY_BRAIN_CHECKPOINT_MAX_ATTEMPTS,
-  avatar: AVATAR_MAX_ATTEMPTS,
   "queue-dispatch": undefined,
 };
 
 /** どの処理のmessageだったかをログの見出しへ出すため、body形状から処理名を決める。 */
 function flowOf(
-  body:
-    | WebhookQueueMessage
-    | ChatTurnQueueMessage
-    | DiaryBrainCheckpointQueueMessage
-    | AvatarQueueMessage,
+  body: WebhookQueueMessage | ChatTurnQueueMessage | DiaryBrainCheckpointQueueMessage,
 ): FlowKey {
   if (!("type" in body)) return "line-webhook";
   if (body.type === "chat-turn") return "chat-turn";
   if (body.type === "diary-brain-checkpoint") return "diary-brain-checkpoint";
-  if (body.type === "avatar") return "avatar";
   return "queue-dispatch";
 }
 
@@ -162,10 +154,7 @@ async function processWebhookMessage(
 
 export async function handleQueueBatch(
   batch: MessageBatch<
-    | WebhookQueueMessage
-    | ChatTurnQueueMessage
-    | DiaryBrainCheckpointQueueMessage
-    | AvatarQueueMessage
+    WebhookQueueMessage | ChatTurnQueueMessage | DiaryBrainCheckpointQueueMessage
   >,
   db: d1.Client,
   workerConfig?: WorkerConfig,
@@ -184,10 +173,7 @@ export async function handleQueueBatch(
   for (const message of batch.messages) {
     const startedAt = Date.now();
     try {
-      if ("type" in message.body && message.body.type === "avatar") {
-        if (!cf || !workerConfig) throw new Error("Avatar bindings are not configured");
-        await processAvatarMessage(message as Message<AvatarQueueMessage>, cf, workerConfig);
-      } else if ("type" in message.body && message.body.type === "chat-turn") {
+      if ("type" in message.body && message.body.type === "chat-turn") {
         if (!cf || !workerConfig) throw new Error("Chat turn bindings are not configured");
         await processChatTurnMessage(message as Message<ChatTurnQueueMessage>, cf, workerConfig);
       } else if ("type" in message.body && message.body.type === "diary-brain-checkpoint") {

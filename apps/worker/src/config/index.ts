@@ -1,17 +1,14 @@
 import { getEnv, logger } from "@me-builder/shared";
 import * as v from "valibot";
 import {
-  DEFAULT_AVATAR_GENERATION_RATE_LIMIT,
   DEFAULT_CHAT_CONTEXT_MESSAGE_LIMIT,
   DEFAULT_CLOUDFLARE_AI_GATEWAY_BASE_URL,
-  DEFAULT_GEMINI_IMAGE_MODEL,
   DEFAULT_GEMINI_MODEL,
   type WorkerConfig,
   WorkerConfigSchema,
 } from "./schema";
 
 export {
-  DEFAULT_AVATAR_GENERATION_RATE_LIMIT,
   DEFAULT_CLOUDFLARE_AI_GATEWAY_BASE_URL,
   DEFAULT_CHAT_CONTEXT_MESSAGE_LIMIT,
   DEFAULT_GEMINI_MODEL,
@@ -38,27 +35,12 @@ function parsePositiveInteger(
   return parsed;
 }
 
-function parseNonNegativeInteger(raw: string | undefined, fallback: number): number {
-  if (!raw) return fallback;
-  const parsed = Number(raw);
-  if (!Number.isInteger(parsed) || parsed < 0) {
-    logger.warn(
-      { fallback, variableName: "AVATAR_GENERATION_RATE_LIMIT" },
-      "Ignored an invalid non-negative integer configuration",
-    );
-    return fallback;
-  }
-  return parsed;
-}
-
 /**
  * Worker アプリケーションの環境設定を取得・パースして返却します。
  * Cloudflare Workers の c.env や process.env の差分を @me-builder/shared の getEnv で吸収します。
  */
 export function getWorkerConfig(env?: Record<string, unknown>): WorkerConfig {
   const rawEnvironment = getEnv(["ENVIRONMENT", "NODE_ENV"], env);
-  const defaultAvatarGenerationRateLimit =
-    rawEnvironment === "production" ? DEFAULT_AVATAR_GENERATION_RATE_LIMIT : 0;
   const rawBaseDomain = getEnv("BASE_DOMAIN", env);
   let rawBaseUrl = getEnv("BASE_URL", env);
   let rawApiUrl = getEnv("API_URL", env);
@@ -89,9 +71,6 @@ export function getWorkerConfig(env?: Record<string, unknown>): WorkerConfig {
   const rawCloudflareAiGatewayBaseUrl =
     getEnv("CF_AI_GATEWAY_BASE_URL", env)?.trim() || DEFAULT_CLOUDFLARE_AI_GATEWAY_BASE_URL;
   const rawGeminiModel = getEnv("GEMINI_MODEL", env)?.trim() || DEFAULT_GEMINI_MODEL;
-  const rawGeminiImageModel =
-    getEnv("GEMINI_IMAGE_MODEL", env)?.trim() || DEFAULT_GEMINI_IMAGE_MODEL;
-  const rawAvatarGenerationRateLimit = getEnv("AVATAR_GENERATION_RATE_LIMIT", env)?.trim();
   const rawChatEnabled = getEnv("CHAT_ENABLED", env)?.trim().toLowerCase() !== "false";
   const rawChatDeliverySecret = getEnv("CHAT_DELIVERY_SECRET", env)?.trim() || undefined;
   const rawChatContextMessageLimit = getEnv("CHAT_CONTEXT_MESSAGE_LIMIT", env)?.trim();
@@ -111,11 +90,6 @@ export function getWorkerConfig(env?: Record<string, unknown>): WorkerConfig {
     cloudflareAiGatewayToken: rawCloudflareAiGatewayToken,
     cloudflareAiGatewayBaseUrl: rawCloudflareAiGatewayBaseUrl,
     geminiModel: rawGeminiModel,
-    geminiImageModel: rawGeminiImageModel,
-    avatarGenerationRateLimit: parseNonNegativeInteger(
-      rawAvatarGenerationRateLimit,
-      defaultAvatarGenerationRateLimit,
-    ),
     chatEnabled: rawChatEnabled,
     chatDeliverySecret: rawChatDeliverySecret,
     chatContextMessageLimit: parsePositiveInteger(

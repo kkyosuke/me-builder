@@ -79,30 +79,13 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** 現在のアバターと最新の生成状態を取得する */
+    /** 現在のアバターを取得する */
     get: operations["getAvatar"];
-    /** 生成候補を現在のアバターに設定する */
-    put: operations["selectAvatar"];
-    post?: never;
+    put?: never;
+    /** 画像をアップロードして現在のアバターに設定する */
+    post: operations["saveAvatar"];
     /** 現在のアバターを削除する */
     delete: operations["deleteAvatar"];
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/avatar/uploads": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** 画像をアップロードして人物判定を受け付ける */
-    post: operations["uploadAvatarSource"];
-    delete?: never;
     options?: never;
     head?: never;
     patch?: never;
@@ -636,7 +619,7 @@ export interface operations {
     };
     requestBody?: never;
     responses: {
-      /** @description 現在値と最新ジョブ */
+      /** @description 現在のアバター */
       200: {
         headers: {
           [name: string]: unknown;
@@ -647,36 +630,6 @@ export interface operations {
               /** Format: uuid */
               id: string;
               imageUrl: string;
-            } | null;
-            job: {
-              /** Format: uuid */
-              id: string;
-              /** @enum {string} */
-              status:
-                | "checking"
-                | "not_person"
-                | "verified"
-                | "accepted"
-                | "generating"
-                | "ready"
-                | "failed"
-                | "cancelled"
-                | "selected"
-                | "expired";
-              errorCode: string | null;
-              /** Format: date-time */
-              createdAt: string;
-              /** Format: date-time */
-              updatedAt: string;
-              /** Format: date-time */
-              expiresAt: string;
-              candidates: {
-                /** Format: uuid */
-                id: string;
-                imageUrl: string;
-                /** Format: date-time */
-                expiresAt: string;
-              }[];
             } | null;
           };
         };
@@ -733,7 +686,7 @@ export interface operations {
       };
     };
   };
-  selectAvatar: {
+  saveAvatar: {
     parameters: {
       query?: never;
       header?: never;
@@ -742,9 +695,9 @@ export interface operations {
     };
     requestBody: {
       content: {
-        "application/json": {
-          /** Format: uuid */
-          candidateId: string;
+        "multipart/form-data": {
+          /** Format: binary */
+          image: string;
         };
       };
     };
@@ -761,40 +714,10 @@ export interface operations {
               id: string;
               imageUrl: string;
             } | null;
-            job: {
-              /** Format: uuid */
-              id: string;
-              /** @enum {string} */
-              status:
-                | "checking"
-                | "not_person"
-                | "verified"
-                | "accepted"
-                | "generating"
-                | "ready"
-                | "failed"
-                | "cancelled"
-                | "selected"
-                | "expired";
-              errorCode: string | null;
-              /** Format: date-time */
-              createdAt: string;
-              /** Format: date-time */
-              updatedAt: string;
-              /** Format: date-time */
-              expiresAt: string;
-              candidates: {
-                /** Format: uuid */
-                id: string;
-                imageUrl: string;
-                /** Format: date-time */
-                expiresAt: string;
-              }[];
-            } | null;
           };
         };
       };
-      /** @description 候補IDが不正 */
+      /** @description 画像が不正 */
       400: {
         headers: {
           [name: string]: unknown;
@@ -803,8 +726,12 @@ export interface operations {
           "application/json": {
             /** @constant */
             error: "Invalid avatar request";
-            /** @constant */
-            reason: "candidate_required";
+            /** @enum {string} */
+            reason:
+              | "image_required"
+              | "unsupported_image_type"
+              | "image_too_large"
+              | "invalid_image";
           };
         };
       };
@@ -820,7 +747,7 @@ export interface operations {
           };
         };
       };
-      /** @description 候補がない */
+      /** @description 対応するAccountが存在しない */
       404: {
         headers: {
           [name: string]: unknown;
@@ -828,21 +755,9 @@ export interface operations {
         content: {
           "application/json": {
             /** @constant */
-            error: "Avatar not found";
-          };
-        };
-      };
-      /** @description 選択できない状態 */
-      409: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": {
+            error: "Account not found";
             /** @constant */
-            error: "Avatar state conflict";
-            /** @constant */
-            reason: "invalid_job_state";
+            reason: "friendship_required";
           };
         };
       };
@@ -939,140 +854,6 @@ export interface operations {
             error: "Avatar change rate limited";
             /** Format: date-time */
             retryAt: string;
-          };
-        };
-      };
-      /** @description 未処理のサーバーエラー */
-      500: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": {
-            /** @constant */
-            error: "Internal Server Error";
-          };
-        };
-      };
-      /** @description D1 bindingが設定されていない */
-      503: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": {
-            /** @constant */
-            error: "Service Unavailable";
-          };
-        };
-      };
-    };
-  };
-  uploadAvatarSource: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        "multipart/form-data": {
-          /** Format: binary */
-          image: string;
-          /** @enum {string} */
-          consent: "true";
-        };
-      };
-    };
-    responses: {
-      /** @description 人物判定を受け付けた状態 */
-      202: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": {
-            currentAvatar: {
-              /** Format: uuid */
-              id: string;
-              imageUrl: string;
-            } | null;
-            job: {
-              /** Format: uuid */
-              id: string;
-              /** @enum {string} */
-              status:
-                | "checking"
-                | "not_person"
-                | "verified"
-                | "accepted"
-                | "generating"
-                | "ready"
-                | "failed"
-                | "cancelled"
-                | "selected"
-                | "expired";
-              errorCode: string | null;
-              /** Format: date-time */
-              createdAt: string;
-              /** Format: date-time */
-              updatedAt: string;
-              /** Format: date-time */
-              expiresAt: string;
-              candidates: {
-                /** Format: uuid */
-                id: string;
-                imageUrl: string;
-                /** Format: date-time */
-                expiresAt: string;
-              }[];
-            } | null;
-          };
-        };
-      };
-      /** @description 同意または画像が不正 */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": {
-            /** @constant */
-            error: "Invalid avatar request";
-            /** @enum {string} */
-            reason:
-              | "consent_required"
-              | "image_required"
-              | "unsupported_image_type"
-              | "image_too_large"
-              | "invalid_image";
-          };
-        };
-      };
-      /** @description LIFF IDトークンを検証できない */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": {
-            /** @constant */
-            error: "Unauthorized";
-          };
-        };
-      };
-      /** @description 対応するAccountが存在しない */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": {
-            /** @constant */
-            error: "Account not found";
-            /** @constant */
-            reason: "friendship_required";
           };
         };
       };

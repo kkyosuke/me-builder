@@ -201,7 +201,6 @@ Rollback
 
 ```text
 execute                            <- Durable Objectが公開するRPC method名
-me-builder-avatar-queue-preview    <- Queue consumerのQueue名
 2026-08-10T02:32:31.457Z           <- alarmの起動時刻
                                    <- fetchの空のmessage
 ```

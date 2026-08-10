@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { config } from "../../../../config";
 import { getLiffIdToken, initializeLiff } from "../../infrastructure/liff-client";
+import type { LiffDisplayProfile } from "../../model/types";
 
 /** LIFFを1画面につき1回初期化し、API認証に使うIDトークンを取得する。 */
 export function useLiffSessionState(eager = true) {
   const initializationRef = useRef<ReturnType<typeof initializeLiff> | null>(null);
   const [isInitializing, setIsInitializing] = useState(eager && config.liffId !== undefined);
+  const [profile, setProfile] = useState<LiffDisplayProfile | null>(null);
 
   const initialize = useCallback(async () => {
     const initialization = initializationRef.current ?? initializeLiff(config.liffId);
@@ -21,8 +23,11 @@ export function useLiffSessionState(eager = true) {
     if (!eager) return;
     let active = true;
     void initialize().then(
-      () => {
-        if (active) setIsInitializing(false);
+      (liffState) => {
+        if (active) {
+          setProfile(liffState.status === "ready" ? liffState.profile : null);
+          setIsInitializing(false);
+        }
       },
       () => {
         if (active) setIsInitializing(false);
@@ -54,5 +59,5 @@ export function useLiffSessionState(eager = true) {
     [initialize],
   );
 
-  return { acquireIdToken, isInitializing };
+  return { acquireIdToken, isInitializing, profile };
 }

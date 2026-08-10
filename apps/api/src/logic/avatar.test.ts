@@ -1,7 +1,6 @@
 import type { AccountDataNamespace, AccountDataOperation, d1 } from "@me-builder/lib";
-import type { AvatarQueueMessage, Queue } from "@me-builder/shared";
 import { describe, expect, it, vi } from "vitest";
-import { deleteAvatar, selectAvatar, uploadAvatarSource } from "./avatar";
+import { deleteAvatar, saveAvatar } from "./avatar";
 
 function accountData(
   execute: (operation: AccountDataOperation, ...args: unknown[]) => Promise<unknown>,
@@ -20,10 +19,10 @@ const dependencies = {
     session: { accountId: "account-1", role: "user" as const },
   })),
   normalizeImage: vi.fn(async () => ({
-    bytes: new Uint8Array(),
+    bytes: new Uint8Array([1]),
     contentType: "image/webp" as const,
   })),
-  createId: () => "id",
+  createId: () => "00000000-0000-4000-8000-000000000001",
 };
 
 const baseParams = {
@@ -34,123 +33,96 @@ const baseParams = {
 };
 
 describe("avatar logic", () => {
-  it("アップロード受付でJob IDを相関IDとして人物判定Queueへ引き継ぐ", async () => {
+  it("正規化画像をprivate R2へ保存して現在値へ直接設定する", async () => {
+    const at = new Date("2026-08-10T00:00:00.000Z");
     const execute = vi.fn(async (operation: AccountDataOperation) => {
-      if (operation === "avatar.createJob") return { type: "created" };
-      if (operation === "avatar.markEnqueued") return undefined;
-      if (operation === "avatar.getState") {
-        return { currentCandidate: null, latestJob: null };
+      if (operation === "avatar.setCurrent") {
+        return {
+          type: "updated",
+          state: {
+            currentAvatar: {
+              id: dependencies.createId(),
+              objectKey: "private-key",
+              contentType: "image/webp",
+              updatedAt: at,
+            },
+          },
+        };
       }
       throw new Error("Unexpected operation");
     });
-    const send = vi.fn().mockResolvedValue(undefined);
-    const bucket = {
-      put: vi.fn().mockResolvedValue(undefined),
-      delete: vi.fn().mockResolvedValue(undefined),
-    };
+    const bucket = { put: vi.fn().mockResolvedValue(undefined) };
 
-    await uploadAvatarSource(
+    const result = await saveAvatar(
       {
         ...baseParams,
+        at,
         accountData: accountData(execute),
         file: new File(["image"], "avatar.webp", { type: "image/webp" }),
         images: {} as ApiBindings["IMAGES"],
         bucket: bucket as unknown as ApiBindings["AVATAR_BUCKET"],
-        queue: { send } as unknown as Queue<AvatarQueueMessage>,
       },
       dependencies,
     );
 
-    expect(send).toHaveBeenCalledWith({
-      type: "avatar",
-      traceId: "id",
-      operation: "person-check",
-      accountId: "account-1",
-      jobId: "id",
+    expect(bucket.put).toHaveBeenCalledWith(
+      "accounts/account-1/avatar/images/00000000-0000-4000-8000-000000000001.webp",
+      new Uint8Array([1]),
+      { httpMetadata: { contentType: "image/webp" } },
+    );
+    expect(execute).toHaveBeenCalledWith(
+      "avatar.setCurrent",
+      expect.objectContaining({ id: dependencies.createId(), contentType: "image/webp" }),
+      0,
+      at,
+    );
+    expect(result).toEqual({
+      type: "saved",
+      state: {
+        currentAvatar: {
+          id: dependencies.createId(),
+          imageUrl: `/api/avatar/images/${dependencies.createId()}`,
+        },
+      },
     });
   });
 
-  it("選択後の物理削除を待たず、AccountDataへ記録した状態を成功として返す", async () => {
-    const at = new Date("2026-08-09T00:00:00.000Z");
-    const candidate = {
-      id: "candidate-1",
-      jobId: "job-1",
-      objectKey: "candidate.webp",
-      contentType: "image/webp",
-      createdAt: at,
-      expiresAt: new Date("2026-08-16T00:00:00.000Z"),
-      selectedAt: at,
-    };
+  it("変更間隔内なら新規objectを削除対象へ登録する", async () => {
+    const retryAt = new Date("2026-08-17T00:00:00.000Z");
     const execute = vi.fn(async (operation: AccountDataOperation) => {
-      if (operation !== "avatar.selectCandidate") throw new Error("Unexpected operation");
-      return {
-        type: "selected",
-        previousObjectKey: "previous.webp",
-        state: {
-          currentCandidate: candidate,
-          latestJob: {
-            id: "job-1",
-            status: "selected",
-            referenceObjectKey: "reference.webp",
-            referenceContentType: "image/webp",
-            pendingOperation: null,
-            queuePending: false,
-            nextEnqueueAt: null,
-            enqueueAttemptCount: 0,
-            processingLeaseExpiresAt: null,
-            attemptCount: 1,
-            errorCode: null,
-            model: "model",
-            createdAt: at,
-            updatedAt: at,
-            expiresAt: candidate.expiresAt,
-            candidates: [candidate],
-          },
-        },
-      };
+      if (operation === "avatar.setCurrent") return { type: "rate-limited", retryAt };
+      if (operation === "avatar.scheduleObjectDeletion") return undefined;
+      throw new Error("Unexpected operation");
     });
 
     await expect(
-      selectAvatar(
-        { ...baseParams, accountData: accountData(execute), candidateId: candidate.id },
+      saveAvatar(
+        {
+          ...baseParams,
+          avatarChangeIntervalMs: 7 * 24 * 60 * 60 * 1000,
+          accountData: accountData(execute),
+          file: new File(["image"], "avatar.webp", { type: "image/webp" }),
+          images: {} as ApiBindings["IMAGES"],
+          bucket: { put: vi.fn() } as unknown as ApiBindings["AVATAR_BUCKET"],
+        },
         dependencies,
       ),
-    ).resolves.toMatchObject({
-      type: "selected",
-      state: { currentAvatar: { id: candidate.id } },
-    });
+    ).resolves.toEqual({ type: "rate-limited", retryAt: retryAt.toISOString() });
+    expect(execute).toHaveBeenCalledWith(
+      "avatar.scheduleObjectDeletion",
+      expect.stringContaining("/avatar/images/"),
+      expect.any(Date),
+    );
   });
 
-  it("現在値の削除はR2 bindingなしでdurable outboxへ委譲できる", async () => {
+  it("現在値の削除をAccountDataへ委譲する", async () => {
     const execute = vi.fn(async (operation: AccountDataOperation) => {
       if (operation !== "avatar.deleteCurrent") throw new Error("Unexpected operation");
-      return { type: "deleted", previousObjectKey: "previous.webp" };
+      return { type: "deleted" };
     });
 
     await expect(
       deleteAvatar({ ...baseParams, accountData: accountData(execute) }, dependencies),
     ).resolves.toEqual({ type: "deleted" });
-  });
-
-  it.each([
-    ["avatar.selectCandidate", "candidate-1"],
-    ["avatar.deleteCurrent", undefined],
-  ] as const)("%sの変更間隔制限を次回変更可能日時へ変換する", async (operation, candidateId) => {
-    const retryAt = new Date("2026-08-16T00:00:00.000Z");
-    const execute = vi.fn(async (actualOperation: AccountDataOperation) => {
-      if (actualOperation !== operation) throw new Error("Unexpected operation");
-      return { type: "rate-limited", retryAt };
-    });
-    const params = {
-      ...baseParams,
-      avatarChangeIntervalMs: 7 * 24 * 60 * 60 * 1000,
-      accountData: accountData(execute),
-    };
-
-    const result = candidateId
-      ? await selectAvatar({ ...params, candidateId }, dependencies)
-      : await deleteAvatar(params, dependencies);
-
-    expect(result).toEqual({ type: "rate-limited", retryAt: retryAt.toISOString() });
   });
 });

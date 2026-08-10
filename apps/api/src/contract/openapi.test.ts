@@ -17,6 +17,11 @@ describe("GET /api/openapi.json", () => {
     expect(document.paths["/api/diagnoses/{diagnosisId}/answers"]?.get).toBeDefined();
     expect(document.paths["/api/line/liff/session"]?.post).toBeDefined();
     expect(document.paths["/api/dev/brain-items"]?.get).toBeDefined();
+    expect(document.paths["/api/avatar"]?.get).toBeDefined();
+    expect(document.paths["/api/avatar"]?.post).toBeDefined();
+    expect(document.paths["/api/avatar"]?.delete).toBeDefined();
+    expect(document.paths["/api/avatar/uploads"]).toBeUndefined();
+    expect(document.paths["/api/avatar"]?.put).toBeUndefined();
     expect(document.paths["/api/avatar/jobs/{jobId}/generation"]).toBeUndefined();
     expect(document.paths["/api/avatar/jobs/{jobId}"]).toBeUndefined();
     expect(document.paths["/api/line/liff/session"]?.post).toMatchObject({
