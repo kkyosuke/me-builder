@@ -4,7 +4,7 @@
 
 この文書は、Web UIとAPI Serverの間で利用する診断APIのパス、認証、リクエスト、レスポンス、エラー契約を所有します。
 
-Question、Diagnosis、DiagnosisResponseの状態と不変条件は[Phase 1 診断ドメイン設計](../diagnosis/diagnosis-domain-design.md)、一覧画面の表示と遷移は[Phase 1 診断体験設計](../diagnosis/diagnosis-experience.md)、D1への写像は[`packages/lib`のschema](../../packages/lib/src/d1/schema/diagnosis.ts)を正とします。この文書はドメイン規則、画面デザイン、D1スキーマを所有しません。
+Question、Diagnosis、DiagnosisResponseの状態と不変条件は[Phase 1 診断ドメイン設計](../diagnosis/diagnosis-domain-design.md)、一覧画面の表示と遷移は[Phase 1 診断体験設計](../diagnosis/diagnosis-experience.md)、公開定義の共有D1 schemaは[`packages/lib`のcatalog schema](../../packages/lib/src/shared-d1/schema/catalog.ts)、回答のAccountData schemaは[`packages/lib`のdiagnosis schema](../../packages/lib/src/account-data/schema/diagnosis.ts)を正とします。この文書はドメイン規則、画面デザイン、物理スキーマを所有しません。
 
 ## 2. 認証境界
 

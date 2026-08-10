@@ -1,5 +1,5 @@
 import { line } from "@me-builder/lib";
-import type { d1 } from "@me-builder/lib";
+import type { sharedD1 } from "@me-builder/lib";
 import {
   type ChatTurnQueueMessage,
   type DiaryBrainCheckpointQueueMessage,
@@ -46,7 +46,7 @@ function flowOf(
 
 async function processWebhookMessage(
   message: Message<WebhookQueueMessage>,
-  db: d1.Client,
+  db: sharedD1.Client,
   queue: string,
   workerConfig?: WorkerConfig,
   cf?: CloudflareBindings,
@@ -156,7 +156,7 @@ export async function handleQueueBatch(
   batch: MessageBatch<
     WebhookQueueMessage | ChatTurnQueueMessage | DiaryBrainCheckpointQueueMessage
   >,
-  db: d1.Client,
+  db: sharedD1.Client,
   workerConfig?: WorkerConfig,
   cf?: CloudflareBindings,
 ): Promise<void> {

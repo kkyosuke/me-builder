@@ -1,4 +1,4 @@
-import { d1 } from "@me-builder/lib";
+import { accountData } from "@me-builder/lib";
 import { logger } from "@me-builder/shared";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AccountData } from ".";
@@ -13,9 +13,9 @@ describe("AccountData alarm", () => {
     const chatTurnSend = vi.fn(async () => undefined);
     vi.spyOn(Date, "now").mockReturnValue(now);
     vi.spyOn(logger, "error").mockImplementation(() => undefined);
-    vi.spyOn(d1.action.conversation, "closeExpiredSessions").mockResolvedValue(0);
+    vi.spyOn(accountData.action.diary, "closeExpiredSessions").mockResolvedValue(0);
     vi.spyOn(
-      d1.action.diagnosisBrainProjection,
+      accountData.action.diagnosisBrainProjection,
       "processPendingDiagnosisBrainProjections",
     ).mockResolvedValue({
       processed: 0,
@@ -24,7 +24,7 @@ describe("AccountData alarm", () => {
       skippedInvalidConfig: 0,
       failed: 0,
     });
-    vi.spyOn(d1.action.conversation, "claimDueDiaryBrainCheckpointIds").mockResolvedValue([
+    vi.spyOn(accountData.action.diary, "claimDueDiaryBrainCheckpointIds").mockResolvedValue([
       "checkpoint-1",
     ]);
 

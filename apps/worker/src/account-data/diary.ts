@@ -1,42 +1,45 @@
-import { d1 } from "@me-builder/lib";
+import { accountData } from "@me-builder/lib";
 
 /** Diary source, session, message and turn operations owned by one AccountData Object. */
 export const diaryActions = {
   "conversation.storeLineTextSource": (
-    db: d1.Client,
+    db: accountData.Database,
     accountId: string,
-    input: Omit<Parameters<typeof d1.action.conversation.storeLineTextSource>[1], "accountId">,
-  ) => d1.action.conversation.storeLineTextSource(db, { ...input, accountId }),
+    input: Omit<Parameters<typeof accountData.action.diary.storeLineTextSource>[1], "accountId">,
+  ) => accountData.action.diary.storeLineTextSource(db, { ...input, accountId }),
   "conversation.attachMessagesToTurn": (
-    db: d1.Client,
+    db: accountData.Database,
     accountId: string,
-    ...args: Parameters<typeof d1.action.conversation.attachMessagesToTurn> extends [
+    ...args: Parameters<typeof accountData.action.diary.attachMessagesToTurn> extends [
       unknown,
       unknown,
       ...infer Rest,
     ]
       ? Rest
       : never
-  ) => d1.action.conversation.attachMessagesToTurn(db, accountId, ...args),
+  ) => accountData.action.diary.attachMessagesToTurn(db, accountId, ...args),
   "conversation.getTurnContext": (
-    db: d1.Client,
+    db: accountData.Database,
     _accountId: string,
-    ...args: Parameters<typeof d1.action.conversation.getTurnContext> extends [
+    ...args: Parameters<typeof accountData.action.diary.getTurnContext> extends [
       unknown,
       ...infer Rest,
     ]
       ? Rest
       : never
-  ) => d1.action.conversation.getTurnContext(db, ...args),
-  "conversation.claimDueDiaryBrainCheckpoints": (db: d1.Client, accountId: string, at?: Date) =>
-    d1.action.conversation.claimDueDiaryBrainCheckpointIds(db, accountId, at),
+  ) => accountData.action.diary.getTurnContext(db, ...args),
+  "conversation.claimDueDiaryBrainCheckpoints": (
+    db: accountData.Database,
+    accountId: string,
+    at?: Date,
+  ) => accountData.action.diary.claimDueDiaryBrainCheckpointIds(db, accountId, at),
   "conversation.getDiaryBrainCheckpointContext": (
-    db: d1.Client,
+    db: accountData.Database,
     accountId: string,
     checkpointId: string,
-  ) => d1.action.conversation.getDiaryBrainCheckpointContext(db, accountId, checkpointId),
+  ) => accountData.action.diary.getDiaryBrainCheckpointContext(db, accountId, checkpointId),
   "conversation.applyDiaryBrainCheckpoint": (
-    db: d1.Client,
+    db: accountData.Database,
     accountId: string,
     checkpointId: string,
     expectedThroughSequence: number,
@@ -44,7 +47,7 @@ export const diaryActions = {
     candidates: readonly { statement: string; sourceMessageIds: readonly string[] }[],
     at?: Date,
   ) =>
-    d1.action.conversation.applyDiaryBrainCheckpoint(
+    accountData.action.diary.applyDiaryBrainCheckpoint(
       db,
       accountId,
       checkpointId,
@@ -54,48 +57,60 @@ export const diaryActions = {
       at,
     ),
   "conversation.getDiaryBrainCheckpointDevelopmentNotification": (
-    db: d1.Client,
+    db: accountData.Database,
     accountId: string,
     checkpointId: string,
   ) =>
-    d1.action.conversation.getDiaryBrainCheckpointDevelopmentNotification(
+    accountData.action.diary.getDiaryBrainCheckpointDevelopmentNotification(
       db,
       accountId,
       checkpointId,
     ),
   "conversation.markDiaryBrainCheckpointDevelopmentNotificationSent": (
-    db: d1.Client,
+    db: accountData.Database,
     accountId: string,
     checkpointId: string,
     at?: Date,
   ) =>
-    d1.action.conversation.markDiaryBrainCheckpointDevelopmentNotificationSent(
+    accountData.action.diary.markDiaryBrainCheckpointDevelopmentNotificationSent(
       db,
       accountId,
       checkpointId,
       at,
     ),
-  "conversation.markTurnGenerating": (db: d1.Client, _accountId: string, turnId: string) =>
-    d1.action.conversation.markTurnGenerating(db, turnId),
-  "conversation.getTurnStatus": (db: d1.Client, _accountId: string, turnId: string) =>
-    d1.action.conversation.getTurnStatus(db, turnId),
-  "conversation.isTurnSessionActive": (db: d1.Client, _accountId: string, turnId: string) =>
-    d1.action.conversation.isTurnSessionActive(db, turnId),
-  "conversation.saveAssistantResponse": (
-    db: d1.Client,
+  "conversation.markTurnGenerating": (
+    db: accountData.Database,
     _accountId: string,
-    input: Parameters<typeof d1.action.conversation.saveAssistantResponse>[1],
-  ) => d1.action.conversation.saveAssistantResponse(db, input),
-  "conversation.getPendingAssistantResponse": (db: d1.Client, accountId: string, turnId: string) =>
-    d1.action.conversation.getPendingAssistantResponse(db, accountId, turnId),
-  "conversation.closeTurnSession": (db: d1.Client, _accountId: string, turnId: string) =>
-    d1.action.conversation.closeTurnSession(db, turnId),
-  "conversation.markTurnDelivered": (db: d1.Client, _accountId: string, turnId: string) =>
-    d1.action.conversation.markTurnDelivered(db, turnId),
+    turnId: string,
+  ) => accountData.action.diary.markTurnGenerating(db, turnId),
+  "conversation.getTurnStatus": (db: accountData.Database, _accountId: string, turnId: string) =>
+    accountData.action.diary.getTurnStatus(db, turnId),
+  "conversation.isTurnSessionActive": (
+    db: accountData.Database,
+    _accountId: string,
+    turnId: string,
+  ) => accountData.action.diary.isTurnSessionActive(db, turnId),
+  "conversation.saveAssistantResponse": (
+    db: accountData.Database,
+    _accountId: string,
+    input: Parameters<typeof accountData.action.diary.saveAssistantResponse>[1],
+  ) => accountData.action.diary.saveAssistantResponse(db, input),
+  "conversation.getPendingAssistantResponse": (
+    db: accountData.Database,
+    accountId: string,
+    turnId: string,
+  ) => accountData.action.diary.getPendingAssistantResponse(db, accountId, turnId),
+  "conversation.closeTurnSession": (db: accountData.Database, _accountId: string, turnId: string) =>
+    accountData.action.diary.closeTurnSession(db, turnId),
+  "conversation.markTurnDelivered": (
+    db: accountData.Database,
+    _accountId: string,
+    turnId: string,
+  ) => accountData.action.diary.markTurnDelivered(db, turnId),
   "conversation.markTurnFailed": (
-    db: d1.Client,
+    db: accountData.Database,
     _accountId: string,
     turnId: string,
     failureStage: string,
-  ) => d1.action.conversation.markTurnFailed(db, turnId, failureStage),
+  ) => accountData.action.diary.markTurnFailed(db, turnId, failureStage),
 } as const;

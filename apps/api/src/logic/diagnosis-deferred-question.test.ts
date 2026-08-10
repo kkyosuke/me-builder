@@ -1,8 +1,8 @@
-import type { d1 } from "@me-builder/lib";
+import type { sharedD1 } from "@me-builder/lib";
 import { describe, expect, it, vi } from "vitest";
 import { deferDiagnosisQuestion } from "./diagnosis-deferred-question";
 
-const db = {} as d1.Client;
+const db = {} as sharedD1.Client;
 const at = new Date("2026-08-06T00:00:00.000Z");
 
 describe("deferDiagnosisQuestion", () => {

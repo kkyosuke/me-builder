@@ -1,11 +1,11 @@
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import type { D1Database } from "@cloudflare/workers-types";
-import { d1 } from "@me-builder/lib";
+import { sharedD1 } from "@me-builder/lib";
 import { Miniflare } from "miniflare";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { app } from "../index";
-import { createD1AccountDataTestNamespace } from "../testing/account-data";
+import { type AccountDataTestStore, createAccountDataTestStore } from "../testing/account-data";
 import { profileSummaryCases } from "./case/profile-summary.case";
 
 const repositoryRoot = path.resolve(__dirname, "../../../..");
@@ -15,6 +15,7 @@ const e2eSetupTimeoutMs = 90_000;
 
 let miniflare: Miniflare;
 let database: D1Database;
+let accountDataStore: AccountDataTestStore;
 
 async function applyMigrations(db: D1Database): Promise<void> {
   const migrationFiles = (await readdir(migrationsDirectory))
@@ -56,15 +57,15 @@ async function prepareAccount(db: D1Database): Promise<void> {
   ]);
 }
 
-async function insertSourceRecord(db: D1Database): Promise<void> {
-  await db
+function insertSourceRecord(): void {
+  accountDataStore.bind("account-summary-e2e");
+  accountDataStore.raw
     .prepare(
       `INSERT INTO source_records (
          id, created_at, updated_at, is_deleted, account_id, kind, access_label
        ) VALUES (?, ?, ?, 0, ?, 'user_input', 'private')`,
     )
-    .bind("source-summary-e2e", timestamp, timestamp, "account-summary-e2e")
-    .run();
+    .run("source-summary-e2e", timestamp, timestamp, "account-summary-e2e");
 }
 
 function mockLineVerification(): void {
@@ -87,7 +88,7 @@ async function request(): Promise<Response> {
     { headers: { Authorization: "Bearer known-token" } },
     {
       DB: database,
-      ACCOUNT_DATA: createD1AccountDataTestNamespace(d1.client.create(database)),
+      ACCOUNT_DATA: accountDataStore.namespace,
       LINE_LOGIN_CHANNEL_ID: "1234567890",
       ENVIRONMENT: "test",
     },
@@ -104,6 +105,8 @@ describe("GET /api/profile-summary local D1 E2E", () => {
     });
     database = (await miniflare.getD1Database("DB")) as D1Database;
     await prepareAccount(database);
+    accountDataStore = createAccountDataTestStore();
+    await accountDataStore.syncCatalogFrom(sharedD1.client.create(database));
   }, e2eSetupTimeoutMs);
 
   beforeEach(() => {
@@ -129,7 +132,7 @@ describe("GET /api/profile-summary local D1 E2E", () => {
   });
 
   it(`${profileSummaryCases.readVersions.id}: ${profileSummaryCases.readVersions.name}`, async () => {
-    await insertSourceRecord(database);
+    insertSourceRecord();
 
     const response = await request();
     expect(response.status).toBe(200);

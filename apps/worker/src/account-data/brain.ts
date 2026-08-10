@@ -1,9 +1,9 @@
-import { d1 } from "@me-builder/lib";
+import { accountData } from "@me-builder/lib";
 
 /** Brain Item domain operations owned by one AccountData Object. */
 export const brainActions = {
-  "brain.listActive": (db: d1.Client, accountId: string) =>
-    d1.action.brain.listActiveBrainItems(db, accountId),
-  "source.hasActive": (db: d1.Client, accountId: string) =>
-    d1.action.source.hasActiveSourceRecords(db, accountId),
+  "brain.listActive": (db: accountData.Database, accountId: string) =>
+    accountData.action.brain.listActiveBrainItems(db, accountId),
+  "source.hasActive": (db: accountData.Database, accountId: string) =>
+    accountData.action.source.hasActiveSourceRecords(db, accountId),
 } as const;

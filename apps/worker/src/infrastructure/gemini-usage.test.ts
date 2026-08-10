@@ -1,4 +1,4 @@
-import { d1 } from "@me-builder/lib";
+import { sharedD1 } from "@me-builder/lib";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createGeminiUsageRecorder } from "./gemini-usage";
 
@@ -19,9 +19,9 @@ describe("Gemini usage recorder", () => {
 
   it("用途を付けてtoken利用量を保存する", async () => {
     const store = vi
-      .spyOn(d1.action.geminiUsage, "storeGeminiUsage")
+      .spyOn(sharedD1.action.geminiUsage, "storeGeminiUsage")
       .mockResolvedValueOnce(undefined);
-    const db = {} as d1.Client;
+    const db = {} as sharedD1.Client;
 
     await createGeminiUsageRecorder(db, "diary_chat", "account-1")(usage);
 
@@ -33,12 +33,12 @@ describe("Gemini usage recorder", () => {
   });
 
   it("保存失敗で生成処理を失敗させない", async () => {
-    vi.spyOn(d1.action.geminiUsage, "storeGeminiUsage").mockRejectedValueOnce(
+    vi.spyOn(sharedD1.action.geminiUsage, "storeGeminiUsage").mockRejectedValueOnce(
       new Error("D1 unavailable"),
     );
 
     await expect(
-      createGeminiUsageRecorder({} as d1.Client, "diary_brain", "account-1")(usage),
+      createGeminiUsageRecorder({} as sharedD1.Client, "diary_brain", "account-1")(usage),
     ).resolves.toBe(undefined);
   });
 });

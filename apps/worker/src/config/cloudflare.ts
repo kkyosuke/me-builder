@@ -1,4 +1,4 @@
-import { d1 } from "@me-builder/lib";
+import { sharedD1 } from "@me-builder/lib";
 import type { AccountDataNamespace } from "@me-builder/lib";
 import type {
   ChatTurnQueueMessage,
@@ -8,7 +8,7 @@ import type {
 import type { Env } from "../types";
 
 export type CloudflareBindings = {
-  d1: d1.Client;
+  d1: sharedD1.Client;
   do: {
     conversation: Env["CONVERSATION_COORDINATOR"];
     accountData?: AccountDataNamespace;
@@ -22,7 +22,7 @@ export type CloudflareBindings = {
 /** Workerへ注入されたCloudflare bindingを、アプリ内で使う名前へ集約する。 */
 export function getCloudflareBindings(env: Env): CloudflareBindings {
   return {
-    d1: d1.client.create(env.DB),
+    d1: sharedD1.client.create(env.DB),
     do: {
       conversation: env.CONVERSATION_COORDINATOR,
       ...(env.ACCOUNT_DATA ? { accountData: env.ACCOUNT_DATA } : {}),

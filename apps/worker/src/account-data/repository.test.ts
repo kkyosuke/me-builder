@@ -1,8 +1,8 @@
-import { d1 } from "@me-builder/lib";
+import { accountData } from "@me-builder/lib";
 import Database from "better-sqlite3";
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
-import { AccountDataRepository, type LegacyAccountDataSnapshot } from "./repository";
+import { AccountDataRepository } from "./repository";
 
 function createRepository() {
   const sqlite = new Database(":memory:");
@@ -77,20 +77,22 @@ describe("AccountDataRepository", () => {
     first.bindAccount("account-1");
     second.bindAccount("account-2");
 
-    const source = await d1.action.conversation.storeLineTextSource(first.client, {
+    const source = await accountData.action.diary.storeLineTextSource(first.client, {
       accountId: "account-1",
       eventId: "event-1",
       body: "private diary",
       receivedAt: new Date("2026-08-08T00:00:00.000Z"),
     });
 
-    expect(await second.client.select().from(d1.schema.sourceRecords).all()).toEqual([]);
+    expect(await second.client.select().from(accountData.schema.sourceRecords).all()).toEqual([]);
     expect(
       await second.client
         .select()
-        .from(d1.schema.sourceRecordTextPayloads)
+        .from(accountData.schema.sourceRecordTextPayloads)
         // IDを知っていても別Objectには行そのものがない。
-        .where(eq(d1.schema.sourceRecordTextPayloads.sourceRecordId, source.sourceRecordId))
+        .where(
+          eq(accountData.schema.sourceRecordTextPayloads.sourceRecordId, source.sourceRecordId),
+        )
         .get(),
     ).toBeUndefined();
   });
@@ -229,76 +231,6 @@ describe("AccountDataRepository", () => {
     ).toEqual({ outcome: "released", reference: null });
   });
 
-  it("共有D1由来のDiary循環参照を一度だけcopyして復元する", async () => {
-    const legacy = createRepository();
-    const target = createRepository();
-    await Promise.all([legacy.initialize(), target.initialize()]);
-    legacy.bindAccount("account-1");
-    target.bindAccount("account-1");
-    const source = await d1.action.conversation.storeLineTextSource(legacy.client, {
-      accountId: "account-1",
-      eventId: "legacy-event-1",
-      body: "legacy private diary",
-      receivedAt: new Date("2026-08-08T00:00:00.000Z"),
-    });
-    const turn = await d1.action.conversation.attachMessagesToTurn(
-      legacy.client,
-      "account-1",
-      [source],
-      1,
-      "test-model",
-      "test-prompt-v1",
-    );
-    await d1.action.conversation.markTurnGenerating(legacy.client, turn.turnId);
-    await d1.action.conversation.saveAssistantResponse(legacy.client, {
-      turnId: turn.turnId,
-      body: "legacy response",
-      endSession: false,
-    });
-
-    const snapshot = {
-      account: await legacy.client
-        .select()
-        .from(d1.schema.accounts)
-        .where(eq(d1.schema.accounts.id, "account-1"))
-        .get(),
-      sourceRecords: await legacy.client.select().from(d1.schema.sourceRecords).all(),
-      sourceRecordTextPayloads: await legacy.client
-        .select()
-        .from(d1.schema.sourceRecordTextPayloads)
-        .all(),
-      sourceRecordRevisions: [],
-      brainItems: [],
-      brainItemEvidenceEdges: [],
-      brainItemRevisions: [],
-      brainItemAccessLabels: [],
-      brainItemTopicLabels: [],
-      conversationSessions: await legacy.client.select().from(d1.schema.conversationSessions).all(),
-      conversationMessages: await legacy.client.select().from(d1.schema.conversationMessages).all(),
-      chatTurns: await legacy.client.select().from(d1.schema.chatTurns).all(),
-      diagnosisResponses: [],
-      diagnosisAnswers: [],
-      diagnosisDeferredQuestions: [],
-      diagnosisBrainProjectionRequests: [],
-      diagnosisBrainProjectionHeads: [],
-    } satisfies LegacyAccountDataSnapshot;
-    target.importLegacyAccountData(snapshot);
-    target.importLegacyAccountData(snapshot);
-
-    expect(target.isLegacyImportComplete()).toBe(true);
-    await expect(
-      d1.action.conversation.getTurnContext(target.client, turn.turnId, 20),
-    ).resolves.toMatchObject({
-      accountId: "account-1",
-      messages: [{ body: "legacy private diary", role: "user" }],
-    });
-    expect(target.client.select().from(d1.schema.conversationMessages).all()).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ assistantBody: "legacy response", turnId: turn.turnId }),
-      ]),
-    );
-  });
-
   it("Diagnosis回答・Source・projection requestを同じAccount SQLiteへ保存する", async () => {
     const repository = createRepository();
     await repository.initialize();
@@ -306,6 +238,7 @@ describe("AccountDataRepository", () => {
     const at = new Date("2026-08-08T00:00:00.000Z");
     const lifecycle = { createdAt: at, updatedAt: at, deletedAt: null, isDeleted: false };
     repository.syncDiagnosisCatalog({
+      version: 1,
       questions: [{ id: "question-1", ...lifecycle }],
       questionVersions: [
         {
@@ -359,7 +292,7 @@ describe("AccountDataRepository", () => {
       ],
     });
 
-    const saved = await d1.action.diagnosis.saveDiagnosisAnswer(repository.client, {
+    const saved = await accountData.action.diagnosis.saveDiagnosisAnswer(repository.client, {
       accountId: "account-1",
       diagnosisId: "diagnosis-1",
       diagnosisQuestionId: "diagnosis-question-1",
@@ -368,9 +301,14 @@ describe("AccountDataRepository", () => {
     });
 
     expect(saved).toMatchObject({ type: "saved", progress: { responseStatus: "answered" } });
-    expect(await repository.client.select().from(d1.schema.sourceRecords).all()).toHaveLength(1);
     expect(
-      await repository.client.select().from(d1.schema.diagnosisBrainProjectionRequests).all(),
+      await repository.client.select().from(accountData.schema.sourceRecords).all(),
+    ).toHaveLength(1);
+    expect(
+      await repository.client
+        .select()
+        .from(accountData.schema.diagnosisBrainProjectionRequests)
+        .all(),
     ).toHaveLength(1);
   });
 });

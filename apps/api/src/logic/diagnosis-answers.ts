@@ -1,10 +1,15 @@
-import { type AccountDataNamespace, accountDataFor, type d1 } from "@me-builder/lib";
+import {
+  type AccountDataNamespace,
+  accountDataFor,
+  type accountData as accountDataLib,
+  type sharedD1,
+} from "@me-builder/lib";
 import { logger, toSafeOperationalErrorFields } from "@me-builder/shared";
 import { scoreDiagnosisAnswers } from "./diagnosis-scoring";
 import { createLiffSession } from "./liff-session";
 
 type StoredDiagnosisAnswers = Extract<
-  Awaited<ReturnType<typeof d1.action.diagnosis.findDiagnosisAnswers>>,
+  Awaited<ReturnType<typeof accountDataLib.action.diagnosis.findDiagnosisAnswers>>,
   { type: "found" }
 >["diagnosis"];
 type DiagnosisAnswers = Omit<StoredDiagnosisAnswers, "scoringConfig">;
@@ -25,7 +30,7 @@ type Params = {
   diagnosisId: string;
   idToken: string | undefined;
   lineLoginChannelId: string | undefined;
-  db: d1.Client;
+  db: sharedD1.Client;
   accountData?: AccountDataNamespace;
   at?: Date;
 };
@@ -37,7 +42,7 @@ type Dependencies = {
     accountId: string,
     diagnosisId: string,
     at: Date,
-  ) => ReturnType<typeof d1.action.diagnosis.findDiagnosisAnswers>;
+  ) => ReturnType<typeof accountDataLib.action.diagnosis.findDiagnosisAnswers>;
 };
 
 const defaultDependencies: Dependencies = {

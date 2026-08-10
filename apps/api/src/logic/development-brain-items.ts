@@ -1,7 +1,14 @@
-import { type AccountDataNamespace, accountDataFor, type d1 } from "@me-builder/lib";
+import {
+  type AccountDataNamespace,
+  accountDataFor,
+  type accountData as accountDataLib,
+  type sharedD1,
+} from "@me-builder/lib";
 import { createLiffSession } from "./liff-session";
 
-type DevelopmentBrainItems = Awaited<ReturnType<typeof d1.action.brain.listActiveBrainItems>>;
+type DevelopmentBrainItems = Awaited<
+  ReturnType<typeof accountDataLib.action.brain.listActiveBrainItems>
+>;
 
 export type DevelopmentBrainItemsOutcome =
   | ({ type: "resolved" } & DevelopmentBrainItems)
@@ -12,7 +19,7 @@ export type DevelopmentBrainItemsOutcome =
 type Params = {
   idToken: string | undefined;
   lineLoginChannelId: string | undefined;
-  db: d1.Client;
+  db: sharedD1.Client;
   accountData?: AccountDataNamespace;
 };
 

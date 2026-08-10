@@ -1,5 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
-import { accountDataFor, d1 } from "@me-builder/lib";
+import { accountDataFor, sharedD1 } from "@me-builder/lib";
 import {
   type ChatTurnQueueMessage,
   type GenerationLease,
@@ -124,7 +124,7 @@ export class ConversationCoordinator extends DurableObject<Env> {
     }
     let delivery = existing;
     if (!delivery) {
-      const target = await d1.action.account.findLineIdentityByAccountId(
+      const target = await sharedD1.action.account.findLineIdentityByAccountId(
         this.cf.d1,
         this.repository.getBoundAccountId() ?? "",
       );

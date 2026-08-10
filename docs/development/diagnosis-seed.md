@@ -30,6 +30,7 @@ seedは必ずmigration適用後に実行します。localでは開発者が明�
 - `created_at`などの日時はDrizzleの`timestamp` modeに合わせたUnix秒で記録する
 - 採点設定の意味と計算規則は各スコアリング設計を正とし、実行時の設定値をseedから版付きの不変な行として登録する
 - 公開済みDiagnosisが参照する採点設定行を更新せず、変更時は新しい設定IDとversionを追加する
+- seedのcatalog内容を変更したら、同じ変更で`catalog_versions`のversionを1つ上げる
 
 `INSERT OR IGNORE`は同じ主キーの既存行を変更しません。そのため再実行前には、既存行がseedの期待内容と一致しているかを確認します。意図しない差分がある場合、SQLの上書き更新で解消せず、Question VersionまたはDiagnosisを新しく作ります。
 
@@ -100,6 +101,9 @@ SQL末尾の検証クエリは、現在のseedだけを適用した場合に次�
 - 各Diagnosisの表示順が登録表と一致する
 - seedを2回実行しても件数と内容が変わらない
 - 採点設定とQuestion ID、Question Version、Choice IDが一致する
+- `catalog_versions`の`diagnosis`が今回のseedのversionと一致する
+
+`catalog_versions`は、AccountDataが保持する公開定義snapshotを再同期するか判断する版です。AccountDataは共有D1のversionと自分が同期済みのversionが一致する間、公開定義を読み直しません。versionを上げ忘れると、新しい診断が利用者へ表示されません。境界の定義は[Accountデータ分離設計](../architecture/account-data-isolation.md)を正とします。
 
 `task ci`はseedを適用したローカルD1に対し、採点設定を参照する全Diagnosisへ回答保存・回答内容取得を行います。採点設定と質問定義が一致せず計算結果を返せない場合はE2Eテストを失敗させ、preview・productionへの適用前に停止します。
 
@@ -111,8 +115,9 @@ SQL末尾の検証クエリは、現在のseedだけを適用した場合に次�
 2. Question VersionとChoiceを`approved`として追加する
 3. 新しいIDとversionで採点設定を追加する
 4. 新しいDiagnosis ID、採点設定への参照、固定した質問順を追加する
-5. localへ適用し、再実行と取得結果を検証する
-6. マージ後、preview CDの適用結果をAPIとWebから確認する
-7. production CDの対象DBと適用結果を確認する
+5. `catalog_versions`のversionを1つ上げる
+6. localへ適用し、再実行と取得結果を検証する
+7. マージ後、preview CDの適用結果をAPIとWebから確認する
+8. production CDの対象DBと適用結果を確認する
 
 公開済みの内容を改訂するときは、既存のSQL行を書き換えて既存DBへ反映させようとしてはいけません。新しいQuestion VersionとDiagnosisを追記し、過去の回答が参照する版を残します。

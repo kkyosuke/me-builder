@@ -1,4 +1,4 @@
-import { d1 } from "@me-builder/lib";
+import { accountData } from "@me-builder/lib";
 import Database from "better-sqlite3";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ConversationCoordinator } from "./conversation-coordinator";
@@ -49,16 +49,16 @@ function createCoordinator(env: Partial<Env> = {}) {
     storage,
     blockConcurrencyWhile: (callback: () => Promise<void>) => callback(),
   } as unknown as DurableObjectState;
-  const accountData = {
+  const accountDataNamespace = {
     getByName: () => ({
       execute: (accountId: string, operation: string, ...args: unknown[]) => {
         if (operation !== "conversation.attachMessagesToTurn") {
           throw new Error(`Unexpected AccountData operation: ${operation}`);
         }
-        return d1.action.conversation.attachMessagesToTurn(
-          {} as d1.Client,
+        return accountData.action.diary.attachMessagesToTurn(
+          {} as accountData.Database,
           accountId,
-          ...(args as Parameters<typeof d1.action.conversation.attachMessagesToTurn> extends [
+          ...(args as Parameters<typeof accountData.action.diary.attachMessagesToTurn> extends [
             unknown,
             unknown,
             ...infer TRest,
@@ -70,7 +70,7 @@ function createCoordinator(env: Partial<Env> = {}) {
     }),
   } as unknown as NonNullable<Env["ACCOUNT_DATA"]>;
   const coordinator = new ConversationCoordinator(ctx, {
-    ACCOUNT_DATA: accountData,
+    ACCOUNT_DATA: accountDataNamespace,
     ...env,
   } as Env);
   return { coordinator, sql, getAlarm: () => alarm };
@@ -110,7 +110,7 @@ describe("ConversationCoordinator recovery", () => {
       receivedAt,
     });
     const attach = vi
-      .spyOn(d1.action.conversation, "attachMessagesToTurn")
+      .spyOn(accountData.action.diary, "attachMessagesToTurn")
       .mockResolvedValueOnce({ turnId: "turn-1", sessionId: "session-1", generationEpoch: 1 })
       .mockResolvedValueOnce({ turnId: "turn-2", sessionId: "session-1", generationEpoch: 2 });
 
@@ -145,7 +145,7 @@ describe("ConversationCoordinator recovery", () => {
       eventId: "event-1",
       receivedAt: new Date().toISOString(),
     });
-    vi.spyOn(d1.action.conversation, "attachMessagesToTurn").mockRejectedValue(
+    vi.spyOn(accountData.action.diary, "attachMessagesToTurn").mockRejectedValue(
       new Error("temporary D1 outage"),
     );
 
@@ -177,7 +177,7 @@ describe("ConversationCoordinator recovery", () => {
       eventId: "event-1",
       receivedAt: new Date().toISOString(),
     });
-    vi.spyOn(d1.action.conversation, "attachMessagesToTurn").mockRejectedValue(
+    vi.spyOn(accountData.action.diary, "attachMessagesToTurn").mockRejectedValue(
       new Error("temporary D1 outage"),
     );
 
@@ -240,7 +240,7 @@ describe("ConversationCoordinator recovery", () => {
       eventId: "event-1",
       receivedAt: new Date().toISOString(),
     });
-    vi.spyOn(d1.action.conversation, "attachMessagesToTurn").mockResolvedValue({
+    vi.spyOn(accountData.action.diary, "attachMessagesToTurn").mockResolvedValue({
       turnId: "old-turn",
       sessionId: "session-1",
       generationEpoch: 0,
