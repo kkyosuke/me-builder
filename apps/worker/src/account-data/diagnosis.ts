@@ -23,6 +23,11 @@ export const diagnosisActions = {
     diagnosisId: string,
     at: Date,
   ) => DO.account.action.diagnosis.findDiagnosisAnswers(db, accountId, diagnosisId, at),
+  "diagnosis.getCompatibilitySharePreviewSource": (
+    db: DO.account.Database,
+    accountId: string,
+    at: Date,
+  ) => DO.account.action.diagnosis.getCompatibilitySharePreviewSource(db, accountId, at),
   "diagnosis.listVisible": (db: DO.account.Database, accountId: string, at: Date) =>
     DO.account.action.diagnosis.listVisibleDiagnoses(db, accountId, at),
   "diagnosisProjection.processLatest": (

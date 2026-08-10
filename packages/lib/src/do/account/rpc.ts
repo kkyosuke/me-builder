@@ -176,6 +176,10 @@ export type AccountDataActions = {
     [diagnosisId: string, at: Date],
     typeof diagnosis.findDiagnosisAnswers
   >;
+  "diagnosis.getCompatibilitySharePreviewSource": RpcAction<
+    [at: Date],
+    typeof diagnosis.getCompatibilitySharePreviewSource
+  >;
   "diagnosis.listVisible": RpcAction<[at: Date], typeof diagnosis.listVisibleDiagnoses>;
   "diagnosisProjection.processLatest": RpcAction<
     [diagnosisId: string, at?: Date],

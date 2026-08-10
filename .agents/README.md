@@ -50,6 +50,7 @@
 | [LINEリッチメニュー運用](../docs/development/line-rich-menu.md) | Messaging APIによるリッチメニューの登録、画像更新、CD運用 |
 | [診断API契約](../docs/development/diagnosis-api.md) | Web UIとAPI Server間の診断APIのパス、認証、入出力、エラー契約 |
 | [プロフィールAPI契約](../docs/development/profile-api.md) | 本人プロフィールとアバター画像の取得・保存・削除API、画像検査、共有D1とPrivate R2の更新境界 |
+| [相性API契約](../docs/development/compatibility-api.md) | Web UIとAPI Server間の相性APIのパス、認証、入出力、エラー契約 |
 | [API契約とクライアント型の生成](../docs/development/api-contract-generation.md) | API ServerのHTTP契約の配置、OpenAPI documentとWeb UI用TypeScript型の生成運用 |
 | [アプリケーション運用ログ方針](../docs/development/operational-logging.md) | 一連の処理を追跡し、エラー原因と最終結果を判断できる運用ログの目的と進め方 |
 | [アバター設定残タスク](../docs/development/avatar-remaining-tasks.md) | アバター設定で未完了の実ブラウザE2E、LIFF実端末確認、Private R2孤立objectの運用改善 |

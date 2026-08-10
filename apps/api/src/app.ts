@@ -12,6 +12,7 @@ import * as v from "valibot";
 import { getConfig } from "./config";
 import { adminStatisticsRoute } from "./contract/admin/statistics";
 import { developmentBrainItemsRoute, developmentBrainVectorRoute } from "./contract/brain/dev-list";
+import { compatibilitySharePreviewRoute } from "./contract/compatibility/share-preview";
 import { saveDiagnosisAnswerRoute } from "./contract/diagnosis/answer";
 import { diagnosisAnswersRoute } from "./contract/diagnosis/answers";
 import { deferDiagnosisQuestionRoute } from "./contract/diagnosis/deferred-question";
@@ -29,6 +30,7 @@ import { profileSummaryGenerationRoute, profileSummaryRoute } from "./contract/p
 import { InternalServerErrorSchema } from "./contract/shared/errors";
 import { getStatistics } from "./controller/admin";
 import { getDevelopmentBrainItems, getDevelopmentBrainVector } from "./controller/brain";
+import { getCompatibilitySharePreviewContents } from "./controller/compatibility";
 import {
   deleteDevelopmentDiagnosisData,
   getDiagnoses,
@@ -128,6 +130,11 @@ app.get(
   "/api/dev/brain-items/:brainItemId/vector",
   developmentBrainVectorRoute,
   getDevelopmentBrainVector,
+);
+app.get(
+  "/api/compatibility/share-preview",
+  compatibilitySharePreviewRoute,
+  getCompatibilitySharePreviewContents,
 );
 
 app.get("/api/diagnoses", diagnosisListRoute, getDiagnoses);

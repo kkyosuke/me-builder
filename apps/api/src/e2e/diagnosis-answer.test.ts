@@ -6,6 +6,7 @@ import { Miniflare } from "miniflare";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { app } from "../index";
 import { type AccountDataTestStore, createAccountDataTestStore } from "../testing/account-data";
+import { compatibilitySharePreviewCases } from "./case/compatibility-share-preview.case";
 import { diagnosisAnswerCases } from "./case/diagnosis-answer.case";
 
 const repositoryRoot = path.resolve(__dirname, "../../../..");
@@ -62,6 +63,7 @@ function mockLineVerification(): void {
         sub: "line-answer-e2e",
         aud: "1234567890",
         exp: timestamp + 86_400,
+        name: "あおい",
       }),
     ),
   );
@@ -99,6 +101,25 @@ async function getAnswers(diagnosisId = "relationship-priority"): Promise<Respon
     { headers: { Authorization: "Bearer known-token" } },
     env(),
   );
+}
+
+async function getCompatibilitySharePreview(): Promise<Response> {
+  return app.request(
+    "/api/compatibility/share-preview",
+    { headers: { Authorization: "Bearer known-token" } },
+    env(),
+  );
+}
+
+async function completeRelationshipDiagnosis(): Promise<unknown> {
+  let lastBody: unknown;
+  for (let index = 1; index <= 10; index += 1) {
+    const id = `dq-relationship-priority-${String(index).padStart(2, "0")}`;
+    const response = await putAnswer(id);
+    expect(response.status).toBe(200);
+    lastBody = await response.json();
+  }
+  return lastBody;
 }
 
 async function deferQuestion(
@@ -252,13 +273,7 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
   it(
     `${diagnosisAnswerCases.complete.id}: ${diagnosisAnswerCases.complete.name}`,
     async () => {
-      let lastBody: unknown;
-      for (let index = 1; index <= 10; index += 1) {
-        const id = `dq-relationship-priority-${String(index).padStart(2, "0")}`;
-        const response = await putAnswer(id);
-        expect(response.status).toBe(200);
-        lastBody = await response.json();
-      }
+      const lastBody = await completeRelationshipDiagnosis();
       expect(lastBody).toMatchObject({
         progress: { responseStatus: "answered", answeredCount: 10, questionCount: 10 },
       });
@@ -266,6 +281,57 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
         responseStatus: "answered",
         answeredCount: 10,
       });
+    },
+    e2eTimeoutMs,
+  );
+
+  it(
+    `${compatibilitySharePreviewCases.completedDiagnosis.id}: ${compatibilitySharePreviewCases.completedDiagnosis.name}`,
+    async () => {
+      const emptyResponse = await getCompatibilitySharePreview();
+      expect(emptyResponse.status).toBe(200);
+      expect(await emptyResponse.json()).toMatchObject({
+        displayName: "あおい",
+        themes: [],
+        canIssueInvitation: false,
+        blockingReasons: ["diagnosis_required"],
+        nextAction: "diagnosis",
+      });
+
+      await completeRelationshipDiagnosis();
+
+      const previewResponse = await getCompatibilitySharePreview();
+      expect(previewResponse.status).toBe(200);
+      const preview = (await previewResponse.json()) as {
+        displayName: string;
+        themes: Array<{
+          diagnosisId: string;
+          parameters: Array<Record<string, unknown>>;
+        }>;
+        canIssueInvitation: boolean;
+        blockingReasons: string[];
+        nextAction: string | null;
+        previewToken: string;
+      };
+      expect(preview.displayName).toBe("あおい");
+      expect(preview.canIssueInvitation).toBe(true);
+      expect(preview.blockingReasons).toEqual([]);
+      expect(preview.nextAction).toBeNull();
+      expect(preview.previewToken).toMatch(/^csp1\.[a-f0-9]{64}$/);
+      expect(preview.themes).toHaveLength(1);
+      expect(preview.themes[0]?.diagnosisId).toBe("relationship-priority");
+      expect(preview.themes[0]?.parameters).toHaveLength(4);
+      expect(preview.themes[0]?.parameters[0]).toEqual({
+        id: expect.any(String),
+        label: expect.any(String),
+        lowLabel: expect.any(String),
+        highLabel: expect.any(String),
+        position: expect.any(Number),
+        statement: expect.stringContaining("傾向があります"),
+      });
+      expect(JSON.stringify(preview)).not.toMatch(
+        /choiceId|questionText|coverage|accountId|fingerprint/,
+      );
     },
     e2eTimeoutMs,
   );
