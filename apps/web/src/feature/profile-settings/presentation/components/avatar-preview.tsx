@@ -1,31 +1,5 @@
-import { Flower2, type LucideIcon, Sparkles, SunMedium, UserRound, Waves } from "lucide-react";
-import type { AvatarPresetId, AvatarSelection } from "../../model/avatar";
-
-const presetStyles: Record<
-  AvatarPresetId,
-  { background: string; foreground: string; icon: LucideIcon }
-> = {
-  sunrise: {
-    background: "from-amber-200 via-orange-300 to-rose-300",
-    foreground: "text-rose-800",
-    icon: SunMedium,
-  },
-  starlight: {
-    background: "from-indigo-500 via-violet-500 to-fuchsia-400",
-    foreground: "text-white",
-    icon: Sparkles,
-  },
-  leaf: {
-    background: "from-lime-200 via-emerald-300 to-teal-300",
-    foreground: "text-emerald-900",
-    icon: Flower2,
-  },
-  water: {
-    background: "from-cyan-200 via-sky-300 to-blue-400",
-    foreground: "text-blue-900",
-    icon: Waves,
-  },
-};
+import { UserRound } from "lucide-react";
+import type { AvatarSelection } from "../../model/avatar";
 
 const sizeStyles = {
   sm: "size-10",
@@ -59,25 +33,7 @@ export function AvatarPreview({
     );
   }
 
-  if (avatar.kind === "uploaded") {
-    return (
-      <img
-        src={avatar.dataUrl}
-        alt=""
-        className={`${commonClassName} object-cover`}
-        aria-hidden="true"
-      />
-    );
-  }
-
-  const style = presetStyles[avatar.presetId];
-  const Icon = style.icon;
   return (
-    <span
-      aria-hidden="true"
-      className={`${commonClassName} ${style.foreground} flex items-center justify-center bg-gradient-to-br ${style.background}`}
-    >
-      <Icon className={iconSizeStyles[size]} />
-    </span>
+    <img src={avatar.src} alt="" className={`${commonClassName} object-cover`} aria-hidden="true" />
   );
 }

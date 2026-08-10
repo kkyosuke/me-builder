@@ -1,12 +1,11 @@
-import { Suspense, lazy, useEffect, useRef, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
 import { LoadingState } from "./components/loading-state";
 import { RouteErrorBoundary } from "./components/route-error-boundary";
 import { config } from "./config";
 import { useLiffSession } from "./feature/liff";
 import { getLiffIdToken } from "./feature/liff/infrastructure/liff-client";
 import { verifyLiffSession } from "./feature/liff/infrastructure/session-api";
-import type { AvatarSelection } from "./feature/profile-settings/model/avatar";
-import { ProfileMenuButton } from "./feature/profile-settings/presentation/components/profile-menu-button";
+import { ProfileMenuButton, useAvatarSettings } from "./feature/profile-settings";
 import { useColorTheme } from "./feature/theme";
 import {
   getIdleMainApplicationRoutes,
@@ -81,8 +80,20 @@ export function App() {
     pathname === "/compatibility" || pathname.startsWith("/compatibility/");
   const isMePath = pathname === "/me" || pathname.startsWith("/me/");
   const currentMainRoute = isCompatibilityPath ? "compatibility" : isMePath ? "me" : "diagnosis";
-  const [avatar, setAvatar] = useState<AvatarSelection | null>(null);
   const [accountRole, setAccountRole] = useState<"user" | "admin" | null>(null);
+  const acquireAvatarIdToken = useCallback(
+    (signal: AbortSignal) => {
+      const currentIdToken = getLiffIdToken();
+      return currentIdToken ? Promise.resolve(currentIdToken) : liffSession.acquireIdToken(signal);
+    },
+    [liffSession.acquireIdToken],
+  );
+  const avatarController = useAvatarSettings({
+    acquireIdToken: acquireAvatarIdToken,
+    enabled: !isAdminPath,
+    pollingEnabled: profileView === "avatar",
+  });
+  const avatar = avatarController.currentAvatar;
 
   useEffect(() => {
     const handlePopState = () => {
@@ -242,12 +253,9 @@ export function App() {
             }
           >
             <AvatarSettingsScreen
-              currentAvatar={avatar}
+              controller={avatarController}
               onBack={closeAvatar}
-              onSave={(nextAvatar) => {
-                setAvatar(nextAvatar);
-                closeAvatar();
-              }}
+              onSaved={closeAvatar}
             />
           </Suspense>
         </RouteErrorBoundary>

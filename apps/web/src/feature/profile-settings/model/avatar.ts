@@ -1,18 +1,24 @@
-export const AVATAR_PRESETS = [
-  { id: "sunrise", name: "朝焼け" },
-  { id: "starlight", name: "星空" },
-  { id: "leaf", name: "若葉" },
-  { id: "water", name: "水面" },
-] as const;
+import type { operations } from "../../../generated/api";
 
-export type AvatarPresetId = (typeof AVATAR_PRESETS)[number]["id"];
+export type AvatarState = operations["getAvatar"]["responses"][200]["content"]["application/json"];
+export type AvatarJob = NonNullable<AvatarState["job"]>;
+export type AvatarJobStatus = AvatarJob["status"];
 
-export type AvatarSelection =
-  | { kind: "preset"; presetId: AvatarPresetId }
-  | { kind: "uploaded"; dataUrl: string; fileName: string };
+/** 認証済み画像をブラウザ内で表示するための一時URL。 */
+export type AvatarSelection = {
+  id: string;
+  src: string;
+};
+
+export type AvatarCandidate = AvatarSelection & {
+  expiresAt: string;
+};
+
+export type AvatarDisplayState = {
+  currentAvatar: AvatarSelection | null;
+  job: (Omit<AvatarJob, "candidates"> & { candidates: AvatarCandidate[] }) | null;
+};
 
 export function getAvatarName(avatar: AvatarSelection | null): string {
-  if (!avatar) return "未設定";
-  if (avatar.kind === "uploaded") return avatar.fileName;
-  return AVATAR_PRESETS.find((preset) => preset.id === avatar.presetId)?.name ?? "アバター";
+  return avatar ? "設定済み" : "未設定";
 }

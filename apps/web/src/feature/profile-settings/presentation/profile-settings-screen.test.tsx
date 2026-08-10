@@ -29,7 +29,7 @@ describe("ProfileSettingsScreen", () => {
     const onThemeChange = vi.fn();
     render(
       <ProfileSettingsScreen
-        avatar={{ kind: "preset", presetId: "leaf" }}
+        avatar={{ id: "avatar-1", src: "blob:avatar-1" }}
         theme="dark"
         onBack={vi.fn()}
         onOpenAvatar={onOpenAvatar}

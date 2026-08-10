@@ -1,95 +1,133 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AvatarSettingsScreen } from "./avatar-settings-screen";
+import type { AvatarSettingsController } from "./use-avatar-settings";
+
+const timestamp = "2026-08-10T00:00:00.000Z";
+
+function controller(overrides: Partial<AvatarSettingsController> = {}): AvatarSettingsController {
+  return {
+    currentAvatar: null,
+    job: null,
+    loadStatus: "ready",
+    errorMessage: null,
+    busy: false,
+    refresh: vi.fn().mockResolvedValue(true),
+    upload: vi.fn().mockResolvedValue(true),
+    generate: vi.fn().mockResolvedValue(true),
+    choose: vi.fn().mockResolvedValue(true),
+    cancel: vi.fn().mockResolvedValue(true),
+    remove: vi.fn().mockResolvedValue(true),
+    ...overrides,
+  };
+}
+
+function job(
+  status: NonNullable<AvatarSettingsController["job"]>["status"],
+): NonNullable<AvatarSettingsController["job"]> {
+  return {
+    id: "00000000-0000-4000-8000-000000000001",
+    status,
+    errorCode: null,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    expiresAt: timestamp,
+    candidates: [],
+  };
+}
 
 describe("AvatarSettingsScreen", () => {
+  beforeEach(() => {
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      value: vi.fn().mockReturnValue("blob:upload"),
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      configurable: true,
+      value: vi.fn(),
+    });
+  });
+
   afterEach(cleanup);
 
-  it("人物を確認してからAI変換候補を設定できる", async () => {
-    const onSave = vi.fn();
-    render(<AvatarSettingsScreen currentAvatar={null} onBack={vi.fn()} onSave={onSave} />);
+  it("同意後に対応形式の画像を人物判定へ送る", async () => {
+    const state = controller();
+    render(<AvatarSettingsScreen controller={state} onBack={vi.fn()} onSaved={vi.fn()} />);
 
-    expect(screen.queryByRole("button", { name: "朝焼けを選択" })).toBeNull();
-    expect((screen.getByLabelText(/画像をアップロード/) as HTMLInputElement).disabled).toBe(true);
+    const input = screen.getByLabelText(/画像をアップロード/) as HTMLInputElement;
+    expect(input.disabled).toBe(true);
     fireEvent.click(screen.getByRole("checkbox", { name: /外部AIサービスへ送信/ }));
-    fireEvent.change(screen.getByLabelText(/画像をアップロード/), {
-      target: { files: [new File(["selfie"], "selfie.png", { type: "image/png" })] },
-    });
+    const file = new File(["selfie"], "selfie.png", { type: "image/png" });
+    fireEvent.change(input, { target: { files: [file] } });
 
-    expect((await screen.findAllByText("selfie.png")).length).toBeGreaterThan(0);
-    expect(screen.queryByRole("button", { name: "ダミー変換を開始" })).toBeNull();
-    expect(screen.getByRole("status").textContent).toContain("人物が写っているか確認しています");
-    expect(await screen.findByText("人物を確認できました")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "ダミー変換を開始" }));
-    fireEvent.click(screen.getByRole("button", { name: "若葉を選択" }));
-    fireEvent.click(screen.getByRole("button", { name: "このアバターに設定" }));
-
-    expect(onSave).toHaveBeenCalledWith({ kind: "preset", presetId: "leaf" });
+    expect(await screen.findByText("selfie.png")).toBeTruthy();
+    expect(state.upload).toHaveBeenCalledWith(file);
   });
 
-  it("人物を確認できなければ自分の画像の選び直しを案内する", async () => {
-    render(<AvatarSettingsScreen currentAvatar={null} onBack={vi.fn()} onSave={vi.fn()} />);
-    fireEvent.click(screen.getByRole("checkbox", { name: /外部AIサービスへ送信/ }));
-    fireEvent.change(screen.getByLabelText(/画像をアップロード/), {
-      target: { files: [new File(["landscape"], "landscape.png", { type: "image/png" })] },
-    });
-
-    expect((await screen.findAllByText("landscape.png")).length).toBeGreaterThan(0);
-    expect(await screen.findByText("人物を確認できました")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "ダミー確認：人物なしの結果を試す" }));
-
-    expect(screen.getByRole("alert").textContent).toContain("人物を確認できませんでした");
-    expect(screen.getByText(/ご自身の顔や上半身が見やすい画像/)).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "ダミー変換を開始" })).toBeNull();
-    expect(screen.getByText("別の画像を選ぶ")).toBeTruthy();
-  });
-
-  it("現在のアバターとアップロード中の画像を区別して表示する", async () => {
+  it("人物を確認できなければ自分の画像の選び直しを案内する", () => {
     render(
       <AvatarSettingsScreen
-        currentAvatar={{ kind: "preset", presetId: "water" }}
+        controller={controller({ job: job("not_person") })}
         onBack={vi.fn()}
-        onSave={vi.fn()}
+        onSaved={vi.fn()}
       />,
     );
 
-    expect(screen.getByText("現在のアバター")).toBeTruthy();
-    expect(screen.getByText("水面")).toBeTruthy();
-    fireEvent.click(screen.getByRole("checkbox", { name: /外部AIサービスへ送信/ }));
-    fireEvent.change(screen.getByLabelText(/画像をアップロード/), {
-      target: { files: [new File(["selfie"], "new-selfie.png", { type: "image/png" })] },
-    });
+    expect(screen.getByRole("alert").textContent).toContain("人物を確認できませんでした");
+    expect(screen.getByRole("alert").textContent).toContain("ご自身の顔や上半身が見やすい画像");
+    expect(screen.queryByRole("button", { name: "アバター生成を開始" })).toBeNull();
+  });
 
-    expect((await screen.findAllByText("new-selfie.png")).length).toBeGreaterThan(0);
-    expect(screen.getByText("現在のアバター")).toBeTruthy();
-    expect(screen.getByText("水面")).toBeTruthy();
+  it("人物確認後に生成を開始できる", () => {
+    const state = controller({ job: job("verified") });
+    render(<AvatarSettingsScreen controller={state} onBack={vi.fn()} onSaved={vi.fn()} />);
+
+    expect(screen.getByText("人物を確認できました")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "アバター生成を開始" }));
+    expect(state.generate).toHaveBeenCalledOnce();
+  });
+
+  it("生成候補を選択して設定できる", async () => {
+    const readyJob = job("ready");
+    readyJob.candidates = [
+      {
+        id: "00000000-0000-4000-8000-000000000002",
+        src: "blob:candidate",
+        expiresAt: timestamp,
+      },
+    ];
+    const state = controller({ job: readyJob });
+    const onSaved = vi.fn();
+    render(<AvatarSettingsScreen controller={state} onBack={vi.fn()} onSaved={onSaved} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "候補1を選択" }));
+    fireEvent.click(screen.getByRole("button", { name: "このアバターに設定" }));
+
+    expect(state.choose).toHaveBeenCalledWith("00000000-0000-4000-8000-000000000002");
+    await waitFor(() => expect(onSaved).toHaveBeenCalledOnce());
   });
 
   it("許可していない画像形式を拒否する", () => {
-    render(<AvatarSettingsScreen currentAvatar={null} onBack={vi.fn()} onSave={vi.fn()} />);
+    const state = controller();
+    render(<AvatarSettingsScreen controller={state} onBack={vi.fn()} onSaved={vi.fn()} />);
     fireEvent.click(screen.getByRole("checkbox", { name: /外部AIサービスへ送信/ }));
     fireEvent.change(screen.getByLabelText(/画像をアップロード/), {
       target: { files: [new File(["<svg />"], "avatar.svg", { type: "image/svg+xml" })] },
     });
 
     expect(screen.getByRole("alert").textContent).toContain("SVGは利用できません");
-    expect(screen.queryByText("avatar.svg")).toBeNull();
-    expect(screen.queryByRole("status")).toBeNull();
+    expect(state.upload).not.toHaveBeenCalled();
   });
 
   it("現在のアバターを削除できる", () => {
-    const onSave = vi.fn();
-    render(
-      <AvatarSettingsScreen
-        currentAvatar={{ kind: "preset", presetId: "water" }}
-        onBack={vi.fn()}
-        onSave={onSave}
-      />,
-    );
+    const state = controller({
+      currentAvatar: { id: "00000000-0000-4000-8000-000000000003", src: "blob:avatar" },
+    });
+    render(<AvatarSettingsScreen controller={state} onBack={vi.fn()} onSaved={vi.fn()} />);
 
     fireEvent.click(screen.getByRole("button", { name: "現在のアバターを削除" }));
-    expect(onSave).toHaveBeenCalledWith(null);
+    expect(state.remove).toHaveBeenCalledOnce();
   });
 });
