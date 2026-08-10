@@ -18,6 +18,8 @@ export type AvatarDisplayState = {
   job: (Omit<AvatarJob, "candidates"> & { candidates: AvatarCandidate[] }) | null;
 };
 
+export type AvatarJobStatus = NonNullable<AvatarDisplayState["job"]>["status"];
+
 export function getAvatarName(avatar: AvatarSelection | null): string {
   return avatar ? "設定済み" : "未設定";
 }

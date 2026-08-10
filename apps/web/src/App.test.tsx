@@ -33,7 +33,6 @@ const mocks = vi.hoisted(() => ({
   fetchAvatarState: vi.fn(),
   fetchAvatarImage: vi.fn(),
   uploadAvatarSource: vi.fn(),
-  startAvatarGeneration: vi.fn(),
   selectAvatar: vi.fn(),
   cancelAvatarJob: vi.fn(),
   deleteAvatar: vi.fn(),
@@ -70,7 +69,6 @@ vi.mock("./feature/profile-settings/infrastructure/avatar-api", () => ({
   fetchAvatarState: mocks.fetchAvatarState,
   fetchAvatarImage: mocks.fetchAvatarImage,
   uploadAvatarSource: mocks.uploadAvatarSource,
-  startAvatarGeneration: mocks.startAvatarGeneration,
   selectAvatar: mocks.selectAvatar,
   cancelAvatarJob: mocks.cancelAvatarJob,
   deleteAvatar: mocks.deleteAvatar,
@@ -314,7 +312,7 @@ describe("App", () => {
     );
   });
 
-  it("人物判定と生成を経てアバターを設定しプロフィールへ戻る", async () => {
+  it("画像選択だけで生成候補へ進みアバターを設定してプロフィールへ戻る", async () => {
     const timestamp = "2026-08-10T00:00:00.000Z";
     const jobId = "00000000-0000-4000-8000-000000000001";
     const candidateId = "00000000-0000-4000-8000-000000000002";
@@ -327,10 +325,6 @@ describe("App", () => {
       candidates: [],
     };
     mocks.uploadAvatarSource.mockResolvedValue({
-      state: { currentAvatar: null, job: { ...baseJob, status: "verified" } },
-      retryAfterMilliseconds: 3_000,
-    });
-    mocks.startAvatarGeneration.mockResolvedValue({
       state: {
         currentAvatar: null,
         job: {
@@ -345,7 +339,7 @@ describe("App", () => {
           ],
         },
       },
-      retryAfterMilliseconds: 3_000,
+      retryAfterMilliseconds: null,
     });
     mocks.selectAvatar.mockResolvedValue({
       state: {
@@ -360,12 +354,9 @@ describe("App", () => {
     fireEvent.click(await screen.findByRole("button", { name: /アバターを設定/ }));
 
     expect(await screen.findByRole("heading", { name: "アバター設定" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("checkbox", { name: /外部AIサービスへ送信/ }));
-    fireEvent.change(screen.getByLabelText(/画像をアップロード/), {
+    fireEvent.change(screen.getByLabelText("アバター用の画像ファイルを選ぶ"), {
       target: { files: [new File(["selfie"], "selfie.png", { type: "image/png" })] },
     });
-    expect(await screen.findByText("人物を確認できました")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "アバター生成を開始" }));
     fireEvent.click(await screen.findByRole("button", { name: "候補1を選択" }));
     fireEvent.click(screen.getByRole("button", { name: "このアバターに設定" }));
 

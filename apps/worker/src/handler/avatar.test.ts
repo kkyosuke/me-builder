@@ -42,11 +42,13 @@ function dependencies(
   const output = vi.fn(() => ({ response: () => new Response(normalized.slice(0)) }));
   const transform = vi.fn(() => ({ output }));
   const images = { input: vi.fn(() => ({ transform })) };
+  const avatarQueue = { send: vi.fn().mockResolvedValue(undefined) };
   const cf = {
     do: { accountData },
+    queue: { avatar: avatarQueue },
     avatar: { bucket, images },
   } as unknown as CloudflareBindings;
-  return { cf, bucket, images };
+  return { cf, bucket, images, avatarQueue };
 }
 
 const config = {
@@ -85,6 +87,96 @@ describe("avatar queue handler", () => {
     );
     expect(execute).toHaveBeenCalledWith("avatar.finishPersonCheck", "job-1", false);
     expect(gemini.generateAvatarImage).not.toHaveBeenCalled();
+    expect(queueMessage.ack).toHaveBeenCalledOnce();
+  });
+
+  it("人物を確認できたら同じジョブの候補生成を自動で投入する", async () => {
+    const execute = vi.fn(async (operation: AccountDataOperation) => {
+      if (operation === "avatar.acquireTask") {
+        return {
+          type: "acquired",
+          job: {
+            referenceObjectKey: "reference.webp",
+            referenceContentType: "image/webp",
+          },
+        };
+      }
+      if (operation === "avatar.finishPersonCheck") return { status: "verified" };
+      if (operation === "avatar.startGeneration") {
+        return { type: "accepted", job: { queuePending: true } };
+      }
+      return null;
+    });
+    const { cf, avatarQueue } = dependencies(execute);
+    gemini.detectPerson.mockResolvedValue(true);
+    const queueMessage = message("person-check");
+
+    await processAvatarMessage(queueMessage, cf, config);
+
+    expect(execute).toHaveBeenCalledWith("avatar.startGeneration", "job-1");
+    expect(avatarQueue.send).toHaveBeenCalledWith({
+      type: "avatar",
+      operation: "generate",
+      accountId: "account-1",
+      jobId: "job-1",
+    });
+    expect(execute).toHaveBeenCalledWith("avatar.markEnqueued", "job-1", "generate");
+    expect(queueMessage.ack).toHaveBeenCalledOnce();
+  });
+
+  it("自動生成の投入に失敗してもalarm再投入用の状態を記録する", async () => {
+    const execute = vi.fn(async (operation: AccountDataOperation) => {
+      if (operation === "avatar.acquireTask") {
+        return {
+          type: "acquired",
+          job: {
+            referenceObjectKey: "reference.webp",
+            referenceContentType: "image/webp",
+          },
+        };
+      }
+      if (operation === "avatar.finishPersonCheck") return { status: "verified" };
+      if (operation === "avatar.startGeneration") {
+        return { type: "accepted", job: { queuePending: true } };
+      }
+      return null;
+    });
+    const { cf, avatarQueue } = dependencies(execute);
+    avatarQueue.send.mockRejectedValue(new Error("queue unavailable"));
+    gemini.detectPerson.mockResolvedValue(true);
+    const queueMessage = message("person-check");
+
+    await processAvatarMessage(queueMessage, cf, config);
+
+    expect(execute).toHaveBeenCalledWith("avatar.recordEnqueueFailure", "job-1", "generate");
+    expect(queueMessage.ack).toHaveBeenCalledOnce();
+  });
+
+  it("自動生成がAccount上限なら生成失敗として完了する", async () => {
+    const execute = vi.fn(async (operation: AccountDataOperation) => {
+      if (operation === "avatar.acquireTask") {
+        return {
+          type: "acquired",
+          job: {
+            referenceObjectKey: "reference.webp",
+            referenceContentType: "image/webp",
+          },
+        };
+      }
+      if (operation === "avatar.finishPersonCheck") return { status: "verified" };
+      if (operation === "avatar.startGeneration") {
+        return { type: "rate-limited", retryAt: new Date() };
+      }
+      return null;
+    });
+    const { cf, avatarQueue } = dependencies(execute);
+    gemini.detectPerson.mockResolvedValue(true);
+    const queueMessage = message("person-check");
+
+    await processAvatarMessage(queueMessage, cf, config);
+
+    expect(execute).toHaveBeenCalledWith("avatar.failJob", "job-1", "generation_rate_limited");
+    expect(avatarQueue.send).not.toHaveBeenCalled();
     expect(queueMessage.ack).toHaveBeenCalledOnce();
   });
 

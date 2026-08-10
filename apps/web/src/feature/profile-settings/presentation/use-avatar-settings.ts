@@ -7,7 +7,6 @@ import {
   fetchAvatarImage,
   fetchAvatarState,
   selectAvatar,
-  startAvatarGeneration,
   uploadAvatarSource,
 } from "../infrastructure/avatar-api";
 import type { AvatarDisplayState, AvatarSelection, AvatarState } from "../model/avatar";
@@ -20,7 +19,7 @@ type CachedImage = {
 };
 
 const EMPTY_STATE: AvatarDisplayState = { currentAvatar: null, job: null };
-const RUNNING_STATUSES = new Set(["checking", "accepted", "generating"]);
+const RUNNING_STATUSES = new Set(["checking", "verified", "accepted", "generating"]);
 
 function messageFrom(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
@@ -197,18 +196,6 @@ export function useAvatarSettings({
     [runAction],
   );
 
-  const generate = useCallback(async (): Promise<boolean> => {
-    const jobId = rawState.current?.job?.id;
-    if (!jobId) {
-      setErrorMessage("人物確認済みの画像を選び直してください。");
-      return false;
-    }
-    return runAction(
-      (idToken, signal) => startAvatarGeneration(config.apiUrl, idToken, jobId, signal),
-      "アバター生成を開始できませんでした。",
-    );
-  }, [runAction]);
-
   const choose = useCallback(
     (candidateId: string) =>
       runAction(
@@ -332,7 +319,6 @@ export function useAvatarSettings({
     busy,
     refresh: () => refresh(true),
     upload,
-    generate,
     choose,
     cancel,
     remove,

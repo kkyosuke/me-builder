@@ -6,7 +6,6 @@ import {
   fetchAvatarImage,
   fetchAvatarState,
   selectAvatar,
-  startAvatarGeneration,
   uploadAvatarSource,
 } from "./avatar-api";
 
@@ -80,37 +79,25 @@ describe("avatar-api", () => {
     expect((init.body as FormData).get("image")).toBe(file);
   });
 
-  it("生成開始と候補選択を契約どおり送信する", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify(state("ready")), {
-          status: 202,
-          headers: { "Content-Type": "application/json" },
+  it("候補選択を契約どおり送信する", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          currentAvatar: {
+            id: candidateId,
+            imageUrl: `/api/avatar/images/${candidateId}`,
+          },
+          job: { ...state("ready").job, status: "selected", candidates: [] },
         }),
-      )
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            currentAvatar: {
-              id: candidateId,
-              imageUrl: `/api/avatar/images/${candidateId}`,
-            },
-            job: { ...state("ready").job, status: "selected", candidates: [] },
-          }),
-          { status: 200, headers: { "Content-Type": "application/json" } },
-        ),
-      );
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
     vi.stubGlobal("fetch", fetchMock);
 
-    await startAvatarGeneration("https://api.example.com", "id-token", jobId);
     await selectAvatar("https://api.example.com", "id-token", candidateId);
 
-    expect(fetchMock.mock.calls[0]?.[0]).toBe(
-      `https://api.example.com/api/avatar/jobs/${jobId}/generation`,
-    );
-    expect(fetchMock.mock.calls[1]?.[0]).toBe("https://api.example.com/api/avatar");
-    expect(fetchMock.mock.calls[1]?.[1]).toEqual(
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("https://api.example.com/api/avatar");
+    expect(fetchMock.mock.calls[0]?.[1]).toEqual(
       expect.objectContaining({
         method: "PUT",
         body: JSON.stringify({ candidateId }),

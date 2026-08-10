@@ -91,7 +91,7 @@ export function App() {
   const avatarController = useAvatarSettings({
     acquireIdToken: acquireAvatarIdToken,
     enabled: !isAdminPath,
-    pollingEnabled: profileView === "avatar",
+    pollingEnabled: profileView !== "closed",
   });
   const avatar = avatarController.currentAvatar;
 
@@ -236,6 +236,7 @@ export function App() {
           >
             <ProfileSettingsScreen
               avatar={avatar}
+              avatarJobStatus={avatarController.job?.status ?? null}
               isAdmin={accountRole === "admin"}
               theme={colorTheme.theme}
               onBack={closeProfile}

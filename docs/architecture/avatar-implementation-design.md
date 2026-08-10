@@ -9,10 +9,11 @@
 ## 2. 結論
 
 - 人物判定と画像生成はHTTPリクエスト内で完了を待たず、Queue Workerで実行する
+- 人物判定で人物を確認できたら、Workerが同じジョブを生成受付へ遷移させて生成messageを自動投入する
 - 受付APIは`202 Accepted`とジョブ状態を返す
 - WebSocketやServer-Sent Eventsは使わず、画面表示中だけ認証済みGETをpollingする
 - 実行中の応答には`Retry-After`を付け、Webはその秒数より短い間隔で再取得しない
-- 画面を閉じたらpollingを止め、再訪時にAccountDataから最新状態を復元する
+- アバター設定またはプロフィールの表示中だけpollingし、両方を閉じたら止める。再訪時はAccountDataから最新状態を復元する
 - 画像本文はprivate R2だけに置き、AccountDataにはR2 object keyと状態だけを置く
 - 画像は署名付きの恒久URLにせず、本人確認を行うAPIから配信する
 
@@ -40,13 +41,14 @@ sequenceDiagram
     Q->>Worker: person-check
     Worker->>R2: 参照画像を取得
     Worker->>Gemini: 人物の有無だけを判定
-    Worker->>AD: verified / not_person
+    alt 人物を確認できた
+        Worker->>AD: verifiedからacceptedへ自動遷移
+        Worker->>Q: generateを投入
+    else 人物を確認できない
+        Worker->>AD: not_person
+    end
     Web->>API: GET /api/avatar
     API-->>Web: 状態 + Retry-After
-    Web->>API: POST /api/avatar/jobs/:id/generation
-    API->>AD: acceptedへ遷移
-    API->>Q: generateを投入
-    API-->>Web: 202 + job
     Q->>Worker: generate
     Worker->>Gemini: 参照画像から候補を生成
     Worker->>R2: 候補を保存
@@ -65,15 +67,15 @@ sequenceDiagram
 | --- | --- | --- | --- |
 | `GET` | `/api/avatar` | 現在値と最新ジョブを取得 | `200` |
 | `POST` | `/api/avatar/uploads` | 同意済み画像を検査・正規化し、人物判定を受け付ける | `202` |
-| `POST` | `/api/avatar/jobs/:jobId/generation` | 人物確認済みジョブの候補生成を受け付ける | `202` |
+| `POST` | `/api/avatar/jobs/:jobId/generation` | 旧クライアント互換と失敗後の再試行用に、人物確認済みジョブの候補生成を受け付ける。通常のWebフローでは呼ばない | `202` |
 | `DELETE` | `/api/avatar/jobs/:jobId` | 未確定ジョブを中止する | `204` |
 | `PUT` | `/api/avatar` | 候補1件を現在のアバターへ設定する | `200` |
 | `DELETE` | `/api/avatar` | 現在のアバターを削除する | `204` |
 | `GET` | `/api/avatar/images/:imageId` | 本人が参照可能な画像をprivate R2から配信する | `200` |
 
-アップロードは`multipart/form-data`の`image`と`consent=true`を受け付けます。最大容量は10 MiB、入力形式はJPEG、PNG、WebPです。`Content-Type`だけでなくmagic bytesとImages bindingのdecode結果を確認し、1024 x 1024以内の正方形WebPへ再encodeしてメタデータを除去します。
+アップロードは`multipart/form-data`の`image`と`consent=true`を受け付けます。Webはファイル選択前に外部AI送信と画像利用条件を常時表示し、画像選択を開始操作として`consent=true`を送ります。別のチェックボックスは設けません。最大容量は10 MiB、入力形式はJPEG、PNG、WebPです。`Content-Type`だけでなくmagic bytesとImages bindingのdecode結果を確認し、1024 x 1024以内の正方形WebPへ再encodeしてメタデータを除去します。
 
-実行中の`GET /api/avatar`は`Retry-After: 3`を返します。Webはタブが表示中の間だけ再取得し、`ready`、`not_person`、`failed`、`cancelled`、`selected`では停止します。`Retry-After`がなければ自動再取得しません。
+実行中の`GET /api/avatar`は`Retry-After: 3`を返します。Webはアバター設定またはプロフィールが表示され、かつタブが表示中の間だけ再取得し、`ready`、`not_person`、`failed`、`cancelled`、`selected`では停止します。`Retry-After`がなければ自動再取得しません。プロフィールでは処理中を「候補を生成中」、`ready`を「候補ができました」と表示します。
 
 ## 5. AccountDataモデル
 
@@ -104,11 +106,11 @@ avatar_object_deletions
 └── attempt_count / last_error_code
 ```
 
-ジョブ状態は`checking`、`not_person`、`verified`、`accepted`、`generating`、`ready`、`failed`、`cancelled`、`selected`です。人物判定と生成のQueue投入前には`queue_pending`を同じ状態更新で立て、投入成功後に解消します。AccountDataのalarmは未投入状態を再配送します。投入失敗は5秒から最大5分まで指数backoffし、参照画像の受付期限を超えたら`queue_enqueue_expired`で`failed`へ終了します。
+ジョブ状態は`checking`、`not_person`、`verified`、`accepted`、`generating`、`ready`、`failed`、`cancelled`、`selected`です。人物判定成功後、Workerは`verified`を利用者の操作待ちにせず、直ちに`accepted`へ遷移させます。Webが短時間の`verified`を取得した場合も処理中としてpollingを続けます。人物判定と生成のQueue投入前には`queue_pending`を同じ状態更新で立て、投入成功後に解消します。AccountDataのalarmは未投入状態を再配送します。投入失敗は5秒から最大5分まで指数backoffし、参照画像の受付期限を超えたら`queue_enqueue_expired`で`failed`へ終了します。
 
 Workerは処理開始時に短いleaseを取得します。同じジョブIDが再配送された場合、terminal状態なら処理せずackします。有効なleaseがある場合はackせず、lease期限後を指定してQueue retryし、Workerの強制終了でジョブが取り残されないようにします。外部処理が一時失敗した場合はleaseを解放してQueue retryへ委ね、規定回数を超えた場合だけ`failed`へ遷移します。
 
-新しい候補生成は1 Accountにつき24時間で3ジョブまでとし、同じジョブのQueue再配送と失敗後の再試行は追加計上しません。超過時は`429 Too Many Requests`と`Retry-After`、再開可能時刻を返します。環境全体の費用上限はAI Gatewayと生成事業者側にも設定し、アプリのAccount上限だけを予算管理にしません。
+新しい候補生成は1 Accountにつき24時間で3ジョブまでとし、同じジョブのQueue再配送と失敗後の再試行は追加計上しません。自動生成開始時に上限へ達していた場合はジョブを`generation_rate_limited`の`failed`へ遷移させ、Webがエラーと再アップロード導線を表示します。互換APIからの明示再試行では`429 Too Many Requests`と`Retry-After`、再開可能時刻を返します。環境全体の費用上限はAI Gatewayと生成事業者側にも設定し、アプリのAccount上限だけを予算管理にしません。
 
 ## 6. QueueとR2
 

@@ -16,7 +16,6 @@ function controller(overrides: Partial<AvatarSettingsController> = {}): AvatarSe
     busy: false,
     refresh: vi.fn().mockResolvedValue(true),
     upload: vi.fn().mockResolvedValue(true),
-    generate: vi.fn().mockResolvedValue(true),
     choose: vi.fn().mockResolvedValue(true),
     cancel: vi.fn().mockResolvedValue(true),
     remove: vi.fn().mockResolvedValue(true),
@@ -52,18 +51,18 @@ describe("AvatarSettingsScreen", () => {
 
   afterEach(cleanup);
 
-  it("同意後に対応形式の画像を人物判定へ送る", async () => {
+  it("説明後に画像を選ぶだけで人物判定と生成へ送る", async () => {
     const state = controller();
     render(<AvatarSettingsScreen controller={state} onBack={vi.fn()} onSaved={vi.fn()} />);
 
-    const input = screen.getByLabelText(/画像をアップロード/) as HTMLInputElement;
-    expect(input.disabled).toBe(true);
-    fireEvent.click(screen.getByRole("checkbox", { name: /外部AIサービスへ送信/ }));
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    expect(screen.getByText(/画像を使う権利と、写っている人の同意/)).toBeTruthy();
+    const input = screen.getByLabelText("アバター用の画像ファイルを選ぶ") as HTMLInputElement;
+    expect(input.disabled).toBe(false);
     const file = new File(["selfie"], "selfie.png", { type: "image/png" });
     fireEvent.change(input, { target: { files: [file] } });
 
-    expect(await screen.findByText("selfie.png")).toBeTruthy();
-    expect(state.upload).toHaveBeenCalledWith(file);
+    await waitFor(() => expect(state.upload).toHaveBeenCalledWith(file));
   });
 
   it("人物を確認できなければ自分の画像の選び直しを案内する", () => {
@@ -80,13 +79,12 @@ describe("AvatarSettingsScreen", () => {
     expect(screen.queryByRole("button", { name: "アバター生成を開始" })).toBeNull();
   });
 
-  it("人物確認後に生成を開始できる", () => {
+  it("人物確認済みの短い中間状態でも追加操作なしで処理中を表示する", () => {
     const state = controller({ job: job("verified") });
     render(<AvatarSettingsScreen controller={state} onBack={vi.fn()} onSaved={vi.fn()} />);
 
-    expect(screen.getByText("人物を確認できました")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "アバター生成を開始" }));
-    expect(state.generate).toHaveBeenCalledOnce();
+    expect(screen.getByText("アバター候補を作っています")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "アバター生成を開始" })).toBeNull();
   });
 
   it("生成候補を選択して設定できる", async () => {
@@ -112,8 +110,7 @@ describe("AvatarSettingsScreen", () => {
   it("許可していない画像形式を拒否する", () => {
     const state = controller();
     render(<AvatarSettingsScreen controller={state} onBack={vi.fn()} onSaved={vi.fn()} />);
-    fireEvent.click(screen.getByRole("checkbox", { name: /外部AIサービスへ送信/ }));
-    fireEvent.change(screen.getByLabelText(/画像をアップロード/), {
+    fireEvent.change(screen.getByLabelText("アバター用の画像ファイルを選ぶ"), {
       target: { files: [new File(["<svg />"], "avatar.svg", { type: "image/svg+xml" })] },
     });
 

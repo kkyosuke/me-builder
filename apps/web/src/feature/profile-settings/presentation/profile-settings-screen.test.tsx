@@ -44,6 +44,21 @@ describe("ProfileSettingsScreen", () => {
     expect(onThemeChange).toHaveBeenCalledWith("light");
   });
 
+  it("アバター候補の生成中であることをプロフィールにも表示する", () => {
+    render(
+      <ProfileSettingsScreen
+        avatar={null}
+        avatarJobStatus="generating"
+        theme="dark"
+        onBack={vi.fn()}
+        onOpenAvatar={vi.fn()}
+        onThemeChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("候補を生成中")).toBeTruthy();
+  });
+
   it("管理者だけに管理者画面へのリンクを表示する", () => {
     const { rerender } = render(
       <ProfileSettingsScreen

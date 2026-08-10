@@ -135,23 +135,6 @@ export async function uploadAvatarSource(
   return parseState(response, "画像のアップロードに失敗しました");
 }
 
-export async function startAvatarGeneration(
-  apiUrl: string | undefined,
-  idToken: string,
-  jobId: string,
-  signal?: AbortSignal,
-): Promise<AvatarStateResult> {
-  const response = await createHttpClient(apiUrl).request(
-    `/api/avatar/jobs/${encodeURIComponent(jobId)}/generation`,
-    {
-      method: "POST",
-      headers: authorization(idToken),
-      ...(signal ? { signal } : {}),
-    },
-  );
-  return parseState(response, "アバター生成の開始に失敗しました");
-}
-
 export async function cancelAvatarJob(
   apiUrl: string | undefined,
   idToken: string,

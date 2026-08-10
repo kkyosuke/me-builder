@@ -73,7 +73,7 @@ function setPollingHeader(
   c: Context<AppEnv>,
   state: v.InferOutput<typeof AvatarStateResponseSchema>,
 ) {
-  if (state.job && ["checking", "accepted", "generating"].includes(state.job.status)) {
+  if (state.job && ["checking", "verified", "accepted", "generating"].includes(state.job.status)) {
     c.header("Retry-After", "3");
   }
 }

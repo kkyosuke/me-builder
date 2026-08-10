@@ -85,7 +85,51 @@ export async function processAvatarMessage(
         bytes: sourceBytes,
         mimeType: acquired.job.referenceContentType,
       });
-      await object.execute("avatar.finishPersonCheck", message.body.jobId, hasPerson);
+      const checkedJob = await object.execute(
+        "avatar.finishPersonCheck",
+        message.body.jobId,
+        hasPerson,
+      );
+      if (!hasPerson || !checkedJob) {
+        message.ack();
+        return;
+      }
+
+      const started = await object.execute("avatar.startGeneration", message.body.jobId);
+      if (started.type === "rate-limited") {
+        await object.execute("avatar.failJob", message.body.jobId, "generation_rate_limited");
+        message.ack();
+        return;
+      }
+      if (started.type !== "accepted" || !started.job.queuePending) {
+        message.ack();
+        return;
+      }
+
+      try {
+        const queue = cf.queue.avatar;
+        if (!queue) throw new Error("Avatar Queue binding is not configured");
+        await queue.send({
+          type: "avatar",
+          operation: "generate",
+          accountId: message.body.accountId,
+          jobId: message.body.jobId,
+        });
+        await object.execute("avatar.markEnqueued", message.body.jobId, "generate");
+      } catch (error) {
+        try {
+          await object.execute("avatar.recordEnqueueFailure", message.body.jobId, "generate");
+        } catch (recordError) {
+          logger.error(
+            { errorName: recordError instanceof Error ? recordError.name : "UnknownError" },
+            "Automatic avatar generation enqueue failure could not be recorded",
+          );
+        }
+        logger.warn(
+          { errorName: error instanceof Error ? error.name : "UnknownError" },
+          "Automatic avatar generation enqueue failed; AccountData alarm will retry",
+        );
+      }
       message.ack();
       return;
     }

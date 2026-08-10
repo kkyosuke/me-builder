@@ -1,7 +1,7 @@
-import { ArrowLeft, ChevronRight, Moon, Shield, Sparkles, Sun } from "lucide-react";
+import { ArrowLeft, ChevronRight, LoaderCircle, Moon, Shield, Sparkles, Sun } from "lucide-react";
 import { useEffect, useRef } from "react";
 import type { ColorTheme } from "../../theme/model/color-theme";
-import { type AvatarSelection, getAvatarName } from "../model/avatar";
+import { type AvatarJobStatus, type AvatarSelection, getAvatarName } from "../model/avatar";
 import { AvatarPreview } from "./components/avatar-preview";
 
 const themes = [
@@ -23,6 +23,7 @@ const themes = [
 
 export function ProfileSettingsScreen({
   avatar,
+  avatarJobStatus = null,
   isAdmin = false,
   theme,
   onBack,
@@ -30,6 +31,7 @@ export function ProfileSettingsScreen({
   onThemeChange,
 }: {
   avatar: AvatarSelection | null;
+  avatarJobStatus?: AvatarJobStatus | null;
   isAdmin?: boolean;
   theme: ColorTheme;
   onBack: () => void;
@@ -37,6 +39,11 @@ export function ProfileSettingsScreen({
   onThemeChange: (theme: ColorTheme) => void;
 }) {
   const backButtonRef = useRef<HTMLButtonElement>(null);
+  const isAvatarProcessing =
+    avatarJobStatus === "checking" ||
+    avatarJobStatus === "verified" ||
+    avatarJobStatus === "accepted" ||
+    avatarJobStatus === "generating";
 
   useEffect(() => {
     backButtonRef.current?.focus();
@@ -106,9 +113,19 @@ export function ProfileSettingsScreen({
                 {avatar ? "アバターを変更" : "アバターを設定"}
               </span>
               <span className="mt-1 block truncate text-sm text-slate-500 dark:text-slate-400">
-                {getAvatarName(avatar)}
+                {isAvatarProcessing
+                  ? "候補を生成中"
+                  : avatarJobStatus === "ready"
+                    ? "候補ができました"
+                    : getAvatarName(avatar)}
               </span>
             </span>
+            {isAvatarProcessing && (
+              <LoaderCircle
+                className="size-5 animate-spin text-violet-500 motion-reduce:animate-none"
+                aria-hidden="true"
+              />
+            )}
             <ChevronRight className="size-5 text-slate-400" aria-hidden="true" />
           </button>
         </section>
