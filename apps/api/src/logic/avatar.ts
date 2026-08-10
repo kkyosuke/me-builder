@@ -179,6 +179,7 @@ export async function uploadAvatarSource(
   } else {
     await enqueue(params.accountData, session.accountId, params.queue, {
       type: "avatar",
+      traceId: jobId,
       operation: "person-check",
       accountId: session.accountId,
       jobId,

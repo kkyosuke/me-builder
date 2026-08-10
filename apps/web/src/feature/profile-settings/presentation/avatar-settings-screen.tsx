@@ -46,11 +46,12 @@ export function AvatarSettingsScreen({
   const [uploadedImage, setUploadedImage] = useState<AvatarSelection | null>(null);
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
-  const [showUpload, setShowUpload] = useState(controller.job?.status !== "ready");
+  // 初期取得前のjob=nullで表示モードを固定しない。利用者が明示的に作り直す場合だけ候補を隠す。
+  const [forceUpload, setForceUpload] = useState(false);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const uploadedObjectUrl = useRef<string | null>(null);
 
-  const candidatesReady = controller.job?.status === "ready" && !showUpload;
+  const candidatesReady = controller.job?.status === "ready" && !forceUpload;
   const jobFailure = failureMessage(controller);
 
   useEffect(() => {
@@ -190,7 +191,7 @@ export function AvatarSettingsScreen({
               disabled={controller.busy}
               onClick={() => {
                 setSelectedCandidateId(null);
-                setShowUpload(true);
+                setForceUpload(true);
               }}
               className="mt-3 w-full rounded-xl px-4 py-3 text-sm font-bold text-slate-600 transition hover:bg-slate-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:text-slate-300 dark:hover:bg-slate-800"
             >

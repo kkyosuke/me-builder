@@ -108,7 +108,7 @@ avatar_object_deletions
 
 ジョブ状態は`checking`、`not_person`、`verified`、`accepted`、`generating`、`ready`、`failed`、`cancelled`、`selected`です。人物判定成功後、Workerは`verified`を利用者の操作待ちにせず、直ちに`accepted`へ遷移させます。Webが短時間の`verified`を取得した場合も処理中としてpollingを続けます。人物判定と生成のQueue投入前には`queue_pending`を同じ状態更新で立て、投入成功後に解消します。AccountDataのalarmは未投入状態を再配送します。投入失敗は5秒から最大5分まで指数backoffし、参照画像の受付期限を超えたら`queue_enqueue_expired`で`failed`へ終了します。
 
-Workerは処理開始時に短いleaseを取得します。同じジョブIDが再配送された場合、terminal状態なら処理せずackします。有効なleaseがある場合はackせず、lease期限後を指定してQueue retryし、Workerの強制終了でジョブが取り残されないようにします。外部処理が一時失敗した場合はleaseを解放してQueue retryへ委ね、規定回数を超えた場合だけ`failed`へ遷移します。
+Workerは処理開始時に短いleaseを取得します。同じジョブIDが再配送された場合、terminal状態なら処理せずackします。有効なleaseがある場合はackせず、lease期限後を指定してQueue retryし、Workerの強制終了でジョブが取り残されないようにします。外部処理が一時失敗した場合はleaseを解放してQueue retryへ委ね、`wrangler.toml`の`max_retries = 3`に初回配送を加えた4回を超える場合だけ`failed`へ遷移します。
 
 新しい候補生成は本番だけ1 Accountにつき24時間で3ジョブまでとし、previewとlocalでは動作確認用に回数制限を設けません。同じジョブのQueue再配送は追加計上しません。上限は`AVATAR_GENERATION_RATE_LIMIT`で環境ごとに設定し、`0`は無制限とします。未設定または不正値の場合、productionは3ジョブ、previewとlocalは無制限へ戻します。自動生成開始時に上限へ達していた場合はジョブを`generation_rate_limited`の`failed`へ遷移させ、Webがエラーと再アップロード導線を表示します。環境全体の費用上限はAI Gatewayと生成事業者側にも設定し、アプリのAccount上限だけを予算管理にしません。
 
@@ -119,11 +119,14 @@ Queue messageは画像本文を含めず、次の参照だけを持ちます。
 ```ts
 type AvatarQueueMessage = {
   type: "avatar";
+  traceId?: string;
   operation: "person-check" | "generate";
   accountId: string;
   jobId: string;
 };
 ```
+
+アップロード受付で発行した`jobId`を`traceId`として人物判定、候補生成、alarmからの再投入へ引き継ぎます。ローリングデプロイ中の旧messageでは`jobId`を補完値として使います。終端ログの件数、message文言、安全なエラー分類は[アプリケーション運用ログ方針](../development/operational-logging.md)を正とします。
 
 R2 object keyはサーバーだけが構築し、ログへ出力しません。
 

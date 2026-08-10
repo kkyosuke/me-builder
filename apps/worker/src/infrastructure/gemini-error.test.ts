@@ -1,11 +1,11 @@
-import { ApiError } from "@google/genai";
+import { ApiError, type GoogleGenAI } from "@google/genai";
 import {
   OperationalError,
   describeQueueMessageResult,
   toSafeOperationalErrorFields,
 } from "@me-builder/shared";
-import { describe, expect, it } from "vitest";
-import { toGeminiOperationalError } from "./gemini-client";
+import { describe, expect, it, vi } from "vitest";
+import { detectPerson, generateAvatarImage, toGeminiOperationalError } from "./gemini-client";
 
 /** 実際に観測された429のresponse body。quota名とmodel名を含むためログへ出せない。 */
 const QUOTA_BODY = JSON.stringify({
@@ -28,6 +28,59 @@ describe("toGeminiOperationalError", () => {
     expect(error.category).toBe("dependency");
     expect(error.dependency).toBe("google-ai");
     expect(error.dependencyStatus).toBe(429);
+  });
+
+  it.each([
+    [
+      "人物判定",
+      (client: GoogleGenAI) =>
+        detectPerson(client, {
+          model: "person-model",
+          bytes: new Uint8Array([1, 2, 3]),
+          mimeType: "image/webp",
+        }),
+      "avatar.person-detect",
+    ],
+    [
+      "アバター生成",
+      (client: GoogleGenAI) =>
+        generateAvatarImage(client, {
+          model: "image-model",
+          bytes: new Uint8Array([1, 2, 3]),
+          mimeType: "image/webp",
+          style: "test-style",
+        }),
+      "avatar.generate",
+    ],
+  ])("%sのSDK例外を安全なエラーへ変換する", async (_name, call, stage) => {
+    const client = {
+      models: {
+        generateContent: vi
+          .fn()
+          .mockRejectedValue(new ApiError({ message: QUOTA_BODY, status: 429 })),
+      },
+    } as unknown as GoogleGenAI;
+
+    const error = await call(client).catch((reason: unknown) => reason);
+
+    expect(error).toBeInstanceOf(OperationalError);
+    expect(error).toMatchObject({
+      code: "GEMINI_RATE_LIMITED",
+      category: "dependency",
+      stage,
+      dependency: "google-ai",
+      dependencyStatus: 429,
+    });
+    expect(
+      JSON.stringify(
+        toSafeOperationalErrorFields(error, {
+          code: "UNEXPECTED",
+          category: "unknown",
+          stage,
+          retryable: true,
+        }),
+      ),
+    ).not.toContain("free_tier");
   });
 
   it("statusごとに原因分類を分ける", () => {

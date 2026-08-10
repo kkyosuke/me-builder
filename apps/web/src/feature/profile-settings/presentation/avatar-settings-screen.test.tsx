@@ -107,6 +107,34 @@ describe("AvatarSettingsScreen", () => {
     await waitFor(() => expect(onSaved).toHaveBeenCalledOnce());
   });
 
+  it("初期取得後にreadyになった場合は候補選択へ切り替える", () => {
+    const initial = controller({ loadStatus: "loading" });
+    const { rerender } = render(
+      <AvatarSettingsScreen controller={initial} onBack={vi.fn()} onSaved={vi.fn()} />,
+    );
+
+    expect(screen.getByRole("heading", { name: "アバター画像を選ぶ" })).toBeTruthy();
+
+    const readyJob = job("ready");
+    readyJob.candidates = [
+      {
+        id: "00000000-0000-4000-8000-000000000004",
+        src: "blob:late-candidate",
+        expiresAt: timestamp,
+      },
+    ];
+    rerender(
+      <AvatarSettingsScreen
+        controller={controller({ job: readyJob })}
+        onBack={vi.fn()}
+        onSaved={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "候補から選ぶ" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "候補1を選択" })).toBeTruthy();
+  });
+
   it("許可していない画像形式を拒否する", () => {
     const state = controller();
     render(<AvatarSettingsScreen controller={state} onBack={vi.fn()} onSaved={vi.fn()} />);

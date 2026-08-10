@@ -99,6 +99,22 @@ describe("describeQueueMessageResult", () => {
     expect(description).not.toContain("account-1");
     expect(description).not.toContain("U1234");
   });
+
+  it("アバター処理を専用の処理名で識別する", () => {
+    expect(
+      describeQueueMessageResult({
+        flow: "avatar",
+        outcome: "degraded",
+        disposition: "ack",
+        stage: "candidate.generate",
+        attempt: 1,
+        maxAttempts: 3,
+        resultCode: "AVATAR_CANDIDATES_PARTIALLY_GENERATED",
+      }),
+    ).toBe(
+      "[Avatar] degraded at candidate.generate -> ack (attempt 1/3, AVATAR_CANDIDATES_PARTIALLY_GENERATED)",
+    );
+  });
 });
 
 describe("describeHttpResult", () => {

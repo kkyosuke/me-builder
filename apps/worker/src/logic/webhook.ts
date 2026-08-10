@@ -14,7 +14,7 @@ import {
   toSafeOperationalErrorFields,
 } from "@me-builder/shared";
 import { type CloudflareBindings, type WorkerConfig, getWorkerConfig } from "../config";
-import { processAvatarMessage } from "../handler/avatar";
+import { AVATAR_MAX_ATTEMPTS, processAvatarMessage } from "../handler/avatar";
 import { CHAT_TURN_MAX_ATTEMPTS, processChatTurnMessage } from "../handler/chat-turn";
 import {
   DIARY_BRAIN_CHECKPOINT_MAX_ATTEMPTS,
@@ -33,6 +33,7 @@ const MAX_ATTEMPTS_BY_FLOW: Record<FlowKey, number | undefined> = {
   "line-webhook": WEBHOOK_QUEUE_MAX_ATTEMPTS,
   "chat-turn": CHAT_TURN_MAX_ATTEMPTS,
   "diary-brain-checkpoint": DIARY_BRAIN_CHECKPOINT_MAX_ATTEMPTS,
+  avatar: AVATAR_MAX_ATTEMPTS,
   "queue-dispatch": undefined,
 };
 
@@ -47,6 +48,7 @@ function flowOf(
   if (!("type" in body)) return "line-webhook";
   if (body.type === "chat-turn") return "chat-turn";
   if (body.type === "diary-brain-checkpoint") return "diary-brain-checkpoint";
+  if (body.type === "avatar") return "avatar";
   return "queue-dispatch";
 }
 

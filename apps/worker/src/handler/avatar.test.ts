@@ -1,5 +1,5 @@
 import type { AccountDataNamespace, AccountDataOperation } from "@me-builder/lib";
-import type { AvatarQueueMessage, Message } from "@me-builder/shared";
+import { type AvatarQueueMessage, type Message, logger } from "@me-builder/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CloudflareBindings, WorkerConfig } from "../config";
 
@@ -12,13 +12,25 @@ vi.mock("../infrastructure/gemini-client", () => gemini);
 
 import { processAvatarMessage } from "./avatar";
 
+const infoLog = vi.spyOn(logger, "info").mockImplementation(() => undefined);
+const warnLog = vi.spyOn(logger, "warn").mockImplementation(() => undefined);
+const errorLog = vi.spyOn(logger, "error").mockImplementation(() => undefined);
+
 const source = new Uint8Array([1, 2, 3]).buffer;
 const generated = new Uint8Array([4, 5, 6]);
 const normalized = new Uint8Array([7, 8, 9]).buffer;
 
 function message(operation: AvatarQueueMessage["operation"], attempts = 1) {
   return {
-    body: { type: "avatar", operation, accountId: "account-1", jobId: "job-1" },
+    id: "avatar-message-1",
+    timestamp: new Date("2026-08-10T00:00:00.000Z"),
+    body: {
+      type: "avatar",
+      traceId: "avatar-trace-1",
+      operation,
+      accountId: "account-1",
+      jobId: "job-1",
+    },
     attempts,
     ack: vi.fn(),
     retry: vi.fn(),
@@ -52,6 +64,7 @@ function dependencies(
 }
 
 const config = {
+  environment: "test",
   googleAiStudioApiKey: "google-key",
   cloudflareAiGatewayToken: "gateway-token",
   cloudflareAiGatewayBaseUrl: "https://gateway.example.com/google-ai-studio",
@@ -117,6 +130,7 @@ describe("avatar queue handler", () => {
     expect(execute).toHaveBeenCalledWith("avatar.startGeneration", "job-1", 0);
     expect(avatarQueue.send).toHaveBeenCalledWith({
       type: "avatar",
+      traceId: "avatar-trace-1",
       operation: "generate",
       accountId: "account-1",
       jobId: "job-1",
@@ -210,9 +224,62 @@ describe("avatar queue handler", () => {
     ).toHaveLength(4);
     expect(execute).toHaveBeenCalledWith("avatar.finishGeneration", "job-1", "gemini-image-model");
     expect(queueMessage.ack).toHaveBeenCalledOnce();
+    expect(infoLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        component: "avatar",
+        traceId: "avatar-trace-1",
+        outcome: "succeeded",
+        disposition: "ack",
+        candidateSuccessCount: 4,
+        candidateFailureCount: 0,
+      }),
+      expect.stringContaining("[Avatar] succeeded at generation.finish -> ack (attempt 1/4"),
+    );
   });
 
-  it("外部処理が3回失敗したらfailedへ解放してackする", async () => {
+  it("候補ごとの失敗を並べず、縮退成功の終端ログ1件へ集約する", async () => {
+    const execute = vi.fn(async (operation: AccountDataOperation) => {
+      if (operation === "avatar.acquireTask") {
+        return {
+          type: "acquired",
+          job: {
+            referenceObjectKey: "reference.webp",
+            referenceContentType: "image/webp",
+            candidates: [],
+          },
+        };
+      }
+      if (operation === "avatar.addCandidate") return true;
+      return null;
+    });
+    const { cf } = dependencies(execute);
+    gemini.generateAvatarImage
+      .mockRejectedValueOnce(new Error("sensitive provider response"))
+      .mockResolvedValue({ bytes: generated, mimeType: "image/png" });
+    const queueMessage = message("generate");
+
+    await processAvatarMessage(queueMessage, cf, config);
+
+    expect(warnLog).not.toHaveBeenCalled();
+    const terminalLogs = errorLog.mock.calls.filter(
+      ([fields]) =>
+        typeof fields === "object" &&
+        fields !== null &&
+        "event" in fields &&
+        fields.event === "queue.message.failed",
+    );
+    expect(terminalLogs).toHaveLength(1);
+    expect(terminalLogs[0]?.[0]).toMatchObject({
+      outcome: "degraded",
+      disposition: "ack",
+      candidateSuccessCount: 3,
+      candidateFailureCount: 1,
+      errorCode: "UNEXPECTED_AVATAR_PROCESSING_ERROR",
+    });
+    expect(JSON.stringify(terminalLogs)).not.toContain("sensitive provider response");
+  });
+
+  it("外部処理が最大回数失敗したら安全な終端ログ1件でfailedへ解放する", async () => {
     const execute = vi.fn(async (operation: AccountDataOperation) => {
       if (operation === "avatar.acquireTask") {
         return {
@@ -228,7 +295,7 @@ describe("avatar queue handler", () => {
     });
     const { cf } = dependencies(execute);
     gemini.generateAvatarImage.mockRejectedValue(new Error("provider unavailable"));
-    const queueMessage = message("generate", 3);
+    const queueMessage = message("generate", 4);
 
     await processAvatarMessage(queueMessage, cf, config);
 
@@ -240,6 +307,65 @@ describe("avatar queue handler", () => {
       "generation_failed",
     );
     expect(queueMessage.ack).toHaveBeenCalledOnce();
+    const terminalLogs = errorLog.mock.calls.filter(
+      ([fields]) =>
+        typeof fields === "object" &&
+        fields !== null &&
+        "event" in fields &&
+        fields.event === "queue.message.failed",
+    );
+    expect(terminalLogs).toHaveLength(1);
+    expect(terminalLogs[0]?.[0]).toMatchObject({
+      component: "avatar",
+      traceId: "avatar-trace-1",
+      attempt: 4,
+      outcome: "failed",
+      disposition: "ack",
+      errorCode: "UNEXPECTED_AVATAR_PROCESSING_ERROR",
+      errorCategory: "unknown",
+    });
+    expect(terminalLogs[0]?.[1]).toContain(
+      "[Avatar] failed at avatar.generate -> ack (attempt 4/4",
+    );
+    expect(JSON.stringify(terminalLogs)).not.toContain("provider unavailable");
+  });
+
+  it("再試行不能な参照画像欠損は初回でfailedへ解放する", async () => {
+    const execute = vi.fn(async (operation: AccountDataOperation) => {
+      if (operation === "avatar.acquireTask") {
+        return {
+          type: "acquired",
+          job: {
+            referenceObjectKey: "missing.webp",
+            referenceContentType: "image/webp",
+            candidates: [],
+          },
+        };
+      }
+      return null;
+    });
+    const { cf, bucket } = dependencies(execute);
+    bucket.get.mockResolvedValue(null);
+    const queueMessage = message("generate");
+
+    await processAvatarMessage(queueMessage, cf, config);
+
+    expect(execute).toHaveBeenCalledWith(
+      "avatar.releaseTask",
+      "job-1",
+      "generate",
+      true,
+      "generation_failed",
+    );
+    expect(queueMessage.ack).toHaveBeenCalledOnce();
+    expect(errorLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        errorCode: "AVATAR_REFERENCE_NOT_FOUND",
+        retryable: false,
+        disposition: "ack",
+      }),
+      expect.stringContaining("[Avatar] failed at reference.load -> ack (attempt 1/4"),
+    );
   });
 
   it("別処理のlease中ならackせずlease期限後へ再配送する", async () => {

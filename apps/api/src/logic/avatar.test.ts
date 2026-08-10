@@ -1,6 +1,7 @@
 import type { AccountDataNamespace, AccountDataOperation, d1 } from "@me-builder/lib";
+import type { AvatarQueueMessage, Queue } from "@me-builder/shared";
 import { describe, expect, it, vi } from "vitest";
-import { deleteAvatar, selectAvatar } from "./avatar";
+import { deleteAvatar, selectAvatar, uploadAvatarSource } from "./avatar";
 
 function accountData(
   execute: (operation: AccountDataOperation, ...args: unknown[]) => Promise<unknown>,
@@ -33,6 +34,42 @@ const baseParams = {
 };
 
 describe("avatar logic", () => {
+  it("アップロード受付でJob IDを相関IDとして人物判定Queueへ引き継ぐ", async () => {
+    const execute = vi.fn(async (operation: AccountDataOperation) => {
+      if (operation === "avatar.createJob") return { type: "created" };
+      if (operation === "avatar.markEnqueued") return undefined;
+      if (operation === "avatar.getState") {
+        return { currentCandidate: null, latestJob: null };
+      }
+      throw new Error("Unexpected operation");
+    });
+    const send = vi.fn().mockResolvedValue(undefined);
+    const bucket = {
+      put: vi.fn().mockResolvedValue(undefined),
+      delete: vi.fn().mockResolvedValue(undefined),
+    };
+
+    await uploadAvatarSource(
+      {
+        ...baseParams,
+        accountData: accountData(execute),
+        file: new File(["image"], "avatar.webp", { type: "image/webp" }),
+        images: {} as ApiBindings["IMAGES"],
+        bucket: bucket as unknown as ApiBindings["AVATAR_BUCKET"],
+        queue: { send } as unknown as Queue<AvatarQueueMessage>,
+      },
+      dependencies,
+    );
+
+    expect(send).toHaveBeenCalledWith({
+      type: "avatar",
+      traceId: "id",
+      operation: "person-check",
+      accountId: "account-1",
+      jobId: "id",
+    });
+  });
+
   it("選択後の物理削除を待たず、AccountDataへ記録した状態を成功として返す", async () => {
     const at = new Date("2026-08-09T00:00:00.000Z");
     const candidate = {

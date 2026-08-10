@@ -143,6 +143,7 @@ export class AccountData extends DurableObject<Env> {
             if (!this.env.AVATAR_QUEUE) throw new Error("Avatar Queue binding is not configured");
             await this.env.AVATAR_QUEUE.send({
               type: "avatar",
+              traceId: item.jobId,
               accountId: this.accountId,
               jobId: item.jobId,
               operation: item.operation,

@@ -41,6 +41,8 @@ export interface DiaryBrainCheckpointQueueMessage {
 /** Avatar Queueには画像本文や外部の本人識別子を含めず、AccountDataとJobだけを参照させる。 */
 export interface AvatarQueueMessage {
   type: "avatar";
+  /** アップロード受付で発行したJob IDを相関IDとして後続生成まで引き継ぐ。 */
+  traceId?: string;
   operation: "person-check" | "generate";
   accountId: string;
   jobId: string;
