@@ -1,9 +1,15 @@
 import * as v from "valibot";
+import type { operations } from "../../../generated/api";
 import { createHttpClient } from "../../../infrastructure/http-client";
 import type {
   DevelopmentBrainItemsResult,
   DevelopmentBrainVectorResult,
 } from "../model/brain-item";
+
+type ApiDevelopmentBrainItemsResponse =
+  operations["getDevelopmentBrainItems"]["responses"][200]["content"]["application/json"];
+type ApiDevelopmentBrainVectorResponse =
+  operations["getDevelopmentBrainVector"]["responses"][200]["content"]["application/json"];
 
 const ResponseSchema = v.object({
   items: v.array(
@@ -16,13 +22,13 @@ const ResponseSchema = v.object({
       createdAt: v.pipe(v.string(), v.isoTimestamp()),
       vectorSync: v.object({
         status: v.picklist(["pending", "submitted", "applied", "failed", "not-scheduled"]),
-        operation: v.optional(v.picklist(["upsert", "delete"])),
+        operation: v.exactOptional(v.picklist(["upsert", "delete"])),
         attemptCount: v.pipe(v.number(), v.safeInteger(), v.minValue(0)),
-        updatedAt: v.optional(v.pipe(v.string(), v.isoTimestamp())),
-        nextAttemptAt: v.optional(v.pipe(v.string(), v.isoTimestamp())),
-        failureCode: v.optional(v.pipe(v.string(), v.nonEmpty())),
+        updatedAt: v.exactOptional(v.pipe(v.string(), v.isoTimestamp())),
+        nextAttemptAt: v.exactOptional(v.pipe(v.string(), v.isoTimestamp())),
+        failureCode: v.exactOptional(v.pipe(v.string(), v.nonEmpty())),
         hasEntry: v.boolean(),
-        entryRevision: v.optional(v.pipe(v.number(), v.safeInteger(), v.minValue(0))),
+        entryRevision: v.exactOptional(v.pipe(v.number(), v.safeInteger(), v.minValue(0))),
       }),
       evidence: v.array(
         v.object({
@@ -35,7 +41,7 @@ const ResponseSchema = v.object({
     }),
   ),
   truncated: v.boolean(),
-}) satisfies v.GenericSchema<DevelopmentBrainItemsResult>;
+}) satisfies v.GenericSchema<ApiDevelopmentBrainItemsResponse>;
 
 const VectorResponseSchema = v.variant("state", [
   v.object({ state: v.literal("not-synced"), checkedAt: v.pipe(v.string(), v.isoTimestamp()) }),
@@ -49,14 +55,14 @@ const VectorResponseSchema = v.variant("state", [
     entryRevision: v.pipe(v.number(), v.safeInteger(), v.minValue(0)),
     dimensions: v.pipe(v.number(), v.safeInteger(), v.minValue(1)),
     metadata: v.object({
-      category: v.optional(v.pipe(v.string(), v.nonEmpty())),
-      derivation: v.optional(v.picklist(["ai", "deterministic"])),
-      embeddingVersion: v.optional(v.pipe(v.number(), v.safeInteger(), v.minValue(1))),
-      schemaVersion: v.optional(v.pipe(v.number(), v.safeInteger(), v.minValue(1))),
+      category: v.exactOptional(v.pipe(v.string(), v.nonEmpty())),
+      derivation: v.exactOptional(v.picklist(["ai", "deterministic"])),
+      embeddingVersion: v.exactOptional(v.pipe(v.number(), v.safeInteger(), v.minValue(1))),
+      schemaVersion: v.exactOptional(v.pipe(v.number(), v.safeInteger(), v.minValue(1))),
     }),
     checkedAt: v.pipe(v.string(), v.isoTimestamp()),
   }),
-]) satisfies v.GenericSchema<DevelopmentBrainVectorResult>;
+]) satisfies v.GenericSchema<ApiDevelopmentBrainVectorResponse>;
 
 export async function fetchDevelopmentBrainItems(
   apiUrl: string | undefined,
@@ -78,7 +84,8 @@ export async function fetchDevelopmentBrainItems(
     throw new Error(`Brain Item一覧の取得に失敗しました (HTTP ${response.status})`);
   }
 
-  return v.parse(ResponseSchema, await response.json());
+  const body: ApiDevelopmentBrainItemsResponse = v.parse(ResponseSchema, await response.json());
+  return body;
 }
 
 export async function fetchDevelopmentBrainVector(
@@ -103,5 +110,9 @@ export async function fetchDevelopmentBrainVector(
     }
     throw new Error(`Vector確認に失敗しました (HTTP ${response.status})`);
   }
-  return v.parse(VectorResponseSchema, await response.json());
+  const body: ApiDevelopmentBrainVectorResponse = v.parse(
+    VectorResponseSchema,
+    await response.json(),
+  );
+  return body;
 }

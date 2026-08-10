@@ -155,7 +155,7 @@ erDiagram
     source_records ||--o| conversation_messages : appears_as
     accounts ||--o{ brain_items : owns
     brain_items ||--o| diary_brain_checkpoint_items : maps
-    brain_items ||--o{ vector_index_jobs : indexes
+    brain_items ||--o{ brain_vector_sync_jobs : indexes
     brain_items ||--o{ brain_item_evidence_edges : has
     source_records ||--o{ brain_item_evidence_edges : evidence
     brain_items ||--o{ brain_item_revisions : revises
@@ -313,11 +313,11 @@ Brain Itemを含むAccount所有データのquery境界は、[Accountデータ�
 
 検証を通過したBrain Itemは`active`として保存します。本人の同意を登録の条件にはしません。Brain Item作成とVectorize同期job追加は同じAccountData SQLite transactionで確定します。AI推定は`derivation = ai`として区別し、Confidenceの算出前を表す`uncomputed`を検索順位に使いません。
 
-開発用の確認一覧は、本人確認済みAccountに対する`brain.listActive`だけをAccountData RPCへ公開し、activeかつ未削除のItem、未削除Evidence、最新のVector同期jobと対応表の有無を最大100件返します。Web UIは各Itemに同期状態、試行回数、失敗code、次回試行時刻を表示します。`applied`はVectorizeが更新を受け付けてAccountDataへ完了記録した状態であり、Vectorize上の実体確認とは区別します。
+開発用の確認機能は、本人確認済みAccountに対して、一覧取得用の`brain.listActive`とVector実体確認用の`brain.findActiveVectorEntry`をAccountData RPCへ公開します。`brain.listActive`はactiveかつ未削除のItem、未削除Evidence、最新のVector同期jobと対応表の有無を最大100件返します。Web UIは各Itemに同期状態、試行回数、失敗code、次回試行時刻を表示します。`applied`はVectorizeが更新を受け付けてAccountDataへ完了記録した状態であり、Vectorize上の実体確認とは区別します。
 
 実体確認は利用者の明示操作時だけ`GET /api/dev/brain-items/:brainItemId/vector`を呼びます。APIは本人確認済みAccountのactive Itemに紐づくvector IDをAccountDataから取得し、Vectorizeの`getByIds`で実体を照合します。応答には存在有無、次元数、許可済みmetadata、確認時刻だけを含め、Embedding値、vector ID、Account ID、`owner_scope`は返しません。一覧取得のたびにVectorizeを呼ばないため、通常表示はAccountDataだけで完結します。これらのAPIとWeb UIは`development` / `local` / `preview` / `test`だけで有効にし、Productionでは404かつUI非表示とします。クライアントからAccount IDを受け取りません。
 
-### 4.8 `vector_index_jobs`
+### 4.8 `brain_vector_sync_jobs`
 
 Vectorizeは非同期更新であるため、AccountDataを正とするoutboxを置きます。
 
@@ -419,7 +419,7 @@ AccountData、Queue、LINEを呼び出した後は、Turn ID、generation epoch�
 - DOの`accepted_messages(status, received_at)`、`delivery_outbox(status, deadline_at)`、`delivery_outbox(turn_id, generation_epoch)`
 - `brain_items(account_id, status, category)`
 - `brain_item_evidence_edges(brain_item_id)`と`(source_record_id)`
-- `vector_index_jobs(status, next_attempt_at)`と`(brain_item_id, item_revision, operation)` unique
+- `brain_vector_sync_jobs(status, next_attempt_at)`と`(brain_item_id, item_revision, operation)` unique
 
 ## 5. メッセージ処理とSession制御
 

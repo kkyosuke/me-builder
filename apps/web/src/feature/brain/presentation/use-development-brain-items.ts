@@ -10,6 +10,8 @@ import type {
   DevelopmentBrainVectorResult,
 } from "../model/brain-item";
 
+const AUTHENTICATION_ERROR_MESSAGE = "本人確認に失敗しました。LINEから開き直してください。";
+
 export function useDevelopmentBrainItems({
   enabled,
   acquireIdToken,
@@ -37,7 +39,13 @@ export function useDevelopmentBrainItems({
     if (mounted.current) setState({ status: "loading" });
     try {
       const idToken = await acquireIdToken(controller.signal);
-      if (!idToken || controller.signal.aborted) return;
+      if (controller.signal.aborted) return;
+      if (!idToken) {
+        if (mounted.current) {
+          setState({ status: "error", message: AUTHENTICATION_ERROR_MESSAGE });
+        }
+        return;
+      }
       const result = await fetchDevelopmentBrainItems(config.apiUrl, idToken, controller.signal);
       if (mounted.current && !controller.signal.aborted) {
         setState({ status: "success", data: result });
@@ -67,7 +75,16 @@ export function useDevelopmentBrainItems({
       }));
       try {
         const idToken = await acquireIdToken(controller.signal);
-        if (!idToken || controller.signal.aborted) return;
+        if (controller.signal.aborted) return;
+        if (!idToken) {
+          if (mounted.current) {
+            setVectorStates((current) => ({
+              ...current,
+              [brainItemId]: { status: "error", message: AUTHENTICATION_ERROR_MESSAGE },
+            }));
+          }
+          return;
+        }
         const result = await fetchDevelopmentBrainVector(
           config.apiUrl,
           idToken,
