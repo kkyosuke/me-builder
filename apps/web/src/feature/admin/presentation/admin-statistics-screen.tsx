@@ -4,11 +4,6 @@ import type { AsyncState } from "../../../model/async-state";
 import type { AdminStatistics } from "../model/statistics";
 
 const number = new Intl.NumberFormat("ja-JP");
-const usd = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  minimumFractionDigits: 4,
-});
 
 function Unavailable({ reason }: { reason: "not-configured" | "upstream-error" }) {
   return (
@@ -52,15 +47,64 @@ function Gemini({ value }: { value: AdminStatistics["gemini"] }) {
       {value.status === "unavailable" ? (
         <Unavailable reason={value.reason} />
       ) : (
-        <dl className="grid grid-cols-2 gap-3">
-          <Metric label="概算コスト" value={usd.format(value.estimatedCostUsd)} />
-          <Metric label="リクエスト" value={number.format(value.requestCount)} />
-          <Metric label="入力token" value={number.format(value.inputTokens)} />
-          <Metric label="出力token" value={number.format(value.outputTokens)} />
-        </dl>
+        <>
+          <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <Metric label="成功レスポンス" value={number.format(value.requestCount)} />
+            <Metric label="入力token" value={number.format(value.inputTokens)} />
+            <Metric label="出力token" value={number.format(value.outputTokens)} />
+          </dl>
+          <h3 className="mt-5 text-sm font-semibold">Account別利用量</h3>
+          {value.accounts.length === 0 ? (
+            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+              当月の利用Accountはありません。
+            </p>
+          ) : (
+            <div className="mt-2 overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-700">
+              <table className="w-full min-w-xl text-left text-sm">
+                <thead className="bg-slate-50 text-xs text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+                  <tr>
+                    <th scope="col" className="px-4 py-3 font-medium">
+                      Account ID
+                    </th>
+                    <th scope="col" className="px-4 py-3 text-right font-medium">
+                      レスポンス
+                    </th>
+                    <th scope="col" className="px-4 py-3 text-right font-medium">
+                      入力token
+                    </th>
+                    <th scope="col" className="px-4 py-3 text-right font-medium">
+                      出力token
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {value.accounts.map((account) => (
+                    <tr
+                      key={account.accountId}
+                      className="border-t border-slate-200 dark:border-slate-700"
+                    >
+                      <th scope="row" className="px-4 py-3 font-mono text-xs font-medium">
+                        {account.accountId}
+                      </th>
+                      <td className="px-4 py-3 text-right tabular-nums">
+                        {number.format(account.requestCount)}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums">
+                        {number.format(account.inputTokens)}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums">
+                        {number.format(account.outputTokens)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
       )}
       <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
-        Vertex AIの利用量集計は現在未対応です。
+        Google Vertex AIレスポンスのusageMetadataを集計しています。
       </p>
     </Card>
   );
@@ -102,7 +146,7 @@ function StatisticsSkeleton() {
         </header>
         <div className="grid gap-5">
           {[
-            { key: "gemini", metricKeys: ["cost", "request", "input", "output"] },
+            { key: "gemini", metricKeys: ["request", "input", "output"] },
             { key: "line", metricKeys: ["billable", "limit", "reply"] },
           ].map(({ key, metricKeys }) => (
             <section
@@ -113,9 +157,7 @@ function StatisticsSkeleton() {
                 <SkeletonBlock className="size-5 rounded-md" />
                 <SkeletonBlock className="h-5 w-24 rounded-full" />
               </div>
-              <div
-                className={`mt-4 grid gap-3 ${key === "gemini" ? "grid-cols-2" : "sm:grid-cols-3"}`}
-              >
+              <div className="mt-4 grid gap-3 sm:grid-cols-3">
                 {metricKeys.map((metricKey) => (
                   <div key={metricKey} className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900">
                     <SkeletonBlock className="h-3 w-20 rounded-full" />

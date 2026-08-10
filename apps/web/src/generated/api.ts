@@ -296,10 +296,15 @@ export interface operations {
               | {
                   /** @constant */
                   status: "available";
-                  estimatedCostUsd: number;
                   requestCount: number;
                   inputTokens: number;
                   outputTokens: number;
+                  accounts: {
+                    accountId: string;
+                    requestCount: number;
+                    inputTokens: number;
+                    outputTokens: number;
+                  }[];
                 }
               | {
                   /** @constant */

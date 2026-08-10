@@ -1,4 +1,4 @@
-import type { d1 } from "@me-builder/lib";
+import { d1 } from "@me-builder/lib";
 import { logger } from "@me-builder/shared";
 import { type LineUsage, fetchLineUsage } from "../infrastructure/line-statistics";
 import { createLiffSession } from "./liff-session";
@@ -19,10 +19,15 @@ export type AdminStatisticsOutcome =
         gemini:
           | {
               status: "available";
-              estimatedCostUsd: number;
               requestCount: number;
               inputTokens: number;
               outputTokens: number;
+              accounts: Array<{
+                accountId: string;
+                requestCount: number;
+                inputTokens: number;
+                outputTokens: number;
+              }>;
             }
           | UnavailableSection;
         line: ({ status: "available" } & LineUsage) | UnavailableSection;
@@ -37,6 +42,7 @@ type Params = {
   lineChannelAccessToken: string | undefined;
   now?: Date;
   getLineUsage?: typeof fetchLineUsage;
+  getGeminiUsage?: typeof d1.action.geminiUsage.summarizeGeminiUsage;
   createSession?: typeof createLiffSession;
 };
 
@@ -64,14 +70,20 @@ export async function getAdminStatistics(params: Params): Promise<AdminStatistic
 
   const now = params.now ?? new Date();
   const start = startOfJstMonth(now);
+  const geminiPromise = (params.getGeminiUsage ?? d1.action.geminiUsage.summarizeGeminiUsage)(
+    params.db,
+    start,
+    now,
+  );
   const linePromise = params.lineChannelAccessToken
     ? (params.getLineUsage ?? fetchLineUsage)({
         channelAccessToken: params.lineChannelAccessToken,
         now,
       })
     : undefined;
-  const [lineResult] = await Promise.allSettled([linePromise]);
+  const [geminiResult, lineResult] = await Promise.allSettled([geminiPromise, linePromise]);
 
+  if (geminiResult.status === "rejected") logger.warn("Failed to fetch Gemini usage statistics");
   if (lineResult.status === "rejected") logger.warn("Failed to fetch LINE usage statistics");
 
   return {
@@ -79,7 +91,16 @@ export async function getAdminStatistics(params: Params): Promise<AdminStatistic
     statistics: {
       period: { start: start.toISOString(), end: now.toISOString() },
       fetchedAt: now.toISOString(),
-      gemini: { status: "unavailable", reason: "not-configured" },
+      gemini:
+        geminiResult.status === "fulfilled"
+          ? {
+              status: "available",
+              requestCount: geminiResult.value.requestCount,
+              inputTokens: geminiResult.value.inputTokens,
+              outputTokens: geminiResult.value.outputTokens,
+              accounts: geminiResult.value.accounts,
+            }
+          : { status: "unavailable", reason: "upstream-error" },
       line:
         linePromise === undefined
           ? { status: "unavailable", reason: "not-configured" }

@@ -16,6 +16,7 @@ import {
   toSafeOperationalErrorFields,
 } from "@me-builder/shared";
 import type { CloudflareBindings, WorkerConfig } from "../config";
+import { createGeminiUsageRecorder } from "../infrastructure/gemini-usage";
 import { generateDiaryChatResponse } from "../logic/diary-chat";
 import {
   DEFAULT_DIARY_CHAT_PROMPT_OPTIONS,
@@ -500,6 +501,7 @@ export async function processChatTurnMessage(
           () =>
             generateDiaryChatResponse(context.messages, workerConfig, generationController.signal, {
               currentUserMessageIds: context.currentUserMessageIds,
+              onUsage: createGeminiUsageRecorder(cf.d1, "diary_chat", message.body.accountId),
               prompt: {
                 objective: DEFAULT_DIARY_CHAT_PROMPT_OPTIONS.objective,
                 conversationGuidance: getDiaryChatConversationGuidance(

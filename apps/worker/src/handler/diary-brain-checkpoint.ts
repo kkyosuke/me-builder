@@ -11,6 +11,7 @@ import {
   operationalLogLevel,
 } from "@me-builder/shared";
 import type { CloudflareBindings, WorkerConfig } from "../config";
+import { createGeminiUsageRecorder } from "../infrastructure/gemini-usage";
 import { createLineRetryKey, pushLineTextWithRetryKey } from "../infrastructure/line-delivery";
 import {
   DIARY_BRAIN_PROMPT_VERSION,
@@ -97,6 +98,7 @@ export async function processDiaryBrainCheckpointMessage(
     context.messages,
     context.sourceMessageIds,
     workerConfig,
+    createGeminiUsageRecorder(cf.d1, "diary_brain", message.body.accountId),
   );
   if (!candidates) {
     throw new OperationalError({
