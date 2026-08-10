@@ -142,7 +142,16 @@ jobs:
           LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
           BASE_DOMAIN: ${{ vars.BASE_DOMAIN }}
         run: |
-          bun --cwd apps/api scripts/register-webhook.ts
+          for attempt in 1 2 3; do
+            if bun --cwd apps/api scripts/register-webhook.ts; then
+              exit 0
+            fi
+            if [ "${attempt}" -lt 3 ]; then
+              echo "LINE Webhook verification failed (attempt ${attempt}/3); retrying in 15 seconds."
+              sleep 15
+            fi
+          done
+          exit 1
 
       # デプロイ済みの URL を LIFF アプリのエンドポイント URL へ反映する
       - name: Register LIFF Endpoint (Preview)
