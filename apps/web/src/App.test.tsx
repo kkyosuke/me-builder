@@ -315,7 +315,7 @@ describe("App", () => {
     );
   });
 
-  it("画像選択だけで生成候補へ進みアバターを設定してプロフィールへ戻る", async () => {
+  it("画像送信後にモーダルを閉じ、完成した候補を選んで設定する", async () => {
     const timestamp = "2026-08-10T00:00:00.000Z";
     const jobId = "00000000-0000-4000-8000-000000000001";
     const candidateId = "00000000-0000-4000-8000-000000000002";
@@ -356,10 +356,18 @@ describe("App", () => {
     fireEvent.click(await enabledProfileButton());
     fireEvent.click(await screen.findByRole("button", { name: /アバターを設定/ }));
 
-    expect(await screen.findByRole("heading", { name: "アバター設定" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "アバター画像を選ぶ" })).toBeTruthy();
+    const file = new File(["selfie"], "selfie.png", { type: "image/png" });
     fireEvent.change(screen.getByLabelText("アバター用の画像ファイルを選ぶ"), {
-      target: { files: [new File(["selfie"], "selfie.png", { type: "image/png" })] },
+      target: { files: [file] },
     });
+    expect(mocks.uploadAvatarSource).not.toHaveBeenCalled();
+    expect(screen.getByRole("img", { name: "送信する画像のプレビュー" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "この画像で候補を作る" }));
+
+    expect(await screen.findByRole("heading", { name: "プロフィール" })).toBeTruthy();
+    fireEvent.click(await screen.findByRole("button", { name: /候補ができました/ }));
+    expect(await screen.findByRole("heading", { name: "候補から選ぶ" })).toBeTruthy();
     fireEvent.click(await screen.findByRole("button", { name: "候補1を選択" }));
     fireEvent.click(screen.getByRole("button", { name: "このアバターに設定" }));
 
@@ -396,7 +404,7 @@ describe("App", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /アバターを設定/ }));
     expect(window.location.pathname).toBe("/profile/avatar");
-    expect(await screen.findByRole("dialog", { name: "アバター設定" })).toBeTruthy();
+    expect(await screen.findByRole("dialog", { name: "アバター画像を選ぶ" })).toBeTruthy();
 
     act(() => window.history.back());
     await waitFor(() => expect(window.location.pathname).toBe("/profile"));

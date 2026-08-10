@@ -7,6 +7,8 @@ dist
 dist-ssr
 *.local
 *.tsbuildinfo
+playwright-report
+test-results
 
 # usagi (task issue store: lock file and session worktrees are machine-local)
 .usagi/issues/.lock

@@ -50,18 +50,27 @@ describe("AvatarSettingsScreen", () => {
 
   afterEach(cleanup);
 
-  it("説明後に画像を選ぶだけで人物判定と生成へ送る", async () => {
+  it("画像をプレビューしてから送信し、受付後にモーダルを閉じる", async () => {
     const state = controller();
-    render(<AvatarSettingsScreen controller={state} onBack={vi.fn()} onSaved={vi.fn()} />);
+    const onSaved = vi.fn();
+    render(<AvatarSettingsScreen controller={state} onBack={vi.fn()} onSaved={onSaved} />);
 
     expect(screen.queryByRole("checkbox")).toBeNull();
     expect(screen.getByText(/画像を使う権利と、写っている人の同意/)).toBeTruthy();
+    expect(
+      (screen.getByRole("button", { name: "この画像で候補を作る" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
     const input = screen.getByLabelText("アバター用の画像ファイルを選ぶ") as HTMLInputElement;
     expect(input.disabled).toBe(false);
     const file = new File(["selfie"], "selfie.png", { type: "image/png" });
     fireEvent.change(input, { target: { files: [file] } });
 
+    expect(state.upload).not.toHaveBeenCalled();
+    expect(screen.getByRole("img", { name: "送信する画像のプレビュー" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "この画像で候補を作る" }));
+
     await waitFor(() => expect(state.upload).toHaveBeenCalledWith(file));
+    await waitFor(() => expect(onSaved).toHaveBeenCalledOnce());
   });
 
   it("人物を確認できなければ自分の画像の選び直しを案内する", () => {
@@ -75,14 +84,6 @@ describe("AvatarSettingsScreen", () => {
 
     expect(screen.getByRole("alert").textContent).toContain("人物を確認できませんでした");
     expect(screen.getByRole("alert").textContent).toContain("ご自身の顔や上半身が見やすい画像");
-    expect(screen.queryByRole("button", { name: "アバター生成を開始" })).toBeNull();
-  });
-
-  it("人物確認済みの短い中間状態でも追加操作なしで処理中を表示する", () => {
-    const state = controller({ job: job("verified") });
-    render(<AvatarSettingsScreen controller={state} onBack={vi.fn()} onSaved={vi.fn()} />);
-
-    expect(screen.getByText("アバター候補を作っています")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "アバター生成を開始" })).toBeNull();
   });
 

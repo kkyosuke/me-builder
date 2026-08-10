@@ -248,7 +248,7 @@ function AppContents() {
           </Suspense>
         </RouteErrorBoundary>
       </div>
-      {profileView === "profile" && (
+      {profileView !== "closed" && (
         <RouteErrorBoundary>
           <Suspense
             fallback={
@@ -258,6 +258,7 @@ function AppContents() {
             <ProfileSettingsScreen
               avatar={avatar}
               avatarJobStatus={avatarController.job?.status ?? null}
+              inactive={profileView === "avatar"}
               isAdmin={accountRole === "admin"}
               theme={colorTheme.theme}
               onBack={closeProfile}

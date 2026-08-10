@@ -167,6 +167,7 @@
   - LIFF機能は `apps/web/src/feature/liff/` に置きます。`@line/liff` の呼び出しは `infrastructure/liff-client.ts`、セッションAPIとの通信は `infrastructure/session-api.ts` に閉じ込め、React コンポーネントから SDK やAPIを直接呼ばないこと。コンポーネントは初期化結果の状態オブジェクトだけを受け取ります。
   - `VITE_LIFF_ID` が未設定の場合は、LIFF 初期化を `logger` へのログ出力とともに安全にスキップし、LIFF なしの画面を表示します（LINE Webhook 自動登録と同じ「環境変数が未設定なら安全にスキップする」方針）。
   - LIFF URLへ追加したpathやqueryは、`liff.init()`がprimary redirectの`liff.state`からsecondary redirectのURLへ復元します。初期化前に`liff.state`を画面遷移へ使わず、`history.pushState`などのURL変更操作も初期化完了まで許可しません。画面判定は初期化後の`location.pathname`を正とします。
+  - LIFFの画面遷移回帰は、実ブラウザのUI E2Eで初期化中の待機表示、初期化前のURL不変、初期化後のpath復元、`liff.init()`の単一実行を一連で検証します。E2E用LIFF adapterはViteの専用modeでだけ差し替え、本番bundleへテスト用分岐を含めません。
   - `liff.init` の失敗時、および外部ブラウザで開かれた場合 (`liff.isInClient()` が false) も画面を白にせず、状態を画面へ表示します。LIFF の初期化結果を画面表示の前提条件にしないこと。
   - LINE の `userId` は本人識別子です。**画面表示もログ出力も行わず**、表示は `displayName` と `pictureUrl` に限ります ([プロジェクト概要 §8](../../docs/product/project-overview.md#8-プライバシーと安全性))。ID トークンおよびアクセストークンもログへ出力しません。
 

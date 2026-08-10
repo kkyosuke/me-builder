@@ -1,21 +1,37 @@
-import {
-  ArrowLeft,
-  Check,
-  CircleAlert,
-  ImagePlus,
-  LoaderCircle,
-  RotateCw,
-  Sparkles,
-  Trash2,
-} from "lucide-react";
+import { Check, CircleAlert, ImagePlus, LoaderCircle, Sparkles, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { AvatarSelection } from "../model/avatar";
-import { getAvatarName } from "../model/avatar";
 import { AvatarPreview } from "./components/avatar-preview";
 import type { AvatarSettingsController } from "./use-avatar-settings";
 
 const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+
+function failureMessage(controller: AvatarSettingsController): {
+  title: string;
+  description: string;
+} | null {
+  const job = controller.job;
+  if (!job) return null;
+  if (job.status === "not_person") {
+    return {
+      title: "人物を確認できませんでした",
+      description: "ご自身の顔や上半身が見やすい画像を選び直してください。",
+    };
+  }
+  if (job.status !== "failed" && job.status !== "cancelled" && job.status !== "expired") {
+    return null;
+  }
+  return job.errorCode === "generation_rate_limited"
+    ? {
+        title: "生成上限に達しました",
+        description: "時間をおいてから、別の画像でもう一度お試しください。",
+      }
+    : {
+        title: "アバター候補を生成できませんでした",
+        description: "別の画像を選んでもう一度お試しください。",
+      };
+}
 
 export function AvatarSettingsScreen({
   controller,
@@ -26,15 +42,19 @@ export function AvatarSettingsScreen({
   onBack: () => void;
   onSaved: () => void;
 }) {
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [uploadedImage, setUploadedImage] = useState<AvatarSelection | null>(null);
-  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
-  const backButtonRef = useRef<HTMLButtonElement>(null);
+  const [showUpload, setShowUpload] = useState(controller.job?.status !== "ready");
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
   const uploadedObjectUrl = useRef<string | null>(null);
 
+  const candidatesReady = controller.job?.status === "ready" && !showUpload;
+  const jobFailure = failureMessage(controller);
+
   useEffect(() => {
-    backButtonRef.current?.focus();
+    closeButtonRef.current?.focus();
   }, []);
 
   useEffect(() => {
@@ -53,7 +73,7 @@ export function AvatarSettingsScreen({
     [],
   );
 
-  const handleFile = async (file: File | undefined) => {
+  const handleFile = (file: File | undefined) => {
     if (!file) return;
     if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
       setFileError("PNG、JPEG、WebP形式の画像を選んでください。SVGは利用できません。");
@@ -65,212 +85,66 @@ export function AvatarSettingsScreen({
     }
 
     setFileError(null);
-    setSelectedCandidateId(null);
     if (uploadedObjectUrl.current) URL.revokeObjectURL(uploadedObjectUrl.current);
     const objectUrl = URL.createObjectURL(file);
     uploadedObjectUrl.current = objectUrl;
+    setUploadedFile(file);
     setUploadedImage({ id: "upload", src: objectUrl });
-    setUploadedFileName(file.name);
-    await controller.upload(file);
   };
 
-  const job = controller.job;
-  const isRunning =
-    job?.status === "checking" ||
-    job?.status === "verified" ||
-    job?.status === "accepted" ||
-    job?.status === "generating";
-  const isChecking = controller.busy || job?.status === "checking";
-  const failureTitle =
-    job?.errorCode === "generation_rate_limited"
-      ? "生成上限に達しました"
-      : job?.errorCode === "person_check_failed"
-        ? "人物確認を完了できませんでした"
-        : "アバター候補を生成できませんでした";
+  const upload = async () => {
+    if (!uploadedFile) return;
+    if (await controller.upload(uploadedFile)) onSaved();
+  };
+
+  const choose = async () => {
+    if (!selectedCandidateId) return;
+    if (await controller.choose(selectedCandidateId)) onSaved();
+  };
 
   return (
     <dialog
       open
       aria-modal="true"
       aria-labelledby="avatar-settings-title"
-      className="fixed inset-0 z-[70] m-0 h-auto max-h-none w-auto max-w-none overflow-y-auto border-0 bg-slate-50 p-0 dark:bg-slate-900"
+      className="fixed inset-0 z-[70] m-0 flex h-full max-h-none w-full max-w-none items-end justify-center overflow-y-auto border-0 bg-slate-950/55 p-0 backdrop-blur-sm sm:items-center sm:p-6"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !controller.busy) onBack();
+      }}
     >
-      <header className="sticky top-0 z-10 border-b border-slate-200/80 bg-white/90 backdrop-blur dark:border-slate-700 dark:bg-slate-900/90">
-        <div className="mx-auto flex min-h-16 max-w-2xl items-center px-4 sm:px-8">
+      <section className="relative max-h-[92dvh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-slate-50 px-5 pt-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-2xl dark:bg-slate-900 sm:rounded-3xl sm:p-7">
+        <header className="flex items-start justify-between gap-4">
+          <div>
+            <p className="flex items-center gap-1.5 text-xs font-bold tracking-wider text-violet-600 dark:text-violet-300">
+              <Sparkles className="size-4" aria-hidden="true" />
+              AVATAR
+            </p>
+            <h1
+              id="avatar-settings-title"
+              className="mt-1 text-xl font-bold text-slate-950 dark:text-white"
+            >
+              {candidatesReady ? "候補から選ぶ" : "アバター画像を選ぶ"}
+            </h1>
+          </div>
           <button
-            ref={backButtonRef}
+            ref={closeButtonRef}
             type="button"
+            disabled={controller.busy}
             onClick={onBack}
-            className="inline-flex size-11 items-center justify-center rounded-full text-slate-600 transition hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:text-slate-300 dark:hover:bg-slate-800"
-            aria-label="プロフィールへ戻る"
+            className="inline-flex size-10 shrink-0 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 disabled:opacity-40 dark:text-slate-300 dark:hover:bg-slate-800"
+            aria-label="アバター設定を閉じる"
           >
-            <ArrowLeft className="size-5" aria-hidden="true" />
+            <X className="size-5" aria-hidden="true" />
           </button>
-          <h1
-            id="avatar-settings-title"
-            className="ml-2 text-lg font-bold text-slate-950 dark:text-white"
-          >
-            アバター設定
-          </h1>
-        </div>
-      </header>
+        </header>
 
-      <main className="mx-auto w-full max-w-2xl px-4 py-8 pb-16 sm:px-8">
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 text-center shadow-sm dark:border-slate-700 dark:bg-slate-800">
-          <p className="text-xs font-bold tracking-wider text-slate-500 dark:text-slate-400">
-            現在のアバター
-          </p>
-          <div className="mt-5 flex justify-center">
-            <AvatarPreview avatar={controller.currentAvatar} size="lg" />
-          </div>
-          <p className="mt-4 font-bold text-slate-950 dark:text-white">
-            {controller.loadStatus === "loading"
-              ? "読み込み中…"
-              : getAvatarName(controller.currentAvatar)}
-          </p>
-        </section>
-
-        {controller.loadStatus === "error" && (
-          <div
-            role="alert"
-            className="mt-5 rounded-2xl bg-rose-50 p-4 text-sm text-rose-900 dark:bg-rose-400/10 dark:text-rose-200"
-          >
-            <p className="font-bold">アバター情報を読み込めませんでした</p>
-            <p className="mt-1 leading-relaxed">{controller.errorMessage}</p>
-            <button
-              type="button"
-              onClick={() => void controller.refresh()}
-              className="mt-3 inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 font-bold shadow-sm dark:bg-slate-800"
-            >
-              <RotateCw className="size-4" aria-hidden="true" />
-              再読み込み
-            </button>
-          </div>
-        )}
-
-        <section aria-labelledby="upload-heading" className="mt-8">
-          <h2
-            id="upload-heading"
-            className="px-1 text-sm font-bold tracking-wider text-slate-500 dark:text-slate-400"
-          >
-            自分の画像を選ぶ
-          </h2>
-          <div className="mt-3 rounded-2xl border border-violet-200 bg-violet-50/70 p-4 text-sm text-slate-700 dark:border-violet-800 dark:bg-violet-950/20 dark:text-slate-200">
-            <p className="leading-relaxed">
-              画像を選ぶと、人物確認と候補生成のため外部AIサービスへ送信されます。画像を使う権利と、写っている人の同意を確認してから選んでください。
+        {candidatesReady ? (
+          <>
+            <p className="mt-3 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+              好きな候補を1つ選んでください。選ぶだけでは現在のアバターは変わりません。
             </p>
-            <p className="mt-2 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
-              人物の有無だけを確認し、本人確認や属性推定には利用しません。生成には数分かかることがあり、候補は自動では設定されません。
-            </p>
-          </div>
-          <label
-            aria-disabled={controller.busy || isRunning}
-            className={`mt-3 flex items-center gap-3 rounded-2xl border border-dashed p-4 transition focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-sky-500 ${
-              !controller.busy && !isRunning
-                ? "cursor-pointer border-sky-300 bg-sky-50/70 hover:bg-sky-100 dark:border-sky-700 dark:bg-sky-950/20 dark:hover:bg-sky-950/40"
-                : "cursor-not-allowed border-slate-300 bg-slate-100 opacity-60 dark:border-slate-700 dark:bg-slate-800"
-            }`}
-          >
-            <span className="flex size-11 items-center justify-center rounded-xl bg-sky-500 text-white">
-              {controller.busy ? (
-                <LoaderCircle
-                  className="size-5 animate-spin motion-reduce:animate-none"
-                  aria-hidden="true"
-                />
-              ) : (
-                <ImagePlus className="size-5" aria-hidden="true" />
-              )}
-            </span>
-            <span>
-              <span className="block font-bold text-slate-950 dark:text-white">
-                {uploadedImage || job ? "別の画像を選ぶ" : "画像を選ぶ"}
-              </span>
-              <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
-                ご自身の顔や上半身が見やすい画像を選んでください
-              </span>
-            </span>
-            <input
-              type="file"
-              aria-label="アバター用の画像ファイルを選ぶ"
-              accept="image/png,image/jpeg,image/webp"
-              disabled={controller.busy || isRunning}
-              className="sr-only"
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                event.target.value = "";
-                void handleFile(file);
-              }}
-            />
-          </label>
-          {fileError && (
-            <p
-              role="alert"
-              className="mt-3 rounded-xl bg-rose-50 p-3 text-sm font-bold text-rose-900 dark:bg-rose-400/10 dark:text-rose-200"
-            >
-              {fileError}
-            </p>
-          )}
-        </section>
-
-        {(controller.busy || isRunning) && (
-          <section aria-labelledby="generation-heading" className="mt-8">
-            <h2
-              id="generation-heading"
-              className="px-1 text-sm font-bold tracking-wider text-slate-500 dark:text-slate-400"
-            >
-              処理中
-            </h2>
-            <output className="mt-3 flex items-start gap-3 rounded-2xl border border-violet-200 bg-violet-50 p-4 text-violet-900 dark:border-violet-800 dark:bg-violet-400/10 dark:text-violet-200">
-              <LoaderCircle
-                className="mt-0.5 size-5 shrink-0 animate-spin motion-reduce:animate-none"
-                aria-hidden="true"
-              />
-              <span>
-                <span className="block font-bold">アバター候補を作っています</span>
-                <span className="mt-1 block text-xs leading-relaxed opacity-80">
-                  {isChecking
-                    ? "まず人物が写っているか確認しています。"
-                    : "人物を確認できました。複数の候補を生成しています。"}
-                  この画面を閉じても処理は続きます。
-                </span>
-              </span>
-            </output>
-            {uploadedImage && (
-              <div className="mt-3 flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-800">
-                <AvatarPreview avatar={uploadedImage} size="md" />
-                <p className="min-w-0 truncate text-sm font-bold text-slate-950 dark:text-white">
-                  {uploadedFileName}
-                </p>
-              </div>
-            )}
-          </section>
-        )}
-
-        {job?.status === "not_person" && (
-          <div
-            role="alert"
-            className="mt-8 flex items-start gap-3 rounded-2xl bg-rose-50 p-4 text-rose-900 dark:bg-rose-400/10 dark:text-rose-200"
-          >
-            <CircleAlert className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
-            <div>
-              <p className="font-bold">人物を確認できませんでした</p>
-              <p className="mt-1 text-sm leading-relaxed opacity-80">
-                ご自身の顔や上半身が見やすい画像を選び直してください。
-              </p>
-            </div>
-          </div>
-        )}
-
-        {job?.status === "ready" && (
-          <section aria-labelledby="candidates-heading" className="mt-8">
-            <h2
-              id="candidates-heading"
-              className="px-1 text-sm font-bold tracking-wider text-slate-500 dark:text-slate-400"
-            >
-              候補を選ぶ
-            </h2>
-            <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {job.candidates.map((candidate, index) => {
+            <div className="mt-6 grid grid-cols-2 gap-3">
+              {controller.job?.candidates.map((candidate, index) => {
                 const selected = selectedCandidateId === candidate.id;
                 return (
                   <button
@@ -290,76 +164,145 @@ export function AvatarSettingsScreen({
                       候補 {index + 1}
                     </span>
                     {selected && (
-                      <span className="absolute top-2 right-2 flex size-5 items-center justify-center rounded-full bg-violet-500 text-white">
-                        <Check className="size-3" aria-hidden="true" />
+                      <span className="absolute top-2 right-2 flex size-6 items-center justify-center rounded-full bg-violet-500 text-white">
+                        <Check className="size-4" aria-hidden="true" />
                       </span>
                     )}
                   </button>
                 );
               })}
             </div>
-            <p className="mt-3 flex items-start gap-2 px-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
-              <Sparkles className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-              候補は期限まで保存され、選んだ画像だけが現在のアバターになります。
-            </p>
-          </section>
-        )}
-
-        {(job?.status === "failed" || job?.status === "cancelled" || job?.status === "expired") && (
-          <div
-            role="alert"
-            className="mt-8 rounded-2xl bg-amber-50 p-4 text-sm text-amber-950 dark:bg-amber-400/10 dark:text-amber-100"
-          >
-            <p className="font-bold">
-              {job.status === "failed" ? failureTitle : "この処理は終了しました"}
-            </p>
-            <p className="mt-1 leading-relaxed">
-              {job.errorCode === "generation_rate_limited"
-                ? "時間をおいてから、別の画像を選んでもう一度お試しください。"
-                : "別の画像を選んでもう一度お試しください。"}
-            </p>
-          </div>
-        )}
-
-        {controller.errorMessage && controller.loadStatus !== "error" && (
-          <p
-            role="alert"
-            className="mt-5 rounded-xl bg-rose-50 p-3 text-sm font-bold text-rose-900 dark:bg-rose-400/10 dark:text-rose-200"
-          >
-            {controller.errorMessage}
-          </p>
-        )}
-
-        <div className="mt-10 space-y-3">
-          {job?.status === "ready" && (
             <button
               type="button"
               disabled={!selectedCandidateId || controller.busy}
-              onClick={() => {
-                if (!selectedCandidateId) return;
-                void controller.choose(selectedCandidateId).then((saved) => {
-                  if (saved) onSaved();
-                });
-              }}
-              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-sky-400 px-5 py-4 font-bold text-slate-950 transition hover:bg-sky-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 disabled:cursor-not-allowed disabled:opacity-40"
+              onClick={() => void choose()}
+              className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-sky-400 px-5 py-4 font-bold text-slate-950 transition hover:bg-sky-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              <Check className="size-5" aria-hidden="true" />
+              {controller.busy ? (
+                <LoaderCircle className="size-5 animate-spin motion-reduce:animate-none" />
+              ) : (
+                <Check className="size-5" aria-hidden="true" />
+              )}
               このアバターに設定
             </button>
-          )}
-          {controller.currentAvatar && (
             <button
               type="button"
               disabled={controller.busy}
-              onClick={() => void controller.remove()}
-              className="flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-bold text-red-700 transition hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500 disabled:opacity-40 dark:text-red-300 dark:hover:bg-red-400/10"
+              onClick={() => {
+                setSelectedCandidateId(null);
+                setShowUpload(true);
+              }}
+              className="mt-3 w-full rounded-xl px-4 py-3 text-sm font-bold text-slate-600 transition hover:bg-slate-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:text-slate-300 dark:hover:bg-slate-800"
             >
-              <Trash2 className="size-4" aria-hidden="true" />
-              現在のアバターを削除
+              別の画像から作り直す
             </button>
-          )}
-        </div>
-      </main>
+          </>
+        ) : (
+          <>
+            <p className="mt-3 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+              ご自身の顔や上半身が見やすい画像を選んでください。選んだ画像を確認してから送信できます。
+            </p>
+
+            {jobFailure && (
+              <div
+                role="alert"
+                className="mt-5 flex items-start gap-3 rounded-2xl bg-rose-50 p-4 text-rose-900 dark:bg-rose-400/10 dark:text-rose-200"
+              >
+                <CircleAlert className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
+                <div>
+                  <p className="font-bold">{jobFailure.title}</p>
+                  <p className="mt-1 text-sm leading-relaxed opacity-80">
+                    {jobFailure.description}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <label className="mt-6 block cursor-pointer rounded-2xl border border-dashed border-sky-300 bg-sky-50/70 p-4 transition hover:bg-sky-100 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-sky-500 dark:border-sky-700 dark:bg-sky-950/20 dark:hover:bg-sky-950/40">
+              {uploadedImage ? (
+                <span className="flex flex-col items-center">
+                  <img
+                    src={uploadedImage.src}
+                    alt="送信する画像のプレビュー"
+                    className="aspect-square w-full max-w-64 rounded-2xl object-cover shadow-md"
+                  />
+                  <span className="mt-3 text-sm font-bold text-sky-700 dark:text-sky-300">
+                    別の画像を選ぶ
+                  </span>
+                  <span className="mt-1 max-w-full truncate text-xs text-slate-500 dark:text-slate-400">
+                    {uploadedFile?.name}
+                  </span>
+                </span>
+              ) : (
+                <span className="flex min-h-36 flex-col items-center justify-center text-center">
+                  <span className="flex size-12 items-center justify-center rounded-2xl bg-sky-500 text-white">
+                    <ImagePlus className="size-6" aria-hidden="true" />
+                  </span>
+                  <span className="mt-3 font-bold text-slate-950 dark:text-white">画像を選ぶ</span>
+                  <span className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    PNG・JPEG・WebP、10MBまで
+                  </span>
+                </span>
+              )}
+              <input
+                type="file"
+                aria-label="アバター用の画像ファイルを選ぶ"
+                accept="image/png,image/jpeg,image/webp"
+                disabled={controller.busy}
+                className="sr-only"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  event.target.value = "";
+                  handleFile(file);
+                }}
+              />
+            </label>
+
+            {fileError && (
+              <p
+                role="alert"
+                className="mt-3 rounded-xl bg-rose-50 p-3 text-sm font-bold text-rose-900 dark:bg-rose-400/10 dark:text-rose-200"
+              >
+                {fileError}
+              </p>
+            )}
+            {controller.errorMessage && (
+              <p
+                role="alert"
+                className="mt-3 rounded-xl bg-rose-50 p-3 text-sm font-bold text-rose-900 dark:bg-rose-400/10 dark:text-rose-200"
+              >
+                {controller.errorMessage}
+              </p>
+            )}
+
+            <p className="mt-5 rounded-2xl bg-violet-50/70 p-4 text-xs leading-relaxed text-slate-600 dark:bg-violet-950/20 dark:text-slate-300">
+              送信すると人物確認と候補生成のため外部AIサービスを利用します。画像を使う権利と、写っている人の同意を確認してください。候補は自動では設定されません。
+            </p>
+            <button
+              type="button"
+              disabled={!uploadedFile || controller.busy}
+              onClick={() => void upload()}
+              className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-sky-400 px-5 py-4 font-bold text-slate-950 transition hover:bg-sky-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {controller.busy && (
+                <LoaderCircle className="size-5 animate-spin motion-reduce:animate-none" />
+              )}
+              この画像で候補を作る
+            </button>
+          </>
+        )}
+
+        {controller.currentAvatar && !controller.busy && (
+          <button
+            type="button"
+            onClick={() => void controller.remove()}
+            className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold text-red-700 transition hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500 dark:text-red-300 dark:hover:bg-red-400/10"
+          >
+            <Trash2 className="size-4" aria-hidden="true" />
+            現在のアバターを削除
+          </button>
+        )}
+      </section>
     </dialog>
   );
 }

@@ -26,3 +26,7 @@ jobs:
       - uses: ./.github/actions/setup-bun-workspace
       - name: Run Tests Including E2E
         run: bun run test
+      - name: Install Chromium for UI E2E
+        run: bunx playwright install --with-deps chromium
+      - name: Run UI E2E
+        run: bun run test:e2e:ui

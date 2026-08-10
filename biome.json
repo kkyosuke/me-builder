@@ -28,6 +28,8 @@
       "**/node_modules/**",
       "**/.bun/**",
       "**/worker-configuration.d.ts",
+      "playwright-report/**",
+      "test-results/**",
       ".usagi/**"
     ]
   }

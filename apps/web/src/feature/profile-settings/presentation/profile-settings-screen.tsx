@@ -1,4 +1,13 @@
-import { ArrowLeft, ChevronRight, LoaderCircle, Moon, Shield, Sparkles, Sun } from "lucide-react";
+import {
+  ArrowLeft,
+  ChevronRight,
+  CircleAlert,
+  LoaderCircle,
+  Moon,
+  Shield,
+  Sparkles,
+  Sun,
+} from "lucide-react";
 import { useEffect, useRef } from "react";
 import type { ColorTheme } from "../../theme/model/color-theme";
 import { type AvatarJobStatus, type AvatarSelection, getAvatarName } from "../model/avatar";
@@ -24,6 +33,7 @@ const themes = [
 export function ProfileSettingsScreen({
   avatar,
   avatarJobStatus = null,
+  inactive = false,
   isAdmin = false,
   theme,
   onBack,
@@ -32,6 +42,7 @@ export function ProfileSettingsScreen({
 }: {
   avatar: AvatarSelection | null;
   avatarJobStatus?: AvatarJobStatus | null;
+  inactive?: boolean;
   isAdmin?: boolean;
   theme: ColorTheme;
   onBack: () => void;
@@ -39,20 +50,36 @@ export function ProfileSettingsScreen({
   onThemeChange: (theme: ColorTheme) => void;
 }) {
   const backButtonRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
   const isAvatarProcessing =
     avatarJobStatus === "checking" ||
     avatarJobStatus === "verified" ||
     avatarJobStatus === "accepted" ||
     avatarJobStatus === "generating";
+  const areCandidatesReady = avatarJobStatus === "ready";
+  const hasAvatarError =
+    avatarJobStatus === "not_person" ||
+    avatarJobStatus === "failed" ||
+    avatarJobStatus === "cancelled" ||
+    avatarJobStatus === "expired";
 
   useEffect(() => {
     backButtonRef.current?.focus();
   }, []);
 
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (inactive) dialog.setAttribute("inert", "");
+    else dialog.removeAttribute("inert");
+  }, [inactive]);
+
   return (
     <dialog
+      ref={dialogRef}
       open
-      aria-modal="true"
+      aria-modal={inactive ? undefined : "true"}
+      aria-hidden={inactive || undefined}
       aria-labelledby="profile-settings-title"
       className="fixed inset-0 z-[60] m-0 h-auto max-h-none w-auto max-w-none overflow-y-auto border-0 bg-slate-50 p-0 dark:bg-slate-900"
     >
@@ -104,29 +131,66 @@ export function ProfileSettingsScreen({
           </h2>
           <button
             type="button"
-            onClick={onOpenAvatar}
-            className="mt-3 flex w-full items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-sky-300 hover:bg-sky-50/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:border-slate-700 dark:bg-slate-800 dark:hover:border-sky-700 dark:hover:bg-sky-950/20"
+            aria-disabled={isAvatarProcessing}
+            onClick={() => {
+              if (!isAvatarProcessing) onOpenAvatar();
+            }}
+            className={`mt-3 flex w-full items-center gap-4 rounded-2xl border bg-white p-4 text-left shadow-sm transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:bg-slate-800 ${
+              isAvatarProcessing
+                ? "cursor-wait border-violet-300 dark:border-violet-800"
+                : areCandidatesReady
+                  ? "border-violet-400 bg-violet-50/60 hover:bg-violet-100/70 dark:border-violet-700 dark:bg-violet-950/20 dark:hover:bg-violet-950/40"
+                  : hasAvatarError
+                    ? "border-rose-300 hover:bg-rose-50 dark:border-rose-800 dark:hover:bg-rose-950/20"
+                    : "border-slate-200 hover:border-sky-300 hover:bg-sky-50/50 dark:border-slate-700 dark:hover:border-sky-700 dark:hover:bg-sky-950/20"
+            }`}
           >
-            <AvatarPreview avatar={avatar} size="md" />
+            <span className="relative shrink-0">
+              <AvatarPreview avatar={avatar} size="md" />
+              {isAvatarProcessing && (
+                <span className="absolute inset-0 flex items-center justify-center rounded-full bg-violet-950/60 text-white ring-2 ring-violet-300">
+                  <LoaderCircle
+                    className="size-7 animate-spin motion-reduce:animate-none"
+                    aria-hidden="true"
+                  />
+                </span>
+              )}
+              {areCandidatesReady && (
+                <span className="absolute -right-1 -bottom-1 flex size-7 items-center justify-center rounded-full bg-violet-500 text-white ring-2 ring-white dark:ring-slate-800">
+                  <Sparkles className="size-4" aria-hidden="true" />
+                </span>
+              )}
+              {hasAvatarError && (
+                <span className="absolute -right-1 -bottom-1 flex size-7 items-center justify-center rounded-full bg-rose-500 text-white ring-2 ring-white dark:ring-slate-800">
+                  <CircleAlert className="size-4" aria-hidden="true" />
+                </span>
+              )}
+            </span>
             <span className="min-w-0 flex-1">
               <span className="block font-bold text-slate-950 dark:text-white">
-                {avatar ? "アバターを変更" : "アバターを設定"}
-              </span>
-              <span className="mt-1 block truncate text-sm text-slate-500 dark:text-slate-400">
                 {isAvatarProcessing
-                  ? "候補を生成中"
-                  : avatarJobStatus === "ready"
+                  ? "アバターを生成中"
+                  : areCandidatesReady
                     ? "候補ができました"
-                    : getAvatarName(avatar)}
+                    : hasAvatarError
+                      ? "画像を選び直す"
+                      : avatar
+                        ? "アバターを変更"
+                        : "アバターを設定"}
+              </span>
+              <span className="mt-1 block text-sm text-slate-500 dark:text-slate-400">
+                {isAvatarProcessing
+                  ? "完了すると、ここから候補を選べます"
+                  : areCandidatesReady
+                    ? "タップして候補を選んでください"
+                    : hasAvatarError
+                      ? "タップして別の画像を選んでください"
+                      : getAvatarName(avatar)}
               </span>
             </span>
-            {isAvatarProcessing && (
-              <LoaderCircle
-                className="size-5 animate-spin text-violet-500 motion-reduce:animate-none"
-                aria-hidden="true"
-              />
+            {!isAvatarProcessing && (
+              <ChevronRight className="size-5 text-slate-400" aria-hidden="true" />
             )}
-            <ChevronRight className="size-5 text-slate-400" aria-hidden="true" />
           </button>
         </section>
 

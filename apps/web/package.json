@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --port 5173",
+    "dev:liff-e2e": "vite --host 127.0.0.1 --port 4173 --mode liff-e2e",
     "build": "tsc && vite build && bun scripts/make-liff-css-compatible.ts && bun scripts/check-liff-css.ts",
     "generate:api": "openapi-typescript ../api/openapi.json -o src/generated/api.ts && biome format --write src/generated/api.ts",
     "typecheck": "tsc --noEmit",
