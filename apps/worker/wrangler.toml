@@ -81,6 +81,7 @@ database_id = "me-builder-db-local-id"
 
 [vars]
 ENVIRONMENT = "local"
+AVATAR_GENERATION_RATE_LIMIT = "0"
 
 [env.local]
 name = "me-builder-worker-local"
@@ -143,6 +144,7 @@ database_id = "me-builder-db-local-id"
 
 [env.local.vars]
 ENVIRONMENT = "local"
+AVATAR_GENERATION_RATE_LIMIT = "0"
 
 [env.preview]
 name = "me-builder-worker-preview"
@@ -205,6 +207,7 @@ database_id = "8c25af7d-bc26-4b40-bbb4-1521c4af5a6e"
 
 [env.preview.vars]
 ENVIRONMENT = "preview"
+AVATAR_GENERATION_RATE_LIMIT = "0"
 
 [env.production]
 name = "me-builder-worker-production"

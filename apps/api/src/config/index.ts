@@ -1,9 +1,9 @@
 import { line } from "@me-builder/lib";
 import { getEnv } from "@me-builder/shared";
 import * as v from "valibot";
-import { type ApiConfig, ConfigSchema } from "./schema";
+import { type ApiConfig, ConfigSchema, PRODUCTION_AVATAR_CHANGE_INTERVAL_MS } from "./schema";
 
-export { ConfigSchema, type ApiConfig };
+export { ConfigSchema, PRODUCTION_AVATAR_CHANGE_INTERVAL_MS, type ApiConfig };
 
 /**
  * API サーバーの環境変数を取得・整理し、Valibot で検証・整形した設定オブジェクトを生成します。
@@ -49,6 +49,8 @@ export function getConfig(env?: Record<string, unknown>): ApiConfig {
   const rawConfig = {
     port: rawPort,
     environment: rawEnvironment,
+    avatarChangeIntervalMs:
+      rawEnvironment === "production" ? PRODUCTION_AVATAR_CHANGE_INTERVAL_MS : 0,
     lineChannelAccessToken: rawLineChannelAccessToken,
     lineChannelSecret: rawLineChannelSecret,
     baseDomain: rawBaseDomain,

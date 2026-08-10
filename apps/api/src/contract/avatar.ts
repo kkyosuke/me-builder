@@ -68,6 +68,10 @@ export const AvatarConflictSchema = v.object({
   reason: v.literal("invalid_job_state"),
 });
 export const AvatarNotFoundSchema = v.object({ error: v.literal("Avatar not found") });
+export const AvatarChangeRateLimitedSchema = v.object({
+  error: v.literal("Avatar change rate limited"),
+  retryAt: TimestampSchema,
+});
 export const getAvatarRoute = describeRoute({
   operationId: "getAvatar",
   tags: ["Avatar"],
@@ -125,6 +129,7 @@ export const selectAvatarRoute = describeRoute({
     404: jsonResponse("候補がない", AvatarNotFoundSchema),
     400: jsonResponse("候補IDが不正", AvatarSelectionInvalidRequestSchema),
     409: jsonResponse("選択できない状態", AvatarConflictSchema),
+    429: jsonResponse("プロフィール変更間隔の制限中", AvatarChangeRateLimitedSchema),
   },
 } satisfies DescribeRouteOptions);
 
@@ -133,7 +138,11 @@ export const deleteAvatarRoute = describeRoute({
   tags: ["Avatar"],
   summary: "現在のアバターを削除する",
   security: [{ liffIdToken: [] }],
-  responses: { 204: { description: "削除した" }, ...authenticatedErrors },
+  responses: {
+    204: { description: "削除した、または現在値がなかった" },
+    ...authenticatedErrors,
+    429: jsonResponse("プロフィール変更間隔の制限中", AvatarChangeRateLimitedSchema),
+  },
 } satisfies DescribeRouteOptions);
 
 export const getAvatarImageRoute = describeRoute({

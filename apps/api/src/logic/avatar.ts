@@ -36,6 +36,7 @@ type BaseParams = {
   lineLoginChannelId: string | undefined;
   db: d1.Client;
   accountData: AccountDataNamespace;
+  avatarChangeIntervalMs: number;
 };
 
 type AvatarDependencies = {
@@ -197,6 +198,7 @@ export async function selectAvatar(
   | { type: "selected"; state: PublicAvatarState }
   | { type: "candidate-not-found" }
   | { type: "invalid-state" }
+  | { type: "rate-limited"; retryAt: string }
   | AvatarAuthFailure
 > {
   const session = await authenticate(params, dependencies);
@@ -204,23 +206,31 @@ export async function selectAvatar(
   const result = await accountDataFor(params.accountData, session.accountId).execute(
     "avatar.selectCandidate",
     params.candidateId,
+    params.avatarChangeIntervalMs,
     params.at,
   );
   if (result.type === "not-found") return { type: "candidate-not-found" };
   if (result.type === "invalid-state") return result;
+  if (result.type === "rate-limited") {
+    return { type: "rate-limited" as const, retryAt: result.retryAt.toISOString() };
+  }
   return { type: "selected", state: publicState(result.state) };
 }
 
 export async function deleteAvatar(
   params: BaseParams & { at?: Date },
   dependencies: AvatarDependencies = defaultDependencies,
-): Promise<{ type: "deleted" } | AvatarAuthFailure> {
+): Promise<{ type: "deleted" } | { type: "rate-limited"; retryAt: string } | AvatarAuthFailure> {
   const session = await authenticate(params, dependencies);
   if (session.type !== "resolved") return session;
-  await accountDataFor(params.accountData, session.accountId).execute(
+  const result = await accountDataFor(params.accountData, session.accountId).execute(
     "avatar.deleteCurrent",
+    params.avatarChangeIntervalMs,
     params.at,
   );
+  if (result.type === "rate-limited") {
+    return { type: "rate-limited", retryAt: result.retryAt.toISOString() };
+  }
   return { type: "deleted" };
 }
 

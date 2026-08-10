@@ -1,6 +1,7 @@
 import { getEnv, logger } from "@me-builder/shared";
 import * as v from "valibot";
 import {
+  DEFAULT_AVATAR_GENERATION_RATE_LIMIT,
   DEFAULT_CHAT_CONTEXT_MESSAGE_LIMIT,
   DEFAULT_CLOUDFLARE_AI_GATEWAY_BASE_URL,
   DEFAULT_GEMINI_IMAGE_MODEL,
@@ -10,6 +11,7 @@ import {
 } from "./schema";
 
 export {
+  DEFAULT_AVATAR_GENERATION_RATE_LIMIT,
   DEFAULT_CLOUDFLARE_AI_GATEWAY_BASE_URL,
   DEFAULT_CHAT_CONTEXT_MESSAGE_LIMIT,
   DEFAULT_GEMINI_MODEL,
@@ -22,11 +24,28 @@ export { type CloudflareBindings, getCloudflareBindings } from "./cloudflare";
  * 設定値の書き間違いでWorker全体が起動不能にならないよう、不正値は既定値へ落とす。
  * ここでNaNを通すとschema検証で例外になり、日記以外のqueue処理まで巻き込んで止まる。
  */
-function parsePositiveInteger(raw: string | undefined, fallback: number): number {
+function parsePositiveInteger(
+  raw: string | undefined,
+  fallback: number,
+  variableName: string,
+): number {
   if (!raw) return fallback;
   const parsed = Number(raw);
   if (!Number.isInteger(parsed) || parsed < 1) {
-    logger.warn({ fallback }, "Ignored an invalid CHAT_CONTEXT_MESSAGE_LIMIT and used the default");
+    logger.warn({ fallback, variableName }, "Ignored an invalid positive integer configuration");
+    return fallback;
+  }
+  return parsed;
+}
+
+function parseNonNegativeInteger(raw: string | undefined, fallback: number): number {
+  if (!raw) return fallback;
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    logger.warn(
+      { fallback, variableName: "AVATAR_GENERATION_RATE_LIMIT" },
+      "Ignored an invalid non-negative integer configuration",
+    );
     return fallback;
   }
   return parsed;
@@ -38,6 +57,8 @@ function parsePositiveInteger(raw: string | undefined, fallback: number): number
  */
 export function getWorkerConfig(env?: Record<string, unknown>): WorkerConfig {
   const rawEnvironment = getEnv(["ENVIRONMENT", "NODE_ENV"], env);
+  const defaultAvatarGenerationRateLimit =
+    rawEnvironment === "production" ? DEFAULT_AVATAR_GENERATION_RATE_LIMIT : 0;
   const rawBaseDomain = getEnv("BASE_DOMAIN", env);
   let rawBaseUrl = getEnv("BASE_URL", env);
   let rawApiUrl = getEnv("API_URL", env);
@@ -70,6 +91,7 @@ export function getWorkerConfig(env?: Record<string, unknown>): WorkerConfig {
   const rawGeminiModel = getEnv("GEMINI_MODEL", env)?.trim() || DEFAULT_GEMINI_MODEL;
   const rawGeminiImageModel =
     getEnv("GEMINI_IMAGE_MODEL", env)?.trim() || DEFAULT_GEMINI_IMAGE_MODEL;
+  const rawAvatarGenerationRateLimit = getEnv("AVATAR_GENERATION_RATE_LIMIT", env)?.trim();
   const rawChatEnabled = getEnv("CHAT_ENABLED", env)?.trim().toLowerCase() !== "false";
   const rawChatDeliverySecret = getEnv("CHAT_DELIVERY_SECRET", env)?.trim() || undefined;
   const rawChatContextMessageLimit = getEnv("CHAT_CONTEXT_MESSAGE_LIMIT", env)?.trim();
@@ -90,11 +112,16 @@ export function getWorkerConfig(env?: Record<string, unknown>): WorkerConfig {
     cloudflareAiGatewayBaseUrl: rawCloudflareAiGatewayBaseUrl,
     geminiModel: rawGeminiModel,
     geminiImageModel: rawGeminiImageModel,
+    avatarGenerationRateLimit: parseNonNegativeInteger(
+      rawAvatarGenerationRateLimit,
+      defaultAvatarGenerationRateLimit,
+    ),
     chatEnabled: rawChatEnabled,
     chatDeliverySecret: rawChatDeliverySecret,
     chatContextMessageLimit: parsePositiveInteger(
       rawChatContextMessageLimit,
       DEFAULT_CHAT_CONTEXT_MESSAGE_LIMIT,
+      "CHAT_CONTEXT_MESSAGE_LIMIT",
     ),
     adminLineUserIds,
   };

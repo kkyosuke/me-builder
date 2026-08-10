@@ -1,12 +1,15 @@
 import type { Queue, WebhookQueueMessage } from "@me-builder/shared";
 import * as v from "valibot";
 
+export const PRODUCTION_AVATAR_CHANGE_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
+
 export const ConfigSchema = v.object({
   port: v.pipe(
     v.optional(v.string(), "3000"),
     v.transform((val) => Number(val) || 3000),
   ),
   environment: v.optional(v.string(), "development"),
+  avatarChangeIntervalMs: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0)), 0),
   lineChannelAccessToken: v.optional(v.string()),
   lineChannelSecret: v.optional(v.string()),
   baseDomain: v.optional(v.string()),

@@ -5,6 +5,7 @@ export const DEFAULT_CLOUDFLARE_AI_GATEWAY_BASE_URL =
 export const DEFAULT_GEMINI_MODEL = "gemini-3.5-flash-lite";
 export const DEFAULT_GEMINI_IMAGE_MODEL = "gemini-2.5-flash-image";
 export const DEFAULT_CHAT_CONTEXT_MESSAGE_LIMIT = 20;
+export const DEFAULT_AVATAR_GENERATION_RATE_LIMIT = 3;
 
 export const WorkerConfigSchema = v.object({
   environment: v.optional(v.string(), "development"),
@@ -22,6 +23,10 @@ export const WorkerConfigSchema = v.object({
   ),
   geminiModel: v.optional(v.string(), DEFAULT_GEMINI_MODEL),
   geminiImageModel: v.optional(v.string(), DEFAULT_GEMINI_IMAGE_MODEL),
+  avatarGenerationRateLimit: v.optional(
+    v.pipe(v.number(), v.integer(), v.minValue(0)),
+    DEFAULT_AVATAR_GENERATION_RATE_LIMIT,
+  ),
   chatEnabled: v.optional(v.boolean(), true),
   chatDeliverySecret: v.optional(v.string()),
   chatContextMessageLimit: v.optional(

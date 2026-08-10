@@ -846,6 +846,20 @@ export interface operations {
           };
         };
       };
+      /** @description プロフィール変更間隔の制限中 */
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Avatar change rate limited";
+            /** Format: date-time */
+            retryAt: string;
+          };
+        };
+      };
       /** @description 未処理のサーバーエラー */
       500: {
         headers: {
@@ -881,7 +895,7 @@ export interface operations {
     };
     requestBody?: never;
     responses: {
-      /** @description 削除した */
+      /** @description 削除した、または現在値がなかった */
       204: {
         headers: {
           [name: string]: unknown;
@@ -911,6 +925,20 @@ export interface operations {
             error: "Account not found";
             /** @constant */
             reason: "friendship_required";
+          };
+        };
+      };
+      /** @description プロフィール変更間隔の制限中 */
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Avatar change rate limited";
+            /** Format: date-time */
+            retryAt: string;
           };
         };
       };

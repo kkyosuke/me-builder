@@ -1,6 +1,6 @@
 import * as v from "valibot";
 import { describe, expect, it } from "vitest";
-import { ConfigSchema, getConfig } from "./index";
+import { ConfigSchema, PRODUCTION_AVATAR_CHANGE_INTERVAL_MS, getConfig } from "./index";
 
 describe("getConfig & ConfigSchema", () => {
   it("Valibot スキーマでデフォルト値が正しく補完されること", () => {
@@ -30,6 +30,14 @@ describe("getConfig & ConfigSchema", () => {
   it("LINE_CHANNEL_SECRET が未設定の場合は undefined になること", () => {
     const parsed = v.parse(ConfigSchema, {});
     expect(parsed.lineChannelSecret).toBeUndefined();
+  });
+
+  it("本番だけアバター変更間隔を7日とし、previewとlocalは制限しないこと", () => {
+    expect(getConfig({ ENVIRONMENT: "production" }).avatarChangeIntervalMs).toBe(
+      PRODUCTION_AVATAR_CHANGE_INTERVAL_MS,
+    );
+    expect(getConfig({ ENVIRONMENT: "preview" }).avatarChangeIntervalMs).toBe(0);
+    expect(getConfig({ ENVIRONMENT: "local" }).avatarChangeIntervalMs).toBe(0);
   });
 
   it("BASE_DOMAIN から BASE_URL および LINE_WEBHOOK_URL が自動補完されること", () => {

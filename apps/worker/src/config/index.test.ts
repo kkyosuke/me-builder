@@ -1,6 +1,7 @@
 import * as v from "valibot";
 import { describe, expect, it } from "vitest";
 import {
+  DEFAULT_AVATAR_GENERATION_RATE_LIMIT,
   DEFAULT_CHAT_CONTEXT_MESSAGE_LIMIT,
   DEFAULT_CLOUDFLARE_AI_GATEWAY_BASE_URL,
   WorkerConfigSchema,
@@ -27,6 +28,7 @@ describe("Worker Config", () => {
     expect(config.lineChannelAccessToken).toBe("test-token-123");
     expect(config.cloudflareAiGatewayBaseUrl).toBe(DEFAULT_CLOUDFLARE_AI_GATEWAY_BASE_URL);
     expect(config.geminiModel).toBe("gemini-3.5-flash-lite");
+    expect(config.avatarGenerationRateLimit).toBe(0);
     expect(config.chatContextMessageLimit).toBe(DEFAULT_CHAT_CONTEXT_MESSAGE_LIMIT);
   });
 
@@ -54,12 +56,40 @@ describe("Worker Config", () => {
     expect(getWorkerConfig({ CHAT_CONTEXT_MESSAGE_LIMIT: "12" }).chatContextMessageLimit).toBe(12);
   });
 
+  it("アバター生成上限を環境変数から取得すること", () => {
+    expect(getWorkerConfig({ AVATAR_GENERATION_RATE_LIMIT: "10" }).avatarGenerationRateLimit).toBe(
+      10,
+    );
+    expect(getWorkerConfig({ AVATAR_GENERATION_RATE_LIMIT: "0" }).avatarGenerationRateLimit).toBe(
+      0,
+    );
+  });
+
+  it("アバター生成上限は本番だけ既定で3回、previewとlocalは無制限にすること", () => {
+    expect(getWorkerConfig({ ENVIRONMENT: "production" }).avatarGenerationRateLimit).toBe(
+      DEFAULT_AVATAR_GENERATION_RATE_LIMIT,
+    );
+    expect(getWorkerConfig({ ENVIRONMENT: "preview" }).avatarGenerationRateLimit).toBe(0);
+    expect(getWorkerConfig({ ENVIRONMENT: "local" }).avatarGenerationRateLimit).toBe(0);
+  });
+
   it("Context message件数が不正なら既定値へ落とし、Worker全体を止めないこと", () => {
     // ここでthrowすると日記以外のqueue処理まで巻き添えで停止してしまう。
     for (const invalid of ["0", "-1", "1.5", "invalid"]) {
       expect(getWorkerConfig({ CHAT_CONTEXT_MESSAGE_LIMIT: invalid }).chatContextMessageLimit).toBe(
         DEFAULT_CHAT_CONTEXT_MESSAGE_LIMIT,
       );
+    }
+  });
+
+  it("アバター生成上限が不正なら本番と同じ既定値へ落とすこと", () => {
+    for (const invalid of ["-1", "1.5", "invalid"]) {
+      expect(
+        getWorkerConfig({
+          ENVIRONMENT: "production",
+          AVATAR_GENERATION_RATE_LIMIT: invalid,
+        }).avatarGenerationRateLimit,
+      ).toBe(DEFAULT_AVATAR_GENERATION_RATE_LIMIT);
     }
   });
 });

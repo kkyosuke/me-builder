@@ -66,14 +66,15 @@ describe("AccountDataRepository", () => {
     }
   });
 
-  it("新規生成をAccountごとに24時間3件までに制限し、同じジョブの再試行は数えない", async () => {
+  it("新規生成をAccountごとに設定された24時間上限までに制限する", async () => {
     const repository = createRepository();
     await repository.initialize();
     repository.bindAccount("account-1");
     const accountId = "account-1";
     const base = new Date("2026-08-09T00:00:00.000Z");
+    const rateLimit = 2;
 
-    for (let index = 0; index < 4; index += 1) {
+    for (let index = 0; index <= rateLimit; index += 1) {
       const at = new Date(base.getTime() + index * 60_000);
       const jobId = `rate-job-${index}`;
       await avatarActions["avatar.createJob"](repository.client, accountId, {
@@ -94,9 +95,10 @@ describe("AccountDataRepository", () => {
         repository.client,
         accountId,
         jobId,
+        rateLimit,
         at,
       );
-      if (index < 3) {
+      if (index < rateLimit) {
         expect(started).toMatchObject({ type: "accepted" });
         await avatarActions["avatar.failJob"](
           repository.client,
@@ -111,6 +113,44 @@ describe("AccountDataRepository", () => {
           retryAt: new Date("2026-08-10T00:00:00.000Z"),
         });
       }
+    }
+  });
+
+  it("生成上限が0ならAccount単位の回数を制限しない", async () => {
+    const repository = createRepository();
+    await repository.initialize();
+    repository.bindAccount("account-1");
+    const accountId = "account-1";
+    const base = new Date("2026-08-09T00:00:00.000Z");
+
+    for (let index = 0; index < 4; index += 1) {
+      const at = new Date(base.getTime() + index * 60_000);
+      const jobId = `unlimited-job-${index}`;
+      await avatarActions["avatar.createJob"](repository.client, accountId, {
+        id: jobId,
+        referenceObjectKey: `unlimited-reference-${index}.webp`,
+        referenceContentType: "image/webp",
+        createdAt: at,
+        expiresAt: new Date(at.getTime() + 24 * 60 * 60 * 1000),
+      });
+      await avatarActions["avatar.finishPersonCheck"](
+        repository.client,
+        accountId,
+        jobId,
+        true,
+        at,
+      );
+
+      await expect(
+        avatarActions["avatar.startGeneration"](repository.client, accountId, jobId, 0, at),
+      ).resolves.toMatchObject({ type: "accepted" });
+      await avatarActions["avatar.failJob"](
+        repository.client,
+        accountId,
+        jobId,
+        "test_completed",
+        at,
+      );
     }
   });
 
@@ -165,6 +205,7 @@ describe("AccountDataRepository", () => {
       repository.client,
       accountId,
       jobId,
+      3,
       new Date("2026-08-09T00:00:04.000Z"),
     );
     expect(accepted).toMatchObject({
@@ -207,6 +248,7 @@ describe("AccountDataRepository", () => {
       repository.client,
       accountId,
       candidate.id,
+      0,
       new Date("2026-08-09T00:00:08.000Z"),
     );
     expect(selected).toMatchObject({
@@ -216,6 +258,26 @@ describe("AccountDataRepository", () => {
         latestJob: { status: "selected" },
       },
     });
+    const changeIntervalMs = 7 * 24 * 60 * 60 * 1000;
+    await expect(
+      avatarActions["avatar.deleteCurrent"](
+        repository.client,
+        accountId,
+        changeIntervalMs,
+        new Date("2026-08-10T00:00:08.000Z"),
+      ),
+    ).resolves.toEqual({
+      type: "rate-limited",
+      retryAt: new Date("2026-08-16T00:00:08.000Z"),
+    });
+    await expect(
+      avatarActions["avatar.deleteCurrent"](
+        repository.client,
+        accountId,
+        changeIntervalMs,
+        new Date("2026-08-16T00:00:08.000Z"),
+      ),
+    ).resolves.toMatchObject({ type: "deleted", previousObjectKey: candidate.objectKey });
     await expect(
       listPendingAvatarObjectDeletions(repository.client, new Date("2026-08-17T00:00:00.000Z")),
     ).resolves.toEqual(

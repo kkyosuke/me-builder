@@ -18,6 +18,7 @@ export type Env = Omit<
   | "ACCOUNT_DATA"
   | "COMPATIBILITY_DATA"
   | "ENVIRONMENT"
+  | "AVATAR_GENERATION_RATE_LIMIT"
 > & {
   ENVIRONMENT?: string;
   BASE_DOMAIN?: string;
@@ -29,6 +30,7 @@ export type Env = Omit<
   CF_AI_GATEWAY_BASE_URL?: string;
   GEMINI_MODEL?: string;
   GEMINI_IMAGE_MODEL?: string;
+  AVATAR_GENERATION_RATE_LIMIT?: string;
   CHAT_ENABLED?: string;
   CHAT_DELIVERY_SECRET?: string;
   CHAT_CONTEXT_MESSAGE_LIMIT?: string;

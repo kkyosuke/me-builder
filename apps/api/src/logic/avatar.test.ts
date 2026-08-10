@@ -28,6 +28,7 @@ const dependencies = {
 const baseParams = {
   idToken: "token",
   lineLoginChannelId: "channel",
+  avatarChangeIntervalMs: 0,
   db: {} as d1.Client,
 };
 
@@ -86,11 +87,33 @@ describe("avatar logic", () => {
   it("現在値の削除はR2 bindingなしでdurable outboxへ委譲できる", async () => {
     const execute = vi.fn(async (operation: AccountDataOperation) => {
       if (operation !== "avatar.deleteCurrent") throw new Error("Unexpected operation");
-      return { previousObjectKey: "previous.webp" };
+      return { type: "deleted", previousObjectKey: "previous.webp" };
     });
 
     await expect(
       deleteAvatar({ ...baseParams, accountData: accountData(execute) }, dependencies),
     ).resolves.toEqual({ type: "deleted" });
+  });
+
+  it.each([
+    ["avatar.selectCandidate", "candidate-1"],
+    ["avatar.deleteCurrent", undefined],
+  ] as const)("%sの変更間隔制限を次回変更可能日時へ変換する", async (operation, candidateId) => {
+    const retryAt = new Date("2026-08-16T00:00:00.000Z");
+    const execute = vi.fn(async (actualOperation: AccountDataOperation) => {
+      if (actualOperation !== operation) throw new Error("Unexpected operation");
+      return { type: "rate-limited", retryAt };
+    });
+    const params = {
+      ...baseParams,
+      avatarChangeIntervalMs: 7 * 24 * 60 * 60 * 1000,
+      accountData: accountData(execute),
+    };
+
+    const result = candidateId
+      ? await selectAvatar({ ...params, candidateId }, dependencies)
+      : await deleteAvatar(params, dependencies);
+
+    expect(result).toEqual({ type: "rate-limited", retryAt: retryAt.toISOString() });
   });
 });

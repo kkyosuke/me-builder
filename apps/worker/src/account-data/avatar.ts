@@ -6,6 +6,7 @@ import type {
   AvatarState,
   CreateAvatarJobInput,
   CreateAvatarJobResult,
+  DeleteCurrentAvatarResult,
   PendingAvatarEnqueue,
   ResolveAvatarImageResult,
   SelectAvatarCandidateResult,
@@ -38,7 +39,6 @@ const PROCESSING_STATUSES: (typeof avatarJobs.$inferSelect.status)[] = [
 const CANDIDATE_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 const REFERENCE_RETENTION_AFTER_GENERATION_MS = 24 * 60 * 60 * 1000;
 const GENERATION_RATE_WINDOW_MS = 24 * 60 * 60 * 1000;
-const GENERATION_RATE_LIMIT = 3;
 const ENQUEUE_RETRY_BASE_MS = 5_000;
 const ENQUEUE_RETRY_MAX_MS = 5 * 60 * 1000;
 
@@ -262,6 +262,7 @@ async function startAvatarGeneration(
   db: d1.Client,
   _accountId: string,
   jobId: string,
+  rateLimit: number,
   at = new Date(),
 ): Promise<StartAvatarGenerationResult> {
   const client = database(db);
@@ -289,14 +290,14 @@ async function startAvatarGeneration(
     .limit(1)
     .get();
   if (otherActiveJob) return { type: "invalid-state", job: existing };
-  if (!retryableGenerationFailure) {
+  if (!retryableGenerationFailure && rateLimit > 0) {
     const windowStart = new Date(requestedAt.getTime() - GENERATION_RATE_WINDOW_MS);
     const usage = await client
       .select({ value: count() })
       .from(avatarGenerationEvents)
       .where(gte(avatarGenerationEvents.startedAt, windowStart))
       .get();
-    if ((usage?.value ?? 0) >= GENERATION_RATE_LIMIT) {
+    if ((usage?.value ?? 0) >= rateLimit) {
       const oldest = await client
         .select({ startedAt: avatarGenerationEvents.startedAt })
         .from(avatarGenerationEvents)
@@ -340,6 +341,7 @@ async function selectAvatarCandidate(
   db: d1.Client,
   _accountId: string,
   candidateId: string,
+  minimumChangeIntervalMs: number,
   at = new Date(),
 ): Promise<SelectAvatarCandidateResult> {
   const client = database(db);
@@ -362,6 +364,10 @@ async function selectAvatarCandidate(
     .from(avatarProfile)
     .where(eq(avatarProfile.singleton, 1))
     .get();
+  if (profile && minimumChangeIntervalMs > 0) {
+    const retryAt = new Date(profile.updatedAt.getTime() + minimumChangeIntervalMs);
+    if (retryAt > at) return { type: "rate-limited", retryAt };
+  }
   const previous = profile?.currentCandidateId
     ? await client
         .select({ objectKey: avatarCandidates.objectKey })
@@ -401,14 +407,20 @@ async function selectAvatarCandidate(
 async function deleteCurrentAvatar(
   db: d1.Client,
   _accountId: string,
+  minimumChangeIntervalMs: number,
   at = new Date(),
-): Promise<{ previousObjectKey: string | null }> {
+): Promise<DeleteCurrentAvatarResult> {
   const client = database(db);
   const profile = await client
     .select()
     .from(avatarProfile)
     .where(eq(avatarProfile.singleton, 1))
     .get();
+  if (!profile?.currentCandidateId) return { type: "unchanged" };
+  if (minimumChangeIntervalMs > 0) {
+    const retryAt = new Date(profile.updatedAt.getTime() + minimumChangeIntervalMs);
+    if (retryAt > at) return { type: "rate-limited", retryAt };
+  }
   const previous = profile?.currentCandidateId
     ? await client
         .select({ objectKey: avatarCandidates.objectKey })
@@ -426,7 +438,8 @@ async function deleteCurrentAvatar(
       target: avatarProfile.singleton,
       set: { currentCandidateId: null, updatedAt: at },
     });
-  return { previousObjectKey: previous?.objectKey ?? null };
+  if (!previous?.objectKey) return { type: "unchanged" };
+  return { type: "deleted", previousObjectKey: previous.objectKey };
 }
 
 async function resolveAvatarImage(

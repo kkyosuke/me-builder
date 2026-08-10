@@ -1139,6 +1139,26 @@
               }
             }
           },
+          "429": {
+            "description": "プロフィール変更間隔の制限中",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Avatar change rate limited"
+                    },
+                    "retryAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": ["error", "retryAt"]
+                }
+              }
+            }
+          },
           "500": {
             "description": "未処理のサーバーエラー",
             "content": {
@@ -1184,7 +1204,7 @@
         ],
         "responses": {
           "204": {
-            "description": "削除した"
+            "description": "削除した、または現在値がなかった"
           },
           "401": {
             "description": "LIFF IDトークンを検証できない",
@@ -1217,6 +1237,26 @@
                     }
                   },
                   "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "プロフィール変更間隔の制限中",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Avatar change rate limited"
+                    },
+                    "retryAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": ["error", "retryAt"]
                 }
               }
             }

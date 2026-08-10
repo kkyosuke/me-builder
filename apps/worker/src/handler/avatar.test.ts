@@ -57,6 +57,7 @@ const config = {
   cloudflareAiGatewayBaseUrl: "https://gateway.example.com/google-ai-studio",
   geminiModel: "gemini-person-model",
   geminiImageModel: "gemini-image-model",
+  avatarGenerationRateLimit: 0,
 } as WorkerConfig;
 
 describe("avatar queue handler", () => {
@@ -113,7 +114,7 @@ describe("avatar queue handler", () => {
 
     await processAvatarMessage(queueMessage, cf, config);
 
-    expect(execute).toHaveBeenCalledWith("avatar.startGeneration", "job-1");
+    expect(execute).toHaveBeenCalledWith("avatar.startGeneration", "job-1", 0);
     expect(avatarQueue.send).toHaveBeenCalledWith({
       type: "avatar",
       operation: "generate",

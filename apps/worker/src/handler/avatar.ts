@@ -116,7 +116,11 @@ export async function processAvatarMessage(
         return;
       }
 
-      const started = await object.execute("avatar.startGeneration", message.body.jobId);
+      const started = await object.execute(
+        "avatar.startGeneration",
+        message.body.jobId,
+        config.avatarGenerationRateLimit,
+      );
       if (started.type === "rate-limited") {
         await object.execute("avatar.failJob", message.body.jobId, "generation_rate_limited");
         message.ack();

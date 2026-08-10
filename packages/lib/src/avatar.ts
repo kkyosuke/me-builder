@@ -69,7 +69,13 @@ export type StartAvatarGenerationResult =
 export type SelectAvatarCandidateResult =
   | { type: "selected"; state: AvatarState; previousObjectKey: string | null }
   | { type: "not-found" }
-  | { type: "invalid-state" };
+  | { type: "invalid-state" }
+  | { type: "rate-limited"; retryAt: Date };
+
+export type DeleteCurrentAvatarResult =
+  | { type: "deleted"; previousObjectKey: string }
+  | { type: "unchanged" }
+  | { type: "rate-limited"; retryAt: Date };
 
 export type ResolveAvatarImageResult =
   | { type: "resolved"; objectKey: string; contentType: string }

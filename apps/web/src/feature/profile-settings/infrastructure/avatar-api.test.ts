@@ -160,4 +160,26 @@ describe("avatar-api", () => {
       message: "アバター機能は現在利用できません。時間をおいてお試しください。",
     });
   });
+
+  it("プロフィール変更間隔の制限を次回変更日時つきで案内する", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            error: "Avatar change rate limited",
+            retryAt: "2026-08-16T00:00:00.000Z",
+          }),
+          { status: 429, headers: { "Content-Type": "application/json" } },
+        ),
+      ),
+    );
+
+    await expect(selectAvatar("https://api.example.com", "id-token", candidateId)).rejects.toEqual(
+      expect.objectContaining({
+        status: 429,
+        message: expect.stringMatching(/アバターは7日間に1回変更できます。次回は.+以降/),
+      }),
+    );
+  });
 });

@@ -6,6 +6,7 @@ import type {
   AvatarState,
   CreateAvatarJobInput,
   CreateAvatarJobResult,
+  DeleteCurrentAvatarResult,
   PendingAvatarEnqueue,
   ResolveAvatarImageResult,
   SelectAvatarCandidateResult,
@@ -87,12 +88,20 @@ export type AccountDataActions = {
     operation: AvatarQueueOperation,
     at?: Date,
   ) => Promise<void>;
-  "avatar.startGeneration": (jobId: string, at?: Date) => Promise<StartAvatarGenerationResult>;
+  "avatar.startGeneration": (
+    jobId: string,
+    rateLimit: number,
+    at?: Date,
+  ) => Promise<StartAvatarGenerationResult>;
   "avatar.selectCandidate": (
     candidateId: string,
+    minimumChangeIntervalMs: number,
     at?: Date,
   ) => Promise<SelectAvatarCandidateResult>;
-  "avatar.deleteCurrent": (at?: Date) => Promise<{ previousObjectKey: string | null }>;
+  "avatar.deleteCurrent": (
+    minimumChangeIntervalMs: number,
+    at?: Date,
+  ) => Promise<DeleteCurrentAvatarResult>;
   "avatar.resolveImage": (imageId: string, at?: Date) => Promise<ResolveAvatarImageResult>;
   "avatar.acquireTask": (
     jobId: string,

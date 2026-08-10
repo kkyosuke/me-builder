@@ -4,6 +4,7 @@ import type { Context } from "hono";
 import * as v from "valibot";
 import { getConfig } from "../config";
 import {
+  AvatarChangeRateLimitedSchema,
   AvatarConflictSchema,
   AvatarInvalidRequestSchema,
   AvatarNotFoundSchema,
@@ -58,12 +59,26 @@ function authResponse(c: Context<AppEnv>, outcome: { type: string }): Response |
 }
 
 function commonParams(c: Context<AppEnv>) {
+  const config = getConfig(c.env);
   return {
     idToken: bearerToken(c.req.header("authorization")),
-    lineLoginChannelId: getConfig(c.env).lineLoginChannelId,
+    lineLoginChannelId: config.lineLoginChannelId,
+    avatarChangeIntervalMs: config.avatarChangeIntervalMs,
     db: d1.client.create(c.env.DB as NonNullable<typeof c.env.DB>),
     accountData: c.env.ACCOUNT_DATA as NonNullable<typeof c.env.ACCOUNT_DATA>,
   };
+}
+
+function changeRateLimited(c: Context<AppEnv>, retryAt: string): Response {
+  const retrySeconds = Math.max(1, Math.ceil((new Date(retryAt).getTime() - Date.now()) / 1000));
+  c.header("Retry-After", String(retrySeconds));
+  return c.json(
+    v.parse(AvatarChangeRateLimitedSchema, {
+      error: "Avatar change rate limited",
+      retryAt,
+    }),
+    429,
+  );
 }
 
 function setPollingHeader(
@@ -179,6 +194,7 @@ export async function putAvatar(c: Context<AppEnv>): Promise<Response> {
       409,
     );
   }
+  if (outcome.type === "rate-limited") return changeRateLimited(c, outcome.retryAt);
   if (outcome.type !== "selected") throw new Error("Unexpected avatar selection outcome");
   return c.json(v.parse(AvatarStateResponseSchema, outcome.state));
 }
@@ -188,6 +204,7 @@ export async function deleteAvatarContents(c: Context<AppEnv>): Promise<Response
   const outcome = await deleteAvatar(commonParams(c));
   const auth = authResponse(c, outcome);
   if (auth) return auth;
+  if (outcome.type === "rate-limited") return changeRateLimited(c, outcome.retryAt);
   return c.body(null, 204);
 }
 

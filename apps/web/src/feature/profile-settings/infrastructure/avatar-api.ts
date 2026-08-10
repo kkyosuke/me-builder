@@ -73,6 +73,24 @@ async function errorMessage(response: Response, fallback: string): Promise<strin
   }
   if (response.status === 409) return "処理状態が更新されました。画面を読み直してください。";
   if (response.status === 429) {
+    const body = await response
+      .clone()
+      .json()
+      .catch(() => null);
+    if (
+      body &&
+      typeof body === "object" &&
+      "error" in body &&
+      body.error === "Avatar change rate limited" &&
+      "retryAt" in body &&
+      typeof body.retryAt === "string"
+    ) {
+      const retryAt = new Date(body.retryAt);
+      const formatted = Number.isNaN(retryAt.getTime())
+        ? body.retryAt
+        : retryAt.toLocaleString("ja-JP", { dateStyle: "long", timeStyle: "short" });
+      return `アバターは7日間に1回変更できます。次回は${formatted}以降に変更できます。`;
+    }
     return "短時間の生成上限に達しました。しばらく待ってからもう一度お試しください。";
   }
   if (response.status === 503)
