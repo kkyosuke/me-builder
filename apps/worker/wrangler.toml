@@ -57,19 +57,6 @@ new_sqlite_classes = ["AccountData"]
 tag = "v3"
 new_sqlite_classes = ["CompatibilityData"]
 
-# AccountDataのschemaを単一baselineへ作り直したため、既存Objectを破棄して再作成する。
-#
-# 破棄されるのは全AccountのSource Record、Brain Item、日記、診断回答そのもので、
-# 復元手段はない。共有D1に残るのはAccount Identityと公開定義だけ。
-# 実データを持つ環境へ適用する前に、失われる範囲を必ず確認する。
-[[migrations]]
-tag = "v4"
-deleted_classes = ["AccountData"]
-
-[[migrations]]
-tag = "v5"
-new_sqlite_classes = ["AccountData"]
-
 [[rules]]
 type = "Text"
 globs = ["**/*.sql"]
