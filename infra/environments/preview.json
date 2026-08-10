@@ -1,32 +1,32 @@
 {
   "environment": "preview",
   "database": {
-    "id": "68d8ef16-c42c-4d56-819f-fa02b3b73b47",
+    "id": "974b9ea6-f739-4de3-b4db-70f17ef198a0",
     "name": "me-builder-db-preview"
   },
   "queues": {
     "webhook": {
-      "id": "2b25a021c44c4130b8623ccc7d4e94ff",
+      "id": "415c1a68ac7e4960a8a3acb53506776c",
       "name": "me-builder-webhook-queue-preview"
     },
     "webhookDeadLetter": {
-      "id": "540777a62f83493ea25c1145477422a2",
+      "id": "2ae4919a61134fc1bb477ff6be52c6a0",
       "name": "me-builder-webhook-dlq-preview"
     },
     "chatTurn": {
-      "id": "c1ac8fe440524079b7185574ef8a19c9",
+      "id": "78cfa77a856343b380742fc014c932c3",
       "name": "me-builder-chat-turn-queue-preview"
     },
     "chatTurnDeadLetter": {
-      "id": "a0d9e3f8d0754de7991f401045186474",
+      "id": "279eea242ced4de0bfcbca00d3b484ce",
       "name": "me-builder-chat-turn-dlq-preview"
     },
     "brainCheckpoint": {
-      "id": "3b75f18e5d0648acade26e5af2805749",
+      "id": "91099e92530d46ff8beb23f429cd3e4b",
       "name": "me-builder-brain-checkpoint-queue-preview"
     },
     "brainCheckpointDeadLetter": {
-      "id": "c56c5bd351214d249a59dd6a221756cf",
+      "id": "7327e2ed82054db0b3b11dc292e8dc16",
       "name": "me-builder-brain-checkpoint-dlq-preview"
     }
   }
