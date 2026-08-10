@@ -7,6 +7,13 @@ import { DevelopmentBrainItems } from "./development-brain-items";
 describe("DevelopmentBrainItems", () => {
   afterEach(cleanup);
 
+  it("一覧の取得中はItemのSkeletonを表示する", () => {
+    render(<DevelopmentBrainItems state={{ status: "loading" }} onRetry={vi.fn()} />);
+
+    expect(screen.getByRole("status", { name: "Brain Item一覧を読み込み中" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Brain Item一覧" })).toBeTruthy();
+  });
+
   it("active ItemとEvidenceを表示する", () => {
     render(
       <DevelopmentBrainItems

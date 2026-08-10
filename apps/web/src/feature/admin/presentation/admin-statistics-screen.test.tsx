@@ -7,6 +7,12 @@ import { AdminStatisticsScreen } from "./admin-statistics-screen";
 describe("AdminStatisticsScreen", () => {
   afterEach(cleanup);
 
+  it("統計情報の取得中は画面構造に沿ったSkeletonを表示する", () => {
+    render(<AdminStatisticsScreen state={{ status: "loading" }} onReload={vi.fn()} />);
+
+    expect(screen.getByRole("status", { name: "統計情報を読み込み中" })).toBeTruthy();
+  });
+
   it("LINE返信数が前日までの集計であることを表示する", () => {
     render(
       <AdminStatisticsScreen
