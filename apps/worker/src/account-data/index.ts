@@ -186,6 +186,10 @@ export class AccountData extends DurableObject<Env> {
    * 公開定義snapshotを、共有D1が公開している版と一致しないときだけ読み直す。
    *
    * 版が同じならRPCあたり1行のqueryで済み、定義が増えても操作コストが増えない。
+   *
+   * 共有D1が版を公開していない間はsnapshotを最新と見なさず、毎回読み直す。
+   * 版なしを0として同期済みに固定すると、seed適用前に作られたObjectが空の
+   * snapshotを持ち続け、以後のRPCが短絡して診断を返せなくなる。
    */
   private async syncDiagnosisCatalog(): Promise<void> {
     const shared = D1.shared.client.create(this.env.DB);
@@ -194,8 +198,8 @@ export class AccountData extends DurableObject<Env> {
       .from(D1.shared.schema.catalogVersions)
       .where(eq(D1.shared.schema.catalogVersions.catalogId, DIAGNOSIS_CATALOG_ID))
       .get();
+    if (published && this.repository.isDiagnosisCatalogCurrent(published.version)) return;
     const version = published?.version ?? 0;
-    if (this.repository.isDiagnosisCatalogCurrent(version)) return;
 
     const [
       questions,
