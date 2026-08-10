@@ -121,4 +121,25 @@ describe("AccountData Workers runtime E2E", () => {
       ).toBe("散歩した");
     });
   });
+
+  it("idFromString経由でもnamespace IDを維持してstorageを削除できる", async () => {
+    const accountId = crypto.randomUUID();
+    const now = Date.now();
+    await env.DB.prepare("INSERT INTO accounts (id, created_at, updated_at) VALUES (?, ?, ?)")
+      .bind(accountId, now, now)
+      .run();
+
+    const namedStub = env.ACCOUNT_DATA.getByName(accountId);
+    await namedStub.execute(accountId, "conversation.storeLineTextSource", {
+      eventId: crypto.randomUUID(),
+      body: "reset target",
+      receivedAt: new Date(),
+    });
+
+    const rawId = env.ACCOUNT_DATA.idFromName(accountId).toString();
+    const rawStub = env.ACCOUNT_DATA.get(env.ACCOUNT_DATA.idFromString(rawId));
+    await rawStub.resetStorage("runtime-reset-token");
+
+    expect(env.ACCOUNT_DATA.idFromName(accountId).toString()).toBe(rawId);
+  });
 });

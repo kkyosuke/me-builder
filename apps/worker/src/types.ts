@@ -21,6 +21,7 @@ export type Env = Omit<
   GEMINI_MODEL?: string;
   CHAT_ENABLED?: string;
   CHAT_DELIVERY_SECRET?: string;
+  PREVIEW_RESET_TOKEN?: string;
   CHAT_CONTEXT_MESSAGE_LIMIT?: string;
   LIFF_ID?: string;
   CHAT_TURN_QUEUE?: Queue<ChatTurnQueueMessage>;

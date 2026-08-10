@@ -12,8 +12,10 @@ export default defineConfig({
       wrangler: { configPath: "./wrangler.toml" },
       miniflare: {
         bindings: {
+          ENVIRONMENT: "preview",
           LINE_CHANNEL_ACCESS_TOKEN: "runtime-test-token",
           CHAT_DELIVERY_SECRET: "runtime-test-delivery-secret",
+          PREVIEW_RESET_TOKEN: "runtime-reset-token",
           TEST_D1_MIGRATIONS: sharedD1Migrations,
         },
       },

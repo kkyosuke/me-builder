@@ -30,6 +30,7 @@ jobs:
       CHAT_DELIVERY_SECRET: ${{ secrets.CHAT_DELIVERY_SECRET }}
       ADMIN_LINE_USER_IDS: ${{ secrets.ADMIN_LINE_USER_IDS }}
       LIFF_ID: ${{ vars.LIFF_ID }}
+      BASE_DOMAIN: ${{ vars.BASE_DOMAIN }}
 
     steps:
       - uses: actions/checkout@v4
@@ -74,49 +75,63 @@ jobs:
             echo "::error::CHAT_DELIVERY_SECRET が GitHub Environment dev に設定されていません。"
             exit 1
           fi
+          if [ -z "${BASE_DOMAIN}" ]; then
+            echo "::error::BASE_DOMAIN が GitHub Environment dev に設定されていません。"
+            exit 1
+          fi
 
-      # API Worker は Worker 所有の DO namespace を外部 binding しているため先に削除する。
-      # GET の 404 は再実行時の正常系として扱い、それ以外の API エラーは削除前に停止する。
-      - name: Delete Preview API Worker
+      # reset中のQueue処理によるDOへの書き戻しを止める。最後のalways stepで必ず再開する。
+      - name: Pause Preview Queue Delivery
+        id: pause_queues
         run: |
-          response_file="${RUNNER_TEMP}/api-worker-response.json"
-          status="$({ curl --silent --show-error --output "${response_file}" --write-out '%{http_code}' \
-            --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
-            "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/scripts/me-builder-api-preview"; } || true)"
-          case "${status}" in
-            200)
-              bun --cwd apps/api wrangler delete --env preview
-              ;;
-            404)
-              echo "Preview API Worker is already absent."
-              ;;
-            *)
-              echo "::error::Preview API Worker の確認に失敗しました (HTTP ${status})。"
-              jq -r '.errors[]?.message // empty' "${response_file}"
-              exit 1
-              ;;
-          esac
+          echo "resume_required=true" >> "${GITHUB_OUTPUT}"
+          status=0
+          for queue in \
+            me-builder-webhook-queue-preview \
+            me-builder-chat-turn-queue-preview \
+            me-builder-brain-checkpoint-queue-preview
+          do
+            bun --cwd apps/worker wrangler queues pause-delivery "${queue}" || status=$?
+          done
+          exit "${status}"
 
-      # Worker の削除により、所有する全 SQLite-backed DO namespace と migration 履歴を破棄する。
-      - name: Delete Preview Worker and Durable Objects
+      # workflow実行中だけ有効なtokenをWorker/APIへ配布し、全DO instanceのdeleteAll RPCを公開する。
+      - name: Deploy Preview Durable Object Reset Bridge
+        id: reset_bridge
         run: |
-          response_file="${RUNNER_TEMP}/worker-response.json"
-          status="$({ curl --silent --show-error --output "${response_file}" --write-out '%{http_code}' \
-            --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
-            "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/scripts/me-builder-worker-preview"; } || true)"
-          case "${status}" in
-            200)
-              bun --cwd apps/worker wrangler delete --env preview
-              ;;
-            404)
-              echo "Preview Worker is already absent."
-              ;;
-            *)
-              echo "::error::Preview Worker の確認に失敗しました (HTTP ${status})。"
-              jq -r '.errors[]?.message // empty' "${response_file}"
-              exit 1
-              ;;
-          esac
+          reset_token="$(openssl rand -hex 32)"
+          echo "::add-mask::${reset_token}"
+          echo "PREVIEW_RESET_TOKEN=${reset_token}" >> "${GITHUB_ENV}"
+          echo "cleanup_required=true" >> "${GITHUB_OUTPUT}"
+
+          umask 077
+          secrets_dir="$(mktemp -d "${RUNNER_TEMP}/reset-bridge-secrets.XXXXXX")"
+          api_secrets_file="${secrets_dir}/api.json"
+          worker_secrets_file="${secrets_dir}/worker.json"
+          trap 'rm -f "${api_secrets_file}" "${worker_secrets_file}"; rmdir "${secrets_dir}"' EXIT
+
+          PREVIEW_RESET_TOKEN="${reset_token}" API_SECRETS_FILE="${api_secrets_file}" WORKER_SECRETS_FILE="${worker_secrets_file}" bun -e '
+            const sharedSecrets = [["LINE_CHANNEL_ACCESS_TOKEN", process.env.LINE_CHANNEL_ACCESS_TOKEN], ["LIFF_ID", process.env.LIFF_ID], ["ADMIN_LINE_USER_IDS", process.env.ADMIN_LINE_USER_IDS]];
+            const optionalSecrets = Object.fromEntries(sharedSecrets.filter(([, value]) => value));
+            await Bun.write(process.env.API_SECRETS_FILE, JSON.stringify({
+              LINE_CHANNEL_SECRET: process.env.LINE_CHANNEL_SECRET,
+              PREVIEW_RESET_TOKEN: process.env.PREVIEW_RESET_TOKEN,
+              ...optionalSecrets,
+            }));
+            await Bun.write(process.env.WORKER_SECRETS_FILE, JSON.stringify({
+              ...optionalSecrets,
+              GOOGLE_VERTEX_AI_API_KEY: process.env.GOOGLE_VERTEX_AI_API_KEY,
+              CHAT_DELIVERY_SECRET: process.env.CHAT_DELIVERY_SECRET,
+              PREVIEW_RESET_TOKEN: process.env.PREVIEW_RESET_TOKEN,
+            }));
+          '
+
+          bun --cwd apps/worker wrangler deploy --env preview --secrets-file "${worker_secrets_file}"
+          bun --cwd apps/api wrangler deploy --env preview --secrets-file "${api_secrets_file}"
+
+      # namespace IDを維持し、Cloudflare APIで列挙した全DO instanceのstorageとalarmを削除する。
+      - name: Reset Preview Durable Object Storage
+        run: bun scripts/reset-preview-durable-objects.ts
 
       # Database resourceとIDは維持し、Cloudflare予約table以外を削除する。
       # d1_migrationsも削除対象になるため、次のstepで現在branchの全migrationが再適用される。
@@ -132,6 +147,7 @@ jobs:
         run: task queues:setup:preview
 
       - name: Redeploy Preview Worker, API, and MCP
+        if: ${{ always() && steps.reset_bridge.outputs.cleanup_required == 'true' }}
         run: |
           umask 077
           secrets_dir="$(mktemp -d "${RUNNER_TEMP}/reset-secrets.XXXXXX")"
@@ -159,6 +175,19 @@ jobs:
           bun --cwd apps/api wrangler deploy --env preview --secrets-file "${api_secrets_file}"
           bun --filter @me-builder/mcp deploy:preview
 
+      - name: Resume Preview Queue Delivery
+        if: ${{ always() && steps.pause_queues.outputs.resume_required == 'true' }}
+        run: |
+          status=0
+          for queue in \
+            me-builder-webhook-queue-preview \
+            me-builder-chat-turn-queue-preview \
+            me-builder-brain-checkpoint-queue-preview
+          do
+            bun --cwd apps/worker wrangler queues resume-delivery "${queue}" || status=$?
+          done
+          exit "${status}"
+
       - name: Verify Restored Preview Connections
         run: bun run --cwd apps/worker check:gemini "Reply with OK."
 
@@ -174,6 +203,6 @@ jobs:
             echo
             echo "- D1 database resourceとIDを維持したまま、全ユーザーテーブルとmigration履歴を削除しました。"
             echo "- 現在のブランチのD1 migrationと診断seedを適用しました。"
-            echo "- Workerで構成された全 Durable Object namespaceを再作成しました。"
+            echo "- Durable Object namespace IDを維持したまま、全instanceのstorageとmigration履歴を削除しました。"
             echo "- Preview Worker、API、MCPを再デプロイし、外部接続を検証しました。"
           } >> "${GITHUB_STEP_SUMMARY}"

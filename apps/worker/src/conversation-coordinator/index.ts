@@ -21,6 +21,7 @@ import {
   DIARY_CHAT_CONVERSATION_POLICY_IDS,
   DIARY_CHAT_PROMPT_VERSION,
 } from "../prompt/diary-chat";
+import { resetDurableObjectStorage, restartDurableObjectAfterReset } from "../reset-storage";
 import type { Env } from "../types";
 import { ConversationCoordinatorRepository } from "./repository";
 
@@ -92,6 +93,14 @@ export class ConversationCoordinator extends DurableObject<Env> {
       await this.ctx.storage.setAlarm(desiredAlarm);
     }
     return { accepted: true };
+  }
+
+  async resetStorage(token: string): Promise<void> {
+    await resetDurableObjectStorage(this.ctx, this.env, token);
+  }
+
+  restartAfterReset(token: string): never {
+    return restartDurableObjectAfterReset(this.ctx, this.env, token);
   }
 
   async deliverTurn(input: TurnDeliveryRequest): Promise<TurnDeliveryResult> {

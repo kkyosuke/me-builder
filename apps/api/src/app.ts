@@ -33,12 +33,25 @@ import {
   putDiagnosisDeferredQuestion,
 } from "./controller/diagnosis";
 import { postLiffSession, postLineWebhook } from "./controller/line";
+import { PREVIEW_RESET_PATH, resetPreviewDurableObjects } from "./controller/preview-reset";
 import { getProfileSummaryContents } from "./controller/profile";
 import type { AppEnv } from "./types";
 
 const app = new Hono<AppEnv>();
 
 app.use("*", cors());
+
+// reset中はD1/DOへ新しい書き込みを受け付けず、一時tokenで保護したreset経路だけを通す。
+app.use("*", async (c, next) => {
+  if (
+    c.env?.ENVIRONMENT === "preview" &&
+    c.env.PREVIEW_RESET_TOKEN &&
+    c.req.path !== PREVIEW_RESET_PATH
+  ) {
+    return c.json({ error: "Preview reset in progress" }, 503);
+  }
+  await next();
+});
 
 // 例外の分類はここでしか作れないが、最終statusを知るのはmiddlewareなので、
 // 記録はせずに安全な分類だけを預けて終端ログ1件へまとめる。
@@ -97,6 +110,8 @@ app.get("/api/health", (c) => {
 });
 
 app.post("/api/line/webhook", postLineWebhook);
+
+app.post(PREVIEW_RESET_PATH, resetPreviewDurableObjects);
 
 // クライアント指定のuserIdではなく、検証済みIDトークンからAccountを解決する。
 app.post("/api/line/liff/session", liffSessionRoute, postLiffSession);

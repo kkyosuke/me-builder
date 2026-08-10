@@ -9,6 +9,7 @@ import {
 } from "@me-builder/lib";
 import { logger, toSafeOperationalErrorFields } from "@me-builder/shared";
 import { eq, inArray } from "drizzle-orm";
+import { resetDurableObjectStorage, restartDurableObjectAfterReset } from "../reset-storage";
 import type { Env } from "../types";
 import { brainActions } from "./brain";
 import { compatibilityActions } from "./compatibility";
@@ -30,7 +31,7 @@ const ALARM_RETRY_MS = 30_000;
 
 /** 1 AccountのSource / Brain / Diagnosis / Diaryを1つのprivate SQLiteに保存する。 */
 export class AccountData extends DurableObject<Env> {
-  private readonly accountId: string;
+  private readonly accountId: string | undefined;
   private readonly repository: AccountDataRepository;
   private legacyImport: Promise<void> | undefined;
   private operationTail: Promise<void> = Promise.resolve();
@@ -38,12 +39,11 @@ export class AccountData extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     const accountId = ctx.id.name;
-    if (!accountId) throw new Error("AccountData must be addressed by account name");
     this.accountId = accountId;
     this.repository = new AccountDataRepository(ctx.storage);
     ctx.blockConcurrencyWhile(async () => {
       await this.repository.initialize();
-      this.repository.bindAccount(accountId);
+      if (accountId) this.repository.bindAccount(accountId);
     });
   }
 
@@ -56,7 +56,7 @@ export class AccountData extends DurableObject<Env> {
       if (typeof accountId !== "string" || accountId.length === 0) {
         throw new Error("AccountData account is required");
       }
-      if (accountId !== this.accountId) {
+      if (!this.accountId || accountId !== this.accountId) {
         throw new Error("AccountData RPC account does not match object name");
       }
       this.repository.bindAccount(accountId);
@@ -98,16 +98,25 @@ export class AccountData extends DurableObject<Env> {
     });
   }
 
+  async resetStorage(token: string): Promise<void> {
+    await resetDurableObjectStorage(this.ctx, this.env, token);
+  }
+
+  restartAfterReset(token: string): never {
+    return restartDurableObjectAfterReset(this.ctx, this.env, token);
+  }
+
   async alarm(): Promise<void> {
     await this.runExclusive(async () => {
       try {
+        const accountId = this.requireAccountId();
         await d1.action.conversation.closeExpiredSessions(this.repository.client);
         await d1.action.diagnosisBrainProjection.processPendingDiagnosisBrainProjections(
           this.repository.client,
         );
         const checkpointIds = await d1.action.conversation.claimDueDiaryBrainCheckpointIds(
           this.repository.client,
-          this.accountId,
+          accountId,
         );
         if (checkpointIds.length > 0 && !this.env.BRAIN_CHECKPOINT_QUEUE) {
           throw new Error("BRAIN_CHECKPOINT_QUEUE binding is required for diary Brain checkpoints");
@@ -115,12 +124,12 @@ export class AccountData extends DurableObject<Env> {
         for (const checkpointId of checkpointIds) {
           await this.env.BRAIN_CHECKPOINT_QUEUE?.send({
             type: "diary-brain-checkpoint",
-            accountId: this.accountId,
+            accountId,
             checkpointId,
           });
           const dispatched = await d1.action.conversation.markDiaryBrainCheckpointDispatched(
             this.repository.client,
-            this.accountId,
+            accountId,
             checkpointId,
           );
           if (!dispatched) {
@@ -154,20 +163,21 @@ export class AccountData extends DurableObject<Env> {
   private async listVisibleCompatibilityReferences(): Promise<readonly CompatibilityReference[]> {
     const namespace = this.env.COMPATIBILITY_DATA;
     if (!namespace) throw new Error("CompatibilityData binding is required");
+    const accountId = this.requireAccountId();
 
-    const references = this.repository.listReconciliableCompatibilityReferences(this.accountId);
+    const references = this.repository.listReconciliableCompatibilityReferences(accountId);
     for (const reference of references) {
       const relationshipData = compatibilityDataFor(namespace, reference.relationshipId);
-      const relationship = await relationshipData.getRelationship(this.accountId);
+      const relationship = await relationshipData.getRelationship(accountId);
       if (relationship) {
         const partnerAccountId =
-          relationship.inviterAccountId === this.accountId
+          relationship.inviterAccountId === accountId
             ? relationship.inviteeAccountId
             : relationship.inviterAccountId;
         if (!partnerAccountId) {
           throw new Error("Accepted compatibility relationship must have both participants");
         }
-        const activation = this.repository.activateCompatibilityReference(this.accountId, {
+        const activation = this.repository.activateCompatibilityReference(accountId, {
           relationshipId: reference.relationshipId,
           partnerAccountId,
           role: reference.role,
@@ -180,16 +190,17 @@ export class AccountData extends DurableObject<Env> {
       }
 
       if (reference.status === "pending" || reference.status === "reserved") {
-        const preview = await relationshipData.getInvitationPreview(this.accountId);
+        const preview = await relationshipData.getInvitationPreview(accountId);
         if (preview) continue;
       }
-      this.repository.endCompatibilityReference(
-        this.accountId,
-        reference.relationshipId,
-        new Date(),
-      );
+      this.repository.endCompatibilityReference(accountId, reference.relationshipId, new Date());
     }
-    return this.repository.listVisibleCompatibilityReferences(this.accountId);
+    return this.repository.listVisibleCompatibilityReferences(accountId);
+  }
+
+  private requireAccountId(): string {
+    if (!this.accountId) throw new Error("AccountData must be addressed by account name");
+    return this.accountId;
   }
 
   private async syncDiagnosisCatalog(): Promise<void> {

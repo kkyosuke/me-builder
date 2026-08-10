@@ -5,19 +5,18 @@ import {
   accountDataFor,
 } from "@me-builder/lib";
 import { logger, toSafeOperationalErrorFields } from "@me-builder/shared";
+import { resetDurableObjectStorage, restartDurableObjectAfterReset } from "../reset-storage";
 import type { Env } from "../types";
 import { CompatibilityDataRepository } from "./repository";
 
 /** 1つの招待と、成立後の1対1相性関係をprivate SQLiteに保存する。 */
 export class CompatibilityData extends DurableObject<Env> {
-  private readonly relationshipId: string;
+  private readonly relationshipId: string | undefined;
   private readonly repository: CompatibilityDataRepository;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     const relationshipId = ctx.id.name;
-    if (!relationshipId)
-      throw new Error("CompatibilityData must be addressed by relationship name");
     this.relationshipId = relationshipId;
     this.repository = new CompatibilityDataRepository(ctx.storage);
     ctx.blockConcurrencyWhile(async () => this.repository.initialize());
@@ -30,6 +29,14 @@ export class CompatibilityData extends DurableObject<Env> {
       await this.ctx.storage.setAlarm(result.relationship.expiresAt);
     }
     return result;
+  }
+
+  async resetStorage(token: string): Promise<void> {
+    await resetDurableObjectStorage(this.ctx, this.env, token);
+  }
+
+  restartAfterReset(token: string): never {
+    return restartDurableObjectAfterReset(this.ctx, this.env, token);
   }
 
   async getInvitationPreview(relationshipId: string, viewerAccountId: string) {
