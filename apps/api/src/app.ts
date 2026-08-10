@@ -1,4 +1,10 @@
-import { describeHttpResult, logger, toSafeOperationalErrorFields } from "@me-builder/shared";
+import {
+  describeHttpResult,
+  httpOutcome,
+  logger,
+  operationalLogLevel,
+  toSafeOperationalErrorFields,
+} from "@me-builder/shared";
 import { Hono } from "hono";
 import { openAPIRouteHandler } from "hono-openapi";
 import { cors } from "hono/cors";
@@ -34,24 +40,18 @@ const app = new Hono<AppEnv>();
 
 app.use("*", cors());
 
+// 例外の分類はここでしか作れないが、最終statusを知るのはmiddlewareなので、
+// 記録はせずに安全な分類だけを預けて終端ログ1件へまとめる。
+// errをそのまま載せると、SDK例外が抱えるrequest/response bodyがlogへ流出しうる。
 app.onError((err, c) => {
-  // errをそのまま載せると、SDK例外が抱えるrequest/response bodyがlogへ流出しうる。
-  logger.error(
-    {
-      event: "http.request.failed",
-      service: "api",
-      method: c.req.method,
-      path: c.req.path,
-      status: 500,
-      outcome: "failed",
-      ...toSafeOperationalErrorFields(err, {
-        code: "UNEXPECTED_API_ERROR",
-        category: "unknown",
-        stage: "http.handle",
-        retryable: false,
-      }),
-    },
-    `[API] ${c.req.method} ${c.req.path} -> 500 (unhandled exception)`,
+  c.set(
+    "safeError",
+    toSafeOperationalErrorFields(err, {
+      code: "UNEXPECTED_API_ERROR",
+      category: "unknown",
+      stage: "http.handle",
+      retryable: false,
+    }),
   );
   return c.json(v.parse(InternalServerErrorSchema, { error: "Internal Server Error" }), 500);
 });
@@ -60,23 +60,31 @@ app.use("*", async (c, next) => {
   const start = Date.now();
   await next();
   const responseTimeMs = Date.now() - start;
-  logger.info(
-    {
-      event: "http.request.completed",
-      service: "api",
-      method: c.req.method,
-      path: c.req.path,
-      status: c.res.status,
-      responseTimeMs,
-    },
-    describeHttpResult({
-      service: "API",
-      method: c.req.method,
-      path: c.req.path,
-      status: c.res.status,
-      durationMs: responseTimeMs,
-    }),
-  );
+  const status = c.res.status;
+  const safeError = c.get("safeError");
+  const outcome = httpOutcome(status);
+  const fields = {
+    event: outcome === "failed" ? "http.request.failed" : "http.request.completed",
+    service: "api",
+    method: c.req.method,
+    path: c.req.path,
+    status,
+    outcome,
+    responseTimeMs,
+    ...(safeError ?? {}),
+  };
+  const description = describeHttpResult({
+    service: "API",
+    method: c.req.method,
+    path: c.req.path,
+    status,
+    durationMs: responseTimeMs,
+    ...(safeError ? { errorCode: safeError.errorCode } : {}),
+  });
+  const level = operationalLogLevel(outcome);
+  if (level === "error") logger.error(fields, description);
+  else if (level === "info") logger.info(fields, description);
+  else logger.warn(fields, description);
 });
 
 app.get("/api/health", (c) => {

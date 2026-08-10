@@ -23,7 +23,7 @@ import {
 } from "../prompt/diary-chat";
 
 /** wrangler.tomlのmax_retries=5に初回配送を加えた最大試行回数。 */
-const CHAT_TURN_MAX_ATTEMPTS = 6;
+export const CHAT_TURN_MAX_ATTEMPTS = 6;
 /** wrangler.tomlのmax_retriesと揃える。これを超えるとDLQへ落ちるため、その前に引き取る。 */
 const MAX_BUSY_ATTEMPTS = 5;
 /** 先行Turnのlease(90秒)を待てるだけの間隔にする。2秒刻みではlease中に使い切ってしまう。 */

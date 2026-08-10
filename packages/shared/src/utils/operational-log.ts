@@ -55,8 +55,20 @@ export function describeHttpResult(result: {
   path: string;
   status: number;
   durationMs: number;
+  errorCode?: string | undefined;
 }): string {
-  return `[${result.service}] ${result.method} ${result.path} -> ${result.status} (${result.durationMs}ms)`;
+  const details = [`${result.durationMs}ms`, ...(result.errorCode ? [result.errorCode] : [])];
+  return `[${result.service}] ${result.method} ${result.path} -> ${result.status} (${details.join(", ")})`;
+}
+
+/**
+ * HTTP statusを結果へ写します。
+ * 4xxは利用者側の入力や認可で終わった結果、5xxはサーバー側の失敗として扱います。
+ */
+export function httpOutcome(status: number): OperationalOutcome {
+  if (status >= 500) return "failed";
+  if (status >= 400) return "discarded";
+  return "succeeded";
 }
 
 /** 結果から出力レベルを決めます。成功だけをinfoにし、通常時のinfoを異常で埋めません。 */

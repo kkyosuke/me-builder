@@ -91,7 +91,8 @@ export async function receiveLineWebhook({
   // 未設定の場合は環境を問わず検証をスキップせず拒否する
   if (!channelSecret) {
     logger.error(
-      "[LINE webhook] rejected at signature.verify -> 500 (LINE_CHANNEL_SECRET is not configured)",
+      // 設定漏れも署名不正も、サーバーの設定状態を推測させないため401へ落としている。
+      "[LINE webhook] rejected at signature.verify -> 401 (LINE_CHANNEL_SECRET is not configured)",
     );
     return { type: "secret-not-configured" };
   }

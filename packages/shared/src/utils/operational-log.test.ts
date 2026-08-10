@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   describeHttpResult,
   describeQueueMessageResult,
+  httpOutcome,
   operationalLogLevel,
 } from "./operational-log";
 
@@ -111,6 +112,36 @@ describe("describeHttpResult", () => {
         durationMs: 35,
       }),
     ).toBe("[API] POST /api/line/webhook -> 200 (35ms)");
+  });
+
+  it("未捕捉例外で終わった場合はエラーコードまで1行で分かる", () => {
+    expect(
+      describeHttpResult({
+        service: "API",
+        method: "GET",
+        path: "/api/profile-summary",
+        status: 500,
+        durationMs: 12,
+        errorCode: "UNEXPECTED_API_ERROR",
+      }),
+    ).toBe("[API] GET /api/profile-summary -> 500 (12ms, UNEXPECTED_API_ERROR)");
+  });
+});
+
+describe("httpOutcome", () => {
+  it("5xxだけを失敗とし、4xxは利用者側で終わった結果として区別する", () => {
+    expect(httpOutcome(200)).toBe("succeeded");
+    expect(httpOutcome(302)).toBe("succeeded");
+    expect(httpOutcome(401)).toBe("discarded");
+    expect(httpOutcome(404)).toBe("discarded");
+    expect(httpOutcome(500)).toBe("failed");
+    expect(httpOutcome(503)).toBe("failed");
+  });
+
+  it("levelと組み合わせると4xxがwarn、5xxがerrorになりinfoに埋もれない", () => {
+    expect(operationalLogLevel(httpOutcome(200))).toBe("info");
+    expect(operationalLogLevel(httpOutcome(401))).toBe("warn");
+    expect(operationalLogLevel(httpOutcome(500))).toBe("error");
   });
 });
 

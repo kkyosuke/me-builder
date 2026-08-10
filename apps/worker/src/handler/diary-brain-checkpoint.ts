@@ -19,7 +19,7 @@ import {
 } from "../logic/diary-brain";
 
 /** wrangler.tomlのmax_retries=5に初回配送を加えた最大試行回数。 */
-const DIARY_BRAIN_CHECKPOINT_MAX_ATTEMPTS = 6;
+export const DIARY_BRAIN_CHECKPOINT_MAX_ATTEMPTS = 6;
 
 /** ack時の終端ログ。失敗はQueue dispatch境界がretry判断とともに1件記録する。 */
 function logCompleted(

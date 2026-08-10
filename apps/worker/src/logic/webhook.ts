@@ -13,12 +13,26 @@ import {
   toSafeOperationalErrorFields,
 } from "@me-builder/shared";
 import { type CloudflareBindings, type WorkerConfig, getWorkerConfig } from "../config";
-import { processChatTurnMessage } from "../handler/chat-turn";
-import { processDiaryBrainCheckpointMessage } from "../handler/diary-brain-checkpoint";
+import { CHAT_TURN_MAX_ATTEMPTS, processChatTurnMessage } from "../handler/chat-turn";
+import {
+  DIARY_BRAIN_CHECKPOINT_MAX_ATTEMPTS,
+  processDiaryBrainCheckpointMessage,
+} from "../handler/diary-brain-checkpoint";
 import { processLineWebhook } from "./feature/line";
 
 /** max_retries = 3では初回と3回の再試行を合わせて4 attemptsになる。 */
 const WEBHOOK_QUEUE_MAX_ATTEMPTS = 4;
+
+/**
+ * 初回配送を含む最大試行回数。wrangler.tomlのmax_retriesと揃える。
+ * 次の失敗でDLQへ落ちるかを終端ログ1行から判断できるようにするため、処理ごとに持つ。
+ */
+const MAX_ATTEMPTS_BY_FLOW: Record<FlowKey, number | undefined> = {
+  "line-webhook": WEBHOOK_QUEUE_MAX_ATTEMPTS,
+  "chat-turn": CHAT_TURN_MAX_ATTEMPTS,
+  "diary-brain-checkpoint": DIARY_BRAIN_CHECKPOINT_MAX_ATTEMPTS,
+  "queue-dispatch": undefined,
+};
 
 /** どの処理のmessageだったかをログの見出しへ出すため、body形状から処理名を決める。 */
 function flowOf(
@@ -157,6 +171,7 @@ export async function handleQueueBatch(
   );
 
   for (const message of batch.messages) {
+    const startedAt = Date.now();
     try {
       if ("type" in message.body && message.body.type === "chat-turn") {
         if (!cf || !workerConfig) throw new Error("Chat turn bindings are not configured");
@@ -187,6 +202,7 @@ export async function handleQueueBatch(
         retryable: true,
       });
       const flow = flowOf(message.body);
+      const durationMs = Date.now() - startedAt;
       logger.error(
         {
           event: "queue.message.failed",
@@ -203,6 +219,7 @@ export async function handleQueueBatch(
           outcome: "failed",
           disposition: "platform-retry",
           ...safeError,
+          durationMs,
         },
         describeQueueMessageResult({
           flow,
@@ -210,6 +227,8 @@ export async function handleQueueBatch(
           disposition: "platform-retry",
           stage: safeError.stage,
           attempt: message.attempts,
+          maxAttempts: MAX_ATTEMPTS_BY_FLOW[flow],
+          durationMs,
           error: safeError,
         }),
       );

@@ -1,6 +1,6 @@
 import type { D1Database } from "@cloudflare/workers-types";
 import type { AccountDataNamespace, CompatibilityDataNamespace } from "@me-builder/lib";
-import type { Queue, WebhookQueueMessage } from "@me-builder/shared";
+import type { Queue, SafeOperationalErrorFields, WebhookQueueMessage } from "@me-builder/shared";
 
 /** Wrangler生成bindingに、SecretとQueueの公開契約だけを重ねる。 */
 type Env = Omit<ApiBindings, "DB" | "WEBHOOK_QUEUE" | "ACCOUNT_DATA" | "COMPATIBILITY_DATA"> & {
@@ -21,4 +21,8 @@ type Env = Omit<ApiBindings, "DB" | "WEBHOOK_QUEUE" | "ACCOUNT_DATA" | "COMPATIB
   COMPATIBILITY_DATA?: CompatibilityDataNamespace;
 };
 
-export type AppEnv = { Bindings: Env };
+export type AppEnv = {
+  Bindings: Env;
+  /** onErrorが分類したエラーを、終端ログを持つmiddlewareへ引き渡すための領域。 */
+  Variables: { safeError?: SafeOperationalErrorFields };
+};
