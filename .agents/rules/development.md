@@ -26,9 +26,10 @@
     - `task lint`: Biome によるコード Lint / フォーマット検証
     - `task lint:fix`: Biome によるコード Lint / フォーマットの自動修復
     - `task test`: Vitest による全テスト実行
-    - `bun run test:pre-push`: pre-push向けにE2Eを除外したテスト実行
+    - `bun run test:unit`: E2Eを除外したテスト実行（`test:pre-push`は同じもののpre-push向けの別名）
+    - `bun run test:e2e`: E2EとWorker runtime E2Eだけのテスト実行
     - `task generate:api`: APIのOpenAPI documentとWeb UI用TypeScript型を再生成
-    - `task ci`: CI (`ci.yml`) で実行される全検証（生成物差分, lint, 未使用export, Markdown lint, typecheck, test, build）の一括ローカル実行。外部リンク切れ確認だけは含みません（`scheduled-checks.yml` が担当）
+    - `task ci`: 生成物差分, lint, 未使用export, Markdown lint, typecheck, test（E2Eを含む全体）, build の一括ローカル実行。`cd-production.yml`が本番デプロイ前に実行するものと同じで、リンク切れ確認は含みません（相対リンクは`ci.yml`、外部URLは`scheduled-checks.yml`が担当）
     - `task db:migrate:local` (または `task db:migrate`): D1 データベースマイグレーションのローカル適用
     - `task db:migrate:preview`: プレビュー環境への D1 データベースマイグレーション適用
     - `task db:migrate:production`: 本番環境への D1 データベースマイグレーション適用
@@ -52,7 +53,7 @@
     - 同じ PR へ続けて push したときは `concurrency` で古い実行を打ち切ります (`cancel-in-progress: true`)。共有環境を触る CD ワークフローだけは打ち切りません。
     - 外部サービスの応答を待つ検証は `scheduled-checks.yml` (毎週月曜 + 手動実行) に隔離します。対象は Markdown の**外部 URL** のリンク切れ確認と、本番 LINE Webhook への疎通確認 (`register-webhook.ts --force`) です。失敗の原因が外部側の変化であってPRの変更ではないものは、ここへ寄せます。
     - **相対リンクの切れは PR の変更が直接引き起こす**（ファイル名変更など）ため、`ci.yml` で `bun run lint:md:links:relative` として検証します。外部 URL を除外した設定 (`mlc_config.relative.json`) を使うのでネットワーク待ちがありません。
-    - `lint:md:links` 系は `find ... -print0 | xargs -0 markdown-link-check` の形で書きます。`find -exec` は実行したコマンドの終了ステータスを伝播せず、**リンクが切れていても常に成功してしまいます**。また 1 プロセスへまとめて渡すことでファイル毎の起動コストを避けます (実測 73 秒 → 1 秒)。
+    - `lint:md:links` 系は `find ... -print0 | xargs -0 markdown-link-check` の形で書きます。`find -exec` は実行したコマンドの終了ステータスを伝播せず、**リンクが切れていても常に成功してしまいます**。また 1 プロセスへまとめて渡すことでファイル毎の起動コストを避けます (実測 73 秒 → 1 秒)。knip は pipe の先のバイナリを辿れないため、`markdown-link-check` は `knip.json` の `ignoreDependencies` に入れています。
     - CD ワークフローはプレビュー・本番デプロイ用に分離されています (`cd-preview.yml`, `cd-production.yml`)。
     - `cd-preview.yml` は PR の作成・更新だけでは**デプロイしません**（プレビューは全 PR 共有の単一環境のため、自動デプロイで上書きし合うのを避ける）。デプロイされるのは次の 2 通りだけです。
       - Actions 画面でブランチを選ぶか `gh workflow run cd-preview.yml --ref <branch>` で手動実行したとき (`workflow_dispatch`)
