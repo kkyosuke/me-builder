@@ -14,6 +14,8 @@ function manifest(environment: "preview" | "production", databaseId: string) {
       chatTurnDeadLetter: { id: "4", name: `me-builder-chat-turn-dlq-${suffix}` },
       brainCheckpoint: { id: "5", name: `me-builder-brain-checkpoint-queue-${suffix}` },
       brainCheckpointDeadLetter: { id: "6", name: `me-builder-brain-checkpoint-dlq-${suffix}` },
+      profileSummary: { id: "7", name: `me-builder-profile-summary-queue-${suffix}` },
+      profileSummaryDeadLetter: { id: "8", name: `me-builder-profile-summary-dlq-${suffix}` },
     },
   });
 }
@@ -26,6 +28,8 @@ describe("renderWranglerConfigs", () => {
     );
     expect(configs.worker).toContain('database_id = "preview-id"');
     expect(configs.api).toContain('queue = "me-builder-webhook-queue-preview"');
+    expect(configs.api).toContain('binding = "PROFILE_SUMMARY_QUEUE"');
+    expect(configs.worker).toContain('queue = "me-builder-profile-summary-queue-production"');
     expect(configs.mcp).toContain('database_id = "production-id"');
     expect(configs.lib).toContain("[[env.preview.d1_databases]]");
   });

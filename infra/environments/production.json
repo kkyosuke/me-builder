@@ -10,6 +10,8 @@
     "chatTurn": { "name": "me-builder-chat-turn-queue-production" },
     "chatTurnDeadLetter": { "name": "me-builder-chat-turn-dlq-production" },
     "brainCheckpoint": { "name": "me-builder-brain-checkpoint-queue-production" },
-    "brainCheckpointDeadLetter": { "name": "me-builder-brain-checkpoint-dlq-production" }
+    "brainCheckpointDeadLetter": { "name": "me-builder-brain-checkpoint-dlq-production" },
+    "profileSummary": { "name": "me-builder-profile-summary-queue-production" },
+    "profileSummaryDeadLetter": { "name": "me-builder-profile-summary-dlq-production" }
   }
 }

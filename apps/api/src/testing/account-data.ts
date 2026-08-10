@@ -49,6 +49,44 @@ const actions = {
       diagnosisId,
       at,
     ),
+  "profileSummary.read": (db: DO.account.Database, accountId: string) =>
+    DO.account.action.profileSummary.readProfileSummary(db, accountId),
+  "profileSummary.requestGeneration": (
+    db: DO.account.Database,
+    accountId: string,
+    requestedAt?: Date,
+  ) => DO.account.action.profileSummary.requestProfileSummaryGeneration(db, accountId, requestedAt),
+  "profileSummary.loadGenerationContext": (
+    db: DO.account.Database,
+    accountId: string,
+    generationId: string,
+    startedAt?: Date,
+  ) =>
+    DO.account.action.profileSummary.loadProfileSummaryGenerationContext(
+      db,
+      accountId,
+      generationId,
+      startedAt,
+    ),
+  "profileSummary.completeGeneration": (
+    db: DO.account.Database,
+    accountId: string,
+    input: Parameters<typeof DO.account.action.profileSummary.completeProfileSummaryGeneration>[2],
+  ) => DO.account.action.profileSummary.completeProfileSummaryGeneration(db, accountId, input),
+  "profileSummary.failGeneration": (
+    db: DO.account.Database,
+    accountId: string,
+    generationId: string,
+    message: string,
+    failedAt?: Date,
+  ) =>
+    DO.account.action.profileSummary.failProfileSummaryGeneration(
+      db,
+      accountId,
+      generationId,
+      message,
+      failedAt,
+    ),
 } as const;
 
 const MIGRATIONS_FOLDER = path.resolve(__dirname, "../../../../packages/lib/drizzle-do-account");

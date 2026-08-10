@@ -55,6 +55,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/profile-summary/generations": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** 本人の記録から新しいまとめ版のAI生成を要求する */
+    post: operations["requestProfileSummaryGeneration"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/dev/brain-items": {
     parameters: {
       query?: never;
@@ -473,6 +490,95 @@ export interface operations {
             error: "Account not found";
             /** @constant */
             reason: "friendship_required";
+          };
+        };
+      };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
+          };
+        };
+      };
+      /** @description D1 bindingが設定されていない */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Service Unavailable";
+          };
+        };
+      };
+    };
+  };
+  requestProfileSummaryGeneration: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 生成要求を受け付けた、または処理中の要求を返した */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            generationId: string;
+            /** @enum {string} */
+            status: "queued" | "generating";
+            created: boolean;
+          };
+        };
+      };
+      /** @description LIFF IDトークンを検証できない */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Unauthorized";
+          };
+        };
+      };
+      /** @description 対応するAccountが存在しない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Account not found";
+            /** @constant */
+            reason: "friendship_required";
+          };
+        };
+      };
+      /** @description 生成に利用できる記録がない */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Profile summary generation unavailable";
+            /** @constant */
+            reason: "source_record_required";
           };
         };
       };

@@ -26,15 +26,11 @@ export default function ProfileApplication() {
           data: { ...summary.state.data, summary: selectedVersion?.summary ?? null },
         }
       : summary.state;
-  const versioning: ProfileSummaryVersioning | undefined = selectedVersion
+  const versioning: ProfileSummaryVersioning | undefined = result
     ? {
-        versions: result?.versions ?? [],
-        selectedVersionId: selectedVersion.id,
-        generation: result?.generation ?? {
-          status: "idle",
-          canRegenerate: false,
-          reasons: [],
-        },
+        versions: result.versions,
+        selectedVersionId: selectedVersion?.id ?? null,
+        generation: result.generation,
       }
     : undefined;
   const brainItems = useDevelopmentBrainItems({
@@ -48,6 +44,7 @@ export default function ProfileApplication() {
       onRetry={() => void summary.reload()}
       {...(versioning ? { versioning } : {})}
       {...(result && result.versions.length > 1 ? { onSelectVersion: setSelectedVersionId } : {})}
+      {...(result ? { onRegenerate: () => void summary.generate() } : {})}
     >
       {showDevelopmentBrainItems && (
         <DevelopmentBrainItems state={brainItems.state} onRetry={() => void brainItems.reload()} />

@@ -25,6 +25,11 @@ queue = "me-builder-brain-checkpoint-queue-local"
 dead_letter_queue = "me-builder-brain-checkpoint-dlq-local"
 max_retries = 5
 
+[[queues.consumers]]
+queue = "me-builder-profile-summary-queue-local"
+dead_letter_queue = "me-builder-profile-summary-dlq-local"
+max_retries = 5
+
 [[queues.producers]]
 queue = "me-builder-chat-turn-queue-local"
 binding = "CHAT_TURN_QUEUE"
@@ -88,6 +93,11 @@ queue = "me-builder-brain-checkpoint-queue-local"
 dead_letter_queue = "me-builder-brain-checkpoint-dlq-local"
 max_retries = 5
 
+[[env.local.queues.consumers]]
+queue = "me-builder-profile-summary-queue-local"
+dead_letter_queue = "me-builder-profile-summary-dlq-local"
+max_retries = 5
+
 [[env.local.queues.producers]]
 queue = "me-builder-chat-turn-queue-local"
 binding = "CHAT_TURN_QUEUE"
@@ -134,6 +144,11 @@ queue = "me-builder-brain-checkpoint-queue-preview"
 dead_letter_queue = "me-builder-brain-checkpoint-dlq-preview"
 max_retries = 5
 
+[[env.preview.queues.consumers]]
+queue = "me-builder-profile-summary-queue-preview"
+dead_letter_queue = "me-builder-profile-summary-dlq-preview"
+max_retries = 5
+
 [[env.preview.queues.producers]]
 queue = "me-builder-chat-turn-queue-preview"
 binding = "CHAT_TURN_QUEUE"
@@ -178,6 +193,11 @@ max_retries = 5
 [[env.production.queues.consumers]]
 queue = "me-builder-brain-checkpoint-queue-production"
 dead_letter_queue = "me-builder-brain-checkpoint-dlq-production"
+max_retries = 5
+
+[[env.production.queues.consumers]]
+queue = "me-builder-profile-summary-queue-production"
+dead_letter_queue = "me-builder-profile-summary-dlq-production"
 max_retries = 5
 
 [[env.production.queues.producers]]

@@ -220,7 +220,7 @@ flowchart LR
 - 共通スコアリングは診断ごとのParameter Profileを再現する
 - サマリー用の読み取り処理は複数診断の結果を並べ、最大3件の定型文を選ぶ
 - Web UIは返された結果を表示し、独自に採点設定や重みを保持しない
-- サマリーの文章とパラメータ結果は保存せず、回答変更時の二重管理を作らない
+- 決定的な集計結果は保存せず、AI生成したサマリー本文だけを生成時点の不変な版として保存する
 - Brain Itemの生成と本人確認の流れは後続設計とし、この画面の提供条件にしない
 
 ### 8.1 保存済み版の取得API
@@ -229,7 +229,42 @@ flowchart LR
 
 同じレスポンスで、次の生成に利用できる現在の診断・日記件数と、現在の生成状態を返します。現在件数は過去版が参照した件数から導出せず、保存済み版の本文とは分けて扱います。再生成理由と再生成可否の計算、生成要求、AI生成はこのGET APIの責務へ含めません。
 
-版を永続化するDBが導入されるまでは、読み取り処理の依存先をダミーの保存済み版へ差し替えます。HTTP契約とWebの版切り替えは本番の読み取り処理と同じものを使い、後続で読み取り元だけを永続ストレージへ置き換えます。
+保存済み版はAccountDataから読み取ります。HTTP契約とWebの版切り替えは保存先の具体的なテーブル構造を知らず、取得した各版の本文と生成状態だけを扱います。
+
+### 8.2 AI生成と版の永続化
+
+本人が生成を要求すると、`POST /api/profile-summary/generations`は本人確認済みのAccountへ生成要求を1件作成し、本文を含まない参照だけをQueueへ送ります。同じAccountに処理中の要求がある場合は新しい要求を重ねず、その要求を返します。APIはAI生成の完了を待ちません。
+
+```mermaid
+sequenceDiagram
+    participant U as Web UI
+    participant A as API Server
+    participant D as AccountData
+    participant Q as Profile Summary Queue
+    participant W as Queue Worker
+    participant G as Gemini
+
+    U->>A: POST /api/profile-summary/generations
+    A->>D: 生成要求をqueuedで保存
+    A->>Q: generationIdとAccount参照を送信
+    A-->>U: 202 Accepted
+    Q->>W: 生成messageを配送
+    W->>D: 入力snapshotを取得してgeneratingへ遷移
+    W->>G: 診断・Brain・日記を構造化して生成
+    G-->>W: schemaに沿ったまとめ
+    W->>D: 新しい不変版を保存して要求を完了
+    U->>A: GET /api/profile-summary
+    A->>D: 保存済み版と生成状態を取得
+    A-->>U: 新しい版を含む読み取り結果
+```
+
+生成入力には、現在有効な診断由来のBrain Item、現在有効なその他のBrain Item、日記として保存したuser message本文を含めます。日記本文はMemoryへ変換済みかどうかを条件にせず、Memoryに含まれなかった出来事や表現もまとめの根拠候補にします。本文をQueue message、APIレスポンス、運用ログへ含めません。
+
+AIは入力ごとの内部IDを根拠として返し、Workerは提示したIDだけで構成されていることを検証します。画面へ保存する根拠は診断・日記の種別と件数へ丸め、日記本文やBrain Item本文を版へ複製しません。モデル出力がschemaに適合しない場合は版を保存しません。
+
+版はAccountDataのprivate SQLiteへAccountごとの連番で追記し、保存後に本文を変更しません。再試行で同じ生成要求が配送されても同じ要求から複数版を作らないよう、生成要求と版を一意に対応させます。Queueの最終試行まで失敗した要求は`failed`とし、完了済みの過去版は残します。
+
+`GET /api/profile-summary`はダミーではなくAccountDataから保存済み版と最新の生成状態を読みます。今回の生成APIは明示的な要求を受け付ける責務だけを持ち、診断・日記の増加や時間経過から再生成可否と理由を判定する処理は含めません。
 
 ## 9. プライバシー、表現、アクセシビリティ
 

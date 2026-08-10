@@ -653,6 +653,130 @@
         }
       }
     },
+    "/api/profile-summary/generations": {
+      "post": {
+        "operationId": "requestProfileSummaryGeneration",
+        "tags": ["Profile"],
+        "summary": "本人の記録から新しいまとめ版のAI生成を要求する",
+        "security": [
+          {
+            "liffIdToken": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "生成要求を受け付けた、または処理中の要求を返した",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "generationId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "status": {
+                      "enum": ["queued", "generating"],
+                      "type": "string"
+                    },
+                    "created": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["generationId", "status", "created"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "LIFF IDトークンを検証できない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Unauthorized"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "対応するAccountが存在しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Account not found"
+                    },
+                    "reason": {
+                      "const": "friendship_required"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "生成に利用できる記録がない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Profile summary generation unavailable"
+                    },
+                    "reason": {
+                      "const": "source_record_required"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "未処理のサーバーエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Internal Server Error"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "D1 bindingが設定されていない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Service Unavailable"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/dev/brain-items": {
       "get": {
         "operationId": "getDevelopmentBrainItems",

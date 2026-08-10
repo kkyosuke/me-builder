@@ -28,6 +28,12 @@
     "brainCheckpointDeadLetter": {
       "id": "7af799325ec744c584e737605487ffc6",
       "name": "me-builder-brain-checkpoint-dlq-preview"
+    },
+    "profileSummary": {
+      "name": "me-builder-profile-summary-queue-preview"
+    },
+    "profileSummaryDeadLetter": {
+      "name": "me-builder-profile-summary-dlq-preview"
     }
   }
 }
