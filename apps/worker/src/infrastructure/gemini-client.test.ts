@@ -9,18 +9,20 @@ describe("Gemini client", () => {
 
     const result = createGeminiClient(
       {
-        googleAiStudioApiKey: "google-key",
+        googleVertexAiApiKey: "google-key",
         cloudflareAiGatewayToken: "gateway-token",
-        cloudflareAiGatewayBaseUrl: "https://gateway.example.com/google-ai-studio",
+        cloudflareAiGatewayBaseUrl: "https://gateway.example.com/google-vertex-ai",
       },
       factory,
     );
 
     expect(result).toBe(client);
     expect(factory).toHaveBeenCalledWith({
+      vertexai: true,
       apiKey: "google-key",
+      apiVersion: "v1",
       httpOptions: {
-        baseUrl: "https://gateway.example.com/google-ai-studio",
+        baseUrl: "https://gateway.example.com/google-vertex-ai",
         headers: {
           "cf-aig-authorization": "Bearer gateway-token",
           "cf-aig-collect-log-payload": "false",

@@ -166,7 +166,7 @@ describe("diary Brain checkpoint", () => {
 
   it("AI設定不足はlocalでは0件、本番では再試行対象にする", async () => {
     const withoutAiCredentials = {
-      GOOGLE_AI_STUDIO_API_KEY: "",
+      GOOGLE_VERTEX_AI_API_KEY: "",
       CLOUDFLARE_APP_API_TOKEN: "",
     };
     await expect(

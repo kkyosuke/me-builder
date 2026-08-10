@@ -654,7 +654,7 @@ finalまたは失敗案内のretryは90秒で止めます。90秒時点で結果
 
 ## 10. AI Gatewayと秘密情報
 
-- provider keyとAI Gateway tokenはWorker Secretだけに置く
+- Vertex AI API keyとAI Gateway tokenはWorker Secretだけに置く
 - `cf-aig-collect-log-payload: false`を付け、promptとresponse本文をGatewayへ保存しない
 - 個人ごとに内容が異なるため生成cacheを無効にする
 - Gateway logにはmodel、token数、status、latency、環境、prompt version、Turn IDだけを残す

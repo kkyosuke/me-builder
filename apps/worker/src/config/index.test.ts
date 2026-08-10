@@ -38,15 +38,15 @@ describe("Worker Config", () => {
 
   it("Cloudflare AI Gateway と Gemini の設定を取得すること", () => {
     const config = getWorkerConfig({
-      GOOGLE_AI_STUDIO_API_KEY: "google-key",
+      GOOGLE_VERTEX_AI_API_KEY: "google-key",
       CLOUDFLARE_APP_API_TOKEN: "gateway-token",
-      CF_AI_GATEWAY_BASE_URL: "https://gateway.example.com/google-ai-studio",
+      CF_AI_GATEWAY_BASE_URL: "https://gateway.example.com/google-vertex-ai",
       GEMINI_MODEL: "gemini-test-model",
     });
 
-    expect(config.googleAiStudioApiKey).toBe("google-key");
+    expect(config.googleVertexAiApiKey).toBe("google-key");
     expect(config.cloudflareAiGatewayToken).toBe("gateway-token");
-    expect(config.cloudflareAiGatewayBaseUrl).toBe("https://gateway.example.com/google-ai-studio");
+    expect(config.cloudflareAiGatewayBaseUrl).toBe("https://gateway.example.com/google-vertex-ai");
     expect(config.geminiModel).toBe("gemini-test-model");
   });
 
