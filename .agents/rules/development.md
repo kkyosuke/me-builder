@@ -49,6 +49,7 @@
       - Actions 画面でブランチを選ぶか `gh workflow run cd-preview.yml --ref <branch>` で手動実行したとき (`workflow_dispatch`)
       - PR に `deploy` ラベルが付いているとき（ラベル付与時と、その後の push）。ラベルを外せば以降の push ではデプロイされませんが、**すでにデプロイ済みの環境は元に戻りません**。
     - 共有環境の取り合いを避けるため `concurrency: cd-preview` で直列化しています。実行中のデプロイは中断せず、待機中の実行だけが新しいものへ置き換わります。
+    - `reset-preview-migrations.yml` は Actions 画面または `gh workflow run reset-preview-migrations.yml --ref <branch> -f confirmation=reset-preview` からだけ起動します。選択したブランチを基準に Preview D1 のCloudflare予約table以外（`d1_migrations`を含む）と全 Durable Object namespaceを削除し、同じD1 database resourceへD1 migration、診断seedを再適用してWorker / API / MCPを再デプロイします。全Previewデータを復元不能に削除するため確認文字列を必須とし、productionは対象にしません。`cd-preview`と同じconcurrency groupで直列化します。
     - `main` ブランチマージ時には `cd-production.yml` が全検証後に Cloudflare 本番環境へ自動デプロイします。
     - リポジトリのチェックアウト、Bun のセットアップ、`actions/cache@v4` によるキャッシュ、および `bun install --frozen-lockfile` の一連の処理は GitHub Composite Action ([.github/actions/setup-bun-workspace](file:///Users/kyosuke/git/github.com/KKyosuke/me-builder/.github/actions/setup-bun-workspace/action.yml)) に共通化されています。
   - パッケージの追加・削除はルートから `bun add <package> --cwd <workspace-dir>`（例: `bun add @line/liff --cwd apps/web`）を使用し、個別ディレクトリで `npm install` を実行しないこと。ルートで引数なしに `bun add <package>` を実行するとルートの `package.json` に入ってしまうため、対象ワークスペースを必ず指定します。
