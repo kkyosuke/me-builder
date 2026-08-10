@@ -26,7 +26,6 @@ import { openApiOptions } from "./contract/openapi";
 import { profileSummaryRoute } from "./contract/profile/summary";
 import { InternalServerErrorSchema } from "./contract/shared/errors";
 import { getStatistics } from "./controller/admin";
-import { getDevelopmentBrainItems } from "./controller/brain";
 import {
   deleteAvatarContents,
   deleteAvatarJob,
@@ -36,6 +35,7 @@ import {
   postAvatarUpload,
   putAvatar,
 } from "./controller/avatar";
+import { getDevelopmentBrainItems } from "./controller/brain";
 import {
   deleteDevelopmentDiagnosisData,
   getDiagnoses,

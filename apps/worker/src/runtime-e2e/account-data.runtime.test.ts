@@ -88,7 +88,7 @@ describe("AccountData Workers runtime E2E", () => {
     });
   });
 
-  it("既存Brainデータを持つ配布済み0003 schemaへ0004を追記できる", async () => {
+  it("既存Brainデータを持つ配布済み0003 schemaへ後続migrationを追記できる", async () => {
     const accountId = crypto.randomUUID();
     const stub = env.ACCOUNT_DATA.getByName(accountId);
 
@@ -103,7 +103,12 @@ describe("AccountData Workers runtime E2E", () => {
       );
 
       state.storage.sql.exec("DROP TABLE compatibility_references");
-      state.storage.sql.exec("DELETE FROM __drizzle_migrations WHERE created_at = 1786270180000");
+      state.storage.sql.exec("DROP TABLE avatar_profile");
+      state.storage.sql.exec("DROP TABLE avatar_generation_events");
+      state.storage.sql.exec("DROP TABLE avatar_candidates");
+      state.storage.sql.exec("DROP TABLE avatar_jobs");
+      state.storage.sql.exec("DROP TABLE avatar_object_deletions");
+      state.storage.sql.exec("DELETE FROM __drizzle_migrations WHERE created_at >= 1786270180000");
 
       const repository = Reflect.get(instance, "repository") as { initialize(): Promise<void> };
       await expect(repository.initialize()).resolves.toBeUndefined();
@@ -114,6 +119,13 @@ describe("AccountData Workers runtime E2E", () => {
           )
           .one().name,
       ).toBe("compatibility_references");
+      expect(
+        state.storage.sql
+          .exec<{ name: string }>(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'avatar_jobs'",
+          )
+          .one().name,
+      ).toBe("avatar_jobs");
       expect(
         state.storage.sql
           .exec<{ statement: string }>("SELECT statement FROM brain_items WHERE id = 'brain-1'")
