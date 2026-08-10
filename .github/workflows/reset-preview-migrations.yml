@@ -128,9 +128,13 @@ jobs:
       - name: Verify Restored Preview Connections
         run: bun run --cwd apps/worker check:gemini "Reply with OK."
 
+      # 破壊的な再作成の後段なので、ここで失敗すると新しいresource IDがリポジトリへ残らない。
+      # lefthookのhook (branch-name / typecheck / test) はローカル開発者向けの検証で、
+      # 作成したPRでCIが同じ検証を回すため、この自動commit/pushでは無効化する。
       - name: Create Pull Request for Recreated Resource IDs
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LEFTHOOK: "0"
         run: |
           git add \
             infra/environments/preview.json \
@@ -143,7 +147,8 @@ jobs:
             exit 0
           fi
 
-          branch="automation/preview-infrastructure-${GITHUB_RUN_ID}"
+          # ブランチ名はリポジトリの命名規約 (feature|bugfix|hotfix|chore|docs|refactor|test|usagi) に合わせる。
+          branch="chore/preview-resource-ids-${GITHUB_RUN_ID}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git switch -c "${branch}"
