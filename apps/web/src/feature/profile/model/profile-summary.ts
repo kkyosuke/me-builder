@@ -36,12 +36,11 @@ type ProfileSummaryVersionOption = Readonly<{
   generationMethod: "ai" | "deterministic";
 }>;
 
-export type ProfileSummaryVersion = ProfileSummaryVersionOption &
-  Readonly<{ summary: ProfileSummary }>;
+type ProfileSummaryVersion = ProfileSummaryVersionOption & Readonly<{ summary: ProfileSummary }>;
 
 export type ProfileSummaryRegenerationReason = "diagnosis" | "brain" | "elapsed";
 
-export type ProfileSummaryGenerationState = Readonly<{
+type ProfileSummaryGenerationState = Readonly<{
   status: "idle" | "queued" | "generating" | "failed";
   canRegenerate: boolean;
   reasons: readonly ProfileSummaryRegenerationReason[];
