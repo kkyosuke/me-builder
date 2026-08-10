@@ -299,6 +299,12 @@ export interface operations {
                   requestCount: number;
                   inputTokens: number;
                   outputTokens: number;
+                  accounts: {
+                    accountId: string;
+                    requestCount: number;
+                    inputTokens: number;
+                    outputTokens: number;
+                  }[];
                 }
               | {
                   /** @constant */

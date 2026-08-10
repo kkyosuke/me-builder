@@ -186,9 +186,41 @@
                             },
                             "outputTokens": {
                               "type": "number"
+                            },
+                            "accounts": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "accountId": {
+                                    "type": "string"
+                                  },
+                                  "requestCount": {
+                                    "type": "number"
+                                  },
+                                  "inputTokens": {
+                                    "type": "number"
+                                  },
+                                  "outputTokens": {
+                                    "type": "number"
+                                  }
+                                },
+                                "required": [
+                                  "accountId",
+                                  "requestCount",
+                                  "inputTokens",
+                                  "outputTokens"
+                                ]
+                              }
                             }
                           },
-                          "required": ["status", "requestCount", "inputTokens", "outputTokens"]
+                          "required": [
+                            "status",
+                            "requestCount",
+                            "inputTokens",
+                            "outputTokens",
+                            "accounts"
+                          ]
                         },
                         {
                           "type": "object",

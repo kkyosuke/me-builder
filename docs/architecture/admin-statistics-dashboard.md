@@ -28,13 +28,16 @@ Accountの責務は[ドメイン設計](../domain/domain-design.md)、実行基�
 | --- | --- | --- | --- |
 | Gemini | 成功レスポンス数 | Vertex AI `GenerateContentResponse` | `responseId`単位の当月累計 |
 | Gemini | 入力・出力token数 | Vertex AI `usageMetadata` | 入力は`promptTokenCount`、出力は`candidatesTokenCount`を合算 |
+| Gemini | Account別利用量 | 共有D1の内部Account ID | 当月の成功レスポンス数、入力・出力token数をAccountごとに表示 |
 | LINE | 課金対象送信数 | Messaging API quota consumption | reply messageは含まれない |
 | LINE | 当月送信上限 | Messaging API quota | 上限なしのplanではその状態を表示 |
 | LINE | 返信送信数（前日まで） | Messaging API delivery/reply | 集計未完了の当日を除き、日別の成功数を当月分集計 |
 
 「LINEメッセージ数」という単一の値にはまとめません。現在のme-builderが主に使うreply messageは課金対象送信数に含まれず、同じ名称で表示すると費用判断を誤るためです。
 
-Geminiの各成功レスポンスについて、Googleが返した`responseId`、model、用途、生成時刻、`usageMetadata`のtoken数だけを共有D1へ保存します。prompt、生成本文、Account ID、LINE user IDは利用量recordへ保存しません。`responseId`を一意キーにして同じGoogleレスポンスの再保存を無視し、構造化出力のschema修正などでGoogleへ再生成した場合は別レスポンスとして数えます。
+Geminiの各成功レスポンスについて、Googleが返した`responseId`、model、用途、生成時刻、`usageMetadata`のtoken数と、me-builder内部のAccount IDだけを共有D1へ保存します。prompt、生成本文、LINE user IDなど外部providerの識別子は利用量recordへ保存しません。Account別利用量は管理者だけに返します。`responseId`を一意キーにして同じGoogleレスポンスの再保存を無視し、構造化出力のschema修正などでGoogleへ再生成した場合は別レスポンスとして数えます。
+
+Google由来の`responseId`または入力・出力・合計token数が欠けたレスポンスは、0として補完したり独自IDを発行したりせず保存対象外にします。欠落した項目名だけを運用ログへ記録し、生成済みのユーザー応答は継続します。
 
 Googleの`usageMetadata`はtoken数であり、請求額の確定値ではありません。概算費用は表示せず、確定費用が必要になった場合はCloud Billing Exportを別途設計します。
 

@@ -34,6 +34,7 @@ describe("getAdminStatistics", () => {
         requestCount: 2,
         inputTokens: 120,
         outputTokens: 40,
+        accounts: [{ accountId: "account-1", requestCount: 2, inputTokens: 120, outputTokens: 40 }],
       }),
       getLineUsage: vi.fn().mockResolvedValue({
         billableMessages: 3,
@@ -44,7 +45,13 @@ describe("getAdminStatistics", () => {
     expect(outcome).toMatchObject({
       type: "resolved",
       statistics: {
-        gemini: { status: "available", requestCount: 2, inputTokens: 120, outputTokens: 40 },
+        gemini: {
+          status: "available",
+          requestCount: 2,
+          inputTokens: 120,
+          outputTokens: 40,
+          accounts: [{ accountId: "account-1" }],
+        },
         line: { status: "available", billableMessages: 3, replyMessages: 8 },
       },
     });
@@ -58,13 +65,20 @@ describe("getAdminStatistics", () => {
         requestCount: 2,
         inputTokens: 120,
         outputTokens: 40,
+        accounts: [{ accountId: "account-1", requestCount: 2, inputTokens: 120, outputTokens: 40 }],
       }),
       getLineUsage: vi.fn().mockRejectedValue(new Error("LINE unavailable")),
     });
     expect(outcome).toMatchObject({
       type: "resolved",
       statistics: {
-        gemini: { status: "available", requestCount: 2, inputTokens: 120, outputTokens: 40 },
+        gemini: {
+          status: "available",
+          requestCount: 2,
+          inputTokens: 120,
+          outputTokens: 40,
+          accounts: [{ accountId: "account-1" }],
+        },
         line: { status: "unavailable", reason: "upstream-error" },
       },
     });

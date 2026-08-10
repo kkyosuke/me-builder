@@ -22,6 +22,12 @@ export type AdminStatisticsOutcome =
               requestCount: number;
               inputTokens: number;
               outputTokens: number;
+              accounts: Array<{
+                accountId: string;
+                requestCount: number;
+                inputTokens: number;
+                outputTokens: number;
+              }>;
             }
           | UnavailableSection;
         line: ({ status: "available" } & LineUsage) | UnavailableSection;
@@ -92,6 +98,7 @@ export async function getAdminStatistics(params: Params): Promise<AdminStatistic
               requestCount: geminiResult.value.requestCount,
               inputTokens: geminiResult.value.inputTokens,
               outputTokens: geminiResult.value.outputTokens,
+              accounts: geminiResult.value.accounts,
             }
           : { status: "unavailable", reason: "upstream-error" },
       line:

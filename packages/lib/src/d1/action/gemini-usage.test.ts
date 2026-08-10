@@ -16,6 +16,7 @@ function createTestDb(): D1Client {
 
 const usage = {
   responseId: "response-1",
+  accountId: "account-1",
   operation: "diary_chat" as const,
   model: "gemini-test",
   promptTokenCount: 100,
@@ -34,6 +35,14 @@ describe("Gemini usage actions", () => {
     await storeGeminiUsage(db, usage);
     await storeGeminiUsage(db, {
       ...usage,
+      responseId: "response-2",
+      accountId: "account-2",
+      promptTokenCount: 50,
+      candidatesTokenCount: 30,
+      totalTokenCount: 87,
+    });
+    await storeGeminiUsage(db, {
+      ...usage,
       responseId: "response-outside-range",
       generatedAt: new Date("2026-07-31T23:59:59.000Z"),
     });
@@ -45,13 +54,17 @@ describe("Gemini usage actions", () => {
         new Date("2026-09-01T00:00:00.000Z"),
       ),
     ).resolves.toEqual({
-      requestCount: 1,
-      inputTokens: 100,
-      outputTokens: 20,
-      thoughtsTokens: 5,
-      cachedContentTokens: 10,
-      toolUsePromptTokens: 2,
-      totalTokens: 127,
+      requestCount: 2,
+      inputTokens: 150,
+      outputTokens: 50,
+      thoughtsTokens: 10,
+      cachedContentTokens: 20,
+      toolUsePromptTokens: 4,
+      totalTokens: 214,
+      accounts: [
+        { accountId: "account-1", requestCount: 1, inputTokens: 100, outputTokens: 20 },
+        { accountId: "account-2", requestCount: 1, inputTokens: 50, outputTokens: 30 },
+      ],
     });
   });
 

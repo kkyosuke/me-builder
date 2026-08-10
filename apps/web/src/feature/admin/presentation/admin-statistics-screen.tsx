@@ -47,11 +47,61 @@ function Gemini({ value }: { value: AdminStatistics["gemini"] }) {
       {value.status === "unavailable" ? (
         <Unavailable reason={value.reason} />
       ) : (
-        <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <Metric label="成功レスポンス" value={number.format(value.requestCount)} />
-          <Metric label="入力token" value={number.format(value.inputTokens)} />
-          <Metric label="出力token" value={number.format(value.outputTokens)} />
-        </dl>
+        <>
+          <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <Metric label="成功レスポンス" value={number.format(value.requestCount)} />
+            <Metric label="入力token" value={number.format(value.inputTokens)} />
+            <Metric label="出力token" value={number.format(value.outputTokens)} />
+          </dl>
+          <h3 className="mt-5 text-sm font-semibold">Account別利用量</h3>
+          {value.accounts.length === 0 ? (
+            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+              当月の利用Accountはありません。
+            </p>
+          ) : (
+            <div className="mt-2 overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-700">
+              <table className="w-full min-w-xl text-left text-sm">
+                <thead className="bg-slate-50 text-xs text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+                  <tr>
+                    <th scope="col" className="px-4 py-3 font-medium">
+                      Account ID
+                    </th>
+                    <th scope="col" className="px-4 py-3 text-right font-medium">
+                      レスポンス
+                    </th>
+                    <th scope="col" className="px-4 py-3 text-right font-medium">
+                      入力token
+                    </th>
+                    <th scope="col" className="px-4 py-3 text-right font-medium">
+                      出力token
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {value.accounts.map((account) => (
+                    <tr
+                      key={account.accountId}
+                      className="border-t border-slate-200 dark:border-slate-700"
+                    >
+                      <th scope="row" className="px-4 py-3 font-mono text-xs font-medium">
+                        {account.accountId}
+                      </th>
+                      <td className="px-4 py-3 text-right tabular-nums">
+                        {number.format(account.requestCount)}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums">
+                        {number.format(account.inputTokens)}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums">
+                        {number.format(account.outputTokens)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
       )}
       <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
         Google Vertex AIレスポンスのusageMetadataを集計しています。

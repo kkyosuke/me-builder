@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "b1dbd0c9-5d8e-4496-b0da-9054ac8e9721",
+  "id": "f93fcf22-3c4e-4dc7-9913-e4a8a387ffe5",
   "prevId": "a8f8b70e-a1d8-4ab4-a20d-2c8012d82cb7",
   "tables": {
     "account_identities": {
@@ -2659,6 +2659,13 @@
           "notNull": true,
           "autoincrement": false
         },
+        "account_id": {
+          "name": "account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
         "operation": {
           "name": "operation",
           "type": "text",
@@ -2740,6 +2747,11 @@
         "gemini_usage_generated_at_idx": {
           "name": "gemini_usage_generated_at_idx",
           "columns": ["generated_at"],
+          "isUnique": false
+        },
+        "gemini_usage_account_generated_at_idx": {
+          "name": "gemini_usage_account_generated_at_idx",
+          "columns": ["account_id", "generated_at"],
           "isUnique": false
         }
       },

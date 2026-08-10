@@ -5,10 +5,11 @@ import type { GeminiUsageRecorder } from "./gemini-client";
 export function createGeminiUsageRecorder(
   db: d1.Client,
   operation: "diary_chat" | "diary_brain",
+  accountId: string,
 ): GeminiUsageRecorder {
   return async (usage) => {
     try {
-      await d1.action.geminiUsage.storeGeminiUsage(db, { ...usage, operation });
+      await d1.action.geminiUsage.storeGeminiUsage(db, { ...usage, operation, accountId });
     } catch (error) {
       logger.error(
         {

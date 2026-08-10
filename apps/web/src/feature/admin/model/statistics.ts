@@ -9,6 +9,12 @@ export type AdminStatistics = {
     requestCount: number;
     inputTokens: number;
     outputTokens: number;
+    accounts: Array<{
+      accountId: string;
+      requestCount: number;
+      inputTokens: number;
+      outputTokens: number;
+    }>;
   }>;
   line: StatisticsSection<{
     billableMessages: number;

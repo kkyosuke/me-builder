@@ -15,6 +15,7 @@ const statistics = {
     requestCount: 12,
     inputTokens: 0,
     outputTokens: 0,
+    accounts: [{ accountId: "account-1", requestCount: 12, inputTokens: 0, outputTokens: 0 }],
   },
   line: {
     status: "available" as const,

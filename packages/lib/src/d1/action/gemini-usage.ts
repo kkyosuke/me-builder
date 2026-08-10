@@ -4,6 +4,7 @@ import { geminiUsageRecords } from "../schema";
 
 export type GeminiUsageRecordInput = {
   responseId: string;
+  accountId: string;
   operation: "diary_chat" | "diary_brain";
   model: string;
   promptTokenCount: number;
@@ -15,14 +16,19 @@ export type GeminiUsageRecordInput = {
   generatedAt: Date;
 };
 
-export type GeminiUsageSummary = {
+export type GeminiAccountUsageSummary = {
+  accountId: string;
   requestCount: number;
   inputTokens: number;
   outputTokens: number;
+};
+
+export type GeminiUsageSummary = Omit<GeminiAccountUsageSummary, "accountId"> & {
   thoughtsTokens: number;
   cachedContentTokens: number;
   toolUsePromptTokens: number;
   totalTokens: number;
+  accounts: GeminiAccountUsageSummary[];
 };
 
 function requireNonNegativeInteger(name: string, value: number): void {
@@ -34,6 +40,7 @@ function requireNonNegativeInteger(name: string, value: number): void {
 /** responseIdを冪等キーとしてGoogle由来のtoken利用量を保存する。 */
 export async function storeGeminiUsage(db: D1Client, input: GeminiUsageRecordInput): Promise<void> {
   if (!input.responseId.trim()) throw new Error("Gemini responseId is required");
+  if (!input.accountId.trim()) throw new Error("Gemini accountId is required");
   if (!input.model.trim()) throw new Error("Gemini model is required");
   for (const [name, value] of Object.entries({
     promptTokenCount: input.promptTokenCount,
@@ -55,8 +62,9 @@ export async function summarizeGeminiUsage(
   start: Date,
   end: Date,
 ): Promise<GeminiUsageSummary> {
-  const result = await db
+  const results = await db
     .select({
+      accountId: geminiUsageRecords.accountId,
       requestCount: count(),
       inputTokens: sql<number>`coalesce(sum(${geminiUsageRecords.promptTokenCount}), 0)`,
       outputTokens: sql<number>`coalesce(sum(${geminiUsageRecords.candidatesTokenCount}), 0)`,
@@ -67,15 +75,36 @@ export async function summarizeGeminiUsage(
     })
     .from(geminiUsageRecords)
     .where(and(gte(geminiUsageRecords.generatedAt, start), lt(geminiUsageRecords.generatedAt, end)))
-    .get();
+    .groupBy(geminiUsageRecords.accountId)
+    .all();
+
+  const accounts = results
+    .map((result) => ({
+      accountId: result.accountId,
+      requestCount: Number(result.requestCount),
+      inputTokens: Number(result.inputTokens),
+      outputTokens: Number(result.outputTokens),
+    }))
+    .sort(
+      (first, second) =>
+        second.inputTokens + second.outputTokens - (first.inputTokens + first.outputTokens) ||
+        first.accountId.localeCompare(second.accountId),
+    );
 
   return {
-    requestCount: Number(result?.requestCount ?? 0),
-    inputTokens: Number(result?.inputTokens ?? 0),
-    outputTokens: Number(result?.outputTokens ?? 0),
-    thoughtsTokens: Number(result?.thoughtsTokens ?? 0),
-    cachedContentTokens: Number(result?.cachedContentTokens ?? 0),
-    toolUsePromptTokens: Number(result?.toolUsePromptTokens ?? 0),
-    totalTokens: Number(result?.totalTokens ?? 0),
+    requestCount: accounts.reduce((sum, account) => sum + account.requestCount, 0),
+    inputTokens: accounts.reduce((sum, account) => sum + account.inputTokens, 0),
+    outputTokens: accounts.reduce((sum, account) => sum + account.outputTokens, 0),
+    thoughtsTokens: results.reduce((sum, result) => sum + Number(result.thoughtsTokens), 0),
+    cachedContentTokens: results.reduce(
+      (sum, result) => sum + Number(result.cachedContentTokens),
+      0,
+    ),
+    toolUsePromptTokens: results.reduce(
+      (sum, result) => sum + Number(result.toolUsePromptTokens),
+      0,
+    ),
+    totalTokens: results.reduce((sum, result) => sum + Number(result.totalTokens), 0),
+    accounts,
   };
 }

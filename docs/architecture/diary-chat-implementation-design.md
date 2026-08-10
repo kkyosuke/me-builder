@@ -656,8 +656,9 @@ finalまたは失敗案内のretryは90秒で止めます。90秒時点で結果
 - Vertex AI API keyはWorker Secretだけに置く
 - promptとresponse本文をアプリケーションログや独自の永続領域へ保存しない
 - Account ID、LINE user ID、Source Record本文、Brain Item本文をエラーログへ入れない
-- Googleの各成功レスポンスから`responseId`、model、用途、生成時刻、`usageMetadata`のtoken数だけを共有D1へ冪等保存する
-- token利用量recordにはprompt、response本文、Account ID、LINE user IDを含めない
+- Googleの各成功レスポンスから`responseId`、model、用途、生成時刻、`usageMetadata`のtoken数と内部Account IDだけを共有D1へ冪等保存する
+- Google由来の`responseId`または主要token数が欠けた場合は0や独自IDで補完せず、利用量recordの保存だけをスキップする
+- token利用量recordにはprompt、response本文、LINE user IDなど外部providerの識別子を含めない
 - providerのrate limit到達時も日記保存は成功させる
 
 ## 11. 観測と監査

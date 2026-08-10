@@ -501,7 +501,7 @@ export async function processChatTurnMessage(
           () =>
             generateDiaryChatResponse(context.messages, workerConfig, generationController.signal, {
               currentUserMessageIds: context.currentUserMessageIds,
-              onUsage: createGeminiUsageRecorder(cf.d1, "diary_chat"),
+              onUsage: createGeminiUsageRecorder(cf.d1, "diary_chat", message.body.accountId),
               prompt: {
                 objective: DEFAULT_DIARY_CHAT_PROMPT_OPTIONS.objective,
                 conversationGuidance: getDiaryChatConversationGuidance(

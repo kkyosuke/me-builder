@@ -5,6 +5,7 @@ export const geminiUsageRecords = sqliteTable(
   "gemini_usage_records",
   {
     responseId: text("response_id").primaryKey(),
+    accountId: text("account_id").notNull(),
     operation: text("operation", { enum: ["diary_chat", "diary_brain"] }).notNull(),
     model: text("model").notNull(),
     promptTokenCount: integer("prompt_token_count").notNull().default(0),
@@ -18,5 +19,8 @@ export const geminiUsageRecords = sqliteTable(
       .notNull()
       .$defaultFn(() => new Date()),
   },
-  (table) => [index("gemini_usage_generated_at_idx").on(table.generatedAt)],
+  (table) => [
+    index("gemini_usage_generated_at_idx").on(table.generatedAt),
+    index("gemini_usage_account_generated_at_idx").on(table.accountId, table.generatedAt),
+  ],
 );

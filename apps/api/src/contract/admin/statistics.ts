@@ -19,6 +19,14 @@ export const AdminStatisticsResponseSchema = v.object({
       requestCount: v.number(),
       inputTokens: v.number(),
       outputTokens: v.number(),
+      accounts: v.array(
+        v.object({
+          accountId: v.string(),
+          requestCount: v.number(),
+          inputTokens: v.number(),
+          outputTokens: v.number(),
+        }),
+      ),
     }),
     UnavailableSectionSchema,
   ]),

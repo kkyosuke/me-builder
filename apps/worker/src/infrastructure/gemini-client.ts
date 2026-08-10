@@ -1,5 +1,5 @@
 import { type GenerateContentResponse, GoogleGenAI, type GoogleGenAIOptions } from "@google/genai";
-import { OperationalError, type OperationalErrorDescriptor } from "@me-builder/shared";
+import { OperationalError, type OperationalErrorDescriptor, logger } from "@me-builder/shared";
 
 export interface GeminiConfig {
   googleVertexAiApiKey: string;
@@ -77,24 +77,88 @@ function classifyGeminiFailure(
   return { code: "GEMINI_CALL_FAILED", category: "dependency" };
 }
 
-function tokenCount(value: number | undefined): number {
-  return Number.isSafeInteger(value) && (value ?? -1) >= 0 ? (value as number) : 0;
+function isTokenCount(value: number | undefined): value is number {
+  return Number.isSafeInteger(value) && (value ?? -1) >= 0;
 }
 
-function toGeminiUsage(response: GenerateContentResponse, requestedModel: string): GeminiUsage {
+function toGeminiUsage(
+  response: GenerateContentResponse,
+  requestedModel: string,
+): GeminiUsage | undefined {
+  const responseId = response.responseId?.trim();
   const metadata = response.usageMetadata;
+  const promptTokenCount = isTokenCount(metadata?.promptTokenCount)
+    ? metadata.promptTokenCount
+    : undefined;
+  const candidatesTokenCount = isTokenCount(metadata?.candidatesTokenCount)
+    ? metadata.candidatesTokenCount
+    : undefined;
+  const totalTokenCount = isTokenCount(metadata?.totalTokenCount)
+    ? metadata.totalTokenCount
+    : undefined;
+  const missingFields = [
+    ...(!responseId ? ["responseId"] : []),
+    ...(!metadata ? ["usageMetadata"] : []),
+    ...(metadata && promptTokenCount === undefined ? ["promptTokenCount"] : []),
+    ...(metadata && candidatesTokenCount === undefined ? ["candidatesTokenCount"] : []),
+    ...(metadata && totalTokenCount === undefined ? ["totalTokenCount"] : []),
+  ];
+  const optionalTokenCounts: Array<[string, number | undefined]> = metadata
+    ? [
+        ["thoughtsTokenCount", metadata.thoughtsTokenCount],
+        ["cachedContentTokenCount", metadata.cachedContentTokenCount],
+        ["toolUsePromptTokenCount", metadata.toolUsePromptTokenCount],
+      ]
+    : [];
+  const invalidOptionalFields = optionalTokenCounts
+    .filter(([, value]) => value !== undefined && !isTokenCount(value))
+    .map(([name]) => name);
+  const invalidFields = [...missingFields, ...invalidOptionalFields];
+  if (
+    invalidFields.length > 0 ||
+    !responseId ||
+    !metadata ||
+    promptTokenCount === undefined ||
+    candidatesTokenCount === undefined ||
+    totalTokenCount === undefined
+  ) {
+    logger.warn(
+      {
+        event: "gemini.usage.skipped",
+        service: "worker",
+        component: "gemini-client",
+        outcome: "discarded",
+        disposition: "continue",
+        stage: "usage.validate",
+        resultCode: "GEMINI_USAGE_METADATA_INCOMPLETE",
+        invalidFields,
+      },
+      "[Gemini usage] skipped at usage.validate -> continue",
+    );
+    return undefined;
+  }
   const generatedAt = response.createTime ? new Date(response.createTime) : new Date();
   return {
-    responseId: response.responseId ?? crypto.randomUUID(),
+    responseId,
     model: response.modelVersion ?? requestedModel,
-    promptTokenCount: tokenCount(metadata?.promptTokenCount),
-    candidatesTokenCount: tokenCount(metadata?.candidatesTokenCount),
-    thoughtsTokenCount: tokenCount(metadata?.thoughtsTokenCount),
-    cachedContentTokenCount: tokenCount(metadata?.cachedContentTokenCount),
-    toolUsePromptTokenCount: tokenCount(metadata?.toolUsePromptTokenCount),
-    totalTokenCount: tokenCount(metadata?.totalTokenCount),
+    promptTokenCount,
+    candidatesTokenCount,
+    thoughtsTokenCount: metadata.thoughtsTokenCount ?? 0,
+    cachedContentTokenCount: metadata.cachedContentTokenCount ?? 0,
+    toolUsePromptTokenCount: metadata.toolUsePromptTokenCount ?? 0,
+    totalTokenCount,
     generatedAt: Number.isNaN(generatedAt.getTime()) ? new Date() : generatedAt,
   };
+}
+
+async function recordGeminiUsage(
+  response: GenerateContentResponse,
+  requestedModel: string,
+  recorder: GeminiUsageRecorder | undefined,
+): Promise<void> {
+  if (!recorder) return;
+  const usage = toGeminiUsage(response, requestedModel);
+  if (usage) await recorder(usage);
 }
 
 export async function generateStructuredText(
@@ -121,7 +185,7 @@ export async function generateStructuredText(
         ...(input.signal ? { abortSignal: input.signal } : {}),
       },
     });
-    await input.onUsage?.(toGeminiUsage(response, input.model));
+    await recordGeminiUsage(response, input.model, input.onUsage);
     return response.text;
   } catch (error) {
     throw toGeminiOperationalError(error, "ai.generate");
@@ -137,7 +201,7 @@ export async function generateText(
 ): Promise<string | undefined> {
   try {
     const response = await client.models.generateContent({ model, contents });
-    await onUsage?.(toGeminiUsage(response, model));
+    await recordGeminiUsage(response, model, onUsage);
     return response.text;
   } catch (error) {
     throw toGeminiOperationalError(error, "ai.generate");

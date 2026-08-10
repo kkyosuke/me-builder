@@ -98,7 +98,7 @@ export async function processDiaryBrainCheckpointMessage(
     context.messages,
     context.sourceMessageIds,
     workerConfig,
-    createGeminiUsageRecorder(cf.d1, "diary_brain"),
+    createGeminiUsageRecorder(cf.d1, "diary_brain", message.body.accountId),
   );
   if (!candidates) {
     throw new OperationalError({

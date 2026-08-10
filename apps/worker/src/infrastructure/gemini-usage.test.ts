@@ -23,9 +23,13 @@ describe("Gemini usage recorder", () => {
       .mockResolvedValueOnce(undefined);
     const db = {} as d1.Client;
 
-    await createGeminiUsageRecorder(db, "diary_chat")(usage);
+    await createGeminiUsageRecorder(db, "diary_chat", "account-1")(usage);
 
-    expect(store).toHaveBeenCalledWith(db, { ...usage, operation: "diary_chat" });
+    expect(store).toHaveBeenCalledWith(db, {
+      ...usage,
+      operation: "diary_chat",
+      accountId: "account-1",
+    });
   });
 
   it("保存失敗で生成処理を失敗させない", async () => {
@@ -33,8 +37,8 @@ describe("Gemini usage recorder", () => {
       new Error("D1 unavailable"),
     );
 
-    await expect(createGeminiUsageRecorder({} as d1.Client, "diary_brain")(usage)).resolves.toBe(
-      undefined,
-    );
+    await expect(
+      createGeminiUsageRecorder({} as d1.Client, "diary_brain", "account-1")(usage),
+    ).resolves.toBe(undefined);
   });
 });
