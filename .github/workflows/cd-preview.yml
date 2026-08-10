@@ -75,13 +75,13 @@ jobs:
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
         run: bun run --cwd apps/worker check:gemini "Reply with OK."
 
+      - name: Sync Wrangler Configuration with Preview Infrastructure
+        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
+        run: task infra:preview:sync
+
       - name: Protect API Documentation with Cloudflare Access (Preview)
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
         run: task access:setup:preview
-
-      - name: Ensure Queues (Preview)
-        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
-        run: task queues:setup:preview
 
       - name: Apply D1 Migrations (Preview)
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
@@ -142,7 +142,16 @@ jobs:
           LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
           BASE_DOMAIN: ${{ vars.BASE_DOMAIN }}
         run: |
-          bun --cwd apps/api scripts/register-webhook.ts
+          for attempt in 1 2 3; do
+            if bun --cwd apps/api scripts/register-webhook.ts; then
+              exit 0
+            fi
+            if [ "${attempt}" -lt 3 ]; then
+              echo "LINE Webhook verification failed (attempt ${attempt}/3); retrying in 15 seconds."
+              sleep 15
+            fi
+          done
+          exit 1
 
       # デプロイ済みの URL を LIFF アプリのエンドポイント URL へ反映する
       - name: Register LIFF Endpoint (Preview)
