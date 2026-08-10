@@ -1,7 +1,5 @@
 import * as v from "valibot";
 
-export const DEFAULT_CLOUDFLARE_AI_GATEWAY_BASE_URL =
-  "https://gateway.ai.cloudflare.com/v1/8e0b10ee5263d2f699a93dbe3ee97da0/default/google-vertex-ai";
 export const DEFAULT_GEMINI_MODEL = "gemini-3.5-flash-lite";
 export const DEFAULT_CHAT_CONTEXT_MESSAGE_LIMIT = 20;
 
@@ -14,11 +12,6 @@ export const WorkerConfigSchema = v.object({
   /** LIFF ID。設定時のみ、返信に LIFF のリンクを添えます。 */
   liffId: v.optional(v.string()),
   googleVertexAiApiKey: v.optional(v.string()),
-  cloudflareAiGatewayToken: v.optional(v.string()),
-  cloudflareAiGatewayBaseUrl: v.optional(
-    v.pipe(v.string(), v.url()),
-    DEFAULT_CLOUDFLARE_AI_GATEWAY_BASE_URL,
-  ),
   geminiModel: v.optional(v.string(), DEFAULT_GEMINI_MODEL),
   chatEnabled: v.optional(v.boolean(), true),
   chatDeliverySecret: v.optional(v.string()),

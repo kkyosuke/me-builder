@@ -4,14 +4,12 @@ import { createGeminiClient, generateText } from "../src/infrastructure/gemini-c
 
 const config = getWorkerConfig();
 
-if (!config.googleVertexAiApiKey || !config.cloudflareAiGatewayToken) {
-  throw new Error("GOOGLE_VERTEX_AI_API_KEY and CLOUDFLARE_APP_API_TOKEN are required");
+if (!config.googleVertexAiApiKey) {
+  throw new Error("GOOGLE_VERTEX_AI_API_KEY is required");
 }
 
 const client = createGeminiClient({
   googleVertexAiApiKey: config.googleVertexAiApiKey,
-  cloudflareAiGatewayToken: config.cloudflareAiGatewayToken,
-  cloudflareAiGatewayBaseUrl: config.cloudflareAiGatewayBaseUrl,
 });
 const contents = process.argv.slice(2).join(" ") || "What is Cloudflare?";
 const text = await generateText(client, config.geminiModel, contents);

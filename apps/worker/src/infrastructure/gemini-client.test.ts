@@ -3,32 +3,17 @@ import { describe, expect, it, vi } from "vitest";
 import { createGeminiClient, generateText } from "./gemini-client";
 
 describe("Gemini client", () => {
-  it("Cloudflare AI Gateway の URL と認証ヘッダーを SDK に設定すること", () => {
+  it("Vertex AI Express ModeへAPI keyで直接接続すること", () => {
     const client = {} as GoogleGenAI;
     const factory = vi.fn((_options: GoogleGenAIOptions) => client);
 
-    const result = createGeminiClient(
-      {
-        googleVertexAiApiKey: "google-key",
-        cloudflareAiGatewayToken: "gateway-token",
-        cloudflareAiGatewayBaseUrl: "https://gateway.example.com/google-vertex-ai",
-      },
-      factory,
-    );
+    const result = createGeminiClient({ googleVertexAiApiKey: "google-key" }, factory);
 
     expect(result).toBe(client);
     expect(factory).toHaveBeenCalledWith({
       vertexai: true,
       apiKey: "google-key",
       apiVersion: "v1",
-      httpOptions: {
-        baseUrl: "https://gateway.example.com/google-vertex-ai",
-        headers: {
-          "cf-aig-authorization": "Bearer gateway-token",
-          "cf-aig-collect-log-payload": "false",
-          "cf-aig-cache-ttl": "0",
-        },
-      },
     });
   });
 

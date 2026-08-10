@@ -2,7 +2,7 @@
 
 ## 1. 目的
 
-運用者が、外部サービスの利用量と概算費用をme-builder内で確認できるようにします。最初の対象はGeminiとLINE Messaging APIです。
+運用者が、外部サービスの利用量をme-builder内で確認できるようにします。現在の自動集計対象はLINE Messaging APIです。Gemini欄はAPI契約を維持しますが、Vertex AI Express Modeへ直接接続する間は信頼できる集計元がないため利用不可として表示します。
 
 この文書は管理者の認可境界、統計項目、取得元、障害時の表示を所有します。一般利用者の診断体験、各外部サービスの呼び出し処理、データベースの物理設計は所有しません。
 
@@ -26,14 +26,13 @@ Accountの責務は[ドメイン設計](../domain/domain-design.md)、実行基�
 
 | 区分 | 項目 | 取得元 | 注意点 |
 | --- | --- | --- | --- |
-| Gemini | 概算コスト（USD） | Cloudflare AI Gateway Analytics | provider請求額ではなくGatewayによる推定値 |
-| Gemini | リクエスト数 | Cloudflare AI Gateway Analytics | 対象gatewayの当月累計 |
-| Gemini | 入力・出力token数 | Cloudflare AI Gateway Analytics | cache済みと未cacheを合算 |
 | LINE | 課金対象送信数 | Messaging API quota consumption | reply messageは含まれない |
 | LINE | 当月送信上限 | Messaging API quota | 上限なしのplanではその状態を表示 |
 | LINE | 返信送信数（前日まで） | Messaging API delivery/reply | 集計未完了の当日を除き、日別の成功数を当月分集計 |
 
 「LINEメッセージ数」という単一の値にはまとめません。現在のme-builderが主に使うreply messageは課金対象送信数に含まれず、同じ名称で表示すると費用判断を誤るためです。
+
+Geminiのレスポンスsectionは`status = unavailable`、`reason = not-configured`を返します。Vertex AIの請求・利用量を安全かつ自動で取得する方式を別途設計するまでは、過去のAI Gateway値や不完全な推定値を表示しません。
 
 ## 4. データフロー
 
@@ -41,18 +40,16 @@ Accountの責務は[ドメイン設計](../domain/domain-design.md)、実行基�
 flowchart LR
     A[Admin Web UI] -->|LINE ID token| API[Admin Statistics API]
     API -->|resolve Account / require admin| D1[(D1)]
-    API -->|Analytics Read token| CF[Cloudflare AI Gateway Analytics]
     API -->|Channel access token| LINE[LINE Messaging API]
-    CF --> API
     LINE --> API
     API --> A
 ```
 
-外部サービスのtokenは必要なServerだけに配布し、Web UIへ返しません。Cloudflareのtokenは、アプリがAI Gatewayの実行とAnalytics参照に使う`CLOUDFLARE_APP_API_TOKEN`と、CDだけがインフラ構築に使う`CLOUDFLARE_DEPLOY_API_TOKEN`へ分離します。前者には`AI Gateway Run`と`Account Analytics Read`、後者にはデプロイに必要な権限だけを付与します。
+外部サービスのtokenは必要なServerだけに配布し、Web UIへ返しません。LINE Channel access tokenはAPI Serverへ、Vertex AI API keyはQueue Workerへだけ配布します。Cloudflareへデプロイするための`CLOUDFLARE_DEPLOY_API_TOKEN`はCDだけで使用します。
 
 ## 5. 取得失敗時の扱い
 
-- GeminiとLINEは独立して取得し、一方の失敗で他方を非表示にしない
+- Geminiの集計元が未設定でもLINE統計を取得・表示する
 - 未設定、外部APIエラー、レスポンス不正を区別できる状態を各sectionに返す
 - 外部APIのエラー本文やsecretをクライアントへ返さない
 - 統計値は運用判断用であり、請求額の確定値として表示しない

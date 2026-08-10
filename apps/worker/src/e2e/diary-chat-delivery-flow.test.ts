@@ -38,7 +38,6 @@ const workerConfig = getWorkerConfig({
   LINE_CHANNEL_ACCESS_TOKEN: "line-token",
   CHAT_DELIVERY_SECRET: "delivery-secret",
   GOOGLE_VERTEX_AI_API_KEY: "google-key",
-  CLOUDFLARE_APP_API_TOKEN: "gateway-token",
   CHAT_CONTEXT_MESSAGE_LIMIT: "20",
   LIFF_ID: liffId,
 });
@@ -201,7 +200,6 @@ async function enqueueLineEvents(
     LINE_CHANNEL_ACCESS_TOKEN: "line-token",
     CHAT_DELIVERY_SECRET: "delivery-secret",
     GOOGLE_VERTEX_AI_API_KEY: "google-key",
-    CLOUDFLARE_APP_API_TOKEN: "gateway-token",
     CHAT_CONTEXT_MESSAGE_LIMIT: "20",
     LIFF_ID: liffId,
   });

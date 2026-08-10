@@ -60,7 +60,7 @@ function Gemini({ value }: { value: AdminStatistics["gemini"] }) {
         </dl>
       )}
       <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
-        Cloudflare AI Gatewayによる推定値です。
+        Vertex AIの利用量集計は現在未対応です。
       </p>
     </Card>
   );

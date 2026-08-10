@@ -107,15 +107,13 @@ export async function generateDiaryBrainCandidates(
   workerConfig: WorkerConfig,
 ): Promise<DiaryBrainCandidate[] | undefined> {
   if (classifySafety(messages, [...sourceMessageIds]) !== "normal") return [];
-  if (!workerConfig.googleVertexAiApiKey || !workerConfig.cloudflareAiGatewayToken) {
+  if (!workerConfig.googleVertexAiApiKey) {
     return ["dev", "development", "local", "test"].includes(workerConfig.environment)
       ? []
       : undefined;
   }
   const client = createGeminiClient({
     googleVertexAiApiKey: workerConfig.googleVertexAiApiKey,
-    cloudflareAiGatewayToken: workerConfig.cloudflareAiGatewayToken,
-    cloudflareAiGatewayBaseUrl: workerConfig.cloudflareAiGatewayBaseUrl,
   });
   const contents = JSON.stringify({
     context_package: {
