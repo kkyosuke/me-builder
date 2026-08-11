@@ -15,12 +15,27 @@ let miniflare: Miniflare;
 let database: D1Database;
 let avatarBucket: R2Bucket;
 
-function squarePng(size = 128): Uint8Array {
-  const bytes = new Uint8Array(24);
-  bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-  bytes.set([0x49, 0x48, 0x44, 0x52], 12);
-  new DataView(bytes.buffer).setUint32(16, size);
-  new DataView(bytes.buffer).setUint32(20, size);
+const squarePngBase64 =
+  "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAE0lEQVQImWP4z8DwHwwZGP6DAQBJyAn3iFfyTAAAAABJRU5ErkJggg==";
+
+function crc32(bytes: Uint8Array, start: number, end: number): number {
+  let crc = 0xffffffff;
+  for (let offset = start; offset < end; offset += 1) {
+    crc ^= bytes[offset] ?? 0;
+    for (let bit = 0; bit < 8; bit += 1) crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function squarePng(): Uint8Array {
+  return Uint8Array.from(atob(squarePngBase64), (value) => value.charCodeAt(0));
+}
+
+function nonSquarePng(): Uint8Array {
+  const bytes = squarePng();
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  view.setUint32(20, 1);
+  view.setUint32(29, crc32(bytes, 12, 29));
   return bytes;
 }
 
@@ -174,8 +189,7 @@ describe("Profile avatar storage API local E2E", () => {
   });
 
   it("非正方形画像をR2へ保存しない", async () => {
-    const bytes = squarePng();
-    new DataView(bytes.buffer).setUint32(20, 64);
+    const bytes = nonSquarePng();
     const response = await app.request(
       "/api/profile/avatar",
       {

@@ -30,7 +30,7 @@ type Params = Readonly<{
 
 type Dependencies = Readonly<{
   createSession: typeof createLiffSession;
-  digest: (bytes: Uint8Array) => Promise<string>;
+  createObjectId: () => string;
   getAvatar: typeof D1.shared.action.profile.getProfileAvatar;
   setAvatar: typeof D1.shared.action.profile.setProfileAvatar;
   clearAvatar: typeof D1.shared.action.profile.clearProfileAvatar;
@@ -38,14 +38,9 @@ type Dependencies = Readonly<{
 
 type ResolvedProfileSession = Extract<LiffSessionOutcome, { type: "resolved" }>["session"];
 
-async function sha256(bytes: Uint8Array): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", bytes.slice().buffer as ArrayBuffer);
-  return [...new Uint8Array(digest)].map((value) => value.toString(16).padStart(2, "0")).join("");
-}
-
 const defaultDependencies: Dependencies = {
   createSession: createLiffSession,
-  digest: sha256,
+  createObjectId: () => crypto.randomUUID(),
   getAvatar: D1.shared.action.profile.getProfileAvatar,
   setAvatar: D1.shared.action.profile.setProfileAvatar,
   clearAvatar: D1.shared.action.profile.clearProfileAvatar,
@@ -132,8 +127,7 @@ export async function saveProfileAvatar(
   session: ResolvedProfileSession,
   dependencies: Dependencies = defaultDependencies,
 ): Promise<ProfileOutcome> {
-  const digest = await dependencies.digest(params.image.bytes);
-  const objectKey = `accounts/${session.accountId}/profile/avatar/${digest}.${params.image.extension}`;
+  const objectKey = `accounts/${session.accountId}/profile/avatar/${dependencies.createObjectId()}.${params.image.extension}`;
   const stored = await params.avatarBucket.put(objectKey, params.image.bytes, {
     httpMetadata: { contentType: params.image.contentType },
   });

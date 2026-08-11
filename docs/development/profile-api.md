@@ -69,7 +69,7 @@ LINE画像の場合は`source`を`line`、`url`をLINEのHTTPS URL、`updatedAt`
 
 - bodyが空でなく2 MiB以下
 - `Content-Type`と実データの形式が一致する
-- 画像headerから寸法を取得できる
+- 画像全体の構造が正しく、headerから寸法を取得できる
 - 幅と高さが同じ
 - 幅と高さが1px以上512px以下
 
@@ -85,7 +85,7 @@ flowchart LR
     API -->|profile JSON with Data URL| W
 ```
 
-R2 object keyは認証で解決したAccount IDと画像内容のSHA-256から決定します。同じAccountが同じ画像を再送した場合は同じkeyになり、別Accountとobjectを共有しません。
+R2 object keyは認証で解決したAccount IDとアップロードごとの一意なIDから決定します。同じ画像を再送してもkeyを再利用しないため、並行した置換・削除の後処理が新しい現在画像を削除しません。別Accountとobjectを共有しません。
 
 共有D1の`account_profiles`は現在画像のobject key、content type、byte size、etag、更新日時を持ちます。更新日時は表示・監査用の現在値であり、次回変更可能日時ではありません。R2は画像bytesとHTTP metadataだけを持ち、どの画像が現在値かを決めません。
 

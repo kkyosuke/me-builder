@@ -42,17 +42,98 @@ function uint32(bytes: Uint8Array, offset: number, littleEndian: boolean): numbe
   );
 }
 
-function detectPng(bytes: Uint8Array): DetectedImage | undefined {
-  if (bytes.length < 24) return undefined;
-  const signature = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
-  if (!signature.every((value, index) => bytes[index] === value)) return undefined;
-  if (String.fromCharCode(...bytes.slice(12, 16)) !== "IHDR") return undefined;
-  return {
-    contentType: "image/png",
-    extension: "png",
-    width: uint32(bytes, 16, false),
-    height: uint32(bytes, 20, false),
+function ascii(bytes: Uint8Array, offset: number, length: number): string {
+  return String.fromCharCode(...bytes.subarray(offset, offset + length));
+}
+
+const crc32Table = Uint32Array.from({ length: 256 }, (_, value) => {
+  let crc = value;
+  for (let bit = 0; bit < 8; bit += 1) crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+  return crc >>> 0;
+});
+
+function crc32(bytes: Uint8Array, start: number, end: number): number {
+  let crc = 0xffffffff;
+  for (let offset = start; offset < end; offset += 1) {
+    crc = (crc >>> 8) ^ (crc32Table[(crc ^ (bytes[offset] ?? 0)) & 0xff] ?? 0);
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function validPngHeader(bytes: Uint8Array, dataOffset: number): boolean {
+  const bitDepth = bytes[dataOffset + 8];
+  const colorType = bytes[dataOffset + 9];
+  const validBitDepths: Readonly<Record<number, readonly number[]>> = {
+    0: [1, 2, 4, 8, 16],
+    2: [8, 16],
+    3: [1, 2, 4, 8],
+    4: [8, 16],
+    6: [8, 16],
   };
+  return Boolean(
+    bitDepth !== undefined &&
+      colorType !== undefined &&
+      validBitDepths[colorType]?.includes(bitDepth) &&
+      bytes[dataOffset + 10] === 0 &&
+      bytes[dataOffset + 11] === 0 &&
+      (bytes[dataOffset + 12] === 0 || bytes[dataOffset + 12] === 1),
+  );
+}
+
+function detectPng(bytes: Uint8Array): DetectedImage | undefined {
+  const signature = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+  if (bytes.length < 45 || !signature.every((value, index) => bytes[index] === value)) {
+    return undefined;
+  }
+
+  let offset = 8;
+  let width: number | undefined;
+  let height: number | undefined;
+  let sawPalette = false;
+  let sawImageData = false;
+  let imageDataEnded = false;
+  while (offset + 12 <= bytes.length) {
+    const length = uint32(bytes, offset, false);
+    const typeOffset = offset + 4;
+    const dataOffset = offset + 8;
+    const dataEnd = dataOffset + length;
+    const chunkEnd = dataEnd + 4;
+    if (chunkEnd > bytes.length) return undefined;
+    const type = ascii(bytes, typeOffset, 4);
+    if (
+      !/^[A-Za-z]{4}$/.test(type) ||
+      uint32(bytes, dataEnd, false) !== crc32(bytes, typeOffset, dataEnd)
+    ) {
+      return undefined;
+    }
+
+    if (offset === 8) {
+      if (type !== "IHDR" || length !== 13 || !validPngHeader(bytes, dataOffset)) return undefined;
+      width = uint32(bytes, dataOffset, false);
+      height = uint32(bytes, dataOffset + 4, false);
+    } else if (type === "IHDR") {
+      return undefined;
+    } else if (type === "PLTE") {
+      if (sawPalette || sawImageData || length === 0 || length % 3 !== 0 || length > 768) {
+        return undefined;
+      }
+      sawPalette = true;
+    } else if (type === "IDAT") {
+      if (imageDataEnded || length === 0) return undefined;
+      sawImageData = true;
+    } else if (sawImageData && type !== "IEND") {
+      imageDataEnded = true;
+    }
+
+    if (type === "IEND") {
+      if (length !== 0 || !sawImageData || chunkEnd !== bytes.length) return undefined;
+      return width === undefined || height === undefined
+        ? undefined
+        : { contentType: "image/png", extension: "png", width, height };
+    }
+    offset = chunkEnd;
+  }
+  return undefined;
 }
 
 const jpegStartOfFrameMarkers = new Set([
@@ -60,68 +141,140 @@ const jpegStartOfFrameMarkers = new Set([
 ]);
 
 function detectJpeg(bytes: Uint8Array): DetectedImage | undefined {
-  if (bytes.length < 4 || bytes[0] !== 0xff || bytes[1] !== 0xd8) return undefined;
+  if (bytes.length < 14 || bytes[0] !== 0xff || bytes[1] !== 0xd8) return undefined;
   let offset = 2;
-  while (offset + 3 < bytes.length) {
+  let width: number | undefined;
+  let height: number | undefined;
+  let sawScan = false;
+  let scanByteLength = 0;
+
+  while (offset < bytes.length) {
     if (bytes[offset] !== 0xff) return undefined;
+    const markerOffset = offset;
     while (offset < bytes.length && bytes[offset] === 0xff) offset += 1;
     if (offset >= bytes.length) return undefined;
     const marker = bytes[offset] as number;
     offset += 1;
-    if (marker === 0xd9 || marker === 0xda) return undefined;
-    if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) continue;
+
+    if (marker === 0xd9) {
+      return offset === bytes.length &&
+        width !== undefined &&
+        height !== undefined &&
+        sawScan &&
+        scanByteLength > 0
+        ? { contentType: "image/jpeg", extension: "jpg", width, height }
+        : undefined;
+    }
+    if (marker === 0xd8 || marker === 0x00 || (marker >= 0xd0 && marker <= 0xd7)) return undefined;
+    if (marker === 0x01) continue;
     if (offset + 1 >= bytes.length) return undefined;
     const segmentLength = uint16(bytes, offset, false);
     if (segmentLength < 2 || offset + segmentLength > bytes.length) return undefined;
+
     if (jpegStartOfFrameMarkers.has(marker)) {
-      if (segmentLength < 7) return undefined;
-      return {
-        contentType: "image/jpeg",
-        extension: "jpg",
-        height: uint16(bytes, offset + 3, false),
-        width: uint16(bytes, offset + 5, false),
-      };
+      const componentCount = bytes[offset + 7];
+      if (
+        width !== undefined ||
+        componentCount === undefined ||
+        componentCount === 0 ||
+        segmentLength !== 8 + componentCount * 3
+      ) {
+        return undefined;
+      }
+      height = uint16(bytes, offset + 3, false);
+      width = uint16(bytes, offset + 5, false);
     }
+
     offset += segmentLength;
+    if (marker !== 0xda) continue;
+    const componentCount = bytes[offset - segmentLength + 2];
+    if (
+      width === undefined ||
+      componentCount === undefined ||
+      componentCount === 0 ||
+      segmentLength !== 6 + componentCount * 2
+    ) {
+      return undefined;
+    }
+    sawScan = true;
+
+    let nextMarkerOffset: number | undefined;
+    while (offset < bytes.length) {
+      if (bytes[offset] !== 0xff) {
+        scanByteLength += 1;
+        offset += 1;
+        continue;
+      }
+      const candidateOffset = offset;
+      while (offset < bytes.length && bytes[offset] === 0xff) offset += 1;
+      if (offset >= bytes.length) return undefined;
+      const candidate = bytes[offset] as number;
+      if (candidate === 0x00 || (candidate >= 0xd0 && candidate <= 0xd7)) {
+        scanByteLength += candidate === 0x00 ? 1 : 0;
+        offset += 1;
+        continue;
+      }
+      nextMarkerOffset = candidateOffset;
+      break;
+    }
+    if (nextMarkerOffset === undefined) return undefined;
+    offset = nextMarkerOffset;
+    if (offset <= markerOffset) return undefined;
   }
   return undefined;
 }
 
 function detectWebp(bytes: Uint8Array): DetectedImage | undefined {
-  if (bytes.length < 30) return undefined;
   if (
-    String.fromCharCode(...bytes.slice(0, 4)) !== "RIFF" ||
-    String.fromCharCode(...bytes.slice(8, 12)) !== "WEBP"
+    bytes.length < 30 ||
+    ascii(bytes, 0, 4) !== "RIFF" ||
+    ascii(bytes, 8, 4) !== "WEBP" ||
+    uint32(bytes, 4, true) + 8 !== bytes.length
   ) {
     return undefined;
   }
-  const format = String.fromCharCode(...bytes.slice(12, 16));
-  if (format === "VP8X") {
-    return {
-      contentType: "image/webp",
-      extension: "webp",
-      width: uint24(bytes, 24) + 1,
-      height: uint24(bytes, 27) + 1,
-    };
+
+  let offset = 12;
+  let canvas: Readonly<{ width: number; height: number }> | undefined;
+  let image: Readonly<{ width: number; height: number }> | undefined;
+  while (offset + 8 <= bytes.length) {
+    const type = ascii(bytes, offset, 4);
+    const length = uint32(bytes, offset + 4, true);
+    const dataOffset = offset + 8;
+    const dataEnd = dataOffset + length;
+    const chunkEnd = dataEnd + (length % 2);
+    if (dataEnd > bytes.length || chunkEnd > bytes.length) return undefined;
+
+    if (type === "VP8X") {
+      if (canvas || image || length !== 10) return undefined;
+      canvas = {
+        width: uint24(bytes, dataOffset + 4) + 1,
+        height: uint24(bytes, dataOffset + 7) + 1,
+      };
+    } else if (type === "VP8L") {
+      if (image || length < 5 || bytes[dataOffset] !== 0x2f) return undefined;
+      const bits = uint32(bytes, dataOffset + 1, true);
+      image = { width: (bits & 0x3fff) + 1, height: ((bits >> 14) & 0x3fff) + 1 };
+    } else if (type === "VP8 ") {
+      if (
+        image ||
+        length < 10 ||
+        bytes[dataOffset + 3] !== 0x9d ||
+        bytes[dataOffset + 4] !== 0x01 ||
+        bytes[dataOffset + 5] !== 0x2a
+      ) {
+        return undefined;
+      }
+      image = {
+        width: uint16(bytes, dataOffset + 6, true) & 0x3fff,
+        height: uint16(bytes, dataOffset + 8, true) & 0x3fff,
+      };
+    }
+    offset = chunkEnd;
   }
-  if (format === "VP8L" && bytes[20] === 0x2f) {
-    const bits = uint32(bytes, 21, true);
-    return {
-      contentType: "image/webp",
-      extension: "webp",
-      width: (bits & 0x3fff) + 1,
-      height: ((bits >> 14) & 0x3fff) + 1,
-    };
-  }
-  if (format === "VP8 " && bytes[23] === 0x9d && bytes[24] === 0x01 && bytes[25] === 0x2a) {
-    return {
-      contentType: "image/webp",
-      extension: "webp",
-      width: uint16(bytes, 26, true) & 0x3fff,
-      height: uint16(bytes, 28, true) & 0x3fff,
-    };
-  }
-  return undefined;
+  if (offset !== bytes.length || !image) return undefined;
+  if (canvas && (canvas.width !== image.width || canvas.height !== image.height)) return undefined;
+  return { contentType: "image/webp", extension: "webp", ...image };
 }
 
 function normalizeContentType(value: string | undefined): AvatarContentType | undefined {

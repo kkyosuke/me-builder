@@ -38,7 +38,7 @@ function setup() {
   };
   const dependencies = {
     createSession: vi.fn().mockResolvedValue(session),
-    digest: vi.fn().mockResolvedValue("digest"),
+    createObjectId: vi.fn().mockReturnValue("upload-id"),
     getAvatar: vi.fn(),
     setAvatar: vi.fn(),
     clearAvatar: vi.fn(),
@@ -59,7 +59,7 @@ describe("Profile logic", () => {
     ).rejects.toThrow("D1 unavailable");
     expect(avatarBucket.put).toHaveBeenCalledOnce();
     expect(avatarBucket.delete).toHaveBeenCalledWith(
-      "accounts/account-1/profile/avatar/digest.png",
+      "accounts/account-1/profile/avatar/upload-id.png",
     );
   });
 
@@ -91,7 +91,7 @@ describe("Profile logic", () => {
     dependencies.setAvatar.mockResolvedValue({
       outcome: "updated",
       avatar: {
-        objectKey: "accounts/account-1/profile/avatar/digest.png",
+        objectKey: "accounts/account-1/profile/avatar/upload-id.png",
         contentType: "image/png",
         byteSize: 3,
         etag: "etag-new",
@@ -109,6 +109,35 @@ describe("Profile logic", () => {
       { event: "profile.avatar.cleanup.failed", outcome: "failed" },
       "Old profile avatar could not be removed after replacement",
     );
+  });
+
+  it("同じ画像を再送してもR2 object keyを再利用しない", async () => {
+    const { params, avatarBucket, dependencies } = setup();
+    dependencies.createObjectId.mockReturnValueOnce("upload-1").mockReturnValueOnce("upload-2");
+    let currentObjectKey = "accounts/account-1/profile/avatar/old.png";
+    dependencies.setAvatar.mockImplementation(async (_db, _accountId, avatar) => {
+      const previousObjectKey = currentObjectKey;
+      currentObjectKey = avatar.objectKey;
+      return { outcome: "updated", avatar, previousObjectKey };
+    });
+
+    await saveProfileAvatar({ ...params, image }, session.session, dependencies as never);
+    await saveProfileAvatar({ ...params, image }, session.session, dependencies as never);
+
+    expect(avatarBucket.put).toHaveBeenNthCalledWith(
+      1,
+      "accounts/account-1/profile/avatar/upload-1.png",
+      image.bytes,
+      expect.anything(),
+    );
+    expect(avatarBucket.put).toHaveBeenNthCalledWith(
+      2,
+      "accounts/account-1/profile/avatar/upload-2.png",
+      image.bytes,
+      expect.anything(),
+    );
+    expect(currentObjectKey).toBe("accounts/account-1/profile/avatar/upload-2.png");
+    expect(avatarBucket.delete).not.toHaveBeenCalledWith(currentObjectKey);
   });
 
   it("プロフィール画像削除時のR2失敗をerrorログへ記録する", async () => {

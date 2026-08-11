@@ -1,81 +1,64 @@
 import { describe, expect, it } from "vitest";
 import { MAX_AVATAR_BYTES, validateAvatarImage } from "./avatar-image";
 
-function png(width: number, height: number): Uint8Array {
-  const bytes = new Uint8Array(24);
-  bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-  bytes.set([0x49, 0x48, 0x44, 0x52], 12);
-  new DataView(bytes.buffer).setUint32(16, width);
-  new DataView(bytes.buffer).setUint32(20, height);
-  return bytes;
+const validImages = {
+  png: "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAE0lEQVQImWP4z8DwHwwZGP6DAQBJyAn3iFfyTAAAAABJRU5ErkJggg==",
+  jpeg: "/9j/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAACAAIDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAf/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAABgj/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABykX//Z",
+  webp: "UklGRjoAAABXRUJQVlA4IC4AAACQAQCdASoCAAIAAUAmJaQAAudZtgAA/vZ//5wOIS38q//7Rj88te91eiYeAAAA",
+} as const;
+
+function decode(base64: string): Uint8Array {
+  return Uint8Array.from(atob(base64), (value) => value.charCodeAt(0));
 }
 
-function jpeg(width: number, height: number): Uint8Array {
-  return Uint8Array.from([
-    0xff,
-    0xd8,
-    0xff,
-    0xc0,
-    0x00,
-    0x11,
-    0x08,
-    height >> 8,
-    height & 0xff,
-    width >> 8,
-    width & 0xff,
-    0x03,
-    0x01,
-    0x11,
-    0x00,
-    0x02,
-    0x11,
-    0x00,
-    0x03,
-    0x11,
-    0x00,
-  ]);
+function crc32(bytes: Uint8Array, start: number, end: number): number {
+  let crc = 0xffffffff;
+  for (let offset = start; offset < end; offset += 1) {
+    crc ^= bytes[offset] ?? 0;
+    for (let bit = 0; bit < 8; bit += 1) crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+  }
+  return (crc ^ 0xffffffff) >>> 0;
 }
 
-function webp(width: number, height: number): Uint8Array {
-  const bytes = new Uint8Array(30);
-  bytes.set(new TextEncoder().encode("RIFF"), 0);
-  bytes.set(new TextEncoder().encode("WEBPVP8X"), 8);
-  const encodedWidth = width - 1;
-  const encodedHeight = height - 1;
-  bytes.set(
-    [
-      encodedWidth & 0xff,
-      (encodedWidth >> 8) & 0xff,
-      (encodedWidth >> 16) & 0xff,
-      encodedHeight & 0xff,
-      (encodedHeight >> 8) & 0xff,
-      (encodedHeight >> 16) & 0xff,
-    ],
-    24,
-  );
+function resizePng(width: number, height: number): Uint8Array {
+  const bytes = decode(validImages.png);
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  view.setUint32(16, width);
+  view.setUint32(20, height);
+  view.setUint32(29, crc32(bytes, 12, 29));
   return bytes;
 }
 
 describe("validateAvatarImage", () => {
   it.each([
-    [png(512, 512), "image/png", "png"],
-    [jpeg(256, 256), "image/jpeg", "jpg"],
-    [webp(128, 128), "image/webp", "webp"],
-  ] as const)("対応画像の形式と正方形の寸法を検証する", (bytes, contentType, extension) => {
+    [decode(validImages.png), "image/png", "png"],
+    [decode(validImages.jpeg), "image/jpeg", "jpg"],
+    [decode(validImages.webp), "image/webp", "webp"],
+  ] as const)("デコード可能な対応画像の形式と寸法を検証する", (bytes, contentType, extension) => {
     expect(validateAvatarImage(bytes, contentType)).toMatchObject({
       type: "valid",
       contentType,
       extension,
+      width: 2,
+      height: 2,
     });
+  });
+
+  it.each([
+    [decode(validImages.png).slice(0, 24), "image/png"],
+    [decode(validImages.jpeg).slice(0, -2), "image/jpeg"],
+    [decode(validImages.webp).slice(0, -2), "image/webp"],
+  ] as const)("headerだけの切断画像を拒否する", (bytes, contentType) => {
+    expect(validateAvatarImage(bytes, contentType)).toEqual({ type: "unsupported" });
   });
 
   it.each([
     [new Uint8Array(), "image/png", "empty"],
     [new Uint8Array(MAX_AVATAR_BYTES + 1), "image/png", "too-large"],
-    [png(256, 256), "image/gif", "unsupported"],
-    [png(256, 256), "image/jpeg", "content-type-mismatch"],
-    [png(256, 128), "image/png", "invalid-size"],
-    [png(513, 513), "image/png", "invalid-size"],
+    [decode(validImages.png), "image/gif", "unsupported"],
+    [decode(validImages.png), "image/jpeg", "content-type-mismatch"],
+    [resizePng(2, 1), "image/png", "invalid-size"],
+    [resizePng(513, 513), "image/png", "invalid-size"],
   ] as const)("不正な入力を拒否する", (bytes, contentType, type) => {
     expect(validateAvatarImage(bytes, contentType)).toEqual({ type });
   });
