@@ -23,6 +23,7 @@ export function applySavedProgress(
   const questionCount = progress.questionCount;
   return {
     ...diagnosis,
+    // API/AccountData側のresponseStatus導出と対応。生成型を保つためWeb内で再計算する。
     responseStatus: answeredCount === questionCount ? "answered" : "in-progress",
     answeredCount,
     questionCount,

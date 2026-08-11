@@ -48,6 +48,10 @@ export type DiaryBrainDedupDecision = Readonly<{
 
 export type ConsolidatedDiaryBrainCandidate = DiaryBrainDedupCandidate &
   Readonly<{
+    evidenceStatements: readonly Readonly<{
+      sourceMessageId: string;
+      statement: string;
+    }>[];
     matchingBrainItemId?: string;
     deduplication: "none" | "exact" | "semantic";
     dedupPromptVersion?: string;
@@ -118,15 +122,39 @@ export function consolidateDiaryBrainCandidates(
     const sourceMessageIds = [
       ...new Set([...(existing?.sourceMessageIds ?? []), ...candidate.sourceMessageIds]),
     ];
+    const evidenceStatements = new Map(
+      existing?.evidenceStatements.map((evidence) => [
+        evidence.sourceMessageId,
+        evidence.statement,
+      ]),
+    );
+    for (const sourceMessageId of candidate.sourceMessageIds) {
+      if (!evidenceStatements.has(sourceMessageId)) {
+        evidenceStatements.set(sourceMessageId, candidate.statement);
+      }
+    }
+    const groupDecisions = decisions.filter((_, index) => rootIndex(index) === root);
+    const semanticDecision = groupDecisions.find(
+      (decision) => decision.deduplication === "semantic",
+    );
+    const deduplication = semanticDecision
+      ? "semantic"
+      : groupDecisions.some((decision) => decision.deduplication === "exact")
+        ? "exact"
+        : "none";
     consolidated.set(root, {
       ...rootCandidate,
       sourceMessageIds,
+      evidenceStatements: [...evidenceStatements].map(([sourceMessageId, statement]) => ({
+        sourceMessageId,
+        statement,
+      })),
       ...(rootDecision.matchingBrainItemId
         ? { matchingBrainItemId: rootDecision.matchingBrainItemId }
         : {}),
-      deduplication: rootDecision.matchingBrainItemId ? rootDecision.deduplication : "none",
-      ...(rootDecision.matchingBrainItemId && rootDecision.dedupPromptVersion
-        ? { dedupPromptVersion: rootDecision.dedupPromptVersion }
+      deduplication,
+      ...(semanticDecision?.dedupPromptVersion
+        ? { dedupPromptVersion: semanticDecision.dedupPromptVersion }
         : {}),
     });
   }

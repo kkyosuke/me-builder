@@ -16,10 +16,7 @@ import {
 import { getProfileSummary } from "../logic/profile-summary";
 import { requestProfileSummaryGeneration } from "../logic/profile-summary-generation";
 import type { AppEnv } from "../types";
-
-function bearerToken(authorization: string | undefined): string | undefined {
-  return authorization?.trim().match(/^Bearer\s+([^\s]+)$/i)?.[1];
-}
+import { bearerToken } from "./auth";
 
 export async function getProfileSummaryContents(c: Context<AppEnv>): Promise<Response> {
   if (!c.env?.DB || !c.env.ACCOUNT_DATA) {

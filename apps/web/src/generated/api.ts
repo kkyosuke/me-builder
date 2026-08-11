@@ -4,23 +4,6 @@
  */
 
 export interface paths {
-  "/api/line/liff/session": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** LIFF IDトークンを検証してAccountを解決する */
-    post: operations["verifyLiffSession"];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   "/api/admin/statistics": {
     parameters: {
       query?: never;
@@ -272,88 +255,6 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-  verifyLiffSession: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        "application/json": {
-          idToken: string;
-        };
-      };
-    };
-    responses: {
-      /** @description 表示可能なLINEプロフィールと検証済みAccount role */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": {
-            /** @enum {string} */
-            role: "user" | "admin";
-            displayName?: string;
-            /** Format: uri */
-            pictureUrl?: string;
-          };
-        };
-      };
-      /** @description LIFF IDトークンを検証できない */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": {
-            /** @constant */
-            error: "Unauthorized";
-          };
-        };
-      };
-      /** @description 対応するAccountが存在しない */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": {
-            /** @constant */
-            error: "Account not found";
-            /** @constant */
-            reason: "friendship_required";
-          };
-        };
-      };
-      /** @description 未処理のサーバーエラー */
-      500: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": {
-            /** @constant */
-            error: "Internal Server Error";
-          };
-        };
-      };
-      /** @description D1 bindingが設定されていない */
-      503: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": {
-            /** @constant */
-            error: "Service Unavailable";
-          };
-        };
-      };
-    };
-  };
   getAdminStatistics: {
     parameters: {
       query?: never;

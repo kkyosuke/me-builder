@@ -207,6 +207,8 @@ GitHub Actionsの手動resetは常に最新`main`を対象にこのライフサ�
       - API (`apps/api`): `api.kagami.kyosuke.dev`
       - MCP (`apps/mcp`): `mcp.kagami.kyosuke.dev`
 
+APIとMCPがブラウザへ返すCORSヘッダは、環境manifestのベースドメインから生成したWeb UIのオリジンだけを許可します。LocalはVite開発サーバーのオリジンを使用し、設定が欠けている場合や一致しないOriginには`Access-Control-Allow-Origin`を返しません。
+
 ### 6.2 APIドキュメントのCloudflare Access境界
 
 PreviewとProductionでは、APIドキュメントを利用者向けAPIとは別のCloudflare Access Applicationで保護します。ApplicationはAPIホスト全体ではなく、次のパスだけを対象にします。

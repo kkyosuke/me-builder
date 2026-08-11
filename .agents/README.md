@@ -53,8 +53,10 @@
 | [相性API契約](../docs/development/compatibility-api.md) | Web UIとAPI Server間の相性APIのパス、認証、入出力、エラー契約 |
 | [API契約とクライアント型の生成](../docs/development/api-contract-generation.md) | API ServerのHTTP契約の配置、OpenAPI documentとWeb UI用TypeScript型の生成運用 |
 | [アプリケーション運用ログ方針](../docs/development/operational-logging.md) | 一連の処理を追跡し、エラー原因と最終結果を判断できる運用ログの目的と進め方 |
+| [Brain Item残タスク](../docs/development/brain-item-remaining-tasks.md) | Brain Item生成・意味的重複判定・Vectorize利用に残っている検証、品質改善、延期中の機能 |
 | [アバター設定残タスク](../docs/development/avatar-remaining-tasks.md) | アバター設定で未完了の実ブラウザE2E、LIFF実端末確認、Private R2孤立objectの運用改善 |
 | [わたしのまとめ残タスク](../docs/development/profile-summary-remaining-tasks.md) | 「わたしのまとめ」で未完了の実環境検証、完了条件、検証後の追跡先 |
+| [日記入力残タスク](../docs/development/diary-remaining-tasks.md) | 日記入力で未実装の送信取り消し（unsend）と写真添付、各項目の完了条件 |
 | [PR作成手順書](../docs/development/pull-request-guidelines.md) | PRタイトルの命名規則、概要の書き方、作成前の準備・検証手順 |
 
 この表は各文書へのナビゲーションです。概念の定義そのものはリンク先だけに記載します。

@@ -1,5 +1,6 @@
 {
   "environment": "production",
+  "baseDomain": "kagami.kyosuke.dev",
   "database": {
     "id": "6d11180b-3286-4b69-bd63-c7b60d768be1",
     "name": "me-builder-db-production"

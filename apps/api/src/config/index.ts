@@ -1,5 +1,5 @@
 import { line } from "@me-builder/lib";
-import { getEnv } from "@me-builder/shared";
+import { getEnv, parseAdminLineUserIds } from "@me-builder/shared";
 import * as v from "valibot";
 import { type ApiConfig, ConfigSchema } from "./schema";
 
@@ -21,6 +21,7 @@ export function getConfig(env?: Record<string, unknown>): ApiConfig {
   const rawLineChannelAccessToken = getEnv("LINE_CHANNEL_ACCESS_TOKEN", env);
   const rawLineChannelSecret = getEnv("LINE_CHANNEL_SECRET", env);
   const rawBaseDomain = getEnv("BASE_DOMAIN", env);
+  const rawWebOrigin = getEnv("WEB_ORIGIN", env)?.trim() || undefined;
   let rawBaseUrl = getEnv("BASE_URL", env);
 
   if ((!rawBaseUrl || rawBaseUrl === "/") && rawBaseDomain) {
@@ -47,10 +48,7 @@ export function getConfig(env?: Record<string, unknown>): ApiConfig {
     channelId: getEnv("LINE_LOGIN_CHANNEL_ID", env)?.trim() || undefined,
     liffId: rawLiffId,
   });
-  const adminLineUserIds = (getEnv("ADMIN_LINE_USER_IDS", env) ?? "")
-    .split(",")
-    .map((value) => value.trim())
-    .filter(Boolean);
+  const adminLineUserIds = parseAdminLineUserIds(getEnv("ADMIN_LINE_USER_IDS", env));
 
   const rawConfig = {
     port: rawPort,
@@ -59,6 +57,7 @@ export function getConfig(env?: Record<string, unknown>): ApiConfig {
     lineChannelSecret: rawLineChannelSecret,
     baseDomain: rawBaseDomain,
     baseUrl: rawBaseUrl,
+    webOrigin: rawWebOrigin,
     lineWebhookUrl: rawLineWebhookUrl,
     webhookQueueName: rawWebhookQueueName,
     webhookQueue: rawWebhookQueue,

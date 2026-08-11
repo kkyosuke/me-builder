@@ -147,7 +147,7 @@ export async function deleteUnmanagedPreviewFoundation() {
   }
 }
 
-export async function discoverPreviewInfrastructure() {
+export async function discoverPreviewInfrastructure(baseDomain: string) {
   const { accountId } = requireCloudflareEnvironment();
   const names = resourceNames("preview");
   const databases = await cloudflare<{ uuid: string; name: string }[]>(
@@ -167,6 +167,7 @@ export async function discoverPreviewInfrastructure() {
   );
   return parseManifest({
     environment: "preview",
+    baseDomain,
     database: { id: database.uuid, name: database.name },
     avatarBucket: { name: avatarBucket.name },
     queues: Object.fromEntries(

@@ -12,6 +12,7 @@ export function getMcpConfig(env?: Record<string, unknown>): McpConfig {
   const rawEnvironment = getEnv(["ENVIRONMENT", "NODE_ENV"], env);
   const rawPort = getEnv(["MCP_PORT", "PORT"], env);
   const rawBaseDomain = getEnv("BASE_DOMAIN", env);
+  const rawWebOrigin = getEnv("WEB_ORIGIN", env)?.trim() || undefined;
   let rawBaseUrl = getEnv("BASE_URL", env);
   let rawApiUrl = getEnv("API_URL", env);
 
@@ -39,6 +40,7 @@ export function getMcpConfig(env?: Record<string, unknown>): McpConfig {
     baseDomain: rawBaseDomain,
     baseUrl: rawBaseUrl,
     apiUrl: rawApiUrl,
+    webOrigin: rawWebOrigin,
   };
 
   return v.parse(McpConfigSchema, rawConfig);

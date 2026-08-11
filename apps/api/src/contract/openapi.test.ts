@@ -16,25 +16,11 @@ describe("GET /api/openapi.json", () => {
     expect(document.paths["/api/diagnoses"]?.get).toBeDefined();
     expect(document.paths["/api/compatibility/share-preview"]?.get).toBeDefined();
     expect(document.paths["/api/diagnoses/{diagnosisId}/answers"]?.get).toBeDefined();
-    expect(document.paths["/api/line/liff/session"]?.post).toBeDefined();
     expect(document.paths["/api/profile"]?.get).toBeDefined();
     expect(document.paths["/api/profile/avatar"]?.put).toBeDefined();
     expect(document.paths["/api/profile/avatar"]?.delete).toBeDefined();
     expect(document.paths["/api/dev/brain-items"]?.get).toBeDefined();
     expect(document.paths["/api/dev/brain-items/{brainItemId}/vector"]?.get).toBeDefined();
-    expect(document.paths["/api/line/liff/session"]?.post).toMatchObject({
-      requestBody: {
-        required: true,
-        content: {
-          "application/json": {
-            schema: {
-              type: "object",
-              required: ["idToken"],
-            },
-          },
-        },
-      },
-    });
     expect(document.paths["/api/openapi.json"]).toBeUndefined();
     expect(document.components.securitySchemes.liffIdToken).toMatchObject({
       type: "http",

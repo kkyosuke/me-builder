@@ -8,6 +8,7 @@ import type { AccountDataDatabase } from "../database";
 import { accountSchema as schema } from "../database";
 import { saveBrainItem } from "./brain";
 import {
+  DIARY_BRAIN_CHECKPOINT_DISPATCH_LEASE_MS,
   applyDiaryBrainCheckpoint,
   attachMessagesToTurn,
   claimDueDiaryBrainCheckpointIds,
@@ -191,6 +192,37 @@ describe("Diary conversation persistence flow", () => {
             category: "memory",
             statement: "発言していない出来事",
             sourceMessageIds: checkpointContext?.sourceMessageIds.slice(0, 1) ?? [],
+          },
+        ],
+      ),
+    ).rejects.toThrow("evidence validation failed");
+    const [firstEvidenceMessageId, secondEvidenceMessageId] =
+      checkpointContext?.sourceMessageIds ?? [];
+    if (!firstEvidenceMessageId || !secondEvidenceMessageId) {
+      throw new Error("Evidence検証test fixtureが不正です");
+    }
+    await expect(
+      applyDiaryBrainCheckpoint(
+        db,
+        account.id,
+        checkpoint?.id ?? "",
+        checkpointContext?.throughSequence ?? 0,
+        "diary-brain-test",
+        [
+          {
+            category: "memory",
+            statement: "今日は少し疲れた",
+            sourceMessageIds: [firstEvidenceMessageId, secondEvidenceMessageId],
+            evidenceStatements: [
+              {
+                sourceMessageId: firstEvidenceMessageId,
+                statement: "今日は少し疲れた",
+              },
+              {
+                sourceMessageId: secondEvidenceMessageId,
+                statement: "今日は少し疲れた",
+              },
+            ],
           },
         ],
       ),
@@ -1093,8 +1125,130 @@ describe("Diary conversation persistence flow", () => {
       listDueDiaryBrainCheckpointIds(
         db,
         account.id,
-        new Date(secondClaimAt.getTime() + 60 * 60 * 1000),
+        new Date(secondClaimAt.getTime() + DIARY_BRAIN_CHECKPOINT_DISPATCH_LEASE_MS - 1),
       ),
     ).resolves.toEqual([]);
+  });
+
+  it("dispatchedのまま回復期限を超えたcheckpointを再回収してappliedにする", async () => {
+    const db = createTestDb();
+    const account = await bindAccount(db, "account-brain_stale-dispatch");
+    const receivedAt = new Date("2026-08-07T00:00:00.000Z");
+    const source = await storeLineTextSource(db, {
+      accountId: account.id,
+      eventId: "brain-stale-dispatch",
+      body: "今日は公園を散歩した",
+      receivedAt,
+    });
+    await attachMessagesToTurn(db, account.id, [source], 1, "test-model", "test-prompt");
+    const [checkpoint] = await db.select().from(schema.diaryBrainCheckpoints);
+    const checkpointId = checkpoint?.id ?? "";
+    const firstClaimAt = new Date(receivedAt.getTime() + 10 * 60 * 1000);
+
+    await expect(claimDueDiaryBrainCheckpointIds(db, account.id, firstClaimAt)).resolves.toEqual([
+      checkpointId,
+    ]);
+    await expect(
+      markDiaryBrainCheckpointDispatched(db, account.id, checkpointId, firstClaimAt),
+    ).resolves.toBe(true);
+
+    const recoveryAt = new Date(firstClaimAt.getTime() + DIARY_BRAIN_CHECKPOINT_DISPATCH_LEASE_MS);
+    await expect(
+      listDueDiaryBrainCheckpointIds(db, account.id, new Date(recoveryAt.getTime() - 1)),
+    ).resolves.toEqual([]);
+    await expect(listDueDiaryBrainCheckpointIds(db, account.id, recoveryAt)).resolves.toEqual([
+      checkpointId,
+    ]);
+    await expect(claimDueDiaryBrainCheckpointIds(db, account.id, recoveryAt)).resolves.toEqual([
+      checkpointId,
+    ]);
+    await expect(
+      markDiaryBrainCheckpointDispatched(db, account.id, checkpointId, recoveryAt),
+    ).resolves.toBe(true);
+
+    const context = await getDiaryBrainCheckpointContext(db, account.id, checkpointId);
+    await expect(
+      applyDiaryBrainCheckpoint(
+        db,
+        account.id,
+        checkpointId,
+        context?.throughSequence ?? 0,
+        "diary-brain-test",
+        [
+          {
+            category: "memory",
+            statement: "今日は公園を散歩した",
+            sourceMessageIds: context?.sourceMessageIds ?? [],
+          },
+        ],
+        recoveryAt,
+      ),
+    ).resolves.toMatchObject({ candidates: [{ operation: "created" }] });
+    expect(
+      db
+        .select({ status: schema.diaryBrainCheckpoints.status })
+        .from(schema.diaryBrainCheckpoints)
+        .where(eq(schema.diaryBrainCheckpoints.id, checkpointId))
+        .get(),
+    ).toEqual({ status: "applied" });
+  });
+
+  it("回復再投入と元のQueue処理が競合してもcheckpointを二重適用しない", async () => {
+    const db = createTestDb();
+    const account = await bindAccount(db, "account-brain_recovery-race");
+    const receivedAt = new Date("2026-08-07T00:00:00.000Z");
+    const source = await storeLineTextSource(db, {
+      accountId: account.id,
+      eventId: "brain-recovery-race",
+      body: "毎朝コーヒーを飲む",
+      receivedAt,
+    });
+    await attachMessagesToTurn(db, account.id, [source], 1, "test-model", "test-prompt");
+    const [checkpoint] = await db.select().from(schema.diaryBrainCheckpoints);
+    const checkpointId = checkpoint?.id ?? "";
+    const firstClaimAt = new Date(receivedAt.getTime() + 10 * 60 * 1000);
+    await claimDueDiaryBrainCheckpointIds(db, account.id, firstClaimAt);
+    await markDiaryBrainCheckpointDispatched(db, account.id, checkpointId, firstClaimAt);
+
+    // 元のQueue処理がcontextを読んだ後に、Alarmが同じcheckpointを再claimする競合を再現する。
+    const originalContext = await getDiaryBrainCheckpointContext(db, account.id, checkpointId);
+    const recoveryAt = new Date(firstClaimAt.getTime() + DIARY_BRAIN_CHECKPOINT_DISPATCH_LEASE_MS);
+    await expect(claimDueDiaryBrainCheckpointIds(db, account.id, recoveryAt)).resolves.toEqual([
+      checkpointId,
+    ]);
+    const replayContext = await getDiaryBrainCheckpointContext(db, account.id, checkpointId);
+    const candidates = [
+      {
+        category: "behavior_pattern" as const,
+        statement: "毎朝コーヒーを飲む",
+        sourceMessageIds: originalContext?.sourceMessageIds ?? [],
+      },
+    ];
+
+    await expect(
+      applyDiaryBrainCheckpoint(
+        db,
+        account.id,
+        checkpointId,
+        originalContext?.throughSequence ?? 0,
+        "diary-brain-test",
+        candidates,
+        recoveryAt,
+      ),
+    ).resolves.toMatchObject({ candidates: [{ operation: "created" }] });
+    await expect(
+      applyDiaryBrainCheckpoint(
+        db,
+        account.id,
+        checkpointId,
+        replayContext?.throughSequence ?? 0,
+        "diary-brain-test",
+        candidates,
+        recoveryAt,
+      ),
+    ).resolves.toBe(false);
+    await expect(db.select().from(schema.brainItems)).resolves.toHaveLength(1);
+    await expect(db.select().from(schema.brainItemEvidenceEdges)).resolves.toHaveLength(1);
+    await expect(db.select().from(schema.diaryBrainCheckpointItems)).resolves.toHaveLength(1);
   });
 });

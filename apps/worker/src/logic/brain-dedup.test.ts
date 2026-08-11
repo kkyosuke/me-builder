@@ -186,10 +186,62 @@ describe("decideDiaryBrainDuplicates", () => {
       {
         ...candidate,
         sourceMessageIds: ["message-1", "message-2"],
-        deduplication: "none",
+        evidenceStatements: [
+          {
+            sourceMessageId: "message-1",
+            statement: "辛いものはあまり食べられない",
+          },
+          { sourceMessageId: "message-2", statement: "辛い食べ物が苦手" },
+        ],
+        deduplication: "semantic",
+        dedupPromptVersion: "brain-dedup-v2",
       },
     ]);
     expect(harness.dependencies.generateDecision).toHaveBeenCalledOnce();
+  });
+
+  it("NFKCと空白だけが異なる候補をexact統合して各Evidenceのstatementを保持する", async () => {
+    const candidates = [
+      {
+        category: "preference" as const,
+        statement: "A Bが好き",
+        sourceMessageIds: ["message-1"],
+      },
+      {
+        category: "preference" as const,
+        statement: "Ａ　Ｂが好き",
+        sourceMessageIds: ["message-2"],
+      },
+    ];
+    const harness = createHarness([]);
+
+    const decisions = await decideDiaryBrainDuplicates(
+      {
+        candidates,
+        messages: [],
+        accountId: "account-1",
+        cf: harness.cf,
+        workerConfig,
+      },
+      harness.dependencies,
+    );
+
+    expect(decisions).toEqual([
+      { deduplication: "none" },
+      { matchingCandidateIndex: 0, deduplication: "exact" },
+    ]);
+    expect(consolidateDiaryBrainCandidates(candidates, decisions ?? [])).toEqual([
+      {
+        ...candidates[0],
+        sourceMessageIds: ["message-1", "message-2"],
+        evidenceStatements: [
+          { sourceMessageId: "message-1", statement: "A Bが好き" },
+          { sourceMessageId: "message-2", statement: "Ａ　Ｂが好き" },
+        ],
+        deduplication: "exact",
+      },
+    ]);
+    expect(harness.dependencies.generateDecision).not.toHaveBeenCalled();
   });
 
   it("検索候補外のIDをAIが返した場合は保存せず再試行へ倒す", async () => {

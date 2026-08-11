@@ -678,10 +678,16 @@ describe("App", () => {
 
   it("/meから新しいまとめ版の生成を要求する", async () => {
     const current = await mocks.fetchProfileSummary();
-    mocks.fetchProfileSummary.mockResolvedValue({
+    const idle = {
       ...current,
-      generation: { status: "idle", canRegenerate: true, reasons: ["brain"] },
-    });
+      generation: { status: "idle" as const, canRegenerate: true, reasons: ["brain" as const] },
+    };
+    const queued = {
+      ...current,
+      generation: { status: "queued" as const, canRegenerate: false, reasons: ["brain" as const] },
+    };
+    mocks.fetchProfileSummary.mockClear();
+    mocks.fetchProfileSummary.mockResolvedValueOnce(idle).mockResolvedValue(queued);
     window.history.replaceState({}, "", "/me");
     render(<App />);
 
