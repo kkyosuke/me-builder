@@ -154,7 +154,7 @@ describe("ProfileSummaryScreen", () => {
     fireEvent.click(regenerateButton);
     fireEvent.click(screen.getByRole("button", { name: "過去のまとめがあります" }));
     expect(onSelectVersion).not.toHaveBeenCalled();
-    act(() => vi.advanceTimersByTime(300));
+    act(() => vi.advanceTimersByTime(320));
 
     expect(onSelectVersion).toHaveBeenCalledWith("version-2");
     expect(onRegenerate).toHaveBeenCalledOnce();
@@ -190,7 +190,6 @@ describe("ProfileSummaryScreen", () => {
     );
     act(() => vi.advanceTimersByTime(300));
     expect(onSelectVersion).toHaveBeenCalledWith("version-2");
-    act(() => vi.advanceTimersToNextTimer());
     expect(latestCard.getAttribute("style")).toContain("translate3d(0px");
     expect(latestCard.className).toContain("duration-0");
 
@@ -222,14 +221,14 @@ describe("ProfileSummaryScreen", () => {
       pointerId: 3,
     });
     firePointer(pastCard, "pointerup", { clientX: 100, clientY: 12, pointerId: 3 });
-    act(() => vi.advanceTimersByTime(0));
+    act(() => vi.advanceTimersToNextTimer());
     const incomingCard = container.querySelector('[data-summary-card-layer="incoming"]');
     expect(incomingCard?.textContent).toContain("第3版");
     expect(incomingCard?.textContent).toContain(summary.headline);
     expect(incomingCard?.getAttribute("data-summary-card-entry")).toBe("foreground");
     expect(incomingCard?.className).toContain("inset-x-0");
     expect(incomingCard?.className).toContain("z-20");
-    act(() => vi.advanceTimersByTime(300));
+    act(() => vi.advanceTimersByTime(320));
     expect(onSelectVersion).toHaveBeenLastCalledWith("version-3");
     expect(screen.queryByRole("button", { name: "最新のわたしを知る" })).toBeNull();
   });
@@ -252,15 +251,13 @@ describe("ProfileSummaryScreen", () => {
     }
 
     const { container } = render(<VersionHarness />);
+    const initialLatestCard = screen.getByLabelText("最新のまとめ");
     fireEvent.click(screen.getByRole("button", { name: "過去のまとめがあります" }));
     act(() => vi.advanceTimersToNextTimer());
     act(() => vi.advanceTimersToNextTimer());
 
-    expect(screen.getByLabelText("過去のまとめ")).toBeTruthy();
-    expect(container.querySelector('[data-summary-card-layer="incoming"]')).toBeTruthy();
-
-    act(() => vi.advanceTimersToNextTimer());
     const pastCard = screen.getByLabelText("過去のまとめ");
+    expect(pastCard).not.toBe(initialLatestCard);
     expect(container.querySelector('[data-summary-card-layer="incoming"]')).toBeNull();
     expect(pastCard.getAttribute("style")).toContain("translate3d(0px");
     expect(pastCard.className).toContain("duration-0");
@@ -269,11 +266,8 @@ describe("ProfileSummaryScreen", () => {
     act(() => vi.advanceTimersToNextTimer());
     act(() => vi.advanceTimersToNextTimer());
 
-    expect(screen.getByLabelText("最新のまとめ")).toBeTruthy();
-    expect(container.querySelector('[data-summary-card-entry="foreground"]')).toBeTruthy();
-
-    act(() => vi.advanceTimersToNextTimer());
     const latestCard = screen.getByLabelText("最新のまとめ");
+    expect(latestCard).not.toBe(pastCard);
     expect(container.querySelector('[data-summary-card-layer="incoming"]')).toBeNull();
     expect(latestCard.getAttribute("style")).toContain("translate3d(0px");
     expect(latestCard.className).toContain("duration-0");
@@ -368,7 +362,7 @@ describe("ProfileSummaryScreen", () => {
     const incomingCard = document.querySelector('[data-summary-card-entry="foreground"]');
     expect(incomingCard?.getAttribute("style")).toContain("translate3d(calc(-105%");
     expect(onSelectVersion).not.toHaveBeenCalled();
-    act(() => vi.advanceTimersByTime(300));
+    act(() => vi.advanceTimersByTime(320));
     expect(onSelectVersion).toHaveBeenCalledWith("version-3");
     expect(screen.queryByRole("button", { name: "最新のわたしを知る" })).toBeNull();
 

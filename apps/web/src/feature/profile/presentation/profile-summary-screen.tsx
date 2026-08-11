@@ -108,6 +108,7 @@ function SummarySkeleton() {
 }
 
 const CARD_TRANSITION_MS = 300;
+const CARD_PREPARATION_MS = 16;
 
 type CardTransition = Readonly<{ type: "select"; direction: -1 | 1; versionId: string }>;
 
@@ -207,13 +208,10 @@ function SummaryCardStack({
     const nextTransition: CardTransition = { type: "select", direction, versionId };
     const complete = () => {
       onSelectVersion?.(nextTransition.versionId);
+      setTransition(null);
+      setTransitionStarted(false);
+      setDragX(0);
       transitionTimer.current = null;
-      preparationTimer.current = setTimeout(() => {
-        setTransition(null);
-        setTransitionStarted(false);
-        setDragX(0);
-        preparationTimer.current = null;
-      }, 0);
     };
 
     if (reducedMotion) {
@@ -229,7 +227,7 @@ function SummaryCardStack({
       transitionTimer.current = setTimeout(complete, CARD_TRANSITION_MS);
     };
     if (prepareFromRest) {
-      preparationTimer.current = setTimeout(start, 0);
+      preparationTimer.current = setTimeout(start, CARD_PREPARATION_MS);
     } else {
       start();
     }
@@ -316,6 +314,7 @@ function SummaryCardStack({
         )}
 
         <div
+          key={selected.id}
           ref={activeCard}
           data-summary-card-layer="active"
           aria-label={
