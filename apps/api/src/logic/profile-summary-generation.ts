@@ -24,6 +24,7 @@ type Params = Readonly<{
   accountData?: AccountDataNamespace;
   queue?: Queue<ProfileSummaryGenerationQueueMessage>;
   at?: Date;
+  allowUnchangedRegeneration?: boolean;
 }>;
 
 export async function requestProfileSummaryGeneration({
@@ -33,12 +34,17 @@ export async function requestProfileSummaryGeneration({
   accountData,
   queue,
   at = new Date(),
+  allowUnchangedRegeneration = false,
 }: Params): Promise<RequestProfileSummaryGenerationOutcome> {
   const session = await createLiffSession({ idToken, lineLoginChannelId, db });
   if (session.type !== "resolved") return session;
   if (!accountData || !queue) throw new Error("Profile Summary generation binding is missing");
   const account = accountDataFor(accountData, session.session.accountId);
-  const request = await account.execute("profileSummary.requestGeneration", at);
+  const request = await account.execute(
+    "profileSummary.requestGeneration",
+    at,
+    allowUnchangedRegeneration,
+  );
   if (request.outcome === "unavailable") return { type: "unavailable", reason: request.reason };
   if (request.outcome === "created") {
     try {

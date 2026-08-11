@@ -162,6 +162,7 @@ export async function readProfileSummary(
   db: AccountDataDatabase,
   accountId: string,
   at = new Date(),
+  allowUnchangedRegeneration = false,
 ): Promise<ProfileSummaryReadModel> {
   const [counts, inputSnapshot, versionRows, latestGeneration] = await Promise.all([
     availableData(db, accountId),
@@ -196,7 +197,7 @@ export async function readProfileSummary(
     availableDataCounts: counts,
     generation: {
       status,
-      canRegenerate: hasInput && reasons.length > 0 && !active,
+      canRegenerate: hasInput && (allowUnchangedRegeneration || reasons.length > 0) && !active,
       reasons,
       message: latestGeneration?.status === "failed" ? latestGeneration.failureMessage : null,
     },
@@ -207,6 +208,7 @@ export async function requestProfileSummaryGeneration(
   db: AccountDataDatabase,
   accountId: string,
   requestedAt = new Date(),
+  allowUnchangedRegeneration = false,
 ): Promise<RequestProfileSummaryGenerationResult> {
   const existing = await db
     .select({ id: profileSummaryGenerations.id, status: profileSummaryGenerations.status })
@@ -234,7 +236,10 @@ export async function requestProfileSummaryGeneration(
   if (inputSnapshot.diagnosis.count + inputSnapshot.diary.count === 0) {
     return { outcome: "unavailable", reason: "source_record_required" };
   }
-  if (regenerationReasons(inputSnapshot, latestVersion, requestedAt).length === 0) {
+  if (
+    !allowUnchangedRegeneration &&
+    regenerationReasons(inputSnapshot, latestVersion, requestedAt).length === 0
+  ) {
     return { outcome: "unavailable", reason: "regeneration_not_required" };
   }
 

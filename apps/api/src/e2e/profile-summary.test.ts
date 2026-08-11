@@ -149,7 +149,11 @@ function mockLineVerification(): void {
   );
 }
 
-async function request(pathname = "/api/profile-summary", method = "GET"): Promise<Response> {
+async function request(
+  pathname = "/api/profile-summary",
+  method = "GET",
+  environment = "test",
+): Promise<Response> {
   return app.request(
     pathname,
     { method, headers: { Authorization: "Bearer known-token" } },
@@ -158,7 +162,7 @@ async function request(pathname = "/api/profile-summary", method = "GET"): Promi
       ACCOUNT_DATA: accountDataStore.namespace,
       PROFILE_SUMMARY_QUEUE: queue,
       LINE_LOGIN_CHANNEL_ID: "1234567890",
-      ENVIRONMENT: "test",
+      ENVIRONMENT: environment,
     },
   );
 }
@@ -217,10 +221,39 @@ describe("Profile Summary local D1 E2E", () => {
     expect(body.availableDataCounts).toEqual({ diagnosis: 0, diary: 1 });
     expect(body.generation).toEqual({
       status: "idle",
-      canRegenerate: false,
+      canRegenerate: true,
       reasons: [],
       message: null,
     });
+  });
+
+  it("開発環境では変更がなくても再生成でき、本番では通常判定を維持する", async () => {
+    await insertDiaryMessage();
+    await insertSummaryVersions();
+
+    const productionRead = await request("/api/profile-summary", "GET", "production");
+    expect((await productionRead.json()).generation).toMatchObject({
+      canRegenerate: false,
+      reasons: [],
+    });
+    const productionRequest = await request(
+      "/api/profile-summary/generations",
+      "POST",
+      "production",
+    );
+    expect(productionRequest.status).toBe(409);
+    expect(await productionRequest.json()).toMatchObject({
+      reason: "regeneration_not_required",
+    });
+
+    const developmentRead = await request();
+    expect((await developmentRead.json()).generation).toMatchObject({
+      canRegenerate: true,
+      reasons: [],
+    });
+    const developmentRequest = await request("/api/profile-summary/generations", "POST");
+    expect(developmentRequest.status).toBe(202);
+    expect(await developmentRequest.json()).toMatchObject({ created: true, status: "queued" });
   });
 
   it(`${profileSummaryCases.requestGeneration.id}: ${profileSummaryCases.requestGeneration.name}`, async () => {

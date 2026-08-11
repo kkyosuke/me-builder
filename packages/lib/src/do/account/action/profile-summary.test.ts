@@ -206,6 +206,14 @@ describe("Profile Summary persistence", () => {
       }),
     ).resolves.toBe(true);
     expect((await readProfileSummary(db, accountId)).versions).toHaveLength(1);
+    await expect(
+      readProfileSummary(db, accountId, new Date("2026-08-09T00:03:00.000Z"), true),
+    ).resolves.toMatchObject({
+      generation: { status: "idle", canRegenerate: true, reasons: [] },
+    });
+    await expect(
+      requestProfileSummaryGeneration(db, accountId, new Date("2026-08-09T00:03:00.000Z"), true),
+    ).resolves.toMatchObject({ outcome: "created", status: "queued" });
   });
 
   it("利用できる入力がなければ生成要求を作らない", async () => {
@@ -215,6 +223,9 @@ describe("Profile Summary persistence", () => {
       outcome: "unavailable",
       reason: "source_record_required",
     });
+    await expect(
+      requestProfileSummaryGeneration(db, "account-1", new Date(), true),
+    ).resolves.toEqual({ outcome: "unavailable", reason: "source_record_required" });
   });
 
   it("最新版の入力snapshotと比較して診断・日記・30日経過を再生成理由にする", async () => {
