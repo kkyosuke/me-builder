@@ -35,7 +35,10 @@ async function readWranglerJson(args: string[]): Promise<unknown> {
     new Response(child.stderr).text(),
   ]);
   if (exitCode !== 0) throw new Error(`Failed to inspect Vectorize: ${stderr.trim()}`);
-  return JSON.parse(stdout);
+  // wranglerは応答が空のとき`JSON.stringify(undefined)`をそのまま出力し、JSONにならない。
+  const body = stdout.trim();
+  if (body === "" || body === "undefined") return null;
+  return JSON.parse(body);
 }
 
 await runWrangler(
@@ -43,7 +46,7 @@ await runWrangler(
   /already exists|already taken|duplicate/i,
   `Vectorize index ${indexName}`,
 );
-const index = (await readWranglerJson(["vectorize", "get", indexName])) as {
+const index = ((await readWranglerJson(["vectorize", "get", indexName])) ?? {}) as {
   config?: { dimensions?: number; metric?: string };
 };
 if (index.config?.dimensions !== 768 || index.config.metric !== "cosine") {
@@ -56,24 +59,29 @@ await runWrangler(
   /already exists|already indexed|duplicate/i,
   `metadata index ${indexName}.owner_scope`,
 );
-let metadataIndexes: unknown = [];
-for (let attempt = 0; attempt < 30; attempt += 1) {
-  metadataIndexes = await readWranglerJson(["vectorize", "list-metadata-index", indexName]);
-  if (
-    Array.isArray(metadataIndexes) &&
-    metadataIndexes.some(
-      (entry) =>
-        typeof entry === "object" &&
-        entry !== null &&
-        "propertyName" in entry &&
-        entry.propertyName === "owner_scope" &&
-        "indexType" in entry &&
-        entry.indexType === "string",
-    )
-  ) {
-    console.info(`Verified metadata index ${indexName}.owner_scope`);
-    process.exit(0);
-  }
-  await Bun.sleep(2_000);
+
+// create-metadata-index はmutationをキューへ積むだけで、list へ現れるまでの時間に保証がない。
+// デプロイをその反映待ちで止めないため、ここでは1回だけ確認し、未反映は警告に留める。
+// 型違いで既に存在する場合だけは、後続のfilter検索が壊れるためデプロイを止める。
+const metadataIndexes = await readWranglerJson(["vectorize", "list-metadata-index", indexName]);
+const ownerScope = (Array.isArray(metadataIndexes) ? metadataIndexes : []).find(
+  (entry): entry is { propertyName: string; indexType?: string } =>
+    typeof entry === "object" &&
+    entry !== null &&
+    "propertyName" in entry &&
+    entry.propertyName === "owner_scope",
+);
+// Cloudflare APIは`String`のように先頭を大文字にして返す。SDKの型宣言 (`'string' | 'number' |
+// 'boolean'`) と一致しないため、大文字小文字を無視して比べる。
+const ownerScopeType = ownerScope?.indexType?.toLowerCase();
+if (!ownerScope) {
+  console.warn(
+    `::warning::metadata index ${indexName}.owner_scope is still propagating; vector insert must wait until it becomes visible`,
+  );
+} else if (ownerScopeType !== "string") {
+  throw new Error(
+    `metadata index ${indexName}.owner_scope must be a string index but is ${ownerScope.indexType}; delete and recreate it before deployment`,
+  );
+} else {
+  console.info(`Verified metadata index ${indexName}.owner_scope`);
 }
-throw new Error(`metadata index ${indexName}.owner_scope was not created as a string index`);
