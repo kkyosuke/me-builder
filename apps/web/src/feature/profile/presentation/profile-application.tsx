@@ -40,6 +40,7 @@ export default function ProfileApplication() {
   return (
     <ProfileSummaryScreen
       state={screenState}
+      generationNotice={summary.generationNotice}
       {...(result ? { availableDataCounts: result.availableDataCounts } : {})}
       onRetry={() => void summary.reload()}
       {...(versioning ? { versioning } : {})}
