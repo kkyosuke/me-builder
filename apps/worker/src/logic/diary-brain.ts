@@ -31,6 +31,10 @@ const ResponseEnvelopeSchema = v.strictObject({
   brain_item_candidates: v.pipe(v.array(v.unknown()), v.maxLength(3)),
 });
 
+function normalizeEvidenceText(value: string): string {
+  return value.normalize("NFKC").replace(/\s+/gu, " ").trim();
+}
+
 export type DiaryBrainCandidate = v.InferOutput<typeof CandidateSchema>;
 
 export function validateDiaryBrainCandidates(
@@ -75,7 +79,12 @@ export function validateDiaryBrainCandidates(
       logRejectedCandidate(candidateIndex, "outside_checkpoint_evidence");
       continue;
     }
-    if (!candidate.source_message_ids.every((id) => sourceBodies.get(id)?.includes(statement))) {
+    const normalizedStatement = normalizeEvidenceText(statement);
+    if (
+      !candidate.source_message_ids.every((id) =>
+        normalizeEvidenceText(sourceBodies.get(id) ?? "").includes(normalizedStatement),
+      )
+    ) {
       logRejectedCandidate(candidateIndex, "ungrounded_statement");
       continue;
     }

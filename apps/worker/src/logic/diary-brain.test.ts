@@ -43,6 +43,31 @@ describe("diary Brain checkpoint", () => {
     expect(validateDiaryBrainCandidates(raw, messages, ["message-1", "message-2"])).toHaveLength(2);
   });
 
+  it("NFKCと空白の差を正規化して原文にあるstatementを受け入れる", () => {
+    const normalizedMessages = [
+      {
+        id: "message-normalized",
+        role: "user" as const,
+        body: "Ａ  Ｂが好き",
+        sequence: 1,
+      },
+    ];
+    const candidate = {
+      category: "preference",
+      statement: "A Bが好き",
+      source_message_ids: ["message-normalized"],
+      is_inference: false,
+    } as const;
+
+    expect(
+      validateDiaryBrainCandidates(
+        JSON.stringify({ brain_item_candidates: [candidate] }),
+        normalizedMessages,
+        ["message-normalized"],
+      ),
+    ).toEqual([candidate]);
+  });
+
   it("本人が明言した内容を6種類のBrain Itemとして受け入れる", () => {
     const classificationMessages = [
       "2026/07/21 牛タンを食べた",

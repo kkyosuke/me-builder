@@ -665,6 +665,10 @@ export type DiaryBrainCheckpointCandidate = Readonly<{
   category: DiaryBrainCategory;
   statement: string;
   sourceMessageIds: readonly string[];
+  evidenceStatements?: readonly Readonly<{
+    sourceMessageId: string;
+    statement: string;
+  }>[];
   matchingBrainItemId?: string;
   deduplication?: "none" | "exact" | "semantic";
   dedupPromptVersion?: string;
@@ -696,6 +700,10 @@ function temporalContextsConflict(
 }
 
 function normalizeDiaryBrainComparison(value: string): string {
+  return value.normalize("NFKC").replace(/\s+/gu, " ").trim();
+}
+
+function normalizeDiaryBrainEvidenceText(value: string): string {
   return value.normalize("NFKC").replace(/\s+/gu, " ").trim();
 }
 
@@ -892,18 +900,31 @@ export async function applyDiaryBrainCheckpoint(
   const groupedCandidates = new Map<string, DiaryBrainCheckpointCandidate>();
   for (const candidate of candidates) {
     const messageIds = [...new Set(candidate.sourceMessageIds)];
+    const evidenceStatements =
+      candidate.evidenceStatements ??
+      messageIds.map((sourceMessageId) => ({
+        sourceMessageId,
+        statement: candidate.statement,
+      }));
+    const evidenceMessageIds = new Set(
+      evidenceStatements.map(({ sourceMessageId }) => sourceMessageId),
+    );
     const deduplication = candidate.deduplication ?? "none";
     const hasMatch = Boolean(candidate.matchingBrainItemId);
     const hasValidDedupAudit =
-      hasMatch === (deduplication !== "none") &&
       (deduplication === "semantic"
         ? Boolean(candidate.dedupPromptVersion?.trim())
-        : !candidate.dedupPromptVersion);
+        : !candidate.dedupPromptVersion) &&
+      (!hasMatch || deduplication !== "none");
     if (
       !DIARY_BRAIN_CATEGORY_SET.has(candidate.category) ||
       !candidate.statement.trim() ||
       messageIds.length === 0 ||
       messageIds.length !== candidate.sourceMessageIds.length ||
+      evidenceStatements.length !== messageIds.length ||
+      evidenceMessageIds.size !== messageIds.length ||
+      !messageIds.every((messageId) => evidenceMessageIds.has(messageId)) ||
+      evidenceStatements.some(({ statement }) => !statement.trim()) ||
       !hasValidDedupAudit
     ) {
       throw new Error("Diary Brain candidate validation failed");
@@ -911,7 +932,11 @@ export async function applyDiaryBrainCheckpoint(
     const key = `${candidate.category}\u0000${candidate.statement.trim()}`;
     const grouped = groupedCandidates.get(key);
     if (!grouped) {
-      groupedCandidates.set(key, { ...candidate, statement: candidate.statement.trim() });
+      groupedCandidates.set(key, {
+        ...candidate,
+        statement: candidate.statement.trim(),
+        evidenceStatements,
+      });
       continue;
     }
     const sameMatch = grouped.matchingBrainItemId === candidate.matchingBrainItemId;
@@ -919,9 +944,20 @@ export async function applyDiaryBrainCheckpoint(
       category: grouped.category,
       statement: grouped.statement,
       sourceMessageIds: [...new Set([...grouped.sourceMessageIds, ...messageIds])],
+      evidenceStatements: [
+        ...(grouped.evidenceStatements ?? []),
+        ...evidenceStatements.filter(
+          ({ sourceMessageId }) =>
+            !grouped.evidenceStatements?.some(
+              (groupedEvidence) => groupedEvidence.sourceMessageId === sourceMessageId,
+            ),
+        ),
+      ],
       ...(sameMatch && grouped.matchingBrainItemId
+        ? { matchingBrainItemId: grouped.matchingBrainItemId }
+        : {}),
+      ...(sameMatch && grouped.deduplication
         ? {
-            matchingBrainItemId: grouped.matchingBrainItemId,
             deduplication: grouped.deduplication,
             ...(grouped.dedupPromptVersion
               ? { dedupPromptVersion: grouped.dedupPromptVersion }
@@ -933,9 +969,16 @@ export async function applyDiaryBrainCheckpoint(
 
   for (const candidate of groupedCandidates.values()) {
     const messageIds = [...candidate.sourceMessageIds];
+    const evidenceStatementByMessageId = new Map(
+      candidate.evidenceStatements?.map(({ sourceMessageId, statement }) => [
+        sourceMessageId,
+        statement.trim(),
+      ]),
+    );
     const sources = await db
       .select({
         id: sourceRecords.id,
+        messageId: conversationMessages.id,
         createdAt: sourceRecords.createdAt,
         body: sourceRecordTextPayloads.body,
       })
@@ -960,9 +1003,13 @@ export async function applyDiaryBrainCheckpoint(
     if (
       sources.length !== messageIds.length ||
       sources.some(
-        ({ body }) =>
+        ({ messageId, body }) =>
           body.length > BRAIN_CHECKPOINT_MAX_USER_MESSAGE_CHARS ||
-          !body.includes(candidate.statement.trim()),
+          !normalizeDiaryBrainEvidenceText(body).includes(
+            normalizeDiaryBrainEvidenceText(
+              evidenceStatementByMessageId.get(messageId) ?? "\u0000",
+            ),
+          ),
       )
     ) {
       throw new Error("Diary Brain candidate evidence validation failed");
@@ -1196,7 +1243,10 @@ export async function applyDiaryBrainCheckpoint(
         brainItemId,
         position: appliedCandidates.length,
         operation: "created",
-        deduplication: "none",
+        deduplication: candidate.deduplication ?? "none",
+        ...(candidate.deduplication === "semantic" && candidate.dedupPromptVersion
+          ? { dedupPromptVersion: candidate.dedupPromptVersion }
+          : {}),
         ...lifecycle,
       }),
     );
@@ -1206,7 +1256,7 @@ export async function applyDiaryBrainCheckpoint(
       statement,
       sourceMessageIds: messageIds,
       operation: "created",
-      deduplication: "none",
+      deduplication: candidate.deduplication ?? "none",
     });
   }
   statements.push(
