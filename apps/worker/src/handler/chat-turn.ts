@@ -19,7 +19,7 @@ import type { CloudflareBindings, WorkerConfig } from "../config";
 import { createGeminiUsageRecorder } from "../infrastructure/gemini-usage";
 import { loadBrainContextMemories } from "../logic/brain-context";
 import {
-  appendDevelopmentBrainUsage,
+  buildDevelopmentBrainUsageMessage,
   classifySafety,
   generateDiaryChatResponse,
 } from "../logic/diary-chat";
@@ -513,7 +513,12 @@ export async function processChatTurnMessage(
             ...(generationController.signal ? { signal: generationController.signal } : {}),
           });
     const response = pendingResponse
-      ? { reply: pendingResponse.body, endSession: pendingResponse.endSession, brainUsages: [] }
+      ? {
+          reply: pendingResponse.body,
+          endSession: pendingResponse.endSession,
+          brainUsages: [],
+          usedBrainItems: pendingResponse.usedBrainItems,
+        }
       : await atBoundary(
           () =>
             generateDiaryChatResponse(context.messages, workerConfig, generationController.signal, {
@@ -535,12 +540,9 @@ export async function processChatTurnMessage(
                 return memory ? [memory] : [];
               });
               return {
-                reply: appendDevelopmentBrainUsage(
-                  generated.reply,
-                  usedMemories,
-                  workerConfig.environment,
-                ),
+                reply: generated.reply,
                 endSession: generated.end_session,
+                usedBrainItems: usedMemories,
                 brainUsages: usedMemories.map((memory) => ({
                   brainItemId: memory.brainItemId,
                   sourceRecordIds: memory.evidence.map(({ sourceRecordId }) => sourceRecordId),
@@ -555,6 +557,10 @@ export async function processChatTurnMessage(
             dependency: "google-ai",
           },
         );
+    const developmentBrainUsageMessage = buildDevelopmentBrainUsageMessage(
+      response.usedBrainItems,
+      workerConfig.environment,
+    );
 
     if (!pendingResponse) {
       const leaseIsActive = await atBoundary(
@@ -611,6 +617,9 @@ export async function processChatTurnMessage(
           leaseToken: lease?.leaseToken ?? "",
           kind: "final",
           text: response.reply,
+          ...(developmentBrainUsageMessage
+            ? { additionalTexts: [developmentBrainUsageMessage] }
+            : {}),
         }),
       {
         code: "LINE_FINAL_DELIVERY_FAILED",

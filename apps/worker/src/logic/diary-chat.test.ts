@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  appendDevelopmentBrainUsage,
+  buildDevelopmentBrainUsageMessage,
   buildDiaryChatContextPackage,
   buildSafetyFallback,
   classifySafety,
@@ -16,28 +16,26 @@ describe("diary chat guardrails", () => {
   it("開発環境では実際に使用したBrain Itemを返信末尾へ追加する", () => {
     const memories = [{ category: "memory", statement: "公園を歩くと落ち着くことがある" }];
 
-    expect(appendDevelopmentBrainUsage("通常の返信", memories, "development")).toBe(
-      "通常の返信\n\n[dev] 使用したBrain Item\n- 1. Memory: 公園を歩くと落ち着くことがある",
+    expect(buildDevelopmentBrainUsageMessage(memories, "development")).toBe(
+      "[dev] 使用したBrain Item\n- 1. Memory: 公園を歩くと落ち着くことがある",
     );
-    expect(appendDevelopmentBrainUsage("通常の返信", memories, "preview")).toContain(
+    expect(buildDevelopmentBrainUsageMessage(memories, "preview")).toContain(
       "[dev] 使用したBrain Item",
     );
-    expect(appendDevelopmentBrainUsage("通常の返信", memories, "production")).toBe("通常の返信");
+    expect(buildDevelopmentBrainUsageMessage(memories, "production")).toBeUndefined();
   });
 
   it("Brain Itemを使用していない場合は開発環境でも返信を変更しない", () => {
-    expect(appendDevelopmentBrainUsage("通常の返信", [], "development")).toBe("通常の返信");
+    expect(buildDevelopmentBrainUsageMessage([], "development")).toBeUndefined();
   });
 
-  it("開発用表示を含む最終返信を5000文字以内に収める", () => {
-    const result = appendDevelopmentBrainUsage(
-      "a".repeat(5_000),
-      [{ category: "memory", statement: "使用した記憶" }],
+  it("開発用表示ではBrain Itemのstatementだけを500文字に制限する", () => {
+    const result = buildDevelopmentBrainUsageMessage(
+      [{ category: "memory", statement: "記".repeat(501) }],
       "development",
     );
 
-    expect(result).toHaveLength(5_000);
-    expect(result).toContain("[dev] 使用したBrain Item\n- 1. Memory: 使用した記憶");
+    expect(result).toBe(`[dev] 使用したBrain Item\n- 1. Memory: ${"記".repeat(500)}`);
   });
 
   it("schemaと質問数を検証する", () => {

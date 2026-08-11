@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, isNull, lte, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import type { AccountDataDatabase } from "../database";
 import {
@@ -1230,7 +1230,14 @@ export async function getPendingAssistantResponse(
   db: AccountDataDatabase,
   accountId: string,
   turnId: string,
-): Promise<{ body: string; endSession: boolean } | undefined> {
+): Promise<
+  | {
+      body: string;
+      endSession: boolean;
+      usedBrainItems: readonly { category: string; statement: string }[];
+    }
+  | undefined
+> {
   const row = await db
     .select({
       body: conversationMessages.assistantBody,
@@ -1254,12 +1261,26 @@ export async function getPendingAssistantResponse(
       ),
     )
     .get();
-  return row?.body
-    ? {
-        body: row.body,
-        endSession: row.endSession,
-      }
-    : undefined;
+  if (!row?.body) return undefined;
+  const usedBrainItems = await db
+    .select({ category: brainItems.category, statement: brainItems.statement })
+    .from(diaryChatBrainUsageAudits)
+    .innerJoin(brainItems, eq(brainItems.id, diaryChatBrainUsageAudits.brainItemId))
+    .where(
+      and(
+        eq(diaryChatBrainUsageAudits.turnId, turnId),
+        eq(diaryChatBrainUsageAudits.purpose, "diary_chat"),
+        eq(diaryChatBrainUsageAudits.isDeleted, false),
+        eq(brainItems.accountId, accountId),
+      ),
+    )
+    .orderBy(asc(brainItems.category), asc(brainItems.statement), asc(brainItems.id))
+    .all();
+  return {
+    body: row.body,
+    endSession: row.endSession,
+    usedBrainItems,
+  };
 }
 
 export async function closeTurnSession(db: AccountDataDatabase, turnId: string): Promise<void> {

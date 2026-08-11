@@ -1,6 +1,33 @@
 import { line } from "@me-builder/lib";
 import { logger } from "@me-builder/shared";
 
+const LINE_TEXT_BUNDLE_PREFIX = "\u001eMB_LINE_TEXTS_V1:";
+
+function validateLineTexts(texts: unknown): asserts texts is string[] {
+  if (
+    !Array.isArray(texts) ||
+    texts.length === 0 ||
+    texts.length > 5 ||
+    texts.some((text) => typeof text !== "string" || text.length === 0 || text.length > 5_000)
+  ) {
+    throw new Error("LINE text bundle is invalid");
+  }
+}
+
+/** 既存の単一本文と互換性を保ちながら、同じoutboxへ複数textを固定する。 */
+export function encodeLineTexts(text: string, additionalTexts: readonly string[] = []): string {
+  const texts = [text, ...additionalTexts];
+  validateLineTexts(texts);
+  return texts.length === 1 ? text : `${LINE_TEXT_BUNDLE_PREFIX}${JSON.stringify(texts)}`;
+}
+
+export function decodeLineTexts(body: string): readonly string[] {
+  if (!body.startsWith(LINE_TEXT_BUNDLE_PREFIX)) return [body];
+  const texts: unknown = JSON.parse(body.slice(LINE_TEXT_BUNDLE_PREFIX.length));
+  validateLineTexts(texts);
+  return texts;
+}
+
 export function isAcceptedLineRetryConflict(error: unknown): boolean {
   return typeof error === "object" && error !== null && "status" in error && error.status === 409;
 }
@@ -48,12 +75,12 @@ export type LineReplyOutcome = "delivered" | "rejected" | "unknown";
 export async function replyLineText(input: {
   channelAccessToken: string;
   replyToken: string;
-  text: string;
+  texts: readonly string[];
 }): Promise<LineReplyOutcome> {
   try {
     await line.client.create(input.channelAccessToken).replyMessage({
       replyToken: input.replyToken,
-      messages: [{ type: "text", text: input.text }],
+      messages: input.texts.map((text) => ({ type: "text" as const, text })),
     });
     return "delivered";
   } catch (error) {
@@ -70,13 +97,13 @@ export async function replyLineText(input: {
 export async function pushLineTextWithRetryKey(input: {
   channelAccessToken: string;
   to: string;
-  text: string;
+  texts: readonly string[];
   retryKey: string;
 }): Promise<void> {
   const apiClient = line.client.create(input.channelAccessToken);
   try {
     await apiClient.pushMessage(
-      { to: input.to, messages: [{ type: "text", text: input.text }] },
+      { to: input.to, messages: input.texts.map((text) => ({ type: "text" as const, text })) },
       input.retryKey,
     );
   } catch (error) {

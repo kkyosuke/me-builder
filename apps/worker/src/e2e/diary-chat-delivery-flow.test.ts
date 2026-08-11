@@ -498,11 +498,15 @@ describe("LINE diary chat delivery E2E", () => {
         evidence: [expect.objectContaining({ text: diaryText })],
       }),
     ]);
-    const developmentReply = `${generatedReply}\n\n[dev] 使用したBrain Item\n- 1. Memory: 公園を歩くと落ち着くことがある`;
+    const developmentBrainUsage =
+      "[dev] 使用したBrain Item\n- 1. Memory: 公園を歩くと落ち着くことがある";
     expect(mockPushMessage).toHaveBeenCalledWith(
       expect.objectContaining({
         to: providerAccountId,
-        messages: [{ type: "text", text: developmentReply }],
+        messages: [
+          { type: "text", text: generatedReply },
+          { type: "text", text: developmentBrainUsage },
+        ],
       }),
       expect.any(String),
     );
@@ -510,7 +514,7 @@ describe("LINE diary chat delivery E2E", () => {
       .select()
       .from(DO.account.schema.conversationMessages);
     expect(savedMessages.find(({ role }) => role === "assistant")?.assistantBody).toBe(
-      developmentReply,
+      generatedReply,
     );
     await expect(
       accountDataStore.db.select().from(DO.account.schema.diaryChatBrainUsageAudits),

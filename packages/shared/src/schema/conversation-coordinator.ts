@@ -6,6 +6,8 @@ export type TurnDeliveryRequest = {
   leaseToken: string;
   kind: TurnDeliveryKind;
   text: string;
+  /** final本文とは分離して同じLINE API requestで配送する補助text。 */
+  additionalTexts?: readonly string[];
 };
 
 export type TurnDeliveryResult =
