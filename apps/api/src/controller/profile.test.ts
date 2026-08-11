@@ -115,12 +115,27 @@ describe("POST /api/profile-summary/generations", () => {
   });
 
   it("利用できる記録がなければ409を返す", async () => {
-    requestProfileSummaryGeneration.mockResolvedValue({ type: "unavailable" });
+    requestProfileSummaryGeneration.mockResolvedValue({
+      type: "unavailable",
+      reason: "source_record_required",
+    });
 
     const response = await generationRequest();
 
     expect(response.status).toBe(409);
     expect(await response.json()).toMatchObject({ reason: "source_record_required" });
+  });
+
+  it("再生成理由がなければ409を返す", async () => {
+    requestProfileSummaryGeneration.mockResolvedValue({
+      type: "unavailable",
+      reason: "regeneration_not_required",
+    });
+
+    const response = await generationRequest();
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ reason: "regeneration_not_required" });
   });
 
   it("Queue bindingがなければ503を返す", async () => {

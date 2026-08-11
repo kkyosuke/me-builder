@@ -31,6 +31,7 @@ type Dependencies = {
   readProfileSummary: (
     accountData: AccountDataNamespace | undefined,
     accountId: string,
+    at: Date,
   ) => Promise<ProfileSummaryReadModel>;
 };
 
@@ -40,9 +41,9 @@ const defaultDependencies: Dependencies = {
     if (!accountData) throw new Error("ACCOUNT_DATA binding is not configured");
     return accountDataFor(accountData, accountId).execute("diagnosis.listVisible", at);
   },
-  readProfileSummary: (accountData, accountId) => {
+  readProfileSummary: (accountData, accountId, at) => {
     if (!accountData) throw new Error("ACCOUNT_DATA binding is not configured");
-    return accountDataFor(accountData, accountId).execute("profileSummary.read");
+    return accountDataFor(accountData, accountId).execute("profileSummary.read", at);
   },
 };
 
@@ -56,7 +57,7 @@ export async function getProfileSummary(
 
   const [diagnoses, readModel] = await Promise.all([
     dependencies.listVisibleDiagnoses(accountData, session.session.accountId, at),
-    dependencies.readProfileSummary(accountData, session.session.accountId),
+    dependencies.readProfileSummary(accountData, session.session.accountId, at),
   ]);
   const hasAnswerableDiagnosis = diagnoses.some(
     ({ availability, responseStatus }) => availability === "open" && responseStatus !== "answered",

@@ -483,7 +483,7 @@ describe("App", () => {
     window.history.replaceState({}, "", "/me");
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "新しい私を見る" }));
+    fireEvent.click(await screen.findByRole("button", { name: "新しい版を再生成" }));
 
     await waitFor(() =>
       expect(mocks.requestProfileSummaryGeneration).toHaveBeenCalledWith(

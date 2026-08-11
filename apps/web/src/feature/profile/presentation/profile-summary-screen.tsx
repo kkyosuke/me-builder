@@ -109,9 +109,7 @@ function SummarySkeleton() {
 
 const CARD_TRANSITION_MS = 300;
 
-type CardTransition =
-  | Readonly<{ type: "select"; direction: -1 | 1; versionId: string }>
-  | Readonly<{ type: "regenerate"; direction: 1 }>;
+type CardTransition = Readonly<{ type: "select"; direction: -1 | 1; versionId: string }>;
 
 type ProfileSummaryVersion = ProfileSummaryVersioning["versions"][number];
 
@@ -142,6 +140,7 @@ function SummaryCardStack({
   renderCard: (version: ProfileSummaryVersion | undefined) => ReactNode;
 }) {
   const dragStart = useRef<{ x: number; y: number; pointerId: number } | null>(null);
+  const activeCard = useRef<HTMLDivElement | null>(null);
   const transitionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [dragX, setDragX] = useState(0);
   const [isReturning, setIsReturning] = useState(false);
@@ -168,23 +167,14 @@ function SummaryCardStack({
   const canRegenerate = Boolean(
     selected.isLatest && versioning.generation.canRegenerate && !isWorking && onRegenerate,
   );
-  const canSwipe =
-    !transition && (Boolean(onSelectVersion && versioning.versions.length > 1) || canRegenerate);
+  const canSwipe = !transition && Boolean(onSelectVersion && versioning.versions.length > 1);
   const adjacentVersion =
     dragX > 0 ? versioning.versions[selectedIndex - 1] : versioning.versions[selectedIndex + 1];
-  const transitionVersion =
-    transition?.type === "select"
-      ? versioning.versions.find(({ id }) => id === transition.versionId)
-      : undefined;
+  const transitionVersion = transition
+    ? versioning.versions.find(({ id }) => id === transition.versionId)
+    : undefined;
   const revealedVersion = transitionVersion ?? adjacentVersion;
-  const revealedNeedsGenerationOffset = Boolean(
-    revealedVersion?.isLatest && versioning.generation.canRegenerate && !isWorking && onRegenerate,
-  );
-  const showsIncomingCard = Boolean(
-    revealedVersion && (dragX !== 0 || transition?.type === "select"),
-  );
-  const hasGenerationCard = canRegenerate || transition?.type === "regenerate";
-  const usesGenerationOffset = canRegenerate || showsGenerationCard;
+  const showsIncomingCard = Boolean(revealedVersion && (dragX !== 0 || transition));
   const reservesGenerationStatus =
     versioning.generation.canRegenerate || versioning.generation.status !== "idle";
 
@@ -218,7 +208,6 @@ function SummaryCardStack({
       deltaX: event.clientX - start.x,
       deltaY: event.clientY - start.y,
       versioning,
-      canRegenerate,
     });
     if (action.type === "none") {
       setIsReturning(true);
@@ -226,20 +215,13 @@ function SummaryCardStack({
       return;
     }
 
-    const nextTransition: CardTransition =
-      action.type === "select"
-        ? {
-            type: "select",
-            direction: event.clientX - start.x < 0 ? -1 : 1,
-            versionId: action.versionId,
-          }
-        : { type: "regenerate", direction: 1 };
-    if (nextTransition.type === "regenerate") {
-      setGenerationCardHeight(event.currentTarget.offsetHeight);
-    }
+    const nextTransition: CardTransition = {
+      type: "select",
+      direction: event.clientX - start.x < 0 ? -1 : 1,
+      versionId: action.versionId,
+    };
     const complete = () => {
-      if (nextTransition.type === "select") onSelectVersion?.(nextTransition.versionId);
-      if (nextTransition.type === "regenerate") onRegenerate?.();
+      onSelectVersion?.(nextTransition.versionId);
       setTransition(null);
       setDragX(0);
       transitionTimer.current = null;
@@ -256,6 +238,10 @@ function SummaryCardStack({
   const reasonText = versioning.generation.reasons
     .map((reason) => regenerationReasonLabels[reason])
     .join("・");
+  const requestRegeneration = () => {
+    setGenerationCardHeight(activeCard.current?.offsetHeight ?? null);
+    onRegenerate?.();
+  };
 
   return (
     <section aria-label="今のわたしの版" aria-roledescription="カルーセル" className="mt-8">
@@ -278,47 +264,26 @@ function SummaryCardStack({
           <div
             aria-hidden="true"
             data-summary-card-layer="incoming"
-            className={`pointer-events-none absolute z-[5] origin-top transition-all duration-300 ease-out motion-reduce:transition-none ${transition?.type === "select" ? (revealedNeedsGenerationOffset ? "top-0 right-0 left-8" : "inset-x-0 top-0") : "inset-x-3 top-1.5"}`}
+            className={`pointer-events-none absolute z-[5] origin-top transition-all duration-300 ease-out motion-reduce:transition-none ${transition ? "inset-x-0 top-0" : "inset-x-3 top-1.5"}`}
             style={{
-              transform:
-                transition?.type === "select"
-                  ? "translate3d(0, 0, 0) scale(1)"
-                  : "translate3d(0, 8px, 0) scale(0.96)",
+              transform: transition
+                ? "translate3d(0, 0, 0) scale(1)"
+                : "translate3d(0, 8px, 0) scale(0.96)",
             }}
           >
             {renderCard(revealedVersion)}
           </div>
         )}
 
-        {hasGenerationCard && (
-          <div
-            aria-hidden="true"
-            className={`absolute flex items-center rounded-3xl bg-gradient-to-r from-violet-600 to-sky-500 px-3 text-white shadow-lg transition-all duration-300 ease-out motion-reduce:transition-none ${transition?.type === "regenerate" ? "top-0 right-0 bottom-4 left-8 z-[5] scale-100" : "inset-y-4 left-0 right-8 scale-100"}`}
-          >
-            <div className="flex w-full items-center gap-3">
-              <Sparkles className="size-5 shrink-0" aria-hidden="true" />
-              <div>
-                <p className="text-sm font-bold">
-                  {transition?.type === "regenerate"
-                    ? "新しい版を追加しています"
-                    : "新しい私を見る"}
-                </p>
-                {transition?.type !== "regenerate" && (
-                  <p className="mt-1 text-[11px] text-white/80">右へスワイプして生成</p>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
         <div
+          ref={activeCard}
           data-summary-card-layer="active"
           aria-label={
             showsGenerationCard
               ? `新しい版を作成中、${selectedIndex + 1}/${versioning.versions.length}`
               : `${versionLabel(selected.sequence)}、${selectedIndex + 1}/${versioning.versions.length}`
           }
-          className={`relative z-10 select-none transition-transform ease-out motion-reduce:transition-none ${transition || isReturning ? "duration-300" : "duration-0"} ${usesGenerationOffset ? "ml-8 w-[calc(100%-2rem)]" : "w-full"} ${canSwipe ? "cursor-grab touch-pan-y active:cursor-grabbing" : ""}`}
+          className={`relative z-10 w-full select-none transition-transform ease-out motion-reduce:transition-none ${transition || isReturning ? "duration-300" : "duration-0"} ${canSwipe ? "cursor-grab touch-pan-y active:cursor-grabbing" : ""}`}
           style={{
             transform: transition
               ? `translate3d(${transition.direction * 115}%, 0, 0) rotate(${transition.direction * 8}deg)`
@@ -332,6 +297,18 @@ function SummaryCardStack({
           onPointerUp={(event) => finishPointer(event, false)}
           onPointerCancel={(event) => finishPointer(event, true)}
         >
+          {canRegenerate && (
+            <button
+              type="button"
+              aria-label="新しい版を再生成"
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={requestRegeneration}
+              disabled={Boolean(transition)}
+              className="absolute top-3 left-3 z-20 inline-flex size-10 items-center justify-center rounded-full border border-violet-200 bg-white/95 text-violet-700 shadow-md backdrop-blur-sm transition hover:bg-violet-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 disabled:opacity-50 dark:border-violet-700 dark:bg-slate-900/95 dark:text-violet-300 dark:hover:bg-violet-950"
+            >
+              <RefreshCw className="size-4.5" aria-hidden="true" />
+            </button>
+          )}
           {showsGenerationCard ? (
             <section
               className={`flex flex-col items-center justify-center rounded-3xl border border-violet-300/40 bg-gradient-to-br from-violet-50 via-white to-sky-50 p-8 text-center shadow-xl shadow-slate-950/10 dark:from-violet-950/50 dark:via-slate-800 dark:to-sky-950/40 ${generationCardHeight ? "h-full" : "min-h-[28rem]"}`}
@@ -392,17 +369,6 @@ function SummaryCardStack({
               : "左右のスワイプで版を移動"
             : "最初のまとめです"}
         </p>
-        {canRegenerate && (
-          <button
-            type="button"
-            onClick={onRegenerate}
-            disabled={Boolean(transition)}
-            className="inline-flex items-center gap-1.5 rounded-full bg-violet-100 px-3 py-1.5 font-bold text-violet-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 dark:bg-violet-950 dark:text-violet-200"
-          >
-            <Sparkles className="size-3.5" aria-hidden="true" />
-            新しい私を見る
-          </button>
-        )}
       </div>
 
       {reasonText && (

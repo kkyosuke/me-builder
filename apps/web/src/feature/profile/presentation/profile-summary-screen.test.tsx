@@ -127,7 +127,7 @@ describe("ProfileSummaryScreen", () => {
     expect(screen.queryByRole("link", { name: "未回答の診断を見る" })).toBeNull();
   });
 
-  it("カードスタックから過去版を選び、新しい版の生成をボタンでも要求できる", () => {
+  it("カード左上の丸いボタンから新しい版を要求できる", () => {
     const onSelectVersion = vi.fn();
     const onRegenerate = vi.fn();
     render(
@@ -148,13 +148,17 @@ describe("ProfileSummaryScreen", () => {
     expect(screen.getByText(/診断が増えました・日記・記録が増えました/)).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "第2版を表示" }));
-    fireEvent.click(screen.getByRole("button", { name: "新しい私を見る" }));
+    const regenerateButton = screen.getByRole("button", { name: "新しい版を再生成" });
+    expect(regenerateButton.className).toContain("rounded-full");
+    expect(regenerateButton.className).toContain("top-3");
+    expect(regenerateButton.className).toContain("left-3");
+    fireEvent.click(regenerateButton);
 
     expect(onSelectVersion).toHaveBeenCalledWith("version-2");
     expect(onRegenerate).toHaveBeenCalledOnce();
   });
 
-  it("左右のスワイプで版を移動し、右スワイプで新しい版を生成する", () => {
+  it("左右のスワイプは版の移動だけを行う", () => {
     vi.useFakeTimers();
     const onSelectVersion = vi.fn();
     const onRegenerate = vi.fn();
@@ -193,10 +197,8 @@ describe("ProfileSummaryScreen", () => {
       pointerId: 2,
     });
     firePointer(latestCard, "pointerup", { clientX: 100, clientY: 12, pointerId: 2 });
-    expect(screen.getByText("新しい版を追加しています")).toBeTruthy();
     expect(onRegenerate).not.toHaveBeenCalled();
-    act(() => vi.advanceTimersByTime(300));
-    expect(onRegenerate).toHaveBeenCalledOnce();
+    expect(latestCard.getAttribute("style")).toContain("translate3d(0px");
 
     rerender(
       <ProfileSummaryScreen
@@ -219,10 +221,10 @@ describe("ProfileSummaryScreen", () => {
     const incomingCard = container.querySelector('[data-summary-card-layer="incoming"]');
     expect(incomingCard?.textContent).toContain("第3版");
     expect(incomingCard?.textContent).toContain(summary.headline);
-    expect(incomingCard?.className).toContain("left-8");
+    expect(incomingCard?.className).toContain("inset-x-0");
     act(() => vi.advanceTimersByTime(300));
     expect(onSelectVersion).toHaveBeenLastCalledWith("version-3");
-    expect(screen.queryByRole("button", { name: "新しい私を見る" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "新しい版を再生成" })).toBeNull();
   });
 
   it("保存済み版がなくても初回生成中と生成失敗を表示する", () => {
@@ -265,9 +267,7 @@ describe("ProfileSummaryScreen", () => {
     expect(onRegenerate).toHaveBeenCalledOnce();
   });
 
-  it("作成中カードへスワイプ元の高さを引き継ぐ", () => {
-    vi.useFakeTimers();
-
+  it("作成中カードへ再生成元の高さを引き継ぐ", () => {
     function GenerationHarness() {
       const [status, setStatus] = useState<"idle" | "generating">("idle");
       return (
@@ -287,19 +287,11 @@ describe("ProfileSummaryScreen", () => {
     render(<GenerationHarness />);
     const latestCard = screen.getByLabelText("第3版、1/2");
     Object.defineProperty(latestCard, "offsetHeight", { configurable: true, value: 640 });
-    firePointer(latestCard, "pointerdown", {
-      button: 0,
-      clientX: 0,
-      clientY: 10,
-      pointerId: 4,
-    });
-    firePointer(latestCard, "pointerup", { clientX: 100, clientY: 12, pointerId: 4 });
-    act(() => vi.advanceTimersByTime(300));
+    fireEvent.click(screen.getByRole("button", { name: "新しい版を再生成" }));
 
     const generationCard = screen.getByLabelText("新しい版を作成中、1/2");
     expect(generationCard.getAttribute("style")).toContain("height: 640px");
-    expect(generationCard.className).toContain("ml-8");
-    expect(generationCard.className).toContain("w-[calc(100%-2rem)]");
+    expect(generationCard.className).toContain("w-full");
   });
 
   it("過去版では生成操作を隠し、生成中も現在の版を閲覧できると伝える", () => {
@@ -314,7 +306,7 @@ describe("ProfileSummaryScreen", () => {
     );
 
     expect(screen.getByText("左右のスワイプで版を移動")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "新しい私を見る" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "新しい版を再生成" })).toBeNull();
 
     rerender(
       <ProfileSummaryScreen
@@ -332,7 +324,7 @@ describe("ProfileSummaryScreen", () => {
     expect(screen.getByRole("heading", { name: "新しい版を作成中" })).toBeTruthy();
     expect(screen.getByLabelText("新しい版を作成中、1/2")).toBeTruthy();
     expect(screen.getByRole("status").textContent).toContain("現在の版や過去の版を確認できます");
-    expect(screen.queryByRole("button", { name: "新しい私を見る" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "新しい版を再生成" })).toBeNull();
   });
 
   it("まとめがなければ診断とLINEの会話を案内する", () => {

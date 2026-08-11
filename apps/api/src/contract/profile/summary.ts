@@ -57,7 +57,7 @@ export const ProfileSummaryGenerationAcceptedSchema = v.object({
 
 export const ProfileSummaryGenerationUnavailableSchema = v.object({
   error: v.literal("Profile summary generation unavailable"),
-  reason: v.literal("source_record_required"),
+  reason: v.picklist(["source_record_required", "regeneration_not_required"]),
 });
 
 export const profileSummaryRoute = describeRoute({

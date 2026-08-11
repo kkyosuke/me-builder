@@ -98,7 +98,7 @@ describe("AccountData Workers runtime E2E", () => {
     });
   });
 
-  it("既存0000 baselineのAccountデータを保ったまま0001と0002を適用できる", async () => {
+  it("既存0000 baselineのAccountデータを保ったまま後続migrationを適用できる", async () => {
     const accountId = crypto.randomUUID();
     const stub = env.ACCOUNT_DATA.getByName(accountId);
 
@@ -112,7 +112,7 @@ describe("AccountData Workers runtime E2E", () => {
       state.storage.sql.exec("DROP TABLE brain_vector_entries");
       state.storage.sql.exec("DROP TABLE brain_vector_sync_jobs");
       state.storage.sql.exec(
-        "DELETE FROM __drizzle_migrations WHERE created_at IN (1786407202292, 1786413718549)",
+        "DELETE FROM __drizzle_migrations WHERE created_at IN (1786407202292, 1786413718549, 1786415351981)",
       );
 
       const repository = Reflect.get(instance, "repository") as { initialize(): Promise<void> };
@@ -138,6 +138,63 @@ describe("AccountData Workers runtime E2E", () => {
           )
           .one(),
       ).toEqual({ brain_item_id: "migration-brain", operation: "upsert", status: "pending" });
+    });
+  });
+
+  it("既存のまとめ版を保って入力snapshot付きschemaへ移行できる", async () => {
+    const accountId = crypto.randomUUID();
+    const stub = env.ACCOUNT_DATA.getByName(accountId);
+
+    await runInDurableObject(stub, async (instance: AccountData, state) => {
+      state.storage.sql.exec("PRAGMA foreign_keys=OFF");
+      state.storage.sql.exec("DROP TABLE profile_summary_versions");
+      state.storage.sql.exec(`CREATE TABLE profile_summary_versions (
+        id text PRIMARY KEY NOT NULL,
+        account_id text NOT NULL,
+        generation_id text NOT NULL UNIQUE,
+        sequence integer NOT NULL,
+        generated_at integer NOT NULL,
+        model text NOT NULL,
+        prompt_version text NOT NULL,
+        summary_json text NOT NULL
+      )`);
+      state.storage.sql.exec(
+        "INSERT INTO profile_summary_generations (id, account_id, status, requested_at, finished_at, model, prompt_version) VALUES ('migration-generation', ?, 'completed', 1, 2, 'gemini-test', 'v1')",
+        accountId,
+      );
+      state.storage.sql.exec(
+        `INSERT INTO profile_summary_versions
+          (id, account_id, generation_id, sequence, generated_at, model, prompt_version, summary_json)
+         VALUES ('migration-version', ?, 'migration-generation', 1, 2, 'gemini-test', 'v1',
+          '{"generatedAt":"2026-08-01T00:00:00.000Z","headline":"既存版","insights":[],"recordCount":3,"diagnosisCount":1,"diaryCount":2,"latestRecordedAt":"2026-07-31T00:00:00.000Z"}')`,
+        accountId,
+      );
+      state.storage.sql.exec("DELETE FROM __drizzle_migrations WHERE created_at = 1786415351981");
+
+      const repository = Reflect.get(instance, "repository") as { initialize(): Promise<void> };
+      await expect(repository.initialize()).resolves.toBeUndefined();
+      const version = state.storage.sql
+        .exec<{
+          headline: string;
+          diagnosis_input_count: number;
+          diary_input_count: number;
+        }>(
+          `SELECT json_extract(summary_json, '$.headline') AS headline,
+                  diagnosis_input_count, diary_input_count
+             FROM profile_summary_versions WHERE id = 'migration-version'`,
+        )
+        .one();
+      expect(version).toEqual({
+        headline: "既存版",
+        diagnosis_input_count: 1,
+        diary_input_count: 2,
+      });
+      expect(
+        state.storage.sql
+          .exec<{ name: string }>("PRAGMA table_info(profile_summary_versions)")
+          .toArray()
+          .map(({ name }) => name),
+      ).not.toContain("account_id");
     });
   });
 
@@ -204,6 +261,7 @@ describe("AccountData Workers runtime E2E", () => {
         diagnosisCount: context.diagnosisCount,
         diaryCount: context.diaryCount,
         latestRecordedAt: context.latestRecordedAt,
+        inputSnapshot: context.inputSnapshot,
       }),
     ).resolves.toBe(true);
     await expect(stub.execute(accountId, "profileSummary.read")).resolves.toMatchObject({

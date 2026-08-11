@@ -9,7 +9,10 @@ export type RequestProfileSummaryGenerationOutcome =
       status: "queued" | "generating";
       created: boolean;
     }>
-  | Readonly<{ type: "unavailable" }>
+  | Readonly<{
+      type: "unavailable";
+      reason: "source_record_required" | "regeneration_not_required";
+    }>
   | Readonly<{ type: "not-configured" }>
   | Readonly<{ type: "unauthenticated"; reason: string }>
   | Readonly<{ type: "account-not-found" }>;
@@ -36,7 +39,7 @@ export async function requestProfileSummaryGeneration({
   if (!accountData || !queue) throw new Error("Profile Summary generation binding is missing");
   const account = accountDataFor(accountData, session.session.accountId);
   const request = await account.execute("profileSummary.requestGeneration", at);
-  if (request.outcome === "unavailable") return { type: "unavailable" };
+  if (request.outcome === "unavailable") return { type: "unavailable", reason: request.reason };
   if (request.outcome === "created") {
     try {
       await queue.send({

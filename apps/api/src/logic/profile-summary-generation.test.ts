@@ -65,6 +65,24 @@ describe("requestProfileSummaryGeneration", () => {
     expect(send).not.toHaveBeenCalled();
   });
 
+  it("AccountDataの再生成不可理由をQueueへ送らず返す", async () => {
+    execute.mockResolvedValueOnce({
+      outcome: "unavailable",
+      reason: "regeneration_not_required",
+    });
+
+    await expect(
+      requestProfileSummaryGeneration({
+        idToken: "token",
+        lineLoginChannelId: "channel",
+        db: {} as D1.shared.Client,
+        accountData,
+        queue,
+      }),
+    ).resolves.toEqual({ type: "unavailable", reason: "regeneration_not_required" });
+    expect(send).not.toHaveBeenCalled();
+  });
+
   it("Queue送信に失敗した要求をfailedへ遷移する", async () => {
     execute.mockResolvedValueOnce({
       outcome: "created",

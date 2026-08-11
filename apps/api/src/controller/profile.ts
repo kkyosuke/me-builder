@@ -77,7 +77,7 @@ export async function postProfileSummaryGeneration(c: Context<AppEnv>): Promise<
       return c.json(
         v.parse(ProfileSummaryGenerationUnavailableSchema, {
           error: "Profile summary generation unavailable",
-          reason: "source_record_required",
+          reason: outcome.reason,
         }),
         409,
       );
