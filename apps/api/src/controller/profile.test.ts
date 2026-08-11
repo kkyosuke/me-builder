@@ -17,23 +17,25 @@ const dummyAccountData = {} as AccountDataNamespace;
 const dummyQueue = {} as Queue<ProfileSummaryGenerationQueueMessage>;
 const outcome = (value: ProfileSummaryOutcome) => getProfileSummary.mockResolvedValue(value);
 
-function request(withDb = true) {
+function request(withDb = true, environment?: string) {
   return app.request(
     "/api/profile-summary",
     { headers: { Authorization: "Bearer dummy.id.token" } },
     {
       LIFF_ID: "2010850319-Yl63upAR",
+      ...(environment ? { ENVIRONMENT: environment } : {}),
       ...(withDb ? { DB: dummyDb, ACCOUNT_DATA: dummyAccountData } : {}),
     },
   );
 }
 
-function generationRequest(withBindings = true) {
+function generationRequest(withBindings = true, environment?: string) {
   return app.request(
     "/api/profile-summary/generations",
     { method: "POST", headers: { Authorization: "Bearer dummy.id.token" } },
     {
       LIFF_ID: "2010850319-Yl63upAR",
+      ...(environment ? { ENVIRONMENT: environment } : {}),
       ...(withBindings
         ? { DB: dummyDb, ACCOUNT_DATA: dummyAccountData, PROFILE_SUMMARY_QUEUE: dummyQueue }
         : {}),
@@ -63,7 +65,27 @@ describe("GET /api/profile-summary", () => {
       nextAction: "diagnosis",
     });
     expect(getProfileSummary).toHaveBeenCalledWith(
-      expect.objectContaining({ idToken: "dummy.id.token", lineLoginChannelId: "2010850319" }),
+      expect.objectContaining({
+        idToken: "dummy.id.token",
+        lineLoginChannelId: "2010850319",
+        allowUnchangedRegeneration: true,
+      }),
+    );
+  });
+
+  it("productionでは無変更再生成を許可しない", async () => {
+    outcome({
+      type: "resolved",
+      versions: [],
+      availableDataCounts: { diagnosis: 0, diary: 0 },
+      generation: { status: "idle", canRegenerate: false, reasons: [], message: null },
+      nextAction: "chat",
+    });
+
+    await request(true, "production");
+
+    expect(getProfileSummary).toHaveBeenCalledWith(
+      expect.objectContaining({ allowUnchangedRegeneration: false }),
     );
   });
 
@@ -112,15 +134,46 @@ describe("POST /api/profile-summary/generations", () => {
       status: "queued",
       created: true,
     });
+    expect(requestProfileSummaryGeneration).toHaveBeenCalledWith(
+      expect.objectContaining({ allowUnchangedRegeneration: true }),
+    );
+  });
+
+  it("productionでは無変更再生成を許可しない", async () => {
+    requestProfileSummaryGeneration.mockResolvedValue({
+      type: "unavailable",
+      reason: "regeneration_not_required",
+    });
+
+    await generationRequest(true, "production");
+
+    expect(requestProfileSummaryGeneration).toHaveBeenCalledWith(
+      expect.objectContaining({ allowUnchangedRegeneration: false }),
+    );
   });
 
   it("利用できる記録がなければ409を返す", async () => {
-    requestProfileSummaryGeneration.mockResolvedValue({ type: "unavailable" });
+    requestProfileSummaryGeneration.mockResolvedValue({
+      type: "unavailable",
+      reason: "source_record_required",
+    });
 
     const response = await generationRequest();
 
     expect(response.status).toBe(409);
     expect(await response.json()).toMatchObject({ reason: "source_record_required" });
+  });
+
+  it("再生成理由がなければ409を返す", async () => {
+    requestProfileSummaryGeneration.mockResolvedValue({
+      type: "unavailable",
+      reason: "regeneration_not_required",
+    });
+
+    const response = await generationRequest();
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ reason: "regeneration_not_required" });
   });
 
   it("Queue bindingがなければ503を返す", async () => {

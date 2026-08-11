@@ -5,7 +5,10 @@ import {
   fetchProfileSummary,
   requestProfileSummaryGeneration,
 } from "../infrastructure/profile-api";
-import type { ProfileSummaryReadResult } from "../model/profile-summary";
+import {
+  ProfileSummaryGenerationUnavailableError,
+  type ProfileSummaryReadResult,
+} from "../model/profile-summary";
 
 export function useProfileSummary({
   acquireIdToken,
@@ -86,6 +89,10 @@ export function useProfileSummary({
         if (latest.generation.status === "idle" || latest.generation.status === "failed") return;
       }
     } catch (error) {
+      if (error instanceof ProfileSummaryGenerationUnavailableError) {
+        await load(false);
+        return;
+      }
       if (mounted.current && !controller.signal.aborted) {
         setState((current) =>
           current.status === "success"
@@ -106,7 +113,7 @@ export function useProfileSummary({
         );
       }
     }
-  }, [acquireIdToken]);
+  }, [acquireIdToken, load]);
 
   useEffect(() => {
     mounted.current = true;

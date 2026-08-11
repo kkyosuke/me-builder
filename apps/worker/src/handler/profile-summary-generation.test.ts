@@ -60,6 +60,10 @@ describe("processProfileSummaryGenerationMessage", () => {
           diagnosisCount: 0,
           diaryCount: 1,
           latestRecordedAt: new Date("2026-08-08T00:00:00.000Z"),
+          inputSnapshot: {
+            diagnosis: { count: 0, latestRecordedAt: null },
+            diary: { count: 1, latestRecordedAt: new Date("2026-08-08T00:00:00.000Z") },
+          },
         };
       }
       if (operation === "profileSummary.completeGeneration") return true;
@@ -91,6 +95,7 @@ describe("processProfileSummaryGenerationMessage", () => {
         generationId: "generation-1",
         model: "gemini-test",
         diaryCount: 1,
+        inputSnapshot: expect.objectContaining({ diary: expect.objectContaining({ count: 1 }) }),
       }),
     );
     expect(message.ack).toHaveBeenCalledOnce();

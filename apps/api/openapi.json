@@ -734,7 +734,8 @@
                       "const": "Profile summary generation unavailable"
                     },
                     "reason": {
-                      "const": "source_record_required"
+                      "enum": ["source_record_required", "regeneration_not_required"],
+                      "type": "string"
                     }
                   },
                   "required": ["error", "reason"]

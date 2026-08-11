@@ -84,9 +84,13 @@ export type AccountDataActions = {
   ) => Promise<CompatibilityReference | null>;
   "compatibility.listVisibleReferences": () => Promise<readonly CompatibilityReference[]>;
   "source.hasActive": RpcAction<[], typeof source.hasActiveSourceRecords>;
-  "profileSummary.read": () => Promise<ProfileSummaryReadModel>;
+  "profileSummary.read": (
+    at?: Date,
+    allowUnchangedRegeneration?: boolean,
+  ) => Promise<ProfileSummaryReadModel>;
   "profileSummary.requestGeneration": (
     requestedAt?: Date,
+    allowUnchangedRegeneration?: boolean,
   ) => Promise<RequestProfileSummaryGenerationResult>;
   "profileSummary.loadGenerationContext": (
     generationId: string,

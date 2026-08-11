@@ -59,13 +59,16 @@ async function prepareAccount(db: D1Database): Promise<void> {
   ]);
 }
 
-async function insertDiaryMessage(): Promise<void> {
+async function insertDiaryMessage(
+  suffix = "initial",
+  receivedAt = new Date(timestamp),
+): Promise<void> {
   accountDataStore.bind("account-summary-e2e");
   const source = await DO.account.action.diary.storeLineTextSource(accountDataStore.db, {
     accountId: "account-summary-e2e",
     eventId: crypto.randomUUID(),
     body: "Memory化されていない日記本文",
-    receivedAt: new Date(timestamp),
+    receivedAt,
   });
   accountDataStore.raw
     .prepare(
@@ -75,7 +78,14 @@ async function insertDiaryMessage(): Promise<void> {
          reply_count, awaiting_reply, next_sequence
        ) VALUES (?, ?, ?, 0, ?, 'closed', ?, ?, 'reflective', 0, 0, 0, 2)`,
     )
-    .run("summary-session", timestamp, timestamp, "account-summary-e2e", timestamp, timestamp);
+    .run(
+      `summary-session-${suffix}`,
+      receivedAt.getTime(),
+      receivedAt.getTime(),
+      "account-summary-e2e",
+      receivedAt.getTime(),
+      receivedAt.getTime(),
+    );
   accountDataStore.raw
     .prepare(
       `INSERT INTO conversation_messages (
@@ -83,15 +93,24 @@ async function insertDiaryMessage(): Promise<void> {
          source_record_id, channel
        ) VALUES (?, ?, ?, 0, ?, 1, 'user', ?, 'line')`,
     )
-    .run("summary-message", timestamp, timestamp, "summary-session", source.sourceRecordId);
+    .run(
+      `summary-message-${suffix}`,
+      receivedAt.getTime(),
+      receivedAt.getTime(),
+      `summary-session-${suffix}`,
+      source.sourceRecordId,
+    );
 }
 
 async function insertSummaryVersions(): Promise<void> {
+  const intervalMs = 31 * 24 * 60 * 60 * 1_000;
+  const firstGeneratedAt = new Date("2026-06-01T00:00:00.000Z").getTime();
   for (const sequence of [1, 2, 3]) {
+    const generatedAt = new Date(firstGeneratedAt + (sequence - 1) * intervalMs);
     const request = await DO.account.action.profileSummary.requestProfileSummaryGeneration(
       accountDataStore.db,
       "account-summary-e2e",
-      new Date(timestamp + sequence * 1_000),
+      generatedAt,
     );
     if (request.outcome !== "created") throw new Error("summary generation was not created");
     await DO.account.action.profileSummary.completeProfileSummaryGeneration(
@@ -99,7 +118,7 @@ async function insertSummaryVersions(): Promise<void> {
       "account-summary-e2e",
       {
         generationId: request.generationId,
-        generatedAt: new Date(timestamp + sequence * 1_000),
+        generatedAt,
         model: "gemini-test",
         promptVersion: "profile-summary-v1",
         headline: `${sequence}番目のまとめ`,
@@ -107,6 +126,10 @@ async function insertSummaryVersions(): Promise<void> {
         diagnosisCount: 0,
         diaryCount: 1,
         latestRecordedAt: new Date(timestamp),
+        inputSnapshot: {
+          diagnosis: { count: 0, latestRecordedAt: null },
+          diary: { count: 1, latestRecordedAt: new Date(timestamp) },
+        },
       },
     );
   }
@@ -126,7 +149,11 @@ function mockLineVerification(): void {
   );
 }
 
-async function request(pathname = "/api/profile-summary", method = "GET"): Promise<Response> {
+async function request(
+  pathname = "/api/profile-summary",
+  method = "GET",
+  environment = "test",
+): Promise<Response> {
   return app.request(
     pathname,
     { method, headers: { Authorization: "Bearer known-token" } },
@@ -135,7 +162,7 @@ async function request(pathname = "/api/profile-summary", method = "GET"): Promi
       ACCOUNT_DATA: accountDataStore.namespace,
       PROFILE_SUMMARY_QUEUE: queue,
       LINE_LOGIN_CHANNEL_ID: "1234567890",
-      ENVIRONMENT: "test",
+      ENVIRONMENT: environment,
     },
   );
 }
@@ -200,6 +227,35 @@ describe("Profile Summary local D1 E2E", () => {
     });
   });
 
+  it("開発環境では変更がなくても再生成でき、本番では通常判定を維持する", async () => {
+    await insertDiaryMessage();
+    await insertSummaryVersions();
+
+    const productionRead = await request("/api/profile-summary", "GET", "production");
+    expect((await productionRead.json()).generation).toMatchObject({
+      canRegenerate: false,
+      reasons: [],
+    });
+    const productionRequest = await request(
+      "/api/profile-summary/generations",
+      "POST",
+      "production",
+    );
+    expect(productionRequest.status).toBe(409);
+    expect(await productionRequest.json()).toMatchObject({
+      reason: "regeneration_not_required",
+    });
+
+    const developmentRead = await request();
+    expect((await developmentRead.json()).generation).toMatchObject({
+      canRegenerate: true,
+      reasons: [],
+    });
+    const developmentRequest = await request("/api/profile-summary/generations", "POST");
+    expect(developmentRequest.status).toBe(202);
+    expect(await developmentRequest.json()).toMatchObject({ created: true, status: "queued" });
+  });
+
   it(`${profileSummaryCases.requestGeneration.id}: ${profileSummaryCases.requestGeneration.name}`, async () => {
     await insertDiaryMessage();
 
@@ -216,5 +272,21 @@ describe("Profile Summary local D1 E2E", () => {
       status: "queued",
       canRegenerate: false,
     });
+  });
+
+  it("日記が増えるとGETが再生成理由を返し、POSTで新しい要求を受け付ける", async () => {
+    await insertDiaryMessage();
+    await insertSummaryVersions();
+    await insertDiaryMessage("added", new Date("2026-08-10T00:00:00.000Z"));
+
+    expect((await (await request()).json()).generation).toEqual({
+      status: "idle",
+      canRegenerate: true,
+      reasons: ["brain"],
+      message: null,
+    });
+    const response = await request("/api/profile-summary/generations", "POST");
+    expect(response.status).toBe(202);
+    expect(await response.json()).toMatchObject({ created: true, status: "queued" });
   });
 });

@@ -5,6 +5,12 @@ import { type ApiConfig, ConfigSchema } from "./schema";
 
 export { ConfigSchema, type ApiConfig };
 
+const DEVELOPMENT_ENVIRONMENTS = new Set(["development", "local", "preview", "test"]);
+
+export function isDevelopmentEnvironment(environment: string): boolean {
+  return DEVELOPMENT_ENVIRONMENTS.has(environment);
+}
+
 /**
  * API サーバーの環境変数を取得・整理し、Valibot で検証・整形した設定オブジェクトを生成します。
  * @me-builder/shared の getEnv を使用して Cloudflare (env) とローカル (process.env) の差分を吸収します。

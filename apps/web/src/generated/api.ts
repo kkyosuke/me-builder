@@ -594,8 +594,8 @@ export interface operations {
           "application/json": {
             /** @constant */
             error: "Profile summary generation unavailable";
-            /** @constant */
-            reason: "source_record_required";
+            /** @enum {string} */
+            reason: "source_record_required" | "regeneration_not_required";
           };
         };
       };

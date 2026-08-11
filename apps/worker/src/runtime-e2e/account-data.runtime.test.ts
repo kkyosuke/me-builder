@@ -1,5 +1,6 @@
 import { type D1Migration, applyD1Migrations, runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
+import { DO } from "@me-builder/lib";
 import { beforeAll, describe, expect, it } from "vitest";
 import type { AccountData } from "../account-data";
 
@@ -98,7 +99,7 @@ describe("AccountData Workers runtime E2E", () => {
     });
   });
 
-  it("既存0000 baselineのAccountデータを保ったまま0001と0002を適用できる", async () => {
+  it("既存0000 baselineのAccountデータを保ったまま後続migrationを適用できる", async () => {
     const accountId = crypto.randomUUID();
     const stub = env.ACCOUNT_DATA.getByName(accountId);
 
@@ -112,10 +113,13 @@ describe("AccountData Workers runtime E2E", () => {
       state.storage.sql.exec("DROP TABLE brain_vector_entries");
       state.storage.sql.exec("DROP TABLE brain_vector_sync_jobs");
       state.storage.sql.exec(
-        "DELETE FROM __drizzle_migrations WHERE created_at IN (1786407202292, 1786413718549)",
+        "DELETE FROM __drizzle_migrations WHERE created_at IN (1786407202292, 1786413718549, 1786415351981)",
       );
 
-      const repository = Reflect.get(instance, "repository") as { initialize(): Promise<void> };
+      const repository = Reflect.get(instance, "repository") as {
+        initialize(): Promise<void>;
+        client: Parameters<typeof DO.account.action.profileSummary.readProfileSummary>[0];
+      };
       await expect(repository.initialize()).resolves.toBeUndefined();
       expect(
         state.storage.sql
@@ -138,6 +142,95 @@ describe("AccountData Workers runtime E2E", () => {
           )
           .one(),
       ).toEqual({ brain_item_id: "migration-brain", operation: "upsert", status: "pending" });
+    });
+  });
+
+  it("既存のまとめ版を保って入力snapshot付きschemaへ移行できる", async () => {
+    const accountId = crypto.randomUUID();
+    const stub = env.ACCOUNT_DATA.getByName(accountId);
+    const generatedAt = new Date("2026-08-01T00:00:00.000Z");
+    const legacyInputAt = new Date("2026-07-30T00:00:00.000Z");
+
+    await runInDurableObject(stub, async (instance: AccountData, state) => {
+      state.storage.sql.exec("PRAGMA foreign_keys=OFF");
+      state.storage.sql.exec("DROP TABLE profile_summary_versions");
+      state.storage.sql.exec(`CREATE TABLE profile_summary_versions (
+        id text PRIMARY KEY NOT NULL,
+        account_id text NOT NULL,
+        generation_id text NOT NULL UNIQUE,
+        sequence integer NOT NULL,
+        generated_at integer NOT NULL,
+        model text NOT NULL,
+        prompt_version text NOT NULL,
+        summary_json text NOT NULL
+      )`);
+      state.storage.sql.exec(
+        "INSERT INTO profile_summary_generations (id, account_id, status, requested_at, finished_at, model, prompt_version) VALUES ('migration-generation', ?, 'completed', 1, 2, 'gemini-test', 'v1')",
+        accountId,
+      );
+      state.storage.sql.exec(
+        "INSERT INTO brain_items (id, created_at, updated_at, is_deleted, account_id, category, statement, attributes_json, derivation, status, stability, sensitivity, externally_shareable, confidence_json) VALUES ('migration-diary-brain', ?, ?, 0, ?, 'memory', '既存版で使用済みの記録', '{}', 'ai', 'active', 'stable', 'private', 0, '{}')",
+        legacyInputAt.getTime() / 1_000,
+        legacyInputAt.getTime() / 1_000,
+        accountId,
+      );
+      state.storage.sql.exec(
+        `INSERT INTO profile_summary_versions
+          (id, account_id, generation_id, sequence, generated_at, model, prompt_version, summary_json)
+         VALUES ('migration-version', ?, 'migration-generation', 1, ?, 'gemini-test', 'v1',
+          '{"generatedAt":"2026-08-01T00:00:00.000Z","headline":"既存版","insights":[],"recordCount":1,"diagnosisCount":0,"diaryCount":0,"latestRecordedAt":"2026-07-30T00:00:00.000Z"}')`,
+        accountId,
+        generatedAt.getTime(),
+      );
+      state.storage.sql.exec("DELETE FROM __drizzle_migrations WHERE created_at = 1786415351981");
+
+      const repository = Reflect.get(instance, "repository") as {
+        initialize(): Promise<void>;
+        client: Parameters<typeof DO.account.action.profileSummary.readProfileSummary>[0];
+      };
+      await expect(repository.initialize()).resolves.toBeUndefined();
+      const version = state.storage.sql
+        .exec<{
+          headline: string;
+          diagnosis_input_count: number;
+          diary_input_count: number;
+        }>(
+          `SELECT json_extract(summary_json, '$.headline') AS headline,
+                  diagnosis_input_count, diary_input_count
+             FROM profile_summary_versions WHERE id = 'migration-version'`,
+        )
+        .one();
+      expect(version).toEqual({
+        headline: "既存版",
+        diagnosis_input_count: 0,
+        diary_input_count: 1,
+      });
+      expect(
+        state.storage.sql
+          .exec<{ name: string }>("PRAGMA table_info(profile_summary_versions)")
+          .toArray()
+          .map(({ name }) => name),
+      ).not.toContain("account_id");
+      const readModel = await DO.account.action.profileSummary.readProfileSummary(
+        repository.client,
+        accountId,
+        new Date("2026-08-02T00:00:00.000Z"),
+      );
+      expect(readModel.generation).toMatchObject({ canRegenerate: false, reasons: [] });
+
+      const addedAt = new Date("2026-08-03T00:00:00.000Z");
+      state.storage.sql.exec(
+        "INSERT INTO brain_items (id, created_at, updated_at, is_deleted, account_id, category, statement, attributes_json, derivation, status, stability, sensitivity, externally_shareable, confidence_json) VALUES ('migration-new-diary-brain', ?, ?, 0, ?, 'memory', '移行後に増えた記録', '{}', 'ai', 'active', 'stable', 'private', 0, '{}')",
+        addedAt.getTime() / 1_000,
+        addedAt.getTime() / 1_000,
+        accountId,
+      );
+      const changed = await DO.account.action.profileSummary.readProfileSummary(
+        repository.client,
+        accountId,
+        addedAt,
+      );
+      expect(changed.generation).toMatchObject({ canRegenerate: true, reasons: ["brain"] });
     });
   });
 
@@ -204,6 +297,7 @@ describe("AccountData Workers runtime E2E", () => {
         diagnosisCount: context.diagnosisCount,
         diaryCount: context.diaryCount,
         latestRecordedAt: context.latestRecordedAt,
+        inputSnapshot: context.inputSnapshot,
       }),
     ).resolves.toBe(true);
     await expect(stub.execute(accountId, "profileSummary.read")).resolves.toMatchObject({

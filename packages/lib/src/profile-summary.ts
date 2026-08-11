@@ -30,8 +30,15 @@ export type ProfileSummaryVersion = Readonly<{
 export type ProfileSummaryGenerationState = Readonly<{
   status: "idle" | "queued" | "generating" | "failed";
   canRegenerate: boolean;
-  reasons: readonly [];
+  reasons: readonly ProfileSummaryRegenerationReason[];
   message: string | null;
+}>;
+
+export type ProfileSummaryRegenerationReason = "diagnosis" | "brain" | "elapsed";
+
+export type ProfileSummaryInputSnapshot = Readonly<{
+  diagnosis: Readonly<{ count: number; latestRecordedAt: Date | null }>;
+  diary: Readonly<{ count: number; latestRecordedAt: Date | null }>;
 }>;
 
 export type ProfileSummaryReadModel = Readonly<{
@@ -53,6 +60,7 @@ export type ProfileSummaryGenerationContext = Readonly<{
   diagnosisCount: number;
   diaryCount: number;
   latestRecordedAt: Date | null;
+  inputSnapshot: ProfileSummaryInputSnapshot;
 }>;
 
 export type RequestProfileSummaryGenerationResult =
@@ -61,7 +69,10 @@ export type RequestProfileSummaryGenerationResult =
       generationId: string;
       status: "queued" | "generating";
     }>
-  | Readonly<{ outcome: "unavailable" }>;
+  | Readonly<{
+      outcome: "unavailable";
+      reason: "source_record_required" | "regeneration_not_required";
+    }>;
 
 export type CompleteProfileSummaryGenerationInput = Readonly<{
   generationId: string;
@@ -73,4 +84,5 @@ export type CompleteProfileSummaryGenerationInput = Readonly<{
   diagnosisCount: number;
   diaryCount: number;
   latestRecordedAt: Date | null;
+  inputSnapshot: ProfileSummaryInputSnapshot;
 }>;
