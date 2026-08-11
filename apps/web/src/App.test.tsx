@@ -29,6 +29,7 @@ const mocks = vi.hoisted(() => ({
   resetDevelopmentDiagnosisData: vi.fn(),
   restoreDiagnosisProgress: vi.fn(),
   fetchProfileSummary: vi.fn(),
+  requestProfileSummaryGeneration: vi.fn(),
   fetchDevelopmentBrainItems: vi.fn(),
   normalizeAvatarImage: vi.fn(),
 }));
@@ -56,6 +57,7 @@ vi.mock("./feature/diagnosis/model/answers", () => ({
 }));
 vi.mock("./feature/profile/infrastructure/profile-api", () => ({
   fetchProfileSummary: mocks.fetchProfileSummary,
+  requestProfileSummaryGeneration: mocks.requestProfileSummaryGeneration,
 }));
 vi.mock("./feature/brain/infrastructure/brain-api", () => ({
   fetchDevelopmentBrainItems: mocks.fetchDevelopmentBrainItems,
@@ -231,6 +233,11 @@ describe("App", () => {
       availableDataCounts: { diagnosis: 2, diary: 5 },
       generation: { status: "idle", canRegenerate: false, reasons: [] },
       nextAction: "diagnosis",
+    });
+    mocks.requestProfileSummaryGeneration.mockResolvedValue({
+      generationId: "generation-1",
+      status: "queued",
+      created: true,
     });
     mocks.fetchDevelopmentBrainItems.mockResolvedValue({
       items: [
@@ -465,6 +472,43 @@ describe("App", () => {
     ).toBeTruthy();
     expect(screen.getByText("現在 2件")).toBeTruthy();
     expect(screen.getByText("現在 5件")).toBeTruthy();
+  });
+
+  it("/meから新しいまとめ版の生成を要求する", async () => {
+    const current = await mocks.fetchProfileSummary();
+    mocks.fetchProfileSummary.mockResolvedValue({
+      ...current,
+      generation: { status: "idle", canRegenerate: true, reasons: ["brain"] },
+    });
+    window.history.replaceState({}, "", "/me");
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "新しい私を見る" }));
+
+    await waitFor(() =>
+      expect(mocks.requestProfileSummaryGeneration).toHaveBeenCalledWith(
+        "https://api.example.com",
+        "dummy.id.token",
+        expect.any(AbortSignal),
+      ),
+    );
+    expect(await screen.findByRole("heading", { name: "新しい版を作成中" })).toBeTruthy();
+  });
+
+  it("/meでは保存済み版がなくてもGET APIの初回生成状態を表示する", async () => {
+    mocks.fetchProfileSummary.mockResolvedValue({
+      summary: null,
+      versions: [],
+      availableDataCounts: { diagnosis: 1, diary: 2 },
+      generation: { status: "generating", canRegenerate: false, reasons: [] },
+      nextAction: "chat",
+    });
+    window.history.replaceState({}, "", "/me");
+
+    render(<App />);
+
+    expect(await screen.findByRole("status", { name: "新しい版を作成中" })).toBeTruthy();
+    expect(screen.queryByText("まだ、わたしのまとめはありません")).toBeNull();
   });
 
   it("LIFF初期化前にliff.stateへ保持された/meでもまとめ画面を表示する", async () => {

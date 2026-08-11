@@ -75,8 +75,14 @@ describe("Brain AccountData schema", () => {
       );
 
     sqlite.exec(
+      readFileSync(path.join(migrationDirectory, "0001_broken_tyger_tiger.sql"), "utf8").replaceAll(
+        "--> statement-breakpoint",
+        "",
+      ),
+    );
+    sqlite.exec(
       readFileSync(
-        path.join(migrationDirectory, "0001_tired_bill_hollister.sql"),
+        path.join(migrationDirectory, "0002_wealthy_titanium_man.sql"),
         "utf8",
       ).replaceAll("--> statement-breakpoint", ""),
     );

@@ -33,13 +33,13 @@
     - `task db:migrate:local` (または `task db:migrate`): D1 データベースマイグレーションのローカル適用
     - `task db:migrate:preview`: プレビュー環境への D1 データベースマイグレーション適用
     - `task db:migrate:production`: 本番環境への D1 データベースマイグレーション適用
-    - `task queues:setup:preview`: プレビュー環境の日記チャット用Queue（Chat Turn / Brain Checkpoint / Brain Vector）と各DLQを冪等に作成
-    - `task queues:setup:production`: 本番環境の日記チャット用Queue（Chat Turn / Brain Checkpoint / Brain Vector）と各DLQを冪等に作成
+    - `task queues:setup:preview`: プレビュー環境の非同期処理用Queue（Chat Turn / Brain Checkpoint / Profile Summary / Brain Vector）と各DLQを冪等に作成
+    - `task queues:setup:production`: 本番環境の非同期処理用Queue（Chat Turn / Brain Checkpoint / Profile Summary / Brain Vector）と各DLQを冪等に作成
     - `task vectorize:setup:preview`: プレビュー環境のBrain Vectorize indexと`owner_scope` metadata indexを冪等に作成・検証
     - `task vectorize:setup:production`: 本番環境のBrain Vectorize indexと`owner_scope` metadata indexを冪等に作成・検証
     - `task access:setup:preview`: プレビュー環境のOpenAPI documentとSwagger UI用パスをCloudflare Accessで保護
     - `task access:setup:production`: 本番環境のOpenAPI documentとSwagger UI用パスをCloudflare Accessで保護
-    - `bun --cwd apps/worker do:generate`: Durable ObjectのDrizzle schemaからmigrationを生成。AccountDataは`packages/lib/drizzle-do-account/`、ConversationCoordinatorは`apps/worker/drizzle/conversation-coordinator/`が出力先
+    - `bun --cwd apps/worker do:generate`: AccountDataのmigrationを`packages/lib/drizzle-do-account/`へ、ConversationCoordinatorとCompatibilityDataのmigrationを`apps/worker/drizzle/<durable-object>/`へ生成
     - `task db:seed:local`: ローカルD1へ診断seedを適用
     - `task db:seed:preview`: プレビューD1へ診断seedを適用
     - `task db:seed:production`: 本番D1へ診断seedを明示的に適用

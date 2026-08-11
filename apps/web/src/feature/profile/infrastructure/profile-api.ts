@@ -4,6 +4,8 @@ import { createHttpClient } from "../../../infrastructure/http-client";
 import type { ProfileSummaryReadResult } from "../model/profile-summary";
 
 type ApiResponse = operations["getProfileSummary"]["responses"][200]["content"]["application/json"];
+type GenerationResponse =
+  operations["requestProfileSummaryGeneration"]["responses"][202]["content"]["application/json"];
 
 const CountSchema = v.pipe(v.number(), v.safeInteger(), v.minValue(0));
 const SummarySchema = v.object({
@@ -48,6 +50,12 @@ const ResponseSchema = v.object({
   nextAction: v.picklist(["diagnosis", "chat"]),
 }) satisfies v.GenericSchema<ApiResponse>;
 
+const GenerationResponseSchema = v.object({
+  generationId: v.pipe(v.string(), v.nonEmpty()),
+  status: v.picklist(["queued", "generating"]),
+  created: v.boolean(),
+}) satisfies v.GenericSchema<GenerationResponse>;
+
 export async function fetchProfileSummary(
   apiUrl: string | undefined,
   idToken: string,
@@ -80,4 +88,29 @@ export async function fetchProfileSummary(
     },
     summary: latest?.summary ?? null,
   };
+}
+
+export async function requestProfileSummaryGeneration(
+  apiUrl: string | undefined,
+  idToken: string,
+  signal?: AbortSignal,
+): Promise<GenerationResponse> {
+  const response = await createHttpClient(apiUrl).request("/api/profile-summary/generations", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${idToken}` },
+    ...(signal ? { signal } : {}),
+  });
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error("本人確認に失敗しました。LINEから開き直してください。");
+    }
+    if (response.status === 404) {
+      throw new Error("利用するには、先にLINE公式アカウントを友だち追加してください。");
+    }
+    if (response.status === 409) {
+      throw new Error("まとめに使える記録がまだありません。");
+    }
+    throw new Error(`まとめの生成を開始できませんでした (HTTP ${response.status})`);
+  }
+  return v.parse(GenerationResponseSchema, await response.json());
 }

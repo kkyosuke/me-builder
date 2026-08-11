@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { config } from "../../../config";
 import type { AsyncState } from "../../../model/async-state";
-import { fetchProfileSummary } from "../infrastructure/profile-api";
+import {
+  fetchProfileSummary,
+  requestProfileSummaryGeneration,
+} from "../infrastructure/profile-api";
 import type { ProfileSummaryReadResult } from "../model/profile-summary";
 
 export function useProfileSummary({
@@ -13,30 +16,95 @@ export function useProfileSummary({
   const mounted = useRef(false);
   const loading = useRef(false);
   const request = useRef<AbortController | null>(null);
+  const generationRequest = useRef<AbortController | null>(null);
 
-  const load = useCallback(async () => {
-    if (loading.current) return;
-    loading.current = true;
-    request.current?.abort();
+  const load = useCallback(
+    async (showLoading = true) => {
+      if (loading.current) return;
+      loading.current = true;
+      request.current?.abort();
+      const controller = new AbortController();
+      request.current = controller;
+      if (mounted.current && showLoading) setState({ status: "loading" });
+      try {
+        const idToken = await acquireIdToken(controller.signal);
+        if (!idToken || controller.signal.aborted) return;
+        const result = await fetchProfileSummary(config.apiUrl, idToken, controller.signal);
+        if (mounted.current && !controller.signal.aborted) {
+          setState({ status: "success", data: result });
+        }
+      } catch (error) {
+        if (mounted.current && !controller.signal.aborted) {
+          setState({
+            status: "error",
+            message: error instanceof Error ? error.message : "まとめを生成できませんでした。",
+          });
+        }
+      } finally {
+        if (request.current === controller) loading.current = false;
+      }
+    },
+    [acquireIdToken],
+  );
+
+  const generate = useCallback(async () => {
+    generationRequest.current?.abort();
     const controller = new AbortController();
-    request.current = controller;
-    if (mounted.current) setState({ status: "loading" });
+    generationRequest.current = controller;
     try {
       const idToken = await acquireIdToken(controller.signal);
       if (!idToken || controller.signal.aborted) return;
-      const result = await fetchProfileSummary(config.apiUrl, idToken, controller.signal);
+      const accepted = await requestProfileSummaryGeneration(
+        config.apiUrl,
+        idToken,
+        controller.signal,
+      );
       if (mounted.current && !controller.signal.aborted) {
-        setState({ status: "success", data: result });
+        setState((current) =>
+          current.status === "success"
+            ? {
+                status: "success",
+                data: {
+                  ...current.data,
+                  generation: {
+                    ...current.data.generation,
+                    status: accepted.status,
+                    canRegenerate: false,
+                  },
+                },
+              }
+            : current,
+        );
+      }
+      for (let attempt = 0; attempt < 60 && !controller.signal.aborted; attempt += 1) {
+        await new Promise<void>((resolve) => setTimeout(resolve, 2_000));
+        if (controller.signal.aborted) return;
+        const latest = await fetchProfileSummary(config.apiUrl, idToken, controller.signal);
+        if (mounted.current && !controller.signal.aborted) {
+          setState({ status: "success", data: latest });
+        }
+        if (latest.generation.status === "idle" || latest.generation.status === "failed") return;
       }
     } catch (error) {
       if (mounted.current && !controller.signal.aborted) {
-        setState({
-          status: "error",
-          message: error instanceof Error ? error.message : "まとめを生成できませんでした。",
-        });
+        setState((current) =>
+          current.status === "success"
+            ? {
+                status: "success",
+                data: {
+                  ...current.data,
+                  generation: {
+                    ...current.data.generation,
+                    status: "failed",
+                    canRegenerate: true,
+                    message:
+                      error instanceof Error ? error.message : "まとめを生成できませんでした。",
+                  },
+                },
+              }
+            : current,
+        );
       }
-    } finally {
-      if (request.current === controller) loading.current = false;
     }
   }, [acquireIdToken]);
 
@@ -50,9 +118,10 @@ export function useProfileSummary({
       active = false;
       mounted.current = false;
       request.current?.abort();
+      generationRequest.current?.abort();
       loading.current = false;
     };
   }, [load]);
 
-  return { state, reload: load };
+  return { state, reload: load, generate };
 }

@@ -10,107 +10,94 @@ function vectorize(environment: string, prefix = "") {
   return `[[${prefix}vectorize]]\nbinding = "BRAIN_VECTOR_INDEX"\nindex_name = "me-builder-brain-${environment}"`;
 }
 
+function queueConsumer(prefix: string, queue: string, deadLetterQueue: string, retries: number) {
+  return `[[${prefix}queues.consumers]]\nqueue = "${queue}"\ndead_letter_queue = "${deadLetterQueue}"\nmax_retries = ${retries}`;
+}
+
+function queueProducer(prefix: string, queue: string, binding: string) {
+  return `[[${prefix}queues.producers]]\nqueue = "${queue}"\nbinding = "${binding}"`;
+}
+
+function durableObject(prefix: string, name: string, scriptName?: string) {
+  const script = scriptName ? `\nscript_name = "${scriptName}"` : "";
+  return `[[${prefix}durable_objects.bindings]]\nname = "${name}"\nclass_name = "${name
+    .toLowerCase()
+    .replace(/(^|_)([a-z])/g, (_, _separator, letter: string) => letter.toUpperCase())}"${script}`;
+}
+
 function workerEnvironment(manifest: InfrastructureManifest) {
   const env = manifest.environment;
   const q = manifest.queues;
-  return `[env.${env}]
-name = "me-builder-worker-${env}"
-
-[[env.${env}.queues.consumers]]
-queue = "${q.webhook.name}"
-dead_letter_queue = "${q.webhookDeadLetter.name}"
-max_retries = 3
-
-[[env.${env}.queues.consumers]]
-queue = "${q.chatTurn.name}"
-dead_letter_queue = "${q.chatTurnDeadLetter.name}"
-max_retries = 5
-
-[[env.${env}.queues.consumers]]
-queue = "${q.brainCheckpoint.name}"
-dead_letter_queue = "${q.brainCheckpointDeadLetter.name}"
-max_retries = 5
-
-[[env.${env}.queues.consumers]]
-queue = "${q.brainVector.name}"
-dead_letter_queue = "${q.brainVectorDeadLetter.name}"
-max_retries = 5
-
-[[env.${env}.queues.producers]]
-queue = "${q.chatTurn.name}"
-binding = "CHAT_TURN_QUEUE"
-
-[[env.${env}.queues.producers]]
-queue = "${q.brainCheckpoint.name}"
-binding = "BRAIN_CHECKPOINT_QUEUE"
-
-[[env.${env}.queues.producers]]
-queue = "${q.brainVector.name}"
-binding = "BRAIN_VECTOR_QUEUE"
-
-[[env.${env}.durable_objects.bindings]]
-name = "CONVERSATION_COORDINATOR"
-class_name = "ConversationCoordinator"
-
-[[env.${env}.durable_objects.bindings]]
-name = "ACCOUNT_DATA"
-class_name = "AccountData"
-
-[[env.${env}.durable_objects.bindings]]
-name = "COMPATIBILITY_DATA"
-class_name = "CompatibilityData"
-
-${d1(manifest.database, `env.${env}.`)}
-
-${vectorize(env, `env.${env}.`)}
-
-[env.${env}.vars]
-ENVIRONMENT = "${env}"`;
+  const prefix = `env.${env}.`;
+  return [
+    `[env.${env}]`,
+    `name = "me-builder-worker-${env}"`,
+    "",
+    queueConsumer(prefix, q.webhook.name, q.webhookDeadLetter.name, 3),
+    "",
+    queueConsumer(prefix, q.chatTurn.name, q.chatTurnDeadLetter.name, 5),
+    "",
+    queueConsumer(prefix, q.brainCheckpoint.name, q.brainCheckpointDeadLetter.name, 5),
+    "",
+    queueConsumer(prefix, q.profileSummary.name, q.profileSummaryDeadLetter.name, 5),
+    "",
+    queueConsumer(prefix, q.brainVector.name, q.brainVectorDeadLetter.name, 5),
+    "",
+    queueProducer(prefix, q.chatTurn.name, "CHAT_TURN_QUEUE"),
+    "",
+    queueProducer(prefix, q.brainCheckpoint.name, "BRAIN_CHECKPOINT_QUEUE"),
+    "",
+    queueProducer(prefix, q.brainVector.name, "BRAIN_VECTOR_QUEUE"),
+    "",
+    durableObject(prefix, "CONVERSATION_COORDINATOR"),
+    "",
+    durableObject(prefix, "ACCOUNT_DATA"),
+    "",
+    durableObject(prefix, "COMPATIBILITY_DATA"),
+    "",
+    d1(manifest.database, prefix),
+    "",
+    vectorize(env, prefix),
+    "",
+    `[env.${env}.vars]`,
+    `ENVIRONMENT = "${env}"`,
+  ].join("\n");
 }
 
 function apiEnvironment(manifest: InfrastructureManifest) {
   const env = manifest.environment;
   const host = env === "preview" ? "api.stg.kagami.kyosuke.dev" : "api.kagami.kyosuke.dev";
-  const vectorBinding = env === "production" ? "" : `\n\n${vectorize(env, `env.${env}.`)}`;
-  return `[env.${env}]
-name = "me-builder-api-${env}"
-routes = [
-  { pattern = "${host}", custom_domain = true }
-]
-
-[[env.${env}.queues.producers]]
-queue = "${manifest.queues.webhook.name}"
-binding = "WEBHOOK_QUEUE"
-
-${d1(manifest.database, `env.${env}.`)}${vectorBinding}
-
-[[env.${env}.durable_objects.bindings]]
-name = "ACCOUNT_DATA"
-class_name = "AccountData"
-script_name = "me-builder-worker-${env}"
-
-[[env.${env}.durable_objects.bindings]]
-name = "COMPATIBILITY_DATA"
-class_name = "CompatibilityData"
-script_name = "me-builder-worker-${env}"
-
-[env.${env}.vars]
-ENVIRONMENT = "${env}"`;
+  const prefix = `env.${env}.`;
+  const config = [
+    `[env.${env}]`,
+    `name = "me-builder-api-${env}"`,
+    "routes = [",
+    `  { pattern = "${host}", custom_domain = true }`,
+    "]",
+    "",
+    queueProducer(prefix, manifest.queues.webhook.name, "WEBHOOK_QUEUE"),
+    "",
+    queueProducer(prefix, manifest.queues.profileSummary.name, "PROFILE_SUMMARY_QUEUE"),
+    "",
+    d1(manifest.database, prefix),
+  ];
+  if (env !== "production") config.push("", vectorize(env, prefix));
+  config.push(
+    "",
+    durableObject(prefix, "ACCOUNT_DATA", `me-builder-worker-${env}`),
+    "",
+    durableObject(prefix, "COMPATIBILITY_DATA", `me-builder-worker-${env}`),
+    "",
+    `[env.${env}.vars]`,
+    `ENVIRONMENT = "${env}"`,
+  );
+  return config.join("\n");
 }
 
 function mcpEnvironment(manifest: InfrastructureManifest) {
   const env = manifest.environment;
   const host = env === "preview" ? "mcp.stg.kagami.kyosuke.dev" : "mcp.kagami.kyosuke.dev";
-  return `[env.${env}]
-name = "me-builder-mcp-${env}"
-routes = [
-  { pattern = "${host}", custom_domain = true }
-]
-
-${d1(manifest.database, `env.${env}.`)}
-
-[env.${env}.vars]
-ENVIRONMENT = "${env}"`;
+  return `[env.${env}]\nname = "me-builder-mcp-${env}"\nroutes = [\n  { pattern = "${host}", custom_domain = true }\n]\n\n${d1(manifest.database, `env.${env}.`)}\n\n[env.${env}.vars]\nENVIRONMENT = "${env}"`;
 }
 
 export function renderWranglerConfigs(
@@ -125,6 +112,8 @@ export function renderWranglerConfigs(
     chatTurnDeadLetter: { id: "local", name: "me-builder-chat-turn-dlq-local" },
     brainCheckpoint: { id: "local", name: "me-builder-brain-checkpoint-queue-local" },
     brainCheckpointDeadLetter: { id: "local", name: "me-builder-brain-checkpoint-dlq-local" },
+    profileSummary: { id: "local", name: "me-builder-profile-summary-queue-local" },
+    profileSummaryDeadLetter: { id: "local", name: "me-builder-profile-summary-dlq-local" },
     brainVector: { id: "local", name: "me-builder-brain-vector-queue-local" },
     brainVectorDeadLetter: { id: "local", name: "me-builder-brain-vector-dlq-local" },
   };
@@ -134,196 +123,140 @@ export function renderWranglerConfigs(
     database: localDatabase,
     queues: localQueues,
   };
-  const worker = `${header}
-name = "me-builder-worker"
-main = "src/index.ts"
-compatibility_date = "2026-08-06"
-compatibility_flags = ["nodejs_compat"]
+  const worker = [
+    header,
+    'name = "me-builder-worker"',
+    'main = "src/index.ts"',
+    'compatibility_date = "2026-08-06"',
+    'compatibility_flags = ["nodejs_compat"]',
+    "",
+    "[observability]",
+    "enabled = true",
+    "",
+    "[observability.logs]",
+    "invocation_logs = false",
+    "",
+    queueConsumer("", localQueues.webhook.name, localQueues.webhookDeadLetter.name, 3),
+    "",
+    queueConsumer("", localQueues.chatTurn.name, localQueues.chatTurnDeadLetter.name, 5),
+    "",
+    queueConsumer(
+      "",
+      localQueues.brainCheckpoint.name,
+      localQueues.brainCheckpointDeadLetter.name,
+      5,
+    ),
+    "",
+    queueConsumer(
+      "",
+      localQueues.profileSummary.name,
+      localQueues.profileSummaryDeadLetter.name,
+      5,
+    ),
+    "",
+    queueConsumer("", localQueues.brainVector.name, localQueues.brainVectorDeadLetter.name, 5),
+    "",
+    queueProducer("", localQueues.chatTurn.name, "CHAT_TURN_QUEUE"),
+    "",
+    queueProducer("", localQueues.brainCheckpoint.name, "BRAIN_CHECKPOINT_QUEUE"),
+    "",
+    queueProducer("", localQueues.brainVector.name, "BRAIN_VECTOR_QUEUE"),
+    "",
+    durableObject("", "CONVERSATION_COORDINATOR"),
+    "",
+    durableObject("", "ACCOUNT_DATA"),
+    "",
+    durableObject("", "COMPATIBILITY_DATA"),
+    "",
+    "[[migrations]]",
+    'tag = "v1"',
+    'new_sqlite_classes = ["ConversationCoordinator"]',
+    "",
+    "[[migrations]]",
+    'tag = "v2"',
+    'new_sqlite_classes = ["AccountData"]',
+    "",
+    "[[migrations]]",
+    'tag = "v3"',
+    'new_sqlite_classes = ["CompatibilityData"]',
+    "",
+    "[[rules]]",
+    'type = "Text"',
+    'globs = ["**/*.sql"]',
+    "fallthrough = true",
+    "",
+    d1(localDatabase),
+    "",
+    vectorize("local"),
+    "",
+    "[vars]",
+    'ENVIRONMENT = "local"',
+    "",
+    workerEnvironment(localManifest),
+    "",
+    workerEnvironment(preview),
+    "",
+    workerEnvironment(production),
+    "",
+  ].join("\n");
 
-[observability]
-enabled = true
+  const apiLocal = [
+    "[env.local]",
+    'name = "me-builder-api-local"',
+    "",
+    queueProducer("env.local.", localQueues.webhook.name, "WEBHOOK_QUEUE"),
+    "",
+    queueProducer("env.local.", localQueues.profileSummary.name, "PROFILE_SUMMARY_QUEUE"),
+    "",
+    d1(localDatabase, "env.local."),
+    "",
+    vectorize("local", "env.local."),
+    "",
+    durableObject("env.local.", "ACCOUNT_DATA", "me-builder-worker-local"),
+    "",
+    durableObject("env.local.", "COMPATIBILITY_DATA", "me-builder-worker-local"),
+    "",
+    "[env.local.vars]",
+    'ENVIRONMENT = "local"',
+  ].join("\n");
+  const api = [
+    header,
+    'name = "me-builder-api"',
+    'main = "src/index.ts"',
+    'compatibility_date = "2026-07-29"',
+    'compatibility_flags = ["nodejs_compat"]',
+    "",
+    "[observability]",
+    "enabled = true",
+    "",
+    "[observability.logs]",
+    "invocation_logs = false",
+    "",
+    queueProducer("", localQueues.webhook.name, "WEBHOOK_QUEUE"),
+    "",
+    queueProducer("", localQueues.profileSummary.name, "PROFILE_SUMMARY_QUEUE"),
+    "",
+    d1(localDatabase),
+    "",
+    vectorize("local"),
+    "",
+    durableObject("", "ACCOUNT_DATA", "me-builder-worker-local"),
+    "",
+    durableObject("", "COMPATIBILITY_DATA", "me-builder-worker-local"),
+    "",
+    "[vars]",
+    'ENVIRONMENT = "local"',
+    "",
+    apiLocal,
+    "",
+    apiEnvironment(preview),
+    "",
+    apiEnvironment(production),
+    "",
+  ].join("\n");
 
-[observability.logs]
-invocation_logs = false
+  const mcp = `${header}\nname = "me-builder-mcp"\nmain = "src/index.ts"\ncompatibility_date = "2024-07-01"\ncompatibility_flags = ["nodejs_compat"]\n\n[observability]\nenabled = true\n\n${d1(localDatabase)}\n\n[vars]\nENVIRONMENT = "local"\n\n[env.local]\nname = "me-builder-mcp-local"\n\n${d1(localDatabase, "env.local.")}\n\n[env.local.vars]\nENVIRONMENT = "local"\n\n${mcpEnvironment(preview)}\n\n${mcpEnvironment(production)}\n`;
 
-[[queues.consumers]]
-queue = "me-builder-webhook-queue-local"
-dead_letter_queue = "me-builder-webhook-dlq-local"
-max_retries = 3
-
-[[queues.consumers]]
-queue = "me-builder-chat-turn-queue-local"
-dead_letter_queue = "me-builder-chat-turn-dlq-local"
-max_retries = 5
-
-[[queues.consumers]]
-queue = "me-builder-brain-checkpoint-queue-local"
-dead_letter_queue = "me-builder-brain-checkpoint-dlq-local"
-max_retries = 5
-
-[[queues.consumers]]
-queue = "me-builder-brain-vector-queue-local"
-dead_letter_queue = "me-builder-brain-vector-dlq-local"
-max_retries = 5
-
-[[queues.producers]]
-queue = "me-builder-chat-turn-queue-local"
-binding = "CHAT_TURN_QUEUE"
-
-[[queues.producers]]
-queue = "me-builder-brain-checkpoint-queue-local"
-binding = "BRAIN_CHECKPOINT_QUEUE"
-
-[[queues.producers]]
-queue = "me-builder-brain-vector-queue-local"
-binding = "BRAIN_VECTOR_QUEUE"
-
-[[durable_objects.bindings]]
-name = "CONVERSATION_COORDINATOR"
-class_name = "ConversationCoordinator"
-
-[[durable_objects.bindings]]
-name = "ACCOUNT_DATA"
-class_name = "AccountData"
-
-[[durable_objects.bindings]]
-name = "COMPATIBILITY_DATA"
-class_name = "CompatibilityData"
-
-[[migrations]]
-tag = "v1"
-new_sqlite_classes = ["ConversationCoordinator"]
-
-[[migrations]]
-tag = "v2"
-new_sqlite_classes = ["AccountData"]
-
-[[migrations]]
-tag = "v3"
-new_sqlite_classes = ["CompatibilityData"]
-
-[[rules]]
-type = "Text"
-globs = ["**/*.sql"]
-fallthrough = true
-
-${d1(localDatabase)}
-
-${vectorize("local")}
-
-[vars]
-ENVIRONMENT = "local"
-
-${workerEnvironment(localManifest)}
-
-${workerEnvironment(preview)}
-
-${workerEnvironment(production)}
-`;
-
-  const apiLocal = `[env.local]
-name = "me-builder-api-local"
-
-[[env.local.queues.producers]]
-queue = "me-builder-webhook-queue-local"
-binding = "WEBHOOK_QUEUE"
-
-${d1(localDatabase, "env.local.")}
-
-${vectorize("local", "env.local.")}
-
-[[env.local.durable_objects.bindings]]
-name = "ACCOUNT_DATA"
-class_name = "AccountData"
-script_name = "me-builder-worker-local"
-
-[[env.local.durable_objects.bindings]]
-name = "COMPATIBILITY_DATA"
-class_name = "CompatibilityData"
-script_name = "me-builder-worker-local"
-
-[env.local.vars]
-ENVIRONMENT = "local"`;
-  const api = `${header}
-name = "me-builder-api"
-main = "src/index.ts"
-compatibility_date = "2026-07-29"
-compatibility_flags = ["nodejs_compat"]
-
-[observability]
-enabled = true
-
-[observability.logs]
-invocation_logs = false
-
-[[queues.producers]]
-queue = "me-builder-webhook-queue-local"
-binding = "WEBHOOK_QUEUE"
-
-${d1(localDatabase)}
-
-${vectorize("local")}
-
-[[durable_objects.bindings]]
-name = "ACCOUNT_DATA"
-class_name = "AccountData"
-script_name = "me-builder-worker-local"
-
-[[durable_objects.bindings]]
-name = "COMPATIBILITY_DATA"
-class_name = "CompatibilityData"
-script_name = "me-builder-worker-local"
-
-[vars]
-ENVIRONMENT = "local"
-
-${apiLocal}
-
-${apiEnvironment(preview)}
-
-${apiEnvironment(production)}
-`;
-
-  const mcp = `${header}
-name = "me-builder-mcp"
-main = "src/index.ts"
-compatibility_date = "2024-07-01"
-compatibility_flags = ["nodejs_compat"]
-
-[observability]
-enabled = true
-
-${d1(localDatabase)}
-
-[vars]
-ENVIRONMENT = "local"
-
-[env.local]
-name = "me-builder-mcp-local"
-
-${d1(localDatabase, "env.local.")}
-
-[env.local.vars]
-ENVIRONMENT = "local"
-
-${mcpEnvironment(preview)}
-
-${mcpEnvironment(production)}
-`;
-
-  const lib = `${header}
-name = "me-builder-lib"
-
-${d1(localDatabase)}
-migrations_dir = "drizzle"
-
-[env.preview]
-${d1(preview.database, "env.preview.")}
-migrations_dir = "drizzle"
-
-[env.production]
-${d1(production.database, "env.production.")}
-migrations_dir = "drizzle"
-`;
+  const lib = `${header}\nname = "me-builder-lib"\n\n${d1(localDatabase)}\nmigrations_dir = "drizzle"\n\n[env.preview]\n${d1(preview.database, "env.preview.")}\nmigrations_dir = "drizzle"\n\n[env.production]\n${d1(production.database, "env.production.")}\nmigrations_dir = "drizzle"\n`;
   return { worker, api, mcp, lib };
 }

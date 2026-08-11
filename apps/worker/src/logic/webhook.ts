@@ -7,6 +7,7 @@ import {
   type FlowKey,
   type Message,
   type MessageBatch,
+  type ProfileSummaryGenerationQueueMessage,
   type WebhookQueueMessage,
   describeQueueMessageResult,
   logger,
@@ -20,6 +21,10 @@ import {
   DIARY_BRAIN_CHECKPOINT_MAX_ATTEMPTS,
   processDiaryBrainCheckpointMessage,
 } from "../handler/diary-brain-checkpoint";
+import {
+  PROFILE_SUMMARY_GENERATION_MAX_ATTEMPTS,
+  processProfileSummaryGenerationMessage,
+} from "../handler/profile-summary-generation";
 import { processLineWebhook } from "./feature/line";
 
 /** max_retries = 3では初回と3回の再試行を合わせて4 attemptsになる。 */
@@ -34,6 +39,7 @@ const MAX_ATTEMPTS_BY_FLOW: Record<FlowKey, number | undefined> = {
   "chat-turn": CHAT_TURN_MAX_ATTEMPTS,
   "diary-brain-checkpoint": DIARY_BRAIN_CHECKPOINT_MAX_ATTEMPTS,
   "brain-vector-sync": 6,
+  "profile-summary-generation": PROFILE_SUMMARY_GENERATION_MAX_ATTEMPTS,
   "queue-dispatch": undefined,
 };
 
@@ -43,12 +49,14 @@ function flowOf(
     | WebhookQueueMessage
     | ChatTurnQueueMessage
     | DiaryBrainCheckpointQueueMessage
-    | BrainVectorSyncQueueMessage,
+    | BrainVectorSyncQueueMessage
+    | ProfileSummaryGenerationQueueMessage,
 ): FlowKey {
   if (!("type" in body)) return "line-webhook";
   if (body.type === "chat-turn") return "chat-turn";
   if (body.type === "diary-brain-checkpoint") return "diary-brain-checkpoint";
   if (body.type === "brain-vector-sync") return "brain-vector-sync";
+  if (body.type === "profile-summary-generation") return "profile-summary-generation";
   return "queue-dispatch";
 }
 
@@ -166,6 +174,7 @@ export async function handleQueueBatch(
     | ChatTurnQueueMessage
     | DiaryBrainCheckpointQueueMessage
     | BrainVectorSyncQueueMessage
+    | ProfileSummaryGenerationQueueMessage
   >,
   db: D1.shared.Client,
   workerConfig?: WorkerConfig,
@@ -198,6 +207,13 @@ export async function handleQueueBatch(
         if (!cf || !workerConfig) throw new Error("Brain vector bindings are not configured");
         await processBrainVectorSyncMessage(
           message as Message<BrainVectorSyncQueueMessage>,
+          cf,
+          workerConfig,
+        );
+      } else if ("type" in message.body && message.body.type === "profile-summary-generation") {
+        if (!cf || !workerConfig) throw new Error("Profile Summary bindings are not configured");
+        await processProfileSummaryGenerationMessage(
+          message as Message<ProfileSummaryGenerationQueueMessage>,
           cf,
           workerConfig,
         );

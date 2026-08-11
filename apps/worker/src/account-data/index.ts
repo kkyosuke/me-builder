@@ -16,12 +16,14 @@ import { brainActions } from "./brain";
 import { compatibilityActions } from "./compatibility";
 import { diagnosisActions } from "./diagnosis";
 import { diaryActions } from "./diary";
+import { profileSummaryActions } from "./profile-summary";
 import { AccountDataRepository, type DiagnosisCatalogSnapshot } from "./repository";
 
 const actions = {
   ...brainActions,
   ...diagnosisActions,
   ...diaryActions,
+  ...profileSummaryActions,
 } as const;
 
 const ALARM_RETRY_MS = 30_000;

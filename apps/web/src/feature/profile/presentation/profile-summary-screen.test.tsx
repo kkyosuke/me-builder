@@ -36,6 +36,12 @@ const summary: ProfileSummary = {
   latestRecordedAt: "2026-08-08T11:45:00.000Z",
 };
 
+const pastSummary: ProfileSummary = {
+  ...summary,
+  generatedAt: "2026-08-02T12:00:00.000Z",
+  headline: "以前の記録から見えていたあなたらしさ",
+};
+
 const versioning: ProfileSummaryVersioning = {
   versions: [
     {
@@ -44,6 +50,7 @@ const versioning: ProfileSummaryVersioning = {
       generatedAt: "2026-08-09T12:00:00.000Z",
       isLatest: true,
       generationMethod: "ai",
+      summary,
     },
     {
       id: "version-2",
@@ -51,6 +58,7 @@ const versioning: ProfileSummaryVersioning = {
       generatedAt: "2026-08-02T12:00:00.000Z",
       isLatest: false,
       generationMethod: "ai",
+      summary: pastSummary,
     },
   ],
   selectedVersionId: "version-3",
@@ -170,6 +178,9 @@ describe("ProfileSummaryScreen", () => {
     firePointer(latestCard, "pointerup", { clientX: 0, clientY: 12, pointerId: 1 });
     expect(onSelectVersion).not.toHaveBeenCalled();
     expect(latestCard.getAttribute("style")).toContain("translate3d(-115%");
+    expect(container.querySelector('[data-summary-card-layer="incoming"]')?.textContent).toContain(
+      pastSummary.headline,
+    );
     act(() => vi.advanceTimersByTime(300));
     expect(onSelectVersion).toHaveBeenCalledWith("version-2");
     expect(latestCard.getAttribute("style")).toContain("translate3d(0px");
@@ -189,7 +200,7 @@ describe("ProfileSummaryScreen", () => {
 
     rerender(
       <ProfileSummaryScreen
-        state={{ status: "success", data: { summary, nextAction: "chat" } }}
+        state={{ status: "success", data: { summary: pastSummary, nextAction: "chat" } }}
         versioning={{ ...versioning, selectedVersionId: "version-2" }}
         onRetry={vi.fn()}
         onSelectVersion={onSelectVersion}
@@ -212,6 +223,46 @@ describe("ProfileSummaryScreen", () => {
     act(() => vi.advanceTimersByTime(300));
     expect(onSelectVersion).toHaveBeenLastCalledWith("version-3");
     expect(screen.queryByRole("button", { name: "新しい私を見る" })).toBeNull();
+  });
+
+  it("保存済み版がなくても初回生成中と生成失敗を表示する", () => {
+    const onRegenerate = vi.fn();
+    const { rerender } = render(
+      <ProfileSummaryScreen
+        state={{ status: "success", data: { summary: null, nextAction: "chat" } }}
+        versioning={{
+          versions: [],
+          selectedVersionId: null,
+          generation: { status: "generating", canRegenerate: false, reasons: [] },
+        }}
+        onRetry={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("status", { name: "新しい版を作成中" })).toBeTruthy();
+    expect(screen.queryByText("まだ、わたしのまとめはありません")).toBeNull();
+
+    rerender(
+      <ProfileSummaryScreen
+        state={{ status: "success", data: { summary: null, nextAction: "chat" } }}
+        versioning={{
+          versions: [],
+          selectedVersionId: null,
+          generation: {
+            status: "failed",
+            canRegenerate: true,
+            reasons: [],
+            message: "生成に失敗しました",
+          },
+        }}
+        onRetry={vi.fn()}
+        onRegenerate={onRegenerate}
+      />,
+    );
+
+    expect(screen.getByRole("alert").textContent).toContain("生成に失敗しました");
+    fireEvent.click(screen.getByRole("button", { name: "再試行" }));
+    expect(onRegenerate).toHaveBeenCalledOnce();
   });
 
   it("作成中カードへスワイプ元の高さを引き継ぐ", () => {

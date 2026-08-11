@@ -20,7 +20,7 @@ import { resetDevelopmentDiagnosisDataRoute } from "./contract/diagnosis/dev-res
 import { diagnosisListRoute } from "./contract/diagnosis/list";
 import { liffSessionRoute } from "./contract/line/liff-session";
 import { openApiOptions } from "./contract/openapi";
-import { profileSummaryRoute } from "./contract/profile/summary";
+import { profileSummaryGenerationRoute, profileSummaryRoute } from "./contract/profile/summary";
 import { InternalServerErrorSchema } from "./contract/shared/errors";
 import { getStatistics } from "./controller/admin";
 import { getDevelopmentBrainItems, getDevelopmentBrainVector } from "./controller/brain";
@@ -33,7 +33,7 @@ import {
   putDiagnosisDeferredQuestion,
 } from "./controller/diagnosis";
 import { postLiffSession, postLineWebhook } from "./controller/line";
-import { getProfileSummaryContents } from "./controller/profile";
+import { getProfileSummaryContents, postProfileSummaryGeneration } from "./controller/profile";
 import type { AppEnv } from "./types";
 
 const app = new Hono<AppEnv>();
@@ -104,6 +104,11 @@ app.post("/api/line/liff/session", liffSessionRoute, postLiffSession);
 app.get("/api/admin/statistics", adminStatisticsRoute, getStatistics);
 
 app.get("/api/profile-summary", profileSummaryRoute, getProfileSummaryContents);
+app.post(
+  "/api/profile-summary/generations",
+  profileSummaryGenerationRoute,
+  postProfileSummaryGeneration,
+);
 
 app.get("/api/dev/brain-items", developmentBrainItemsRoute, getDevelopmentBrainItems);
 app.get(

@@ -1,5 +1,6 @@
 import m0000 from "./0000_baseline.sql";
-import m0001 from "./0001_tired_bill_hollister.sql";
+import m0001 from "./0001_broken_tyger_tiger.sql";
+import m0002 from "./0002_wealthy_titanium_man.sql";
 import journal from "./meta/_journal.json";
 
 export default {
@@ -7,5 +8,6 @@ export default {
   migrations: {
     m0000,
     m0001,
+    m0002,
   },
 };

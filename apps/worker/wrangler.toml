@@ -26,6 +26,11 @@ dead_letter_queue = "me-builder-brain-checkpoint-dlq-local"
 max_retries = 5
 
 [[queues.consumers]]
+queue = "me-builder-profile-summary-queue-local"
+dead_letter_queue = "me-builder-profile-summary-dlq-local"
+max_retries = 5
+
+[[queues.consumers]]
 queue = "me-builder-brain-vector-queue-local"
 dead_letter_queue = "me-builder-brain-vector-dlq-local"
 max_retries = 5
@@ -102,6 +107,11 @@ dead_letter_queue = "me-builder-brain-checkpoint-dlq-local"
 max_retries = 5
 
 [[env.local.queues.consumers]]
+queue = "me-builder-profile-summary-queue-local"
+dead_letter_queue = "me-builder-profile-summary-dlq-local"
+max_retries = 5
+
+[[env.local.queues.consumers]]
 queue = "me-builder-brain-vector-queue-local"
 dead_letter_queue = "me-builder-brain-vector-dlq-local"
 max_retries = 5
@@ -161,6 +171,11 @@ dead_letter_queue = "me-builder-brain-checkpoint-dlq-preview"
 max_retries = 5
 
 [[env.preview.queues.consumers]]
+queue = "me-builder-profile-summary-queue-preview"
+dead_letter_queue = "me-builder-profile-summary-dlq-preview"
+max_retries = 5
+
+[[env.preview.queues.consumers]]
 queue = "me-builder-brain-vector-queue-preview"
 dead_letter_queue = "me-builder-brain-vector-dlq-preview"
 max_retries = 5
@@ -217,6 +232,11 @@ max_retries = 5
 [[env.production.queues.consumers]]
 queue = "me-builder-brain-checkpoint-queue-production"
 dead_letter_queue = "me-builder-brain-checkpoint-dlq-production"
+max_retries = 5
+
+[[env.production.queues.consumers]]
+queue = "me-builder-profile-summary-queue-production"
+dead_letter_queue = "me-builder-profile-summary-dlq-production"
 max_retries = 5
 
 [[env.production.queues.consumers]]

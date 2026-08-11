@@ -47,4 +47,11 @@ export interface BrainVectorSyncQueueMessage {
   itemRevision: number;
 }
 
+/** 本文を含めず、AccountDataに保存済みの生成要求だけを参照する。 */
+export interface ProfileSummaryGenerationQueueMessage {
+  type: "profile-summary-generation";
+  accountId: string;
+  generationId: string;
+}
+
 export type { Queue, Message, MessageBatch };

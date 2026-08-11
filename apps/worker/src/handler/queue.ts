@@ -3,6 +3,7 @@ import type {
   ChatTurnQueueMessage,
   DiaryBrainCheckpointQueueMessage,
   MessageBatch,
+  ProfileSummaryGenerationQueueMessage,
   WebhookQueueMessage,
 } from "@me-builder/shared";
 import { logger } from "@me-builder/shared";
@@ -17,6 +18,7 @@ export async function queueHandler(
     | ChatTurnQueueMessage
     | DiaryBrainCheckpointQueueMessage
     | BrainVectorSyncQueueMessage
+    | ProfileSummaryGenerationQueueMessage
   >,
   env: Env,
 ): Promise<void> {

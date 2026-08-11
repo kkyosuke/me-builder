@@ -48,7 +48,7 @@ type ProfileSummaryGenerationState = Readonly<{
 }>;
 
 export type ProfileSummaryVersioning = Readonly<{
-  versions: readonly ProfileSummaryVersionOption[];
-  selectedVersionId: string;
+  versions: readonly ProfileSummaryVersion[];
+  selectedVersionId: string | null;
   generation: ProfileSummaryGenerationState;
 }>;
