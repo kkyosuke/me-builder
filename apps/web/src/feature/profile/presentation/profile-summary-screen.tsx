@@ -207,10 +207,13 @@ function SummaryCardStack({
     const nextTransition: CardTransition = { type: "select", direction, versionId };
     const complete = () => {
       onSelectVersion?.(nextTransition.versionId);
-      setTransition(null);
-      setTransitionStarted(false);
-      setDragX(0);
       transitionTimer.current = null;
+      preparationTimer.current = setTimeout(() => {
+        setTransition(null);
+        setTransitionStarted(false);
+        setDragX(0);
+        preparationTimer.current = null;
+      }, 0);
     };
 
     if (reducedMotion) {

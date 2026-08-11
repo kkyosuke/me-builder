@@ -183,13 +183,14 @@ describe("ProfileSummaryScreen", () => {
     });
     firePointer(latestCard, "pointerup", { clientX: 0, clientY: 12, pointerId: 1 });
     expect(onSelectVersion).not.toHaveBeenCalled();
-    act(() => vi.advanceTimersByTime(0));
+    act(() => vi.advanceTimersToNextTimer());
     expect(latestCard.getAttribute("style")).toContain("translate3d(-115%");
     expect(container.querySelector('[data-summary-card-layer="incoming"]')?.textContent).toContain(
       pastSummary.headline,
     );
     act(() => vi.advanceTimersByTime(300));
     expect(onSelectVersion).toHaveBeenCalledWith("version-2");
+    act(() => vi.advanceTimersToNextTimer());
     expect(latestCard.getAttribute("style")).toContain("translate3d(0px");
     expect(latestCard.className).toContain("duration-0");
 
@@ -231,6 +232,54 @@ describe("ProfileSummaryScreen", () => {
     act(() => vi.advanceTimersByTime(300));
     expect(onSelectVersion).toHaveBeenLastCalledWith("version-3");
     expect(screen.queryByRole("button", { name: "最新のわたしを知る" })).toBeNull();
+  });
+
+  it("ボタンで版を切り替えた後にカードを再アニメーションしない", () => {
+    vi.useFakeTimers();
+
+    function VersionHarness() {
+      const [selectedVersionId, setSelectedVersionId] = useState("version-3");
+      const selectedSummary = selectedVersionId === "version-3" ? summary : pastSummary;
+      return (
+        <ProfileSummaryScreen
+          state={{ status: "success", data: { summary: selectedSummary, nextAction: "chat" } }}
+          versioning={{ ...versioning, selectedVersionId }}
+          onRetry={vi.fn()}
+          onSelectVersion={setSelectedVersionId}
+          onRegenerate={vi.fn()}
+        />
+      );
+    }
+
+    const { container } = render(<VersionHarness />);
+    fireEvent.click(screen.getByRole("button", { name: "過去のまとめがあります" }));
+    act(() => vi.advanceTimersToNextTimer());
+    act(() => vi.advanceTimersToNextTimer());
+
+    expect(screen.getByLabelText("過去のまとめ")).toBeTruthy();
+    expect(container.querySelector('[data-summary-card-layer="incoming"]')).toBeTruthy();
+
+    act(() => vi.advanceTimersToNextTimer());
+    const pastCard = screen.getByLabelText("過去のまとめ");
+    expect(container.querySelector('[data-summary-card-layer="incoming"]')).toBeNull();
+    expect(pastCard.getAttribute("style")).toContain("translate3d(0px");
+    expect(pastCard.className).toContain("duration-0");
+
+    fireEvent.click(screen.getByRole("button", { name: "最新のまとめへ" }));
+    act(() => vi.advanceTimersToNextTimer());
+    act(() => vi.advanceTimersToNextTimer());
+
+    expect(screen.getByLabelText("最新のまとめ")).toBeTruthy();
+    expect(container.querySelector('[data-summary-card-entry="foreground"]')).toBeTruthy();
+
+    act(() => vi.advanceTimersToNextTimer());
+    const latestCard = screen.getByLabelText("最新のまとめ");
+    expect(container.querySelector('[data-summary-card-layer="incoming"]')).toBeNull();
+    expect(latestCard.getAttribute("style")).toContain("translate3d(0px");
+    expect(latestCard.className).toContain("duration-0");
+
+    act(() => vi.advanceTimersByTime(300));
+    expect(latestCard.getAttribute("style")).toContain("translate3d(0px");
   });
 
   it("保存済み版がなくても初回生成中と生成失敗を表示する", () => {
