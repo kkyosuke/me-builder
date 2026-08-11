@@ -37,6 +37,7 @@
     - `task queues:setup:production`: 本番環境の非同期処理用Queue（Chat Turn / Brain Checkpoint / Profile Summary / Brain Vector）と各DLQを冪等に作成
     - `task vectorize:setup:preview`: プレビュー環境のBrain Vectorize indexと`owner_scope` metadata indexを冪等に作成・検証
     - `task vectorize:setup:production`: 本番環境のBrain Vectorize indexと`owner_scope` metadata indexを冪等に作成・検証
+    - metadata indexの作成 (`wrangler vectorize create-metadata-index`) はmutationをキューへ積むだけで、`list-metadata-index`へ現れるまでの時間に保証がありません。**反映をポーリングで待たせないでください**（待っても保証されず、デプロイ時間だけが伸びます）。setupは1回だけ確認し、未反映なら警告を出して続行し、**型違いで既に存在する場合だけ**デプロイを止めます
     - `task access:setup:preview`: プレビュー環境のOpenAPI documentとSwagger UI用パスをCloudflare Accessで保護
     - `task access:setup:production`: 本番環境のOpenAPI documentとSwagger UI用パスをCloudflare Accessで保護
     - `bun --cwd apps/worker do:generate`: AccountDataのmigrationを`packages/lib/drizzle-do-account/`へ、ConversationCoordinatorとCompatibilityDataのmigrationを`apps/worker/drizzle/<durable-object>/`へ生成
