@@ -82,7 +82,7 @@ async function upsertBrainVector(
   hmacSecret: string,
   target: Readonly<{
     action: "upsert";
-    statement: string;
+    embeddingText: string;
     category: string;
     derivation: "ai" | "deterministic";
     itemRevision: number;
@@ -99,7 +99,7 @@ async function upsertBrainVector(
     }),
     {
       model: workerConfig.geminiEmbeddingModel,
-      contents: target.statement,
+      contents: target.embeddingText,
       dimensions: BRAIN_VECTOR_DIMENSIONS,
     },
   );

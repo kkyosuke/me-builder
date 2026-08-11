@@ -176,7 +176,7 @@ Brain Itemの`derivation`は導出契機になったEvidence edgeから集計し
 | 変換方法 | 版付き設定によるルールベース計算 | 構造化出力を使うAI抽出 |
 | 主な追加入力 | Question、Choice、採点設定 | 未処理チェックポイント範囲の会話 |
 | 作成単位 | 計算可能なParameterごとに1件 | 意味的に独立した命題ごとに1件、1チェックポイント最大3件 |
-| 分類 | 最初は`Preference` | 現在は`Memory` |
+| 分類 | 最初は`Preference` | 本人が明言した`Memory`、`Behavior Pattern`、`Value / Motivation`、`Decision System`、`Preference`、`Goal` |
 | Derivation | `deterministic` | `ai` |
 | Evidence | Parameterへ寄与したAnswerのSource Record | 候補が参照したuser messageのSource Record |
 | 利用開始 | 生成時点 | 生成時点。ただしAI推定として区別する |
@@ -248,14 +248,14 @@ Source Record本文はモデルへの入力には含めますが、モデルの�
 
 ### 7.2 AIの候補出力
 
-AIは会話応答とは独立して、本人が明示した出来事を表す`Memory`を1チェックポイント最大3件提案します。現在の実装では`Memory`かつ`is_inference = false`であり、`statement`がすべての根拠user message本文にそのまま含まれる候補だけを受け付けます。自由な言い換えを許すと、構造検証だけでは発言にない内容を除外できないため、最初の縦切りでは連続した原文の抜き出しに限定します。上限は1回の構造化出力と保存負荷を制限するための安全弁であり、明示的な出来事を1件に固定するドメイン上の理由はありません。
+AIは会話応答とは独立して、本人が明示した命題を1チェックポイント最大3件提案します。日記から生成する分類は`Memory`、`Behavior Pattern`、`Value / Motivation`、`Decision System`、`Preference`、`Goal`です。いずれも`is_inference = false`であり、`statement`がすべての根拠user message本文にそのまま含まれる候補だけを受け付けます。自由な言い換えを許すと、構造検証だけでは発言にない内容を除外できないため、連続した原文の抜き出しに限定します。本人が明言していない動機や安定した傾向は生成しません。上限は1回の構造化出力と保存負荷を制限するための安全弁です。
 
 ```json
 {
   "brain_item_candidates": [
     {
-      "category": "memory",
-      "statement": "公開予定を一週間延期した",
+      "category": "goal",
+      "statement": "来月までに転職先を決めたい",
       "source_message_ids": ["message-1"],
       "is_inference": false
     }
@@ -271,23 +271,27 @@ AIは会話応答とは独立して、本人が明示した出来事を表す`Me
 - 根拠が0件
 - safety routeが候補生成を禁止する
 - 発言にない内容を事実として追加している
-- 性格、価値観、好み、動機、意図、安定した行動パターンを推定している
+- 本人が明言していない性格、価値観、好み、動機、意図、安定した行動パターンを推定している
 - 空のstatement、未定義分類、上限を超えた候補
 
-明示された出来事はMemory候補にできます。解釈を含むValue / Motivation、Preference、Decision Systemなどは、推定の確認体験を設計するまで日記から生成しません。
+分類境界は[Brain内部情報の分類](brain-content-taxonomy.md)を正とします。具体的な出来事・経験は`memory`、明示された反復行動は`behavior_pattern`、明示された行動理由は`value_motivation`、選択基準は`decision_system`、具体的な好き嫌いは`preference`、未来の達成意図は`goal`にします。1回の行動だけから反復傾向や動機を推定しません。
+
+`statement`に「今日」「昨日」「来月」「来年」などの相対日付がある場合、AIとAccountDataはBrain Itemの命題を原文のまま保存します。AccountDataは根拠Source Recordの受信日時を基準に`Asia/Tokyo`の絶対日付を決定的に解決し、原文、基準日、timezone、解決対応を`attributes.temporalContext`へ分離して保存します。たとえば2026年8月11日の「来月までに転職先を決めたい」は、`statement`を変えず、`来月 = 2026年9月`を時点情報に持ちます。EvidenceのSource Record原文も変更しません。
+
+Vectorizeへ渡すembeddingテキストと検索queryには、原文の後ろへ`時点情報: 来月 = 2026年9月`のような補足だけを追加します。相対日付らしい文字列を単純置換せず、語末、句読点、助詞、数字など日付表現として自然な右境界を持つ場合だけ解決します。そのため「明日香」「今日子」のような固有名詞は時点情報へ変換しません。判定に迷う表現は時点情報を付けない側へ倒し、Brain Itemの原文を壊さないことを優先します。Account単位のtimezoneを持つまでは日本時間を明示的な既定とし、timezone対応は後続課題とします。
 
 検証を通過した日記候補は、共通出力へ次のように写します。
 
 | 出力 | 値 |
 | --- | --- |
-| `category` | `memory` |
-| `statement` | 候補のstatement |
-| `attributes` | `sourceKind = diary`、Session ID、checkpoint ID、prompt version、`isInference = false` |
+| `category` | 検証済み候補の`memory` / `behavior_pattern` / `value_motivation` / `decision_system` / `preference` / `goal` |
+| `statement` | 候補のstatement。相対日付を含む場合も原文の命題 |
+| `attributes` | `sourceKind = diary`、Session ID、checkpoint ID、prompt version、`isInference = false`。相対日付を解決した場合は`temporalContext` |
 | `derivation` | `ai` |
 | `validFrom` | 根拠になった発言の時点。複数ある場合は候補が表す期間に合わせる |
 | Evidence | `source_message_ids`から解決したSource Record |
 
-`stability`と`sensitivity`はモデルの自由記述を保存せず、分類と安全判定に対するレビュー済みのアプリケーション規則から設定します。分類ごとの具体的な値は、分類固有の`attributes` schemaとあわせて後続で決めます。
+`stability`と`sensitivity`はモデルの自由記述を保存せず、分類と安全判定に対するレビュー済みのアプリケーション規則から設定します。日記由来では`memory`を`stable`、`goal`を`temporary`、その他の4分類を`changeable`として保存します。
 
 ### 7.3 登録タイミング
 
@@ -299,7 +303,7 @@ Brain Item生成はTurnごとの返信経路から分離します。未処理の
 
 実行時刻は「最初の未処理発言 + 30分」と「最後の未処理発言 + 10分」の早い方です。AccountDataはAlarmだけに期限判定を依存せず、新着取込時にも各発言の受信時刻と現在の期限を比較します。期限以後の発言は新しいチェックポイントへ入れるため、Alarmが遅延した場合や1つの取込batchが複数の期限をまたぐ場合も、10分・30分の境界は後ろへ伸びません。
 
-1チェックポイントはuser messageを最大10件、1messageを最大5,000文字とします。新しいuser発言を加えると件数上限を超える場合は既存範囲をその時点で固定し、その発言から次のチェックポイントを開始します。文字数上限を超える原文はSource Recordとして保持しますが、このAI変換の入力とEvidence候補から除外します。Memoryはuser原文から直接抜き出すため、assistant本文も入力へ含めません。これにより削除・撤回済みuser発言の内容がassistant応答を経由して再流入することも防ぎます。時間だけで区切ると短時間の大量連投が無制限なAI入力になるため、件数と文字数の両方で入力を有界にします。
+1チェックポイントはuser messageを最大10件、1messageを最大5,000文字とします。新しいuser発言を加えると件数上限を超える場合は既存範囲をその時点で固定し、その発言から次のチェックポイントを開始します。文字数上限を超える原文はSource Recordとして保持しますが、このAI変換の入力とEvidence候補から除外します。Brain Item候補はuser原文から直接抜き出すため、assistant本文も入力へ含めません。これにより削除・撤回済みuser発言の内容がassistant応答を経由して再流入することも防ぎます。時間だけで区切ると短時間の大量連投が無制限なAI入力になるため、件数と文字数の両方で入力を有界にします。
 
 6時間無操作と24時間上限はConversation Sessionを閉じる境界であり、Brain Item生成を待つための時間ではありません。Session境界には、会話文脈・順序・返信率の集計範囲を限定し、無期限に会話を伸ばさない役割があります。Brain Item生成はより短いチェックポイントで進むため、一覧など後続UIから早い段階で利用できます。
 
@@ -371,8 +375,9 @@ AIの意味的重複判定だけで既存Itemを上書きしません。同義�
 - 10分無操作、30分上限、明示終了によるチェックポイント作成・延長・範囲固定・起動
 - AccountData alarmからIDのみを渡すQueue処理
 - 抽出専用`brain_item_candidates`出力schema
-- 通常安全route、`Memory`、非推定、1チェックポイント最大3件への制限
+- 通常安全route、許可した6分類、非推定、1チェックポイント最大3件への制限
 - 原文中の連続した文言だけを受け付ける根拠検証と、user message 10件・1件5,000文字の入力上限
+- 相対日付を含むstatementの原文を保持し、Source Record受信時点の日本時間で解決した時点情報をattributesへ分離して保存
 - 候補のAccount・チェックポイント範囲・Evidence・安全性検証
 - Brain Item、Evidence、Access Label、チェックポイント完了を一括保存するAccountData action
 - Brain ItemとAccess LabelからConfirmationを除くschema migrationと既存projectionの追従
@@ -385,9 +390,9 @@ AIの意味的重複判定だけで既存Itemを上書きしません。同義�
 - Itemと否定・修正操作の対応づけ
 - 否定による無効化、修正、改訂
 - 既存Brain Itemとの重複判定とEvidence追加
-- AI解釈を伴う分類
+- 本人が明言していない内容をAIが推定する分類
 
-最初の縦切りとして、会話チェックポイントからMemoryを最大3件生成し、Evidence付きで保存し、active ItemをVectorizeへ同期し、通常チャットで検索してAccountData再認可後に利用するところまでを実装しています。否定・修正・改訂、AI解釈を伴う分類、重複統合は後続です。
+会話チェックポイントから本人が明言した6分類のBrain Itemを最大3件生成し、Evidence付きで保存し、active ItemをVectorizeへ同期し、通常チャットで検索してAccountData再認可後に利用するところまでを実装しています。相対日付は原文と時点情報を分離して保存し、Vectorize登録と検索queryで併記します。否定・修正・改訂、本人が明言していない内容のAI推定、重複統合は後続です。
 
 ## 10. 後続で決めること
 

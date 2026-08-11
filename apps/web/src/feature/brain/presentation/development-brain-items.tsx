@@ -8,6 +8,9 @@ import type {
 
 const categoryLabels: Record<string, string> = {
   memory: "Memory",
+  behavior_pattern: "Behavior Pattern",
+  value_motivation: "Value / Motivation",
+  decision_system: "Decision System",
   preference: "Preference",
   boundary: "Boundary",
   need: "Need",

@@ -16,6 +16,7 @@ import {
   sourceRecordTextPayloads,
   sourceRecords,
 } from "../schema";
+import { resolveDiaryTemporalContext } from "./diary-temporal";
 
 const SESSION_INACTIVITY_MS = 6 * 60 * 60 * 1000;
 const SESSION_HARD_CAP_MS = 24 * 60 * 60 * 1000;
@@ -23,6 +24,24 @@ const BRAIN_CHECKPOINT_INACTIVITY_MS = 10 * 60 * 1000;
 const BRAIN_CHECKPOINT_HARD_CAP_MS = 30 * 60 * 1000;
 const BRAIN_CHECKPOINT_MAX_USER_MESSAGES = 10;
 const BRAIN_CHECKPOINT_MAX_USER_MESSAGE_CHARS = 5_000;
+export const DIARY_BRAIN_CATEGORIES = [
+  "memory",
+  "behavior_pattern",
+  "value_motivation",
+  "decision_system",
+  "preference",
+  "goal",
+] as const;
+export type DiaryBrainCategory = (typeof DIARY_BRAIN_CATEGORIES)[number];
+const DIARY_BRAIN_CATEGORY_SET = new Set<string>(DIARY_BRAIN_CATEGORIES);
+const DIARY_BRAIN_STABILITY: Record<DiaryBrainCategory, "temporary" | "changeable" | "stable"> = {
+  memory: "stable",
+  behavior_pattern: "changeable",
+  value_motivation: "changeable",
+  decision_system: "changeable",
+  preference: "changeable",
+  goal: "temporary",
+};
 /** Checkpointは`account_id`を持たないため、所有者は親のSessionから導出する。 */
 function ownedSessionIds(db: AccountDataDatabase, accountId: string) {
   return db
@@ -549,6 +568,8 @@ export type ConversationContextMessage = {
   role: "user" | "assistant";
   body: string;
   sequence: number;
+  /** user messageは根拠Source Recordの受信時刻。旧形式やassistantでは省略する。 */
+  recordedAt?: Date;
 };
 
 /** Turnと同じSessionの直近messageを、Account所有権を含むjoinで取得する。 */
@@ -586,6 +607,7 @@ export async function getTurnContext(
       sequence: conversationMessages.sequence,
       assistantBody: conversationMessages.assistantBody,
       userBody: sourceRecordTextPayloads.body,
+      userRecordedAt: sourceRecords.createdAt,
     })
     .from(conversationMessages)
     .leftJoin(sourceRecords, eq(conversationMessages.sourceRecordId, sourceRecords.id))
@@ -607,7 +629,19 @@ export async function getTurnContext(
 
   const messages = rows.reverse().flatMap((row) => {
     const body = row.role === "user" ? row.userBody : row.assistantBody;
-    return body ? [{ id: row.id, role: row.role, body, sequence: row.sequence }] : [];
+    return body
+      ? [
+          {
+            id: row.id,
+            role: row.role,
+            body,
+            sequence: row.sequence,
+            ...(row.role === "user" && row.userRecordedAt
+              ? { recordedAt: row.userRecordedAt }
+              : {}),
+          },
+        ]
+      : [];
   });
   return {
     accountId: turn.accountId,
@@ -623,6 +657,7 @@ export async function getTurnContext(
 }
 
 export type DiaryBrainCheckpointCandidate = Readonly<{
+  category: DiaryBrainCategory;
   statement: string;
   sourceMessageIds: readonly string[];
 }>;
@@ -815,13 +850,14 @@ export async function applyDiaryBrainCheckpoint(
   for (const candidate of candidates) {
     const messageIds = [...new Set(candidate.sourceMessageIds)];
     if (
+      !DIARY_BRAIN_CATEGORY_SET.has(candidate.category) ||
       !candidate.statement.trim() ||
       messageIds.length === 0 ||
       messageIds.length !== candidate.sourceMessageIds.length
     ) {
       throw new Error("Diary Brain candidate validation failed");
     }
-    const candidateKey = `${candidate.statement.trim()}\u0000${[...messageIds].sort().join("\u0000")}`;
+    const candidateKey = `${candidate.category}\u0000${candidate.statement.trim()}\u0000${[...messageIds].sort().join("\u0000")}`;
     if (acceptedCandidateKeys.has(candidateKey)) continue;
     acceptedCandidateKeys.add(candidateKey);
     const sources = await db
@@ -858,25 +894,29 @@ export async function applyDiaryBrainCheckpoint(
     ) {
       throw new Error("Diary Brain candidate evidence validation failed");
     }
+    const recordedAt = new Date(Math.min(...sources.map(({ createdAt }) => createdAt.getTime())));
+    const statement = candidate.statement.trim();
+    const temporalContext = resolveDiaryTemporalContext(statement, recordedAt);
     const brainItemId = crypto.randomUUID();
     const lifecycle = { createdAt: at, updatedAt: at };
     statements.push(
       db.insert(brainItems).values({
         id: brainItemId,
         accountId,
-        category: "memory",
-        statement: candidate.statement.trim(),
+        category: candidate.category,
+        statement,
         attributes: {
           sourceKind: "diary",
           sessionId: checkpoint.sessionId,
           checkpointId,
           promptVersion,
           isInference: false,
+          ...(temporalContext ? { temporalContext } : {}),
         },
         derivation: "ai",
         status: "active",
-        validFrom: new Date(Math.min(...sources.map(({ createdAt }) => createdAt.getTime()))),
-        stability: "stable",
+        validFrom: recordedAt,
+        stability: DIARY_BRAIN_STABILITY[candidate.category],
         sensitivity: "normal",
         externallyShareable: false,
         confidence: { state: "uncomputed" },
@@ -925,7 +965,8 @@ export async function applyDiaryBrainCheckpoint(
       }),
     );
     appliedCandidates.push({
-      statement: candidate.statement.trim(),
+      category: candidate.category,
+      statement,
       sourceMessageIds: messageIds,
     });
   }
@@ -969,7 +1010,11 @@ export async function getDiaryBrainCheckpointDevelopmentNotification(
     .get();
   if (!checkpoint) return undefined;
   const items = await db
-    .select({ brainItemId: brainItems.id, statement: brainItems.statement })
+    .select({
+      brainItemId: brainItems.id,
+      category: brainItems.category,
+      statement: brainItems.statement,
+    })
     .from(diaryBrainCheckpointItems)
     .innerJoin(brainItems, eq(diaryBrainCheckpointItems.brainItemId, brainItems.id))
     .where(
@@ -998,7 +1043,12 @@ export async function getDiaryBrainCheckpointDevelopmentNotification(
       )
       .orderBy(conversationMessages.sequence)
       .all();
-    result.push({ statement: item.statement, sourceMessageIds: messages.map(({ id }) => id) });
+    if (!DIARY_BRAIN_CATEGORY_SET.has(item.category)) continue;
+    result.push({
+      category: item.category as DiaryBrainCategory,
+      statement: item.statement,
+      sourceMessageIds: messages.map(({ id }) => id),
+    });
   }
   return { candidates: result };
 }

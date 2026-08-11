@@ -11,6 +11,7 @@ import {
 } from "../schema/brain";
 import { sourceRecordTextPayloads } from "../schema/diary";
 import { sourceRecords } from "../schema/source";
+import { buildDiaryTemporalSearchText, readDiaryTemporalContext } from "./diary-temporal";
 
 type LifecycleColumn = "createdAt" | "updatedAt" | "deletedAt" | "isDeleted";
 type EvidenceInsert = typeof brainItemEvidenceEdges.$inferInsert;
@@ -84,6 +85,8 @@ export type BrainChatContextMemory = Readonly<{
   category: string;
   statement: string;
   derivation: "ai" | "deterministic";
+  /** Brain Itemの生成方法とは独立した、命題に未明言の推定が含まれるかどうか。 */
+  isInference: boolean;
   status: "active";
   confidence: unknown;
   accessLabels: readonly string[];
@@ -276,7 +279,7 @@ export async function claimDueBrainVectorSyncJobs(
 export type BrainVectorSyncTarget =
   | Readonly<{
       action: "upsert";
-      statement: string;
+      embeddingText: string;
       category: string;
       derivation: "ai" | "deterministic";
       itemRevision: number;
@@ -314,6 +317,7 @@ export async function getBrainVectorSyncTarget(
     db
       .select({
         statement: brainItems.statement,
+        attributes: brainItems.attributes,
         category: brainItems.category,
         derivation: brainItems.derivation,
         status: brainItems.status,
@@ -351,7 +355,10 @@ export async function getBrainVectorSyncTarget(
   }
   return {
     action: "upsert",
-    statement: item.statement,
+    embeddingText: buildDiaryTemporalSearchText(
+      item.statement,
+      readDiaryTemporalContext(item.attributes),
+    ),
     category: item.category,
     derivation: item.derivation,
     itemRevision: Math.max(item.updatedAt.getTime(), newestJob?.itemRevision ?? itemRevision),
@@ -587,6 +594,7 @@ export async function loadBrainChatContextMemories(
       brainItemId: brainItems.id,
       category: brainItems.category,
       statement: brainItems.statement,
+      attributes: brainItems.attributes,
       derivation: brainItems.derivation,
       confidence: brainItems.confidence,
       recordedAt: brainItems.createdAt,
@@ -660,6 +668,13 @@ export async function loadBrainChatContextMemories(
       category: item.category,
       statement: item.statement,
       derivation: item.derivation,
+      isInference:
+        item.attributes &&
+        typeof item.attributes === "object" &&
+        "isInference" in item.attributes &&
+        typeof item.attributes.isInference === "boolean"
+          ? item.attributes.isInference
+          : item.derivation === "ai",
       status: "active",
       confidence: item.confidence,
       accessLabels: [...new Set(accessLabels)].sort(),

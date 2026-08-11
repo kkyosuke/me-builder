@@ -96,8 +96,13 @@ describe("Diary conversation persistence flow", () => {
     expect(context).toMatchObject({
       accountId: account.id,
       messages: [
-        { role: "user", body: "今日は少し疲れた", sequence: 1 },
-        { role: "user", body: "それでも散歩できた", sequence: 2 },
+        { role: "user", body: "今日は少し疲れた", sequence: 1, recordedAt: firstReceivedAt },
+        {
+          role: "user",
+          body: "それでも散歩できた",
+          sequence: 2,
+          recordedAt: secondReceivedAt,
+        },
       ],
     });
     expect(context?.currentUserMessageIds).toEqual(context?.messages.map(({ id }) => id));
@@ -164,7 +169,13 @@ describe("Diary conversation persistence flow", () => {
         checkpoint?.id ?? "",
         checkpointContext?.throughSequence ?? 0,
         "diary-brain-test",
-        [{ statement: "範囲外の根拠", sourceMessageIds: ["outside-message"] }],
+        [
+          {
+            category: "memory",
+            statement: "範囲外の根拠",
+            sourceMessageIds: ["outside-message"],
+          },
+        ],
       ),
     ).rejects.toThrow("evidence validation failed");
     await expect(
@@ -176,6 +187,7 @@ describe("Diary conversation persistence flow", () => {
         "diary-brain-test",
         [
           {
+            category: "memory",
             statement: "発言していない出来事",
             sourceMessageIds: checkpointContext?.sourceMessageIds.slice(0, 1) ?? [],
           },
@@ -199,14 +211,17 @@ describe("Diary conversation persistence flow", () => {
         "diary-brain-test",
         [
           {
+            category: "memory",
             statement: "今日は少し疲れた",
             sourceMessageIds: checkpointContext?.sourceMessageIds.slice(0, 1) ?? [],
           },
           {
+            category: "memory",
             statement: "散歩できた",
             sourceMessageIds: checkpointContext?.sourceMessageIds.slice(1, 2) ?? [],
           },
           {
+            category: "memory",
             statement: " 今日は少し疲れた ",
             sourceMessageIds: checkpointContext?.sourceMessageIds.slice(0, 1) ?? [],
           },
@@ -215,10 +230,12 @@ describe("Diary conversation persistence flow", () => {
     ).resolves.toEqual({
       candidates: [
         {
+          category: "memory",
           statement: "今日は少し疲れた",
           sourceMessageIds: checkpointContext?.sourceMessageIds.slice(0, 1) ?? [],
         },
         {
+          category: "memory",
           statement: "散歩できた",
           sourceMessageIds: checkpointContext?.sourceMessageIds.slice(1, 2) ?? [],
         },
@@ -230,6 +247,13 @@ describe("Diary conversation persistence flow", () => {
           accountId: account.id,
           category: "memory",
           statement: "今日は少し疲れた",
+          attributes: expect.objectContaining({
+            temporalContext: expect.objectContaining({
+              originalStatement: "今日は少し疲れた",
+              anchorDate: "2026-08-07",
+              timeZone: "Asia/Tokyo",
+            }),
+          }),
           derivation: "ai",
           status: "active",
         }),
@@ -251,10 +275,12 @@ describe("Diary conversation persistence flow", () => {
     ).resolves.toEqual({
       candidates: [
         {
+          category: "memory",
           statement: "今日は少し疲れた",
           sourceMessageIds: checkpointContext?.sourceMessageIds.slice(0, 1) ?? [],
         },
         {
+          category: "memory",
           statement: "散歩できた",
           sourceMessageIds: checkpointContext?.sourceMessageIds.slice(1, 2) ?? [],
         },
@@ -293,6 +319,63 @@ describe("Diary conversation persistence flow", () => {
     expect(await db.select().from(schema.sourceRecordTextPayloads)).toMatchObject([
       { body: "今日は少し疲れた" },
       { body: "それでも散歩できた" },
+    ]);
+  });
+
+  it("Memory以外の分類と相対日付を解決したstatementを保存する", async () => {
+    const db = createTestDb();
+    const account = await bindAccount(db, "account-diary_category_e2e");
+    const source = await storeLineTextSource(db, {
+      accountId: account.id,
+      eventId: "event-goal",
+      body: "来月までに転職先を決めたい",
+      receivedAt: new Date("2026-08-11T03:00:00.000Z"),
+    });
+    await attachMessagesToTurn(db, account.id, [source], 1, "test-model", "test-prompt");
+    const [checkpoint] = await db.select().from(schema.diaryBrainCheckpoints);
+    await claimDueDiaryBrainCheckpointIds(db, account.id, new Date("2026-08-11T03:30:00.000Z"));
+    await markDiaryBrainCheckpointDispatched(db, account.id, checkpoint?.id ?? "");
+    const context = await getDiaryBrainCheckpointContext(db, account.id, checkpoint?.id ?? "");
+
+    await expect(
+      applyDiaryBrainCheckpoint(
+        db,
+        account.id,
+        checkpoint?.id ?? "",
+        context?.throughSequence ?? 0,
+        "diary-brain-v2",
+        [
+          {
+            category: "goal",
+            statement: "来月までに転職先を決めたい",
+            sourceMessageIds: context?.sourceMessageIds ?? [],
+          },
+        ],
+      ),
+    ).resolves.toEqual({
+      candidates: [
+        {
+          category: "goal",
+          statement: "来月までに転職先を決めたい",
+          sourceMessageIds: context?.sourceMessageIds ?? [],
+        },
+      ],
+    });
+    await expect(db.select().from(schema.brainItems)).resolves.toEqual([
+      expect.objectContaining({
+        category: "goal",
+        statement: "来月までに転職先を決めたい",
+        stability: "temporary",
+        attributes: expect.objectContaining({
+          promptVersion: "diary-brain-v2",
+          temporalContext: {
+            originalStatement: "来月までに転職先を決めたい",
+            anchorDate: "2026-08-11",
+            timeZone: "Asia/Tokyo",
+            resolutions: [{ original: "来月", resolved: "2026年9月" }],
+          },
+        }),
+      }),
     ]);
   });
 

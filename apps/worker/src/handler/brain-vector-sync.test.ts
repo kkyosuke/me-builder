@@ -54,8 +54,8 @@ describe("Brain vector sync queue", () => {
       .fn()
       .mockResolvedValueOnce({
         action: "upsert",
-        statement: "公園を散歩した",
-        category: "memory",
+        embeddingText: "来月までに転職先を決めたい\n時点情報: 来月 = 2026年9月",
+        category: "goal",
         derivation: "ai",
         itemRevision: 100,
       })
@@ -71,7 +71,7 @@ describe("Brain vector sync queue", () => {
         values: expect.any(Array),
         metadata: expect.objectContaining({
           owner_scope: expect.stringMatching(/^[0-9a-f]{64}$/),
-          category: "memory",
+          category: "goal",
           derivation: "ai",
           embedding_version: 1,
           schema_version: 1,
@@ -79,10 +79,16 @@ describe("Brain vector sync queue", () => {
       }),
     ]);
     expect(upsert.mock.calls[0]?.[0]?.[0]?.values).toHaveLength(768);
+    expect(geminiMocks.embedDocument).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        contents: "来月までに転職先を決めたい\n時点情報: 来月 = 2026年9月",
+      }),
+    );
     const metadata = upsert.mock.calls[0]?.[0]?.[0]?.metadata;
     expect(JSON.stringify(metadata)).not.toContain("account-1");
     expect(JSON.stringify(metadata)).not.toContain("brain-1");
-    expect(JSON.stringify(metadata)).not.toContain("公園を散歩した");
+    expect(JSON.stringify(metadata)).not.toContain("転職先を決めたい");
     expect(execute).toHaveBeenLastCalledWith(
       "account-1",
       "brain.completeVectorSyncJob",
@@ -118,7 +124,7 @@ describe("Brain vector sync queue", () => {
       .fn()
       .mockResolvedValueOnce({
         action: "upsert",
-        statement: "公園を散歩した",
+        embeddingText: "公園を散歩した",
         category: "memory",
         derivation: "ai",
         itemRevision: 100,

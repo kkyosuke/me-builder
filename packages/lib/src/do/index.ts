@@ -27,4 +27,19 @@ export type {
   AppliedBrainVectorSync,
   BrainChatContextMemory,
 } from "./account/action/brain";
-export type { ConversationContextMessage } from "./account/action/diary";
+export { DIARY_BRAIN_CATEGORIES } from "./account/action/diary";
+export type {
+  ConversationContextMessage,
+  DiaryBrainCategory,
+  DiaryBrainCheckpointCandidate,
+} from "./account/action/diary";
+export {
+  buildDiaryTemporalSearchText,
+  DIARY_BRAIN_TIME_ZONE,
+  readDiaryTemporalContext,
+  resolveDiaryTemporalContext,
+} from "./account/action/diary-temporal";
+export type {
+  DiaryTemporalContext,
+  DiaryTemporalResolution,
+} from "./account/action/diary-temporal";

@@ -1,4 +1,5 @@
 import { D1, accountDataFor } from "@me-builder/lib";
+import type { DiaryBrainCategory } from "@me-builder/lib";
 import type {
   DiaryBrainCheckpointQueueMessage,
   Message,
@@ -14,10 +15,10 @@ import type { CloudflareBindings, WorkerConfig } from "../config";
 import { createGeminiUsageRecorder } from "../infrastructure/gemini-usage";
 import { createLineRetryKey, pushLineTextWithRetryKey } from "../infrastructure/line-delivery";
 import {
-  DIARY_BRAIN_PROMPT_VERSION,
   buildDevelopmentBrainItemMessage,
   generateDiaryBrainCandidates,
 } from "../logic/diary-brain";
+import { DIARY_BRAIN_PROMPT_VERSION } from "../prompt/diary-brain";
 
 /** wrangler.tomlのmax_retries=5に初回配送を加えた最大試行回数。 */
 export const DIARY_BRAIN_CHECKPOINT_MAX_ATTEMPTS = 6;
@@ -115,6 +116,7 @@ export async function processDiaryBrainCheckpointMessage(
     context.throughSequence,
     DIARY_BRAIN_PROMPT_VERSION,
     candidates.map((candidate) => ({
+      category: candidate.category,
       statement: candidate.statement,
       sourceMessageIds: candidate.source_message_ids,
     })),
@@ -151,7 +153,11 @@ async function sendDevelopmentNotification(
   cf: CloudflareBindings,
   workerConfig: WorkerConfig,
   appliedResult?: {
-    candidates: readonly { statement: string; sourceMessageIds: readonly string[] }[];
+    candidates: readonly {
+      category: DiaryBrainCategory;
+      statement: string;
+      sourceMessageIds: readonly string[];
+    }[];
   },
 ): Promise<void> {
   const result =

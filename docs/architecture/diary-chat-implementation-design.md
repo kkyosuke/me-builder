@@ -283,7 +283,7 @@ prompt本文、Context Package、未検証のモデル出力は保存しませ�
 | `development_notification_sent_at` | no | 開発環境の確認Push完了時刻 |
 | `created_at`, `updated_at`, `deleted_at`, `is_deleted` | yes / no / yes | lifecycle |
 
-同じSessionの`pending`は最大1件とします。新しいuser messageをTurnへ取り込むtransactionで、発言ごとに現在の期限とuser message 10件の範囲上限を評価します。期限前かつ上限以内なら範囲を延長し、期限以後または追加すると上限を超える場合は既存範囲を`queued`へ固定して新しい`pending`を作ります。Memory変換では削除・撤回されていないuser原文だけを最大10message、各5,000文字まで読み、assistant本文は入力へ含めません。明示終了時は期限を現在時刻へ進めます。
+同じSessionの`pending`は最大1件とします。新しいuser messageをTurnへ取り込むtransactionで、発言ごとに現在の期限とuser message 10件の範囲上限を評価します。期限前かつ上限以内なら範囲を延長し、期限以後または追加すると上限を超える場合は既存範囲を`queued`へ固定して新しい`pending`を作ります。Brain Item変換では削除・撤回されていないuser原文だけを最大10message、各5,000文字まで読み、assistant本文は入力へ含めません。明示終了時は期限を現在時刻へ進めます。
 
 Alarmは期限到来した`pending`またはQueue投入に失敗した`queued`だけをclaimし、指数バックオフ付きの投入leaseとして`next_attempt_at`を進めます。Queue投入が失敗した場合は永続化済みの次回試行時刻からAlarmを明示的に再設定し、プラットフォームの自動retry上限を越えても処理を再開できるようにします。QueueがIDを受理したら`dispatched`へ進め、以後はAlarmの対象にしません。送信後・状態更新前に停止した場合だけlease後に重複投入され得ますが、checkpoint IDと適用transactionで多重適用を防ぎます。`dispatched`後のAI一時失敗はQueue自身の再配送とDLQで扱い、Alarmと二重に再投入しません。Workerは固定範囲を読み直し、Brain Item一式、`diary_brain_checkpoint_items`、`applied`への遷移を同じtransactionで確定します。JSONまたは出力envelope全体が不正な場合は再配送し、envelope内の個別候補だけがschema・Evidence・候補間重複の検証に失敗した場合は、安全な理由コードをerror logへ残してその候補だけを登録対象から外します。AlarmとRPC actionはAccountData Object内で直列化します。
 
@@ -310,7 +310,7 @@ stateDiagram-v2
 
 Brain Itemを含むAccount所有データのquery境界は、[Accountデータ分離設計](account-data-isolation.md)を正とします。
 
-検証を通過したBrain Itemは`active`として保存します。本人の同意を登録の条件にはしません。Brain Item作成とVectorize同期job追加は同じAccountData SQLite transactionで確定します。AI推定は`derivation = ai`として区別し、Confidenceの算出前を表す`uncomputed`を検索順位に使いません。
+検証を通過したBrain Itemは`active`として保存します。本人の同意を登録の条件にはしません。Brain Item作成とVectorize同期job追加は同じAccountData SQLite transactionで確定します。`derivation`は変換方法、`attributes.isInference`は本人が明言していない推定を含むかを表す別の軸として扱い、Confidenceの算出前を表す`uncomputed`を検索順位に使いません。
 
 開発用の確認機能は、本人確認済みAccountに対して、一覧取得用の`brain.listActive`とVector実体確認用の`brain.findActiveVectorEntry`をAccountData RPCへ公開します。`brain.listActive`はactiveかつ未削除のItem、未削除Evidence、最新のVector同期jobと対応表の有無を最大100件返します。Web UIは各Itemに同期状態、試行回数、失敗code、次回試行時刻を表示します。`applied`はVectorizeが更新を受け付けてAccountDataへ完了記録した状態であり、Vectorize上の実体確認とは区別します。
 
@@ -477,11 +477,11 @@ flowchart LR
 4. AccountDataで`active`、有効期間、Access Policy、削除・撤回・無効化状態を再検証する
 5. 再検証を通過した上位5件を選び、必要なEvidenceのSource Recordを最大3件取得する
 6. 訂正済み旧版、削除済み、撤回済み、拒否済みを除外する
-7. 各要素へ種類、時点、Derivation、Confidence、根拠IDを付ける
+7. 各要素へ種類、時点、Derivation、推定有無、Confidence、根拠IDを付ける
 
 `owner_scope`は環境別Secretを鍵とする`HMAC(account_id)`から作り、Vectorizeのmetadata indexまたはnamespaceへ保存します。生のAccount IDは保存しません。filterはtopKより前に適用し、他Accountの候補に検索枠を消費させません。Vectorizeのmetadataは候補を絞る用途に限定し、認可の根拠にはしないため、AccountData再検証は必ず残します。
 
-実装では現在Turnのuser発言だけを最大10,000文字の`RETRIEVAL_QUERY`としてembeddingし、`owner_scope` filter適用後の上位10件を候補にします。cosine scoreが0.7未満の候補は関連なしとして除外します。AccountDataはvector ID対応表から、本人所有、active、未削除、有効期間内、activeなAccess Labelありを再検証し、類似度順の最大5件を返します。支持Evidence原文は未削除の本人Source Recordだけを関連度順のItemから新しい順に選び、Context全体で最大3件にします。Gemini入力時にstatementは1件2,000文字、Evidenceは1件1,000文字を上限にします。検索には2秒の独立timeoutを設け、Vectorize・embedding・再認可の失敗時と同様に、本文を含まないdegraded logを残して記憶なしの通常返信を継続します。検索timeoutは生成全体の90秒deadlineをabortしません。
+実装では現在Turnのuser発言だけを最大10,000文字の`RETRIEVAL_QUERY`としてembeddingします。相対日付はWorkerの処理時刻ではなく、user messageごとのSource Record受信時刻を基準に絶対表現へ変換します。`owner_scope` filter適用後の上位10件を候補にし、cosine scoreが0.7未満の候補は関連なしとして除外します。AccountDataはvector ID対応表から、本人所有、active、未削除、有効期間内、activeなAccess Labelありを再検証し、類似度順の最大5件を返します。支持Evidence原文は未削除の本人Source Recordだけを関連度順のItemから新しい順に選び、Context全体で最大3件にします。Gemini入力時にstatementは1件2,000文字、Evidenceは1件1,000文字を上限にします。検索には2秒の独立timeoutを設け、Vectorize・embedding・再認可の失敗時と同様に、本文を含まないdegraded logを残して記憶なしの通常返信を継続します。検索timeoutは生成全体の90秒deadlineをabortしません。
 
 ### token budget
 
@@ -526,7 +526,7 @@ system promptは次の順で固定し、Git管理する`prompt_version`を付け
 
 会話データはsystem promptへ文字列連結せず、`context_package`というJSON値としてuser入力側へ置きます。区切り文字だけに依存せず、role分離、schema検証、tool非公開を併用します。
 
-system promptの本文と`prompt_version`は[`apps/worker/src/prompt/diary-chat.ts`](../../apps/worker/src/prompt/diary-chat.ts)をSSoTとします。アプリケーションが管理する信頼済み入力として、会話の目的を`objective`、話し方と質問方法を`conversationGuidance`へ独立して渡し、役割、優先順位、記憶、助言、安全、出力の固定規則と合成します。user本文や取得した記憶をこれらの指示へ流用しません。固定規則または既定値の振る舞いが変わる変更では`prompt_version`も更新します。生成処理とTurn作成処理は同じ定数を参照し、本文と記録上の版がずれないようにします。
+Workerが利用するsystem promptの本文と`prompt_version`は`apps/worker/src/prompt/`へ集約します。日記の通常返信は[`diary-chat.ts`](../../apps/worker/src/prompt/diary-chat.ts)、Brain Item抽出は[`diary-brain.ts`](../../apps/worker/src/prompt/diary-brain.ts)をSSoTとし、生成・検証・保存処理を持つ`logic/`や`handler/`へ本文を置きません。アプリケーションが管理する信頼済み入力として、通常返信の会話目的を`objective`、話し方と質問方法を`conversationGuidance`へ独立して渡し、役割、優先順位、記憶、助言、安全、出力の固定規則と合成します。user本文や取得した記憶をこれらの指示へ流用しません。固定規則または既定値の振る舞いが変わる変更では同じファイルの`prompt_version`も更新します。生成処理と記録処理は同じ定数を参照し、本文と記録上の版がずれないようにします。
 
 ### 7.3 会話方針の選択と返信率
 
@@ -582,7 +582,7 @@ flowchart TD
 
 日記候補の入力、起動条件、検証、Brain Item登録、否定・修正、重複・改訂は[Brain Item生成設計 §7](../domain/brain/brain-item-generation-design.md#7-日記チャットからの生成)を正とします。
 
-Brain Item抽出は会話返信とは別のsystem prompt、prompt version、Valibot schemaを使います。AccountData alarmがBrain Checkpoint QueueへIDだけを送り、consumerが削除・撤回されていないuser messageを最大10件、各5,000文字まで読み直してGeminiへ渡します。Chat Turn Queueと物理的に分離するため、Brain変換のAI待ちや再配送は通常返信を待たせません。上限超過本文はSource Recordとして保持したまま変換対象から外します。JSON・出力envelope不正またはproviderの一時失敗はQueueを失敗させて再試行し、個別候補のschema・Evidence・重複違反、空白statement、根拠user message本文にそのまま含まれないstatementは理由コードだけをlogへ残して候補単位で除外します。安全経路または正常な空配列は0件として適用します。候補の保存はAccountData actionだけが行い、モデルへDBや外部I/Oのtoolを公開しません。
+Brain Item抽出は会話返信とは別のsystem prompt、prompt version、Valibot schemaを使います。AccountData alarmがBrain Checkpoint QueueへIDだけを送り、consumerが削除・撤回されていないuser messageを最大10件、各5,000文字まで読み直してGeminiへ渡します。Chat Turn Queueと物理的に分離するため、Brain変換のAI待ちや再配送は通常返信を待たせません。上限超過本文はSource Recordとして保持したまま変換対象から外します。本人が明言した命題は`memory`、`behavior_pattern`、`value_motivation`、`decision_system`、`preference`、`goal`の6分類から最大3件を生成し、未明言の動機や傾向を推定しません。JSON・出力envelope不正またはproviderの一時失敗はQueueを失敗させて再試行し、個別候補のschema・Evidence・重複違反、空白statement、根拠user message本文にそのまま含まれないstatementは理由コードだけをlogへ残して候補単位で除外します。安全経路または正常な空配列は0件として適用します。相対日付を含むstatementの保存とVectorize検索時の扱いは[Brain Item生成設計](../domain/brain/brain-item-generation-design.md)を正とします。候補の保存はAccountData actionだけが行い、モデルへDBや外部I/Oのtoolを公開しません。
 
 ## 8. ガードレール
 
@@ -612,7 +612,7 @@ Brain Item抽出は会話返信とは別のsystem prompt、prompt version、Vali
 ### 8.3 Memory Poisoning
 
 - Source Recordは本人の発言として保存するが、客観的真実とは扱わない
-- AI推定は`derivation = ai`として本人の明言やルールベース変換と区別する
+- `derivation`と推定有無を分け、`is_inference = true`だけを本人が明言していない推定として扱う
 - 推定内容は本人が否定・修正できる提示にする
 - Evidenceがない候補や、1回の出来事から安定した性格を断定する候補は保存しない
 - 既存Itemと矛盾する候補を自動上書きしない

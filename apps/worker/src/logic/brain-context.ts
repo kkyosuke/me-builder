@@ -2,6 +2,8 @@ import {
   type BrainChatContextMemory,
   type ConversationContextMessage,
   accountDataFor,
+  buildDiaryTemporalSearchText,
+  resolveDiaryTemporalContext,
 } from "@me-builder/lib";
 import { logger } from "@me-builder/shared";
 import type { CloudflareBindings, WorkerConfig } from "../config";
@@ -30,11 +32,19 @@ const defaultDependencies: BrainContextDependencies = {
 export function buildBrainSearchQuery(
   messages: readonly ConversationContextMessage[],
   currentUserMessageIds: readonly string[],
+  at = new Date(),
 ): string | undefined {
   const currentIds = new Set(currentUserMessageIds);
   const query = messages
     .filter(({ id, role }) => role === "user" && currentIds.has(id))
-    .map(({ body }) => body.trim())
+    .map(({ body, recordedAt }) => {
+      const statement = body.trim();
+      if (!statement) return "";
+      return buildDiaryTemporalSearchText(
+        statement,
+        resolveDiaryTemporalContext(statement, recordedAt ?? at),
+      );
+    })
     .filter(Boolean)
     .join("\n");
   if (!query) return undefined;

@@ -140,6 +140,7 @@ export function buildDiaryChatContextPackage(
       category: memory.category,
       statement: memory.statement.slice(0, MEMORY_STATEMENT_CHARACTER_LIMIT),
       derivation: memory.derivation,
+      is_inference: memory.isInference,
       status: memory.status,
       confidence: memory.confidence,
       access_labels: memory.accessLabels,

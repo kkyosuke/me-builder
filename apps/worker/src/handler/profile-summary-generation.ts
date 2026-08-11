@@ -7,7 +7,8 @@ import {
   toSafeOperationalErrorFields,
 } from "@me-builder/shared";
 import type { CloudflareBindings, WorkerConfig } from "../config";
-import { PROFILE_SUMMARY_PROMPT_VERSION, generateProfileSummary } from "../logic/profile-summary";
+import { generateProfileSummary } from "../logic/profile-summary";
+import { PROFILE_SUMMARY_PROMPT_VERSION } from "../prompt/profile-summary";
 
 /** wrangler.tomlのmax_retries=5に初回配送を加えた最大試行回数。 */
 export const PROFILE_SUMMARY_GENERATION_MAX_ATTEMPTS = 6;

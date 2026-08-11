@@ -11,6 +11,8 @@ describe("diary chat prompt", () => {
     expect(DIARY_CHAT_SYSTEM_PROMPT).toContain("質問しない応答を既定");
     expect(DIARY_CHAT_SYSTEM_PROMPT).toContain("会話を続けることだけを目的に質問しない");
     expect(DIARY_CHAT_SYSTEM_PROMPT).toContain("質問がなければ0");
+    expect(DIARY_CHAT_SYSTEM_PROMPT).toContain("aiであることだけを理由に推定扱いしない");
+    expect(DIARY_CHAT_SYSTEM_PROMPT).toContain("is_inferenceがtrue");
   });
 
   it("追跡可能なprompt versionを持つ", () => {
@@ -24,6 +26,7 @@ describe("diary chat prompt", () => {
     });
 
     expect(prompt).toContain("## 会話の目的\n選択の背景にある行動原理を、仮説として探る。");
+    expect(prompt).toContain("行動傾向、動機、判断基準、好み、Goalも含まれます");
     expect(prompt).toContain("## 話し方と質問方法\n短く共感してから、必要な場合だけ質問する。");
     expect(prompt).toContain("## 安全");
   });

@@ -1,4 +1,5 @@
 import { DO } from "@me-builder/lib";
+import type { DiaryBrainCheckpointCandidate } from "@me-builder/lib";
 
 /** Diary source, session, message and turn operations owned by one AccountData Object. */
 export const diaryActions = {
@@ -44,7 +45,7 @@ export const diaryActions = {
     checkpointId: string,
     expectedThroughSequence: number,
     promptVersion: string,
-    candidates: readonly { statement: string; sourceMessageIds: readonly string[] }[],
+    candidates: readonly DiaryBrainCheckpointCandidate[],
     at?: Date,
   ) =>
     DO.account.action.diary.applyDiaryBrainCheckpoint(
