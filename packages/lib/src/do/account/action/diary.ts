@@ -57,6 +57,8 @@ function ownedSessionIds(db: AccountDataDatabase, accountId: string) {
 
 const BRAIN_CHECKPOINT_DISPATCH_RETRY_BASE_MS = 30 * 1000;
 const BRAIN_CHECKPOINT_DISPATCH_RETRY_MAX_MS = 15 * 60 * 1000;
+/** Queueの6回の配送機会を待った後、DLQ滞留をAlarmから自己回復するまでのlease。 */
+export const DIARY_BRAIN_CHECKPOINT_DISPATCH_LEASE_MS = 60 * 60 * 1000;
 const CONVERSATION_POLICY_EXPLORATION_RATE = 0.2;
 
 export type ConversationPolicyStat = {
@@ -711,7 +713,7 @@ export async function listDueDiaryBrainCheckpointIds(
     .where(
       and(
         inArray(diaryBrainCheckpoints.sessionId, ownedSessionIds(db, accountId)),
-        inArray(diaryBrainCheckpoints.status, ["pending", "queued"]),
+        inArray(diaryBrainCheckpoints.status, ["pending", "queued", "dispatched"]),
         lte(diaryBrainCheckpoints.nextAttemptAt, at),
         eq(diaryBrainCheckpoints.isDeleted, false),
       ),
@@ -753,7 +755,7 @@ export async function claimDueDiaryBrainCheckpointIds(
         and(
           eq(diaryBrainCheckpoints.id, checkpointId),
           inArray(diaryBrainCheckpoints.sessionId, ownedSessionIds(db, accountId)),
-          inArray(diaryBrainCheckpoints.status, ["pending", "queued"]),
+          inArray(diaryBrainCheckpoints.status, ["pending", "queued", "dispatched"]),
           lte(diaryBrainCheckpoints.nextAttemptAt, at),
           eq(diaryBrainCheckpoints.isDeleted, false),
         ),
@@ -765,7 +767,7 @@ export async function claimDueDiaryBrainCheckpointIds(
   return claimedIds;
 }
 
-/** Queueがcheckpointを受理したことを記録し、Alarmによる再投入対象から外す。 */
+/** Queue受理を記録し、lease期限まではAlarmによる再投入対象から外す。 */
 export async function markDiaryBrainCheckpointDispatched(
   db: AccountDataDatabase,
   accountId: string,
@@ -774,7 +776,11 @@ export async function markDiaryBrainCheckpointDispatched(
 ): Promise<boolean> {
   const updated = await db
     .update(diaryBrainCheckpoints)
-    .set({ status: "dispatched", updatedAt: at })
+    .set({
+      status: "dispatched",
+      nextAttemptAt: new Date(at.getTime() + DIARY_BRAIN_CHECKPOINT_DISPATCH_LEASE_MS),
+      updatedAt: at,
+    })
     .where(
       and(
         eq(diaryBrainCheckpoints.id, checkpointId),

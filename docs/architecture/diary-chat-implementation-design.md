@@ -285,7 +285,9 @@ prompt本文、Context Package、未検証のモデル出力は保存しませ�
 
 同じSessionの`pending`は最大1件とします。新しいuser messageをTurnへ取り込むtransactionで、発言ごとに現在の期限とuser message 10件の範囲上限を評価します。期限前かつ上限以内なら範囲を延長し、期限以後または追加すると上限を超える場合は既存範囲を`queued`へ固定して新しい`pending`を作ります。Brain Item変換では削除・撤回されていないuser原文だけを最大10message、各5,000文字まで読み、assistant本文は入力へ含めません。明示終了時は期限を現在時刻へ進めます。
 
-Alarmは期限到来した`pending`またはQueue投入に失敗した`queued`だけをclaimし、指数バックオフ付きの投入leaseとして`next_attempt_at`を進めます。Queue投入が失敗した場合は永続化済みの次回試行時刻からAlarmを明示的に再設定し、プラットフォームの自動retry上限を越えても処理を再開できるようにします。QueueがIDを受理したら`dispatched`へ進め、以後はAlarmの対象にしません。送信後・状態更新前に停止した場合だけlease後に重複投入され得ますが、checkpoint IDと適用transactionで多重適用を防ぎます。`dispatched`後のAI一時失敗はQueue自身の再配送とDLQで扱い、Alarmと二重に再投入しません。Workerは固定範囲を読み直し、Brain Item一式、`diary_brain_checkpoint_items`、`applied`への遷移を同じtransactionで確定します。JSONまたは出力envelope全体が不正な場合は再配送し、envelope内の個別候補だけがschema・Evidence・候補間重複の検証に失敗した場合は、安全な理由コードをerror logへ残してその候補だけを登録対象から外します。AlarmとRPC actionはAccountData Object内で直列化します。
+Alarmは期限到来した`pending`、Queue投入に失敗した`queued`、または回復期限を超えた`dispatched`をclaimし、`queued`へ進めます。Queue投入前は指数バックオフ付きの投入leaseとして`next_attempt_at`を進め、投入失敗時は永続化済みの次回試行時刻からAlarmを明示的に再設定します。QueueがIDを受理したら`dispatched`へ進め、`next_attempt_at`へ1時間後の回復期限を保存します。Queue自身の初回配送と最大5回の再試行をこの期間は優先し、それでも`applied`にならなければ同じcheckpoint IDを再投入してDLQ滞留から自己回復します。
+
+送信後・状態更新前の停止、または回復再投入と元のQueue処理の競合によって重複配送され得ますが、Workerは固定範囲を読み直し、Brain Item一式、`diary_brain_checkpoint_items`、`applied`への遷移を同じtransactionで確定します。AlarmとRPC actionはAccountData Object内で直列化し、先に`applied`へ進めた処理だけを成功させるため多重適用しません。JSONまたは出力envelope全体が不正な場合は再配送し、envelope内の個別候補だけがschema・Evidence・候補間重複の検証に失敗した場合は、安全な理由コードをerror logへ残してその候補だけを登録対象から外します。
 
 ```mermaid
 stateDiagram-v2
@@ -295,6 +297,7 @@ stateDiagram-v2
     queued --> queued: Queue投入失敗をbackoff後に再試行
     queued --> dispatched: Queueが受理
     dispatched --> dispatched: AI・検証失敗をQueueが再配送
+    dispatched --> queued: 1時間の回復期限超過
     queued --> applied: 送信直後のmessageが先に適用
     dispatched --> applied: Item一式を原子的に適用
     applied --> [*]
