@@ -227,6 +227,69 @@ describe("getCompatibilitySharePreview", () => {
     });
   });
 
+  it("回答済みDiagnosisの一部だけ採点できない場合も招待発行を許可しない", async () => {
+    const validScoring = {
+      scoringVersion: 1,
+      balancedLabel: "状況に応じて決めたい",
+      parameters: [
+        {
+          id: "planning",
+          label: "予定を決めるタイミング",
+          lowLabel: "その場で決めたい",
+          highLabel: "早めに決めたい",
+          score: 78,
+          coverage: 100,
+          band: "high" as const,
+        },
+      ],
+    };
+    const result = await getCompatibilitySharePreview(
+      { idToken: "id-token", lineLoginChannelId: "channel-id", db, at },
+      {
+        createSession: vi.fn().mockResolvedValue({
+          type: "resolved",
+          session: { accountId: "account-1", role: "user", displayName: "あおい" },
+        }),
+        getPreviewSource: vi.fn().mockResolvedValue({
+          diagnoses: [
+            { id: "valid", availability: "open", responseStatus: "answered" },
+            { id: "invalid", availability: "open", responseStatus: "answered" },
+          ],
+          answeredDiagnoses: [
+            {
+              id: "valid",
+              title: "時間と予定",
+              answers: [],
+              scoringConfig: { id: "config-valid" },
+            },
+            {
+              id: "invalid",
+              title: "採点不能",
+              answers: [],
+              scoringConfig: { id: "config-invalid" },
+            },
+          ],
+        }),
+        getShareProfile: vi.fn().mockResolvedValue(availableShareProfile),
+        scoreAnswers: vi
+          .fn()
+          .mockImplementation((_answers, config) =>
+            config?.id === "config-valid" ? validScoring : null,
+          ),
+        createPreviewToken: vi.fn().mockResolvedValue(previewToken),
+      },
+    );
+
+    expect(result).toMatchObject({
+      preview: {
+        themes: [{ diagnosisId: "valid" }],
+        canIssueInvitation: false,
+        blockingReasons: ["scoring_unavailable"],
+        nextAction: null,
+      },
+    });
+  });
+
   it.each([
     { result: { type: "unavailable" as const }, reason: "profile_summary_required" },
     { result: { type: "stale" as const }, reason: "profile_summary_stale" },

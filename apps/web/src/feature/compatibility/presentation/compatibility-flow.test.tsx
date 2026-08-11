@@ -67,7 +67,7 @@ describe("Compatibility flow", () => {
               lowLabel: "その場で決めたい",
               highLabel: "早めに決めたい",
               position: 78,
-              statement: "私は、予定を早めに決めておけると安心します。",
+              statement: "「早めに決めたい」傾向があります",
             },
             {
               id: "holiday",
@@ -75,7 +75,7 @@ describe("Compatibility flow", () => {
               lowLabel: "ひとり時間を重視",
               highLabel: "一緒の時間を重視",
               position: 68,
-              statement: "私は、一緒に楽しむ時間を大切にしたいです。",
+              statement: "「一緒の時間を重視」傾向があります",
             },
           ],
         },
@@ -93,6 +93,8 @@ describe("Compatibility flow", () => {
     expect(screen.getByRole("heading", { name: "暮らし方" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "共有する振る舞い・考え方" })).toBeTruthy();
     expect(screen.getByText("2件すべて共有")).toBeTruthy();
+    expect(screen.getByText("「早めに決めたい」傾向があります")).toBeTruthy();
+    expect(screen.queryByText("「「早めに決めたい」傾向があります」")).toBeNull();
     expect(screen.queryByRole("checkbox")).toBeNull();
     expect(screen.getByText(/日記やLINEの会話本文/)).toBeTruthy();
     expect(

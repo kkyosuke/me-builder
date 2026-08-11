@@ -32,6 +32,8 @@ flowchart LR
 
 `themes`へ含めるのは、本人の現在有効な回答による回答済みDiagnosisのうち、Diagnosisが固定した採点設定版で1件以上のパラメータを計算できるものです。Diagnosisは表示順とDiagnosis ID、`parameters`は採点設定内の定義順で安定して返します。
 
+回答済みDiagnosisのうち1件でも採点設定の欠落・不正または計算可能なパラメータの不足があれば、計算できたテーマは確認用に返しますが、`scoring_unavailable`として招待発行を許可しません。確認対象の一部を黙って除外した状態では同意を成立させません。
+
 各パラメータの`statement`は、現在の帯域に対応する審査済みラベルから`「{帯域の表示名}」傾向があります`の形で決定的に組み立てます。中央帯ではDiagnosisの採点設定が持つ中央帯の表示名を使います。関わり方の審査済み定型文は現在の採点設定に存在しないため、このAPIで推測して返しません。
 
 ```json
@@ -83,7 +85,7 @@ flowchart LR
 | `profile_summary_required` | 共有専用プロフィールprojectionを持つ生成済み版がない |
 | `profile_summary_stale` | 共有専用プロフィールprojectionの内部根拠が削除または無効化されている |
 | `diagnosis_required` | 共有可能なテーマがなく、現在回答できる未完了Diagnosisがある |
-| `scoring_unavailable` | 回答済みDiagnosisがあるが、共有表示を計算できない |
+| `scoring_unavailable` | 回答済みDiagnosisのうち1件以上で共有表示を計算できない |
 | `diagnosis_unavailable` | 回答済みDiagnosisも現在回答できる未完了Diagnosisもない |
 
 `nextAction`は共有専用プロフィールprojectionが利用できなければ`profile-summary`、それ以外で共有可能なテーマがなく現在回答できる未完了Diagnosisがあれば`diagnosis`、それ以外は`null`にします。表示名、プロフィール版、Diagnosisの不足は同時に発生し得るため、クライアントは`blockingReasons`を配列として扱います。

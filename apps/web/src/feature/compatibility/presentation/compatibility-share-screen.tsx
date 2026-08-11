@@ -47,7 +47,7 @@ function ShareParameterCard({ parameter }: { parameter: CompatibilitySharePrevie
         <div className="min-w-0 flex-1">
           <h4 className="font-bold text-slate-950 dark:text-slate-50">{parameter.label}</h4>
           <p className="mt-1 text-sm leading-relaxed text-slate-700 dark:text-slate-300">
-            「{parameter.statement}」
+            {parameter.statement}
           </p>
           <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
             <div

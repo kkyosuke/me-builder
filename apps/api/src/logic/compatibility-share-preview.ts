@@ -126,9 +126,11 @@ export async function getCompatibilitySharePreview(
   const hasAnswerableDiagnosis = source.diagnoses.some(
     ({ availability, responseStatus }) => availability === "open" && responseStatus !== "answered",
   );
-  const hasAnsweredDiagnosis = source.diagnoses.some(
+  const answeredDiagnosisCount = source.diagnoses.filter(
     ({ responseStatus }) => responseStatus === "answered",
-  );
+  ).length;
+  const hasAnsweredDiagnosis = answeredDiagnosisCount > 0;
+  const hasUnshareableAnsweredDiagnosis = themes.length < answeredDiagnosisCount;
   const blockingReasons: CompatibilitySharePreviewBlockingReason[] = [];
   if (displayName === null) blockingReasons.push("display_name_unavailable");
   if (shareProfileResult.type === "unavailable") {
@@ -137,11 +139,11 @@ export async function getCompatibilitySharePreview(
   if (shareProfileResult.type === "stale") blockingReasons.push("profile_summary_stale");
   if (themes.length === 0) {
     if (hasAnswerableDiagnosis) blockingReasons.push("diagnosis_required");
-    if (hasAnsweredDiagnosis) blockingReasons.push("scoring_unavailable");
     if (!hasAnswerableDiagnosis && !hasAnsweredDiagnosis) {
       blockingReasons.push("diagnosis_unavailable");
     }
   }
+  if (hasUnshareableAnsweredDiagnosis) blockingReasons.push("scoring_unavailable");
 
   return {
     type: "resolved",
