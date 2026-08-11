@@ -16,6 +16,8 @@ function manifest(environment: "preview" | "production", databaseId: string) {
       brainCheckpointDeadLetter: { id: "6", name: `me-builder-brain-checkpoint-dlq-${suffix}` },
       profileSummary: { id: "7", name: `me-builder-profile-summary-queue-${suffix}` },
       profileSummaryDeadLetter: { id: "8", name: `me-builder-profile-summary-dlq-${suffix}` },
+      brainVector: { id: "9", name: `me-builder-brain-vector-queue-${suffix}` },
+      brainVectorDeadLetter: { id: "10", name: `me-builder-brain-vector-dlq-${suffix}` },
     },
   });
 }
@@ -30,6 +32,10 @@ describe("renderWranglerConfigs", () => {
     expect(configs.api).toContain('queue = "me-builder-webhook-queue-preview"');
     expect(configs.api).toContain('binding = "PROFILE_SUMMARY_QUEUE"');
     expect(configs.worker).toContain('queue = "me-builder-profile-summary-queue-production"');
+    expect(configs.worker).toContain('binding = "BRAIN_VECTOR_QUEUE"');
+    expect(configs.worker).toContain('binding = "BRAIN_VECTOR_INDEX"');
+    expect(configs.api).toContain('index_name = "me-builder-brain-preview"');
+    expect(configs.api).not.toContain('index_name = "me-builder-brain-production"');
     expect(configs.mcp).toContain('database_id = "production-id"');
     expect(configs.lib).toContain("[[env.preview.d1_databases]]");
   });

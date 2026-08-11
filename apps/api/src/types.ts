@@ -10,7 +10,12 @@ import type {
 /** Wrangler生成bindingに、SecretとQueueの公開契約だけを重ねる。 */
 type Env = Omit<
   ApiBindings,
-  "DB" | "WEBHOOK_QUEUE" | "PROFILE_SUMMARY_QUEUE" | "ACCOUNT_DATA" | "COMPATIBILITY_DATA"
+  | "DB"
+  | "WEBHOOK_QUEUE"
+  | "PROFILE_SUMMARY_QUEUE"
+  | "ACCOUNT_DATA"
+  | "COMPATIBILITY_DATA"
+  | "BRAIN_VECTOR_INDEX"
 > & {
   ENVIRONMENT?: string;
   LINE_CHANNEL_ACCESS_TOKEN?: string;
@@ -25,6 +30,7 @@ type Env = Omit<
   DB?: D1Database;
   ACCOUNT_DATA?: AccountDataNamespace;
   COMPATIBILITY_DATA?: CompatibilityDataNamespace;
+  BRAIN_VECTOR_INDEX?: ApiBindings["BRAIN_VECTOR_INDEX"];
 };
 
 export type AppEnv = {

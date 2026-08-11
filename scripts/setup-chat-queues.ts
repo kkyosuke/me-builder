@@ -10,6 +10,8 @@ const queueNames = [
   `me-builder-brain-checkpoint-dlq-${environment}`,
   `me-builder-profile-summary-queue-${environment}`,
   `me-builder-profile-summary-dlq-${environment}`,
+  `me-builder-brain-vector-queue-${environment}`,
+  `me-builder-brain-vector-dlq-${environment}`,
   `me-builder-webhook-dlq-${environment}`,
 ];
 

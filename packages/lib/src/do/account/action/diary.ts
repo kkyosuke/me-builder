@@ -6,6 +6,7 @@ import {
   brainItemEvidenceEdges,
   brainItemTopicLabels,
   brainItems,
+  brainVectorSyncJobs,
   chatTurns,
   conversationMessages,
   conversationSessions,
@@ -878,6 +879,15 @@ export async function applyDiaryBrainCheckpoint(
         sensitivity: "normal",
         externallyShareable: false,
         confidence: { state: "uncomputed" },
+        ...lifecycle,
+      }),
+      db.insert(brainVectorSyncJobs).values({
+        id: `${brainItemId}:${at.getTime()}:upsert`,
+        brainItemId,
+        itemRevision: at.getTime(),
+        operation: "upsert",
+        status: "pending",
+        nextAttemptAt: at,
         ...lifecycle,
       }),
       ...sources.map((source) =>

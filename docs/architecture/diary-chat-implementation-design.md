@@ -154,7 +154,7 @@ erDiagram
     source_records ||--o| conversation_messages : appears_as
     accounts ||--o{ brain_items : owns
     brain_items ||--o| diary_brain_checkpoint_items : maps
-    brain_items ||--o{ vector_index_jobs : indexes
+    brain_items ||--o{ brain_vector_sync_jobs : indexes
     brain_items ||--o{ brain_item_evidence_edges : has
     source_records ||--o{ brain_item_evidence_edges : evidence
     brain_items ||--o{ brain_item_revisions : revises
@@ -310,25 +310,57 @@ stateDiagram-v2
 
 Brain Itemを含むAccount所有データのquery境界は、[Accountデータ分離設計](account-data-isolation.md)を正とします。
 
-検証を通過したBrain Itemは`active`として保存します。本人の同意を登録の条件にはしません。Vectorize同期jobと検索利用は後続実装であり、導入時にはBrain Item作成と同じAccountData SQLite transactionでoutboxへ追加します。AI推定は`derivation = ai`として区別し、Confidenceの算出前を表す`uncomputed`を検索順位に使いません。
+検証を通過したBrain Itemは`active`として保存します。本人の同意を登録の条件にはしません。Brain Item作成とVectorize同期job追加は同じAccountData SQLite transactionで確定します。AI推定は`derivation = ai`として区別し、Confidenceの算出前を表す`uncomputed`を検索順位に使いません。
 
-開発用の確認一覧は、本人確認済みAccountに対する`brain.listActive`だけをAccountData RPCへ公開し、activeかつ未削除のItemと未削除Evidenceを最大100件返します。APIの`GET /api/dev/brain-items`とWeb UIの表示は`development` / `local` / `preview` / `test`だけで有効にし、Productionでは404かつUI非表示とします。クライアントからAccount IDを受け取りません。
+開発用の確認機能は、本人確認済みAccountに対して、一覧取得用の`brain.listActive`とVector実体確認用の`brain.findActiveVectorEntry`をAccountData RPCへ公開します。`brain.listActive`はactiveかつ未削除のItem、未削除Evidence、最新のVector同期jobと対応表の有無を最大100件返します。Web UIは各Itemに同期状態、試行回数、失敗code、次回試行時刻を表示します。`applied`はVectorizeが更新を受け付けてAccountDataへ完了記録した状態であり、Vectorize上の実体確認とは区別します。
 
-### 4.8 `vector_index_jobs`
+実体確認は利用者の明示操作時だけ`GET /api/dev/brain-items/:brainItemId/vector`を呼びます。APIは本人確認済みAccountのactive Itemに紐づくvector IDをAccountDataから取得し、Vectorizeの`getByIds`で実体を照合します。応答には存在有無、次元数、許可済みmetadata、確認時刻だけを含め、Embedding値、vector ID、Account ID、`owner_scope`は返しません。一覧取得のたびにVectorizeを呼ばないため、通常表示はAccountDataだけで完結します。これらのAPIとWeb UIは`development` / `local` / `preview` / `test`だけで有効にし、Productionでは404かつUI非表示とします。クライアントからAccount IDを受け取りません。
+
+### 4.8 `brain_vector_sync_jobs`
 
 Vectorizeは非同期更新であるため、AccountDataを正とするoutboxを置きます。
 
 | 列 | 用途 |
 | --- | --- |
-| `id`, `brain_item_id`, `item_revision` | PK、対象Item、更新版 |
+| `id`, `brain_item_id`, `item_revision` | PK、対象Item、更新版。対象Accountは1 Account = 1 AccountData SQLiteの配置から一意に決まるため重複保存しない |
 | `operation` | `upsert` / `delete` |
-| `owner_scope` | Account IDを直接含まない検索scope |
 | `status` | `pending` / `submitted` / `applied` / `failed` |
 | `mutation_id` | Vectorizeが返した非同期mutation ID |
 | `attempt_count`, `next_attempt_at`, `failure_code` | retry管理。本文を含めない |
 | `created_at`, `updated_at` | lifecycle |
 
-以下はVectorize同期を実装するときの境界です。Brain Itemの作成、改訂、無効化、削除、撤回では、Brain Itemの利用可否変更とjob追加を同じAccountData SQLite transactionで確定します。Queue consumerはItem ID、revision、operationを使って冪等にupsertまたはdeleteし、mutation IDを保存します。AccountData alarmは長時間`pending` / `submitted`のjobとVectorize間の差分を再照合し、DLQから復旧します。削除時はAccountDataで先に利用不可にするため、Vectorizeに古いvectorが残る間も検索後のAccountData再認可で利用されません。
+`brain_vector_entries`はAccountData内だけに置く対応表で、`vector_id`、`brain_item_id`、反映した`item_revision`を保持します。検索結果からBrain Itemへ戻す場合と、現在のSecretから再計算できない旧vectorを削除する場合に使います。本文やEmbedding値は保持しません。
+
+Brain Itemの作成、改訂、無効化、削除、撤回では、Brain Itemの利用可否変更とjob追加を同じAccountData SQLite transactionで確定します。AccountData alarmは`pending` / `failed`または期限切れの`submitted` jobを専用Brain Vector Queueへ送ります。Queue messageはAccount ID、job ID、Item ID、revisionだけを持ち、Brain Item本文を複製しません。
+
+```mermaid
+sequenceDiagram
+    participant AD as AccountData
+    participant Q as Brain Vector Queue
+    participant C as Vector consumer
+    participant G as Gemini Embedding
+    participant V as Vectorize
+    AD->>AD: Brain Item変更 + outbox jobを同一transactionで保存
+    AD->>Q: IDとrevisionだけを送信
+    Q->>C: at-least-once配送
+    C->>AD: jobと現在のBrain Itemを再取得
+    alt 現在もactiveかつ未削除
+        C->>G: statementをembedding
+        C->>V: 決定的vector IDでupsert
+    else superseded / invalidated / deleted
+        C->>V: 決定的vector IDをdelete
+    end
+    C->>AD: mutation ID、vector ID、適用結果を保存
+    AD->>AD: 現在状態を再確認し、必要なら補正jobをpendingへ戻す
+```
+
+consumerはQueue messageの`operation`や本文を信頼せず、処理直前にAccountDataの現在状態を再取得します。さらにVectorize操作後の完了記録をAccountDataで直列化し、開始時からItemの利用可否やrevisionが変わっていれば、現在状態へ収束させる補正jobを同じtransactionで`pending`へ戻します。これにより、古い`upsert`がembedding中にItemを無効化した場合や、Queueが順序を入れ替えて配送した場合も、最後に現在状態を反映する操作が残ります。
+
+vector IDはAccount IDとItem IDの組を環境別SecretでHMACした決定的な値、`owner_scope`はAccount IDを同じSecretで用途分離してHMACした値です。AccountDataにはvector IDとBrain Item IDの対応表を保持し、検索結果の再認可とSecret変更前に作成したvectorの削除に使います。Vectorizeへ保存するmetadataは`owner_scope`、category、derivation、embedding version、schema versionだけとし、生のAccount ID、Item ID、本文、Source Record ID、Evidenceを保存しません。
+
+Vectorizeへのupsertまたはdelete受付後に`applied`とmutation IDを記録します。失敗時は本文を含まないfailure codeだけを保存し、Queue再配送とoutboxの再送期限で回復します。削除時はAccountDataで先に利用不可にするため、Vectorizeに古いvectorが残る間も、検索導入後のAccountData再認可では利用されません。
+
+`BRAIN_VECTOR_HMAC_SECRET`は通常のSecretローテーションだけで単独変更してはいけません。変更時は新しいindexを用意し、AccountDataを正として全active Itemを再同期し、検索先を切り替えた後に旧indexを削除します。緊急失効時も同じ再構築手順を使います。個別Itemの削除ではAccountDataの対応表に保存した旧vector IDを使うため、Secret変更前のvectorも削除できます。
 
 ### 4.9 ConversationCoordinatorのローカルSQLite
 
@@ -386,7 +418,7 @@ AccountData、Queue、LINEを呼び出した後は、Turn ID、generation epoch�
 - DOの`accepted_messages(status, received_at)`、`delivery_outbox(status, deadline_at)`、`delivery_outbox(turn_id, generation_epoch)`
 - `brain_items(account_id, status, category)`
 - `brain_item_evidence_edges(brain_item_id)`と`(source_record_id)`
-- `vector_index_jobs(status, next_attempt_at)`と`(brain_item_id, item_revision, operation)` unique
+- `brain_vector_sync_jobs(status, next_attempt_at)`と`(brain_item_id, item_revision, operation)` unique
 
 ## 5. メッセージ処理とSession制御
 

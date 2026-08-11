@@ -14,6 +14,7 @@ export const FLOW_LABEL = {
   "line-webhook": "LINE webhook",
   "chat-turn": "Chat turn",
   "diary-brain-checkpoint": "Diary Brain checkpoint",
+  "brain-vector-sync": "Brain vector sync",
   "profile-summary-generation": "Profile summary generation",
   "queue-dispatch": "Queue dispatch",
 } as const;

@@ -1,6 +1,7 @@
 import { line } from "@me-builder/lib";
 import type { D1 } from "@me-builder/lib";
 import {
+  type BrainVectorSyncQueueMessage,
   type ChatTurnQueueMessage,
   type DiaryBrainCheckpointQueueMessage,
   type FlowKey,
@@ -14,6 +15,7 @@ import {
   toSafeOperationalErrorFields,
 } from "@me-builder/shared";
 import { type CloudflareBindings, type WorkerConfig, getWorkerConfig } from "../config";
+import { processBrainVectorSyncMessage } from "../handler/brain-vector-sync";
 import { CHAT_TURN_MAX_ATTEMPTS, processChatTurnMessage } from "../handler/chat-turn";
 import {
   DIARY_BRAIN_CHECKPOINT_MAX_ATTEMPTS,
@@ -36,6 +38,7 @@ const MAX_ATTEMPTS_BY_FLOW: Record<FlowKey, number | undefined> = {
   "line-webhook": WEBHOOK_QUEUE_MAX_ATTEMPTS,
   "chat-turn": CHAT_TURN_MAX_ATTEMPTS,
   "diary-brain-checkpoint": DIARY_BRAIN_CHECKPOINT_MAX_ATTEMPTS,
+  "brain-vector-sync": 6,
   "profile-summary-generation": PROFILE_SUMMARY_GENERATION_MAX_ATTEMPTS,
   "queue-dispatch": undefined,
 };
@@ -46,11 +49,13 @@ function flowOf(
     | WebhookQueueMessage
     | ChatTurnQueueMessage
     | DiaryBrainCheckpointQueueMessage
+    | BrainVectorSyncQueueMessage
     | ProfileSummaryGenerationQueueMessage,
 ): FlowKey {
   if (!("type" in body)) return "line-webhook";
   if (body.type === "chat-turn") return "chat-turn";
   if (body.type === "diary-brain-checkpoint") return "diary-brain-checkpoint";
+  if (body.type === "brain-vector-sync") return "brain-vector-sync";
   if (body.type === "profile-summary-generation") return "profile-summary-generation";
   return "queue-dispatch";
 }
@@ -168,6 +173,7 @@ export async function handleQueueBatch(
     | WebhookQueueMessage
     | ChatTurnQueueMessage
     | DiaryBrainCheckpointQueueMessage
+    | BrainVectorSyncQueueMessage
     | ProfileSummaryGenerationQueueMessage
   >,
   db: D1.shared.Client,
@@ -194,6 +200,13 @@ export async function handleQueueBatch(
         if (!cf || !workerConfig) throw new Error("Diary Brain bindings are not configured");
         await processDiaryBrainCheckpointMessage(
           message as Message<DiaryBrainCheckpointQueueMessage>,
+          cf,
+          workerConfig,
+        );
+      } else if ("type" in message.body && message.body.type === "brain-vector-sync") {
+        if (!cf || !workerConfig) throw new Error("Brain vector bindings are not configured");
+        await processBrainVectorSyncMessage(
+          message as Message<BrainVectorSyncQueueMessage>,
           cf,
           workerConfig,
         );

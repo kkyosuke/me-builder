@@ -34,6 +34,12 @@
     },
     "profileSummaryDeadLetter": {
       "name": "me-builder-profile-summary-dlq-preview"
+    },
+    "brainVector": {
+      "name": "me-builder-brain-vector-queue-preview"
+    },
+    "brainVectorDeadLetter": {
+      "name": "me-builder-brain-vector-dlq-preview"
     }
   }
 }

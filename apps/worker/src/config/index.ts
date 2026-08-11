@@ -2,17 +2,14 @@ import { getEnv, logger } from "@me-builder/shared";
 import * as v from "valibot";
 import {
   DEFAULT_CHAT_CONTEXT_MESSAGE_LIMIT,
+  DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_GEMINI_MODEL,
   type WorkerConfig,
   WorkerConfigSchema,
 } from "./schema";
 
-export {
-  DEFAULT_CHAT_CONTEXT_MESSAGE_LIMIT,
-  DEFAULT_GEMINI_MODEL,
-  WorkerConfigSchema,
-  type WorkerConfig,
-};
+export { DEFAULT_CHAT_CONTEXT_MESSAGE_LIMIT, DEFAULT_GEMINI_MODEL, WorkerConfigSchema };
+export type { WorkerConfig };
 export { type CloudflareBindings, getCloudflareBindings } from "./cloudflare";
 
 /**
@@ -62,6 +59,9 @@ export function getWorkerConfig(env?: Record<string, unknown>): WorkerConfig {
   const rawLiffId = getEnv("LIFF_ID", env)?.trim() || undefined;
   const rawGoogleVertexAiApiKey = getEnv("GOOGLE_VERTEX_AI_API_KEY", env)?.trim() || undefined;
   const rawGeminiModel = getEnv("GEMINI_MODEL", env)?.trim() || DEFAULT_GEMINI_MODEL;
+  const rawGeminiEmbeddingModel =
+    getEnv("GEMINI_EMBEDDING_MODEL", env)?.trim() || DEFAULT_GEMINI_EMBEDDING_MODEL;
+  const rawBrainVectorHmacSecret = getEnv("BRAIN_VECTOR_HMAC_SECRET", env)?.trim() || undefined;
   const rawChatEnabled = getEnv("CHAT_ENABLED", env)?.trim().toLowerCase() !== "false";
   const rawChatDeliverySecret = getEnv("CHAT_DELIVERY_SECRET", env)?.trim() || undefined;
   const rawChatContextMessageLimit = getEnv("CHAT_CONTEXT_MESSAGE_LIMIT", env)?.trim();
@@ -79,6 +79,8 @@ export function getWorkerConfig(env?: Record<string, unknown>): WorkerConfig {
     liffId: rawLiffId,
     googleVertexAiApiKey: rawGoogleVertexAiApiKey,
     geminiModel: rawGeminiModel,
+    geminiEmbeddingModel: rawGeminiEmbeddingModel,
+    brainVectorHmacSecret: rawBrainVectorHmacSecret,
     chatEnabled: rawChatEnabled,
     chatDeliverySecret: rawChatDeliverySecret,
     chatContextMessageLimit: parsePositiveInteger(

@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, lte, sql } from "drizzle-orm";
 import type { AccountDataDatabase } from "../database";
 import {
   brainItemAccessLabels,
@@ -6,6 +6,8 @@ import {
   brainItemRevisions,
   brainItemTopicLabels,
   brainItems,
+  brainVectorEntries,
+  brainVectorSyncJobs,
 } from "../schema/brain";
 import { sourceRecords } from "../schema/source";
 
@@ -42,6 +44,8 @@ export type SaveBrainItemResult =
     }>;
 
 const DEVELOPMENT_BRAIN_ITEM_LIMIT = 100;
+const VECTOR_SYNC_DISPATCH_RETRY_MS = 15 * 60 * 1000;
+const VECTOR_SYNC_FAILURE_RETRY_MS = 60 * 1000;
 
 export type ActiveBrainItemList = Readonly<{
   items: readonly Readonly<{
@@ -51,6 +55,16 @@ export type ActiveBrainItemList = Readonly<{
     derivation: "ai" | "deterministic";
     status: "active";
     createdAt: Date;
+    vectorSync: Readonly<{
+      status: "pending" | "submitted" | "applied" | "failed" | "not-scheduled";
+      operation?: "upsert" | "delete";
+      attemptCount: number;
+      updatedAt?: Date;
+      nextAttemptAt?: Date;
+      failureCode?: string;
+      hasEntry: boolean;
+      entryRevision?: number;
+    }>;
     evidence: readonly Readonly<{
       sourceRecordId: string;
       relation: "supports" | "contradicts";
@@ -127,9 +141,20 @@ export async function saveBrainItem(
 
   const accountId = input.item.accountId;
   const brainItemId = input.item.id;
-  const lifecycle = input.at ? { createdAt: input.at, updatedAt: input.at } : {};
+  const changedAt = input.at ?? new Date();
+  const lifecycle = { createdAt: changedAt, updatedAt: changedAt };
+  const itemRevision = changedAt.getTime();
   const statements: D1BatchStatement[] = [
     db.insert(brainItems).values({ ...input.item, ...lifecycle }),
+    db.insert(brainVectorSyncJobs).values({
+      id: `${brainItemId}:${itemRevision}:upsert`,
+      brainItemId,
+      itemRevision,
+      operation: "upsert",
+      status: "pending",
+      nextAttemptAt: changedAt,
+      ...lifecycle,
+    }),
     ...input.evidence.map((edge) =>
       db.insert(brainItemEvidenceEdges).values({ ...edge, ...lifecycle, brainItemId }),
     ),
@@ -145,7 +170,7 @@ export async function saveBrainItem(
     statements.push(
       db
         .update(brainItems)
-        .set({ status: "superseded", updatedAt: input.at })
+        .set({ status: "superseded", updatedAt: changedAt })
         .where(
           and(eq(brainItems.id, input.supersedes.brainItemId), eq(brainItems.accountId, accountId)),
         ),
@@ -156,6 +181,15 @@ export async function saveBrainItem(
         derivationMethod: input.supersedes.derivationMethod,
         ...lifecycle,
       }),
+      db.insert(brainVectorSyncJobs).values({
+        id: `${input.supersedes.brainItemId}:${itemRevision}:delete`,
+        brainItemId: input.supersedes.brainItemId,
+        itemRevision,
+        operation: "delete",
+        status: "pending",
+        nextAttemptAt: changedAt,
+        ...lifecycle,
+      }),
     );
   }
 
@@ -163,6 +197,307 @@ export async function saveBrainItem(
   if (!firstStatement) throw new Error("Brain Itemの保存statementがありません");
   await db.batch([firstStatement, ...statements.slice(1), ...additionalStatements]);
   return { type: "saved", brainItemId };
+}
+
+export type BrainVectorSyncJob = Readonly<{
+  id: string;
+  brainItemId: string;
+  itemRevision: number;
+}>;
+
+/** Alarm時点で期限を迎えたVector同期jobをclaimする。 */
+export async function claimDueBrainVectorSyncJobs(
+  db: AccountDataDatabase,
+  at = new Date(),
+): Promise<BrainVectorSyncJob[]> {
+  const due = await db
+    .select({
+      id: brainVectorSyncJobs.id,
+      brainItemId: brainVectorSyncJobs.brainItemId,
+      itemRevision: brainVectorSyncJobs.itemRevision,
+    })
+    .from(brainVectorSyncJobs)
+    .where(
+      and(
+        inArray(brainVectorSyncJobs.status, ["pending", "submitted", "failed"]),
+        lte(brainVectorSyncJobs.nextAttemptAt, at),
+        eq(brainVectorSyncJobs.isDeleted, false),
+      ),
+    )
+    .orderBy(asc(brainVectorSyncJobs.nextAttemptAt), asc(brainVectorSyncJobs.id))
+    .limit(10)
+    .all();
+  const claimed: BrainVectorSyncJob[] = [];
+  for (const job of due) {
+    const rows = await db
+      .update(brainVectorSyncJobs)
+      .set({
+        status: "submitted",
+        attemptCount: sql`${brainVectorSyncJobs.attemptCount} + 1`,
+        nextAttemptAt: new Date(at.getTime() + VECTOR_SYNC_DISPATCH_RETRY_MS),
+        failureCode: null,
+        updatedAt: at,
+      })
+      .where(
+        and(
+          eq(brainVectorSyncJobs.id, job.id),
+          inArray(brainVectorSyncJobs.status, ["pending", "submitted", "failed"]),
+          lte(brainVectorSyncJobs.nextAttemptAt, at),
+          eq(brainVectorSyncJobs.isDeleted, false),
+        ),
+      )
+      .returning({ id: brainVectorSyncJobs.id })
+      .all();
+    if (rows.length > 0) claimed.push(job);
+  }
+  return claimed;
+}
+
+export type BrainVectorSyncTarget =
+  | Readonly<{
+      action: "upsert";
+      statement: string;
+      category: string;
+      derivation: "ai" | "deterministic";
+      itemRevision: number;
+      previousVectorId?: string;
+    }>
+  | Readonly<{ action: "delete"; vectorId?: string }>;
+
+export type AppliedBrainVectorSync =
+  | Readonly<{ action: "upsert"; vectorId: string; itemRevision: number }>
+  | Readonly<{ action: "delete"; vectorId: string }>;
+
+/** Queue本文を信頼せず、jobとBrain Itemの現在状態から操作を決める。 */
+export async function getBrainVectorSyncTarget(
+  db: AccountDataDatabase,
+  accountId: string,
+  jobId: string,
+  brainItemId: string,
+  itemRevision: number,
+): Promise<BrainVectorSyncTarget | undefined> {
+  const job = await db
+    .select({ id: brainVectorSyncJobs.id })
+    .from(brainVectorSyncJobs)
+    .where(
+      and(
+        eq(brainVectorSyncJobs.id, jobId),
+        eq(brainVectorSyncJobs.brainItemId, brainItemId),
+        eq(brainVectorSyncJobs.itemRevision, itemRevision),
+        inArray(brainVectorSyncJobs.status, ["submitted", "failed"]),
+        eq(brainVectorSyncJobs.isDeleted, false),
+      ),
+    )
+    .get();
+  if (!job) return undefined;
+  const [item, entry, newestJob] = await Promise.all([
+    db
+      .select({
+        statement: brainItems.statement,
+        category: brainItems.category,
+        derivation: brainItems.derivation,
+        status: brainItems.status,
+        isDeleted: brainItems.isDeleted,
+        updatedAt: brainItems.updatedAt,
+      })
+      .from(brainItems)
+      .where(and(eq(brainItems.id, brainItemId), eq(brainItems.accountId, accountId)))
+      .get(),
+    db
+      .select({ vectorId: brainVectorEntries.id })
+      .from(brainVectorEntries)
+      .where(
+        and(
+          eq(brainVectorEntries.brainItemId, brainItemId),
+          eq(brainVectorEntries.isDeleted, false),
+        ),
+      )
+      .get(),
+    db
+      .select({ itemRevision: brainVectorSyncJobs.itemRevision })
+      .from(brainVectorSyncJobs)
+      .where(
+        and(
+          eq(brainVectorSyncJobs.brainItemId, brainItemId),
+          eq(brainVectorSyncJobs.isDeleted, false),
+        ),
+      )
+      .orderBy(desc(brainVectorSyncJobs.itemRevision))
+      .limit(1)
+      .get(),
+  ]);
+  if (!item || item.isDeleted || item.status !== "active") {
+    return { action: "delete", ...(entry ? { vectorId: entry.vectorId } : {}) };
+  }
+  return {
+    action: "upsert",
+    statement: item.statement,
+    category: item.category,
+    derivation: item.derivation,
+    itemRevision: Math.max(item.updatedAt.getTime(), newestJob?.itemRevision ?? itemRevision),
+    ...(entry ? { previousVectorId: entry.vectorId } : {}),
+  };
+}
+
+export async function completeBrainVectorSyncJob(
+  db: AccountDataDatabase,
+  accountId: string,
+  jobId: string,
+  applied: AppliedBrainVectorSync,
+  mutationId: string,
+  at = new Date(),
+): Promise<boolean> {
+  const job = await db
+    .select({
+      id: brainVectorSyncJobs.id,
+      brainItemId: brainVectorSyncJobs.brainItemId,
+      itemRevision: brainVectorSyncJobs.itemRevision,
+    })
+    .from(brainVectorSyncJobs)
+    .where(
+      and(
+        eq(brainVectorSyncJobs.id, jobId),
+        inArray(brainVectorSyncJobs.status, ["submitted", "failed"]),
+        eq(brainVectorSyncJobs.isDeleted, false),
+      ),
+    )
+    .get();
+  if (!job) return false;
+
+  const [item, newestJob] = await Promise.all([
+    db
+      .select({
+        status: brainItems.status,
+        isDeleted: brainItems.isDeleted,
+        updatedAt: brainItems.updatedAt,
+      })
+      .from(brainItems)
+      .where(and(eq(brainItems.id, job.brainItemId), eq(brainItems.accountId, accountId)))
+      .get(),
+    db
+      .select({ itemRevision: brainVectorSyncJobs.itemRevision })
+      .from(brainVectorSyncJobs)
+      .where(
+        and(
+          eq(brainVectorSyncJobs.brainItemId, job.brainItemId),
+          eq(brainVectorSyncJobs.isDeleted, false),
+        ),
+      )
+      .orderBy(desc(brainVectorSyncJobs.itemRevision))
+      .limit(1)
+      .get(),
+  ]);
+  const isActive = Boolean(item && !item.isDeleted && item.status === "active");
+  const desiredAction = isActive ? "upsert" : "delete";
+  const desiredRevision = Math.max(
+    item?.updatedAt.getTime() ?? 0,
+    newestJob?.itemRevision ?? job.itemRevision,
+  );
+  const needsCorrection =
+    applied.action !== desiredAction ||
+    (applied.action === "upsert" && isActive && applied.itemRevision !== desiredRevision);
+  const lifecycle = { createdAt: at, updatedAt: at };
+  const completeStatement = db
+    .update(brainVectorSyncJobs)
+    .set({ status: "applied", mutationId, failureCode: null, updatedAt: at })
+    .where(
+      and(
+        eq(brainVectorSyncJobs.id, jobId),
+        inArray(brainVectorSyncJobs.status, ["submitted", "failed"]),
+        eq(brainVectorSyncJobs.isDeleted, false),
+      ),
+    );
+  const statements: D1BatchStatement[] = [];
+  if (applied.action === "upsert") {
+    statements.push(
+      db
+        .insert(brainVectorEntries)
+        .values({
+          id: applied.vectorId,
+          brainItemId: job.brainItemId,
+          itemRevision: applied.itemRevision,
+          ...lifecycle,
+        })
+        .onConflictDoUpdate({
+          target: brainVectorEntries.brainItemId,
+          set: {
+            id: applied.vectorId,
+            itemRevision: applied.itemRevision,
+            isDeleted: false,
+            deletedAt: null,
+            updatedAt: at,
+          },
+        }),
+    );
+  } else {
+    statements.push(
+      db
+        .delete(brainVectorEntries)
+        .where(
+          and(
+            eq(brainVectorEntries.id, applied.vectorId),
+            eq(brainVectorEntries.brainItemId, job.brainItemId),
+          ),
+        ),
+    );
+  }
+  if (needsCorrection) {
+    statements.push(
+      db
+        .insert(brainVectorSyncJobs)
+        .values({
+          id: `${job.brainItemId}:${desiredRevision}:${desiredAction}`,
+          brainItemId: job.brainItemId,
+          itemRevision: desiredRevision,
+          operation: desiredAction,
+          status: "pending",
+          nextAttemptAt: at,
+          ...lifecycle,
+        })
+        .onConflictDoUpdate({
+          target: [
+            brainVectorSyncJobs.brainItemId,
+            brainVectorSyncJobs.itemRevision,
+            brainVectorSyncJobs.operation,
+          ],
+          set: {
+            status: "pending",
+            mutationId: null,
+            failureCode: null,
+            nextAttemptAt: at,
+            updatedAt: at,
+          },
+        }),
+    );
+  }
+  await db.batch([completeStatement, ...statements]);
+  return true;
+}
+
+export async function failBrainVectorSyncJob(
+  db: AccountDataDatabase,
+  jobId: string,
+  failureCode: string,
+  at = new Date(),
+): Promise<boolean> {
+  const rows = await db
+    .update(brainVectorSyncJobs)
+    .set({
+      status: "failed",
+      failureCode,
+      nextAttemptAt: new Date(at.getTime() + VECTOR_SYNC_FAILURE_RETRY_MS),
+      updatedAt: at,
+    })
+    .where(
+      and(
+        eq(brainVectorSyncJobs.id, jobId),
+        eq(brainVectorSyncJobs.status, "submitted"),
+        eq(brainVectorSyncJobs.isDeleted, false),
+      ),
+    )
+    .returning({ id: brainVectorSyncJobs.id })
+    .all();
+  return rows.length > 0;
 }
 
 /** 認証済みAccountの所有物としてBrain Itemを取得する。 */
@@ -183,7 +518,34 @@ export async function findBrainItemForAccount(
     .get();
 }
 
-/** 開発用の確認画面へ、本人のactiveなBrain Itemと根拠関係だけを新しい順で返す。 */
+export type ActiveBrainVectorEntry = Readonly<{
+  vectorId: string;
+  itemRevision: number;
+}>;
+
+/** 開発用の実体確認に必要なvector IDをactive Itemに限って返す。 */
+export async function findActiveBrainVectorEntry(
+  db: AccountDataDatabase,
+  accountId: string,
+  brainItemId: string,
+): Promise<ActiveBrainVectorEntry | undefined> {
+  return db
+    .select({ vectorId: brainVectorEntries.id, itemRevision: brainVectorEntries.itemRevision })
+    .from(brainVectorEntries)
+    .innerJoin(brainItems, eq(brainItems.id, brainVectorEntries.brainItemId))
+    .where(
+      and(
+        eq(brainVectorEntries.brainItemId, brainItemId),
+        eq(brainVectorEntries.isDeleted, false),
+        eq(brainItems.accountId, accountId),
+        eq(brainItems.status, "active"),
+        eq(brainItems.isDeleted, false),
+      ),
+    )
+    .get();
+}
+
+/** 開発用の確認画面へ、本人のactiveなBrain Item、根拠、Vector同期状態を返す。 */
 export async function listActiveBrainItems(
   db: AccountDataDatabase,
   accountId: string,
@@ -210,10 +572,10 @@ export async function listActiveBrainItems(
   const truncated = rows.length > DEVELOPMENT_BRAIN_ITEM_LIMIT;
   const items = rows.slice(0, DEVELOPMENT_BRAIN_ITEM_LIMIT);
   const itemIds = items.map(({ id }) => id);
-  const evidenceRows =
+  const [evidenceRows, vectorJobs, vectorEntries] = await Promise.all([
     itemIds.length === 0
       ? []
-      : await db
+      : db
           .select({
             brainItemId: brainItemEvidenceEdges.brainItemId,
             sourceRecordId: brainItemEvidenceEdges.sourceRecordId,
@@ -228,16 +590,78 @@ export async function listActiveBrainItems(
               eq(brainItemEvidenceEdges.isDeleted, false),
             ),
           )
-          .orderBy(brainItemEvidenceEdges.generatedAt, brainItemEvidenceEdges.id);
+          .orderBy(brainItemEvidenceEdges.generatedAt, brainItemEvidenceEdges.id),
+    itemIds.length === 0
+      ? []
+      : db
+          .select({
+            brainItemId: brainVectorSyncJobs.brainItemId,
+            status: brainVectorSyncJobs.status,
+            operation: brainVectorSyncJobs.operation,
+            attemptCount: brainVectorSyncJobs.attemptCount,
+            updatedAt: brainVectorSyncJobs.updatedAt,
+            nextAttemptAt: brainVectorSyncJobs.nextAttemptAt,
+            failureCode: brainVectorSyncJobs.failureCode,
+          })
+          .from(brainVectorSyncJobs)
+          .where(
+            and(
+              inArray(brainVectorSyncJobs.brainItemId, itemIds),
+              eq(brainVectorSyncJobs.isDeleted, false),
+            ),
+          )
+          .orderBy(
+            desc(brainVectorSyncJobs.itemRevision),
+            desc(brainVectorSyncJobs.updatedAt),
+            desc(brainVectorSyncJobs.id),
+          ),
+    itemIds.length === 0
+      ? []
+      : db
+          .select({
+            brainItemId: brainVectorEntries.brainItemId,
+            itemRevision: brainVectorEntries.itemRevision,
+          })
+          .from(brainVectorEntries)
+          .where(
+            and(
+              inArray(brainVectorEntries.brainItemId, itemIds),
+              eq(brainVectorEntries.isDeleted, false),
+            ),
+          ),
+  ]);
+
+  const latestVectorJobByItem = new Map<string, (typeof vectorJobs)[number]>();
+  for (const job of vectorJobs) {
+    if (!latestVectorJobByItem.has(job.brainItemId)) {
+      latestVectorJobByItem.set(job.brainItemId, job);
+    }
+  }
+  const vectorEntryByItem = new Map(
+    vectorEntries.map((entry) => [entry.brainItemId, entry] as const),
+  );
 
   return {
-    items: items.map((item) => ({
-      ...item,
-      status: "active" as const,
-      evidence: evidenceRows
-        .filter(({ brainItemId }) => brainItemId === item.id)
-        .map(({ brainItemId: _, ...evidence }) => evidence),
-    })),
+    items: items.map((item) => {
+      const job = latestVectorJobByItem.get(item.id);
+      const entry = vectorEntryByItem.get(item.id);
+      return {
+        ...item,
+        status: "active" as const,
+        vectorSync: {
+          status: job?.status ?? ("not-scheduled" as const),
+          ...(job ? { operation: job.operation, updatedAt: job.updatedAt } : {}),
+          attemptCount: job?.attemptCount ?? 0,
+          ...(job?.status !== "applied" && job ? { nextAttemptAt: job.nextAttemptAt } : {}),
+          ...(job?.failureCode ? { failureCode: job.failureCode } : {}),
+          hasEntry: Boolean(entry),
+          ...(entry ? { entryRevision: entry.itemRevision } : {}),
+        },
+        evidence: evidenceRows
+          .filter(({ brainItemId }) => brainItemId === item.id)
+          .map(({ brainItemId: _, ...evidence }) => evidence),
+      };
+    }),
     truncated,
   };
 }

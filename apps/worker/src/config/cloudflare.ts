@@ -1,6 +1,7 @@
 import { D1 } from "@me-builder/lib";
 import type { AccountDataNamespace } from "@me-builder/lib";
 import type {
+  BrainVectorSyncQueueMessage,
   ChatTurnQueueMessage,
   DiaryBrainCheckpointQueueMessage,
   Queue,
@@ -16,7 +17,9 @@ export type CloudflareBindings = {
   queue: {
     chatTurn: Queue<ChatTurnQueueMessage> | undefined;
     brainCheckpoint: Queue<DiaryBrainCheckpointQueueMessage> | undefined;
+    brainVector?: Queue<BrainVectorSyncQueueMessage> | undefined;
   };
+  vector?: { brain: Env["BRAIN_VECTOR_INDEX"] };
 };
 
 /** Workerへ注入されたCloudflare bindingを、アプリ内で使う名前へ集約する。 */
@@ -30,6 +33,8 @@ export function getCloudflareBindings(env: Env): CloudflareBindings {
     queue: {
       chatTurn: env.CHAT_TURN_QUEUE,
       brainCheckpoint: env.BRAIN_CHECKPOINT_QUEUE,
+      brainVector: env.BRAIN_VECTOR_QUEUE,
     },
+    vector: { brain: env.BRAIN_VECTOR_INDEX },
   };
 }

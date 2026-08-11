@@ -22,4 +22,5 @@ export namespace DO {
 
 export { accountSchema } from "./account/database";
 export * from "./account/rpc";
+export type { ActiveBrainVectorEntry, AppliedBrainVectorSync } from "./account/action/brain";
 export type { ConversationContextMessage } from "./account/action/diary";

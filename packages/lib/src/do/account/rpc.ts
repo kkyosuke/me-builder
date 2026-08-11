@@ -34,6 +34,22 @@ type DomainAction<TAction extends (...args: never[]) => unknown> = RpcAction<
 
 export type AccountDataActions = {
   "brain.listActive": RpcAction<[], typeof brain.listActiveBrainItems>;
+  "brain.findActiveVectorEntry": RpcAction<
+    [brainItemId: string],
+    typeof brain.findActiveBrainVectorEntry
+  >;
+  "brain.getVectorSyncTarget": RpcAction<
+    [jobId: string, brainItemId: string, itemRevision: number],
+    typeof brain.getBrainVectorSyncTarget
+  >;
+  "brain.completeVectorSyncJob": RpcAction<
+    [jobId: string, applied: brain.AppliedBrainVectorSync, mutationId: string, at?: Date],
+    typeof brain.completeBrainVectorSyncJob
+  >;
+  "brain.failVectorSyncJob": RpcAction<
+    [jobId: string, failureCode: string, at?: Date],
+    typeof brain.failBrainVectorSyncJob
+  >;
   "compatibility.addOutgoingReference": (
     input: Readonly<{ relationshipId: string; createdAt: Date }>,
   ) => Promise<CompatibilityReference>;

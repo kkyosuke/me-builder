@@ -1,4 +1,5 @@
 import type {
+  BrainVectorSyncQueueMessage,
   ChatTurnQueueMessage,
   DiaryBrainCheckpointQueueMessage,
   MessageBatch,
@@ -16,6 +17,7 @@ export async function queueHandler(
     | WebhookQueueMessage
     | ChatTurnQueueMessage
     | DiaryBrainCheckpointQueueMessage
+    | BrainVectorSyncQueueMessage
     | ProfileSummaryGenerationQueueMessage
   >,
   env: Env,

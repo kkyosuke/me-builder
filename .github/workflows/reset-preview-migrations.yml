@@ -29,6 +29,7 @@ jobs:
       LINE_CHANNEL_SECRET: ${{ secrets.LINE_CHANNEL_SECRET }}
       GOOGLE_VERTEX_AI_API_KEY: ${{ secrets.GOOGLE_VERTEX_AI_API_KEY }}
       CHAT_DELIVERY_SECRET: ${{ secrets.CHAT_DELIVERY_SECRET }}
+      BRAIN_VECTOR_HMAC_SECRET: ${{ secrets.BRAIN_VECTOR_HMAC_SECRET }}
       ADMIN_LINE_USER_IDS: ${{ secrets.ADMIN_LINE_USER_IDS }}
       LIFF_ID: ${{ vars.LIFF_ID }}
 
@@ -83,6 +84,10 @@ jobs:
             echo "::error::CHAT_DELIVERY_SECRET が GitHub Environment dev に設定されていません。"
             exit 1
           fi
+          if [ -z "${BRAIN_VECTOR_HMAC_SECRET}" ]; then
+            echo "::error::BRAIN_VECTOR_HMAC_SECRET が GitHub Environment dev に設定されていません。"
+            exit 1
+          fi
 
       - name: Install Pulumi CLI
         run: |
@@ -103,6 +108,9 @@ jobs:
           task db:migrate:preview
           task db:seed:preview
 
+      - name: Ensure Brain Vectorize Index
+        run: task vectorize:setup:preview
+
       - name: Redeploy Preview Worker, API, and MCP
         run: |
           umask 077
@@ -115,7 +123,7 @@ jobs:
             const sharedSecrets = [["LINE_CHANNEL_ACCESS_TOKEN", process.env.LINE_CHANNEL_ACCESS_TOKEN], ["LIFF_ID", process.env.LIFF_ID], ["ADMIN_LINE_USER_IDS", process.env.ADMIN_LINE_USER_IDS]];
             const optionalSecrets = Object.fromEntries(sharedSecrets.filter(([, value]) => value));
             const workerOnlySecrets = Object.fromEntries(
-              [["GOOGLE_VERTEX_AI_API_KEY", process.env.GOOGLE_VERTEX_AI_API_KEY], ["CHAT_DELIVERY_SECRET", process.env.CHAT_DELIVERY_SECRET]].filter(([, value]) => value),
+              [["GOOGLE_VERTEX_AI_API_KEY", process.env.GOOGLE_VERTEX_AI_API_KEY], ["CHAT_DELIVERY_SECRET", process.env.CHAT_DELIVERY_SECRET], ["BRAIN_VECTOR_HMAC_SECRET", process.env.BRAIN_VECTOR_HMAC_SECRET]].filter(([, value]) => value),
             );
             await Bun.write(process.env.API_SECRETS_FILE, JSON.stringify({
               LINE_CHANNEL_SECRET: process.env.LINE_CHANNEL_SECRET,

@@ -22,6 +22,7 @@ jobs:
       LINE_CHANNEL_SECRET: ${{ secrets.LINE_CHANNEL_SECRET }}
       GOOGLE_VERTEX_AI_API_KEY: ${{ secrets.GOOGLE_VERTEX_AI_API_KEY }}
       CHAT_DELIVERY_SECRET: ${{ secrets.CHAT_DELIVERY_SECRET }}
+      BRAIN_VECTOR_HMAC_SECRET: ${{ secrets.BRAIN_VECTOR_HMAC_SECRET }}
       CLOUDFLARE_ACCESS_ALLOWED_EMAILS: ${{ vars.CLOUDFLARE_ACCESS_ALLOWED_EMAILS }}
       ADMIN_LINE_USER_IDS: ${{ secrets.ADMIN_LINE_USER_IDS }}
       # LIFF Server API は LINE Login チャネルのチャネルアクセストークンを要求する。
@@ -72,6 +73,10 @@ jobs:
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
         run: task queues:setup:production
 
+      - name: Ensure Brain Vectorize Index (Production)
+        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
+        run: task vectorize:setup:production
+
       - name: Apply D1 Migrations (Production)
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
         run: task db:migrate:production
@@ -93,6 +98,10 @@ jobs:
             echo "::error::CHAT_DELIVERY_SECRET が GitHub Secrets に設定されていません。日記チャットの重複配送防止に必須です。"
             exit 1
           fi
+          if [ -z "${BRAIN_VECTOR_HMAC_SECRET}" ]; then
+            echo "::error::BRAIN_VECTOR_HMAC_SECRET が GitHub Secrets に設定されていません。Brain Vectorの仮名化に必須です。"
+            exit 1
+          fi
 
           umask 077
           secrets_dir="$(mktemp -d "${RUNNER_TEMP}/worker-secrets.XXXXXX")"
@@ -107,7 +116,7 @@ jobs:
                 .filter(([, value]) => value),
             );
             const workerOnlySecrets = Object.fromEntries(
-              [["GOOGLE_VERTEX_AI_API_KEY", process.env.GOOGLE_VERTEX_AI_API_KEY], ["CHAT_DELIVERY_SECRET", process.env.CHAT_DELIVERY_SECRET]]
+              [["GOOGLE_VERTEX_AI_API_KEY", process.env.GOOGLE_VERTEX_AI_API_KEY], ["CHAT_DELIVERY_SECRET", process.env.CHAT_DELIVERY_SECRET], ["BRAIN_VECTOR_HMAC_SECRET", process.env.BRAIN_VECTOR_HMAC_SECRET]]
                 .filter(([, value]) => value),
             );
             await Bun.write(process.env.API_SECRETS_FILE, JSON.stringify({

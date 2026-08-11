@@ -248,6 +248,13 @@ describe("App", () => {
           derivation: "ai",
           status: "active",
           createdAt: "2026-08-09T00:00:00.000Z",
+          vectorSync: {
+            status: "applied",
+            operation: "upsert",
+            attemptCount: 1,
+            hasEntry: true,
+            entryRevision: 1,
+          },
           evidence: [
             {
               sourceRecordId: "source-1",

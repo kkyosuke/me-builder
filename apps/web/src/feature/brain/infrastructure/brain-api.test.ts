@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchDevelopmentBrainItems } from "./brain-api";
+import { fetchDevelopmentBrainItems, fetchDevelopmentBrainVector } from "./brain-api";
 
 describe("fetchDevelopmentBrainItems", () => {
   afterEach(() => vi.restoreAllMocks());
@@ -16,6 +16,14 @@ describe("fetchDevelopmentBrainItems", () => {
               derivation: "ai",
               status: "active",
               createdAt: "2026-08-09T00:00:00.000Z",
+              vectorSync: {
+                status: "applied",
+                operation: "upsert",
+                attemptCount: 1,
+                updatedAt: "2026-08-09T00:01:00.000Z",
+                hasEntry: true,
+                entryRevision: 1,
+              },
               evidence: [],
             },
           ],
@@ -37,6 +45,29 @@ describe("fetchDevelopmentBrainItems", () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status: 404 }));
     await expect(fetchDevelopmentBrainItems(undefined, "id-token")).rejects.toThrow(
       "この環境では利用できません",
+    );
+  });
+
+  it("本人のBrain Itemに対応するVectorize実体を確認する", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          state: "present",
+          entryRevision: 12,
+          dimensions: 768,
+          metadata: { category: "memory", derivation: "ai", embeddingVersion: 1 },
+          checkedAt: "2026-08-10T00:00:00.000Z",
+        }),
+        { status: 200 },
+      ),
+    );
+
+    await expect(
+      fetchDevelopmentBrainVector("https://api.example.com", "id-token", "brain/item"),
+    ).resolves.toMatchObject({ state: "present", dimensions: 768 });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.example.com/api/dev/brain-items/brain%2Fitem/vector",
+      { headers: { Authorization: "Bearer id-token" } },
     );
   });
 });

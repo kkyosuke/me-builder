@@ -6,6 +6,7 @@ import {
   brainItemRevisions,
   brainItemTopicLabels,
   brainItems,
+  brainVectorSyncJobs,
 } from "../schema/brain";
 import {
   diagnoses,
@@ -196,6 +197,7 @@ async function deleteAccountDiagnosisDataOnce(
   db: AccountDataDatabase,
   accountId: string,
 ): Promise<DeletedAccountDiagnosisData> {
+  const deletedAt = new Date();
   const projectionBrainItemIds = await findDiagnosisProjectionBrainItemIds(db, accountId);
   const projectionBrainItemIdChunks = chunks(projectionBrainItemIds, RESET_DELETE_CHUNK_SIZE);
   const ownedResponseIds = db
@@ -242,6 +244,20 @@ async function deleteAccountDiagnosisDataOnce(
     );
   }
   for (const brainItemIdChunk of projectionBrainItemIdChunks) {
+    for (const brainItemId of brainItemIdChunk) {
+      statements.push(
+        db.insert(brainVectorSyncJobs).values({
+          id: `${brainItemId}:${deletedAt.getTime()}:delete`,
+          brainItemId,
+          itemRevision: deletedAt.getTime(),
+          operation: "delete",
+          status: "pending",
+          nextAttemptAt: deletedAt,
+          createdAt: deletedAt,
+          updatedAt: deletedAt,
+        }),
+      );
+    }
     statements.push(
       db
         .delete(brainItems)

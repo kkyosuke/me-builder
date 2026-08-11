@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import Database from "better-sqlite3";
 import { eq } from "drizzle-orm";
@@ -38,6 +39,68 @@ function insertItemFixture() {
 }
 
 describe("Brain AccountData schema", () => {
+  it("migration時に既存のactive Brain ItemをVector同期対象へbackfillする", () => {
+    const sqlite = new Database(":memory:");
+    const migrationDirectory = path.resolve(__dirname, "../../../../drizzle-do-account");
+    sqlite.exec(
+      readFileSync(path.join(migrationDirectory, "0000_baseline.sql"), "utf8").replaceAll(
+        "--> statement-breakpoint",
+        "",
+      ),
+    );
+    sqlite
+      .prepare("INSERT INTO account_data_identity (singleton, account_id) VALUES (1, ?)")
+      .run("account-1");
+    sqlite
+      .prepare(
+        `INSERT INTO brain_items (
+          id, created_at, updated_at, is_deleted, account_id, category, statement,
+          attributes_json, derivation, status, stability, sensitivity,
+          externally_shareable, confidence_json
+        ) VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`,
+      )
+      .run(
+        "brain-existing",
+        1_786_363_200,
+        1_786_363_200,
+        "account-1",
+        "memory",
+        "既存の記憶",
+        "{}",
+        "ai",
+        "active",
+        "stable",
+        "normal",
+        '{"state":"uncomputed"}',
+      );
+
+    sqlite.exec(
+      readFileSync(path.join(migrationDirectory, "0001_broken_tyger_tiger.sql"), "utf8").replaceAll(
+        "--> statement-breakpoint",
+        "",
+      ),
+    );
+    sqlite.exec(
+      readFileSync(
+        path.join(migrationDirectory, "0002_wealthy_titanium_man.sql"),
+        "utf8",
+      ).replaceAll("--> statement-breakpoint", ""),
+    );
+
+    expect(
+      sqlite
+        .prepare(
+          "SELECT brain_item_id, item_revision, operation, status FROM brain_vector_sync_jobs",
+        )
+        .get(),
+    ).toEqual({
+      brain_item_id: "brain-existing",
+      item_revision: 1_786_363_200_000,
+      operation: "upsert",
+      status: "pending",
+    });
+  });
+
   it("Evidenceと複数のAccess・Topic Labelを保存する", () => {
     const db = insertItemFixture();
     db.insert(schema.brainItemEvidenceEdges)

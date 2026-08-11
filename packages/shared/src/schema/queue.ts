@@ -38,6 +38,15 @@ export interface DiaryBrainCheckpointQueueMessage {
   checkpointId: string;
 }
 
+/** 本文を含めず、AccountDataのVector同期outboxだけを参照する。 */
+export interface BrainVectorSyncQueueMessage {
+  type: "brain-vector-sync";
+  accountId: string;
+  jobId: string;
+  brainItemId: string;
+  itemRevision: number;
+}
+
 /** 本文を含めず、AccountDataに保存済みの生成要求だけを参照する。 */
 export interface ProfileSummaryGenerationQueueMessage {
   type: "profile-summary-generation";

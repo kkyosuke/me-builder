@@ -98,7 +98,7 @@ describe("AccountData Workers runtime E2E", () => {
     });
   });
 
-  it("既存0000 baselineのAccountデータを保ったまま0001を適用できる", async () => {
+  it("既存0000 baselineのAccountデータを保ったまま0001と0002を適用できる", async () => {
     const accountId = crypto.randomUUID();
     const stub = env.ACCOUNT_DATA.getByName(accountId);
 
@@ -109,7 +109,11 @@ describe("AccountData Workers runtime E2E", () => {
       );
       state.storage.sql.exec("DROP TABLE profile_summary_versions");
       state.storage.sql.exec("DROP TABLE profile_summary_generations");
-      state.storage.sql.exec("DELETE FROM __drizzle_migrations WHERE created_at = 1786407202292");
+      state.storage.sql.exec("DROP TABLE brain_vector_entries");
+      state.storage.sql.exec("DROP TABLE brain_vector_sync_jobs");
+      state.storage.sql.exec(
+        "DELETE FROM __drizzle_migrations WHERE created_at IN (1786407202292, 1786413718549)",
+      );
 
       const repository = Reflect.get(instance, "repository") as { initialize(): Promise<void> };
       await expect(repository.initialize()).resolves.toBeUndefined();
@@ -127,6 +131,13 @@ describe("AccountData Workers runtime E2E", () => {
           )
           .one().statement,
       ).toBe("散歩した");
+      expect(
+        state.storage.sql
+          .exec<{ brain_item_id: string; operation: string; status: string }>(
+            "SELECT brain_item_id, operation, status FROM brain_vector_sync_jobs WHERE brain_item_id = 'migration-brain'",
+          )
+          .one(),
+      ).toEqual({ brain_item_id: "migration-brain", operation: "upsert", status: "pending" });
     });
   });
 

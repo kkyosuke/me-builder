@@ -6,6 +6,10 @@ function d1(database: InfrastructureManifest["database"], prefix = "") {
   return `[[${prefix}d1_databases]]\nbinding = "DB"\ndatabase_name = "${database.name}"\ndatabase_id = "${database.id}"`;
 }
 
+function vectorize(environment: string, prefix = "") {
+  return `[[${prefix}vectorize]]\nbinding = "BRAIN_VECTOR_INDEX"\nindex_name = "me-builder-brain-${environment}"`;
+}
+
 function queueConsumer(prefix: string, queue: string, deadLetterQueue: string, retries: number) {
   return `[[${prefix}queues.consumers]]\nqueue = "${queue}"\ndead_letter_queue = "${deadLetterQueue}"\nmax_retries = ${retries}`;
 }
@@ -37,9 +41,13 @@ function workerEnvironment(manifest: InfrastructureManifest) {
     "",
     queueConsumer(prefix, q.profileSummary.name, q.profileSummaryDeadLetter.name, 5),
     "",
+    queueConsumer(prefix, q.brainVector.name, q.brainVectorDeadLetter.name, 5),
+    "",
     queueProducer(prefix, q.chatTurn.name, "CHAT_TURN_QUEUE"),
     "",
     queueProducer(prefix, q.brainCheckpoint.name, "BRAIN_CHECKPOINT_QUEUE"),
+    "",
+    queueProducer(prefix, q.brainVector.name, "BRAIN_VECTOR_QUEUE"),
     "",
     durableObject(prefix, "CONVERSATION_COORDINATOR"),
     "",
@@ -48,6 +56,8 @@ function workerEnvironment(manifest: InfrastructureManifest) {
     durableObject(prefix, "COMPATIBILITY_DATA"),
     "",
     d1(manifest.database, prefix),
+    "",
+    vectorize(env, prefix),
     "",
     `[env.${env}.vars]`,
     `ENVIRONMENT = "${env}"`,
@@ -58,7 +68,7 @@ function apiEnvironment(manifest: InfrastructureManifest) {
   const env = manifest.environment;
   const host = env === "preview" ? "api.stg.kagami.kyosuke.dev" : "api.kagami.kyosuke.dev";
   const prefix = `env.${env}.`;
-  return [
+  const config = [
     `[env.${env}]`,
     `name = "me-builder-api-${env}"`,
     "routes = [",
@@ -70,6 +80,9 @@ function apiEnvironment(manifest: InfrastructureManifest) {
     queueProducer(prefix, manifest.queues.profileSummary.name, "PROFILE_SUMMARY_QUEUE"),
     "",
     d1(manifest.database, prefix),
+  ];
+  if (env !== "production") config.push("", vectorize(env, prefix));
+  config.push(
     "",
     durableObject(prefix, "ACCOUNT_DATA", `me-builder-worker-${env}`),
     "",
@@ -77,7 +90,8 @@ function apiEnvironment(manifest: InfrastructureManifest) {
     "",
     `[env.${env}.vars]`,
     `ENVIRONMENT = "${env}"`,
-  ].join("\n");
+  );
+  return config.join("\n");
 }
 
 function mcpEnvironment(manifest: InfrastructureManifest) {
@@ -100,6 +114,8 @@ export function renderWranglerConfigs(
     brainCheckpointDeadLetter: { id: "local", name: "me-builder-brain-checkpoint-dlq-local" },
     profileSummary: { id: "local", name: "me-builder-profile-summary-queue-local" },
     profileSummaryDeadLetter: { id: "local", name: "me-builder-profile-summary-dlq-local" },
+    brainVector: { id: "local", name: "me-builder-brain-vector-queue-local" },
+    brainVectorDeadLetter: { id: "local", name: "me-builder-brain-vector-dlq-local" },
   };
   const localManifest = {
     ...preview,
@@ -138,9 +154,13 @@ export function renderWranglerConfigs(
       5,
     ),
     "",
+    queueConsumer("", localQueues.brainVector.name, localQueues.brainVectorDeadLetter.name, 5),
+    "",
     queueProducer("", localQueues.chatTurn.name, "CHAT_TURN_QUEUE"),
     "",
     queueProducer("", localQueues.brainCheckpoint.name, "BRAIN_CHECKPOINT_QUEUE"),
+    "",
+    queueProducer("", localQueues.brainVector.name, "BRAIN_VECTOR_QUEUE"),
     "",
     durableObject("", "CONVERSATION_COORDINATOR"),
     "",
@@ -167,6 +187,8 @@ export function renderWranglerConfigs(
     "",
     d1(localDatabase),
     "",
+    vectorize("local"),
+    "",
     "[vars]",
     'ENVIRONMENT = "local"',
     "",
@@ -187,6 +209,8 @@ export function renderWranglerConfigs(
     queueProducer("env.local.", localQueues.profileSummary.name, "PROFILE_SUMMARY_QUEUE"),
     "",
     d1(localDatabase, "env.local."),
+    "",
+    vectorize("local", "env.local."),
     "",
     durableObject("env.local.", "ACCOUNT_DATA", "me-builder-worker-local"),
     "",
@@ -213,6 +237,8 @@ export function renderWranglerConfigs(
     queueProducer("", localQueues.profileSummary.name, "PROFILE_SUMMARY_QUEUE"),
     "",
     d1(localDatabase),
+    "",
+    vectorize("local"),
     "",
     durableObject("", "ACCOUNT_DATA", "me-builder-worker-local"),
     "",

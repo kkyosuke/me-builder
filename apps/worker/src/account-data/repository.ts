@@ -431,7 +431,7 @@ export class AccountDataRepository {
       .get();
   }
 
-  /** Active diary sessionと未処理projectionのうち、最も早いmaintenance時刻を返す。 */
+  /** 未処理のAccountData内部処理のうち、最も早いmaintenance時刻を返す。 */
   nextMaintenanceAt(): number | null {
     const session = this.database
       .select({
@@ -465,6 +465,18 @@ export class AccountDataRepository {
       .orderBy(asc(DO.account.schema.diaryBrainCheckpoints.nextAttemptAt))
       .limit(1)
       .get();
+    const brainVectorSync = this.database
+      .select({ nextAttemptAt: DO.account.schema.brainVectorSyncJobs.nextAttemptAt })
+      .from(DO.account.schema.brainVectorSyncJobs)
+      .where(
+        and(
+          inArray(DO.account.schema.brainVectorSyncJobs.status, ["pending", "submitted", "failed"]),
+          eq(DO.account.schema.brainVectorSyncJobs.isDeleted, false),
+        ),
+      )
+      .orderBy(asc(DO.account.schema.brainVectorSyncJobs.nextAttemptAt))
+      .limit(1)
+      .get();
     const candidates = [
       session
         ? Math.min(
@@ -474,6 +486,7 @@ export class AccountDataRepository {
         : null,
       projection?.nextAttemptAt.getTime() ?? null,
       diaryBrainCheckpoint?.nextAttemptAt.getTime() ?? null,
+      brainVectorSync?.nextAttemptAt.getTime() ?? null,
     ].filter((value): value is number => value !== null);
     return candidates.length > 0 ? Math.min(...candidates) : null;
   }

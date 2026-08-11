@@ -21,6 +21,8 @@ export function resourceNames(environment: Environment) {
       brainCheckpointDeadLetter: `me-builder-brain-checkpoint-dlq-${environment}`,
       profileSummary: `me-builder-profile-summary-queue-${environment}`,
       profileSummaryDeadLetter: `me-builder-profile-summary-dlq-${environment}`,
+      brainVector: `me-builder-brain-vector-queue-${environment}`,
+      brainVectorDeadLetter: `me-builder-brain-vector-dlq-${environment}`,
     },
   } as const;
 }

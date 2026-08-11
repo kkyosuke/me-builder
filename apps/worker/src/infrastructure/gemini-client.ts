@@ -206,6 +206,24 @@ export async function generateStructuredText(
   }
 }
 
+/** 検索対象文を固定次元のembeddingへ変換する。 */
+export async function embedDocument(
+  client: GoogleGenAI,
+  input: { model: string; contents: string; dimensions: number; signal?: AbortSignal },
+): Promise<number[] | undefined> {
+  const response = await client.models.embedContent({
+    model: input.model,
+    contents: input.contents,
+    config: {
+      taskType: "RETRIEVAL_DOCUMENT",
+      outputDimensionality: input.dimensions,
+      ...(input.signal ? { abortSignal: input.signal } : {}),
+    },
+  });
+  const values = response.embeddings?.[0]?.values;
+  return values?.length === input.dimensions ? values : undefined;
+}
+
 /** 指定した Gemini モデルへテキスト生成を依頼し、応答本文を返します。 */
 export async function generateText(
   client: GoogleGenAI,

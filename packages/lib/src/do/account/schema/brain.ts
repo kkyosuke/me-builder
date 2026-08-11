@@ -29,6 +29,43 @@ export const brainItems = sqliteTable(
   (table) => [index("brain_item_lookup_idx").on(table.accountId, table.status, table.category)],
 );
 
+/** AccountDataを正としてVectorizeへの反映を再試行するoutbox。本文は保持しない。 */
+export const brainVectorSyncJobs = sqliteTable(
+  "brain_vector_sync_jobs",
+  {
+    ...baseSchema,
+    brainItemId: text("brain_item_id").notNull(),
+    itemRevision: integer("item_revision").notNull(),
+    operation: text("operation", { enum: ["upsert", "delete"] }).notNull(),
+    status: text("status", {
+      enum: ["pending", "submitted", "applied", "failed"],
+    }).notNull(),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    nextAttemptAt: integer("next_attempt_at", { mode: "timestamp" }).notNull(),
+    mutationId: text("mutation_id"),
+    failureCode: text("failure_code"),
+  },
+  (table) => [
+    uniqueIndex("brain_vector_sync_job_revision_idx").on(
+      table.brainItemId,
+      table.itemRevision,
+      table.operation,
+    ),
+    index("brain_vector_sync_job_due_idx").on(table.status, table.nextAttemptAt),
+  ],
+);
+
+/** Vectorizeの仮名IDをAccountData上のBrain Itemへ戻す対応表。 */
+export const brainVectorEntries = sqliteTable(
+  "brain_vector_entries",
+  {
+    ...baseSchema,
+    brainItemId: text("brain_item_id").notNull(),
+    itemRevision: integer("item_revision").notNull(),
+  },
+  (table) => [uniqueIndex("brain_vector_entry_item_idx").on(table.brainItemId)],
+);
+
 /**
  * Source RecordがBrain Itemを支える、または反証する関係。
  *

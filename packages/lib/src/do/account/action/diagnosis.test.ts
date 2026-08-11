@@ -650,6 +650,12 @@ describe("deleteAccountDiagnosisData", () => {
     expect(await db.select().from(schema.brainItemTopicLabels)).toMatchObject([
       { id: "diary-topic" },
     ]);
+    const vectorDeletes = await db
+      .select({ brainItemId: schema.brainVectorSyncJobs.brainItemId })
+      .from(schema.brainVectorSyncJobs)
+      .where(eq(schema.brainVectorSyncJobs.operation, "delete"));
+    expect(vectorDeletes).toEqual(expect.arrayContaining([{ brainItemId: revisedBrainItemId }]));
+    expect(vectorDeletes).not.toContainEqual({ brainItemId: "diary-brain-item" });
     expect(await db.select().from(schema.sourceRecords)).toMatchObject([{ id: "diary-source" }]);
   });
 

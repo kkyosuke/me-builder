@@ -119,6 +119,21 @@ export class AccountData extends DurableObject<Env> {
             throw new Error("Diary Brain checkpoint dispatch state could not be recorded");
           }
         }
+        const vectorJobs = await DO.account.action.brain.claimDueBrainVectorSyncJobs(
+          this.repository.client,
+        );
+        if (vectorJobs.length > 0 && !this.env.BRAIN_VECTOR_QUEUE) {
+          throw new Error("BRAIN_VECTOR_QUEUE binding is required for Brain vector sync");
+        }
+        for (const job of vectorJobs) {
+          await this.env.BRAIN_VECTOR_QUEUE?.send({
+            type: "brain-vector-sync",
+            accountId: this.accountId,
+            jobId: job.id,
+            brainItemId: job.brainItemId,
+            itemRevision: job.itemRevision,
+          });
+        }
         await this.scheduleMaintenance();
       } catch (error) {
         logger.error(
