@@ -128,6 +128,7 @@ describe("ProfileSummaryScreen", () => {
   });
 
   it("過去版の存在を控えめに伝え、カード下から最新のわたしを生成できる", () => {
+    vi.useFakeTimers();
     const onSelectVersion = vi.fn();
     const onRegenerate = vi.fn();
     render(
@@ -147,11 +148,13 @@ describe("ProfileSummaryScreen", () => {
     expect(screen.getByText(/AI生成/)).toBeTruthy();
     expect(screen.getByText(/診断が増えました・日記・記録が増えました/)).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "過去のまとめがあります" }));
     const regenerateButton = screen.getByRole("button", { name: "最新のわたしを知る" });
     expect(regenerateButton.className).toContain("w-full");
     expect(regenerateButton.className).not.toContain("absolute");
     fireEvent.click(regenerateButton);
+    fireEvent.click(screen.getByRole("button", { name: "過去のまとめがあります" }));
+    expect(onSelectVersion).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(300));
 
     expect(onSelectVersion).toHaveBeenCalledWith("version-2");
     expect(onRegenerate).toHaveBeenCalledOnce();
@@ -180,6 +183,7 @@ describe("ProfileSummaryScreen", () => {
     });
     firePointer(latestCard, "pointerup", { clientX: 0, clientY: 12, pointerId: 1 });
     expect(onSelectVersion).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(0));
     expect(latestCard.getAttribute("style")).toContain("translate3d(-115%");
     expect(container.querySelector('[data-summary-card-layer="incoming"]')?.textContent).toContain(
       pastSummary.headline,
@@ -217,10 +221,13 @@ describe("ProfileSummaryScreen", () => {
       pointerId: 3,
     });
     firePointer(pastCard, "pointerup", { clientX: 100, clientY: 12, pointerId: 3 });
+    act(() => vi.advanceTimersByTime(0));
     const incomingCard = container.querySelector('[data-summary-card-layer="incoming"]');
     expect(incomingCard?.textContent).toContain("第3版");
     expect(incomingCard?.textContent).toContain(summary.headline);
+    expect(incomingCard?.getAttribute("data-summary-card-entry")).toBe("foreground");
     expect(incomingCard?.className).toContain("inset-x-0");
+    expect(incomingCard?.className).toContain("z-20");
     act(() => vi.advanceTimersByTime(300));
     expect(onSelectVersion).toHaveBeenLastCalledWith("version-3");
     expect(screen.queryByRole("button", { name: "最新のわたしを知る" })).toBeNull();
@@ -294,18 +301,26 @@ describe("ProfileSummaryScreen", () => {
   });
 
   it("過去版では生成操作を隠し、生成中も現在の版を閲覧できると伝える", () => {
+    vi.useFakeTimers();
+    const onSelectVersion = vi.fn();
     const { rerender } = render(
       <ProfileSummaryScreen
         state={{ status: "success", data: { summary, nextAction: "chat" } }}
         versioning={{ ...versioning, selectedVersionId: "version-2" }}
         onRetry={vi.fn()}
-        onSelectVersion={vi.fn()}
+        onSelectVersion={onSelectVersion}
         onRegenerate={vi.fn()}
       />,
     );
 
     expect(screen.getByText("過去のまとめ", { selector: "p" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "今のまとめに戻る" })).toBeTruthy();
+    const latestButton = screen.getByRole("button", { name: "最新のまとめへ" });
+    fireEvent.click(latestButton);
+    const incomingCard = document.querySelector('[data-summary-card-entry="foreground"]');
+    expect(incomingCard?.getAttribute("style")).toContain("translate3d(calc(-105%");
+    expect(onSelectVersion).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(300));
+    expect(onSelectVersion).toHaveBeenCalledWith("version-3");
     expect(screen.queryByRole("button", { name: "最新のわたしを知る" })).toBeNull();
 
     rerender(
