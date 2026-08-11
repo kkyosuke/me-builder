@@ -1326,6 +1326,7 @@
                                 "enum": [
                                   "pending",
                                   "submitted",
+                                  "retry_scheduled",
                                   "applied",
                                   "failed",
                                   "not-scheduled"

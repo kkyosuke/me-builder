@@ -986,7 +986,13 @@ export interface operations {
               lastObservedAt: string;
               vectorSync: {
                 /** @enum {string} */
-                status: "pending" | "submitted" | "applied" | "failed" | "not-scheduled";
+                status:
+                  | "pending"
+                  | "submitted"
+                  | "retry_scheduled"
+                  | "applied"
+                  | "failed"
+                  | "not-scheduled";
                 /** @enum {string} */
                 operation?: "upsert" | "delete";
                 attemptCount: number;
