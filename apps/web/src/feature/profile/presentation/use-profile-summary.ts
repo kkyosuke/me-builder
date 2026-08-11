@@ -22,6 +22,7 @@ export type ProfileSummaryGenerationNotice = Readonly<{
 }>;
 
 function waitForNextPoll(delayMs: number, signal: AbortSignal): Promise<void> {
+  if (signal.aborted) return Promise.resolve();
   return new Promise((resolve) => {
     const onAbort = () => {
       clearTimeout(timer);

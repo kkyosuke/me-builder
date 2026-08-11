@@ -433,7 +433,12 @@ describe("ProfileSummaryScreen", () => {
       />,
     );
 
-    expect(screen.getByRole("alert").textContent).toContain("確認に時間がかかっています");
+    const alert = screen.getByRole("alert");
+    expect(alert.textContent).toContain("確認に時間がかかっています");
+    expect(
+      alert.compareDocumentPosition(screen.getByLabelText("新しい版を作成中")) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "最新の状態を再読み込み" }));
     expect(onRetry).toHaveBeenCalledOnce();
   });

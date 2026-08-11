@@ -770,6 +770,8 @@ export function ProfileSummaryScreen({
         </p>
       </header>
 
+      {generationNotice && <GenerationNotice notice={generationNotice} onReload={onRetry} />}
+
       {state.status === "loading" && <SummarySkeleton />}
       {state.status === "error" && (
         <section className="mt-8 rounded-3xl border border-red-400/30 bg-red-400/10 p-6 text-center">
@@ -817,8 +819,6 @@ export function ProfileSummaryScreen({
           {state.data.summary && <NextAction action={state.data.nextAction} />}
         </>
       )}
-
-      {generationNotice && <GenerationNotice notice={generationNotice} onReload={onRetry} />}
 
       {children}
 
