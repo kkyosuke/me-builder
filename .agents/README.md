@@ -15,8 +15,8 @@
 | [README](../README.md) | プロジェクトの短い入口と文書リンク |
 | [ドキュメントガイド](../docs/README.md) | `docs/` のディレクトリ構造、文書の探し方、全ドキュメントへの入口 |
 | [プロジェクト概要](../docs/product/project-overview.md) | 目的、主要要件、MVP、ロードマップ、Phase 1の入力体験とログイン手段 |
-| [全体画面遷移設計](../docs/product/screen-navigation.md) | LINEとWebをまたぐ入口、主ナビゲーション、右上のプロフィール、診断・相性・傾向・セルフケア・AI相談・管理者画面の接続 |
-| [自分の傾向サマリー体験設計](../docs/product/profile-summary-experience.md) | 複数の診断回答を横断して本人の現在の傾向を表示する画面、要約規則、導線、状態、完了条件 |
+| [全体画面遷移設計](../docs/product/screen-navigation.md) | LINEとWebをまたぐ入口、主ナビゲーション、右上のプロフィール、診断・相性・わたしのまとめ・セルフケア・AI相談・管理者画面の接続 |
+| [わたしのまとめ仕様](../docs/product/profile-summary-experience.md) | 診断と日記からAI生成した版付きの「わたしのまとめ」、診断テーマ、導線、状態、受け入れ条件 |
 | [相性診断・うつし共有体験設計](../docs/product/compatibility-experience.md) | 1対1の招待リンク、LINE共有、双方の同意、相性一覧、「私について」と「2人について」、共有終了の体験 |
 | [プロフィール設定体験設計](../docs/product/profile-settings-experience.md) | 共通ヘッダー右上の入口、プロフィール画面、アバター設定への接続、ライト・ダークテーマの選択と保存 |
 | [アバター設定体験設計](../docs/product/avatar-experience.md) | LINEプロフィール画像の初期表示、端末画像の選択・プレビュー・設定、差し替え・削除の体験と責務境界 |
@@ -52,6 +52,7 @@
 | [プロフィールAPI契約](../docs/development/profile-api.md) | 本人プロフィールとアバター画像の取得・保存・削除API、画像検査、共有D1とPrivate R2の更新境界 |
 | [API契約とクライアント型の生成](../docs/development/api-contract-generation.md) | API ServerのHTTP契約の配置、OpenAPI documentとWeb UI用TypeScript型の生成運用 |
 | [アプリケーション運用ログ方針](../docs/development/operational-logging.md) | 一連の処理を追跡し、エラー原因と最終結果を判断できる運用ログの目的と進め方 |
+| [わたしのまとめ残タスク](../docs/development/profile-summary-remaining-tasks.md) | 「わたしのまとめ」で未完了の実環境検証、完了条件、検証後の追跡先 |
 | [PR作成手順書](../docs/development/pull-request-guidelines.md) | PRタイトルの命名規則、概要の書き方、作成前の準備・検証手順 |
 
 この表は各文書へのナビゲーションです。概念の定義そのものはリンク先だけに記載します。
