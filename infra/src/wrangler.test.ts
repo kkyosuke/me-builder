@@ -6,6 +6,7 @@ function manifest(environment: "preview" | "production", databaseId: string) {
   const suffix = environment;
   return parseManifest({
     environment,
+    baseDomain: environment === "preview" ? "preview.example.com" : "example.com",
     database: { id: databaseId, name: `me-builder-db-${suffix}` },
     avatarBucket: { name: `me-builder-avatar-${suffix}` },
     queues: {
@@ -40,6 +41,11 @@ describe("renderWranglerConfigs", () => {
     expect(configs.api).toContain('bucket_name = "me-builder-avatar-preview"');
     expect(configs.api).toContain('bucket_name = "me-builder-avatar-production"');
     expect(configs.api).toContain('bucket_name = "me-builder-avatar-local"');
+    expect(configs.api).toContain('WEB_ORIGIN = "https://preview.example.com"');
+    expect(configs.api).toContain('WEB_ORIGIN = "https://example.com"');
+    expect(configs.api).toContain('WEB_ORIGIN = "http://localhost:5173"');
+    expect(configs.api).toContain('{ pattern = "api.preview.example.com", custom_domain = true }');
+    expect(configs.mcp).toContain('{ pattern = "mcp.example.com", custom_domain = true }');
     expect(configs.mcp).toContain('database_id = "production-id"');
     expect(configs.lib).toContain("[[env.preview.d1_databases]]");
   });

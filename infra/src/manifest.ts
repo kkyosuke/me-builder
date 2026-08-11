@@ -4,6 +4,7 @@ type QueueKey = keyof ReturnType<typeof resourceNames>["queues"];
 
 export interface InfrastructureManifest {
   environment: Environment;
+  baseDomain: string;
   database: { id: string; name: string };
   avatarBucket: { name: string };
   queues: Record<QueueKey, { id?: string; name: string }>;
@@ -15,6 +16,10 @@ export function parseManifest(input: unknown): InfrastructureManifest {
   }
   const value = input as Record<string, unknown>;
   const environment = parseEnvironment(String(value.environment));
+  const baseDomain = String(value.baseDomain ?? "");
+  if (!/^(?!-)[a-z0-9-]+(?:\.[a-z0-9-]+)+$/.test(baseDomain)) {
+    throw new Error(`Invalid base domain for ${environment}`);
+  }
   const expected = resourceNames(environment);
   const database = value.database as Record<string, unknown> | undefined;
   if (!database || database.name !== expected.database || typeof database.id !== "string") {
@@ -35,6 +40,7 @@ export function parseManifest(input: unknown): InfrastructureManifest {
   }
   return {
     environment,
+    baseDomain,
     database: { id: database.id, name: expected.database },
     avatarBucket: { name: expected.avatarBucket },
     queues,

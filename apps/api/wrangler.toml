@@ -43,6 +43,7 @@ script_name = "me-builder-worker-local"
 
 [vars]
 ENVIRONMENT = "local"
+WEB_ORIGIN = "http://localhost:5173"
 
 [env.local]
 name = "me-builder-api-local"
@@ -80,6 +81,7 @@ script_name = "me-builder-worker-local"
 
 [env.local.vars]
 ENVIRONMENT = "local"
+WEB_ORIGIN = "http://localhost:5173"
 
 [env.preview]
 name = "me-builder-api-preview"
@@ -120,6 +122,7 @@ script_name = "me-builder-worker-preview"
 
 [env.preview.vars]
 ENVIRONMENT = "preview"
+WEB_ORIGIN = "https://stg.kagami.kyosuke.dev"
 
 [env.production]
 name = "me-builder-api-production"
@@ -156,3 +159,4 @@ script_name = "me-builder-worker-production"
 
 [env.production.vars]
 ENVIRONMENT = "production"
+WEB_ORIGIN = "https://kagami.kyosuke.dev"

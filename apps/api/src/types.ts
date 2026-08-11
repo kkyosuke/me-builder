@@ -16,6 +16,7 @@ type Env = Omit<
   | "ACCOUNT_DATA"
   | "COMPATIBILITY_DATA"
   | "BRAIN_VECTOR_INDEX"
+  | "WEB_ORIGIN"
 > & {
   ENVIRONMENT?: string;
   LINE_CHANNEL_ACCESS_TOKEN?: string;
@@ -25,6 +26,7 @@ type Env = Omit<
   LINE_LOGIN_CHANNEL_ID?: string;
   ADMIN_LINE_USER_IDS?: string;
   BASE_URL?: string;
+  WEB_ORIGIN?: string;
   WEBHOOK_QUEUE?: Queue<WebhookQueueMessage>;
   PROFILE_SUMMARY_QUEUE?: Queue<ProfileSummaryGenerationQueueMessage>;
   DB?: D1Database;

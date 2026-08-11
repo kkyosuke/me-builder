@@ -16,6 +16,7 @@ describe("getConfig & ConfigSchema", () => {
       BASE_DOMAIN: "stg.kagami.kyosuke.dev",
       LINE_CHANNEL_ACCESS_TOKEN: "preview-token",
       LINE_CHANNEL_SECRET: "preview-channel-secret",
+      WEB_ORIGIN: "https://stg.kagami.kyosuke.dev",
     });
     expect(conf.environment).toBe("preview");
     expect(conf.baseDomain).toBe("stg.kagami.kyosuke.dev");
@@ -23,6 +24,13 @@ describe("getConfig & ConfigSchema", () => {
     expect(conf.lineWebhookUrl).toBe("https://api.stg.kagami.kyosuke.dev/api/line/webhook");
     expect(conf.lineChannelAccessToken).toBe("preview-token");
     expect(conf.lineChannelSecret).toBe("preview-channel-secret");
+    expect(conf.webOrigin).toBe("https://stg.kagami.kyosuke.dev");
+  });
+
+  it("WEB_ORIGIN が未設定の場合は undefined になりワイルドカードへ補完されないこと", () => {
+    const conf = getConfig({ ENVIRONMENT: "production", WEB_ORIGIN: undefined });
+
+    expect(conf.webOrigin).toBeUndefined();
   });
 
   it("LINE_CHANNEL_SECRET が未設定の場合は undefined になること", () => {

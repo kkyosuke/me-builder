@@ -14,6 +14,7 @@ database_id = "me-builder-db-local-id"
 
 [vars]
 ENVIRONMENT = "local"
+WEB_ORIGIN = "http://localhost:5173"
 
 [env.local]
 name = "me-builder-mcp-local"
@@ -25,6 +26,7 @@ database_id = "me-builder-db-local-id"
 
 [env.local.vars]
 ENVIRONMENT = "local"
+WEB_ORIGIN = "http://localhost:5173"
 
 [env.preview]
 name = "me-builder-mcp-preview"
@@ -39,6 +41,7 @@ database_id = "b61c9de2-4fa3-4644-8f01-f42af513e57a"
 
 [env.preview.vars]
 ENVIRONMENT = "preview"
+WEB_ORIGIN = "https://stg.kagami.kyosuke.dev"
 
 [env.production]
 name = "me-builder-mcp-production"
@@ -53,3 +56,4 @@ database_id = "6d11180b-3286-4b69-bd63-c7b60d768be1"
 
 [env.production.vars]
 ENVIRONMENT = "production"
+WEB_ORIGIN = "https://kagami.kyosuke.dev"

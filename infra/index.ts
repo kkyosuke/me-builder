@@ -4,6 +4,7 @@ import { parseEnvironment, resourceNames } from "./src/environment.ts";
 
 const config = new pulumi.Config();
 const environment = parseEnvironment(config.require("environment"));
+const baseDomain = config.require("baseDomain");
 const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
 
 if (!accountId) {
@@ -42,6 +43,7 @@ const queues = Object.fromEntries(
 
 export const infrastructure = {
   environment,
+  baseDomain,
   database: {
     id: database.uuid,
     name: database.name,
