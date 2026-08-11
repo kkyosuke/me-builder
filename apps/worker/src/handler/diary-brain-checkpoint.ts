@@ -150,9 +150,12 @@ export async function processDiaryBrainCheckpointMessage(
       category: candidate.category,
       statement: candidate.statement,
       sourceMessageIds: candidate.sourceMessageIds,
-      ...(candidate.matchingBrainItemId
+      evidenceStatements: candidate.evidenceStatements,
+      ...(candidate.deduplication !== "none"
         ? {
-            matchingBrainItemId: candidate.matchingBrainItemId,
+            ...(candidate.matchingBrainItemId
+              ? { matchingBrainItemId: candidate.matchingBrainItemId }
+              : {}),
             deduplication: candidate.deduplication,
             ...(candidate.dedupPromptVersion
               ? { dedupPromptVersion: candidate.dedupPromptVersion }

@@ -57,6 +57,8 @@ function ownedSessionIds(db: AccountDataDatabase, accountId: string) {
 
 const BRAIN_CHECKPOINT_DISPATCH_RETRY_BASE_MS = 30 * 1000;
 const BRAIN_CHECKPOINT_DISPATCH_RETRY_MAX_MS = 15 * 60 * 1000;
+/** Queueの6回の配送機会を待った後、DLQ滞留をAlarmから自己回復するまでのlease。 */
+export const DIARY_BRAIN_CHECKPOINT_DISPATCH_LEASE_MS = 60 * 60 * 1000;
 const CONVERSATION_POLICY_EXPLORATION_RATE = 0.2;
 
 export type ConversationPolicyStat = {
@@ -665,6 +667,10 @@ export type DiaryBrainCheckpointCandidate = Readonly<{
   category: DiaryBrainCategory;
   statement: string;
   sourceMessageIds: readonly string[];
+  evidenceStatements?: readonly Readonly<{
+    sourceMessageId: string;
+    statement: string;
+  }>[];
   matchingBrainItemId?: string;
   deduplication?: "none" | "exact" | "semantic";
   dedupPromptVersion?: string;
@@ -699,6 +705,10 @@ function normalizeDiaryBrainComparison(value: string): string {
   return value.normalize("NFKC").replace(/\s+/gu, " ").trim();
 }
 
+function normalizeDiaryBrainEvidenceText(value: string): string {
+  return value.normalize("NFKC").replace(/\s+/gu, " ").trim();
+}
+
 /** Alarm時点で期限を迎えたcheckpointをQueue投入対象として返す。 */
 export async function listDueDiaryBrainCheckpointIds(
   db: AccountDataDatabase,
@@ -711,7 +721,7 @@ export async function listDueDiaryBrainCheckpointIds(
     .where(
       and(
         inArray(diaryBrainCheckpoints.sessionId, ownedSessionIds(db, accountId)),
-        inArray(diaryBrainCheckpoints.status, ["pending", "queued"]),
+        inArray(diaryBrainCheckpoints.status, ["pending", "queued", "dispatched"]),
         lte(diaryBrainCheckpoints.nextAttemptAt, at),
         eq(diaryBrainCheckpoints.isDeleted, false),
       ),
@@ -753,7 +763,7 @@ export async function claimDueDiaryBrainCheckpointIds(
         and(
           eq(diaryBrainCheckpoints.id, checkpointId),
           inArray(diaryBrainCheckpoints.sessionId, ownedSessionIds(db, accountId)),
-          inArray(diaryBrainCheckpoints.status, ["pending", "queued"]),
+          inArray(diaryBrainCheckpoints.status, ["pending", "queued", "dispatched"]),
           lte(diaryBrainCheckpoints.nextAttemptAt, at),
           eq(diaryBrainCheckpoints.isDeleted, false),
         ),
@@ -765,7 +775,7 @@ export async function claimDueDiaryBrainCheckpointIds(
   return claimedIds;
 }
 
-/** Queueがcheckpointを受理したことを記録し、Alarmによる再投入対象から外す。 */
+/** Queue受理を記録し、lease期限まではAlarmによる再投入対象から外す。 */
 export async function markDiaryBrainCheckpointDispatched(
   db: AccountDataDatabase,
   accountId: string,
@@ -774,7 +784,11 @@ export async function markDiaryBrainCheckpointDispatched(
 ): Promise<boolean> {
   const updated = await db
     .update(diaryBrainCheckpoints)
-    .set({ status: "dispatched", updatedAt: at })
+    .set({
+      status: "dispatched",
+      nextAttemptAt: new Date(at.getTime() + DIARY_BRAIN_CHECKPOINT_DISPATCH_LEASE_MS),
+      updatedAt: at,
+    })
     .where(
       and(
         eq(diaryBrainCheckpoints.id, checkpointId),
@@ -892,18 +906,31 @@ export async function applyDiaryBrainCheckpoint(
   const groupedCandidates = new Map<string, DiaryBrainCheckpointCandidate>();
   for (const candidate of candidates) {
     const messageIds = [...new Set(candidate.sourceMessageIds)];
+    const evidenceStatements =
+      candidate.evidenceStatements ??
+      messageIds.map((sourceMessageId) => ({
+        sourceMessageId,
+        statement: candidate.statement,
+      }));
+    const evidenceMessageIds = new Set(
+      evidenceStatements.map(({ sourceMessageId }) => sourceMessageId),
+    );
     const deduplication = candidate.deduplication ?? "none";
     const hasMatch = Boolean(candidate.matchingBrainItemId);
     const hasValidDedupAudit =
-      hasMatch === (deduplication !== "none") &&
       (deduplication === "semantic"
         ? Boolean(candidate.dedupPromptVersion?.trim())
-        : !candidate.dedupPromptVersion);
+        : !candidate.dedupPromptVersion) &&
+      (!hasMatch || deduplication !== "none");
     if (
       !DIARY_BRAIN_CATEGORY_SET.has(candidate.category) ||
       !candidate.statement.trim() ||
       messageIds.length === 0 ||
       messageIds.length !== candidate.sourceMessageIds.length ||
+      evidenceStatements.length !== messageIds.length ||
+      evidenceMessageIds.size !== messageIds.length ||
+      !messageIds.every((messageId) => evidenceMessageIds.has(messageId)) ||
+      evidenceStatements.some(({ statement }) => !statement.trim()) ||
       !hasValidDedupAudit
     ) {
       throw new Error("Diary Brain candidate validation failed");
@@ -911,7 +938,11 @@ export async function applyDiaryBrainCheckpoint(
     const key = `${candidate.category}\u0000${candidate.statement.trim()}`;
     const grouped = groupedCandidates.get(key);
     if (!grouped) {
-      groupedCandidates.set(key, { ...candidate, statement: candidate.statement.trim() });
+      groupedCandidates.set(key, {
+        ...candidate,
+        statement: candidate.statement.trim(),
+        evidenceStatements,
+      });
       continue;
     }
     const sameMatch = grouped.matchingBrainItemId === candidate.matchingBrainItemId;
@@ -919,9 +950,20 @@ export async function applyDiaryBrainCheckpoint(
       category: grouped.category,
       statement: grouped.statement,
       sourceMessageIds: [...new Set([...grouped.sourceMessageIds, ...messageIds])],
+      evidenceStatements: [
+        ...(grouped.evidenceStatements ?? []),
+        ...evidenceStatements.filter(
+          ({ sourceMessageId }) =>
+            !grouped.evidenceStatements?.some(
+              (groupedEvidence) => groupedEvidence.sourceMessageId === sourceMessageId,
+            ),
+        ),
+      ],
       ...(sameMatch && grouped.matchingBrainItemId
+        ? { matchingBrainItemId: grouped.matchingBrainItemId }
+        : {}),
+      ...(sameMatch && grouped.deduplication
         ? {
-            matchingBrainItemId: grouped.matchingBrainItemId,
             deduplication: grouped.deduplication,
             ...(grouped.dedupPromptVersion
               ? { dedupPromptVersion: grouped.dedupPromptVersion }
@@ -933,9 +975,16 @@ export async function applyDiaryBrainCheckpoint(
 
   for (const candidate of groupedCandidates.values()) {
     const messageIds = [...candidate.sourceMessageIds];
+    const evidenceStatementByMessageId = new Map(
+      candidate.evidenceStatements?.map(({ sourceMessageId, statement }) => [
+        sourceMessageId,
+        statement.trim(),
+      ]),
+    );
     const sources = await db
       .select({
         id: sourceRecords.id,
+        messageId: conversationMessages.id,
         createdAt: sourceRecords.createdAt,
         body: sourceRecordTextPayloads.body,
       })
@@ -959,11 +1008,16 @@ export async function applyDiaryBrainCheckpoint(
       .all();
     if (
       sources.length !== messageIds.length ||
-      sources.some(
-        ({ body }) =>
+      sources.some(({ messageId, body }) => {
+        const evidenceStatement = evidenceStatementByMessageId.get(messageId);
+        return (
           body.length > BRAIN_CHECKPOINT_MAX_USER_MESSAGE_CHARS ||
-          !body.includes(candidate.statement.trim()),
-      )
+          evidenceStatement === undefined ||
+          !normalizeDiaryBrainEvidenceText(body).includes(
+            normalizeDiaryBrainEvidenceText(evidenceStatement),
+          )
+        );
+      })
     ) {
       throw new Error("Diary Brain candidate evidence validation failed");
     }
@@ -1196,7 +1250,10 @@ export async function applyDiaryBrainCheckpoint(
         brainItemId,
         position: appliedCandidates.length,
         operation: "created",
-        deduplication: "none",
+        deduplication: candidate.deduplication ?? "none",
+        ...(candidate.deduplication === "semantic" && candidate.dedupPromptVersion
+          ? { dedupPromptVersion: candidate.dedupPromptVersion }
+          : {}),
         ...lifecycle,
       }),
     );
@@ -1206,7 +1263,7 @@ export async function applyDiaryBrainCheckpoint(
       statement,
       sourceMessageIds: messageIds,
       operation: "created",
-      deduplication: "none",
+      deduplication: candidate.deduplication ?? "none",
     });
   }
   statements.push(

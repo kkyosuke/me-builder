@@ -414,4 +414,32 @@ describe("ProfileSummaryScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: "再試行" }));
     expect(onRetry).toHaveBeenCalledOnce();
   });
+
+  it("生成状態の確認上限で案内と再読み込み導線を表示する", () => {
+    const onRetry = vi.fn();
+    render(
+      <ProfileSummaryScreen
+        state={{ status: "success", data: { summary, nextAction: "chat" } }}
+        versioning={{
+          ...versioning,
+          generation: { ...versioning.generation, status: "generating", canRegenerate: false },
+        }}
+        generationNotice={{
+          kind: "delayed",
+          message:
+            "確認に時間がかかっています。生成は続いている可能性があります。最新の状態を再読み込みしてください。",
+        }}
+        onRetry={onRetry}
+      />,
+    );
+
+    const alert = screen.getByRole("alert");
+    expect(alert.textContent).toContain("確認に時間がかかっています");
+    expect(
+      alert.compareDocumentPosition(screen.getByLabelText("新しい版を作成中")) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "最新の状態を再読み込み" }));
+    expect(onRetry).toHaveBeenCalledOnce();
+  });
 });

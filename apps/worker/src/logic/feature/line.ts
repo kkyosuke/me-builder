@@ -3,6 +3,7 @@ import {
   type ConversationCoordinatorNamespace,
   OperationalError,
   type WebhookQueueMessage,
+  resolveLineAccountRole,
   toOperationalError,
 } from "@me-builder/shared";
 import * as v from "valibot";
@@ -218,7 +219,7 @@ async function ensureAccountIdentity(
     return await D1.shared.action.account.upsertIdentity(db, {
       provider: "line",
       providerAccountId,
-      role: workerConfig.adminLineUserIds.includes(providerAccountId) ? "admin" : "user",
+      role: resolveLineAccountRole(providerAccountId, workerConfig.adminLineUserIds),
     });
   } catch (error) {
     throw toOperationalError(error, {

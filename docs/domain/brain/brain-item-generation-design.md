@@ -318,7 +318,7 @@ sequenceDiagram
 
     U->>AD: user message + Source Record
     AD->>AD: 期限を評価しcheckpointを作成・延長・固定
-    A->>AD: Queue未投入checkpointをclaim
+    A->>AD: 期限到来または回復期限超過checkpointをclaim
     A->>Q: account ID + checkpoint ID
     A->>AD: Queue受理を記録
     Q->>W: IDのみを配送
@@ -328,9 +328,15 @@ sequenceDiagram
     W->>W: schema・Account・Evidence・安全性を検証
     W->>AD: Brain Item + Evidence + Access Label + checkpoint完了
     AD-->>W: atomic commit
+    alt dispatchedのまま回復期限を超過
+        A->>AD: 同じcheckpointを再claim
+        A->>Q: 同じIDを再投入
+    end
 ```
 
-Queueには本文を含めず、Account IDとcheckpoint IDだけを渡します。Alarmが回復するのはQueueへの投入が完了していないチェックポイントだけです。Queueが受理した後のAI失敗はQueue自身の再配送とDLQへ委ね、Alarmから同じ処理を増殖させません。WorkerはAccountDataから会話を読み直し、Brain Item、Evidence edge、Access Label、チェックポイントと実際に保存したItemの対応、チェックポイント完了を同じtransactionで保存します。AccountDataはalarm、user message取込、Queueからの適用をAccount単位で直列化し、Queueの重複・並行配送でも完了済みチェックポイントを再適用しません。
+Queueには本文を含めず、Account IDとcheckpoint IDだけを渡します。Queueが受理した後はQueue自身の再配送を優先し、`dispatched`のまま回復期限を超えた場合だけAlarmが同じIDを再投入します。回復期限と配送状態の物理的な規則は[日記チャット実装設計 §4.6](../../architecture/diary-chat-implementation-design.md#46-diary_brain_checkpoints)を正とします。DLQへ到達した場合やQueue処理が失われた場合も、チェックポイントを恒久的に欠落させません。
+
+WorkerはAccountDataから会話を読み直し、Brain Item、Evidence edge、Access Label、チェックポイントと実際に保存したItemの対応、チェックポイント完了を同じtransactionで保存します。AccountDataはalarm、user message取込、Queueからの適用をAccount単位で直列化します。回復再投入と元のQueue messageが競合しても、先に`applied`へ進めた処理だけがItem一式を確定し、後続処理は完了済みチェックポイントとしてスキップするため二重適用しません。
 
 AI生成、JSON parse、出力envelope検証が失敗した場合はQueue messageをackせず再試行します。envelope内の個別候補だけがschema、Evidence、候補間重複の検証に失敗した場合は、その候補の位置と理由コードだけをerror logへ残し、日記本文、statement、Account ID、Evidence IDをlogへ含めずに候補単位で除外します。残った候補だけを適用し、すべて除外された場合は0件でチェックポイントを完了します。AI設定がない場合に0件を正常扱いできるのはlocal / test環境だけで、本番相当環境では失敗として再試行します。安全経路へ切り替えた場合、またはAIが有効な候補なしと正常に判断した場合も0件でチェックポイントを完了します。いずれの場合もSource Recordと通常の会話応答は保持され、会話返信の成功・配送状態はBrain Itemの登録条件にしません。
 
@@ -366,9 +372,9 @@ AI生成、JSON parse、出力envelope検証が失敗した場合はQueue messag
 
 AIの意味的重複判定だけで既存Itemを上書きしません。同義判定が不確かな場合は別Itemとして保存し、後から統合できるようにします。
 
-日記候補ごとに、原文と解決済み時点情報を検索queryとして同じAccountのVectorizeを検索します。Vector scoreは比較対象を絞るためだけに使い、score単独では統合しません。Vectorizeで見つかったItemとVector同期前の直近active ItemをAccountDataで再認可し、同じcategoryの候補だけを専用の意味的重複判定promptへまとめて渡します。候補上限に達してもVector同期前Itemを比較対象へ含められるよう、直近active Item用の候補枠を確保します。同じcheckpoint内の新規候補同士も比較し、同じ命題なら代表候補へEvidenceを集約してItemを1件だけ作ります。表現が異なっても、条件・対象・時点を含め相互に言い換えられる`same_proposition`だけを統合します。関連しているだけ、具体性・強さ・時点が異なる、または判断が不確かな場合は新規Itemにします。
+日記候補ごとに、原文と解決済み時点情報を検索queryとして同じAccountのVectorizeを検索します。Vector scoreは比較対象を絞るためだけに使い、score単独では統合しません。Vectorizeで見つかったItemとVector同期前の直近active ItemをAccountDataで再認可し、同じcategoryの候補だけを専用の意味的重複判定promptへまとめて渡します。候補上限に達してもVector同期前Itemを比較対象へ含められるよう、直近active Item用の候補枠を確保します。同じcheckpoint内の新規候補同士も比較し、同じ命題なら代表候補へEvidenceを集約してItemを1件だけ作ります。統合後もEvidenceごとに抽出時のstatementを保持し、NFKCと空白を正規化した原文にそのstatementが含まれることを保存直前に再検証します。表現が異なっても、条件・対象・時点を含め相互に言い換えられる`same_proposition`だけを統合します。関連しているだけ、具体性・強さ・時点が異なる、または判断が不確かな場合は新規Itemにします。
 
-判定モデルが返せる既存Item IDは検索候補のallowlistに限定し、AccountDataは保存直前にAccount所有、`active`、category、`isInference = false`、相対日付の解決結果を再検証します。判定済みの既存Itemを再検証できない場合は、完全一致検索や新規Item作成へ縮退せずQueueを再試行します。同一命題なら既存Itemのstatementや属性を変更せず、新しいSource Recordとの`supports` Evidence edgeだけを追加します。この事後の裏付けはItemを作った入力ではないため、Evidence edgeの`isDerivationTrigger`は`false`にします。既存ItemのVectorはstatementが変わらないため再登録しません。checkpointとの対応には、新規作成かEvidence追加か、完全一致か意味的判定か、意味的判定のprompt versionを保存します。AI判定全体が不正、候補外IDを返す、または依存サービスが一時失敗した場合も新規Itemへ縮退せずQueueを再試行し、重複データの確定を避けます。
+判定モデルが返せる既存Item IDは検索候補のallowlistに限定し、AccountDataは保存直前にAccount所有、`active`、category、`isInference = false`、相対日付の解決結果を再検証します。判定済みの既存Itemを再検証できない場合は、完全一致検索や新規Item作成へ縮退せずQueueを再試行します。同一命題なら既存Itemのstatementや属性を変更せず、新しいSource Recordとの`supports` Evidence edgeだけを追加します。この事後の裏付けはItemを作った入力ではないため、Evidence edgeの`isDerivationTrigger`は`false`にします。既存ItemのVectorはstatementが変わらないため再登録しません。checkpointとの対応には、新規作成かEvidence追加か、完全一致か意味的判定か、意味的判定のprompt versionを保存します。同じcheckpoint内の候補同士を統合して新規Itemを作る場合も、統合に使った判定方法と意味的判定のprompt versionを保存します。AI判定全体が不正、候補外IDを返す、または依存サービスが一時失敗した場合も新規Itemへ縮退せずQueueを再試行し、重複データの確定を避けます。
 
 同じ命題へEvidenceが増えても、Brain Itemの`createdAt`は最初にItemを作った時点として保持し、最新日時で上書きしません。「最初に本人から得た時点」と「最後に本人から得た時点」は、activeな`supports` Evidenceが参照するSource Recordの記録時点から、それぞれ`firstObservedAt`と`lastObservedAt`として導出します。通常チャットのContext Packageと本人向け一覧は両方を明示し、一覧は`lastObservedAt`の新しい順にします。statementが変わらないEvidence追加ではVectorを再登録しません。
 
@@ -382,7 +388,7 @@ AIの意味的重複判定だけで既存Itemを上書きしません。同義�
 - AccountData alarmからIDのみを渡すQueue処理
 - 抽出専用`brain_item_candidates`出力schema
 - 通常安全route、許可した6分類、非推定、1チェックポイント最大3件への制限
-- 原文中の連続した文言だけを受け付ける根拠検証と、user message 10件・1件5,000文字の入力上限
+- NFKCと空白の差を正規化した原文中の連続した文言だけを受け付ける根拠検証と、user message 10件・1件5,000文字の入力上限
 - 相対日付を含むstatementの原文を保持し、Source Record受信時点の日本時間で解決した時点情報をattributesへ分離して保存
 - 候補のAccount・チェックポイント範囲・Evidence・安全性検証
 - Brain Item、Evidence、Access Label、チェックポイント完了を一括保存するAccountData action

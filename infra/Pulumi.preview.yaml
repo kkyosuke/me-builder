@@ -1,3 +1,4 @@
 config:
+  me-builder-cloudflare:baseDomain: stg.kagami.kyosuke.dev
   me-builder-cloudflare:environment: preview
 encryptionsalt: v1:oVwo0Ahnjrs=:v1:Gi6c2CFYHQF9gtU0:KYNXZCHaC02XMAVzxSSAO7SfE1pYyA==

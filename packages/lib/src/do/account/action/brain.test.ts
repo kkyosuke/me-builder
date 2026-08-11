@@ -10,12 +10,14 @@ import {
   type SaveBrainItemInput,
   claimDueBrainVectorSyncJobs,
   completeBrainVectorSyncJob,
+  failBrainVectorSyncJob,
   findActiveBrainVectorEntry,
   findBrainItemForAccount,
   getBrainVectorSyncTarget,
   listActiveBrainItems,
   loadBrainChatContextMemories,
   loadBrainSemanticDedupCandidates,
+  resetFailedBrainVectorSyncJob,
   saveBrainItem,
 } from "./brain";
 
@@ -125,7 +127,7 @@ describe("saveBrainItem", () => {
       })
       .where(eq(schema.brainItems.id, "brain-1"));
 
-    const jobs = await claimDueBrainVectorSyncJobs(db, at);
+    const { jobs } = await claimDueBrainVectorSyncJobs(db, at);
     expect(jobs).toEqual([
       { id: `brain-1:${at.getTime()}:upsert`, brainItemId: "brain-1", itemRevision: at.getTime() },
     ]);
@@ -160,12 +162,150 @@ describe("saveBrainItem", () => {
     ]);
   });
 
+  it("失敗ごとに待機時間を増やし、6回目の失敗で終端化して以後claimしない", async () => {
+    const db = createTestDb();
+    await insertAccountsAndSources(db);
+    let claimAt = new Date("2026-08-10T00:00:00Z");
+    await saveBrainItem(db, createInput({ at: claimAt }));
+    const retryDelays = [60, 2 * 60, 8 * 60, 30 * 60, 2 * 60 * 60].map((seconds) => seconds * 1000);
+
+    for (const [index, retryDelay] of retryDelays.entries()) {
+      const { jobs } = await claimDueBrainVectorSyncJobs(db, claimAt);
+      expect(jobs).toHaveLength(1);
+      const failedAt = new Date(claimAt.getTime() + 1_000);
+      const result = await failBrainVectorSyncJob(
+        db,
+        jobs[0]?.id ?? "",
+        "BRAIN_VECTOR_SYNC_FAILED",
+        true,
+        failedAt,
+      );
+      const nextAttemptAt = new Date(failedAt.getTime() + retryDelay);
+      expect(result).toEqual({
+        outcome: "retry-scheduled",
+        attemptCount: index + 1,
+        nextAttemptAt,
+      });
+      expect(
+        db
+          .select({
+            status: schema.brainVectorSyncJobs.status,
+            attemptCount: schema.brainVectorSyncJobs.attemptCount,
+            nextAttemptAt: schema.brainVectorSyncJobs.nextAttemptAt,
+          })
+          .from(schema.brainVectorSyncJobs)
+          .get(),
+      ).toEqual({
+        status: "retry_scheduled",
+        attemptCount: index + 1,
+        nextAttemptAt,
+      });
+      await expect(
+        claimDueBrainVectorSyncJobs(db, new Date(nextAttemptAt.getTime() - 1)),
+      ).resolves.toEqual({ jobs: [], terminalFailures: [] });
+      claimAt = nextAttemptAt;
+    }
+
+    const { jobs: finalJobs } = await claimDueBrainVectorSyncJobs(db, claimAt);
+    const finalResult = await failBrainVectorSyncJob(
+      db,
+      finalJobs[0]?.id ?? "",
+      "BRAIN_VECTOR_SYNC_FAILED",
+      true,
+      claimAt,
+    );
+    expect(finalResult).toEqual({ outcome: "failed", attemptCount: 6 });
+    expect(
+      db
+        .select({ status: schema.brainVectorSyncJobs.status })
+        .from(schema.brainVectorSyncJobs)
+        .get(),
+    ).toEqual({ status: "failed" });
+    await expect(
+      claimDueBrainVectorSyncJobs(db, new Date("2027-08-10T00:00:00Z")),
+    ).resolves.toEqual({ jobs: [], terminalFailures: [] });
+  });
+
+  it("非一時エラーを即時終端化し、明示的なreset後だけ再開する", async () => {
+    const db = createTestDb();
+    await insertAccountsAndSources(db);
+    const at = new Date("2026-08-10T00:00:00Z");
+    await saveBrainItem(db, createInput({ at }));
+    const { jobs } = await claimDueBrainVectorSyncJobs(db, at);
+
+    await expect(
+      failBrainVectorSyncJob(
+        db,
+        jobs[0]?.id ?? "",
+        "BRAIN_VECTOR_HMAC_SECRET_NOT_CONFIGURED",
+        false,
+        at,
+      ),
+    ).resolves.toEqual({ outcome: "failed", attemptCount: 1 });
+    await expect(claimDueBrainVectorSyncJobs(db, at)).resolves.toEqual({
+      jobs: [],
+      terminalFailures: [],
+    });
+    const failedList = await listActiveBrainItems(db, "account-1");
+    expect(failedList.items[0]?.vectorSync).toMatchObject({
+      status: "failed",
+      attemptCount: 1,
+      failureCode: "BRAIN_VECTOR_HMAC_SECRET_NOT_CONFIGURED",
+    });
+    expect(failedList.items[0]?.vectorSync).not.toHaveProperty("nextAttemptAt");
+
+    await expect(resetFailedBrainVectorSyncJob(db, jobs[0]?.id ?? "", at)).resolves.toBe(true);
+    await expect(claimDueBrainVectorSyncJobs(db, at)).resolves.toEqual({
+      jobs,
+      terminalFailures: [],
+    });
+    expect(
+      db
+        .select({ attemptCount: schema.brainVectorSyncJobs.attemptCount })
+        .from(schema.brainVectorSyncJobs)
+        .get(),
+    ).toEqual({ attemptCount: 1 });
+  });
+
+  it("最終dispatchのlease期限切れを終端化して以後claimしない", async () => {
+    const db = createTestDb();
+    await insertAccountsAndSources(db);
+    const at = new Date("2026-08-10T00:00:00Z");
+    await saveBrainItem(db, createInput({ at }));
+    await db
+      .update(schema.brainVectorSyncJobs)
+      .set({ status: "submitted", attemptCount: 6, nextAttemptAt: at })
+      .where(eq(schema.brainVectorSyncJobs.brainItemId, "brain-1"));
+
+    await expect(claimDueBrainVectorSyncJobs(db, at)).resolves.toEqual({
+      jobs: [],
+      terminalFailures: [
+        {
+          attemptCount: 6,
+          failureCode: "BRAIN_VECTOR_SYNC_ATTEMPTS_EXHAUSTED",
+        },
+      ],
+    });
+    expect(
+      db
+        .select({ status: schema.brainVectorSyncJobs.status })
+        .from(schema.brainVectorSyncJobs)
+        .get(),
+    ).toEqual({ status: "failed" });
+    await expect(claimDueBrainVectorSyncJobs(db, at)).resolves.toEqual({
+      jobs: [],
+      terminalFailures: [],
+    });
+  });
+
   it("古いupsert jobでも処理時にinvalidatedならdeleteを返す", async () => {
     const db = createTestDb();
     await insertAccountsAndSources(db);
     const at = new Date("2026-08-10T00:00:00Z");
     await saveBrainItem(db, createInput({ at }));
-    const [job] = await claimDueBrainVectorSyncJobs(db, at);
+    const {
+      jobs: [job],
+    } = await claimDueBrainVectorSyncJobs(db, at);
     await db
       .update(schema.brainItems)
       .set({ status: "invalidated", updatedAt: new Date(at.getTime() + 1) })
@@ -183,7 +323,9 @@ describe("saveBrainItem", () => {
     const invalidatedAt = new Date(at.getTime() + 1);
     const completedAt = new Date(at.getTime() + 2);
     await saveBrainItem(db, createInput({ at }));
-    const [upsertJob] = await claimDueBrainVectorSyncJobs(db, at);
+    const {
+      jobs: [upsertJob],
+    } = await claimDueBrainVectorSyncJobs(db, at);
     await db.batch([
       db
         .update(schema.brainItems)
@@ -195,6 +337,7 @@ describe("saveBrainItem", () => {
         itemRevision: invalidatedAt.getTime(),
         operation: "delete",
         status: "applied",
+        attemptCount: 4,
         mutationId: "earlier-delete",
         nextAttemptAt: invalidatedAt,
         createdAt: invalidatedAt,
@@ -218,8 +361,12 @@ describe("saveBrainItem", () => {
         .select()
         .from(schema.brainVectorSyncJobs)
         .where(eq(schema.brainVectorSyncJobs.operation, "delete")),
-    ).resolves.toEqual([expect.objectContaining({ status: "pending", mutationId: null })]);
-    const [deleteJob] = await claimDueBrainVectorSyncJobs(db, completedAt);
+    ).resolves.toEqual([
+      expect.objectContaining({ status: "pending", attemptCount: 0, mutationId: null }),
+    ]);
+    const {
+      jobs: [deleteJob],
+    } = await claimDueBrainVectorSyncJobs(db, completedAt);
     await expect(
       getBrainVectorSyncTarget(
         db,
@@ -547,7 +694,9 @@ describe("findActiveBrainVectorEntry", () => {
     await insertAccountsAndSources(db);
     const at = new Date("2026-08-10T00:00:00Z");
     await saveBrainItem(db, createInput({ at }));
-    const [job] = await claimDueBrainVectorSyncJobs(db, at);
+    const {
+      jobs: [job],
+    } = await claimDueBrainVectorSyncJobs(db, at);
     await completeBrainVectorSyncJob(
       db,
       "account-1",

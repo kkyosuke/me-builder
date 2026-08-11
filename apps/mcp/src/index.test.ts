@@ -9,6 +9,40 @@ describe("MCP Server Error Handling", () => {
     expect(data.status).toBe("ok");
   });
 
+  it("allows CORS only from the configured Web origin", async () => {
+    const allowedOrigin = "https://stg.kagami.kyosuke.dev";
+    const allowed = await app.request(
+      "/health",
+      {
+        method: "OPTIONS",
+        headers: {
+          Origin: allowedOrigin,
+          "Access-Control-Request-Method": "GET",
+          "Access-Control-Request-Headers": "Authorization, Content-Type",
+        },
+      },
+      { WEB_ORIGIN: allowedOrigin },
+    );
+    const denied = await app.request(
+      "/health",
+      {
+        method: "OPTIONS",
+        headers: {
+          Origin: "https://attacker.example",
+          "Access-Control-Request-Method": "GET",
+          "Access-Control-Request-Headers": "Authorization, Content-Type",
+        },
+      },
+      { WEB_ORIGIN: allowedOrigin },
+    );
+
+    expect(allowed.headers.get("Access-Control-Allow-Origin")).toBe(allowedOrigin);
+    expect(allowed.headers.get("Access-Control-Allow-Headers")).toBe("Authorization,Content-Type");
+    expect([...denied.headers.keys()].filter((name) => name.startsWith("access-control-"))).toEqual(
+      [],
+    );
+  });
+
   it("handles unhandled exception with 500 status using app.onError", async () => {
     const testApp = new (await import("hono")).Hono();
     testApp.onError((_err, c) => c.json({ error: "Internal Server Error" }, 500));

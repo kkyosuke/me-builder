@@ -36,10 +36,12 @@ function vectorStatusLabel(sync: DevelopmentBrainItemsResult["items"][number]["v
       return sync.hasEntry ? "Vector更新待ち" : "Vector登録待ち";
     case "submitted":
       return sync.hasEntry ? "Vector更新送信中" : "Vector送信中";
+    case "retry_scheduled":
+      return "Vector再試行待ち";
     case "applied":
       return sync.hasEntry ? "Vector同期受付済み" : "Vector未登録";
     case "failed":
-      return "Vector再試行中";
+      return "Vector同期停止";
   }
 }
 

@@ -28,6 +28,14 @@ import { sourceRecords } from "../schema/source";
 type DiagnosisListAvailability = "open" | "closed";
 type DiagnosisListResponseStatus = "unanswered" | "in-progress" | "answered";
 
+function diagnosisResponseStatus(
+  answeredCount: number,
+  questionCount: number,
+): DiagnosisListResponseStatus {
+  if (answeredCount === 0) return "unanswered";
+  return answeredCount === questionCount ? "answered" : "in-progress";
+}
+
 export type DiagnosisListItem = Readonly<{
   id: string;
   title: string;
@@ -539,12 +547,7 @@ async function buildSaveResult(
   ]);
   const questionCount = questionCountRow?.value ?? 0;
   const answeredCount = answeredCountRow?.value ?? 0;
-  const responseStatus: DiagnosisListResponseStatus =
-    answeredCount === 0
-      ? "unanswered"
-      : answeredCount === questionCount
-        ? "answered"
-        : "in-progress";
+  const responseStatus = diagnosisResponseStatus(answeredCount, questionCount);
 
   return {
     type: "saved",
@@ -932,7 +935,7 @@ export async function findDiagnosisAnswers(
       id: response.id,
       title: response.title,
       description: response.description,
-      responseStatus: answeredCount === questionCount ? "answered" : "in-progress",
+      responseStatus: diagnosisResponseStatus(answeredCount, questionCount),
       answeredCount,
       questionCount,
       scoringConfig:
@@ -1020,12 +1023,7 @@ export async function listVisibleDiagnoses(
     .all();
 
   return rows.map((row) => {
-    const responseStatus: DiagnosisListResponseStatus =
-      row.answeredCount === 0
-        ? "unanswered"
-        : row.answeredCount === row.questionCount
-          ? "answered"
-          : "in-progress";
+    const responseStatus = diagnosisResponseStatus(row.answeredCount, row.questionCount);
 
     return {
       id: row.id,

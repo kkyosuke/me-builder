@@ -9,6 +9,8 @@ export const McpConfigSchema = v.object({
   baseDomain: v.optional(v.string()),
   baseUrl: v.optional(v.string()),
   apiUrl: v.optional(v.string()),
+  /** ブラウザからのCORSリクエストを許可するWeb UIのオリジン。 */
+  webOrigin: v.optional(v.pipe(v.string(), v.url())),
 });
 
 export type McpConfig = v.InferOutput<typeof McpConfigSchema>;

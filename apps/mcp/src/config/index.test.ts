@@ -20,4 +20,16 @@ describe("getMcpConfig & McpConfigSchema", () => {
     expect(conf.baseUrl).toBe("https://mcp.stg.kagami.kyosuke.dev");
     expect(conf.apiUrl).toBe("https://api.stg.kagami.kyosuke.dev");
   });
+
+  it("WEB_ORIGIN を許可Webオリジンとして取得すること", () => {
+    const conf = getMcpConfig({ WEB_ORIGIN: "https://kagami.kyosuke.dev" });
+
+    expect(conf.webOrigin).toBe("https://kagami.kyosuke.dev");
+  });
+
+  it("WEB_ORIGIN が未設定の場合は undefined になりワイルドカードへ補完されないこと", () => {
+    const conf = getMcpConfig({ WEB_ORIGIN: undefined });
+
+    expect(conf.webOrigin).toBeUndefined();
+  });
 });

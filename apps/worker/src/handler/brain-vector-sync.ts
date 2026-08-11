@@ -1,5 +1,13 @@
-import { accountDataFor } from "@me-builder/lib";
-import type { BrainVectorSyncQueueMessage, Message } from "@me-builder/shared";
+import { BRAIN_VECTOR_SYNC_MAX_ATTEMPTS, accountDataFor } from "@me-builder/lib";
+import {
+  type BrainVectorSyncQueueMessage,
+  type Message,
+  OperationalError,
+  describeQueueMessageResult,
+  logger,
+  toOperationalError,
+  toSafeOperationalErrorFields,
+} from "@me-builder/shared";
 import type { CloudflareBindings, WorkerConfig } from "../config";
 import { BRAIN_VECTOR_DIMENSIONS } from "../config/schema";
 import { createBrainOwnerScope, createBrainVectorId } from "../infrastructure/brain-vector-id";
@@ -29,8 +37,8 @@ export async function processBrainVectorSyncMessage(
   try {
     const index = cf.vector?.brain;
     const secret = workerConfig.brainVectorHmacSecret;
-    if (!index) throw new Error("BRAIN_VECTOR_INDEX binding is not configured");
-    if (!secret) throw new Error("BRAIN_VECTOR_HMAC_SECRET is not configured");
+    if (!index) throw configurationError("BRAIN_VECTOR_INDEX_NOT_CONFIGURED");
+    if (!secret) throw configurationError("BRAIN_VECTOR_HMAC_SECRET_NOT_CONFIGURED");
     const vectorId =
       target.action === "delete" && target.vectorId
         ? target.vectorId
@@ -66,12 +74,60 @@ export async function processBrainVectorSyncMessage(
     if (!completed) throw new Error("Brain vector sync completion could not be recorded");
     message.ack();
   } catch (error) {
-    await accountData.execute(
+    const operationalError = toOperationalError(error, {
+      code: "BRAIN_VECTOR_SYNC_FAILED",
+      category: "unknown",
+      stage: "vector.sync",
+      retryable: true,
+    });
+    const failure = await accountData.execute(
       "brain.failVectorSyncJob",
       message.body.jobId,
-      error instanceof Error ? error.name : "UnknownError",
+      operationalError.code,
+      operationalError.retryable,
     );
-    throw error;
+    message.ack();
+    if (!failure) return;
+
+    const terminal = failure.outcome === "failed";
+    const safeError = {
+      ...toSafeOperationalErrorFields(operationalError, {
+        code: "BRAIN_VECTOR_SYNC_FAILED",
+        category: "unknown",
+        stage: "vector.sync",
+        retryable: true,
+      }),
+      retryable: !terminal,
+    };
+    const fields = {
+      event: "queue.message.failed",
+      service: "worker",
+      component: "brain-vector-sync",
+      traceId: message.id,
+      queueMessageId: message.id,
+      messageType: "brain-vector-sync",
+      attempt: failure.attemptCount,
+      maxAttempts: BRAIN_VECTOR_SYNC_MAX_ATTEMPTS,
+      outcome: terminal ? "failed" : "deferred",
+      disposition: "ack",
+      jobStatus: terminal ? "failed" : "retry_scheduled",
+      ...(failure.outcome === "retry-scheduled"
+        ? { nextAttemptAt: failure.nextAttemptAt.toISOString() }
+        : { terminalReason: operationalError.retryable ? "attempts-exhausted" : "non-retryable" }),
+      ...safeError,
+    } as const;
+    const description = describeQueueMessageResult({
+      flow: "brain-vector-sync",
+      outcome: terminal ? "failed" : "deferred",
+      disposition: "ack",
+      stage: operationalError.stage,
+      attempt: failure.attemptCount,
+      maxAttempts: BRAIN_VECTOR_SYNC_MAX_ATTEMPTS,
+      resultCode: terminal ? "BRAIN_VECTOR_SYNC_TERMINATED" : "BRAIN_VECTOR_SYNC_RETRY_SCHEDULED",
+      error: safeError,
+    });
+    if (terminal) logger.error(fields, description);
+    else logger.warn(fields, description);
   }
 }
 
@@ -91,7 +147,7 @@ async function upsertBrainVector(
   workerConfig: WorkerConfig,
 ) {
   if (!workerConfig.googleVertexAiApiKey) {
-    throw new Error("Gemini embedding credentials are not configured");
+    throw configurationError("GEMINI_EMBEDDING_CREDENTIALS_NOT_CONFIGURED");
   }
   const values = await embedDocument(
     createGeminiClient({
@@ -118,6 +174,15 @@ async function upsertBrainVector(
       },
     },
   ]);
+}
+
+function configurationError(code: string): OperationalError {
+  return new OperationalError({
+    code,
+    category: "configuration",
+    stage: "vector.configure",
+    retryable: false,
+  });
 }
 
 function mutationIdOf(mutation: { mutationId?: string; ids?: string[] }): string {

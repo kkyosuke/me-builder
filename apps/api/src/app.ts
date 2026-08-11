@@ -18,7 +18,6 @@ import { deferDiagnosisQuestionRoute } from "./contract/diagnosis/deferred-quest
 import { diagnosisDetailRoute } from "./contract/diagnosis/detail";
 import { resetDevelopmentDiagnosisDataRoute } from "./contract/diagnosis/dev-reset";
 import { diagnosisListRoute } from "./contract/diagnosis/list";
-import { liffSessionRoute } from "./contract/line/liff-session";
 import { openApiOptions } from "./contract/openapi";
 import {
   deleteProfileAvatarRoute,
@@ -37,7 +36,7 @@ import {
   putDiagnosisAnswer,
   putDiagnosisDeferredQuestion,
 } from "./controller/diagnosis";
-import { postLiffSession, postLineWebhook } from "./controller/line";
+import { postLineWebhook } from "./controller/line";
 import { getProfileSummaryContents, postProfileSummaryGeneration } from "./controller/profile";
 import {
   deleteProfileAvatarContents,
@@ -47,8 +46,16 @@ import {
 import type { AppEnv } from "./types";
 
 const app = new Hono<AppEnv>();
+const webCors = cors({
+  origin: (origin, c) => (origin === getConfig(c.env).webOrigin ? origin : undefined),
+  allowHeaders: ["Authorization", "Content-Type"],
+});
 
-app.use("*", cors());
+app.use("*", async (c, next) => {
+  const origin = c.req.header("Origin");
+  if (!origin || origin !== getConfig(c.env).webOrigin) return next();
+  return webCors(c, next);
+});
 
 // 例外の分類はここでしか作れないが、最終statusを知るのはmiddlewareなので、
 // 記録はせずに安全な分類だけを預けて終端ログ1件へまとめる。
@@ -107,9 +114,6 @@ app.get("/api/health", (c) => {
 });
 
 app.post("/api/line/webhook", postLineWebhook);
-
-// クライアント指定のuserIdではなく、検証済みIDトークンからAccountを解決する。
-app.post("/api/line/liff/session", liffSessionRoute, postLiffSession);
 
 app.get("/api/admin/statistics", adminStatisticsRoute, getStatistics);
 

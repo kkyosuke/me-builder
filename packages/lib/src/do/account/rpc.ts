@@ -55,8 +55,12 @@ export type AccountDataActions = {
     typeof brain.completeBrainVectorSyncJob
   >;
   "brain.failVectorSyncJob": RpcAction<
-    [jobId: string, failureCode: string, at?: Date],
+    [jobId: string, failureCode: string, retryable?: boolean, at?: Date],
     typeof brain.failBrainVectorSyncJob
+  >;
+  "brain.resetFailedVectorSyncJob": RpcAction<
+    [jobId: string, at?: Date],
+    typeof brain.resetFailedBrainVectorSyncJob
   >;
   "compatibility.addOutgoingReference": (
     input: Readonly<{ relationshipId: string; createdAt: Date }>,

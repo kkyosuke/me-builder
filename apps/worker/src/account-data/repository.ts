@@ -458,7 +458,11 @@ export class AccountDataRepository {
       .from(DO.account.schema.diaryBrainCheckpoints)
       .where(
         and(
-          inArray(DO.account.schema.diaryBrainCheckpoints.status, ["pending", "queued"]),
+          inArray(DO.account.schema.diaryBrainCheckpoints.status, [
+            "pending",
+            "queued",
+            "dispatched",
+          ]),
           eq(DO.account.schema.diaryBrainCheckpoints.isDeleted, false),
         ),
       )
@@ -470,7 +474,11 @@ export class AccountDataRepository {
       .from(DO.account.schema.brainVectorSyncJobs)
       .where(
         and(
-          inArray(DO.account.schema.brainVectorSyncJobs.status, ["pending", "submitted", "failed"]),
+          inArray(DO.account.schema.brainVectorSyncJobs.status, [
+            "pending",
+            "submitted",
+            "retry_scheduled",
+          ]),
           eq(DO.account.schema.brainVectorSyncJobs.isDeleted, false),
         ),
       )

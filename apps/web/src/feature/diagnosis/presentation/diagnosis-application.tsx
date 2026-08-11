@@ -10,6 +10,7 @@ import { useDiagnosisDetail } from "./hooks/use-diagnosis-detail";
 import { useDiagnosisList } from "./hooks/use-diagnosis-list";
 import { useResetDiagnosisData } from "./hooks/use-reset-diagnosis-data";
 
+// APIのisDevelopmentEnvironmentと同じ環境名。認可境界はAPI側のfail-closed判定を正とする。
 const DEVELOPMENT_ENVIRONMENTS = new Set(["development", "local", "preview", "test"]);
 
 export default function DiagnosisApplication() {
