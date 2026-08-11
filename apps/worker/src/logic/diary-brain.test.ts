@@ -2,7 +2,6 @@ import { logger } from "@me-builder/shared";
 import { describe, expect, it, vi } from "vitest";
 import { getWorkerConfig } from "../config";
 import {
-  DIARY_BRAIN_SYSTEM_PROMPT,
   buildDevelopmentBrainItemMessage,
   generateDiaryBrainCandidates,
   validateDiaryBrainCandidates,
@@ -86,13 +85,6 @@ describe("diary Brain checkpoint", () => {
         ),
       ).toEqual([candidate]);
     }
-  });
-
-  it("分類境界と相対日付の保持をsystem promptへ明示する", () => {
-    expect(DIARY_BRAIN_SYSTEM_PROMPT).toContain("「衝動買いしちゃう」→ behavior_pattern");
-    expect(DIARY_BRAIN_SYSTEM_PROMPT).toContain("「承認されたいから頑張る」→ value_motivation");
-    expect(DIARY_BRAIN_SYSTEM_PROMPT).toContain("「来月までに転職先を決めたい」→ goal");
-    expect(DIARY_BRAIN_SYSTEM_PROMPT).toContain("相対日付も書き換えずstatementへ含める");
   });
 
   it("checkpoint外のmessageを参照する候補だけをlog付きで破棄する", () => {

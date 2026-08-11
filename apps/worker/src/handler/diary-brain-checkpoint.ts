@@ -15,10 +15,10 @@ import type { CloudflareBindings, WorkerConfig } from "../config";
 import { createGeminiUsageRecorder } from "../infrastructure/gemini-usage";
 import { createLineRetryKey, pushLineTextWithRetryKey } from "../infrastructure/line-delivery";
 import {
-  DIARY_BRAIN_PROMPT_VERSION,
   buildDevelopmentBrainItemMessage,
   generateDiaryBrainCandidates,
 } from "../logic/diary-brain";
+import { DIARY_BRAIN_PROMPT_VERSION } from "../prompt/diary-brain";
 
 /** wrangler.tomlのmax_retries=5に初回配送を加えた最大試行回数。 */
 export const DIARY_BRAIN_CHECKPOINT_MAX_ATTEMPTS = 6;
