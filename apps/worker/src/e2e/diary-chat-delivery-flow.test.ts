@@ -407,7 +407,10 @@ describe("LINE diary chat delivery E2E", () => {
 
   it("現在TurnでVectorize検索し、AccountDataで再認可した記憶をContext Packageへ入れる", async () => {
     const diaryText = "今日は疲れたので、落ち着く方法を探したい";
-    const { bindings, queuedTurn } = await ingestDiary(diaryText, "brain-context");
+    const { bindings, providerAccountId, queuedTurn } = await ingestDiary(
+      diaryText,
+      "brain-context",
+    );
     const [source] = await accountDataStore.db.select().from(DO.account.schema.sourceRecords);
     if (!source) throw new Error("Expected a source record");
     const recordedAt = new Date("2026-08-10T00:00:00Z");
@@ -465,7 +468,7 @@ describe("LINE diary chat delivery E2E", () => {
       createQueueMessage(queuedTurn),
       bindings,
       getWorkerConfig({
-        ENVIRONMENT: "test",
+        ENVIRONMENT: "preview",
         LINE_CHANNEL_ACCESS_TOKEN: "line-token",
         CHAT_DELIVERY_SECRET: "delivery-secret",
         GOOGLE_VERTEX_AI_API_KEY: "google-key",
@@ -495,6 +498,20 @@ describe("LINE diary chat delivery E2E", () => {
         evidence: [expect.objectContaining({ text: diaryText })],
       }),
     ]);
+    const developmentReply = `${generatedReply}\n\n[dev] 使用したBrain Item\n- 1. Memory: 公園を歩くと落ち着くことがある`;
+    expect(mockPushMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: providerAccountId,
+        messages: [{ type: "text", text: developmentReply }],
+      }),
+      expect.any(String),
+    );
+    const savedMessages = await accountDataStore.db
+      .select()
+      .from(DO.account.schema.conversationMessages);
+    expect(savedMessages.find(({ role }) => role === "assistant")?.assistantBody).toBe(
+      developmentReply,
+    );
     await expect(
       accountDataStore.db.select().from(DO.account.schema.diaryChatBrainUsageAudits),
     ).resolves.toEqual([

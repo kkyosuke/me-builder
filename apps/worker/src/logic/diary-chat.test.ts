@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  appendDevelopmentBrainUsage,
   buildDiaryChatContextPackage,
   buildSafetyFallback,
   classifySafety,
@@ -12,6 +13,33 @@ const messages = [
 ];
 
 describe("diary chat guardrails", () => {
+  it("開発環境では実際に使用したBrain Itemを返信末尾へ追加する", () => {
+    const memories = [{ category: "memory", statement: "公園を歩くと落ち着くことがある" }];
+
+    expect(appendDevelopmentBrainUsage("通常の返信", memories, "development")).toBe(
+      "通常の返信\n\n[dev] 使用したBrain Item\n- 1. Memory: 公園を歩くと落ち着くことがある",
+    );
+    expect(appendDevelopmentBrainUsage("通常の返信", memories, "preview")).toContain(
+      "[dev] 使用したBrain Item",
+    );
+    expect(appendDevelopmentBrainUsage("通常の返信", memories, "production")).toBe("通常の返信");
+  });
+
+  it("Brain Itemを使用していない場合は開発環境でも返信を変更しない", () => {
+    expect(appendDevelopmentBrainUsage("通常の返信", [], "development")).toBe("通常の返信");
+  });
+
+  it("開発用表示を含む最終返信を5000文字以内に収める", () => {
+    const result = appendDevelopmentBrainUsage(
+      "a".repeat(5_000),
+      [{ category: "memory", statement: "使用した記憶" }],
+      "development",
+    );
+
+    expect(result).toHaveLength(5_000);
+    expect(result).toContain("[dev] 使用したBrain Item\n- 1. Memory: 使用した記憶");
+  });
+
   it("schemaと質問数を検証する", () => {
     const valid = JSON.stringify({
       mode: "explore",

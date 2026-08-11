@@ -18,7 +18,11 @@ import {
 import type { CloudflareBindings, WorkerConfig } from "../config";
 import { createGeminiUsageRecorder } from "../infrastructure/gemini-usage";
 import { loadBrainContextMemories } from "../logic/brain-context";
-import { classifySafety, generateDiaryChatResponse } from "../logic/diary-chat";
+import {
+  appendDevelopmentBrainUsage,
+  classifySafety,
+  generateDiaryChatResponse,
+} from "../logic/diary-chat";
 import {
   DEFAULT_DIARY_CHAT_PROMPT_OPTIONS,
   getDiaryChatConversationGuidance,
@@ -526,22 +530,21 @@ export async function processChatTurnMessage(
               const memoryByContextId = new Map<string, (typeof brainMemories)[number]>(
                 brainMemories.map((memory, index) => [`memory-${index + 1}`, memory] as const),
               );
+              const usedMemories = generated.used_memory_ids.flatMap((id) => {
+                const memory = memoryByContextId.get(id);
+                return memory ? [memory] : [];
+              });
               return {
-                reply: generated.reply,
+                reply: appendDevelopmentBrainUsage(
+                  generated.reply,
+                  usedMemories,
+                  workerConfig.environment,
+                ),
                 endSession: generated.end_session,
-                brainUsages: generated.used_memory_ids.flatMap((id) => {
-                  const memory = memoryByContextId.get(id);
-                  return memory
-                    ? [
-                        {
-                          brainItemId: memory.brainItemId,
-                          sourceRecordIds: memory.evidence.map(
-                            ({ sourceRecordId }) => sourceRecordId,
-                          ),
-                        },
-                      ]
-                    : [];
-                }),
+                brainUsages: usedMemories.map((memory) => ({
+                  brainItemId: memory.brainItemId,
+                  sourceRecordIds: memory.evidence.map(({ sourceRecordId }) => sourceRecordId),
+                })),
               };
             }),
           {
