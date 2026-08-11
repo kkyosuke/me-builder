@@ -12,6 +12,7 @@ import {
   conversationSessions,
   diaryBrainCheckpointItems,
   diaryBrainCheckpoints,
+  diaryChatBrainUsageAudits,
   sourceRecordTextPayloads,
   sourceRecords,
 } from "../schema";
@@ -1071,10 +1072,15 @@ export async function isTurnSessionActive(
 
 export async function saveAssistantResponse(
   db: AccountDataDatabase,
+  accountId: string,
   input: {
     turnId: string;
     body: string;
     endSession: boolean;
+    brainUsages?: readonly Readonly<{
+      brainItemId: string;
+      sourceRecordIds: readonly string[];
+    }>[];
   },
 ): Promise<string> {
   const turn = await db
@@ -1096,6 +1102,17 @@ export async function saveAssistantResponse(
     .where(eq(conversationSessions.id, turn.sessionId))
     .get();
   if (!session) throw new Error("Conversation session was not found");
+  if (session.accountId !== accountId) throw new Error("Conversation account mismatch");
+  const brainUsages = input.brainUsages ?? [];
+  const brainItemIds = brainUsages.map(({ brainItemId }) => brainItemId);
+  const evidenceSourceRecordIds = brainUsages.flatMap(({ sourceRecordIds }) => sourceRecordIds);
+  if (
+    brainUsages.length > 5 ||
+    new Set(brainItemIds).size !== brainItemIds.length ||
+    evidenceSourceRecordIds.length > 3
+  ) {
+    throw new Error("Diary chat Brain usage exceeds the Context Package limits");
+  }
   const messageId = crypto.randomUUID();
   const now = new Date();
   const statements: BatchItem<"sqlite">[] = [
@@ -1125,6 +1142,69 @@ export async function saveAssistantResponse(
       })
       .where(eq(chatTurns.id, input.turnId)),
   ];
+  for (const usage of brainUsages) {
+    const item = await db
+      .select({
+        id: brainItems.id,
+        status: brainItems.status,
+        derivation: brainItems.derivation,
+        confidence: brainItems.confidence,
+      })
+      .from(brainItems)
+      .where(and(eq(brainItems.id, usage.brainItemId), eq(brainItems.accountId, accountId)))
+      .get();
+    if (!item) throw new Error("Diary chat Brain usage account mismatch");
+    const labels = await db
+      .select({ label: brainItemAccessLabels.label })
+      .from(brainItemAccessLabels)
+      .where(
+        and(
+          eq(brainItemAccessLabels.brainItemId, item.id),
+          eq(brainItemAccessLabels.isDeleted, false),
+        ),
+      )
+      .all();
+    const uniqueSourceRecordIds = [...new Set(usage.sourceRecordIds)];
+    if (uniqueSourceRecordIds.length !== usage.sourceRecordIds.length) {
+      throw new Error("Diary chat Brain usage contains duplicate Evidence");
+    }
+    const evidence =
+      uniqueSourceRecordIds.length === 0
+        ? []
+        : await db
+            .select({ sourceRecordId: sourceRecords.id })
+            .from(brainItemEvidenceEdges)
+            .innerJoin(sourceRecords, eq(sourceRecords.id, brainItemEvidenceEdges.sourceRecordId))
+            .where(
+              and(
+                eq(brainItemEvidenceEdges.brainItemId, item.id),
+                eq(brainItemEvidenceEdges.relation, "supports"),
+                eq(brainItemEvidenceEdges.isDeleted, false),
+                inArray(sourceRecords.id, uniqueSourceRecordIds),
+                eq(sourceRecords.accountId, accountId),
+                eq(sourceRecords.isDeleted, false),
+              ),
+            )
+            .all();
+    if (evidence.length !== uniqueSourceRecordIds.length) {
+      throw new Error("Diary chat Brain usage Evidence is not authorized");
+    }
+    statements.push(
+      db.insert(diaryChatBrainUsageAudits).values({
+        id: crypto.randomUUID(),
+        turnId: input.turnId,
+        brainItemId: item.id,
+        purpose: "diary_chat",
+        status: item.status,
+        derivation: item.derivation,
+        confidence: item.confidence,
+        accessLabels: labels.map(({ label }) => label).sort(),
+        sourceRecordIds: uniqueSourceRecordIds,
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+  }
   if (input.endSession) {
     statements.push(
       db

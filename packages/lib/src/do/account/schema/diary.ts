@@ -119,6 +119,36 @@ export const chatTurns = sqliteTable(
   ],
 );
 
+/** 日記チャットが回答生成に実際に利用したBrain Itemと根拠の監査snapshot。 */
+export const diaryChatBrainUsageAudits = sqliteTable(
+  "diary_chat_brain_usage_audits",
+  {
+    ...baseSchema,
+    turnId: text("turn_id")
+      .notNull()
+      .references(() => chatTurns.id),
+    brainItemId: text("brain_item_id")
+      .notNull()
+      .references(() => brainItems.id),
+    purpose: text("purpose", { enum: ["diary_chat"] }).notNull(),
+    status: text("status", { enum: ["active", "superseded", "invalidated"] }).notNull(),
+    derivation: text("derivation", { enum: ["ai", "deterministic"] }).notNull(),
+    confidence: text("confidence_json", { mode: "json" }).notNull().$type<unknown>(),
+    accessLabels: text("access_labels_json", { mode: "json" }).notNull().$type<readonly string[]>(),
+    sourceRecordIds: text("source_record_ids_json", { mode: "json" })
+      .notNull()
+      .$type<readonly string[]>(),
+  },
+  (table) => [
+    uniqueIndex("diary_chat_brain_usage_turn_item_idx").on(
+      table.turnId,
+      table.brainItemId,
+      table.purpose,
+    ),
+    index("diary_chat_brain_usage_turn_idx").on(table.turnId),
+  ],
+);
+
 /** 複数Turnをまとめ、無操作または最大待機時間でBrain Itemへ変換する範囲。 */
 export const diaryBrainCheckpoints = sqliteTable(
   "diary_brain_checkpoints",

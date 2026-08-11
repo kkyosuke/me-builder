@@ -92,9 +92,9 @@ export const diaryActions = {
   ) => DO.account.action.diary.isTurnSessionActive(db, turnId),
   "conversation.saveAssistantResponse": (
     db: DO.account.Database,
-    _accountId: string,
-    input: Parameters<typeof DO.account.action.diary.saveAssistantResponse>[1],
-  ) => DO.account.action.diary.saveAssistantResponse(db, input),
+    accountId: string,
+    input: Parameters<typeof DO.account.action.diary.saveAssistantResponse>[2],
+  ) => DO.account.action.diary.saveAssistantResponse(db, accountId, input),
   "conversation.getPendingAssistantResponse": (
     db: DO.account.Database,
     accountId: string,

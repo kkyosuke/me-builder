@@ -38,6 +38,10 @@ export type AccountDataActions = {
     [brainItemId: string],
     typeof brain.findActiveBrainVectorEntry
   >;
+  "brain.loadChatContextMemories": RpcAction<
+    [vectorIds: readonly string[], at?: Date],
+    typeof brain.loadBrainChatContextMemories
+  >;
   "brain.getVectorSyncTarget": RpcAction<
     [jobId: string, brainItemId: string, itemRevision: number],
     typeof brain.getBrainVectorSyncTarget
@@ -148,7 +152,10 @@ export type AccountDataActions = {
   "conversation.markTurnGenerating": DomainAction<typeof diary.markTurnGenerating>;
   "conversation.getTurnStatus": DomainAction<typeof diary.getTurnStatus>;
   "conversation.isTurnSessionActive": DomainAction<typeof diary.isTurnSessionActive>;
-  "conversation.saveAssistantResponse": DomainAction<typeof diary.saveAssistantResponse>;
+  "conversation.saveAssistantResponse": RpcAction<
+    [input: Parameters<typeof diary.saveAssistantResponse>[2]],
+    typeof diary.saveAssistantResponse
+  >;
   "conversation.getPendingAssistantResponse": RpcAction<
     [turnId: string],
     typeof diary.getPendingAssistantResponse

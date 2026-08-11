@@ -9,6 +9,12 @@ export const brainActions = {
     accountId: string,
     brainItemId: string,
   ) => DO.account.action.brain.findActiveBrainVectorEntry(db, accountId, brainItemId),
+  "brain.loadChatContextMemories": (
+    db: DO.account.Database,
+    accountId: string,
+    vectorIds: readonly string[],
+    at?: Date,
+  ) => DO.account.action.brain.loadBrainChatContextMemories(db, accountId, vectorIds, at),
   "brain.getVectorSyncTarget": (
     db: DO.account.Database,
     accountId: string,

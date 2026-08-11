@@ -1,4 +1,4 @@
-import type { ConversationContextMessage } from "@me-builder/lib";
+import type { BrainChatContextMemory, ConversationContextMessage } from "@me-builder/lib";
 import { toJsonSchema } from "@valibot/to-json-schema";
 import * as v from "valibot";
 import type { WorkerConfig } from "../config";
@@ -31,7 +31,10 @@ const DiaryChatResponseSchema = v.strictObject({
     route: SafetyRouteSchema,
     restricted_advice: v.boolean(),
   }),
+  used_memory_ids: v.pipe(v.array(v.string()), v.maxLength(5)),
 });
+const MEMORY_STATEMENT_CHARACTER_LIMIT = 2_000;
+const MEMORY_EVIDENCE_CHARACTER_LIMIT = 1_000;
 
 export type DiaryChatResponse = v.InferOutput<typeof DiaryChatResponseSchema>;
 export type SafetyRoute = v.InferOutput<typeof SafetyRouteSchema>;
@@ -81,6 +84,7 @@ export function stricterSafetyRoute(first: SafetyRoute, second: SafetyRoute): Sa
 export function validateDiaryChatResponse(
   raw: string,
   preclassifiedRoute: SafetyRoute,
+  allowedMemoryIds: readonly string[] = [],
 ): DiaryChatResponse | undefined {
   let json: unknown;
   try {
@@ -91,8 +95,10 @@ export function validateDiaryChatResponse(
   const parsed = v.safeParse(DiaryChatResponseSchema, json);
   if (!parsed.success) return undefined;
   const safetyRoute = stricterSafetyRoute(preclassifiedRoute, parsed.output.safety.route);
+  const allowed = new Set(allowedMemoryIds);
   return {
     ...parsed.output,
+    used_memory_ids: [...new Set(parsed.output.used_memory_ids)].filter((id) => allowed.has(id)),
     safety: {
       route: safetyRoute,
       restricted_advice: parsed.output.safety.restricted_advice || safetyRoute !== "normal",
@@ -115,6 +121,33 @@ export function buildSafetyFallback(route: SafetyRoute): DiaryChatResponse {
     main_question_count: requiresSafetyConfirmation ? 1 : 0,
     end_session: false,
     safety: { route, restricted_advice: route !== "normal" },
+    used_memory_ids: [],
+  };
+}
+
+export function buildDiaryChatContextPackage(
+  messages: readonly ConversationContextMessage[],
+  safetyRoute: SafetyRoute,
+  brainMemories: readonly BrainChatContextMemory[] = [],
+) {
+  return {
+    safety_route: safetyRoute,
+    messages: messages.map(({ id, role, body }) => ({ id, role, body })),
+    memories: brainMemories.map((memory, index) => ({
+      id: `memory-${index + 1}`,
+      category: memory.category,
+      statement: memory.statement.slice(0, MEMORY_STATEMENT_CHARACTER_LIMIT),
+      derivation: memory.derivation,
+      status: memory.status,
+      confidence: memory.confidence,
+      access_labels: memory.accessLabels,
+      recorded_at: memory.recordedAt,
+      evidence: memory.evidence.map(({ text, recordedAt }, evidenceIndex) => ({
+        id: `evidence-${index + 1}-${evidenceIndex + 1}`,
+        text: text.slice(0, MEMORY_EVIDENCE_CHARACTER_LIMIT),
+        recorded_at: recordedAt,
+      })),
+    })),
   };
 }
 
@@ -124,6 +157,7 @@ export async function generateDiaryChatResponse(
   signal?: AbortSignal,
   context?: {
     currentUserMessageIds?: string[];
+    brainMemories?: readonly BrainChatContextMemory[];
     prompt?: DiaryChatPromptOptions;
     onUsage?: GeminiUsageRecorder;
   },
@@ -137,13 +171,12 @@ export async function generateDiaryChatResponse(
   const client = createGeminiClient({
     googleVertexAiApiKey: workerConfig.googleVertexAiApiKey,
   });
+  const brainMemories = context?.brainMemories ?? [];
   const contents = JSON.stringify({
-    context_package: {
-      safety_route: safetyRoute,
-      messages: messages.map(({ id, role, body }) => ({ id, role, body })),
-    },
+    context_package: buildDiaryChatContextPackage(messages, safetyRoute, brainMemories),
   });
   const schema = toJsonSchema(DiaryChatResponseSchema) as Record<string, unknown>;
+  const allowedMemoryIds = brainMemories.map((_, index) => `memory-${index + 1}`);
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const raw = await generateStructuredText(client, {
       model: workerConfig.geminiModel,
@@ -156,7 +189,9 @@ export async function generateDiaryChatResponse(
       ...(signal ? { signal } : {}),
       ...(context?.onUsage ? { onUsage: context.onUsage } : {}),
     });
-    const validated = raw ? validateDiaryChatResponse(raw, safetyRoute) : undefined;
+    const validated = raw
+      ? validateDiaryChatResponse(raw, safetyRoute, allowedMemoryIds)
+      : undefined;
     if (validated) return validated;
   }
   return buildSafetyFallback(safetyRoute);
