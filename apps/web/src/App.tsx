@@ -106,7 +106,10 @@ function AppContents() {
     { status: "loading" | "ready" } | { status: "error"; message: string }
   >({ status: "loading" });
   const [profileReloadKey, setProfileReloadKey] = useState(0);
-  const linePictureUrl = profileLinePictureUrl ?? liffSession.profile?.pictureUrl;
+  const linePictureUrl =
+    profileReadState.status === "ready"
+      ? (profileLinePictureUrl ?? liffSession.profile?.pictureUrl)
+      : undefined;
 
   const applyAccountProfile = useCallback((profile: AccountProfile) => {
     setAvatar(uploadedAvatar(profile));

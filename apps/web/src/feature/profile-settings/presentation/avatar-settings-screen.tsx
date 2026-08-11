@@ -25,6 +25,7 @@ export function AvatarSettingsScreen({
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const selectionIdRef = useRef(0);
   const isSaving = savingAction !== null;
+  const displayedAvatar = selectedImage ?? currentAvatar;
 
   useEffect(() => {
     closeButtonRef.current?.focus();
@@ -113,20 +114,26 @@ export function AvatarSettingsScreen({
         <main className="overflow-y-auto px-4 py-6 sm:px-6">
           <section className="rounded-3xl bg-gradient-to-br from-sky-100 via-white to-violet-100 p-5 dark:from-sky-950/60 dark:via-slate-800 dark:to-violet-950/50">
             <div className="flex items-center gap-4">
-              <AvatarPreview avatar={currentAvatar} fallbackImageUrl={linePictureUrl} size="lg" />
-              <div className="min-w-0">
+              <AvatarPreview
+                avatar={displayedAvatar}
+                fallbackImageUrl={selectedImage ? undefined : linePictureUrl}
+                size="lg"
+              />
+              <div aria-live="polite" className="min-w-0">
                 <p className="text-xs font-bold tracking-wider text-slate-500 dark:text-slate-400">
-                  現在のアバター
+                  {selectedImage ? "設定するアバター" : "現在のアバター"}
                 </p>
                 <p className="mt-2 break-words font-bold text-slate-950 dark:text-white">
-                  {getAvatarName(currentAvatar, linePictureUrl)}
+                  {selectedImage ? "選択した画像" : getAvatarName(currentAvatar, linePictureUrl)}
                 </p>
                 <p className="mt-1 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
-                  {currentAvatar
-                    ? "アプリで選んだ画像を表示しています。"
-                    : linePictureUrl
-                      ? "LINEのプロフィール画像を表示しています。"
-                      : "画像を選ぶとプロフィールに表示できます。"}
+                  {selectedImage
+                    ? "この画像でよければ、下のボタンから保存してください。"
+                    : currentAvatar
+                      ? "アプリで選んだ画像を表示しています。"
+                      : linePictureUrl
+                        ? "LINEのプロフィール画像を表示しています。"
+                        : "画像を選ぶとプロフィールに表示できます。"}
                 </p>
               </div>
             </div>
@@ -178,25 +185,6 @@ export function AvatarSettingsScreen({
             )}
           </section>
 
-          {selectedImage && (
-            <section aria-labelledby="avatar-preview-heading" className="mt-6">
-              <h2
-                id="avatar-preview-heading"
-                className="px-1 text-sm font-bold text-slate-950 dark:text-white"
-              >
-                設定後のプレビュー
-              </h2>
-              <div className="mt-3 rounded-3xl border border-slate-200 bg-white p-6 text-center shadow-sm dark:border-slate-700 dark:bg-slate-800">
-                <div className="flex justify-center">
-                  <AvatarPreview avatar={selectedImage} size="xl" />
-                </div>
-                <p className="mt-4 text-xs text-slate-500 dark:text-slate-400">
-                  画像は中央を正方形に切り抜き、プロフィールでは円形で表示されます。
-                </p>
-              </div>
-            </section>
-          )}
-
           {saveError && (
             <p
               role="alert"
@@ -222,7 +210,7 @@ export function AvatarSettingsScreen({
             ) : (
               <Check className="size-5" aria-hidden="true" />
             )}
-            {savingAction === "save" ? "保存しています" : "この画像を設定"}
+            {savingAction === "save" ? "保存しています" : "この画像を保存"}
           </button>
           {currentAvatar && (
             <button
