@@ -1311,6 +1311,14 @@
                             "type": "string",
                             "format": "date-time"
                           },
+                          "firstObservedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "lastObservedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
                           "vectorSync": {
                             "type": "object",
                             "properties": {
@@ -1376,13 +1384,18 @@
                                 "generatedAt": {
                                   "type": "string",
                                   "format": "date-time"
+                                },
+                                "recordedAt": {
+                                  "type": "string",
+                                  "format": "date-time"
                                 }
                               },
                               "required": [
                                 "sourceRecordId",
                                 "relation",
                                 "derivationMethod",
-                                "generatedAt"
+                                "generatedAt",
+                                "recordedAt"
                               ]
                             }
                           }
@@ -1394,6 +1407,8 @@
                           "derivation",
                           "status",
                           "createdAt",
+                          "firstObservedAt",
+                          "lastObservedAt",
                           "vectorSync",
                           "evidence"
                         ]

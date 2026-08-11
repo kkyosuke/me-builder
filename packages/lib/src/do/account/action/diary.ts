@@ -16,7 +16,12 @@ import {
   sourceRecordTextPayloads,
   sourceRecords,
 } from "../schema";
-import { resolveDiaryTemporalContext } from "./diary-temporal";
+import {
+  type DiaryTemporalContext,
+  buildDiaryTemporalSearchText,
+  readDiaryTemporalContext,
+  resolveDiaryTemporalContext,
+} from "./diary-temporal";
 
 const SESSION_INACTIVITY_MS = 6 * 60 * 60 * 1000;
 const SESSION_HARD_CAP_MS = 24 * 60 * 60 * 1000;
@@ -660,11 +665,39 @@ export type DiaryBrainCheckpointCandidate = Readonly<{
   category: DiaryBrainCategory;
   statement: string;
   sourceMessageIds: readonly string[];
+  matchingBrainItemId?: string;
+  deduplication?: "none" | "exact" | "semantic";
+  dedupPromptVersion?: string;
+}>;
+
+type AppliedDiaryBrainCheckpointCandidate = Readonly<{
+  category: DiaryBrainCategory;
+  statement: string;
+  sourceMessageIds: readonly string[];
+  operation: "created" | "evidence_added";
+  deduplication: "none" | "exact" | "semantic";
 }>;
 
 export type DiaryBrainCheckpointApplyResult = Readonly<{
-  candidates: readonly DiaryBrainCheckpointCandidate[];
+  candidates: readonly AppliedDiaryBrainCheckpointCandidate[];
 }>;
+
+function temporalContextsConflict(
+  left: DiaryTemporalContext | undefined,
+  right: DiaryTemporalContext | undefined,
+): boolean {
+  if (!left || !right) return false;
+  const key = (context: DiaryTemporalContext) =>
+    context.resolutions
+      .map(({ original, resolved }) => `${original}\u0000${resolved}`)
+      .sort()
+      .join("\u0001");
+  return key(left) !== key(right);
+}
+
+function normalizeDiaryBrainComparison(value: string): string {
+  return value.normalize("NFKC").replace(/\s+/gu, " ").trim();
+}
 
 /** Alarm時点で期限を迎えたcheckpointをQueue投入対象として返す。 */
 export async function listDueDiaryBrainCheckpointIds(
@@ -790,6 +823,7 @@ export async function getDiaryBrainCheckpointContext(
       sequence: conversationMessages.sequence,
       assistantBody: conversationMessages.assistantBody,
       userBody: sourceRecordTextPayloads.body,
+      userRecordedAt: sourceRecords.createdAt,
     })
     .from(conversationMessages)
     .leftJoin(sourceRecords, eq(conversationMessages.sourceRecordId, sourceRecords.id))
@@ -813,7 +847,15 @@ export async function getDiaryBrainCheckpointContext(
   const messages = rows.flatMap((row) => {
     const body = row.role === "user" ? row.userBody : row.assistantBody;
     return body && body.length <= BRAIN_CHECKPOINT_MAX_USER_MESSAGE_CHARS
-      ? [{ id: row.id, role: row.role, body, sequence: row.sequence }]
+      ? [
+          {
+            id: row.id,
+            role: row.role,
+            body,
+            sequence: row.sequence,
+            ...(row.userRecordedAt ? { recordedAt: row.userRecordedAt } : {}),
+          },
+        ]
       : [];
   });
   return {
@@ -845,21 +887,52 @@ export async function applyDiaryBrainCheckpoint(
   if (!checkpoint) return false;
   if (candidates.length > 3) throw new Error("Diary Brain candidates exceed the limit");
   const statements: BatchItem<"sqlite">[] = [];
-  const appliedCandidates: DiaryBrainCheckpointCandidate[] = [];
-  const acceptedCandidateKeys = new Set<string>();
+  const appliedCandidates: AppliedDiaryBrainCheckpointCandidate[] = [];
+  const appliedCandidateIndexByItemId = new Map<string, number>();
+  const groupedCandidates = new Map<string, DiaryBrainCheckpointCandidate>();
   for (const candidate of candidates) {
     const messageIds = [...new Set(candidate.sourceMessageIds)];
+    const deduplication = candidate.deduplication ?? "none";
+    const hasMatch = Boolean(candidate.matchingBrainItemId);
+    const hasValidDedupAudit =
+      hasMatch === (deduplication !== "none") &&
+      (deduplication === "semantic"
+        ? Boolean(candidate.dedupPromptVersion?.trim())
+        : !candidate.dedupPromptVersion);
     if (
       !DIARY_BRAIN_CATEGORY_SET.has(candidate.category) ||
       !candidate.statement.trim() ||
       messageIds.length === 0 ||
-      messageIds.length !== candidate.sourceMessageIds.length
+      messageIds.length !== candidate.sourceMessageIds.length ||
+      !hasValidDedupAudit
     ) {
       throw new Error("Diary Brain candidate validation failed");
     }
-    const candidateKey = `${candidate.category}\u0000${candidate.statement.trim()}\u0000${[...messageIds].sort().join("\u0000")}`;
-    if (acceptedCandidateKeys.has(candidateKey)) continue;
-    acceptedCandidateKeys.add(candidateKey);
+    const key = `${candidate.category}\u0000${candidate.statement.trim()}`;
+    const grouped = groupedCandidates.get(key);
+    if (!grouped) {
+      groupedCandidates.set(key, { ...candidate, statement: candidate.statement.trim() });
+      continue;
+    }
+    const sameMatch = grouped.matchingBrainItemId === candidate.matchingBrainItemId;
+    groupedCandidates.set(key, {
+      category: grouped.category,
+      statement: grouped.statement,
+      sourceMessageIds: [...new Set([...grouped.sourceMessageIds, ...messageIds])],
+      ...(sameMatch && grouped.matchingBrainItemId
+        ? {
+            matchingBrainItemId: grouped.matchingBrainItemId,
+            deduplication: grouped.deduplication,
+            ...(grouped.dedupPromptVersion
+              ? { dedupPromptVersion: grouped.dedupPromptVersion }
+              : {}),
+          }
+        : {}),
+    });
+  }
+
+  for (const candidate of groupedCandidates.values()) {
+    const messageIds = [...candidate.sourceMessageIds];
     const sources = await db
       .select({
         id: sourceRecords.id,
@@ -897,8 +970,169 @@ export async function applyDiaryBrainCheckpoint(
     const recordedAt = new Date(Math.min(...sources.map(({ createdAt }) => createdAt.getTime())));
     const statement = candidate.statement.trim();
     const temporalContext = resolveDiaryTemporalContext(statement, recordedAt);
-    const brainItemId = crypto.randomUUID();
     const lifecycle = { createdAt: at, updatedAt: at };
+    const requestedItem = candidate.matchingBrainItemId
+      ? await db
+          .select({
+            id: brainItems.id,
+            category: brainItems.category,
+            statement: brainItems.statement,
+            attributes: brainItems.attributes,
+            derivation: brainItems.derivation,
+          })
+          .from(brainItems)
+          .where(
+            and(
+              eq(brainItems.id, candidate.matchingBrainItemId),
+              eq(brainItems.accountId, accountId),
+              eq(brainItems.status, "active"),
+              eq(brainItems.isDeleted, false),
+            ),
+          )
+          .get()
+      : undefined;
+    const requestedIsInference =
+      requestedItem?.attributes &&
+      typeof requestedItem.attributes === "object" &&
+      "isInference" in requestedItem.attributes &&
+      typeof requestedItem.attributes.isInference === "boolean"
+        ? requestedItem.attributes.isInference
+        : requestedItem?.derivation === "ai";
+    const requestedTemporalContext = readDiaryTemporalContext(requestedItem?.attributes);
+    const requestedDeduplicationIsValid =
+      candidate.deduplication === "semantic" ||
+      (candidate.deduplication === "exact" &&
+        requestedItem &&
+        normalizeDiaryBrainComparison(
+          buildDiaryTemporalSearchText(requestedItem.statement, requestedTemporalContext),
+        ) ===
+          normalizeDiaryBrainComparison(buildDiaryTemporalSearchText(statement, temporalContext)));
+    const requestedMatch =
+      requestedItem &&
+      requestedDeduplicationIsValid &&
+      requestedItem.category === candidate.category &&
+      !requestedIsInference &&
+      !temporalContextsConflict(temporalContext, requestedTemporalContext)
+        ? requestedItem
+        : undefined;
+    if (candidate.matchingBrainItemId && !requestedMatch) {
+      throw new Error("Diary Brain requested match revalidation failed");
+    }
+    const exactItems = requestedMatch
+      ? []
+      : await db
+          .select({
+            id: brainItems.id,
+            category: brainItems.category,
+            statement: brainItems.statement,
+            attributes: brainItems.attributes,
+            derivation: brainItems.derivation,
+          })
+          .from(brainItems)
+          .where(
+            and(
+              eq(brainItems.accountId, accountId),
+              eq(brainItems.category, candidate.category),
+              eq(brainItems.statement, statement),
+              eq(brainItems.status, "active"),
+              eq(brainItems.isDeleted, false),
+            ),
+          )
+          .all();
+    const exactMatch = exactItems.find((item) => {
+      const isInference =
+        item.attributes &&
+        typeof item.attributes === "object" &&
+        "isInference" in item.attributes &&
+        typeof item.attributes.isInference === "boolean"
+          ? item.attributes.isInference
+          : item.derivation === "ai";
+      return (
+        !isInference &&
+        !temporalContextsConflict(temporalContext, readDiaryTemporalContext(item.attributes))
+      );
+    });
+    const matchedItem = requestedMatch ?? exactMatch;
+    const actualDeduplication = requestedMatch
+      ? (candidate.deduplication ?? "none")
+      : exactMatch
+        ? "exact"
+        : "none";
+
+    if (matchedItem) {
+      const brainItemId = matchedItem.id;
+      statements.push(
+        ...sources.map((source) =>
+          db
+            .insert(brainItemEvidenceEdges)
+            .values({
+              id: crypto.randomUUID(),
+              brainItemId,
+              sourceRecordId: source.id,
+              relation: "supports",
+              isDerivationTrigger: false,
+              derivationMethod: "ai",
+              generatedAt: at,
+              ...lifecycle,
+            })
+            .onConflictDoNothing(),
+        ),
+      );
+      const appliedIndex = appliedCandidateIndexByItemId.get(brainItemId);
+      if (appliedIndex !== undefined) {
+        const previous = appliedCandidates[appliedIndex];
+        if (previous) {
+          appliedCandidates[appliedIndex] = {
+            ...previous,
+            sourceMessageIds: [...new Set([...previous.sourceMessageIds, ...messageIds])],
+            ...(actualDeduplication === "semantic" ? { deduplication: "semantic" as const } : {}),
+          };
+          if (previous.deduplication !== "semantic" && actualDeduplication === "semantic") {
+            statements.push(
+              db
+                .update(diaryBrainCheckpointItems)
+                .set({
+                  deduplication: "semantic",
+                  dedupPromptVersion: candidate.dedupPromptVersion,
+                  updatedAt: at,
+                })
+                .where(
+                  and(
+                    eq(diaryBrainCheckpointItems.checkpointId, checkpointId),
+                    eq(diaryBrainCheckpointItems.brainItemId, brainItemId),
+                  ),
+                ),
+            );
+          }
+        }
+        continue;
+      }
+      statements.push(
+        db.insert(diaryBrainCheckpointItems).values({
+          id: crypto.randomUUID(),
+          checkpointId,
+          brainItemId,
+          position: appliedCandidates.length,
+          operation: "evidence_added",
+          deduplication: actualDeduplication,
+          ...(actualDeduplication === "semantic" && candidate.dedupPromptVersion
+            ? { dedupPromptVersion: candidate.dedupPromptVersion }
+            : {}),
+          ...lifecycle,
+        }),
+      );
+      appliedCandidateIndexByItemId.set(brainItemId, appliedCandidates.length);
+      appliedCandidates.push({
+        category: candidate.category,
+        statement: matchedItem.statement,
+        sourceMessageIds: messageIds,
+        operation: "evidence_added",
+        deduplication: actualDeduplication,
+      });
+      continue;
+    }
+
+    const brainItemId = crypto.randomUUID();
     statements.push(
       db.insert(brainItems).values({
         id: brainItemId,
@@ -961,13 +1195,18 @@ export async function applyDiaryBrainCheckpoint(
         checkpointId,
         brainItemId,
         position: appliedCandidates.length,
+        operation: "created",
+        deduplication: "none",
         ...lifecycle,
       }),
     );
+    appliedCandidateIndexByItemId.set(brainItemId, appliedCandidates.length);
     appliedCandidates.push({
       category: candidate.category,
       statement,
       sourceMessageIds: messageIds,
+      operation: "created",
+      deduplication: "none",
     });
   }
   statements.push(
@@ -996,7 +1235,12 @@ export async function getDiaryBrainCheckpointDevelopmentNotification(
   checkpointId: string,
 ): Promise<DiaryBrainCheckpointApplyResult | undefined> {
   const checkpoint = await db
-    .select({ id: diaryBrainCheckpoints.id })
+    .select({
+      id: diaryBrainCheckpoints.id,
+      sessionId: diaryBrainCheckpoints.sessionId,
+      fromSequence: diaryBrainCheckpoints.fromSequence,
+      throughSequence: diaryBrainCheckpoints.throughSequence,
+    })
     .from(diaryBrainCheckpoints)
     .where(
       and(
@@ -1014,6 +1258,8 @@ export async function getDiaryBrainCheckpointDevelopmentNotification(
       brainItemId: brainItems.id,
       category: brainItems.category,
       statement: brainItems.statement,
+      operation: diaryBrainCheckpointItems.operation,
+      deduplication: diaryBrainCheckpointItems.deduplication,
     })
     .from(diaryBrainCheckpointItems)
     .innerJoin(brainItems, eq(diaryBrainCheckpointItems.brainItemId, brainItems.id))
@@ -1026,7 +1272,7 @@ export async function getDiaryBrainCheckpointDevelopmentNotification(
     )
     .orderBy(diaryBrainCheckpointItems.position)
     .all();
-  const result: DiaryBrainCheckpointCandidate[] = [];
+  const result: AppliedDiaryBrainCheckpointCandidate[] = [];
   for (const item of items) {
     const messages = await db
       .select({ id: conversationMessages.id })
@@ -1039,6 +1285,9 @@ export async function getDiaryBrainCheckpointDevelopmentNotification(
         and(
           eq(brainItemEvidenceEdges.brainItemId, item.brainItemId),
           eq(brainItemEvidenceEdges.isDeleted, false),
+          eq(conversationMessages.sessionId, checkpoint.sessionId),
+          gte(conversationMessages.sequence, checkpoint.fromSequence),
+          lte(conversationMessages.sequence, checkpoint.throughSequence),
         ),
       )
       .orderBy(conversationMessages.sequence)
@@ -1048,6 +1297,8 @@ export async function getDiaryBrainCheckpointDevelopmentNotification(
       category: item.category as DiaryBrainCategory,
       statement: item.statement,
       sourceMessageIds: messages.map(({ id }) => id),
+      operation: item.operation,
+      deduplication: item.deduplication,
     });
   }
   return { candidates: result };

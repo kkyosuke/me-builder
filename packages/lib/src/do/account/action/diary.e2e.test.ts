@@ -6,6 +6,7 @@ import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { describe, expect, it } from "vitest";
 import type { AccountDataDatabase } from "../database";
 import { accountSchema as schema } from "../database";
+import { saveBrainItem } from "./brain";
 import {
   applyDiaryBrainCheckpoint,
   attachMessagesToTurn,
@@ -233,11 +234,15 @@ describe("Diary conversation persistence flow", () => {
           category: "memory",
           statement: "今日は少し疲れた",
           sourceMessageIds: checkpointContext?.sourceMessageIds.slice(0, 1) ?? [],
+          operation: "created",
+          deduplication: "none",
         },
         {
           category: "memory",
           statement: "散歩できた",
           sourceMessageIds: checkpointContext?.sourceMessageIds.slice(1, 2) ?? [],
+          operation: "created",
+          deduplication: "none",
         },
       ],
     });
@@ -278,11 +283,15 @@ describe("Diary conversation persistence flow", () => {
           category: "memory",
           statement: "今日は少し疲れた",
           sourceMessageIds: checkpointContext?.sourceMessageIds.slice(0, 1) ?? [],
+          operation: "created",
+          deduplication: "none",
         },
         {
           category: "memory",
           statement: "散歩できた",
           sourceMessageIds: checkpointContext?.sourceMessageIds.slice(1, 2) ?? [],
+          operation: "created",
+          deduplication: "none",
         },
       ],
     });
@@ -358,6 +367,8 @@ describe("Diary conversation persistence flow", () => {
           category: "goal",
           statement: "来月までに転職先を決めたい",
           sourceMessageIds: context?.sourceMessageIds ?? [],
+          operation: "created",
+          deduplication: "none",
         },
       ],
     });
@@ -377,6 +388,168 @@ describe("Diary conversation persistence flow", () => {
         }),
       }),
     ]);
+  });
+
+  it("意味的に同じ既存Itemへ新しいEvidenceだけを追加する", async () => {
+    const db = createTestDb();
+    const account = await bindAccount(db, "account-diary_brain_dedup");
+    const existingAt = new Date("2026-08-01T00:00:00Z");
+    const existingSource = await storeLineTextSource(db, {
+      accountId: account.id,
+      eventId: "dedup-existing-source",
+      body: "辛い食べ物が苦手",
+      receivedAt: existingAt,
+    });
+    await saveBrainItem(db, {
+      at: existingAt,
+      item: {
+        id: "existing-preference",
+        accountId: account.id,
+        category: "preference",
+        statement: "辛い食べ物が苦手",
+        attributes: { sourceKind: "diary", isInference: false },
+        derivation: "ai",
+        status: "active",
+        stability: "changeable",
+        sensitivity: "normal",
+        externallyShareable: false,
+        confidence: { state: "uncomputed" },
+      },
+      evidence: [
+        {
+          id: "existing-evidence",
+          sourceRecordId: existingSource.sourceRecordId,
+          relation: "supports",
+          isDerivationTrigger: true,
+          derivationMethod: "ai",
+          generatedAt: existingAt,
+        },
+      ],
+      accessLabels: [{ id: "existing-access", label: "unclassified", assignedBy: "system" }],
+      topicLabels: [{ id: "existing-topic", label: "diary" }],
+    });
+
+    const receivedAt = new Date("2026-08-11T03:00:00Z");
+    const newSource = await storeLineTextSource(db, {
+      accountId: account.id,
+      eventId: "dedup-new-source",
+      body: "辛いものはあまり食べられない",
+      receivedAt,
+    });
+    await attachMessagesToTurn(db, account.id, [newSource], 1, "test-model", "test-prompt");
+    const [checkpoint] = await db.select().from(schema.diaryBrainCheckpoints);
+    await claimDueDiaryBrainCheckpointIds(
+      db,
+      account.id,
+      new Date(receivedAt.getTime() + 11 * 60 * 1000),
+    );
+    await markDiaryBrainCheckpointDispatched(db, account.id, checkpoint?.id ?? "");
+    const context = await getDiaryBrainCheckpointContext(db, account.id, checkpoint?.id ?? "");
+
+    await expect(
+      applyDiaryBrainCheckpoint(
+        db,
+        account.id,
+        checkpoint?.id ?? "",
+        context?.throughSequence ?? 0,
+        "diary-brain-v2",
+        [
+          {
+            category: "preference",
+            statement: "辛いものはあまり食べられない",
+            sourceMessageIds: context?.sourceMessageIds ?? [],
+            matchingBrainItemId: "existing-preference",
+            deduplication: "semantic",
+          },
+        ],
+        receivedAt,
+      ),
+    ).rejects.toThrow("Diary Brain candidate validation failed");
+
+    await expect(
+      applyDiaryBrainCheckpoint(
+        db,
+        account.id,
+        checkpoint?.id ?? "",
+        context?.throughSequence ?? 0,
+        "diary-brain-v2",
+        [
+          {
+            category: "preference",
+            statement: "辛いものはあまり食べられない",
+            sourceMessageIds: context?.sourceMessageIds ?? [],
+            matchingBrainItemId: "missing-preference",
+            deduplication: "semantic",
+            dedupPromptVersion: "brain-dedup-v1",
+          },
+        ],
+        receivedAt,
+      ),
+    ).rejects.toThrow("Diary Brain requested match revalidation failed");
+    await expect(db.select().from(schema.brainItems)).resolves.toHaveLength(1);
+    await expect(db.select().from(schema.brainItemEvidenceEdges)).resolves.toHaveLength(1);
+
+    await expect(
+      applyDiaryBrainCheckpoint(
+        db,
+        account.id,
+        checkpoint?.id ?? "",
+        context?.throughSequence ?? 0,
+        "diary-brain-v2",
+        [
+          {
+            category: "preference",
+            statement: "辛いものはあまり食べられない",
+            sourceMessageIds: context?.sourceMessageIds ?? [],
+            matchingBrainItemId: "existing-preference",
+            deduplication: "semantic",
+            dedupPromptVersion: "brain-dedup-v1",
+          },
+        ],
+        receivedAt,
+      ),
+    ).resolves.toEqual({
+      candidates: [
+        {
+          category: "preference",
+          statement: "辛い食べ物が苦手",
+          sourceMessageIds: context?.sourceMessageIds ?? [],
+          operation: "evidence_added",
+          deduplication: "semantic",
+        },
+      ],
+    });
+    await expect(db.select().from(schema.brainItems)).resolves.toHaveLength(1);
+    await expect(db.select().from(schema.brainItemEvidenceEdges)).resolves.toEqual([
+      expect.objectContaining({ id: "existing-evidence", isDerivationTrigger: true }),
+      expect.objectContaining({
+        brainItemId: "existing-preference",
+        sourceRecordId: newSource.sourceRecordId,
+        isDerivationTrigger: false,
+      }),
+    ]);
+    await expect(db.select().from(schema.brainVectorSyncJobs)).resolves.toHaveLength(1);
+    await expect(db.select().from(schema.diaryBrainCheckpointItems)).resolves.toEqual([
+      expect.objectContaining({
+        brainItemId: "existing-preference",
+        operation: "evidence_added",
+        deduplication: "semantic",
+        dedupPromptVersion: "brain-dedup-v1",
+      }),
+    ]);
+    await expect(
+      getDiaryBrainCheckpointDevelopmentNotification(db, account.id, checkpoint?.id ?? ""),
+    ).resolves.toEqual({
+      candidates: [
+        {
+          category: "preference",
+          statement: "辛い食べ物が苦手",
+          sourceMessageIds: context?.sourceMessageIds ?? [],
+          operation: "evidence_added",
+          deduplication: "semantic",
+        },
+      ],
+    });
   });
 
   it("回答で実際に使ったBrain ItemとEvidenceを応答と同じbatchで監査保存する", async () => {

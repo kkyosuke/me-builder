@@ -997,6 +997,10 @@ export interface operations {
               status: "active";
               /** Format: date-time */
               createdAt: string;
+              /** Format: date-time */
+              firstObservedAt: string;
+              /** Format: date-time */
+              lastObservedAt: string;
               vectorSync: {
                 /** @enum {string} */
                 status: "pending" | "submitted" | "applied" | "failed" | "not-scheduled";
@@ -1019,6 +1023,8 @@ export interface operations {
                 derivationMethod: "ai" | "deterministic";
                 /** Format: date-time */
                 generatedAt: string;
+                /** Format: date-time */
+                recordedAt: string;
               }[];
             }[];
             truncated: boolean;

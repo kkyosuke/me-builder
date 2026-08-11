@@ -33,7 +33,8 @@ function createHarness(options: { queryError?: Error } = {}) {
       status: "active",
       confidence: { state: "uncomputed" },
       accessLabels: ["unclassified"],
-      recordedAt: new Date("2026-08-10T00:00:00Z"),
+      firstObservedAt: new Date("2026-08-01T00:00:00Z"),
+      lastObservedAt: new Date("2026-08-10T00:00:00Z"),
       evidence: [
         {
           sourceRecordId: "source-1",

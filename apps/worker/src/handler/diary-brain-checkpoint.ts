@@ -14,6 +14,7 @@ import {
 import type { CloudflareBindings, WorkerConfig } from "../config";
 import { createGeminiUsageRecorder } from "../infrastructure/gemini-usage";
 import { createLineRetryKey, pushLineTextWithRetryKey } from "../infrastructure/line-delivery";
+import { consolidateDiaryBrainCandidates, decideDiaryBrainDuplicates } from "../logic/brain-dedup";
 import {
   buildDevelopmentBrainItemMessage,
   generateDiaryBrainCandidates,
@@ -95,11 +96,12 @@ export async function processDiaryBrainCheckpointMessage(
     });
     return;
   }
+  const usageRecorder = createGeminiUsageRecorder(cf.d1, "diary_brain", message.body.accountId);
   const candidates = await generateDiaryBrainCandidates(
     context.messages,
     context.sourceMessageIds,
     workerConfig,
-    createGeminiUsageRecorder(cf.d1, "diary_brain", message.body.accountId),
+    usageRecorder,
   );
   if (!candidates) {
     throw new OperationalError({
@@ -110,15 +112,53 @@ export async function processDiaryBrainCheckpointMessage(
       dependency: "google-ai",
     });
   }
+  const deduplication = await decideDiaryBrainDuplicates({
+    candidates: candidates.map((candidate) => ({
+      category: candidate.category,
+      statement: candidate.statement,
+      sourceMessageIds: candidate.source_message_ids,
+    })),
+    messages: context.messages,
+    accountId: message.body.accountId,
+    cf,
+    workerConfig,
+    onUsage: usageRecorder,
+  });
+  if (!deduplication) {
+    throw new OperationalError({
+      code: "DIARY_BRAIN_DEDUPLICATION_FAILED",
+      category: "dependency",
+      stage: "deduplication.decide",
+      retryable: true,
+      dependency: "google-ai",
+    });
+  }
+  const consolidatedCandidates = consolidateDiaryBrainCandidates(
+    candidates.map((candidate) => ({
+      category: candidate.category,
+      statement: candidate.statement,
+      sourceMessageIds: candidate.source_message_ids,
+    })),
+    deduplication,
+  );
   const applied = await accountData.execute(
     "conversation.applyDiaryBrainCheckpoint",
     context.checkpointId,
     context.throughSequence,
     DIARY_BRAIN_PROMPT_VERSION,
-    candidates.map((candidate) => ({
+    consolidatedCandidates.map((candidate) => ({
       category: candidate.category,
       statement: candidate.statement,
-      sourceMessageIds: candidate.source_message_ids,
+      sourceMessageIds: candidate.sourceMessageIds,
+      ...(candidate.matchingBrainItemId
+        ? {
+            matchingBrainItemId: candidate.matchingBrainItemId,
+            deduplication: candidate.deduplication,
+            ...(candidate.dedupPromptVersion
+              ? { dedupPromptVersion: candidate.dedupPromptVersion }
+              : {}),
+          }
+        : {}),
     })),
   );
   if (!applied) {
@@ -157,6 +197,8 @@ async function sendDevelopmentNotification(
       category: DiaryBrainCategory;
       statement: string;
       sourceMessageIds: readonly string[];
+      operation: "created" | "evidence_added";
+      deduplication: "none" | "exact" | "semantic";
     }[];
   },
 ): Promise<void> {

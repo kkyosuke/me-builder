@@ -153,7 +153,7 @@ erDiagram
     source_records ||--|| source_record_text_payloads : stores
     source_records ||--o| conversation_messages : appears_as
     accounts ||--o{ brain_items : owns
-    brain_items ||--o| diary_brain_checkpoint_items : maps
+    brain_items ||--o{ diary_brain_checkpoint_items : maps
     brain_items ||--o{ brain_vector_sync_jobs : indexes
     brain_items ||--o{ brain_item_evidence_edges : has
     source_records ||--o{ brain_item_evidence_edges : evidence
@@ -300,7 +300,7 @@ stateDiagram-v2
     applied --> [*]
 ```
 
-`diary_brain_checkpoint_items`はcheckpointと実際に保存されたBrain Itemを生成順に結ぶ永続的な対応表です。local / preview環境の確認Pushはこの対応とEvidence edgeから内容を再構築します。Brain Item適用後にPushだけ失敗しても、Queue再配送でItemを再生成せず通知だけを同じretry keyで再送します。productionでは確認Pushを送りません。
+`diary_brain_checkpoint_items`はcheckpointと実際に作成またはEvidence追加したBrain Itemを処理順に結ぶ永続的な対応表です。`operation`で新規作成とEvidence追加、`deduplication`で未統合・完全一致・意味的判定を区別し、意味的判定時は専用prompt versionも保持します。local / preview環境の確認Pushはこの対応とcheckpoint範囲内のEvidence edgeから内容を再構築します。Brain Item適用後にPushだけ失敗しても、Queue再配送でItemやEvidenceを再生成せず通知だけを同じretry keyで再送します。productionでは確認Pushを送りません。
 
 ### 4.7 Brain Item関連
 
@@ -414,7 +414,7 @@ AccountData、Queue、LINEを呼び出した後は、Turn ID、generation epoch�
 - `conversation_messages(channel, channel_event_id)` unique
 - `chat_turns(status, created_at)`と`chat_turns(session_id, through_sequence)`
 - `diary_brain_checkpoints(account_id, status, next_attempt_at)`と`session_id`ごとの`pending`部分一意index
-- `diary_brain_checkpoint_items(checkpoint_id, position)` uniqueと`brain_item_id` unique
+- `diary_brain_checkpoint_items(checkpoint_id, position)` uniqueと`(checkpoint_id, brain_item_id)` unique
 - DOの`accepted_messages(status, received_at)`、`delivery_outbox(status, deadline_at)`、`delivery_outbox(turn_id, generation_epoch)`
 - `brain_items(account_id, status, category)`
 - `brain_item_evidence_edges(brain_item_id)`と`(source_record_id)`

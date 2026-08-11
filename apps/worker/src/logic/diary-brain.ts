@@ -137,6 +137,8 @@ export function buildDevelopmentBrainItemMessage(
     category: DiaryBrainCategory;
     statement: string;
     sourceMessageIds: readonly string[];
+    operation: "created" | "evidence_added";
+    deduplication: "none" | "exact" | "semantic";
   }[],
   environment: string,
 ): string | undefined {
@@ -145,10 +147,13 @@ export function buildDevelopmentBrainItemMessage(
     candidates.length === 0
       ? "- 追加なし"
       : candidates
-          .map(
-            (candidate, index) =>
-              `- ${index + 1}. ${candidate.category}: ${candidate.statement} (evidence: ${candidate.sourceMessageIds.join(", ")})`,
-          )
+          .map((candidate, index) => {
+            const operation =
+              candidate.operation === "created"
+                ? "新規"
+                : `Evidence追加/${candidate.deduplication}`;
+            return `- ${index + 1}. [${operation}] ${candidate.category}: ${candidate.statement} (evidence: ${candidate.sourceMessageIds.join(", ")})`;
+          })
           .join("\n");
-  return `[dev] 追加したBrain Item\n${summary}`;
+  return `[dev] Brain Item反映結果\n${summary}`;
 }

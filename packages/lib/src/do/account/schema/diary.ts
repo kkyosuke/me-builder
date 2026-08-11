@@ -180,7 +180,7 @@ export const diaryBrainCheckpoints = sqliteTable(
   ],
 );
 
-/** checkpointから実際に作成したBrain Item。dev通知と監査で保存結果を再取得する。 */
+/** checkpointから作成またはEvidence追加したBrain Item。dev通知と監査で保存結果を再取得する。 */
 export const diaryBrainCheckpointItems = sqliteTable(
   "diary_brain_checkpoint_items",
   {
@@ -192,9 +192,16 @@ export const diaryBrainCheckpointItems = sqliteTable(
       .notNull()
       .references(() => brainItems.id),
     position: integer("position").notNull(),
+    operation: text("operation", { enum: ["created", "evidence_added"] })
+      .notNull()
+      .default("created"),
+    deduplication: text("deduplication", { enum: ["none", "exact", "semantic"] })
+      .notNull()
+      .default("none"),
+    dedupPromptVersion: text("dedup_prompt_version"),
   },
   (table) => [
     uniqueIndex("diary_brain_checkpoint_item_position_idx").on(table.checkpointId, table.position),
-    uniqueIndex("diary_brain_checkpoint_item_brain_idx").on(table.brainItemId),
+    uniqueIndex("diary_brain_checkpoint_item_brain_idx").on(table.checkpointId, table.brainItemId),
   ],
 );

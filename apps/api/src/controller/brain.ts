@@ -47,6 +47,8 @@ export async function getDevelopmentBrainItems(c: Context<AppEnv>): Promise<Resp
           items: outcome.items.map((item) => ({
             ...item,
             createdAt: item.createdAt.toISOString(),
+            firstObservedAt: item.firstObservedAt.toISOString(),
+            lastObservedAt: item.lastObservedAt.toISOString(),
             vectorSync: {
               ...item.vectorSync,
               ...(item.vectorSync.updatedAt
@@ -59,6 +61,7 @@ export async function getDevelopmentBrainItems(c: Context<AppEnv>): Promise<Resp
             evidence: item.evidence.map((edge) => ({
               ...edge,
               generatedAt: edge.generatedAt.toISOString(),
+              recordedAt: edge.recordedAt.toISOString(),
             })),
           })),
           truncated: outcome.truncated,

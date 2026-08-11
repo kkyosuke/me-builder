@@ -25,6 +25,8 @@ export const DevelopmentBrainItemsResponseSchema = v.object({
       derivation: v.picklist(["ai", "deterministic"]),
       status: v.literal("active"),
       createdAt: TimestampSchema,
+      firstObservedAt: TimestampSchema,
+      lastObservedAt: TimestampSchema,
       vectorSync: VectorSyncSchema,
       evidence: v.array(
         v.object({
@@ -32,6 +34,7 @@ export const DevelopmentBrainItemsResponseSchema = v.object({
           relation: v.picklist(["supports", "contradicts"]),
           derivationMethod: v.picklist(["ai", "deterministic"]),
           generatedAt: v.pipe(v.string(), v.isoTimestamp()),
+          recordedAt: TimestampSchema,
         }),
       ),
     }),

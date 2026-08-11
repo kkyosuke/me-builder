@@ -51,6 +51,8 @@ describe("GET /api/dev/brain-items", () => {
           derivation: "ai",
           status: "active",
           createdAt: new Date("2026-08-09T00:00:00Z"),
+          firstObservedAt: new Date("2026-08-01T00:00:00Z"),
+          lastObservedAt: new Date("2026-08-09T00:00:00Z"),
           vectorSync: {
             status: "applied",
             operation: "upsert",
@@ -65,6 +67,7 @@ describe("GET /api/dev/brain-items", () => {
               relation: "supports",
               derivationMethod: "ai",
               generatedAt: new Date("2026-08-09T00:00:01Z"),
+              recordedAt: new Date("2026-08-09T00:00:00Z"),
             },
           ],
         },
@@ -80,7 +83,14 @@ describe("GET /api/dev/brain-items", () => {
         expect.objectContaining({
           id: "brain-1",
           createdAt: "2026-08-09T00:00:00.000Z",
-          evidence: [expect.objectContaining({ generatedAt: "2026-08-09T00:00:01.000Z" })],
+          firstObservedAt: "2026-08-01T00:00:00.000Z",
+          lastObservedAt: "2026-08-09T00:00:00.000Z",
+          evidence: [
+            expect.objectContaining({
+              generatedAt: "2026-08-09T00:00:01.000Z",
+              recordedAt: "2026-08-09T00:00:00.000Z",
+            }),
+          ],
         }),
       ],
       truncated: false,

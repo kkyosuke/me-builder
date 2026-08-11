@@ -3,7 +3,8 @@ import m0001 from "./0001_broken_tyger_tiger.sql";
 import m0002 from "./0002_wealthy_titanium_man.sql";
 import m0003 from "./0003_conscious_sheva_callister.sql";
 import m0004 from "./0004_marvelous_sway.sql";
-import m0005 from "./0005_brown_masked_marvel.sql";
+import m0005 from "./0005_white_boomer.sql";
+import m0006 from "./0006_clumsy_grey_gargoyle.sql";
 import journal from "./meta/_journal.json";
 
 export default {
@@ -15,5 +16,6 @@ export default {
     m0003,
     m0004,
     m0005,
+    m0006,
   },
 };

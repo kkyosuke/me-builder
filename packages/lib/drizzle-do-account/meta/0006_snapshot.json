@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "de09f38b-46b1-4b93-af16-105a082b0579",
-  "prevId": "6f488466-67a1-45bd-922c-4f31dcd65035",
+  "id": "58d18374-a0f0-4bf5-bb6d-9613c46f89ab",
+  "prevId": "de09f38b-46b1-4b93-af16-105a082b0579",
   "tables": {
     "brain_item_access_labels": {
       "name": "brain_item_access_labels",
@@ -2441,6 +2441,74 @@
           "tableTo": "account_data_identity",
           "columnsFrom": ["account_id"],
           "columnsTo": ["account_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "profile_summary_share_projections": {
+      "name": "profile_summary_share_projections",
+      "columns": {
+        "profile_summary_version_id": {
+          "name": "profile_summary_version_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "schema_version": {
+          "name": "schema_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "generated_at": {
+          "name": "generated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "statements_json": {
+          "name": "statements_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "evidence_references_json": {
+          "name": "evidence_references_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "fingerprint": {
+          "name": "fingerprint",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "profile_summary_share_projection_generated_idx": {
+          "name": "profile_summary_share_projection_generated_idx",
+          "columns": ["generated_at"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "profile_summary_share_projections_profile_summary_version_id_profile_summary_versions_id_fk": {
+          "name": "profile_summary_share_projections_profile_summary_version_id_profile_summary_versions_id_fk",
+          "tableFrom": "profile_summary_share_projections",
+          "tableTo": "profile_summary_versions",
+          "columnsFrom": ["profile_summary_version_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }

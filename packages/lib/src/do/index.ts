@@ -26,6 +26,7 @@ export type {
   ActiveBrainVectorEntry,
   AppliedBrainVectorSync,
   BrainChatContextMemory,
+  BrainSemanticDedupCandidate,
 } from "./account/action/brain";
 export { DIARY_BRAIN_CATEGORIES } from "./account/action/diary";
 export type {
