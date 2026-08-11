@@ -45,7 +45,7 @@ docs/
 
 - [プロジェクト概要](product/project-overview.md) — 目的、主要要件、MVP、ロードマップ、Phase 1の入力体験とログイン手段
 - [全体画面遷移設計](product/screen-navigation.md) — LINEとWebをまたぐ入口と、利用者・管理者向け画面の全体遷移
-- [自分の傾向サマリー体験設計](product/profile-summary-experience.md) — 診断と日記からAI生成した版付きの「わたしのまとめ」と診断テーマの表示規則
+- [わたしのまとめ仕様](product/profile-summary-experience.md) — 診断と日記からAI生成した版付きの「わたしのまとめ」と診断テーマの表示規則
 - [相性診断・うつし共有体験設計](product/compatibility-experience.md) — 招待リンクとLINE共有、双方の同意、相性一覧、「それぞれについて」と「2人について」、共有終了
 - [プロフィール設定体験設計](product/profile-settings-experience.md) — 右上の入口、アバター設定への接続、ライト・ダークテーマの選択と保存
 - [アバター設定体験設計](product/avatar-experience.md) — LINEプロフィール画像の初期表示、端末画像の選択・プレビュー・設定、差し替え・削除

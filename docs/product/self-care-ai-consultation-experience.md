@@ -4,7 +4,7 @@
 
 この文書は、本人が「自分はどんなときに負荷を感じやすく、どんなサインが出て、何をすると整いやすいか」を確認し、現在の状況についてAIへ相談する体験を定義します。表示するセルフケア情報、情報の確かさの区別、AI相談への入口、返答の構成、安全時の切り替え、本人による確認とフィードバックを所有します。
 
-診断を横断したプロフィール画面は[自分の傾向サマリー体験設計](profile-summary-experience.md)、日記チャットの会話原則と記憶を使った助言は[日記チャット体験設計](diary-chat-experience.md)、Brain Itemの分類は[Brain内部情報の分類](../domain/brain/brain-content-taxonomy.md)、AI処理のガードレールは[日記チャット実装設計](../architecture/diary-chat-implementation-design.md)を正とします。
+診断と日記を横断したプロフィール画面は[わたしのまとめ仕様](profile-summary-experience.md)、日記チャットの会話原則と記憶を使った助言は[日記チャット体験設計](diary-chat-experience.md)、Brain Itemの分類は[Brain内部情報の分類](../domain/brain/brain-content-taxonomy.md)、AI処理のガードレールは[日記チャット実装設計](../architecture/diary-chat-implementation-design.md)を正とします。
 
 この文書は、医療的な診断、治療、ストレスや症状のスコアリング、AIモデル・プロンプト・API・データベースの具体的な実装、緊急窓口情報の運用方式を所有しません。
 

@@ -10,7 +10,7 @@
 | --- | --- |
 | LINEとWebの役割、本人識別 | [プロジェクト概要](project-overview.md) |
 | 診断一覧、回答、個別の回答結果 | [Phase 1 診断体験設計](../diagnosis/diagnosis-experience.md) |
-| 複数診断を横断した「わたしの傾向」 | [自分の傾向サマリー体験設計](profile-summary-experience.md) |
+| 診断と日記を横断した「わたしのまとめ」 | [わたしのまとめ仕様](profile-summary-experience.md) |
 | 招待リンク、相性一覧、2人の相性シート | [相性診断・うつし共有体験設計](compatibility-experience.md) |
 | 右上のプロフィール入口、アバターへの接続、ライト・ダーク | [プロフィール設定体験設計](profile-settings-experience.md) |
 | アバターの現在表示、画像選択、プレビュー、設定 | [アバター設定体験設計](avatar-experience.md) |
