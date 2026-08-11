@@ -2,7 +2,7 @@ import { D1 } from "@me-builder/lib";
 import { logger } from "@me-builder/shared";
 import type { Context } from "hono";
 import * as v from "valibot";
-import { getConfig } from "../config";
+import { getConfig, isDevelopmentEnvironment } from "../config";
 import {
   AnswerConflictErrorSchema,
   InvalidAnswerErrorSchema,
@@ -41,13 +41,7 @@ import { deferDiagnosisQuestion } from "../logic/diagnosis-deferred-question";
 import { getDiagnosisDetail } from "../logic/diagnosis-detail";
 import { getDiagnosisList } from "../logic/diagnosis-list";
 import type { AppEnv } from "../types";
-
-const DEVELOPMENT_ENVIRONMENTS = new Set(["development", "local", "preview", "test"]);
-
-function bearerToken(authorization: string | undefined): string | undefined {
-  const match = authorization?.trim().match(/^Bearer\s+([^\s]+)$/i);
-  return match?.[1];
-}
+import { bearerToken } from "./auth";
 
 /** `GET /api/diagnoses` — 回答進捗を含む、表示可能な診断一覧を返す。 */
 export async function getDiagnoses(c: Context<AppEnv>): Promise<Response> {
@@ -327,7 +321,7 @@ export async function getDiagnosisAnswerContents(c: Context<AppEnv>): Promise<Re
 /** `DELETE /api/dev/diagnosis-data` — 開発環境で本人の回答由来データを全削除する。 */
 export async function deleteDevelopmentDiagnosisData(c: Context<AppEnv>): Promise<Response> {
   const explicitEnvironment = c.env?.ENVIRONMENT?.trim();
-  if (!explicitEnvironment || !DEVELOPMENT_ENVIRONMENTS.has(explicitEnvironment)) {
+  if (!explicitEnvironment || !isDevelopmentEnvironment(explicitEnvironment)) {
     return c.json(v.parse(DevelopmentRouteNotFoundErrorSchema, { error: "Not Found" }), 404);
   }
   const currentConfig = getConfig(c.env);

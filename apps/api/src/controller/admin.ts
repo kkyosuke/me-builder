@@ -12,10 +12,7 @@ import {
 } from "../contract/shared/errors";
 import { getAdminStatistics } from "../logic/admin-statistics";
 import type { AppEnv } from "../types";
-
-function bearerToken(authorization: string | undefined): string | undefined {
-  return authorization?.trim().match(/^Bearer\s+([^\s]+)$/i)?.[1];
-}
+import { bearerToken } from "./auth";
 
 export async function getStatistics(c: Context<AppEnv>): Promise<Response> {
   if (!c.env?.DB) {
