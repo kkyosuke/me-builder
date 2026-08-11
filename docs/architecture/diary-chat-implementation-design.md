@@ -310,7 +310,7 @@ stateDiagram-v2
 
 Brain Itemを含むAccount所有データのquery境界は、[Accountデータ分離設計](account-data-isolation.md)を正とします。
 
-検証を通過したBrain Itemは`active`として保存します。本人の同意を登録の条件にはしません。Brain Item作成とVectorize同期job追加は同じAccountData SQLite transactionで確定します。AI推定は`derivation = ai`として区別し、Confidenceの算出前を表す`uncomputed`を検索順位に使いません。
+検証を通過したBrain Itemは`active`として保存します。本人の同意を登録の条件にはしません。Brain Item作成とVectorize同期job追加は同じAccountData SQLite transactionで確定します。`derivation`は変換方法、`attributes.isInference`は本人が明言していない推定を含むかを表す別の軸として扱い、Confidenceの算出前を表す`uncomputed`を検索順位に使いません。
 
 開発用の確認機能は、本人確認済みAccountに対して、一覧取得用の`brain.listActive`とVector実体確認用の`brain.findActiveVectorEntry`をAccountData RPCへ公開します。`brain.listActive`はactiveかつ未削除のItem、未削除Evidence、最新のVector同期jobと対応表の有無を最大100件返します。Web UIは各Itemに同期状態、試行回数、失敗code、次回試行時刻を表示します。`applied`はVectorizeが更新を受け付けてAccountDataへ完了記録した状態であり、Vectorize上の実体確認とは区別します。
 
@@ -477,11 +477,11 @@ flowchart LR
 4. AccountDataで`active`、有効期間、Access Policy、削除・撤回・無効化状態を再検証する
 5. 再検証を通過した上位5件を選び、必要なEvidenceのSource Recordを最大3件取得する
 6. 訂正済み旧版、削除済み、撤回済み、拒否済みを除外する
-7. 各要素へ種類、時点、Derivation、Confidence、根拠IDを付ける
+7. 各要素へ種類、時点、Derivation、推定有無、Confidence、根拠IDを付ける
 
 `owner_scope`は環境別Secretを鍵とする`HMAC(account_id)`から作り、Vectorizeのmetadata indexまたはnamespaceへ保存します。生のAccount IDは保存しません。filterはtopKより前に適用し、他Accountの候補に検索枠を消費させません。Vectorizeのmetadataは候補を絞る用途に限定し、認可の根拠にはしないため、AccountData再検証は必ず残します。
 
-実装では現在Turnのuser発言だけを最大10,000文字の`RETRIEVAL_QUERY`としてembeddingし、`owner_scope` filter適用後の上位10件を候補にします。cosine scoreが0.7未満の候補は関連なしとして除外します。AccountDataはvector ID対応表から、本人所有、active、未削除、有効期間内、activeなAccess Labelありを再検証し、類似度順の最大5件を返します。支持Evidence原文は未削除の本人Source Recordだけを関連度順のItemから新しい順に選び、Context全体で最大3件にします。Gemini入力時にstatementは1件2,000文字、Evidenceは1件1,000文字を上限にします。検索には2秒の独立timeoutを設け、Vectorize・embedding・再認可の失敗時と同様に、本文を含まないdegraded logを残して記憶なしの通常返信を継続します。検索timeoutは生成全体の90秒deadlineをabortしません。
+実装では現在Turnのuser発言だけを最大10,000文字の`RETRIEVAL_QUERY`としてembeddingします。相対日付はWorkerの処理時刻ではなく、user messageごとのSource Record受信時刻を基準に絶対表現へ変換します。`owner_scope` filter適用後の上位10件を候補にし、cosine scoreが0.7未満の候補は関連なしとして除外します。AccountDataはvector ID対応表から、本人所有、active、未削除、有効期間内、activeなAccess Labelありを再検証し、類似度順の最大5件を返します。支持Evidence原文は未削除の本人Source Recordだけを関連度順のItemから新しい順に選び、Context全体で最大3件にします。Gemini入力時にstatementは1件2,000文字、Evidenceは1件1,000文字を上限にします。検索には2秒の独立timeoutを設け、Vectorize・embedding・再認可の失敗時と同様に、本文を含まないdegraded logを残して記憶なしの通常返信を継続します。検索timeoutは生成全体の90秒deadlineをabortしません。
 
 ### token budget
 
@@ -612,7 +612,7 @@ Brain Item抽出は会話返信とは別のsystem prompt、prompt version、Vali
 ### 8.3 Memory Poisoning
 
 - Source Recordは本人の発言として保存するが、客観的真実とは扱わない
-- AI推定は`derivation = ai`として本人の明言やルールベース変換と区別する
+- `derivation`と推定有無を分け、`is_inference = true`だけを本人が明言していない推定として扱う
 - 推定内容は本人が否定・修正できる提示にする
 - Evidenceがない候補や、1回の出来事から安定した性格を断定する候補は保存しない
 - 既存Itemと矛盾する候補を自動上書きしない

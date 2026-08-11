@@ -11,6 +11,8 @@ describe("diary chat prompt", () => {
     expect(DIARY_CHAT_SYSTEM_PROMPT).toContain("質問しない応答を既定");
     expect(DIARY_CHAT_SYSTEM_PROMPT).toContain("会話を続けることだけを目的に質問しない");
     expect(DIARY_CHAT_SYSTEM_PROMPT).toContain("質問がなければ0");
+    expect(DIARY_CHAT_SYSTEM_PROMPT).toContain("aiであることだけを理由に推定扱いしない");
+    expect(DIARY_CHAT_SYSTEM_PROMPT).toContain("is_inferenceがtrue");
   });
 
   it("追跡可能なprompt versionを持つ", () => {

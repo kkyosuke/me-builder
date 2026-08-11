@@ -36,11 +36,14 @@ export function buildBrainSearchQuery(
   const currentIds = new Set(currentUserMessageIds);
   const query = messages
     .filter(({ id, role }) => role === "user" && currentIds.has(id))
-    .map(({ body }) => body.trim())
+    .map(({ body, recordedAt }) => {
+      const statement = body.trim();
+      return statement ? normalizeDiaryRelativeDates(statement, recordedAt ?? at).statement : "";
+    })
     .filter(Boolean)
     .join("\n");
   if (!query) return undefined;
-  return normalizeDiaryRelativeDates(query.slice(-SEARCH_QUERY_CHARACTER_LIMIT), at).statement;
+  return query.slice(-SEARCH_QUERY_CHARACTER_LIMIT);
 }
 
 /**

@@ -84,6 +84,8 @@ export type BrainChatContextMemory = Readonly<{
   category: string;
   statement: string;
   derivation: "ai" | "deterministic";
+  /** Brain Itemの生成方法とは独立した、命題に未明言の推定が含まれるかどうか。 */
+  isInference: boolean;
   status: "active";
   confidence: unknown;
   accessLabels: readonly string[];
@@ -587,6 +589,7 @@ export async function loadBrainChatContextMemories(
       brainItemId: brainItems.id,
       category: brainItems.category,
       statement: brainItems.statement,
+      attributes: brainItems.attributes,
       derivation: brainItems.derivation,
       confidence: brainItems.confidence,
       recordedAt: brainItems.createdAt,
@@ -660,6 +663,13 @@ export async function loadBrainChatContextMemories(
       category: item.category,
       statement: item.statement,
       derivation: item.derivation,
+      isInference:
+        item.attributes &&
+        typeof item.attributes === "object" &&
+        "isInference" in item.attributes &&
+        typeof item.attributes.isInference === "boolean"
+          ? item.attributes.isInference
+          : item.derivation === "ai",
       status: "active",
       confidence: item.confidence,
       accessLabels: [...new Set(accessLabels)].sort(),

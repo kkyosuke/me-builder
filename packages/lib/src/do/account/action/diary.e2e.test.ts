@@ -96,8 +96,13 @@ describe("Diary conversation persistence flow", () => {
     expect(context).toMatchObject({
       accountId: account.id,
       messages: [
-        { role: "user", body: "今日は少し疲れた", sequence: 1 },
-        { role: "user", body: "それでも散歩できた", sequence: 2 },
+        { role: "user", body: "今日は少し疲れた", sequence: 1, recordedAt: firstReceivedAt },
+        {
+          role: "user",
+          body: "それでも散歩できた",
+          sequence: 2,
+          recordedAt: secondReceivedAt,
+        },
       ],
     });
     expect(context?.currentUserMessageIds).toEqual(context?.messages.map(({ id }) => id));

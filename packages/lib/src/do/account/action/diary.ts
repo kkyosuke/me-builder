@@ -568,6 +568,8 @@ export type ConversationContextMessage = {
   role: "user" | "assistant";
   body: string;
   sequence: number;
+  /** user messageは根拠Source Recordの受信時刻。旧形式やassistantでは省略する。 */
+  recordedAt?: Date;
 };
 
 /** Turnと同じSessionの直近messageを、Account所有権を含むjoinで取得する。 */
@@ -605,6 +607,7 @@ export async function getTurnContext(
       sequence: conversationMessages.sequence,
       assistantBody: conversationMessages.assistantBody,
       userBody: sourceRecordTextPayloads.body,
+      userRecordedAt: sourceRecords.createdAt,
     })
     .from(conversationMessages)
     .leftJoin(sourceRecords, eq(conversationMessages.sourceRecordId, sourceRecords.id))
@@ -626,7 +629,19 @@ export async function getTurnContext(
 
   const messages = rows.reverse().flatMap((row) => {
     const body = row.role === "user" ? row.userBody : row.assistantBody;
-    return body ? [{ id: row.id, role: row.role, body, sequence: row.sequence }] : [];
+    return body
+      ? [
+          {
+            id: row.id,
+            role: row.role,
+            body,
+            sequence: row.sequence,
+            ...(row.role === "user" && row.userRecordedAt
+              ? { recordedAt: row.userRecordedAt }
+              : {}),
+          },
+        ]
+      : [];
   });
   return {
     accountId: turn.accountId,

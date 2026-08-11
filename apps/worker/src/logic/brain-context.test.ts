@@ -12,7 +12,13 @@ import {
 const messages = [
   { id: "past-user", role: "user" as const, body: "昨日は仕事をした", sequence: 1 },
   { id: "assistant", role: "assistant" as const, body: "お疲れさま", sequence: 2 },
-  { id: "current-1", role: "user" as const, body: "今日は疲れた", sequence: 3 },
+  {
+    id: "current-1",
+    role: "user" as const,
+    body: "今日は疲れた",
+    sequence: 3,
+    recordedAt: new Date("2026-08-31T14:59:00.000Z"),
+  },
   { id: "current-2", role: "user" as const, body: "落ち着く方法を探したい", sequence: 4 },
 ];
 
@@ -23,6 +29,7 @@ function createHarness(options: { queryError?: Error } = {}) {
       category: "memory",
       statement: "公園を歩くと落ち着くことがある",
       derivation: "ai",
+      isInference: false,
       status: "active",
       confidence: { state: "uncomputed" },
       accessLabels: ["unclassified"],
@@ -67,9 +74,9 @@ describe("buildBrainSearchQuery", () => {
       buildBrainSearchQuery(
         messages,
         ["current-1", "current-2"],
-        new Date("2026-08-11T03:00:00.000Z"),
+        new Date("2026-09-01T03:00:00.000Z"),
       ),
-    ).toBe("2026年8月11日は疲れた\n落ち着く方法を探したい");
+    ).toBe("2026年8月31日は疲れた\n落ち着く方法を探したい");
   });
 
   it("相対日付を保存時と同じ絶対表現にしてVector検索する", () => {
@@ -79,9 +86,10 @@ describe("buildBrainSearchQuery", () => {
         role: "user" as const,
         body: "来月までに転職先を決めたい",
         sequence: 1,
+        recordedAt: new Date("2026-08-31T14:59:00.000Z"),
       },
     ];
-    expect(buildBrainSearchQuery(goalMessage, ["goal"], new Date("2026-08-11T03:00:00.000Z"))).toBe(
+    expect(buildBrainSearchQuery(goalMessage, ["goal"], new Date("2026-09-01T03:00:00.000Z"))).toBe(
       "2026年9月までに転職先を決めたい",
     );
   });

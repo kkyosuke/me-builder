@@ -407,13 +407,13 @@ describe("LINE diary chat delivery E2E", () => {
 
   it("現在TurnでVectorize検索し、AccountDataで再認可した記憶をContext Packageへ入れる", async () => {
     const diaryText = "今日は疲れたので、落ち着く方法を探したい";
-    const normalizedSearchText = normalizeDiaryRelativeDates(diaryText, new Date()).statement;
     const { bindings, providerAccountId, queuedTurn } = await ingestDiary(
       diaryText,
       "brain-context",
     );
     const [source] = await accountDataStore.db.select().from(DO.account.schema.sourceRecords);
     if (!source) throw new Error("Expected a source record");
+    const normalizedSearchText = normalizeDiaryRelativeDates(diaryText, source.createdAt).statement;
     const recordedAt = new Date("2026-08-10T00:00:00Z");
     await DO.account.action.brain.saveBrainItem(accountDataStore.db, {
       at: recordedAt,
@@ -496,6 +496,7 @@ describe("LINE diary chat delivery E2E", () => {
         id: "memory-1",
         statement: "公園を歩くと落ち着くことがある",
         derivation: "ai",
+        is_inference: true,
         evidence: [expect.objectContaining({ text: diaryText })],
       }),
     ]);
