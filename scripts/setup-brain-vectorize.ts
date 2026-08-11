@@ -71,11 +71,14 @@ const ownerScope = (Array.isArray(metadataIndexes) ? metadataIndexes : []).find(
     "propertyName" in entry &&
     entry.propertyName === "owner_scope",
 );
+// Cloudflare APIは`String`のように先頭を大文字にして返す。SDKの型宣言 (`'string' | 'number' |
+// 'boolean'`) と一致しないため、大文字小文字を無視して比べる。
+const ownerScopeType = ownerScope?.indexType?.toLowerCase();
 if (!ownerScope) {
   console.warn(
     `::warning::metadata index ${indexName}.owner_scope is still propagating; vector insert must wait until it becomes visible`,
   );
-} else if (ownerScope.indexType !== "string") {
+} else if (ownerScopeType !== "string") {
   throw new Error(
     `metadata index ${indexName}.owner_scope must be a string index but is ${ownerScope.indexType}; delete and recreate it before deployment`,
   );
