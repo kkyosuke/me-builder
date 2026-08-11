@@ -14,6 +14,7 @@ import {
   findBrainItemForAccount,
   getBrainVectorSyncTarget,
   listActiveBrainItems,
+  loadBrainChatContextMemories,
   saveBrainItem,
 } from "./brain";
 
@@ -242,6 +243,83 @@ describe("saveBrainItem", () => {
       type: "source-account-mismatch",
     });
     await expect(db.select().from(schema.brainItems)).resolves.toHaveLength(0);
+  });
+});
+
+describe("loadBrainChatContextMemories", () => {
+  it("Vectorize候補をAccountDataで再認可し、active ItemとEvidenceだけを類似度順で返す", async () => {
+    const db = createTestDb();
+    await insertAccountsAndSources(db);
+    await db.insert(schema.sourceRecordTextPayloads).values({
+      sourceRecordId: "source-1",
+      body: "公園を歩くと気持ちが落ち着いた",
+      contentHash: "hash-1",
+    });
+    const recordedAt = new Date("2026-08-10T00:00:00Z");
+    await saveBrainItem(db, createInput({ at: recordedAt }));
+    await saveBrainItem(
+      db,
+      createInput({
+        at: recordedAt,
+        item: {
+          ...createInput().item,
+          id: "brain-expired",
+          statement: "以前は夜更かしが好きだった",
+          validTo: new Date("2026-08-10T12:00:00Z"),
+        },
+        evidence: [
+          {
+            id: "evidence-expired",
+            sourceRecordId: "source-1",
+            relation: "supports",
+            isDerivationTrigger: true,
+            derivationMethod: "ai",
+            generatedAt: recordedAt,
+          },
+        ],
+        accessLabels: [{ id: "access-expired", label: "private", assignedBy: "system" }],
+        topicLabels: [],
+      }),
+    );
+    await db.insert(schema.brainVectorEntries).values([
+      {
+        id: "vector-expired",
+        brainItemId: "brain-expired",
+        itemRevision: recordedAt.getTime(),
+        createdAt: recordedAt,
+        updatedAt: recordedAt,
+      },
+      {
+        id: "vector-active",
+        brainItemId: "brain-1",
+        itemRevision: recordedAt.getTime(),
+        createdAt: recordedAt,
+        updatedAt: recordedAt,
+      },
+    ]);
+
+    await expect(
+      loadBrainChatContextMemories(
+        db,
+        "account-1",
+        ["vector-expired", "foreign-vector", "vector-active", "vector-active"],
+        new Date("2026-08-11T00:00:00Z"),
+      ),
+    ).resolves.toEqual([
+      {
+        category: "preference",
+        statement: "日記から見える傾向",
+        derivation: "ai",
+        confidence: { state: "uncomputed" },
+        recordedAt,
+        evidence: [
+          {
+            text: "公園を歩くと気持ちが落ち着いた",
+            recordedAt: expect.any(Date),
+          },
+        ],
+      },
+    ]);
   });
 });
 

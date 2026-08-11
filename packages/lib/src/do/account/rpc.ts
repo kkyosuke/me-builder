@@ -38,6 +38,10 @@ export type AccountDataActions = {
     [brainItemId: string],
     typeof brain.findActiveBrainVectorEntry
   >;
+  "brain.loadChatContextMemories": RpcAction<
+    [vectorIds: readonly string[], at?: Date],
+    typeof brain.loadBrainChatContextMemories
+  >;
   "brain.getVectorSyncTarget": RpcAction<
     [jobId: string, brainItemId: string, itemRevision: number],
     typeof brain.getBrainVectorSyncTarget

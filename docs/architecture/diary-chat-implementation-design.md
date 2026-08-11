@@ -481,6 +481,8 @@ flowchart LR
 
 `owner_scope`は環境別Secretを鍵とする`HMAC(account_id)`から作り、Vectorizeのmetadata indexまたはnamespaceへ保存します。生のAccount IDは保存しません。filterはtopKより前に適用し、他Accountの候補に検索枠を消費させません。Vectorizeのmetadataは候補を絞る用途に限定し、認可の根拠にはしないため、AccountData再検証は必ず残します。
 
+実装では現在Turnのuser発言だけを最大10,000文字の`RETRIEVAL_QUERY`としてembeddingし、`owner_scope` filter適用後の上位10件を候補にします。AccountDataはvector ID対応表から、本人所有、active、未削除、有効期間内、activeなAccess Labelありを再検証し、類似度順の最大5件を返します。各Itemの支持Evidence原文は未削除の本人Source Recordだけを新しい順に最大3件含め、Gemini入力時にstatementは1件2,000文字、Evidenceは1件1,000文字を上限にします。Vectorize・embedding・再認可が失敗した場合は、本文を含まないdegraded logを残して記憶なしの通常返信を継続します。
+
 ### token budget
 
 `CHAT_CONTEXT_MAX_INPUT_TOKENS`を既定24,000 tokenとし、モデル固有の最大contextへ直接依存させません。生成出力には別に`CHAT_MAX_OUTPUT_TOKENS`として2,000 tokenを予約し、合計が利用モデルの上限内であることを設定読込時に検証します。

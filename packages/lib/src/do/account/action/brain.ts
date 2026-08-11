@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import type { AccountDataDatabase } from "../database";
 import {
   brainItemAccessLabels,
@@ -9,6 +9,7 @@ import {
   brainVectorEntries,
   brainVectorSyncJobs,
 } from "../schema/brain";
+import { sourceRecordTextPayloads } from "../schema/diary";
 import { sourceRecords } from "../schema/source";
 
 type LifecycleColumn = "createdAt" | "updatedAt" | "deletedAt" | "isDeleted";
@@ -44,6 +45,9 @@ export type SaveBrainItemResult =
     }>;
 
 const DEVELOPMENT_BRAIN_ITEM_LIMIT = 100;
+const CHAT_CONTEXT_VECTOR_CANDIDATE_LIMIT = 10;
+const CHAT_CONTEXT_MEMORY_LIMIT = 5;
+const CHAT_CONTEXT_EVIDENCE_LIMIT = 3;
 const VECTOR_SYNC_DISPATCH_RETRY_MS = 15 * 60 * 1000;
 const VECTOR_SYNC_FAILURE_RETRY_MS = 60 * 1000;
 
@@ -73,6 +77,18 @@ export type ActiveBrainItemList = Readonly<{
     }>[];
   }>[];
   truncated: boolean;
+}>;
+
+export type BrainChatContextMemory = Readonly<{
+  category: string;
+  statement: string;
+  derivation: "ai" | "deterministic";
+  confidence: unknown;
+  recordedAt: Date;
+  evidence: readonly Readonly<{
+    text: string;
+    recordedAt: Date;
+  }>[];
 }>;
 
 function hasInvalidOrDuplicateLabels(labels: readonly { label: string }[]): boolean {
@@ -543,6 +559,95 @@ export async function findActiveBrainVectorEntry(
       ),
     )
     .get();
+}
+
+/**
+ * Vectorizeが返した仮名IDを候補としてのみ扱い、AccountDataの現在状態で通常チャット用に再認可する。
+ * 入力順（類似度順）を保ち、原文Evidenceは各Item最大3件に制限する。
+ */
+export async function loadBrainChatContextMemories(
+  db: AccountDataDatabase,
+  accountId: string,
+  vectorIds: readonly string[],
+  at = new Date(),
+): Promise<readonly BrainChatContextMemory[]> {
+  const candidateVectorIds = [...new Set(vectorIds.filter((id) => id.length > 0))].slice(
+    0,
+    CHAT_CONTEXT_VECTOR_CANDIDATE_LIMIT,
+  );
+  if (candidateVectorIds.length === 0) return [];
+
+  const rows = await db
+    .select({
+      vectorId: brainVectorEntries.id,
+      brainItemId: brainItems.id,
+      category: brainItems.category,
+      statement: brainItems.statement,
+      derivation: brainItems.derivation,
+      confidence: brainItems.confidence,
+      recordedAt: brainItems.createdAt,
+    })
+    .from(brainVectorEntries)
+    .innerJoin(brainItems, eq(brainItems.id, brainVectorEntries.brainItemId))
+    .innerJoin(
+      brainItemAccessLabels,
+      and(
+        eq(brainItemAccessLabels.brainItemId, brainItems.id),
+        eq(brainItemAccessLabels.isDeleted, false),
+      ),
+    )
+    .where(
+      and(
+        inArray(brainVectorEntries.id, candidateVectorIds),
+        eq(brainVectorEntries.isDeleted, false),
+        eq(brainItems.accountId, accountId),
+        eq(brainItems.status, "active"),
+        eq(brainItems.isDeleted, false),
+        or(isNull(brainItems.validFrom), lte(brainItems.validFrom, at)),
+        or(isNull(brainItems.validTo), gt(brainItems.validTo, at)),
+      ),
+    )
+    .all();
+  const rowByVectorId = new Map(rows.map((row) => [row.vectorId, row] as const));
+  const authorized = candidateVectorIds
+    .flatMap((vectorId) => {
+      const row = rowByVectorId.get(vectorId);
+      return row ? [row] : [];
+    })
+    .slice(0, CHAT_CONTEXT_MEMORY_LIMIT);
+
+  return Promise.all(
+    authorized.map(async (item) => {
+      const evidence = await db
+        .select({ text: sourceRecordTextPayloads.body, recordedAt: sourceRecords.createdAt })
+        .from(brainItemEvidenceEdges)
+        .innerJoin(sourceRecords, eq(sourceRecords.id, brainItemEvidenceEdges.sourceRecordId))
+        .innerJoin(
+          sourceRecordTextPayloads,
+          eq(sourceRecordTextPayloads.sourceRecordId, sourceRecords.id),
+        )
+        .where(
+          and(
+            eq(brainItemEvidenceEdges.brainItemId, item.brainItemId),
+            eq(brainItemEvidenceEdges.relation, "supports"),
+            eq(brainItemEvidenceEdges.isDeleted, false),
+            eq(sourceRecords.accountId, accountId),
+            eq(sourceRecords.isDeleted, false),
+          ),
+        )
+        .orderBy(desc(brainItemEvidenceEdges.generatedAt), desc(brainItemEvidenceEdges.id))
+        .limit(CHAT_CONTEXT_EVIDENCE_LIMIT)
+        .all();
+      return {
+        category: item.category,
+        statement: item.statement,
+        derivation: item.derivation,
+        confidence: item.confidence,
+        recordedAt: item.recordedAt,
+        evidence,
+      };
+    }),
+  );
 }
 
 /** 開発用の確認画面へ、本人のactiveなBrain Item、根拠、Vector同期状態を返す。 */

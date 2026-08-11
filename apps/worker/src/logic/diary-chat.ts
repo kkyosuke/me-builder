@@ -1,4 +1,4 @@
-import type { ConversationContextMessage } from "@me-builder/lib";
+import type { BrainChatContextMemory, ConversationContextMessage } from "@me-builder/lib";
 import { toJsonSchema } from "@valibot/to-json-schema";
 import * as v from "valibot";
 import type { WorkerConfig } from "../config";
@@ -32,6 +32,8 @@ const DiaryChatResponseSchema = v.strictObject({
     restricted_advice: v.boolean(),
   }),
 });
+const MEMORY_STATEMENT_CHARACTER_LIMIT = 2_000;
+const MEMORY_EVIDENCE_CHARACTER_LIMIT = 1_000;
 
 export type DiaryChatResponse = v.InferOutput<typeof DiaryChatResponseSchema>;
 export type SafetyRoute = v.InferOutput<typeof SafetyRouteSchema>;
@@ -118,12 +120,36 @@ export function buildSafetyFallback(route: SafetyRoute): DiaryChatResponse {
   };
 }
 
+export function buildDiaryChatContextPackage(
+  messages: readonly ConversationContextMessage[],
+  safetyRoute: SafetyRoute,
+  brainMemories: readonly BrainChatContextMemory[] = [],
+) {
+  return {
+    safety_route: safetyRoute,
+    messages: messages.map(({ id, role, body }) => ({ id, role, body })),
+    memories: brainMemories.map((memory, index) => ({
+      id: `memory-${index + 1}`,
+      category: memory.category,
+      statement: memory.statement.slice(0, MEMORY_STATEMENT_CHARACTER_LIMIT),
+      derivation: memory.derivation,
+      confidence: memory.confidence,
+      recorded_at: memory.recordedAt,
+      evidence: memory.evidence.map(({ text, recordedAt }) => ({
+        text: text.slice(0, MEMORY_EVIDENCE_CHARACTER_LIMIT),
+        recorded_at: recordedAt,
+      })),
+    })),
+  };
+}
+
 export async function generateDiaryChatResponse(
   messages: ConversationContextMessage[],
   workerConfig: WorkerConfig,
   signal?: AbortSignal,
   context?: {
     currentUserMessageIds?: string[];
+    brainMemories?: readonly BrainChatContextMemory[];
     prompt?: DiaryChatPromptOptions;
     onUsage?: GeminiUsageRecorder;
   },
@@ -138,10 +164,7 @@ export async function generateDiaryChatResponse(
     googleVertexAiApiKey: workerConfig.googleVertexAiApiKey,
   });
   const contents = JSON.stringify({
-    context_package: {
-      safety_route: safetyRoute,
-      messages: messages.map(({ id, role, body }) => ({ id, role, body })),
-    },
+    context_package: buildDiaryChatContextPackage(messages, safetyRoute, context?.brainMemories),
   });
   const schema = toJsonSchema(DiaryChatResponseSchema) as Record<string, unknown>;
   for (let attempt = 0; attempt < 2; attempt += 1) {

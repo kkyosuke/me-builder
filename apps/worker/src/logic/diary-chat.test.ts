@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildDiaryChatContextPackage,
   buildSafetyFallback,
   classifySafety,
   stricterSafetyRoute,
@@ -54,5 +55,56 @@ describe("diary chat guardrails", () => {
       { id: "second", role: "user" as const, body: "でも今日は仕事した", sequence: 2 },
     ];
     expect(classifySafety(coalesced, ["first", "second"])).toBe("self_harm_possible");
+  });
+
+  it("再認可済みBrain Itemを推定区分とEvidence付きでContext Packageへ入れる", () => {
+    expect(
+      buildDiaryChatContextPackage(messages, "normal", [
+        {
+          category: "memory",
+          statement: "公園を歩くと落ち着くことがある",
+          derivation: "ai",
+          confidence: { state: "uncomputed" },
+          recordedAt: new Date("2026-08-10T00:00:00Z"),
+          evidence: [
+            {
+              text: "公園を散歩したら落ち着いた",
+              recordedAt: new Date("2026-08-10T00:00:00Z"),
+            },
+          ],
+        },
+      ]).memories,
+    ).toEqual([
+      {
+        id: "memory-1",
+        category: "memory",
+        statement: "公園を歩くと落ち着くことがある",
+        derivation: "ai",
+        confidence: { state: "uncomputed" },
+        recorded_at: new Date("2026-08-10T00:00:00Z"),
+        evidence: [
+          {
+            text: "公園を散歩したら落ち着いた",
+            recorded_at: new Date("2026-08-10T00:00:00Z"),
+          },
+        ],
+      },
+    ]);
+  });
+
+  it("MemoryとEvidenceでContext token budgetを過剰消費しないよう文字数を制限する", () => {
+    const context = buildDiaryChatContextPackage(messages, "normal", [
+      {
+        category: "memory",
+        statement: "記".repeat(2_001),
+        derivation: "deterministic",
+        confidence: { state: "confirmed" },
+        recordedAt: new Date("2026-08-10T00:00:00Z"),
+        evidence: [{ text: "根".repeat(1_001), recordedAt: new Date("2026-08-10T00:00:00Z") }],
+      },
+    ]);
+
+    expect(context.memories[0]?.statement).toHaveLength(2_000);
+    expect(context.memories[0]?.evidence[0]?.text).toHaveLength(1_000);
   });
 });
