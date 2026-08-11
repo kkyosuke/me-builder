@@ -108,6 +108,7 @@ function SummarySkeleton() {
 }
 
 const CARD_TRANSITION_MS = 300;
+const CARD_PREPARATION_MS = 16;
 
 type CardTransition = Readonly<{ type: "select"; direction: -1 | 1; versionId: string }>;
 
@@ -141,15 +142,18 @@ function SummaryCardStack({
 }) {
   const dragStart = useRef<{ x: number; y: number; pointerId: number } | null>(null);
   const activeCard = useRef<HTMLDivElement | null>(null);
+  const preparationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const transitionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [dragX, setDragX] = useState(0);
   const [isReturning, setIsReturning] = useState(false);
   const [transition, setTransition] = useState<CardTransition | null>(null);
+  const [transitionStarted, setTransitionStarted] = useState(false);
   const [generationCardHeight, setGenerationCardHeight] = useState<number | null>(null);
   const reducedMotion = useReducedMotion();
 
   useEffect(
     () => () => {
+      if (preparationTimer.current) clearTimeout(preparationTimer.current);
       if (transitionTimer.current) clearTimeout(transitionTimer.current);
     },
     [],
@@ -179,6 +183,7 @@ function SummaryCardStack({
     : undefined;
   const revealedVersion = transitionVersion ?? adjacentVersion;
   const showsIncomingCard = Boolean(revealedVersion && (dragX !== 0 || transition));
+  const incomingIsNewer = (transition?.direction ?? (dragX > 0 ? 1 : -1)) > 0;
   const reservesGenerationStatus =
     versioning.generation.canRegenerate || versioning.generation.status !== "idle";
 
@@ -193,6 +198,39 @@ function SummaryCardStack({
     const start = dragStart.current;
     if (!start || start.pointerId !== event.pointerId) return;
     setDragX(summaryCardDragOffset(event.clientX - start.x, event.clientY - start.y));
+  };
+
+  const selectVersion = (
+    versionId: string,
+    direction: CardTransition["direction"],
+    prepareFromRest = false,
+  ) => {
+    const nextTransition: CardTransition = { type: "select", direction, versionId };
+    const complete = () => {
+      onSelectVersion?.(nextTransition.versionId);
+      setTransition(null);
+      setTransitionStarted(false);
+      setDragX(0);
+      transitionTimer.current = null;
+    };
+
+    if (reducedMotion) {
+      complete();
+      return;
+    }
+
+    setTransition(nextTransition);
+    setTransitionStarted(!prepareFromRest);
+    const start = () => {
+      setTransitionStarted(true);
+      preparationTimer.current = null;
+      transitionTimer.current = setTimeout(complete, CARD_TRANSITION_MS);
+    };
+    if (prepareFromRest) {
+      preparationTimer.current = setTimeout(start, CARD_PREPARATION_MS);
+    } else {
+      start();
+    }
   };
 
   const finishPointer = (event: ReactPointerEvent<HTMLDivElement>, cancelled: boolean) => {
@@ -219,24 +257,7 @@ function SummaryCardStack({
       return;
     }
 
-    const nextTransition: CardTransition = {
-      type: "select",
-      direction: event.clientX - start.x < 0 ? -1 : 1,
-      versionId: action.versionId,
-    };
-    const complete = () => {
-      onSelectVersion?.(nextTransition.versionId);
-      setTransition(null);
-      setDragX(0);
-      transitionTimer.current = null;
-    };
-
-    if (reducedMotion) {
-      complete();
-      return;
-    }
-    setTransition(nextTransition);
-    transitionTimer.current = setTimeout(complete, CARD_TRANSITION_MS);
+    selectVersion(action.versionId, event.clientX - start.x < 0 ? -1 : 1, dragX === 0);
   };
 
   const reasonText = versioning.generation.reasons
@@ -249,16 +270,43 @@ function SummaryCardStack({
 
   return (
     <section aria-label="今のわたしの版" aria-roledescription="カルーセル" className="mt-8">
+      <div className="mb-3 flex min-h-9 items-center justify-between gap-3">
+        <p className="inline-flex items-center gap-1.5 text-sm font-bold text-slate-700 dark:text-slate-200">
+          {selected.isLatest ? (
+            <Sparkles className="size-4 text-violet-600 dark:text-violet-300" aria-hidden="true" />
+          ) : (
+            <History className="size-4" aria-hidden="true" />
+          )}
+          {selected.isLatest ? "最新のまとめ" : "過去のまとめ"}
+        </p>
+        {!selected.isLatest && latestVersion && onSelectVersion && (
+          <button
+            type="button"
+            onClick={() => selectVersion(latestVersion.id, 1, true)}
+            disabled={Boolean(transition)}
+            className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-3 py-2 text-xs font-bold text-sky-800 transition hover:bg-sky-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400 disabled:opacity-50 dark:bg-sky-950 dark:text-sky-200 dark:hover:bg-sky-900"
+          >
+            最新のまとめへ
+            <ArrowRight className="size-3.5" aria-hidden="true" />
+          </button>
+        )}
+      </div>
+
       <div className="relative pb-4">
         {revealedVersion && showsIncomingCard && (
           <div
             aria-hidden="true"
             data-summary-card-layer="incoming"
-            className={`pointer-events-none absolute z-[5] origin-top transition-all duration-300 ease-out motion-reduce:transition-none ${transition ? "inset-x-0 top-0" : "inset-x-3 top-1.5"}`}
+            data-summary-card-entry={incomingIsNewer ? "foreground" : "background"}
+            className={`pointer-events-none absolute origin-top ease-out motion-reduce:transition-none ${transitionStarted ? "transition-all duration-300" : "transition-none duration-0"} ${incomingIsNewer ? "inset-x-0 top-0 z-20" : `${transitionStarted ? "inset-x-0 top-0" : "inset-x-3 top-1.5"} z-[5]`}`}
             style={{
-              transform: transition
-                ? "translate3d(0, 0, 0) scale(1)"
-                : "translate3d(0, 8px, 0) scale(0.96)",
+              transform: incomingIsNewer
+                ? transitionStarted
+                  ? "translate3d(0, 0, 0) scale(1)"
+                  : `translate3d(calc(-105% + ${Math.max(0, dragX)}px), 0, 0) scale(1)`
+                : transitionStarted
+                  ? "translate3d(0, 0, 0) scale(1)"
+                  : "translate3d(0, 8px, 0) scale(0.96)",
             }}
           >
             {renderCard(revealedVersion)}
@@ -266,6 +314,7 @@ function SummaryCardStack({
         )}
 
         <div
+          key={selected.id}
           ref={activeCard}
           data-summary-card-layer="active"
           aria-label={
@@ -275,11 +324,12 @@ function SummaryCardStack({
                 ? "最新のまとめ"
                 : "過去のまとめ"
           }
-          className={`relative z-10 w-full select-none transition-transform ease-out motion-reduce:transition-none ${transition || isReturning ? "duration-300" : "duration-0"} ${canSwipe ? "cursor-grab touch-pan-y active:cursor-grabbing" : ""}`}
+          className={`relative z-10 w-full select-none transition-transform ease-out motion-reduce:transition-none ${transitionStarted || isReturning ? "duration-300" : "duration-0"} ${canSwipe ? "cursor-grab touch-pan-y active:cursor-grabbing" : ""}`}
           style={{
-            transform: transition
-              ? `translate3d(${transition.direction * 115}%, 0, 0) rotate(${transition.direction * 8}deg)`
-              : `translate3d(${dragX}px, 0, 0) rotate(${dragX / 60}deg)`,
+            transform:
+              transition && transitionStarted
+                ? `translate3d(${transition.direction * 115}%, 0, 0) rotate(${transition.direction * 8}deg)`
+                : `translate3d(${dragX}px, 0, 0) rotate(${dragX / 60}deg)`,
             ...(showsGenerationCard && generationCardHeight
               ? { height: `${generationCardHeight}px` }
               : {}),
@@ -329,29 +379,12 @@ function SummaryCardStack({
         <div className="mt-1 flex justify-center">
           <button
             type="button"
-            onClick={() => onSelectVersion(firstPastVersion.id)}
+            onClick={() => selectVersion(firstPastVersion.id, -1, true)}
             disabled={Boolean(transition)}
             className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-semibold text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
           >
             <History className="size-3.5" aria-hidden="true" />
             過去のまとめがあります
-          </button>
-        </div>
-      )}
-
-      {!selected.isLatest && latestVersion && onSelectVersion && (
-        <div className="mt-1 flex items-center justify-between gap-3">
-          <p className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
-            <History className="size-3.5" aria-hidden="true" />
-            過去のまとめ
-          </p>
-          <button
-            type="button"
-            onClick={() => onSelectVersion(latestVersion.id)}
-            disabled={Boolean(transition)}
-            className="rounded-full bg-sky-100 px-3 py-2 text-xs font-bold text-sky-800 transition hover:bg-sky-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400 disabled:opacity-50 dark:bg-sky-950 dark:text-sky-200 dark:hover:bg-sky-900"
-          >
-            今のまとめに戻る
           </button>
         </div>
       )}
