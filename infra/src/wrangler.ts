@@ -29,6 +29,10 @@ function r2(bucket: InfrastructureManifest["avatarBucket"], prefix = "") {
   return `[[${prefix}r2_buckets]]\nbinding = "AVATAR_BUCKET"\nbucket_name = "${bucket.name}"`;
 }
 
+function webVars(baseDomain: string, environment: string) {
+  return [`ENVIRONMENT = "${environment}"`, `WEB_ORIGIN = "https://${baseDomain}"`];
+}
+
 function workerEnvironment(manifest: InfrastructureManifest) {
   const env = manifest.environment;
   const q = manifest.queues;
@@ -70,7 +74,7 @@ function workerEnvironment(manifest: InfrastructureManifest) {
 
 function apiEnvironment(manifest: InfrastructureManifest) {
   const env = manifest.environment;
-  const host = env === "preview" ? "api.stg.kagami.kyosuke.dev" : "api.kagami.kyosuke.dev";
+  const host = `api.${manifest.baseDomain}`;
   const prefix = `env.${env}.`;
   const config = [
     `[env.${env}]`,
@@ -95,15 +99,15 @@ function apiEnvironment(manifest: InfrastructureManifest) {
     durableObject(prefix, "COMPATIBILITY_DATA", `me-builder-worker-${env}`),
     "",
     `[env.${env}.vars]`,
-    `ENVIRONMENT = "${env}"`,
+    ...webVars(manifest.baseDomain, env),
   );
   return config.join("\n");
 }
 
 function mcpEnvironment(manifest: InfrastructureManifest) {
   const env = manifest.environment;
-  const host = env === "preview" ? "mcp.stg.kagami.kyosuke.dev" : "mcp.kagami.kyosuke.dev";
-  return `[env.${env}]\nname = "me-builder-mcp-${env}"\nroutes = [\n  { pattern = "${host}", custom_domain = true }\n]\n\n${d1(manifest.database, `env.${env}.`)}\n\n[env.${env}.vars]\nENVIRONMENT = "${env}"`;
+  const host = `mcp.${manifest.baseDomain}`;
+  return `[env.${env}]\nname = "me-builder-mcp-${env}"\nroutes = [\n  { pattern = "${host}", custom_domain = true }\n]\n\n${d1(manifest.database, `env.${env}.`)}\n\n[env.${env}.vars]\n${webVars(manifest.baseDomain, env).join("\n")}`;
 }
 
 export function renderWranglerConfigs(
@@ -126,6 +130,7 @@ export function renderWranglerConfigs(
   const localManifest = {
     ...preview,
     environment: "local" as never,
+    baseDomain: "localhost",
     database: localDatabase,
     avatarBucket: { name: "me-builder-avatar-local" },
     queues: localQueues,
@@ -227,6 +232,7 @@ export function renderWranglerConfigs(
     "",
     "[env.local.vars]",
     'ENVIRONMENT = "local"',
+    'WEB_ORIGIN = "http://localhost:5173"',
   ].join("\n");
   const api = [
     header,
@@ -257,6 +263,7 @@ export function renderWranglerConfigs(
     "",
     "[vars]",
     'ENVIRONMENT = "local"',
+    'WEB_ORIGIN = "http://localhost:5173"',
     "",
     apiLocal,
     "",
@@ -266,7 +273,7 @@ export function renderWranglerConfigs(
     "",
   ].join("\n");
 
-  const mcp = `${header}\nname = "me-builder-mcp"\nmain = "src/index.ts"\ncompatibility_date = "2024-07-01"\ncompatibility_flags = ["nodejs_compat"]\n\n[observability]\nenabled = true\n\n${d1(localDatabase)}\n\n[vars]\nENVIRONMENT = "local"\n\n[env.local]\nname = "me-builder-mcp-local"\n\n${d1(localDatabase, "env.local.")}\n\n[env.local.vars]\nENVIRONMENT = "local"\n\n${mcpEnvironment(preview)}\n\n${mcpEnvironment(production)}\n`;
+  const mcp = `${header}\nname = "me-builder-mcp"\nmain = "src/index.ts"\ncompatibility_date = "2024-07-01"\ncompatibility_flags = ["nodejs_compat"]\n\n[observability]\nenabled = true\n\n${d1(localDatabase)}\n\n[vars]\nENVIRONMENT = "local"\nWEB_ORIGIN = "http://localhost:5173"\n\n[env.local]\nname = "me-builder-mcp-local"\n\n${d1(localDatabase, "env.local.")}\n\n[env.local.vars]\nENVIRONMENT = "local"\nWEB_ORIGIN = "http://localhost:5173"\n\n${mcpEnvironment(preview)}\n\n${mcpEnvironment(production)}\n`;
 
   const lib = `${header}\nname = "me-builder-lib"\n\n${d1(localDatabase)}\nmigrations_dir = "drizzle"\n\n[env.preview]\n${d1(preview.database, "env.preview.")}\nmigrations_dir = "drizzle"\n\n[env.production]\n${d1(production.database, "env.production.")}\nmigrations_dir = "drizzle"\n`;
   return { worker, api, mcp, lib };

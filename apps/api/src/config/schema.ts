@@ -11,6 +11,8 @@ export const ConfigSchema = v.object({
   lineChannelSecret: v.optional(v.string()),
   baseDomain: v.optional(v.string()),
   baseUrl: v.optional(v.string()),
+  /** ブラウザからのCORSリクエストを許可するWeb UIのオリジン。 */
+  webOrigin: v.optional(v.pipe(v.string(), v.url())),
   lineWebhookUrl: v.optional(v.string()),
   /** LIFF ID。未設定の場合、LINE Login チャネル ID の補完元がなくなります。 */
   liffId: v.optional(v.string()),

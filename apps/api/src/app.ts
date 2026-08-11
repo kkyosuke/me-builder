@@ -47,8 +47,15 @@ import {
 import type { AppEnv } from "./types";
 
 const app = new Hono<AppEnv>();
+const webCors = cors({
+  origin: (origin, c) => (origin === getConfig(c.env).webOrigin ? origin : undefined),
+});
 
-app.use("*", cors());
+app.use("*", async (c, next) => {
+  const origin = c.req.header("Origin");
+  if (!origin || origin !== getConfig(c.env).webOrigin) return next();
+  return webCors(c, next);
+});
 
 // 例外の分類はここでしか作れないが、最終statusを知るのはmiddlewareなので、
 // 記録はせずに安全な分類だけを預けて終端ログ1件へまとめる。

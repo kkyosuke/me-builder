@@ -21,6 +21,7 @@ export function getConfig(env?: Record<string, unknown>): ApiConfig {
   const rawLineChannelAccessToken = getEnv("LINE_CHANNEL_ACCESS_TOKEN", env);
   const rawLineChannelSecret = getEnv("LINE_CHANNEL_SECRET", env);
   const rawBaseDomain = getEnv("BASE_DOMAIN", env);
+  const rawWebOrigin = getEnv("WEB_ORIGIN", env)?.trim() || undefined;
   let rawBaseUrl = getEnv("BASE_URL", env);
 
   if ((!rawBaseUrl || rawBaseUrl === "/") && rawBaseDomain) {
@@ -59,6 +60,7 @@ export function getConfig(env?: Record<string, unknown>): ApiConfig {
     lineChannelSecret: rawLineChannelSecret,
     baseDomain: rawBaseDomain,
     baseUrl: rawBaseUrl,
+    webOrigin: rawWebOrigin,
     lineWebhookUrl: rawLineWebhookUrl,
     webhookQueueName: rawWebhookQueueName,
     webhookQueue: rawWebhookQueue,
