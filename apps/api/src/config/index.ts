@@ -1,5 +1,5 @@
 import { line } from "@me-builder/lib";
-import { getEnv } from "@me-builder/shared";
+import { getEnv, parseAdminLineUserIds } from "@me-builder/shared";
 import * as v from "valibot";
 import { type ApiConfig, ConfigSchema } from "./schema";
 
@@ -47,10 +47,7 @@ export function getConfig(env?: Record<string, unknown>): ApiConfig {
     channelId: getEnv("LINE_LOGIN_CHANNEL_ID", env)?.trim() || undefined,
     liffId: rawLiffId,
   });
-  const adminLineUserIds = (getEnv("ADMIN_LINE_USER_IDS", env) ?? "")
-    .split(",")
-    .map((value) => value.trim())
-    .filter(Boolean);
+  const adminLineUserIds = parseAdminLineUserIds(getEnv("ADMIN_LINE_USER_IDS", env));
 
   const rawConfig = {
     port: rawPort,

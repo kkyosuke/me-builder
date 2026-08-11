@@ -14,11 +14,3 @@ export type LiffState =
   | { status: "login-required" }
   | { status: "ready"; inClient: boolean; profile: LiffDisplayProfile }
   | { status: "error"; message: string };
-
-/** API側でIDトークンを検証した結果。 */
-export type LiffSessionState =
-  | { status: "idle" }
-  | { status: "verifying" }
-  | { status: "verified"; role: "user" | "admin" }
-  | { status: "friendship-required" }
-  | { status: "error"; message: string };

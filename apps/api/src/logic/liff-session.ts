@@ -1,5 +1,5 @@
 import { D1, line } from "@me-builder/lib";
-import { logger } from "@me-builder/shared";
+import { logger, resolveLineAccountRole } from "@me-builder/shared";
 
 /**
  * LIFF の ID トークンを検証し、対応する Account を解決します。
@@ -64,7 +64,7 @@ export async function createLiffSession({
   const resolved = await D1.shared.action.account.resolveAccountByLineLogin(
     db,
     verified.claims.sub,
-    adminLineUserIds.includes(verified.claims.sub) ? "admin" : "user",
+    resolveLineAccountRole(verified.claims.sub, adminLineUserIds),
   );
 
   if (!resolved) {

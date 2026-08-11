@@ -18,7 +18,6 @@ import { deferDiagnosisQuestionRoute } from "./contract/diagnosis/deferred-quest
 import { diagnosisDetailRoute } from "./contract/diagnosis/detail";
 import { resetDevelopmentDiagnosisDataRoute } from "./contract/diagnosis/dev-reset";
 import { diagnosisListRoute } from "./contract/diagnosis/list";
-import { liffSessionRoute } from "./contract/line/liff-session";
 import { openApiOptions } from "./contract/openapi";
 import {
   deleteProfileAvatarRoute,
@@ -37,7 +36,7 @@ import {
   putDiagnosisAnswer,
   putDiagnosisDeferredQuestion,
 } from "./controller/diagnosis";
-import { postLiffSession, postLineWebhook } from "./controller/line";
+import { postLineWebhook } from "./controller/line";
 import { getProfileSummaryContents, postProfileSummaryGeneration } from "./controller/profile";
 import {
   deleteProfileAvatarContents,
@@ -107,9 +106,6 @@ app.get("/api/health", (c) => {
 });
 
 app.post("/api/line/webhook", postLineWebhook);
-
-// クライアント指定のuserIdではなく、検証済みIDトークンからAccountを解決する。
-app.post("/api/line/liff/session", liffSessionRoute, postLiffSession);
 
 app.get("/api/admin/statistics", adminStatisticsRoute, getStatistics);
 

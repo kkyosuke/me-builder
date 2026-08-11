@@ -103,6 +103,17 @@ describe("GET /api/dev/brain-items", () => {
     expect(loadDevelopmentBrainItems).not.toHaveBeenCalled();
   });
 
+  it("ENVIRONMENT未設定では存在を公開せず404を返す", async () => {
+    const response = await app.request(
+      "/api/dev/brain-items",
+      { headers: { Authorization: "Bearer dummy.id.token" } },
+      { LIFF_ID: "2010850319-Yl63upAR", DB: dummyDb, ACCOUNT_DATA: dummyAccountData },
+    );
+
+    expect(response.status).toBe(404);
+    expect(loadDevelopmentBrainItems).not.toHaveBeenCalled();
+  });
+
   it("storage bindingがなければ503を返す", async () => {
     const response = await request("development", false);
     expect(response.status).toBe(503);
@@ -163,6 +174,22 @@ describe("GET /api/dev/brain-items/:brainItemId/vector", () => {
       "/api/dev/brain-items/brain-1/vector",
       { headers: { Authorization: "Bearer dummy.id.token" } },
       { ENVIRONMENT: "production" },
+    );
+
+    expect(response.status).toBe(404);
+    expect(loadDevelopmentBrainVector).not.toHaveBeenCalled();
+  });
+
+  it("ENVIRONMENT未設定ではVectorize bindingがあっても404を返す", async () => {
+    const response = await app.request(
+      "/api/dev/brain-items/brain-1/vector",
+      { headers: { Authorization: "Bearer dummy.id.token" } },
+      {
+        LIFF_ID: "2010850319-Yl63upAR",
+        DB: dummyDb,
+        ACCOUNT_DATA: dummyAccountData,
+        BRAIN_VECTOR_INDEX: dummyVectorIndex,
+      },
     );
 
     expect(response.status).toBe(404);

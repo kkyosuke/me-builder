@@ -2,7 +2,7 @@ import { D1 } from "@me-builder/lib";
 import { logger } from "@me-builder/shared";
 import type { Context } from "hono";
 import * as v from "valibot";
-import { getConfig } from "../config";
+import { getConfig, isDevelopmentEnvironment } from "../config";
 import {
   DevelopmentBrainItemsResponseSchema,
   DevelopmentBrainVectorResponseSchema,
@@ -15,19 +15,15 @@ import {
 import { getDevelopmentBrainItems as loadDevelopmentBrainItems } from "../logic/development-brain-items";
 import { getDevelopmentBrainVector as loadDevelopmentBrainVector } from "../logic/development-brain-items";
 import type { AppEnv } from "../types";
-
-const DEVELOPMENT_ENVIRONMENTS = new Set(["development", "local", "preview", "test"]);
-
-function bearerToken(authorization: string | undefined): string | undefined {
-  return authorization?.trim().match(/^Bearer\s+([^\s]+)$/i)?.[1];
-}
+import { bearerToken } from "./auth";
 
 /** `GET /api/dev/brain-items` — 開発環境だけで本人のactive Itemを返す。 */
 export async function getDevelopmentBrainItems(c: Context<AppEnv>): Promise<Response> {
-  const config = getConfig(c.env);
-  if (!DEVELOPMENT_ENVIRONMENTS.has(config.environment)) {
+  const explicitEnvironment = c.env?.ENVIRONMENT?.trim();
+  if (!explicitEnvironment || !isDevelopmentEnvironment(explicitEnvironment)) {
     return c.json({ error: "Not Found" } as const, 404);
   }
+  const config = getConfig(c.env);
   if (!c.env?.DB || !c.env.ACCOUNT_DATA) {
     logger.error({ path: c.req.path }, "Brain Item storage binding is not configured");
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
@@ -83,10 +79,11 @@ export async function getDevelopmentBrainItems(c: Context<AppEnv>): Promise<Resp
 
 /** `GET /api/dev/brain-items/:brainItemId/vector` — Vectorizeの実体を明示操作時だけ照合する。 */
 export async function getDevelopmentBrainVector(c: Context<AppEnv>): Promise<Response> {
-  const config = getConfig(c.env);
-  if (!DEVELOPMENT_ENVIRONMENTS.has(config.environment)) {
+  const explicitEnvironment = c.env?.ENVIRONMENT?.trim();
+  if (!explicitEnvironment || !isDevelopmentEnvironment(explicitEnvironment)) {
     return c.json({ error: "Not Found" } as const, 404);
   }
+  const config = getConfig(c.env);
   if (!c.env?.DB || !c.env.ACCOUNT_DATA || !c.env.BRAIN_VECTOR_INDEX) {
     logger.error({ path: c.req.path }, "Brain vector storage binding is not configured");
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
