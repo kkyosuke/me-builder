@@ -98,7 +98,7 @@ describe("AccountData Workers runtime E2E", () => {
     });
   });
 
-  it("既存0000 baselineのAccountデータを保ったまま0001と0002を適用できる", async () => {
+  it("既存0000 baselineのAccountデータを保ったまま0001から0003を適用できる", async () => {
     const accountId = crypto.randomUUID();
     const stub = env.ACCOUNT_DATA.getByName(accountId);
 
@@ -111,8 +111,9 @@ describe("AccountData Workers runtime E2E", () => {
       state.storage.sql.exec("DROP TABLE profile_summary_generations");
       state.storage.sql.exec("DROP TABLE brain_vector_entries");
       state.storage.sql.exec("DROP TABLE brain_vector_sync_jobs");
+      state.storage.sql.exec("DROP TABLE diary_chat_brain_usage_audits");
       state.storage.sql.exec(
-        "DELETE FROM __drizzle_migrations WHERE created_at IN (1786407202292, 1786413718549)",
+        "DELETE FROM __drizzle_migrations WHERE created_at IN (1786407202292, 1786413718549, 1786417727320)",
       );
 
       const repository = Reflect.get(instance, "repository") as { initialize(): Promise<void> };
@@ -124,6 +125,13 @@ describe("AccountData Workers runtime E2E", () => {
           )
           .one().name,
       ).toBe("profile_summary_versions");
+      expect(
+        state.storage.sql
+          .exec<{ name: string }>(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'diary_chat_brain_usage_audits'",
+          )
+          .one().name,
+      ).toBe("diary_chat_brain_usage_audits");
       expect(
         state.storage.sql
           .exec<{ statement: string }>(

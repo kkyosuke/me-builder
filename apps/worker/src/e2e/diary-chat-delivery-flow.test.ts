@@ -318,6 +318,7 @@ describe("LINE diary chat delivery E2E", () => {
         main_question_count: 1,
         end_session: false,
         safety: { route: "normal", restricted_advice: false },
+        used_memory_ids: [],
       }),
     });
     mockPushMessage = vi.fn().mockResolvedValue({});
@@ -449,6 +450,16 @@ describe("LINE diary chat delivery E2E", () => {
       count: 1,
     });
     bindings.vector = { brain: { query } as unknown as VectorizeIndex };
+    mockGenerateContent.mockResolvedValueOnce({
+      text: JSON.stringify({
+        mode: "advise",
+        reply: generatedReply,
+        main_question_count: 0,
+        end_session: false,
+        safety: { route: "normal", restricted_advice: false },
+        used_memory_ids: ["memory-1"],
+      }),
+    });
 
     await processChatTurnMessage(
       createQueueMessage(queuedTurn),
@@ -482,6 +493,16 @@ describe("LINE diary chat delivery E2E", () => {
         statement: "公園を歩くと落ち着くことがある",
         derivation: "ai",
         evidence: [expect.objectContaining({ text: diaryText })],
+      }),
+    ]);
+    await expect(
+      accountDataStore.db.select().from(DO.account.schema.diaryChatBrainUsageAudits),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        brainItemId: "brain-memory",
+        purpose: "diary_chat",
+        status: "active",
+        sourceRecordIds: [source.id],
       }),
     ]);
   });

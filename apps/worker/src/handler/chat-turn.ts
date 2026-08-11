@@ -509,7 +509,7 @@ export async function processChatTurnMessage(
             ...(generationController.signal ? { signal: generationController.signal } : {}),
           });
     const response = pendingResponse
-      ? { reply: pendingResponse.body, endSession: pendingResponse.endSession }
+      ? { reply: pendingResponse.body, endSession: pendingResponse.endSession, brainUsages: [] }
       : await atBoundary(
           () =>
             generateDiaryChatResponse(context.messages, workerConfig, generationController.signal, {
@@ -522,10 +522,28 @@ export async function processChatTurnMessage(
                   context.conversationPolicyId,
                 ),
               },
-            }).then((generated) => ({
-              reply: generated.reply,
-              endSession: generated.end_session,
-            })),
+            }).then((generated) => {
+              const memoryByContextId = new Map<string, (typeof brainMemories)[number]>(
+                brainMemories.map((memory, index) => [`memory-${index + 1}`, memory] as const),
+              );
+              return {
+                reply: generated.reply,
+                endSession: generated.end_session,
+                brainUsages: generated.used_memory_ids.flatMap((id) => {
+                  const memory = memoryByContextId.get(id);
+                  return memory
+                    ? [
+                        {
+                          brainItemId: memory.brainItemId,
+                          sourceRecordIds: memory.evidence.map(
+                            ({ sourceRecordId }) => sourceRecordId,
+                          ),
+                        },
+                      ]
+                    : [];
+                }),
+              };
+            }),
           {
             code: "DIARY_CHAT_GENERATION_FAILED",
             category: "dependency",
@@ -565,6 +583,7 @@ export async function processChatTurnMessage(
             turnId: message.body.turnId,
             body: response.reply,
             endSession: response.endSession,
+            brainUsages: response.brainUsages,
           }),
         {
           code: "ASSISTANT_RESPONSE_SAVE_FAILED",

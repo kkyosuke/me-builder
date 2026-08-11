@@ -148,7 +148,10 @@ export type AccountDataActions = {
   "conversation.markTurnGenerating": DomainAction<typeof diary.markTurnGenerating>;
   "conversation.getTurnStatus": DomainAction<typeof diary.getTurnStatus>;
   "conversation.isTurnSessionActive": DomainAction<typeof diary.isTurnSessionActive>;
-  "conversation.saveAssistantResponse": DomainAction<typeof diary.saveAssistantResponse>;
+  "conversation.saveAssistantResponse": RpcAction<
+    [input: Parameters<typeof diary.saveAssistantResponse>[2]],
+    typeof diary.saveAssistantResponse
+  >;
   "conversation.getPendingAssistantResponse": RpcAction<
     [turnId: string],
     typeof diary.getPendingAssistantResponse

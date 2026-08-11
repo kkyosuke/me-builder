@@ -11,6 +11,8 @@ import { createGeminiClient, embedQuery } from "../infrastructure/gemini-client"
 
 const VECTOR_CANDIDATE_LIMIT = 10;
 const SEARCH_QUERY_CHARACTER_LIMIT = 10_000;
+const BRAIN_SEARCH_TIMEOUT_MS = 2_000;
+const BRAIN_SEARCH_MINIMUM_SCORE = 0.7;
 
 export type BrainContextDependencies = Readonly<{
   createOwnerScope: typeof createBrainOwnerScope;
@@ -61,29 +63,52 @@ export async function loadBrainContextMemories(
   const query = buildBrainSearchQuery(input.messages, input.currentUserMessageIds);
   if (!index || !accountDataNamespace || !apiKey || !hmacSecret || !query) return [];
 
+  const searchController = new AbortController();
+  const forwardParentAbort = () => searchController.abort(input.signal?.reason);
+  const timeoutError = new Error("Brain context search timed out");
+  timeoutError.name = "TimeoutError";
+  const timeout = setTimeout(() => searchController.abort(timeoutError), BRAIN_SEARCH_TIMEOUT_MS);
+  const aborted = new Promise<never>((_, reject) => {
+    searchController.signal.addEventListener(
+      "abort",
+      () => reject(searchController.signal.reason ?? timeoutError),
+      { once: true },
+    );
+  });
+  if (input.signal?.aborted) forwardParentAbort();
+  else input.signal?.addEventListener("abort", forwardParentAbort, { once: true });
+
   try {
-    const values = await dependencies.embedSearchQuery(
-      dependencies.createGemini({ googleVertexAiApiKey: apiKey }),
-      {
-        model: input.workerConfig.geminiEmbeddingModel,
-        contents: query,
-        dimensions: BRAIN_VECTOR_DIMENSIONS,
-        ...(input.signal ? { signal: input.signal } : {}),
-      },
-    );
-    if (!values) throw new Error("Brain search embedding response is invalid");
-    const ownerScope = await dependencies.createOwnerScope(hmacSecret, input.accountId);
-    const result = await index.query(values, {
-      topK: VECTOR_CANDIDATE_LIMIT,
-      filter: { owner_scope: { $eq: ownerScope } },
-      returnValues: false,
-      returnMetadata: "none",
-    });
-    const vectorIds = result.matches.map(({ id }) => id);
-    return accountDataFor(accountDataNamespace, input.accountId).execute(
-      "brain.loadChatContextMemories",
-      vectorIds,
-    );
+    return await Promise.race([
+      aborted,
+      (async () => {
+        const values = await dependencies.embedSearchQuery(
+          dependencies.createGemini({ googleVertexAiApiKey: apiKey }),
+          {
+            model: input.workerConfig.geminiEmbeddingModel,
+            contents: query,
+            dimensions: BRAIN_VECTOR_DIMENSIONS,
+            signal: searchController.signal,
+          },
+        );
+        if (!values) throw new Error("Brain search embedding response is invalid");
+        const ownerScope = await dependencies.createOwnerScope(hmacSecret, input.accountId);
+        const result = await index.query(values, {
+          topK: VECTOR_CANDIDATE_LIMIT,
+          filter: { owner_scope: { $eq: ownerScope } },
+          returnValues: false,
+          returnMetadata: "none",
+        });
+        if (searchController.signal.aborted) throw searchController.signal.reason;
+        const vectorIds = result.matches
+          .filter(({ score }) => Number.isFinite(score) && score >= BRAIN_SEARCH_MINIMUM_SCORE)
+          .map(({ id }) => id);
+        return accountDataFor(accountDataNamespace, input.accountId).execute(
+          "brain.loadChatContextMemories",
+          vectorIds,
+        );
+      })(),
+    ]);
   } catch (error) {
     logger.warn(
       {
@@ -101,5 +126,8 @@ export async function loadBrainContextMemories(
       "[Brain context] failed at context.brain-search -> continue without memories",
     );
     return [];
+  } finally {
+    clearTimeout(timeout);
+    input.signal?.removeEventListener("abort", forwardParentAbort);
   }
 }

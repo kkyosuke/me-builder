@@ -103,13 +103,13 @@ describe("Diary conversation persistence flow", () => {
     expect(context?.currentUserMessageIds).toEqual(context?.messages.map(({ id }) => id));
 
     await expect(markTurnGenerating(db, attached.turnId)).resolves.toBe(true);
-    const responseMessageId = await saveAssistantResponse(db, {
+    const responseMessageId = await saveAssistantResponse(db, account.id, {
       turnId: attached.turnId,
       body: "疲れている中でも散歩できたことを記録したよ。今は少し休めそう？",
       endSession: true,
     });
     await expect(
-      saveAssistantResponse(db, {
+      saveAssistantResponse(db, account.id, {
         turnId: attached.turnId,
         body: "再試行で重複保存されてはいけない応答",
         endSession: true,
@@ -295,6 +295,83 @@ describe("Diary conversation persistence flow", () => {
     ]);
   });
 
+  it("回答で実際に使ったBrain ItemとEvidenceを応答と同じbatchで監査保存する", async () => {
+    const db = createTestDb();
+    const account = await bindAccount(db, "account-diary_brain_audit");
+    const receivedAt = new Date("2026-08-07T00:00:00.000Z");
+    const source = await storeLineTextSource(db, {
+      accountId: account.id,
+      eventId: "brain-audit-source",
+      body: "公園を歩くと落ち着いた",
+      receivedAt,
+    });
+    const turn = await attachMessagesToTurn(
+      db,
+      account.id,
+      [source],
+      1,
+      "test-model",
+      "test-prompt",
+    );
+    await db.insert(schema.brainItems).values({
+      id: "brain-audit-item",
+      accountId: account.id,
+      category: "memory",
+      statement: "公園を歩くと落ち着いた",
+      attributes: {},
+      derivation: "ai",
+      status: "active",
+      stability: "stable",
+      sensitivity: "normal",
+      externallyShareable: false,
+      confidence: { state: "uncomputed" },
+      createdAt: receivedAt,
+      updatedAt: receivedAt,
+    });
+    await db.batch([
+      db.insert(schema.brainItemEvidenceEdges).values({
+        id: "brain-audit-evidence",
+        brainItemId: "brain-audit-item",
+        sourceRecordId: source.sourceRecordId,
+        relation: "supports",
+        isDerivationTrigger: true,
+        derivationMethod: "ai",
+        generatedAt: receivedAt,
+        createdAt: receivedAt,
+        updatedAt: receivedAt,
+      }),
+      db.insert(schema.brainItemAccessLabels).values({
+        id: "brain-audit-access",
+        brainItemId: "brain-audit-item",
+        label: "unclassified",
+        assignedBy: "system",
+        createdAt: receivedAt,
+        updatedAt: receivedAt,
+      }),
+    ]);
+    await markTurnGenerating(db, turn.turnId);
+
+    await saveAssistantResponse(db, account.id, {
+      turnId: turn.turnId,
+      body: "以前と同じように、公園を少し歩く選択肢もありそうです。",
+      endSession: false,
+      brainUsages: [{ brainItemId: "brain-audit-item", sourceRecordIds: [source.sourceRecordId] }],
+    });
+
+    await expect(db.select().from(schema.diaryChatBrainUsageAudits)).resolves.toEqual([
+      expect.objectContaining({
+        turnId: turn.turnId,
+        brainItemId: "brain-audit-item",
+        purpose: "diary_chat",
+        status: "active",
+        derivation: "ai",
+        confidence: { state: "uncomputed" },
+        accessLabels: ["unclassified"],
+        sourceRecordIds: [source.sourceRecordId],
+      }),
+    ]);
+  });
+
   it("異なるSessionへ保存済みのeventがまとめて再送されても新しいTurnを作らない", async () => {
     const db = createTestDb();
     const account = await bindAccount(db, "account-session_boundary");
@@ -429,7 +506,7 @@ describe("Diary conversation persistence flow", () => {
       ["reflective"],
     );
     await markTurnGenerating(db, firstTurn.turnId);
-    await saveAssistantResponse(db, {
+    await saveAssistantResponse(db, account.id, {
       turnId: firstTurn.turnId,
       body: "疲れた一日だったんだね。",
       endSession: false,
@@ -617,7 +694,7 @@ describe("Diary conversation persistence flow", () => {
         "test-prompt",
       );
       await markTurnGenerating(db, turn.turnId);
-      await saveAssistantResponse(db, {
+      await saveAssistantResponse(db, account.id, {
         turnId: turn.turnId,
         body: `応答${index + 1}`,
         endSession: false,
@@ -659,7 +736,7 @@ describe("Diary conversation persistence flow", () => {
       "test-prompt",
     );
     await markTurnGenerating(db, firstTurn.turnId);
-    await saveAssistantResponse(db, {
+    await saveAssistantResponse(db, account.id, {
       turnId: firstTurn.turnId,
       body: "削除対象の内容を含むassistant応答",
       endSession: false,

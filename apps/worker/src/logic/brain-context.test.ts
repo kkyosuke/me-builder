@@ -1,6 +1,6 @@
 import type { AccountDataNamespace, BrainChatContextMemory } from "@me-builder/lib";
 import { logger } from "@me-builder/shared";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CloudflareBindings } from "../config";
 import { getWorkerConfig } from "../config";
 import {
@@ -19,13 +19,20 @@ const messages = [
 function createHarness(options: { queryError?: Error } = {}) {
   const memories: readonly BrainChatContextMemory[] = [
     {
+      brainItemId: "brain-1",
       category: "memory",
       statement: "公園を歩くと落ち着くことがある",
       derivation: "ai",
+      status: "active",
       confidence: { state: "uncomputed" },
+      accessLabels: ["unclassified"],
       recordedAt: new Date("2026-08-10T00:00:00Z"),
       evidence: [
-        { text: "公園を散歩したら落ち着いた", recordedAt: new Date("2026-08-10T00:00:00Z") },
+        {
+          sourceRecordId: "source-1",
+          text: "公園を散歩したら落ち着いた",
+          recordedAt: new Date("2026-08-10T00:00:00Z"),
+        },
       ],
     },
   ];
@@ -63,6 +70,8 @@ describe("buildBrainSearchQuery", () => {
 });
 
 describe("loadBrainContextMemories", () => {
+  afterEach(() => vi.useRealTimers());
+
   it("owner_scopeをtopK前にfilterし、候補IDをAccountDataで再認可する", async () => {
     const harness = createHarness();
     const result = await loadBrainContextMemories(
@@ -90,6 +99,63 @@ describe("loadBrainContextMemories", () => {
       "vector-2",
       "vector-1",
     ]);
+  });
+
+  it("最低score未満の候補をAccountDataへ渡さない", async () => {
+    const harness = createHarness();
+    harness.query.mockResolvedValue({
+      matches: [
+        { id: "vector-relevant", score: 0.7 },
+        { id: "vector-unrelated", score: 0.699 },
+      ],
+      count: 2,
+    });
+
+    await loadBrainContextMemories(
+      {
+        cf: harness.cf,
+        workerConfig: getWorkerConfig({
+          GOOGLE_VERTEX_AI_API_KEY: "google-key",
+          BRAIN_VECTOR_HMAC_SECRET: "hmac-secret",
+        }),
+        accountId: "account-1",
+        messages,
+        currentUserMessageIds: ["current-1", "current-2"],
+      },
+      harness.dependencies,
+    );
+
+    expect(harness.execute).toHaveBeenCalledWith("account-1", "brain.loadChatContextMemories", [
+      "vector-relevant",
+    ]);
+  });
+
+  it("検索専用timeout後も生成用の親signalをabortしない", async () => {
+    vi.useFakeTimers();
+    const harness = createHarness();
+    const dependencies = {
+      ...harness.dependencies,
+      embedSearchQuery: vi.fn(() => new Promise<number[]>(() => undefined)),
+    };
+    const generationController = new AbortController();
+    const search = loadBrainContextMemories(
+      {
+        cf: harness.cf,
+        workerConfig: getWorkerConfig({
+          GOOGLE_VERTEX_AI_API_KEY: "google-key",
+          BRAIN_VECTOR_HMAC_SECRET: "hmac-secret",
+        }),
+        accountId: "account-1",
+        messages,
+        currentUserMessageIds: ["current-1", "current-2"],
+        signal: generationController.signal,
+      },
+      dependencies,
+    );
+
+    await vi.advanceTimersByTimeAsync(2_000);
+    await expect(search).resolves.toEqual([]);
+    expect(generationController.signal.aborted).toBe(false);
   });
 
   it("検索障害時は本文をlogへ出さず、記憶なしで通常返信を継続する", async () => {

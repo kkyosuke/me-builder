@@ -80,12 +80,16 @@ export type ActiveBrainItemList = Readonly<{
 }>;
 
 export type BrainChatContextMemory = Readonly<{
+  brainItemId: string;
   category: string;
   statement: string;
   derivation: "ai" | "deterministic";
+  status: "active";
   confidence: unknown;
+  accessLabels: readonly string[];
   recordedAt: Date;
   evidence: readonly Readonly<{
+    sourceRecordId: string;
     text: string;
     recordedAt: Date;
   }>[];
@@ -563,7 +567,7 @@ export async function findActiveBrainVectorEntry(
 
 /**
  * Vectorizeが返した仮名IDを候補としてのみ扱い、AccountDataの現在状態で通常チャット用に再認可する。
- * 入力順（類似度順）を保ち、原文Evidenceは各Item最大3件に制限する。
+ * 入力順（類似度順）を保ち、原文EvidenceはContext全体で最大3件に制限する。
  */
 export async function loadBrainChatContextMemories(
   db: AccountDataDatabase,
@@ -586,6 +590,7 @@ export async function loadBrainChatContextMemories(
       derivation: brainItems.derivation,
       confidence: brainItems.confidence,
       recordedAt: brainItems.createdAt,
+      accessLabel: brainItemAccessLabels.label,
     })
     .from(brainVectorEntries)
     .innerJoin(brainItems, eq(brainItems.id, brainVectorEntries.brainItemId))
@@ -616,38 +621,53 @@ export async function loadBrainChatContextMemories(
     })
     .slice(0, CHAT_CONTEXT_MEMORY_LIMIT);
 
-  return Promise.all(
-    authorized.map(async (item) => {
-      const evidence = await db
-        .select({ text: sourceRecordTextPayloads.body, recordedAt: sourceRecords.createdAt })
-        .from(brainItemEvidenceEdges)
-        .innerJoin(sourceRecords, eq(sourceRecords.id, brainItemEvidenceEdges.sourceRecordId))
-        .innerJoin(
-          sourceRecordTextPayloads,
-          eq(sourceRecordTextPayloads.sourceRecordId, sourceRecords.id),
-        )
-        .where(
-          and(
-            eq(brainItemEvidenceEdges.brainItemId, item.brainItemId),
-            eq(brainItemEvidenceEdges.relation, "supports"),
-            eq(brainItemEvidenceEdges.isDeleted, false),
-            eq(sourceRecords.accountId, accountId),
-            eq(sourceRecords.isDeleted, false),
-          ),
-        )
-        .orderBy(desc(brainItemEvidenceEdges.generatedAt), desc(brainItemEvidenceEdges.id))
-        .limit(CHAT_CONTEXT_EVIDENCE_LIMIT)
-        .all();
-      return {
-        category: item.category,
-        statement: item.statement,
-        derivation: item.derivation,
-        confidence: item.confidence,
-        recordedAt: item.recordedAt,
-        evidence,
-      };
-    }),
-  );
+  let remainingEvidence = CHAT_CONTEXT_EVIDENCE_LIMIT;
+  const memories: BrainChatContextMemory[] = [];
+  for (const item of authorized) {
+    const accessLabels = rows
+      .filter((row) => row.vectorId === item.vectorId)
+      .map((row) => row.accessLabel);
+    const evidence =
+      remainingEvidence === 0
+        ? []
+        : await db
+            .select({
+              sourceRecordId: sourceRecords.id,
+              text: sourceRecordTextPayloads.body,
+              recordedAt: sourceRecords.createdAt,
+            })
+            .from(brainItemEvidenceEdges)
+            .innerJoin(sourceRecords, eq(sourceRecords.id, brainItemEvidenceEdges.sourceRecordId))
+            .innerJoin(
+              sourceRecordTextPayloads,
+              eq(sourceRecordTextPayloads.sourceRecordId, sourceRecords.id),
+            )
+            .where(
+              and(
+                eq(brainItemEvidenceEdges.brainItemId, item.brainItemId),
+                eq(brainItemEvidenceEdges.relation, "supports"),
+                eq(brainItemEvidenceEdges.isDeleted, false),
+                eq(sourceRecords.accountId, accountId),
+                eq(sourceRecords.isDeleted, false),
+              ),
+            )
+            .orderBy(desc(brainItemEvidenceEdges.generatedAt), desc(brainItemEvidenceEdges.id))
+            .limit(remainingEvidence)
+            .all();
+    remainingEvidence -= evidence.length;
+    memories.push({
+      brainItemId: item.brainItemId,
+      category: item.category,
+      statement: item.statement,
+      derivation: item.derivation,
+      status: "active",
+      confidence: item.confidence,
+      accessLabels: [...new Set(accessLabels)].sort(),
+      recordedAt: item.recordedAt,
+      evidence,
+    });
+  }
+  return memories;
 }
 
 /** 開発用の確認画面へ、本人のactiveなBrain Item、根拠、Vector同期状態を返す。 */

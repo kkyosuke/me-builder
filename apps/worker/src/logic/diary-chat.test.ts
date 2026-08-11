@@ -19,8 +19,24 @@ describe("diary chat guardrails", () => {
       main_question_count: 1,
       end_session: false,
       safety: { route: "normal", restricted_advice: false },
+      used_memory_ids: [],
     });
     expect(validateDiaryChatResponse(valid, "normal")?.mode).toBe("explore");
+  });
+
+  it("モデルが返したmemory IDはContextに存在するものだけを監査対象にする", () => {
+    const raw = JSON.stringify({
+      mode: "advise",
+      reply: "以前うまくいった方法も選択肢にできそうです。",
+      main_question_count: 0,
+      end_session: false,
+      safety: { route: "normal", restricted_advice: false },
+      used_memory_ids: ["memory-1", "memory-unknown", "memory-1"],
+    });
+
+    expect(validateDiaryChatResponse(raw, "normal", ["memory-1"])?.used_memory_ids).toEqual([
+      "memory-1",
+    ]);
   });
 
   it("事前分類よりモデルの安全routeを弱めない", () => {
@@ -61,13 +77,17 @@ describe("diary chat guardrails", () => {
     expect(
       buildDiaryChatContextPackage(messages, "normal", [
         {
+          brainItemId: "brain-1",
           category: "memory",
           statement: "公園を歩くと落ち着くことがある",
           derivation: "ai",
+          status: "active",
           confidence: { state: "uncomputed" },
+          accessLabels: ["unclassified"],
           recordedAt: new Date("2026-08-10T00:00:00Z"),
           evidence: [
             {
+              sourceRecordId: "source-1",
               text: "公園を散歩したら落ち着いた",
               recordedAt: new Date("2026-08-10T00:00:00Z"),
             },
@@ -80,10 +100,13 @@ describe("diary chat guardrails", () => {
         category: "memory",
         statement: "公園を歩くと落ち着くことがある",
         derivation: "ai",
+        status: "active",
         confidence: { state: "uncomputed" },
+        access_labels: ["unclassified"],
         recorded_at: new Date("2026-08-10T00:00:00Z"),
         evidence: [
           {
+            id: "evidence-1-1",
             text: "公園を散歩したら落ち着いた",
             recorded_at: new Date("2026-08-10T00:00:00Z"),
           },
@@ -95,12 +118,21 @@ describe("diary chat guardrails", () => {
   it("MemoryとEvidenceでContext token budgetを過剰消費しないよう文字数を制限する", () => {
     const context = buildDiaryChatContextPackage(messages, "normal", [
       {
+        brainItemId: "brain-1",
         category: "memory",
         statement: "記".repeat(2_001),
         derivation: "deterministic",
+        status: "active",
         confidence: { state: "confirmed" },
+        accessLabels: ["private"],
         recordedAt: new Date("2026-08-10T00:00:00Z"),
-        evidence: [{ text: "根".repeat(1_001), recordedAt: new Date("2026-08-10T00:00:00Z") }],
+        evidence: [
+          {
+            sourceRecordId: "source-1",
+            text: "根".repeat(1_001),
+            recordedAt: new Date("2026-08-10T00:00:00Z"),
+          },
+        ],
       },
     ]);
 
