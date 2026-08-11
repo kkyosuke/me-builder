@@ -65,6 +65,7 @@ export async function processProfileSummaryGenerationMessage(
       diagnosisCount: context.diagnosisCount,
       diaryCount: context.diaryCount,
       latestRecordedAt: context.latestRecordedAt,
+      inputSnapshot: context.inputSnapshot,
     });
     if (!completed) {
       throw new OperationalError({

@@ -16,7 +16,7 @@ export const profileSummaryCases = {
         versionCount: 3,
         latestVersionCount: 1,
         availableDataCounts: { diagnosis: 3, diary: 6 },
-        generation: { status: "idle", canRegenerate: true, reasons: [], message: null },
+        generation: { status: "idle", canRegenerate: false, reasons: [], message: null },
       },
     },
   },

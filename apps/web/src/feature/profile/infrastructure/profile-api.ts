@@ -1,7 +1,10 @@
 import * as v from "valibot";
 import type { operations } from "../../../generated/api";
 import { createHttpClient } from "../../../infrastructure/http-client";
-import type { ProfileSummaryReadResult } from "../model/profile-summary";
+import {
+  ProfileSummaryGenerationUnavailableError,
+  type ProfileSummaryReadResult,
+} from "../model/profile-summary";
 
 type ApiResponse = operations["getProfileSummary"]["responses"][200]["content"]["application/json"];
 type GenerationResponse =
@@ -55,6 +58,10 @@ const GenerationResponseSchema = v.object({
   status: v.picklist(["queued", "generating"]),
   created: v.boolean(),
 }) satisfies v.GenericSchema<GenerationResponse>;
+const GenerationUnavailableResponseSchema = v.object({
+  error: v.literal("Profile summary generation unavailable"),
+  reason: v.picklist(["source_record_required", "regeneration_not_required"]),
+});
 
 export async function fetchProfileSummary(
   apiUrl: string | undefined,
@@ -108,7 +115,11 @@ export async function requestProfileSummaryGeneration(
       throw new Error("利用するには、先にLINE公式アカウントを友だち追加してください。");
     }
     if (response.status === 409) {
-      throw new Error("まとめに使える記録がまだありません。");
+      const unavailable = v.safeParse(GenerationUnavailableResponseSchema, await response.json());
+      if (unavailable.success) {
+        throw new ProfileSummaryGenerationUnavailableError(unavailable.output.reason);
+      }
+      throw new Error("まとめの生成可否を確認できませんでした。");
     }
     throw new Error(`まとめの生成を開始できませんでした (HTTP ${response.status})`);
   }

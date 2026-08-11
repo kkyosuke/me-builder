@@ -65,6 +65,49 @@ describe("requestProfileSummaryGeneration", () => {
     expect(send).not.toHaveBeenCalled();
   });
 
+  it("開発環境の無変更再生成許可をAccountDataへ渡す", async () => {
+    execute.mockResolvedValueOnce({
+      outcome: "created",
+      generationId: "generation-dev",
+      status: "queued",
+    });
+
+    await requestProfileSummaryGeneration({
+      idToken: "token",
+      lineLoginChannelId: "channel",
+      db: {} as D1.shared.Client,
+      accountData,
+      queue,
+      at: new Date("2026-08-11T00:00:00.000Z"),
+      allowUnchangedRegeneration: true,
+    });
+
+    expect(execute).toHaveBeenCalledWith(
+      "account-1",
+      "profileSummary.requestGeneration",
+      new Date("2026-08-11T00:00:00.000Z"),
+      true,
+    );
+  });
+
+  it("AccountDataの再生成不可理由をQueueへ送らず返す", async () => {
+    execute.mockResolvedValueOnce({
+      outcome: "unavailable",
+      reason: "regeneration_not_required",
+    });
+
+    await expect(
+      requestProfileSummaryGeneration({
+        idToken: "token",
+        lineLoginChannelId: "channel",
+        db: {} as D1.shared.Client,
+        accountData,
+        queue,
+      }),
+    ).resolves.toEqual({ type: "unavailable", reason: "regeneration_not_required" });
+    expect(send).not.toHaveBeenCalled();
+  });
+
   it("Queue送信に失敗した要求をfailedへ遷移する", async () => {
     execute.mockResolvedValueOnce({
       outcome: "created",

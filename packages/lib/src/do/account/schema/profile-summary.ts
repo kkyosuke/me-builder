@@ -35,9 +35,6 @@ export const profileSummaryVersions = sqliteTable(
   "profile_summary_versions",
   {
     id: text("id").primaryKey(),
-    accountId: text("account_id")
-      .notNull()
-      .references(() => accountDataIdentity.accountId),
     generationId: text("generation_id")
       .notNull()
       .unique()
@@ -46,10 +43,14 @@ export const profileSummaryVersions = sqliteTable(
     generatedAt: integer("generated_at", { mode: "timestamp_ms" }).notNull(),
     model: text("model").notNull(),
     promptVersion: text("prompt_version").notNull(),
+    diagnosisInputCount: integer("diagnosis_input_count").notNull(),
+    diagnosisInputLatestAt: integer("diagnosis_input_latest_at", { mode: "timestamp_ms" }),
+    diaryInputCount: integer("diary_input_count").notNull(),
+    diaryInputLatestAt: integer("diary_input_latest_at", { mode: "timestamp_ms" }),
     summary: text("summary_json", { mode: "json" }).notNull().$type<ProfileSummaryContent>(),
   },
   (table) => [
-    uniqueIndex("profile_summary_version_account_sequence_idx").on(table.accountId, table.sequence),
-    index("profile_summary_version_account_generated_idx").on(table.accountId, table.generatedAt),
+    uniqueIndex("profile_summary_version_sequence_idx").on(table.sequence),
+    index("profile_summary_version_generated_idx").on(table.generatedAt),
   ],
 );

@@ -9,7 +9,10 @@ export type RequestProfileSummaryGenerationOutcome =
       status: "queued" | "generating";
       created: boolean;
     }>
-  | Readonly<{ type: "unavailable" }>
+  | Readonly<{
+      type: "unavailable";
+      reason: "source_record_required" | "regeneration_not_required";
+    }>
   | Readonly<{ type: "not-configured" }>
   | Readonly<{ type: "unauthenticated"; reason: string }>
   | Readonly<{ type: "account-not-found" }>;
@@ -21,6 +24,7 @@ type Params = Readonly<{
   accountData?: AccountDataNamespace;
   queue?: Queue<ProfileSummaryGenerationQueueMessage>;
   at?: Date;
+  allowUnchangedRegeneration?: boolean;
 }>;
 
 export async function requestProfileSummaryGeneration({
@@ -30,13 +34,18 @@ export async function requestProfileSummaryGeneration({
   accountData,
   queue,
   at = new Date(),
+  allowUnchangedRegeneration = false,
 }: Params): Promise<RequestProfileSummaryGenerationOutcome> {
   const session = await createLiffSession({ idToken, lineLoginChannelId, db });
   if (session.type !== "resolved") return session;
   if (!accountData || !queue) throw new Error("Profile Summary generation binding is missing");
   const account = accountDataFor(accountData, session.session.accountId);
-  const request = await account.execute("profileSummary.requestGeneration", at);
-  if (request.outcome === "unavailable") return { type: "unavailable" };
+  const request = await account.execute(
+    "profileSummary.requestGeneration",
+    at,
+    allowUnchangedRegeneration,
+  );
+  if (request.outcome === "unavailable") return { type: "unavailable", reason: request.reason };
   if (request.outcome === "created") {
     try {
       await queue.send({

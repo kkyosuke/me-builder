@@ -3,10 +3,7 @@ import type { ProfileSummaryVersioning } from "../model/profile-summary";
 const SWIPE_THRESHOLD_PX = 72;
 const MAX_DRAG_PX = 160;
 
-type ProfileSummarySwipeAction =
-  | { type: "none" }
-  | { type: "select"; versionId: string }
-  | { type: "regenerate" };
+type ProfileSummarySwipeAction = { type: "none" } | { type: "select"; versionId: string };
 
 export function summaryCardDragOffset(deltaX: number, deltaY: number): number {
   if (Math.abs(deltaY) >= Math.abs(deltaX)) return 0;
@@ -17,12 +14,10 @@ export function resolveProfileSummarySwipe({
   deltaX,
   deltaY,
   versioning,
-  canRegenerate,
 }: {
   deltaX: number;
   deltaY: number;
   versioning: ProfileSummaryVersioning;
-  canRegenerate: boolean;
 }): ProfileSummarySwipeAction {
   if (Math.abs(deltaX) < SWIPE_THRESHOLD_PX || Math.abs(deltaX) <= Math.abs(deltaY)) {
     return { type: "none" };
@@ -40,5 +35,5 @@ export function resolveProfileSummarySwipe({
 
   const newerVersion = versioning.versions[selectedIndex - 1];
   if (newerVersion) return { type: "select", versionId: newerVersion.id };
-  return canRegenerate ? { type: "regenerate" } : { type: "none" };
+  return { type: "none" };
 }

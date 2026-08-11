@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { ProfileSummaryGenerationUnavailableError } from "../model/profile-summary";
 import { fetchProfileSummary, requestProfileSummaryGeneration } from "./profile-api";
 
 describe("fetchProfileSummary", () => {
@@ -98,6 +99,32 @@ describe("fetchProfileSummary", () => {
       expect.objectContaining({
         method: "POST",
         headers: { Authorization: "Bearer id-token" },
+      }),
+    );
+  });
+
+  it.each([
+    ["source_record_required", "まとめに使える記録がまだありません。"],
+    ["regeneration_not_required", "新しい情報がないため、再生成は必要ありません。"],
+  ] as const)("生成できない理由 %s を区別する", async (reason, message) => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          Response.json(
+            { error: "Profile summary generation unavailable", reason },
+            { status: 409 },
+          ),
+        ),
+    );
+
+    const request = requestProfileSummaryGeneration(undefined, "id-token");
+
+    await expect(request).rejects.toEqual(
+      expect.objectContaining<Partial<ProfileSummaryGenerationUnavailableError>>({
+        reason,
+        message,
       }),
     );
   });

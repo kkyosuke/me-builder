@@ -1,8 +1,10 @@
-import { and, countDistinct, desc, eq, inArray, notInArray } from "drizzle-orm";
+import { and, countDistinct, desc, eq, inArray, lte, max, notInArray } from "drizzle-orm";
 import type {
   CompleteProfileSummaryGenerationInput,
   ProfileSummaryGenerationContext,
+  ProfileSummaryInputSnapshot,
   ProfileSummaryReadModel,
+  ProfileSummaryRegenerationReason,
   RequestProfileSummaryGenerationResult,
 } from "../../../profile-summary";
 import type { AccountDataDatabase } from "../database";
@@ -17,6 +19,7 @@ import { profileSummaryGenerations, profileSummaryVersions } from "../schema/pro
 import { sourceRecords } from "../schema/source";
 
 const PROFILE_SUMMARY_EVIDENCE_LIMIT = 100;
+export const PROFILE_SUMMARY_REGENERATION_INTERVAL_MS = 30 * 24 * 60 * 60 * 1_000;
 
 async function availableData(db: AccountDataDatabase, accountId: string) {
   const diagnosis = await db
@@ -39,18 +42,132 @@ async function availableData(db: AccountDataDatabase, accountId: string) {
   return { diagnosis: Number(diagnosis?.value ?? 0), diary: Number(diary?.value ?? 0) };
 }
 
+function latestDate(...dates: readonly (Date | null | undefined)[]): Date | null {
+  return dates.reduce<Date | null>(
+    (latest, date) => (!date || (latest && latest >= date) ? latest : date),
+    null,
+  );
+}
+
+async function currentInputSnapshot(
+  db: AccountDataDatabase,
+  accountId: string,
+): Promise<ProfileSummaryInputSnapshot> {
+  const diagnosisItemIds = (
+    await db
+      .select({ id: diagnosisBrainProjectionHeads.currentBrainItemId })
+      .from(diagnosisBrainProjectionHeads)
+      .where(eq(diagnosisBrainProjectionHeads.accountId, accountId))
+      .all()
+  ).map(({ id }) => id);
+  const [diagnosis, diaryMessages, diaryBrain] = await Promise.all([
+    db
+      .select({
+        count: countDistinct(diagnosisBrainProjectionHeads.diagnosisId),
+        latest: max(brainItems.createdAt),
+      })
+      .from(diagnosisBrainProjectionHeads)
+      .innerJoin(brainItems, eq(diagnosisBrainProjectionHeads.currentBrainItemId, brainItems.id))
+      .where(
+        and(
+          eq(diagnosisBrainProjectionHeads.accountId, accountId),
+          eq(brainItems.status, "active"),
+          eq(brainItems.isDeleted, false),
+        ),
+      )
+      .get(),
+    db
+      .select({
+        count: countDistinct(conversationMessages.sourceRecordId),
+        latest: max(sourceRecords.createdAt),
+      })
+      .from(conversationMessages)
+      .innerJoin(conversationSessions, eq(conversationMessages.sessionId, conversationSessions.id))
+      .innerJoin(sourceRecords, eq(conversationMessages.sourceRecordId, sourceRecords.id))
+      .where(
+        and(
+          eq(conversationSessions.accountId, accountId),
+          eq(conversationMessages.role, "user"),
+          eq(conversationMessages.isDeleted, false),
+          eq(sourceRecords.isDeleted, false),
+        ),
+      )
+      .get(),
+    db
+      .select({ count: countDistinct(brainItems.id), latest: max(brainItems.createdAt) })
+      .from(brainItems)
+      .where(
+        and(
+          eq(brainItems.accountId, accountId),
+          eq(brainItems.status, "active"),
+          eq(brainItems.isDeleted, false),
+          ...(diagnosisItemIds.length > 0 ? [notInArray(brainItems.id, diagnosisItemIds)] : []),
+        ),
+      )
+      .get(),
+  ]);
+  return {
+    diagnosis: {
+      count: Number(diagnosis?.count ?? 0),
+      latestRecordedAt: diagnosis?.latest ?? null,
+    },
+    diary: {
+      count: Number(diaryMessages?.count ?? 0) + Number(diaryBrain?.count ?? 0),
+      latestRecordedAt: latestDate(diaryMessages?.latest, diaryBrain?.latest),
+    },
+  };
+}
+
+function regenerationReasons(
+  current: ProfileSummaryInputSnapshot,
+  latestVersion:
+    | Pick<
+        typeof profileSummaryVersions.$inferSelect,
+        | "generatedAt"
+        | "diagnosisInputCount"
+        | "diagnosisInputLatestAt"
+        | "diaryInputCount"
+        | "diaryInputLatestAt"
+      >
+    | undefined,
+  at: Date,
+): ProfileSummaryRegenerationReason[] {
+  if (!latestVersion) {
+    return [
+      ...(current.diagnosis.count > 0 ? (["diagnosis"] as const) : []),
+      ...(current.diary.count > 0 ? (["brain"] as const) : []),
+    ];
+  }
+  const diagnosisChanged =
+    current.diagnosis.count > latestVersion.diagnosisInputCount ||
+    (current.diagnosis.latestRecordedAt !== null &&
+      (latestVersion.diagnosisInputLatestAt === null ||
+        current.diagnosis.latestRecordedAt > latestVersion.diagnosisInputLatestAt));
+  const diaryChanged =
+    current.diary.count > latestVersion.diaryInputCount ||
+    (current.diary.latestRecordedAt !== null &&
+      (latestVersion.diaryInputLatestAt === null ||
+        current.diary.latestRecordedAt > latestVersion.diaryInputLatestAt));
+  return [
+    ...(diagnosisChanged ? (["diagnosis"] as const) : []),
+    ...(diaryChanged ? (["brain"] as const) : []),
+    ...(at.getTime() - latestVersion.generatedAt.getTime() >=
+    PROFILE_SUMMARY_REGENERATION_INTERVAL_MS
+      ? (["elapsed"] as const)
+      : []),
+  ];
+}
+
 export async function readProfileSummary(
   db: AccountDataDatabase,
   accountId: string,
+  at = new Date(),
+  allowUnchangedRegeneration = false,
 ): Promise<ProfileSummaryReadModel> {
-  const [counts, versionRows, latestGeneration] = await Promise.all([
+  const [counts, inputSnapshot, versionRows, latestGeneration] = await Promise.all([
     availableData(db, accountId),
-    db
-      .select()
-      .from(profileSummaryVersions)
-      .where(eq(profileSummaryVersions.accountId, accountId))
-      .orderBy(desc(profileSummaryVersions.sequence))
-      .all(),
+    currentInputSnapshot(db, accountId),
+    db.select().from(profileSummaryVersions).orderBy(desc(profileSummaryVersions.sequence)).all(),
     db
       .select()
       .from(profileSummaryGenerations)
@@ -66,6 +183,8 @@ export async function readProfileSummary(
     latestGeneration?.status === "failed"
       ? latestGeneration.status
       : "idle";
+  const reasons = regenerationReasons(inputSnapshot, versionRows[0], at);
+  const hasInput = inputSnapshot.diagnosis.count + inputSnapshot.diary.count > 0;
   return {
     versions: versionRows.map((version, index) => ({
       id: version.id,
@@ -78,8 +197,8 @@ export async function readProfileSummary(
     availableDataCounts: counts,
     generation: {
       status,
-      canRegenerate: counts.diagnosis + counts.diary > 0 && !active,
-      reasons: [],
+      canRegenerate: hasInput && (allowUnchangedRegeneration || reasons.length > 0) && !active,
+      reasons,
       message: latestGeneration?.status === "failed" ? latestGeneration.failureMessage : null,
     },
   };
@@ -89,6 +208,7 @@ export async function requestProfileSummaryGeneration(
   db: AccountDataDatabase,
   accountId: string,
   requestedAt = new Date(),
+  allowUnchangedRegeneration = false,
 ): Promise<RequestProfileSummaryGenerationResult> {
   const existing = await db
     .select({ id: profileSummaryGenerations.id, status: profileSummaryGenerations.status })
@@ -104,8 +224,24 @@ export async function requestProfileSummaryGeneration(
   if (existing && (existing.status === "queued" || existing.status === "generating")) {
     return { outcome: "existing", generationId: existing.id, status: existing.status };
   }
-  const counts = await availableData(db, accountId);
-  if (counts.diagnosis + counts.diary === 0) return { outcome: "unavailable" };
+  const [inputSnapshot, latestVersion] = await Promise.all([
+    currentInputSnapshot(db, accountId),
+    db
+      .select()
+      .from(profileSummaryVersions)
+      .orderBy(desc(profileSummaryVersions.sequence))
+      .limit(1)
+      .get(),
+  ]);
+  if (inputSnapshot.diagnosis.count + inputSnapshot.diary.count === 0) {
+    return { outcome: "unavailable", reason: "source_record_required" };
+  }
+  if (
+    !allowUnchangedRegeneration &&
+    regenerationReasons(inputSnapshot, latestVersion, requestedAt).length === 0
+  ) {
+    return { outcome: "unavailable", reason: "regeneration_not_required" };
+  }
 
   const generationId = crypto.randomUUID();
   await db
@@ -142,8 +278,17 @@ export async function loadProfileSummaryGenerationContext(
       .run();
   }
 
+  // AIへ渡す入力の境界を最初に固定する。これ以降に追加された入力は、この版で
+  // 使用済みにせず、次回の再生成理由として検出できる状態を保つ。
+  const inputSnapshot = await currentInputSnapshot(db, accountId);
+  const diagnosisLatestAt = inputSnapshot.diagnosis.latestRecordedAt;
+  const diaryLatestAt = inputSnapshot.diary.latestRecordedAt;
   const diagnosisRows = await db
-    .select({ id: brainItems.id, text: brainItems.statement, recordedAt: brainItems.createdAt })
+    .select({
+      id: brainItems.id,
+      text: brainItems.statement,
+      recordedAt: brainItems.createdAt,
+    })
     .from(diagnosisBrainProjectionHeads)
     .innerJoin(brainItems, eq(diagnosisBrainProjectionHeads.currentBrainItemId, brainItems.id))
     .where(
@@ -151,6 +296,7 @@ export async function loadProfileSummaryGenerationContext(
         eq(diagnosisBrainProjectionHeads.accountId, accountId),
         eq(brainItems.status, "active"),
         eq(brainItems.isDeleted, false),
+        ...(diagnosisLatestAt ? [lte(brainItems.createdAt, diagnosisLatestAt)] : []),
       ),
     )
     .orderBy(desc(brainItems.createdAt))
@@ -172,6 +318,7 @@ export async function loadProfileSummaryGenerationContext(
         eq(brainItems.status, "active"),
         eq(brainItems.isDeleted, false),
         ...(diagnosisItemIds.length > 0 ? [notInArray(brainItems.id, diagnosisItemIds)] : []),
+        ...(diaryLatestAt ? [lte(brainItems.createdAt, diaryLatestAt)] : []),
       ),
     )
     .orderBy(desc(brainItems.createdAt))
@@ -196,6 +343,7 @@ export async function loadProfileSummaryGenerationContext(
         eq(conversationMessages.role, "user"),
         eq(conversationMessages.isDeleted, false),
         eq(sourceRecords.isDeleted, false),
+        ...(diaryLatestAt ? [lte(sourceRecords.createdAt, diaryLatestAt)] : []),
       ),
     )
     .orderBy(desc(sourceRecords.createdAt))
@@ -232,6 +380,7 @@ export async function loadProfileSummaryGenerationContext(
     diagnosisCount: counts.diagnosis,
     diaryCount: counts.diary,
     latestRecordedAt,
+    inputSnapshot,
   };
 }
 
@@ -256,7 +405,6 @@ export async function completeProfileSummaryGeneration(
   const previous = await db
     .select({ sequence: profileSummaryVersions.sequence })
     .from(profileSummaryVersions)
-    .where(eq(profileSummaryVersions.accountId, accountId))
     .orderBy(desc(profileSummaryVersions.sequence))
     .limit(1)
     .get();
@@ -275,12 +423,15 @@ export async function completeProfileSummaryGeneration(
       .insert(profileSummaryVersions)
       .values({
         id: crypto.randomUUID(),
-        accountId,
         generationId: input.generationId,
         sequence,
         generatedAt: input.generatedAt,
         model: input.model,
         promptVersion: input.promptVersion,
+        diagnosisInputCount: input.inputSnapshot.diagnosis.count,
+        diagnosisInputLatestAt: input.inputSnapshot.diagnosis.latestRecordedAt,
+        diaryInputCount: input.inputSnapshot.diary.count,
+        diaryInputLatestAt: input.inputSnapshot.diary.latestRecordedAt,
         summary,
       })
       .onConflictDoNothing(),

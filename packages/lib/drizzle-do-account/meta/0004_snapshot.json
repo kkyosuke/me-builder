@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "3b205fd5-e098-4fd2-8ec3-f73f91df9052",
-  "prevId": "de6671f1-c78f-4976-b2b2-ebd139f337ab",
+  "id": "6f488466-67a1-45bd-922c-4f31dcd65035",
+  "prevId": "3b205fd5-e098-4fd2-8ec3-f73f91df9052",
   "tables": {
     "brain_item_access_labels": {
       "name": "brain_item_access_labels",
@@ -2099,6 +2099,138 @@
           "tableFrom": "diary_brain_checkpoints",
           "tableTo": "conversation_sessions",
           "columnsFrom": ["session_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "diary_chat_brain_usage_audits": {
+      "name": "diary_chat_brain_usage_audits",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "is_deleted": {
+          "name": "is_deleted",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "turn_id": {
+          "name": "turn_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "brain_item_id": {
+          "name": "brain_item_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "purpose": {
+          "name": "purpose",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "derivation": {
+          "name": "derivation",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "confidence_json": {
+          "name": "confidence_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "access_labels_json": {
+          "name": "access_labels_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "source_record_ids_json": {
+          "name": "source_record_ids_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "diary_chat_brain_usage_turn_item_idx": {
+          "name": "diary_chat_brain_usage_turn_item_idx",
+          "columns": ["turn_id", "brain_item_id", "purpose"],
+          "isUnique": true
+        },
+        "diary_chat_brain_usage_turn_idx": {
+          "name": "diary_chat_brain_usage_turn_idx",
+          "columns": ["turn_id"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "diary_chat_brain_usage_audits_turn_id_chat_turns_id_fk": {
+          "name": "diary_chat_brain_usage_audits_turn_id_chat_turns_id_fk",
+          "tableFrom": "diary_chat_brain_usage_audits",
+          "tableTo": "chat_turns",
+          "columnsFrom": ["turn_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "diary_chat_brain_usage_audits_brain_item_id_brain_items_id_fk": {
+          "name": "diary_chat_brain_usage_audits_brain_item_id_brain_items_id_fk",
+          "tableFrom": "diary_chat_brain_usage_audits",
+          "tableTo": "brain_items",
+          "columnsFrom": ["brain_item_id"],
           "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
