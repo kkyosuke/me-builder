@@ -3,6 +3,7 @@ type BrainItemEvidence = {
   relation: "supports" | "contradicts";
   derivationMethod: "ai" | "deterministic";
   generatedAt: string;
+  recordedAt: string;
 };
 
 type BrainItem = {
@@ -12,6 +13,8 @@ type BrainItem = {
   derivation: "ai" | "deterministic";
   status: "active";
   createdAt: string;
+  firstObservedAt: string;
+  lastObservedAt: string;
   vectorSync: {
     status: "pending" | "submitted" | "applied" | "failed" | "not-scheduled";
     operation?: "upsert" | "delete" | undefined;

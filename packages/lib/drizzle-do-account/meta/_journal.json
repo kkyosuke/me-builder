@@ -36,6 +36,13 @@
       "when": 1786433070406,
       "tag": "0004_marvelous_sway",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1786453107455,
+      "tag": "0005_white_boomer",
+      "breakpoints": true
     }
   ]
 }

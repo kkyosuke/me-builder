@@ -15,6 +15,7 @@ import {
   getBrainVectorSyncTarget,
   listActiveBrainItems,
   loadBrainChatContextMemories,
+  loadBrainSemanticDedupCandidates,
   saveBrainItem,
 } from "./brain";
 
@@ -263,17 +264,116 @@ describe("saveBrainItem", () => {
   });
 });
 
+describe("loadBrainSemanticDedupCandidates", () => {
+  it("Vector候補をAccountとactive状態で再認可し、比較用statementを返す", async () => {
+    const db = createTestDb();
+    await insertAccountsAndSources(db);
+    const at = new Date("2026-08-10T00:00:00Z");
+    await saveBrainItem(db, createInput({ at }));
+    await db.insert(schema.brainVectorEntries).values({
+      id: "vector-1",
+      brainItemId: "brain-1",
+      itemRevision: at.getTime(),
+    });
+
+    await expect(
+      loadBrainSemanticDedupCandidates(db, "account-1", ["vector-1"], ["preference"]),
+    ).resolves.toEqual([
+      {
+        brainItemId: "brain-1",
+        category: "preference",
+        statement: "日記から見える傾向",
+        comparisonText: "日記から見える傾向",
+        isInference: false,
+      },
+    ]);
+  });
+
+  it("Vector候補が上限まであってもVector同期前の直近Itemを比較候補へ残す", async () => {
+    const db = createTestDb();
+    await db.insert(schema.accountDataIdentity).values({ singleton: 1, accountId: "account-1" });
+    const vectorItems = Array.from({ length: 30 }, (_, index) => ({
+      ...createInput().item,
+      id: `brain-vector-${index}`,
+      statement: `Vector候補 ${index}`,
+      createdAt: new Date(`2026-07-${String(index + 1).padStart(2, "0")}T00:00:00Z`),
+      updatedAt: new Date(`2026-07-${String(index + 1).padStart(2, "0")}T00:00:00Z`),
+    }));
+    await db.insert(schema.brainItems).values([
+      ...vectorItems,
+      {
+        ...createInput().item,
+        id: "brain-recent-unsynced",
+        statement: "Vector同期前の直近Item",
+        createdAt: new Date("2026-08-11T00:00:00Z"),
+        updatedAt: new Date("2026-08-11T00:00:00Z"),
+      },
+    ]);
+    await db.insert(schema.brainVectorEntries).values(
+      vectorItems.map((item, index) => ({
+        id: `vector-${index}`,
+        brainItemId: item.id,
+        itemRevision: item.updatedAt.getTime(),
+      })),
+    );
+
+    const result = await loadBrainSemanticDedupCandidates(
+      db,
+      "account-1",
+      vectorItems.map((_, index) => `vector-${index}`),
+      ["preference"],
+    );
+
+    expect(result).toHaveLength(30);
+    expect(result.map(({ brainItemId }) => brainItemId)).toContain("brain-recent-unsynced");
+  });
+});
+
 describe("loadBrainChatContextMemories", () => {
   it("Vectorize候補をAccountDataで再認可し、active ItemとEvidenceだけを類似度順で返す", async () => {
     const db = createTestDb();
     await insertAccountsAndSources(db);
+    const firstObservedAt = new Date("2026-07-01T00:00:00Z");
+    const lastObservedAt = new Date("2026-08-04T00:00:00Z");
+    await db
+      .update(schema.sourceRecords)
+      .set({ createdAt: firstObservedAt, updatedAt: firstObservedAt })
+      .where(eq(schema.sourceRecords.id, "source-1"));
+    await db.insert(schema.sourceRecords).values({
+      id: "source-2",
+      accountId: "account-1",
+      kind: "user_input",
+      createdAt: lastObservedAt,
+      updatedAt: lastObservedAt,
+    });
     await db.insert(schema.sourceRecordTextPayloads).values({
       sourceRecordId: "source-1",
       body: "公園を歩くと気持ちが落ち着いた",
       contentHash: "hash-1",
     });
+    await db.insert(schema.sourceRecordTextPayloads).values({
+      sourceRecordId: "source-2",
+      body: "今日も公園を歩くと落ち着いた",
+      contentHash: "hash-2",
+    });
     const recordedAt = new Date("2026-08-10T00:00:00Z");
-    await saveBrainItem(db, createInput({ at: recordedAt }));
+    await saveBrainItem(
+      db,
+      createInput({
+        at: recordedAt,
+        evidence: [
+          ...createInput().evidence,
+          {
+            id: "evidence-2",
+            sourceRecordId: "source-2",
+            relation: "supports",
+            isDerivationTrigger: false,
+            derivationMethod: "ai",
+            generatedAt: recordedAt,
+          },
+        ],
+      }),
+    );
     await saveBrainItem(
       db,
       createInput({
@@ -332,12 +432,18 @@ describe("loadBrainChatContextMemories", () => {
         status: "active",
         confidence: { state: "uncomputed" },
         accessLabels: ["unclassified"],
-        recordedAt,
+        firstObservedAt,
+        lastObservedAt,
         evidence: [
+          {
+            sourceRecordId: "source-2",
+            text: "今日も公園を歩くと落ち着いた",
+            recordedAt: lastObservedAt,
+          },
           {
             sourceRecordId: "source-1",
             text: "公園を歩くと気持ちが落ち着いた",
-            recordedAt: expect.any(Date),
+            recordedAt: firstObservedAt,
           },
         ],
       },
@@ -466,14 +572,55 @@ describe("findActiveBrainVectorEntry", () => {
 });
 
 describe("listActiveBrainItems", () => {
-  it("本人のactive ItemとEvidenceだけを新しい順で返す", async () => {
+  it("本人のactive Itemを最後に確認した日時順で返し、最初と最後の確認日時を導出する", async () => {
     const db = createTestDb();
     await insertAccountsAndSources(db);
+    const firstObservedAt = new Date("2026-07-01T00:00:00Z");
+    const newerItemObservedAt = new Date("2026-08-04T00:00:00Z");
+    const lastObservedAt = new Date("2026-08-11T00:00:00Z");
+    await db
+      .update(schema.sourceRecords)
+      .set({ createdAt: firstObservedAt, updatedAt: firstObservedAt })
+      .where(eq(schema.sourceRecords.id, "source-1"));
+    await db.insert(schema.sourceRecords).values([
+      {
+        id: "source-2",
+        accountId: "account-1",
+        kind: "user_input",
+        createdAt: newerItemObservedAt,
+        updatedAt: newerItemObservedAt,
+      },
+      {
+        id: "source-3",
+        accountId: "account-1",
+        kind: "user_input",
+        createdAt: lastObservedAt,
+        updatedAt: lastObservedAt,
+      },
+    ]);
     await saveBrainItem(
       db,
       createInput({
         at: new Date("2026-08-08T00:00:00Z"),
         item: { ...createInput().item, id: "older-active", statement: "古い記憶" },
+        evidence: [
+          {
+            id: "older-first-evidence",
+            sourceRecordId: "source-1",
+            relation: "supports",
+            isDerivationTrigger: true,
+            derivationMethod: "ai",
+            generatedAt: firstObservedAt,
+          },
+          {
+            id: "older-last-evidence",
+            sourceRecordId: "source-3",
+            relation: "supports",
+            isDerivationTrigger: false,
+            derivationMethod: "ai",
+            generatedAt: lastObservedAt,
+          },
+        ],
       }),
     );
     await saveBrainItem(
@@ -484,7 +631,7 @@ describe("listActiveBrainItems", () => {
         evidence: [
           {
             id: "newer-evidence",
-            sourceRecordId: "source-1",
+            sourceRecordId: "source-2",
             relation: "supports",
             isDerivationTrigger: true,
             derivationMethod: "ai",
@@ -505,18 +652,28 @@ describe("listActiveBrainItems", () => {
     await expect(listActiveBrainItems(db, "account-1")).resolves.toEqual({
       items: [
         expect.objectContaining({
-          id: "newer-active",
-          statement: "新しい記憶",
+          id: "older-active",
+          statement: "古い記憶",
           status: "active",
+          firstObservedAt,
+          lastObservedAt,
           vectorSync: expect.objectContaining({
             status: "pending",
             operation: "upsert",
             attemptCount: 0,
             hasEntry: false,
           }),
-          evidence: [expect.objectContaining({ sourceRecordId: "source-1", relation: "supports" })],
+          evidence: [
+            expect.objectContaining({ sourceRecordId: "source-1", recordedAt: firstObservedAt }),
+            expect.objectContaining({ sourceRecordId: "source-3", recordedAt: lastObservedAt }),
+          ],
         }),
-        expect.objectContaining({ id: "older-active", statement: "古い記憶" }),
+        expect.objectContaining({
+          id: "newer-active",
+          statement: "新しい記憶",
+          firstObservedAt: newerItemObservedAt,
+          lastObservedAt: newerItemObservedAt,
+        }),
       ],
       truncated: false,
     });

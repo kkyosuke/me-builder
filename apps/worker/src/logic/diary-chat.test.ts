@@ -111,7 +111,8 @@ describe("diary chat guardrails", () => {
           status: "active",
           confidence: { state: "uncomputed" },
           accessLabels: ["unclassified"],
-          recordedAt: new Date("2026-08-10T00:00:00Z"),
+          firstObservedAt: new Date("2026-08-01T00:00:00Z"),
+          lastObservedAt: new Date("2026-08-10T00:00:00Z"),
           evidence: [
             {
               sourceRecordId: "source-1",
@@ -131,7 +132,8 @@ describe("diary chat guardrails", () => {
         status: "active",
         confidence: { state: "uncomputed" },
         access_labels: ["unclassified"],
-        recorded_at: new Date("2026-08-10T00:00:00Z"),
+        first_observed_at: new Date("2026-08-01T00:00:00Z"),
+        last_observed_at: new Date("2026-08-10T00:00:00Z"),
         evidence: [
           {
             id: "evidence-1-1",
@@ -154,7 +156,8 @@ describe("diary chat guardrails", () => {
         status: "active",
         confidence: { state: "confirmed" },
         accessLabels: ["private"],
-        recordedAt: new Date("2026-08-10T00:00:00Z"),
+        firstObservedAt: new Date("2026-08-01T00:00:00Z"),
+        lastObservedAt: new Date("2026-08-10T00:00:00Z"),
         evidence: [
           {
             sourceRecordId: "source-1",

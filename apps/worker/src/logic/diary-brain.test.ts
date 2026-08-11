@@ -192,21 +192,40 @@ describe("diary Brain checkpoint", () => {
         category: "memory" as const,
         statement: "公園を散歩した",
         sourceMessageIds: ["message-1"],
+        operation: "created" as const,
+        deduplication: "none" as const,
       },
     ];
     expect(buildDevelopmentBrainItemMessage(candidates, "development")).toContain(
-      "[dev] 追加したBrain Item\n- 1. memory: 公園を散歩した",
+      "[dev] Brain Item反映結果\n- 1. [新規] memory: 公園を散歩した",
     );
     expect(buildDevelopmentBrainItemMessage(candidates, "preview")).toContain(
-      "[dev] 追加したBrain Item\n- 1. memory: 公園を散歩した",
+      "[dev] Brain Item反映結果\n- 1. [新規] memory: 公園を散歩した",
     );
     expect(buildDevelopmentBrainItemMessage(candidates, "production")).toBeUndefined();
   });
 
   it("development環境では保存結果が0件でも追加なしと通知する", () => {
     expect(buildDevelopmentBrainItemMessage([], "development")).toBe(
-      "[dev] 追加したBrain Item\n- 追加なし",
+      "[dev] Brain Item反映結果\n- 追加なし",
     );
+  });
+
+  it("development環境では既存ItemへのEvidence追加と判定方法を通知する", () => {
+    expect(
+      buildDevelopmentBrainItemMessage(
+        [
+          {
+            category: "preference",
+            statement: "辛い食べ物が苦手",
+            sourceMessageIds: ["message-2"],
+            operation: "evidence_added",
+            deduplication: "semantic",
+          },
+        ],
+        "development",
+      ),
+    ).toContain("[Evidence追加/semantic] preference: 辛い食べ物が苦手");
   });
 
   it("AI設定不足はlocalでは0件、本番では再試行対象にする", async () => {
