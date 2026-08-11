@@ -328,13 +328,13 @@ sequenceDiagram
     W->>W: schema・Account・Evidence・安全性を検証
     W->>AD: Brain Item + Evidence + Access Label + checkpoint完了
     AD-->>W: atomic commit
-    alt dispatchedのまま1時間滞留
+    alt dispatchedのまま回復期限を超過
         A->>AD: 同じcheckpointを再claim
         A->>Q: 同じIDを再投入
     end
 ```
 
-Queueには本文を含めず、Account IDとcheckpoint IDだけを渡します。Queueが受理した後はQueue自身の再配送を優先し、`dispatched`のまま1時間を超えた場合だけAlarmが同じIDを再投入します。この回復期限は、現在のQueue設定である初回配送と最大5回の再試行に加えて、AI処理や配送遅延の余裕を持たせるleaseです。DLQへ到達した場合やQueue処理が失われた場合も、チェックポイントを恒久的に欠落させません。
+Queueには本文を含めず、Account IDとcheckpoint IDだけを渡します。Queueが受理した後はQueue自身の再配送を優先し、`dispatched`のまま回復期限を超えた場合だけAlarmが同じIDを再投入します。回復期限と配送状態の物理的な規則は[日記チャット実装設計 §4.6](../../architecture/diary-chat-implementation-design.md#46-diary_brain_checkpoints)を正とします。DLQへ到達した場合やQueue処理が失われた場合も、チェックポイントを恒久的に欠落させません。
 
 WorkerはAccountDataから会話を読み直し、Brain Item、Evidence edge、Access Label、チェックポイントと実際に保存したItemの対応、チェックポイント完了を同じtransactionで保存します。AccountDataはalarm、user message取込、Queueからの適用をAccount単位で直列化します。回復再投入と元のQueue messageが競合しても、先に`applied`へ進めた処理だけがItem一式を確定し、後続処理は完了済みチェックポイントとしてスキップするため二重適用しません。
 
