@@ -49,6 +49,7 @@ import type { AppEnv } from "./types";
 const app = new Hono<AppEnv>();
 const webCors = cors({
   origin: (origin, c) => (origin === getConfig(c.env).webOrigin ? origin : undefined),
+  allowHeaders: ["Authorization", "Content-Type"],
 });
 
 app.use("*", async (c, next) => {

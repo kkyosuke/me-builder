@@ -16,6 +16,7 @@ const app = new Hono<{
 }>();
 const webCors = cors({
   origin: (origin, c) => (origin === getMcpConfig(c.env).webOrigin ? origin : undefined),
+  allowHeaders: ["Authorization", "Content-Type"],
 });
 
 app.use("*", async (c, next) => {

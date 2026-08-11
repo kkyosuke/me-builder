@@ -16,6 +16,7 @@ type Env = Omit<
   | "ACCOUNT_DATA"
   | "COMPATIBILITY_DATA"
   | "BRAIN_VECTOR_INDEX"
+  | "WEB_ORIGIN"
 > & {
   ENVIRONMENT?: string;
   LINE_CHANNEL_ACCESS_TOKEN?: string;
