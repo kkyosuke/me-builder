@@ -35,7 +35,7 @@ routes = [
 [[env.preview.d1_databases]]
 binding = "DB"
 database_name = "me-builder-db-preview"
-database_id = "974b9ea6-f739-4de3-b4db-70f17ef198a0"
+database_id = "b61c9de2-4fa3-4644-8f01-f42af513e57a"
 
 [env.preview.vars]
 ENVIRONMENT = "preview"

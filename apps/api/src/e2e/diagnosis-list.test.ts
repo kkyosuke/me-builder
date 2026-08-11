@@ -1,11 +1,11 @@
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import type { D1Database } from "@cloudflare/workers-types";
-import { d1 } from "@me-builder/lib";
+import { D1 } from "@me-builder/lib";
 import { Miniflare } from "miniflare";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { app } from "../index";
-import { createD1AccountDataTestNamespace } from "../testing/account-data";
+import { type AccountDataTestStore, createAccountDataTestStore } from "../testing/account-data";
 import { diagnosisDetailCases } from "./case/diagnosis-detail.case";
 import { diagnosisListCases } from "./case/diagnosis-list.case";
 
@@ -16,6 +16,7 @@ const timestamp = 1_785_801_600;
 
 let miniflare: Miniflare;
 let database: D1Database;
+let accountDataStore: AccountDataTestStore;
 
 async function applyMigrations(db: D1Database): Promise<void> {
   const migrationFiles = (await readdir(migrationsDirectory))
@@ -99,14 +100,15 @@ async function insertAnswers(
   responseId: string,
   answerLimit: number,
 ): Promise<void> {
-  await db
+  const owned = accountDataStore.raw;
+  accountDataStore.bind("account-e2e");
+  owned
     .prepare(
       `INSERT INTO diagnosis_responses (
          id, created_at, updated_at, is_deleted, account_id, diagnosis_id
        ) VALUES (?, ?, ?, 0, ?, ?)`,
     )
-    .bind(responseId, timestamp, timestamp, "account-e2e", diagnosisId)
-    .run();
+    .run(responseId, timestamp, timestamp, "account-e2e", diagnosisId);
 
   const questions = await db
     .prepare(
@@ -121,34 +123,32 @@ async function insertAnswers(
 
   for (const [index, question] of questions.results.entries()) {
     const sourceRecordId = `source-${responseId}-${index}`;
-    await db.batch([
-      db
-        .prepare(
-          `INSERT INTO source_records (
-             id, created_at, updated_at, is_deleted, account_id, kind, access_label
-           ) VALUES (?, ?, ?, 0, ?, 'user_input', 'private')`,
-        )
-        .bind(sourceRecordId, timestamp, timestamp, "account-e2e"),
-      db
-        .prepare(
-          `INSERT INTO diagnosis_answers (
-             id, created_at, updated_at, is_deleted, diagnosis_response_id,
-             diagnosis_question_id, question_id, question_version, choice_id,
-             accepted_at, source_record_id
-           ) VALUES (?, ?, ?, 0, ?, ?, ?, ?, 'yes', ?, ?)`,
-        )
-        .bind(
-          `answer-${responseId}-${index}`,
-          timestamp,
-          timestamp,
-          responseId,
-          question.id,
-          question.question_id,
-          question.question_version,
-          timestamp,
-          sourceRecordId,
-        ),
-    ]);
+    owned
+      .prepare(
+        `INSERT INTO source_records (
+           id, created_at, updated_at, is_deleted, account_id, kind, access_label
+         ) VALUES (?, ?, ?, 0, ?, 'user_input', 'private')`,
+      )
+      .run(sourceRecordId, timestamp, timestamp, "account-e2e");
+    owned
+      .prepare(
+        `INSERT INTO diagnosis_answers (
+           id, created_at, updated_at, is_deleted, diagnosis_response_id,
+           diagnosis_question_id, question_id, question_version, choice_id,
+           accepted_at, source_record_id
+         ) VALUES (?, ?, ?, 0, ?, ?, ?, ?, 'yes', ?, ?)`,
+      )
+      .run(
+        `answer-${responseId}-${index}`,
+        timestamp,
+        timestamp,
+        responseId,
+        question.id,
+        question.question_id,
+        question.question_version,
+        timestamp,
+        sourceRecordId,
+      );
   }
 }
 
@@ -157,7 +157,7 @@ async function request(idToken?: string, path = "/api/diagnoses"): Promise<Respo
 
   return await app.request(path, init, {
     DB: database,
-    ACCOUNT_DATA: createD1AccountDataTestNamespace(d1.client.create(database)),
+    ACCOUNT_DATA: accountDataStore.namespace,
     LINE_LOGIN_CHANNEL_ID: "1234567890",
     ENVIRONMENT: "test",
   });
@@ -173,6 +173,8 @@ describe("GET /api/diagnoses local D1 E2E", () => {
     });
     database = (await miniflare.getD1Database("DB")) as D1Database;
     await prepareDatabase(database);
+    accountDataStore = createAccountDataTestStore();
+    await accountDataStore.syncCatalogFrom(D1.shared.client.create(database));
     mockLineVerification();
   });
 
@@ -271,6 +273,8 @@ describe("GET /api/diagnoses/:diagnosisId local D1 E2E", () => {
     });
     database = (await miniflare.getD1Database("DB")) as D1Database;
     await prepareDatabase(database);
+    accountDataStore = createAccountDataTestStore();
+    await accountDataStore.syncCatalogFrom(D1.shared.client.create(database));
     mockLineVerification();
   });
 

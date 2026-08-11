@@ -1,4 +1,4 @@
-import { type AccountDataNamespace, accountDataFor, type d1 } from "@me-builder/lib";
+import { type AccountDataNamespace, type D1, type DO, accountDataFor } from "@me-builder/lib";
 import { createLiffSession } from "./liff-session";
 
 const DUMMY_SUMMARY = {
@@ -102,7 +102,7 @@ export type ProfileSummaryOutcome =
 type Params = {
   idToken: string | undefined;
   lineLoginChannelId: string | undefined;
-  db: d1.Client;
+  db: D1.shared.Client;
   accountData?: AccountDataNamespace;
   at?: Date;
 };
@@ -113,11 +113,11 @@ type Dependencies = {
     accountData: AccountDataNamespace | undefined,
     accountId: string,
     at: Date,
-  ) => ReturnType<typeof d1.action.diagnosis.listVisibleDiagnoses>;
+  ) => ReturnType<typeof DO.account.action.diagnosis.listVisibleDiagnoses>;
   hasActiveSourceRecords: (
     accountData: AccountDataNamespace | undefined,
     accountId: string,
-  ) => ReturnType<typeof d1.action.source.hasActiveSourceRecords>;
+  ) => ReturnType<typeof DO.account.action.source.hasActiveSourceRecords>;
   readModel: typeof DUMMY_PROFILE_SUMMARY_READ_MODEL;
 };
 

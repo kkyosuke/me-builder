@@ -1,8 +1,8 @@
-import { type AccountDataNamespace, accountDataFor, type d1 } from "@me-builder/lib";
+import { type AccountDataNamespace, type D1, type DO, accountDataFor } from "@me-builder/lib";
 import { createLiffSession } from "./liff-session";
 
 type DeletedDiagnosisData = Awaited<
-  ReturnType<typeof d1.action.diagnosis.deleteAccountDiagnosisData>
+  ReturnType<typeof DO.account.action.diagnosis.deleteAccountDiagnosisData>
 >;
 
 export type ResetDevelopmentDiagnosisDataOutcome =
@@ -14,7 +14,7 @@ export type ResetDevelopmentDiagnosisDataOutcome =
 type Params = {
   idToken: string | undefined;
   lineLoginChannelId: string | undefined;
-  db: d1.Client;
+  db: D1.shared.Client;
   accountData?: AccountDataNamespace;
 };
 
@@ -23,7 +23,7 @@ type Dependencies = {
   deleteDiagnosisData: (
     accountData: AccountDataNamespace | undefined,
     accountId: string,
-  ) => ReturnType<typeof d1.action.diagnosis.deleteAccountDiagnosisData>;
+  ) => ReturnType<typeof DO.account.action.diagnosis.deleteAccountDiagnosisData>;
 };
 
 const defaultDependencies: Dependencies = {

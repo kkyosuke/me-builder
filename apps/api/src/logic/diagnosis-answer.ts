@@ -1,9 +1,9 @@
-import { type AccountDataNamespace, accountDataFor, type d1 } from "@me-builder/lib";
+import { type AccountDataNamespace, type D1, type DO, accountDataFor } from "@me-builder/lib";
 import { logger } from "@me-builder/shared";
 import { createLiffSession } from "./liff-session";
 
 type SavedAnswer = Extract<
-  Awaited<ReturnType<typeof d1.action.diagnosis.saveDiagnosisAnswer>>,
+  Awaited<ReturnType<typeof DO.account.action.diagnosis.saveDiagnosisAnswer>>,
   { type: "saved" }
 >;
 
@@ -24,7 +24,7 @@ type SaveDiagnosisAnswerParams = {
   choiceId: string;
   idToken: string | undefined;
   lineLoginChannelId: string | undefined;
-  db: d1.Client;
+  db: D1.shared.Client;
   accountData?: AccountDataNamespace;
   at?: Date;
   scheduleProjection?: (task: () => Promise<void>) => void;
@@ -35,14 +35,16 @@ type Dependencies = {
   saveAnswer: (
     accountData: AccountDataNamespace | undefined,
     accountId: string,
-    input: Omit<Parameters<typeof d1.action.diagnosis.saveDiagnosisAnswer>[1], "accountId">,
-  ) => ReturnType<typeof d1.action.diagnosis.saveDiagnosisAnswer>;
+    input: Omit<Parameters<typeof DO.account.action.diagnosis.saveDiagnosisAnswer>[1], "accountId">,
+  ) => ReturnType<typeof DO.account.action.diagnosis.saveDiagnosisAnswer>;
   processLatestProjection?: (
     accountData: AccountDataNamespace | undefined,
     accountId: string,
     diagnosisId: string,
     at: Date,
-  ) => ReturnType<typeof d1.action.diagnosisBrainProjection.processLatestDiagnosisBrainProjection>;
+  ) => ReturnType<
+    typeof DO.account.action.diagnosisBrainProjection.processLatestDiagnosisBrainProjection
+  >;
 };
 
 const defaultDependencies: Dependencies = {

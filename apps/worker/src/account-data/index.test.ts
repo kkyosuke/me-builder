@@ -1,4 +1,4 @@
-import { d1 } from "@me-builder/lib";
+import { D1, DO } from "@me-builder/lib";
 import { logger } from "@me-builder/shared";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AccountData } from ".";
@@ -13,9 +13,9 @@ describe("AccountData alarm", () => {
     const chatTurnSend = vi.fn(async () => undefined);
     vi.spyOn(Date, "now").mockReturnValue(now);
     vi.spyOn(logger, "error").mockImplementation(() => undefined);
-    vi.spyOn(d1.action.conversation, "closeExpiredSessions").mockResolvedValue(0);
+    vi.spyOn(DO.account.action.diary, "closeExpiredSessions").mockResolvedValue(0);
     vi.spyOn(
-      d1.action.diagnosisBrainProjection,
+      DO.account.action.diagnosisBrainProjection,
       "processPendingDiagnosisBrainProjections",
     ).mockResolvedValue({
       processed: 0,
@@ -24,7 +24,7 @@ describe("AccountData alarm", () => {
       skippedInvalidConfig: 0,
       failed: 0,
     });
-    vi.spyOn(d1.action.conversation, "claimDueDiaryBrainCheckpointIds").mockResolvedValue([
+    vi.spyOn(DO.account.action.diary, "claimDueDiaryBrainCheckpointIds").mockResolvedValue([
       "checkpoint-1",
     ]);
 
@@ -62,5 +62,32 @@ describe("AccountData alarm", () => {
       }),
       expect.stringContaining("[AccountData] alarm failed at alarm.maintenance -> alarm-retry"),
     );
+  });
+
+  it("共有D1が版を公開していない間はcatalog snapshotを最新と見なさない", async () => {
+    const isDiagnosisCatalogCurrent = vi.fn(() => true);
+    const syncDiagnosisCatalog = vi.fn();
+    // `from()`はawaitできて`.where()`も持つdrizzleのbuilderを模す。
+    const shared = {
+      select: () => ({
+        from: () =>
+          Object.assign(Promise.resolve([]), {
+            where: () => ({ get: async () => undefined }),
+          }),
+      }),
+    };
+    vi.spyOn(D1.shared.client, "create").mockReturnValue(shared as never);
+
+    const instance = Object.create(AccountData.prototype) as AccountData;
+    Object.assign(instance as unknown as Record<string, unknown>, {
+      repository: { isDiagnosisCatalogCurrent, syncDiagnosisCatalog },
+      env: { DB: {} },
+    });
+
+    await (instance as unknown as { syncDiagnosisCatalog(): Promise<void> }).syncDiagnosisCatalog();
+
+    // 版が無いのでshort-circuitせず、snapshotを読み直す。
+    expect(isDiagnosisCatalogCurrent).not.toHaveBeenCalled();
+    expect(syncDiagnosisCatalog).toHaveBeenCalledWith(expect.objectContaining({ version: 0 }));
   });
 });

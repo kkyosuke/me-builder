@@ -481,11 +481,18 @@ INSERT OR IGNORE INTO diagnosis_questions (
   ('dq-conversation-emotion-10', 1786233600, 1786233600, 0, 'conversation-emotion', 'q-conversation-emotion-10', 1, 9);
 --> statement-breakpoint
 
+-- AccountDataがsnapshotを再同期するか判断する版。
+-- このseedのcatalog内容を変更したら、必ずversionを1つ上げる。
+INSERT INTO catalog_versions (catalog_id, version, updated_at) VALUES ('diagnosis', 1, 1786233600)
+  ON CONFLICT(catalog_id) DO UPDATE SET version = excluded.version, updated_at = excluded.updated_at;
+--> statement-breakpoint
+
 -- Expected result: diagnosis_count=5, question_version_count=50,
--- choice_count=100, diagnosis_question_count=50, scoring_config_count=5.
+-- choice_count=100, diagnosis_question_count=50, scoring_config_count=5, catalog_version=1.
 SELECT
   (SELECT COUNT(*) FROM diagnoses WHERE id IN ('relationship-priority', 'money-values', 'leisure-style', 'time-planning', 'conversation-emotion') AND state = 'published' AND description <> '' AND is_deleted = 0) AS diagnosis_count,
   (SELECT COUNT(*) FROM question_versions WHERE version = 1 AND state = 'approved' AND is_deleted = 0 AND (question_id LIKE 'q-relationship-priority-%' OR question_id LIKE 'q-money-%' OR question_id LIKE 'q-leisure-style-%' OR question_id LIKE 'q-time-planning-%' OR question_id LIKE 'q-conversation-emotion-%')) AS question_version_count,
   (SELECT COUNT(*) FROM question_choices WHERE question_version = 1 AND is_deleted = 0 AND (question_id LIKE 'q-relationship-priority-%' OR question_id LIKE 'q-money-%' OR question_id LIKE 'q-leisure-style-%' OR question_id LIKE 'q-time-planning-%' OR question_id LIKE 'q-conversation-emotion-%')) AS choice_count,
   (SELECT COUNT(*) FROM diagnosis_questions WHERE diagnosis_id IN ('relationship-priority', 'money-values', 'leisure-style', 'time-planning', 'conversation-emotion') AND is_deleted = 0) AS diagnosis_question_count,
-  (SELECT COUNT(*) FROM diagnosis_scoring_configs WHERE id IN ('relationship-priority-v1', 'money-values-v1', 'leisure-style-v1', 'time-planning-v1', 'conversation-emotion-v1') AND version = 1 AND is_deleted = 0) AS scoring_config_count;
+  (SELECT COUNT(*) FROM diagnosis_scoring_configs WHERE id IN ('relationship-priority-v1', 'money-values-v1', 'leisure-style-v1', 'time-planning-v1', 'conversation-emotion-v1') AND version = 1 AND is_deleted = 0) AS scoring_config_count,
+  (SELECT version FROM catalog_versions WHERE catalog_id = 'diagnosis') AS catalog_version;

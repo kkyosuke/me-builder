@@ -1,8 +1,8 @@
-import type { AccountDataNamespace, d1 } from "@me-builder/lib";
+import type { AccountDataNamespace, D1 } from "@me-builder/lib";
 import { describe, expect, it, vi } from "vitest";
 import { getDevelopmentBrainItems } from "./development-brain-items";
 
-const db = {} as d1.Client;
+const db = {} as D1.shared.Client;
 const accountData = {} as AccountDataNamespace;
 
 function dependencies() {

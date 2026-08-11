@@ -41,7 +41,7 @@
 | [Source Recordのライフサイクル設計](../docs/domain/source/source-record-lifecycle-design.md) | Source Recordの不変性、訂正・削除・取り消し・撤回、Brain Itemへの波及、エクスポート範囲 |
 | [Brainのラベル・アクセス制御設計](../docs/domain/brain/brain-access-label-design.md) | Topic Label、Access Label、Access Profile、MCP提供時の原則、Source Recordの既定ラベル |
 | [インフラ・システム構成](../docs/architecture/infrastructure-architecture.md) | Cloudflareを全面的に採用したインフラ基盤、システム構成、サービス配置 |
-| [Accountデータ分離設計](../docs/architecture/account-data-isolation.md) | 1 Account = 1 AccountData DO、保存先の判定規則、内部module、共有D1境界、完了形への切り替え規則 |
+| [Accountデータ分離設計](../docs/architecture/account-data-isolation.md) | 1 Account = 1 AccountData DO、保存先の判定規則、内部module、共有D1が保存するもの |
 | [相性共有データ実装設計](../docs/architecture/compatibility-data-design.md) | CompatibilityData DO、AccountData一覧参照、同意指紋、状態遷移、migration規則 |
 | [日記チャット実装設計](../docs/architecture/diary-chat-implementation-design.md) | 日記チャットのAccountDataモデル、実行基盤、プロンプト、ガードレール、応答期限 |
 | [キャラクターデザイン](../docs/design/character-design.md) | うつし・ミラの名前、役割、外見設定、デザインアセットの置き場所と命名規則 |

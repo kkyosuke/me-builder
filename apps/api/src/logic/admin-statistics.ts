@@ -1,4 +1,4 @@
-import { d1 } from "@me-builder/lib";
+import { D1 } from "@me-builder/lib";
 import { logger } from "@me-builder/shared";
 import { type LineUsage, fetchLineUsage } from "../infrastructure/line-statistics";
 import { createLiffSession } from "./liff-session";
@@ -38,11 +38,11 @@ type Params = {
   idToken: string | undefined;
   lineLoginChannelId: string | undefined;
   adminLineUserIds: readonly string[];
-  db: d1.Client;
+  db: D1.shared.Client;
   lineChannelAccessToken: string | undefined;
   now?: Date;
   getLineUsage?: typeof fetchLineUsage;
-  getGeminiUsage?: typeof d1.action.geminiUsage.summarizeGeminiUsage;
+  getGeminiUsage?: typeof D1.shared.action.geminiUsage.summarizeGeminiUsage;
   createSession?: typeof createLiffSession;
 };
 
@@ -70,11 +70,9 @@ export async function getAdminStatistics(params: Params): Promise<AdminStatistic
 
   const now = params.now ?? new Date();
   const start = startOfJstMonth(now);
-  const geminiPromise = (params.getGeminiUsage ?? d1.action.geminiUsage.summarizeGeminiUsage)(
-    params.db,
-    start,
-    now,
-  );
+  const geminiPromise = (
+    params.getGeminiUsage ?? D1.shared.action.geminiUsage.summarizeGeminiUsage
+  )(params.db, start, now);
   const linePromise = params.lineChannelAccessToken
     ? (params.getLineUsage ?? fetchLineUsage)({
         channelAccessToken: params.lineChannelAccessToken,

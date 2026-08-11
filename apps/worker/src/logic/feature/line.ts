@@ -1,4 +1,4 @@
-import { type AccountDataNamespace, accountDataFor, d1, line } from "@me-builder/lib";
+import { type AccountDataNamespace, D1, accountDataFor, line } from "@me-builder/lib";
 import {
   type ConversationCoordinatorNamespace,
   OperationalError,
@@ -53,7 +53,7 @@ function getLineEventId(event: {
 /** 署名検証済みLINE eventを原本として保存し、AccountのCoordinatorへ渡す。 */
 export async function processLineWebhook(
   payload: unknown,
-  db: d1.Client,
+  db: D1.shared.Client,
   workerConfig: WorkerConfig,
   coordinatorNamespace?: ConversationCoordinatorNamespace,
   accountDataNamespace?: AccountDataNamespace,
@@ -209,13 +209,13 @@ export async function processLineWebhook(
 }
 
 async function ensureAccountIdentity(
-  db: d1.Client,
+  db: D1.shared.Client,
   providerAccountId: string | undefined,
   workerConfig: WorkerConfig,
-): Promise<Awaited<ReturnType<typeof d1.action.account.upsertIdentity>> | undefined> {
+): Promise<Awaited<ReturnType<typeof D1.shared.action.account.upsertIdentity>> | undefined> {
   if (!providerAccountId) return undefined;
   try {
-    return await d1.action.account.upsertIdentity(db, {
+    return await D1.shared.action.account.upsertIdentity(db, {
       provider: "line",
       providerAccountId,
       role: workerConfig.adminLineUserIds.includes(providerAccountId) ? "admin" : "user",

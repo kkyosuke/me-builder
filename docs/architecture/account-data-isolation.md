@@ -10,7 +10,7 @@
 - ユーザー起点query、background処理、管理者集計のAccount境界
 - Account Data Durable Objectと共有D1の責務境界
 - Account Data schemaでAccount境界を強制する方法
-- 保存先の判定規則と、共有D1のAccount所有tableを破棄して完了形へ切り替える規則
+- 新しいデータの保存先を決める判定規則
 
 この文書が所有しないもの:
 
@@ -147,63 +147,59 @@ account-data/
 └── schema
 ```
 
-共有ライブラリのschemaとactionも、実行基盤の名前ではなく所有者で分けます。1つの`d1`名前空間へAccountData所有tableと共有D1所有tableが同居すると、module名が保存先を示さなくなり、[データの区分](#3-データの区分)の判定が読めなくなります。
+共有ライブラリのschemaとactionも、保存先ごとに分けます。1つの名前空間へAccountData所有tableと共有D1所有tableが同居すると、参照した名前が保存先を示さなくなり、[データの区分](#3-データの区分)の判定が読めなくなります。
 
 ```text
 packages/lib/src/
-├── shared-d1/        # 共有D1が所有: Account Identity、公開定義、集計projection
-└── account-data/     # AccountDataが所有: Source、Brain、Diary、Diagnosis回答
+├── table/base.ts     # 保存先に依存しない共通column
+├── d1/               # D1が保存するdatabase
+│   └── shared/       # Account Identity、公開定義、集計projection
+└── do/               # Durable Objectが保存するdatabase
+    └── account/      # 1 AccountのSource、Brain、Diary、Diagnosis回答
+```
+
+呼び出し側は`D1.shared.*`と`DO.account.*`で参照します。保存先とdatabaseが参照式に現れるため、どちらを触っているかがコード上で分かります。
+
+```ts
+D1.shared.action.account.resolveAccountByLineLogin(db, sub);
+DO.account.action.diary.storeLineTextSource(db, input);
 ```
 
 AccountDataのactionは、Durable Object SQLite用のdatabase型を引数に取ります。D1 client型へ変換して同じactionを両方の保存先から呼べる状態を作りません。同じ関数が両方から呼べる限り、保存先を間違えてもtypecheckで検出できないためです。
 
-AccountDataは共有D1の公開定義をsnapshotとして保持しますが、同期は版の比較で必要なときだけ行います。RPCごとに公開定義を全件読み直す実装は、定義が増えるほど1回の操作コストが増えるため完了形にしません。
+AccountDataは共有D1の公開定義をsnapshotとして保持しますが、同期は版の比較で必要なときだけ行います。RPCごとに公開定義を全件読み直しません。定義が増えるほど1回の操作コストが線形に増えるためです。
 
 Conversation Coordinatorは連投調停、generation lease、配送outboxだけを所有し、本文やBrain ItemのSSoTにしません。Geminiなど外部APIの待機中にAccountData Objectを占有せず、読み取りと永続化を短いRPCへ分けます。
 
 複数Account間の相性共有は、関係ごとの`CompatibilityData`を正本とし、各AccountDataには一覧用参照だけを置きます。具体的な境界と整合性は[相性共有データ実装設計](compatibility-data-design.md)を正とします。
 
-## 7. 完了形
+## 7. 共有D1が保存するもの
 
-共有D1には次の3種類だけを残し、Account所有tableをすべて削除します。
+共有D1は次の3種類だけを保存します。
 
-| 種類 | 共有D1に残す理由 |
+| 種類 | 共有D1が保存する理由 |
 | --- | --- |
 | Account Identity | 認証が`account_id`を解決する処理そのものであり、AccountDataを選ぶより前に読む必要がある |
 | 全Account共通の公開定義 | 全Accountが同じ内容を読むため、AccountDataへ置くとAccount数だけ複製される |
 | 原文を含まない集計projection | 全Account横断の集計にAccountDataの全走査を使わないため |
 
-次の状態が1つでも残っている間は完了形ではありません。
+次を禁止します。
 
-- 共有D1にAccount所有tableが存在する
-- AccountData内にAccount Identityの状態（利用停止、role、退会）を複製した列がある。これらは共有D1が所有し、認可のたびにIdentity側で判定します
-- Account所有descendantに`account_id`がある
-- 公開定義のsnapshotを版の比較なしに同期している
-- 1つの名前空間へ共有D1所有とAccountData所有のschema・actionが同居している
-- 共有D1のAccount所有データを読む経路がアプリケーションに残っている
+- 共有D1へAccount所有tableを置く
+- AccountDataへAccount Identityの状態（利用停止、role、退会）を複製する。これらは共有D1が所有し、認可のたびにIdentity側で判定します
+- Account所有descendantへ`account_id`を持たせる
+- 公開定義のsnapshotを版の比較なしに同期する
+- 1つの名前空間へ共有D1所有とAccountData所有のschema・actionを同居させる
 
 Brain Itemのベクトル検索を追加する場合も、`WHERE`相当のmetadata filterだけをAccount境界にしません。認証済み`account_id`から決定的に選ぶ検索名前空間を境界とし、正本はAccountDataに残します。
 
-## 8. 完了形への切り替え規則
-
-Phase 1では共有D1のAccount所有データを保持対象にしません。段階移行とrollback期間を設けず、破棄して作り直します。copy経路を残すほうが、二重の正本と移行専用の列を長期間抱えることになり、[データの区分](#3-データの区分)の判定を曖昧にするためです。
-
-切り替えは次の順序で行います。
-
-1. AccountData schemaをAccount所有tableの唯一の定義にし、共有D1側の定義とactionを削除する
-2. 共有D1へAccount所有tableをdropするmigrationを適用する
-3. 既存のAccountData Objectを破棄し、新しいschemaで作り直す
-4. copy経路（legacy snapshotと完了時刻の記録）をアプリケーションから削除する
-
-破棄する範囲はAccount所有データだけです。Account Identityと公開定義は共有D1に残るため、Accountとログイン手段、診断の定義は作り直しません。利用者から見るとSource Record、Brain Item、日記、診断回答が消えるため、実データを持つ環境では破棄前に影響範囲を確認します。
-
-破棄後も次のtestを維持します。
+次のtestで境界を維持します。
 
 - 別Accountの`account_id`を同じObjectへ渡すと拒否される
 - 共有D1からAccount所有データの原文を取得できない
 - 共有D1にAccount所有tableが存在しない
 
-## 9. 変更時チェックリスト
+## 8. 変更時チェックリスト
 
 - [ ] [データの区分](#3-データの区分)の判定順で保存先を決めたか
 - [ ] Account所有tableを共有D1ではなくAccountData schemaへ追加したか

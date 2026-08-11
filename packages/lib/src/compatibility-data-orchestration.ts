@@ -1,4 +1,3 @@
-import { type AccountDataNamespace, accountDataFor } from "./account-data";
 import {
   type AcceptCompatibilityInvitationInput,
   type AcceptCompatibilityInvitationResult,
@@ -6,6 +5,7 @@ import {
   type CompatibilityRelationship,
   compatibilityDataFor,
 } from "./compatibility-data";
+import { type AccountDataNamespace, accountDataFor } from "./do/account/rpc";
 
 export type AcceptCompatibilityInvitationWithReferencesResult =
   | AcceptCompatibilityInvitationResult

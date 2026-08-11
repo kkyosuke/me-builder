@@ -1,4 +1,4 @@
-import { d1 } from "@me-builder/lib";
+import { D1 } from "@me-builder/lib";
 import { logger } from "@me-builder/shared";
 import type { Context } from "hono";
 import * as v from "valibot";
@@ -59,7 +59,7 @@ export async function getDiagnoses(c: Context<AppEnv>): Promise<Response> {
   const outcome = await getDiagnosisList({
     idToken: bearerToken(c.req.header("authorization")),
     lineLoginChannelId: getConfig(c.env).lineLoginChannelId,
-    db: d1.client.create(c.env.DB),
+    db: D1.shared.client.create(c.env.DB),
     ...(c.env.ACCOUNT_DATA ? { accountData: c.env.ACCOUNT_DATA } : {}),
   });
 
@@ -91,7 +91,7 @@ export async function getDiagnosis(c: Context<AppEnv>): Promise<Response> {
     diagnosisId: c.req.param("diagnosisId") ?? "",
     idToken: bearerToken(c.req.header("authorization")),
     lineLoginChannelId: getConfig(c.env).lineLoginChannelId,
-    db: d1.client.create(c.env.DB),
+    db: D1.shared.client.create(c.env.DB),
   });
 
   switch (outcome.type) {
@@ -151,7 +151,7 @@ export async function putDiagnosisAnswer(c: Context<AppEnv>): Promise<Response> 
     choiceId: parsed.output.choiceId,
     idToken: bearerToken(c.req.header("authorization")),
     lineLoginChannelId: getConfig(c.env).lineLoginChannelId,
-    db: d1.client.create(c.env.DB),
+    db: D1.shared.client.create(c.env.DB),
     accountData: c.env.ACCOUNT_DATA,
     scheduleProjection: (task) => {
       try {
@@ -231,7 +231,7 @@ export async function putDiagnosisDeferredQuestion(c: Context<AppEnv>): Promise<
     diagnosisQuestionId: c.req.param("diagnosisQuestionId") ?? "",
     idToken: bearerToken(c.req.header("authorization")),
     lineLoginChannelId: getConfig(c.env).lineLoginChannelId,
-    db: d1.client.create(c.env.DB),
+    db: D1.shared.client.create(c.env.DB),
     accountData: c.env.ACCOUNT_DATA,
   });
 
@@ -295,7 +295,7 @@ export async function getDiagnosisAnswerContents(c: Context<AppEnv>): Promise<Re
     diagnosisId: c.req.param("diagnosisId") ?? "",
     idToken: bearerToken(c.req.header("authorization")),
     lineLoginChannelId: getConfig(c.env).lineLoginChannelId,
-    db: d1.client.create(c.env.DB),
+    db: D1.shared.client.create(c.env.DB),
     accountData: c.env.ACCOUNT_DATA,
   });
 
@@ -339,7 +339,7 @@ export async function deleteDevelopmentDiagnosisData(c: Context<AppEnv>): Promis
   const outcome = await resetDevelopmentDiagnosisData({
     idToken: bearerToken(c.req.header("authorization")),
     lineLoginChannelId: currentConfig.lineLoginChannelId,
-    db: d1.client.create(c.env.DB),
+    db: D1.shared.client.create(c.env.DB),
     accountData: c.env.ACCOUNT_DATA,
   });
 

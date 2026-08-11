@@ -1,5 +1,5 @@
 import type { D1Database } from "@cloudflare/workers-types";
-import { d1, line } from "@me-builder/lib";
+import { D1, line } from "@me-builder/lib";
 import {
   type Message,
   type MessageBatch,
@@ -26,7 +26,7 @@ vi.spyOn(line.client, "create").mockReturnValue({
   pushMessage: mockPushMessage,
   replyMessage: mockReplyMessage,
 } as unknown as ReturnType<typeof line.client.create>);
-vi.spyOn(d1.action.account, "upsertIdentity").mockResolvedValue({
+vi.spyOn(D1.shared.action.account, "upsertIdentity").mockResolvedValue({
   account: {
     id: "account-1",
     status: "active",
@@ -118,7 +118,7 @@ describe("Worker", () => {
 
   it("日記を原本保存してCoordinatorへ渡し、受付配送はAPI側の予約へ委ねる", async () => {
     const { batch, message } = createBatch("今日は散歩した");
-    const db = {} as d1.Client;
+    const db = {} as D1.shared.Client;
     await handleQueueBatch(
       batch,
       db,
@@ -169,11 +169,16 @@ describe("Worker", () => {
       new Error("日記本文やSDK responseを含む可能性がある内容"),
     );
 
-    await handleQueueBatch(batch, {} as d1.Client, getWorkerConfig({ ENVIRONMENT: "test" }), {
-      d1: {} as d1.Client,
-      do: { conversation: coordinatorNamespace, accountData: accountDataNamespace },
-      queue: { chatTurn: undefined, brainCheckpoint: undefined },
-    });
+    await handleQueueBatch(
+      batch,
+      {} as D1.shared.Client,
+      getWorkerConfig({ ENVIRONMENT: "test" }),
+      {
+        d1: {} as D1.shared.Client,
+        do: { conversation: coordinatorNamespace, accountData: accountDataNamespace },
+        queue: { chatTurn: undefined, brainCheckpoint: undefined },
+      },
+    );
 
     expect(message.retry).toHaveBeenCalledOnce();
     expect(message.ack).not.toHaveBeenCalled();
@@ -201,11 +206,16 @@ describe("Worker", () => {
   it("旧Webhook Queue messageでは既存のenvelope IDを相関IDとして補う", async () => {
     const { batch } = createBatch("今日は散歩した", false);
 
-    await handleQueueBatch(batch, {} as d1.Client, getWorkerConfig({ ENVIRONMENT: "test" }), {
-      d1: {} as d1.Client,
-      do: { conversation: coordinatorNamespace, accountData: accountDataNamespace },
-      queue: { chatTurn: undefined, brainCheckpoint: undefined },
-    });
+    await handleQueueBatch(
+      batch,
+      {} as D1.shared.Client,
+      getWorkerConfig({ ENVIRONMENT: "test" }),
+      {
+        d1: {} as D1.shared.Client,
+        do: { conversation: coordinatorNamespace, accountData: accountDataNamespace },
+        queue: { chatTurn: undefined, brainCheckpoint: undefined },
+      },
+    );
 
     expect(mockAcceptMessage).toHaveBeenCalledWith(
       expect.objectContaining({ traceId: "queue-envelope-1" }),
@@ -221,11 +231,16 @@ describe("Worker", () => {
     Object.defineProperty(message, "attempts", { value: 4 });
     mockAccountDataExecute.mockRejectedValueOnce(new Error("temporary failure"));
 
-    await handleQueueBatch(batch, {} as d1.Client, getWorkerConfig({ ENVIRONMENT: "test" }), {
-      d1: {} as d1.Client,
-      do: { conversation: coordinatorNamespace, accountData: accountDataNamespace },
-      queue: { chatTurn: undefined, brainCheckpoint: undefined },
-    });
+    await handleQueueBatch(
+      batch,
+      {} as D1.shared.Client,
+      getWorkerConfig({ ENVIRONMENT: "test" }),
+      {
+        d1: {} as D1.shared.Client,
+        do: { conversation: coordinatorNamespace, accountData: accountDataNamespace },
+        queue: { chatTurn: undefined, brainCheckpoint: undefined },
+      },
+    );
 
     expect(message.retry).toHaveBeenCalledOnce();
     expect(mockErrorLog).toHaveBeenCalledWith(
@@ -242,7 +257,7 @@ describe("Worker", () => {
     const { batch } = createBatch("診断");
     await handleQueueBatch(
       batch,
-      {} as d1.Client,
+      {} as D1.shared.Client,
       getWorkerConfig({
         ENVIRONMENT: "test",
         LINE_CHANNEL_ACCESS_TOKEN: "line-token",
@@ -263,7 +278,7 @@ describe("Worker", () => {
       lineTextEvents: [{ eventId: "webhook-event-1", intent: "diagnosis-request" }],
     };
 
-    await handleQueueBatch(batch, {} as d1.Client, getWorkerConfig({ ENVIRONMENT: "test" }));
+    await handleQueueBatch(batch, {} as D1.shared.Client, getWorkerConfig({ ENVIRONMENT: "test" }));
 
     expect(mockAccountDataExecute).not.toHaveBeenCalled();
     expect(mockReplyMessage).not.toHaveBeenCalled();

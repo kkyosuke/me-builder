@@ -1,4 +1,4 @@
-import { d1 } from "@me-builder/lib";
+import { D1 } from "@me-builder/lib";
 import { logger } from "@me-builder/shared";
 import type { Context } from "hono";
 import * as v from "valibot";
@@ -27,7 +27,7 @@ export async function getStatistics(c: Context<AppEnv>): Promise<Response> {
     idToken: bearerToken(c.req.header("authorization")),
     lineLoginChannelId: config.lineLoginChannelId,
     adminLineUserIds: config.adminLineUserIds,
-    db: d1.client.create(c.env.DB),
+    db: D1.shared.client.create(c.env.DB),
     lineChannelAccessToken: config.lineChannelAccessToken,
   });
   switch (outcome.type) {

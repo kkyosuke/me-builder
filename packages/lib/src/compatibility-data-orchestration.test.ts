@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { AccountDataNamespace } from "./account-data";
 import type { CompatibilityDataNamespace } from "./compatibility-data";
 import { acceptCompatibilityInvitationWithReferences } from "./compatibility-data-orchestration";
+import type { AccountDataNamespace } from "./do/account/rpc";
 
 describe("compatibility data orchestration", () => {
   it("予約の保存後にRPC応答が失われても双方へ冪等な解放を試みる", async () => {

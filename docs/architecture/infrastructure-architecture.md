@@ -97,11 +97,11 @@ flowchart TD
 | **MCP サーバー** | **Cloudflare Workers** | 外部 AI エージェント向け MCP (Model Context Protocol) 端点の提供。SSE (Server-Sent Events) および HTTP 通信を直接処理。 |
 | **キューワーカー** | **Cloudflare Workers** | Cloudflare Queues から非同期メッセージを受信・消費・バックグラウンド処理する非同期ワーカー。 |
 | **メッセージキュー** | **Cloudflare Queues** | Webhook 等のイベントを安全に保持・非同期配送するサーバーレスメッセージキュー。 |
-| **構造化データストア** | **Cloudflare D1** | サーバーレスリレーショナルデータベース (SQLite)。`Account` 情報、`Brain` メタデータ、`Access Label`、`Access Profile`、監査ログを保持。 |
+| **構造化データストア** | **Cloudflare D1** | サーバーレスリレーショナルデータベース (SQLite)。Account Identity、全Account共通の公開定義、原文を含まない集計projectionだけを保持。Account所有データは保持しない。 |
 | **ベクトル検索ストア** | **Cloudflare Vectorize** | 完全マネージドなベクトルデータベース。`Brain Item` の埋め込みベクトル（Embedding）を保存し、コサイン類似度等による高速セマンティック検索を提供。 |
 | **メディアストレージ** | **Cloudflare R2** | S3互換のオブジェクトストレージ。ユーザーが投稿・回答した写真、イラスト、動画、音声などのメディア原本データを保存（エグレス料金ゼロ）。 |
 | **キー・バリュー / キャッシュ** | **Cloudflare KV** | 低遅延グローバルキー・バリューストア。認証トークン、一時セッション、アクセス制御キャッシュ、レート制限カウントを保持。 |
-| **状態管理 / ドメイン協調** | **Cloudflare Durable Objects** | 厳格な単一整合性が求められるリアルタイムセッション制御や、MCP接続状態の排他制御・ステートフルな協調を処理。 |
+| **状態管理 / ドメイン協調** | **Cloudflare Durable Objects** | Account所有データのSSoT。1 Accountにつき1つのprivate SQLiteへ`Source`・`Brain`・`Diary`・`Diagnosis`回答を保存し、連投調停や相性関係の協調も担う。 |
 | **AI / 推論基盤** | **Cloudflare Workers AI** | エッジ上でのテキスト Embedding 生成（ベクトル化）および軽量 AI モデル推論の実行。外部 LLM サービス呼び出し時は Workers 経由で安全にプロキシ通信。 |
 | **セキュリティ & ネットワーク** | **Cloudflare Access / WAF** | DDoS防御、WAFルール適用、SSL/TLS証明書管理、管理画面等へのゼロトラストアクセス制御（Cloudflare Access）。 |
 
@@ -150,7 +150,7 @@ flowchart TD
   │   └── worker/        # Queue Worker (Cloudflare Workers, wrangler.toml)
   └── packages/
       ├── shared/        # 共有型定義 & ユーティリティ (純粋な .ts ソース直参照)
-      └── lib/           # LINE連携 & D1 (Drizzle ORM) データベースモジュール
+      └── lib/           # LINE連携、共有D1とAccountDataのschema・action (Drizzle ORM)
   ```
 
   - `apps/web`: React (Vite + TypeScript) によるフロントエンド。`apps/web/wrangler.toml` により Pages 設定および環境別設定（local, preview, production）を管理。
@@ -158,7 +158,7 @@ flowchart TD
   - `apps/mcp`: Cloudflare Workers / Bun 上で動作する MCP (Model Context Protocol) サーバー。`apps/mcp/wrangler.toml` により Workers の環境別設定を制御。
   - `apps/worker`: Cloudflare Queues メッセージを非同期処理する Cloudflare Workers ワーカー。`apps/worker/wrangler.toml` により Worker の環境別設定を制御。
   - `packages/shared`: 全アプリケーション間で共有されるドメイン型定義およびユーティリティライブラリ。
-  - `packages/lib`: LINE Messaging API 連携および Cloudflare D1 データベース操作（Drizzle ORM モジュール）等を提供するヘルパーライブラリ。
+  - `packages/lib`: LINE Messaging API 連携、共有D1（`d1/shared/`）とAccountData Durable Object（`do/account/`）のschema・action（Drizzle ORM）を所有者ごとに分けて提供するライブラリ。`D1.shared.*`と`DO.account.*`で参照する。境界は[Accountデータ分離設計](account-data-isolation.md)を正とします。
 
 ### 6.1 Cloudflareリソースの宣言とデプロイ境界
 

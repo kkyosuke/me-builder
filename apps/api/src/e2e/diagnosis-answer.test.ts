@@ -1,11 +1,11 @@
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import type { D1Database } from "@cloudflare/workers-types";
-import { d1 } from "@me-builder/lib";
+import { D1 } from "@me-builder/lib";
 import { Miniflare } from "miniflare";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { app } from "../index";
-import { createD1AccountDataTestNamespace } from "../testing/account-data";
+import { type AccountDataTestStore, createAccountDataTestStore } from "../testing/account-data";
 import { diagnosisAnswerCases } from "./case/diagnosis-answer.case";
 
 const repositoryRoot = path.resolve(__dirname, "../../../..");
@@ -16,6 +16,7 @@ const e2eTimeoutMs = 30_000;
 
 let miniflare: Miniflare;
 let database: D1Database;
+let accountDataStore: AccountDataTestStore;
 
 async function applySqlFile(db: D1Database, sql: string): Promise<void> {
   const statements = sql
@@ -68,7 +69,7 @@ function mockLineVerification(): void {
 
 const env = () => ({
   DB: database,
-  ACCOUNT_DATA: createD1AccountDataTestNamespace(d1.client.create(database)),
+  ACCOUNT_DATA: accountDataStore.namespace,
   LINE_LOGIN_CHANNEL_ID: "1234567890",
   ENVIRONMENT: "test",
 });
@@ -146,9 +147,9 @@ async function countRows(
     | "diagnosis_answers"
     | "diagnosis_deferred_questions",
 ) {
-  const result = await database.prepare(`SELECT COUNT(*) AS count FROM ${table}`).first<{
-    count: number;
-  }>();
+  const result = accountDataStore.raw.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get() as
+    | { count: number }
+    | undefined;
   return result?.count ?? 0;
 }
 
@@ -162,6 +163,8 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
     });
     database = (await miniflare.getD1Database("DB")) as D1Database;
     await prepareDatabase(database);
+    accountDataStore = createAccountDataTestStore();
+    await accountDataStore.syncCatalogFrom(D1.shared.client.create(database));
     mockLineVerification();
   }, e2eTimeoutMs);
 
@@ -208,9 +211,9 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
     });
 
     expect((await putAnswer("dq-relationship-priority-01")).status).toBe(200);
-    const activeDeferred = await database
+    const activeDeferred = accountDataStore.raw
       .prepare("SELECT COUNT(*) AS count FROM diagnosis_deferred_questions WHERE is_deleted = 0")
-      .first<{ count: number }>();
+      .get() as { count: number } | undefined;
     expect(activeDeferred?.count).toBe(0);
   });
 
@@ -239,9 +242,9 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
       error: "Answer already exists",
       reason: "answer_change_requires_revision",
     });
-    const persisted = await database
+    const persisted = accountDataStore.raw
       .prepare("SELECT choice_id FROM diagnosis_answers WHERE is_deleted = 0")
-      .first<{ choice_id: string }>();
+      .get() as { choice_id: string } | undefined;
     expect(persisted?.choice_id).toBe("yes");
     expect(await countRows("source_records")).toBe(1);
   });
@@ -513,15 +516,14 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
 
     expect(saved.status).toBe(200);
     expect(reset.status).toBe(200);
-    const orphaned = await database
+    const orphaned = accountDataStore.raw
       .prepare(
         `SELECT COUNT(*) AS count
          FROM source_records AS source
          LEFT JOIN diagnosis_answers AS answer ON answer.source_record_id = source.id
          WHERE source.account_id = ? AND source.kind = 'user_input' AND answer.id IS NULL`,
       )
-      .bind("account-answer-e2e")
-      .first<{ count: number }>();
+      .get("account-answer-e2e") as { count: number } | undefined;
     expect(orphaned?.count ?? 0).toBe(0);
     expect(await countRows("source_records")).toBe(await countRows("diagnosis_answers"));
   });

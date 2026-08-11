@@ -4,7 +4,7 @@
 
 この文書は、診断の一覧表示、回答実行、回答保存を実際に利用できる縦切りにするための、現在の実装状況、残作業、実装順序を所有します。
 
-画面と遷移の正は[Phase 1 診断体験設計](../diagnosis/diagnosis-experience.md)、集約と不変条件の正は[Phase 1 診断ドメイン設計](../diagnosis/diagnosis-domain-design.md)、HTTP契約の正は[診断API契約](diagnosis-api.md)、D1への写像の正は[`packages/lib`のschema](../../packages/lib/src/d1/schema/diagnosis.ts)です。この文書は、それらの定義や具体的なAPIスキーマを所有しません。
+画面と遷移の正は[Phase 1 診断体験設計](../diagnosis/diagnosis-experience.md)、集約と不変条件の正は[Phase 1 診断ドメイン設計](../diagnosis/diagnosis-domain-design.md)、HTTP契約の正は[診断API契約](diagnosis-api.md)、永続化への写像の正は[`packages/lib`のcatalog schema](../../packages/lib/src/d1/shared/schema/catalog.ts)と[diagnosis schema](../../packages/lib/src/do/account/schema/diagnosis.ts)です。この文書は、それらの定義や具体的なAPIスキーマを所有しません。
 
 ## 2. 現在地
 
