@@ -10,6 +10,7 @@ import type {
   DiagnosisListItem,
   DiagnosisResult,
 } from "./feature/diagnosis";
+import { ProfileSummaryGenerationUnavailableError } from "./feature/profile/model/profile-summary";
 import { OperationError } from "./infrastructure/errors";
 
 const mocks = vi.hoisted(() => ({
@@ -493,6 +494,30 @@ describe("App", () => {
       ),
     );
     expect(await screen.findByRole("heading", { name: "新しい版を作成中" })).toBeTruthy();
+  });
+
+  it("再生成が不要になっていた場合は最新状態を再取得してボタンを閉じる", async () => {
+    const current = await mocks.fetchProfileSummary();
+    const stale = {
+      ...current,
+      generation: { status: "idle" as const, canRegenerate: true, reasons: ["brain" as const] },
+    };
+    const refreshed = {
+      ...current,
+      generation: { status: "idle" as const, canRegenerate: false, reasons: [] },
+    };
+    mocks.fetchProfileSummary.mockResolvedValueOnce(stale).mockResolvedValue(refreshed);
+    mocks.requestProfileSummaryGeneration.mockRejectedValueOnce(
+      new ProfileSummaryGenerationUnavailableError("regeneration_not_required"),
+    );
+    window.history.replaceState({}, "", "/me");
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "新しい版を再生成" }));
+
+    await waitFor(() => expect(mocks.fetchProfileSummary).toHaveBeenCalledTimes(3));
+    expect(screen.queryByRole("button", { name: "新しい版を再生成" })).toBeNull();
+    expect(screen.queryByText("まとめに使える記録がまだありません。")).toBeNull();
   });
 
   it("/meでは保存済み版がなくてもGET APIの初回生成状態を表示する", async () => {

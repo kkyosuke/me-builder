@@ -40,6 +40,24 @@ type ProfileSummaryVersion = ProfileSummaryVersionOption & Readonly<{ summary: P
 
 export type ProfileSummaryRegenerationReason = "diagnosis" | "brain" | "elapsed";
 
+export type ProfileSummaryGenerationUnavailableReason =
+  | "source_record_required"
+  | "regeneration_not_required";
+
+export class ProfileSummaryGenerationUnavailableError extends Error {
+  readonly reason: ProfileSummaryGenerationUnavailableReason;
+
+  constructor(reason: ProfileSummaryGenerationUnavailableReason) {
+    super(
+      reason === "source_record_required"
+        ? "まとめに使える記録がまだありません。"
+        : "新しい情報がないため、再生成は必要ありません。",
+    );
+    this.name = "ProfileSummaryGenerationUnavailableError";
+    this.reason = reason;
+  }
+}
+
 type ProfileSummaryGenerationState = Readonly<{
   status: "idle" | "queued" | "generating" | "failed";
   canRegenerate: boolean;

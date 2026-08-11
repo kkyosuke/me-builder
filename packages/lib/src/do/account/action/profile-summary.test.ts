@@ -152,6 +152,10 @@ describe("Profile Summary persistence", () => {
       requested.generationId,
     );
     expect(context).toMatchObject({ diagnosisCount: 0, diaryCount: 1 });
+    expect(context?.inputSnapshot).toEqual({
+      diagnosis: { count: 0, latestRecordedAt: null },
+      diary: { count: 1, latestRecordedAt: recordedAt },
+    });
     expect(context?.evidence).toEqual([
       expect.objectContaining({
         source: "diary",

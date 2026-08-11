@@ -1,4 +1,4 @@
-import { and, countDistinct, desc, eq, inArray, max, notInArray } from "drizzle-orm";
+import { and, countDistinct, desc, eq, inArray, lte, max, notInArray } from "drizzle-orm";
 import type {
   CompleteProfileSummaryGenerationInput,
   ProfileSummaryGenerationContext,
@@ -273,6 +273,11 @@ export async function loadProfileSummaryGenerationContext(
       .run();
   }
 
+  // AIへ渡す入力の境界を最初に固定する。これ以降に追加された入力は、この版で
+  // 使用済みにせず、次回の再生成理由として検出できる状態を保つ。
+  const inputSnapshot = await currentInputSnapshot(db, accountId);
+  const diagnosisLatestAt = inputSnapshot.diagnosis.latestRecordedAt;
+  const diaryLatestAt = inputSnapshot.diary.latestRecordedAt;
   const diagnosisRows = await db
     .select({
       id: brainItems.id,
@@ -286,6 +291,7 @@ export async function loadProfileSummaryGenerationContext(
         eq(diagnosisBrainProjectionHeads.accountId, accountId),
         eq(brainItems.status, "active"),
         eq(brainItems.isDeleted, false),
+        ...(diagnosisLatestAt ? [lte(brainItems.createdAt, diagnosisLatestAt)] : []),
       ),
     )
     .orderBy(desc(brainItems.createdAt))
@@ -307,6 +313,7 @@ export async function loadProfileSummaryGenerationContext(
         eq(brainItems.status, "active"),
         eq(brainItems.isDeleted, false),
         ...(diagnosisItemIds.length > 0 ? [notInArray(brainItems.id, diagnosisItemIds)] : []),
+        ...(diaryLatestAt ? [lte(brainItems.createdAt, diaryLatestAt)] : []),
       ),
     )
     .orderBy(desc(brainItems.createdAt))
@@ -331,6 +338,7 @@ export async function loadProfileSummaryGenerationContext(
         eq(conversationMessages.role, "user"),
         eq(conversationMessages.isDeleted, false),
         eq(sourceRecords.isDeleted, false),
+        ...(diaryLatestAt ? [lte(sourceRecords.createdAt, diaryLatestAt)] : []),
       ),
     )
     .orderBy(desc(sourceRecords.createdAt))
@@ -361,7 +369,6 @@ export async function loadProfileSummaryGenerationContext(
     (latest, item) => (!latest || item.recordedAt > latest ? item.recordedAt : latest),
     null,
   );
-  const inputSnapshot = await currentInputSnapshot(db, accountId);
   return {
     generationId,
     evidence,
