@@ -478,6 +478,29 @@ describe("Diary conversation persistence flow", () => {
             category: "preference",
             statement: "辛いものはあまり食べられない",
             sourceMessageIds: context?.sourceMessageIds ?? [],
+            matchingBrainItemId: "missing-preference",
+            deduplication: "semantic",
+            dedupPromptVersion: "brain-dedup-v1",
+          },
+        ],
+        receivedAt,
+      ),
+    ).rejects.toThrow("Diary Brain requested match revalidation failed");
+    await expect(db.select().from(schema.brainItems)).resolves.toHaveLength(1);
+    await expect(db.select().from(schema.brainItemEvidenceEdges)).resolves.toHaveLength(1);
+
+    await expect(
+      applyDiaryBrainCheckpoint(
+        db,
+        account.id,
+        checkpoint?.id ?? "",
+        context?.throughSequence ?? 0,
+        "diary-brain-v2",
+        [
+          {
+            category: "preference",
+            statement: "辛いものはあまり食べられない",
+            sourceMessageIds: context?.sourceMessageIds ?? [],
             matchingBrainItemId: "existing-preference",
             deduplication: "semantic",
             dedupPromptVersion: "brain-dedup-v1",
@@ -497,7 +520,14 @@ describe("Diary conversation persistence flow", () => {
       ],
     });
     await expect(db.select().from(schema.brainItems)).resolves.toHaveLength(1);
-    await expect(db.select().from(schema.brainItemEvidenceEdges)).resolves.toHaveLength(2);
+    await expect(db.select().from(schema.brainItemEvidenceEdges)).resolves.toEqual([
+      expect.objectContaining({ id: "existing-evidence", isDerivationTrigger: true }),
+      expect.objectContaining({
+        brainItemId: "existing-preference",
+        sourceRecordId: newSource.sourceRecordId,
+        isDerivationTrigger: false,
+      }),
+    ]);
     await expect(db.select().from(schema.brainVectorSyncJobs)).resolves.toHaveLength(1);
     await expect(db.select().from(schema.diaryBrainCheckpointItems)).resolves.toEqual([
       expect.objectContaining({

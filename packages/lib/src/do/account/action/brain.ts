@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, isNull, lte, max, min, or, sql } from "drizzle-orm";
 import type { AccountDataDatabase } from "../database";
 import {
   brainItemAccessLabels,
@@ -64,6 +64,8 @@ export type ActiveBrainItemList = Readonly<{
     derivation: "ai" | "deterministic";
     status: "active";
     createdAt: Date;
+    firstObservedAt: Date;
+    lastObservedAt: Date;
     vectorSync: Readonly<{
       status: "pending" | "submitted" | "applied" | "failed" | "not-scheduled";
       operation?: "upsert" | "delete";
@@ -79,6 +81,7 @@ export type ActiveBrainItemList = Readonly<{
       relation: "supports" | "contradicts";
       derivationMethod: "ai" | "deterministic";
       generatedAt: Date;
+      recordedAt: Date;
     }>[];
   }>[];
   truncated: boolean;
@@ -94,7 +97,8 @@ export type BrainChatContextMemory = Readonly<{
   status: "active";
   confidence: unknown;
   accessLabels: readonly string[];
-  recordedAt: Date;
+  firstObservedAt: Date;
+  lastObservedAt: Date;
   evidence: readonly Readonly<{
     sourceRecordId: string;
     text: string;
@@ -712,7 +716,7 @@ export async function loadBrainChatContextMemories(
       attributes: brainItems.attributes,
       derivation: brainItems.derivation,
       confidence: brainItems.confidence,
-      recordedAt: brainItems.createdAt,
+      createdAt: brainItems.createdAt,
       accessLabel: brainItemAccessLabels.label,
     })
     .from(brainVectorEntries)
@@ -743,10 +747,37 @@ export async function loadBrainChatContextMemories(
       return row ? [row] : [];
     })
     .slice(0, CHAT_CONTEXT_MEMORY_LIMIT);
+  const authorizedItemIds = authorized.map(({ brainItemId }) => brainItemId);
+  const observationRows =
+    authorizedItemIds.length === 0
+      ? []
+      : await db
+          .select({
+            brainItemId: brainItemEvidenceEdges.brainItemId,
+            firstObservedAt: min(sourceRecords.createdAt),
+            lastObservedAt: max(sourceRecords.createdAt),
+          })
+          .from(brainItemEvidenceEdges)
+          .innerJoin(sourceRecords, eq(sourceRecords.id, brainItemEvidenceEdges.sourceRecordId))
+          .where(
+            and(
+              inArray(brainItemEvidenceEdges.brainItemId, authorizedItemIds),
+              eq(brainItemEvidenceEdges.relation, "supports"),
+              eq(brainItemEvidenceEdges.isDeleted, false),
+              eq(sourceRecords.accountId, accountId),
+              eq(sourceRecords.isDeleted, false),
+            ),
+          )
+          .groupBy(brainItemEvidenceEdges.brainItemId)
+          .all();
+  const observationsByItemId = new Map(
+    observationRows.map((row) => [row.brainItemId, row] as const),
+  );
 
   let remainingEvidence = CHAT_CONTEXT_EVIDENCE_LIMIT;
   const memories: BrainChatContextMemory[] = [];
   for (const item of authorized) {
+    const observations = observationsByItemId.get(item.brainItemId);
     const accessLabels = rows
       .filter((row) => row.vectorId === item.vectorId)
       .map((row) => row.accessLabel);
@@ -787,7 +818,8 @@ export async function loadBrainChatContextMemories(
       status: "active",
       confidence: item.confidence,
       accessLabels: [...new Set(accessLabels)].sort(),
-      recordedAt: item.recordedAt,
+      firstObservedAt: observations?.firstObservedAt ?? item.createdAt,
+      lastObservedAt: observations?.lastObservedAt ?? item.createdAt,
       evidence,
     });
   }
@@ -807,8 +839,26 @@ export async function listActiveBrainItems(
       derivation: brainItems.derivation,
       status: brainItems.status,
       createdAt: brainItems.createdAt,
+      firstObservedAt: min(sourceRecords.createdAt),
+      lastObservedAt: max(sourceRecords.createdAt),
     })
     .from(brainItems)
+    .innerJoin(
+      brainItemEvidenceEdges,
+      and(
+        eq(brainItemEvidenceEdges.brainItemId, brainItems.id),
+        eq(brainItemEvidenceEdges.relation, "supports"),
+        eq(brainItemEvidenceEdges.isDeleted, false),
+      ),
+    )
+    .innerJoin(
+      sourceRecords,
+      and(
+        eq(sourceRecords.id, brainItemEvidenceEdges.sourceRecordId),
+        eq(sourceRecords.accountId, accountId),
+        eq(sourceRecords.isDeleted, false),
+      ),
+    )
     .where(
       and(
         eq(brainItems.accountId, accountId),
@@ -816,7 +866,15 @@ export async function listActiveBrainItems(
         eq(brainItems.isDeleted, false),
       ),
     )
-    .orderBy(desc(brainItems.createdAt), desc(brainItems.id))
+    .groupBy(
+      brainItems.id,
+      brainItems.category,
+      brainItems.statement,
+      brainItems.derivation,
+      brainItems.status,
+      brainItems.createdAt,
+    )
+    .orderBy(desc(max(sourceRecords.createdAt)), desc(brainItems.id))
     .limit(DEVELOPMENT_BRAIN_ITEM_LIMIT + 1);
   const truncated = rows.length > DEVELOPMENT_BRAIN_ITEM_LIMIT;
   const items = rows.slice(0, DEVELOPMENT_BRAIN_ITEM_LIMIT);
@@ -831,15 +889,19 @@ export async function listActiveBrainItems(
             relation: brainItemEvidenceEdges.relation,
             derivationMethod: brainItemEvidenceEdges.derivationMethod,
             generatedAt: brainItemEvidenceEdges.generatedAt,
+            recordedAt: sourceRecords.createdAt,
           })
           .from(brainItemEvidenceEdges)
+          .innerJoin(sourceRecords, eq(sourceRecords.id, brainItemEvidenceEdges.sourceRecordId))
           .where(
             and(
               inArray(brainItemEvidenceEdges.brainItemId, itemIds),
               eq(brainItemEvidenceEdges.isDeleted, false),
+              eq(sourceRecords.accountId, accountId),
+              eq(sourceRecords.isDeleted, false),
             ),
           )
-          .orderBy(brainItemEvidenceEdges.generatedAt, brainItemEvidenceEdges.id),
+          .orderBy(sourceRecords.createdAt, brainItemEvidenceEdges.id),
     itemIds.length === 0
       ? []
       : db
@@ -896,6 +958,8 @@ export async function listActiveBrainItems(
       const entry = vectorEntryByItem.get(item.id);
       return {
         ...item,
+        firstObservedAt: item.firstObservedAt ?? item.createdAt,
+        lastObservedAt: item.lastObservedAt ?? item.createdAt,
         status: "active" as const,
         vectorSync: {
           status: job?.status ?? ("not-scheduled" as const),

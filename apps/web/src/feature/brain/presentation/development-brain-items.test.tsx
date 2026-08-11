@@ -39,6 +39,8 @@ describe("DevelopmentBrainItems", () => {
                 derivation: "ai",
                 status: "active",
                 createdAt: "2026-08-09T00:00:00.000Z",
+                firstObservedAt: "2026-08-01T00:00:00.000Z",
+                lastObservedAt: "2026-08-09T00:00:00.000Z",
                 vectorSync: {
                   status: "applied",
                   operation: "upsert",
@@ -53,6 +55,7 @@ describe("DevelopmentBrainItems", () => {
                     relation: "supports",
                     derivationMethod: "ai",
                     generatedAt: "2026-08-09T00:00:01.000Z",
+                    recordedAt: "2026-08-09T00:00:00.000Z",
                   },
                 ],
               },
@@ -84,10 +87,13 @@ describe("DevelopmentBrainItems", () => {
     expect(screen.getByText("Vector同期受付済み")).toBeTruthy();
     expect(screen.getByText("Vectorizeに実体あり（768次元）")).toBeTruthy();
     expect(screen.getByText("behavior_pattern / ai / embedding v1")).toBeTruthy();
+    expect(screen.getByText(/最初に確認:/)).toBeTruthy();
+    expect(screen.getByText(/最後に確認:/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Vectorizeで実体確認" }));
     expect(onVerifyVector).toHaveBeenCalledWith("brain-1");
     fireEvent.click(screen.getByText("Evidence 1件"));
     expect(screen.getByText("source-1")).toBeTruthy();
+    expect(screen.getByText(/本人から記録:/)).toBeTruthy();
   });
 
   it("0件を明示する", () => {

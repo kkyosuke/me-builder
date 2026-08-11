@@ -273,6 +273,8 @@ describe("App", () => {
           derivation: "ai",
           status: "active",
           createdAt: "2026-08-09T00:00:00.000Z",
+          firstObservedAt: "2026-08-01T00:00:00.000Z",
+          lastObservedAt: "2026-08-09T00:00:00.000Z",
           vectorSync: {
             status: "applied",
             operation: "upsert",
@@ -286,6 +288,7 @@ describe("App", () => {
               relation: "supports",
               derivationMethod: "ai",
               generatedAt: "2026-08-09T00:00:01.000Z",
+              recordedAt: "2026-08-09T00:00:00.000Z",
             },
           ],
         },

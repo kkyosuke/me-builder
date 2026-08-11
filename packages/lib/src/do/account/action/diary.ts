@@ -1015,6 +1015,9 @@ export async function applyDiaryBrainCheckpoint(
       !temporalContextsConflict(temporalContext, requestedTemporalContext)
         ? requestedItem
         : undefined;
+    if (candidate.matchingBrainItemId && !requestedMatch) {
+      throw new Error("Diary Brain requested match revalidation failed");
+    }
     const exactItems = requestedMatch
       ? []
       : await db
@@ -1067,7 +1070,7 @@ export async function applyDiaryBrainCheckpoint(
               brainItemId,
               sourceRecordId: source.id,
               relation: "supports",
-              isDerivationTrigger: true,
+              isDerivationTrigger: false,
               derivationMethod: "ai",
               generatedAt: at,
               ...lifecycle,

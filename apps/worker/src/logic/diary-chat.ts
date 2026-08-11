@@ -144,7 +144,8 @@ export function buildDiaryChatContextPackage(
       status: memory.status,
       confidence: memory.confidence,
       access_labels: memory.accessLabels,
-      recorded_at: memory.recordedAt,
+      first_observed_at: memory.firstObservedAt,
+      last_observed_at: memory.lastObservedAt,
       evidence: memory.evidence.map(({ text, recordedAt }, evidenceIndex) => ({
         id: `evidence-${index + 1}-${evidenceIndex + 1}`,
         text: text.slice(0, MEMORY_EVIDENCE_CHARACTER_LIMIT),

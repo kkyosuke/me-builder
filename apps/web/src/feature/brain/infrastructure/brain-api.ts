@@ -20,6 +20,8 @@ const ResponseSchema = v.object({
       derivation: v.picklist(["ai", "deterministic"]),
       status: v.literal("active"),
       createdAt: v.pipe(v.string(), v.isoTimestamp()),
+      firstObservedAt: v.pipe(v.string(), v.isoTimestamp()),
+      lastObservedAt: v.pipe(v.string(), v.isoTimestamp()),
       vectorSync: v.object({
         status: v.picklist(["pending", "submitted", "applied", "failed", "not-scheduled"]),
         operation: v.exactOptional(v.picklist(["upsert", "delete"])),
@@ -36,6 +38,7 @@ const ResponseSchema = v.object({
           relation: v.picklist(["supports", "contradicts"]),
           derivationMethod: v.picklist(["ai", "deterministic"]),
           generatedAt: v.pipe(v.string(), v.isoTimestamp()),
+          recordedAt: v.pipe(v.string(), v.isoTimestamp()),
         }),
       ),
     }),

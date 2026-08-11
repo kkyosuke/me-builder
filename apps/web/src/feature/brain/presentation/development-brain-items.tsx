@@ -196,7 +196,10 @@ export function DevelopmentBrainItems({
                 <p className="mt-3 whitespace-pre-wrap text-sm font-semibold leading-relaxed text-slate-950 dark:text-slate-50">
                   {item.statement}
                 </p>
-                <p className="mt-2 text-xs text-slate-500">{formatDateTime(item.createdAt)}</p>
+                <div className="mt-2 text-xs text-slate-500">
+                  <p>{`最初に確認: ${formatDateTime(item.firstObservedAt)}`}</p>
+                  <p>{`最後に確認: ${formatDateTime(item.lastObservedAt)}`}</p>
+                </div>
 
                 <div className="mt-3 border-t border-slate-200 pt-3 dark:border-slate-700">
                   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -243,6 +246,9 @@ export function DevelopmentBrainItems({
                         </p>
                         <p className="mt-1 text-slate-500">
                           {`${edge.relation} / ${edge.derivationMethod}`}
+                        </p>
+                        <p className="mt-1 text-slate-500">
+                          {`本人から記録: ${formatDateTime(edge.recordedAt)}`}
                         </p>
                       </li>
                     ))}
