@@ -16,6 +16,7 @@ import {
   sourceRecordTextPayloads,
   sourceRecords,
 } from "../schema";
+import { resolveDiaryTemporalContext } from "./diary-temporal";
 
 const SESSION_INACTIVITY_MS = 6 * 60 * 60 * 1000;
 const SESSION_HARD_CAP_MS = 24 * 60 * 60 * 1000;
@@ -41,7 +42,6 @@ const DIARY_BRAIN_STABILITY: Record<DiaryBrainCategory, "temporary" | "changeabl
   preference: "changeable",
   goal: "temporary",
 };
-const DIARY_BRAIN_TIME_ZONE = "Asia/Tokyo";
 /** Checkpointは`account_id`を持たないため、所有者は親のSessionから導出する。 */
 function ownedSessionIds(db: AccountDataDatabase, accountId: string) {
   return db
@@ -666,97 +666,6 @@ export type DiaryBrainCheckpointApplyResult = Readonly<{
   candidates: readonly DiaryBrainCheckpointCandidate[];
 }>;
 
-type TemporalResolution = Readonly<{ original: string; resolved: string }>;
-
-function calendarDateInDiaryTimeZone(at: Date): { year: number; month: number; day: number } {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: DIARY_BRAIN_TIME_ZONE,
-    year: "numeric",
-    month: "numeric",
-    day: "numeric",
-  }).formatToParts(at);
-  const value = (type: Intl.DateTimeFormatPartTypes) =>
-    Number(parts.find((part) => part.type === type)?.value);
-  return { year: value("year"), month: value("month"), day: value("day") };
-}
-
-function shiftCalendarMonth(
-  date: { year: number; month: number },
-  offset: number,
-): { year: number; month: number } {
-  const zeroBased = date.year * 12 + date.month - 1 + offset;
-  return { year: Math.floor(zeroBased / 12), month: (zeroBased % 12) + 1 };
-}
-
-function shiftCalendarDay(
-  date: { year: number; month: number; day: number },
-  offset: number,
-): { year: number; month: number; day: number } {
-  const shifted = new Date(Date.UTC(date.year, date.month - 1, date.day + offset));
-  return {
-    year: shifted.getUTCFullYear(),
-    month: shifted.getUTCMonth() + 1,
-    day: shifted.getUTCDate(),
-  };
-}
-
-function formatCalendarMonth(date: { year: number; month: number }): string {
-  return `${date.year}年${date.month}月`;
-}
-
-function formatCalendarDate(date: { year: number; month: number; day: number }): string {
-  return `${formatCalendarMonth(date)}${date.day}日`;
-}
-
-/** 相対日付を発言時点の日本時間で決定的に解決し、Vector検索でも時点を失わない命題にする。 */
-export function normalizeDiaryRelativeDates(
-  originalStatement: string,
-  recordedAt: Date,
-): Readonly<{
-  statement: string;
-  temporalContext?: Readonly<{
-    originalStatement: string;
-    anchorDate: string;
-    timeZone: typeof DIARY_BRAIN_TIME_ZONE;
-    resolutions: readonly TemporalResolution[];
-  }>;
-}> {
-  const anchor = calendarDateInDiaryTimeZone(recordedAt);
-  const resolutions: TemporalResolution[] = [];
-  let statement = originalStatement;
-  const replace = (expression: string, resolved: string) => {
-    if (!statement.includes(expression)) return;
-    statement = statement.replaceAll(expression, resolved);
-    resolutions.push({ original: expression, resolved });
-  };
-
-  replace("再来月", formatCalendarMonth(shiftCalendarMonth(anchor, 2)));
-  replace("来月", formatCalendarMonth(shiftCalendarMonth(anchor, 1)));
-  replace("今月", formatCalendarMonth(anchor));
-  replace("先月", formatCalendarMonth(shiftCalendarMonth(anchor, -1)));
-  replace("再来年", `${anchor.year + 2}年`);
-  replace("来年", `${anchor.year + 1}年`);
-  replace("今年", `${anchor.year}年`);
-  replace("去年", `${anchor.year - 1}年`);
-  replace("一昨日", formatCalendarDate(shiftCalendarDay(anchor, -2)));
-  replace("昨日", formatCalendarDate(shiftCalendarDay(anchor, -1)));
-  replace("今日", formatCalendarDate(anchor));
-  replace("明後日", formatCalendarDate(shiftCalendarDay(anchor, 2)));
-  replace("明日", formatCalendarDate(shiftCalendarDay(anchor, 1)));
-
-  return resolutions.length === 0
-    ? { statement }
-    : {
-        statement,
-        temporalContext: {
-          originalStatement,
-          anchorDate: `${anchor.year}-${String(anchor.month).padStart(2, "0")}-${String(anchor.day).padStart(2, "0")}`,
-          timeZone: DIARY_BRAIN_TIME_ZONE,
-          resolutions,
-        },
-      };
-}
-
 /** Alarm時点で期限を迎えたcheckpointをQueue投入対象として返す。 */
 export async function listDueDiaryBrainCheckpointIds(
   db: AccountDataDatabase,
@@ -986,7 +895,8 @@ export async function applyDiaryBrainCheckpoint(
       throw new Error("Diary Brain candidate evidence validation failed");
     }
     const recordedAt = new Date(Math.min(...sources.map(({ createdAt }) => createdAt.getTime())));
-    const normalized = normalizeDiaryRelativeDates(candidate.statement.trim(), recordedAt);
+    const statement = candidate.statement.trim();
+    const temporalContext = resolveDiaryTemporalContext(statement, recordedAt);
     const brainItemId = crypto.randomUUID();
     const lifecycle = { createdAt: at, updatedAt: at };
     statements.push(
@@ -994,14 +904,14 @@ export async function applyDiaryBrainCheckpoint(
         id: brainItemId,
         accountId,
         category: candidate.category,
-        statement: normalized.statement,
+        statement,
         attributes: {
           sourceKind: "diary",
           sessionId: checkpoint.sessionId,
           checkpointId,
           promptVersion,
           isInference: false,
-          ...(normalized.temporalContext ? { temporalContext: normalized.temporalContext } : {}),
+          ...(temporalContext ? { temporalContext } : {}),
         },
         derivation: "ai",
         status: "active",
@@ -1056,7 +966,7 @@ export async function applyDiaryBrainCheckpoint(
     );
     appliedCandidates.push({
       category: candidate.category,
-      statement: normalized.statement,
+      statement,
       sourceMessageIds: messageIds,
     });
   }

@@ -276,15 +276,17 @@ AIは会話応答とは独立して、本人が明示した命題を1チェッ�
 
 分類境界は[Brain内部情報の分類](brain-content-taxonomy.md)を正とします。具体的な出来事・経験は`memory`、明示された反復行動は`behavior_pattern`、明示された行動理由は`value_motivation`、選択基準は`decision_system`、具体的な好き嫌いは`preference`、未来の達成意図は`goal`にします。1回の行動だけから反復傾向や動機を推定しません。
 
-`statement`に「今日」「昨日」「来月」「来年」などの相対日付がある場合、AIは原文のまま返します。AccountDataは根拠Source Recordの受信日時を基準に`Asia/Tokyo`の絶対日付へ決定的に変換してからBrain Itemへ保存します。たとえば2026年8月11日の「来月までに転職先を決めたい」は「2026年9月までに転職先を決めたい」になります。変換前の原文、基準日、timezone、変換対応は`attributes.temporalContext`へ保存し、EvidenceのSource Record原文も変更しません。Vectorizeは絶対日付を含む保存後の`statement`をembeddingし、検索queryに含まれる相対日付も検索実行日の同じ規則で絶対表現へ変換します。Account単位のtimezoneを持つまでは日本時間を明示的な既定とし、timezone対応は後続課題とします。
+`statement`に「今日」「昨日」「来月」「来年」などの相対日付がある場合、AIとAccountDataはBrain Itemの命題を原文のまま保存します。AccountDataは根拠Source Recordの受信日時を基準に`Asia/Tokyo`の絶対日付を決定的に解決し、原文、基準日、timezone、解決対応を`attributes.temporalContext`へ分離して保存します。たとえば2026年8月11日の「来月までに転職先を決めたい」は、`statement`を変えず、`来月 = 2026年9月`を時点情報に持ちます。EvidenceのSource Record原文も変更しません。
+
+Vectorizeへ渡すembeddingテキストと検索queryには、原文の後ろへ`時点情報: 来月 = 2026年9月`のような補足だけを追加します。相対日付らしい文字列を単純置換せず、語末、句読点、助詞、数字など日付表現として自然な右境界を持つ場合だけ解決します。そのため「明日香」「今日子」のような固有名詞は時点情報へ変換しません。判定に迷う表現は時点情報を付けない側へ倒し、Brain Itemの原文を壊さないことを優先します。Account単位のtimezoneを持つまでは日本時間を明示的な既定とし、timezone対応は後続課題とします。
 
 検証を通過した日記候補は、共通出力へ次のように写します。
 
 | 出力 | 値 |
 | --- | --- |
 | `category` | 検証済み候補の`memory` / `behavior_pattern` / `value_motivation` / `decision_system` / `preference` / `goal` |
-| `statement` | 候補のstatement。相対日付を含む場合はアプリケーションが絶対日付へ変換した命題 |
-| `attributes` | `sourceKind = diary`、Session ID、checkpoint ID、prompt version、`isInference = false`。相対日付を変換した場合は`temporalContext` |
+| `statement` | 候補のstatement。相対日付を含む場合も原文の命題 |
+| `attributes` | `sourceKind = diary`、Session ID、checkpoint ID、prompt version、`isInference = false`。相対日付を解決した場合は`temporalContext` |
 | `derivation` | `ai` |
 | `validFrom` | 根拠になった発言の時点。複数ある場合は候補が表す期間に合わせる |
 | Evidence | `source_message_ids`から解決したSource Record |
@@ -375,7 +377,7 @@ AIの意味的重複判定だけで既存Itemを上書きしません。同義�
 - 抽出専用`brain_item_candidates`出力schema
 - 通常安全route、許可した6分類、非推定、1チェックポイント最大3件への制限
 - 原文中の連続した文言だけを受け付ける根拠検証と、user message 10件・1件5,000文字の入力上限
-- 相対日付をSource Record受信時点の日本時間で絶対日付へ変換し、原文と変換根拠をattributesへ保存
+- 相対日付を含むstatementの原文を保持し、Source Record受信時点の日本時間で解決した時点情報をattributesへ分離して保存
 - 候補のAccount・チェックポイント範囲・Evidence・安全性検証
 - Brain Item、Evidence、Access Label、チェックポイント完了を一括保存するAccountData action
 - Brain ItemとAccess LabelからConfirmationを除くschema migrationと既存projectionの追従
@@ -390,7 +392,7 @@ AIの意味的重複判定だけで既存Itemを上書きしません。同義�
 - 既存Brain Itemとの重複判定とEvidence追加
 - 本人が明言していない内容をAIが推定する分類
 
-会話チェックポイントから本人が明言した6分類のBrain Itemを最大3件生成し、Evidence付きで保存し、active ItemをVectorizeへ同期し、通常チャットで検索してAccountData再認可後に利用するところまでを実装しています。相対日付は保存前に絶対日付へ変換します。否定・修正・改訂、本人が明言していない内容のAI推定、重複統合は後続です。
+会話チェックポイントから本人が明言した6分類のBrain Itemを最大3件生成し、Evidence付きで保存し、active ItemをVectorizeへ同期し、通常チャットで検索してAccountData再認可後に利用するところまでを実装しています。相対日付は原文と時点情報を分離して保存し、Vectorize登録と検索queryで併記します。否定・修正・改訂、本人が明言していない内容のAI推定、重複統合は後続です。
 
 ## 10. 後続で決めること
 

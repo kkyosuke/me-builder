@@ -582,7 +582,7 @@ flowchart TD
 
 日記候補の入力、起動条件、検証、Brain Item登録、否定・修正、重複・改訂は[Brain Item生成設計 §7](../domain/brain/brain-item-generation-design.md#7-日記チャットからの生成)を正とします。
 
-Brain Item抽出は会話返信とは別のsystem prompt、prompt version、Valibot schemaを使います。AccountData alarmがBrain Checkpoint QueueへIDだけを送り、consumerが削除・撤回されていないuser messageを最大10件、各5,000文字まで読み直してGeminiへ渡します。Chat Turn Queueと物理的に分離するため、Brain変換のAI待ちや再配送は通常返信を待たせません。上限超過本文はSource Recordとして保持したまま変換対象から外します。本人が明言した命題は`memory`、`behavior_pattern`、`value_motivation`、`decision_system`、`preference`、`goal`の6分類から最大3件を生成し、未明言の動機や傾向を推定しません。JSON・出力envelope不正またはproviderの一時失敗はQueueを失敗させて再試行し、個別候補のschema・Evidence・重複違反、空白statement、根拠user message本文にそのまま含まれないstatementは理由コードだけをlogへ残して候補単位で除外します。安全経路または正常な空配列は0件として適用します。「今日」「昨日」「来月」「来年」などはSource Record受信時点の`Asia/Tokyo`で絶対日付へ変換し、原文と変換根拠を`attributes.temporalContext`へ残します。Vectorizeには絶対日付を含む保存後のstatementを登録し、検索query側の相対日付も検索時点で同じ絶対表現へ変換します。候補の保存はAccountData actionだけが行い、モデルへDBや外部I/Oのtoolを公開しません。
+Brain Item抽出は会話返信とは別のsystem prompt、prompt version、Valibot schemaを使います。AccountData alarmがBrain Checkpoint QueueへIDだけを送り、consumerが削除・撤回されていないuser messageを最大10件、各5,000文字まで読み直してGeminiへ渡します。Chat Turn Queueと物理的に分離するため、Brain変換のAI待ちや再配送は通常返信を待たせません。上限超過本文はSource Recordとして保持したまま変換対象から外します。本人が明言した命題は`memory`、`behavior_pattern`、`value_motivation`、`decision_system`、`preference`、`goal`の6分類から最大3件を生成し、未明言の動機や傾向を推定しません。JSON・出力envelope不正またはproviderの一時失敗はQueueを失敗させて再試行し、個別候補のschema・Evidence・重複違反、空白statement、根拠user message本文にそのまま含まれないstatementは理由コードだけをlogへ残して候補単位で除外します。安全経路または正常な空配列は0件として適用します。相対日付を含むstatementの保存とVectorize検索時の扱いは[Brain Item生成設計](../domain/brain/brain-item-generation-design.md)を正とします。候補の保存はAccountData actionだけが行い、モデルへDBや外部I/Oのtoolを公開しません。
 
 ## 8. ガードレール
 

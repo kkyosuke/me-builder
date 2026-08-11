@@ -1,7 +1,13 @@
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import type { D1Database } from "@cloudflare/workers-types";
-import { D1, DO, line, normalizeDiaryRelativeDates } from "@me-builder/lib";
+import {
+  D1,
+  DO,
+  buildDiaryTemporalSearchText,
+  line,
+  resolveDiaryTemporalContext,
+} from "@me-builder/lib";
 import {
   type ChatTurnQueueMessage,
   type Message,
@@ -413,7 +419,10 @@ describe("LINE diary chat delivery E2E", () => {
     );
     const [source] = await accountDataStore.db.select().from(DO.account.schema.sourceRecords);
     if (!source) throw new Error("Expected a source record");
-    const normalizedSearchText = normalizeDiaryRelativeDates(diaryText, source.createdAt).statement;
+    const temporalSearchText = buildDiaryTemporalSearchText(
+      diaryText,
+      resolveDiaryTemporalContext(diaryText, source.createdAt),
+    );
     const recordedAt = new Date("2026-08-10T00:00:00Z");
     await DO.account.action.brain.saveBrainItem(accountDataStore.db, {
       at: recordedAt,
@@ -486,7 +495,7 @@ describe("LINE diary chat delivery E2E", () => {
     );
     expect(mockEmbedContent).toHaveBeenCalledWith(
       expect.objectContaining({
-        contents: normalizedSearchText,
+        contents: temporalSearchText,
         config: expect.objectContaining({ taskType: "RETRIEVAL_QUERY", outputDimensionality: 768 }),
       }),
     );

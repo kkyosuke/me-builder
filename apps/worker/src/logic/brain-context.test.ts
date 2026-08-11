@@ -76,7 +76,7 @@ describe("buildBrainSearchQuery", () => {
         ["current-1", "current-2"],
         new Date("2026-09-01T03:00:00.000Z"),
       ),
-    ).toBe("2026年8月31日は疲れた\n落ち着く方法を探したい");
+    ).toBe("今日は疲れた\n時点情報: 今日 = 2026年8月31日\n落ち着く方法を探したい");
   });
 
   it("相対日付を保存時と同じ絶対表現にしてVector検索する", () => {
@@ -90,8 +90,15 @@ describe("buildBrainSearchQuery", () => {
       },
     ];
     expect(buildBrainSearchQuery(goalMessage, ["goal"], new Date("2026-09-01T03:00:00.000Z"))).toBe(
-      "2026年9月までに転職先を決めたい",
+      "来月までに転職先を決めたい\n時点情報: 来月 = 2026年9月",
     );
+  });
+
+  it("人名に含まれる相対日付文字列は検索文へ時点情報を追加しない", () => {
+    const nameMessage = [
+      { id: "name", role: "user" as const, body: "明日香さんと今日子さんに会った", sequence: 1 },
+    ];
+    expect(buildBrainSearchQuery(nameMessage, ["name"])).toBe("明日香さんと今日子さんに会った");
   });
 });
 

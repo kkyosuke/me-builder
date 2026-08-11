@@ -106,6 +106,23 @@ describe("saveBrainItem", () => {
     await insertAccountsAndSources(db);
     const at = new Date("2026-08-10T00:00:00Z");
     await saveBrainItem(db, createInput({ at }));
+    await db
+      .update(schema.brainItems)
+      .set({
+        statement: "来月までに転職先を決めたい",
+        attributes: {
+          sourceKind: "diary",
+          isInference: false,
+          temporalContext: {
+            originalStatement: "来月までに転職先を決めたい",
+            anchorDate: "2026-08-10",
+            timeZone: "Asia/Tokyo",
+            resolutions: [{ original: "来月", resolved: "2026年9月" }],
+          },
+        },
+        updatedAt: at,
+      })
+      .where(eq(schema.brainItems.id, "brain-1"));
 
     const jobs = await claimDueBrainVectorSyncJobs(db, at);
     expect(jobs).toEqual([
@@ -115,7 +132,7 @@ describe("saveBrainItem", () => {
       getBrainVectorSyncTarget(db, "account-1", jobs[0]?.id ?? "", "brain-1", at.getTime()),
     ).resolves.toEqual({
       action: "upsert",
-      statement: "日記から見える傾向",
+      embeddingText: "来月までに転職先を決めたい\n時点情報: 来月 = 2026年9月",
       category: "preference",
       derivation: "ai",
       itemRevision: at.getTime(),

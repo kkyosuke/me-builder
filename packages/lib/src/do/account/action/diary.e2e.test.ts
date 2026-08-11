@@ -231,7 +231,7 @@ describe("Diary conversation persistence flow", () => {
       candidates: [
         {
           category: "memory",
-          statement: "2026年8月7日は少し疲れた",
+          statement: "今日は少し疲れた",
           sourceMessageIds: checkpointContext?.sourceMessageIds.slice(0, 1) ?? [],
         },
         {
@@ -246,7 +246,7 @@ describe("Diary conversation persistence flow", () => {
         expect.objectContaining({
           accountId: account.id,
           category: "memory",
-          statement: "2026年8月7日は少し疲れた",
+          statement: "今日は少し疲れた",
           attributes: expect.objectContaining({
             temporalContext: expect.objectContaining({
               originalStatement: "今日は少し疲れた",
@@ -276,7 +276,7 @@ describe("Diary conversation persistence flow", () => {
       candidates: [
         {
           category: "memory",
-          statement: "2026年8月7日は少し疲れた",
+          statement: "今日は少し疲れた",
           sourceMessageIds: checkpointContext?.sourceMessageIds.slice(0, 1) ?? [],
         },
         {
@@ -356,7 +356,7 @@ describe("Diary conversation persistence flow", () => {
       candidates: [
         {
           category: "goal",
-          statement: "2026年9月までに転職先を決めたい",
+          statement: "来月までに転職先を決めたい",
           sourceMessageIds: context?.sourceMessageIds ?? [],
         },
       ],
@@ -364,7 +364,7 @@ describe("Diary conversation persistence flow", () => {
     await expect(db.select().from(schema.brainItems)).resolves.toEqual([
       expect.objectContaining({
         category: "goal",
-        statement: "2026年9月までに転職先を決めたい",
+        statement: "来月までに転職先を決めたい",
         stability: "temporary",
         attributes: expect.objectContaining({
           promptVersion: "diary-brain-v2",

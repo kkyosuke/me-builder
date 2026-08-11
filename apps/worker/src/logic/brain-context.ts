@@ -2,7 +2,8 @@ import {
   type BrainChatContextMemory,
   type ConversationContextMessage,
   accountDataFor,
-  normalizeDiaryRelativeDates,
+  buildDiaryTemporalSearchText,
+  resolveDiaryTemporalContext,
 } from "@me-builder/lib";
 import { logger } from "@me-builder/shared";
 import type { CloudflareBindings, WorkerConfig } from "../config";
@@ -38,7 +39,11 @@ export function buildBrainSearchQuery(
     .filter(({ id, role }) => role === "user" && currentIds.has(id))
     .map(({ body, recordedAt }) => {
       const statement = body.trim();
-      return statement ? normalizeDiaryRelativeDates(statement, recordedAt ?? at).statement : "";
+      if (!statement) return "";
+      return buildDiaryTemporalSearchText(
+        statement,
+        resolveDiaryTemporalContext(statement, recordedAt ?? at),
+      );
     })
     .filter(Boolean)
     .join("\n");
