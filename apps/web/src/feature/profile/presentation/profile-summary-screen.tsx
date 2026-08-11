@@ -167,6 +167,10 @@ function SummaryCardStack({
   const canRegenerate = Boolean(
     selected.isLatest && versioning.generation.canRegenerate && !isWorking && onRegenerate,
   );
+  const latestVersion =
+    versioning.versions.find(({ isLatest }) => isLatest) ?? versioning.versions[0];
+  const firstPastVersion = versioning.versions.find(({ isLatest }) => !isLatest);
+  const hasPastVersions = Boolean(firstPastVersion);
   const canSwipe = !transition && Boolean(onSelectVersion && versioning.versions.length > 1);
   const adjacentVersion =
     dragX > 0 ? versioning.versions[selectedIndex - 1] : versioning.versions[selectedIndex + 1];
@@ -246,20 +250,6 @@ function SummaryCardStack({
   return (
     <section aria-label="今のわたしの版" aria-roledescription="カルーセル" className="mt-8">
       <div className="relative pb-4">
-        {versioning.versions.length > 1 && (
-          <div
-            aria-hidden="true"
-            className="absolute inset-x-5 top-3 bottom-1 rounded-3xl border border-violet-200 bg-violet-100/70 dark:border-violet-800 dark:bg-violet-950/60"
-          />
-        )}
-
-        {versioning.versions.length > 1 && !showsIncomingCard && (
-          <div
-            aria-hidden="true"
-            className="absolute inset-x-3 top-1.5 bottom-2.5 rounded-3xl border border-sky-200 bg-sky-100/80 dark:border-sky-800 dark:bg-sky-950/70"
-          />
-        )}
-
         {revealedVersion && showsIncomingCard && (
           <div
             aria-hidden="true"
@@ -280,8 +270,10 @@ function SummaryCardStack({
           data-summary-card-layer="active"
           aria-label={
             showsGenerationCard
-              ? `新しい版を作成中、${selectedIndex + 1}/${versioning.versions.length}`
-              : `${versionLabel(selected.sequence)}、${selectedIndex + 1}/${versioning.versions.length}`
+              ? "新しい版を作成中"
+              : selected.isLatest
+                ? "最新のまとめ"
+                : "過去のまとめ"
           }
           className={`relative z-10 w-full select-none transition-transform ease-out motion-reduce:transition-none ${transition || isReturning ? "duration-300" : "duration-0"} ${canSwipe ? "cursor-grab touch-pan-y active:cursor-grabbing" : ""}`}
           style={{
@@ -297,18 +289,6 @@ function SummaryCardStack({
           onPointerUp={(event) => finishPointer(event, false)}
           onPointerCancel={(event) => finishPointer(event, true)}
         >
-          {canRegenerate && (
-            <button
-              type="button"
-              aria-label="新しい版を再生成"
-              onPointerDown={(event) => event.stopPropagation()}
-              onClick={requestRegeneration}
-              disabled={Boolean(transition)}
-              className="absolute top-3 left-3 z-20 inline-flex size-10 items-center justify-center rounded-full border border-violet-200 bg-white/95 text-violet-700 shadow-md backdrop-blur-sm transition hover:bg-violet-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 disabled:opacity-50 dark:border-violet-700 dark:bg-slate-900/95 dark:text-violet-300 dark:hover:bg-violet-950"
-            >
-              <RefreshCw className="size-4.5" aria-hidden="true" />
-            </button>
-          )}
           {showsGenerationCard ? (
             <section
               className={`flex flex-col items-center justify-center rounded-3xl border border-violet-300/40 bg-gradient-to-br from-violet-50 via-white to-sky-50 p-8 text-center shadow-xl shadow-slate-950/10 dark:from-violet-950/50 dark:via-slate-800 dark:to-sky-950/40 ${generationCardHeight ? "h-full" : "min-h-[28rem]"}`}
@@ -345,31 +325,48 @@ function SummaryCardStack({
         </div>
       </div>
 
-      <div className="mt-1 flex min-h-7 items-center justify-center gap-2" aria-label="まとめの版">
-        {versioning.versions.map((version, index) => (
+      {selected.isLatest && hasPastVersions && onSelectVersion && firstPastVersion && (
+        <div className="mt-1 flex justify-center">
           <button
-            key={version.id}
             type="button"
-            aria-label={`${versionLabel(version.sequence)}を表示`}
-            aria-pressed={version.id === selected.id}
-            disabled={!onSelectVersion || version.id === selected.id || Boolean(transition)}
-            onClick={() => onSelectVersion?.(version.id)}
-            className={`rounded-full transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400 ${version.id === selected.id ? "h-2.5 w-7 bg-sky-500" : "size-2.5 bg-slate-300 hover:bg-slate-400 dark:bg-slate-600"}`}
+            onClick={() => onSelectVersion(firstPastVersion.id)}
+            disabled={Boolean(transition)}
+            className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-semibold text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
           >
-            <span className="sr-only">{`${index + 1}/${versioning.versions.length}`}</span>
+            <History className="size-3.5" aria-hidden="true" />
+            過去のまとめがあります
           </button>
-        ))}
-      </div>
+        </div>
+      )}
 
-      <div className="mt-2 flex min-h-8 flex-wrap items-center justify-between gap-2 text-xs">
-        <p className="text-slate-500 dark:text-slate-400">
-          {versioning.versions.length > 1
-            ? selected.isLatest
-              ? "左へスワイプで過去の私"
-              : "左右のスワイプで版を移動"
-            : "最初のまとめです"}
-        </p>
-      </div>
+      {!selected.isLatest && latestVersion && onSelectVersion && (
+        <div className="mt-1 flex items-center justify-between gap-3">
+          <p className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
+            <History className="size-3.5" aria-hidden="true" />
+            過去のまとめ
+          </p>
+          <button
+            type="button"
+            onClick={() => onSelectVersion(latestVersion.id)}
+            disabled={Boolean(transition)}
+            className="rounded-full bg-sky-100 px-3 py-2 text-xs font-bold text-sky-800 transition hover:bg-sky-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400 disabled:opacity-50 dark:bg-sky-950 dark:text-sky-200 dark:hover:bg-sky-900"
+          >
+            今のまとめに戻る
+          </button>
+        </div>
+      )}
+
+      {canRegenerate && (
+        <button
+          type="button"
+          onClick={requestRegeneration}
+          disabled={Boolean(transition)}
+          className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-violet-600 px-5 py-3.5 text-sm font-bold text-white shadow-lg shadow-violet-950/15 transition hover:bg-violet-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 disabled:opacity-50 dark:bg-violet-500 dark:hover:bg-violet-400"
+        >
+          <Sparkles className="size-4.5" aria-hidden="true" />
+          最新のわたしを知る
+        </button>
+      )}
 
       {reasonText && (
         <p

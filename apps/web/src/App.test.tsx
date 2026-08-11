@@ -467,7 +467,7 @@ describe("App", () => {
         name: "最近の記録から、こんなあなたらしさが見えています",
       }),
     ).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "第1版を表示" }));
+    fireEvent.click(screen.getByRole("button", { name: "過去のまとめがあります" }));
     expect(
       await screen.findByRole("heading", { name: "過去の記録から見えたあなたらしさ" }),
     ).toBeTruthy();
@@ -484,7 +484,7 @@ describe("App", () => {
     window.history.replaceState({}, "", "/me");
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "新しい版を再生成" }));
+    fireEvent.click(await screen.findByRole("button", { name: "最新のわたしを知る" }));
 
     await waitFor(() =>
       expect(mocks.requestProfileSummaryGeneration).toHaveBeenCalledWith(
@@ -513,10 +513,10 @@ describe("App", () => {
     window.history.replaceState({}, "", "/me");
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "新しい版を再生成" }));
+    fireEvent.click(await screen.findByRole("button", { name: "最新のわたしを知る" }));
 
     await waitFor(() => expect(mocks.fetchProfileSummary).toHaveBeenCalledTimes(3));
-    expect(screen.queryByRole("button", { name: "新しい版を再生成" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "最新のわたしを知る" })).toBeNull();
     expect(screen.queryByText("まとめに使える記録がまだありません。")).toBeNull();
   });
 

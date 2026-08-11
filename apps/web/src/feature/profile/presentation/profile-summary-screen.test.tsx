@@ -127,7 +127,7 @@ describe("ProfileSummaryScreen", () => {
     expect(screen.queryByRole("link", { name: "未回答の診断を見る" })).toBeNull();
   });
 
-  it("カード左上の丸いボタンから新しい版を要求できる", () => {
+  it("過去版の存在を控えめに伝え、カード下から最新のわたしを生成できる", () => {
     const onSelectVersion = vi.fn();
     const onRegenerate = vi.fn();
     render(
@@ -141,17 +141,16 @@ describe("ProfileSummaryScreen", () => {
     );
 
     expect(screen.queryByRole("combobox")).toBeNull();
-    expect(screen.getByLabelText("第3版、1/2")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "第3版を表示" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "第2版を表示" })).toBeTruthy();
+    expect(screen.getByLabelText("最新のまとめ")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "第3版を表示" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "第2版を表示" })).toBeNull();
     expect(screen.getByText(/AI生成/)).toBeTruthy();
     expect(screen.getByText(/診断が増えました・日記・記録が増えました/)).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "第2版を表示" }));
-    const regenerateButton = screen.getByRole("button", { name: "新しい版を再生成" });
-    expect(regenerateButton.className).toContain("rounded-full");
-    expect(regenerateButton.className).toContain("top-3");
-    expect(regenerateButton.className).toContain("left-3");
+    fireEvent.click(screen.getByRole("button", { name: "過去のまとめがあります" }));
+    const regenerateButton = screen.getByRole("button", { name: "最新のわたしを知る" });
+    expect(regenerateButton.className).toContain("w-full");
+    expect(regenerateButton.className).not.toContain("absolute");
     fireEvent.click(regenerateButton);
 
     expect(onSelectVersion).toHaveBeenCalledWith("version-2");
@@ -172,7 +171,7 @@ describe("ProfileSummaryScreen", () => {
       />,
     );
 
-    const latestCard = screen.getByLabelText("第3版、1/2");
+    const latestCard = screen.getByLabelText("最新のまとめ");
     firePointer(latestCard, "pointerdown", {
       button: 0,
       clientX: 100,
@@ -210,7 +209,7 @@ describe("ProfileSummaryScreen", () => {
       />,
     );
 
-    const pastCard = screen.getByLabelText("第2版、2/2");
+    const pastCard = screen.getByLabelText("過去のまとめ");
     firePointer(pastCard, "pointerdown", {
       button: 0,
       clientX: 0,
@@ -224,7 +223,7 @@ describe("ProfileSummaryScreen", () => {
     expect(incomingCard?.className).toContain("inset-x-0");
     act(() => vi.advanceTimersByTime(300));
     expect(onSelectVersion).toHaveBeenLastCalledWith("version-3");
-    expect(screen.queryByRole("button", { name: "新しい版を再生成" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "最新のわたしを知る" })).toBeNull();
   });
 
   it("保存済み版がなくても初回生成中と生成失敗を表示する", () => {
@@ -285,11 +284,11 @@ describe("ProfileSummaryScreen", () => {
     }
 
     render(<GenerationHarness />);
-    const latestCard = screen.getByLabelText("第3版、1/2");
+    const latestCard = screen.getByLabelText("最新のまとめ");
     Object.defineProperty(latestCard, "offsetHeight", { configurable: true, value: 640 });
-    fireEvent.click(screen.getByRole("button", { name: "新しい版を再生成" }));
+    fireEvent.click(screen.getByRole("button", { name: "最新のわたしを知る" }));
 
-    const generationCard = screen.getByLabelText("新しい版を作成中、1/2");
+    const generationCard = screen.getByLabelText("新しい版を作成中");
     expect(generationCard.getAttribute("style")).toContain("height: 640px");
     expect(generationCard.className).toContain("w-full");
   });
@@ -305,8 +304,9 @@ describe("ProfileSummaryScreen", () => {
       />,
     );
 
-    expect(screen.getByText("左右のスワイプで版を移動")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "新しい版を再生成" })).toBeNull();
+    expect(screen.getByText("過去のまとめ", { selector: "p" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "今のまとめに戻る" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "最新のわたしを知る" })).toBeNull();
 
     rerender(
       <ProfileSummaryScreen
@@ -322,9 +322,9 @@ describe("ProfileSummaryScreen", () => {
     );
 
     expect(screen.getByRole("heading", { name: "新しい版を作成中" })).toBeTruthy();
-    expect(screen.getByLabelText("新しい版を作成中、1/2")).toBeTruthy();
+    expect(screen.getByLabelText("新しい版を作成中")).toBeTruthy();
     expect(screen.getByRole("status").textContent).toContain("現在の版や過去の版を確認できます");
-    expect(screen.queryByRole("button", { name: "新しい版を再生成" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "最新のわたしを知る" })).toBeNull();
   });
 
   it("まとめがなければ診断とLINEの会話を案内する", () => {
