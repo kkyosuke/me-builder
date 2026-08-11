@@ -18,7 +18,7 @@ export const compatibilitySharePreviewCases = {
       status: 200,
       body: {
         displayName: "あおい",
-        previewTokenPattern: "^csp1\\.[a-f0-9]{64}$",
+        previewTokenPattern: "^csp2\\.[a-f0-9]{64}$",
         canIssueInvitation: true,
         blockingReasons: [],
         nextAction: null,

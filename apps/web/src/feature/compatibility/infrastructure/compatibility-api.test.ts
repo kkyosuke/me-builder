@@ -3,7 +3,18 @@ import { fetchCompatibilitySharePreview } from "./compatibility-api";
 
 const preview = {
   displayName: "うさぎ",
-  previewToken: `csp1.${"a".repeat(64)}`,
+  previewToken: `csp2.${"a".repeat(64)}`,
+  aboutMe: {
+    profileSummaryVersionId: "summary-version-1",
+    generatedAt: "2026-08-11T00:00:00.000Z",
+    statements: [
+      {
+        key: "planning-style",
+        label: "予定の立て方",
+        statement: "私は、先の見通しを持って動けると安心しやすいです",
+      },
+    ],
+  },
   themes: [
     {
       diagnosisId: "daily-life",

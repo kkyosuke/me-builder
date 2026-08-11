@@ -1,4 +1,5 @@
 import type { DiagnosisScoring, ScoredParameter } from "./diagnosis";
+import type { CompatibilityShareProfile } from "./profile-summary";
 
 export type CompatibilitySharePreviewParameter = Readonly<{
   id: string;
@@ -22,7 +23,7 @@ export type CompatibilitySharePreviewDiagnosis = Readonly<{
   scoring: DiagnosisScoring;
 }>;
 
-const PREVIEW_TOKEN_VERSION = "csp1";
+const PREVIEW_TOKEN_VERSION = "csp2";
 
 function displayBandLabel(parameter: ScoredParameter, balancedLabel: string): string | null {
   switch (parameter.band) {
@@ -71,6 +72,7 @@ function bytesToHex(bytes: ArrayBuffer): string {
 /** 表示内容と採点設定版を、後続commandで再計算できる不透明な確認tokenへ変換する。 */
 export async function createCompatibilitySharePreviewToken(
   displayName: string | null,
+  shareProfile: CompatibilityShareProfile | null,
   diagnoses: readonly CompatibilitySharePreviewDiagnosis[],
 ): Promise<string> {
   const themes = diagnoses.flatMap((diagnosis) => {
@@ -85,7 +87,7 @@ export async function createCompatibilitySharePreviewToken(
         ]
       : [];
   });
-  const canonical = JSON.stringify({ version: 1, displayName, themes });
+  const canonical = JSON.stringify({ version: 2, displayName, shareProfile, themes });
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonical));
   return `${PREVIEW_TOKEN_VERSION}.${bytesToHex(digest)}`;
 }

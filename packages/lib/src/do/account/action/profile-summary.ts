@@ -1,5 +1,6 @@
 import { and, countDistinct, desc, eq, inArray, lte, max, notInArray } from "drizzle-orm";
 import type {
+  CompatibilityShareProfileReadResult,
   CompleteProfileSummaryGenerationInput,
   ProfileSummaryGenerationContext,
   ProfileSummaryInputSnapshot,
@@ -7,6 +8,7 @@ import type {
   ProfileSummaryRegenerationReason,
   RequestProfileSummaryGenerationResult,
 } from "../../../profile-summary";
+import { createCompatibilityShareProfileFingerprint } from "../../../profile-summary";
 import type { AccountDataDatabase } from "../database";
 import { brainItems } from "../schema/brain";
 import { diagnosisBrainProjectionHeads } from "../schema/diagnosis";
@@ -15,7 +17,11 @@ import {
   conversationSessions,
   sourceRecordTextPayloads,
 } from "../schema/diary";
-import { profileSummaryGenerations, profileSummaryVersions } from "../schema/profile-summary";
+import {
+  profileSummaryGenerations,
+  profileSummaryShareProjections,
+  profileSummaryVersions,
+} from "../schema/profile-summary";
 import { sourceRecords } from "../schema/source";
 
 const PROFILE_SUMMARY_EVIDENCE_LIMIT = 100;
@@ -200,6 +206,100 @@ export async function readProfileSummary(
       canRegenerate: hasInput && (allowUnchangedRegeneration || reasons.length > 0) && !active,
       reasons,
       message: latestGeneration?.status === "failed" ? latestGeneration.failureMessage : null,
+    },
+  };
+}
+
+/** 最新の共有専用projectionを返す。内部根拠が無効なら文章を開示しない。 */
+export async function readCompatibilityShareProfile(
+  db: AccountDataDatabase,
+  accountId: string,
+): Promise<CompatibilityShareProfileReadResult> {
+  const projection = await db
+    .select({
+      profileSummaryVersionId: profileSummaryShareProjections.profileSummaryVersionId,
+      generatedAt: profileSummaryShareProjections.generatedAt,
+      statements: profileSummaryShareProjections.statements,
+      evidenceReferences: profileSummaryShareProjections.evidenceReferences,
+      fingerprint: profileSummaryShareProjections.fingerprint,
+    })
+    .from(profileSummaryShareProjections)
+    .innerJoin(
+      profileSummaryVersions,
+      eq(profileSummaryShareProjections.profileSummaryVersionId, profileSummaryVersions.id),
+    )
+    .orderBy(desc(profileSummaryVersions.sequence))
+    .limit(1)
+    .get();
+  if (!projection) return { type: "unavailable" };
+  if (projection.statements.length === 0 || projection.evidenceReferences.length === 0) {
+    return { type: "stale" };
+  }
+
+  const evidenceReferences = [...new Set(projection.evidenceReferences)];
+  const brainIds: string[] = [];
+  const diaryIds: string[] = [];
+  for (const reference of evidenceReferences) {
+    if (reference.startsWith("brain:")) brainIds.push(reference.slice("brain:".length));
+    else if (reference.startsWith("diary:")) diaryIds.push(reference.slice("diary:".length));
+    else return { type: "stale" };
+  }
+  if (brainIds.some((id) => id.length === 0) || diaryIds.some((id) => id.length === 0)) {
+    return { type: "stale" };
+  }
+
+  const [activeBrainRows, activeDiaryRows] = await Promise.all([
+    brainIds.length === 0
+      ? Promise.resolve([])
+      : db
+          .select({ id: brainItems.id })
+          .from(brainItems)
+          .where(
+            and(
+              eq(brainItems.accountId, accountId),
+              eq(brainItems.status, "active"),
+              eq(brainItems.isDeleted, false),
+              inArray(brainItems.id, brainIds),
+            ),
+          )
+          .all(),
+    diaryIds.length === 0
+      ? Promise.resolve([])
+      : db
+          .select({ id: sourceRecords.id })
+          .from(conversationMessages)
+          .innerJoin(
+            conversationSessions,
+            eq(conversationMessages.sessionId, conversationSessions.id),
+          )
+          .innerJoin(sourceRecords, eq(conversationMessages.sourceRecordId, sourceRecords.id))
+          .where(
+            and(
+              eq(conversationSessions.accountId, accountId),
+              eq(conversationMessages.role, "user"),
+              eq(conversationMessages.isDeleted, false),
+              eq(sourceRecords.isDeleted, false),
+              inArray(sourceRecords.id, diaryIds),
+            ),
+          )
+          .all(),
+  ]);
+  const activeBrainIds = new Set(activeBrainRows.map(({ id }) => id));
+  const activeDiaryIds = new Set(activeDiaryRows.map(({ id }) => id));
+  if (
+    brainIds.some((id) => !activeBrainIds.has(id)) ||
+    diaryIds.some((id) => !activeDiaryIds.has(id))
+  ) {
+    return { type: "stale" };
+  }
+
+  return {
+    type: "available",
+    profile: {
+      profileSummaryVersionId: projection.profileSummaryVersionId,
+      generatedAt: projection.generatedAt.toISOString(),
+      statements: projection.statements,
+      fingerprint: projection.fingerprint,
     },
   };
 }
@@ -409,6 +509,17 @@ export async function completeProfileSummaryGeneration(
     .limit(1)
     .get();
   const sequence = (previous?.sequence ?? 0) + 1;
+  const profileSummaryVersionId = crypto.randomUUID();
+  const compatibilityShareStatements = input.compatibilityShareStatements.map(
+    ({ key, label, statement }) => ({ key, label, statement }),
+  );
+  const compatibilityShareEvidenceReferences = [
+    ...new Set(input.compatibilityShareStatements.flatMap(({ evidenceIds }) => evidenceIds)),
+  ];
+  const compatibilityShareFingerprint = await createCompatibilityShareProfileFingerprint(
+    profileSummaryVersionId,
+    compatibilityShareStatements,
+  );
   const summary = {
     generatedAt: input.generatedAt.toISOString(),
     headline: input.headline,
@@ -422,7 +533,7 @@ export async function completeProfileSummaryGeneration(
     db
       .insert(profileSummaryVersions)
       .values({
-        id: crypto.randomUUID(),
+        id: profileSummaryVersionId,
         generationId: input.generationId,
         sequence,
         generatedAt: input.generatedAt,
@@ -435,6 +546,14 @@ export async function completeProfileSummaryGeneration(
         summary,
       })
       .onConflictDoNothing(),
+    db.insert(profileSummaryShareProjections).values({
+      profileSummaryVersionId,
+      schemaVersion: 1,
+      generatedAt: input.generatedAt,
+      statements: compatibilityShareStatements,
+      evidenceReferences: compatibilityShareEvidenceReferences,
+      fingerprint: compatibilityShareFingerprint,
+    }),
     db
       .update(profileSummaryGenerations)
       .set({

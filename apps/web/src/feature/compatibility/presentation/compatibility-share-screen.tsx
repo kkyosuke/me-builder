@@ -1,4 +1,4 @@
-import { AlertCircle, RefreshCw, Send, UserRound } from "lucide-react";
+import { AlertCircle, RefreshCw, Send, Sparkles, UserRound } from "lucide-react";
 import type { AsyncState } from "../../../model/async-state";
 import type {
   CompatibilitySharePreview,
@@ -10,6 +10,8 @@ import { CompatibilityBackHeader } from "./components/compatibility-ui";
 
 const blockingReasonMessages: Record<CompatibilitySharePreviewBlockingReason, string> = {
   display_name_unavailable: "LINEの表示名を確認できませんでした。",
+  profile_summary_required: "共有用の「私について」がまだ作成されていません。",
+  profile_summary_stale: "共有用の「私について」に更新が必要です。",
   diagnosis_required: "共有できる診断結果がまだありません。",
   scoring_unavailable: "一部の診断結果を共有用に準備できませんでした。",
   diagnosis_unavailable: "診断情報を読み込めませんでした。時間をおいて再度お試しください。",
@@ -89,13 +91,44 @@ function SharePreviewContent({ preview }: { preview: CompatibilitySharePreview }
         </div>
       </div>
       <p className="mt-4 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-        診断から見える振る舞い・考え方の傾向をすべて共有します。相手に見える内容を確認してから、1人用の招待リンクを発行します。
+        診断と記録から一般化した振る舞い・考え方と、診断テーマの傾向をすべて共有します。相手に見える内容を確認してから、1人用の招待リンクを発行します。
       </p>
+
+      {preview.aboutMe && (
+        <section aria-labelledby="about-me-heading" className="mt-8">
+          <p className="text-xs font-bold text-slate-500">相手に見える「私について」</p>
+          <h2
+            id="about-me-heading"
+            className="mt-1 flex items-center gap-2 text-xl font-bold text-slate-950 dark:text-slate-50"
+          >
+            <Sparkles className="size-5 text-violet-500" aria-hidden="true" />
+            まず知ってほしいこと
+          </h2>
+          <div className="mt-4 space-y-3">
+            {preview.aboutMe.statements.map((item) => (
+              <article
+                key={item.key}
+                className="rounded-2xl border border-violet-300 bg-violet-50 p-4 dark:border-violet-700 dark:bg-violet-950/30"
+              >
+                <h3 className="text-sm font-bold text-violet-950 dark:text-violet-100">
+                  {item.label}
+                </h3>
+                <p className="mt-1 text-sm leading-relaxed text-slate-700 dark:text-slate-300">
+                  {item.statement}
+                </p>
+              </article>
+            ))}
+          </div>
+          <p className="mt-2 text-xs text-slate-500">
+            わたしの傾向で生成した版を使用しています。新しい版は確認するまで自動共有されません。
+          </p>
+        </section>
+      )}
 
       <section aria-labelledby="themes-heading" className="mt-8">
         <div className="flex items-end justify-between gap-3">
           <div>
-            <p className="text-xs font-bold text-slate-500">相手に見える「私について」</p>
+            <p className="text-xs font-bold text-slate-500">2人の比較に使う診断テーマ</p>
             <h2
               id="themes-heading"
               className="mt-1 text-xl font-bold text-slate-950 dark:text-slate-50"
@@ -154,6 +187,14 @@ function SharePreviewContent({ preview }: { preview: CompatibilitySharePreview }
               className="mt-4 flex min-h-11 items-center justify-center rounded-xl bg-amber-300 px-4 py-2 text-sm font-bold text-amber-950"
             >
               診断を始める
+            </a>
+          )}
+          {preview.nextAction === "profile-summary" && (
+            <a
+              href="/me"
+              className="mt-4 flex min-h-11 items-center justify-center rounded-xl bg-amber-300 px-4 py-2 text-sm font-bold text-amber-950"
+            >
+              わたしの傾向を作る
             </a>
           )}
         </section>

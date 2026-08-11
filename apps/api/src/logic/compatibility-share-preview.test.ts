@@ -4,7 +4,20 @@ import { getCompatibilitySharePreview } from "./compatibility-share-preview";
 
 const db = {} as D1.shared.Client;
 const at = new Date("2026-08-09T00:00:00.000Z");
-const previewToken = `csp1.${"a".repeat(64)}`;
+const previewToken = `csp2.${"a".repeat(64)}`;
+const shareProfile = {
+  profileSummaryVersionId: "summary-version-1",
+  generatedAt: "2026-08-11T00:00:00.000Z",
+  statements: [
+    {
+      key: "planning-style",
+      label: "予定の立て方",
+      statement: "私は、先の見通しを持って動けると安心しやすいです",
+    },
+  ],
+  fingerprint: "b".repeat(64),
+};
+const availableShareProfile = { type: "available" as const, profile: shareProfile };
 
 describe("getCompatibilitySharePreview", () => {
   it("本人の回答済みDiagnosisだけを採点し、安全な共有表示へ変換する", async () => {
@@ -70,6 +83,7 @@ describe("getCompatibilitySharePreview", () => {
       {
         createSession,
         getPreviewSource,
+        getShareProfile: vi.fn().mockResolvedValue(availableShareProfile),
         scoreAnswers,
         createPreviewToken: vi.fn().mockResolvedValue(previewToken),
       },
@@ -82,6 +96,11 @@ describe("getCompatibilitySharePreview", () => {
       preview: {
         displayName: "あおい",
         previewToken,
+        aboutMe: {
+          profileSummaryVersionId: "summary-version-1",
+          generatedAt: "2026-08-11T00:00:00.000Z",
+          statements: shareProfile.statements,
+        },
         themes: [
           {
             diagnosisId: "answered",
@@ -117,6 +136,7 @@ describe("getCompatibilitySharePreview", () => {
           diagnoses: [],
           answeredDiagnoses: [],
         }),
+        getShareProfile: vi.fn().mockResolvedValue(availableShareProfile),
         scoreAnswers: vi.fn(),
         createPreviewToken: vi.fn().mockResolvedValue(previewToken),
       },
@@ -127,6 +147,11 @@ describe("getCompatibilitySharePreview", () => {
       preview: {
         displayName: null,
         previewToken,
+        aboutMe: {
+          profileSummaryVersionId: "summary-version-1",
+          generatedAt: "2026-08-11T00:00:00.000Z",
+          statements: shareProfile.statements,
+        },
         themes: [],
         canIssueInvitation: false,
         blockingReasons: ["display_name_unavailable", "diagnosis_unavailable"],
@@ -153,6 +178,7 @@ describe("getCompatibilitySharePreview", () => {
           ],
           answeredDiagnoses: [],
         }),
+        getShareProfile: vi.fn().mockResolvedValue(availableShareProfile),
         scoreAnswers: vi.fn(),
         createPreviewToken: vi.fn().mockResolvedValue(previewToken),
       },
@@ -186,6 +212,7 @@ describe("getCompatibilitySharePreview", () => {
             },
           ],
         }),
+        getShareProfile: vi.fn().mockResolvedValue(availableShareProfile),
         scoreAnswers: vi.fn().mockReturnValue(null),
         createPreviewToken: vi.fn().mockResolvedValue(previewToken),
       },
@@ -201,17 +228,50 @@ describe("getCompatibilitySharePreview", () => {
   });
 
   it.each([
+    { result: { type: "unavailable" as const }, reason: "profile_summary_required" },
+    { result: { type: "stale" as const }, reason: "profile_summary_stale" },
+  ])(
+    "共有用プロフィールが利用できなければ生成画面へ案内する: $reason",
+    async ({ result, reason }) => {
+      const outcome = await getCompatibilitySharePreview(
+        { idToken: "id-token", lineLoginChannelId: "channel-id", db, at },
+        {
+          createSession: vi.fn().mockResolvedValue({
+            type: "resolved",
+            session: { accountId: "account-1", role: "user", displayName: "あおい" },
+          }),
+          getPreviewSource: vi.fn().mockResolvedValue({ diagnoses: [], answeredDiagnoses: [] }),
+          getShareProfile: vi.fn().mockResolvedValue(result),
+          scoreAnswers: vi.fn(),
+          createPreviewToken: vi.fn().mockResolvedValue(previewToken),
+        },
+      );
+
+      expect(outcome).toMatchObject({
+        preview: {
+          aboutMe: null,
+          canIssueInvitation: false,
+          blockingReasons: [reason, "diagnosis_unavailable"],
+          nextAction: "profile-summary",
+        },
+      });
+    },
+  );
+
+  it.each([
     { type: "not-configured" as const },
     { type: "unauthenticated" as const, reason: "invalid token" },
     { type: "account-not-found" as const },
   ])("本人を解決できない場合は診断データを読まない: $type", async (session) => {
     const getPreviewSource = vi.fn();
+    const getShareProfile = vi.fn();
 
     const result = await getCompatibilitySharePreview(
       { idToken: undefined, lineLoginChannelId: undefined, db, at },
       {
         createSession: vi.fn().mockResolvedValue(session),
         getPreviewSource,
+        getShareProfile,
         scoreAnswers: vi.fn(),
         createPreviewToken: vi.fn(),
       },
@@ -219,5 +279,6 @@ describe("getCompatibilitySharePreview", () => {
 
     expect(result).toEqual(session);
     expect(getPreviewSource).not.toHaveBeenCalled();
+    expect(getShareProfile).not.toHaveBeenCalled();
   });
 });

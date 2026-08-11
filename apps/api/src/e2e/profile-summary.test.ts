@@ -123,6 +123,14 @@ async function insertSummaryVersions(): Promise<void> {
         promptVersion: "profile-summary-v1",
         headline: `${sequence}番目のまとめ`,
         insights: [],
+        compatibilityShareStatements: [
+          {
+            key: `summary-${sequence}`,
+            label: "共有用",
+            statement: "私は、振り返る時間を大切にしています",
+            evidenceIds: ["diary:profile-summary-e2e"],
+          },
+        ],
         diagnosisCount: 0,
         diaryCount: 1,
         latestRecordedAt: new Date(timestamp),

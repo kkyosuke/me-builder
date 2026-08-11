@@ -6,6 +6,7 @@ import type {
   ReserveCompatibilityReferenceResult,
 } from "../../compatibility-data";
 import type {
+  CompatibilityShareProfileReadResult,
   CompleteProfileSummaryGenerationInput,
   ProfileSummaryGenerationContext,
   ProfileSummaryReadModel,
@@ -92,6 +93,7 @@ export type AccountDataActions = {
     at?: Date,
     allowUnchangedRegeneration?: boolean,
   ) => Promise<ProfileSummaryReadModel>;
+  "profileSummary.readCompatibilityShareProfile": () => Promise<CompatibilityShareProfileReadResult>;
   "profileSummary.requestGeneration": (
     requestedAt?: Date,
     allowUnchangedRegeneration?: boolean,

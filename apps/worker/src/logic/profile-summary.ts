@@ -1,4 +1,5 @@
 import type {
+  GeneratedCompatibilityShareStatement,
   ProfileSummaryEvidence,
   ProfileSummaryGenerationContext,
   ProfileSummaryInsight,
@@ -23,11 +24,30 @@ const InsightSchema = v.strictObject({
 const ResponseSchema = v.strictObject({
   headline: v.pipe(v.string(), v.minLength(1), v.maxLength(120)),
   insights: v.pipe(v.array(InsightSchema), v.minLength(1), v.maxLength(3)),
+  compatibility_share: v.strictObject({
+    statements: v.pipe(
+      v.array(
+        v.strictObject({
+          key: v.pipe(v.string(), v.minLength(1), v.maxLength(80)),
+          label: v.pipe(v.string(), v.minLength(1), v.maxLength(80)),
+          statement: v.pipe(v.string(), v.minLength(1), v.maxLength(240)),
+          evidence_ids: v.pipe(
+            v.array(v.pipe(v.string(), v.minLength(1))),
+            v.minLength(1),
+            v.maxLength(20),
+          ),
+        }),
+      ),
+      v.minLength(1),
+      v.maxLength(3),
+    ),
+  }),
 });
 
 export type GeneratedProfileSummary = Readonly<{
   headline: string;
   insights: readonly ProfileSummaryInsight[];
+  compatibilityShareStatements: readonly GeneratedCompatibilityShareStatement[];
 }>;
 
 export function validateGeneratedProfileSummary(
@@ -63,7 +83,26 @@ export function validateGeneratedProfileSummary(
       sources,
     });
   }
-  return { headline: parsed.output.headline, insights };
+  const shareKeys = new Set<string>();
+  const compatibilityShareStatements: GeneratedCompatibilityShareStatement[] = [];
+  for (const statement of parsed.output.compatibility_share.statements) {
+    if (shareKeys.has(statement.key)) return undefined;
+    shareKeys.add(statement.key);
+    const evidenceIds = [...new Set(statement.evidence_ids)];
+    if (
+      evidenceIds.length !== statement.evidence_ids.length ||
+      evidenceIds.some((id) => !evidenceById.has(id))
+    ) {
+      return undefined;
+    }
+    compatibilityShareStatements.push({
+      key: statement.key,
+      label: statement.label,
+      statement: statement.statement,
+      evidenceIds,
+    });
+  }
+  return { headline: parsed.output.headline, insights, compatibilityShareStatements };
 }
 
 export async function generateProfileSummary(
@@ -91,7 +130,7 @@ export async function generateProfileSummary(
       contents,
       systemInstruction: PROFILE_SUMMARY_SYSTEM_PROMPT,
       responseJsonSchema,
-      maxOutputTokens: 2_500,
+      maxOutputTokens: 3_500,
     });
     const generated = raw ? validateGeneratedProfileSummary(raw, context.evidence) : undefined;
     if (generated) return generated;

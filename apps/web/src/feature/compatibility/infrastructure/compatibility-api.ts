@@ -17,7 +17,24 @@ const ParameterSchema = v.object({
 });
 const ResponseSchema = v.object({
   displayName: v.nullable(NonEmptyStringSchema),
-  previewToken: v.pipe(v.string(), v.regex(/^csp1\.[a-f0-9]{64}$/)),
+  previewToken: v.pipe(v.string(), v.regex(/^csp2\.[a-f0-9]{64}$/)),
+  aboutMe: v.nullable(
+    v.object({
+      profileSummaryVersionId: NonEmptyStringSchema,
+      generatedAt: v.pipe(v.string(), v.isoTimestamp()),
+      statements: v.pipe(
+        v.array(
+          v.object({
+            key: NonEmptyStringSchema,
+            label: NonEmptyStringSchema,
+            statement: NonEmptyStringSchema,
+          }),
+        ),
+        v.minLength(1),
+        v.maxLength(3),
+      ),
+    }),
+  ),
   themes: v.array(
     v.object({
       diagnosisId: NonEmptyStringSchema,
@@ -29,12 +46,14 @@ const ResponseSchema = v.object({
   blockingReasons: v.array(
     v.picklist([
       "display_name_unavailable",
+      "profile_summary_required",
+      "profile_summary_stale",
       "diagnosis_required",
       "scoring_unavailable",
       "diagnosis_unavailable",
     ]),
   ),
-  nextAction: v.nullable(v.literal("diagnosis")),
+  nextAction: v.nullable(v.picklist(["diagnosis", "profile-summary"])),
 }) satisfies v.GenericSchema<ApiResponse>;
 
 export async function fetchCompatibilitySharePreview(

@@ -44,7 +44,18 @@ describe("Compatibility flow", () => {
   it("APIから取得した振る舞い・考え方をすべて表示し、詳細は共有しない", () => {
     const preview: CompatibilitySharePreview = {
       displayName: "うさぎ",
-      previewToken: `csp1.${"a".repeat(64)}`,
+      previewToken: `csp2.${"a".repeat(64)}`,
+      aboutMe: {
+        profileSummaryVersionId: "summary-version-1",
+        generatedAt: "2026-08-11T00:00:00.000Z",
+        statements: [
+          {
+            key: "planning-style",
+            label: "予定の立て方",
+            statement: "私は、先の見通しを持って動けると安心しやすいです",
+          },
+        ],
+      },
       themes: [
         {
           diagnosisId: "daily-life",
@@ -78,11 +89,12 @@ describe("Compatibility flow", () => {
     );
 
     expect(screen.getByText("うさぎさんから招待")).toBeTruthy();
+    expect(screen.getByText("私は、先の見通しを持って動けると安心しやすいです")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "暮らし方" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "共有する振る舞い・考え方" })).toBeTruthy();
     expect(screen.getByText("2件すべて共有")).toBeTruthy();
     expect(screen.queryByRole("checkbox")).toBeNull();
-    expect(screen.getByText(/日記やLINEの会話から得た記憶/)).toBeTruthy();
+    expect(screen.getByText(/日記やLINEの会話本文/)).toBeTruthy();
     expect(
       screen.getByRole("button", { name: "招待リンク発行は準備中" }).hasAttribute("disabled"),
     ).toBe(true);
@@ -95,7 +107,18 @@ describe("Compatibility flow", () => {
           status: "success",
           data: {
             displayName: "うさぎ",
-            previewToken: `csp1.${"b".repeat(64)}`,
+            previewToken: `csp2.${"b".repeat(64)}`,
+            aboutMe: {
+              profileSummaryVersionId: "summary-version-1",
+              generatedAt: "2026-08-11T00:00:00.000Z",
+              statements: [
+                {
+                  key: "planning-style",
+                  label: "予定の立て方",
+                  statement: "私は、先の見通しを持つことを大切にしています",
+                },
+              ],
+            },
             themes: [],
             canIssueInvitation: false,
             blockingReasons: ["diagnosis_required"],
@@ -122,7 +145,7 @@ describe("Compatibility flow", () => {
     expect(screen.getByRole("heading", { name: "共有する振る舞い・考え方" })).toBeTruthy();
     expect(screen.getByText("3件すべて共有")).toBeTruthy();
     expect(screen.queryByRole("checkbox")).toBeNull();
-    expect(screen.getByText(/日記やLINEの会話から得た記憶/)).toBeTruthy();
+    expect(screen.getByText(/日記やLINEの会話本文/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "相性を見てみる" }));
 
     expect(

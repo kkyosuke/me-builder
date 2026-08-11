@@ -303,7 +303,18 @@ describe("App", () => {
     }));
     mocks.fetchCompatibilitySharePreview.mockResolvedValue({
       displayName: "テスト",
-      previewToken: `csp1.${"a".repeat(64)}`,
+      previewToken: `csp2.${"a".repeat(64)}`,
+      aboutMe: {
+        profileSummaryVersionId: "summary-version-1",
+        generatedAt: "2026-08-11T00:00:00.000Z",
+        statements: [
+          {
+            key: "planning-style",
+            label: "予定の立て方",
+            statement: "私は、先の見通しを持って動けると安心しやすいです",
+          },
+        ],
+      },
       themes: [
         {
           diagnosisId: "daily-life",
@@ -783,7 +794,7 @@ describe("App", () => {
     render(<App />);
 
     expect(await screen.findByRole("heading", { name: "うつしをシェア" })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "予定の立て方" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "予定の立て方", level: 4 })).toBeTruthy();
     expect(mocks.fetchCompatibilitySharePreview).toHaveBeenCalledWith(
       "https://api.example.com",
       "dummy.id.token",

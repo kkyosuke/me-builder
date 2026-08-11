@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
-import type { ProfileSummaryContent } from "../../../profile-summary";
+import type { CompatibilityShareStatement, ProfileSummaryContent } from "../../../profile-summary";
 import { accountDataIdentity } from "./identity";
 
 /** 非同期生成の状態を保存し、同じAccountの処理中要求を1件に制限する。 */
@@ -53,4 +53,24 @@ export const profileSummaryVersions = sqliteTable(
     uniqueIndex("profile_summary_version_sequence_idx").on(table.sequence),
     index("profile_summary_version_generated_idx").on(table.generatedAt),
   ],
+);
+
+/** 本人向けまとめとは分離した、相性共有専用の不変な表示projection。 */
+export const profileSummaryShareProjections = sqliteTable(
+  "profile_summary_share_projections",
+  {
+    profileSummaryVersionId: text("profile_summary_version_id")
+      .primaryKey()
+      .references(() => profileSummaryVersions.id),
+    schemaVersion: integer("schema_version").notNull(),
+    generatedAt: integer("generated_at", { mode: "timestamp_ms" }).notNull(),
+    statements: text("statements_json", { mode: "json" })
+      .notNull()
+      .$type<readonly CompatibilityShareStatement[]>(),
+    evidenceReferences: text("evidence_references_json", { mode: "json" })
+      .notNull()
+      .$type<readonly string[]>(),
+    fingerprint: text("fingerprint").notNull(),
+  },
+  (table) => [index("profile_summary_share_projection_generated_idx").on(table.generatedAt)],
 );

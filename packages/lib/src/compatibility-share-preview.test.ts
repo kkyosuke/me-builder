@@ -104,22 +104,37 @@ describe("buildCompatibilitySharePreviewThemes", () => {
     };
     const parameter = diagnosis.scoring.parameters[0];
     if (!parameter) throw new Error("Expected a scored parameter");
+    const shareProfile = {
+      profileSummaryVersionId: "summary-version-1",
+      generatedAt: "2026-08-11T00:00:00.000Z",
+      statements: [{ key: "planning", label: "予定", statement: "私は、見通しがあると安心します" }],
+      fingerprint: "a".repeat(64),
+    };
 
-    const token = await createCompatibilitySharePreviewToken("あおい", [diagnosis]);
-    expect(token).toMatch(/^csp1\.[a-f0-9]{64}$/);
-    await expect(createCompatibilitySharePreviewToken("あおい", [diagnosis])).resolves.toBe(token);
+    const token = await createCompatibilitySharePreviewToken("あおい", shareProfile, [diagnosis]);
+    expect(token).toMatch(/^csp2\.[a-f0-9]{64}$/);
     await expect(
-      createCompatibilitySharePreviewToken("あおい", [
+      createCompatibilitySharePreviewToken("あおい", shareProfile, [diagnosis]),
+    ).resolves.toBe(token);
+    await expect(
+      createCompatibilitySharePreviewToken(
+        "あおい",
+        { ...shareProfile, profileSummaryVersionId: "summary-version-2" },
+        [diagnosis],
+      ),
+    ).resolves.not.toBe(token);
+    await expect(
+      createCompatibilitySharePreviewToken("あおい", shareProfile, [
         { ...diagnosis, scoring: { ...diagnosis.scoring, scoringVersion: 2 } },
       ]),
     ).resolves.not.toBe(token);
     await expect(
-      createCompatibilitySharePreviewToken("あおい", [
+      createCompatibilitySharePreviewToken("あおい", shareProfile, [
         { ...diagnosis, scoringConfigId: "time-planning-v2" },
       ]),
     ).resolves.not.toBe(token);
     await expect(
-      createCompatibilitySharePreviewToken("あおい", [
+      createCompatibilitySharePreviewToken("あおい", shareProfile, [
         {
           ...diagnosis,
           scoring: {

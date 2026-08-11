@@ -14,6 +14,8 @@ export const profileSummaryActions = {
       at,
       allowUnchangedRegeneration,
     ),
+  "profileSummary.readCompatibilityShareProfile": (db: DO.account.Database, accountId: string) =>
+    DO.account.action.profileSummary.readCompatibilityShareProfile(db, accountId),
   "profileSummary.requestGeneration": (
     db: DO.account.Database,
     accountId: string,

@@ -18,10 +18,15 @@ export type CompatibilitySharePreviewOutcome =
       preview: {
         displayName: string | null;
         previewToken: string;
+        aboutMe: {
+          profileSummaryVersionId: string;
+          generatedAt: string;
+          statements: readonly { key: string; label: string; statement: string }[];
+        } | null;
         themes: readonly CompatibilitySharePreviewTheme[];
         canIssueInvitation: boolean;
         blockingReasons: readonly CompatibilitySharePreviewBlockingReason[];
-        nextAction: "diagnosis" | null;
+        nextAction: "diagnosis" | "profile-summary" | null;
       };
     }
   | { type: "not-configured" }
@@ -30,6 +35,8 @@ export type CompatibilitySharePreviewOutcome =
 
 type CompatibilitySharePreviewBlockingReason =
   | "display_name_unavailable"
+  | "profile_summary_required"
+  | "profile_summary_stale"
   | "diagnosis_required"
   | "scoring_unavailable"
   | "diagnosis_unavailable";
@@ -49,6 +56,10 @@ type Dependencies = {
     accountId: string,
     at: Date,
   ) => ReturnType<typeof DO.account.action.diagnosis.getCompatibilitySharePreviewSource>;
+  getShareProfile: (
+    accountData: AccountDataNamespace | undefined,
+    accountId: string,
+  ) => ReturnType<typeof DO.account.action.profileSummary.readCompatibilityShareProfile>;
   scoreAnswers: typeof scoreDiagnosisAnswers;
   createPreviewToken: typeof createCompatibilitySharePreviewToken;
 };
@@ -60,6 +71,12 @@ const defaultDependencies: Dependencies = {
     return accountDataFor(accountData, accountId).execute(
       "diagnosis.getCompatibilitySharePreviewSource",
       at,
+    );
+  },
+  getShareProfile: (accountData, accountId) => {
+    if (!accountData) throw new Error("ACCOUNT_DATA binding is not configured");
+    return accountDataFor(accountData, accountId).execute(
+      "profileSummary.readCompatibilityShareProfile",
     );
   },
   scoreAnswers: scoreDiagnosisAnswers,
@@ -74,7 +91,10 @@ export async function getCompatibilitySharePreview(
   const session = await dependencies.createSession({ idToken, lineLoginChannelId, db });
   if (session.type !== "resolved") return session;
 
-  const source = await dependencies.getPreviewSource(accountData, session.session.accountId, at);
+  const [source, shareProfileResult] = await Promise.all([
+    dependencies.getPreviewSource(accountData, session.session.accountId, at),
+    dependencies.getShareProfile(accountData, session.session.accountId),
+  ]);
   const shareableDiagnoses = source.answeredDiagnoses.flatMap(
     ({ id, title, answers, scoringConfig }): CompatibilitySharePreviewDiagnosis[] => {
       try {
@@ -97,7 +117,12 @@ export async function getCompatibilitySharePreview(
   );
   const themes = buildCompatibilitySharePreviewThemes(shareableDiagnoses);
   const displayName = session.session.displayName?.trim() || null;
-  const previewToken = await dependencies.createPreviewToken(displayName, shareableDiagnoses);
+  const shareProfile = shareProfileResult.type === "available" ? shareProfileResult.profile : null;
+  const previewToken = await dependencies.createPreviewToken(
+    displayName,
+    shareProfile,
+    shareableDiagnoses,
+  );
   const hasAnswerableDiagnosis = source.diagnoses.some(
     ({ availability, responseStatus }) => availability === "open" && responseStatus !== "answered",
   );
@@ -106,6 +131,10 @@ export async function getCompatibilitySharePreview(
   );
   const blockingReasons: CompatibilitySharePreviewBlockingReason[] = [];
   if (displayName === null) blockingReasons.push("display_name_unavailable");
+  if (shareProfileResult.type === "unavailable") {
+    blockingReasons.push("profile_summary_required");
+  }
+  if (shareProfileResult.type === "stale") blockingReasons.push("profile_summary_stale");
   if (themes.length === 0) {
     if (hasAnswerableDiagnosis) blockingReasons.push("diagnosis_required");
     if (hasAnsweredDiagnosis) blockingReasons.push("scoring_unavailable");
@@ -119,10 +148,22 @@ export async function getCompatibilitySharePreview(
     preview: {
       displayName,
       previewToken,
+      aboutMe: shareProfile
+        ? {
+            profileSummaryVersionId: shareProfile.profileSummaryVersionId,
+            generatedAt: shareProfile.generatedAt,
+            statements: shareProfile.statements,
+          }
+        : null,
       themes,
       canIssueInvitation: blockingReasons.length === 0,
       blockingReasons,
-      nextAction: themes.length === 0 && hasAnswerableDiagnosis ? "diagnosis" : null,
+      nextAction:
+        shareProfileResult.type !== "available"
+          ? "profile-summary"
+          : themes.length === 0 && hasAnswerableDiagnosis
+            ? "diagnosis"
+            : null,
     },
   };
 }

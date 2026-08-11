@@ -1,7 +1,7 @@
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import type { D1Database } from "@cloudflare/workers-types";
-import { D1 } from "@me-builder/lib";
+import { D1, DO } from "@me-builder/lib";
 import { Miniflare } from "miniflare";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { app } from "../index";
@@ -120,6 +120,75 @@ async function completeRelationshipDiagnosis(): Promise<unknown> {
     lastBody = await response.json();
   }
   return lastBody;
+}
+
+async function generateCompatibilityShareProfile(): Promise<void> {
+  const accountId = "account-answer-e2e";
+  const source = await DO.account.action.diary.storeLineTextSource(accountDataStore.db, {
+    accountId,
+    eventId: "compatibility-share-profile-e2e",
+    body: "予定の見通しがあると落ち着いて動ける。",
+    receivedAt: new Date(timestamp),
+  });
+  accountDataStore.raw
+    .prepare(
+      `INSERT INTO conversation_sessions (
+         id, created_at, updated_at, is_deleted, account_id, status, started_at,
+         last_user_message_at, conversation_policy_id, reply_opportunity_count,
+         reply_count, awaiting_reply, next_sequence
+       ) VALUES (?, ?, ?, 0, ?, 'closed', ?, ?, 'reflective', 0, 0, 0, 2)`,
+    )
+    .run("compatibility-summary-session", timestamp, timestamp, accountId, timestamp, timestamp);
+  accountDataStore.raw
+    .prepare(
+      `INSERT INTO conversation_messages (
+         id, created_at, updated_at, is_deleted, session_id, sequence, role,
+         source_record_id, channel
+       ) VALUES (?, ?, ?, 0, ?, 1, 'user', ?, 'line')`,
+    )
+    .run(
+      "compatibility-summary-message",
+      timestamp,
+      timestamp,
+      "compatibility-summary-session",
+      source.sourceRecordId,
+    );
+  const request = await DO.account.action.profileSummary.requestProfileSummaryGeneration(
+    accountDataStore.db,
+    accountId,
+  );
+  if (request.outcome !== "created") throw new Error("profile summary generation was not created");
+  const context = await DO.account.action.profileSummary.loadProfileSummaryGenerationContext(
+    accountDataStore.db,
+    accountId,
+    request.generationId,
+  );
+  const evidenceId = context?.evidence[0]?.id;
+  if (!context || !evidenceId) throw new Error("profile summary evidence was not available");
+  await DO.account.action.profileSummary.completeProfileSummaryGeneration(
+    accountDataStore.db,
+    accountId,
+    {
+      generationId: request.generationId,
+      generatedAt: new Date(timestamp + 1_000),
+      model: "gemini-test",
+      promptVersion: "profile-summary-v2",
+      headline: "見通しを大切にしています",
+      insights: [],
+      compatibilityShareStatements: [
+        {
+          key: "planning-style",
+          label: "予定の立て方",
+          statement: "私は、先の見通しを持って動けると安心しやすいです",
+          evidenceIds: [evidenceId],
+        },
+      ],
+      diagnosisCount: context.diagnosisCount,
+      diaryCount: context.diaryCount,
+      latestRecordedAt: context.latestRecordedAt,
+      inputSnapshot: context.inputSnapshot,
+    },
+  );
 }
 
 async function deferQuestion(
@@ -292,18 +361,21 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
       expect(emptyResponse.status).toBe(200);
       expect(await emptyResponse.json()).toMatchObject({
         displayName: "あおい",
+        aboutMe: null,
         themes: [],
         canIssueInvitation: false,
-        blockingReasons: ["diagnosis_required"],
-        nextAction: "diagnosis",
+        blockingReasons: ["profile_summary_required", "diagnosis_required"],
+        nextAction: "profile-summary",
       });
 
       await completeRelationshipDiagnosis();
+      await generateCompatibilityShareProfile();
 
       const previewResponse = await getCompatibilitySharePreview();
       expect(previewResponse.status).toBe(200);
       const preview = (await previewResponse.json()) as {
         displayName: string;
+        aboutMe: { statements: Array<Record<string, unknown>> } | null;
         themes: Array<{
           diagnosisId: string;
           parameters: Array<Record<string, unknown>>;
@@ -317,7 +389,14 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
       expect(preview.canIssueInvitation).toBe(true);
       expect(preview.blockingReasons).toEqual([]);
       expect(preview.nextAction).toBeNull();
-      expect(preview.previewToken).toMatch(/^csp1\.[a-f0-9]{64}$/);
+      expect(preview.previewToken).toMatch(/^csp2\.[a-f0-9]{64}$/);
+      expect(preview.aboutMe?.statements).toEqual([
+        {
+          key: "planning-style",
+          label: "予定の立て方",
+          statement: "私は、先の見通しを持って動けると安心しやすいです",
+        },
+      ]);
       expect(preview.themes).toHaveLength(1);
       expect(preview.themes[0]?.diagnosisId).toBe("relationship-priority");
       expect(preview.themes[0]?.parameters).toHaveLength(4);

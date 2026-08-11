@@ -11,7 +11,7 @@ vi.mock("../logic/compatibility-share-preview", () => ({ getCompatibilitySharePr
 
 const dummyDb = {} as D1Database;
 const dummyAccountData = {} as AccountDataNamespace;
-const previewToken = `csp1.${"a".repeat(64)}`;
+const previewToken = `csp2.${"a".repeat(64)}`;
 
 function outcome(value: CompatibilitySharePreviewOutcome) {
   getCompatibilitySharePreview.mockResolvedValue(value);
@@ -39,6 +39,7 @@ describe("GET /api/compatibility/share-preview", () => {
       preview: {
         displayName: "あおい",
         previewToken,
+        aboutMe: null,
         themes: [],
         canIssueInvitation: false,
         blockingReasons: ["diagnosis_required"],
@@ -52,6 +53,7 @@ describe("GET /api/compatibility/share-preview", () => {
     expect(await response.json()).toEqual({
       displayName: "あおい",
       previewToken,
+      aboutMe: null,
       themes: [],
       canIssueInvitation: false,
       blockingReasons: ["diagnosis_required"],

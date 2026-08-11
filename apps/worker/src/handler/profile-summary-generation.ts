@@ -63,6 +63,7 @@ export async function processProfileSummaryGenerationMessage(
       promptVersion: PROFILE_SUMMARY_PROMPT_VERSION,
       headline: generated.headline,
       insights: generated.insights,
+      compatibilityShareStatements: generated.compatibilityShareStatements,
       diagnosisCount: context.diagnosisCount,
       diaryCount: context.diaryCount,
       latestRecordedAt: context.latestRecordedAt,

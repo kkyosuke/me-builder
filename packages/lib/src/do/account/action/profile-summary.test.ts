@@ -1,5 +1,6 @@
 import path from "node:path";
 import Database from "better-sqlite3";
+import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { describe, expect, it } from "vitest";
@@ -10,6 +11,7 @@ import {
   PROFILE_SUMMARY_REGENERATION_INTERVAL_MS,
   completeProfileSummaryGeneration,
   loadProfileSummaryGenerationContext,
+  readCompatibilityShareProfile,
   readProfileSummary,
   requestProfileSummaryGeneration,
 } from "./profile-summary";
@@ -163,6 +165,8 @@ describe("Profile Summary persistence", () => {
       }),
     ]);
     if (!context) throw new Error("generation context was not loaded");
+    const evidenceId = context.evidence[0]?.id;
+    if (!evidenceId) throw new Error("summary evidence was not loaded");
 
     const input = {
       generationId: requested.generationId,
@@ -177,6 +181,14 @@ describe("Profile Summary persistence", () => {
           description: "歩くことで落ち着きを取り戻すことがあります。",
           evidenceCount: 1,
           sources: ["diary" as const],
+        },
+      ],
+      compatibilityShareStatements: [
+        {
+          key: "calm-walking",
+          label: "落ち着く時間",
+          statement: "私は、ゆっくり考える時間を大切にしています",
+          evidenceIds: [evidenceId],
         },
       ],
       diagnosisCount: context.diagnosisCount,
@@ -206,6 +218,17 @@ describe("Profile Summary persistence", () => {
       }),
     ).resolves.toBe(true);
     expect((await readProfileSummary(db, accountId)).versions).toHaveLength(1);
+    await expect(readCompatibilityShareProfile(db, accountId)).resolves.toMatchObject({
+      type: "available",
+      profile: {
+        statements: [
+          {
+            key: "calm-walking",
+            statement: "私は、ゆっくり考える時間を大切にしています",
+          },
+        ],
+      },
+    });
     await expect(
       readProfileSummary(db, accountId, new Date("2026-08-09T00:03:00.000Z"), true),
     ).resolves.toMatchObject({
@@ -214,6 +237,12 @@ describe("Profile Summary persistence", () => {
     await expect(
       requestProfileSummaryGeneration(db, accountId, new Date("2026-08-09T00:03:00.000Z"), true),
     ).resolves.toMatchObject({ outcome: "created", status: "queued" });
+
+    await db
+      .update(schema.conversationMessages)
+      .set({ isDeleted: true })
+      .where(eq(schema.conversationMessages.id, "message-summary-1"));
+    await expect(readCompatibilityShareProfile(db, accountId)).resolves.toEqual({ type: "stale" });
   });
 
   it("利用できる入力がなければ生成要求を作らない", async () => {
@@ -248,6 +277,14 @@ describe("Profile Summary persistence", () => {
       promptVersion: "profile-summary-v1",
       headline: "最初のまとめ",
       insights: [],
+      compatibilityShareStatements: [
+        {
+          key: "initial-style",
+          label: "大切にすること",
+          statement: "私は、落ち着いて考える時間を大切にしています",
+          evidenceIds: [context.evidence[0]?.id ?? ""],
+        },
+      ],
       diagnosisCount: context.diagnosisCount,
       diaryCount: context.diaryCount,
       latestRecordedAt: context.latestRecordedAt,

@@ -31,6 +31,16 @@ describe("validateGeneratedProfileSummary", () => {
               evidence_ids: ["brain:diagnosis-1", "diary:source-1"],
             },
           ],
+          compatibility_share: {
+            statements: [
+              {
+                key: "planning-style",
+                label: "見通しを持つ",
+                statement: "私は、先の見通しを持って動くことを大切にしています",
+                evidence_ids: ["brain:diagnosis-1", "diary:source-1"],
+              },
+            ],
+          },
         }),
         evidence,
       ),
@@ -43,6 +53,14 @@ describe("validateGeneratedProfileSummary", () => {
           description: "予定と日々の実感を手がかりにする傾向があります。",
           evidenceCount: 2,
           sources: ["diagnosis", "diary"],
+        },
+      ],
+      compatibilityShareStatements: [
+        {
+          key: "planning-style",
+          label: "見通しを持つ",
+          statement: "私は、先の見通しを持って動くことを大切にしています",
+          evidenceIds: ["brain:diagnosis-1", "diary:source-1"],
         },
       ],
     });
@@ -62,6 +80,47 @@ describe("validateGeneratedProfileSummary", () => {
                 evidence_ids: evidenceIds,
               },
             ],
+            compatibility_share: {
+              statements: [
+                {
+                  key: "valid-share",
+                  label: "共有用",
+                  statement: "私は、考える時間を大切にしています",
+                  evidence_ids: ["brain:diagnosis-1"],
+                },
+              ],
+            },
+          }),
+          evidence,
+        ),
+      ).toBeUndefined();
+    }
+  });
+
+  it("共有用文章でも提示していない根拠IDと重複した根拠IDを拒否する", () => {
+    for (const evidenceIds of [["unknown"], ["diary:source-1", "diary:source-1"]]) {
+      expect(
+        validateGeneratedProfileSummary(
+          JSON.stringify({
+            headline: "まとめ",
+            insights: [
+              {
+                key: "valid",
+                label: "有効",
+                description: "有効な根拠です。",
+                evidence_ids: ["brain:diagnosis-1"],
+              },
+            ],
+            compatibility_share: {
+              statements: [
+                {
+                  key: "invalid-share",
+                  label: "共有用",
+                  statement: "私は、考える時間を大切にしています",
+                  evidence_ids: evidenceIds,
+                },
+              ],
+            },
           }),
           evidence,
         ),
