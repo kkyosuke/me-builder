@@ -70,6 +70,46 @@ describe("AccountDataRepository", () => {
     );
   });
 
+  it("dispatched checkpointの回復期限を次のmaintenanceとして返す", async () => {
+    const repository = createRepository();
+    await repository.initialize();
+    repository.bindAccount("account-1");
+    const receivedAt = new Date("2026-08-08T00:00:00.000Z");
+    const source = await DO.account.action.diary.storeLineTextSource(repository.client, {
+      accountId: "account-1",
+      eventId: "event-dispatched-maintenance",
+      body: "今日は公園を散歩した",
+      receivedAt,
+    });
+    await DO.account.action.diary.attachMessagesToTurn(
+      repository.client,
+      "account-1",
+      [source],
+      1,
+      "test-model",
+      "test-prompt",
+    );
+    const [checkpoint] = await repository.client
+      .select()
+      .from(DO.account.schema.diaryBrainCheckpoints);
+    const dispatchedAt = new Date(receivedAt.getTime() + 10 * 60 * 1000);
+    await DO.account.action.diary.claimDueDiaryBrainCheckpointIds(
+      repository.client,
+      "account-1",
+      dispatchedAt,
+    );
+    await DO.account.action.diary.markDiaryBrainCheckpointDispatched(
+      repository.client,
+      "account-1",
+      checkpoint?.id ?? "",
+      dispatchedAt,
+    );
+
+    expect(repository.nextMaintenanceAt()).toBe(
+      dispatchedAt.getTime() + DO.account.action.diary.DIARY_BRAIN_CHECKPOINT_DISPATCH_LEASE_MS,
+    );
+  });
+
   it("別ObjectのAccount所有データをSELECTできない", async () => {
     const first = createRepository();
     const second = createRepository();

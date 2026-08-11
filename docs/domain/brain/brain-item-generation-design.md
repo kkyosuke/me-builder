@@ -318,7 +318,7 @@ sequenceDiagram
 
     U->>AD: user message + Source Record
     AD->>AD: 期限を評価しcheckpointを作成・延長・固定
-    A->>AD: Queue未投入checkpointをclaim
+    A->>AD: 期限到来または回復期限超過checkpointをclaim
     A->>Q: account ID + checkpoint ID
     A->>AD: Queue受理を記録
     Q->>W: IDのみを配送
@@ -328,9 +328,15 @@ sequenceDiagram
     W->>W: schema・Account・Evidence・安全性を検証
     W->>AD: Brain Item + Evidence + Access Label + checkpoint完了
     AD-->>W: atomic commit
+    alt dispatchedのまま回復期限を超過
+        A->>AD: 同じcheckpointを再claim
+        A->>Q: 同じIDを再投入
+    end
 ```
 
-Queueには本文を含めず、Account IDとcheckpoint IDだけを渡します。Alarmが回復するのはQueueへの投入が完了していないチェックポイントだけです。Queueが受理した後のAI失敗はQueue自身の再配送とDLQへ委ね、Alarmから同じ処理を増殖させません。WorkerはAccountDataから会話を読み直し、Brain Item、Evidence edge、Access Label、チェックポイントと実際に保存したItemの対応、チェックポイント完了を同じtransactionで保存します。AccountDataはalarm、user message取込、Queueからの適用をAccount単位で直列化し、Queueの重複・並行配送でも完了済みチェックポイントを再適用しません。
+Queueには本文を含めず、Account IDとcheckpoint IDだけを渡します。Queueが受理した後はQueue自身の再配送を優先し、`dispatched`のまま回復期限を超えた場合だけAlarmが同じIDを再投入します。回復期限と配送状態の物理的な規則は[日記チャット実装設計 §4.6](../../architecture/diary-chat-implementation-design.md#46-diary_brain_checkpoints)を正とします。DLQへ到達した場合やQueue処理が失われた場合も、チェックポイントを恒久的に欠落させません。
+
+WorkerはAccountDataから会話を読み直し、Brain Item、Evidence edge、Access Label、チェックポイントと実際に保存したItemの対応、チェックポイント完了を同じtransactionで保存します。AccountDataはalarm、user message取込、Queueからの適用をAccount単位で直列化します。回復再投入と元のQueue messageが競合しても、先に`applied`へ進めた処理だけがItem一式を確定し、後続処理は完了済みチェックポイントとしてスキップするため二重適用しません。
 
 AI生成、JSON parse、出力envelope検証が失敗した場合はQueue messageをackせず再試行します。envelope内の個別候補だけがschema、Evidence、候補間重複の検証に失敗した場合は、その候補の位置と理由コードだけをerror logへ残し、日記本文、statement、Account ID、Evidence IDをlogへ含めずに候補単位で除外します。残った候補だけを適用し、すべて除外された場合は0件でチェックポイントを完了します。AI設定がない場合に0件を正常扱いできるのはlocal / test環境だけで、本番相当環境では失敗として再試行します。安全経路へ切り替えた場合、またはAIが有効な候補なしと正常に判断した場合も0件でチェックポイントを完了します。いずれの場合もSource Recordと通常の会話応答は保持され、会話返信の成功・配送状態はBrain Itemの登録条件にしません。
 

@@ -458,7 +458,11 @@ export class AccountDataRepository {
       .from(DO.account.schema.diaryBrainCheckpoints)
       .where(
         and(
-          inArray(DO.account.schema.diaryBrainCheckpoints.status, ["pending", "queued"]),
+          inArray(DO.account.schema.diaryBrainCheckpoints.status, [
+            "pending",
+            "queued",
+            "dispatched",
+          ]),
           eq(DO.account.schema.diaryBrainCheckpoints.isDeleted, false),
         ),
       )
