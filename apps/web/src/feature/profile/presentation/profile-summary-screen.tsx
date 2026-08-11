@@ -27,6 +27,7 @@ import type {
   ProfileSummaryVersioning,
 } from "../model/profile-summary";
 import { resolveProfileSummarySwipe, summaryCardDragOffset } from "./profile-summary-card-swipe";
+import type { ProfileSummaryGenerationNotice } from "./use-profile-summary";
 
 const sourceLabels: Record<ProfileRecordSource, string> = {
   diagnosis: "診断",
@@ -706,8 +707,39 @@ function NextAction({ action }: { action: ProfileSummaryResult["nextAction"] }) 
   );
 }
 
+function GenerationNotice({
+  notice,
+  onReload,
+}: {
+  notice: ProfileSummaryGenerationNotice;
+  onReload: () => void;
+}) {
+  const isDelayed = notice.kind === "delayed";
+  return (
+    <section
+      className={`mt-6 rounded-2xl border p-4 ${isDelayed ? "border-amber-300/50 bg-amber-50 dark:border-amber-700/50 dark:bg-amber-950/30" : "border-red-300/50 bg-red-50 dark:border-red-700/50 dark:bg-red-950/30"}`}
+      role="alert"
+    >
+      <p
+        className={`text-sm leading-relaxed ${isDelayed ? "text-amber-900 dark:text-amber-200" : "text-red-700 dark:text-red-300"}`}
+      >
+        {notice.message}
+      </p>
+      <button
+        type="button"
+        onClick={onReload}
+        className="mt-3 inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-bold text-slate-900 shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:bg-slate-800 dark:text-slate-100"
+      >
+        <RefreshCw className="size-4" aria-hidden="true" />
+        最新の状態を再読み込み
+      </button>
+    </section>
+  );
+}
+
 export function ProfileSummaryScreen({
   state,
+  generationNotice,
   availableDataCounts,
   versioning,
   onRetry,
@@ -716,6 +748,7 @@ export function ProfileSummaryScreen({
   children,
 }: {
   state: AsyncState<ProfileSummaryResult>;
+  generationNotice?: ProfileSummaryGenerationNotice | null;
   availableDataCounts?: Readonly<{ diagnosis: number; diary: number }>;
   versioning?: ProfileSummaryVersioning;
   onRetry: () => void;
@@ -784,6 +817,8 @@ export function ProfileSummaryScreen({
           {state.data.summary && <NextAction action={state.data.nextAction} />}
         </>
       )}
+
+      {generationNotice && <GenerationNotice notice={generationNotice} onReload={onRetry} />}
 
       {children}
 
