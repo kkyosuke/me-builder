@@ -35,7 +35,7 @@ const ProfileSummaryVersionSchema = v.object({
 const ProfileSummaryGenerationSchema = v.object({
   status: v.picklist(["idle", "queued", "generating", "failed"]),
   canRegenerate: v.boolean(),
-  reasons: v.array(v.picklist(["diagnosis", "brain", "elapsed"])),
+  reasons: v.array(v.picklist(["diagnosis", "brain", "format", "elapsed"])),
   message: v.nullable(NonEmptyStringSchema),
 });
 

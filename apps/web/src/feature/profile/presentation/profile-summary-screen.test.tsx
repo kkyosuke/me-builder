@@ -65,7 +65,7 @@ const versioning: ProfileSummaryVersioning = {
   generation: {
     status: "idle",
     canRegenerate: true,
-    reasons: ["diagnosis", "brain", "elapsed"],
+    reasons: ["diagnosis", "brain", "format", "elapsed"],
   },
 };
 
@@ -146,7 +146,11 @@ describe("ProfileSummaryScreen", () => {
     expect(screen.queryByRole("button", { name: "第3版を表示" })).toBeNull();
     expect(screen.queryByRole("button", { name: "第2版を表示" })).toBeNull();
     expect(screen.getByText(/AI生成/)).toBeTruthy();
-    expect(screen.getByText(/診断が増えました・日記・記録が増えました/)).toBeTruthy();
+    expect(
+      screen.getByText(
+        /診断が増えました・日記・記録が増えました・まとめの生成内容が更新されました/,
+      ),
+    ).toBeTruthy();
 
     const regenerateButton = screen.getByRole("button", { name: "最新のわたしを知る" });
     expect(regenerateButton.className).toContain("w-full");

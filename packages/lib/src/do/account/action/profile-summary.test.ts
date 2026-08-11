@@ -10,6 +10,7 @@ import { storeLineTextSource } from "./diary";
 import {
   PROFILE_SUMMARY_REGENERATION_INTERVAL_MS,
   completeProfileSummaryGeneration,
+  failProfileSummaryGeneration,
   loadProfileSummaryGenerationContext,
   readCompatibilityShareProfile,
   readProfileSummary,
@@ -234,15 +235,26 @@ describe("Profile Summary persistence", () => {
     ).resolves.toMatchObject({
       generation: { status: "idle", canRegenerate: true, reasons: [] },
     });
-    await expect(
-      requestProfileSummaryGeneration(db, accountId, new Date("2026-08-09T00:03:00.000Z"), true),
-    ).resolves.toMatchObject({ outcome: "created", status: "queued" });
+    const forced = await requestProfileSummaryGeneration(
+      db,
+      accountId,
+      new Date("2026-08-09T00:03:00.000Z"),
+      true,
+    );
+    expect(forced).toMatchObject({ outcome: "created", status: "queued" });
+    if (forced.outcome !== "created") throw new Error("forced generation was not created");
+    await failProfileSummaryGeneration(db, accountId, forced.generationId, "test failure");
 
     await db
       .update(schema.conversationMessages)
       .set({ isDeleted: true })
       .where(eq(schema.conversationMessages.id, "message-summary-1"));
     await expect(readCompatibilityShareProfile(db, accountId)).resolves.toEqual({ type: "stale" });
+    await expect(
+      readProfileSummary(db, accountId, new Date("2026-08-09T00:04:00.000Z")),
+    ).resolves.toMatchObject({
+      generation: { canRegenerate: false, reasons: ["format"] },
+    });
   });
 
   it("利用できる入力がなければ生成要求を作らない", async () => {
@@ -255,6 +267,51 @@ describe("Profile Summary persistence", () => {
     await expect(
       requestProfileSummaryGeneration(db, "account-1", new Date(), true),
     ).resolves.toEqual({ outcome: "unavailable", reason: "source_record_required" });
+  });
+
+  it("共有用出力を持たない旧版を現在の生成形式へ更新できる", async () => {
+    const db = createTestDb();
+    const { accountId, recordedAt } = await insertDiaryFixture(db);
+    const generatedAt = new Date("2026-08-09T00:00:00.000Z");
+    await db.insert(schema.profileSummaryGenerations).values({
+      id: "legacy-generation",
+      accountId,
+      status: "completed",
+      requestedAt: generatedAt,
+      startedAt: generatedAt,
+      finishedAt: generatedAt,
+      model: "gemini-test",
+      promptVersion: "profile-summary-v1",
+    });
+    await db.insert(schema.profileSummaryVersions).values({
+      id: "legacy-version",
+      generationId: "legacy-generation",
+      sequence: 1,
+      generatedAt,
+      model: "gemini-test",
+      promptVersion: "profile-summary-v1",
+      diagnosisInputCount: 0,
+      diagnosisInputLatestAt: null,
+      diaryInputCount: 1,
+      diaryInputLatestAt: recordedAt,
+      summary: {
+        generatedAt: generatedAt.toISOString(),
+        headline: "以前のまとめ",
+        insights: [],
+        recordCount: 1,
+        diagnosisCount: 0,
+        diaryCount: 1,
+        latestRecordedAt: recordedAt.toISOString(),
+      },
+    });
+
+    const requestedAt = new Date("2026-08-09T00:01:00.000Z");
+    await expect(readProfileSummary(db, accountId, requestedAt)).resolves.toMatchObject({
+      generation: { canRegenerate: true, reasons: ["format"] },
+    });
+    await expect(
+      requestProfileSummaryGeneration(db, accountId, requestedAt),
+    ).resolves.toMatchObject({ outcome: "created", status: "queued" });
   });
 
   it("最新版の入力snapshotと比較して診断・日記・30日経過を再生成理由にする", async () => {

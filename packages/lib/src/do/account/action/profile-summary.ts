@@ -136,6 +136,7 @@ function regenerationReasons(
         | "diaryInputLatestAt"
       >
     | undefined,
+  hasCurrentGenerationOutput: boolean,
   at: Date,
 ): ProfileSummaryRegenerationReason[] {
   if (!latestVersion) {
@@ -157,6 +158,7 @@ function regenerationReasons(
   return [
     ...(diagnosisChanged ? (["diagnosis"] as const) : []),
     ...(diaryChanged ? (["brain"] as const) : []),
+    ...(!hasCurrentGenerationOutput ? (["format"] as const) : []),
     ...(at.getTime() - latestVersion.generatedAt.getTime() >=
     PROFILE_SUMMARY_REGENERATION_INTERVAL_MS
       ? (["elapsed"] as const)
@@ -170,7 +172,7 @@ export async function readProfileSummary(
   at = new Date(),
   allowUnchangedRegeneration = false,
 ): Promise<ProfileSummaryReadModel> {
-  const [counts, inputSnapshot, versionRows, latestGeneration] = await Promise.all([
+  const [counts, inputSnapshot, versionRows, latestGeneration, shareProfile] = await Promise.all([
     availableData(db, accountId),
     currentInputSnapshot(db, accountId),
     db.select().from(profileSummaryVersions).orderBy(desc(profileSummaryVersions.sequence)).all(),
@@ -181,6 +183,7 @@ export async function readProfileSummary(
       .orderBy(desc(profileSummaryGenerations.requestedAt), desc(profileSummaryGenerations.id))
       .limit(1)
       .get(),
+    readCompatibilityShareProfile(db, accountId),
   ]);
   const active = latestGeneration?.status === "queued" || latestGeneration?.status === "generating";
   const status =
@@ -189,7 +192,13 @@ export async function readProfileSummary(
     latestGeneration?.status === "failed"
       ? latestGeneration.status
       : "idle";
-  const reasons = regenerationReasons(inputSnapshot, versionRows[0], at);
+  const reasons = regenerationReasons(
+    inputSnapshot,
+    versionRows[0],
+    shareProfile.type === "available" &&
+      shareProfile.profile.profileSummaryVersionId === versionRows[0]?.id,
+    at,
+  );
   const hasInput = inputSnapshot.diagnosis.count + inputSnapshot.diary.count > 0;
   return {
     versions: versionRows.map((version, index) => ({
@@ -324,7 +333,7 @@ export async function requestProfileSummaryGeneration(
   if (existing && (existing.status === "queued" || existing.status === "generating")) {
     return { outcome: "existing", generationId: existing.id, status: existing.status };
   }
-  const [inputSnapshot, latestVersion] = await Promise.all([
+  const [inputSnapshot, latestVersion, shareProfile] = await Promise.all([
     currentInputSnapshot(db, accountId),
     db
       .select()
@@ -332,13 +341,20 @@ export async function requestProfileSummaryGeneration(
       .orderBy(desc(profileSummaryVersions.sequence))
       .limit(1)
       .get(),
+    readCompatibilityShareProfile(db, accountId),
   ]);
   if (inputSnapshot.diagnosis.count + inputSnapshot.diary.count === 0) {
     return { outcome: "unavailable", reason: "source_record_required" };
   }
   if (
     !allowUnchangedRegeneration &&
-    regenerationReasons(inputSnapshot, latestVersion, requestedAt).length === 0
+    regenerationReasons(
+      inputSnapshot,
+      latestVersion,
+      shareProfile.type === "available" &&
+        shareProfile.profile.profileSummaryVersionId === latestVersion?.id,
+      requestedAt,
+    ).length === 0
   ) {
     return { outcome: "unavailable", reason: "regeneration_not_required" };
   }

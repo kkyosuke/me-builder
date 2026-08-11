@@ -38,7 +38,7 @@ type ProfileSummaryVersionOption = Readonly<{
 
 type ProfileSummaryVersion = ProfileSummaryVersionOption & Readonly<{ summary: ProfileSummary }>;
 
-export type ProfileSummaryRegenerationReason = "diagnosis" | "brain" | "elapsed";
+export type ProfileSummaryRegenerationReason = "diagnosis" | "brain" | "format" | "elapsed";
 
 export type ProfileSummaryGenerationUnavailableReason =
   | "source_record_required"

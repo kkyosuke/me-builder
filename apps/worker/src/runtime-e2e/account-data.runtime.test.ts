@@ -236,7 +236,7 @@ describe("AccountData Workers runtime E2E", () => {
         accountId,
         new Date("2026-08-02T00:00:00.000Z"),
       );
-      expect(readModel.generation).toMatchObject({ canRegenerate: false, reasons: [] });
+      expect(readModel.generation).toMatchObject({ canRegenerate: true, reasons: ["format"] });
 
       const addedAt = new Date("2026-08-03T00:00:00.000Z");
       state.storage.sql.exec(
@@ -250,7 +250,10 @@ describe("AccountData Workers runtime E2E", () => {
         accountId,
         addedAt,
       );
-      expect(changed.generation).toMatchObject({ canRegenerate: true, reasons: ["brain"] });
+      expect(changed.generation).toMatchObject({
+        canRegenerate: true,
+        reasons: ["brain", "format"],
+      });
     });
   });
 

@@ -528,7 +528,7 @@ export interface operations {
               /** @enum {string} */
               status: "idle" | "queued" | "generating" | "failed";
               canRegenerate: boolean;
-              reasons: ("diagnosis" | "brain" | "elapsed")[];
+              reasons: ("diagnosis" | "brain" | "format" | "elapsed")[];
               message: string | null;
             };
             /** @enum {string} */

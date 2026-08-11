@@ -44,6 +44,7 @@ function formatDate(value: string): string {
 const regenerationReasonLabels: Record<ProfileSummaryRegenerationReason, string> = {
   diagnosis: "診断が増えました",
   brain: "日記・記録が増えました",
+  format: "まとめの生成内容が更新されました",
   elapsed: "前回の生成から時間が経ちました",
 };
 

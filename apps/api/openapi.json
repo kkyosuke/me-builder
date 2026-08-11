@@ -555,7 +555,7 @@
                         "reasons": {
                           "type": "array",
                           "items": {
-                            "enum": ["diagnosis", "brain", "elapsed"],
+                            "enum": ["diagnosis", "brain", "format", "elapsed"],
                             "type": "string"
                           }
                         },

@@ -47,7 +47,7 @@ const ResponseSchema = v.object({
   generation: v.object({
     status: v.picklist(["idle", "queued", "generating", "failed"]),
     canRegenerate: v.boolean(),
-    reasons: v.array(v.picklist(["diagnosis", "brain", "elapsed"])),
+    reasons: v.array(v.picklist(["diagnosis", "brain", "format", "elapsed"])),
     message: v.nullable(v.pipe(v.string(), v.nonEmpty())),
   }),
   nextAction: v.picklist(["diagnosis", "chat"]),
