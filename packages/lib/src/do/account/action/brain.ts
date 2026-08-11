@@ -49,6 +49,10 @@ const DEVELOPMENT_BRAIN_ITEM_LIMIT = 100;
 const CHAT_CONTEXT_VECTOR_CANDIDATE_LIMIT = 10;
 const CHAT_CONTEXT_MEMORY_LIMIT = 5;
 const CHAT_CONTEXT_EVIDENCE_LIMIT = 3;
+const SEMANTIC_DEDUP_VECTOR_CANDIDATE_LIMIT = 30;
+const SEMANTIC_DEDUP_RECENT_CANDIDATE_LIMIT = 20;
+const SEMANTIC_DEDUP_CANDIDATE_LIMIT = 30;
+const SEMANTIC_DEDUP_COMPARISON_TEXT_LIMIT = 1_500;
 const VECTOR_SYNC_DISPATCH_RETRY_MS = 15 * 60 * 1000;
 const VECTOR_SYNC_FAILURE_RETRY_MS = 60 * 1000;
 
@@ -97,6 +101,23 @@ export type BrainChatContextMemory = Readonly<{
     recordedAt: Date;
   }>[];
 }>;
+
+export type BrainSemanticDedupCandidate = Readonly<{
+  brainItemId: string;
+  category: string;
+  statement: string;
+  comparisonText: string;
+  isInference: boolean;
+}>;
+
+function brainItemIsInference(attributes: unknown, derivation: "ai" | "deterministic"): boolean {
+  return attributes &&
+    typeof attributes === "object" &&
+    "isInference" in attributes &&
+    typeof attributes.isInference === "boolean"
+    ? attributes.isInference
+    : derivation === "ai";
+}
 
 function hasInvalidOrDuplicateLabels(labels: readonly { label: string }[]): boolean {
   const normalized = labels.map(({ label }) => label.trim());
@@ -573,6 +594,100 @@ export async function findActiveBrainVectorEntry(
 }
 
 /**
+ * Vectorize候補をAccountDataで再認可し、同期前の直近Itemも補って意味的重複判定へ返す。
+ * statement以外のEvidence本文やAccess Labelは重複判定モデルへ渡さない。
+ */
+export async function loadBrainSemanticDedupCandidates(
+  db: AccountDataDatabase,
+  accountId: string,
+  vectorIds: readonly string[],
+  categories: readonly string[],
+): Promise<readonly BrainSemanticDedupCandidate[]> {
+  const candidateVectorIds = [...new Set(vectorIds.filter(Boolean))].slice(
+    0,
+    SEMANTIC_DEDUP_VECTOR_CANDIDATE_LIMIT,
+  );
+  const candidateCategories = [...new Set(categories.filter(Boolean))].slice(0, 6);
+  if (candidateCategories.length === 0) return [];
+
+  const vectorRows =
+    candidateVectorIds.length === 0
+      ? []
+      : await db
+          .select({
+            vectorId: brainVectorEntries.id,
+            brainItemId: brainItems.id,
+            category: brainItems.category,
+            statement: brainItems.statement,
+            attributes: brainItems.attributes,
+            derivation: brainItems.derivation,
+          })
+          .from(brainVectorEntries)
+          .innerJoin(brainItems, eq(brainItems.id, brainVectorEntries.brainItemId))
+          .where(
+            and(
+              inArray(brainVectorEntries.id, candidateVectorIds),
+              eq(brainVectorEntries.isDeleted, false),
+              eq(brainItems.accountId, accountId),
+              inArray(brainItems.category, candidateCategories),
+              eq(brainItems.status, "active"),
+              eq(brainItems.isDeleted, false),
+            ),
+          )
+          .all();
+  const recentRows = await db
+    .select({
+      brainItemId: brainItems.id,
+      category: brainItems.category,
+      statement: brainItems.statement,
+      attributes: brainItems.attributes,
+      derivation: brainItems.derivation,
+    })
+    .from(brainItems)
+    .where(
+      and(
+        eq(brainItems.accountId, accountId),
+        inArray(brainItems.category, candidateCategories),
+        eq(brainItems.status, "active"),
+        eq(brainItems.isDeleted, false),
+      ),
+    )
+    .orderBy(desc(brainItems.createdAt), desc(brainItems.id))
+    .limit(SEMANTIC_DEDUP_RECENT_CANDIDATE_LIMIT)
+    .all();
+
+  const vectorRowById = new Map(vectorRows.map((row) => [row.vectorId, row] as const));
+  const ordered = [
+    ...candidateVectorIds.flatMap((vectorId) => {
+      const row = vectorRowById.get(vectorId);
+      return row ? [row] : [];
+    }),
+    ...recentRows,
+  ];
+  const seen = new Set<string>();
+  return ordered
+    .flatMap((item) => {
+      if (seen.has(item.brainItemId)) return [];
+      const comparisonText = buildDiaryTemporalSearchText(
+        item.statement,
+        readDiaryTemporalContext(item.attributes),
+      );
+      if (comparisonText.length > SEMANTIC_DEDUP_COMPARISON_TEXT_LIMIT) return [];
+      seen.add(item.brainItemId);
+      return [
+        {
+          brainItemId: item.brainItemId,
+          category: item.category,
+          statement: item.statement,
+          comparisonText,
+          isInference: brainItemIsInference(item.attributes, item.derivation),
+        },
+      ];
+    })
+    .slice(0, SEMANTIC_DEDUP_CANDIDATE_LIMIT);
+}
+
+/**
  * Vectorizeが返した仮名IDを候補としてのみ扱い、AccountDataの現在状態で通常チャット用に再認可する。
  * 入力順（類似度順）を保ち、原文EvidenceはContext全体で最大3件に制限する。
  */
@@ -668,13 +783,7 @@ export async function loadBrainChatContextMemories(
       category: item.category,
       statement: item.statement,
       derivation: item.derivation,
-      isInference:
-        item.attributes &&
-        typeof item.attributes === "object" &&
-        "isInference" in item.attributes &&
-        typeof item.attributes.isInference === "boolean"
-          ? item.attributes.isInference
-          : item.derivation === "ai",
+      isInference: brainItemIsInference(item.attributes, item.derivation),
       status: "active",
       confidence: item.confidence,
       accessLabels: [...new Set(accessLabels)].sort(),

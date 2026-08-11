@@ -15,6 +15,7 @@ import {
   getBrainVectorSyncTarget,
   listActiveBrainItems,
   loadBrainChatContextMemories,
+  loadBrainSemanticDedupCandidates,
   saveBrainItem,
 } from "./brain";
 
@@ -260,6 +261,32 @@ describe("saveBrainItem", () => {
       type: "source-account-mismatch",
     });
     await expect(db.select().from(schema.brainItems)).resolves.toHaveLength(0);
+  });
+});
+
+describe("loadBrainSemanticDedupCandidates", () => {
+  it("Vector候補をAccountとactive状態で再認可し、比較用statementを返す", async () => {
+    const db = createTestDb();
+    await insertAccountsAndSources(db);
+    const at = new Date("2026-08-10T00:00:00Z");
+    await saveBrainItem(db, createInput({ at }));
+    await db.insert(schema.brainVectorEntries).values({
+      id: "vector-1",
+      brainItemId: "brain-1",
+      itemRevision: at.getTime(),
+    });
+
+    await expect(
+      loadBrainSemanticDedupCandidates(db, "account-1", ["vector-1"], ["preference"]),
+    ).resolves.toEqual([
+      {
+        brainItemId: "brain-1",
+        category: "preference",
+        statement: "日記から見える傾向",
+        comparisonText: "日記から見える傾向",
+        isInference: false,
+      },
+    ]);
   });
 });
 

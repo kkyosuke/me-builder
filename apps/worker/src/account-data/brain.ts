@@ -15,6 +15,13 @@ export const brainActions = {
     vectorIds: readonly string[],
     at?: Date,
   ) => DO.account.action.brain.loadBrainChatContextMemories(db, accountId, vectorIds, at),
+  "brain.loadSemanticDedupCandidates": (
+    db: DO.account.Database,
+    accountId: string,
+    vectorIds: readonly string[],
+    categories: readonly string[],
+  ) =>
+    DO.account.action.brain.loadBrainSemanticDedupCandidates(db, accountId, vectorIds, categories),
   "brain.getVectorSyncTarget": (
     db: DO.account.Database,
     accountId: string,

@@ -366,6 +366,10 @@ AI生成、JSON parse、出力envelope検証が失敗した場合はQueue messag
 
 AIの意味的重複判定だけで既存Itemを上書きしません。同義判定が不確かな場合は別Itemとして保存し、後から統合できるようにします。
 
+日記候補ごとに、原文と解決済み時点情報を検索queryとして同じAccountのVectorizeを検索します。Vector scoreは比較対象を絞るためだけに使い、score単独では統合しません。Vectorizeで見つかったItemとVector同期前の直近active ItemをAccountDataで再認可し、同じcategoryの候補だけを専用の意味的重複判定promptへまとめて渡します。表現が異なっても、条件・対象・時点を含め相互に言い換えられる`same_proposition`だけを既存Itemへ結びます。関連しているだけ、具体性・強さ・時点が異なる、または判断が不確かな場合は新規Itemにします。
+
+判定モデルが返せる既存Item IDは検索候補のallowlistに限定し、AccountDataは保存直前にAccount所有、`active`、category、`isInference = false`、相対日付の解決結果を再検証します。同一命題なら既存Itemのstatementや属性を変更せず、新しいSource Recordとの`supports` Evidence edgeだけを追加します。既存ItemのVectorはstatementが変わらないため再登録しません。checkpointとの対応には、新規作成かEvidence追加か、完全一致か意味的判定か、意味的判定のprompt versionを保存します。AI判定全体が不正、候補外IDを返す、または依存サービスが一時失敗した場合は新規Itemへ縮退せずQueueを再試行し、重複データの確定を避けます。
+
 ## 9. 実装境界
 
 診断回答からBrain ItemとEvidence edgeを作るprojectionは実装済みです。旧設計の`confirmation`列・index・保存入力は削除し、診断と日記のどちらも生成時から`active`に統一しています。
@@ -382,6 +386,7 @@ AIの意味的重複判定だけで既存Itemを上書きしません。同義�
 - Brain Item、Evidence、Access Label、チェックポイント完了を一括保存するAccountData action
 - Brain ItemとAccess LabelからConfirmationを除くschema migrationと既存projectionの追従
 - Account単位の直列化とcheckpoint状態によって、Queueの並行・再配送時にBrain Itemを重複作成しない冪等性
+- Account内のVector候補と直近Itemを専用AIで比較し、同一命題なら新規Itemを作らずEvidenceだけを追加する意味的重複判定
 - dev / development / local環境の処理後Pushに、実際に追加したItemとEvidence message ID、または追加なしを表示し、Push失敗だけを再送
 - dev / development / local / preview / test環境の「わたしのまとめ」に、本人のactive ItemとEvidenceを新しい順で表示する確認一覧
 
@@ -389,15 +394,14 @@ AIの意味的重複判定だけで既存Itemを上書きしません。同義�
 
 - Itemと否定・修正操作の対応づけ
 - 否定による無効化、修正、改訂
-- 既存Brain Itemとの重複判定とEvidence追加
 - 本人が明言していない内容をAIが推定する分類
 
-会話チェックポイントから本人が明言した6分類のBrain Itemを最大3件生成し、Evidence付きで保存し、active ItemをVectorizeへ同期し、通常チャットで検索してAccountData再認可後に利用するところまでを実装しています。相対日付は原文と時点情報を分離して保存し、Vectorize登録と検索queryで併記します。否定・修正・改訂、本人が明言していない内容のAI推定、重複統合は後続です。
+会話チェックポイントから本人が明言した6分類のBrain Itemを最大3件生成し、Evidence付きで保存し、意味的に同じ既存ItemにはEvidenceだけを追加し、active ItemをVectorizeへ同期して通常チャットで利用するところまでを実装しています。相対日付は原文と時点情報を分離して保存し、Vectorize登録と検索queryで併記します。否定・修正・改訂、本人が明言していない内容のAI推定は後続です。
 
 ## 10. 後続で決めること
 
 - Confidenceの具体的な算出方法
 - 分類固有の`attributes` schema
-- AIによる意味的重複判定の閾値と、自動統合しない境界
+- 意味的重複判定の評価dataset、誤統合率の監視、prompt version更新基準
 - 複数Itemを訂正・否定するLINE / Web UI
 - 反証候補を自動的にedgeへする条件
