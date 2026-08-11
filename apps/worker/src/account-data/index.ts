@@ -119,9 +119,28 @@ export class AccountData extends DurableObject<Env> {
             throw new Error("Diary Brain checkpoint dispatch state could not be recorded");
           }
         }
-        const vectorJobs = await DO.account.action.brain.claimDueBrainVectorSyncJobs(
+        const vectorClaim = await DO.account.action.brain.claimDueBrainVectorSyncJobs(
           this.repository.client,
         );
+        for (const failure of vectorClaim.terminalFailures) {
+          logger.error(
+            {
+              event: "brain-vector-sync.job.failed",
+              service: "worker",
+              component: "account-data",
+              outcome: "failed",
+              disposition: "stop",
+              stage: "vector.dispatch",
+              errorCode: failure.failureCode,
+              errorCategory: "timeout",
+              retryable: false,
+              attempt: failure.attemptCount,
+              maxAttempts: DO.account.action.brain.BRAIN_VECTOR_SYNC_MAX_ATTEMPTS,
+            },
+            `[Brain vector sync] failed at vector.dispatch -> stop (attempt ${failure.attemptCount}/${DO.account.action.brain.BRAIN_VECTOR_SYNC_MAX_ATTEMPTS}, ${failure.failureCode}, category:timeout)`,
+          );
+        }
+        const vectorJobs = vectorClaim.jobs;
         if (vectorJobs.length > 0 && !this.env.BRAIN_VECTOR_QUEUE) {
           throw new Error("BRAIN_VECTOR_QUEUE binding is required for Brain vector sync");
         }

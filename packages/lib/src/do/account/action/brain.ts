@@ -55,7 +55,14 @@ const SEMANTIC_DEDUP_CANDIDATE_LIMIT = 30;
 const SEMANTIC_DEDUP_RECENT_RESERVED_LIMIT = 10;
 const SEMANTIC_DEDUP_COMPARISON_TEXT_LIMIT = 1_500;
 const VECTOR_SYNC_DISPATCH_RETRY_MS = 15 * 60 * 1000;
-const VECTOR_SYNC_FAILURE_RETRY_MS = 60 * 1000;
+export const BRAIN_VECTOR_SYNC_MAX_ATTEMPTS = 6;
+const VECTOR_SYNC_FAILURE_RETRY_DELAYS_MS = [
+  60 * 1000,
+  2 * 60 * 1000,
+  8 * 60 * 1000,
+  30 * 60 * 1000,
+  2 * 60 * 60 * 1000,
+] as const;
 
 export type ActiveBrainItemList = Readonly<{
   items: readonly Readonly<{
@@ -68,7 +75,7 @@ export type ActiveBrainItemList = Readonly<{
     firstObservedAt: Date;
     lastObservedAt: Date;
     vectorSync: Readonly<{
-      status: "pending" | "submitted" | "applied" | "failed" | "not-scheduled";
+      status: "pending" | "submitted" | "retry_scheduled" | "applied" | "failed" | "not-scheduled";
       operation?: "upsert" | "delete";
       attemptCount: number;
       updatedAt?: Date;
@@ -248,17 +255,42 @@ export async function saveBrainItem(
   return { type: "saved", brainItemId };
 }
 
-export type BrainVectorSyncJob = Readonly<{
+type BrainVectorSyncJob = Readonly<{
   id: string;
   brainItemId: string;
   itemRevision: number;
+}>;
+
+export type BrainVectorSyncClaimBatch = Readonly<{
+  jobs: readonly BrainVectorSyncJob[];
+  terminalFailures: readonly Readonly<{ attemptCount: number; failureCode: string }>[];
 }>;
 
 /** Alarm時点で期限を迎えたVector同期jobをclaimする。 */
 export async function claimDueBrainVectorSyncJobs(
   db: AccountDataDatabase,
   at = new Date(),
-): Promise<BrainVectorSyncJob[]> {
+): Promise<BrainVectorSyncClaimBatch> {
+  const terminalFailures = await db
+    .update(brainVectorSyncJobs)
+    .set({
+      status: "failed",
+      failureCode: "BRAIN_VECTOR_SYNC_ATTEMPTS_EXHAUSTED",
+      updatedAt: at,
+    })
+    .where(
+      and(
+        inArray(brainVectorSyncJobs.status, ["pending", "submitted", "retry_scheduled"]),
+        lte(brainVectorSyncJobs.nextAttemptAt, at),
+        sql`${brainVectorSyncJobs.attemptCount} >= ${BRAIN_VECTOR_SYNC_MAX_ATTEMPTS}`,
+        eq(brainVectorSyncJobs.isDeleted, false),
+      ),
+    )
+    .returning({
+      attemptCount: brainVectorSyncJobs.attemptCount,
+      failureCode: brainVectorSyncJobs.failureCode,
+    })
+    .all();
   const due = await db
     .select({
       id: brainVectorSyncJobs.id,
@@ -268,7 +300,8 @@ export async function claimDueBrainVectorSyncJobs(
     .from(brainVectorSyncJobs)
     .where(
       and(
-        inArray(brainVectorSyncJobs.status, ["pending", "submitted", "failed"]),
+        inArray(brainVectorSyncJobs.status, ["pending", "submitted", "retry_scheduled"]),
+        sql`${brainVectorSyncJobs.attemptCount} < ${BRAIN_VECTOR_SYNC_MAX_ATTEMPTS}`,
         lte(brainVectorSyncJobs.nextAttemptAt, at),
         eq(brainVectorSyncJobs.isDeleted, false),
       ),
@@ -290,7 +323,8 @@ export async function claimDueBrainVectorSyncJobs(
       .where(
         and(
           eq(brainVectorSyncJobs.id, job.id),
-          inArray(brainVectorSyncJobs.status, ["pending", "submitted", "failed"]),
+          inArray(brainVectorSyncJobs.status, ["pending", "submitted", "retry_scheduled"]),
+          sql`${brainVectorSyncJobs.attemptCount} < ${BRAIN_VECTOR_SYNC_MAX_ATTEMPTS}`,
           lte(brainVectorSyncJobs.nextAttemptAt, at),
           eq(brainVectorSyncJobs.isDeleted, false),
         ),
@@ -299,7 +333,13 @@ export async function claimDueBrainVectorSyncJobs(
       .all();
     if (rows.length > 0) claimed.push(job);
   }
-  return claimed;
+  return {
+    jobs: claimed,
+    terminalFailures: terminalFailures.map(({ attemptCount, failureCode }) => ({
+      attemptCount,
+      failureCode: failureCode ?? "BRAIN_VECTOR_SYNC_ATTEMPTS_EXHAUSTED",
+    })),
+  };
 }
 
 export type BrainVectorSyncTarget =
@@ -333,7 +373,7 @@ export async function getBrainVectorSyncTarget(
         eq(brainVectorSyncJobs.id, jobId),
         eq(brainVectorSyncJobs.brainItemId, brainItemId),
         eq(brainVectorSyncJobs.itemRevision, itemRevision),
-        inArray(brainVectorSyncJobs.status, ["submitted", "failed"]),
+        eq(brainVectorSyncJobs.status, "submitted"),
         eq(brainVectorSyncJobs.isDeleted, false),
       ),
     )
@@ -410,7 +450,7 @@ export async function completeBrainVectorSyncJob(
     .where(
       and(
         eq(brainVectorSyncJobs.id, jobId),
-        inArray(brainVectorSyncJobs.status, ["submitted", "failed"]),
+        eq(brainVectorSyncJobs.status, "submitted"),
         eq(brainVectorSyncJobs.isDeleted, false),
       ),
     )
@@ -456,7 +496,7 @@ export async function completeBrainVectorSyncJob(
     .where(
       and(
         eq(brainVectorSyncJobs.id, jobId),
-        inArray(brainVectorSyncJobs.status, ["submitted", "failed"]),
+        eq(brainVectorSyncJobs.status, "submitted"),
         eq(brainVectorSyncJobs.isDeleted, false),
       ),
     );
@@ -515,6 +555,7 @@ export async function completeBrainVectorSyncJob(
           ],
           set: {
             status: "pending",
+            attemptCount: 0,
             mutationId: null,
             failureCode: null,
             nextAttemptAt: at,
@@ -531,20 +572,74 @@ export async function failBrainVectorSyncJob(
   db: AccountDataDatabase,
   jobId: string,
   failureCode: string,
+  retryable = true,
   at = new Date(),
-): Promise<boolean> {
+): Promise<BrainVectorSyncFailureResult | undefined> {
+  const job = await db
+    .select({ attemptCount: brainVectorSyncJobs.attemptCount })
+    .from(brainVectorSyncJobs)
+    .where(
+      and(
+        eq(brainVectorSyncJobs.id, jobId),
+        eq(brainVectorSyncJobs.status, "submitted"),
+        eq(brainVectorSyncJobs.isDeleted, false),
+      ),
+    )
+    .get();
+  if (!job) return undefined;
+
+  const terminal = !retryable || job.attemptCount >= BRAIN_VECTOR_SYNC_MAX_ATTEMPTS;
+  const retryDelayMs = terminal ? 0 : VECTOR_SYNC_FAILURE_RETRY_DELAYS_MS[job.attemptCount - 1];
+  if (!terminal && retryDelayMs === undefined) {
+    throw new Error("Brain vector sync retry delay is not configured");
+  }
+  const nextAttemptAt = new Date(at.getTime() + (retryDelayMs ?? 0));
   const rows = await db
     .update(brainVectorSyncJobs)
     .set({
-      status: "failed",
+      status: terminal ? "failed" : "retry_scheduled",
       failureCode,
-      nextAttemptAt: new Date(at.getTime() + VECTOR_SYNC_FAILURE_RETRY_MS),
+      nextAttemptAt,
       updatedAt: at,
     })
     .where(
       and(
         eq(brainVectorSyncJobs.id, jobId),
         eq(brainVectorSyncJobs.status, "submitted"),
+        eq(brainVectorSyncJobs.isDeleted, false),
+      ),
+    )
+    .returning({ id: brainVectorSyncJobs.id })
+    .all();
+  if (rows.length === 0) return undefined;
+  return terminal
+    ? { outcome: "failed", attemptCount: job.attemptCount }
+    : { outcome: "retry-scheduled", attemptCount: job.attemptCount, nextAttemptAt };
+}
+
+export type BrainVectorSyncFailureResult =
+  | Readonly<{ outcome: "retry-scheduled"; attemptCount: number; nextAttemptAt: Date }>
+  | Readonly<{ outcome: "failed"; attemptCount: number }>;
+
+/** 運用者が原因を解消した後、恒久失敗jobを明示的に最初から再試行する。 */
+export async function resetFailedBrainVectorSyncJob(
+  db: AccountDataDatabase,
+  jobId: string,
+  at = new Date(),
+): Promise<boolean> {
+  const rows = await db
+    .update(brainVectorSyncJobs)
+    .set({
+      status: "pending",
+      attemptCount: 0,
+      nextAttemptAt: at,
+      failureCode: null,
+      updatedAt: at,
+    })
+    .where(
+      and(
+        eq(brainVectorSyncJobs.id, jobId),
+        eq(brainVectorSyncJobs.status, "failed"),
         eq(brainVectorSyncJobs.isDeleted, false),
       ),
     )
@@ -973,7 +1068,9 @@ export async function listActiveBrainItems(
           status: job?.status ?? ("not-scheduled" as const),
           ...(job ? { operation: job.operation, updatedAt: job.updatedAt } : {}),
           attemptCount: job?.attemptCount ?? 0,
-          ...(job?.status !== "applied" && job ? { nextAttemptAt: job.nextAttemptAt } : {}),
+          ...(job && ["pending", "submitted", "retry_scheduled"].includes(job.status)
+            ? { nextAttemptAt: job.nextAttemptAt }
+            : {}),
           ...(job?.failureCode ? { failureCode: job.failureCode } : {}),
           hasEntry: Boolean(entry),
           ...(entry ? { entryRevision: entry.itemRevision } : {}),

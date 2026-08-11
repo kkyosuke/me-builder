@@ -43,6 +43,13 @@
       "when": 1786453107455,
       "tag": "0005_white_boomer",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1786491203636,
+      "tag": "0006_vector_sync_retry_scheduled",
+      "breakpoints": true
     }
   ]
 }

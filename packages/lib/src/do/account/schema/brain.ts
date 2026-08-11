@@ -38,7 +38,7 @@ export const brainVectorSyncJobs = sqliteTable(
     itemRevision: integer("item_revision").notNull(),
     operation: text("operation", { enum: ["upsert", "delete"] }).notNull(),
     status: text("status", {
-      enum: ["pending", "submitted", "applied", "failed"],
+      enum: ["pending", "submitted", "retry_scheduled", "applied", "failed"],
     }).notNull(),
     attemptCount: integer("attempt_count").notNull().default(0),
     nextAttemptAt: integer("next_attempt_at", { mode: "timestamp" }).notNull(),

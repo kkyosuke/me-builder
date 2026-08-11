@@ -23,7 +23,14 @@ const ResponseSchema = v.object({
       firstObservedAt: v.pipe(v.string(), v.isoTimestamp()),
       lastObservedAt: v.pipe(v.string(), v.isoTimestamp()),
       vectorSync: v.object({
-        status: v.picklist(["pending", "submitted", "applied", "failed", "not-scheduled"]),
+        status: v.picklist([
+          "pending",
+          "submitted",
+          "retry_scheduled",
+          "applied",
+          "failed",
+          "not-scheduled",
+        ]),
         operation: v.exactOptional(v.picklist(["upsert", "delete"])),
         attemptCount: v.pipe(v.number(), v.safeInteger(), v.minValue(0)),
         updatedAt: v.exactOptional(v.pipe(v.string(), v.isoTimestamp())),
