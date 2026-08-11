@@ -2,6 +2,7 @@ import {
   type BrainChatContextMemory,
   type ConversationContextMessage,
   accountDataFor,
+  normalizeDiaryRelativeDates,
 } from "@me-builder/lib";
 import { logger } from "@me-builder/shared";
 import type { CloudflareBindings, WorkerConfig } from "../config";
@@ -30,6 +31,7 @@ const defaultDependencies: BrainContextDependencies = {
 export function buildBrainSearchQuery(
   messages: readonly ConversationContextMessage[],
   currentUserMessageIds: readonly string[],
+  at = new Date(),
 ): string | undefined {
   const currentIds = new Set(currentUserMessageIds);
   const query = messages
@@ -38,7 +40,7 @@ export function buildBrainSearchQuery(
     .filter(Boolean)
     .join("\n");
   if (!query) return undefined;
-  return query.slice(-SEARCH_QUERY_CHARACTER_LIMIT);
+  return normalizeDiaryRelativeDates(query.slice(-SEARCH_QUERY_CHARACTER_LIMIT), at).statement;
 }
 
 /**

@@ -34,8 +34,8 @@ describe("DevelopmentBrainItems", () => {
             items: [
               {
                 id: "brain-1",
-                category: "memory",
-                statement: "公園を散歩した",
+                category: "behavior_pattern",
+                statement: "衝動買いしちゃう",
                 derivation: "ai",
                 status: "active",
                 createdAt: "2026-08-09T00:00:00.000Z",
@@ -67,7 +67,7 @@ describe("DevelopmentBrainItems", () => {
               state: "present",
               entryRevision: 12,
               dimensions: 768,
-              metadata: { category: "memory", derivation: "ai", embeddingVersion: 1 },
+              metadata: { category: "behavior_pattern", derivation: "ai", embeddingVersion: 1 },
               checkedAt: "2026-08-10T00:00:00.000Z",
             },
           },
@@ -78,11 +78,12 @@ describe("DevelopmentBrainItems", () => {
     );
 
     expect(screen.getByRole("heading", { name: "Brain Item一覧" })).toBeTruthy();
-    expect(screen.getByText("公園を散歩した")).toBeTruthy();
+    expect(screen.getByText("衝動買いしちゃう")).toBeTruthy();
+    expect(screen.getByText("Behavior Pattern")).toBeTruthy();
     expect(screen.getByText("active")).toBeTruthy();
     expect(screen.getByText("Vector同期受付済み")).toBeTruthy();
     expect(screen.getByText("Vectorizeに実体あり（768次元）")).toBeTruthy();
-    expect(screen.getByText("memory / ai / embedding v1")).toBeTruthy();
+    expect(screen.getByText("behavior_pattern / ai / embedding v1")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Vectorizeで実体確認" }));
     expect(onVerifyVector).toHaveBeenCalledWith("brain-1");
     fireEvent.click(screen.getByText("Evidence 1件"));

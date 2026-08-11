@@ -63,8 +63,26 @@ function createHarness(options: { queryError?: Error } = {}) {
 
 describe("buildBrainSearchQuery", () => {
   it("現在Turnのuser発言だけを順番どおり検索文にする", () => {
-    expect(buildBrainSearchQuery(messages, ["current-1", "current-2"])).toBe(
-      "今日は疲れた\n落ち着く方法を探したい",
+    expect(
+      buildBrainSearchQuery(
+        messages,
+        ["current-1", "current-2"],
+        new Date("2026-08-11T03:00:00.000Z"),
+      ),
+    ).toBe("2026年8月11日は疲れた\n落ち着く方法を探したい");
+  });
+
+  it("相対日付を保存時と同じ絶対表現にしてVector検索する", () => {
+    const goalMessage = [
+      {
+        id: "goal",
+        role: "user" as const,
+        body: "来月までに転職先を決めたい",
+        sequence: 1,
+      },
+    ];
+    expect(buildBrainSearchQuery(goalMessage, ["goal"], new Date("2026-08-11T03:00:00.000Z"))).toBe(
+      "2026年9月までに転職先を決めたい",
     );
   });
 });

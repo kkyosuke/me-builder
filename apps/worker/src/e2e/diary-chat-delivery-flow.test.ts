@@ -1,7 +1,7 @@
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import type { D1Database } from "@cloudflare/workers-types";
-import { D1, DO, line } from "@me-builder/lib";
+import { D1, DO, line, normalizeDiaryRelativeDates } from "@me-builder/lib";
 import {
   type ChatTurnQueueMessage,
   type Message,
@@ -407,6 +407,7 @@ describe("LINE diary chat delivery E2E", () => {
 
   it("現在TurnでVectorize検索し、AccountDataで再認可した記憶をContext Packageへ入れる", async () => {
     const diaryText = "今日は疲れたので、落ち着く方法を探したい";
+    const normalizedSearchText = normalizeDiaryRelativeDates(diaryText, new Date()).statement;
     const { bindings, providerAccountId, queuedTurn } = await ingestDiary(
       diaryText,
       "brain-context",
@@ -485,7 +486,7 @@ describe("LINE diary chat delivery E2E", () => {
     );
     expect(mockEmbedContent).toHaveBeenCalledWith(
       expect.objectContaining({
-        contents: diaryText,
+        contents: normalizedSearchText,
         config: expect.objectContaining({ taskType: "RETRIEVAL_QUERY", outputDimensionality: 768 }),
       }),
     );

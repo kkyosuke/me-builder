@@ -1,4 +1,5 @@
 import { D1, accountDataFor } from "@me-builder/lib";
+import type { DiaryBrainCategory } from "@me-builder/lib";
 import type {
   DiaryBrainCheckpointQueueMessage,
   Message,
@@ -115,6 +116,7 @@ export async function processDiaryBrainCheckpointMessage(
     context.throughSequence,
     DIARY_BRAIN_PROMPT_VERSION,
     candidates.map((candidate) => ({
+      category: candidate.category,
       statement: candidate.statement,
       sourceMessageIds: candidate.source_message_ids,
     })),
@@ -151,7 +153,11 @@ async function sendDevelopmentNotification(
   cf: CloudflareBindings,
   workerConfig: WorkerConfig,
   appliedResult?: {
-    candidates: readonly { statement: string; sourceMessageIds: readonly string[] }[];
+    candidates: readonly {
+      category: DiaryBrainCategory;
+      statement: string;
+      sourceMessageIds: readonly string[];
+    }[];
   },
 ): Promise<void> {
   const result =

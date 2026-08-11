@@ -2,6 +2,7 @@ import { logger } from "@me-builder/shared";
 import { describe, expect, it, vi } from "vitest";
 import { getWorkerConfig } from "../config";
 import {
+  DIARY_BRAIN_SYSTEM_PROMPT,
   buildDevelopmentBrainItemMessage,
   generateDiaryBrainCandidates,
   validateDiaryBrainCandidates,
@@ -41,6 +42,57 @@ describe("diary Brain checkpoint", () => {
       ],
     });
     expect(validateDiaryBrainCandidates(raw, messages, ["message-1", "message-2"])).toHaveLength(2);
+  });
+
+  it("本人が明言した内容を6種類のBrain Itemとして受け入れる", () => {
+    const classificationMessages = [
+      "2026/07/21 牛タンを食べた",
+      "昔いじめられてた",
+      "衝動買いしちゃう",
+      "承認されたいから頑張る",
+      "安さより長く使えるものを選ぶ",
+      "辛い食べ物が苦手",
+      "来月までに転職先を決めたい",
+    ].map((body, index) => ({
+      id: `classification-${index + 1}`,
+      role: "user" as const,
+      body,
+      sequence: index + 1,
+    }));
+    const categories = [
+      "memory",
+      "memory",
+      "behavior_pattern",
+      "value_motivation",
+      "decision_system",
+      "preference",
+      "goal",
+    ] as const;
+
+    for (const [index, message] of classificationMessages.entries()) {
+      const category = categories[index];
+      if (!message || !category) throw new Error("分類test fixtureが不正です");
+      const candidate = {
+        category,
+        statement: message.body,
+        source_message_ids: [message.id],
+        is_inference: false,
+      };
+      expect(
+        validateDiaryBrainCandidates(
+          JSON.stringify({ brain_item_candidates: [candidate] }),
+          classificationMessages,
+          [message.id],
+        ),
+      ).toEqual([candidate]);
+    }
+  });
+
+  it("分類境界と相対日付の保持をsystem promptへ明示する", () => {
+    expect(DIARY_BRAIN_SYSTEM_PROMPT).toContain("「衝動買いしちゃう」→ behavior_pattern");
+    expect(DIARY_BRAIN_SYSTEM_PROMPT).toContain("「承認されたいから頑張る」→ value_motivation");
+    expect(DIARY_BRAIN_SYSTEM_PROMPT).toContain("「来月までに転職先を決めたい」→ goal");
+    expect(DIARY_BRAIN_SYSTEM_PROMPT).toContain("相対日付も書き換えずstatementへ含める");
   });
 
   it("checkpoint外のmessageを参照する候補だけをlog付きで破棄する", () => {
@@ -145,15 +197,16 @@ describe("diary Brain checkpoint", () => {
   it("development環境だけ追加結果の通知文を作る", () => {
     const candidates = [
       {
+        category: "memory" as const,
         statement: "公園を散歩した",
         sourceMessageIds: ["message-1"],
       },
     ];
     expect(buildDevelopmentBrainItemMessage(candidates, "development")).toContain(
-      "[dev] 追加したBrain Item\n- 1. Memory: 公園を散歩した",
+      "[dev] 追加したBrain Item\n- 1. memory: 公園を散歩した",
     );
     expect(buildDevelopmentBrainItemMessage(candidates, "preview")).toContain(
-      "[dev] 追加したBrain Item\n- 1. Memory: 公園を散歩した",
+      "[dev] 追加したBrain Item\n- 1. memory: 公園を散歩した",
     );
     expect(buildDevelopmentBrainItemMessage(candidates, "production")).toBeUndefined();
   });

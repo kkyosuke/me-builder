@@ -23,6 +23,25 @@ const BRAIN_CHECKPOINT_INACTIVITY_MS = 10 * 60 * 1000;
 const BRAIN_CHECKPOINT_HARD_CAP_MS = 30 * 60 * 1000;
 const BRAIN_CHECKPOINT_MAX_USER_MESSAGES = 10;
 const BRAIN_CHECKPOINT_MAX_USER_MESSAGE_CHARS = 5_000;
+export const DIARY_BRAIN_CATEGORIES = [
+  "memory",
+  "behavior_pattern",
+  "value_motivation",
+  "decision_system",
+  "preference",
+  "goal",
+] as const;
+export type DiaryBrainCategory = (typeof DIARY_BRAIN_CATEGORIES)[number];
+const DIARY_BRAIN_CATEGORY_SET = new Set<string>(DIARY_BRAIN_CATEGORIES);
+const DIARY_BRAIN_STABILITY: Record<DiaryBrainCategory, "temporary" | "changeable" | "stable"> = {
+  memory: "stable",
+  behavior_pattern: "changeable",
+  value_motivation: "changeable",
+  decision_system: "changeable",
+  preference: "changeable",
+  goal: "temporary",
+};
+const DIARY_BRAIN_TIME_ZONE = "Asia/Tokyo";
 /** Checkpointは`account_id`を持たないため、所有者は親のSessionから導出する。 */
 function ownedSessionIds(db: AccountDataDatabase, accountId: string) {
   return db
@@ -623,6 +642,7 @@ export async function getTurnContext(
 }
 
 export type DiaryBrainCheckpointCandidate = Readonly<{
+  category: DiaryBrainCategory;
   statement: string;
   sourceMessageIds: readonly string[];
 }>;
@@ -630,6 +650,97 @@ export type DiaryBrainCheckpointCandidate = Readonly<{
 export type DiaryBrainCheckpointApplyResult = Readonly<{
   candidates: readonly DiaryBrainCheckpointCandidate[];
 }>;
+
+type TemporalResolution = Readonly<{ original: string; resolved: string }>;
+
+function calendarDateInDiaryTimeZone(at: Date): { year: number; month: number; day: number } {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: DIARY_BRAIN_TIME_ZONE,
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+  }).formatToParts(at);
+  const value = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((part) => part.type === type)?.value);
+  return { year: value("year"), month: value("month"), day: value("day") };
+}
+
+function shiftCalendarMonth(
+  date: { year: number; month: number },
+  offset: number,
+): { year: number; month: number } {
+  const zeroBased = date.year * 12 + date.month - 1 + offset;
+  return { year: Math.floor(zeroBased / 12), month: (zeroBased % 12) + 1 };
+}
+
+function shiftCalendarDay(
+  date: { year: number; month: number; day: number },
+  offset: number,
+): { year: number; month: number; day: number } {
+  const shifted = new Date(Date.UTC(date.year, date.month - 1, date.day + offset));
+  return {
+    year: shifted.getUTCFullYear(),
+    month: shifted.getUTCMonth() + 1,
+    day: shifted.getUTCDate(),
+  };
+}
+
+function formatCalendarMonth(date: { year: number; month: number }): string {
+  return `${date.year}年${date.month}月`;
+}
+
+function formatCalendarDate(date: { year: number; month: number; day: number }): string {
+  return `${formatCalendarMonth(date)}${date.day}日`;
+}
+
+/** 相対日付を発言時点の日本時間で決定的に解決し、Vector検索でも時点を失わない命題にする。 */
+export function normalizeDiaryRelativeDates(
+  originalStatement: string,
+  recordedAt: Date,
+): Readonly<{
+  statement: string;
+  temporalContext?: Readonly<{
+    originalStatement: string;
+    anchorDate: string;
+    timeZone: typeof DIARY_BRAIN_TIME_ZONE;
+    resolutions: readonly TemporalResolution[];
+  }>;
+}> {
+  const anchor = calendarDateInDiaryTimeZone(recordedAt);
+  const resolutions: TemporalResolution[] = [];
+  let statement = originalStatement;
+  const replace = (expression: string, resolved: string) => {
+    if (!statement.includes(expression)) return;
+    statement = statement.replaceAll(expression, resolved);
+    resolutions.push({ original: expression, resolved });
+  };
+
+  replace("再来月", formatCalendarMonth(shiftCalendarMonth(anchor, 2)));
+  replace("来月", formatCalendarMonth(shiftCalendarMonth(anchor, 1)));
+  replace("今月", formatCalendarMonth(anchor));
+  replace("先月", formatCalendarMonth(shiftCalendarMonth(anchor, -1)));
+  replace("再来年", `${anchor.year + 2}年`);
+  replace("来年", `${anchor.year + 1}年`);
+  replace("今年", `${anchor.year}年`);
+  replace("去年", `${anchor.year - 1}年`);
+  replace("一昨日", formatCalendarDate(shiftCalendarDay(anchor, -2)));
+  replace("昨日", formatCalendarDate(shiftCalendarDay(anchor, -1)));
+  replace("今日", formatCalendarDate(anchor));
+  replace("明後日", formatCalendarDate(shiftCalendarDay(anchor, 2)));
+  replace("明日", formatCalendarDate(shiftCalendarDay(anchor, 1)));
+
+  return resolutions.length === 0
+    ? { statement }
+    : {
+        statement,
+        temporalContext: {
+          originalStatement,
+          anchorDate: `${anchor.year}-${String(anchor.month).padStart(2, "0")}-${String(anchor.day).padStart(2, "0")}`,
+          timeZone: DIARY_BRAIN_TIME_ZONE,
+          resolutions,
+        },
+      };
+}
 
 /** Alarm時点で期限を迎えたcheckpointをQueue投入対象として返す。 */
 export async function listDueDiaryBrainCheckpointIds(
@@ -815,13 +926,14 @@ export async function applyDiaryBrainCheckpoint(
   for (const candidate of candidates) {
     const messageIds = [...new Set(candidate.sourceMessageIds)];
     if (
+      !DIARY_BRAIN_CATEGORY_SET.has(candidate.category) ||
       !candidate.statement.trim() ||
       messageIds.length === 0 ||
       messageIds.length !== candidate.sourceMessageIds.length
     ) {
       throw new Error("Diary Brain candidate validation failed");
     }
-    const candidateKey = `${candidate.statement.trim()}\u0000${[...messageIds].sort().join("\u0000")}`;
+    const candidateKey = `${candidate.category}\u0000${candidate.statement.trim()}\u0000${[...messageIds].sort().join("\u0000")}`;
     if (acceptedCandidateKeys.has(candidateKey)) continue;
     acceptedCandidateKeys.add(candidateKey);
     const sources = await db
@@ -858,25 +970,28 @@ export async function applyDiaryBrainCheckpoint(
     ) {
       throw new Error("Diary Brain candidate evidence validation failed");
     }
+    const recordedAt = new Date(Math.min(...sources.map(({ createdAt }) => createdAt.getTime())));
+    const normalized = normalizeDiaryRelativeDates(candidate.statement.trim(), recordedAt);
     const brainItemId = crypto.randomUUID();
     const lifecycle = { createdAt: at, updatedAt: at };
     statements.push(
       db.insert(brainItems).values({
         id: brainItemId,
         accountId,
-        category: "memory",
-        statement: candidate.statement.trim(),
+        category: candidate.category,
+        statement: normalized.statement,
         attributes: {
           sourceKind: "diary",
           sessionId: checkpoint.sessionId,
           checkpointId,
           promptVersion,
           isInference: false,
+          ...(normalized.temporalContext ? { temporalContext: normalized.temporalContext } : {}),
         },
         derivation: "ai",
         status: "active",
-        validFrom: new Date(Math.min(...sources.map(({ createdAt }) => createdAt.getTime()))),
-        stability: "stable",
+        validFrom: recordedAt,
+        stability: DIARY_BRAIN_STABILITY[candidate.category],
         sensitivity: "normal",
         externallyShareable: false,
         confidence: { state: "uncomputed" },
@@ -925,7 +1040,8 @@ export async function applyDiaryBrainCheckpoint(
       }),
     );
     appliedCandidates.push({
-      statement: candidate.statement.trim(),
+      category: candidate.category,
+      statement: normalized.statement,
       sourceMessageIds: messageIds,
     });
   }
@@ -969,7 +1085,11 @@ export async function getDiaryBrainCheckpointDevelopmentNotification(
     .get();
   if (!checkpoint) return undefined;
   const items = await db
-    .select({ brainItemId: brainItems.id, statement: brainItems.statement })
+    .select({
+      brainItemId: brainItems.id,
+      category: brainItems.category,
+      statement: brainItems.statement,
+    })
     .from(diaryBrainCheckpointItems)
     .innerJoin(brainItems, eq(diaryBrainCheckpointItems.brainItemId, brainItems.id))
     .where(
@@ -998,7 +1118,12 @@ export async function getDiaryBrainCheckpointDevelopmentNotification(
       )
       .orderBy(conversationMessages.sequence)
       .all();
-    result.push({ statement: item.statement, sourceMessageIds: messages.map(({ id }) => id) });
+    if (!DIARY_BRAIN_CATEGORY_SET.has(item.category)) continue;
+    result.push({
+      category: item.category as DiaryBrainCategory,
+      statement: item.statement,
+      sourceMessageIds: messages.map(({ id }) => id),
+    });
   }
   return { candidates: result };
 }

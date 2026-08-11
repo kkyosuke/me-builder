@@ -27,4 +27,9 @@ export type {
   AppliedBrainVectorSync,
   BrainChatContextMemory,
 } from "./account/action/brain";
-export type { ConversationContextMessage } from "./account/action/diary";
+export { DIARY_BRAIN_CATEGORIES, normalizeDiaryRelativeDates } from "./account/action/diary";
+export type {
+  ConversationContextMessage,
+  DiaryBrainCategory,
+  DiaryBrainCheckpointCandidate,
+} from "./account/action/diary";
