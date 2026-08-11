@@ -77,6 +77,10 @@ jobs:
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
         run: task vectorize:setup:production
 
+      - name: Ensure Private Avatar R2 Bucket (Production)
+        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
+        run: task avatar-bucket:setup:production
+
       - name: Apply D1 Migrations (Production)
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
         run: task db:migrate:production

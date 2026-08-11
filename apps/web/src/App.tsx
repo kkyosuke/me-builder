@@ -1,10 +1,15 @@
-import { Suspense, lazy, useEffect, useRef, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
 import { LoadingState } from "./components/loading-state";
 import { RouteErrorBoundary } from "./components/route-error-boundary";
 import { config } from "./config";
 import { LiffSessionProvider, useLiffSession } from "./feature/liff";
 import { getLiffIdToken } from "./feature/liff/infrastructure/liff-client";
-import { verifyLiffSession } from "./feature/liff/infrastructure/session-api";
+import {
+  type AccountProfile,
+  deleteAccountAvatar,
+  fetchAccountProfile,
+  saveAccountAvatar,
+} from "./feature/profile-settings/infrastructure/profile-api";
 import type { AvatarSelection } from "./feature/profile-settings/model/avatar";
 import { ProfileMenuButton } from "./feature/profile-settings/presentation/components/profile-menu-button";
 import { useColorTheme } from "./feature/theme";
@@ -61,6 +66,18 @@ function resolveRequestedPathname(): string {
   return liffState.split(/[?#]/, 1)[0] ?? window.location.pathname;
 }
 
+function errorMessage(error: unknown): string {
+  return error instanceof Error
+    ? error.message
+    : "プロフィールを取得できませんでした。再試行してください。";
+}
+
+function uploadedAvatar(profile: AccountProfile): AvatarSelection | null {
+  return profile.avatar?.source === "uploaded"
+    ? { kind: "uploaded", dataUrl: profile.avatar.url, fileName: "" }
+    : null;
+}
+
 function AppContents() {
   const colorTheme = useColorTheme();
   const liffSession = useLiffSession();
@@ -84,6 +101,22 @@ function AppContents() {
   const currentMainRoute = isCompatibilityPath ? "compatibility" : isMePath ? "me" : "diagnosis";
   const [avatar, setAvatar] = useState<AvatarSelection | null>(null);
   const [accountRole, setAccountRole] = useState<"user" | "admin" | null>(null);
+  const [profileLinePictureUrl, setProfileLinePictureUrl] = useState<string | undefined>();
+  const [profileReadState, setProfileReadState] = useState<
+    { status: "loading" | "ready" } | { status: "error"; message: string }
+  >({ status: "loading" });
+  const [profileReloadKey, setProfileReloadKey] = useState(0);
+  const linePictureUrl =
+    profileReadState.status === "ready"
+      ? (profileLinePictureUrl ?? liffSession.profile?.pictureUrl)
+      : undefined;
+
+  const applyAccountProfile = useCallback((profile: AccountProfile) => {
+    setAvatar(uploadedAvatar(profile));
+    setAccountRole(profile.role);
+    setProfileLinePictureUrl(profile.avatar?.source === "line" ? profile.avatar.url : undefined);
+    setProfileReadState({ status: "ready" });
+  }, []);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -136,28 +169,26 @@ function AppContents() {
   }, [isProfileOpen]);
 
   useEffect(() => {
-    if (!isProfileOpen) return;
-
+    if (isAdminPath) return;
     const controller = new AbortController();
-    setAccountRole(null);
+    setProfileReadState((current) =>
+      profileReloadKey === 0 && current.status === "ready" ? current : { status: "loading" },
+    );
     void (async () => {
       try {
         const idToken = getLiffIdToken() ?? (await liffSession.acquireIdToken(controller.signal));
-        if (!idToken || controller.signal.aborted) return;
-        const session = await verifyLiffSession(config.apiUrl, idToken, controller.signal);
-        if (!controller.signal.aborted && session.status === "verified") {
-          setAccountRole(session.role);
-        }
-      } catch {
-        // roleを取得できない場合も、管理者導線以外のプロフィール操作は継続する。
+        if (controller.signal.aborted) return;
+        if (!idToken) throw new Error("LINEからプロフィールを開き直してください。");
+        applyAccountProfile(await fetchAccountProfile(config.apiUrl, idToken, controller.signal));
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        setAccountRole(null);
+        setProfileReadState({ status: "error", message: errorMessage(error) });
       }
     })();
 
-    return () => {
-      controller.abort();
-      setAccountRole(null);
-    };
-  }, [isProfileOpen, liffSession.acquireIdToken]);
+    return () => controller.abort();
+  }, [applyAccountProfile, isAdminPath, liffSession.acquireIdToken, profileReloadKey]);
 
   const openProfile = () => {
     shouldRestoreProfileButtonFocus.current = true;
@@ -192,13 +223,24 @@ function AppContents() {
     setNavigation((current) => ({ ...current, profileView: "profile" }));
   };
 
+  const saveAvatar = async (nextAvatar: AvatarSelection | null) => {
+    const controller = new AbortController();
+    const idToken = getLiffIdToken() ?? (await liffSession.acquireIdToken(controller.signal));
+    if (!idToken) throw new Error("LINEからプロフィールを開き直してください。");
+    const profile = nextAvatar
+      ? await saveAccountAvatar(config.apiUrl, idToken, nextAvatar, controller.signal)
+      : await deleteAccountAvatar(config.apiUrl, idToken, controller.signal);
+    applyAccountProfile(profile);
+    closeAvatar();
+  };
+
   return (
     <>
       {!isAdminPath && profileView === "closed" && (
         <ProfileMenuButton
           ref={profileButtonRef}
           avatar={avatar}
-          linePictureUrl={liffSession.profile?.pictureUrl}
+          linePictureUrl={linePictureUrl}
           onOpen={openProfile}
           onPreload={preloadProfileSettingsScreen}
         />
@@ -229,10 +271,13 @@ function AppContents() {
               avatar={avatar}
               isAdmin={accountRole === "admin"}
               isInactive={profileView === "avatar"}
-              linePictureUrl={liffSession.profile?.pictureUrl}
+              isProfileLoading={profileReadState.status === "loading"}
+              profileError={profileReadState.status === "error" ? profileReadState.message : null}
+              linePictureUrl={linePictureUrl}
               theme={colorTheme.theme}
               onBack={closeProfile}
               onOpenAvatar={openAvatar}
+              onRetryProfile={() => setProfileReloadKey((current) => current + 1)}
               onThemeChange={colorTheme.setTheme}
             />
           </Suspense>
@@ -247,12 +292,9 @@ function AppContents() {
           >
             <AvatarSettingsScreen
               currentAvatar={avatar}
-              linePictureUrl={liffSession.profile?.pictureUrl}
+              linePictureUrl={linePictureUrl}
               onBack={closeAvatar}
-              onSave={(nextAvatar) => {
-                setAvatar(nextAvatar);
-                closeAvatar();
-              }}
+              onSave={saveAvatar}
             />
           </Suspense>
         </RouteErrorBoundary>

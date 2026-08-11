@@ -1,4 +1,4 @@
-import { Check, ImagePlus, Info, RotateCcw, Trash2, X } from "lucide-react";
+import { Check, ImagePlus, LoaderCircle, RotateCcw, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { type AvatarSelection, getAvatarName } from "../model/avatar";
 import { normalizeAvatarImage } from "../model/normalize-avatar-image";
@@ -15,13 +15,17 @@ export function AvatarSettingsScreen({
   currentAvatar: AvatarSelection | null;
   linePictureUrl?: string | undefined;
   onBack: () => void;
-  onSave: (avatar: AvatarSelection | null) => void;
+  onSave: (avatar: AvatarSelection | null) => Promise<void>;
 }) {
   const [selectedImage, setSelectedImage] = useState<AvatarSelection | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [isPreparingImage, setIsPreparingImage] = useState(false);
+  const [savingAction, setSavingAction] = useState<"save" | "delete" | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const selectionIdRef = useRef(0);
+  const isSaving = savingAction !== null;
+  const displayedAvatar = selectedImage ?? currentAvatar;
 
   useEffect(() => {
     closeButtonRef.current?.focus();
@@ -39,6 +43,7 @@ export function AvatarSettingsScreen({
     }
 
     setFileError(null);
+    setSaveError(null);
     setSelectedImage(null);
     setIsPreparingImage(true);
     try {
@@ -53,6 +58,23 @@ export function AvatarSettingsScreen({
     }
   };
 
+  const handleSave = async (avatar: AvatarSelection | null) => {
+    if (isSaving) return;
+    setSaveError(null);
+    setSavingAction(avatar ? "save" : "delete");
+    try {
+      await onSave(avatar);
+    } catch (error) {
+      setSaveError(
+        error instanceof Error
+          ? error.message
+          : "アバターを保存できませんでした。再試行してください。",
+      );
+    } finally {
+      setSavingAction(null);
+    }
+  };
+
   return (
     <dialog
       open
@@ -60,7 +82,7 @@ export function AvatarSettingsScreen({
       aria-labelledby="avatar-settings-title"
       onCancel={(event) => {
         event.preventDefault();
-        onBack();
+        if (!isSaving) onBack();
       }}
       className="fixed inset-0 z-[70] m-0 flex h-dvh max-h-none w-full max-w-none items-end justify-center overflow-hidden border-0 bg-slate-950/50 p-0 backdrop-blur-sm sm:items-center sm:p-6"
     >
@@ -81,6 +103,7 @@ export function AvatarSettingsScreen({
             ref={closeButtonRef}
             type="button"
             onClick={onBack}
+            disabled={isSaving}
             className="inline-flex size-11 items-center justify-center rounded-full text-slate-600 transition hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:text-slate-300 dark:hover:bg-slate-800"
             aria-label="アバター変更を閉じる"
           >
@@ -91,20 +114,26 @@ export function AvatarSettingsScreen({
         <main className="overflow-y-auto px-4 py-6 sm:px-6">
           <section className="rounded-3xl bg-gradient-to-br from-sky-100 via-white to-violet-100 p-5 dark:from-sky-950/60 dark:via-slate-800 dark:to-violet-950/50">
             <div className="flex items-center gap-4">
-              <AvatarPreview avatar={currentAvatar} fallbackImageUrl={linePictureUrl} size="lg" />
-              <div className="min-w-0">
+              <AvatarPreview
+                avatar={displayedAvatar}
+                fallbackImageUrl={selectedImage ? undefined : linePictureUrl}
+                size="lg"
+              />
+              <div aria-live="polite" className="min-w-0">
                 <p className="text-xs font-bold tracking-wider text-slate-500 dark:text-slate-400">
-                  現在のアバター
+                  {selectedImage ? "設定するアバター" : "現在のアバター"}
                 </p>
                 <p className="mt-2 break-words font-bold text-slate-950 dark:text-white">
-                  {getAvatarName(currentAvatar, linePictureUrl)}
+                  {selectedImage ? "選択した画像" : getAvatarName(currentAvatar, linePictureUrl)}
                 </p>
                 <p className="mt-1 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
-                  {currentAvatar
-                    ? "アプリで選んだ画像を表示しています。"
-                    : linePictureUrl
-                      ? "LINEのプロフィール画像を表示しています。"
-                      : "画像を選ぶとプロフィールに表示できます。"}
+                  {selectedImage
+                    ? "この画像でよければ、下のボタンから保存してください。"
+                    : currentAvatar
+                      ? "アプリで選んだ画像を表示しています。"
+                      : linePictureUrl
+                        ? "LINEのプロフィール画像を表示しています。"
+                        : "画像を選ぶとプロフィールに表示できます。"}
                 </p>
               </div>
             </div>
@@ -136,6 +165,7 @@ export function AvatarSettingsScreen({
               <input
                 type="file"
                 accept="image/png,image/jpeg,image/webp"
+                disabled={isSaving}
                 className="sr-only"
                 aria-label={selectedImage ? "別の画像を選ぶ" : "画像を選ぶ"}
                 onChange={(event) => {
@@ -155,59 +185,55 @@ export function AvatarSettingsScreen({
             )}
           </section>
 
-          {selectedImage && (
-            <section aria-labelledby="avatar-preview-heading" className="mt-6">
-              <h2
-                id="avatar-preview-heading"
-                className="px-1 text-sm font-bold text-slate-950 dark:text-white"
-              >
-                設定後のプレビュー
-              </h2>
-              <div className="mt-3 rounded-3xl border border-slate-200 bg-white p-6 text-center shadow-sm dark:border-slate-700 dark:bg-slate-800">
-                <div className="flex justify-center">
-                  <AvatarPreview avatar={selectedImage} size="xl" />
-                </div>
-                <p className="mt-4 text-xs text-slate-500 dark:text-slate-400">
-                  画像は中央を正方形に切り抜き、プロフィールでは円形で表示されます。
-                </p>
-              </div>
-            </section>
-          )}
-
-          <div className="mt-6 flex items-start gap-3 rounded-2xl bg-slate-100 p-4 text-sm text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-            <Info
-              className="mt-0.5 size-5 shrink-0 text-sky-600 dark:text-sky-300"
-              aria-hidden="true"
-            />
-            <p className="leading-relaxed">
-              現在はUI確認用のため、選んだ画像はサーバーへ送信・保存されず、再読み込みすると
-              {linePictureUrl ? "元のLINE画像" : "画像未設定の状態"}に戻ります。
+          {saveError && (
+            <p
+              role="alert"
+              className="mt-6 rounded-xl bg-rose-50 p-3 text-sm font-bold text-rose-900 dark:bg-rose-400/10 dark:text-rose-200"
+            >
+              {saveError}
             </p>
-          </div>
+          )}
         </main>
 
         <footer className="shrink-0 space-y-2 border-t border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900 sm:px-6">
           <button
             type="button"
-            disabled={!selectedImage || isPreparingImage}
-            onClick={() => onSave(selectedImage)}
+            disabled={!selectedImage || isPreparingImage || isSaving}
+            onClick={() => void handleSave(selectedImage)}
             className="flex w-full items-center justify-center gap-2 rounded-2xl bg-sky-400 px-5 py-4 font-bold text-slate-950 transition hover:bg-sky-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            <Check className="size-5" aria-hidden="true" />
-            この画像を設定
+            {savingAction === "save" ? (
+              <LoaderCircle
+                className="size-5 animate-spin motion-reduce:animate-none"
+                aria-hidden="true"
+              />
+            ) : (
+              <Check className="size-5" aria-hidden="true" />
+            )}
+            {savingAction === "save" ? "保存しています" : "この画像を保存"}
           </button>
           {currentAvatar && (
             <button
               type="button"
-              onClick={() => onSave(null)}
+              disabled={isSaving}
+              onClick={() => void handleSave(null)}
               className="flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-bold text-slate-600 transition hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-500 dark:text-slate-300 dark:hover:bg-slate-800"
             >
-              {linePictureUrl ? (
+              {savingAction === "delete" ? (
+                <LoaderCircle
+                  className="size-4 animate-spin motion-reduce:animate-none"
+                  aria-hidden="true"
+                />
+              ) : linePictureUrl ? (
                 <RotateCcw className="size-4" aria-hidden="true" />
               ) : (
                 <Trash2 className="size-4" aria-hidden="true" />
               )}
-              {linePictureUrl ? "LINEの画像に戻す" : "現在の画像を削除"}
+              {savingAction === "delete"
+                ? "削除しています"
+                : linePictureUrl
+                  ? "LINEの画像に戻す"
+                  : "現在の画像を削除"}
             </button>
           )}
         </footer>

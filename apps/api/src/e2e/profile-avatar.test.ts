@@ -1,0 +1,219 @@
+import { readFile, readdir } from "node:fs/promises";
+import path from "node:path";
+import type { D1Database, R2Bucket } from "@cloudflare/workers-types";
+import { Miniflare } from "miniflare";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { app } from "../index";
+
+const repositoryRoot = path.resolve(__dirname, "../../../..");
+const migrationsDirectory = path.join(repositoryRoot, "packages/lib/drizzle");
+const timestamp = 1_786_406_400;
+const lineAvatarUrl = "https://profile.line-scdn.net/line-avatar";
+const e2eSetupTimeoutMs = 90_000;
+
+let miniflare: Miniflare;
+let database: D1Database;
+let avatarBucket: R2Bucket;
+
+const squarePngBase64 =
+  "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAE0lEQVQImWP4z8DwHwwZGP6DAQBJyAn3iFfyTAAAAABJRU5ErkJggg==";
+
+function crc32(bytes: Uint8Array, start: number, end: number): number {
+  let crc = 0xffffffff;
+  for (let offset = start; offset < end; offset += 1) {
+    crc ^= bytes[offset] ?? 0;
+    for (let bit = 0; bit < 8; bit += 1) crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function squarePng(): Uint8Array {
+  return Uint8Array.from(atob(squarePngBase64), (value) => value.charCodeAt(0));
+}
+
+function nonSquarePng(): Uint8Array {
+  const bytes = squarePng();
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  view.setUint32(20, 1);
+  view.setUint32(29, crc32(bytes, 12, 29));
+  return bytes;
+}
+
+async function applyMigrations(db: D1Database): Promise<void> {
+  const migrationFiles = (await readdir(migrationsDirectory))
+    .filter((file) => /^\d+_.+\.sql$/.test(file))
+    .sort();
+  for (const file of migrationFiles) {
+    const sql = await readFile(path.join(migrationsDirectory, file), "utf8");
+    for (const statement of sql
+      .split("--> statement-breakpoint")
+      .map((value) => value.trim())
+      .filter(Boolean)) {
+      await db.prepare(statement).run();
+    }
+  }
+}
+
+async function prepareAccount(db: D1Database): Promise<void> {
+  await applyMigrations(db);
+  await db.batch([
+    db
+      .prepare(
+        `INSERT INTO accounts (id, created_at, updated_at, is_deleted, status)
+         VALUES (?, ?, ?, 0, 'active')`,
+      )
+      .bind("account-profile-e2e", timestamp, timestamp),
+    db
+      .prepare(
+        `INSERT INTO account_identities (
+           id, created_at, updated_at, is_deleted, account_id, provider, provider_account_id
+         ) VALUES (?, ?, ?, 0, ?, 'line_login', ?)`,
+      )
+      .bind(
+        "identity-profile-e2e",
+        timestamp,
+        timestamp,
+        "account-profile-e2e",
+        "line-profile-e2e",
+      ),
+  ]);
+}
+
+function bindings() {
+  return {
+    DB: database,
+    AVATAR_BUCKET: avatarBucket,
+    LINE_LOGIN_CHANNEL_ID: "1234567890",
+    ENVIRONMENT: "test",
+  };
+}
+
+function authorization() {
+  return { Authorization: "Bearer known-token" };
+}
+
+describe("Profile avatar storage API local E2E", () => {
+  beforeAll(async () => {
+    miniflare = new Miniflare({
+      compatibilityDate: "2026-07-29",
+      modules: true,
+      script: "export default { fetch() { return new Response('ok') } }",
+      d1Databases: { DB: "profile-avatar-e2e" },
+      r2Buckets: ["AVATAR_BUCKET"],
+    });
+    database = (await miniflare.getD1Database("DB")) as D1Database;
+    avatarBucket = (await miniflare.getR2Bucket("AVATAR_BUCKET")) as unknown as R2Bucket;
+    await prepareAccount(database);
+  }, e2eSetupTimeoutMs);
+
+  beforeEach(() => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({
+          iss: "https://access.line.me",
+          sub: "line-profile-e2e",
+          aud: "1234567890",
+          exp: timestamp + 86_400,
+          name: "プロフィール利用者",
+          picture: lineAvatarUrl,
+        }),
+      ),
+    );
+  });
+
+  afterEach(() => vi.unstubAllGlobals());
+  afterAll(async () => miniflare.dispose());
+
+  it("画像を保存し、GET 1回で画像を表示し、削除後はLINE画像へ戻す", async () => {
+    const initialProfile = await app.request(
+      "/api/profile",
+      { headers: authorization() },
+      bindings(),
+    );
+    expect(await initialProfile.json()).toMatchObject({
+      role: "user",
+      displayName: "プロフィール利用者",
+      avatar: { source: "line", url: lineAvatarUrl, updatedAt: null },
+    });
+
+    const bytes = squarePng();
+    const saved = await app.request(
+      "/api/profile/avatar",
+      {
+        method: "PUT",
+        headers: { ...authorization(), "Content-Type": "image/png" },
+        body: bytes.slice().buffer as ArrayBuffer,
+      },
+      bindings(),
+    );
+
+    expect(saved.status).toBe(200);
+    expect(saved.headers.get("cache-control")).toBe("no-store");
+    expect(await saved.json()).toMatchObject({
+      role: "user",
+      displayName: "プロフィール利用者",
+      avatar: { source: "uploaded", url: expect.stringMatching(/^data:image\/png;base64,/) },
+    });
+    expect((await avatarBucket.list()).objects).toHaveLength(1);
+    expect(
+      await database
+        .prepare(
+          "SELECT avatar_object_key, avatar_content_type, avatar_byte_size FROM account_profiles",
+        )
+        .first(),
+    ).toMatchObject({
+      avatar_content_type: "image/png",
+      avatar_byte_size: bytes.byteLength,
+    });
+
+    const profile = await app.request("/api/profile", { headers: authorization() }, bindings());
+    expect(profile.status).toBe(200);
+    expect(await profile.json()).toMatchObject({
+      avatar: { source: "uploaded", url: expect.stringMatching(/^data:image\/png;base64,/) },
+    });
+
+    const deleted = await app.request(
+      "/api/profile/avatar",
+      { method: "DELETE", headers: authorization() },
+      bindings(),
+    );
+    expect(deleted.status).toBe(200);
+    expect(await deleted.json()).toMatchObject({
+      avatar: { source: "line", url: lineAvatarUrl, updatedAt: null },
+    });
+    expect((await avatarBucket.list()).objects).toHaveLength(0);
+    expect(
+      await database.prepare("SELECT avatar_object_key FROM account_profiles").first(),
+    ).toEqual({ avatar_object_key: null });
+  });
+
+  it("非正方形画像をR2へ保存しない", async () => {
+    const bytes = nonSquarePng();
+    const response = await app.request(
+      "/api/profile/avatar",
+      {
+        method: "PUT",
+        headers: { ...authorization(), "Content-Type": "image/png" },
+        body: bytes.slice().buffer as ArrayBuffer,
+      },
+      bindings(),
+    );
+    expect(response.status).toBe(422);
+    expect((await avatarBucket.list()).objects).toHaveLength(0);
+  });
+
+  it("PUTは画像bodyの検査より前に認証する", async () => {
+    const response = await app.request(
+      "/api/profile/avatar",
+      {
+        method: "PUT",
+        headers: { "Content-Type": "image/png" },
+        body: Uint8Array.from([1, 2, 3]).buffer,
+      },
+      bindings(),
+    );
+    expect(response.status).toBe(401);
+    expect((await avatarBucket.list()).objects).toHaveLength(0);
+  });
+});

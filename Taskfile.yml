@@ -77,7 +77,7 @@ tasks:
       - bun --cwd infra generate:wrangler
 
   infra:preview:up:
-    desc: 'Create or update Preview D1 and Queues with Pulumi, then generate Wrangler TOML files'
+    desc: 'Create or update Preview D1, private R2, and Queues with Pulumi, then generate Wrangler TOML files'
     cmds:
       - bun --cwd infra preview:up
 
@@ -87,7 +87,7 @@ tasks:
       - bun --cwd infra preview:sync
 
   infra:preview:destroy:
-    desc: 'Delete Preview Workers/DO, D1, and Queues (requires ALLOW_PREVIEW_DESTROY=preview)'
+    desc: 'Delete Preview Workers/DO, D1, private R2, and Queues (requires ALLOW_PREVIEW_DESTROY=preview)'
     cmds:
       - bun --cwd infra preview:destroy
 
@@ -120,6 +120,15 @@ tasks:
     desc: 'Create the production Brain Vectorize index and metadata index if missing'
     cmds:
       - bun scripts/setup-brain-vectorize.ts production
+  avatar-bucket:setup:preview:
+    desc: 'Create the private Preview avatar R2 bucket if missing'
+    cmds:
+      - bun scripts/setup-avatar-bucket.ts preview
+
+  avatar-bucket:setup:production:
+    desc: 'Create the private Production avatar R2 bucket if missing'
+    cmds:
+      - bun scripts/setup-avatar-bucket.ts production
 
   access:setup:preview:
     desc: 'Protect preview OpenAPI and Swagger UI routes with Cloudflare Access'

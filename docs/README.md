@@ -86,6 +86,7 @@ docs/
 - [診断サムネイル生成](development/diagnosis-thumbnail-generation.md) — 診断一覧用サムネイルの生成プロンプトと配置手順
 - [LINEリッチメニュー運用](development/line-rich-menu.md) — Messaging APIによるリッチメニューの登録、画像更新、CD運用
 - [診断API契約](development/diagnosis-api.md) — Web UIとAPI Server間の診断API契約
+- [プロフィールAPI契約](development/profile-api.md) — 本人プロフィールとアバター画像の取得・保存・削除API契約
 - [API契約とクライアント型の生成](development/api-contract-generation.md) — HTTP契約の配置とOpenAPI・Web UI用型の生成運用
 - [アプリケーション運用ログ方針](development/operational-logging.md) — 一連の処理を追跡し、エラー原因と最終結果を判断できる運用ログの目的と進め方
 - [PR作成手順書](development/pull-request-guidelines.md) — PRタイトル、概要、作成前の準備と検証手順

@@ -22,6 +22,17 @@ const database = new cloudflare.D1Database(
   { protect },
 );
 
+const avatarBucket = new cloudflare.R2Bucket(
+  "avatarBucket",
+  {
+    accountId,
+    name: names.avatarBucket,
+    location: "apac",
+    storageClass: "Standard",
+  },
+  { protect },
+);
+
 const queues = Object.fromEntries(
   Object.entries(names.queues).map(([key, queueName]) => [
     key,
@@ -34,6 +45,9 @@ export const infrastructure = {
   database: {
     id: database.uuid,
     name: database.name,
+  },
+  avatarBucket: {
+    name: avatarBucket.name,
   },
   queues: Object.fromEntries(
     Object.entries(queues).map(([key, queue]) => [

@@ -20,6 +20,11 @@ import { resetDevelopmentDiagnosisDataRoute } from "./contract/diagnosis/dev-res
 import { diagnosisListRoute } from "./contract/diagnosis/list";
 import { liffSessionRoute } from "./contract/line/liff-session";
 import { openApiOptions } from "./contract/openapi";
+import {
+  deleteProfileAvatarRoute,
+  getProfileRoute,
+  putProfileAvatarRoute,
+} from "./contract/profile/profile";
 import { profileSummaryGenerationRoute, profileSummaryRoute } from "./contract/profile/summary";
 import { InternalServerErrorSchema } from "./contract/shared/errors";
 import { getStatistics } from "./controller/admin";
@@ -34,6 +39,11 @@ import {
 } from "./controller/diagnosis";
 import { postLiffSession, postLineWebhook } from "./controller/line";
 import { getProfileSummaryContents, postProfileSummaryGeneration } from "./controller/profile";
+import {
+  deleteProfileAvatarContents,
+  getProfileContents,
+  putProfileAvatar,
+} from "./controller/profile-avatar";
 import type { AppEnv } from "./types";
 
 const app = new Hono<AppEnv>();
@@ -109,6 +119,9 @@ app.post(
   profileSummaryGenerationRoute,
   postProfileSummaryGeneration,
 );
+app.get("/api/profile", getProfileRoute, getProfileContents);
+app.put("/api/profile/avatar", putProfileAvatarRoute, putProfileAvatar);
+app.delete("/api/profile/avatar", deleteProfileAvatarRoute, deleteProfileAvatarContents);
 
 app.get("/api/dev/brain-items", developmentBrainItemsRoute, getDevelopmentBrainItems);
 app.get(

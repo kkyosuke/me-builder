@@ -4,6 +4,9 @@
     "id": "6d11180b-3286-4b69-bd63-c7b60d768be1",
     "name": "me-builder-db-production"
   },
+  "avatarBucket": {
+    "name": "me-builder-avatar-production"
+  },
   "queues": {
     "webhook": { "name": "me-builder-webhook-queue-production" },
     "webhookDeadLetter": { "name": "me-builder-webhook-dlq-production" },
