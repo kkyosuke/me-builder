@@ -118,6 +118,7 @@ describe("Diary conversation persistence flow", () => {
     await expect(getPendingAssistantResponse(db, account.id, attached.turnId)).resolves.toEqual({
       body: "疲れている中でも散歩できたことを記録したよ。今は少し休めそう？",
       endSession: true,
+      usedBrainItems: [],
     });
     await expect(db.select().from(schema.brainItems)).resolves.toHaveLength(0);
     await expect(
@@ -356,6 +357,12 @@ describe("Diary conversation persistence flow", () => {
       body: "以前と同じように、公園を少し歩く選択肢もありそうです。",
       endSession: false,
       brainUsages: [{ brainItemId: "brain-audit-item", sourceRecordIds: [source.sourceRecordId] }],
+    });
+
+    await expect(getPendingAssistantResponse(db, account.id, turn.turnId)).resolves.toEqual({
+      body: "以前と同じように、公園を少し歩く選択肢もありそうです。",
+      endSession: false,
+      usedBrainItems: [{ category: "memory", statement: "公園を歩くと落ち着いた" }],
     });
 
     await expect(db.select().from(schema.diaryChatBrainUsageAudits)).resolves.toEqual([

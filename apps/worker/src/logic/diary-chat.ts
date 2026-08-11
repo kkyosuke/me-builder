@@ -35,6 +35,8 @@ const DiaryChatResponseSchema = v.strictObject({
 });
 const MEMORY_STATEMENT_CHARACTER_LIMIT = 2_000;
 const MEMORY_EVIDENCE_CHARACTER_LIMIT = 1_000;
+const DEVELOPMENT_BRAIN_STATEMENT_CHARACTER_LIMIT = 500;
+const DEVELOPMENT_BRAIN_USAGE_ENVIRONMENTS = new Set(["dev", "development", "local", "preview"]);
 
 export type DiaryChatResponse = v.InferOutput<typeof DiaryChatResponseSchema>;
 export type SafetyRoute = v.InferOutput<typeof SafetyRouteSchema>;
@@ -149,6 +151,28 @@ export function buildDiaryChatContextPackage(
       })),
     })),
   };
+}
+
+/** 開発環境だけ、モデルが実際に回答へ反映したBrain Itemの確認messageを作る。 */
+export function buildDevelopmentBrainUsageMessage(
+  memories: readonly Pick<BrainChatContextMemory, "category" | "statement">[],
+  environment: string,
+): string | undefined {
+  if (memories.length === 0 || !DEVELOPMENT_BRAIN_USAGE_ENVIRONMENTS.has(environment)) {
+    return undefined;
+  }
+  const summary = [...memories]
+    .sort(
+      (first, second) =>
+        first.category.localeCompare(second.category) ||
+        first.statement.localeCompare(second.statement),
+    )
+    .map(
+      ({ category, statement }, index) =>
+        `- ${index + 1}. ${category === "memory" ? "Memory" : category}: ${statement.slice(0, DEVELOPMENT_BRAIN_STATEMENT_CHARACTER_LIMIT)}`,
+    )
+    .join("\n");
+  return `[dev] 使用したBrain Item\n${summary}`;
 }
 
 export async function generateDiaryChatResponse(

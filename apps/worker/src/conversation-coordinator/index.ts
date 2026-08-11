@@ -13,6 +13,8 @@ import { DEFAULT_GEMINI_MODEL, getCloudflareBindings } from "../config";
 import type { CloudflareBindings } from "../config";
 import {
   createLineRetryKey,
+  decodeLineTexts,
+  encodeLineTexts,
   getLineDeliveryFailureKind,
   pushLineTextWithRetryKey,
   replyLineText,
@@ -148,7 +150,7 @@ export class ConversationCoordinator extends DurableObject<Env> {
         turnId: input.turnId,
         generationEpoch: input.generationEpoch,
         target,
-        body: input.text,
+        body: encodeLineTexts(input.text, input.additionalTexts),
         retryKey: await createLineRetryKey(this.env.CHAT_DELIVERY_SECRET, retryIdentity),
         status: "pending",
         deadlineAt: Date.now() + Math.max(1, this.currentLeaseDeadline(input.turnId) - Date.now()),
@@ -433,6 +435,7 @@ export class ConversationCoordinator extends DurableObject<Env> {
     }
     if (!this.env.LINE_CHANNEL_ACCESS_TOKEN)
       throw new Error("LINE channel token is not configured");
+    const texts = decodeLineTexts(delivery.body);
     // finalはreplyで返せればmessageを消費しない。
     if (delivery.kind === "final" && delivery.turnId) {
       const replyToken = this.peekReplyToken(delivery.turnId);
@@ -440,7 +443,7 @@ export class ConversationCoordinator extends DurableObject<Env> {
         const outcome = await replyLineText({
           channelAccessToken: this.env.LINE_CHANNEL_ACCESS_TOKEN,
           replyToken,
-          text: delivery.body,
+          texts,
         });
         if (outcome === "delivered") {
           this.discardReplyToken(delivery.turnId);
@@ -461,7 +464,7 @@ export class ConversationCoordinator extends DurableObject<Env> {
       await pushLineTextWithRetryKey({
         channelAccessToken: this.env.LINE_CHANNEL_ACCESS_TOKEN,
         to: delivery.target,
-        text: delivery.body,
+        texts,
         retryKey: delivery.retryKey,
       });
       this.repository.markDeliveryStatus(delivery.id, "delivered");

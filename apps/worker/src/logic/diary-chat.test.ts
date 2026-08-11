@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildDevelopmentBrainUsageMessage,
   buildDiaryChatContextPackage,
   buildSafetyFallback,
   classifySafety,
@@ -12,6 +13,31 @@ const messages = [
 ];
 
 describe("diary chat guardrails", () => {
+  it("開発環境では実際に使用したBrain Itemを返信末尾へ追加する", () => {
+    const memories = [{ category: "memory", statement: "公園を歩くと落ち着くことがある" }];
+
+    expect(buildDevelopmentBrainUsageMessage(memories, "development")).toBe(
+      "[dev] 使用したBrain Item\n- 1. Memory: 公園を歩くと落ち着くことがある",
+    );
+    expect(buildDevelopmentBrainUsageMessage(memories, "preview")).toContain(
+      "[dev] 使用したBrain Item",
+    );
+    expect(buildDevelopmentBrainUsageMessage(memories, "production")).toBeUndefined();
+  });
+
+  it("Brain Itemを使用していない場合は開発環境でも返信を変更しない", () => {
+    expect(buildDevelopmentBrainUsageMessage([], "development")).toBeUndefined();
+  });
+
+  it("開発用表示ではBrain Itemのstatementだけを500文字に制限する", () => {
+    const result = buildDevelopmentBrainUsageMessage(
+      [{ category: "memory", statement: "記".repeat(501) }],
+      "development",
+    );
+
+    expect(result).toBe(`[dev] 使用したBrain Item\n- 1. Memory: ${"記".repeat(500)}`);
+  });
+
   it("schemaと質問数を検証する", () => {
     const valid = JSON.stringify({
       mode: "explore",

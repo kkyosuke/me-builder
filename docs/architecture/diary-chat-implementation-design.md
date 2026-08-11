@@ -701,6 +701,8 @@ finalまたは失敗案内のretryは90秒で止めます。90秒時点で結果
 
 logへ出せる識別子は環境、Queue message ID、Turn ID、Session IDの一方向hash、prompt version、処理段階です。Account ID、LINE user ID、reply token、日記本文、Context Package、生成本文、Brain Item本文は出しません。
 
+`dev` / `development` / `local` / `preview`では、モデルが回答へ実際に反映したBrain Itemがある場合だけ、通常返信と同じLINE API requestの2通目へ`[dev] 使用したBrain Item`として分類とstatementを追加します。検索候補だっただけのItem、Brain Item ID、Source Record ID、Evidence本文は表示しません。使用0件では追加表示せず、`test`と`production`では常に表示しません。通常返信は加工せずassistant messageへ保存し、開発用表示を含む配送message列はConversationCoordinatorのoutboxへ固定して再配送時の内容と順序を維持します。
+
 過去情報を助言へ使った事実は本文ではなく、Brain Item ID、Source Record ID、利用時点のstatus、Derivation、Confidence、Access Policyを`purpose = diary_chat`の監査recordへ残します。実装ではContext Packageへ`memory-N`の仮IDだけを渡し、モデルの構造化出力から実際に回答へ反映した仮IDを受け取ります。Worker内で実IDへ戻し、assistant応答と`diary_chat_brain_usage_audits`を同じAccountData batchで保存します。Brain Item IDとSource Record IDはGeminiへ渡しません。
 
 ## 12. テストと評価

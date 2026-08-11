@@ -18,7 +18,11 @@ import {
 import type { CloudflareBindings, WorkerConfig } from "../config";
 import { createGeminiUsageRecorder } from "../infrastructure/gemini-usage";
 import { loadBrainContextMemories } from "../logic/brain-context";
-import { classifySafety, generateDiaryChatResponse } from "../logic/diary-chat";
+import {
+  buildDevelopmentBrainUsageMessage,
+  classifySafety,
+  generateDiaryChatResponse,
+} from "../logic/diary-chat";
 import {
   DEFAULT_DIARY_CHAT_PROMPT_OPTIONS,
   getDiaryChatConversationGuidance,
@@ -509,7 +513,12 @@ export async function processChatTurnMessage(
             ...(generationController.signal ? { signal: generationController.signal } : {}),
           });
     const response = pendingResponse
-      ? { reply: pendingResponse.body, endSession: pendingResponse.endSession, brainUsages: [] }
+      ? {
+          reply: pendingResponse.body,
+          endSession: pendingResponse.endSession,
+          brainUsages: [],
+          usedBrainItems: pendingResponse.usedBrainItems,
+        }
       : await atBoundary(
           () =>
             generateDiaryChatResponse(context.messages, workerConfig, generationController.signal, {
@@ -526,22 +535,18 @@ export async function processChatTurnMessage(
               const memoryByContextId = new Map<string, (typeof brainMemories)[number]>(
                 brainMemories.map((memory, index) => [`memory-${index + 1}`, memory] as const),
               );
+              const usedMemories = generated.used_memory_ids.flatMap((id) => {
+                const memory = memoryByContextId.get(id);
+                return memory ? [memory] : [];
+              });
               return {
                 reply: generated.reply,
                 endSession: generated.end_session,
-                brainUsages: generated.used_memory_ids.flatMap((id) => {
-                  const memory = memoryByContextId.get(id);
-                  return memory
-                    ? [
-                        {
-                          brainItemId: memory.brainItemId,
-                          sourceRecordIds: memory.evidence.map(
-                            ({ sourceRecordId }) => sourceRecordId,
-                          ),
-                        },
-                      ]
-                    : [];
-                }),
+                usedBrainItems: usedMemories,
+                brainUsages: usedMemories.map((memory) => ({
+                  brainItemId: memory.brainItemId,
+                  sourceRecordIds: memory.evidence.map(({ sourceRecordId }) => sourceRecordId),
+                })),
               };
             }),
           {
@@ -552,6 +557,10 @@ export async function processChatTurnMessage(
             dependency: "google-ai",
           },
         );
+    const developmentBrainUsageMessage = buildDevelopmentBrainUsageMessage(
+      response.usedBrainItems,
+      workerConfig.environment,
+    );
 
     if (!pendingResponse) {
       const leaseIsActive = await atBoundary(
@@ -608,6 +617,9 @@ export async function processChatTurnMessage(
           leaseToken: lease?.leaseToken ?? "",
           kind: "final",
           text: response.reply,
+          ...(developmentBrainUsageMessage
+            ? { additionalTexts: [developmentBrainUsageMessage] }
+            : {}),
         }),
       {
         code: "LINE_FINAL_DELIVERY_FAILED",

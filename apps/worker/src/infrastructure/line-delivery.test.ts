@@ -1,9 +1,35 @@
 import { describe, expect, it } from "vitest";
 import {
   createLineRetryKey,
+  decodeLineTexts,
+  encodeLineTexts,
   getLineDeliveryFailureKind,
   isAcceptedLineRetryConflict,
 } from "./line-delivery";
+
+describe("LINE text bundle", () => {
+  it("単一textは既存outboxと互換な本文のまま保存する", () => {
+    expect(encodeLineTexts("通常返信")).toBe("通常返信");
+    expect(decodeLineTexts("通常返信")).toEqual(["通常返信"]);
+  });
+
+  it("複数textを1つのoutbox本文へ固定して同じ順序へ復元する", () => {
+    const encoded = encodeLineTexts("通常返信", ["[dev] 使用したBrain Item"]);
+
+    expect(encoded).not.toContain("通常返信\n[dev]");
+    expect(decodeLineTexts(encoded)).toEqual(["通常返信", "[dev] 使用したBrain Item"]);
+  });
+
+  it("LINE上限を超えるtext bundleを拒否する", () => {
+    expect(() => encodeLineTexts("a".repeat(5_001))).toThrow("LINE text bundle is invalid");
+    expect(() =>
+      encodeLineTexts(
+        "通常返信",
+        Array.from({ length: 5 }, () => "追加"),
+      ),
+    ).toThrow("LINE text bundle is invalid");
+  });
+});
 
 describe("createLineRetryKey", () => {
   it("同じSecretと配送identityから同じUUIDを生成する", async () => {

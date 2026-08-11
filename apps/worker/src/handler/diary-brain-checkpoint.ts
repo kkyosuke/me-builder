@@ -178,7 +178,7 @@ async function sendDevelopmentNotification(
       await pushLineTextWithRetryKey({
         channelAccessToken: workerConfig.lineChannelAccessToken,
         to: providerAccountId,
-        text: developmentMessage,
+        texts: [developmentMessage],
         retryKey: await createLineRetryKey(
           workerConfig.chatDeliverySecret,
           `diary-brain:${checkpointId}`,
