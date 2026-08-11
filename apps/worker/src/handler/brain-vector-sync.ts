@@ -90,14 +90,12 @@ async function upsertBrainVector(
   }>,
   workerConfig: WorkerConfig,
 ) {
-  if (!workerConfig.googleAiStudioApiKey || !workerConfig.cloudflareAiGatewayToken) {
+  if (!workerConfig.googleVertexAiApiKey) {
     throw new Error("Gemini embedding credentials are not configured");
   }
   const values = await embedDocument(
     createGeminiClient({
-      googleAiStudioApiKey: workerConfig.googleAiStudioApiKey,
-      cloudflareAiGatewayToken: workerConfig.cloudflareAiGatewayToken,
-      cloudflareAiGatewayBaseUrl: workerConfig.cloudflareAiGatewayBaseUrl,
+      googleVertexAiApiKey: workerConfig.googleVertexAiApiKey,
     }),
     {
       model: workerConfig.geminiEmbeddingModel,

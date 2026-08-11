@@ -71,6 +71,31 @@ tasks:
     cmds:
       - bun run generate:api
 
+  infra:generate:
+    desc: 'Generate Wrangler TOML files from committed Pulumi stack outputs'
+    cmds:
+      - bun --cwd infra generate:wrangler
+
+  infra:preview:up:
+    desc: 'Create or update Preview D1 and Queues with Pulumi, then generate Wrangler TOML files'
+    cmds:
+      - bun --cwd infra preview:up
+
+  infra:preview:sync:
+    desc: 'Sync generated Wrangler TOML files with the current Preview resource IDs'
+    cmds:
+      - bun --cwd infra preview:sync
+
+  infra:preview:destroy:
+    desc: 'Delete Preview Workers/DO, D1, and Queues (requires ALLOW_PREVIEW_DESTROY=preview)'
+    cmds:
+      - bun --cwd infra preview:destroy
+
+  infra:preview:clean:
+    desc: 'Delete an existing unmanaged Preview environment before Pulumi adoption'
+    cmds:
+      - bun --cwd infra preview:clean
+
   db:setup:
     desc: 'Automatically create missing remote D1 databases and update wrangler.toml files'
     cmds:

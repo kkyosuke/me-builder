@@ -10,7 +10,7 @@
 - ユーザー起点query、background処理、管理者集計のAccount境界
 - Account Data Durable Objectと共有D1の責務境界
 - Account Data schemaでAccount境界を強制する方法
-- 既存の共有D1データをAccount Dataへ移すmigration規則
+- 新しいデータの保存先を決める判定規則
 
 この文書が所有しないもの:
 
@@ -46,9 +46,30 @@ flowchart LR
 | 複数Account間の共有関係 | 相性招待、双方の同意 | 関係ごとの専用Durable Object | 片方のAccountDataへ正本を寄せない |
 | 全体運用 | 管理者統計、配送先解決 | 共有D1 | 原文・Brain Item本文を保存しない |
 
-AccountData SQLiteでは、Object identityとAccount所有rootだけが`account_id`を持つことを原則とします。descendantの所有者はrootへの外部キーから一意に決まるため、同じ`account_id`を重複保存しません。Objectの物理分離を第一境界、Object identityとrootの`account_id`一致を誤routing検出の第二境界とします。
+新しいデータの保存先は、次の順で判定します。
 
-移行期間中の既知の例外として、既存の共有D1 actionとschemaを再利用するBrainのedge、revision、labelとDiagnosis Brain projection headには、本変更以前から存在する`account_id`が残ります。これは認可境界として利用せず、AccountData専用schemaへ分離した時点で親への外部キーへ置き換えます。Conversation、Source、Diagnosis回答のdescendantへ移行専用の`account_id`は追加しません。
+1. 認証が`account_id`を解決するより前に読む必要があるか。必要なら共有D1のAccount Identity
+2. 全Accountが同じ内容を読むか。読むなら共有D1の公開定義
+3. 2つのAccountの合意そのものが正本か。そうなら関係ごとの専用Durable Object
+4. 全Account横断で集計するか。するなら正本をAccountDataに残し、原文を含まない集計projectionだけを共有D1へ押し出す
+5. いずれにも当てはまらないならAccountData
+
+「本人だけが読むデータ」を共有D1へ置く理由は、この判定のどこにも現れません。Source Record、Brain Item、Diary、Diagnosis回答はいずれも5に該当します。
+
+```mermaid
+flowchart TD
+    N[新しいデータ] --> Q1{account_id解決前に読むか}
+    Q1 -->|Yes| SD[共有D1 / Account Identity]
+    Q1 -->|No| Q2{全Accountが同じ内容を読むか}
+    Q2 -->|Yes| SC[共有D1 / 公開定義]
+    Q2 -->|No| Q3{2 Accountの合意が正本か}
+    Q3 -->|Yes| RD[関係ごとのDurable Object]
+    Q3 -->|No| Q4{全Account横断で集計するか}
+    Q4 -->|Yes| AP[AccountDataが正本<br/>集計projectionだけ共有D1]
+    Q4 -->|No| AD[AccountData]
+```
+
+AccountData SQLiteでは、Object identityとAccount所有rootだけが`account_id`を持ちます。descendantの所有者はrootへの外部キーから一意に決まるため、同じ`account_id`を重複保存しません。Objectの物理分離を第一境界、Object identityとrootの`account_id`一致を誤routing検出の第二境界とします。この原則へ例外を作りません。
 
 ## 4. 不変条件
 
@@ -63,8 +84,8 @@ AccountData SQLiteでは、Object identityとAccount所有rootだけが`account_
 
 ### 4.2 書き込み
 
-1. Account所有rootは`account_id NOT NULL`とAccountData内のsingleton Accountへの外部キーを持ちます。
-2. Account所有descendantは原則として`account_id`を持たず、所有rootまたは同じaggregateの親へ通常の外部キーを張ります。移行中の既知の例外は[データの区分](#3-データの区分)だけで管理します。
+1. Account所有rootは`account_id NOT NULL`と、Objectへ固定したidentityへの外部キーを持ちます。AccountDataは共有D1のAccount行を複製せず、identityだけをFK先にします。
+2. Account所有descendantは`account_id`を持たず、所有rootまたは同じaggregateの親へ通常の外部キーを張ります。
 3. 2つのAccount所有rootを結ぶ関係も、同じAccountData Object内に片方のAccountしか存在しないため、両方のroot IDへの外部キーで混在を防ぎます。
 4. Conversation MessageとChat Turnの循環参照は、両方を同じObject内に作成してから参照を復元します。
 5. AccountData repositoryはdescendantへ所有者を重複転記せず、rootの所有者とObject identityだけを検証します。
@@ -77,25 +98,36 @@ projection retryや期限切れSession終了は各AccountData Objectのalarmで�
 
 ## 5. 現在のAccount所有関係
 
+共有D1はAccountとログイン手段だけを持ちます。
+
 ```mermaid
 erDiagram
     accounts ||--o{ account_identities : owns
-    accounts ||--o{ source_records : owns
+```
+
+AccountData内のAccount所有rootは、共有D1のAccount行ではなく、Objectへ固定したidentityを親にします。
+
+```mermaid
+erDiagram
+    account_data_identity ||--o{ source_records : owns
     source_records ||--o| source_record_text_payloads : owns
     source_records ||--o{ source_record_revisions : revises
-    accounts ||--o{ conversation_sessions : owns
+    account_data_identity ||--o{ conversation_sessions : owns
     conversation_sessions ||--o{ conversation_messages : contains
     conversation_sessions ||--o{ chat_turns : processes
-    accounts ||--o{ diagnosis_responses : owns
+    conversation_sessions ||--o{ diary_brain_checkpoints : summarizes
+    diary_brain_checkpoints ||--o{ diary_brain_checkpoint_items : produces
+    account_data_identity ||--o{ diagnosis_responses : owns
     diagnosis_responses ||--o{ diagnosis_answers : contains
     diagnosis_responses ||--o{ diagnosis_deferred_questions : defers
     diagnosis_responses ||--o{ diagnosis_brain_projection_requests : projects
-    accounts ||--o{ brain_items : owns
+    account_data_identity ||--o{ brain_items : owns
     brain_items ||--o{ brain_item_evidence_edges : supports
     brain_items ||--o{ brain_item_revisions : revises
     brain_items ||--o{ brain_item_access_labels : permits
     brain_items ||--o{ brain_item_topic_labels : classifies
-    accounts ||--o{ diagnosis_brain_projection_heads : owns
+    account_data_identity ||--o{ diagnosis_brain_projection_heads : owns
+    account_data_identity ||--o{ compatibility_references : lists
 ```
 
 関係tableが2つのAccount所有rootを結ぶ場合も、両rootは同じAccountData Object内にしか存在しません。通常の外部キーでSource RecordとBrain Item、Diagnosis ResponseとSource Recordを結び、別ObjectのIDは参照先そのものが存在しないため関連付けられません。
@@ -115,40 +147,68 @@ account-data/
 └── schema
 ```
 
+共有ライブラリのschemaとactionも、保存先ごとに分けます。1つの名前空間へAccountData所有tableと共有D1所有tableが同居すると、参照した名前が保存先を示さなくなり、[データの区分](#3-データの区分)の判定が読めなくなります。
+
+```text
+packages/lib/src/
+├── table/base.ts     # 保存先に依存しない共通column
+├── d1/               # D1が保存するdatabase
+│   └── shared/       # Account Identity、公開定義、集計projection
+└── do/               # Durable Objectが保存するdatabase
+    └── account/      # 1 AccountのSource、Brain、Diary、Diagnosis回答
+```
+
+呼び出し側は`D1.shared.*`と`DO.account.*`で参照します。保存先とdatabaseが参照式に現れるため、どちらを触っているかがコード上で分かります。
+
+```ts
+D1.shared.action.account.resolveAccountByLineLogin(db, sub);
+DO.account.action.diary.storeLineTextSource(db, input);
+```
+
+AccountDataのactionは、Durable Object SQLite用のdatabase型を引数に取ります。D1 client型へ変換して同じactionを両方の保存先から呼べる状態を作りません。同じ関数が両方から呼べる限り、保存先を間違えてもtypecheckで検出できないためです。
+
+AccountDataは共有D1の公開定義をsnapshotとして保持しますが、同期は版の比較で必要なときだけ行います。RPCごとに公開定義を全件読み直しません。定義が増えるほど1回の操作コストが線形に増えるためです。
+
 Conversation Coordinatorは連投調停、generation lease、配送outboxだけを所有し、本文やBrain ItemのSSoTにしません。Geminiなど外部APIの待機中にAccountData Objectを占有せず、読み取りと永続化を短いRPCへ分けます。
 
 複数Account間の相性共有は、関係ごとの`CompatibilityData`を正本とし、各AccountDataには一覧用参照だけを置きます。具体的な境界と整合性は[相性共有データ実装設計](compatibility-data-design.md)を正とします。
 
-## 7. Migration規則
+## 7. 共有D1が保存するもの
 
-共有D1の既存Account所有tableをAccountDataへ移すときは、次の順序を守ります。
+共有D1は次の3種類だけを保存します。
 
-1. 既存の親子関係から`account_id`を比較し、既に混在していればmigrationを失敗させる
-2. Accountごとに同じAccountData Objectを決定し、rootとdescendantを同じObjectへcopyする
-3. copy後に行数、ID集合、rootの`account_id`、`PRAGMA foreign_key_check`を照合する
-4. 読み取りをAccountDataへ切り替えてから、共有D1へのAccount所有データ書き込みを停止する
-5. rollback期間後に共有D1のAccount所有tableを削除する
-6. 異なるAccountを同じObjectへ渡すnegative testと、共有D1から原文を取得できないtestを追加する
+| 種類 | 共有D1が保存する理由 |
+| --- | --- |
+| Account Identity | 認証が`account_id`を解決する処理そのものであり、AccountDataを選ぶより前に読む必要がある |
+| 全Account共通の公開定義 | 全Accountが同じ内容を読むため、AccountDataへ置くとAccount数だけ複製される |
+| 原文を含まない集計projection | 全Account横断の集計にAccountDataの全走査を使わないため |
 
-現在の移行期間は、AccountDataへの最初のRPCで旧共有D1からそのAccountの所有行をlazy copyします。公開Diagnosis catalogを先に同期し、Source、Brain、Diary、Diagnosisの親子順に1つのSQLite transactionへ保存します。Conversation MessageとChat Turnの循環参照は一度NULLでcopyし、両方のrootを作成してから復元します。完了時刻を`account_data_identity.legacy_imported_at`へ保存し、失敗時は完了扱いにせず次のRPCで再試行します。
+次を禁止します。
 
-共有D1のdescendantへ移行専用の`account_id`を追加してはいけません。copy対象は既存の親子関係から導出し、別Accountのrootを参照する既存行はAccountData側の外部キー検証で移行を失敗させます。deploy時は旧書き込みと最初のlazy copyが競合しないようAccount所有データへの書き込みを停止してからWorker、APIを切り替えます。移行完了Account数とcopy失敗を監視し、全対象Accountの照合が終わるまで共有D1の旧tableを削除しません。
+- 共有D1へAccount所有tableを置く
+- AccountDataへAccount Identityの状態（利用停止、role、退会）を複製する。これらは共有D1が所有し、認可のたびにIdentity側で判定します
+- Account所有descendantへ`account_id`を持たせる
+- 公開定義のsnapshotを版の比較なしに同期する
+- 1つの名前空間へ共有D1所有とAccountData所有のschema・actionを同居させる
 
-descendantの`account_id`を削除するcontract migrationは、AccountDataへの切り替えを含むdeployと同時に適用しません。切り替え済みのWorkerとAPIが本番で稼働し、共有D1へAccount所有データを書かないことを確認した後のstacked deployで適用します。これにより、migrationが先に適用される時間帯に旧アプリケーションが削除済み列へ書き込む事態を防ぎます。
+Brain Itemのベクトル検索を追加する場合も、`WHERE`相当のmetadata filterだけをAccount境界にしません。認証済み`account_id`から決定的に選ぶ検索名前空間を境界とし、正本はAccountDataに残します。
 
-不一致行を削除したり、片方の所有者へ自動的に寄せたりしてmigrationを成功させてはいけません。混在が見つかった場合は、データごとの正しい所有者を調査してからrepairします。
+次のtestで境界を維持します。
 
-新規環境では共有D1にAccount所有tableを作らず、AccountDataだけを利用します。既存環境の共有D1 schemaはlazy copyの入力としてだけ維持し、AccountData向けに列やtriggerを追加しません。
+- 別Accountの`account_id`を同じObjectへ渡すと拒否される
+- 共有D1からAccount所有データの原文を取得できない
+- 共有D1にAccount所有tableが存在しない
 
 ## 8. 変更時チェックリスト
 
-- [ ] 新しいtableが全Account共通かAccount所有かを決めたか
+- [ ] [データの区分](#3-データの区分)の判定順で保存先を決めたか
 - [ ] Account所有tableを共有D1ではなくAccountData schemaへ追加したか
+- [ ] AccountDataへAccount Identityの状態を複製していないか
+- [ ] 公開定義のsnapshotを版の比較で必要なときだけ同期しているか
 - [ ] AccountData Objectが認証済み`account_id`から選ばれているか
 - [ ] Object identityと異なる`account_id`をRPCで拒否するか
-- [ ] descendantへ新しい`account_id`を重複追加していないか。既知の移行例外を増やしていないか
+- [ ] descendantへ`account_id`を重複追加していないか
 - [ ] Account所有table間の参照が同じObject内の外部キーで固定されているか
 - [ ] API・Worker・MCPがAccountDataのraw SQLite clientを取得できないか
 - [ ] 全Account処理がAccountData RPCから分離され、原文を集約していないか
-- [ ] migrationが既存の混在を検出し、copy後のID集合と外部キーを検証するか
 - [ ] 別Accountを使うnegative testがあるか

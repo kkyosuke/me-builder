@@ -1,6 +1,6 @@
 import type { D1Database } from "@cloudflare/workers-types";
 import type { AccountDataNamespace, CompatibilityDataNamespace } from "@me-builder/lib";
-import type { Queue, WebhookQueueMessage } from "@me-builder/shared";
+import type { Queue, SafeOperationalErrorFields, WebhookQueueMessage } from "@me-builder/shared";
 
 /** Wrangler生成bindingに、SecretとQueueの公開契約だけを重ねる。 */
 type Env = Omit<
@@ -14,9 +14,6 @@ type Env = Omit<
   LIFF_ID?: string;
   LINE_LOGIN_CHANNEL_ID?: string;
   ADMIN_LINE_USER_IDS?: string;
-  CLOUDFLARE_ACCOUNT_ID?: string;
-  CLOUDFLARE_AI_GATEWAY_ID?: string;
-  CLOUDFLARE_APP_API_TOKEN?: string;
   BASE_URL?: string;
   WEBHOOK_QUEUE?: Queue<WebhookQueueMessage>;
   DB?: D1Database;
@@ -25,4 +22,8 @@ type Env = Omit<
   BRAIN_VECTOR_INDEX?: ApiBindings["BRAIN_VECTOR_INDEX"];
 };
 
-export type AppEnv = { Bindings: Env };
+export type AppEnv = {
+  Bindings: Env;
+  /** onErrorが分類したエラーを、終端ログを持つmiddlewareへ引き渡すための領域。 */
+  Variables: { safeError?: SafeOperationalErrorFields };
+};

@@ -6,6 +6,7 @@ import type {
   WebhookQueueMessage,
 } from "@me-builder/shared";
 import { logger } from "@me-builder/shared";
+import { toSafeOperationalErrorFields } from "@me-builder/shared";
 import { getCloudflareBindings, getWorkerConfig } from "../config";
 import { handleQueueBatch } from "../logic/webhook";
 import type { Env } from "../types";
@@ -19,19 +20,29 @@ export async function queueHandler(
   >,
   env: Env,
 ): Promise<void> {
+  let workerConfig: ReturnType<typeof getWorkerConfig>;
+  let cf: ReturnType<typeof getCloudflareBindings>;
   try {
-    const workerConfig = getWorkerConfig(env as unknown as Record<string, unknown>);
-    const cf = getCloudflareBindings(env);
-    logger.info({ environment: workerConfig.environment }, "Worker queue handler triggered");
-    await handleQueueBatch(batch, cf.d1, workerConfig, cf);
-  } catch (err) {
+    workerConfig = getWorkerConfig(env as unknown as Record<string, unknown>);
+    cf = getCloudflareBindings(env);
+  } catch (error) {
     logger.error(
       {
+        event: "queue.batch.failed",
+        service: "worker",
         queue: batch.queue,
-        errorName: err instanceof Error ? err.name : "UnknownError",
+        outcome: "failed",
+        disposition: "platform-retry",
+        ...toSafeOperationalErrorFields(error, {
+          code: "WORKER_CONFIGURATION_FAILED",
+          category: "configuration",
+          stage: "worker.configure",
+          retryable: true,
+        }),
       },
-      "Unhandled exception in worker queue handler",
+      `[Queue dispatch] failed at worker.configure -> platform-retry (queue ${batch.queue}, WORKER_CONFIGURATION_FAILED)`,
     );
-    throw err;
+    throw error;
   }
+  await handleQueueBatch(batch, cf.d1, workerConfig, cf);
 }

@@ -1,8 +1,8 @@
-import type { d1 } from "@me-builder/lib";
+import type { D1 } from "@me-builder/lib";
 import { describe, expect, it, vi } from "vitest";
 import { saveDiagnosisAnswer } from "./diagnosis-answer";
 
-const db = {} as d1.Client;
+const db = {} as D1.shared.Client;
 const at = new Date("2026-08-05T00:00:00.000Z");
 
 describe("saveDiagnosisAnswer", () => {

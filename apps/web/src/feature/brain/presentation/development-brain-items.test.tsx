@@ -7,6 +7,23 @@ import { DevelopmentBrainItems } from "./development-brain-items";
 describe("DevelopmentBrainItems", () => {
   afterEach(cleanup);
 
+  it("一覧の取得中はItemのSkeletonを表示する", () => {
+    render(
+      <DevelopmentBrainItems
+        state={{ status: "loading" }}
+        vectorStates={{}}
+        onRetry={vi.fn()}
+        onVerifyVector={vi.fn()}
+      />,
+    );
+
+    const skeleton = screen.getByRole("status", { name: "Brain Item一覧を読み込み中" });
+    expect(skeleton.classList.contains("block")).toBe(true);
+    expect(skeleton.classList.contains("mt-5")).toBe(true);
+    expect(skeleton.querySelector(".space-y-3")?.children).toHaveLength(2);
+    expect(screen.getByRole("heading", { name: "Brain Item一覧" })).toBeTruthy();
+  });
+
   it("active ItemとEvidenceを表示する", () => {
     const onVerifyVector = vi.fn();
     render(

@@ -3,7 +3,11 @@ import { logger } from "@me-builder/shared";
 import { toJsonSchema } from "@valibot/to-json-schema";
 import * as v from "valibot";
 import type { WorkerConfig } from "../config";
-import { createGeminiClient, generateStructuredText } from "../infrastructure/gemini-client";
+import {
+  type GeminiUsageRecorder,
+  createGeminiClient,
+  generateStructuredText,
+} from "../infrastructure/gemini-client";
 import { classifySafety } from "./diary-chat";
 
 export const DIARY_BRAIN_PROMPT_VERSION = "diary-brain-v1";
@@ -105,17 +109,16 @@ export async function generateDiaryBrainCandidates(
   messages: ConversationContextMessage[],
   sourceMessageIds: readonly string[],
   workerConfig: WorkerConfig,
+  onUsage?: GeminiUsageRecorder,
 ): Promise<DiaryBrainCandidate[] | undefined> {
   if (classifySafety(messages, [...sourceMessageIds]) !== "normal") return [];
-  if (!workerConfig.googleAiStudioApiKey || !workerConfig.cloudflareAiGatewayToken) {
+  if (!workerConfig.googleVertexAiApiKey) {
     return ["dev", "development", "local", "test"].includes(workerConfig.environment)
       ? []
       : undefined;
   }
   const client = createGeminiClient({
-    googleAiStudioApiKey: workerConfig.googleAiStudioApiKey,
-    cloudflareAiGatewayToken: workerConfig.cloudflareAiGatewayToken,
-    cloudflareAiGatewayBaseUrl: workerConfig.cloudflareAiGatewayBaseUrl,
+    googleVertexAiApiKey: workerConfig.googleVertexAiApiKey,
   });
   const contents = JSON.stringify({
     context_package: {
@@ -130,6 +133,7 @@ export async function generateDiaryBrainCandidates(
       systemInstruction: SYSTEM_PROMPT,
       responseJsonSchema: schema,
       maxOutputTokens: 1_000,
+      ...(onUsage ? { onUsage } : {}),
     });
     const candidates = raw
       ? validateDiaryBrainCandidates(raw, messages, sourceMessageIds)

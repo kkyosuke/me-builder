@@ -1,20 +1,27 @@
-import * as action from "./action";
-import { type D1Client, createD1Client } from "./client";
-import * as schema from "./schema";
+import * as sharedAction from "./shared/action";
+import { type SharedD1Client, createSharedD1Client } from "./shared/client";
+import * as sharedSchema from "./shared/schema";
 
-export const d1 = {
-  client: {
-    create: createD1Client,
-  },
-  action,
-  schema,
+/**
+ * Cloudflare D1が保存するdatabase。
+ *
+ * 保存するのはAccount Identity、全Account共通の公開定義、原文を含まない集計projectionだけ。
+ * Account所有データは`DO.account`が持つ。境界は
+ * `docs/architecture/account-data-isolation.md`を正とする。
+ */
+const shared = {
+  client: { create: createSharedD1Client },
+  action: sharedAction,
+  schema: sharedSchema,
 };
 
-export namespace d1 {
-  export type Client = D1Client;
+export const D1 = { shared };
+
+export namespace D1 {
+  export namespace shared {
+    export type Client = SharedD1Client;
+  }
 }
 
-export { createD1Client } from "./client";
-export type { D1Client } from "./client";
-export { action, schema };
-export * from "./action";
+export { DIAGNOSIS_CATALOG_ID } from "./shared/schema/catalog";
+export type { DiagnosisDetail, DiagnosisDetailResult } from "./shared/action/catalog";

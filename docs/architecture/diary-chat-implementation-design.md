@@ -29,20 +29,20 @@
 
 ## 2. 実装方針
 
-**確定**: 既存の`apps/api`、`apps/worker`、Cloudflare Queues、D1、AI Gateway、Geminiを拡張します。Account所有データにはAccountごとの`AccountData` Durable Object、会話の順序と締切の調停にはAccountごとの`ConversationCoordinator` Durable Objectを使います。
+**確定**: 既存の`apps/api`、`apps/worker`、Cloudflare Queues、D1、Vertex AI Express ModeのGeminiを拡張します。Account所有データにはAccountごとの`AccountData` Durable Object、会話の順序と締切の調停にはAccountごとの`ConversationCoordinator` Durable Objectを使います。
 
 | 関心 | 採用する仕組み | 理由 |
 | --- | --- | --- |
 | 原本と利用可否のSSoT | AccountDataのprivate SQLite | Source Record、Brain Item、権限、削除状態をAccount単位で物理分離して判定するため |
 | Account内の会話順序 | Durable ObjectのローカルSQLite | 連投、応答中の追加発言、Session境界、外部I/O前後の状態遷移をAccount単位で調停するため |
 | 非同期配送と再試行 | Cloudflare Queues | Webhook受付とAI生成を分離するため |
-| LLM呼び出し | AI Gateway経由のGemini | 既存経路を維持し、本文なしで利用量と遅延を観測するため |
+| LLM呼び出し | Vertex AI Express ModeのGeminiへ直接接続 | API key認証を公式SDKのExpress Mode経路で利用するため |
 | 意味検索 | Vectorize | Accountを仮名化した検索scope内で、利用可能なBrain Itemの関連候補を絞るため |
 | 原文取得 | AccountData RPC | raw databaseを公開せず、選択済みAccount Object内でAccess Policyと削除状態を最終判定するため |
 
 どちらのDurable Objectも認証で解決した`accountId`から決定的に1インスタンスを選び、全Accountを1つのObjectへ集約しません。`AccountData`はBrain／Diagnosis／Diary moduleを1つのprivate SQLite上に持ちます。`ConversationCoordinator`のSQLiteは未処理message ID、処理中Turn、世代番号、配送outbox、締切だけを永続化し、日記本文やBrain ItemのSSoTにはしません。
 
-DOが直列化するのは各ObjectのローカルSQLite上の状態遷移です。別DOへのRPC、共有D1、Queue、LINE、AI Gatewayなどの外部I/Oを`await`している間まで自動的に同一transactionになるとは扱いません。外部I/Oの前に意図をローカルSQLiteへ確定し、完了後に同じ世代番号を確認して結果を反映します。`blockConcurrencyWhile()`はschema初期化に限り、別DOやAI呼び出しを囲みません。
+DOが直列化するのは各ObjectのローカルSQLite上の状態遷移です。別DOへのRPC、共有D1、Queue、LINE、Vertex AIなどの外部I/Oを`await`している間まで自動的に同一transactionになるとは扱いません。外部I/Oの前に意図をローカルSQLiteへ確定し、完了後に同じ世代番号を確認して結果を反映します。`blockConcurrencyWhile()`はschema初期化に限り、別DOやAI呼び出しを囲みません。
 
 Cloudflare Agents SDKは最初の実装では採用しません。LINEはWebhookとPushによる非同期チャネルであり、WebSocket同期状態や別のメッセージストアを加えるとAccountDataとの二重管理になります。Webチャット、再開可能なstreaming、複雑なscheduleが必要になった時点で再評価します。
 
@@ -62,11 +62,10 @@ flowchart TD
     AD -->|alarm: checkpoint投入| BQ[Brain Checkpoint Queue]
     BQ --> BW[Queue Worker: Brain変換]
     BW -->|checkpoint取得・適用| AD
-    BW -->|抽出prompt| AIG
+    BW -->|抽出prompt| GEMINI
     GW -->|Context Package| AD
     GW -->|候補検索| V[Vectorize]
-    GW -->|本文ログ無効| AIG[AI Gateway]
-    AIG --> GEMINI[Gemini]
+    GW -->|Context Package| GEMINI[Vertex AI Express Mode<br/>Gemini]
     GW -->|検証結果| DO
     DO -->|finalをretry key付きpush| LINE
     DO -->|Session・message・Turn RPC| AD
@@ -323,7 +322,7 @@ Vectorizeは非同期更新であるため、AccountDataを正とするoutboxを
 
 | 列 | 用途 |
 | --- | --- |
-| `id`, `account_id`, `brain_item_id`, `item_revision` | PK、対象Account、対象Item、更新版 |
+| `id`, `brain_item_id`, `item_revision` | PK、対象Item、更新版。対象Accountは1 Account = 1 AccountData SQLiteの配置から一意に決まるため重複保存しない |
 | `operation` | `upsert` / `delete` |
 | `status` | `pending` / `submitted` / `applied` / `failed` |
 | `mutation_id` | Vectorizeが返した非同期mutation ID |
@@ -442,9 +441,9 @@ AccountData、Queue、LINEを呼び出した後は、Turn ID、generation epoch�
 
 Coordinatorは最初の未処理messageから1.5秒待ち、その間のuser messageを1Turnへまとめます。生成開始後に届いたmessageは次のTurnへ送ります。Accountごとの`inflight_turn_id`は最大1件とし、Turn作成ごとに`generation_epoch`を単調増加させます。
 
-Chat Turn Queueへ渡すのは認証済みAccount ID、Turn ID、generation epochです。generate WorkerはAccount IDからAccountDataとCoordinatorを選び、処理開始時にCoordinatorの`acquireGeneration`を呼びます。`inflight_turn_id`が空でepochが現在値と一致する場合だけ期限付きleaseを取得します。Queueが同じTurnを同時配送しても、leaseを得られるconsumerは1つだけです。Workerは長い処理の節目でleaseを更新しますが90秒のhard deadlineは延長できません。AI Gatewayへの各requestにはlease失効前のtimeoutとabortを設定し、1回目が終了またはtimeoutする前に2回目を開始しません。
+Chat Turn Queueへ渡すのは認証済みAccount ID、Turn ID、generation epochです。generate WorkerはAccount IDからAccountDataとCoordinatorを選び、処理開始時にCoordinatorの`acquireGeneration`を呼びます。`inflight_turn_id`が空でepochが現在値と一致する場合だけ期限付きleaseを取得します。Queueが同じTurnを同時配送しても、leaseを得られるconsumerは1つだけです。Workerは長い処理の節目でleaseを更新しますが90秒のhard deadlineは延長できません。Vertex AIへの各requestにはlease失効前のtimeoutとabortを設定し、1回目が終了またはtimeoutする前に2回目を開始しません。
 
-完了通知時にTurn ID、generation epoch、leaseがDOの現在値と一致しなければ、生成結果を保存・送信せず破棄します。`inflight_turn_id`は生成完了では解放せず、finalの送信要求が受理されるか、90秒で`failed` / `delivery_unknown`になるまで保持します。次Turnを開始するときはepochを進めてから新しいleaseを発行し、旧epochのLINE outboxも以後retryしません。AccountDataやAI Gatewayの応答待ち中に新しいmessageが届いてもDOは受付を続け、現在Turnの後へ積みます。これにより一人につきAI生成を1つに制限し、遅延した古い生成結果や送信retryが新しい会話へ割り込みません。
+完了通知時にTurn ID、generation epoch、leaseがDOの現在値と一致しなければ、生成結果を保存・送信せず破棄します。`inflight_turn_id`は生成完了では解放せず、finalの送信要求が受理されるか、90秒で`failed` / `delivery_unknown`になるまで保持します。次Turnを開始するときはepochを進めてから新しいleaseを発行し、旧epochのLINE outboxも以後retryしません。AccountDataやVertex AIの応答待ち中に新しいmessageが届いてもDOは受付を続け、現在Turnの後へ積みます。これにより一人につきAI生成を1つに制限し、遅延した古い生成結果や送信retryが新しい会話へ割り込みません。
 
 ### 5.3 Session境界
 
@@ -684,18 +683,19 @@ finalまたは失敗案内のretryは90秒で止めます。90秒時点で結果
 - DLQ再処理は本文をlogへ出さず、Turn IDとfailure stageから行う
 - 先行Turnの生成待ちで`busy`が続く場合はQueueのretry上限までは待ち、上限に達したTurnはDLQへ落とさずCoordinatorへ差し戻して`pending_queue`から再投入する
 
-## 10. AI Gatewayと秘密情報
+## 10. Vertex AIと秘密情報
 
-- provider keyとAI Gateway tokenはWorker Secretだけに置く
-- `cf-aig-collect-log-payload: false`を付け、promptとresponse本文をGatewayへ保存しない
-- 個人ごとに内容が異なるため生成cacheを無効にする
-- Gateway logにはmodel、token数、status、latency、環境、prompt version、Turn IDだけを残す
-- Account ID、LINE user ID、Source Record本文、Brain Item本文をmetadataへ入れない
-- rate limitとspend limitを環境別に設定し、上限到達時も日記保存は成功させる
+- Vertex AI API keyはWorker Secretだけに置く
+- promptとresponse本文をアプリケーションログや独自の永続領域へ保存しない
+- Account ID、LINE user ID、Source Record本文、Brain Item本文をエラーログへ入れない
+- Googleの各成功レスポンスから`responseId`、model、用途、生成時刻、`usageMetadata`のtoken数と内部Account IDだけを共有D1へ冪等保存する
+- Google由来の`responseId`、入力token数、合計token数が欠けた場合は0や独自IDで補完せず、利用量recordの保存だけをスキップする。出力token数だけが省略された場合は、Google定義の合計token数から入力・思考・tool実行結果のtoken数を引いて導出する
+- token利用量recordにはprompt、response本文、LINE user IDなど外部providerの識別子を含めない
+- providerのrate limit到達時も日記保存は成功させる
 
 ## 11. 観測と監査
 
-初期段階で計測するのは各処理段階のlatency、38秒final率、90秒final率、retry、DLQ、DOの`pending_queue`滞留時間、重複抑止、schema違反、token数、モデル別失敗率です。安全性経路の集計は、保存する分類と監査要件を決めた後に追加します。
+初期段階で計測するのは各処理段階のlatency、38秒final率、90秒final率、retry、DLQ、DOの`pending_queue`滞留時間、重複抑止、schema違反、Googleレスポンス由来のtoken数、モデル別失敗率です。token数はGoogleの`responseId`単位で共有D1へ保存し、管理者統計では当月分を集計します。安全性経路の集計は、保存する分類と監査要件を決めた後に追加します。
 
 logへ出せる識別子は環境、Queue message ID、Turn ID、Session IDの一方向hash、prompt version、処理段階です。Account ID、LINE user ID、reply token、日記本文、Context Package、生成本文、Brain Item本文は出しません。
 
@@ -726,7 +726,7 @@ logへ出せる識別子は環境、Queue message ID、Turn ID、Session IDの�
 - finalに診断リンクを付加せず、AccountDataのassistant本文と同じ生成本文を配送する
 - 90秒でfinalまたは失敗案内の配送outboxを確定する
 - Queue再配送、DO再起動、alarm再実行でもTurnが重複しない
-- AI Gatewayのpayload loggingとcacheが無効になる
+- Vertex AI clientがExpress ModeのAPI keyで直接接続し、proxy URLを設定しない
 
 ### 会話評価fixture
 
@@ -765,7 +765,7 @@ prompt versionを本番へ出す条件はschema準拠100%、越権した記憶�
 - Vectorizeは[metadata filterがtopK前に適用される仕様](https://developers.cloudflare.com/vectorize/reference/metadata-filtering/)と[更新が非同期である仕様](https://developers.cloudflare.com/vectorize/reference/client-api/)を前提にする
 - LINEのpushは[retry keyによる安全な再試行](https://developers.line.biz/ja/docs/messaging-api/retrying-api-request/)に従う
 - Durable Objectの削除説明と復旧手順は[Point-in-time recovery](https://developers.cloudflare.com/durable-objects/reference/data-location/#durable-object-data-recovery)を前提にする
-- AI Gatewayは[本文logを無効にできる仕様](https://developers.cloudflare.com/changelog/product/ai-gateway/)に従い、metadataだけを記録する
+- Vertex AI Express Modeは[Google Gen AI SDKのAPI key認証](https://cloud.google.com/vertex-ai/generative-ai/docs/start/express-mode/overview)を使う
 - Geminiは[Structured outputs](https://ai.google.dev/gemini-api/docs/structured-output)を使い、アプリケーションでもschema検証する
 
 ## 15. 後続で決めること

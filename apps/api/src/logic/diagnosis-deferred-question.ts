@@ -1,8 +1,8 @@
-import { type AccountDataNamespace, accountDataFor, type d1 } from "@me-builder/lib";
+import { type AccountDataNamespace, type D1, type DO, accountDataFor } from "@me-builder/lib";
 import { createLiffSession } from "./liff-session";
 
 type Deferred = Extract<
-  Awaited<ReturnType<typeof d1.action.diagnosis.deferDiagnosisQuestion>>,
+  Awaited<ReturnType<typeof DO.account.action.diagnosis.deferDiagnosisQuestion>>,
   { type: "deferred" }
 >;
 
@@ -21,7 +21,7 @@ type Params = {
   diagnosisQuestionId: string;
   idToken: string | undefined;
   lineLoginChannelId: string | undefined;
-  db: d1.Client;
+  db: D1.shared.Client;
   accountData?: AccountDataNamespace;
   at?: Date;
 };
@@ -31,8 +31,11 @@ type Dependencies = {
   deferQuestion: (
     accountData: AccountDataNamespace | undefined,
     accountId: string,
-    input: Omit<Parameters<typeof d1.action.diagnosis.deferDiagnosisQuestion>[1], "accountId">,
-  ) => ReturnType<typeof d1.action.diagnosis.deferDiagnosisQuestion>;
+    input: Omit<
+      Parameters<typeof DO.account.action.diagnosis.deferDiagnosisQuestion>[1],
+      "accountId"
+    >,
+  ) => ReturnType<typeof DO.account.action.diagnosis.deferDiagnosisQuestion>;
 };
 
 const defaultDependencies: Dependencies = {

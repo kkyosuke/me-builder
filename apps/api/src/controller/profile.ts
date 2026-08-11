@@ -1,4 +1,4 @@
-import { d1 } from "@me-builder/lib";
+import { D1 } from "@me-builder/lib";
 import { logger } from "@me-builder/shared";
 import type { Context } from "hono";
 import * as v from "valibot";
@@ -25,7 +25,7 @@ export async function getProfileSummaryContents(c: Context<AppEnv>): Promise<Res
   const outcome = await getProfileSummary({
     idToken: bearerToken(c.req.header("authorization")),
     lineLoginChannelId: getConfig(c.env).lineLoginChannelId,
-    db: d1.client.create(c.env.DB),
+    db: D1.shared.client.create(c.env.DB),
     accountData: c.env.ACCOUNT_DATA,
   });
 
@@ -33,7 +33,9 @@ export async function getProfileSummaryContents(c: Context<AppEnv>): Promise<Res
     case "resolved":
       return c.json(
         v.parse(ProfileSummaryResponseSchema, {
-          summary: outcome.summary,
+          versions: outcome.versions,
+          availableDataCounts: outcome.availableDataCounts,
+          generation: outcome.generation,
           nextAction: outcome.nextAction,
         }),
       );

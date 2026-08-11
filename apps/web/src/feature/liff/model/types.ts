@@ -2,7 +2,7 @@
  * 画面へ表示してよいプロフィール項目だけを持つ。
  * LINEのuserIdは本人識別子のため含めない。
  */
-interface LiffDisplayProfile {
+export interface LiffDisplayProfile {
   displayName: string;
   pictureUrl?: string;
 }
@@ -19,6 +19,6 @@ export type LiffState =
 export type LiffSessionState =
   | { status: "idle" }
   | { status: "verifying" }
-  | { status: "verified" }
+  | { status: "verified"; role: "user" | "admin" }
   | { status: "friendship-required" }
   | { status: "error"; message: string };

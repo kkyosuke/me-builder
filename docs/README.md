@@ -48,7 +48,7 @@ docs/
 - [自分の傾向サマリー体験設計](product/profile-summary-experience.md) — 複数の診断回答を横断して本人の現在の傾向を表示する画面と要約規則
 - [相性診断・うつし共有体験設計](product/compatibility-experience.md) — 招待リンクとLINE共有、双方の同意、相性一覧、「それぞれについて」と「2人について」、共有終了
 - [プロフィール設定体験設計](product/profile-settings-experience.md) — 右上の入口、アバター設定への接続、ライト・ダークテーマの選択と保存
-- [アバター設定体験設計](product/avatar-experience.md) — 画像アップロード、AI候補の非同期生成、候補選択、表示、差し替え・削除
+- [アバター設定体験設計](product/avatar-experience.md) — LINEプロフィール画像の初期表示、端末画像の選択・プレビュー・設定、差し替え・削除
 - [ストレスの手がかりとAIセルフケア相談体験設計](product/self-care-ai-consultation-experience.md) — 自分用のセルフケア情報、AI相談、安全上の切り替え
 - [日記チャット体験設計](product/diary-chat-experience.md) — 日々の声かけから出来事と行動原理を探り、記憶を使って助言する対話体験と応答時間
 
@@ -77,7 +77,7 @@ docs/
 ### システム・デザイン・開発運用を確認する
 
 - [インフラ・システム構成](architecture/infrastructure-architecture.md) — Cloudflareを利用するシステム構成とサービス配置
-- [Accountデータ分離設計](architecture/account-data-isolation.md) — 1 Account = 1 AccountData DO、内部module、共有D1境界、migration規則
+- [Accountデータ分離設計](architecture/account-data-isolation.md) — 1 Account = 1 AccountData DO、保存先の判定規則、内部module、共有D1が保存するもの
 - [相性共有データ実装設計](architecture/compatibility-data-design.md) — 1関係 = 1 CompatibilityData DO、Account別一覧参照、同意指紋、状態遷移
 - [日記チャット実装設計](architecture/diary-chat-implementation-design.md) — 日記チャットのAccountDataモデル、実行基盤、プロンプト、ガードレール、応答期限
 - [管理者向け統計ダッシュボード設計](architecture/admin-statistics-dashboard.md) — 管理者認可とGemini・LINEの利用統計

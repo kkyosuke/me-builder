@@ -5,8 +5,32 @@ describe("fetchProfileSummary", () => {
   afterEach(() => vi.unstubAllGlobals());
 
   it("本人のまとめと次の行動を取得する", async () => {
+    const summary = {
+      generatedAt: "2026-08-08T12:00:00.000Z",
+      headline: "まとめ",
+      insights: [],
+      recordCount: 1,
+      diagnosisCount: 1,
+      diaryCount: 0,
+      latestRecordedAt: "2026-08-08T11:00:00.000Z",
+    };
+    const apiResponse = {
+      versions: [
+        {
+          id: "version-1",
+          sequence: 1,
+          generatedAt: summary.generatedAt,
+          isLatest: true,
+          generationMethod: "ai",
+          summary,
+        },
+      ],
+      availableDataCounts: { diagnosis: 2, diary: 3 },
+      generation: { status: "idle", canRegenerate: false, reasons: [], message: null },
+      nextAction: "chat",
+    };
     const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ summary: null, nextAction: "chat" }), {
+      new Response(JSON.stringify(apiResponse), {
         status: 200,
         headers: { "Content-Type": "application/json" },
       }),
@@ -15,7 +39,11 @@ describe("fetchProfileSummary", () => {
 
     const result = await fetchProfileSummary("https://api.example.com", "id-token");
 
-    expect(result).toEqual({ summary: null, nextAction: "chat" });
+    expect(result).toEqual({
+      ...apiResponse,
+      generation: { status: "idle", canRegenerate: false, reasons: [] },
+      summary,
+    });
     expect(fetchMock).toHaveBeenCalledWith(
       "https://api.example.com/api/profile-summary",
       expect.objectContaining({ headers: { Authorization: "Bearer id-token" } }),
@@ -25,11 +53,17 @@ describe("fetchProfileSummary", () => {
   it("不正なレスポンスを受け入れない", async () => {
     vi.stubGlobal(
       "fetch",
-      vi
-        .fn()
-        .mockResolvedValue(
-          new Response(JSON.stringify({ summary: null, nextAction: "unknown" }), { status: 200 }),
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            versions: [],
+            availableDataCounts: { diagnosis: 0, diary: 0 },
+            generation: { status: "idle", canRegenerate: false, reasons: [], message: null },
+            nextAction: "unknown",
+          }),
+          { status: 200 },
         ),
+      ),
     );
 
     await expect(fetchProfileSummary(undefined, "id-token")).rejects.toThrow();

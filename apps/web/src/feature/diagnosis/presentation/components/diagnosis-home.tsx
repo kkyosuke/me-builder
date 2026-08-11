@@ -1,10 +1,10 @@
 import { ArrowRight, ChevronDown, RotateCw, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { LoadingState } from "../../../../components/loading-state";
 import { MainNavigation } from "../../../../components/main-navigation";
 import type { AsyncState } from "../../../../model/async-state";
 import type { DiagnosisListItem } from "../../model/diagnosis-list-item";
 import { buildDiagnosisListSections } from "../../model/diagnosis-list-sections";
+import { DiagnosisListSkeleton } from "./diagnosis-loading-skeleton";
 
 const diagnosisThumbnails: Record<string, string> = {
   "relationship-priority": "/images/diagnoses/relationship-priority.jpg",
@@ -142,9 +142,7 @@ export function DiagnosisHome({
             </button>
           </div>
         )}
-        {diagnoses.status === "loading" && (
-          <LoadingState variant="panel" message="診断を読み込んでいます..." />
-        )}
+        {diagnoses.status === "loading" && <DiagnosisListSkeleton />}
         {diagnoses.status === "success" && diagnoses.data.length === 0 && (
           <p className="rounded-3xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-6 text-center text-sm text-slate-600 dark:text-slate-400">
             回答できる診断はありません。

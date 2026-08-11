@@ -1,4 +1,4 @@
-import { ArrowLeft, ChevronRight, Moon, Sparkles, Sun } from "lucide-react";
+import { ArrowLeft, ChevronRight, Moon, Shield, Sparkles, Sun } from "lucide-react";
 import { useEffect, useRef } from "react";
 import type { ColorTheme } from "../../theme/model/color-theme";
 import { type AvatarSelection, getAvatarName } from "../model/avatar";
@@ -23,28 +23,50 @@ const themes = [
 
 export function ProfileSettingsScreen({
   avatar,
+  isAdmin = false,
+  isInactive = false,
+  linePictureUrl,
   theme,
   onBack,
   onOpenAvatar,
   onThemeChange,
 }: {
   avatar: AvatarSelection | null;
+  isAdmin?: boolean;
+  isInactive?: boolean;
+  linePictureUrl?: string | undefined;
   theme: ColorTheme;
   onBack: () => void;
   onOpenAvatar: () => void;
   onThemeChange: (theme: ColorTheme) => void;
 }) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
   const backButtonRef = useRef<HTMLButtonElement>(null);
+  const avatarButtonRef = useRef<HTMLButtonElement>(null);
+  const wasInactiveRef = useRef(isInactive);
 
   useEffect(() => {
-    backButtonRef.current?.focus();
-  }, []);
+    dialogRef.current?.toggleAttribute("inert", isInactive);
+    if (isInactive) {
+      wasInactiveRef.current = true;
+      return;
+    }
+
+    if (wasInactiveRef.current) {
+      avatarButtonRef.current?.focus();
+    } else {
+      backButtonRef.current?.focus();
+    }
+    wasInactiveRef.current = false;
+  }, [isInactive]);
 
   return (
     <dialog
+      ref={dialogRef}
       open
       aria-modal="true"
       aria-labelledby="profile-settings-title"
+      aria-hidden={isInactive || undefined}
       className="fixed inset-0 z-[60] m-0 h-auto max-h-none w-auto max-w-none overflow-y-auto border-0 bg-slate-50 p-0 dark:bg-slate-900"
     >
       <header className="sticky top-0 z-10 border-b border-slate-200/80 bg-white/90 backdrop-blur dark:border-slate-700 dark:bg-slate-900/90">
@@ -70,7 +92,7 @@ export function ProfileSettingsScreen({
       <main className="mx-auto w-full max-w-2xl px-4 py-8 pb-16 sm:px-8">
         <section className="overflow-hidden rounded-3xl bg-gradient-to-br from-sky-100 via-white to-violet-100 p-6 shadow-lg shadow-slate-950/5 dark:from-sky-950/60 dark:via-slate-800 dark:to-violet-950/50">
           <div className="flex items-center gap-4">
-            <AvatarPreview avatar={avatar} size="lg" />
+            <AvatarPreview avatar={avatar} fallbackImageUrl={linePictureUrl} size="lg" />
             <div className="min-w-0">
               <p className="flex items-center gap-1.5 text-xs font-bold tracking-wider text-violet-700 dark:text-violet-200">
                 <Sparkles className="size-4" aria-hidden="true" />
@@ -94,17 +116,18 @@ export function ProfileSettingsScreen({
             アバター
           </h2>
           <button
+            ref={avatarButtonRef}
             type="button"
             onClick={onOpenAvatar}
             className="mt-3 flex w-full items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-sky-300 hover:bg-sky-50/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:border-slate-700 dark:bg-slate-800 dark:hover:border-sky-700 dark:hover:bg-sky-950/20"
           >
-            <AvatarPreview avatar={avatar} size="md" />
+            <AvatarPreview avatar={avatar} fallbackImageUrl={linePictureUrl} size="md" />
             <span className="min-w-0 flex-1">
               <span className="block font-bold text-slate-950 dark:text-white">
-                {avatar ? "アバターを変更" : "アバターを設定"}
+                {avatar || linePictureUrl ? "アバターを変更" : "アバターを設定"}
               </span>
               <span className="mt-1 block truncate text-sm text-slate-500 dark:text-slate-400">
-                {getAvatarName(avatar)}
+                {getAvatarName(avatar, linePictureUrl)}
               </span>
             </span>
             <ChevronRight className="size-5 text-slate-400" aria-hidden="true" />
@@ -168,6 +191,34 @@ export function ProfileSettingsScreen({
             選んだテーマはこのブラウザに保存され、次に開いたときも使われます。
           </p>
         </section>
+
+        {isAdmin && (
+          <section aria-labelledby="admin-setting-heading" className="mt-8">
+            <h2
+              id="admin-setting-heading"
+              className="px-1 text-sm font-bold tracking-wider text-slate-500 dark:text-slate-400"
+            >
+              管理
+            </h2>
+            <a
+              href="/admin"
+              className="mt-3 flex w-full items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-violet-300 hover:bg-violet-50/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 dark:border-slate-700 dark:bg-slate-800 dark:hover:border-violet-700 dark:hover:bg-violet-950/20"
+            >
+              <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-700 dark:bg-violet-400/15 dark:text-violet-200">
+                <Shield className="size-5" aria-hidden="true" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block font-bold text-slate-950 dark:text-white">
+                  管理者画面を開く
+                </span>
+                <span className="mt-1 block text-sm text-slate-500 dark:text-slate-400">
+                  利用状況と外部サービスの統計を確認
+                </span>
+              </span>
+              <ChevronRight className="size-5 text-slate-400" aria-hidden="true" />
+            </a>
+          </section>
+        )}
       </main>
     </dialog>
   );

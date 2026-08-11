@@ -1,33 +1,51 @@
-import { type AppliedBrainVectorSync, d1 } from "@me-builder/lib";
+import { type AppliedBrainVectorSync, DO } from "@me-builder/lib";
 
 /** Brain Item domain operations owned by one AccountData Object. */
 export const brainActions = {
-  "brain.listActive": (db: d1.Client, accountId: string) =>
-    d1.action.brain.listActiveBrainItems(db, accountId),
-  "brain.findActiveVectorEntry": (db: d1.Client, accountId: string, brainItemId: string) =>
-    d1.action.brain.findActiveBrainVectorEntry(db, accountId, brainItemId),
+  "brain.listActive": (db: DO.account.Database, accountId: string) =>
+    DO.account.action.brain.listActiveBrainItems(db, accountId),
+  "brain.findActiveVectorEntry": (
+    db: DO.account.Database,
+    accountId: string,
+    brainItemId: string,
+  ) => DO.account.action.brain.findActiveBrainVectorEntry(db, accountId, brainItemId),
   "brain.getVectorSyncTarget": (
-    db: d1.Client,
+    db: DO.account.Database,
     accountId: string,
     jobId: string,
     brainItemId: string,
     itemRevision: number,
-  ) => d1.action.brain.getBrainVectorSyncTarget(db, accountId, jobId, brainItemId, itemRevision),
+  ) =>
+    DO.account.action.brain.getBrainVectorSyncTarget(
+      db,
+      accountId,
+      jobId,
+      brainItemId,
+      itemRevision,
+    ),
   "brain.completeVectorSyncJob": (
-    db: d1.Client,
+    db: DO.account.Database,
     accountId: string,
     jobId: string,
     applied: AppliedBrainVectorSync,
     mutationId: string,
     at?: Date,
-  ) => d1.action.brain.completeBrainVectorSyncJob(db, accountId, jobId, applied, mutationId, at),
+  ) =>
+    DO.account.action.brain.completeBrainVectorSyncJob(
+      db,
+      accountId,
+      jobId,
+      applied,
+      mutationId,
+      at,
+    ),
   "brain.failVectorSyncJob": (
-    db: d1.Client,
-    accountId: string,
+    db: DO.account.Database,
+    _accountId: string,
     jobId: string,
     failureCode: string,
     at?: Date,
-  ) => d1.action.brain.failBrainVectorSyncJob(db, accountId, jobId, failureCode, at),
-  "source.hasActive": (db: d1.Client, accountId: string) =>
-    d1.action.source.hasActiveSourceRecords(db, accountId),
+  ) => DO.account.action.brain.failBrainVectorSyncJob(db, jobId, failureCode, at),
+  "source.hasActive": (db: DO.account.Database, accountId: string) =>
+    DO.account.action.source.hasActiveSourceRecords(db, accountId),
 } as const;

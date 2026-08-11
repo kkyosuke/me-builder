@@ -41,11 +41,9 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
       LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
       LINE_CHANNEL_SECRET: ${{ secrets.LINE_CHANNEL_SECRET }}
-      GOOGLE_AI_STUDIO_API_KEY: ${{ secrets.GOOGLE_AI_STUDIO_API_KEY }}
-      CLOUDFLARE_APP_API_TOKEN: ${{ secrets.CLOUDFLARE_APP_API_TOKEN }}
+      GOOGLE_VERTEX_AI_API_KEY: ${{ secrets.GOOGLE_VERTEX_AI_API_KEY }}
       CHAT_DELIVERY_SECRET: ${{ secrets.CHAT_DELIVERY_SECRET }}
       BRAIN_VECTOR_HMAC_SECRET: ${{ secrets.BRAIN_VECTOR_HMAC_SECRET }}
-      CLOUDFLARE_AI_GATEWAY_ID: ${{ vars.CLOUDFLARE_AI_GATEWAY_ID }}
       CLOUDFLARE_ACCESS_ALLOWED_EMAILS: ${{ vars.CLOUDFLARE_ACCESS_ALLOWED_EMAILS }}
       ADMIN_LINE_USER_IDS: ${{ secrets.ADMIN_LINE_USER_IDS }}
       # LIFF Server API は LINE Login チャネルのチャネルアクセストークンを要求する。
@@ -74,17 +72,21 @@ jobs:
       - name: Build Web Deployment Artifact
         run: bun --filter @me-builder/web build
 
-      - name: Protect API Documentation with Cloudflare Access (Preview)
-        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
-        run: task access:setup:preview
-
       - name: Ensure Queues (Preview)
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
         run: task queues:setup:preview
 
-      - name: Ensure Brain Vectorize (Preview)
+      - name: Ensure Brain Vectorize Index (Preview)
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
         run: task vectorize:setup:preview
+
+      - name: Sync Wrangler Configuration with Preview Infrastructure
+        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
+        run: task infra:preview:sync
+
+      - name: Protect API Documentation with Cloudflare Access (Preview)
+        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
+        run: task access:setup:preview
 
       - name: Apply D1 Migrations (Preview)
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
@@ -108,7 +110,7 @@ jobs:
             exit 1
           fi
           if [ -z "${BRAIN_VECTOR_HMAC_SECRET}" ]; then
-            echo "::error::BRAIN_VECTOR_HMAC_SECRET が GitHub Secrets に設定されていません。Brain ItemのVectorize同期に必須です。"
+            echo "::error::BRAIN_VECTOR_HMAC_SECRET が GitHub Secrets に設定されていません。Brain Vectorの仮名化に必須です。"
             exit 1
           fi
 
@@ -119,19 +121,17 @@ jobs:
           trap 'rm -f "${api_secrets_file}" "${worker_secrets_file}"; rmdir "${secrets_dir}"' EXIT
 
           API_SECRETS_FILE="${api_secrets_file}" WORKER_SECRETS_FILE="${worker_secrets_file}" bun -e '
-            const sharedSecrets = [["LINE_CHANNEL_ACCESS_TOKEN", process.env.LINE_CHANNEL_ACCESS_TOKEN], ["LIFF_ID", process.env.LIFF_ID], ["ADMIN_LINE_USER_IDS", process.env.ADMIN_LINE_USER_IDS], ["CLOUDFLARE_APP_API_TOKEN", process.env.CLOUDFLARE_APP_API_TOKEN]];
+            const sharedSecrets = [["LINE_CHANNEL_ACCESS_TOKEN", process.env.LINE_CHANNEL_ACCESS_TOKEN], ["LIFF_ID", process.env.LIFF_ID], ["ADMIN_LINE_USER_IDS", process.env.ADMIN_LINE_USER_IDS]];
             const optionalSecrets = Object.fromEntries(
               sharedSecrets
                 .filter(([, value]) => value),
             );
             const workerOnlySecrets = Object.fromEntries(
-              [["GOOGLE_AI_STUDIO_API_KEY", process.env.GOOGLE_AI_STUDIO_API_KEY], ["CHAT_DELIVERY_SECRET", process.env.CHAT_DELIVERY_SECRET], ["BRAIN_VECTOR_HMAC_SECRET", process.env.BRAIN_VECTOR_HMAC_SECRET]]
+              [["GOOGLE_VERTEX_AI_API_KEY", process.env.GOOGLE_VERTEX_AI_API_KEY], ["CHAT_DELIVERY_SECRET", process.env.CHAT_DELIVERY_SECRET], ["BRAIN_VECTOR_HMAC_SECRET", process.env.BRAIN_VECTOR_HMAC_SECRET]]
                 .filter(([, value]) => value),
             );
             await Bun.write(process.env.API_SECRETS_FILE, JSON.stringify({
               LINE_CHANNEL_SECRET: process.env.LINE_CHANNEL_SECRET,
-              CLOUDFLARE_ACCOUNT_ID: process.env.CLOUDFLARE_ACCOUNT_ID,
-              CLOUDFLARE_AI_GATEWAY_ID: process.env.CLOUDFLARE_AI_GATEWAY_ID || "default",
               ...optionalSecrets,
             }));
             await Bun.write(process.env.WORKER_SECRETS_FILE, JSON.stringify({
@@ -145,21 +145,23 @@ jobs:
           bun --filter @me-builder/mcp deploy:preview
           bun --filter @me-builder/web deploy:preview
 
+      # URL が変わっていなければ現在の登録状態を 1 回問い合わせるだけで終わる。
+      # 登録し直したときだけ LINE Platform からの疎通確認まで実行し、
+      # デプロイ直後で Worker がまだ応答しない場合に備えて 1 度だけ再試行する。
       - name: Register LINE Webhook (Preview)
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' && env.LINE_CHANNEL_ACCESS_TOKEN != '' }}
         env:
           LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
           BASE_DOMAIN: ${{ vars.BASE_DOMAIN }}
         run: |
-          bun --cwd apps/api scripts/register-webhook.ts
-
-      - name: Verify Gemini Connectivity (Preview)
-        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
-        run: bun --cwd apps/worker run check:gemini "Reply with OK."
-
-      - name: Verify AI Gateway Analytics Connectivity (Preview)
-        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
-        run: bun --cwd apps/api run check:analytics
+          if bun --cwd apps/api scripts/register-webhook.ts; then
+            exit 0
+          fi
+          # 1 回目で URL は書き換わっているため、`--force` を付けないと 2 回目は
+          # 「登録済み」と判定して疎通確認をせずに成功してしまう。
+          echo "LINE Webhook registration failed; retrying once with --force in 5 seconds."
+          sleep 5
+          bun --cwd apps/api scripts/register-webhook.ts --force
 
       # デプロイ済みの URL を LIFF アプリのエンドポイント URL へ反映する
       - name: Register LIFF Endpoint (Preview)

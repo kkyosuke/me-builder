@@ -8,6 +8,7 @@ export const acceptedMessages = sqliteTable(
     accountId: text("account_id").notNull(),
     sourceRecordId: text("source_record_id").notNull(),
     receivedAt: integer("received_at").notNull(),
+    traceId: text("trace_id"),
     status: text("status", { enum: ["pending", "attaching", "attached"] })
       .notNull()
       .default("pending"),
@@ -54,6 +55,7 @@ export const attachBatchMessages = sqliteTable(
 export const localTurns = sqliteTable("local_turns", {
   turnId: text("turn_id").primaryKey(),
   generationEpoch: integer("generation_epoch").notNull(),
+  traceIds: text("trace_ids", { mode: "json" }).$type<string[]>(),
   status: text("status", {
     enum: ["pending_queue", "queued", "generating", "delivered", "failed"],
   }).notNull(),

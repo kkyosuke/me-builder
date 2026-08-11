@@ -1,11 +1,13 @@
 import { DurableObject } from "cloudflare:workers";
-import { accountDataFor, d1 } from "@me-builder/lib";
+import { D1, accountDataFor } from "@me-builder/lib";
 import {
   type ChatTurnQueueMessage,
   type GenerationLease,
+  MAX_CHAT_TURN_TRACE_IDS,
   type TurnDeliveryRequest,
   type TurnDeliveryResult,
   logger,
+  toSafeOperationalErrorFields,
 } from "@me-builder/shared";
 import { DEFAULT_GEMINI_MODEL, getCloudflareBindings } from "../config";
 import type { CloudflareBindings } from "../config";
@@ -23,6 +25,8 @@ import type { Env } from "../types";
 import { ConversationCoordinatorRepository } from "./repository";
 
 const COALESCE_MS = 1_500;
+/** Queue payloadと終端logを有界に保つため、1 Turnへまとめる入力数を制限する。 */
+const MAX_MESSAGES_PER_TURN = MAX_CHAT_TURN_TRACE_IDS;
 const LEASE_MS = 90_000;
 const ALARM_RETRY_MS = 30_000;
 const ACCEPTED_MESSAGE_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
@@ -35,6 +39,8 @@ export type AcceptedDiaryMessage = {
   sourceRecordId: string;
   eventId: string;
   receivedAt: string;
+  /** API受付からChat Turn Queueまで引き継ぐ相関ID。 */
+  traceId?: string;
   /** finalをpushではなくreplyで返すための一度きりのtoken。保存もlog出力もしない。 */
   replyToken?: string;
 };
@@ -118,7 +124,7 @@ export class ConversationCoordinator extends DurableObject<Env> {
     }
     let delivery = existing;
     if (!delivery) {
-      const target = await d1.action.account.findLineIdentityByAccountId(
+      const target = await D1.shared.action.account.findLineIdentityByAccountId(
         this.cf.d1,
         this.repository.getBoundAccountId() ?? "",
       );
@@ -231,12 +237,22 @@ export class ConversationCoordinator extends DurableObject<Env> {
     try {
       await this.processAlarm();
     } catch (error) {
+      // errorMessageにはSDK例外が抱えるresponse bodyが載りうるため、安全な分類だけを残す。
       logger.error(
         {
-          errorName: error instanceof Error ? error.name : "UnknownError",
-          errorMessage: error instanceof Error ? error.message : String(error),
+          event: "alarm.run.failed",
+          service: "worker",
+          component: "conversation-coordinator",
+          outcome: "failed",
+          disposition: "alarm-retry",
+          ...toSafeOperationalErrorFields(error, {
+            code: "CONVERSATION_COORDINATOR_ALARM_FAILED",
+            category: "unknown",
+            stage: "alarm.process",
+            retryable: true,
+          }),
         },
-        "Conversation coordinator alarm failed; retry scheduled",
+        `[Conversation coordinator] alarm failed at alarm.process -> alarm-retry (retrying in ${ALARM_RETRY_MS}ms or at the earliest lease deadline)`,
       );
       const retryAt = Date.now() + ALARM_RETRY_MS;
       const leaseDeadline = this.repository.earliestLeaseDeadline();
@@ -251,7 +267,7 @@ export class ConversationCoordinator extends DurableObject<Env> {
     this.repository.expirePendingDeliveries(Date.now());
     this.repository.expireGenerationLeases(Date.now());
     for (const turn of this.repository.listPendingQueueTurns()) {
-      await this.enqueueTurn(turn.turnId, turn.generationEpoch);
+      await this.enqueueTurn(turn.turnId, turn.generationEpoch, turn.traceIds ?? undefined);
     }
 
     let batch = this.repository.findAttachBatch();
@@ -260,7 +276,7 @@ export class ConversationCoordinator extends DurableObject<Env> {
       if (pending.length > 0) {
         const generationEpoch = this.repository.nextGenerationEpoch();
         this.repository.createAttachBatch(
-          pending.map(({ eventId }) => eventId),
+          pending.slice(0, MAX_MESSAGES_PER_TURN).map(({ eventId }) => eventId),
           generationEpoch,
         );
         batch = this.repository.findAttachBatch();
@@ -288,11 +304,18 @@ export class ConversationCoordinator extends DurableObject<Env> {
       DIARY_CHAT_CONVERSATION_POLICY_IDS,
     );
     const isCurrentGeneration = attached.generationEpoch === batch.generationEpoch;
+    const traceIds = [
+      ...new Set(batch.messages.flatMap((message) => (message.traceId ? [message.traceId] : []))),
+    ];
     this.repository.completeAttachBatch(
       batch.id,
       batch.messages.map(({ eventId }) => eventId),
       isCurrentGeneration
-        ? { turnId: attached.turnId, generationEpoch: attached.generationEpoch }
+        ? {
+            turnId: attached.turnId,
+            generationEpoch: attached.generationEpoch,
+            ...(traceIds.length > 0 ? { traceIds } : {}),
+          }
         : undefined,
     );
     this.adoptReplyToken(
@@ -300,7 +323,7 @@ export class ConversationCoordinator extends DurableObject<Env> {
       isCurrentGeneration ? attached.turnId : undefined,
     );
     if (isCurrentGeneration) {
-      await this.enqueueTurn(attached.turnId, attached.generationEpoch);
+      await this.enqueueTurn(attached.turnId, attached.generationEpoch, traceIds);
     }
     await this.schedulePendingWork();
   }
@@ -336,12 +359,24 @@ export class ConversationCoordinator extends DurableObject<Env> {
     this.replyTokensByTurnId.delete(turnId);
   }
 
-  private async enqueueTurn(turnId: string, generationEpoch: number): Promise<void> {
+  private async enqueueTurn(
+    turnId: string,
+    generationEpoch: number,
+    traceIds?: string[],
+  ): Promise<void> {
     const queue = this.cf.queue.chatTurn;
     if (!queue) throw new Error("CHAT_TURN_QUEUE binding is not configured");
     const accountId = this.repository.getBoundAccountId();
     if (!accountId) throw new Error("Conversation coordinator is not bound to an Account");
-    const message: ChatTurnQueueMessage = { type: "chat-turn", accountId, turnId, generationEpoch };
+    const traceId = traceIds?.at(-1);
+    const message: ChatTurnQueueMessage = {
+      type: "chat-turn",
+      ...(traceId ? { traceId } : {}),
+      ...(traceIds && traceIds.length > 0 ? { traceIds } : {}),
+      accountId,
+      turnId,
+      generationEpoch,
+    };
     await queue.send(message);
     this.repository.markTurnQueued(turnId);
   }

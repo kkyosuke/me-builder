@@ -310,7 +310,7 @@ sequenceDiagram
     participant A as Alarm
     participant Q as Queue
     participant W as Brain Worker
-    participant AI as AI Gateway
+    participant AI as Vertex AI Express Mode
 
     U->>AD: user message + Source Record
     AD->>AD: 期限を評価しcheckpointを作成・延長・固定

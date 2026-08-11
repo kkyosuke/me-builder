@@ -20,3 +20,35 @@ export type ProfileSummaryResult = Readonly<{
   summary: ProfileSummary | null;
   nextAction: "diagnosis" | "chat";
 }>;
+
+export type ProfileSummaryReadResult = ProfileSummaryResult &
+  Readonly<{
+    versions: readonly ProfileSummaryVersion[];
+    availableDataCounts: Readonly<{ diagnosis: number; diary: number }>;
+    generation: ProfileSummaryGenerationState;
+  }>;
+
+type ProfileSummaryVersionOption = Readonly<{
+  id: string;
+  sequence: number | null;
+  generatedAt: string;
+  isLatest: boolean;
+  generationMethod: "ai" | "deterministic";
+}>;
+
+type ProfileSummaryVersion = ProfileSummaryVersionOption & Readonly<{ summary: ProfileSummary }>;
+
+export type ProfileSummaryRegenerationReason = "diagnosis" | "brain" | "elapsed";
+
+type ProfileSummaryGenerationState = Readonly<{
+  status: "idle" | "queued" | "generating" | "failed";
+  canRegenerate: boolean;
+  reasons: readonly ProfileSummaryRegenerationReason[];
+  message?: string;
+}>;
+
+export type ProfileSummaryVersioning = Readonly<{
+  versions: readonly ProfileSummaryVersionOption[];
+  selectedVersionId: string;
+  generation: ProfileSummaryGenerationState;
+}>;

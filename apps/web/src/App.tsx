@@ -1,6 +1,10 @@
 import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { LoadingState } from "./components/loading-state";
 import { RouteErrorBoundary } from "./components/route-error-boundary";
+import { config } from "./config";
+import { LiffSessionProvider, useLiffSession } from "./feature/liff";
+import { getLiffIdToken } from "./feature/liff/infrastructure/liff-client";
+import { verifyLiffSession } from "./feature/liff/infrastructure/session-api";
 import type { AvatarSelection } from "./feature/profile-settings/model/avatar";
 import { ProfileMenuButton } from "./feature/profile-settings/presentation/components/profile-menu-button";
 import { useColorTheme } from "./feature/theme";
@@ -57,8 +61,9 @@ function resolveRequestedPathname(): string {
   return liffState.split(/[?#]/, 1)[0] ?? window.location.pathname;
 }
 
-export function App() {
+function AppContents() {
   const colorTheme = useColorTheme();
+  const liffSession = useLiffSession();
   const [navigation, setNavigation] = useState(() => {
     const requestedPathname = resolveRequestedPathname();
     const profileView = resolveProfileView(requestedPathname);
@@ -75,8 +80,10 @@ export function App() {
   const isCompatibilityPath =
     pathname === "/compatibility" || pathname.startsWith("/compatibility/");
   const isMePath = pathname === "/me" || pathname.startsWith("/me/");
+  const isProfileOpen = profileView !== "closed";
   const currentMainRoute = isCompatibilityPath ? "compatibility" : isMePath ? "me" : "diagnosis";
   const [avatar, setAvatar] = useState<AvatarSelection | null>(null);
+  const [accountRole, setAccountRole] = useState<"user" | "admin" | null>(null);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -124,9 +131,33 @@ export function App() {
   }, [currentMainRoute, isAdminPath]);
 
   useEffect(() => {
-    if (profileView !== "profile") return;
+    if (!isProfileOpen) return;
     return scheduleIdlePreloadAfter(loadProfileSettingsScreen, preloadAvatarSettingsScreen);
-  }, [profileView]);
+  }, [isProfileOpen]);
+
+  useEffect(() => {
+    if (!isProfileOpen) return;
+
+    const controller = new AbortController();
+    setAccountRole(null);
+    void (async () => {
+      try {
+        const idToken = getLiffIdToken() ?? (await liffSession.acquireIdToken(controller.signal));
+        if (!idToken || controller.signal.aborted) return;
+        const session = await verifyLiffSession(config.apiUrl, idToken, controller.signal);
+        if (!controller.signal.aborted && session.status === "verified") {
+          setAccountRole(session.role);
+        }
+      } catch {
+        // roleを取得できない場合も、管理者導線以外のプロフィール操作は継続する。
+      }
+    })();
+
+    return () => {
+      controller.abort();
+      setAccountRole(null);
+    };
+  }, [isProfileOpen, liffSession.acquireIdToken]);
 
   const openProfile = () => {
     shouldRestoreProfileButtonFocus.current = true;
@@ -167,6 +198,7 @@ export function App() {
         <ProfileMenuButton
           ref={profileButtonRef}
           avatar={avatar}
+          linePictureUrl={liffSession.profile?.pictureUrl}
           onOpen={openProfile}
           onPreload={preloadProfileSettingsScreen}
         />
@@ -186,7 +218,7 @@ export function App() {
           </Suspense>
         </RouteErrorBoundary>
       </div>
-      {profileView === "profile" && (
+      {isProfileOpen && (
         <RouteErrorBoundary>
           <Suspense
             fallback={
@@ -195,6 +227,9 @@ export function App() {
           >
             <ProfileSettingsScreen
               avatar={avatar}
+              isAdmin={accountRole === "admin"}
+              isInactive={profileView === "avatar"}
+              linePictureUrl={liffSession.profile?.pictureUrl}
               theme={colorTheme.theme}
               onBack={closeProfile}
               onOpenAvatar={openAvatar}
@@ -207,11 +242,12 @@ export function App() {
         <RouteErrorBoundary>
           <Suspense
             fallback={
-              <LoadingState message="アバター設定を読み込んでいます..." variant="overlay" />
+              <LoadingState message="アバター変更を読み込んでいます..." variant="overlay" />
             }
           >
             <AvatarSettingsScreen
               currentAvatar={avatar}
+              linePictureUrl={liffSession.profile?.pictureUrl}
               onBack={closeAvatar}
               onSave={(nextAvatar) => {
                 setAvatar(nextAvatar);
@@ -222,5 +258,13 @@ export function App() {
         </RouteErrorBoundary>
       )}
     </>
+  );
+}
+
+export function App() {
+  return (
+    <LiffSessionProvider>
+      <AppContents />
+    </LiffSessionProvider>
   );
 }

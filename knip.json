@@ -1,8 +1,11 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
   "ignore": ["apps/web/src/generated/**"],
-  "ignoreDependencies": ["cloudflare"],
+  "ignoreDependencies": ["cloudflare", "markdown-link-check"],
   "workspaces": {
+    "infra": {
+      "entry": ["index.ts", "scripts/*.ts", "src/cleanup-worker.ts"]
+    },
     "apps/worker": {
       "entry": ["src/**/*.test.ts", "src/account-data/drizzle-schema.ts", "drizzle*.config.ts"]
     }

@@ -41,10 +41,33 @@ function verifySignature({ body, channelSecret, signature }: VerifySignaturePara
   }
 }
 
+/** Webhook Endpoint URL の登録に渡すパラメータ。 */
+export type RegisterWebhookParams = LineClientConfig & {
+  /**
+   * 既に同じ URL が有効な状態で登録済みでも、再登録と疎通確認をやり直します。
+   *
+   * 既定 (false) では現在の登録状態を 1 回問い合わせるだけで終わります。
+   * `testWebhookEndpoint` は LINE Platform が実際に Webhook URL を呼び出して応答を待つため
+   * 十数秒かかり、URL が変わっていないデプロイでこれを毎回実行すると CD の実行時間を浪費します。
+   */
+  forceVerify?: boolean;
+};
+
+/** Webhook Endpoint URL の登録結果。 */
+export type RegisterWebhookResult = {
+  success: boolean;
+  message: string;
+  /** 既に要求どおり登録済みだったため、再登録と疎通確認を省略した */
+  skipped: boolean;
+};
+
 /**
  * LINE Messaging API SDK (@line/bot-sdk) を使用して Webhook Endpoint URL を登録・更新します。
+ *
+ * URL が既に有効な状態で登録済みなら何もしません。実際に登録内容を書き換えたときだけ、
+ * 登録後の URL 一致・有効化状態・LINE Platform からの疎通を検証します。
  */
-async function register(config: LineClientConfig): Promise<{ success: boolean; message: string }> {
+async function register(config: RegisterWebhookParams): Promise<RegisterWebhookResult> {
   const token = config.channelAccessToken;
   const url = config.webhookUrl;
 
@@ -52,11 +75,22 @@ async function register(config: LineClientConfig): Promise<{ success: boolean; m
     const msg =
       "[LINE Webhook] LINE_CHANNEL_ACCESS_TOKEN または Webhook URL (LINE_WEBHOOK_URL / BASE_URL) が設定されていないため自動登録をスキップします。";
     logger.info(msg);
-    return { success: false, message: msg };
+    return { success: false, message: msg, skipped: false };
   }
 
   try {
     const apiClient = client.create(token);
+
+    if (!config.forceVerify) {
+      // 未登録の場合 LINE は 404 を返すため、失敗は「登録済みではない」として扱う。
+      const current = await apiClient.getWebhookEndpoint().catch(() => undefined);
+      if (current?.endpoint === url && current.active) {
+        const msg = `[LINE Webhook] Webhook URL は既に登録・有効化済みのため、再登録と疎通確認をスキップしました: ${url}`;
+        logger.info(msg);
+        return { success: true, message: msg, skipped: true };
+      }
+    }
+
     await apiClient.setWebhookEndpoint({
       endpoint: url,
     });
@@ -65,31 +99,31 @@ async function register(config: LineClientConfig): Promise<{ success: boolean; m
     if (configured.endpoint !== url) {
       const msg = "[LINE Webhook] 登録後の Webhook URL が要求した URL と一致しません。";
       logger.error(msg);
-      return { success: false, message: msg };
+      return { success: false, message: msg, skipped: false };
     }
     if (!configured.active) {
       const msg =
         "[LINE Webhook] Webhook が無効です。LINE Developers コンソールで Webhook の利用を有効にしてください。";
       logger.error(msg);
-      return { success: false, message: msg };
+      return { success: false, message: msg, skipped: false };
     }
 
     const tested = await apiClient.testWebhookEndpoint({ endpoint: url });
     if (!tested.success || tested.statusCode !== 200) {
       const msg = `[LINE Webhook] LINE Platform から Webhook URL への疎通確認に失敗しました (status=${tested.statusCode}, reason=${tested.reason})。`;
       logger.error(msg);
-      return { success: false, message: msg };
+      return { success: false, message: msg, skipped: false };
     }
 
     const msg = `[LINE Webhook] Webhook URL の登録・有効化・疎通を確認しました: ${url}`;
     logger.info(msg);
-    return { success: true, message: msg };
+    return { success: true, message: msg, skipped: false };
   } catch (error) {
     const msg = `[LINE Webhook] LINE Messaging API SDK でのエラーが発生しました: ${
       error instanceof Error ? error.message : String(error)
     }`;
     logger.error(msg);
-    return { success: false, message: msg };
+    return { success: false, message: msg, skipped: false };
   }
 }
 
@@ -140,7 +174,7 @@ function parseEvents(payload: unknown): lineWebhook.Event[] {
 }
 
 export const webhook: {
-  register: (config: LineClientConfig) => Promise<{ success: boolean; message: string }>;
+  register: (config: RegisterWebhookParams) => Promise<RegisterWebhookResult>;
   parseEvents: (payload: unknown) => lineWebhook.Event[];
   extractMessages: (payload: unknown) => string[];
   verifySignature: (params: VerifySignatureParams) => boolean;

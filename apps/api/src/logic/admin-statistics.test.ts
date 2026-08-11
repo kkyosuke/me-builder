@@ -1,18 +1,15 @@
-import type { d1 } from "@me-builder/lib";
+import type { D1 } from "@me-builder/lib";
 import { describe, expect, it, vi } from "vitest";
 import { getAdminStatistics } from "./admin-statistics";
 import type { createLiffSession } from "./liff-session";
 
-const db = {} as d1.Client;
+const db = {} as D1.shared.Client;
 const base = {
   idToken: "id-token",
   lineLoginChannelId: "channel",
   adminLineUserIds: [] as string[],
   db,
   lineChannelAccessToken: "line-token",
-  cloudflareAccountId: "cf-account",
-  cloudflareAiGatewayId: "default",
-  cloudflareAppApiToken: "cf-token",
   now: new Date("2026-08-08T03:00:00.000Z"),
 };
 
@@ -22,25 +19,22 @@ function session(role: "user" | "admin"): typeof createLiffSession {
 
 describe("getAdminStatistics", () => {
   it("通常Accountには統計を返さない", async () => {
-    const getAiUsage = vi.fn();
     const outcome = await getAdminStatistics({
       ...base,
       createSession: session("user"),
-      getAiUsage,
     });
     expect(outcome).toEqual({ type: "forbidden" });
-    expect(getAiUsage).not.toHaveBeenCalled();
   });
 
   it("管理者へGeminiとLINEの当月統計を返す", async () => {
     const outcome = await getAdminStatistics({
       ...base,
       createSession: session("admin"),
-      getAiUsage: vi.fn().mockResolvedValue({
-        estimatedCostUsd: 0.02,
-        requestCount: 4,
-        inputTokens: 100,
-        outputTokens: 20,
+      getGeminiUsage: vi.fn().mockResolvedValue({
+        requestCount: 2,
+        inputTokens: 120,
+        outputTokens: 40,
+        accounts: [{ accountId: "account-1", requestCount: 2, inputTokens: 120, outputTokens: 40 }],
       }),
       getLineUsage: vi.fn().mockResolvedValue({
         billableMessages: 3,
@@ -51,20 +45,53 @@ describe("getAdminStatistics", () => {
     expect(outcome).toMatchObject({
       type: "resolved",
       statistics: {
-        gemini: { status: "available", estimatedCostUsd: 0.02 },
+        gemini: {
+          status: "available",
+          requestCount: 2,
+          inputTokens: 120,
+          outputTokens: 40,
+          accounts: [{ accountId: "account-1" }],
+        },
         line: { status: "available", billableMessages: 3, replyMessages: 8 },
       },
     });
   });
 
-  it("一方の外部取得失敗でも他方の統計を返す", async () => {
+  it("LINEの取得失敗時もGeminiの統計を返す", async () => {
     const outcome = await getAdminStatistics({
       ...base,
       createSession: session("admin"),
-      getAiUsage: vi.fn().mockRejectedValue(new Error("Cloudflare unavailable")),
+      getGeminiUsage: vi.fn().mockResolvedValue({
+        requestCount: 2,
+        inputTokens: 120,
+        outputTokens: 40,
+        accounts: [{ accountId: "account-1", requestCount: 2, inputTokens: 120, outputTokens: 40 }],
+      }),
+      getLineUsage: vi.fn().mockRejectedValue(new Error("LINE unavailable")),
+    });
+    expect(outcome).toMatchObject({
+      type: "resolved",
+      statistics: {
+        gemini: {
+          status: "available",
+          requestCount: 2,
+          inputTokens: 120,
+          outputTokens: 40,
+          accounts: [{ accountId: "account-1" }],
+        },
+        line: { status: "unavailable", reason: "upstream-error" },
+      },
+    });
+  });
+
+  it("Gemini集計の取得失敗時もLINEの統計を返す", async () => {
+    const outcome = await getAdminStatistics({
+      ...base,
+      createSession: session("admin"),
+      getGeminiUsage: vi.fn().mockRejectedValue(new Error("D1 unavailable")),
       getLineUsage: vi.fn().mockResolvedValue({
         billableMessages: 3,
-        monthlyLimit: null,
+        monthlyLimit: 5000,
         replyMessages: 8,
       }),
     });
@@ -72,7 +99,7 @@ describe("getAdminStatistics", () => {
       type: "resolved",
       statistics: {
         gemini: { status: "unavailable", reason: "upstream-error" },
-        line: { status: "available" },
+        line: { status: "available", billableMessages: 3, replyMessages: 8 },
       },
     });
   });

@@ -6,7 +6,7 @@
 
 画面と遷移は[Phase 1 診断体験設計](diagnosis-experience.md)、Account / Brain / Sourceの境界は[ドメイン設計](../domain/domain-design.md)、Source Recordの改訂関係は[根拠・反証・改訂のエッジ設計](../domain/brain/evidence-edge-design.md)、原本の不変性と訂正・削除の波及は[Source Recordのライフサイクル設計](../domain/source/source-record-lifecycle-design.md)を正とします。
 
-この文書では、D1のテーブル、カラム、インデックス、APIスキーマ、セッションの実装方式を定義しません。ここで定義する論理モデルを永続化設計とAPI設計の入力とし、D1への現在の写像は[`packages/lib`のschema](../../packages/lib/src/d1/schema/diagnosis.ts)を正とします。
+この文書では、テーブル、カラム、インデックス、APIスキーマ、セッションの実装方式を定義しません。ここで定義する論理モデルを永続化設計とAPI設計の入力とし、現在の写像は公開定義が[`packages/lib`のcatalog schema](../../packages/lib/src/d1/shared/schema/catalog.ts)、回答が[diagnosis schema](../../packages/lib/src/do/account/schema/diagnosis.ts)を正とします。
 
 ## 2. 結論
 

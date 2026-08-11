@@ -1,0 +1,47 @@
+import * as cloudflare from "@pulumi/cloudflare";
+import * as pulumi from "@pulumi/pulumi";
+import { parseEnvironment, resourceNames } from "./src/environment.ts";
+
+const config = new pulumi.Config();
+const environment = parseEnvironment(config.require("environment"));
+const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+
+if (!accountId) {
+  throw new Error("CLOUDFLARE_ACCOUNT_ID is required");
+}
+
+const names = resourceNames(environment);
+const protect = environment === "production";
+const database = new cloudflare.D1Database(
+  "database",
+  {
+    accountId,
+    name: names.database,
+    primaryLocationHint: "apac",
+  },
+  { protect },
+);
+
+const queues = Object.fromEntries(
+  Object.entries(names.queues).map(([key, queueName]) => [
+    key,
+    new cloudflare.Queue(key, { accountId, queueName }, { protect }),
+  ]),
+);
+
+export const infrastructure = {
+  environment,
+  database: {
+    id: database.uuid,
+    name: database.name,
+  },
+  queues: Object.fromEntries(
+    Object.entries(queues).map(([key, queue]) => [
+      key,
+      {
+        id: queue.queueId,
+        name: queue.queueName,
+      },
+    ]),
+  ),
+};

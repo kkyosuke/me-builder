@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
   },
   initializeLiff: vi.fn(),
   getLiffIdToken: vi.fn(),
+  verifyLiffSession: vi.fn(),
   fetchDiagnosisList: vi.fn(),
   fetchDiagnosisDefinition: vi.fn(),
   fetchDiagnosisProgress: vi.fn(),
@@ -29,7 +30,7 @@ const mocks = vi.hoisted(() => ({
   restoreDiagnosisProgress: vi.fn(),
   fetchProfileSummary: vi.fn(),
   fetchDevelopmentBrainItems: vi.fn(),
-  fetchDevelopmentBrainVector: vi.fn(),
+  normalizeAvatarImage: vi.fn(),
 }));
 
 vi.mock("./config", () => ({
@@ -38,6 +39,9 @@ vi.mock("./config", () => ({
 vi.mock("./feature/liff/infrastructure/liff-client", () => ({
   initializeLiff: mocks.initializeLiff,
   getLiffIdToken: mocks.getLiffIdToken,
+}));
+vi.mock("./feature/liff/infrastructure/session-api", () => ({
+  verifyLiffSession: mocks.verifyLiffSession,
 }));
 vi.mock("./feature/diagnosis/infrastructure/diagnosis-api", () => ({
   fetchDiagnosisList: mocks.fetchDiagnosisList,
@@ -55,7 +59,9 @@ vi.mock("./feature/profile/infrastructure/profile-api", () => ({
 }));
 vi.mock("./feature/brain/infrastructure/brain-api", () => ({
   fetchDevelopmentBrainItems: mocks.fetchDevelopmentBrainItems,
-  fetchDevelopmentBrainVector: mocks.fetchDevelopmentBrainVector,
+}));
+vi.mock("./feature/profile-settings/model/normalize-avatar-image", () => ({
+  normalizeAvatarImage: mocks.normalizeAvatarImage,
 }));
 vi.mock("./feature/diagnosis/presentation/components/swipe-diagnosis", () => ({
   SwipeDiagnosis: ({
@@ -164,6 +170,7 @@ describe("App", () => {
       profile: { displayName: "テスト" },
     });
     mocks.getLiffIdToken.mockReturnValue("dummy.id.token");
+    mocks.verifyLiffSession.mockResolvedValue({ status: "verified", role: "user" });
     mocks.fetchDiagnosisList.mockResolvedValue([diagnosis()]);
     mocks.fetchDiagnosisDefinition.mockResolvedValue(definition);
     mocks.fetchDiagnosisProgress.mockResolvedValue(undefined);
@@ -180,24 +187,49 @@ describe("App", () => {
       deletedSourceRecordCount: 10,
       deletedBrainItemCount: 4,
     });
+    const profileSummary = {
+      generatedAt: "2026-08-08T12:00:00.000Z",
+      headline: "最近の記録から、こんなあなたらしさが見えています",
+      insights: [
+        {
+          key: "prepare",
+          label: "見通しを持って動く",
+          description: "説明",
+          evidenceCount: 2,
+          sources: ["diagnosis", "diary"] as const,
+        },
+      ],
+      recordCount: 2,
+      diagnosisCount: 1,
+      diaryCount: 1,
+      latestRecordedAt: "2026-08-08T11:45:00.000Z",
+    } as const;
     mocks.fetchProfileSummary.mockResolvedValue({
-      summary: {
-        generatedAt: "2026-08-08T12:00:00.000Z",
-        headline: "最近の記録から、こんなあなたらしさが見えています",
-        insights: [
-          {
-            key: "prepare",
-            label: "見通しを持って動く",
-            description: "説明",
-            evidenceCount: 2,
-            sources: ["diagnosis", "diary"],
+      summary: profileSummary,
+      versions: [
+        {
+          id: "version-1",
+          sequence: 2,
+          generatedAt: profileSummary.generatedAt,
+          isLatest: true,
+          generationMethod: "ai",
+          summary: profileSummary,
+        },
+        {
+          id: "version-previous",
+          sequence: 1,
+          generatedAt: "2026-08-01T12:00:00.000Z",
+          isLatest: false,
+          generationMethod: "ai",
+          summary: {
+            ...profileSummary,
+            generatedAt: "2026-08-01T12:00:00.000Z",
+            headline: "過去の記録から見えたあなたらしさ",
           },
-        ],
-        recordCount: 2,
-        diagnosisCount: 1,
-        diaryCount: 1,
-        latestRecordedAt: "2026-08-08T11:45:00.000Z",
-      },
+        },
+      ],
+      availableDataCounts: { diagnosis: 2, diary: 5 },
+      generation: { status: "idle", canRegenerate: false, reasons: [] },
       nextAction: "diagnosis",
     });
     mocks.fetchDevelopmentBrainItems.mockResolvedValue({
@@ -213,7 +245,6 @@ describe("App", () => {
             status: "applied",
             operation: "upsert",
             attemptCount: 1,
-            updatedAt: "2026-08-09T00:01:00.000Z",
             hasEntry: true,
             entryRevision: 1,
           },
@@ -229,6 +260,11 @@ describe("App", () => {
       ],
       truncated: false,
     });
+    mocks.normalizeAvatarImage.mockImplementation(async (file: File) => ({
+      kind: "uploaded",
+      dataUrl: `data:${file.type};base64,normalized`,
+      fileName: file.name,
+    }));
     mocks.restoreDiagnosisProgress.mockImplementation(
       (_questions: DiagnosisDefinition["questions"], answers: DiagnosisResult["answers"]) => ({
         answers: answers.map((answer) => ({
@@ -242,6 +278,26 @@ describe("App", () => {
         })),
         unansweredQuestions: [],
       }),
+    );
+  });
+
+  it("未設定時はLINEプロフィール画像を右上アイコンに表示する", async () => {
+    mocks.initializeLiff.mockResolvedValue({
+      status: "ready",
+      inClient: true,
+      profile: {
+        displayName: "テスト",
+        pictureUrl: "https://example.com/line-profile.jpg",
+      },
+    });
+
+    render(<App />);
+
+    const profileButton = await screen.findByRole("button", { name: "プロフィールを開く" });
+    await waitFor(() =>
+      expect(profileButton.querySelector("img")?.getAttribute("src")).toBe(
+        "https://example.com/line-profile.jpg",
+      ),
     );
   });
 
@@ -273,25 +329,55 @@ describe("App", () => {
     await waitFor(() => expect(document.documentElement.classList.contains("light")).toBe(true));
   });
 
-  it("ダミー候補からアバターを設定してプロフィールへ戻る", async () => {
+  it("管理者のプロフィールにだけ管理者画面へのリンクを表示する", async () => {
+    mocks.verifyLiffSession.mockResolvedValue({ status: "verified", role: "admin" });
     render(<App />);
 
     fireEvent.click(screen.getByRole("button", { name: "プロフィールを開く" }));
-    fireEvent.click(await screen.findByRole("button", { name: /アバターを設定/ }));
 
-    expect(await screen.findByRole("heading", { name: "アバター設定" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("checkbox", { name: /外部AIサービスへ送信/ }));
-    fireEvent.change(screen.getByLabelText(/画像をアップロード/), {
+    const adminLink = await screen.findByRole("link", { name: /管理者画面を開く/ });
+    expect(adminLink.getAttribute("href")).toBe("/admin");
+    expect(mocks.verifyLiffSession).toHaveBeenCalledWith(
+      "https://api.example.com",
+      "dummy.id.token",
+      expect.any(AbortSignal),
+    );
+  });
+
+  it("LINE画像を表示し、選んだ画像をアバターに設定してプロフィールへ戻る", async () => {
+    mocks.initializeLiff.mockResolvedValue({
+      status: "ready",
+      inClient: true,
+      profile: {
+        displayName: "テスト",
+        pictureUrl: "https://example.com/line-profile.jpg",
+      },
+    });
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "プロフィールを開く" }));
+    expect(await screen.findByText("LINEのプロフィール画像")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /アバターを変更/ }));
+
+    expect(await screen.findByRole("heading", { name: "アバターを変更" })).toBeTruthy();
+    expect(screen.getByText("LINEのプロフィール画像を表示しています。")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("画像を選ぶ"), {
       target: { files: [new File(["selfie"], "selfie.png", { type: "image/png" })] },
     });
-    expect((await screen.findAllByText("selfie.png")).length).toBeGreaterThan(0);
-    expect(await screen.findByText("人物を確認できました")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "ダミー変換を開始" }));
-    fireEvent.click(screen.getByRole("button", { name: "星空を選択" }));
-    fireEvent.click(screen.getByRole("button", { name: "このアバターに設定" }));
+    expect(await screen.findByRole("heading", { name: "設定後のプレビュー" })).toBeTruthy();
+    expect(screen.queryByText("selfie.png")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "この画像を設定" }));
 
     expect(await screen.findByRole("heading", { name: "プロフィール" })).toBeTruthy();
-    expect(screen.getByText("星空")).toBeTruthy();
+    expect(screen.getByText("設定した画像")).toBeTruthy();
+    expect(screen.queryByText("selfie.png")).toBeNull();
+    expect(screen.queryByText(/人物を確認/)).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "プロフィールを閉じる" }));
+    const profileButton = await screen.findByRole("button", { name: "プロフィールを開く" });
+    expect(profileButton.querySelector("img")?.getAttribute("src")).toMatch(
+      /^data:image\/png;base64,normalized$/,
+    );
   });
 
   it("プロフィールとアバター設定をブラウザ履歴で戻れる", async () => {
@@ -309,7 +395,13 @@ describe("App", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /アバターを設定/ }));
     expect(window.location.pathname).toBe("/profile/avatar");
-    expect(await screen.findByRole("dialog", { name: "アバター設定" })).toBeTruthy();
+    expect(await screen.findByRole("dialog", { name: "アバターを変更" })).toBeTruthy();
+    const inactiveProfile = document.querySelector<HTMLDialogElement>(
+      'dialog[aria-labelledby="profile-settings-title"]',
+    );
+    expect(inactiveProfile).not.toBeNull();
+    expect(inactiveProfile?.getAttribute("aria-hidden")).toBe("true");
+    expect(inactiveProfile?.hasAttribute("inert")).toBe(true);
 
     act(() => window.history.back());
     await waitFor(() => expect(window.location.pathname).toBe("/profile"));
@@ -355,6 +447,24 @@ describe("App", () => {
       expect.any(AbortSignal),
     );
     expect(mocks.fetchDiagnosisList).not.toHaveBeenCalled();
+  });
+
+  it("/meではGET APIが返した過去版の本文へ切り替えられる", async () => {
+    window.history.replaceState({}, "", "/me");
+
+    render(<App />);
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "最近の記録から、こんなあなたらしさが見えています",
+      }),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "第1版を表示" }));
+    expect(
+      await screen.findByRole("heading", { name: "過去の記録から見えたあなたらしさ" }),
+    ).toBeTruthy();
+    expect(screen.getByText("現在 2件")).toBeTruthy();
+    expect(screen.getByText("現在 5件")).toBeTruthy();
   });
 
   it("LIFF初期化前にliff.stateへ保持された/meでもまとめ画面を表示する", async () => {
@@ -444,20 +554,20 @@ describe("App", () => {
     );
   });
 
-  it("詳細取得が即時完了してもloadingを400ms表示する", async () => {
+  it("詳細取得が即時完了してもSkeletonを400ms表示する", async () => {
     render(<App />);
     const openDiagnosis = await screen.findByRole("button", { name: /テスト診断/ });
     vi.useFakeTimers();
 
     fireEvent.click(openDiagnosis);
-    expect(screen.getByText("診断を読み込んでいます...")).toBeTruthy();
+    expect(screen.getByRole("status", { name: "診断詳細を読み込み中" })).toBeTruthy();
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();
       vi.advanceTimersByTime(399);
     });
 
-    expect(screen.getByText("診断を読み込んでいます...")).toBeTruthy();
+    expect(screen.getByRole("status", { name: "診断詳細を読み込み中" })).toBeTruthy();
     expect(screen.queryByText("回答UI: テスト診断")).toBeNull();
 
     await act(async () => vi.advanceTimersByTime(1));

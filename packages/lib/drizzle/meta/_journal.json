@@ -5,43 +5,8 @@
     {
       "idx": 0,
       "version": "6",
-      "when": 1786224192704,
-      "tag": "0000_hesitant_mesmero",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "6",
-      "when": 1786237022676,
-      "tag": "0001_many_lady_deathstrike",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "6",
-      "when": 1786240705115,
-      "tag": "0002_purple_shatterstar",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "6",
-      "when": 1786243686576,
-      "tag": "0003_zippy_ultimatum",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "6",
-      "when": 1786319012621,
-      "tag": "0004_yummy_scrambler",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "6",
-      "when": 1786322281223,
-      "tag": "0005_little_old_lace",
+      "when": 1786361204662,
+      "tag": "0000_baseline",
       "breakpoints": true
     }
   ]

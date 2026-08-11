@@ -1,4 +1,4 @@
-import { d1 } from "@me-builder/lib";
+import { D1 } from "@me-builder/lib";
 import { logger } from "@me-builder/shared";
 import type { Context } from "hono";
 import * as v from "valibot";
@@ -36,7 +36,7 @@ export async function getDevelopmentBrainItems(c: Context<AppEnv>): Promise<Resp
   const outcome = await loadDevelopmentBrainItems({
     idToken: bearerToken(c.req.header("authorization")),
     lineLoginChannelId: config.lineLoginChannelId,
-    db: d1.client.create(c.env.DB),
+    db: D1.shared.client.create(c.env.DB),
     accountData: c.env.ACCOUNT_DATA,
   });
 
@@ -94,7 +94,7 @@ export async function getDevelopmentBrainVector(c: Context<AppEnv>): Promise<Res
   const outcome = await loadDevelopmentBrainVector({
     idToken: bearerToken(c.req.header("authorization")),
     lineLoginChannelId: config.lineLoginChannelId,
-    db: d1.client.create(c.env.DB),
+    db: D1.shared.client.create(c.env.DB),
     accountData: c.env.ACCOUNT_DATA,
     vectorIndex: c.env.BRAIN_VECTOR_INDEX,
     brainItemId,

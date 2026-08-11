@@ -19,10 +19,17 @@ const ResponseSchema = v.object({
   gemini: v.union([
     v.object({
       status: v.literal("available"),
-      estimatedCostUsd: v.number(),
       requestCount: v.number(),
       inputTokens: v.number(),
       outputTokens: v.number(),
+      accounts: v.array(
+        v.object({
+          accountId: v.string(),
+          requestCount: v.number(),
+          inputTokens: v.number(),
+          outputTokens: v.number(),
+        }),
+      ),
     }),
     UnavailableSchema,
   ]),

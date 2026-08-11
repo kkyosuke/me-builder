@@ -1,4 +1,4 @@
-import type { AccountDataNamespace, d1 } from "@me-builder/lib";
+import type { AccountDataNamespace, D1 } from "@me-builder/lib";
 import type { BrainVectorSyncQueueMessage, Message } from "@me-builder/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { type CloudflareBindings, getWorkerConfig } from "../config";
@@ -32,7 +32,7 @@ function createBindings(execute: ReturnType<typeof vi.fn>, index: object): Cloud
     getByName: vi.fn(() => ({ execute })),
   } as unknown as AccountDataNamespace;
   return {
-    d1: {} as d1.Client,
+    d1: {} as D1.shared.Client,
     do: { conversation: undefined, accountData },
     queue: { chatTurn: undefined, brainCheckpoint: undefined },
     vector: { brain: index as NonNullable<CloudflareBindings["vector"]>["brain"] },
@@ -41,8 +41,7 @@ function createBindings(execute: ReturnType<typeof vi.fn>, index: object): Cloud
 
 const config = getWorkerConfig({
   ENVIRONMENT: "test",
-  GOOGLE_AI_STUDIO_API_KEY: "google-key",
-  CLOUDFLARE_APP_API_TOKEN: "gateway-token",
+  GOOGLE_VERTEX_AI_API_KEY: "google-key",
   BRAIN_VECTOR_HMAC_SECRET: "scope-secret",
 });
 

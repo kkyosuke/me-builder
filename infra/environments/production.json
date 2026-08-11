@@ -1,0 +1,17 @@
+{
+  "environment": "production",
+  "database": {
+    "id": "6d11180b-3286-4b69-bd63-c7b60d768be1",
+    "name": "me-builder-db-production"
+  },
+  "queues": {
+    "webhook": { "name": "me-builder-webhook-queue-production" },
+    "webhookDeadLetter": { "name": "me-builder-webhook-dlq-production" },
+    "chatTurn": { "name": "me-builder-chat-turn-queue-production" },
+    "chatTurnDeadLetter": { "name": "me-builder-chat-turn-dlq-production" },
+    "brainCheckpoint": { "name": "me-builder-brain-checkpoint-queue-production" },
+    "brainCheckpointDeadLetter": { "name": "me-builder-brain-checkpoint-dlq-production" },
+    "brainVector": { "name": "me-builder-brain-vector-queue-production" },
+    "brainVectorDeadLetter": { "name": "me-builder-brain-vector-dlq-production" }
+  }
+}

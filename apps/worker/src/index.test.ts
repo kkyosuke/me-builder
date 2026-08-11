@@ -1,6 +1,11 @@
 import type { D1Database } from "@cloudflare/workers-types";
-import { d1, line } from "@me-builder/lib";
-import type { Message, MessageBatch, WebhookQueueMessage } from "@me-builder/shared";
+import { D1, line } from "@me-builder/lib";
+import {
+  type Message,
+  type MessageBatch,
+  type WebhookQueueMessage,
+  logger,
+} from "@me-builder/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getWorkerConfig } from "./config";
 import worker from "./index";
@@ -15,11 +20,13 @@ const mockAccountDataExecute = vi.fn().mockResolvedValue({
   eventId: "webhook-event-1",
   receivedAt: new Date("2026-08-06T12:00:00Z"),
 });
+const mockInfoLog = vi.spyOn(logger, "info").mockImplementation(() => undefined);
+const mockErrorLog = vi.spyOn(logger, "error").mockImplementation(() => undefined);
 vi.spyOn(line.client, "create").mockReturnValue({
   pushMessage: mockPushMessage,
   replyMessage: mockReplyMessage,
 } as unknown as ReturnType<typeof line.client.create>);
-vi.spyOn(d1.action.account, "upsertIdentity").mockResolvedValue({
+vi.spyOn(D1.shared.action.account, "upsertIdentity").mockResolvedValue({
   account: {
     id: "account-1",
     status: "active",
@@ -41,7 +48,10 @@ vi.spyOn(d1.action.account, "upsertIdentity").mockResolvedValue({
   },
 });
 
-function createBatch(text: string): {
+function createBatch(
+  text: string,
+  includeTraceId = true,
+): {
   batch: MessageBatch<WebhookQueueMessage>;
   message: Message<WebhookQueueMessage>;
 } {
@@ -51,6 +61,7 @@ function createBatch(text: string): {
     attempts: 1,
     body: {
       id: "queue-envelope-1",
+      ...(includeTraceId ? { traceId: "trace-1" } : {}),
       source: "line",
       receivedAt: "2026-08-06T12:00:00Z",
       routing: {
@@ -101,11 +112,13 @@ describe("Worker", () => {
     mockReplyMessage.mockClear();
     mockAcceptMessage.mockClear();
     mockAccountDataExecute.mockClear();
+    mockInfoLog.mockClear();
+    mockErrorLog.mockClear();
   });
 
   it("日記を原本保存してCoordinatorへ渡し、受付配送はAPI側の予約へ委ねる", async () => {
     const { batch, message } = createBatch("今日は散歩した");
-    const db = {} as d1.Client;
+    const db = {} as D1.shared.Client;
     await handleQueueBatch(
       batch,
       db,
@@ -130,17 +143,121 @@ describe("Worker", () => {
       }),
     );
     expect(mockAcceptMessage).toHaveBeenCalledWith(
-      expect.objectContaining({ accountId: "account-1", sourceRecordId: "source-1" }),
+      expect.objectContaining({
+        accountId: "account-1",
+        sourceRecordId: "source-1",
+        traceId: "trace-1",
+      }),
     );
     expect(mockPushMessage).not.toHaveBeenCalled();
     expect(message.ack).toHaveBeenCalledOnce();
+    expect(mockInfoLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "queue.message.completed",
+        traceId: "trace-1",
+        stage: "chat.accept",
+        outcome: "succeeded",
+        disposition: "ack",
+      }),
+      expect.stringContaining("[LINE webhook] succeeded at chat.accept -> ack"),
+    );
+  });
+
+  it("AccountDataの失敗を安全に分類し、同じ相関IDで再試行を記録する", async () => {
+    const { batch, message } = createBatch("今日は散歩した");
+    mockAccountDataExecute.mockRejectedValueOnce(
+      new Error("日記本文やSDK responseを含む可能性がある内容"),
+    );
+
+    await handleQueueBatch(
+      batch,
+      {} as D1.shared.Client,
+      getWorkerConfig({ ENVIRONMENT: "test" }),
+      {
+        d1: {} as D1.shared.Client,
+        do: { conversation: coordinatorNamespace, accountData: accountDataNamespace },
+        queue: { chatTurn: undefined, brainCheckpoint: undefined },
+      },
+    );
+
+    expect(message.retry).toHaveBeenCalledOnce();
+    expect(message.ack).not.toHaveBeenCalled();
+    const failureLogs = mockErrorLog.mock.calls.filter(
+      ([fields]) =>
+        typeof fields === "object" &&
+        fields !== null &&
+        "event" in fields &&
+        fields.event === "queue.message.failed",
+    );
+    expect(failureLogs).toHaveLength(1);
+    expect(failureLogs[0]?.[0]).toMatchObject({
+      traceId: "trace-1",
+      stage: "source.store",
+      errorCode: "LINE_SOURCE_STORE_FAILED",
+      errorCategory: "dependency",
+      dependency: "account-data",
+      retryable: true,
+      disposition: "retry",
+    });
+    expect(JSON.stringify(failureLogs)).not.toContain("日記本文");
+    expect(JSON.stringify(failureLogs)).not.toContain("SDK response");
+  });
+
+  it("旧Webhook Queue messageでは既存のenvelope IDを相関IDとして補う", async () => {
+    const { batch } = createBatch("今日は散歩した", false);
+
+    await handleQueueBatch(
+      batch,
+      {} as D1.shared.Client,
+      getWorkerConfig({ ENVIRONMENT: "test" }),
+      {
+        d1: {} as D1.shared.Client,
+        do: { conversation: coordinatorNamespace, accountData: accountDataNamespace },
+        queue: { chatTurn: undefined, brainCheckpoint: undefined },
+      },
+    );
+
+    expect(mockAcceptMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ traceId: "queue-envelope-1" }),
+    );
+    expect(mockInfoLog).toHaveBeenCalledWith(
+      expect.objectContaining({ traceId: "queue-envelope-1" }),
+      expect.stringContaining("[LINE webhook] succeeded at"),
+    );
+  });
+
+  it("最終attemptの失敗はDLQへ向かうことを記録する", async () => {
+    const { batch, message } = createBatch("今日は散歩した");
+    Object.defineProperty(message, "attempts", { value: 4 });
+    mockAccountDataExecute.mockRejectedValueOnce(new Error("temporary failure"));
+
+    await handleQueueBatch(
+      batch,
+      {} as D1.shared.Client,
+      getWorkerConfig({ ENVIRONMENT: "test" }),
+      {
+        d1: {} as D1.shared.Client,
+        do: { conversation: coordinatorNamespace, accountData: accountDataNamespace },
+        queue: { chatTurn: undefined, brainCheckpoint: undefined },
+      },
+    );
+
+    expect(message.retry).toHaveBeenCalledOnce();
+    expect(mockErrorLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        traceId: "trace-1",
+        attempt: 4,
+        disposition: "dead-letter",
+      }),
+      expect.stringContaining("[LINE webhook] failed at source.store -> dead-letter (attempt 4/4"),
+    );
   });
 
   it("診断キーワードは日記保存せずLIFF導線をpushする", async () => {
     const { batch } = createBatch("診断");
     await handleQueueBatch(
       batch,
-      {} as d1.Client,
+      {} as D1.shared.Client,
       getWorkerConfig({
         ENVIRONMENT: "test",
         LINE_CHANNEL_ACCESS_TOKEN: "line-token",
@@ -161,7 +278,7 @@ describe("Worker", () => {
       lineTextEvents: [{ eventId: "webhook-event-1", intent: "diagnosis-request" }],
     };
 
-    await handleQueueBatch(batch, {} as d1.Client, getWorkerConfig({ ENVIRONMENT: "test" }));
+    await handleQueueBatch(batch, {} as D1.shared.Client, getWorkerConfig({ ENVIRONMENT: "test" }));
 
     expect(mockAccountDataExecute).not.toHaveBeenCalled();
     expect(mockReplyMessage).not.toHaveBeenCalled();

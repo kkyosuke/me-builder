@@ -23,9 +23,7 @@ export type Env = Omit<
   BASE_URL?: string;
   API_URL?: string;
   LINE_CHANNEL_ACCESS_TOKEN?: string;
-  GOOGLE_AI_STUDIO_API_KEY?: string;
-  CLOUDFLARE_APP_API_TOKEN?: string;
-  CF_AI_GATEWAY_BASE_URL?: string;
+  GOOGLE_VERTEX_AI_API_KEY?: string;
   GEMINI_MODEL?: string;
   GEMINI_EMBEDDING_MODEL?: string;
   BRAIN_VECTOR_HMAC_SECRET?: string;

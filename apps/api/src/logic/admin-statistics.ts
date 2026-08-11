@@ -1,9 +1,5 @@
-import type { d1 } from "@me-builder/lib";
+import { D1 } from "@me-builder/lib";
 import { logger } from "@me-builder/shared";
-import {
-  type AiGatewayUsage,
-  fetchAiGatewayUsage,
-} from "../infrastructure/cloudflare-ai-gateway-analytics";
 import { type LineUsage, fetchLineUsage } from "../infrastructure/line-statistics";
 import { createLiffSession } from "./liff-session";
 
@@ -20,7 +16,20 @@ export type AdminStatisticsOutcome =
       statistics: {
         period: { start: string; end: string };
         fetchedAt: string;
-        gemini: ({ status: "available" } & AiGatewayUsage) | UnavailableSection;
+        gemini:
+          | {
+              status: "available";
+              requestCount: number;
+              inputTokens: number;
+              outputTokens: number;
+              accounts: Array<{
+                accountId: string;
+                requestCount: number;
+                inputTokens: number;
+                outputTokens: number;
+              }>;
+            }
+          | UnavailableSection;
         line: ({ status: "available" } & LineUsage) | UnavailableSection;
       };
     };
@@ -29,14 +38,11 @@ type Params = {
   idToken: string | undefined;
   lineLoginChannelId: string | undefined;
   adminLineUserIds: readonly string[];
-  db: d1.Client;
+  db: D1.shared.Client;
   lineChannelAccessToken: string | undefined;
-  cloudflareAccountId: string | undefined;
-  cloudflareAiGatewayId: string;
-  cloudflareAppApiToken: string | undefined;
   now?: Date;
-  getAiUsage?: typeof fetchAiGatewayUsage;
   getLineUsage?: typeof fetchLineUsage;
+  getGeminiUsage?: typeof D1.shared.action.geminiUsage.summarizeGeminiUsage;
   createSession?: typeof createLiffSession;
 };
 
@@ -64,16 +70,9 @@ export async function getAdminStatistics(params: Params): Promise<AdminStatistic
 
   const now = params.now ?? new Date();
   const start = startOfJstMonth(now);
-  const geminiPromise =
-    params.cloudflareAppApiToken && params.cloudflareAccountId
-      ? (params.getAiUsage ?? fetchAiGatewayUsage)({
-          apiToken: params.cloudflareAppApiToken,
-          accountId: params.cloudflareAccountId,
-          gatewayId: params.cloudflareAiGatewayId,
-          start,
-          end: now,
-        })
-      : undefined;
+  const geminiPromise = (
+    params.getGeminiUsage ?? D1.shared.action.geminiUsage.summarizeGeminiUsage
+  )(params.db, start, now);
   const linePromise = params.lineChannelAccessToken
     ? (params.getLineUsage ?? fetchLineUsage)({
         channelAccessToken: params.lineChannelAccessToken,
@@ -91,11 +90,15 @@ export async function getAdminStatistics(params: Params): Promise<AdminStatistic
       period: { start: start.toISOString(), end: now.toISOString() },
       fetchedAt: now.toISOString(),
       gemini:
-        geminiPromise === undefined
-          ? { status: "unavailable", reason: "not-configured" }
-          : geminiResult.status === "fulfilled" && geminiResult.value
-            ? { status: "available", ...geminiResult.value }
-            : { status: "unavailable", reason: "upstream-error" },
+        geminiResult.status === "fulfilled"
+          ? {
+              status: "available",
+              requestCount: geminiResult.value.requestCount,
+              inputTokens: geminiResult.value.inputTokens,
+              outputTokens: geminiResult.value.outputTokens,
+              accounts: geminiResult.value.accounts,
+            }
+          : { status: "unavailable", reason: "upstream-error" },
       line:
         linePromise === undefined
           ? { status: "unavailable", reason: "not-configured" }

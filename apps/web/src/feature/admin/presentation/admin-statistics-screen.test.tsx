@@ -7,6 +7,12 @@ import { AdminStatisticsScreen } from "./admin-statistics-screen";
 describe("AdminStatisticsScreen", () => {
   afterEach(cleanup);
 
+  it("統計情報の取得中は画面構造に沿ったSkeletonを表示する", () => {
+    render(<AdminStatisticsScreen state={{ status: "loading" }} onReload={vi.fn()} />);
+
+    expect(screen.getByRole("status", { name: "統計情報を読み込み中" })).toBeTruthy();
+  });
+
   it("LINE返信数が前日までの集計であることを表示する", () => {
     render(
       <AdminStatisticsScreen
@@ -20,10 +26,10 @@ describe("AdminStatisticsScreen", () => {
             fetchedAt: "2026-08-08T00:00:00.000Z",
             gemini: {
               status: "available",
-              estimatedCostUsd: 0,
               requestCount: 0,
               inputTokens: 0,
               outputTokens: 0,
+              accounts: [],
             },
             line: {
               status: "available",
@@ -53,10 +59,12 @@ describe("AdminStatisticsScreen", () => {
             fetchedAt: "2026-08-08T00:00:00.000Z",
             gemini: {
               status: "available",
-              estimatedCostUsd: 0,
               requestCount: 12,
               inputTokens: 0,
               outputTokens: 0,
+              accounts: [
+                { accountId: "account-1", requestCount: 12, inputTokens: 0, outputTokens: 0 },
+              ],
             },
             line: {
               status: "available",
@@ -72,7 +80,8 @@ describe("AdminStatisticsScreen", () => {
     );
 
     expect(screen.getByRole("heading", { name: "利用統計" })).toBeTruthy();
-    expect(screen.getByText("12")).toBeTruthy();
+    expect(screen.getAllByText("12")).toHaveLength(2);
+    expect(screen.getByText("account-1")).toBeTruthy();
     expect(
       (screen.getByRole("button", { name: "統計情報を更新中" }) as HTMLButtonElement).disabled,
     ).toBe(true);

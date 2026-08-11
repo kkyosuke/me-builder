@@ -6,10 +6,15 @@ export type AdminStatistics = {
   period: { start: string; end: string };
   fetchedAt: string;
   gemini: StatisticsSection<{
-    estimatedCostUsd: number;
     requestCount: number;
     inputTokens: number;
     outputTokens: number;
+    accounts: Array<{
+      accountId: string;
+      requestCount: number;
+      inputTokens: number;
+      outputTokens: number;
+    }>;
   }>;
   line: StatisticsSection<{
     billableMessages: number;

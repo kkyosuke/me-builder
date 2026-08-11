@@ -1,78 +1,56 @@
-import {
-  ArrowLeft,
-  Check,
-  CircleAlert,
-  ImagePlus,
-  ScanFace,
-  Sparkles,
-  Trash2,
-  UserCheck,
-  WandSparkles,
-} from "lucide-react";
+import { Check, ImagePlus, Info, RotateCcw, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { AVATAR_PRESETS, type AvatarSelection, getAvatarName } from "../model/avatar";
+import { type AvatarSelection, getAvatarName } from "../model/avatar";
+import { normalizeAvatarImage } from "../model/normalize-avatar-image";
 import { AvatarPreview } from "./components/avatar-preview";
-
-type PersonCheckStatus = "idle" | "checking" | "person" | "not-person";
-type GeneratedAvatar = Extract<AvatarSelection, { kind: "preset" }>;
 
 const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 export function AvatarSettingsScreen({
   currentAvatar,
+  linePictureUrl,
   onBack,
   onSave,
 }: {
   currentAvatar: AvatarSelection | null;
+  linePictureUrl?: string | undefined;
   onBack: () => void;
   onSave: (avatar: AvatarSelection | null) => void;
 }) {
-  const [uploadedImage, setUploadedImage] = useState<AvatarSelection | null>(null);
-  const [personCheckStatus, setPersonCheckStatus] = useState<PersonCheckStatus>("idle");
-  const [showCandidates, setShowCandidates] = useState(false);
-  const [selectedCandidate, setSelectedCandidate] = useState<GeneratedAvatar | null>(null);
-  const [hasAiConsent, setHasAiConsent] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<AvatarSelection | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
-  const backButtonRef = useRef<HTMLButtonElement>(null);
+  const [isPreparingImage, setIsPreparingImage] = useState(false);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const selectionIdRef = useRef(0);
 
   useEffect(() => {
-    backButtonRef.current?.focus();
+    closeButtonRef.current?.focus();
   }, []);
 
-  useEffect(() => {
-    if (personCheckStatus !== "checking") return;
-
-    const timer = window.setTimeout(() => setPersonCheckStatus("person"), 500);
-    return () => window.clearTimeout(timer);
-  }, [personCheckStatus]);
-
-  const handleFile = (file: File | undefined) => {
+  const handleFile = async (file: File | undefined) => {
     if (!file) return;
+    const selectionId = selectionIdRef.current + 1;
+    selectionIdRef.current = selectionId;
     if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
       setFileError("PNG、JPEG、WebP形式の画像を選んでください。SVGは利用できません。");
-      setUploadedImage(null);
-      setPersonCheckStatus("idle");
-      setShowCandidates(false);
-      setSelectedCandidate(null);
+      setSelectedImage(null);
+      setIsPreparingImage(false);
       return;
     }
-    setFileError(null);
-    const reader = new FileReader();
-    reader.addEventListener("load", () => {
-      if (typeof reader.result === "string") {
-        setUploadedImage({ kind: "uploaded", dataUrl: reader.result, fileName: file.name });
-        setPersonCheckStatus("checking");
-        setShowCandidates(false);
-        setSelectedCandidate(null);
-      }
-    });
-    reader.readAsDataURL(file);
-  };
 
-  const showNotPersonResult = () => {
-    setPersonCheckStatus("not-person");
-    setShowCandidates(false);
-    setSelectedCandidate(null);
+    setFileError(null);
+    setSelectedImage(null);
+    setIsPreparingImage(true);
+    try {
+      const normalizedImage = await normalizeAvatarImage(file);
+      if (selectionIdRef.current === selectionId) setSelectedImage(normalizedImage);
+    } catch {
+      if (selectionIdRef.current === selectionId) {
+        setFileError("画像を読み込めませんでした。別の画像を選んでください。");
+      }
+    } finally {
+      if (selectionIdRef.current === selectionId) setIsPreparingImage(false);
+    }
   };
 
   return (
@@ -80,261 +58,160 @@ export function AvatarSettingsScreen({
       open
       aria-modal="true"
       aria-labelledby="avatar-settings-title"
-      className="fixed inset-0 z-[70] m-0 h-auto max-h-none w-auto max-w-none overflow-y-auto border-0 bg-slate-50 p-0 dark:bg-slate-900"
+      onCancel={(event) => {
+        event.preventDefault();
+        onBack();
+      }}
+      className="fixed inset-0 z-[70] m-0 flex h-dvh max-h-none w-full max-w-none items-end justify-center overflow-hidden border-0 bg-slate-950/50 p-0 backdrop-blur-sm sm:items-center sm:p-6"
     >
-      <header className="sticky top-0 z-10 border-b border-slate-200/80 bg-white/90 backdrop-blur dark:border-slate-700 dark:bg-slate-900/90">
-        <div className="mx-auto flex min-h-16 max-w-2xl items-center px-4 sm:px-8">
+      <div className="flex max-h-[calc(100dvh-1rem)] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl bg-slate-50 shadow-2xl dark:bg-slate-900 sm:max-h-[calc(100dvh-3rem)] sm:rounded-3xl">
+        <header className="flex min-h-16 shrink-0 items-center justify-between border-b border-slate-200/80 bg-white px-4 dark:border-slate-700 dark:bg-slate-900 sm:px-6">
+          <div>
+            <p className="text-xs font-bold tracking-wider text-sky-600 dark:text-sky-300">
+              PROFILE IMAGE
+            </p>
+            <h1
+              id="avatar-settings-title"
+              className="mt-0.5 text-lg font-bold text-slate-950 dark:text-white"
+            >
+              アバターを変更
+            </h1>
+          </div>
           <button
-            ref={backButtonRef}
+            ref={closeButtonRef}
             type="button"
             onClick={onBack}
             className="inline-flex size-11 items-center justify-center rounded-full text-slate-600 transition hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:text-slate-300 dark:hover:bg-slate-800"
-            aria-label="プロフィールへ戻る"
+            aria-label="アバター変更を閉じる"
           >
-            <ArrowLeft className="size-5" aria-hidden="true" />
+            <X className="size-5" aria-hidden="true" />
           </button>
-          <h1
-            id="avatar-settings-title"
-            className="ml-2 text-lg font-bold text-slate-950 dark:text-white"
-          >
-            アバター設定
-          </h1>
-        </div>
-      </header>
+        </header>
 
-      <main className="mx-auto w-full max-w-2xl px-4 py-8 pb-16 sm:px-8">
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 text-center shadow-sm dark:border-slate-700 dark:bg-slate-800">
-          <p className="text-xs font-bold tracking-wider text-slate-500 dark:text-slate-400">
-            現在のアバター
-          </p>
-          <div className="mt-5 flex justify-center">
-            <AvatarPreview avatar={currentAvatar} size="lg" />
-          </div>
-          <p className="mt-4 font-bold text-slate-950 dark:text-white">
-            {getAvatarName(currentAvatar)}
-          </p>
-          <p className="mt-2 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
-            ダミーUIです。画像の人物判定・AI変換・サーバー保存は実行しません。
-          </p>
-        </section>
-
-        <section aria-labelledby="upload-heading" className="mt-8">
-          <h2
-            id="upload-heading"
-            className="px-1 text-sm font-bold tracking-wider text-slate-500 dark:text-slate-400"
-          >
-            1. 自分の画像を選ぶ
-          </h2>
-          <label className="mt-3 flex items-start gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-700 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
-            <input
-              type="checkbox"
-              checked={hasAiConsent}
-              onChange={(event) => setHasAiConsent(event.target.checked)}
-              className="mt-0.5 size-5 shrink-0 accent-sky-500"
-            />
-            <span className="leading-relaxed">
-              この画像を使う権利と、写っている人の同意を確認しました。人物判定とアバター生成のため、画像が外部AIサービスへ送信されることに同意します。
-            </span>
-          </label>
-          <p className="mt-2 px-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
-            人物の有無だけを確認し、本人確認や年齢・性格などの属性推定には利用しません。
-          </p>
-          <label
-            aria-disabled={!hasAiConsent}
-            className={`mt-3 flex items-center gap-3 rounded-2xl border border-dashed p-4 transition focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-sky-500 ${
-              hasAiConsent
-                ? "cursor-pointer border-sky-300 bg-sky-50/70 hover:bg-sky-100 dark:border-sky-700 dark:bg-sky-950/20 dark:hover:bg-sky-950/40"
-                : "cursor-not-allowed border-slate-300 bg-slate-100 opacity-60 dark:border-slate-700 dark:bg-slate-800"
-            }`}
-          >
-            <span className="flex size-11 items-center justify-center rounded-xl bg-sky-500 text-white">
-              <ImagePlus className="size-5" aria-hidden="true" />
-            </span>
-            <span>
-              <span className="block font-bold text-slate-950 dark:text-white">
-                {uploadedImage ? "別の画像を選ぶ" : "画像をアップロード"}
-              </span>
-              <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
-                ご自身が写っている画像を選んでください
-              </span>
-            </span>
-            <input
-              type="file"
-              accept="image/png,image/jpeg,image/webp"
-              disabled={!hasAiConsent}
-              className="sr-only"
-              onChange={(event) => handleFile(event.target.files?.[0])}
-            />
-          </label>
-          {fileError && (
-            <p
-              role="alert"
-              className="mt-3 rounded-xl bg-rose-50 p-3 text-sm font-bold text-rose-900 dark:bg-rose-400/10 dark:text-rose-200"
-            >
-              {fileError}
-            </p>
-          )}
-        </section>
-
-        {uploadedImage?.kind === "uploaded" && (
-          <section aria-labelledby="person-check-heading" className="mt-8">
-            <h2
-              id="person-check-heading"
-              className="px-1 text-sm font-bold tracking-wider text-slate-500 dark:text-slate-400"
-            >
-              2. AIで人物を確認する
-            </h2>
-            <div className="mt-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800">
-              <div className="flex items-center gap-3">
-                <AvatarPreview avatar={uploadedImage} size="md" />
-                <div className="min-w-0">
-                  <p className="truncate font-bold text-slate-950 dark:text-white">
-                    {uploadedImage.fileName}
-                  </p>
-                  <p className="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
-                    人物が写っているかだけを確認します。本人確認や属性の推定はしません。
-                  </p>
-                </div>
+        <main className="overflow-y-auto px-4 py-6 sm:px-6">
+          <section className="rounded-3xl bg-gradient-to-br from-sky-100 via-white to-violet-100 p-5 dark:from-sky-950/60 dark:via-slate-800 dark:to-violet-950/50">
+            <div className="flex items-center gap-4">
+              <AvatarPreview avatar={currentAvatar} fallbackImageUrl={linePictureUrl} size="lg" />
+              <div className="min-w-0">
+                <p className="text-xs font-bold tracking-wider text-slate-500 dark:text-slate-400">
+                  現在のアバター
+                </p>
+                <p className="mt-2 break-words font-bold text-slate-950 dark:text-white">
+                  {getAvatarName(currentAvatar, linePictureUrl)}
+                </p>
+                <p className="mt-1 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+                  {currentAvatar
+                    ? "アプリで選んだ画像を表示しています。"
+                    : linePictureUrl
+                      ? "LINEのプロフィール画像を表示しています。"
+                      : "画像を選ぶとプロフィールに表示できます。"}
+                </p>
               </div>
-
-              {personCheckStatus === "checking" && (
-                <output className="mt-4 flex items-center gap-3 rounded-xl bg-sky-50 p-4 text-sm font-bold text-sky-800 dark:bg-sky-400/10 dark:text-sky-200">
-                  <ScanFace
-                    className="size-5 animate-pulse motion-reduce:animate-none"
-                    aria-hidden="true"
-                  />
-                  人物が写っているか確認しています…
-                </output>
-              )}
-
-              {personCheckStatus === "person" && (
-                <output className="mt-4 flex items-start gap-3 rounded-xl bg-emerald-50 p-4 text-emerald-900 dark:bg-emerald-400/10 dark:text-emerald-200">
-                  <UserCheck className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
-                  <span>
-                    <span className="block font-bold">人物を確認できました</span>
-                    <span className="mt-1 block text-xs leading-relaxed opacity-80">
-                      この画像をもとにAI変換へ進めます。
-                    </span>
-                  </span>
-                </output>
-              )}
-
-              {personCheckStatus === "not-person" && (
-                <div
-                  role="alert"
-                  className="mt-4 flex items-start gap-3 rounded-xl bg-rose-50 p-4 text-rose-900 dark:bg-rose-400/10 dark:text-rose-200"
-                >
-                  <CircleAlert className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
-                  <div>
-                    <p className="font-bold">人物を確認できませんでした</p>
-                    <p className="mt-1 text-xs leading-relaxed opacity-80">
-                      ご自身の顔や上半身が見やすい画像を選び直してください。
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {personCheckStatus !== "checking" && (
-                <button
-                  type="button"
-                  onClick={showNotPersonResult}
-                  className="mt-4 w-full rounded-xl px-3 py-2 text-xs font-bold text-slate-500 transition hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-500 dark:text-slate-400 dark:hover:bg-slate-700"
-                >
-                  ダミー確認：人物なしの結果を試す
-                </button>
-              )}
             </div>
           </section>
-        )}
 
-        {personCheckStatus === "person" && (
-          <section aria-labelledby="ai-candidates-heading" className="mt-8">
+          <section aria-labelledby="image-selection-heading" className="mt-6">
             <h2
-              id="ai-candidates-heading"
-              className="px-1 text-sm font-bold tracking-wider text-slate-500 dark:text-slate-400"
+              id="image-selection-heading"
+              className="px-1 text-sm font-bold text-slate-950 dark:text-white"
             >
-              3. AIでアバターに変換する
+              端末から画像を選ぶ
             </h2>
-            {!showCandidates ? (
-              <div className="mt-3 rounded-2xl border border-violet-200 bg-violet-50/70 p-4 dark:border-violet-800 dark:bg-violet-950/20">
-                <p className="text-sm leading-relaxed text-slate-700 dark:text-slate-200">
-                  外部の画像生成サービスへ送信して候補を作ります。処理には時間がかかり、完成した候補が自動で設定されることはありません。
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setShowCandidates(true)}
-                  className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-500 to-fuchsia-500 px-5 py-4 font-bold text-white shadow-lg shadow-violet-500/20 transition hover:brightness-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500"
-                >
-                  <WandSparkles className="size-5" aria-hidden="true" />
-                  ダミー変換を開始
-                </button>
-              </div>
-            ) : (
-              <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                {AVATAR_PRESETS.map((candidate) => {
-                  const avatar: GeneratedAvatar = {
-                    kind: "preset",
-                    presetId: candidate.id,
-                  };
-                  const isSelected = selectedCandidate?.presetId === candidate.id;
-                  return (
-                    <button
-                      key={candidate.id}
-                      type="button"
-                      aria-label={`${candidate.name}を選択`}
-                      aria-pressed={isSelected}
-                      onClick={() => setSelectedCandidate(avatar)}
-                      className={`relative flex flex-col items-center rounded-2xl border p-4 transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 ${
-                        isSelected
-                          ? "border-violet-500 bg-violet-50 ring-1 ring-violet-500 dark:bg-violet-400/10"
-                          : "border-slate-200 bg-white hover:border-violet-300 dark:border-slate-700 dark:bg-slate-800"
-                      }`}
-                    >
-                      <AvatarPreview avatar={avatar} size="md" />
-                      <span className="mt-3 text-sm font-bold text-slate-900 dark:text-white">
-                        {candidate.name}
-                      </span>
-                      {isSelected && (
-                        <span className="absolute top-2 right-2 flex size-5 items-center justify-center rounded-full bg-violet-500 text-white">
-                          <Check className="size-3" aria-hidden="true" />
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
+            <label className="mt-3 flex cursor-pointer items-center gap-3 rounded-2xl border border-dashed border-sky-300 bg-sky-50/70 p-4 transition hover:bg-sky-100 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-sky-500 dark:border-sky-700 dark:bg-sky-950/20 dark:hover:bg-sky-950/40">
+              <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-sky-500 text-white">
+                <ImagePlus className="size-5" aria-hidden="true" />
+              </span>
+              <span className="min-w-0">
+                <span aria-live="polite" className="block font-bold text-slate-950 dark:text-white">
+                  {isPreparingImage
+                    ? "画像を準備しています"
+                    : selectedImage
+                      ? "別の画像を選ぶ"
+                      : "画像を選ぶ"}
+                </span>
+                <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
+                  PNG、JPEG、WebPに対応
+                </span>
+              </span>
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="sr-only"
+                aria-label={selectedImage ? "別の画像を選ぶ" : "画像を選ぶ"}
+                onChange={(event) => {
+                  const file = event.currentTarget.files?.[0];
+                  event.currentTarget.value = "";
+                  void handleFile(file);
+                }}
+              />
+            </label>
+            {fileError && (
+              <p
+                role="alert"
+                className="mt-3 rounded-xl bg-rose-50 p-3 text-sm font-bold text-rose-900 dark:bg-rose-400/10 dark:text-rose-200"
+              >
+                {fileError}
+              </p>
             )}
-            <p className="mt-3 flex items-start gap-2 px-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
-              <Sparkles className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-              本番では変換を非同期で受け付けます。このダミーでは候補をすぐ表示します。
-            </p>
           </section>
-        )}
 
-        <div className="mt-10 space-y-3">
-          {showCandidates && (
-            <button
-              type="button"
-              disabled={!selectedCandidate}
-              onClick={() => onSave(selectedCandidate)}
-              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-sky-400 px-5 py-4 font-bold text-slate-950 transition hover:bg-sky-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <Check className="size-5" aria-hidden="true" />
-              このアバターに設定
-            </button>
+          {selectedImage && (
+            <section aria-labelledby="avatar-preview-heading" className="mt-6">
+              <h2
+                id="avatar-preview-heading"
+                className="px-1 text-sm font-bold text-slate-950 dark:text-white"
+              >
+                設定後のプレビュー
+              </h2>
+              <div className="mt-3 rounded-3xl border border-slate-200 bg-white p-6 text-center shadow-sm dark:border-slate-700 dark:bg-slate-800">
+                <div className="flex justify-center">
+                  <AvatarPreview avatar={selectedImage} size="xl" />
+                </div>
+                <p className="mt-4 text-xs text-slate-500 dark:text-slate-400">
+                  画像は中央を正方形に切り抜き、プロフィールでは円形で表示されます。
+                </p>
+              </div>
+            </section>
           )}
+
+          <div className="mt-6 flex items-start gap-3 rounded-2xl bg-slate-100 p-4 text-sm text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+            <Info
+              className="mt-0.5 size-5 shrink-0 text-sky-600 dark:text-sky-300"
+              aria-hidden="true"
+            />
+            <p className="leading-relaxed">
+              現在はUI確認用のため、選んだ画像はサーバーへ送信・保存されず、再読み込みすると
+              {linePictureUrl ? "元のLINE画像" : "画像未設定の状態"}に戻ります。
+            </p>
+          </div>
+        </main>
+
+        <footer className="shrink-0 space-y-2 border-t border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900 sm:px-6">
+          <button
+            type="button"
+            disabled={!selectedImage || isPreparingImage}
+            onClick={() => onSave(selectedImage)}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-sky-400 px-5 py-4 font-bold text-slate-950 transition hover:bg-sky-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <Check className="size-5" aria-hidden="true" />
+            この画像を設定
+          </button>
           {currentAvatar && (
             <button
               type="button"
               onClick={() => onSave(null)}
-              className="flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-bold text-red-700 transition hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500 dark:text-red-300 dark:hover:bg-red-400/10"
+              className="flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-bold text-slate-600 transition hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-500 dark:text-slate-300 dark:hover:bg-slate-800"
             >
-              <Trash2 className="size-4" aria-hidden="true" />
-              現在のアバターを削除
+              {linePictureUrl ? (
+                <RotateCcw className="size-4" aria-hidden="true" />
+              ) : (
+                <Trash2 className="size-4" aria-hidden="true" />
+              )}
+              {linePictureUrl ? "LINEの画像に戻す" : "現在の画像を削除"}
             </button>
           )}
-        </div>
-      </main>
+        </footer>
+      </div>
     </dialog>
   );
 }

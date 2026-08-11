@@ -4,21 +4,19 @@ import {
   type AccountDataOperation,
   type AccountDataResult,
   type CompatibilityReference,
+  D1,
+  DIAGNOSIS_CATALOG_ID,
+  DO,
   compatibilityDataFor,
-  d1,
 } from "@me-builder/lib";
-import { logger } from "@me-builder/shared";
-import { eq, inArray } from "drizzle-orm";
+import { logger, toSafeOperationalErrorFields } from "@me-builder/shared";
+import { eq } from "drizzle-orm";
 import type { Env } from "../types";
 import { brainActions } from "./brain";
 import { compatibilityActions } from "./compatibility";
 import { diagnosisActions } from "./diagnosis";
 import { diaryActions } from "./diary";
-import {
-  AccountDataRepository,
-  type DiagnosisCatalogSnapshot,
-  type LegacyAccountDataSnapshot,
-} from "./repository";
+import { AccountDataRepository, type DiagnosisCatalogSnapshot } from "./repository";
 
 const actions = {
   ...brainActions,
@@ -32,7 +30,6 @@ const ALARM_RETRY_MS = 30_000;
 export class AccountData extends DurableObject<Env> {
   private readonly accountId: string;
   private readonly repository: AccountDataRepository;
-  private legacyImport: Promise<void> | undefined;
   private operationTail: Promise<void> = Promise.resolve();
 
   constructor(ctx: DurableObjectState, env: Env) {
@@ -42,13 +39,8 @@ export class AccountData extends DurableObject<Env> {
     this.accountId = accountId;
     this.repository = new AccountDataRepository(ctx.storage);
     ctx.blockConcurrencyWhile(async () => {
-      try {
-        await this.repository.initialize();
-        this.repository.bindAccount(accountId);
-      } catch (error) {
-        logAccountDataFailure("initialization", error);
-        throw error;
-      }
+      await this.repository.initialize();
+      this.repository.bindAccount(accountId);
     });
   }
 
@@ -84,33 +76,14 @@ export class AccountData extends DurableObject<Env> {
       const action = (actions as Partial<Record<AccountDataOperation, unknown>>)[operation];
       if (typeof action !== "function") throw new Error("Unsupported AccountData operation");
       const boundAction = action as (
-        db: d1.Client,
+        db: DO.account.Database,
         boundAccountId: string,
         ...actionArgs: AccountDataArgs<TOperation>
       ) => Promise<AccountDataResult<TOperation>>;
 
-      if (!this.legacyImport) this.legacyImport = this.importLegacyAccountData(accountId);
-      try {
-        await this.legacyImport;
-      } catch (error) {
-        this.legacyImport = undefined;
-        logAccountDataFailure("legacy_import", error, operation);
-        throw error;
-      }
       if (operation.startsWith("diagnosis")) await this.syncDiagnosisCatalog();
-      let result: AccountDataResult<TOperation>;
-      try {
-        result = await boundAction(this.repository.client, accountId, ...args);
-      } catch (error) {
-        logAccountDataFailure("action", error, operation);
-        throw error;
-      }
-      try {
-        await this.scheduleMaintenance();
-      } catch (error) {
-        logAccountDataFailure("maintenance", error, operation);
-        throw error;
-      }
+      const result = await boundAction(this.repository.client, accountId, ...args);
+      await this.scheduleMaintenance();
       return result;
     });
   }
@@ -118,11 +91,11 @@ export class AccountData extends DurableObject<Env> {
   async alarm(): Promise<void> {
     await this.runExclusive(async () => {
       try {
-        await d1.action.conversation.closeExpiredSessions(this.repository.client);
-        await d1.action.diagnosisBrainProjection.processPendingDiagnosisBrainProjections(
+        await DO.account.action.diary.closeExpiredSessions(this.repository.client);
+        await DO.account.action.diagnosisBrainProjection.processPendingDiagnosisBrainProjections(
           this.repository.client,
         );
-        const checkpointIds = await d1.action.conversation.claimDueDiaryBrainCheckpointIds(
+        const checkpointIds = await DO.account.action.diary.claimDueDiaryBrainCheckpointIds(
           this.repository.client,
           this.accountId,
         );
@@ -135,7 +108,7 @@ export class AccountData extends DurableObject<Env> {
             accountId: this.accountId,
             checkpointId,
           });
-          const dispatched = await d1.action.conversation.markDiaryBrainCheckpointDispatched(
+          const dispatched = await DO.account.action.diary.markDiaryBrainCheckpointDispatched(
             this.repository.client,
             this.accountId,
             checkpointId,
@@ -144,9 +117,8 @@ export class AccountData extends DurableObject<Env> {
             throw new Error("Diary Brain checkpoint dispatch state could not be recorded");
           }
         }
-        const vectorJobs = await d1.action.brain.claimDueBrainVectorSyncJobs(
+        const vectorJobs = await DO.account.action.brain.claimDueBrainVectorSyncJobs(
           this.repository.client,
-          this.accountId,
         );
         if (vectorJobs.length > 0 && !this.env.BRAIN_VECTOR_QUEUE) {
           throw new Error("BRAIN_VECTOR_QUEUE binding is required for Brain vector sync");
@@ -163,8 +135,20 @@ export class AccountData extends DurableObject<Env> {
         await this.scheduleMaintenance();
       } catch (error) {
         logger.error(
-          { errorName: error instanceof Error ? error.name : "UnknownError" },
-          "AccountData alarm failed; retry scheduled",
+          {
+            event: "alarm.run.failed",
+            service: "worker",
+            component: "account-data",
+            outcome: "failed",
+            disposition: "alarm-retry",
+            ...toSafeOperationalErrorFields(error, {
+              code: "ACCOUNT_DATA_ALARM_FAILED",
+              category: "unknown",
+              stage: "alarm.maintenance",
+              retryable: true,
+            }),
+          },
+          "[AccountData] alarm failed at alarm.maintenance -> alarm-retry (maintenance will be retried on the next alarm)",
         );
         await this.scheduleMaintenanceRetry();
       }
@@ -213,8 +197,25 @@ export class AccountData extends DurableObject<Env> {
     return this.repository.listVisibleCompatibilityReferences(this.accountId);
   }
 
+  /**
+   * 公開定義snapshotを、共有D1が公開している版と一致しないときだけ読み直す。
+   *
+   * 版が同じならRPCあたり1行のqueryで済み、定義が増えても操作コストが増えない。
+   *
+   * 共有D1が版を公開していない間はsnapshotを最新と見なさず、毎回読み直す。
+   * 版なしを0として同期済みに固定すると、seed適用前に作られたObjectが空の
+   * snapshotを持ち続け、以後のRPCが短絡して診断を返せなくなる。
+   */
   private async syncDiagnosisCatalog(): Promise<void> {
-    const shared = d1.client.create(this.env.DB);
+    const shared = D1.shared.client.create(this.env.DB);
+    const published = await shared
+      .select({ version: D1.shared.schema.catalogVersions.version })
+      .from(D1.shared.schema.catalogVersions)
+      .where(eq(D1.shared.schema.catalogVersions.catalogId, DIAGNOSIS_CATALOG_ID))
+      .get();
+    if (published && this.repository.isDiagnosisCatalogCurrent(published.version)) return;
+    const version = published?.version ?? 0;
+
     const [
       questions,
       questionVersions,
@@ -223,14 +224,15 @@ export class AccountData extends DurableObject<Env> {
       diagnoses,
       diagnosisQuestions,
     ] = await Promise.all([
-      shared.select().from(d1.schema.questions),
-      shared.select().from(d1.schema.questionVersions),
-      shared.select().from(d1.schema.questionChoices),
-      shared.select().from(d1.schema.diagnosisScoringConfigs),
-      shared.select().from(d1.schema.diagnoses),
-      shared.select().from(d1.schema.diagnosisQuestions),
+      shared.select().from(D1.shared.schema.questions),
+      shared.select().from(D1.shared.schema.questionVersions),
+      shared.select().from(D1.shared.schema.questionChoices),
+      shared.select().from(D1.shared.schema.diagnosisScoringConfigs),
+      shared.select().from(D1.shared.schema.diagnoses),
+      shared.select().from(D1.shared.schema.diagnosisQuestions),
     ]);
     this.repository.syncDiagnosisCatalog({
+      version,
       questions,
       questionVersions,
       questionChoices,
@@ -238,192 +240,6 @@ export class AccountData extends DurableObject<Env> {
       diagnoses,
       diagnosisQuestions,
     } satisfies DiagnosisCatalogSnapshot);
-  }
-
-  private async importLegacyAccountData(accountId: string): Promise<void> {
-    if (this.repository.isLegacyImportComplete()) return;
-    await this.syncDiagnosisCatalog();
-    const shared = d1.client.create(this.env.DB);
-    const account = await shared
-      .select()
-      .from(d1.schema.accounts)
-      .where(eq(d1.schema.accounts.id, accountId))
-      .get();
-    if (!account) throw new Error("AccountData source account was not found in shared identity DB");
-    const [
-      sourceRecords,
-      sourceRecordTextPayloads,
-      sourceRecordRevisions,
-      brainItems,
-      brainItemEvidenceEdges,
-      brainItemRevisions,
-      brainItemAccessLabels,
-      brainItemTopicLabels,
-      conversationSessions,
-      conversationMessages,
-      chatTurns,
-      diagnosisResponses,
-      diagnosisAnswers,
-      diagnosisDeferredQuestions,
-      diagnosisBrainProjectionRequests,
-      diagnosisBrainProjectionHeads,
-    ] = await Promise.all([
-      shared
-        .select()
-        .from(d1.schema.sourceRecords)
-        .where(eq(d1.schema.sourceRecords.accountId, accountId))
-        .all(),
-      shared
-        .select()
-        .from(d1.schema.sourceRecordTextPayloads)
-        .where(
-          inArray(
-            d1.schema.sourceRecordTextPayloads.sourceRecordId,
-            shared
-              .select({ id: d1.schema.sourceRecords.id })
-              .from(d1.schema.sourceRecords)
-              .where(eq(d1.schema.sourceRecords.accountId, accountId)),
-          ),
-        )
-        .all(),
-      shared
-        .select()
-        .from(d1.schema.sourceRecordRevisions)
-        .where(
-          inArray(
-            d1.schema.sourceRecordRevisions.previousSourceRecordId,
-            shared
-              .select({ id: d1.schema.sourceRecords.id })
-              .from(d1.schema.sourceRecords)
-              .where(eq(d1.schema.sourceRecords.accountId, accountId)),
-          ),
-        )
-        .all(),
-      shared
-        .select()
-        .from(d1.schema.brainItems)
-        .where(eq(d1.schema.brainItems.accountId, accountId))
-        .all(),
-      shared
-        .select()
-        .from(d1.schema.brainItemEvidenceEdges)
-        .where(eq(d1.schema.brainItemEvidenceEdges.accountId, accountId))
-        .all(),
-      shared
-        .select()
-        .from(d1.schema.brainItemRevisions)
-        .where(eq(d1.schema.brainItemRevisions.accountId, accountId))
-        .all(),
-      shared
-        .select()
-        .from(d1.schema.brainItemAccessLabels)
-        .where(eq(d1.schema.brainItemAccessLabels.accountId, accountId))
-        .all(),
-      shared
-        .select()
-        .from(d1.schema.brainItemTopicLabels)
-        .where(eq(d1.schema.brainItemTopicLabels.accountId, accountId))
-        .all(),
-      shared
-        .select()
-        .from(d1.schema.conversationSessions)
-        .where(eq(d1.schema.conversationSessions.accountId, accountId))
-        .all(),
-      shared
-        .select()
-        .from(d1.schema.conversationMessages)
-        .where(
-          inArray(
-            d1.schema.conversationMessages.sessionId,
-            shared
-              .select({ id: d1.schema.conversationSessions.id })
-              .from(d1.schema.conversationSessions)
-              .where(eq(d1.schema.conversationSessions.accountId, accountId)),
-          ),
-        )
-        .all(),
-      shared
-        .select()
-        .from(d1.schema.chatTurns)
-        .where(
-          inArray(
-            d1.schema.chatTurns.sessionId,
-            shared
-              .select({ id: d1.schema.conversationSessions.id })
-              .from(d1.schema.conversationSessions)
-              .where(eq(d1.schema.conversationSessions.accountId, accountId)),
-          ),
-        )
-        .all(),
-      shared
-        .select()
-        .from(d1.schema.diagnosisResponses)
-        .where(eq(d1.schema.diagnosisResponses.accountId, accountId))
-        .all(),
-      shared
-        .select()
-        .from(d1.schema.diagnosisAnswers)
-        .where(
-          inArray(
-            d1.schema.diagnosisAnswers.diagnosisResponseId,
-            shared
-              .select({ id: d1.schema.diagnosisResponses.id })
-              .from(d1.schema.diagnosisResponses)
-              .where(eq(d1.schema.diagnosisResponses.accountId, accountId)),
-          ),
-        )
-        .all(),
-      shared
-        .select()
-        .from(d1.schema.diagnosisDeferredQuestions)
-        .where(
-          inArray(
-            d1.schema.diagnosisDeferredQuestions.diagnosisResponseId,
-            shared
-              .select({ id: d1.schema.diagnosisResponses.id })
-              .from(d1.schema.diagnosisResponses)
-              .where(eq(d1.schema.diagnosisResponses.accountId, accountId)),
-          ),
-        )
-        .all(),
-      shared
-        .select()
-        .from(d1.schema.diagnosisBrainProjectionRequests)
-        .where(
-          inArray(
-            d1.schema.diagnosisBrainProjectionRequests.diagnosisResponseId,
-            shared
-              .select({ id: d1.schema.diagnosisResponses.id })
-              .from(d1.schema.diagnosisResponses)
-              .where(eq(d1.schema.diagnosisResponses.accountId, accountId)),
-          ),
-        )
-        .all(),
-      shared
-        .select()
-        .from(d1.schema.diagnosisBrainProjectionHeads)
-        .where(eq(d1.schema.diagnosisBrainProjectionHeads.accountId, accountId))
-        .all(),
-    ]);
-    this.repository.importLegacyAccountData({
-      account,
-      sourceRecords,
-      sourceRecordTextPayloads,
-      sourceRecordRevisions,
-      brainItems,
-      brainItemEvidenceEdges,
-      brainItemRevisions,
-      brainItemAccessLabels,
-      brainItemTopicLabels,
-      conversationSessions,
-      conversationMessages,
-      chatTurns,
-      diagnosisResponses,
-      diagnosisAnswers,
-      diagnosisDeferredQuestions,
-      diagnosisBrainProjectionRequests,
-      diagnosisBrainProjectionHeads,
-    } satisfies LegacyAccountDataSnapshot);
   }
 
   private async scheduleMaintenance(): Promise<void> {
@@ -452,24 +268,4 @@ export class AccountData extends DurableObject<Env> {
       release();
     }
   }
-}
-
-function logAccountDataFailure(
-  phase: "initialization" | "legacy_import" | "action" | "maintenance",
-  error: unknown,
-  operation?: string,
-): void {
-  const errorCode =
-    error && typeof error === "object" && "code" in error
-      ? String((error as { code: unknown }).code)
-      : undefined;
-  logger.error(
-    {
-      phase,
-      ...(operation ? { operation } : {}),
-      errorName: error instanceof Error ? error.name : "UnknownError",
-      ...(errorCode ? { errorCode } : {}),
-    },
-    "AccountData operation failed",
-  );
 }

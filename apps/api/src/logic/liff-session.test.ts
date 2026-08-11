@@ -1,5 +1,5 @@
 import path from "node:path";
-import { d1 } from "@me-builder/lib";
+import { D1 } from "@me-builder/lib";
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
@@ -14,9 +14,9 @@ const ID_TOKEN = "dummy.id.token";
  * `@me-builder/lib` のテーブル定義とマイグレーションをそのまま使い、
  * インメモリ SQLite を D1 の代わりに使います。
  */
-function createTestDb(): d1.Client {
+function createTestDb(): D1.shared.Client {
   const sqlite = new Database(":memory:");
-  const db = drizzle(sqlite, { schema: d1.schema });
+  const db = drizzle(sqlite, { schema: D1.shared.schema });
   // biome-ignore lint/suspicious/noExplicitAny: drizzle の migrate はドライバごとの型を要求する
   migrate(db as any, {
     migrationsFolder: path.resolve(__dirname, "../../../../packages/lib/drizzle"),
@@ -31,7 +31,7 @@ function createTestDb(): d1.Client {
     },
     writable: true,
   });
-  return db as unknown as d1.Client;
+  return db as unknown as D1.shared.Client;
 }
 
 /** ID トークンの検証エンドポイントの応答を差し替えます。 */
@@ -56,7 +56,7 @@ const validClaims = {
 };
 
 describe("createLiffSession", () => {
-  let db: d1.Client;
+  let db: D1.shared.Client;
 
   beforeEach(() => {
     db = createTestDb();
@@ -71,7 +71,7 @@ describe("createLiffSession", () => {
     createLiffSession({ idToken: ID_TOKEN, lineLoginChannelId: channelId, db });
 
   it("友だち追加で作られた Account を引き当て、表示用の情報だけを返すこと", async () => {
-    const followed = await d1.action.account.upsertIdentity(db, {
+    const followed = await D1.shared.action.account.upsertIdentity(db, {
       provider: "line",
       providerAccountId: SUB,
     });
@@ -91,21 +91,21 @@ describe("createLiffSession", () => {
     // sub (LINE の userId) を戻り値へ含めない
     expect(JSON.stringify(result)).not.toContain(SUB);
     // Account は増えず、line_login の identity が同じ Account へ紐づく
-    expect(await db.select().from(d1.schema.accounts).all()).toHaveLength(1);
-    const identities = await db.select().from(d1.schema.accountIdentities).all();
+    expect(await db.select().from(D1.shared.schema.accounts).all()).toHaveLength(1);
+    const identities = await db.select().from(D1.shared.schema.accountIdentities).all();
     expect(identities.map((i) => i.provider).sort()).toEqual(["line", "line_login"]);
     expect(new Set(identities.map((i) => i.accountId)).size).toBe(1);
   });
 
   it("2 回目の呼び出しでも identity が増えないこと", async () => {
-    await d1.action.account.upsertIdentity(db, { provider: "line", providerAccountId: SUB });
+    await D1.shared.action.account.upsertIdentity(db, { provider: "line", providerAccountId: SUB });
     mockVerifyEndpoint({ json: validClaims });
 
     await call();
     const second = await call();
 
     expect(second.type).toBe("resolved");
-    expect(await db.select().from(d1.schema.accountIdentities).all()).toHaveLength(2);
+    expect(await db.select().from(D1.shared.schema.accountIdentities).all()).toHaveLength(2);
   });
 
   it("ID トークンが無い場合は unauthenticated を返し、検証エンドポイントを呼ばないこと", async () => {
@@ -136,7 +136,7 @@ describe("createLiffSession", () => {
     const result = await call();
 
     expect(result.type).toBe("unauthenticated");
-    expect(await db.select().from(d1.schema.accounts).all()).toHaveLength(0);
+    expect(await db.select().from(D1.shared.schema.accounts).all()).toHaveLength(0);
   });
 
   it("aud が別チャネルの ID トークンを拒否すること", async () => {
@@ -153,11 +153,11 @@ describe("createLiffSession", () => {
     const result = await call();
 
     expect(result.type).toBe("account-not-found");
-    expect(await db.select().from(d1.schema.accounts).all()).toHaveLength(0);
+    expect(await db.select().from(D1.shared.schema.accounts).all()).toHaveLength(0);
   });
 
   it("戻り値に HTTP のステータスコードを含めないこと", async () => {
-    await d1.action.account.upsertIdentity(db, { provider: "line", providerAccountId: SUB });
+    await D1.shared.action.account.upsertIdentity(db, { provider: "line", providerAccountId: SUB });
     mockVerifyEndpoint({ json: validClaims });
 
     const result = await call();

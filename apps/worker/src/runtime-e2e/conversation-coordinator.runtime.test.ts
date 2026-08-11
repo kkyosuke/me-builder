@@ -8,25 +8,26 @@ describe("ConversationCoordinator Workers runtime E2E", () => {
     const accountId = crypto.randomUUID();
     const eventId = crypto.randomUUID();
     const sourceRecordId = crypto.randomUUID();
+    const traceId = crypto.randomUUID();
     const receivedAt = new Date().toISOString();
     const stub = env.CONVERSATION_COORDINATOR.getByName(accountId);
 
     await expect(
-      stub.acceptMessage({ accountId, eventId, sourceRecordId, receivedAt }),
+      stub.acceptMessage({ accountId, eventId, sourceRecordId, receivedAt, traceId }),
     ).resolves.toEqual({ accepted: true });
     await expect(
-      stub.acceptMessage({ accountId, eventId, sourceRecordId, receivedAt }),
+      stub.acceptMessage({ accountId, eventId, sourceRecordId, receivedAt, traceId }),
     ).resolves.toEqual({ accepted: false });
 
     await runInDurableObject(stub, async (_instance: ConversationCoordinator, state) => {
       expect(
         state.storage.sql
-          .exec<{ event_id: string }>(
-            "SELECT event_id FROM accepted_messages WHERE event_id = ?",
+          .exec<{ event_id: string; trace_id: string }>(
+            "SELECT event_id, trace_id FROM accepted_messages WHERE event_id = ?",
             eventId,
           )
-          .one().event_id,
-      ).toBe(eventId);
+          .one(),
+      ).toEqual({ event_id: eventId, trace_id: traceId });
       await expect(state.storage.getAlarm()).resolves.toBeTypeOf("number");
     });
   });

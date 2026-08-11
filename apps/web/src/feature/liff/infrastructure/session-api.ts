@@ -9,10 +9,16 @@ const toMessage = (error: unknown): string =>
 
 type LiffSessionRequest =
   operations["verifyLiffSession"]["requestBody"]["content"]["application/json"];
+type LiffSessionResponse =
+  operations["verifyLiffSession"]["responses"][200]["content"]["application/json"];
 
 /** IDトークンをAPIへ送り、サーバー側で本人性を検証してAccountを解決させる。 */
-export async function verifyLiffSession(apiUrl: string | undefined): Promise<LiffSessionState> {
-  const token = getLiffIdToken();
+export async function verifyLiffSession(
+  apiUrl: string | undefined,
+  idToken: string | null = getLiffIdToken(),
+  signal?: AbortSignal,
+): Promise<LiffSessionState> {
+  const token = idToken;
 
   if (!token) {
     logger.warn("ID トークンが取得できません。LIFF アプリの openid スコープを確認してください");
@@ -28,6 +34,7 @@ export async function verifyLiffSession(apiUrl: string | undefined): Promise<Lif
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
+      ...(signal ? { signal } : {}),
     });
 
     if (response.status === 404) {
@@ -39,8 +46,9 @@ export async function verifyLiffSession(apiUrl: string | undefined): Promise<Lif
       return { status: "error", message: `本人確認に失敗しました (HTTP ${response.status})` };
     }
 
+    const session = (await response.json()) as LiffSessionResponse;
     logger.info("ID トークンの検証に成功しました");
-    return { status: "verified" };
+    return { status: "verified", role: session.role };
   } catch (error) {
     logger.warn(`ID トークンの検証リクエストに失敗しました: ${toMessage(error)}`);
     return { status: "error", message: "本人確認のリクエストに失敗しました" };

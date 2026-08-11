@@ -56,11 +56,10 @@ flowchart TD
             Queues[("Cloudflare Queues<br/>(Webhook Message Queue)")]
             DO["Cloudflare Durable Objects<br/>(Stateful / Realtime Session)"]
             WorkersAI["Cloudflare Workers AI<br/>(Embedding / LLM Inference)"]
-            AIGateway["Cloudflare AI Gateway<br/>(LLM Proxy / Observability)"]
         end
     end
 
-    Gemini["Google AI Studio<br/>(Gemini)"]
+    Gemini["Google Vertex AI Express Mode<br/>(Gemini)"]
 
     Web --> CF_Sec
     LINE --> CF_Sec
@@ -72,8 +71,7 @@ flowchart TD
 
     WorkersAPI --> Queues
     Queues --> WorkersWorker
-    WorkersWorker --> AIGateway
-    AIGateway --> Gemini
+    WorkersWorker --> Gemini
 
     WorkersAPI --> D1
     WorkersAPI --> R2
@@ -87,7 +85,7 @@ flowchart TD
     WorkersMCP --> KV
 
     classDef cfFill fill:#f6821f,stroke:#333,stroke-width:1px,color:#fff;
-    class Pages,WorkersAPI,WorkersMCP,WorkersWorker,D1,Vectorize,R2,KV,Queues,DO,WorkersAI,AIGateway cfFill;
+    class Pages,WorkersAPI,WorkersMCP,WorkersWorker,D1,Vectorize,R2,KV,Queues,DO,WorkersAI cfFill;
 ```
 
 ## 4. コンポーネント別の役割と選定
@@ -99,13 +97,12 @@ flowchart TD
 | **MCP サーバー** | **Cloudflare Workers** | 外部 AI エージェント向け MCP (Model Context Protocol) 端点の提供。SSE (Server-Sent Events) および HTTP 通信を直接処理。 |
 | **キューワーカー** | **Cloudflare Workers** | Cloudflare Queues から非同期メッセージを受信・消費・バックグラウンド処理する非同期ワーカー。 |
 | **メッセージキュー** | **Cloudflare Queues** | Webhook 等のイベントを安全に保持・非同期配送するサーバーレスメッセージキュー。 |
-| **構造化データストア** | **Cloudflare D1** | サーバーレスリレーショナルデータベース (SQLite)。`Account` 情報、`Brain` メタデータ、`Access Label`、`Access Profile`、監査ログを保持。 |
+| **構造化データストア** | **Cloudflare D1** | サーバーレスリレーショナルデータベース (SQLite)。Account Identity、全Account共通の公開定義、原文を含まない集計projectionだけを保持。Account所有データは保持しない。 |
 | **ベクトル検索ストア** | **Cloudflare Vectorize** | 完全マネージドなベクトルデータベース。`Brain Item` の埋め込みベクトル（Embedding）を保存し、コサイン類似度等による高速セマンティック検索を提供。 |
 | **メディアストレージ** | **Cloudflare R2** | S3互換のオブジェクトストレージ。ユーザーが投稿・回答した写真、イラスト、動画、音声などのメディア原本データを保存（エグレス料金ゼロ）。 |
 | **キー・バリュー / キャッシュ** | **Cloudflare KV** | 低遅延グローバルキー・バリューストア。認証トークン、一時セッション、アクセス制御キャッシュ、レート制限カウントを保持。 |
-| **状態管理 / ドメイン協調** | **Cloudflare Durable Objects** | 厳格な単一整合性が求められるリアルタイムセッション制御や、MCP接続状態の排他制御・ステートフルな協調を処理。 |
-| **AI / 推論基盤** | **Cloudflare Workers AI** | エッジ上でのテキスト Embedding 生成（ベクトル化）および軽量 AI モデル推論の実行。外部 LLM サービス呼び出し時は Workers 経由で安全にプロキシ通信。 |
-| **外部LLMゲートウェイ** | **Cloudflare AI Gateway** | Queue Worker から Google AI Studio の Gemini を呼び出す際の統一経路。Gateway の認証、可観測性、利用量管理を担い、Google API key をクライアントへ公開しない。 |
+| **状態管理 / ドメイン協調** | **Cloudflare Durable Objects** | Account所有データのSSoT。1 Accountにつき1つのprivate SQLiteへ`Source`・`Brain`・`Diary`・`Diagnosis`回答を保存し、連投調停や相性関係の協調も担う。 |
+| **AI / 推論基盤** | **Vertex AI Express Mode (Gemini)** | Queue WorkerからAPI key認証でテキスト生成とEmbedding生成を実行。本文、生成結果、API keyをアプリケーションログへ残さない。 |
 | **セキュリティ & ネットワーク** | **Cloudflare Access / WAF** | DDoS防御、WAFルール適用、SSL/TLS証明書管理、管理画面等へのゼロトラストアクセス制御（Cloudflare Access）。 |
 
 ## 5. データ連携フロー原則
@@ -115,8 +112,8 @@ flowchart TD
    - Account所有メディアのメタデータ、所有権、アクセスラベル等の構造化情報はAccountDataへ記録します。共有D1との境界は[Accountデータ分離設計](account-data-isolation.md)を正とします。
 
 2. **テキストおよびメディアのベクトル化と検索**
-   - 新規の回答データや要約テキストは Cloudflare Workers AI を通じて Embedding ベクトルへ変換されます。
-   - 生成されたベクトルは Cloudflare Vectorize にインデックス化され、MCP経由でのセマンティック検索（`search_answers` 等）に利用されます。
+   - activeなBrain Itemは、AccountDataの同期outboxと専用Queueを経由してVertex AI Express ModeのGeminiでEmbeddingへ変換されます。
+   - 生成されたベクトルはCloudflare Vectorizeへ保存します。Vectorizeは候補抽出だけを担い、利用時はAccountDataで現在の状態とAccess Policyを再認可します。
 
 3. **MCPアクセス制限と監査**
    - MCPリクエスト受領時、Cloudflare Workers は D1 および KV に保持された `Access Profile` と `Access Label` を照合し、認可範囲内の情報のみを返却します。
@@ -127,11 +124,12 @@ flowchart TD
    - バックグラウンドの Queue Worker (`apps/worker`) がキューから非同期バッチメッセージを取り出し順次処理します。LINE日記メッセージの最終応答、応答期限、再試行は[日記チャット実装設計](diary-chat-implementation-design.md#9-38秒sloと配送)を正とします。
 
 5. **外部LLMの呼び出し**
-   - Google AI Studio の Gemini を利用する処理は、Queue Worker から Cloudflare AI Gateway を経由して呼び出します。
-   - Google AI Studio API key と AI Gateway token は Worker の Secret として保持し、Web UI、APIレスポンス、ログへ露出させません。
+   - Vertex AI Express Mode の Gemini を利用する処理は、Queue Worker からGoogleへ直接呼び出します。
+   - `@google/genai`は`vertexai: true`とAPI version `v1`で初期化し、プロジェクトやロケーションの指定を要しないExpress ModeのAPI key認証を使います。
+   - Vertex AI API key (`GOOGLE_VERTEX_AI_API_KEY`) は Worker の Secret として保持し、Web UI、APIレスポンス、ログへ露出させません。
    - 接続確認では、LINEへ `AI: 質問` と明示して送った本文だけをモデルへ渡し、生成結果を同じトークへ返信します。通常の日記と診断要求はモデルへ送りません。
    - モデルへ渡した本文と生成結果はアプリケーションログおよびデータベースへ保存しません。
-   - 接続確認の失敗時は、設定不足、空応答、API例外を区別できる構造化ログを出力します。モデルへ渡した本文、生成結果、Google API key、AI Gateway token はエラーログにも含めません。
+   - 接続確認の失敗時は、設定不足、空応答、API例外を区別できる構造化ログを出力します。モデルへ渡した本文、生成結果、Google API key はエラーログにも含めません。
 
 ## 6. 開発・運用環境方針
 
@@ -141,6 +139,7 @@ flowchart TD
 
   ```text
   me-builder/
+  ├── infra/              # PulumiによるCloudflare基盤リソースとWrangler設定の生成
   ├── Taskfile.yml       # タスクランナー定義 (task dev, task i, task deploy:preview 等)
   ├── package.json       # ルート設定 (workspaces 定義, wrangler devDependency)
   ├── tsconfig.json      # モノレポ共通 TypeScript 設定
@@ -151,7 +150,7 @@ flowchart TD
   │   └── worker/        # Queue Worker (Cloudflare Workers, wrangler.toml)
   └── packages/
       ├── shared/        # 共有型定義 & ユーティリティ (純粋な .ts ソース直参照)
-      └── lib/           # LINE連携 & D1 (Drizzle ORM) データベースモジュール
+      └── lib/           # LINE連携、共有D1とAccountDataのschema・action (Drizzle ORM)
   ```
 
   - `apps/web`: React (Vite + TypeScript) によるフロントエンド。`apps/web/wrangler.toml` により Pages 設定および環境別設定（local, preview, production）を管理。
@@ -159,9 +158,35 @@ flowchart TD
   - `apps/mcp`: Cloudflare Workers / Bun 上で動作する MCP (Model Context Protocol) サーバー。`apps/mcp/wrangler.toml` により Workers の環境別設定を制御。
   - `apps/worker`: Cloudflare Queues メッセージを非同期処理する Cloudflare Workers ワーカー。`apps/worker/wrangler.toml` により Worker の環境別設定を制御。
   - `packages/shared`: 全アプリケーション間で共有されるドメイン型定義およびユーティリティライブラリ。
-  - `packages/lib`: LINE Messaging API 連携および Cloudflare D1 データベース操作（Drizzle ORM モジュール）等を提供するヘルパーライブラリ。
+  - `packages/lib`: LINE Messaging API 連携、共有D1（`d1/shared/`）とAccountData Durable Object（`do/account/`）のschema・action（Drizzle ORM）を所有者ごとに分けて提供するライブラリ。`D1.shared.*`と`DO.account.*`で参照する。境界は[Accountデータ分離設計](account-data-isolation.md)を正とします。
 
-- **環境分類と Wrangler 構成 (`Local` / `Preview` / `Production`)**:
+### 6.1 Cloudflareリソースの宣言とデプロイ境界
+
+Cloudflareの基盤リソースは`infra/`のPulumi programをSSoTとします。Pulumiは環境ごとのD1 database、QueueおよびDLQを作成・変更・削除し、stack outputからリポジトリ内の`wrangler.toml`を生成します。リソースIDを手作業でTOMLへ複製しません。
+
+Worker scriptのbundle、Secretの配布、Durable Object migrationとQueue consumerの登録はWranglerが担当します。Durable Object namespaceとmigration履歴はWorker scriptが所有し、独立したPulumiリソースとして作成・削除できないためです。`infra`のライフサイクルコマンドは、この所有関係に従って実行順を制御します。
+
+```mermaid
+flowchart LR
+    Program["infra/ Pulumi program"] --> Up["pulumi up"]
+    Up --> Base["D1 / Queues / DLQs"]
+    Base --> Output["stack output"]
+    Output --> Generate["wrangler.toml生成"]
+    Generate --> Deploy["Wrangler deploy"]
+    Deploy --> Worker["Workers / DO migrations / Queue consumers"]
+
+    Destroy["環境削除"] --> Stop["API・MCP Workerとconsumerを先に削除"]
+    Stop --> Unbind["削除用WorkerでQueue bindingを解除"]
+    Unbind --> QueueWorker["Queue Worker / DOを削除"]
+    QueueWorker --> PulumiDestroy["pulumi destroy"]
+    PulumiDestroy --> Removed["D1 / Queues / DLQsを削除"]
+```
+
+Previewの破壊的な検証はPreview専用stackでのみ行います。削除時はAPI・MCP WorkerとQueue consumerを先に削除し、削除専用の最小Workerを一度デプロイしてproducer bindingも解除します。その後、Queue Workerの削除で所有するDOとmigration履歴を破棄し、`pulumi destroy`でD1・Queue・DLQを削除します。再構築時は`pulumi up`、TOML生成、D1 migration、Workerデプロイの順とします。Productionを破壊対象とするコマンドは提供しません。
+
+GitHub Actionsの手動resetは常に最新`main`を対象にこのライフサイクルを実行し、復旧確認後に新しいD1・Queue IDをmanifestとWrangler TOMLへ反映するPRを自動作成します。通常のPreview CDはデプロイ前にCloudflare上の現在IDを検証・同期するため、自動PRがマージされる前でも古いD1 IDを参照しません。
+
+- **環境分類と Pulumi / Wrangler 構成 (`Local` / `Preview` / `Production`)**:
   - **ローカル開発環境 (`Local`)**:
     - `wrangler.toml` 内の `env.local` ターゲット（`me-builder-api-local`, `me-builder-mcp-local`, `me-builder-web-local`）。
     - ルートの `bun dev` または `wrangler dev --env local` によりローカルエミュレーション実行。
@@ -182,7 +207,7 @@ flowchart TD
       - API (`apps/api`): `api.kagami.kyosuke.dev`
       - MCP (`apps/mcp`): `mcp.kagami.kyosuke.dev`
 
-### 6.1 APIドキュメントのCloudflare Access境界
+### 6.2 APIドキュメントのCloudflare Access境界
 
 PreviewとProductionでは、APIドキュメントを利用者向けAPIとは別のCloudflare Access Applicationで保護します。ApplicationはAPIホスト全体ではなく、次のパスだけを対象にします。
 

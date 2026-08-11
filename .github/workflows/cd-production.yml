@@ -20,11 +20,9 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
       LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
       LINE_CHANNEL_SECRET: ${{ secrets.LINE_CHANNEL_SECRET }}
-      GOOGLE_AI_STUDIO_API_KEY: ${{ secrets.GOOGLE_AI_STUDIO_API_KEY }}
-      CLOUDFLARE_APP_API_TOKEN: ${{ secrets.CLOUDFLARE_APP_API_TOKEN }}
+      GOOGLE_VERTEX_AI_API_KEY: ${{ secrets.GOOGLE_VERTEX_AI_API_KEY }}
       CHAT_DELIVERY_SECRET: ${{ secrets.CHAT_DELIVERY_SECRET }}
       BRAIN_VECTOR_HMAC_SECRET: ${{ secrets.BRAIN_VECTOR_HMAC_SECRET }}
-      CLOUDFLARE_AI_GATEWAY_ID: ${{ vars.CLOUDFLARE_AI_GATEWAY_ID }}
       CLOUDFLARE_ACCESS_ALLOWED_EMAILS: ${{ vars.CLOUDFLARE_ACCESS_ALLOWED_EMAILS }}
       ADMIN_LINE_USER_IDS: ${{ secrets.ADMIN_LINE_USER_IDS }}
       # LIFF Server API は LINE Login チャネルのチャネルアクセストークンを要求する。
@@ -48,8 +46,24 @@ jobs:
           version: 3.x
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
+      # PR の CI と同じ検証を、実際にデプロイするツリーへもう一度かける。
+      # main への push で個別の CI ワークフローは走らせないため、これが本番前の唯一の関門。
       - name: Run CI Verification
         run: bun run ci
+
+      # 型チェックの incremental 情報を main のキャッシュとして残す。PR の CI はこれを復元して使う。
+      - name: Save TypeScript build info
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            apps/*/tsconfig.tsbuildinfo
+            packages/*/tsconfig.tsbuildinfo
+            infra/tsconfig.tsbuildinfo
+          key: ${{ runner.os }}-tsbuildinfo-${{ github.sha }}
+
+      - name: Verify Vertex AI Connectivity (Production)
+        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
+        run: bun run --cwd apps/worker check:gemini "Reply with OK."
 
       - name: Protect API Documentation with Cloudflare Access (Production)
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
@@ -59,7 +73,7 @@ jobs:
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
         run: task queues:setup:production
 
-      - name: Ensure Brain Vectorize (Production)
+      - name: Ensure Brain Vectorize Index (Production)
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
         run: task vectorize:setup:production
 
@@ -85,7 +99,7 @@ jobs:
             exit 1
           fi
           if [ -z "${BRAIN_VECTOR_HMAC_SECRET}" ]; then
-            echo "::error::BRAIN_VECTOR_HMAC_SECRET が GitHub Secrets に設定されていません。Brain ItemのVectorize同期に必須です。"
+            echo "::error::BRAIN_VECTOR_HMAC_SECRET が GitHub Secrets に設定されていません。Brain Vectorの仮名化に必須です。"
             exit 1
           fi
 
@@ -96,19 +110,17 @@ jobs:
           trap 'rm -f "${api_secrets_file}" "${worker_secrets_file}"; rmdir "${secrets_dir}"' EXIT
 
           API_SECRETS_FILE="${api_secrets_file}" WORKER_SECRETS_FILE="${worker_secrets_file}" bun -e '
-            const sharedSecrets = [["LINE_CHANNEL_ACCESS_TOKEN", process.env.LINE_CHANNEL_ACCESS_TOKEN], ["LIFF_ID", process.env.LIFF_ID], ["ADMIN_LINE_USER_IDS", process.env.ADMIN_LINE_USER_IDS], ["CLOUDFLARE_APP_API_TOKEN", process.env.CLOUDFLARE_APP_API_TOKEN]];
+            const sharedSecrets = [["LINE_CHANNEL_ACCESS_TOKEN", process.env.LINE_CHANNEL_ACCESS_TOKEN], ["LIFF_ID", process.env.LIFF_ID], ["ADMIN_LINE_USER_IDS", process.env.ADMIN_LINE_USER_IDS]];
             const optionalSecrets = Object.fromEntries(
               sharedSecrets
                 .filter(([, value]) => value),
             );
             const workerOnlySecrets = Object.fromEntries(
-              [["GOOGLE_AI_STUDIO_API_KEY", process.env.GOOGLE_AI_STUDIO_API_KEY], ["CHAT_DELIVERY_SECRET", process.env.CHAT_DELIVERY_SECRET], ["BRAIN_VECTOR_HMAC_SECRET", process.env.BRAIN_VECTOR_HMAC_SECRET]]
+              [["GOOGLE_VERTEX_AI_API_KEY", process.env.GOOGLE_VERTEX_AI_API_KEY], ["CHAT_DELIVERY_SECRET", process.env.CHAT_DELIVERY_SECRET], ["BRAIN_VECTOR_HMAC_SECRET", process.env.BRAIN_VECTOR_HMAC_SECRET]]
                 .filter(([, value]) => value),
             );
             await Bun.write(process.env.API_SECRETS_FILE, JSON.stringify({
               LINE_CHANNEL_SECRET: process.env.LINE_CHANNEL_SECRET,
-              CLOUDFLARE_ACCOUNT_ID: process.env.CLOUDFLARE_ACCOUNT_ID,
-              CLOUDFLARE_AI_GATEWAY_ID: process.env.CLOUDFLARE_AI_GATEWAY_ID || "default",
               ...optionalSecrets,
             }));
             await Bun.write(process.env.WORKER_SECRETS_FILE, JSON.stringify({
@@ -122,6 +134,7 @@ jobs:
           bun --filter @me-builder/mcp deploy:production
           bun --filter @me-builder/web deploy:production
 
+      # URL が変わっていなければ現在の登録状態を 1 回問い合わせるだけで終わる。
       - name: Register LINE Webhook (Production)
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' && env.LINE_CHANNEL_ACCESS_TOKEN != '' }}
         env:
@@ -129,14 +142,6 @@ jobs:
           BASE_DOMAIN: ${{ vars.BASE_DOMAIN }}
         run: |
           bun --cwd apps/api scripts/register-webhook.ts
-
-      - name: Verify Gemini Connectivity (Production)
-        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
-        run: bun --cwd apps/worker run check:gemini "Reply with OK."
-
-      - name: Verify AI Gateway Analytics Connectivity (Production)
-        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
-        run: bun --cwd apps/api run check:analytics
 
       # デプロイ済みの URL を LIFF アプリのエンドポイント URL へ反映する
       - name: Register LIFF Endpoint (Production)

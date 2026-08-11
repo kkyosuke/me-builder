@@ -1,12 +1,15 @@
 import {
   type AccountDataNamespace,
   type ActiveBrainVectorEntry,
+  type D1,
+  type DO,
   accountDataFor,
-  type d1,
 } from "@me-builder/lib";
 import { createLiffSession } from "./liff-session";
 
-type DevelopmentBrainItems = Awaited<ReturnType<typeof d1.action.brain.listActiveBrainItems>>;
+type DevelopmentBrainItems = Awaited<
+  ReturnType<typeof DO.account.action.brain.listActiveBrainItems>
+>;
 type BrainVectorIndex = ApiBindings["BRAIN_VECTOR_INDEX"];
 type DevelopmentBrainVectorMetadata = {
   category?: string;
@@ -24,7 +27,7 @@ export type DevelopmentBrainItemsOutcome =
 type Params = {
   idToken: string | undefined;
   lineLoginChannelId: string | undefined;
-  db: d1.Client;
+  db: D1.shared.Client;
   accountData?: AccountDataNamespace;
 };
 

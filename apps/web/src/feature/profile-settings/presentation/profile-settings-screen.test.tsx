@@ -24,12 +24,31 @@ describe("ProfileSettingsScreen", () => {
     expect((screen.getByRole("radio", { name: /ダーク/ }) as HTMLInputElement).checked).toBe(true);
   });
 
+  it("LINEプロフィール画像を現在のアバターとして表示する", () => {
+    render(
+      <ProfileSettingsScreen
+        avatar={null}
+        linePictureUrl="https://example.com/line-profile.jpg"
+        theme="dark"
+        onBack={vi.fn()}
+        onOpenAvatar={vi.fn()}
+        onThemeChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("LINEのプロフィール画像")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /アバターを変更/ })).toBeTruthy();
+    expect(
+      document.querySelectorAll('img[src="https://example.com/line-profile.jpg"]').length,
+    ).toBe(2);
+  });
+
   it("アバター設定とテーマ変更をそれぞれ通知する", () => {
     const onOpenAvatar = vi.fn();
     const onThemeChange = vi.fn();
     render(
       <ProfileSettingsScreen
-        avatar={{ kind: "preset", presetId: "leaf" }}
+        avatar={{ kind: "uploaded", dataUrl: "data:image/png;base64,avatar", fileName: "me.png" }}
         theme="dark"
         onBack={vi.fn()}
         onOpenAvatar={onOpenAvatar}
@@ -42,5 +61,56 @@ describe("ProfileSettingsScreen", () => {
 
     expect(onOpenAvatar).toHaveBeenCalledOnce();
     expect(onThemeChange).toHaveBeenCalledWith("light");
+  });
+
+  it("アバター変更中はプロフィールを操作対象から外す", () => {
+    render(
+      <ProfileSettingsScreen
+        avatar={null}
+        isInactive
+        linePictureUrl="https://example.com/line-profile.jpg"
+        theme="dark"
+        onBack={vi.fn()}
+        onOpenAvatar={vi.fn()}
+        onThemeChange={vi.fn()}
+      />,
+    );
+
+    const dialog = document.querySelector<HTMLDialogElement>(
+      'dialog[aria-labelledby="profile-settings-title"]',
+    );
+    expect(dialog).not.toBeNull();
+    expect(dialog?.getAttribute("aria-hidden")).toBe("true");
+    expect(dialog?.hasAttribute("inert")).toBe(true);
+  });
+
+  it("管理者だけに管理者画面へのリンクを表示する", () => {
+    const { rerender } = render(
+      <ProfileSettingsScreen
+        avatar={null}
+        isAdmin={false}
+        theme="dark"
+        onBack={vi.fn()}
+        onOpenAvatar={vi.fn()}
+        onThemeChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole("link", { name: /管理者画面を開く/ })).toBeNull();
+
+    rerender(
+      <ProfileSettingsScreen
+        avatar={null}
+        isAdmin
+        theme="dark"
+        onBack={vi.fn()}
+        onOpenAvatar={vi.fn()}
+        onThemeChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("link", { name: /管理者画面を開く/ }).getAttribute("href")).toBe(
+      "/admin",
+    );
   });
 });

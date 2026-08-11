@@ -1,0 +1,39 @@
+{
+  "environment": "preview",
+  "database": {
+    "id": "b61c9de2-4fa3-4644-8f01-f42af513e57a",
+    "name": "me-builder-db-preview"
+  },
+  "queues": {
+    "webhook": {
+      "id": "0c3e1a5cbe5045bcb4f1f1b636a3808b",
+      "name": "me-builder-webhook-queue-preview"
+    },
+    "webhookDeadLetter": {
+      "id": "4453ebb9f7db458ab2a4d409c962faab",
+      "name": "me-builder-webhook-dlq-preview"
+    },
+    "chatTurn": {
+      "id": "7feb7b16606e4d9dbb05960146f10287",
+      "name": "me-builder-chat-turn-queue-preview"
+    },
+    "chatTurnDeadLetter": {
+      "id": "3ace672094284b17b4d0b651ca86d390",
+      "name": "me-builder-chat-turn-dlq-preview"
+    },
+    "brainCheckpoint": {
+      "id": "5753099e4a774a34bc59d040bff3d6d1",
+      "name": "me-builder-brain-checkpoint-queue-preview"
+    },
+    "brainCheckpointDeadLetter": {
+      "id": "7af799325ec744c584e737605487ffc6",
+      "name": "me-builder-brain-checkpoint-dlq-preview"
+    },
+    "brainVector": {
+      "name": "me-builder-brain-vector-queue-preview"
+    },
+    "brainVectorDeadLetter": {
+      "name": "me-builder-brain-vector-dlq-preview"
+    }
+  }
+}

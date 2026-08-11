@@ -1,22 +1,23 @@
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import type { D1Database } from "@cloudflare/workers-types";
-import { d1 } from "@me-builder/lib";
-import type { ChatTurnQueueMessage } from "@me-builder/shared";
+import { D1, DO } from "@me-builder/lib";
+import { type ChatTurnQueueMessage, MAX_CHAT_TURN_TRACE_IDS } from "@me-builder/shared";
 import Database from "better-sqlite3";
 import { Miniflare } from "miniflare";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ConversationCoordinator } from "../conversation-coordinator";
-import { createD1AccountDataTestNamespace } from "../testing/account-data";
+import { type AccountDataTestStore, createAccountDataTestStore } from "../testing/account-data";
 import type { Env } from "../types";
 
 const migrationsDirectory = path.resolve(__dirname, "../../../../packages/lib/drizzle");
-type StoredLineSource = Awaited<ReturnType<typeof d1.action.conversation.storeLineTextSource>>;
+type StoredLineSource = Awaited<ReturnType<typeof DO.account.action.diary.storeLineTextSource>>;
 type StoredAccountLineSource = StoredLineSource & { accountId: string };
 
 let miniflare: Miniflare;
 let database: D1Database;
-let client: d1.Client;
+let client: D1.shared.Client;
+let accountDataStore: AccountDataTestStore;
 
 async function applyMigrations(db: D1Database): Promise<void> {
   const migrations = (await readdir(migrationsDirectory))
@@ -72,7 +73,7 @@ function createCoordinator(send: (message: ChatTurnQueueMessage) => Promise<void
   } as unknown as DurableObjectState;
   const env = {
     DB: database,
-    ACCOUNT_DATA: createD1AccountDataTestNamespace(client),
+    ACCOUNT_DATA: accountDataStore.namespace,
     CHAT_TURN_QUEUE: { send },
     GEMINI_MODEL: "test-model",
   } as unknown as Env;
@@ -93,12 +94,15 @@ async function storeSource(
   eventId: string,
   body: string,
   receivedAt: Date,
+  // Accountが違えばObjectも違う。既定はこのテストの主Accountのstore。
+  store: AccountDataTestStore = accountDataStore,
 ): Promise<StoredAccountLineSource> {
-  const { account } = await d1.action.account.upsertIdentity(client, {
+  const { account } = await D1.shared.action.account.upsertIdentity(client, {
     provider: "line",
     providerAccountId,
   });
-  const source = await d1.action.conversation.storeLineTextSource(client, {
+  store.bind(account.id);
+  const source = await DO.account.action.diary.storeLineTextSource(store.db, {
     accountId: account.id,
     eventId,
     body,
@@ -121,7 +125,8 @@ describe("ConversationCoordinator D1 E2E", () => {
     });
     database = (await miniflare.getD1Database("DB")) as D1Database;
     await applyMigrations(database);
-    client = d1.client.create(database);
+    client = D1.shared.client.create(database);
+    accountDataStore = createAccountDataTestStore();
   });
 
   afterEach(async () => {
@@ -147,14 +152,20 @@ describe("ConversationCoordinator D1 E2E", () => {
       queued.push(message);
     });
 
-    await coordinator.acceptMessage(acceptedInput(first));
-    await coordinator.acceptMessage(acceptedInput(second));
+    await coordinator.acceptMessage({ ...acceptedInput(first), traceId: "trace-first" });
+    await coordinator.acceptMessage({ ...acceptedInput(second), traceId: "trace-second" });
     await runAlarm();
 
     expect(queued).toHaveLength(1);
     const queuedTurn = queued[0];
     if (!queuedTurn) throw new Error("Expected a queued turn");
-    const context = await d1.action.conversation.getTurnContext(client, queuedTurn.turnId, 20);
+    expect(queuedTurn.traceId).toBe("trace-second");
+    expect(queuedTurn.traceIds).toEqual(["trace-first", "trace-second"]);
+    const context = await DO.account.action.diary.getTurnContext(
+      accountDataStore.db,
+      queuedTurn.turnId,
+      20,
+    );
     expect(context?.messages.map(({ body }) => body)).toEqual([
       "今日は少し疲れた",
       "それでも散歩できた",
@@ -175,6 +186,43 @@ describe("ConversationCoordinator D1 E2E", () => {
     await expect(
       coordinator.acquireGeneration(queuedTurn.turnId, queuedTurn.generationEpoch),
     ).resolves.toEqual({ acquired: false, reason: "stale" });
+  });
+
+  it("1 TurnのtraceIdsを上限内に保ち、超過した入力を次Turnへ残す", async () => {
+    const sourceCount = MAX_CHAT_TURN_TRACE_IDS + 1;
+    const sources: StoredAccountLineSource[] = [];
+    for (let index = 0; index < sourceCount; index += 1) {
+      sources.push(
+        await storeSource(
+          "U_trace_limit_e2e",
+          `trace-limit-event-${index}`,
+          `message-${index}`,
+          new Date(Date.UTC(2026, 7, 7, 0, 0, index)),
+        ),
+      );
+    }
+    const queued: ChatTurnQueueMessage[] = [];
+    const { coordinator, getAlarm, runAlarm } = createCoordinator(async (message) => {
+      queued.push(message);
+    });
+    for (const [index, source] of sources.entries()) {
+      await coordinator.acceptMessage({ ...acceptedInput(source), traceId: `trace-${index}` });
+    }
+
+    await runAlarm();
+
+    expect(queued).toHaveLength(1);
+    expect(queued[0]?.traceIds).toEqual(
+      Array.from({ length: MAX_CHAT_TURN_TRACE_IDS }, (_, index) => `trace-${index}`),
+    );
+    expect(queued[0]?.traceId).toBe(`trace-${MAX_CHAT_TURN_TRACE_IDS - 1}`);
+    expect(getAlarm()).not.toBeNull();
+    const context = await DO.account.action.diary.getTurnContext(
+      accountDataStore.db,
+      queued[0]?.turnId ?? "",
+      sourceCount,
+    );
+    expect(context?.messages).toHaveLength(MAX_CHAT_TURN_TRACE_IDS);
   });
 
   it("D1反映後に停止しても固定batchだけを復旧し、後着messageを次Turnへ送る", async () => {
@@ -203,8 +251,8 @@ describe("ConversationCoordinator D1 E2E", () => {
       "INSERT INTO attach_batch_messages(event_id, batch_id) VALUES (?, 'batch-1')",
       first.eventId,
     );
-    const firstTurn = await d1.action.conversation.attachMessagesToTurn(
-      client,
+    const firstTurn = await DO.account.action.diary.attachMessagesToTurn(
+      accountDataStore.db,
       first.accountId,
       [first],
       1,
@@ -225,15 +273,15 @@ describe("ConversationCoordinator D1 E2E", () => {
       generationEpoch: 1,
     });
     expect(queued[1]).toMatchObject({ type: "chat-turn", generationEpoch: 2 });
-    const messages = await client
-      .select({ channelEventId: d1.schema.conversationMessages.channelEventId })
-      .from(d1.schema.conversationMessages)
-      .orderBy(d1.schema.conversationMessages.sequence);
+    const messages = await accountDataStore.db
+      .select({ channelEventId: DO.account.schema.conversationMessages.channelEventId })
+      .from(DO.account.schema.conversationMessages)
+      .orderBy(DO.account.schema.conversationMessages.sequence);
     expect(messages.map(({ channelEventId }) => channelEventId)).toEqual([
       "recovery-event-1",
       "recovery-event-2",
     ]);
-    expect(await client.select().from(d1.schema.chatTurns)).toHaveLength(2);
+    expect(await accountDataStore.db.select().from(DO.account.schema.chatTurns)).toHaveLength(2);
   });
 
   it("Queue投入が一時失敗してもalarmから同じTurnだけを再投入する", async () => {
@@ -259,8 +307,10 @@ describe("ConversationCoordinator D1 E2E", () => {
 
     expect(attempt).toBe(2);
     expect(queued).toHaveLength(1);
-    expect(await client.select().from(d1.schema.chatTurns)).toHaveLength(1);
-    expect(await client.select().from(d1.schema.conversationMessages)).toHaveLength(1);
+    expect(await accountDataStore.db.select().from(DO.account.schema.chatTurns)).toHaveLength(1);
+    expect(
+      await accountDataStore.db.select().from(DO.account.schema.conversationMessages),
+    ).toHaveLength(1);
   });
 
   it("保持期間後に再送されたeventから既存Turnを再生成しない", async () => {
@@ -287,8 +337,10 @@ describe("ConversationCoordinator D1 E2E", () => {
     await runAlarm();
 
     expect(queued).toHaveLength(1);
-    expect(await client.select().from(d1.schema.chatTurns)).toHaveLength(1);
-    expect(await client.select().from(d1.schema.conversationMessages)).toHaveLength(1);
+    expect(await accountDataStore.db.select().from(DO.account.schema.chatTurns)).toHaveLength(1);
+    expect(
+      await accountDataStore.db.select().from(DO.account.schema.conversationMessages),
+    ).toHaveLength(1);
   });
 
   it("保持期間後の古いeventと新着eventが混在しても新着だけを次Turnへ送る", async () => {
@@ -317,11 +369,11 @@ describe("ConversationCoordinator D1 E2E", () => {
     await runAlarm();
 
     expect(queued).toHaveLength(2);
-    expect(await client.select().from(d1.schema.chatTurns)).toHaveLength(2);
-    const messages = await client
-      .select({ channelEventId: d1.schema.conversationMessages.channelEventId })
-      .from(d1.schema.conversationMessages)
-      .orderBy(d1.schema.conversationMessages.sequence);
+    expect(await accountDataStore.db.select().from(DO.account.schema.chatTurns)).toHaveLength(2);
+    const messages = await accountDataStore.db
+      .select({ channelEventId: DO.account.schema.conversationMessages.channelEventId })
+      .from(DO.account.schema.conversationMessages)
+      .orderBy(DO.account.schema.conversationMessages.sequence);
     expect(messages.map(({ channelEventId }) => channelEventId)).toEqual([
       "mixed-old-event",
       "mixed-fresh-event",
@@ -340,6 +392,7 @@ describe("ConversationCoordinator D1 E2E", () => {
       "account-b-event",
       "Account Bのメッセージ",
       new Date("2026-08-07T00:00:01.000Z"),
+      createAccountDataTestStore(),
     );
     const queued: ChatTurnQueueMessage[] = [];
     const { coordinator, runAlarm } = createCoordinator(async (message) => {
@@ -353,7 +406,9 @@ describe("ConversationCoordinator D1 E2E", () => {
     await runAlarm();
 
     expect(queued).toHaveLength(1);
-    const messages = await client.select().from(d1.schema.conversationMessages);
+    const messages = await accountDataStore.db
+      .select()
+      .from(DO.account.schema.conversationMessages);
     expect(messages).toHaveLength(1);
     expect(messages[0]?.channelEventId).toBe("account-a-event");
   });
@@ -380,8 +435,10 @@ describe("ConversationCoordinator D1 E2E", () => {
     await runAlarm();
 
     expect(queued).toHaveLength(1);
-    expect(await client.select().from(d1.schema.chatTurns)).toHaveLength(1);
-    expect(await client.select().from(d1.schema.conversationMessages)).toHaveLength(1);
+    expect(await accountDataStore.db.select().from(DO.account.schema.chatTurns)).toHaveLength(1);
+    expect(
+      await accountDataStore.db.select().from(DO.account.schema.conversationMessages),
+    ).toHaveLength(1);
   });
 
   it("生成leaseのalarmより新着messageの連投待ちを優先する", async () => {
@@ -416,6 +473,6 @@ describe("ConversationCoordinator D1 E2E", () => {
     expect(nextAlarm).toBeLessThanOrEqual(Date.now() + 1_500);
     await runAlarm();
     expect(queued).toHaveLength(2);
-    expect(await client.select().from(d1.schema.chatTurns)).toHaveLength(2);
+    expect(await accountDataStore.db.select().from(DO.account.schema.chatTurns)).toHaveLength(2);
   });
 });
