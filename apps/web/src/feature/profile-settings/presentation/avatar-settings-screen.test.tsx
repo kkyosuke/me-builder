@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AvatarSettingsScreen } from "./avatar-settings-screen";
 
@@ -150,5 +150,52 @@ describe("AvatarSettingsScreen", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "現在の画像を削除" }));
     expect(onSave).toHaveBeenCalledWith(null);
+  });
+
+  it("保存中は閉じる操作と重複送信を無効にする", async () => {
+    let completeSave: (() => void) | undefined;
+    const onSave = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          completeSave = resolve;
+        }),
+    );
+    render(<AvatarSettingsScreen currentAvatar={null} onBack={vi.fn()} onSave={onSave} />);
+    fireEvent.change(screen.getByLabelText("画像を選ぶ"), {
+      target: { files: [new File(["avatar"], "avatar.png", { type: "image/png" })] },
+    });
+    await screen.findByRole("heading", { name: "設定後のプレビュー" });
+
+    fireEvent.click(screen.getByRole("button", { name: "この画像を設定" }));
+
+    const savingButton = screen.getByRole("button", { name: "保存しています" });
+    expect((savingButton as HTMLButtonElement).disabled).toBe(true);
+    expect(
+      (screen.getByRole("button", { name: "アバター変更を閉じる" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+    fireEvent.click(savingButton);
+    expect(onSave).toHaveBeenCalledOnce();
+
+    completeSave?.();
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "この画像を設定" })).toBeTruthy(),
+    );
+  });
+
+  it("保存失敗時はモーダルと選択画像を維持して再試行を案内する", async () => {
+    const onSave = vi.fn().mockRejectedValueOnce(new Error("画像を保存できませんでした。"));
+    render(<AvatarSettingsScreen currentAvatar={null} onBack={vi.fn()} onSave={onSave} />);
+    fireEvent.change(screen.getByLabelText("画像を選ぶ"), {
+      target: { files: [new File(["avatar"], "avatar.png", { type: "image/png" })] },
+    });
+    await screen.findByRole("heading", { name: "設定後のプレビュー" });
+
+    fireEvent.click(screen.getByRole("button", { name: "この画像を設定" }));
+
+    expect((await screen.findByRole("alert")).textContent).toContain(
+      "画像を保存できませんでした。",
+    );
+    expect(screen.getByRole("heading", { name: "設定後のプレビュー" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "この画像を設定" })).toBeTruthy();
   });
 });

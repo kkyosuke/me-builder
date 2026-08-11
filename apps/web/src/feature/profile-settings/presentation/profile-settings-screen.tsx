@@ -1,4 +1,4 @@
-import { ArrowLeft, ChevronRight, Moon, Shield, Sparkles, Sun } from "lucide-react";
+import { ArrowLeft, ChevronRight, Moon, RefreshCw, Shield, Sparkles, Sun } from "lucide-react";
 import { useEffect, useRef } from "react";
 import type { ColorTheme } from "../../theme/model/color-theme";
 import { type AvatarSelection, getAvatarName } from "../model/avatar";
@@ -25,19 +25,25 @@ export function ProfileSettingsScreen({
   avatar,
   isAdmin = false,
   isInactive = false,
+  isProfileLoading = false,
+  profileError = null,
   linePictureUrl,
   theme,
   onBack,
   onOpenAvatar,
+  onRetryProfile,
   onThemeChange,
 }: {
   avatar: AvatarSelection | null;
   isAdmin?: boolean;
   isInactive?: boolean;
+  isProfileLoading?: boolean;
+  profileError?: string | null;
   linePictureUrl?: string | undefined;
   theme: ColorTheme;
   onBack: () => void;
   onOpenAvatar: () => void;
+  onRetryProfile?: () => void;
   onThemeChange: (theme: ColorTheme) => void;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -115,23 +121,57 @@ export function ProfileSettingsScreen({
           >
             アバター
           </h2>
-          <button
-            ref={avatarButtonRef}
-            type="button"
-            onClick={onOpenAvatar}
-            className="mt-3 flex w-full items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-sky-300 hover:bg-sky-50/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:border-slate-700 dark:bg-slate-800 dark:hover:border-sky-700 dark:hover:bg-sky-950/20"
-          >
-            <AvatarPreview avatar={avatar} fallbackImageUrl={linePictureUrl} size="md" />
-            <span className="min-w-0 flex-1">
-              <span className="block font-bold text-slate-950 dark:text-white">
-                {avatar || linePictureUrl ? "アバターを変更" : "アバターを設定"}
+          {isProfileLoading ? (
+            <output
+              aria-busy="true"
+              aria-label="アバターを読み込んでいます"
+              className="mt-3 flex w-full items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800"
+            >
+              <span
+                aria-hidden="true"
+                className="size-16 shrink-0 animate-pulse rounded-full bg-slate-200 motion-reduce:animate-none dark:bg-slate-700"
+              />
+              <span aria-hidden="true" className="flex-1 space-y-2">
+                <span className="block h-5 w-32 animate-pulse rounded bg-slate-200 motion-reduce:animate-none dark:bg-slate-700" />
+                <span className="block h-4 w-24 animate-pulse rounded bg-slate-100 motion-reduce:animate-none dark:bg-slate-700/70" />
               </span>
-              <span className="mt-1 block truncate text-sm text-slate-500 dark:text-slate-400">
-                {getAvatarName(avatar, linePictureUrl)}
+            </output>
+          ) : profileError ? (
+            <div
+              role="alert"
+              className="mt-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-rose-900 dark:border-rose-400/30 dark:bg-rose-400/10 dark:text-rose-100"
+            >
+              <p className="text-sm font-bold">{profileError}</p>
+              {onRetryProfile && (
+                <button
+                  type="button"
+                  onClick={onRetryProfile}
+                  className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-bold text-rose-900 shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-500 dark:bg-slate-800 dark:text-rose-100"
+                >
+                  <RefreshCw className="size-4" aria-hidden="true" />
+                  再試行
+                </button>
+              )}
+            </div>
+          ) : (
+            <button
+              ref={avatarButtonRef}
+              type="button"
+              onClick={onOpenAvatar}
+              className="mt-3 flex w-full items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-sky-300 hover:bg-sky-50/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:border-slate-700 dark:bg-slate-800 dark:hover:border-sky-700 dark:hover:bg-sky-950/20"
+            >
+              <AvatarPreview avatar={avatar} fallbackImageUrl={linePictureUrl} size="md" />
+              <span className="min-w-0 flex-1">
+                <span className="block font-bold text-slate-950 dark:text-white">
+                  {avatar || linePictureUrl ? "アバターを変更" : "アバターを設定"}
+                </span>
+                <span className="mt-1 block truncate text-sm text-slate-500 dark:text-slate-400">
+                  {getAvatarName(avatar, linePictureUrl)}
+                </span>
               </span>
-            </span>
-            <ChevronRight className="size-5 text-slate-400" aria-hidden="true" />
-          </button>
+              <ChevronRight className="size-5 text-slate-400" aria-hidden="true" />
+            </button>
+          )}
         </section>
 
         <section aria-labelledby="theme-setting-heading" className="mt-8">

@@ -1,4 +1,4 @@
-import { Check, ImagePlus, Info, RotateCcw, Trash2, X } from "lucide-react";
+import { Check, ImagePlus, LoaderCircle, RotateCcw, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { type AvatarSelection, getAvatarName } from "../model/avatar";
 import { normalizeAvatarImage } from "../model/normalize-avatar-image";
@@ -15,13 +15,16 @@ export function AvatarSettingsScreen({
   currentAvatar: AvatarSelection | null;
   linePictureUrl?: string | undefined;
   onBack: () => void;
-  onSave: (avatar: AvatarSelection | null) => void;
+  onSave: (avatar: AvatarSelection | null) => Promise<void>;
 }) {
   const [selectedImage, setSelectedImage] = useState<AvatarSelection | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [isPreparingImage, setIsPreparingImage] = useState(false);
+  const [savingAction, setSavingAction] = useState<"save" | "delete" | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const selectionIdRef = useRef(0);
+  const isSaving = savingAction !== null;
 
   useEffect(() => {
     closeButtonRef.current?.focus();
@@ -39,6 +42,7 @@ export function AvatarSettingsScreen({
     }
 
     setFileError(null);
+    setSaveError(null);
     setSelectedImage(null);
     setIsPreparingImage(true);
     try {
@@ -53,6 +57,23 @@ export function AvatarSettingsScreen({
     }
   };
 
+  const handleSave = async (avatar: AvatarSelection | null) => {
+    if (isSaving) return;
+    setSaveError(null);
+    setSavingAction(avatar ? "save" : "delete");
+    try {
+      await onSave(avatar);
+    } catch (error) {
+      setSaveError(
+        error instanceof Error
+          ? error.message
+          : "アバターを保存できませんでした。再試行してください。",
+      );
+    } finally {
+      setSavingAction(null);
+    }
+  };
+
   return (
     <dialog
       open
@@ -60,7 +81,7 @@ export function AvatarSettingsScreen({
       aria-labelledby="avatar-settings-title"
       onCancel={(event) => {
         event.preventDefault();
-        onBack();
+        if (!isSaving) onBack();
       }}
       className="fixed inset-0 z-[70] m-0 flex h-dvh max-h-none w-full max-w-none items-end justify-center overflow-hidden border-0 bg-slate-950/50 p-0 backdrop-blur-sm sm:items-center sm:p-6"
     >
@@ -81,6 +102,7 @@ export function AvatarSettingsScreen({
             ref={closeButtonRef}
             type="button"
             onClick={onBack}
+            disabled={isSaving}
             className="inline-flex size-11 items-center justify-center rounded-full text-slate-600 transition hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:text-slate-300 dark:hover:bg-slate-800"
             aria-label="アバター変更を閉じる"
           >
@@ -136,6 +158,7 @@ export function AvatarSettingsScreen({
               <input
                 type="file"
                 accept="image/png,image/jpeg,image/webp"
+                disabled={isSaving}
                 className="sr-only"
                 aria-label={selectedImage ? "別の画像を選ぶ" : "画像を選ぶ"}
                 onChange={(event) => {
@@ -174,40 +197,55 @@ export function AvatarSettingsScreen({
             </section>
           )}
 
-          <div className="mt-6 flex items-start gap-3 rounded-2xl bg-slate-100 p-4 text-sm text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-            <Info
-              className="mt-0.5 size-5 shrink-0 text-sky-600 dark:text-sky-300"
-              aria-hidden="true"
-            />
-            <p className="leading-relaxed">
-              現在はUI確認用のため、選んだ画像はサーバーへ送信・保存されず、再読み込みすると
-              {linePictureUrl ? "元のLINE画像" : "画像未設定の状態"}に戻ります。
+          {saveError && (
+            <p
+              role="alert"
+              className="mt-6 rounded-xl bg-rose-50 p-3 text-sm font-bold text-rose-900 dark:bg-rose-400/10 dark:text-rose-200"
+            >
+              {saveError}
             </p>
-          </div>
+          )}
         </main>
 
         <footer className="shrink-0 space-y-2 border-t border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900 sm:px-6">
           <button
             type="button"
-            disabled={!selectedImage || isPreparingImage}
-            onClick={() => onSave(selectedImage)}
+            disabled={!selectedImage || isPreparingImage || isSaving}
+            onClick={() => void handleSave(selectedImage)}
             className="flex w-full items-center justify-center gap-2 rounded-2xl bg-sky-400 px-5 py-4 font-bold text-slate-950 transition hover:bg-sky-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            <Check className="size-5" aria-hidden="true" />
-            この画像を設定
+            {savingAction === "save" ? (
+              <LoaderCircle
+                className="size-5 animate-spin motion-reduce:animate-none"
+                aria-hidden="true"
+              />
+            ) : (
+              <Check className="size-5" aria-hidden="true" />
+            )}
+            {savingAction === "save" ? "保存しています" : "この画像を設定"}
           </button>
           {currentAvatar && (
             <button
               type="button"
-              onClick={() => onSave(null)}
+              disabled={isSaving}
+              onClick={() => void handleSave(null)}
               className="flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-bold text-slate-600 transition hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-500 dark:text-slate-300 dark:hover:bg-slate-800"
             >
-              {linePictureUrl ? (
+              {savingAction === "delete" ? (
+                <LoaderCircle
+                  className="size-4 animate-spin motion-reduce:animate-none"
+                  aria-hidden="true"
+                />
+              ) : linePictureUrl ? (
                 <RotateCcw className="size-4" aria-hidden="true" />
               ) : (
                 <Trash2 className="size-4" aria-hidden="true" />
               )}
-              {linePictureUrl ? "LINEの画像に戻す" : "現在の画像を削除"}
+              {savingAction === "delete"
+                ? "削除しています"
+                : linePictureUrl
+                  ? "LINEの画像に戻す"
+                  : "現在の画像を削除"}
             </button>
           )}
         </footer>
