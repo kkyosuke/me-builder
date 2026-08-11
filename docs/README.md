@@ -92,6 +92,7 @@ docs/
 - [Brain Item残タスク](development/brain-item-remaining-tasks.md) — Brain Item生成・意味的重複判定・Vectorize利用に残っている検証、品質改善、延期中の機能
 - [アバター設定残タスク](development/avatar-remaining-tasks.md) — アバター設定に残っている実ブラウザE2E、LIFF実端末確認、Private R2の運用改善
 - [わたしのまとめ残タスク](development/profile-summary-remaining-tasks.md) — 「わたしのまとめ」で未完了の実環境検証と完了条件
+- [日記入力残タスク](development/diary-remaining-tasks.md) — 日記入力で未実装の送信取り消し（unsend）と写真添付
 - [PR作成手順書](development/pull-request-guidelines.md) — PRタイトル、概要、作成前の準備と検証手順
 
 ## ドキュメントを更新する
