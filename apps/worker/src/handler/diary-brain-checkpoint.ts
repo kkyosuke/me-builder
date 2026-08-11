@@ -14,7 +14,7 @@ import {
 import type { CloudflareBindings, WorkerConfig } from "../config";
 import { createGeminiUsageRecorder } from "../infrastructure/gemini-usage";
 import { createLineRetryKey, pushLineTextWithRetryKey } from "../infrastructure/line-delivery";
-import { decideDiaryBrainDuplicates } from "../logic/brain-dedup";
+import { consolidateDiaryBrainCandidates, decideDiaryBrainDuplicates } from "../logic/brain-dedup";
 import {
   buildDevelopmentBrainItemMessage,
   generateDiaryBrainCandidates,
@@ -133,16 +133,32 @@ export async function processDiaryBrainCheckpointMessage(
       dependency: "google-ai",
     });
   }
+  const consolidatedCandidates = consolidateDiaryBrainCandidates(
+    candidates.map((candidate) => ({
+      category: candidate.category,
+      statement: candidate.statement,
+      sourceMessageIds: candidate.source_message_ids,
+    })),
+    deduplication,
+  );
   const applied = await accountData.execute(
     "conversation.applyDiaryBrainCheckpoint",
     context.checkpointId,
     context.throughSequence,
     DIARY_BRAIN_PROMPT_VERSION,
-    candidates.map((candidate, index) => ({
+    consolidatedCandidates.map((candidate) => ({
       category: candidate.category,
       statement: candidate.statement,
-      sourceMessageIds: candidate.source_message_ids,
-      ...deduplication[index],
+      sourceMessageIds: candidate.sourceMessageIds,
+      ...(candidate.matchingBrainItemId
+        ? {
+            matchingBrainItemId: candidate.matchingBrainItemId,
+            deduplication: candidate.deduplication,
+            ...(candidate.dedupPromptVersion
+              ? { dedupPromptVersion: candidate.dedupPromptVersion }
+              : {}),
+          }
+        : {}),
     })),
   );
   if (!applied) {

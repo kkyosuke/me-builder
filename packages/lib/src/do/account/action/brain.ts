@@ -52,6 +52,7 @@ const CHAT_CONTEXT_EVIDENCE_LIMIT = 3;
 const SEMANTIC_DEDUP_VECTOR_CANDIDATE_LIMIT = 30;
 const SEMANTIC_DEDUP_RECENT_CANDIDATE_LIMIT = 20;
 const SEMANTIC_DEDUP_CANDIDATE_LIMIT = 30;
+const SEMANTIC_DEDUP_RECENT_RESERVED_LIMIT = 10;
 const SEMANTIC_DEDUP_COMPARISON_TEXT_LIMIT = 1_500;
 const VECTOR_SYNC_DISPATCH_RETRY_MS = 15 * 60 * 1000;
 const VECTOR_SYNC_FAILURE_RETRY_MS = 60 * 1000;
@@ -661,12 +662,19 @@ export async function loadBrainSemanticDedupCandidates(
     .all();
 
   const vectorRowById = new Map(vectorRows.map((row) => [row.vectorId, row] as const));
+  const orderedVectorRows = candidateVectorIds.flatMap((vectorId) => {
+    const row = vectorRowById.get(vectorId);
+    return row ? [row] : [];
+  });
+  const vectorRowsBeforeRecent = Math.max(
+    0,
+    SEMANTIC_DEDUP_CANDIDATE_LIMIT - SEMANTIC_DEDUP_RECENT_RESERVED_LIMIT,
+  );
   const ordered = [
-    ...candidateVectorIds.flatMap((vectorId) => {
-      const row = vectorRowById.get(vectorId);
-      return row ? [row] : [];
-    }),
-    ...recentRows,
+    ...orderedVectorRows.slice(0, vectorRowsBeforeRecent),
+    ...recentRows.slice(0, SEMANTIC_DEDUP_RECENT_RESERVED_LIMIT),
+    ...orderedVectorRows.slice(vectorRowsBeforeRecent),
+    ...recentRows.slice(SEMANTIC_DEDUP_RECENT_RESERVED_LIMIT),
   ];
   const seen = new Set<string>();
   return ordered

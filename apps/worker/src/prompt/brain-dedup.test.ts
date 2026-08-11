@@ -6,6 +6,7 @@ describe("Brain semantic deduplication prompt", () => {
     expect(BRAIN_DEDUP_SYSTEM_PROMPT).toContain("相互に言い換えられる場合だけ");
     expect(BRAIN_DEDUP_SYSTEM_PROMPT).toContain("時点情報が異なる場合は一致させない");
     expect(BRAIN_DEDUP_SYSTEM_PROMPT).toContain("判断に迷う");
+    expect(BRAIN_DEDUP_SYSTEM_PROMPT).toContain("canonical_candidate_index");
   });
 
   it("追跡可能なprompt versionを持つ", () => {

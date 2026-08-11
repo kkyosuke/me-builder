@@ -2,7 +2,11 @@ import type { AccountDataNamespace, BrainSemanticDedupCandidate } from "@me-buil
 import { describe, expect, it, vi } from "vitest";
 import type { CloudflareBindings } from "../config";
 import { getWorkerConfig } from "../config";
-import { type BrainDedupDependencies, decideDiaryBrainDuplicates } from "./brain-dedup";
+import {
+  type BrainDedupDependencies,
+  consolidateDiaryBrainCandidates,
+  decideDiaryBrainDuplicates,
+} from "./brain-dedup";
 
 const workerConfig = getWorkerConfig({
   ENVIRONMENT: "test",
@@ -31,7 +35,7 @@ function createHarness(existing: readonly BrainSemanticDedupCandidate[]) {
 }
 
 const candidate = {
-  category: "preference",
+  category: "preference" as const,
   statement: "辛いものはあまり食べられない",
   sourceMessageIds: ["message-1"],
 };
@@ -81,7 +85,7 @@ describe("decideDiaryBrainDuplicates", () => {
       {
         matchingBrainItemId: "brain-1",
         deduplication: "semantic",
-        dedupPromptVersion: "brain-dedup-v1",
+        dedupPromptVersion: "brain-dedup-v2",
       },
     ]);
     expect(harness.query).toHaveBeenCalledWith(expect.any(Array), {
@@ -100,7 +104,7 @@ describe("decideDiaryBrainDuplicates", () => {
 
   it("原文と解決済み時点情報が一致すればAIを呼ばずexact matchにする", async () => {
     const temporalCandidate = {
-      category: "goal",
+      category: "goal" as const,
       statement: "来月までに転職先を決めたい",
       sourceMessageIds: ["message-1"],
     };
@@ -135,6 +139,57 @@ describe("decideDiaryBrainDuplicates", () => {
       ),
     ).resolves.toEqual([{ matchingBrainItemId: "brain-goal", deduplication: "exact" }]);
     expect(harness.dependencies.generateDecision).not.toHaveBeenCalled();
+  });
+
+  it("同じcheckpoint内の意味的に同じ候補を代表候補へまとめる", async () => {
+    const candidates = [
+      candidate,
+      {
+        category: "preference" as const,
+        statement: "辛い食べ物が苦手",
+        sourceMessageIds: ["message-2"],
+      },
+    ];
+    const harness = createHarness([]);
+    harness.dependencies.generateDecision = vi.fn().mockResolvedValue(
+      JSON.stringify({
+        matches: [
+          {
+            candidate_index: 1,
+            canonical_candidate_index: 0,
+            judgment: "same_proposition",
+          },
+        ],
+      }),
+    );
+
+    const decisions = await decideDiaryBrainDuplicates(
+      {
+        candidates,
+        messages: [],
+        accountId: "account-1",
+        cf: harness.cf,
+        workerConfig,
+      },
+      harness.dependencies,
+    );
+
+    expect(decisions).toEqual([
+      { deduplication: "none" },
+      {
+        matchingCandidateIndex: 0,
+        deduplication: "semantic",
+        dedupPromptVersion: "brain-dedup-v2",
+      },
+    ]);
+    expect(consolidateDiaryBrainCandidates(candidates, decisions ?? [])).toEqual([
+      {
+        ...candidate,
+        sourceMessageIds: ["message-1", "message-2"],
+        deduplication: "none",
+      },
+    ]);
+    expect(harness.dependencies.generateDecision).toHaveBeenCalledOnce();
   });
 
   it("検索候補外のIDをAIが返した場合は保存せず再試行へ倒す", async () => {

@@ -288,6 +288,45 @@ describe("loadBrainSemanticDedupCandidates", () => {
       },
     ]);
   });
+
+  it("Vector候補が上限まであってもVector同期前の直近Itemを比較候補へ残す", async () => {
+    const db = createTestDb();
+    await db.insert(schema.accountDataIdentity).values({ singleton: 1, accountId: "account-1" });
+    const vectorItems = Array.from({ length: 30 }, (_, index) => ({
+      ...createInput().item,
+      id: `brain-vector-${index}`,
+      statement: `Vector候補 ${index}`,
+      createdAt: new Date(`2026-07-${String(index + 1).padStart(2, "0")}T00:00:00Z`),
+      updatedAt: new Date(`2026-07-${String(index + 1).padStart(2, "0")}T00:00:00Z`),
+    }));
+    await db.insert(schema.brainItems).values([
+      ...vectorItems,
+      {
+        ...createInput().item,
+        id: "brain-recent-unsynced",
+        statement: "Vector同期前の直近Item",
+        createdAt: new Date("2026-08-11T00:00:00Z"),
+        updatedAt: new Date("2026-08-11T00:00:00Z"),
+      },
+    ]);
+    await db.insert(schema.brainVectorEntries).values(
+      vectorItems.map((item, index) => ({
+        id: `vector-${index}`,
+        brainItemId: item.id,
+        itemRevision: item.updatedAt.getTime(),
+      })),
+    );
+
+    const result = await loadBrainSemanticDedupCandidates(
+      db,
+      "account-1",
+      vectorItems.map((_, index) => `vector-${index}`),
+      ["preference"],
+    );
+
+    expect(result).toHaveLength(30);
+    expect(result.map(({ brainItemId }) => brainItemId)).toContain("brain-recent-unsynced");
+  });
 });
 
 describe("loadBrainChatContextMemories", () => {
