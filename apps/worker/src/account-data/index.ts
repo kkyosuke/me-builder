@@ -28,7 +28,7 @@ const actions = {
 
 const ALARM_RETRY_MS = 30_000;
 
-/** 1 AccountのSource / Brain / Diagnosis / Diaryを1つのprivate SQLiteに保存する。 */
+/** 1 AccountのSource / Brain / Diagnosis / Diary / Profile Summaryをprivate SQLiteに保存する。 */
 export class AccountData extends DurableObject<Env> {
   private readonly accountId: string;
   private readonly repository: AccountDataRepository;

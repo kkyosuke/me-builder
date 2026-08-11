@@ -7,6 +7,7 @@ function manifest(environment: "preview" | "production", databaseId: string) {
   return parseManifest({
     environment,
     database: { id: databaseId, name: `me-builder-db-${suffix}` },
+    avatarBucket: { name: `me-builder-avatar-${suffix}` },
     queues: {
       webhook: { id: "1", name: `me-builder-webhook-queue-${suffix}` },
       webhookDeadLetter: { id: "2", name: `me-builder-webhook-dlq-${suffix}` },
@@ -23,7 +24,7 @@ function manifest(environment: "preview" | "production", databaseId: string) {
 }
 
 describe("renderWranglerConfigs", () => {
-  it("renders Pulumi D1 outputs and queue names into every consumer config", () => {
+  it("renders Pulumi D1, private avatar R2 and queue outputs into consumer configs", () => {
     const configs = renderWranglerConfigs(
       manifest("preview", "preview-id"),
       manifest("production", "production-id"),
@@ -36,6 +37,9 @@ describe("renderWranglerConfigs", () => {
     expect(configs.worker).toContain('binding = "BRAIN_VECTOR_INDEX"');
     expect(configs.api).toContain('index_name = "me-builder-brain-preview"');
     expect(configs.api).not.toContain('index_name = "me-builder-brain-production"');
+    expect(configs.api).toContain('bucket_name = "me-builder-avatar-preview"');
+    expect(configs.api).toContain('bucket_name = "me-builder-avatar-production"');
+    expect(configs.api).toContain('bucket_name = "me-builder-avatar-local"');
     expect(configs.mcp).toContain('database_id = "production-id"');
     expect(configs.lib).toContain("[[env.preview.d1_databases]]");
   });
