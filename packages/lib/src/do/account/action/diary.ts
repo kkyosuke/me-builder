@@ -1002,15 +1002,16 @@ export async function applyDiaryBrainCheckpoint(
       .all();
     if (
       sources.length !== messageIds.length ||
-      sources.some(
-        ({ messageId, body }) =>
+      sources.some(({ messageId, body }) => {
+        const evidenceStatement = evidenceStatementByMessageId.get(messageId);
+        return (
           body.length > BRAIN_CHECKPOINT_MAX_USER_MESSAGE_CHARS ||
+          evidenceStatement === undefined ||
           !normalizeDiaryBrainEvidenceText(body).includes(
-            normalizeDiaryBrainEvidenceText(
-              evidenceStatementByMessageId.get(messageId) ?? "\u0000",
-            ),
-          ),
-      )
+            normalizeDiaryBrainEvidenceText(evidenceStatement),
+          )
+        );
+      })
     ) {
       throw new Error("Diary Brain candidate evidence validation failed");
     }

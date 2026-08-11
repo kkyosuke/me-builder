@@ -195,6 +195,37 @@ describe("Diary conversation persistence flow", () => {
         ],
       ),
     ).rejects.toThrow("evidence validation failed");
+    const [firstEvidenceMessageId, secondEvidenceMessageId] =
+      checkpointContext?.sourceMessageIds ?? [];
+    if (!firstEvidenceMessageId || !secondEvidenceMessageId) {
+      throw new Error("Evidence検証test fixtureが不正です");
+    }
+    await expect(
+      applyDiaryBrainCheckpoint(
+        db,
+        account.id,
+        checkpoint?.id ?? "",
+        checkpointContext?.throughSequence ?? 0,
+        "diary-brain-test",
+        [
+          {
+            category: "memory",
+            statement: "今日は少し疲れた",
+            sourceMessageIds: [firstEvidenceMessageId, secondEvidenceMessageId],
+            evidenceStatements: [
+              {
+                sourceMessageId: firstEvidenceMessageId,
+                statement: "今日は少し疲れた",
+              },
+              {
+                sourceMessageId: secondEvidenceMessageId,
+                statement: "今日は少し疲れた",
+              },
+            ],
+          },
+        ],
+      ),
+    ).rejects.toThrow("evidence validation failed");
     await expect(db.select().from(schema.brainItems)).resolves.toHaveLength(0);
     expect(
       db
