@@ -8,6 +8,8 @@ const queueNames = [
   `me-builder-chat-turn-dlq-${environment}`,
   `me-builder-brain-checkpoint-queue-${environment}`,
   `me-builder-brain-checkpoint-dlq-${environment}`,
+  `me-builder-profile-summary-queue-${environment}`,
+  `me-builder-profile-summary-dlq-${environment}`,
   `me-builder-webhook-dlq-${environment}`,
 ];
 

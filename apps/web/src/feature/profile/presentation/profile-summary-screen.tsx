@@ -472,86 +472,89 @@ function SummaryContent({
   onSelectVersion?: (versionId: string) => void;
   onRegenerate?: () => void;
 }) {
-  const renderCard = (selectedVersion: ProfileSummaryVersion | undefined) => (
-    <section className="overflow-hidden rounded-3xl border border-sky-300/30 bg-gradient-to-br from-sky-50 via-white to-violet-50 p-5 shadow-xl shadow-slate-950/10 sm:p-6 dark:from-sky-950/40 dark:via-slate-800 dark:to-violet-950/30">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-3">
-          <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-sky-400/15 text-sky-700 dark:text-sky-300">
-            <Sparkles className="size-6" aria-hidden="true" />
-          </span>
-          <div>
-            <p className="text-xs font-semibold tracking-wider text-sky-700 dark:text-sky-300">
-              今のわたし
-            </p>
-            <h2 className="mt-1 text-lg font-bold text-slate-950 dark:text-slate-50">
-              {summary.headline}
-            </h2>
-          </div>
-        </div>
-        {selectedVersion && (
-          <div className="shrink-0 text-right">
-            <p className="inline-flex items-center gap-1 text-xs font-bold text-violet-700 dark:text-violet-300">
-              <History className="size-3.5" aria-hidden="true" />
-              {versionLabel(selectedVersion.sequence)}
-            </p>
-            <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
-              {selectedVersion.generationMethod === "ai" ? "AI生成" : "現在の集計"}
-              {`・${formatDate(selectedVersion.generatedAt)}`}
-            </p>
-          </div>
-        )}
-      </div>
-
-      <ol className="mt-5 space-y-3">
-        {summary.insights.map((insight, index) => (
-          <li key={insight.key} className="rounded-2xl bg-white/80 p-4 dark:bg-slate-900/60">
-            <div className="flex items-center gap-2">
-              <span className="flex size-6 items-center justify-center rounded-full bg-sky-500 text-xs font-bold text-white">
-                {index + 1}
-              </span>
-              <h3 className="font-bold text-slate-950 dark:text-slate-50">{insight.label}</h3>
+  const renderCard = (selectedVersion: ProfileSummaryVersion | undefined) => {
+    const cardSummary = selectedVersion?.summary ?? summary;
+    return (
+      <section className="overflow-hidden rounded-3xl border border-sky-300/30 bg-gradient-to-br from-sky-50 via-white to-violet-50 p-5 shadow-xl shadow-slate-950/10 sm:p-6 dark:from-sky-950/40 dark:via-slate-800 dark:to-violet-950/30">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-sky-400/15 text-sky-700 dark:text-sky-300">
+              <Sparkles className="size-6" aria-hidden="true" />
+            </span>
+            <div>
+              <p className="text-xs font-semibold tracking-wider text-sky-700 dark:text-sky-300">
+                今のわたし
+              </p>
+              <h2 className="mt-1 text-lg font-bold text-slate-950 dark:text-slate-50">
+                {cardSummary.headline}
+              </h2>
             </div>
-            <p className="mt-2 text-sm leading-relaxed text-slate-700 dark:text-slate-300">
-              {insight.description}
-            </p>
-            <p className="mt-3 flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
-              <span>根拠</span>
-              {insight.sources.map((source) => (
-                <span
-                  key={source}
-                  className="rounded-full bg-slate-100 px-2 py-1 dark:bg-slate-700"
-                >
-                  {sourceLabels[source]}
-                </span>
-              ))}
-              <span>{`${insight.evidenceCount}件`}</span>
-            </p>
-          </li>
-        ))}
-      </ol>
+          </div>
+          {selectedVersion && (
+            <div className="shrink-0 text-right">
+              <p className="inline-flex items-center gap-1 text-xs font-bold text-violet-700 dark:text-violet-300">
+                <History className="size-3.5" aria-hidden="true" />
+                {versionLabel(selectedVersion.sequence)}
+              </p>
+              <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                {selectedVersion.generationMethod === "ai" ? "AI生成" : "現在の集計"}
+                {`・${formatDate(selectedVersion.generatedAt)}`}
+              </p>
+            </div>
+          )}
+        </div>
 
-      <dl className="mt-5 grid grid-cols-3 gap-2 border-t border-slate-200/80 pt-4 text-center dark:border-slate-700">
-        <div>
-          <dt className="text-xs text-slate-500">診断</dt>
-          <dd className="mt-1 font-bold text-slate-900 dark:text-slate-100">
-            {summary.diagnosisCount}件
-          </dd>
-        </div>
-        <div>
-          <dt className="text-xs text-slate-500">日記</dt>
-          <dd className="mt-1 font-bold text-slate-900 dark:text-slate-100">
-            {summary.diaryCount}件
-          </dd>
-        </div>
-        <div>
-          <dt className="text-xs text-slate-500">最終記録</dt>
-          <dd className="mt-1 text-sm font-bold text-slate-900 dark:text-slate-100">
-            {summary.latestRecordedAt ? formatDate(summary.latestRecordedAt) : "—"}
-          </dd>
-        </div>
-      </dl>
-    </section>
-  );
+        <ol className="mt-5 space-y-3">
+          {cardSummary.insights.map((insight, index) => (
+            <li key={insight.key} className="rounded-2xl bg-white/80 p-4 dark:bg-slate-900/60">
+              <div className="flex items-center gap-2">
+                <span className="flex size-6 items-center justify-center rounded-full bg-sky-500 text-xs font-bold text-white">
+                  {index + 1}
+                </span>
+                <h3 className="font-bold text-slate-950 dark:text-slate-50">{insight.label}</h3>
+              </div>
+              <p className="mt-2 text-sm leading-relaxed text-slate-700 dark:text-slate-300">
+                {insight.description}
+              </p>
+              <p className="mt-3 flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
+                <span>根拠</span>
+                {insight.sources.map((source) => (
+                  <span
+                    key={source}
+                    className="rounded-full bg-slate-100 px-2 py-1 dark:bg-slate-700"
+                  >
+                    {sourceLabels[source]}
+                  </span>
+                ))}
+                <span>{`${insight.evidenceCount}件`}</span>
+              </p>
+            </li>
+          ))}
+        </ol>
+
+        <dl className="mt-5 grid grid-cols-3 gap-2 border-t border-slate-200/80 pt-4 text-center dark:border-slate-700">
+          <div>
+            <dt className="text-xs text-slate-500">診断</dt>
+            <dd className="mt-1 font-bold text-slate-900 dark:text-slate-100">
+              {cardSummary.diagnosisCount}件
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs text-slate-500">日記</dt>
+            <dd className="mt-1 font-bold text-slate-900 dark:text-slate-100">
+              {cardSummary.diaryCount}件
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs text-slate-500">最終記録</dt>
+            <dd className="mt-1 text-sm font-bold text-slate-900 dark:text-slate-100">
+              {cardSummary.latestRecordedAt ? formatDate(cardSummary.latestRecordedAt) : "—"}
+            </dd>
+          </div>
+        </dl>
+      </section>
+    );
+  };
   return (
     <>
       <SummaryCardFrame
@@ -593,7 +596,34 @@ function SummaryContent({
   );
 }
 
-function EmptySummary() {
+function EmptySummary({
+  generation,
+  onRegenerate,
+}: {
+  generation?: ProfileSummaryVersioning["generation"];
+  onRegenerate?: () => void;
+}) {
+  const isWorking = generation?.status === "queued" || generation?.status === "generating";
+  if (isWorking) {
+    return (
+      <output
+        aria-label="新しい版を作成中"
+        className="mt-8 flex min-h-[28rem] flex-col items-center justify-center rounded-3xl border border-violet-300/40 bg-gradient-to-br from-violet-50 via-white to-sky-50 p-8 text-center shadow-xl shadow-slate-950/10 dark:from-violet-950/50 dark:via-slate-800 dark:to-sky-950/40"
+      >
+        <LoaderCircle
+          className="size-12 animate-spin text-violet-700 motion-reduce:animate-none dark:text-violet-300"
+          aria-hidden="true"
+        />
+        <h2 className="mt-5 text-xl font-bold text-slate-950 dark:text-slate-50">
+          新しい版を作成中
+        </h2>
+        <p className="mt-3 max-w-sm text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+          診断と日記・記録から、最初のまとめを作っています。完了まで少しお待ちください。
+        </p>
+      </output>
+    );
+  }
+
   return (
     <section className="mt-8 rounded-3xl border border-sky-300/30 bg-white p-6 text-center shadow-xl shadow-slate-950/10 dark:bg-slate-800">
       <span className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-sky-400/15 text-sky-700 dark:text-sky-300">
@@ -616,6 +646,32 @@ function EmptySummary() {
         <MessageCircleHeart className="size-5" aria-hidden="true" />
         LINEで今日のことを話してみる
       </p>
+      {generation?.status === "idle" && generation.canRegenerate && onRegenerate && (
+        <button
+          type="button"
+          onClick={onRegenerate}
+          className="mt-5 inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-3 text-sm font-bold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500"
+        >
+          <Sparkles className="size-4" aria-hidden="true" />
+          最初のまとめを作る
+        </button>
+      )}
+      {generation?.status === "failed" && (
+        <div className="mt-5 rounded-2xl bg-red-50 p-4 text-left dark:bg-red-950/30">
+          <p className="text-sm leading-relaxed text-red-700 dark:text-red-300" role="alert">
+            {generation.message ?? "最初のまとめを作成できませんでした。再試行してください。"}
+          </p>
+          {generation.canRegenerate && onRegenerate && (
+            <button
+              type="button"
+              onClick={onRegenerate}
+              className="mt-3 rounded-xl bg-red-200 px-4 py-2 text-sm font-bold text-red-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500"
+            >
+              再試行
+            </button>
+          )}
+        </div>
+      )}
     </section>
   );
 }
@@ -724,7 +780,10 @@ export function ProfileSummaryScreen({
               {...(onRegenerate ? { onRegenerate } : {})}
             />
           ) : (
-            <EmptySummary />
+            <EmptySummary
+              {...(versioning ? { generation: versioning.generation } : {})}
+              {...(onRegenerate ? { onRegenerate } : {})}
+            />
           )}
           {state.data.summary && <NextAction action={state.data.nextAction} />}
         </>

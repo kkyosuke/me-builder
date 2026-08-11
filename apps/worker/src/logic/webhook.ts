@@ -6,6 +6,7 @@ import {
   type FlowKey,
   type Message,
   type MessageBatch,
+  type ProfileSummaryGenerationQueueMessage,
   type WebhookQueueMessage,
   describeQueueMessageResult,
   logger,
@@ -18,6 +19,10 @@ import {
   DIARY_BRAIN_CHECKPOINT_MAX_ATTEMPTS,
   processDiaryBrainCheckpointMessage,
 } from "../handler/diary-brain-checkpoint";
+import {
+  PROFILE_SUMMARY_GENERATION_MAX_ATTEMPTS,
+  processProfileSummaryGenerationMessage,
+} from "../handler/profile-summary-generation";
 import { processLineWebhook } from "./feature/line";
 
 /** max_retries = 3では初回と3回の再試行を合わせて4 attemptsになる。 */
@@ -31,16 +36,22 @@ const MAX_ATTEMPTS_BY_FLOW: Record<FlowKey, number | undefined> = {
   "line-webhook": WEBHOOK_QUEUE_MAX_ATTEMPTS,
   "chat-turn": CHAT_TURN_MAX_ATTEMPTS,
   "diary-brain-checkpoint": DIARY_BRAIN_CHECKPOINT_MAX_ATTEMPTS,
+  "profile-summary-generation": PROFILE_SUMMARY_GENERATION_MAX_ATTEMPTS,
   "queue-dispatch": undefined,
 };
 
 /** どの処理のmessageだったかをログの見出しへ出すため、body形状から処理名を決める。 */
 function flowOf(
-  body: WebhookQueueMessage | ChatTurnQueueMessage | DiaryBrainCheckpointQueueMessage,
+  body:
+    | WebhookQueueMessage
+    | ChatTurnQueueMessage
+    | DiaryBrainCheckpointQueueMessage
+    | ProfileSummaryGenerationQueueMessage,
 ): FlowKey {
   if (!("type" in body)) return "line-webhook";
   if (body.type === "chat-turn") return "chat-turn";
   if (body.type === "diary-brain-checkpoint") return "diary-brain-checkpoint";
+  if (body.type === "profile-summary-generation") return "profile-summary-generation";
   return "queue-dispatch";
 }
 
@@ -154,7 +165,10 @@ async function processWebhookMessage(
 
 export async function handleQueueBatch(
   batch: MessageBatch<
-    WebhookQueueMessage | ChatTurnQueueMessage | DiaryBrainCheckpointQueueMessage
+    | WebhookQueueMessage
+    | ChatTurnQueueMessage
+    | DiaryBrainCheckpointQueueMessage
+    | ProfileSummaryGenerationQueueMessage
   >,
   db: D1.shared.Client,
   workerConfig?: WorkerConfig,
@@ -180,6 +194,13 @@ export async function handleQueueBatch(
         if (!cf || !workerConfig) throw new Error("Diary Brain bindings are not configured");
         await processDiaryBrainCheckpointMessage(
           message as Message<DiaryBrainCheckpointQueueMessage>,
+          cf,
+          workerConfig,
+        );
+      } else if ("type" in message.body && message.body.type === "profile-summary-generation") {
+        if (!cf || !workerConfig) throw new Error("Profile Summary bindings are not configured");
+        await processProfileSummaryGenerationMessage(
+          message as Message<ProfileSummaryGenerationQueueMessage>,
           cf,
           workerConfig,
         );

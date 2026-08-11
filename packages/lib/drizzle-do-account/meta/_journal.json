@@ -8,6 +8,13 @@
       "when": 1786361220917,
       "tag": "0000_baseline",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1786407202292,
+      "tag": "0001_broken_tyger_tiger",
+      "breakpoints": true
     }
   ]
 }

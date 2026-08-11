@@ -5,6 +5,12 @@ import type {
   ReleaseCompatibilityReservationResult,
   ReserveCompatibilityReferenceResult,
 } from "../../compatibility-data";
+import type {
+  CompleteProfileSummaryGenerationInput,
+  ProfileSummaryGenerationContext,
+  ProfileSummaryReadModel,
+  RequestProfileSummaryGenerationResult,
+} from "../../profile-summary";
 import type * as brain from "./action/brain";
 import type * as diagnosis from "./action/diagnosis";
 import type * as diagnosisBrainProjection from "./action/diagnosis-brain-projection";
@@ -62,6 +68,22 @@ export type AccountDataActions = {
   ) => Promise<CompatibilityReference | null>;
   "compatibility.listVisibleReferences": () => Promise<readonly CompatibilityReference[]>;
   "source.hasActive": RpcAction<[], typeof source.hasActiveSourceRecords>;
+  "profileSummary.read": () => Promise<ProfileSummaryReadModel>;
+  "profileSummary.requestGeneration": (
+    requestedAt?: Date,
+  ) => Promise<RequestProfileSummaryGenerationResult>;
+  "profileSummary.loadGenerationContext": (
+    generationId: string,
+    startedAt?: Date,
+  ) => Promise<ProfileSummaryGenerationContext | null>;
+  "profileSummary.completeGeneration": (
+    input: CompleteProfileSummaryGenerationInput,
+  ) => Promise<boolean>;
+  "profileSummary.failGeneration": (
+    generationId: string,
+    message: string,
+    failedAt?: Date,
+  ) => Promise<void>;
   "conversation.storeLineTextSource": RpcAction<
     [WithoutAccountId<Parameters<typeof diary.storeLineTextSource>[1]>],
     typeof diary.storeLineTextSource

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchProfileSummary } from "./profile-api";
+import { fetchProfileSummary, requestProfileSummaryGeneration } from "./profile-api";
 
 describe("fetchProfileSummary", () => {
   afterEach(() => vi.unstubAllGlobals());
@@ -74,6 +74,31 @@ describe("fetchProfileSummary", () => {
 
     await expect(fetchProfileSummary(undefined, "id-token")).rejects.toThrow(
       "本人確認に失敗しました",
+    );
+  });
+
+  it("新しいまとめ版の生成を要求する", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          Response.json(
+            { generationId: "generation-1", status: "queued", created: true },
+            { status: 202 },
+          ),
+        ),
+    );
+
+    await expect(
+      requestProfileSummaryGeneration("https://api.example.com", "id-token"),
+    ).resolves.toEqual({ generationId: "generation-1", status: "queued", created: true });
+    expect(fetch).toHaveBeenCalledWith(
+      "https://api.example.com/api/profile-summary/generations",
+      expect.objectContaining({
+        method: "POST",
+        headers: { Authorization: "Bearer id-token" },
+      }),
     );
   });
 });

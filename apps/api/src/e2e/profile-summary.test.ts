@@ -1,7 +1,8 @@
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import type { D1Database } from "@cloudflare/workers-types";
-import { D1 } from "@me-builder/lib";
+import { D1, DO } from "@me-builder/lib";
+import type { ProfileSummaryGenerationQueueMessage, Queue } from "@me-builder/shared";
 import { Miniflare } from "miniflare";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { app } from "../index";
@@ -16,12 +17,13 @@ const e2eSetupTimeoutMs = 90_000;
 let miniflare: Miniflare;
 let database: D1Database;
 let accountDataStore: AccountDataTestStore;
+const send = vi.fn();
+const queue = { send } as unknown as Queue<ProfileSummaryGenerationQueueMessage>;
 
 async function applyMigrations(db: D1Database): Promise<void> {
   const migrationFiles = (await readdir(migrationsDirectory))
     .filter((file) => /^\d+_.+\.sql$/.test(file))
     .sort();
-
   for (const file of migrationFiles) {
     const sql = await readFile(path.join(migrationsDirectory, file), "utf8");
     const statements = sql
@@ -57,15 +59,57 @@ async function prepareAccount(db: D1Database): Promise<void> {
   ]);
 }
 
-function insertSourceRecord(): void {
+async function insertDiaryMessage(): Promise<void> {
   accountDataStore.bind("account-summary-e2e");
+  const source = await DO.account.action.diary.storeLineTextSource(accountDataStore.db, {
+    accountId: "account-summary-e2e",
+    eventId: crypto.randomUUID(),
+    body: "Memory化されていない日記本文",
+    receivedAt: new Date(timestamp),
+  });
   accountDataStore.raw
     .prepare(
-      `INSERT INTO source_records (
-         id, created_at, updated_at, is_deleted, account_id, kind, access_label
-       ) VALUES (?, ?, ?, 0, ?, 'user_input', 'private')`,
+      `INSERT INTO conversation_sessions (
+         id, created_at, updated_at, is_deleted, account_id, status, started_at,
+         last_user_message_at, conversation_policy_id, reply_opportunity_count,
+         reply_count, awaiting_reply, next_sequence
+       ) VALUES (?, ?, ?, 0, ?, 'closed', ?, ?, 'reflective', 0, 0, 0, 2)`,
     )
-    .run("source-summary-e2e", timestamp, timestamp, "account-summary-e2e");
+    .run("summary-session", timestamp, timestamp, "account-summary-e2e", timestamp, timestamp);
+  accountDataStore.raw
+    .prepare(
+      `INSERT INTO conversation_messages (
+         id, created_at, updated_at, is_deleted, session_id, sequence, role,
+         source_record_id, channel
+       ) VALUES (?, ?, ?, 0, ?, 1, 'user', ?, 'line')`,
+    )
+    .run("summary-message", timestamp, timestamp, "summary-session", source.sourceRecordId);
+}
+
+async function insertSummaryVersions(): Promise<void> {
+  for (const sequence of [1, 2, 3]) {
+    const request = await DO.account.action.profileSummary.requestProfileSummaryGeneration(
+      accountDataStore.db,
+      "account-summary-e2e",
+      new Date(timestamp + sequence * 1_000),
+    );
+    if (request.outcome !== "created") throw new Error("summary generation was not created");
+    await DO.account.action.profileSummary.completeProfileSummaryGeneration(
+      accountDataStore.db,
+      "account-summary-e2e",
+      {
+        generationId: request.generationId,
+        generatedAt: new Date(timestamp + sequence * 1_000),
+        model: "gemini-test",
+        promptVersion: "profile-summary-v1",
+        headline: `${sequence}番目のまとめ`,
+        insights: [],
+        diagnosisCount: 0,
+        diaryCount: 1,
+        latestRecordedAt: new Date(timestamp),
+      },
+    );
+  }
 }
 
 function mockLineVerification(): void {
@@ -82,20 +126,21 @@ function mockLineVerification(): void {
   );
 }
 
-async function request(): Promise<Response> {
+async function request(pathname = "/api/profile-summary", method = "GET"): Promise<Response> {
   return app.request(
-    "/api/profile-summary",
-    { headers: { Authorization: "Bearer known-token" } },
+    pathname,
+    { method, headers: { Authorization: "Bearer known-token" } },
     {
       DB: database,
       ACCOUNT_DATA: accountDataStore.namespace,
+      PROFILE_SUMMARY_QUEUE: queue,
       LINE_LOGIN_CHANNEL_ID: "1234567890",
       ENVIRONMENT: "test",
     },
   );
 }
 
-describe("GET /api/profile-summary local D1 E2E", () => {
+describe("Profile Summary local D1 E2E", () => {
   beforeAll(async () => {
     miniflare = new Miniflare({
       compatibilityDate: "2026-07-29",
@@ -105,25 +150,21 @@ describe("GET /api/profile-summary local D1 E2E", () => {
     });
     database = (await miniflare.getD1Database("DB")) as D1Database;
     await prepareAccount(database);
-    accountDataStore = createAccountDataTestStore();
-    await accountDataStore.syncCatalogFrom(D1.shared.client.create(database));
   }, e2eSetupTimeoutMs);
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    accountDataStore = createAccountDataTestStore();
+    await accountDataStore.syncCatalogFrom(D1.shared.client.create(database));
+    send.mockReset();
+    send.mockResolvedValue(undefined);
     mockLineVerification();
   });
 
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
-  afterAll(async () => {
-    await miniflare.dispose();
-  });
+  afterEach(() => vi.unstubAllGlobals());
+  afterAll(async () => miniflare.dispose());
 
   it(`${profileSummaryCases.noRecords.id}: ${profileSummaryCases.noRecords.name}`, async () => {
     const response = await request();
-
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({
       versions: [],
@@ -132,16 +173,13 @@ describe("GET /api/profile-summary local D1 E2E", () => {
   });
 
   it(`${profileSummaryCases.readVersions.id}: ${profileSummaryCases.readVersions.name}`, async () => {
-    insertSourceRecord();
+    await insertDiaryMessage();
+    await insertSummaryVersions();
 
     const response = await request();
     expect(response.status).toBe(200);
     const body = (await response.json()) as {
-      versions: Array<{
-        id: string;
-        isLatest: boolean;
-        summary: { headline: string };
-      }>;
+      versions: Array<{ id: string; isLatest: boolean; summary: { headline: string } }>;
       availableDataCounts: { diagnosis: number; diary: number };
       generation: {
         status: string;
@@ -150,16 +188,33 @@ describe("GET /api/profile-summary local D1 E2E", () => {
         message: string | null;
       };
     };
-
     expect(body.versions).toHaveLength(3);
     expect(body.versions.filter(({ isLatest }) => isLatest)).toHaveLength(1);
     expect(new Set(body.versions.map(({ summary }) => summary.headline)).size).toBe(3);
-    expect(body.availableDataCounts).toEqual({ diagnosis: 3, diary: 6 });
+    expect(body.availableDataCounts).toEqual({ diagnosis: 0, diary: 1 });
     expect(body.generation).toEqual({
       status: "idle",
-      canRegenerate: false,
+      canRegenerate: true,
       reasons: [],
       message: null,
+    });
+  });
+
+  it(`${profileSummaryCases.requestGeneration.id}: ${profileSummaryCases.requestGeneration.name}`, async () => {
+    await insertDiaryMessage();
+
+    const response = await request("/api/profile-summary/generations", "POST");
+    expect(response.status).toBe(202);
+    expect(await response.json()).toMatchObject({ status: "queued", created: true });
+    expect(send).toHaveBeenCalledWith({
+      type: "profile-summary-generation",
+      accountId: "account-summary-e2e",
+      generationId: expect.any(String),
+    });
+    expect(JSON.stringify(send.mock.calls)).not.toContain("Memory化されていない日記本文");
+    expect((await (await request()).json()).generation).toMatchObject({
+      status: "queued",
+      canRegenerate: false,
     });
   });
 });

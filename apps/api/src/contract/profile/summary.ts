@@ -49,6 +49,17 @@ export const ProfileSummaryResponseSchema = v.object({
   nextAction: v.picklist(["diagnosis", "chat"]),
 });
 
+export const ProfileSummaryGenerationAcceptedSchema = v.object({
+  generationId: NonEmptyStringSchema,
+  status: v.picklist(["queued", "generating"]),
+  created: v.boolean(),
+});
+
+export const ProfileSummaryGenerationUnavailableSchema = v.object({
+  error: v.literal("Profile summary generation unavailable"),
+  reason: v.literal("source_record_required"),
+});
+
 export const profileSummaryRoute = describeRoute({
   operationId: "getProfileSummary",
   tags: ["Profile"],
@@ -59,6 +70,21 @@ export const profileSummaryRoute = describeRoute({
       "本人向けの保存済みまとめ版、現在使えるデータ件数、生成状態と次にできること",
       ProfileSummaryResponseSchema,
     ),
+    ...authenticatedErrors,
+  },
+} satisfies DescribeRouteOptions);
+
+export const profileSummaryGenerationRoute = describeRoute({
+  operationId: "requestProfileSummaryGeneration",
+  tags: ["Profile"],
+  summary: "本人の記録から新しいまとめ版のAI生成を要求する",
+  security: [{ liffIdToken: [] }],
+  responses: {
+    202: jsonResponse(
+      "生成要求を受け付けた、または処理中の要求を返した",
+      ProfileSummaryGenerationAcceptedSchema,
+    ),
+    409: jsonResponse("生成に利用できる記録がない", ProfileSummaryGenerationUnavailableSchema),
     ...authenticatedErrors,
   },
 } satisfies DescribeRouteOptions);

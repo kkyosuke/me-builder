@@ -2,6 +2,7 @@ import type {
   ChatTurnQueueMessage,
   DiaryBrainCheckpointQueueMessage,
   MessageBatch,
+  ProfileSummaryGenerationQueueMessage,
   WebhookQueueMessage,
 } from "@me-builder/shared";
 import { logger } from "@me-builder/shared";
@@ -12,7 +13,10 @@ import type { Env } from "../types";
 
 export async function queueHandler(
   batch: MessageBatch<
-    WebhookQueueMessage | ChatTurnQueueMessage | DiaryBrainCheckpointQueueMessage
+    | WebhookQueueMessage
+    | ChatTurnQueueMessage
+    | DiaryBrainCheckpointQueueMessage
+    | ProfileSummaryGenerationQueueMessage
   >,
   env: Env,
 ): Promise<void> {

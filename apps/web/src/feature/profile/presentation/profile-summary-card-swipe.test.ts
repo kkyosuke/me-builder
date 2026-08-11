@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
-import type { ProfileSummaryVersioning } from "../model/profile-summary";
+import type { ProfileSummary, ProfileSummaryVersioning } from "../model/profile-summary";
 import { resolveProfileSummarySwipe, summaryCardDragOffset } from "./profile-summary-card-swipe";
+
+const summary: ProfileSummary = {
+  generatedAt: "2026-08-09T12:00:00.000Z",
+  headline: "まとめ",
+  insights: [],
+  recordCount: 0,
+  diagnosisCount: 0,
+  diaryCount: 0,
+  latestRecordedAt: null,
+};
 
 const versioning: ProfileSummaryVersioning = {
   versions: [
@@ -10,6 +20,7 @@ const versioning: ProfileSummaryVersioning = {
       generatedAt: "2026-08-09T12:00:00.000Z",
       isLatest: true,
       generationMethod: "ai",
+      summary,
     },
     {
       id: "version-2",
@@ -17,6 +28,7 @@ const versioning: ProfileSummaryVersioning = {
       generatedAt: "2026-08-02T12:00:00.000Z",
       isLatest: false,
       generationMethod: "ai",
+      summary: { ...summary, generatedAt: "2026-08-02T12:00:00.000Z" },
     },
   ],
   selectedVersionId: "version-3",

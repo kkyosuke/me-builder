@@ -5,3 +5,4 @@ export * from "./compatibility-data";
 export * from "./compatibility-data-domain";
 export * from "./compatibility-data-orchestration";
 export * from "./diagnosis";
+export * from "./profile-summary";

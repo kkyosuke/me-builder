@@ -34,8 +34,7 @@ function dependencies(diagnoses: unknown[]) {
       session: { accountId: "account-1", role: "user" },
     }),
     listVisibleDiagnoses: vi.fn().mockResolvedValue(diagnoses),
-    hasActiveSourceRecords: vi.fn().mockResolvedValue(true),
-    readModel,
+    readProfileSummary: vi.fn().mockResolvedValue(readModel),
   };
 }
 
@@ -70,9 +69,13 @@ describe("getProfileSummary", () => {
     expect(result).toMatchObject({ type: "resolved", nextAction: "chat" });
   });
 
-  it("入力記録が全くなければまとめを返さない", async () => {
+  it("保存済み版がなければAccountDataの空の読み取り結果を返す", async () => {
     const deps = dependencies([{ availability: "open", responseStatus: "unanswered" }]);
-    deps.hasActiveSourceRecords.mockResolvedValue(false);
+    deps.readProfileSummary.mockResolvedValue({
+      versions: [],
+      availableDataCounts: { diagnosis: 0, diary: 0 },
+      generation: { status: "idle", canRegenerate: false, reasons: [], message: null },
+    });
 
     const result = await getProfileSummary(
       { idToken: "token", lineLoginChannelId: "channel", db, accountData },
@@ -87,7 +90,7 @@ describe("getProfileSummary", () => {
     });
   });
 
-  it("ダミーの保存済み版、現在件数、生成状態を返す", async () => {
+  it("AccountDataの保存済み版、現在件数、生成状態を返す", async () => {
     const deps = dependencies([]);
 
     const result = await getProfileSummary(
@@ -114,6 +117,6 @@ describe("getProfileSummary", () => {
 
     expect(result).toEqual({ type: "unauthenticated", reason: "invalid" });
     expect(deps.listVisibleDiagnoses).not.toHaveBeenCalled();
-    expect(deps.hasActiveSourceRecords).not.toHaveBeenCalled();
+    expect(deps.readProfileSummary).not.toHaveBeenCalled();
   });
 });
