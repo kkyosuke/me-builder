@@ -20,13 +20,14 @@ import { queueHandler } from "../handler/queue";
 import { type AccountDataTestStore, createAccountDataTestStore } from "../testing/account-data";
 import type { Env } from "../types";
 
-const { mockGenerateContent } = vi.hoisted(() => ({
+const { mockEmbedContent, mockGenerateContent } = vi.hoisted(() => ({
+  mockEmbedContent: vi.fn(),
   mockGenerateContent: vi.fn(),
 }));
 
 vi.mock("@google/genai", () => ({
   GoogleGenAI: class {
-    models = { generateContent: mockGenerateContent };
+    models = { embedContent: mockEmbedContent, generateContent: mockGenerateContent };
   },
 }));
 
@@ -307,6 +308,9 @@ describe("LINE diary chat delivery E2E", () => {
     await applyMigrations(database);
     client = D1.shared.client.create(database);
     accountDataStore = createAccountDataTestStore();
+    mockEmbedContent.mockReset().mockResolvedValue({
+      embeddings: [{ values: Array.from({ length: 768 }, () => 0.1) }],
+    });
     mockGenerateContent.mockReset().mockResolvedValue({
       text: JSON.stringify({
         mode: "explore",
@@ -314,6 +318,7 @@ describe("LINE diary chat delivery E2E", () => {
         main_question_count: 1,
         end_session: false,
         safety: { route: "normal", restricted_advice: false },
+        used_memory_ids: [],
       }),
     });
     mockPushMessage = vi.fn().mockResolvedValue({});
@@ -398,6 +403,108 @@ describe("LINE diary chat delivery E2E", () => {
     await expect(
       coordinator.acquireGeneration(queuedTurn.turnId, queuedTurn.generationEpoch),
     ).resolves.toEqual({ acquired: false, reason: "stale" });
+  });
+
+  it("現在TurnでVectorize検索し、AccountDataで再認可した記憶をContext Packageへ入れる", async () => {
+    const diaryText = "今日は疲れたので、落ち着く方法を探したい";
+    const { bindings, queuedTurn } = await ingestDiary(diaryText, "brain-context");
+    const [source] = await accountDataStore.db.select().from(DO.account.schema.sourceRecords);
+    if (!source) throw new Error("Expected a source record");
+    const recordedAt = new Date("2026-08-10T00:00:00Z");
+    await DO.account.action.brain.saveBrainItem(accountDataStore.db, {
+      at: recordedAt,
+      item: {
+        id: "brain-memory",
+        accountId: queuedTurn.accountId,
+        category: "memory",
+        statement: "公園を歩くと落ち着くことがある",
+        attributes: {},
+        derivation: "ai",
+        status: "active",
+        stability: "changeable",
+        sensitivity: "normal",
+        externallyShareable: false,
+        confidence: { state: "uncomputed" },
+      },
+      evidence: [
+        {
+          id: "brain-memory-evidence",
+          sourceRecordId: source.id,
+          relation: "supports",
+          isDerivationTrigger: true,
+          derivationMethod: "ai",
+          generatedAt: recordedAt,
+        },
+      ],
+      accessLabels: [{ id: "brain-memory-access", label: "private", assignedBy: "system" }],
+    });
+    await accountDataStore.db.insert(DO.account.schema.brainVectorEntries).values({
+      id: "vector-memory",
+      brainItemId: "brain-memory",
+      itemRevision: recordedAt.getTime(),
+      createdAt: recordedAt,
+      updatedAt: recordedAt,
+    });
+    const query = vi.fn().mockResolvedValue({
+      matches: [{ id: "vector-memory", score: 0.91 }],
+      count: 1,
+    });
+    bindings.vector = { brain: { query } as unknown as VectorizeIndex };
+    mockGenerateContent.mockResolvedValueOnce({
+      text: JSON.stringify({
+        mode: "advise",
+        reply: generatedReply,
+        main_question_count: 0,
+        end_session: false,
+        safety: { route: "normal", restricted_advice: false },
+        used_memory_ids: ["memory-1"],
+      }),
+    });
+
+    await processChatTurnMessage(
+      createQueueMessage(queuedTurn),
+      bindings,
+      getWorkerConfig({
+        ENVIRONMENT: "test",
+        LINE_CHANNEL_ACCESS_TOKEN: "line-token",
+        CHAT_DELIVERY_SECRET: "delivery-secret",
+        GOOGLE_VERTEX_AI_API_KEY: "google-key",
+        BRAIN_VECTOR_HMAC_SECRET: "brain-secret",
+      }),
+    );
+
+    expect(query).toHaveBeenCalledWith(
+      expect.any(Array),
+      expect.objectContaining({
+        topK: 10,
+        filter: { owner_scope: { $eq: expect.any(String) } },
+      }),
+    );
+    expect(mockEmbedContent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        contents: diaryText,
+        config: expect.objectContaining({ taskType: "RETRIEVAL_QUERY", outputDimensionality: 768 }),
+      }),
+    );
+    const prompt = mockGenerateContent.mock.calls[0]?.[0]?.contents;
+    expect(JSON.parse(prompt).context_package.memories).toEqual([
+      expect.objectContaining({
+        id: "memory-1",
+        statement: "公園を歩くと落ち着くことがある",
+        derivation: "ai",
+        evidence: [expect.objectContaining({ text: diaryText })],
+      }),
+    ]);
+    await expect(
+      accountDataStore.db.select().from(DO.account.schema.diaryChatBrainUsageAudits),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        brainItemId: "brain-memory",
+        purpose: "diary_chat",
+        status: "active",
+        sourceRecordIds: [source.id],
+      }),
+    ]);
   });
 
   it("replyTokenがあればfinalをreplyで返し、pushを消費しない", async () => {

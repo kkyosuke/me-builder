@@ -14,6 +14,7 @@ import {
   findBrainItemForAccount,
   getBrainVectorSyncTarget,
   listActiveBrainItems,
+  loadBrainChatContextMemories,
   saveBrainItem,
 } from "./brain";
 
@@ -242,6 +243,150 @@ describe("saveBrainItem", () => {
       type: "source-account-mismatch",
     });
     await expect(db.select().from(schema.brainItems)).resolves.toHaveLength(0);
+  });
+});
+
+describe("loadBrainChatContextMemories", () => {
+  it("Vectorize候補をAccountDataで再認可し、active ItemとEvidenceだけを類似度順で返す", async () => {
+    const db = createTestDb();
+    await insertAccountsAndSources(db);
+    await db.insert(schema.sourceRecordTextPayloads).values({
+      sourceRecordId: "source-1",
+      body: "公園を歩くと気持ちが落ち着いた",
+      contentHash: "hash-1",
+    });
+    const recordedAt = new Date("2026-08-10T00:00:00Z");
+    await saveBrainItem(db, createInput({ at: recordedAt }));
+    await saveBrainItem(
+      db,
+      createInput({
+        at: recordedAt,
+        item: {
+          ...createInput().item,
+          id: "brain-expired",
+          statement: "以前は夜更かしが好きだった",
+          validTo: new Date("2026-08-10T12:00:00Z"),
+        },
+        evidence: [
+          {
+            id: "evidence-expired",
+            sourceRecordId: "source-1",
+            relation: "supports",
+            isDerivationTrigger: true,
+            derivationMethod: "ai",
+            generatedAt: recordedAt,
+          },
+        ],
+        accessLabels: [{ id: "access-expired", label: "private", assignedBy: "system" }],
+        topicLabels: [],
+      }),
+    );
+    await db.insert(schema.brainVectorEntries).values([
+      {
+        id: "vector-expired",
+        brainItemId: "brain-expired",
+        itemRevision: recordedAt.getTime(),
+        createdAt: recordedAt,
+        updatedAt: recordedAt,
+      },
+      {
+        id: "vector-active",
+        brainItemId: "brain-1",
+        itemRevision: recordedAt.getTime(),
+        createdAt: recordedAt,
+        updatedAt: recordedAt,
+      },
+    ]);
+
+    await expect(
+      loadBrainChatContextMemories(
+        db,
+        "account-1",
+        ["vector-expired", "foreign-vector", "vector-active", "vector-active"],
+        new Date("2026-08-11T00:00:00Z"),
+      ),
+    ).resolves.toEqual([
+      {
+        brainItemId: "brain-1",
+        category: "preference",
+        statement: "日記から見える傾向",
+        derivation: "ai",
+        status: "active",
+        confidence: { state: "uncomputed" },
+        accessLabels: ["unclassified"],
+        recordedAt,
+        evidence: [
+          {
+            sourceRecordId: "source-1",
+            text: "公園を歩くと気持ちが落ち着いた",
+            recordedAt: expect.any(Date),
+          },
+        ],
+      },
+    ]);
+  });
+
+  it("複数Brain ItemでもEvidence原文をContext全体で3件までにする", async () => {
+    const db = createTestDb();
+    await insertAccountsAndSources(db);
+    const recordedAt = new Date("2026-08-10T00:00:00Z");
+    for (const index of [1, 2, 3, 4]) {
+      const sourceRecordId = `source-${index}`;
+      if (index > 1) {
+        await db.insert(schema.sourceRecords).values({
+          id: sourceRecordId,
+          accountId: "account-1",
+          kind: "user_input",
+        });
+      }
+      await db.insert(schema.sourceRecordTextPayloads).values({
+        sourceRecordId,
+        body: `Evidence ${index}`,
+        contentHash: `hash-${index}`,
+      });
+    }
+    const evidence = (brainItemId: string, indexes: readonly number[]) =>
+      indexes.map((index) => ({
+        id: `${brainItemId}-evidence-${index}`,
+        sourceRecordId: `source-${index}`,
+        relation: "supports" as const,
+        isDerivationTrigger: true,
+        derivationMethod: "ai" as const,
+        generatedAt: new Date(recordedAt.getTime() + index),
+      }));
+    await saveBrainItem(db, createInput({ at: recordedAt, evidence: evidence("brain-1", [1, 2]) }));
+    await saveBrainItem(
+      db,
+      createInput({
+        at: recordedAt,
+        item: { ...createInput().item, id: "brain-2", statement: "別の記憶" },
+        evidence: evidence("brain-2", [3, 4]),
+        accessLabels: [{ id: "brain-2-access", label: "unclassified", assignedBy: "system" }],
+        topicLabels: [],
+      }),
+    );
+    await db.insert(schema.brainVectorEntries).values([
+      {
+        id: "vector-1",
+        brainItemId: "brain-1",
+        itemRevision: recordedAt.getTime(),
+        createdAt: recordedAt,
+        updatedAt: recordedAt,
+      },
+      {
+        id: "vector-2",
+        brainItemId: "brain-2",
+        itemRevision: recordedAt.getTime(),
+        createdAt: recordedAt,
+        updatedAt: recordedAt,
+      },
+    ]);
+
+    const memories = await loadBrainChatContextMemories(db, "account-1", ["vector-1", "vector-2"]);
+
+    expect(memories).toHaveLength(2);
+    expect(memories.flatMap(({ evidence: itemEvidence }) => itemEvidence)).toHaveLength(3);
+    expect(memories.map(({ evidence: itemEvidence }) => itemEvidence.length)).toEqual([2, 1]);
   });
 });
 

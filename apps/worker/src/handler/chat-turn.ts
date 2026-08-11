@@ -17,7 +17,8 @@ import {
 } from "@me-builder/shared";
 import type { CloudflareBindings, WorkerConfig } from "../config";
 import { createGeminiUsageRecorder } from "../infrastructure/gemini-usage";
-import { generateDiaryChatResponse } from "../logic/diary-chat";
+import { loadBrainContextMemories } from "../logic/brain-context";
+import { classifySafety, generateDiaryChatResponse } from "../logic/diary-chat";
 import {
   DEFAULT_DIARY_CHAT_PROMPT_OPTIONS,
   getDiaryChatConversationGuidance,
@@ -495,12 +496,25 @@ export async function processChatTurnMessage(
     }
 
     const generationController = controller;
+    const safetyRoute = classifySafety(context.messages, context.currentUserMessageIds);
+    const brainMemories =
+      pendingResponse || safetyRoute !== "normal"
+        ? []
+        : await loadBrainContextMemories({
+            cf,
+            workerConfig,
+            accountId: message.body.accountId,
+            messages: context.messages,
+            currentUserMessageIds: context.currentUserMessageIds,
+            ...(generationController.signal ? { signal: generationController.signal } : {}),
+          });
     const response = pendingResponse
-      ? { reply: pendingResponse.body, endSession: pendingResponse.endSession }
+      ? { reply: pendingResponse.body, endSession: pendingResponse.endSession, brainUsages: [] }
       : await atBoundary(
           () =>
             generateDiaryChatResponse(context.messages, workerConfig, generationController.signal, {
               currentUserMessageIds: context.currentUserMessageIds,
+              brainMemories,
               onUsage: createGeminiUsageRecorder(cf.d1, "diary_chat", message.body.accountId),
               prompt: {
                 objective: DEFAULT_DIARY_CHAT_PROMPT_OPTIONS.objective,
@@ -508,10 +522,28 @@ export async function processChatTurnMessage(
                   context.conversationPolicyId,
                 ),
               },
-            }).then((generated) => ({
-              reply: generated.reply,
-              endSession: generated.end_session,
-            })),
+            }).then((generated) => {
+              const memoryByContextId = new Map<string, (typeof brainMemories)[number]>(
+                brainMemories.map((memory, index) => [`memory-${index + 1}`, memory] as const),
+              );
+              return {
+                reply: generated.reply,
+                endSession: generated.end_session,
+                brainUsages: generated.used_memory_ids.flatMap((id) => {
+                  const memory = memoryByContextId.get(id);
+                  return memory
+                    ? [
+                        {
+                          brainItemId: memory.brainItemId,
+                          sourceRecordIds: memory.evidence.map(
+                            ({ sourceRecordId }) => sourceRecordId,
+                          ),
+                        },
+                      ]
+                    : [];
+                }),
+              };
+            }),
           {
             code: "DIARY_CHAT_GENERATION_FAILED",
             category: "dependency",
@@ -551,6 +583,7 @@ export async function processChatTurnMessage(
             turnId: message.body.turnId,
             body: response.reply,
             endSession: response.endSession,
+            brainUsages: response.brainUsages,
           }),
         {
           code: "ASSISTANT_RESPONSE_SAVE_FAILED",

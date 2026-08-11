@@ -1,7 +1,7 @@
 import type { GoogleGenAI, GoogleGenAIOptions } from "@google/genai";
 import { logger } from "@me-builder/shared";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createGeminiClient, generateText } from "./gemini-client";
+import { createGeminiClient, embedQuery, generateText } from "./gemini-client";
 
 describe("Gemini client", () => {
   afterEach(() => vi.restoreAllMocks());
@@ -55,6 +55,25 @@ describe("Gemini client", () => {
       toolUsePromptTokenCount: 1,
       totalTokenCount: 17,
       generatedAt: new Date("2026-08-10T08:00:00.000Z"),
+    });
+  });
+
+  it("検索文をRETRIEVAL_QUERYとして指定次元へembeddingすること", async () => {
+    const values = Array.from({ length: 768 }, () => 0.1);
+    const embedContent = vi.fn().mockResolvedValue({ embeddings: [{ values }] });
+    const client = { models: { embedContent } } as unknown as GoogleGenAI;
+
+    await expect(
+      embedQuery(client, {
+        model: "gemini-embedding-001",
+        contents: "落ち着く方法を探したい",
+        dimensions: 768,
+      }),
+    ).resolves.toBe(values);
+    expect(embedContent).toHaveBeenCalledWith({
+      model: "gemini-embedding-001",
+      contents: "落ち着く方法を探したい",
+      config: { taskType: "RETRIEVAL_QUERY", outputDimensionality: 768 },
     });
   });
 

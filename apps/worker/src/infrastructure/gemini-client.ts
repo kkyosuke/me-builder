@@ -224,6 +224,24 @@ export async function embedDocument(
   return values?.length === input.dimensions ? values : undefined;
 }
 
+/** 保存済みdocumentと同じモデル・次元で、検索query用embeddingを生成する。 */
+export async function embedQuery(
+  client: GoogleGenAI,
+  input: { model: string; contents: string; dimensions: number; signal?: AbortSignal },
+): Promise<number[] | undefined> {
+  const response = await client.models.embedContent({
+    model: input.model,
+    contents: input.contents,
+    config: {
+      taskType: "RETRIEVAL_QUERY",
+      outputDimensionality: input.dimensions,
+      ...(input.signal ? { abortSignal: input.signal } : {}),
+    },
+  });
+  const values = response.embeddings?.[0]?.values;
+  return values?.length === input.dimensions ? values : undefined;
+}
+
 /** 指定した Gemini モデルへテキスト生成を依頼し、応答本文を返します。 */
 export async function generateText(
   client: GoogleGenAI,
