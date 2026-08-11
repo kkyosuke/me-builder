@@ -5,8 +5,8 @@ import * as sharedSchema from "./shared/schema";
 /**
  * Cloudflare D1が保存するdatabase。
  *
- * 保存するのはAccount Identity、全Account共通の公開定義、原文を含まない集計projectionだけ。
- * Account所有データは`DO.account`が持つ。境界は
+ * 保存するのはAccount Identityと運営設定、全Account共通の公開定義、原文を含まない
+ * 集計projection。日記や診断回答などの個人コンテンツは`DO.account`が持つ。境界は
  * `docs/architecture/account-data-isolation.md`を正とする。
  */
 const shared = {

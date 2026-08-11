@@ -1,4 +1,4 @@
-import type { D1Database } from "@cloudflare/workers-types";
+import type { D1Database, R2Bucket } from "@cloudflare/workers-types";
 import type { AccountDataNamespace, CompatibilityDataNamespace } from "@me-builder/lib";
 import type {
   ProfileSummaryGenerationQueueMessage,
@@ -28,6 +28,7 @@ type Env = Omit<
   WEBHOOK_QUEUE?: Queue<WebhookQueueMessage>;
   PROFILE_SUMMARY_QUEUE?: Queue<ProfileSummaryGenerationQueueMessage>;
   DB?: D1Database;
+  AVATAR_BUCKET?: R2Bucket;
   ACCOUNT_DATA?: AccountDataNamespace;
   COMPATIBILITY_DATA?: CompatibilityDataNamespace;
   BRAIN_VECTOR_INDEX?: ApiBindings["BRAIN_VECTOR_INDEX"];

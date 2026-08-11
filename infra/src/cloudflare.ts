@@ -2,9 +2,13 @@ import { resourceNames } from "./environment";
 import { parseManifest } from "./manifest";
 import { requireCloudflareEnvironment, run } from "./process";
 
-type ApiResponse<T> = { success: boolean; result: T; errors?: { message: string }[] };
+type ApiResponse<T> = {
+  success: boolean;
+  result: T;
+  errors?: { message: string }[];
+};
 
-async function cloudflare<T>(path: string, init?: RequestInit) {
+async function cloudflareResponse<T>(path: string, init?: RequestInit): Promise<ApiResponse<T>> {
   const { token } = requireCloudflareEnvironment();
   const response = await fetch(`https://api.cloudflare.com/client/v4${path}`, {
     ...init,
@@ -16,7 +20,39 @@ async function cloudflare<T>(path: string, init?: RequestInit) {
       `Cloudflare API ${response.status}: ${body.errors?.map(({ message }) => message).join(", ") || "unknown error"}`,
     );
   }
-  return body.result;
+  return body;
+}
+
+async function cloudflare<T>(path: string, init?: RequestInit): Promise<T> {
+  return (await cloudflareResponse<T>(path, init)).result;
+}
+
+function encodeR2ObjectKey(key: string): string {
+  return key.split("/").map(encodeURIComponent).join("/");
+}
+
+async function emptyPreviewAvatarBucket(): Promise<void> {
+  const { accountId } = requireCloudflareEnvironment();
+  const bucketName = resourceNames("preview").avatarBucket;
+  const remote = await cloudflare<{ buckets?: { name?: string }[] }>(
+    `/accounts/${accountId}/r2/buckets?per_page=1000&name_contains=${bucketName}`,
+  );
+  if (!remote.buckets?.some(({ name }) => name === bucketName)) return;
+
+  while (true) {
+    const objects = await cloudflare<{ key?: string }[]>(
+      `/accounts/${accountId}/r2/buckets/${bucketName}/objects?per_page=1000`,
+    );
+    if (objects.length === 0) break;
+    for (const object of objects) {
+      if (!object.key) throw new Error("Cloudflare returned an R2 object without a key");
+      await cloudflare(
+        `/accounts/${accountId}/r2/buckets/${bucketName}/objects/${encodeR2ObjectKey(object.key)}`,
+        { method: "DELETE" },
+      );
+    }
+  }
+  console.info(`Emptied Preview R2 bucket: ${bucketName}`);
 }
 
 async function deleteWorker(scriptName: string, attempts = 1) {
@@ -54,6 +90,7 @@ export async function deletePreviewDependents() {
   const { accountId } = requireCloudflareEnvironment();
   await deleteWorker("me-builder-api-preview");
   await deleteWorker("me-builder-mcp-preview");
+  await emptyPreviewAvatarBucket();
 
   const queues = await cloudflare<{ queue_id: string; queue_name: string }[]>(
     `/accounts/${accountId}/queues?per_page=100`,
@@ -98,6 +135,16 @@ export async function deleteUnmanagedPreviewFoundation() {
     await cloudflare(`/accounts/${accountId}/d1/database/${database.uuid}`, { method: "DELETE" });
     console.info(`Deleted unmanaged D1 database: ${database.name}`);
   }
+
+  const remoteBuckets = await cloudflare<{ buckets?: { name?: string }[] }>(
+    `/accounts/${accountId}/r2/buckets?per_page=1000&name_contains=${names.avatarBucket}`,
+  );
+  if (remoteBuckets.buckets?.some(({ name }) => name === names.avatarBucket)) {
+    await cloudflare(`/accounts/${accountId}/r2/buckets/${names.avatarBucket}`, {
+      method: "DELETE",
+    });
+    console.info(`Deleted unmanaged R2 bucket: ${names.avatarBucket}`);
+  }
 }
 
 export async function discoverPreviewInfrastructure() {
@@ -109,12 +156,19 @@ export async function discoverPreviewInfrastructure() {
   const database = databases.find(({ name }) => name === names.database);
   if (!database) throw new Error(`Missing D1 database: ${names.database}`);
 
+  const remoteBuckets = await cloudflare<{ buckets?: { name?: string }[] }>(
+    `/accounts/${accountId}/r2/buckets?per_page=1000&name_contains=${names.avatarBucket}`,
+  );
+  const avatarBucket = remoteBuckets.buckets?.find(({ name }) => name === names.avatarBucket);
+  if (!avatarBucket?.name) throw new Error(`Missing Avatar R2 bucket: ${names.avatarBucket}`);
+
   const remoteQueues = await cloudflare<{ queue_id: string; queue_name: string }[]>(
     `/accounts/${accountId}/queues?per_page=100`,
   );
   return parseManifest({
     environment: "preview",
     database: { id: database.uuid, name: database.name },
+    avatarBucket: { name: avatarBucket.name },
     queues: Object.fromEntries(
       Object.entries(names.queues).map(([key, name]) => {
         const queue = remoteQueues.find(({ queue_name }) => queue_name === name);

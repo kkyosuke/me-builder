@@ -5,9 +5,10 @@ import { describe, expect, it } from "vitest";
 
 const migrationsDirectory = path.resolve(__dirname, "../../../drizzle");
 
-/** 共有D1が保存するのはAccount Identity、公開定義、集計projectionだけ。 */
+/** 共有D1が保存するのはAccount Identity・運営設定、公開定義、集計projectionだけ。 */
 const SHARED_D1_TABLES = [
   "account_identities",
+  "account_profiles",
   "accounts",
   "catalog_versions",
   "diagnoses",
@@ -19,7 +20,7 @@ const SHARED_D1_TABLES = [
   "questions",
 ];
 
-const ACCOUNT_OWNED_TABLES = [
+const PERSONAL_CONTENT_TABLES = [
   "brain_item_access_labels",
   "brain_item_evidence_edges",
   "brain_item_revisions",
@@ -69,7 +70,7 @@ describe("shared D1 clean baseline migration", () => {
     sqlite.close();
   });
 
-  it("Account所有tableを共有D1へ作らない", () => {
+  it("個人コンテンツtableを共有D1へ作らない", () => {
     const sqlite = applyMigrations();
     const tableNames = new Set(
       sqlite
@@ -77,7 +78,7 @@ describe("shared D1 clean baseline migration", () => {
         .pluck()
         .all() as string[],
     );
-    for (const table of ACCOUNT_OWNED_TABLES) {
+    for (const table of PERSONAL_CONTENT_TABLES) {
       expect(tableNames.has(table), table).toBe(false);
     }
     sqlite.close();

@@ -12,6 +12,7 @@ export function parseEnvironment(value: string): Environment {
 export function resourceNames(environment: Environment) {
   return {
     database: `me-builder-db-${environment}`,
+    avatarBucket: `me-builder-avatar-${environment}`,
     queues: {
       webhook: `me-builder-webhook-queue-${environment}`,
       webhookDeadLetter: `me-builder-webhook-dlq-${environment}`,

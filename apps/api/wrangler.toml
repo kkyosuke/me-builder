@@ -27,6 +27,10 @@ database_id = "me-builder-db-local-id"
 binding = "BRAIN_VECTOR_INDEX"
 index_name = "me-builder-brain-local"
 
+[[r2_buckets]]
+binding = "AVATAR_BUCKET"
+bucket_name = "me-builder-avatar-local"
+
 [[durable_objects.bindings]]
 name = "ACCOUNT_DATA"
 class_name = "AccountData"
@@ -59,6 +63,10 @@ database_id = "me-builder-db-local-id"
 [[env.local.vectorize]]
 binding = "BRAIN_VECTOR_INDEX"
 index_name = "me-builder-brain-local"
+
+[[env.local.r2_buckets]]
+binding = "AVATAR_BUCKET"
+bucket_name = "me-builder-avatar-local"
 
 [[env.local.durable_objects.bindings]]
 name = "ACCOUNT_DATA"
@@ -96,6 +104,10 @@ database_id = "b61c9de2-4fa3-4644-8f01-f42af513e57a"
 binding = "BRAIN_VECTOR_INDEX"
 index_name = "me-builder-brain-preview"
 
+[[env.preview.r2_buckets]]
+binding = "AVATAR_BUCKET"
+bucket_name = "me-builder-avatar-preview"
+
 [[env.preview.durable_objects.bindings]]
 name = "ACCOUNT_DATA"
 class_name = "AccountData"
@@ -127,6 +139,10 @@ binding = "PROFILE_SUMMARY_QUEUE"
 binding = "DB"
 database_name = "me-builder-db-production"
 database_id = "6d11180b-3286-4b69-bd63-c7b60d768be1"
+
+[[env.production.r2_buckets]]
+binding = "AVATAR_BUCKET"
+bucket_name = "me-builder-avatar-production"
 
 [[env.production.durable_objects.bindings]]
 name = "ACCOUNT_DATA"

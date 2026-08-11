@@ -21,7 +21,9 @@ const mocks = vi.hoisted(() => ({
   },
   initializeLiff: vi.fn(),
   getLiffIdToken: vi.fn(),
-  verifyLiffSession: vi.fn(),
+  fetchAccountProfile: vi.fn(),
+  saveAccountAvatar: vi.fn(),
+  deleteAccountAvatar: vi.fn(),
   fetchDiagnosisList: vi.fn(),
   fetchDiagnosisDefinition: vi.fn(),
   fetchDiagnosisProgress: vi.fn(),
@@ -42,8 +44,10 @@ vi.mock("./feature/liff/infrastructure/liff-client", () => ({
   initializeLiff: mocks.initializeLiff,
   getLiffIdToken: mocks.getLiffIdToken,
 }));
-vi.mock("./feature/liff/infrastructure/session-api", () => ({
-  verifyLiffSession: mocks.verifyLiffSession,
+vi.mock("./feature/profile-settings/infrastructure/profile-api", () => ({
+  fetchAccountProfile: mocks.fetchAccountProfile,
+  saveAccountAvatar: mocks.saveAccountAvatar,
+  deleteAccountAvatar: mocks.deleteAccountAvatar,
 }));
 vi.mock("./feature/diagnosis/infrastructure/diagnosis-api", () => ({
   fetchDiagnosisList: mocks.fetchDiagnosisList,
@@ -173,7 +177,27 @@ describe("App", () => {
       profile: { displayName: "テスト" },
     });
     mocks.getLiffIdToken.mockReturnValue("dummy.id.token");
-    mocks.verifyLiffSession.mockResolvedValue({ status: "verified", role: "user" });
+    mocks.fetchAccountProfile.mockResolvedValue({
+      role: "user",
+      displayName: "テスト",
+      avatar: null,
+    });
+    mocks.saveAccountAvatar.mockImplementation(
+      async (_apiUrl: string, _idToken: string, nextAvatar: { dataUrl: string }) => ({
+        role: "user",
+        displayName: "テスト",
+        avatar: {
+          source: "uploaded",
+          url: nextAvatar.dataUrl,
+          updatedAt: "2026-08-11T00:00:00.000Z",
+        },
+      }),
+    );
+    mocks.deleteAccountAvatar.mockResolvedValue({
+      role: "user",
+      displayName: "テスト",
+      avatar: null,
+    });
     mocks.fetchDiagnosisList.mockResolvedValue([diagnosis()]);
     mocks.fetchDiagnosisDefinition.mockResolvedValue(definition);
     mocks.fetchDiagnosisProgress.mockResolvedValue(undefined);
@@ -290,22 +314,26 @@ describe("App", () => {
   });
 
   it("未設定時はLINEプロフィール画像を右上アイコンに表示する", async () => {
+    const linePictureUrl = "https://example.com/line-profile.jpg";
     mocks.initializeLiff.mockResolvedValue({
       status: "ready",
       inClient: true,
       profile: {
         displayName: "テスト",
-        pictureUrl: "https://example.com/line-profile.jpg",
+        pictureUrl: linePictureUrl,
       },
+    });
+    mocks.fetchAccountProfile.mockResolvedValue({
+      role: "user",
+      displayName: "テスト",
+      avatar: { source: "line", url: linePictureUrl, updatedAt: null },
     });
 
     render(<App />);
 
     const profileButton = await screen.findByRole("button", { name: "プロフィールを開く" });
     await waitFor(() =>
-      expect(profileButton.querySelector("img")?.getAttribute("src")).toBe(
-        "https://example.com/line-profile.jpg",
-      ),
+      expect(profileButton.querySelector("img")?.getAttribute("src")).toBe(linePictureUrl),
     );
   });
 
@@ -338,14 +366,18 @@ describe("App", () => {
   });
 
   it("管理者のプロフィールにだけ管理者画面へのリンクを表示する", async () => {
-    mocks.verifyLiffSession.mockResolvedValue({ status: "verified", role: "admin" });
+    mocks.fetchAccountProfile.mockResolvedValue({
+      role: "admin",
+      displayName: "管理者",
+      avatar: null,
+    });
     render(<App />);
 
     fireEvent.click(screen.getByRole("button", { name: "プロフィールを開く" }));
 
     const adminLink = await screen.findByRole("link", { name: /管理者画面を開く/ });
     expect(adminLink.getAttribute("href")).toBe("/admin");
-    expect(mocks.verifyLiffSession).toHaveBeenCalledWith(
+    expect(mocks.fetchAccountProfile).toHaveBeenCalledWith(
       "https://api.example.com",
       "dummy.id.token",
       expect.any(AbortSignal),
@@ -353,13 +385,19 @@ describe("App", () => {
   });
 
   it("LINE画像を表示し、選んだ画像をアバターに設定してプロフィールへ戻る", async () => {
+    const linePictureUrl = "https://example.com/line-profile.jpg";
     mocks.initializeLiff.mockResolvedValue({
       status: "ready",
       inClient: true,
       profile: {
         displayName: "テスト",
-        pictureUrl: "https://example.com/line-profile.jpg",
+        pictureUrl: linePictureUrl,
       },
+    });
+    mocks.fetchAccountProfile.mockResolvedValue({
+      role: "user",
+      displayName: "テスト",
+      avatar: { source: "line", url: linePictureUrl, updatedAt: null },
     });
     render(<App />);
 
@@ -372,11 +410,21 @@ describe("App", () => {
     fireEvent.change(screen.getByLabelText("画像を選ぶ"), {
       target: { files: [new File(["selfie"], "selfie.png", { type: "image/png" })] },
     });
-    expect(await screen.findByRole("heading", { name: "設定後のプレビュー" })).toBeTruthy();
+    expect(await screen.findByText("設定するアバター")).toBeTruthy();
     expect(screen.queryByText("selfie.png")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "この画像を設定" }));
+    fireEvent.click(screen.getByRole("button", { name: "この画像を保存" }));
 
     expect(await screen.findByRole("heading", { name: "プロフィール" })).toBeTruthy();
+    expect(mocks.saveAccountAvatar).toHaveBeenCalledWith(
+      "https://api.example.com",
+      "dummy.id.token",
+      {
+        kind: "uploaded",
+        dataUrl: "data:image/png;base64,normalized",
+        fileName: "selfie.png",
+      },
+      expect.any(AbortSignal),
+    );
     expect(screen.getByText("設定した画像")).toBeTruthy();
     expect(screen.queryByText("selfie.png")).toBeNull();
     expect(screen.queryByText(/人物を確認/)).toBeNull();
@@ -386,6 +434,118 @@ describe("App", () => {
     expect(profileButton.querySelector("img")?.getAttribute("src")).toMatch(
       /^data:image\/png;base64,normalized$/,
     );
+  });
+
+  it("保存済み画像をプロフィールAPIから取得して右上アイコンへ復元する", async () => {
+    mocks.fetchAccountProfile.mockResolvedValue({
+      role: "user",
+      displayName: "テスト",
+      avatar: {
+        source: "uploaded",
+        url: "data:image/png;base64,c2F2ZWQ=",
+        updatedAt: "2026-08-11T00:00:00.000Z",
+      },
+    });
+
+    render(<App />);
+
+    const profileButton = await screen.findByRole("button", { name: "プロフィールを開く" });
+    await waitFor(() =>
+      expect(profileButton.querySelector("img")?.getAttribute("src")).toBe(
+        "data:image/png;base64,c2F2ZWQ=",
+      ),
+    );
+  });
+
+  it("保存画像の取得前にLINE画像を先に表示しない", async () => {
+    const linePictureUrl = "https://example.com/line-profile.jpg";
+    let resolveProfile: ((profile: unknown) => void) | undefined;
+    mocks.initializeLiff.mockResolvedValue({
+      status: "ready",
+      inClient: true,
+      profile: { displayName: "テスト", pictureUrl: linePictureUrl },
+    });
+    mocks.fetchAccountProfile.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveProfile = resolve;
+      }),
+    );
+
+    render(<App />);
+
+    const profileButton = await screen.findByRole("button", { name: "プロフィールを開く" });
+    await waitFor(() => expect(mocks.fetchAccountProfile).toHaveBeenCalled());
+    expect(profileButton.querySelector("img")).toBeNull();
+    expect(document.querySelector(`img[src="${linePictureUrl}"]`)).toBeNull();
+
+    await act(async () => {
+      resolveProfile?.({
+        role: "user",
+        displayName: "テスト",
+        avatar: {
+          source: "uploaded",
+          url: "data:image/png;base64,c2F2ZWQ=",
+          updatedAt: "2026-08-11T00:00:00.000Z",
+        },
+      });
+    });
+
+    await waitFor(() =>
+      expect(profileButton.querySelector("img")?.getAttribute("src")).toBe(
+        "data:image/png;base64,c2F2ZWQ=",
+      ),
+    );
+  });
+
+  it("保存済み画像を削除してLINE画像へ戻す", async () => {
+    const linePictureUrl = "https://example.com/line-profile.jpg";
+    mocks.initializeLiff.mockResolvedValue({
+      status: "ready",
+      inClient: true,
+      profile: { displayName: "テスト", pictureUrl: linePictureUrl },
+    });
+    mocks.fetchAccountProfile.mockResolvedValue({
+      role: "user",
+      displayName: "テスト",
+      avatar: {
+        source: "uploaded",
+        url: "data:image/png;base64,c2F2ZWQ=",
+        updatedAt: "2026-08-11T00:00:00.000Z",
+      },
+    });
+    mocks.deleteAccountAvatar.mockResolvedValue({
+      role: "user",
+      displayName: "テスト",
+      avatar: { source: "line", url: linePictureUrl, updatedAt: null },
+    });
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "プロフィールを開く" }));
+    fireEvent.click(await screen.findByRole("button", { name: /アバターを変更/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "LINEの画像に戻す" }));
+
+    await waitFor(() =>
+      expect(mocks.deleteAccountAvatar).toHaveBeenCalledWith(
+        "https://api.example.com",
+        "dummy.id.token",
+        expect.any(AbortSignal),
+      ),
+    );
+    expect(await screen.findByText("LINEのプロフィール画像")).toBeTruthy();
+  });
+
+  it("プロフィール取得失敗を表示して再試行できる", async () => {
+    mocks.fetchAccountProfile
+      .mockRejectedValueOnce(new Error("プロフィールの取得に失敗しました。再試行してください。"))
+      .mockResolvedValue({ role: "user", displayName: "テスト", avatar: null });
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "プロフィールを開く" }));
+    expect((await screen.findByRole("alert")).textContent).toContain("プロフィールの取得に失敗");
+    fireEvent.click(screen.getByRole("button", { name: "再試行" }));
+
+    expect(await screen.findByRole("button", { name: /アバターを設定/ })).toBeTruthy();
+    expect(mocks.fetchAccountProfile).toHaveBeenCalledTimes(2);
   });
 
   it("プロフィールとアバター設定をブラウザ履歴で戻れる", async () => {

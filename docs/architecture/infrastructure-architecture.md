@@ -97,11 +97,11 @@ flowchart TD
 | **MCP サーバー** | **Cloudflare Workers** | 外部 AI エージェント向け MCP (Model Context Protocol) 端点の提供。SSE (Server-Sent Events) および HTTP 通信を直接処理。 |
 | **キューワーカー** | **Cloudflare Workers** | Cloudflare Queues から非同期メッセージを受信・消費・バックグラウンド処理する非同期ワーカー。 |
 | **メッセージキュー** | **Cloudflare Queues** | Webhook 等のイベントを安全に保持・非同期配送するサーバーレスメッセージキュー。 |
-| **構造化データストア** | **Cloudflare D1** | サーバーレスリレーショナルデータベース (SQLite)。Account Identity、全Account共通の公開定義、原文を含まない集計projectionだけを保持。Account所有データは保持しない。 |
+| **構造化データストア** | **Cloudflare D1** | サーバーレスリレーショナルデータベース (SQLite)。Account、Identity、role、status、アバターメタデータ、全Account共通の公開定義、原文を含まない集計projectionを保持。日記や診断回答などの個人コンテンツは保持しない。 |
 | **ベクトル検索ストア** | **Cloudflare Vectorize** | 完全マネージドなベクトルデータベース。`Brain Item` の埋め込みベクトル（Embedding）を保存し、コサイン類似度等による高速セマンティック検索を提供。 |
-| **メディアストレージ** | **Cloudflare R2** | S3互換のオブジェクトストレージ。ユーザーが投稿・回答した写真、イラスト、動画、音声などのメディア原本データを保存（エグレス料金ゼロ）。 |
+| **メディアストレージ** | **Cloudflare R2** | S3互換のオブジェクトストレージ。環境別のprivate bucketへアバターなどのAccount所有メディア原本を保存し、公開URLを持たせずAPI Server bindingから読み書きする。 |
 | **キー・バリュー / キャッシュ** | **Cloudflare KV** | 低遅延グローバルキー・バリューストア。認証トークン、一時セッション、アクセス制御キャッシュ、レート制限カウントを保持。 |
-| **状態管理 / ドメイン協調** | **Cloudflare Durable Objects** | Account所有データのSSoT。1 Accountにつき1つのprivate SQLiteへ`Source`・`Brain`・`Diary`・`Diagnosis`回答を保存し、連投調停や相性関係の協調も担う。 |
+| **状態管理 / ドメイン協調** | **Cloudflare Durable Objects** | 個人コンテンツのSSoT。1 Accountにつき1つのprivate SQLiteへ`Source`・`Brain`・`Diary`・`Diagnosis`回答・プロフィール要約を保存し、連投調停や相性関係の協調も担う。 |
 | **AI / 推論基盤** | **Vertex AI Express Mode (Gemini)** | Queue WorkerからAPI key認証でテキスト生成とEmbedding生成を実行。本文、生成結果、API keyをアプリケーションログへ残さない。 |
 | **セキュリティ & ネットワーク** | **Cloudflare Access / WAF** | DDoS防御、WAFルール適用、SSL/TLS証明書管理、管理画面等へのゼロトラストアクセス制御（Cloudflare Access）。 |
 
@@ -109,7 +109,7 @@ flowchart TD
 
 1. **メディア登録とメタデータ保持**
    - ユーザーから投稿されたバイナリデータ（写真・動画・音声）は Cloudflare R2 へ直接保存します。
-   - Account所有メディアのメタデータ、所有権、アクセスラベル等の構造化情報はAccountDataへ記録します。共有D1との境界は[Accountデータ分離設計](account-data-isolation.md)を正とします。
+   - アバターのobject key、content type、byte size、etag、更新日時など、Account運営に必要なメディアメタデータは共有D1へ記録します。個人コンテンツに属するメディアの構造化情報との境界は[Accountデータ分離設計](account-data-isolation.md)を正とします。
 
 2. **テキストおよびメディアのベクトル化と検索**
    - activeなBrain Itemは、AccountDataの同期outboxと専用Queueを経由してVertex AI Express ModeのGeminiでEmbeddingへ変換されます。
@@ -162,14 +162,14 @@ flowchart TD
 
 ### 6.1 Cloudflareリソースの宣言とデプロイ境界
 
-Cloudflareの基盤リソースは`infra/`のPulumi programをSSoTとします。Pulumiは環境ごとのD1 database、QueueおよびDLQを作成・変更・削除し、stack outputからリポジトリ内の`wrangler.toml`を生成します。リソースIDを手作業でTOMLへ複製しません。
+Cloudflareの基盤リソースは`infra/`のPulumi programをSSoTとします。Pulumiは環境ごとのD1 database、Private R2 bucket、QueueおよびDLQを作成・変更・削除し、stack outputからリポジトリ内の`wrangler.toml`を生成します。リソースIDやbucket名を手作業でTOMLへ複製しません。
 
 Worker scriptのbundle、Secretの配布、Durable Object migrationとQueue consumerの登録はWranglerが担当します。Durable Object namespaceとmigration履歴はWorker scriptが所有し、独立したPulumiリソースとして作成・削除できないためです。`infra`のライフサイクルコマンドは、この所有関係に従って実行順を制御します。
 
 ```mermaid
 flowchart LR
     Program["infra/ Pulumi program"] --> Up["pulumi up"]
-    Up --> Base["D1 / Queues / DLQs"]
+    Up --> Base["D1 / Private R2 / Queues / DLQs"]
     Base --> Output["stack output"]
     Output --> Generate["wrangler.toml生成"]
     Generate --> Deploy["Wrangler deploy"]
@@ -179,12 +179,12 @@ flowchart LR
     Stop --> Unbind["削除用WorkerでQueue bindingを解除"]
     Unbind --> QueueWorker["Queue Worker / DOを削除"]
     QueueWorker --> PulumiDestroy["pulumi destroy"]
-    PulumiDestroy --> Removed["D1 / Queues / DLQsを削除"]
+    PulumiDestroy --> Removed["D1 / Private R2 / Queues / DLQsを削除"]
 ```
 
-Previewの破壊的な検証はPreview専用stackでのみ行います。削除時はAPI・MCP WorkerとQueue consumerを先に削除し、削除専用の最小Workerを一度デプロイしてproducer bindingも解除します。その後、Queue Workerの削除で所有するDOとmigration履歴を破棄し、`pulumi destroy`でD1・Queue・DLQを削除します。再構築時は`pulumi up`、TOML生成、D1 migration、Workerデプロイの順とします。Productionを破壊対象とするコマンドは提供しません。
+Previewの破壊的な検証はPreview専用stackでのみ行います。削除時はAPI・MCP WorkerとQueue consumerを先に削除し、Private R2を空にしてから、削除専用の最小Workerを一度デプロイしてproducer bindingも解除します。その後、Queue Workerの削除で所有するDOとmigration履歴を破棄し、`pulumi destroy`でD1・Private R2・Queue・DLQを削除します。再構築時は`pulumi up`、TOML生成、D1 migration、Workerデプロイの順とします。Productionを破壊対象とするコマンドは提供しません。
 
-GitHub Actionsの手動resetは常に最新`main`を対象にこのライフサイクルを実行し、復旧確認後に新しいD1・Queue IDをmanifestとWrangler TOMLへ反映するPRを自動作成します。通常のPreview CDはデプロイ前にCloudflare上の現在IDを検証・同期するため、自動PRがマージされる前でも古いD1 IDを参照しません。
+GitHub Actionsの手動resetは常に最新`main`を対象にこのライフサイクルを実行し、復旧確認後に新しいD1・Private R2・Queueの情報をmanifestとWrangler TOMLへ反映するPRを自動作成します。通常のPreview CDはデプロイ前にPrivate R2がなければ同じ命名規則で作成し、Cloudflare上の現在リソースを検証・同期するため、自動PRがマージされる前でも古いD1 IDを参照しません。Production CDもPrivate R2の存在をデプロイ前に保証します。
 
 - **環境分類と Pulumi / Wrangler 構成 (`Local` / `Preview` / `Production`)**:
   - **ローカル開発環境 (`Local`)**:

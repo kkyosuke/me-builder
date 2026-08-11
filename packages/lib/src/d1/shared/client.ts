@@ -5,8 +5,8 @@ import * as schema from "./schema";
 /**
  * 共有D1のclient型。
  *
- * 共有D1はAccount Identity、全Account共通の公開定義、原文を含まない集計projectionだけを
- * 保持する。Account所有データを扱うactionはこの型を受け取らない。
+ * 共有D1はAccount Identityと運営設定、全Account共通の公開定義、原文を含まない
+ * 集計projectionを保持する。日記や診断回答など個人コンテンツのactionはこの型を受け取らない。
  */
 export type SharedD1Client = DrizzleD1Database<typeof schema>;
 

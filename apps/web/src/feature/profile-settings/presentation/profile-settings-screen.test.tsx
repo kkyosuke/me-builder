@@ -113,4 +113,39 @@ describe("ProfileSettingsScreen", () => {
       "/admin",
     );
   });
+
+  it("プロフィール取得中はアバター操作をSkeletonに置き換える", () => {
+    render(
+      <ProfileSettingsScreen
+        avatar={null}
+        isProfileLoading
+        theme="dark"
+        onBack={vi.fn()}
+        onOpenAvatar={vi.fn()}
+        onThemeChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("status", { name: "アバターを読み込んでいます" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /アバターを設定/ })).toBeNull();
+  });
+
+  it("プロフィール取得失敗を表示して再試行を通知する", () => {
+    const onRetryProfile = vi.fn();
+    render(
+      <ProfileSettingsScreen
+        avatar={null}
+        profileError="プロフィールの取得に失敗しました。"
+        theme="dark"
+        onBack={vi.fn()}
+        onOpenAvatar={vi.fn()}
+        onRetryProfile={onRetryProfile}
+        onThemeChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("alert").textContent).toContain("プロフィールの取得に失敗");
+    fireEvent.click(screen.getByRole("button", { name: "再試行" }));
+    expect(onRetryProfile).toHaveBeenCalledOnce();
+  });
 });

@@ -4,6 +4,9 @@
     "id": "b61c9de2-4fa3-4644-8f01-f42af513e57a",
     "name": "me-builder-db-preview"
   },
+  "avatarBucket": {
+    "name": "me-builder-avatar-preview"
+  },
   "queues": {
     "webhook": {
       "id": "0c3e1a5cbe5045bcb4f1f1b636a3808b",

@@ -82,7 +82,9 @@ jobs:
 
       - name: Sync Wrangler Configuration with Preview Infrastructure
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
-        run: task infra:preview:sync
+        run: |
+          task avatar-bucket:setup:preview
+          task infra:preview:sync
 
       - name: Protect API Documentation with Cloudflare Access (Preview)
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}

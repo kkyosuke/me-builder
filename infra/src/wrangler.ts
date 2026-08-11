@@ -25,6 +25,10 @@ function durableObject(prefix: string, name: string, scriptName?: string) {
     .replace(/(^|_)([a-z])/g, (_, _separator, letter: string) => letter.toUpperCase())}"${script}`;
 }
 
+function r2(bucket: InfrastructureManifest["avatarBucket"], prefix = "") {
+  return `[[${prefix}r2_buckets]]\nbinding = "AVATAR_BUCKET"\nbucket_name = "${bucket.name}"`;
+}
+
 function workerEnvironment(manifest: InfrastructureManifest) {
   const env = manifest.environment;
   const q = manifest.queues;
@@ -84,6 +88,8 @@ function apiEnvironment(manifest: InfrastructureManifest) {
   if (env !== "production") config.push("", vectorize(env, prefix));
   config.push(
     "",
+    r2(manifest.avatarBucket, prefix),
+    "",
     durableObject(prefix, "ACCOUNT_DATA", `me-builder-worker-${env}`),
     "",
     durableObject(prefix, "COMPATIBILITY_DATA", `me-builder-worker-${env}`),
@@ -121,6 +127,7 @@ export function renderWranglerConfigs(
     ...preview,
     environment: "local" as never,
     database: localDatabase,
+    avatarBucket: { name: "me-builder-avatar-local" },
     queues: localQueues,
   };
   const worker = [
@@ -212,6 +219,8 @@ export function renderWranglerConfigs(
     "",
     vectorize("local", "env.local."),
     "",
+    r2(localManifest.avatarBucket, "env.local."),
+    "",
     durableObject("env.local.", "ACCOUNT_DATA", "me-builder-worker-local"),
     "",
     durableObject("env.local.", "COMPATIBILITY_DATA", "me-builder-worker-local"),
@@ -239,6 +248,8 @@ export function renderWranglerConfigs(
     d1(localDatabase),
     "",
     vectorize("local"),
+    "",
+    r2(localManifest.avatarBucket),
     "",
     durableObject("", "ACCOUNT_DATA", "me-builder-worker-local"),
     "",
