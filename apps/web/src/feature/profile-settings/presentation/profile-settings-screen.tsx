@@ -1,6 +1,7 @@
 import { ArrowLeft, ChevronRight, Moon, RefreshCw, Shield, Sparkles, Sun } from "lucide-react";
 import { useEffect, useRef } from "react";
 import type { ColorTheme } from "../../theme/model/color-theme";
+import type { FontSize } from "../../theme/model/font-size";
 import { type AvatarSelection, getAvatarName } from "../model/avatar";
 import { AvatarPreview } from "./components/avatar-preview";
 
@@ -21,6 +22,12 @@ const themes = [
   },
 ] as const;
 
+const fontSizes = [
+  { id: "small", name: "小" },
+  { id: "medium", name: "中" },
+  { id: "large", name: "大" },
+] as const;
+
 export function ProfileSettingsScreen({
   avatar,
   isAdmin = false,
@@ -29,10 +36,12 @@ export function ProfileSettingsScreen({
   profileError = null,
   linePictureUrl,
   theme,
+  fontSize,
   onBack,
   onOpenAvatar,
   onRetryProfile,
   onThemeChange,
+  onFontSizeChange,
 }: {
   avatar: AvatarSelection | null;
   isAdmin?: boolean;
@@ -41,10 +50,12 @@ export function ProfileSettingsScreen({
   profileError?: string | null;
   linePictureUrl?: string | undefined;
   theme: ColorTheme;
+  fontSize: FontSize;
   onBack: () => void;
   onOpenAvatar: () => void;
   onRetryProfile?: () => void;
   onThemeChange: (theme: ColorTheme) => void;
+  onFontSizeChange: (fontSize: FontSize) => void;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const backButtonRef = useRef<HTMLButtonElement>(null);
@@ -108,7 +119,7 @@ export function ProfileSettingsScreen({
                 あなたらしい見た目に
               </h2>
               <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                アバターと画面の明るさをここで整えられます。
+                アバターと画面の見やすさをここで整えられます。
               </p>
             </div>
           </div>
@@ -230,6 +241,44 @@ export function ProfileSettingsScreen({
           <p className="mt-3 px-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
             選んだテーマはこのブラウザに保存され、次に開いたときも使われます。
           </p>
+
+          <div className="mt-6">
+            <p
+              id="font-size-setting-label"
+              className="px-1 text-sm font-bold text-slate-700 dark:text-slate-200"
+            >
+              文字サイズ
+            </p>
+            <div
+              role="radiogroup"
+              aria-labelledby="font-size-setting-label"
+              className="mt-2 grid grid-cols-3 rounded-2xl border border-slate-200 bg-white p-1 shadow-sm dark:border-slate-700 dark:bg-slate-800"
+            >
+              {fontSizes.map((item) => {
+                const selected = fontSize === item.id;
+                return (
+                  <label
+                    key={item.id}
+                    className={`relative flex min-h-11 cursor-pointer items-center justify-center rounded-xl px-3 font-bold transition focus-within:z-10 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-sky-500 ${
+                      selected
+                        ? "bg-sky-500 text-white shadow-sm dark:bg-sky-300 dark:text-slate-950"
+                        : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="font-size"
+                      value={item.id}
+                      checked={selected}
+                      onChange={() => onFontSizeChange(item.id)}
+                      className="sr-only"
+                    />
+                    {item.name}
+                  </label>
+                );
+              })}
+            </div>
+          </div>
         </section>
 
         {isAdmin && (
