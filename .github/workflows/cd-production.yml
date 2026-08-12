@@ -135,7 +135,6 @@ jobs:
 
           bun --cwd apps/worker wrangler deploy --env production --secrets-file "${worker_secrets_file}"
           bun --cwd apps/api wrangler deploy --env production --secrets-file "${api_secrets_file}"
-          bun --filter @me-builder/mcp deploy:production
           bun --filter @me-builder/web deploy:production
 
       # URL が変わっていなければ現在の登録状態を 1 回問い合わせるだけで終わる。

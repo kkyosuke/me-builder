@@ -94,7 +94,7 @@ flowchart TD
 | --- | --- | --- |
 | **フロントエンド** | **Cloudflare Pages** | Webアプリケーションおよび管理者画面のビルド・ホスティング。高速なエッジ配信と自動プレビューデプロイを実現。 |
 | **API サーバー** | **Cloudflare Workers** | HTTP / REST / Webhook API（LINE連携、認証、データ登録等）の処理。軽量な TypeScript/Hono フレームワーク等で構築。 |
-| **MCP サーバー** | **Cloudflare Workers** | 外部 AI エージェント向け MCP (Model Context Protocol) 端点の提供。SSE (Server-Sent Events) および HTTP 通信を直接処理。 |
+| **MCP サーバー（Phase 2）** | **Cloudflare Workers** | 外部 AI エージェント向け MCP (Model Context Protocol) 端点の提供。初期リリースではデプロイせず、Phase 2でSSE (Server-Sent Events) および HTTP 通信を提供する。 |
 | **キューワーカー** | **Cloudflare Workers** | Cloudflare Queues から非同期メッセージを受信・消費・バックグラウンド処理する非同期ワーカー。 |
 | **メッセージキュー** | **Cloudflare Queues** | Webhook 等のイベントを安全に保持・非同期配送するサーバーレスメッセージキュー。 |
 | **構造化データストア** | **Cloudflare D1** | サーバーレスリレーショナルデータベース (SQLite)。Account、Identity、role、status、アバターメタデータ、全Account共通の公開定義、原文を含まない集計projectionを保持。日記や診断回答などの個人コンテンツは保持しない。 |
@@ -115,7 +115,7 @@ flowchart TD
    - activeなBrain Itemは、AccountDataの同期outboxと専用Queueを経由してVertex AI Express ModeのGeminiでEmbeddingへ変換されます。
    - 生成されたベクトルはCloudflare Vectorizeへ保存します。Vectorizeは候補抽出だけを担い、利用時はAccountDataで現在の状態とAccess Policyを再認可します。
 
-3. **MCPアクセス制限と監査**
+3. **MCPアクセス制限と監査（Phase 2）**
    - MCPリクエスト受領時、Cloudflare Workers は D1 および KV に保持された `Access Profile` と `Access Label` を照合し、認可範囲内の情報のみを返却します。
    - すべての閲覧・検索リクエストは D1 または KV に監査ログとして非同期書き込みされます。
 
@@ -133,7 +133,7 @@ flowchart TD
 
 ## 6. 開発・運用環境方針
 
-開発基盤には **Bun Workspaces** を用いたモノレポ構造（`apps/web`, `apps/api`, `apps/mcp`, `apps/worker`）を採用し、ローカル開発・プレビュー・本番環境で一貫した開発体験と安全なデプロイを実現します。
+開発基盤には **Bun Workspaces** を用いたモノレポ構造（`apps/web`, `apps/api`, `apps/mcp`, `apps/worker`）を採用します。`apps/mcp`はPhase 2向けの開発スケルトンとして保持しますが、初期リリースのプレビュー・本番環境へはデプロイしません。
 
 - **モノレポ構成 (`Bun Workspaces`)**:
 
@@ -155,7 +155,7 @@ flowchart TD
 
   - `apps/web`: React (Vite + TypeScript) によるフロントエンド。`apps/web/wrangler.toml` により Pages 設定および環境別設定（local, preview, production）を管理。
   - `apps/api`: `Bun.serve` および Web標準 API 準拠の **Hono** フレームワークを採用。`apps/api/wrangler.toml` により Cloudflare Workers の環境別設定（local, preview, production）を制御。
-  - `apps/mcp`: Cloudflare Workers / Bun 上で動作する MCP (Model Context Protocol) サーバー。`apps/mcp/wrangler.toml` により Workers の環境別設定を制御。
+  - `apps/mcp`: Phase 2でCloudflare Workers / Bun 上に提供する MCP (Model Context Protocol) サーバーのスケルトン。`apps/mcp/wrangler.toml`は将来の環境別設定を生成するが、初期リリースのデプロイ対象には含めない。
   - `apps/worker`: Cloudflare Queues メッセージを非同期処理する Cloudflare Workers ワーカー。`apps/worker/wrangler.toml` により Worker の環境別設定を制御。
   - `packages/shared`: 全アプリケーション間で共有されるドメイン型定義およびユーティリティライブラリ。
   - `packages/lib`: LINE Messaging API 連携、共有D1（`d1/shared/`）とAccountData Durable Object（`do/account/`）のschema・action（Drizzle ORM）を所有者ごとに分けて提供するライブラリ。`D1.shared.*`と`DO.account.*`で参照する。境界は[Accountデータ分離設計](account-data-isolation.md)を正とします。
@@ -186,26 +186,26 @@ Previewの破壊的な検証はPreview専用stackでのみ行います。削除�
 
 GitHub Actionsの手動resetは常に最新`main`を対象にこのライフサイクルを実行し、復旧確認後に新しいD1・Private R2・Queueの情報をmanifestとWrangler TOMLへ反映するPRを自動作成します。通常のPreview CDはデプロイ前にPrivate R2がなければ同じ命名規則で作成し、Cloudflare上の現在リソースを検証・同期するため、自動PRがマージされる前でも古いD1 IDを参照しません。Production CDもPrivate R2の存在をデプロイ前に保証します。
 
+初期リリースのデプロイ対象はWeb UI、API Server、Queue Workerだけです。MCPのPreview／Production設定はPhase 2の実装準備として生成しますが、手動タスク、Preview CD、Production CD、Preview resetのいずれからもデプロイしません。
+
 - **環境分類と Pulumi / Wrangler 構成 (`Local` / `Preview` / `Production`)**:
   - **ローカル開発環境 (`Local`)**:
     - `wrangler.toml` 内の `env.local` ターゲット（`me-builder-api-local`, `me-builder-mcp-local`, `me-builder-web-local`）。
     - ルートの `bun dev` または `wrangler dev --env local` によりローカルエミュレーション実行。
   - **プレビュー環境 (`Preview`)**:
-    - `wrangler.toml` 内の `env.preview` ターゲット（`me-builder-api-preview`, `me-builder-mcp-preview`, `me-builder-web`）。
+    - `wrangler.toml` 内の初期リリース対象（`me-builder-api-preview`, `me-builder-web`）。`me-builder-mcp-preview`の設定は予約済みだがデプロイしない。
     - 全 PR で共有する単一の検証環境。プルリクエストの作成・更新だけでは自動デプロイせず、`CD / Preview` ワークフローが次のいずれかで起動したときのみ `wrangler deploy --env preview` / `wrangler pages deploy` を実行。
       - ブランチを指定した手動実行 (`workflow_dispatch`)
       - `deploy` ラベルが付いた PR（ラベル付与時と、その後の push）
     - **カスタムドメイン・ルーティング配置**:
       - UI (`apps/web`): `stg.kagami.kyosuke.dev`
       - API (`apps/api`): `api.stg.kagami.kyosuke.dev`
-      - MCP (`apps/mcp`): `mcp.stg.kagami.kyosuke.dev`
   - **本番環境 (`Production`)**:
-    - `wrangler.toml` 内の `env.production` ターゲット（`me-builder-api-production`, `me-builder-mcp-production`, `me-builder-web`）。
+    - `wrangler.toml` 内の初期リリース対象（`me-builder-api-production`, `me-builder-web`）。`me-builder-mcp-production`の設定は予約済みだがデプロイしない。
     - `main` ブランチマージ時に、CI/CD パイプライン経由で `wrangler deploy --env production` を実行し本番環境へデプロイ。
     - **カスタムドメイン・ルーティング配置**:
       - UI (`apps/web`): `kagami.kyosuke.dev`
       - API (`apps/api`): `api.kagami.kyosuke.dev`
-      - MCP (`apps/mcp`): `mcp.kagami.kyosuke.dev`
 
 APIとMCPがブラウザへ返すCORSヘッダは、環境manifestのベースドメインから生成したWeb UIのオリジンだけを許可します。LocalはVite開発サーバーのオリジンを使用し、設定が欠けている場合や一致しないOriginには`Access-Control-Allow-Origin`を返しません。
 

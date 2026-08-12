@@ -79,6 +79,10 @@ jobs:
       - uses: ./.github/actions/setup-bun-workspace
         if: steps.scope.outputs.code == 'true' || steps.scope.outputs.docs == 'true'
 
+      - name: Dependency Vulnerability Audit
+        if: steps.scope.outputs.code == 'true'
+        run: bun run audit
+
       - name: Generated API Contract Check
         if: steps.scope.outputs.code == 'true'
         run: bun run check:generated

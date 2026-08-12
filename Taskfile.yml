@@ -56,13 +56,18 @@ tasks:
     cmds:
       - bun run lint:fix
 
+  audit:
+    desc: 'Audit installed dependencies for known vulnerabilities'
+    cmds:
+      - bun run audit
+
   test:
     desc: 'Run tests using Vitest'
     cmds:
       - bun run test
 
   ci:
-    desc: 'Run full CI checks locally (generated files, lint, typecheck, test, build)'
+    desc: 'Run full CI checks locally (dependency audit, generated files, lint, typecheck, test, build)'
     cmds:
       - bun run ci
 
@@ -182,19 +187,17 @@ tasks:
       - bun --filter @me-builder/lib db:seed:production
 
   deploy:preview:
-    desc: 'Deploy all applications to preview environment via Wrangler'
+    desc: 'Deploy initial-release applications to preview environment via Wrangler'
     cmds:
       - task: access:setup:preview
       - bun --filter @me-builder/worker deploy:preview
       - bun --filter @me-builder/api deploy:preview
-      - bun --filter @me-builder/mcp deploy:preview
       - bun --filter @me-builder/web deploy:preview
 
   deploy:production:
-    desc: 'Deploy all applications to production environment via Wrangler'
+    desc: 'Deploy initial-release applications to production environment via Wrangler'
     cmds:
       - task: access:setup:production
       - bun --filter @me-builder/worker deploy:production
       - bun --filter @me-builder/api deploy:production
-      - bun --filter @me-builder/mcp deploy:production
       - bun --filter @me-builder/web deploy:production
