@@ -317,16 +317,18 @@ export async function getCompatibilityRelationship(c: Context<AppEnv>): Promise<
 /** `GET /api/compatibility/relationships` — 本人の相性一覧を返す。 */
 export async function getCompatibilityRelationships(c: Context<AppEnv>): Promise<Response> {
   c.header("Cache-Control", "no-store");
-  if (!c.env?.DB || !c.env.ACCOUNT_DATA || !c.env.COMPATIBILITY_DATA) {
+  const currentConfig = getConfig(c.env);
+  if (!c.env?.DB || !c.env.ACCOUNT_DATA || !c.env.COMPATIBILITY_DATA || !currentConfig.liffId) {
     logger.error({ path: c.req.path }, "Compatibility relationship binding is not configured");
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   }
   const outcome = await listCompatibilityRelationships({
     idToken: bearerToken(c.req.header("authorization")),
-    lineLoginChannelId: getConfig(c.env).lineLoginChannelId,
+    lineLoginChannelId: currentConfig.lineLoginChannelId,
     db: D1.shared.client.create(c.env.DB),
     accountData: c.env.ACCOUNT_DATA,
     compatibilityData: c.env.COMPATIBILITY_DATA,
+    liffId: currentConfig.liffId,
   });
   switch (outcome.type) {
     case "resolved":

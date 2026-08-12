@@ -5,10 +5,16 @@ import {
   accountDataFor,
   compatibilityDataFor,
 } from "@me-builder/lib";
+import { createCompatibilityInvitationUrl } from "./compatibility-invitation-url";
 import { createLiffSession } from "./liff-session";
 
 type CompatibilityRelationshipListItem =
-  | Readonly<{ relationshipId: string; status: "pending"; expiresAt: string }>
+  | Readonly<{
+      relationshipId: string;
+      status: "pending";
+      expiresAt: string;
+      invitationUrl: string;
+    }>
   | Readonly<{
       relationshipId: string;
       status: "accepted";
@@ -27,6 +33,7 @@ type Params = Readonly<{
   db: D1.shared.Client;
   accountData: AccountDataNamespace;
   compatibilityData: CompatibilityDataNamespace;
+  liffId: string;
 }>;
 
 /** AccountDataの一覧projectionを正本へ同期し、外部公開可能な最小カードへ変換する。 */
@@ -36,6 +43,7 @@ export async function listCompatibilityRelationships({
   db,
   accountData,
   compatibilityData,
+  liffId,
 }: Params): Promise<CompatibilityRelationshipsOutcome> {
   const session = await createLiffSession({ idToken, lineLoginChannelId, db });
   if (session.type !== "resolved") return session;
@@ -53,6 +61,7 @@ export async function listCompatibilityRelationships({
               relationshipId: reference.relationshipId,
               status: "pending",
               expiresAt: preview.expiresAt.toISOString(),
+              invitationUrl: createCompatibilityInvitationUrl(liffId, reference.relationshipId),
             }
           : null;
       }

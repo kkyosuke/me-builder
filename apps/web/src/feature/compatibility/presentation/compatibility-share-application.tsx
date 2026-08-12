@@ -16,11 +16,15 @@ export default function CompatibilityShareApplication() {
 
   const shareToLine = async (url: string) => {
     try {
-      await shareCompatibilityInvitationToLine(
+      const destination = await shareCompatibilityInvitationToLine(
         state.status === "success" ? state.data.displayName : null,
         url,
       );
-      setSharingMessage("LINEの共有先を開きました。");
+      setSharingMessage(
+        destination === "line"
+          ? "LINEの共有先を開きました。"
+          : "端末の共有先を開きました。LINEを選んで送信してください。",
+      );
     } catch (error) {
       setSharingMessage(error instanceof Error ? error.message : "LINEで共有できませんでした。");
     }

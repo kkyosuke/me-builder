@@ -1,24 +1,25 @@
 import { ShieldCheck } from "lucide-react";
 import { useEffect, useRef } from "react";
+import type { AsyncState } from "../../../model/async-state";
 import type { CompatibilityPerson } from "../model/compatibility";
 import {
   CompatibilityPairSheet,
   CompatibilityPersonSheet,
 } from "./components/compatibility-result-sheets";
-import {
-  CompatibilityAvatar,
-  CompatibilityBackHeader,
-  DemoNotice,
-} from "./components/compatibility-ui";
+import { CompatibilityAvatar, CompatibilityBackHeader } from "./components/compatibility-ui";
 import { useCompatibilityResult } from "./hooks/use-compatibility-result";
 import { useCompatibilitySectionSwipe } from "./hooks/use-compatibility-section-swipe";
 
 export function CompatibilityResultScreen({
   me,
   partner,
+  endingState = { status: "idle" },
+  onEnd = () => undefined,
 }: {
   me: CompatibilityPerson;
   partner: CompatibilityPerson;
+  endingState?: AsyncState<null>;
+  onEnd?: () => void;
 }) {
   const result = useCompatibilityResult();
   const sectionSwipe = useCompatibilitySectionSwipe({
@@ -38,7 +39,7 @@ export function CompatibilityResultScreen({
   const indicatorPosition = sectionIndex - dragOffset / sectionSwipe.viewportWidth;
   const isDragging = sectionSwipe.dragOffset !== null;
 
-  if (result.state.sharing === "ended") {
+  if (endingState.status === "success") {
     return (
       <main className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col justify-center px-4 py-10 sm:px-8">
         <section className="rounded-3xl border border-slate-200 bg-white p-7 text-center shadow-xl shadow-slate-950/10 dark:border-slate-700 dark:bg-slate-800">
@@ -58,7 +59,6 @@ export function CompatibilityResultScreen({
             相性一覧へ戻る
           </a>
         </section>
-        <DemoNotice />
       </main>
     );
   }
@@ -150,7 +150,9 @@ export function CompatibilityResultScreen({
       <section className="mt-8 border-t border-slate-200 pt-6 dark:border-slate-700">
         <p className="flex items-start gap-2 text-xs leading-relaxed text-slate-500">
           <ShieldCheck className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-          比較には「予定の立て方」「休日の過ごし方」「お金の使い方」を使っています。生の回答は表示していません。
+          比較には
+          {me.themes.map((theme) => `「${theme.title}」`).join("、")}
+          を使っています。生の回答は表示していません。
         </p>
         {result.state.sharing === "confirming-end" ? (
           <div className="mt-5 rounded-2xl border border-red-300/50 bg-red-50 p-4 dark:border-red-700/40 dark:bg-red-950/30">
@@ -161,10 +163,11 @@ export function CompatibilityResultScreen({
             <div className="mt-4 flex gap-3">
               <button
                 type="button"
-                onClick={result.confirmEnd}
+                disabled={endingState.status === "loading"}
+                onClick={onEnd}
                 className="min-h-11 flex-1 rounded-xl bg-red-600 px-3 text-sm font-bold text-white"
               >
-                共有を終了
+                {endingState.status === "loading" ? "終了しています..." : "共有を終了"}
               </button>
               <button
                 type="button"
@@ -184,8 +187,12 @@ export function CompatibilityResultScreen({
             共有を終了する
           </button>
         )}
+        {endingState.status === "error" && (
+          <p role="alert" className="mt-3 text-sm font-semibold text-red-700 dark:text-red-300">
+            {endingState.message}
+          </p>
+        )}
       </section>
-      <DemoNotice />
     </main>
   );
 }

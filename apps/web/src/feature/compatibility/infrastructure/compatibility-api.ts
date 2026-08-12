@@ -3,6 +3,11 @@ import type { operations } from "../../../generated/api";
 import { createHttpClient } from "../../../infrastructure/http-client";
 import type { CompatibilityInvitation } from "../model/compatibility-invitation";
 import type { CompatibilityInvitationPreview } from "../model/compatibility-invitation-preview";
+import type {
+  CompatibilityInvitationAcceptance,
+  CompatibilityRelationship,
+  CompatibilityRelationshipList,
+} from "../model/compatibility-relationship";
 import type { CompatibilitySharePreview } from "../model/compatibility-share-preview";
 
 type ApiResponse =
@@ -94,6 +99,56 @@ const InvitationPreviewResponseSchema = v.object({
   ),
   nextAction: v.nullable(v.picklist(["diagnosis", "profile-summary"])),
 }) satisfies v.GenericSchema<InvitationPreviewApiResponse>;
+
+const RelationshipIdSchema = v.pipe(v.string(), v.regex(/^[a-f0-9]{64}$/));
+const RelationshipListResponseSchema = v.object({
+  items: v.array(
+    v.variant("status", [
+      v.object({
+        relationshipId: RelationshipIdSchema,
+        status: v.literal("pending"),
+        expiresAt: v.pipe(v.string(), v.isoTimestamp()),
+        invitationUrl: v.pipe(v.string(), v.url()),
+      }),
+      v.object({
+        relationshipId: RelationshipIdSchema,
+        status: v.literal("accepted"),
+        partnerDisplayName: NonEmptyStringSchema,
+      }),
+    ]),
+  ),
+}) satisfies v.GenericSchema<CompatibilityRelationshipList>;
+
+const RelationshipPersonSchema = v.object({
+  displayName: NonEmptyStringSchema,
+  aboutMe: ShareProfileSchema,
+  themes: v.pipe(v.array(ShareThemeSchema), v.minLength(1)),
+});
+const RelationshipResponseSchema = v.variant("status", [
+  v.object({
+    relationshipId: RelationshipIdSchema,
+    status: v.literal("ready"),
+    partner: RelationshipPersonSchema,
+    viewer: RelationshipPersonSchema,
+  }),
+  v.object({
+    relationshipId: RelationshipIdSchema,
+    status: v.literal("waiting"),
+    nextAction: v.nullable(v.picklist(["diagnosis", "profile-summary"])),
+  }),
+]) satisfies v.GenericSchema<CompatibilityRelationship>;
+
+const InvitationAcceptanceResponseSchema = v.object({
+  relationshipId: RelationshipIdSchema,
+  status: v.literal("accepted"),
+}) satisfies v.GenericSchema<CompatibilityInvitationAcceptance>;
+
+function authenticatedError(response: Response): Error | null {
+  if (response.status === 401) {
+    return new Error("本人確認に失敗しました。LINEから開き直してください。");
+  }
+  return null;
+}
 
 export async function fetchCompatibilitySharePreview(
   apiUrl: string | undefined,
@@ -188,4 +243,129 @@ export async function fetchCompatibilityInvitation(
   }
 
   return v.parse(InvitationPreviewResponseSchema, await response.json());
+}
+
+export async function fetchCompatibilityRelationships(
+  apiUrl: string | undefined,
+  idToken: string,
+  signal?: AbortSignal,
+): Promise<CompatibilityRelationshipList> {
+  const response = await createHttpClient(apiUrl).request("/api/compatibility/relationships", {
+    headers: { Authorization: `Bearer ${idToken}` },
+    ...(signal ? { signal } : {}),
+  });
+  if (!response.ok) {
+    if (response.status === 404) {
+      throw new Error("利用するには、先にLINE公式アカウントを友だち追加してください。");
+    }
+    throw (
+      authenticatedError(response) ??
+      new Error(`相性一覧の取得に失敗しました (HTTP ${response.status})`)
+    );
+  }
+  return v.parse(RelationshipListResponseSchema, await response.json());
+}
+
+export async function acceptCompatibilityInvitation(
+  apiUrl: string | undefined,
+  idToken: string,
+  relationshipId: string,
+  previewToken: string,
+  signal?: AbortSignal,
+): Promise<CompatibilityInvitationAcceptance> {
+  const response = await createHttpClient(apiUrl).request(
+    `/api/compatibility/invitations/${encodeURIComponent(relationshipId)}/accept`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${idToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ previewToken }),
+      ...(signal ? { signal } : {}),
+    },
+  );
+  if (!response.ok) {
+    const authenticationError = authenticatedError(response);
+    if (authenticationError) throw authenticationError;
+    if (response.status === 409) {
+      throw new Error(
+        "共有内容が更新されたか、この招待を承諾できません。内容を再確認してください。",
+      );
+    }
+    throw new Error(`招待の承諾に失敗しました (HTTP ${response.status})`);
+  }
+  return v.parse(InvitationAcceptanceResponseSchema, await response.json());
+}
+
+export async function fetchCompatibilityRelationship(
+  apiUrl: string | undefined,
+  idToken: string,
+  relationshipId: string,
+  signal?: AbortSignal,
+): Promise<CompatibilityRelationship> {
+  const response = await createHttpClient(apiUrl).request(
+    `/api/compatibility/relationships/${encodeURIComponent(relationshipId)}`,
+    {
+      headers: { Authorization: `Bearer ${idToken}` },
+      ...(signal ? { signal } : {}),
+    },
+  );
+  if (!response.ok) {
+    const authenticationError = authenticatedError(response);
+    if (authenticationError) throw authenticationError;
+    throw new Error(
+      response.status === 404
+        ? "この相性シートは利用できません。共有が終了した可能性があります。"
+        : `相性シートの取得に失敗しました (HTTP ${response.status})`,
+    );
+  }
+  return v.parse(RelationshipResponseSchema, await response.json());
+}
+
+async function deleteCompatibilityResource(
+  apiUrl: string | undefined,
+  idToken: string,
+  path: string,
+  failureMessage: string,
+  signal?: AbortSignal,
+): Promise<void> {
+  const response = await createHttpClient(apiUrl).request(path, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${idToken}` },
+    ...(signal ? { signal } : {}),
+  });
+  if (!response.ok) {
+    throw authenticatedError(response) ?? new Error(`${failureMessage} (HTTP ${response.status})`);
+  }
+}
+
+export function cancelCompatibilityInvitation(
+  apiUrl: string | undefined,
+  idToken: string,
+  relationshipId: string,
+  signal?: AbortSignal,
+): Promise<void> {
+  return deleteCompatibilityResource(
+    apiUrl,
+    idToken,
+    `/api/compatibility/invitations/${encodeURIComponent(relationshipId)}`,
+    "招待の取り消しに失敗しました",
+    signal,
+  );
+}
+
+export function endCompatibilityRelationship(
+  apiUrl: string | undefined,
+  idToken: string,
+  relationshipId: string,
+  signal?: AbortSignal,
+): Promise<void> {
+  return deleteCompatibilityResource(
+    apiUrl,
+    idToken,
+    `/api/compatibility/relationships/${encodeURIComponent(relationshipId)}`,
+    "共有の終了に失敗しました",
+    signal,
+  );
 }

@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  acceptCompatibilityInvitation,
+  cancelCompatibilityInvitation,
+  endCompatibilityRelationship,
   fetchCompatibilityInvitation,
+  fetchCompatibilityRelationship,
+  fetchCompatibilityRelationships,
   fetchCompatibilitySharePreview,
   issueCompatibilityInvitation,
 } from "./compatibility-api";
@@ -176,5 +181,81 @@ describe("fetchCompatibilityInvitation", () => {
     await expect(
       fetchCompatibilityInvitation(undefined, "id-token", "1".repeat(64)),
     ).rejects.toThrow("LINE公式アカウントを友だち追加");
+  });
+});
+
+describe("compatibility relationship APIs", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("一覧から再送可能なLIFF URLを取得する", async () => {
+    const relationshipId = "1".repeat(64);
+    const data = {
+      items: [
+        {
+          relationshipId,
+          status: "pending",
+          expiresAt: "2026-08-26T00:00:00.000Z",
+          invitationUrl: `https://liff.line.me/test/compatibility/invitations/${relationshipId}`,
+        },
+      ],
+    };
+    const fetchMock = vi.fn().mockResolvedValue(Response.json(data));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(fetchCompatibilityRelationships(undefined, "id-token")).resolves.toEqual(data);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/compatibility/relationships",
+      expect.objectContaining({ headers: { Authorization: "Bearer id-token" } }),
+    );
+  });
+
+  it("確認済みpreviewTokenで招待を承諾する", async () => {
+    const relationshipId = "2".repeat(64);
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(Response.json({ relationshipId, status: "accepted" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await acceptCompatibilityInvitation(
+      undefined,
+      "id-token",
+      relationshipId,
+      preview.previewToken,
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/compatibility/invitations/${relationshipId}/accept`,
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ previewToken: preview.previewToken }),
+      }),
+    );
+  });
+
+  it("相手と自分の相性シートを取得する", async () => {
+    const relationshipId = "3".repeat(64);
+    const data = {
+      relationshipId,
+      status: "ready",
+      partner: { displayName: "あおい", aboutMe: preview.aboutMe, themes: preview.themes },
+      viewer: { displayName: "はる", aboutMe: preview.aboutMe, themes: preview.themes },
+    };
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json(data)));
+    await expect(
+      fetchCompatibilityRelationship(undefined, "id-token", relationshipId),
+    ).resolves.toEqual(data);
+  });
+
+  it.each([
+    ["invitation", cancelCompatibilityInvitation, "/api/compatibility/invitations/"],
+    ["relationship", endCompatibilityRelationship, "/api/compatibility/relationships/"],
+  ] as const)("DELETEで%sを終了する", async (_name, operation, prefix) => {
+    const relationshipId = "4".repeat(64);
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await operation(undefined, "id-token", relationshipId);
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${prefix}${relationshipId}`,
+      expect.objectContaining({ method: "DELETE" }),
+    );
   });
 });

@@ -8,11 +8,15 @@ export function compatibilityInvitationMessage(displayName: string | null, url: 
 export async function shareCompatibilityInvitationToLine(
   displayName: string | null,
   url: string,
-): Promise<void> {
-  const shared = await shareLiffTextMessage(compatibilityInvitationMessage(displayName, url));
-  if (!shared) {
-    throw new Error("この環境ではLINEの共有先を開けません。リンクをコピーして送ってください。");
+): Promise<"line" | "system"> {
+  const message = compatibilityInvitationMessage(displayName, url);
+  const shared = await shareLiffTextMessage(message);
+  if (shared) return "line";
+  if (navigator.share) {
+    await navigator.share({ title: "相性診断の招待", text: message });
+    return "system";
   }
+  throw new Error("この環境では共有先を開けません。リンクをコピーしてLINEで送ってください。");
 }
 
 export async function copyCompatibilityInvitationUrl(url: string): Promise<void> {

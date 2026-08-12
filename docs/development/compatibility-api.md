@@ -346,7 +346,8 @@ sequenceDiagram
     {
       "relationshipId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "status": "pending",
-      "expiresAt": "2026-08-26T00:00:00.000Z"
+      "expiresAt": "2026-08-26T00:00:00.000Z",
+      "invitationUrl": "https://liff.line.me/1234567890-AbCdEfGh/compatibility/invitations/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     },
     {
       "relationshipId": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -357,7 +358,7 @@ sequenceDiagram
 }
 ```
 
-`pending`は本人が発行した利用可能な招待だけです。受信者がリンクを開いただけでは一覧参照を作らないため、未承諾の受信者側一覧には現れません。`accepted`は本人が当事者である成立中の関係だけです。取消・期限切れ・終了を検出した参照はAccountData側で非表示へ同期し、レスポンスへ含めません。
+`pending`は本人が発行した利用可能な招待だけです。`invitationUrl`は発行時と同じ正規LIFF URLで、一覧からLINEへ再送する場合に使います。受信者がリンクを開いただけでは一覧参照を作らないため、未承諾の受信者側一覧には現れません。`accepted`は本人が当事者である成立中の関係だけです。取消・期限切れ・終了を検出した参照はAccountData側で非表示へ同期し、レスポンスへ含めません。
 
 認証・基盤の共通エラーは共有プレビューと同じです。成功レスポンスへ相手のAccount IDや相性シート本文を含めません。成功・エラーを問わず`Cache-Control: no-store`を付けます。
 

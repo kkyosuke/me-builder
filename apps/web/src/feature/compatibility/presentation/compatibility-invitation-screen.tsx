@@ -5,6 +5,7 @@ import type {
   CompatibilityInvitationPreview,
   CompatibilityInvitationPreviewBlockingReason,
 } from "../model/compatibility-invitation-preview";
+import type { CompatibilityInvitationAcceptance } from "../model/compatibility-relationship";
 import { CompatibilityPrivacyNotice } from "./components/compatibility-disclosure";
 import {
   CompatibilityAboutMePreview,
@@ -66,7 +67,15 @@ function InvitationError({ message, onRetry }: { message: string; onRetry: () =>
   );
 }
 
-function InvitationContents({ invitation }: { invitation: CompatibilityInvitationPreview }) {
+function InvitationContents({
+  acceptanceState,
+  invitation,
+  onAccept,
+}: {
+  acceptanceState: AsyncState<CompatibilityInvitationAcceptance>;
+  invitation: CompatibilityInvitationPreview;
+  onAccept: (previewToken: string) => void;
+}) {
   const inviterName = invitation.inviter.displayName;
   const recipientName = invitation.recipient.displayName ?? "あなた";
 
@@ -156,17 +165,39 @@ function InvitationContents({ invitation }: { invitation: CompatibilityInvitatio
         </section>
       )}
 
-      <button
-        type="button"
-        disabled
-        className="mt-8 flex min-h-12 w-full cursor-not-allowed items-center justify-center gap-2 rounded-2xl bg-slate-200 px-5 py-3 font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-400"
-      >
-        <HeartHandshake className="size-5" aria-hidden="true" />
-        {invitation.canAccept ? "相性を見てみる（準備中）" : "相性をまだ見られません"}
-      </button>
-      {invitation.canAccept && (
-        <p className="mt-2 text-center text-xs leading-relaxed text-slate-500">
-          共有内容の確認まで利用できます。承諾と相性シートの作成は次の更新で有効になります。
+      {acceptanceState.status === "success" ? (
+        <section className="mt-8 rounded-3xl border border-emerald-300 bg-emerald-50 p-5 text-center dark:bg-emerald-950/30">
+          <h2 className="font-bold text-emerald-950 dark:text-emerald-100">
+            2人の相性シートを作りました
+          </h2>
+          <a
+            href={`/compatibility/relationships/${acceptanceState.data.relationshipId}`}
+            className="mt-4 flex min-h-12 items-center justify-center rounded-2xl bg-emerald-600 px-5 font-bold text-white"
+          >
+            相性シートを見る
+          </a>
+        </section>
+      ) : (
+        <button
+          type="button"
+          disabled={!invitation.canAccept || acceptanceState.status === "loading"}
+          onClick={() => onAccept(invitation.recipient.previewToken)}
+          className="mt-8 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-rose-500 px-5 py-3 font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 dark:disabled:bg-slate-800 dark:disabled:text-slate-400"
+        >
+          <HeartHandshake className="size-5" aria-hidden="true" />
+          {acceptanceState.status === "loading"
+            ? "相性シートを作っています..."
+            : invitation.canAccept
+              ? "相性を見てみる"
+              : "相性をまだ見られません"}
+        </button>
+      )}
+      {acceptanceState.status === "error" && (
+        <p
+          role="alert"
+          className="mt-3 rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-700 dark:bg-red-950/30 dark:text-red-300"
+        >
+          {acceptanceState.message}
         </p>
       )}
       <a
@@ -180,9 +211,13 @@ function InvitationContents({ invitation }: { invitation: CompatibilityInvitatio
 }
 
 export function CompatibilityInvitationScreen({
+  acceptanceState = { status: "idle" },
+  onAccept = () => undefined,
   onRetry,
   state,
 }: {
+  acceptanceState?: AsyncState<CompatibilityInvitationAcceptance>;
+  onAccept?: (previewToken: string) => void;
   onRetry: () => void;
   state: AsyncState<CompatibilityInvitationPreview>;
 }) {
@@ -191,7 +226,13 @@ export function CompatibilityInvitationScreen({
       <CompatibilityBackHeader href="/compatibility" label="閉じる" />
       {(state.status === "idle" || state.status === "loading") && <InvitationSkeleton />}
       {state.status === "error" && <InvitationError message={state.message} onRetry={onRetry} />}
-      {state.status === "success" && <InvitationContents invitation={state.data} />}
+      {state.status === "success" && (
+        <InvitationContents
+          invitation={state.data}
+          acceptanceState={acceptanceState}
+          onAccept={onAccept}
+        />
+      )}
     </main>
   );
 }

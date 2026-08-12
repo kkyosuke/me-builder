@@ -43,11 +43,3 @@ export function CompatibilityBackHeader({
     </header>
   );
 }
-
-export function DemoNotice() {
-  return (
-    <p className="mt-6 rounded-2xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-xs leading-relaxed text-amber-900 dark:border-amber-500/30 dark:bg-amber-950/30 dark:text-amber-200">
-      この画面は体験確認用のサンプルです。表示内容や操作はまだ保存されません。
-    </p>
-  );
-}
