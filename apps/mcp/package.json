@@ -8,7 +8,9 @@
     "dev:wrangler": "wrangler dev --env local",
     "build": "bun build src/index.ts --outdir ./dist --target bun",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --dir ."
+    "test": "vitest run --dir .",
+    "deploy:preview": "wrangler deploy --env preview",
+    "deploy:production": "wrangler deploy --env production"
   },
   "dependencies": {
     "@me-builder/shared": "workspace:*",

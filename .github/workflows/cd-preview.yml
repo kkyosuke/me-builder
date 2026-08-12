@@ -144,6 +144,7 @@ jobs:
 
           bun --cwd apps/worker wrangler deploy --env preview --secrets-file "${worker_secrets_file}"
           bun --cwd apps/api wrangler deploy --env preview --secrets-file "${api_secrets_file}"
+          bun --filter @me-builder/mcp deploy:preview
           bun --filter @me-builder/web deploy:preview
 
       # URL が変わっていなければ現在の登録状態を 1 回問い合わせるだけで終わる。
@@ -199,6 +200,7 @@ jobs:
             echo "| --- | --- |"
             echo "| 🖥️ **Web UI** | [stg.kagami.kyosuke.dev](https://stg.kagami.kyosuke.dev) |"
             echo "| ⚡ **API Server** | [api.stg.kagami.kyosuke.dev](https://api.stg.kagami.kyosuke.dev) |"
+            echo "| 🤖 **MCP Server** | [mcp.stg.kagami.kyosuke.dev](https://mcp.stg.kagami.kyosuke.dev) |"
             echo "| ☁️ **Cloudflare Dashboard** | [Workers & Pages を開く](https://dash.cloudflare.com/${CLOUDFLARE_ACCOUNT_ID}/workers-and-pages) |"
           } >> "${GITHUB_STEP_SUMMARY}"
 
@@ -241,6 +243,7 @@ jobs:
             | --- | --- |
             | 🖥️ **Web UI** | [stg.kagami.kyosuke.dev](https://stg.kagami.kyosuke.dev) |
             | ⚡ **API Server** | [api.stg.kagami.kyosuke.dev](https://api.stg.kagami.kyosuke.dev) |
+            | 🤖 **MCP Server** | [mcp.stg.kagami.kyosuke.dev](https://mcp.stg.kagami.kyosuke.dev) |
             | ☁️ **Cloudflare Dashboard** | [Workers & Pages を開く](${cloudflareDashboardUrl}) |
 
             > プレビューは全 PR 共有の単一環境です。ラベルを外しても環境は元に戻りません。

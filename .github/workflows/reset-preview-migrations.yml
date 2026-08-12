@@ -137,6 +137,7 @@ jobs:
 
           bun --cwd apps/worker wrangler deploy --env preview --secrets-file "${worker_secrets_file}"
           bun --cwd apps/api wrangler deploy --env preview --secrets-file "${api_secrets_file}"
+          bun --filter @me-builder/mcp deploy:preview
 
       - name: Verify Restored Preview Connections
         run: bun run --cwd apps/worker check:gemini "Reply with OK."
@@ -225,7 +226,7 @@ jobs:
             echo "- PreviewのD1、Private R2、Queue/DLQ、Worker/DOを削除し、Pulumiで基盤を再作成しました。"
             echo "- 現在のブランチのD1 migrationと診断seedを適用しました。"
             echo "- Workerで構成された全 Durable Object namespaceを再作成しました。"
-            echo "- Preview WorkerとAPIを再デプロイし、外部接続を検証しました。"
+            echo "- Preview Worker、API、MCPを再デプロイし、外部接続を検証しました。"
             case "${RESOURCE_ID_MODE}" in
               pr)
                 echo "- 変更されたresource IDの反映PRを作成し、\`bun run ci\`が通ったのでsquash mergeしました。"

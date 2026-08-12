@@ -9,7 +9,7 @@
 - **パッケージ構成**:
   - `apps/web`: React UI (Vite + TypeScript)
   - `apps/api`: Bun.serve + Hono API Server
-  - `apps/mcp`: Phase 2向けの MCP Server スケルトン（初期リリースではデプロイしない）
+  - `apps/mcp`: Phase 2向けの MCP Server スケルトン（初期リリースではユーザー向け機能を提供しない）
   - `apps/worker`: Cloudflare Queues メッセージを消費する Worker
   - `packages/shared`: 共有型定義・ユーティリティ
   - `packages/lib`: LINE連携等の共通ドメイン・ヘルパーライブラリ
@@ -46,9 +46,8 @@
     - `task db:seed:local`: ローカルD1へ診断seedを適用
     - `task db:seed:preview`: プレビューD1へ診断seedを適用
     - `task db:seed:production`: 本番D1へ診断seedを明示的に適用
-    - `task deploy:preview`: 初期リリース対象（Web UI, API, Queue Worker）のプレビュー環境へのデプロイ (`wrangler deploy --env preview`, `wrangler pages deploy`)
-    - `task deploy:production`: 初期リリース対象（Web UI, API, Queue Worker）の本番環境へのデプロイ (`wrangler deploy --env production`, `wrangler pages deploy`)
-    - MCPはPhase 2までPreview／Productionへデプロイしません。`apps/mcp`の個別deploy script、ルートdeploy script、Task、CD workflowへMCPデプロイを追加しないでください。
+    - `task deploy:preview`: D1 マイグレーション適用および全アプリのプレビュー環境へのデプロイ (`wrangler deploy --env preview`, `wrangler pages deploy`)
+    - `task deploy:production`: D1 マイグレーション適用および全アプリの本番環境へのデプロイ (`wrangler deploy --env production`, `wrangler pages deploy`)
   - **CI/CD ワークフロー構造 (`.github/workflows/*.yml`)**:
     - CI は単一の `ci.yml` (job 名 `Verify`) にまとめています。パッケージごとに job を分けると、1 回の push で 6〜7 個の job がそれぞれ checkout と `bun install` を払い直し、GitHub Actions の課金が job ごとに分単位へ切り上げられるため、実際の検証時間の 2 倍近くを消費します。**検証内容を増やすためにパッケージ単位のワークフローを復活させないでください。**
     - `ci.yml` は PR (`pull_request`) と手動実行 (`workflow_dispatch`) だけで動きます。`main` への push では CI ワークフローを走らせません。コード変更時は`bun audit`を実行し、既知脆弱性が1件でも検出された場合は失敗します。マージ後の検証は `cd-production.yml` の `bun run ci` が担い、同じ監査を含む検証を二重に課金しません。
@@ -65,7 +64,7 @@
       - Actions 画面でブランチを選ぶか `gh workflow run cd-preview.yml --ref <branch>` で手動実行したとき (`workflow_dispatch`)
       - PR に `deploy` ラベルが付いているとき（ラベル付与時と、その後の push）。ラベルを外せば以降の push ではデプロイされませんが、**すでにデプロイ済みの環境は元に戻りません**。
     - 共有環境の取り合いを避けるため `concurrency: cd-preview` で直列化しています。実行中のデプロイは中断せず、待機中の実行だけが新しいものへ置き換わります。
-    - `reset-preview-migrations.yml` は Actions 画面または `gh workflow run reset-preview-migrations.yml --ref <branch> -f confirmation=reset-preview` からだけ起動します。選択したブランチを基準に Preview D1 のCloudflare予約table以外（`d1_migrations`を含む）と全 Durable Object namespaceを削除し、同じD1 database resourceへD1 migration、診断seedを再適用してWorker / APIを再デプロイします。MCPは初期リリース対象外のため再デプロイしません。全Previewデータを復元不能に削除するため確認文字列を必須とし、productionは対象にしません。`cd-preview`と同じconcurrency groupで直列化します。実行時に選んだブランチをそのままcheckoutするため、migration・seed・deployとresource IDのcommit先は同じブランチになります（tagからは実行できません）。
+    - `reset-preview-migrations.yml` は Actions 画面または `gh workflow run reset-preview-migrations.yml --ref <branch> -f confirmation=reset-preview` からだけ起動します。選択したブランチを基準に Preview D1 のCloudflare予約table以外（`d1_migrations`を含む）と全 Durable Object namespaceを削除し、同じD1 database resourceへD1 migration、診断seedを再適用してWorker / API / MCPを再デプロイします。全Previewデータを復元不能に削除するため確認文字列を必須とし、productionは対象にしません。`cd-preview`と同じconcurrency groupで直列化します。実行時に選んだブランチをそのままcheckoutするため、migration・seed・deployとresource IDのcommit先は同じブランチになります（tagからは実行できません）。
       - 再作成でresource IDが変わったときの反映先は、実行したブランチで変わります。**`main`から実行した場合**は`chore/preview-resource-ids-<run id>`ブランチへcommitしてPRを作成し、同じjobで`bun run ci`が通ったときだけsquash mergeします（`main`はrulesetで直接pushできないため）。検証が落ちたときはPRを開いたまま残します。**それ以外のブランチから実行した場合**は、そのブランチへ直接commitしてpushし、PRは作りません。ブランチの持ち主がそのまま作業を続けられるようにするためで、検証はその人のPRの`ci.yml`が担います。
       - `GITHUB_TOKEN`で作成したPRは`pull_request`イベントを発火せず`ci.yml`が走らないため、GitHubのauto-mergeではなくjob内の検証をマージ条件にします。
     - `main` ブランチマージ時には `cd-production.yml` が全検証後に Cloudflare 本番環境へ自動デプロイします。
