@@ -135,6 +135,10 @@ export type AccountDataActions = {
     [at?: Date],
     typeof diary.claimDueDiaryBrainCheckpointIds
   >;
+  "conversation.resetFailedDiaryBrainCheckpoint": RpcAction<
+    [checkpointId: string, at?: Date],
+    typeof diary.resetFailedDiaryBrainCheckpoint
+  >;
   "conversation.getDiaryBrainCheckpointContext": RpcAction<
     [checkpointId: string],
     typeof diary.getDiaryBrainCheckpointContext
