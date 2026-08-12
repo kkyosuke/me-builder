@@ -11,6 +11,7 @@ import {
   deferDiagnosisQuestion,
   deleteAccountDiagnosisData,
   findDiagnosisAnswers,
+  hasDiagnosisResponse,
   listVisibleDiagnoses,
   saveDiagnosisAnswer,
 } from "./diagnosis";
@@ -112,6 +113,32 @@ describe("deferDiagnosisQuestion", () => {
         at: new Date("2026-08-04T00:00:00Z"),
       }),
     ).resolves.toEqual({ type: "diagnosis-question-not-found" });
+  });
+
+  it("withdrawnでは既存Responseがあっても延期を保存しない", async () => {
+    const db = createTestDb();
+    await db.insert(schema.accountDataIdentity).values({ singleton: 1, accountId: "account" });
+    await insertDiagnosis(db, { id: "withdrawn-defer" });
+    const base = {
+      accountId: "account",
+      diagnosisId: "withdrawn-defer",
+      diagnosisQuestionId: "withdrawn-defer-sq1",
+      at: new Date("2026-08-03T00:00:00Z"),
+    };
+    await deferDiagnosisQuestion(db, base);
+    await db
+      .update(schema.diagnoses)
+      .set({ state: "withdrawn", withdrawnAt: new Date("2026-08-04T00:00:00Z") })
+      .where(eq(schema.diagnoses.id, "withdrawn-defer"));
+
+    await expect(
+      deferDiagnosisQuestion(db, {
+        ...base,
+        diagnosisQuestionId: "withdrawn-defer-sq2",
+        at: new Date("2026-08-05T00:00:00Z"),
+      }),
+    ).resolves.toEqual({ type: "diagnosis-not-found" });
+    expect(await db.select().from(schema.diagnosisDeferredQuestions)).toHaveLength(1);
   });
 });
 
@@ -308,6 +335,32 @@ describe("listVisibleDiagnoses", () => {
       lastAnsweredAt: "2026-08-02T12:00:00.000Z",
     });
   });
+
+  it("withdrawnは本人にResponseがある場合だけclosedとして一覧へ返す", async () => {
+    const db = createTestDb();
+    await db.insert(schema.accountDataIdentity).values({ singleton: 1, accountId: "account-1" });
+    await insertDiagnosis(db, { id: "withdrawn-owned", state: "withdrawn" });
+    await insertDiagnosis(db, { id: "withdrawn-unanswered", state: "withdrawn" });
+    await db.insert(schema.diagnosisResponses).values({
+      id: "response-owned",
+      accountId: "account-1",
+      diagnosisId: "withdrawn-owned",
+    });
+
+    const result = await listVisibleDiagnoses(db, "account-1", new Date("2026-08-03T00:00:00Z"));
+
+    expect(result).toEqual([
+      expect.objectContaining({
+        id: "withdrawn-owned",
+        availability: "closed",
+        responseStatus: "unanswered",
+      }),
+    ]);
+    await expect(hasDiagnosisResponse(db, "account-1", "withdrawn-owned")).resolves.toBe(true);
+    await expect(hasDiagnosisResponse(db, "account-1", "withdrawn-unanswered")).resolves.toBe(
+      false,
+    );
+  });
 });
 
 describe("findDiagnosisAnswers", () => {
@@ -405,6 +458,36 @@ describe("findDiagnosisAnswers", () => {
 
     await expect(
       findDiagnosisAnswers(db, "another", "private-result", new Date("2026-08-03T00:00:00Z")),
+    ).resolves.toEqual({ type: "not-found" });
+  });
+
+  it("回答後にwithdrawnになっても本人の回答内容を返す", async () => {
+    const db = createTestDb();
+    await db.insert(schema.accountDataIdentity).values({ singleton: 1, accountId: "owner" });
+    await insertDiagnosis(db, { id: "withdrawn-result" });
+    await saveDiagnosisAnswer(db, {
+      accountId: "owner",
+      diagnosisId: "withdrawn-result",
+      diagnosisQuestionId: "withdrawn-result-sq1",
+      choiceId: "yes",
+      at: new Date("2026-08-03T00:00:00Z"),
+    });
+    await db
+      .update(schema.diagnoses)
+      .set({ state: "withdrawn", withdrawnAt: new Date("2026-08-04T00:00:00Z") })
+      .where(eq(schema.diagnoses.id, "withdrawn-result"));
+
+    await expect(
+      findDiagnosisAnswers(db, "owner", "withdrawn-result", new Date("2026-08-05T00:00:00Z")),
+    ).resolves.toEqual({
+      type: "found",
+      diagnosis: expect.objectContaining({
+        id: "withdrawn-result",
+        answeredCount: 1,
+      }),
+    });
+    await expect(
+      findDiagnosisAnswers(db, "another", "withdrawn-result", new Date("2026-08-05T00:00:00Z")),
     ).resolves.toEqual({ type: "not-found" });
   });
 });
@@ -1122,5 +1205,35 @@ describe("saveDiagnosisAnswer", () => {
     expect(result).toEqual({ type: "diagnosis-closed" });
     expect(await db.select().from(schema.diagnosisResponses)).toHaveLength(0);
     expect(await db.select().from(schema.sourceRecords)).toHaveLength(0);
+  });
+
+  it("withdrawnでは既存Responseがあっても新規回答を保存しない", async () => {
+    const db = createTestDb();
+    await db.insert(schema.accountDataIdentity).values({ singleton: 1, accountId: "account" });
+    await insertDiagnosis(db, { id: "withdrawn-save" });
+    const base = {
+      accountId: "account",
+      diagnosisId: "withdrawn-save",
+      at: new Date("2026-08-03T00:00:00Z"),
+    };
+    await saveDiagnosisAnswer(db, {
+      ...base,
+      diagnosisQuestionId: "withdrawn-save-sq1",
+      choiceId: "yes",
+    });
+    await db
+      .update(schema.diagnoses)
+      .set({ state: "withdrawn", withdrawnAt: new Date("2026-08-04T00:00:00Z") })
+      .where(eq(schema.diagnoses.id, "withdrawn-save"));
+
+    await expect(
+      saveDiagnosisAnswer(db, {
+        ...base,
+        diagnosisQuestionId: "withdrawn-save-sq2",
+        choiceId: "yes",
+        at: new Date("2026-08-05T00:00:00Z"),
+      }),
+    ).resolves.toEqual({ type: "diagnosis-not-found" });
+    expect(await db.select().from(schema.diagnosisAnswers)).toHaveLength(1);
   });
 });

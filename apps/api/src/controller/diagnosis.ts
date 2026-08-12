@@ -77,7 +77,7 @@ export async function getDiagnoses(c: Context<AppEnv>): Promise<Response> {
 
 /** `GET /api/diagnoses/:diagnosisId` — 新規回答用の公開済みQuestion Versionを返す。 */
 export async function getDiagnosis(c: Context<AppEnv>): Promise<Response> {
-  if (!c.env?.DB) {
+  if (!c.env?.DB || !c.env.ACCOUNT_DATA) {
     logger.error({ path: c.req.path }, "DB binding is not configured");
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   }
@@ -87,6 +87,7 @@ export async function getDiagnosis(c: Context<AppEnv>): Promise<Response> {
     idToken: bearerToken(c.req.header("authorization")),
     lineLoginChannelId: getConfig(c.env).lineLoginChannelId,
     db: D1.shared.client.create(c.env.DB),
+    accountData: c.env.ACCOUNT_DATA,
   });
 
   switch (outcome.type) {
