@@ -32,6 +32,7 @@ jobs:
       BRAIN_VECTOR_HMAC_SECRET: ${{ secrets.BRAIN_VECTOR_HMAC_SECRET }}
       ADMIN_LINE_USER_IDS: ${{ secrets.ADMIN_LINE_USER_IDS }}
       LIFF_ID: ${{ vars.LIFF_ID }}
+      LINE_LOGIN_CHANNEL_ID: ${{ vars.LINE_LOGIN_CHANNEL_ID }}
 
     steps:
       # 実行時に選んだブランチをそのまま使う。migration・seed・deployの内容と、
@@ -88,6 +89,7 @@ jobs:
             echo "::error::BRAIN_VECTOR_HMAC_SECRET が GitHub Environment dev に設定されていません。"
             exit 1
           fi
+          bun --cwd apps/web scripts/validate-liff-configuration.ts
 
       - name: Install Pulumi CLI
         run: |
@@ -122,12 +124,16 @@ jobs:
           API_SECRETS_FILE="${api_secrets_file}" WORKER_SECRETS_FILE="${worker_secrets_file}" bun -e '
             const sharedSecrets = [["LINE_CHANNEL_ACCESS_TOKEN", process.env.LINE_CHANNEL_ACCESS_TOKEN], ["LIFF_ID", process.env.LIFF_ID], ["ADMIN_LINE_USER_IDS", process.env.ADMIN_LINE_USER_IDS]];
             const optionalSecrets = Object.fromEntries(sharedSecrets.filter(([, value]) => value));
+            const apiConfiguration = Object.fromEntries(
+              [["LINE_LOGIN_CHANNEL_ID", process.env.LINE_LOGIN_CHANNEL_ID]].filter(([, value]) => value),
+            );
             const workerOnlySecrets = Object.fromEntries(
               [["GOOGLE_VERTEX_AI_API_KEY", process.env.GOOGLE_VERTEX_AI_API_KEY], ["CHAT_DELIVERY_SECRET", process.env.CHAT_DELIVERY_SECRET], ["BRAIN_VECTOR_HMAC_SECRET", process.env.BRAIN_VECTOR_HMAC_SECRET]].filter(([, value]) => value),
             );
             await Bun.write(process.env.API_SECRETS_FILE, JSON.stringify({
               LINE_CHANNEL_SECRET: process.env.LINE_CHANNEL_SECRET,
               ...optionalSecrets,
+              ...apiConfiguration,
             }));
             await Bun.write(process.env.WORKER_SECRETS_FILE, JSON.stringify({
               ...optionalSecrets,

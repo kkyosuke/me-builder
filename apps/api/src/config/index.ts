@@ -1,4 +1,4 @@
-import { line } from "@me-builder/lib";
+import { resolveLiffConfiguration } from "@me-builder/lib";
 import { getEnv, parseAdminLineUserIds } from "@me-builder/shared";
 import * as v from "valibot";
 import { type ApiConfig, ConfigSchema } from "./schema";
@@ -42,11 +42,9 @@ export function getConfig(env?: Record<string, unknown>): ApiConfig {
   const rawWebhookQueueName = getEnv(["WEBHOOK_QUEUE_NAME", "WEBHOOK_QUEUE"], env);
   const rawWebhookQueue = env?.WEBHOOK_QUEUE;
 
-  const rawLiffId = getEnv("LIFF_ID", env)?.trim() || undefined;
-  // LIFF ID は `{LINE Login チャネル ID}-{ランダム文字列}` の形式なので接頭辞から補完する
-  const rawLineLoginChannelId = line.idToken.resolveLoginChannelId({
-    channelId: getEnv("LINE_LOGIN_CHANNEL_ID", env)?.trim() || undefined,
-    liffId: rawLiffId,
+  const liffConfiguration = resolveLiffConfiguration({
+    liffId: getEnv("LIFF_ID", env),
+    lineLoginChannelId: getEnv("LINE_LOGIN_CHANNEL_ID", env),
   });
   const adminLineUserIds = parseAdminLineUserIds(getEnv("ADMIN_LINE_USER_IDS", env));
 
@@ -61,8 +59,8 @@ export function getConfig(env?: Record<string, unknown>): ApiConfig {
     lineWebhookUrl: rawLineWebhookUrl,
     webhookQueueName: rawWebhookQueueName,
     webhookQueue: rawWebhookQueue,
-    liffId: rawLiffId,
-    lineLoginChannelId: rawLineLoginChannelId,
+    liffId: liffConfiguration.liffId,
+    lineLoginChannelId: liffConfiguration.lineLoginChannelId,
     adminLineUserIds,
   };
 

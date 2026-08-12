@@ -31,8 +31,10 @@ describe("issueCompatibilityInvitation", () => {
     const result = await issueCompatibilityInvitation(
       {
         idToken: "id-token",
-        lineLoginChannelId: "channel-id",
-        liffId: "1234567890-testliff",
+        liff: {
+          lineLoginChannelId: "1234567890",
+          liffId: "1234567890-testliff",
+        },
         db,
         accountData,
         compatibilityData,
@@ -44,6 +46,11 @@ describe("issueCompatibilityInvitation", () => {
       type: "created",
       invitationUrl: `https://liff.line.me/1234567890-testliff/compatibility/invitations/${relationshipId}`,
       expiresAt: expiresAt.toISOString(),
+    });
+    expect(deps.createSession).toHaveBeenCalledWith({
+      idToken: "id-token",
+      lineLoginChannelId: "1234567890",
+      db,
     });
     expect(deps.createInvitation).toHaveBeenCalledWith(accountData, compatibilityData, {
       inviterAccountId: "account-1",
@@ -58,8 +65,10 @@ describe("issueCompatibilityInvitation", () => {
       issueCompatibilityInvitation(
         {
           idToken: "id-token",
-          lineLoginChannelId: "channel-id",
-          liffId: "1234567890-testliff",
+          liff: {
+            lineLoginChannelId: "1234567890",
+            liffId: "1234567890-testliff",
+          },
           db,
           accountData,
           compatibilityData,
@@ -82,8 +91,10 @@ describe("issueCompatibilityInvitation", () => {
       issueCompatibilityInvitation(
         {
           idToken: "id-token",
-          lineLoginChannelId: "channel-id",
-          liffId: "1234567890-testliff",
+          liff: {
+            lineLoginChannelId: "1234567890",
+            liffId: "1234567890-testliff",
+          },
           db,
           accountData,
           compatibilityData,

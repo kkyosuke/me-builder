@@ -1,116 +1,119 @@
 import type { AccountDataNamespace, CompatibilityDataNamespace, D1 } from "@me-builder/lib";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-
-const { acceptCompatibilityInvitationWithReferences, resolveCompatibilityInvitationRecipient } =
-  vi.hoisted(() => ({
-    acceptCompatibilityInvitationWithReferences: vi.fn(),
-    resolveCompatibilityInvitationRecipient: vi.fn(),
-  }));
-vi.mock("@me-builder/lib", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@me-builder/lib")>()),
-  acceptCompatibilityInvitationWithReferences,
-}));
-vi.mock("./compatibility-invitation-preview", () => ({ resolveCompatibilityInvitationRecipient }));
-
-const { acceptCompatibilityInvitation } = await import("./compatibility-invitation-acceptance");
+import { describe, expect, it, vi } from "vitest";
+import { acceptCompatibilityInvitation } from "./compatibility-invitation-acceptance";
 
 const relationshipId = "1".repeat(64);
-const inviteeAccountId = "account-invitee";
 const db = {} as D1.shared.Client;
 const accountData = {} as AccountDataNamespace;
 const compatibilityData = {} as CompatibilityDataNamespace;
 
-function recipient(overrides: { inviteeDisplayName?: string | null } = {}) {
+function params(overrides: Record<string, unknown> = {}) {
   return {
-    type: "resolved" as const,
-    inviteeAccountId,
-    inviteeDisplayName:
-      overrides.inviteeDisplayName === undefined ? "はる" : overrides.inviteeDisplayName,
-    inviterDisplayName: "あおい",
-    expiresAt: new Date("2026-08-26T00:00:00.000Z"),
-  };
-}
-
-function request() {
-  return acceptCompatibilityInvitation({
     relationshipId,
-    idToken: "token",
-    lineLoginChannelId: "channel",
+    idToken: "id-token",
+    lineLoginChannelId: "1234567890",
     db,
     accountData,
     compatibilityData,
-  });
+    ...overrides,
+  };
+}
+
+function dependencies(overrides: Record<string, unknown> = {}) {
+  const base = {
+    createSession: vi.fn().mockResolvedValue({
+      type: "resolved",
+      session: { accountId: "account-b", displayName: " 受信者 ", role: "user" },
+    }),
+    acceptInvitation: vi.fn().mockResolvedValue({
+      outcome: "accepted",
+      relationship: {},
+    }),
+  };
+  return { ...base, ...overrides } as typeof base;
 }
 
 describe("acceptCompatibilityInvitation", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    resolveCompatibilityInvitationRecipient.mockResolvedValue(recipient());
-    acceptCompatibilityInvitationWithReferences.mockResolvedValue({
-      outcome: "accepted",
-      relationship: { inviteeAccountId },
-    });
-  });
+  it("本人セッションから承諾入力を作り、表示用プレビューを介さず正本を更新する", async () => {
+    const deps = dependencies();
 
-  it("継続同意として承諾し、固定するのは受信者の表示名だけにする", async () => {
-    await expect(request()).resolves.toEqual({ type: "accepted", relationshipId });
-    expect(acceptCompatibilityInvitationWithReferences).toHaveBeenCalledWith(
+    await expect(acceptCompatibilityInvitation(params(), deps)).resolves.toEqual({
+      type: "accepted",
+      relationshipId,
+    });
+    expect(deps.createSession).toHaveBeenCalledWith({
+      idToken: "id-token",
+      lineLoginChannelId: "1234567890",
+      db,
+    });
+    expect(deps.acceptInvitation).toHaveBeenCalledWith(
       accountData,
       compatibilityData,
       relationshipId,
-      { inviteeAccountId, inviteeDisplayName: "はる" },
+      { inviteeAccountId: "account-b", inviteeDisplayName: "受信者" },
     );
   });
 
   it("同じ承諾の再試行も成立として返す", async () => {
-    acceptCompatibilityInvitationWithReferences.mockResolvedValue({
-      outcome: "unchanged",
-      relationship: { inviteeAccountId },
+    const deps = dependencies({
+      acceptInvitation: vi.fn().mockResolvedValue({ outcome: "unchanged", relationship: {} }),
     });
 
-    await expect(request()).resolves.toEqual({ type: "accepted", relationshipId });
+    await expect(acceptCompatibilityInvitation(params(), deps)).resolves.toEqual({
+      type: "accepted",
+      relationshipId,
+    });
   });
 
-  it("検証済み表示名を取得できなければ書き込まずshare-unavailableを返す", async () => {
-    resolveCompatibilityInvitationRecipient.mockResolvedValue(
-      recipient({ inviteeDisplayName: null }),
-    );
+  it("不正な関係IDは本人確認や正本更新より前に拒否する", async () => {
+    const deps = dependencies();
 
-    await expect(request()).resolves.toEqual({ type: "share-unavailable" });
-    expect(acceptCompatibilityInvitationWithReferences).not.toHaveBeenCalled();
+    await expect(
+      acceptCompatibilityInvitation(params({ relationshipId: "invalid" }), deps),
+    ).resolves.toEqual({ type: "unavailable" });
+    expect(deps.createSession).not.toHaveBeenCalled();
+    expect(deps.acceptInvitation).not.toHaveBeenCalled();
   });
 
-  it("同じ2人の関係がすでにあればduplicate-relationshipを返す", async () => {
-    acceptCompatibilityInvitationWithReferences.mockResolvedValue({ outcome: "duplicate" });
+  it("表示名を確認できなければ正本を更新しない", async () => {
+    const deps = dependencies({
+      createSession: vi.fn().mockResolvedValue({
+        type: "resolved",
+        session: { accountId: "account-b", role: "user" },
+      }),
+    });
 
-    await expect(request()).resolves.toEqual({ type: "duplicate-relationship" });
+    await expect(acceptCompatibilityInvitation(params(), deps)).resolves.toEqual({
+      type: "share-unavailable",
+    });
+    expect(deps.acceptInvitation).not.toHaveBeenCalled();
   });
-
-  it("送信者本人の承諾はown-invitationを返す", async () => {
-    acceptCompatibilityInvitationWithReferences.mockResolvedValue({ outcome: "self-invite" });
-
-    await expect(request()).resolves.toEqual({ type: "own-invitation" });
-  });
-
-  it.each([["expired"], ["unavailable"], ["unreserved"]] as const)(
-    "正本が%sなら理由を区別せずunavailableを返す",
-    async (outcome) => {
-      acceptCompatibilityInvitationWithReferences.mockResolvedValue({ outcome });
-
-      await expect(request()).resolves.toEqual({ type: "unavailable" });
-    },
-  );
 
   it.each([
     [{ type: "unavailable" }],
-    [{ type: "own-invitation" }],
     [{ type: "unauthenticated", reason: "invalid token" }],
     [{ type: "account-not-found" }],
     [{ type: "not-configured" }],
-  ])("受信者を解決できなければそのまま返す (%o)", async (outcome) => {
-    resolveCompatibilityInvitationRecipient.mockResolvedValue(outcome);
+  ])("本人セッションを解決できなければ結果をそのまま返す (%o)", async (outcome) => {
+    const deps = dependencies({ createSession: vi.fn().mockResolvedValue(outcome) });
 
-    await expect(request()).resolves.toEqual(outcome);
-    expect(acceptCompatibilityInvitationWithReferences).not.toHaveBeenCalled();
+    await expect(acceptCompatibilityInvitation(params(), deps)).resolves.toEqual(outcome);
+    expect(deps.acceptInvitation).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["duplicate", "duplicate-relationship"],
+    ["self-invite", "own-invitation"],
+    ["expired", "unavailable"],
+    ["unavailable", "unavailable"],
+    ["unreserved", "unavailable"],
+  ] as const)("正本の%sを%sへ変換する", async (outcome, expectedType) => {
+    const deps = dependencies({
+      acceptInvitation: vi.fn().mockResolvedValue({ outcome }),
+    });
+
+    await expect(acceptCompatibilityInvitation(params(), deps)).resolves.toEqual({
+      type: expectedType,
+    });
   });
 });

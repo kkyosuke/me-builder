@@ -5,11 +5,10 @@ import {
   type CompatibilityInvitationPreview,
   type D1,
   compatibilityDataFor,
+  compatibilityRelationshipId,
 } from "@me-builder/lib";
 import { createLiffSession } from "./liff-session";
 import { type ProfileAvatarImage, resolveProfileAvatarImage } from "./profile-avatar-image";
-
-const RELATIONSHIP_ID_PATTERN = /^[a-f0-9]{64}$/;
 
 type Params = Readonly<{
   relationshipId: string;
@@ -58,9 +57,9 @@ export async function getCompatibilityInvitationAvatar(
   params: Params,
   dependencies: Dependencies = defaultDependencies,
 ): Promise<CompatibilityInvitationAvatarOutcome> {
+  if (!compatibilityRelationshipId.isValid(params.relationshipId)) return { type: "unavailable" };
   const session = await dependencies.createSession(params);
   if (session.type !== "resolved") return session;
-  if (!RELATIONSHIP_ID_PATTERN.test(params.relationshipId)) return { type: "unavailable" };
 
   const preview = await dependencies.getInvitationPreview(
     params.compatibilityData,

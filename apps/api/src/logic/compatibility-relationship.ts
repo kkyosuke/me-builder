@@ -5,6 +5,7 @@ import {
   type CompatibilitySharePreviewTheme,
   type D1,
   compatibilityDataFor,
+  compatibilityRelationshipId,
   selectCommonCompatibilityDiagnoses,
 } from "@me-builder/lib";
 import {
@@ -13,8 +14,6 @@ import {
   loadCompatibilitySharePreviewData,
 } from "./compatibility-share-preview";
 import { createLiffSession } from "./liff-session";
-
-const RELATIONSHIP_ID_PATTERN = /^[a-f0-9]{64}$/;
 
 type Person = Readonly<{
   displayName: string;
@@ -90,9 +89,9 @@ export async function getCompatibilityRelationshipContents({
   compatibilityData,
   at = new Date(),
 }: Params): Promise<CompatibilityRelationshipOutcome> {
+  if (!compatibilityRelationshipId.isValid(relationshipId)) return { type: "unavailable" };
   const session = await createLiffSession({ idToken, lineLoginChannelId, db });
   if (session.type !== "resolved") return session;
-  if (!RELATIONSHIP_ID_PATTERN.test(relationshipId)) return { type: "unavailable" };
 
   const canonical = await compatibilityDataFor(compatibilityData, relationshipId).getRelationship(
     session.session.accountId,

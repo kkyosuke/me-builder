@@ -73,6 +73,19 @@ describe("line.liff.registerEndpoint", () => {
     expect(calls).toHaveLength(0);
   });
 
+  it.each([{ liffId: "invalid" }, { liffId: LIFF_ID, channelId: "9999999999" }])(
+    "不正なLIFF設定を失敗結果へ変換してAPIを呼ばないこと",
+    async (invalid) => {
+      mockFetch(() => ({ json: {} }));
+
+      const result = await liff.registerEndpoint({ ...params, ...invalid });
+
+      expect(result).toMatchObject({ success: false });
+      expect(result.message).toContain("LIFF");
+      expect(calls).toHaveLength(0);
+    },
+  );
+
   it("LIFF ID が一致するアプリの URL を更新すること", async () => {
     mockFetch((url, method) => {
       if (url.includes("/oauth")) {

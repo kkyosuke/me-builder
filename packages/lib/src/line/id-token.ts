@@ -127,33 +127,8 @@ async function verify({
   };
 }
 
-/**
- * LINE Login チャネル ID を解決します。
- *
- * LIFF ID は `{LINE Login チャネル ID}-{ランダム文字列}` の形式のため、
- * チャネル ID が未設定の場合は接頭辞から補完します。
- */
-function resolveLoginChannelId(params: {
-  channelId?: string | undefined;
-  liffId?: string | undefined;
-}): string | undefined {
-  if (params.channelId) {
-    return params.channelId;
-  }
-  const prefix = params.liffId?.split("-")[0];
-  if (prefix && /^\d+$/.test(prefix)) {
-    return prefix;
-  }
-  return undefined;
-}
-
 export const idToken: {
   verify: (params: VerifyIdTokenParams) => Promise<VerifyIdTokenResult>;
-  resolveLoginChannelId: (params: {
-    channelId?: string | undefined;
-    liffId?: string | undefined;
-  }) => string | undefined;
 } = {
   verify,
-  resolveLoginChannelId,
 };

@@ -1,3 +1,4 @@
+import { resolveLiffConfiguration } from "@me-builder/lib/line/liff-configuration";
 import { getEnv, logger, parseAdminLineUserIds } from "@me-builder/shared";
 import * as v from "valibot";
 import {
@@ -55,8 +56,7 @@ export function getWorkerConfig(env?: Record<string, unknown>): WorkerConfig {
   }
 
   const rawLineChannelAccessToken = getEnv("LINE_CHANNEL_ACCESS_TOKEN", env);
-  // 空文字は「未設定」として扱い、返信にリンクを添えないようにします。
-  const rawLiffId = getEnv("LIFF_ID", env)?.trim() || undefined;
+  const liffConfiguration = resolveLiffConfiguration({ liffId: getEnv("LIFF_ID", env) });
   const rawGoogleVertexAiApiKey = getEnv("GOOGLE_VERTEX_AI_API_KEY", env)?.trim() || undefined;
   const rawGeminiModel = getEnv("GEMINI_MODEL", env)?.trim() || DEFAULT_GEMINI_MODEL;
   const rawGeminiEmbeddingModel =
@@ -72,7 +72,7 @@ export function getWorkerConfig(env?: Record<string, unknown>): WorkerConfig {
     baseUrl: rawBaseUrl,
     apiUrl: rawApiUrl,
     lineChannelAccessToken: rawLineChannelAccessToken,
-    liffId: rawLiffId,
+    liffId: liffConfiguration.liffId,
     googleVertexAiApiKey: rawGoogleVertexAiApiKey,
     geminiModel: rawGeminiModel,
     geminiEmbeddingModel: rawGeminiEmbeddingModel,

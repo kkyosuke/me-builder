@@ -35,6 +35,16 @@ function dependencies() {
 }
 
 describe("getCompatibilityInvitationAvatar", () => {
+  it("不正な関係IDは本人確認を始めず利用不可として扱う", async () => {
+    const deps = dependencies();
+
+    await expect(
+      getCompatibilityInvitationAvatar({ ...params, relationshipId: "invalid" }, deps as never),
+    ).resolves.toEqual({ type: "unavailable" });
+    expect(deps.createSession).not.toHaveBeenCalled();
+    expect(deps.getInvitationPreview).not.toHaveBeenCalled();
+  });
+
   it("認可済み招待contextの送信者Accountだけを画像解決へ渡す", async () => {
     const deps = dependencies();
 

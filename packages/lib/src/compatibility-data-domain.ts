@@ -9,6 +9,7 @@ import {
   type CreateCompatibilityInvitationInput,
   type CreateCompatibilityInvitationResult,
   type EndCompatibilityRelationshipResult,
+  compatibilityRelationshipId,
 } from "./compatibility-data";
 
 function assertNonEmpty(value: string, field: string): void {
@@ -36,7 +37,7 @@ export function decideCompatibilityInvitationCreation(
   createdAt: Date,
 ): CreateCompatibilityInvitationResult {
   assertNonEmpty(relationshipId, "relationshipId");
-  if (!/^[a-f0-9]{64}$/.test(relationshipId)) {
+  if (!compatibilityRelationshipId.isValid(relationshipId)) {
     throw new Error("Compatibility relationship id must be a 256-bit hex token");
   }
   assertNonEmpty(input.inviterAccountId, "inviterAccountId");

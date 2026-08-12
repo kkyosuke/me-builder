@@ -1,20 +1,19 @@
+import { compatibilityRelationshipId } from "@me-builder/lib";
 import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
 import * as v from "valibot";
 import { authenticatedErrors, jsonResponse } from "../shared/errors";
-
-const RelationshipIdSchema = v.pipe(v.string(), v.regex(/^[a-f0-9]{64}$/));
 
 export const CompatibilityRelationshipsResponseSchema = v.object({
   items: v.array(
     v.variant("status", [
       v.object({
-        relationshipId: RelationshipIdSchema,
+        relationshipId: compatibilityRelationshipId.schema,
         status: v.literal("pending"),
         expiresAt: v.pipe(v.string(), v.isoTimestamp()),
         invitationUrl: v.pipe(v.string(), v.url()),
       }),
       v.object({
-        relationshipId: RelationshipIdSchema,
+        relationshipId: compatibilityRelationshipId.schema,
         status: v.literal("accepted"),
         partnerDisplayName: v.pipe(v.string(), v.nonEmpty()),
       }),

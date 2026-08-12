@@ -1,3 +1,4 @@
+import { resolveLiffConfiguration } from "@me-builder/lib/line/liff-configuration";
 import * as v from "valibot";
 import { type WebConfig, WebConfigSchema } from "./schema";
 
@@ -41,15 +42,14 @@ export function getWebConfig(env?: Record<string, string | undefined>): WebConfi
     rawApiUrl = domain;
   }
 
-  // 空文字は「未設定」として扱い、LIFF 初期化をスキップできるようにします。
-  const rawLiffId = getEnv("LIFF_ID")?.trim() || undefined;
+  const liffConfiguration = resolveLiffConfiguration({ liffId: getEnv("LIFF_ID") });
 
   const rawConfig = {
     environment: rawEnvironment,
     baseDomain: rawBaseDomain,
     baseUrl: rawBaseUrl,
     apiUrl: rawApiUrl,
-    liffId: rawLiffId,
+    liffId: liffConfiguration.liffId,
   };
 
   return v.parse(WebConfigSchema, rawConfig);

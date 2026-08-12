@@ -8,9 +8,11 @@
   "exports": {
     ".": "./src/index.ts",
     "./line": "./src/line/index.ts",
+    "./line/liff-configuration": "./src/line/configuration.ts",
     "./d1": "./src/d1/index.ts",
     "./do": "./src/do/index.ts",
-    "./diagnosis": "./src/diagnosis/index.ts"
+    "./diagnosis": "./src/diagnosis/index.ts",
+    "./compatibility": "./src/compatibility/index.ts"
   },
   "scripts": {
     "build": "tsc --noEmit",

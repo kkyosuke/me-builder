@@ -1,5 +1,5 @@
 import { logger } from "@me-builder/shared";
-import { idToken } from "./id-token";
+import { resolveLiffConfiguration } from "./configuration";
 
 /**
  * LIFF アプリのエンドポイント URL を LIFF Server API 経由で登録・更新します。
@@ -87,7 +87,10 @@ function resolveChannelId(params: RegisterLiffEndpointParams): string | undefine
       "[LIFF] LINE_LOGIN_CHANNEL_ID が未設定のため LIFF ID の接頭辞をチャネル ID として使用します",
     );
   }
-  return idToken.resolveLoginChannelId(params);
+  return resolveLiffConfiguration({
+    liffId: params.liffId,
+    lineLoginChannelId: params.channelId,
+  }).lineLoginChannelId;
 }
 
 /** client credentials で LINE Login チャネルのチャネルアクセストークンを発行します。 */
@@ -160,18 +163,17 @@ async function callLiffApi(
 async function registerEndpoint(
   params: RegisterLiffEndpointParams,
 ): Promise<RegisterLiffEndpointResult> {
-  const channelId = resolveChannelId(params);
   const { channelSecret, endpointUrl, description } = params;
   const viewType: LiffViewType = params.viewType ?? "full";
 
-  if (!channelId || !channelSecret || !endpointUrl) {
-    const msg =
-      "[LIFF] LINE_LOGIN_CHANNEL_ID / LINE_LOGIN_CHANNEL_SECRET / エンドポイント URL が設定されていないため、LIFF アプリの自動設定をスキップします。";
-    logger.info(msg);
-    return { success: false, message: msg };
-  }
-
   try {
+    const channelId = resolveChannelId(params);
+    if (!channelId || !channelSecret || !endpointUrl) {
+      const msg =
+        "[LIFF] LINE_LOGIN_CHANNEL_ID / LINE_LOGIN_CHANNEL_SECRET / エンドポイント URL が設定されていないため、LIFF アプリの自動設定をスキップします。";
+      logger.info(msg);
+      return { success: false, message: msg };
+    }
     const token = await issueChannelAccessToken(channelId, channelSecret);
 
     const listed = (await callLiffApi(token, "")) as { apps?: LiffApp[] } | undefined;
@@ -220,7 +222,9 @@ async function registerEndpoint(
     return { success: true, message: msg, liffId: created.liffId };
   } catch (error) {
     // 万一エラー文へ混ざっても外へ出さないよう、チャネルシークレットは伏せる
-    const detail = toMessage(error).replaceAll(channelSecret, "***");
+    const detail = channelSecret
+      ? toMessage(error).replaceAll(channelSecret, "***")
+      : toMessage(error);
     const msg = `[LIFF] LIFF アプリの自動設定に失敗しました: ${detail}`;
     logger.error(msg);
     return { success: false, message: msg };

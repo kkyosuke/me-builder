@@ -76,7 +76,13 @@ export async function getCompatibilityShareConsentContents(c: Context<AppEnv>): 
 /** `POST /api/compatibility/invitations` — 共有同意から1人用の招待を発行する。 */
 export async function postCompatibilityInvitation(c: Context<AppEnv>): Promise<Response> {
   const currentConfig = getConfig(c.env);
-  if (!c.env?.DB || !c.env.ACCOUNT_DATA || !c.env.COMPATIBILITY_DATA || !currentConfig.liffId) {
+  if (
+    !c.env?.DB ||
+    !c.env.ACCOUNT_DATA ||
+    !c.env.COMPATIBILITY_DATA ||
+    !currentConfig.liffId ||
+    !currentConfig.lineLoginChannelId
+  ) {
     logger.error(
       { path: operationalHttpPath(c.req.path) },
       "Compatibility invitation binding is not configured",
@@ -86,8 +92,10 @@ export async function postCompatibilityInvitation(c: Context<AppEnv>): Promise<R
 
   const outcome = await issueCompatibilityInvitation({
     idToken: bearerToken(c.req.header("authorization")),
-    lineLoginChannelId: currentConfig.lineLoginChannelId,
-    liffId: currentConfig.liffId,
+    liff: {
+      liffId: currentConfig.liffId,
+      lineLoginChannelId: currentConfig.lineLoginChannelId,
+    },
     db: D1.shared.client.create(c.env.DB),
     accountData: c.env.ACCOUNT_DATA,
     compatibilityData: c.env.COMPATIBILITY_DATA,

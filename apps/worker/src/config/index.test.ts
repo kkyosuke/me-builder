@@ -38,6 +38,10 @@ describe("Worker Config", () => {
     expect(getWorkerConfig({ LIFF_ID: "  " }).liffId).toBeUndefined();
   });
 
+  it("不正なLIFF IDを返信処理前に拒否すること", () => {
+    expect(() => getWorkerConfig({ LIFF_ID: "invalid" })).toThrow("LIFF_ID");
+  });
+
   it("Vertex AI Express Modeの設定を取得すること", () => {
     const config = getWorkerConfig({
       GOOGLE_VERTEX_AI_API_KEY: "google-key",
