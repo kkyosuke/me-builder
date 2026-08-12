@@ -18,8 +18,18 @@ describe("resolveLiffConfiguration", () => {
     ).toEqual({ liffId: "2010850319-Yl63upAR", lineLoginChannelId: "2010850319" });
   });
 
-  it.each(["invalid", "abc-def", "123-", "123-a_b"])("不正なLIFF ID %sを拒否する", (liffId) => {
-    expect(() => resolveLiffConfiguration({ liffId })).toThrow("LIFF_ID");
+  it.each(["invalid", "abc-def", "123-"])(
+    "チャネルIDを抽出できないLIFF ID %sを拒否する",
+    (liffId) => {
+      expect(() => resolveLiffConfiguration({ liffId })).toThrow("LIFF_ID");
+    },
+  );
+
+  it("公式に規定されていないsuffixの文字集合を制限しない", () => {
+    expect(resolveLiffConfiguration({ liffId: "2010850319-Yl_63-up.AR" })).toEqual({
+      liffId: "2010850319-Yl_63-up.AR",
+      lineLoginChannelId: "2010850319",
+    });
   });
 
   it("明示したチャネルIDとLIFF IDの接頭辞が不一致なら拒否する", () => {

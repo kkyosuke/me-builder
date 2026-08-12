@@ -1,9 +1,23 @@
+import { compatibilityRelationshipId } from "@me-builder/lib/compatibility";
 import { createHttpClient } from "../../../infrastructure/http-client";
 
-const AVATAR_PATH_PATTERN =
-  /^\/api\/(?:profile\/avatar|compatibility\/invitations\/[a-f0-9]{64}\/avatar)$/;
+const PROFILE_AVATAR_PATH = "/api/profile/avatar";
+const INVITATION_AVATAR_PREFIX = "/api/compatibility/invitations/";
+const INVITATION_AVATAR_SUFFIX = "/avatar";
 const SUPPORTED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
+
+function isAllowedAvatarPath(path: string): boolean {
+  if (path === PROFILE_AVATAR_PATH) return true;
+  if (!path.startsWith(INVITATION_AVATAR_PREFIX) || !path.endsWith(INVITATION_AVATAR_SUFFIX)) {
+    return false;
+  }
+  const relationshipId = path.slice(
+    INVITATION_AVATAR_PREFIX.length,
+    -INVITATION_AVATAR_SUFFIX.length,
+  );
+  return compatibilityRelationshipId.isValid(relationshipId);
+}
 
 /** APIが返した認可対象pathだけへBearerを送り、表示用Blobを取得する。 */
 export async function fetchCompatibilityAvatarImage(
@@ -12,7 +26,7 @@ export async function fetchCompatibilityAvatarImage(
   avatarPath: string | null,
   signal?: AbortSignal,
 ): Promise<Blob | null> {
-  if (!avatarPath || !AVATAR_PATH_PATTERN.test(avatarPath)) return null;
+  if (!avatarPath || !isAllowedAvatarPath(avatarPath)) return null;
   let response: Response;
   try {
     response = await createHttpClient(apiUrl).request(avatarPath, {

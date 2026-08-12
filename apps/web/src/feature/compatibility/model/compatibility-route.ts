@@ -17,13 +17,16 @@ export function resolveCompatibilityRoute(pathname: string): CompatibilityRoute 
   return "list";
 }
 
-export function resolveCompatibilityInvitationId(pathname: string): string | null {
-  const prefix = "/compatibility/invitations/";
+function resolveRelationshipId(pathname: string, prefix: string): string | null {
   if (!pathname.startsWith(prefix)) return null;
   const relationshipId = pathname.slice(prefix.length);
   return compatibilityRelationshipId.isValid(relationshipId) ? relationshipId : null;
 }
 
+export function resolveCompatibilityInvitationId(pathname: string): string | null {
+  return resolveRelationshipId(pathname, "/compatibility/invitations/");
+}
+
 export function resolveCompatibilityRelationshipId(pathname: string): string | null {
-  return pathname.match(/^\/compatibility\/relationships\/([a-f0-9]{64})$/)?.[1] ?? null;
+  return resolveRelationshipId(pathname, "/compatibility/relationships/");
 }

@@ -238,7 +238,7 @@ export async function endCompatibilityRelationshipWithReferences(
     if (!inviteeAccountId || !endedAt) {
       throw new Error("Ended compatibility relationship must have both participants and endedAt");
     }
-    const participantIds = [result.relationship.inviterAccountId, inviteeAccountId].sort();
+    const participantIds = [result.relationship.inviterAccountId, inviteeAccountId];
     await Promise.all(
       participantIds.map((accountId) =>
         accountDataFor(accountNamespace, accountId).execute(

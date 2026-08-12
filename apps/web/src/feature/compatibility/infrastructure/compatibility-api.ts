@@ -1,3 +1,4 @@
+import { compatibilityRelationshipId } from "@me-builder/lib/compatibility";
 import * as v from "valibot";
 import type { operations } from "../../../generated/api";
 import { createHttpClient } from "../../../infrastructure/http-client";
@@ -74,7 +75,7 @@ const InvitationPreviewResponseSchema = v.object({
   nextAction: v.nullable(v.picklist(["diagnosis", "profile-summary"])),
 }) satisfies v.GenericSchema<InvitationPreviewApiResponse>;
 
-const RelationshipIdSchema = v.pipe(v.string(), v.regex(/^[a-f0-9]{64}$/));
+const RelationshipIdSchema = compatibilityRelationshipId.schema;
 const RelationshipListResponseSchema = v.object({
   items: v.array(
     v.variant("status", [

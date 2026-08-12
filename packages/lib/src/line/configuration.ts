@@ -1,4 +1,4 @@
-const LIFF_ID_PATTERN = /^(\d+)-([A-Za-z0-9]+)$/;
+const LIFF_ID_PATTERN = /^(\d+)-(.+)$/;
 const CHANNEL_ID_PATTERN = /^\d+$/;
 
 export type LiffConfiguration = Readonly<{
@@ -26,9 +26,10 @@ export function resolveLiffConfiguration(params: {
     return { liffId: undefined, lineLoginChannelId: explicitChannelId };
   }
 
+  // LINEが公開していないsuffixの文字集合は推測せず、チャネルIDの抽出に必要な境界だけを見る。
   const match = LIFF_ID_PATTERN.exec(liffId);
   if (!match) {
-    throw new Error("LIFF_ID must have the form {LINE Login channel ID}-{LIFF app suffix}");
+    throw new Error("LIFF_ID must start with {LINE Login channel ID}- and include a suffix");
   }
   const channelIdFromLiff = match[1];
   if (explicitChannelId && explicitChannelId !== channelIdFromLiff) {

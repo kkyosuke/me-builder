@@ -166,7 +166,7 @@ describe("compatibility data orchestration", () => {
     expect(endedAtValues).toEqual([canonicalCancelledAt]);
   });
 
-  it("相性関係の正本を終了した後にAccount ID順で双方の一覧参照を終了する", async () => {
+  it("相性関係の正本を終了した後に双方の一覧参照を終了する", async () => {
     const calls: string[] = [];
     const endedAtValues: Date[] = [];
     const canonicalEndedAt = new Date("2026-08-12T01:00:00.000Z");
@@ -210,11 +210,10 @@ describe("compatibility data orchestration", () => {
       "account-a",
     );
 
-    expect(calls).toEqual([
-      "canonical.end",
-      "account-a.compatibility.endReference",
-      "account-b.compatibility.endReference",
-    ]);
+    expect(calls[0]).toBe("canonical.end");
+    expect(new Set(calls.slice(1))).toEqual(
+      new Set(["account-a.compatibility.endReference", "account-b.compatibility.endReference"]),
+    );
     expect(endedAtValues).toHaveLength(2);
     expect(endedAtValues).toEqual([canonicalEndedAt, canonicalEndedAt]);
   });
