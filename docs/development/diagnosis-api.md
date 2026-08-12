@@ -58,7 +58,7 @@ Authorization: Bearer <LIFF ID token>
 
 ### `GET /api/diagnoses/{diagnosisId}`
 
-新しく回答を開始するため、指定したDiagnosisの質問とChoiceを公開時のQuestion Versionで返します。認証境界は一覧APIと同じです。
+指定したDiagnosisの質問とChoiceを公開時のQuestion Versionで返します。受付中は新しい回答の開始に使い、公開停止後は本人の保存済み回答の表示に必要な範囲で使います。認証境界は一覧APIと同じです。
 
 Diagnosisが`published`かつ削除されておらず、サーバー時刻が受付開始以降・受付終了より前の場合に取得できます。加えて、`withdrawn`でも本人の`DiagnosisResponse`が存在する場合は、保存済み回答の表示に必要な固定済みQuestion Versionを取得できます。この取得可否は新規回答・回答修正・延期の受付可否を変更しません。
 

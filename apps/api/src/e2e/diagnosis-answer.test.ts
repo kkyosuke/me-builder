@@ -478,11 +478,14 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
   });
 
   it("回答済みならwithdrawn後も一覧・詳細・回答内容を取得できる", async () => {
-    await putAnswer("dq-relationship-priority-01", "yes");
+    for (let index = 1; index <= 10; index += 1) {
+      const questionId = `dq-relationship-priority-${String(index).padStart(2, "0")}`;
+      expect((await putAnswer(questionId, "yes")).status).toBe(200);
+    }
     await withdrawDiagnosis();
 
     const listItem = await listRelationshipDiagnosis();
-    expect(listItem).toMatchObject({ responseStatus: "in-progress", answeredCount: 1 });
+    expect(listItem).toMatchObject({ responseStatus: "answered", answeredCount: 10 });
 
     const detail = await getDetail();
     expect(detail.status).toBe(200);
@@ -490,10 +493,21 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
 
     const answers = await getAnswers();
     expect(answers.status).toBe(200);
-    expect(await answers.json()).toMatchObject({
+    const answersBody = (await answers.json()) as {
+      id: string;
+      responseStatus: string;
+      answeredCount: number;
+      answers: Array<{ diagnosisQuestionId: string; choiceId: string }>;
+    };
+    expect(answersBody).toMatchObject({
       id: "relationship-priority",
-      answeredCount: 1,
-      answers: [{ diagnosisQuestionId: "dq-relationship-priority-01", choiceId: "yes" }],
+      responseStatus: "answered",
+      answeredCount: 10,
+    });
+    expect(answersBody.answers).toHaveLength(10);
+    expect(answersBody.answers[0]).toMatchObject({
+      diagnosisQuestionId: "dq-relationship-priority-01",
+      choiceId: "yes",
     });
   });
 

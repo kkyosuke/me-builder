@@ -75,10 +75,10 @@ export async function getDiagnoses(c: Context<AppEnv>): Promise<Response> {
   }
 }
 
-/** `GET /api/diagnoses/:diagnosisId` — 新規回答用の公開済みQuestion Versionを返す。 */
+/** `GET /api/diagnoses/:diagnosisId` — 受付中または回答者向けのQuestion Versionを返す。 */
 export async function getDiagnosis(c: Context<AppEnv>): Promise<Response> {
   if (!c.env?.DB || !c.env.ACCOUNT_DATA) {
-    logger.error({ path: c.req.path }, "DB binding is not configured");
+    logger.error({ path: c.req.path }, "Diagnosis storage binding is not configured");
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   }
 
