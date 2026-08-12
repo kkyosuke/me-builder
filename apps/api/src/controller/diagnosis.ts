@@ -59,6 +59,7 @@ export async function getDiagnoses(c: Context<AppEnv>): Promise<Response> {
 
   switch (outcome.type) {
     case "resolved":
+      c.header("Cache-Control", "no-store");
       return c.json(v.parse(DiagnosisListResponseSchema, { diagnoses: outcome.diagnoses }));
     case "account-not-found":
       return c.json(
@@ -90,6 +91,7 @@ export async function getDiagnosis(c: Context<AppEnv>): Promise<Response> {
 
   switch (outcome.type) {
     case "resolved":
+      c.header("Cache-Control", "no-store");
       return c.json(v.parse(DiagnosisDetailResponseSchema, outcome.diagnosis));
     case "diagnosis-not-found":
       return c.json(
@@ -295,6 +297,7 @@ export async function getDiagnosisAnswerContents(c: Context<AppEnv>): Promise<Re
 
   switch (outcome.type) {
     case "resolved":
+      c.header("Cache-Control", "no-store");
       return c.json(v.parse(DiagnosisAnswersResponseSchema, outcome.diagnosis));
     case "diagnosis-answers-not-found":
       return c.json(

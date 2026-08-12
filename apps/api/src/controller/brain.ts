@@ -38,6 +38,7 @@ export async function getDevelopmentBrainItems(c: Context<AppEnv>): Promise<Resp
 
   switch (outcome.type) {
     case "resolved":
+      c.header("Cache-Control", "no-store");
       return c.json(
         v.parse(DevelopmentBrainItemsResponseSchema, {
           items: outcome.items.map((item) => ({
@@ -102,6 +103,7 @@ export async function getDevelopmentBrainVector(c: Context<AppEnv>): Promise<Res
 
   switch (outcome.type) {
     case "resolved":
+      c.header("Cache-Control", "no-store");
       return c.json(
         v.parse(DevelopmentBrainVectorResponseSchema, {
           ...outcome.result,
