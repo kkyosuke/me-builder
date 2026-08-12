@@ -27,7 +27,6 @@ export type Env = Omit<
   GEMINI_MODEL?: string;
   GEMINI_EMBEDDING_MODEL?: string;
   BRAIN_VECTOR_HMAC_SECRET?: string;
-  CHAT_ENABLED?: string;
   CHAT_DELIVERY_SECRET?: string;
   CHAT_CONTEXT_MESSAGE_LIMIT?: string;
   LIFF_ID?: string;

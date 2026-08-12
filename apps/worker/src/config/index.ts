@@ -62,7 +62,6 @@ export function getWorkerConfig(env?: Record<string, unknown>): WorkerConfig {
   const rawGeminiEmbeddingModel =
     getEnv("GEMINI_EMBEDDING_MODEL", env)?.trim() || DEFAULT_GEMINI_EMBEDDING_MODEL;
   const rawBrainVectorHmacSecret = getEnv("BRAIN_VECTOR_HMAC_SECRET", env)?.trim() || undefined;
-  const rawChatEnabled = getEnv("CHAT_ENABLED", env)?.trim().toLowerCase() !== "false";
   const rawChatDeliverySecret = getEnv("CHAT_DELIVERY_SECRET", env)?.trim() || undefined;
   const rawChatContextMessageLimit = getEnv("CHAT_CONTEXT_MESSAGE_LIMIT", env)?.trim();
   const adminLineUserIds = parseAdminLineUserIds(getEnv("ADMIN_LINE_USER_IDS", env));
@@ -78,7 +77,6 @@ export function getWorkerConfig(env?: Record<string, unknown>): WorkerConfig {
     geminiModel: rawGeminiModel,
     geminiEmbeddingModel: rawGeminiEmbeddingModel,
     brainVectorHmacSecret: rawBrainVectorHmacSecret,
-    chatEnabled: rawChatEnabled,
     chatDeliverySecret: rawChatDeliverySecret,
     chatContextMessageLimit: parsePositiveInteger(
       rawChatContextMessageLimit,

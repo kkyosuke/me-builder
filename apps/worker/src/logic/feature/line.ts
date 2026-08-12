@@ -185,7 +185,7 @@ export async function processLineWebhook(
         dependency: "account-data",
       });
     }
-    if (!workerConfig.chatEnabled || !coordinatorNamespace) {
+    if (!coordinatorNamespace) {
       result = mergeResult(result, {
         outcome: "degraded",
         stage: "source.store",
