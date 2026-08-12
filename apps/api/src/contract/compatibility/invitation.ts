@@ -1,4 +1,4 @@
-import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
+import { type DescribeRouteOptions, describeRoute, validator } from "hono-openapi";
 import * as v from "valibot";
 import { authenticatedErrors, jsonResponse } from "../shared/errors";
 
@@ -22,15 +22,24 @@ export const CompatibilityInvitationConflictSchema = v.object({
   reason: v.picklist(["preview_changed", "share_unavailable"]),
 });
 
+export const issueCompatibilityInvitationValidator = validator(
+  "json",
+  IssueCompatibilityInvitationRequestSchema,
+  (result, c) => {
+    if (!result.success) {
+      return c.json(
+        v.parse(InvalidCompatibilityInvitationRequestSchema, { error: "Invalid request" }),
+        400,
+      );
+    }
+  },
+);
+
 export const issueCompatibilityInvitationRoute = describeRoute({
   operationId: "issueCompatibilityInvitation",
   tags: ["Compatibility"],
   summary: "確認済みの共有内容から1人用の招待リンクを発行する",
   security: [{ liffIdToken: [] }],
-  requestBody: {
-    required: true,
-    content: { "application/json": { schema: IssueCompatibilityInvitationRequestSchema } },
-  },
   responses: {
     201: jsonResponse("発行した招待リンクと有効期限", IssueCompatibilityInvitationResponseSchema),
     400: jsonResponse("リクエストJSONが不正", InvalidCompatibilityInvitationRequestSchema),

@@ -16,6 +16,19 @@ describe("GET /api/openapi.json", () => {
     expect(document.paths["/api/diagnoses"]?.get).toBeDefined();
     expect(document.paths["/api/compatibility/share-preview"]?.get).toBeDefined();
     expect(document.paths["/api/compatibility/invitations"]?.post).toBeDefined();
+    expect(document.paths["/api/compatibility/invitations"]?.post).toMatchObject({
+      requestBody: {
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              properties: { previewToken: { type: "string" } },
+              required: ["previewToken"],
+            },
+          },
+        },
+      },
+    });
     expect(document.paths["/api/diagnoses/{diagnosisId}/answers"]?.get).toBeDefined();
     expect(document.paths["/api/profile"]?.get).toBeDefined();
     expect(document.paths["/api/profile/avatar"]?.put).toBeDefined();

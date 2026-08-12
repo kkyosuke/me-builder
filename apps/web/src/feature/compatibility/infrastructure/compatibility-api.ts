@@ -8,6 +8,8 @@ type ApiResponse =
   operations["getCompatibilitySharePreview"]["responses"][200]["content"]["application/json"];
 type InvitationApiResponse =
   operations["issueCompatibilityInvitation"]["responses"][201]["content"]["application/json"];
+type InvitationApiRequest =
+  operations["issueCompatibilityInvitation"]["requestBody"]["content"]["application/json"];
 
 const NonEmptyStringSchema = v.pipe(v.string(), v.nonEmpty());
 const ParameterSchema = v.object({
@@ -93,13 +95,14 @@ export async function issueCompatibilityInvitation(
   previewToken: string,
   signal?: AbortSignal,
 ): Promise<CompatibilityInvitation> {
+  const body: InvitationApiRequest = { previewToken };
   const response = await createHttpClient(apiUrl).request("/api/compatibility/invitations", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${idToken}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ previewToken }),
+    body: JSON.stringify(body),
     ...(signal ? { signal } : {}),
   });
 

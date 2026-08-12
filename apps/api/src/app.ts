@@ -17,7 +17,10 @@ import {
   resetAllDevelopmentBrainVectorSyncJobsRoute,
   resetDevelopmentBrainVectorSyncJobRoute,
 } from "./contract/brain/dev-vector-sync-jobs";
-import { issueCompatibilityInvitationRoute } from "./contract/compatibility/invitation";
+import {
+  issueCompatibilityInvitationRoute,
+  issueCompatibilityInvitationValidator,
+} from "./contract/compatibility/invitation";
 import { compatibilitySharePreviewRoute } from "./contract/compatibility/share-preview";
 import { saveDiagnosisAnswerRoute } from "./contract/diagnosis/answer";
 import { diagnosisAnswersRoute } from "./contract/diagnosis/answers";
@@ -153,6 +156,7 @@ app.get(
 app.post(
   "/api/compatibility/invitations",
   issueCompatibilityInvitationRoute,
+  issueCompatibilityInvitationValidator,
   postCompatibilityInvitation,
 );
 app.get(

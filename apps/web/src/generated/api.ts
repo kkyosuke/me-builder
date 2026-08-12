@@ -1177,7 +1177,9 @@ export interface operations {
     };
     requestBody: {
       content: {
-        "application/json": Record<string, never>;
+        "application/json": {
+          previewToken: string;
+        };
       };
     };
     responses: {

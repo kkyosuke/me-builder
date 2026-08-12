@@ -2,7 +2,7 @@ import { shareLiffTextMessage } from "../../liff/infrastructure/liff-client";
 
 export function compatibilityInvitationMessage(displayName: string | null, url: string): string {
   const sender = displayName?.trim() || "友だち";
-  return `${sender}さんから相性診断の招待が届いています。\n${url}`;
+  return `${sender}さんから相性診断の招待が届いています。\n内容を確認して承諾するまで、情報の共有は始まりません。\n${url}`;
 }
 
 export async function shareCompatibilityInvitationToLine(

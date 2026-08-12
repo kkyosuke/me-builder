@@ -1591,54 +1591,6 @@
             "liffIdToken": []
           }
         ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "kind": "schema",
-                "type": "object",
-                "expects": "Object",
-                "async": false,
-                "entries": {
-                  "previewToken": {
-                    "kind": "schema",
-                    "type": "string",
-                    "expects": "string",
-                    "async": false,
-                    "~standard": {
-                      "version": 1,
-                      "vendor": "valibot"
-                    },
-                    "pipe": [
-                      {
-                        "kind": "schema",
-                        "type": "string",
-                        "expects": "string",
-                        "async": false,
-                        "~standard": {
-                          "version": 1,
-                          "vendor": "valibot"
-                        }
-                      },
-                      {
-                        "kind": "validation",
-                        "type": "regex",
-                        "async": false,
-                        "expects": "/^csp2\\.[a-f0-9]{64}$/",
-                        "requirement": {}
-                      }
-                    ]
-                  }
-                },
-                "~standard": {
-                  "version": 1,
-                  "vendor": "valibot"
-                }
-              }
-            }
-          }
-        },
         "responses": {
           "201": {
             "description": "発行した招待リンクと有効期限",
@@ -1761,6 +1713,23 @@
                   },
                   "required": ["error"]
                 }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "previewToken": {
+                    "type": "string",
+                    "pattern": "^csp2\\.[a-f0-9]{64}$"
+                  }
+                },
+                "required": ["previewToken"]
               }
             }
           }

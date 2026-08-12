@@ -11,7 +11,7 @@ vi.mock("../../liff/infrastructure/liff-client", () => ({ shareLiffTextMessage: 
 describe("compatibility invitation sharing", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("表示名と招待URLだけでLINE共有文を作る", async () => {
+  it("送信者、承諾前は共有されないこと、招待URLをLINE共有文に含める", async () => {
     vi.mocked(shareLiffTextMessage).mockResolvedValue(true);
     const url = `https://example.com/compatibility/invitations/${"1".repeat(64)}`;
 
@@ -21,7 +21,7 @@ describe("compatibility invitation sharing", () => {
       compatibilityInvitationMessage("あおい", url),
     );
     expect(compatibilityInvitationMessage("あおい", url)).toBe(
-      `あおいさんから相性診断の招待が届いています。\n${url}`,
+      `あおいさんから相性診断の招待が届いています。\n内容を確認して承諾するまで、情報の共有は始まりません。\n${url}`,
     );
   });
 
