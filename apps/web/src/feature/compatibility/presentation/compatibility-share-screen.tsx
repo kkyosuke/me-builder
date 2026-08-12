@@ -146,24 +146,6 @@ function SharePreviewContent({
           <p className="mt-3 break-all rounded-xl bg-white/80 p-3 text-xs text-slate-700 dark:bg-slate-950/60 dark:text-slate-300">
             {invitationState.data.invitationUrl}
           </p>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <button
-              type="button"
-              onClick={() => onShareToLine(invitationState.data.invitationUrl)}
-              className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#06c755] px-5 py-3 font-bold text-white"
-            >
-              <MessageCircle className="size-5" aria-hidden="true" />
-              LINEで送る
-            </button>
-            <button
-              type="button"
-              onClick={() => onCopyLink(invitationState.data.invitationUrl)}
-              className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-emerald-400 bg-white px-5 py-3 font-bold text-emerald-900 dark:bg-slate-950 dark:text-emerald-100"
-            >
-              <Copy className="size-5" aria-hidden="true" />
-              リンクをコピー
-            </button>
-          </div>
           {sharingMessage && (
             <output className="mt-3 block text-center text-sm text-slate-700 dark:text-slate-300">
               {sharingMessage}
@@ -189,12 +171,31 @@ function SharePreviewContent({
       <footer className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 shadow-[0_-8px_30px_rgba(15,23,42,0.12)] backdrop-blur dark:border-slate-700 dark:bg-slate-900/95">
         <div className="mx-auto w-full max-w-2xl px-4 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-8">
           <CompatibilityPrivacyDisclosure footer="相手が内容を確認して承諾するまで、共有は始まりません。共有は後から終了できます。" />
-          {invitationState.status !== "success" && (
+          {invitationState.status === "success" ? (
+            <div className="mt-2 grid h-12 grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => onShareToLine(invitationState.data.invitationUrl)}
+                className="flex h-12 min-w-0 items-center justify-center gap-2 rounded-2xl bg-[#06c755] px-2 text-sm font-bold text-white"
+              >
+                <MessageCircle className="size-5 shrink-0" aria-hidden="true" />
+                友だちに送る
+              </button>
+              <button
+                type="button"
+                onClick={() => onCopyLink(invitationState.data.invitationUrl)}
+                className="flex h-12 min-w-0 items-center justify-center gap-2 rounded-2xl border border-emerald-400 bg-white px-2 text-sm font-bold text-emerald-900 dark:bg-slate-950 dark:text-emerald-100"
+              >
+                <Copy className="size-5 shrink-0" aria-hidden="true" />
+                コピー
+              </button>
+            </div>
+          ) : (
             <button
               type="button"
               disabled={!preview.canIssueInvitation || invitationState.status === "loading"}
               onClick={() => onIssue(preview.previewToken)}
-              className="mt-2 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-rose-500 px-5 py-3 font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 dark:disabled:bg-slate-800 dark:disabled:text-slate-400"
+              className="mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-rose-500 px-5 font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 dark:disabled:bg-slate-800 dark:disabled:text-slate-400"
             >
               {invitationState.status === "loading" ? (
                 <LoaderCircle
@@ -235,9 +236,7 @@ export function CompatibilityShareScreen({
   state: AsyncState<CompatibilitySharePreview>;
 }) {
   return (
-    <main
-      className={`mx-auto min-h-dvh w-full max-w-2xl px-4 pt-6 sm:px-8 ${invitationState.status === "success" ? "pb-24" : "pb-44"}`}
-    >
+    <main className="mx-auto min-h-dvh w-full max-w-2xl px-4 pt-6 pb-44 sm:px-8">
       <CompatibilityBackHeader />
       {(state.status === "idle" || state.status === "loading") && <SharePreviewSkeleton />}
       {state.status === "error" && (
