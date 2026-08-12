@@ -398,6 +398,20 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
       const preview = (await previewResponse.json()) as {
         recipient: { previewToken: string };
       };
+      const pendingInviterList = await app.request(
+        "/api/compatibility/relationships",
+        { headers: { Authorization: "Bearer inviter-token" } },
+        env(),
+      );
+      expect(await pendingInviterList.json()).toEqual({
+        items: [expect.objectContaining({ relationshipId, status: "pending" })],
+      });
+      const pendingRecipientList = await app.request(
+        "/api/compatibility/relationships",
+        { headers: { Authorization: "Bearer recipient-token" } },
+        env(),
+      );
+      expect(await pendingRecipientList.json()).toEqual({ items: [] });
 
       const response = await app.request(
         `/api/compatibility/invitations/${relationshipId}/accept`,
@@ -447,6 +461,21 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
         expect(detail.partner.themes).toHaveLength(1);
         expect(detail.viewer.themes).toHaveLength(1);
         expect(JSON.stringify(detail)).not.toMatch(/accountId|fingerprint|choiceId|evidenceId/);
+
+        const listResponse = await app.request(
+          "/api/compatibility/relationships",
+          { headers: { Authorization: `Bearer ${role}-token` } },
+          env(),
+        );
+        expect(await listResponse.json()).toEqual({
+          items: [
+            {
+              relationshipId,
+              status: "accepted",
+              partnerDisplayName: participants[partnerRole].name,
+            },
+          ],
+        });
       }
     },
     e2eTimeoutMs,

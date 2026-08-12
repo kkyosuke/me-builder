@@ -27,6 +27,7 @@ import {
 } from "./contract/compatibility/invitation-accept";
 import { compatibilityInvitationPreviewRoute } from "./contract/compatibility/invitation-preview";
 import { compatibilityRelationshipRoute } from "./contract/compatibility/relationship";
+import { compatibilityRelationshipsRoute } from "./contract/compatibility/relationships";
 import { compatibilitySharePreviewRoute } from "./contract/compatibility/share-preview";
 import { saveDiagnosisAnswerRoute } from "./contract/diagnosis/answer";
 import { diagnosisAnswersRoute } from "./contract/diagnosis/answers";
@@ -53,6 +54,7 @@ import {
 import {
   getCompatibilityInvitation,
   getCompatibilityRelationship,
+  getCompatibilityRelationships,
   getCompatibilitySharePreviewContents,
   postCompatibilityInvitation,
   postCompatibilityInvitationAcceptance,
@@ -180,6 +182,11 @@ app.get(
   "/api/compatibility/invitations/:relationshipId",
   compatibilityInvitationPreviewRoute,
   getCompatibilityInvitation,
+);
+app.get(
+  "/api/compatibility/relationships",
+  compatibilityRelationshipsRoute,
+  getCompatibilityRelationships,
 );
 app.get(
   "/api/compatibility/relationships/:relationshipId",

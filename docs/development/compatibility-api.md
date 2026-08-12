@@ -331,3 +331,30 @@ sequenceDiagram
 | `404` | 関係IDが不正、存在しない、未成立、終了済み、または閲覧者が当事者でない | `{ "error": "Compatibility relationship unavailable", "reason": "relationship_unavailable" }` |
 
 認証・基盤の共通エラーは共有プレビューと同じです。成功レスポンスへAccount ID、各種指紋、生の回答、内部根拠を含めません。成功・エラーを問わず`Cache-Control: no-store`を付けます。
+
+## 8. 相性一覧
+
+### `GET /api/compatibility/relationships`
+
+本人のAccountDataが持つ一覧参照をCompatibilityDataの正本へ同期した後、発行中の招待と成立中の相性関係を作成日時の昇順で返します。
+
+```json
+{
+  "items": [
+    {
+      "relationshipId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "status": "pending",
+      "expiresAt": "2026-08-26T00:00:00.000Z"
+    },
+    {
+      "relationshipId": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "status": "accepted",
+      "partnerDisplayName": "はる"
+    }
+  ]
+}
+```
+
+`pending`は本人が発行した利用可能な招待だけです。受信者がリンクを開いただけでは一覧参照を作らないため、未承諾の受信者側一覧には現れません。`accepted`は本人が当事者である成立中の関係だけです。取消・期限切れ・終了を検出した参照はAccountData側で非表示へ同期し、レスポンスへ含めません。
+
+認証・基盤の共通エラーは共有プレビューと同じです。成功レスポンスへ相手のAccount IDや相性シート本文を含めません。成功・エラーを問わず`Cache-Control: no-store`を付けます。
