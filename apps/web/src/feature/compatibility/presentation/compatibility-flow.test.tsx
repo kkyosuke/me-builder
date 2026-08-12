@@ -183,9 +183,17 @@ describe("Compatibility flow", () => {
 
     const sendButton = screen.getByRole("button", { name: "友だちに送る" });
     const copyButton = screen.getByRole("button", { name: "コピー" });
+    const successCard = screen
+      .getByRole("heading", { name: "招待リンクを発行しました" })
+      .closest("section");
+    const privacyCard = screen.getByText("共有されない詳細").closest("details");
     const footer = sendButton.closest("footer");
+    expect(successCard?.classList.contains("mb-8")).toBe(true);
+    expect(privacyCard?.classList.contains("border")).toBe(true);
+    expect(privacyCard?.classList.contains("shadow-sm")).toBe(true);
     expect(footer?.classList.contains("fixed")).toBe(true);
     expect(copyButton.closest("footer")).toBe(footer);
+    expect(footer?.firstElementChild?.classList.contains("space-y-3")).toBe(true);
     expect(sendButton.parentElement?.classList.contains("grid-cols-2")).toBe(true);
     expect(sendButton.parentElement?.classList.contains("h-12")).toBe(true);
     fireEvent.click(sendButton);
