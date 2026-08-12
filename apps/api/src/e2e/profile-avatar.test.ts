@@ -189,7 +189,7 @@ describe("Profile avatar storage API local E2E", () => {
     ).toEqual({ avatar_object_key: null });
   });
 
-  it("R2 object欠落時はGETを縮退し、その後もPUTとDELETEで自己回復できる", async () => {
+  it("R2 object欠落時はGETを縮退し、DELETEとPUTのどちらでも自己回復できる", async () => {
     const bytes = squarePng();
     const initialPut = await app.request(
       "/api/profile/avatar",
@@ -226,7 +226,20 @@ describe("Profile avatar storage API local E2E", () => {
     expect(JSON.stringify(errorLog.mock.calls)).not.toContain("account-profile-e2e");
     expect(JSON.stringify(errorLog.mock.calls)).not.toContain(stored.key);
 
-    const recovered = await app.request(
+    const deletedMissingAvatar = await app.request(
+      "/api/profile/avatar",
+      { method: "DELETE", headers: authorization() },
+      bindings(),
+    );
+    expect(deletedMissingAvatar.status).toBe(200);
+    expect(await deletedMissingAvatar.json()).toMatchObject({
+      avatar: { source: "line", url: lineAvatarUrl, updatedAt: null },
+    });
+    expect(
+      await database.prepare("SELECT avatar_object_key FROM account_profiles").first(),
+    ).toEqual({ avatar_object_key: null });
+
+    const secondPut = await app.request(
       "/api/profile/avatar",
       {
         method: "PUT",
@@ -235,17 +248,41 @@ describe("Profile avatar storage API local E2E", () => {
       },
       bindings(),
     );
-    expect(recovered.status).toBe(200);
-    expect(await recovered.json()).toMatchObject({ avatar: { source: "uploaded" } });
-    expect((await avatarBucket.list()).objects).toHaveLength(1);
+    expect(secondPut.status).toBe(200);
+    const [secondStored] = (await avatarBucket.list()).objects;
+    expect(secondStored).toBeDefined();
+    if (!secondStored) throw new Error("Expected the second avatar fixture in R2");
+    await avatarBucket.delete(secondStored.key);
 
-    const deleted = await app.request(
+    const secondDegraded = await app.request(
+      "/api/profile",
+      { headers: authorization() },
+      bindings(),
+    );
+    expect(secondDegraded.status).toBe(200);
+
+    const recoveredByPut = await app.request(
+      "/api/profile/avatar",
+      {
+        method: "PUT",
+        headers: { ...authorization(), "Content-Type": "image/png" },
+        body: bytes.slice().buffer as ArrayBuffer,
+      },
+      bindings(),
+    );
+    expect(recoveredByPut.status).toBe(200);
+    expect(await recoveredByPut.json()).toMatchObject({ avatar: { source: "uploaded" } });
+    expect((await avatarBucket.list()).objects).toHaveLength(1);
+    expect(JSON.stringify(errorLog.mock.calls)).not.toContain("account-profile-e2e");
+    expect(JSON.stringify(errorLog.mock.calls)).not.toContain(secondStored.key);
+
+    const cleanup = await app.request(
       "/api/profile/avatar",
       { method: "DELETE", headers: authorization() },
       bindings(),
     );
-    expect(deleted.status).toBe(200);
-    expect(await deleted.json()).toMatchObject({
+    expect(cleanup.status).toBe(200);
+    expect(await cleanup.json()).toMatchObject({
       avatar: { source: "line", url: lineAvatarUrl, updatedAt: null },
     });
     expect((await avatarBucket.list()).objects).toHaveLength(0);
