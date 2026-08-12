@@ -21,7 +21,7 @@ const MINIMUM_LOADING_MS = 400;
 const waitForMinimumLoading = (): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, MINIMUM_LOADING_MS));
 
-export type GuidanceKind = "closed" | "unsupported" | "load-error";
+export type GuidanceKind = "closed" | "unsupported" | "invalid-link" | "load-error";
 
 export type DiagnosisDetailContent =
   | { type: "answer"; diagnosis: DiagnosisDefinition; initialAnswers: DiagnosisAnswer[] }

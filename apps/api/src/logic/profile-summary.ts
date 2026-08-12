@@ -40,30 +40,24 @@ type Params = {
 
 type Dependencies = {
   createSession: typeof createLiffSession;
-  listVisibleDiagnoses: (
+  getDiagnosisSource: (
     accountData: AccountDataNamespace | undefined,
     accountId: string,
     at: Date,
-  ) => ReturnType<typeof DO.account.action.diagnosis.listVisibleDiagnoses>;
+  ) => ReturnType<typeof DO.account.action.diagnosis.getDiagnosisAnsweredSource>;
   readProfileSummary: (
     accountData: AccountDataNamespace | undefined,
     accountId: string,
     at: Date,
     allowUnchangedRegeneration: boolean,
   ) => Promise<ProfileSummaryReadModel>;
-  findAnswers: (
-    accountData: AccountDataNamespace | undefined,
-    accountId: string,
-    diagnosisId: string,
-    at: Date,
-  ) => ReturnType<typeof DO.account.action.diagnosis.findDiagnosisAnswers>;
 };
 
 const defaultDependencies: Dependencies = {
   createSession: createLiffSession,
-  listVisibleDiagnoses: (accountData, accountId, at) => {
+  getDiagnosisSource: (accountData, accountId, at) => {
     if (!accountData) throw new Error("ACCOUNT_DATA binding is not configured");
-    return accountDataFor(accountData, accountId).execute("diagnosis.listVisible", at);
+    return accountDataFor(accountData, accountId).execute("diagnosis.getAnsweredSource", at);
   },
   readProfileSummary: (accountData, accountId, at, allowUnchangedRegeneration) => {
     if (!accountData) throw new Error("ACCOUNT_DATA binding is not configured");
@@ -72,10 +66,6 @@ const defaultDependencies: Dependencies = {
       at,
       allowUnchangedRegeneration,
     );
-  },
-  findAnswers: (accountData, accountId, diagnosisId, at) => {
-    if (!accountData) throw new Error("ACCOUNT_DATA binding is not configured");
-    return accountDataFor(accountData, accountId).execute("diagnosis.findAnswers", diagnosisId, at);
   },
 };
 
@@ -94,8 +84,8 @@ export async function getProfileSummary(
   const session = await dependencies.createSession({ idToken, lineLoginChannelId, db });
   if (session.type !== "resolved") return session;
 
-  const [diagnoses, readModel] = await Promise.all([
-    dependencies.listVisibleDiagnoses(accountData, session.session.accountId, at),
+  const [diagnosisSource, readModel] = await Promise.all([
+    dependencies.getDiagnosisSource(accountData, session.session.accountId, at),
     dependencies.readProfileSummary(
       accountData,
       session.session.accountId,
@@ -103,6 +93,7 @@ export async function getProfileSummary(
       allowUnchangedRegeneration,
     ),
   ]);
+  const diagnoses = diagnosisSource.diagnoses;
   const hasAnswerableDiagnosis = diagnoses.some(
     ({ availability, responseStatus }) => availability === "open" && responseStatus !== "answered",
   );
@@ -117,44 +108,45 @@ export async function getProfileSummary(
         left.displayOrder - right.displayOrder ||
         left.id.localeCompare(right.id),
     );
-  const diagnosisThemes = await Promise.all(
-    answeredDiagnoses.map(async ({ id, title, lastAnsweredAt }) => {
-      const result = await dependencies.findAnswers(accountData, session.session.accountId, id, at);
-      if (result.type !== "found") {
-        throw new Error(`Answered diagnosis ${id} could not be loaded`);
-      }
-      let scoring: DiagnosisScoring | null = null;
-      try {
-        scoring = scoreDiagnosisAnswers(result.diagnosis.answers, result.diagnosis.scoringConfig);
-      } catch (error) {
-        logger.warn(
-          {
-            event: "diagnosis.scoring.skipped",
-            service: "api",
-            component: "profile-summary",
-            diagnosisId: id,
-            scoringConfigId: result.diagnosis.scoringConfig?.id,
-            outcome: "degraded",
-            ...toSafeOperationalErrorFields(error, {
-              code: "DIAGNOSIS_SCORING_CONFIG_INVALID",
-              category: "invariant",
-              stage: "diagnosis.score",
-              retryable: false,
-            }),
-          },
-          `[Profile summary] degraded at diagnosis.score -> theme returned without scoring (diagnosis ${id}, DIAGNOSIS_SCORING_CONFIG_INVALID)`,
-        );
-      }
-      return {
-        id,
-        title,
-        lastAnsweredAt,
-        answeredCount: result.diagnosis.answeredCount,
-        questionCount: result.diagnosis.questionCount,
-        scoring,
-      };
-    }),
+  const answersByDiagnosisId = new Map(
+    diagnosisSource.answeredDiagnoses.map((diagnosis) => [diagnosis.id, diagnosis]),
   );
+  const diagnosisThemes = answeredDiagnoses.map(({ id, title, lastAnsweredAt }) => {
+    const diagnosis = answersByDiagnosisId.get(id);
+    if (!diagnosis) {
+      throw new Error(`Answered diagnosis ${id} could not be loaded`);
+    }
+    let scoring: DiagnosisScoring | null = null;
+    try {
+      scoring = scoreDiagnosisAnswers(diagnosis.answers, diagnosis.scoringConfig);
+    } catch (error) {
+      logger.warn(
+        {
+          event: "diagnosis.scoring.skipped",
+          service: "api",
+          component: "profile-summary",
+          diagnosisId: id,
+          scoringConfigId: diagnosis.scoringConfig?.id,
+          outcome: "degraded",
+          ...toSafeOperationalErrorFields(error, {
+            code: "DIAGNOSIS_SCORING_CONFIG_INVALID",
+            category: "invariant",
+            stage: "diagnosis.score",
+            retryable: false,
+          }),
+        },
+        `[Profile summary] degraded at diagnosis.score -> theme returned without scoring (diagnosis ${id}, DIAGNOSIS_SCORING_CONFIG_INVALID)`,
+      );
+    }
+    return {
+      id,
+      title,
+      lastAnsweredAt,
+      answeredCount: diagnosis.answeredCount,
+      questionCount: diagnosis.questionCount,
+      scoring,
+    };
+  });
 
   return {
     type: "resolved",

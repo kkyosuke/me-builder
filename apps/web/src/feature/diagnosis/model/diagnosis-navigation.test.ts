@@ -3,6 +3,7 @@ import type { DiagnosisListItem } from "./diagnosis-list-item";
 import {
   applySavedProgress,
   diagnosisResultIdFromPathname,
+  isDiagnosisResultPathname,
   resolveDiagnosisDestination,
 } from "./diagnosis-navigation";
 
@@ -44,6 +45,7 @@ describe("diagnosisResultIdFromPathname", () => {
   it("別画面と不正なpercent encodingは直接URLとして扱わない", () => {
     expect(diagnosisResultIdFromPathname("/diagnosis")).toBeNull();
     expect(diagnosisResultIdFromPathname("/diagnosis/%E0%A4%A/answers")).toBeNull();
+    expect(isDiagnosisResultPathname("/diagnosis/%E0%A4%A/answers")).toBe(true);
   });
 });
 

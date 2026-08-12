@@ -55,7 +55,7 @@ type Dependencies = {
     accountData: AccountDataNamespace | undefined,
     accountId: string,
     at: Date,
-  ) => ReturnType<typeof DO.account.action.diagnosis.getCompatibilitySharePreviewSource>;
+  ) => ReturnType<typeof DO.account.action.diagnosis.getDiagnosisAnsweredSource>;
   getShareProfile: (
     accountData: AccountDataNamespace | undefined,
     accountId: string,
@@ -68,10 +68,7 @@ const defaultDependencies: Dependencies = {
   createSession: createLiffSession,
   getPreviewSource: (accountData, accountId, at) => {
     if (!accountData) throw new Error("ACCOUNT_DATA binding is not configured");
-    return accountDataFor(accountData, accountId).execute(
-      "diagnosis.getCompatibilitySharePreviewSource",
-      at,
-    );
+    return accountDataFor(accountData, accountId).execute("diagnosis.getAnsweredSource", at);
   },
   getShareProfile: (accountData, accountId) => {
     if (!accountData) throw new Error("ACCOUNT_DATA binding is not configured");

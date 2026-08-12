@@ -1,0 +1,1 @@
+ALTER TABLE `profile_summary_generations` ADD `dispatched_at` integer;

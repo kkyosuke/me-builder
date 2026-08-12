@@ -97,6 +97,28 @@ export class AccountData extends DurableObject<Env> {
         await DO.account.action.diagnosisBrainProjection.processPendingDiagnosisBrainProjections(
           this.repository.client,
         );
+        const profileSummaryGenerationIds =
+          await DO.account.action.profileSummary.listUndispatchedProfileSummaryGenerationIds(
+            this.repository.client,
+            this.accountId,
+          );
+        if (profileSummaryGenerationIds.length > 0 && !this.env.PROFILE_SUMMARY_QUEUE) {
+          throw new Error(
+            "PROFILE_SUMMARY_QUEUE binding is required for Profile Summary generation",
+          );
+        }
+        for (const generationId of profileSummaryGenerationIds) {
+          await this.env.PROFILE_SUMMARY_QUEUE?.send({
+            type: "profile-summary-generation",
+            accountId: this.accountId,
+            generationId,
+          });
+          await DO.account.action.profileSummary.markProfileSummaryGenerationDispatched(
+            this.repository.client,
+            this.accountId,
+            generationId,
+          );
+        }
         const checkpointClaim = await DO.account.action.diary.claimDueDiaryBrainCheckpointIds(
           this.repository.client,
           this.accountId,

@@ -13,6 +13,7 @@ export const profileSummaryGenerations = sqliteTable(
       .references(() => accountDataIdentity.accountId),
     status: text("status", { enum: ["queued", "generating", "completed", "failed"] }).notNull(),
     requestedAt: integer("requested_at", { mode: "timestamp_ms" }).notNull(),
+    dispatchedAt: integer("dispatched_at", { mode: "timestamp_ms" }),
     startedAt: integer("started_at", { mode: "timestamp_ms" }),
     finishedAt: integer("finished_at", { mode: "timestamp_ms" }),
     failureMessage: text("failure_message"),

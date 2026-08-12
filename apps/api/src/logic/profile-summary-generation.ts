@@ -1,5 +1,10 @@
 import { type AccountDataNamespace, type D1, accountDataFor } from "@me-builder/lib";
-import type { ProfileSummaryGenerationQueueMessage, Queue } from "@me-builder/shared";
+import {
+  type ProfileSummaryGenerationQueueMessage,
+  type Queue,
+  logger,
+  toSafeOperationalErrorFields,
+} from "@me-builder/shared";
 import { createLiffSession } from "./liff-session";
 
 export type RequestProfileSummaryGenerationOutcome =
@@ -46,20 +51,58 @@ export async function requestProfileSummaryGeneration({
     allowUnchangedRegeneration,
   );
   if (request.outcome === "unavailable") return { type: "unavailable", reason: request.reason };
-  if (request.outcome === "created") {
+  if (request.needsDispatch) {
+    let dispatched = false;
     try {
       await queue.send({
         type: "profile-summary-generation",
         accountId: session.session.accountId,
         generationId: request.generationId,
       });
+      dispatched = true;
     } catch (error) {
-      await account.execute(
-        "profileSummary.failGeneration",
-        request.generationId,
-        "生成処理を開始できませんでした。時間をおいて再試行してください。",
+      logger.warn(
+        {
+          event: "profile-summary-generation.dispatch.deferred",
+          service: "api",
+          component: "profile-summary-generation",
+          generationId: request.generationId,
+          outcome: "deferred",
+          disposition: "account-data-alarm",
+          ...toSafeOperationalErrorFields(error, {
+            code: "PROFILE_SUMMARY_QUEUE_DISPATCH_DEFERRED",
+            category: "dependency",
+            stage: "queue.send",
+            retryable: true,
+            dependency: "cloudflare-queue",
+          }),
+        },
+        "[Profile summary generation] deferred at queue.send -> account-data-alarm",
       );
-      throw error;
+    }
+    if (dispatched) {
+      try {
+        await account.execute("profileSummary.markGenerationDispatched", request.generationId, at);
+      } catch (error) {
+        logger.warn(
+          {
+            event: "profile-summary-generation.dispatch-record.deferred",
+            service: "api",
+            component: "profile-summary-generation",
+            generationId: request.generationId,
+            outcome: "deferred",
+            disposition: "account-data-alarm",
+            ...toSafeOperationalErrorFields(error, {
+              code: "PROFILE_SUMMARY_DISPATCH_RECORD_DEFERRED",
+              category: "dependency",
+              stage: "dispatch.record",
+              retryable: true,
+              dependency: "account-data",
+            }),
+          },
+          "[Profile summary generation] deferred at dispatch.record -> account-data-alarm",
+        );
+      }
     }
   }
   return {

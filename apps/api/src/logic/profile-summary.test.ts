@@ -33,9 +33,8 @@ function dependencies(diagnoses: unknown[]) {
       type: "resolved",
       session: { accountId: "account-1", role: "user" },
     }),
-    listVisibleDiagnoses: vi.fn().mockResolvedValue(diagnoses),
+    getDiagnosisSource: vi.fn().mockResolvedValue({ diagnoses, answeredDiagnoses: [] }),
     readProfileSummary: vi.fn().mockResolvedValue(readModel),
-    findAnswers: vi.fn().mockResolvedValue({ type: "not-found" }),
   };
 }
 
@@ -49,7 +48,7 @@ describe("getProfileSummary", () => {
     );
 
     expect(result).toMatchObject({ type: "resolved", nextAction: "diagnosis" });
-    expect(deps.listVisibleDiagnoses).toHaveBeenCalledWith(
+    expect(deps.getDiagnosisSource).toHaveBeenCalledWith(
       accountData,
       "account-1",
       expect.any(Date),
@@ -99,7 +98,7 @@ describe("getProfileSummary", () => {
   });
 
   it("完了済み診断を最終回答日時順に共通採点して返す", async () => {
-    const deps = dependencies([
+    const diagnoses = [
       {
         id: "later",
         title: "あとに答えた診断",
@@ -116,52 +115,51 @@ describe("getProfileSummary", () => {
         responseStatus: "answered",
         lastAnsweredAt: "2026-08-11T02:00:00.000Z",
       },
-    ]);
-    deps.findAnswers.mockImplementation((_accountData, _accountId, diagnosisId) =>
-      Promise.resolve({
-        type: "found",
-        diagnosis: {
-          id: diagnosisId,
-          title: diagnosisId,
-          description: "説明",
-          responseStatus: "answered",
-          answeredCount: 1,
-          questionCount: 1,
-          scoringConfig: {
-            id: `scoring-${diagnosisId}`,
-            version: 1,
-            questions: [{ questionId: "q1", questionVersion: 1, choiceIds: ["yes", "no"] }],
-            definition: {
-              parameters: [
-                {
-                  id: "planning",
-                  label: "計画性",
-                  lowLabel: "即興的",
-                  highLabel: "計画的",
-                },
-              ],
-              choiceScores: { yes: 1, no: -1 },
-              questions: { q1: { questionVersion: 1, weights: { planning: 1 } } },
-              minimumCoverage: 1,
-              lowMaximum: 35,
-              highMinimum: 65,
-              balancedLabel: "状況による",
-            },
+    ];
+    const deps = dependencies(diagnoses);
+    deps.getDiagnosisSource.mockResolvedValue({
+      diagnoses,
+      answeredDiagnoses: ["later", "earlier"].map((diagnosisId) => ({
+        id: diagnosisId,
+        title: diagnosisId,
+        description: "説明",
+        responseStatus: "answered",
+        answeredCount: 1,
+        questionCount: 1,
+        scoringConfig: {
+          id: `scoring-${diagnosisId}`,
+          version: 1,
+          questions: [{ questionId: "q1", questionVersion: 1, choiceIds: ["yes", "no"] }],
+          definition: {
+            parameters: [
+              {
+                id: "planning",
+                label: "計画性",
+                lowLabel: "即興的",
+                highLabel: "計画的",
+              },
+            ],
+            choiceScores: { yes: 1, no: -1 },
+            questions: { q1: { questionVersion: 1, weights: { planning: 1 } } },
+            minimumCoverage: 1,
+            lowMaximum: 35,
+            highMinimum: 65,
+            balancedLabel: "状況による",
           },
-          answers: [
-            {
-              diagnosisQuestionId: "dq1",
-              questionId: "q1",
-              questionVersion: 1,
-              questionText: "予定を立てますか",
-              choiceId: "yes",
-              choiceLabel: "はい",
-              acceptedAt: "2026-08-12T02:00:00.000Z",
-            },
-          ],
         },
-      }),
-    );
+        answers: [
+          {
+            diagnosisQuestionId: "dq1",
+            questionId: "q1",
+            questionVersion: 1,
+            questionText: "予定を立てますか",
+            choiceId: "yes",
+            choiceLabel: "はい",
+            acceptedAt: "2026-08-12T02:00:00.000Z",
+          },
+        ],
+      })),
+    });
 
     const result = await getProfileSummary(
       { idToken: "token", lineLoginChannelId: "channel", db, accountData },
@@ -228,7 +226,7 @@ describe("getProfileSummary", () => {
     );
 
     expect(result).toEqual({ type: "unauthenticated", reason: "invalid" });
-    expect(deps.listVisibleDiagnoses).not.toHaveBeenCalled();
+    expect(deps.getDiagnosisSource).not.toHaveBeenCalled();
     expect(deps.readProfileSummary).not.toHaveBeenCalled();
   });
 });

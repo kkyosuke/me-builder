@@ -11,7 +11,9 @@ import {
   PROFILE_SUMMARY_REGENERATION_INTERVAL_MS,
   completeProfileSummaryGeneration,
   failProfileSummaryGeneration,
+  listUndispatchedProfileSummaryGenerationIds,
   loadProfileSummaryGenerationContext,
+  markProfileSummaryGenerationDispatched,
   readCompatibilityShareProfile,
   readProfileSummary,
   requestProfileSummaryGeneration,
@@ -142,11 +144,28 @@ describe("Profile Summary persistence", () => {
       accountId,
       new Date("2026-08-09T00:00:00.000Z"),
     );
-    expect(requested).toMatchObject({ outcome: "created", status: "queued" });
+    expect(requested).toMatchObject({
+      outcome: "created",
+      status: "queued",
+      needsDispatch: true,
+    });
     if (requested.outcome !== "created") throw new Error("generation was not created");
+    await expect(listUndispatchedProfileSummaryGenerationIds(db, accountId)).resolves.toEqual([
+      requested.generationId,
+    ]);
+    await expect(
+      markProfileSummaryGenerationDispatched(
+        db,
+        accountId,
+        requested.generationId,
+        new Date("2026-08-09T00:00:01.000Z"),
+      ),
+    ).resolves.toBe(true);
+    await expect(listUndispatchedProfileSummaryGenerationIds(db, accountId)).resolves.toEqual([]);
     await expect(requestProfileSummaryGeneration(db, accountId)).resolves.toMatchObject({
       outcome: "existing",
       generationId: requested.generationId,
+      needsDispatch: false,
     });
 
     const context = await loadProfileSummaryGenerationContext(

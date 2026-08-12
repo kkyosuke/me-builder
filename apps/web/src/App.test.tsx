@@ -787,6 +787,32 @@ describe("App", () => {
     expect(mocks.fetchDiagnosisList).toHaveBeenCalledOnce();
   });
 
+  it("無効な回答結果URLでは案内を表示して元のまとめへ戻せる", async () => {
+    window.history.replaceState({}, "", "/diagnosis/missing/answers?from=me");
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "この回答結果を開けません" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "わたしのまとめへ" }).getAttribute("href")).toBe("/me");
+    expect(mocks.fetchDiagnosisResult).not.toHaveBeenCalled();
+  });
+
+  it("回答結果URLの通信失敗を同じ診断で再試行する", async () => {
+    mocks.fetchDiagnosisList.mockResolvedValue([
+      diagnosis({ responseStatus: "answered", answeredCount: 10 }),
+    ]);
+    mocks.fetchDiagnosisResult.mockRejectedValueOnce(new Error("temporary failure"));
+    window.history.replaceState({}, "", "/diagnosis/diagnosis-1/answers?from=me");
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "診断を読み込めませんでした" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "もう一度読み込む" }));
+
+    expect(await screen.findByText("結果UI: テスト診断 (1件)")).toBeTruthy();
+    expect(mocks.fetchDiagnosisResult).toHaveBeenCalledTimes(2);
+  });
+
   it("/compatibilityでは相性一覧を表示し、診断一覧は取得しない", async () => {
     window.history.replaceState({}, "", "/compatibility");
 

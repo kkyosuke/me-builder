@@ -111,6 +111,11 @@ export type AccountDataActions = {
     requestedAt?: Date,
     allowUnchangedRegeneration?: boolean,
   ) => Promise<RequestProfileSummaryGenerationResult>;
+  "profileSummary.listUndispatchedGenerationIds": (at?: Date, limit?: number) => Promise<string[]>;
+  "profileSummary.markGenerationDispatched": (
+    generationId: string,
+    dispatchedAt?: Date,
+  ) => Promise<boolean>;
   "profileSummary.loadGenerationContext": (
     generationId: string,
     startedAt?: Date,
@@ -195,10 +200,7 @@ export type AccountDataActions = {
     [diagnosisId: string, at: Date],
     typeof diagnosis.findDiagnosisAnswers
   >;
-  "diagnosis.getCompatibilitySharePreviewSource": RpcAction<
-    [at: Date],
-    typeof diagnosis.getCompatibilitySharePreviewSource
-  >;
+  "diagnosis.getAnsweredSource": RpcAction<[at: Date], typeof diagnosis.getDiagnosisAnsweredSource>;
   "diagnosis.hasResponse": RpcAction<[diagnosisId: string], typeof diagnosis.hasDiagnosisResponse>;
   "diagnosis.listVisible": RpcAction<[at: Date], typeof diagnosis.listVisibleDiagnoses>;
   "diagnosisProjection.processLatest": RpcAction<

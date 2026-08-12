@@ -27,6 +27,7 @@ describe("requestProfileSummaryGeneration", () => {
       outcome: "created",
       generationId: "generation-1",
       status: "queued",
+      needsDispatch: true,
     });
 
     await expect(
@@ -44,6 +45,12 @@ describe("requestProfileSummaryGeneration", () => {
       generationId: "generation-1",
     });
     expect(JSON.stringify(send.mock.calls)).not.toContain("本文");
+    expect(execute).toHaveBeenLastCalledWith(
+      "account-1",
+      "profileSummary.markGenerationDispatched",
+      "generation-1",
+      expect.any(Date),
+    );
   });
 
   it("処理中の要求があればQueueへ重複送信しない", async () => {
@@ -51,6 +58,7 @@ describe("requestProfileSummaryGeneration", () => {
       outcome: "existing",
       generationId: "generation-1",
       status: "generating",
+      needsDispatch: false,
     });
 
     await expect(
@@ -70,6 +78,7 @@ describe("requestProfileSummaryGeneration", () => {
       outcome: "created",
       generationId: "generation-dev",
       status: "queued",
+      needsDispatch: true,
     });
 
     await requestProfileSummaryGeneration({
@@ -108,11 +117,12 @@ describe("requestProfileSummaryGeneration", () => {
     expect(send).not.toHaveBeenCalled();
   });
 
-  it("Queue送信に失敗した要求をfailedへ遷移する", async () => {
+  it("Queue送信に失敗しても要求をqueuedに保ちAlarmで復旧できる", async () => {
     execute.mockResolvedValueOnce({
       outcome: "created",
       generationId: "generation-1",
       status: "queued",
+      needsDispatch: true,
     });
     send.mockRejectedValueOnce(new Error("queue unavailable"));
 
@@ -124,12 +134,30 @@ describe("requestProfileSummaryGeneration", () => {
         accountData,
         queue,
       }),
-    ).rejects.toThrow("queue unavailable");
-    expect(execute).toHaveBeenLastCalledWith(
-      "account-1",
-      "profileSummary.failGeneration",
-      "generation-1",
-      expect.any(String),
-    );
+    ).resolves.toMatchObject({ type: "accepted", status: "queued" });
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("未配送の既存要求を同じgeneration IDでQueueへ再送する", async () => {
+    execute.mockResolvedValueOnce({
+      outcome: "existing",
+      generationId: "generation-1",
+      status: "queued",
+      needsDispatch: true,
+    });
+
+    await requestProfileSummaryGeneration({
+      idToken: "token",
+      lineLoginChannelId: "channel",
+      db: {} as D1.shared.Client,
+      accountData,
+      queue,
+    });
+
+    expect(send).toHaveBeenCalledWith({
+      type: "profile-summary-generation",
+      accountId: "account-1",
+      generationId: "generation-1",
+    });
   });
 });

@@ -120,6 +120,31 @@ describe("AccountDataRepository", () => {
     expect(repository.nextMaintenanceAt()).toBeNull();
   });
 
+  it("未配送のProfile Summary生成要求を直近のmaintenanceとして返す", async () => {
+    const repository = createRepository();
+    await repository.initialize();
+    repository.bindAccount("account-1");
+    const requestedAt = new Date("2026-08-12T00:00:00.000Z");
+    await repository.client.insert(DO.account.schema.profileSummaryGenerations).values({
+      id: "generation-undispatched",
+      accountId: "account-1",
+      status: "queued",
+      requestedAt,
+    });
+
+    expect(repository.nextMaintenanceAt()).toBe(
+      requestedAt.getTime() + DO.account.action.profileSummary.PROFILE_SUMMARY_DISPATCH_RECOVERY_MS,
+    );
+
+    await DO.account.action.profileSummary.markProfileSummaryGenerationDispatched(
+      repository.client,
+      "account-1",
+      "generation-undispatched",
+      new Date("2026-08-12T00:00:01.000Z"),
+    );
+    expect(repository.nextMaintenanceAt()).toBeNull();
+  });
+
   it("別ObjectのAccount所有データをSELECTできない", async () => {
     const first = createRepository();
     const second = createRepository();
