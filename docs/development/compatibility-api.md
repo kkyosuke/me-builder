@@ -16,6 +16,20 @@ Authorization: Bearer <LIFF ID token>
 
 IDトークン、Account ID、生の回答、結果指紋はレスポンスとログへ出しません。
 
+### 2.1 相性画面のプロフィール画像
+
+共有プレビューと招待確認で返す`avatarUrl`は、API Serverが当事者のAccountを確定した後、次の順で解決します。
+
+1. 共有D1が参照するPrivate R2のプロフィール設定画像
+2. LINEプロフィール画像
+3. `null`
+
+本人のLINE画像は検証済みLIFF IDトークンの`picture`を使います。相手のLINE画像は、Accountに紐づくMessaging APIのuser IDを共有D1から解決し、[Messaging APIのGet profile](https://developers.line.biz/en/reference/messaging-api/#get-profile)をAPI Serverから呼び出して取得します。このAPIが相手のLIFFトークンを要求することはありません。本システムでは公式アカウントの友だち追加をAccount作成の起点としており、Messaging APIチャネルとLINE Loginチャネルを同じProviderに置くため、両チャネルのuser IDを同一人物へ安全に対応付けられます。
+
+Private R2の画像はData URL、LINE画像はLINEが返したHTTPS URLとして`avatarUrl`へ入れます。R2 objectの欠落・メタデータ不一致、Messaging APIの取得失敗、LINE画像未設定はいずれもプロフィールや招待の取得全体を失敗させず、次の候補または`null`へ縮退します。Web UIは`null`または画像読み込み失敗時にLINEの既定表示に合わせた人物シルエットを表示します。
+
+`avatarUrl`は表示補助であり、共有プロフィールや診断結果の同意指紋、`previewToken`には含めません。プロフィール画像の変更だけで確認済みの診断共有内容を失効させず、各GET時点の現在画像を表示します。相手の画像は、招待の送信者・受信者としてサーバー側で認可できる応答にだけ含め、Account IDやLINE user IDをクライアントへ返しません。
+
 ## 3. 共有プレビュー
 
 ### `GET /api/compatibility/share-preview`
@@ -39,6 +53,7 @@ flowchart LR
 ```json
 {
   "displayName": "あおい",
+  "avatarUrl": "https://profile.line-scdn.net/avatar",
   "previewToken": "csp2.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "aboutMe": {
     "profileSummaryVersionId": "summary-version-id",
@@ -73,7 +88,7 @@ flowchart LR
 }
 ```
 
-`displayName`は検証済みIDトークンに表示名がなければ`null`です。`aboutMe`は本人向けまとめと同じ生成要求から作った共有専用projectionであり、内部の根拠ID、日記・会話本文、Brain Item本文は含めません。projectionがない、または内部根拠が削除・無効化されている場合は`null`です。
+`displayName`は検証済みIDトークンに表示名がなければ`null`です。`avatarUrl`の決定と縮退は[相性画面のプロフィール画像](#21-相性画面のプロフィール画像)に従います。`aboutMe`は本人向けまとめと同じ生成要求から作った共有専用projectionであり、内部の根拠ID、日記・会話本文、Brain Item本文は含めません。projectionがない、または内部根拠が削除・無効化されている場合は`null`です。
 
 `previewToken`は表示名、共有プロフィール版と文章、画面へ返した診断由来の共有表示、各テーマの採点設定IDとversionから決定的に計算するバージョン付きの不透明な確認tokenです。後続の招待発行APIはtokenを受け取り、現在状態から再計算した値と一致しない場合に再確認を要求します。tokenは共有プロフィール指紋やテーマ別の結果指紋ではなく、招待リンクやログへ含めません。
 
@@ -90,7 +105,7 @@ flowchart LR
 
 `nextAction`は共有専用プロフィールprojectionが利用できなければ`profile-summary`、それ以外で共有可能なテーマがなく現在回答できる未完了Diagnosisがあれば`diagnosis`、それ以外は`null`にします。表示名、プロフィール版、Diagnosisの不足は同時に発生し得るため、クライアントは`blockingReasons`を配列として扱います。
 
-このAPIは本人が発行前に確認する読み取りモデルです。生の回答、具体的な出来事、日記・会話本文、Source Record、Brain Item本文、内部根拠ID、質問文、Choice、回答日時、Account ID、採点設定本体、`coverage`、各種指紋を返しません。
+このAPIは本人が発行前に確認する読み取りモデルです。生の回答、具体的な出来事、日記・会話本文、Source Record、Brain Item本文、内部根拠ID、質問文、Choice、回答日時、Account ID、採点設定本体、`coverage`、各種指紋を返しません。プロフィール画像をブラウザや中継キャッシュへ保持させないため、成功・エラーを問わず`Cache-Control: no-store`を付けます。
 
 認証・基盤の共通エラーは次のとおりです。
 
@@ -175,6 +190,7 @@ sequenceDiagram
 {
   "inviter": {
     "displayName": "あおい",
+    "avatarUrl": "data:image/webp;base64,...",
     "aboutMe": {
       "profileSummaryVersionId": "summary-version-inviter",
       "generatedAt": "2026-08-11T00:00:00.000Z",
@@ -205,6 +221,7 @@ sequenceDiagram
   },
   "recipient": {
     "displayName": "はる",
+    "avatarUrl": null,
     "previewToken": "csp2.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "aboutMe": {
       "profileSummaryVersionId": "summary-version-recipient",
@@ -226,7 +243,7 @@ sequenceDiagram
 }
 ```
 
-`inviter.themes`は送信者が発行時に提示したテーマ、`recipient.themes`はそのうち受信者も現在確認できる共通テーマを、共有プレビューと同じ構造で返します。
+`inviter.themes`は送信者が発行時に提示したテーマ、`recipient.themes`はそのうち受信者も現在確認できる共通テーマを、共有プレビューと同じ構造で返します。双方の`avatarUrl`は[相性画面のプロフィール画像](#21-相性画面のプロフィール画像)に従い、送信者側も招待が特定したAccountからサーバー側で解決します。
 
 `canAccept`は受信者の検証済み表示名、利用可能な共有プロフィール、計算可能な診断表示、1件以上の共通テーマがそろう場合だけ`true`です。`blockingReasons`は共有プレビューの受信者側理由に`common_diagnosis_required`を加えた配列です。共通テーマがなければ`nextAction`を`diagnosis`にし、共有プロフィールを利用できなければ`profile-summary`を優先します。
 

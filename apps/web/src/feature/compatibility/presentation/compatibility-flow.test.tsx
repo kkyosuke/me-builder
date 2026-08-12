@@ -84,6 +84,7 @@ describe("Compatibility flow", () => {
   it("APIから取得した振る舞い・考え方をすべて表示し、詳細は共有しない", () => {
     const preview: CompatibilitySharePreview = {
       displayName: "うさぎ",
+      avatarUrl: "https://profile.line-scdn.net/me",
       previewToken: `csp2.${"a".repeat(64)}`,
       aboutMe: {
         profileSummaryVersionId: "summary-version-1",
@@ -134,6 +135,7 @@ describe("Compatibility flow", () => {
     );
 
     expect(screen.getByText("うさぎさんから招待")).toBeTruthy();
+    expect(document.querySelector('img[src="https://profile.line-scdn.net/me"]')).not.toBeNull();
     expect(screen.getByText("私は、先の見通しを持って動けると安心しやすいです")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "暮らし方" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "共有する振る舞い・考え方" })).toBeTruthy();
@@ -163,6 +165,7 @@ describe("Compatibility flow", () => {
           status: "success",
           data: {
             displayName: "うさぎ",
+            avatarUrl: null,
             previewToken: `csp2.${"a".repeat(64)}`,
             aboutMe: null,
             themes: [],
@@ -194,6 +197,7 @@ describe("Compatibility flow", () => {
           status: "success",
           data: {
             displayName: "うさぎ",
+            avatarUrl: null,
             previewToken: `csp2.${"b".repeat(64)}`,
             aboutMe: {
               profileSummaryVersionId: "summary-version-1",
@@ -243,6 +247,7 @@ describe("Compatibility flow", () => {
     const invitation: CompatibilityInvitationPreview = {
       inviter: {
         displayName: "あおい",
+        avatarUrl: "https://profile.line-scdn.net/inviter",
         aboutMe: {
           profileSummaryVersionId: "profile-inviter",
           generatedAt: "2026-08-11T00:00:00.000Z",
@@ -252,6 +257,7 @@ describe("Compatibility flow", () => {
       },
       recipient: {
         displayName: "はる",
+        avatarUrl: null,
         previewToken: `csp2.${"a".repeat(64)}`,
         aboutMe: {
           profileSummaryVersionId: "profile-recipient",
@@ -275,6 +281,9 @@ describe("Compatibility flow", () => {
     );
 
     expect(screen.getByText("あおいさんから招待が届いています")).toBeTruthy();
+    expect(
+      document.querySelector('img[src="https://profile.line-scdn.net/inviter"]'),
+    ).not.toBeNull();
     expect(screen.getByText("私は見通しを大切にします")).toBeTruthy();
     expect(screen.getByText("私は予定の余白を大切にします")).toBeTruthy();
     expect(screen.getAllByRole("heading", { name: "共有する振る舞い・考え方" })).toHaveLength(2);

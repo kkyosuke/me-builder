@@ -45,15 +45,19 @@ import { bearerToken } from "./auth";
 
 /** `GET /api/compatibility/share-preview` — 招待発行前に本人へ共有内容を表示する。 */
 export async function getCompatibilitySharePreviewContents(c: Context<AppEnv>): Promise<Response> {
+  c.header("Cache-Control", "no-store");
   if (!c.env?.DB || !c.env.ACCOUNT_DATA) {
     logger.error({ path: c.req.path }, "Compatibility preview storage binding is not configured");
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   }
 
+  const currentConfig = getConfig(c.env);
   const outcome = await getCompatibilitySharePreview({
     idToken: bearerToken(c.req.header("authorization")),
-    lineLoginChannelId: getConfig(c.env).lineLoginChannelId,
+    lineLoginChannelId: currentConfig.lineLoginChannelId,
+    lineChannelAccessToken: currentConfig.lineChannelAccessToken,
     db: D1.shared.client.create(c.env.DB),
+    avatarBucket: c.env.AVATAR_BUCKET,
     accountData: c.env.ACCOUNT_DATA,
   });
 
@@ -150,11 +154,14 @@ export async function getCompatibilityInvitation(c: Context<AppEnv>): Promise<Re
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   }
 
+  const currentConfig = getConfig(c.env);
   const outcome = await getCompatibilityInvitationContents({
     relationshipId: c.req.param("relationshipId") ?? "",
     idToken: bearerToken(c.req.header("authorization")),
-    lineLoginChannelId: getConfig(c.env).lineLoginChannelId,
+    lineLoginChannelId: currentConfig.lineLoginChannelId,
+    lineChannelAccessToken: currentConfig.lineChannelAccessToken,
     db: D1.shared.client.create(c.env.DB),
+    avatarBucket: c.env.AVATAR_BUCKET,
     accountData: c.env.ACCOUNT_DATA,
     compatibilityData: c.env.COMPATIBILITY_DATA,
   });

@@ -1,4 +1,4 @@
-import type { D1Database } from "@cloudflare/workers-types";
+import type { D1Database, R2Bucket } from "@cloudflare/workers-types";
 import type { AccountDataNamespace, CompatibilityDataNamespace } from "@me-builder/lib";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { app } from "../index";
@@ -20,6 +20,7 @@ vi.mock("../logic/compatibility-invitation-preview", () => ({
 }));
 
 const dummyDb = {} as D1Database;
+const dummyAvatarBucket = {} as R2Bucket;
 const dummyAccountData = {} as AccountDataNamespace;
 const dummyCompatibilityData = {} as CompatibilityDataNamespace;
 const previewToken = `csp2.${"a".repeat(64)}`;
@@ -49,6 +50,7 @@ describe("GET /api/compatibility/share-preview", () => {
       type: "resolved",
       preview: {
         displayName: "あおい",
+        avatarUrl: null,
         previewToken,
         aboutMe: null,
         themes: [],
@@ -58,11 +60,16 @@ describe("GET /api/compatibility/share-preview", () => {
       },
     });
 
-    const response = await request();
+    const response = await request({
+      AVATAR_BUCKET: dummyAvatarBucket,
+      LINE_CHANNEL_ACCESS_TOKEN: "line-token",
+    });
 
     expect(response.status).toBe(200);
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
     expect(await response.json()).toEqual({
       displayName: "あおい",
+      avatarUrl: null,
       previewToken,
       aboutMe: null,
       themes: [],
@@ -74,6 +81,8 @@ describe("GET /api/compatibility/share-preview", () => {
       expect.objectContaining({
         idToken: "dummy.id.token",
         lineLoginChannelId: "2010850319",
+        lineChannelAccessToken: "line-token",
+        avatarBucket: dummyAvatarBucket,
         accountData: dummyAccountData,
       }),
     );
@@ -218,6 +227,7 @@ describe("GET /api/compatibility/invitations/:relationshipId", () => {
   const invitation = {
     inviter: {
       displayName: "あおい",
+      avatarUrl: "https://profile.line-scdn.net/inviter",
       aboutMe: {
         profileSummaryVersionId: "profile-inviter",
         generatedAt: "2026-08-11T00:00:00.000Z",
@@ -242,6 +252,7 @@ describe("GET /api/compatibility/invitations/:relationshipId", () => {
     },
     recipient: {
       displayName: "はる",
+      avatarUrl: null,
       previewToken,
       aboutMe: null,
       themes: [],
@@ -269,7 +280,10 @@ describe("GET /api/compatibility/invitations/:relationshipId", () => {
   it("resolvedをno-storeの200へ変換する", async () => {
     getCompatibilityInvitationContents.mockResolvedValue({ type: "resolved", invitation });
 
-    const response = await invitationRequest();
+    const response = await invitationRequest({
+      AVATAR_BUCKET: dummyAvatarBucket,
+      LINE_CHANNEL_ACCESS_TOKEN: "line-token",
+    });
 
     expect(response.status).toBe(200);
     expect(response.headers.get("Cache-Control")).toBe("no-store");
@@ -278,6 +292,8 @@ describe("GET /api/compatibility/invitations/:relationshipId", () => {
       expect.objectContaining({
         relationshipId,
         idToken: "dummy.id.token",
+        lineChannelAccessToken: "line-token",
+        avatarBucket: dummyAvatarBucket,
         accountData: dummyAccountData,
         compatibilityData: dummyCompatibilityData,
       }),

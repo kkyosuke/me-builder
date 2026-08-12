@@ -1,3 +1,4 @@
+import type { R2Bucket } from "@cloudflare/workers-types";
 import {
   type AccountDataNamespace,
   type CompatibilitySharePreviewDiagnosis,
@@ -10,25 +11,28 @@ import {
   createCompatibilitySharePreviewToken,
 } from "@me-builder/lib";
 import { logger } from "@me-builder/shared";
+import { resolveCompatibilityAvatarUrl } from "./compatibility-avatar";
 import { scoreDiagnosisAnswers } from "./diagnosis-scoring";
 import { createLiffSession } from "./liff-session";
+
+type CompatibilitySharePreviewContents = Readonly<{
+  displayName: string | null;
+  previewToken: string;
+  aboutMe: {
+    profileSummaryVersionId: string;
+    generatedAt: string;
+    statements: readonly { key: string; label: string; statement: string }[];
+  } | null;
+  themes: readonly CompatibilitySharePreviewTheme[];
+  canIssueInvitation: boolean;
+  blockingReasons: readonly CompatibilitySharePreviewBlockingReason[];
+  nextAction: "diagnosis" | "profile-summary" | null;
+}>;
 
 export type CompatibilitySharePreviewOutcome =
   | {
       type: "resolved";
-      preview: {
-        displayName: string | null;
-        previewToken: string;
-        aboutMe: {
-          profileSummaryVersionId: string;
-          generatedAt: string;
-          statements: readonly { key: string; label: string; statement: string }[];
-        } | null;
-        themes: readonly CompatibilitySharePreviewTheme[];
-        canIssueInvitation: boolean;
-        blockingReasons: readonly CompatibilitySharePreviewBlockingReason[];
-        nextAction: "diagnosis" | "profile-summary" | null;
-      };
+      preview: CompatibilitySharePreviewContents & { avatarUrl: string | null };
     }
   | { type: "not-configured" }
   | { type: "unauthenticated"; reason: string }
@@ -46,6 +50,8 @@ type Params = {
   idToken: string | undefined;
   lineLoginChannelId: string | undefined;
   db: D1.shared.Client;
+  avatarBucket?: R2Bucket | undefined;
+  lineChannelAccessToken?: string | undefined;
   accountData?: AccountDataNamespace;
   at?: Date;
 };
@@ -54,7 +60,7 @@ export type CompatibilitySharePreviewData = Readonly<{
   displayName: string | null;
   shareProfile: CompatibilityShareProfile | null;
   shareableDiagnoses: readonly CompatibilitySharePreviewDiagnosis[];
-  preview: Extract<CompatibilitySharePreviewOutcome, { type: "resolved" }>["preview"];
+  preview: CompatibilitySharePreviewContents;
 }>;
 
 export type CompatibilitySharePreviewDataDependencies = {
@@ -74,6 +80,7 @@ export type CompatibilitySharePreviewDataDependencies = {
 
 type Dependencies = CompatibilitySharePreviewDataDependencies & {
   createSession: typeof createLiffSession;
+  resolveAvatarUrl?: typeof resolveCompatibilityAvatarUrl;
 };
 
 export const compatibilitySharePreviewDataDependencies: CompatibilitySharePreviewDataDependencies =
@@ -95,6 +102,7 @@ export const compatibilitySharePreviewDataDependencies: CompatibilitySharePrevie
 
 const defaultDependencies: Dependencies = {
   createSession: createLiffSession,
+  resolveAvatarUrl: resolveCompatibilityAvatarUrl,
   ...compatibilitySharePreviewDataDependencies,
 };
 
@@ -198,7 +206,15 @@ export async function loadCompatibilitySharePreviewData(
 
 /** 本人の完了済み診断を、招待発行前に確認できる安全な表示へ変換する。 */
 export async function getCompatibilitySharePreview(
-  { idToken, lineLoginChannelId, db, accountData, at = new Date() }: Params,
+  {
+    idToken,
+    lineLoginChannelId,
+    db,
+    avatarBucket,
+    lineChannelAccessToken,
+    accountData,
+    at = new Date(),
+  }: Params,
   dependencies: Dependencies = defaultDependencies,
 ): Promise<CompatibilitySharePreviewOutcome> {
   const session = await dependencies.createSession({ idToken, lineLoginChannelId, db });
@@ -213,5 +229,14 @@ export async function getCompatibilitySharePreview(
     },
     dependencies,
   );
-  return { type: "resolved", preview: data.preview };
+  const avatarUrl = dependencies.resolveAvatarUrl
+    ? await dependencies.resolveAvatarUrl({
+        accountId: session.session.accountId,
+        verifiedLinePictureUrl: session.session.pictureUrl,
+        db,
+        avatarBucket,
+        lineChannelAccessToken,
+      })
+    : null;
+  return { type: "resolved", preview: { ...data.preview, avatarUrl } };
 }

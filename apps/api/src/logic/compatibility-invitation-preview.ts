@@ -1,3 +1,4 @@
+import type { R2Bucket } from "@cloudflare/workers-types";
 import {
   type AccountDataNamespace,
   type CompatibilityDataNamespace,
@@ -8,6 +9,7 @@ import {
   compatibilityDataFor,
   createCompatibilityShareThemeFingerprints,
 } from "@me-builder/lib";
+import { resolveCompatibilityAvatarUrl } from "./compatibility-avatar";
 import {
   type CompatibilitySharePreviewBlockingReason,
   type CompatibilitySharePreviewData,
@@ -26,11 +28,13 @@ type PublicProfile = NonNullable<CompatibilitySharePreviewData["preview"]["about
 type CompatibilityInvitationContents = Readonly<{
   inviter: Readonly<{
     displayName: string;
+    avatarUrl: string | null;
     aboutMe: PublicProfile;
     themes: readonly CompatibilitySharePreviewTheme[];
   }>;
   recipient: Readonly<{
     displayName: string | null;
+    avatarUrl: string | null;
     previewToken: string;
     aboutMe: PublicProfile | null;
     themes: readonly CompatibilitySharePreviewTheme[];
@@ -54,6 +58,8 @@ type Params = Readonly<{
   idToken: string | undefined;
   lineLoginChannelId: string | undefined;
   db: D1.shared.Client;
+  avatarBucket?: R2Bucket | undefined;
+  lineChannelAccessToken?: string | undefined;
   accountData: AccountDataNamespace;
   compatibilityData: CompatibilityDataNamespace;
   at?: Date;
@@ -72,6 +78,7 @@ type Dependencies = Readonly<{
   ) => Promise<CompatibilityInvitationAcceptanceContext | null>;
   loadSharePreviewData: typeof loadCompatibilitySharePreviewData;
   createThemeFingerprints: typeof createCompatibilityShareThemeFingerprints;
+  resolveAvatarUrl?: typeof resolveCompatibilityAvatarUrl;
 }>;
 
 export type CompatibilityInvitationAcceptanceDataOutcome =
@@ -82,6 +89,7 @@ export type CompatibilityInvitationAcceptanceDataOutcome =
       context: CompatibilityInvitationAcceptanceContext;
       recipientData: CompatibilitySharePreviewData;
       recipientDiagnoses: CompatibilitySharePreviewData["shareableDiagnoses"];
+      inviteeLinePictureUrl: string | undefined;
     }
   | Exclude<CompatibilityInvitationPreviewOutcome, { type: "resolved" }>;
 
@@ -93,6 +101,7 @@ const defaultDependencies: Dependencies = {
     compatibilityDataFor(namespace, relationshipId).getInvitationAcceptanceContext(),
   loadSharePreviewData: loadCompatibilitySharePreviewData,
   createThemeFingerprints: createCompatibilityShareThemeFingerprints,
+  resolveAvatarUrl: resolveCompatibilityAvatarUrl,
 };
 
 function matchesOfferedSnapshot(
@@ -195,11 +204,13 @@ export async function loadCompatibilityInvitationAcceptanceData(
     invitation: {
       inviter: {
         displayName: preview.inviterDisplayName,
+        avatarUrl: null,
         aboutMe,
         themes: inviterThemes,
       },
       recipient: {
         displayName: recipientData.preview.displayName,
+        avatarUrl: null,
         previewToken: recipientData.preview.previewToken,
         aboutMe: recipientData.preview.aboutMe,
         themes: recipientThemes,
@@ -220,6 +231,7 @@ export async function loadCompatibilityInvitationAcceptanceData(
     recipientDiagnoses: recipientData.shareableDiagnoses.filter(({ diagnosisId }) =>
       offeredDiagnosisIds.has(diagnosisId),
     ),
+    inviteeLinePictureUrl: session.session.pictureUrl,
   };
 }
 
@@ -230,5 +242,29 @@ export async function getCompatibilityInvitationContents(
 ): Promise<CompatibilityInvitationPreviewOutcome> {
   const outcome = await loadCompatibilityInvitationAcceptanceData(params, dependencies);
   if (outcome.type !== "resolved") return outcome;
-  return { type: "resolved", invitation: outcome.invitation };
+  const [inviterAvatarUrl, recipientAvatarUrl] = dependencies.resolveAvatarUrl
+    ? await Promise.all([
+        dependencies.resolveAvatarUrl({
+          accountId: outcome.context.inviterAccountId,
+          db: params.db,
+          avatarBucket: params.avatarBucket,
+          lineChannelAccessToken: params.lineChannelAccessToken,
+        }),
+        dependencies.resolveAvatarUrl({
+          accountId: outcome.inviteeAccountId,
+          verifiedLinePictureUrl: outcome.inviteeLinePictureUrl,
+          db: params.db,
+          avatarBucket: params.avatarBucket,
+          lineChannelAccessToken: params.lineChannelAccessToken,
+        }),
+      ])
+    : [null, null];
+  return {
+    type: "resolved",
+    invitation: {
+      ...outcome.invitation,
+      inviter: { ...outcome.invitation.inviter, avatarUrl: inviterAvatarUrl },
+      recipient: { ...outcome.invitation.recipient, avatarUrl: recipientAvatarUrl },
+    },
+  };
 }

@@ -46,6 +46,7 @@ export const CompatibilityShareProfileSchema = v.object({
 
 export const CompatibilitySharePreviewResponseSchema = v.object({
   displayName: v.nullable(NonEmptyStringSchema),
+  avatarUrl: v.nullable(NonEmptyStringSchema),
   previewToken: PreviewTokenSchema,
   aboutMe: v.nullable(CompatibilityShareProfileSchema),
   themes: v.array(CompatibilitySharePreviewThemeSchema),

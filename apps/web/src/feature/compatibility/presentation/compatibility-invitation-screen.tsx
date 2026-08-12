@@ -11,7 +11,7 @@ import {
   CompatibilityAboutMePreview,
   CompatibilityThemesPreview,
 } from "./components/compatibility-share-content";
-import { CompatibilityBackHeader } from "./components/compatibility-ui";
+import { CompatibilityBackHeader, CompatibilityProfileAvatar } from "./components/compatibility-ui";
 
 const blockingReasonMessages: Record<CompatibilityInvitationPreviewBlockingReason, string> = {
   display_name_unavailable: "LINEの表示名を確認できませんでした。",
@@ -77,25 +77,14 @@ function InvitationContents({
   onAccept: (previewToken: string) => void;
 }) {
   const inviterName = invitation.inviter.displayName;
-  const recipientName = invitation.recipient.displayName ?? "あなた";
 
   return (
     <>
       <section className="mt-5 rounded-3xl border border-violet-300/30 bg-gradient-to-br from-violet-50 via-white to-rose-50 p-5 text-center dark:from-violet-950/30 dark:via-slate-800 dark:to-rose-950/30">
         <div className="flex items-center justify-center gap-3">
-          <span
-            aria-hidden="true"
-            className="flex size-20 items-center justify-center rounded-[45%_55%_60%_40%] bg-gradient-to-br from-violet-300 to-fuchsia-500 text-2xl font-black text-violet-950"
-          >
-            {inviterName.slice(0, 1)}
-          </span>
+          <CompatibilityProfileAvatar imageUrl={invitation.inviter.avatarUrl} tone="violet" />
           <HeartHandshake className="size-7 text-rose-500" aria-hidden="true" />
-          <span
-            aria-hidden="true"
-            className="flex size-20 items-center justify-center rounded-[55%_45%_40%_60%] bg-gradient-to-br from-sky-300 to-cyan-500 text-2xl font-black text-sky-950"
-          >
-            {recipientName.slice(0, 1)}
-          </span>
+          <CompatibilityProfileAvatar imageUrl={invitation.recipient.avatarUrl} tone="sky" />
         </div>
         <p className="mt-5 text-sm font-semibold text-violet-700 dark:text-violet-300">
           {inviterName}さんから招待が届いています

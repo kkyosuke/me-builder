@@ -403,6 +403,7 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
       expect(emptyResponse.status).toBe(200);
       expect(await emptyResponse.json()).toMatchObject({
         displayName: "あおい",
+        avatarUrl: null,
         aboutMe: null,
         themes: [],
         canIssueInvitation: false,
@@ -417,6 +418,7 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
       expect(previewResponse.status).toBe(200);
       const preview = (await previewResponse.json()) as {
         displayName: string;
+        avatarUrl: string | null;
         aboutMe: { statements: Array<Record<string, unknown>> } | null;
         themes: Array<{
           diagnosisId: string;
@@ -428,6 +430,7 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
         previewToken: string;
       };
       expect(preview.displayName).toBe("あおい");
+      expect(preview.avatarUrl).toBeNull();
       expect(preview.canIssueInvitation).toBe(true);
       expect(preview.blockingReasons).toEqual([]);
       expect(preview.nextAction).toBeNull();

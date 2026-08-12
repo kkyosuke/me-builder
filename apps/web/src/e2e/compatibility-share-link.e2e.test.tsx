@@ -156,6 +156,7 @@ describe("LIFF compatibility share link journey", () => {
     mocks.fetchCompatibilityInvitation.mockResolvedValue({
       inviter: {
         displayName: "あおい",
+        avatarUrl: "https://profile.line-scdn.net/inviter",
         aboutMe: {
           profileSummaryVersionId: "profile-inviter",
           generatedAt: "2026-08-11T00:00:00.000Z",
@@ -180,6 +181,7 @@ describe("LIFF compatibility share link journey", () => {
       },
       recipient: {
         displayName: "はる",
+        avatarUrl: null,
         previewToken: `csp2.${"a".repeat(64)}`,
         aboutMe: {
           profileSummaryVersionId: "profile-recipient",
@@ -204,6 +206,9 @@ describe("LIFF compatibility share link journey", () => {
       await screen.findByRole("heading", { name: "2人の相性を見てみませんか？" }),
     ).toBeTruthy();
     expect(screen.getByText("あおいさんから招待が届いています")).toBeTruthy();
+    expect(
+      document.querySelector('img[src="https://profile.line-scdn.net/inviter"]'),
+    ).not.toBeNull();
     expect(screen.getByText("私は見通しを大切にします")).toBeTruthy();
     expect(mocks.fetchCompatibilityInvitation).toHaveBeenCalledWith(
       undefined,

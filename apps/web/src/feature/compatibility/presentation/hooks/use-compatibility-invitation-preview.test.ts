@@ -13,6 +13,7 @@ const relationshipId = "1".repeat(64);
 const invitation = {
   inviter: {
     displayName: "あおい",
+    avatarUrl: "https://profile.line-scdn.net/inviter",
     aboutMe: {
       profileSummaryVersionId: "profile-inviter",
       generatedAt: "2026-08-11T00:00:00.000Z",
@@ -22,6 +23,7 @@ const invitation = {
   },
   recipient: {
     displayName: "はる",
+    avatarUrl: null,
     previewToken: `csp2.${"a".repeat(64)}`,
     aboutMe: null,
     themes: [],

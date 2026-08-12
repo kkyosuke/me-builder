@@ -1499,6 +1499,7 @@ export interface operations {
           "application/json": {
             inviter: {
               displayName: string;
+              avatarUrl: string | null;
               aboutMe: {
                 profileSummaryVersionId: string;
                 /** Format: date-time */
@@ -1524,6 +1525,7 @@ export interface operations {
             };
             recipient: {
               displayName: string | null;
+              avatarUrl: string | null;
               previewToken: string;
               aboutMe: {
                 profileSummaryVersionId: string;
@@ -2285,6 +2287,7 @@ export interface operations {
         content: {
           "application/json": {
             displayName: string | null;
+            avatarUrl: string | null;
             previewToken: string;
             aboutMe: {
               profileSummaryVersionId: string;

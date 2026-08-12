@@ -50,6 +50,7 @@ const ShareThemeSchema = v.object({
 });
 const ResponseSchema = v.object({
   displayName: v.nullable(NonEmptyStringSchema),
+  avatarUrl: v.nullable(NonEmptyStringSchema),
   previewToken: v.pipe(v.string(), v.regex(/^csp2\.[a-f0-9]{64}$/)),
   aboutMe: v.nullable(ShareProfileSchema),
   themes: v.array(ShareThemeSchema),
@@ -75,11 +76,13 @@ const InvitationResponseSchema = v.object({
 const InvitationPreviewResponseSchema = v.object({
   inviter: v.object({
     displayName: NonEmptyStringSchema,
+    avatarUrl: v.nullable(NonEmptyStringSchema),
     aboutMe: ShareProfileSchema,
     themes: v.pipe(v.array(ShareThemeSchema), v.minLength(1)),
   }),
   recipient: v.object({
     displayName: v.nullable(NonEmptyStringSchema),
+    avatarUrl: v.nullable(NonEmptyStringSchema),
     previewToken: v.pipe(v.string(), v.regex(/^csp2\.[a-f0-9]{64}$/)),
     aboutMe: v.nullable(ShareProfileSchema),
     themes: v.array(ShareThemeSchema),

@@ -11,6 +11,7 @@ vi.mock("../../infrastructure/compatibility-api", () => ({
 
 const preview = {
   displayName: "うさぎ",
+  avatarUrl: null,
   previewToken: `csp2.${"a".repeat(64)}`,
   aboutMe: {
     profileSummaryVersionId: "summary-version-1",

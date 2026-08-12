@@ -2053,6 +2053,17 @@
                           "type": "string",
                           "minLength": 1
                         },
+                        "avatarUrl": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
                         "aboutMe": {
                           "type": "object",
                           "properties": {
@@ -2151,12 +2162,23 @@
                           "minItems": 1
                         }
                       },
-                      "required": ["displayName", "aboutMe", "themes"]
+                      "required": ["displayName", "avatarUrl", "aboutMe", "themes"]
                     },
                     "recipient": {
                       "type": "object",
                       "properties": {
                         "displayName": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "avatarUrl": {
                           "anyOf": [
                             {
                               "type": "string",
@@ -2275,7 +2297,7 @@
                           }
                         }
                       },
-                      "required": ["displayName", "previewToken", "aboutMe", "themes"]
+                      "required": ["displayName", "avatarUrl", "previewToken", "aboutMe", "themes"]
                     },
                     "expiresAt": {
                       "type": "string",
@@ -3589,6 +3611,17 @@
                         }
                       ]
                     },
+                    "avatarUrl": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
                     "previewToken": {
                       "type": "string",
                       "pattern": "^csp2\\.[a-f0-9]{64}$"
@@ -3727,6 +3760,7 @@
                   },
                   "required": [
                     "displayName",
+                    "avatarUrl",
                     "previewToken",
                     "aboutMe",
                     "themes",
