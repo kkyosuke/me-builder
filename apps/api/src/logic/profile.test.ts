@@ -158,7 +158,7 @@ describe("Profile logic", () => {
     );
   });
 
-  it("保存メタデータが指すR2 objectがなければLINE画像へ暗黙に戻さない", async () => {
+  it("保存メタデータが指すR2 objectがなければLINE画像へ縮退してerrorログを残す", async () => {
     const { params, avatarBucket, dependencies } = setup();
     dependencies.getAvatar.mockResolvedValue({
       objectKey: "accounts/account-1/profile/avatar/missing.png",
@@ -168,9 +168,56 @@ describe("Profile logic", () => {
       updatedAt: new Date("2026-08-11T00:00:00.000Z"),
     });
     vi.mocked(avatarBucket.get).mockResolvedValue(null);
+    const errorLog = vi.spyOn(logger, "error").mockImplementation(() => undefined);
 
-    await expect(getProfile(params, dependencies as never)).rejects.toThrow(
-      "Profile avatar metadata references a missing object",
+    await expect(getProfile(params, dependencies as never)).resolves.toEqual({
+      type: "resolved",
+      profile: {
+        role: "user",
+        displayName: "利用者",
+        avatar: { source: "line", url: session.session.pictureUrl, updatedAt: null },
+      },
+    });
+    expect(dependencies.clearAvatar).not.toHaveBeenCalled();
+    expect(errorLog).toHaveBeenCalledWith(
+      {
+        event: "profile.avatar.read.degraded",
+        outcome: "degraded",
+        reason: "object-missing",
+      },
+      "Profile avatar read degraded to the fallback profile",
+    );
+    expect(JSON.stringify(errorLog.mock.calls)).not.toContain(session.session.accountId);
+    expect(JSON.stringify(errorLog.mock.calls)).not.toContain("missing.png");
+  });
+
+  it("R2 objectが保存メタデータと一致しなければLINE画像へ縮退する", async () => {
+    const { params, avatarBucket, dependencies } = setup();
+    dependencies.getAvatar.mockResolvedValue({
+      objectKey: "accounts/account-1/profile/avatar/mismatched.png",
+      contentType: "image/png",
+      byteSize: 3,
+      etag: "expected-etag",
+      updatedAt: new Date("2026-08-11T00:00:00.000Z"),
+    });
+    vi.mocked(avatarBucket.get).mockResolvedValue({
+      etag: "different-etag",
+      httpMetadata: { contentType: "image/png" },
+      arrayBuffer: vi.fn().mockResolvedValue(Uint8Array.from([1, 2, 3]).buffer),
+    } as never);
+    const errorLog = vi.spyOn(logger, "error").mockImplementation(() => undefined);
+
+    await expect(getProfile(params, dependencies as never)).resolves.toMatchObject({
+      type: "resolved",
+      profile: { avatar: { source: "line" } },
+    });
+    expect(errorLog).toHaveBeenCalledWith(
+      {
+        event: "profile.avatar.read.degraded",
+        outcome: "degraded",
+        reason: "metadata-mismatch",
+      },
+      "Profile avatar read degraded to the fallback profile",
     );
   });
 });

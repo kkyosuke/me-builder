@@ -24,9 +24,10 @@ describe("AccountData alarm", () => {
       skippedInvalidConfig: 0,
       failed: 0,
     });
-    vi.spyOn(DO.account.action.diary, "claimDueDiaryBrainCheckpointIds").mockResolvedValue([
-      "checkpoint-1",
-    ]);
+    vi.spyOn(DO.account.action.diary, "claimDueDiaryBrainCheckpointIds").mockResolvedValue({
+      checkpointIds: ["checkpoint-1"],
+      terminalFailures: [],
+    });
 
     const instance = Object.create(AccountData.prototype) as AccountData;
     Object.assign(instance as unknown as Record<string, unknown>, {
@@ -77,7 +78,10 @@ describe("AccountData alarm", () => {
       skippedInvalidConfig: 0,
       failed: 0,
     });
-    vi.spyOn(DO.account.action.diary, "claimDueDiaryBrainCheckpointIds").mockResolvedValue([]);
+    vi.spyOn(DO.account.action.diary, "claimDueDiaryBrainCheckpointIds").mockResolvedValue({
+      checkpointIds: [],
+      terminalFailures: [],
+    });
     vi.spyOn(DO.account.action.brain, "claimDueBrainVectorSyncJobs").mockResolvedValue({
       jobs: [],
       terminalFailures: [
@@ -112,6 +116,58 @@ describe("AccountData alarm", () => {
       expect.stringContaining("category:unknown"),
     );
     expect(JSON.stringify(errorLog.mock.calls)).not.toContain("statement");
+  });
+
+  it("上限到達したDiary Brain checkpointをID付き構造化ログへ記録する", async () => {
+    const checkpointId = "checkpoint-poison";
+    vi.spyOn(logger, "error").mockImplementation(() => undefined);
+    vi.spyOn(DO.account.action.diary, "closeExpiredSessions").mockResolvedValue(0);
+    vi.spyOn(
+      DO.account.action.diagnosisBrainProjection,
+      "processPendingDiagnosisBrainProjections",
+    ).mockResolvedValue({
+      processed: 0,
+      applied: 0,
+      skippedIncomplete: 0,
+      skippedInvalidConfig: 0,
+      failed: 0,
+    });
+    vi.spyOn(DO.account.action.diary, "claimDueDiaryBrainCheckpointIds").mockResolvedValue({
+      checkpointIds: [],
+      terminalFailures: [
+        {
+          checkpointId,
+          attemptCount: DO.account.action.diary.DIARY_BRAIN_CHECKPOINT_MAX_DISPATCH_ATTEMPTS,
+          failureCode: "DIARY_BRAIN_CHECKPOINT_ATTEMPTS_EXHAUSTED",
+        },
+      ],
+    });
+    vi.spyOn(DO.account.action.brain, "claimDueBrainVectorSyncJobs").mockResolvedValue({
+      jobs: [],
+      terminalFailures: [],
+    });
+
+    const instance = Object.create(AccountData.prototype) as AccountData;
+    Object.assign(instance as unknown as Record<string, unknown>, {
+      accountId: "account-1",
+      operationTail: Promise.resolve(),
+      repository: { client: {}, nextMaintenanceAt: () => null },
+      ctx: { storage: {} },
+      env: {},
+    });
+
+    await expect(instance.alarm()).resolves.toBeUndefined();
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "diary-brain-checkpoint.job.failed",
+        checkpointId,
+        outcome: "failed",
+        disposition: "stop",
+        errorCode: "DIARY_BRAIN_CHECKPOINT_ATTEMPTS_EXHAUSTED",
+        retryable: false,
+      }),
+      expect.stringContaining("[Diary Brain checkpoint] failed"),
+    );
   });
 
   it("共有D1が版を公開していない間はcatalog snapshotを最新と見なさない", async () => {

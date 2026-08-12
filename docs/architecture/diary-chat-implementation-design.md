@@ -278,14 +278,14 @@ prompt本文、Context Package、未検証のモデル出力は保存しませ�
 | `from_sequence`, `through_sequence` | yes | 未変換会話の範囲 |
 | `first_message_at`, `last_message_at` | yes | 起動時刻を決める基準 |
 | `due_at`, `next_attempt_at` | yes | 初回期限とQueue再投入可能時刻 |
-| `status` | yes | `pending`: 新着で延長可能、`queued`: 範囲固定・Queue投入待ち、`dispatched`: Queue受理済み、`applied`: 適用済み |
+| `status` | yes | `pending`: 新着で延長可能、`queued`: 範囲固定・Queue投入待ち、`dispatched`: Queue受理済み、`applied`: 適用済み、`failed`: 再試行上限到達で終端 |
 | `attempt_count`, `applied_at` | yes / no | Queue投入回数と適用完了時刻 |
 | `development_notification_sent_at` | no | 開発環境の確認Push完了時刻 |
 | `created_at`, `updated_at`, `deleted_at`, `is_deleted` | yes / no / yes | lifecycle |
 
 同じSessionの`pending`は最大1件とします。新しいuser messageをTurnへ取り込むtransactionで、発言ごとに現在の期限とuser message 10件の範囲上限を評価します。期限前かつ上限以内なら範囲を延長し、期限以後または追加すると上限を超える場合は既存範囲を`queued`へ固定して新しい`pending`を作ります。Brain Item変換では削除・撤回されていないuser原文だけを最大10message、各5,000文字まで読み、assistant本文は入力へ含めません。明示終了時は期限を現在時刻へ進めます。
 
-Alarmは期限到来した`pending`、Queue投入に失敗した`queued`、または回復期限を超えた`dispatched`をclaimし、`queued`へ進めます。Queue投入前は指数バックオフ付きの投入leaseとして`next_attempt_at`を進め、投入失敗時は永続化済みの次回試行時刻からAlarmを明示的に再設定します。QueueがIDを受理したら`dispatched`へ進め、`next_attempt_at`へ1時間後の回復期限を保存します。Queue自身の初回配送と最大5回の再試行をこの期間は優先し、それでも`applied`にならなければ同じcheckpoint IDを再投入してDLQ滞留から自己回復します。
+Alarmは期限到来した`pending`、Queue投入に失敗した`queued`、または回復期限を超えた`dispatched`をclaimし、`queued`へ進めます。Queue投入前は指数バックオフ付きの投入leaseとして`next_attempt_at`を進め、投入失敗時は永続化済みの次回試行時刻からAlarmを明示的に再設定します。QueueがIDを受理したら`dispatched`へ進め、`next_attempt_at`へ1時間後の回復期限を保存します。Queue自身の初回配送と最大5回の再試行をこの期間は優先し、それでも`applied`にならなければ同じcheckpoint IDを再投入してDLQ滞留から自己回復します。alarmからのQueue投入は5回を上限とし、最大30回のQueue配送後も適用できなかったcheckpointは`failed`へ終端化して、以後のclaimとalarm対象から外します。終端時はcheckpoint IDと試行回数を構造化ログへ記録します。原因解消後はreset RPCで固定済みの範囲を`queued`へ戻し、試行回数を0から再開します。
 
 送信後・状態更新前の停止、または回復再投入と元のQueue処理の競合によって重複配送され得ますが、Workerは固定範囲を読み直し、Brain Item一式、`diary_brain_checkpoint_items`、`applied`への遷移を同じtransactionで確定します。AlarmとRPC actionはAccountData Object内で直列化し、先に`applied`へ進めた処理だけを成功させるため多重適用しません。JSONまたは出力envelope全体が不正な場合は再配送し、envelope内の個別候補だけがschema・Evidence・候補間重複の検証に失敗した場合は、安全な理由コードをerror logへ残してその候補だけを登録対象から外します。
 
@@ -298,6 +298,8 @@ stateDiagram-v2
     queued --> dispatched: Queueが受理
     dispatched --> dispatched: AI・検証失敗をQueueが再配送
     dispatched --> queued: 1時間の回復期限超過
+    dispatched --> failed: 5回目の回復期限超過
+    failed --> queued: 運用者がreset
     queued --> applied: 送信直後のmessageが先に適用
     dispatched --> applied: Item一式を原子的に適用
     applied --> [*]

@@ -9,6 +9,7 @@ import { accountSchema as schema } from "../database";
 import { saveBrainItem } from "./brain";
 import {
   DIARY_BRAIN_CHECKPOINT_DISPATCH_LEASE_MS,
+  DIARY_BRAIN_CHECKPOINT_MAX_DISPATCH_ATTEMPTS,
   applyDiaryBrainCheckpoint,
   attachMessagesToTurn,
   claimDueDiaryBrainCheckpointIds,
@@ -23,6 +24,7 @@ import {
   markTurnDelivered,
   markTurnFailed,
   markTurnGenerating,
+  resetFailedDiaryBrainCheckpoint,
   saveAssistantResponse,
   storeLineTextSource,
 } from "./diary";
@@ -141,9 +143,10 @@ describe("Diary conversation persistence flow", () => {
     await expect(listDueDiaryBrainCheckpointIds(db, account.id, new Date())).resolves.toEqual([
       checkpoint?.id,
     ]);
-    await expect(claimDueDiaryBrainCheckpointIds(db, account.id, new Date())).resolves.toEqual([
-      checkpoint?.id,
-    ]);
+    await expect(claimDueDiaryBrainCheckpointIds(db, account.id, new Date())).resolves.toEqual({
+      checkpointIds: [checkpoint?.id],
+      terminalFailures: [],
+    });
     await expect(
       markDiaryBrainCheckpointDispatched(db, account.id, checkpoint?.id ?? ""),
     ).resolves.toBe(true);
@@ -924,9 +927,10 @@ describe("Diary conversation persistence flow", () => {
     ]);
 
     const claimedAt = new Date(startedAt.getTime() + 31 * 60 * 1000);
-    await expect(claimDueDiaryBrainCheckpointIds(db, account.id, claimedAt)).resolves.toEqual([
-      checkpoint?.id,
-    ]);
+    await expect(claimDueDiaryBrainCheckpointIds(db, account.id, claimedAt)).resolves.toEqual({
+      checkpointIds: [checkpoint?.id],
+      terminalFailures: [],
+    });
     await expect(
       markDiaryBrainCheckpointDispatched(db, account.id, checkpoint?.id ?? "", claimedAt),
     ).resolves.toBe(true);
@@ -1094,9 +1098,10 @@ describe("Diary conversation persistence flow", () => {
       ),
     ).resolves.toEqual([checkpoint?.id]);
     const firstClaimAt = new Date(receivedAt.getTime() + 10 * 60 * 1000);
-    await expect(claimDueDiaryBrainCheckpointIds(db, account.id, firstClaimAt)).resolves.toEqual([
-      checkpoint?.id,
-    ]);
+    await expect(claimDueDiaryBrainCheckpointIds(db, account.id, firstClaimAt)).resolves.toEqual({
+      checkpointIds: [checkpoint?.id],
+      terminalFailures: [],
+    });
     await expect(
       listDueDiaryBrainCheckpointIds(
         db,
@@ -1105,9 +1110,10 @@ describe("Diary conversation persistence flow", () => {
       ),
     ).resolves.toEqual([]);
     const secondClaimAt = new Date(firstClaimAt.getTime() + 30 * 1000);
-    await expect(claimDueDiaryBrainCheckpointIds(db, account.id, secondClaimAt)).resolves.toEqual([
-      checkpoint?.id,
-    ]);
+    await expect(claimDueDiaryBrainCheckpointIds(db, account.id, secondClaimAt)).resolves.toEqual({
+      checkpointIds: [checkpoint?.id],
+      terminalFailures: [],
+    });
     const retried = await db
       .select()
       .from(schema.diaryBrainCheckpoints)
@@ -1145,9 +1151,10 @@ describe("Diary conversation persistence flow", () => {
     const checkpointId = checkpoint?.id ?? "";
     const firstClaimAt = new Date(receivedAt.getTime() + 10 * 60 * 1000);
 
-    await expect(claimDueDiaryBrainCheckpointIds(db, account.id, firstClaimAt)).resolves.toEqual([
-      checkpointId,
-    ]);
+    await expect(claimDueDiaryBrainCheckpointIds(db, account.id, firstClaimAt)).resolves.toEqual({
+      checkpointIds: [checkpointId],
+      terminalFailures: [],
+    });
     await expect(
       markDiaryBrainCheckpointDispatched(db, account.id, checkpointId, firstClaimAt),
     ).resolves.toBe(true);
@@ -1159,9 +1166,10 @@ describe("Diary conversation persistence flow", () => {
     await expect(listDueDiaryBrainCheckpointIds(db, account.id, recoveryAt)).resolves.toEqual([
       checkpointId,
     ]);
-    await expect(claimDueDiaryBrainCheckpointIds(db, account.id, recoveryAt)).resolves.toEqual([
-      checkpointId,
-    ]);
+    await expect(claimDueDiaryBrainCheckpointIds(db, account.id, recoveryAt)).resolves.toEqual({
+      checkpointIds: [checkpointId],
+      terminalFailures: [],
+    });
     await expect(
       markDiaryBrainCheckpointDispatched(db, account.id, checkpointId, recoveryAt),
     ).resolves.toBe(true);
@@ -1193,6 +1201,93 @@ describe("Diary conversation persistence flow", () => {
     ).toEqual({ status: "applied" });
   });
 
+  it("上限到達で終端化し、reset後だけ固定範囲を再回収する", async () => {
+    const db = createTestDb();
+    const account = await bindAccount(db, "account-brain_poison-checkpoint");
+    const receivedAt = new Date("2026-08-07T00:00:00.000Z");
+    const source = await storeLineTextSource(db, {
+      accountId: account.id,
+      eventId: "brain-poison-checkpoint",
+      body: "毎朝ストレッチをする",
+      receivedAt,
+    });
+    await attachMessagesToTurn(db, account.id, [source], 1, "test-model", "test-prompt");
+    const [checkpoint] = await db.select().from(schema.diaryBrainCheckpoints);
+    const checkpointId = checkpoint?.id ?? "";
+    let claimAt = new Date(receivedAt.getTime() + 10 * 60 * 1000);
+    for (let attempt = 1; attempt <= DIARY_BRAIN_CHECKPOINT_MAX_DISPATCH_ATTEMPTS; attempt += 1) {
+      await expect(claimDueDiaryBrainCheckpointIds(db, account.id, claimAt)).resolves.toEqual({
+        checkpointIds: [checkpointId],
+        terminalFailures: [],
+      });
+      await expect(
+        markDiaryBrainCheckpointDispatched(db, account.id, checkpointId, claimAt),
+      ).resolves.toBe(true);
+      expect(
+        db
+          .select({
+            status: schema.diaryBrainCheckpoints.status,
+            attemptCount: schema.diaryBrainCheckpoints.attemptCount,
+          })
+          .from(schema.diaryBrainCheckpoints)
+          .where(eq(schema.diaryBrainCheckpoints.id, checkpointId))
+          .get(),
+      ).toEqual({ status: "dispatched", attemptCount: attempt });
+      if (attempt < DIARY_BRAIN_CHECKPOINT_MAX_DISPATCH_ATTEMPTS) {
+        claimAt = new Date(claimAt.getTime() + DIARY_BRAIN_CHECKPOINT_DISPATCH_LEASE_MS);
+      }
+    }
+    const exhaustedAt = new Date(claimAt.getTime() + DIARY_BRAIN_CHECKPOINT_DISPATCH_LEASE_MS);
+
+    await expect(
+      listDueDiaryBrainCheckpointIds(db, account.id, new Date(exhaustedAt.getTime() - 1)),
+    ).resolves.toEqual([]);
+    await expect(listDueDiaryBrainCheckpointIds(db, account.id, exhaustedAt)).resolves.toEqual([]);
+    await expect(claimDueDiaryBrainCheckpointIds(db, account.id, exhaustedAt)).resolves.toEqual({
+      checkpointIds: [],
+      terminalFailures: [
+        {
+          checkpointId,
+          attemptCount: DIARY_BRAIN_CHECKPOINT_MAX_DISPATCH_ATTEMPTS,
+          failureCode: "DIARY_BRAIN_CHECKPOINT_ATTEMPTS_EXHAUSTED",
+        },
+      ],
+    });
+    expect(
+      db
+        .select({ status: schema.diaryBrainCheckpoints.status })
+        .from(schema.diaryBrainCheckpoints)
+        .where(eq(schema.diaryBrainCheckpoints.id, checkpointId))
+        .get(),
+    ).toEqual({ status: "failed" });
+    await expect(claimDueDiaryBrainCheckpointIds(db, account.id, exhaustedAt)).resolves.toEqual({
+      checkpointIds: [],
+      terminalFailures: [],
+    });
+    await expect(
+      getDiaryBrainCheckpointContext(db, account.id, checkpointId),
+    ).resolves.toBeUndefined();
+
+    const resetAt = new Date(exhaustedAt.getTime() + 1);
+    await expect(
+      resetFailedDiaryBrainCheckpoint(db, account.id, checkpointId, resetAt),
+    ).resolves.toBe(true);
+    await expect(claimDueDiaryBrainCheckpointIds(db, account.id, resetAt)).resolves.toEqual({
+      checkpointIds: [checkpointId],
+      terminalFailures: [],
+    });
+    expect(
+      db
+        .select({
+          status: schema.diaryBrainCheckpoints.status,
+          attemptCount: schema.diaryBrainCheckpoints.attemptCount,
+        })
+        .from(schema.diaryBrainCheckpoints)
+        .where(eq(schema.diaryBrainCheckpoints.id, checkpointId))
+        .get(),
+    ).toEqual({ status: "queued", attemptCount: 1 });
+  });
+
   it("回復再投入と元のQueue処理が競合してもcheckpointを二重適用しない", async () => {
     const db = createTestDb();
     const account = await bindAccount(db, "account-brain_recovery-race");
@@ -1213,9 +1308,10 @@ describe("Diary conversation persistence flow", () => {
     // 元のQueue処理がcontextを読んだ後に、Alarmが同じcheckpointを再claimする競合を再現する。
     const originalContext = await getDiaryBrainCheckpointContext(db, account.id, checkpointId);
     const recoveryAt = new Date(firstClaimAt.getTime() + DIARY_BRAIN_CHECKPOINT_DISPATCH_LEASE_MS);
-    await expect(claimDueDiaryBrainCheckpointIds(db, account.id, recoveryAt)).resolves.toEqual([
-      checkpointId,
-    ]);
+    await expect(claimDueDiaryBrainCheckpointIds(db, account.id, recoveryAt)).resolves.toEqual({
+      checkpointIds: [checkpointId],
+      terminalFailures: [],
+    });
     const replayContext = await getDiaryBrainCheckpointContext(db, account.id, checkpointId);
     const candidates = [
       {

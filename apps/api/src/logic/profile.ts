@@ -68,6 +68,17 @@ function lineProfile(session: {
   };
 }
 
+function degradedProfile(
+  session: ResolvedProfileSession,
+  reason: "object-missing" | "metadata-mismatch",
+): ProfileOutcome {
+  logger.error(
+    { event: "profile.avatar.read.degraded", outcome: "degraded", reason },
+    "Profile avatar read degraded to the fallback profile",
+  );
+  return { type: "resolved", profile: lineProfile(session) };
+}
+
 async function resolveSession(params: Params, dependencies: Dependencies) {
   return dependencies.createSession({
     idToken: params.idToken,
@@ -97,14 +108,14 @@ export async function getProfile(
   if (!avatar) return { type: "resolved", profile: lineProfile(session.session) };
 
   const object = await params.avatarBucket.get(avatar.objectKey);
-  if (!object) throw new Error("Profile avatar metadata references a missing object");
+  if (!object) return degradedProfile(session.session, "object-missing");
   const bytes = new Uint8Array(await object.arrayBuffer());
   if (
     bytes.byteLength !== avatar.byteSize ||
     object.etag !== avatar.etag ||
     object.httpMetadata?.contentType !== avatar.contentType
   ) {
-    throw new Error("Profile avatar metadata does not match the stored object");
+    return degradedProfile(session.session, "metadata-mismatch");
   }
 
   return {

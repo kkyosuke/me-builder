@@ -108,6 +108,16 @@ describe("AccountDataRepository", () => {
     expect(repository.nextMaintenanceAt()).toBe(
       dispatchedAt.getTime() + DO.account.action.diary.DIARY_BRAIN_CHECKPOINT_DISPATCH_LEASE_MS,
     );
+
+    await repository.client
+      .update(DO.account.schema.diaryBrainCheckpoints)
+      .set({ status: "failed" })
+      .where(eq(DO.account.schema.diaryBrainCheckpoints.id, checkpoint?.id ?? ""));
+    await repository.client
+      .update(DO.account.schema.conversationSessions)
+      .set({ status: "closed" })
+      .where(eq(DO.account.schema.conversationSessions.accountId, "account-1"));
+    expect(repository.nextMaintenanceAt()).toBeNull();
   });
 
   it("別ObjectのAccount所有データをSELECTできない", async () => {
