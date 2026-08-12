@@ -127,10 +127,18 @@ describe("compatibility data orchestration", () => {
 
   it("招待の正本を取り消した後に送信者の一覧参照を終了する", async () => {
     const calls: string[] = [];
+    const endedAtValues: Date[] = [];
+    const canonicalCancelledAt = new Date("2026-08-12T00:30:00.000Z");
     const accountNamespace = {
       getByName: () => ({
-        async execute(_accountId: string, operation: string) {
+        async execute(
+          _accountId: string,
+          operation: string,
+          _relationshipId: string,
+          endedAt: Date,
+        ) {
           calls.push(operation);
+          endedAtValues.push(endedAt);
           return null;
         },
       }),
@@ -141,7 +149,7 @@ describe("compatibility data orchestration", () => {
           calls.push("canonical.cancel");
           return {
             outcome: "cancelled",
-            relationship: { inviterAccountId: "account-a" },
+            relationship: { inviterAccountId: "account-a", cancelledAt: canonicalCancelledAt },
           };
         },
       }),
@@ -155,11 +163,13 @@ describe("compatibility data orchestration", () => {
     );
 
     expect(calls).toEqual(["canonical.cancel", "compatibility.endReference"]);
+    expect(endedAtValues).toEqual([canonicalCancelledAt]);
   });
 
   it("相性関係の正本を終了した後にAccount ID順で双方の一覧参照を終了する", async () => {
     const calls: string[] = [];
     const endedAtValues: Date[] = [];
+    const canonicalEndedAt = new Date("2026-08-12T01:00:00.000Z");
     const accountNamespace = {
       getByName(accountId: string) {
         return {
@@ -186,6 +196,7 @@ describe("compatibility data orchestration", () => {
             relationship: {
               inviterAccountId: "account-b",
               inviteeAccountId: "account-a",
+              endedAt: canonicalEndedAt,
             },
           };
         },
@@ -205,19 +216,27 @@ describe("compatibility data orchestration", () => {
       "account-b.compatibility.endReference",
     ]);
     expect(endedAtValues).toHaveLength(2);
-    expect(endedAtValues[0]).toBe(endedAtValues[1]);
+    expect(endedAtValues).toEqual([canonicalEndedAt, canonicalEndedAt]);
   });
 
   it("正本終了後に片方の参照更新だけ失敗しても再試行で双方を冪等修復する", async () => {
     const attempts = new Map<string, number>();
+    const projectionEndedAt = new Map<string, Date>();
+    const canonicalEndedAt = new Date("2026-08-12T01:00:00.000Z");
     const accountNamespace = {
       getByName(accountId: string) {
         return {
-          async execute() {
+          async execute(
+            _routedAccountId: string,
+            _operation: string,
+            _relationshipId: string,
+            endedAt: Date,
+          ) {
             attempts.set(accountId, (attempts.get(accountId) ?? 0) + 1);
             if (accountId === "account-a" && attempts.get(accountId) === 1) {
               throw new Error("account-a unavailable");
             }
+            if (!projectionEndedAt.has(accountId)) projectionEndedAt.set(accountId, endedAt);
             return null;
           },
         };
@@ -227,6 +246,7 @@ describe("compatibility data orchestration", () => {
     const relationship = {
       inviterAccountId: "account-a",
       inviteeAccountId: "account-b",
+      endedAt: canonicalEndedAt,
     };
     const compatibilityNamespace = {
       getByName: () => ({
@@ -258,6 +278,12 @@ describe("compatibility data orchestration", () => {
       new Map([
         ["account-a", 2],
         ["account-b", 2],
+      ]),
+    );
+    expect(projectionEndedAt).toEqual(
+      new Map([
+        ["account-b", canonicalEndedAt],
+        ["account-a", canonicalEndedAt],
       ]),
     );
   });

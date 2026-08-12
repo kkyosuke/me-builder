@@ -9,9 +9,8 @@ const CompatibilityRelationshipIdSchema = v.pipe(
 /** relationship ID の生成元が所有する、公開範囲を絞った検証境界。 */
 export const compatibilityRelationshipId = {
   schema: CompatibilityRelationshipIdSchema,
-  parse(value: string): string | undefined {
-    const parsed = v.safeParse(CompatibilityRelationshipIdSchema, value);
-    return parsed.success ? parsed.output : undefined;
+  isValid(value: unknown): value is string {
+    return v.safeParse(CompatibilityRelationshipIdSchema, value).success;
   },
 } as const;
 

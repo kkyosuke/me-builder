@@ -32,6 +32,7 @@ jobs:
       BRAIN_VECTOR_HMAC_SECRET: ${{ secrets.BRAIN_VECTOR_HMAC_SECRET }}
       ADMIN_LINE_USER_IDS: ${{ secrets.ADMIN_LINE_USER_IDS }}
       LIFF_ID: ${{ vars.LIFF_ID }}
+      LINE_LOGIN_CHANNEL_ID: ${{ vars.LINE_LOGIN_CHANNEL_ID }}
 
     steps:
       # 実行時に選んだブランチをそのまま使う。migration・seed・deployの内容と、
@@ -88,6 +89,7 @@ jobs:
             echo "::error::BRAIN_VECTOR_HMAC_SECRET が GitHub Environment dev に設定されていません。"
             exit 1
           fi
+          bun --cwd apps/web scripts/validate-liff-configuration.ts
 
       - name: Install Pulumi CLI
         run: |

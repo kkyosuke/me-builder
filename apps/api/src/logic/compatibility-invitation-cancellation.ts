@@ -27,9 +27,9 @@ export type CancelCompatibilityInvitationOutcome =
 export async function cancelCompatibilityInvitation(
   params: Params,
 ): Promise<CancelCompatibilityInvitationOutcome> {
+  if (!compatibilityRelationshipId.isValid(params.relationshipId)) return { type: "unavailable" };
   const session = await createLiffSession(params);
   if (session.type !== "resolved") return session;
-  if (!compatibilityRelationshipId.parse(params.relationshipId)) return { type: "unavailable" };
   const result = await cancelCompatibilityInvitationWithReference(
     params.accountData,
     params.compatibilityData,

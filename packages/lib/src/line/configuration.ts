@@ -6,6 +6,11 @@ export type LiffConfiguration = Readonly<{
   lineLoginChannelId: string | undefined;
 }>;
 
+export type ConfiguredLiff = Readonly<{
+  liffId: string;
+  lineLoginChannelId: string;
+}>;
+
 /** LIFF ID と LINE Login チャネル ID を一箇所で検証・解決する。 */
 export function resolveLiffConfiguration(params: {
   liffId?: string | undefined;

@@ -41,4 +41,8 @@ describe("getWebConfig & WebConfigSchema", () => {
     expect(getWebConfig({ LIFF_ID: "" }).liffId).toBeUndefined();
     expect(getWebConfig({ LIFF_ID: "   " }).liffId).toBeUndefined();
   });
+
+  it("不正なLIFF IDを画面のビルド・初期化前に拒否すること", () => {
+    expect(() => getWebConfig({ LIFF_ID: "invalid" })).toThrow("LIFF_ID");
+  });
 });

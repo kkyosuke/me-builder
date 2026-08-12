@@ -1,6 +1,5 @@
 import { client } from "./client";
 import * as configModule from "./config";
-import * as configurationModule from "./configuration";
 import { idToken } from "./id-token";
 import { liff } from "./liff";
 import { richMenu } from "./rich-menu";
@@ -14,7 +13,6 @@ export const line: {
   richMenu: typeof richMenu;
   idToken: typeof idToken;
   config: typeof configModule;
-  configuration: typeof configurationModule;
   text: typeof lineText;
 } = {
   client,
@@ -23,7 +21,6 @@ export const line: {
   richMenu,
   idToken,
   config: configModule,
-  configuration: configurationModule,
   text: lineText,
 };
 
@@ -34,7 +31,7 @@ export namespace line {
 export { LineConfigSchema } from "./config";
 export type { LineConfig } from "./config";
 export { resolveLiffConfiguration } from "./configuration";
-export type { LiffConfiguration } from "./configuration";
+export type { ConfiguredLiff, LiffConfiguration } from "./configuration";
 export type { LineClientConfig } from "./client";
 export { classifyLineText } from "./text";
 export type { LineTextIntent } from "./text";

@@ -1,9 +1,9 @@
 import {
   type AccountDataNamespace,
   type CompatibilityDataNamespace,
+  type ConfiguredLiff,
   type D1,
   createCompatibilityInvitationWithReference,
-  line,
 } from "@me-builder/lib";
 import { createCompatibilityInvitationUrl } from "./compatibility-invitation-url";
 import { createLiffSession } from "./liff-session";
@@ -17,8 +17,7 @@ export type CompatibilityInvitationIssueOutcome =
 
 type Params = Readonly<{
   idToken: string | undefined;
-  lineLoginChannelId: string | undefined;
-  liffId: string;
+  liff: ConfiguredLiff;
   db: D1.shared.Client;
   accountData: AccountDataNamespace;
   compatibilityData: CompatibilityDataNamespace;
@@ -36,17 +35,12 @@ const defaultDependencies: Dependencies = {
 
 /** 本人が共有へ同意した時点の表示名だけを固定し、1人用の招待を発行する。 */
 export async function issueCompatibilityInvitation(
-  { idToken, lineLoginChannelId, liffId, db, accountData, compatibilityData }: Params,
+  { idToken, liff, db, accountData, compatibilityData }: Params,
   dependencies: Dependencies = defaultDependencies,
 ): Promise<CompatibilityInvitationIssueOutcome> {
-  const resolvedLiff = line.configuration.resolveLiffConfiguration({
-    liffId,
-    lineLoginChannelId,
-  });
-  if (!resolvedLiff.liffId) throw new Error("LIFF_ID is required to issue an invitation");
   const session = await dependencies.createSession({
     idToken,
-    lineLoginChannelId: resolvedLiff.lineLoginChannelId,
+    lineLoginChannelId: liff.lineLoginChannelId,
     db,
   });
   if (session.type !== "resolved") return session;
@@ -59,9 +53,10 @@ export async function issueCompatibilityInvitation(
     inviterAccountId: session.session.accountId,
     inviterDisplayName,
   });
+  const invitationUrl = createCompatibilityInvitationUrl(liff.liffId, result.relationship.id);
   return {
     type: "created",
-    invitationUrl: createCompatibilityInvitationUrl(resolvedLiff.liffId, result.relationship.id),
+    invitationUrl,
     expiresAt: result.relationship.expiresAt.toISOString(),
   };
 }

@@ -23,20 +23,24 @@ export type EndCompatibilityRelationshipOutcome =
   | { type: "unauthenticated"; reason: string }
   | { type: "account-not-found" };
 
+type Dependencies = Readonly<{
+  createSession: typeof createLiffSession;
+  endRelationship: typeof endCompatibilityRelationshipWithReferences;
+}>;
+
+const defaultDependencies: Dependencies = {
+  createSession: createLiffSession,
+  endRelationship: endCompatibilityRelationshipWithReferences,
+};
+
 /** 本人確認後に正本と双方の一覧参照を終了する。 */
 export async function endCompatibilityRelationship(
   params: Params,
-  dependencies: {
-    createSession: typeof createLiffSession;
-    endRelationship: typeof endCompatibilityRelationshipWithReferences;
-  } = {
-    createSession: createLiffSession,
-    endRelationship: endCompatibilityRelationshipWithReferences,
-  },
+  dependencies: Dependencies = defaultDependencies,
 ): Promise<EndCompatibilityRelationshipOutcome> {
+  if (!compatibilityRelationshipId.isValid(params.relationshipId)) return { type: "unavailable" };
   const session = await dependencies.createSession(params);
   if (session.type !== "resolved") return session;
-  if (!compatibilityRelationshipId.parse(params.relationshipId)) return { type: "unavailable" };
   const result = await dependencies.endRelationship(
     params.accountData,
     params.compatibilityData,

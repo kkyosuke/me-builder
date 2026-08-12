@@ -20,7 +20,8 @@ export function resolveCompatibilityRoute(pathname: string): CompatibilityRoute 
 export function resolveCompatibilityInvitationId(pathname: string): string | null {
   const prefix = "/compatibility/invitations/";
   if (!pathname.startsWith(prefix)) return null;
-  return compatibilityRelationshipId.parse(pathname.slice(prefix.length)) ?? null;
+  const relationshipId = pathname.slice(prefix.length);
+  return compatibilityRelationshipId.isValid(relationshipId) ? relationshipId : null;
 }
 
 export function resolveCompatibilityRelationshipId(pathname: string): string | null {

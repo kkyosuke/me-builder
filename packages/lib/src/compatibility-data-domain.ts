@@ -37,7 +37,7 @@ export function decideCompatibilityInvitationCreation(
   createdAt: Date,
 ): CreateCompatibilityInvitationResult {
   assertNonEmpty(relationshipId, "relationshipId");
-  if (!compatibilityRelationshipId.parse(relationshipId)) {
+  if (!compatibilityRelationshipId.isValid(relationshipId)) {
     throw new Error("Compatibility relationship id must be a 256-bit hex token");
   }
   assertNonEmpty(input.inviterAccountId, "inviterAccountId");

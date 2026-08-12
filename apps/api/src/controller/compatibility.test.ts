@@ -173,7 +173,10 @@ describe("POST /api/compatibility/invitations", () => {
     expect(issueCompatibilityInvitation).toHaveBeenCalledWith(
       expect.objectContaining({
         idToken: "dummy.id.token",
-        liffId: "2010850319-Yl63upAR",
+        liff: {
+          liffId: "2010850319-Yl63upAR",
+          lineLoginChannelId: "2010850319",
+        },
         accountData: dummyAccountData,
         compatibilityData: dummyCompatibilityData,
       }),

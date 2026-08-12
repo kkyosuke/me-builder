@@ -210,10 +210,14 @@ export async function cancelCompatibilityInvitationWithReference(
     relationshipId,
   ).cancelInvitation(actorAccountId);
   if (result.outcome === "cancelled" || result.outcome === "unchanged") {
+    const { cancelledAt } = result.relationship;
+    if (!cancelledAt) {
+      throw new Error("Cancelled compatibility invitation must have cancelledAt");
+    }
     await accountDataFor(accountNamespace, actorAccountId).execute(
       "compatibility.endReference",
       relationshipId,
-      new Date(),
+      cancelledAt,
     );
   }
   return result;
@@ -230,12 +234,11 @@ export async function endCompatibilityRelationshipWithReferences(
     actorAccountId,
   );
   if (result.outcome === "ended" || result.outcome === "unchanged") {
-    const inviteeAccountId = result.relationship.inviteeAccountId;
-    if (!inviteeAccountId) {
-      throw new Error("Ended compatibility relationship must have both participants");
+    const { endedAt, inviteeAccountId } = result.relationship;
+    if (!inviteeAccountId || !endedAt) {
+      throw new Error("Ended compatibility relationship must have both participants and endedAt");
     }
     const participantIds = [result.relationship.inviterAccountId, inviteeAccountId].sort();
-    const endedAt = new Date();
     await Promise.all(
       participantIds.map((accountId) =>
         accountDataFor(accountNamespace, accountId).execute(

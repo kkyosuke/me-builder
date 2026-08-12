@@ -89,9 +89,9 @@ export async function getCompatibilityRelationshipContents({
   compatibilityData,
   at = new Date(),
 }: Params): Promise<CompatibilityRelationshipOutcome> {
+  if (!compatibilityRelationshipId.isValid(relationshipId)) return { type: "unavailable" };
   const session = await createLiffSession({ idToken, lineLoginChannelId, db });
   if (session.type !== "resolved") return session;
-  if (!compatibilityRelationshipId.parse(relationshipId)) return { type: "unavailable" };
 
   const canonical = await compatibilityDataFor(compatibilityData, relationshipId).getRelationship(
     session.session.accountId,

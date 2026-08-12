@@ -163,18 +163,17 @@ async function callLiffApi(
 async function registerEndpoint(
   params: RegisterLiffEndpointParams,
 ): Promise<RegisterLiffEndpointResult> {
-  const channelId = resolveChannelId(params);
   const { channelSecret, endpointUrl, description } = params;
   const viewType: LiffViewType = params.viewType ?? "full";
 
-  if (!channelId || !channelSecret || !endpointUrl) {
-    const msg =
-      "[LIFF] LINE_LOGIN_CHANNEL_ID / LINE_LOGIN_CHANNEL_SECRET / エンドポイント URL が設定されていないため、LIFF アプリの自動設定をスキップします。";
-    logger.info(msg);
-    return { success: false, message: msg };
-  }
-
   try {
+    const channelId = resolveChannelId(params);
+    if (!channelId || !channelSecret || !endpointUrl) {
+      const msg =
+        "[LIFF] LINE_LOGIN_CHANNEL_ID / LINE_LOGIN_CHANNEL_SECRET / エンドポイント URL が設定されていないため、LIFF アプリの自動設定をスキップします。";
+      logger.info(msg);
+      return { success: false, message: msg };
+    }
     const token = await issueChannelAccessToken(channelId, channelSecret);
 
     const listed = (await callLiffApi(token, "")) as { apps?: LiffApp[] } | undefined;
@@ -223,7 +222,9 @@ async function registerEndpoint(
     return { success: true, message: msg, liffId: created.liffId };
   } catch (error) {
     // 万一エラー文へ混ざっても外へ出さないよう、チャネルシークレットは伏せる
-    const detail = toMessage(error).replaceAll(channelSecret, "***");
+    const detail = channelSecret
+      ? toMessage(error).replaceAll(channelSecret, "***")
+      : toMessage(error);
     const msg = `[LIFF] LIFF アプリの自動設定に失敗しました: ${detail}`;
     logger.error(msg);
     return { success: false, message: msg };
@@ -232,6 +233,8 @@ async function registerEndpoint(
 
 export const liff: {
   registerEndpoint: (params: RegisterLiffEndpointParams) => Promise<RegisterLiffEndpointResult>;
+  resolveConfiguration: typeof resolveLiffConfiguration;
 } = {
   registerEndpoint,
+  resolveConfiguration: resolveLiffConfiguration,
 };

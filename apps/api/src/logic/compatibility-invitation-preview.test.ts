@@ -163,13 +163,13 @@ describe("getCompatibilityInvitationContents", () => {
     expect(deps.getInvitationPreview).not.toHaveBeenCalled();
   });
 
-  it("不正な関係IDは本人確認後に利用不可として扱う", async () => {
+  it("不正な関係IDは本人確認を始めず利用不可として扱う", async () => {
     const deps = dependencies();
 
     await expect(
       getCompatibilityInvitationContents(params({ relationshipId: "invalid" }), deps),
     ).resolves.toEqual({ type: "unavailable" });
-    expect(deps.createSession).toHaveBeenCalledOnce();
+    expect(deps.createSession).not.toHaveBeenCalled();
     expect(deps.getInvitationPreview).not.toHaveBeenCalled();
   });
 });

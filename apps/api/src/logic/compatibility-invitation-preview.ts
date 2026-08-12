@@ -72,9 +72,9 @@ export async function resolveCompatibilityInvitationRecipient(
   { relationshipId, idToken, lineLoginChannelId, db, compatibilityData }: Params,
   dependencies: Dependencies = defaultDependencies,
 ): Promise<CompatibilityInvitationRecipientOutcome> {
+  if (!compatibilityRelationshipId.isValid(relationshipId)) return { type: "unavailable" };
   const session = await dependencies.createSession({ idToken, lineLoginChannelId, db });
   if (session.type !== "resolved") return session;
-  if (!compatibilityRelationshipId.parse(relationshipId)) return { type: "unavailable" };
 
   const preview = await dependencies.getInvitationPreview(
     compatibilityData,

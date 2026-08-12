@@ -42,7 +42,7 @@ export function getConfig(env?: Record<string, unknown>): ApiConfig {
   const rawWebhookQueueName = getEnv(["WEBHOOK_QUEUE_NAME", "WEBHOOK_QUEUE"], env);
   const rawWebhookQueue = env?.WEBHOOK_QUEUE;
 
-  const liffConfiguration = line.configuration.resolveLiffConfiguration({
+  const liffConfiguration = line.liff.resolveConfiguration({
     liffId: getEnv("LIFF_ID", env),
     lineLoginChannelId: getEnv("LINE_LOGIN_CHANNEL_ID", env),
   });
