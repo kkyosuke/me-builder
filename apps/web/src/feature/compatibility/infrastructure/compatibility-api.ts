@@ -117,11 +117,32 @@ const InvitationAcceptanceResponseSchema = v.object({
   status: v.literal("accepted"),
 }) satisfies v.GenericSchema<CompatibilityInvitationAcceptance>;
 
+const FRIENDSHIP_REQUIRED_MESSAGE =
+  "利用するには、先にLINE公式アカウントを友だち追加してください。";
+
 function authenticatedError(response: Response): Error | null {
   if (response.status === 401) {
     return new Error("本人確認に失敗しました。LINEから開き直してください。");
   }
   return null;
+}
+
+/**
+ * 相性APIは友だち未追加と対象が利用できない状態を同じ`404`で返す。
+ *
+ * `reason`を見て取り違えないようにし、どちらの場合もHTTP状態コードを見せない。
+ */
+async function notFoundError(response: Response, unavailableMessage: string): Promise<Error> {
+  const body = await response.json().catch(() => null);
+  if (
+    body &&
+    typeof body === "object" &&
+    "reason" in body &&
+    body.reason === "friendship_required"
+  ) {
+    return new Error(FRIENDSHIP_REQUIRED_MESSAGE);
+  }
+  return new Error(unavailableMessage);
 }
 
 export async function fetchCompatibilityShareConsent(
@@ -193,16 +214,10 @@ export async function fetchCompatibilityInvitation(
       throw new Error("本人確認に失敗しました。LINEから開き直してください。");
     }
     if (response.status === 404) {
-      const body = await response.json().catch(() => null);
-      if (
-        body &&
-        typeof body === "object" &&
-        "reason" in body &&
-        body.reason === "friendship_required"
-      ) {
-        throw new Error("利用するには、先にLINE公式アカウントを友だち追加してください。");
-      }
-      throw new Error("この招待は利用できません。期限切れまたは使用済みの可能性があります。");
+      throw await notFoundError(
+        response,
+        "この招待は利用できません。期限切れまたは使用済みの可能性があります。",
+      );
     }
     if (response.status === 409) {
       throw new Error("自分が発行した招待は承諾できません。相性一覧から確認してください。");
@@ -251,6 +266,12 @@ export async function acceptCompatibilityInvitation(
   if (!response.ok) {
     const authenticationError = authenticatedError(response);
     if (authenticationError) throw authenticationError;
+    if (response.status === 404) {
+      throw await notFoundError(
+        response,
+        "この招待は利用できません。期限切れまたは取り消された可能性があります。",
+      );
+    }
     if (response.status === 409) {
       throw new Error("この招待は承諾できません。相性一覧から確認してください。");
     }
@@ -275,11 +296,13 @@ export async function fetchCompatibilityRelationship(
   if (!response.ok) {
     const authenticationError = authenticatedError(response);
     if (authenticationError) throw authenticationError;
-    throw new Error(
-      response.status === 404
-        ? "この相性シートは利用できません。共有が終了した可能性があります。"
-        : `相性シートの取得に失敗しました (HTTP ${response.status})`,
-    );
+    if (response.status === 404) {
+      throw await notFoundError(
+        response,
+        "この相性シートは利用できません。共有が終了した可能性があります。",
+      );
+    }
+    throw new Error(`相性シートの取得に失敗しました (HTTP ${response.status})`);
   }
   return v.parse(RelationshipResponseSchema, await response.json());
 }
@@ -288,7 +311,7 @@ async function deleteCompatibilityResource(
   apiUrl: string | undefined,
   idToken: string,
   path: string,
-  failureMessage: string,
+  messages: Readonly<{ failure: string; gone: string }>,
   signal?: AbortSignal,
 ): Promise<void> {
   const response = await createHttpClient(apiUrl).request(path, {
@@ -297,7 +320,10 @@ async function deleteCompatibilityResource(
     ...(signal ? { signal } : {}),
   });
   if (!response.ok) {
-    throw authenticatedError(response) ?? new Error(`${failureMessage} (HTTP ${response.status})`);
+    const authenticationError = authenticatedError(response);
+    if (authenticationError) throw authenticationError;
+    if (response.status === 404) throw await notFoundError(response, messages.gone);
+    throw new Error(`${messages.failure} (HTTP ${response.status})`);
   }
 }
 
@@ -311,7 +337,10 @@ export function cancelCompatibilityInvitation(
     apiUrl,
     idToken,
     `/api/compatibility/invitations/${encodeURIComponent(relationshipId)}`,
-    "招待の取り消しに失敗しました",
+    {
+      failure: "招待の取り消しに失敗しました",
+      gone: "この招待はすでに取り消されたか、期限切れです。一覧を再読み込みしてください。",
+    },
     signal,
   );
 }
@@ -326,7 +355,10 @@ export function endCompatibilityRelationship(
     apiUrl,
     idToken,
     `/api/compatibility/relationships/${encodeURIComponent(relationshipId)}`,
-    "共有の終了に失敗しました",
+    {
+      failure: "共有の終了に失敗しました",
+      gone: "この共有はすでに終了しています。一覧を再読み込みしてください。",
+    },
     signal,
   );
 }
