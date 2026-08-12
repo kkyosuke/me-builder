@@ -244,18 +244,21 @@ export class AccountData extends DurableObject<Env> {
       const relationshipData = compatibilityDataFor(namespace, reference.relationshipId);
       const relationship = await relationshipData.getRelationship(this.accountId);
       if (relationship) {
+        const { acceptedAt } = relationship;
         const partnerAccountId =
           relationship.inviterAccountId === this.accountId
             ? relationship.inviteeAccountId
             : relationship.inviterAccountId;
-        if (!partnerAccountId) {
-          throw new Error("Accepted compatibility relationship must have both participants");
+        if (!partnerAccountId || !acceptedAt) {
+          throw new Error(
+            "Accepted compatibility relationship must have both participants and acceptedAt",
+          );
         }
         const activation = this.repository.activateCompatibilityReference(this.accountId, {
           relationshipId: reference.relationshipId,
           partnerAccountId,
           role: reference.role,
-          updatedAt: new Date(),
+          updatedAt: acceptedAt,
         });
         if (activation.outcome === "conflict") {
           throw new Error("Accepted compatibility relationship conflicts with another reference");

@@ -212,7 +212,7 @@ describe("POST /api/compatibility/invitations", () => {
     { LIFF_ID: "invalid" },
     { LIFF_ID: "2010850319-Yl63upAR", LINE_LOGIN_CHANNEL_ID: "9999999999" },
   ])("不正なLIFF設定を招待作成前に500で拒否する", async (env) => {
-    const response = await issueRequest({ previewToken }, env);
+    const response = await issueRequest(env);
     expect(response.status).toBe(500);
     expect(issueCompatibilityInvitation).not.toHaveBeenCalled();
   });

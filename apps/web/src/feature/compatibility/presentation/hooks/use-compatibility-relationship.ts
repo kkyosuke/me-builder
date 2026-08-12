@@ -57,13 +57,13 @@ export function useCompatibilityRelationship({
   }, [load]);
 
   const end = useCallback(async () => {
-    if (!relationshipId || ending.status === "loading") return;
-    endRequest.current?.abort();
+    if (!relationshipId || endRequest.current) return;
     const controller = new AbortController();
     endRequest.current = controller;
     setEnding({ status: "loading" });
     try {
       const token = await acquireIdToken(controller.signal);
+      if (controller.signal.aborted) return;
       if (!token) throw new Error("LINEから相性画面を開いてください。");
       await endCompatibilityRelationship(config.apiUrl, token, relationshipId, controller.signal);
       if (!controller.signal.aborted) setEnding({ status: "success", data: null });
@@ -74,8 +74,10 @@ export function useCompatibilityRelationship({
           message: error instanceof Error ? error.message : "共有を終了できませんでした。",
         });
       }
+    } finally {
+      if (endRequest.current === controller) endRequest.current = null;
     }
-  }, [acquireIdToken, ending.status, relationshipId]);
+  }, [acquireIdToken, relationshipId]);
 
   return { state, ending, reload: load, end };
 }

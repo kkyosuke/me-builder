@@ -19,13 +19,13 @@ export function useCompatibilityInvitationAcceptance({
   useEffect(() => () => request.current?.abort(), []);
 
   const accept = useCallback(async () => {
-    if (!relationshipId || state.status === "loading") return;
-    request.current?.abort();
+    if (!relationshipId || request.current) return;
     const controller = new AbortController();
     request.current = controller;
     setState({ status: "loading" });
     try {
       const token = await acquireIdToken(controller.signal);
+      if (controller.signal.aborted) return;
       if (!token) throw new Error("LINEから招待画面を開いてください。");
       const data = await acceptCompatibilityInvitation(
         config.apiUrl,
@@ -41,8 +41,10 @@ export function useCompatibilityInvitationAcceptance({
           message: error instanceof Error ? error.message : "招待を承諾できませんでした。",
         });
       }
+    } finally {
+      if (request.current === controller) request.current = null;
     }
-  }, [acquireIdToken, relationshipId, state.status]);
+  }, [acquireIdToken, relationshipId]);
 
   return { state, accept };
 }

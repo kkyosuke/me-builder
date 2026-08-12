@@ -125,6 +125,57 @@ describe("compatibility data orchestration", () => {
     ]);
   });
 
+  it("承諾正本のacceptedAtを双方の有効参照へ投影する", async () => {
+    const canonicalAcceptedAt = new Date("2026-08-12T00:15:00.000Z");
+    const activationInputs: Array<{ accountId: string; updatedAt: Date }> = [];
+    const accountNamespace = {
+      getByName(accountId: string) {
+        return {
+          async execute(routedAccountId: string, operation: string, input: { updatedAt?: Date }) {
+            expect(routedAccountId).toBe(accountId);
+            if (operation === "compatibility.activateReference" && input.updatedAt) {
+              activationInputs.push({ accountId, updatedAt: input.updatedAt });
+              return { outcome: "activated", reference: {} };
+            }
+            return { outcome: "reserved", reference: {} };
+          },
+        };
+      },
+    } as unknown as AccountDataNamespace;
+    const compatibilityNamespace = {
+      getByName: () => ({
+        async getInvitationAcceptanceContext() {
+          return {
+            inviterAccountId: "account-a",
+            expiresAt: new Date("2026-08-23T00:00:00.000Z"),
+          };
+        },
+        async acceptInvitation() {
+          return {
+            outcome: "accepted",
+            relationship: {
+              inviterAccountId: "account-a",
+              inviteeAccountId: "account-b",
+              acceptedAt: canonicalAcceptedAt,
+            },
+          };
+        },
+      }),
+    } as unknown as CompatibilityDataNamespace;
+
+    await acceptCompatibilityInvitationWithReferences(
+      accountNamespace,
+      compatibilityNamespace,
+      "1".repeat(64),
+      { inviteeAccountId: "account-b", inviteeDisplayName: "受信者" },
+    );
+
+    expect(activationInputs).toEqual([
+      { accountId: "account-a", updatedAt: canonicalAcceptedAt },
+      { accountId: "account-b", updatedAt: canonicalAcceptedAt },
+    ]);
+  });
+
   it("招待の正本を取り消した後に送信者の一覧参照を終了する", async () => {
     const calls: string[] = [];
     const endedAtValues: Date[] = [];

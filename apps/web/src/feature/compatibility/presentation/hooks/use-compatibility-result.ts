@@ -2,7 +2,7 @@ import { useCallback, useState } from "react";
 
 type CompatibilityResultState = {
   section: "pair" | "people";
-  sharing: "active" | "confirming-end" | "ended";
+  sharing: "active" | "confirming-end";
 };
 
 const initialState: CompatibilityResultState = {
@@ -22,9 +22,5 @@ export function useCompatibilityResult() {
   const cancelEnd = useCallback(() => {
     setState((current) => ({ ...current, sharing: "active" }));
   }, []);
-  const confirmEnd = useCallback(() => {
-    setState((current) => ({ ...current, sharing: "ended" }));
-  }, []);
-
-  return { state, showSection, requestEnd, cancelEnd, confirmEnd };
+  return { state, showSection, requestEnd, cancelEnd };
 }

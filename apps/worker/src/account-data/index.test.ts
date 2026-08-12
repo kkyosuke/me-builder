@@ -3,6 +3,48 @@ import { logger } from "@me-builder/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AccountData } from ".";
 
+describe("AccountData compatibility projection reconciliation", () => {
+  it("承諾正本のacceptedAtで予約参照を有効化する", async () => {
+    const acceptedAt = new Date("2026-08-12T00:15:00.000Z");
+    const activateCompatibilityReference = vi.fn().mockReturnValue({ outcome: "activated" });
+    const instance = Object.create(AccountData.prototype) as AccountData;
+    Object.assign(instance as unknown as Record<string, unknown>, {
+      accountId: "account-a",
+      repository: {
+        listReconciliableCompatibilityReferences: () => [
+          { relationshipId: "1".repeat(64), role: "inviter", status: "reserved" },
+        ],
+        activateCompatibilityReference,
+        listVisibleCompatibilityReferences: () => [],
+      },
+      env: {
+        COMPATIBILITY_DATA: {
+          getByName: () => ({
+            getRelationship: vi.fn().mockResolvedValue({
+              inviterAccountId: "account-a",
+              inviteeAccountId: "account-b",
+              acceptedAt,
+            }),
+          }),
+        },
+      },
+    });
+
+    await (
+      instance as unknown as {
+        listVisibleCompatibilityReferences(): Promise<unknown>;
+      }
+    ).listVisibleCompatibilityReferences();
+
+    expect(activateCompatibilityReference).toHaveBeenCalledWith("account-a", {
+      relationshipId: "1".repeat(64),
+      partnerAccountId: "account-b",
+      role: "inviter",
+      updatedAt: acceptedAt,
+    });
+  });
+});
+
 describe("AccountData alarm", () => {
   beforeEach(() => {
     vi.spyOn(

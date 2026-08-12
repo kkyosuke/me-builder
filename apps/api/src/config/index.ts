@@ -1,4 +1,4 @@
-import { line } from "@me-builder/lib";
+import { resolveLiffConfiguration } from "@me-builder/lib";
 import { getEnv, parseAdminLineUserIds } from "@me-builder/shared";
 import * as v from "valibot";
 import { type ApiConfig, ConfigSchema } from "./schema";
@@ -42,7 +42,7 @@ export function getConfig(env?: Record<string, unknown>): ApiConfig {
   const rawWebhookQueueName = getEnv(["WEBHOOK_QUEUE_NAME", "WEBHOOK_QUEUE"], env);
   const rawWebhookQueue = env?.WEBHOOK_QUEUE;
 
-  const liffConfiguration = line.liff.resolveConfiguration({
+  const liffConfiguration = resolveLiffConfiguration({
     liffId: getEnv("LIFF_ID", env),
     lineLoginChannelId: getEnv("LINE_LOGIN_CHANNEL_ID", env),
   });

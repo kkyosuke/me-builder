@@ -50,7 +50,7 @@ type Dependencies = Readonly<{
 }>;
 
 /** 承諾に必要なのは、pending招待の当事者と相手へ固定する表示名だけ。 */
-export type CompatibilityInvitationRecipientOutcome =
+type CompatibilityInvitationRecipientOutcome =
   | {
       type: "resolved";
       inviteeAccountId: string;
@@ -68,7 +68,7 @@ const defaultDependencies: Dependencies = {
 };
 
 /** 本人確認とpending招待の判定だけを行い、AccountDataを読まない。 */
-export async function resolveCompatibilityInvitationRecipient(
+async function resolveCompatibilityInvitationRecipient(
   { relationshipId, idToken, lineLoginChannelId, db, compatibilityData }: Params,
   dependencies: Dependencies = defaultDependencies,
 ): Promise<CompatibilityInvitationRecipientOutcome> {

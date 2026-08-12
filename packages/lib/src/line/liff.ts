@@ -233,8 +233,6 @@ async function registerEndpoint(
 
 export const liff: {
   registerEndpoint: (params: RegisterLiffEndpointParams) => Promise<RegisterLiffEndpointResult>;
-  resolveConfiguration: typeof resolveLiffConfiguration;
 } = {
   registerEndpoint,
-  resolveConfiguration: resolveLiffConfiguration,
 };

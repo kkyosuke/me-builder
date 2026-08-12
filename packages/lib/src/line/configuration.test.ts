@@ -18,7 +18,7 @@ describe("resolveLiffConfiguration", () => {
     ).toEqual({ liffId: "2010850319-Yl63upAR", lineLoginChannelId: "2010850319" });
   });
 
-  it.each(["invalid", "abc-def", "123-"])(
+  it.each(["invalid", "abc-def", "123-", "123-a/b", "123-a?b", "123-a b", "123-a\\b"])(
     "チャネルIDを抽出できないLIFF ID %sを拒否する",
     (liffId) => {
       expect(() => resolveLiffConfiguration({ liffId })).toThrow("LIFF_ID");

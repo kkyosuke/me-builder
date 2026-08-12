@@ -3,8 +3,9 @@ import {
   type CompatibilityDataNamespace,
   type D1,
   acceptCompatibilityInvitationWithReferences,
+  compatibilityRelationshipId,
 } from "@me-builder/lib";
-import { resolveCompatibilityInvitationRecipient } from "./compatibility-invitation-preview";
+import { createLiffSession } from "./liff-session";
 
 type Params = Readonly<{
   relationshipId: string;
@@ -13,8 +14,17 @@ type Params = Readonly<{
   db: D1.shared.Client;
   accountData: AccountDataNamespace;
   compatibilityData: CompatibilityDataNamespace;
-  at?: Date;
 }>;
+
+type Dependencies = Readonly<{
+  createSession: typeof createLiffSession;
+  acceptInvitation: typeof acceptCompatibilityInvitationWithReferences;
+}>;
+
+const defaultDependencies: Dependencies = {
+  createSession: createLiffSession,
+  acceptInvitation: acceptCompatibilityInvitationWithReferences,
+};
 
 export type AcceptCompatibilityInvitationOutcome =
   | { type: "accepted"; relationshipId: string }
@@ -32,18 +42,25 @@ export type AcceptCompatibilityInvitationOutcome =
  */
 export async function acceptCompatibilityInvitation(
   params: Params,
+  dependencies: Dependencies = defaultDependencies,
 ): Promise<AcceptCompatibilityInvitationOutcome> {
-  const recipient = await resolveCompatibilityInvitationRecipient(params);
-  if (recipient.type !== "resolved") return recipient;
-  if (!recipient.inviteeDisplayName) return { type: "share-unavailable" };
+  if (!compatibilityRelationshipId.isValid(params.relationshipId)) return { type: "unavailable" };
+  const session = await dependencies.createSession({
+    idToken: params.idToken,
+    lineLoginChannelId: params.lineLoginChannelId,
+    db: params.db,
+  });
+  if (session.type !== "resolved") return session;
+  const inviteeDisplayName = session.session.displayName?.trim();
+  if (!inviteeDisplayName) return { type: "share-unavailable" };
 
-  const result = await acceptCompatibilityInvitationWithReferences(
+  const result = await dependencies.acceptInvitation(
     params.accountData,
     params.compatibilityData,
     params.relationshipId,
     {
-      inviteeAccountId: recipient.inviteeAccountId,
-      inviteeDisplayName: recipient.inviteeDisplayName,
+      inviteeAccountId: session.session.accountId,
+      inviteeDisplayName,
     },
   );
 

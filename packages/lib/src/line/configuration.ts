@@ -1,5 +1,20 @@
-const LIFF_ID_PATTERN = /^(\d+)-(.+)$/;
+const LIFF_ID_PATTERN = /^(\d+)-(.+)$/u;
 const CHANNEL_ID_PATTERN = /^\d+$/;
+
+function isSafePathSegment(value: string): boolean {
+  for (const character of value) {
+    const codePoint = character.codePointAt(0);
+    if (
+      codePoint === undefined ||
+      codePoint <= 0x20 ||
+      codePoint === 0x7f ||
+      "/?#\\".includes(character)
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
 
 export type LiffConfiguration = Readonly<{
   liffId: string | undefined;
@@ -26,12 +41,15 @@ export function resolveLiffConfiguration(params: {
     return { liffId: undefined, lineLoginChannelId: explicitChannelId };
   }
 
-  // LINEが公開していないsuffixの文字集合は推測せず、チャネルIDの抽出に必要な境界だけを見る。
+  // LINEが公開していないsuffixの文字集合は推測せず、URLの1 path segmentとして危険な文字だけを除く。
   const match = LIFF_ID_PATTERN.exec(liffId);
-  if (!match) {
-    throw new Error("LIFF_ID must start with {LINE Login channel ID}- and include a suffix");
+  const channelIdFromLiff = match?.[1];
+  const suffix = match?.[2];
+  if (!channelIdFromLiff || !suffix || !isSafePathSegment(suffix)) {
+    throw new Error(
+      "LIFF_ID must start with {LINE Login channel ID}- and include a URL-safe path suffix",
+    );
   }
-  const channelIdFromLiff = match[1];
   if (explicitChannelId && explicitChannelId !== channelIdFromLiff) {
     throw new Error("LINE_LOGIN_CHANNEL_ID must match the channel ID prefix of LIFF_ID");
   }

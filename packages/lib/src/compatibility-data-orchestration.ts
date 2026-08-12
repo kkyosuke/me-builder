@@ -98,6 +98,7 @@ async function activateCompatibilityReferences(
   relationshipId: string,
   inviterAccountId: string,
   inviteeAccountId: string,
+  acceptedAt: Date,
 ): Promise<void> {
   const participants = [
     { accountId: inviterAccountId, partnerAccountId: inviteeAccountId, role: "inviter" as const },
@@ -110,7 +111,7 @@ async function activateCompatibilityReferences(
         relationshipId,
         partnerAccountId: participant.partnerAccountId,
         role: participant.role,
-        updatedAt: new Date(),
+        updatedAt: acceptedAt,
       },
     );
     if (activation.outcome === "conflict") {
@@ -131,15 +132,18 @@ export async function acceptCompatibilityInvitationWithReferences(
   if (!context) {
     const result = await relationshipData.acceptInvitation(input);
     if (result.outcome === "accepted" || result.outcome === "unchanged") {
-      const inviteeAccountId = result.relationship.inviteeAccountId;
-      if (!inviteeAccountId) {
-        throw new Error("Accepted compatibility relationship must have both participants");
+      const { acceptedAt, inviteeAccountId } = result.relationship;
+      if (!inviteeAccountId || !acceptedAt) {
+        throw new Error(
+          "Accepted compatibility relationship must have both participants and acceptedAt",
+        );
       }
       await activateCompatibilityReferences(
         accountNamespace,
         relationshipId,
         result.relationship.inviterAccountId,
         inviteeAccountId,
+        acceptedAt,
       );
     }
     return result;
@@ -189,11 +193,17 @@ export async function acceptCompatibilityInvitationWithReferences(
     return result;
   }
 
+  const { acceptedAt } = result.relationship;
+  if (!acceptedAt) {
+    throw new Error("Accepted compatibility relationship must have acceptedAt");
+  }
+
   await activateCompatibilityReferences(
     accountNamespace,
     relationshipId,
     context.inviterAccountId,
     input.inviteeAccountId,
+    acceptedAt,
   );
   return result;
 }
