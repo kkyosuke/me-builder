@@ -602,10 +602,25 @@ export async function completeProfileSummaryGeneration(
   const compatibilityShareEvidenceReferences = [
     ...new Set(input.compatibilityShareStatements.flatMap(({ evidenceIds }) => evidenceIds)),
   ];
-  const compatibilityShareFingerprint = await createCompatibilityShareProfileFingerprint(
-    profileSummaryVersionId,
-    compatibilityShareStatements,
-  );
+  // 共有できる文章が1件も残らなかった生成では新しいprojectionを作らない。
+  // 相手ごとの継続同意では常に最新projectionを共有するため、空を保存すると
+  // 成立済みの共有が本人の操作なしに止まる。前版のprojectionを最新のまま残す。
+  const shareProjectionInserts =
+    compatibilityShareStatements.length > 0
+      ? [
+          db.insert(profileSummaryShareProjections).values({
+            profileSummaryVersionId,
+            schemaVersion: 1,
+            generatedAt: input.generatedAt,
+            statements: compatibilityShareStatements,
+            evidenceReferences: compatibilityShareEvidenceReferences,
+            fingerprint: await createCompatibilityShareProfileFingerprint(
+              profileSummaryVersionId,
+              compatibilityShareStatements,
+            ),
+          }),
+        ]
+      : [];
   const summary = {
     generatedAt: input.generatedAt.toISOString(),
     headline: input.headline,
@@ -632,14 +647,7 @@ export async function completeProfileSummaryGeneration(
         summary,
       })
       .onConflictDoNothing(),
-    db.insert(profileSummaryShareProjections).values({
-      profileSummaryVersionId,
-      schemaVersion: 1,
-      generatedAt: input.generatedAt,
-      statements: compatibilityShareStatements,
-      evidenceReferences: compatibilityShareEvidenceReferences,
-      fingerprint: compatibilityShareFingerprint,
-    }),
+    ...shareProjectionInserts,
     db
       .update(profileSummaryGenerations)
       .set({

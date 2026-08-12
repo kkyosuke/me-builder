@@ -297,6 +297,83 @@ describe("Profile Summary persistence", () => {
     });
   });
 
+  it("共有できる文章が残らない生成では、前版の共有projectionを最新のまま保つ", async () => {
+    const db = createTestDb();
+    const { accountId, recordedAt } = await insertDiaryFixture(db);
+    const requested = await requestProfileSummaryGeneration(
+      db,
+      accountId,
+      new Date("2026-08-09T00:00:00.000Z"),
+    );
+    if (requested.outcome !== "created") throw new Error("generation was not created");
+    const context = await loadProfileSummaryGenerationContext(
+      db,
+      accountId,
+      requested.generationId,
+    );
+    const evidenceId = context?.evidence[0]?.id;
+    if (!context || !evidenceId) throw new Error("generation context was not loaded");
+    const baseInput = {
+      generatedAt: new Date("2026-08-09T00:01:00.000Z"),
+      model: "gemini-test",
+      promptVersion: "profile-summary-v2",
+      headline: "歩く時間が気持ちを整えています",
+      insights: [],
+      diagnosisCount: context.diagnosisCount,
+      diaryCount: context.diaryCount,
+      latestRecordedAt: context.latestRecordedAt,
+      inputSnapshot: context.inputSnapshot,
+    };
+    await expect(
+      completeProfileSummaryGeneration(db, accountId, {
+        ...baseInput,
+        generationId: requested.generationId,
+        compatibilityShareStatements: [
+          {
+            key: "calm-walking",
+            label: "落ち着く時間",
+            statement: "私は、ゆっくり考える時間を大切にしています",
+            evidenceIds: [evidenceId],
+          },
+        ],
+      }),
+    ).resolves.toBe(true);
+
+    await insertAdditionalDiary(db, accountId, "share-empty", new Date("2026-08-10T00:00:00.000Z"));
+    const regenerated = await requestProfileSummaryGeneration(
+      db,
+      accountId,
+      new Date("2026-08-10T00:01:00.000Z"),
+      true,
+    );
+    if (regenerated.outcome !== "created") throw new Error("regeneration was not created");
+    await expect(
+      completeProfileSummaryGeneration(db, accountId, {
+        ...baseInput,
+        generationId: regenerated.generationId,
+        generatedAt: new Date("2026-08-10T00:02:00.000Z"),
+        headline: "共有できる文章が残らなかった版",
+        latestRecordedAt: recordedAt,
+        compatibilityShareStatements: [],
+      }),
+    ).resolves.toBe(true);
+
+    // 最新版は増えるが、共有は前版の文章を使い続けるため相手の相性シートが止まらない。
+    const summary = await readProfileSummary(db, accountId);
+    expect(summary.versions[0]).toMatchObject({
+      isLatest: true,
+      summary: { headline: "共有できる文章が残らなかった版" },
+    });
+    await expect(readCompatibilityShareProfile(db, accountId)).resolves.toMatchObject({
+      type: "available",
+      profile: {
+        statements: [
+          { key: "calm-walking", statement: "私は、ゆっくり考える時間を大切にしています" },
+        ],
+      },
+    });
+  });
+
   it("利用できる入力がなければ生成要求を作らない", async () => {
     const db = createTestDb();
     await db.insert(schema.accountDataIdentity).values({ singleton: 1, accountId: "account-1" });
