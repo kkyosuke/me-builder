@@ -303,7 +303,6 @@ stateDiagram-v2
     queued --> applied: 送信直後のmessageが先に適用
     dispatched --> applied: Item一式を原子的に適用
     applied --> [*]
-    failed --> [*]
 ```
 
 `diary_brain_checkpoint_items`はcheckpointと実際に作成またはEvidence追加したBrain Itemを処理順に結ぶ永続的な対応表です。`operation`で新規作成とEvidence追加、`deduplication`で未統合・完全一致・意味的判定を区別し、意味的判定時は専用prompt versionも保持します。local / preview環境の確認Pushはこの対応とcheckpoint範囲内のEvidence edgeから内容を再構築します。Brain Item適用後にPushだけ失敗しても、Queue再配送でItemやEvidenceを再生成せず通知だけを同じretry keyで再送します。productionでは確認Pushを送りません。

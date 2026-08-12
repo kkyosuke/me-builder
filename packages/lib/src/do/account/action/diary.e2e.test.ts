@@ -1214,16 +1214,34 @@ describe("Diary conversation persistence flow", () => {
     await attachMessagesToTurn(db, account.id, [source], 1, "test-model", "test-prompt");
     const [checkpoint] = await db.select().from(schema.diaryBrainCheckpoints);
     const checkpointId = checkpoint?.id ?? "";
-    const exhaustedAt = new Date(receivedAt.getTime() + 6 * 60 * 60 * 1000);
-    await db
-      .update(schema.diaryBrainCheckpoints)
-      .set({
-        status: "dispatched",
-        attemptCount: DIARY_BRAIN_CHECKPOINT_MAX_DISPATCH_ATTEMPTS,
-        nextAttemptAt: exhaustedAt,
-      })
-      .where(eq(schema.diaryBrainCheckpoints.id, checkpointId));
+    let claimAt = new Date(receivedAt.getTime() + 10 * 60 * 1000);
+    for (let attempt = 1; attempt <= DIARY_BRAIN_CHECKPOINT_MAX_DISPATCH_ATTEMPTS; attempt += 1) {
+      await expect(claimDueDiaryBrainCheckpointIds(db, account.id, claimAt)).resolves.toEqual({
+        checkpointIds: [checkpointId],
+        terminalFailures: [],
+      });
+      await expect(
+        markDiaryBrainCheckpointDispatched(db, account.id, checkpointId, claimAt),
+      ).resolves.toBe(true);
+      expect(
+        db
+          .select({
+            status: schema.diaryBrainCheckpoints.status,
+            attemptCount: schema.diaryBrainCheckpoints.attemptCount,
+          })
+          .from(schema.diaryBrainCheckpoints)
+          .where(eq(schema.diaryBrainCheckpoints.id, checkpointId))
+          .get(),
+      ).toEqual({ status: "dispatched", attemptCount: attempt });
+      if (attempt < DIARY_BRAIN_CHECKPOINT_MAX_DISPATCH_ATTEMPTS) {
+        claimAt = new Date(claimAt.getTime() + DIARY_BRAIN_CHECKPOINT_DISPATCH_LEASE_MS);
+      }
+    }
+    const exhaustedAt = new Date(claimAt.getTime() + DIARY_BRAIN_CHECKPOINT_DISPATCH_LEASE_MS);
 
+    await expect(
+      listDueDiaryBrainCheckpointIds(db, account.id, new Date(exhaustedAt.getTime() - 1)),
+    ).resolves.toEqual([]);
     await expect(listDueDiaryBrainCheckpointIds(db, account.id, exhaustedAt)).resolves.toEqual([]);
     await expect(claimDueDiaryBrainCheckpointIds(db, account.id, exhaustedAt)).resolves.toEqual({
       checkpointIds: [],
