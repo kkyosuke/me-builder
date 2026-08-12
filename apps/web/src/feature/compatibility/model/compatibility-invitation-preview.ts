@@ -11,11 +11,13 @@ export type CompatibilityInvitationPreviewBlockingReason =
 export type CompatibilityInvitationPreview = {
   inviter: {
     displayName: string;
+    avatarUrl: string | null;
     aboutMe: CompatibilityShareProfile;
     themes: CompatibilitySharePreviewTheme[];
   };
   recipient: {
     displayName: string | null;
+    avatarUrl: string | null;
     previewToken: string;
     aboutMe: CompatibilityShareProfile | null;
     themes: CompatibilitySharePreviewTheme[];

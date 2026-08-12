@@ -33,6 +33,7 @@ import {
 } from "../contract/shared/errors";
 import { issueCompatibilityInvitation } from "../logic/compatibility-invitation";
 import { acceptCompatibilityInvitation } from "../logic/compatibility-invitation-acceptance";
+import { getCompatibilityInvitationAvatar } from "../logic/compatibility-invitation-avatar";
 import { cancelCompatibilityInvitation } from "../logic/compatibility-invitation-cancellation";
 import { getCompatibilityInvitationContents } from "../logic/compatibility-invitation-preview";
 import { getCompatibilityRelationshipContents } from "../logic/compatibility-relationship";
@@ -42,17 +43,20 @@ import { getCompatibilitySharePreview } from "../logic/compatibility-share-previ
 import { operationalHttpPath } from "../operational-http-path";
 import type { AppEnv } from "../types";
 import { bearerToken } from "./auth";
+import { avatarImageResponse } from "./avatar-image-response";
 
 /** `GET /api/compatibility/share-preview` — 招待発行前に本人へ共有内容を表示する。 */
 export async function getCompatibilitySharePreviewContents(c: Context<AppEnv>): Promise<Response> {
+  c.header("Cache-Control", "no-store");
   if (!c.env?.DB || !c.env.ACCOUNT_DATA) {
     logger.error({ path: c.req.path }, "Compatibility preview storage binding is not configured");
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   }
 
+  const currentConfig = getConfig(c.env);
   const outcome = await getCompatibilitySharePreview({
     idToken: bearerToken(c.req.header("authorization")),
-    lineLoginChannelId: getConfig(c.env).lineLoginChannelId,
+    lineLoginChannelId: currentConfig.lineLoginChannelId,
     db: D1.shared.client.create(c.env.DB),
     accountData: c.env.ACCOUNT_DATA,
   });
@@ -150,10 +154,11 @@ export async function getCompatibilityInvitation(c: Context<AppEnv>): Promise<Re
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   }
 
+  const currentConfig = getConfig(c.env);
   const outcome = await getCompatibilityInvitationContents({
     relationshipId: c.req.param("relationshipId") ?? "",
     idToken: bearerToken(c.req.header("authorization")),
-    lineLoginChannelId: getConfig(c.env).lineLoginChannelId,
+    lineLoginChannelId: currentConfig.lineLoginChannelId,
     db: D1.shared.client.create(c.env.DB),
     accountData: c.env.ACCOUNT_DATA,
     compatibilityData: c.env.COMPATIBILITY_DATA,
@@ -162,6 +167,65 @@ export async function getCompatibilityInvitation(c: Context<AppEnv>): Promise<Re
   switch (outcome.type) {
     case "resolved":
       return c.json(v.parse(CompatibilityInvitationPreviewResponseSchema, outcome.invitation));
+    case "unavailable":
+      return c.json(
+        v.parse(CompatibilityInvitationUnavailableSchema, {
+          error: "Compatibility invitation unavailable",
+          reason: "invitation_unavailable",
+        }),
+        404,
+      );
+    case "own-invitation":
+      return c.json(
+        v.parse(OwnCompatibilityInvitationSchema, {
+          error: "Compatibility invitation unavailable",
+          reason: "own_invitation",
+        }),
+        409,
+      );
+    case "account-not-found":
+      return c.json(
+        v.parse(AccountNotFoundErrorSchema, {
+          error: "Account not found",
+          reason: "friendship_required",
+        }),
+        404,
+      );
+    case "not-configured":
+    case "unauthenticated":
+      return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
+  }
+}
+
+/** `GET /api/compatibility/invitations/:relationshipId/avatar` — 受信者へ送信者画像を返す。 */
+export async function getCompatibilityInvitationAvatarContents(
+  c: Context<AppEnv>,
+): Promise<Response> {
+  c.header("Cache-Control", "no-store");
+  if (!c.env?.DB || !c.env.AVATAR_BUCKET || !c.env.COMPATIBILITY_DATA) {
+    logger.error(
+      { path: operationalHttpPath(c.req.path) },
+      "Compatibility invitation avatar binding is not configured",
+    );
+    return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
+  }
+
+  const currentConfig = getConfig(c.env);
+  const outcome = await getCompatibilityInvitationAvatar({
+    relationshipId: c.req.param("relationshipId") ?? "",
+    idToken: bearerToken(c.req.header("authorization")),
+    lineLoginChannelId: currentConfig.lineLoginChannelId,
+    lineChannelAccessToken: currentConfig.lineChannelAccessToken,
+    db: D1.shared.client.create(c.env.DB),
+    avatarBucket: c.env.AVATAR_BUCKET,
+    compatibilityData: c.env.COMPATIBILITY_DATA,
+  });
+
+  switch (outcome.type) {
+    case "resolved":
+      return avatarImageResponse(outcome.image);
+    case "image-unavailable":
+      return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
     case "unavailable":
       return c.json(
         v.parse(CompatibilityInvitationUnavailableSchema, {

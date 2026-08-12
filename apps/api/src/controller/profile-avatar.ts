@@ -17,8 +17,10 @@ import {
   getProfile,
   saveProfileAvatar,
 } from "../logic/profile";
+import { getProfileAvatarImage } from "../logic/profile-avatar-image";
 import type { AppEnv } from "../types";
 import { bearerToken } from "./auth";
+import { avatarImageResponse } from "./avatar-image-response";
 
 function dependencies(c: Context<AppEnv>) {
   const currentConfig = getConfig(c.env);
@@ -84,6 +86,33 @@ export async function getProfileContents(c: Context<AppEnv>): Promise<Response> 
   const params = dependencies(c);
   if (!params) return unavailable(c);
   return profileResponse(c, await getProfile(params));
+}
+
+export async function getProfileAvatarImageContents(c: Context<AppEnv>): Promise<Response> {
+  c.header("Cache-Control", "no-store");
+  const params = dependencies(c);
+  if (!params) return unavailable(c);
+  const outcome = await getProfileAvatarImage({
+    ...params,
+    lineChannelAccessToken: getConfig(c.env).lineChannelAccessToken,
+  });
+  switch (outcome.type) {
+    case "resolved":
+      return avatarImageResponse(outcome.image);
+    case "unavailable":
+      return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
+    case "account-not-found":
+      return c.json(
+        v.parse(AccountNotFoundErrorSchema, {
+          error: "Account not found",
+          reason: "friendship_required",
+        }),
+        404,
+      );
+    case "not-configured":
+    case "unauthenticated":
+      return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
+  }
 }
 
 export async function putProfileAvatar(c: Context<AppEnv>): Promise<Response> {

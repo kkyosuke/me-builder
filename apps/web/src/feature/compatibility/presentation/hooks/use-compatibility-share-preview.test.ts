@@ -3,14 +3,19 @@
 import { renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { fetchCompatibilitySharePreview } from "../../infrastructure/compatibility-api";
+import { fetchCompatibilityAvatarImage } from "../../infrastructure/compatibility-avatar-api";
 import { useCompatibilitySharePreview } from "./use-compatibility-share-preview";
 
 vi.mock("../../infrastructure/compatibility-api", () => ({
   fetchCompatibilitySharePreview: vi.fn(),
 }));
+vi.mock("../../infrastructure/compatibility-avatar-api", () => ({
+  fetchCompatibilityAvatarImage: vi.fn(),
+}));
 
 const preview = {
   displayName: "うさぎ",
+  avatarUrl: "/api/profile/avatar",
   previewToken: `csp2.${"a".repeat(64)}`,
   aboutMe: {
     profileSummaryVersionId: "summary-version-1",
@@ -32,14 +37,26 @@ const preview = {
 describe("useCompatibilitySharePreview", () => {
   it("LIFFトークンで共有プレビューを取得する", async () => {
     vi.mocked(fetchCompatibilitySharePreview).mockResolvedValue(preview);
+    vi.mocked(fetchCompatibilityAvatarImage).mockResolvedValue(new Blob([Uint8Array.from([1])]));
+    URL.createObjectURL = vi.fn().mockReturnValue("blob:profile-avatar");
+    URL.revokeObjectURL = vi.fn();
     const acquireIdToken = vi.fn().mockResolvedValue("id-token");
     const { result } = renderHook(() => useCompatibilitySharePreview({ acquireIdToken }));
 
     await waitFor(() => expect(result.current.state.status).toBe("success"));
-    expect(result.current.state).toEqual({ status: "success", data: preview });
+    expect(result.current.state).toEqual({
+      status: "success",
+      data: { ...preview, avatarUrl: "blob:profile-avatar" },
+    });
     expect(fetchCompatibilitySharePreview).toHaveBeenCalledWith(
       undefined,
       "id-token",
+      expect.anything(),
+    );
+    expect(fetchCompatibilityAvatarImage).toHaveBeenCalledWith(
+      undefined,
+      "id-token",
+      "/api/profile/avatar",
       expect.anything(),
     );
   });

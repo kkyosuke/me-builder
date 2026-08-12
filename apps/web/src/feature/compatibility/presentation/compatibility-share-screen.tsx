@@ -6,7 +6,6 @@ import {
   MessageCircle,
   RefreshCw,
   Send,
-  UserRound,
 } from "lucide-react";
 import type { AsyncState } from "../../../model/async-state";
 import type { CompatibilityInvitation } from "../model/compatibility-invitation";
@@ -19,7 +18,7 @@ import {
   CompatibilityAboutMePreview,
   CompatibilityThemesPreview,
 } from "./components/compatibility-share-content";
-import { CompatibilityBackHeader } from "./components/compatibility-ui";
+import { CompatibilityBackHeader, CompatibilityProfileAvatar } from "./components/compatibility-ui";
 
 const blockingReasonMessages: Record<CompatibilitySharePreviewBlockingReason, string> = {
   display_name_unavailable: "LINEの表示名を確認できませんでした。",
@@ -71,12 +70,11 @@ function SharePreviewContent({
   return (
     <>
       <div className="mt-5 flex items-center gap-4">
-        <span
-          aria-hidden="true"
-          className="flex size-20 shrink-0 items-center justify-center rounded-[40%_60%_55%_45%] bg-gradient-to-br from-sky-300 to-cyan-500 text-2xl font-black text-sky-950 shadow-lg"
-        >
-          {preview.displayName?.slice(0, 1) ?? <UserRound className="size-8" />}
-        </span>
+        <CompatibilityProfileAvatar
+          imageUrl={preview.avatarUrl}
+          displayName={displayName}
+          tone="sky"
+        />
         <div>
           <p className="text-sm font-semibold tracking-wider text-rose-700 dark:text-rose-300">
             {displayName}さんから招待

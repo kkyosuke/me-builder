@@ -1,4 +1,5 @@
 import { ArrowLeft } from "lucide-react";
+import { useState } from "react";
 import type { CompatibilityPerson } from "../../model/compatibility";
 
 export function CompatibilityAvatar({
@@ -20,6 +21,45 @@ export function CompatibilityAvatar({
       }`}
     >
       {person.initial}
+    </span>
+  );
+}
+
+export function CompatibilityProfileAvatar({
+  imageUrl,
+  displayName,
+  tone,
+}: {
+  imageUrl: string | null;
+  displayName: string;
+  tone: "sky" | "violet";
+}) {
+  const [failedImageUrl, setFailedImageUrl] = useState<string | null>(null);
+  const commonClassName =
+    "size-20 shrink-0 overflow-hidden rounded-full ring-2 ring-white shadow-lg dark:ring-slate-700";
+
+  if (imageUrl && imageUrl !== failedImageUrl) {
+    return (
+      <img
+        src={imageUrl}
+        alt=""
+        aria-hidden="true"
+        className={`${commonClassName} object-cover`}
+        onError={() => setFailedImageUrl(imageUrl)}
+      />
+    );
+  }
+
+  const color =
+    tone === "sky"
+      ? "from-sky-100 to-sky-200 text-sky-600 dark:from-sky-900 dark:to-slate-800 dark:text-sky-300"
+      : "from-violet-100 to-violet-200 text-violet-600 dark:from-violet-900 dark:to-slate-800 dark:text-violet-300";
+  return (
+    <span
+      aria-hidden="true"
+      className={`${commonClassName} flex items-center justify-center bg-gradient-to-br ${color}`}
+    >
+      <span className="text-2xl font-black">{Array.from(displayName.trim())[0] ?? "?"}</span>
     </span>
   );
 }

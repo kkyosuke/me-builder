@@ -320,6 +320,7 @@ describe("App", () => {
     }));
     mocks.fetchCompatibilitySharePreview.mockResolvedValue({
       displayName: "テスト",
+      avatarUrl: null,
       previewToken: `csp2.${"a".repeat(64)}`,
       aboutMe: {
         profileSummaryVersionId: "summary-version-1",
@@ -355,6 +356,7 @@ describe("App", () => {
     mocks.fetchCompatibilityInvitation.mockResolvedValue({
       inviter: {
         displayName: "あおい",
+        avatarUrl: null,
         aboutMe: {
           profileSummaryVersionId: "profile-inviter",
           generatedAt: "2026-08-11T00:00:00.000Z",
@@ -370,6 +372,7 @@ describe("App", () => {
       },
       recipient: {
         displayName: "テスト",
+        avatarUrl: null,
         previewToken: `csp2.${"b".repeat(64)}`,
         aboutMe: null,
         themes: [],

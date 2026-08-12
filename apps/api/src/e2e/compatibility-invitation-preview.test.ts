@@ -297,16 +297,30 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
       const preview = (await previewResponse.json()) as {
         inviter: {
           displayName: string;
+          avatarUrl: string | null;
           aboutMe: { statements: { statement: string }[] };
           themes: unknown[];
         };
-        recipient: { displayName: string; aboutMe: unknown; themes: unknown[] };
+        recipient: {
+          displayName: string;
+          avatarUrl: string | null;
+          aboutMe: unknown;
+          themes: unknown[];
+        };
         canAccept: boolean;
         blockingReasons: string[];
       };
       expect(preview).toMatchObject({
-        inviter: { displayName: "あおい", aboutMe: expect.any(Object) },
-        recipient: { displayName: "はる", aboutMe: expect.any(Object) },
+        inviter: {
+          displayName: "あおい",
+          avatarUrl: `/api/compatibility/invitations/${relationshipId}/avatar`,
+          aboutMe: expect.any(Object),
+        },
+        recipient: {
+          displayName: "はる",
+          avatarUrl: "/api/profile/avatar",
+          aboutMe: expect.any(Object),
+        },
         canAccept: true,
         blockingReasons: [],
       });
@@ -365,8 +379,17 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
 
       expect(response.status).toBe(200);
       expect(await response.json()).toMatchObject({
-        inviter: { displayName: "あおい", themes: expect.any(Array) },
-        recipient: { displayName: "はる", aboutMe: null, themes: [] },
+        inviter: {
+          displayName: "あおい",
+          avatarUrl: `/api/compatibility/invitations/${relationshipId}/avatar`,
+          themes: expect.any(Array),
+        },
+        recipient: {
+          displayName: "はる",
+          avatarUrl: "/api/profile/avatar",
+          aboutMe: null,
+          themes: [],
+        },
         canAccept: false,
         blockingReasons: expect.arrayContaining([
           "profile_summary_required",

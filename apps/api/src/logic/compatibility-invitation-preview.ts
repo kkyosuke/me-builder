@@ -26,11 +26,13 @@ type PublicProfile = NonNullable<CompatibilitySharePreviewData["preview"]["about
 type CompatibilityInvitationContents = Readonly<{
   inviter: Readonly<{
     displayName: string;
+    avatarUrl: string | null;
     aboutMe: PublicProfile;
     themes: readonly CompatibilitySharePreviewTheme[];
   }>;
   recipient: Readonly<{
     displayName: string | null;
+    avatarUrl: string | null;
     previewToken: string;
     aboutMe: PublicProfile | null;
     themes: readonly CompatibilitySharePreviewTheme[];
@@ -195,11 +197,13 @@ export async function loadCompatibilityInvitationAcceptanceData(
     invitation: {
       inviter: {
         displayName: preview.inviterDisplayName,
+        avatarUrl: null,
         aboutMe,
         themes: inviterThemes,
       },
       recipient: {
         displayName: recipientData.preview.displayName,
+        avatarUrl: null,
         previewToken: recipientData.preview.previewToken,
         aboutMe: recipientData.preview.aboutMe,
         themes: recipientThemes,
@@ -230,5 +234,15 @@ export async function getCompatibilityInvitationContents(
 ): Promise<CompatibilityInvitationPreviewOutcome> {
   const outcome = await loadCompatibilityInvitationAcceptanceData(params, dependencies);
   if (outcome.type !== "resolved") return outcome;
-  return { type: "resolved", invitation: outcome.invitation };
+  return {
+    type: "resolved",
+    invitation: {
+      ...outcome.invitation,
+      inviter: {
+        ...outcome.invitation.inviter,
+        avatarUrl: `/api/compatibility/invitations/${encodeURIComponent(params.relationshipId)}/avatar`,
+      },
+      recipient: { ...outcome.invitation.recipient, avatarUrl: "/api/profile/avatar" },
+    },
+  };
 }

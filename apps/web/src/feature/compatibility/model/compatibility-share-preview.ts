@@ -30,6 +30,7 @@ export type CompatibilityShareProfile = {
 /** 招待を発行する前に、本人へ開示する内容と発行可否を示す。 */
 export type CompatibilitySharePreview = {
   displayName: string | null;
+  avatarUrl: string | null;
   previewToken: string;
   aboutMe: CompatibilityShareProfile | null;
   themes: CompatibilitySharePreviewTheme[];

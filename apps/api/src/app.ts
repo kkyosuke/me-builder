@@ -25,6 +25,7 @@ import {
   acceptCompatibilityInvitationRoute,
   acceptCompatibilityInvitationValidator,
 } from "./contract/compatibility/invitation-accept";
+import { compatibilityInvitationAvatarRoute } from "./contract/compatibility/invitation-avatar";
 import { compatibilityInvitationCancelRoute } from "./contract/compatibility/invitation-cancel";
 import { compatibilityInvitationPreviewRoute } from "./contract/compatibility/invitation-preview";
 import { compatibilityRelationshipRoute } from "./contract/compatibility/relationship";
@@ -40,6 +41,7 @@ import { diagnosisListRoute } from "./contract/diagnosis/list";
 import { openApiOptions } from "./contract/openapi";
 import {
   deleteProfileAvatarRoute,
+  getProfileAvatarImageRoute,
   getProfileRoute,
   putProfileAvatarRoute,
 } from "./contract/profile/profile";
@@ -57,6 +59,7 @@ import {
   deleteCompatibilityInvitation,
   deleteCompatibilityRelationship,
   getCompatibilityInvitation,
+  getCompatibilityInvitationAvatarContents,
   getCompatibilityRelationship,
   getCompatibilityRelationships,
   getCompatibilitySharePreviewContents,
@@ -75,6 +78,7 @@ import { postLineWebhook } from "./controller/line";
 import { getProfileSummaryContents, postProfileSummaryGeneration } from "./controller/profile";
 import {
   deleteProfileAvatarContents,
+  getProfileAvatarImageContents,
   getProfileContents,
   putProfileAvatar,
 } from "./controller/profile-avatar";
@@ -161,6 +165,7 @@ app.post(
   postProfileSummaryGeneration,
 );
 app.get("/api/profile", getProfileRoute, getProfileContents);
+app.get("/api/profile/avatar", getProfileAvatarImageRoute, getProfileAvatarImageContents);
 app.put("/api/profile/avatar", putProfileAvatarRoute, putProfileAvatar);
 app.delete("/api/profile/avatar", deleteProfileAvatarRoute, deleteProfileAvatarContents);
 
@@ -181,6 +186,11 @@ app.post(
   issueCompatibilityInvitationRoute,
   issueCompatibilityInvitationValidator,
   postCompatibilityInvitation,
+);
+app.get(
+  "/api/compatibility/invitations/:relationshipId/avatar",
+  compatibilityInvitationAvatarRoute,
+  getCompatibilityInvitationAvatarContents,
 );
 app.get(
   "/api/compatibility/invitations/:relationshipId",

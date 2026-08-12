@@ -134,9 +134,15 @@ describe("getCompatibilityInvitationContents", () => {
     await expect(getCompatibilityInvitationContents(params(), deps)).resolves.toEqual({
       type: "resolved",
       invitation: {
-        inviter: { displayName: "あおい", aboutMe, themes: [theme] },
+        inviter: {
+          displayName: "あおい",
+          avatarUrl: `/api/compatibility/invitations/${relationshipId}/avatar`,
+          aboutMe,
+          themes: [theme],
+        },
         recipient: {
           displayName: "はる",
+          avatarUrl: "/api/profile/avatar",
           previewToken,
           aboutMe: { ...aboutMe, profileSummaryVersionId: "profile-recipient" },
           themes: [theme],

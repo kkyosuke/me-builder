@@ -18,6 +18,7 @@ export const compatibilitySharePreviewCases = {
       status: 200,
       body: {
         displayName: "あおい",
+        avatarUrl: "/api/profile/avatar",
         previewTokenPattern: "^csp2\\.[a-f0-9]{64}$",
         canIssueInvitation: true,
         blockingReasons: [],

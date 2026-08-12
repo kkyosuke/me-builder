@@ -95,6 +95,7 @@ describe("getCompatibilitySharePreview", () => {
       type: "resolved",
       preview: {
         displayName: "あおい",
+        avatarUrl: "/api/profile/avatar",
         previewToken,
         aboutMe: {
           profileSummaryVersionId: "summary-version-1",
@@ -146,6 +147,7 @@ describe("getCompatibilitySharePreview", () => {
       type: "resolved",
       preview: {
         displayName: null,
+        avatarUrl: "/api/profile/avatar",
         previewToken,
         aboutMe: {
           profileSummaryVersionId: "summary-version-1",

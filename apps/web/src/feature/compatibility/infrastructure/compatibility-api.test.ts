@@ -12,6 +12,7 @@ import {
 
 const preview = {
   displayName: "うさぎ",
+  avatarUrl: "/api/profile/avatar",
   previewToken: `csp2.${"a".repeat(64)}`,
   aboutMe: {
     profileSummaryVersionId: "summary-version-1",
@@ -128,11 +129,13 @@ describe("fetchCompatibilityInvitation", () => {
     const invitation = {
       inviter: {
         displayName: "あおい",
+        avatarUrl: `/api/compatibility/invitations/${relationshipId}/avatar`,
         aboutMe: preview.aboutMe,
         themes: preview.themes,
       },
       recipient: {
         displayName: "はる",
+        avatarUrl: "/api/profile/avatar",
         previewToken: preview.previewToken,
         aboutMe: preview.aboutMe,
         themes: preview.themes,

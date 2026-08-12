@@ -12,11 +12,13 @@ const PreviewTokenSchema = v.pipe(v.string(), v.regex(/^csp2\.[a-f0-9]{64}$/));
 export const CompatibilityInvitationPreviewResponseSchema = v.object({
   inviter: v.object({
     displayName: NonEmptyStringSchema,
+    avatarUrl: v.nullable(NonEmptyStringSchema),
     aboutMe: CompatibilityShareProfileSchema,
     themes: v.pipe(v.array(CompatibilitySharePreviewThemeSchema), v.minLength(1)),
   }),
   recipient: v.object({
     displayName: v.nullable(NonEmptyStringSchema),
+    avatarUrl: v.nullable(NonEmptyStringSchema),
     previewToken: PreviewTokenSchema,
     aboutMe: v.nullable(CompatibilityShareProfileSchema),
     themes: v.array(CompatibilitySharePreviewThemeSchema),

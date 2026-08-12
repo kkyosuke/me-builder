@@ -13,22 +13,24 @@ import { logger } from "@me-builder/shared";
 import { scoreDiagnosisAnswers } from "./diagnosis-scoring";
 import { createLiffSession } from "./liff-session";
 
+type CompatibilitySharePreviewContents = Readonly<{
+  displayName: string | null;
+  previewToken: string;
+  aboutMe: {
+    profileSummaryVersionId: string;
+    generatedAt: string;
+    statements: readonly { key: string; label: string; statement: string }[];
+  } | null;
+  themes: readonly CompatibilitySharePreviewTheme[];
+  canIssueInvitation: boolean;
+  blockingReasons: readonly CompatibilitySharePreviewBlockingReason[];
+  nextAction: "diagnosis" | "profile-summary" | null;
+}>;
+
 export type CompatibilitySharePreviewOutcome =
   | {
       type: "resolved";
-      preview: {
-        displayName: string | null;
-        previewToken: string;
-        aboutMe: {
-          profileSummaryVersionId: string;
-          generatedAt: string;
-          statements: readonly { key: string; label: string; statement: string }[];
-        } | null;
-        themes: readonly CompatibilitySharePreviewTheme[];
-        canIssueInvitation: boolean;
-        blockingReasons: readonly CompatibilitySharePreviewBlockingReason[];
-        nextAction: "diagnosis" | "profile-summary" | null;
-      };
+      preview: CompatibilitySharePreviewContents & { avatarUrl: string | null };
     }
   | { type: "not-configured" }
   | { type: "unauthenticated"; reason: string }
@@ -54,7 +56,7 @@ export type CompatibilitySharePreviewData = Readonly<{
   displayName: string | null;
   shareProfile: CompatibilityShareProfile | null;
   shareableDiagnoses: readonly CompatibilitySharePreviewDiagnosis[];
-  preview: Extract<CompatibilitySharePreviewOutcome, { type: "resolved" }>["preview"];
+  preview: CompatibilitySharePreviewContents;
 }>;
 
 export type CompatibilitySharePreviewDataDependencies = {
@@ -213,5 +215,8 @@ export async function getCompatibilitySharePreview(
     },
     dependencies,
   );
-  return { type: "resolved", preview: data.preview };
+  return {
+    type: "resolved",
+    preview: { ...data.preview, avatarUrl: "/api/profile/avatar" },
+  };
 }
