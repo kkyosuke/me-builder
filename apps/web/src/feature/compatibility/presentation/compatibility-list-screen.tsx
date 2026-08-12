@@ -11,9 +11,11 @@ type PendingItem = Extract<CompatibilityRelationshipListItem, { status: "pending
 
 function ListSkeleton() {
   return (
-    <SkeletonLoader label="相性一覧を読み込み中" className="mt-8 space-y-3">
-      <SkeletonBlock className="h-36 rounded-3xl" />
-      <SkeletonBlock className="h-32 rounded-3xl" />
+    <SkeletonLoader label="相性一覧を読み込み中" className="mt-8">
+      <div className="space-y-3">
+        <SkeletonBlock className="h-36 rounded-3xl" />
+        <SkeletonBlock className="h-32 rounded-3xl" />
+      </div>
     </SkeletonLoader>
   );
 }

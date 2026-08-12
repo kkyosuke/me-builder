@@ -25,6 +25,20 @@ function firePointer(
 describe("Compatibility flow", () => {
   afterEach(cleanup);
 
+  it("一覧読み込み中のスケルトンカード間に余白を空ける", () => {
+    render(
+      <CompatibilityListScreen
+        state={{ status: "loading" }}
+        onRetry={vi.fn()}
+        onCancel={vi.fn()}
+        onResend={vi.fn()}
+      />,
+    );
+
+    const loader = screen.getByLabelText("相性一覧を読み込み中");
+    expect(loader.querySelector("div[aria-hidden='true'] > .space-y-3")).toBeTruthy();
+  });
+
   it("APIの一覧で共有中と返事待ちを区別し、再送と取消を操作できる", () => {
     const onCancel = vi.fn();
     const onResend = vi.fn();
