@@ -154,6 +154,7 @@ function isUniqueViolation(error: unknown): boolean {
 
 const RESET_DELETE_CHUNK_SIZE = 49;
 const RESET_MAX_ATTEMPTS = 3;
+const DIAGNOSIS_WRITE_MAX_ATTEMPTS = 3;
 
 type D1BatchStatement = Parameters<AccountDataDatabase["batch"]>[0][number];
 
@@ -417,7 +418,7 @@ export async function deferDiagnosisQuestion(
     at: Date;
   },
 ): Promise<DeferDiagnosisQuestionResult> {
-  return deferDiagnosisQuestionWithResponseRetry(db, input);
+  return deferDiagnosisQuestionWithResponseRetry(db, input, 1);
 }
 
 async function deferDiagnosisQuestionWithResponseRetry(
@@ -428,6 +429,7 @@ async function deferDiagnosisQuestionWithResponseRetry(
     diagnosisQuestionId: string;
     at: Date;
   },
+  attempt: number,
 ): Promise<DeferDiagnosisQuestionResult> {
   const diagnosis = await db
     .select({
@@ -514,8 +516,8 @@ async function deferDiagnosisQuestionWithResponseRetry(
       if (concurrent) {
         return deferredResult(concurrent, "unchanged");
       }
-      if (concurrentResponseId !== responseId) {
-        return deferDiagnosisQuestionWithResponseRetry(db, input);
+      if (concurrentResponseId !== responseId && attempt < DIAGNOSIS_WRITE_MAX_ATTEMPTS) {
+        return deferDiagnosisQuestionWithResponseRetry(db, input, attempt + 1);
       }
     }
     throw error;
@@ -583,12 +585,13 @@ export async function saveDiagnosisAnswer(
   db: AccountDataDatabase,
   input: SaveDiagnosisAnswerInput,
 ): Promise<SaveDiagnosisAnswerResult> {
-  return saveDiagnosisAnswerWithRevisionRetry(db, input);
+  return saveDiagnosisAnswerWithRevisionRetry(db, input, 1);
 }
 
 async function saveDiagnosisAnswerWithRevisionRetry(
   db: AccountDataDatabase,
   input: SaveDiagnosisAnswerInput,
+  attempt: number,
 ): Promise<SaveDiagnosisAnswerResult> {
   const diagnosis = await db
     .select({
@@ -775,9 +778,10 @@ async function saveDiagnosisAnswerWithRevisionRetry(
     // response作成競合ではIDが、既存responseのCAS競合ではrevisionが進むため判別できる。
     if (
       concurrentResponse &&
+      attempt < DIAGNOSIS_WRITE_MAX_ATTEMPTS &&
       (concurrentResponse.id !== responseId || concurrentResponse.revision > observedRevision)
     ) {
-      return saveDiagnosisAnswerWithRevisionRetry(db, input);
+      return saveDiagnosisAnswerWithRevisionRetry(db, input, attempt + 1);
     }
     throw error;
   }

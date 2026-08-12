@@ -1146,6 +1146,75 @@ describe("saveDiagnosisAnswer", () => {
     ).toEqual([1, 2, 3]);
   });
 
+  it("異なる質問との競合が上限まで続いた場合は制約エラーを返す", async () => {
+    const db = createTestDb();
+    await db
+      .insert(schema.accountDataIdentity)
+      .values({ singleton: 1, accountId: "account-revision-race-limit" });
+    await insertDiagnosis(db, { id: "revision-race-limit-target" });
+    for (const position of [3, 4, 5]) {
+      const questionId = `revision-race-limit-target-q${position}`;
+      await insertQuestion(db, questionId);
+      await db.insert(schema.diagnosisQuestions).values({
+        id: `revision-race-limit-target-sq${position}`,
+        diagnosisId: "revision-race-limit-target",
+        questionId,
+        questionVersion: 1,
+        position: position - 1,
+      });
+    }
+    const base = {
+      accountId: "account-revision-race-limit",
+      diagnosisId: "revision-race-limit-target",
+      choiceId: "yes",
+      at: new Date("2026-08-03T00:00:00Z"),
+    };
+    await saveDiagnosisAnswer(db, {
+      ...base,
+      diagnosisQuestionId: "revision-race-limit-target-sq1",
+    });
+
+    const originalBatch = db.batch.bind(db);
+    const concurrentQuestionIds = [
+      "revision-race-limit-target-sq3",
+      "revision-race-limit-target-sq4",
+      "revision-race-limit-target-sq5",
+    ];
+    let conflictIndex = 0;
+    let savingConcurrentAnswer = false;
+    Object.assign(db, {
+      batch: async (queries: Array<PromiseLike<unknown>>) => {
+        if (!savingConcurrentAnswer && conflictIndex < concurrentQuestionIds.length) {
+          const diagnosisQuestionId = concurrentQuestionIds[conflictIndex];
+          if (!diagnosisQuestionId) {
+            throw new Error("競合させるDiagnosis Questionが見つかりません");
+          }
+          conflictIndex += 1;
+          savingConcurrentAnswer = true;
+          try {
+            await saveDiagnosisAnswer(db, { ...base, diagnosisQuestionId });
+          } finally {
+            savingConcurrentAnswer = false;
+          }
+          throw new Error(
+            "UNIQUE constraint failed: diagnosis_brain_projection_requests.diagnosis_response_id, diagnosis_brain_projection_requests.response_revision",
+          );
+        }
+        return originalBatch(queries as never);
+      },
+    });
+
+    await expect(
+      saveDiagnosisAnswer(db, {
+        ...base,
+        diagnosisQuestionId: "revision-race-limit-target-sq2",
+      }),
+    ).rejects.toThrow("UNIQUE constraint failed");
+
+    expect(conflictIndex).toBe(3);
+    expect(await db.select().from(schema.diagnosisAnswers)).toHaveLength(4);
+  });
+
   it.each([
     {
       name: "存在しないDiagnosis",
