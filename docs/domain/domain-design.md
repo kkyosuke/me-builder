@@ -229,7 +229,7 @@ MVPでは、1つのAccountが1つのBrainを利用する体験を基本としま
 - [プロジェクト概要 §13](../product/project-overview.md#13-現時点のプロダクト原則)の原則2「本人の回答とAIの推定を混同しない」を満たすには、両方が同じ軸に載っている必要がある
 - [プロジェクト概要 §3.2](../product/project-overview.md#32-mcpでエージェントへ提供する)の`get_evidence`は、由来を持たないBrain Itemがあると全域で定義されない
 
-**確定**: Brain Itemを持たないSource Recordを許容します。Phase 1は入力から蓄積までにAIを使わないため、これが既定の状態です。
+**確定**: Brain Itemを持たないSource Recordを許容します。Phase 1でも日記からAIでBrain Itemを生成しますが、本人が対象となる内容を明言していない場合や変換が成立しない場合は、原本のSource Recordだけを保持します。
 
 | 方向 | 多重度 |
 | --- | --- |
