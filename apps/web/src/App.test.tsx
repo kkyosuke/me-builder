@@ -841,6 +841,16 @@ describe("App", () => {
     expect(mocks.fetchDiagnosisResult).toHaveBeenCalledTimes(2);
   });
 
+  it("回答結果URLの初回取得中は一覧ではなく結果画面のSkeletonを表示する", () => {
+    mocks.fetchDiagnosisList.mockReturnValueOnce(new Promise(() => undefined));
+    window.history.replaceState({}, "", "/diagnosis/diagnosis-1/answers");
+
+    render(<App />);
+
+    expect(screen.getByRole("status", { name: "診断結果を読み込み中" })).toBeTruthy();
+    expect(screen.queryByRole("status", { name: "診断一覧を読み込み中" })).toBeNull();
+  });
+
   it("/compatibilityでは相性一覧を表示し、診断一覧は取得しない", async () => {
     window.history.replaceState({}, "", "/compatibility");
 
@@ -911,20 +921,20 @@ describe("App", () => {
     );
   });
 
-  it("詳細取得が即時完了してもSkeletonを400ms表示する", async () => {
+  it("回答取得が即時完了しても回答画面のSkeletonを400ms表示する", async () => {
     render(<App />);
     const openDiagnosis = await screen.findByRole("button", { name: /テスト診断/ });
     vi.useFakeTimers();
 
     fireEvent.click(openDiagnosis);
-    expect(screen.getByRole("status", { name: "診断詳細を読み込み中" })).toBeTruthy();
+    expect(screen.getByRole("status", { name: "診断回答を読み込み中" })).toBeTruthy();
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();
       vi.advanceTimersByTime(399);
     });
 
-    expect(screen.getByRole("status", { name: "診断詳細を読み込み中" })).toBeTruthy();
+    expect(screen.getByRole("status", { name: "診断回答を読み込み中" })).toBeTruthy();
     expect(screen.queryByText("回答UI: テスト診断")).toBeNull();
 
     await act(async () => vi.advanceTimersByTime(1));

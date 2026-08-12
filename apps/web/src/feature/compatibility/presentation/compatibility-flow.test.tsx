@@ -142,15 +142,13 @@ describe("Compatibility flow", () => {
     expect(screen.queryByText(/傾向があります/)).toBeNull();
     expect(screen.queryByRole("heading", { name: "まず知ってほしいこと" })).toBeNull();
     expect(screen.queryByRole("checkbox")).toBeNull();
-    const disclosure = screen.getByText("共有されない詳細").closest("details");
-    expect(disclosure?.hasAttribute("open")).toBe(false);
+    expect(screen.getByRole("heading", { name: "共有されない詳細" })).toBeTruthy();
+    expect(document.querySelector("details")).toBeNull();
+    expect(screen.getByText(/日記やLINEの会話本文/)).toBeTruthy();
     const issueButton = screen.getByRole("button", { name: "共有して招待リンクを発行する" });
     expect(issueButton.closest("footer")?.classList.contains("fixed")).toBe(true);
     expect(issueButton.classList.contains("h-12")).toBe(true);
     expect(issueButton.hasAttribute("disabled")).toBe(false);
-    fireEvent.click(screen.getByText("共有されない詳細"));
-    expect(disclosure?.hasAttribute("open")).toBe(true);
-    expect(screen.getByText(/日記やLINEの会話本文/)).toBeTruthy();
     fireEvent.click(issueButton);
     expect(onIssue).toHaveBeenCalledOnce();
   });
@@ -196,6 +194,10 @@ describe("Compatibility flow", () => {
     expect(footer?.firstElementChild?.classList.contains("space-y-3")).toBe(true);
     expect(sendButton.parentElement?.classList.contains("grid-cols-2")).toBe(true);
     expect(sendButton.parentElement?.classList.contains("h-12")).toBe(true);
+    expect(screen.getByRole("heading", { name: "招待リンクを発行しました" })).toBeTruthy();
+    expect(
+      screen.getByRole("heading", { name: "招待リンクを発行しました" }).closest("section"),
+    ).toBe(screen.getByRole("heading", { name: "共有されない詳細" }).closest("section"));
     fireEvent.click(sendButton);
     fireEvent.click(copyButton);
     expect(onShareToLine).toHaveBeenCalledWith(invitationUrl);

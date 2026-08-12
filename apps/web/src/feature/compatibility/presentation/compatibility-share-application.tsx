@@ -12,9 +12,12 @@ export default function CompatibilityShareApplication() {
   const { acquireIdToken } = useLiffSession();
   const { state, reload } = useCompatibilityShareConsent({ acquireIdToken });
   const invitation = useCompatibilityInvitationIssue({ acquireIdToken });
+  const [isSharing, setIsSharing] = useState(false);
   const [sharingMessage, setSharingMessage] = useState<string | null>(null);
 
   const shareToLine = async (url: string) => {
+    setIsSharing(true);
+    setSharingMessage(null);
     try {
       const destination = await shareCompatibilityInvitationToLine(
         state.status === "success" ? state.data.displayName : null,
@@ -22,11 +25,15 @@ export default function CompatibilityShareApplication() {
       );
       setSharingMessage(
         destination === "line"
-          ? "LINEの共有先を開きました。"
-          : "端末の共有先を開きました。LINEを選んで送信してください。",
+          ? "LINEで招待を送信しました。"
+          : destination === "system"
+            ? "招待を共有しました。"
+            : "送信をキャンセルしました。",
       );
     } catch (error) {
       setSharingMessage(error instanceof Error ? error.message : "LINEで共有できませんでした。");
+    } finally {
+      setIsSharing(false);
     }
   };
 
@@ -45,6 +52,7 @@ export default function CompatibilityShareApplication() {
     <CompatibilityShareScreen
       state={state}
       invitationState={invitation.state}
+      isSharing={isSharing}
       sharingMessage={sharingMessage}
       onIssue={() => void invitation.issue()}
       onRetry={() => void reload()}

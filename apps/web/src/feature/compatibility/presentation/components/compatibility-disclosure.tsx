@@ -1,4 +1,4 @@
-import { ChevronDown, LockKeyhole, ShieldCheck } from "lucide-react";
+import { LockKeyhole, ShieldCheck } from "lucide-react";
 import type { ReactNode } from "react";
 
 function CompatibilityPrivacyItems() {
@@ -19,9 +19,11 @@ function CompatibilityPrivacyItems() {
 
 export function CompatibilityPrivacyNotice({
   footer,
+  status,
   title,
 }: {
   footer: ReactNode;
+  status?: ReactNode;
   title: string;
 }) {
   return (
@@ -37,29 +39,7 @@ export function CompatibilityPrivacyNotice({
         <LockKeyhole className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
         {footer}
       </p>
+      {status && <div className="mt-4 border-t border-emerald-300/40 pt-4">{status}</div>}
     </section>
-  );
-}
-
-/** 固定フッター向けに、共有されない情報を初期状態で折りたたんで表示する。 */
-export function CompatibilityPrivacyDisclosure({ footer }: { footer: ReactNode }) {
-  return (
-    <details className="group rounded-xl border border-emerald-300/60 bg-emerald-50 shadow-sm dark:border-emerald-700/60 dark:bg-emerald-950/40">
-      <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 px-3 text-sm font-bold text-emerald-950 [&::-webkit-details-marker]:hidden dark:text-emerald-100">
-        <ShieldCheck className="size-4 shrink-0" aria-hidden="true" />
-        <span className="flex-1">共有されない詳細</span>
-        <ChevronDown
-          className="size-4 shrink-0 transition-transform group-open:rotate-180 motion-reduce:transition-none"
-          aria-hidden="true"
-        />
-      </summary>
-      <div className="border-t border-emerald-300/40 px-3 pt-3 pb-3">
-        <CompatibilityPrivacyItems />
-        <p className="mt-3 flex items-start gap-2 border-t border-emerald-300/40 pt-3 text-xs leading-relaxed text-emerald-800 dark:text-emerald-300">
-          <LockKeyhole className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-          {footer}
-        </p>
-      </div>
-    </details>
   );
 }

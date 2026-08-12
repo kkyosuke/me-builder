@@ -13,7 +13,7 @@ describe("compatibility invitation sharing", () => {
   afterEach(() => vi.unstubAllGlobals());
 
   it("送信者、承諾前は共有されないこと、招待URLをLINE共有文に含める", async () => {
-    vi.mocked(shareLiffTextMessage).mockResolvedValue(true);
+    vi.mocked(shareLiffTextMessage).mockReturnValue(Promise.resolve("sent"));
     const url = `https://example.com/compatibility/invitations/${"1".repeat(64)}`;
 
     await shareCompatibilityInvitationToLine("あおい", url);
@@ -36,7 +36,7 @@ describe("compatibility invitation sharing", () => {
   });
 
   it("LIFF共有が使えない外部ブラウザでは端末の共有先を開く", async () => {
-    vi.mocked(shareLiffTextMessage).mockResolvedValue(false);
+    vi.mocked(shareLiffTextMessage).mockReturnValue(null);
     const share = vi.fn().mockResolvedValue(undefined);
     vi.stubGlobal("navigator", { share });
 
@@ -49,5 +49,23 @@ describe("compatibility invitation sharing", () => {
         text: expect.stringContaining("あおいさん"),
       }),
     );
+  });
+
+  it("LIFF共有で送信せず閉じた場合はキャンセルとして扱う", async () => {
+    vi.mocked(shareLiffTextMessage).mockReturnValue(Promise.resolve("cancelled"));
+
+    await expect(
+      shareCompatibilityInvitationToLine("あおい", "https://example.com/invitation"),
+    ).resolves.toBe("cancelled");
+  });
+
+  it("端末の共有先を閉じた場合はエラーにせずキャンセルとして扱う", async () => {
+    vi.mocked(shareLiffTextMessage).mockReturnValue(null);
+    const share = vi.fn().mockRejectedValue({ name: "AbortError" });
+    vi.stubGlobal("navigator", { share });
+
+    await expect(
+      shareCompatibilityInvitationToLine("あおい", "https://example.com/invitation"),
+    ).resolves.toBe("cancelled");
   });
 });

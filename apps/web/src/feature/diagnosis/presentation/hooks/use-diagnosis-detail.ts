@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { config } from "../../../../config";
 import { OperationError } from "../../../../infrastructure/errors";
-import type { AsyncState } from "../../../../model/async-state";
 import {
   deferDiagnosisQuestion,
   fetchDiagnosisDefinition,
@@ -11,7 +10,10 @@ import {
 import { restoreDiagnosisProgress } from "../../model/answers";
 import type { DiagnosisDefinition } from "../../model/diagnosis-definition";
 import type { DiagnosisListItem } from "../../model/diagnosis-list-item";
-import { resolveDiagnosisDestination } from "../../model/diagnosis-navigation";
+import {
+  type DiagnosisDestination,
+  resolveDiagnosisDestination,
+} from "../../model/diagnosis-navigation";
 import type { DiagnosisResult } from "../../model/diagnosis-result";
 import type { DiagnosisAnswer } from "../../model/types";
 import { useDiagnosisAnswerSaver } from "./use-diagnosis-answer-saver";
@@ -23,10 +25,16 @@ const waitForMinimumLoading = (): Promise<void> =>
 
 export type GuidanceKind = "closed" | "unsupported" | "invalid-link" | "load-error";
 
-export type DiagnosisDetailContent =
+type DiagnosisDetailContent =
   | { type: "answer"; diagnosis: DiagnosisDefinition; initialAnswers: DiagnosisAnswer[] }
   | { type: "result"; result: DiagnosisResult }
   | { type: "guidance"; kind: Exclude<GuidanceKind, "load-error"> };
+
+type DiagnosisDetailState =
+  | { status: "idle" }
+  | { status: "loading"; destination: Exclude<DiagnosisDestination, "closed"> }
+  | { status: "success"; data: DiagnosisDetailContent }
+  | { status: "error"; message: string };
 
 interface UseDiagnosisDetailOptions {
   idToken: string | null;
@@ -37,7 +45,7 @@ interface UseDiagnosisDetailOptions {
 }
 
 export function useDiagnosisDetail({ idToken, onProgress }: UseDiagnosisDetailOptions) {
-  const [state, setState] = useState<AsyncState<DiagnosisDetailContent>>({ status: "idle" });
+  const [state, setState] = useState<DiagnosisDetailState>({ status: "idle" });
   const selectedDefinition = useRef<DiagnosisDefinition | null>(null);
   const mounted = useRef(false);
   const request = useRef<AbortController | null>(null);
@@ -76,7 +84,7 @@ export function useDiagnosisDetail({ idToken, onProgress }: UseDiagnosisDetailOp
       request.current?.abort();
       const controller = new AbortController();
       request.current = controller;
-      setState({ status: "loading" });
+      setState({ status: "loading", destination });
       const minimumLoading = waitForMinimumLoading();
       try {
         await answerSaver.waitForPendingSaves(diagnosis.id);
@@ -177,7 +185,7 @@ export function useDiagnosisDetail({ idToken, onProgress }: UseDiagnosisDetailOp
     request.current?.abort();
     const controller = new AbortController();
     request.current = controller;
-    setState({ status: "loading" });
+    setState({ status: "loading", destination: "result" });
     const minimumLoading = waitForMinimumLoading();
     const completedProgress = {
       responseStatus: "answered" as const,
