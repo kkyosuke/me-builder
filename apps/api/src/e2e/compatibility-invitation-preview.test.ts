@@ -408,7 +408,13 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
         env(),
       );
       expect(await pendingInviterList.json()).toEqual({
-        items: [expect.objectContaining({ relationshipId, status: "pending" })],
+        items: [
+          expect.objectContaining({
+            relationshipId,
+            status: "pending",
+            invitationUrl: `https://liff.line.me/1234567890-testliff/compatibility/invitations/${relationshipId}`,
+          }),
+        ],
       });
       const pendingRecipientList = await app.request(
         "/api/compatibility/relationships",

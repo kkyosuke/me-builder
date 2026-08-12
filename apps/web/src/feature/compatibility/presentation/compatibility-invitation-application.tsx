@@ -1,5 +1,6 @@
 import { useLiffSession } from "../../liff";
 import { CompatibilityInvitationScreen } from "./compatibility-invitation-screen";
+import { useCompatibilityInvitationAcceptance } from "./hooks/use-compatibility-invitation-acceptance";
 import { useCompatibilityInvitationPreview } from "./hooks/use-compatibility-invitation-preview";
 
 export default function CompatibilityInvitationApplication({
@@ -12,6 +13,14 @@ export default function CompatibilityInvitationApplication({
     acquireIdToken,
     relationshipId,
   });
+  const acceptance = useCompatibilityInvitationAcceptance({ acquireIdToken, relationshipId });
 
-  return <CompatibilityInvitationScreen state={state} onRetry={() => void reload()} />;
+  return (
+    <CompatibilityInvitationScreen
+      state={state}
+      acceptanceState={acceptance.state}
+      onAccept={(previewToken) => void acceptance.accept(previewToken)}
+      onRetry={() => void reload()}
+    />
+  );
 }

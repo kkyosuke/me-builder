@@ -1737,6 +1737,8 @@ export interface operations {
                   status: "pending";
                   /** Format: date-time */
                   expiresAt: string;
+                  /** Format: uri */
+                  invitationUrl: string;
                 }
               | {
                   relationshipId: string;

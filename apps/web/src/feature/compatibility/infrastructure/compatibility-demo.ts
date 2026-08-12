@@ -1,9 +1,13 @@
-import type { CompatibilityListData, CompatibilityPerson } from "../model/compatibility";
+import type { CompatibilityPerson } from "../model/compatibility";
 
 export const me: CompatibilityPerson = {
   name: "わたし",
   initial: "わ",
   color: "sky",
+  statements: [
+    "私は、予定を早めに決めておけると安心します。",
+    "私は、一緒に楽しむ時間を大切にしたいです。",
+  ],
   themes: [
     {
       id: "planning",
@@ -42,6 +46,10 @@ export const aoi: CompatibilityPerson = {
   name: "あおい",
   initial: "あ",
   color: "violet",
+  statements: [
+    "私は、見通しを持って動けると心地よく感じます。",
+    "私は、自分で決められる余白を大切にしたいです。",
+  ],
   themes: [
     {
       id: "planning",
@@ -74,17 +82,4 @@ export const aoi: CompatibilityPerson = {
       request: "気になる場所を気軽に提案し合えるとうれしいです。",
     },
   ],
-};
-
-export const compatibilityListData: CompatibilityListData = {
-  owner: me,
-  available: {
-    partner: aoi,
-    comparableThemeCount: 3,
-    href: "/compatibility/demo",
-  },
-  diagnosisWaiting: {
-    name: "はる",
-    href: "/diagnosis",
-  },
 };

@@ -1,13 +1,43 @@
-import { ArrowRight, CheckCircle2, Clock3, RotateCw, Send, Sparkles } from "lucide-react";
-import { useState } from "react";
+import { AlertCircle, ArrowRight, Clock3, RefreshCw, RotateCw, Send } from "lucide-react";
 import { MainNavigation } from "../../../components/main-navigation";
-import type { CompatibilityListData } from "../model/compatibility";
-import { CompatibilityAvatar, DemoNotice } from "./components/compatibility-ui";
+import { SkeletonBlock, SkeletonLoader } from "../../../components/skeleton";
+import type { AsyncState } from "../../../model/async-state";
+import type {
+  CompatibilityRelationshipList,
+  CompatibilityRelationshipListItem,
+} from "../model/compatibility-relationship";
 
-export function CompatibilityListScreen({ data }: { data: CompatibilityListData }) {
-  const [inviteVisible, setInviteVisible] = useState(true);
-  const [operationMessage, setOperationMessage] = useState<string | null>(null);
-  const { available, diagnosisWaiting, owner } = data;
+type PendingItem = Extract<CompatibilityRelationshipListItem, { status: "pending" }>;
+
+function ListSkeleton() {
+  return (
+    <SkeletonLoader label="相性一覧を読み込み中" className="mt-8 space-y-3">
+      <SkeletonBlock className="h-36 rounded-3xl" />
+      <SkeletonBlock className="h-32 rounded-3xl" />
+    </SkeletonLoader>
+  );
+}
+
+export function CompatibilityListScreen({
+  state,
+  operation = { status: "idle" },
+  sharingMessage,
+  onRetry,
+  onCancel,
+  onResend,
+}: {
+  state: AsyncState<CompatibilityRelationshipList>;
+  operation?: AsyncState<string>;
+  sharingMessage?: string | null;
+  onRetry: () => void;
+  onCancel: (relationshipId: string) => void;
+  onResend: (item: PendingItem) => void;
+}) {
+  const accepted =
+    state.status === "success" ? state.data.items.filter((x) => x.status === "accepted") : [];
+  const pending =
+    state.status === "success" ? state.data.items.filter((x) => x.status === "pending") : [];
+
   return (
     <main className="mx-auto min-h-dvh w-full max-w-2xl px-4 py-8 pb-28 sm:px-8">
       <header>
@@ -22,7 +52,7 @@ export function CompatibilityListScreen({ data }: { data: CompatibilityListData 
         </p>
         <a
           href="/compatibility/share"
-          className="mt-6 flex min-h-12 items-center justify-between rounded-2xl bg-rose-400 px-5 py-3 font-bold text-rose-950 shadow-lg shadow-rose-500/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-400"
+          className="mt-6 flex min-h-12 items-center justify-between rounded-2xl bg-rose-400 px-5 py-3 font-bold text-rose-950 shadow-lg shadow-rose-500/20"
         >
           <span className="flex items-center gap-2">
             <Send className="size-5" aria-hidden="true" />
@@ -32,136 +62,135 @@ export function CompatibilityListScreen({ data }: { data: CompatibilityListData 
         </a>
       </header>
 
-      <section aria-labelledby="available-heading" className="mt-9">
-        <div className="flex items-center justify-between">
-          <h2
-            id="available-heading"
-            className="text-lg font-bold text-slate-950 dark:text-slate-50"
-          >
-            結果を見られる相手
+      {state.status === "loading" && <ListSkeleton />}
+      {state.status === "error" && (
+        <section className="mt-8 rounded-3xl border border-red-300 bg-red-50 p-6 text-center dark:border-red-800 dark:bg-red-950/30">
+          <AlertCircle className="mx-auto size-8 text-red-600" aria-hidden="true" />
+          <h2 className="mt-3 font-bold text-red-900 dark:text-red-100">
+            相性一覧を表示できませんでした
           </h2>
-          <span className="rounded-full bg-emerald-400/15 px-2.5 py-1 text-xs font-bold text-emerald-700 dark:text-emerald-300">
-            1人
-          </span>
-        </div>
-        <article className="mt-3 rounded-3xl border border-rose-200 bg-gradient-to-br from-white to-rose-50 p-5 shadow-lg shadow-slate-950/5 dark:border-rose-900/50 dark:from-slate-800 dark:to-rose-950/30">
-          <div className="flex items-center">
-            <div className="flex items-center">
-              <CompatibilityAvatar person={owner} />
-              <span className="-mx-1 text-lg font-bold text-slate-400">×</span>
-              <CompatibilityAvatar person={available.partner} />
-            </div>
-            <div className="ml-4 min-w-0">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-300">
-                <CheckCircle2 className="size-4" aria-hidden="true" />
-                結果あり
-              </div>
-              <h3 className="mt-1 truncate text-lg font-bold text-slate-950 dark:text-slate-50">
-                {available.partner.name}さん
-              </h3>
-              <p className="mt-0.5 text-xs text-slate-500">
-                {available.comparableThemeCount}つのテーマで比較できます
-              </p>
-            </div>
-          </div>
-          <a
-            href={available.href}
-            className="mt-5 flex min-h-11 items-center justify-between rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-bold text-white dark:bg-slate-50 dark:text-slate-950"
+          <p className="mt-2 text-sm text-red-800 dark:text-red-200">{state.message}</p>
+          <button
+            type="button"
+            onClick={onRetry}
+            className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-xl bg-red-200 px-4 font-bold text-red-950"
           >
-            2人の相性シートを見る
-            <ArrowRight className="size-4" aria-hidden="true" />
-          </a>
-        </article>
-      </section>
+            <RefreshCw className="size-4" aria-hidden="true" />
+            再試行
+          </button>
+        </section>
+      )}
 
-      <section aria-labelledby="preparing-heading" className="mt-9">
-        <h2 id="preparing-heading" className="text-lg font-bold text-slate-950 dark:text-slate-50">
-          準備中
-        </h2>
-        <div className="mt-3 space-y-3">
-          <article className="rounded-3xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800">
-            <div className="flex items-start gap-3">
-              <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-violet-400/15 text-violet-700 dark:text-violet-300">
-                <Sparkles className="size-5" aria-hidden="true" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between gap-2">
-                  <h3 className="font-bold text-slate-950 dark:text-slate-50">
-                    {diagnosisWaiting.name}さん
-                  </h3>
-                  <span className="rounded-full bg-violet-400/15 px-2 py-1 text-xs font-bold text-violet-700 dark:text-violet-300">
-                    診断待ち
-                  </span>
-                </div>
-                <p className="mt-1 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-                  比較できる内容を、もう一度確認してください。
-                </p>
-                <a
-                  href={diagnosisWaiting.href}
-                  className="mt-3 inline-flex min-h-10 items-center gap-2 text-sm font-bold text-sky-700 dark:text-sky-300"
-                >
-                  診断を見る
-                  <ArrowRight className="size-4" aria-hidden="true" />
-                </a>
-              </div>
-            </div>
-          </article>
-
-          {inviteVisible && (
-            <article className="rounded-3xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800">
-              <div className="flex items-start gap-3">
-                <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-amber-400/15 text-amber-700 dark:text-amber-300">
-                  <Clock3 className="size-5" aria-hidden="true" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <h3 className="font-bold text-slate-950 dark:text-slate-50">招待リンク</h3>
-                    <span className="rounded-full bg-amber-400/15 px-2 py-1 text-xs font-bold text-amber-800 dark:text-amber-300">
-                      返事待ち
-                    </span>
-                  </div>
-                  <p className="mt-1 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-                    相手が承諾するまで、相手の情報は表示されません。
-                  </p>
-                  <div className="mt-3 flex gap-4">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setOperationMessage("LINEで送り直せる招待リンクを用意しました。")
-                      }
-                      className="inline-flex min-h-10 items-center gap-2 text-sm font-bold text-sky-700 dark:text-sky-300"
-                    >
-                      <RotateCw className="size-4" aria-hidden="true" />
-                      もう一度送る
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setInviteVisible(false);
-                        setOperationMessage("招待を取り消しました。");
-                      }}
-                      className="min-h-10 text-sm font-bold text-slate-500"
-                    >
-                      取り消す
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </article>
+      {state.status === "success" && (
+        <>
+          {state.data.items.length === 0 && (
+            <section className="mt-8 rounded-3xl border border-slate-200 bg-white p-6 text-center dark:border-slate-700 dark:bg-slate-800">
+              <h2 className="font-bold text-slate-950 dark:text-slate-50">
+                まだ共有中の相手はいません
+              </h2>
+              <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+                うつしをLINEで送って、2人の相性シートを作ってみましょう。
+              </p>
+            </section>
           )}
-        </div>
-      </section>
 
-      {operationMessage && (
+          {accepted.length > 0 && (
+            <section aria-labelledby="available-heading" className="mt-9">
+              <h2
+                id="available-heading"
+                className="text-lg font-bold text-slate-950 dark:text-slate-50"
+              >
+                相性シート
+              </h2>
+              <div className="mt-3 space-y-3">
+                {accepted.map((item) => (
+                  <article
+                    key={item.relationshipId}
+                    className="rounded-3xl border border-rose-200 bg-white p-5 shadow-lg shadow-slate-950/5 dark:border-rose-900/50 dark:bg-slate-800"
+                  >
+                    <p className="text-xs font-bold text-emerald-700 dark:text-emerald-300">
+                      共有中
+                    </p>
+                    <h3 className="mt-1 text-lg font-bold text-slate-950 dark:text-slate-50">
+                      {item.partnerDisplayName}さん
+                    </h3>
+                    <a
+                      href={`/compatibility/relationships/${item.relationshipId}`}
+                      className="mt-4 flex min-h-11 items-center justify-between rounded-xl bg-slate-950 px-4 text-sm font-bold text-white dark:bg-slate-50 dark:text-slate-950"
+                    >
+                      2人の相性シートを見る
+                      <ArrowRight className="size-4" aria-hidden="true" />
+                    </a>
+                  </article>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {pending.length > 0 && (
+            <section aria-labelledby="pending-heading" className="mt-9">
+              <h2
+                id="pending-heading"
+                className="text-lg font-bold text-slate-950 dark:text-slate-50"
+              >
+                返事待ち
+              </h2>
+              <div className="mt-3 space-y-3">
+                {pending.map((item) => (
+                  <article
+                    key={item.relationshipId}
+                    className="rounded-3xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800"
+                  >
+                    <div className="flex items-start gap-3">
+                      <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-amber-400/15 text-amber-700">
+                        <Clock3 className="size-5" aria-hidden="true" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-bold text-slate-950 dark:text-slate-50">招待リンク</h3>
+                        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                          期限: {new Date(item.expiresAt).toLocaleDateString("ja-JP")}
+                        </p>
+                        <div className="mt-3 flex flex-wrap gap-4">
+                          <button
+                            type="button"
+                            onClick={() => onResend(item)}
+                            className="inline-flex min-h-10 items-center gap-2 text-sm font-bold text-[#078d3e]"
+                          >
+                            <RotateCw className="size-4" aria-hidden="true" />
+                            LINEでもう一度送る
+                          </button>
+                          <button
+                            type="button"
+                            disabled={operation.status === "loading"}
+                            onClick={() => onCancel(item.relationshipId)}
+                            className="min-h-10 text-sm font-bold text-red-700 disabled:opacity-50"
+                          >
+                            取り消す
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </section>
+          )}
+        </>
+      )}
+
+      {(sharingMessage || operation.status === "success" || operation.status === "error") && (
         <p
           aria-live="polite"
           className="mt-4 rounded-2xl bg-sky-400/10 px-4 py-3 text-sm font-semibold text-sky-800 dark:text-sky-200"
         >
-          {operationMessage}
+          {sharingMessage ??
+            (operation.status === "success"
+              ? operation.data
+              : operation.status === "error"
+                ? operation.message
+                : "")}
         </p>
       )}
-
-      <DemoNotice />
       <MainNavigation current="compatibility" />
     </main>
   );

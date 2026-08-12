@@ -11,6 +11,7 @@ export const CompatibilityRelationshipsResponseSchema = v.object({
         relationshipId: RelationshipIdSchema,
         status: v.literal("pending"),
         expiresAt: v.pipe(v.string(), v.isoTimestamp()),
+        invitationUrl: v.pipe(v.string(), v.url()),
       }),
       v.object({
         relationshipId: RelationshipIdSchema,

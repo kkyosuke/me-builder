@@ -2,7 +2,7 @@
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { aoi, compatibilityListData, me } from "../infrastructure/compatibility-demo";
+import { aoi, me } from "../infrastructure/compatibility-demo";
 import type { CompatibilityInvitationPreview } from "../model/compatibility-invitation-preview";
 import type { CompatibilitySharePreview } from "../model/compatibility-share-preview";
 import { CompatibilityInvitationScreen } from "./compatibility-invitation-screen";
@@ -25,21 +25,46 @@ function firePointer(
 describe("Compatibility flow", () => {
   afterEach(cleanup);
 
-  it("一覧で結果あり・診断待ち・返事待ちを区別する", () => {
-    render(<CompatibilityListScreen data={compatibilityListData} />);
+  it("APIの一覧で共有中と返事待ちを区別し、再送と取消を操作できる", () => {
+    const onCancel = vi.fn();
+    const onResend = vi.fn();
+    const pending = {
+      relationshipId: "1".repeat(64),
+      status: "pending" as const,
+      expiresAt: "2026-08-26T00:00:00.000Z",
+      invitationUrl: `https://liff.line.me/test/compatibility/invitations/${"1".repeat(64)}`,
+    };
+    render(
+      <CompatibilityListScreen
+        state={{
+          status: "success",
+          data: {
+            items: [
+              pending,
+              {
+                relationshipId: "2".repeat(64),
+                status: "accepted",
+                partnerDisplayName: "あおい",
+              },
+            ],
+          },
+        }}
+        onRetry={vi.fn()}
+        onCancel={onCancel}
+        onResend={onResend}
+      />,
+    );
 
     expect(screen.getByRole("heading", { name: "ふたりの見取り図" })).toBeTruthy();
-    expect(screen.getByText("結果あり")).toBeTruthy();
-    expect(screen.getByText("診断待ち")).toBeTruthy();
+    expect(screen.getByText("共有中")).toBeTruthy();
     expect(screen.getByText("返事待ち")).toBeTruthy();
     expect(screen.getByRole("link", { name: "2人の相性シートを見る" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "相性" }).getAttribute("aria-current")).toBe("page");
 
-    fireEvent.click(screen.getByRole("button", { name: "もう一度送る" }));
-    expect(screen.getByText("LINEで送り直せる招待リンクを用意しました。")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "LINEでもう一度送る" }));
+    expect(onResend).toHaveBeenCalledWith(pending);
     fireEvent.click(screen.getByRole("button", { name: "取り消す" }));
-    expect(screen.getByText("招待を取り消しました。")).toBeTruthy();
-    expect(screen.queryByText("返事待ち")).toBeNull();
+    expect(onCancel).toHaveBeenCalledWith(pending.relationshipId);
   });
 
   it("APIから取得した振る舞い・考え方をすべて表示し、詳細は共有しない", () => {
@@ -181,7 +206,7 @@ describe("Compatibility flow", () => {
     ).toBe(true);
   });
 
-  it("受信者が双方の実際の共有内容を確認し、未実装の承諾を成立扱いにしない", () => {
+  it("受信者が双方の実際の共有内容を確認して承諾できる", () => {
     const theme = {
       diagnosisId: "daily-life",
       title: "暮らし方",
@@ -221,9 +246,11 @@ describe("Compatibility flow", () => {
       blockingReasons: [],
       nextAction: null,
     };
+    const onAccept = vi.fn();
     render(
       <CompatibilityInvitationScreen
         state={{ status: "success", data: invitation }}
+        onAccept={onAccept}
         onRetry={vi.fn()}
       />,
     );
@@ -235,14 +262,16 @@ describe("Compatibility flow", () => {
     expect(screen.getByText("1テーマが共通")).toBeTruthy();
     expect(screen.queryByRole("checkbox")).toBeNull();
     expect(screen.getByText(/日記やLINEの会話本文/)).toBeTruthy();
-    expect(
-      screen.getByRole("button", { name: "相性を見てみる（準備中）" }).hasAttribute("disabled"),
-    ).toBe(true);
-    expect(screen.queryByText(/相性シートを作りました/)).toBeNull();
+    expect(screen.getByRole("button", { name: "相性を見てみる" }).hasAttribute("disabled")).toBe(
+      false,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "相性を見てみる" }));
+    expect(onAccept).toHaveBeenCalledWith(invitation.recipient.previewToken);
   });
 
   it("人物ごとの資料と2人の共通点・違いをタブとスワイプで切り替える", () => {
-    render(<CompatibilityResultScreen me={me} partner={aoi} />);
+    const onEnd = vi.fn();
+    const { rerender } = render(<CompatibilityResultScreen me={me} partner={aoi} onEnd={onEnd} />);
 
     expect(screen.getByRole("heading", { name: "2人の相性シート" })).toBeTruthy();
     expect(
@@ -295,6 +324,15 @@ describe("Compatibility flow", () => {
       screen.getByText("終了すると、2人ともこの相性シートを見られなくなります。"),
     ).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "共有を終了" }));
+    expect(onEnd).toHaveBeenCalledOnce();
+    rerender(
+      <CompatibilityResultScreen
+        me={me}
+        partner={aoi}
+        onEnd={onEnd}
+        endingState={{ status: "success", data: null }}
+      />,
+    );
     expect(screen.getByRole("heading", { name: "共有を終了しました" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "相性一覧へ戻る" })).toBeTruthy();
   });

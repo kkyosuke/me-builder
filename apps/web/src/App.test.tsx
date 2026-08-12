@@ -37,6 +37,12 @@ const mocks = vi.hoisted(() => ({
   normalizeAvatarImage: vi.fn(),
   fetchCompatibilitySharePreview: vi.fn(),
   fetchCompatibilityInvitation: vi.fn(),
+  fetchCompatibilityRelationships: vi.fn(),
+  fetchCompatibilityRelationship: vi.fn(),
+  acceptCompatibilityInvitation: vi.fn(),
+  issueCompatibilityInvitation: vi.fn(),
+  cancelCompatibilityInvitation: vi.fn(),
+  endCompatibilityRelationship: vi.fn(),
 }));
 
 vi.mock("./config", () => ({
@@ -75,6 +81,12 @@ vi.mock("./feature/profile-settings/model/normalize-avatar-image", () => ({
 vi.mock("./feature/compatibility/infrastructure/compatibility-api", () => ({
   fetchCompatibilitySharePreview: mocks.fetchCompatibilitySharePreview,
   fetchCompatibilityInvitation: mocks.fetchCompatibilityInvitation,
+  fetchCompatibilityRelationships: mocks.fetchCompatibilityRelationships,
+  fetchCompatibilityRelationship: mocks.fetchCompatibilityRelationship,
+  acceptCompatibilityInvitation: mocks.acceptCompatibilityInvitation,
+  issueCompatibilityInvitation: mocks.issueCompatibilityInvitation,
+  cancelCompatibilityInvitation: mocks.cancelCompatibilityInvitation,
+  endCompatibilityRelationship: mocks.endCompatibilityRelationship,
 }));
 vi.mock("./feature/diagnosis/presentation/components/swipe-diagnosis", () => ({
   SwipeDiagnosis: ({
@@ -367,6 +379,13 @@ describe("App", () => {
       blockingReasons: ["common_diagnosis_required"],
       nextAction: "diagnosis",
     });
+    mocks.fetchCompatibilityRelationships.mockResolvedValue({ items: [] });
+    mocks.acceptCompatibilityInvitation.mockResolvedValue({
+      relationshipId: "1".repeat(64),
+      status: "accepted",
+    });
+    mocks.cancelCompatibilityInvitation.mockResolvedValue(undefined);
+    mocks.endCompatibilityRelationship.mockResolvedValue(undefined);
     mocks.restoreDiagnosisProgress.mockImplementation(
       (_questions: DiagnosisDefinition["questions"], answers: DiagnosisResult["answers"]) => ({
         answers: answers.map((answer) => ({

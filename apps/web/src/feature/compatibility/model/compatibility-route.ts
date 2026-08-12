@@ -11,10 +11,14 @@ export function resolveCompatibilityPathname(pathname: string, search: string): 
 export function resolveCompatibilityRoute(pathname: string): CompatibilityRoute {
   if (pathname.startsWith("/compatibility/invitations/")) return "invitation";
   if (pathname === "/compatibility/share") return "share";
-  if (pathname.startsWith("/compatibility/demo")) return "result";
+  if (pathname.startsWith("/compatibility/relationships/")) return "result";
   return "list";
 }
 
 export function resolveCompatibilityInvitationId(pathname: string): string | null {
   return pathname.match(/^\/compatibility\/invitations\/([a-f0-9]{64})$/)?.[1] ?? null;
+}
+
+export function resolveCompatibilityRelationshipId(pathname: string): string | null {
+  return pathname.match(/^\/compatibility\/relationships\/([a-f0-9]{64})$/)?.[1] ?? null;
 }

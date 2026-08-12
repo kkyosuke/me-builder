@@ -5,6 +5,7 @@ import {
   createCompatibilityInvitationWithReference,
   createCompatibilityShareThemeFingerprints,
 } from "@me-builder/lib";
+import { createCompatibilityInvitationUrl } from "./compatibility-invitation-url";
 import {
   type CompatibilitySharePreviewDataDependencies,
   compatibilitySharePreviewDataDependencies,
@@ -86,9 +87,7 @@ export async function issueCompatibilityInvitation(
     },
     offeredThemes,
   });
-  const invitationUrl = new URL(
-    `https://liff.line.me/${encodeURIComponent(liffId)}/compatibility/invitations/${result.relationship.id}`,
-  ).toString();
+  const invitationUrl = createCompatibilityInvitationUrl(liffId, result.relationship.id);
   return {
     type: "created",
     invitationUrl,

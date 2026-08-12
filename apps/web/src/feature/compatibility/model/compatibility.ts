@@ -13,18 +13,6 @@ export type CompatibilityPerson = {
   name: string;
   initial: string;
   color: "sky" | "violet";
+  statements: string[];
   themes: CompatibilityTheme[];
-};
-
-export type CompatibilityListData = {
-  owner: CompatibilityPerson;
-  available: {
-    partner: CompatibilityPerson;
-    comparableThemeCount: number;
-    href: string;
-  };
-  diagnosisWaiting: {
-    name: string;
-    href: string;
-  };
 };

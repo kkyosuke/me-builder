@@ -1,25 +1,27 @@
 import { Suspense, lazy } from "react";
 import { LoadingState } from "../../../components/loading-state";
-import { aoi, compatibilityListData, me } from "../infrastructure/compatibility-demo";
-import { resolveCompatibilityInvitationId } from "../model/compatibility-route";
-import { CompatibilityListScreen } from "./compatibility-list-screen";
+import {
+  resolveCompatibilityInvitationId,
+  resolveCompatibilityRelationshipId,
+} from "../model/compatibility-route";
 import { useCompatibilityRoute } from "./hooks/use-compatibility-route";
 
 const CompatibilityInvitationApplication = lazy(
   () => import("./compatibility-invitation-application"),
 );
-const CompatibilityResultScreen = lazy(() =>
-  import("./compatibility-result-screen").then((feature) => ({
-    default: feature.CompatibilityResultScreen,
-  })),
-);
+const CompatibilityListApplication = lazy(() => import("./compatibility-list-application"));
+const CompatibilityResultApplication = lazy(() => import("./compatibility-result-application"));
 const CompatibilityShareApplication = lazy(() => import("./compatibility-share-application"));
 
 export default function CompatibilityApplication() {
   const { pathname, route } = useCompatibilityRoute();
 
   if (route === "list") {
-    return <CompatibilityListScreen data={compatibilityListData} />;
+    return (
+      <Suspense fallback={<LoadingState message="相性一覧を読み込んでいます..." />}>
+        <CompatibilityListApplication />
+      </Suspense>
+    );
   }
 
   return (
@@ -31,7 +33,9 @@ export default function CompatibilityApplication() {
       ) : route === "share" ? (
         <CompatibilityShareApplication />
       ) : (
-        <CompatibilityResultScreen me={me} partner={aoi} />
+        <CompatibilityResultApplication
+          relationshipId={resolveCompatibilityRelationshipId(pathname)}
+        />
       )}
     </Suspense>
   );
