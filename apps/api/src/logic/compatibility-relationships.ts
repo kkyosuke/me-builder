@@ -7,7 +7,7 @@ import {
 } from "@me-builder/lib";
 import { createLiffSession } from "./liff-session";
 
-export type CompatibilityRelationshipListItem =
+type CompatibilityRelationshipListItem =
   | Readonly<{ relationshipId: string; status: "pending"; expiresAt: string }>
   | Readonly<{
       relationshipId: string;
