@@ -147,13 +147,14 @@ function isUniqueViolation(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return (
     message.includes("UNIQUE constraint failed") ||
-    message.includes("D1_ERROR") ||
-    message.includes("SQLITE_CONSTRAINT")
+    message.includes("SQLITE_CONSTRAINT_UNIQUE") ||
+    message.includes("SQLITE_CONSTRAINT_PRIMARYKEY")
   );
 }
 
 const RESET_DELETE_CHUNK_SIZE = 49;
 const RESET_MAX_ATTEMPTS = 3;
+const DIAGNOSIS_WRITE_MAX_ATTEMPTS = 3;
 
 type D1BatchStatement = Parameters<AccountDataDatabase["batch"]>[0][number];
 
@@ -426,6 +427,19 @@ export async function deferDiagnosisQuestion(
     at: Date;
   },
 ): Promise<DeferDiagnosisQuestionResult> {
+  return deferDiagnosisQuestionWithResponseRetry(db, input, 1);
+}
+
+async function deferDiagnosisQuestionWithResponseRetry(
+  db: AccountDataDatabase,
+  input: {
+    accountId: string;
+    diagnosisId: string;
+    diagnosisQuestionId: string;
+    at: Date;
+  },
+  attempt: number,
+): Promise<DeferDiagnosisQuestionResult> {
   const diagnosis = await db
     .select({
       state: diagnoses.state,
@@ -491,7 +505,7 @@ export async function deferDiagnosisQuestion(
       }),
     ]);
   } catch (error) {
-    if (!isUniqueViolation(error)) {
+    if (!isUniqueViolation(error) && !isForeignKeyViolation(error)) {
       throw error;
     }
     const concurrentResponseId = await findDiagnosisResponseId(
@@ -510,6 +524,9 @@ export async function deferDiagnosisQuestion(
       );
       if (concurrent) {
         return deferredResult(concurrent, "unchanged");
+      }
+      if (concurrentResponseId !== responseId && attempt < DIAGNOSIS_WRITE_MAX_ATTEMPTS) {
+        return deferDiagnosisQuestionWithResponseRetry(db, input, attempt + 1);
       }
     }
     throw error;
@@ -577,12 +594,13 @@ export async function saveDiagnosisAnswer(
   db: AccountDataDatabase,
   input: SaveDiagnosisAnswerInput,
 ): Promise<SaveDiagnosisAnswerResult> {
-  return saveDiagnosisAnswerWithRevisionRetry(db, input);
+  return saveDiagnosisAnswerWithRevisionRetry(db, input, 1);
 }
 
 async function saveDiagnosisAnswerWithRevisionRetry(
   db: AccountDataDatabase,
   input: SaveDiagnosisAnswerInput,
+  attempt: number,
 ): Promise<SaveDiagnosisAnswerResult> {
   const diagnosis = await db
     .select({
@@ -742,7 +760,7 @@ async function saveDiagnosisAnswerWithRevisionRetry(
       }),
     ]);
   } catch (error) {
-    if (!isUniqueViolation(error)) {
+    if (!isUniqueViolation(error) && !isForeignKeyViolation(error)) {
       throw error;
     }
     const concurrentResponse = await db
@@ -769,9 +787,10 @@ async function saveDiagnosisAnswerWithRevisionRetry(
     // response作成競合ではIDが、既存responseのCAS競合ではrevisionが進むため判別できる。
     if (
       concurrentResponse &&
+      attempt < DIAGNOSIS_WRITE_MAX_ATTEMPTS &&
       (concurrentResponse.id !== responseId || concurrentResponse.revision > observedRevision)
     ) {
-      return saveDiagnosisAnswerWithRevisionRetry(db, input);
+      return saveDiagnosisAnswerWithRevisionRetry(db, input, attempt + 1);
     }
     throw error;
   }
