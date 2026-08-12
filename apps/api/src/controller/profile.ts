@@ -41,6 +41,7 @@ export async function getProfileSummaryContents(c: Context<AppEnv>): Promise<Res
           versions: outcome.versions,
           availableDataCounts: outcome.availableDataCounts,
           generation: outcome.generation,
+          diagnosisThemes: outcome.diagnosisThemes,
           nextAction: outcome.nextAction,
         }),
       );

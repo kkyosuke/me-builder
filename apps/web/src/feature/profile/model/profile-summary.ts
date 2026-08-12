@@ -18,7 +18,29 @@ export type ProfileSummary = Readonly<{
 
 export type ProfileSummaryResult = Readonly<{
   summary: ProfileSummary | null;
+  diagnosisThemes?: readonly ProfileDiagnosisTheme[];
   nextAction: "diagnosis" | "chat";
+}>;
+
+export type ProfileDiagnosisTheme = Readonly<{
+  id: string;
+  title: string;
+  lastAnsweredAt: string;
+  answeredCount: number;
+  questionCount: number;
+  scoring: Readonly<{
+    scoringVersion: number;
+    balancedLabel: string;
+    parameters: readonly Readonly<{
+      id: string;
+      label: string;
+      lowLabel: string;
+      highLabel: string;
+      score: number | null;
+      coverage: number;
+      band: "low" | "balanced" | "high" | "insufficient";
+    }>[];
+  }> | null;
 }>;
 
 export type ProfileSummaryReadResult = ProfileSummaryResult &
@@ -26,6 +48,7 @@ export type ProfileSummaryReadResult = ProfileSummaryResult &
     versions: readonly ProfileSummaryVersion[];
     availableDataCounts: Readonly<{ diagnosis: number; diary: number }>;
     generation: ProfileSummaryGenerationState;
+    diagnosisThemes: readonly ProfileDiagnosisTheme[];
   }>;
 
 type ProfileSummaryVersionOption = Readonly<{

@@ -47,6 +47,7 @@ function readResult(
       reasons: ["diagnosis"],
       ...(status === "failed" ? { message: "生成に失敗しました。" } : {}),
     },
+    diagnosisThemes: [],
     nextAction: "chat",
   };
 }
@@ -174,9 +175,10 @@ describe("useProfileSummary", () => {
     expect(fetchProfileSummary).toHaveBeenCalledTimes(41);
   });
 
-  it("POST失敗時はGET由来の生成状態を変更せずエラーを返す", async () => {
+  it("POST失敗時はGETで永続化済みの失敗状態を取得して再試行可能にする", async () => {
     const initial = readResult("idle");
-    vi.mocked(fetchProfileSummary).mockResolvedValue(initial);
+    const failed = readResult("failed");
+    vi.mocked(fetchProfileSummary).mockResolvedValueOnce(initial).mockResolvedValueOnce(failed);
     vi.mocked(requestProfileSummaryGeneration).mockRejectedValue(
       new Error("まとめの生成を開始できませんでした。"),
     );
@@ -188,12 +190,36 @@ describe("useProfileSummary", () => {
       await result.current.generate();
     });
 
-    expect(result.current.state).toEqual({ status: "success", data: initial });
+    expect(result.current.state).toEqual({ status: "success", data: failed });
     expect(result.current.generationNotice).toEqual({
       kind: "error",
       message: "まとめの生成を開始できませんでした。",
     });
-    expect(fetchProfileSummary).toHaveBeenCalledOnce();
+    expect(fetchProfileSummary).toHaveBeenCalledTimes(2);
+  });
+
+  it("POST応答だけ失われた場合は受付済み状態から完了まで確認を続ける", async () => {
+    const initial = readResult("idle");
+    const queued = readResult("queued");
+    const completed = readResult("idle", "version-2");
+    vi.mocked(fetchProfileSummary)
+      .mockResolvedValueOnce(initial)
+      .mockResolvedValueOnce(queued)
+      .mockResolvedValueOnce(completed);
+    vi.mocked(requestProfileSummaryGeneration).mockRejectedValueOnce(
+      new Error("POST response was lost"),
+    );
+
+    const { result } = renderHook(() => useProfileSummary({ acquireIdToken }));
+    await waitFor(() => expect(result.current.state).toEqual({ status: "success", data: initial }));
+
+    await act(async () => {
+      await result.current.generate();
+    });
+
+    expect(result.current.state).toEqual({ status: "success", data: completed });
+    expect(result.current.generationNotice).toBeNull();
+    expect(fetchProfileSummary).toHaveBeenCalledTimes(3);
   });
 
   it("生成要求の受付後に状態確認が失敗しても作成中の表示を維持する", async () => {

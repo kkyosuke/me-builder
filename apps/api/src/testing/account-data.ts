@@ -68,11 +68,8 @@ const actions = {
     diagnosisId: string,
     at: Date,
   ) => DO.account.action.diagnosis.findDiagnosisAnswers(db, accountId, diagnosisId, at),
-  "diagnosis.getCompatibilitySharePreviewSource": (
-    db: DO.account.Database,
-    accountId: string,
-    at: Date,
-  ) => DO.account.action.diagnosis.getCompatibilitySharePreviewSource(db, accountId, at),
+  "diagnosis.getAnsweredSource": (db: DO.account.Database, accountId: string, at: Date) =>
+    DO.account.action.diagnosis.getDiagnosisAnsweredSource(db, accountId, at),
   "diagnosis.hasResponse": (db: DO.account.Database, accountId: string, diagnosisId: string) =>
     DO.account.action.diagnosis.hasDiagnosisResponse(db, accountId, diagnosisId),
   "diagnosis.listVisible": (db: DO.account.Database, accountId: string, at: Date) =>
@@ -116,6 +113,30 @@ const actions = {
       accountId,
       requestedAt,
       allowUnchangedRegeneration,
+    ),
+  "profileSummary.listUndispatchedGenerationIds": (
+    db: DO.account.Database,
+    accountId: string,
+    at?: Date,
+    limit?: number,
+  ) =>
+    DO.account.action.profileSummary.listUndispatchedProfileSummaryGenerationIds(
+      db,
+      accountId,
+      at,
+      limit,
+    ),
+  "profileSummary.markGenerationDispatched": (
+    db: DO.account.Database,
+    accountId: string,
+    generationId: string,
+    dispatchedAt?: Date,
+  ) =>
+    DO.account.action.profileSummary.markProfileSummaryGenerationDispatched(
+      db,
+      accountId,
+      generationId,
+      dispatchedAt,
     ),
   "profileSummary.loadGenerationContext": (
     db: DO.account.Database,

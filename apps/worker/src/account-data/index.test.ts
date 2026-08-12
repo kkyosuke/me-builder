@@ -1,10 +1,63 @@
 import { D1, DO } from "@me-builder/lib";
 import { logger } from "@me-builder/shared";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AccountData } from ".";
 
 describe("AccountData alarm", () => {
+  beforeEach(() => {
+    vi.spyOn(
+      DO.account.action.profileSummary,
+      "listUndispatchedProfileSummaryGenerationIds",
+    ).mockResolvedValue([]);
+  });
+
   afterEach(() => vi.restoreAllMocks());
+
+  it("未配送のProfile Summary生成要求をQueueへ投入して配送済みにする", async () => {
+    const send = vi.fn(async () => undefined);
+    const markDispatched = vi
+      .spyOn(DO.account.action.profileSummary, "markProfileSummaryGenerationDispatched")
+      .mockResolvedValue(true);
+    vi.mocked(
+      DO.account.action.profileSummary.listUndispatchedProfileSummaryGenerationIds,
+    ).mockResolvedValue(["generation-1"]);
+    vi.spyOn(DO.account.action.diary, "closeExpiredSessions").mockResolvedValue(0);
+    vi.spyOn(
+      DO.account.action.diagnosisBrainProjection,
+      "processPendingDiagnosisBrainProjections",
+    ).mockResolvedValue({
+      processed: 0,
+      applied: 0,
+      skippedIncomplete: 0,
+      skippedInvalidConfig: 0,
+      failed: 0,
+    });
+    vi.spyOn(DO.account.action.diary, "claimDueDiaryBrainCheckpointIds").mockResolvedValue({
+      checkpointIds: [],
+      terminalFailures: [],
+    });
+    vi.spyOn(DO.account.action.brain, "claimDueBrainVectorSyncJobs").mockResolvedValue({
+      jobs: [],
+      terminalFailures: [],
+    });
+
+    const instance = Object.create(AccountData.prototype) as AccountData;
+    Object.assign(instance as unknown as Record<string, unknown>, {
+      accountId: "account-1",
+      operationTail: Promise.resolve(),
+      repository: { client: {}, nextMaintenanceAt: () => null },
+      ctx: { storage: {} },
+      env: { PROFILE_SUMMARY_QUEUE: { send } },
+    });
+
+    await expect(instance.alarm()).resolves.toBeUndefined();
+    expect(send).toHaveBeenCalledWith({
+      type: "profile-summary-generation",
+      accountId: "account-1",
+      generationId: "generation-1",
+    });
+    expect(markDispatched).toHaveBeenCalledWith({}, "account-1", "generation-1");
+  });
 
   it("Queue投入失敗時も永続状態から次のalarmを明示的に設定する", async () => {
     const now = new Date("2026-08-09T00:00:00.000Z").getTime();

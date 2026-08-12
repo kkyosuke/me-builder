@@ -8,7 +8,7 @@ import {
   type ReleaseCompatibilityReservationResult,
   type ReserveCompatibilityReferenceResult,
 } from "@me-builder/lib";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/durable-sqlite";
 import { migrate } from "drizzle-orm/durable-sqlite/migrator";
 import migrations from "../../../../packages/lib/drizzle-do-account/migrations.js";
@@ -485,6 +485,18 @@ export class AccountDataRepository {
       .orderBy(asc(DO.account.schema.brainVectorSyncJobs.nextAttemptAt))
       .limit(1)
       .get();
+    const profileSummaryGeneration = this.database
+      .select({ requestedAt: DO.account.schema.profileSummaryGenerations.requestedAt })
+      .from(DO.account.schema.profileSummaryGenerations)
+      .where(
+        and(
+          eq(DO.account.schema.profileSummaryGenerations.status, "queued"),
+          isNull(DO.account.schema.profileSummaryGenerations.dispatchedAt),
+        ),
+      )
+      .orderBy(asc(DO.account.schema.profileSummaryGenerations.requestedAt))
+      .limit(1)
+      .get();
     const candidates = [
       session
         ? Math.min(
@@ -495,6 +507,10 @@ export class AccountDataRepository {
       projection?.nextAttemptAt.getTime() ?? null,
       diaryBrainCheckpoint?.nextAttemptAt.getTime() ?? null,
       brainVectorSync?.nextAttemptAt.getTime() ?? null,
+      profileSummaryGeneration
+        ? profileSummaryGeneration.requestedAt.getTime() +
+          DO.account.action.profileSummary.PROFILE_SUMMARY_DISPATCH_RECOVERY_MS
+        : null,
     ].filter((value): value is number => value !== null);
     return candidates.length > 0 ? Math.min(...candidates) : null;
   }

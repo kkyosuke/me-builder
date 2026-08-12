@@ -28,6 +28,30 @@ export const profileSummaryActions = {
       requestedAt,
       allowUnchangedRegeneration,
     ),
+  "profileSummary.listUndispatchedGenerationIds": (
+    db: DO.account.Database,
+    accountId: string,
+    at?: Date,
+    limit?: number,
+  ) =>
+    DO.account.action.profileSummary.listUndispatchedProfileSummaryGenerationIds(
+      db,
+      accountId,
+      at,
+      limit,
+    ),
+  "profileSummary.markGenerationDispatched": (
+    db: DO.account.Database,
+    accountId: string,
+    generationId: string,
+    dispatchedAt?: Date,
+  ) =>
+    DO.account.action.profileSummary.markProfileSummaryGenerationDispatched(
+      db,
+      accountId,
+      generationId,
+      dispatchedAt,
+    ),
   "profileSummary.loadGenerationContext": (
     db: DO.account.Database,
     accountId: string,

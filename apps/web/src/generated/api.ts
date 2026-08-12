@@ -500,6 +500,28 @@ export interface operations {
               reasons: ("diagnosis" | "brain" | "format" | "elapsed")[];
               message: string | null;
             };
+            diagnosisThemes: {
+              id: string;
+              title: string;
+              /** Format: date-time */
+              lastAnsweredAt: string;
+              answeredCount: number;
+              questionCount: number;
+              scoring: {
+                scoringVersion: number;
+                balancedLabel: string;
+                parameters: {
+                  id: string;
+                  label: string;
+                  lowLabel: string;
+                  highLabel: string;
+                  score: number | null;
+                  coverage: number;
+                  /** @enum {string} */
+                  band: "low" | "balanced" | "high" | "insufficient";
+                }[];
+              } | null;
+            }[];
             /** @enum {string} */
             nextAction: "diagnosis" | "chat";
           };

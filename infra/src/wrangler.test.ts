@@ -34,6 +34,7 @@ describe("renderWranglerConfigs", () => {
     expect(configs.api).toContain('queue = "me-builder-webhook-queue-preview"');
     expect(configs.api).toContain('binding = "PROFILE_SUMMARY_QUEUE"');
     expect(configs.worker).toContain('queue = "me-builder-profile-summary-queue-production"');
+    expect(configs.worker).toContain('binding = "PROFILE_SUMMARY_QUEUE"');
     expect(configs.worker).toContain('binding = "BRAIN_VECTOR_QUEUE"');
     expect(configs.worker).toContain('binding = "BRAIN_VECTOR_INDEX"');
     expect(configs.api).toContain('index_name = "me-builder-brain-preview"');

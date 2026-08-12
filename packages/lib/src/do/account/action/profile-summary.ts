@@ -1,4 +1,15 @@
-import { and, countDistinct, desc, eq, inArray, lte, max, notInArray } from "drizzle-orm";
+import {
+  and,
+  asc,
+  countDistinct,
+  desc,
+  eq,
+  inArray,
+  isNull,
+  lte,
+  max,
+  notInArray,
+} from "drizzle-orm";
 import type {
   CompatibilityShareProfileReadResult,
   CompleteProfileSummaryGenerationInput,
@@ -26,6 +37,8 @@ import { sourceRecords } from "../schema/source";
 
 const PROFILE_SUMMARY_EVIDENCE_LIMIT = 100;
 export const PROFILE_SUMMARY_REGENERATION_INTERVAL_MS = 30 * 24 * 60 * 60 * 1_000;
+export const PROFILE_SUMMARY_DISPATCH_BATCH_SIZE = 10;
+export const PROFILE_SUMMARY_DISPATCH_RECOVERY_MS = 30_000;
 
 async function availableData(db: AccountDataDatabase, accountId: string) {
   const diagnosis = await db
@@ -320,7 +333,11 @@ export async function requestProfileSummaryGeneration(
   allowUnchangedRegeneration = false,
 ): Promise<RequestProfileSummaryGenerationResult> {
   const existing = await db
-    .select({ id: profileSummaryGenerations.id, status: profileSummaryGenerations.status })
+    .select({
+      id: profileSummaryGenerations.id,
+      status: profileSummaryGenerations.status,
+      dispatchedAt: profileSummaryGenerations.dispatchedAt,
+    })
     .from(profileSummaryGenerations)
     .where(
       and(
@@ -331,7 +348,12 @@ export async function requestProfileSummaryGeneration(
     .limit(1)
     .get();
   if (existing && (existing.status === "queued" || existing.status === "generating")) {
-    return { outcome: "existing", generationId: existing.id, status: existing.status };
+    return {
+      outcome: "existing",
+      generationId: existing.id,
+      status: existing.status,
+      needsDispatch: existing.status === "queued" && existing.dispatchedAt === null,
+    };
   }
   const [inputSnapshot, latestVersion, shareProfile] = await Promise.all([
     currentInputSnapshot(db, accountId),
@@ -364,7 +386,55 @@ export async function requestProfileSummaryGeneration(
     .insert(profileSummaryGenerations)
     .values({ id: generationId, accountId, status: "queued", requestedAt })
     .run();
-  return { outcome: "created", generationId, status: "queued" };
+  return { outcome: "created", generationId, status: "queued", needsDispatch: true };
+}
+
+/** Queueへ未投入の生成要求を、AccountData alarmから復旧できる単位で返す。 */
+export async function listUndispatchedProfileSummaryGenerationIds(
+  db: AccountDataDatabase,
+  accountId: string,
+  at = new Date(),
+  limit = PROFILE_SUMMARY_DISPATCH_BATCH_SIZE,
+): Promise<string[]> {
+  const recoveryCutoff = new Date(at.getTime() - PROFILE_SUMMARY_DISPATCH_RECOVERY_MS);
+  const rows = await db
+    .select({ id: profileSummaryGenerations.id })
+    .from(profileSummaryGenerations)
+    .where(
+      and(
+        eq(profileSummaryGenerations.accountId, accountId),
+        eq(profileSummaryGenerations.status, "queued"),
+        isNull(profileSummaryGenerations.dispatchedAt),
+        lte(profileSummaryGenerations.requestedAt, recoveryCutoff),
+      ),
+    )
+    .orderBy(asc(profileSummaryGenerations.requestedAt), asc(profileSummaryGenerations.id))
+    .limit(limit)
+    .all();
+  return rows.map(({ id }) => id);
+}
+
+/** Queueが受理した後だけ配送済みにする。重複配送時も同じgeneration IDを維持する。 */
+export async function markProfileSummaryGenerationDispatched(
+  db: AccountDataDatabase,
+  accountId: string,
+  generationId: string,
+  dispatchedAt = new Date(),
+): Promise<boolean> {
+  const updated = await db
+    .update(profileSummaryGenerations)
+    .set({ dispatchedAt })
+    .where(
+      and(
+        eq(profileSummaryGenerations.id, generationId),
+        eq(profileSummaryGenerations.accountId, accountId),
+        eq(profileSummaryGenerations.status, "queued"),
+        isNull(profileSummaryGenerations.dispatchedAt),
+      ),
+    )
+    .returning({ id: profileSummaryGenerations.id })
+    .get();
+  return updated?.id === generationId;
 }
 
 export async function loadProfileSummaryGenerationContext(

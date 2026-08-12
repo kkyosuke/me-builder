@@ -67,6 +67,7 @@ export function useProfileSummary({
           setState({ status: "success", data: result });
           setGenerationNotice(null);
         }
+        return result;
       } catch (error) {
         if (mounted.current && !controller.signal.aborted) {
           setState({
@@ -88,6 +89,7 @@ export function useProfileSummary({
     generationRequest.current = controller;
     const previousState = state;
     let generationAccepted = false;
+    let generationReconciled = false;
     setState((current) => {
       if (current.status !== "success") return current;
       return {
@@ -109,24 +111,38 @@ export function useProfileSummary({
         if (mounted.current) setState(previousState);
         return;
       }
-      const generation = await requestProfileSummaryGeneration(
-        config.apiUrl,
-        idToken,
-        controller.signal,
-      );
-      generationAccepted = true;
-      if (mounted.current && !controller.signal.aborted) {
-        setState((current) =>
-          current.status === "success"
-            ? {
-                status: "success",
-                data: {
-                  ...current.data,
-                  generation: { ...current.data.generation, status: generation.status },
-                },
-              }
-            : current,
+      try {
+        const generation = await requestProfileSummaryGeneration(
+          config.apiUrl,
+          idToken,
+          controller.signal,
         );
+        generationAccepted = true;
+        if (mounted.current && !controller.signal.aborted) {
+          setState((current) =>
+            current.status === "success"
+              ? {
+                  status: "success",
+                  data: {
+                    ...current.data,
+                    generation: { ...current.data.generation, status: generation.status },
+                  },
+                }
+              : current,
+          );
+        }
+      } catch (error) {
+        if (error instanceof ProfileSummaryGenerationUnavailableError) {
+          await load(false);
+          return;
+        }
+        const latest = await load(false);
+        generationReconciled = true;
+        if (latest?.generation.status !== "queued" && latest?.generation.status !== "generating") {
+          throw error;
+        }
+        // POST応答だけ失われた場合も、AccountDataの受付済み状態から確認を継続する。
+        generationAccepted = true;
       }
 
       for (const delayMs of [0, ...PROFILE_SUMMARY_POLL_INTERVALS_MS]) {
@@ -147,12 +163,8 @@ export function useProfileSummary({
         });
       }
     } catch (error) {
-      if (error instanceof ProfileSummaryGenerationUnavailableError) {
-        await load(false);
-        return;
-      }
       if (mounted.current && !controller.signal.aborted) {
-        if (!generationAccepted) setState(previousState);
+        if (!generationAccepted && !generationReconciled) await load(false);
         setGenerationNotice({
           kind: "error",
           message: error instanceof Error ? error.message : "まとめを生成できませんでした。",

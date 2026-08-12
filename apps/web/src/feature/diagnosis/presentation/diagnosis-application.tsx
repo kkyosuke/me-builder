@@ -1,6 +1,10 @@
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { config } from "../../../config";
 import { useLiffSession } from "../../liff";
+import {
+  diagnosisResultIdFromPathname,
+  isDiagnosisResultPathname,
+} from "../model/diagnosis-navigation";
 import { DiagnosisDetailScreen } from "./components/diagnosis-detail-screen";
 import { DiagnosisGuidance } from "./components/diagnosis-guidance";
 import { DiagnosisHome } from "./components/diagnosis-home";
@@ -25,6 +29,29 @@ export default function DiagnosisApplication() {
     await diagnoses.load();
   }, [detail.close, diagnoses.load]);
   const reset = useResetDiagnosisData({ idToken: diagnoses.idToken, onReset: handleReset });
+  const openedDirectDiagnosisId = useRef<string | null>(null);
+  const isDirectResultPath = isDiagnosisResultPathname(window.location.pathname);
+  const directDiagnosisId = diagnosisResultIdFromPathname(window.location.pathname);
+  const fromProfile = new URLSearchParams(window.location.search).get("from") === "me";
+  const directBackHref = fromProfile ? "/me" : "/diagnosis";
+  const directBackLabel = fromProfile ? "わたしのまとめへ" : "診断一覧へ";
+  const directDiagnosis =
+    directDiagnosisId && diagnoses.state.status === "success"
+      ? diagnoses.state.data.find(({ id }) => id === directDiagnosisId)
+      : undefined;
+
+  useEffect(() => {
+    if (
+      !directDiagnosisId ||
+      diagnoses.state.status !== "success" ||
+      openedDirectDiagnosisId.current === directDiagnosisId
+    ) {
+      return;
+    }
+    if (!directDiagnosis) return;
+    openedDirectDiagnosisId.current = directDiagnosisId;
+    void detail.open(directDiagnosis);
+  }, [diagnoses.state.status, detail.open, directDiagnosis, directDiagnosisId]);
 
   let content = (
     <DiagnosisHome
@@ -39,14 +66,49 @@ export default function DiagnosisApplication() {
     />
   );
 
+  if (isDirectResultPath && diagnoses.state.status === "success" && !directDiagnosis) {
+    content = (
+      <DiagnosisGuidance
+        kind="invalid-link"
+        onBack={detail.close}
+        onRetry={() => void diagnoses.load()}
+        backHref={directBackHref}
+        backLabel={directBackLabel}
+      />
+    );
+  }
+
   if (detail.state.status === "loading") {
     content = <DiagnosisDetailSkeleton />;
   } else if (detail.state.status === "error") {
-    content = <DiagnosisGuidance kind="load-error" onBack={detail.close} />;
+    content = (
+      <DiagnosisGuidance
+        kind="load-error"
+        onBack={detail.close}
+        {...(directDiagnosis
+          ? {
+              onRetry: () => void detail.open(directDiagnosis),
+              backHref: directBackHref,
+              backLabel: directBackLabel,
+            }
+          : {})}
+      />
+    );
   } else if (detail.state.status === "success") {
     const detailContent = detail.state.data;
     if (detailContent.type === "result") {
-      content = <DiagnosisResultView result={detailContent.result} onBack={detail.close} />;
+      content = (
+        <DiagnosisResultView
+          result={detailContent.result}
+          onBack={detail.close}
+          {...(directDiagnosisId
+            ? {
+                backHref: fromProfile ? "/me" : "/diagnosis",
+                backLabel: fromProfile ? "わたしのまとめ" : "診断一覧",
+              }
+            : {})}
+        />
+      );
     }
     if (detailContent.type === "answer") {
       content = (
@@ -61,7 +123,13 @@ export default function DiagnosisApplication() {
       );
     }
     if (detailContent.type === "guidance") {
-      content = <DiagnosisGuidance kind={detailContent.kind} onBack={detail.close} />;
+      content = (
+        <DiagnosisGuidance
+          kind={detailContent.kind}
+          onBack={detail.close}
+          {...(directDiagnosisId ? { backHref: directBackHref, backLabel: directBackLabel } : {})}
+        />
+      );
     }
   }
 

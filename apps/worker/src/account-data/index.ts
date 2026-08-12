@@ -28,6 +28,35 @@ const actions = {
 
 const ALARM_RETRY_MS = 30_000;
 
+/** APIからQueueへ渡せなかった生成要求を、永続状態を正として同じIDで再配送する。 */
+export async function dispatchUndispatchedProfileSummaryGenerations(
+  db: DO.account.Database,
+  accountId: string,
+  queue: Env["PROFILE_SUMMARY_QUEUE"],
+): Promise<number> {
+  const generationIds =
+    await DO.account.action.profileSummary.listUndispatchedProfileSummaryGenerationIds(
+      db,
+      accountId,
+    );
+  if (generationIds.length > 0 && !queue) {
+    throw new Error("PROFILE_SUMMARY_QUEUE binding is required for Profile Summary generation");
+  }
+  for (const generationId of generationIds) {
+    await queue?.send({
+      type: "profile-summary-generation",
+      accountId,
+      generationId,
+    });
+    await DO.account.action.profileSummary.markProfileSummaryGenerationDispatched(
+      db,
+      accountId,
+      generationId,
+    );
+  }
+  return generationIds.length;
+}
+
 /** 1 AccountのSource / Brain / Diagnosis / Diary / Profile Summaryをprivate SQLiteに保存する。 */
 export class AccountData extends DurableObject<Env> {
   private readonly accountId: string;
@@ -96,6 +125,11 @@ export class AccountData extends DurableObject<Env> {
         await DO.account.action.diary.closeExpiredSessions(this.repository.client);
         await DO.account.action.diagnosisBrainProjection.processPendingDiagnosisBrainProjections(
           this.repository.client,
+        );
+        await dispatchUndispatchedProfileSummaryGenerations(
+          this.repository.client,
+          this.accountId,
+          this.env.PROFILE_SUMMARY_QUEUE,
         );
         const checkpointClaim = await DO.account.action.diary.claimDueDiaryBrainCheckpointIds(
           this.repository.client,

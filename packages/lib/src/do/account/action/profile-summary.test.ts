@@ -11,7 +11,9 @@ import {
   PROFILE_SUMMARY_REGENERATION_INTERVAL_MS,
   completeProfileSummaryGeneration,
   failProfileSummaryGeneration,
+  listUndispatchedProfileSummaryGenerationIds,
   loadProfileSummaryGenerationContext,
+  markProfileSummaryGenerationDispatched,
   readCompatibilityShareProfile,
   readProfileSummary,
   requestProfileSummaryGeneration,
@@ -142,11 +144,28 @@ describe("Profile Summary persistence", () => {
       accountId,
       new Date("2026-08-09T00:00:00.000Z"),
     );
-    expect(requested).toMatchObject({ outcome: "created", status: "queued" });
+    expect(requested).toMatchObject({
+      outcome: "created",
+      status: "queued",
+      needsDispatch: true,
+    });
     if (requested.outcome !== "created") throw new Error("generation was not created");
+    await expect(listUndispatchedProfileSummaryGenerationIds(db, accountId)).resolves.toEqual([
+      requested.generationId,
+    ]);
+    await expect(
+      markProfileSummaryGenerationDispatched(
+        db,
+        accountId,
+        requested.generationId,
+        new Date("2026-08-09T00:00:01.000Z"),
+      ),
+    ).resolves.toBe(true);
+    await expect(listUndispatchedProfileSummaryGenerationIds(db, accountId)).resolves.toEqual([]);
     await expect(requestProfileSummaryGeneration(db, accountId)).resolves.toMatchObject({
       outcome: "existing",
       generationId: requested.generationId,
+      needsDispatch: false,
     });
 
     const context = await loadProfileSummaryGenerationContext(
@@ -244,6 +263,21 @@ describe("Profile Summary persistence", () => {
     expect(forced).toMatchObject({ outcome: "created", status: "queued" });
     if (forced.outcome !== "created") throw new Error("forced generation was not created");
     await failProfileSummaryGeneration(db, accountId, forced.generationId, "test failure");
+    await expect(
+      readProfileSummary(db, accountId, new Date("2026-08-09T00:03:30.000Z"), true),
+    ).resolves.toMatchObject({
+      generation: { status: "failed", canRegenerate: true },
+    });
+    const retried = await requestProfileSummaryGeneration(
+      db,
+      accountId,
+      new Date("2026-08-09T00:03:30.000Z"),
+      true,
+    );
+    expect(retried).toMatchObject({ outcome: "created", status: "queued" });
+    if (retried.outcome !== "created") throw new Error("retry generation was not created");
+    expect(retried.generationId).not.toBe(forced.generationId);
+    await failProfileSummaryGeneration(db, accountId, retried.generationId, "retry failure");
 
     await db
       .update(schema.conversationMessages)

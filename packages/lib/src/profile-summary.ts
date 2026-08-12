@@ -90,6 +90,7 @@ export type RequestProfileSummaryGenerationResult =
       outcome: "created" | "existing";
       generationId: string;
       status: "queued" | "generating";
+      needsDispatch: boolean;
     }>
   | Readonly<{
       outcome: "unavailable";

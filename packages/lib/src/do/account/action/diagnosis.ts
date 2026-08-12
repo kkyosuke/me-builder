@@ -119,7 +119,7 @@ export type DiagnosisAnswersResult =
   | { type: "found"; diagnosis: DiagnosisAnswers }
   | { type: "not-found" };
 
-export type CompatibilitySharePreviewSource = Readonly<{
+export type DiagnosisAnsweredSource = Readonly<{
   diagnoses: DiagnosisListItem[];
   answeredDiagnoses: DiagnosisAnswers[];
 }>;
@@ -990,12 +990,12 @@ export async function findDiagnosisAnswers(
   };
 }
 
-/** 相性共有プレビューに必要な一覧と回答済みDiagnosisを、1回のAccountData RPCで取得する。 */
-export async function getCompatibilitySharePreviewSource(
+/** 一覧と回答済みDiagnosisを、複数の読み取り画面向けに1回で取得する。 */
+export async function getDiagnosisAnsweredSource(
   db: AccountDataDatabase,
   accountId: string,
   at: Date,
-): Promise<CompatibilitySharePreviewSource> {
+): Promise<DiagnosisAnsweredSource> {
   const diagnoses = await listVisibleDiagnoses(db, accountId, at);
   const answeredResults = await Promise.all(
     diagnoses

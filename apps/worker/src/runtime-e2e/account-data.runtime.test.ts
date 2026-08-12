@@ -99,6 +99,35 @@ describe("AccountData Workers runtime E2E", () => {
     });
   });
 
+  it("Worker runtimeのQueue bindingから未配送のまとめ生成要求を再送する", async () => {
+    const accountId = crypto.randomUUID();
+    const generationId = crypto.randomUUID();
+    const stub = env.ACCOUNT_DATA.getByName(accountId);
+
+    expect(env.PROFILE_SUMMARY_QUEUE).toBeDefined();
+    await runInDurableObject(stub, async (instance: AccountData, state) => {
+      state.storage.sql.exec(
+        `INSERT INTO profile_summary_generations
+          (id, account_id, status, requested_at)
+         VALUES (?, ?, 'queued', ?)`,
+        generationId,
+        accountId,
+        Date.now() - 60_000,
+      );
+
+      await instance.alarm();
+
+      expect(
+        state.storage.sql
+          .exec<{ dispatched_at: number | null }>(
+            "SELECT dispatched_at FROM profile_summary_generations WHERE id = ?",
+            generationId,
+          )
+          .one().dispatched_at,
+      ).toEqual(expect.any(Number));
+    });
+  });
+
   it("既存0000 baselineのAccountデータを保ったまま後続migrationを適用できる", async () => {
     const accountId = crypto.randomUUID();
     const stub = env.ACCOUNT_DATA.getByName(accountId);
@@ -123,9 +152,7 @@ describe("AccountData Workers runtime E2E", () => {
       state.storage.sql.exec(
         "CREATE UNIQUE INDEX diary_brain_checkpoint_item_brain_idx ON diary_brain_checkpoint_items (brain_item_id)",
       );
-      state.storage.sql.exec(
-        "DELETE FROM __drizzle_migrations WHERE created_at IN (1786407202292, 1786413718549, 1786415351981, 1786433070406, 1786453107455, 1786491203636, 1786493237869)",
-      );
+      state.storage.sql.exec("DELETE FROM __drizzle_migrations WHERE created_at > 1786361220917");
 
       const repository = Reflect.get(instance, "repository") as {
         initialize(): Promise<void>;
@@ -194,6 +221,7 @@ describe("AccountData Workers runtime E2E", () => {
         "INSERT INTO profile_summary_generations (id, account_id, status, requested_at, finished_at, model, prompt_version) VALUES ('migration-generation', ?, 'completed', 1, 2, 'gemini-test', 'v1')",
         accountId,
       );
+      state.storage.sql.exec("ALTER TABLE profile_summary_generations DROP COLUMN dispatched_at");
       state.storage.sql.exec(
         "INSERT INTO brain_items (id, created_at, updated_at, is_deleted, account_id, category, statement, attributes_json, derivation, status, stability, sensitivity, externally_shareable, confidence_json) VALUES ('migration-diary-brain', ?, ?, 0, ?, 'memory', '既存版で使用済みの記録', '{}', 'ai', 'active', 'stable', 'private', 0, '{}')",
         legacyInputAt.getTime() / 1_000,
@@ -218,9 +246,7 @@ describe("AccountData Workers runtime E2E", () => {
       state.storage.sql.exec(
         "CREATE UNIQUE INDEX diary_brain_checkpoint_item_brain_idx ON diary_brain_checkpoint_items (brain_item_id)",
       );
-      state.storage.sql.exec(
-        "DELETE FROM __drizzle_migrations WHERE created_at IN (1786415351981, 1786433070406, 1786453107455, 1786491203636, 1786493237869)",
-      );
+      state.storage.sql.exec("DELETE FROM __drizzle_migrations WHERE created_at >= 1786415351981");
 
       const repository = Reflect.get(instance, "repository") as {
         initialize(): Promise<void>;

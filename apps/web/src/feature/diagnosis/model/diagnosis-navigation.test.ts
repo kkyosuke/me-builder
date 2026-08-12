@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { DiagnosisListItem } from "./diagnosis-list-item";
-import { applySavedProgress, resolveDiagnosisDestination } from "./diagnosis-navigation";
+import {
+  applySavedProgress,
+  diagnosisResultIdFromPathname,
+  isDiagnosisResultPathname,
+  resolveDiagnosisDestination,
+} from "./diagnosis-navigation";
 
 const diagnosis: DiagnosisListItem = {
   id: "diagnosis-1",
@@ -29,6 +34,18 @@ describe("resolveDiagnosisDestination", () => {
 
   it("未完了かつ受付終了なら案内へ進む", () => {
     expect(resolveDiagnosisDestination({ ...diagnosis, availability: "closed" })).toBe("closed");
+  });
+});
+
+describe("diagnosisResultIdFromPathname", () => {
+  it("回答結果の直接URLからDiagnosis IDを復元する", () => {
+    expect(diagnosisResultIdFromPathname("/diagnosis/value%2Fwork/answers")).toBe("value/work");
+  });
+
+  it("別画面と不正なpercent encodingは直接URLとして扱わない", () => {
+    expect(diagnosisResultIdFromPathname("/diagnosis")).toBeNull();
+    expect(diagnosisResultIdFromPathname("/diagnosis/%E0%A4%A/answers")).toBeNull();
+    expect(isDiagnosisResultPathname("/diagnosis/%E0%A4%A/answers")).toBe(true);
   });
 });
 
