@@ -178,4 +178,22 @@ export const compatibilitySharePreviewCases = {
       },
     },
   },
+  cancelInvitation: {
+    id: "COMPATIBILITY-INVITATION-CANCEL-001",
+    name: "送信者が招待を取り消すと内容と一覧から消えること",
+    in: {
+      method: "DELETE",
+      path: "/api/compatibility/invitations/:relationshipId",
+      authorization: "Bearer inviter-token",
+      setup: ["送信者が招待を発行"],
+    },
+    out: {
+      status: 204,
+      body: {
+        relationshipStatus: "cancelled",
+        invitationPreviewStatus: 404,
+        senderList: "empty",
+      },
+    },
+  },
 } as const satisfies Record<string, E2eCase>;
