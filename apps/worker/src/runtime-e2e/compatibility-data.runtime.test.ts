@@ -21,6 +21,10 @@ describe("CompatibilityData Workers runtime E2E", () => {
       stub.createInvitation(relationshipId, {
         inviterAccountId,
         inviterDisplayName: "送信者",
+        offeredProfile: {
+          profileSummaryVersionId: "profile-version-inviter",
+          fingerprint: "f".repeat(64),
+        },
         offeredThemes: [
           {
             diagnosisId: "diagnosis-1",
@@ -44,6 +48,10 @@ describe("CompatibilityData Workers runtime E2E", () => {
     const acceptance = {
       inviteeAccountId,
       inviteeDisplayName: "受信者",
+      acceptedProfile: {
+        profileSummaryVersionId: "profile-version-invitee",
+        fingerprint: "e".repeat(64),
+      },
       acceptedThemes: [
         {
           diagnosisId: "diagnosis-1",
@@ -96,6 +104,10 @@ describe("CompatibilityData Workers runtime E2E", () => {
     await relationship.createInvitation(relationshipId, {
       inviterAccountId,
       inviterDisplayName: "送信者",
+      offeredProfile: {
+        profileSummaryVersionId: "profile-version-inviter",
+        fingerprint: "f".repeat(64),
+      },
       offeredThemes: [{ diagnosisId: "diagnosis-1", resultFingerprint: "a".repeat(64) }],
     });
     await inviter.execute("compatibility.addOutgoingReference", {
@@ -115,6 +127,10 @@ describe("CompatibilityData Workers runtime E2E", () => {
     await relationship.acceptInvitation(relationshipId, {
       inviteeAccountId,
       inviteeDisplayName: "受信者",
+      acceptedProfile: {
+        profileSummaryVersionId: "profile-version-invitee",
+        fingerprint: "e".repeat(64),
+      },
       acceptedThemes: [{ diagnosisId: "diagnosis-1", resultFingerprint: "b".repeat(64) }],
     });
 
@@ -139,6 +155,10 @@ describe("CompatibilityData Workers runtime E2E", () => {
     await relationship.createInvitation(relationshipId, {
       inviterAccountId,
       inviterDisplayName: "送信者",
+      offeredProfile: {
+        profileSummaryVersionId: "profile-version-inviter",
+        fingerprint: "f".repeat(64),
+      },
       offeredThemes: [{ diagnosisId: "diagnosis-1", resultFingerprint: "a".repeat(64) }],
     });
     await inviter.execute("compatibility.addOutgoingReference", {
@@ -161,6 +181,10 @@ describe("CompatibilityData Workers runtime E2E", () => {
     await relationship.createInvitation(relationshipId, {
       inviterAccountId,
       inviterDisplayName: "送信者",
+      offeredProfile: {
+        profileSummaryVersionId: "profile-version-inviter",
+        fingerprint: "f".repeat(64),
+      },
       offeredThemes: [{ diagnosisId: "diagnosis-1", resultFingerprint: "a".repeat(64) }],
     });
     await inviter.execute("compatibility.addOutgoingReference", {
@@ -180,6 +204,10 @@ describe("CompatibilityData Workers runtime E2E", () => {
     await relationship.acceptInvitation(relationshipId, {
       inviteeAccountId,
       inviteeDisplayName: "受信者",
+      acceptedProfile: {
+        profileSummaryVersionId: "profile-version-invitee",
+        fingerprint: "e".repeat(64),
+      },
       acceptedThemes: [{ diagnosisId: "diagnosis-1", resultFingerprint: "b".repeat(64) }],
     });
 
@@ -205,11 +233,19 @@ describe("CompatibilityData Workers runtime E2E", () => {
       aToB.createInvitation(relationshipAtoB, {
         inviterAccountId: accountA,
         inviterDisplayName: "A",
+        offeredProfile: {
+          profileSummaryVersionId: "profile-version-a",
+          fingerprint: "f".repeat(64),
+        },
         offeredThemes: [{ diagnosisId: "diagnosis-1", resultFingerprint: "a".repeat(64) }],
       }),
       bToA.createInvitation(relationshipBtoA, {
         inviterAccountId: accountB,
         inviterDisplayName: "B",
+        offeredProfile: {
+          profileSummaryVersionId: "profile-version-b",
+          fingerprint: "e".repeat(64),
+        },
         offeredThemes: [{ diagnosisId: "diagnosis-1", resultFingerprint: "b".repeat(64) }],
       }),
       aData.execute("compatibility.addOutgoingReference", {
@@ -230,6 +266,10 @@ describe("CompatibilityData Workers runtime E2E", () => {
         {
           inviteeAccountId: accountB,
           inviteeDisplayName: "B",
+          acceptedProfile: {
+            profileSummaryVersionId: "profile-version-b",
+            fingerprint: "e".repeat(64),
+          },
           acceptedThemes: [{ diagnosisId: "diagnosis-1", resultFingerprint: "b".repeat(64) }],
         },
       ),
@@ -240,6 +280,10 @@ describe("CompatibilityData Workers runtime E2E", () => {
         {
           inviteeAccountId: accountA,
           inviteeDisplayName: "A",
+          acceptedProfile: {
+            profileSummaryVersionId: "profile-version-a",
+            fingerprint: "f".repeat(64),
+          },
           acceptedThemes: [{ diagnosisId: "diagnosis-1", resultFingerprint: "a".repeat(64) }],
         },
       ),

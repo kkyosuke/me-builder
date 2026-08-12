@@ -28,4 +28,26 @@ export const compatibilitySharePreviewCases = {
       },
     },
   },
+  issueInvitation: {
+    id: "COMPATIBILITY-INVITATION-001",
+    name: "確認済みの共有内容から1人用の招待リンクを発行すること",
+    in: {
+      method: "POST",
+      path: "/api/compatibility/invitations",
+      authorization: "Bearer known-token",
+      setup: [
+        "共有プロフィールを生成",
+        "relationship-priorityの10問すべてへchoiceId=yesを保存",
+        "共有プレビューのpreviewTokenを送信",
+      ],
+    },
+    out: {
+      status: 201,
+      body: {
+        invitationUrlPattern: "^https://example\\.com/compatibility/invitations/[a-f0-9]{64}$",
+        expiresAt: "CompatibilityDataが決定する14日後のISO日時",
+        senderReferenceStatus: "pending",
+      },
+    },
+  },
 } as const satisfies Record<string, E2eCase>;
