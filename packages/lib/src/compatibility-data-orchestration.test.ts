@@ -2,7 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 import type { CompatibilityDataNamespace } from "./compatibility-data";
 import {
   acceptCompatibilityInvitationWithReferences,
+  cancelCompatibilityInvitationWithReference,
   createCompatibilityInvitationWithReference,
+  endCompatibilityRelationshipWithReferences,
 } from "./compatibility-data-orchestration";
 import type { AccountDataNamespace } from "./do/account/rpc";
 
@@ -136,6 +138,80 @@ describe("compatibility data orchestration", () => {
     ).toEqual([
       { accountId: "account-a", operation: "compatibility.releaseReservation" },
       { accountId: "account-b", operation: "compatibility.releaseReservation" },
+    ]);
+  });
+
+  it("招待の正本を取り消した後に送信者の一覧参照を終了する", async () => {
+    const calls: string[] = [];
+    const accountNamespace = {
+      getByName: () => ({
+        async execute(_accountId: string, operation: string) {
+          calls.push(operation);
+          return null;
+        },
+      }),
+    } as unknown as AccountDataNamespace;
+    const compatibilityNamespace = {
+      getByName: () => ({
+        async cancelInvitation() {
+          calls.push("canonical.cancel");
+          return {
+            outcome: "cancelled",
+            relationship: { inviterAccountId: "account-a" },
+          };
+        },
+      }),
+    } as unknown as CompatibilityDataNamespace;
+
+    await cancelCompatibilityInvitationWithReference(
+      accountNamespace,
+      compatibilityNamespace,
+      "1".repeat(64),
+      "account-a",
+    );
+
+    expect(calls).toEqual(["canonical.cancel", "compatibility.endReference"]);
+  });
+
+  it("相性関係の正本を終了した後にAccount ID順で双方の一覧参照を終了する", async () => {
+    const calls: string[] = [];
+    const accountNamespace = {
+      getByName(accountId: string) {
+        return {
+          async execute(routedAccountId: string, operation: string) {
+            expect(routedAccountId).toBe(accountId);
+            calls.push(`${accountId}.${operation}`);
+            return null;
+          },
+        };
+      },
+    } as unknown as AccountDataNamespace;
+    const compatibilityNamespace = {
+      getByName: () => ({
+        async endRelationship() {
+          calls.push("canonical.end");
+          return {
+            outcome: "ended",
+            relationship: {
+              inviterAccountId: "account-b",
+              inviteeAccountId: "account-a",
+            },
+          };
+        },
+      }),
+    } as unknown as CompatibilityDataNamespace;
+
+    await endCompatibilityRelationshipWithReferences(
+      accountNamespace,
+      compatibilityNamespace,
+      "1".repeat(64),
+      "account-a",
+    );
+
+    expect(calls).toEqual([
+      "canonical.end",
+      "account-a.compatibility.endReference",
+      "account-b.compatibility.endReference",
     ]);
   });
 });

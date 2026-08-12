@@ -23,7 +23,7 @@ type Person = Readonly<{
   themes: readonly CompatibilitySharePreviewTheme[];
 }>;
 
-export type CompatibilityRelationshipContents =
+type CompatibilityRelationshipContents =
   | Readonly<{
       relationshipId: string;
       status: "ready";

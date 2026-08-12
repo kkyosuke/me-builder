@@ -36,6 +36,7 @@ import { acceptCompatibilityInvitation } from "../logic/compatibility-invitation
 import { cancelCompatibilityInvitation } from "../logic/compatibility-invitation-cancellation";
 import { getCompatibilityInvitationContents } from "../logic/compatibility-invitation-preview";
 import { getCompatibilityRelationshipContents } from "../logic/compatibility-relationship";
+import { endCompatibilityRelationship } from "../logic/compatibility-relationship-end";
 import { listCompatibilityRelationships } from "../logic/compatibility-relationships";
 import { getCompatibilitySharePreview } from "../logic/compatibility-share-preview";
 import { operationalHttpPath } from "../operational-http-path";
@@ -76,7 +77,7 @@ export async function getCompatibilitySharePreviewContents(c: Context<AppEnv>): 
 /** `POST /api/compatibility/invitations` — 確認済み内容から1人用の招待を発行する。 */
 export async function postCompatibilityInvitation(c: Context<AppEnv>): Promise<Response> {
   const currentConfig = getConfig(c.env);
-  if (!c.env?.DB || !c.env.ACCOUNT_DATA || !c.env.COMPATIBILITY_DATA || !currentConfig.webOrigin) {
+  if (!c.env?.DB || !c.env.ACCOUNT_DATA || !c.env.COMPATIBILITY_DATA || !currentConfig.liffId) {
     logger.error(
       { path: operationalHttpPath(c.req.path) },
       "Compatibility invitation binding is not configured",
@@ -105,7 +106,7 @@ export async function postCompatibilityInvitation(c: Context<AppEnv>): Promise<R
     idToken: bearerToken(c.req.header("authorization")),
     previewToken: parsed.output.previewToken,
     lineLoginChannelId: currentConfig.lineLoginChannelId,
-    webOrigin: currentConfig.webOrigin,
+    liffId: currentConfig.liffId,
     db: D1.shared.client.create(c.env.DB),
     accountData: c.env.ACCOUNT_DATA,
     compatibilityData: c.env.COMPATIBILITY_DATA,
@@ -370,6 +371,49 @@ export async function deleteCompatibilityInvitation(c: Context<AppEnv>): Promise
         v.parse(CompatibilityInvitationUnavailableSchema, {
           error: "Compatibility invitation unavailable",
           reason: "invitation_unavailable",
+        }),
+        404,
+      );
+    case "account-not-found":
+      return c.json(
+        v.parse(AccountNotFoundErrorSchema, {
+          error: "Account not found",
+          reason: "friendship_required",
+        }),
+        404,
+      );
+    case "not-configured":
+    case "unauthenticated":
+      return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
+  }
+}
+
+/** `DELETE /api/compatibility/relationships/:relationshipId` — 当事者の相性関係を終了する。 */
+export async function deleteCompatibilityRelationship(c: Context<AppEnv>): Promise<Response> {
+  c.header("Cache-Control", "no-store");
+  if (!c.env?.DB || !c.env.ACCOUNT_DATA || !c.env.COMPATIBILITY_DATA) {
+    logger.error(
+      { path: operationalHttpPath(c.req.path) },
+      "Compatibility relationship binding is not configured",
+    );
+    return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
+  }
+  const outcome = await endCompatibilityRelationship({
+    relationshipId: c.req.param("relationshipId") ?? "",
+    idToken: bearerToken(c.req.header("authorization")),
+    lineLoginChannelId: getConfig(c.env).lineLoginChannelId,
+    db: D1.shared.client.create(c.env.DB),
+    accountData: c.env.ACCOUNT_DATA,
+    compatibilityData: c.env.COMPATIBILITY_DATA,
+  });
+  switch (outcome.type) {
+    case "ended":
+      return c.body(null, 204);
+    case "unavailable":
+      return c.json(
+        v.parse(CompatibilityRelationshipUnavailableSchema, {
+          error: "Compatibility relationship unavailable",
+          reason: "relationship_unavailable",
         }),
         404,
       );

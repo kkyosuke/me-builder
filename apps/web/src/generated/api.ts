@@ -204,7 +204,8 @@ export interface paths {
     get: operations["getCompatibilityRelationship"];
     put?: never;
     post?: never;
-    delete?: never;
+    /** 当事者が成立中の相性関係を終了する */
+    delete: operations["endCompatibilityRelationship"];
     options?: never;
     head?: never;
     patch?: never;
@@ -1879,6 +1880,83 @@ export interface operations {
                 nextAction: ("diagnosis" | "profile-summary") | null;
               };
         };
+      };
+      /** @description LIFF IDトークンを検証できない */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Unauthorized";
+          };
+        };
+      };
+      /** @description 相性関係または対応するAccountを利用できない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | {
+                /** @constant */
+                error: "Compatibility relationship unavailable";
+                /** @constant */
+                reason: "relationship_unavailable";
+              }
+            | {
+                /** @constant */
+                error: "Account not found";
+                /** @constant */
+                reason: "friendship_required";
+              };
+        };
+      };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
+          };
+        };
+      };
+      /** @description D1 bindingが設定されていない */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Service Unavailable";
+          };
+        };
+      };
+    };
+  };
+  endCompatibilityRelationship: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        relationshipId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 相性関係を終了した */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
       /** @description LIFF IDトークンを検証できない */
       401: {

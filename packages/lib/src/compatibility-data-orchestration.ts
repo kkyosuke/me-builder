@@ -218,3 +218,30 @@ export async function cancelCompatibilityInvitationWithReference(
   }
   return result;
 }
+
+/** 正本の関係を終了してから、双方の一覧参照を冪等に非表示へ更新する。 */
+export async function endCompatibilityRelationshipWithReferences(
+  accountNamespace: AccountDataNamespace,
+  compatibilityNamespace: CompatibilityDataNamespace,
+  relationshipId: string,
+  actorAccountId: string,
+) {
+  const result = await compatibilityDataFor(compatibilityNamespace, relationshipId).endRelationship(
+    actorAccountId,
+  );
+  if (result.outcome === "ended" || result.outcome === "unchanged") {
+    const inviteeAccountId = result.relationship.inviteeAccountId;
+    if (!inviteeAccountId) {
+      throw new Error("Ended compatibility relationship must have both participants");
+    }
+    const participantIds = [result.relationship.inviterAccountId, inviteeAccountId].sort();
+    for (const accountId of participantIds) {
+      await accountDataFor(accountNamespace, accountId).execute(
+        "compatibility.endReference",
+        relationshipId,
+        new Date(),
+      );
+    }
+  }
+  return result;
+}

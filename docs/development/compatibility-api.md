@@ -132,7 +132,7 @@ sequenceDiagram
 
 ```json
 {
-  "invitationUrl": "https://example.com/compatibility/invitations/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "invitationUrl": "https://liff.line.me/1234567890-AbCdEfGh/compatibility/invitations/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "expiresAt": "2026-08-26T00:00:00.000Z"
 }
 ```
@@ -143,7 +143,9 @@ sequenceDiagram
 | `409` | 確認後に表示内容が変わった | `{ "error": "Compatibility invitation unavailable", "reason": "preview_changed" }` |
 | `409` | 現在の状態では共有を開始できない | `{ "error": "Compatibility invitation unavailable", "reason": "share_unavailable" }` |
 
-認証・基盤の共通エラーは共有プレビューと同じです。`DB`、`AccountData`、`CompatibilityData`、またはWeb UI originのbindingがなければ`503`を返し、招待を作成しません。
+`invitationUrl`はLINE内でLIFFとして開ける`https://liff.line.me/{LIFF_ID}/compatibility/invitations/{relationshipId}`です。LIFFは設定済みのWeb endpointへpathを`liff.state`として引き継ぎ、Web UIが招待画面を解決します。
+
+認証・基盤の共通エラーは共有プレビューと同じです。`DB`、`AccountData`、`CompatibilityData`、または`LIFF_ID`のbindingがなければ`503`を返し、招待を作成しません。
 
 ## 5. 招待内容の確認
 
@@ -370,5 +372,19 @@ sequenceDiagram
 | HTTP | 条件 | レスポンス |
 | --- | --- | --- |
 | `404` | 関係IDが不正、存在しない、期限切れ、成立済み、または本人が送信者でない | `{ "error": "Compatibility invitation unavailable", "reason": "invitation_unavailable" }` |
+
+認証・基盤の共通エラーは共有プレビューと同じです。成功・エラーを問わず`Cache-Control: no-store`を付けます。
+
+## 10. 相性関係の終了
+
+### `DELETE /api/compatibility/relationships/:relationshipId`
+
+成立中の相性関係を、どちらかの当事者が終了します。CompatibilityDataの正本を先に`ended`へ遷移させ、その後に双方のAccountData一覧参照を非表示にします。正本更新後に一覧参照の更新が失敗しても、同じリクエストの再試行で双方の参照更新を完了できるよう冪等に処理します。
+
+成功時はレスポンス本文のない`204`を返します。終了後は双方の一覧・詳細から関係が消え、以前の直接リンクでも相性シートを再表示できません。
+
+| HTTP | 条件 | レスポンス |
+| --- | --- | --- |
+| `404` | 関係IDが不正、存在しない、未成立、または本人が当事者でない | `{ "error": "Compatibility relationship unavailable", "reason": "relationship_unavailable" }` |
 
 認証・基盤の共通エラーは共有プレビューと同じです。成功・エラーを問わず`Cache-Control: no-store`を付けます。
