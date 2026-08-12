@@ -82,9 +82,17 @@ function InvitationContents({
     <>
       <section className="mt-5 rounded-3xl border border-violet-300/30 bg-gradient-to-br from-violet-50 via-white to-rose-50 p-5 text-center dark:from-violet-950/30 dark:via-slate-800 dark:to-rose-950/30">
         <div className="flex items-center justify-center gap-3">
-          <CompatibilityProfileAvatar imageUrl={invitation.inviter.avatarUrl} tone="violet" />
+          <CompatibilityProfileAvatar
+            imageUrl={invitation.inviter.avatarUrl}
+            displayName={inviterName}
+            tone="violet"
+          />
           <HeartHandshake className="size-7 text-rose-500" aria-hidden="true" />
-          <CompatibilityProfileAvatar imageUrl={invitation.recipient.avatarUrl} tone="sky" />
+          <CompatibilityProfileAvatar
+            imageUrl={invitation.recipient.avatarUrl}
+            displayName={invitation.recipient.displayName ?? "あなた"}
+            tone="sky"
+          />
         </div>
         <p className="mt-5 text-sm font-semibold text-violet-700 dark:text-violet-300">
           {inviterName}さんから招待が届いています

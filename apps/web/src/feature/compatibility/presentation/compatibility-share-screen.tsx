@@ -70,7 +70,11 @@ function SharePreviewContent({
   return (
     <>
       <div className="mt-5 flex items-center gap-4">
-        <CompatibilityProfileAvatar imageUrl={preview.avatarUrl} tone="sky" />
+        <CompatibilityProfileAvatar
+          imageUrl={preview.avatarUrl}
+          displayName={displayName}
+          tone="sky"
+        />
         <div>
           <p className="text-sm font-semibold tracking-wider text-rose-700 dark:text-rose-300">
             {displayName}さんから招待

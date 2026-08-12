@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { config } from "../../../../config";
 import type { AsyncState } from "../../../../model/async-state";
 import { fetchCompatibilitySharePreview } from "../../infrastructure/compatibility-api";
+import { fetchCompatibilityAvatarImage } from "../../infrastructure/compatibility-avatar-api";
 import type { CompatibilitySharePreview } from "../../model/compatibility-share-preview";
 
 export function useCompatibilitySharePreview({
@@ -15,6 +16,7 @@ export function useCompatibilitySharePreview({
   const mounted = useRef(false);
   const loading = useRef(false);
   const request = useRef<AbortController | null>(null);
+  const avatarObjectUrl = useRef<string | null>(null);
 
   const load = useCallback(async () => {
     if (loading.current) return;
@@ -34,8 +36,20 @@ export function useCompatibilitySharePreview({
         idToken,
         controller.signal,
       );
+      const avatarBlob = await fetchCompatibilityAvatarImage(
+        config.apiUrl,
+        idToken,
+        preview.avatarUrl,
+        controller.signal,
+      );
       if (mounted.current && !controller.signal.aborted) {
-        setState({ status: "success", data: preview });
+        const nextAvatarObjectUrl = avatarBlob ? URL.createObjectURL(avatarBlob) : null;
+        if (avatarObjectUrl.current) URL.revokeObjectURL(avatarObjectUrl.current);
+        avatarObjectUrl.current = nextAvatarObjectUrl;
+        setState({
+          status: "success",
+          data: { ...preview, avatarUrl: nextAvatarObjectUrl },
+        });
       }
     } catch (error) {
       if (mounted.current && !controller.signal.aborted) {
@@ -59,6 +73,8 @@ export function useCompatibilitySharePreview({
       active = false;
       mounted.current = false;
       request.current?.abort();
+      if (avatarObjectUrl.current) URL.revokeObjectURL(avatarObjectUrl.current);
+      avatarObjectUrl.current = null;
       loading.current = false;
     };
   }, [load]);

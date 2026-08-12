@@ -31,8 +31,12 @@ describe("GET /api/openapi.json", () => {
     });
     expect(document.paths["/api/diagnoses/{diagnosisId}/answers"]?.get).toBeDefined();
     expect(document.paths["/api/profile"]?.get).toBeDefined();
+    expect(document.paths["/api/profile/avatar"]?.get).toBeDefined();
     expect(document.paths["/api/profile/avatar"]?.put).toBeDefined();
     expect(document.paths["/api/profile/avatar"]?.delete).toBeDefined();
+    expect(
+      document.paths["/api/compatibility/invitations/{relationshipId}/avatar"]?.get,
+    ).toBeDefined();
     expect(document.paths["/api/dev/brain-items"]?.get).toBeDefined();
     expect(document.paths["/api/dev/brain-items/{brainItemId}/vector"]?.get).toBeDefined();
     expect(document.paths["/api/dev/brain-vector-sync-jobs/failed"]?.get).toBeDefined();

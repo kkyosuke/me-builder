@@ -1,4 +1,4 @@
-import { ArrowLeft, UserRound } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { useState } from "react";
 import type { CompatibilityPerson } from "../../model/compatibility";
 
@@ -27,9 +27,11 @@ export function CompatibilityAvatar({
 
 export function CompatibilityProfileAvatar({
   imageUrl,
+  displayName,
   tone,
 }: {
   imageUrl: string | null;
+  displayName: string;
   tone: "sky" | "violet";
 }) {
   const [failedImageUrl, setFailedImageUrl] = useState<string | null>(null);
@@ -57,7 +59,7 @@ export function CompatibilityProfileAvatar({
       aria-hidden="true"
       className={`${commonClassName} flex items-center justify-center bg-gradient-to-br ${color}`}
     >
-      <UserRound className="size-9" />
+      <span className="text-2xl font-black">{Array.from(displayName.trim())[0] ?? "?"}</span>
     </span>
   );
 }

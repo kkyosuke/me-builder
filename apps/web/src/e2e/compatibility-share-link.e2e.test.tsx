@@ -8,6 +8,7 @@ import CompatibilityInvitationApplication from "../feature/compatibility/present
 
 const mocks = vi.hoisted(() => ({
   acquireIdToken: vi.fn().mockResolvedValue("recipient-token"),
+  fetchCompatibilityAvatarImage: vi.fn(),
   fetchCompatibilityInvitation: vi.fn(),
   fetchCompatibilitySharePreview: vi.fn(),
   issueCompatibilityInvitation: vi.fn(),
@@ -33,6 +34,9 @@ vi.mock("../feature/compatibility/infrastructure/compatibility-api", () => ({
 vi.mock("../feature/compatibility/infrastructure/compatibility-invitation-sharing", () => ({
   shareCompatibilityInvitationToLine: mocks.shareCompatibilityInvitationToLine,
   copyCompatibilityInvitationUrl: vi.fn(),
+}));
+vi.mock("../feature/compatibility/infrastructure/compatibility-avatar-api", () => ({
+  fetchCompatibilityAvatarImage: mocks.fetchCompatibilityAvatarImage,
 }));
 
 vi.mock("../feature/liff", () => ({
@@ -156,7 +160,7 @@ describe("LIFF compatibility share link journey", () => {
     mocks.fetchCompatibilityInvitation.mockResolvedValue({
       inviter: {
         displayName: "あおい",
-        avatarUrl: "https://profile.line-scdn.net/inviter",
+        avatarUrl: `/api/compatibility/invitations/${relationshipId}/avatar`,
         aboutMe: {
           profileSummaryVersionId: "profile-inviter",
           generatedAt: "2026-08-11T00:00:00.000Z",
@@ -195,6 +199,11 @@ describe("LIFF compatibility share link journey", () => {
       blockingReasons: ["common_diagnosis_required"],
       nextAction: "diagnosis",
     });
+    mocks.fetchCompatibilityAvatarImage
+      .mockResolvedValueOnce(new Blob([Uint8Array.from([1])]))
+      .mockResolvedValueOnce(null);
+    URL.createObjectURL = vi.fn().mockReturnValue("blob:inviter-avatar");
+    URL.revokeObjectURL = vi.fn();
 
     render(
       <CompatibilityInvitationApplication
@@ -206,9 +215,7 @@ describe("LIFF compatibility share link journey", () => {
       await screen.findByRole("heading", { name: "2人の相性を見てみませんか？" }),
     ).toBeTruthy();
     expect(screen.getByText("あおいさんから招待が届いています")).toBeTruthy();
-    expect(
-      document.querySelector('img[src="https://profile.line-scdn.net/inviter"]'),
-    ).not.toBeNull();
+    expect(document.querySelector('img[src="blob:inviter-avatar"]')).not.toBeNull();
     expect(screen.getByText("私は見通しを大切にします")).toBeTruthy();
     expect(mocks.fetchCompatibilityInvitation).toHaveBeenCalledWith(
       undefined,

@@ -284,6 +284,7 @@ describe("Compatibility flow", () => {
     expect(
       document.querySelector('img[src="https://profile.line-scdn.net/inviter"]'),
     ).not.toBeNull();
+    expect(screen.getByText("は")).toBeTruthy();
     expect(screen.getByText("私は見通しを大切にします")).toBeTruthy();
     expect(screen.getByText("私は予定の余白を大切にします")).toBeTruthy();
     expect(screen.getAllByRole("heading", { name: "共有する振る舞い・考え方" })).toHaveLength(2);

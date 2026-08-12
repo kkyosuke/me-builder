@@ -12,7 +12,8 @@
 
 - 本人のプロフィール取得は`GET /api/profile`とし、Account IDをpath、query、bodyで受け取らない
 - LIFF IDトークンを検証して解決したAccountだけを読み書きする
-- 取得結果には表示名、role、現在表示するアバターを含め、プロフィール表示に別のアバター取得APIを要求しない
+- 取得結果には表示名、role、現在表示するアバターを含める
+- 相性画面など画像をJSONへ埋め込まない利用箇所向けに、`GET /api/profile/avatar`で本人の現在画像をバイナリ返却する
 - 保存は`PUT /api/profile/avatar`、削除は`DELETE /api/profile/avatar`とする
 - 保存・削除の応答も更新後のプロフィール全体を返し、直後の再取得を不要にする
 - 画像本体は環境別のPrivate R2、現在画像のメタデータは共有D1のAccount運営情報へ保存する
@@ -26,6 +27,7 @@
 | Method | Path | 用途 | 成功時 |
 | --- | --- | --- | --- |
 | `GET` | `/api/profile` | 本人の表示用プロフィールを取得 | `200`とプロフィール |
+| `GET` | `/api/profile/avatar` | 本人の現在のアバター画像を取得 | `200`と画像、画像がなければ`204` |
 | `PUT` | `/api/profile/avatar` | 現在のアバターを画像bodyで置換 | `200`と更新後プロフィール |
 | `DELETE` | `/api/profile/avatar` | 保存画像を外してLINE画像へ戻す | `200`と更新後プロフィール |
 
@@ -59,6 +61,12 @@ LINE画像の場合は`source`を`line`、`url`をLINEのHTTPS URL、`updatedAt`
 
 応答は本人の画像を含むため`Cache-Control: no-store`とします。Account ID、R2 object key、etag、元ファイル名は返しません。
 
+### 4.1 画像バイナリ応答
+
+`GET /api/profile/avatar`は、Bearerトークンから解決した本人について、保存画像、検証済みIDトークンのLINE画像の順に解決します。画像があれば`Content-Type`を付けた画像bodyを`200`で返し、どちらも利用できなければbodyなしの`204`を返します。Private R2の不整合やLINE画像の取得失敗はプロフィール画面全体の失敗にせず、次の候補または`204`へ縮退します。
+
+Web UIはこのAPIを通常の`img` URLとして直接参照せず、LIFF IDトークンをAuthorization headerへ付けて取得し、取得したBlobのObject URLを表示に使います。IDトークンをquery parameterや画像URLへ含めません。応答には`Cache-Control: no-store`と`X-Content-Type-Options: nosniff`を付けます。
+
 ## 5. アバター保存入力
 
 `PUT /api/profile/avatar`はJSONやmultipartではなく画像本体をrequest bodyとして受け取ります。`Content-Type`は次のいずれかです。
@@ -85,6 +93,7 @@ flowchart LR
     API -->|LIFF ID token verify<br/>avatar metadata| D1[(Shared D1<br/>Account operation)]
     API -->|image bytes| R2[(Private R2)]
     API -->|profile JSON with Data URL| W
+    API -->|Bearerで認可したimage response| W
 ```
 
 R2 object keyは認証で解決したAccount IDとアップロードごとの一意なIDから決定します。同じ画像を再送してもkeyを再利用しないため、並行した置換・削除の後処理が新しい現在画像を削除しません。別Accountとobjectを共有しません。
@@ -137,6 +146,7 @@ GETで保存画像の不整合を検出した場合、共有D1のメタデータ
 - PNG、JPEG、WebPの正方形画像をPrivate R2へ保存できる
 - 現在画像のメタデータを共有D1へ保存できる
 - 保存・削除の応答だけで更新後表示へ切り替えられる
+- 本人の画像をAccount IDやIDトークンをURLへ含めずバイナリ取得できる
 - 不正形式、形式偽装、過大画像、非正方形画像を拒否できる
 - 別AccountのプロフィールやR2 objectを取得・更新できない
 - OpenAPIとWeb UI用の生成型へ契約が反映される

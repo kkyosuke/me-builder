@@ -82,7 +82,6 @@ describe("getCompatibilitySharePreview", () => {
       { idToken: "id-token", lineLoginChannelId: "channel-id", db, at },
       {
         createSession,
-        resolveAvatarUrl: vi.fn().mockResolvedValue("data:image/png;base64,AQID"),
         getPreviewSource,
         getShareProfile: vi.fn().mockResolvedValue(availableShareProfile),
         scoreAnswers,
@@ -96,7 +95,7 @@ describe("getCompatibilitySharePreview", () => {
       type: "resolved",
       preview: {
         displayName: "あおい",
-        avatarUrl: "data:image/png;base64,AQID",
+        avatarUrl: "/api/profile/avatar",
         previewToken,
         aboutMe: {
           profileSummaryVersionId: "summary-version-1",
@@ -148,7 +147,7 @@ describe("getCompatibilitySharePreview", () => {
       type: "resolved",
       preview: {
         displayName: null,
-        avatarUrl: null,
+        avatarUrl: "/api/profile/avatar",
         previewToken,
         aboutMe: {
           profileSummaryVersionId: "summary-version-1",

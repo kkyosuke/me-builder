@@ -46,6 +46,26 @@ export const getProfileRoute = describeRoute({
   },
 } satisfies DescribeRouteOptions);
 
+export const getProfileAvatarImageRoute = describeRoute({
+  operationId: "getProfileAvatarImage",
+  tags: ["Profile"],
+  summary: "本人の現在のアバター画像を取得する",
+  security: [{ liffIdToken: [] }],
+  responses: {
+    200: {
+      description: "本人の現在のアバター画像",
+      content: Object.fromEntries(
+        ["image/jpeg", "image/png", "image/webp"].map((contentType) => [
+          contentType,
+          { schema: { type: "string", format: "binary" } },
+        ]),
+      ),
+    },
+    204: { description: "表示できるアバター画像がない" },
+    ...profileErrors,
+  },
+} satisfies DescribeRouteOptions);
+
 export const putProfileAvatarRoute = describeRoute({
   operationId: "putProfileAvatar",
   tags: ["Profile"],

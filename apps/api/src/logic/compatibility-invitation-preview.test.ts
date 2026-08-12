@@ -111,15 +111,6 @@ function dependencies(overrides: Record<string, unknown> = {}) {
         }),
       ),
     createThemeFingerprints: vi.fn().mockResolvedValue([offeredTheme]),
-    resolveAvatarUrl: vi
-      .fn()
-      .mockImplementation(({ accountId }) =>
-        Promise.resolve(
-          accountId === "account-inviter"
-            ? "https://profile.line-scdn.net/inviter"
-            : "https://profile.line-scdn.net/recipient",
-        ),
-      ),
     ...overrides,
   };
 }
@@ -145,13 +136,13 @@ describe("getCompatibilityInvitationContents", () => {
       invitation: {
         inviter: {
           displayName: "あおい",
-          avatarUrl: "https://profile.line-scdn.net/inviter",
+          avatarUrl: `/api/compatibility/invitations/${relationshipId}/avatar`,
           aboutMe,
           themes: [theme],
         },
         recipient: {
           displayName: "はる",
-          avatarUrl: "https://profile.line-scdn.net/recipient",
+          avatarUrl: "/api/profile/avatar",
           previewToken,
           aboutMe: { ...aboutMe, profileSummaryVersionId: "profile-recipient" },
           themes: [theme],
@@ -167,13 +158,6 @@ describe("getCompatibilityInvitationContents", () => {
       expect.objectContaining({
         accountId: "account-inviter",
         profileSummaryVersionId: "profile-inviter",
-      }),
-    );
-    expect(deps.resolveAvatarUrl).toHaveBeenNthCalledWith(
-      2,
-      expect.objectContaining({
-        accountId: "account-recipient",
-        verifiedLinePictureUrl: undefined,
       }),
     );
   });

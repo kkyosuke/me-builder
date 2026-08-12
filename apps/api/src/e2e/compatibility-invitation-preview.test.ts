@@ -311,8 +311,16 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
         blockingReasons: string[];
       };
       expect(preview).toMatchObject({
-        inviter: { displayName: "あおい", avatarUrl: null, aboutMe: expect.any(Object) },
-        recipient: { displayName: "はる", avatarUrl: null, aboutMe: expect.any(Object) },
+        inviter: {
+          displayName: "あおい",
+          avatarUrl: `/api/compatibility/invitations/${relationshipId}/avatar`,
+          aboutMe: expect.any(Object),
+        },
+        recipient: {
+          displayName: "はる",
+          avatarUrl: "/api/profile/avatar",
+          aboutMe: expect.any(Object),
+        },
         canAccept: true,
         blockingReasons: [],
       });
@@ -371,8 +379,17 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
 
       expect(response.status).toBe(200);
       expect(await response.json()).toMatchObject({
-        inviter: { displayName: "あおい", avatarUrl: null, themes: expect.any(Array) },
-        recipient: { displayName: "はる", avatarUrl: null, aboutMe: null, themes: [] },
+        inviter: {
+          displayName: "あおい",
+          avatarUrl: `/api/compatibility/invitations/${relationshipId}/avatar`,
+          themes: expect.any(Array),
+        },
+        recipient: {
+          displayName: "はる",
+          avatarUrl: "/api/profile/avatar",
+          aboutMe: null,
+          themes: [],
+        },
         canAccept: false,
         blockingReasons: expect.arrayContaining([
           "profile_summary_required",

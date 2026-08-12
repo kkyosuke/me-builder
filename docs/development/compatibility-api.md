@@ -22,13 +22,15 @@ IDトークン、Account ID、生の回答、結果指紋はレスポンスと�
 
 1. 共有D1が参照するPrivate R2のプロフィール設定画像
 2. LINEプロフィール画像
-3. `null`
+3. 画像なし
 
 本人のLINE画像は検証済みLIFF IDトークンの`picture`を使います。相手のLINE画像は、Accountに紐づくMessaging APIのuser IDを共有D1から解決し、[Messaging APIのGet profile](https://developers.line.biz/en/reference/messaging-api/#get-profile)をAPI Serverから呼び出して取得します。このAPIが相手のLIFFトークンを要求することはありません。本システムでは公式アカウントの友だち追加をAccount作成の起点としており、Messaging APIチャネルとLINE Loginチャネルを同じProviderに置くため、両チャネルのuser IDを同一人物へ安全に対応付けられます。
 
-Private R2の画像はData URL、LINE画像はLINEが返したHTTPS URLとして`avatarUrl`へ入れます。R2 objectの欠落・メタデータ不一致、Messaging APIの取得失敗、LINE画像未設定はいずれもプロフィールや招待の取得全体を失敗させず、次の候補または`null`へ縮退します。Web UIは`null`または画像読み込み失敗時にLINEの既定表示に合わせた人物シルエットを表示します。
+`avatarUrl`には画像本体や外部画像URLではなく、Bearer認証付きで取得する同一APIの相対pathを入れます。本人は`GET /api/profile/avatar`、招待の送信者は`GET /api/compatibility/invitations/:relationshipId/avatar`から画像bodyを取得します。Web UIは取得したBlobのObject URLを表示に使い、LIFF IDトークンをquery parameterや画像URLへ含めません。
 
-`avatarUrl`は表示補助であり、共有プロフィールや診断結果の同意指紋、`previewToken`には含めません。プロフィール画像の変更だけで確認済みの診断共有内容を失効させず、各GET時点の現在画像を表示します。相手の画像は、招待の送信者・受信者としてサーバー側で認可できる応答にだけ含め、Account IDやLINE user IDをクライアントへ返しません。
+R2 objectの欠落・メタデータ不一致、Messaging APIの取得失敗、LINE画像未設定はいずれもプロフィールや招待の取得全体を失敗させず、画像APIの次候補またはbodyなしの`204`へ縮退します。Web UIは画像がない場合や画像読み込み失敗時に表示名の先頭文字を表示します。表示名も取得できない本人については「あなた」の先頭文字を使います。
+
+`avatarUrl`は表示補助であり、共有プロフィールや診断結果の同意指紋、`previewToken`には含めません。プロフィール画像の変更だけで確認済みの診断共有内容を失効させず、各GET時点の現在画像を表示します。相手の画像取得pathは、招待の送信者・受信者としてサーバー側で認可できる応答にだけ含め、Account IDやLINE user IDをクライアントへ返しません。
 
 ## 3. 共有プレビュー
 
@@ -53,7 +55,7 @@ flowchart LR
 ```json
 {
   "displayName": "あおい",
-  "avatarUrl": "https://profile.line-scdn.net/avatar",
+  "avatarUrl": "/api/profile/avatar",
   "previewToken": "csp2.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "aboutMe": {
     "profileSummaryVersionId": "summary-version-id",
@@ -190,7 +192,7 @@ sequenceDiagram
 {
   "inviter": {
     "displayName": "あおい",
-    "avatarUrl": "data:image/webp;base64,...",
+    "avatarUrl": "/api/compatibility/invitations/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/avatar",
     "aboutMe": {
       "profileSummaryVersionId": "summary-version-inviter",
       "generatedAt": "2026-08-11T00:00:00.000Z",
@@ -221,7 +223,7 @@ sequenceDiagram
   },
   "recipient": {
     "displayName": "はる",
-    "avatarUrl": null,
+    "avatarUrl": "/api/profile/avatar",
     "previewToken": "csp2.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "aboutMe": {
       "profileSummaryVersionId": "summary-version-recipient",
@@ -244,6 +246,8 @@ sequenceDiagram
 ```
 
 `inviter.themes`は送信者が発行時に提示したテーマ、`recipient.themes`はそのうち受信者も現在確認できる共通テーマを、共有プレビューと同じ構造で返します。双方の`avatarUrl`は[相性画面のプロフィール画像](#21-相性画面のプロフィール画像)に従い、送信者側も招待が特定したAccountからサーバー側で解決します。
+
+`GET /api/compatibility/invitations/:relationshipId/avatar`は、招待確認APIと同じBearer認証を要求し、受信者としてpending招待を確認できる場合だけ送信者の現在画像を返します。送信者Accountは招待contextから決め、path、query、bodyでAccount IDを受け取りません。画像がなければ`204`、招待が無効なら`404`、自分の招待なら`409`とし、画像応答には`Cache-Control: no-store`と`X-Content-Type-Options: nosniff`を付けます。
 
 `canAccept`は受信者の検証済み表示名、利用可能な共有プロフィール、計算可能な診断表示、1件以上の共通テーマがそろう場合だけ`true`です。`blockingReasons`は共有プレビューの受信者側理由に`common_diagnosis_required`を加えた配列です。共通テーマがなければ`nextAction`を`diagnosis`にし、共有プロフィールを利用できなければ`profile-summary`を優先します。
 

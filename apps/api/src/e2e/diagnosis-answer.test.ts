@@ -403,7 +403,7 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
       expect(emptyResponse.status).toBe(200);
       expect(await emptyResponse.json()).toMatchObject({
         displayName: "あおい",
-        avatarUrl: null,
+        avatarUrl: "/api/profile/avatar",
         aboutMe: null,
         themes: [],
         canIssueInvitation: false,
@@ -430,7 +430,7 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
         previewToken: string;
       };
       expect(preview.displayName).toBe("あおい");
-      expect(preview.avatarUrl).toBeNull();
+      expect(preview.avatarUrl).toBe("/api/profile/avatar");
       expect(preview.canIssueInvitation).toBe(true);
       expect(preview.blockingReasons).toEqual([]);
       expect(preview.nextAction).toBeNull();

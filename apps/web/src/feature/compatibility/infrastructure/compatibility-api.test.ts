@@ -12,7 +12,7 @@ import {
 
 const preview = {
   displayName: "うさぎ",
-  avatarUrl: "https://profile.line-scdn.net/me",
+  avatarUrl: "/api/profile/avatar",
   previewToken: `csp2.${"a".repeat(64)}`,
   aboutMe: {
     profileSummaryVersionId: "summary-version-1",
@@ -129,13 +129,13 @@ describe("fetchCompatibilityInvitation", () => {
     const invitation = {
       inviter: {
         displayName: "あおい",
-        avatarUrl: "https://profile.line-scdn.net/inviter",
+        avatarUrl: `/api/compatibility/invitations/${relationshipId}/avatar`,
         aboutMe: preview.aboutMe,
         themes: preview.themes,
       },
       recipient: {
         displayName: "はる",
-        avatarUrl: null,
+        avatarUrl: "/api/profile/avatar",
         previewToken: preview.previewToken,
         aboutMe: preview.aboutMe,
         themes: preview.themes,

@@ -174,6 +174,16 @@ describe("Profile avatar storage API local E2E", () => {
       avatar: { source: "uploaded", url: expect.stringMatching(/^data:image\/png;base64,/) },
     });
 
+    const image = await app.request(
+      "/api/profile/avatar",
+      { headers: authorization() },
+      bindings(),
+    );
+    expect(image.status).toBe(200);
+    expect(image.headers.get("Content-Type")).toBe("image/png");
+    expect(image.headers.get("Cache-Control")).toBe("no-store");
+    expect(new Uint8Array(await image.arrayBuffer())).toEqual(bytes);
+
     const deleted = await app.request(
       "/api/profile/avatar",
       { method: "DELETE", headers: authorization() },
