@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { resolveCompatibilityPathname, resolveCompatibilityRoute } from "./compatibility-route";
+import {
+  resolveCompatibilityInvitationId,
+  resolveCompatibilityPathname,
+  resolveCompatibilityRoute,
+} from "./compatibility-route";
 
 describe("compatibility route", () => {
   it.each([
@@ -18,5 +22,12 @@ describe("compatibility route", () => {
         `?liff.state=${encodeURIComponent("/compatibility/invitations/demo?from=line")}`,
       ),
     ).toBe("/compatibility/invitations/demo");
+  });
+
+  it("256 bitの招待IDだけをパスから取り出す", () => {
+    expect(resolveCompatibilityInvitationId(`/compatibility/invitations/${"a".repeat(64)}`)).toBe(
+      "a".repeat(64),
+    );
+    expect(resolveCompatibilityInvitationId("/compatibility/invitations/demo")).toBeNull();
   });
 });

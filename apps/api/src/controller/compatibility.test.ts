@@ -10,8 +10,14 @@ const { getCompatibilitySharePreview } = vi.hoisted(() => ({
 const { issueCompatibilityInvitation } = vi.hoisted(() => ({
   issueCompatibilityInvitation: vi.fn(),
 }));
+const { getCompatibilityInvitationContents } = vi.hoisted(() => ({
+  getCompatibilityInvitationContents: vi.fn(),
+}));
 vi.mock("../logic/compatibility-share-preview", () => ({ getCompatibilitySharePreview }));
 vi.mock("../logic/compatibility-invitation", () => ({ issueCompatibilityInvitation }));
+vi.mock("../logic/compatibility-invitation-preview", () => ({
+  getCompatibilityInvitationContents,
+}));
 
 const dummyDb = {} as D1Database;
 const dummyAccountData = {} as AccountDataNamespace;
@@ -195,5 +201,101 @@ describe("POST /api/compatibility/invitations", () => {
 
     expect(response.status).toBe(503);
     expect(issueCompatibilityInvitation).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET /api/compatibility/invitations/:relationshipId", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const relationshipId = "1".repeat(64);
+  const invitation = {
+    inviter: {
+      displayName: "あおい",
+      aboutMe: {
+        profileSummaryVersionId: "profile-inviter",
+        generatedAt: "2026-08-11T00:00:00.000Z",
+        statements: [{ key: "planning", label: "予定", statement: "私は見通しを大切にします" }],
+      },
+      themes: [
+        {
+          diagnosisId: "diagnosis-1",
+          title: "時間と予定",
+          parameters: [
+            {
+              id: "planning",
+              label: "予定",
+              lowLabel: "その場",
+              highLabel: "早め",
+              position: 80,
+              statement: "「早め」傾向があります",
+            },
+          ],
+        },
+      ],
+    },
+    recipient: {
+      displayName: "はる",
+      previewToken,
+      aboutMe: null,
+      themes: [],
+    },
+    expiresAt: "2026-08-26T00:00:00.000Z",
+    canAccept: false,
+    blockingReasons: ["profile_summary_required", "common_diagnosis_required"],
+    nextAction: "profile-summary",
+  };
+
+  function invitationRequest(env: Record<string, unknown> = {}) {
+    return app.request(
+      `/api/compatibility/invitations/${relationshipId}`,
+      { headers: { Authorization: "Bearer dummy.id.token" } },
+      {
+        LIFF_ID: "2010850319-Yl63upAR",
+        DB: dummyDb,
+        ACCOUNT_DATA: dummyAccountData,
+        COMPATIBILITY_DATA: dummyCompatibilityData,
+        ...env,
+      },
+    );
+  }
+
+  it("resolvedをno-storeの200へ変換する", async () => {
+    getCompatibilityInvitationContents.mockResolvedValue({ type: "resolved", invitation });
+
+    const response = await invitationRequest();
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    expect(await response.json()).toEqual(invitation);
+    expect(getCompatibilityInvitationContents).toHaveBeenCalledWith(
+      expect.objectContaining({
+        relationshipId,
+        idToken: "dummy.id.token",
+        accountData: dummyAccountData,
+        compatibilityData: dummyCompatibilityData,
+      }),
+    );
+  });
+
+  it.each([
+    { type: "unavailable" as const, status: 404, reason: "invitation_unavailable" },
+    { type: "own-invitation" as const, status: 409, reason: "own_invitation" },
+  ])("$typeを推測可能な情報を増やさないエラーへ変換する", async ({ type, status, reason }) => {
+    getCompatibilityInvitationContents.mockResolvedValue({ type });
+
+    const response = await invitationRequest();
+
+    expect(response.status).toBe(status);
+    expect(await response.json()).toEqual({
+      error: "Compatibility invitation unavailable",
+      reason,
+    });
+  });
+
+  it("CompatibilityData bindingがなければlogicを呼ばず503を返す", async () => {
+    const response = await invitationRequest({ COMPATIBILITY_DATA: undefined });
+
+    expect(response.status).toBe(503);
+    expect(getCompatibilityInvitationContents).not.toHaveBeenCalled();
   });
 });

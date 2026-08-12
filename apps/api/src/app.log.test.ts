@@ -66,6 +66,22 @@ describe("HTTPの終端ログ", () => {
     expect(calls[0]?.[1]).toContain("[API] POST /api/line/webhook -> 401");
   });
 
+  it("招待IDを実pathのまま運用ログへ記録しない", async () => {
+    const log = spyOnLogger();
+    const relationshipId = "a".repeat(64);
+
+    const res = await app.request(`/api/compatibility/invitations/${relationshipId}`);
+
+    expect(res.status).toBe(503);
+    const calls = terminalCalls(log.error);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.[0]).toMatchObject({
+      path: "/api/compatibility/invitations/:relationshipId",
+    });
+    expect(calls[0]?.[1]).toContain("GET /api/compatibility/invitations/:relationshipId");
+    expect(JSON.stringify(log.error.mock.calls)).not.toContain(relationshipId);
+  });
+
   it("未捕捉例外はerror 1件にまとまり、原因分類と生の例外の非出力を満たす", async () => {
     const log = spyOnLogger();
     const secret = "本文やSDK responseを含みうる内容";

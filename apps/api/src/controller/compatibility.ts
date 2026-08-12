@@ -9,6 +9,11 @@ import {
   IssueCompatibilityInvitationRequestSchema,
   IssueCompatibilityInvitationResponseSchema,
 } from "../contract/compatibility/invitation";
+import {
+  CompatibilityInvitationPreviewResponseSchema,
+  CompatibilityInvitationUnavailableSchema,
+  OwnCompatibilityInvitationSchema,
+} from "../contract/compatibility/invitation-preview";
 import { CompatibilitySharePreviewResponseSchema } from "../contract/compatibility/share-preview";
 import {
   AccountNotFoundErrorSchema,
@@ -16,7 +21,9 @@ import {
   UnauthorizedErrorSchema,
 } from "../contract/shared/errors";
 import { issueCompatibilityInvitation } from "../logic/compatibility-invitation";
+import { getCompatibilityInvitationContents } from "../logic/compatibility-invitation-preview";
 import { getCompatibilitySharePreview } from "../logic/compatibility-share-preview";
+import { operationalHttpPath } from "../operational-http-path";
 import type { AppEnv } from "../types";
 import { bearerToken } from "./auth";
 
@@ -55,7 +62,10 @@ export async function getCompatibilitySharePreviewContents(c: Context<AppEnv>): 
 export async function postCompatibilityInvitation(c: Context<AppEnv>): Promise<Response> {
   const currentConfig = getConfig(c.env);
   if (!c.env?.DB || !c.env.ACCOUNT_DATA || !c.env.COMPATIBILITY_DATA || !currentConfig.webOrigin) {
-    logger.error({ path: c.req.path }, "Compatibility invitation binding is not configured");
+    logger.error(
+      { path: operationalHttpPath(c.req.path) },
+      "Compatibility invitation binding is not configured",
+    );
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   }
 
@@ -96,6 +106,59 @@ export async function postCompatibilityInvitation(c: Context<AppEnv>): Promise<R
         v.parse(CompatibilityInvitationConflictSchema, {
           error: "Compatibility invitation unavailable",
           reason: outcome.type === "preview-changed" ? "preview_changed" : "share_unavailable",
+        }),
+        409,
+      );
+    case "account-not-found":
+      return c.json(
+        v.parse(AccountNotFoundErrorSchema, {
+          error: "Account not found",
+          reason: "friendship_required",
+        }),
+        404,
+      );
+    case "not-configured":
+    case "unauthenticated":
+      return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
+  }
+}
+
+/** `GET /api/compatibility/invitations/:relationshipId` — 受信者へ同意前の確認内容を返す。 */
+export async function getCompatibilityInvitation(c: Context<AppEnv>): Promise<Response> {
+  if (!c.env?.DB || !c.env.ACCOUNT_DATA || !c.env.COMPATIBILITY_DATA) {
+    logger.error(
+      { path: operationalHttpPath(c.req.path) },
+      "Compatibility invitation binding is not configured",
+    );
+    return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
+  }
+
+  const outcome = await getCompatibilityInvitationContents({
+    relationshipId: c.req.param("relationshipId") ?? "",
+    idToken: bearerToken(c.req.header("authorization")),
+    lineLoginChannelId: getConfig(c.env).lineLoginChannelId,
+    db: D1.shared.client.create(c.env.DB),
+    accountData: c.env.ACCOUNT_DATA,
+    compatibilityData: c.env.COMPATIBILITY_DATA,
+  });
+
+  switch (outcome.type) {
+    case "resolved":
+      c.header("Cache-Control", "no-store");
+      return c.json(v.parse(CompatibilityInvitationPreviewResponseSchema, outcome.invitation));
+    case "unavailable":
+      return c.json(
+        v.parse(CompatibilityInvitationUnavailableSchema, {
+          error: "Compatibility invitation unavailable",
+          reason: "invitation_unavailable",
+        }),
+        404,
+      );
+    case "own-invitation":
+      return c.json(
+        v.parse(OwnCompatibilityInvitationSchema, {
+          error: "Compatibility invitation unavailable",
+          reason: "own_invitation",
         }),
         409,
       );

@@ -106,7 +106,9 @@ export type AccountDataActions = {
     at?: Date,
     allowUnchangedRegeneration?: boolean,
   ) => Promise<ProfileSummaryReadModel>;
-  "profileSummary.readCompatibilityShareProfile": () => Promise<CompatibilityShareProfileReadResult>;
+  "profileSummary.readCompatibilityShareProfile": (
+    profileSummaryVersionId?: string,
+  ) => Promise<CompatibilityShareProfileReadResult>;
   "profileSummary.requestGeneration": (
     requestedAt?: Date,
     allowUnchangedRegeneration?: boolean,

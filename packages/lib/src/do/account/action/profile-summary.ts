@@ -223,6 +223,7 @@ export async function readProfileSummary(
 export async function readCompatibilityShareProfile(
   db: AccountDataDatabase,
   accountId: string,
+  profileSummaryVersionId?: string,
 ): Promise<CompatibilityShareProfileReadResult> {
   const projection = await db
     .select({
@@ -236,6 +237,11 @@ export async function readCompatibilityShareProfile(
     .innerJoin(
       profileSummaryVersions,
       eq(profileSummaryShareProjections.profileSummaryVersionId, profileSummaryVersions.id),
+    )
+    .where(
+      profileSummaryVersionId
+        ? eq(profileSummaryShareProjections.profileSummaryVersionId, profileSummaryVersionId)
+        : undefined,
     )
     .orderBy(desc(profileSummaryVersions.sequence))
     .limit(1)

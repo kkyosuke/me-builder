@@ -77,9 +77,11 @@ export type CompatibilityInvitationPreview = Readonly<{
   isOwnInvitation: boolean;
 }>;
 
-/** 承諾の重複関係確認だけに使う、画面へ返さない内部context。 */
+/** 招待表示の同意照合と承諾時の重複確認に使う、画面へ返さない内部context。 */
 export type CompatibilityInvitationAcceptanceContext = Readonly<{
   inviterAccountId: string;
+  offeredProfile: CompatibilityProfileFingerprint;
+  offeredThemes: readonly CompatibilityThemeFingerprint[];
   offeredDiagnosisIds: readonly string[];
   expiresAt: Date;
 }>;

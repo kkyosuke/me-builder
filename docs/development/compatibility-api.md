@@ -144,3 +144,93 @@ sequenceDiagram
 | `409` | 現在の状態では共有を開始できない | `{ "error": "Compatibility invitation unavailable", "reason": "share_unavailable" }` |
 
 認証・基盤の共通エラーは共有プレビューと同じです。`DB`、`AccountData`、`CompatibilityData`、またはWeb UI originのbindingがなければ`503`を返し、招待を作成しません。
+
+## 5. 招待内容の確認
+
+### `GET /api/compatibility/invitations/:relationshipId`
+
+招待リンクを開いた受信者が、関係を成立させる前に双方の共有内容を確認します。`relationshipId`は招待リンクに含まれる256 bitの不透明な関係IDです。クライアントからAccount IDや表示内容を送りません。
+
+```mermaid
+sequenceDiagram
+    participant Web
+    participant API
+    participant CompatibilityData
+    participant Inviter as 送信者AccountData
+    participant Invitee as 受信者AccountData
+    Web->>API: relationshipId, LIFF ID token
+    API->>CompatibilityData: pending招待の安全なpreviewと内部同意context
+    API->>Inviter: 発行時に同意したプロフィール版と現在の診断表示
+    API->>Invitee: 現在の共有プロフィールと診断表示
+    API-->>Web: 双方の表示内容、共通テーマ、承諾可否
+```
+
+送信者については、CompatibilityDataに保存した共有プロフィール版・指紋とテーマ別指紋に現在のAccountDataから再構築した内容が一致する場合だけ返します。発行後に回答が変わった、同意版の内部根拠が無効になった、または表示を再構築できない場合は、別の内容へ同意を読み替えず招待を利用不可にします。
+
+受信者については、本人の現在の共有プロフィールと、送信者が提示したテーマとの共通部分だけを返します。個別選択は受け付けません。`previewToken`は受信者の表示名、共有プロフィール、現在の診断表示全体を結ぶ不透明な確認tokenであり、後続の承諾APIが再確認に利用します。
+
+```json
+{
+  "inviter": {
+    "displayName": "あおい",
+    "aboutMe": {
+      "profileSummaryVersionId": "summary-version-inviter",
+      "generatedAt": "2026-08-11T00:00:00.000Z",
+      "statements": [
+        {
+          "key": "planning-style",
+          "label": "予定の立て方",
+          "statement": "私は、先の見通しを持って動けると安心しやすいです"
+        }
+      ]
+    },
+    "themes": [
+      {
+        "diagnosisId": "time-planning",
+        "title": "時間と予定",
+        "parameters": [
+          {
+            "id": "advance-planning",
+            "label": "予定を決めるタイミング",
+            "lowLabel": "その場で決めたい",
+            "highLabel": "早めに決めたい",
+            "position": 78,
+            "statement": "「早めに決めたい」傾向があります"
+          }
+        ]
+      }
+    ]
+  },
+  "recipient": {
+    "displayName": "はる",
+    "previewToken": "csp2.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "aboutMe": {
+      "profileSummaryVersionId": "summary-version-recipient",
+      "generatedAt": "2026-08-12T00:00:00.000Z",
+      "statements": [
+        {
+          "key": "planning-style",
+          "label": "予定の立て方",
+          "statement": "私は、予定に余白があると心地よく感じます"
+        }
+      ]
+    },
+    "themes": []
+  },
+  "expiresAt": "2026-08-26T00:00:00.000Z",
+  "canAccept": false,
+  "blockingReasons": ["common_diagnosis_required"],
+  "nextAction": "diagnosis"
+}
+```
+
+`inviter.themes`は送信者が発行時に提示したテーマ、`recipient.themes`はそのうち受信者も現在確認できる共通テーマを、共有プレビューと同じ構造で返します。
+
+`canAccept`は受信者の検証済み表示名、利用可能な共有プロフィール、計算可能な診断表示、1件以上の共通テーマがそろう場合だけ`true`です。`blockingReasons`は共有プレビューの受信者側理由に`common_diagnosis_required`を加えた配列です。共通テーマがなければ`nextAction`を`diagnosis`にし、共有プロフィールを利用できなければ`profile-summary`を優先します。
+
+| HTTP | 条件 | レスポンス |
+| --- | --- | --- |
+| `404` | 関係IDが不正、存在しない、期限切れ、取消済み、承諾済み、または送信者の同意内容を安全に再構築できない | `{ "error": "Compatibility invitation unavailable", "reason": "invitation_unavailable" }` |
+| `409` | 送信者本人が自分の招待を開いた | `{ "error": "Compatibility invitation unavailable", "reason": "own_invitation" }` |
+
+認証・基盤の共通エラーは共有プレビューと同じです。`DB`、`AccountData`、または`CompatibilityData` bindingがなければ`503`を返します。成功レスポンスへAccount ID、生の回答、具体的な出来事、日記・会話本文、内部根拠ID、採点設定、各種指紋を含めず、`Cache-Control: no-store`を付けます。リンクを開いただけでは受信者のAccount、閲覧履歴、同意をCompatibilityDataまたは送信者AccountDataへ保存しません。

@@ -44,6 +44,20 @@ describe("CompatibilityData Workers runtime E2E", () => {
     });
     expect(invitation).not.toHaveProperty("inviterAccountId");
     expect(invitation).not.toHaveProperty("resultFingerprint");
+    await expect(stub.getInvitationAcceptanceContext(relationshipId)).resolves.toMatchObject({
+      inviterAccountId,
+      offeredProfile: {
+        profileSummaryVersionId: "profile-version-inviter",
+        fingerprint: "f".repeat(64),
+      },
+      offeredThemes: [
+        {
+          diagnosisId: "diagnosis-1",
+          resultFingerprint: "a".repeat(64),
+        },
+      ],
+      offeredDiagnosisIds: ["diagnosis-1"],
+    });
 
     const acceptance = {
       inviteeAccountId,
