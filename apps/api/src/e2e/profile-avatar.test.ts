@@ -1,6 +1,7 @@
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import type { D1Database, R2Bucket } from "@cloudflare/workers-types";
+import { logger } from "@me-builder/shared";
 import { Miniflare } from "miniflare";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { app } from "../index";
@@ -172,6 +173,71 @@ describe("Profile avatar storage API local E2E", () => {
     expect(await profile.json()).toMatchObject({
       avatar: { source: "uploaded", url: expect.stringMatching(/^data:image\/png;base64,/) },
     });
+
+    const deleted = await app.request(
+      "/api/profile/avatar",
+      { method: "DELETE", headers: authorization() },
+      bindings(),
+    );
+    expect(deleted.status).toBe(200);
+    expect(await deleted.json()).toMatchObject({
+      avatar: { source: "line", url: lineAvatarUrl, updatedAt: null },
+    });
+    expect((await avatarBucket.list()).objects).toHaveLength(0);
+    expect(
+      await database.prepare("SELECT avatar_object_key FROM account_profiles").first(),
+    ).toEqual({ avatar_object_key: null });
+  });
+
+  it("R2 object欠落時はGETを縮退し、その後もPUTとDELETEで自己回復できる", async () => {
+    const bytes = squarePng();
+    const initialPut = await app.request(
+      "/api/profile/avatar",
+      {
+        method: "PUT",
+        headers: { ...authorization(), "Content-Type": "image/png" },
+        body: bytes.slice().buffer as ArrayBuffer,
+      },
+      bindings(),
+    );
+    expect(initialPut.status).toBe(200);
+
+    const [stored] = (await avatarBucket.list()).objects;
+    expect(stored).toBeDefined();
+    if (!stored) throw new Error("Expected the avatar fixture in R2");
+    await avatarBucket.delete(stored.key);
+    const errorLog = vi.spyOn(logger, "error").mockImplementation(() => undefined);
+
+    const degraded = await app.request("/api/profile", { headers: authorization() }, bindings());
+    expect(degraded.status).toBe(200);
+    expect(await degraded.json()).toMatchObject({
+      role: "user",
+      displayName: "プロフィール利用者",
+      avatar: { source: "line", url: lineAvatarUrl, updatedAt: null },
+    });
+    expect(errorLog).toHaveBeenCalledWith(
+      {
+        event: "profile.avatar.read.degraded",
+        outcome: "degraded",
+        reason: "object-missing",
+      },
+      "Profile avatar read degraded to the fallback profile",
+    );
+    expect(JSON.stringify(errorLog.mock.calls)).not.toContain("account-profile-e2e");
+    expect(JSON.stringify(errorLog.mock.calls)).not.toContain(stored.key);
+
+    const recovered = await app.request(
+      "/api/profile/avatar",
+      {
+        method: "PUT",
+        headers: { ...authorization(), "Content-Type": "image/png" },
+        body: bytes.slice().buffer as ArrayBuffer,
+      },
+      bindings(),
+    );
+    expect(recovered.status).toBe(200);
+    expect(await recovered.json()).toMatchObject({ avatar: { source: "uploaded" } });
+    expect((await avatarBucket.list()).objects).toHaveLength(1);
 
     const deleted = await app.request(
       "/api/profile/avatar",
