@@ -1,8 +1,11 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, configure, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "../App";
+
+// App全体の初期描画とAPI往復を待つため、他のE2Eと同時実行しても既定の1秒で切らない。
+configure({ asyncUtilTimeout: 5_000 });
 
 const liff = vi.hoisted(() => ({
   initialize: vi.fn(),

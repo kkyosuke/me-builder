@@ -249,4 +249,65 @@ describe("compatibility relationship APIs", () => {
       expect.objectContaining({ method: "DELETE" }),
     );
   });
+
+  it.each([
+    [404, "この招待は利用できません"],
+    [409, "この招待は承諾できません"],
+    [401, "本人確認に失敗しました"],
+  ])("承諾のHTTP %sを利用者向けメッセージへ変換する", async (status, message) => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status })));
+
+    await expect(
+      acceptCompatibilityInvitation(undefined, "id-token", "5".repeat(64)),
+    ).rejects.toThrow(message);
+  });
+
+  it.each([
+    [404, "この相性シートは利用できません"],
+    [401, "本人確認に失敗しました"],
+  ])("相性シート取得のHTTP %sを利用者向けメッセージへ変換する", async (status, message) => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status })));
+
+    await expect(
+      fetchCompatibilityRelationship(undefined, "id-token", "5".repeat(64)),
+    ).rejects.toThrow(message);
+  });
+
+  it.each([
+    ["invitation", cancelCompatibilityInvitation, "この招待はすでに取り消されたか"],
+    ["relationship", endCompatibilityRelationship, "この共有はすでに終了しています"],
+  ] as const)(
+    "すでに終えた%sへのDELETEはHTTP状態コードを見せずに状況を伝える",
+    async (_name, operation, message) => {
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 404 })));
+
+      const failure = await operation(undefined, "id-token", "6".repeat(64)).catch(
+        (error: unknown) => error,
+      );
+      expect(failure).toBeInstanceOf(Error);
+      expect((failure as Error).message).toContain(message);
+      expect((failure as Error).message).not.toContain("404");
+    },
+  );
+
+  it.each([
+    ["accept", () => acceptCompatibilityInvitation(undefined, "t", "7".repeat(64))],
+    ["relationship", () => fetchCompatibilityRelationship(undefined, "t", "7".repeat(64))],
+    ["cancel", () => cancelCompatibilityInvitation(undefined, "t", "7".repeat(64))],
+    ["end", () => endCompatibilityRelationship(undefined, "t", "7".repeat(64))],
+  ] as const)("%sでもAccountがなければ友だち追加を案内する", async (_name, operation) => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          Response.json(
+            { error: "Account not found", reason: "friendship_required" },
+            { status: 404 },
+          ),
+        ),
+    );
+
+    await expect(operation()).rejects.toThrow("LINE公式アカウントを友だち追加");
+  });
 });
