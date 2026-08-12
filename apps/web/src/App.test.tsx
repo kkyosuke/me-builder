@@ -35,7 +35,7 @@ const mocks = vi.hoisted(() => ({
   requestProfileSummaryGeneration: vi.fn(),
   fetchDevelopmentBrainItems: vi.fn(),
   normalizeAvatarImage: vi.fn(),
-  fetchCompatibilitySharePreview: vi.fn(),
+  fetchCompatibilityShareConsent: vi.fn(),
   fetchCompatibilityInvitation: vi.fn(),
   fetchCompatibilityRelationships: vi.fn(),
   fetchCompatibilityRelationship: vi.fn(),
@@ -79,7 +79,7 @@ vi.mock("./feature/profile-settings/model/normalize-avatar-image", () => ({
   normalizeAvatarImage: mocks.normalizeAvatarImage,
 }));
 vi.mock("./feature/compatibility/infrastructure/compatibility-api", () => ({
-  fetchCompatibilitySharePreview: mocks.fetchCompatibilitySharePreview,
+  fetchCompatibilityShareConsent: mocks.fetchCompatibilityShareConsent,
   fetchCompatibilityInvitation: mocks.fetchCompatibilityInvitation,
   fetchCompatibilityRelationships: mocks.fetchCompatibilityRelationships,
   fetchCompatibilityRelationship: mocks.fetchCompatibilityRelationship,
@@ -318,68 +318,19 @@ describe("App", () => {
       dataUrl: `data:${file.type};base64,normalized`,
       fileName: file.name,
     }));
-    mocks.fetchCompatibilitySharePreview.mockResolvedValue({
+    mocks.fetchCompatibilityShareConsent.mockResolvedValue({
       displayName: "テスト",
       avatarUrl: null,
-      previewToken: `csp2.${"a".repeat(64)}`,
-      aboutMe: {
-        profileSummaryVersionId: "summary-version-1",
-        generatedAt: "2026-08-11T00:00:00.000Z",
-        statements: [
-          {
-            key: "planning-style",
-            label: "予定の立て方",
-            statement: "私は、先の見通しを持って動けると安心しやすいです",
-          },
-        ],
-      },
-      themes: [
-        {
-          diagnosisId: "daily-life",
-          title: "暮らし方",
-          parameters: [
-            {
-              id: "planning",
-              label: "予定の立て方",
-              lowLabel: "その場で決めたい",
-              highLabel: "早めに決めたい",
-              position: 78,
-              statement: "私は、予定を早めに決めておけると安心します。",
-            },
-          ],
-        },
-      ],
-      canIssueInvitation: true,
+      canShare: true,
       blockingReasons: [],
       nextAction: null,
     });
     mocks.fetchCompatibilityInvitation.mockResolvedValue({
-      inviter: {
-        displayName: "あおい",
-        avatarUrl: null,
-        aboutMe: {
-          profileSummaryVersionId: "profile-inviter",
-          generatedAt: "2026-08-11T00:00:00.000Z",
-          statements: [
-            {
-              key: "planning",
-              label: "予定",
-              statement: "私は見通しを大切にします",
-            },
-          ],
-        },
-        themes: [],
-      },
-      recipient: {
-        displayName: "テスト",
-        avatarUrl: null,
-        previewToken: `csp2.${"b".repeat(64)}`,
-        aboutMe: null,
-        themes: [],
-      },
+      inviter: { displayName: "あおい", avatarUrl: null },
+      recipient: { displayName: "テスト", avatarUrl: null },
       expiresAt: "2026-08-26T00:00:00.000Z",
-      canAccept: false,
-      blockingReasons: ["common_diagnosis_required"],
+      canAccept: true,
+      blockingReasons: [],
       nextAction: "diagnosis",
     });
     mocks.fetchCompatibilityRelationships.mockResolvedValue({ items: [] });
@@ -874,14 +825,15 @@ describe("App", () => {
     expect(mocks.fetchDiagnosisList).not.toHaveBeenCalled();
   });
 
-  it("/compatibility/shareでは共有プレビューAPIの内容を表示する", async () => {
+  it("/compatibility/shareでは共有可否APIの結果から共有の範囲を表示する", async () => {
     window.history.replaceState({}, "", "/compatibility/share");
 
     render(<App />);
 
     expect(await screen.findByRole("heading", { name: "うつしをシェア" })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "予定の立て方", level: 4 })).toBeTruthy();
-    expect(mocks.fetchCompatibilitySharePreview).toHaveBeenCalledWith(
+    expect(screen.getByRole("heading", { name: "共有されるもの" })).toBeTruthy();
+    expect(screen.queryByText(/傾向があります/)).toBeNull();
+    expect(mocks.fetchCompatibilityShareConsent).toHaveBeenCalledWith(
       "https://api.example.com",
       "dummy.id.token",
       expect.anything(),

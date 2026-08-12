@@ -251,14 +251,9 @@ describe("Profile Summary persistence", () => {
         ],
       },
     });
-    await expect(
-      readCompatibilityShareProfile(db, accountId, generatedVersionId),
-    ).resolves.toMatchObject({
+    await expect(readCompatibilityShareProfile(db, accountId)).resolves.toMatchObject({
       type: "available",
       profile: { profileSummaryVersionId: generatedVersionId },
-    });
-    await expect(readCompatibilityShareProfile(db, accountId, "missing-version")).resolves.toEqual({
-      type: "unavailable",
     });
     await expect(
       readProfileSummary(db, accountId, new Date("2026-08-09T00:03:00.000Z"), true),

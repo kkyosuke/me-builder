@@ -18,14 +18,6 @@ function invitationInput() {
   return {
     inviterAccountId: "account-inviter",
     inviterDisplayName: " 送信者 ",
-    offeredProfile: {
-      profileSummaryVersionId: "profile-version-inviter",
-      fingerprint: "f".repeat(64),
-    },
-    offeredThemes: [
-      { diagnosisId: "diagnosis-1", resultFingerprint: "a".repeat(64) },
-      { diagnosisId: "diagnosis-2", resultFingerprint: "b".repeat(64) },
-    ],
   } as const;
 }
 
@@ -51,23 +43,17 @@ describe("compatibility data domain", () => {
       createdAt,
       expiresAt,
     });
-    expect(relationship.offeredThemes.every(({ consentedAt }) => +consentedAt === +createdAt)).toBe(
-      true,
-    );
     expect(() =>
       decideCompatibilityInvitationCreation(
         null,
         relationshipId,
-        {
-          ...invitationInput(),
-          offeredThemes: [{ diagnosisId: "diagnosis-1", resultFingerprint: "invalid" }],
-        },
+        { ...invitationInput(), inviterDisplayName: "  " },
         createdAt,
       ),
-    ).toThrow("SHA-256");
+    ).toThrow("inviterDisplayName is required");
   });
 
-  it("同じ招待commandを冪等に扱い、異なる内容は競合として拒否する", () => {
+  it("同じ招待commandを冪等に扱い、異なる送信者は競合として拒否する", () => {
     const relationship = pendingRelationship();
 
     expect(
@@ -96,21 +82,11 @@ describe("compatibility data domain", () => {
     ).toEqual({
       id: relationshipId,
       inviterDisplayName: "送信者",
-      offeredDiagnosisIds: ["diagnosis-1", "diagnosis-2"],
       expiresAt,
       isOwnInvitation: false,
     });
     expect(createCompatibilityInvitationAcceptanceContext(relationship, createdAt)).toEqual({
       inviterAccountId: "account-inviter",
-      offeredProfile: {
-        profileSummaryVersionId: "profile-version-inviter",
-        fingerprint: "f".repeat(64),
-      },
-      offeredThemes: [
-        { diagnosisId: "diagnosis-1", resultFingerprint: "a".repeat(64) },
-        { diagnosisId: "diagnosis-2", resultFingerprint: "b".repeat(64) },
-      ],
-      offeredDiagnosisIds: ["diagnosis-1", "diagnosis-2"],
       expiresAt,
     });
     expect(expireCompatibilityRelationship(relationship, new Date(expiresAt.getTime() - 1))).toBe(
@@ -131,11 +107,6 @@ describe("compatibility data domain", () => {
     const acceptance = {
       inviteeAccountId: "account-invitee",
       inviteeDisplayName: " 受信者 ",
-      acceptedProfile: {
-        profileSummaryVersionId: "profile-version-invitee",
-        fingerprint: "e".repeat(64),
-      },
-      acceptedThemes: [{ diagnosisId: "diagnosis-2", resultFingerprint: "c".repeat(64) }],
     } as const;
     const accepted = decideCompatibilityInvitationAcceptance(relationship, acceptance, acceptedAt);
     expect(accepted).toMatchObject({
@@ -144,7 +115,6 @@ describe("compatibility data domain", () => {
         inviteeDisplayName: "受信者",
         status: "accepted",
         acceptedAt,
-        acceptedThemes: [{ diagnosisId: "diagnosis-2", consentedAt: acceptedAt }],
       },
     });
     if (accepted.outcome !== "accepted") throw new Error("Expected an accepted relationship");
@@ -152,6 +122,13 @@ describe("compatibility data domain", () => {
     expect(
       decideCompatibilityInvitationAcceptance(accepted.relationship, acceptance, acceptedAt),
     ).toMatchObject({ outcome: "unchanged" });
+    expect(
+      decideCompatibilityInvitationAcceptance(
+        accepted.relationship,
+        { inviteeAccountId: "account-other", inviteeDisplayName: "別の人" },
+        acceptedAt,
+      ),
+    ).toEqual({ outcome: "unavailable" });
     expect(
       getAcceptedCompatibilityRelationship(accepted.relationship, "account-outsider"),
     ).toBeNull();
@@ -173,15 +150,7 @@ describe("compatibility data domain", () => {
     expect(
       decideCompatibilityInvitationAcceptance(
         relationship,
-        {
-          inviteeAccountId: "account-invitee",
-          inviteeDisplayName: "受信者",
-          acceptedProfile: {
-            profileSummaryVersionId: "profile-version-invitee",
-            fingerprint: "e".repeat(64),
-          },
-          acceptedThemes: [{ diagnosisId: "diagnosis-1", resultFingerprint: "c".repeat(64) }],
-        },
+        { inviteeAccountId: "account-invitee", inviteeDisplayName: "受信者" },
         expiresAt,
       ),
     ).toEqual({ outcome: "expired" });

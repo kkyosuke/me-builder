@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { aoi, me } from "../infrastructure/compatibility-demo";
 import type { CompatibilityInvitationPreview } from "../model/compatibility-invitation-preview";
-import type { CompatibilitySharePreview } from "../model/compatibility-share-preview";
+import type { CompatibilityShareConsent } from "../model/compatibility-share-consent";
 import { CompatibilityInvitationScreen } from "./compatibility-invitation-screen";
 import { CompatibilityListScreen } from "./compatibility-list-screen";
 import { CompatibilityResultScreen } from "./compatibility-result-screen";
@@ -81,54 +81,18 @@ describe("Compatibility flow", () => {
     expect(onCancel).toHaveBeenCalledWith(pending.relationshipId);
   });
 
-  it("APIから取得した振る舞い・考え方をすべて表示し、詳細は共有しない", () => {
-    const preview: CompatibilitySharePreview = {
+  it("共有画面では具体的な内容を出さず、共有の範囲と自動共有だけを伝える", () => {
+    const consent: CompatibilityShareConsent = {
       displayName: "うさぎ",
       avatarUrl: "https://profile.line-scdn.net/me",
-      previewToken: `csp2.${"a".repeat(64)}`,
-      aboutMe: {
-        profileSummaryVersionId: "summary-version-1",
-        generatedAt: "2026-08-11T00:00:00.000Z",
-        statements: [
-          {
-            key: "planning-style",
-            label: "予定の立て方",
-            statement: "私は、先の見通しを持って動けると安心しやすいです",
-          },
-        ],
-      },
-      themes: [
-        {
-          diagnosisId: "daily-life",
-          title: "暮らし方",
-          parameters: [
-            {
-              id: "planning",
-              label: "予定の立て方",
-              lowLabel: "その場で決めたい",
-              highLabel: "早めに決めたい",
-              position: 78,
-              statement: "「早めに決めたい」傾向があります",
-            },
-            {
-              id: "holiday",
-              label: "休日の過ごし方",
-              lowLabel: "ひとり時間を重視",
-              highLabel: "一緒の時間を重視",
-              position: 68,
-              statement: "「一緒の時間を重視」傾向があります",
-            },
-          ],
-        },
-      ],
-      canIssueInvitation: true,
+      canShare: true,
       blockingReasons: [],
       nextAction: null,
     };
     const onIssue = vi.fn();
     render(
       <CompatibilityShareScreen
-        state={{ status: "success", data: preview }}
+        state={{ status: "success", data: consent }}
         onIssue={onIssue}
         onRetry={vi.fn()}
       />,
@@ -136,16 +100,14 @@ describe("Compatibility flow", () => {
 
     expect(screen.getByText("うさぎさんから招待")).toBeTruthy();
     expect(document.querySelector('img[src="https://profile.line-scdn.net/me"]')).not.toBeNull();
-    expect(screen.getByText("私は、先の見通しを持って動けると安心しやすいです")).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "暮らし方" })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "共有する振る舞い・考え方" })).toBeTruthy();
-    expect(screen.getByText("2件すべて共有")).toBeTruthy();
-    expect(screen.getByText("「早めに決めたい」傾向があります")).toBeTruthy();
-    expect(screen.queryByText("「「早めに決めたい」傾向があります」")).toBeNull();
+    expect(screen.getByRole("heading", { name: "共有されるもの" })).toBeTruthy();
+    expect(screen.getByText(/これから増える分も自動で/)).toBeTruthy();
+    expect(screen.queryByText(/傾向があります/)).toBeNull();
+    expect(screen.queryByRole("heading", { name: "まず知ってほしいこと" })).toBeNull();
     expect(screen.queryByRole("checkbox")).toBeNull();
     const disclosure = screen.getByText("共有されない詳細").closest("details");
     expect(disclosure?.hasAttribute("open")).toBe(false);
-    const issueButton = screen.getByRole("button", { name: "招待リンクを発行する" });
+    const issueButton = screen.getByRole("button", { name: "共有して招待リンクを発行する" });
     expect(issueButton.closest("footer")?.classList.contains("fixed")).toBe(true);
     expect(issueButton.classList.contains("h-12")).toBe(true);
     expect(issueButton.hasAttribute("disabled")).toBe(false);
@@ -153,7 +115,7 @@ describe("Compatibility flow", () => {
     expect(disclosure?.hasAttribute("open")).toBe(true);
     expect(screen.getByText(/日記やLINEの会話本文/)).toBeTruthy();
     fireEvent.click(issueButton);
-    expect(onIssue).toHaveBeenCalledWith(preview.previewToken);
+    expect(onIssue).toHaveBeenCalledOnce();
   });
 
   it("発行後に固定フッターから友だちへの送信とコピーを選べる", () => {
@@ -167,10 +129,7 @@ describe("Compatibility flow", () => {
           data: {
             displayName: "うさぎ",
             avatarUrl: null,
-            previewToken: `csp2.${"a".repeat(64)}`,
-            aboutMe: null,
-            themes: [],
-            canIssueInvitation: true,
+            canShare: true,
             blockingReasons: [],
             nextAction: null,
           },
@@ -198,7 +157,7 @@ describe("Compatibility flow", () => {
     expect(onCopyLink).toHaveBeenCalledWith(invitationUrl);
   });
 
-  it("共有できる診断がなければ診断への導線を表示する", () => {
+  it("共有できる内容がまだなくても発行でき、診断への導線だけを添える", () => {
     render(
       <CompatibilityShareScreen
         state={{
@@ -206,21 +165,8 @@ describe("Compatibility flow", () => {
           data: {
             displayName: "うさぎ",
             avatarUrl: null,
-            previewToken: `csp2.${"b".repeat(64)}`,
-            aboutMe: {
-              profileSummaryVersionId: "summary-version-1",
-              generatedAt: "2026-08-11T00:00:00.000Z",
-              statements: [
-                {
-                  key: "planning-style",
-                  label: "予定の立て方",
-                  statement: "私は、先の見通しを持つことを大切にしています",
-                },
-              ],
-            },
-            themes: [],
-            canIssueInvitation: false,
-            blockingReasons: ["diagnosis_required"],
+            canShare: true,
+            blockingReasons: [],
             nextAction: "diagnosis",
           },
         }}
@@ -228,52 +174,42 @@ describe("Compatibility flow", () => {
       />,
     );
 
-    expect(screen.getByText(/共有できる診断結果がまだありません。/)).toBeTruthy();
+    expect(screen.getByText(/2人で比べられるテーマが増えます/)).toBeTruthy();
     expect(screen.getByRole("link", { name: "診断を始める" }).getAttribute("href")).toBe(
       "/diagnosis",
     );
+    expect(
+      screen.getByRole("button", { name: "共有して招待リンクを発行する" }).hasAttribute("disabled"),
+    ).toBe(false);
+  });
+
+  it("表示名を確認できない場合は招待リンクを発行できない", () => {
+    render(
+      <CompatibilityShareScreen
+        state={{
+          status: "success",
+          data: {
+            displayName: null,
+            avatarUrl: null,
+            canShare: false,
+            blockingReasons: ["display_name_unavailable"],
+            nextAction: null,
+          },
+        }}
+        onRetry={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(/LINEの表示名を確認できませんでした。/)).toBeTruthy();
     expect(
       screen.getByRole("button", { name: "招待リンクを発行できません" }).hasAttribute("disabled"),
     ).toBe(true);
   });
 
-  it("受信者が双方の実際の共有内容を確認して承諾できる", () => {
-    const theme = {
-      diagnosisId: "daily-life",
-      title: "暮らし方",
-      parameters: [
-        {
-          id: "planning",
-          label: "予定の立て方",
-          lowLabel: "その場で決めたい",
-          highLabel: "早めに決めたい",
-          position: 78,
-          statement: "「早めに決めたい」傾向があります",
-        },
-      ],
-    };
+  it("受信者は共有していいかだけを確認して承諾できる", () => {
     const invitation: CompatibilityInvitationPreview = {
-      inviter: {
-        displayName: "あおい",
-        avatarUrl: "https://profile.line-scdn.net/inviter",
-        aboutMe: {
-          profileSummaryVersionId: "profile-inviter",
-          generatedAt: "2026-08-11T00:00:00.000Z",
-          statements: [{ key: "planning", label: "予定", statement: "私は見通しを大切にします" }],
-        },
-        themes: [theme],
-      },
-      recipient: {
-        displayName: "はる",
-        avatarUrl: null,
-        previewToken: `csp2.${"a".repeat(64)}`,
-        aboutMe: {
-          profileSummaryVersionId: "profile-recipient",
-          generatedAt: "2026-08-12T00:00:00.000Z",
-          statements: [{ key: "space", label: "余白", statement: "私は予定の余白を大切にします" }],
-        },
-        themes: [theme],
-      },
+      inviter: { displayName: "あおい", avatarUrl: "https://profile.line-scdn.net/inviter" },
+      recipient: { displayName: "はる", avatarUrl: null },
       expiresAt: "2026-08-26T00:00:00.000Z",
       canAccept: true,
       blockingReasons: [],
@@ -293,17 +229,15 @@ describe("Compatibility flow", () => {
       document.querySelector('img[src="https://profile.line-scdn.net/inviter"]'),
     ).not.toBeNull();
     expect(screen.getByText("は")).toBeTruthy();
-    expect(screen.getByText("私は見通しを大切にします")).toBeTruthy();
-    expect(screen.getByText("私は予定の余白を大切にします")).toBeTruthy();
-    expect(screen.getAllByRole("heading", { name: "共有する振る舞い・考え方" })).toHaveLength(2);
-    expect(screen.getByText("1テーマが共通")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "共有されるもの" })).toBeTruthy();
+    expect(screen.queryByText(/傾向があります/)).toBeNull();
     expect(screen.queryByRole("checkbox")).toBeNull();
     expect(screen.getByText(/日記やLINEの会話本文/)).toBeTruthy();
     expect(screen.getByRole("button", { name: "相性を見てみる" }).hasAttribute("disabled")).toBe(
       false,
     );
     fireEvent.click(screen.getByRole("button", { name: "相性を見てみる" }));
-    expect(onAccept).toHaveBeenCalledWith(invitation.recipient.previewToken);
+    expect(onAccept).toHaveBeenCalledOnce();
   });
 
   it("人物ごとの資料と2人の共通点・違いをタブとスワイプで切り替える", () => {

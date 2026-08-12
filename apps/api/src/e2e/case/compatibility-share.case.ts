@@ -1,13 +1,13 @@
 import type { E2eCase } from "./e2e-case";
 
 // 正式なAPI契約は docs/development/compatibility-api.md を参照する。
-export const compatibilitySharePreviewCases = {
+export const compatibilityShareCases = {
   completedDiagnosis: {
-    id: "COMPATIBILITY-PREVIEW-001",
-    name: "回答完了後に共有可能な傾向だけを返すこと",
+    id: "COMPATIBILITY-CONSENT-001",
+    name: "共有可否と表示名だけを返し、共有される内容を返さないこと",
     in: {
       method: "GET",
-      path: "/api/compatibility/share-preview",
+      path: "/api/compatibility/share-consent",
       authorization: "Bearer known-token",
       setup: [
         "migrationとdiagnosis seedを適用",
@@ -19,28 +19,21 @@ export const compatibilitySharePreviewCases = {
       body: {
         displayName: "あおい",
         avatarUrl: "/api/profile/avatar",
-        previewTokenPattern: "^csp2\\.[a-f0-9]{64}$",
-        canIssueInvitation: true,
+        canShare: true,
         blockingReasons: [],
         nextAction: null,
-        themeCount: 1,
-        parameterCount: 4,
-        excludedFields: ["choiceId", "questionText", "coverage", "accountId", "fingerprint"],
+        excludedFields: ["aboutMe", "themes", "previewToken", "accountId", "fingerprint"],
       },
     },
   },
   issueInvitation: {
     id: "COMPATIBILITY-INVITATION-001",
-    name: "確認済みの共有内容から1人用の招待リンクを発行すること",
+    name: "共有への同意だけで1人用の招待リンクを発行すること",
     in: {
       method: "POST",
       path: "/api/compatibility/invitations",
       authorization: "Bearer known-token",
-      setup: [
-        "共有プロフィールを生成",
-        "relationship-priorityの10問すべてへchoiceId=yesを保存",
-        "共有プレビューのpreviewTokenを送信",
-      ],
+      setup: ["共有できる内容がまだない状態でも発行できることを含める"],
     },
     out: {
       status: 201,
@@ -54,52 +47,42 @@ export const compatibilitySharePreviewCases = {
   },
   previewInvitation: {
     id: "COMPATIBILITY-INVITATION-PREVIEW-001",
-    name: "別Accountが保存なしで双方の共有内容を確認できること",
+    name: "別Accountが保存なしで招待者と共有可否だけを確認できること",
     in: {
       method: "GET",
       path: "/api/compatibility/invitations/:relationshipId",
       authorization: "Bearer recipient-token",
-      setup: [
-        "送信者と受信者が共通Diagnosisを完了して共有プロフィールを生成",
-        "送信者が共有プレビューから招待を発行",
-      ],
+      setup: ["送信者が招待を発行"],
     },
     out: {
       status: 200,
       body: {
         inviterDisplayName: "あおい",
         recipientDisplayName: "はる",
-        commonThemeCount: 1,
+        canAccept: true,
         relationshipStatus: "pending",
         recipientReferenceCount: 0,
-        excludedFields: ["accountId", "fingerprint", "choiceId", "evidenceId"],
+        excludedFields: ["aboutMe", "themes", "accountId", "fingerprint", "choiceId", "evidenceId"],
       },
     },
   },
-  previewInvitationWithIncompleteRecipient: {
+  acceptWithoutSharableContent: {
     id: "COMPATIBILITY-INVITATION-PREVIEW-002",
-    name: "受信者の準備が未完了なら保存せずに必要な次アクションを返すこと",
+    name: "共有できる内容がまだなくても承諾でき、そろった時点で自動的に相性シートへ反映されること",
     in: {
-      method: "GET",
-      path: "/api/compatibility/invitations/:relationshipId",
+      method: "POST",
+      path: "/api/compatibility/invitations/:relationshipId/accept",
       authorization: "Bearer recipient-token",
-      setup: [
-        "送信者だけがDiagnosisを完了して共有プロフィールを生成",
-        "送信者が共有プレビューから招待を発行",
-      ],
+      setup: ["受信者がDiagnosis未回答・共有プロフィール未生成のまま承諾"],
     },
     out: {
       status: 200,
       body: {
-        canAccept: false,
-        blockingReasons: [
-          "profile_summary_required",
-          "diagnosis_required",
-          "common_diagnosis_required",
-        ],
-        nextAction: "profile-summary",
-        relationshipStatus: "pending",
-        recipientReferenceCount: 0,
+        relationshipStatus: "accepted",
+        detailStatusBeforePreparation: "waiting",
+        detailNextActionBeforePreparation: "profile-summary",
+        detailStatusAfterPreparation: "ready",
+        reconsentRequired: false,
       },
     },
   },
@@ -123,15 +106,12 @@ export const compatibilitySharePreviewCases = {
   },
   acceptInvitation: {
     id: "COMPATIBILITY-INVITATION-ACCEPT-001",
-    name: "確認した共有内容で相性関係と双方の一覧参照を成立させること",
+    name: "受信者の共有同意で相性関係と双方の一覧参照を成立させること",
     in: {
       method: "POST",
       path: "/api/compatibility/invitations/:relationshipId/accept",
       authorization: "Bearer recipient-token",
-      setup: [
-        "送信者と受信者が共通Diagnosisを完了して共有プロフィールを生成",
-        "招待確認APIで受信者のpreviewTokenを確認",
-      ],
+      setup: ["送信者と受信者が共通Diagnosisを完了して共有プロフィールを生成"],
     },
     out: {
       status: 200,
@@ -145,12 +125,15 @@ export const compatibilitySharePreviewCases = {
   },
   relationshipDetail: {
     id: "COMPATIBILITY-RELATIONSHIP-DETAIL-001",
-    name: "双方が相手を先にした同じ同意済み相性シートを取得できること",
+    name: "双方が相手を先にした、現在の内容から組み立てた同じ相性シートを取得できること",
     in: {
       method: "GET",
       path: "/api/compatibility/relationships/:relationshipId",
       authorization: "Bearer participant-token",
-      setup: ["送信者と受信者が招待を承諾して相性関係を成立"],
+      setup: [
+        "送信者と受信者が招待を承諾して相性関係を成立",
+        "承諾後に送信者のわたしのまとめを再生成",
+      ],
     },
     out: {
       status: 200,
@@ -158,6 +141,7 @@ export const compatibilitySharePreviewCases = {
         status: "ready",
         partnerFirst: true,
         commonThemeCount: 1,
+        latestProfileShared: true,
         excludedFields: ["accountId", "fingerprint", "choiceId", "evidenceId"],
       },
     },
@@ -224,7 +208,7 @@ export const compatibilitySharePreviewCases = {
       path: "/api/compatibility/invitations/:relationshipId",
       authorization: "Bearer recipient-token",
       setup: [
-        "送信者が共有プレビューを確認してLIFF招待リンクを発行",
+        "送信者が共有へ同意してLIFF招待リンクを発行",
         "受信者がリンク内のrelationshipIdで招待画面の表示内容を取得",
       ],
     },

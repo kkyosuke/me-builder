@@ -6,11 +6,11 @@ import {
 } from "../infrastructure/compatibility-invitation-sharing";
 import { CompatibilityShareScreen } from "./compatibility-share-screen";
 import { useCompatibilityInvitationIssue } from "./hooks/use-compatibility-invitation-issue";
-import { useCompatibilitySharePreview } from "./hooks/use-compatibility-share-preview";
+import { useCompatibilityShareConsent } from "./hooks/use-compatibility-share-consent";
 
 export default function CompatibilityShareApplication() {
   const { acquireIdToken } = useLiffSession();
-  const { state, reload } = useCompatibilitySharePreview({ acquireIdToken });
+  const { state, reload } = useCompatibilityShareConsent({ acquireIdToken });
   const invitation = useCompatibilityInvitationIssue({ acquireIdToken });
   const [sharingMessage, setSharingMessage] = useState<string | null>(null);
 
@@ -46,7 +46,7 @@ export default function CompatibilityShareApplication() {
       state={state}
       invitationState={invitation.state}
       sharingMessage={sharingMessage}
-      onIssue={(previewToken) => void invitation.issue(previewToken)}
+      onIssue={() => void invitation.issue()}
       onRetry={() => void reload()}
       onShareToLine={(url) => void shareToLine(url)}
       onCopyLink={(url) => void copyLink(url)}

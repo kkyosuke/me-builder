@@ -17,16 +17,11 @@ import {
   expireCompatibilityRelationship,
   getAcceptedCompatibilityRelationship,
 } from "@me-builder/lib";
-import { asc, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { type DrizzleSqliteDODatabase, drizzle } from "drizzle-orm/durable-sqlite";
 import { migrate } from "drizzle-orm/durable-sqlite/migrator";
 import migrations from "../../drizzle/compatibility-data/migrations.js";
-import {
-  compatibilityAcceptedThemes,
-  compatibilityDataSchema,
-  compatibilityOfferedThemes,
-  compatibilityRelationships,
-} from "./schema";
+import { compatibilityDataSchema, compatibilityRelationships } from "./schema";
 
 type CompatibilityDatabase = DrizzleSqliteDODatabase<typeof compatibilityDataSchema>;
 
@@ -55,47 +50,26 @@ export class CompatibilityDataRepository {
     );
     if (decision.outcome === "unchanged") return decision;
     const { relationship } = decision;
-    if (!relationship.offeredProfile) {
-      throw new Error("Created compatibility invitation must have inviter profile consent");
-    }
-    const offeredProfile = relationship.offeredProfile;
 
-    this.db.transaction((tx) => {
-      tx.insert(compatibilityRelationships)
-        .values({
-          singleton: 1,
-          relationshipId: relationship.id,
-          inviterAccountId: relationship.inviterAccountId,
-          inviteeAccountId: relationship.inviteeAccountId,
-          inviterDisplayName: relationship.inviterDisplayName,
-          inviteeDisplayName: relationship.inviteeDisplayName,
-          offeredProfileSummaryVersionId: offeredProfile.profileSummaryVersionId,
-          offeredProfileFingerprint: offeredProfile.fingerprint,
-          offeredProfileConsentedAt: offeredProfile.consentedAt,
-          acceptedProfileSummaryVersionId: relationship.acceptedProfile?.profileSummaryVersionId,
-          acceptedProfileFingerprint: relationship.acceptedProfile?.fingerprint,
-          acceptedProfileConsentedAt: relationship.acceptedProfile?.consentedAt,
-          status: relationship.status,
-          expiresAt: relationship.expiresAt,
-          acceptedAt: relationship.acceptedAt,
-          cancelledAt: relationship.cancelledAt,
-          endedAt: relationship.endedAt,
-          endedByAccountId: relationship.endedByAccountId,
-          createdAt: relationship.createdAt,
-          updatedAt: relationship.updatedAt,
-        })
-        .run();
-      tx.insert(compatibilityOfferedThemes)
-        .values(
-          relationship.offeredThemes.map((theme) => ({
-            relationshipId: relationship.id,
-            diagnosisId: theme.diagnosisId,
-            resultFingerprint: theme.resultFingerprint,
-            consentedAt: theme.consentedAt,
-          })),
-        )
-        .run();
-    });
+    this.db
+      .insert(compatibilityRelationships)
+      .values({
+        singleton: 1,
+        relationshipId: relationship.id,
+        inviterAccountId: relationship.inviterAccountId,
+        inviteeAccountId: relationship.inviteeAccountId,
+        inviterDisplayName: relationship.inviterDisplayName,
+        inviteeDisplayName: relationship.inviteeDisplayName,
+        status: relationship.status,
+        expiresAt: relationship.expiresAt,
+        acceptedAt: relationship.acceptedAt,
+        cancelledAt: relationship.cancelledAt,
+        endedAt: relationship.endedAt,
+        endedByAccountId: relationship.endedByAccountId,
+        createdAt: relationship.createdAt,
+        updatedAt: relationship.updatedAt,
+      })
+      .run();
 
     const persisted = this.readRelationship();
     if (!persisted) throw new Error("Compatibility invitation was not persisted");
@@ -122,32 +96,17 @@ export class CompatibilityDataRepository {
     if (decision.outcome !== "accepted") return decision;
     const acceptedRelationship = decision.relationship;
 
-    this.db.transaction((tx) => {
-      tx.insert(compatibilityAcceptedThemes)
-        .values(
-          acceptedRelationship.acceptedThemes.map((theme) => ({
-            relationshipId: acceptedRelationship.id,
-            diagnosisId: theme.diagnosisId,
-            resultFingerprint: theme.resultFingerprint,
-            consentedAt: theme.consentedAt,
-          })),
-        )
-        .run();
-      tx.update(compatibilityRelationships)
-        .set({
-          inviteeAccountId: acceptedRelationship.inviteeAccountId,
-          inviteeDisplayName: acceptedRelationship.inviteeDisplayName,
-          acceptedProfileSummaryVersionId:
-            acceptedRelationship.acceptedProfile?.profileSummaryVersionId,
-          acceptedProfileFingerprint: acceptedRelationship.acceptedProfile?.fingerprint,
-          acceptedProfileConsentedAt: acceptedRelationship.acceptedProfile?.consentedAt,
-          status: acceptedRelationship.status,
-          acceptedAt: acceptedRelationship.acceptedAt,
-          updatedAt: acceptedRelationship.updatedAt,
-        })
-        .where(eq(compatibilityRelationships.singleton, 1))
-        .run();
-    });
+    this.db
+      .update(compatibilityRelationships)
+      .set({
+        inviteeAccountId: acceptedRelationship.inviteeAccountId,
+        inviteeDisplayName: acceptedRelationship.inviteeDisplayName,
+        status: acceptedRelationship.status,
+        acceptedAt: acceptedRelationship.acceptedAt,
+        updatedAt: acceptedRelationship.updatedAt,
+      })
+      .where(eq(compatibilityRelationships.singleton, 1))
+      .run();
 
     const accepted = this.readRelationship();
     if (!accepted) throw new Error("Accepted compatibility relationship was not persisted");
@@ -217,24 +176,6 @@ export class CompatibilityDataRepository {
       .where(eq(compatibilityRelationships.singleton, 1))
       .get();
     if (!relationship) return null;
-    const offeredThemes = this.db
-      .select({
-        diagnosisId: compatibilityOfferedThemes.diagnosisId,
-        resultFingerprint: compatibilityOfferedThemes.resultFingerprint,
-        consentedAt: compatibilityOfferedThemes.consentedAt,
-      })
-      .from(compatibilityOfferedThemes)
-      .orderBy(asc(compatibilityOfferedThemes.diagnosisId))
-      .all();
-    const acceptedThemes = this.db
-      .select({
-        diagnosisId: compatibilityAcceptedThemes.diagnosisId,
-        resultFingerprint: compatibilityAcceptedThemes.resultFingerprint,
-        consentedAt: compatibilityAcceptedThemes.consentedAt,
-      })
-      .from(compatibilityAcceptedThemes)
-      .orderBy(asc(compatibilityAcceptedThemes.diagnosisId))
-      .all();
     return {
       id: relationship.relationshipId,
       inviterAccountId: relationship.inviterAccountId,
@@ -242,28 +183,6 @@ export class CompatibilityDataRepository {
       inviterDisplayName: relationship.inviterDisplayName,
       inviteeDisplayName: relationship.inviteeDisplayName,
       status: relationship.status,
-      offeredProfile:
-        relationship.offeredProfileSummaryVersionId &&
-        relationship.offeredProfileFingerprint &&
-        relationship.offeredProfileConsentedAt
-          ? {
-              profileSummaryVersionId: relationship.offeredProfileSummaryVersionId,
-              fingerprint: relationship.offeredProfileFingerprint,
-              consentedAt: relationship.offeredProfileConsentedAt,
-            }
-          : null,
-      acceptedProfile:
-        relationship.acceptedProfileSummaryVersionId &&
-        relationship.acceptedProfileFingerprint &&
-        relationship.acceptedProfileConsentedAt
-          ? {
-              profileSummaryVersionId: relationship.acceptedProfileSummaryVersionId,
-              fingerprint: relationship.acceptedProfileFingerprint,
-              consentedAt: relationship.acceptedProfileConsentedAt,
-            }
-          : null,
-      offeredThemes,
-      acceptedThemes,
       expiresAt: relationship.expiresAt,
       acceptedAt: relationship.acceptedAt,
       cancelledAt: relationship.cancelledAt,

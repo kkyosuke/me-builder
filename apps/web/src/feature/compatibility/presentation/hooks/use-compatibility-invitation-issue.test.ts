@@ -18,9 +18,8 @@ describe("useCompatibilityInvitationIssue", () => {
     vi.mocked(issueCompatibilityInvitation).mockResolvedValue(invitation);
     const acquireIdToken = vi.fn().mockResolvedValue("id-token");
     const { result } = renderHook(() => useCompatibilityInvitationIssue({ acquireIdToken }));
-    const previewToken = `csp2.${"a".repeat(64)}`;
 
-    act(() => void result.current.issue(previewToken));
+    act(() => void result.current.issue());
 
     await waitFor(() =>
       expect(result.current.state).toEqual({ status: "success", data: invitation }),
@@ -28,7 +27,6 @@ describe("useCompatibilityInvitationIssue", () => {
     expect(issueCompatibilityInvitation).toHaveBeenCalledWith(
       undefined,
       "id-token",
-      previewToken,
       expect.any(AbortSignal),
     );
   });

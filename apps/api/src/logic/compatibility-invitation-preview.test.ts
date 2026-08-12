@@ -7,12 +7,6 @@ const accountData = {} as AccountDataNamespace;
 const compatibilityData = {} as CompatibilityDataNamespace;
 const db = {} as D1.shared.Client;
 const expiresAt = new Date("2026-08-26T00:00:00.000Z");
-const previewToken = `csp2.${"a".repeat(64)}`;
-const offeredProfile = {
-  profileSummaryVersionId: "profile-inviter",
-  fingerprint: "b".repeat(64),
-};
-const offeredTheme = { diagnosisId: "diagnosis-1", resultFingerprint: "c".repeat(64) };
 const theme = {
   diagnosisId: "diagnosis-1",
   title: "時間と予定",
@@ -27,57 +21,31 @@ const theme = {
     },
   ],
 };
-const aboutMe = {
-  profileSummaryVersionId: "profile-inviter",
-  generatedAt: "2026-08-11T00:00:00.000Z",
-  statements: [{ key: "planning", label: "予定", statement: "私は見通しを大切にします" }],
-};
 
 function previewData({
   displayName,
-  profile = offeredProfile,
+  hasProfile = true,
   themes = [theme],
-  blockingReasons = [],
 }: {
   displayName: string | null;
-  profile?: typeof offeredProfile | null;
+  hasProfile?: boolean;
   themes?: readonly (typeof theme)[];
-  blockingReasons?: readonly ("diagnosis_required" | "profile_summary_required")[];
 }) {
   return {
     displayName,
-    shareProfile: profile
+    aboutMe: hasProfile
       ? {
-          ...profile,
+          profileSummaryVersionId: "profile-recipient",
           generatedAt: "2026-08-11T00:00:00.000Z",
-          statements: aboutMe.statements,
+          statements: [{ key: "planning", label: "予定", statement: "私は見通しを大切にします" }],
         }
       : null,
-    shareableDiagnoses: themes.map((item) => ({
-      diagnosisId: item.diagnosisId,
-      title: item.title,
-      scoringConfigId: "scoring-1",
-      scoring: {
-        scoringVersion: 1,
-        balancedLabel: "状況による",
-        parameters: [],
-      },
-    })),
-    preview: {
-      displayName,
-      previewToken,
-      aboutMe: profile
-        ? { ...aboutMe, profileSummaryVersionId: profile.profileSummaryVersionId }
+    themes,
+    nextAction: !hasProfile
+      ? ("profile-summary" as const)
+      : themes.length === 0
+        ? ("diagnosis" as const)
         : null,
-      themes,
-      canIssueInvitation: blockingReasons.length === 0,
-      blockingReasons,
-      nextAction: blockingReasons.includes("profile_summary_required")
-        ? ("profile-summary" as const)
-        : blockingReasons.includes("diagnosis_required")
-          ? ("diagnosis" as const)
-          : null,
-    },
   };
 }
 
@@ -90,27 +58,10 @@ function dependencies(overrides: Record<string, unknown> = {}) {
     getInvitationPreview: vi.fn().mockResolvedValue({
       id: relationshipId,
       inviterDisplayName: "あおい",
-      offeredDiagnosisIds: ["diagnosis-1"],
       expiresAt,
       isOwnInvitation: false,
     }),
-    getInvitationContext: vi.fn().mockResolvedValue({
-      inviterAccountId: "account-inviter",
-      offeredProfile,
-      offeredThemes: [offeredTheme],
-      offeredDiagnosisIds: ["diagnosis-1"],
-      expiresAt,
-    }),
-    loadSharePreviewData: vi
-      .fn()
-      .mockResolvedValueOnce(previewData({ displayName: "あおい" }))
-      .mockResolvedValueOnce(
-        previewData({
-          displayName: "はる",
-          profile: { profileSummaryVersionId: "profile-recipient", fingerprint: "d".repeat(64) },
-        }),
-      ),
-    createThemeFingerprints: vi.fn().mockResolvedValue([offeredTheme]),
+    loadSharePreviewData: vi.fn().mockResolvedValue(previewData({ displayName: "はる" })),
     ...overrides,
   };
 }
@@ -128,7 +79,7 @@ function params(overrides: Record<string, unknown> = {}) {
 }
 
 describe("getCompatibilityInvitationContents", () => {
-  it("同意済み送信者snapshotと受信者の共通テーマを保存せず返す", async () => {
+  it("招待者の表示名と受信者の共有可否だけを返し、双方の内容を読み込まない", async () => {
     const deps = dependencies();
 
     await expect(getCompatibilityInvitationContents(params(), deps)).resolves.toEqual({
@@ -137,59 +88,45 @@ describe("getCompatibilityInvitationContents", () => {
         inviter: {
           displayName: "あおい",
           avatarUrl: `/api/compatibility/invitations/${relationshipId}/avatar`,
-          aboutMe,
-          themes: [theme],
         },
-        recipient: {
-          displayName: "はる",
-          avatarUrl: "/api/profile/avatar",
-          previewToken,
-          aboutMe: { ...aboutMe, profileSummaryVersionId: "profile-recipient" },
-          themes: [theme],
-        },
+        recipient: { displayName: "はる", avatarUrl: "/api/profile/avatar" },
         expiresAt: expiresAt.toISOString(),
         canAccept: true,
         blockingReasons: [],
         nextAction: null,
       },
     });
-    expect(deps.loadSharePreviewData).toHaveBeenNthCalledWith(
-      1,
-      expect.objectContaining({
-        accountId: "account-inviter",
-        profileSummaryVersionId: "profile-inviter",
-      }),
+    expect(deps.loadSharePreviewData).toHaveBeenCalledOnce();
+    expect(deps.loadSharePreviewData).toHaveBeenCalledWith(
+      expect.objectContaining({ accountId: "account-recipient" }),
     );
   });
 
-  it("共通テーマがなければ診断へ案内し承諾不可にする", async () => {
+  it("共有できる内容がまだなくても承諾でき、次の操作だけを案内する", async () => {
     const deps = dependencies({
       loadSharePreviewData: vi
         .fn()
-        .mockResolvedValueOnce(previewData({ displayName: "あおい" }))
-        .mockResolvedValueOnce(previewData({ displayName: "はる", themes: [] })),
+        .mockResolvedValue(previewData({ displayName: "はる", themes: [] })),
+    });
+
+    await expect(getCompatibilityInvitationContents(params(), deps)).resolves.toMatchObject({
+      type: "resolved",
+      invitation: { canAccept: true, blockingReasons: [], nextAction: "diagnosis" },
+    });
+  });
+
+  it("表示名を確認できない受信者には承諾させない", async () => {
+    const deps = dependencies({
+      loadSharePreviewData: vi.fn().mockResolvedValue(previewData({ displayName: null })),
     });
 
     await expect(getCompatibilityInvitationContents(params(), deps)).resolves.toMatchObject({
       type: "resolved",
       invitation: {
-        recipient: { themes: [] },
+        recipient: { displayName: null },
         canAccept: false,
-        blockingReasons: ["common_diagnosis_required"],
-        nextAction: "diagnosis",
+        blockingReasons: ["display_name_unavailable"],
       },
-    });
-  });
-
-  it("送信者の同意指紋と現在内容が異なれば内容を開示しない", async () => {
-    const deps = dependencies({
-      createThemeFingerprints: vi
-        .fn()
-        .mockResolvedValue([{ diagnosisId: "diagnosis-1", resultFingerprint: "e".repeat(64) }]),
-    });
-
-    await expect(getCompatibilityInvitationContents(params(), deps)).resolves.toEqual({
-      type: "unavailable",
     });
   });
 
@@ -198,7 +135,6 @@ describe("getCompatibilityInvitationContents", () => {
       getInvitationPreview: vi.fn().mockResolvedValue({
         id: relationshipId,
         inviterDisplayName: "あおい",
-        offeredDiagnosisIds: ["diagnosis-1"],
         expiresAt,
         isOwnInvitation: true,
       }),
@@ -207,7 +143,7 @@ describe("getCompatibilityInvitationContents", () => {
     await expect(getCompatibilityInvitationContents(params(), deps)).resolves.toEqual({
       type: "own-invitation",
     });
-    expect(deps.getInvitationContext).not.toHaveBeenCalled();
+    expect(deps.loadSharePreviewData).not.toHaveBeenCalled();
   });
 
   it("本人確認に失敗した場合は招待を読まない", async () => {

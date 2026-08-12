@@ -1811,7 +1811,7 @@
       "post": {
         "operationId": "acceptCompatibilityInvitation",
         "tags": ["Compatibility"],
-        "summary": "確認済みの共有内容で相性招待を承諾する",
+        "summary": "共有へ同意した受信者が相性招待を承諾する",
         "security": [
           {
             "liffIdToken": []
@@ -1834,22 +1834,6 @@
                     }
                   },
                   "required": ["relationshipId", "status"]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "リクエストJSONが不正",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "const": "Invalid request"
-                    }
-                  },
-                  "required": ["error"]
                 }
               }
             }
@@ -1902,12 +1886,7 @@
                       "const": "Compatibility invitation unavailable"
                     },
                     "reason": {
-                      "enum": [
-                        "own_invitation",
-                        "preview_changed",
-                        "share_unavailable",
-                        "duplicate_relationship"
-                      ],
+                      "enum": ["own_invitation", "share_unavailable", "duplicate_relationship"],
                       "type": "string"
                     }
                   },
@@ -1949,23 +1928,6 @@
             }
           }
         },
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "previewToken": {
-                    "type": "string",
-                    "pattern": "^csp2\\.[a-f0-9]{64}$"
-                  }
-                },
-                "required": ["previewToken"]
-              }
-            }
-          }
-        },
         "parameters": [
           {
             "schema": {
@@ -1982,7 +1944,7 @@
       "post": {
         "operationId": "issueCompatibilityInvitation",
         "tags": ["Compatibility"],
-        "summary": "確認済みの共有内容から1人用の招待リンクを発行する",
+        "summary": "共有へ同意した本人が1人用の招待リンクを発行する",
         "security": [
           {
             "liffIdToken": []
@@ -2006,22 +1968,6 @@
                     }
                   },
                   "required": ["invitationUrl", "expiresAt"]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "リクエストJSONが不正",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "const": "Invalid request"
-                    }
-                  },
-                  "required": ["error"]
                 }
               }
             }
@@ -2062,7 +2008,7 @@
             }
           },
           "409": {
-            "description": "確認後に共有内容が変わった、または現在共有できない",
+            "description": "現在は共有を開始できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -2072,8 +2018,7 @@
                       "const": "Compatibility invitation unavailable"
                     },
                     "reason": {
-                      "enum": ["preview_changed", "share_unavailable"],
-                      "type": "string"
+                      "const": "share_unavailable"
                     }
                   },
                   "required": ["error", "reason"]
@@ -2110,23 +2055,6 @@
                   },
                   "required": ["error"]
                 }
-              }
-            }
-          }
-        },
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "previewToken": {
-                    "type": "string",
-                    "pattern": "^csp2\\.[a-f0-9]{64}$"
-                  }
-                },
-                "required": ["previewToken"]
               }
             }
           }
@@ -2289,7 +2217,7 @@
       "get": {
         "operationId": "getCompatibilityInvitation",
         "tags": ["Compatibility"],
-        "summary": "受信者が承諾前に双方の共有内容を確認する",
+        "summary": "受信者が承諾前に招待者と共有の意味を確認する",
         "security": [
           {
             "liffIdToken": []
@@ -2297,7 +2225,7 @@
         ],
         "responses": {
           "200": {
-            "description": "招待者の同意済み内容と受信者の現在内容",
+            "description": "招待者の表示名と受信者の共有可否",
             "content": {
               "application/json": {
                 "schema": {
@@ -2320,106 +2248,9 @@
                               "type": "null"
                             }
                           ]
-                        },
-                        "aboutMe": {
-                          "type": "object",
-                          "properties": {
-                            "profileSummaryVersionId": {
-                              "type": "string",
-                              "minLength": 1
-                            },
-                            "generatedAt": {
-                              "type": "string",
-                              "format": "date-time"
-                            },
-                            "statements": {
-                              "type": "array",
-                              "items": {
-                                "type": "object",
-                                "properties": {
-                                  "key": {
-                                    "type": "string",
-                                    "minLength": 1
-                                  },
-                                  "label": {
-                                    "type": "string",
-                                    "minLength": 1
-                                  },
-                                  "statement": {
-                                    "type": "string",
-                                    "minLength": 1
-                                  }
-                                },
-                                "required": ["key", "label", "statement"]
-                              },
-                              "minItems": 1,
-                              "maxItems": 3
-                            }
-                          },
-                          "required": ["profileSummaryVersionId", "generatedAt", "statements"]
-                        },
-                        "themes": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "diagnosisId": {
-                                "type": "string",
-                                "minLength": 1
-                              },
-                              "title": {
-                                "type": "string",
-                                "minLength": 1
-                              },
-                              "parameters": {
-                                "type": "array",
-                                "items": {
-                                  "type": "object",
-                                  "properties": {
-                                    "id": {
-                                      "type": "string",
-                                      "minLength": 1
-                                    },
-                                    "label": {
-                                      "type": "string",
-                                      "minLength": 1
-                                    },
-                                    "lowLabel": {
-                                      "type": "string",
-                                      "minLength": 1
-                                    },
-                                    "highLabel": {
-                                      "type": "string",
-                                      "minLength": 1
-                                    },
-                                    "position": {
-                                      "type": "integer",
-                                      "minimum": 0,
-                                      "maximum": 100
-                                    },
-                                    "statement": {
-                                      "type": "string",
-                                      "minLength": 1
-                                    }
-                                  },
-                                  "required": [
-                                    "id",
-                                    "label",
-                                    "lowLabel",
-                                    "highLabel",
-                                    "position",
-                                    "statement"
-                                  ]
-                                },
-                                "minItems": 1
-                              }
-                            },
-                            "required": ["diagnosisId", "title", "parameters"]
-                          },
-                          "minItems": 1
                         }
                       },
-                      "required": ["displayName", "avatarUrl", "aboutMe", "themes"]
+                      "required": ["displayName", "avatarUrl"]
                     },
                     "recipient": {
                       "type": "object",
@@ -2445,116 +2276,9 @@
                               "type": "null"
                             }
                           ]
-                        },
-                        "previewToken": {
-                          "type": "string",
-                          "pattern": "^csp2\\.[a-f0-9]{64}$"
-                        },
-                        "aboutMe": {
-                          "anyOf": [
-                            {
-                              "type": "object",
-                              "properties": {
-                                "profileSummaryVersionId": {
-                                  "type": "string",
-                                  "minLength": 1
-                                },
-                                "generatedAt": {
-                                  "type": "string",
-                                  "format": "date-time"
-                                },
-                                "statements": {
-                                  "type": "array",
-                                  "items": {
-                                    "type": "object",
-                                    "properties": {
-                                      "key": {
-                                        "type": "string",
-                                        "minLength": 1
-                                      },
-                                      "label": {
-                                        "type": "string",
-                                        "minLength": 1
-                                      },
-                                      "statement": {
-                                        "type": "string",
-                                        "minLength": 1
-                                      }
-                                    },
-                                    "required": ["key", "label", "statement"]
-                                  },
-                                  "minItems": 1,
-                                  "maxItems": 3
-                                }
-                              },
-                              "required": ["profileSummaryVersionId", "generatedAt", "statements"]
-                            },
-                            {
-                              "type": "null"
-                            }
-                          ]
-                        },
-                        "themes": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "diagnosisId": {
-                                "type": "string",
-                                "minLength": 1
-                              },
-                              "title": {
-                                "type": "string",
-                                "minLength": 1
-                              },
-                              "parameters": {
-                                "type": "array",
-                                "items": {
-                                  "type": "object",
-                                  "properties": {
-                                    "id": {
-                                      "type": "string",
-                                      "minLength": 1
-                                    },
-                                    "label": {
-                                      "type": "string",
-                                      "minLength": 1
-                                    },
-                                    "lowLabel": {
-                                      "type": "string",
-                                      "minLength": 1
-                                    },
-                                    "highLabel": {
-                                      "type": "string",
-                                      "minLength": 1
-                                    },
-                                    "position": {
-                                      "type": "integer",
-                                      "minimum": 0,
-                                      "maximum": 100
-                                    },
-                                    "statement": {
-                                      "type": "string",
-                                      "minLength": 1
-                                    }
-                                  },
-                                  "required": [
-                                    "id",
-                                    "label",
-                                    "lowLabel",
-                                    "highLabel",
-                                    "position",
-                                    "statement"
-                                  ]
-                                },
-                                "minItems": 1
-                              }
-                            },
-                            "required": ["diagnosisId", "title", "parameters"]
-                          }
                         }
                       },
-                      "required": ["displayName", "avatarUrl", "previewToken", "aboutMe", "themes"]
+                      "required": ["displayName", "avatarUrl"]
                     },
                     "expiresAt": {
                       "type": "string",
@@ -2566,15 +2290,7 @@
                     "blockingReasons": {
                       "type": "array",
                       "items": {
-                        "enum": [
-                          "display_name_unavailable",
-                          "profile_summary_required",
-                          "profile_summary_stale",
-                          "diagnosis_required",
-                          "scoring_unavailable",
-                          "diagnosis_unavailable",
-                          "common_diagnosis_required"
-                        ],
+                        "enum": ["display_name_unavailable"],
                         "type": "string"
                       }
                     },
@@ -2968,7 +2684,7 @@
       "get": {
         "operationId": "getCompatibilityRelationship",
         "tags": ["Compatibility"],
-        "summary": "成立中の相性関係を同意済み内容から再構築する",
+        "summary": "成立中の相性関係を双方の現在の内容から組み立てる",
         "security": [
           {
             "liffIdToken": []
@@ -2976,7 +2692,7 @@
         ],
         "responses": {
           "200": {
-            "description": "相性シート、または再共有待ち状態",
+            "description": "相性シート、または比較できるテーマの準備待ち状態",
             "content": {
               "application/json": {
                 "schema": {
@@ -3839,11 +3555,11 @@
         ]
       }
     },
-    "/api/compatibility/share-preview": {
+    "/api/compatibility/share-consent": {
       "get": {
-        "operationId": "getCompatibilitySharePreview",
+        "operationId": "getCompatibilityShareConsent",
         "tags": ["Compatibility"],
-        "summary": "招待発行前に本人が共有内容を確認する",
+        "summary": "招待発行前に本人の共有可否を確認する",
         "security": [
           {
             "liffIdToken": []
@@ -3851,7 +3567,7 @@
         ],
         "responses": {
           "200": {
-            "description": "本人の表示名と、相性診断へ利用できる現在の傾向",
+            "description": "相手へ表示される表示名と画像path、共有を始められるかどうか",
             "content": {
               "application/json": {
                 "schema": {
@@ -3879,127 +3595,13 @@
                         }
                       ]
                     },
-                    "previewToken": {
-                      "type": "string",
-                      "pattern": "^csp2\\.[a-f0-9]{64}$"
-                    },
-                    "aboutMe": {
-                      "anyOf": [
-                        {
-                          "type": "object",
-                          "properties": {
-                            "profileSummaryVersionId": {
-                              "type": "string",
-                              "minLength": 1
-                            },
-                            "generatedAt": {
-                              "type": "string",
-                              "format": "date-time"
-                            },
-                            "statements": {
-                              "type": "array",
-                              "items": {
-                                "type": "object",
-                                "properties": {
-                                  "key": {
-                                    "type": "string",
-                                    "minLength": 1
-                                  },
-                                  "label": {
-                                    "type": "string",
-                                    "minLength": 1
-                                  },
-                                  "statement": {
-                                    "type": "string",
-                                    "minLength": 1
-                                  }
-                                },
-                                "required": ["key", "label", "statement"]
-                              },
-                              "minItems": 1,
-                              "maxItems": 3
-                            }
-                          },
-                          "required": ["profileSummaryVersionId", "generatedAt", "statements"]
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
-                    },
-                    "themes": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "diagnosisId": {
-                            "type": "string",
-                            "minLength": 1
-                          },
-                          "title": {
-                            "type": "string",
-                            "minLength": 1
-                          },
-                          "parameters": {
-                            "type": "array",
-                            "items": {
-                              "type": "object",
-                              "properties": {
-                                "id": {
-                                  "type": "string",
-                                  "minLength": 1
-                                },
-                                "label": {
-                                  "type": "string",
-                                  "minLength": 1
-                                },
-                                "lowLabel": {
-                                  "type": "string",
-                                  "minLength": 1
-                                },
-                                "highLabel": {
-                                  "type": "string",
-                                  "minLength": 1
-                                },
-                                "position": {
-                                  "type": "integer",
-                                  "minimum": 0,
-                                  "maximum": 100
-                                },
-                                "statement": {
-                                  "type": "string",
-                                  "minLength": 1
-                                }
-                              },
-                              "required": [
-                                "id",
-                                "label",
-                                "lowLabel",
-                                "highLabel",
-                                "position",
-                                "statement"
-                              ]
-                            },
-                            "minItems": 1
-                          }
-                        },
-                        "required": ["diagnosisId", "title", "parameters"]
-                      }
-                    },
-                    "canIssueInvitation": {
+                    "canShare": {
                       "type": "boolean"
                     },
                     "blockingReasons": {
                       "type": "array",
                       "items": {
-                        "enum": [
-                          "display_name_unavailable",
-                          "profile_summary_required",
-                          "profile_summary_stale",
-                          "diagnosis_required",
-                          "scoring_unavailable",
-                          "diagnosis_unavailable"
-                        ],
+                        "enum": ["display_name_unavailable"],
                         "type": "string"
                       }
                     },
@@ -4018,10 +3620,7 @@
                   "required": [
                     "displayName",
                     "avatarUrl",
-                    "previewToken",
-                    "aboutMe",
-                    "themes",
-                    "canIssueInvitation",
+                    "canShare",
                     "blockingReasons",
                     "nextAction"
                   ]

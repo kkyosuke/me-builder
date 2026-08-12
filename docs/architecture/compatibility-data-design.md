@@ -12,6 +12,8 @@
 
 相性関係は2つのAccountに属するため、片方の`AccountData`へ正本を置きません。推測困難な招待IDから決定的に選ぶ`CompatibilityData` Durable Objectを1関係につき1つ作り、そのprivate SQLiteを招待と同意のSSoTにします。
 
+同意は相手単位の継続同意です。`CompatibilityData`は誰と誰が、いつ共有へ同意したかだけを保存し、共有した表示内容や指紋を保存しません。相性シートは表示時点で双方の`AccountData`から都度組み立てます。
+
 各`AccountData`には、自分の一覧を組み立て、同じ相手との重複関係を防ぐための`compatibility_references`だけを保存します。共有D1には相性関係、表示名、同意、診断結果を保存しません。
 
 相性関係の入力検証、招待期限の判定、状態遷移、冪等性、閲覧可否、previewへの変換、および双方のAccountDataを同じ順序で予約する承諾オーケストレーションは`packages/lib`のランタイム非依存なロジックが所有します。`apps/worker`はDurable Objectとprivate SQLiteのadapterとして、現在状態の読込、ドメインロジックが返した決定結果の保存、alarm設定だけを担当します。CloudflareやDrizzleへ依存するコードを`packages/lib`へ持ち込みません。
@@ -23,7 +25,7 @@ flowchart LR
     API -->|256 bitの招待ID| C[CompatibilityData]
     A -->|relation参照のみ| AR[(private SQLite)]
     B -->|relation参照のみ| BR[(private SQLite)]
-    C --> CR[(private SQLite<br/>招待・表示名snapshot・同意指紋)]
+    C --> CR[(private SQLite<br/>招待・表示名snapshot・同意時刻)]
     API --> D1[(共有D1<br/>公開Diagnosis catalogのみ)]
 ```
 
@@ -40,8 +42,8 @@ flowchart LR
 | データ | 保存先 | 理由 |
 | --- | --- | --- |
 | 招待状態、参加者、表示名snapshot | CompatibilityData SQLite | 2者の共有関係を片方のAccount所有にしない |
-| 送信者が提示した共有プロフィール版・指紋、テーマと結果指紋 | CompatibilityData SQLite | 発行時に確認した共有範囲を固定する |
-| 受信者が承諾した共有プロフィール版・指紋、テーマと結果指紋 | CompatibilityData SQLite | 受信者の明示的同意を送信者の同意と分ける |
+| 送信者の同意時刻（`created_at`） | CompatibilityData SQLite | 発行時の継続同意の成立時点を残す |
+| 受信者の同意時刻（`accepted_at`） | CompatibilityData SQLite | 受信者の明示的同意を送信者の同意と分ける |
 | 共有用の一人称文章と内部根拠参照 | 各AccountData SQLiteの専用projection | 本人向けまとめや生の根拠を関係データへ複製しない |
 | 生の回答、パラメータ値、表示文章 | 各AccountData SQLiteから都度計算 | 相性関係へ個人データを複製しない |
 | Accountごとの相性一覧参照 | 各AccountData SQLite | 全Account走査なしで本人の一覧を取得する |
@@ -53,10 +55,6 @@ flowchart LR
 
 ```mermaid
 erDiagram
-    compatibility_relationships ||--|{ compatibility_offered_themes : offers
-    compatibility_relationships ||--o{ compatibility_accepted_themes : accepts
-    compatibility_offered_themes ||--o| compatibility_accepted_themes : limits
-
     compatibility_relationships {
       integer singleton PK
       text relationship_id UK
@@ -64,12 +62,6 @@ erDiagram
       text invitee_account_id
       text inviter_display_name
       text invitee_display_name
-      text offered_profile_summary_version_id
-      text offered_profile_fingerprint
-      integer offered_profile_consented_at
-      text accepted_profile_summary_version_id
-      text accepted_profile_fingerprint
-      integer accepted_profile_consented_at
       text status
       integer expires_at
       integer accepted_at
@@ -79,29 +71,17 @@ erDiagram
       integer created_at
       integer updated_at
     }
-    compatibility_offered_themes {
-      text relationship_id PK
-      text diagnosis_id PK
-      text result_fingerprint
-      integer consented_at
-    }
-    compatibility_accepted_themes {
-      text relationship_id PK
-      text diagnosis_id PK
-      text result_fingerprint
-      integer consented_at
-    }
 ```
 
-`result_fingerprint`は、本人へプレビューした診断ID、採点設定版、パラメータ位置、審査済み文章を正規化してSHA-256で計算します。回答そのものは含めず、APIレスポンスやログへ出しません。結果表示時に現在の表示内容から再計算した指紋と一致するテーマだけを比較へ使います。不一致または回答削除の場合は古い結果を表示せず、所有者本人へ再確認を求めます。
+送信者の同意時刻は`created_at`、受信者の同意時刻は`accepted_at`が表します。同意した表示内容、共有プロフィール版、診断テーマ、結果指紋は保存しません。共有対象は関係が`accepted`である間、双方の`AccountData`が現在共有できるものすべてです。
 
-招待発行前の確認と発行commandは、表示名、共有プロフィール版と文章、診断由来の共有表示全体から決定的に計算するバージョン付きの不透明なpreview tokenで結びます。発行時はAccountDataの現在状態から表示内容とtokenを再計算し、クライアントが確認時に受け取ったtokenと一致する場合だけ、共有プロフィール版・指紋と、その時点のテーマ別`result_fingerprint`を保存します。token自体を各指紋として保存または公開せず、不一致時は古い確認内容で発行せず再確認を求めます。
+招待発行と承諾のcommandは、表示内容を確認するtokenを受け取りません。API Serverは検証済みLINE ID tokenから解決したAccount IDと表示名だけを渡し、`CompatibilityData`が現在時刻で状態遷移を判定します。
 
-共有プロフィールprojectionは、本人向けプロフィールまとめと同じ生成要求から作りますが、本人向け本文とは別のAccountData tableへ保存します。文章、schema version、生成元のプロフィール版、内部根拠参照、指紋を持ち、専用RPCだけが読み取ります。内部根拠のどれかが削除または無効化されていればprojectionを返しません。新しい版を生成しても既存関係の同意版を自動更新しません。
+共有プロフィールprojectionは、本人向けプロフィールまとめと同じ生成要求から作りますが、本人向け本文とは別のAccountData tableへ保存します。文章、schema version、生成元のプロフィール版、内部根拠参照を持ち、専用RPCだけが読み取ります。専用RPCは常に最新版を返し、内部根拠のどれかが削除または無効化されていればprojectionを返しません。
 
-招待確認用RPCは、表示名、提示された診断ID、期限だけを持つ専用previewを返します。Account ID、結果指紋、同意時刻、内部状態行をpreviewへ含めません。API Serverが招待確認時の表示を同意済みsnapshotへ照合し、承諾時に重複関係を確認するために使う送信者Account ID、共有プロフィール版・指紋、テーマ別指紋は、画面表示用previewとは別の内部contextとして取得します。内部contextはHTTPレスポンスとログへ出しません。
+招待確認用RPCは、表示名と期限だけを持つ専用previewを返します。Account ID、同意時刻、内部状態行をpreviewへ含めません。承諾時に重複関係を確認するために使う送信者Account IDは、画面表示用previewとは別の内部contextとして取得します。内部contextはHTTPレスポンスとログへ出しません。
 
-受信者は送信者が提示したテーマの部分集合だけを承諾でき、1件以上を必須とします。これにより、共有対象が空のまま関係だけが成立する状態を作りません。
+受信者は共有対象を個別に選べません。共有できる対象が0件のまま関係が成立した場合は、シートを組み立てられない準備待ちとして扱い、双方の対象がそろった時点で追加の同意なしにシートを返します。
 
 ## 5. AccountDataの一覧参照
 
@@ -123,7 +103,7 @@ erDiagram
 ```mermaid
 stateDiagram-v2
     [*] --> pending: 招待作成
-    pending --> accepted: 受信者が1件以上のテーマへ同意
+    pending --> accepted: 受信者が共有へ同意
     pending --> cancelled: 送信者が取消
     pending --> expired: 14日経過
     accepted --> ended: どちらかが共有終了
@@ -155,19 +135,22 @@ AccountDataの一覧RPCは、内部的に`pending`、`reserved`、`active`の参
 - pending招待だけを送信者が取り消せる
 - ドメインの各判断関数が現在時刻と期限を比較し、pendingかつ期限内の招待だけを表示・承諾・取消できる
 - 状態遷移と期限判定にはCompatibilityDataが取得した現在時刻だけを使う
-- 承諾テーマは提示テーマの1件以上の部分集合にする
 - accepted関係だけを参加者が終了できる
 - terminal状態から別状態へ戻さない
 - CompatibilityData RPCはraw SQLite clientを公開しない
-- 招待previewへAccount ID、結果指紋、同意時刻を含めない
+- 招待previewへAccount IDと同意時刻を含めない
 - AccountData参照は一覧projectionであり、相性シートの閲覧権限に使わない
 - 承諾前に双方のAccountDataを同じ順序で予約し、同じ2人のaccepted関係を重複作成しない
 - CompatibilityDataは双方の予約を確認できないpending招待の承諾を拒否する
-- 共有終了、同意した表示内容の変更、内部根拠の削除・無効化後は保存済みの古い内容を返さない
+- 共有終了後は相手の内容を返さず、以降の更新も共有しない
+- 内部根拠の削除・無効化後は共有専用projectionを返さない
+- 相性シートは保存済みの過去の表示内容ではなく、表示時点の双方の内容から組み立てる
 
 ## 8. Migrationと運用
 
 `CompatibilityData`は新規DO classとしてWrangler migrationへ追加し、専用のDrizzle migrationを`0000`から管理します。`AccountData`の`compatibility_references`は既存private SQLiteへの追加migrationとし、共有D1 migrationへ追加しません。
+
+表示内容単位の同意をやめた後も、`compatibility_offered_themes`、`compatibility_accepted_themes`、および`compatibility_relationships`の共有プロフィール指紋columnは残したまま書き込みを止めます。削除は[本番データベースマイグレーション運用](../development/production-migration-operations.md)のexpand-contractに従い、後続releaseのcontractで行います。
 
 期限切れはCompatibilityDataのalarmで終端化し、一覧取得時にも現在時刻で再判定します。共有D1をCronで全走査しません。
 
@@ -175,6 +158,6 @@ AccountDataの一覧RPCは、内部的に`pending`、`reserved`、`active`の参
 
 - HTTP path、request / response形式、画面キャッシュ
 - 相性シートの文章と比較候補の具体的な生成契約
-- 再同意画面と同意指紋更新API
+- 相手へ渡る内容を本人が一覧する画面と、そのAPI
 - terminalデータの削除保留期間とAccount削除時の物理削除手順
 - 通知outboxとLINE再通知頻度

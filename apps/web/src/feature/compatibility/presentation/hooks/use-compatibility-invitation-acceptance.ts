@@ -18,35 +18,31 @@ export function useCompatibilityInvitationAcceptance({
 
   useEffect(() => () => request.current?.abort(), []);
 
-  const accept = useCallback(
-    async (previewToken: string) => {
-      if (!relationshipId || state.status === "loading") return;
-      request.current?.abort();
-      const controller = new AbortController();
-      request.current = controller;
-      setState({ status: "loading" });
-      try {
-        const token = await acquireIdToken(controller.signal);
-        if (!token) throw new Error("LINEから招待画面を開いてください。");
-        const data = await acceptCompatibilityInvitation(
-          config.apiUrl,
-          token,
-          relationshipId,
-          previewToken,
-          controller.signal,
-        );
-        if (!controller.signal.aborted) setState({ status: "success", data });
-      } catch (error) {
-        if (!controller.signal.aborted) {
-          setState({
-            status: "error",
-            message: error instanceof Error ? error.message : "招待を承諾できませんでした。",
-          });
-        }
+  const accept = useCallback(async () => {
+    if (!relationshipId || state.status === "loading") return;
+    request.current?.abort();
+    const controller = new AbortController();
+    request.current = controller;
+    setState({ status: "loading" });
+    try {
+      const token = await acquireIdToken(controller.signal);
+      if (!token) throw new Error("LINEから招待画面を開いてください。");
+      const data = await acceptCompatibilityInvitation(
+        config.apiUrl,
+        token,
+        relationshipId,
+        controller.signal,
+      );
+      if (!controller.signal.aborted) setState({ status: "success", data });
+    } catch (error) {
+      if (!controller.signal.aborted) {
+        setState({
+          status: "error",
+          message: error instanceof Error ? error.message : "招待を承諾できませんでした。",
+        });
       }
-    },
-    [acquireIdToken, relationshipId, state.status],
-  );
+    }
+  }, [acquireIdToken, relationshipId, state.status]);
 
   return { state, accept };
 }

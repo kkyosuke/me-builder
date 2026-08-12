@@ -5,15 +5,11 @@ import * as v from "valibot";
 import { getConfig } from "../config";
 import {
   CompatibilityInvitationConflictSchema,
-  InvalidCompatibilityInvitationRequestSchema,
-  IssueCompatibilityInvitationRequestSchema,
   IssueCompatibilityInvitationResponseSchema,
 } from "../contract/compatibility/invitation";
 import {
-  AcceptCompatibilityInvitationRequestSchema,
   AcceptCompatibilityInvitationResponseSchema,
   CompatibilityInvitationAcceptanceConflictSchema,
-  InvalidCompatibilityInvitationAcceptanceSchema,
 } from "../contract/compatibility/invitation-accept";
 import {
   CompatibilityInvitationPreviewResponseSchema,
@@ -25,7 +21,7 @@ import {
   CompatibilityRelationshipUnavailableSchema,
 } from "../contract/compatibility/relationship";
 import { CompatibilityRelationshipsResponseSchema } from "../contract/compatibility/relationships";
-import { CompatibilitySharePreviewResponseSchema } from "../contract/compatibility/share-preview";
+import { CompatibilityShareConsentResponseSchema } from "../contract/compatibility/share-consent";
 import {
   AccountNotFoundErrorSchema,
   ServiceUnavailableErrorSchema,
@@ -39,31 +35,30 @@ import { getCompatibilityInvitationContents } from "../logic/compatibility-invit
 import { getCompatibilityRelationshipContents } from "../logic/compatibility-relationship";
 import { endCompatibilityRelationship } from "../logic/compatibility-relationship-end";
 import { listCompatibilityRelationships } from "../logic/compatibility-relationships";
-import { getCompatibilitySharePreview } from "../logic/compatibility-share-preview";
+import { getCompatibilityShareConsent } from "../logic/compatibility-share-preview";
 import { operationalHttpPath } from "../operational-http-path";
 import type { AppEnv } from "../types";
 import { bearerToken } from "./auth";
 import { avatarImageResponse } from "./avatar-image-response";
 
-/** `GET /api/compatibility/share-preview` — 招待発行前に本人へ共有内容を表示する。 */
-export async function getCompatibilitySharePreviewContents(c: Context<AppEnv>): Promise<Response> {
+/** `GET /api/compatibility/share-consent` — 招待発行前に本人の共有可否を返す。 */
+export async function getCompatibilityShareConsentContents(c: Context<AppEnv>): Promise<Response> {
   c.header("Cache-Control", "no-store");
   if (!c.env?.DB || !c.env.ACCOUNT_DATA) {
-    logger.error({ path: c.req.path }, "Compatibility preview storage binding is not configured");
+    logger.error({ path: c.req.path }, "Compatibility consent storage binding is not configured");
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   }
 
-  const currentConfig = getConfig(c.env);
-  const outcome = await getCompatibilitySharePreview({
+  const outcome = await getCompatibilityShareConsent({
     idToken: bearerToken(c.req.header("authorization")),
-    lineLoginChannelId: currentConfig.lineLoginChannelId,
+    lineLoginChannelId: getConfig(c.env).lineLoginChannelId,
     db: D1.shared.client.create(c.env.DB),
     accountData: c.env.ACCOUNT_DATA,
   });
 
   switch (outcome.type) {
     case "resolved":
-      return c.json(v.parse(CompatibilitySharePreviewResponseSchema, outcome.preview));
+      return c.json(v.parse(CompatibilityShareConsentResponseSchema, outcome.consent));
     case "account-not-found":
       return c.json(
         v.parse(AccountNotFoundErrorSchema, {
@@ -78,7 +73,7 @@ export async function getCompatibilitySharePreviewContents(c: Context<AppEnv>): 
   }
 }
 
-/** `POST /api/compatibility/invitations` — 確認済み内容から1人用の招待を発行する。 */
+/** `POST /api/compatibility/invitations` — 共有同意から1人用の招待を発行する。 */
 export async function postCompatibilityInvitation(c: Context<AppEnv>): Promise<Response> {
   const currentConfig = getConfig(c.env);
   if (!c.env?.DB || !c.env.ACCOUNT_DATA || !c.env.COMPATIBILITY_DATA || !currentConfig.liffId) {
@@ -89,26 +84,8 @@ export async function postCompatibilityInvitation(c: Context<AppEnv>): Promise<R
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   }
 
-  let input: unknown;
-  try {
-    input = await c.req.json();
-  } catch {
-    return c.json(
-      v.parse(InvalidCompatibilityInvitationRequestSchema, { error: "Invalid request" }),
-      400,
-    );
-  }
-  const parsed = v.safeParse(IssueCompatibilityInvitationRequestSchema, input);
-  if (!parsed.success) {
-    return c.json(
-      v.parse(InvalidCompatibilityInvitationRequestSchema, { error: "Invalid request" }),
-      400,
-    );
-  }
-
   const outcome = await issueCompatibilityInvitation({
     idToken: bearerToken(c.req.header("authorization")),
-    previewToken: parsed.output.previewToken,
     lineLoginChannelId: currentConfig.lineLoginChannelId,
     liffId: currentConfig.liffId,
     db: D1.shared.client.create(c.env.DB),
@@ -120,12 +97,11 @@ export async function postCompatibilityInvitation(c: Context<AppEnv>): Promise<R
     case "created":
       c.header("Cache-Control", "no-store");
       return c.json(v.parse(IssueCompatibilityInvitationResponseSchema, outcome), 201);
-    case "preview-changed":
     case "share-unavailable":
       return c.json(
         v.parse(CompatibilityInvitationConflictSchema, {
           error: "Compatibility invitation unavailable",
-          reason: outcome.type === "preview-changed" ? "preview_changed" : "share_unavailable",
+          reason: "share_unavailable",
         }),
         409,
       );
@@ -143,7 +119,7 @@ export async function postCompatibilityInvitation(c: Context<AppEnv>): Promise<R
   }
 }
 
-/** `GET /api/compatibility/invitations/:relationshipId` — 受信者へ同意前の確認内容を返す。 */
+/** `GET /api/compatibility/invitations/:relationshipId` — 受信者へ承諾前の確認内容を返す。 */
 export async function getCompatibilityInvitation(c: Context<AppEnv>): Promise<Response> {
   c.header("Cache-Control", "no-store");
   if (!c.env?.DB || !c.env.ACCOUNT_DATA || !c.env.COMPATIBILITY_DATA) {
@@ -256,7 +232,7 @@ export async function getCompatibilityInvitationAvatarContents(
   }
 }
 
-/** `POST /api/compatibility/invitations/:relationshipId/accept` — 確認済み招待を承諾する。 */
+/** `POST /api/compatibility/invitations/:relationshipId/accept` — 受信者が共有へ同意する。 */
 export async function postCompatibilityInvitationAcceptance(c: Context<AppEnv>): Promise<Response> {
   c.header("Cache-Control", "no-store");
   if (!c.env?.DB || !c.env.ACCOUNT_DATA || !c.env.COMPATIBILITY_DATA) {
@@ -267,26 +243,8 @@ export async function postCompatibilityInvitationAcceptance(c: Context<AppEnv>):
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   }
 
-  let input: unknown;
-  try {
-    input = await c.req.json();
-  } catch {
-    return c.json(
-      v.parse(InvalidCompatibilityInvitationAcceptanceSchema, { error: "Invalid request" }),
-      400,
-    );
-  }
-  const parsed = v.safeParse(AcceptCompatibilityInvitationRequestSchema, input);
-  if (!parsed.success) {
-    return c.json(
-      v.parse(InvalidCompatibilityInvitationAcceptanceSchema, { error: "Invalid request" }),
-      400,
-    );
-  }
-
   const outcome = await acceptCompatibilityInvitation({
     relationshipId: c.req.param("relationshipId") ?? "",
-    previewToken: parsed.output.previewToken,
     idToken: bearerToken(c.req.header("authorization")),
     lineLoginChannelId: getConfig(c.env).lineLoginChannelId,
     db: D1.shared.client.create(c.env.DB),
@@ -311,7 +269,6 @@ export async function postCompatibilityInvitationAcceptance(c: Context<AppEnv>):
         404,
       );
     case "own-invitation":
-    case "preview-changed":
     case "share-unavailable":
     case "duplicate-relationship":
       return c.json(
@@ -335,7 +292,7 @@ export async function postCompatibilityInvitationAcceptance(c: Context<AppEnv>):
   }
 }
 
-/** `GET /api/compatibility/relationships/:relationshipId` — 同意済み相性シートを返す。 */
+/** `GET /api/compatibility/relationships/:relationshipId` — 現在の相性シートを返す。 */
 export async function getCompatibilityRelationship(c: Context<AppEnv>): Promise<Response> {
   c.header("Cache-Control", "no-store");
   if (!c.env?.DB || !c.env.ACCOUNT_DATA || !c.env.COMPATIBILITY_DATA) {

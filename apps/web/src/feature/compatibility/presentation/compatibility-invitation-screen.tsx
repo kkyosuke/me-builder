@@ -7,21 +7,25 @@ import type {
 } from "../model/compatibility-invitation-preview";
 import type { CompatibilityInvitationAcceptance } from "../model/compatibility-relationship";
 import { CompatibilityPrivacyNotice } from "./components/compatibility-disclosure";
-import {
-  CompatibilityAboutMePreview,
-  CompatibilityThemesPreview,
-} from "./components/compatibility-share-content";
+import { CompatibilityShareScope } from "./components/compatibility-share-content";
 import { CompatibilityBackHeader, CompatibilityProfileAvatar } from "./components/compatibility-ui";
 
 const blockingReasonMessages: Record<CompatibilityInvitationPreviewBlockingReason, string> = {
   display_name_unavailable: "LINEの表示名を確認できませんでした。",
-  profile_summary_required: "共有用の「私について」がまだ作成されていません。",
-  profile_summary_stale: "共有用の「私について」に更新が必要です。",
-  diagnosis_required: "共有できる診断結果がまだありません。",
-  scoring_unavailable: "一部の診断結果を共有用に準備できませんでした。",
-  diagnosis_unavailable: "診断情報を読み込めませんでした。時間をおいて再度お試しください。",
-  common_diagnosis_required: "2人とも確認できる共通の診断テーマがまだありません。",
 };
+
+const nextActionGuides = {
+  diagnosis: {
+    message: "診断に答えると、2人で比べられるテーマが増えます。",
+    href: "/diagnosis",
+    label: "診断を見る",
+  },
+  "profile-summary": {
+    message: "「わたしのまとめ」ができると、あなたの「私について」も共有されます。",
+    href: "/me",
+    label: "わたしの傾向を作る",
+  },
+} as const;
 
 function InvitationSkeleton() {
   return (
@@ -34,7 +38,7 @@ function InvitationSkeleton() {
         <SkeletonBlock className="mx-auto mt-5 h-5 w-40 rounded-full" />
         <SkeletonBlock className="mx-auto mt-3 h-8 w-64 rounded-full" />
       </div>
-      {["about", "themes", "privacy"].map((key) => (
+      {["scope", "privacy"].map((key) => (
         <SkeletonBlock key={key} className="mt-5 h-40 w-full rounded-3xl" />
       ))}
     </SkeletonLoader>
@@ -74,9 +78,10 @@ function InvitationContents({
 }: {
   acceptanceState: AsyncState<CompatibilityInvitationAcceptance>;
   invitation: CompatibilityInvitationPreview;
-  onAccept: (previewToken: string) => void;
+  onAccept: () => void;
 }) {
   const inviterName = invitation.inviter.displayName;
+  const guide = invitation.nextAction ? nextActionGuides[invitation.nextAction] : null;
 
   return (
     <>
@@ -101,44 +106,31 @@ function InvitationContents({
           2人の相性を見てみませんか？
         </h1>
         <p className="mt-3 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-          診断から見える範囲で、お互いの大切にしたいことを資料にまとめます。
+          診断から見える範囲で、お互いの大切にしたいことを資料にまとめます。承諾すると、これから増える分もお互いへ自動で共有されます。
         </p>
         <p className="mt-3 text-xs text-slate-500">
           招待の有効期限: {new Date(invitation.expiresAt).toLocaleDateString("ja-JP")}
         </p>
       </section>
 
-      <CompatibilityAboutMePreview
-        eyebrow={`${inviterName}さんが共有する「私について」`}
-        headingId="inviter-about-me-heading"
-        profile={invitation.inviter.aboutMe}
-      />
-      <CompatibilityThemesPreview
-        eyebrow={`${inviterName}さんが共有する診断テーマ`}
-        headingId="inviter-themes-heading"
-        themes={invitation.inviter.themes}
-      />
-
-      {invitation.recipient.aboutMe && (
-        <CompatibilityAboutMePreview
-          eyebrow={`${inviterName}さんに見える、あなたの「私について」`}
-          headingId="recipient-about-me-heading"
-          profile={invitation.recipient.aboutMe}
-        />
-      )}
-      {invitation.recipient.themes.length > 0 && (
-        <CompatibilityThemesPreview
-          eyebrow={`${inviterName}さんとの比較に使う共通テーマ`}
-          headingId="recipient-themes-heading"
-          themes={invitation.recipient.themes}
-          countLabel={`${invitation.recipient.themes.length}テーマが共通`}
-        />
-      )}
+      <CompatibilityShareScope headingId="share-scope-heading" />
 
       <CompatibilityPrivacyNotice
         title="共有されない詳細"
         footer="相性を見てみることへ承諾するまで、あなたの情報は相手へ共有されません。"
       />
+
+      {guide && (
+        <section className="mt-8 rounded-2xl border border-sky-300/60 bg-sky-50 p-4 dark:border-sky-500/30 dark:bg-sky-950/30">
+          <p className="text-sm leading-relaxed text-sky-950 dark:text-sky-100">{guide.message}</p>
+          <a
+            href={guide.href}
+            className="mt-3 flex min-h-11 items-center justify-center rounded-xl bg-sky-300 px-4 py-2 text-sm font-bold text-sky-950"
+          >
+            {guide.label}
+          </a>
+        </section>
+      )}
 
       {invitation.blockingReasons.length > 0 && (
         <section className="mt-8 rounded-2xl border border-amber-300/60 bg-amber-50 p-4 dark:border-amber-500/30 dark:bg-amber-950/30">
@@ -151,14 +143,6 @@ function InvitationContents({
               <li key={reason}>・{blockingReasonMessages[reason]}</li>
             ))}
           </ul>
-          {invitation.nextAction && (
-            <a
-              href={invitation.nextAction === "profile-summary" ? "/me" : "/diagnosis"}
-              className="mt-4 flex min-h-11 items-center justify-center rounded-xl bg-amber-300 px-4 py-2 text-sm font-bold text-amber-950"
-            >
-              {invitation.nextAction === "profile-summary" ? "わたしの傾向を作る" : "診断を見る"}
-            </a>
-          )}
         </section>
       )}
 
@@ -178,7 +162,7 @@ function InvitationContents({
         <button
           type="button"
           disabled={!invitation.canAccept || acceptanceState.status === "loading"}
-          onClick={() => onAccept(invitation.recipient.previewToken)}
+          onClick={onAccept}
           className="mt-8 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-rose-500 px-5 py-3 font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 dark:disabled:bg-slate-800 dark:disabled:text-slate-400"
         >
           <HeartHandshake className="size-5" aria-hidden="true" />
@@ -214,7 +198,7 @@ export function CompatibilityInvitationScreen({
   state,
 }: {
   acceptanceState?: AsyncState<CompatibilityInvitationAcceptance>;
-  onAccept?: (previewToken: string) => void;
+  onAccept?: () => void;
   onRetry: () => void;
   state: AsyncState<CompatibilityInvitationPreview>;
 }) {

@@ -1,15 +1,14 @@
 import {
   type AccountDataNamespace,
   type CompatibilityDataNamespace,
-  type CompatibilityProfileFingerprint,
   type CompatibilityRelationship,
   type CompatibilitySharePreviewTheme,
-  type CompatibilityThemeFingerprint,
   type D1,
   compatibilityDataFor,
-  createCompatibilityShareThemeFingerprints,
+  selectCommonCompatibilityDiagnoses,
 } from "@me-builder/lib";
 import {
+  type CompatibilityShareAboutMe,
   type CompatibilitySharePreviewData,
   loadCompatibilitySharePreviewData,
 } from "./compatibility-share-preview";
@@ -19,7 +18,7 @@ const RELATIONSHIP_ID_PATTERN = /^[a-f0-9]{64}$/;
 
 type Person = Readonly<{
   displayName: string;
-  aboutMe: NonNullable<CompatibilitySharePreviewData["preview"]["aboutMe"]>;
+  aboutMe: CompatibilityShareAboutMe;
   themes: readonly CompatibilitySharePreviewTheme[];
 }>;
 
@@ -53,75 +52,35 @@ type Params = Readonly<{
   at?: Date;
 }>;
 
-function matchesProfile(
-  data: CompatibilitySharePreviewData,
-  consent: CompatibilityProfileFingerprint | null,
-): boolean {
-  return Boolean(
-    consent &&
-      data.shareProfile &&
-      data.shareProfile.profileSummaryVersionId === consent.profileSummaryVersionId &&
-      data.shareProfile.fingerprint === consent.fingerprint,
-  );
-}
-
-function matchesThemes(
-  actual: readonly CompatibilityThemeFingerprint[],
-  consent: readonly CompatibilityThemeFingerprint[],
-): boolean {
-  if (actual.length !== consent.length) return false;
-  const actualById = new Map(actual.map((theme) => [theme.diagnosisId, theme.resultFingerprint]));
-  return consent.every((theme) => actualById.get(theme.diagnosisId) === theme.resultFingerprint);
-}
-
-function commonDiagnoses(
-  data: CompatibilitySharePreviewData,
-  acceptedDiagnosisIds: ReadonlySet<string>,
-) {
-  return data.shareableDiagnoses.filter(({ diagnosisId }) => acceptedDiagnosisIds.has(diagnosisId));
+function participantDetails(relationship: CompatibilityRelationship, viewerAccountId: string) {
+  const inviteeAccountId = relationship.inviteeAccountId;
+  const inviteeDisplayName = relationship.inviteeDisplayName;
+  if (!inviteeAccountId || !inviteeDisplayName) return null;
+  return {
+    viewerIsInviter: relationship.inviterAccountId === viewerAccountId,
+    inviter: {
+      accountId: relationship.inviterAccountId,
+      displayName: relationship.inviterDisplayName,
+    },
+    invitee: { accountId: inviteeAccountId, displayName: inviteeDisplayName },
+  };
 }
 
 function orderedThemes(
   data: CompatibilitySharePreviewData,
-  acceptedDiagnosisIds: readonly string[],
+  diagnosisIds: readonly string[],
 ): CompatibilitySharePreviewTheme[] {
-  const byId = new Map(data.preview.themes.map((theme) => [theme.diagnosisId, theme]));
-  return acceptedDiagnosisIds.flatMap((diagnosisId) => {
+  const byId = new Map(data.themes.map((theme) => [theme.diagnosisId, theme]));
+  return diagnosisIds.flatMap((diagnosisId) => {
     const theme = byId.get(diagnosisId);
     return theme ? [theme] : [];
   });
 }
 
-function participantDetails(relationship: CompatibilityRelationship, viewerAccountId: string) {
-  const viewerIsInviter = relationship.inviterAccountId === viewerAccountId;
-  const inviteeAccountId = relationship.inviteeAccountId;
-  const inviteeDisplayName = relationship.inviteeDisplayName;
-  if (
-    !inviteeAccountId ||
-    !inviteeDisplayName ||
-    !relationship.offeredProfile ||
-    !relationship.acceptedProfile
-  ) {
-    return null;
-  }
-  return {
-    viewerIsInviter,
-    inviter: {
-      accountId: relationship.inviterAccountId,
-      displayName: relationship.inviterDisplayName,
-      profile: relationship.offeredProfile,
-      themes: relationship.offeredThemes,
-    },
-    invitee: {
-      accountId: inviteeAccountId,
-      displayName: inviteeDisplayName,
-      profile: relationship.acceptedProfile,
-      themes: relationship.acceptedThemes,
-    },
-  };
-}
-
-/** accepted正本の同意指紋を現在のAccountData表示へ照合し、相性シートを再構築する。 */
+/**
+ * 成立中の関係について、双方の現在の共有内容から相性シートを組み立てる。
+ * 共有は関係が続く限り自動で最新化されるため、過去の同意内容と照合しない。
+ */
 export async function getCompatibilityRelationshipContents({
   relationshipId,
   idToken,
@@ -142,65 +101,52 @@ export async function getCompatibilityRelationshipContents({
   const participants = participantDetails(canonical, session.session.accountId);
   if (!participants) return { type: "unavailable" };
 
-  const acceptedDiagnosisIds = canonical.acceptedThemes.map(({ diagnosisId }) => diagnosisId);
-  const acceptedDiagnosisIdSet = new Set(acceptedDiagnosisIds);
   const [inviterData, inviteeData] = await Promise.all([
     loadCompatibilitySharePreviewData({
       accountId: participants.inviter.accountId,
       verifiedDisplayName: participants.inviter.displayName,
       accountData,
       at,
-      profileSummaryVersionId: participants.inviter.profile?.profileSummaryVersionId,
     }),
     loadCompatibilitySharePreviewData({
       accountId: participants.invitee.accountId,
       verifiedDisplayName: participants.invitee.displayName,
       accountData,
       at,
-      profileSummaryVersionId: participants.invitee.profile.profileSummaryVersionId,
     }),
   ]);
-  const inviterDiagnoses = commonDiagnoses(inviterData, acceptedDiagnosisIdSet);
-  const inviteeDiagnoses = commonDiagnoses(inviteeData, acceptedDiagnosisIdSet);
-  const [inviterFingerprints, inviteeFingerprints] = await Promise.all([
-    createCompatibilityShareThemeFingerprints(inviterDiagnoses),
-    createCompatibilityShareThemeFingerprints(inviteeDiagnoses),
-  ]);
-  const offeredCommonThemes = canonical.offeredThemes.filter(({ diagnosisId }) =>
-    acceptedDiagnosisIdSet.has(diagnosisId),
+  const viewerData = participants.viewerIsInviter ? inviterData : inviteeData;
+  const commonDiagnosisIds = selectCommonCompatibilityDiagnoses(
+    inviterData.themes,
+    inviteeData.themes,
   );
-  const inviterProfileReady = matchesProfile(inviterData, participants.inviter.profile);
-  const inviteeProfileReady = matchesProfile(inviteeData, participants.invitee.profile);
-  const inviterThemesReady = matchesThemes(inviterFingerprints, offeredCommonThemes);
-  const inviteeThemesReady = matchesThemes(inviteeFingerprints, canonical.acceptedThemes);
+  const inviterAboutMe = inviterData.aboutMe;
+  const inviteeAboutMe = inviteeData.aboutMe;
 
-  if (!inviterProfileReady || !inviteeProfileReady || !inviterThemesReady || !inviteeThemesReady) {
-    const ownProfileReady = participants.viewerIsInviter
-      ? inviterProfileReady
-      : inviteeProfileReady;
-    const ownThemesReady = participants.viewerIsInviter ? inviterThemesReady : inviteeThemesReady;
+  if (!inviterAboutMe || !inviteeAboutMe || commonDiagnosisIds.length === 0) {
     return {
       type: "resolved",
       relationship: {
         relationshipId,
         status: "waiting",
-        nextAction: !ownProfileReady ? "profile-summary" : !ownThemesReady ? "diagnosis" : null,
+        nextAction: !viewerData.aboutMe
+          ? "profile-summary"
+          : commonDiagnosisIds.length === 0
+            ? "diagnosis"
+            : null,
       },
     };
   }
 
-  const inviterAboutMe = inviterData.preview.aboutMe;
-  const inviteeAboutMe = inviteeData.preview.aboutMe;
-  if (!inviterAboutMe || !inviteeAboutMe) return { type: "unavailable" };
   const inviter = {
     displayName: participants.inviter.displayName,
     aboutMe: inviterAboutMe,
-    themes: orderedThemes(inviterData, acceptedDiagnosisIds),
+    themes: orderedThemes(inviterData, commonDiagnosisIds),
   };
   const invitee = {
     displayName: participants.invitee.displayName,
     aboutMe: inviteeAboutMe,
-    themes: orderedThemes(inviteeData, acceptedDiagnosisIds),
+    themes: orderedThemes(inviteeData, commonDiagnosisIds),
   };
   return {
     type: "resolved",

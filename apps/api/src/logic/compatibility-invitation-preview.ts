@@ -1,15 +1,11 @@
 import {
   type AccountDataNamespace,
   type CompatibilityDataNamespace,
-  type CompatibilityInvitationAcceptanceContext,
   type CompatibilityInvitationPreview,
-  type CompatibilitySharePreviewTheme,
   type D1,
   compatibilityDataFor,
-  createCompatibilityShareThemeFingerprints,
 } from "@me-builder/lib";
 import {
-  type CompatibilitySharePreviewBlockingReason,
   type CompatibilitySharePreviewData,
   loadCompatibilitySharePreviewData,
 } from "./compatibility-share-preview";
@@ -17,29 +13,15 @@ import { createLiffSession } from "./liff-session";
 
 const RELATIONSHIP_ID_PATTERN = /^[a-f0-9]{64}$/;
 
-type CompatibilityInvitationPreviewBlockingReason =
-  | CompatibilitySharePreviewBlockingReason
-  | "common_diagnosis_required";
+type CompatibilityInvitationBlockingReason = "display_name_unavailable";
 
-type PublicProfile = NonNullable<CompatibilitySharePreviewData["preview"]["aboutMe"]>;
-
+/** 受信者が承諾前に見るのは、招待者が誰かと自分が共有を始められるかだけ。 */
 type CompatibilityInvitationContents = Readonly<{
-  inviter: Readonly<{
-    displayName: string;
-    avatarUrl: string | null;
-    aboutMe: PublicProfile;
-    themes: readonly CompatibilitySharePreviewTheme[];
-  }>;
-  recipient: Readonly<{
-    displayName: string | null;
-    avatarUrl: string | null;
-    previewToken: string;
-    aboutMe: PublicProfile | null;
-    themes: readonly CompatibilitySharePreviewTheme[];
-  }>;
+  inviter: Readonly<{ displayName: string; avatarUrl: string | null }>;
+  recipient: Readonly<{ displayName: string | null; avatarUrl: string | null }>;
   expiresAt: string;
   canAccept: boolean;
-  blockingReasons: readonly CompatibilityInvitationPreviewBlockingReason[];
+  blockingReasons: readonly CompatibilityInvitationBlockingReason[];
   nextAction: "diagnosis" | "profile-summary" | null;
 }>;
 
@@ -68,12 +50,7 @@ type Dependencies = Readonly<{
     relationshipId: string,
     viewerAccountId: string,
   ) => Promise<CompatibilityInvitationPreview | null>;
-  getInvitationContext: (
-    namespace: CompatibilityDataNamespace,
-    relationshipId: string,
-  ) => Promise<CompatibilityInvitationAcceptanceContext | null>;
   loadSharePreviewData: typeof loadCompatibilitySharePreviewData;
-  createThemeFingerprints: typeof createCompatibilityShareThemeFingerprints;
 }>;
 
 export type CompatibilityInvitationAcceptanceDataOutcome =
@@ -81,9 +58,7 @@ export type CompatibilityInvitationAcceptanceDataOutcome =
       type: "resolved";
       invitation: CompatibilityInvitationContents;
       inviteeAccountId: string;
-      context: CompatibilityInvitationAcceptanceContext;
       recipientData: CompatibilitySharePreviewData;
-      recipientDiagnoses: CompatibilitySharePreviewData["shareableDiagnoses"];
     }
   | Exclude<CompatibilityInvitationPreviewOutcome, { type: "resolved" }>;
 
@@ -91,32 +66,10 @@ const defaultDependencies: Dependencies = {
   createSession: createLiffSession,
   getInvitationPreview: (namespace, relationshipId, viewerAccountId) =>
     compatibilityDataFor(namespace, relationshipId).getInvitationPreview(viewerAccountId),
-  getInvitationContext: (namespace, relationshipId) =>
-    compatibilityDataFor(namespace, relationshipId).getInvitationAcceptanceContext(),
   loadSharePreviewData: loadCompatibilitySharePreviewData,
-  createThemeFingerprints: createCompatibilityShareThemeFingerprints,
 };
 
-function matchesOfferedSnapshot(
-  context: CompatibilityInvitationAcceptanceContext,
-  data: CompatibilitySharePreviewData,
-  fingerprints: readonly { diagnosisId: string; resultFingerprint: string }[],
-): boolean {
-  if (
-    !data.shareProfile ||
-    data.shareProfile.profileSummaryVersionId !== context.offeredProfile.profileSummaryVersionId ||
-    data.shareProfile.fingerprint !== context.offeredProfile.fingerprint
-  ) {
-    return false;
-  }
-  if (fingerprints.length !== context.offeredThemes.length) return false;
-  const actual = new Map(fingerprints.map((theme) => [theme.diagnosisId, theme.resultFingerprint]));
-  return context.offeredThemes.every(
-    (theme) => actual.get(theme.diagnosisId) === theme.resultFingerprint,
-  );
-}
-
-/** pending招待と双方の現在状態から、保存を伴わない受信者向け確認表示を組み立てる。 */
+/** pending招待と受信者の現在状態から、保存を伴わない承諾前の確認表示を組み立てる。 */
 export async function loadCompatibilityInvitationAcceptanceData(
   {
     relationshipId,
@@ -141,89 +94,27 @@ export async function loadCompatibilityInvitationAcceptanceData(
   if (!preview) return { type: "unavailable" };
   if (preview.isOwnInvitation) return { type: "own-invitation" };
 
-  const context = await dependencies.getInvitationContext(compatibilityData, relationshipId);
-  if (!context || !context.offeredProfile || !Array.isArray(context.offeredThemes)) {
-    return { type: "unavailable" };
-  }
-
-  const offeredDiagnosisIds = new Set(context.offeredDiagnosisIds);
-  const [inviterData, recipientData] = await Promise.all([
-    dependencies.loadSharePreviewData({
-      accountId: context.inviterAccountId,
-      verifiedDisplayName: preview.inviterDisplayName,
-      accountData,
-      at,
-      profileSummaryVersionId: context.offeredProfile.profileSummaryVersionId,
-    }),
-    dependencies.loadSharePreviewData({
-      accountId: session.session.accountId,
-      verifiedDisplayName: session.session.displayName,
-      accountData,
-      at,
-    }),
-  ]);
-  const offeredDiagnoses = inviterData.shareableDiagnoses.filter(({ diagnosisId }) =>
-    offeredDiagnosisIds.has(diagnosisId),
-  );
-  const offeredFingerprints = await dependencies.createThemeFingerprints(offeredDiagnoses);
-  if (!matchesOfferedSnapshot(context, inviterData, offeredFingerprints)) {
-    return { type: "unavailable" };
-  }
-
-  const inviterThemesById = new Map(
-    inviterData.preview.themes.map((theme) => [theme.diagnosisId, theme]),
-  );
-  const inviterThemes = context.offeredDiagnosisIds.flatMap((diagnosisId) => {
-    const theme = inviterThemesById.get(diagnosisId);
-    return theme ? [theme] : [];
+  const recipientData = await dependencies.loadSharePreviewData({
+    accountId: session.session.accountId,
+    verifiedDisplayName: session.session.displayName,
+    accountData,
+    at,
   });
-  const recipientThemesById = new Map(
-    recipientData.preview.themes.map((theme) => [theme.diagnosisId, theme]),
-  );
-  const recipientThemes = context.offeredDiagnosisIds.flatMap((diagnosisId) => {
-    const theme = recipientThemesById.get(diagnosisId);
-    return theme ? [theme] : [];
-  });
-  const blockingReasons: CompatibilityInvitationPreviewBlockingReason[] = [
-    ...recipientData.preview.blockingReasons,
-  ];
-  if (recipientThemes.length === 0) blockingReasons.push("common_diagnosis_required");
-
-  const aboutMe = inviterData.preview.aboutMe;
-  if (!aboutMe) return { type: "unavailable" };
+  const blockingReasons: CompatibilityInvitationBlockingReason[] =
+    recipientData.displayName === null ? ["display_name_unavailable"] : [];
 
   return {
     type: "resolved",
     invitation: {
-      inviter: {
-        displayName: preview.inviterDisplayName,
-        avatarUrl: null,
-        aboutMe,
-        themes: inviterThemes,
-      },
-      recipient: {
-        displayName: recipientData.preview.displayName,
-        avatarUrl: null,
-        previewToken: recipientData.preview.previewToken,
-        aboutMe: recipientData.preview.aboutMe,
-        themes: recipientThemes,
-      },
+      inviter: { displayName: preview.inviterDisplayName, avatarUrl: null },
+      recipient: { displayName: recipientData.displayName, avatarUrl: null },
       expiresAt: preview.expiresAt.toISOString(),
       canAccept: blockingReasons.length === 0,
       blockingReasons,
-      nextAction:
-        recipientData.preview.nextAction === "profile-summary"
-          ? "profile-summary"
-          : recipientThemes.length === 0
-            ? "diagnosis"
-            : recipientData.preview.nextAction,
+      nextAction: recipientData.nextAction,
     },
     inviteeAccountId: session.session.accountId,
-    context,
     recipientData,
-    recipientDiagnoses: recipientData.shareableDiagnoses.filter(({ diagnosisId }) =>
-      offeredDiagnosisIds.has(diagnosisId),
-    ),
   };
 }
 
