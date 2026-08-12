@@ -49,8 +49,9 @@ const ResponseSchema = v.strictObject({
 const COMPATIBILITY_SHARE_STATEMENT_LIMIT = 3;
 const COMPATIBILITY_SHARE_LABEL_MAX_LENGTH = 40;
 
+/** 半角の`!?`も、全角と同じく文章を分ける記号として扱う。 */
 const SAFE_COMPATIBILITY_SHARE_STATEMENT =
-  /^私は、[^\n。！？]{2,220}(?:を大切にしています|しやすいです|心地よく感じます|を好みます|したいです)[。]?$/u;
+  /^私は、[^\n。！？!?]{2,220}(?:を大切にしています|しやすいです|心地よく感じます|を好みます|したいです)[。]?$/u;
 const FORBIDDEN_COMPATIBILITY_SHARE_DETAIL =
   /[0-9０-９]|[「」『』“”"]|(?:今日|昨日|一昨日|明日|先週|今週|来週|先月|今月|来月|去年|今年|来年)|(?:[\p{Script=Han}\p{Script=Katakana}ー]{1,}(?:さん|氏|ちゃん|くん|先生))|(?:[\p{Script=Han}\p{Script=Katakana}ー]{2,}(?:都|道|府|県|市|区|町|村|駅|空港|公園|店舗|ホテル|学校|大学|病院|会社))|(?:健康|病気|病名|診断|治療|療養|服薬|薬|通院|入院|退院|症状|障害|うつ|鬱|パニック|不眠|自傷|自殺)|(?:日記|LINE|会話(?:本文|の引用)|相手|あなた|すべき|してほしい|して欲しい|得意|苦手|性格|能力|優秀)/u;
 const EVIDENCE_EXCERPT_LENGTH = 20;
