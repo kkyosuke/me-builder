@@ -99,6 +99,51 @@ describe("setup-api-docs-access", () => {
     );
   });
 
+  it("既存policyが同じ設定なら更新APIを呼ばない", async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        response(
+          [
+            {
+              id: "app-1",
+              name: "me-builder-api-docs-preview",
+              policies: [
+                {
+                  id: "policy-1",
+                  name: "Allow me-builder API docs developers",
+                  decision: "allow",
+                  include: [
+                    { email: { email: "ops@example.com" } },
+                    { email: { email: "dev@example.com" } },
+                  ],
+                  exclude: [],
+                  require: [],
+                  precedence: 1,
+                  session_duration: "24h",
+                },
+              ],
+            },
+          ],
+          { total_pages: 1 },
+        ),
+      )
+      .mockResolvedValueOnce(response({ id: "app-1", name: "me-builder-api-docs-preview" }));
+
+    await setupApiDocsAccess({
+      environment: "preview",
+      accountId: "account-1",
+      apiToken: "token",
+      baseDomain: "stg.example.com",
+      allowedEmails: ["dev@example.com", "ops@example.com"],
+      fetch: fetchMock,
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[1]?.[1]?.method).toBe("PUT");
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/policies/"))).toBe(false);
+  });
+
   it("同じ保護対象を持つ既存Applicationをpolicy検査後に引き継ぐ", async () => {
     const fetchMock = vi
       .fn<typeof fetch>()

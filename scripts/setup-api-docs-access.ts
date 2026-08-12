@@ -46,6 +46,11 @@ interface AccessPolicy {
   id: string;
   name: string;
   decision: string;
+  include?: Array<{ email?: { email?: string } }>;
+  exclude?: unknown[];
+  require?: unknown[];
+  precedence?: number;
+  session_duration?: string;
 }
 
 export interface SetupApiDocsAccessParams {
@@ -123,6 +128,27 @@ function policyPayload(allowedEmails: readonly string[]) {
     precedence: 1,
     session_duration: SESSION_DURATION,
   };
+}
+
+function hasSamePolicyConfiguration(
+  current: AccessPolicy,
+  desired: ReturnType<typeof policyPayload>,
+): boolean {
+  const currentEmails = current.include?.flatMap((rule) =>
+    rule.email?.email ? [rule.email.email.toLowerCase()] : [],
+  );
+  const desiredEmails = desired.include.map((rule) => rule.email.email.toLowerCase());
+  if (!currentEmails || currentEmails.length !== current.include?.length) return false;
+
+  return (
+    current.name === desired.name &&
+    current.decision === desired.decision &&
+    current.precedence === desired.precedence &&
+    current.session_duration === desired.session_duration &&
+    (current.exclude?.length ?? 0) === 0 &&
+    (current.require?.length ?? 0) === 0 &&
+    currentEmails.toSorted().join("\n") === desiredEmails.toSorted().join("\n")
+  );
 }
 
 function createApiClient(accountId: string, apiToken: string, fetchImpl: typeof globalThis.fetch) {
@@ -247,6 +273,12 @@ export async function setupApiDocsAccess(params: SetupApiDocsAccessParams): Prom
 
   const policy = policyPayload(params.allowedEmails);
   if (managedPolicies[0]) {
+    if (hasSamePolicyConfiguration(managedPolicies[0], policy)) {
+      console.info(
+        `Cloudflare Access is already configured for ${hostname} (${params.environment})`,
+      );
+      return;
+    }
     await callApi(`/access/apps/${application.id}/policies/${managedPolicies[0].id}`, {
       method: "PUT",
       body: JSON.stringify(policy),
