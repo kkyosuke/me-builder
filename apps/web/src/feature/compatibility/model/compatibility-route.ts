@@ -1,3 +1,5 @@
+import { compatibilityRelationshipId } from "@me-builder/lib/compatibility";
+
 export type CompatibilityRoute = "invitation" | "list" | "result" | "share";
 
 export function resolveCompatibilityPathname(pathname: string, search: string): string {
@@ -16,7 +18,9 @@ export function resolveCompatibilityRoute(pathname: string): CompatibilityRoute 
 }
 
 export function resolveCompatibilityInvitationId(pathname: string): string | null {
-  return pathname.match(/^\/compatibility\/invitations\/([a-f0-9]{64})$/)?.[1] ?? null;
+  const prefix = "/compatibility/invitations/";
+  if (!pathname.startsWith(prefix)) return null;
+  return compatibilityRelationshipId.parse(pathname.slice(prefix.length)) ?? null;
 }
 
 export function resolveCompatibilityRelationshipId(pathname: string): string | null {

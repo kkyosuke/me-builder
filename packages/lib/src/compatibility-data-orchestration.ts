@@ -235,13 +235,16 @@ export async function endCompatibilityRelationshipWithReferences(
       throw new Error("Ended compatibility relationship must have both participants");
     }
     const participantIds = [result.relationship.inviterAccountId, inviteeAccountId].sort();
-    for (const accountId of participantIds) {
-      await accountDataFor(accountNamespace, accountId).execute(
-        "compatibility.endReference",
-        relationshipId,
-        new Date(),
-      );
-    }
+    const endedAt = new Date();
+    await Promise.all(
+      participantIds.map((accountId) =>
+        accountDataFor(accountNamespace, accountId).execute(
+          "compatibility.endReference",
+          relationshipId,
+          endedAt,
+        ),
+      ),
+    );
   }
   return result;
 }

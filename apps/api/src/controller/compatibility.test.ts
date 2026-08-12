@@ -16,6 +16,9 @@ const { getCompatibilityInvitationContents } = vi.hoisted(() => ({
 const { getCompatibilityInvitationAvatar } = vi.hoisted(() => ({
   getCompatibilityInvitationAvatar: vi.fn(),
 }));
+const { endCompatibilityRelationship } = vi.hoisted(() => ({
+  endCompatibilityRelationship: vi.fn(),
+}));
 vi.mock("../logic/compatibility-share-preview", () => ({ getCompatibilityShareConsent }));
 vi.mock("../logic/compatibility-invitation", () => ({ issueCompatibilityInvitation }));
 vi.mock("../logic/compatibility-invitation-preview", () => ({
@@ -24,6 +27,7 @@ vi.mock("../logic/compatibility-invitation-preview", () => ({
 vi.mock("../logic/compatibility-invitation-avatar", () => ({
   getCompatibilityInvitationAvatar,
 }));
+vi.mock("../logic/compatibility-relationship-end", () => ({ endCompatibilityRelationship }));
 
 const dummyDb = {} as D1Database;
 const dummyAvatarBucket = {} as R2Bucket;
@@ -200,6 +204,15 @@ describe("POST /api/compatibility/invitations", () => {
     expect(response.status).toBe(503);
     expect(issueCompatibilityInvitation).not.toHaveBeenCalled();
   });
+
+  it.each([
+    { LIFF_ID: "invalid" },
+    { LIFF_ID: "2010850319-Yl63upAR", LINE_LOGIN_CHANNEL_ID: "9999999999" },
+  ])("不正なLIFF設定を招待作成前に500で拒否する", async (env) => {
+    const response = await issueRequest({ previewToken }, env);
+    expect(response.status).toBe(500);
+    expect(issueCompatibilityInvitation).not.toHaveBeenCalled();
+  });
 });
 
 describe("GET /api/compatibility/invitations/:relationshipId", () => {
@@ -329,5 +342,86 @@ describe("GET /api/compatibility/invitations/:relationshipId/avatar", () => {
     const response = await requestAvatar({ AVATAR_BUCKET: undefined });
     expect(response.status).toBe(503);
     expect(getCompatibilityInvitationAvatar).not.toHaveBeenCalled();
+  });
+});
+
+describe("DELETE /api/compatibility/relationships/:relationshipId", () => {
+  beforeEach(() => vi.clearAllMocks());
+  const relationshipId = "1".repeat(64);
+
+  function endRequest(env: Record<string, unknown> = {}, authorization = "Bearer dummy.id.token") {
+    return app.request(
+      `/api/compatibility/relationships/${relationshipId}`,
+      { method: "DELETE", headers: { Authorization: authorization } },
+      {
+        LIFF_ID: "2010850319-Yl63upAR",
+        DB: dummyDb,
+        ACCOUNT_DATA: dummyAccountData,
+        COMPATIBILITY_DATA: dummyCompatibilityData,
+        ...env,
+      },
+    );
+  }
+
+  it("endedをno-storeの204へ変換する", async () => {
+    endCompatibilityRelationship.mockResolvedValue({ type: "ended" });
+    const response = await endRequest();
+    expect(response.status).toBe(204);
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    expect(await response.text()).toBe("");
+    expect(endCompatibilityRelationship).toHaveBeenCalledWith(
+      expect.objectContaining({
+        relationshipId,
+        idToken: "dummy.id.token",
+        accountData: dummyAccountData,
+        compatibilityData: dummyCompatibilityData,
+      }),
+    );
+  });
+
+  it("unavailableを404へ変換する", async () => {
+    endCompatibilityRelationship.mockResolvedValue({ type: "unavailable" });
+    const response = await endRequest();
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({
+      error: "Compatibility relationship unavailable",
+      reason: "relationship_unavailable",
+    });
+  });
+
+  it.each([
+    { outcome: { type: "not-configured" }, status: 401, body: { error: "Unauthorized" } },
+    {
+      outcome: { type: "unauthenticated", reason: "invalid" },
+      status: 401,
+      body: { error: "Unauthorized" },
+    },
+    {
+      outcome: { type: "account-not-found" },
+      status: 404,
+      body: { error: "Account not found", reason: "friendship_required" },
+    },
+  ])("認証結果をHTTPへ変換する", async ({ outcome, status, body }) => {
+    endCompatibilityRelationship.mockResolvedValue(outcome);
+    const response = await endRequest();
+    expect(response.status).toBe(status);
+    expect(await response.json()).toEqual(body);
+  });
+
+  it.each(["DB", "ACCOUNT_DATA", "COMPATIBILITY_DATA"])(
+    "%s bindingがなければlogicを呼ばず503を返す",
+    async (binding) => {
+      const response = await endRequest({ [binding]: undefined });
+      expect(response.status).toBe(503);
+      expect(endCompatibilityRelationship).not.toHaveBeenCalled();
+    },
+  );
+
+  it("Bearer形式でない認証情報をIDトークンとして渡さない", async () => {
+    endCompatibilityRelationship.mockResolvedValue({ type: "unauthenticated", reason: "missing" });
+    await endRequest({}, "Basic credentials");
+    expect(endCompatibilityRelationship).toHaveBeenCalledWith(
+      expect.objectContaining({ idToken: undefined }),
+    );
   });
 });

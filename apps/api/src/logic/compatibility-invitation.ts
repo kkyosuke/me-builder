@@ -3,6 +3,7 @@ import {
   type CompatibilityDataNamespace,
   type D1,
   createCompatibilityInvitationWithReference,
+  line,
 } from "@me-builder/lib";
 import { createCompatibilityInvitationUrl } from "./compatibility-invitation-url";
 import { createLiffSession } from "./liff-session";
@@ -38,7 +39,16 @@ export async function issueCompatibilityInvitation(
   { idToken, lineLoginChannelId, liffId, db, accountData, compatibilityData }: Params,
   dependencies: Dependencies = defaultDependencies,
 ): Promise<CompatibilityInvitationIssueOutcome> {
-  const session = await dependencies.createSession({ idToken, lineLoginChannelId, db });
+  const resolvedLiff = line.configuration.resolveLiffConfiguration({
+    liffId,
+    lineLoginChannelId,
+  });
+  if (!resolvedLiff.liffId) throw new Error("LIFF_ID is required to issue an invitation");
+  const session = await dependencies.createSession({
+    idToken,
+    lineLoginChannelId: resolvedLiff.lineLoginChannelId,
+    db,
+  });
   if (session.type !== "resolved") return session;
 
   // 共有対象は関係の成立後に自動で最新化されるため、発行時に固定するのは表示名だけ。
@@ -51,7 +61,7 @@ export async function issueCompatibilityInvitation(
   });
   return {
     type: "created",
-    invitationUrl: createCompatibilityInvitationUrl(liffId, result.relationship.id),
+    invitationUrl: createCompatibilityInvitationUrl(resolvedLiff.liffId, result.relationship.id),
     expiresAt: result.relationship.expiresAt.toISOString(),
   };
 }

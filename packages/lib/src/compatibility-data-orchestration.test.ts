@@ -159,12 +159,19 @@ describe("compatibility data orchestration", () => {
 
   it("相性関係の正本を終了した後にAccount ID順で双方の一覧参照を終了する", async () => {
     const calls: string[] = [];
+    const endedAtValues: Date[] = [];
     const accountNamespace = {
       getByName(accountId: string) {
         return {
-          async execute(routedAccountId: string, operation: string) {
+          async execute(
+            routedAccountId: string,
+            operation: string,
+            _relationshipId: string,
+            at: Date,
+          ) {
             expect(routedAccountId).toBe(accountId);
             calls.push(`${accountId}.${operation}`);
+            endedAtValues.push(at);
             return null;
           },
         };
@@ -197,5 +204,61 @@ describe("compatibility data orchestration", () => {
       "account-a.compatibility.endReference",
       "account-b.compatibility.endReference",
     ]);
+    expect(endedAtValues).toHaveLength(2);
+    expect(endedAtValues[0]).toBe(endedAtValues[1]);
+  });
+
+  it("正本終了後に片方の参照更新だけ失敗しても再試行で双方を冪等修復する", async () => {
+    const attempts = new Map<string, number>();
+    const accountNamespace = {
+      getByName(accountId: string) {
+        return {
+          async execute() {
+            attempts.set(accountId, (attempts.get(accountId) ?? 0) + 1);
+            if (accountId === "account-a" && attempts.get(accountId) === 1) {
+              throw new Error("account-a unavailable");
+            }
+            return null;
+          },
+        };
+      },
+    } as unknown as AccountDataNamespace;
+    let canonicalAttempt = 0;
+    const relationship = {
+      inviterAccountId: "account-a",
+      inviteeAccountId: "account-b",
+    };
+    const compatibilityNamespace = {
+      getByName: () => ({
+        async endRelationship() {
+          canonicalAttempt += 1;
+          return { outcome: canonicalAttempt === 1 ? "ended" : "unchanged", relationship };
+        },
+      }),
+    } as unknown as CompatibilityDataNamespace;
+
+    await expect(
+      endCompatibilityRelationshipWithReferences(
+        accountNamespace,
+        compatibilityNamespace,
+        "1".repeat(64),
+        "account-a",
+      ),
+    ).rejects.toThrow("account-a unavailable");
+    await expect(
+      endCompatibilityRelationshipWithReferences(
+        accountNamespace,
+        compatibilityNamespace,
+        "1".repeat(64),
+        "account-a",
+      ),
+    ).resolves.toMatchObject({ outcome: "unchanged" });
+
+    expect(attempts).toEqual(
+      new Map([
+        ["account-a", 2],
+        ["account-b", 2],
+      ]),
+    );
   });
 });

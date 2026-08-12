@@ -71,4 +71,23 @@ describe("getConfig & ConfigSchema", () => {
 
     expect(conf.lineWebhookUrl).toBe("https://custom.com/webhook");
   });
+
+  it("LIFF IDからLINE LoginチャネルIDを補完すること", () => {
+    const conf = getConfig({ LIFF_ID: "2010850319-Yl63upAR" });
+    expect(conf.liffId).toBe("2010850319-Yl63upAR");
+    expect(conf.lineLoginChannelId).toBe("2010850319");
+  });
+
+  it("不正なLIFF IDを拒否すること", () => {
+    expect(() => getConfig({ LIFF_ID: "not-a-liff-id" })).toThrow("LIFF_ID");
+  });
+
+  it("明示チャネルIDとLIFF IDの接頭辞が不一致なら拒否すること", () => {
+    expect(() =>
+      getConfig({
+        LIFF_ID: "2010850319-Yl63upAR",
+        LINE_LOGIN_CHANNEL_ID: "9999999999",
+      }),
+    ).toThrow("must match");
+  });
 });

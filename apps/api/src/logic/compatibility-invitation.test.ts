@@ -31,7 +31,7 @@ describe("issueCompatibilityInvitation", () => {
     const result = await issueCompatibilityInvitation(
       {
         idToken: "id-token",
-        lineLoginChannelId: "channel-id",
+        lineLoginChannelId: "1234567890",
         liffId: "1234567890-testliff",
         db,
         accountData,
@@ -58,7 +58,7 @@ describe("issueCompatibilityInvitation", () => {
       issueCompatibilityInvitation(
         {
           idToken: "id-token",
-          lineLoginChannelId: "channel-id",
+          lineLoginChannelId: "1234567890",
           liffId: "1234567890-testliff",
           db,
           accountData,
@@ -82,7 +82,7 @@ describe("issueCompatibilityInvitation", () => {
       issueCompatibilityInvitation(
         {
           idToken: "id-token",
-          lineLoginChannelId: "channel-id",
+          lineLoginChannelId: "1234567890",
           liffId: "1234567890-testliff",
           db,
           accountData,
@@ -91,6 +91,26 @@ describe("issueCompatibilityInvitation", () => {
         deps,
       ),
     ).resolves.toEqual({ type: "share-unavailable" });
+    expect(deps.createInvitation).not.toHaveBeenCalled();
+  });
+
+  it("LIFF設定が不正ならセッションや招待正本を作る前に拒否する", async () => {
+    const deps = dependencies();
+
+    await expect(
+      issueCompatibilityInvitation(
+        {
+          idToken: "id-token",
+          lineLoginChannelId: "9999999999",
+          liffId: "1234567890-testliff",
+          db,
+          accountData,
+          compatibilityData,
+        },
+        deps,
+      ),
+    ).rejects.toThrow("must match");
+    expect(deps.createSession).not.toHaveBeenCalled();
     expect(deps.createInvitation).not.toHaveBeenCalled();
   });
 });

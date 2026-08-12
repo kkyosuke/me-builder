@@ -1,9 +1,10 @@
+import { compatibilityRelationshipId } from "@me-builder/lib";
 import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
 import * as v from "valibot";
 import { authenticatedErrors, jsonResponse } from "../shared/errors";
 
 export const AcceptCompatibilityInvitationResponseSchema = v.object({
-  relationshipId: v.pipe(v.string(), v.regex(/^[a-f0-9]{64}$/)),
+  relationshipId: compatibilityRelationshipId.schema,
   status: v.literal("accepted"),
 });
 

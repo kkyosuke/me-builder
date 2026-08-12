@@ -1,3 +1,20 @@
+import * as v from "valibot";
+
+const COMPATIBILITY_RELATIONSHIP_ID_PATTERN = /^[a-f0-9]{64}$/;
+const CompatibilityRelationshipIdSchema = v.pipe(
+  v.string(),
+  v.regex(COMPATIBILITY_RELATIONSHIP_ID_PATTERN),
+);
+
+/** relationship ID の生成元が所有する、公開範囲を絞った検証境界。 */
+export const compatibilityRelationshipId = {
+  schema: CompatibilityRelationshipIdSchema,
+  parse(value: string): string | undefined {
+    const parsed = v.safeParse(CompatibilityRelationshipIdSchema, value);
+    return parsed.success ? parsed.output : undefined;
+  },
+} as const;
+
 export type CompatibilityRelationshipStatus =
   | "pending"
   | "accepted"

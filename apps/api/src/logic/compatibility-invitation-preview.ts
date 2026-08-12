@@ -4,11 +4,10 @@ import {
   type CompatibilityInvitationPreview,
   type D1,
   compatibilityDataFor,
+  compatibilityRelationshipId,
 } from "@me-builder/lib";
 import { loadCompatibilitySharePreviewData } from "./compatibility-share-preview";
 import { createLiffSession } from "./liff-session";
-
-const RELATIONSHIP_ID_PATTERN = /^[a-f0-9]{64}$/;
 
 type CompatibilityInvitationBlockingReason = "display_name_unavailable";
 
@@ -75,7 +74,7 @@ export async function resolveCompatibilityInvitationRecipient(
 ): Promise<CompatibilityInvitationRecipientOutcome> {
   const session = await dependencies.createSession({ idToken, lineLoginChannelId, db });
   if (session.type !== "resolved") return session;
-  if (!RELATIONSHIP_ID_PATTERN.test(relationshipId)) return { type: "unavailable" };
+  if (!compatibilityRelationshipId.parse(relationshipId)) return { type: "unavailable" };
 
   const preview = await dependencies.getInvitationPreview(
     compatibilityData,

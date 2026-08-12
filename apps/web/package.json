@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@line/liff": "^2.29.1",
+    "@me-builder/lib": "workspace:*",
     "@me-builder/shared": "workspace:*",
     "@tailwindcss/vite": "^4.3.3",
     "lucide-react": "^1.27.0",
@@ -26,7 +27,6 @@
     "valibot": "^1.4.2"
   },
   "devDependencies": {
-    "@me-builder/lib": "workspace:*",
     "@testing-library/react": "^16.3.0",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",

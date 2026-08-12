@@ -168,18 +168,3 @@ describe("line.idToken.verify の経過時間チェック", () => {
     expect((await idToken.verify({ idToken: ID_TOKEN, channelId: CHANNEL_ID })).ok).toBe(true);
   });
 });
-
-describe("line.idToken.resolveLoginChannelId", () => {
-  it("チャネル ID が指定されていればそれを使うこと", () => {
-    expect(idToken.resolveLoginChannelId({ channelId: "111", liffId: "222-abc" })).toBe("111");
-  });
-
-  it("未指定なら LIFF ID の接頭辞から補完すること", () => {
-    expect(idToken.resolveLoginChannelId({ liffId: `${CHANNEL_ID}-Yl63upAR` })).toBe(CHANNEL_ID);
-  });
-
-  it("接頭辞が数値でなければ補完しないこと", () => {
-    expect(idToken.resolveLoginChannelId({ liffId: "abc-def" })).toBeUndefined();
-    expect(idToken.resolveLoginChannelId({})).toBeUndefined();
-  });
-});

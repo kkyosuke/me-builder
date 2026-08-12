@@ -3,10 +3,9 @@ import {
   type CompatibilityDataNamespace,
   type D1,
   cancelCompatibilityInvitationWithReference,
+  compatibilityRelationshipId,
 } from "@me-builder/lib";
 import { createLiffSession } from "./liff-session";
-
-const RELATIONSHIP_ID_PATTERN = /^[a-f0-9]{64}$/;
 
 type Params = Readonly<{
   relationshipId: string;
@@ -30,7 +29,7 @@ export async function cancelCompatibilityInvitation(
 ): Promise<CancelCompatibilityInvitationOutcome> {
   const session = await createLiffSession(params);
   if (session.type !== "resolved") return session;
-  if (!RELATIONSHIP_ID_PATTERN.test(params.relationshipId)) return { type: "unavailable" };
+  if (!compatibilityRelationshipId.parse(params.relationshipId)) return { type: "unavailable" };
   const result = await cancelCompatibilityInvitationWithReference(
     params.accountData,
     params.compatibilityData,
