@@ -170,7 +170,7 @@ export async function receiveLineWebhook({
 
   const filtered = excludeUnsupportedMessageEvents(payload);
   if (filtered.excludedCount > 0) {
-    await Promise.all(
+    const unsupportedReplies = Promise.all(
       filtered.replyTokens.map(async (replyToken) => {
         if (!replyUnsupportedMessage) return;
         try {
@@ -184,6 +184,9 @@ export async function receiveLineWebhook({
         }
       }),
     );
+    // LINE返信の遅延で、同じWebhookに含まれるテキストのQueue投入をブロックしない。
+    // controllerがExecutionContextへ登録し、ローカル実行でも開始済みPromiseとして継続する。
+    waitUntil?.(unsupportedReplies);
   }
 
   const traceId = crypto.randomUUID();

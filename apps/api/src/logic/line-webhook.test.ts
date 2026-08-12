@@ -165,6 +165,24 @@ describe("receiveLineWebhook unsupported messages", () => {
     await expect(result).resolves.toMatchObject({ type: "accepted", queued: false });
     expect(send).not.toHaveBeenCalled();
   });
+
+  it("案内の返信完了を待たず、混在するテキストをQueueへ投入する", async () => {
+    const replyUnsupportedMessage = vi.fn(() => new Promise<unknown>(() => {}));
+    const waitUntil = vi.fn();
+    const imageEvent = {
+      ...textEvent(""),
+      replyToken: "reply-image",
+      message: { type: "image", id: "image-id" },
+    };
+    const { send, result } = receive([imageEvent, textEvent("今日は散歩した")], {
+      replyUnsupportedMessage,
+      waitUntil,
+    });
+
+    await expect(result).resolves.toMatchObject({ type: "accepted", queued: true });
+    expect(waitUntil).toHaveBeenCalledOnce();
+    expect(send).toHaveBeenCalledOnce();
+  });
 });
 
 describe("replyTokenの受け渡し", () => {
