@@ -40,10 +40,38 @@ function createMessage(attempts = 1): Message<ProfileSummaryGenerationQueueMessa
   } as Message<ProfileSummaryGenerationQueueMessage>;
 }
 
+function generatedOutcome(rejectedShareRules: string[] = []) {
+  return {
+    type: "generated",
+    summary: {
+      headline: "日々の記録から見えるあなた",
+      insights: [
+        {
+          key: "diary",
+          label: "日記を振り返る",
+          description: "日々の実感を大切にする傾向があります。",
+          evidenceCount: 1,
+          sources: ["diary"],
+        },
+      ],
+      compatibilityShareStatements: [
+        {
+          key: "reflecting",
+          label: "振り返る時間",
+          statement: "私は、落ち着いて振り返る時間を大切にしています",
+          evidenceIds: ["diary:source-1"],
+        },
+      ],
+    },
+    rejectedShareRules,
+  };
+}
+
 describe("processProfileSummaryGenerationMessage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.spyOn(logger, "info").mockImplementation(() => undefined);
+    vi.spyOn(logger, "warn").mockImplementation(() => undefined);
     vi.spyOn(logger, "error").mockImplementation(() => undefined);
     execute.mockImplementation(async (_accountId: string, operation: string) => {
       if (operation === "profileSummary.loadGenerationContext") {
@@ -72,26 +100,7 @@ describe("processProfileSummaryGenerationMessage", () => {
   });
 
   it("AI生成結果を新しい版として保存してackする", async () => {
-    generateProfileSummary.mockResolvedValue({
-      headline: "日々の記録から見えるあなた",
-      insights: [
-        {
-          key: "diary",
-          label: "日記を振り返る",
-          description: "日々の実感を大切にする傾向があります。",
-          evidenceCount: 1,
-          sources: ["diary"],
-        },
-      ],
-      compatibilityShareStatements: [
-        {
-          key: "reflecting",
-          label: "振り返る時間",
-          statement: "私は、落ち着いて振り返る時間を大切にしています",
-          evidenceIds: ["diary:source-1"],
-        },
-      ],
-    });
+    generateProfileSummary.mockResolvedValue(generatedOutcome());
     const message = createMessage();
 
     await processProfileSummaryGenerationMessage(message, cf, workerConfig);
@@ -113,8 +122,31 @@ describe("processProfileSummaryGenerationMessage", () => {
     expect(message.retry).not.toHaveBeenCalled();
   });
 
+  it("共有専用文章を落とした場合も版を保存し、縮退成功として記録する", async () => {
+    generateProfileSummary.mockResolvedValue(generatedOutcome(["forbidden_detail"]));
+    const message = createMessage();
+
+    await processProfileSummaryGenerationMessage(message, cf, workerConfig);
+
+    expect(execute).toHaveBeenCalledWith(
+      "account-1",
+      "profileSummary.completeGeneration",
+      expect.objectContaining({ generationId: "generation-1" }),
+    );
+    expect(message.ack).toHaveBeenCalledOnce();
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        outcome: "degraded",
+        resultCode: "PROFILE_SUMMARY_SHARE_STATEMENTS_REJECTED",
+        rejectedShareStatementCount: 1,
+        rejectedShareRules: ["forbidden_detail"],
+      }),
+      expect.any(String),
+    );
+  });
+
   it("最終試行で失敗状態を保存してDLQへ送る", async () => {
-    generateProfileSummary.mockResolvedValue(undefined);
+    generateProfileSummary.mockResolvedValue({ type: "failed", reason: "response_truncated" });
     const message = createMessage(6);
 
     await processProfileSummaryGenerationMessage(message, cf, workerConfig);
@@ -127,5 +159,39 @@ describe("processProfileSummaryGenerationMessage", () => {
     );
     expect(message.retry).toHaveBeenCalledOnce();
     expect(message.ack).not.toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        errorCode: "PROFILE_SUMMARY_RESPONSE_TRUNCATED",
+        errorCategory: "dependency",
+        stage: "ai.generate",
+        disposition: "dead-letter",
+      }),
+      expect.any(String),
+    );
+  });
+
+  it("設定不足で生成できない場合はQueueの試行を使い切らずに失敗を確定する", async () => {
+    generateProfileSummary.mockResolvedValue({ type: "failed", reason: "ai_credentials_missing" });
+    const message = createMessage();
+
+    await processProfileSummaryGenerationMessage(message, cf, workerConfig);
+
+    expect(execute).toHaveBeenCalledWith(
+      "account-1",
+      "profileSummary.failGeneration",
+      "generation-1",
+      expect.any(String),
+    );
+    expect(message.ack).toHaveBeenCalledOnce();
+    expect(message.retry).not.toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        errorCode: "PROFILE_SUMMARY_AI_CREDENTIALS_MISSING",
+        errorCategory: "configuration",
+        retryable: false,
+        disposition: "ack",
+      }),
+      expect.any(String),
+    );
   });
 });

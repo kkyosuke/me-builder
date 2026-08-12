@@ -175,18 +175,30 @@ async function recordGeminiUsage(
   if (usage) await recorder(usage);
 }
 
-export async function generateStructuredText(
+type StructuredTextInput = {
+  model: string;
+  contents: string;
+  systemInstruction: string;
+  responseJsonSchema: Record<string, unknown>;
+  maxOutputTokens: number;
+  signal?: AbortSignal;
+  onUsage?: GeminiUsageRecorder;
+};
+
+type StructuredTextResponse = {
+  text: string | undefined;
+  /**
+   * 生成が終わった理由。`MAX_TOKENS`で切れた応答は途中までのJSONになり、
+   * schema不適合と区別できないため、呼び出し側が原因を分けられるように残す。
+   */
+  finishReason: string | undefined;
+};
+
+/** 構造化出力を、応答本文と終了理由の両方が分かる形で取得します。 */
+export async function generateStructuredResponse(
   client: GoogleGenAI,
-  input: {
-    model: string;
-    contents: string;
-    systemInstruction: string;
-    responseJsonSchema: Record<string, unknown>;
-    maxOutputTokens: number;
-    signal?: AbortSignal;
-    onUsage?: GeminiUsageRecorder;
-  },
-): Promise<string | undefined> {
+  input: StructuredTextInput,
+): Promise<StructuredTextResponse> {
   try {
     const response = await client.models.generateContent({
       model: input.model,
@@ -200,10 +212,17 @@ export async function generateStructuredText(
       },
     });
     await recordGeminiUsage(response, input.model, input.onUsage);
-    return response.text;
+    return { text: response.text, finishReason: response.candidates?.[0]?.finishReason };
   } catch (error) {
     throw toGeminiOperationalError(error, "ai.generate");
   }
+}
+
+export async function generateStructuredText(
+  client: GoogleGenAI,
+  input: StructuredTextInput,
+): Promise<string | undefined> {
+  return (await generateStructuredResponse(client, input)).text;
 }
 
 /** 検索対象文を固定次元のembeddingへ変換する。 */

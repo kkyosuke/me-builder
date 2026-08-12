@@ -134,24 +134,28 @@ describe("Profile Summary Queue recovery E2E", () => {
       ),
     );
     generateProfileSummary.mockImplementation(async (context: ProfileSummaryGenerationContext) => ({
-      headline: "見通しを持つと落ち着いて動けます",
-      insights: [
-        {
-          key: "planning",
-          label: "見通しを持つ",
-          description: "予定を把握すると落ち着いて動きやすい傾向があります。",
-          evidenceCount: 1,
-          sources: ["diary"],
-        },
-      ],
-      compatibilityShareStatements: [
-        {
-          key: "planning-style",
-          label: "予定の立て方",
-          statement: "私は、先の見通しを持って動くことを大切にしています",
-          evidenceIds: [context.evidence[0]?.id ?? ""],
-        },
-      ],
+      type: "generated",
+      summary: {
+        headline: "見通しを持つと落ち着いて動けます",
+        insights: [
+          {
+            key: "planning",
+            label: "見通しを持つ",
+            description: "予定を把握すると落ち着いて動きやすい傾向があります。",
+            evidenceCount: 1,
+            sources: ["diary"],
+          },
+        ],
+        compatibilityShareStatements: [
+          {
+            key: "planning-style",
+            label: "予定の立て方",
+            statement: "私は、先の見通しを持って動くことを大切にしています",
+            evidenceIds: [context.evidence[0]?.id ?? ""],
+          },
+        ],
+      },
+      rejectedShareRules: [],
     }));
   });
 
