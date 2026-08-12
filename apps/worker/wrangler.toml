@@ -44,6 +44,10 @@ queue = "me-builder-brain-checkpoint-queue-local"
 binding = "BRAIN_CHECKPOINT_QUEUE"
 
 [[queues.producers]]
+queue = "me-builder-profile-summary-queue-local"
+binding = "PROFILE_SUMMARY_QUEUE"
+
+[[queues.producers]]
 queue = "me-builder-brain-vector-queue-local"
 binding = "BRAIN_VECTOR_QUEUE"
 
@@ -125,6 +129,10 @@ queue = "me-builder-brain-checkpoint-queue-local"
 binding = "BRAIN_CHECKPOINT_QUEUE"
 
 [[env.local.queues.producers]]
+queue = "me-builder-profile-summary-queue-local"
+binding = "PROFILE_SUMMARY_QUEUE"
+
+[[env.local.queues.producers]]
 queue = "me-builder-brain-vector-queue-local"
 binding = "BRAIN_VECTOR_QUEUE"
 
@@ -189,6 +197,10 @@ queue = "me-builder-brain-checkpoint-queue-preview"
 binding = "BRAIN_CHECKPOINT_QUEUE"
 
 [[env.preview.queues.producers]]
+queue = "me-builder-profile-summary-queue-preview"
+binding = "PROFILE_SUMMARY_QUEUE"
+
+[[env.preview.queues.producers]]
 queue = "me-builder-brain-vector-queue-preview"
 binding = "BRAIN_VECTOR_QUEUE"
 
@@ -251,6 +263,10 @@ binding = "CHAT_TURN_QUEUE"
 [[env.production.queues.producers]]
 queue = "me-builder-brain-checkpoint-queue-production"
 binding = "BRAIN_CHECKPOINT_QUEUE"
+
+[[env.production.queues.producers]]
+queue = "me-builder-profile-summary-queue-production"
+binding = "PROFILE_SUMMARY_QUEUE"
 
 [[env.production.queues.producers]]
 queue = "me-builder-brain-vector-queue-production"

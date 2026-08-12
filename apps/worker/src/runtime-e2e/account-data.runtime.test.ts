@@ -99,6 +99,35 @@ describe("AccountData Workers runtime E2E", () => {
     });
   });
 
+  it("Worker runtimeのQueue bindingから未配送のまとめ生成要求を再送する", async () => {
+    const accountId = crypto.randomUUID();
+    const generationId = crypto.randomUUID();
+    const stub = env.ACCOUNT_DATA.getByName(accountId);
+
+    expect(env.PROFILE_SUMMARY_QUEUE).toBeDefined();
+    await runInDurableObject(stub, async (instance: AccountData, state) => {
+      state.storage.sql.exec(
+        `INSERT INTO profile_summary_generations
+          (id, account_id, status, requested_at)
+         VALUES (?, ?, 'queued', ?)`,
+        generationId,
+        accountId,
+        Date.now() - 60_000,
+      );
+
+      await instance.alarm();
+
+      expect(
+        state.storage.sql
+          .exec<{ dispatched_at: number | null }>(
+            "SELECT dispatched_at FROM profile_summary_generations WHERE id = ?",
+            generationId,
+          )
+          .one().dispatched_at,
+      ).toEqual(expect.any(Number));
+    });
+  });
+
   it("既存0000 baselineのAccountデータを保ったまま後続migrationを適用できる", async () => {
     const accountId = crypto.randomUUID();
     const stub = env.ACCOUNT_DATA.getByName(accountId);
