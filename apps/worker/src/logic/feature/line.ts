@@ -8,6 +8,7 @@ import {
 } from "@me-builder/shared";
 import * as v from "valibot";
 import type { WorkerConfig } from "../../config";
+import { replyLineText } from "../../infrastructure/line-delivery";
 
 export const classifyLineText = line.text.classify;
 
@@ -129,19 +130,27 @@ export async function processLineWebhook(
         });
         continue;
       }
-      try {
-        await line.client.create(workerConfig.lineChannelAccessToken).replyMessage({
-          replyToken: event.replyToken,
-          messages: [{ type: "text", text: buildDiagnosisReplyText(workerConfig.liffId) }],
-        });
-      } catch (error) {
-        throw toOperationalError(error, {
+      const replyOutcome = await replyLineText({
+        channelAccessToken: workerConfig.lineChannelAccessToken,
+        replyToken: event.replyToken,
+        texts: [buildDiagnosisReplyText(workerConfig.liffId)],
+      });
+      if (replyOutcome === "unknown") {
+        throw new OperationalError({
           code: "LINE_DIAGNOSIS_REPLY_FAILED",
           category: "dependency",
           stage: "line.reply",
           retryable: true,
           dependency: "line",
         });
+      }
+      if (replyOutcome === "rejected") {
+        result = mergeResult(result, {
+          outcome: "degraded",
+          stage: "line.reply",
+          resultCode: "LINE_DIAGNOSIS_REPLY_REJECTED",
+        });
+        continue;
       }
       result = mergeResult(result, { outcome: "succeeded", stage: "line.reply" });
       continue;
