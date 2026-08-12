@@ -74,7 +74,7 @@ describe("issueCompatibilityInvitation", () => {
         idToken: "id-token",
         previewToken,
         lineLoginChannelId: "channel-id",
-        webOrigin: "https://example.com",
+        liffId: "1234567890-testliff",
         db,
         accountData,
         compatibilityData,
@@ -85,7 +85,7 @@ describe("issueCompatibilityInvitation", () => {
 
     expect(result).toEqual({
       type: "created",
-      invitationUrl: `https://example.com/compatibility/invitations/${relationshipId}`,
+      invitationUrl: `https://liff.line.me/1234567890-testliff/compatibility/invitations/${relationshipId}`,
       expiresAt: expiresAt.toISOString(),
     });
     expect(deps.createInvitation).toHaveBeenCalledWith(accountData, compatibilityData, {
@@ -110,7 +110,7 @@ describe("issueCompatibilityInvitation", () => {
           idToken: "id-token",
           previewToken,
           lineLoginChannelId: "channel-id",
-          webOrigin: "https://example.com",
+          liffId: "1234567890-testliff",
           db,
           accountData,
           compatibilityData,

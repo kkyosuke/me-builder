@@ -44,7 +44,8 @@ export const compatibilitySharePreviewCases = {
     out: {
       status: 201,
       body: {
-        invitationUrlPattern: "^https://example\\.com/compatibility/invitations/[a-f0-9]{64}$",
+        invitationUrlPattern:
+          "^https://liff\\.line\\.me/1234567890-testliff/compatibility/invitations/[a-f0-9]{64}$",
         expiresAt: "CompatibilityDataが決定する14日後のISO日時",
         senderReferenceStatus: "pending",
       },
@@ -193,6 +194,46 @@ export const compatibilitySharePreviewCases = {
         relationshipStatus: "cancelled",
         invitationPreviewStatus: 404,
         senderList: "empty",
+      },
+    },
+  },
+  endRelationship: {
+    id: "COMPATIBILITY-RELATIONSHIP-END-001",
+    name: "片方が共有を終了すると双方の一覧と相性シートから消えること",
+    in: {
+      method: "DELETE",
+      path: "/api/compatibility/relationships/:relationshipId",
+      authorization: "Bearer recipient-token",
+      setup: ["送信者と受信者が招待を承諾して相性関係を成立"],
+    },
+    out: {
+      status: 204,
+      body: {
+        relationshipStatus: "ended",
+        bothLists: "empty",
+        bothDetailStatuses: 404,
+      },
+    },
+  },
+  shareJourney: {
+    id: "COMPATIBILITY-SHARE-JOURNEY-001",
+    name: "LIFF共有リンクの発行から受信者の招待内容表示まで到達できること",
+    in: {
+      method: "GET",
+      path: "/api/compatibility/invitations/:relationshipId",
+      authorization: "Bearer recipient-token",
+      setup: [
+        "送信者が共有プレビューを確認してLIFF招待リンクを発行",
+        "受信者がリンク内のrelationshipIdで招待画面の表示内容を取得",
+      ],
+    },
+    out: {
+      status: 200,
+      body: {
+        invitationUrlOrigin: "https://liff.line.me/1234567890-testliff",
+        inviterDisplayName: "あおい",
+        recipientDisplayName: "はる",
+        canAccept: true,
       },
     },
   },

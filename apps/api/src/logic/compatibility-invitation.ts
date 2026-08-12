@@ -24,7 +24,7 @@ type Params = Readonly<{
   idToken: string | undefined;
   previewToken: string;
   lineLoginChannelId: string | undefined;
-  webOrigin: string;
+  liffId: string;
   db: D1.shared.Client;
   accountData: AccountDataNamespace;
   compatibilityData: CompatibilityDataNamespace;
@@ -51,7 +51,7 @@ export async function issueCompatibilityInvitation(
     idToken,
     previewToken,
     lineLoginChannelId,
-    webOrigin,
+    liffId,
     db,
     accountData,
     compatibilityData,
@@ -87,8 +87,7 @@ export async function issueCompatibilityInvitation(
     offeredThemes,
   });
   const invitationUrl = new URL(
-    `/compatibility/invitations/${result.relationship.id}`,
-    webOrigin,
+    `https://liff.line.me/${encodeURIComponent(liffId)}/compatibility/invitations/${result.relationship.id}`,
   ).toString();
   return {
     type: "created",

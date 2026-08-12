@@ -153,7 +153,7 @@ describe("POST /api/compatibility/invitations", () => {
   it("createdを201の招待URLへ変換する", async () => {
     issueCompatibilityInvitation.mockResolvedValue({
       type: "created",
-      invitationUrl: `https://example.com/compatibility/invitations/${"1".repeat(64)}`,
+      invitationUrl: `https://liff.line.me/2010850319-Yl63upAR/compatibility/invitations/${"1".repeat(64)}`,
       expiresAt: "2026-08-26T00:00:00.000Z",
     });
 
@@ -161,14 +161,14 @@ describe("POST /api/compatibility/invitations", () => {
 
     expect(response.status).toBe(201);
     expect(await response.json()).toEqual({
-      invitationUrl: `https://example.com/compatibility/invitations/${"1".repeat(64)}`,
+      invitationUrl: `https://liff.line.me/2010850319-Yl63upAR/compatibility/invitations/${"1".repeat(64)}`,
       expiresAt: "2026-08-26T00:00:00.000Z",
     });
     expect(issueCompatibilityInvitation).toHaveBeenCalledWith(
       expect.objectContaining({
         idToken: "dummy.id.token",
         previewToken,
-        webOrigin: "https://example.com",
+        liffId: "2010850319-Yl63upAR",
         accountData: dummyAccountData,
         compatibilityData: dummyCompatibilityData,
       }),
@@ -198,6 +198,13 @@ describe("POST /api/compatibility/invitations", () => {
 
   it("CompatibilityData bindingがなければ503を返す", async () => {
     const response = await issueRequest({ previewToken }, { COMPATIBILITY_DATA: undefined });
+
+    expect(response.status).toBe(503);
+    expect(issueCompatibilityInvitation).not.toHaveBeenCalled();
+  });
+
+  it("LIFF_IDがなければ招待を作成せず503を返す", async () => {
+    const response = await issueRequest({ previewToken }, { LIFF_ID: undefined });
 
     expect(response.status).toBe(503);
     expect(issueCompatibilityInvitation).not.toHaveBeenCalled();

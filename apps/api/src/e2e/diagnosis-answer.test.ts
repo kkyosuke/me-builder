@@ -81,6 +81,7 @@ const env = () => ({
   LINE_LOGIN_CHANNEL_ID: "1234567890",
   ENVIRONMENT: "test",
   WEB_ORIGIN: "https://example.com",
+  LIFF_ID: "1234567890-testliff",
 });
 
 async function putAnswer(

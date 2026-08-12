@@ -99,6 +99,7 @@ function env() {
     ACCOUNT_DATA: accountData,
     COMPATIBILITY_DATA: compatibilityDataStore.namespace,
     LINE_LOGIN_CHANNEL_ID: "1234567890",
+    LIFF_ID: "1234567890-testliff",
     ENVIRONMENT: "test",
     WEB_ORIGIN: "https://example.com",
   };
@@ -126,6 +127,9 @@ async function issueInvitationForInviter(): Promise<string> {
   );
   expect(issueResponse.status).toBe(201);
   const issued = (await issueResponse.json()) as { invitationUrl: string };
+  expect(issued.invitationUrl).toMatch(
+    /^https:\/\/liff\.line\.me\/1234567890-testliff\/compatibility\/invitations\/[a-f0-9]{64}$/,
+  );
   const relationshipId = new URL(issued.invitationUrl).pathname.split("/").at(-1);
   if (!relationshipId) throw new Error("relationship ID was not issued");
   return relationshipId;
@@ -382,7 +386,7 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
   );
 
   it(
-    `${compatibilitySharePreviewCases.acceptInvitation.id} / ${compatibilitySharePreviewCases.relationshipDetail.id}: 承諾後に双方が相手を先にした相性シートを取得できること`,
+    `${compatibilitySharePreviewCases.shareJourney.id}: LIFF共有から招待表示・承諾・相性シート・共有終了まで完了できること`,
     async () => {
       await Promise.all([completeDiagnosis("inviter-token"), completeDiagnosis("recipient-token")]);
       await Promise.all([
@@ -476,6 +480,29 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
             },
           ],
         });
+      }
+
+      const endResponse = await app.request(
+        `/api/compatibility/relationships/${relationshipId}`,
+        { method: "DELETE", headers: { Authorization: "Bearer recipient-token" } },
+        env(),
+      );
+      expect(endResponse.status).toBe(204);
+      expect(endResponse.headers.get("Cache-Control")).toBe("no-store");
+      expect(compatibilityDataStore.relationships.get(relationshipId)?.status).toBe("ended");
+      for (const role of ["inviter", "recipient"] as const) {
+        const listResponse = await app.request(
+          "/api/compatibility/relationships",
+          { headers: { Authorization: `Bearer ${role}-token` } },
+          env(),
+        );
+        expect(await listResponse.json()).toEqual({ items: [] });
+        const detailResponse = await app.request(
+          `/api/compatibility/relationships/${relationshipId}`,
+          { headers: { Authorization: `Bearer ${role}-token` } },
+          env(),
+        );
+        expect(detailResponse.status).toBe(404);
       }
     },
     e2eTimeoutMs,

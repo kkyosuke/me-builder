@@ -28,6 +28,7 @@ import {
 import { compatibilityInvitationCancelRoute } from "./contract/compatibility/invitation-cancel";
 import { compatibilityInvitationPreviewRoute } from "./contract/compatibility/invitation-preview";
 import { compatibilityRelationshipRoute } from "./contract/compatibility/relationship";
+import { compatibilityRelationshipEndRoute } from "./contract/compatibility/relationship-end";
 import { compatibilityRelationshipsRoute } from "./contract/compatibility/relationships";
 import { compatibilitySharePreviewRoute } from "./contract/compatibility/share-preview";
 import { saveDiagnosisAnswerRoute } from "./contract/diagnosis/answer";
@@ -54,6 +55,7 @@ import {
 } from "./controller/brain";
 import {
   deleteCompatibilityInvitation,
+  deleteCompatibilityRelationship,
   getCompatibilityInvitation,
   getCompatibilityRelationship,
   getCompatibilityRelationships,
@@ -199,6 +201,11 @@ app.get(
   "/api/compatibility/relationships/:relationshipId",
   compatibilityRelationshipRoute,
   getCompatibilityRelationship,
+);
+app.delete(
+  "/api/compatibility/relationships/:relationshipId",
+  compatibilityRelationshipEndRoute,
+  deleteCompatibilityRelationship,
 );
 app.get(
   "/api/dev/brain-vector-sync-jobs/failed",
