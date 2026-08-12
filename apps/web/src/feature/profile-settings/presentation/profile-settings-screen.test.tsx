@@ -7,14 +7,16 @@ import { ProfileSettingsScreen } from "./profile-settings-screen";
 describe("ProfileSettingsScreen", () => {
   afterEach(cleanup);
 
-  it("未設定のアバターと現在の表示テーマを確認できる", () => {
+  it("未設定のアバターと現在の表示設定を確認できる", () => {
     render(
       <ProfileSettingsScreen
         avatar={null}
         theme="dark"
+        fontSize="medium"
         onBack={vi.fn()}
         onOpenAvatar={vi.fn()}
         onThemeChange={vi.fn()}
+        onFontSizeChange={vi.fn()}
       />,
     );
 
@@ -22,6 +24,8 @@ describe("ProfileSettingsScreen", () => {
     expect(screen.getByText("未設定")).toBeTruthy();
     expect(screen.getByRole("radiogroup", { name: "表示テーマ" })).toBeTruthy();
     expect((screen.getByRole("radio", { name: /ダーク/ }) as HTMLInputElement).checked).toBe(true);
+    expect(screen.getByRole("radiogroup", { name: "文字サイズ" })).toBeTruthy();
+    expect((screen.getByRole("radio", { name: "中" }) as HTMLInputElement).checked).toBe(true);
   });
 
   it("LINEプロフィール画像を現在のアバターとして表示する", () => {
@@ -30,9 +34,11 @@ describe("ProfileSettingsScreen", () => {
         avatar={null}
         linePictureUrl="https://example.com/line-profile.jpg"
         theme="dark"
+        fontSize="medium"
         onBack={vi.fn()}
         onOpenAvatar={vi.fn()}
         onThemeChange={vi.fn()}
+        onFontSizeChange={vi.fn()}
       />,
     );
 
@@ -43,24 +49,29 @@ describe("ProfileSettingsScreen", () => {
     ).toBe(2);
   });
 
-  it("アバター設定とテーマ変更をそれぞれ通知する", () => {
+  it("アバター設定、テーマ変更、文字サイズ変更をそれぞれ通知する", () => {
     const onOpenAvatar = vi.fn();
     const onThemeChange = vi.fn();
+    const onFontSizeChange = vi.fn();
     render(
       <ProfileSettingsScreen
         avatar={{ kind: "uploaded", dataUrl: "data:image/png;base64,avatar", fileName: "me.png" }}
         theme="dark"
+        fontSize="medium"
         onBack={vi.fn()}
         onOpenAvatar={onOpenAvatar}
         onThemeChange={onThemeChange}
+        onFontSizeChange={onFontSizeChange}
       />,
     );
 
     fireEvent.click(screen.getByRole("button", { name: /アバターを変更/ }));
     fireEvent.click(screen.getByRole("radio", { name: /ライト/ }));
+    fireEvent.click(screen.getByRole("radio", { name: "小" }));
 
     expect(onOpenAvatar).toHaveBeenCalledOnce();
     expect(onThemeChange).toHaveBeenCalledWith("light");
+    expect(onFontSizeChange).toHaveBeenCalledWith("small");
   });
 
   it("アバター変更中はプロフィールを操作対象から外す", () => {
@@ -70,9 +81,11 @@ describe("ProfileSettingsScreen", () => {
         isInactive
         linePictureUrl="https://example.com/line-profile.jpg"
         theme="dark"
+        fontSize="medium"
         onBack={vi.fn()}
         onOpenAvatar={vi.fn()}
         onThemeChange={vi.fn()}
+        onFontSizeChange={vi.fn()}
       />,
     );
 
@@ -90,9 +103,11 @@ describe("ProfileSettingsScreen", () => {
         avatar={null}
         isAdmin={false}
         theme="dark"
+        fontSize="medium"
         onBack={vi.fn()}
         onOpenAvatar={vi.fn()}
         onThemeChange={vi.fn()}
+        onFontSizeChange={vi.fn()}
       />,
     );
 
@@ -103,9 +118,11 @@ describe("ProfileSettingsScreen", () => {
         avatar={null}
         isAdmin
         theme="dark"
+        fontSize="medium"
         onBack={vi.fn()}
         onOpenAvatar={vi.fn()}
         onThemeChange={vi.fn()}
+        onFontSizeChange={vi.fn()}
       />,
     );
 
@@ -120,9 +137,11 @@ describe("ProfileSettingsScreen", () => {
         avatar={null}
         isProfileLoading
         theme="dark"
+        fontSize="medium"
         onBack={vi.fn()}
         onOpenAvatar={vi.fn()}
         onThemeChange={vi.fn()}
+        onFontSizeChange={vi.fn()}
       />,
     );
 
@@ -137,10 +156,12 @@ describe("ProfileSettingsScreen", () => {
         avatar={null}
         profileError="プロフィールの取得に失敗しました。"
         theme="dark"
+        fontSize="medium"
         onBack={vi.fn()}
         onOpenAvatar={vi.fn()}
         onRetryProfile={onRetryProfile}
         onThemeChange={vi.fn()}
+        onFontSizeChange={vi.fn()}
       />,
     );
 

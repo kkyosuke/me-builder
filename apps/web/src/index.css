@@ -33,6 +33,20 @@ body {
   @apply overflow-x-clip;
 }
 
+/* 「中」を従来より少しコンパクトにし、remベースのUI全体を同じ比率で調整します。 */
+html,
+html.font-size-medium {
+  font-size: 15px;
+}
+
+html.font-size-small {
+  font-size: 14px;
+}
+
+html.font-size-large {
+  font-size: 16px;
+}
+
 body {
   /* overscroll: スワイプ中に LINE 内ブラウザの引っ張り更新が割り込まないよう抑えます。 */
   @apply min-h-dvh overscroll-y-contain bg-slate-50 font-sans text-slate-950 antialiased dark:bg-slate-900 dark:text-slate-50;

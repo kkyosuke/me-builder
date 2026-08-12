@@ -12,7 +12,7 @@ import {
 } from "./feature/profile-settings/infrastructure/profile-api";
 import type { AvatarSelection } from "./feature/profile-settings/model/avatar";
 import { ProfileMenuButton } from "./feature/profile-settings/presentation/components/profile-menu-button";
-import { useColorTheme } from "./feature/theme";
+import { useColorTheme, useFontSize } from "./feature/theme";
 import {
   getIdleMainApplicationRoutes,
   loadAdminApplication,
@@ -80,6 +80,7 @@ function uploadedAvatar(profile: AccountProfile): AvatarSelection | null {
 
 function AppContents() {
   const colorTheme = useColorTheme();
+  const fontSize = useFontSize();
   const liffSession = useLiffSession();
   const [navigation, setNavigation] = useState(() => {
     const requestedPathname = resolveRequestedPathname();
@@ -275,10 +276,12 @@ function AppContents() {
               profileError={profileReadState.status === "error" ? profileReadState.message : null}
               linePictureUrl={linePictureUrl}
               theme={colorTheme.theme}
+              fontSize={fontSize.fontSize}
               onBack={closeProfile}
               onOpenAvatar={openAvatar}
               onRetryProfile={() => setProfileReloadKey((current) => current + 1)}
               onThemeChange={colorTheme.setTheme}
+              onFontSizeChange={fontSize.setFontSize}
             />
           </Suspense>
         </RouteErrorBoundary>

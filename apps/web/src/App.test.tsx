@@ -408,6 +408,19 @@ describe("App", () => {
     await waitFor(() => expect(document.documentElement.classList.contains("light")).toBe(true));
   });
 
+  it("プロフィールで文字サイズを切り替えて保存する", async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "プロフィールを開く" }));
+    const smallFontSize = await screen.findByRole("radio", { name: "小" });
+
+    fireEvent.click(smallFontSize);
+
+    expect((smallFontSize as HTMLInputElement).checked).toBe(true);
+    expect(document.documentElement.classList.contains("font-size-small")).toBe(true);
+    expect(window.localStorage.getItem("me-builder-font-size")).toBe("small");
+  });
+
   it("管理者のプロフィールにだけ管理者画面へのリンクを表示する", async () => {
     mocks.fetchAccountProfile.mockResolvedValue({
       role: "admin",
