@@ -382,7 +382,7 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
   );
 
   it(
-    `${compatibilitySharePreviewCases.acceptInvitation.id}: ${compatibilitySharePreviewCases.acceptInvitation.name}`,
+    `${compatibilitySharePreviewCases.acceptInvitation.id} / ${compatibilitySharePreviewCases.relationshipDetail.id}: 承諾後に双方が相手を先にした相性シートを取得できること`,
     async () => {
       await Promise.all([completeDiagnosis("inviter-token"), completeDiagnosis("recipient-token")]);
       await Promise.all([
@@ -424,6 +424,29 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
             )
             .get(relationshipId),
         ).toEqual({ relationship_id: relationshipId, status: "active" });
+      }
+
+      for (const role of ["inviter", "recipient"] as const) {
+        const detailResponse = await app.request(
+          `/api/compatibility/relationships/${relationshipId}`,
+          { headers: { Authorization: `Bearer ${role}-token` } },
+          env(),
+        );
+        expect(detailResponse.status).toBe(200);
+        const detail = (await detailResponse.json()) as {
+          status: string;
+          partner: { displayName: string; themes: unknown[] };
+          viewer: { displayName: string; themes: unknown[] };
+        };
+        const partnerRole = role === "inviter" ? "recipient" : "inviter";
+        expect(detail).toMatchObject({
+          status: "ready",
+          partner: { displayName: participants[partnerRole].name },
+          viewer: { displayName: participants[role].name },
+        });
+        expect(detail.partner.themes).toHaveLength(1);
+        expect(detail.viewer.themes).toHaveLength(1);
+        expect(JSON.stringify(detail)).not.toMatch(/accountId|fingerprint|choiceId|evidenceId/);
       }
     },
     e2eTimeoutMs,

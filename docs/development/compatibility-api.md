@@ -282,3 +282,52 @@ sequenceDiagram
 | `409` | 同じ2人の別の相性関係がすでに成立している | `{ "error": "Compatibility invitation unavailable", "reason": "duplicate_relationship" }` |
 
 認証・基盤の共通エラーは共有プレビューと同じです。成功・エラーを問わず`Cache-Control: no-store`を付けます。
+
+## 7. 相性関係の詳細
+
+### `GET /api/compatibility/relationships/:relationshipId`
+
+成立中の相性関係について、閲覧者と相手が承諾した「私について」と共通テーマを返します。閲覧者が送信者・受信者のどちらであっても`partner`を先、`viewer`を後として返します。
+
+```json
+{
+  "relationshipId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "status": "ready",
+  "partner": {
+    "displayName": "あおい",
+    "aboutMe": {
+      "profileSummaryVersionId": "summary-version-inviter",
+      "generatedAt": "2026-08-11T00:00:00.000Z",
+      "statements": []
+    },
+    "themes": []
+  },
+  "viewer": {
+    "displayName": "はる",
+    "aboutMe": {
+      "profileSummaryVersionId": "summary-version-recipient",
+      "generatedAt": "2026-08-12T00:00:00.000Z",
+      "statements": []
+    },
+    "themes": []
+  }
+}
+```
+
+双方の`themes`は承諾時の共通Diagnosisだけを同じ順序で返します。保存済みの同意指紋と、指定されたプロフィール版および現在再計算したテーマがすべて一致する場合だけ`ready`にします。どちらかの内容を安全に再構築できない場合は古い内容や片方だけの内容を返さず、次の待機状態を返します。
+
+```json
+{
+  "relationshipId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "status": "waiting",
+  "nextAction": "diagnosis"
+}
+```
+
+`nextAction`は閲覧者自身の共有プロフィールが利用できなければ`profile-summary`、閲覧者自身の共通テーマを再構築できなければ`diagnosis`、相手側だけが利用できなければ`null`です。
+
+| HTTP | 条件 | レスポンス |
+| --- | --- | --- |
+| `404` | 関係IDが不正、存在しない、未成立、終了済み、または閲覧者が当事者でない | `{ "error": "Compatibility relationship unavailable", "reason": "relationship_unavailable" }` |
+
+認証・基盤の共通エラーは共有プレビューと同じです。成功レスポンスへAccount ID、各種指紋、生の回答、内部根拠を含めません。成功・エラーを問わず`Cache-Control: no-store`を付けます。

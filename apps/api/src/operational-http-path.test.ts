@@ -15,4 +15,11 @@ describe("operationalHttpPath", () => {
     "招待IDを含まないpathは変更しない: %s",
     (path) => expect(operationalHttpPath(path)).toBe(path),
   );
+
+  it.each([
+    `/api/compatibility/relationships/${"a".repeat(64)}`,
+    "/api/compatibility/relationships/invalid",
+  ])("相性関係IDを運用ログへ含めない: %s", (path) => {
+    expect(operationalHttpPath(path)).toBe("/api/compatibility/relationships/:relationshipId");
+  });
 });

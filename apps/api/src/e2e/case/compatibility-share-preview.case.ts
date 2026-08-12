@@ -141,4 +141,23 @@ export const compatibilitySharePreviewCases = {
       },
     },
   },
+  relationshipDetail: {
+    id: "COMPATIBILITY-RELATIONSHIP-DETAIL-001",
+    name: "双方が相手を先にした同じ同意済み相性シートを取得できること",
+    in: {
+      method: "GET",
+      path: "/api/compatibility/relationships/:relationshipId",
+      authorization: "Bearer participant-token",
+      setup: ["送信者と受信者が招待を承諾して相性関係を成立"],
+    },
+    out: {
+      status: 200,
+      body: {
+        status: "ready",
+        partnerFirst: true,
+        commonThemeCount: 1,
+        excludedFields: ["accountId", "fingerprint", "choiceId", "evidenceId"],
+      },
+    },
+  },
 } as const satisfies Record<string, E2eCase>;

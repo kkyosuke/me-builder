@@ -26,6 +26,7 @@ import {
   acceptCompatibilityInvitationValidator,
 } from "./contract/compatibility/invitation-accept";
 import { compatibilityInvitationPreviewRoute } from "./contract/compatibility/invitation-preview";
+import { compatibilityRelationshipRoute } from "./contract/compatibility/relationship";
 import { compatibilitySharePreviewRoute } from "./contract/compatibility/share-preview";
 import { saveDiagnosisAnswerRoute } from "./contract/diagnosis/answer";
 import { diagnosisAnswersRoute } from "./contract/diagnosis/answers";
@@ -51,6 +52,7 @@ import {
 } from "./controller/brain";
 import {
   getCompatibilityInvitation,
+  getCompatibilityRelationship,
   getCompatibilitySharePreviewContents,
   postCompatibilityInvitation,
   postCompatibilityInvitationAcceptance,
@@ -178,6 +180,11 @@ app.get(
   "/api/compatibility/invitations/:relationshipId",
   compatibilityInvitationPreviewRoute,
   getCompatibilityInvitation,
+);
+app.get(
+  "/api/compatibility/relationships/:relationshipId",
+  compatibilityRelationshipRoute,
+  getCompatibilityRelationship,
 );
 app.get(
   "/api/dev/brain-vector-sync-jobs/failed",
