@@ -1,64 +1,95 @@
-import { ArrowRight, CheckCircle2, HeartHandshake, UserCheck } from "lucide-react";
-import { useState } from "react";
-import type { CompatibilityPerson } from "../model/compatibility";
+import { AlertCircle, HeartHandshake, RefreshCw } from "lucide-react";
+import { SkeletonBlock, SkeletonLoader } from "../../../components/skeleton";
+import type { AsyncState } from "../../../model/async-state";
+import type {
+  CompatibilityInvitationPreview,
+  CompatibilityInvitationPreviewBlockingReason,
+} from "../model/compatibility-invitation-preview";
+import { CompatibilityPrivacyNotice } from "./components/compatibility-disclosure";
 import {
-  CompatibilityDisclosurePreview,
-  CompatibilityPrivacyNotice,
-} from "./components/compatibility-disclosure";
-import {
-  CompatibilityAvatar,
-  CompatibilityBackHeader,
-  DemoNotice,
-} from "./components/compatibility-ui";
+  CompatibilityAboutMePreview,
+  CompatibilityThemesPreview,
+} from "./components/compatibility-share-content";
+import { CompatibilityBackHeader } from "./components/compatibility-ui";
 
-export function CompatibilityInvitationScreen({
-  inviter,
-  recipient,
-}: {
-  inviter: CompatibilityPerson;
-  recipient: CompatibilityPerson;
-}) {
-  const [accepted, setAccepted] = useState(false);
+const blockingReasonMessages: Record<CompatibilityInvitationPreviewBlockingReason, string> = {
+  display_name_unavailable: "LINEの表示名を確認できませんでした。",
+  profile_summary_required: "共有用の「私について」がまだ作成されていません。",
+  profile_summary_stale: "共有用の「私について」に更新が必要です。",
+  diagnosis_required: "共有できる診断結果がまだありません。",
+  scoring_unavailable: "一部の診断結果を共有用に準備できませんでした。",
+  diagnosis_unavailable: "診断情報を読み込めませんでした。時間をおいて再度お試しください。",
+  common_diagnosis_required: "2人とも確認できる共通の診断テーマがまだありません。",
+};
 
-  if (accepted) {
-    return (
-      <main className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col justify-center px-4 py-10 sm:px-8">
-        <section className="rounded-3xl border border-emerald-300/40 bg-gradient-to-br from-emerald-50 to-sky-50 p-7 text-center shadow-xl shadow-slate-950/10 dark:border-emerald-700/40 dark:from-emerald-950/30 dark:to-sky-950/30">
-          <span className="mx-auto flex size-16 items-center justify-center rounded-3xl bg-emerald-400/20 text-emerald-700 dark:text-emerald-300">
-            <CheckCircle2 className="size-8" aria-hidden="true" />
-          </span>
-          <h1 className="mt-5 text-2xl font-bold text-slate-950 dark:text-slate-50">
-            {inviter.name}さんとの相性シートを作りました
-          </h1>
-          <p className="mt-3 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-            共有された振る舞い・考え方から、2人の共通点や違いを見てみましょう。
-          </p>
-          <a
-            href="/compatibility/demo"
-            className="mt-6 flex min-h-12 items-center justify-between rounded-2xl bg-rose-400 px-5 py-3 font-bold text-rose-950"
-          >
-            2人の相性シートを見る
-            <ArrowRight className="size-5" aria-hidden="true" />
-          </a>
-        </section>
-        <DemoNotice />
-      </main>
-    );
-  }
+function InvitationSkeleton() {
+  return (
+    <SkeletonLoader label="招待内容を読み込み中" className="mt-5">
+      <div className="rounded-3xl border border-slate-200 p-5 dark:border-slate-800">
+        <div className="flex justify-center gap-4">
+          <SkeletonBlock className="size-20 rounded-3xl" />
+          <SkeletonBlock className="size-20 rounded-3xl" />
+        </div>
+        <SkeletonBlock className="mx-auto mt-5 h-5 w-40 rounded-full" />
+        <SkeletonBlock className="mx-auto mt-3 h-8 w-64 rounded-full" />
+      </div>
+      {["about", "themes", "privacy"].map((key) => (
+        <SkeletonBlock key={key} className="mt-5 h-40 w-full rounded-3xl" />
+      ))}
+    </SkeletonLoader>
+  );
+}
+
+function InvitationError({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <section className="mt-8 rounded-3xl border border-red-400/30 bg-red-400/10 p-6 text-center">
+      <AlertCircle className="mx-auto size-8 text-red-600 dark:text-red-300" aria-hidden="true" />
+      <h1 className="mt-3 text-xl font-bold text-red-800 dark:text-red-200">
+        招待内容を表示できませんでした
+      </h1>
+      <p className="mt-2 text-sm leading-relaxed text-slate-700 dark:text-slate-300">{message}</p>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl bg-red-300 px-4 py-2 text-sm font-bold text-red-950"
+      >
+        <RefreshCw className="size-4" aria-hidden="true" />
+        再試行
+      </button>
+      <a
+        href="/compatibility"
+        className="mt-3 flex min-h-11 items-center justify-center text-sm font-bold text-slate-500"
+      >
+        相性一覧へ戻る
+      </a>
+    </section>
+  );
+}
+
+function InvitationContents({ invitation }: { invitation: CompatibilityInvitationPreview }) {
+  const inviterName = invitation.inviter.displayName;
+  const recipientName = invitation.recipient.displayName ?? "あなた";
 
   return (
-    <main className="mx-auto min-h-dvh w-full max-w-2xl px-4 py-6 pb-12 sm:px-8">
-      <CompatibilityBackHeader href="/compatibility" label="閉じる" />
+    <>
       <section className="mt-5 rounded-3xl border border-violet-300/30 bg-gradient-to-br from-violet-50 via-white to-rose-50 p-5 text-center dark:from-violet-950/30 dark:via-slate-800 dark:to-rose-950/30">
         <div className="flex items-center justify-center gap-3">
-          <CompatibilityAvatar person={inviter} size="lg" />
+          <span
+            aria-hidden="true"
+            className="flex size-20 items-center justify-center rounded-[45%_55%_60%_40%] bg-gradient-to-br from-violet-300 to-fuchsia-500 text-2xl font-black text-violet-950"
+          >
+            {inviterName.slice(0, 1)}
+          </span>
           <HeartHandshake className="size-7 text-rose-500" aria-hidden="true" />
-          <span className="flex size-20 items-center justify-center rounded-[55%_45%_40%_60%] border-2 border-dashed border-slate-300 text-sm font-bold text-slate-500 dark:border-slate-600">
-            あなた
+          <span
+            aria-hidden="true"
+            className="flex size-20 items-center justify-center rounded-[55%_45%_40%_60%] bg-gradient-to-br from-sky-300 to-cyan-500 text-2xl font-black text-sky-950"
+          >
+            {recipientName.slice(0, 1)}
           </span>
         </div>
         <p className="mt-5 text-sm font-semibold text-violet-700 dark:text-violet-300">
-          {inviter.name}さんから招待が届いています
+          {inviterName}さんから招待が届いています
         </p>
         <h1 className="mt-1 text-2xl font-bold text-slate-950 dark:text-slate-50">
           2人の相性を見てみませんか？
@@ -66,40 +97,101 @@ export function CompatibilityInvitationScreen({
         <p className="mt-3 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
           診断から見える範囲で、お互いの大切にしたいことを資料にまとめます。
         </p>
+        <p className="mt-3 text-xs text-slate-500">
+          招待の有効期限: {new Date(invitation.expiresAt).toLocaleDateString("ja-JP")}
+        </p>
       </section>
 
-      <CompatibilityDisclosurePreview
-        eyebrow={
-          <span className="flex items-center gap-1.5">
-            <UserCheck className="size-4" aria-hidden="true" />
-            {inviter.name}さんに見える内容
-          </span>
-        }
-        headingId="recipient-preview-heading"
-        description={`診断から見える傾向をすべて共有します。${inviter.name}さんも同じ範囲を確認済みです。`}
-        themes={recipient.themes}
+      <CompatibilityAboutMePreview
+        eyebrow={`${inviterName}さんが共有する「私について」`}
+        headingId="inviter-about-me-heading"
+        profile={invitation.inviter.aboutMe}
+      />
+      <CompatibilityThemesPreview
+        eyebrow={`${inviterName}さんが共有する診断テーマ`}
+        headingId="inviter-themes-heading"
+        themes={invitation.inviter.themes}
       />
 
+      {invitation.recipient.aboutMe && (
+        <CompatibilityAboutMePreview
+          eyebrow={`${inviterName}さんに見える、あなたの「私について」`}
+          headingId="recipient-about-me-heading"
+          profile={invitation.recipient.aboutMe}
+        />
+      )}
+      {invitation.recipient.themes.length > 0 && (
+        <CompatibilityThemesPreview
+          eyebrow={`${inviterName}さんとの比較に使う共通テーマ`}
+          headingId="recipient-themes-heading"
+          themes={invitation.recipient.themes}
+          countLabel={`${invitation.recipient.themes.length}テーマが共通`}
+        />
+      )}
+
       <CompatibilityPrivacyNotice
-        title="承諾する前に"
-        footer="承諾すると双方の相性一覧へ追加され、共有はどちらからでも終了できます。"
+        title="共有されない詳細"
+        footer="相性を見てみることへ承諾するまで、あなたの情報は相手へ共有されません。"
       />
+
+      {invitation.blockingReasons.length > 0 && (
+        <section className="mt-8 rounded-2xl border border-amber-300/60 bg-amber-50 p-4 dark:border-amber-500/30 dark:bg-amber-950/30">
+          <h2 className="flex items-center gap-2 font-bold text-amber-950 dark:text-amber-100">
+            <AlertCircle className="size-5" aria-hidden="true" />
+            相性を見る前に
+          </h2>
+          <ul className="mt-2 space-y-1 text-sm text-amber-900 dark:text-amber-200">
+            {invitation.blockingReasons.map((reason) => (
+              <li key={reason}>・{blockingReasonMessages[reason]}</li>
+            ))}
+          </ul>
+          {invitation.nextAction && (
+            <a
+              href={invitation.nextAction === "profile-summary" ? "/me" : "/diagnosis"}
+              className="mt-4 flex min-h-11 items-center justify-center rounded-xl bg-amber-300 px-4 py-2 text-sm font-bold text-amber-950"
+            >
+              {invitation.nextAction === "profile-summary" ? "わたしの傾向を作る" : "診断を見る"}
+            </a>
+          )}
+        </section>
+      )}
 
       <button
         type="button"
-        onClick={() => setAccepted(true)}
-        className="mt-8 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-rose-400 px-5 py-3 font-bold text-rose-950 shadow-lg shadow-rose-500/20"
+        disabled
+        className="mt-8 flex min-h-12 w-full cursor-not-allowed items-center justify-center gap-2 rounded-2xl bg-slate-200 px-5 py-3 font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-400"
       >
         <HeartHandshake className="size-5" aria-hidden="true" />
-        相性を見てみる
+        {invitation.canAccept ? "相性を見てみる（準備中）" : "相性をまだ見られません"}
       </button>
+      {invitation.canAccept && (
+        <p className="mt-2 text-center text-xs leading-relaxed text-slate-500">
+          共有内容の確認まで利用できます。承諾と相性シートの作成は次の更新で有効になります。
+        </p>
+      )}
       <a
         href="/compatibility"
         className="mt-3 flex min-h-11 items-center justify-center text-sm font-bold text-slate-500"
       >
         今は承諾しない
       </a>
-      <DemoNotice />
+    </>
+  );
+}
+
+export function CompatibilityInvitationScreen({
+  onRetry,
+  state,
+}: {
+  onRetry: () => void;
+  state: AsyncState<CompatibilityInvitationPreview>;
+}) {
+  return (
+    <main className="mx-auto min-h-dvh w-full max-w-2xl px-4 py-6 pb-12 sm:px-8">
+      <CompatibilityBackHeader href="/compatibility" label="閉じる" />
+      {(state.status === "idle" || state.status === "loading") && <InvitationSkeleton />}
+      {state.status === "error" && <InvitationError message={state.message} onRetry={onRetry} />}
+      {state.status === "success" && <InvitationContents invitation={state.data} />}
     </main>
   );
 }

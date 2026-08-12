@@ -175,6 +175,14 @@ export function createCompatibilityInvitationAcceptanceContext(
   }
   return {
     inviterAccountId: relationship.inviterAccountId,
+    offeredProfile: {
+      profileSummaryVersionId: relationship.offeredProfile.profileSummaryVersionId,
+      fingerprint: relationship.offeredProfile.fingerprint,
+    },
+    offeredThemes: relationship.offeredThemes.map(({ diagnosisId, resultFingerprint }) => ({
+      diagnosisId,
+      resultFingerprint,
+    })),
     offeredDiagnosisIds: relationship.offeredThemes.map(({ diagnosisId }) => diagnosisId),
     expiresAt: relationship.expiresAt,
   };

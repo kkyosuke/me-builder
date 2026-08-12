@@ -50,4 +50,73 @@ export const compatibilitySharePreviewCases = {
       },
     },
   },
+  previewInvitation: {
+    id: "COMPATIBILITY-INVITATION-PREVIEW-001",
+    name: "別Accountが保存なしで双方の共有内容を確認できること",
+    in: {
+      method: "GET",
+      path: "/api/compatibility/invitations/:relationshipId",
+      authorization: "Bearer recipient-token",
+      setup: [
+        "送信者と受信者が共通Diagnosisを完了して共有プロフィールを生成",
+        "送信者が共有プレビューから招待を発行",
+      ],
+    },
+    out: {
+      status: 200,
+      body: {
+        inviterDisplayName: "あおい",
+        recipientDisplayName: "はる",
+        commonThemeCount: 1,
+        relationshipStatus: "pending",
+        recipientReferenceCount: 0,
+        excludedFields: ["accountId", "fingerprint", "choiceId", "evidenceId"],
+      },
+    },
+  },
+  previewInvitationWithIncompleteRecipient: {
+    id: "COMPATIBILITY-INVITATION-PREVIEW-002",
+    name: "受信者の準備が未完了なら保存せずに必要な次アクションを返すこと",
+    in: {
+      method: "GET",
+      path: "/api/compatibility/invitations/:relationshipId",
+      authorization: "Bearer recipient-token",
+      setup: [
+        "送信者だけがDiagnosisを完了して共有プロフィールを生成",
+        "送信者が共有プレビューから招待を発行",
+      ],
+    },
+    out: {
+      status: 200,
+      body: {
+        canAccept: false,
+        blockingReasons: [
+          "profile_summary_required",
+          "diagnosis_required",
+          "common_diagnosis_required",
+        ],
+        nextAction: "profile-summary",
+        relationshipStatus: "pending",
+        recipientReferenceCount: 0,
+      },
+    },
+  },
+  previewCancelledInvitation: {
+    id: "COMPATIBILITY-INVITATION-PREVIEW-003",
+    name: "取消済みの招待内容を開示しないこと",
+    in: {
+      method: "GET",
+      path: "/api/compatibility/invitations/:relationshipId",
+      authorization: "Bearer recipient-token",
+      setup: ["送信者が招待を発行", "送信者が招待を取り消す"],
+    },
+    out: {
+      status: 404,
+      body: {
+        error: "Compatibility invitation unavailable",
+        reason: "invitation_unavailable",
+        recipientReferenceCount: 0,
+      },
+    },
+  },
 } as const satisfies Record<string, E2eCase>;

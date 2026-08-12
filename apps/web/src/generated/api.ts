@@ -141,6 +141,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/compatibility/invitations/{relationshipId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** 受信者が承諾前に双方の共有内容を確認する */
+    get: operations["getCompatibilityInvitation"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/dev/brain-vector-sync-jobs/failed": {
     parameters: {
       query?: never;
@@ -1268,6 +1285,164 @@ export interface operations {
             error: "Compatibility invitation unavailable";
             /** @enum {string} */
             reason: "preview_changed" | "share_unavailable";
+          };
+        };
+      };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
+          };
+        };
+      };
+      /** @description D1 bindingが設定されていない */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Service Unavailable";
+          };
+        };
+      };
+    };
+  };
+  getCompatibilityInvitation: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        relationshipId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 招待者の同意済み内容と受信者の現在内容 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            inviter: {
+              displayName: string;
+              aboutMe: {
+                profileSummaryVersionId: string;
+                /** Format: date-time */
+                generatedAt: string;
+                statements: {
+                  key: string;
+                  label: string;
+                  statement: string;
+                }[];
+              };
+              themes: {
+                diagnosisId: string;
+                title: string;
+                parameters: {
+                  id: string;
+                  label: string;
+                  lowLabel: string;
+                  highLabel: string;
+                  position: number;
+                  statement: string;
+                }[];
+              }[];
+            };
+            recipient: {
+              displayName: string | null;
+              previewToken: string;
+              aboutMe: {
+                profileSummaryVersionId: string;
+                /** Format: date-time */
+                generatedAt: string;
+                statements: {
+                  key: string;
+                  label: string;
+                  statement: string;
+                }[];
+              } | null;
+              themes: {
+                diagnosisId: string;
+                title: string;
+                parameters: {
+                  id: string;
+                  label: string;
+                  lowLabel: string;
+                  highLabel: string;
+                  position: number;
+                  statement: string;
+                }[];
+              }[];
+            };
+            /** Format: date-time */
+            expiresAt: string;
+            canAccept: boolean;
+            blockingReasons: (
+              | "display_name_unavailable"
+              | "profile_summary_required"
+              | "profile_summary_stale"
+              | "diagnosis_required"
+              | "scoring_unavailable"
+              | "diagnosis_unavailable"
+              | "common_diagnosis_required"
+            )[];
+            nextAction: ("diagnosis" | "profile-summary") | null;
+          };
+        };
+      };
+      /** @description LIFF IDトークンを検証できない */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Unauthorized";
+          };
+        };
+      };
+      /** @description 招待または対応するAccountを利用できない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | {
+                /** @constant */
+                error: "Compatibility invitation unavailable";
+                /** @constant */
+                reason: "invitation_unavailable";
+              }
+            | {
+                /** @constant */
+                error: "Account not found";
+                /** @constant */
+                reason: "friendship_required";
+              };
+        };
+      };
+      /** @description 送信者本人が自分の招待を開いた */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Compatibility invitation unavailable";
+            /** @constant */
+            reason: "own_invitation";
           };
         };
       };

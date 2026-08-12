@@ -15,13 +15,13 @@ export type CompatibilitySharePreviewParameter = {
   statement: string;
 };
 
-type CompatibilitySharePreviewTheme = {
+export type CompatibilitySharePreviewTheme = {
   diagnosisId: string;
   title: string;
   parameters: CompatibilitySharePreviewParameter[];
 };
 
-type CompatibilityShareProfile = {
+export type CompatibilityShareProfile = {
   profileSummaryVersionId: string;
   generatedAt: string;
   statements: Array<{ key: string; label: string; statement: string }>;

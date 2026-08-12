@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchCompatibilitySharePreview, issueCompatibilityInvitation } from "./compatibility-api";
+import {
+  fetchCompatibilityInvitation,
+  fetchCompatibilitySharePreview,
+  issueCompatibilityInvitation,
+} from "./compatibility-api";
 
 const preview = {
   displayName: "うさぎ",
@@ -108,5 +112,69 @@ describe("issueCompatibilityInvitation", () => {
     await expect(
       issueCompatibilityInvitation(undefined, "id-token", preview.previewToken),
     ).rejects.toThrow("共有内容が更新されました");
+  });
+});
+
+describe("fetchCompatibilityInvitation", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("認証付きで関係IDの招待内容を取得する", async () => {
+    const relationshipId = "1".repeat(64);
+    const invitation = {
+      inviter: {
+        displayName: "あおい",
+        aboutMe: preview.aboutMe,
+        themes: preview.themes,
+      },
+      recipient: {
+        displayName: "はる",
+        previewToken: preview.previewToken,
+        aboutMe: preview.aboutMe,
+        themes: preview.themes,
+      },
+      expiresAt: "2026-08-26T00:00:00.000Z",
+      canAccept: true,
+      blockingReasons: [],
+      nextAction: null,
+    };
+    const fetchMock = vi.fn().mockResolvedValue(Response.json(invitation));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      fetchCompatibilityInvitation("https://api.example.com", "id-token", relationshipId),
+    ).resolves.toEqual(invitation);
+    expect(fetchMock).toHaveBeenCalledWith(
+      `https://api.example.com/api/compatibility/invitations/${relationshipId}`,
+      expect.objectContaining({ headers: { Authorization: "Bearer id-token" } }),
+    );
+  });
+
+  it.each([
+    [404, "この招待は利用できません"],
+    [409, "自分が発行した招待は承諾できません"],
+  ])("HTTP %sを利用者向けメッセージへ変換する", async (status, message) => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status })));
+
+    await expect(
+      fetchCompatibilityInvitation(undefined, "id-token", "1".repeat(64)),
+    ).rejects.toThrow(message);
+  });
+
+  it("Accountがなければ友だち追加を案内する", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          Response.json(
+            { error: "Account not found", reason: "friendship_required" },
+            { status: 404 },
+          ),
+        ),
+    );
+
+    await expect(
+      fetchCompatibilityInvitation(undefined, "id-token", "1".repeat(64)),
+    ).rejects.toThrow("LINE公式アカウントを友だち追加");
   });
 });
