@@ -1,4 +1,4 @@
-import { ArrowRight, ChevronDown, RotateCw, Trash2 } from "lucide-react";
+import { ArrowRight, ChevronDown, RotateCw } from "lucide-react";
 import { useState } from "react";
 import { MainNavigation } from "../../../../components/main-navigation";
 import type { AsyncState } from "../../../../model/async-state";
@@ -101,16 +101,10 @@ export function DiagnosisHome({
   diagnoses,
   onOpenDiagnosis,
   onRetry,
-  canResetDiagnosisData,
-  resetState,
-  onResetDiagnosisData,
 }: {
   diagnoses: AsyncState<DiagnosisListItem[]>;
   onOpenDiagnosis: (diagnosis: DiagnosisListItem) => void;
   onRetry: () => void;
-  canResetDiagnosisData: boolean;
-  resetState: AsyncState<string>;
-  onResetDiagnosisData: () => void;
 }) {
   const [isAnsweredOpen, setIsAnsweredOpen] = useState(false);
   const sections =
@@ -202,53 +196,6 @@ export function DiagnosisHome({
         )}
       </section>
 
-      {canResetDiagnosisData && (
-        <section
-          aria-labelledby="development-tools-heading"
-          className="mt-8 rounded-2xl border border-dashed border-rose-400/30 bg-rose-400/5 p-4"
-        >
-          <p className="text-xs font-semibold tracking-wider text-rose-700 dark:text-rose-300">
-            DEV ONLY
-          </p>
-          <h2
-            id="development-tools-heading"
-            className="mt-1 text-sm font-bold text-slate-900 dark:text-slate-100"
-          >
-            開発用データ操作
-          </h2>
-          <p className="mt-2 text-xs leading-relaxed text-slate-600 dark:text-slate-400">
-            ログイン中ユーザーの回答、回答進捗、保留、回答由来Source Record、診断から生成されたBrain
-            Itemを削除します。診断定義と日記由来データは残ります。
-          </p>
-          <button
-            type="button"
-            onClick={onResetDiagnosisData}
-            disabled={resetState.status === "loading"}
-            className="mt-3 inline-flex items-center justify-center gap-2 rounded-xl border border-rose-400/40 px-4 py-2 text-sm font-semibold text-rose-700 dark:text-rose-200 transition hover:bg-rose-400/10 disabled:cursor-wait disabled:opacity-60"
-          >
-            {resetState.status === "loading" ? (
-              <RotateCw
-                className="size-4 animate-spin motion-reduce:animate-none"
-                aria-hidden="true"
-              />
-            ) : (
-              <Trash2 className="size-4" aria-hidden="true" />
-            )}
-            {resetState.status === "loading" ? "削除しています..." : "回答データを全削除"}
-          </button>
-          {(resetState.status === "success" || resetState.status === "error") && (
-            <output
-              className={`mt-3 block text-xs ${
-                resetState.status === "success"
-                  ? "text-emerald-700 dark:text-emerald-300"
-                  : "text-rose-700 dark:text-rose-300"
-              }`}
-            >
-              {resetState.status === "success" ? resetState.data : resetState.message}
-            </output>
-          )}
-        </section>
-      )}
       <MainNavigation current="diagnosis" />
     </main>
   );

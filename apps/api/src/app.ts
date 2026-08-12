@@ -26,11 +26,11 @@ import { compatibilityRelationshipRoute } from "./contract/compatibility/relatio
 import { compatibilityRelationshipEndRoute } from "./contract/compatibility/relationship-end";
 import { compatibilityRelationshipsRoute } from "./contract/compatibility/relationships";
 import { compatibilityShareConsentRoute } from "./contract/compatibility/share-consent";
+import { resetDevelopmentAccountDataRoute } from "./contract/development/account-data-reset";
 import { saveDiagnosisAnswerRoute } from "./contract/diagnosis/answer";
 import { diagnosisAnswersRoute } from "./contract/diagnosis/answers";
 import { deferDiagnosisQuestionRoute } from "./contract/diagnosis/deferred-question";
 import { diagnosisDetailRoute } from "./contract/diagnosis/detail";
-import { resetDevelopmentDiagnosisDataRoute } from "./contract/diagnosis/dev-reset";
 import { diagnosisListRoute } from "./contract/diagnosis/list";
 import { openApiOptions } from "./contract/openapi";
 import {
@@ -60,8 +60,8 @@ import {
   postCompatibilityInvitation,
   postCompatibilityInvitationAcceptance,
 } from "./controller/compatibility";
+import { deleteDevelopmentAccountData } from "./controller/development";
 import {
-  deleteDevelopmentDiagnosisData,
   getDiagnoses,
   getDiagnosis,
   getDiagnosisAnswerContents,
@@ -243,11 +243,7 @@ app.put(
   deferDiagnosisQuestionRoute,
   putDiagnosisDeferredQuestion,
 );
-app.delete(
-  "/api/dev/diagnosis-data",
-  resetDevelopmentDiagnosisDataRoute,
-  deleteDevelopmentDiagnosisData,
-);
+app.delete("/api/dev/account-data", resetDevelopmentAccountDataRoute, deleteDevelopmentAccountData);
 
 // Web UIの型生成にも使う、機械可読なAPI契約。
 app.get("/api/openapi.json", openAPIRouteHandler(app, openApiOptions));

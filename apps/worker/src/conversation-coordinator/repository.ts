@@ -1,4 +1,4 @@
-import { and, asc, count, eq, inArray, lte, min, notInArray } from "drizzle-orm";
+import { and, asc, count, eq, inArray, lte, min, notInArray, sql } from "drizzle-orm";
 import { type DrizzleSqliteDODatabase, drizzle } from "drizzle-orm/durable-sqlite";
 import { migrate } from "drizzle-orm/durable-sqlite/migrator";
 import type { AcceptedDiaryMessage } from ".";
@@ -58,6 +58,21 @@ export class ConversationCoordinatorRepository {
       .from(coordinatorIdentity)
       .where(eq(coordinatorIdentity.singleton, 1))
       .get()?.accountId;
+  }
+
+  /** Account identityを維持し、進行中処理と配送状態をすべて破棄する。 */
+  resetAccountData(): void {
+    this.db.transaction((tx) => {
+      tx.delete(attachBatchMessages).run();
+      tx.delete(attachBatches).run();
+      tx.delete(acceptedMessages).run();
+      tx.delete(deliveryOutbox).run();
+      tx.delete(localTurns).run();
+      tx.update(coordinatorState)
+        .set({ generationEpoch: sql`${coordinatorState.generationEpoch} + 1` })
+        .where(eq(coordinatorState.singleton, 1))
+        .run();
+    });
   }
 
   findAcceptedMessage(eventId: string) {

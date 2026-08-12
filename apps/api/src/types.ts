@@ -1,5 +1,9 @@
 import type { D1Database, R2Bucket } from "@cloudflare/workers-types";
-import type { AccountDataNamespace, CompatibilityDataNamespace } from "@me-builder/lib";
+import type {
+  AccountDataNamespace,
+  CompatibilityDataNamespace,
+  ConversationCoordinatorNamespace,
+} from "@me-builder/lib";
 import type {
   ProfileSummaryGenerationQueueMessage,
   Queue,
@@ -15,6 +19,7 @@ type Env = Omit<
   | "PROFILE_SUMMARY_QUEUE"
   | "ACCOUNT_DATA"
   | "COMPATIBILITY_DATA"
+  | "CONVERSATION_COORDINATOR"
   | "BRAIN_VECTOR_INDEX"
   | "WEB_ORIGIN"
 > & {
@@ -33,6 +38,7 @@ type Env = Omit<
   AVATAR_BUCKET?: R2Bucket;
   ACCOUNT_DATA?: AccountDataNamespace;
   COMPATIBILITY_DATA?: CompatibilityDataNamespace;
+  CONVERSATION_COORDINATOR?: ConversationCoordinatorNamespace;
   BRAIN_VECTOR_INDEX?: ApiBindings["BRAIN_VECTOR_INDEX"];
 };
 

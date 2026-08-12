@@ -113,21 +113,22 @@ export const diagnosisAnswerCases = {
   },
   resetDevelopmentData: {
     id: "ANSWER-007",
-    name: "test環境で本人の回答由来データを全削除すること",
+    name: "test環境で本人の診断・日記・Brain・まとめを全削除すること",
     in: {
       method: "DELETE",
-      path: "/api/dev/diagnosis-data",
+      path: "/api/dev/account-data",
       authorization: "Bearer known-token",
-      setup: ["2問分の回答を保存", "ENVIRONMENT=test"],
+      setup: ["2問分の回答、日記、Brain Item、わたしのまとめを保存", "ENVIRONMENT=test"],
     },
     out: {
       status: 200,
       body: {
-        deletedResponseCount: 1,
-        deletedAnswerCount: 2,
-        deletedDeferredQuestionCount: 0,
-        deletedSourceRecordCount: 2,
-        deletedBrainItemCount: 0,
+        deletedDiagnosisResponseCount: 1,
+        deletedConversationSessionCount: 1,
+        deletedSourceRecordCount: 3,
+        deletedBrainItemCount: 1,
+        deletedProfileSummaryVersionCount: 1,
+        scheduledVectorDeletionCount: 1,
         list: { responseStatus: "unanswered", answeredCount: 0 },
       },
     },
@@ -137,7 +138,7 @@ export const diagnosisAnswerCases = {
     name: "production環境では回答データを削除しないこと",
     in: {
       method: "DELETE",
-      path: "/api/dev/diagnosis-data",
+      path: "/api/dev/account-data",
       authorization: "Bearer known-token",
       setup: ["1問分の回答を保存", "ENVIRONMENT=production"],
     },
@@ -151,7 +152,7 @@ export const diagnosisAnswerCases = {
     name: "ENVIRONMENT未設定では回答データを削除しないこと",
     in: {
       method: "DELETE",
-      path: "/api/dev/diagnosis-data",
+      path: "/api/dev/account-data",
       authorization: "Bearer known-token",
       setup: ["1問分の回答を保存", "ENVIRONMENT bindingなし"],
     },
@@ -165,7 +166,7 @@ export const diagnosisAnswerCases = {
     name: "回答保存とリセットが競合してもSource Recordを孤立させないこと",
     in: {
       method: "PUT + DELETE",
-      path: "/api/diagnoses/relationship-priority/answers/{diagnosisQuestionId} + /api/dev/diagnosis-data",
+      path: "/api/diagnoses/relationship-priority/answers/{diagnosisQuestionId} + /api/dev/account-data",
       authorization: "Bearer known-token",
       setup: ["1問分の回答を保存", "2問目の保存とリセットを同時実行"],
     },

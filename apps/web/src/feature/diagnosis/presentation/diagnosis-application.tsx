@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
-import { config } from "../../../config";
+import { useEffect, useRef } from "react";
 import { useLiffSession } from "../../liff";
 import {
   diagnosisResultIdFromPathname,
@@ -12,10 +11,6 @@ import { DiagnosisDetailSkeleton } from "./components/diagnosis-loading-skeleton
 import { DiagnosisResultView } from "./components/diagnosis-result";
 import { useDiagnosisDetail } from "./hooks/use-diagnosis-detail";
 import { useDiagnosisList } from "./hooks/use-diagnosis-list";
-import { useResetDiagnosisData } from "./hooks/use-reset-diagnosis-data";
-
-// APIのisDevelopmentEnvironmentと同じ環境名。認可境界はAPI側のfail-closed判定を正とする。
-const DEVELOPMENT_ENVIRONMENTS = new Set(["development", "local", "preview", "test"]);
 
 export default function DiagnosisApplication() {
   const liffSession = useLiffSession();
@@ -24,11 +19,6 @@ export default function DiagnosisApplication() {
     idToken: diagnoses.idToken,
     onProgress: diagnoses.updateProgress,
   });
-  const handleReset = useCallback(async () => {
-    detail.close();
-    await diagnoses.load();
-  }, [detail.close, diagnoses.load]);
-  const reset = useResetDiagnosisData({ idToken: diagnoses.idToken, onReset: handleReset });
   const openedDirectDiagnosisId = useRef<string | null>(null);
   const isDirectResultPath = isDiagnosisResultPathname(window.location.pathname);
   const directDiagnosisId = diagnosisResultIdFromPathname(window.location.pathname);
@@ -58,11 +48,6 @@ export default function DiagnosisApplication() {
       diagnoses={diagnoses.state}
       onOpenDiagnosis={(diagnosis) => void detail.open(diagnosis)}
       onRetry={() => void diagnoses.load()}
-      canResetDiagnosisData={
-        config.environment !== undefined && DEVELOPMENT_ENVIRONMENTS.has(config.environment)
-      }
-      resetState={reset.state}
-      onResetDiagnosisData={() => void reset.reset()}
     />
   );
 

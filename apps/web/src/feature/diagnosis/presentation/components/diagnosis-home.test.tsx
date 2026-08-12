@@ -31,9 +31,6 @@ describe("DiagnosisHome", () => {
         diagnoses={{ status: "loading" }}
         onOpenDiagnosis={vi.fn()}
         onRetry={vi.fn()}
-        canResetDiagnosisData={false}
-        resetState={{ status: "idle" }}
-        onResetDiagnosisData={vi.fn()}
       />,
     );
 
@@ -47,9 +44,6 @@ describe("DiagnosisHome", () => {
         diagnoses={{ status: "success", data: [] }}
         onOpenDiagnosis={vi.fn()}
         onRetry={vi.fn()}
-        canResetDiagnosisData={false}
-        resetState={{ status: "idle" }}
-        onResetDiagnosisData={vi.fn()}
       />,
     );
 
@@ -90,9 +84,6 @@ describe("DiagnosisHome", () => {
         }}
         onOpenDiagnosis={vi.fn()}
         onRetry={vi.fn()}
-        canResetDiagnosisData={false}
-        resetState={{ status: "idle" }}
-        onResetDiagnosisData={vi.fn()}
       />,
     );
 
@@ -124,9 +115,6 @@ describe("DiagnosisHome", () => {
         }}
         onOpenDiagnosis={vi.fn()}
         onRetry={vi.fn()}
-        canResetDiagnosisData={false}
-        resetState={{ status: "idle" }}
-        onResetDiagnosisData={vi.fn()}
       />,
     );
 

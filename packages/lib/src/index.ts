@@ -5,5 +5,6 @@ export * from "./compatibility-data";
 export * from "./compatibility-data-domain";
 export * from "./compatibility-data-orchestration";
 export * from "./compatibility-share-preview";
+export * from "./conversation-coordinator";
 export * from "./diagnosis";
 export * from "./profile-summary";

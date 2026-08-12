@@ -31,4 +31,28 @@ describe("ConversationCoordinator Workers runtime E2E", () => {
       await expect(state.storage.getAlarm()).resolves.toBeTypeOf("number");
     });
   });
+
+  it("開発リセットで受付messageとalarmを削除し、別Accountからの操作を拒否する", async () => {
+    const accountId = crypto.randomUUID();
+    const stub = env.CONVERSATION_COORDINATOR.getByName(accountId);
+    await stub.acceptMessage({
+      accountId,
+      eventId: crypto.randomUUID(),
+      sourceRecordId: crypto.randomUUID(),
+      receivedAt: new Date().toISOString(),
+    });
+
+    await expect(stub.resetAccountData(accountId)).resolves.toBeUndefined();
+    await runInDurableObject(stub, async (instance: ConversationCoordinator, state) => {
+      await expect(instance.resetAccountData(crypto.randomUUID())).rejects.toThrow(
+        "does not match object name",
+      );
+      expect(
+        state.storage.sql
+          .exec<{ count: number }>("SELECT COUNT(*) AS count FROM accepted_messages")
+          .one().count,
+      ).toBe(0);
+      await expect(state.storage.getAlarm()).resolves.toBeNull();
+    });
+  });
 });

@@ -96,6 +96,17 @@ export class ConversationCoordinator extends DurableObject<Env> {
     return { accepted: true };
   }
 
+  /** 開発用リセットで、本人の進行中Turnと配送状態を無効化する。 */
+  async resetAccountData(accountId: string): Promise<void> {
+    if (!this.repository.bindAccount(accountId)) {
+      throw new Error("Conversation coordinator reset account does not match object name");
+    }
+    await this.ctx.storage.deleteAlarm();
+    this.repository.resetAccountData();
+    this.replyTokensByEventId.clear();
+    this.replyTokensByTurnId.clear();
+  }
+
   async deliverTurn(input: TurnDeliveryRequest): Promise<TurnDeliveryResult> {
     const existing = this.repository.findTurnDelivery(
       input.turnId,

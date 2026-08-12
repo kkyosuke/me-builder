@@ -78,6 +78,9 @@ const env = () => ({
   DB: database,
   ACCOUNT_DATA: accountDataStore.namespace,
   COMPATIBILITY_DATA: compatibilityDataStore.namespace,
+  CONVERSATION_COORDINATOR: {
+    getByName: () => ({ resetAccountData: async () => undefined }),
+  },
   LINE_LOGIN_CHANNEL_ID: "1234567890",
   ENVIRONMENT: "test",
   WEB_ORIGIN: "https://example.com",
@@ -236,10 +239,10 @@ async function deferQuestion(
   );
 }
 
-async function deleteDiagnosisData(environment: string | undefined): Promise<Response> {
+async function deleteAccountData(environment: string | undefined): Promise<Response> {
   const { ENVIRONMENT: _, ...baseEnv } = env();
   return app.request(
-    "/api/dev/diagnosis-data",
+    "/api/dev/account-data",
     { method: "DELETE", headers: { Authorization: "Bearer known-token" } },
     { ...baseEnv, ...(environment === undefined ? {} : { ENVIRONMENT: environment }) },
   );
@@ -269,7 +272,12 @@ async function countRows(
     | "diagnosis_responses"
     | "source_records"
     | "diagnosis_answers"
-    | "diagnosis_deferred_questions",
+    | "diagnosis_deferred_questions"
+    | "conversation_sessions"
+    | "profile_summary_versions"
+    | "brain_items"
+    | "brain_vector_entries"
+    | "brain_vector_sync_jobs",
 ) {
   const result = accountDataStore.raw.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get() as
     | { count: number }
@@ -716,20 +724,44 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
   it(`${diagnosisAnswerCases.resetDevelopmentData.id}: ${diagnosisAnswerCases.resetDevelopmentData.name}`, async () => {
     await putAnswer("dq-relationship-priority-01", "yes");
     await putAnswer("dq-relationship-priority-02", "no");
+    await generateCompatibilityShareProfile();
+    accountDataStore.raw
+      .prepare(
+        `INSERT INTO brain_items (
+           id, created_at, updated_at, is_deleted, account_id, category, statement,
+           attributes_json, derivation, status, stability, sensitivity,
+           externally_shareable, confidence_json
+         ) VALUES (?, ?, ?, 0, ?, 'memory', 'テスト用記憶', '{}', 'ai', 'active',
+           'changeable', 'normal', 0, '{}')`,
+      )
+      .run("reset-brain-item", timestamp, timestamp, "account-answer-e2e");
+    accountDataStore.raw
+      .prepare(
+        `INSERT INTO brain_vector_entries (
+           id, created_at, updated_at, is_deleted, brain_item_id, item_revision
+         ) VALUES (?, ?, ?, 0, ?, ?)`,
+      )
+      .run("reset-vector", timestamp, timestamp, "reset-brain-item", timestamp);
 
-    const response = await deleteDiagnosisData("test");
+    const response = await deleteAccountData("test");
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
-      deletedResponseCount: 1,
-      deletedAnswerCount: 2,
-      deletedDeferredQuestionCount: 0,
-      deletedSourceRecordCount: 2,
-      deletedBrainItemCount: 0,
+      deletedDiagnosisResponseCount: 1,
+      deletedConversationSessionCount: 1,
+      deletedSourceRecordCount: 3,
+      deletedBrainItemCount: 1,
+      deletedProfileSummaryVersionCount: 1,
+      scheduledVectorDeletionCount: 1,
     });
     expect(await countRows("diagnosis_responses")).toBe(0);
     expect(await countRows("source_records")).toBe(0);
     expect(await countRows("diagnosis_answers")).toBe(0);
+    expect(await countRows("conversation_sessions")).toBe(0);
+    expect(await countRows("profile_summary_versions")).toBe(0);
+    expect(await countRows("brain_items")).toBe(0);
+    expect(await countRows("brain_vector_entries")).toBe(1);
+    expect(await countRows("brain_vector_sync_jobs")).toBe(1);
     expect(await listRelationshipDiagnosis()).toMatchObject({
       responseStatus: "unanswered",
       answeredCount: 0,
@@ -739,7 +771,7 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
   it(`${diagnosisAnswerCases.rejectProductionReset.id}: ${diagnosisAnswerCases.rejectProductionReset.name}`, async () => {
     await putAnswer("dq-relationship-priority-01", "yes");
 
-    const response = await deleteDiagnosisData("production");
+    const response = await deleteAccountData("production");
 
     expect(response.status).toBe(404);
     expect(await response.json()).toEqual({ error: "Not Found" });
@@ -751,7 +783,7 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
   it(`${diagnosisAnswerCases.rejectUnconfiguredReset.id}: ${diagnosisAnswerCases.rejectUnconfiguredReset.name}`, async () => {
     await putAnswer("dq-relationship-priority-01", "yes");
 
-    const response = await deleteDiagnosisData(undefined);
+    const response = await deleteAccountData(undefined);
 
     expect(response.status).toBe(404);
     expect(await response.json()).toEqual({ error: "Not Found" });
@@ -765,7 +797,7 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
 
     const [saved, reset] = await Promise.all([
       putAnswer("dq-relationship-priority-02", "no"),
-      deleteDiagnosisData("test"),
+      deleteAccountData("test"),
     ]);
 
     expect(saved.status).toBe(200);

@@ -169,4 +169,35 @@ describe("ProfileSettingsScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: "再試行" }));
     expect(onRetryProfile).toHaveBeenCalledOnce();
   });
+
+  it("開発用データ操作を最下部に表示し、確認後に全削除する", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const onResetAccountData = vi.fn().mockResolvedValue({
+      deletedDiagnosisResponseCount: 1,
+      deletedConversationSessionCount: 2,
+      deletedSourceRecordCount: 3,
+      deletedBrainItemCount: 4,
+      deletedProfileSummaryVersionCount: 5,
+      scheduledVectorDeletionCount: 6,
+    });
+    render(
+      <ProfileSettingsScreen
+        avatar={null}
+        canResetAccountData
+        theme="dark"
+        fontSize="medium"
+        onBack={vi.fn()}
+        onOpenAvatar={vi.fn()}
+        onResetAccountData={onResetAccountData}
+        onThemeChange={vi.fn()}
+        onFontSizeChange={vi.fn()}
+      />,
+    );
+
+    const button = screen.getByRole("button", { name: "自分のデータを全削除" });
+    expect(button.closest("section")).toBe(document.querySelector("main section:last-child"));
+    fireEvent.click(button);
+    expect(await screen.findByText(/本人データを削除しました（15件）/)).toBeTruthy();
+    expect(onResetAccountData).toHaveBeenCalledOnce();
+  });
 });
