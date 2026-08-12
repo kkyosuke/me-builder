@@ -1,10 +1,12 @@
 import { line } from "@me-builder/lib";
 import {
+  OperationalError,
   type Queue,
   type WebhookQueueMessage,
   logger,
   toSafeOperationalErrorFields,
 } from "@me-builder/shared";
+import { isDevelopmentEnvironment } from "../config";
 
 /**
  * LINE Webhook を受理し、Cloudflare Queues へ投入します。
@@ -23,6 +25,8 @@ export type ReceiveLineWebhookParams = {
   signature: string | null | undefined;
   channelSecret: string | undefined;
   queue: Queue<WebhookQueueMessage> | undefined;
+  /** Queue 未設定時に縮退を許可するか判定する実行環境 */
+  environment: string;
   /** 1対1トークへチャットローディングを表示する。未設定時は安全にスキップする */
   startChatLoading?: ((chatId: string) => Promise<unknown>) | undefined;
   /** チャットローディングの完了をWebhook応答後まで待機させる */
@@ -30,7 +34,7 @@ export type ReceiveLineWebhookParams = {
 };
 
 export type LineWebhookOutcome =
-  /** 受理して Queue へ投入した（Queue 未設定なら `queued: false`） */
+  /** 受理して Queue へ投入した（ローカル開発で Queue 未設定なら `queued: false`） */
   | { type: "accepted"; id: string; queued: boolean }
   /** チャネルシークレットが未設定で検証できない（サーバー側の設定漏れ） */
   | { type: "secret-not-configured" }
@@ -85,6 +89,7 @@ export async function receiveLineWebhook({
   signature,
   channelSecret,
   queue,
+  environment,
   startChatLoading,
   waitUntil,
 }: ReceiveLineWebhookParams): Promise<LineWebhookOutcome> {
@@ -129,6 +134,35 @@ export async function receiveLineWebhook({
   };
 
   const messages = line.webhook.extractMessages(payload);
+
+  // previewは開発用機能を利用できる環境だが、実際にLINE Webhookを受信するデプロイ環境なので
+  // Queue未設定をローカル開発用の縮退へ倒さない。
+  const canDegradeWithoutQueue = isDevelopmentEnvironment(environment) && environment !== "preview";
+  if (!queue && !canDegradeWithoutQueue) {
+    const errorDescriptor = {
+      code: "WEBHOOK_QUEUE_BINDING_MISSING",
+      category: "configuration",
+      stage: "queue.configure",
+      retryable: true,
+      dependency: "cloudflare-queue",
+    } as const;
+    const error = new OperationalError(errorDescriptor);
+    logger.error(
+      {
+        event: "line.webhook.failed",
+        service: "api",
+        traceId,
+        component: "line-webhook",
+        outcome: "failed",
+        disposition: "http-error",
+        source: event.source,
+        messageCount: messages.length,
+        ...toSafeOperationalErrorFields(error, errorDescriptor),
+      },
+      "[LINE webhook] failed at queue.configure -> http-error (WEBHOOK_QUEUE_BINDING_MISSING, category:configuration, via:cloudflare-queue)",
+    );
+    throw error;
+  }
 
   const chatIds = extractOneToOneTextChatIds(payload);
 

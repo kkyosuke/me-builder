@@ -42,6 +42,7 @@ function receive(
       signature: sign(body),
       channelSecret: CHANNEL_SECRET,
       queue,
+      environment: "test",
       startChatLoading: options.startChatLoading,
       waitUntil: options.waitUntil ?? ((promise) => void promise),
     }),
