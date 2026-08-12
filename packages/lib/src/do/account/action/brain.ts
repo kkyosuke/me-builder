@@ -46,6 +46,7 @@ export type SaveBrainItemResult =
     }>;
 
 const DEVELOPMENT_BRAIN_ITEM_LIMIT = 100;
+const DEVELOPMENT_FAILED_VECTOR_SYNC_JOB_LIMIT = 100;
 const CHAT_CONTEXT_VECTOR_CANDIDATE_LIMIT = 10;
 const CHAT_CONTEXT_MEMORY_LIMIT = 5;
 const CHAT_CONTEXT_EVIDENCE_LIMIT = 3;
@@ -640,11 +641,16 @@ export type FailedBrainVectorSyncJob = Readonly<{
   failedAt: Date;
 }>;
 
+export type FailedBrainVectorSyncJobList = Readonly<{
+  jobs: readonly FailedBrainVectorSyncJob[];
+  truncated: boolean;
+}>;
+
 /** 本文を含めず、運用者が再試行対象を特定するための終端jobだけを返す。 */
 export async function listFailedBrainVectorSyncJobs(
   db: AccountDataDatabase,
-): Promise<readonly FailedBrainVectorSyncJob[]> {
-  const jobs = await db
+): Promise<FailedBrainVectorSyncJobList> {
+  const rows = await db
     .select({
       jobId: brainVectorSyncJobs.id,
       brainItemId: brainVectorSyncJobs.brainItemId,
@@ -657,11 +663,15 @@ export async function listFailedBrainVectorSyncJobs(
     .from(brainVectorSyncJobs)
     .where(and(eq(brainVectorSyncJobs.status, "failed"), eq(brainVectorSyncJobs.isDeleted, false)))
     .orderBy(desc(brainVectorSyncJobs.updatedAt), asc(brainVectorSyncJobs.id))
+    .limit(DEVELOPMENT_FAILED_VECTOR_SYNC_JOB_LIMIT + 1)
     .all();
-  return jobs.map((job) => ({
-    ...job,
-    failureCode: job.failureCode ?? "BRAIN_VECTOR_SYNC_FAILED",
-  }));
+  return {
+    jobs: rows.slice(0, DEVELOPMENT_FAILED_VECTOR_SYNC_JOB_LIMIT).map((job) => ({
+      ...job,
+      failureCode: job.failureCode ?? "BRAIN_VECTOR_SYNC_FAILED",
+    })),
+    truncated: rows.length > DEVELOPMENT_FAILED_VECTOR_SYNC_JOB_LIMIT,
+  };
 }
 
 /** 運用者が原因を解消した後、恒久失敗jobを明示的に最初から再試行する。 */

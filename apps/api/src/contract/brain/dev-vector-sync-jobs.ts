@@ -18,6 +18,7 @@ export const DevelopmentFailedBrainVectorSyncJobsResponseSchema = v.object({
       failedAt: TimestampSchema,
     }),
   ),
+  truncated: v.boolean(),
 });
 
 export const ResetDevelopmentBrainVectorSyncJobResponseSchema = v.object({

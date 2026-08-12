@@ -1,7 +1,7 @@
 import {
   type AccountDataNamespace,
   type D1,
-  type FailedBrainVectorSyncJob,
+  type FailedBrainVectorSyncJobList,
   accountDataFor,
 } from "@me-builder/lib";
 import { createLiffSession } from "./liff-session";
@@ -23,7 +23,7 @@ type Dependencies = {
   listFailed: (
     accountData: AccountDataNamespace | undefined,
     accountId: string,
-  ) => Promise<readonly FailedBrainVectorSyncJob[]>;
+  ) => Promise<FailedBrainVectorSyncJobList>;
   resetFailed: (
     accountData: AccountDataNamespace | undefined,
     accountId: string,
@@ -52,7 +52,7 @@ const defaultDependencies: Dependencies = {
 };
 
 export type DevelopmentFailedBrainVectorSyncJobsOutcome =
-  | { type: "resolved"; jobs: readonly FailedBrainVectorSyncJob[] }
+  | ({ type: "resolved" } & FailedBrainVectorSyncJobList)
   | SessionFailure;
 
 export type ResetDevelopmentBrainVectorSyncJobOutcome =
@@ -70,8 +70,8 @@ export async function listDevelopmentFailedBrainVectorSyncJobs(
 ): Promise<DevelopmentFailedBrainVectorSyncJobsOutcome> {
   const session = await dependencies.createSession({ idToken, lineLoginChannelId, db });
   if (session.type !== "resolved") return session;
-  const jobs = await dependencies.listFailed(accountData, session.session.accountId);
-  return { type: "resolved", jobs };
+  const result = await dependencies.listFailed(accountData, session.session.accountId);
+  return { type: "resolved", ...result };
 }
 
 /** 本人確認済みAccountの指定した終端jobを再試行可能に戻す。 */

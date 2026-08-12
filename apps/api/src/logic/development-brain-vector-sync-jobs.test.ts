@@ -21,7 +21,7 @@ function dependencies() {
       type: "resolved",
       session: { accountId: "account-1", role: "user" },
     }),
-    listFailed: vi.fn().mockResolvedValue([]),
+    listFailed: vi.fn().mockResolvedValue({ jobs: [], truncated: false }),
     resetFailed: vi.fn().mockResolvedValue(true),
     resetAllFailed: vi.fn().mockResolvedValue(2),
   };
@@ -34,6 +34,7 @@ describe("development Brain Vector sync jobs", () => {
     await expect(listDevelopmentFailedBrainVectorSyncJobs(params, deps)).resolves.toEqual({
       type: "resolved",
       jobs: [],
+      truncated: false,
     });
     await expect(
       resetDevelopmentBrainVectorSyncJob({ ...params, jobId: "job-1" }, deps),

@@ -1161,6 +1161,7 @@ export interface operations {
               /** Format: date-time */
               failedAt: string;
             }[];
+            truncated: boolean;
           };
         };
       };

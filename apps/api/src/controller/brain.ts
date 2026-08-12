@@ -182,6 +182,7 @@ export async function getDevelopmentFailedBrainVectorSyncJobs(
   return c.json(
     v.parse(DevelopmentFailedBrainVectorSyncJobsResponseSchema, {
       jobs: outcome.jobs.map((job) => ({ ...job, failedAt: job.failedAt.toISOString() })),
+      truncated: outcome.truncated,
     }),
   );
 }

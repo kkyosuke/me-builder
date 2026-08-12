@@ -1645,9 +1645,12 @@
                           "failedAt"
                         ]
                       }
+                    },
+                    "truncated": {
+                      "type": "boolean"
                     }
                   },
-                  "required": ["jobs"]
+                  "required": ["jobs", "truncated"]
                 }
               }
             }

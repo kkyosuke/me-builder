@@ -238,6 +238,7 @@ describe("開発用Brain Vector同期job API", () => {
           failedAt: new Date("2026-08-12T00:00:00Z"),
         },
       ],
+      truncated: false,
     });
 
     const response = await app.request(
@@ -260,6 +261,7 @@ describe("開発用Brain Vector同期job API", () => {
           failedAt: "2026-08-12T00:00:00.000Z",
         },
       ],
+      truncated: false,
     });
   });
 
@@ -322,17 +324,31 @@ describe("開発用Brain Vector同期job API", () => {
     },
   );
 
-  it("未認証は401へ変換する", async () => {
-    loadDevelopmentFailedBrainVectorSyncJobs.mockResolvedValue({
-      type: "unauthenticated",
-      reason: "invalid",
-    });
+  it.each([
+    {
+      path: "/api/dev/brain-vector-sync-jobs/failed",
+      method: "GET",
+      logic: loadDevelopmentFailedBrainVectorSyncJobs,
+    },
+    {
+      path: "/api/dev/brain-vector-sync-jobs/job-1/reset",
+      method: "POST",
+      logic: resetDevelopmentFailedBrainVectorSyncJob,
+    },
+    {
+      path: "/api/dev/brain-vector-sync-jobs/reset-failed",
+      method: "POST",
+      logic: resetAllDevelopmentFailedBrainVectorSyncJobs,
+    },
+  ])("未認証なら$method $pathを401へ変換する", async ({ path, method, logic }) => {
+    logic.mockResolvedValue({ type: "unauthenticated", reason: "invalid" });
     const response = await app.request(
-      "/api/dev/brain-vector-sync-jobs/failed",
-      { headers: authorization },
+      path,
+      { method, headers: authorization },
       env("development"),
     );
     expect(response.status).toBe(401);
     expect(await response.json()).toEqual({ error: "Unauthorized" });
+    expect(logic).toHaveBeenCalledTimes(1);
   });
 });

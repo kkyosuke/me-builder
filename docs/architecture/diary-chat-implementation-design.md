@@ -365,6 +365,8 @@ Vectorizeへのupsertまたはdelete受付後に`applied`とmutation IDを記録
 
 終端化の原因を運用者が解消した場合は、開発環境限定の`GET /api/dev/brain-vector-sync-jobs/failed`で本人確認済みAccountの終端jobを一覧し、`POST /api/dev/brain-vector-sync-jobs/:jobId/reset`または`POST /api/dev/brain-vector-sync-jobs/reset-failed`でjob ID指定またはAccount内一括のresetを行います。APIはAccount IDを入力として受け取らず、LIFFセッションから本人のAccountを解決して、AccountDataの`brain.listFailedVectorSyncJobs`、`brain.resetFailedVectorSyncJob`、`brain.resetAllFailedVectorSyncJobs`を呼びます。resetしたjobは`pending`へ戻り、試行回数を0から再開します。これらのAPIは`ENVIRONMENT`が`development` / `local` / `preview` / `test`のいずれかへ明示設定された場合だけ有効とし、未設定またはProductionでは404を返します。通常のBrain Item変更で新しいrevisionの補正jobが作られた場合は新しいjobとして同期します。原因が未解消のまま自動復帰させず、恒久障害でalarmとQueueのループを再開しないことを優先します。
 
+一覧APIは終端日時の新しい順に最大100件を返し、それを超える場合は`truncated: true`で通知します。一括resetは一覧の表示上限に関係なく、Account内の全終端jobを対象にします。
+
 `BRAIN_VECTOR_HMAC_SECRET`は通常のSecretローテーションだけで単独変更してはいけません。変更時は新しいindexを用意し、AccountDataを正として全active Itemを再同期し、検索先を切り替えた後に旧indexを削除します。緊急失効時も同じ再構築手順を使います。個別Itemの削除ではAccountDataの対応表に保存した旧vector IDを使うため、Secret変更前のvectorも削除できます。
 
 ### 4.9 ConversationCoordinatorのローカルSQLite
