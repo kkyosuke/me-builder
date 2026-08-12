@@ -86,4 +86,51 @@ describe("AdminStatisticsScreen", () => {
       (screen.getByRole("button", { name: "統計情報を更新中" }) as HTMLButtonElement).disabled,
     ).toBe(true);
   });
+
+  it("狭い画面ではAccount別利用量だけを横スクロールできる", () => {
+    render(
+      <AdminStatisticsScreen
+        state={{
+          status: "success",
+          data: {
+            period: {
+              start: "2026-08-01T00:00:00.000Z",
+              end: "2026-08-08T00:00:00.000Z",
+            },
+            fetchedAt: "2026-08-08T00:00:00.000Z",
+            gemini: {
+              status: "available",
+              requestCount: 1,
+              inputTokens: 2,
+              outputTokens: 3,
+              accounts: [
+                {
+                  accountId: "very-long-account-id-that-must-not-expand-the-dashboard",
+                  requestCount: 1,
+                  inputTokens: 2,
+                  outputTokens: 3,
+                },
+              ],
+            },
+            line: {
+              status: "available",
+              billableMessages: 0,
+              monthlyLimit: 5000,
+              replyMessages: 0,
+            },
+          },
+        }}
+        onReload={vi.fn()}
+      />,
+    );
+
+    const scrollRegion = screen.getByRole("region", {
+      name: "Account別利用量。横にスクロールできます",
+    });
+    expect(scrollRegion.classList.contains("max-w-full")).toBe(true);
+    expect(scrollRegion.classList.contains("overflow-x-auto")).toBe(true);
+    expect(scrollRegion.parentElement?.closest("section")?.classList.contains("min-w-0")).toBe(
+      true,
+    );
+  });
 });

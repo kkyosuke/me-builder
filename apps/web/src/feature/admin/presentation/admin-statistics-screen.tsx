@@ -8,7 +8,7 @@ const number = new Intl.NumberFormat("ja-JP");
 function Unavailable({ reason }: { reason: "not-configured" | "upstream-error" }) {
   return (
     <div className="flex items-center gap-2 rounded-2xl bg-amber-50 p-4 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
-      <AlertCircle className="size-4" aria-hidden="true" />
+      <AlertCircle className="size-4 shrink-0" aria-hidden="true" />
       {reason === "not-configured"
         ? "集計用の環境設定がありません。"
         : "外部サービスから取得できませんでした。"}
@@ -20,7 +20,7 @@ function Metric({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900">
       <dt className="text-xs text-slate-500 dark:text-slate-400">{label}</dt>
-      <dd className="mt-1 text-xl font-semibold tabular-nums">{value}</dd>
+      <dd className="mt-1 break-all text-xl font-semibold tabular-nums">{value}</dd>
     </div>
   );
 }
@@ -31,7 +31,7 @@ function Card({
   children,
 }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
   return (
-    <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+    <section className="min-w-0 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 dark:border-slate-700 dark:bg-slate-800">
       <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold">
         {icon}
         {title}
@@ -59,7 +59,10 @@ function Gemini({ value }: { value: AdminStatistics["gemini"] }) {
               当月の利用Accountはありません。
             </p>
           ) : (
-            <div className="mt-2 overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-700">
+            <section
+              aria-label="Account別利用量。横にスクロールできます"
+              className="mt-2 max-w-full overflow-x-auto overscroll-x-contain rounded-2xl border border-slate-200 dark:border-slate-700"
+            >
               <table className="w-full min-w-xl text-left text-sm">
                 <thead className="bg-slate-50 text-xs text-slate-500 dark:bg-slate-900 dark:text-slate-400">
                   <tr>
@@ -99,7 +102,7 @@ function Gemini({ value }: { value: AdminStatistics["gemini"] }) {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </section>
           )}
         </>
       )}
@@ -137,7 +140,7 @@ function Line({ value }: { value: AdminStatistics["line"] }) {
 
 function StatisticsSkeleton() {
   return (
-    <main className="mx-auto min-h-dvh w-full max-w-4xl px-4 py-16 sm:px-8">
+    <main className="mx-auto min-h-dvh w-full min-w-0 max-w-4xl px-4 py-16 sm:px-8">
       <SkeletonLoader label="統計情報を読み込み中">
         <header className="mb-6">
           <SkeletonBlock className="h-4 w-16 rounded-full" />
@@ -195,17 +198,17 @@ export function AdminStatisticsScreen({
     );
   const { data } = state;
   return (
-    <main className="mx-auto min-h-dvh w-full max-w-4xl px-4 py-16 sm:px-8">
+    <main className="mx-auto min-h-dvh w-full min-w-0 max-w-4xl px-4 py-16 sm:px-8">
       <header className="mb-6">
         <p className="text-sm font-medium text-violet-600 dark:text-violet-400">Admin</p>
-        <div className="flex items-center justify-between gap-4">
-          <h1 className="text-3xl font-bold">利用統計</h1>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="min-w-0 text-3xl font-bold">利用統計</h1>
           <button
             type="button"
             onClick={onReload}
             disabled={isRefreshing}
             aria-label={isRefreshing ? "統計情報を更新中" : undefined}
-            className="flex items-center gap-2 rounded-full border border-slate-300 px-4 py-2 text-sm dark:border-slate-600"
+            className="flex shrink-0 items-center gap-2 rounded-full border border-slate-300 px-4 py-2 text-sm dark:border-slate-600"
           >
             <RefreshCw className={`size-4 ${isRefreshing ? "animate-spin" : ""}`} />
             {isRefreshing ? "更新中..." : "更新"}
@@ -216,7 +219,7 @@ export function AdminStatisticsScreen({
           {new Date(data.period.end).toLocaleString("ja-JP")}
         </p>
       </header>
-      <div className="grid gap-5">
+      <div className="grid min-w-0 gap-5">
         <Gemini value={data.gemini} />
         <Line value={data.line} />
       </div>
