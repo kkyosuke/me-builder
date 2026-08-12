@@ -17,7 +17,6 @@ export const WorkerConfigSchema = v.object({
   geminiModel: v.optional(v.string(), DEFAULT_GEMINI_MODEL),
   geminiEmbeddingModel: v.optional(v.string(), DEFAULT_GEMINI_EMBEDDING_MODEL),
   brainVectorHmacSecret: v.optional(v.string()),
-  chatEnabled: v.optional(v.boolean(), true),
   chatDeliverySecret: v.optional(v.string()),
   chatContextMessageLimit: v.optional(
     v.pipe(v.number(), v.integer(), v.minValue(1)),
