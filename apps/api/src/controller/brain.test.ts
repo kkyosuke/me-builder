@@ -78,6 +78,7 @@ describe("GET /api/dev/brain-items", () => {
     const response = await request();
 
     expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
     expect(await response.json()).toEqual({
       items: [
         expect.objectContaining({
@@ -157,6 +158,7 @@ describe("GET /api/dev/brain-items/:brainItemId/vector", () => {
     );
 
     expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
     expect(await response.json()).toEqual({
       state: "present",
       entryRevision: 12,

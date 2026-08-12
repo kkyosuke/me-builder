@@ -35,6 +35,7 @@ export async function getProfileSummaryContents(c: Context<AppEnv>): Promise<Res
 
   switch (outcome.type) {
     case "resolved":
+      c.header("Cache-Control", "no-store");
       return c.json(
         v.parse(ProfileSummaryResponseSchema, {
           versions: outcome.versions,

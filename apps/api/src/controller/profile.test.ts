@@ -58,6 +58,7 @@ describe("GET /api/profile-summary", () => {
     const response = await request();
 
     expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
     expect(await response.json()).toEqual({
       versions: [],
       availableDataCounts: { diagnosis: 0, diary: 0 },
