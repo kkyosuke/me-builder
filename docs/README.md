@@ -90,6 +90,7 @@ docs/
 - [相性API契約](development/compatibility-api.md) — Web UIとAPI Server間の相性API契約
 - [API契約とクライアント型の生成](development/api-contract-generation.md) — HTTP契約の配置とOpenAPI・Web UI用型の生成運用
 - [アプリケーション運用ログ方針](development/operational-logging.md) — 一連の処理を追跡し、エラー原因と最終結果を判断できる運用ログの目的と進め方
+- [本番データベースマイグレーション運用](development/production-migration-operations.md) — forward-only、expand-contract、適用順序、D1とDurable Objectの復旧方針
 - [Brain Item残タスク](development/brain-item-remaining-tasks.md) — Brain Item生成・意味的重複判定・Vectorize利用に残っている検証、品質改善、延期中の機能
 - [アバター設定残タスク](development/avatar-remaining-tasks.md) — アバター設定に残っている実ブラウザE2E、LIFF実端末確認、Private R2の運用改善
 - [わたしのまとめ残タスク](development/profile-summary-remaining-tasks.md) — 「わたしのまとめ」で未完了の実環境検証と完了条件

@@ -1,5 +1,6 @@
 import { createHmac } from "node:crypto";
 import { line } from "@me-builder/lib";
+import { logger } from "@me-builder/shared";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { app } from "./index";
 
@@ -231,24 +232,65 @@ describe("API Server Webhook Queue", () => {
     });
   });
 
-  it("POST /api/line/webhook handles request safely if WEBHOOK_QUEUE binding is absent", async () => {
-    const body = JSON.stringify({ events: [] });
+  it.each([undefined, "local", "development", "test"])(
+    "POST /api/line/webhook keeps degraded acceptance if WEBHOOK_QUEUE is absent (%s)",
+    async (environment) => {
+      const body = JSON.stringify({ events: [] });
 
-    const res = await app.request(
-      "/api/line/webhook",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-line-signature": sign(body) },
-        body,
-      },
-      { LINE_CHANNEL_SECRET: CHANNEL_SECRET },
-    );
+      const res = await app.request(
+        "/api/line/webhook",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-line-signature": sign(body) },
+          body,
+        },
+        {
+          LINE_CHANNEL_SECRET: CHANNEL_SECRET,
+          ...(environment === undefined ? {} : { ENVIRONMENT: environment }),
+        },
+      );
 
-    expect(res.status).toBe(200);
-    const data = await res.json();
-    expect(data.status).toBe("ok");
-    expect(data.queued).toBe(false);
-  });
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.status).toBe("ok");
+      expect(data.queued).toBe(false);
+    },
+  );
+
+  it.each(["production", "preview"])(
+    "POST /api/line/webhook returns 5xx and logs a configuration error if WEBHOOK_QUEUE is absent (%s)",
+    async (environment) => {
+      const errorLog = vi.spyOn(logger, "error").mockImplementation(() => undefined);
+      const body = JSON.stringify({ events: [] });
+
+      const res = await app.request(
+        "/api/line/webhook",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-line-signature": sign(body) },
+          body,
+        },
+        { LINE_CHANNEL_SECRET: CHANNEL_SECRET, ENVIRONMENT: environment },
+      );
+
+      expect(res.status).toBeGreaterThanOrEqual(500);
+      expect(res.status).toBeLessThan(600);
+      expect(await res.json()).toEqual({ error: "Internal Server Error" });
+      expect(errorLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: "line.webhook.failed",
+          outcome: "failed",
+          disposition: "http-error",
+          errorCode: "WEBHOOK_QUEUE_BINDING_MISSING",
+          errorCategory: "configuration",
+          stage: "queue.configure",
+          retryable: true,
+          dependency: "cloudflare-queue",
+        }),
+        expect.stringContaining("WEBHOOK_QUEUE_BINDING_MISSING"),
+      );
+    },
+  );
 
   it("handles unhandled exception with 500 status using app.onError", async () => {
     const testApp = new (await import("hono")).Hono();

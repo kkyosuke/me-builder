@@ -8,9 +8,23 @@ const { loadDevelopmentBrainItems, loadDevelopmentBrainVector } = vi.hoisted(() 
   loadDevelopmentBrainItems: vi.fn(),
   loadDevelopmentBrainVector: vi.fn(),
 }));
+const {
+  loadDevelopmentFailedBrainVectorSyncJobs,
+  resetDevelopmentFailedBrainVectorSyncJob,
+  resetAllDevelopmentFailedBrainVectorSyncJobs,
+} = vi.hoisted(() => ({
+  loadDevelopmentFailedBrainVectorSyncJobs: vi.fn(),
+  resetDevelopmentFailedBrainVectorSyncJob: vi.fn(),
+  resetAllDevelopmentFailedBrainVectorSyncJobs: vi.fn(),
+}));
 vi.mock("../logic/development-brain-items", () => ({
   getDevelopmentBrainItems: loadDevelopmentBrainItems,
   getDevelopmentBrainVector: loadDevelopmentBrainVector,
+}));
+vi.mock("../logic/development-brain-vector-sync-jobs", () => ({
+  listDevelopmentFailedBrainVectorSyncJobs: loadDevelopmentFailedBrainVectorSyncJobs,
+  resetDevelopmentBrainVectorSyncJob: resetDevelopmentFailedBrainVectorSyncJob,
+  resetAllDevelopmentBrainVectorSyncJobs: resetAllDevelopmentFailedBrainVectorSyncJobs,
 }));
 
 const dummyDb = {} as D1Database;
@@ -78,6 +92,7 @@ describe("GET /api/dev/brain-items", () => {
     const response = await request();
 
     expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
     expect(await response.json()).toEqual({
       items: [
         expect.objectContaining({
@@ -157,6 +172,7 @@ describe("GET /api/dev/brain-items/:brainItemId/vector", () => {
     );
 
     expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
     expect(await response.json()).toEqual({
       state: "present",
       entryRevision: 12,
@@ -194,5 +210,145 @@ describe("GET /api/dev/brain-items/:brainItemId/vector", () => {
 
     expect(response.status).toBe(404);
     expect(loadDevelopmentBrainVector).not.toHaveBeenCalled();
+  });
+});
+
+describe("開発用Brain Vector同期job API", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const env = (environment: string | undefined) => ({
+    ...(environment === undefined ? {} : { ENVIRONMENT: environment }),
+    LIFF_ID: "2010850319-Yl63upAR",
+    DB: dummyDb,
+    ACCOUNT_DATA: dummyAccountData,
+  });
+  const authorization = { Authorization: "Bearer dummy.id.token" };
+
+  it("終端job一覧を本文なしの運用情報として返す", async () => {
+    loadDevelopmentFailedBrainVectorSyncJobs.mockResolvedValue({
+      type: "resolved",
+      jobs: [
+        {
+          jobId: "job-1",
+          brainItemId: "brain-1",
+          itemRevision: 12,
+          operation: "upsert",
+          attemptCount: 6,
+          failureCode: "BRAIN_VECTOR_SYNC_ATTEMPTS_EXHAUSTED",
+          failedAt: new Date("2026-08-12T00:00:00Z"),
+        },
+      ],
+      truncated: false,
+    });
+
+    const response = await app.request(
+      "/api/dev/brain-vector-sync-jobs/failed",
+      { headers: authorization },
+      env("development"),
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(await response.json()).toEqual({
+      jobs: [
+        {
+          jobId: "job-1",
+          brainItemId: "brain-1",
+          itemRevision: 12,
+          operation: "upsert",
+          attemptCount: 6,
+          failureCode: "BRAIN_VECTOR_SYNC_ATTEMPTS_EXHAUSTED",
+          failedAt: "2026-08-12T00:00:00.000Z",
+        },
+      ],
+      truncated: false,
+    });
+  });
+
+  it("jobId指定で本人の終端jobをresetする", async () => {
+    resetDevelopmentFailedBrainVectorSyncJob.mockResolvedValue({ type: "resolved", reset: true });
+
+    const response = await app.request(
+      "/api/dev/brain-vector-sync-jobs/job-1/reset",
+      { method: "POST", headers: authorization },
+      env("preview"),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ reset: true });
+    expect(resetDevelopmentFailedBrainVectorSyncJob).toHaveBeenCalledWith(
+      expect.objectContaining({ jobId: "job-1", idToken: "dummy.id.token" }),
+    );
+  });
+
+  it("Account内の終端jobを一括resetする", async () => {
+    resetAllDevelopmentFailedBrainVectorSyncJobs.mockResolvedValue({
+      type: "resolved",
+      resetCount: 3,
+    });
+
+    const response = await app.request(
+      "/api/dev/brain-vector-sync-jobs/reset-failed",
+      { method: "POST", headers: authorization },
+      env("local"),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ resetCount: 3 });
+  });
+
+  it.each(["production", "staging", undefined])(
+    "ENVIRONMENT=%sでは全操作を404にしてlogicを呼ばない",
+    async (environment) => {
+      const responses = await Promise.all([
+        app.request(
+          "/api/dev/brain-vector-sync-jobs/failed",
+          { headers: authorization },
+          env(environment),
+        ),
+        app.request(
+          "/api/dev/brain-vector-sync-jobs/job-1/reset",
+          { method: "POST", headers: authorization },
+          env(environment),
+        ),
+        app.request(
+          "/api/dev/brain-vector-sync-jobs/reset-failed",
+          { method: "POST", headers: authorization },
+          env(environment),
+        ),
+      ]);
+      expect(responses.map(({ status }) => status)).toEqual([404, 404, 404]);
+      expect(loadDevelopmentFailedBrainVectorSyncJobs).not.toHaveBeenCalled();
+      expect(resetDevelopmentFailedBrainVectorSyncJob).not.toHaveBeenCalled();
+      expect(resetAllDevelopmentFailedBrainVectorSyncJobs).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    {
+      path: "/api/dev/brain-vector-sync-jobs/failed",
+      method: "GET",
+      logic: loadDevelopmentFailedBrainVectorSyncJobs,
+    },
+    {
+      path: "/api/dev/brain-vector-sync-jobs/job-1/reset",
+      method: "POST",
+      logic: resetDevelopmentFailedBrainVectorSyncJob,
+    },
+    {
+      path: "/api/dev/brain-vector-sync-jobs/reset-failed",
+      method: "POST",
+      logic: resetAllDevelopmentFailedBrainVectorSyncJobs,
+    },
+  ])("未認証なら$method $pathを401へ変換する", async ({ path, method, logic }) => {
+    logic.mockResolvedValue({ type: "unauthenticated", reason: "invalid" });
+    const response = await app.request(
+      path,
+      { method, headers: authorization },
+      env("development"),
+    );
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: "Unauthorized" });
+    expect(logic).toHaveBeenCalledTimes(1);
   });
 });

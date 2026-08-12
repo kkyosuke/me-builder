@@ -59,9 +59,14 @@ export type AccountDataActions = {
     [jobId: string, failureCode: string, retryable?: boolean, at?: Date],
     typeof brain.failBrainVectorSyncJob
   >;
+  "brain.listFailedVectorSyncJobs": RpcAction<[], typeof brain.listFailedBrainVectorSyncJobs>;
   "brain.resetFailedVectorSyncJob": RpcAction<
     [jobId: string, at?: Date],
     typeof brain.resetFailedBrainVectorSyncJob
+  >;
+  "brain.resetAllFailedVectorSyncJobs": RpcAction<
+    [at?: Date],
+    typeof brain.resetAllFailedBrainVectorSyncJobs
   >;
   "compatibility.addOutgoingReference": (
     input: Readonly<{ relationshipId: string; createdAt: Date }>,
@@ -137,6 +142,10 @@ export type AccountDataActions = {
     [at?: Date],
     typeof diary.claimDueDiaryBrainCheckpointIds
   >;
+  "conversation.resetFailedDiaryBrainCheckpoint": RpcAction<
+    [checkpointId: string, at?: Date],
+    typeof diary.resetFailedDiaryBrainCheckpoint
+  >;
   "conversation.getDiaryBrainCheckpointContext": RpcAction<
     [checkpointId: string],
     typeof diary.getDiaryBrainCheckpointContext
@@ -190,6 +199,7 @@ export type AccountDataActions = {
     [at: Date],
     typeof diagnosis.getCompatibilitySharePreviewSource
   >;
+  "diagnosis.hasResponse": RpcAction<[diagnosisId: string], typeof diagnosis.hasDiagnosisResponse>;
   "diagnosis.listVisible": RpcAction<[at: Date], typeof diagnosis.listVisibleDiagnoses>;
   "diagnosisProjection.processLatest": RpcAction<
     [diagnosisId: string, at?: Date],

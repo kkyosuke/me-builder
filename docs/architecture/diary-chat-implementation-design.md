@@ -278,14 +278,14 @@ prompt本文、Context Package、未検証のモデル出力は保存しませ�
 | `from_sequence`, `through_sequence` | yes | 未変換会話の範囲 |
 | `first_message_at`, `last_message_at` | yes | 起動時刻を決める基準 |
 | `due_at`, `next_attempt_at` | yes | 初回期限とQueue再投入可能時刻 |
-| `status` | yes | `pending`: 新着で延長可能、`queued`: 範囲固定・Queue投入待ち、`dispatched`: Queue受理済み、`applied`: 適用済み |
+| `status` | yes | `pending`: 新着で延長可能、`queued`: 範囲固定・Queue投入待ち、`dispatched`: Queue受理済み、`applied`: 適用済み、`failed`: 再試行上限到達で終端 |
 | `attempt_count`, `applied_at` | yes / no | Queue投入回数と適用完了時刻 |
 | `development_notification_sent_at` | no | 開発環境の確認Push完了時刻 |
 | `created_at`, `updated_at`, `deleted_at`, `is_deleted` | yes / no / yes | lifecycle |
 
 同じSessionの`pending`は最大1件とします。新しいuser messageをTurnへ取り込むtransactionで、発言ごとに現在の期限とuser message 10件の範囲上限を評価します。期限前かつ上限以内なら範囲を延長し、期限以後または追加すると上限を超える場合は既存範囲を`queued`へ固定して新しい`pending`を作ります。Brain Item変換では削除・撤回されていないuser原文だけを最大10message、各5,000文字まで読み、assistant本文は入力へ含めません。明示終了時は期限を現在時刻へ進めます。
 
-Alarmは期限到来した`pending`、Queue投入に失敗した`queued`、または回復期限を超えた`dispatched`をclaimし、`queued`へ進めます。Queue投入前は指数バックオフ付きの投入leaseとして`next_attempt_at`を進め、投入失敗時は永続化済みの次回試行時刻からAlarmを明示的に再設定します。QueueがIDを受理したら`dispatched`へ進め、`next_attempt_at`へ1時間後の回復期限を保存します。Queue自身の初回配送と最大5回の再試行をこの期間は優先し、それでも`applied`にならなければ同じcheckpoint IDを再投入してDLQ滞留から自己回復します。
+Alarmは期限到来した`pending`、Queue投入に失敗した`queued`、または回復期限を超えた`dispatched`をclaimし、`queued`へ進めます。Queue投入前は指数バックオフ付きの投入leaseとして`next_attempt_at`を進め、投入失敗時は永続化済みの次回試行時刻からAlarmを明示的に再設定します。QueueがIDを受理したら`dispatched`へ進め、`next_attempt_at`へ1時間後の回復期限を保存します。Queue自身の初回配送と最大5回の再試行をこの期間は優先し、それでも`applied`にならなければ同じcheckpoint IDを再投入してDLQ滞留から自己回復します。alarmからのQueue投入は5回を上限とし、最大30回のQueue配送後も適用できなかったcheckpointは`failed`へ終端化して、以後のclaimとalarm対象から外します。終端時はcheckpoint IDと試行回数を構造化ログへ記録します。原因解消後はreset RPCで固定済みの範囲を`queued`へ戻し、試行回数を0から再開します。
 
 送信後・状態更新前の停止、または回復再投入と元のQueue処理の競合によって重複配送され得ますが、Workerは固定範囲を読み直し、Brain Item一式、`diary_brain_checkpoint_items`、`applied`への遷移を同じtransactionで確定します。AlarmとRPC actionはAccountData Object内で直列化し、先に`applied`へ進めた処理だけを成功させるため多重適用しません。JSONまたは出力envelope全体が不正な場合は再配送し、envelope内の個別候補だけがschema・Evidence・候補間重複の検証に失敗した場合は、安全な理由コードをerror logへ残してその候補だけを登録対象から外します。
 
@@ -298,6 +298,8 @@ stateDiagram-v2
     queued --> dispatched: Queueが受理
     dispatched --> dispatched: AI・検証失敗をQueueが再配送
     dispatched --> queued: 1時間の回復期限超過
+    dispatched --> failed: 5回目の回復期限超過
+    failed --> queued: 運用者がreset
     queued --> applied: 送信直後のmessageが先に適用
     dispatched --> applied: Item一式を原子的に適用
     applied --> [*]
@@ -363,7 +365,9 @@ vector IDはAccount IDとItem IDの組を環境別SecretでHMACした決定的�
 
 Vectorizeへのupsertまたはdelete受付後に`applied`とmutation IDを記録します。失敗時は本文を含まないfailure codeだけを保存し、Queue messageをackしたうえでoutboxを`retry_scheduled`へ戻します。次回実行はQueueの即時再配送ではなくAccountData alarmから行い、1回目から順に60秒、2分、8分、30分、2時間待機します。`attempt_count`はclaim時に増やし、初回を含む6回目の失敗、または設定不備など再試行不能と分類できる失敗で`failed`へ終端化します。`failed`はalarmの対象外とし、終端化時は試行回数、上限、failure code、再試行不可を構造化error logへ記録します。削除時はAccountDataで先に利用不可にするため、Vectorizeに古いvectorが残る間も、検索導入後のAccountData再認可では利用されません。
 
-終端化の原因を運用者が解消した場合は、AccountDataの内部操作`brain.resetFailedVectorSyncJob`を明示的に実行して同じjobを`pending`へ戻し、試行回数を0から再開します。通常のBrain Item変更で新しいrevisionの補正jobが作られた場合は新しいjobとして同期します。原因が未解消のまま自動復帰させず、恒久障害でalarmとQueueのループを再開しないことを優先します。
+終端化の原因を運用者が解消した場合は、開発環境限定の`GET /api/dev/brain-vector-sync-jobs/failed`で本人確認済みAccountの終端jobを一覧し、`POST /api/dev/brain-vector-sync-jobs/:jobId/reset`または`POST /api/dev/brain-vector-sync-jobs/reset-failed`でjob ID指定またはAccount内一括のresetを行います。APIはAccount IDを入力として受け取らず、LIFFセッションから本人のAccountを解決して、AccountDataの`brain.listFailedVectorSyncJobs`、`brain.resetFailedVectorSyncJob`、`brain.resetAllFailedVectorSyncJobs`を呼びます。resetしたjobは`pending`へ戻り、試行回数を0から再開します。これらのAPIは`ENVIRONMENT`が`development` / `local` / `preview` / `test`のいずれかへ明示設定された場合だけ有効とし、未設定またはProductionでは404を返します。通常のBrain Item変更で新しいrevisionの補正jobが作られた場合は新しいjobとして同期します。原因が未解消のまま自動復帰させず、恒久障害でalarmとQueueのループを再開しないことを優先します。
+
+一覧APIは終端日時の新しい順に最大100件を返し、それを超える場合は`truncated: true`で通知します。一括resetは一覧の表示上限に関係なく、Account内の全終端jobを対象にします。
 
 `BRAIN_VECTOR_HMAC_SECRET`は通常のSecretローテーションだけで単独変更してはいけません。変更時は新しいindexを用意し、AccountDataを正として全active Itemを再同期し、検索先を切り替えた後に旧indexを削除します。緊急失効時も同じ再構築手順を使います。個別Itemの削除ではAccountDataの対応表に保存した旧vector IDを使うため、Secret変更前のvectorも削除できます。
 

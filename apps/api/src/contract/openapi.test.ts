@@ -21,6 +21,9 @@ describe("GET /api/openapi.json", () => {
     expect(document.paths["/api/profile/avatar"]?.delete).toBeDefined();
     expect(document.paths["/api/dev/brain-items"]?.get).toBeDefined();
     expect(document.paths["/api/dev/brain-items/{brainItemId}/vector"]?.get).toBeDefined();
+    expect(document.paths["/api/dev/brain-vector-sync-jobs/failed"]?.get).toBeDefined();
+    expect(document.paths["/api/dev/brain-vector-sync-jobs/reset-failed"]?.post).toBeDefined();
+    expect(document.paths["/api/dev/brain-vector-sync-jobs/{jobId}/reset"]?.post).toBeDefined();
     expect(document.paths["/api/openapi.json"]).toBeUndefined();
     expect(document.components.securitySchemes.liffIdToken).toMatchObject({
       type: "http",

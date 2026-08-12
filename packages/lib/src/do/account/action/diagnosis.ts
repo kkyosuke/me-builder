@@ -1,4 +1,4 @@
-import { and, asc, count, eq, inArray, lte, max, or } from "drizzle-orm";
+import { and, asc, count, eq, inArray, isNotNull, lte, max, or } from "drizzle-orm";
 import type { AccountDataDatabase } from "../database";
 import {
   brainItemAccessLabels,
@@ -152,13 +152,14 @@ function isUniqueViolation(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return (
     message.includes("UNIQUE constraint failed") ||
-    message.includes("D1_ERROR") ||
-    message.includes("SQLITE_CONSTRAINT")
+    message.includes("SQLITE_CONSTRAINT_UNIQUE") ||
+    message.includes("SQLITE_CONSTRAINT_PRIMARYKEY")
   );
 }
 
 const RESET_DELETE_CHUNK_SIZE = 49;
 const RESET_MAX_ATTEMPTS = 3;
+const DIAGNOSIS_WRITE_MAX_ATTEMPTS = 3;
 
 type D1BatchStatement = Parameters<AccountDataDatabase["batch"]>[0][number];
 
@@ -353,6 +354,15 @@ async function findDiagnosisResponseId(
   return response?.id;
 }
 
+/** 本人に削除されていないDiagnosisResponseがあるかを返します。 */
+export async function hasDiagnosisResponse(
+  db: AccountDataDatabase,
+  accountId: string,
+  diagnosisId: string,
+): Promise<boolean> {
+  return (await findDiagnosisResponseId(db, accountId, diagnosisId)) !== undefined;
+}
+
 async function findPersistedAnswer(
   db: AccountDataDatabase,
   responseId: string,
@@ -422,6 +432,19 @@ export async function deferDiagnosisQuestion(
     at: Date;
   },
 ): Promise<DeferDiagnosisQuestionResult> {
+  return deferDiagnosisQuestionWithResponseRetry(db, input, 1);
+}
+
+async function deferDiagnosisQuestionWithResponseRetry(
+  db: AccountDataDatabase,
+  input: {
+    accountId: string;
+    diagnosisId: string;
+    diagnosisQuestionId: string;
+    at: Date;
+  },
+  attempt: number,
+): Promise<DeferDiagnosisQuestionResult> {
   const diagnosis = await db
     .select({
       state: diagnoses.state,
@@ -487,7 +510,7 @@ export async function deferDiagnosisQuestion(
       }),
     ]);
   } catch (error) {
-    if (!isUniqueViolation(error)) {
+    if (!isUniqueViolation(error) && !isForeignKeyViolation(error)) {
       throw error;
     }
     const concurrentResponseId = await findDiagnosisResponseId(
@@ -506,6 +529,9 @@ export async function deferDiagnosisQuestion(
       );
       if (concurrent) {
         return deferredResult(concurrent, "unchanged");
+      }
+      if (concurrentResponseId !== responseId && attempt < DIAGNOSIS_WRITE_MAX_ATTEMPTS) {
+        return deferDiagnosisQuestionWithResponseRetry(db, input, attempt + 1);
       }
     }
     throw error;
@@ -573,12 +599,13 @@ export async function saveDiagnosisAnswer(
   db: AccountDataDatabase,
   input: SaveDiagnosisAnswerInput,
 ): Promise<SaveDiagnosisAnswerResult> {
-  return saveDiagnosisAnswerWithRevisionRetry(db, input);
+  return saveDiagnosisAnswerWithRevisionRetry(db, input, 1);
 }
 
 async function saveDiagnosisAnswerWithRevisionRetry(
   db: AccountDataDatabase,
   input: SaveDiagnosisAnswerInput,
+  attempt: number,
 ): Promise<SaveDiagnosisAnswerResult> {
   const diagnosis = await db
     .select({
@@ -738,7 +765,7 @@ async function saveDiagnosisAnswerWithRevisionRetry(
       }),
     ]);
   } catch (error) {
-    if (!isUniqueViolation(error)) {
+    if (!isUniqueViolation(error) && !isForeignKeyViolation(error)) {
       throw error;
     }
     const concurrentResponse = await db
@@ -765,9 +792,10 @@ async function saveDiagnosisAnswerWithRevisionRetry(
     // response作成競合ではIDが、既存responseのCAS競合ではrevisionが進むため判別できる。
     if (
       concurrentResponse &&
+      attempt < DIAGNOSIS_WRITE_MAX_ATTEMPTS &&
       (concurrentResponse.id !== responseId || concurrentResponse.revision > observedRevision)
     ) {
-      return saveDiagnosisAnswerWithRevisionRetry(db, input);
+      return saveDiagnosisAnswerWithRevisionRetry(db, input, attempt + 1);
     }
     throw error;
   }
@@ -816,7 +844,7 @@ export async function findDiagnosisAnswers(
   if (
     !response ||
     response.diagnosisIsDeleted ||
-    response.state !== "published" ||
+    (response.state !== "published" && response.state !== "withdrawn") ||
     response.opensAt.getTime() > at.getTime()
   ) {
     return { type: "not-found" };
@@ -985,8 +1013,9 @@ export async function getCompatibilitySharePreviewSource(
 /**
  * 一覧へ表示できるDiagnosisと、指定Accountの現在の回答進捗を取得します。
  *
- * 公開前・公開停止・削除済みは含めません。受付終了後は回答内容への導線を残すため
- * `closed`として含めます。回答状態は現在有効なAnswerの件数から導出します。
+ * 公開前・削除済みは含めません。公開停止は本人にDiagnosisResponseがある場合だけ、
+ * 受付終了と同じく回答内容への導線を残すため`closed`として含めます。
+ * 回答状態は現在有効なAnswerの件数から導出します。
  */
 export async function listVisibleDiagnoses(
   db: AccountDataDatabase,
@@ -1000,6 +1029,7 @@ export async function listVisibleDiagnoses(
       description: diagnoses.description,
       opensAt: diagnoses.opensAt,
       closesAt: diagnoses.closesAt,
+      state: diagnoses.state,
       displayOrder: diagnoses.displayOrder,
       questionCount: count(diagnosisQuestions.id),
       answeredCount: count(diagnosisAnswers.id),
@@ -1031,7 +1061,10 @@ export async function listVisibleDiagnoses(
     )
     .where(
       and(
-        eq(diagnoses.state, "published"),
+        or(
+          eq(diagnoses.state, "published"),
+          and(eq(diagnoses.state, "withdrawn"), isNotNull(diagnosisResponses.id)),
+        ),
         eq(diagnoses.isDeleted, false),
         lte(diagnoses.opensAt, at),
       ),
@@ -1042,6 +1075,7 @@ export async function listVisibleDiagnoses(
       diagnoses.description,
       diagnoses.opensAt,
       diagnoses.closesAt,
+      diagnoses.state,
       diagnoses.displayOrder,
     )
     .orderBy(asc(diagnoses.displayOrder), asc(diagnoses.id))
@@ -1057,7 +1091,10 @@ export async function listVisibleDiagnoses(
       opensAt: row.opensAt.toISOString(),
       closesAt: row.closesAt?.toISOString() ?? null,
       displayOrder: row.displayOrder,
-      availability: row.closesAt && row.closesAt.getTime() <= at.getTime() ? "closed" : "open",
+      availability:
+        row.state === "withdrawn" || (row.closesAt && row.closesAt.getTime() <= at.getTime())
+          ? "closed"
+          : "open",
       responseStatus,
       answeredCount: row.answeredCount,
       questionCount: row.questionCount,

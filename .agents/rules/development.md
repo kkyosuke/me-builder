@@ -147,6 +147,7 @@
   - ヘッダ欠落・署名不一致は `401 Unauthorized` を返し、Queue 投入・LINE 返信・D1 書き込みのいずれも行いません。拒否時は `logger.warn` で構造化ログを出力しますが、**署名値およびチャネルシークレットそのものはログに含めません**。
   - チャネルシークレットは `LINE_CHANNEL_SECRET` として`apps/api`にのみ配布します（CloudflareはCDの`wrangler deploy --secrets-file`、ローカルは`.env`）。`wrangler.toml`の`[vars]`には置きません。CDはsecretをコードと同じWorker Versionへ原子的にアップロードし、デプロイ後の`wrangler secret put`は実行しません。
   - `LINE_CHANNEL_SECRET` は **必須** です。未設定の場合は環境 (`local` / `preview` / `production`) を問わず署名検証をスキップせず、`logger.error` を出力したうえで全ての Webhook リクエストを 401 で拒否します。ローカルで Webhook 受信と返信の動作確認を行う場合も `.env` にチャネルシークレットを設定してください。
+  - 署名検証後の `WEBHOOK_QUEUE` 未設定は、preview / production などのデプロイ環境では構成エラーとして 5xx を返し、LINE Platform の再送対象にします。ローカル開発環境では Queue を用意せず署名検証まで確認できるよう、構造化された縮退ログを残して 200 を返します。
 
 - **Web UI のデザインシステム (`apps/web`)**:
   - UI は **Tailwind CSS** のユーティリティと **lucide-react** のアイコンだけで組みます。他の UI コンポーネントライブラリ、アニメーションライブラリ、ジェスチャーライブラリ (framer-motion, react-spring, react-tinder-card 等) は導入しません。スワイプなどの操作は Pointer Events と CSS transform / transition で実装します。

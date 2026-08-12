@@ -21,6 +21,7 @@ const mockAccountDataExecute = vi.fn().mockResolvedValue({
   receivedAt: new Date("2026-08-06T12:00:00Z"),
 });
 const mockInfoLog = vi.spyOn(logger, "info").mockImplementation(() => undefined);
+const mockWarnLog = vi.spyOn(logger, "warn").mockImplementation(() => undefined);
 const mockErrorLog = vi.spyOn(logger, "error").mockImplementation(() => undefined);
 vi.spyOn(line.client, "create").mockReturnValue({
   pushMessage: mockPushMessage,
@@ -109,10 +110,11 @@ const accountDataNamespace = {
 describe("Worker", () => {
   beforeEach(() => {
     mockPushMessage.mockClear();
-    mockReplyMessage.mockClear();
+    mockReplyMessage.mockReset().mockResolvedValue({});
     mockAcceptMessage.mockClear();
     mockAccountDataExecute.mockClear();
     mockInfoLog.mockClear();
+    mockWarnLog.mockClear();
     mockErrorLog.mockClear();
   });
 
@@ -253,8 +255,8 @@ describe("Worker", () => {
     );
   });
 
-  it("診断キーワードは日記保存せずLIFF導線をpushする", async () => {
-    const { batch } = createBatch("診断");
+  it("診断キーワードは日記保存せずLIFF導線をreplyする", async () => {
+    const { batch, message } = createBatch("診断");
     await handleQueueBatch(
       batch,
       {} as D1.shared.Client,
@@ -270,6 +272,93 @@ describe("Worker", () => {
       replyToken: "reply-token-1",
       messages: [{ type: "text", text: expect.stringContaining("liff.line.me/123-liff") }],
     });
+    expect(message.ack).toHaveBeenCalledOnce();
+    expect(message.retry).not.toHaveBeenCalled();
+  });
+
+  it("使用済みreplyTokenは恒久的な拒否としてackし、最終attemptでもDLQへ送らない", async () => {
+    const { batch, message } = createBatch("診断");
+    Object.defineProperty(message, "attempts", { value: 4 });
+    mockReplyMessage.mockRejectedValueOnce({ status: 400 });
+
+    await handleQueueBatch(
+      batch,
+      {} as D1.shared.Client,
+      getWorkerConfig({
+        ENVIRONMENT: "test",
+        LINE_CHANNEL_ACCESS_TOKEN: "line-token",
+        LIFF_ID: "123-liff",
+      }),
+    );
+
+    expect(message.ack).toHaveBeenCalledOnce();
+    expect(message.retry).not.toHaveBeenCalled();
+    expect(mockErrorLog).not.toHaveBeenCalled();
+    expect(mockWarnLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "queue.message.completed",
+        outcome: "degraded",
+        disposition: "ack",
+        stage: "line.reply",
+        resultCode: "LINE_DIAGNOSIS_REPLY_REJECTED",
+      }),
+      expect.stringContaining("[LINE webhook] degraded at line.reply -> ack"),
+    );
+  });
+
+  it("LINEの一時障害は診断返信を再試行する", async () => {
+    const { batch, message } = createBatch("診断");
+    mockReplyMessage.mockRejectedValueOnce({ status: 500 });
+
+    await handleQueueBatch(
+      batch,
+      {} as D1.shared.Client,
+      getWorkerConfig({
+        ENVIRONMENT: "test",
+        LINE_CHANNEL_ACCESS_TOKEN: "line-token",
+        LIFF_ID: "123-liff",
+      }),
+    );
+
+    expect(message.retry).toHaveBeenCalledOnce();
+    expect(message.ack).not.toHaveBeenCalled();
+    expect(mockErrorLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        errorCode: "LINE_DIAGNOSIS_REPLY_FAILED",
+        retryable: true,
+        disposition: "retry",
+        stage: "line.reply",
+      }),
+      expect.stringContaining("[LINE webhook] failed at line.reply -> retry"),
+    );
+  });
+
+  it("同じ診断Webhookの再配送でもユーザーへの返信は1通だけになる", async () => {
+    const first = createBatch("診断");
+    const redelivery = createBatch("診断");
+    let deliveredCount = 0;
+    mockReplyMessage.mockImplementation(async () => {
+      if (deliveredCount === 0) {
+        deliveredCount += 1;
+        return {};
+      }
+      throw { status: 400 };
+    });
+    const config = getWorkerConfig({
+      ENVIRONMENT: "test",
+      LINE_CHANNEL_ACCESS_TOKEN: "line-token",
+      LIFF_ID: "123-liff",
+    });
+
+    await handleQueueBatch(first.batch, {} as D1.shared.Client, config);
+    await handleQueueBatch(redelivery.batch, {} as D1.shared.Client, config);
+
+    expect(mockReplyMessage).toHaveBeenCalledTimes(2);
+    expect(deliveredCount).toBe(1);
+    expect(first.message.ack).toHaveBeenCalledOnce();
+    expect(redelivery.message.ack).toHaveBeenCalledOnce();
+    expect(first.message.retry).not.toHaveBeenCalled();
+    expect(redelivery.message.retry).not.toHaveBeenCalled();
   });
 
   it("API routingとWorkerの再判定が不一致なら保存も返信もしない", async () => {

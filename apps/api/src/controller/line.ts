@@ -26,6 +26,7 @@ export async function postLineWebhook(c: Context<AppEnv>): Promise<Response> {
     signature: c.req.header("x-line-signature"),
     channelSecret: currentConfig.lineChannelSecret,
     queue: currentConfig.webhookQueue,
+    environment: currentConfig.environment,
     startChatLoading: lineClient
       ? (chatId) => lineClient.showLoadingAnimation({ chatId, loadingSeconds: 60 })
       : undefined,

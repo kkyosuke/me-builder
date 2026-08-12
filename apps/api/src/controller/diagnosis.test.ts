@@ -67,6 +67,7 @@ describe("GET /api/diagnoses", () => {
     const res = await request();
 
     expect(res.status).toBe(200);
+    expect(res.headers.get("cache-control")).toBe("no-store");
     expect(await res.json()).toEqual({ diagnoses: [] });
     expect(getDiagnosisList).toHaveBeenCalledWith(
       expect.objectContaining({ idToken: "dummy.id.token", lineLoginChannelId: "2010850319" }),
@@ -309,6 +310,7 @@ describe("GET /api/diagnoses/:diagnosisId", () => {
     );
 
     expect(res.status).toBe(200);
+    expect(res.headers.get("cache-control")).toBe("no-store");
     expect((await res.json()).id).toBe("diagnosis-1");
     expect(getDiagnosisDetail).toHaveBeenCalledWith(
       expect.objectContaining({ diagnosisId: "diagnosis-1", idToken: "dummy.id.token" }),
@@ -377,6 +379,7 @@ describe("GET /api/diagnoses/:diagnosisId/answers", () => {
     const response = await get();
 
     expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
     expect(await response.json()).toMatchObject({
       id: "diagnosis-1",
       responseStatus: "answered",

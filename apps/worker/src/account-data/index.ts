@@ -97,10 +97,30 @@ export class AccountData extends DurableObject<Env> {
         await DO.account.action.diagnosisBrainProjection.processPendingDiagnosisBrainProjections(
           this.repository.client,
         );
-        const checkpointIds = await DO.account.action.diary.claimDueDiaryBrainCheckpointIds(
+        const checkpointClaim = await DO.account.action.diary.claimDueDiaryBrainCheckpointIds(
           this.repository.client,
           this.accountId,
         );
+        for (const failure of checkpointClaim.terminalFailures) {
+          logger.error(
+            {
+              event: "diary-brain-checkpoint.job.failed",
+              service: "worker",
+              component: "account-data",
+              checkpointId: failure.checkpointId,
+              outcome: "failed",
+              disposition: "stop",
+              stage: "checkpoint.dispatch",
+              errorCode: failure.failureCode,
+              errorCategory: "timeout",
+              retryable: false,
+              attempt: failure.attemptCount,
+              maxAttempts: DO.account.action.diary.DIARY_BRAIN_CHECKPOINT_MAX_DISPATCH_ATTEMPTS,
+            },
+            `[Diary Brain checkpoint] failed at checkpoint.dispatch -> stop (attempt ${failure.attemptCount}/${DO.account.action.diary.DIARY_BRAIN_CHECKPOINT_MAX_DISPATCH_ATTEMPTS}, ${failure.failureCode}, category:timeout)`,
+          );
+        }
+        const checkpointIds = checkpointClaim.checkpointIds;
         if (checkpointIds.length > 0 && !this.env.BRAIN_CHECKPOINT_QUEUE) {
           throw new Error("BRAIN_CHECKPOINT_QUEUE binding is required for diary Brain checkpoints");
         }
@@ -128,16 +148,20 @@ export class AccountData extends DurableObject<Env> {
               event: "brain-vector-sync.job.failed",
               service: "worker",
               component: "account-data",
+              jobId: failure.jobId,
+              brainItemId: failure.brainItemId,
               outcome: "failed",
               disposition: "stop",
+              jobStatus: "failed",
+              terminalReason: "attempts-exhausted",
               stage: "vector.dispatch",
               errorCode: failure.failureCode,
-              errorCategory: "timeout",
+              errorCategory: "unknown",
               retryable: false,
               attempt: failure.attemptCount,
               maxAttempts: DO.account.action.brain.BRAIN_VECTOR_SYNC_MAX_ATTEMPTS,
             },
-            `[Brain vector sync] failed at vector.dispatch -> stop (attempt ${failure.attemptCount}/${DO.account.action.brain.BRAIN_VECTOR_SYNC_MAX_ATTEMPTS}, ${failure.failureCode}, category:timeout)`,
+            `[Brain vector sync] failed at vector.dispatch -> stop (attempt ${failure.attemptCount}/${DO.account.action.brain.BRAIN_VECTOR_SYNC_MAX_ATTEMPTS}, ${failure.failureCode}, category:unknown)`,
           );
         }
         const vectorJobs = vectorClaim.jobs;

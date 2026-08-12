@@ -29,6 +29,7 @@ export async function getStatistics(c: Context<AppEnv>): Promise<Response> {
   });
   switch (outcome.type) {
     case "resolved":
+      c.header("Cache-Control", "no-store");
       return c.json(v.parse(AdminStatisticsResponseSchema, outcome.statistics));
     case "forbidden":
       return c.json(v.parse(ForbiddenErrorSchema, { error: "Forbidden" }), 403);

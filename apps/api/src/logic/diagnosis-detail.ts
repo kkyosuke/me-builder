@@ -1,4 +1,4 @@
-import { D1 } from "@me-builder/lib";
+import { type AccountDataNamespace, D1, type DO, accountDataFor } from "@me-builder/lib";
 import { createLiffSession } from "./liff-session";
 
 type DiagnosisDetail = Extract<
@@ -19,22 +19,39 @@ type DiagnosisDetailParams = {
   idToken: string | undefined;
   lineLoginChannelId: string | undefined;
   db: D1.shared.Client;
+  accountData?: AccountDataNamespace;
   at?: Date;
 };
 
 type DiagnosisDetailDependencies = {
   createSession: typeof createLiffSession;
   findOpenDiagnosisDetail: typeof D1.shared.action.catalog.findOpenDiagnosisDetail;
+  hasDiagnosisResponse: (
+    accountData: AccountDataNamespace | undefined,
+    accountId: string,
+    diagnosisId: string,
+  ) => ReturnType<typeof DO.account.action.diagnosis.hasDiagnosisResponse>;
 };
 
 const defaultDependencies: DiagnosisDetailDependencies = {
   createSession: createLiffSession,
   findOpenDiagnosisDetail: D1.shared.action.catalog.findOpenDiagnosisDetail,
+  hasDiagnosisResponse: (accountData, accountId, diagnosisId) => {
+    if (!accountData) throw new Error("ACCOUNT_DATA binding is not configured");
+    return accountDataFor(accountData, accountId).execute("diagnosis.hasResponse", diagnosisId);
+  },
 };
 
-/** 本人確認後に、新規回答を開始できるDiagnosisの公開済みQuestion Versionを返します。 */
+/** 本人確認後に、受付中または公開停止前にResponseを作成済みのDiagnosis詳細を返します。 */
 export async function getDiagnosisDetail(
-  { diagnosisId, idToken, lineLoginChannelId, db, at = new Date() }: DiagnosisDetailParams,
+  {
+    diagnosisId,
+    idToken,
+    lineLoginChannelId,
+    db,
+    accountData,
+    at = new Date(),
+  }: DiagnosisDetailParams,
   dependencies: DiagnosisDetailDependencies = defaultDependencies,
 ): Promise<DiagnosisDetailOutcome> {
   const session = await dependencies.createSession({ idToken, lineLoginChannelId, db });
@@ -42,7 +59,19 @@ export async function getDiagnosisDetail(
     return session;
   }
 
-  const result = await dependencies.findOpenDiagnosisDetail(db, diagnosisId, at);
+  let result = await dependencies.findOpenDiagnosisDetail(db, diagnosisId, at);
+  if (result.type === "not-found") {
+    const hasResponse = await dependencies.hasDiagnosisResponse(
+      accountData,
+      session.session.accountId,
+      diagnosisId,
+    );
+    if (hasResponse) {
+      result = await dependencies.findOpenDiagnosisDetail(db, diagnosisId, at, {
+        allowWithdrawn: true,
+      });
+    }
+  }
   if (result.type === "not-found") {
     return { type: "diagnosis-not-found" };
   }

@@ -208,6 +208,8 @@ describe("Brain vector sync queue", () => {
       expect.objectContaining({
         event: "queue.message.failed",
         component: "brain-vector-sync",
+        jobId: "job-1",
+        brainItemId: "brain-1",
         outcome: "failed",
         disposition: "ack",
         jobStatus: "failed",
