@@ -175,6 +175,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/compatibility/relationships/{relationshipId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** 成立中の相性関係を同意済み内容から再構築する */
+    get: operations["getCompatibilityRelationship"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/dev/brain-vector-sync-jobs/failed": {
     parameters: {
       query?: never;
@@ -1573,6 +1590,146 @@ export interface operations {
             /** @constant */
             reason: "own_invitation";
           };
+        };
+      };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
+          };
+        };
+      };
+      /** @description D1 bindingが設定されていない */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Service Unavailable";
+          };
+        };
+      };
+    };
+  };
+  getCompatibilityRelationship: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        relationshipId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 相性シート、または再共有待ち状態 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | {
+                relationshipId: string;
+                /** @constant */
+                status: "ready";
+                partner: {
+                  displayName: string;
+                  aboutMe: {
+                    profileSummaryVersionId: string;
+                    /** Format: date-time */
+                    generatedAt: string;
+                    statements: {
+                      key: string;
+                      label: string;
+                      statement: string;
+                    }[];
+                  };
+                  themes: {
+                    diagnosisId: string;
+                    title: string;
+                    parameters: {
+                      id: string;
+                      label: string;
+                      lowLabel: string;
+                      highLabel: string;
+                      position: number;
+                      statement: string;
+                    }[];
+                  }[];
+                };
+                viewer: {
+                  displayName: string;
+                  aboutMe: {
+                    profileSummaryVersionId: string;
+                    /** Format: date-time */
+                    generatedAt: string;
+                    statements: {
+                      key: string;
+                      label: string;
+                      statement: string;
+                    }[];
+                  };
+                  themes: {
+                    diagnosisId: string;
+                    title: string;
+                    parameters: {
+                      id: string;
+                      label: string;
+                      lowLabel: string;
+                      highLabel: string;
+                      position: number;
+                      statement: string;
+                    }[];
+                  }[];
+                };
+              }
+            | {
+                relationshipId: string;
+                /** @constant */
+                status: "waiting";
+                nextAction: ("diagnosis" | "profile-summary") | null;
+              };
+        };
+      };
+      /** @description LIFF IDトークンを検証できない */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Unauthorized";
+          };
+        };
+      };
+      /** @description 相性関係または対応するAccountを利用できない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | {
+                /** @constant */
+                error: "Compatibility relationship unavailable";
+                /** @constant */
+                reason: "relationship_unavailable";
+              }
+            | {
+                /** @constant */
+                error: "Account not found";
+                /** @constant */
+                reason: "friendship_required";
+              };
         };
       };
       /** @description 未処理のサーバーエラー */
