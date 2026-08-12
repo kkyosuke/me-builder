@@ -33,6 +33,8 @@ const actions = {
     diagnosisId: string,
     at: Date,
   ) => DO.account.action.diagnosis.findDiagnosisAnswers(db, accountId, diagnosisId, at),
+  "diagnosis.hasResponse": (db: DO.account.Database, accountId: string, diagnosisId: string) =>
+    DO.account.action.diagnosis.hasDiagnosisResponse(db, accountId, diagnosisId),
   "diagnosis.listVisible": (db: DO.account.Database, accountId: string, at: Date) =>
     DO.account.action.diagnosis.listVisibleDiagnoses(db, accountId, at),
   "source.hasActive": (db: DO.account.Database, accountId: string) =>

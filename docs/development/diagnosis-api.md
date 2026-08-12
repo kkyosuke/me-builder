@@ -22,7 +22,7 @@ Authorization: Bearer <LIFF ID token>
 
 本人が閲覧できるDiagnosisと現在の回答進捗を一覧用の要約として返します。質問文とChoiceは含めず、診断詳細APIで取得します。
 
-一覧へ含めるのは、削除されていない`published`のDiagnosisのうち、サーバー時刻が受付開始時点以降のものです。受付終了後のDiagnosisは回答内容への導線を維持するため一覧へ含め、`availability`を`closed`にします。公開前、公開停止、削除済みのDiagnosisは含めません。
+一覧へ含めるのは、削除されていない`published`のDiagnosisのうち、サーバー時刻が受付開始時点以降のものです。受付終了後のDiagnosisは回答内容への導線を維持するため一覧へ含め、`availability`を`closed`にします。`withdrawn`のDiagnosisは本人の`DiagnosisResponse`が存在する場合だけ同じ導線を維持して一覧へ含め、`availability`を`closed`にします。公開前、本人の`DiagnosisResponse`がない公開停止、削除済みのDiagnosisは含めません。
 
 ```json
 {
@@ -58,9 +58,11 @@ Authorization: Bearer <LIFF ID token>
 
 ### `GET /api/diagnoses/{diagnosisId}`
 
-新しく回答を開始するため、指定したDiagnosisの質問とChoiceを公開時のQuestion Versionで返します。認証境界は一覧APIと同じです。
+指定したDiagnosisの質問とChoiceを公開時のQuestion Versionで返します。受付中は新しい回答の開始に使い、公開停止後は本人の保存済み回答の表示に必要な範囲で使います。認証境界は一覧APIと同じです。
 
-Diagnosisが`published`かつ削除されておらず、サーバー時刻が受付開始以降・受付終了より前の場合だけ取得できます。存在しない、公開前、公開停止、削除済みは公開状態を外部へ漏らさないため同じ`404 diagnosis_not_found`として扱います。受付終了後は、回答済みであってもこのAPIから新しい回答を開始させず、`409 diagnosis_closed`を返します。受付終了後の本人の回答閲覧は、後続の回答内容APIが所有します。
+Diagnosisが`published`かつ削除されておらず、サーバー時刻が受付開始以降・受付終了より前の場合に取得できます。加えて、`withdrawn`でも本人の`DiagnosisResponse`が存在する場合は、保存済み回答の表示に必要な固定済みQuestion Versionを取得できます。この取得可否は新規回答・回答修正・延期の受付可否を変更しません。
+
+存在しない、公開前、本人の`DiagnosisResponse`がない公開停止、削除済みは公開状態を外部へ漏らさないため同じ`404 diagnosis_not_found`として扱います。受付終了後は、回答済みであってもこのAPIから新しい回答を開始させず、`409 diagnosis_closed`を返します。受付終了後の本人の回答閲覧は、後続の回答内容APIが所有します。
 
 質問はDiagnosis内の`position`、ChoiceはQuestion Version内の`position`の昇順で返します。削除済みのDiagnosis Question、Question Version、Choiceは含めません。Question VersionはDiagnosis Questionが参照している版を返し、現在の最新版へ暗黙に置き換えません。
 
@@ -91,7 +93,7 @@ Diagnosisが`published`かつ削除されておらず、サーバー時刻が受
 
 | HTTP | 条件 | レスポンス |
 | --- | --- | --- |
-| `404` | Diagnosisが存在しない、公開前、公開停止、または削除済み | `{ "error": "Diagnosis not found", "reason": "diagnosis_not_found" }` |
+| `404` | Diagnosisが存在しない、公開前、本人の`DiagnosisResponse`がない公開停止、または削除済み | `{ "error": "Diagnosis not found", "reason": "diagnosis_not_found" }` |
 | `409` | Diagnosisが受付終了済み | `{ "error": "Diagnosis closed", "reason": "diagnosis_closed" }` |
 
 認証・基盤の共通エラーは次節に従います。
@@ -176,7 +178,7 @@ Diagnosisが`published`かつ削除されておらず、サーバー時刻が受
 
 ### `GET /api/diagnoses/{diagnosisId}/answers`
 
-本人が保存した現在有効な回答を、回答時点のQuestion VersionとChoice、およびAPIが計算した傾向とともに返します。受付終了後も回答内容を確認できるよう、Diagnosisが公開済みで受付開始後なら`closesAt`を過ぎていても取得できます。
+本人が保存した現在有効な回答を、回答時点のQuestion VersionとChoice、およびAPIが計算した傾向とともに返します。本人の`DiagnosisResponse`が存在すれば、受付終了後および`withdrawn`への公開停止後も取得できます。
 
 回答はDiagnosis Questionの`position`順で返します。質問文と選択肢ラベルはAnswerが保持するQuestion ID / Question Version / Choice IDから解決し、現在の最新版へ暗黙に置き換えません。採点はDiagnosisが参照するD1の版付き設定をAPIが検証して行い、Web UIは計算し直しません。Account ID、DiagnosisResponse ID、Source Record ID、採点設定本体は返しません。
 
@@ -223,7 +225,7 @@ Diagnosisが`published`かつ削除されておらず、サーバー時刻が受
 
 | HTTP | 条件 | レスポンス |
 | --- | --- | --- |
-| `404` | Diagnosisが存在しない、公開前、公開停止、削除済み、または本人の回答がない | `{ "error": "Diagnosis answers not found", "reason": "diagnosis_answers_not_found" }` |
+| `404` | Diagnosisが存在しない、公開前、削除済み、または本人の`DiagnosisResponse`がない | `{ "error": "Diagnosis answers not found", "reason": "diagnosis_answers_not_found" }` |
 
 回答途中でも保存済みの回答は返し、`responseStatus`と件数で未完了であることを表します。Web UIは回答済みから回答内容画面へ遷移しますが、再開機能でも同じ取得結果を利用できます。
 

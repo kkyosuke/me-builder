@@ -188,6 +188,7 @@ export type AccountDataActions = {
     [diagnosisId: string, at: Date],
     typeof diagnosis.findDiagnosisAnswers
   >;
+  "diagnosis.hasResponse": RpcAction<[diagnosisId: string], typeof diagnosis.hasDiagnosisResponse>;
   "diagnosis.listVisible": RpcAction<[at: Date], typeof diagnosis.listVisibleDiagnoses>;
   "diagnosisProjection.processLatest": RpcAction<
     [diagnosisId: string, at?: Date],

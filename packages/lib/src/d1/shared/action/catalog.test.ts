@@ -132,4 +132,20 @@ describe("findOpenDiagnosisDetail", () => {
       findOpenDiagnosisDetail(db, "closed-detail", new Date("2026-08-03T00:00:00Z")),
     ).resolves.toEqual({ type: "closed" });
   });
+
+  it("回答者向けの場合だけwithdrawnの固定済みQuestion Versionを返す", async () => {
+    const db = createTestDb();
+    await insertDiagnosis(db, { id: "withdrawn-detail", state: "withdrawn" });
+    const at = new Date("2026-08-03T00:00:00Z");
+
+    await expect(findOpenDiagnosisDetail(db, "withdrawn-detail", at)).resolves.toEqual({
+      type: "not-found",
+    });
+    await expect(
+      findOpenDiagnosisDetail(db, "withdrawn-detail", at, { allowWithdrawn: true }),
+    ).resolves.toEqual({
+      type: "found",
+      diagnosis: expect.objectContaining({ id: "withdrawn-detail" }),
+    });
+  });
 });

@@ -33,13 +33,15 @@ export type DiagnosisDetailResult =
   | { type: "closed" };
 
 /**
- * 新規回答用のDiagnosis詳細を、Diagnosisが固定したQuestion Versionのまま取得します。
+ * Diagnosis詳細を、Diagnosisが固定したQuestion Versionのまま取得します。
  * 非公開状態は存在有無を秘匿してnot-foundへ寄せ、受付終了だけを区別します。
+ * 回答者であることを呼び出し側が確認した場合だけ、公開停止後の閲覧を許可できます。
  */
 export async function findOpenDiagnosisDetail(
   db: SharedD1Client,
   diagnosisId: string,
   at: Date,
+  options: { allowWithdrawn?: boolean } = {},
 ): Promise<DiagnosisDetailResult> {
   const [diagnosis] = await db
     .select({
@@ -59,12 +61,17 @@ export async function findOpenDiagnosisDetail(
   if (
     !diagnosis ||
     diagnosis.isDeleted ||
-    diagnosis.state !== "published" ||
+    (diagnosis.state !== "published" &&
+      !(options.allowWithdrawn && diagnosis.state === "withdrawn")) ||
     diagnosis.opensAt.getTime() > at.getTime()
   ) {
     return { type: "not-found" };
   }
-  if (diagnosis.closesAt && diagnosis.closesAt.getTime() <= at.getTime()) {
+  if (
+    diagnosis.state === "published" &&
+    diagnosis.closesAt &&
+    diagnosis.closesAt.getTime() <= at.getTime()
+  ) {
     return { type: "closed" };
   }
 

@@ -101,6 +101,24 @@ async function getAnswers(diagnosisId = "relationship-priority"): Promise<Respon
   );
 }
 
+async function getDetail(diagnosisId = "relationship-priority"): Promise<Response> {
+  return app.request(
+    `/api/diagnoses/${diagnosisId}`,
+    { headers: { Authorization: "Bearer known-token" } },
+    env(),
+  );
+}
+
+async function withdrawDiagnosis(diagnosisId = "relationship-priority"): Promise<void> {
+  await database
+    .prepare("UPDATE diagnoses SET state = 'withdrawn', withdrawn_at = ? WHERE id = ?")
+    .bind(timestamp, diagnosisId)
+    .run();
+  accountDataStore.raw
+    .prepare("UPDATE diagnoses SET state = 'withdrawn', withdrawn_at = ? WHERE id = ?")
+    .run(timestamp, diagnosisId);
+}
+
 async function deferQuestion(
   diagnosisQuestionId: string,
   diagnosisId = "relationship-priority",
@@ -457,6 +475,87 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
       error: "Diagnosis answers not found",
       reason: "diagnosis_answers_not_found",
     });
+  });
+
+  it("回答済みならwithdrawn後も一覧・詳細・回答内容を取得できる", async () => {
+    for (let index = 1; index <= 10; index += 1) {
+      const questionId = `dq-relationship-priority-${String(index).padStart(2, "0")}`;
+      expect((await putAnswer(questionId, "yes")).status).toBe(200);
+    }
+    await withdrawDiagnosis();
+
+    const listItem = await listRelationshipDiagnosis();
+    expect(listItem).toMatchObject({ responseStatus: "answered", answeredCount: 10 });
+
+    const detail = await getDetail();
+    expect(detail.status).toBe(200);
+    expect(await detail.json()).toMatchObject({ id: "relationship-priority" });
+
+    const answers = await getAnswers();
+    expect(answers.status).toBe(200);
+    const answersBody = (await answers.json()) as {
+      id: string;
+      responseStatus: string;
+      answeredCount: number;
+      answers: Array<{ diagnosisQuestionId: string; choiceId: string }>;
+    };
+    expect(answersBody).toMatchObject({
+      id: "relationship-priority",
+      responseStatus: "answered",
+      answeredCount: 10,
+    });
+    expect(answersBody.answers).toHaveLength(10);
+    expect(answersBody.answers[0]).toMatchObject({
+      diagnosisQuestionId: "dq-relationship-priority-01",
+      choiceId: "yes",
+    });
+  });
+
+  it("未回答ならwithdrawnの一覧・詳細・回答内容を公開しない", async () => {
+    await withdrawDiagnosis();
+
+    const list = await app.request(
+      "/api/diagnoses",
+      { headers: { Authorization: "Bearer known-token" } },
+      env(),
+    );
+    const listBody = (await list.json()) as { diagnoses: Array<{ id: string }> };
+    expect(listBody.diagnoses.some(({ id }) => id === "relationship-priority")).toBe(false);
+
+    const detail = await getDetail();
+    expect(detail.status).toBe(404);
+    expect(await detail.json()).toEqual({
+      error: "Diagnosis not found",
+      reason: "diagnosis_not_found",
+    });
+
+    const answers = await getAnswers();
+    expect(answers.status).toBe(404);
+    expect(await answers.json()).toEqual({
+      error: "Diagnosis answers not found",
+      reason: "diagnosis_answers_not_found",
+    });
+  });
+
+  it("withdrawnでは既存Responseがあっても新規回答保存・延期を拒否する", async () => {
+    await putAnswer("dq-relationship-priority-01", "yes");
+    await withdrawDiagnosis();
+
+    const answer = await putAnswer("dq-relationship-priority-02", "no");
+    expect(answer.status).toBe(404);
+    expect(await answer.json()).toEqual({
+      error: "Diagnosis not found",
+      reason: "diagnosis_not_found",
+    });
+
+    const deferred = await deferQuestion("dq-relationship-priority-02");
+    expect(deferred.status).toBe(404);
+    expect(await deferred.json()).toEqual({
+      error: "Diagnosis not found",
+      reason: "diagnosis_not_found",
+    });
+    expect(await countRows("diagnosis_answers")).toBe(1);
+    expect(await countRows("diagnosis_deferred_questions")).toBe(0);
   });
 
   it(`${diagnosisAnswerCases.resetDevelopmentData.id}: ${diagnosisAnswerCases.resetDevelopmentData.name}`, async () => {
