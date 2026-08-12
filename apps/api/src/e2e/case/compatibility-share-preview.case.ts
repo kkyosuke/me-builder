@@ -160,4 +160,22 @@ export const compatibilitySharePreviewCases = {
       },
     },
   },
+  relationshipList: {
+    id: "COMPATIBILITY-RELATIONSHIP-LIST-001",
+    name: "発行中招待と成立中関係を当事者の一覧へ反映すること",
+    in: {
+      method: "GET",
+      path: "/api/compatibility/relationships",
+      authorization: "Bearer participant-token",
+      setup: ["送信者が招待を発行し、受信者が承諾"],
+    },
+    out: {
+      status: 200,
+      body: {
+        senderBeforeAcceptance: "pending",
+        recipientBeforeAcceptance: "empty",
+        bothAfterAcceptance: "accepted",
+      },
+    },
+  },
 } as const satisfies Record<string, E2eCase>;

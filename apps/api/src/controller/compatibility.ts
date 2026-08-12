@@ -24,6 +24,7 @@ import {
   CompatibilityRelationshipResponseSchema,
   CompatibilityRelationshipUnavailableSchema,
 } from "../contract/compatibility/relationship";
+import { CompatibilityRelationshipsResponseSchema } from "../contract/compatibility/relationships";
 import { CompatibilitySharePreviewResponseSchema } from "../contract/compatibility/share-preview";
 import {
   AccountNotFoundErrorSchema,
@@ -34,6 +35,7 @@ import { issueCompatibilityInvitation } from "../logic/compatibility-invitation"
 import { acceptCompatibilityInvitation } from "../logic/compatibility-invitation-acceptance";
 import { getCompatibilityInvitationContents } from "../logic/compatibility-invitation-preview";
 import { getCompatibilityRelationshipContents } from "../logic/compatibility-relationship";
+import { listCompatibilityRelationships } from "../logic/compatibility-relationships";
 import { getCompatibilitySharePreview } from "../logic/compatibility-share-preview";
 import { operationalHttpPath } from "../operational-http-path";
 import type { AppEnv } from "../types";
@@ -296,6 +298,37 @@ export async function getCompatibilityRelationship(c: Context<AppEnv>): Promise<
         }),
         404,
       );
+    case "account-not-found":
+      return c.json(
+        v.parse(AccountNotFoundErrorSchema, {
+          error: "Account not found",
+          reason: "friendship_required",
+        }),
+        404,
+      );
+    case "not-configured":
+    case "unauthenticated":
+      return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
+  }
+}
+
+/** `GET /api/compatibility/relationships` — 本人の相性一覧を返す。 */
+export async function getCompatibilityRelationships(c: Context<AppEnv>): Promise<Response> {
+  c.header("Cache-Control", "no-store");
+  if (!c.env?.DB || !c.env.ACCOUNT_DATA || !c.env.COMPATIBILITY_DATA) {
+    logger.error({ path: c.req.path }, "Compatibility relationship binding is not configured");
+    return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
+  }
+  const outcome = await listCompatibilityRelationships({
+    idToken: bearerToken(c.req.header("authorization")),
+    lineLoginChannelId: getConfig(c.env).lineLoginChannelId,
+    db: D1.shared.client.create(c.env.DB),
+    accountData: c.env.ACCOUNT_DATA,
+    compatibilityData: c.env.COMPATIBILITY_DATA,
+  });
+  switch (outcome.type) {
+    case "resolved":
+      return c.json(v.parse(CompatibilityRelationshipsResponseSchema, { items: outcome.items }));
     case "account-not-found":
       return c.json(
         v.parse(AccountNotFoundErrorSchema, {
