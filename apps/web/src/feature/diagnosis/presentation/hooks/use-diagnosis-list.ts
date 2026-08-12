@@ -13,6 +13,7 @@ export function useDiagnosisList({
   const [state, setState] = useState<AsyncState<DiagnosisListItem[]>>({ status: "loading" });
   const [idToken, setIdToken] = useState<string | null>(null);
   const mounted = useRef(false);
+  const hasLoaded = useRef(false);
   const loading = useRef(false);
   const request = useRef<AbortController | null>(null);
 
@@ -24,7 +25,7 @@ export function useDiagnosisList({
     request.current?.abort();
     const controller = new AbortController();
     request.current = controller;
-    if (mounted.current) {
+    if (mounted.current && !hasLoaded.current) {
       setState({ status: "loading" });
     }
 
@@ -37,6 +38,7 @@ export function useDiagnosisList({
 
       const diagnoses = await fetchDiagnosisList(config.apiUrl, currentIdToken, controller.signal);
       if (mounted.current && !controller.signal.aborted) {
+        hasLoaded.current = true;
         setState({ status: "success", data: diagnoses });
       }
     } catch (error) {

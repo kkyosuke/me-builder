@@ -81,6 +81,43 @@ describe("Compatibility flow", () => {
     expect(onCancel).toHaveBeenCalledWith(pending.relationshipId);
   });
 
+  it("招待の取消中は一覧をSkeletonに戻さず対象カードだけにSpinnerを表示する", () => {
+    const cancellingId = "1".repeat(64);
+    render(
+      <CompatibilityListScreen
+        state={{
+          status: "success",
+          data: {
+            items: [
+              {
+                relationshipId: cancellingId,
+                status: "pending",
+                expiresAt: "2026-08-26T00:00:00.000Z",
+                invitationUrl: "https://example.com/first",
+              },
+              {
+                relationshipId: "2".repeat(64),
+                status: "pending",
+                expiresAt: "2026-08-27T00:00:00.000Z",
+                invitationUrl: "https://example.com/second",
+              },
+            ],
+          },
+        }}
+        operation={{ status: "loading" }}
+        cancellingRelationshipId={cancellingId}
+        onRetry={vi.fn()}
+        onCancel={vi.fn()}
+        onResend={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByLabelText("相性一覧を読み込み中")).toBeNull();
+    const spinner = screen.getByLabelText("招待を取り消しています");
+    expect(spinner.closest("article")?.getAttribute("aria-busy")).toBe("true");
+    expect(document.querySelectorAll('article[aria-busy="true"]')).toHaveLength(1);
+  });
+
   it("共有画面では具体的な内容を出さず、共有の範囲と自動共有だけを伝える", () => {
     const consent: CompatibilityShareConsent = {
       displayName: "うさぎ",
@@ -296,6 +333,18 @@ describe("Compatibility flow", () => {
     ).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "共有を終了" }));
     expect(onEnd).toHaveBeenCalledOnce();
+    rerender(
+      <CompatibilityResultScreen
+        me={me}
+        partner={aoi}
+        onEnd={onEnd}
+        endingState={{ status: "loading" }}
+      />,
+    );
+    expect(
+      screen.getByRole("button", { name: "終了しています..." }).querySelector("svg"),
+    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "戻る" }).hasAttribute("disabled")).toBe(true);
     rerender(
       <CompatibilityResultScreen
         me={me}

@@ -1,4 +1,12 @@
-import { AlertCircle, ArrowRight, Clock3, RefreshCw, RotateCw, Send } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowRight,
+  Clock3,
+  LoaderCircle,
+  RefreshCw,
+  RotateCw,
+  Send,
+} from "lucide-react";
 import { MainNavigation } from "../../../components/main-navigation";
 import { SkeletonBlock, SkeletonLoader } from "../../../components/skeleton";
 import type { AsyncState } from "../../../model/async-state";
@@ -23,6 +31,7 @@ function ListSkeleton() {
 export function CompatibilityListScreen({
   state,
   operation = { status: "idle" },
+  cancellingRelationshipId = null,
   sharingMessage,
   onRetry,
   onCancel,
@@ -30,6 +39,7 @@ export function CompatibilityListScreen({
 }: {
   state: AsyncState<CompatibilityRelationshipList>;
   operation?: AsyncState<string>;
+  cancellingRelationshipId?: string | null;
   sharingMessage?: string | null;
   onRetry: () => void;
   onCancel: (relationshipId: string) => void;
@@ -138,42 +148,61 @@ export function CompatibilityListScreen({
                 返事待ち
               </h2>
               <div className="mt-3 space-y-3">
-                {pending.map((item) => (
-                  <article
-                    key={item.relationshipId}
-                    className="rounded-3xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800"
-                  >
-                    <div className="flex items-start gap-3">
-                      <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-amber-400/15 text-amber-700">
-                        <Clock3 className="size-5" aria-hidden="true" />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <h3 className="font-bold text-slate-950 dark:text-slate-50">招待リンク</h3>
-                        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                          期限: {new Date(item.expiresAt).toLocaleDateString("ja-JP")}
-                        </p>
-                        <div className="mt-3 flex flex-wrap gap-4">
-                          <button
-                            type="button"
-                            onClick={() => onResend(item)}
-                            className="inline-flex min-h-10 items-center gap-2 text-sm font-bold text-[#078d3e]"
-                          >
-                            <RotateCw className="size-4" aria-hidden="true" />
-                            LINEでもう一度送る
-                          </button>
-                          <button
-                            type="button"
-                            disabled={operation.status === "loading"}
-                            onClick={() => onCancel(item.relationshipId)}
-                            className="min-h-10 text-sm font-bold text-red-700 disabled:opacity-50"
-                          >
-                            取り消す
-                          </button>
+                {pending.map((item) => {
+                  const isCancelling = cancellingRelationshipId === item.relationshipId;
+                  return (
+                    <article
+                      key={item.relationshipId}
+                      aria-busy={isCancelling}
+                      className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800"
+                    >
+                      <div className="flex items-start gap-3">
+                        <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-amber-400/15 text-amber-700">
+                          <Clock3 className="size-5" aria-hidden="true" />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <h3 className="font-bold text-slate-950 dark:text-slate-50">
+                            招待リンク
+                          </h3>
+                          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                            期限: {new Date(item.expiresAt).toLocaleDateString("ja-JP")}
+                          </p>
+                          <div className="mt-3 flex flex-wrap gap-4">
+                            <button
+                              type="button"
+                              disabled={isCancelling}
+                              onClick={() => onResend(item)}
+                              className="inline-flex min-h-10 items-center gap-2 text-sm font-bold text-[#078d3e] disabled:opacity-50"
+                            >
+                              <RotateCw className="size-4" aria-hidden="true" />
+                              LINEでもう一度送る
+                            </button>
+                            <button
+                              type="button"
+                              disabled={operation.status === "loading"}
+                              onClick={() => onCancel(item.relationshipId)}
+                              className="min-h-10 text-sm font-bold text-red-700 disabled:opacity-50"
+                            >
+                              取り消す
+                            </button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </article>
-                ))}
+                      {isCancelling && (
+                        <output
+                          aria-label="招待を取り消しています"
+                          className="absolute inset-0 z-10 flex items-center justify-center gap-2 bg-white/90 text-sm font-bold text-slate-700 backdrop-blur-[1px] dark:bg-slate-800/90 dark:text-slate-200"
+                        >
+                          <LoaderCircle
+                            className="size-5 animate-spin motion-reduce:animate-none"
+                            aria-hidden="true"
+                          />
+                          取り消しています...
+                        </output>
+                      )}
+                    </article>
+                  );
+                })}
               </div>
             </section>
           )}

@@ -32,6 +32,7 @@ export default function CompatibilityListApplication() {
     <CompatibilityListScreen
       state={relationships.state}
       operation={relationships.operation}
+      cancellingRelationshipId={relationships.cancellingRelationshipId}
       sharingMessage={sharingMessage}
       onRetry={() => void relationships.reload()}
       onCancel={(relationshipId) => void relationships.cancel(relationshipId)}

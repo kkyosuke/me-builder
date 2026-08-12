@@ -1,4 +1,4 @@
-import { ShieldCheck } from "lucide-react";
+import { LoaderCircle, ShieldCheck } from "lucide-react";
 import { useEffect, useRef } from "react";
 import type { AsyncState } from "../../../model/async-state";
 import type { CompatibilityPerson } from "../model/compatibility";
@@ -167,12 +167,19 @@ export function CompatibilityResultScreen({
                 onClick={onEnd}
                 className="min-h-11 flex-1 rounded-xl bg-red-600 px-3 text-sm font-bold text-white"
               >
+                {endingState.status === "loading" && (
+                  <LoaderCircle
+                    className="mr-2 inline size-4 animate-spin motion-reduce:animate-none"
+                    aria-hidden="true"
+                  />
+                )}
                 {endingState.status === "loading" ? "終了しています..." : "共有を終了"}
               </button>
               <button
                 type="button"
+                disabled={endingState.status === "loading"}
                 onClick={result.cancelEnd}
-                className="min-h-11 flex-1 rounded-xl border border-slate-300 px-3 text-sm font-bold text-slate-700 dark:border-slate-600 dark:text-slate-200"
+                className="min-h-11 flex-1 rounded-xl border border-slate-300 px-3 text-sm font-bold text-slate-700 disabled:cursor-wait disabled:opacity-50 dark:border-slate-600 dark:text-slate-200"
               >
                 戻る
               </button>

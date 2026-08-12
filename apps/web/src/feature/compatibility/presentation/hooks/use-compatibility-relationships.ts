@@ -18,6 +18,7 @@ export function useCompatibilityRelationships({
     status: "loading",
   });
   const [operation, setOperation] = useState<AsyncState<string>>({ status: "idle" });
+  const [cancellingRelationshipId, setCancellingRelationshipId] = useState<string | null>(null);
   const request = useRef<AbortController | null>(null);
   const operationRequest = useRef<AbortController | null>(null);
 
@@ -51,9 +52,10 @@ export function useCompatibilityRelationships({
 
   const cancel = useCallback(
     async (relationshipId: string) => {
-      operationRequest.current?.abort();
+      if (operationRequest.current) return;
       const controller = new AbortController();
       operationRequest.current = controller;
+      setCancellingRelationshipId(relationshipId);
       setOperation({ status: "loading" });
       try {
         const token = await acquireIdToken(controller.signal);
@@ -65,8 +67,20 @@ export function useCompatibilityRelationships({
           controller.signal,
         );
         if (controller.signal.aborted) return;
+        setState((current) =>
+          current.status === "success"
+            ? {
+                status: "success",
+                data: {
+                  ...current.data,
+                  items: current.data.items.filter(
+                    (item) => item.relationshipId !== relationshipId,
+                  ),
+                },
+              }
+            : current,
+        );
         setOperation({ status: "success", data: "招待を取り消しました。" });
-        await load();
       } catch (error) {
         if (!controller.signal.aborted) {
           setOperation({
@@ -74,10 +88,15 @@ export function useCompatibilityRelationships({
             message: error instanceof Error ? error.message : "招待を取り消せませんでした。",
           });
         }
+      } finally {
+        if (operationRequest.current === controller) {
+          operationRequest.current = null;
+          if (!controller.signal.aborted) setCancellingRelationshipId(null);
+        }
       }
     },
-    [acquireIdToken, load],
+    [acquireIdToken],
   );
 
-  return { state, operation, reload: load, cancel };
+  return { state, operation, cancellingRelationshipId, reload: load, cancel };
 }
