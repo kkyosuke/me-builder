@@ -101,4 +101,22 @@ export const compatibilitySharePreviewCases = {
       },
     },
   },
+  previewCancelledInvitation: {
+    id: "COMPATIBILITY-INVITATION-PREVIEW-003",
+    name: "取消済みの招待内容を開示しないこと",
+    in: {
+      method: "GET",
+      path: "/api/compatibility/invitations/:relationshipId",
+      authorization: "Bearer recipient-token",
+      setup: ["送信者が招待を発行", "送信者が招待を取り消す"],
+    },
+    out: {
+      status: 404,
+      body: {
+        error: "Compatibility invitation unavailable",
+        reason: "invitation_unavailable",
+        recipientReferenceCount: 0,
+      },
+    },
+  },
 } as const satisfies Record<string, E2eCase>;

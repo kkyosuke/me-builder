@@ -233,4 +233,4 @@ sequenceDiagram
 | `404` | 関係IDが不正、存在しない、期限切れ、取消済み、承諾済み、または送信者の同意内容を安全に再構築できない | `{ "error": "Compatibility invitation unavailable", "reason": "invitation_unavailable" }` |
 | `409` | 送信者本人が自分の招待を開いた | `{ "error": "Compatibility invitation unavailable", "reason": "own_invitation" }` |
 
-認証・基盤の共通エラーは共有プレビューと同じです。`DB`、`AccountData`、または`CompatibilityData` bindingがなければ`503`を返します。成功レスポンスへAccount ID、生の回答、具体的な出来事、日記・会話本文、内部根拠ID、採点設定、各種指紋を含めず、`Cache-Control: no-store`を付けます。リンクを開いただけでは受信者のAccount、閲覧履歴、同意をCompatibilityDataまたは送信者AccountDataへ保存しません。
+認証・基盤の共通エラーは共有プレビューと同じです。`DB`、`AccountData`、または`CompatibilityData` bindingがなければ`503`を返します。成功レスポンスへAccount ID、生の回答、具体的な出来事、日記・会話本文、内部根拠ID、採点設定、各種指紋を含めません。招待の状態変化をブラウザや中継キャッシュが保持しないよう、成功・エラーを問わず`Cache-Control: no-store`を付けます。リンクを開いただけでは受信者のAccount、閲覧履歴、同意をCompatibilityDataまたは送信者AccountDataへ保存しません。

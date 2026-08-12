@@ -380,4 +380,37 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
     },
     e2eTimeoutMs,
   );
+
+  it(
+    `${compatibilitySharePreviewCases.previewCancelledInvitation.id}: ${compatibilitySharePreviewCases.previewCancelledInvitation.name}`,
+    async () => {
+      await completeDiagnosis("inviter-token");
+      await generateShareProfile("inviter", "私は、先の見通しを持って動けると安心します");
+      const relationshipId = await issueInvitationForInviter();
+      await expect(
+        compatibilityDataStore.namespace
+          .getByName(relationshipId)
+          .cancelInvitation(relationshipId, participants.inviter.accountId),
+      ).resolves.toMatchObject({ outcome: "cancelled" });
+
+      const response = await app.request(
+        `/api/compatibility/invitations/${relationshipId}`,
+        { headers: { Authorization: "Bearer recipient-token" } },
+        env(),
+      );
+
+      expect(response.status).toBe(404);
+      expect(response.headers.get("Cache-Control")).toBe("no-store");
+      expect(await response.json()).toEqual({
+        error: "Compatibility invitation unavailable",
+        reason: "invitation_unavailable",
+      });
+      expect(
+        stores.recipient.raw
+          .prepare("SELECT COUNT(*) AS count FROM compatibility_references")
+          .get(),
+      ).toEqual({ count: 0 });
+    },
+    e2eTimeoutMs,
+  );
 });

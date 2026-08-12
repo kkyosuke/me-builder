@@ -125,6 +125,7 @@ export async function postCompatibilityInvitation(c: Context<AppEnv>): Promise<R
 
 /** `GET /api/compatibility/invitations/:relationshipId` — 受信者へ同意前の確認内容を返す。 */
 export async function getCompatibilityInvitation(c: Context<AppEnv>): Promise<Response> {
+  c.header("Cache-Control", "no-store");
   if (!c.env?.DB || !c.env.ACCOUNT_DATA || !c.env.COMPATIBILITY_DATA) {
     logger.error(
       { path: operationalHttpPath(c.req.path) },
@@ -144,7 +145,6 @@ export async function getCompatibilityInvitation(c: Context<AppEnv>): Promise<Re
 
   switch (outcome.type) {
     case "resolved":
-      c.header("Cache-Control", "no-store");
       return c.json(v.parse(CompatibilityInvitationPreviewResponseSchema, outcome.invitation));
     case "unavailable":
       return c.json(

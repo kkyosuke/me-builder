@@ -286,6 +286,7 @@ describe("GET /api/compatibility/invitations/:relationshipId", () => {
     const response = await invitationRequest();
 
     expect(response.status).toBe(status);
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
     expect(await response.json()).toEqual({
       error: "Compatibility invitation unavailable",
       reason,
