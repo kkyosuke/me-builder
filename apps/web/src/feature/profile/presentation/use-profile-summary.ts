@@ -49,6 +49,7 @@ export function useProfileSummary({
   const loading = useRef(false);
   const request = useRef<AbortController | null>(null);
   const generationRequest = useRef<AbortController | null>(null);
+  const generationInFlight = useRef(false);
 
   const load = useCallback(
     async (showLoading = true) => {
@@ -81,14 +82,52 @@ export function useProfileSummary({
   );
 
   const generate = useCallback(async () => {
-    generationRequest.current?.abort();
+    if (generationInFlight.current) return;
+    generationInFlight.current = true;
     const controller = new AbortController();
     generationRequest.current = controller;
+    const previousState = state;
+    let generationAccepted = false;
+    setState((current) => {
+      if (current.status !== "success") return current;
+      return {
+        status: "success",
+        data: {
+          ...current.data,
+          generation: {
+            ...current.data.generation,
+            status: "queued",
+            canRegenerate: false,
+          },
+        },
+      };
+    });
     setGenerationNotice(null);
     try {
       const idToken = await acquireIdToken(controller.signal);
-      if (!idToken || controller.signal.aborted) return;
-      await requestProfileSummaryGeneration(config.apiUrl, idToken, controller.signal);
+      if (!idToken || controller.signal.aborted) {
+        if (mounted.current) setState(previousState);
+        return;
+      }
+      const generation = await requestProfileSummaryGeneration(
+        config.apiUrl,
+        idToken,
+        controller.signal,
+      );
+      generationAccepted = true;
+      if (mounted.current && !controller.signal.aborted) {
+        setState((current) =>
+          current.status === "success"
+            ? {
+                status: "success",
+                data: {
+                  ...current.data,
+                  generation: { ...current.data.generation, status: generation.status },
+                },
+              }
+            : current,
+        );
+      }
 
       for (const delayMs of [0, ...PROFILE_SUMMARY_POLL_INTERVALS_MS]) {
         if (delayMs > 0) await waitForNextPoll(delayMs, controller.signal);
@@ -113,13 +152,19 @@ export function useProfileSummary({
         return;
       }
       if (mounted.current && !controller.signal.aborted) {
+        if (!generationAccepted) setState(previousState);
         setGenerationNotice({
           kind: "error",
           message: error instanceof Error ? error.message : "まとめを生成できませんでした。",
         });
       }
+    } finally {
+      if (generationRequest.current === controller) {
+        generationRequest.current = null;
+        generationInFlight.current = false;
+      }
     }
-  }, [acquireIdToken, load]);
+  }, [acquireIdToken, load, state]);
 
   useEffect(() => {
     mounted.current = true;
@@ -132,6 +177,7 @@ export function useProfileSummary({
       mounted.current = false;
       request.current?.abort();
       generationRequest.current?.abort();
+      generationInFlight.current = false;
       loading.current = false;
     };
   }, [load]);

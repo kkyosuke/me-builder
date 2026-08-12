@@ -94,6 +94,39 @@ describe("useProfileSummary", () => {
     expect(result.current.generationNotice).toBeNull();
   });
 
+  it("生成要求の通信を待たずに作成中の状態へ切り替える", async () => {
+    const initial = readResult("idle");
+    let resolveGeneration:
+      | ((value: Awaited<ReturnType<typeof requestProfileSummaryGeneration>>) => void)
+      | null = null;
+    vi.mocked(fetchProfileSummary).mockResolvedValue(initial);
+    vi.mocked(requestProfileSummaryGeneration).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveGeneration = resolve;
+        }),
+    );
+
+    const { result } = renderHook(() => useProfileSummary({ acquireIdToken }));
+    await waitFor(() => expect(result.current.state).toEqual({ status: "success", data: initial }));
+
+    act(() => {
+      void result.current.generate();
+    });
+
+    expect(result.current.state).toEqual({
+      status: "success",
+      data: {
+        ...initial,
+        generation: { ...initial.generation, status: "queued", canRegenerate: false },
+      },
+    });
+
+    await act(async () => {
+      resolveGeneration?.({ generationId: "generation-1", status: "queued", created: true });
+    });
+  });
+
   it("生成失敗をGETの応答から反映する", async () => {
     const initial = readResult("idle");
     const queued = readResult("queued");
@@ -161,5 +194,31 @@ describe("useProfileSummary", () => {
       message: "まとめの生成を開始できませんでした。",
     });
     expect(fetchProfileSummary).toHaveBeenCalledOnce();
+  });
+
+  it("生成要求の受付後に状態確認が失敗しても作成中の表示を維持する", async () => {
+    const initial = readResult("idle");
+    vi.mocked(fetchProfileSummary)
+      .mockResolvedValueOnce(initial)
+      .mockRejectedValueOnce(new Error("状態を確認できませんでした。"));
+
+    const { result } = renderHook(() => useProfileSummary({ acquireIdToken }));
+    await waitFor(() => expect(result.current.state).toEqual({ status: "success", data: initial }));
+
+    await act(async () => {
+      await result.current.generate();
+    });
+
+    expect(result.current.state).toEqual({
+      status: "success",
+      data: {
+        ...initial,
+        generation: { ...initial.generation, status: "queued", canRegenerate: false },
+      },
+    });
+    expect(result.current.generationNotice).toEqual({
+      kind: "error",
+      message: "状態を確認できませんでした。",
+    });
   });
 });
