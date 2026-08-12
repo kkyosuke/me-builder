@@ -1,6 +1,15 @@
-import type { ProfileSummaryEvidence } from "@me-builder/lib";
-import { describe, expect, it } from "vitest";
-import { validateGeneratedProfileSummary } from "./profile-summary";
+import type { ProfileSummaryEvidence, ProfileSummaryGenerationContext } from "@me-builder/lib";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { WorkerConfig } from "../config";
+import { generateProfileSummary, validateGeneratedProfileSummary } from "./profile-summary";
+
+const { generateStructuredResponse } = vi.hoisted(() => ({
+  generateStructuredResponse: vi.fn(),
+}));
+vi.mock("../infrastructure/gemini-client", () => ({
+  createGeminiClient: vi.fn(() => ({})),
+  generateStructuredResponse,
+}));
 
 const evidence: ProfileSummaryEvidence[] = [
   {
@@ -322,6 +331,199 @@ describe("validateGeneratedProfileSummary", () => {
       type: "valid",
       summary: expect.objectContaining({ compatibilityShareStatements: [] }),
       rejectedShareRules: ["evidence_excerpt"],
+    });
+  });
+
+  it("共有用文章が0件の応答でも、本人向けの版として保存する", () => {
+    expect(
+      validateGeneratedProfileSummary(
+        JSON.stringify({
+          headline: "まとめ",
+          insights: [
+            {
+              key: "valid",
+              label: "有効",
+              description: "有効な根拠です。",
+              evidence_ids: ["brain:diagnosis-1"],
+            },
+          ],
+          compatibility_share: { statements: [] },
+        }),
+        evidence,
+      ),
+    ).toEqual({
+      type: "valid",
+      summary: expect.objectContaining({ compatibilityShareStatements: [] }),
+      rejectedShareRules: [],
+    });
+  });
+
+  it("上限を超えた共有用文章は超過分だけを落とす", () => {
+    const statement = (index: number) => ({
+      key: `share-${index}`,
+      label: `共有用${"あ".repeat(index)}`,
+      statement: `私は、${"静かな時間".slice(0, 1 + index)}を好みます`,
+      evidence_ids: ["brain:diagnosis-1"],
+    });
+
+    expect(
+      validateGeneratedProfileSummary(
+        JSON.stringify({
+          headline: "まとめ",
+          insights: [
+            {
+              key: "valid",
+              label: "有効",
+              description: "有効な根拠です。",
+              evidence_ids: ["brain:diagnosis-1"],
+            },
+          ],
+          compatibility_share: { statements: [1, 2, 3, 4].map(statement) },
+        }),
+        evidence,
+      ),
+    ).toEqual({
+      type: "valid",
+      summary: expect.objectContaining({
+        compatibilityShareStatements: [
+          expect.objectContaining({ key: "share-1" }),
+          expect.objectContaining({ key: "share-2" }),
+          expect.objectContaining({ key: "share-3" }),
+        ],
+      }),
+      rejectedShareRules: ["count_exceeded"],
+    });
+  });
+
+  it("落とした共有用文章と同じkeyでも、後続の妥当な文章は残す", () => {
+    expect(
+      validateGeneratedProfileSummary(
+        JSON.stringify({
+          headline: "まとめ",
+          insights: [
+            {
+              key: "valid",
+              label: "有効",
+              description: "有効な根拠です。",
+              evidence_ids: ["brain:diagnosis-1"],
+            },
+          ],
+          compatibility_share: {
+            statements: [
+              {
+                key: "share",
+                label: "共有用",
+                statement: "私は、相手に早めに相談してほしいです",
+                evidence_ids: ["brain:diagnosis-1"],
+              },
+              {
+                key: "share",
+                label: "共有用",
+                statement: "私は、静かな時間を好みます",
+                evidence_ids: ["brain:diagnosis-1"],
+              },
+            ],
+          },
+        }),
+        evidence,
+      ),
+    ).toEqual({
+      type: "valid",
+      summary: expect.objectContaining({
+        compatibilityShareStatements: [
+          expect.objectContaining({ statement: "私は、静かな時間を好みます" }),
+        ],
+      }),
+      rejectedShareRules: ["statement_shape"],
+    });
+  });
+});
+
+describe("generateProfileSummary", () => {
+  const context = {
+    generationId: "generation-1",
+    evidence,
+    diagnosisCount: 1,
+    diaryCount: 2,
+    latestRecordedAt: new Date("2026-08-09T00:00:00.000Z"),
+    inputSnapshot: {
+      diagnosis: { count: 1, latestRecordedAt: new Date("2026-08-01T00:00:00.000Z") },
+      diary: { count: 2, latestRecordedAt: new Date("2026-08-09T00:00:00.000Z") },
+    },
+  } satisfies ProfileSummaryGenerationContext;
+  const workerConfig = {
+    environment: "test",
+    geminiModel: "gemini-test",
+    googleVertexAiApiKey: "test-key",
+  } as WorkerConfig;
+  const validResponse = generatedWithShare({
+    label: "考える時間",
+    statement: "私は、考える時間を大切にしています",
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("認証情報がない場合と根拠がない場合を、応答の不備と区別する", async () => {
+    expect(
+      await generateProfileSummary(context, { ...workerConfig, googleVertexAiApiKey: "" }),
+    ).toEqual({ type: "failed", reason: "ai_credentials_missing" });
+    expect(await generateProfileSummary({ ...context, evidence: [] }, workerConfig)).toEqual({
+      type: "failed",
+      reason: "evidence_empty",
+    });
+    expect(generateStructuredResponse).not.toHaveBeenCalled();
+  });
+
+  it("上限tokenで切れた応答を、空応答やschema不適合と区別する", async () => {
+    generateStructuredResponse.mockResolvedValue({
+      text: '{"headline":"まと',
+      finishReason: "MAX_TOKENS",
+    });
+
+    expect(await generateProfileSummary(context, workerConfig)).toEqual({
+      type: "failed",
+      reason: "response_truncated",
+    });
+    expect(generateStructuredResponse).toHaveBeenCalledTimes(2);
+  });
+
+  it("本文のない応答は、切断の有無で理由を分ける", async () => {
+    generateStructuredResponse.mockResolvedValue({ text: undefined, finishReason: "MAX_TOKENS" });
+    expect(await generateProfileSummary(context, workerConfig)).toEqual({
+      type: "failed",
+      reason: "response_truncated",
+    });
+
+    generateStructuredResponse.mockResolvedValue({ text: "", finishReason: "STOP" });
+    expect(await generateProfileSummary(context, workerConfig)).toEqual({
+      type: "failed",
+      reason: "response_empty",
+    });
+  });
+
+  it("schemaへ適合しない応答は理由を残して作り直す", async () => {
+    generateStructuredResponse
+      .mockResolvedValueOnce({ text: "{}", finishReason: "STOP" })
+      .mockResolvedValueOnce({ text: validResponse, finishReason: "STOP" });
+
+    expect(await generateProfileSummary(context, workerConfig)).toEqual({
+      type: "generated",
+      summary: expect.objectContaining({ headline: "まとめ" }),
+      rejectedShareRules: [],
+    });
+    expect(generateStructuredResponse).toHaveBeenCalledTimes(2);
+  });
+
+  it("最後の試行の理由を失敗結果へ残す", async () => {
+    generateStructuredResponse
+      .mockResolvedValueOnce({ text: "{}", finishReason: "STOP" })
+      .mockResolvedValueOnce({ text: "壊れたJSON", finishReason: "STOP" });
+
+    expect(await generateProfileSummary(context, workerConfig)).toEqual({
+      type: "failed",
+      reason: "response_not_json",
     });
   });
 });

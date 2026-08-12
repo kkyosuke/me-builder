@@ -21,28 +21,33 @@ const InsightSchema = v.strictObject({
   ),
 });
 
+/**
+ * 共有専用文章のschemaは、極端な応答だけを弾く緩い形にします。
+ * 件数と1件ごとの形式は保存前の決定的な検査が持ち、外れた文章だけを落とします。
+ * ここを厳しくすると、共有文章1件の不備で本人向けの版まで保存できなくなります。
+ */
+const CompatibilityShareStatementSchema = v.strictObject({
+  key: v.pipe(v.string(), v.minLength(1), v.maxLength(80)),
+  label: v.pipe(v.string(), v.minLength(1), v.maxLength(200)),
+  statement: v.pipe(v.string(), v.minLength(1), v.maxLength(400)),
+  evidence_ids: v.pipe(
+    v.array(v.pipe(v.string(), v.minLength(1))),
+    v.minLength(1),
+    v.maxLength(20),
+  ),
+});
+
 const ResponseSchema = v.strictObject({
   headline: v.pipe(v.string(), v.minLength(1), v.maxLength(120)),
   insights: v.pipe(v.array(InsightSchema), v.minLength(1), v.maxLength(3)),
   compatibility_share: v.strictObject({
-    statements: v.pipe(
-      v.array(
-        v.strictObject({
-          key: v.pipe(v.string(), v.minLength(1), v.maxLength(80)),
-          label: v.pipe(v.string(), v.minLength(1), v.maxLength(80)),
-          statement: v.pipe(v.string(), v.minLength(1), v.maxLength(240)),
-          evidence_ids: v.pipe(
-            v.array(v.pipe(v.string(), v.minLength(1))),
-            v.minLength(1),
-            v.maxLength(20),
-          ),
-        }),
-      ),
-      v.minLength(1),
-      v.maxLength(3),
-    ),
+    statements: v.pipe(v.array(CompatibilityShareStatementSchema), v.maxLength(10)),
   }),
 });
+
+/** 共有できる文章の上限。超えた分は保存前の検査で落とす。 */
+const COMPATIBILITY_SHARE_STATEMENT_LIMIT = 3;
+const COMPATIBILITY_SHARE_LABEL_MAX_LENGTH = 40;
 
 const SAFE_COMPATIBILITY_SHARE_STATEMENT =
   /^私は、[^\n。！？]{2,220}(?:を大切にしています|しやすいです|心地よく感じます|を好みます|したいです)[。]?$/u;
@@ -82,6 +87,7 @@ function containsEvidenceExcerpt(
  * 本文を運用ログへ出さずに、どの決定的ルールで落ちたかを追えるようにする。
  */
 export type CompatibilityShareRejectionRule =
+  | "count_exceeded"
   | "key_duplicated"
   | "evidence_invalid"
   | "label_shape"
@@ -110,7 +116,9 @@ function rejectionRuleOfCompatibilityShareStatement(
   statement: string,
   referencedEvidence: readonly ProfileSummaryEvidence[],
 ): CompatibilityShareRejectionRule | undefined {
-  if (/[\n。！？]/u.test(label)) return "label_shape";
+  if (/[\n。！？]/u.test(label) || label.length > COMPATIBILITY_SHARE_LABEL_MAX_LENGTH) {
+    return "label_shape";
+  }
   if (!SAFE_COMPATIBILITY_SHARE_STATEMENT.test(statement)) return "statement_shape";
   if (
     FORBIDDEN_COMPATIBILITY_SHARE_DETAIL.test(label) ||
@@ -184,11 +192,14 @@ export function validateGeneratedProfileSummary(
   const compatibilityShareStatements: GeneratedCompatibilityShareStatement[] = [];
   const rejectedShareRules: CompatibilityShareRejectionRule[] = [];
   for (const statement of parsed.output.compatibility_share.statements) {
+    if (compatibilityShareStatements.length >= COMPATIBILITY_SHARE_STATEMENT_LIMIT) {
+      rejectedShareRules.push("count_exceeded");
+      continue;
+    }
     if (shareKeys.has(statement.key)) {
       rejectedShareRules.push("key_duplicated");
       continue;
     }
-    shareKeys.add(statement.key);
     const evidenceIds = [...new Set(statement.evidence_ids)];
     if (
       evidenceIds.length !== statement.evidence_ids.length ||
@@ -210,6 +221,8 @@ export function validateGeneratedProfileSummary(
       rejectedShareRules.push(rejectionRule);
       continue;
     }
+    // 落とした文章はkeyを占有しない。同じkeyで送られた後続の妥当な文章を残せるようにする。
+    shareKeys.add(statement.key);
     compatibilityShareStatements.push({
       key: statement.key,
       label: statement.label,

@@ -80,6 +80,21 @@ const GENERATION_FAILURES: Record<
   },
 };
 
+/**
+ * 共有専用projectionの縮退を表す結果コードを返します。
+ * 共有できる文章が1件も残らなかった状態は、次の生成で作り直せるよう区別して残します。
+ */
+function compatibilityShareResultCode(
+  generated: Extract<Awaited<ReturnType<typeof generateProfileSummary>>, { type: "generated" }>,
+): string | undefined {
+  if (generated.summary.compatibilityShareStatements.length === 0) {
+    return "PROFILE_SUMMARY_SHARE_STATEMENTS_UNAVAILABLE";
+  }
+  return generated.rejectedShareRules.length === 0
+    ? undefined
+    : "PROFILE_SUMMARY_SHARE_STATEMENTS_REJECTED";
+}
+
 export async function processProfileSummaryGenerationMessage(
   message: Message<ProfileSummaryGenerationQueueMessage>,
   cf: CloudflareBindings,
@@ -142,17 +157,15 @@ export async function processProfileSummaryGenerationMessage(
       });
     }
     message.ack();
+    const shareResultCode = compatibilityShareResultCode(generated);
     logResult(message, workerConfig, startedAt, {
-      // 共有専用文章を1件でも落とした場合は、版を保存できても縮退成功として残す。
-      outcome: generated.rejectedShareRules.length === 0 ? "succeeded" : "degraded",
+      // 共有専用文章が欠けた版も保存するため、本人向けの成功と縮退成功を区別する。
+      outcome: shareResultCode ? "degraded" : "succeeded",
       disposition: "ack",
       stage: "summary.persist",
-      ...(generated.rejectedShareRules.length === 0
-        ? {}
-        : {
-            resultCode: "PROFILE_SUMMARY_SHARE_STATEMENTS_REJECTED",
-            rejectedShareRules: generated.rejectedShareRules,
-          }),
+      ...(shareResultCode
+        ? { resultCode: shareResultCode, rejectedShareRules: generated.rejectedShareRules }
+        : {}),
     });
   } catch (error) {
     const safeError = toSafeOperationalErrorFields(error, {
