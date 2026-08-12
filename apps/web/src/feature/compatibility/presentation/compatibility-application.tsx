@@ -1,15 +1,6 @@
 import { Suspense, lazy } from "react";
 import { LoadingState } from "../../../components/loading-state";
-import {
-  aoi,
-  compatibilityListData,
-  demoInvitationUrl,
-  me,
-} from "../infrastructure/compatibility-demo";
-import {
-  copyCompatibilityInvitation,
-  createLineShareUrl,
-} from "../infrastructure/compatibility-share";
+import { aoi, compatibilityListData, me } from "../infrastructure/compatibility-demo";
 import { CompatibilityListScreen } from "./compatibility-list-screen";
 import { useCompatibilityRoute } from "./hooks/use-compatibility-route";
 
@@ -23,11 +14,7 @@ const CompatibilityResultScreen = lazy(() =>
     default: feature.CompatibilityResultScreen,
   })),
 );
-const CompatibilityShareScreen = lazy(() =>
-  import("./compatibility-share-screen").then((feature) => ({
-    default: feature.CompatibilityShareScreen,
-  })),
-);
+const CompatibilityShareApplication = lazy(() => import("./compatibility-share-application"));
 
 export default function CompatibilityApplication() {
   const route = useCompatibilityRoute();
@@ -41,12 +28,7 @@ export default function CompatibilityApplication() {
       {route === "invitation" ? (
         <CompatibilityInvitationScreen inviter={aoi} recipient={me} />
       ) : route === "share" ? (
-        <CompatibilityShareScreen
-          person={me}
-          invitationUrl={demoInvitationUrl}
-          lineShareUrl={createLineShareUrl(demoInvitationUrl)}
-          copyInvitation={copyCompatibilityInvitation}
-        />
+        <CompatibilityShareApplication />
       ) : (
         <CompatibilityResultScreen me={me} partner={aoi} />
       )}

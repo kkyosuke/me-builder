@@ -108,6 +108,7 @@ describe("AccountData Workers runtime E2E", () => {
         "INSERT INTO brain_items (id, created_at, updated_at, is_deleted, account_id, category, statement, attributes_json, derivation, status, stability, sensitivity, externally_shareable, confidence_json) VALUES ('migration-brain', 1, 1, 0, ?, 'memory', '散歩した', '{}', 'ai', 'active', 'stable', 'private', 0, '{}')",
         accountId,
       );
+      state.storage.sql.exec("DROP TABLE profile_summary_share_projections");
       state.storage.sql.exec("DROP TABLE profile_summary_versions");
       state.storage.sql.exec("DROP TABLE profile_summary_generations");
       state.storage.sql.exec("DROP TABLE brain_vector_entries");
@@ -123,7 +124,7 @@ describe("AccountData Workers runtime E2E", () => {
         "CREATE UNIQUE INDEX diary_brain_checkpoint_item_brain_idx ON diary_brain_checkpoint_items (brain_item_id)",
       );
       state.storage.sql.exec(
-        "DELETE FROM __drizzle_migrations WHERE created_at IN (1786407202292, 1786413718549, 1786415351981, 1786433070406, 1786453107455, 1786491203636)",
+        "DELETE FROM __drizzle_migrations WHERE created_at IN (1786407202292, 1786413718549, 1786415351981, 1786433070406, 1786453107455, 1786491203636, 1786493237869)",
       );
 
       const repository = Reflect.get(instance, "repository") as {
@@ -145,6 +146,13 @@ describe("AccountData Workers runtime E2E", () => {
           )
           .one().name,
       ).toBe("diary_chat_brain_usage_audits");
+      expect(
+        state.storage.sql
+          .exec<{ name: string }>(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'profile_summary_share_projections'",
+          )
+          .one().name,
+      ).toBe("profile_summary_share_projections");
       expect(
         state.storage.sql
           .exec<{ statement: string }>(
@@ -170,6 +178,7 @@ describe("AccountData Workers runtime E2E", () => {
 
     await runInDurableObject(stub, async (instance: AccountData, state) => {
       state.storage.sql.exec("PRAGMA foreign_keys=OFF");
+      state.storage.sql.exec("DROP TABLE profile_summary_share_projections");
       state.storage.sql.exec("DROP TABLE profile_summary_versions");
       state.storage.sql.exec(`CREATE TABLE profile_summary_versions (
         id text PRIMARY KEY NOT NULL,
@@ -210,7 +219,7 @@ describe("AccountData Workers runtime E2E", () => {
         "CREATE UNIQUE INDEX diary_brain_checkpoint_item_brain_idx ON diary_brain_checkpoint_items (brain_item_id)",
       );
       state.storage.sql.exec(
-        "DELETE FROM __drizzle_migrations WHERE created_at IN (1786415351981, 1786433070406, 1786453107455, 1786491203636)",
+        "DELETE FROM __drizzle_migrations WHERE created_at IN (1786415351981, 1786433070406, 1786453107455, 1786491203636, 1786493237869)",
       );
 
       const repository = Reflect.get(instance, "repository") as {
@@ -245,7 +254,7 @@ describe("AccountData Workers runtime E2E", () => {
         accountId,
         new Date("2026-08-02T00:00:00.000Z"),
       );
-      expect(readModel.generation).toMatchObject({ canRegenerate: false, reasons: [] });
+      expect(readModel.generation).toMatchObject({ canRegenerate: true, reasons: ["format"] });
 
       const addedAt = new Date("2026-08-03T00:00:00.000Z");
       state.storage.sql.exec(
@@ -259,7 +268,10 @@ describe("AccountData Workers runtime E2E", () => {
         accountId,
         addedAt,
       );
-      expect(changed.generation).toMatchObject({ canRegenerate: true, reasons: ["brain"] });
+      expect(changed.generation).toMatchObject({
+        canRegenerate: true,
+        reasons: ["brain", "format"],
+      });
     });
   });
 
@@ -323,6 +335,14 @@ describe("AccountData Workers runtime E2E", () => {
             sources: ["diary"],
           },
         ],
+        compatibilityShareStatements: [
+          {
+            key: "reflecting",
+            label: "振り返る時間",
+            statement: "私は、落ち着いて振り返る時間を大切にしています",
+            evidenceIds: [context.evidence[0]?.id ?? ""],
+          },
+        ],
         diagnosisCount: context.diagnosisCount,
         diaryCount: context.diaryCount,
         latestRecordedAt: context.latestRecordedAt,
@@ -337,6 +357,19 @@ describe("AccountData Workers runtime E2E", () => {
         },
       ],
       generation: { status: "idle" },
+    });
+    await expect(
+      stub.execute(accountId, "profileSummary.readCompatibilityShareProfile"),
+    ).resolves.toMatchObject({
+      type: "available",
+      profile: {
+        statements: [
+          {
+            key: "reflecting",
+            statement: "私は、落ち着いて振り返る時間を大切にしています",
+          },
+        ],
+      },
     });
   });
 });

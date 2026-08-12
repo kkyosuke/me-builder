@@ -436,7 +436,7 @@
                         "reasons": {
                           "type": "array",
                           "items": {
-                            "enum": ["diagnosis", "brain", "elapsed"],
+                            "enum": ["diagnosis", "brain", "format", "elapsed"],
                             "type": "string"
                           }
                         },
@@ -1977,6 +1977,254 @@
             "required": true
           }
         ]
+      }
+    },
+    "/api/compatibility/share-preview": {
+      "get": {
+        "operationId": "getCompatibilitySharePreview",
+        "tags": ["Compatibility"],
+        "summary": "招待発行前に本人が共有内容を確認する",
+        "security": [
+          {
+            "liffIdToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "本人の表示名と、相性診断へ利用できる現在の傾向",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "displayName": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "previewToken": {
+                      "type": "string",
+                      "pattern": "^csp2\\.[a-f0-9]{64}$"
+                    },
+                    "aboutMe": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "profileSummaryVersionId": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "generatedAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "statements": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "key": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "label": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "statement": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                },
+                                "required": ["key", "label", "statement"]
+                              },
+                              "minItems": 1,
+                              "maxItems": 3
+                            }
+                          },
+                          "required": ["profileSummaryVersionId", "generatedAt", "statements"]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "themes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "diagnosisId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "title": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "parameters": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "label": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "lowLabel": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "highLabel": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "position": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 100
+                                },
+                                "statement": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "label",
+                                "lowLabel",
+                                "highLabel",
+                                "position",
+                                "statement"
+                              ]
+                            },
+                            "minItems": 1
+                          }
+                        },
+                        "required": ["diagnosisId", "title", "parameters"]
+                      }
+                    },
+                    "canIssueInvitation": {
+                      "type": "boolean"
+                    },
+                    "blockingReasons": {
+                      "type": "array",
+                      "items": {
+                        "enum": [
+                          "display_name_unavailable",
+                          "profile_summary_required",
+                          "profile_summary_stale",
+                          "diagnosis_required",
+                          "scoring_unavailable",
+                          "diagnosis_unavailable"
+                        ],
+                        "type": "string"
+                      }
+                    },
+                    "nextAction": {
+                      "anyOf": [
+                        {
+                          "enum": ["diagnosis", "profile-summary"],
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "displayName",
+                    "previewToken",
+                    "aboutMe",
+                    "themes",
+                    "canIssueInvitation",
+                    "blockingReasons",
+                    "nextAction"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "LIFF IDトークンを検証できない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Unauthorized"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "対応するAccountが存在しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Account not found"
+                    },
+                    "reason": {
+                      "const": "friendship_required"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "未処理のサーバーエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Internal Server Error"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "D1 bindingが設定されていない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Service Unavailable"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/diagnoses": {

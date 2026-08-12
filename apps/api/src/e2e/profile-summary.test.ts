@@ -62,7 +62,7 @@ async function prepareAccount(db: D1Database): Promise<void> {
 async function insertDiaryMessage(
   suffix = "initial",
   receivedAt = new Date(timestamp),
-): Promise<void> {
+): Promise<string> {
   accountDataStore.bind("account-summary-e2e");
   const source = await DO.account.action.diary.storeLineTextSource(accountDataStore.db, {
     accountId: "account-summary-e2e",
@@ -100,9 +100,10 @@ async function insertDiaryMessage(
       `summary-session-${suffix}`,
       source.sourceRecordId,
     );
+  return source.sourceRecordId;
 }
 
-async function insertSummaryVersions(): Promise<void> {
+async function insertSummaryVersions(evidenceSourceRecordId: string): Promise<void> {
   const intervalMs = 31 * 24 * 60 * 60 * 1_000;
   const firstGeneratedAt = new Date("2026-06-01T00:00:00.000Z").getTime();
   for (const sequence of [1, 2, 3]) {
@@ -123,6 +124,14 @@ async function insertSummaryVersions(): Promise<void> {
         promptVersion: "profile-summary-v1",
         headline: `${sequence}番目のまとめ`,
         insights: [],
+        compatibilityShareStatements: [
+          {
+            key: `summary-${sequence}`,
+            label: "共有用",
+            statement: "私は、振り返る時間を大切にしています",
+            evidenceIds: [`diary:${evidenceSourceRecordId}`],
+          },
+        ],
         diagnosisCount: 0,
         diaryCount: 1,
         latestRecordedAt: new Date(timestamp),
@@ -200,8 +209,8 @@ describe("Profile Summary local D1 E2E", () => {
   });
 
   it(`${profileSummaryCases.readVersions.id}: ${profileSummaryCases.readVersions.name}`, async () => {
-    await insertDiaryMessage();
-    await insertSummaryVersions();
+    const evidenceSourceRecordId = await insertDiaryMessage();
+    await insertSummaryVersions(evidenceSourceRecordId);
 
     const response = await request();
     expect(response.status).toBe(200);
@@ -228,8 +237,8 @@ describe("Profile Summary local D1 E2E", () => {
   });
 
   it("開発環境では変更がなくても再生成でき、本番では通常判定を維持する", async () => {
-    await insertDiaryMessage();
-    await insertSummaryVersions();
+    const evidenceSourceRecordId = await insertDiaryMessage();
+    await insertSummaryVersions(evidenceSourceRecordId);
 
     const productionRead = await request("/api/profile-summary", "GET", "production");
     expect((await productionRead.json()).generation).toMatchObject({
@@ -275,8 +284,8 @@ describe("Profile Summary local D1 E2E", () => {
   });
 
   it("日記が増えるとGETが再生成理由を返し、POSTで新しい要求を受け付ける", async () => {
-    await insertDiaryMessage();
-    await insertSummaryVersions();
+    const evidenceSourceRecordId = await insertDiaryMessage();
+    await insertSummaryVersions(evidenceSourceRecordId);
     await insertDiaryMessage("added", new Date("2026-08-10T00:00:00.000Z"));
 
     expect((await (await request()).json()).generation).toEqual({

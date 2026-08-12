@@ -14,6 +14,7 @@ describe("GET /api/openapi.json", () => {
     expect(response.status).toBe(200);
     expect(document.openapi).toBe("3.1.0");
     expect(document.paths["/api/diagnoses"]?.get).toBeDefined();
+    expect(document.paths["/api/compatibility/share-preview"]?.get).toBeDefined();
     expect(document.paths["/api/diagnoses/{diagnosisId}/answers"]?.get).toBeDefined();
     expect(document.paths["/api/profile"]?.get).toBeDefined();
     expect(document.paths["/api/profile/avatar"]?.put).toBeDefined();

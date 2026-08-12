@@ -59,7 +59,7 @@ export function CompatibilityPrivacyNotice({
           <span aria-hidden="true">・</span>診断で選んだ具体的な回答
         </li>
         <li className="flex gap-2">
-          <span aria-hidden="true">・</span>日記やLINEの会話から得た記憶
+          <span aria-hidden="true">・</span>日記やLINEの会話本文、具体的な出来事や記憶
         </li>
         <li className="flex gap-2">
           <span aria-hidden="true">・</span>自由記述や会話そのものの内容

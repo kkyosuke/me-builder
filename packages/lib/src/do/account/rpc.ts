@@ -6,6 +6,7 @@ import type {
   ReserveCompatibilityReferenceResult,
 } from "../../compatibility-data";
 import type {
+  CompatibilityShareProfileReadResult,
   CompleteProfileSummaryGenerationInput,
   ProfileSummaryGenerationContext,
   ProfileSummaryReadModel,
@@ -105,6 +106,7 @@ export type AccountDataActions = {
     at?: Date,
     allowUnchangedRegeneration?: boolean,
   ) => Promise<ProfileSummaryReadModel>;
+  "profileSummary.readCompatibilityShareProfile": () => Promise<CompatibilityShareProfileReadResult>;
   "profileSummary.requestGeneration": (
     requestedAt?: Date,
     allowUnchangedRegeneration?: boolean,
@@ -192,6 +194,10 @@ export type AccountDataActions = {
   "diagnosis.findAnswers": RpcAction<
     [diagnosisId: string, at: Date],
     typeof diagnosis.findDiagnosisAnswers
+  >;
+  "diagnosis.getCompatibilitySharePreviewSource": RpcAction<
+    [at: Date],
+    typeof diagnosis.getCompatibilitySharePreviewSource
   >;
   "diagnosis.hasResponse": RpcAction<[diagnosisId: string], typeof diagnosis.hasDiagnosisResponse>;
   "diagnosis.listVisible": RpcAction<[at: Date], typeof diagnosis.listVisibleDiagnoses>;

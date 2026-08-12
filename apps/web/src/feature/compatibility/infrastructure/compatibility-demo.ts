@@ -76,8 +76,6 @@ export const aoi: CompatibilityPerson = {
   ],
 };
 
-export const demoInvitationUrl = "https://example.com/compatibility/invitations/demo";
-
 export const compatibilityListData: CompatibilityListData = {
   owner: me,
   available: {

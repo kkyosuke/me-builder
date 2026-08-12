@@ -40,8 +40,9 @@ flowchart LR
 | データ | 保存先 | 理由 |
 | --- | --- | --- |
 | 招待状態、参加者、表示名snapshot | CompatibilityData SQLite | 2者の共有関係を片方のAccount所有にしない |
-| 送信者が提示したテーマと結果指紋 | CompatibilityData SQLite | 発行時に確認した共有範囲を固定する |
-| 受信者が承諾したテーマと結果指紋 | CompatibilityData SQLite | 受信者の明示的同意を送信者の同意と分ける |
+| 送信者が提示した共有プロフィール版・指紋、テーマと結果指紋 | CompatibilityData SQLite | 発行時に確認した共有範囲を固定する |
+| 受信者が承諾した共有プロフィール版・指紋、テーマと結果指紋 | CompatibilityData SQLite | 受信者の明示的同意を送信者の同意と分ける |
+| 共有用の一人称文章と内部根拠参照 | 各AccountData SQLiteの専用projection | 本人向けまとめや生の根拠を関係データへ複製しない |
 | 生の回答、パラメータ値、表示文章 | 各AccountData SQLiteから都度計算 | 相性関係へ個人データを複製しない |
 | Accountごとの相性一覧参照 | 各AccountData SQLite | 全Account走査なしで本人の一覧を取得する |
 | Question、Diagnosis、Scoring Config | 共有D1 | 全Account共通の公開catalogである |
@@ -87,6 +88,10 @@ erDiagram
 ```
 
 `result_fingerprint`は、本人へプレビューした診断ID、採点設定版、パラメータ位置、審査済み文章を正規化してSHA-256で計算します。回答そのものは含めず、APIレスポンスやログへ出しません。結果表示時に現在の表示内容から再計算した指紋と一致するテーマだけを比較へ使います。不一致または回答削除の場合は古い結果を表示せず、所有者本人へ再確認を求めます。
+
+招待発行前の確認と発行commandは、表示名、共有プロフィール版と文章、診断由来の共有表示全体から決定的に計算するバージョン付きの不透明なpreview tokenで結びます。発行時はAccountDataの現在状態から表示内容とtokenを再計算し、クライアントが確認時に受け取ったtokenと一致する場合だけ、共有プロフィール版・指紋と、その時点のテーマ別`result_fingerprint`を保存します。token自体を各指紋として保存または公開せず、不一致時は古い確認内容で発行せず再確認を求めます。
+
+共有プロフィールprojectionは、本人向けプロフィールまとめと同じ生成要求から作りますが、本人向け本文とは別のAccountData tableへ保存します。文章、schema version、生成元のプロフィール版、内部根拠参照、指紋を持ち、専用RPCだけが読み取ります。内部根拠のどれかが削除または無効化されていればprojectionを返しません。新しい版を生成しても既存関係の同意版を自動更新しません。
 
 招待確認用RPCは、表示名、提示された診断ID、期限だけを持つ専用previewを返します。Account ID、結果指紋、同意時刻、内部状態行をpreviewへ含めません。承諾処理が重複関係の確認に使う送信者Account IDは、画面表示用previewとは別の内部contextとして取得します。
 
@@ -152,7 +157,7 @@ AccountDataの一覧RPCは、内部的に`pending`、`reserved`、`active`の参
 - AccountData参照は一覧projectionであり、相性シートの閲覧権限に使わない
 - 承諾前に双方のAccountDataを同じ順序で予約し、同じ2人のaccepted関係を重複作成しない
 - CompatibilityDataは双方の予約を確認できないpending招待の承諾を拒否する
-- 共有終了、回答変更、回答削除後は保存済みの古い比較内容を返さない
+- 共有終了、同意した表示内容の変更、内部根拠の削除・無効化後は保存済みの古い内容を返さない
 
 ## 8. Migrationと運用
 

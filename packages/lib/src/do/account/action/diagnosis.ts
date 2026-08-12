@@ -119,6 +119,11 @@ export type DiagnosisAnswersResult =
   | { type: "found"; diagnosis: DiagnosisAnswers }
   | { type: "not-found" };
 
+export type CompatibilitySharePreviewSource = Readonly<{
+  diagnoses: DiagnosisListItem[];
+  answeredDiagnoses: DiagnosisAnswers[];
+}>;
+
 export type DeletedAccountDiagnosisData = Readonly<{
   deletedResponseCount: number;
   deletedAnswerCount: number;
@@ -983,6 +988,26 @@ export async function findDiagnosisAnswers(
       })),
     },
   };
+}
+
+/** 相性共有プレビューに必要な一覧と回答済みDiagnosisを、1回のAccountData RPCで取得する。 */
+export async function getCompatibilitySharePreviewSource(
+  db: AccountDataDatabase,
+  accountId: string,
+  at: Date,
+): Promise<CompatibilitySharePreviewSource> {
+  const diagnoses = await listVisibleDiagnoses(db, accountId, at);
+  const answeredResults = await Promise.all(
+    diagnoses
+      .filter(({ responseStatus }) => responseStatus === "answered")
+      .map(({ id }) => findDiagnosisAnswers(db, accountId, id, at)),
+  );
+  const answeredDiagnoses = answeredResults.flatMap((result) =>
+    result.type === "found" && result.diagnosis.responseStatus === "answered"
+      ? [result.diagnosis]
+      : [],
+  );
+  return { diagnoses, answeredDiagnoses };
 }
 
 /**

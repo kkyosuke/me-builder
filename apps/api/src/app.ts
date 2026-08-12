@@ -17,6 +17,7 @@ import {
   resetAllDevelopmentBrainVectorSyncJobsRoute,
   resetDevelopmentBrainVectorSyncJobRoute,
 } from "./contract/brain/dev-vector-sync-jobs";
+import { compatibilitySharePreviewRoute } from "./contract/compatibility/share-preview";
 import { saveDiagnosisAnswerRoute } from "./contract/diagnosis/answer";
 import { diagnosisAnswersRoute } from "./contract/diagnosis/answers";
 import { deferDiagnosisQuestionRoute } from "./contract/diagnosis/deferred-question";
@@ -39,6 +40,7 @@ import {
   postDevelopmentBrainVectorSyncJobReset,
   postDevelopmentBrainVectorSyncJobsResetAll,
 } from "./controller/brain";
+import { getCompatibilitySharePreviewContents } from "./controller/compatibility";
 import {
   deleteDevelopmentDiagnosisData,
   getDiagnoses,
@@ -158,6 +160,11 @@ app.post(
   "/api/dev/brain-vector-sync-jobs/:jobId/reset",
   resetDevelopmentBrainVectorSyncJobRoute,
   postDevelopmentBrainVectorSyncJobReset,
+);
+app.get(
+  "/api/compatibility/share-preview",
+  compatibilitySharePreviewRoute,
+  getCompatibilitySharePreviewContents,
 );
 
 app.get("/api/diagnoses", diagnosisListRoute, getDiagnoses);

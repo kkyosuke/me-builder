@@ -83,6 +83,14 @@ describe("processProfileSummaryGenerationMessage", () => {
           sources: ["diary"],
         },
       ],
+      compatibilityShareStatements: [
+        {
+          key: "reflecting",
+          label: "振り返る時間",
+          statement: "私は、落ち着いて振り返る時間を大切にしています",
+          evidenceIds: ["diary:source-1"],
+        },
+      ],
     });
     const message = createMessage();
 
@@ -96,6 +104,9 @@ describe("processProfileSummaryGenerationMessage", () => {
         model: "gemini-test",
         diaryCount: 1,
         inputSnapshot: expect.objectContaining({ diary: expect.objectContaining({ count: 1 }) }),
+        compatibilityShareStatements: [
+          expect.objectContaining({ key: "reflecting", evidenceIds: ["diary:source-1"] }),
+        ],
       }),
     );
     expect(message.ack).toHaveBeenCalledOnce();

@@ -1,5 +1,6 @@
 import path from "node:path";
 import Database from "better-sqlite3";
+import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { describe, expect, it } from "vitest";
@@ -9,7 +10,9 @@ import { storeLineTextSource } from "./diary";
 import {
   PROFILE_SUMMARY_REGENERATION_INTERVAL_MS,
   completeProfileSummaryGeneration,
+  failProfileSummaryGeneration,
   loadProfileSummaryGenerationContext,
+  readCompatibilityShareProfile,
   readProfileSummary,
   requestProfileSummaryGeneration,
 } from "./profile-summary";
@@ -163,6 +166,8 @@ describe("Profile Summary persistence", () => {
       }),
     ]);
     if (!context) throw new Error("generation context was not loaded");
+    const evidenceId = context.evidence[0]?.id;
+    if (!evidenceId) throw new Error("summary evidence was not loaded");
 
     const input = {
       generationId: requested.generationId,
@@ -177,6 +182,14 @@ describe("Profile Summary persistence", () => {
           description: "歩くことで落ち着きを取り戻すことがあります。",
           evidenceCount: 1,
           sources: ["diary" as const],
+        },
+      ],
+      compatibilityShareStatements: [
+        {
+          key: "calm-walking",
+          label: "落ち着く時間",
+          statement: "私は、ゆっくり考える時間を大切にしています",
+          evidenceIds: [evidenceId],
         },
       ],
       diagnosisCount: context.diagnosisCount,
@@ -206,14 +219,42 @@ describe("Profile Summary persistence", () => {
       }),
     ).resolves.toBe(true);
     expect((await readProfileSummary(db, accountId)).versions).toHaveLength(1);
+    await expect(readCompatibilityShareProfile(db, accountId)).resolves.toMatchObject({
+      type: "available",
+      profile: {
+        statements: [
+          {
+            key: "calm-walking",
+            statement: "私は、ゆっくり考える時間を大切にしています",
+          },
+        ],
+      },
+    });
     await expect(
       readProfileSummary(db, accountId, new Date("2026-08-09T00:03:00.000Z"), true),
     ).resolves.toMatchObject({
       generation: { status: "idle", canRegenerate: true, reasons: [] },
     });
+    const forced = await requestProfileSummaryGeneration(
+      db,
+      accountId,
+      new Date("2026-08-09T00:03:00.000Z"),
+      true,
+    );
+    expect(forced).toMatchObject({ outcome: "created", status: "queued" });
+    if (forced.outcome !== "created") throw new Error("forced generation was not created");
+    await failProfileSummaryGeneration(db, accountId, forced.generationId, "test failure");
+
+    await db
+      .update(schema.conversationMessages)
+      .set({ isDeleted: true })
+      .where(eq(schema.conversationMessages.id, "message-summary-1"));
+    await expect(readCompatibilityShareProfile(db, accountId)).resolves.toEqual({ type: "stale" });
     await expect(
-      requestProfileSummaryGeneration(db, accountId, new Date("2026-08-09T00:03:00.000Z"), true),
-    ).resolves.toMatchObject({ outcome: "created", status: "queued" });
+      readProfileSummary(db, accountId, new Date("2026-08-09T00:04:00.000Z")),
+    ).resolves.toMatchObject({
+      generation: { canRegenerate: false, reasons: ["format"] },
+    });
   });
 
   it("利用できる入力がなければ生成要求を作らない", async () => {
@@ -226,6 +267,51 @@ describe("Profile Summary persistence", () => {
     await expect(
       requestProfileSummaryGeneration(db, "account-1", new Date(), true),
     ).resolves.toEqual({ outcome: "unavailable", reason: "source_record_required" });
+  });
+
+  it("共有用出力を持たない旧版を現在の生成形式へ更新できる", async () => {
+    const db = createTestDb();
+    const { accountId, recordedAt } = await insertDiaryFixture(db);
+    const generatedAt = new Date("2026-08-09T00:00:00.000Z");
+    await db.insert(schema.profileSummaryGenerations).values({
+      id: "legacy-generation",
+      accountId,
+      status: "completed",
+      requestedAt: generatedAt,
+      startedAt: generatedAt,
+      finishedAt: generatedAt,
+      model: "gemini-test",
+      promptVersion: "profile-summary-v1",
+    });
+    await db.insert(schema.profileSummaryVersions).values({
+      id: "legacy-version",
+      generationId: "legacy-generation",
+      sequence: 1,
+      generatedAt,
+      model: "gemini-test",
+      promptVersion: "profile-summary-v1",
+      diagnosisInputCount: 0,
+      diagnosisInputLatestAt: null,
+      diaryInputCount: 1,
+      diaryInputLatestAt: recordedAt,
+      summary: {
+        generatedAt: generatedAt.toISOString(),
+        headline: "以前のまとめ",
+        insights: [],
+        recordCount: 1,
+        diagnosisCount: 0,
+        diaryCount: 1,
+        latestRecordedAt: recordedAt.toISOString(),
+      },
+    });
+
+    const requestedAt = new Date("2026-08-09T00:01:00.000Z");
+    await expect(readProfileSummary(db, accountId, requestedAt)).resolves.toMatchObject({
+      generation: { canRegenerate: true, reasons: ["format"] },
+    });
+    await expect(
+      requestProfileSummaryGeneration(db, accountId, requestedAt),
+    ).resolves.toMatchObject({ outcome: "created", status: "queued" });
   });
 
   it("最新版の入力snapshotと比較して診断・日記・30日経過を再生成理由にする", async () => {
@@ -248,6 +334,14 @@ describe("Profile Summary persistence", () => {
       promptVersion: "profile-summary-v1",
       headline: "最初のまとめ",
       insights: [],
+      compatibilityShareStatements: [
+        {
+          key: "initial-style",
+          label: "大切にすること",
+          statement: "私は、落ち着いて考える時間を大切にしています",
+          evidenceIds: [context.evidence[0]?.id ?? ""],
+        },
+      ],
       diagnosisCount: context.diagnosisCount,
       diaryCount: context.diaryCount,
       latestRecordedAt: context.latestRecordedAt,

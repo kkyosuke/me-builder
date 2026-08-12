@@ -50,6 +50,13 @@
       "when": 1786491203636,
       "tag": "0006_vector_sync_retry_scheduled",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1786493237869,
+      "tag": "0007_demonic_cable",
+      "breakpoints": true
     }
   ]
 }
