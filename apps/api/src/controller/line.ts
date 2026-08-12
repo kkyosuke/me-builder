@@ -30,6 +30,13 @@ export async function postLineWebhook(c: Context<AppEnv>): Promise<Response> {
     startChatLoading: lineClient
       ? (chatId) => lineClient.showLoadingAnimation({ chatId, loadingSeconds: 60 })
       : undefined,
+    replyUnsupportedMessage: lineClient
+      ? (replyToken, text) =>
+          lineClient.replyMessage({
+            replyToken,
+            messages: [{ type: "text", text }],
+          })
+      : undefined,
     waitUntil: (promise) => {
       try {
         c.executionCtx.waitUntil(promise);

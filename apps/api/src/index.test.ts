@@ -3,6 +3,7 @@ import { line } from "@me-builder/lib";
 import { logger } from "@me-builder/shared";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { app } from "./index";
+import { UNSUPPORTED_MESSAGE_REPLY_TEXT } from "./logic/line-webhook";
 
 const CHANNEL_SECRET = "test-channel-secret";
 
@@ -135,6 +136,47 @@ describe("POST /api/line/webhook signature verification", () => {
 });
 
 describe("API Server Webhook Queue", () => {
+  it("非テキストへ定型文を返信し、Webhook Queueへ投入しない", async () => {
+    const apiClient = line.client.create("test-token");
+    const replyMessage = vi
+      .spyOn(apiClient, "replyMessage")
+      .mockResolvedValue({ sentMessages: [] });
+    vi.spyOn(line.client, "create").mockReturnValue(apiClient);
+    const { queue, send } = createMockQueue();
+    const body = JSON.stringify({
+      events: [
+        {
+          type: "message",
+          replyToken: "reply-image",
+          source: { type: "user", userId: "U1" },
+          message: { type: "image", id: "image-id" },
+        },
+      ],
+    });
+
+    const res = await app.request(
+      "/api/line/webhook",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-line-signature": sign(body) },
+        body,
+      },
+      {
+        WEBHOOK_QUEUE: queue,
+        LINE_CHANNEL_ACCESS_TOKEN: "test-token",
+        LINE_CHANNEL_SECRET: CHANNEL_SECRET,
+      },
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ status: "ok", queued: false });
+    expect(replyMessage).toHaveBeenCalledWith({
+      replyToken: "reply-image",
+      messages: [{ type: "text", text: UNSUPPORTED_MESSAGE_REPLY_TEXT }],
+    });
+    expect(send).not.toHaveBeenCalled();
+  });
+
   it("1対1のテキストでは60秒のローディングを開始してからQueueへ投入する", async () => {
     const apiClient = line.client.create("test-token");
     const showLoadingAnimation = vi.spyOn(apiClient, "showLoadingAnimation").mockResolvedValue({});

@@ -79,7 +79,7 @@ flowchart TD
 
 | コンポーネント | 行うこと | 行わないこと |
 | --- | --- | --- |
-| API Worker | LINE署名検証、event ID付与、決定的なcommand routing、待機表示、Queue投入 | 日記本文の意味解釈、Session更新、AI呼び出し |
+| API Worker | LINE署名検証、対応入力の選別、event ID付与、決定的なcommand routing、待機表示、Queue投入 | 日記本文の意味解釈、Session更新、AI呼び出し |
 | ingest Worker | 冪等な原本保存、Account解決、Coordinator通知 | 会話順序の独自判断、AI生成 |
 | Coordinator | Account内の順序、連投集約、Session、Turn lease、外部I/Oのoutboxと締切 | 原本やBrain Itemの正本保持 |
 | generate Worker | Context構築、安全判定、prompt実行、出力検証 | Account IDや権限をモデルへ決めさせること |
@@ -434,15 +434,16 @@ AccountData、Queue、LINEを呼び出した後は、Turn ID、generation epoch�
 ### 5.1 受付から原本保存
 
 1. API Workerがraw bodyでLINE署名を検証する
-2. 決定的な完全一致command routingを行い、1対1トークのテキストではLINEの待機表示を開始する
-3. 日記eventをreply token付きでWebhook Queueへ投入し、channel event IDを冪等キーにする
-4. ingest WorkerがAccountを再解決する。client由来のAccount IDは受け付けない
-5. 認証で解決したAccount IDからAccountData Objectを選び、Source Record IDをchannel event IDから決定的に作ってSource RecordとpayloadをSQLite transactionで`INSERT ... ON CONFLICT DO NOTHING`する
-6. 新規保存か既存eventかにかかわらず、AccountのCoordinatorへSource Record ID、event ID、受付時刻を通知する
-7. Coordinatorはevent IDを一意キーとして既存のaccepted messageへSource Record IDを結び、AccountData反映outboxをローカルSQLite transactionへ保存する。再通知なら既存状態を返す
-8. CoordinatorがAccountDataへRPCし、Session選択、採番、conversation message追加をevent IDで冪等なSQLite transactionとして実行する
-9. AccountData反映後、Coordinatorがaccepted messageを`attached`へ進める。失敗時はoutboxとalarmから再試行する
-10. Source RecordのAccountData保存とCoordinatorのローカル永続化が成功した後にWebhook Queueをackする
+2. 非テキストのmessage eventには現在読み込めない旨を定型文でreplyし、そのeventをWebhook Queueへ投入せず、原本保存とAI入力の対象から外す
+3. 残ったeventへ決定的な完全一致command routingを行い、1対1トークのテキストではLINEの待機表示を開始する
+4. 日記eventをreply token付きでWebhook Queueへ投入し、channel event IDを冪等キーにする
+5. ingest WorkerがAccountを再解決する。client由来のAccount IDは受け付けない
+6. 認証で解決したAccount IDからAccountData Objectを選び、Source Record IDをchannel event IDから決定的に作ってSource RecordとpayloadをSQLite transactionで`INSERT ... ON CONFLICT DO NOTHING`する
+7. 新規保存か既存eventかにかかわらず、AccountのCoordinatorへSource Record ID、event ID、受付時刻を通知する
+8. Coordinatorはevent IDを一意キーとして既存のaccepted messageへSource Record IDを結び、AccountData反映outboxをローカルSQLite transactionへ保存する。再通知なら既存状態を返す
+9. CoordinatorがAccountDataへRPCし、Session選択、採番、conversation message追加をevent IDで冪等なSQLite transactionとして実行する
+10. AccountData反映後、Coordinatorがaccepted messageを`attached`へ進める。失敗時はoutboxとalarmから再試行する
+11. Source RecordのAccountData保存とCoordinatorのローカル永続化が成功した後にWebhook Queueをackする
 
 既存Source Recordの検出だけを理由に処理を打ち切りません。AccountData保存後かつCoordinator通知前の失敗ではQueue再配送が必ず同じRPCを再実行し、Coordinator通知後かつAccountData会話反映前の失敗ではDOのoutboxが処理を再開します。これにより、原本だけ存在して会話へ入らない中間状態を終端状態にしません。
 

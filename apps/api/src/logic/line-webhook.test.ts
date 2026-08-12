@@ -1,7 +1,7 @@
 import { createHmac } from "node:crypto";
 import { type Queue, type WebhookQueueMessage, logger } from "@me-builder/shared";
 import { describe, expect, it, vi } from "vitest";
-import { receiveLineWebhook } from "./line-webhook";
+import { UNSUPPORTED_MESSAGE_REPLY_TEXT, receiveLineWebhook } from "./line-webhook";
 
 const CHANNEL_SECRET = "test-channel-secret";
 
@@ -23,6 +23,7 @@ function receive(
   options: {
     startChatLoading?: (chatId: string) => Promise<unknown>;
     waitUntil?: (promise: Promise<unknown>) => void;
+    replyUnsupportedMessage?: (replyToken: string, text: string) => Promise<unknown>;
     sendError?: Error;
   } = {},
 ) {
@@ -45,6 +46,7 @@ function receive(
       environment: "test",
       startChatLoading: options.startChatLoading,
       waitUntil: options.waitUntil ?? ((promise) => void promise),
+      replyUnsupportedMessage: options.replyUnsupportedMessage,
     }),
   };
 }
@@ -110,6 +112,74 @@ describe("receiveLineWebhook chat loading", () => {
 
     await expect(result).resolves.toMatchObject({ type: "accepted", queued: true });
     expect(startChatLoading).toHaveBeenCalledOnce();
+    expect(waitUntil).toHaveBeenCalledOnce();
+    expect(send).toHaveBeenCalledOnce();
+  });
+});
+
+describe("receiveLineWebhook unsupported messages", () => {
+  it.each(["image", "video", "audio", "file", "location", "sticker"])(
+    "%sメッセージへ案内を返信し、Queueへ投入しない",
+    async (messageType) => {
+      const replyUnsupportedMessage = vi.fn().mockResolvedValue({});
+      const event = {
+        ...textEvent(""),
+        replyToken: `reply-${messageType}`,
+        message: { type: messageType, id: `${messageType}-id` },
+      };
+      const { send, result } = receive([event], { replyUnsupportedMessage });
+
+      await expect(result).resolves.toMatchObject({ type: "accepted", queued: false });
+      expect(replyUnsupportedMessage).toHaveBeenCalledWith(
+        `reply-${messageType}`,
+        UNSUPPORTED_MESSAGE_REPLY_TEXT,
+      );
+      expect(send).not.toHaveBeenCalled();
+    },
+  );
+
+  it("テキストと非テキストが混在すると、非テキストだけを除いてQueueへ投入する", async () => {
+    const replyUnsupportedMessage = vi.fn().mockResolvedValue({});
+    const imageEvent = {
+      ...textEvent(""),
+      replyToken: "reply-image",
+      message: { type: "image", id: "image-id" },
+    };
+    const text = textEvent("今日は散歩した");
+    const { send, result } = receive([imageEvent, text], { replyUnsupportedMessage });
+
+    await expect(result).resolves.toMatchObject({ type: "accepted", queued: true });
+    expect(replyUnsupportedMessage).toHaveBeenCalledOnce();
+    const queued = send.mock.calls[0]?.[0] as WebhookQueueMessage;
+    expect((queued.payload as { events: unknown[] }).events).toEqual([text]);
+  });
+
+  it("案内の返信に失敗しても非テキストをQueueへ投入しない", async () => {
+    const replyUnsupportedMessage = vi.fn().mockRejectedValue(new Error("LINE unavailable"));
+    const imageEvent = {
+      ...textEvent(""),
+      message: { type: "image", id: "image-id" },
+    };
+    const { send, result } = receive([imageEvent], { replyUnsupportedMessage });
+
+    await expect(result).resolves.toMatchObject({ type: "accepted", queued: false });
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("案内の返信完了を待たず、混在するテキストをQueueへ投入する", async () => {
+    const replyUnsupportedMessage = vi.fn(() => new Promise<unknown>(() => {}));
+    const waitUntil = vi.fn();
+    const imageEvent = {
+      ...textEvent(""),
+      replyToken: "reply-image",
+      message: { type: "image", id: "image-id" },
+    };
+    const { send, result } = receive([imageEvent, textEvent("今日は散歩した")], {
+      replyUnsupportedMessage,
+      waitUntil,
+    });
+
+    await expect(result).resolves.toMatchObject({ type: "accepted", queued: true });
     expect(waitUntil).toHaveBeenCalledOnce();
     expect(send).toHaveBeenCalledOnce();
   });

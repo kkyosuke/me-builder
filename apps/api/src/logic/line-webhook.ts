@@ -31,7 +31,12 @@ export type ReceiveLineWebhookParams = {
   startChatLoading?: ((chatId: string) => Promise<unknown>) | undefined;
   /** チャットローディングの完了をWebhook応答後まで待機させる */
   waitUntil?: ((promise: Promise<unknown>) => void) | undefined;
+  /** 現在扱えない非テキストmessageへ定型文を返信する */
+  replyUnsupportedMessage?: ((replyToken: string, text: string) => Promise<unknown>) | undefined;
 };
+
+export const UNSUPPORTED_MESSAGE_REPLY_TEXT =
+  "ごめんね、テキスト以外のメッセージは今は読み込めないよ。テキストで送ってね。";
 
 export type LineWebhookOutcome =
   /** 受理して Queue へ投入した（ローカル開発で Queue 未設定なら `queued: false`） */
@@ -84,6 +89,47 @@ function routeLineTextEvents(payload: unknown): NonNullable<WebhookQueueMessage[
   };
 }
 
+function excludeUnsupportedMessageEvents(payload: unknown): {
+  payload: unknown;
+  replyTokens: string[];
+  excludedCount: number;
+  hasRemainingEvents: boolean;
+} {
+  if (!payload || typeof payload !== "object") {
+    return { payload, replyTokens: [], excludedCount: 0, hasRemainingEvents: true };
+  }
+  const events = (payload as Record<string, unknown>).events;
+  if (!Array.isArray(events)) {
+    return { payload, replyTokens: [], excludedCount: 0, hasRemainingEvents: true };
+  }
+
+  const replyTokens: string[] = [];
+  const remainingEvents = events.filter((webhookEvent) => {
+    if (!webhookEvent || typeof webhookEvent !== "object") return true;
+    const event = webhookEvent as Record<string, unknown>;
+    const message = event.message;
+    if (
+      event.type !== "message" ||
+      !message ||
+      typeof message !== "object" ||
+      (message as Record<string, unknown>).type === "text"
+    ) {
+      return true;
+    }
+    if (typeof event.replyToken === "string" && event.replyToken.length > 0) {
+      replyTokens.push(event.replyToken);
+    }
+    return false;
+  });
+
+  return {
+    payload: { ...(payload as Record<string, unknown>), events: remainingEvents },
+    replyTokens,
+    excludedCount: events.length - remainingEvents.length,
+    hasRemainingEvents: remainingEvents.length > 0,
+  };
+}
+
 export async function receiveLineWebhook({
   rawBody,
   signature,
@@ -92,6 +138,7 @@ export async function receiveLineWebhook({
   environment,
   startChatLoading,
   waitUntil,
+  replyUnsupportedMessage,
 }: ReceiveLineWebhookParams): Promise<LineWebhookOutcome> {
   // 未設定の場合は環境を問わず検証をスキップせず拒否する
   if (!channelSecret) {
@@ -121,6 +168,27 @@ export async function receiveLineWebhook({
     );
   }
 
+  const filtered = excludeUnsupportedMessageEvents(payload);
+  if (filtered.excludedCount > 0) {
+    const unsupportedReplies = Promise.all(
+      filtered.replyTokens.map(async (replyToken) => {
+        if (!replyUnsupportedMessage) return;
+        try {
+          await replyUnsupportedMessage(replyToken, UNSUPPORTED_MESSAGE_REPLY_TEXT);
+        } catch (error) {
+          // replyTokenやSDK responseはログへ含めない。返信失敗でも非テキストは後段へ渡さない。
+          logger.warn(
+            { errorName: error instanceof Error ? error.name : "UnknownError" },
+            "[LINE webhook] could not reply to an unsupported message; the message remains excluded",
+          );
+        }
+      }),
+    );
+    // LINE返信の遅延で、同じWebhookに含まれるテキストのQueue投入をブロックしない。
+    // controllerがExecutionContextへ登録し、ローカル実行でも開始済みPromiseとして継続する。
+    waitUntil?.(unsupportedReplies);
+  }
+
   const traceId = crypto.randomUUID();
   const event: WebhookQueueMessage = {
     id: traceId,
@@ -129,11 +197,28 @@ export async function receiveLineWebhook({
     receivedAt: new Date().toISOString(),
     // replyTokenは日記のfinalをpushではなくreplyで返すために残す。
     // D1へは保存せず、logへも出さず、Coordinatorが払い出した時点で破棄する。
-    payload,
-    routing: routeLineTextEvents(payload),
+    payload: filtered.payload,
+    routing: routeLineTextEvents(filtered.payload),
   };
 
-  const messages = line.webhook.extractMessages(payload);
+  const messages = line.webhook.extractMessages(filtered.payload);
+
+  if (filtered.excludedCount > 0 && !filtered.hasRemainingEvents) {
+    logger.info(
+      {
+        event: "line.webhook.accepted",
+        service: "api",
+        traceId,
+        component: "line-webhook",
+        outcome: "succeeded",
+        disposition: "ignored-unsupported-message",
+        source: event.source,
+        excludedCount: filtered.excludedCount,
+      },
+      "[LINE webhook] succeeded at input.filter -> ignored-unsupported-message",
+    );
+    return { type: "accepted", id: event.id, queued: false };
+  }
 
   // previewは開発用機能を利用できる環境だが、実際にLINE Webhookを受信するデプロイ環境なので
   // Queue未設定をローカル開発用の縮退へ倒さない。
@@ -164,7 +249,7 @@ export async function receiveLineWebhook({
     throw error;
   }
 
-  const chatIds = extractOneToOneTextChatIds(payload);
+  const chatIds = extractOneToOneTextChatIds(filtered.payload);
 
   if (startChatLoading && waitUntil) {
     waitUntil(
