@@ -41,6 +41,7 @@ function previewData({
         }
       : null,
     themes,
+    hasAnswerableDiagnosis: true,
     nextAction: !hasProfile
       ? ("profile-summary" as const)
       : themes.length === 0
@@ -117,6 +118,10 @@ describe("getCompatibilityInvitationContents", () => {
 
   it("表示名を確認できない受信者には承諾させない", async () => {
     const deps = dependencies({
+      createSession: vi.fn().mockResolvedValue({
+        type: "resolved",
+        session: { accountId: "account-recipient", role: "user" },
+      }),
       loadSharePreviewData: vi.fn().mockResolvedValue(previewData({ displayName: null })),
     });
 

@@ -63,16 +63,17 @@ export function buildCompatibilitySharePreviewThemes(
 }
 
 /**
- * 双方が現在共有できる表示から、比較に使う共通テーマだけを安定した順序で選ぶ。
+ * 双方が現在共有できる表示から、比較に使う共通テーマだけを選ぶ。
  * 採点できないパラメータだけのDiagnosisは表示側で除外されるため、
  * 比較対象は回答の有無ではなく実際に表示できるテーマで判定する。
+ * 双方へ同じ相性シートを見せるため、順序は`primary`側だけで決める。
  */
 export function selectCommonCompatibilityDiagnoses(
-  viewer: readonly { diagnosisId: string }[],
-  partner: readonly { diagnosisId: string }[],
+  primary: readonly { diagnosisId: string }[],
+  secondary: readonly { diagnosisId: string }[],
 ): string[] {
-  const partnerIds = new Set(partner.map(({ diagnosisId }) => diagnosisId));
-  return viewer
-    .filter(({ diagnosisId }) => partnerIds.has(diagnosisId))
+  const secondaryIds = new Set(secondary.map(({ diagnosisId }) => diagnosisId));
+  return primary
+    .filter(({ diagnosisId }) => secondaryIds.has(diagnosisId))
     .map(({ diagnosisId }) => diagnosisId);
 }

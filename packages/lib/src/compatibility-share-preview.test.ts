@@ -81,7 +81,7 @@ describe("buildCompatibilitySharePreviewThemes", () => {
     ]);
   });
 
-  it("双方が現在共有できるDiagnosisの共通部分だけを、閲覧者側の順序で選ぶ", () => {
+  it("双方が現在共有できるDiagnosisの共通部分だけを、primary側の順序で選ぶ", () => {
     const diagnosis = (diagnosisId: string) => ({
       diagnosisId,
       title: diagnosisId,

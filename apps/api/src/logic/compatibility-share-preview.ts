@@ -48,6 +48,8 @@ export type CompatibilitySharePreviewData = Readonly<{
   displayName: string | null;
   aboutMe: CompatibilityShareAboutMe | null;
   themes: readonly CompatibilitySharePreviewTheme[];
+  /** 本人がいま回答できる未完了Diagnosisがあるか。案内の出し分けだけに使う。 */
+  hasAnswerableDiagnosis: boolean;
   /** 共有できる内容がまだない本人へ案内する次の操作。共有開始は妨げない。 */
   nextAction: "diagnosis" | "profile-summary" | null;
 }>;
@@ -143,6 +145,7 @@ export async function loadCompatibilitySharePreviewData(
         }
       : null,
     themes,
+    hasAnswerableDiagnosis,
     nextAction: !shareProfile
       ? "profile-summary"
       : themes.length === 0 && hasAnswerableDiagnosis

@@ -48,10 +48,12 @@ function theme(diagnosisId: string) {
 function shareData({
   displayName,
   hasProfile = true,
+  hasAnswerableDiagnosis = true,
   themes,
 }: {
   displayName: string;
   hasProfile?: boolean;
+  hasAnswerableDiagnosis?: boolean;
   themes: ReturnType<typeof theme>[];
 }) {
   return {
@@ -64,6 +66,7 @@ function shareData({
         }
       : null,
     themes,
+    hasAnswerableDiagnosis,
     nextAction: hasProfile ? null : ("profile-summary" as const),
   };
 }
@@ -100,7 +103,7 @@ describe("getCompatibilityRelationshipContents", () => {
     });
   });
 
-  it("片方で表示できないテーマは比較に使わず、診断への案内付きで準備待ちにする", async () => {
+  it("片方で表示できないテーマは比較に使わず、回答できる診断が残っていれば案内する", async () => {
     // 回答済みでも採点できないDiagnosisは共有表示から落ちるため、themesの共通部分で判定する。
     mocks.loadSharePreviewData
       .mockResolvedValueOnce(shareData({ displayName: "あおい", themes: [theme("shared")] }))
@@ -109,6 +112,23 @@ describe("getCompatibilityRelationshipContents", () => {
     await expect(getCompatibilityRelationshipContents(params)).resolves.toEqual({
       type: "resolved",
       relationship: { relationshipId, status: "waiting", nextAction: "diagnosis" },
+    });
+  });
+
+  it("閲覧者が回答し終えている場合は、共通テーマがなくても診断へ案内しない", async () => {
+    mocks.loadSharePreviewData
+      .mockResolvedValueOnce(
+        shareData({
+          displayName: "あおい",
+          hasAnswerableDiagnosis: false,
+          themes: [theme("only-mine")],
+        }),
+      )
+      .mockResolvedValueOnce(shareData({ displayName: "はる", themes: [] }));
+
+    await expect(getCompatibilityRelationshipContents(params)).resolves.toEqual({
+      type: "resolved",
+      relationship: { relationshipId, status: "waiting", nextAction: null },
     });
   });
 

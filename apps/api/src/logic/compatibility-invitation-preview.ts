@@ -5,10 +5,7 @@ import {
   type D1,
   compatibilityDataFor,
 } from "@me-builder/lib";
-import {
-  type CompatibilitySharePreviewData,
-  loadCompatibilitySharePreviewData,
-} from "./compatibility-share-preview";
+import { loadCompatibilitySharePreviewData } from "./compatibility-share-preview";
 import { createLiffSession } from "./liff-session";
 
 const RELATIONSHIP_ID_PATTERN = /^[a-f0-9]{64}$/;
@@ -53,12 +50,14 @@ type Dependencies = Readonly<{
   loadSharePreviewData: typeof loadCompatibilitySharePreviewData;
 }>;
 
-export type CompatibilityInvitationAcceptanceDataOutcome =
+/** 承諾に必要なのは、pending招待の当事者と相手へ固定する表示名だけ。 */
+export type CompatibilityInvitationRecipientOutcome =
   | {
       type: "resolved";
-      invitation: CompatibilityInvitationContents;
       inviteeAccountId: string;
-      recipientData: CompatibilitySharePreviewData;
+      inviteeDisplayName: string | null;
+      inviterDisplayName: string;
+      expiresAt: Date;
     }
   | Exclude<CompatibilityInvitationPreviewOutcome, { type: "resolved" }>;
 
@@ -69,19 +68,11 @@ const defaultDependencies: Dependencies = {
   loadSharePreviewData: loadCompatibilitySharePreviewData,
 };
 
-/** pending招待と受信者の現在状態から、保存を伴わない承諾前の確認表示を組み立てる。 */
-export async function loadCompatibilityInvitationAcceptanceData(
-  {
-    relationshipId,
-    idToken,
-    lineLoginChannelId,
-    db,
-    accountData,
-    compatibilityData,
-    at = new Date(),
-  }: Params,
+/** 本人確認とpending招待の判定だけを行い、AccountDataを読まない。 */
+export async function resolveCompatibilityInvitationRecipient(
+  { relationshipId, idToken, lineLoginChannelId, db, compatibilityData }: Params,
   dependencies: Dependencies = defaultDependencies,
-): Promise<CompatibilityInvitationAcceptanceDataOutcome> {
+): Promise<CompatibilityInvitationRecipientOutcome> {
   const session = await dependencies.createSession({ idToken, lineLoginChannelId, db });
   if (session.type !== "resolved") return session;
   if (!RELATIONSHIP_ID_PATTERN.test(relationshipId)) return { type: "unavailable" };
@@ -94,27 +85,12 @@ export async function loadCompatibilityInvitationAcceptanceData(
   if (!preview) return { type: "unavailable" };
   if (preview.isOwnInvitation) return { type: "own-invitation" };
 
-  const recipientData = await dependencies.loadSharePreviewData({
-    accountId: session.session.accountId,
-    verifiedDisplayName: session.session.displayName,
-    accountData,
-    at,
-  });
-  const blockingReasons: CompatibilityInvitationBlockingReason[] =
-    recipientData.displayName === null ? ["display_name_unavailable"] : [];
-
   return {
     type: "resolved",
-    invitation: {
-      inviter: { displayName: preview.inviterDisplayName, avatarUrl: null },
-      recipient: { displayName: recipientData.displayName, avatarUrl: null },
-      expiresAt: preview.expiresAt.toISOString(),
-      canAccept: blockingReasons.length === 0,
-      blockingReasons,
-      nextAction: recipientData.nextAction,
-    },
     inviteeAccountId: session.session.accountId,
-    recipientData,
+    inviteeDisplayName: session.session.displayName?.trim() || null,
+    inviterDisplayName: preview.inviterDisplayName,
+    expiresAt: preview.expiresAt,
   };
 }
 
@@ -123,17 +99,34 @@ export async function getCompatibilityInvitationContents(
   params: Params,
   dependencies: Dependencies = defaultDependencies,
 ): Promise<CompatibilityInvitationPreviewOutcome> {
-  const outcome = await loadCompatibilityInvitationAcceptanceData(params, dependencies);
-  if (outcome.type !== "resolved") return outcome;
+  const recipient = await resolveCompatibilityInvitationRecipient(params, dependencies);
+  if (recipient.type !== "resolved") return recipient;
+
+  // 案内（nextAction）のためだけに本人の共有内容を読む。承諾可否には影響しない。
+  const recipientData = await dependencies.loadSharePreviewData({
+    accountId: recipient.inviteeAccountId,
+    verifiedDisplayName: recipient.inviteeDisplayName ?? undefined,
+    accountData: params.accountData,
+    at: params.at ?? new Date(),
+  });
+  const blockingReasons: CompatibilityInvitationBlockingReason[] =
+    recipient.inviteeDisplayName === null ? ["display_name_unavailable"] : [];
+
   return {
     type: "resolved",
     invitation: {
-      ...outcome.invitation,
       inviter: {
-        ...outcome.invitation.inviter,
+        displayName: recipient.inviterDisplayName,
         avatarUrl: `/api/compatibility/invitations/${encodeURIComponent(params.relationshipId)}/avatar`,
       },
-      recipient: { ...outcome.invitation.recipient, avatarUrl: "/api/profile/avatar" },
+      recipient: {
+        displayName: recipient.inviteeDisplayName,
+        avatarUrl: "/api/profile/avatar",
+      },
+      expiresAt: recipient.expiresAt.toISOString(),
+      canAccept: blockingReasons.length === 0,
+      blockingReasons,
+      nextAction: recipientData.nextAction,
     },
   };
 }

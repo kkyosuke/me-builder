@@ -358,6 +358,18 @@ describe("Profile Summary persistence", () => {
       }),
     ).resolves.toBe(true);
 
+    // 旧実装が保存した空のprojectionが残っていても、同じく読み飛ばす。
+    const latestVersionId = (await readProfileSummary(db, accountId)).versions[0]?.id;
+    if (!latestVersionId) throw new Error("latest version was not stored");
+    await db.insert(schema.profileSummaryShareProjections).values({
+      profileSummaryVersionId: latestVersionId,
+      schemaVersion: 1,
+      generatedAt: new Date("2026-08-10T00:02:00.000Z"),
+      statements: [],
+      evidenceReferences: [],
+      fingerprint: "f".repeat(64),
+    });
+
     // 最新版は増えるが、共有は前版の文章を使い続けるため相手の相性シートが止まらない。
     const summary = await readProfileSummary(db, accountId);
     expect(summary.versions[0]).toMatchObject({

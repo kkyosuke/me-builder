@@ -4,7 +4,7 @@ import {
   type D1,
   acceptCompatibilityInvitationWithReferences,
 } from "@me-builder/lib";
-import { loadCompatibilityInvitationAcceptanceData } from "./compatibility-invitation-preview";
+import { resolveCompatibilityInvitationRecipient } from "./compatibility-invitation-preview";
 
 type Params = Readonly<{
   relationshipId: string;
@@ -26,22 +26,24 @@ export type AcceptCompatibilityInvitationOutcome =
   | { type: "unauthenticated"; reason: string }
   | { type: "account-not-found" };
 
-/** 受信者の共有同意を、正本と双方の一覧参照へ一体で反映する。 */
+/**
+ * 受信者の共有同意を、正本と双方の一覧参照へ一体で反映する。
+ * 共有対象は成立後に自動で最新化されるため、固定するのは表示名だけ。
+ */
 export async function acceptCompatibilityInvitation(
   params: Params,
 ): Promise<AcceptCompatibilityInvitationOutcome> {
-  const prepared = await loadCompatibilityInvitationAcceptanceData(params);
-  if (prepared.type !== "resolved") return prepared;
-  const { invitation, recipientData } = prepared;
-  if (!invitation.canAccept || !recipientData.displayName) return { type: "share-unavailable" };
+  const recipient = await resolveCompatibilityInvitationRecipient(params);
+  if (recipient.type !== "resolved") return recipient;
+  if (!recipient.inviteeDisplayName) return { type: "share-unavailable" };
 
   const result = await acceptCompatibilityInvitationWithReferences(
     params.accountData,
     params.compatibilityData,
     params.relationshipId,
     {
-      inviteeAccountId: prepared.inviteeAccountId,
-      inviteeDisplayName: recipientData.displayName,
+      inviteeAccountId: recipient.inviteeAccountId,
+      inviteeDisplayName: recipient.inviteeDisplayName,
     },
   );
 

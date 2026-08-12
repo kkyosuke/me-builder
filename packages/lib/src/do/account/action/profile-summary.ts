@@ -9,6 +9,7 @@ import {
   lte,
   max,
   notInArray,
+  sql,
 } from "drizzle-orm";
 import type {
   CompatibilityShareProfileReadResult,
@@ -250,13 +251,14 @@ export async function readCompatibilityShareProfile(
       profileSummaryVersions,
       eq(profileSummaryShareProjections.profileSummaryVersionId, profileSummaryVersions.id),
     )
+    // 共有できる文章が残らなかった版のprojectionは共有対象にせず、
+    // 旧実装が保存した空のprojectionも同じ扱いで読み飛ばす。
+    .where(sql`json_array_length(${profileSummaryShareProjections.statements}) > 0`)
     .orderBy(desc(profileSummaryVersions.sequence))
     .limit(1)
     .get();
   if (!projection) return { type: "unavailable" };
-  if (projection.statements.length === 0 || projection.evidenceReferences.length === 0) {
-    return { type: "stale" };
-  }
+  if (projection.evidenceReferences.length === 0) return { type: "stale" };
 
   const evidenceReferences = [...new Set(projection.evidenceReferences)];
   const brainIds: string[] = [];
