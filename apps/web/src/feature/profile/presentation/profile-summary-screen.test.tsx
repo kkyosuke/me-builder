@@ -115,7 +115,7 @@ describe("ProfileSummaryScreen", () => {
     expect(screen.queryByText(/件を参照/)).toBeNull();
   });
 
-  it("診断テーマの全パラメータと回答結果への根拠導線を表示する", () => {
+  it("診断結果を小さなリンクカードで表示する", () => {
     render(
       <ProfileSummaryScreen
         state={{
@@ -155,6 +155,14 @@ describe("ProfileSummaryScreen", () => {
                   ],
                 },
               },
+              {
+                id: "communication",
+                title: "会話のしかた",
+                lastAnsweredAt: "2026-08-11T02:00:00.000Z",
+                answeredCount: 1,
+                questionCount: 1,
+                scoring: null,
+              },
             ],
           },
         }}
@@ -162,14 +170,16 @@ describe("ProfileSummaryScreen", () => {
       />,
     );
 
-    expect(screen.getByRole("heading", { name: "テーマごとの傾向" })).toBeTruthy();
-    expect(screen.getByRole("meter", { name: "計画性の傾向" }).getAttribute("aria-valuenow")).toBe(
-      "75",
-    );
-    expect(screen.getByText("回答が増えると表示できます")).toBeTruthy();
-    expect(screen.getByRole("link", { name: "回答結果を見る" }).getAttribute("href")).toBe(
-      "/diagnosis/work%2Fvalue/answers?from=me",
-    );
+    expect(screen.getByRole("heading", { name: "診断結果" })).toBeTruthy();
+    expect(screen.queryByRole("meter")).toBeNull();
+    expect(screen.getByText("2項目の結果")).toBeTruthy();
+    expect(screen.getByText("回答内容を確認")).toBeTruthy();
+    expect(
+      screen.getByRole("link", { name: "仕事の進め方の回答結果を見る" }).getAttribute("href"),
+    ).toBe("/diagnosis/work%2Fvalue/answers?from=me");
+    expect(
+      screen.getByRole("link", { name: "会話のしかたの回答結果を見る" }).getAttribute("href"),
+    ).toBe("/diagnosis/communication/answers?from=me");
   });
 
   it("未回答の診断がなければ毎日の会話を促す", () => {
