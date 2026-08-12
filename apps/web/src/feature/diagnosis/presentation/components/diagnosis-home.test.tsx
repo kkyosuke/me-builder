@@ -38,7 +38,7 @@ describe("DiagnosisHome", () => {
     );
 
     expect(screen.getByRole("status", { name: "診断一覧を読み込み中" })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "診断" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "わたしの診断" })).toBeTruthy();
   });
 
   it("主ナビゲーションで診断を現在位置として表示する", () => {
@@ -53,8 +53,8 @@ describe("DiagnosisHome", () => {
       />,
     );
 
-    expect(screen.getByText("私をさがす")).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "診断" })).toBeTruthy();
+    expect(screen.getByText("私をひもとく")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "わたしの診断" })).toBeTruthy();
     expect(screen.queryByText("me-builder")).toBeNull();
     expect(screen.getByRole("link", { name: "診断" }).getAttribute("aria-current")).toBe("page");
     expect(screen.getByRole("link", { name: "わたし" }).getAttribute("href")).toBe("/me");

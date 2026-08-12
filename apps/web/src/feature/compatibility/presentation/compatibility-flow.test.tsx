@@ -28,7 +28,7 @@ describe("Compatibility flow", () => {
   it("一覧で結果あり・診断待ち・返事待ちを区別する", () => {
     render(<CompatibilityListScreen data={compatibilityListData} />);
 
-    expect(screen.getByRole("heading", { name: "相性診断" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "ふたりの見取り図" })).toBeTruthy();
     expect(screen.getByText("結果あり")).toBeTruthy();
     expect(screen.getByText("診断待ち")).toBeTruthy();
     expect(screen.getByText("返事待ち")).toBeTruthy();

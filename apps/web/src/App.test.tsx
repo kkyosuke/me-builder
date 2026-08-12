@@ -847,7 +847,7 @@ describe("App", () => {
 
     render(<App />);
 
-    expect(await screen.findByRole("heading", { name: "相性診断" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "ふたりの見取り図" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "相性" }).getAttribute("aria-current")).toBe("page");
     expect(mocks.fetchDiagnosisList).not.toHaveBeenCalled();
   });
