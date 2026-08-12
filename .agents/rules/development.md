@@ -9,7 +9,7 @@
 - **パッケージ構成**:
   - `apps/web`: React UI (Vite + TypeScript)
   - `apps/api`: Bun.serve + Hono API Server
-  - `apps/mcp`: Cloudflare / Bun 上で動作する MCP Server スケルトン
+  - `apps/mcp`: Phase 2向けの MCP Server スケルトン（初期リリースではユーザー向け機能を提供しない）
   - `apps/worker`: Cloudflare Queues メッセージを消費する Worker
   - `packages/shared`: 共有型定義・ユーティリティ
   - `packages/lib`: LINE連携等の共通ドメイン・ヘルパーライブラリ
@@ -25,11 +25,12 @@
     - `task typecheck`: 全パッケージの TypeScript 型チェック
     - `task lint`: Biome によるコード Lint / フォーマット検証
     - `task lint:fix`: Biome によるコード Lint / フォーマットの自動修復
+    - `task audit`: `bun audit` による既知脆弱性の検査
     - `task test`: Vitest による全テスト実行
     - `bun run test:unit`: E2Eを除外したテスト実行（`test:pre-push`は同じもののpre-push向けの別名）
     - `bun run test:e2e`: E2EとWorker runtime E2Eだけのテスト実行
     - `task generate:api`: APIのOpenAPI documentとWeb UI用TypeScript型を再生成
-    - `task ci`: 生成物差分, lint, 未使用export, Markdown lint, typecheck, test（E2Eを含む全体）, build の一括ローカル実行。`cd-production.yml`が本番デプロイ前に実行するものと同じで、リンク切れ確認は含みません（相対リンクは`ci.yml`、外部URLは`scheduled-checks.yml`が担当）
+    - `task ci`: 依存関係監査, 生成物差分, lint, 未使用export, Markdown lint, typecheck, test（E2Eを含む全体）, build の一括ローカル実行。`cd-production.yml`が本番デプロイ前に実行するものと同じで、リンク切れ確認は含みません（相対リンクは`ci.yml`、外部URLは`scheduled-checks.yml`が担当）
     - `task db:migrate:local` (または `task db:migrate`): D1 データベースマイグレーションのローカル適用
     - `task db:migrate:preview`: プレビュー環境への D1 データベースマイグレーション適用
     - `task db:migrate:production`: 本番環境への D1 データベースマイグレーション適用
@@ -49,7 +50,7 @@
     - `task deploy:production`: D1 マイグレーション適用および全アプリの本番環境へのデプロイ (`wrangler deploy --env production`, `wrangler pages deploy`)
   - **CI/CD ワークフロー構造 (`.github/workflows/*.yml`)**:
     - CI は単一の `ci.yml` (job 名 `Verify`) にまとめています。パッケージごとに job を分けると、1 回の push で 6〜7 個の job がそれぞれ checkout と `bun install` を払い直し、GitHub Actions の課金が job ごとに分単位へ切り上げられるため、実際の検証時間の 2 倍近くを消費します。**検証内容を増やすためにパッケージ単位のワークフローを復活させないでください。**
-    - `ci.yml` は PR (`pull_request`) と手動実行 (`workflow_dispatch`) だけで動きます。`main` への push では CI ワークフローを走らせません。マージ後の検証は `cd-production.yml` の `bun run ci` が担い、同じ検証を二重に課金しません。
+    - `ci.yml` は PR (`pull_request`) と手動実行 (`workflow_dispatch`) だけで動きます。`main` への push では CI ワークフローを走らせません。コード変更時は`bun audit`を実行し、既知脆弱性が1件でも検出された場合は失敗します。マージ後の検証は `cd-production.yml` の `bun run ci` が担い、同じ監査を含む検証を二重に課金しません。
     - `ci.yml` はルートの `bun run test:unit` を実行します。1 プロセスの `vitest run` で `apps/web` を含む全パッケージのテストを流します。パッケージごとに `vitest` を起動し直すより速く済みます。
     - **E2E は `ci.yml` では実行しません。** E2E (7 ファイル) だけで通常のテスト全体 (106 ファイル) に匹敵する時間がかかるため、`e2e` ラベルが付いた PR で `ci-e2e.yml` が実行します。ラベルが無ければ job ごと skip され、GitHub Actions の課金対象になりません。`main` へマージする直前は `cd-production.yml` の `bun run ci` が E2E を含めて実行するため、E2E を通さずに本番へ出ることはありません。
     - テストの区分は npm script で表します。`test` が全体、`test:unit` が E2E を除いた分、`test:e2e` が E2E と Worker runtime E2E です。`test:unit` と `test:e2e` は重複も漏れもなく `test` を二分します。**E2E は `e2e/` ディレクトリ配下に置くか `*.e2e.test.*` という名前にしてください**（`test:e2e` はパスに `e2e` を含むかで選別します）。
@@ -71,6 +72,7 @@
     - キャッシュは 2 種類あります。依存キャッシュ (`~/.bun/install/cache`) はルートの `bun.lock` のハッシュをキーにします (`**/bun.lock` はツリー全体を走査するため使いません)。型チェックの incremental 情報 (`**/*.tsbuildinfo`) は復元だけを全ワークフローで行い、保存は `main` の `cd-production.yml` だけが行います。PR ごとに保存するとリポジトリのキャッシュ上限 (10GB) を圧迫し、依存キャッシュが追い出されるためです。
     - `tsconfig.json` の `incremental` は、この tsbuildinfo キャッシュを効かせるために有効化しています。無効化するとキャッシュが無意味になります。
   - パッケージの追加・削除はルートから `bun add <package> --cwd <workspace-dir>`（例: `bun add @line/liff --cwd apps/web`）を使用し、個別ディレクトリで `npm install` を実行しないこと。ルートで引数なしに `bun add <package>` を実行するとルートの `package.json` に入ってしまうため、対象ワークスペースを必ず指定します。
+  - 上流パッケージが脆弱な推移依存を固定している場合は、ルート`package.json`の`overrides`で修正版を固定します。削除・緩和する前に`bun audit`が0件であることと`task ci`が通ることを確認してください。
   - pre-pushではブランチ名、型、E2E以外のテストを検証します。ローカルD1などを使うE2Eはpushの必須条件にせず、`task test`と`task ci`、GitHub Actionsでは`e2e`ラベル付きPRの`ci-e2e.yml`と`cd-production.yml`が実行します。
   - `postinstall`の`lefthook install`はGitHub Actions上でもhookを設置するため、ワークフロー内でcommit / pushするstepには`LEFTHOOK: "0"`を設定してhookを無効化します。hookはローカル開発者向けの検証であり、ワークフロー側は`bun run ci`などで同じ検証を明示的に実行します。
   - ワークフローが`GITHUB_TOKEN`で作成したPRは`pull_request`イベントを発火せず、`ci.yml`が起動しません。自動PRをテスト結果で条件付きにマージする場合は、GitHubのauto-mergeやrequired status checksに頼らず、PRを作った同じjobで検証を実行してからマージします。

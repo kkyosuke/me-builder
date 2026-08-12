@@ -56,13 +56,18 @@ tasks:
     cmds:
       - bun run lint:fix
 
+  audit:
+    desc: 'Audit installed dependencies for known vulnerabilities'
+    cmds:
+      - bun run audit
+
   test:
     desc: 'Run tests using Vitest'
     cmds:
       - bun run test
 
   ci:
-    desc: 'Run full CI checks locally (generated files, lint, typecheck, test, build)'
+    desc: 'Run full CI checks locally (dependency audit, generated files, lint, typecheck, test, build)'
     cmds:
       - bun run ci
 
