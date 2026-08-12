@@ -14,7 +14,7 @@ import type {
   CompatibilitySharePreview,
   CompatibilitySharePreviewBlockingReason,
 } from "../model/compatibility-share-preview";
-import { CompatibilityPrivacyNotice } from "./components/compatibility-disclosure";
+import { CompatibilityPrivacyDisclosure } from "./components/compatibility-disclosure";
 import {
   CompatibilityAboutMePreview,
   CompatibilityThemesPreview,
@@ -105,11 +105,6 @@ function SharePreviewContent({
         themes={preview.themes}
       />
 
-      <CompatibilityPrivacyNotice
-        title="共有されない詳細"
-        footer="相手が内容を確認して承諾するまで、共有は始まりません。共有は後から終了できます。"
-      />
-
       {preview.blockingReasons.length > 0 && (
         <section className="mt-8 rounded-2xl border border-amber-300/60 bg-amber-50 p-4 dark:border-amber-500/30 dark:bg-amber-950/30">
           <h2 className="flex items-center gap-2 font-bold text-amber-950 dark:text-amber-100">
@@ -190,28 +185,36 @@ function SharePreviewContent({
               </button>
             </div>
           )}
-          <button
-            type="button"
-            disabled={!preview.canIssueInvitation || invitationState.status === "loading"}
-            onClick={() => onIssue(preview.previewToken)}
-            className="mt-8 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-rose-500 px-5 py-3 font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 dark:disabled:bg-slate-800 dark:disabled:text-slate-400"
-          >
-            {invitationState.status === "loading" ? (
-              <LoaderCircle
-                className="size-5 animate-spin motion-reduce:animate-none"
-                aria-hidden="true"
-              />
-            ) : (
-              <Send className="size-5" aria-hidden="true" />
-            )}
-            {invitationState.status === "loading"
-              ? "招待リンクを発行中"
-              : preview.canIssueInvitation
-                ? "招待リンクを発行する"
-                : "招待リンクを発行できません"}
-          </button>
         </>
       )}
+
+      <footer className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 shadow-[0_-8px_30px_rgba(15,23,42,0.12)] backdrop-blur dark:border-slate-700 dark:bg-slate-900/95">
+        <div className="mx-auto w-full max-w-2xl px-4 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-8">
+          <CompatibilityPrivacyDisclosure footer="相手が内容を確認して承諾するまで、共有は始まりません。共有は後から終了できます。" />
+          {invitationState.status !== "success" && (
+            <button
+              type="button"
+              disabled={!preview.canIssueInvitation || invitationState.status === "loading"}
+              onClick={() => onIssue(preview.previewToken)}
+              className="mt-2 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-rose-500 px-5 py-3 font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 dark:disabled:bg-slate-800 dark:disabled:text-slate-400"
+            >
+              {invitationState.status === "loading" ? (
+                <LoaderCircle
+                  className="size-5 animate-spin motion-reduce:animate-none"
+                  aria-hidden="true"
+                />
+              ) : (
+                <Send className="size-5" aria-hidden="true" />
+              )}
+              {invitationState.status === "loading"
+                ? "招待リンクを発行中"
+                : preview.canIssueInvitation
+                  ? "招待リンクを発行する"
+                  : "招待リンクを発行できません"}
+            </button>
+          )}
+        </div>
+      </footer>
     </>
   );
 }
@@ -234,7 +237,9 @@ export function CompatibilityShareScreen({
   state: AsyncState<CompatibilitySharePreview>;
 }) {
   return (
-    <main className="mx-auto min-h-dvh w-full max-w-2xl px-4 py-6 pb-12 sm:px-8">
+    <main
+      className={`mx-auto min-h-dvh w-full max-w-2xl px-4 pt-6 sm:px-8 ${invitationState.status === "success" ? "pb-24" : "pb-44"}`}
+    >
       <CompatibilityBackHeader />
       {(state.status === "idle" || state.status === "loading") && <SharePreviewSkeleton />}
       {state.status === "error" && (

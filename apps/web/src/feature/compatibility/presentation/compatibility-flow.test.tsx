@@ -141,9 +141,14 @@ describe("Compatibility flow", () => {
     expect(screen.getByText("「早めに決めたい」傾向があります")).toBeTruthy();
     expect(screen.queryByText("「「早めに決めたい」傾向があります」")).toBeNull();
     expect(screen.queryByRole("checkbox")).toBeNull();
-    expect(screen.getByText(/日記やLINEの会話本文/)).toBeTruthy();
+    const disclosure = screen.getByText("共有されない詳細").closest("details");
+    expect(disclosure?.hasAttribute("open")).toBe(false);
     const issueButton = screen.getByRole("button", { name: "招待リンクを発行する" });
+    expect(issueButton.closest("footer")?.classList.contains("fixed")).toBe(true);
     expect(issueButton.hasAttribute("disabled")).toBe(false);
+    fireEvent.click(screen.getByText("共有されない詳細"));
+    expect(disclosure?.hasAttribute("open")).toBe(true);
+    expect(screen.getByText(/日記やLINEの会話本文/)).toBeTruthy();
     fireEvent.click(issueButton);
     expect(onIssue).toHaveBeenCalledWith(preview.previewToken);
   });

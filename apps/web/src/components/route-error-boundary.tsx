@@ -11,6 +11,37 @@ interface RouteErrorBoundaryState {
   failed: boolean;
 }
 
+const CHUNK_RELOAD_QUERY = "app-reload";
+const appVersion = typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : "development";
+const chunkLoadFailurePattern =
+  /chunkloaderror|chunk load failed|loading chunk .+ failed|failed to fetch dynamically imported module|importing a module script failed|error loading dynamically imported module/i;
+
+type ChunkReloadDependencies = Readonly<{
+  appVersion: string;
+  currentUrl: string;
+  replace: (url: string) => void;
+  storage: Pick<Storage, "getItem" | "setItem">;
+}>;
+
+/** 古いSPAが削除済みlazy chunkを要求した場合だけ、同じリリースにつき1回再取得する。 */
+export function recoverFromChunkLoadFailure(
+  error: Error,
+  { appVersion, currentUrl, replace, storage }: ChunkReloadDependencies,
+): boolean {
+  if (!chunkLoadFailurePattern.test(`${error.name} ${error.message}`)) return false;
+  const recoveryKey = `route-chunk-reload:${appVersion}`;
+  try {
+    if (storage.getItem(recoveryKey)) return false;
+    storage.setItem(recoveryKey, "attempted");
+    const reloadUrl = new URL(currentUrl);
+    reloadUrl.searchParams.set(CHUNK_RELOAD_QUERY, appVersion);
+    replace(reloadUrl.toString());
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** 遅延読み込みの失敗を白画面にせず、アプリ全体の再取得へ案内する。 */
 export class RouteErrorBoundary extends Component<
   RouteErrorBoundaryProps,
@@ -24,6 +55,12 @@ export class RouteErrorBoundary extends Component<
 
   componentDidCatch(error: Error, info: ErrorInfo): void {
     logger.error({ err: error, componentStack: info.componentStack }, "画面の描画に失敗しました");
+    recoverFromChunkLoadFailure(error, {
+      appVersion,
+      currentUrl: window.location.href,
+      replace: (url) => window.location.replace(url),
+      storage: window.sessionStorage,
+    });
   }
 
   private reload = (): void => {
