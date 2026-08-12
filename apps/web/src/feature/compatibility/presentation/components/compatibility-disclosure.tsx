@@ -44,7 +44,7 @@ export function CompatibilityPrivacyNotice({
 /** 固定フッター向けに、共有されない情報を初期状態で折りたたんで表示する。 */
 export function CompatibilityPrivacyDisclosure({ footer }: { footer: ReactNode }) {
   return (
-    <details className="group rounded-xl bg-emerald-50 dark:bg-emerald-950/40">
+    <details className="group rounded-xl border border-emerald-300/60 bg-emerald-50 shadow-sm dark:border-emerald-700/60 dark:bg-emerald-950/40">
       <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 px-3 text-sm font-bold text-emerald-950 [&::-webkit-details-marker]:hidden dark:text-emerald-100">
         <ShieldCheck className="size-4 shrink-0" aria-hidden="true" />
         <span className="flex-1">共有されない詳細</span>

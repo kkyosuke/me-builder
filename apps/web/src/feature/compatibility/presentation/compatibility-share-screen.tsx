@@ -123,7 +123,7 @@ function ShareConsentContent({
       )}
 
       {invitationState.status === "success" ? (
-        <section className="mt-8 rounded-3xl border border-emerald-300 bg-emerald-50 p-5 dark:border-emerald-700 dark:bg-emerald-950/30">
+        <section className="mt-8 mb-8 rounded-3xl border border-emerald-300 bg-emerald-50 p-5 dark:border-emerald-700 dark:bg-emerald-950/30">
           <h2 className="flex items-center gap-2 font-bold text-emerald-950 dark:text-emerald-100">
             <CheckCircle2 className="size-5" aria-hidden="true" />
             招待リンクを発行しました
@@ -158,10 +158,10 @@ function ShareConsentContent({
       )}
 
       <footer className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 shadow-[0_-8px_30px_rgba(15,23,42,0.12)] backdrop-blur dark:border-slate-700 dark:bg-slate-900/95">
-        <div className="mx-auto w-full max-w-2xl px-4 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-8">
+        <div className="mx-auto w-full max-w-2xl space-y-3 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-8">
           <CompatibilityPrivacyDisclosure footer="相手が承諾するまで、共有は始まりません。共有は後から終了できます。" />
           {invitationState.status === "success" ? (
-            <div className="mt-2 grid h-12 grid-cols-2 gap-2">
+            <div className="grid h-12 grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => onShareToLine(invitationState.data.invitationUrl)}
@@ -184,7 +184,7 @@ function ShareConsentContent({
               type="button"
               disabled={!consent.canShare || invitationState.status === "loading"}
               onClick={onIssue}
-              className="mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-rose-500 px-5 font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 dark:disabled:bg-slate-800 dark:disabled:text-slate-400"
+              className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-rose-500 px-5 font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 dark:disabled:bg-slate-800 dark:disabled:text-slate-400"
             >
               {invitationState.status === "loading" ? (
                 <LoaderCircle
