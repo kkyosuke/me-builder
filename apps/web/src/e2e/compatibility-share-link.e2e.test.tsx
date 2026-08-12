@@ -115,7 +115,7 @@ describe("LIFF compatibility share link journey", () => {
     render(<CompatibilityApplication />);
 
     fireEvent.click(await screen.findByRole("button", { name: "招待リンクを発行する" }));
-    fireEvent.click(await screen.findByRole("button", { name: "LINEで送る" }));
+    fireEvent.click(await screen.findByRole("button", { name: "友だちに送る" }));
     expect(mocks.shareCompatibilityInvitationToLine).toHaveBeenCalledWith("あおい", invitationUrl);
 
     await act(async () => {

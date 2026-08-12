@@ -147,6 +147,7 @@ describe("Compatibility flow", () => {
     expect(disclosure?.hasAttribute("open")).toBe(false);
     const issueButton = screen.getByRole("button", { name: "招待リンクを発行する" });
     expect(issueButton.closest("footer")?.classList.contains("fixed")).toBe(true);
+    expect(issueButton.classList.contains("h-12")).toBe(true);
     expect(issueButton.hasAttribute("disabled")).toBe(false);
     fireEvent.click(screen.getByText("共有されない詳細"));
     expect(disclosure?.hasAttribute("open")).toBe(true);
@@ -155,7 +156,7 @@ describe("Compatibility flow", () => {
     expect(onIssue).toHaveBeenCalledWith(preview.previewToken);
   });
 
-  it("発行後にLINE共有とリンクコピーを選べる", () => {
+  it("発行後に固定フッターから友だちへの送信とコピーを選べる", () => {
     const invitationUrl = `https://example.com/compatibility/invitations/${"1".repeat(64)}`;
     const onShareToLine = vi.fn();
     const onCopyLink = vi.fn();
@@ -184,8 +185,15 @@ describe("Compatibility flow", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "LINEで送る" }));
-    fireEvent.click(screen.getByRole("button", { name: "リンクをコピー" }));
+    const sendButton = screen.getByRole("button", { name: "友だちに送る" });
+    const copyButton = screen.getByRole("button", { name: "コピー" });
+    const footer = sendButton.closest("footer");
+    expect(footer?.classList.contains("fixed")).toBe(true);
+    expect(copyButton.closest("footer")).toBe(footer);
+    expect(sendButton.parentElement?.classList.contains("grid-cols-2")).toBe(true);
+    expect(sendButton.parentElement?.classList.contains("h-12")).toBe(true);
+    fireEvent.click(sendButton);
+    fireEvent.click(copyButton);
     expect(onShareToLine).toHaveBeenCalledWith(invitationUrl);
     expect(onCopyLink).toHaveBeenCalledWith(invitationUrl);
   });
