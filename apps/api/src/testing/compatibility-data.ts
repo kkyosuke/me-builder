@@ -3,6 +3,7 @@ import {
   type CompatibilityRelationship,
   createCompatibilityInvitationAcceptanceContext,
   createCompatibilityInvitationPreview,
+  decideCompatibilityInvitationAcceptance,
   decideCompatibilityInvitationCancellation,
   decideCompatibilityInvitationCreation,
   decideCompatibilityRelationshipEnd,
@@ -46,8 +47,15 @@ export function createCompatibilityDataTestStore(): CompatibilityDataTestStore {
             new Date(),
           );
         },
-        async acceptInvitation() {
-          throw new Error("Unsupported CompatibilityData test operation: acceptInvitation");
+        async acceptInvitation(relationshipId, input) {
+          if (relationshipId !== name) throw new Error("CompatibilityData test routing mismatch");
+          const result = decideCompatibilityInvitationAcceptance(
+            relationships.get(name) ?? null,
+            input,
+            new Date(),
+          );
+          if (result.outcome === "accepted") relationships.set(name, result.relationship);
+          return result;
         },
         async cancelInvitation(relationshipId, actorAccountId) {
           if (relationshipId !== name) throw new Error("CompatibilityData test routing mismatch");

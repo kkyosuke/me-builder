@@ -124,6 +124,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/compatibility/invitations/{relationshipId}/accept": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** 確認済みの共有内容で相性招待を承諾する */
+    post: operations["acceptCompatibilityInvitation"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/compatibility/invitations": {
     parameters: {
       query?: never;
@@ -1179,6 +1196,118 @@ export interface operations {
                 /** @constant */
                 error: "Not Found";
               };
+        };
+      };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
+          };
+        };
+      };
+      /** @description D1 bindingが設定されていない */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Service Unavailable";
+          };
+        };
+      };
+    };
+  };
+  acceptCompatibilityInvitation: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        relationshipId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          previewToken: string;
+        };
+      };
+    };
+    responses: {
+      /** @description 成立した相性関係 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            relationshipId: string;
+            /** @constant */
+            status: "accepted";
+          };
+        };
+      };
+      /** @description リクエストJSONが不正 */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Invalid request";
+          };
+        };
+      };
+      /** @description LIFF IDトークンを検証できない */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Unauthorized";
+          };
+        };
+      };
+      /** @description 招待または対応するAccountを利用できない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @enum {string} */
+            error: "Compatibility invitation unavailable" | "Account not found";
+            /** @enum {string} */
+            reason: "invitation_unavailable" | "friendship_required";
+          };
+        };
+      };
+      /** @description 招待を現在承諾できない */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Compatibility invitation unavailable";
+            /** @enum {string} */
+            reason:
+              | "own_invitation"
+              | "preview_changed"
+              | "share_unavailable"
+              | "duplicate_relationship";
+          };
         };
       };
       /** @description 未処理のサーバーエラー */

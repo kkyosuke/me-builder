@@ -37,6 +37,155 @@ const actions = {
     await db.insert(table).values(reference);
     return reference;
   },
+  "compatibility.reserveIncomingReference": async (
+    db: DO.account.Database,
+    accountId: string,
+    input: Readonly<{ relationshipId: string; partnerAccountId: string; createdAt: Date }>,
+  ) => {
+    const table = DO.account.schema.compatibilityReferences;
+    const existing = await db
+      .select()
+      .from(table)
+      .where(eq(table.relationshipId, input.relationshipId))
+      .get();
+    if (existing) {
+      const matches =
+        existing.accountId === accountId &&
+        existing.role === "invitee" &&
+        existing.partnerAccountId === input.partnerAccountId &&
+        (existing.status === "reserved" || existing.status === "active");
+      return { outcome: matches ? "unchanged" : "conflict", reference: existing } as const;
+    }
+    const reference = {
+      relationshipId: input.relationshipId,
+      accountId,
+      role: "invitee" as const,
+      partnerAccountId: input.partnerAccountId,
+      status: "reserved" as const,
+      createdAt: input.createdAt,
+      updatedAt: input.createdAt,
+    };
+    await db.insert(table).values(reference);
+    return { outcome: "reserved", reference } as const;
+  },
+  "compatibility.reserveOutgoingReference": async (
+    db: DO.account.Database,
+    accountId: string,
+    input: Readonly<{ relationshipId: string; partnerAccountId: string; updatedAt: Date }>,
+  ) => {
+    const table = DO.account.schema.compatibilityReferences;
+    const existing = await db
+      .select()
+      .from(table)
+      .where(eq(table.relationshipId, input.relationshipId))
+      .get();
+    if (!existing || existing.accountId !== accountId || existing.role !== "inviter") {
+      if (!existing) throw new Error("Outgoing compatibility reference is missing");
+      return { outcome: "conflict", reference: existing } as const;
+    }
+    if (
+      existing.partnerAccountId === input.partnerAccountId &&
+      (existing.status === "reserved" || existing.status === "active")
+    ) {
+      return { outcome: "unchanged", reference: existing } as const;
+    }
+    if (existing.status !== "pending" || existing.partnerAccountId !== null) {
+      return { outcome: "conflict", reference: existing } as const;
+    }
+    const reference = {
+      ...existing,
+      partnerAccountId: input.partnerAccountId,
+      status: "reserved" as const,
+      updatedAt: input.updatedAt,
+    };
+    await db.update(table).set(reference).where(eq(table.relationshipId, input.relationshipId));
+    return { outcome: "reserved", reference } as const;
+  },
+  "compatibility.releaseReservation": async (
+    db: DO.account.Database,
+    _accountId: string,
+    relationshipId: string,
+    releasedAt: Date,
+  ) => {
+    const table = DO.account.schema.compatibilityReferences;
+    const existing = await db
+      .select()
+      .from(table)
+      .where(eq(table.relationshipId, relationshipId))
+      .get();
+    if (!existing || existing.status !== "reserved") {
+      return { outcome: "unchanged", reference: existing ?? null } as const;
+    }
+    if (existing.role === "invitee") {
+      await db.delete(table).where(eq(table.relationshipId, relationshipId));
+      return { outcome: "released", reference: null } as const;
+    }
+    const reference = {
+      ...existing,
+      partnerAccountId: null,
+      status: "pending" as const,
+      updatedAt: releasedAt,
+    };
+    await db.update(table).set(reference).where(eq(table.relationshipId, relationshipId));
+    return { outcome: "released", reference } as const;
+  },
+  "compatibility.activateReference": async (
+    db: DO.account.Database,
+    accountId: string,
+    input: Readonly<{
+      relationshipId: string;
+      partnerAccountId: string;
+      role: "inviter" | "invitee";
+      updatedAt: Date;
+    }>,
+  ) => {
+    const table = DO.account.schema.compatibilityReferences;
+    const existing = await db
+      .select()
+      .from(table)
+      .where(eq(table.relationshipId, input.relationshipId))
+      .get();
+    if (
+      !existing ||
+      existing.accountId !== accountId ||
+      existing.partnerAccountId !== input.partnerAccountId ||
+      existing.role !== input.role ||
+      (existing.status !== "reserved" && existing.status !== "active")
+    ) {
+      if (!existing) throw new Error("Reserved compatibility reference is missing");
+      return { outcome: "conflict", reference: existing } as const;
+    }
+    if (existing.status === "active") return { outcome: "unchanged", reference: existing } as const;
+    const reference = { ...existing, status: "active" as const, updatedAt: input.updatedAt };
+    await db.update(table).set(reference).where(eq(table.relationshipId, input.relationshipId));
+    return { outcome: "activated", reference } as const;
+  },
+  "compatibility.endReference": async (
+    db: DO.account.Database,
+    _accountId: string,
+    relationshipId: string,
+    endedAt: Date,
+  ) => {
+    const table = DO.account.schema.compatibilityReferences;
+    const existing = await db
+      .select()
+      .from(table)
+      .where(eq(table.relationshipId, relationshipId))
+      .get();
+    if (!existing) return null;
+    const reference = { ...existing, status: "ended" as const, updatedAt: endedAt };
+    await db.update(table).set(reference).where(eq(table.relationshipId, relationshipId));
+    return reference;
+  },
+  "compatibility.listVisibleReferences": async (db: DO.account.Database, accountId: string) => {
+    const table = DO.account.schema.compatibilityReferences;
+    const references = await db.select().from(table);
+    return references.filter(
+      (reference) =>
+        reference.accountId === accountId &&
+        (reference.status === "pending" || reference.status === "active"),
+    );
+  },
   "brain.listFailedVectorSyncJobs": (db: DO.account.Database, _accountId: string) =>
     DO.account.action.brain.listFailedBrainVectorSyncJobs(db),
   "brain.resetFailedVectorSyncJob": (

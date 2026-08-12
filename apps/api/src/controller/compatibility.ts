@@ -10,6 +10,12 @@ import {
   IssueCompatibilityInvitationResponseSchema,
 } from "../contract/compatibility/invitation";
 import {
+  AcceptCompatibilityInvitationRequestSchema,
+  AcceptCompatibilityInvitationResponseSchema,
+  CompatibilityInvitationAcceptanceConflictSchema,
+  InvalidCompatibilityInvitationAcceptanceSchema,
+} from "../contract/compatibility/invitation-accept";
+import {
   CompatibilityInvitationPreviewResponseSchema,
   CompatibilityInvitationUnavailableSchema,
   OwnCompatibilityInvitationSchema,
@@ -21,6 +27,7 @@ import {
   UnauthorizedErrorSchema,
 } from "../contract/shared/errors";
 import { issueCompatibilityInvitation } from "../logic/compatibility-invitation";
+import { acceptCompatibilityInvitation } from "../logic/compatibility-invitation-acceptance";
 import { getCompatibilityInvitationContents } from "../logic/compatibility-invitation-preview";
 import { getCompatibilitySharePreview } from "../logic/compatibility-share-preview";
 import { operationalHttpPath } from "../operational-http-path";
@@ -159,6 +166,85 @@ export async function getCompatibilityInvitation(c: Context<AppEnv>): Promise<Re
         v.parse(OwnCompatibilityInvitationSchema, {
           error: "Compatibility invitation unavailable",
           reason: "own_invitation",
+        }),
+        409,
+      );
+    case "account-not-found":
+      return c.json(
+        v.parse(AccountNotFoundErrorSchema, {
+          error: "Account not found",
+          reason: "friendship_required",
+        }),
+        404,
+      );
+    case "not-configured":
+    case "unauthenticated":
+      return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
+  }
+}
+
+/** `POST /api/compatibility/invitations/:relationshipId/accept` — 確認済み招待を承諾する。 */
+export async function postCompatibilityInvitationAcceptance(c: Context<AppEnv>): Promise<Response> {
+  c.header("Cache-Control", "no-store");
+  if (!c.env?.DB || !c.env.ACCOUNT_DATA || !c.env.COMPATIBILITY_DATA) {
+    logger.error(
+      { path: operationalHttpPath(c.req.path) },
+      "Compatibility invitation binding is not configured",
+    );
+    return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
+  }
+
+  let input: unknown;
+  try {
+    input = await c.req.json();
+  } catch {
+    return c.json(
+      v.parse(InvalidCompatibilityInvitationAcceptanceSchema, { error: "Invalid request" }),
+      400,
+    );
+  }
+  const parsed = v.safeParse(AcceptCompatibilityInvitationRequestSchema, input);
+  if (!parsed.success) {
+    return c.json(
+      v.parse(InvalidCompatibilityInvitationAcceptanceSchema, { error: "Invalid request" }),
+      400,
+    );
+  }
+
+  const outcome = await acceptCompatibilityInvitation({
+    relationshipId: c.req.param("relationshipId") ?? "",
+    previewToken: parsed.output.previewToken,
+    idToken: bearerToken(c.req.header("authorization")),
+    lineLoginChannelId: getConfig(c.env).lineLoginChannelId,
+    db: D1.shared.client.create(c.env.DB),
+    accountData: c.env.ACCOUNT_DATA,
+    compatibilityData: c.env.COMPATIBILITY_DATA,
+  });
+
+  switch (outcome.type) {
+    case "accepted":
+      return c.json(
+        v.parse(AcceptCompatibilityInvitationResponseSchema, {
+          relationshipId: outcome.relationshipId,
+          status: "accepted",
+        }),
+      );
+    case "unavailable":
+      return c.json(
+        v.parse(CompatibilityInvitationUnavailableSchema, {
+          error: "Compatibility invitation unavailable",
+          reason: "invitation_unavailable",
+        }),
+        404,
+      );
+    case "own-invitation":
+    case "preview-changed":
+    case "share-unavailable":
+    case "duplicate-relationship":
+      return c.json(
+        v.parse(CompatibilityInvitationAcceptanceConflictSchema, {
+          error: "Compatibility invitation unavailable",
+          reason: outcome.type.replaceAll("-", "_"),
         }),
         409,
       );

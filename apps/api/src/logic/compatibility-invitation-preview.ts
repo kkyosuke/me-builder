@@ -41,7 +41,7 @@ type CompatibilityInvitationContents = Readonly<{
   nextAction: "diagnosis" | "profile-summary" | null;
 }>;
 
-type CompatibilityInvitationPreviewOutcome =
+export type CompatibilityInvitationPreviewOutcome =
   | { type: "resolved"; invitation: CompatibilityInvitationContents }
   | { type: "unavailable" }
   | { type: "own-invitation" }
@@ -74,6 +74,17 @@ type Dependencies = Readonly<{
   createThemeFingerprints: typeof createCompatibilityShareThemeFingerprints;
 }>;
 
+export type CompatibilityInvitationAcceptanceDataOutcome =
+  | {
+      type: "resolved";
+      invitation: CompatibilityInvitationContents;
+      inviteeAccountId: string;
+      context: CompatibilityInvitationAcceptanceContext;
+      recipientData: CompatibilitySharePreviewData;
+      recipientDiagnoses: CompatibilitySharePreviewData["shareableDiagnoses"];
+    }
+  | Exclude<CompatibilityInvitationPreviewOutcome, { type: "resolved" }>;
+
 const defaultDependencies: Dependencies = {
   createSession: createLiffSession,
   getInvitationPreview: (namespace, relationshipId, viewerAccountId) =>
@@ -104,7 +115,7 @@ function matchesOfferedSnapshot(
 }
 
 /** pending招待と双方の現在状態から、保存を伴わない受信者向け確認表示を組み立てる。 */
-export async function getCompatibilityInvitationContents(
+export async function loadCompatibilityInvitationAcceptanceData(
   {
     relationshipId,
     idToken,
@@ -115,7 +126,7 @@ export async function getCompatibilityInvitationContents(
     at = new Date(),
   }: Params,
   dependencies: Dependencies = defaultDependencies,
-): Promise<CompatibilityInvitationPreviewOutcome> {
+): Promise<CompatibilityInvitationAcceptanceDataOutcome> {
   const session = await dependencies.createSession({ idToken, lineLoginChannelId, db });
   if (session.type !== "resolved") return session;
   if (!RELATIONSHIP_ID_PATTERN.test(relationshipId)) return { type: "unavailable" };
@@ -203,5 +214,21 @@ export async function getCompatibilityInvitationContents(
             ? "diagnosis"
             : recipientData.preview.nextAction,
     },
+    inviteeAccountId: session.session.accountId,
+    context,
+    recipientData,
+    recipientDiagnoses: recipientData.shareableDiagnoses.filter(({ diagnosisId }) =>
+      offeredDiagnosisIds.has(diagnosisId),
+    ),
   };
+}
+
+/** pending招待から、HTTPへ公開してよい確認表示だけを返す。 */
+export async function getCompatibilityInvitationContents(
+  params: Params,
+  dependencies: Dependencies = defaultDependencies,
+): Promise<CompatibilityInvitationPreviewOutcome> {
+  const outcome = await loadCompatibilityInvitationAcceptanceData(params, dependencies);
+  if (outcome.type !== "resolved") return outcome;
+  return { type: "resolved", invitation: outcome.invitation };
 }

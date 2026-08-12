@@ -1702,6 +1702,177 @@
         ]
       }
     },
+    "/api/compatibility/invitations/{relationshipId}/accept": {
+      "post": {
+        "operationId": "acceptCompatibilityInvitation",
+        "tags": ["Compatibility"],
+        "summary": "確認済みの共有内容で相性招待を承諾する",
+        "security": [
+          {
+            "liffIdToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成立した相性関係",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "relationshipId": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    },
+                    "status": {
+                      "const": "accepted"
+                    }
+                  },
+                  "required": ["relationshipId", "status"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "リクエストJSONが不正",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Invalid request"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "LIFF IDトークンを検証できない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Unauthorized"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "招待または対応するAccountを利用できない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "enum": ["Compatibility invitation unavailable", "Account not found"],
+                      "type": "string"
+                    },
+                    "reason": {
+                      "enum": ["invitation_unavailable", "friendship_required"],
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "招待を現在承諾できない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Compatibility invitation unavailable"
+                    },
+                    "reason": {
+                      "enum": [
+                        "own_invitation",
+                        "preview_changed",
+                        "share_unavailable",
+                        "duplicate_relationship"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "未処理のサーバーエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Internal Server Error"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "D1 bindingが設定されていない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Service Unavailable"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "previewToken": {
+                    "type": "string",
+                    "pattern": "^csp2\\.[a-f0-9]{64}$"
+                  }
+                },
+                "required": ["previewToken"]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "relationshipId",
+            "required": true
+          }
+        ]
+      }
+    },
     "/api/compatibility/invitations": {
       "post": {
         "operationId": "issueCompatibilityInvitation",

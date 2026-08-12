@@ -21,6 +21,10 @@ import {
   issueCompatibilityInvitationRoute,
   issueCompatibilityInvitationValidator,
 } from "./contract/compatibility/invitation";
+import {
+  acceptCompatibilityInvitationRoute,
+  acceptCompatibilityInvitationValidator,
+} from "./contract/compatibility/invitation-accept";
 import { compatibilityInvitationPreviewRoute } from "./contract/compatibility/invitation-preview";
 import { compatibilitySharePreviewRoute } from "./contract/compatibility/share-preview";
 import { saveDiagnosisAnswerRoute } from "./contract/diagnosis/answer";
@@ -49,6 +53,7 @@ import {
   getCompatibilityInvitation,
   getCompatibilitySharePreviewContents,
   postCompatibilityInvitation,
+  postCompatibilityInvitationAcceptance,
 } from "./controller/compatibility";
 import {
   deleteDevelopmentDiagnosisData,
@@ -156,6 +161,12 @@ app.get(
   "/api/dev/brain-items/:brainItemId/vector",
   developmentBrainVectorRoute,
   getDevelopmentBrainVector,
+);
+app.post(
+  "/api/compatibility/invitations/:relationshipId/accept",
+  acceptCompatibilityInvitationRoute,
+  acceptCompatibilityInvitationValidator,
+  postCompatibilityInvitationAcceptance,
 );
 app.post(
   "/api/compatibility/invitations",

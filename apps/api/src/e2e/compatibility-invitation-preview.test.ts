@@ -382,6 +382,54 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
   );
 
   it(
+    `${compatibilitySharePreviewCases.acceptInvitation.id}: ${compatibilitySharePreviewCases.acceptInvitation.name}`,
+    async () => {
+      await Promise.all([completeDiagnosis("inviter-token"), completeDiagnosis("recipient-token")]);
+      await Promise.all([
+        generateShareProfile("inviter", "私は、先の見通しを持って動けると安心します"),
+        generateShareProfile("recipient", "私は、予定に余白があると心地よく感じます"),
+      ]);
+      const relationshipId = await issueInvitationForInviter();
+      const previewResponse = await app.request(
+        `/api/compatibility/invitations/${relationshipId}`,
+        { headers: { Authorization: "Bearer recipient-token" } },
+        env(),
+      );
+      const preview = (await previewResponse.json()) as {
+        recipient: { previewToken: string };
+      };
+
+      const response = await app.request(
+        `/api/compatibility/invitations/${relationshipId}/accept`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: "Bearer recipient-token",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ previewToken: preview.recipient.previewToken }),
+        },
+        env(),
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get("Cache-Control")).toBe("no-store");
+      expect(await response.json()).toEqual({ relationshipId, status: "accepted" });
+      expect(compatibilityDataStore.relationships.get(relationshipId)?.status).toBe("accepted");
+      for (const role of ["inviter", "recipient"] as const) {
+        expect(
+          stores[role].raw
+            .prepare(
+              "SELECT relationship_id, status FROM compatibility_references WHERE relationship_id = ?",
+            )
+            .get(relationshipId),
+        ).toEqual({ relationship_id: relationshipId, status: "active" });
+      }
+    },
+    e2eTimeoutMs,
+  );
+
+  it(
     `${compatibilitySharePreviewCases.previewCancelledInvitation.id}: ${compatibilitySharePreviewCases.previewCancelledInvitation.name}`,
     async () => {
       await completeDiagnosis("inviter-token");
