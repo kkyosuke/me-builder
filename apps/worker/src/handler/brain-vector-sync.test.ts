@@ -1,5 +1,5 @@
 import type { AccountDataNamespace, D1 } from "@me-builder/lib";
-import type { BrainVectorSyncQueueMessage, Message } from "@me-builder/shared";
+import { type BrainVectorSyncQueueMessage, type Message, logger } from "@me-builder/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { type CloudflareBindings, getWorkerConfig } from "../config";
 
@@ -150,27 +150,73 @@ describe("Brain vector sync queue", () => {
     );
   });
 
-  it("Vectorize失敗を本文なしのfailure codeとして記録し、Queue再配送へ返す", async () => {
-    const execute = vi.fn().mockResolvedValueOnce({ action: "delete" }).mockResolvedValueOnce(true);
+  it("Vectorize失敗を本文なしで記録し、Queueをackしてoutbox再試行へ委ねる", async () => {
+    const nextAttemptAt = new Date("2026-08-10T00:01:00Z");
+    const execute = vi.fn().mockResolvedValueOnce({ action: "delete" }).mockResolvedValueOnce({
+      outcome: "retry-scheduled",
+      attemptCount: 1,
+      nextAttemptAt,
+    });
     const message = createMessage();
 
-    await expect(
-      processBrainVectorSyncMessage(
-        message,
-        createBindings(execute, {
-          deleteByIds: vi.fn(async () => {
-            throw new TypeError("provider response contained private payload");
-          }),
+    await processBrainVectorSyncMessage(
+      message,
+      createBindings(execute, {
+        deleteByIds: vi.fn(async () => {
+          throw new TypeError("provider response contained private payload");
         }),
-        config,
-      ),
-    ).rejects.toThrow(TypeError);
+      }),
+      config,
+    );
     expect(execute).toHaveBeenLastCalledWith(
       "account-1",
       "brain.failVectorSyncJob",
       "job-1",
-      "TypeError",
+      "BRAIN_VECTOR_SYNC_FAILED",
+      true,
     );
-    expect(message.ack).not.toHaveBeenCalled();
+    expect(message.ack).toHaveBeenCalledOnce();
+  });
+
+  it("非一時の設定不備を終端化し、構造化error logで検知可能にする", async () => {
+    const execute = vi
+      .fn()
+      .mockResolvedValueOnce({ action: "delete" })
+      .mockResolvedValueOnce({ outcome: "failed", attemptCount: 1 });
+    const message = createMessage();
+    const errorLog = vi.spyOn(logger, "error").mockImplementation(() => undefined);
+    const configWithoutSecret = getWorkerConfig({
+      ENVIRONMENT: "test",
+      GOOGLE_VERTEX_AI_API_KEY: "google-key",
+    });
+
+    await processBrainVectorSyncMessage(
+      message,
+      createBindings(execute, { deleteByIds: vi.fn() }),
+      configWithoutSecret,
+    );
+
+    expect(execute).toHaveBeenLastCalledWith(
+      "account-1",
+      "brain.failVectorSyncJob",
+      "job-1",
+      "BRAIN_VECTOR_HMAC_SECRET_NOT_CONFIGURED",
+      false,
+    );
+    expect(message.ack).toHaveBeenCalledOnce();
+    expect(errorLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "queue.message.failed",
+        component: "brain-vector-sync",
+        outcome: "failed",
+        disposition: "ack",
+        jobStatus: "failed",
+        retryable: false,
+        attempt: 1,
+        maxAttempts: 6,
+        terminalReason: "non-retryable",
+      }),
+      expect.stringContaining("BRAIN_VECTOR_HMAC_SECRET_NOT_CONFIGURED"),
+    );
   });
 });

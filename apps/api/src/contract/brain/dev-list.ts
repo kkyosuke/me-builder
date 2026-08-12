@@ -6,7 +6,14 @@ const NonEmptyStringSchema = v.pipe(v.string(), v.nonEmpty());
 const TimestampSchema = v.pipe(v.string(), v.isoTimestamp());
 
 const VectorSyncSchema = v.object({
-  status: v.picklist(["pending", "submitted", "applied", "failed", "not-scheduled"]),
+  status: v.picklist([
+    "pending",
+    "submitted",
+    "retry_scheduled",
+    "applied",
+    "failed",
+    "not-scheduled",
+  ]),
   operation: v.optional(v.picklist(["upsert", "delete"])),
   attemptCount: v.pipe(v.number(), v.safeInteger(), v.minValue(0)),
   updatedAt: v.optional(TimestampSchema),

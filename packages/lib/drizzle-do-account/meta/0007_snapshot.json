@@ -1,8 +1,8 @@
 {
-  "id": "308763a2-ac31-4558-a5e8-605543894383",
-  "prevId": "de09f38b-46b1-4b93-af16-105a082b0579",
   "version": "6",
   "dialect": "sqlite",
+  "id": "21a40417-50f0-4920-ae0d-01a110b5930d",
+  "prevId": "308763a2-ac31-4558-a5e8-605543894383",
   "tables": {
     "brain_item_access_labels": {
       "name": "brain_item_access_labels",
@@ -69,8 +69,8 @@
         "brain_item_access_label_active_idx": {
           "name": "brain_item_access_label_active_idx",
           "columns": ["brain_item_id", "label"],
-          "where": "is_deleted = 0",
-          "isUnique": true
+          "isUnique": true,
+          "where": "is_deleted = 0"
         },
         "brain_item_access_label_lookup_idx": {
           "name": "brain_item_access_label_lookup_idx",
@@ -82,11 +82,11 @@
         "brain_item_access_labels_brain_item_id_brain_items_id_fk": {
           "name": "brain_item_access_labels_brain_item_id_brain_items_id_fk",
           "tableFrom": "brain_item_access_labels",
-          "columnsFrom": ["brain_item_id"],
           "tableTo": "brain_items",
+          "columnsFrom": ["brain_item_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -191,20 +191,20 @@
         "brain_item_evidence_edges_brain_item_id_brain_items_id_fk": {
           "name": "brain_item_evidence_edges_brain_item_id_brain_items_id_fk",
           "tableFrom": "brain_item_evidence_edges",
-          "columnsFrom": ["brain_item_id"],
           "tableTo": "brain_items",
+          "columnsFrom": ["brain_item_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "brain_item_evidence_edges_source_record_id_source_records_id_fk": {
           "name": "brain_item_evidence_edges_source_record_id_source_records_id_fk",
           "tableFrom": "brain_item_evidence_edges",
-          "columnsFrom": ["source_record_id"],
           "tableTo": "source_records",
+          "columnsFrom": ["source_record_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -283,20 +283,20 @@
         "brain_item_revisions_previous_brain_item_id_brain_items_id_fk": {
           "name": "brain_item_revisions_previous_brain_item_id_brain_items_id_fk",
           "tableFrom": "brain_item_revisions",
-          "columnsFrom": ["previous_brain_item_id"],
           "tableTo": "brain_items",
+          "columnsFrom": ["previous_brain_item_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "brain_item_revisions_next_brain_item_id_brain_items_id_fk": {
           "name": "brain_item_revisions_next_brain_item_id_brain_items_id_fk",
           "tableFrom": "brain_item_revisions",
-          "columnsFrom": ["next_brain_item_id"],
           "tableTo": "brain_items",
+          "columnsFrom": ["next_brain_item_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -361,8 +361,8 @@
         "brain_item_topic_label_active_idx": {
           "name": "brain_item_topic_label_active_idx",
           "columns": ["brain_item_id", "label"],
-          "where": "is_deleted = 0",
-          "isUnique": true
+          "isUnique": true,
+          "where": "is_deleted = 0"
         },
         "brain_item_topic_label_lookup_idx": {
           "name": "brain_item_topic_label_lookup_idx",
@@ -374,11 +374,11 @@
         "brain_item_topic_labels_brain_item_id_brain_items_id_fk": {
           "name": "brain_item_topic_labels_brain_item_id_brain_items_id_fk",
           "tableFrom": "brain_item_topic_labels",
-          "columnsFrom": ["brain_item_id"],
           "tableTo": "brain_items",
+          "columnsFrom": ["brain_item_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -521,11 +521,11 @@
         "brain_items_account_id_account_data_identity_account_id_fk": {
           "name": "brain_items_account_id_account_data_identity_account_id_fk",
           "tableFrom": "brain_items",
-          "columnsFrom": ["account_id"],
           "tableTo": "account_data_identity",
+          "columnsFrom": ["account_id"],
           "columnsTo": ["account_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -769,8 +769,8 @@
         "compatibility_reference_active_partner_idx": {
           "name": "compatibility_reference_active_partner_idx",
           "columns": ["partner_account_id"],
-          "where": "\"compatibility_references\".\"status\" in ('reserved', 'active')",
-          "isUnique": true
+          "isUnique": true,
+          "where": "\"compatibility_references\".\"status\" in ('reserved', 'active')"
         },
         "compatibility_reference_status_updated_idx": {
           "name": "compatibility_reference_status_updated_idx",
@@ -782,11 +782,11 @@
         "compatibility_references_account_id_account_data_identity_account_id_fk": {
           "name": "compatibility_references_account_id_account_data_identity_account_id_fk",
           "tableFrom": "compatibility_references",
-          "columnsFrom": ["account_id"],
           "tableTo": "account_data_identity",
+          "columnsFrom": ["account_id"],
           "columnsTo": ["account_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -891,8 +891,8 @@
         "diagnosis_answer_current_idx": {
           "name": "diagnosis_answer_current_idx",
           "columns": ["diagnosis_response_id", "diagnosis_question_id"],
-          "where": "is_deleted = 0",
-          "isUnique": true
+          "isUnique": true,
+          "where": "is_deleted = 0"
         },
         "diagnosis_answer_source_record_idx": {
           "name": "diagnosis_answer_source_record_idx",
@@ -904,38 +904,38 @@
         "diagnosis_answers_diagnosis_response_id_diagnosis_responses_id_fk": {
           "name": "diagnosis_answers_diagnosis_response_id_diagnosis_responses_id_fk",
           "tableFrom": "diagnosis_answers",
-          "columnsFrom": ["diagnosis_response_id"],
           "tableTo": "diagnosis_responses",
+          "columnsFrom": ["diagnosis_response_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "diagnosis_answers_diagnosis_question_id_diagnosis_questions_id_fk": {
           "name": "diagnosis_answers_diagnosis_question_id_diagnosis_questions_id_fk",
           "tableFrom": "diagnosis_answers",
-          "columnsFrom": ["diagnosis_question_id"],
           "tableTo": "diagnosis_questions",
+          "columnsFrom": ["diagnosis_question_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "diagnosis_answers_source_record_id_source_records_id_fk": {
           "name": "diagnosis_answers_source_record_id_source_records_id_fk",
           "tableFrom": "diagnosis_answers",
-          "columnsFrom": ["source_record_id"],
           "tableTo": "source_records",
+          "columnsFrom": ["source_record_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "diagnosis_answers_question_id_question_version_choice_id_question_choices_question_id_question_version_choice_id_fk": {
           "name": "diagnosis_answers_question_id_question_version_choice_id_question_choices_question_id_question_version_choice_id_fk",
           "tableFrom": "diagnosis_answers",
-          "columnsFrom": ["question_id", "question_version", "choice_id"],
           "tableTo": "question_choices",
+          "columnsFrom": ["question_id", "question_version", "choice_id"],
           "columnsTo": ["question_id", "question_version", "choice_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1048,38 +1048,38 @@
         "diagnosis_brain_projection_heads_account_id_account_data_identity_account_id_fk": {
           "name": "diagnosis_brain_projection_heads_account_id_account_data_identity_account_id_fk",
           "tableFrom": "diagnosis_brain_projection_heads",
-          "columnsFrom": ["account_id"],
           "tableTo": "account_data_identity",
+          "columnsFrom": ["account_id"],
           "columnsTo": ["account_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "diagnosis_brain_projection_heads_diagnosis_id_diagnoses_id_fk": {
           "name": "diagnosis_brain_projection_heads_diagnosis_id_diagnoses_id_fk",
           "tableFrom": "diagnosis_brain_projection_heads",
-          "columnsFrom": ["diagnosis_id"],
           "tableTo": "diagnoses",
+          "columnsFrom": ["diagnosis_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "diagnosis_brain_projection_heads_scoring_config_id_diagnosis_scoring_configs_id_fk": {
           "name": "diagnosis_brain_projection_heads_scoring_config_id_diagnosis_scoring_configs_id_fk",
           "tableFrom": "diagnosis_brain_projection_heads",
-          "columnsFrom": ["scoring_config_id"],
           "tableTo": "diagnosis_scoring_configs",
+          "columnsFrom": ["scoring_config_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "diagnosis_brain_projection_heads_current_brain_item_id_brain_items_id_fk": {
           "name": "diagnosis_brain_projection_heads_current_brain_item_id_brain_items_id_fk",
           "tableFrom": "diagnosis_brain_projection_heads",
-          "columnsFrom": ["current_brain_item_id"],
           "tableTo": "brain_items",
+          "columnsFrom": ["current_brain_item_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1178,19 +1178,19 @@
         "diagnosis_brain_projection_pending_idx": {
           "name": "diagnosis_brain_projection_pending_idx",
           "columns": ["status", "next_attempt_at"],
-          "where": "status IN ('pending', 'failed') AND is_deleted = 0",
-          "isUnique": false
+          "isUnique": false,
+          "where": "status IN ('pending', 'failed') AND is_deleted = 0"
         }
       },
       "foreignKeys": {
         "diagnosis_brain_projection_requests_diagnosis_response_id_diagnosis_responses_id_fk": {
           "name": "diagnosis_brain_projection_requests_diagnosis_response_id_diagnosis_responses_id_fk",
           "tableFrom": "diagnosis_brain_projection_requests",
-          "columnsFrom": ["diagnosis_response_id"],
           "tableTo": "diagnosis_responses",
+          "columnsFrom": ["diagnosis_response_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1262,28 +1262,28 @@
         "diagnosis_deferred_question_active_idx": {
           "name": "diagnosis_deferred_question_active_idx",
           "columns": ["diagnosis_response_id", "diagnosis_question_id"],
-          "where": "is_deleted = 0",
-          "isUnique": true
+          "isUnique": true,
+          "where": "is_deleted = 0"
         }
       },
       "foreignKeys": {
         "diagnosis_deferred_questions_diagnosis_response_id_diagnosis_responses_id_fk": {
           "name": "diagnosis_deferred_questions_diagnosis_response_id_diagnosis_responses_id_fk",
           "tableFrom": "diagnosis_deferred_questions",
-          "columnsFrom": ["diagnosis_response_id"],
           "tableTo": "diagnosis_responses",
+          "columnsFrom": ["diagnosis_response_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "diagnosis_deferred_questions_diagnosis_question_id_diagnosis_questions_id_fk": {
           "name": "diagnosis_deferred_questions_diagnosis_question_id_diagnosis_questions_id_fk",
           "tableFrom": "diagnosis_deferred_questions",
-          "columnsFrom": ["diagnosis_question_id"],
           "tableTo": "diagnosis_questions",
+          "columnsFrom": ["diagnosis_question_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1356,28 +1356,28 @@
         "diagnosis_response_account_active_idx": {
           "name": "diagnosis_response_account_active_idx",
           "columns": ["account_id", "diagnosis_id"],
-          "where": "is_deleted = 0",
-          "isUnique": true
+          "isUnique": true,
+          "where": "is_deleted = 0"
         }
       },
       "foreignKeys": {
         "diagnosis_responses_account_id_account_data_identity_account_id_fk": {
           "name": "diagnosis_responses_account_id_account_data_identity_account_id_fk",
           "tableFrom": "diagnosis_responses",
-          "columnsFrom": ["account_id"],
           "tableTo": "account_data_identity",
+          "columnsFrom": ["account_id"],
           "columnsTo": ["account_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "diagnosis_responses_diagnosis_id_diagnoses_id_fk": {
           "name": "diagnosis_responses_diagnosis_id_diagnoses_id_fk",
           "tableFrom": "diagnosis_responses",
-          "columnsFrom": ["diagnosis_id"],
           "tableTo": "diagnoses",
+          "columnsFrom": ["diagnosis_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1555,11 +1555,11 @@
         "chat_turns_session_id_conversation_sessions_id_fk": {
           "name": "chat_turns_session_id_conversation_sessions_id_fk",
           "tableFrom": "chat_turns",
-          "columnsFrom": ["session_id"],
           "tableTo": "conversation_sessions",
+          "columnsFrom": ["session_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1678,28 +1678,28 @@
         "conversation_message_channel_event_idx": {
           "name": "conversation_message_channel_event_idx",
           "columns": ["channel", "channel_event_id"],
-          "where": "\"conversation_messages\".\"channel_event_id\" is not null",
-          "isUnique": true
+          "isUnique": true,
+          "where": "\"conversation_messages\".\"channel_event_id\" is not null"
         }
       },
       "foreignKeys": {
         "conversation_messages_session_id_conversation_sessions_id_fk": {
           "name": "conversation_messages_session_id_conversation_sessions_id_fk",
           "tableFrom": "conversation_messages",
-          "columnsFrom": ["session_id"],
           "tableTo": "conversation_sessions",
+          "columnsFrom": ["session_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "conversation_messages_source_record_id_source_records_id_fk": {
           "name": "conversation_messages_source_record_id_source_records_id_fk",
           "tableFrom": "conversation_messages",
-          "columnsFrom": ["source_record_id"],
           "tableTo": "source_records",
+          "columnsFrom": ["source_record_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1845,19 +1845,19 @@
         "conversation_session_active_account_idx": {
           "name": "conversation_session_active_account_idx",
           "columns": ["account_id"],
-          "where": "\"conversation_sessions\".\"status\" = 'active'",
-          "isUnique": true
+          "isUnique": true,
+          "where": "\"conversation_sessions\".\"status\" = 'active'"
         }
       },
       "foreignKeys": {
         "conversation_sessions_account_id_account_data_identity_account_id_fk": {
           "name": "conversation_sessions_account_id_account_data_identity_account_id_fk",
           "tableFrom": "conversation_sessions",
-          "columnsFrom": ["account_id"],
           "tableTo": "account_data_identity",
+          "columnsFrom": ["account_id"],
           "columnsTo": ["account_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1964,20 +1964,20 @@
         "diary_brain_checkpoint_items_checkpoint_id_diary_brain_checkpoints_id_fk": {
           "name": "diary_brain_checkpoint_items_checkpoint_id_diary_brain_checkpoints_id_fk",
           "tableFrom": "diary_brain_checkpoint_items",
-          "columnsFrom": ["checkpoint_id"],
           "tableTo": "diary_brain_checkpoints",
+          "columnsFrom": ["checkpoint_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "diary_brain_checkpoint_items_brain_item_id_brain_items_id_fk": {
           "name": "diary_brain_checkpoint_items_brain_item_id_brain_items_id_fk",
           "tableFrom": "diary_brain_checkpoint_items",
-          "columnsFrom": ["brain_item_id"],
           "tableTo": "brain_items",
+          "columnsFrom": ["brain_item_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -2107,8 +2107,8 @@
         "diary_brain_checkpoint_pending_session_idx": {
           "name": "diary_brain_checkpoint_pending_session_idx",
           "columns": ["session_id"],
-          "where": "\"diary_brain_checkpoints\".\"status\" = 'pending' AND \"diary_brain_checkpoints\".\"is_deleted\" = 0",
-          "isUnique": true
+          "isUnique": true,
+          "where": "\"diary_brain_checkpoints\".\"status\" = 'pending' AND \"diary_brain_checkpoints\".\"is_deleted\" = 0"
         },
         "diary_brain_checkpoint_due_idx": {
           "name": "diary_brain_checkpoint_due_idx",
@@ -2120,11 +2120,11 @@
         "diary_brain_checkpoints_session_id_conversation_sessions_id_fk": {
           "name": "diary_brain_checkpoints_session_id_conversation_sessions_id_fk",
           "tableFrom": "diary_brain_checkpoints",
-          "columnsFrom": ["session_id"],
           "tableTo": "conversation_sessions",
+          "columnsFrom": ["session_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -2243,20 +2243,20 @@
         "diary_chat_brain_usage_audits_turn_id_chat_turns_id_fk": {
           "name": "diary_chat_brain_usage_audits_turn_id_chat_turns_id_fk",
           "tableFrom": "diary_chat_brain_usage_audits",
-          "columnsFrom": ["turn_id"],
           "tableTo": "chat_turns",
+          "columnsFrom": ["turn_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "diary_chat_brain_usage_audits_brain_item_id_brain_items_id_fk": {
           "name": "diary_chat_brain_usage_audits_brain_item_id_brain_items_id_fk",
           "tableFrom": "diary_chat_brain_usage_audits",
-          "columnsFrom": ["brain_item_id"],
           "tableTo": "brain_items",
+          "columnsFrom": ["brain_item_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -2308,11 +2308,11 @@
         "source_record_text_payloads_source_record_id_source_records_id_fk": {
           "name": "source_record_text_payloads_source_record_id_source_records_id_fk",
           "tableFrom": "source_record_text_payloads",
-          "columnsFrom": ["source_record_id"],
           "tableTo": "source_records",
+          "columnsFrom": ["source_record_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -2425,8 +2425,8 @@
         "profile_summary_generation_active_account_idx": {
           "name": "profile_summary_generation_active_account_idx",
           "columns": ["account_id"],
-          "where": "\"profile_summary_generations\".\"status\" in ('queued', 'generating')",
-          "isUnique": true
+          "isUnique": true,
+          "where": "\"profile_summary_generations\".\"status\" in ('queued', 'generating')"
         },
         "profile_summary_generation_account_requested_idx": {
           "name": "profile_summary_generation_account_requested_idx",
@@ -2438,11 +2438,79 @@
         "profile_summary_generations_account_id_account_data_identity_account_id_fk": {
           "name": "profile_summary_generations_account_id_account_data_identity_account_id_fk",
           "tableFrom": "profile_summary_generations",
-          "columnsFrom": ["account_id"],
           "tableTo": "account_data_identity",
+          "columnsFrom": ["account_id"],
           "columnsTo": ["account_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "profile_summary_share_projections": {
+      "name": "profile_summary_share_projections",
+      "columns": {
+        "profile_summary_version_id": {
+          "name": "profile_summary_version_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "schema_version": {
+          "name": "schema_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "generated_at": {
+          "name": "generated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "statements_json": {
+          "name": "statements_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "evidence_references_json": {
+          "name": "evidence_references_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "fingerprint": {
+          "name": "fingerprint",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "profile_summary_share_projection_generated_idx": {
+          "name": "profile_summary_share_projection_generated_idx",
+          "columns": ["generated_at"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "profile_summary_share_projections_profile_summary_version_id_profile_summary_versions_id_fk": {
+          "name": "profile_summary_share_projections_profile_summary_version_id_profile_summary_versions_id_fk",
+          "tableFrom": "profile_summary_share_projections",
+          "tableTo": "profile_summary_versions",
+          "columnsFrom": ["profile_summary_version_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -2551,11 +2619,11 @@
         "profile_summary_versions_generation_id_profile_summary_generations_id_fk": {
           "name": "profile_summary_versions_generation_id_profile_summary_generations_id_fk",
           "tableFrom": "profile_summary_versions",
-          "columnsFrom": ["generation_id"],
           "tableTo": "profile_summary_generations",
+          "columnsFrom": ["generation_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -2634,20 +2702,20 @@
         "source_record_revisions_previous_source_record_id_source_records_id_fk": {
           "name": "source_record_revisions_previous_source_record_id_source_records_id_fk",
           "tableFrom": "source_record_revisions",
-          "columnsFrom": ["previous_source_record_id"],
           "tableTo": "source_records",
+          "columnsFrom": ["previous_source_record_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "source_record_revisions_next_source_record_id_source_records_id_fk": {
           "name": "source_record_revisions_next_source_record_id_source_records_id_fk",
           "tableFrom": "source_record_revisions",
-          "columnsFrom": ["next_source_record_id"],
           "tableTo": "source_records",
+          "columnsFrom": ["next_source_record_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -2728,11 +2796,11 @@
         "source_records_account_id_account_data_identity_account_id_fk": {
           "name": "source_records_account_id_account_data_identity_account_id_fk",
           "tableFrom": "source_records",
-          "columnsFrom": ["account_id"],
           "tableTo": "account_data_identity",
+          "columnsFrom": ["account_id"],
           "columnsTo": ["account_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -2880,11 +2948,11 @@
         "diagnoses_scoring_config_id_diagnosis_scoring_configs_id_fk": {
           "name": "diagnoses_scoring_config_id_diagnosis_scoring_configs_id_fk",
           "tableFrom": "diagnoses",
-          "columnsFrom": ["scoring_config_id"],
           "tableTo": "diagnosis_scoring_configs",
+          "columnsFrom": ["scoring_config_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -2963,43 +3031,43 @@
         "diagnosis_question_active_idx": {
           "name": "diagnosis_question_active_idx",
           "columns": ["diagnosis_id", "question_id"],
-          "where": "is_deleted = 0",
-          "isUnique": true
+          "isUnique": true,
+          "where": "is_deleted = 0"
         },
         "diagnosis_question_position_active_idx": {
           "name": "diagnosis_question_position_active_idx",
           "columns": ["diagnosis_id", "position"],
-          "where": "is_deleted = 0",
-          "isUnique": true
+          "isUnique": true,
+          "where": "is_deleted = 0"
         }
       },
       "foreignKeys": {
         "diagnosis_questions_diagnosis_id_diagnoses_id_fk": {
           "name": "diagnosis_questions_diagnosis_id_diagnoses_id_fk",
           "tableFrom": "diagnosis_questions",
-          "columnsFrom": ["diagnosis_id"],
           "tableTo": "diagnoses",
+          "columnsFrom": ["diagnosis_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "diagnosis_questions_question_id_questions_id_fk": {
           "name": "diagnosis_questions_question_id_questions_id_fk",
           "tableFrom": "diagnosis_questions",
-          "columnsFrom": ["question_id"],
           "tableTo": "questions",
+          "columnsFrom": ["question_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "diagnosis_questions_question_id_question_version_question_versions_question_id_version_fk": {
           "name": "diagnosis_questions_question_id_question_version_question_versions_question_id_version_fk",
           "tableFrom": "diagnosis_questions",
-          "columnsFrom": ["question_id", "question_version"],
           "tableTo": "question_versions",
+          "columnsFrom": ["question_id", "question_version"],
           "columnsTo": ["question_id", "version"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -3152,11 +3220,11 @@
         "question_choices_question_id_question_version_question_versions_question_id_version_fk": {
           "name": "question_choices_question_id_question_version_question_versions_question_id_version_fk",
           "tableFrom": "question_choices",
-          "columnsFrom": ["question_id", "question_version"],
           "tableTo": "question_versions",
+          "columnsFrom": ["question_id", "question_version"],
           "columnsTo": ["question_id", "version"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
@@ -3261,19 +3329,19 @@
         "question_version_active_idx": {
           "name": "question_version_active_idx",
           "columns": ["question_id", "version"],
-          "where": "is_deleted = 0",
-          "isUnique": true
+          "isUnique": true,
+          "where": "is_deleted = 0"
         }
       },
       "foreignKeys": {
         "question_versions_question_id_questions_id_fk": {
           "name": "question_versions_question_id_questions_id_fk",
           "tableFrom": "question_versions",
-          "columnsFrom": ["question_id"],
           "tableTo": "questions",
+          "columnsFrom": ["question_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
@@ -3335,9 +3403,9 @@
   "views": {},
   "enums": {},
   "_meta": {
-    "columns": {},
     "schemas": {},
-    "tables": {}
+    "tables": {},
+    "columns": {}
   },
   "internal": {
     "indexes": {}

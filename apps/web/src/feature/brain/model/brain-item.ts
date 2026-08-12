@@ -16,7 +16,7 @@ type BrainItem = {
   firstObservedAt: string;
   lastObservedAt: string;
   vectorSync: {
-    status: "pending" | "submitted" | "applied" | "failed" | "not-scheduled";
+    status: "pending" | "submitted" | "retry_scheduled" | "applied" | "failed" | "not-scheduled";
     operation?: "upsert" | "delete" | undefined;
     attemptCount: number;
     updatedAt?: string | undefined;
