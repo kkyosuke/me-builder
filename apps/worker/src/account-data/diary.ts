@@ -34,6 +34,12 @@ export const diaryActions = {
     accountId: string,
     at?: Date,
   ) => DO.account.action.diary.claimDueDiaryBrainCheckpointIds(db, accountId, at),
+  "conversation.resetFailedDiaryBrainCheckpoint": (
+    db: DO.account.Database,
+    accountId: string,
+    checkpointId: string,
+    at?: Date,
+  ) => DO.account.action.diary.resetFailedDiaryBrainCheckpoint(db, accountId, checkpointId, at),
   "conversation.getDiaryBrainCheckpointContext": (
     db: DO.account.Database,
     accountId: string,

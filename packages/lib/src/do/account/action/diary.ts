@@ -59,6 +59,8 @@ const BRAIN_CHECKPOINT_DISPATCH_RETRY_BASE_MS = 30 * 1000;
 const BRAIN_CHECKPOINT_DISPATCH_RETRY_MAX_MS = 15 * 60 * 1000;
 /** Queueの6回の配送機会を待った後、DLQ滞留をAlarmから自己回復するまでのlease。 */
 export const DIARY_BRAIN_CHECKPOINT_DISPATCH_LEASE_MS = 60 * 60 * 1000;
+/** Queue内の最大6配送を5回まで投入し、合計30配送で恒久失敗を終端化する。 */
+export const DIARY_BRAIN_CHECKPOINT_MAX_DISPATCH_ATTEMPTS = 5;
 const CONVERSATION_POLICY_EXPLORATION_RATE = 0.2;
 
 export type ConversationPolicyStat = {
@@ -722,6 +724,7 @@ export async function listDueDiaryBrainCheckpointIds(
       and(
         inArray(diaryBrainCheckpoints.sessionId, ownedSessionIds(db, accountId)),
         inArray(diaryBrainCheckpoints.status, ["pending", "queued", "dispatched"]),
+        sql`${diaryBrainCheckpoints.attemptCount} < ${DIARY_BRAIN_CHECKPOINT_MAX_DISPATCH_ATTEMPTS}`,
         lte(diaryBrainCheckpoints.nextAttemptAt, at),
         eq(diaryBrainCheckpoints.isDeleted, false),
       ),
@@ -732,12 +735,38 @@ export async function listDueDiaryBrainCheckpointIds(
   return rows.map(({ id }) => id);
 }
 
+export type DiaryBrainCheckpointClaimBatch = Readonly<{
+  checkpointIds: readonly string[];
+  terminalFailures: readonly Readonly<{
+    checkpointId: string;
+    attemptCount: number;
+    failureCode: string;
+  }>[];
+}>;
+
 /** 期限到来した範囲をsealし、Queue投入対象としてclaimする。 */
 export async function claimDueDiaryBrainCheckpointIds(
   db: AccountDataDatabase,
   accountId: string,
   at = new Date(),
-): Promise<string[]> {
+): Promise<DiaryBrainCheckpointClaimBatch> {
+  const terminalFailures = await db
+    .update(diaryBrainCheckpoints)
+    .set({ status: "failed", updatedAt: at })
+    .where(
+      and(
+        inArray(diaryBrainCheckpoints.sessionId, ownedSessionIds(db, accountId)),
+        inArray(diaryBrainCheckpoints.status, ["pending", "queued", "dispatched"]),
+        sql`${diaryBrainCheckpoints.attemptCount} >= ${DIARY_BRAIN_CHECKPOINT_MAX_DISPATCH_ATTEMPTS}`,
+        lte(diaryBrainCheckpoints.nextAttemptAt, at),
+        eq(diaryBrainCheckpoints.isDeleted, false),
+      ),
+    )
+    .returning({
+      checkpointId: diaryBrainCheckpoints.id,
+      attemptCount: diaryBrainCheckpoints.attemptCount,
+    })
+    .all();
   const dueIds = await listDueDiaryBrainCheckpointIds(db, accountId, at);
   const claimedIds: string[] = [];
   for (const checkpointId of dueIds) {
@@ -764,6 +793,7 @@ export async function claimDueDiaryBrainCheckpointIds(
           eq(diaryBrainCheckpoints.id, checkpointId),
           inArray(diaryBrainCheckpoints.sessionId, ownedSessionIds(db, accountId)),
           inArray(diaryBrainCheckpoints.status, ["pending", "queued", "dispatched"]),
+          sql`${diaryBrainCheckpoints.attemptCount} < ${DIARY_BRAIN_CHECKPOINT_MAX_DISPATCH_ATTEMPTS}`,
           lte(diaryBrainCheckpoints.nextAttemptAt, at),
           eq(diaryBrainCheckpoints.isDeleted, false),
         ),
@@ -772,7 +802,42 @@ export async function claimDueDiaryBrainCheckpointIds(
       .all();
     if (rows[0]) claimedIds.push(rows[0].id);
   }
-  return claimedIds;
+  return {
+    checkpointIds: claimedIds,
+    terminalFailures: terminalFailures.map(({ checkpointId, attemptCount }) => ({
+      checkpointId,
+      attemptCount,
+      failureCode: "DIARY_BRAIN_CHECKPOINT_ATTEMPTS_EXHAUSTED",
+    })),
+  };
+}
+
+/** 運用者が原因を解消した後、恒久失敗checkpointの固定範囲を最初から再試行する。 */
+export async function resetFailedDiaryBrainCheckpoint(
+  db: AccountDataDatabase,
+  accountId: string,
+  checkpointId: string,
+  at = new Date(),
+): Promise<boolean> {
+  const rows = await db
+    .update(diaryBrainCheckpoints)
+    .set({
+      status: "queued",
+      attemptCount: 0,
+      nextAttemptAt: at,
+      updatedAt: at,
+    })
+    .where(
+      and(
+        eq(diaryBrainCheckpoints.id, checkpointId),
+        inArray(diaryBrainCheckpoints.sessionId, ownedSessionIds(db, accountId)),
+        eq(diaryBrainCheckpoints.status, "failed"),
+        eq(diaryBrainCheckpoints.isDeleted, false),
+      ),
+    )
+    .returning({ id: diaryBrainCheckpoints.id })
+    .all();
+  return rows.length > 0;
 }
 
 /** Queue受理を記録し、lease期限まではAlarmによる再投入対象から外す。 */
