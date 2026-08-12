@@ -39,6 +39,7 @@ interface AccessApplication {
   id: string;
   name: string;
   domain?: string;
+  policies?: AccessPolicy[];
 }
 
 interface AccessPolicy {
@@ -157,9 +158,7 @@ function createApiClient(accountId: string, apiToken: string, fetchImpl: typeof 
         .join(", ");
       const method = init?.method ?? "GET";
       const accessSetupHint =
-        method === "POST" &&
-        path === "/access/apps" &&
-        issues.some((issue) => String(issue.code) === "1010")
+        path.startsWith("/access/apps") && issues.some((issue) => String(issue.code) === "1010")
           ? " Verify that the account's Zero Trust organization is initialized and the API token has Access: Apps and Policies Write."
           : "";
       throw new Error(
@@ -212,7 +211,11 @@ export async function setupApiDocsAccess(params: SetupApiDocsAccessParams): Prom
   let application: AccessApplication;
   let policies: AccessPolicy[];
   if (matches[0]) {
-    policies = await listAll<AccessPolicy>(callApi, `/access/apps/${matches[0].id}/policies`);
+    // Application一覧は紐づくpolicyも返す。別endpointへの重複GETを避けつつ、
+    // 古いレスポンス形だけは従来endpointへフォールバックする。
+    policies =
+      matches[0].policies ??
+      (await listAll<AccessPolicy>(callApi, `/access/apps/${matches[0].id}/policies`));
     const unmanagedPolicies = policies.filter((policy) => policy.name !== POLICY_NAME);
     if (unmanagedPolicies.length > 0) {
       throw new Error(
@@ -233,7 +236,8 @@ export async function setupApiDocsAccess(params: SetupApiDocsAccessParams): Prom
         body: JSON.stringify(payload),
       })
     ).result;
-    policies = await listAll<AccessPolicy>(callApi, `/access/apps/${application.id}/policies`);
+    // policyを含めず新規作成したApplicationには、管理対象外policyは存在しない。
+    policies = [];
   }
 
   const managedPolicies = policies.filter((policy) => policy.name === POLICY_NAME);
