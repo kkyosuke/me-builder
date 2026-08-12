@@ -124,6 +124,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/compatibility/invitations": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** 確認済みの共有内容から1人用の招待リンクを発行する */
+    post: operations["issueCompatibilityInvitation"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/dev/brain-vector-sync-jobs/failed": {
     parameters: {
       query?: never;
@@ -1145,6 +1162,113 @@ export interface operations {
                 /** @constant */
                 error: "Not Found";
               };
+        };
+      };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
+          };
+        };
+      };
+      /** @description D1 bindingが設定されていない */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Service Unavailable";
+          };
+        };
+      };
+    };
+  };
+  issueCompatibilityInvitation: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          previewToken: string;
+        };
+      };
+    };
+    responses: {
+      /** @description 発行した招待リンクと有効期限 */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uri */
+            invitationUrl: string;
+            /** Format: date-time */
+            expiresAt: string;
+          };
+        };
+      };
+      /** @description リクエストJSONが不正 */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Invalid request";
+          };
+        };
+      };
+      /** @description LIFF IDトークンを検証できない */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Unauthorized";
+          };
+        };
+      };
+      /** @description 対応するAccountが存在しない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Account not found";
+            /** @constant */
+            reason: "friendship_required";
+          };
+        };
+      };
+      /** @description 確認後に共有内容が変わった、または現在共有できない */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Compatibility invitation unavailable";
+            /** @enum {string} */
+            reason: "preview_changed" | "share_unavailable";
+          };
         };
       };
       /** @description 未処理のサーバーエラー */

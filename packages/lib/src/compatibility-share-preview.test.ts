@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildCompatibilitySharePreviewThemes,
   createCompatibilitySharePreviewToken,
+  createCompatibilityShareThemeFingerprints,
 } from "./compatibility-share-preview";
 
 describe("buildCompatibilitySharePreviewThemes", () => {
@@ -144,6 +145,40 @@ describe("buildCompatibilitySharePreviewThemes", () => {
         },
       ]),
     ).resolves.not.toBe(token);
+  });
+
+  it("テーマごとに表示内容と採点設定版を含む指紋を作る", async () => {
+    const diagnosis = {
+      diagnosisId: "diagnosis-1",
+      title: "時間と予定",
+      scoringConfigId: "time-planning-v1",
+      scoring: {
+        scoringVersion: 1,
+        balancedLabel: "状況による",
+        parameters: [
+          {
+            id: "planning",
+            label: "予定",
+            lowLabel: "その場",
+            highLabel: "早め",
+            score: 80,
+            coverage: 100,
+            band: "high" as const,
+          },
+        ],
+      },
+    };
+
+    const first = await createCompatibilityShareThemeFingerprints([diagnosis]);
+    expect(first).toEqual([
+      { diagnosisId: "diagnosis-1", resultFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/) },
+    ]);
+    await expect(createCompatibilityShareThemeFingerprints([diagnosis])).resolves.toEqual(first);
+    await expect(
+      createCompatibilityShareThemeFingerprints([
+        { ...diagnosis, scoring: { ...diagnosis.scoring, scoringVersion: 2 } },
+      ]),
+    ).resolves.not.toEqual(first);
   });
 
   it("計算不能なパラメータと空になったDiagnosisを共有対象から除外する", () => {

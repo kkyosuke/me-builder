@@ -8,10 +8,35 @@ import {
   DO,
 } from "@me-builder/lib";
 import Database from "better-sqlite3";
+import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 
 const actions = {
+  "compatibility.addOutgoingReference": async (
+    db: DO.account.Database,
+    accountId: string,
+    input: Readonly<{ relationshipId: string; createdAt: Date }>,
+  ) => {
+    const table = DO.account.schema.compatibilityReferences;
+    const existing = await db
+      .select()
+      .from(table)
+      .where(eq(table.relationshipId, input.relationshipId))
+      .get();
+    if (existing) return existing;
+    const reference = {
+      relationshipId: input.relationshipId,
+      accountId,
+      role: "inviter" as const,
+      partnerAccountId: null,
+      status: "pending" as const,
+      createdAt: input.createdAt,
+      updatedAt: input.createdAt,
+    };
+    await db.insert(table).values(reference);
+    return reference;
+  },
   "brain.listFailedVectorSyncJobs": (db: DO.account.Database, _accountId: string) =>
     DO.account.action.brain.listFailedBrainVectorSyncJobs(db),
   "brain.resetFailedVectorSyncJob": (

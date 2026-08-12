@@ -1,5 +1,16 @@
-import { AlertCircle, RefreshCw, Send, Sparkles, UserRound } from "lucide-react";
+import {
+  AlertCircle,
+  CheckCircle2,
+  Copy,
+  LoaderCircle,
+  MessageCircle,
+  RefreshCw,
+  Send,
+  Sparkles,
+  UserRound,
+} from "lucide-react";
 import type { AsyncState } from "../../../model/async-state";
+import type { CompatibilityInvitation } from "../model/compatibility-invitation";
 import type {
   CompatibilitySharePreview,
   CompatibilitySharePreviewBlockingReason,
@@ -65,7 +76,23 @@ function ShareParameterCard({ parameter }: { parameter: CompatibilitySharePrevie
   );
 }
 
-function SharePreviewContent({ preview }: { preview: CompatibilitySharePreview }) {
+function SharePreviewContent({
+  invitationState,
+  onCopyLink,
+  onIssue,
+  onRetryPreview,
+  onShareToLine,
+  preview,
+  sharingMessage,
+}: {
+  invitationState: AsyncState<CompatibilityInvitation>;
+  onCopyLink: (url: string) => void;
+  onIssue: (previewToken: string) => void;
+  onRetryPreview: () => void;
+  onShareToLine: (url: string) => void;
+  preview: CompatibilitySharePreview;
+  sharingMessage: string | null;
+}) {
   const parameterCount = preview.themes.reduce(
     (count, theme) => count + theme.parameters.length,
     0,
@@ -200,28 +227,97 @@ function SharePreviewContent({ preview }: { preview: CompatibilitySharePreview }
         </section>
       )}
 
-      <button
-        type="button"
-        disabled
-        className="mt-8 flex min-h-12 w-full cursor-not-allowed items-center justify-center gap-2 rounded-2xl bg-slate-200 px-5 py-3 font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-400"
-      >
-        <Send className="size-5" aria-hidden="true" />
-        {preview.canIssueInvitation ? "招待リンク発行は準備中" : "招待リンクを発行できません"}
-      </button>
-      {preview.canIssueInvitation && (
-        <p className="mt-2 text-center text-xs leading-relaxed text-slate-500">
-          共有内容の確認まで接続済みです。リンク発行は次のAPI実装で利用できます。
-        </p>
+      {invitationState.status === "success" ? (
+        <section className="mt-8 rounded-3xl border border-emerald-300 bg-emerald-50 p-5 dark:border-emerald-700 dark:bg-emerald-950/30">
+          <h2 className="flex items-center gap-2 font-bold text-emerald-950 dark:text-emerald-100">
+            <CheckCircle2 className="size-5" aria-hidden="true" />
+            招待リンクを発行しました
+          </h2>
+          <p className="mt-2 text-sm leading-relaxed text-emerald-900 dark:text-emerald-200">
+            このリンクは1人が承諾すると使用済みになります。有効期限は
+            {new Date(invitationState.data.expiresAt).toLocaleDateString("ja-JP")}です。
+          </p>
+          <p className="mt-3 break-all rounded-xl bg-white/80 p-3 text-xs text-slate-700 dark:bg-slate-950/60 dark:text-slate-300">
+            {invitationState.data.invitationUrl}
+          </p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => onShareToLine(invitationState.data.invitationUrl)}
+              className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#06c755] px-5 py-3 font-bold text-white"
+            >
+              <MessageCircle className="size-5" aria-hidden="true" />
+              LINEで送る
+            </button>
+            <button
+              type="button"
+              onClick={() => onCopyLink(invitationState.data.invitationUrl)}
+              className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-emerald-400 bg-white px-5 py-3 font-bold text-emerald-900 dark:bg-slate-950 dark:text-emerald-100"
+            >
+              <Copy className="size-5" aria-hidden="true" />
+              リンクをコピー
+            </button>
+          </div>
+          {sharingMessage && (
+            <output className="mt-3 block text-center text-sm text-slate-700 dark:text-slate-300">
+              {sharingMessage}
+            </output>
+          )}
+        </section>
+      ) : (
+        <>
+          {invitationState.status === "error" && (
+            <div
+              role="alert"
+              className="mt-8 rounded-2xl border border-red-300 bg-red-50 p-4 text-sm text-red-800 dark:border-red-700 dark:bg-red-950/30 dark:text-red-200"
+            >
+              <p>{invitationState.message}</p>
+              <button type="button" onClick={onRetryPreview} className="mt-2 font-bold underline">
+                共有内容を再読み込み
+              </button>
+            </div>
+          )}
+          <button
+            type="button"
+            disabled={!preview.canIssueInvitation || invitationState.status === "loading"}
+            onClick={() => onIssue(preview.previewToken)}
+            className="mt-8 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-rose-500 px-5 py-3 font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 dark:disabled:bg-slate-800 dark:disabled:text-slate-400"
+          >
+            {invitationState.status === "loading" ? (
+              <LoaderCircle
+                className="size-5 animate-spin motion-reduce:animate-none"
+                aria-hidden="true"
+              />
+            ) : (
+              <Send className="size-5" aria-hidden="true" />
+            )}
+            {invitationState.status === "loading"
+              ? "招待リンクを発行中"
+              : preview.canIssueInvitation
+                ? "招待リンクを発行する"
+                : "招待リンクを発行できません"}
+          </button>
+        </>
       )}
     </>
   );
 }
 
 export function CompatibilityShareScreen({
+  invitationState = { status: "idle" },
+  onCopyLink = () => undefined,
+  onIssue = () => undefined,
   onRetry,
+  onShareToLine = () => undefined,
+  sharingMessage = null,
   state,
 }: {
+  invitationState?: AsyncState<CompatibilityInvitation>;
+  onCopyLink?: (url: string) => void;
+  onIssue?: (previewToken: string) => void;
   onRetry: () => void;
+  onShareToLine?: (url: string) => void;
+  sharingMessage?: string | null;
   state: AsyncState<CompatibilitySharePreview>;
 }) {
   return (
@@ -246,7 +342,17 @@ export function CompatibilityShareScreen({
           </button>
         </section>
       )}
-      {state.status === "success" && <SharePreviewContent preview={state.data} />}
+      {state.status === "success" && (
+        <SharePreviewContent
+          preview={state.data}
+          invitationState={invitationState}
+          sharingMessage={sharingMessage}
+          onCopyLink={onCopyLink}
+          onIssue={onIssue}
+          onRetryPreview={onRetry}
+          onShareToLine={onShareToLine}
+        />
+      )}
     </main>
   );
 }

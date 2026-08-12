@@ -42,6 +42,10 @@ function invitationInput() {
   return {
     inviterAccountId: "account-inviter",
     inviterDisplayName: "送信者",
+    offeredProfile: {
+      profileSummaryVersionId: "profile-version-inviter",
+      fingerprint: "f".repeat(64),
+    },
     offeredThemes: [
       {
         diagnosisId: "diagnosis-1",
@@ -116,6 +120,10 @@ describe("CompatibilityDataRepository", () => {
         {
           inviteeAccountId: "account-inviter",
           inviteeDisplayName: "送信者",
+          acceptedProfile: {
+            profileSummaryVersionId: "profile-version-inviter",
+            fingerprint: "f".repeat(64),
+          },
           acceptedThemes: [
             {
               diagnosisId: "diagnosis-1",
@@ -131,6 +139,10 @@ describe("CompatibilityDataRepository", () => {
         {
           inviteeAccountId: "account-invitee",
           inviteeDisplayName: "受信者",
+          acceptedProfile: {
+            profileSummaryVersionId: "profile-version-invitee",
+            fingerprint: "e".repeat(64),
+          },
           acceptedThemes: [],
         },
         acceptedAt,
@@ -141,6 +153,10 @@ describe("CompatibilityDataRepository", () => {
         {
           inviteeAccountId: "account-invitee",
           inviteeDisplayName: "受信者",
+          acceptedProfile: {
+            profileSummaryVersionId: "profile-version-invitee",
+            fingerprint: "e".repeat(64),
+          },
           acceptedThemes: [
             {
               diagnosisId: "diagnosis-unknown",
@@ -161,6 +177,10 @@ describe("CompatibilityDataRepository", () => {
     const acceptance = {
       inviteeAccountId: "account-invitee",
       inviteeDisplayName: "受信者",
+      acceptedProfile: {
+        profileSummaryVersionId: "profile-version-invitee",
+        fingerprint: "e".repeat(64),
+      },
       acceptedThemes: [
         {
           diagnosisId: "diagnosis-2",
@@ -207,6 +227,10 @@ describe("CompatibilityDataRepository", () => {
         {
           inviteeAccountId: "account-invitee",
           inviteeDisplayName: "受信者",
+          acceptedProfile: {
+            profileSummaryVersionId: "profile-version-invitee",
+            fingerprint: "e".repeat(64),
+          },
           acceptedThemes: [
             {
               diagnosisId: "diagnosis-1",

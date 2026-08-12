@@ -64,6 +64,12 @@ erDiagram
       text invitee_account_id
       text inviter_display_name
       text invitee_display_name
+      text offered_profile_summary_version_id
+      text offered_profile_fingerprint
+      integer offered_profile_consented_at
+      text accepted_profile_summary_version_id
+      text accepted_profile_fingerprint
+      integer accepted_profile_consented_at
       text status
       integer expires_at
       integer accepted_at

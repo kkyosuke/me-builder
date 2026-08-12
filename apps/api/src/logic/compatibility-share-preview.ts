@@ -2,6 +2,7 @@ import {
   type AccountDataNamespace,
   type CompatibilitySharePreviewDiagnosis,
   type CompatibilitySharePreviewTheme,
+  type CompatibilityShareProfile,
   type D1,
   type DO,
   accountDataFor,
@@ -49,8 +50,14 @@ type Params = {
   at?: Date;
 };
 
-type Dependencies = {
-  createSession: typeof createLiffSession;
+export type CompatibilitySharePreviewData = Readonly<{
+  displayName: string | null;
+  shareProfile: CompatibilityShareProfile | null;
+  shareableDiagnoses: readonly CompatibilitySharePreviewDiagnosis[];
+  preview: Extract<CompatibilitySharePreviewOutcome, { type: "resolved" }>["preview"];
+}>;
+
+export type CompatibilitySharePreviewDataDependencies = {
   getPreviewSource: (
     accountData: AccountDataNamespace | undefined,
     accountId: string,
@@ -64,33 +71,49 @@ type Dependencies = {
   createPreviewToken: typeof createCompatibilitySharePreviewToken;
 };
 
-const defaultDependencies: Dependencies = {
-  createSession: createLiffSession,
-  getPreviewSource: (accountData, accountId, at) => {
-    if (!accountData) throw new Error("ACCOUNT_DATA binding is not configured");
-    return accountDataFor(accountData, accountId).execute("diagnosis.getAnsweredSource", at);
-  },
-  getShareProfile: (accountData, accountId) => {
-    if (!accountData) throw new Error("ACCOUNT_DATA binding is not configured");
-    return accountDataFor(accountData, accountId).execute(
-      "profileSummary.readCompatibilityShareProfile",
-    );
-  },
-  scoreAnswers: scoreDiagnosisAnswers,
-  createPreviewToken: createCompatibilitySharePreviewToken,
+type Dependencies = CompatibilitySharePreviewDataDependencies & {
+  createSession: typeof createLiffSession;
 };
 
-/** 本人の完了済み診断を、招待発行前に確認できる安全な表示へ変換する。 */
-export async function getCompatibilitySharePreview(
-  { idToken, lineLoginChannelId, db, accountData, at = new Date() }: Params,
-  dependencies: Dependencies = defaultDependencies,
-): Promise<CompatibilitySharePreviewOutcome> {
-  const session = await dependencies.createSession({ idToken, lineLoginChannelId, db });
-  if (session.type !== "resolved") return session;
+export const compatibilitySharePreviewDataDependencies: CompatibilitySharePreviewDataDependencies =
+  {
+    getPreviewSource: (accountData, accountId, at) => {
+      if (!accountData) throw new Error("ACCOUNT_DATA binding is not configured");
+      return accountDataFor(accountData, accountId).execute("diagnosis.getAnsweredSource", at);
+    },
+    getShareProfile: (accountData, accountId) => {
+      if (!accountData) throw new Error("ACCOUNT_DATA binding is not configured");
+      return accountDataFor(accountData, accountId).execute(
+        "profileSummary.readCompatibilityShareProfile",
+      );
+    },
+    scoreAnswers: scoreDiagnosisAnswers,
+    createPreviewToken: createCompatibilitySharePreviewToken,
+  };
 
+const defaultDependencies: Dependencies = {
+  createSession: createLiffSession,
+  ...compatibilitySharePreviewDataDependencies,
+};
+
+/** 認証済みAccountの現在状態を、公開previewと発行command用snapshotへ同時に変換する。 */
+export async function loadCompatibilitySharePreviewData(
+  {
+    accountId,
+    verifiedDisplayName,
+    accountData,
+    at,
+  }: {
+    accountId: string;
+    verifiedDisplayName: string | undefined;
+    accountData: AccountDataNamespace | undefined;
+    at: Date;
+  },
+  dependencies: CompatibilitySharePreviewDataDependencies = compatibilitySharePreviewDataDependencies,
+): Promise<CompatibilitySharePreviewData> {
   const [source, shareProfileResult] = await Promise.all([
-    dependencies.getPreviewSource(accountData, session.session.accountId, at),
-    dependencies.getShareProfile(accountData, session.session.accountId),
+    dependencies.getPreviewSource(accountData, accountId, at),
+    dependencies.getShareProfile(accountData, accountId),
   ]);
   const shareableDiagnoses = source.answeredDiagnoses.flatMap(
     ({ id, title, answers, scoringConfig }): CompatibilitySharePreviewDiagnosis[] => {
@@ -113,7 +136,7 @@ export async function getCompatibilitySharePreview(
     },
   );
   const themes = buildCompatibilitySharePreviewThemes(shareableDiagnoses);
-  const displayName = session.session.displayName?.trim() || null;
+  const displayName = verifiedDisplayName?.trim() || null;
   const shareProfile = shareProfileResult.type === "available" ? shareProfileResult.profile : null;
   const previewToken = await dependencies.createPreviewToken(
     displayName,
@@ -143,7 +166,9 @@ export async function getCompatibilitySharePreview(
   if (hasUnshareableAnsweredDiagnosis) blockingReasons.push("scoring_unavailable");
 
   return {
-    type: "resolved",
+    displayName,
+    shareProfile,
+    shareableDiagnoses,
     preview: {
       displayName,
       previewToken,
@@ -165,4 +190,24 @@ export async function getCompatibilitySharePreview(
             : null,
     },
   };
+}
+
+/** 本人の完了済み診断を、招待発行前に確認できる安全な表示へ変換する。 */
+export async function getCompatibilitySharePreview(
+  { idToken, lineLoginChannelId, db, accountData, at = new Date() }: Params,
+  dependencies: Dependencies = defaultDependencies,
+): Promise<CompatibilitySharePreviewOutcome> {
+  const session = await dependencies.createSession({ idToken, lineLoginChannelId, db });
+  if (session.type !== "resolved") return session;
+
+  const data = await loadCompatibilitySharePreviewData(
+    {
+      accountId: session.session.accountId,
+      verifiedDisplayName: session.session.displayName,
+      accountData,
+      at,
+    },
+    dependencies,
+  );
+  return { type: "resolved", preview: data.preview };
 }

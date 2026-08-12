@@ -6,6 +6,10 @@ import { Miniflare } from "miniflare";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { app } from "../index";
 import { type AccountDataTestStore, createAccountDataTestStore } from "../testing/account-data";
+import {
+  type CompatibilityDataTestStore,
+  createCompatibilityDataTestStore,
+} from "../testing/compatibility-data";
 import { compatibilitySharePreviewCases } from "./case/compatibility-share-preview.case";
 import { diagnosisAnswerCases } from "./case/diagnosis-answer.case";
 
@@ -18,6 +22,7 @@ const e2eTimeoutMs = 30_000;
 let miniflare: Miniflare;
 let database: D1Database;
 let accountDataStore: AccountDataTestStore;
+let compatibilityDataStore: CompatibilityDataTestStore;
 
 async function applySqlFile(db: D1Database, sql: string): Promise<void> {
   const statements = sql
@@ -72,8 +77,10 @@ function mockLineVerification(): void {
 const env = () => ({
   DB: database,
   ACCOUNT_DATA: accountDataStore.namespace,
+  COMPATIBILITY_DATA: compatibilityDataStore.namespace,
   LINE_LOGIN_CHANNEL_ID: "1234567890",
   ENVIRONMENT: "test",
+  WEB_ORIGIN: "https://example.com",
 });
 
 async function putAnswer(
@@ -107,6 +114,21 @@ async function getCompatibilitySharePreview(): Promise<Response> {
   return app.request(
     "/api/compatibility/share-preview",
     { headers: { Authorization: "Bearer known-token" } },
+    env(),
+  );
+}
+
+async function issueCompatibilityInvitation(previewToken: string): Promise<Response> {
+  return app.request(
+    "/api/compatibility/invitations",
+    {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer known-token",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ previewToken }),
+    },
     env(),
   );
 }
@@ -272,6 +294,7 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
     database = (await miniflare.getD1Database("DB")) as D1Database;
     await prepareDatabase(database);
     accountDataStore = createAccountDataTestStore();
+    compatibilityDataStore = createCompatibilityDataTestStore();
     await accountDataStore.syncCatalogFrom(D1.shared.client.create(database));
     mockLineVerification();
   }, e2eTimeoutMs);
@@ -429,6 +452,32 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
       expect(JSON.stringify(preview)).not.toMatch(
         /choiceId|questionText|coverage|accountId|fingerprint/,
       );
+    },
+    e2eTimeoutMs,
+  );
+
+  it(
+    `${compatibilitySharePreviewCases.issueInvitation.id}: ${compatibilitySharePreviewCases.issueInvitation.name}`,
+    async () => {
+      await completeRelationshipDiagnosis();
+      await generateCompatibilityShareProfile();
+      const previewResponse = await getCompatibilitySharePreview();
+      const preview = (await previewResponse.json()) as { previewToken: string };
+
+      const issueResponse = await issueCompatibilityInvitation(preview.previewToken);
+      expect(issueResponse.status).toBe(201);
+      const invitation = (await issueResponse.json()) as {
+        invitationUrl: string;
+        expiresAt: string;
+      };
+      expect(invitation.invitationUrl).toMatch(
+        /^https:\/\/example\.com\/compatibility\/invitations\/[a-f0-9]{64}$/,
+      );
+      expect(new Date(invitation.expiresAt).getTime()).toBeGreaterThan(Date.now());
+      expect(compatibilityDataStore.relationships.size).toBe(1);
+      expect(
+        accountDataStore.raw.prepare("SELECT status FROM compatibility_references").get(),
+      ).toEqual({ status: "pending" });
     },
     e2eTimeoutMs,
   );

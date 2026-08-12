@@ -84,8 +84,13 @@ describe("Compatibility flow", () => {
       blockingReasons: [],
       nextAction: null,
     };
+    const onIssue = vi.fn();
     render(
-      <CompatibilityShareScreen state={{ status: "success", data: preview }} onRetry={vi.fn()} />,
+      <CompatibilityShareScreen
+        state={{ status: "success", data: preview }}
+        onIssue={onIssue}
+        onRetry={vi.fn()}
+      />,
     );
 
     expect(screen.getByText("うさぎさんから招待")).toBeTruthy();
@@ -97,9 +102,44 @@ describe("Compatibility flow", () => {
     expect(screen.queryByText("「「早めに決めたい」傾向があります」")).toBeNull();
     expect(screen.queryByRole("checkbox")).toBeNull();
     expect(screen.getByText(/日記やLINEの会話本文/)).toBeTruthy();
-    expect(
-      screen.getByRole("button", { name: "招待リンク発行は準備中" }).hasAttribute("disabled"),
-    ).toBe(true);
+    const issueButton = screen.getByRole("button", { name: "招待リンクを発行する" });
+    expect(issueButton.hasAttribute("disabled")).toBe(false);
+    fireEvent.click(issueButton);
+    expect(onIssue).toHaveBeenCalledWith(preview.previewToken);
+  });
+
+  it("発行後にLINE共有とリンクコピーを選べる", () => {
+    const invitationUrl = `https://example.com/compatibility/invitations/${"1".repeat(64)}`;
+    const onShareToLine = vi.fn();
+    const onCopyLink = vi.fn();
+    render(
+      <CompatibilityShareScreen
+        state={{
+          status: "success",
+          data: {
+            displayName: "うさぎ",
+            previewToken: `csp2.${"a".repeat(64)}`,
+            aboutMe: null,
+            themes: [],
+            canIssueInvitation: true,
+            blockingReasons: [],
+            nextAction: null,
+          },
+        }}
+        invitationState={{
+          status: "success",
+          data: { invitationUrl, expiresAt: "2026-08-26T00:00:00.000Z" },
+        }}
+        onCopyLink={onCopyLink}
+        onRetry={vi.fn()}
+        onShareToLine={onShareToLine}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "LINEで送る" }));
+    fireEvent.click(screen.getByRole("button", { name: "リンクをコピー" }));
+    expect(onShareToLine).toHaveBeenCalledWith(invitationUrl);
+    expect(onCopyLink).toHaveBeenCalledWith(invitationUrl);
   });
 
   it("共有できる診断がなければ診断への導線を表示する", () => {

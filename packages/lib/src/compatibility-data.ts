@@ -25,6 +25,14 @@ export type CompatibilityThemeConsent = Readonly<{
   consentedAt: Date;
 }>;
 
+export type CompatibilityProfileFingerprint = Readonly<{
+  profileSummaryVersionId: string;
+  fingerprint: string;
+}>;
+
+export type CompatibilityProfileConsent = CompatibilityProfileFingerprint &
+  Readonly<{ consentedAt: Date }>;
+
 export type CompatibilityRelationship = Readonly<{
   id: string;
   inviterAccountId: string;
@@ -32,6 +40,9 @@ export type CompatibilityRelationship = Readonly<{
   inviterDisplayName: string;
   inviteeDisplayName: string | null;
   status: CompatibilityRelationshipStatus;
+  /** 旧migrationで作られた未発行データはnull。新規招待では必ず保存する。 */
+  offeredProfile: CompatibilityProfileConsent | null;
+  acceptedProfile: CompatibilityProfileConsent | null;
   offeredThemes: readonly CompatibilityThemeConsent[];
   acceptedThemes: readonly CompatibilityThemeConsent[];
   expiresAt: Date;
@@ -46,12 +57,14 @@ export type CompatibilityRelationship = Readonly<{
 export type CreateCompatibilityInvitationInput = Readonly<{
   inviterAccountId: string;
   inviterDisplayName: string;
+  offeredProfile: CompatibilityProfileFingerprint;
   offeredThemes: readonly CompatibilityThemeFingerprint[];
 }>;
 
 export type AcceptCompatibilityInvitationInput = Readonly<{
   inviteeAccountId: string;
   inviteeDisplayName: string;
+  acceptedProfile: CompatibilityProfileFingerprint;
   acceptedThemes: readonly CompatibilityThemeFingerprint[];
 }>;
 
