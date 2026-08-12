@@ -472,7 +472,7 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
         expiresAt: string;
       };
       expect(invitation.invitationUrl).toMatch(
-        /^https:\/\/example\.com\/compatibility\/invitations\/[a-f0-9]{64}$/,
+        /^https:\/\/liff\.line\.me\/1234567890-testliff\/compatibility\/invitations\/[a-f0-9]{64}$/,
       );
       expect(new Date(invitation.expiresAt).getTime()).toBeGreaterThan(Date.now());
       expect(compatibilityDataStore.relationships.size).toBe(1);
