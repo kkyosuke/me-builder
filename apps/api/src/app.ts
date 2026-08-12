@@ -25,6 +25,7 @@ import {
   acceptCompatibilityInvitationRoute,
   acceptCompatibilityInvitationValidator,
 } from "./contract/compatibility/invitation-accept";
+import { compatibilityInvitationCancelRoute } from "./contract/compatibility/invitation-cancel";
 import { compatibilityInvitationPreviewRoute } from "./contract/compatibility/invitation-preview";
 import { compatibilityRelationshipRoute } from "./contract/compatibility/relationship";
 import { compatibilityRelationshipsRoute } from "./contract/compatibility/relationships";
@@ -52,6 +53,7 @@ import {
   postDevelopmentBrainVectorSyncJobsResetAll,
 } from "./controller/brain";
 import {
+  deleteCompatibilityInvitation,
   getCompatibilityInvitation,
   getCompatibilityRelationship,
   getCompatibilityRelationships,
@@ -182,6 +184,11 @@ app.get(
   "/api/compatibility/invitations/:relationshipId",
   compatibilityInvitationPreviewRoute,
   getCompatibilityInvitation,
+);
+app.delete(
+  "/api/compatibility/invitations/:relationshipId",
+  compatibilityInvitationCancelRoute,
+  deleteCompatibilityInvitation,
 );
 app.get(
   "/api/compatibility/relationships",

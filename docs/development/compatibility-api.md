@@ -358,3 +358,17 @@ sequenceDiagram
 `pending`は本人が発行した利用可能な招待だけです。受信者がリンクを開いただけでは一覧参照を作らないため、未承諾の受信者側一覧には現れません。`accepted`は本人が当事者である成立中の関係だけです。取消・期限切れ・終了を検出した参照はAccountData側で非表示へ同期し、レスポンスへ含めません。
 
 認証・基盤の共通エラーは共有プレビューと同じです。成功レスポンスへ相手のAccount IDや相性シート本文を含めません。成功・エラーを問わず`Cache-Control: no-store`を付けます。
+
+## 9. 招待の取消
+
+### `DELETE /api/compatibility/invitations/:relationshipId`
+
+送信者本人が`pending`の招待を取り消します。CompatibilityDataの正本を先に`cancelled`へ遷移させ、その後に送信者AccountDataの一覧参照を非表示にします。正本更新後に一覧参照の更新が失敗しても、同じリクエストの再試行で参照更新を完了できるよう冪等に処理します。
+
+成功時はレスポンス本文のない`204`を返します。
+
+| HTTP | 条件 | レスポンス |
+| --- | --- | --- |
+| `404` | 関係IDが不正、存在しない、期限切れ、成立済み、または本人が送信者でない | `{ "error": "Compatibility invitation unavailable", "reason": "invitation_unavailable" }` |
+
+認証・基盤の共通エラーは共有プレビューと同じです。成功・エラーを問わず`Cache-Control: no-store`を付けます。

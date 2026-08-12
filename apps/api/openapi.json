@@ -2436,6 +2436,114 @@
             "required": true
           }
         ]
+      },
+      "delete": {
+        "operationId": "cancelCompatibilityInvitation",
+        "tags": ["Compatibility"],
+        "summary": "本人が発行中の相性招待を取り消す",
+        "security": [
+          {
+            "liffIdToken": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "招待を取り消した"
+          },
+          "401": {
+            "description": "LIFF IDトークンを検証できない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Unauthorized"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "招待または対応するAccountを利用できない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "error": {
+                          "const": "Compatibility invitation unavailable"
+                        },
+                        "reason": {
+                          "const": "invitation_unavailable"
+                        }
+                      },
+                      "required": ["error", "reason"]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "error": {
+                          "const": "Account not found"
+                        },
+                        "reason": {
+                          "const": "friendship_required"
+                        }
+                      },
+                      "required": ["error", "reason"]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "未処理のサーバーエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Internal Server Error"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "D1 bindingが設定されていない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Service Unavailable"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "relationshipId",
+            "required": true
+          }
+        ]
       }
     },
     "/api/compatibility/relationships": {

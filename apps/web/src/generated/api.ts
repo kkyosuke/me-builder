@@ -169,7 +169,8 @@ export interface paths {
     get: operations["getCompatibilityInvitation"];
     put?: never;
     post?: never;
-    delete?: never;
+    /** 本人が発行中の相性招待を取り消す */
+    delete: operations["cancelCompatibilityInvitation"];
     options?: never;
     head?: never;
     patch?: never;
@@ -1607,6 +1608,83 @@ export interface operations {
             /** @constant */
             reason: "own_invitation";
           };
+        };
+      };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
+          };
+        };
+      };
+      /** @description D1 bindingが設定されていない */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Service Unavailable";
+          };
+        };
+      };
+    };
+  };
+  cancelCompatibilityInvitation: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        relationshipId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 招待を取り消した */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description LIFF IDトークンを検証できない */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Unauthorized";
+          };
+        };
+      };
+      /** @description 招待または対応するAccountを利用できない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | {
+                /** @constant */
+                error: "Compatibility invitation unavailable";
+                /** @constant */
+                reason: "invitation_unavailable";
+              }
+            | {
+                /** @constant */
+                error: "Account not found";
+                /** @constant */
+                reason: "friendship_required";
+              };
         };
       };
       /** @description 未処理のサーバーエラー */

@@ -33,6 +33,7 @@ import {
 } from "../contract/shared/errors";
 import { issueCompatibilityInvitation } from "../logic/compatibility-invitation";
 import { acceptCompatibilityInvitation } from "../logic/compatibility-invitation-acceptance";
+import { cancelCompatibilityInvitation } from "../logic/compatibility-invitation-cancellation";
 import { getCompatibilityInvitationContents } from "../logic/compatibility-invitation-preview";
 import { getCompatibilityRelationshipContents } from "../logic/compatibility-relationship";
 import { listCompatibilityRelationships } from "../logic/compatibility-relationships";
@@ -329,6 +330,49 @@ export async function getCompatibilityRelationships(c: Context<AppEnv>): Promise
   switch (outcome.type) {
     case "resolved":
       return c.json(v.parse(CompatibilityRelationshipsResponseSchema, { items: outcome.items }));
+    case "account-not-found":
+      return c.json(
+        v.parse(AccountNotFoundErrorSchema, {
+          error: "Account not found",
+          reason: "friendship_required",
+        }),
+        404,
+      );
+    case "not-configured":
+    case "unauthenticated":
+      return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
+  }
+}
+
+/** `DELETE /api/compatibility/invitations/:relationshipId` — 本人の発行中招待を取り消す。 */
+export async function deleteCompatibilityInvitation(c: Context<AppEnv>): Promise<Response> {
+  c.header("Cache-Control", "no-store");
+  if (!c.env?.DB || !c.env.ACCOUNT_DATA || !c.env.COMPATIBILITY_DATA) {
+    logger.error(
+      { path: operationalHttpPath(c.req.path) },
+      "Compatibility invitation binding is not configured",
+    );
+    return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
+  }
+  const outcome = await cancelCompatibilityInvitation({
+    relationshipId: c.req.param("relationshipId") ?? "",
+    idToken: bearerToken(c.req.header("authorization")),
+    lineLoginChannelId: getConfig(c.env).lineLoginChannelId,
+    db: D1.shared.client.create(c.env.DB),
+    accountData: c.env.ACCOUNT_DATA,
+    compatibilityData: c.env.COMPATIBILITY_DATA,
+  });
+  switch (outcome.type) {
+    case "cancelled":
+      return c.body(null, 204);
+    case "unavailable":
+      return c.json(
+        v.parse(CompatibilityInvitationUnavailableSchema, {
+          error: "Compatibility invitation unavailable",
+          reason: "invitation_unavailable",
+        }),
+        404,
+      );
     case "account-not-found":
       return c.json(
         v.parse(AccountNotFoundErrorSchema, {

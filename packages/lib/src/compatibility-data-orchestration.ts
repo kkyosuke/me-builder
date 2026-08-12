@@ -197,3 +197,24 @@ export async function acceptCompatibilityInvitationWithReferences(
   );
   return result;
 }
+
+/** 正本の招待を取り消してから、送信者の一覧参照を冪等に非表示へ更新する。 */
+export async function cancelCompatibilityInvitationWithReference(
+  accountNamespace: AccountDataNamespace,
+  compatibilityNamespace: CompatibilityDataNamespace,
+  relationshipId: string,
+  actorAccountId: string,
+) {
+  const result = await compatibilityDataFor(
+    compatibilityNamespace,
+    relationshipId,
+  ).cancelInvitation(actorAccountId);
+  if (result.outcome === "cancelled" || result.outcome === "unchanged") {
+    await accountDataFor(accountNamespace, actorAccountId).execute(
+      "compatibility.endReference",
+      relationshipId,
+      new Date(),
+    );
+  }
+  return result;
+}

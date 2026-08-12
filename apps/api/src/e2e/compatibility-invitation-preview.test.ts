@@ -487,11 +487,14 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
       await completeDiagnosis("inviter-token");
       await generateShareProfile("inviter", "私は、先の見通しを持って動けると安心します");
       const relationshipId = await issueInvitationForInviter();
-      await expect(
-        compatibilityDataStore.namespace
-          .getByName(relationshipId)
-          .cancelInvitation(relationshipId, participants.inviter.accountId),
-      ).resolves.toMatchObject({ outcome: "cancelled" });
+      const cancelResponse = await app.request(
+        `/api/compatibility/invitations/${relationshipId}`,
+        { method: "DELETE", headers: { Authorization: "Bearer inviter-token" } },
+        env(),
+      );
+      expect(cancelResponse.status).toBe(204);
+      expect(cancelResponse.headers.get("Cache-Control")).toBe("no-store");
+      expect(compatibilityDataStore.relationships.get(relationshipId)?.status).toBe("cancelled");
 
       const response = await app.request(
         `/api/compatibility/invitations/${relationshipId}`,
@@ -510,6 +513,12 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
           .prepare("SELECT COUNT(*) AS count FROM compatibility_references")
           .get(),
       ).toEqual({ count: 0 });
+      const listResponse = await app.request(
+        "/api/compatibility/relationships",
+        { headers: { Authorization: "Bearer inviter-token" } },
+        env(),
+      );
+      expect(await listResponse.json()).toEqual({ items: [] });
     },
     e2eTimeoutMs,
   );
