@@ -3,9 +3,39 @@ import {
   type AcceptCompatibilityInvitationResult,
   type CompatibilityDataNamespace,
   type CompatibilityRelationship,
+  type CreateCompatibilityInvitationInput,
+  type CreateCompatibilityInvitationResult,
   compatibilityDataFor,
+  createCompatibilityRelationshipId,
 } from "./compatibility-data";
 import { type AccountDataNamespace, accountDataFor } from "./do/account/rpc";
+
+export type CreateCompatibilityInvitationWithReferenceResult = CreateCompatibilityInvitationResult;
+
+/** 正本の招待を作成し、送信者の一覧参照まで保存してから発行成功とする。 */
+export async function createCompatibilityInvitationWithReference(
+  accountNamespace: AccountDataNamespace,
+  compatibilityNamespace: CompatibilityDataNamespace,
+  input: CreateCompatibilityInvitationInput,
+  relationshipId = createCompatibilityRelationshipId(),
+): Promise<CreateCompatibilityInvitationWithReferenceResult> {
+  const relationshipData = compatibilityDataFor(compatibilityNamespace, relationshipId);
+  const result = await relationshipData.createInvitation(input);
+  try {
+    await accountDataFor(accountNamespace, input.inviterAccountId).execute(
+      "compatibility.addOutgoingReference",
+      {
+        relationshipId,
+        createdAt: result.relationship.createdAt,
+      },
+    );
+  } catch (error) {
+    // URLを返す前の失敗では正本を取消し、参照のない利用可能な招待を残さない。
+    await relationshipData.cancelInvitation(input.inviterAccountId).catch(() => undefined);
+    throw error;
+  }
+  return result;
+}
 
 export type AcceptCompatibilityInvitationWithReferencesResult =
   | AcceptCompatibilityInvitationResult

@@ -10,6 +10,16 @@ export const compatibilityRelationships = sqliteTable(
     inviteeAccountId: text("invitee_account_id"),
     inviterDisplayName: text("inviter_display_name").notNull(),
     inviteeDisplayName: text("invitee_display_name"),
+    offeredProfileSummaryVersionId: text("offered_profile_summary_version_id"),
+    offeredProfileFingerprint: text("offered_profile_fingerprint"),
+    offeredProfileConsentedAt: integer("offered_profile_consented_at", {
+      mode: "timestamp_ms",
+    }),
+    acceptedProfileSummaryVersionId: text("accepted_profile_summary_version_id"),
+    acceptedProfileFingerprint: text("accepted_profile_fingerprint"),
+    acceptedProfileConsentedAt: integer("accepted_profile_consented_at", {
+      mode: "timestamp_ms",
+    }),
     status: text("status", {
       enum: ["pending", "accepted", "cancelled", "expired", "ended"],
     })
@@ -31,7 +41,7 @@ export const compatibilityRelationships = sqliteTable(
     ),
     check(
       "compatibility_relationship_accepted_participant_check",
-      sql`${table.status} <> 'accepted' or (${table.inviteeAccountId} is not null and ${table.inviteeDisplayName} is not null and ${table.acceptedAt} is not null)`,
+      sql`${table.status} <> 'accepted' or (${table.inviteeAccountId} is not null and ${table.inviteeDisplayName} is not null and ${table.acceptedAt} is not null and ((${table.acceptedProfileSummaryVersionId} is null and ${table.acceptedProfileFingerprint} is null and ${table.acceptedProfileConsentedAt} is null) or (${table.acceptedProfileSummaryVersionId} is not null and ${table.acceptedProfileFingerprint} is not null and ${table.acceptedProfileConsentedAt} is not null)))`,
     ),
   ],
 );

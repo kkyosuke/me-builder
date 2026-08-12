@@ -17,6 +17,7 @@ import {
   resetAllDevelopmentBrainVectorSyncJobsRoute,
   resetDevelopmentBrainVectorSyncJobRoute,
 } from "./contract/brain/dev-vector-sync-jobs";
+import { issueCompatibilityInvitationRoute } from "./contract/compatibility/invitation";
 import { compatibilitySharePreviewRoute } from "./contract/compatibility/share-preview";
 import { saveDiagnosisAnswerRoute } from "./contract/diagnosis/answer";
 import { diagnosisAnswersRoute } from "./contract/diagnosis/answers";
@@ -40,7 +41,10 @@ import {
   postDevelopmentBrainVectorSyncJobReset,
   postDevelopmentBrainVectorSyncJobsResetAll,
 } from "./controller/brain";
-import { getCompatibilitySharePreviewContents } from "./controller/compatibility";
+import {
+  getCompatibilitySharePreviewContents,
+  postCompatibilityInvitation,
+} from "./controller/compatibility";
 import {
   deleteDevelopmentDiagnosisData,
   getDiagnoses,
@@ -145,6 +149,11 @@ app.get(
   "/api/dev/brain-items/:brainItemId/vector",
   developmentBrainVectorRoute,
   getDevelopmentBrainVector,
+);
+app.post(
+  "/api/compatibility/invitations",
+  issueCompatibilityInvitationRoute,
+  postCompatibilityInvitation,
 );
 app.get(
   "/api/dev/brain-vector-sync-jobs/failed",

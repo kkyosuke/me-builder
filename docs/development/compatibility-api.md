@@ -100,3 +100,47 @@ flowchart LR
 | `404` | 検証済みLINE Accountに対応するAccountがない | `{ "error": "Account not found", "reason": "friendship_required" }` |
 | `503` | D1またはAccountData bindingがない | `{ "error": "Service Unavailable" }` |
 | `500` | 未処理のサーバーエラー | `{ "error": "Internal Server Error" }` |
+
+## 4. 招待リンク発行
+
+### `POST /api/compatibility/invitations`
+
+共有プレビューで確認した内容から、1人だけが承諾できる招待リンクを発行します。クライアントは直前の共有プレビューで受け取った`previewToken`だけを送り、Account ID、表示名、共有プロフィール、診断結果を送りません。
+
+```json
+{
+  "previewToken": "csp2.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+}
+```
+
+API Serverは本人の現在状態から共有プレビューを再計算します。tokenが一致し、現在も発行可能な場合だけ、256 bitの不透明な関係IDでCompatibilityDataへ`pending`招待を作成し、送信者のAccountDataへ一覧参照を保存します。招待リンクへAccount IDと`previewToken`を含めません。
+
+```mermaid
+sequenceDiagram
+    participant Web
+    participant API
+    participant AccountData
+    participant CompatibilityData
+    Web->>API: previewToken
+    API->>AccountData: 現在の共有表示を再計算
+    API->>CompatibilityData: pending招待を作成
+    API->>AccountData: 送信者の返事待ち参照を追加
+    API-->>Web: invitationUrl, expiresAt
+```
+
+成功時は`201`を返します。`expiresAt`はCompatibilityDataが決定した14日後の期限です。
+
+```json
+{
+  "invitationUrl": "https://example.com/compatibility/invitations/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "expiresAt": "2026-08-26T00:00:00.000Z"
+}
+```
+
+| HTTP | 条件 | レスポンス |
+| --- | --- | --- |
+| `400` | JSONまたは`previewToken`の形式が不正 | `{ "error": "Invalid request" }` |
+| `409` | 確認後に表示内容が変わった | `{ "error": "Compatibility invitation unavailable", "reason": "preview_changed" }` |
+| `409` | 現在の状態では共有を開始できない | `{ "error": "Compatibility invitation unavailable", "reason": "share_unavailable" }` |
+
+認証・基盤の共通エラーは共有プレビューと同じです。`DB`、`AccountData`、`CompatibilityData`、またはWeb UI originのbindingがなければ`503`を返し、招待を作成しません。

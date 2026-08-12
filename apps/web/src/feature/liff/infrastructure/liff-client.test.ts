@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getLiffIdToken, initializeLiff } from "./liff-client";
+import { getLiffIdToken, initializeLiff, shareLiffTextMessage } from "./liff-client";
 
 const mockLiff = vi.hoisted(() => ({
   init: vi.fn(),
@@ -8,6 +8,8 @@ const mockLiff = vi.hoisted(() => ({
   login: vi.fn(),
   getProfile: vi.fn(),
   getIDToken: vi.fn(),
+  isApiAvailable: vi.fn(),
+  shareTargetPicker: vi.fn(),
 }));
 
 vi.mock("@line/liff", () => ({ default: mockLiff }));
@@ -94,6 +96,27 @@ describe("initializeLiff", () => {
 
     expect(state.status).toBe("error");
     expect(state).toMatchObject({ message: expect.stringContaining("network error") });
+  });
+});
+
+describe("shareLiffTextMessage", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("共有先選択を利用できる場合はテキストメッセージだけを渡す", async () => {
+    mockLiff.isApiAvailable.mockReturnValue(true);
+    mockLiff.shareTargetPicker.mockResolvedValue(undefined);
+
+    await expect(shareLiffTextMessage("招待メッセージ")).resolves.toBe(true);
+    expect(mockLiff.shareTargetPicker).toHaveBeenCalledWith([
+      { type: "text", text: "招待メッセージ" },
+    ]);
+  });
+
+  it("共有先選択を利用できなければSDKを呼ばずfalseを返す", async () => {
+    mockLiff.isApiAvailable.mockReturnValue(false);
+
+    await expect(shareLiffTextMessage("招待メッセージ")).resolves.toBe(false);
+    expect(mockLiff.shareTargetPicker).not.toHaveBeenCalled();
   });
 });
 

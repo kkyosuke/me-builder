@@ -1,5 +1,5 @@
 import type { D1Database } from "@cloudflare/workers-types";
-import type { AccountDataNamespace } from "@me-builder/lib";
+import type { AccountDataNamespace, CompatibilityDataNamespace } from "@me-builder/lib";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { app } from "../index";
 import type { CompatibilitySharePreviewOutcome } from "../logic/compatibility-share-preview";
@@ -7,10 +7,15 @@ import type { CompatibilitySharePreviewOutcome } from "../logic/compatibility-sh
 const { getCompatibilitySharePreview } = vi.hoisted(() => ({
   getCompatibilitySharePreview: vi.fn(),
 }));
+const { issueCompatibilityInvitation } = vi.hoisted(() => ({
+  issueCompatibilityInvitation: vi.fn(),
+}));
 vi.mock("../logic/compatibility-share-preview", () => ({ getCompatibilitySharePreview }));
+vi.mock("../logic/compatibility-invitation", () => ({ issueCompatibilityInvitation }));
 
 const dummyDb = {} as D1Database;
 const dummyAccountData = {} as AccountDataNamespace;
+const dummyCompatibilityData = {} as CompatibilityDataNamespace;
 const previewToken = `csp2.${"a".repeat(64)}`;
 
 function outcome(value: CompatibilitySharePreviewOutcome) {
@@ -111,5 +116,84 @@ describe("GET /api/compatibility/share-preview", () => {
 
     expect(response.status).toBe(503);
     expect(getCompatibilitySharePreview).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /api/compatibility/invitations", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  function issueRequest(body: unknown, env: Record<string, unknown> = {}) {
+    return app.request(
+      "/api/compatibility/invitations",
+      {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer dummy.id.token",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      },
+      {
+        LIFF_ID: "2010850319-Yl63upAR",
+        WEB_ORIGIN: "https://example.com",
+        DB: dummyDb,
+        ACCOUNT_DATA: dummyAccountData,
+        COMPATIBILITY_DATA: dummyCompatibilityData,
+        ...env,
+      },
+    );
+  }
+
+  it("createdを201の招待URLへ変換する", async () => {
+    issueCompatibilityInvitation.mockResolvedValue({
+      type: "created",
+      invitationUrl: `https://example.com/compatibility/invitations/${"1".repeat(64)}`,
+      expiresAt: "2026-08-26T00:00:00.000Z",
+    });
+
+    const response = await issueRequest({ previewToken });
+
+    expect(response.status).toBe(201);
+    expect(await response.json()).toEqual({
+      invitationUrl: `https://example.com/compatibility/invitations/${"1".repeat(64)}`,
+      expiresAt: "2026-08-26T00:00:00.000Z",
+    });
+    expect(issueCompatibilityInvitation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        idToken: "dummy.id.token",
+        previewToken,
+        webOrigin: "https://example.com",
+        accountData: dummyAccountData,
+        compatibilityData: dummyCompatibilityData,
+      }),
+    );
+  });
+
+  it.each([
+    { type: "preview-changed" as const, reason: "preview_changed" },
+    { type: "share-unavailable" as const, reason: "share_unavailable" },
+  ])("$typeを409へ変換する", async ({ type, reason }) => {
+    issueCompatibilityInvitation.mockResolvedValue({ type });
+    const response = await issueRequest({ previewToken });
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({
+      error: "Compatibility invitation unavailable",
+      reason,
+    });
+  });
+
+  it("不正なpreviewTokenではlogicを呼ばず400を返す", async () => {
+    const response = await issueRequest({ previewToken: "invalid" });
+
+    expect(response.status).toBe(400);
+    expect(issueCompatibilityInvitation).not.toHaveBeenCalled();
+  });
+
+  it("CompatibilityData bindingがなければ503を返す", async () => {
+    const response = await issueRequest({ previewToken }, { COMPATIBILITY_DATA: undefined });
+
+    expect(response.status).toBe(503);
+    expect(issueCompatibilityInvitation).not.toHaveBeenCalled();
   });
 });

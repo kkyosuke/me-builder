@@ -15,6 +15,13 @@ export function getLiffIdToken(): string | null {
   }
 }
 
+/** LIFFの共有先選択を開き、LINEの友だちへテキストを送れる場合だけtrueを返す。 */
+export async function shareLiffTextMessage(text: string): Promise<boolean> {
+  if (!liff.isApiAvailable("shareTargetPicker")) return false;
+  await liff.shareTargetPicker([{ type: "text", text }]);
+  return true;
+}
+
 /**
  * LIFF を初期化し、ログイン状態に応じた表示用の状態を返します。
  *

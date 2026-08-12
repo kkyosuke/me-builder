@@ -55,6 +55,10 @@ export class CompatibilityDataRepository {
     );
     if (decision.outcome === "unchanged") return decision;
     const { relationship } = decision;
+    if (!relationship.offeredProfile) {
+      throw new Error("Created compatibility invitation must have inviter profile consent");
+    }
+    const offeredProfile = relationship.offeredProfile;
 
     this.db.transaction((tx) => {
       tx.insert(compatibilityRelationships)
@@ -65,6 +69,12 @@ export class CompatibilityDataRepository {
           inviteeAccountId: relationship.inviteeAccountId,
           inviterDisplayName: relationship.inviterDisplayName,
           inviteeDisplayName: relationship.inviteeDisplayName,
+          offeredProfileSummaryVersionId: offeredProfile.profileSummaryVersionId,
+          offeredProfileFingerprint: offeredProfile.fingerprint,
+          offeredProfileConsentedAt: offeredProfile.consentedAt,
+          acceptedProfileSummaryVersionId: relationship.acceptedProfile?.profileSummaryVersionId,
+          acceptedProfileFingerprint: relationship.acceptedProfile?.fingerprint,
+          acceptedProfileConsentedAt: relationship.acceptedProfile?.consentedAt,
           status: relationship.status,
           expiresAt: relationship.expiresAt,
           acceptedAt: relationship.acceptedAt,
@@ -127,6 +137,10 @@ export class CompatibilityDataRepository {
         .set({
           inviteeAccountId: acceptedRelationship.inviteeAccountId,
           inviteeDisplayName: acceptedRelationship.inviteeDisplayName,
+          acceptedProfileSummaryVersionId:
+            acceptedRelationship.acceptedProfile?.profileSummaryVersionId,
+          acceptedProfileFingerprint: acceptedRelationship.acceptedProfile?.fingerprint,
+          acceptedProfileConsentedAt: acceptedRelationship.acceptedProfile?.consentedAt,
           status: acceptedRelationship.status,
           acceptedAt: acceptedRelationship.acceptedAt,
           updatedAt: acceptedRelationship.updatedAt,
@@ -228,6 +242,26 @@ export class CompatibilityDataRepository {
       inviterDisplayName: relationship.inviterDisplayName,
       inviteeDisplayName: relationship.inviteeDisplayName,
       status: relationship.status,
+      offeredProfile:
+        relationship.offeredProfileSummaryVersionId &&
+        relationship.offeredProfileFingerprint &&
+        relationship.offeredProfileConsentedAt
+          ? {
+              profileSummaryVersionId: relationship.offeredProfileSummaryVersionId,
+              fingerprint: relationship.offeredProfileFingerprint,
+              consentedAt: relationship.offeredProfileConsentedAt,
+            }
+          : null,
+      acceptedProfile:
+        relationship.acceptedProfileSummaryVersionId &&
+        relationship.acceptedProfileFingerprint &&
+        relationship.acceptedProfileConsentedAt
+          ? {
+              profileSummaryVersionId: relationship.acceptedProfileSummaryVersionId,
+              fingerprint: relationship.acceptedProfileFingerprint,
+              consentedAt: relationship.acceptedProfileConsentedAt,
+            }
+          : null,
       offeredThemes,
       acceptedThemes,
       expiresAt: relationship.expiresAt,

@@ -18,6 +18,10 @@ function invitationInput() {
   return {
     inviterAccountId: "account-inviter",
     inviterDisplayName: " 送信者 ",
+    offeredProfile: {
+      profileSummaryVersionId: "profile-version-inviter",
+      fingerprint: "f".repeat(64),
+    },
     offeredThemes: [
       { diagnosisId: "diagnosis-1", resultFingerprint: "a".repeat(64) },
       { diagnosisId: "diagnosis-2", resultFingerprint: "b".repeat(64) },
@@ -119,6 +123,10 @@ describe("compatibility data domain", () => {
     const acceptance = {
       inviteeAccountId: "account-invitee",
       inviteeDisplayName: " 受信者 ",
+      acceptedProfile: {
+        profileSummaryVersionId: "profile-version-invitee",
+        fingerprint: "e".repeat(64),
+      },
       acceptedThemes: [{ diagnosisId: "diagnosis-2", resultFingerprint: "c".repeat(64) }],
     } as const;
     const accepted = decideCompatibilityInvitationAcceptance(relationship, acceptance, acceptedAt);
@@ -160,6 +168,10 @@ describe("compatibility data domain", () => {
         {
           inviteeAccountId: "account-invitee",
           inviteeDisplayName: "受信者",
+          acceptedProfile: {
+            profileSummaryVersionId: "profile-version-invitee",
+            fingerprint: "e".repeat(64),
+          },
           acceptedThemes: [{ diagnosisId: "diagnosis-1", resultFingerprint: "c".repeat(64) }],
         },
         expiresAt,

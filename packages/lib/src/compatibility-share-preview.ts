@@ -69,6 +69,31 @@ function bytesToHex(bytes: ArrayBuffer): string {
   return [...new Uint8Array(bytes)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
+/** 発行時に確認したテーマ表示を、後続の再確認に使う外部非公開の指紋へ変換する。 */
+export async function createCompatibilityShareThemeFingerprints(
+  diagnoses: readonly CompatibilitySharePreviewDiagnosis[],
+): Promise<Array<{ diagnosisId: string; resultFingerprint: string }>> {
+  return Promise.all(
+    diagnoses.flatMap((diagnosis) => {
+      const theme = buildCompatibilitySharePreviewThemes([diagnosis])[0];
+      if (!theme) return [];
+      const canonical = JSON.stringify({
+        schemaVersion: 1,
+        diagnosisId: diagnosis.diagnosisId,
+        scoringConfigId: diagnosis.scoringConfigId,
+        scoringVersion: diagnosis.scoring.scoringVersion,
+        theme,
+      });
+      return [
+        crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonical)).then((digest) => ({
+          diagnosisId: diagnosis.diagnosisId,
+          resultFingerprint: bytesToHex(digest),
+        })),
+      ];
+    }),
+  );
+}
+
 /** 表示内容と採点設定版を、後続commandで再計算できる不透明な確認tokenへ変換する。 */
 export async function createCompatibilitySharePreviewToken(
   displayName: string | null,
