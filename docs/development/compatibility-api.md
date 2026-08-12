@@ -234,3 +234,51 @@ sequenceDiagram
 | `409` | 送信者本人が自分の招待を開いた | `{ "error": "Compatibility invitation unavailable", "reason": "own_invitation" }` |
 
 認証・基盤の共通エラーは共有プレビューと同じです。`DB`、`AccountData`、または`CompatibilityData` bindingがなければ`503`を返します。成功レスポンスへAccount ID、生の回答、具体的な出来事、日記・会話本文、内部根拠ID、採点設定、各種指紋を含めません。招待の状態変化をブラウザや中継キャッシュが保持しないよう、成功・エラーを問わず`Cache-Control: no-store`を付けます。リンクを開いただけでは受信者のAccount、閲覧履歴、同意をCompatibilityDataまたは送信者AccountDataへ保存しません。
+
+## 6. 招待の承諾
+
+### `POST /api/compatibility/invitations/:relationshipId/accept`
+
+招待確認画面で双方の共有内容を確認した受信者が、相性関係を成立させます。クライアントは招待確認APIで受け取った受信者自身の`previewToken`だけを送り、Account ID、表示名、プロフィール、診断結果、共有対象の選択は送りません。
+
+```json
+{
+  "previewToken": "csp2.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+}
+```
+
+API Serverは承諾直前に双方の共有内容を再構築します。送信者側は招待発行時の同意指紋、受信者側は`previewToken`と照合し、受信者にも現在表示できる共通Diagnosisをすべて承諾対象にします。双方のAccountDataで同じAccountペアの予約を直列化した後、CompatibilityDataを`accepted`へ遷移させ、双方の一覧参照を有効化します。
+
+```mermaid
+sequenceDiagram
+    participant Web
+    participant API
+    participant Accounts as 双方のAccountData
+    participant CompatibilityData
+    Web->>API: relationshipId, previewToken
+    API->>API: 双方の共有内容と同意を再検証
+    API->>Accounts: 同じAccountペアを予約
+    API->>CompatibilityData: acceptedへ遷移
+    API->>Accounts: 双方の一覧参照を有効化
+    API-->>Web: accepted
+```
+
+成功時は`200`を返します。
+
+```json
+{
+  "relationshipId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "status": "accepted"
+}
+```
+
+| HTTP | 条件 | レスポンス |
+| --- | --- | --- |
+| `400` | JSONまたは`previewToken`の形式が不正 | `{ "error": "Invalid request" }` |
+| `404` | 関係IDが不正、招待が存在しない、期限切れ、取消済み、または同意内容を安全に再構築できない | `{ "error": "Compatibility invitation unavailable", "reason": "invitation_unavailable" }` |
+| `409` | 送信者本人が承諾しようとした | `{ "error": "Compatibility invitation unavailable", "reason": "own_invitation" }` |
+| `409` | 確認後に受信者の表示内容が変わった | `{ "error": "Compatibility invitation unavailable", "reason": "preview_changed" }` |
+| `409` | 受信者の共有準備または共通Diagnosisが不足している | `{ "error": "Compatibility invitation unavailable", "reason": "share_unavailable" }` |
+| `409` | 同じ2人の別の相性関係がすでに成立している | `{ "error": "Compatibility invitation unavailable", "reason": "duplicate_relationship" }` |
+
+認証・基盤の共通エラーは共有プレビューと同じです。成功・エラーを問わず`Cache-Control: no-store`を付けます。

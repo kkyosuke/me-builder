@@ -119,4 +119,26 @@ export const compatibilitySharePreviewCases = {
       },
     },
   },
+  acceptInvitation: {
+    id: "COMPATIBILITY-INVITATION-ACCEPT-001",
+    name: "確認した共有内容で相性関係と双方の一覧参照を成立させること",
+    in: {
+      method: "POST",
+      path: "/api/compatibility/invitations/:relationshipId/accept",
+      authorization: "Bearer recipient-token",
+      setup: [
+        "送信者と受信者が共通Diagnosisを完了して共有プロフィールを生成",
+        "招待確認APIで受信者のpreviewTokenを確認",
+      ],
+    },
+    out: {
+      status: 200,
+      body: {
+        status: "accepted",
+        relationshipStatus: "accepted",
+        inviterReferenceStatus: "active",
+        recipientReferenceStatus: "active",
+      },
+    },
+  },
 } as const satisfies Record<string, E2eCase>;
