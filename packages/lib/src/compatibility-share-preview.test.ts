@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildCompatibilitySharePreviewThemes,
-  createCompatibilitySharePreviewToken,
-  createCompatibilityShareThemeFingerprints,
+  selectCommonCompatibilityDiagnoses,
 } from "./compatibility-share-preview";
 
 describe("buildCompatibilitySharePreviewThemes", () => {
@@ -82,76 +81,11 @@ describe("buildCompatibilitySharePreviewThemes", () => {
     ]);
   });
 
-  it("同じ表示内容には同じtokenを返し、位置または採点設定版の変更を検出する", async () => {
-    const diagnosis = {
-      diagnosisId: "diagnosis-1",
-      title: "時間と予定",
-      scoringConfigId: "time-planning-v1",
-      scoring: {
-        scoringVersion: 1,
-        balancedLabel: "状況に応じて決めたい",
-        parameters: [
-          {
-            id: "planning",
-            label: "予定",
-            lowLabel: "その場",
-            highLabel: "早め",
-            score: 80,
-            coverage: 100,
-            band: "high" as const,
-          },
-        ],
-      },
-    };
-    const parameter = diagnosis.scoring.parameters[0];
-    if (!parameter) throw new Error("Expected a scored parameter");
-    const shareProfile = {
-      profileSummaryVersionId: "summary-version-1",
-      generatedAt: "2026-08-11T00:00:00.000Z",
-      statements: [{ key: "planning", label: "予定", statement: "私は、見通しがあると安心します" }],
-      fingerprint: "a".repeat(64),
-    };
-
-    const token = await createCompatibilitySharePreviewToken("あおい", shareProfile, [diagnosis]);
-    expect(token).toMatch(/^csp2\.[a-f0-9]{64}$/);
-    await expect(
-      createCompatibilitySharePreviewToken("あおい", shareProfile, [diagnosis]),
-    ).resolves.toBe(token);
-    await expect(
-      createCompatibilitySharePreviewToken(
-        "あおい",
-        { ...shareProfile, profileSummaryVersionId: "summary-version-2" },
-        [diagnosis],
-      ),
-    ).resolves.not.toBe(token);
-    await expect(
-      createCompatibilitySharePreviewToken("あおい", shareProfile, [
-        { ...diagnosis, scoring: { ...diagnosis.scoring, scoringVersion: 2 } },
-      ]),
-    ).resolves.not.toBe(token);
-    await expect(
-      createCompatibilitySharePreviewToken("あおい", shareProfile, [
-        { ...diagnosis, scoringConfigId: "time-planning-v2" },
-      ]),
-    ).resolves.not.toBe(token);
-    await expect(
-      createCompatibilitySharePreviewToken("あおい", shareProfile, [
-        {
-          ...diagnosis,
-          scoring: {
-            ...diagnosis.scoring,
-            parameters: [{ ...parameter, score: 79 }],
-          },
-        },
-      ]),
-    ).resolves.not.toBe(token);
-  });
-
-  it("テーマごとに表示内容と採点設定版を含む指紋を作る", async () => {
-    const diagnosis = {
-      diagnosisId: "diagnosis-1",
-      title: "時間と予定",
-      scoringConfigId: "time-planning-v1",
+  it("双方が現在共有できるDiagnosisの共通部分だけを、primary側の順序で選ぶ", () => {
+    const diagnosis = (diagnosisId: string) => ({
+      diagnosisId,
+      title: diagnosisId,
+      scoringConfigId: `${diagnosisId}-v1`,
       scoring: {
         scoringVersion: 1,
         balancedLabel: "状況による",
@@ -167,18 +101,15 @@ describe("buildCompatibilitySharePreviewThemes", () => {
           },
         ],
       },
-    };
+    });
 
-    const first = await createCompatibilityShareThemeFingerprints([diagnosis]);
-    expect(first).toEqual([
-      { diagnosisId: "diagnosis-1", resultFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/) },
-    ]);
-    await expect(createCompatibilityShareThemeFingerprints([diagnosis])).resolves.toEqual(first);
-    await expect(
-      createCompatibilityShareThemeFingerprints([
-        { ...diagnosis, scoring: { ...diagnosis.scoring, scoringVersion: 2 } },
-      ]),
-    ).resolves.not.toEqual(first);
+    expect(
+      selectCommonCompatibilityDiagnoses(
+        [diagnosis("diagnosis-1"), diagnosis("diagnosis-2"), diagnosis("diagnosis-3")],
+        [diagnosis("diagnosis-3"), diagnosis("diagnosis-1")],
+      ),
+    ).toEqual(["diagnosis-1", "diagnosis-3"]);
+    expect(selectCommonCompatibilityDiagnoses([diagnosis("diagnosis-1")], [])).toEqual([]);
   });
 
   it("計算不能なパラメータと空になったDiagnosisを共有対象から除外する", () => {

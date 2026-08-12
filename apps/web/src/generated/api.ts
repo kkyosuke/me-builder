@@ -134,7 +134,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** 確認済みの共有内容で相性招待を承諾する */
+    /** 共有へ同意した受信者が相性招待を承諾する */
     post: operations["acceptCompatibilityInvitation"];
     delete?: never;
     options?: never;
@@ -151,7 +151,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** 確認済みの共有内容から1人用の招待リンクを発行する */
+    /** 共有へ同意した本人が1人用の招待リンクを発行する */
     post: operations["issueCompatibilityInvitation"];
     delete?: never;
     options?: never;
@@ -183,7 +183,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** 受信者が承諾前に双方の共有内容を確認する */
+    /** 受信者が承諾前に招待者と共有の意味を確認する */
     get: operations["getCompatibilityInvitation"];
     put?: never;
     post?: never;
@@ -218,7 +218,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** 成立中の相性関係を同意済み内容から再構築する */
+    /** 成立中の相性関係を双方の現在の内容から組み立てる */
     get: operations["getCompatibilityRelationship"];
     put?: never;
     post?: never;
@@ -280,15 +280,15 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/api/compatibility/share-preview": {
+  "/api/compatibility/share-consent": {
     parameters: {
       query?: never;
       header?: never;
       path?: never;
       cookie?: never;
     };
-    /** 招待発行前に本人が共有内容を確認する */
-    get: operations["getCompatibilitySharePreview"];
+    /** 招待発行前に本人の共有可否を確認する */
+    get: operations["getCompatibilityShareConsent"];
     put?: never;
     post?: never;
     delete?: never;
@@ -1366,13 +1366,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody: {
-      content: {
-        "application/json": {
-          previewToken: string;
-        };
-      };
-    };
+    requestBody?: never;
     responses: {
       /** @description 成立した相性関係 */
       200: {
@@ -1384,18 +1378,6 @@ export interface operations {
             relationshipId: string;
             /** @constant */
             status: "accepted";
-          };
-        };
-      };
-      /** @description リクエストJSONが不正 */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": {
-            /** @constant */
-            error: "Invalid request";
           };
         };
       };
@@ -1435,11 +1417,7 @@ export interface operations {
             /** @constant */
             error: "Compatibility invitation unavailable";
             /** @enum {string} */
-            reason:
-              | "own_invitation"
-              | "preview_changed"
-              | "share_unavailable"
-              | "duplicate_relationship";
+            reason: "own_invitation" | "share_unavailable" | "duplicate_relationship";
           };
         };
       };
@@ -1476,13 +1454,7 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody: {
-      content: {
-        "application/json": {
-          previewToken: string;
-        };
-      };
-    };
+    requestBody?: never;
     responses: {
       /** @description 発行した招待リンクと有効期限 */
       201: {
@@ -1495,18 +1467,6 @@ export interface operations {
             invitationUrl: string;
             /** Format: date-time */
             expiresAt: string;
-          };
-        };
-      };
-      /** @description リクエストJSONが不正 */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": {
-            /** @constant */
-            error: "Invalid request";
           };
         };
       };
@@ -1536,7 +1496,7 @@ export interface operations {
           };
         };
       };
-      /** @description 確認後に共有内容が変わった、または現在共有できない */
+      /** @description 現在は共有を開始できない */
       409: {
         headers: {
           [name: string]: unknown;
@@ -1545,8 +1505,8 @@ export interface operations {
           "application/json": {
             /** @constant */
             error: "Compatibility invitation unavailable";
-            /** @enum {string} */
-            reason: "preview_changed" | "share_unavailable";
+            /** @constant */
+            reason: "share_unavailable";
           };
         };
       };
@@ -1689,7 +1649,7 @@ export interface operations {
     };
     requestBody?: never;
     responses: {
-      /** @description 招待者の同意済み内容と受信者の現在内容 */
+      /** @description 招待者の表示名と受信者の共有可否 */
       200: {
         headers: {
           [name: string]: unknown;
@@ -1699,68 +1659,15 @@ export interface operations {
             inviter: {
               displayName: string;
               avatarUrl: string | null;
-              aboutMe: {
-                profileSummaryVersionId: string;
-                /** Format: date-time */
-                generatedAt: string;
-                statements: {
-                  key: string;
-                  label: string;
-                  statement: string;
-                }[];
-              };
-              themes: {
-                diagnosisId: string;
-                title: string;
-                parameters: {
-                  id: string;
-                  label: string;
-                  lowLabel: string;
-                  highLabel: string;
-                  position: number;
-                  statement: string;
-                }[];
-              }[];
             };
             recipient: {
               displayName: string | null;
               avatarUrl: string | null;
-              previewToken: string;
-              aboutMe: {
-                profileSummaryVersionId: string;
-                /** Format: date-time */
-                generatedAt: string;
-                statements: {
-                  key: string;
-                  label: string;
-                  statement: string;
-                }[];
-              } | null;
-              themes: {
-                diagnosisId: string;
-                title: string;
-                parameters: {
-                  id: string;
-                  label: string;
-                  lowLabel: string;
-                  highLabel: string;
-                  position: number;
-                  statement: string;
-                }[];
-              }[];
             };
             /** Format: date-time */
             expiresAt: string;
             canAccept: boolean;
-            blockingReasons: (
-              | "display_name_unavailable"
-              | "profile_summary_required"
-              | "profile_summary_stale"
-              | "diagnosis_required"
-              | "scoring_unavailable"
-              | "diagnosis_unavailable"
-              | "common_diagnosis_required"
-            )[];
+            blockingReasons: "display_name_unavailable"[];
             nextAction: ("diagnosis" | "profile-summary") | null;
           };
         };
@@ -2014,7 +1921,7 @@ export interface operations {
     };
     requestBody?: never;
     responses: {
-      /** @description 相性シート、または再共有待ち状態 */
+      /** @description 相性シート、または比較できるテーマの準備待ち状態 */
       200: {
         headers: {
           [name: string]: unknown;
@@ -2469,7 +2376,7 @@ export interface operations {
       };
     };
   };
-  getCompatibilitySharePreview: {
+  getCompatibilityShareConsent: {
     parameters: {
       query?: never;
       header?: never;
@@ -2478,7 +2385,7 @@ export interface operations {
     };
     requestBody?: never;
     responses: {
-      /** @description 本人の表示名と、相性診断へ利用できる現在の傾向 */
+      /** @description 相手へ表示される表示名と画像path、共有を始められるかどうか */
       200: {
         headers: {
           [name: string]: unknown;
@@ -2487,38 +2394,8 @@ export interface operations {
           "application/json": {
             displayName: string | null;
             avatarUrl: string | null;
-            previewToken: string;
-            aboutMe: {
-              profileSummaryVersionId: string;
-              /** Format: date-time */
-              generatedAt: string;
-              statements: {
-                key: string;
-                label: string;
-                statement: string;
-              }[];
-            } | null;
-            themes: {
-              diagnosisId: string;
-              title: string;
-              parameters: {
-                id: string;
-                label: string;
-                lowLabel: string;
-                highLabel: string;
-                position: number;
-                statement: string;
-              }[];
-            }[];
-            canIssueInvitation: boolean;
-            blockingReasons: (
-              | "display_name_unavailable"
-              | "profile_summary_required"
-              | "profile_summary_stale"
-              | "diagnosis_required"
-              | "scoring_unavailable"
-              | "diagnosis_unavailable"
-            )[];
+            canShare: boolean;
+            blockingReasons: "display_name_unavailable"[];
             nextAction: ("diagnosis" | "profile-summary") | null;
           };
         };

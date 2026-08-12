@@ -10,7 +10,7 @@ import {
   type CompatibilityDataTestStore,
   createCompatibilityDataTestStore,
 } from "../testing/compatibility-data";
-import { compatibilitySharePreviewCases } from "./case/compatibility-share-preview.case";
+import { compatibilityShareCases } from "./case/compatibility-share.case";
 import { diagnosisAnswerCases } from "./case/diagnosis-answer.case";
 
 const repositoryRoot = path.resolve(__dirname, "../../../..");
@@ -111,25 +111,18 @@ async function getAnswers(diagnosisId = "relationship-priority"): Promise<Respon
   );
 }
 
-async function getCompatibilitySharePreview(): Promise<Response> {
+async function getCompatibilityShareConsent(): Promise<Response> {
   return app.request(
-    "/api/compatibility/share-preview",
+    "/api/compatibility/share-consent",
     { headers: { Authorization: "Bearer known-token" } },
     env(),
   );
 }
 
-async function issueCompatibilityInvitation(previewToken: string): Promise<Response> {
+async function issueCompatibilityInvitation(): Promise<Response> {
   return app.request(
     "/api/compatibility/invitations",
-    {
-      method: "POST",
-      headers: {
-        Authorization: "Bearer known-token",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ previewToken }),
-    },
+    { method: "POST", headers: { Authorization: "Bearer known-token" } },
     env(),
   );
 }
@@ -397,78 +390,42 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
   );
 
   it(
-    `${compatibilitySharePreviewCases.completedDiagnosis.id}: ${compatibilitySharePreviewCases.completedDiagnosis.name}`,
+    `${compatibilityShareCases.completedDiagnosis.id}: ${compatibilityShareCases.completedDiagnosis.name}`,
     async () => {
-      const emptyResponse = await getCompatibilitySharePreview();
+      const emptyResponse = await getCompatibilityShareConsent();
       expect(emptyResponse.status).toBe(200);
-      expect(await emptyResponse.json()).toMatchObject({
+      expect(await emptyResponse.json()).toEqual({
         displayName: "あおい",
         avatarUrl: "/api/profile/avatar",
-        aboutMe: null,
-        themes: [],
-        canIssueInvitation: false,
-        blockingReasons: ["profile_summary_required", "diagnosis_required"],
+        canShare: true,
+        blockingReasons: [],
         nextAction: "profile-summary",
       });
 
       await completeRelationshipDiagnosis();
       await generateCompatibilityShareProfile();
 
-      const previewResponse = await getCompatibilitySharePreview();
-      expect(previewResponse.status).toBe(200);
-      const preview = (await previewResponse.json()) as {
-        displayName: string;
-        avatarUrl: string | null;
-        aboutMe: { statements: Array<Record<string, unknown>> } | null;
-        themes: Array<{
-          diagnosisId: string;
-          parameters: Array<Record<string, unknown>>;
-        }>;
-        canIssueInvitation: boolean;
-        blockingReasons: string[];
-        nextAction: string | null;
-        previewToken: string;
-      };
-      expect(preview.displayName).toBe("あおい");
-      expect(preview.avatarUrl).toBe("/api/profile/avatar");
-      expect(preview.canIssueInvitation).toBe(true);
-      expect(preview.blockingReasons).toEqual([]);
-      expect(preview.nextAction).toBeNull();
-      expect(preview.previewToken).toMatch(/^csp2\.[a-f0-9]{64}$/);
-      expect(preview.aboutMe?.statements).toEqual([
-        {
-          key: "planning-style",
-          label: "予定の立て方",
-          statement: "私は、先の見通しを持って動けると安心しやすいです",
-        },
-      ]);
-      expect(preview.themes).toHaveLength(1);
-      expect(preview.themes[0]?.diagnosisId).toBe("relationship-priority");
-      expect(preview.themes[0]?.parameters).toHaveLength(4);
-      expect(preview.themes[0]?.parameters[0]).toEqual({
-        id: expect.any(String),
-        label: expect.any(String),
-        lowLabel: expect.any(String),
-        highLabel: expect.any(String),
-        position: expect.any(Number),
-        statement: expect.stringContaining("傾向があります"),
+      const consentResponse = await getCompatibilityShareConsent();
+      expect(consentResponse.status).toBe(200);
+      const consent = await consentResponse.json();
+      expect(consent).toEqual({
+        displayName: "あおい",
+        avatarUrl: "/api/profile/avatar",
+        canShare: true,
+        blockingReasons: [],
+        nextAction: null,
       });
-      expect(JSON.stringify(preview)).not.toMatch(
-        /choiceId|questionText|coverage|accountId|fingerprint/,
+      expect(JSON.stringify(consent)).not.toMatch(
+        /aboutMe|themes|previewToken|statement|choiceId|questionText|coverage|accountId|fingerprint/,
       );
     },
     e2eTimeoutMs,
   );
 
   it(
-    `${compatibilitySharePreviewCases.issueInvitation.id}: ${compatibilitySharePreviewCases.issueInvitation.name}`,
+    `${compatibilityShareCases.issueInvitation.id}: ${compatibilityShareCases.issueInvitation.name}`,
     async () => {
-      await completeRelationshipDiagnosis();
-      await generateCompatibilityShareProfile();
-      const previewResponse = await getCompatibilitySharePreview();
-      const preview = (await previewResponse.json()) as { previewToken: string };
-
-      const issueResponse = await issueCompatibilityInvitation(preview.previewToken);
+      const issueResponse = await issueCompatibilityInvitation();
       expect(issueResponse.status).toBe(201);
       const invitation = (await issueResponse.json()) as {
         invitationUrl: string;

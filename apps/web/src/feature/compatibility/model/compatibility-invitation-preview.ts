@@ -1,27 +1,9 @@
-import type {
-  CompatibilitySharePreviewBlockingReason,
-  CompatibilitySharePreviewTheme,
-  CompatibilityShareProfile,
-} from "./compatibility-share-preview";
+export type CompatibilityInvitationPreviewBlockingReason = "display_name_unavailable";
 
-export type CompatibilityInvitationPreviewBlockingReason =
-  | CompatibilitySharePreviewBlockingReason
-  | "common_diagnosis_required";
-
+/** 承諾前に受信者へ見せるのは、誰からの招待かと自分が共有を始められるかだけ。 */
 export type CompatibilityInvitationPreview = {
-  inviter: {
-    displayName: string;
-    avatarUrl: string | null;
-    aboutMe: CompatibilityShareProfile;
-    themes: CompatibilitySharePreviewTheme[];
-  };
-  recipient: {
-    displayName: string | null;
-    avatarUrl: string | null;
-    previewToken: string;
-    aboutMe: CompatibilityShareProfile | null;
-    themes: CompatibilitySharePreviewTheme[];
-  };
+  inviter: { displayName: string; avatarUrl: string | null };
+  recipient: { displayName: string | null; avatarUrl: string | null };
   expiresAt: string;
   canAccept: boolean;
   blockingReasons: CompatibilityInvitationPreviewBlockingReason[];

@@ -18,23 +18,11 @@ const invitation = {
   inviter: {
     displayName: "あおい",
     avatarUrl: `/api/compatibility/invitations/${relationshipId}/avatar`,
-    aboutMe: {
-      profileSummaryVersionId: "profile-inviter",
-      generatedAt: "2026-08-11T00:00:00.000Z",
-      statements: [{ key: "planning", label: "予定", statement: "私は見通しを大切にします" }],
-    },
-    themes: [],
   },
-  recipient: {
-    displayName: "はる",
-    avatarUrl: null,
-    previewToken: `csp2.${"a".repeat(64)}`,
-    aboutMe: null,
-    themes: [],
-  },
+  recipient: { displayName: "はる", avatarUrl: null },
   expiresAt: "2026-08-26T00:00:00.000Z",
-  canAccept: false,
-  blockingReasons: ["common_diagnosis_required" as const],
+  canAccept: true,
+  blockingReasons: [],
   nextAction: "diagnosis" as const,
 };
 

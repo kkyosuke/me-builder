@@ -4,7 +4,7 @@ import { authenticatedErrors, jsonResponse } from "../shared/errors";
 import {
   CompatibilitySharePreviewThemeSchema,
   CompatibilityShareProfileSchema,
-} from "./share-preview";
+} from "./share-content";
 
 const PersonSchema = v.object({
   displayName: v.pipe(v.string(), v.nonEmpty()),
@@ -34,10 +34,13 @@ export const CompatibilityRelationshipUnavailableSchema = v.object({
 export const compatibilityRelationshipRoute = describeRoute({
   operationId: "getCompatibilityRelationship",
   tags: ["Compatibility"],
-  summary: "成立中の相性関係を同意済み内容から再構築する",
+  summary: "成立中の相性関係を双方の現在の内容から組み立てる",
   security: [{ liffIdToken: [] }],
   responses: {
-    200: jsonResponse("相性シート、または再共有待ち状態", CompatibilityRelationshipResponseSchema),
+    200: jsonResponse(
+      "相性シート、または比較できるテーマの準備待ち状態",
+      CompatibilityRelationshipResponseSchema,
+    ),
     ...authenticatedErrors,
     404: jsonResponse(
       "相性関係または対応するAccountを利用できない",

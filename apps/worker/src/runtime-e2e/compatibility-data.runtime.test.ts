@@ -21,16 +21,6 @@ describe("CompatibilityData Workers runtime E2E", () => {
       stub.createInvitation(relationshipId, {
         inviterAccountId,
         inviterDisplayName: "送信者",
-        offeredProfile: {
-          profileSummaryVersionId: "profile-version-inviter",
-          fingerprint: "f".repeat(64),
-        },
-        offeredThemes: [
-          {
-            diagnosisId: "diagnosis-1",
-            resultFingerprint: "a".repeat(64),
-          },
-        ],
       }),
     ).resolves.toMatchObject({ outcome: "created", relationship: { status: "pending" } });
 
@@ -38,40 +28,17 @@ describe("CompatibilityData Workers runtime E2E", () => {
     expect(invitation).toEqual({
       id: relationshipId,
       inviterDisplayName: "送信者",
-      offeredDiagnosisIds: ["diagnosis-1"],
       expiresAt: expect.any(Date),
       isOwnInvitation: false,
     });
     expect(invitation).not.toHaveProperty("inviterAccountId");
-    expect(invitation).not.toHaveProperty("resultFingerprint");
     await expect(stub.getInvitationAcceptanceContext(relationshipId)).resolves.toMatchObject({
       inviterAccountId,
-      offeredProfile: {
-        profileSummaryVersionId: "profile-version-inviter",
-        fingerprint: "f".repeat(64),
-      },
-      offeredThemes: [
-        {
-          diagnosisId: "diagnosis-1",
-          resultFingerprint: "a".repeat(64),
-        },
-      ],
-      offeredDiagnosisIds: ["diagnosis-1"],
     });
 
     const acceptance = {
       inviteeAccountId,
       inviteeDisplayName: "受信者",
-      acceptedProfile: {
-        profileSummaryVersionId: "profile-version-invitee",
-        fingerprint: "e".repeat(64),
-      },
-      acceptedThemes: [
-        {
-          diagnosisId: "diagnosis-1",
-          resultFingerprint: "b".repeat(64),
-        },
-      ],
     } as const;
     await expect(stub.acceptInvitation(relationshipId, acceptance)).resolves.toEqual({
       outcome: "unreserved",
@@ -118,11 +85,6 @@ describe("CompatibilityData Workers runtime E2E", () => {
     await relationship.createInvitation(relationshipId, {
       inviterAccountId,
       inviterDisplayName: "送信者",
-      offeredProfile: {
-        profileSummaryVersionId: "profile-version-inviter",
-        fingerprint: "f".repeat(64),
-      },
-      offeredThemes: [{ diagnosisId: "diagnosis-1", resultFingerprint: "a".repeat(64) }],
     });
     await inviter.execute("compatibility.addOutgoingReference", {
       relationshipId,
@@ -141,11 +103,6 @@ describe("CompatibilityData Workers runtime E2E", () => {
     await relationship.acceptInvitation(relationshipId, {
       inviteeAccountId,
       inviteeDisplayName: "受信者",
-      acceptedProfile: {
-        profileSummaryVersionId: "profile-version-invitee",
-        fingerprint: "e".repeat(64),
-      },
-      acceptedThemes: [{ diagnosisId: "diagnosis-1", resultFingerprint: "b".repeat(64) }],
     });
 
     await expect(inviter.execute("compatibility.listVisibleReferences")).resolves.toEqual([
@@ -169,11 +126,6 @@ describe("CompatibilityData Workers runtime E2E", () => {
     await relationship.createInvitation(relationshipId, {
       inviterAccountId,
       inviterDisplayName: "送信者",
-      offeredProfile: {
-        profileSummaryVersionId: "profile-version-inviter",
-        fingerprint: "f".repeat(64),
-      },
-      offeredThemes: [{ diagnosisId: "diagnosis-1", resultFingerprint: "a".repeat(64) }],
     });
     await inviter.execute("compatibility.addOutgoingReference", {
       relationshipId,
@@ -195,11 +147,6 @@ describe("CompatibilityData Workers runtime E2E", () => {
     await relationship.createInvitation(relationshipId, {
       inviterAccountId,
       inviterDisplayName: "送信者",
-      offeredProfile: {
-        profileSummaryVersionId: "profile-version-inviter",
-        fingerprint: "f".repeat(64),
-      },
-      offeredThemes: [{ diagnosisId: "diagnosis-1", resultFingerprint: "a".repeat(64) }],
     });
     await inviter.execute("compatibility.addOutgoingReference", {
       relationshipId,
@@ -218,11 +165,6 @@ describe("CompatibilityData Workers runtime E2E", () => {
     await relationship.acceptInvitation(relationshipId, {
       inviteeAccountId,
       inviteeDisplayName: "受信者",
-      acceptedProfile: {
-        profileSummaryVersionId: "profile-version-invitee",
-        fingerprint: "e".repeat(64),
-      },
-      acceptedThemes: [{ diagnosisId: "diagnosis-1", resultFingerprint: "b".repeat(64) }],
     });
 
     await expect(invitee.execute("compatibility.listVisibleReferences")).resolves.toEqual([
@@ -247,20 +189,10 @@ describe("CompatibilityData Workers runtime E2E", () => {
       aToB.createInvitation(relationshipAtoB, {
         inviterAccountId: accountA,
         inviterDisplayName: "A",
-        offeredProfile: {
-          profileSummaryVersionId: "profile-version-a",
-          fingerprint: "f".repeat(64),
-        },
-        offeredThemes: [{ diagnosisId: "diagnosis-1", resultFingerprint: "a".repeat(64) }],
       }),
       bToA.createInvitation(relationshipBtoA, {
         inviterAccountId: accountB,
         inviterDisplayName: "B",
-        offeredProfile: {
-          profileSummaryVersionId: "profile-version-b",
-          fingerprint: "e".repeat(64),
-        },
-        offeredThemes: [{ diagnosisId: "diagnosis-1", resultFingerprint: "b".repeat(64) }],
       }),
       aData.execute("compatibility.addOutgoingReference", {
         relationshipId: relationshipAtoB,
@@ -280,11 +212,6 @@ describe("CompatibilityData Workers runtime E2E", () => {
         {
           inviteeAccountId: accountB,
           inviteeDisplayName: "B",
-          acceptedProfile: {
-            profileSummaryVersionId: "profile-version-b",
-            fingerprint: "e".repeat(64),
-          },
-          acceptedThemes: [{ diagnosisId: "diagnosis-1", resultFingerprint: "b".repeat(64) }],
         },
       ),
       acceptCompatibilityInvitationWithReferences(
@@ -294,11 +221,6 @@ describe("CompatibilityData Workers runtime E2E", () => {
         {
           inviteeAccountId: accountA,
           inviteeDisplayName: "A",
-          acceptedProfile: {
-            profileSummaryVersionId: "profile-version-a",
-            fingerprint: "f".repeat(64),
-          },
-          acceptedThemes: [{ diagnosisId: "diagnosis-1", resultFingerprint: "a".repeat(64) }],
         },
       ),
     ]);

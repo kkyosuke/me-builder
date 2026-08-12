@@ -2,10 +2,10 @@ import type { D1Database, R2Bucket } from "@cloudflare/workers-types";
 import type { AccountDataNamespace, CompatibilityDataNamespace } from "@me-builder/lib";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { app } from "../index";
-import type { CompatibilitySharePreviewOutcome } from "../logic/compatibility-share-preview";
+import type { CompatibilityShareConsentOutcome } from "../logic/compatibility-share-preview";
 
-const { getCompatibilitySharePreview } = vi.hoisted(() => ({
-  getCompatibilitySharePreview: vi.fn(),
+const { getCompatibilityShareConsent } = vi.hoisted(() => ({
+  getCompatibilityShareConsent: vi.fn(),
 }));
 const { issueCompatibilityInvitation } = vi.hoisted(() => ({
   issueCompatibilityInvitation: vi.fn(),
@@ -16,7 +16,7 @@ const { getCompatibilityInvitationContents } = vi.hoisted(() => ({
 const { getCompatibilityInvitationAvatar } = vi.hoisted(() => ({
   getCompatibilityInvitationAvatar: vi.fn(),
 }));
-vi.mock("../logic/compatibility-share-preview", () => ({ getCompatibilitySharePreview }));
+vi.mock("../logic/compatibility-share-preview", () => ({ getCompatibilityShareConsent }));
 vi.mock("../logic/compatibility-invitation", () => ({ issueCompatibilityInvitation }));
 vi.mock("../logic/compatibility-invitation-preview", () => ({
   getCompatibilityInvitationContents,
@@ -29,15 +29,14 @@ const dummyDb = {} as D1Database;
 const dummyAvatarBucket = {} as R2Bucket;
 const dummyAccountData = {} as AccountDataNamespace;
 const dummyCompatibilityData = {} as CompatibilityDataNamespace;
-const previewToken = `csp2.${"a".repeat(64)}`;
 
-function outcome(value: CompatibilitySharePreviewOutcome) {
-  getCompatibilitySharePreview.mockResolvedValue(value);
+function outcome(value: CompatibilityShareConsentOutcome) {
+  getCompatibilityShareConsent.mockResolvedValue(value);
 }
 
 function request(env: Record<string, unknown> = {}, authorization = "Bearer dummy.id.token") {
   return app.request(
-    "/api/compatibility/share-preview",
+    "/api/compatibility/share-consent",
     { headers: { Authorization: authorization } },
     {
       LIFF_ID: "2010850319-Yl63upAR",
@@ -48,20 +47,17 @@ function request(env: Record<string, unknown> = {}, authorization = "Bearer dumm
   );
 }
 
-describe("GET /api/compatibility/share-preview", () => {
+describe("GET /api/compatibility/share-consent", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("resolvedを200の共有プレビューへ変換する", async () => {
+  it("resolvedを200の共有可否へ変換する", async () => {
     outcome({
       type: "resolved",
-      preview: {
+      consent: {
         displayName: "あおい",
-        avatarUrl: null,
-        previewToken,
-        aboutMe: null,
-        themes: [],
-        canIssueInvitation: false,
-        blockingReasons: ["diagnosis_required"],
+        avatarUrl: "/api/profile/avatar",
+        canShare: true,
+        blockingReasons: [],
         nextAction: "diagnosis",
       },
     });
@@ -75,15 +71,12 @@ describe("GET /api/compatibility/share-preview", () => {
     expect(response.headers.get("Cache-Control")).toBe("no-store");
     expect(await response.json()).toEqual({
       displayName: "あおい",
-      avatarUrl: null,
-      previewToken,
-      aboutMe: null,
-      themes: [],
-      canIssueInvitation: false,
-      blockingReasons: ["diagnosis_required"],
+      avatarUrl: "/api/profile/avatar",
+      canShare: true,
+      blockingReasons: [],
       nextAction: "diagnosis",
     });
-    expect(getCompatibilitySharePreview).toHaveBeenCalledWith(
+    expect(getCompatibilityShareConsent).toHaveBeenCalledWith(
       expect.objectContaining({
         idToken: "dummy.id.token",
         lineLoginChannelId: "2010850319",
@@ -109,7 +102,7 @@ describe("GET /api/compatibility/share-preview", () => {
 
     await request({}, "Basic credentials");
 
-    expect(getCompatibilitySharePreview).toHaveBeenCalledWith(
+    expect(getCompatibilityShareConsent).toHaveBeenCalledWith(
       expect.objectContaining({ idToken: undefined }),
     );
   });
@@ -128,29 +121,25 @@ describe("GET /api/compatibility/share-preview", () => {
 
   it("storage bindingがなければlogicを呼ばず503を返す", async () => {
     const response = await app.request(
-      "/api/compatibility/share-preview",
+      "/api/compatibility/share-consent",
       { headers: { Authorization: "Bearer dummy.id.token" } },
       { LIFF_ID: "2010850319-Yl63upAR" },
     );
 
     expect(response.status).toBe(503);
-    expect(getCompatibilitySharePreview).not.toHaveBeenCalled();
+    expect(getCompatibilityShareConsent).not.toHaveBeenCalled();
   });
 });
 
 describe("POST /api/compatibility/invitations", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  function issueRequest(body: unknown, env: Record<string, unknown> = {}) {
+  function issueRequest(env: Record<string, unknown> = {}) {
     return app.request(
       "/api/compatibility/invitations",
       {
         method: "POST",
-        headers: {
-          Authorization: "Bearer dummy.id.token",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(body),
+        headers: { Authorization: "Bearer dummy.id.token" },
       },
       {
         LIFF_ID: "2010850319-Yl63upAR",
@@ -170,7 +159,7 @@ describe("POST /api/compatibility/invitations", () => {
       expiresAt: "2026-08-26T00:00:00.000Z",
     });
 
-    const response = await issueRequest({ previewToken });
+    const response = await issueRequest();
 
     expect(response.status).toBe(201);
     expect(await response.json()).toEqual({
@@ -180,7 +169,6 @@ describe("POST /api/compatibility/invitations", () => {
     expect(issueCompatibilityInvitation).toHaveBeenCalledWith(
       expect.objectContaining({
         idToken: "dummy.id.token",
-        previewToken,
         liffId: "2010850319-Yl63upAR",
         accountData: dummyAccountData,
         compatibilityData: dummyCompatibilityData,
@@ -188,36 +176,26 @@ describe("POST /api/compatibility/invitations", () => {
     );
   });
 
-  it.each([
-    { type: "preview-changed" as const, reason: "preview_changed" },
-    { type: "share-unavailable" as const, reason: "share_unavailable" },
-  ])("$typeを409へ変換する", async ({ type, reason }) => {
-    issueCompatibilityInvitation.mockResolvedValue({ type });
-    const response = await issueRequest({ previewToken });
+  it("share-unavailableを409へ変換する", async () => {
+    issueCompatibilityInvitation.mockResolvedValue({ type: "share-unavailable" });
+    const response = await issueRequest();
 
     expect(response.status).toBe(409);
     expect(await response.json()).toEqual({
       error: "Compatibility invitation unavailable",
-      reason,
+      reason: "share_unavailable",
     });
   });
 
-  it("不正なpreviewTokenではlogicを呼ばず400を返す", async () => {
-    const response = await issueRequest({ previewToken: "invalid" });
-
-    expect(response.status).toBe(400);
-    expect(issueCompatibilityInvitation).not.toHaveBeenCalled();
-  });
-
   it("CompatibilityData bindingがなければ503を返す", async () => {
-    const response = await issueRequest({ previewToken }, { COMPATIBILITY_DATA: undefined });
+    const response = await issueRequest({ COMPATIBILITY_DATA: undefined });
 
     expect(response.status).toBe(503);
     expect(issueCompatibilityInvitation).not.toHaveBeenCalled();
   });
 
   it("LIFF_IDがなければ招待を作成せず503を返す", async () => {
-    const response = await issueRequest({ previewToken }, { LIFF_ID: undefined });
+    const response = await issueRequest({ LIFF_ID: undefined });
 
     expect(response.status).toBe(503);
     expect(issueCompatibilityInvitation).not.toHaveBeenCalled();
@@ -232,38 +210,11 @@ describe("GET /api/compatibility/invitations/:relationshipId", () => {
     inviter: {
       displayName: "あおい",
       avatarUrl: `/api/compatibility/invitations/${relationshipId}/avatar`,
-      aboutMe: {
-        profileSummaryVersionId: "profile-inviter",
-        generatedAt: "2026-08-11T00:00:00.000Z",
-        statements: [{ key: "planning", label: "予定", statement: "私は見通しを大切にします" }],
-      },
-      themes: [
-        {
-          diagnosisId: "diagnosis-1",
-          title: "時間と予定",
-          parameters: [
-            {
-              id: "planning",
-              label: "予定",
-              lowLabel: "その場",
-              highLabel: "早め",
-              position: 80,
-              statement: "「早め」傾向があります",
-            },
-          ],
-        },
-      ],
     },
-    recipient: {
-      displayName: "はる",
-      avatarUrl: "/api/profile/avatar",
-      previewToken,
-      aboutMe: null,
-      themes: [],
-    },
+    recipient: { displayName: "はる", avatarUrl: "/api/profile/avatar" },
     expiresAt: "2026-08-26T00:00:00.000Z",
-    canAccept: false,
-    blockingReasons: ["profile_summary_required", "common_diagnosis_required"],
+    canAccept: true,
+    blockingReasons: [],
     nextAction: "profile-summary",
   };
 

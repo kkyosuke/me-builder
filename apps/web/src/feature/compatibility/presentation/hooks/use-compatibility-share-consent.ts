@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { config } from "../../../../config";
 import type { AsyncState } from "../../../../model/async-state";
-import { fetchCompatibilitySharePreview } from "../../infrastructure/compatibility-api";
+import { fetchCompatibilityShareConsent } from "../../infrastructure/compatibility-api";
 import { fetchCompatibilityAvatarImage } from "../../infrastructure/compatibility-avatar-api";
-import type { CompatibilitySharePreview } from "../../model/compatibility-share-preview";
+import type { CompatibilityShareConsent } from "../../model/compatibility-share-consent";
 
-export function useCompatibilitySharePreview({
+export function useCompatibilityShareConsent({
   acquireIdToken,
 }: {
   acquireIdToken: (signal: AbortSignal) => Promise<string | null>;
 }) {
-  const [state, setState] = useState<AsyncState<CompatibilitySharePreview>>({
+  const [state, setState] = useState<AsyncState<CompatibilityShareConsent>>({
     status: "loading",
   });
   const mounted = useRef(false);
@@ -31,7 +31,7 @@ export function useCompatibilitySharePreview({
       if (!idToken) {
         throw new Error("LINEから相性共有画面を開いてください。");
       }
-      const preview = await fetchCompatibilitySharePreview(
+      const consent = await fetchCompatibilityShareConsent(
         config.apiUrl,
         idToken,
         controller.signal,
@@ -39,7 +39,7 @@ export function useCompatibilitySharePreview({
       const avatarBlob = await fetchCompatibilityAvatarImage(
         config.apiUrl,
         idToken,
-        preview.avatarUrl,
+        consent.avatarUrl,
         controller.signal,
       );
       if (mounted.current && !controller.signal.aborted) {
@@ -48,14 +48,14 @@ export function useCompatibilitySharePreview({
         avatarObjectUrl.current = nextAvatarObjectUrl;
         setState({
           status: "success",
-          data: { ...preview, avatarUrl: nextAvatarObjectUrl },
+          data: { ...consent, avatarUrl: nextAvatarObjectUrl },
         });
       }
     } catch (error) {
       if (mounted.current && !controller.signal.aborted) {
         setState({
           status: "error",
-          message: error instanceof Error ? error.message : "共有する内容を読み込めませんでした。",
+          message: error instanceof Error ? error.message : "共有の確認を読み込めませんでした。",
         });
       }
     } finally {

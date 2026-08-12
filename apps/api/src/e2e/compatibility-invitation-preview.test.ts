@@ -10,7 +10,7 @@ import {
   type CompatibilityDataTestStore,
   createCompatibilityDataTestStore,
 } from "../testing/compatibility-data";
-import { compatibilitySharePreviewCases } from "./case/compatibility-share-preview.case";
+import { compatibilityShareCases } from "./case/compatibility-share.case";
 
 const repositoryRoot = path.resolve(__dirname, "../../../..");
 const migrationsDirectory = path.join(repositoryRoot, "packages/lib/drizzle");
@@ -106,23 +106,16 @@ function env() {
 }
 
 async function issueInvitationForInviter(): Promise<string> {
-  const sharePreviewResponse = await app.request(
-    "/api/compatibility/share-preview",
+  const consentResponse = await app.request(
+    "/api/compatibility/share-consent",
     { headers: { Authorization: "Bearer inviter-token" } },
     env(),
   );
-  expect(sharePreviewResponse.status).toBe(200);
-  const sharePreview = (await sharePreviewResponse.json()) as { previewToken: string };
+  expect(consentResponse.status).toBe(200);
+  expect(await consentResponse.json()).toMatchObject({ canShare: true });
   const issueResponse = await app.request(
     "/api/compatibility/invitations",
-    {
-      method: "POST",
-      headers: {
-        Authorization: "Bearer inviter-token",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ previewToken: sharePreview.previewToken }),
-    },
+    { method: "POST", headers: { Authorization: "Bearer inviter-token" } },
     env(),
   );
   expect(issueResponse.status).toBe(201);
@@ -273,7 +266,7 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
   });
 
   it(
-    `${compatibilitySharePreviewCases.previewInvitation.id}: ${compatibilitySharePreviewCases.previewInvitation.name}`,
+    `${compatibilityShareCases.previewInvitation.id}: ${compatibilityShareCases.previewInvitation.name}`,
     async () => {
       await Promise.all([completeDiagnosis("inviter-token"), completeDiagnosis("recipient-token")]);
       await Promise.all([
@@ -282,11 +275,6 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
       ]);
 
       const relationshipId = await issueInvitationForInviter();
-      await generateShareProfile(
-        "inviter",
-        "私は、新しく作ったまとめだけに含まれる内容です",
-        "updated",
-      );
 
       const previewResponse = await app.request(
         `/api/compatibility/invitations/${relationshipId}`,
@@ -294,54 +282,20 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
         env(),
       );
       expect(previewResponse.status).toBe(200);
-      const preview = (await previewResponse.json()) as {
-        inviter: {
-          displayName: string;
-          avatarUrl: string | null;
-          aboutMe: { statements: { statement: string }[] };
-          themes: unknown[];
-        };
-        recipient: {
-          displayName: string;
-          avatarUrl: string | null;
-          aboutMe: unknown;
-          themes: unknown[];
-        };
-        canAccept: boolean;
-        blockingReasons: string[];
-      };
-      expect(preview).toMatchObject({
+      const preview = await previewResponse.json();
+      expect(preview).toEqual({
         inviter: {
           displayName: "あおい",
           avatarUrl: `/api/compatibility/invitations/${relationshipId}/avatar`,
-          aboutMe: expect.any(Object),
         },
-        recipient: {
-          displayName: "はる",
-          avatarUrl: "/api/profile/avatar",
-          aboutMe: expect.any(Object),
-        },
+        recipient: { displayName: "はる", avatarUrl: "/api/profile/avatar" },
+        expiresAt: expect.any(String),
         canAccept: true,
         blockingReasons: [],
+        nextAction: null,
       });
-      expect(preview.inviter.themes).toHaveLength(1);
-      expect(preview.recipient.themes).toHaveLength(1);
-      expect(preview.inviter.aboutMe.statements).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            statement: "私は、先の見通しを持って動けると安心します",
-          }),
-        ]),
-      );
-      expect(preview.inviter.aboutMe.statements).not.toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            statement: "私は、新しく作ったまとめだけに含まれる内容です",
-          }),
-        ]),
-      );
       expect(JSON.stringify(preview)).not.toMatch(
-        /accountId|fingerprint|choiceId|evidenceId|inviteeAccountId/,
+        /aboutMe|themes|statement|accountId|fingerprint|choiceId|evidenceId|inviteeAccountId/,
       );
       expect(compatibilityDataStore.relationships.get(relationshipId)?.status).toBe("pending");
       expect(
@@ -365,51 +319,65 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
   );
 
   it(
-    `${compatibilitySharePreviewCases.previewInvitationWithIncompleteRecipient.id}: ${compatibilitySharePreviewCases.previewInvitationWithIncompleteRecipient.name}`,
+    `${compatibilityShareCases.acceptWithoutSharableContent.id}: ${compatibilityShareCases.acceptWithoutSharableContent.name}`,
     async () => {
       await completeDiagnosis("inviter-token");
       await generateShareProfile("inviter", "私は、先の見通しを持って動けると安心します");
       const relationshipId = await issueInvitationForInviter();
 
-      const response = await app.request(
+      const previewResponse = await app.request(
         `/api/compatibility/invitations/${relationshipId}`,
         { headers: { Authorization: "Bearer recipient-token" } },
         env(),
       );
-
-      expect(response.status).toBe(200);
-      expect(await response.json()).toMatchObject({
-        inviter: {
-          displayName: "あおい",
-          avatarUrl: `/api/compatibility/invitations/${relationshipId}/avatar`,
-          themes: expect.any(Array),
-        },
-        recipient: {
-          displayName: "はる",
-          avatarUrl: "/api/profile/avatar",
-          aboutMe: null,
-          themes: [],
-        },
-        canAccept: false,
-        blockingReasons: expect.arrayContaining([
-          "profile_summary_required",
-          "diagnosis_required",
-          "common_diagnosis_required",
-        ]),
+      expect(previewResponse.status).toBe(200);
+      expect(await previewResponse.json()).toMatchObject({
+        canAccept: true,
+        blockingReasons: [],
         nextAction: "profile-summary",
       });
-      expect(compatibilityDataStore.relationships.get(relationshipId)?.status).toBe("pending");
-      expect(
-        stores.recipient.raw
-          .prepare("SELECT COUNT(*) AS count FROM compatibility_references")
-          .get(),
-      ).toEqual({ count: 0 });
+
+      const acceptResponse = await app.request(
+        `/api/compatibility/invitations/${relationshipId}/accept`,
+        { method: "POST", headers: { Authorization: "Bearer recipient-token" } },
+        env(),
+      );
+      expect(acceptResponse.status).toBe(200);
+      expect(compatibilityDataStore.relationships.get(relationshipId)?.status).toBe("accepted");
+
+      const waitingResponse = await app.request(
+        `/api/compatibility/relationships/${relationshipId}`,
+        { headers: { Authorization: "Bearer recipient-token" } },
+        env(),
+      );
+      expect(waitingResponse.status).toBe(200);
+      expect(await waitingResponse.json()).toEqual({
+        relationshipId,
+        status: "waiting",
+        nextAction: "profile-summary",
+      });
+
+      // 追加の同意なしに、そろった内容がそのまま相性シートへ反映される。
+      await completeDiagnosis("recipient-token");
+      await generateShareProfile("recipient", "私は、予定に余白があると心地よく感じます");
+
+      const readyResponse = await app.request(
+        `/api/compatibility/relationships/${relationshipId}`,
+        { headers: { Authorization: "Bearer recipient-token" } },
+        env(),
+      );
+      expect(readyResponse.status).toBe(200);
+      expect(await readyResponse.json()).toMatchObject({
+        status: "ready",
+        partner: { displayName: "あおい" },
+        viewer: { displayName: "はる" },
+      });
     },
     e2eTimeoutMs,
   );
 
   it(
-    `${compatibilitySharePreviewCases.shareJourney.id}: LIFF共有から招待表示・承諾・相性シート・共有終了まで完了できること`,
+    `${compatibilityShareCases.shareJourney.id}: LIFF共有から招待表示・承諾・相性シート・共有終了まで完了できること`,
     async () => {
       await Promise.all([completeDiagnosis("inviter-token"), completeDiagnosis("recipient-token")]);
       await Promise.all([
@@ -417,14 +385,6 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
         generateShareProfile("recipient", "私は、予定に余白があると心地よく感じます"),
       ]);
       const relationshipId = await issueInvitationForInviter();
-      const previewResponse = await app.request(
-        `/api/compatibility/invitations/${relationshipId}`,
-        { headers: { Authorization: "Bearer recipient-token" } },
-        env(),
-      );
-      const preview = (await previewResponse.json()) as {
-        recipient: { previewToken: string };
-      };
       const pendingInviterList = await app.request(
         "/api/compatibility/relationships",
         { headers: { Authorization: "Bearer inviter-token" } },
@@ -448,14 +408,7 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
 
       const response = await app.request(
         `/api/compatibility/invitations/${relationshipId}/accept`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: "Bearer recipient-token",
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ previewToken: preview.recipient.previewToken }),
-        },
+        { method: "POST", headers: { Authorization: "Bearer recipient-token" } },
         env(),
       );
 
@@ -473,6 +426,9 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
         ).toEqual({ relationship_id: relationshipId, status: "active" });
       }
 
+      // 承諾後に更新したまとめも、再同意なしで双方の相性シートへ反映される。
+      await generateShareProfile("inviter", "私は、更新後のまとめに含まれる内容です", "updated");
+
       for (const role of ["inviter", "recipient"] as const) {
         const detailResponse = await app.request(
           `/api/compatibility/relationships/${relationshipId}`,
@@ -482,8 +438,16 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
         expect(detailResponse.status).toBe(200);
         const detail = (await detailResponse.json()) as {
           status: string;
-          partner: { displayName: string; themes: unknown[] };
-          viewer: { displayName: string; themes: unknown[] };
+          partner: {
+            displayName: string;
+            aboutMe: { statements: { statement: string }[] };
+            themes: unknown[];
+          };
+          viewer: {
+            displayName: string;
+            aboutMe: { statements: { statement: string }[] };
+            themes: unknown[];
+          };
         };
         const partnerRole = role === "inviter" ? "recipient" : "inviter";
         expect(detail).toMatchObject({
@@ -493,6 +457,12 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
         });
         expect(detail.partner.themes).toHaveLength(1);
         expect(detail.viewer.themes).toHaveLength(1);
+        const inviterSide = role === "inviter" ? detail.viewer : detail.partner;
+        expect(inviterSide.aboutMe.statements).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ statement: "私は、更新後のまとめに含まれる内容です" }),
+          ]),
+        );
         expect(JSON.stringify(detail)).not.toMatch(/accountId|fingerprint|choiceId|evidenceId/);
 
         const listResponse = await app.request(
@@ -538,7 +508,7 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
   );
 
   it(
-    `${compatibilitySharePreviewCases.previewCancelledInvitation.id}: ${compatibilitySharePreviewCases.previewCancelledInvitation.name}`,
+    `${compatibilityShareCases.previewCancelledInvitation.id}: ${compatibilityShareCases.previewCancelledInvitation.name}`,
     async () => {
       await completeDiagnosis("inviter-token");
       await generateShareProfile("inviter", "私は、先の見通しを持って動けると安心します");

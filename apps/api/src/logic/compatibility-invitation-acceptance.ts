@@ -3,13 +3,11 @@ import {
   type CompatibilityDataNamespace,
   type D1,
   acceptCompatibilityInvitationWithReferences,
-  createCompatibilityShareThemeFingerprints,
 } from "@me-builder/lib";
-import { loadCompatibilityInvitationAcceptanceData } from "./compatibility-invitation-preview";
+import { resolveCompatibilityInvitationRecipient } from "./compatibility-invitation-preview";
 
 type Params = Readonly<{
   relationshipId: string;
-  previewToken: string;
   idToken: string | undefined;
   lineLoginChannelId: string | undefined;
   db: D1.shared.Client;
@@ -22,47 +20,30 @@ export type AcceptCompatibilityInvitationOutcome =
   | { type: "accepted"; relationshipId: string }
   | { type: "unavailable" }
   | { type: "own-invitation" }
-  | { type: "preview-changed" }
   | { type: "share-unavailable" }
   | { type: "duplicate-relationship" }
   | { type: "not-configured" }
   | { type: "unauthenticated"; reason: string }
   | { type: "account-not-found" };
 
-/** 承諾直前に双方の表示を再検証し、正本と双方の一覧参照を一体で更新する。 */
+/**
+ * 受信者の共有同意を、正本と双方の一覧参照へ一体で反映する。
+ * 共有対象は成立後に自動で最新化されるため、固定するのは表示名だけ。
+ */
 export async function acceptCompatibilityInvitation(
   params: Params,
 ): Promise<AcceptCompatibilityInvitationOutcome> {
-  const prepared = await loadCompatibilityInvitationAcceptanceData(params);
-  if (prepared.type !== "resolved") return prepared;
-  if (params.previewToken !== prepared.recipientData.preview.previewToken) {
-    return { type: "preview-changed" };
-  }
-  const { invitation, recipientData } = prepared;
-  if (
-    !invitation.canAccept ||
-    !recipientData.preview.displayName ||
-    !recipientData.shareProfile ||
-    prepared.recipientDiagnoses.length === 0
-  ) {
-    return { type: "share-unavailable" };
-  }
+  const recipient = await resolveCompatibilityInvitationRecipient(params);
+  if (recipient.type !== "resolved") return recipient;
+  if (!recipient.inviteeDisplayName) return { type: "share-unavailable" };
 
-  const acceptedThemes = await createCompatibilityShareThemeFingerprints(
-    prepared.recipientDiagnoses,
-  );
   const result = await acceptCompatibilityInvitationWithReferences(
     params.accountData,
     params.compatibilityData,
     params.relationshipId,
     {
-      inviteeAccountId: prepared.inviteeAccountId,
-      inviteeDisplayName: recipientData.preview.displayName,
-      acceptedProfile: {
-        profileSummaryVersionId: recipientData.shareProfile.profileSummaryVersionId,
-        fingerprint: recipientData.shareProfile.fingerprint,
-      },
-      acceptedThemes,
+      inviteeAccountId: recipient.inviteeAccountId,
+      inviteeDisplayName: recipient.inviteeDisplayName,
     },
   );
 
@@ -75,7 +56,6 @@ export async function acceptCompatibilityInvitation(
     case "self-invite":
       return { type: "own-invitation" };
     case "expired":
-    case "invalid-themes":
     case "unavailable":
     case "unreserved":
       return { type: "unavailable" };

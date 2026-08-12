@@ -14,25 +14,10 @@ export function createCompatibilityRelationshipId(): string {
   ).join("");
 }
 
-export type CompatibilityThemeFingerprint = Readonly<{
-  diagnosisId: string;
-  resultFingerprint: string;
-}>;
-
-export type CompatibilityThemeConsent = Readonly<{
-  diagnosisId: string;
-  resultFingerprint: string;
-  consentedAt: Date;
-}>;
-
-export type CompatibilityProfileFingerprint = Readonly<{
-  profileSummaryVersionId: string;
-  fingerprint: string;
-}>;
-
-export type CompatibilityProfileConsent = CompatibilityProfileFingerprint &
-  Readonly<{ consentedAt: Date }>;
-
+/**
+ * 相性関係は、表示内容ではなく相手そのものへの継続的な共有同意を持つ。
+ * 送信者の同意時刻は`createdAt`、受信者の同意時刻は`acceptedAt`が表す。
+ */
 export type CompatibilityRelationship = Readonly<{
   id: string;
   inviterAccountId: string;
@@ -40,11 +25,6 @@ export type CompatibilityRelationship = Readonly<{
   inviterDisplayName: string;
   inviteeDisplayName: string | null;
   status: CompatibilityRelationshipStatus;
-  /** 旧migrationで作られた未発行データはnull。新規招待では必ず保存する。 */
-  offeredProfile: CompatibilityProfileConsent | null;
-  acceptedProfile: CompatibilityProfileConsent | null;
-  offeredThemes: readonly CompatibilityThemeConsent[];
-  acceptedThemes: readonly CompatibilityThemeConsent[];
   expiresAt: Date;
   acceptedAt: Date | null;
   cancelledAt: Date | null;
@@ -57,32 +37,24 @@ export type CompatibilityRelationship = Readonly<{
 export type CreateCompatibilityInvitationInput = Readonly<{
   inviterAccountId: string;
   inviterDisplayName: string;
-  offeredProfile: CompatibilityProfileFingerprint;
-  offeredThemes: readonly CompatibilityThemeFingerprint[];
 }>;
 
 export type AcceptCompatibilityInvitationInput = Readonly<{
   inviteeAccountId: string;
   inviteeDisplayName: string;
-  acceptedProfile: CompatibilityProfileFingerprint;
-  acceptedThemes: readonly CompatibilityThemeFingerprint[];
 }>;
 
-/** 招待確認画面へ渡せる、Account IDと同意指紋を含まない表示用データ。 */
+/** 招待確認画面へ渡せる、Account IDを含まない表示用データ。 */
 export type CompatibilityInvitationPreview = Readonly<{
   id: string;
   inviterDisplayName: string;
-  offeredDiagnosisIds: readonly string[];
   expiresAt: Date;
   isOwnInvitation: boolean;
 }>;
 
-/** 招待表示の同意照合と承諾時の重複確認に使う、画面へ返さない内部context。 */
+/** 承諾時の重複確認に使う、画面へ返さない内部context。 */
 export type CompatibilityInvitationAcceptanceContext = Readonly<{
   inviterAccountId: string;
-  offeredProfile: CompatibilityProfileFingerprint;
-  offeredThemes: readonly CompatibilityThemeFingerprint[];
-  offeredDiagnosisIds: readonly string[];
   expiresAt: Date;
 }>;
 
@@ -97,7 +69,7 @@ export type AcceptCompatibilityInvitationResult =
       relationship: CompatibilityRelationship;
     }>
   | Readonly<{
-      outcome: "self-invite" | "expired" | "unavailable" | "invalid-themes" | "unreserved";
+      outcome: "self-invite" | "expired" | "unavailable" | "unreserved";
     }>;
 
 export type CancelCompatibilityInvitationResult =

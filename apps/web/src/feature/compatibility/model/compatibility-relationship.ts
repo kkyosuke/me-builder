@@ -1,7 +1,7 @@
 import type {
   CompatibilitySharePreviewTheme,
   CompatibilityShareProfile,
-} from "./compatibility-share-preview";
+} from "./compatibility-share-content";
 
 export type CompatibilityRelationshipListItem =
   | {

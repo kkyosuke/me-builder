@@ -30,11 +30,6 @@ describe("compatibility data orchestration", () => {
       {
         inviterAccountId: "account-a",
         inviterDisplayName: "送信者",
-        offeredProfile: {
-          profileSummaryVersionId: "profile-version-a",
-          fingerprint: "f".repeat(64),
-        },
-        offeredThemes: [{ diagnosisId: "diagnosis-1", resultFingerprint: "a".repeat(64) }],
       },
       relationshipId,
     );
@@ -71,11 +66,6 @@ describe("compatibility data orchestration", () => {
         {
           inviterAccountId: "account-a",
           inviterDisplayName: "送信者",
-          offeredProfile: {
-            profileSummaryVersionId: "profile-version-a",
-            fingerprint: "f".repeat(64),
-          },
-          offeredThemes: [{ diagnosisId: "diagnosis-1", resultFingerprint: "a".repeat(64) }],
         },
         "1".repeat(64),
       ),
@@ -109,7 +99,6 @@ describe("compatibility data orchestration", () => {
           async getInvitationAcceptanceContext() {
             return {
               inviterAccountId: "account-a",
-              offeredDiagnosisIds: ["diagnosis-1"],
               expiresAt: new Date("2026-08-23T00:00:00.000Z"),
             };
           },
@@ -125,11 +114,6 @@ describe("compatibility data orchestration", () => {
         {
           inviteeAccountId: "account-b",
           inviteeDisplayName: "受信者",
-          acceptedProfile: {
-            profileSummaryVersionId: "profile-version-b",
-            fingerprint: "b".repeat(64),
-          },
-          acceptedThemes: [{ diagnosisId: "diagnosis-1", resultFingerprint: "a".repeat(64) }],
         },
       ),
     ).rejects.toThrow("reservation response lost");

@@ -10,33 +10,38 @@ import {
 import type { AsyncState } from "../../../model/async-state";
 import type { CompatibilityInvitation } from "../model/compatibility-invitation";
 import type {
-  CompatibilitySharePreview,
-  CompatibilitySharePreviewBlockingReason,
-} from "../model/compatibility-share-preview";
+  CompatibilityShareConsent,
+  CompatibilityShareConsentBlockingReason,
+} from "../model/compatibility-share-consent";
 import { CompatibilityPrivacyDisclosure } from "./components/compatibility-disclosure";
-import {
-  CompatibilityAboutMePreview,
-  CompatibilityThemesPreview,
-} from "./components/compatibility-share-content";
+import { CompatibilityShareScope } from "./components/compatibility-share-content";
 import { CompatibilityBackHeader, CompatibilityProfileAvatar } from "./components/compatibility-ui";
 
-const blockingReasonMessages: Record<CompatibilitySharePreviewBlockingReason, string> = {
+const blockingReasonMessages: Record<CompatibilityShareConsentBlockingReason, string> = {
   display_name_unavailable: "LINEの表示名を確認できませんでした。",
-  profile_summary_required: "共有用の「私について」がまだ作成されていません。",
-  profile_summary_stale: "共有用の「私について」に更新が必要です。",
-  diagnosis_required: "共有できる診断結果がまだありません。",
-  scoring_unavailable: "一部の診断結果を共有用に準備できませんでした。",
-  diagnosis_unavailable: "診断情報を読み込めませんでした。時間をおいて再度お試しください。",
 };
 
-function SharePreviewSkeleton() {
+const nextActionGuides = {
+  diagnosis: {
+    message: "診断に答えると、2人で比べられるテーマが増えます。",
+    href: "/diagnosis",
+    label: "診断を始める",
+  },
+  "profile-summary": {
+    message: "「わたしのまとめ」ができると、「私について」も共有されます。",
+    href: "/me",
+    label: "わたしの傾向を作る",
+  },
+} as const;
+
+function ShareConsentSkeleton() {
   return (
     <output
-      aria-label="共有内容を読み込み中"
+      aria-label="共有の確認を読み込み中"
       aria-live="polite"
       className="mt-8 block animate-pulse space-y-3 motion-reduce:animate-none"
     >
-      <span className="sr-only">共有する内容を読み込んでいます</span>
+      <span className="sr-only">共有の確認を読み込んでいます</span>
       {["first", "second", "third"].map((key) => (
         <span
           key={key}
@@ -48,30 +53,31 @@ function SharePreviewSkeleton() {
   );
 }
 
-function SharePreviewContent({
+function ShareConsentContent({
+  consent,
   invitationState,
   onCopyLink,
   onIssue,
-  onRetryPreview,
+  onRetryConsent,
   onShareToLine,
-  preview,
   sharingMessage,
 }: {
+  consent: CompatibilityShareConsent;
   invitationState: AsyncState<CompatibilityInvitation>;
   onCopyLink: (url: string) => void;
-  onIssue: (previewToken: string) => void;
-  onRetryPreview: () => void;
+  onIssue: () => void;
+  onRetryConsent: () => void;
   onShareToLine: (url: string) => void;
-  preview: CompatibilitySharePreview;
   sharingMessage: string | null;
 }) {
-  const displayName = preview.displayName ?? "あなた";
+  const displayName = consent.displayName ?? "あなた";
+  const guide = consent.nextAction ? nextActionGuides[consent.nextAction] : null;
 
   return (
     <>
       <div className="mt-5 flex items-center gap-4">
         <CompatibilityProfileAvatar
-          imageUrl={preview.avatarUrl}
+          imageUrl={consent.avatarUrl}
           displayName={displayName}
           tone="sky"
         />
@@ -85,51 +91,34 @@ function SharePreviewContent({
         </div>
       </div>
       <p className="mt-4 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-        診断と記録から一般化した振る舞い・考え方と、診断テーマの傾向をすべて共有します。相手に見える内容を確認してから、1人用の招待リンクを発行します。
+        この相手とうつしをシェアしていいかだけを確認します。共有した後は、増えた分も自動で共有されます。共有される内容は「わたし」からいつでも確認できます。
       </p>
 
-      {preview.aboutMe && (
-        <CompatibilityAboutMePreview
-          eyebrow="相手に見える「私について」"
-          headingId="about-me-heading"
-          profile={preview.aboutMe}
-          note="わたしの傾向で生成した版を使用しています。新しい版は確認するまで自動共有されません。"
-        />
+      <CompatibilityShareScope headingId="share-scope-heading" />
+
+      {guide && (
+        <section className="mt-8 rounded-2xl border border-sky-300/60 bg-sky-50 p-4 dark:border-sky-500/30 dark:bg-sky-950/30">
+          <p className="text-sm leading-relaxed text-sky-950 dark:text-sky-100">{guide.message}</p>
+          <a
+            href={guide.href}
+            className="mt-3 flex min-h-11 items-center justify-center rounded-xl bg-sky-300 px-4 py-2 text-sm font-bold text-sky-950"
+          >
+            {guide.label}
+          </a>
+        </section>
       )}
 
-      <CompatibilityThemesPreview
-        eyebrow="2人の比較に使う診断テーマ"
-        headingId="themes-heading"
-        themes={preview.themes}
-      />
-
-      {preview.blockingReasons.length > 0 && (
+      {consent.blockingReasons.length > 0 && (
         <section className="mt-8 rounded-2xl border border-amber-300/60 bg-amber-50 p-4 dark:border-amber-500/30 dark:bg-amber-950/30">
           <h2 className="flex items-center gap-2 font-bold text-amber-950 dark:text-amber-100">
             <AlertCircle className="size-5" aria-hidden="true" />
             招待リンクを発行する前に
           </h2>
           <ul className="mt-2 space-y-1 text-sm text-amber-900 dark:text-amber-200">
-            {preview.blockingReasons.map((reason) => (
+            {consent.blockingReasons.map((reason) => (
               <li key={reason}>・{blockingReasonMessages[reason]}</li>
             ))}
           </ul>
-          {preview.nextAction === "diagnosis" && (
-            <a
-              href="/diagnosis"
-              className="mt-4 flex min-h-11 items-center justify-center rounded-xl bg-amber-300 px-4 py-2 text-sm font-bold text-amber-950"
-            >
-              診断を始める
-            </a>
-          )}
-          {preview.nextAction === "profile-summary" && (
-            <a
-              href="/me"
-              className="mt-4 flex min-h-11 items-center justify-center rounded-xl bg-amber-300 px-4 py-2 text-sm font-bold text-amber-950"
-            >
-              わたしの傾向を作る
-            </a>
-          )}
         </section>
       )}
 
@@ -160,8 +149,8 @@ function SharePreviewContent({
               className="mt-8 rounded-2xl border border-red-300 bg-red-50 p-4 text-sm text-red-800 dark:border-red-700 dark:bg-red-950/30 dark:text-red-200"
             >
               <p>{invitationState.message}</p>
-              <button type="button" onClick={onRetryPreview} className="mt-2 font-bold underline">
-                共有内容を再読み込み
+              <button type="button" onClick={onRetryConsent} className="mt-2 font-bold underline">
+                共有の確認を再読み込み
               </button>
             </div>
           )}
@@ -170,7 +159,7 @@ function SharePreviewContent({
 
       <footer className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 shadow-[0_-8px_30px_rgba(15,23,42,0.12)] backdrop-blur dark:border-slate-700 dark:bg-slate-900/95">
         <div className="mx-auto w-full max-w-2xl px-4 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-8">
-          <CompatibilityPrivacyDisclosure footer="相手が内容を確認して承諾するまで、共有は始まりません。共有は後から終了できます。" />
+          <CompatibilityPrivacyDisclosure footer="相手が承諾するまで、共有は始まりません。共有は後から終了できます。" />
           {invitationState.status === "success" ? (
             <div className="mt-2 grid h-12 grid-cols-2 gap-2">
               <button
@@ -193,8 +182,8 @@ function SharePreviewContent({
           ) : (
             <button
               type="button"
-              disabled={!preview.canIssueInvitation || invitationState.status === "loading"}
-              onClick={() => onIssue(preview.previewToken)}
+              disabled={!consent.canShare || invitationState.status === "loading"}
+              onClick={onIssue}
               className="mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-rose-500 px-5 font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 dark:disabled:bg-slate-800 dark:disabled:text-slate-400"
             >
               {invitationState.status === "loading" ? (
@@ -207,8 +196,8 @@ function SharePreviewContent({
               )}
               {invitationState.status === "loading"
                 ? "招待リンクを発行中"
-                : preview.canIssueInvitation
-                  ? "招待リンクを発行する"
+                : consent.canShare
+                  ? "共有して招待リンクを発行する"
                   : "招待リンクを発行できません"}
             </button>
           )}
@@ -229,20 +218,20 @@ export function CompatibilityShareScreen({
 }: {
   invitationState?: AsyncState<CompatibilityInvitation>;
   onCopyLink?: (url: string) => void;
-  onIssue?: (previewToken: string) => void;
+  onIssue?: () => void;
   onRetry: () => void;
   onShareToLine?: (url: string) => void;
   sharingMessage?: string | null;
-  state: AsyncState<CompatibilitySharePreview>;
+  state: AsyncState<CompatibilityShareConsent>;
 }) {
   return (
     <main className="mx-auto min-h-dvh w-full max-w-2xl px-4 pt-6 pb-44 sm:px-8">
       <CompatibilityBackHeader />
-      {(state.status === "idle" || state.status === "loading") && <SharePreviewSkeleton />}
+      {(state.status === "idle" || state.status === "loading") && <ShareConsentSkeleton />}
       {state.status === "error" && (
         <section className="mt-8 rounded-3xl border border-red-400/30 bg-red-400/10 p-6 text-center">
           <p className="font-bold text-red-700 dark:text-red-300">
-            共有する内容を表示できませんでした
+            共有の確認を表示できませんでした
           </p>
           <p className="mt-2 text-sm leading-relaxed text-slate-700 dark:text-slate-300">
             {state.message}
@@ -258,13 +247,13 @@ export function CompatibilityShareScreen({
         </section>
       )}
       {state.status === "success" && (
-        <SharePreviewContent
-          preview={state.data}
+        <ShareConsentContent
+          consent={state.data}
           invitationState={invitationState}
           sharingMessage={sharingMessage}
           onCopyLink={onCopyLink}
           onIssue={onIssue}
-          onRetryPreview={onRetry}
+          onRetryConsent={onRetry}
           onShareToLine={onShareToLine}
         />
       )}

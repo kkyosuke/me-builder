@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
   acquireIdToken: vi.fn().mockResolvedValue("recipient-token"),
   fetchCompatibilityAvatarImage: vi.fn(),
   fetchCompatibilityInvitation: vi.fn(),
-  fetchCompatibilitySharePreview: vi.fn(),
+  fetchCompatibilityShareConsent: vi.fn(),
   issueCompatibilityInvitation: vi.fn(),
   acceptCompatibilityInvitation: vi.fn(),
   fetchCompatibilityRelationships: vi.fn(),
@@ -22,7 +22,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("../feature/compatibility/infrastructure/compatibility-api", () => ({
   fetchCompatibilityInvitation: mocks.fetchCompatibilityInvitation,
-  fetchCompatibilitySharePreview: mocks.fetchCompatibilitySharePreview,
+  fetchCompatibilityShareConsent: mocks.fetchCompatibilityShareConsent,
   issueCompatibilityInvitation: mocks.issueCompatibilityInvitation,
   acceptCompatibilityInvitation: mocks.acceptCompatibilityInvitation,
   fetchCompatibilityRelationships: mocks.fetchCompatibilityRelationships,
@@ -51,7 +51,6 @@ describe("LIFF compatibility share link journey", () => {
 
   it("共有リンク発行からLINE送信・承諾・相性表示・共有終了までUIで完了する", async () => {
     const relationshipId = "2".repeat(64);
-    const previewToken = `csp2.${"b".repeat(64)}`;
     const invitationUrl = `https://liff.line.me/1234567890-testliff/compatibility/invitations/${relationshipId}`;
     const profile = {
       profileSummaryVersionId: "profile-1",
@@ -79,12 +78,10 @@ describe("LIFF compatibility share link journey", () => {
       ],
     };
 
-    mocks.fetchCompatibilitySharePreview.mockResolvedValue({
+    mocks.fetchCompatibilityShareConsent.mockResolvedValue({
       displayName: "あおい",
-      previewToken,
-      aboutMe: profile,
-      themes: [inviterTheme],
-      canIssueInvitation: true,
+      avatarUrl: "/api/profile/avatar",
+      canShare: true,
       blockingReasons: [],
       nextAction: null,
     });
@@ -94,8 +91,11 @@ describe("LIFF compatibility share link journey", () => {
     });
     mocks.shareCompatibilityInvitationToLine.mockResolvedValue("line");
     mocks.fetchCompatibilityInvitation.mockResolvedValue({
-      inviter: { displayName: "あおい", aboutMe: profile, themes: [inviterTheme] },
-      recipient: { displayName: "はる", previewToken, aboutMe: profile, themes: [recipientTheme] },
+      inviter: {
+        displayName: "あおい",
+        avatarUrl: `/api/compatibility/invitations/${relationshipId}/avatar`,
+      },
+      recipient: { displayName: "はる", avatarUrl: "/api/profile/avatar" },
       expiresAt: "2026-08-26T00:00:00.000Z",
       canAccept: true,
       blockingReasons: [],
@@ -114,7 +114,7 @@ describe("LIFF compatibility share link journey", () => {
     window.history.replaceState({}, "", "/compatibility/share");
     render(<CompatibilityApplication />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "招待リンクを発行する" }));
+    fireEvent.click(await screen.findByRole("button", { name: "共有して招待リンクを発行する" }));
     fireEvent.click(await screen.findByRole("button", { name: "友だちに送る" }));
     expect(mocks.shareCompatibilityInvitationToLine).toHaveBeenCalledWith("あおい", invitationUrl);
 
@@ -150,7 +150,7 @@ describe("LIFF compatibility share link journey", () => {
     expect(await screen.findByText("まだ共有中の相手はいません")).toBeTruthy();
   });
 
-  it("発行されたLIFFリンクのpathから受信者へ双方の共有内容を表示する", async () => {
+  it("発行されたLIFFリンクのpathから受信者へ共有の確認を表示する", async () => {
     const relationshipId = "1".repeat(64);
     const liffId = "1234567890-testliff";
     const invitationUrl = new URL(
@@ -161,42 +161,11 @@ describe("LIFF compatibility share link journey", () => {
       inviter: {
         displayName: "あおい",
         avatarUrl: `/api/compatibility/invitations/${relationshipId}/avatar`,
-        aboutMe: {
-          profileSummaryVersionId: "profile-inviter",
-          generatedAt: "2026-08-11T00:00:00.000Z",
-          statements: [{ key: "planning", label: "予定", statement: "私は見通しを大切にします" }],
-        },
-        themes: [
-          {
-            diagnosisId: "time-planning",
-            title: "時間と予定",
-            parameters: [
-              {
-                id: "planning",
-                label: "予定の立て方",
-                lowLabel: "その場で決めたい",
-                highLabel: "早めに決めたい",
-                position: 78,
-                statement: "「早めに決めたい」傾向があります",
-              },
-            ],
-          },
-        ],
       },
-      recipient: {
-        displayName: "はる",
-        avatarUrl: null,
-        previewToken: `csp2.${"a".repeat(64)}`,
-        aboutMe: {
-          profileSummaryVersionId: "profile-recipient",
-          generatedAt: "2026-08-12T00:00:00.000Z",
-          statements: [{ key: "space", label: "余白", statement: "私は予定の余白を大切にします" }],
-        },
-        themes: [],
-      },
+      recipient: { displayName: "はる", avatarUrl: null },
       expiresAt: "2026-08-26T00:00:00.000Z",
-      canAccept: false,
-      blockingReasons: ["common_diagnosis_required"],
+      canAccept: true,
+      blockingReasons: [],
       nextAction: "diagnosis",
     });
     mocks.fetchCompatibilityAvatarImage
@@ -216,7 +185,8 @@ describe("LIFF compatibility share link journey", () => {
     ).toBeTruthy();
     expect(screen.getByText("あおいさんから招待が届いています")).toBeTruthy();
     expect(document.querySelector('img[src="blob:inviter-avatar"]')).not.toBeNull();
-    expect(screen.getByText("私は見通しを大切にします")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "共有されるもの" })).toBeTruthy();
+    expect(screen.queryByText(/傾向があります/)).toBeNull();
     expect(mocks.fetchCompatibilityInvitation).toHaveBeenCalledWith(
       undefined,
       "recipient-token",

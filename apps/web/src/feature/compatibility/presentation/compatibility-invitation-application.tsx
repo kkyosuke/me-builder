@@ -19,7 +19,7 @@ export default function CompatibilityInvitationApplication({
     <CompatibilityInvitationScreen
       state={state}
       acceptanceState={acceptance.state}
-      onAccept={(previewToken) => void acceptance.accept(previewToken)}
+      onAccept={() => void acceptance.accept()}
       onRetry={() => void reload()}
     />
   );

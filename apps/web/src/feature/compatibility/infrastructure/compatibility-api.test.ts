@@ -6,14 +6,19 @@ import {
   fetchCompatibilityInvitation,
   fetchCompatibilityRelationship,
   fetchCompatibilityRelationships,
-  fetchCompatibilitySharePreview,
+  fetchCompatibilityShareConsent,
   issueCompatibilityInvitation,
 } from "./compatibility-api";
 
-const preview = {
+const consent = {
   displayName: "うさぎ",
   avatarUrl: "/api/profile/avatar",
-  previewToken: `csp2.${"a".repeat(64)}`,
+  canShare: true,
+  blockingReasons: [],
+  nextAction: null,
+};
+
+const shareContent = {
   aboutMe: {
     profileSummaryVersionId: "summary-version-1",
     generatedAt: "2026-08-11T00:00:00.000Z",
@@ -41,17 +46,14 @@ const preview = {
       ],
     },
   ],
-  canIssueInvitation: true,
-  blockingReasons: [],
-  nextAction: null,
 };
 
-describe("fetchCompatibilitySharePreview", () => {
+describe("fetchCompatibilityShareConsent", () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it("認証付きで共有プレビューを取得する", async () => {
+  it("認証付きで共有可否を取得する", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify(preview), {
+      new Response(JSON.stringify(consent), {
         status: 200,
         headers: { "Content-Type": "application/json" },
       }),
@@ -59,31 +61,31 @@ describe("fetchCompatibilitySharePreview", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(
-      fetchCompatibilitySharePreview("https://api.example.com", "id-token"),
-    ).resolves.toEqual(preview);
+      fetchCompatibilityShareConsent("https://api.example.com", "id-token"),
+    ).resolves.toEqual(consent);
     expect(fetchMock).toHaveBeenCalledWith(
-      "https://api.example.com/api/compatibility/share-preview",
+      "https://api.example.com/api/compatibility/share-consent",
       expect.objectContaining({ headers: { Authorization: "Bearer id-token" } }),
     );
   });
 
-  it("契約外のプレビュートークンを受け入れない", async () => {
+  it("契約外の共有可否を受け入れない", async () => {
     vi.stubGlobal(
       "fetch",
       vi
         .fn()
         .mockResolvedValue(
-          new Response(JSON.stringify({ ...preview, previewToken: "invalid" }), { status: 200 }),
+          new Response(JSON.stringify({ ...consent, canShare: "yes" }), { status: 200 }),
         ),
     );
 
-    await expect(fetchCompatibilitySharePreview(undefined, "id-token")).rejects.toThrow();
+    await expect(fetchCompatibilityShareConsent(undefined, "id-token")).rejects.toThrow();
   });
 
   it("認証失敗を利用者向けメッセージへ変換する", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 401 })));
 
-    await expect(fetchCompatibilitySharePreview(undefined, "id-token")).rejects.toThrow(
+    await expect(fetchCompatibilityShareConsent(undefined, "id-token")).rejects.toThrow(
       "本人確認に失敗しました",
     );
   });
@@ -92,7 +94,7 @@ describe("fetchCompatibilitySharePreview", () => {
 describe("issueCompatibilityInvitation", () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it("previewTokenだけを送り、発行したURLを受け取る", async () => {
+  it("リクエスト本文を送らず、発行したURLを受け取る", async () => {
     const invitation = {
       invitationUrl: `https://example.com/compatibility/invitations/${"1".repeat(64)}`,
       expiresAt: "2026-08-26T00:00:00.000Z",
@@ -101,23 +103,21 @@ describe("issueCompatibilityInvitation", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(
-      issueCompatibilityInvitation("https://api.example.com", "id-token", preview.previewToken),
+      issueCompatibilityInvitation("https://api.example.com", "id-token"),
     ).resolves.toEqual(invitation);
     expect(fetchMock).toHaveBeenCalledWith(
       "https://api.example.com/api/compatibility/invitations",
-      expect.objectContaining({
-        method: "POST",
-        body: JSON.stringify({ previewToken: preview.previewToken }),
-      }),
+      expect.objectContaining({ method: "POST", headers: { Authorization: "Bearer id-token" } }),
     );
+    expect(fetchMock.mock.calls[0]?.[1]).not.toHaveProperty("body");
   });
 
-  it("preview更新競合を再確認メッセージへ変換する", async () => {
+  it("共有を開始できない競合を利用者向けメッセージへ変換する", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 409 })));
 
-    await expect(
-      issueCompatibilityInvitation(undefined, "id-token", preview.previewToken),
-    ).rejects.toThrow("共有内容が更新されました");
+    await expect(issueCompatibilityInvitation(undefined, "id-token")).rejects.toThrow(
+      "いまは共有を始められません",
+    );
   });
 });
 
@@ -130,16 +130,8 @@ describe("fetchCompatibilityInvitation", () => {
       inviter: {
         displayName: "あおい",
         avatarUrl: `/api/compatibility/invitations/${relationshipId}/avatar`,
-        aboutMe: preview.aboutMe,
-        themes: preview.themes,
       },
-      recipient: {
-        displayName: "はる",
-        avatarUrl: "/api/profile/avatar",
-        previewToken: preview.previewToken,
-        aboutMe: preview.aboutMe,
-        themes: preview.themes,
-      },
+      recipient: { displayName: "はる", avatarUrl: "/api/profile/avatar" },
       expiresAt: "2026-08-26T00:00:00.000Z",
       canAccept: true,
       blockingReasons: [],
@@ -212,26 +204,22 @@ describe("compatibility relationship APIs", () => {
     );
   });
 
-  it("確認済みpreviewTokenで招待を承諾する", async () => {
+  it("リクエスト本文なしで招待を承諾する", async () => {
     const relationshipId = "2".repeat(64);
     const fetchMock = vi
       .fn()
       .mockResolvedValue(Response.json({ relationshipId, status: "accepted" }));
     vi.stubGlobal("fetch", fetchMock);
 
-    await acceptCompatibilityInvitation(
-      undefined,
-      "id-token",
-      relationshipId,
-      preview.previewToken,
-    );
+    await acceptCompatibilityInvitation(undefined, "id-token", relationshipId);
     expect(fetchMock).toHaveBeenCalledWith(
       `/api/compatibility/invitations/${relationshipId}/accept`,
       expect.objectContaining({
         method: "POST",
-        body: JSON.stringify({ previewToken: preview.previewToken }),
+        headers: { Authorization: "Bearer id-token" },
       }),
     );
+    expect(fetchMock.mock.calls[0]?.[1]).not.toHaveProperty("body");
   });
 
   it("相手と自分の相性シートを取得する", async () => {
@@ -239,8 +227,8 @@ describe("compatibility relationship APIs", () => {
     const data = {
       relationshipId,
       status: "ready",
-      partner: { displayName: "あおい", aboutMe: preview.aboutMe, themes: preview.themes },
-      viewer: { displayName: "はる", aboutMe: preview.aboutMe, themes: preview.themes },
+      partner: { displayName: "あおい", ...shareContent },
+      viewer: { displayName: "はる", ...shareContent },
     };
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json(data)));
     await expect(

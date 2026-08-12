@@ -8,14 +8,12 @@ import type {
   CompatibilityRelationship,
   CompatibilityRelationshipList,
 } from "../model/compatibility-relationship";
-import type { CompatibilitySharePreview } from "../model/compatibility-share-preview";
+import type { CompatibilityShareConsent } from "../model/compatibility-share-consent";
 
 type ApiResponse =
-  operations["getCompatibilitySharePreview"]["responses"][200]["content"]["application/json"];
+  operations["getCompatibilityShareConsent"]["responses"][200]["content"]["application/json"];
 type InvitationApiResponse =
   operations["issueCompatibilityInvitation"]["responses"][201]["content"]["application/json"];
-type InvitationApiRequest =
-  operations["issueCompatibilityInvitation"]["requestBody"]["content"]["application/json"];
 type InvitationPreviewApiResponse =
   operations["getCompatibilityInvitation"]["responses"][200]["content"]["application/json"];
 
@@ -51,20 +49,8 @@ const ShareThemeSchema = v.object({
 const ResponseSchema = v.object({
   displayName: v.nullable(NonEmptyStringSchema),
   avatarUrl: v.nullable(NonEmptyStringSchema),
-  previewToken: v.pipe(v.string(), v.regex(/^csp2\.[a-f0-9]{64}$/)),
-  aboutMe: v.nullable(ShareProfileSchema),
-  themes: v.array(ShareThemeSchema),
-  canIssueInvitation: v.boolean(),
-  blockingReasons: v.array(
-    v.picklist([
-      "display_name_unavailable",
-      "profile_summary_required",
-      "profile_summary_stale",
-      "diagnosis_required",
-      "scoring_unavailable",
-      "diagnosis_unavailable",
-    ]),
-  ),
+  canShare: v.boolean(),
+  blockingReasons: v.array(v.picklist(["display_name_unavailable"])),
   nextAction: v.nullable(v.picklist(["diagnosis", "profile-summary"])),
 }) satisfies v.GenericSchema<ApiResponse>;
 
@@ -77,29 +63,14 @@ const InvitationPreviewResponseSchema = v.object({
   inviter: v.object({
     displayName: NonEmptyStringSchema,
     avatarUrl: v.nullable(NonEmptyStringSchema),
-    aboutMe: ShareProfileSchema,
-    themes: v.pipe(v.array(ShareThemeSchema), v.minLength(1)),
   }),
   recipient: v.object({
     displayName: v.nullable(NonEmptyStringSchema),
     avatarUrl: v.nullable(NonEmptyStringSchema),
-    previewToken: v.pipe(v.string(), v.regex(/^csp2\.[a-f0-9]{64}$/)),
-    aboutMe: v.nullable(ShareProfileSchema),
-    themes: v.array(ShareThemeSchema),
   }),
   expiresAt: v.pipe(v.string(), v.isoTimestamp()),
   canAccept: v.boolean(),
-  blockingReasons: v.array(
-    v.picklist([
-      "display_name_unavailable",
-      "profile_summary_required",
-      "profile_summary_stale",
-      "diagnosis_required",
-      "scoring_unavailable",
-      "diagnosis_unavailable",
-      "common_diagnosis_required",
-    ]),
-  ),
+  blockingReasons: v.array(v.picklist(["display_name_unavailable"])),
   nextAction: v.nullable(v.picklist(["diagnosis", "profile-summary"])),
 }) satisfies v.GenericSchema<InvitationPreviewApiResponse>;
 
@@ -153,12 +124,12 @@ function authenticatedError(response: Response): Error | null {
   return null;
 }
 
-export async function fetchCompatibilitySharePreview(
+export async function fetchCompatibilityShareConsent(
   apiUrl: string | undefined,
   idToken: string,
   signal?: AbortSignal,
-): Promise<CompatibilitySharePreview> {
-  const response = await createHttpClient(apiUrl).request("/api/compatibility/share-preview", {
+): Promise<CompatibilityShareConsent> {
+  const response = await createHttpClient(apiUrl).request("/api/compatibility/share-consent", {
     headers: { Authorization: `Bearer ${idToken}` },
     ...(signal ? { signal } : {}),
   });
@@ -170,7 +141,7 @@ export async function fetchCompatibilitySharePreview(
     if (response.status === 404) {
       throw new Error("利用するには、先にLINE公式アカウントを友だち追加してください。");
     }
-    throw new Error(`共有内容の取得に失敗しました (HTTP ${response.status})`);
+    throw new Error(`共有の確認に失敗しました (HTTP ${response.status})`);
   }
 
   return v.parse(ResponseSchema, await response.json());
@@ -179,17 +150,11 @@ export async function fetchCompatibilitySharePreview(
 export async function issueCompatibilityInvitation(
   apiUrl: string | undefined,
   idToken: string,
-  previewToken: string,
   signal?: AbortSignal,
 ): Promise<CompatibilityInvitation> {
-  const body: InvitationApiRequest = { previewToken };
   const response = await createHttpClient(apiUrl).request("/api/compatibility/invitations", {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${idToken}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
+    headers: { Authorization: `Bearer ${idToken}` },
     ...(signal ? { signal } : {}),
   });
 
@@ -201,7 +166,7 @@ export async function issueCompatibilityInvitation(
       throw new Error("利用するには、先にLINE公式アカウントを友だち追加してください。");
     }
     if (response.status === 409) {
-      throw new Error("共有内容が更新されました。内容を再確認してから発行してください。");
+      throw new Error("いまは共有を始められません。時間をおいて再度お試しください。");
     }
     throw new Error(`招待リンクの発行に失敗しました (HTTP ${response.status})`);
   }
@@ -273,18 +238,13 @@ export async function acceptCompatibilityInvitation(
   apiUrl: string | undefined,
   idToken: string,
   relationshipId: string,
-  previewToken: string,
   signal?: AbortSignal,
 ): Promise<CompatibilityInvitationAcceptance> {
   const response = await createHttpClient(apiUrl).request(
     `/api/compatibility/invitations/${encodeURIComponent(relationshipId)}/accept`,
     {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${idToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ previewToken }),
+      headers: { Authorization: `Bearer ${idToken}` },
       ...(signal ? { signal } : {}),
     },
   );
@@ -292,9 +252,7 @@ export async function acceptCompatibilityInvitation(
     const authenticationError = authenticatedError(response);
     if (authenticationError) throw authenticationError;
     if (response.status === 409) {
-      throw new Error(
-        "共有内容が更新されたか、この招待を承諾できません。内容を再確認してください。",
-      );
+      throw new Error("この招待は承諾できません。相性一覧から確認してください。");
     }
     throw new Error(`招待の承諾に失敗しました (HTTP ${response.status})`);
   }

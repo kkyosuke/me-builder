@@ -5,6 +5,30 @@ import { CompatibilityResultScreen } from "./compatibility-result-screen";
 import { CompatibilityBackHeader } from "./components/compatibility-ui";
 import { useCompatibilityRelationship } from "./hooks/use-compatibility-relationship";
 
+const waitingGuides = {
+  "profile-summary": {
+    title: "相性シートを表示する準備が必要です",
+    message:
+      "共有できる「私について」がまだありません。わたしのまとめを作ると、追加の確認なしで共有されます。",
+    href: "/me",
+    label: "わたしの傾向を作る",
+  },
+  diagnosis: {
+    title: "相性シートを表示する準備が必要です",
+    message:
+      "2人で比べられる共通の診断テーマがまだありません。診断に答えると、追加の確認なしで共有されます。",
+    href: "/diagnosis",
+    label: "診断を見る",
+  },
+  partner: {
+    title: "相手の準備を待っています",
+    message:
+      "あなたの共有内容はそろっています。相手の準備が終わると、追加の確認なしでこの相性シートを表示できます。",
+    href: "/compatibility",
+    label: "相性一覧へ戻る",
+  },
+} as const;
+
 export default function CompatibilityResultApplication({
   relationshipId,
 }: {
@@ -45,23 +69,19 @@ export default function CompatibilityResultApplication({
   }
   if (relationship.state.status !== "success") return null;
   if (relationship.state.data.status === "waiting") {
-    const nextHref =
-      relationship.state.data.nextAction === "profile-summary" ? "/me" : "/diagnosis";
+    // nextActionがnullのときは相手側の準備待ちで、閲覧者の操作では解消できない。
+    const waiting = waitingGuides[relationship.state.data.nextAction ?? "partner"];
     return (
       <main className="mx-auto min-h-dvh w-full max-w-2xl px-4 py-6 sm:px-8">
         <CompatibilityBackHeader />
         <section className="mt-8 rounded-3xl border border-amber-300 bg-amber-50 p-6 dark:bg-amber-950/30">
-          <h1 className="text-xl font-bold">相性シートを更新する準備が必要です</h1>
-          <p className="mt-2 text-sm">
-            現在の共有内容で比較できるテーマがありません。自分の内容を更新すると、もう一度表示できます。
-          </p>
+          <h1 className="text-xl font-bold">{waiting.title}</h1>
+          <p className="mt-2 text-sm">{waiting.message}</p>
           <a
-            href={nextHref}
+            href={waiting.href}
             className="mt-5 flex min-h-11 items-center justify-center rounded-xl bg-amber-300 font-bold text-amber-950"
           >
-            {relationship.state.data.nextAction === "profile-summary"
-              ? "わたしの傾向を作る"
-              : "診断を見る"}
+            {waiting.label}
           </a>
         </section>
       </main>

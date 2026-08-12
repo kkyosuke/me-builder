@@ -17,21 +17,15 @@ import {
   resetAllDevelopmentBrainVectorSyncJobsRoute,
   resetDevelopmentBrainVectorSyncJobRoute,
 } from "./contract/brain/dev-vector-sync-jobs";
-import {
-  issueCompatibilityInvitationRoute,
-  issueCompatibilityInvitationValidator,
-} from "./contract/compatibility/invitation";
-import {
-  acceptCompatibilityInvitationRoute,
-  acceptCompatibilityInvitationValidator,
-} from "./contract/compatibility/invitation-accept";
+import { issueCompatibilityInvitationRoute } from "./contract/compatibility/invitation";
+import { acceptCompatibilityInvitationRoute } from "./contract/compatibility/invitation-accept";
 import { compatibilityInvitationAvatarRoute } from "./contract/compatibility/invitation-avatar";
 import { compatibilityInvitationCancelRoute } from "./contract/compatibility/invitation-cancel";
 import { compatibilityInvitationPreviewRoute } from "./contract/compatibility/invitation-preview";
 import { compatibilityRelationshipRoute } from "./contract/compatibility/relationship";
 import { compatibilityRelationshipEndRoute } from "./contract/compatibility/relationship-end";
 import { compatibilityRelationshipsRoute } from "./contract/compatibility/relationships";
-import { compatibilitySharePreviewRoute } from "./contract/compatibility/share-preview";
+import { compatibilityShareConsentRoute } from "./contract/compatibility/share-consent";
 import { saveDiagnosisAnswerRoute } from "./contract/diagnosis/answer";
 import { diagnosisAnswersRoute } from "./contract/diagnosis/answers";
 import { deferDiagnosisQuestionRoute } from "./contract/diagnosis/deferred-question";
@@ -62,7 +56,7 @@ import {
   getCompatibilityInvitationAvatarContents,
   getCompatibilityRelationship,
   getCompatibilityRelationships,
-  getCompatibilitySharePreviewContents,
+  getCompatibilityShareConsentContents,
   postCompatibilityInvitation,
   postCompatibilityInvitationAcceptance,
 } from "./controller/compatibility";
@@ -178,13 +172,11 @@ app.get(
 app.post(
   "/api/compatibility/invitations/:relationshipId/accept",
   acceptCompatibilityInvitationRoute,
-  acceptCompatibilityInvitationValidator,
   postCompatibilityInvitationAcceptance,
 );
 app.post(
   "/api/compatibility/invitations",
   issueCompatibilityInvitationRoute,
-  issueCompatibilityInvitationValidator,
   postCompatibilityInvitation,
 );
 app.get(
@@ -233,9 +225,9 @@ app.post(
   postDevelopmentBrainVectorSyncJobReset,
 );
 app.get(
-  "/api/compatibility/share-preview",
-  compatibilitySharePreviewRoute,
-  getCompatibilitySharePreviewContents,
+  "/api/compatibility/share-consent",
+  compatibilityShareConsentRoute,
+  getCompatibilityShareConsentContents,
 );
 
 app.get("/api/diagnoses", diagnosisListRoute, getDiagnoses);

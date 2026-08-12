@@ -1,5 +1,4 @@
 import type { DiagnosisScoring, ScoredParameter } from "./diagnosis";
-import type { CompatibilityShareProfile } from "./profile-summary";
 
 export type CompatibilitySharePreviewParameter = Readonly<{
   id: string;
@@ -23,8 +22,6 @@ export type CompatibilitySharePreviewDiagnosis = Readonly<{
   scoring: DiagnosisScoring;
 }>;
 
-const PREVIEW_TOKEN_VERSION = "csp2";
-
 function displayBandLabel(parameter: ScoredParameter, balancedLabel: string): string | null {
   switch (parameter.band) {
     case "low":
@@ -38,7 +35,7 @@ function displayBandLabel(parameter: ScoredParameter, balancedLabel: string): st
   }
 }
 
-/** 採点済みDiagnosisを、回答やcoverageを含まない本人確認用の共有表示へ変換する。 */
+/** 採点済みDiagnosisを、回答やcoverageを含まない共有表示へ変換する。 */
 export function buildCompatibilitySharePreviewThemes(
   diagnoses: readonly CompatibilitySharePreviewDiagnosis[],
 ): CompatibilitySharePreviewTheme[] {
@@ -65,54 +62,18 @@ export function buildCompatibilitySharePreviewThemes(
   });
 }
 
-function bytesToHex(bytes: ArrayBuffer): string {
-  return [...new Uint8Array(bytes)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
-}
-
-/** 発行時に確認したテーマ表示を、後続の再確認に使う外部非公開の指紋へ変換する。 */
-export async function createCompatibilityShareThemeFingerprints(
-  diagnoses: readonly CompatibilitySharePreviewDiagnosis[],
-): Promise<Array<{ diagnosisId: string; resultFingerprint: string }>> {
-  return Promise.all(
-    diagnoses.flatMap((diagnosis) => {
-      const theme = buildCompatibilitySharePreviewThemes([diagnosis])[0];
-      if (!theme) return [];
-      const canonical = JSON.stringify({
-        schemaVersion: 1,
-        diagnosisId: diagnosis.diagnosisId,
-        scoringConfigId: diagnosis.scoringConfigId,
-        scoringVersion: diagnosis.scoring.scoringVersion,
-        theme,
-      });
-      return [
-        crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonical)).then((digest) => ({
-          diagnosisId: diagnosis.diagnosisId,
-          resultFingerprint: bytesToHex(digest),
-        })),
-      ];
-    }),
-  );
-}
-
-/** 表示内容と採点設定版を、後続commandで再計算できる不透明な確認tokenへ変換する。 */
-export async function createCompatibilitySharePreviewToken(
-  displayName: string | null,
-  shareProfile: CompatibilityShareProfile | null,
-  diagnoses: readonly CompatibilitySharePreviewDiagnosis[],
-): Promise<string> {
-  const themes = diagnoses.flatMap((diagnosis) => {
-    const theme = buildCompatibilitySharePreviewThemes([diagnosis])[0];
-    return theme
-      ? [
-          {
-            ...theme,
-            scoringConfigId: diagnosis.scoringConfigId,
-            scoringVersion: diagnosis.scoring.scoringVersion,
-          },
-        ]
-      : [];
-  });
-  const canonical = JSON.stringify({ version: 2, displayName, shareProfile, themes });
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonical));
-  return `${PREVIEW_TOKEN_VERSION}.${bytesToHex(digest)}`;
+/**
+ * 双方が現在共有できる表示から、比較に使う共通テーマだけを選ぶ。
+ * 採点できないパラメータだけのDiagnosisは表示側で除外されるため、
+ * 比較対象は回答の有無ではなく実際に表示できるテーマで判定する。
+ * 双方へ同じ相性シートを見せるため、順序は`primary`側だけで決める。
+ */
+export function selectCommonCompatibilityDiagnoses(
+  primary: readonly { diagnosisId: string }[],
+  secondary: readonly { diagnosisId: string }[],
+): string[] {
+  const secondaryIds = new Set(secondary.map(({ diagnosisId }) => diagnosisId));
+  return primary
+    .filter(({ diagnosisId }) => secondaryIds.has(diagnosisId))
+    .map(({ diagnosisId }) => diagnosisId);
 }

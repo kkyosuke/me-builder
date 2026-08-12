@@ -5,10 +5,7 @@ import {
   type CancelCompatibilityInvitationResult,
   type CompatibilityInvitationAcceptanceContext,
   type CompatibilityInvitationPreview,
-  type CompatibilityProfileFingerprint,
   type CompatibilityRelationship,
-  type CompatibilityThemeConsent,
-  type CompatibilityThemeFingerprint,
   type CreateCompatibilityInvitationInput,
   type CreateCompatibilityInvitationResult,
   type EndCompatibilityRelationshipResult,
@@ -22,38 +19,6 @@ function assertValidDate(value: Date, field: string): void {
   if (!Number.isFinite(value.getTime())) throw new Error(`${field} must be a valid date`);
 }
 
-function assertThemes(themes: readonly CompatibilityThemeFingerprint[]): void {
-  if (themes.length === 0) throw new Error("At least one compatibility theme is required");
-  const diagnosisIds = new Set<string>();
-  for (const theme of themes) {
-    assertNonEmpty(theme.diagnosisId, "diagnosisId");
-    if (!/^[a-f0-9]{64}$/.test(theme.resultFingerprint)) {
-      throw new Error("Compatibility result fingerprint must be a SHA-256 hex digest");
-    }
-    if (diagnosisIds.has(theme.diagnosisId)) {
-      throw new Error("Compatibility themes must not contain duplicate diagnoses");
-    }
-    diagnosisIds.add(theme.diagnosisId);
-  }
-}
-
-function assertProfile(profile: CompatibilityProfileFingerprint): void {
-  assertNonEmpty(profile.profileSummaryVersionId, "profileSummaryVersionId");
-  if (!/^[a-f0-9]{64}$/.test(profile.fingerprint)) {
-    throw new Error("Compatibility profile fingerprint must be a SHA-256 hex digest");
-  }
-}
-
-function sameProfile(
-  left: CompatibilityProfileFingerprint,
-  right: CompatibilityProfileFingerprint,
-): boolean {
-  return (
-    left.profileSummaryVersionId === right.profileSummaryVersionId &&
-    left.fingerprint === right.fingerprint
-  );
-}
-
 function isCompatibilityInvitationExpired(
   relationship: CompatibilityRelationship,
   at: Date,
@@ -61,17 +26,6 @@ function isCompatibilityInvitationExpired(
   assertValidDate(at, "at");
   assertValidDate(relationship.expiresAt, "expiresAt");
   return relationship.expiresAt.getTime() <= at.getTime();
-}
-
-function sameThemes(
-  left: readonly CompatibilityThemeConsent[],
-  right: readonly CompatibilityThemeFingerprint[],
-): boolean {
-  if (left.length !== right.length) return false;
-  const byDiagnosis = new Map(left.map((theme) => [theme.diagnosisId, theme]));
-  return right.every(
-    (theme) => byDiagnosis.get(theme.diagnosisId)?.resultFingerprint === theme.resultFingerprint,
-  );
 }
 
 /** 新規招待または同じcommandの再試行を、永続化技術に依存せず判定する。 */
@@ -87,18 +41,13 @@ export function decideCompatibilityInvitationCreation(
   }
   assertNonEmpty(input.inviterAccountId, "inviterAccountId");
   assertNonEmpty(input.inviterDisplayName, "inviterDisplayName");
-  assertProfile(input.offeredProfile);
-  assertThemes(input.offeredThemes);
   assertValidDate(createdAt, "createdAt");
 
   if (existing) {
     if (
       existing.id !== relationshipId ||
       existing.inviterAccountId !== input.inviterAccountId ||
-      existing.inviterDisplayName !== input.inviterDisplayName.trim() ||
-      existing.offeredProfile === null ||
-      !sameProfile(existing.offeredProfile, input.offeredProfile) ||
-      !sameThemes(existing.offeredThemes, input.offeredThemes)
+      existing.inviterDisplayName !== input.inviterDisplayName.trim()
     ) {
       throw new Error("Compatibility invitation conflicts with persisted relationship");
     }
@@ -112,10 +61,6 @@ export function decideCompatibilityInvitationCreation(
     inviterDisplayName: input.inviterDisplayName.trim(),
     inviteeDisplayName: null,
     status: "pending",
-    offeredProfile: { ...input.offeredProfile, consentedAt: createdAt },
-    acceptedProfile: null,
-    offeredThemes: input.offeredThemes.map((theme) => ({ ...theme, consentedAt: createdAt })),
-    acceptedThemes: [],
     expiresAt: new Date(createdAt.getTime() + COMPATIBILITY_INVITATION_TTL_MS),
     acceptedAt: null,
     cancelledAt: null,
@@ -145,17 +90,12 @@ export function createCompatibilityInvitationPreview(
 ): CompatibilityInvitationPreview | null {
   assertNonEmpty(viewerAccountId, "viewerAccountId");
   assertValidDate(at, "at");
-  if (
-    relationship?.status !== "pending" ||
-    relationship.offeredProfile === null ||
-    isCompatibilityInvitationExpired(relationship, at)
-  ) {
+  if (relationship?.status !== "pending" || isCompatibilityInvitationExpired(relationship, at)) {
     return null;
   }
   return {
     id: relationship.id,
     inviterDisplayName: relationship.inviterDisplayName,
-    offeredDiagnosisIds: relationship.offeredThemes.map(({ diagnosisId }) => diagnosisId),
     expiresAt: relationship.expiresAt,
     isOwnInvitation: relationship.inviterAccountId === viewerAccountId,
   };
@@ -166,24 +106,11 @@ export function createCompatibilityInvitationAcceptanceContext(
   at: Date,
 ): CompatibilityInvitationAcceptanceContext | null {
   assertValidDate(at, "at");
-  if (
-    relationship?.status !== "pending" ||
-    relationship.offeredProfile === null ||
-    isCompatibilityInvitationExpired(relationship, at)
-  ) {
+  if (relationship?.status !== "pending" || isCompatibilityInvitationExpired(relationship, at)) {
     return null;
   }
   return {
     inviterAccountId: relationship.inviterAccountId,
-    offeredProfile: {
-      profileSummaryVersionId: relationship.offeredProfile.profileSummaryVersionId,
-      fingerprint: relationship.offeredProfile.fingerprint,
-    },
-    offeredThemes: relationship.offeredThemes.map(({ diagnosisId, resultFingerprint }) => ({
-      diagnosisId,
-      resultFingerprint,
-    })),
-    offeredDiagnosisIds: relationship.offeredThemes.map(({ diagnosisId }) => diagnosisId),
     expiresAt: relationship.expiresAt,
   };
 }
@@ -196,11 +123,8 @@ export function decideCompatibilityInvitationAcceptance(
 ): AcceptCompatibilityInvitationResult {
   assertNonEmpty(input.inviteeAccountId, "inviteeAccountId");
   assertNonEmpty(input.inviteeDisplayName, "inviteeDisplayName");
-  assertProfile(input.acceptedProfile);
-  assertThemes(input.acceptedThemes);
   assertValidDate(acceptedAt, "acceptedAt");
   if (!relationship) return { outcome: "unavailable" };
-  if (!relationship.offeredProfile) return { outcome: "unavailable" };
   if (
     relationship.status === "expired" ||
     (relationship.status === "pending" &&
@@ -214,23 +138,13 @@ export function decideCompatibilityInvitationAcceptance(
   if (relationship.status === "accepted") {
     if (
       relationship.inviteeAccountId === input.inviteeAccountId &&
-      relationship.inviteeDisplayName === input.inviteeDisplayName.trim() &&
-      relationship.acceptedProfile !== null &&
-      sameProfile(relationship.acceptedProfile, input.acceptedProfile) &&
-      sameThemes(relationship.acceptedThemes, input.acceptedThemes)
+      relationship.inviteeDisplayName === input.inviteeDisplayName.trim()
     ) {
       return { outcome: "unchanged", relationship };
     }
     return { outcome: "unavailable" };
   }
   if (relationship.status !== "pending") return { outcome: "unavailable" };
-
-  const offeredDiagnosisIds = new Set(
-    relationship.offeredThemes.map(({ diagnosisId }) => diagnosisId),
-  );
-  if (input.acceptedThemes.some(({ diagnosisId }) => !offeredDiagnosisIds.has(diagnosisId))) {
-    return { outcome: "invalid-themes" };
-  }
 
   return {
     outcome: "accepted",
@@ -239,11 +153,6 @@ export function decideCompatibilityInvitationAcceptance(
       inviteeAccountId: input.inviteeAccountId,
       inviteeDisplayName: input.inviteeDisplayName.trim(),
       status: "accepted",
-      acceptedProfile: { ...input.acceptedProfile, consentedAt: acceptedAt },
-      acceptedThemes: input.acceptedThemes.map((theme) => ({
-        ...theme,
-        consentedAt: acceptedAt,
-      })),
       acceptedAt,
       updatedAt: acceptedAt,
     },
@@ -281,8 +190,6 @@ export function getAcceptedCompatibilityRelationship(
   if (
     !relationship ||
     relationship.status !== "accepted" ||
-    relationship.offeredProfile === null ||
-    relationship.acceptedProfile === null ||
     (relationship.inviterAccountId !== actorAccountId &&
       relationship.inviteeAccountId !== actorAccountId)
   ) {
