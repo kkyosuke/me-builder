@@ -22,13 +22,13 @@ const CompatibilitySharePreviewParameterSchema = v.object({
   statement: NonEmptyStringSchema,
 });
 
-const CompatibilitySharePreviewThemeSchema = v.object({
+export const CompatibilitySharePreviewThemeSchema = v.object({
   diagnosisId: NonEmptyStringSchema,
   title: NonEmptyStringSchema,
   parameters: v.pipe(v.array(CompatibilitySharePreviewParameterSchema), v.minLength(1)),
 });
 
-const CompatibilityShareProfileSchema = v.object({
+export const CompatibilityShareProfileSchema = v.object({
   profileSummaryVersionId: NonEmptyStringSchema,
   generatedAt: v.pipe(v.string(), v.isoTimestamp()),
   statements: v.pipe(

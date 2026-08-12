@@ -36,6 +36,7 @@ const mocks = vi.hoisted(() => ({
   fetchDevelopmentBrainItems: vi.fn(),
   normalizeAvatarImage: vi.fn(),
   fetchCompatibilitySharePreview: vi.fn(),
+  fetchCompatibilityInvitation: vi.fn(),
 }));
 
 vi.mock("./config", () => ({
@@ -73,6 +74,7 @@ vi.mock("./feature/profile-settings/model/normalize-avatar-image", () => ({
 }));
 vi.mock("./feature/compatibility/infrastructure/compatibility-api", () => ({
   fetchCompatibilitySharePreview: mocks.fetchCompatibilitySharePreview,
+  fetchCompatibilityInvitation: mocks.fetchCompatibilityInvitation,
 }));
 vi.mock("./feature/diagnosis/presentation/components/swipe-diagnosis", () => ({
   SwipeDiagnosis: ({
@@ -337,6 +339,33 @@ describe("App", () => {
       canIssueInvitation: true,
       blockingReasons: [],
       nextAction: null,
+    });
+    mocks.fetchCompatibilityInvitation.mockResolvedValue({
+      inviter: {
+        displayName: "あおい",
+        aboutMe: {
+          profileSummaryVersionId: "profile-inviter",
+          generatedAt: "2026-08-11T00:00:00.000Z",
+          statements: [
+            {
+              key: "planning",
+              label: "予定",
+              statement: "私は見通しを大切にします",
+            },
+          ],
+        },
+        themes: [],
+      },
+      recipient: {
+        displayName: "テスト",
+        previewToken: `csp2.${"b".repeat(64)}`,
+        aboutMe: null,
+        themes: [],
+      },
+      expiresAt: "2026-08-26T00:00:00.000Z",
+      canAccept: false,
+      blockingReasons: ["common_diagnosis_required"],
+      nextAction: "diagnosis",
     });
     mocks.restoreDiagnosisProgress.mockImplementation(
       (_questions: DiagnosisDefinition["questions"], answers: DiagnosisResult["answers"]) => ({
@@ -839,7 +868,12 @@ describe("App", () => {
   });
 
   it("LIFFの招待リンクから相性の確認画面を直接表示する", async () => {
-    window.history.replaceState({}, "", "/?liff.state=%2Fcompatibility%2Finvitations%2Fdemo");
+    const relationshipId = "1".repeat(64);
+    window.history.replaceState(
+      {},
+      "",
+      `/?liff.state=${encodeURIComponent(`/compatibility/invitations/${relationshipId}`)}`,
+    );
 
     render(<App />);
 
@@ -847,6 +881,12 @@ describe("App", () => {
       await screen.findByRole("heading", { name: "2人の相性を見てみませんか？" }),
     ).toBeTruthy();
     expect(screen.getByText("あおいさんから招待が届いています")).toBeTruthy();
+    expect(mocks.fetchCompatibilityInvitation).toHaveBeenCalledWith(
+      "https://api.example.com",
+      "dummy.id.token",
+      relationshipId,
+      expect.anything(),
+    );
     expect(mocks.fetchDiagnosisList).not.toHaveBeenCalled();
   });
 

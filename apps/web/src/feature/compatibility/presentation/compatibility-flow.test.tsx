@@ -3,6 +3,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { aoi, compatibilityListData, me } from "../infrastructure/compatibility-demo";
+import type { CompatibilityInvitationPreview } from "../model/compatibility-invitation-preview";
 import type { CompatibilitySharePreview } from "../model/compatibility-share-preview";
 import { CompatibilityInvitationScreen } from "./compatibility-invitation-screen";
 import { CompatibilityListScreen } from "./compatibility-list-screen";
@@ -180,20 +181,64 @@ describe("Compatibility flow", () => {
     ).toBe(true);
   });
 
-  it("受信者が自分の共有内容と共有されない詳細を確認して承諾する", () => {
-    render(<CompatibilityInvitationScreen inviter={aoi} recipient={me} />);
+  it("受信者が双方の実際の共有内容を確認し、未実装の承諾を成立扱いにしない", () => {
+    const theme = {
+      diagnosisId: "daily-life",
+      title: "暮らし方",
+      parameters: [
+        {
+          id: "planning",
+          label: "予定の立て方",
+          lowLabel: "その場で決めたい",
+          highLabel: "早めに決めたい",
+          position: 78,
+          statement: "「早めに決めたい」傾向があります",
+        },
+      ],
+    };
+    const invitation: CompatibilityInvitationPreview = {
+      inviter: {
+        displayName: "あおい",
+        aboutMe: {
+          profileSummaryVersionId: "profile-inviter",
+          generatedAt: "2026-08-11T00:00:00.000Z",
+          statements: [{ key: "planning", label: "予定", statement: "私は見通しを大切にします" }],
+        },
+        themes: [theme],
+      },
+      recipient: {
+        displayName: "はる",
+        previewToken: `csp2.${"a".repeat(64)}`,
+        aboutMe: {
+          profileSummaryVersionId: "profile-recipient",
+          generatedAt: "2026-08-12T00:00:00.000Z",
+          statements: [{ key: "space", label: "余白", statement: "私は予定の余白を大切にします" }],
+        },
+        themes: [theme],
+      },
+      expiresAt: "2026-08-26T00:00:00.000Z",
+      canAccept: true,
+      blockingReasons: [],
+      nextAction: null,
+    };
+    render(
+      <CompatibilityInvitationScreen
+        state={{ status: "success", data: invitation }}
+        onRetry={vi.fn()}
+      />,
+    );
 
     expect(screen.getByText("あおいさんから招待が届いています")).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "共有する振る舞い・考え方" })).toBeTruthy();
-    expect(screen.getByText("3件すべて共有")).toBeTruthy();
+    expect(screen.getByText("私は見通しを大切にします")).toBeTruthy();
+    expect(screen.getByText("私は予定の余白を大切にします")).toBeTruthy();
+    expect(screen.getAllByRole("heading", { name: "共有する振る舞い・考え方" })).toHaveLength(2);
+    expect(screen.getByText("1テーマが共通")).toBeTruthy();
     expect(screen.queryByRole("checkbox")).toBeNull();
     expect(screen.getByText(/日記やLINEの会話本文/)).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "相性を見てみる" }));
-
     expect(
-      screen.getByRole("heading", { name: "あおいさんとの相性シートを作りました" }),
-    ).toBeTruthy();
-    expect(screen.getByRole("link", { name: "2人の相性シートを見る" })).toBeTruthy();
+      screen.getByRole("button", { name: "相性を見てみる（準備中）" }).hasAttribute("disabled"),
+    ).toBe(true);
+    expect(screen.queryByText(/相性シートを作りました/)).toBeNull();
   });
 
   it("人物ごとの資料と2人の共通点・違いをタブとスワイプで切り替える", () => {

@@ -2,6 +2,7 @@ import * as v from "valibot";
 import type { operations } from "../../../generated/api";
 import { createHttpClient } from "../../../infrastructure/http-client";
 import type { CompatibilityInvitation } from "../model/compatibility-invitation";
+import type { CompatibilityInvitationPreview } from "../model/compatibility-invitation-preview";
 import type { CompatibilitySharePreview } from "../model/compatibility-share-preview";
 
 type ApiResponse =
@@ -10,6 +11,8 @@ type InvitationApiResponse =
   operations["issueCompatibilityInvitation"]["responses"][201]["content"]["application/json"];
 type InvitationApiRequest =
   operations["issueCompatibilityInvitation"]["requestBody"]["content"]["application/json"];
+type InvitationPreviewApiResponse =
+  operations["getCompatibilityInvitation"]["responses"][200]["content"]["application/json"];
 
 const NonEmptyStringSchema = v.pipe(v.string(), v.nonEmpty());
 const ParameterSchema = v.object({
@@ -20,33 +23,31 @@ const ParameterSchema = v.object({
   position: v.pipe(v.number(), v.safeInteger(), v.minValue(0), v.maxValue(100)),
   statement: NonEmptyStringSchema,
 });
+const ShareProfileSchema = v.object({
+  profileSummaryVersionId: NonEmptyStringSchema,
+  generatedAt: v.pipe(v.string(), v.isoTimestamp()),
+  statements: v.pipe(
+    v.array(
+      v.object({
+        key: NonEmptyStringSchema,
+        label: NonEmptyStringSchema,
+        statement: NonEmptyStringSchema,
+      }),
+    ),
+    v.minLength(1),
+    v.maxLength(3),
+  ),
+});
+const ShareThemeSchema = v.object({
+  diagnosisId: NonEmptyStringSchema,
+  title: NonEmptyStringSchema,
+  parameters: v.pipe(v.array(ParameterSchema), v.minLength(1)),
+});
 const ResponseSchema = v.object({
   displayName: v.nullable(NonEmptyStringSchema),
   previewToken: v.pipe(v.string(), v.regex(/^csp2\.[a-f0-9]{64}$/)),
-  aboutMe: v.nullable(
-    v.object({
-      profileSummaryVersionId: NonEmptyStringSchema,
-      generatedAt: v.pipe(v.string(), v.isoTimestamp()),
-      statements: v.pipe(
-        v.array(
-          v.object({
-            key: NonEmptyStringSchema,
-            label: NonEmptyStringSchema,
-            statement: NonEmptyStringSchema,
-          }),
-        ),
-        v.minLength(1),
-        v.maxLength(3),
-      ),
-    }),
-  ),
-  themes: v.array(
-    v.object({
-      diagnosisId: NonEmptyStringSchema,
-      title: NonEmptyStringSchema,
-      parameters: v.pipe(v.array(ParameterSchema), v.minLength(1)),
-    }),
-  ),
+  aboutMe: v.nullable(ShareProfileSchema),
+  themes: v.array(ShareThemeSchema),
   canIssueInvitation: v.boolean(),
   blockingReasons: v.array(
     v.picklist([
@@ -65,6 +66,34 @@ const InvitationResponseSchema = v.object({
   invitationUrl: v.pipe(v.string(), v.url()),
   expiresAt: v.pipe(v.string(), v.isoTimestamp()),
 }) satisfies v.GenericSchema<InvitationApiResponse>;
+
+const InvitationPreviewResponseSchema = v.object({
+  inviter: v.object({
+    displayName: NonEmptyStringSchema,
+    aboutMe: ShareProfileSchema,
+    themes: v.pipe(v.array(ShareThemeSchema), v.minLength(1)),
+  }),
+  recipient: v.object({
+    displayName: v.nullable(NonEmptyStringSchema),
+    previewToken: v.pipe(v.string(), v.regex(/^csp2\.[a-f0-9]{64}$/)),
+    aboutMe: v.nullable(ShareProfileSchema),
+    themes: v.array(ShareThemeSchema),
+  }),
+  expiresAt: v.pipe(v.string(), v.isoTimestamp()),
+  canAccept: v.boolean(),
+  blockingReasons: v.array(
+    v.picklist([
+      "display_name_unavailable",
+      "profile_summary_required",
+      "profile_summary_stale",
+      "diagnosis_required",
+      "scoring_unavailable",
+      "diagnosis_unavailable",
+      "common_diagnosis_required",
+    ]),
+  ),
+  nextAction: v.nullable(v.picklist(["diagnosis", "profile-summary"])),
+}) satisfies v.GenericSchema<InvitationPreviewApiResponse>;
 
 export async function fetchCompatibilitySharePreview(
   apiUrl: string | undefined,
@@ -120,4 +149,43 @@ export async function issueCompatibilityInvitation(
   }
 
   return v.parse(InvitationResponseSchema, await response.json());
+}
+
+export async function fetchCompatibilityInvitation(
+  apiUrl: string | undefined,
+  idToken: string,
+  relationshipId: string,
+  signal?: AbortSignal,
+): Promise<CompatibilityInvitationPreview> {
+  const response = await createHttpClient(apiUrl).request(
+    `/api/compatibility/invitations/${encodeURIComponent(relationshipId)}`,
+    {
+      headers: { Authorization: `Bearer ${idToken}` },
+      ...(signal ? { signal } : {}),
+    },
+  );
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error("本人確認に失敗しました。LINEから開き直してください。");
+    }
+    if (response.status === 404) {
+      const body = await response.json().catch(() => null);
+      if (
+        body &&
+        typeof body === "object" &&
+        "reason" in body &&
+        body.reason === "friendship_required"
+      ) {
+        throw new Error("利用するには、先にLINE公式アカウントを友だち追加してください。");
+      }
+      throw new Error("この招待は利用できません。期限切れまたは使用済みの可能性があります。");
+    }
+    if (response.status === 409) {
+      throw new Error("自分が発行した招待は承諾できません。相性一覧から確認してください。");
+    }
+    throw new Error(`招待内容の取得に失敗しました (HTTP ${response.status})`);
+  }
+
+  return v.parse(InvitationPreviewResponseSchema, await response.json());
 }

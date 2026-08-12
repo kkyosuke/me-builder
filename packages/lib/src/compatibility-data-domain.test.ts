@@ -102,6 +102,14 @@ describe("compatibility data domain", () => {
     });
     expect(createCompatibilityInvitationAcceptanceContext(relationship, createdAt)).toEqual({
       inviterAccountId: "account-inviter",
+      offeredProfile: {
+        profileSummaryVersionId: "profile-version-inviter",
+        fingerprint: "f".repeat(64),
+      },
+      offeredThemes: [
+        { diagnosisId: "diagnosis-1", resultFingerprint: "a".repeat(64) },
+        { diagnosisId: "diagnosis-2", resultFingerprint: "b".repeat(64) },
+      ],
       offeredDiagnosisIds: ["diagnosis-1", "diagnosis-2"],
       expiresAt,
     });

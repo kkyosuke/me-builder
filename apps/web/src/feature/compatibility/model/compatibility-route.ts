@@ -14,3 +14,7 @@ export function resolveCompatibilityRoute(pathname: string): CompatibilityRoute 
   if (pathname.startsWith("/compatibility/demo")) return "result";
   return "list";
 }
+
+export function resolveCompatibilityInvitationId(pathname: string): string | null {
+  return pathname.match(/^\/compatibility\/invitations\/([a-f0-9]{64})$/)?.[1] ?? null;
+}

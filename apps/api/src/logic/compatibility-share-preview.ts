@@ -34,7 +34,7 @@ export type CompatibilitySharePreviewOutcome =
   | { type: "unauthenticated"; reason: string }
   | { type: "account-not-found" };
 
-type CompatibilitySharePreviewBlockingReason =
+export type CompatibilitySharePreviewBlockingReason =
   | "display_name_unavailable"
   | "profile_summary_required"
   | "profile_summary_stale"
@@ -66,6 +66,7 @@ export type CompatibilitySharePreviewDataDependencies = {
   getShareProfile: (
     accountData: AccountDataNamespace | undefined,
     accountId: string,
+    profileSummaryVersionId?: string,
   ) => ReturnType<typeof DO.account.action.profileSummary.readCompatibilityShareProfile>;
   scoreAnswers: typeof scoreDiagnosisAnswers;
   createPreviewToken: typeof createCompatibilitySharePreviewToken;
@@ -81,10 +82,11 @@ export const compatibilitySharePreviewDataDependencies: CompatibilitySharePrevie
       if (!accountData) throw new Error("ACCOUNT_DATA binding is not configured");
       return accountDataFor(accountData, accountId).execute("diagnosis.getAnsweredSource", at);
     },
-    getShareProfile: (accountData, accountId) => {
+    getShareProfile: (accountData, accountId, profileSummaryVersionId) => {
       if (!accountData) throw new Error("ACCOUNT_DATA binding is not configured");
       return accountDataFor(accountData, accountId).execute(
         "profileSummary.readCompatibilityShareProfile",
+        profileSummaryVersionId,
       );
     },
     scoreAnswers: scoreDiagnosisAnswers,
@@ -103,17 +105,19 @@ export async function loadCompatibilitySharePreviewData(
     verifiedDisplayName,
     accountData,
     at,
+    profileSummaryVersionId,
   }: {
     accountId: string;
     verifiedDisplayName: string | undefined;
     accountData: AccountDataNamespace | undefined;
     at: Date;
+    profileSummaryVersionId?: string;
   },
   dependencies: CompatibilitySharePreviewDataDependencies = compatibilitySharePreviewDataDependencies,
 ): Promise<CompatibilitySharePreviewData> {
   const [source, shareProfileResult] = await Promise.all([
     dependencies.getPreviewSource(accountData, accountId, at),
-    dependencies.getShareProfile(accountData, accountId),
+    dependencies.getShareProfile(accountData, accountId, profileSummaryVersionId),
   ]);
   const shareableDiagnoses = source.answeredDiagnoses.flatMap(
     ({ id, title, answers, scoringConfig }): CompatibilitySharePreviewDiagnosis[] => {

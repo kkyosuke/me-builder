@@ -6,7 +6,6 @@ import {
   MessageCircle,
   RefreshCw,
   Send,
-  Sparkles,
   UserRound,
 } from "lucide-react";
 import type { AsyncState } from "../../../model/async-state";
@@ -14,9 +13,12 @@ import type { CompatibilityInvitation } from "../model/compatibility-invitation"
 import type {
   CompatibilitySharePreview,
   CompatibilitySharePreviewBlockingReason,
-  CompatibilitySharePreviewParameter,
 } from "../model/compatibility-share-preview";
 import { CompatibilityPrivacyNotice } from "./components/compatibility-disclosure";
+import {
+  CompatibilityAboutMePreview,
+  CompatibilityThemesPreview,
+} from "./components/compatibility-share-content";
 import { CompatibilityBackHeader } from "./components/compatibility-ui";
 
 const blockingReasonMessages: Record<CompatibilitySharePreviewBlockingReason, string> = {
@@ -47,35 +49,6 @@ function SharePreviewSkeleton() {
   );
 }
 
-function ShareParameterCard({ parameter }: { parameter: CompatibilitySharePreviewParameter }) {
-  return (
-    <article className="rounded-2xl border border-rose-300 bg-rose-50 p-4 dark:border-rose-700 dark:bg-rose-950/30">
-      <div className="flex items-start gap-3">
-        <span
-          aria-hidden="true"
-          className="mt-2 block size-2 shrink-0 rounded-full bg-rose-500 shadow-[0_0_0_4px_rgba(244,63,94,0.12)]"
-        />
-        <div className="min-w-0 flex-1">
-          <h4 className="font-bold text-slate-950 dark:text-slate-50">{parameter.label}</h4>
-          <p className="mt-1 text-sm leading-relaxed text-slate-700 dark:text-slate-300">
-            {parameter.statement}
-          </p>
-          <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-sky-400 to-rose-400"
-              style={{ width: `${parameter.position}%` }}
-            />
-          </div>
-          <div className="mt-1 flex justify-between gap-3 text-[0.6875rem] text-slate-500">
-            <span>{parameter.lowLabel}</span>
-            <span className="text-right">{parameter.highLabel}</span>
-          </div>
-        </div>
-      </div>
-    </article>
-  );
-}
-
 function SharePreviewContent({
   invitationState,
   onCopyLink,
@@ -93,10 +66,6 @@ function SharePreviewContent({
   preview: CompatibilitySharePreview;
   sharingMessage: string | null;
 }) {
-  const parameterCount = preview.themes.reduce(
-    (count, theme) => count + theme.parameters.length,
-    0,
-  );
   const displayName = preview.displayName ?? "あなた";
 
   return (
@@ -122,75 +91,19 @@ function SharePreviewContent({
       </p>
 
       {preview.aboutMe && (
-        <section aria-labelledby="about-me-heading" className="mt-8">
-          <p className="text-xs font-bold text-slate-500">相手に見える「私について」</p>
-          <h2
-            id="about-me-heading"
-            className="mt-1 flex items-center gap-2 text-xl font-bold text-slate-950 dark:text-slate-50"
-          >
-            <Sparkles className="size-5 text-violet-500" aria-hidden="true" />
-            まず知ってほしいこと
-          </h2>
-          <div className="mt-4 space-y-3">
-            {preview.aboutMe.statements.map((item) => (
-              <article
-                key={item.key}
-                className="rounded-2xl border border-violet-300 bg-violet-50 p-4 dark:border-violet-700 dark:bg-violet-950/30"
-              >
-                <h3 className="text-sm font-bold text-violet-950 dark:text-violet-100">
-                  {item.label}
-                </h3>
-                <p className="mt-1 text-sm leading-relaxed text-slate-700 dark:text-slate-300">
-                  {item.statement}
-                </p>
-              </article>
-            ))}
-          </div>
-          <p className="mt-2 text-xs text-slate-500">
-            わたしの傾向で生成した版を使用しています。新しい版は確認するまで自動共有されません。
-          </p>
-        </section>
+        <CompatibilityAboutMePreview
+          eyebrow="相手に見える「私について」"
+          headingId="about-me-heading"
+          profile={preview.aboutMe}
+          note="わたしの傾向で生成した版を使用しています。新しい版は確認するまで自動共有されません。"
+        />
       )}
 
-      <section aria-labelledby="themes-heading" className="mt-8">
-        <div className="flex items-end justify-between gap-3">
-          <div>
-            <p className="text-xs font-bold text-slate-500">2人の比較に使う診断テーマ</p>
-            <h2
-              id="themes-heading"
-              className="mt-1 text-xl font-bold text-slate-950 dark:text-slate-50"
-            >
-              共有する振る舞い・考え方
-            </h2>
-          </div>
-          <span className="text-right text-sm font-bold text-rose-700 dark:text-rose-300">
-            {parameterCount}件すべて共有
-          </span>
-        </div>
-        <div className="mt-4 space-y-6">
-          {preview.themes.map((theme, index) => {
-            const headingId = `compatibility-share-theme-${index}`;
-            return (
-              <section key={theme.diagnosisId} aria-labelledby={headingId}>
-                <h3
-                  id={headingId}
-                  className="mb-3 text-sm font-bold text-slate-700 dark:text-slate-300"
-                >
-                  {theme.title}
-                </h3>
-                <div className="space-y-3">
-                  {theme.parameters.map((parameter) => (
-                    <ShareParameterCard
-                      key={`${theme.diagnosisId}:${parameter.id}`}
-                      parameter={parameter}
-                    />
-                  ))}
-                </div>
-              </section>
-            );
-          })}
-        </div>
-      </section>
+      <CompatibilityThemesPreview
+        eyebrow="2人の比較に使う診断テーマ"
+        headingId="themes-heading"
+        themes={preview.themes}
+      />
 
       <CompatibilityPrivacyNotice
         title="共有されない詳細"

@@ -21,6 +21,7 @@ import {
   issueCompatibilityInvitationRoute,
   issueCompatibilityInvitationValidator,
 } from "./contract/compatibility/invitation";
+import { compatibilityInvitationPreviewRoute } from "./contract/compatibility/invitation-preview";
 import { compatibilitySharePreviewRoute } from "./contract/compatibility/share-preview";
 import { saveDiagnosisAnswerRoute } from "./contract/diagnosis/answer";
 import { diagnosisAnswersRoute } from "./contract/diagnosis/answers";
@@ -45,6 +46,7 @@ import {
   postDevelopmentBrainVectorSyncJobsResetAll,
 } from "./controller/brain";
 import {
+  getCompatibilityInvitation,
   getCompatibilitySharePreviewContents,
   postCompatibilityInvitation,
 } from "./controller/compatibility";
@@ -63,6 +65,7 @@ import {
   getProfileContents,
   putProfileAvatar,
 } from "./controller/profile-avatar";
+import { operationalHttpPath } from "./operational-http-path";
 import type { AppEnv } from "./types";
 
 const app = new Hono<AppEnv>();
@@ -98,13 +101,14 @@ app.use("*", async (c, next) => {
   await next();
   const responseTimeMs = Date.now() - start;
   const status = c.res.status;
+  const path = operationalHttpPath(c.req.path);
   const safeError = c.get("safeError");
   const outcome = httpOutcome(status);
   const fields = {
     event: outcome === "failed" ? "http.request.failed" : "http.request.completed",
     service: "api",
     method: c.req.method,
-    path: c.req.path,
+    path,
     status,
     outcome,
     responseTimeMs,
@@ -113,7 +117,7 @@ app.use("*", async (c, next) => {
   const description = describeHttpResult({
     service: "API",
     method: c.req.method,
-    path: c.req.path,
+    path,
     status,
     durationMs: responseTimeMs,
     ...(safeError ? { errorCode: safeError.errorCode } : {}),
@@ -158,6 +162,11 @@ app.post(
   issueCompatibilityInvitationRoute,
   issueCompatibilityInvitationValidator,
   postCompatibilityInvitation,
+);
+app.get(
+  "/api/compatibility/invitations/:relationshipId",
+  compatibilityInvitationPreviewRoute,
+  getCompatibilityInvitation,
 );
 app.get(
   "/api/dev/brain-vector-sync-jobs/failed",
