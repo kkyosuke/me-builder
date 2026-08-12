@@ -79,6 +79,84 @@ describe("deferDiagnosisQuestion", () => {
     expect(active).toHaveLength(0);
   });
 
+  it("response未作成時に異なる質問の回答と競合しても最新responseから延期を再試行する", async () => {
+    const db = createTestDb();
+    await db
+      .insert(schema.accountDataIdentity)
+      .values({ singleton: 1, accountId: "defer-response-race-account" });
+    await insertDiagnosis(db, { id: "defer-response-race-target" });
+    const at = new Date("2026-08-06T00:00:00Z");
+    const originalBatch = db.batch.bind(db);
+    let injectConcurrentAnswer = true;
+    let concurrentAnswerResult: Awaited<ReturnType<typeof saveDiagnosisAnswer>> | undefined;
+    Object.assign(db, {
+      batch: async (queries: Array<PromiseLike<unknown>>) => {
+        if (injectConcurrentAnswer) {
+          injectConcurrentAnswer = false;
+          concurrentAnswerResult = await saveDiagnosisAnswer(db, {
+            accountId: "defer-response-race-account",
+            diagnosisId: "defer-response-race-target",
+            diagnosisQuestionId: "defer-response-race-target-sq1",
+            choiceId: "yes",
+            at,
+          });
+          // D1のatomic batchでは、後着deferが採番したresponse IDへの参照はrollbackされる。
+          throw new Error("D1_ERROR: FOREIGN KEY constraint failed: SQLITE_CONSTRAINT");
+        }
+        return originalBatch(queries as never);
+      },
+    });
+
+    await expect(
+      deferDiagnosisQuestion(db, {
+        accountId: "defer-response-race-account",
+        diagnosisId: "defer-response-race-target",
+        diagnosisQuestionId: "defer-response-race-target-sq2",
+        at,
+      }),
+    ).resolves.toMatchObject({
+      type: "deferred",
+      outcome: "created",
+      deferredQuestion: { diagnosisQuestionId: "defer-response-race-target-sq2" },
+    });
+
+    expect(concurrentAnswerResult).toMatchObject({ type: "saved", outcome: "created" });
+    expect(await db.select().from(schema.diagnosisResponses)).toHaveLength(1);
+    expect(await db.select().from(schema.diagnosisAnswers)).toHaveLength(1);
+    expect(await db.select().from(schema.diagnosisDeferredQuestions)).toHaveLength(1);
+  });
+
+  it("制約違反ではないD1エラーを競合成功として扱わない", async () => {
+    const db = createTestDb();
+    await db
+      .insert(schema.accountDataIdentity)
+      .values({ singleton: 1, accountId: "defer-d1-error-account" });
+    await insertDiagnosis(db, { id: "defer-d1-error-target" });
+    const input = {
+      accountId: "defer-d1-error-account",
+      diagnosisId: "defer-d1-error-target",
+      diagnosisQuestionId: "defer-d1-error-target-sq1",
+      at: new Date("2026-08-06T00:00:00Z"),
+    };
+    const originalBatch = db.batch.bind(db);
+    let injectConcurrentDefer = true;
+    Object.assign(db, {
+      batch: async (queries: Array<PromiseLike<unknown>>) => {
+        if (injectConcurrentDefer) {
+          injectConcurrentDefer = false;
+          await deferDiagnosisQuestion(db, input);
+          throw new Error("D1_ERROR: transient database failure");
+        }
+        return originalBatch(queries as never);
+      },
+    });
+
+    await expect(deferDiagnosisQuestion(db, input)).rejects.toThrow(
+      "D1_ERROR: transient database failure",
+    );
+    expect(await db.select().from(schema.diagnosisDeferredQuestions)).toHaveLength(1);
+  });
+
   it("公開状態・受付期間・Diagnosis Questionを検証する", async () => {
     const db = createTestDb();
     await db

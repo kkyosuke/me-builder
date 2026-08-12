@@ -147,8 +147,8 @@ function isUniqueViolation(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return (
     message.includes("UNIQUE constraint failed") ||
-    message.includes("D1_ERROR") ||
-    message.includes("SQLITE_CONSTRAINT")
+    message.includes("SQLITE_CONSTRAINT_UNIQUE") ||
+    message.includes("SQLITE_CONSTRAINT_PRIMARYKEY")
   );
 }
 
@@ -417,6 +417,18 @@ export async function deferDiagnosisQuestion(
     at: Date;
   },
 ): Promise<DeferDiagnosisQuestionResult> {
+  return deferDiagnosisQuestionWithResponseRetry(db, input);
+}
+
+async function deferDiagnosisQuestionWithResponseRetry(
+  db: AccountDataDatabase,
+  input: {
+    accountId: string;
+    diagnosisId: string;
+    diagnosisQuestionId: string;
+    at: Date;
+  },
+): Promise<DeferDiagnosisQuestionResult> {
   const diagnosis = await db
     .select({
       state: diagnoses.state,
@@ -482,7 +494,7 @@ export async function deferDiagnosisQuestion(
       }),
     ]);
   } catch (error) {
-    if (!isUniqueViolation(error)) {
+    if (!isUniqueViolation(error) && !isForeignKeyViolation(error)) {
       throw error;
     }
     const concurrentResponseId = await findDiagnosisResponseId(
@@ -501,6 +513,9 @@ export async function deferDiagnosisQuestion(
       );
       if (concurrent) {
         return deferredResult(concurrent, "unchanged");
+      }
+      if (concurrentResponseId !== responseId) {
+        return deferDiagnosisQuestionWithResponseRetry(db, input);
       }
     }
     throw error;
@@ -733,7 +748,7 @@ async function saveDiagnosisAnswerWithRevisionRetry(
       }),
     ]);
   } catch (error) {
-    if (!isUniqueViolation(error)) {
+    if (!isUniqueViolation(error) && !isForeignKeyViolation(error)) {
       throw error;
     }
     const concurrentResponse = await db
