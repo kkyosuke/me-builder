@@ -10,6 +10,15 @@ describe("profile summary prompt", () => {
     expect(PROFILE_SUMMARY_SYSTEM_PROMPT).toContain("具体的な出来事");
   });
 
+  it("共有専用文章の機械的な検査規則をpromptへ明示する", () => {
+    for (const forbidden of ["相手", "あなた", "日記", "診断", "得意", "苦手", "性格", "能力"]) {
+      expect(PROFILE_SUMMARY_SYSTEM_PROMPT).toContain(forbidden);
+    }
+    expect(PROFILE_SUMMARY_SYSTEM_PROMPT).toContain("数字（半角・全角）");
+    expect(PROFILE_SUMMARY_SYSTEM_PROMPT).toContain("かぎ括弧");
+    expect(PROFILE_SUMMARY_SYSTEM_PROMPT).toContain("句点は文末にのみ置く");
+  });
+
   it("追跡可能なprompt versionを持つ", () => {
     expect(PROFILE_SUMMARY_PROMPT_VERSION).toMatch(/^profile-summary-v\d+$/u);
   });
