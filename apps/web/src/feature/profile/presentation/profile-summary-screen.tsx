@@ -20,6 +20,7 @@ import {
 import { MainNavigation } from "../../../components/main-navigation";
 import type { AsyncState } from "../../../model/async-state";
 import type {
+  ProfileDiagnosisTheme,
   ProfileRecordSource,
   ProfileSummary,
   ProfileSummaryRegenerationReason,
@@ -398,8 +399,12 @@ function SummaryCardStack({
           disabled={Boolean(transition)}
           className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-violet-600 px-5 py-3.5 text-sm font-bold text-white shadow-lg shadow-violet-950/15 transition hover:bg-violet-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 disabled:opacity-50 dark:bg-violet-500 dark:hover:bg-violet-400"
         >
-          <Sparkles className="size-4.5" aria-hidden="true" />
-          最新のわたしを知る
+          {versioning.generation.status === "failed" ? (
+            <RefreshCw className="size-4.5" aria-hidden="true" />
+          ) : (
+            <Sparkles className="size-4.5" aria-hidden="true" />
+          )}
+          {versioning.generation.status === "failed" ? "再試行" : "最新のわたしを知る"}
         </button>
       )}
 
@@ -674,6 +679,99 @@ function EmptySummary({
   );
 }
 
+function DiagnosisThemes({ themes }: { themes: readonly ProfileDiagnosisTheme[] }) {
+  if (themes.length === 0) return null;
+  return (
+    <section aria-labelledby="diagnosis-themes-heading" className="mt-8">
+      <h2
+        id="diagnosis-themes-heading"
+        className="flex items-center gap-2 text-lg font-bold text-slate-950 dark:text-slate-50"
+      >
+        <ClipboardCheck className="size-5 text-sky-700 dark:text-sky-300" aria-hidden="true" />
+        テーマごとの傾向
+      </h2>
+      <div className="mt-3 space-y-4">
+        {themes.map((theme) => (
+          <article
+            key={theme.id}
+            className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800"
+          >
+            <h3 className="font-bold text-slate-950 dark:text-slate-50">{theme.title}</h3>
+            <p className="mt-1 text-xs text-slate-500">
+              {`${theme.answeredCount} / ${theme.questionCount}問に回答`}
+            </p>
+            {theme.scoring ? (
+              <div className="mt-3 divide-y divide-slate-200 dark:divide-slate-700">
+                {theme.scoring.parameters.map((parameter) => {
+                  const summary =
+                    parameter.band === "insufficient" || parameter.score === null
+                      ? "回答が増えると表示できます"
+                      : parameter.band === "low"
+                        ? parameter.lowLabel
+                        : parameter.band === "high"
+                          ? parameter.highLabel
+                          : theme.scoring?.balancedLabel;
+                  return (
+                    <div key={parameter.id} className="py-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                          {parameter.label}
+                        </h4>
+                        <p className="text-xs font-semibold text-sky-700 dark:text-sky-200">
+                          {summary}
+                        </p>
+                      </div>
+                      <div
+                        role="meter"
+                        aria-label={`${parameter.label}の傾向`}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={parameter.score ?? undefined}
+                        aria-valuetext={summary}
+                        className="relative mt-3 h-2 rounded-full bg-gradient-to-r from-indigo-400/70 via-slate-300 to-sky-300/70 dark:via-slate-600"
+                      >
+                        <span
+                          className="absolute left-1/2 top-1/2 h-4 w-px -translate-x-1/2 -translate-y-1/2 bg-slate-600/70 dark:bg-slate-300/70"
+                          aria-hidden="true"
+                        />
+                        {parameter.score !== null && (
+                          <span
+                            className="absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-white shadow dark:border-slate-900"
+                            style={{ left: `${parameter.score}%` }}
+                            aria-hidden="true"
+                          />
+                        )}
+                      </div>
+                      <div className="mt-1.5 flex justify-between gap-3 text-[11px] text-slate-600 dark:text-slate-400">
+                        <span>{parameter.lowLabel}</span>
+                        <span className="text-right">{parameter.highLabel}</span>
+                      </div>
+                      <p className="mt-1 text-[10px] text-slate-500">
+                        {`回答充足度 ${parameter.coverage}%`}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="mt-3 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                この診断には、回答から見える傾向がまだ設定されていません。
+              </p>
+            )}
+            <a
+              href={`/diagnosis/${encodeURIComponent(theme.id)}/answers?from=me`}
+              className="mt-3 flex items-center justify-between rounded-xl bg-sky-100 px-4 py-3 text-sm font-bold text-sky-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400 dark:bg-sky-950 dark:text-sky-100"
+            >
+              回答結果を見る
+              <ArrowRight className="size-4" aria-hidden="true" />
+            </a>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function NextAction({ action }: { action: ProfileSummaryResult["nextAction"] }) {
   const needsDiagnosis = action === "diagnosis";
   return (
@@ -817,6 +915,7 @@ export function ProfileSummaryScreen({
               {...(onRegenerate ? { onRegenerate } : {})}
             />
           )}
+          <DiagnosisThemes themes={state.data.diagnosisThemes ?? []} />
           {state.data.summary && <NextAction action={state.data.nextAction} />}
         </>
       )}

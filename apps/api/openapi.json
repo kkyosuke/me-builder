@@ -454,12 +454,133 @@
                       },
                       "required": ["status", "canRegenerate", "reasons", "message"]
                     },
+                    "diagnosisThemes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "title": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "lastAnsweredAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "answeredCount": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "questionCount": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          "scoring": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "scoringVersion": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "balancedLabel": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "parameters": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "id": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "label": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "lowLabel": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "highLabel": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "score": {
+                                          "anyOf": [
+                                            {
+                                              "type": "integer",
+                                              "minimum": 0,
+                                              "maximum": 100
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "coverage": {
+                                          "type": "integer",
+                                          "minimum": 0,
+                                          "maximum": 100
+                                        },
+                                        "band": {
+                                          "enum": ["low", "balanced", "high", "insufficient"],
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "id",
+                                        "label",
+                                        "lowLabel",
+                                        "highLabel",
+                                        "score",
+                                        "coverage",
+                                        "band"
+                                      ]
+                                    },
+                                    "minItems": 1
+                                  }
+                                },
+                                "required": ["scoringVersion", "balancedLabel", "parameters"]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "title",
+                          "lastAnsweredAt",
+                          "answeredCount",
+                          "questionCount",
+                          "scoring"
+                        ]
+                      }
+                    },
                     "nextAction": {
                       "enum": ["diagnosis", "chat"],
                       "type": "string"
                     }
                   },
-                  "required": ["versions", "availableDataCounts", "generation", "nextAction"]
+                  "required": [
+                    "versions",
+                    "availableDataCounts",
+                    "generation",
+                    "diagnosisThemes",
+                    "nextAction"
+                  ]
                 }
               }
             }

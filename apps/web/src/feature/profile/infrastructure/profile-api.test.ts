@@ -28,6 +28,7 @@ describe("fetchProfileSummary", () => {
       ],
       availableDataCounts: { diagnosis: 2, diary: 3 },
       generation: { status: "idle", canRegenerate: false, reasons: [], message: null },
+      diagnosisThemes: [],
       nextAction: "chat",
     };
     const fetchMock = vi.fn().mockResolvedValue(

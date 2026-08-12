@@ -47,6 +47,7 @@ function readResult(
       reasons: ["diagnosis"],
       ...(status === "failed" ? { message: "生成に失敗しました。" } : {}),
     },
+    diagnosisThemes: [],
     nextAction: "chat",
   };
 }
@@ -174,9 +175,10 @@ describe("useProfileSummary", () => {
     expect(fetchProfileSummary).toHaveBeenCalledTimes(41);
   });
 
-  it("POST失敗時はGET由来の生成状態を変更せずエラーを返す", async () => {
+  it("POST失敗時はGETで永続化済みの失敗状態を取得して再試行可能にする", async () => {
     const initial = readResult("idle");
-    vi.mocked(fetchProfileSummary).mockResolvedValue(initial);
+    const failed = readResult("failed");
+    vi.mocked(fetchProfileSummary).mockResolvedValueOnce(initial).mockResolvedValueOnce(failed);
     vi.mocked(requestProfileSummaryGeneration).mockRejectedValue(
       new Error("まとめの生成を開始できませんでした。"),
     );
@@ -188,12 +190,12 @@ describe("useProfileSummary", () => {
       await result.current.generate();
     });
 
-    expect(result.current.state).toEqual({ status: "success", data: initial });
+    expect(result.current.state).toEqual({ status: "success", data: failed });
     expect(result.current.generationNotice).toEqual({
       kind: "error",
       message: "まとめの生成を開始できませんでした。",
     });
-    expect(fetchProfileSummary).toHaveBeenCalledOnce();
+    expect(fetchProfileSummary).toHaveBeenCalledTimes(2);
   });
 
   it("生成要求の受付後に状態確認が失敗しても作成中の表示を維持する", async () => {

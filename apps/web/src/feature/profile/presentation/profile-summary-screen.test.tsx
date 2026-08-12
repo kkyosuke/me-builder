@@ -115,6 +115,63 @@ describe("ProfileSummaryScreen", () => {
     expect(screen.queryByText(/件を参照/)).toBeNull();
   });
 
+  it("診断テーマの全パラメータと回答結果への根拠導線を表示する", () => {
+    render(
+      <ProfileSummaryScreen
+        state={{
+          status: "success",
+          data: {
+            summary,
+            nextAction: "chat",
+            diagnosisThemes: [
+              {
+                id: "work/value",
+                title: "仕事の進め方",
+                lastAnsweredAt: "2026-08-12T02:00:00.000Z",
+                answeredCount: 2,
+                questionCount: 2,
+                scoring: {
+                  scoringVersion: 1,
+                  balancedLabel: "状況による",
+                  parameters: [
+                    {
+                      id: "planning",
+                      label: "計画性",
+                      lowLabel: "即興的",
+                      highLabel: "計画的",
+                      score: 75,
+                      coverage: 100,
+                      band: "high",
+                    },
+                    {
+                      id: "pace",
+                      label: "進める速さ",
+                      lowLabel: "じっくり",
+                      highLabel: "すばやく",
+                      score: null,
+                      coverage: 50,
+                      band: "insufficient",
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        }}
+        onRetry={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "テーマごとの傾向" })).toBeTruthy();
+    expect(screen.getByRole("meter", { name: "計画性の傾向" }).getAttribute("aria-valuenow")).toBe(
+      "75",
+    );
+    expect(screen.getByText("回答が増えると表示できます")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "回答結果を見る" }).getAttribute("href")).toBe(
+      "/diagnosis/work%2Fvalue/answers?from=me",
+    );
+  });
+
   it("未回答の診断がなければ毎日の会話を促す", () => {
     render(
       <ProfileSummaryScreen
@@ -345,6 +402,31 @@ describe("ProfileSummaryScreen", () => {
     const generationCard = screen.getByLabelText("新しい版を作成中");
     expect(generationCard.getAttribute("style")).toContain("height: 640px");
     expect(generationCard.className).toContain("w-full");
+  });
+
+  it("最後の成功版を残したまま失敗した生成を再試行できる", () => {
+    const onRegenerate = vi.fn();
+    render(
+      <ProfileSummaryScreen
+        state={{ status: "success", data: { summary, nextAction: "chat" } }}
+        versioning={{
+          ...versioning,
+          generation: {
+            status: "failed",
+            canRegenerate: true,
+            reasons: ["diagnosis"],
+            message: "新しい版を作成できませんでした。",
+          },
+        }}
+        onRetry={vi.fn()}
+        onRegenerate={onRegenerate}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: summary.headline })).toBeTruthy();
+    expect(screen.getByRole("alert").textContent).toContain("新しい版を作成できませんでした");
+    fireEvent.click(screen.getByRole("button", { name: "再試行" }));
+    expect(onRegenerate).toHaveBeenCalledOnce();
   });
 
   it("過去版では生成操作を隠し、生成中も現在の版を閲覧できると伝える", () => {

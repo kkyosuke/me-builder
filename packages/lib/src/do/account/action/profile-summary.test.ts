@@ -244,6 +244,21 @@ describe("Profile Summary persistence", () => {
     expect(forced).toMatchObject({ outcome: "created", status: "queued" });
     if (forced.outcome !== "created") throw new Error("forced generation was not created");
     await failProfileSummaryGeneration(db, accountId, forced.generationId, "test failure");
+    await expect(
+      readProfileSummary(db, accountId, new Date("2026-08-09T00:03:30.000Z"), true),
+    ).resolves.toMatchObject({
+      generation: { status: "failed", canRegenerate: true },
+    });
+    const retried = await requestProfileSummaryGeneration(
+      db,
+      accountId,
+      new Date("2026-08-09T00:03:30.000Z"),
+      true,
+    );
+    expect(retried).toMatchObject({ outcome: "created", status: "queued" });
+    if (retried.outcome !== "created") throw new Error("retry generation was not created");
+    expect(retried.generationId).not.toBe(forced.generationId);
+    await failProfileSummaryGeneration(db, accountId, retried.generationId, "retry failure");
 
     await db
       .update(schema.conversationMessages)

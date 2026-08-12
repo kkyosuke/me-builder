@@ -52,6 +52,7 @@ describe("GET /api/profile-summary", () => {
       versions: [],
       availableDataCounts: { diagnosis: 0, diary: 0 },
       generation: { status: "idle", canRegenerate: false, reasons: [], message: null },
+      diagnosisThemes: [],
       nextAction: "diagnosis",
     });
 
@@ -63,6 +64,7 @@ describe("GET /api/profile-summary", () => {
       versions: [],
       availableDataCounts: { diagnosis: 0, diary: 0 },
       generation: { status: "idle", canRegenerate: false, reasons: [], message: null },
+      diagnosisThemes: [],
       nextAction: "diagnosis",
     });
     expect(getProfileSummary).toHaveBeenCalledWith(
@@ -80,6 +82,7 @@ describe("GET /api/profile-summary", () => {
       versions: [],
       availableDataCounts: { diagnosis: 0, diary: 0 },
       generation: { status: "idle", canRegenerate: false, reasons: [], message: null },
+      diagnosisThemes: [],
       nextAction: "chat",
     });
 

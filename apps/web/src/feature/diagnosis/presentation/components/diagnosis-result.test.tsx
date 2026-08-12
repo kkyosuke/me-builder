@@ -67,6 +67,22 @@ describe("DiagnosisResultView", () => {
     expect(details?.open).toBe(true);
     expect(screen.getByText("自分の余裕を優先したい。")).toBeTruthy();
     expect(screen.getByText("はい")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "わたしのまとめを見る" }).getAttribute("href")).toBe(
+      "/me",
+    );
+  });
+
+  it("サマリーから開いた回答結果ではサマリーへの戻り先を表示する", () => {
+    render(
+      <DiagnosisResultView
+        result={result}
+        onBack={vi.fn()}
+        backHref="/me"
+        backLabel="わたしのまとめ"
+      />,
+    );
+
+    expect(screen.getByRole("link", { name: "わたしのまとめ" }).getAttribute("href")).toBe("/me");
   });
 
   it("一覧へ戻る操作を通知する", () => {

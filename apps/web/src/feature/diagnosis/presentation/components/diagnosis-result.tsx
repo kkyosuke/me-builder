@@ -15,22 +15,36 @@ function formatAcceptedAt(value: string): string {
 export function DiagnosisResultView({
   result,
   onBack,
+  backHref,
+  backLabel = "診断一覧",
 }: {
   result: DiagnosisResult;
   onBack: () => void;
+  backHref?: string;
+  backLabel?: string;
 }) {
   const scoring = result.scoring;
 
   return (
     <main className="mx-auto min-h-dvh w-full max-w-2xl px-4 py-5 sm:px-8 sm:py-8">
-      <button
-        type="button"
-        onClick={onBack}
-        className="mb-5 inline-flex items-center gap-2 rounded-xl px-2 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 transition hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-950 dark:hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400"
-      >
-        <ArrowLeft className="size-4" aria-hidden="true" />
-        診断一覧
-      </button>
+      {backHref ? (
+        <a
+          href={backHref}
+          className="mb-5 inline-flex items-center gap-2 rounded-xl px-2 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+        >
+          <ArrowLeft className="size-4" aria-hidden="true" />
+          {backLabel}
+        </a>
+      ) : (
+        <button
+          type="button"
+          onClick={onBack}
+          className="mb-5 inline-flex items-center gap-2 rounded-xl px-2 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+        >
+          <ArrowLeft className="size-4" aria-hidden="true" />
+          {backLabel}
+        </button>
+      )}
 
       <header className="rounded-3xl border border-sky-300/20 bg-white dark:bg-slate-800 p-5 shadow-xl shadow-slate-950/20 sm:p-6">
         <div className="flex items-center gap-3">
@@ -153,6 +167,12 @@ export function DiagnosisResultView({
             ))}
           </ol>
         </details>
+        <a
+          href="/me"
+          className="mt-5 flex items-center justify-center rounded-xl bg-sky-400 px-4 py-3 text-sm font-bold text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400"
+        >
+          わたしのまとめを見る
+        </a>
       </section>
     </main>
   );

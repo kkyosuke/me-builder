@@ -50,6 +50,35 @@ const ResponseSchema = v.object({
     reasons: v.array(v.picklist(["diagnosis", "brain", "format", "elapsed"])),
     message: v.nullable(v.pipe(v.string(), v.nonEmpty())),
   }),
+  diagnosisThemes: v.array(
+    v.object({
+      id: v.pipe(v.string(), v.nonEmpty()),
+      title: v.pipe(v.string(), v.nonEmpty()),
+      lastAnsweredAt: v.pipe(v.string(), v.isoTimestamp()),
+      answeredCount: CountSchema,
+      questionCount: v.pipe(CountSchema, v.minValue(1)),
+      scoring: v.nullable(
+        v.object({
+          scoringVersion: v.pipe(CountSchema, v.minValue(1)),
+          balancedLabel: v.pipe(v.string(), v.nonEmpty()),
+          parameters: v.pipe(
+            v.array(
+              v.object({
+                id: v.pipe(v.string(), v.nonEmpty()),
+                label: v.pipe(v.string(), v.nonEmpty()),
+                lowLabel: v.pipe(v.string(), v.nonEmpty()),
+                highLabel: v.pipe(v.string(), v.nonEmpty()),
+                score: v.nullable(v.pipe(CountSchema, v.maxValue(100))),
+                coverage: v.pipe(CountSchema, v.maxValue(100)),
+                band: v.picklist(["low", "balanced", "high", "insufficient"]),
+              }),
+            ),
+            v.minLength(1),
+          ),
+        }),
+      ),
+    }),
+  ),
   nextAction: v.picklist(["diagnosis", "chat"]),
 }) satisfies v.GenericSchema<ApiResponse>;
 

@@ -2,6 +2,16 @@ import type { DiagnosisListItem } from "./diagnosis-list-item";
 
 export type DiagnosisDestination = "answer" | "result" | "closed";
 
+export function diagnosisResultIdFromPathname(pathname: string): string | null {
+  const encodedId = pathname.match(/^\/diagnosis\/([^/]+)\/answers\/?$/)?.[1];
+  if (!encodedId) return null;
+  try {
+    return decodeURIComponent(encodedId);
+  } catch {
+    return null;
+  }
+}
+
 export function resolveDiagnosisDestination(diagnosis: DiagnosisListItem): DiagnosisDestination {
   if (diagnosis.responseStatus === "answered") {
     return "result";

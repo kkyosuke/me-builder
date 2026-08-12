@@ -152,7 +152,7 @@ export function useProfileSummary({
         return;
       }
       if (mounted.current && !controller.signal.aborted) {
-        if (!generationAccepted) setState(previousState);
+        if (!generationAccepted) await load(false);
         setGenerationNotice({
           kind: "error",
           message: error instanceof Error ? error.message : "まとめを生成できませんでした。",

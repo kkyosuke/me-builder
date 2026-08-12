@@ -39,6 +39,34 @@ const ProfileSummaryGenerationSchema = v.object({
   message: v.nullable(NonEmptyStringSchema),
 });
 
+const ProfileDiagnosisThemeSchema = v.object({
+  id: NonEmptyStringSchema,
+  title: NonEmptyStringSchema,
+  lastAnsweredAt: v.pipe(v.string(), v.isoTimestamp()),
+  answeredCount: CountSchema,
+  questionCount: v.pipe(CountSchema, v.minValue(1)),
+  scoring: v.nullable(
+    v.object({
+      scoringVersion: v.pipe(CountSchema, v.minValue(1)),
+      balancedLabel: NonEmptyStringSchema,
+      parameters: v.pipe(
+        v.array(
+          v.object({
+            id: NonEmptyStringSchema,
+            label: NonEmptyStringSchema,
+            lowLabel: NonEmptyStringSchema,
+            highLabel: NonEmptyStringSchema,
+            score: v.nullable(v.pipe(CountSchema, v.maxValue(100))),
+            coverage: v.pipe(CountSchema, v.maxValue(100)),
+            band: v.picklist(["low", "balanced", "high", "insufficient"]),
+          }),
+        ),
+        v.minLength(1),
+      ),
+    }),
+  ),
+});
+
 export const ProfileSummaryResponseSchema = v.object({
   versions: v.array(ProfileSummaryVersionSchema),
   availableDataCounts: v.object({
@@ -46,6 +74,7 @@ export const ProfileSummaryResponseSchema = v.object({
     diary: CountSchema,
   }),
   generation: ProfileSummaryGenerationSchema,
+  diagnosisThemes: v.array(ProfileDiagnosisThemeSchema),
   nextAction: v.picklist(["diagnosis", "chat"]),
 });
 
