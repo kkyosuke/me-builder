@@ -263,7 +263,12 @@ type BrainVectorSyncJob = Readonly<{
 
 export type BrainVectorSyncClaimBatch = Readonly<{
   jobs: readonly BrainVectorSyncJob[];
-  terminalFailures: readonly Readonly<{ attemptCount: number; failureCode: string }>[];
+  terminalFailures: readonly Readonly<{
+    jobId: string;
+    brainItemId: string;
+    attemptCount: number;
+    failureCode: string;
+  }>[];
 }>;
 
 /** Alarm時点で期限を迎えたVector同期jobをclaimする。 */
@@ -287,6 +292,8 @@ export async function claimDueBrainVectorSyncJobs(
       ),
     )
     .returning({
+      jobId: brainVectorSyncJobs.id,
+      brainItemId: brainVectorSyncJobs.brainItemId,
       attemptCount: brainVectorSyncJobs.attemptCount,
       failureCode: brainVectorSyncJobs.failureCode,
     })
@@ -335,7 +342,9 @@ export async function claimDueBrainVectorSyncJobs(
   }
   return {
     jobs: claimed,
-    terminalFailures: terminalFailures.map(({ attemptCount, failureCode }) => ({
+    terminalFailures: terminalFailures.map(({ jobId, brainItemId, attemptCount, failureCode }) => ({
+      jobId,
+      brainItemId,
       attemptCount,
       failureCode: failureCode ?? "BRAIN_VECTOR_SYNC_ATTEMPTS_EXHAUSTED",
     })),
@@ -621,6 +630,40 @@ export type BrainVectorSyncFailureResult =
   | Readonly<{ outcome: "retry-scheduled"; attemptCount: number; nextAttemptAt: Date }>
   | Readonly<{ outcome: "failed"; attemptCount: number }>;
 
+export type FailedBrainVectorSyncJob = Readonly<{
+  jobId: string;
+  brainItemId: string;
+  itemRevision: number;
+  operation: "upsert" | "delete";
+  attemptCount: number;
+  failureCode: string;
+  failedAt: Date;
+}>;
+
+/** 本文を含めず、運用者が再試行対象を特定するための終端jobだけを返す。 */
+export async function listFailedBrainVectorSyncJobs(
+  db: AccountDataDatabase,
+): Promise<readonly FailedBrainVectorSyncJob[]> {
+  const jobs = await db
+    .select({
+      jobId: brainVectorSyncJobs.id,
+      brainItemId: brainVectorSyncJobs.brainItemId,
+      itemRevision: brainVectorSyncJobs.itemRevision,
+      operation: brainVectorSyncJobs.operation,
+      attemptCount: brainVectorSyncJobs.attemptCount,
+      failureCode: brainVectorSyncJobs.failureCode,
+      failedAt: brainVectorSyncJobs.updatedAt,
+    })
+    .from(brainVectorSyncJobs)
+    .where(and(eq(brainVectorSyncJobs.status, "failed"), eq(brainVectorSyncJobs.isDeleted, false)))
+    .orderBy(desc(brainVectorSyncJobs.updatedAt), asc(brainVectorSyncJobs.id))
+    .all();
+  return jobs.map((job) => ({
+    ...job,
+    failureCode: job.failureCode ?? "BRAIN_VECTOR_SYNC_FAILED",
+  }));
+}
+
 /** 運用者が原因を解消した後、恒久失敗jobを明示的に最初から再試行する。 */
 export async function resetFailedBrainVectorSyncJob(
   db: AccountDataDatabase,
@@ -646,6 +689,26 @@ export async function resetFailedBrainVectorSyncJob(
     .returning({ id: brainVectorSyncJobs.id })
     .all();
   return rows.length > 0;
+}
+
+/** Account内の恒久失敗jobをまとめて最初から再試行できる状態へ戻す。 */
+export async function resetAllFailedBrainVectorSyncJobs(
+  db: AccountDataDatabase,
+  at = new Date(),
+): Promise<number> {
+  const rows = await db
+    .update(brainVectorSyncJobs)
+    .set({
+      status: "pending",
+      attemptCount: 0,
+      nextAttemptAt: at,
+      failureCode: null,
+      updatedAt: at,
+    })
+    .where(and(eq(brainVectorSyncJobs.status, "failed"), eq(brainVectorSyncJobs.isDeleted, false)))
+    .returning({ id: brainVectorSyncJobs.id })
+    .all();
+  return rows.length;
 }
 
 /** 認証済みAccountの所有物としてBrain Itemを取得する。 */

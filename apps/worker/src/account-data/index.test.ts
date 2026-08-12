@@ -64,6 +64,56 @@ describe("AccountData alarm", () => {
     );
   });
 
+  it("Vector同期jobの終端ログにreset対象IDと実際の原因分類を含める", async () => {
+    const errorLog = vi.spyOn(logger, "error").mockImplementation(() => undefined);
+    vi.spyOn(DO.account.action.diary, "closeExpiredSessions").mockResolvedValue(0);
+    vi.spyOn(
+      DO.account.action.diagnosisBrainProjection,
+      "processPendingDiagnosisBrainProjections",
+    ).mockResolvedValue({
+      processed: 0,
+      applied: 0,
+      skippedIncomplete: 0,
+      skippedInvalidConfig: 0,
+      failed: 0,
+    });
+    vi.spyOn(DO.account.action.diary, "claimDueDiaryBrainCheckpointIds").mockResolvedValue([]);
+    vi.spyOn(DO.account.action.brain, "claimDueBrainVectorSyncJobs").mockResolvedValue({
+      jobs: [],
+      terminalFailures: [
+        {
+          jobId: "job-1",
+          brainItemId: "brain-1",
+          attemptCount: 6,
+          failureCode: "BRAIN_VECTOR_SYNC_ATTEMPTS_EXHAUSTED",
+        },
+      ],
+    });
+
+    const instance = Object.create(AccountData.prototype) as AccountData;
+    Object.assign(instance as unknown as Record<string, unknown>, {
+      accountId: "account-1",
+      operationTail: Promise.resolve(),
+      repository: { client: {}, nextMaintenanceAt: () => null },
+      ctx: { storage: {} },
+      env: {},
+    });
+
+    await expect(instance.alarm()).resolves.toBeUndefined();
+    expect(errorLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "brain-vector-sync.job.failed",
+        jobId: "job-1",
+        brainItemId: "brain-1",
+        jobStatus: "failed",
+        terminalReason: "attempts-exhausted",
+        errorCategory: "unknown",
+      }),
+      expect.stringContaining("category:unknown"),
+    );
+    expect(JSON.stringify(errorLog.mock.calls)).not.toContain("statement");
+  });
+
   it("共有D1が版を公開していない間はcatalog snapshotを最新と見なさない", async () => {
     const isDiagnosisCatalogCurrent = vi.fn(() => true);
     const syncDiagnosisCatalog = vi.fn();

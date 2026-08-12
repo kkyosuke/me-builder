@@ -128,16 +128,20 @@ export class AccountData extends DurableObject<Env> {
               event: "brain-vector-sync.job.failed",
               service: "worker",
               component: "account-data",
+              jobId: failure.jobId,
+              brainItemId: failure.brainItemId,
               outcome: "failed",
               disposition: "stop",
+              jobStatus: "failed",
+              terminalReason: "attempts-exhausted",
               stage: "vector.dispatch",
               errorCode: failure.failureCode,
-              errorCategory: "timeout",
+              errorCategory: "unknown",
               retryable: false,
               attempt: failure.attemptCount,
               maxAttempts: DO.account.action.brain.BRAIN_VECTOR_SYNC_MAX_ATTEMPTS,
             },
-            `[Brain vector sync] failed at vector.dispatch -> stop (attempt ${failure.attemptCount}/${DO.account.action.brain.BRAIN_VECTOR_SYNC_MAX_ATTEMPTS}, ${failure.failureCode}, category:timeout)`,
+            `[Brain vector sync] failed at vector.dispatch -> stop (attempt ${failure.attemptCount}/${DO.account.action.brain.BRAIN_VECTOR_SYNC_MAX_ATTEMPTS}, ${failure.failureCode}, category:unknown)`,
           );
         }
         const vectorJobs = vectorClaim.jobs;

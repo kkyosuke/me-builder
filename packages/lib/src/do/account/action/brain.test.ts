@@ -15,8 +15,10 @@ import {
   findBrainItemForAccount,
   getBrainVectorSyncTarget,
   listActiveBrainItems,
+  listFailedBrainVectorSyncJobs,
   loadBrainChatContextMemories,
   loadBrainSemanticDedupCandidates,
+  resetAllFailedBrainVectorSyncJobs,
   resetFailedBrainVectorSyncJob,
   saveBrainItem,
 } from "./brain";
@@ -267,6 +269,65 @@ describe("saveBrainItem", () => {
     ).toEqual({ attemptCount: 1 });
   });
 
+  it("Account内の終端jobを一覧し、一括reset後にすべて再claimする", async () => {
+    const db = createTestDb();
+    await insertAccountsAndSources(db);
+    const at = new Date("2026-08-10T00:00:00Z");
+    await saveBrainItem(db, createInput({ at }));
+    const secondInputBase = createInput();
+    const secondEvidence = secondInputBase.evidence[0];
+    const secondAccessLabel = secondInputBase.accessLabels[0];
+    if (!secondEvidence || !secondAccessLabel)
+      throw new Error("Brain Item test fixture is invalid");
+    await saveBrainItem(
+      db,
+      createInput({
+        at,
+        item: { ...secondInputBase.item, id: "brain-2" },
+        evidence: [{ ...secondEvidence, id: "evidence-2" }],
+        accessLabels: [{ ...secondAccessLabel, id: "access-2" }],
+        topicLabels: [{ id: "topic-2", label: "diary" }],
+      }),
+    );
+    const { jobs } = await claimDueBrainVectorSyncJobs(db, at);
+    expect(jobs).toHaveLength(2);
+    for (const job of jobs) {
+      await failBrainVectorSyncJob(
+        db,
+        job.id,
+        "BRAIN_VECTOR_HMAC_SECRET_NOT_CONFIGURED",
+        false,
+        at,
+      );
+    }
+
+    await expect(listFailedBrainVectorSyncJobs(db)).resolves.toEqual([
+      {
+        jobId: `brain-1:${at.getTime()}:upsert`,
+        brainItemId: "brain-1",
+        itemRevision: at.getTime(),
+        operation: "upsert",
+        attemptCount: 1,
+        failureCode: "BRAIN_VECTOR_HMAC_SECRET_NOT_CONFIGURED",
+        failedAt: at,
+      },
+      {
+        jobId: `brain-2:${at.getTime()}:upsert`,
+        brainItemId: "brain-2",
+        itemRevision: at.getTime(),
+        operation: "upsert",
+        attemptCount: 1,
+        failureCode: "BRAIN_VECTOR_HMAC_SECRET_NOT_CONFIGURED",
+        failedAt: at,
+      },
+    ]);
+    await expect(resetAllFailedBrainVectorSyncJobs(db, at)).resolves.toBe(2);
+    await expect(claimDueBrainVectorSyncJobs(db, at)).resolves.toEqual({
+      jobs,
+      terminalFailures: [],
+    });
+  });
+
   it("最終dispatchのlease期限切れを終端化して以後claimしない", async () => {
     const db = createTestDb();
     await insertAccountsAndSources(db);
@@ -281,6 +342,8 @@ describe("saveBrainItem", () => {
       jobs: [],
       terminalFailures: [
         {
+          jobId: `brain-1:${at.getTime()}:upsert`,
+          brainItemId: "brain-1",
           attemptCount: 6,
           failureCode: "BRAIN_VECTOR_SYNC_ATTEMPTS_EXHAUSTED",
         },

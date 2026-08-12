@@ -12,6 +12,16 @@ import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 
 const actions = {
+  "brain.listFailedVectorSyncJobs": (db: DO.account.Database, _accountId: string) =>
+    DO.account.action.brain.listFailedBrainVectorSyncJobs(db),
+  "brain.resetFailedVectorSyncJob": (
+    db: DO.account.Database,
+    _accountId: string,
+    jobId: string,
+    at?: Date,
+  ) => DO.account.action.brain.resetFailedBrainVectorSyncJob(db, jobId, at),
+  "brain.resetAllFailedVectorSyncJobs": (db: DO.account.Database, _accountId: string, at?: Date) =>
+    DO.account.action.brain.resetAllFailedBrainVectorSyncJobs(db, at),
   "diagnosis.deleteAccountData": (db: DO.account.Database, accountId: string) =>
     DO.account.action.diagnosis.deleteAccountDiagnosisData(db, accountId),
   "diagnosis.deferQuestion": (

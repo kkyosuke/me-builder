@@ -60,12 +60,16 @@ export const brainActions = {
     retryable?: boolean,
     at?: Date,
   ) => DO.account.action.brain.failBrainVectorSyncJob(db, jobId, failureCode, retryable, at),
+  "brain.listFailedVectorSyncJobs": (db: DO.account.Database, _accountId: string) =>
+    DO.account.action.brain.listFailedBrainVectorSyncJobs(db),
   "brain.resetFailedVectorSyncJob": (
     db: DO.account.Database,
     _accountId: string,
     jobId: string,
     at?: Date,
   ) => DO.account.action.brain.resetFailedBrainVectorSyncJob(db, jobId, at),
+  "brain.resetAllFailedVectorSyncJobs": (db: DO.account.Database, _accountId: string, at?: Date) =>
+    DO.account.action.brain.resetAllFailedBrainVectorSyncJobs(db, at),
   "source.hasActive": (db: DO.account.Database, accountId: string) =>
     DO.account.action.source.hasActiveSourceRecords(db, accountId),
 } as const;

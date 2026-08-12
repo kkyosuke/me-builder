@@ -27,6 +27,7 @@ export type {
   AppliedBrainVectorSync,
   BrainChatContextMemory,
   BrainSemanticDedupCandidate,
+  FailedBrainVectorSyncJob,
 } from "./account/action/brain";
 export { BRAIN_VECTOR_SYNC_MAX_ATTEMPTS } from "./account/action/brain";
 export { DIARY_BRAIN_CATEGORIES } from "./account/action/diary";
