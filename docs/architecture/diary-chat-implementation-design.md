@@ -365,7 +365,9 @@ vector IDはAccount IDとItem IDの組を環境別SecretでHMACした決定的�
 
 Vectorizeへのupsertまたはdelete受付後に`applied`とmutation IDを記録します。失敗時は本文を含まないfailure codeだけを保存し、Queue messageをackしたうえでoutboxを`retry_scheduled`へ戻します。次回実行はQueueの即時再配送ではなくAccountData alarmから行い、1回目から順に60秒、2分、8分、30分、2時間待機します。`attempt_count`はclaim時に増やし、初回を含む6回目の失敗、または設定不備など再試行不能と分類できる失敗で`failed`へ終端化します。`failed`はalarmの対象外とし、終端化時は試行回数、上限、failure code、再試行不可を構造化error logへ記録します。削除時はAccountDataで先に利用不可にするため、Vectorizeに古いvectorが残る間も、検索導入後のAccountData再認可では利用されません。
 
-終端化の原因を運用者が解消した場合は、AccountDataの内部操作`brain.resetFailedVectorSyncJob`を明示的に実行して同じjobを`pending`へ戻し、試行回数を0から再開します。通常のBrain Item変更で新しいrevisionの補正jobが作られた場合は新しいjobとして同期します。原因が未解消のまま自動復帰させず、恒久障害でalarmとQueueのループを再開しないことを優先します。
+終端化の原因を運用者が解消した場合は、開発環境限定の`GET /api/dev/brain-vector-sync-jobs/failed`で本人確認済みAccountの終端jobを一覧し、`POST /api/dev/brain-vector-sync-jobs/:jobId/reset`または`POST /api/dev/brain-vector-sync-jobs/reset-failed`でjob ID指定またはAccount内一括のresetを行います。APIはAccount IDを入力として受け取らず、LIFFセッションから本人のAccountを解決して、AccountDataの`brain.listFailedVectorSyncJobs`、`brain.resetFailedVectorSyncJob`、`brain.resetAllFailedVectorSyncJobs`を呼びます。resetしたjobは`pending`へ戻り、試行回数を0から再開します。これらのAPIは`ENVIRONMENT`が`development` / `local` / `preview` / `test`のいずれかへ明示設定された場合だけ有効とし、未設定またはProductionでは404を返します。通常のBrain Item変更で新しいrevisionの補正jobが作られた場合は新しいjobとして同期します。原因が未解消のまま自動復帰させず、恒久障害でalarmとQueueのループを再開しないことを優先します。
+
+一覧APIは終端日時の新しい順に最大100件を返し、それを超える場合は`truncated: true`で通知します。一括resetは一覧の表示上限に関係なく、Account内の全終端jobを対象にします。
 
 `BRAIN_VECTOR_HMAC_SECRET`は通常のSecretローテーションだけで単独変更してはいけません。変更時は新しいindexを用意し、AccountDataを正として全active Itemを再同期し、検索先を切り替えた後に旧indexを削除します。緊急失効時も同じ再構築手順を使います。個別Itemの削除ではAccountDataの対応表に保存した旧vector IDを使うため、Secret変更前のvectorも削除できます。
 

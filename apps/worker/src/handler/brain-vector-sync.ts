@@ -106,6 +106,8 @@ export async function processBrainVectorSyncMessage(
       traceId: message.id,
       queueMessageId: message.id,
       messageType: "brain-vector-sync",
+      jobId: message.body.jobId,
+      brainItemId: message.body.brainItemId,
       attempt: failure.attemptCount,
       maxAttempts: BRAIN_VECTOR_SYNC_MAX_ATTEMPTS,
       outcome: terminal ? "failed" : "deferred",

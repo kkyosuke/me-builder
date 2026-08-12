@@ -12,6 +12,11 @@ import * as v from "valibot";
 import { getConfig } from "./config";
 import { adminStatisticsRoute } from "./contract/admin/statistics";
 import { developmentBrainItemsRoute, developmentBrainVectorRoute } from "./contract/brain/dev-list";
+import {
+  developmentFailedBrainVectorSyncJobsRoute,
+  resetAllDevelopmentBrainVectorSyncJobsRoute,
+  resetDevelopmentBrainVectorSyncJobRoute,
+} from "./contract/brain/dev-vector-sync-jobs";
 import { saveDiagnosisAnswerRoute } from "./contract/diagnosis/answer";
 import { diagnosisAnswersRoute } from "./contract/diagnosis/answers";
 import { deferDiagnosisQuestionRoute } from "./contract/diagnosis/deferred-question";
@@ -27,7 +32,13 @@ import {
 import { profileSummaryGenerationRoute, profileSummaryRoute } from "./contract/profile/summary";
 import { InternalServerErrorSchema } from "./contract/shared/errors";
 import { getStatistics } from "./controller/admin";
-import { getDevelopmentBrainItems, getDevelopmentBrainVector } from "./controller/brain";
+import {
+  getDevelopmentBrainItems,
+  getDevelopmentBrainVector,
+  getDevelopmentFailedBrainVectorSyncJobs,
+  postDevelopmentBrainVectorSyncJobReset,
+  postDevelopmentBrainVectorSyncJobsResetAll,
+} from "./controller/brain";
 import {
   deleteDevelopmentDiagnosisData,
   getDiagnoses,
@@ -132,6 +143,21 @@ app.get(
   "/api/dev/brain-items/:brainItemId/vector",
   developmentBrainVectorRoute,
   getDevelopmentBrainVector,
+);
+app.get(
+  "/api/dev/brain-vector-sync-jobs/failed",
+  developmentFailedBrainVectorSyncJobsRoute,
+  getDevelopmentFailedBrainVectorSyncJobs,
+);
+app.post(
+  "/api/dev/brain-vector-sync-jobs/reset-failed",
+  resetAllDevelopmentBrainVectorSyncJobsRoute,
+  postDevelopmentBrainVectorSyncJobsResetAll,
+);
+app.post(
+  "/api/dev/brain-vector-sync-jobs/:jobId/reset",
+  resetDevelopmentBrainVectorSyncJobRoute,
+  postDevelopmentBrainVectorSyncJobReset,
 );
 
 app.get("/api/diagnoses", diagnosisListRoute, getDiagnoses);
