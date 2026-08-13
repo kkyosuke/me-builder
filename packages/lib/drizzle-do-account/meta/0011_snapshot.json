@@ -68,19 +68,13 @@
       "indexes": {
         "brain_item_access_label_active_idx": {
           "name": "brain_item_access_label_active_idx",
-          "columns": [
-            "brain_item_id",
-            "label"
-          ],
+          "columns": ["brain_item_id", "label"],
           "isUnique": true,
           "where": "is_deleted = 0"
         },
         "brain_item_access_label_lookup_idx": {
           "name": "brain_item_access_label_lookup_idx",
-          "columns": [
-            "label",
-            "is_deleted"
-          ],
+          "columns": ["label", "is_deleted"],
           "isUnique": false
         }
       },
@@ -89,12 +83,8 @@
           "name": "brain_item_access_labels_brain_item_id_brain_items_id_fk",
           "tableFrom": "brain_item_access_labels",
           "tableTo": "brain_items",
-          "columnsFrom": [
-            "brain_item_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["brain_item_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -188,19 +178,12 @@
       "indexes": {
         "brain_item_evidence_relation_idx": {
           "name": "brain_item_evidence_relation_idx",
-          "columns": [
-            "brain_item_id",
-            "source_record_id",
-            "relation"
-          ],
+          "columns": ["brain_item_id", "source_record_id", "relation"],
           "isUnique": true
         },
         "brain_item_evidence_item_idx": {
           "name": "brain_item_evidence_item_idx",
-          "columns": [
-            "brain_item_id",
-            "is_deleted"
-          ],
+          "columns": ["brain_item_id", "is_deleted"],
           "isUnique": false
         }
       },
@@ -209,12 +192,8 @@
           "name": "brain_item_evidence_edges_brain_item_id_brain_items_id_fk",
           "tableFrom": "brain_item_evidence_edges",
           "tableTo": "brain_items",
-          "columnsFrom": [
-            "brain_item_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["brain_item_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -222,12 +201,8 @@
           "name": "brain_item_evidence_edges_source_record_id_source_records_id_fk",
           "tableFrom": "brain_item_evidence_edges",
           "tableTo": "source_records",
-          "columnsFrom": [
-            "source_record_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["source_record_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -300,10 +275,7 @@
       "indexes": {
         "brain_item_revision_pair_idx": {
           "name": "brain_item_revision_pair_idx",
-          "columns": [
-            "previous_brain_item_id",
-            "next_brain_item_id"
-          ],
+          "columns": ["previous_brain_item_id", "next_brain_item_id"],
           "isUnique": true
         }
       },
@@ -312,12 +284,8 @@
           "name": "brain_item_revisions_previous_brain_item_id_brain_items_id_fk",
           "tableFrom": "brain_item_revisions",
           "tableTo": "brain_items",
-          "columnsFrom": [
-            "previous_brain_item_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["previous_brain_item_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -325,12 +293,8 @@
           "name": "brain_item_revisions_next_brain_item_id_brain_items_id_fk",
           "tableFrom": "brain_item_revisions",
           "tableTo": "brain_items",
-          "columnsFrom": [
-            "next_brain_item_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["next_brain_item_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -396,19 +360,13 @@
       "indexes": {
         "brain_item_topic_label_active_idx": {
           "name": "brain_item_topic_label_active_idx",
-          "columns": [
-            "brain_item_id",
-            "label"
-          ],
+          "columns": ["brain_item_id", "label"],
           "isUnique": true,
           "where": "is_deleted = 0"
         },
         "brain_item_topic_label_lookup_idx": {
           "name": "brain_item_topic_label_lookup_idx",
-          "columns": [
-            "label",
-            "is_deleted"
-          ],
+          "columns": ["label", "is_deleted"],
           "isUnique": false
         }
       },
@@ -417,12 +375,8 @@
           "name": "brain_item_topic_labels_brain_item_id_brain_items_id_fk",
           "tableFrom": "brain_item_topic_labels",
           "tableTo": "brain_items",
-          "columnsFrom": [
-            "brain_item_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["brain_item_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -559,11 +513,7 @@
       "indexes": {
         "brain_item_lookup_idx": {
           "name": "brain_item_lookup_idx",
-          "columns": [
-            "account_id",
-            "status",
-            "category"
-          ],
+          "columns": ["account_id", "status", "category"],
           "isUnique": false
         }
       },
@@ -572,12 +522,8 @@
           "name": "brain_items_account_id_account_data_identity_account_id_fk",
           "tableFrom": "brain_items",
           "tableTo": "account_data_identity",
-          "columnsFrom": [
-            "account_id"
-          ],
-          "columnsTo": [
-            "account_id"
-          ],
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["account_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -643,9 +589,7 @@
       "indexes": {
         "brain_vector_entry_item_idx": {
           "name": "brain_vector_entry_item_idx",
-          "columns": [
-            "brain_item_id"
-          ],
+          "columns": ["brain_item_id"],
           "isUnique": true
         }
       },
@@ -754,19 +698,12 @@
       "indexes": {
         "brain_vector_sync_job_revision_idx": {
           "name": "brain_vector_sync_job_revision_idx",
-          "columns": [
-            "brain_item_id",
-            "item_revision",
-            "operation"
-          ],
+          "columns": ["brain_item_id", "item_revision", "operation"],
           "isUnique": true
         },
         "brain_vector_sync_job_due_idx": {
           "name": "brain_vector_sync_job_due_idx",
-          "columns": [
-            "status",
-            "next_attempt_at"
-          ],
+          "columns": ["status", "next_attempt_at"],
           "isUnique": false
         }
       },
@@ -831,18 +768,13 @@
       "indexes": {
         "compatibility_reference_active_partner_idx": {
           "name": "compatibility_reference_active_partner_idx",
-          "columns": [
-            "partner_account_id"
-          ],
+          "columns": ["partner_account_id"],
           "isUnique": true,
           "where": "\"compatibility_references\".\"status\" in ('reserved', 'active')"
         },
         "compatibility_reference_status_updated_idx": {
           "name": "compatibility_reference_status_updated_idx",
-          "columns": [
-            "status",
-            "updated_at"
-          ],
+          "columns": ["status", "updated_at"],
           "isUnique": false
         }
       },
@@ -851,12 +783,8 @@
           "name": "compatibility_references_account_id_account_data_identity_account_id_fk",
           "tableFrom": "compatibility_references",
           "tableTo": "account_data_identity",
-          "columnsFrom": [
-            "account_id"
-          ],
-          "columnsTo": [
-            "account_id"
-          ],
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["account_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -962,18 +890,13 @@
       "indexes": {
         "diagnosis_answer_current_idx": {
           "name": "diagnosis_answer_current_idx",
-          "columns": [
-            "diagnosis_response_id",
-            "diagnosis_question_id"
-          ],
+          "columns": ["diagnosis_response_id", "diagnosis_question_id"],
           "isUnique": true,
           "where": "is_deleted = 0"
         },
         "diagnosis_answer_source_record_idx": {
           "name": "diagnosis_answer_source_record_idx",
-          "columns": [
-            "source_record_id"
-          ],
+          "columns": ["source_record_id"],
           "isUnique": true
         }
       },
@@ -982,12 +905,8 @@
           "name": "diagnosis_answers_diagnosis_response_id_diagnosis_responses_id_fk",
           "tableFrom": "diagnosis_answers",
           "tableTo": "diagnosis_responses",
-          "columnsFrom": [
-            "diagnosis_response_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["diagnosis_response_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -995,12 +914,8 @@
           "name": "diagnosis_answers_diagnosis_question_id_diagnosis_questions_id_fk",
           "tableFrom": "diagnosis_answers",
           "tableTo": "diagnosis_questions",
-          "columnsFrom": [
-            "diagnosis_question_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["diagnosis_question_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1008,12 +923,8 @@
           "name": "diagnosis_answers_source_record_id_source_records_id_fk",
           "tableFrom": "diagnosis_answers",
           "tableTo": "source_records",
-          "columnsFrom": [
-            "source_record_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["source_record_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1021,16 +932,8 @@
           "name": "diagnosis_answers_question_id_question_version_choice_id_question_choices_question_id_question_version_choice_id_fk",
           "tableFrom": "diagnosis_answers",
           "tableTo": "question_choices",
-          "columnsFrom": [
-            "question_id",
-            "question_version",
-            "choice_id"
-          ],
-          "columnsTo": [
-            "question_id",
-            "question_version",
-            "choice_id"
-          ],
+          "columnsFrom": ["question_id", "question_version", "choice_id"],
+          "columnsTo": ["question_id", "question_version", "choice_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1146,12 +1049,8 @@
           "name": "diagnosis_brain_projection_heads_account_id_account_data_identity_account_id_fk",
           "tableFrom": "diagnosis_brain_projection_heads",
           "tableTo": "account_data_identity",
-          "columnsFrom": [
-            "account_id"
-          ],
-          "columnsTo": [
-            "account_id"
-          ],
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["account_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1159,12 +1058,8 @@
           "name": "diagnosis_brain_projection_heads_diagnosis_id_diagnoses_id_fk",
           "tableFrom": "diagnosis_brain_projection_heads",
           "tableTo": "diagnoses",
-          "columnsFrom": [
-            "diagnosis_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["diagnosis_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1172,12 +1067,8 @@
           "name": "diagnosis_brain_projection_heads_scoring_config_id_diagnosis_scoring_configs_id_fk",
           "tableFrom": "diagnosis_brain_projection_heads",
           "tableTo": "diagnosis_scoring_configs",
-          "columnsFrom": [
-            "scoring_config_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["scoring_config_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1185,12 +1076,8 @@
           "name": "diagnosis_brain_projection_heads_current_brain_item_id_brain_items_id_fk",
           "tableFrom": "diagnosis_brain_projection_heads",
           "tableTo": "brain_items",
-          "columnsFrom": [
-            "current_brain_item_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["current_brain_item_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1285,18 +1172,12 @@
       "indexes": {
         "diagnosis_brain_projection_revision_idx": {
           "name": "diagnosis_brain_projection_revision_idx",
-          "columns": [
-            "diagnosis_response_id",
-            "response_revision"
-          ],
+          "columns": ["diagnosis_response_id", "response_revision"],
           "isUnique": true
         },
         "diagnosis_brain_projection_pending_idx": {
           "name": "diagnosis_brain_projection_pending_idx",
-          "columns": [
-            "status",
-            "next_attempt_at"
-          ],
+          "columns": ["status", "next_attempt_at"],
           "isUnique": false,
           "where": "status IN ('pending', 'failed') AND is_deleted = 0"
         }
@@ -1306,12 +1187,8 @@
           "name": "diagnosis_brain_projection_requests_diagnosis_response_id_diagnosis_responses_id_fk",
           "tableFrom": "diagnosis_brain_projection_requests",
           "tableTo": "diagnosis_responses",
-          "columnsFrom": [
-            "diagnosis_response_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["diagnosis_response_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1384,10 +1261,7 @@
       "indexes": {
         "diagnosis_deferred_question_active_idx": {
           "name": "diagnosis_deferred_question_active_idx",
-          "columns": [
-            "diagnosis_response_id",
-            "diagnosis_question_id"
-          ],
+          "columns": ["diagnosis_response_id", "diagnosis_question_id"],
           "isUnique": true,
           "where": "is_deleted = 0"
         }
@@ -1397,12 +1271,8 @@
           "name": "diagnosis_deferred_questions_diagnosis_response_id_diagnosis_responses_id_fk",
           "tableFrom": "diagnosis_deferred_questions",
           "tableTo": "diagnosis_responses",
-          "columnsFrom": [
-            "diagnosis_response_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["diagnosis_response_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1410,12 +1280,8 @@
           "name": "diagnosis_deferred_questions_diagnosis_question_id_diagnosis_questions_id_fk",
           "tableFrom": "diagnosis_deferred_questions",
           "tableTo": "diagnosis_questions",
-          "columnsFrom": [
-            "diagnosis_question_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["diagnosis_question_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1489,10 +1355,7 @@
       "indexes": {
         "diagnosis_response_account_active_idx": {
           "name": "diagnosis_response_account_active_idx",
-          "columns": [
-            "account_id",
-            "diagnosis_id"
-          ],
+          "columns": ["account_id", "diagnosis_id"],
           "isUnique": true,
           "where": "is_deleted = 0"
         }
@@ -1502,12 +1365,8 @@
           "name": "diagnosis_responses_account_id_account_data_identity_account_id_fk",
           "tableFrom": "diagnosis_responses",
           "tableTo": "account_data_identity",
-          "columnsFrom": [
-            "account_id"
-          ],
-          "columnsTo": [
-            "account_id"
-          ],
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["account_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1515,12 +1374,8 @@
           "name": "diagnosis_responses_diagnosis_id_diagnoses_id_fk",
           "tableFrom": "diagnosis_responses",
           "tableTo": "diagnoses",
-          "columnsFrom": [
-            "diagnosis_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["diagnosis_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1687,19 +1542,12 @@
       "indexes": {
         "chat_turn_status_created_idx": {
           "name": "chat_turn_status_created_idx",
-          "columns": [
-            "status",
-            "created_at"
-          ],
+          "columns": ["status", "created_at"],
           "isUnique": false
         },
         "chat_turn_session_range_idx": {
           "name": "chat_turn_session_range_idx",
-          "columns": [
-            "session_id",
-            "from_sequence",
-            "through_sequence"
-          ],
+          "columns": ["session_id", "from_sequence", "through_sequence"],
           "isUnique": true
         }
       },
@@ -1708,12 +1556,8 @@
           "name": "chat_turns_session_id_conversation_sessions_id_fk",
           "tableFrom": "chat_turns",
           "tableTo": "conversation_sessions",
-          "columnsFrom": [
-            "session_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["session_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1828,18 +1672,12 @@
       "indexes": {
         "conversation_message_session_sequence_idx": {
           "name": "conversation_message_session_sequence_idx",
-          "columns": [
-            "session_id",
-            "sequence"
-          ],
+          "columns": ["session_id", "sequence"],
           "isUnique": true
         },
         "conversation_message_channel_event_idx": {
           "name": "conversation_message_channel_event_idx",
-          "columns": [
-            "channel",
-            "channel_event_id"
-          ],
+          "columns": ["channel", "channel_event_id"],
           "isUnique": true,
           "where": "\"conversation_messages\".\"channel_event_id\" is not null"
         }
@@ -1849,12 +1687,8 @@
           "name": "conversation_messages_session_id_conversation_sessions_id_fk",
           "tableFrom": "conversation_messages",
           "tableTo": "conversation_sessions",
-          "columnsFrom": [
-            "session_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["session_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1862,12 +1696,8 @@
           "name": "conversation_messages_source_record_id_source_records_id_fk",
           "tableFrom": "conversation_messages",
           "tableTo": "source_records",
-          "columnsFrom": [
-            "source_record_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["source_record_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2009,17 +1839,12 @@
       "indexes": {
         "conversation_session_account_status_idx": {
           "name": "conversation_session_account_status_idx",
-          "columns": [
-            "account_id",
-            "status"
-          ],
+          "columns": ["account_id", "status"],
           "isUnique": false
         },
         "conversation_session_active_account_idx": {
           "name": "conversation_session_active_account_idx",
-          "columns": [
-            "account_id"
-          ],
+          "columns": ["account_id"],
           "isUnique": true,
           "where": "\"conversation_sessions\".\"status\" = 'active'"
         }
@@ -2029,12 +1854,8 @@
           "name": "conversation_sessions_account_id_account_data_identity_account_id_fk",
           "tableFrom": "conversation_sessions",
           "tableTo": "account_data_identity",
-          "columnsFrom": [
-            "account_id"
-          ],
-          "columnsTo": [
-            "account_id"
-          ],
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["account_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2143,19 +1964,12 @@
       "indexes": {
         "daily_prompt_delivery_account_date_idx": {
           "name": "daily_prompt_delivery_account_date_idx",
-          "columns": [
-            "account_id",
-            "local_date"
-          ],
+          "columns": ["account_id", "local_date"],
           "isUnique": true
         },
         "daily_prompt_delivery_account_status_idx": {
           "name": "daily_prompt_delivery_account_status_idx",
-          "columns": [
-            "account_id",
-            "status",
-            "local_date"
-          ],
+          "columns": ["account_id", "status", "local_date"],
           "isUnique": false
         }
       },
@@ -2164,12 +1978,8 @@
           "name": "daily_prompt_deliveries_account_id_account_data_identity_account_id_fk",
           "tableFrom": "daily_prompt_deliveries",
           "tableTo": "account_data_identity",
-          "columnsFrom": [
-            "account_id"
-          ],
-          "columnsTo": [
-            "account_id"
-          ],
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["account_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2265,18 +2075,12 @@
       "indexes": {
         "diary_brain_checkpoint_item_position_idx": {
           "name": "diary_brain_checkpoint_item_position_idx",
-          "columns": [
-            "checkpoint_id",
-            "position"
-          ],
+          "columns": ["checkpoint_id", "position"],
           "isUnique": true
         },
         "diary_brain_checkpoint_item_brain_idx": {
           "name": "diary_brain_checkpoint_item_brain_idx",
-          "columns": [
-            "checkpoint_id",
-            "brain_item_id"
-          ],
+          "columns": ["checkpoint_id", "brain_item_id"],
           "isUnique": true
         }
       },
@@ -2285,12 +2089,8 @@
           "name": "diary_brain_checkpoint_items_checkpoint_id_diary_brain_checkpoints_id_fk",
           "tableFrom": "diary_brain_checkpoint_items",
           "tableTo": "diary_brain_checkpoints",
-          "columnsFrom": [
-            "checkpoint_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["checkpoint_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -2298,12 +2098,8 @@
           "name": "diary_brain_checkpoint_items_brain_item_id_brain_items_id_fk",
           "tableFrom": "diary_brain_checkpoint_items",
           "tableTo": "brain_items",
-          "columnsFrom": [
-            "brain_item_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["brain_item_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2434,19 +2230,13 @@
       "indexes": {
         "diary_brain_checkpoint_pending_session_idx": {
           "name": "diary_brain_checkpoint_pending_session_idx",
-          "columns": [
-            "session_id"
-          ],
+          "columns": ["session_id"],
           "isUnique": true,
           "where": "\"diary_brain_checkpoints\".\"status\" = 'pending' AND \"diary_brain_checkpoints\".\"is_deleted\" = 0"
         },
         "diary_brain_checkpoint_due_idx": {
           "name": "diary_brain_checkpoint_due_idx",
-          "columns": [
-            "status",
-            "next_attempt_at",
-            "is_deleted"
-          ],
+          "columns": ["status", "next_attempt_at", "is_deleted"],
           "isUnique": false
         }
       },
@@ -2455,12 +2245,8 @@
           "name": "diary_brain_checkpoints_session_id_conversation_sessions_id_fk",
           "tableFrom": "diary_brain_checkpoints",
           "tableTo": "conversation_sessions",
-          "columnsFrom": [
-            "session_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["session_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2568,18 +2354,12 @@
       "indexes": {
         "diary_chat_brain_usage_turn_item_idx": {
           "name": "diary_chat_brain_usage_turn_item_idx",
-          "columns": [
-            "turn_id",
-            "brain_item_id",
-            "purpose"
-          ],
+          "columns": ["turn_id", "brain_item_id", "purpose"],
           "isUnique": true
         },
         "diary_chat_brain_usage_turn_idx": {
           "name": "diary_chat_brain_usage_turn_idx",
-          "columns": [
-            "turn_id"
-          ],
+          "columns": ["turn_id"],
           "isUnique": false
         }
       },
@@ -2588,12 +2368,8 @@
           "name": "diary_chat_brain_usage_audits_turn_id_chat_turns_id_fk",
           "tableFrom": "diary_chat_brain_usage_audits",
           "tableTo": "chat_turns",
-          "columnsFrom": [
-            "turn_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["turn_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -2601,12 +2377,8 @@
           "name": "diary_chat_brain_usage_audits_brain_item_id_brain_items_id_fk",
           "tableFrom": "diary_chat_brain_usage_audits",
           "tableTo": "brain_items",
-          "columnsFrom": [
-            "brain_item_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["brain_item_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2661,12 +2433,8 @@
           "name": "source_record_text_payloads_source_record_id_source_records_id_fk",
           "tableFrom": "source_record_text_payloads",
           "tableTo": "source_records",
-          "columnsFrom": [
-            "source_record_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["source_record_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2704,9 +2472,7 @@
       "indexes": {
         "account_data_identity_account_id_unique": {
           "name": "account_data_identity_account_id_unique",
-          "columns": [
-            "account_id"
-          ],
+          "columns": ["account_id"],
           "isUnique": true
         }
       },
@@ -2797,18 +2563,13 @@
       "indexes": {
         "profile_summary_generation_active_account_idx": {
           "name": "profile_summary_generation_active_account_idx",
-          "columns": [
-            "account_id"
-          ],
+          "columns": ["account_id"],
           "isUnique": true,
           "where": "\"profile_summary_generations\".\"status\" in ('queued', 'generating')"
         },
         "profile_summary_generation_account_requested_idx": {
           "name": "profile_summary_generation_account_requested_idx",
-          "columns": [
-            "account_id",
-            "requested_at"
-          ],
+          "columns": ["account_id", "requested_at"],
           "isUnique": false
         }
       },
@@ -2817,12 +2578,8 @@
           "name": "profile_summary_generations_account_id_account_data_identity_account_id_fk",
           "tableFrom": "profile_summary_generations",
           "tableTo": "account_data_identity",
-          "columnsFrom": [
-            "account_id"
-          ],
-          "columnsTo": [
-            "account_id"
-          ],
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["account_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2880,9 +2637,7 @@
       "indexes": {
         "profile_summary_share_projection_generated_idx": {
           "name": "profile_summary_share_projection_generated_idx",
-          "columns": [
-            "generated_at"
-          ],
+          "columns": ["generated_at"],
           "isUnique": false
         }
       },
@@ -2891,12 +2646,8 @@
           "name": "profile_summary_share_projections_profile_summary_version_id_profile_summary_versions_id_fk",
           "tableFrom": "profile_summary_share_projections",
           "tableTo": "profile_summary_versions",
-          "columnsFrom": [
-            "profile_summary_version_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["profile_summary_version_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2989,23 +2740,17 @@
       "indexes": {
         "profile_summary_versions_generation_id_unique": {
           "name": "profile_summary_versions_generation_id_unique",
-          "columns": [
-            "generation_id"
-          ],
+          "columns": ["generation_id"],
           "isUnique": true
         },
         "profile_summary_version_sequence_idx": {
           "name": "profile_summary_version_sequence_idx",
-          "columns": [
-            "sequence"
-          ],
+          "columns": ["sequence"],
           "isUnique": true
         },
         "profile_summary_version_generated_idx": {
           "name": "profile_summary_version_generated_idx",
-          "columns": [
-            "generated_at"
-          ],
+          "columns": ["generated_at"],
           "isUnique": false
         }
       },
@@ -3014,12 +2759,8 @@
           "name": "profile_summary_versions_generation_id_profile_summary_generations_id_fk",
           "tableFrom": "profile_summary_versions",
           "tableTo": "profile_summary_generations",
-          "columnsFrom": [
-            "generation_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["generation_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -3092,10 +2833,7 @@
       "indexes": {
         "source_record_revision_pair_idx": {
           "name": "source_record_revision_pair_idx",
-          "columns": [
-            "previous_source_record_id",
-            "next_source_record_id"
-          ],
+          "columns": ["previous_source_record_id", "next_source_record_id"],
           "isUnique": true
         }
       },
@@ -3104,12 +2842,8 @@
           "name": "source_record_revisions_previous_source_record_id_source_records_id_fk",
           "tableFrom": "source_record_revisions",
           "tableTo": "source_records",
-          "columnsFrom": [
-            "previous_source_record_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["previous_source_record_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -3117,12 +2851,8 @@
           "name": "source_record_revisions_next_source_record_id_source_records_id_fk",
           "tableFrom": "source_record_revisions",
           "tableTo": "source_records",
-          "columnsFrom": [
-            "next_source_record_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["next_source_record_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -3206,12 +2936,8 @@
           "name": "source_records_account_id_account_data_identity_account_id_fk",
           "tableFrom": "source_records",
           "tableTo": "account_data_identity",
-          "columnsFrom": [
-            "account_id"
-          ],
-          "columnsTo": [
-            "account_id"
-          ],
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["account_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -3370,12 +3096,8 @@
           "name": "diagnoses_scoring_config_id_diagnosis_scoring_configs_id_fk",
           "tableFrom": "diagnoses",
           "tableTo": "diagnosis_scoring_configs",
-          "columnsFrom": [
-            "scoring_config_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["scoring_config_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -3455,19 +3177,13 @@
       "indexes": {
         "diagnosis_question_active_idx": {
           "name": "diagnosis_question_active_idx",
-          "columns": [
-            "diagnosis_id",
-            "question_id"
-          ],
+          "columns": ["diagnosis_id", "question_id"],
           "isUnique": true,
           "where": "is_deleted = 0"
         },
         "diagnosis_question_position_active_idx": {
           "name": "diagnosis_question_position_active_idx",
-          "columns": [
-            "diagnosis_id",
-            "position"
-          ],
+          "columns": ["diagnosis_id", "position"],
           "isUnique": true,
           "where": "is_deleted = 0"
         }
@@ -3477,12 +3193,8 @@
           "name": "diagnosis_questions_diagnosis_id_diagnoses_id_fk",
           "tableFrom": "diagnosis_questions",
           "tableTo": "diagnoses",
-          "columnsFrom": [
-            "diagnosis_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["diagnosis_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -3490,12 +3202,8 @@
           "name": "diagnosis_questions_question_id_questions_id_fk",
           "tableFrom": "diagnosis_questions",
           "tableTo": "questions",
-          "columnsFrom": [
-            "question_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["question_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -3503,14 +3211,8 @@
           "name": "diagnosis_questions_question_id_question_version_question_versions_question_id_version_fk",
           "tableFrom": "diagnosis_questions",
           "tableTo": "question_versions",
-          "columnsFrom": [
-            "question_id",
-            "question_version"
-          ],
-          "columnsTo": [
-            "question_id",
-            "version"
-          ],
+          "columnsFrom": ["question_id", "question_version"],
+          "columnsTo": ["question_id", "version"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -3657,11 +3359,7 @@
       "indexes": {
         "question_choice_position_idx": {
           "name": "question_choice_position_idx",
-          "columns": [
-            "question_id",
-            "question_version",
-            "position"
-          ],
+          "columns": ["question_id", "question_version", "position"],
           "isUnique": true
         }
       },
@@ -3670,25 +3368,15 @@
           "name": "question_choices_question_id_question_version_question_versions_question_id_version_fk",
           "tableFrom": "question_choices",
           "tableTo": "question_versions",
-          "columnsFrom": [
-            "question_id",
-            "question_version"
-          ],
-          "columnsTo": [
-            "question_id",
-            "version"
-          ],
+          "columnsFrom": ["question_id", "question_version"],
+          "columnsTo": ["question_id", "version"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
         "question_choices_question_id_question_version_choice_id_pk": {
-          "columns": [
-            "question_id",
-            "question_version",
-            "choice_id"
-          ],
+          "columns": ["question_id", "question_version", "choice_id"],
           "name": "question_choices_question_id_question_version_choice_id_pk"
         }
       },
@@ -3787,10 +3475,7 @@
       "indexes": {
         "question_version_active_idx": {
           "name": "question_version_active_idx",
-          "columns": [
-            "question_id",
-            "version"
-          ],
+          "columns": ["question_id", "version"],
           "isUnique": true,
           "where": "is_deleted = 0"
         }
@@ -3800,22 +3485,15 @@
           "name": "question_versions_question_id_questions_id_fk",
           "tableFrom": "question_versions",
           "tableTo": "questions",
-          "columnsFrom": [
-            "question_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["question_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
         "question_versions_question_id_version_pk": {
-          "columns": [
-            "question_id",
-            "version"
-          ],
+          "columns": ["question_id", "version"],
           "name": "question_versions_question_id_version_pk"
         }
       },
