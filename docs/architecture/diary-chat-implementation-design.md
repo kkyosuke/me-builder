@@ -355,6 +355,7 @@ Brain Itemを含むAccount所有データのquery境界は、[Accountデータ�
 | 日記からの`identity`生成 | 未対応 | 候補category、prompt、Valibot schema、stability規則へ追加する |
 | `attributes.promptContext` | 未対応 | 種別ごとのschemaとEvidence整合検証を追加する |
 | 曜日・本人情報からの声かけ候補取得 | 未対応 | active、Valid Time、Evidence、Access Policyを再検証して必要最小限を返す |
+| 時刻帯・声かけ方針の自動選択 | 未対応 | 本人の明言を優先し、本人自身の返信実績が不足する間は18時の標準候補へ戻す選択器を追加する。クライアントからAccount IDや選択結果を指定させない |
 | 18時の能動配信 | 未対応 | [日記チャット体験設計](../product/diary-chat-experience.md)の段階導入に従って後続実装する |
 
 開発用の確認機能は、本人確認済みAccountに対して、一覧取得用の`brain.listActive`とVector実体確認用の`brain.findActiveVectorEntry`をAccountData RPCへ公開します。`brain.listActive`はactiveかつ未削除のItem、未削除Evidence、最新のVector同期jobと対応表の有無を最大100件返します。Web UIは各Itemに同期状態、試行回数、失敗code、次回試行時刻を表示します。`applied`はVectorizeが更新を受け付けてAccountDataへ完了記録した状態であり、Vectorize上の実体確認とは区別します。
