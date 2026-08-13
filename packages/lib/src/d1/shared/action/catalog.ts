@@ -1,4 +1,5 @@
 import { and, asc, eq } from "drizzle-orm";
+import type { RelationshipCategory } from "../../../diagnosis/relationship-category";
 import type { SharedD1Client } from "../client";
 import {
   diagnoses,
@@ -12,6 +13,7 @@ export type DiagnosisDetail = Readonly<{
   id: string;
   title: string;
   description: string;
+  relationshipCategory: RelationshipCategory;
   opensAt: string;
   closesAt: string | null;
   questions: Array<{
@@ -48,6 +50,7 @@ export async function findOpenDiagnosisDetail(
       id: diagnoses.id,
       title: diagnoses.title,
       description: diagnoses.description,
+      relationshipCategory: diagnoses.relationshipCategory,
       opensAt: diagnoses.opensAt,
       closesAt: diagnoses.closesAt,
       state: diagnoses.state,
@@ -139,6 +142,7 @@ export async function findOpenDiagnosisDetail(
       id: diagnosis.id,
       title: diagnosis.title,
       description: diagnosis.description,
+      relationshipCategory: diagnosis.relationshipCategory,
       opensAt: diagnosis.opensAt.toISOString(),
       closesAt: diagnosis.closesAt?.toISOString() ?? null,
       questions,

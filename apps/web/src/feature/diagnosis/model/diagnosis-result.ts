@@ -1,3 +1,5 @@
+import type { RelationshipCategory } from "./relationship-category";
+
 export interface DiagnosisResultAnswer {
   diagnosisQuestionId: string;
   questionId: string;
@@ -29,6 +31,7 @@ export interface DiagnosisResult {
   id: string;
   title: string;
   description: string;
+  relationshipCategory: RelationshipCategory;
   responseStatus: "in-progress" | "answered";
   answeredCount: number;
   questionCount: number;

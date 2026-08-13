@@ -1,0 +1,1 @@
+ALTER TABLE `diagnoses` ADD `relationship_category` text DEFAULT 'general' NOT NULL;

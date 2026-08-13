@@ -124,11 +124,23 @@ stateDiagram-v2
 
 - タイトル
 - 一覧で内容を伝える短い説明
+- 回答で前提にする相手とのRelationship Category
 - 回答受付の開始時点と終了時点
 - 公開状態
 - 順序づけられた`Diagnosis Question`
 
 Diagnosis QuestionはDiagnosis内の項目であり、特定のQuestion Versionへの参照と表示順を持ちます。将来同じQuestion Versionを別のDiagnosisで再利用しても、回答がどのDiagnosis上の項目に対するものかを区別できます。
+
+Relationship Categoryは回答時に利用者が選ぶ設定ではなく、運営がDiagnosisを作る段階で質問内容と一緒に固定します。相手によって回答が変わり得るため、異なるカテゴリで同じテーマを扱う場合はカテゴリごとにDiagnosisを分けます。
+
+| 値 | 利用者向けラベル | 用途 |
+| --- | --- | --- |
+| `partner` | パートナー | 恋人、配偶者などとの関係を前提にする |
+| `family` | 家族 | 親、子、きょうだいなどとの関係を前提にする |
+| `friend` | 友達 | 友人との関係を前提にする |
+| `work` | 仕事 | 同僚、上司、部下、取引先などとの関係を前提にする |
+| `other` | その他 | 上記へ当てはまらない特定の関係を前提にする |
+| `general` | 人間関係全般 | 特定の関係によらない質問だけで構成する |
 
 ### 公開状態と受付可否
 
@@ -153,10 +165,11 @@ stateDiagram-v2
 ### 不変条件
 
 - Diagnosisは1件以上のDiagnosis Questionを持つ
+- DiagnosisはRelationship Categoryを1つ持つ
 - 同じQuestionを1つのDiagnosisへ重複して含めない
 - Diagnosis公開時点で、すべてのDiagnosis QuestionがapprovedのQuestion Versionを参照している
 - 受付終了時点がある場合、受付開始時点より後にする
-- published以降はタイトル、短い説明、受付期間、質問の組み合わせ、参照する版、順序を変更しない
+- published以降はタイトル、短い説明、Relationship Category、受付期間、質問の組み合わせ、参照する版、順序を変更しない
 - 公開内容の訂正が必要な場合は新しいDiagnosisを作成する
 
 Phase 1では公開中のDiagnosisをすべての有効なAccountが回答できます。対象者のセグメント、招待制、質問のランダム化は後続設計へ延期します。

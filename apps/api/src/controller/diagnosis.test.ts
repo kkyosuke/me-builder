@@ -279,6 +279,7 @@ describe("GET /api/diagnoses/:diagnosisId", () => {
         id: "diagnosis-1",
         title: "タイトル",
         description: "説明",
+        relationshipCategory: "general",
         opensAt: "2026-08-04T00:00:00.000Z",
         closesAt: null,
         questions: [
@@ -352,6 +353,7 @@ describe("GET /api/diagnoses/:diagnosisId/answers", () => {
         id: "diagnosis-1",
         title: "タイトル",
         description: "説明",
+        relationshipCategory: "general",
         responseStatus: "answered",
         answeredCount: 1,
         questionCount: 1,

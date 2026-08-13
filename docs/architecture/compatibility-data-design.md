@@ -41,7 +41,7 @@ flowchart LR
 
 | データ | 保存先 | 理由 |
 | --- | --- | --- |
-| 招待状態、参加者、表示名snapshot | CompatibilityData SQLite | 2者の共有関係を片方のAccount所有にしない |
+| 招待状態、参加者、表示名snapshot、Relationship Category | CompatibilityData SQLite | 2者の共有関係を片方のAccount所有にしない |
 | 送信者の同意時刻（`created_at`） | CompatibilityData SQLite | 発行時の継続同意の成立時点を残す |
 | 受信者の同意時刻（`accepted_at`） | CompatibilityData SQLite | 受信者の明示的同意を送信者の同意と分ける |
 | 共有用の一人称文章と内部根拠参照 | 各AccountData SQLiteの専用projection | 本人向けまとめや生の根拠を関係データへ複製しない |
@@ -62,6 +62,7 @@ erDiagram
       text invitee_account_id
       text inviter_display_name
       text invitee_display_name
+      text relationship_category
       text status
       integer expires_at
       integer accepted_at
@@ -73,7 +74,7 @@ erDiagram
     }
 ```
 
-送信者の同意時刻は`created_at`、受信者の同意時刻は`accepted_at`が表します。同意した表示内容、共有プロフィール版、診断テーマ、結果指紋は保存しません。共有対象は関係が`accepted`である間、双方の`AccountData`が現在共有できるものすべてです。
+送信者の同意時刻は`created_at`、受信者の同意時刻は`accepted_at`が表します。`relationship_category`は招待時に選択し、受信者が承諾した関係分類です。同意した表示内容、共有プロフィール版、診断テーマ、結果指紋は保存しません。共有対象は関係が`accepted`である間、双方の`AccountData`が現在共有できるもののうち、関係分類が一致するDiagnosisと`general`のDiagnosisです。
 
 招待発行と承諾のcommandは、表示内容を確認するtokenを受け取りません。API Serverは検証済みLINE ID tokenから解決したAccount IDと表示名だけを渡し、`CompatibilityData`が現在時刻で状態遷移を判定します。
 

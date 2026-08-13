@@ -1,6 +1,7 @@
 import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
 import * as v from "valibot";
 import { AccountNotFoundErrorSchema, authenticatedErrors, jsonResponse } from "../shared/errors";
+import { RelationshipCategorySchema } from "./shared";
 
 const NonEmptyStringSchema = v.pipe(v.string(), v.nonEmpty());
 const CountSchema = v.pipe(v.number(), v.safeInteger(), v.minValue(0));
@@ -35,6 +36,7 @@ export const DiagnosisAnswersResponseSchema = v.object({
   id: NonEmptyStringSchema,
   title: NonEmptyStringSchema,
   description: NonEmptyStringSchema,
+  relationshipCategory: RelationshipCategorySchema,
   responseStatus: v.picklist(["in-progress", "answered"]),
   answeredCount: CountSchema,
   questionCount: v.pipe(CountSchema, v.minValue(1)),

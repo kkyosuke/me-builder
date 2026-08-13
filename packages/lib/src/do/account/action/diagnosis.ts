@@ -1,4 +1,5 @@
 import { and, asc, count, eq, inArray, isNotNull, lte, max, or } from "drizzle-orm";
+import type { RelationshipCategory } from "../../../diagnosis/relationship-category";
 import type { AccountDataDatabase } from "../database";
 import {
   brainItemAccessLabels,
@@ -40,6 +41,7 @@ export type DiagnosisListItem = Readonly<{
   id: string;
   title: string;
   description: string;
+  relationshipCategory: RelationshipCategory;
   opensAt: string;
   closesAt: string | null;
   displayOrder: number;
@@ -91,6 +93,7 @@ type DiagnosisAnswers = Readonly<{
   id: string;
   title: string;
   description: string;
+  relationshipCategory: RelationshipCategory;
   responseStatus: DiagnosisListResponseStatus;
   answeredCount: number;
   questionCount: number;
@@ -816,6 +819,7 @@ export async function findDiagnosisAnswers(
       id: diagnoses.id,
       title: diagnoses.title,
       description: diagnoses.description,
+      relationshipCategory: diagnoses.relationshipCategory,
       opensAt: diagnoses.opensAt,
       state: diagnoses.state,
       diagnosisIsDeleted: diagnoses.isDeleted,
@@ -968,6 +972,7 @@ export async function findDiagnosisAnswers(
       id: response.id,
       title: response.title,
       description: response.description,
+      relationshipCategory: response.relationshipCategory,
       responseStatus: diagnosisResponseStatus(answeredCount, questionCount),
       answeredCount,
       questionCount,
@@ -1027,6 +1032,7 @@ export async function listVisibleDiagnoses(
       id: diagnoses.id,
       title: diagnoses.title,
       description: diagnoses.description,
+      relationshipCategory: diagnoses.relationshipCategory,
       opensAt: diagnoses.opensAt,
       closesAt: diagnoses.closesAt,
       state: diagnoses.state,
@@ -1073,6 +1079,7 @@ export async function listVisibleDiagnoses(
       diagnoses.id,
       diagnoses.title,
       diagnoses.description,
+      diagnoses.relationshipCategory,
       diagnoses.opensAt,
       diagnoses.closesAt,
       diagnoses.state,
@@ -1088,6 +1095,7 @@ export async function listVisibleDiagnoses(
       id: row.id,
       title: row.title,
       description: row.description,
+      relationshipCategory: row.relationshipCategory,
       opensAt: row.opensAt.toISOString(),
       closesAt: row.closesAt?.toISOString() ?? null,
       displayOrder: row.displayOrder,

@@ -8,6 +8,7 @@ import m0006 from "./0006_vector_sync_retry_scheduled.sql";
 import m0007 from "./0007_demonic_cable.sql";
 import m0008 from "./0008_soft_hulk.sql";
 import m0009 from "./0009_misty_zarda.sql";
+import m0010 from "./0010_gorgeous_red_wolf.sql";
 import journal from "./meta/_journal.json";
 
 export default {
@@ -23,5 +24,6 @@ export default {
     m0007,
     m0008,
     m0009,
+    m0010,
   },
 };

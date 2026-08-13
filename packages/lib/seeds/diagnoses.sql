@@ -396,17 +396,18 @@ INSERT INTO diagnoses (
   is_deleted,
   title,
   description,
+  relationship_category,
   scoring_config_id,
   display_order,
   opens_at,
   state,
   published_at
 ) VALUES
-  ('relationship-priority', 1785801600, 1785801600, 0, '自分と相手の優先・境界線', '頼まれごとや意思決定で、自分と相手をどう尊重するかを見ます。', 'relationship-priority-v1', 10, 1785801600, 'published', 1785801600),
-  ('money-values', 1785801600, 1785801600, 0, 'お金と消費', '貯蓄、支出、共有、公平性、リスクに関する傾向を見ます。', 'money-values-v1', 20, 1785801600, 'published', 1785801600),
-  ('leisure-style', 1785974400, 1785974400, 0, 'インドア・アウトドアと余暇', '休日の過ごし方、体験、趣味の共有、活動量に関する傾向を見ます。', 'leisure-style-v1', 30, 1785801600, 'published', 1785974400),
-  ('time-planning', 1785974400, 1785974400, 0, '時間と予定', '予定の立て方、変更への柔軟性、時間の約束、一緒の時間に関する傾向を見ます。', 'time-planning-v1', 40, 1785801600, 'published', 1785974400),
-  ('conversation-emotion', 1786233600, 1786233600, 0, '会話と感情表現', '共感、愛情表現、希望の伝え方、支え方、感情の共有に関する傾向を見ます。', 'conversation-emotion-v1', 50, 1785801600, 'published', 1786233600)
+  ('relationship-priority', 1785801600, 1785801600, 0, '自分と相手の優先・境界線', '頼まれごとや意思決定で、自分と相手をどう尊重するかを見ます。', 'general', 'relationship-priority-v1', 10, 1785801600, 'published', 1785801600),
+  ('money-values', 1785801600, 1785801600, 0, 'お金と消費', '貯蓄、支出、共有、公平性、リスクに関する傾向を見ます。', 'general', 'money-values-v1', 20, 1785801600, 'published', 1785801600),
+  ('leisure-style', 1785974400, 1785974400, 0, 'インドア・アウトドアと余暇', '休日の過ごし方、体験、趣味の共有、活動量に関する傾向を見ます。', 'general', 'leisure-style-v1', 30, 1785801600, 'published', 1785974400),
+  ('time-planning', 1785974400, 1785974400, 0, '時間と予定', '予定の立て方、変更への柔軟性、時間の約束、一緒の時間に関する傾向を見ます。', 'general', 'time-planning-v1', 40, 1785801600, 'published', 1785974400),
+  ('conversation-emotion', 1786233600, 1786233600, 0, '会話と感情表現', '共感、愛情表現、希望の伝え方、支え方、感情の共有に関する傾向を見ます。', 'general', 'conversation-emotion-v1', 50, 1785801600, 'published', 1786233600)
 ON CONFLICT(id) DO UPDATE SET
   description = CASE
     WHEN diagnoses.description = '' THEN excluded.description
@@ -483,7 +484,7 @@ INSERT OR IGNORE INTO diagnosis_questions (
 
 -- AccountDataがsnapshotを再同期するか判断する版。
 -- このseedのcatalog内容を変更したら、必ずversionを1つ上げる。
-INSERT INTO catalog_versions (catalog_id, version, updated_at) VALUES ('diagnosis', 1, 1786233600)
+INSERT INTO catalog_versions (catalog_id, version, updated_at) VALUES ('diagnosis', 2, 1786665600)
   ON CONFLICT(catalog_id) DO UPDATE SET version = excluded.version, updated_at = excluded.updated_at;
 --> statement-breakpoint
 

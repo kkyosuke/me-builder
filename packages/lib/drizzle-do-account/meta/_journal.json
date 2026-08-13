@@ -71,6 +71,13 @@
       "when": 1786578970278,
       "tag": "0009_misty_zarda",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1786653041443,
+      "tag": "0010_gorgeous_red_wolf",
+      "breakpoints": true
     }
   ]
 }

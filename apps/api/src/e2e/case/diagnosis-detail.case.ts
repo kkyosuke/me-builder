@@ -15,6 +15,7 @@ export const diagnosisDetailCases = {
       status: 200,
       body: {
         id: "relationship-priority",
+        relationshipCategory: "general",
         questionCount: 10,
         firstQuestion: {
           diagnosisQuestionId: "dq-relationship-priority-01",

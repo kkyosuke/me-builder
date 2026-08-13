@@ -19,11 +19,13 @@ export const diagnosisListCases = {
       body: {
         diagnoses: {
           "money-values": {
+            relationshipCategory: "general",
             responseStatus: "in-progress",
             answeredCount: 1,
             questionCount: 10,
           },
           "relationship-priority": {
+            relationshipCategory: "general",
             responseStatus: "answered",
             answeredCount: 10,
             questionCount: 10,

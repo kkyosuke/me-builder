@@ -3733,6 +3733,10 @@
                             "type": "string",
                             "minLength": 1
                           },
+                          "relationshipCategory": {
+                            "enum": ["partner", "family", "friend", "work", "other", "general"],
+                            "type": "string"
+                          },
                           "opensAt": {
                             "type": "string",
                             "format": "date-time"
@@ -3787,6 +3791,7 @@
                           "id",
                           "title",
                           "description",
+                          "relationshipCategory",
                           "opensAt",
                           "closesAt",
                           "displayOrder",
@@ -3904,6 +3909,10 @@
                       "type": "string",
                       "minLength": 1
                     },
+                    "relationshipCategory": {
+                      "enum": ["partner", "family", "friend", "work", "other", "general"],
+                      "type": "string"
+                    },
                     "opensAt": {
                       "type": "string",
                       "format": "date-time"
@@ -3984,7 +3993,15 @@
                       "minItems": 1
                     }
                   },
-                  "required": ["id", "title", "description", "opensAt", "closesAt", "questions"]
+                  "required": [
+                    "id",
+                    "title",
+                    "description",
+                    "relationshipCategory",
+                    "opensAt",
+                    "closesAt",
+                    "questions"
+                  ]
                 }
               }
             }
@@ -4134,6 +4151,10 @@
                       "type": "string",
                       "minLength": 1
                     },
+                    "relationshipCategory": {
+                      "enum": ["partner", "family", "friend", "work", "other", "general"],
+                      "type": "string"
+                    },
                     "responseStatus": {
                       "enum": ["in-progress", "answered"],
                       "type": "string"
@@ -4277,6 +4298,7 @@
                     "id",
                     "title",
                     "description",
+                    "relationshipCategory",
                     "responseStatus",
                     "answeredCount",
                     "questionCount",

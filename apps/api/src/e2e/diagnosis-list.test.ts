@@ -190,6 +190,7 @@ describe("GET /api/diagnoses local D1 E2E", () => {
     const initialBody = (await initialResponse.json()) as {
       diagnoses: Array<{
         id: string;
+        relationshipCategory: string;
         description: string;
         displayOrder: number;
         responseStatus: string;
@@ -223,6 +224,7 @@ describe("GET /api/diagnoses local D1 E2E", () => {
     };
 
     expect(progressedBody.diagnoses.find(({ id }) => id === "money-values")).toMatchObject({
+      relationshipCategory: "general",
       responseStatus: "in-progress",
       answeredCount: 1,
       questionCount: 10,
@@ -230,6 +232,7 @@ describe("GET /api/diagnoses local D1 E2E", () => {
     });
     expect(progressedBody.diagnoses.find(({ id }) => id === "relationship-priority")).toMatchObject(
       {
+        relationshipCategory: "general",
         responseStatus: "answered",
         answeredCount: 10,
         questionCount: 10,
@@ -288,6 +291,7 @@ describe("GET /api/diagnoses/:diagnosisId local D1 E2E", () => {
     expect(response.status).toBe(200);
     const body = (await response.json()) as {
       id: string;
+      relationshipCategory: string;
       questions: Array<{
         diagnosisQuestionId: string;
         questionVersion: number;
@@ -295,6 +299,7 @@ describe("GET /api/diagnoses/:diagnosisId local D1 E2E", () => {
       }>;
     };
     expect(body.id).toBe("relationship-priority");
+    expect(body.relationshipCategory).toBe("general");
     expect(body.questions).toHaveLength(10);
     expect(body.questions[0]).toMatchObject({
       diagnosisQuestionId: "dq-relationship-priority-01",

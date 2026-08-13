@@ -40,15 +40,15 @@ seedは必ずmigration適用後に実行します。localでは開発者が明�
 
 現在のseedは次の公開済みDiagnosisを登録します。
 
-| 表示順 | Diagnosis ID | タイトル | Question Version | 受付開始 |
-| ---: | --- | --- | --- | --- |
-| 10 | `relationship-priority` | 自分と相手の優先・境界線 | すべてversion 1 | 2026-08-04 00:00:00 UTC |
-| 20 | `money-values` | お金と消費 | すべてversion 1 | 2026-08-04 00:00:00 UTC |
-| 30 | `leisure-style` | インドア・アウトドアと余暇 | すべてversion 1 | 2026-08-04 00:00:00 UTC |
-| 40 | `time-planning` | 時間と予定 | すべてversion 1 | 2026-08-04 00:00:00 UTC |
-| 50 | `conversation-emotion` | 会話と感情表現 | すべてversion 1 | 2026-08-04 00:00:00 UTC |
+| 表示順 | Diagnosis ID | タイトル | Relationship Category | Question Version | 受付開始 |
+| ---: | --- | --- | --- | --- | --- |
+| 10 | `relationship-priority` | 自分と相手の優先・境界線 | `general` | すべてversion 1 | 2026-08-04 00:00:00 UTC |
+| 20 | `money-values` | お金と消費 | `general` | すべてversion 1 | 2026-08-04 00:00:00 UTC |
+| 30 | `leisure-style` | インドア・アウトドアと余暇 | `general` | すべてversion 1 | 2026-08-04 00:00:00 UTC |
+| 40 | `time-planning` | 時間と予定 | `general` | すべてversion 1 | 2026-08-04 00:00:00 UTC |
+| 50 | `conversation-emotion` | 会話と感情表現 | `general` | すべてversion 1 | 2026-08-04 00:00:00 UTC |
 
-いずれも終了日時を持たず、Question Versionは`approved`、Diagnosisは`published`として登録します。Diagnosisには一覧表示用の短い説明、表示順、版付き採点設定への参照を持たせます。Choiceは「いいえ」「はい」の2件です。表示順は診断内容ではなく一覧上の優先順位として変更でき、将来の差し込みに備えて10刻みで設定します。
+いずれも終了日時を持たず、Question Versionは`approved`、Diagnosisは`published`として登録します。既存の質問は特定の関係を前提に書かれていないため`general`とし、関係別のDiagnosisは質問内容を確定してから追加します。Diagnosisには一覧表示用の短い説明、表示順、版付き採点設定への参照を持たせます。Choiceは「いいえ」「はい」の2件です。表示順は診断内容ではなく一覧上の優先順位として変更でき、将来の差し込みに備えて10刻みで設定します。
 
 ## 5. 実行方法
 

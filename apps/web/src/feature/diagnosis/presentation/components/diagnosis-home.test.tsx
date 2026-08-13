@@ -10,6 +10,7 @@ function diagnosis(overrides: Partial<DiagnosisListItem>): DiagnosisListItem {
     id: "diagnosis",
     title: "診断",
     description: "説明",
+    relationshipCategory: "general",
     opensAt: "2026-08-01T00:00:00.000Z",
     closesAt: null,
     displayOrder: 1,
@@ -100,6 +101,44 @@ describe("DiagnosisHome", () => {
 
     expect(within(answeredCard).queryByText("回答済み")).toBeNull();
     expect(within(answeredCard).queryByText(/10\/10|10問/)).toBeNull();
+  });
+
+  it("カテゴリラベルを表示し、一覧をチップで絞り込む", () => {
+    render(
+      <DiagnosisHome
+        diagnoses={{
+          status: "success",
+          data: [
+            diagnosis({
+              id: "partner",
+              title: "パートナー向け診断",
+              relationshipCategory: "partner",
+            }),
+            diagnosis({
+              id: "work",
+              title: "仕事向け診断",
+              relationshipCategory: "work",
+              displayOrder: 2,
+            }),
+          ],
+        }}
+        onOpenDiagnosis={vi.fn()}
+        onRetry={vi.fn()}
+      />,
+    );
+
+    const filters = within(screen.getByLabelText("関係カテゴリで絞り込む"));
+    expect(filters.getByRole("button", { name: "すべて" }).getAttribute("aria-pressed")).toBe(
+      "true",
+    );
+    expect(screen.getByRole("button", { name: /パートナー向け診断/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /仕事向け診断/ })).toBeTruthy();
+
+    fireEvent.click(filters.getByRole("button", { name: "仕事" }));
+
+    expect(screen.queryByRole("button", { name: /パートナー向け診断/ })).toBeNull();
+    expect(screen.getByRole("button", { name: /仕事向け診断/ })).toBeTruthy();
+    expect(filters.getByRole("button", { name: "仕事" }).getAttribute("aria-pressed")).toBe("true");
   });
 
   it("診断ごとのサムネイルと未知の診断用フォールバックを表示する", () => {

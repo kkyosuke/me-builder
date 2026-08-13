@@ -343,6 +343,7 @@ describe("AccountDataRepository", () => {
           id: "diagnosis-1",
           title: "Diagnosis",
           description: "Description",
+          relationshipCategory: "general",
           scoringConfigId: null,
           displayOrder: 1,
           opensAt: new Date("2026-08-01T00:00:00.000Z"),

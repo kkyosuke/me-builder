@@ -2472,6 +2472,8 @@ export interface operations {
               id: string;
               title: string;
               description: string;
+              /** @enum {string} */
+              relationshipCategory: "partner" | "family" | "friend" | "work" | "other" | "general";
               /** Format: date-time */
               opensAt: string;
               closesAt: string | null;
@@ -2560,6 +2562,8 @@ export interface operations {
             id: string;
             title: string;
             description: string;
+            /** @enum {string} */
+            relationshipCategory: "partner" | "family" | "friend" | "work" | "other" | "general";
             /** Format: date-time */
             opensAt: string;
             closesAt: string | null;
@@ -2671,6 +2675,8 @@ export interface operations {
             id: string;
             title: string;
             description: string;
+            /** @enum {string} */
+            relationshipCategory: "partner" | "family" | "friend" | "work" | "other" | "general";
             /** @enum {string} */
             responseStatus: "in-progress" | "answered";
             answeredCount: number;
