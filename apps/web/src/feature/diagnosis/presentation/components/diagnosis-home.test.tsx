@@ -135,8 +135,6 @@ describe("DiagnosisHome", () => {
       "家族",
       "友達",
       "仕事",
-      "その他",
-      "人間関係全般",
     ]);
     expect(screen.getByRole("button", { name: /パートナー向け診断/ })).toBeTruthy();
     expect(screen.getByRole("button", { name: /仕事向け診断/ })).toBeTruthy();
@@ -169,7 +167,7 @@ describe("DiagnosisHome", () => {
 
     const filters = within(screen.getByRole("group", { name: "関係カテゴリで絞り込む" }));
     expect(filters.getByRole("button", { name: "パートナー" })).toBeTruthy();
-    expect(filters.getByRole("button", { name: "人間関係全般" })).toBeTruthy();
+    expect(filters.queryByRole("button", { name: "人間関係全般" })).toBeNull();
     expect(
       within(screen.getByRole("button", { name: /人間関係全般の診断/ })).getByText("人間関係全般"),
     ).toBeTruthy();

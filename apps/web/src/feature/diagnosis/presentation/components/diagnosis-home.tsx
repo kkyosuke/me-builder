@@ -7,10 +7,10 @@ import { buildDiagnosisListSections } from "../../model/diagnosis-list-sections"
 import {
   type RelationshipCategoryFilter,
   filterDiagnosesByRelationshipCategory,
+  filterableRelationshipCategoryValues,
   getRelationshipCategoryBadgeClassName,
   getRelationshipCategoryFilterClassName,
   getRelationshipCategoryLabel,
-  relationshipCategoryValues,
 } from "../../model/relationship-category";
 import { DiagnosisListSkeleton } from "./diagnosis-loading-skeleton";
 
@@ -151,7 +151,7 @@ export function DiagnosisHome({
           >
             全部
           </button>
-          {relationshipCategoryValues.map((category) => (
+          {filterableRelationshipCategoryValues.map((category) => (
             <button
               type="button"
               key={category}

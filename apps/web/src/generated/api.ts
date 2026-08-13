@@ -2473,7 +2473,7 @@ export interface operations {
               title: string;
               description: string;
               /** @enum {string} */
-              relationshipCategory: "partner" | "family" | "friend" | "work" | "other" | "general";
+              relationshipCategory: "partner" | "family" | "friend" | "work" | "general";
               /** Format: date-time */
               opensAt: string;
               closesAt: string | null;
@@ -2563,7 +2563,7 @@ export interface operations {
             title: string;
             description: string;
             /** @enum {string} */
-            relationshipCategory: "partner" | "family" | "friend" | "work" | "other" | "general";
+            relationshipCategory: "partner" | "family" | "friend" | "work" | "general";
             /** Format: date-time */
             opensAt: string;
             closesAt: string | null;
@@ -2676,7 +2676,7 @@ export interface operations {
             title: string;
             description: string;
             /** @enum {string} */
-            relationshipCategory: "partner" | "family" | "friend" | "work" | "other" | "general";
+            relationshipCategory: "partner" | "family" | "friend" | "work" | "general";
             /** @enum {string} */
             responseStatus: "in-progress" | "answered";
             answeredCount: number;

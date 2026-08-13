@@ -46,7 +46,6 @@ describe("relationship category filter", () => {
     expect(getRelationshipCategoryBadgeClassName("family")).toContain("bg-amber-100");
     expect(getRelationshipCategoryBadgeClassName("friend")).toContain("bg-emerald-100");
     expect(getRelationshipCategoryBadgeClassName("work")).toContain("bg-blue-100");
-    expect(getRelationshipCategoryBadgeClassName("other")).toContain("bg-violet-100");
     expect(getRelationshipCategoryBadgeClassName("general")).toContain("bg-slate-100");
   });
 });

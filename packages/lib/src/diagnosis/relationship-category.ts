@@ -4,7 +4,6 @@ export const relationshipCategoryValues = [
   "family",
   "friend",
   "work",
-  "other",
   "general",
 ] as const;
 

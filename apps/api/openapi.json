@@ -3734,7 +3734,7 @@
                             "minLength": 1
                           },
                           "relationshipCategory": {
-                            "enum": ["partner", "family", "friend", "work", "other", "general"],
+                            "enum": ["partner", "family", "friend", "work", "general"],
                             "type": "string"
                           },
                           "opensAt": {
@@ -3910,7 +3910,7 @@
                       "minLength": 1
                     },
                     "relationshipCategory": {
-                      "enum": ["partner", "family", "friend", "work", "other", "general"],
+                      "enum": ["partner", "family", "friend", "work", "general"],
                       "type": "string"
                     },
                     "opensAt": {
@@ -4152,7 +4152,7 @@
                       "minLength": 1
                     },
                     "relationshipCategory": {
-                      "enum": ["partner", "family", "friend", "work", "other", "general"],
+                      "enum": ["partner", "family", "friend", "work", "general"],
                       "type": "string"
                     },
                     "responseStatus": {
