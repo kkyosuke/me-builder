@@ -53,7 +53,7 @@ export function CompatibilityPersonSheet({
                   style={{ left: `${theme.position}%` }}
                 />
               </span>
-              <div className="mt-2 flex justify-between gap-2 text-[0.6875rem] text-slate-500">
+              <div className="mt-2 flex justify-between gap-2 text-2xs text-slate-500">
                 <span>{theme.leftLabel}</span>
                 <span className="text-right">{theme.rightLabel}</span>
               </div>
@@ -122,7 +122,7 @@ function AxisComparison({
           </div>
         ))}
       </div>
-      <div className="ml-[5.5rem] mt-2 flex justify-between gap-2 text-[0.6875rem] text-slate-500">
+      <div className="ml-[5.5rem] mt-2 flex justify-between gap-2 text-2xs text-slate-500">
         <span>{theme.leftLabel}</span>
         <span className="text-right">{theme.rightLabel}</span>
       </div>

@@ -158,7 +158,7 @@ export function ProfileSettingsScreen({
       </header>
 
       <main className="mx-auto w-full max-w-2xl px-4 py-8 pb-16 sm:px-8">
-        <section className="overflow-hidden rounded-3xl bg-gradient-to-br from-sky-100 via-white to-violet-100 p-6 shadow-lg shadow-slate-950/5 dark:from-sky-950/60 dark:via-slate-800 dark:to-violet-950/50">
+        <section className="min-h-62 overflow-hidden rounded-3xl bg-gradient-to-br from-sky-100 via-white to-violet-100 p-6 shadow-lg shadow-slate-950/5 min-[375px]:min-h-50 sm:min-h-40 dark:from-sky-950/60 dark:via-slate-800 dark:to-violet-950/50">
           <div className="flex items-center gap-4">
             <AvatarPreview avatar={avatar} fallbackImageUrl={linePictureUrl} size="lg" />
             <div className="min-w-0">
@@ -179,67 +179,69 @@ export function ProfileSettingsScreen({
         <section aria-labelledby="avatar-setting-heading" className="mt-8">
           <h2
             id="avatar-setting-heading"
-            className="px-1 text-sm font-bold tracking-wider text-slate-500 dark:text-slate-400"
+            className="min-h-5 px-1 text-sm font-bold tracking-wider text-slate-500 dark:text-slate-400"
           >
             アバター
           </h2>
-          {isProfileLoading ? (
-            <output
-              aria-busy="true"
-              aria-label="アバターを読み込んでいます"
-              className="mt-3 flex w-full items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800"
-            >
-              <span
-                aria-hidden="true"
-                className="size-16 shrink-0 animate-pulse rounded-full bg-slate-200 motion-reduce:animate-none dark:bg-slate-700"
-              />
-              <span aria-hidden="true" className="flex-1 space-y-2">
-                <span className="block h-5 w-32 animate-pulse rounded bg-slate-200 motion-reduce:animate-none dark:bg-slate-700" />
-                <span className="block h-4 w-24 animate-pulse rounded bg-slate-100 motion-reduce:animate-none dark:bg-slate-700/70" />
-              </span>
-            </output>
-          ) : profileError ? (
-            <div
-              role="alert"
-              className="mt-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-rose-900 dark:border-rose-400/30 dark:bg-rose-400/10 dark:text-rose-100"
-            >
-              <p className="text-sm font-bold">{profileError}</p>
-              {onRetryProfile && (
-                <button
-                  type="button"
-                  onClick={onRetryProfile}
-                  className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-bold text-rose-900 shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-500 dark:bg-slate-800 dark:text-rose-100"
-                >
-                  <RefreshCw className="size-4" aria-hidden="true" />
-                  再試行
-                </button>
-              )}
-            </div>
-          ) : (
-            <button
-              ref={avatarButtonRef}
-              type="button"
-              onClick={onOpenAvatar}
-              className="mt-3 flex w-full items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-sky-300 hover:bg-sky-50/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:border-slate-700 dark:bg-slate-800 dark:hover:border-sky-700 dark:hover:bg-sky-950/20"
-            >
-              <AvatarPreview avatar={avatar} fallbackImageUrl={linePictureUrl} size="md" />
-              <span className="min-w-0 flex-1">
-                <span className="block font-bold text-slate-950 dark:text-white">
-                  {avatar || linePictureUrl ? "アバターを変更" : "アバターを設定"}
+          <div className="mt-3 min-h-32">
+            {isProfileLoading ? (
+              <output
+                aria-busy="true"
+                aria-label="アバターを読み込んでいます"
+                className="flex w-full items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800"
+              >
+                <span
+                  aria-hidden="true"
+                  className="size-16 shrink-0 animate-pulse rounded-full bg-slate-200 motion-reduce:animate-none dark:bg-slate-700"
+                />
+                <span aria-hidden="true" className="flex-1 space-y-2">
+                  <span className="block h-5 w-32 animate-pulse rounded bg-slate-200 motion-reduce:animate-none dark:bg-slate-700" />
+                  <span className="block h-4 w-24 animate-pulse rounded bg-slate-100 motion-reduce:animate-none dark:bg-slate-700/70" />
                 </span>
-                <span className="mt-1 block truncate text-sm text-slate-500 dark:text-slate-400">
-                  {getAvatarName(avatar, linePictureUrl)}
+              </output>
+            ) : profileError ? (
+              <div
+                role="alert"
+                className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-rose-900 dark:border-rose-400/30 dark:bg-rose-400/10 dark:text-rose-100"
+              >
+                <p className="text-sm font-bold">{profileError}</p>
+                {onRetryProfile && (
+                  <button
+                    type="button"
+                    onClick={onRetryProfile}
+                    className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-bold text-rose-900 shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-500 dark:bg-slate-800 dark:text-rose-100"
+                  >
+                    <RefreshCw className="size-4" aria-hidden="true" />
+                    再試行
+                  </button>
+                )}
+              </div>
+            ) : (
+              <button
+                ref={avatarButtonRef}
+                type="button"
+                onClick={onOpenAvatar}
+                className="flex w-full items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-sky-300 hover:bg-sky-50/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:border-slate-700 dark:bg-slate-800 dark:hover:border-sky-700 dark:hover:bg-sky-950/20"
+              >
+                <AvatarPreview avatar={avatar} fallbackImageUrl={linePictureUrl} size="md" />
+                <span className="min-w-0 flex-1">
+                  <span className="block font-bold text-slate-950 dark:text-white">
+                    {avatar || linePictureUrl ? "アバターを変更" : "アバターを設定"}
+                  </span>
+                  <span className="mt-1 block truncate text-sm text-slate-500 dark:text-slate-400">
+                    {getAvatarName(avatar, linePictureUrl)}
+                  </span>
                 </span>
-              </span>
-              <ChevronRight className="size-5 text-slate-400" aria-hidden="true" />
-            </button>
-          )}
+                <ChevronRight className="size-5 text-slate-400" aria-hidden="true" />
+              </button>
+            )}
+          </div>
         </section>
 
         <section aria-labelledby="theme-setting-heading" className="mt-8">
           <h2
             id="theme-setting-heading"
-            className="px-1 text-sm font-bold tracking-wider text-slate-500 dark:text-slate-400"
+            className="min-h-5 px-1 text-sm font-bold tracking-wider text-slate-500 dark:text-slate-400"
           >
             表示
           </h2>
@@ -250,7 +252,7 @@ export function ProfileSettingsScreen({
               return (
                 <label
                   key={item.id}
-                  className={`relative flex cursor-pointer items-center gap-3 rounded-2xl border p-4 text-left transition focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-sky-500 ${
+                  className={`relative flex min-h-19 cursor-pointer items-center gap-3 rounded-2xl border p-4 text-left transition focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-sky-500 ${
                     selected
                       ? "border-sky-500 bg-sky-50 ring-1 ring-sky-500 dark:border-sky-400 dark:bg-sky-400/10 dark:ring-sky-400"
                       : "border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:hover:border-slate-600"
@@ -289,14 +291,14 @@ export function ProfileSettingsScreen({
               );
             })}
           </div>
-          <p className="mt-3 px-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+          <p className="mt-3 min-h-10 px-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
             選んだテーマはこのブラウザに保存され、次に開いたときも使われます。
           </p>
 
           <div className="mt-6">
             <p
               id="font-size-setting-label"
-              className="px-1 text-sm font-bold text-slate-700 dark:text-slate-200"
+              className="min-h-5 px-1 text-sm font-bold text-slate-700 dark:text-slate-200"
             >
               文字サイズ
             </p>
