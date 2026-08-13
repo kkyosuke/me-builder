@@ -1,7 +1,18 @@
-import { ArrowLeft, ChevronRight, Moon, RefreshCw, Shield, Sparkles, Sun } from "lucide-react";
-import { useEffect, useRef } from "react";
+import {
+  ArrowLeft,
+  ChevronRight,
+  Moon,
+  RefreshCw,
+  Shield,
+  Sparkles,
+  Sun,
+  Trash2,
+} from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { type AsyncState, errorMessage } from "../../../model/async-state";
 import type { ColorTheme } from "../../theme/model/color-theme";
 import type { FontSize } from "../../theme/model/font-size";
+import type { ResetDevelopmentAccountDataResult } from "../infrastructure/development-account-data-api";
 import { type AvatarSelection, getAvatarName } from "../model/avatar";
 import { AvatarPreview } from "./components/avatar-preview";
 
@@ -40,6 +51,8 @@ export function ProfileSettingsScreen({
   onBack,
   onOpenAvatar,
   onRetryProfile,
+  canResetAccountData = false,
+  onResetAccountData,
   onThemeChange,
   onFontSizeChange,
 }: {
@@ -54,6 +67,8 @@ export function ProfileSettingsScreen({
   onBack: () => void;
   onOpenAvatar: () => void;
   onRetryProfile?: () => void;
+  canResetAccountData?: boolean;
+  onResetAccountData?: () => Promise<ResetDevelopmentAccountDataResult>;
   onThemeChange: (theme: ColorTheme) => void;
   onFontSizeChange: (fontSize: FontSize) => void;
 }) {
@@ -61,6 +76,40 @@ export function ProfileSettingsScreen({
   const backButtonRef = useRef<HTMLButtonElement>(null);
   const avatarButtonRef = useRef<HTMLButtonElement>(null);
   const wasInactiveRef = useRef(isInactive);
+  const [resetState, setResetState] = useState<AsyncState<string>>({ status: "idle" });
+
+  const resetAccountData = useCallback(async () => {
+    if (!onResetAccountData) return;
+    if (
+      !window.confirm(
+        "ログイン中ユーザーの診断、日記、Brain Item、わたしのまとめ、Vectorをすべて削除します。この操作は取り消せません。続けますか？",
+      )
+    ) {
+      return;
+    }
+    setResetState({ status: "loading" });
+    try {
+      const deleted = await onResetAccountData();
+      const contentCount =
+        deleted.deletedDiagnosisResponseCount +
+        deleted.deletedConversationSessionCount +
+        deleted.deletedSourceRecordCount +
+        deleted.deletedBrainItemCount +
+        deleted.deletedProfileSummaryVersionCount;
+      setResetState({
+        status: "success",
+        data:
+          contentCount === 0 && deleted.scheduledVectorDeletionCount === 0
+            ? "削除対象の本人データはありませんでした。"
+            : `本人データを削除しました（${contentCount}件）。Vector ${deleted.scheduledVectorDeletionCount}件の削除を受け付けました。`,
+      });
+    } catch (error) {
+      setResetState({
+        status: "error",
+        message: errorMessage(error, "本人データを削除できませんでした。"),
+      });
+    }
+  }, [onResetAccountData]);
 
   useEffect(() => {
     dialogRef.current?.toggleAttribute("inert", isInactive);
@@ -306,6 +355,54 @@ export function ProfileSettingsScreen({
               </span>
               <ChevronRight className="size-5 text-slate-400" aria-hidden="true" />
             </a>
+          </section>
+        )}
+
+        {canResetAccountData && onResetAccountData && (
+          <section
+            aria-labelledby="development-data-reset-heading"
+            className="mt-8 rounded-2xl border border-dashed border-rose-400/40 bg-rose-400/5 p-4"
+          >
+            <p className="text-xs font-semibold tracking-wider text-rose-700 dark:text-rose-300">
+              DEV ONLY
+            </p>
+            <h2
+              id="development-data-reset-heading"
+              className="mt-1 text-sm font-bold text-slate-950 dark:text-white"
+            >
+              開発用データ操作
+            </h2>
+            <p className="mt-2 text-xs leading-relaxed text-slate-600 dark:text-slate-400">
+              診断、日記、Brain
+              Item、わたしのまとめを物理削除し、すべてのVectorを非同期で削除します。Account、アバター、相性関係は残ります。
+            </p>
+            <button
+              type="button"
+              onClick={() => void resetAccountData()}
+              disabled={resetState.status === "loading"}
+              className="mt-3 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-rose-400/50 px-4 py-2 text-sm font-bold text-rose-700 transition hover:bg-rose-400/10 disabled:cursor-wait disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-500 dark:text-rose-200"
+            >
+              {resetState.status === "loading" ? (
+                <RefreshCw
+                  className="size-4 animate-spin motion-reduce:animate-none"
+                  aria-hidden="true"
+                />
+              ) : (
+                <Trash2 className="size-4" aria-hidden="true" />
+              )}
+              {resetState.status === "loading" ? "削除しています..." : "自分のデータを全削除"}
+            </button>
+            {(resetState.status === "success" || resetState.status === "error") && (
+              <output
+                className={`mt-3 block text-xs ${
+                  resetState.status === "success"
+                    ? "text-emerald-700 dark:text-emerald-300"
+                    : "text-rose-700 dark:text-rose-300"
+                }`}
+              >
+                {resetState.status === "success" ? resetState.data : resetState.message}
+              </output>
+            )}
           </section>
         )}
       </main>

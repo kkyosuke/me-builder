@@ -229,46 +229,9 @@ Diagnosisが`published`かつ削除されておらず、サーバー時刻が受
 
 回答途中でも保存済みの回答は返し、`responseStatus`と件数で未完了であることを表します。Web UIは回答済みから回答内容画面へ遷移しますが、再開機能でも同じ取得結果を利用できます。
 
-## 8. 開発環境の回答データリセット
+開発環境で本人の診断を含む個人コンテンツを初期化する操作は[開発用AccountデータリセットAPI契約](development-account-data-reset-api.md)を正とします。
 
-### `DELETE /api/dev/diagnosis-data`
-
-開発時に同じAccountで回答フローを繰り返し確認できるよう、本人の診断回答データを物理削除します。`ENVIRONMENT` bindingに`development`、`local`、`preview`、`test`のいずれかが明示されている環境だけで利用できます。bindingの未設定・空文字・未知値・`production`では`404`を返して削除処理を実行しません。
-
-削除対象は本人のDiagnosisResponse、Answer、「あとで回答」、Answerが作成したSource Recordとその改訂関係、および診断projection一式です。診断projection一式にはProjection Request、Projection Head、Headから改訂元へたどれる現在・過去のBrain Itemと、そのEvidence、Access Label、Topic Label、改訂関係を含みます。
-
-```mermaid
-flowchart LR
-    R[DiagnosisResponse] --> A[Answer / あとで回答]
-    A --> S[Answer由来Source Record]
-    R --> PR[Projection Request]
-    S --> E[Evidence]
-    E --> B[診断由来Brain Item]
-    B --> H[Projection Head]
-    B --> L[Label / 改訂関係]
-```
-
-Diagnosis、Question、Choiceなどの診断定義、Account、他のAccountのデータ、診断回答以外のSource Record、日記など診断以外の入力から作られたBrain Itemは削除しません。Brain Itemの`category`ではなくProjection Headと改訂鎖から対象を特定します。クライアントからAccount IDは受け取らず、他の診断APIと同じ認証境界で本人を解決します。
-
-この物理削除は開発用リセットだけの挙動です。本番のドメイン上の削除は[Source Recordのライフサイクル設計](../domain/source/source-record-lifecycle-design.md#4-削除とtombstone)に従い、Source Recordをtombstoneへ遷移させてBrain Itemへ波及させます。
-
-Projection Headと改訂鎖から削除対象のBrain Itemを解決した後、物理削除は1つのD1 atomic batchで実行します。D1のbound parameters上限を超えないよう、Brain Itemは49件ずつ同じbatch内で削除します。
-
-回答保存もatomic batchであり、外部キー制約も維持するため、同じAccountのバックグラウンドprojectionとリセットが競合しても途中状態は残りません。対象解決後に新しいEvidenceが作られて外部キー違反になった場合はbatch全体をロールバックし、最新のProjection Headから対象を解決し直して最大3回までリセットを再試行します。
-
-```json
-{
-  "deletedResponseCount": 2,
-  "deletedAnswerCount": 12,
-  "deletedDeferredQuestionCount": 1,
-  "deletedSourceRecordCount": 12,
-  "deletedBrainItemCount": 4
-}
-```
-
-削除対象がない場合も各件数を`0`として`200`を返します。Web UIは環境変数に同じ開発環境が明示されている場合だけ確認付きの操作を表示し、未設定時は表示しません。成功後は診断一覧を再取得します。API側の環境制限を認可境界とし、UIの非表示だけには依存しません。
-
-## 9. エラー
+## 8. エラー
 
 | HTTP | 条件 | レスポンス |
 | --- | --- | --- |
@@ -279,7 +242,7 @@ Projection Headと改訂鎖から削除対象のBrain Itemを解決した後、�
 
 認証失敗の詳細、トークン、`sub`、Account IDはレスポンスへ含めません。
 
-## 10. ローカルE2Eテスト
+## 9. ローカルE2Eテスト
 
 診断APIのE2Eテストは`apps/api/src/e2e/`に置きます。Miniflareが提供するローカルD1へ本番と同じmigrationと診断seedを適用し、Honoの`app.request`へD1 bindingとして渡します。
 

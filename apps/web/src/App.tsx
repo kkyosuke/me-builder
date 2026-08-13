@@ -5,6 +5,10 @@ import { config } from "./config";
 import { LiffSessionProvider, useLiffSession } from "./feature/liff";
 import { getLiffIdToken } from "./feature/liff/infrastructure/liff-client";
 import {
+  type ResetDevelopmentAccountDataResult,
+  resetDevelopmentAccountData,
+} from "./feature/profile-settings/infrastructure/development-account-data-api";
+import {
   type AccountProfile,
   deleteAccountAvatar,
   fetchAccountProfile,
@@ -36,6 +40,8 @@ const ProfileSettingsScreen = lazy(loadProfileSettingsScreen);
 const AvatarSettingsScreen = lazy(loadAvatarSettingsScreen);
 
 type ProfileView = "closed" | "profile" | "avatar";
+
+const DEVELOPMENT_ENVIRONMENTS = new Set(["development", "local", "preview", "test"]);
 
 const PROFILE_HISTORY_STATE_KEY = "me-builder-profile-view";
 
@@ -107,6 +113,7 @@ function AppContents() {
     { status: "loading" | "ready" } | { status: "error"; message: string }
   >({ status: "loading" });
   const [profileReloadKey, setProfileReloadKey] = useState(0);
+  const [accountDataResetKey, setAccountDataResetKey] = useState(0);
   const linePictureUrl =
     profileReadState.status === "ready"
       ? (profileLinePictureUrl ?? liffSession.profile?.pictureUrl)
@@ -235,6 +242,15 @@ function AppContents() {
     closeAvatar();
   };
 
+  const resetAccountData = async (): Promise<ResetDevelopmentAccountDataResult> => {
+    const controller = new AbortController();
+    const idToken = getLiffIdToken() ?? (await liffSession.acquireIdToken(controller.signal));
+    if (!idToken) throw new Error("LINEからプロフィールを開き直してください。");
+    const result = await resetDevelopmentAccountData(config.apiUrl, idToken, controller.signal);
+    setAccountDataResetKey((current) => current + 1);
+    return result;
+  };
+
   return (
     <>
       {!isAdminPath && profileView === "closed" && (
@@ -252,11 +268,11 @@ function AppContents() {
             {isAdminPath ? (
               <AdminApplication />
             ) : isCompatibilityPath ? (
-              <CompatibilityApplication />
+              <CompatibilityApplication key={accountDataResetKey} />
             ) : isMePath ? (
-              <ProfileApplication />
+              <ProfileApplication key={accountDataResetKey} />
             ) : (
-              <DiagnosisApplication />
+              <DiagnosisApplication key={accountDataResetKey} />
             )}
           </Suspense>
         </RouteErrorBoundary>
@@ -280,6 +296,8 @@ function AppContents() {
               onBack={closeProfile}
               onOpenAvatar={openAvatar}
               onRetryProfile={() => setProfileReloadKey((current) => current + 1)}
+              canResetAccountData={DEVELOPMENT_ENVIRONMENTS.has(config.environment ?? "")}
+              onResetAccountData={resetAccountData}
               onThemeChange={colorTheme.setTheme}
               onFontSizeChange={fontSize.setFontSize}
             />

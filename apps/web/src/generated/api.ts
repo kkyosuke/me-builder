@@ -382,7 +382,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/api/dev/diagnosis-data": {
+  "/api/dev/account-data": {
     parameters: {
       query?: never;
       header?: never;
@@ -392,8 +392,8 @@ export interface paths {
     get?: never;
     put?: never;
     post?: never;
-    /** 開発環境で本人の診断回答データを全削除する */
-    delete: operations["resetDevelopmentDiagnosisData"];
+    /** 開発環境で本人の個人コンテンツを全削除する */
+    delete: operations["resetDevelopmentAccountData"];
     options?: never;
     head?: never;
     patch?: never;
@@ -3032,7 +3032,7 @@ export interface operations {
       };
     };
   };
-  resetDevelopmentDiagnosisData: {
+  resetDevelopmentAccountData: {
     parameters: {
       query?: never;
       header?: never;
@@ -3041,18 +3041,19 @@ export interface operations {
     };
     requestBody?: never;
     responses: {
-      /** @description 削除した本人の回答関連データ件数 */
+      /** @description 削除した本人のAccountData件数とVector削除予定件数 */
       200: {
         headers: {
           [name: string]: unknown;
         };
         content: {
           "application/json": {
-            deletedResponseCount: number;
-            deletedAnswerCount: number;
-            deletedDeferredQuestionCount: number;
+            deletedDiagnosisResponseCount: number;
+            deletedConversationSessionCount: number;
             deletedSourceRecordCount: number;
             deletedBrainItemCount: number;
+            deletedProfileSummaryVersionCount: number;
+            scheduledVectorDeletionCount: number;
           };
         };
       };

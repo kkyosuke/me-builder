@@ -1,0 +1,1 @@
+ALTER TABLE `account_data_identity` ADD `reset_epoch` integer DEFAULT 0 NOT NULL;

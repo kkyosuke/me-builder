@@ -38,6 +38,7 @@ const REPLY_TOKEN_TTL_MS = 60_000;
 
 export type AcceptedDiaryMessage = {
   accountId: string;
+  resetEpoch: number;
   sourceRecordId: string;
   eventId: string;
   receivedAt: string;
@@ -50,6 +51,7 @@ export type AcceptedDiaryMessage = {
 /** Account単位で連投と生成leaseを調停するDurable Object。本文の正本はD1にだけ置く。 */
 export class ConversationCoordinator extends DurableObject<Env> {
   private readonly repository: ConversationCoordinatorRepository;
+  private readonly initialized: Promise<void>;
   private readonly cf: CloudflareBindings;
   /**
    * replyTokenはDO storageにもD1にも書かず、このinstanceのmemoryにだけ置く。
@@ -62,12 +64,17 @@ export class ConversationCoordinator extends DurableObject<Env> {
     super(ctx, env);
     this.repository = new ConversationCoordinatorRepository(ctx.storage);
     this.cf = getCloudflareBindings(env);
-    ctx.blockConcurrencyWhile(async () => this.repository.initialize());
+    this.initialized = this.repository.initialize();
+    ctx.blockConcurrencyWhile(() => this.initialized);
   }
 
   async acceptMessage(input: AcceptedDiaryMessage): Promise<{ accepted: boolean }> {
+    await this.initialized;
     if (!this.repository.bindAccount(input.accountId)) {
       throw new Error("Conversation coordinator cannot accept messages from another account");
+    }
+    if (input.resetEpoch !== this.repository.getResetEpoch()) {
+      throw new Error("Conversation coordinator reset epoch is stale");
     }
     const existing = this.repository.findAcceptedMessage(input.eventId);
     if (existing) {
@@ -94,6 +101,27 @@ export class ConversationCoordinator extends DurableObject<Env> {
       await this.ctx.storage.setAlarm(desiredAlarm);
     }
     return { accepted: true };
+  }
+
+  async getResetEpoch(accountId: string): Promise<number> {
+    await this.initialized;
+    if (!this.repository.bindAccount(accountId)) {
+      throw new Error("Conversation coordinator account does not match object name");
+    }
+    return this.repository.getResetEpoch();
+  }
+
+  /** 開発用リセットでepochを進め、本人の進行中Turnと配送状態を無効化する。 */
+  async resetAccountData(accountId: string): Promise<number> {
+    await this.initialized;
+    if (!this.repository.bindAccount(accountId)) {
+      throw new Error("Conversation coordinator reset account does not match object name");
+    }
+    await this.ctx.storage.deleteAlarm();
+    const resetEpoch = this.repository.resetAccountData();
+    this.replyTokensByEventId.clear();
+    this.replyTokensByTurnId.clear();
+    return resetEpoch;
   }
 
   async deliverTurn(input: TurnDeliveryRequest): Promise<TurnDeliveryResult> {

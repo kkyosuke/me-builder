@@ -91,6 +91,7 @@ describe("ConversationCoordinator recovery", () => {
     const receivedAt = new Date().toISOString();
     await coordinator.acceptMessage({
       accountId: "account-1",
+      resetEpoch: 0,
       sourceRecordId: "source-1",
       eventId: "event-1",
       receivedAt,
@@ -105,6 +106,7 @@ describe("ConversationCoordinator recovery", () => {
     );
     await coordinator.acceptMessage({
       accountId: "account-1",
+      resetEpoch: 0,
       sourceRecordId: "source-2",
       eventId: "event-2",
       receivedAt,
@@ -141,6 +143,7 @@ describe("ConversationCoordinator recovery", () => {
     });
     await coordinator.acceptMessage({
       accountId: "account-1",
+      resetEpoch: 0,
       sourceRecordId: "source-1",
       eventId: "event-1",
       receivedAt: new Date().toISOString(),
@@ -173,6 +176,7 @@ describe("ConversationCoordinator recovery", () => {
     );
     await coordinator.acceptMessage({
       accountId: "account-1",
+      resetEpoch: 0,
       sourceRecordId: "source-1",
       eventId: "event-1",
       receivedAt: new Date().toISOString(),
@@ -190,6 +194,7 @@ describe("ConversationCoordinator recovery", () => {
     const { coordinator } = createCoordinator();
     const input = {
       accountId: "account-1",
+      resetEpoch: 0,
       sourceRecordId: "source-1",
       eventId: "event-1",
       receivedAt: new Date().toISOString(),
@@ -236,6 +241,7 @@ describe("ConversationCoordinator recovery", () => {
     });
     await coordinator.acceptMessage({
       accountId: "account-1",
+      resetEpoch: 0,
       sourceRecordId: "source-1",
       eventId: "event-1",
       receivedAt: new Date().toISOString(),

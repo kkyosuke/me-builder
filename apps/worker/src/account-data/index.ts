@@ -14,6 +14,7 @@ import { eq } from "drizzle-orm";
 import type { Env } from "../types";
 import { brainActions } from "./brain";
 import { compatibilityActions } from "./compatibility";
+import { developmentActions } from "./development";
 import { diagnosisActions } from "./diagnosis";
 import { diaryActions } from "./diary";
 import { profileSummaryActions } from "./profile-summary";
@@ -22,6 +23,7 @@ import { AccountDataRepository, type DiagnosisCatalogSnapshot } from "./reposito
 const actions = {
   ...brainActions,
   ...diagnosisActions,
+  ...developmentActions,
   ...diaryActions,
   ...profileSummaryActions,
 } as const;

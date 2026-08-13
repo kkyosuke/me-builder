@@ -1,4 +1,4 @@
-import { and, asc, count, eq, inArray, lte, min, notInArray } from "drizzle-orm";
+import { and, asc, count, eq, inArray, lte, min, notInArray, sql } from "drizzle-orm";
 import { type DrizzleSqliteDODatabase, drizzle } from "drizzle-orm/durable-sqlite";
 import { migrate } from "drizzle-orm/durable-sqlite/migrator";
 import type { AcceptedDiaryMessage } from ".";
@@ -58,6 +58,44 @@ export class ConversationCoordinatorRepository {
       .from(coordinatorIdentity)
       .where(eq(coordinatorIdentity.singleton, 1))
       .get()?.accountId;
+  }
+
+  getResetEpoch(): number {
+    const resetEpoch = this.db
+      .select({ resetEpoch: coordinatorState.resetEpoch })
+      .from(coordinatorState)
+      .where(eq(coordinatorState.singleton, 1))
+      .get()?.resetEpoch;
+    if (resetEpoch === undefined) throw new Error("Coordinator state is not initialized");
+    return resetEpoch;
+  }
+
+  /** Account identityを維持し、reset epochを進めて進行中処理と配送状態を破棄する。 */
+  resetAccountData(): number {
+    let nextResetEpoch: number | undefined;
+    this.db.transaction((tx) => {
+      const current = tx
+        .select({ resetEpoch: coordinatorState.resetEpoch })
+        .from(coordinatorState)
+        .where(eq(coordinatorState.singleton, 1))
+        .get()?.resetEpoch;
+      if (current === undefined) throw new Error("Coordinator state is not initialized");
+      nextResetEpoch = current + 1;
+      tx.delete(attachBatchMessages).run();
+      tx.delete(attachBatches).run();
+      tx.delete(acceptedMessages).run();
+      tx.delete(deliveryOutbox).run();
+      tx.delete(localTurns).run();
+      tx.update(coordinatorState)
+        .set({
+          generationEpoch: sql`${coordinatorState.generationEpoch} + 1`,
+          resetEpoch: nextResetEpoch,
+        })
+        .where(eq(coordinatorState.singleton, 1))
+        .run();
+    });
+    if (nextResetEpoch === undefined) throw new Error("Coordinator reset epoch was not updated");
+    return nextResetEpoch;
   }
 
   findAcceptedMessage(eventId: string) {

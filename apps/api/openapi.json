@@ -4886,11 +4886,11 @@
         ]
       }
     },
-    "/api/dev/diagnosis-data": {
+    "/api/dev/account-data": {
       "delete": {
-        "operationId": "resetDevelopmentDiagnosisData",
+        "operationId": "resetDevelopmentAccountData",
         "tags": ["Development"],
-        "summary": "開発環境で本人の診断回答データを全削除する",
+        "summary": "開発環境で本人の個人コンテンツを全削除する",
         "security": [
           {
             "liffIdToken": []
@@ -4898,23 +4898,18 @@
         ],
         "responses": {
           "200": {
-            "description": "削除した本人の回答関連データ件数",
+            "description": "削除した本人のAccountData件数とVector削除予定件数",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "deletedResponseCount": {
+                    "deletedDiagnosisResponseCount": {
                       "type": "integer",
                       "minimum": 0,
                       "maximum": 9007199254740991
                     },
-                    "deletedAnswerCount": {
-                      "type": "integer",
-                      "minimum": 0,
-                      "maximum": 9007199254740991
-                    },
-                    "deletedDeferredQuestionCount": {
+                    "deletedConversationSessionCount": {
                       "type": "integer",
                       "minimum": 0,
                       "maximum": 9007199254740991
@@ -4928,14 +4923,25 @@
                       "type": "integer",
                       "minimum": 0,
                       "maximum": 9007199254740991
+                    },
+                    "deletedProfileSummaryVersionCount": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "scheduledVectorDeletionCount": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
                     }
                   },
                   "required": [
-                    "deletedResponseCount",
-                    "deletedAnswerCount",
-                    "deletedDeferredQuestionCount",
+                    "deletedDiagnosisResponseCount",
+                    "deletedConversationSessionCount",
                     "deletedSourceRecordCount",
-                    "deletedBrainItemCount"
+                    "deletedBrainItemCount",
+                    "deletedProfileSummaryVersionCount",
+                    "scheduledVectorDeletionCount"
                   ]
                 }
               }

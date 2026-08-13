@@ -14,6 +14,7 @@ import { handleQueueBatch } from "./logic/webhook";
 const mockPushMessage = vi.fn().mockResolvedValue({});
 const mockReplyMessage = vi.fn().mockResolvedValue({});
 const mockAcceptMessage = vi.fn().mockResolvedValue({ accepted: true });
+const mockGetResetEpoch = vi.fn().mockResolvedValue(0);
 const mockAccountDataExecute = vi.fn().mockResolvedValue({
   sourceRecordId: "source-1",
   accountId: "account-1",
@@ -101,7 +102,10 @@ function createBatch(
 }
 
 const coordinatorNamespace = {
-  getByName: vi.fn(() => ({ acceptMessage: mockAcceptMessage })),
+  getByName: vi.fn(() => ({
+    acceptMessage: mockAcceptMessage,
+    getResetEpoch: mockGetResetEpoch,
+  })),
 } as unknown as NonNullable<import("./types").Env["CONVERSATION_COORDINATOR"]>;
 const accountDataNamespace = {
   getByName: vi.fn(() => ({ execute: mockAccountDataExecute })),
@@ -112,6 +116,7 @@ describe("Worker", () => {
     mockPushMessage.mockClear();
     mockReplyMessage.mockReset().mockResolvedValue({});
     mockAcceptMessage.mockClear();
+    mockGetResetEpoch.mockClear();
     mockAccountDataExecute.mockClear();
     mockInfoLog.mockClear();
     mockWarnLog.mockClear();
@@ -142,11 +147,13 @@ describe("Worker", () => {
       expect.objectContaining({
         eventId: "webhook-event-1",
         body: "今日は散歩した",
+        resetEpoch: 0,
       }),
     );
     expect(mockAcceptMessage).toHaveBeenCalledWith(
       expect.objectContaining({
         accountId: "account-1",
+        resetEpoch: 0,
         sourceRecordId: "source-1",
         traceId: "trace-1",
       }),

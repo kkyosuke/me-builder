@@ -12,6 +12,8 @@ export const accountDataIdentity = sqliteTable(
   {
     singleton: integer("singleton").primaryKey(),
     accountId: text("account_id").notNull().unique(),
+    /** ConversationCoordinatorと共有し、開発リセットをまたぐ日記受付を拒否する。 */
+    resetEpoch: integer("reset_epoch").notNull().default(0),
   },
   (table) => [check("account_data_identity_singleton_check", sql`${table.singleton} = 1`)],
 );

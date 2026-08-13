@@ -152,6 +152,7 @@ describe("AccountData Workers runtime E2E", () => {
       state.storage.sql.exec(
         "CREATE UNIQUE INDEX diary_brain_checkpoint_item_brain_idx ON diary_brain_checkpoint_items (brain_item_id)",
       );
+      state.storage.sql.exec("ALTER TABLE account_data_identity DROP COLUMN reset_epoch");
       state.storage.sql.exec("DELETE FROM __drizzle_migrations WHERE created_at > 1786361220917");
 
       const repository = Reflect.get(instance, "repository") as {
@@ -246,6 +247,7 @@ describe("AccountData Workers runtime E2E", () => {
       state.storage.sql.exec(
         "CREATE UNIQUE INDEX diary_brain_checkpoint_item_brain_idx ON diary_brain_checkpoint_items (brain_item_id)",
       );
+      state.storage.sql.exec("ALTER TABLE account_data_identity DROP COLUMN reset_epoch");
       state.storage.sql.exec("DELETE FROM __drizzle_migrations WHERE created_at >= 1786415351981");
 
       const repository = Reflect.get(instance, "repository") as {

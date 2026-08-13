@@ -23,8 +23,6 @@ type ApiDeferDiagnosisQuestionResponse =
   operations["deferDiagnosisQuestion"]["responses"][200]["content"]["application/json"];
 type ApiDiagnosisAnswersResponse =
   operations["getDiagnosisAnswers"]["responses"][200]["content"]["application/json"];
-type ApiResetDevelopmentDiagnosisDataResponse =
-  operations["resetDevelopmentDiagnosisData"]["responses"][200]["content"]["application/json"];
 
 const DiagnosisListItemSchema = v.object({
   id: v.pipe(v.string(), v.nonEmpty()),
@@ -484,55 +482,4 @@ export async function fetchDiagnosisProgress(
   signal?: AbortSignal,
 ): Promise<DiagnosisResult | undefined> {
   return requestDiagnosisResult(apiUrl, idToken, diagnosisId, true, signal);
-}
-
-const ResetDevelopmentDiagnosisDataResponseSchema = v.object({
-  deletedResponseCount: v.pipe(v.number(), v.safeInteger(), v.minValue(0)),
-  deletedAnswerCount: v.pipe(v.number(), v.safeInteger(), v.minValue(0)),
-  deletedDeferredQuestionCount: v.pipe(v.number(), v.safeInteger(), v.minValue(0)),
-  deletedSourceRecordCount: v.pipe(v.number(), v.safeInteger(), v.minValue(0)),
-  deletedBrainItemCount: v.pipe(v.number(), v.safeInteger(), v.minValue(0)),
-}) satisfies v.GenericSchema<ApiResetDevelopmentDiagnosisDataResponse>;
-
-export type ResetDevelopmentDiagnosisDataResult = v.InferOutput<
-  typeof ResetDevelopmentDiagnosisDataResponseSchema
->;
-
-/** 開発環境で、本人の診断回答由来データを全削除する。 */
-export async function resetDevelopmentDiagnosisData(
-  apiUrl: string | undefined,
-  idToken: string,
-): Promise<ResetDevelopmentDiagnosisDataResult> {
-  const response = await createHttpClient(apiUrl).request("/api/dev/diagnosis-data", {
-    method: "DELETE",
-    headers: { Authorization: `Bearer ${idToken}` },
-  });
-
-  if (!response.ok) {
-    if (response.status === 401) {
-      throw new AuthenticationError("本人確認に失敗しました。LINEから開き直してください。", {
-        code: "AUTHENTICATION_REQUIRED",
-        status: response.status,
-      });
-    }
-    if (response.status === 404) {
-      throw new OperationError("この環境では回答データを削除できません。", {
-        code: "DEVELOPMENT_RESET_UNAVAILABLE",
-        status: response.status,
-      });
-    }
-    throw new UnknownError(`回答データの削除に失敗しました (HTTP ${response.status})`, {
-      code: "DEVELOPMENT_RESET_REQUEST_FAILED",
-      status: response.status,
-    });
-  }
-
-  try {
-    return v.parse(ResetDevelopmentDiagnosisDataResponseSchema, await response.json());
-  } catch (error) {
-    throw new ValidationError("回答データ削除のレスポンスが不正です。", {
-      code: "DEVELOPMENT_RESET_INVALID_RESPONSE",
-      cause: error,
-    });
-  }
 }

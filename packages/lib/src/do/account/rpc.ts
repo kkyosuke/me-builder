@@ -13,6 +13,7 @@ import type {
   RequestProfileSummaryGenerationResult,
 } from "../../profile-summary";
 import type * as brain from "./action/brain";
+import type * as development from "./action/development";
 import type * as diagnosis from "./action/diagnosis";
 import type * as diagnosisBrainProjection from "./action/diagnosis-brain-projection";
 import type * as diary from "./action/diary";
@@ -188,6 +189,10 @@ export type AccountDataActions = {
   "conversation.markTurnDelivered": DomainAction<typeof diary.markTurnDelivered>;
   "conversation.markTurnFailed": DomainAction<typeof diary.markTurnFailed>;
   "diagnosis.deleteAccountData": RpcAction<[], typeof diagnosis.deleteAccountDiagnosisData>;
+  "development.deleteAllAccountData": RpcAction<
+    [resetEpoch: number, at?: Date],
+    typeof development.deleteAllDevelopmentAccountData
+  >;
   "diagnosis.deferQuestion": RpcAction<
     [WithoutAccountId<Parameters<typeof diagnosis.deferDiagnosisQuestion>[1]>],
     typeof diagnosis.deferDiagnosisQuestion

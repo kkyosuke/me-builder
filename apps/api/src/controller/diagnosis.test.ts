@@ -2,7 +2,6 @@ import type { D1Database } from "@cloudflare/workers-types";
 import type { AccountDataNamespace } from "@me-builder/lib";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { app } from "../index";
-import type { ResetDevelopmentDiagnosisDataOutcome } from "../logic/dev-diagnosis-reset";
 import type { SaveDiagnosisAnswerOutcome } from "../logic/diagnosis-answer";
 import type { DiagnosisAnswersOutcome } from "../logic/diagnosis-answers";
 import type { DeferDiagnosisQuestionOutcome } from "../logic/diagnosis-deferred-question";
@@ -15,14 +14,12 @@ const {
   getDiagnosisAnswers,
   saveDiagnosisAnswer,
   deferDiagnosisQuestion,
-  resetDevelopmentDiagnosisData,
 } = vi.hoisted(() => ({
   getDiagnosisList: vi.fn(),
   getDiagnosisDetail: vi.fn(),
   getDiagnosisAnswers: vi.fn(),
   saveDiagnosisAnswer: vi.fn(),
   deferDiagnosisQuestion: vi.fn(),
-  resetDevelopmentDiagnosisData: vi.fn(),
 }));
 
 vi.mock("../logic/diagnosis-list", () => ({ getDiagnosisList }));
@@ -30,7 +27,6 @@ vi.mock("../logic/diagnosis-detail", () => ({ getDiagnosisDetail }));
 vi.mock("../logic/diagnosis-answers", () => ({ getDiagnosisAnswers }));
 vi.mock("../logic/diagnosis-answer", () => ({ saveDiagnosisAnswer }));
 vi.mock("../logic/diagnosis-deferred-question", () => ({ deferDiagnosisQuestion }));
-vi.mock("../logic/dev-diagnosis-reset", () => ({ resetDevelopmentDiagnosisData }));
 
 const dummyDb = {} as D1Database;
 const dummyAccountData = {} as AccountDataNamespace;
@@ -53,8 +49,6 @@ const deferOutcome = (value: DeferDiagnosisQuestionOutcome) =>
   deferDiagnosisQuestion.mockResolvedValue(value);
 const answersOutcome = (value: DiagnosisAnswersOutcome) =>
   getDiagnosisAnswers.mockResolvedValue(value);
-const resetOutcome = (value: ResetDevelopmentDiagnosisDataOutcome) =>
-  resetDevelopmentDiagnosisData.mockResolvedValue(value);
 
 describe("GET /api/diagnoses", () => {
   beforeEach(() => {
@@ -410,82 +404,5 @@ describe("GET /api/diagnoses/:diagnosisId/answers", () => {
     const response = await get(false);
     expect(response.status).toBe(503);
     expect(getDiagnosisAnswers).not.toHaveBeenCalled();
-  });
-});
-
-describe("DELETE /api/dev/diagnosis-data", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  const remove = (environment: string | undefined, withDb = true) =>
-    app.request(
-      "/api/dev/diagnosis-data",
-      { method: "DELETE", headers: { Authorization: "Bearer dummy.id.token" } },
-      {
-        LIFF_ID,
-        ...(environment === undefined ? {} : { ENVIRONMENT: environment }),
-        ...(withDb ? { DB: dummyDb, ACCOUNT_DATA: dummyAccountData } : {}),
-      },
-    );
-
-  it("previewではresolvedを200と削除件数へ変換する", async () => {
-    resetOutcome({
-      type: "resolved",
-      deletedResponseCount: 2,
-      deletedAnswerCount: 12,
-      deletedDeferredQuestionCount: 1,
-      deletedSourceRecordCount: 12,
-      deletedBrainItemCount: 4,
-    });
-
-    const response = await remove("preview");
-
-    expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({
-      deletedResponseCount: 2,
-      deletedAnswerCount: 12,
-      deletedDeferredQuestionCount: 1,
-      deletedSourceRecordCount: 12,
-      deletedBrainItemCount: 4,
-    });
-    expect(resetDevelopmentDiagnosisData).toHaveBeenCalledWith(
-      expect.objectContaining({ idToken: "dummy.id.token", lineLoginChannelId: "2010850319" }),
-    );
-  });
-
-  it.each(["production", "staging"])("%sでは404にして削除処理を呼ばない", async (environment) => {
-    const response = await remove(environment);
-
-    expect(response.status).toBe(404);
-    expect(await response.json()).toEqual({ error: "Not Found" });
-    expect(resetDevelopmentDiagnosisData).not.toHaveBeenCalled();
-  });
-
-  it.each([undefined, ""])(
-    "ENVIRONMENTが%sなら404にして削除処理を呼ばない",
-    async (environment) => {
-      const response = await remove(environment);
-
-      expect(response.status).toBe(404);
-      expect(await response.json()).toEqual({ error: "Not Found" });
-      expect(resetDevelopmentDiagnosisData).not.toHaveBeenCalled();
-    },
-  );
-
-  it.each([
-    ["account-not-found", 404, { error: "Account not found", reason: "friendship_required" }],
-    ["unauthenticated", 401, { error: "Unauthorized" }],
-  ] as const)("%sをHTTP %sへ変換する", async (type, status, body) => {
-    resetOutcome(type === "unauthenticated" ? { type, reason: "invalid" } : { type });
-    const response = await remove("preview");
-    expect(response.status).toBe(status);
-    expect(await response.json()).toEqual(body);
-  });
-
-  it("開発環境でもDB bindingが無ければ503を返す", async () => {
-    const response = await remove("preview", false);
-    expect(response.status).toBe(503);
-    expect(resetDevelopmentDiagnosisData).not.toHaveBeenCalled();
   });
 });

@@ -29,7 +29,7 @@ const mocks = vi.hoisted(() => ({
   fetchDiagnosisProgress: vi.fn(),
   fetchDiagnosisResult: vi.fn(),
   saveDiagnosisAnswer: vi.fn(),
-  resetDevelopmentDiagnosisData: vi.fn(),
+  resetDevelopmentAccountData: vi.fn(),
   restoreDiagnosisProgress: vi.fn(),
   fetchProfileSummary: vi.fn(),
   requestProfileSummaryGeneration: vi.fn(),
@@ -57,13 +57,15 @@ vi.mock("./feature/profile-settings/infrastructure/profile-api", () => ({
   saveAccountAvatar: mocks.saveAccountAvatar,
   deleteAccountAvatar: mocks.deleteAccountAvatar,
 }));
+vi.mock("./feature/profile-settings/infrastructure/development-account-data-api", () => ({
+  resetDevelopmentAccountData: mocks.resetDevelopmentAccountData,
+}));
 vi.mock("./feature/diagnosis/infrastructure/diagnosis-api", () => ({
   fetchDiagnosisList: mocks.fetchDiagnosisList,
   fetchDiagnosisDefinition: mocks.fetchDiagnosisDefinition,
   fetchDiagnosisProgress: mocks.fetchDiagnosisProgress,
   fetchDiagnosisResult: mocks.fetchDiagnosisResult,
   saveDiagnosisAnswer: mocks.saveDiagnosisAnswer,
-  resetDevelopmentDiagnosisData: mocks.resetDevelopmentDiagnosisData,
 }));
 vi.mock("./feature/diagnosis/model/answers", () => ({
   restoreDiagnosisProgress: mocks.restoreDiagnosisProgress,
@@ -225,12 +227,13 @@ describe("App", () => {
       answer: { acceptedAt: "2026-08-05T00:00:01.000Z" },
       progress: { responseStatus: "in-progress", answeredCount: 1, questionCount: 10 },
     });
-    mocks.resetDevelopmentDiagnosisData.mockResolvedValue({
-      deletedResponseCount: 1,
-      deletedAnswerCount: 10,
-      deletedDeferredQuestionCount: 0,
+    mocks.resetDevelopmentAccountData.mockResolvedValue({
+      deletedDiagnosisResponseCount: 1,
+      deletedConversationSessionCount: 2,
       deletedSourceRecordCount: 10,
       deletedBrainItemCount: 4,
+      deletedProfileSummaryVersionCount: 1,
+      scheduledVectorDeletionCount: 4,
     });
     const profileSummary = {
       generatedAt: "2026-08-08T12:00:00.000Z",
@@ -918,47 +921,52 @@ describe("App", () => {
     expect(screen.getByText("回答UI: テスト診断")).toBeTruthy();
   });
 
-  it("dev環境では確認後に本人の回答データを全削除し、一覧を再取得する", async () => {
+  it("dev環境ではプロフィール最下部から本人データを全削除する", async () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "回答データを全削除" }));
+    fireEvent.click(await screen.findByRole("button", { name: "プロフィールを開く" }));
+    fireEvent.click(await screen.findByRole("button", { name: "自分のデータを全削除" }));
 
     await waitFor(() =>
-      expect(mocks.resetDevelopmentDiagnosisData).toHaveBeenCalledWith(
+      expect(mocks.resetDevelopmentAccountData).toHaveBeenCalledWith(
         "https://api.example.com",
         "dummy.id.token",
+        expect.any(AbortSignal),
       ),
     );
     expect(
-      await screen.findByText("診断由来データを削除しました（回答・保留・Brain Item 14件）。"),
+      await screen.findByText(
+        "本人データを削除しました（18件）。Vector 4件の削除を受け付けました。",
+      ),
     ).toBeTruthy();
     expect(mocks.fetchDiagnosisList).toHaveBeenCalledTimes(2);
   });
 
-  it("dev環境の回答データ削除を確認でキャンセルできる", async () => {
+  it("dev環境の本人データ削除を確認でキャンセルできる", async () => {
     vi.spyOn(window, "confirm").mockReturnValue(false);
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "回答データを全削除" }));
+    fireEvent.click(await screen.findByRole("button", { name: "プロフィールを開く" }));
+    fireEvent.click(await screen.findByRole("button", { name: "自分のデータを全削除" }));
 
-    expect(mocks.resetDevelopmentDiagnosisData).not.toHaveBeenCalled();
+    expect(mocks.resetDevelopmentAccountData).not.toHaveBeenCalled();
   });
 
   it("production環境では開発用データ操作を表示しない", async () => {
     mocks.config.environment = "production";
     render(<App />);
 
-    await screen.findByRole("button", { name: /テスト診断/ });
-    expect(screen.queryByRole("button", { name: "回答データを全削除" })).toBeNull();
+    fireEvent.click(await screen.findByRole("button", { name: "プロフィールを開く" }));
+    expect(screen.queryByRole("button", { name: "自分のデータを全削除" })).toBeNull();
   });
 
   it("環境変数未設定では開発用データ操作を表示しない", async () => {
     mocks.config.environment = undefined;
     render(<App />);
 
-    await screen.findByRole("button", { name: /テスト診断/ });
-    expect(screen.queryByRole("button", { name: "回答データを全削除" })).toBeNull();
+    fireEvent.click(await screen.findByRole("button", { name: "プロフィールを開く" }));
+    expect(screen.queryByRole("button", { name: "自分のデータを全削除" })).toBeNull();
   });
 
   it("回答UIの選択を保存APIへ接続する", async () => {

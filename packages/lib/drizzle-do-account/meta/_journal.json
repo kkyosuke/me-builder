@@ -64,6 +64,13 @@
       "when": 1786508350508,
       "tag": "0008_soft_hulk",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1786578970278,
+      "tag": "0009_misty_zarda",
+      "breakpoints": true
     }
   ]
 }
