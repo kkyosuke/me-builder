@@ -33,18 +33,57 @@ body {
   @apply overflow-x-clip;
 }
 
-/* 「中」を従来より少しコンパクトにし、remベースのUI全体を同じ比率で調整します。 */
-html,
+/*
+ * 文字サイズの変更で rem ベースの余白や操作領域まで拡縮すると、プロフィールの
+ * 選択ボタン自身が移動します。ルートの基準寸法は固定し、Tailwind の文字トークンと
+ * 素の本文だけを切り替えて、操作領域の位置と大きさを維持します。
+ */
+html {
+  font-size: 16px;
+}
+
+:root,
 html.font-size-medium {
-  font-size: 15px;
+  --text-xs: 0.703125rem;
+  --text-sm: 0.8203125rem;
+  --text-base: 0.9375rem;
+  --text-lg: 1.0546875rem;
+  --text-xl: 1.171875rem;
+  --text-2xl: 1.40625rem;
+  --text-3xl: 1.7578125rem;
 }
 
 html.font-size-small {
-  font-size: 14px;
+  --text-xs: 0.65625rem;
+  --text-sm: 0.765625rem;
+  --text-base: 0.875rem;
+  --text-lg: 0.984375rem;
+  --text-xl: 1.09375rem;
+  --text-2xl: 1.3125rem;
+  --text-3xl: 1.640625rem;
 }
 
 html.font-size-large {
-  font-size: 16px;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+}
+
+body,
+html.font-size-medium body {
+  font-size: 0.9375rem;
+}
+
+html.font-size-small body {
+  font-size: 0.875rem;
+}
+
+html.font-size-large body {
+  font-size: 1rem;
 }
 
 body {
