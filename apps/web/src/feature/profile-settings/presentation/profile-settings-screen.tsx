@@ -8,7 +8,7 @@ import {
   Sun,
   Trash2,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { type MouseEvent, useCallback, useEffect, useRef, useState } from "react";
 import { type AsyncState, errorMessage } from "../../../model/async-state";
 import type { ColorTheme } from "../../theme/model/color-theme";
 import type { FontSize } from "../../theme/model/font-size";
@@ -49,6 +49,7 @@ export function ProfileSettingsScreen({
   theme,
   fontSize,
   onBack,
+  onOpenAdmin,
   onOpenAvatar,
   onRetryProfile,
   canResetAccountData = false,
@@ -65,6 +66,7 @@ export function ProfileSettingsScreen({
   theme: ColorTheme;
   fontSize: FontSize;
   onBack: () => void;
+  onOpenAdmin?: () => void;
   onOpenAvatar: () => void;
   onRetryProfile?: () => void;
   canResetAccountData?: boolean;
@@ -340,6 +342,21 @@ export function ProfileSettingsScreen({
             </h2>
             <a
               href="/admin"
+              onClick={(event: MouseEvent<HTMLAnchorElement>) => {
+                if (
+                  !onOpenAdmin ||
+                  event.defaultPrevented ||
+                  event.button !== 0 ||
+                  event.metaKey ||
+                  event.ctrlKey ||
+                  event.shiftKey ||
+                  event.altKey
+                ) {
+                  return;
+                }
+                event.preventDefault();
+                onOpenAdmin();
+              }}
               className="mt-3 flex w-full items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-violet-300 hover:bg-violet-50/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 dark:border-slate-700 dark:bg-slate-800 dark:hover:border-violet-700 dark:hover:bg-violet-950/20"
             >
               <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-700 dark:bg-violet-400/15 dark:text-violet-200">

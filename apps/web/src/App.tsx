@@ -44,6 +44,7 @@ type ProfileView = "closed" | "profile" | "avatar";
 const DEVELOPMENT_ENVIRONMENTS = new Set(["development", "local", "preview", "test"]);
 
 const PROFILE_HISTORY_STATE_KEY = "me-builder-profile-view";
+const PROFILE_RETURN_PATHNAME_STATE_KEY = "me-builder-profile-return-pathname";
 
 function resolveProfileView(pathname: string): ProfileView {
   if (pathname.startsWith("/profile/avatar")) return "avatar";
@@ -55,6 +56,12 @@ function historyProfileView(state: unknown): Exclude<ProfileView, "closed"> | nu
   if (!state || typeof state !== "object") return null;
   const value = (state as Record<string, unknown>)[PROFILE_HISTORY_STATE_KEY];
   return value === "profile" || value === "avatar" ? value : null;
+}
+
+function historyProfileReturnPathname(state: unknown): string | null {
+  if (!state || typeof state !== "object") return null;
+  const value = (state as Record<string, unknown>)[PROFILE_RETURN_PATHNAME_STATE_KEY];
+  return typeof value === "string" && value.startsWith("/") ? value : null;
 }
 
 function resolveRequestedPathname(): string {
@@ -91,19 +98,21 @@ function AppContents() {
   const [navigation, setNavigation] = useState(() => {
     const requestedPathname = resolveRequestedPathname();
     const profileView = resolveProfileView(requestedPathname);
+    const pathname = profileView === "closed" ? requestedPathname : "/me";
     return {
-      pathname: profileView === "closed" ? requestedPathname : "/me",
+      pathname,
+      mainPathname: pathname.startsWith("/admin") ? null : pathname,
       profileView,
     };
   });
   const profileButtonRef = useRef<HTMLButtonElement>(null);
   const applicationContentRef = useRef<HTMLDivElement>(null);
   const shouldRestoreProfileButtonFocus = useRef(false);
-  const { pathname, profileView } = navigation;
+  const { pathname, mainPathname, profileView } = navigation;
   const isAdminPath = pathname.startsWith("/admin");
   const isCompatibilityPath =
-    pathname === "/compatibility" || pathname.startsWith("/compatibility/");
-  const isMePath = pathname === "/me" || pathname.startsWith("/me/");
+    mainPathname === "/compatibility" || mainPathname?.startsWith("/compatibility/");
+  const isMePath = mainPathname === "/me" || mainPathname?.startsWith("/me/");
   const isProfileOpen = profileView !== "closed";
   const currentMainRoute = isCompatibilityPath ? "compatibility" : isMePath ? "me" : "diagnosis";
   const [avatar, setAvatar] = useState<AvatarSelection | null>(null);
@@ -131,9 +140,21 @@ function AppContents() {
       const nextView = resolveProfileView(window.location.pathname);
       setNavigation((current) => {
         if (nextView !== "closed") {
-          return { ...current, profileView: nextView };
+          const returnPathname = historyProfileReturnPathname(window.history.state) ?? "/me";
+          return {
+            pathname: returnPathname,
+            mainPathname: returnPathname,
+            profileView: nextView,
+          };
         }
-        return { pathname: resolveRequestedPathname(), profileView: "closed" };
+        const requestedPathname = resolveRequestedPathname();
+        return {
+          pathname: requestedPathname,
+          mainPathname: requestedPathname.startsWith("/admin")
+            ? current.mainPathname
+            : requestedPathname,
+          profileView: "closed",
+        };
       });
     };
 
@@ -150,12 +171,12 @@ function AppContents() {
   useEffect(() => {
     const applicationContent = applicationContentRef.current;
     if (!applicationContent) return;
-    if (profileView === "closed") {
+    if (profileView === "closed" && !isAdminPath) {
       applicationContent.removeAttribute("inert");
     } else {
       applicationContent.setAttribute("inert", "");
     }
-  }, [profileView]);
+  }, [isAdminPath, profileView]);
 
   useEffect(() => {
     if (isAdminPath) return;
@@ -200,8 +221,20 @@ function AppContents() {
 
   const openProfile = () => {
     shouldRestoreProfileButtonFocus.current = true;
-    window.history.pushState({ [PROFILE_HISTORY_STATE_KEY]: "profile" }, "", "/profile");
+    window.history.pushState(
+      {
+        [PROFILE_HISTORY_STATE_KEY]: "profile",
+        [PROFILE_RETURN_PATHNAME_STATE_KEY]: pathname,
+      },
+      "",
+      "/profile",
+    );
     setNavigation((current) => ({ ...current, profileView: "profile" }));
+  };
+
+  const openAdmin = () => {
+    window.history.pushState({}, "", "/admin");
+    setNavigation((current) => ({ ...current, pathname: "/admin", profileView: "closed" }));
   };
 
   const closeProfile = () => {
@@ -212,7 +245,7 @@ function AppContents() {
     }
 
     window.history.replaceState({}, "", "/me");
-    setNavigation({ pathname: "/me", profileView: "closed" });
+    setNavigation({ pathname: "/me", mainPathname: "/me", profileView: "closed" });
   };
 
   const openAvatar = () => {
@@ -262,21 +295,32 @@ function AppContents() {
           onPreload={preloadProfileSettingsScreen}
         />
       )}
-      <div ref={applicationContentRef} aria-hidden={profileView !== "closed" ? true : undefined}>
+      {mainPathname && (
+        <div
+          ref={applicationContentRef}
+          hidden={isAdminPath}
+          aria-hidden={profileView !== "closed" || isAdminPath ? true : undefined}
+        >
+          <RouteErrorBoundary>
+            <Suspense fallback={<LoadingState message="画面を読み込んでいます..." />}>
+              {isCompatibilityPath ? (
+                <CompatibilityApplication key={accountDataResetKey} />
+              ) : isMePath ? (
+                <ProfileApplication key={accountDataResetKey} />
+              ) : (
+                <DiagnosisApplication key={accountDataResetKey} />
+              )}
+            </Suspense>
+          </RouteErrorBoundary>
+        </div>
+      )}
+      {isAdminPath && (
         <RouteErrorBoundary>
           <Suspense fallback={<LoadingState message="画面を読み込んでいます..." />}>
-            {isAdminPath ? (
-              <AdminApplication />
-            ) : isCompatibilityPath ? (
-              <CompatibilityApplication key={accountDataResetKey} />
-            ) : isMePath ? (
-              <ProfileApplication key={accountDataResetKey} />
-            ) : (
-              <DiagnosisApplication key={accountDataResetKey} />
-            )}
+            <AdminApplication />
           </Suspense>
         </RouteErrorBoundary>
-      </div>
+      )}
       {isProfileOpen && (
         <RouteErrorBoundary>
           <Suspense
@@ -294,6 +338,7 @@ function AppContents() {
               theme={colorTheme.theme}
               fontSize={fontSize.fontSize}
               onBack={closeProfile}
+              onOpenAdmin={openAdmin}
               onOpenAvatar={openAvatar}
               onRetryProfile={() => setProfileReloadKey((current) => current + 1)}
               canResetAccountData={DEVELOPMENT_ENVIRONMENTS.has(config.environment ?? "")}
