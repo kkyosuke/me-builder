@@ -9,6 +9,7 @@
 - 日記チャットの実行時コンポーネントとデータフロー
 - Conversation Session、Chat Turn、Context Packageの物理モデル
 - Source Record、会話メッセージ、Brain Itemを保存するAccountDataテーブル
+- 声かけコンテキストのBrain Itemへの保存、構造化属性、観測時点の導出
 - AI入力、プロンプト、構造化出力
 - 入力前から送信時までのガードレール
 - 38秒以内の初回返信を実現する締切、再試行、冪等性、監視
@@ -317,6 +318,46 @@ Brain Itemを含むAccount所有データのquery境界は、[Accountデータ�
 
 検証を通過したBrain Itemは`active`として保存します。本人の同意を登録の条件にはしません。Brain Item作成とVectorize同期job追加は同じAccountData SQLite transactionで確定します。`derivation`は変換方法、`attributes.isInference`は本人が明言していない推定を含むかを表す別の軸として扱い、Confidenceの算出前を表す`uncomputed`を検索順位に使いません。
 
+声かけコンテキストは専用のプロフィールrecordへ複製せず、Brain Itemを正本として組み立てます。1つのItemへ複数属性を詰め込まず、本人が独立して訂正できる命題ごとに分けます。
+
+| 本人の発言 | Brain Item | category | `attributes_json`で機械判定する内容 |
+| --- | --- | --- | --- |
+| 「看護師なの」 | 看護師なの | `identity` | 声かけ用途が職業であることと、根拠が本人の明言であること |
+| 「休みはシフトで変わる」 | 休みはシフトで変わる | `behavior_pattern` | 週間リズムが変動シフトであること |
+| 「月曜はいつも塾」 | 月曜はいつも塾 | `behavior_pattern` | 繰り返し単位が週、対象曜日が月曜であること |
+| 「家に帰ってからなら落ち着く」 | 家に帰ってからなら落ち着く | `preference` | 返信しやすい時間が固定時刻ではなく帰宅後であること |
+
+`statement`は本人が確認・訂正できる命題、`attributes_json`はアプリケーションが声かけ候補を絞るための構造化表現です。構造化表現には用途種別、曜日や変動シフトなどの繰り返し条件、時間帯または「帰宅後」のような生活上の区切りを持たせます。`statement`に根拠がない職業、曜日、勤務形態を`attributes_json`だけへ追加してはいけません。
+
+```json
+{
+  "sourceKind": "diary",
+  "isInference": false,
+  "promptContext": {
+    "kind": "weekly_rhythm",
+    "scheduleMode": "variable_shift"
+  }
+}
+```
+
+`promptContext.kind`は、少なくとも`occupation`、`weekly_rhythm`、`recurring_schedule`、`rest_window`、`question_style`を区別します。具体的なJSON schemaはValibotをSSoTとし、自由なキーや未検証のモデル出力をそのまま保存しません。曜日は列挙値、時間は検証済みの時刻帯または生活上の区切りだけを許可します。
+
+取得時点を`attributes_json`へ重複保存しません。Brain Itemの`created_at`はItem作成時刻、`valid_from` / `valid_to`は命題の有効期間です。本人から最初と最後に得た時点は、activeな`supports` Evidenceが参照するSource Recordの記録時刻から`firstObservedAt` / `lastObservedAt`として導出します。この導出はAccountDataのBrain queryで実装済みです。同じ命題を再度得た場合はEvidenceを追加し、`created_at`を上書きせず`lastObservedAt`だけが新しくなります。
+
+職業や週間リズムが変わった場合は、古いItemの`attributes_json`を書き換えません。新しいSource Recordを根拠に新しいBrain Itemを作り、`brain_item_revisions`で旧Itemを`superseded`へ移します。これにより「いつ知ったか」と「いつ変わったか」を分けて追跡できます。
+
+現行実装との差分は次のとおりです。
+
+| 要素 | 現在 | 声かけ個別化で必要な対応 |
+| --- | --- | --- |
+| Brain Item、Evidence、Valid Time | 実装済み | 既存構造を利用する |
+| `firstObservedAt` / `lastObservedAt` | Evidenceからの導出を実装済み | 声かけ候補取得でも返す |
+| 日記からの`identity`生成 | 未対応 | 候補category、prompt、Valibot schema、stability規則へ追加する |
+| `attributes.promptContext` | 未対応 | 種別ごとのschemaとEvidence整合検証を追加する |
+| 曜日・本人情報からの声かけ候補取得 | 未対応 | active、Valid Time、Evidence、Access Policyを再検証して必要最小限を返す |
+| 時刻帯・声かけ方針の自動選択 | 未対応 | 本人の明言を優先し、本人自身の返信実績が不足する間は18時の標準候補へ戻す選択器を追加する。クライアントからAccount IDや選択結果を指定させない |
+| 18時の能動配信 | 未対応 | [日記チャット体験設計](../product/diary-chat-experience.md)の段階導入に従って後続実装する |
+
 開発用の確認機能は、本人確認済みAccountに対して、一覧取得用の`brain.listActive`とVector実体確認用の`brain.findActiveVectorEntry`をAccountData RPCへ公開します。`brain.listActive`はactiveかつ未削除のItem、未削除Evidence、最新のVector同期jobと対応表の有無を最大100件返します。Web UIは各Itemに同期状態、試行回数、失敗code、次回試行時刻を表示します。`applied`はVectorizeが更新を受け付けてAccountDataへ完了記録した状態であり、Vectorize上の実体確認とは区別します。
 
 実体確認は利用者の明示操作時だけ`GET /api/dev/brain-items/:brainItemId/vector`を呼びます。APIは本人確認済みAccountのactive Itemに紐づくvector IDをAccountDataから取得し、Vectorizeの`getByIds`で実体を照合します。応答には存在有無、次元数、許可済みmetadata、確認時刻だけを含め、Embedding値、vector ID、Account ID、`owner_scope`は返しません。一覧取得のたびにVectorizeを呼ばないため、通常表示はAccountDataだけで完結します。これらのAPIとWeb UIは`development` / `local` / `preview` / `test`だけで有効にし、Productionでは404かつUI非表示とします。クライアントからAccount IDを受け取りません。
@@ -593,6 +634,8 @@ flowchart TD
 日記候補の入力、起動条件、検証、Brain Item登録、否定・修正、重複・改訂は[Brain Item生成設計 §7](../domain/brain/brain-item-generation-design.md#7-日記チャットからの生成)を正とします。
 
 Brain Item抽出は会話返信とは別のsystem prompt、prompt version、Valibot schemaを使います。AccountData alarmがBrain Checkpoint QueueへIDだけを送り、consumerが削除・撤回されていないuser messageを最大10件、各5,000文字まで読み直してGeminiへ渡します。Chat Turn Queueと物理的に分離するため、Brain変換のAI待ちや再配送は通常返信を待たせません。上限超過本文はSource Recordとして保持したまま変換対象から外します。本人が明言した命題は`memory`、`behavior_pattern`、`value_motivation`、`decision_system`、`preference`、`goal`の6分類から最大3件を生成し、未明言の動機や傾向を推定しません。JSON・出力envelope不正またはproviderの一時失敗はQueueを失敗させて再試行し、個別候補のschema・Evidence・重複違反、空白statement、根拠user message本文にそのまま含まれないstatementは理由コードだけをlogへ残して候補単位で除外します。安全経路または正常な空配列は0件として適用します。相対日付を含むstatementの保存とVectorize検索時の扱いは[Brain Item生成設計](../domain/brain/brain-item-generation-design.md)を正とします。候補の保存はAccountData actionだけが行い、モデルへDBや外部I/Oのtoolを公開しません。
+
+声かけコンテキストを生成する段階では、既存6分類へ`identity`を追加し、候補schemaへ検証済みの`promptContext`を追加します。抽出モデルが「看護師」から変動シフトを補完することは禁止し、職業と週間リズムは別候補・別Evidenceとして扱います。構造化属性の値が根拠本文で検証できない候補はBrain Item全体を保存せず、自由記述の`attributes_json`へ縮退しません。
 
 ## 8. ガードレール
 
