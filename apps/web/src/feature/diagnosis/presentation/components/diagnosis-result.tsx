@@ -1,5 +1,9 @@
 import { ArrowLeft, CheckCircle2, ChevronDown, Clock3, Sparkles } from "lucide-react";
 import type { DiagnosisResult } from "../../model/diagnosis-result";
+import {
+  getRelationshipCategoryBadgeClassName,
+  getRelationshipCategoryLabel,
+} from "../../model/relationship-category";
 import { getParameterSummary } from "../parameter-summary";
 
 function formatAcceptedAt(value: string): string {
@@ -54,6 +58,11 @@ export function DiagnosisResultView({
           <div>
             <p className="text-xs font-semibold tracking-wider text-sky-700 dark:text-sky-300">
               回答結果
+            </p>
+            <p
+              className={`mt-1 w-fit rounded-full px-2 py-1 text-xs font-semibold ${getRelationshipCategoryBadgeClassName(result.relationshipCategory)}`}
+            >
+              {getRelationshipCategoryLabel(result.relationshipCategory)}
             </p>
             <h1 className="mt-1 text-xl font-bold text-slate-950 dark:text-slate-50">
               {result.title}

@@ -1,6 +1,7 @@
 import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
 import * as v from "valibot";
 import { authenticatedErrors, jsonResponse } from "../shared/errors";
+import { RelationshipCategorySchema } from "./shared";
 
 const NonEmptyStringSchema = v.pipe(v.string(), v.nonEmpty());
 const TimestampSchema = v.pipe(v.string(), v.isoTimestamp());
@@ -9,6 +10,7 @@ const DiagnosisListItemSchema = v.object({
   id: NonEmptyStringSchema,
   title: NonEmptyStringSchema,
   description: NonEmptyStringSchema,
+  relationshipCategory: RelationshipCategorySchema,
   opensAt: TimestampSchema,
   closesAt: v.nullable(TimestampSchema),
   displayOrder: v.pipe(v.number(), v.safeInteger(), v.minValue(0)),

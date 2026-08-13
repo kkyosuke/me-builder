@@ -1,6 +1,7 @@
 import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
 import * as v from "valibot";
 import { AccountNotFoundErrorSchema, authenticatedErrors, jsonResponse } from "../shared/errors";
+import { RelationshipCategorySchema } from "./shared";
 
 const NonEmptyStringSchema = v.pipe(v.string(), v.nonEmpty());
 const TimestampSchema = v.pipe(v.string(), v.isoTimestamp());
@@ -23,6 +24,7 @@ export const DiagnosisDetailResponseSchema = v.object({
   id: NonEmptyStringSchema,
   title: NonEmptyStringSchema,
   description: NonEmptyStringSchema,
+  relationshipCategory: RelationshipCategorySchema,
   opensAt: TimestampSchema,
   closesAt: v.nullable(TimestampSchema),
   questions: v.pipe(v.array(DiagnosisQuestionSchema), v.minLength(1)),

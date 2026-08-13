@@ -10,6 +10,7 @@ import { createHttpClient } from "../../../infrastructure/http-client";
 import type { DiagnosisDefinition } from "../model/diagnosis-definition";
 import type { DiagnosisListItem } from "../model/diagnosis-list-item";
 import type { DiagnosisResult } from "../model/diagnosis-result";
+import { relationshipCategoryValues } from "../model/relationship-category";
 import { DiagnosisQuestionsSchema } from "../model/types";
 
 type ApiDiagnosisListResponse =
@@ -28,6 +29,7 @@ const DiagnosisListItemSchema = v.object({
   id: v.pipe(v.string(), v.nonEmpty()),
   title: v.pipe(v.string(), v.nonEmpty()),
   description: v.pipe(v.string(), v.nonEmpty()),
+  relationshipCategory: v.picklist(relationshipCategoryValues),
   opensAt: v.pipe(v.string(), v.isoTimestamp()),
   closesAt: v.nullable(v.pipe(v.string(), v.isoTimestamp())),
   displayOrder: v.pipe(v.number(), v.safeInteger(), v.minValue(0)),
@@ -46,6 +48,7 @@ const toDiagnosisListItem = (item: ApiDiagnosisListItem): DiagnosisListItem => (
   id: item.id,
   title: item.title,
   description: item.description,
+  relationshipCategory: item.relationshipCategory,
   opensAt: item.opensAt,
   closesAt: item.closesAt,
   displayOrder: item.displayOrder,
@@ -88,6 +91,7 @@ const ApiDiagnosisDetailSchema = v.object({
   id: v.pipe(v.string(), v.nonEmpty()),
   title: v.pipe(v.string(), v.nonEmpty()),
   description: v.pipe(v.string(), v.nonEmpty()),
+  relationshipCategory: v.picklist(relationshipCategoryValues),
   opensAt: v.pipe(v.string(), v.isoTimestamp()),
   closesAt: v.nullable(v.pipe(v.string(), v.isoTimestamp())),
   questions: v.array(
@@ -197,6 +201,7 @@ export async function fetchDiagnosisDefinition(
     id: body.id,
     title: body.title,
     description: body.description,
+    relationshipCategory: body.relationshipCategory,
     questions,
   };
 }
@@ -375,6 +380,7 @@ const DiagnosisAnswersResponseSchema = v.object({
   id: v.pipe(v.string(), v.nonEmpty()),
   title: v.pipe(v.string(), v.nonEmpty()),
   description: v.pipe(v.string(), v.nonEmpty()),
+  relationshipCategory: v.picklist(relationshipCategoryValues),
   responseStatus: v.picklist(["in-progress", "answered"]),
   answeredCount: v.pipe(v.number(), v.safeInteger(), v.minValue(0)),
   questionCount: v.pipe(v.number(), v.safeInteger(), v.minValue(1)),

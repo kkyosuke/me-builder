@@ -29,6 +29,7 @@ describe("fetchDiagnosisList", () => {
             id: "relationship-priority",
             title: "自分と相手の優先・境界線",
             description: "説明",
+            relationshipCategory: "general",
             opensAt: "2026-08-04T00:00:00.000Z",
             closesAt: null,
             displayOrder: 10,
@@ -208,6 +209,7 @@ describe("fetchDiagnosisDefinition", () => {
         id: "relationship-priority",
         title: "API title",
         description: "API description",
+        relationshipCategory: "general",
         opensAt: "2026-08-04T00:00:00.000Z",
         closesAt: null,
         questions: [
@@ -310,6 +312,7 @@ describe("fetchDiagnosisResult", () => {
         id: "relationship-priority",
         title: "自分と相手の優先・境界線",
         description: "説明",
+        relationshipCategory: "general",
         responseStatus: "answered",
         answeredCount: 10,
         questionCount: 10,

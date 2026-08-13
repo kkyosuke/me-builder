@@ -7,6 +7,7 @@ import {
   text,
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
+import { relationshipCategoryValues } from "../../../diagnosis/relationship-category";
 import { baseSchema, lifecycleSchema } from "../../../table/base";
 
 /**
@@ -77,6 +78,11 @@ export const diagnoses = sqliteTable("diagnoses", {
   ...baseSchema,
   title: text("title").notNull(),
   description: text("description").notNull().default(""),
+  relationshipCategory: text("relationship_category", {
+    enum: relationshipCategoryValues,
+  })
+    .notNull()
+    .default("general"),
   scoringConfigId: text("scoring_config_id").references(() => diagnosisScoringConfigs.id),
   displayOrder: integer("display_order").notNull().default(0),
   opensAt: integer("opens_at", { mode: "timestamp" }).notNull(),

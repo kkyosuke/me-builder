@@ -10,6 +10,7 @@ function diagnosis(overrides: Partial<DiagnosisListItem>): DiagnosisListItem {
     id: "diagnosis",
     title: "診断",
     description: "説明",
+    relationshipCategory: "general",
     opensAt: "2026-08-01T00:00:00.000Z",
     closesAt: null,
     displayOrder: 1,
@@ -100,6 +101,79 @@ describe("DiagnosisHome", () => {
 
     expect(within(answeredCard).queryByText("回答済み")).toBeNull();
     expect(within(answeredCard).queryByText(/10\/10|10問/)).toBeNull();
+  });
+
+  it("カテゴリラベルを表示し、一覧をチップで絞り込む", () => {
+    render(
+      <DiagnosisHome
+        diagnoses={{
+          status: "success",
+          data: [
+            diagnosis({
+              id: "partner",
+              title: "パートナー向け診断",
+              relationshipCategory: "partner",
+            }),
+            diagnosis({
+              id: "work",
+              title: "仕事向け診断",
+              relationshipCategory: "work",
+              displayOrder: 2,
+            }),
+          ],
+        }}
+        onOpenDiagnosis={vi.fn()}
+        onRetry={vi.fn()}
+      />,
+    );
+
+    const filters = within(screen.getByRole("group", { name: "関係カテゴリで絞り込む" }));
+    expect(filters.getByRole("button", { name: "全部" }).getAttribute("aria-pressed")).toBe("true");
+    expect(filters.getAllByRole("button").map((button) => button.textContent)).toEqual([
+      "全部",
+      "パートナー",
+      "家族",
+      "友達",
+      "仕事",
+    ]);
+    expect(screen.getByRole("button", { name: /パートナー向け診断/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /仕事向け診断/ })).toBeTruthy();
+    expect(
+      within(screen.getByRole("button", { name: /パートナー向け診断/ })).getByText("パートナー")
+        .className,
+    ).toContain("bg-rose-100");
+
+    fireEvent.click(filters.getByRole("button", { name: "仕事" }));
+
+    expect(screen.queryByRole("button", { name: /パートナー向け診断/ })).toBeNull();
+    expect(screen.getByRole("button", { name: /仕事向け診断/ })).toBeTruthy();
+    expect(filters.getByRole("button", { name: "仕事" }).getAttribute("aria-pressed")).toBe("true");
+    expect(filters.getByRole("button", { name: "仕事" }).className).toContain(
+      "aria-pressed:bg-blue-100",
+    );
+  });
+
+  it("カテゴリが1種類だけでも全カテゴリの絞り込みを表示する", () => {
+    render(
+      <DiagnosisHome
+        diagnoses={{
+          status: "success",
+          data: [diagnosis({ id: "general", title: "人間関係全般の診断" })],
+        }}
+        onOpenDiagnosis={vi.fn()}
+        onRetry={vi.fn()}
+      />,
+    );
+
+    const filters = within(screen.getByRole("group", { name: "関係カテゴリで絞り込む" }));
+    expect(filters.getByRole("button", { name: "パートナー" })).toBeTruthy();
+    expect(filters.queryByRole("button", { name: "人間関係全般" })).toBeNull();
+    expect(
+      within(screen.getByRole("button", { name: /人間関係全般の診断/ })).getByText("人間関係全般"),
+    ).toBeTruthy();
+
+    fireEvent.click(filters.getByRole("button", { name: "パートナー" }));
+    expect(screen.getByText("このカテゴリの診断はありません。")).toBeTruthy();
   });
 
   it("診断ごとのサムネイルと未知の診断用フォールバックを表示する", () => {

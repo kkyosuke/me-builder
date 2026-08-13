@@ -4,6 +4,14 @@ import { MainNavigation } from "../../../../components/main-navigation";
 import type { AsyncState } from "../../../../model/async-state";
 import type { DiagnosisListItem } from "../../model/diagnosis-list-item";
 import { buildDiagnosisListSections } from "../../model/diagnosis-list-sections";
+import {
+  type RelationshipCategoryFilter,
+  filterDiagnosesByRelationshipCategory,
+  filterableRelationshipCategoryValues,
+  getRelationshipCategoryBadgeClassName,
+  getRelationshipCategoryFilterClassName,
+  getRelationshipCategoryLabel,
+} from "../../model/relationship-category";
 import { DiagnosisListSkeleton } from "./diagnosis-loading-skeleton";
 
 const diagnosisThumbnails: Record<string, string> = {
@@ -40,6 +48,11 @@ function DiagnosisCard({
         className="aspect-video w-full object-cover"
       />
       <span className="flex flex-1 flex-col p-3">
+        <span
+          className={`mb-2 w-fit rounded-full px-2 py-1 text-[0.6875rem] leading-none font-semibold ${getRelationshipCategoryBadgeClassName(diagnosis.relationshipCategory)}`}
+        >
+          {getRelationshipCategoryLabel(diagnosis.relationshipCategory)}
+        </span>
         <span className="line-clamp-2 text-sm leading-snug font-bold text-slate-950 sm:text-base dark:text-slate-50">
           {diagnosis.title}
         </span>
@@ -107,8 +120,13 @@ export function DiagnosisHome({
   onRetry: () => void;
 }) {
   const [isAnsweredOpen, setIsAnsweredOpen] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState<RelationshipCategoryFilter>("all");
+  const filteredDiagnoses =
+    diagnoses.status === "success"
+      ? filterDiagnosesByRelationshipCategory(diagnoses.data, categoryFilter)
+      : [];
   const sections =
-    diagnoses.status === "success" ? buildDiagnosisListSections(diagnoses.data) : null;
+    diagnoses.status === "success" ? buildDiagnosisListSections(filteredDiagnoses) : null;
 
   return (
     <main className="mx-auto min-h-dvh w-full max-w-2xl px-4 py-8 pb-28 sm:px-8">
@@ -121,6 +139,31 @@ export function DiagnosisHome({
           答えたいカードを選んでください。
         </p>
       </header>
+
+      {diagnoses.status === "success" && diagnoses.data.length > 0 && (
+        <fieldset className="-mx-4 mb-7 flex min-w-0 gap-2 overflow-x-auto border-0 px-4 pt-0 pb-1 sm:mx-0 sm:px-0">
+          <legend className="sr-only">関係カテゴリで絞り込む</legend>
+          <button
+            type="button"
+            aria-pressed={categoryFilter === "all"}
+            onClick={() => setCategoryFilter("all")}
+            className="shrink-0 rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-sky-400 aria-pressed:border-sky-500 aria-pressed:bg-sky-100 aria-pressed:text-sky-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:aria-pressed:border-sky-500 dark:aria-pressed:bg-sky-950 dark:aria-pressed:text-sky-100"
+          >
+            全部
+          </button>
+          {filterableRelationshipCategoryValues.map((category) => (
+            <button
+              type="button"
+              key={category}
+              aria-pressed={categoryFilter === category}
+              onClick={() => setCategoryFilter(category)}
+              className={`shrink-0 rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-sky-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 ${getRelationshipCategoryFilterClassName(category)}`}
+            >
+              {getRelationshipCategoryLabel(category)}
+            </button>
+          ))}
+        </fieldset>
+      )}
 
       <section aria-label="診断一覧" className="space-y-8">
         {diagnoses.status === "error" && (
@@ -142,6 +185,13 @@ export function DiagnosisHome({
             回答できる診断はありません。
           </p>
         )}
+        {diagnoses.status === "success" &&
+          diagnoses.data.length > 0 &&
+          filteredDiagnoses.length === 0 && (
+            <p className="rounded-3xl border border-slate-200 bg-white p-6 text-center text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">
+              このカテゴリの診断はありません。
+            </p>
+          )}
         {sections && (
           <>
             <DiagnosisSection

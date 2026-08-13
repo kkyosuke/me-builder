@@ -15,6 +15,13 @@
       "when": 1786415871012,
       "tag": "0001_cool_gorilla_man",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1786652960955,
+      "tag": "0002_purple_sabretooth",
+      "breakpoints": true
     }
   ]
 }

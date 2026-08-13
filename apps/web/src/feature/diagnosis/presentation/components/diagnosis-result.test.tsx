@@ -9,6 +9,7 @@ const result: DiagnosisResult = {
   id: "diagnosis-1",
   title: "価値観診断",
   description: "説明",
+  relationshipCategory: "general",
   responseStatus: "answered",
   answeredCount: 1,
   questionCount: 1,
@@ -47,6 +48,7 @@ describe("DiagnosisResultView", () => {
     render(<DiagnosisResultView result={result} onBack={vi.fn()} />);
 
     expect(screen.getByRole("heading", { name: "価値観診断" })).toBeTruthy();
+    expect(screen.getByText("人間関係全般")).toBeTruthy();
     expect(screen.getByText("優先傾向")).toBeTruthy();
     expect(screen.getByText("相手を優先")).toBeTruthy();
     expect(screen.getAllByText("自分を優先")).toHaveLength(2);

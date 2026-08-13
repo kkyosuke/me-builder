@@ -9,6 +9,7 @@ const diagnosis: DiagnosisDefinition = {
   id: "diagnosis-1",
   title: "保存テスト",
   description: "説明",
+  relationshipCategory: "general",
   questions: [
     {
       diagnosisQuestionId: "dq-1",

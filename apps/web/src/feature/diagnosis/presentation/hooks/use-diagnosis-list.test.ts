@@ -13,6 +13,7 @@ const answeredDiagnosis = {
   id: "diagnosis-1",
   title: "診断",
   description: "説明",
+  relationshipCategory: "general" as const,
   opensAt: "2026-08-01T00:00:00.000Z",
   closesAt: null,
   displayOrder: 1,

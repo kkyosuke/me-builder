@@ -142,6 +142,7 @@ const definition: DiagnosisDefinition = {
   id: "diagnosis-1",
   title: "テスト診断",
   description: "説明",
+  relationshipCategory: "general",
   questions: [],
 };
 
@@ -149,6 +150,7 @@ const result: DiagnosisResult = {
   id: "diagnosis-1",
   title: "テスト診断",
   description: "説明",
+  relationshipCategory: "general",
   responseStatus: "answered",
   answeredCount: 10,
   questionCount: 10,
@@ -171,6 +173,7 @@ function diagnosis(overrides: Partial<DiagnosisListItem> = {}): DiagnosisListIte
     id: "diagnosis-1",
     title: "テスト診断",
     description: "説明",
+    relationshipCategory: "general",
     opensAt: "2026-08-04T00:00:00.000Z",
     closesAt: null,
     displayOrder: 10,

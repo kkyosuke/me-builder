@@ -11,6 +11,7 @@ const diagnosis: DiagnosisListItem = {
   id: "diagnosis-1",
   title: "診断",
   description: "説明",
+  relationshipCategory: "general",
   opensAt: "2026-08-05T00:00:00.000Z",
   closesAt: null,
   displayOrder: 10,

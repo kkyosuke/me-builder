@@ -1,5 +1,9 @@
 import { ArrowLeft } from "lucide-react";
 import type { DiagnosisDefinition } from "../../model/diagnosis-definition";
+import {
+  getRelationshipCategoryBadgeClassName,
+  getRelationshipCategoryLabel,
+} from "../../model/relationship-category";
 import type { DiagnosisAnswer } from "../../model/types";
 import { SwipeDiagnosis } from "./swipe-diagnosis";
 
@@ -28,6 +32,12 @@ export function DiagnosisDetailScreen({
         <ArrowLeft className="size-4" aria-hidden="true" />
         診断一覧
       </button>
+
+      <p
+        className={`mb-3 w-fit rounded-full px-3 py-1.5 text-xs font-semibold ${getRelationshipCategoryBadgeClassName(diagnosis.relationshipCategory)}`}
+      >
+        {getRelationshipCategoryLabel(diagnosis.relationshipCategory)}
+      </p>
 
       <p className="mb-4 rounded-2xl border border-sky-300/30 bg-sky-300/10 px-4 py-3 text-sm leading-relaxed text-sky-800 dark:text-sky-100">
         回答は1問ずつ保存されます。保存に失敗した場合は、選択を保ったまま再試行できます。

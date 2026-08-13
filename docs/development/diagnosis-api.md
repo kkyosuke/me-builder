@@ -31,6 +31,7 @@ Authorization: Bearer <LIFF ID token>
       "id": "relationship-priority",
       "title": "自分と相手の優先・境界線",
       "description": "頼まれごとや意思決定で、自分と相手をどう尊重するかを見ます。",
+      "relationshipCategory": "general",
       "opensAt": "2026-08-04T00:00:00.000Z",
       "closesAt": null,
       "displayOrder": 10,
@@ -52,7 +53,7 @@ Authorization: Bearer <LIFF ID token>
 | `in-progress` | 1件以上かつ`questionCount`未満 |
 | `answered` | `answeredCount`と`questionCount`が一致 |
 
-`displayOrder`は運営が設定した一覧表示順で、小さい値を先に扱います。`lastAnsweredAt`は本人の現在有効なAnswerのうち最新の回答日時で、回答がなければ`null`です。一覧画面は[Phase 1 診断体験設計](../diagnosis/diagnosis-experience.md#3-画面と責務)に従って分類・並び替えるため、このAPIの配列順には依存しません。APIは表示順、Diagnosis IDの昇順で安定して返します。
+`relationshipCategory`は[診断ドメイン設計](../diagnosis/diagnosis-domain-design.md#構成)でDiagnosisへ固定した分類です。`displayOrder`は運営が設定した一覧表示順で、小さい値を先に扱います。`lastAnsweredAt`は本人の現在有効なAnswerのうち最新の回答日時で、回答がなければ`null`です。一覧画面は[Phase 1 診断体験設計](../diagnosis/diagnosis-experience.md#3-画面と責務)に従って分類・並び替えるため、このAPIの配列順には依存しません。APIは表示順、Diagnosis IDの昇順で安定して返します。
 
 ## 4. 診断詳細
 
@@ -71,6 +72,7 @@ Diagnosisが`published`かつ削除されておらず、サーバー時刻が受
   "id": "relationship-priority",
   "title": "自分と相手の優先・境界線",
   "description": "頼まれごとや意思決定で、自分と相手をどう尊重するかを見ます。",
+  "relationshipCategory": "general",
   "opensAt": "2026-08-04T00:00:00.000Z",
   "closesAt": null,
   "questions": [
@@ -187,6 +189,7 @@ Diagnosisが`published`かつ削除されておらず、サーバー時刻が受
   "id": "relationship-priority",
   "title": "自分と相手の優先・境界線",
   "description": "頼まれごとや意思決定で、自分と相手をどう尊重するかを見ます。",
+  "relationshipCategory": "general",
   "responseStatus": "answered",
   "answeredCount": 10,
   "questionCount": 10,

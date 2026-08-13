@@ -396,25 +396,38 @@ INSERT INTO diagnoses (
   is_deleted,
   title,
   description,
+  relationship_category,
   scoring_config_id,
   display_order,
   opens_at,
   state,
   published_at
 ) VALUES
-  ('relationship-priority', 1785801600, 1785801600, 0, '自分と相手の優先・境界線', '頼まれごとや意思決定で、自分と相手をどう尊重するかを見ます。', 'relationship-priority-v1', 10, 1785801600, 'published', 1785801600),
-  ('money-values', 1785801600, 1785801600, 0, 'お金と消費', '貯蓄、支出、共有、公平性、リスクに関する傾向を見ます。', 'money-values-v1', 20, 1785801600, 'published', 1785801600),
-  ('leisure-style', 1785974400, 1785974400, 0, 'インドア・アウトドアと余暇', '休日の過ごし方、体験、趣味の共有、活動量に関する傾向を見ます。', 'leisure-style-v1', 30, 1785801600, 'published', 1785974400),
-  ('time-planning', 1785974400, 1785974400, 0, '時間と予定', '予定の立て方、変更への柔軟性、時間の約束、一緒の時間に関する傾向を見ます。', 'time-planning-v1', 40, 1785801600, 'published', 1785974400),
-  ('conversation-emotion', 1786233600, 1786233600, 0, '会話と感情表現', '共感、愛情表現、希望の伝え方、支え方、感情の共有に関する傾向を見ます。', 'conversation-emotion-v1', 50, 1785801600, 'published', 1786233600)
+  ('relationship-priority', 1785801600, 1785801600, 0, '自分と相手の優先・境界線', '頼まれごとや意思決定で、自分と相手をどう尊重するかを見ます。', 'partner', 'relationship-priority-v1', 10, 1785801600, 'published', 1785801600),
+  ('money-values', 1785801600, 1785801600, 0, 'お金と消費', '貯蓄、支出、共有、公平性、リスクに関する傾向を見ます。', 'partner', 'money-values-v1', 20, 1785801600, 'published', 1785801600),
+  ('leisure-style', 1785974400, 1785974400, 0, 'インドア・アウトドアと余暇', '休日の過ごし方、体験、趣味の共有、活動量に関する傾向を見ます。', 'partner', 'leisure-style-v1', 30, 1785801600, 'published', 1785974400),
+  ('time-planning', 1785974400, 1785974400, 0, '時間と予定', '予定の立て方、変更への柔軟性、時間の約束、一緒の時間に関する傾向を見ます。', 'partner', 'time-planning-v1', 40, 1785801600, 'published', 1785974400),
+  ('conversation-emotion', 1786233600, 1786233600, 0, '会話と感情表現', '共感、愛情表現、希望の伝え方、支え方、感情の共有に関する傾向を見ます。', 'partner', 'conversation-emotion-v1', 50, 1785801600, 'published', 1786233600)
 ON CONFLICT(id) DO UPDATE SET
   description = CASE
     WHEN diagnoses.description = '' THEN excluded.description
     ELSE diagnoses.description
   END,
+  relationship_category = CASE
+    WHEN diagnoses.id IN ('relationship-priority', 'money-values', 'leisure-style', 'time-planning', 'conversation-emotion')
+      AND diagnoses.relationship_category = 'general'
+      AND excluded.relationship_category = 'partner'
+    THEN excluded.relationship_category
+    ELSE diagnoses.relationship_category
+  END,
   scoring_config_id = COALESCE(diagnoses.scoring_config_id, excluded.scoring_config_id),
   display_order = excluded.display_order
 WHERE diagnoses.description = ''
+  OR (
+    diagnoses.id IN ('relationship-priority', 'money-values', 'leisure-style', 'time-planning', 'conversation-emotion')
+    AND diagnoses.relationship_category = 'general'
+    AND excluded.relationship_category = 'partner'
+  )
   OR diagnoses.scoring_config_id IS NULL
   OR diagnoses.display_order <> excluded.display_order;
 --> statement-breakpoint
@@ -483,14 +496,14 @@ INSERT OR IGNORE INTO diagnosis_questions (
 
 -- AccountDataがsnapshotを再同期するか判断する版。
 -- このseedのcatalog内容を変更したら、必ずversionを1つ上げる。
-INSERT INTO catalog_versions (catalog_id, version, updated_at) VALUES ('diagnosis', 1, 1786233600)
+INSERT INTO catalog_versions (catalog_id, version, updated_at) VALUES ('diagnosis', 3, 1786665600)
   ON CONFLICT(catalog_id) DO UPDATE SET version = excluded.version, updated_at = excluded.updated_at;
 --> statement-breakpoint
 
 -- Expected result: diagnosis_count=5, question_version_count=50,
--- choice_count=100, diagnosis_question_count=50, scoring_config_count=5, catalog_version=1.
+-- choice_count=100, diagnosis_question_count=50, scoring_config_count=5, catalog_version=3.
 SELECT
-  (SELECT COUNT(*) FROM diagnoses WHERE id IN ('relationship-priority', 'money-values', 'leisure-style', 'time-planning', 'conversation-emotion') AND state = 'published' AND description <> '' AND is_deleted = 0) AS diagnosis_count,
+  (SELECT COUNT(*) FROM diagnoses WHERE id IN ('relationship-priority', 'money-values', 'leisure-style', 'time-planning', 'conversation-emotion') AND state = 'published' AND relationship_category = 'partner' AND description <> '' AND is_deleted = 0) AS diagnosis_count,
   (SELECT COUNT(*) FROM question_versions WHERE version = 1 AND state = 'approved' AND is_deleted = 0 AND (question_id LIKE 'q-relationship-priority-%' OR question_id LIKE 'q-money-%' OR question_id LIKE 'q-leisure-style-%' OR question_id LIKE 'q-time-planning-%' OR question_id LIKE 'q-conversation-emotion-%')) AS question_version_count,
   (SELECT COUNT(*) FROM question_choices WHERE question_version = 1 AND is_deleted = 0 AND (question_id LIKE 'q-relationship-priority-%' OR question_id LIKE 'q-money-%' OR question_id LIKE 'q-leisure-style-%' OR question_id LIKE 'q-time-planning-%' OR question_id LIKE 'q-conversation-emotion-%')) AS choice_count,
   (SELECT COUNT(*) FROM diagnosis_questions WHERE diagnosis_id IN ('relationship-priority', 'money-values', 'leisure-style', 'time-planning', 'conversation-emotion') AND is_deleted = 0) AS diagnosis_question_count,
