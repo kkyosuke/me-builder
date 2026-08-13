@@ -358,6 +358,23 @@ AI生成、JSON parse、出力envelope検証が失敗した場合はQueue messag
 
 複数のBrain Itemが対象になり得る場合、否定や修正がどのItemを指すか一意に解決できなければ一括変更しません。対象を1つだけ聞き返すか、Itemごとに本人が選べるUIを使います。
 
+### 7.5 声かけコンテキストへの拡張
+
+曜日と本人の情報から日々の声かけを個別化する体験は、[日記チャット体験設計 §3](../../product/diary-chat-experience.md#3-日々の入口)を正とします。この用途でも、声かけ専用の原本や巨大なプロフィールItemを作らず、本人が独立して訂正できる命題ごとにBrain Itemを生成します。
+
+現在の日記候補6分類に`identity`を追加し、本人が明言した職業、所属上の役割、生活上の立場を扱えるようにします。「看護師なの」は`identity`ですが、そこから雇用形態、勤務先、勤務時間、休日を推定しません。週間リズムや曜日別予定は、本人が別に明言した発言から`behavior_pattern`または内容に合う既存分類として生成します。
+
+候補には、`statement`とは別に声かけ用途の構造化属性を付けられるようにします。`statement`は従来どおり根拠user message本文に含まれる連続した原文だけを許可し、構造化属性は職業、週間リズム、定期予定、一息つく区切り、聞かれ方のどれに使えるかを表します。曜日、変動シフト、時間帯などの値もEvidence本文で裏づけられる場合だけ受け付けます。
+
+たとえば「看護師なの」と「休みはシフトで変わる」は、同じSessionで続けて得られても、次の2件として分けます。
+
+| statement | category | 声かけ用途 | Evidence |
+| --- | --- | --- | --- |
+| 看護師なの | `identity` | occupation | 「看護師なの」を含むSource Record |
+| 休みはシフトで変わる | `behavior_pattern` | weekly_rhythm / variable_shift | 「休みはシフトで変わる」を含むSource Record |
+
+職業だけから2件目を作ることは禁止します。構造化属性のschema、保存先、現行実装との差分は[日記チャット実装設計 §4.7](../../architecture/diary-chat-implementation-design.md#47-brain-item関連)を正とします。
+
 ## 8. 重複、Evidence追加、改訂
 
 生成前に、同じAccountのactiveなBrain Itemから同義候補を探します。
@@ -403,13 +420,14 @@ AIの意味的重複判定だけで既存Itemを上書きしません。同義�
 - Itemと否定・修正操作の対応づけ
 - 否定による無効化、修正、改訂
 - 本人が明言していない内容をAIが推定する分類
+- 日記候補の`identity`分類と、声かけ用途の構造化属性
 
 会話チェックポイントから本人が明言した6分類のBrain Itemを最大3件生成し、Evidence付きで保存し、意味的に同じ既存ItemにはEvidenceだけを追加し、active ItemをVectorizeへ同期して通常チャットで利用するところまでを実装しています。相対日付は原文と時点情報を分離して保存し、Vectorize登録と検索queryで併記します。否定・修正・改訂、本人が明言していない内容のAI推定は後続です。
 
 ## 10. 後続で決めること
 
 - Confidenceの具体的な算出方法
-- 分類固有の`attributes` schema
+- 声かけ用途以外の分類固有`attributes` schema
 - 意味的重複判定の評価dataset、誤統合率の監視、prompt version更新基準
 - 複数Itemを訂正・否定するLINE / Web UI
 - 反証候補を自動的にedgeへする条件
