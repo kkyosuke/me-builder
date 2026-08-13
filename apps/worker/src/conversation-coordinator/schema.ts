@@ -21,6 +21,7 @@ export const coordinatorState = sqliteTable(
   {
     singleton: integer("singleton").primaryKey(),
     generationEpoch: integer("generation_epoch").notNull().default(0),
+    resetEpoch: integer("reset_epoch").notNull().default(0),
   },
   (table) => [check("coordinator_state_singleton_check", sql`${table.singleton} = 1`)],
 );

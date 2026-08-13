@@ -2,6 +2,7 @@ import { and, asc, desc, eq, gte, inArray, isNull, lte, or, sql } from "drizzle-
 import type { BatchItem } from "drizzle-orm/batch";
 import type { AccountDataDatabase } from "../database";
 import {
+  accountDataIdentity,
   brainItemAccessLabels,
   brainItemEvidenceEdges,
   brainItemTopicLabels,
@@ -150,8 +151,24 @@ async function sha256(value: string): Promise<string> {
 /** LINE eventを不変なSource Recordとして冪等に保存する。 */
 export async function storeLineTextSource(
   db: AccountDataDatabase,
-  input: { accountId: string; eventId: string; body: string; receivedAt: Date },
+  input: {
+    accountId: string;
+    eventId: string;
+    body: string;
+    receivedAt: Date;
+    resetEpoch?: number;
+  },
 ): Promise<StoredLineSource> {
+  if (input.resetEpoch !== undefined) {
+    const currentResetEpoch = await db
+      .select({ resetEpoch: accountDataIdentity.resetEpoch })
+      .from(accountDataIdentity)
+      .where(eq(accountDataIdentity.accountId, input.accountId))
+      .get();
+    if (currentResetEpoch?.resetEpoch !== input.resetEpoch) {
+      throw new Error("AccountData reset epoch is stale");
+    }
+  }
   const originalRef = `line:${input.eventId}`;
   const existing = await db
     .select({ id: sourceRecords.id })

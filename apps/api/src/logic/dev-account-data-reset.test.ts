@@ -20,6 +20,7 @@ describe("resetDevelopmentAccountData", () => {
     };
     const resetCoordinator = vi.fn(async () => {
       order.push("coordinator");
+      return 7;
     });
     const deleteAccountData = vi.fn(async () => {
       order.push("account-data");
@@ -44,7 +45,7 @@ describe("resetDevelopmentAccountData", () => {
     ).resolves.toEqual({ type: "resolved", ...deleted });
     expect(order).toEqual(["coordinator", "account-data"]);
     expect(resetCoordinator).toHaveBeenCalledWith(conversationCoordinator, "account-1");
-    expect(deleteAccountData).toHaveBeenCalledWith(accountData, "account-1");
+    expect(deleteAccountData).toHaveBeenCalledWith(accountData, "account-1", 7);
   });
 
   it("本人を解決できなければ保存先を操作しない", async () => {

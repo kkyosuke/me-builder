@@ -1,6 +1,7 @@
-import { count } from "drizzle-orm";
+import { count, eq } from "drizzle-orm";
 import type { AccountDataDatabase } from "../database";
 import {
+  accountDataIdentity,
   brainItemAccessLabels,
   brainItemEvidenceEdges,
   brainItemRevisions,
@@ -44,9 +45,30 @@ type D1BatchStatement = Parameters<AccountDataDatabase["batch"]>[0][number];
  */
 export async function deleteAllDevelopmentAccountData(
   db: AccountDataDatabase,
-  _accountId: string,
+  accountId: string,
+  resetEpoch: number,
   at = new Date(),
 ): Promise<DeletedDevelopmentAccountData> {
+  if (!Number.isSafeInteger(resetEpoch) || resetEpoch < 0) {
+    throw new Error("AccountData reset epoch must be a non-negative safe integer");
+  }
+  const identity = await db
+    .select({ resetEpoch: accountDataIdentity.resetEpoch })
+    .from(accountDataIdentity)
+    .where(eq(accountDataIdentity.accountId, accountId))
+    .get();
+  if (!identity) throw new Error("AccountData identity is missing");
+  if (resetEpoch <= identity.resetEpoch) {
+    return {
+      deletedDiagnosisResponseCount: 0,
+      deletedConversationSessionCount: 0,
+      deletedSourceRecordCount: 0,
+      deletedBrainItemCount: 0,
+      deletedProfileSummaryVersionCount: 0,
+      scheduledVectorDeletionCount: 0,
+    };
+  }
+
   const [
     deletedDiagnosisResponseCount,
     deletedConversationSessionCount,
@@ -64,14 +86,29 @@ export async function deleteAllDevelopmentAccountData(
     db.select({ value: count() }).from(profileSummaryVersions).get(),
     db.select({ brainItemId: brainItems.id }).from(brainItems),
     db.select({ brainItemId: brainVectorEntries.brainItemId }).from(brainVectorEntries),
-    db.select({ brainItemId: brainVectorSyncJobs.brainItemId }).from(brainVectorSyncJobs),
+    db
+      .select({
+        brainItemId: brainVectorSyncJobs.brainItemId,
+        itemRevision: brainVectorSyncJobs.itemRevision,
+      })
+      .from(brainVectorSyncJobs),
   ]);
   const vectorBrainItemIds = [
     ...new Set([...itemRows, ...entryRows, ...jobRows].map(({ brainItemId }) => brainItemId)),
   ];
-  const revision = at.getTime();
+  const latestRevisionByBrainItemId = new Map<string, number>();
+  for (const job of jobRows) {
+    latestRevisionByBrainItemId.set(
+      job.brainItemId,
+      Math.max(latestRevisionByBrainItemId.get(job.brainItemId) ?? 0, job.itemRevision),
+    );
+  }
 
   const statements: D1BatchStatement[] = [
+    db
+      .update(accountDataIdentity)
+      .set({ resetEpoch })
+      .where(eq(accountDataIdentity.accountId, accountId)),
     db.delete(profileSummaryShareProjections),
     db.delete(profileSummaryVersions),
     db.delete(profileSummaryGenerations),
@@ -94,10 +131,15 @@ export async function deleteAllDevelopmentAccountData(
     db.delete(sourceRecordTextPayloads),
     db.delete(sourceRecords),
     db.delete(brainItems),
-    db.delete(brainVectorSyncJobs),
   ];
 
   for (const brainItemId of vectorBrainItemIds) {
+    // 処理中upsertの完了が必ずこのdeleteを補正対象として再起動できるよう、
+    // 既存outboxを残し、そのItemの全revisionより新しいrevisionを採番する。
+    const revision = Math.max(
+      at.getTime(),
+      (latestRevisionByBrainItemId.get(brainItemId) ?? 0) + 1,
+    );
     statements.push(
       db.insert(brainVectorSyncJobs).values({
         id: `${brainItemId}:${revision}:development-reset-delete`,

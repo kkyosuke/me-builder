@@ -11,12 +11,13 @@ describe("ConversationCoordinator Workers runtime E2E", () => {
     const traceId = crypto.randomUUID();
     const receivedAt = new Date().toISOString();
     const stub = env.CONVERSATION_COORDINATOR.getByName(accountId);
+    const resetEpoch = await stub.getResetEpoch(accountId);
 
     await expect(
-      stub.acceptMessage({ accountId, eventId, sourceRecordId, receivedAt, traceId }),
+      stub.acceptMessage({ accountId, resetEpoch, eventId, sourceRecordId, receivedAt, traceId }),
     ).resolves.toEqual({ accepted: true });
     await expect(
-      stub.acceptMessage({ accountId, eventId, sourceRecordId, receivedAt, traceId }),
+      stub.acceptMessage({ accountId, resetEpoch, eventId, sourceRecordId, receivedAt, traceId }),
     ).resolves.toEqual({ accepted: false });
 
     await runInDurableObject(stub, async (_instance: ConversationCoordinator, state) => {
@@ -35,15 +36,26 @@ describe("ConversationCoordinator Workers runtime E2E", () => {
   it("開発リセットで受付messageとalarmを削除し、別Accountからの操作を拒否する", async () => {
     const accountId = crypto.randomUUID();
     const stub = env.CONVERSATION_COORDINATOR.getByName(accountId);
+    const resetEpoch = await stub.getResetEpoch(accountId);
     await stub.acceptMessage({
       accountId,
+      resetEpoch,
       eventId: crypto.randomUUID(),
       sourceRecordId: crypto.randomUUID(),
       receivedAt: new Date().toISOString(),
     });
 
-    await expect(stub.resetAccountData(accountId)).resolves.toBeUndefined();
+    await expect(stub.resetAccountData(accountId)).resolves.toBe(resetEpoch + 1);
     await runInDurableObject(stub, async (instance: ConversationCoordinator, state) => {
+      await expect(
+        instance.acceptMessage({
+          accountId,
+          resetEpoch,
+          eventId: crypto.randomUUID(),
+          sourceRecordId: crypto.randomUUID(),
+          receivedAt: new Date().toISOString(),
+        }),
+      ).rejects.toThrow("reset epoch is stale");
       await expect(instance.resetAccountData(crypto.randomUUID())).rejects.toThrow(
         "does not match object name",
       );

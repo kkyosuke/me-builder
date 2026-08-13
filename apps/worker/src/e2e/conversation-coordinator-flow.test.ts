@@ -112,7 +112,7 @@ async function storeSource(
 }
 
 function acceptedInput(source: StoredAccountLineSource) {
-  return { ...source, receivedAt: source.receivedAt.toISOString() };
+  return { ...source, resetEpoch: 0, receivedAt: source.receivedAt.toISOString() };
 }
 
 describe("ConversationCoordinator D1 E2E", () => {

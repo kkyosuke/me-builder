@@ -1,0 +1,1 @@
+ALTER TABLE `coordinator_state` ADD `reset_epoch` integer DEFAULT 0 NOT NULL;

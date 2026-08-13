@@ -1,6 +1,7 @@
 /** API Serverが開発用リセットで利用するConversation Coordinator RPC境界。 */
 export interface ConversationCoordinatorRpc {
-  resetAccountData(accountId: string): Promise<void>;
+  getResetEpoch(accountId: string): Promise<number>;
+  resetAccountData(accountId: string): Promise<number>;
 }
 
 export interface ConversationCoordinatorNamespace {

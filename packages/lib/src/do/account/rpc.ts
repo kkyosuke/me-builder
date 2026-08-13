@@ -190,7 +190,7 @@ export type AccountDataActions = {
   "conversation.markTurnFailed": DomainAction<typeof diary.markTurnFailed>;
   "diagnosis.deleteAccountData": RpcAction<[], typeof diagnosis.deleteAccountDiagnosisData>;
   "development.deleteAllAccountData": RpcAction<
-    [at?: Date],
+    [resetEpoch: number, at?: Date],
     typeof development.deleteAllDevelopmentAccountData
   >;
   "diagnosis.deferQuestion": RpcAction<

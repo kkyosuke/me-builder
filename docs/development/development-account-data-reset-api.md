@@ -25,7 +25,9 @@ AccountDataと共有D1の保存境界は[Accountデータ分離設計](../archit
 - 生成中と生成済みの「わたしのまとめ」および相性共有用projection
 - Conversation Coordinatorの受付済みmessage、Turn、配送outbox、alarm、memory上の一時token
 
-削除開始時点でAccountDataが把握しているBrain Item、Vector対応表、Vector同期jobのBrain Item IDを和集合にし、各IDへVectorize削除jobを登録します。AccountDataの個人コンテンツを先に利用不能にし、Vectorizeの削除はQueueで非同期に完了させます。APIの`200`はAccountDataの削除とVector削除jobの永続化までを表し、Vectorizeからの物理削除完了は表しません。
+削除開始時点でAccountDataが把握しているBrain Item、Vector対応表、Vector同期jobのBrain Item IDを和集合にし、各IDへ既存jobより新しいrevisionのVectorize削除jobを登録します。既存のVector同期jobは削除せず、処理中だったupsertがリセット後に完了した場合も、新しい削除jobを補正対象として再実行します。AccountDataの個人コンテンツを先に利用不能にし、Vectorizeの削除はQueueで非同期に完了させます。APIの`200`はAccountDataの削除とVector削除jobの永続化までを表し、Vectorizeからの物理削除完了は表しません。
+
+Conversation CoordinatorとAccountDataはリセット世代を共有します。日記受付は保存前に現在の世代を取得し、Source Record保存とCoordinator受付の両方で一致を確認します。リセット開始後に古い世代の受付が到着した場合は保存せず、並行する複数のリセットが逆順にAccountDataへ到着した場合も古い世代の削除を実行しません。
 
 ```mermaid
 sequenceDiagram
@@ -37,9 +39,10 @@ sequenceDiagram
     participant V as Vectorize
 
     W->>A: DELETE /api/dev/account-data
-    A->>C: 進行中処理を無効化して一時状態を削除
-    A->>D: 個人コンテンツを物理削除
-    D->>D: Vector削除jobを永続化
+    A->>C: リセット世代を進め、進行中処理と一時状態を削除
+    C-->>A: 新しいリセット世代
+    A->>D: 新しい世代で個人コンテンツを物理削除
+    D->>D: 既存jobを維持して新しいrevisionのVector削除jobを永続化
     A-->>W: 200 + 削除件数
     D->>Q: alarmから削除jobを送信
     Q->>V: deleteByIds

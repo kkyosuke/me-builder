@@ -166,6 +166,21 @@ export async function processLineWebhook(
         dependency: "account-data",
       });
     }
+    const coordinator = coordinatorNamespace?.getByName(resolved.account.id);
+    let resetEpoch: number | undefined;
+    if (coordinator) {
+      try {
+        resetEpoch = await coordinator.getResetEpoch(resolved.account.id);
+      } catch (error) {
+        throw toOperationalError(error, {
+          code: "CONVERSATION_COORDINATOR_EPOCH_FAILED",
+          category: "dependency",
+          stage: "chat.epoch",
+          retryable: true,
+          dependency: "conversation-coordinator",
+        });
+      }
+    }
     let source: { sourceRecordId: string };
     try {
       source = await accountDataFor(accountDataNamespace, resolved.account.id).execute(
@@ -174,6 +189,7 @@ export async function processLineWebhook(
           eventId,
           body: event.message.text,
           receivedAt,
+          ...(resetEpoch === undefined ? {} : { resetEpoch }),
         },
       );
     } catch (error) {
@@ -194,10 +210,19 @@ export async function processLineWebhook(
       continue;
     }
 
-    const coordinator = coordinatorNamespace.getByName(resolved.account.id);
+    if (!coordinator || resetEpoch === undefined) {
+      throw new OperationalError({
+        code: "CONVERSATION_COORDINATOR_EPOCH_MISSING",
+        category: "invariant",
+        stage: "chat.epoch",
+        retryable: true,
+        dependency: "conversation-coordinator",
+      });
+    }
     try {
       await coordinator.acceptMessage({
         accountId: resolved.account.id,
+        resetEpoch,
         sourceRecordId: source.sourceRecordId,
         eventId,
         receivedAt: receivedAt.toISOString(),

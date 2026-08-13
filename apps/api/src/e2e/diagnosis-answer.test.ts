@@ -79,7 +79,7 @@ const env = () => ({
   ACCOUNT_DATA: accountDataStore.namespace,
   COMPATIBILITY_DATA: compatibilityDataStore.namespace,
   CONVERSATION_COORDINATOR: {
-    getByName: () => ({ resetAccountData: async () => undefined }),
+    getByName: () => ({ resetAccountData: async () => 1 }),
   },
   LINE_LOGIN_CHANNEL_ID: "1234567890",
   ENVIRONMENT: "test",

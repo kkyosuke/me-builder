@@ -24,12 +24,15 @@ export type GenerationLease =
 export interface ConversationCoordinatorRpc {
   acceptMessage(input: {
     accountId: string;
+    resetEpoch: number;
     sourceRecordId: string;
     eventId: string;
     receivedAt: string;
     /** フローを後続Queueまで追跡する相関ID。省略形は旧callerとの互換用。 */
     traceId?: string;
   }): Promise<{ accepted: boolean }>;
+  getResetEpoch(accountId: string): Promise<number>;
+  resetAccountData(accountId: string): Promise<number>;
   acquireGeneration(turnId: string, generationEpoch: number): Promise<GenerationLease>;
   requeueTurn(turnId: string, generationEpoch: number): Promise<void>;
   isGenerationLeaseActive(

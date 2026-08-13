@@ -31,10 +31,11 @@ type Dependencies = {
   resetCoordinator: (
     namespace: ConversationCoordinatorNamespace,
     accountId: string,
-  ) => Promise<void>;
+  ) => Promise<number>;
   deleteAccountData: (
     namespace: AccountDataNamespace,
     accountId: string,
+    resetEpoch: number,
   ) => ReturnType<typeof DO.account.action.development.deleteAllDevelopmentAccountData>;
 };
 
@@ -42,8 +43,8 @@ const defaultDependencies: Dependencies = {
   createSession: createLiffSession,
   resetCoordinator: (namespace, accountId) =>
     conversationCoordinatorFor(namespace, accountId).resetAccountData(accountId),
-  deleteAccountData: (namespace, accountId) =>
-    accountDataFor(namespace, accountId).execute("development.deleteAllAccountData"),
+  deleteAccountData: (namespace, accountId, resetEpoch) =>
+    accountDataFor(namespace, accountId).execute("development.deleteAllAccountData", resetEpoch),
 };
 
 /** 本人確認後に、進行中の日記処理を止めてAccountData個人コンテンツを物理削除する。 */
@@ -59,7 +60,7 @@ export async function resetDevelopmentAccountData(
   if (session.type !== "resolved") return session;
 
   const accountId = session.session.accountId;
-  await dependencies.resetCoordinator(params.conversationCoordinator, accountId);
-  const deleted = await dependencies.deleteAccountData(params.accountData, accountId);
+  const resetEpoch = await dependencies.resetCoordinator(params.conversationCoordinator, accountId);
+  const deleted = await dependencies.deleteAccountData(params.accountData, accountId, resetEpoch);
   return { type: "resolved", ...deleted };
 }
