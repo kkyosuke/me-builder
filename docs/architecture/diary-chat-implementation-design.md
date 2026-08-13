@@ -71,6 +71,11 @@ flowchart TD
     DO -->|finalをretry key付きpush| LINE
     DO -->|Session・message・Turn RPC| AD
     AD -->|alarm: Session終了・projection retry| AD
+    DPCRON[Daily Prompt Cron: 09:00 UTC] -->|activeなLINE Account IDだけを列挙| D1
+    DPCRON -->|Account IDと日本日付を投入| DQ[Daily Prompt Queue]
+    DQ --> DW[Queue Worker: daily prompt]
+    DW -->|送信可否・日次配送状態| AD
+    DW -->|retry key付きpush| LINE
     CRON -->|同期差分確認| V
     TQ --> DLQ[Chat Turn DLQ]
     BQ --> BDLQ[Brain Checkpoint DLQ]
@@ -84,6 +89,7 @@ flowchart TD
 | ingest Worker | 冪等な原本保存、Account解決、Coordinator通知 | 会話順序の独自判断、AI生成 |
 | Coordinator | Account内の順序、連投集約、Session、Turn lease、外部I/Oのoutboxと締切 | 原本やBrain Itemの正本保持 |
 | generate Worker | Context構築、安全判定、prompt実行、出力検証 | Account IDや権限をモデルへ決めさせること |
+| daily prompt job | 日本時間18時の対象列挙、Queue投入、固定文面のLINE Push | Cron内での全件Push、本人情報を使った文面生成 |
 | AccountData | 原本、Session、message、Brain Item、Diagnosis回答、Account内maintenance | 会話の実行lock、他Accountのデータ保持 |
 | 共有D1 | Identity解決、公開Question・Diagnosis catalog | Account所有原文、Brain Item本文 |
 | Vectorize | 利用可能なBrain Itemの候補検索 | 認可、削除・撤回・無効化状態の最終判定 |
@@ -117,19 +123,48 @@ sequenceDiagram
     GW->>DO: 完了を通知
 ```
 
-3つのQueueの責務は次のように分けます。通常返信をBrain変換より優先できるよう、両者は物理Queueを分離し、互いのAI呼び出しや再配送でhead-of-line blockingを起こさない構成にします。
+Queueの責務は次のように分けます。通常返信をBrain変換より優先できるよう、処理種別ごとに物理Queueを分離し、互いのAI呼び出しや再配送でhead-of-line blockingを起こさない構成にします。
 
 | Queue | 区切る処理 | ackの条件 | 再配送時の守り |
 | --- | --- | --- | --- |
 | Webhook Queue | LINE Webhook受付と原本・会話への取り込み | Source Recordの保存とCoordinatorへの通知が完了したとき | channel event IDとSource Record IDで冪等化する |
 | Chat Turn Queue | TurnのAI生成・LINE最終応答 | 生成・配送が完了したとき | Turn leaseで多重生成・配送を防ぐ |
 | Brain Checkpoint Queue | 期限を迎えたcheckpointのAI変換 | AccountDataへの適用が完了したとき | checkpoint状態とIDで多重適用を防ぐ |
+| Daily Prompt Queue | 18時の固定声かけをAccount単位に分割して配送 | 配送済み、送信不要、または再試行不能が確定したとき | Accountと日本日付の一意な配送状態、LINE retry keyで二重送信を防ぐ |
 
 処理不能なmessageを無制限に通常Queueへ戻さないよう、各QueueにDLQを設定します。Chat Turn QueueとBrain Checkpoint Queueへ本文やLINEの`replyToken`は渡しません。Turn処理はAccount ID、Turn ID、generation epoch、Brain処理はAccount ID、checkpoint IDだけを渡し、consumerはAccountDataから対象を読み直します。Account IDは認可済みrouting keyであり、data access自体はAccountData Object identityでも再検証します。受付からTurn作成までの詳細は[5.1 受付から原本保存](#51-受付から原本保存)、生成順序の詳細は[5.2 連投とTurn](#52-連投とturn)を正とします。
 
 ### 3.2 AccountData alarmの意図
 
 AccountDataはactive Session境界、未処理Diagnosis projection、未処理Brain checkpointのうち最も早い時刻へalarmを設定します。各時間条件は[Brain Item生成設計 §7.3](../domain/brain/brain-item-generation-design.md#73-登録タイミング)と[日記チャット体験設計のSession境界](../product/diary-chat-experience.md#会話セッションの境界)を正とします。Durable Object alarmはObjectがinactiveでも指定時刻に起動するため、共有D1を全Account走査するCronは使いません。同じ対象を再実行しても結果が変わらないよう冪等にし、Session終了を理由にユーザー原文とassistant本文を削除しません。
+
+### 3.3 18時の基本声かけjob
+
+基本版は別のデプロイ単位を増やさず、`apps/worker`のCron、job、Queue consumerとして実装します。Cloudflare CronはUTCで指定するため毎日09:00 UTCに起動し、`Asia/Tokyo`の当日を配送日として固定します。Cronは共有D1からactiveなLINE Account IDだけをページング取得し、本文やLINE user IDを含めずDaily Prompt Queueへ投入します。Cron内ではLINE Pushを行いません。
+
+consumerはAccountDataで同じ日本日付の配送状態とactive Sessionを確認します。直前の声かけが未回答なら翌日の1回を休み、未回答が3回続いていれば新しい本人発言まで自動休止します。送信対象の場合だけ共有D1から現在有効なLINE identityを解決し、Account IDと日本日付から作る決定的なLINE retry keyで固定文面をPushします。LINE受付後の状態保存に失敗してQueueが再配送されても、同じretry keyを再利用します。
+
+```mermaid
+sequenceDiagram
+    participant C as Worker Cron
+    participant D1 as Shared D1
+    participant Q as Daily Prompt Queue
+    participant W as daily prompt consumer
+    participant AD as AccountData
+    participant L as LINE
+    C->>D1: activeなLINE Account IDをページング取得
+    C->>Q: Account ID、日本日付
+    Q->>W: at-least-once配送
+    W->>AD: 当日の配送を準備
+    alt 会話中・翌日休止・自動休止
+        AD-->>W: skipped
+    else 送信対象
+        AD-->>W: pending delivery ID
+        W->>D1: 現在有効なLINE identityを解決
+        W->>L: 固定文面をretry key付きPush
+        W->>AD: deliveredを記録
+    end
+```
 
 ## 4. AccountDataデータモデル
 
@@ -356,7 +391,7 @@ Brain Itemを含むAccount所有データのquery境界は、[Accountデータ�
 | `attributes.promptContext` | 未対応 | 種別ごとのschemaとEvidence整合検証を追加する |
 | 曜日・本人情報からの声かけ候補取得 | 未対応 | active、Valid Time、Evidence、Access Policyを再検証して必要最小限を返す |
 | 時刻帯・声かけ方針の自動選択 | 未対応 | 本人の明言を優先し、本人自身の返信実績が不足する間は18時の標準候補へ戻す選択器を追加する。クライアントからAccount IDや選択結果を指定させない |
-| 18時の能動配信 | 未対応 | [日記チャット体験設計](../product/diary-chat-experience.md)の段階導入に従って後続実装する |
+| 18時の能動配信 | 固定文面、専用Queue、AccountDataの配送状態まで実装済み | 本人情報による時刻・文面調整は[日記チャット体験設計](../product/diary-chat-experience.md)の後続段階で追加する |
 
 開発用の確認機能は、本人確認済みAccountに対して、一覧取得用の`brain.listActive`とVector実体確認用の`brain.findActiveVectorEntry`をAccountData RPCへ公開します。`brain.listActive`はactiveかつ未削除のItem、未削除Evidence、最新のVector同期jobと対応表の有無を最大100件返します。Web UIは各Itemに同期状態、試行回数、失敗code、次回試行時刻を表示します。`applied`はVectorizeが更新を受け付けてAccountDataへ完了記録した状態であり、Vectorize上の実体確認とは区別します。
 
@@ -412,7 +447,23 @@ Vectorizeへのupsertまたはdelete受付後に`applied`とmutation IDを記録
 
 `BRAIN_VECTOR_HMAC_SECRET`は通常のSecretローテーションだけで単独変更してはいけません。変更時は新しいindexを用意し、AccountDataを正として全active Itemを再同期し、検索先を切り替えた後に旧indexを削除します。緊急失効時も同じ再構築手順を使います。個別Itemの削除ではAccountDataの対応表に保存した旧vector IDを使うため、Secret変更前のvectorも削除できます。
 
-### 4.9 ConversationCoordinatorのローカルSQLite
+### 4.9 `daily_prompt_deliveries`
+
+18時の声かけはAccountDataにAccountと日本日付ごとの配送状態を保存します。本文はコード上のversion付き固定文面を正とし、このtableへ複製しません。
+
+| 列 | 用途 |
+| --- | --- |
+| `id`, `account_id`, `local_date` | 配送ID、所有Account、`Asia/Tokyo`の配送日。`(account_id, local_date)`を一意にする |
+| `prompt_version` | 使用した固定文面のversion |
+| `status` | `pending` / `delivered` / `skipped` / `failed` |
+| `skip_reason` | `active_session` / `recent_unanswered` / `auto_paused`。本文や推定理由は保存しない |
+| `failure_stage` | 再試行不能で終端した工程の安全なcode |
+| `delivered_at`, `responded_at` | LINE受付時刻と、その後に本人発言を受け付けた時刻 |
+| lifecycle列 | 作成・更新・削除状態 |
+
+Queue再配送で`pending`を読み直した場合は同じ配送IDとretry keyで再送します。`delivered`、`skipped`、`failed`は同じ日付の再配送で新しいPushを作りません。本人のLINE発言をAccountDataへ原本保存するtransactionで未回答の`pending` / `delivered`を回答済みにし、翌日休止と自動休止を解除します。
+
+### 4.10 ConversationCoordinatorのローカルSQLite
 
 ConversationCoordinatorのローカルSQLiteはAccount内の連投、生成lease、LINE配送outboxを調停します。会話履歴のSSoTにはせず、履歴復元はAccountDataから行います。schemaとqueryはDrizzleのDurable SQLite driverを通します。
 
@@ -456,7 +507,7 @@ AccountData反映を始める前に対象event IDとgeneration epochを固定bat
 
 AccountData、Queue、LINEを呼び出した後は、Turn ID、generation epoch、lease tokenが現在値と一致するときだけ完了へ進めます。Queue投入前は`pending_queue`として残し、alarmから同じTurn IDを再投入します。AccountData側のevent ID・sequence一意制約と組み合わせ、DO再起動やQueue再配送でも履歴と応答を重複させません。終端化した`local_turns`は削除し、`attached`のevent IDは30日間の冪等期間を経て削除します。
 
-### 4.10 index
+### 4.11 index
 
 - `conversation_sessions(account_id, status)`
 - `source_records(account_id, original_ref)` unique where `original_ref` is not null

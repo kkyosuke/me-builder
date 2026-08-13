@@ -73,6 +73,36 @@ export const conversationMessages = sqliteTable(
   ],
 );
 
+/** 日本時間の日付ごとに、固定声かけの送信可否とLINE配送結果を保持する。 */
+export const dailyPromptDeliveries = sqliteTable(
+  "daily_prompt_deliveries",
+  {
+    ...baseSchema,
+    accountId: text("account_id")
+      .notNull()
+      .references(() => accountDataIdentity.accountId),
+    localDate: text("local_date").notNull(),
+    promptVersion: text("prompt_version").notNull(),
+    status: text("status", { enum: ["pending", "delivered", "skipped", "failed"] })
+      .notNull()
+      .default("pending"),
+    skipReason: text("skip_reason", {
+      enum: ["active_session", "recent_unanswered", "auto_paused"],
+    }),
+    failureStage: text("failure_stage"),
+    deliveredAt: integer("delivered_at", { mode: "timestamp" }),
+    respondedAt: integer("responded_at", { mode: "timestamp" }),
+  },
+  (table) => [
+    uniqueIndex("daily_prompt_delivery_account_date_idx").on(table.accountId, table.localDate),
+    index("daily_prompt_delivery_account_status_idx").on(
+      table.accountId,
+      table.status,
+      table.localDate,
+    ),
+  ],
+);
+
 export const chatTurns = sqliteTable(
   "chat_turns",
   {

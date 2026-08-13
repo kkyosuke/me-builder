@@ -143,6 +143,7 @@ describe("AccountData Workers runtime E2E", () => {
       state.storage.sql.exec("DROP TABLE brain_vector_entries");
       state.storage.sql.exec("DROP TABLE brain_vector_sync_jobs");
       state.storage.sql.exec("DROP TABLE diary_chat_brain_usage_audits");
+      state.storage.sql.exec("DROP TABLE daily_prompt_deliveries");
       state.storage.sql.exec("DROP INDEX diary_brain_checkpoint_item_brain_idx");
       state.storage.sql.exec(
         "ALTER TABLE diary_brain_checkpoint_items DROP COLUMN dedup_prompt_version",
@@ -238,6 +239,7 @@ describe("AccountData Workers runtime E2E", () => {
         generatedAt.getTime(),
       );
       state.storage.sql.exec("DROP TABLE diary_chat_brain_usage_audits");
+      state.storage.sql.exec("DROP TABLE daily_prompt_deliveries");
       state.storage.sql.exec("DROP INDEX diary_brain_checkpoint_item_brain_idx");
       state.storage.sql.exec(
         "ALTER TABLE diary_brain_checkpoint_items DROP COLUMN dedup_prompt_version",

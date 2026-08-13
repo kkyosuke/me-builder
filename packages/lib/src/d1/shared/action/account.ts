@@ -1,5 +1,5 @@
 import { logger } from "@me-builder/shared";
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq, gt } from "drizzle-orm";
 import type { SharedD1Client } from "../client";
 import { accountIdentities, accounts } from "../schema/account";
 
@@ -200,6 +200,33 @@ export async function findLineIdentityByAccountId(
     )
     .get();
   return identity?.providerAccountId;
+}
+
+/** CronがDaily Prompt Queueへ投入するactiveなLINE Account IDだけをページング取得する。 */
+export async function listActiveLineAccountIds(
+  db: SharedD1Client,
+  input: Readonly<{ afterAccountId?: string; limit?: number }> = {},
+): Promise<string[]> {
+  const limit = input.limit ?? 100;
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
+    throw new Error("Active LINE Account page limit must be between 1 and 100");
+  }
+  const filters = [
+    eq(accountIdentities.provider, "line"),
+    eq(accountIdentities.isDeleted, false),
+    eq(accounts.status, "active"),
+    eq(accounts.isDeleted, false),
+    ...(input.afterAccountId ? [gt(accounts.id, input.afterAccountId)] : []),
+  ];
+  const rows = await db
+    .selectDistinct({ accountId: accounts.id })
+    .from(accounts)
+    .innerJoin(accountIdentities, eq(accountIdentities.accountId, accounts.id))
+    .where(and(...filters))
+    .orderBy(asc(accounts.id))
+    .limit(limit)
+    .all();
+  return rows.map(({ accountId }) => accountId);
 }
 
 /**

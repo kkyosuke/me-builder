@@ -12,6 +12,8 @@ const queueNames = [
   `me-builder-profile-summary-dlq-${environment}`,
   `me-builder-brain-vector-queue-${environment}`,
   `me-builder-brain-vector-dlq-${environment}`,
+  `me-builder-daily-prompt-queue-${environment}`,
+  `me-builder-daily-prompt-dlq-${environment}`,
   `me-builder-webhook-dlq-${environment}`,
 ];
 

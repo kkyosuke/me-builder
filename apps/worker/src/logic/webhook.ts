@@ -3,6 +3,7 @@ import type { D1 } from "@me-builder/lib";
 import {
   type BrainVectorSyncQueueMessage,
   type ChatTurnQueueMessage,
+  type DailyPromptQueueMessage,
   type DiaryBrainCheckpointQueueMessage,
   type FlowKey,
   type Message,
@@ -17,6 +18,7 @@ import {
 import { type CloudflareBindings, type WorkerConfig, getWorkerConfig } from "../config";
 import { processBrainVectorSyncMessage } from "../handler/brain-vector-sync";
 import { CHAT_TURN_MAX_ATTEMPTS, processChatTurnMessage } from "../handler/chat-turn";
+import { DAILY_PROMPT_MAX_ATTEMPTS, processDailyPromptMessage } from "../handler/daily-prompt";
 import {
   DIARY_BRAIN_CHECKPOINT_MAX_ATTEMPTS,
   processDiaryBrainCheckpointMessage,
@@ -40,6 +42,7 @@ const MAX_ATTEMPTS_BY_FLOW: Record<FlowKey, number | undefined> = {
   "diary-brain-checkpoint": DIARY_BRAIN_CHECKPOINT_MAX_ATTEMPTS,
   "brain-vector-sync": 6,
   "profile-summary-generation": PROFILE_SUMMARY_GENERATION_MAX_ATTEMPTS,
+  "daily-prompt": DAILY_PROMPT_MAX_ATTEMPTS,
   "queue-dispatch": undefined,
 };
 
@@ -50,13 +53,15 @@ function flowOf(
     | ChatTurnQueueMessage
     | DiaryBrainCheckpointQueueMessage
     | BrainVectorSyncQueueMessage
-    | ProfileSummaryGenerationQueueMessage,
+    | ProfileSummaryGenerationQueueMessage
+    | DailyPromptQueueMessage,
 ): FlowKey {
   if (!("type" in body)) return "line-webhook";
   if (body.type === "chat-turn") return "chat-turn";
   if (body.type === "diary-brain-checkpoint") return "diary-brain-checkpoint";
   if (body.type === "brain-vector-sync") return "brain-vector-sync";
   if (body.type === "profile-summary-generation") return "profile-summary-generation";
+  if (body.type === "daily-prompt") return "daily-prompt";
   return "queue-dispatch";
 }
 
@@ -175,6 +180,7 @@ export async function handleQueueBatch(
     | DiaryBrainCheckpointQueueMessage
     | BrainVectorSyncQueueMessage
     | ProfileSummaryGenerationQueueMessage
+    | DailyPromptQueueMessage
   >,
   db: D1.shared.Client,
   workerConfig?: WorkerConfig,
@@ -214,6 +220,13 @@ export async function handleQueueBatch(
         if (!cf || !workerConfig) throw new Error("Profile Summary bindings are not configured");
         await processProfileSummaryGenerationMessage(
           message as Message<ProfileSummaryGenerationQueueMessage>,
+          cf,
+          workerConfig,
+        );
+      } else if ("type" in message.body && message.body.type === "daily-prompt") {
+        if (!cf || !workerConfig) throw new Error("Daily prompt bindings are not configured");
+        await processDailyPromptMessage(
+          message as Message<DailyPromptQueueMessage>,
           cf,
           workerConfig,
         );

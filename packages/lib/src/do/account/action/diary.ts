@@ -11,6 +11,7 @@ import {
   chatTurns,
   conversationMessages,
   conversationSessions,
+  dailyPromptDeliveries,
   diaryBrainCheckpointItems,
   diaryBrainCheckpoints,
   diaryChatBrainUsageAudits,
@@ -148,6 +149,213 @@ async function sha256(value: string): Promise<string> {
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
+export type DailyPromptPreparation =
+  | Readonly<{ type: "ready"; deliveryId: string; promptVersion: string }>
+  | Readonly<{
+      type: "not-ready";
+      status: "delivered" | "skipped" | "failed";
+      reason?: "active_session" | "recent_unanswered" | "auto_paused";
+    }>;
+
+function assertLocalDate(localDate: string): void {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(localDate)) throw new Error("Daily prompt date is invalid");
+  const parsed = new Date(`${localDate}T00:00:00.000Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== localDate) {
+    throw new Error("Daily prompt date is invalid");
+  }
+}
+
+function nextLocalDate(localDate: string): string {
+  const parsed = new Date(`${localDate}T00:00:00.000Z`);
+  parsed.setUTCDate(parsed.getUTCDate() + 1);
+  return parsed.toISOString().slice(0, 10);
+}
+
+async function skipDailyPrompt(
+  db: AccountDataDatabase,
+  input: Readonly<{
+    accountId: string;
+    localDate: string;
+    promptVersion: string;
+    reason: "active_session" | "recent_unanswered" | "auto_paused";
+    at: Date;
+  }>,
+): Promise<DailyPromptPreparation> {
+  await db.insert(dailyPromptDeliveries).values({
+    id: `daily-prompt:${input.localDate}`,
+    accountId: input.accountId,
+    localDate: input.localDate,
+    promptVersion: input.promptVersion,
+    status: "skipped",
+    skipReason: input.reason,
+    createdAt: input.at,
+    updatedAt: input.at,
+  });
+  return { type: "not-ready", status: "skipped", reason: input.reason };
+}
+
+/** 当日の固定声かけを1回だけ準備し、会話中と未回答時の休止を同じAccount内で判定する。 */
+export async function prepareDailyPrompt(
+  db: AccountDataDatabase,
+  accountId: string,
+  input: Readonly<{ localDate: string; promptVersion: string; at?: Date }>,
+): Promise<DailyPromptPreparation> {
+  assertLocalDate(input.localDate);
+  if (!input.promptVersion.trim()) throw new Error("Daily prompt version is required");
+  const at = input.at ?? new Date();
+  const existing = await db
+    .select()
+    .from(dailyPromptDeliveries)
+    .where(
+      and(
+        eq(dailyPromptDeliveries.accountId, accountId),
+        eq(dailyPromptDeliveries.localDate, input.localDate),
+        eq(dailyPromptDeliveries.isDeleted, false),
+      ),
+    )
+    .get();
+  if (existing) {
+    if (existing.status === "pending") {
+      return { type: "ready", deliveryId: existing.id, promptVersion: existing.promptVersion };
+    }
+    return {
+      type: "not-ready",
+      status: existing.status,
+      ...(existing.skipReason ? { reason: existing.skipReason } : {}),
+    };
+  }
+
+  const latestDelivered = await db
+    .select({
+      localDate: dailyPromptDeliveries.localDate,
+      respondedAt: dailyPromptDeliveries.respondedAt,
+    })
+    .from(dailyPromptDeliveries)
+    .where(
+      and(
+        eq(dailyPromptDeliveries.accountId, accountId),
+        eq(dailyPromptDeliveries.status, "delivered"),
+        eq(dailyPromptDeliveries.isDeleted, false),
+      ),
+    )
+    .orderBy(desc(dailyPromptDeliveries.localDate))
+    .limit(3)
+    .all();
+  const consecutiveUnanswered = latestDelivered.findIndex(
+    ({ respondedAt }) => respondedAt !== null,
+  );
+  const unansweredCount =
+    consecutiveUnanswered === -1 ? latestDelivered.length : consecutiveUnanswered;
+  if (unansweredCount >= 3) {
+    return await skipDailyPrompt(db, {
+      accountId,
+      localDate: input.localDate,
+      promptVersion: input.promptVersion,
+      reason: "auto_paused",
+      at,
+    });
+  }
+  const previous = latestDelivered[0];
+  if (previous?.respondedAt === null && nextLocalDate(previous.localDate) === input.localDate) {
+    return await skipDailyPrompt(db, {
+      accountId,
+      localDate: input.localDate,
+      promptVersion: input.promptVersion,
+      reason: "recent_unanswered",
+      at,
+    });
+  }
+
+  await closeExpiredSessions(db, at);
+  const activeSession = await db
+    .select({ id: conversationSessions.id })
+    .from(conversationSessions)
+    .where(
+      and(
+        eq(conversationSessions.accountId, accountId),
+        eq(conversationSessions.status, "active"),
+        eq(conversationSessions.isDeleted, false),
+      ),
+    )
+    .get();
+  if (activeSession) {
+    return await skipDailyPrompt(db, {
+      accountId,
+      localDate: input.localDate,
+      promptVersion: input.promptVersion,
+      reason: "active_session",
+      at,
+    });
+  }
+
+  const deliveryId = `daily-prompt:${input.localDate}`;
+  await db.insert(dailyPromptDeliveries).values({
+    id: deliveryId,
+    accountId,
+    localDate: input.localDate,
+    promptVersion: input.promptVersion,
+    status: "pending",
+    createdAt: at,
+    updatedAt: at,
+  });
+  return { type: "ready", deliveryId, promptVersion: input.promptVersion };
+}
+
+export async function markDailyPromptDelivered(
+  db: AccountDataDatabase,
+  accountId: string,
+  deliveryId: string,
+  at = new Date(),
+): Promise<boolean> {
+  const delivery = await db
+    .select({ status: dailyPromptDeliveries.status })
+    .from(dailyPromptDeliveries)
+    .where(
+      and(
+        eq(dailyPromptDeliveries.id, deliveryId),
+        eq(dailyPromptDeliveries.accountId, accountId),
+        eq(dailyPromptDeliveries.isDeleted, false),
+      ),
+    )
+    .get();
+  if (delivery?.status === "delivered") return true;
+  if (delivery?.status !== "pending") return false;
+  await db
+    .update(dailyPromptDeliveries)
+    .set({ status: "delivered", deliveredAt: at, updatedAt: at })
+    .where(
+      and(
+        eq(dailyPromptDeliveries.id, deliveryId),
+        eq(dailyPromptDeliveries.accountId, accountId),
+        eq(dailyPromptDeliveries.status, "pending"),
+      ),
+    );
+  return true;
+}
+
+export async function markDailyPromptFailed(
+  db: AccountDataDatabase,
+  accountId: string,
+  deliveryId: string,
+  failureStage: string,
+  at = new Date(),
+): Promise<boolean> {
+  if (!failureStage.trim()) throw new Error("Daily prompt failure stage is required");
+  const updated = await db
+    .update(dailyPromptDeliveries)
+    .set({ status: "failed", failureStage, updatedAt: at })
+    .where(
+      and(
+        eq(dailyPromptDeliveries.id, deliveryId),
+        eq(dailyPromptDeliveries.accountId, accountId),
+        eq(dailyPromptDeliveries.status, "pending"),
+      ),
+    )
+    .returning({ id: dailyPromptDeliveries.id })
+    .get();
+  return Boolean(updated);
+}
+
 /** LINE eventを不変なSource Recordとして冪等に保存する。 */
 export async function storeLineTextSource(
   db: AccountDataDatabase,
@@ -204,6 +412,17 @@ export async function storeLineTextSource(
         createdAt: input.receivedAt,
       })
       .onConflictDoNothing(),
+    db
+      .update(dailyPromptDeliveries)
+      .set({ respondedAt: input.receivedAt, updatedAt: now })
+      .where(
+        and(
+          eq(dailyPromptDeliveries.accountId, input.accountId),
+          inArray(dailyPromptDeliveries.status, ["pending", "delivered"]),
+          isNull(dailyPromptDeliveries.respondedAt),
+          eq(dailyPromptDeliveries.isDeleted, false),
+        ),
+      ),
   ]);
 
   return {

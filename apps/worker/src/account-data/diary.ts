@@ -8,6 +8,24 @@ export const diaryActions = {
     accountId: string,
     input: Omit<Parameters<typeof DO.account.action.diary.storeLineTextSource>[1], "accountId">,
   ) => DO.account.action.diary.storeLineTextSource(db, { ...input, accountId }),
+  "conversation.prepareDailyPrompt": (
+    db: DO.account.Database,
+    accountId: string,
+    input: Parameters<typeof DO.account.action.diary.prepareDailyPrompt>[2],
+  ) => DO.account.action.diary.prepareDailyPrompt(db, accountId, input),
+  "conversation.markDailyPromptDelivered": (
+    db: DO.account.Database,
+    accountId: string,
+    deliveryId: string,
+    at?: Date,
+  ) => DO.account.action.diary.markDailyPromptDelivered(db, accountId, deliveryId, at),
+  "conversation.markDailyPromptFailed": (
+    db: DO.account.Database,
+    accountId: string,
+    deliveryId: string,
+    failureStage: string,
+    at?: Date,
+  ) => DO.account.action.diary.markDailyPromptFailed(db, accountId, deliveryId, failureStage, at),
   "conversation.attachMessagesToTurn": (
     db: DO.account.Database,
     accountId: string,

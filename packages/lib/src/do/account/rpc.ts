@@ -133,6 +133,18 @@ export type AccountDataActions = {
     [WithoutAccountId<Parameters<typeof diary.storeLineTextSource>[1]>],
     typeof diary.storeLineTextSource
   >;
+  "conversation.prepareDailyPrompt": RpcAction<
+    [input: Parameters<typeof diary.prepareDailyPrompt>[2]],
+    typeof diary.prepareDailyPrompt
+  >;
+  "conversation.markDailyPromptDelivered": RpcAction<
+    [deliveryId: string, at?: Date],
+    typeof diary.markDailyPromptDelivered
+  >;
+  "conversation.markDailyPromptFailed": RpcAction<
+    [deliveryId: string, failureStage: string, at?: Date],
+    typeof diary.markDailyPromptFailed
+  >;
   "conversation.attachMessagesToTurn": RpcAction<
     [
       inputs: Parameters<typeof diary.attachMessagesToTurn>[2],

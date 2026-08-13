@@ -44,6 +44,12 @@
     },
     "brainVectorDeadLetter": {
       "name": "me-builder-brain-vector-dlq-preview"
+    },
+    "dailyPrompt": {
+      "name": "me-builder-daily-prompt-queue-preview"
+    },
+    "dailyPromptDeadLetter": {
+      "name": "me-builder-daily-prompt-dlq-preview"
     }
   }
 }

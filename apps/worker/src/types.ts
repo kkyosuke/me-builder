@@ -3,6 +3,7 @@ import type { AccountDataNamespace, CompatibilityDataNamespace } from "@me-build
 import type {
   BrainVectorSyncQueueMessage,
   ChatTurnQueueMessage,
+  DailyPromptQueueMessage,
   DiaryBrainCheckpointQueueMessage,
   ProfileSummaryGenerationQueueMessage,
 } from "@me-builder/shared";
@@ -14,6 +15,7 @@ export type Env = Omit<
   | "BRAIN_CHECKPOINT_QUEUE"
   | "BRAIN_VECTOR_QUEUE"
   | "PROFILE_SUMMARY_QUEUE"
+  | "DAILY_PROMPT_QUEUE"
   | "BRAIN_VECTOR_INDEX"
   | "CONVERSATION_COORDINATOR"
   | "ACCOUNT_DATA"
@@ -36,6 +38,7 @@ export type Env = Omit<
   BRAIN_CHECKPOINT_QUEUE?: Queue<DiaryBrainCheckpointQueueMessage>;
   BRAIN_VECTOR_QUEUE?: Queue<BrainVectorSyncQueueMessage>;
   PROFILE_SUMMARY_QUEUE?: Queue<ProfileSummaryGenerationQueueMessage>;
+  DAILY_PROMPT_QUEUE?: Queue<DailyPromptQueueMessage>;
   BRAIN_VECTOR_INDEX?: WorkerBindings["BRAIN_VECTOR_INDEX"];
   CONVERSATION_COORDINATOR?: WorkerBindings["CONVERSATION_COORDINATOR"];
   ACCOUNT_DATA?: AccountDataNamespace;

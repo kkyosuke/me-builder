@@ -54,4 +54,12 @@ export interface ProfileSummaryGenerationQueueMessage {
   generationId: string;
 }
 
+/** 本文やLINE identityを含めず、AccountDataで当日の配送可否を再判定する。 */
+export interface DailyPromptQueueMessage {
+  type: "daily-prompt";
+  accountId: string;
+  /** Asia/Tokyoで解決済みのYYYY-MM-DD。 */
+  localDate: string;
+}
+
 export type { Queue, Message, MessageBatch };
