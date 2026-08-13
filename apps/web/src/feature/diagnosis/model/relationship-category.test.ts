@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { DiagnosisListItem } from "./diagnosis-list-item";
 import {
-  availableRelationshipCategories,
   filterDiagnosesByRelationshipCategory,
+  getRelationshipCategoryBadgeClassName,
+  getRelationshipCategoryFilterClassName,
 } from "./relationship-category";
 
 function diagnosis(
@@ -32,14 +33,20 @@ describe("relationship category filter", () => {
     diagnosis("general", "general"),
   ];
 
-  it("一覧に存在するカテゴリだけを定義順で返す", () => {
-    expect(availableRelationshipCategories(diagnoses)).toEqual(["partner", "work", "general"]);
-  });
-
   it("選択したカテゴリだけへ絞り込み、allでは全件を維持する", () => {
     expect(filterDiagnosesByRelationshipCategory(diagnoses, "work").map(({ id }) => id)).toEqual([
       "work",
     ]);
     expect(filterDiagnosesByRelationshipCategory(diagnoses, "all")).toEqual(diagnoses);
+  });
+
+  it("カテゴリごとにラベルと選択チップの色を返す", () => {
+    expect(getRelationshipCategoryBadgeClassName("partner")).toContain("bg-rose-100");
+    expect(getRelationshipCategoryFilterClassName("partner")).toContain("aria-pressed:bg-rose-100");
+    expect(getRelationshipCategoryBadgeClassName("family")).toContain("bg-amber-100");
+    expect(getRelationshipCategoryBadgeClassName("friend")).toContain("bg-emerald-100");
+    expect(getRelationshipCategoryBadgeClassName("work")).toContain("bg-blue-100");
+    expect(getRelationshipCategoryBadgeClassName("other")).toContain("bg-violet-100");
+    expect(getRelationshipCategoryBadgeClassName("general")).toContain("bg-slate-100");
   });
 });

@@ -128,20 +128,34 @@ describe("DiagnosisHome", () => {
     );
 
     const filters = within(screen.getByRole("group", { name: "関係カテゴリで絞り込む" }));
-    expect(filters.getByRole("button", { name: "すべて" }).getAttribute("aria-pressed")).toBe(
-      "true",
-    );
+    expect(filters.getByRole("button", { name: "全部" }).getAttribute("aria-pressed")).toBe("true");
+    expect(filters.getAllByRole("button").map((button) => button.textContent)).toEqual([
+      "全部",
+      "パートナー",
+      "家族",
+      "友達",
+      "仕事",
+      "その他",
+      "人間関係全般",
+    ]);
     expect(screen.getByRole("button", { name: /パートナー向け診断/ })).toBeTruthy();
     expect(screen.getByRole("button", { name: /仕事向け診断/ })).toBeTruthy();
+    expect(
+      within(screen.getByRole("button", { name: /パートナー向け診断/ })).getByText("パートナー")
+        .className,
+    ).toContain("bg-rose-100");
 
     fireEvent.click(filters.getByRole("button", { name: "仕事" }));
 
     expect(screen.queryByRole("button", { name: /パートナー向け診断/ })).toBeNull();
     expect(screen.getByRole("button", { name: /仕事向け診断/ })).toBeTruthy();
     expect(filters.getByRole("button", { name: "仕事" }).getAttribute("aria-pressed")).toBe("true");
+    expect(filters.getByRole("button", { name: "仕事" }).className).toContain(
+      "aria-pressed:bg-blue-100",
+    );
   });
 
-  it("カテゴリが1種類だけなら重複する絞り込みを表示しない", () => {
+  it("カテゴリが1種類だけでも全カテゴリの絞り込みを表示する", () => {
     render(
       <DiagnosisHome
         diagnoses={{
@@ -153,10 +167,15 @@ describe("DiagnosisHome", () => {
       />,
     );
 
-    expect(screen.queryByRole("group", { name: "関係カテゴリで絞り込む" })).toBeNull();
+    const filters = within(screen.getByRole("group", { name: "関係カテゴリで絞り込む" }));
+    expect(filters.getByRole("button", { name: "パートナー" })).toBeTruthy();
+    expect(filters.getByRole("button", { name: "人間関係全般" })).toBeTruthy();
     expect(
       within(screen.getByRole("button", { name: /人間関係全般の診断/ })).getByText("人間関係全般"),
     ).toBeTruthy();
+
+    fireEvent.click(filters.getByRole("button", { name: "パートナー" }));
+    expect(screen.getByText("このカテゴリの診断はありません。")).toBeTruthy();
   });
 
   it("診断ごとのサムネイルと未知の診断用フォールバックを表示する", () => {

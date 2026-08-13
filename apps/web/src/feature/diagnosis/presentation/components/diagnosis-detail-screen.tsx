@@ -1,6 +1,9 @@
 import { ArrowLeft } from "lucide-react";
 import type { DiagnosisDefinition } from "../../model/diagnosis-definition";
-import { getRelationshipCategoryLabel } from "../../model/relationship-category";
+import {
+  getRelationshipCategoryBadgeClassName,
+  getRelationshipCategoryLabel,
+} from "../../model/relationship-category";
 import type { DiagnosisAnswer } from "../../model/types";
 import { SwipeDiagnosis } from "./swipe-diagnosis";
 
@@ -30,7 +33,9 @@ export function DiagnosisDetailScreen({
         診断一覧
       </button>
 
-      <p className="mb-3 w-fit rounded-full bg-sky-100 px-3 py-1.5 text-xs font-semibold text-sky-800 dark:bg-sky-950 dark:text-sky-200">
+      <p
+        className={`mb-3 w-fit rounded-full px-3 py-1.5 text-xs font-semibold ${getRelationshipCategoryBadgeClassName(diagnosis.relationshipCategory)}`}
+      >
         {getRelationshipCategoryLabel(diagnosis.relationshipCategory)}
       </p>
 

@@ -6,9 +6,11 @@ import type { DiagnosisListItem } from "../../model/diagnosis-list-item";
 import { buildDiagnosisListSections } from "../../model/diagnosis-list-sections";
 import {
   type RelationshipCategoryFilter,
-  availableRelationshipCategories,
   filterDiagnosesByRelationshipCategory,
+  getRelationshipCategoryBadgeClassName,
+  getRelationshipCategoryFilterClassName,
   getRelationshipCategoryLabel,
+  relationshipCategoryValues,
 } from "../../model/relationship-category";
 import { DiagnosisListSkeleton } from "./diagnosis-loading-skeleton";
 
@@ -46,7 +48,9 @@ function DiagnosisCard({
         className="aspect-video w-full object-cover"
       />
       <span className="flex flex-1 flex-col p-3">
-        <span className="mb-2 w-fit rounded-full bg-sky-100 px-2 py-1 text-[0.6875rem] leading-none font-semibold text-sky-800 dark:bg-sky-950 dark:text-sky-200">
+        <span
+          className={`mb-2 w-fit rounded-full px-2 py-1 text-[0.6875rem] leading-none font-semibold ${getRelationshipCategoryBadgeClassName(diagnosis.relationshipCategory)}`}
+        >
           {getRelationshipCategoryLabel(diagnosis.relationshipCategory)}
         </span>
         <span className="line-clamp-2 text-sm leading-snug font-bold text-slate-950 sm:text-base dark:text-slate-50">
@@ -117,8 +121,6 @@ export function DiagnosisHome({
 }) {
   const [isAnsweredOpen, setIsAnsweredOpen] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<RelationshipCategoryFilter>("all");
-  const categories =
-    diagnoses.status === "success" ? availableRelationshipCategories(diagnoses.data) : [];
   const filteredDiagnoses =
     diagnoses.status === "success"
       ? filterDiagnosesByRelationshipCategory(diagnoses.data, categoryFilter)
@@ -138,7 +140,7 @@ export function DiagnosisHome({
         </p>
       </header>
 
-      {diagnoses.status === "success" && categories.length > 1 && (
+      {diagnoses.status === "success" && diagnoses.data.length > 0 && (
         <fieldset className="-mx-4 mb-7 flex min-w-0 gap-2 overflow-x-auto border-0 px-4 pt-0 pb-1 sm:mx-0 sm:px-0">
           <legend className="sr-only">関係カテゴリで絞り込む</legend>
           <button
@@ -147,15 +149,15 @@ export function DiagnosisHome({
             onClick={() => setCategoryFilter("all")}
             className="shrink-0 rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-sky-400 aria-pressed:border-sky-500 aria-pressed:bg-sky-100 aria-pressed:text-sky-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:aria-pressed:border-sky-500 dark:aria-pressed:bg-sky-950 dark:aria-pressed:text-sky-100"
           >
-            すべて
+            全部
           </button>
-          {categories.map((category) => (
+          {relationshipCategoryValues.map((category) => (
             <button
               type="button"
               key={category}
               aria-pressed={categoryFilter === category}
               onClick={() => setCategoryFilter(category)}
-              className="shrink-0 rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-sky-400 aria-pressed:border-sky-500 aria-pressed:bg-sky-100 aria-pressed:text-sky-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:aria-pressed:border-sky-500 dark:aria-pressed:bg-sky-950 dark:aria-pressed:text-sky-100"
+              className={`shrink-0 rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-sky-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 ${getRelationshipCategoryFilterClassName(category)}`}
             >
               {getRelationshipCategoryLabel(category)}
             </button>
