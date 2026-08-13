@@ -127,7 +127,7 @@ describe("DiagnosisHome", () => {
       />,
     );
 
-    const filters = within(screen.getByLabelText("関係カテゴリで絞り込む"));
+    const filters = within(screen.getByRole("group", { name: "関係カテゴリで絞り込む" }));
     expect(filters.getByRole("button", { name: "すべて" }).getAttribute("aria-pressed")).toBe(
       "true",
     );
@@ -139,6 +139,24 @@ describe("DiagnosisHome", () => {
     expect(screen.queryByRole("button", { name: /パートナー向け診断/ })).toBeNull();
     expect(screen.getByRole("button", { name: /仕事向け診断/ })).toBeTruthy();
     expect(filters.getByRole("button", { name: "仕事" }).getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("カテゴリが1種類だけなら重複する絞り込みを表示しない", () => {
+    render(
+      <DiagnosisHome
+        diagnoses={{
+          status: "success",
+          data: [diagnosis({ id: "general", title: "人間関係全般の診断" })],
+        }}
+        onOpenDiagnosis={vi.fn()}
+        onRetry={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole("group", { name: "関係カテゴリで絞り込む" })).toBeNull();
+    expect(
+      within(screen.getByRole("button", { name: /人間関係全般の診断/ })).getByText("人間関係全般"),
+    ).toBeTruthy();
   });
 
   it("診断ごとのサムネイルと未知の診断用フォールバックを表示する", () => {

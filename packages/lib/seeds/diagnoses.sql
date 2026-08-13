@@ -489,7 +489,7 @@ INSERT INTO catalog_versions (catalog_id, version, updated_at) VALUES ('diagnosi
 --> statement-breakpoint
 
 -- Expected result: diagnosis_count=5, question_version_count=50,
--- choice_count=100, diagnosis_question_count=50, scoring_config_count=5, catalog_version=1.
+-- choice_count=100, diagnosis_question_count=50, scoring_config_count=5, catalog_version=2.
 SELECT
   (SELECT COUNT(*) FROM diagnoses WHERE id IN ('relationship-priority', 'money-values', 'leisure-style', 'time-planning', 'conversation-emotion') AND state = 'published' AND description <> '' AND is_deleted = 0) AS diagnosis_count,
   (SELECT COUNT(*) FROM question_versions WHERE version = 1 AND state = 'approved' AND is_deleted = 0 AND (question_id LIKE 'q-relationship-priority-%' OR question_id LIKE 'q-money-%' OR question_id LIKE 'q-leisure-style-%' OR question_id LIKE 'q-time-planning-%' OR question_id LIKE 'q-conversation-emotion-%')) AS question_version_count,

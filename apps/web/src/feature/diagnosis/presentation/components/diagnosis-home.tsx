@@ -138,11 +138,9 @@ export function DiagnosisHome({
         </p>
       </header>
 
-      {diagnoses.status === "success" && diagnoses.data.length > 0 && (
-        <div
-          aria-label="関係カテゴリで絞り込む"
-          className="-mx-4 mb-7 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0"
-        >
+      {diagnoses.status === "success" && categories.length > 1 && (
+        <fieldset className="-mx-4 mb-7 flex min-w-0 gap-2 overflow-x-auto border-0 px-4 pt-0 pb-1 sm:mx-0 sm:px-0">
+          <legend className="sr-only">関係カテゴリで絞り込む</legend>
           <button
             type="button"
             aria-pressed={categoryFilter === "all"}
@@ -162,7 +160,7 @@ export function DiagnosisHome({
               {getRelationshipCategoryLabel(category)}
             </button>
           ))}
-        </div>
+        </fieldset>
       )}
 
       <section aria-label="診断一覧" className="space-y-8">

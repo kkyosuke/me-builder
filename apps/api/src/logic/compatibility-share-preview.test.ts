@@ -28,11 +28,19 @@ describe("getCompatibilityShareConsent", () => {
       session: { accountId: "account-1", role: "user", displayName: " あおい " },
     });
     const getPreviewSource = vi.fn().mockResolvedValue({
-      diagnoses: [{ id: "answered", availability: "open", responseStatus: "answered" }],
+      diagnoses: [
+        {
+          id: "answered",
+          relationshipCategory: "general",
+          availability: "open",
+          responseStatus: "answered",
+        },
+      ],
       answeredDiagnoses: [
         {
           id: "answered",
           title: "時間と予定",
+          relationshipCategory: "general",
           answers: [{ questionId: "question-1", questionVersion: 1, choiceId: "yes" }],
           scoringConfig: { id: "config-1" },
         },
@@ -86,7 +94,14 @@ describe("getCompatibilityShareConsent", () => {
           session: { accountId: "account-1", role: "user", displayName: "あおい" },
         }),
         getPreviewSource: vi.fn().mockResolvedValue({
-          diagnoses: [{ id: "open", availability: "open", responseStatus: "unanswered" }],
+          diagnoses: [
+            {
+              id: "open",
+              relationshipCategory: "general",
+              availability: "open",
+              responseStatus: "unanswered",
+            },
+          ],
           answeredDiagnoses: [],
         }),
         getShareProfile: vi.fn().mockResolvedValue(availableShareProfile),
@@ -206,19 +221,31 @@ describe("loadCompatibilitySharePreviewData", () => {
       {
         getPreviewSource: vi.fn().mockResolvedValue({
           diagnoses: [
-            { id: "valid", availability: "open", responseStatus: "answered" },
-            { id: "invalid", availability: "open", responseStatus: "answered" },
+            {
+              id: "valid",
+              relationshipCategory: "general",
+              availability: "open",
+              responseStatus: "answered",
+            },
+            {
+              id: "invalid",
+              relationshipCategory: "general",
+              availability: "open",
+              responseStatus: "answered",
+            },
           ],
           answeredDiagnoses: [
             {
               id: "valid",
               title: "時間と予定",
+              relationshipCategory: "general",
               answers: [],
               scoringConfig: { id: "config-valid" },
             },
             {
               id: "invalid",
               title: "採点不能",
+              relationshipCategory: "general",
               answers: [],
               scoringConfig: { id: "config-invalid" },
             },
@@ -240,5 +267,45 @@ describe("loadCompatibilitySharePreviewData", () => {
       statements: shareProfile.statements,
     });
     expect(data.nextAction).toBeNull();
+  });
+
+  it("招待に関係カテゴリを保存するまではgeneral以外を共有対象にしない", async () => {
+    const scoreAnswers = vi.fn();
+    const data = await loadCompatibilitySharePreviewData(
+      {
+        accountId: "account-1",
+        verifiedDisplayName: "あおい",
+        accountData: undefined,
+        at,
+      },
+      {
+        getPreviewSource: vi.fn().mockResolvedValue({
+          diagnoses: [
+            {
+              id: "partner-open",
+              relationshipCategory: "partner",
+              availability: "open",
+              responseStatus: "unanswered",
+            },
+          ],
+          answeredDiagnoses: [
+            {
+              id: "partner-answered",
+              title: "パートナーとの会話",
+              relationshipCategory: "partner",
+              answers: [],
+              scoringConfig: { id: "config-partner" },
+            },
+          ],
+        }),
+        getShareProfile: vi.fn().mockResolvedValue(availableShareProfile),
+        scoreAnswers,
+      },
+    );
+
+    expect(data.themes).toEqual([]);
+    expect(data.hasAnswerableDiagnosis).toBe(false);
+    expect(data.nextAction).toBeNull();
+    expect(scoreAnswers).not.toHaveBeenCalled();
   });
 });
