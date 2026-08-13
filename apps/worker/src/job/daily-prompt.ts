@@ -1,14 +1,8 @@
 import { D1 } from "@me-builder/lib";
-import type { DailyPromptQueueMessage, Queue } from "@me-builder/shared";
+import { type DailyPromptQueueMessage, type Queue, toTokyoLocalDate } from "@me-builder/shared";
 
 const ACCOUNT_PAGE_SIZE = 100;
-const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
-
-/** Cloudflare CronのUTC時刻を、DSTのないAsia/Tokyoの日付へ固定する。 */
-export function toTokyoLocalDate(timestamp: number): string {
-  if (!Number.isFinite(timestamp)) throw new Error("Scheduled timestamp is invalid");
-  return new Date(timestamp + JST_OFFSET_MS).toISOString().slice(0, 10);
-}
+export { toTokyoLocalDate } from "@me-builder/shared";
 
 /** Cron内ではPushせず、activeなAccountを1件ずつ専用Queueへ分割する。 */
 export async function enqueueDailyPrompts(

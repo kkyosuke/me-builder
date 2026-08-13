@@ -1,3 +1,4 @@
+import { toTokyoLocalDate } from "@me-builder/shared";
 import { and, asc, desc, eq, gte, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import type { AccountDataDatabase } from "../database";
@@ -12,6 +13,7 @@ import {
   conversationMessages,
   conversationSessions,
   dailyPromptDeliveries,
+  dailyPromptPreferences,
   diaryBrainCheckpointItems,
   diaryBrainCheckpoints,
   diaryChatBrainUsageAudits,
@@ -154,8 +156,16 @@ export type DailyPromptPreparation =
   | Readonly<{
       type: "not-ready";
       status: "delivered" | "skipped" | "failed";
-      reason?: "active_session" | "recent_unanswered" | "auto_paused";
+      reason?: DailyPromptSkipReason;
     }>;
+
+type DailyPromptSkipReason =
+  | "manual_stopped"
+  | "stale"
+  | "active_session"
+  | "user_activity"
+  | "recent_unanswered"
+  | "auto_paused";
 
 function assertLocalDate(localDate: string): void {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(localDate)) throw new Error("Daily prompt date is invalid");
@@ -177,24 +187,68 @@ async function skipDailyPrompt(
     accountId: string;
     localDate: string;
     promptVersion: string;
-    reason: "active_session" | "recent_unanswered" | "auto_paused";
+    reason: DailyPromptSkipReason;
     at: Date;
   }>,
 ): Promise<DailyPromptPreparation> {
-  await db.insert(dailyPromptDeliveries).values({
-    id: `daily-prompt:${input.localDate}`,
-    accountId: input.accountId,
-    localDate: input.localDate,
-    promptVersion: input.promptVersion,
-    status: "skipped",
-    skipReason: input.reason,
-    createdAt: input.at,
-    updatedAt: input.at,
-  });
+  const deliveryId = `daily-prompt:${input.localDate}`;
+  const updated = await db
+    .update(dailyPromptDeliveries)
+    .set({ status: "skipped", skipReason: input.reason, updatedAt: input.at })
+    .where(
+      and(
+        eq(dailyPromptDeliveries.id, deliveryId),
+        eq(dailyPromptDeliveries.accountId, input.accountId),
+        eq(dailyPromptDeliveries.status, "pending"),
+      ),
+    )
+    .returning({ id: dailyPromptDeliveries.id })
+    .get();
+  if (!updated) {
+    await db.insert(dailyPromptDeliveries).values({
+      id: deliveryId,
+      accountId: input.accountId,
+      localDate: input.localDate,
+      promptVersion: input.promptVersion,
+      status: "skipped",
+      skipReason: input.reason,
+      createdAt: input.at,
+      updatedAt: input.at,
+    });
+  }
   return { type: "not-ready", status: "skipped", reason: input.reason };
 }
 
-/** 当日の固定声かけを1回だけ準備し、会話中と未回答時の休止を同じAccount内で判定する。 */
+async function hasActiveConversation(
+  db: AccountDataDatabase,
+  accountId: string,
+  at: Date,
+): Promise<boolean> {
+  await closeExpiredSessions(db, at);
+  const activeSession = await db
+    .select({ id: conversationSessions.id })
+    .from(conversationSessions)
+    .where(
+      and(
+        eq(conversationSessions.accountId, accountId),
+        eq(conversationSessions.status, "active"),
+        eq(conversationSessions.isDeleted, false),
+      ),
+    )
+    .get();
+  return Boolean(activeSession);
+}
+
+async function isDailyPromptStopped(db: AccountDataDatabase, accountId: string): Promise<boolean> {
+  const preference = await db
+    .select({ status: dailyPromptPreferences.status })
+    .from(dailyPromptPreferences)
+    .where(eq(dailyPromptPreferences.accountId, accountId))
+    .get();
+  return preference?.status === "stopped";
+}
+
+/** 当日の固定声かけを1回だけ準備し、再配送時も現在の送信可否を再評価する。 */
 export async function prepareDailyPrompt(
   db: AccountDataDatabase,
   accountId: string,
@@ -214,15 +268,52 @@ export async function prepareDailyPrompt(
       ),
     )
     .get();
-  if (existing) {
-    if (existing.status === "pending") {
-      return { type: "ready", deliveryId: existing.id, promptVersion: existing.promptVersion };
-    }
+  if (existing && existing.status !== "pending") {
     return {
       type: "not-ready",
       status: existing.status,
       ...(existing.skipReason ? { reason: existing.skipReason } : {}),
     };
+  }
+
+  if (toTokyoLocalDate(at.getTime()) !== input.localDate) {
+    return await skipDailyPrompt(db, {
+      accountId,
+      localDate: input.localDate,
+      promptVersion: existing?.promptVersion ?? input.promptVersion,
+      reason: "stale",
+      at,
+    });
+  }
+  if (await isDailyPromptStopped(db, accountId)) {
+    return await skipDailyPrompt(db, {
+      accountId,
+      localDate: input.localDate,
+      promptVersion: existing?.promptVersion ?? input.promptVersion,
+      reason: "manual_stopped",
+      at,
+    });
+  }
+  if (existing?.respondedAt) {
+    return await skipDailyPrompt(db, {
+      accountId,
+      localDate: input.localDate,
+      promptVersion: existing.promptVersion,
+      reason: "user_activity",
+      at,
+    });
+  }
+  if (await hasActiveConversation(db, accountId, at)) {
+    return await skipDailyPrompt(db, {
+      accountId,
+      localDate: input.localDate,
+      promptVersion: existing?.promptVersion ?? input.promptVersion,
+      reason: "active_session",
+      at,
+    });
+  }
+  if (existing) {
+    return { type: "ready", deliveryId: existing.id, promptVersion: existing.promptVersion };
   }
 
   const latestDelivered = await db
@@ -262,28 +353,6 @@ export async function prepareDailyPrompt(
       localDate: input.localDate,
       promptVersion: input.promptVersion,
       reason: "recent_unanswered",
-      at,
-    });
-  }
-
-  await closeExpiredSessions(db, at);
-  const activeSession = await db
-    .select({ id: conversationSessions.id })
-    .from(conversationSessions)
-    .where(
-      and(
-        eq(conversationSessions.accountId, accountId),
-        eq(conversationSessions.status, "active"),
-        eq(conversationSessions.isDeleted, false),
-      ),
-    )
-    .get();
-  if (activeSession) {
-    return await skipDailyPrompt(db, {
-      accountId,
-      localDate: input.localDate,
-      promptVersion: input.promptVersion,
-      reason: "active_session",
       at,
     });
   }
@@ -365,6 +434,7 @@ export async function storeLineTextSource(
     body: string;
     receivedAt: Date;
     resetEpoch?: number;
+    dailyPromptControl?: "stop";
   },
 ): Promise<StoredLineSource> {
   if (input.resetEpoch !== undefined) {
@@ -389,7 +459,7 @@ export async function storeLineTextSource(
     existing?.id ?? `line-${await sha256(`${input.accountId}:${input.eventId}`)}`;
   const now = new Date();
 
-  await db.batch([
+  const statements: BatchItem<"sqlite">[] = [
     db
       .insert(sourceRecords)
       .values({
@@ -423,7 +493,42 @@ export async function storeLineTextSource(
           eq(dailyPromptDeliveries.isDeleted, false),
         ),
       ),
-  ]);
+  ];
+  if (input.dailyPromptControl === "stop") {
+    statements.splice(
+      2,
+      0,
+      db
+        .insert(dailyPromptPreferences)
+        .values({
+          accountId: input.accountId,
+          status: "stopped",
+          stoppedAt: input.receivedAt,
+          stoppedSourceRecordId: sourceRecordId,
+          updatedAt: now,
+        })
+        .onConflictDoUpdate({
+          target: dailyPromptPreferences.accountId,
+          set: {
+            status: "stopped",
+            stoppedAt: input.receivedAt,
+            stoppedSourceRecordId: sourceRecordId,
+            updatedAt: now,
+          },
+        }),
+      db
+        .update(dailyPromptDeliveries)
+        .set({ status: "skipped", skipReason: "manual_stopped", updatedAt: now })
+        .where(
+          and(
+            eq(dailyPromptDeliveries.accountId, input.accountId),
+            eq(dailyPromptDeliveries.status, "pending"),
+            eq(dailyPromptDeliveries.isDeleted, false),
+          ),
+        ),
+    );
+  }
+  await db.batch(statements);
 
   return {
     sourceRecordId,

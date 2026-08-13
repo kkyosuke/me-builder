@@ -142,7 +142,7 @@ AccountDataはactive Session境界、未処理Diagnosis projection、未処理Br
 
 基本版は別のデプロイ単位を増やさず、`apps/worker`のCron、job、Queue consumerとして実装します。Cloudflare CronはUTCで指定するため毎日09:00 UTCに起動し、`Asia/Tokyo`の当日を配送日として固定します。Cronは共有D1からactiveなLINE Account IDだけをページング取得し、本文やLINE user IDを含めずDaily Prompt Queueへ投入します。Cron内ではLINE Pushを行いません。
 
-consumerはAccountDataで同じ日本日付の配送状態とactive Sessionを確認します。直前の声かけが未回答なら翌日の1回を休み、未回答が3回続いていれば新しい本人発言まで自動休止します。送信対象の場合だけ共有D1から現在有効なLINE identityを解決し、Account IDと日本日付から作る決定的なLINE retry keyで固定文面をPushします。LINE受付後の状態保存に失敗してQueueが再配送されても、同じretry keyを再利用します。
+consumerはAccountDataで同じ日本日付の配送状態、停止意思、active Session、配送準備後の本人発言を確認します。直前の声かけが未回答なら翌日の1回を休み、未回答が3回続いていれば新しい本人発言まで自動休止します。Queueの配送日が処理時点の日本日付と一致しない場合は期限切れとして送信しません。送信対象の場合だけ共有D1から現在有効なLINE identityを解決し、Account IDと日本日付から作る決定的なLINE retry keyで固定文面をPushします。LINE受付後の状態保存に失敗してQueueが再配送されても、同じretry keyを再利用し、送信直前の可否を再評価します。
 
 ```mermaid
 sequenceDiagram
@@ -156,7 +156,7 @@ sequenceDiagram
     C->>Q: Account ID、日本日付
     Q->>W: at-least-once配送
     W->>AD: 当日の配送を準備
-    alt 会話中・翌日休止・自動休止
+    alt 停止済み・期限切れ・会話中・本人発言あり・翌日休止・自動休止
         AD-->>W: skipped
     else 送信対象
         AD-->>W: pending delivery ID
@@ -456,14 +456,26 @@ Vectorizeへのupsertまたはdelete受付後に`applied`とmutation IDを記録
 | `id`, `account_id`, `local_date` | 配送ID、所有Account、`Asia/Tokyo`の配送日。`(account_id, local_date)`を一意にする |
 | `prompt_version` | 使用した固定文面のversion |
 | `status` | `pending` / `delivered` / `skipped` / `failed` |
-| `skip_reason` | `active_session` / `recent_unanswered` / `auto_paused`。本文や推定理由は保存しない |
+| `skip_reason` | `manual_stopped` / `stale` / `active_session` / `user_activity` / `recent_unanswered` / `auto_paused`。本文や推定理由は保存しない |
 | `failure_stage` | 再試行不能で終端した工程の安全なcode |
 | `delivered_at`, `responded_at` | LINE受付時刻と、その後に本人発言を受け付けた時刻 |
 | lifecycle列 | 作成・更新・削除状態 |
 
-Queue再配送で`pending`を読み直した場合は同じ配送IDとretry keyで再送します。`delivered`、`skipped`、`failed`は同じ日付の再配送で新しいPushを作りません。本人のLINE発言をAccountDataへ原本保存するtransactionで未回答の`pending` / `delivered`を回答済みにし、翌日休止と自動休止を解除します。
+Queue再配送で`pending`を読み直した場合も、停止意思、現在の日本日付、active Session、配送準備後の本人発言を再評価します。送信可能な場合だけ同じ配送IDとretry keyで再送し、送信不能になっていれば`skipped`へ終端化します。`delivered`、`skipped`、`failed`は同じ日付の再配送で新しいPushを作りません。本人のLINE発言をAccountDataへ原本保存するtransactionで未回答の`pending` / `delivered`を回答済みにし、翌日休止と自動休止を解除します。
 
-### 4.10 ConversationCoordinatorのローカルSQLite
+停止意思は確定的な停止表現だけをアプリケーションルールで判定し、Source Record保存と同じAccountData transactionで`daily_prompt_preferences`へ反映します。曖昧な発言をAI推定だけで停止扱いにしません。停止時点で当日の`pending`配送も`manual_stopped`として終端化し、以後は新しい配送を作りません。
+
+### 4.10 `daily_prompt_preferences`
+
+| 列 | 用途 |
+| --- | --- |
+| `account_id` | 所有Account。Accountごとに最大1行 |
+| `status` | `stopped`。行がない場合を初期状態の有効として扱う |
+| `stopped_at` | 本人の停止意思を受け付けた時刻 |
+| `stopped_source_record_id` | 停止意思の根拠となるSource Record |
+| `updated_at` | 最終更新時刻 |
+
+### 4.11 ConversationCoordinatorのローカルSQLite
 
 ConversationCoordinatorのローカルSQLiteはAccount内の連投、生成lease、LINE配送outboxを調停します。会話履歴のSSoTにはせず、履歴復元はAccountDataから行います。schemaとqueryはDrizzleのDurable SQLite driverを通します。
 
@@ -507,7 +519,7 @@ AccountData反映を始める前に対象event IDとgeneration epochを固定bat
 
 AccountData、Queue、LINEを呼び出した後は、Turn ID、generation epoch、lease tokenが現在値と一致するときだけ完了へ進めます。Queue投入前は`pending_queue`として残し、alarmから同じTurn IDを再投入します。AccountData側のevent ID・sequence一意制約と組み合わせ、DO再起動やQueue再配送でも履歴と応答を重複させません。終端化した`local_turns`は削除し、`attached`のevent IDは30日間の冪等期間を経て削除します。
 
-### 4.11 index
+### 4.12 index
 
 - `conversation_sessions(account_id, status)`
 - `source_records(account_id, original_ref)` unique where `original_ref` is not null

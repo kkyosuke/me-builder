@@ -73,6 +73,19 @@ export const conversationMessages = sqliteTable(
   ],
 );
 
+/** 本人が明示した日次声かけの停止状態と、その根拠となる発言を保持する。 */
+export const dailyPromptPreferences = sqliteTable("daily_prompt_preferences", {
+  accountId: text("account_id")
+    .primaryKey()
+    .references(() => accountDataIdentity.accountId),
+  status: text("status", { enum: ["stopped"] }).notNull(),
+  stoppedAt: integer("stopped_at", { mode: "timestamp" }).notNull(),
+  stoppedSourceRecordId: text("stopped_source_record_id")
+    .notNull()
+    .references(() => sourceRecords.id),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+});
+
 /** 日本時間の日付ごとに、固定声かけの送信可否とLINE配送結果を保持する。 */
 export const dailyPromptDeliveries = sqliteTable(
   "daily_prompt_deliveries",
@@ -87,7 +100,14 @@ export const dailyPromptDeliveries = sqliteTable(
       .notNull()
       .default("pending"),
     skipReason: text("skip_reason", {
-      enum: ["active_session", "recent_unanswered", "auto_paused"],
+      enum: [
+        "manual_stopped",
+        "stale",
+        "active_session",
+        "user_activity",
+        "recent_unanswered",
+        "auto_paused",
+      ],
     }),
     failureStage: text("failure_stage"),
     deliveredAt: integer("delivered_at", { mode: "timestamp" }),

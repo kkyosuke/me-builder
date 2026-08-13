@@ -33,8 +33,8 @@ export type { LineConfig } from "./config";
 export { resolveLiffConfiguration } from "./configuration";
 export type { ConfiguredLiff, LiffConfiguration } from "./configuration";
 export type { LineClientConfig } from "./client";
-export { classifyLineText } from "./text";
-export type { LineTextIntent } from "./text";
+export { classifyDailyPromptControl, classifyLineText } from "./text";
+export type { DailyPromptControl, LineTextIntent } from "./text";
 export type {
   LiffViewType,
   RegisterLiffEndpointParams,

@@ -71,6 +71,24 @@ describe("deleteAllDevelopmentAccountData", () => {
     expect(db.select().from(schema.accountDataIdentity).get()?.resetEpoch).toBe(2);
   });
 
+  it("声かけ停止の根拠と状態をSource Recordとともに削除する", async () => {
+    const db = createTestDb();
+    const accountId = "account-1";
+    db.insert(schema.accountDataIdentity).values({ singleton: 1, accountId }).run();
+    await storeLineTextSource(db, {
+      accountId,
+      eventId: "stop-message",
+      body: "声かけを止めて",
+      receivedAt: new Date("2026-08-13T00:00:00.000Z"),
+      dailyPromptControl: "stop",
+    });
+
+    await deleteAllDevelopmentAccountData(db, accountId, 1);
+
+    expect(db.select().from(schema.dailyPromptPreferences).all()).toEqual([]);
+    expect(db.select().from(schema.sourceRecords).all()).toEqual([]);
+  });
+
   it("処理中upsertがdelete後に完了しても補正deleteを再登録する", async () => {
     const db = createTestDb();
     const accountId = "account-1";
