@@ -431,6 +431,7 @@ describe("App", () => {
       avatar: null,
     });
     render(<App />);
+    const startingDiagnosis = await screen.findByText("テスト診断");
 
     fireEvent.click(screen.getByRole("button", { name: "プロフィールを開く" }));
 
@@ -441,6 +442,15 @@ describe("App", () => {
       "dummy.id.token",
       expect.any(AbortSignal),
     );
+
+    fireEvent.click(adminLink);
+    expect(window.location.pathname).toBe("/admin");
+    expect(screen.queryByRole("dialog", { name: "プロフィール" })).toBeNull();
+
+    act(() => window.history.back());
+    await waitFor(() => expect(window.location.pathname).toBe("/profile"));
+    expect(await screen.findByRole("dialog", { name: "プロフィール" })).toBeTruthy();
+    expect(startingDiagnosis.isConnected).toBe(true);
   });
 
   it("LINE画像を表示し、選んだ画像をアバターに設定してプロフィールへ戻る", async () => {
