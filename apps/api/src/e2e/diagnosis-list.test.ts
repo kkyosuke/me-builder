@@ -52,8 +52,11 @@ async function prepareDatabase(db: D1Database): Promise<void> {
 
   const seed = await readFile(diagnosisSeed, "utf8");
   await applySeed(db, seed);
-  // 運営が表示順を変更した場合も、seedの再実行で正式値へ戻ることを確認する。
-  await db.prepare("UPDATE diagnoses SET display_order = 999").run();
+  // 運営が表示順を変更した場合と、migrationの初期値generalが残る場合に、
+  // seedの再実行で正式な公開定義へ戻ることを確認する。
+  await db
+    .prepare("UPDATE diagnoses SET display_order = 999, relationship_category = 'general'")
+    .run();
   await applySeed(db, seed);
 
   await db
@@ -224,7 +227,7 @@ describe("GET /api/diagnoses local D1 E2E", () => {
     };
 
     expect(progressedBody.diagnoses.find(({ id }) => id === "money-values")).toMatchObject({
-      relationshipCategory: "general",
+      relationshipCategory: "partner",
       responseStatus: "in-progress",
       answeredCount: 1,
       questionCount: 10,
@@ -232,7 +235,7 @@ describe("GET /api/diagnoses local D1 E2E", () => {
     });
     expect(progressedBody.diagnoses.find(({ id }) => id === "relationship-priority")).toMatchObject(
       {
-        relationshipCategory: "general",
+        relationshipCategory: "partner",
         responseStatus: "answered",
         answeredCount: 10,
         questionCount: 10,
@@ -299,7 +302,7 @@ describe("GET /api/diagnoses/:diagnosisId local D1 E2E", () => {
       }>;
     };
     expect(body.id).toBe("relationship-priority");
-    expect(body.relationshipCategory).toBe("general");
+    expect(body.relationshipCategory).toBe("partner");
     expect(body.questions).toHaveLength(10);
     expect(body.questions[0]).toMatchObject({
       diagnosisQuestionId: "dq-relationship-priority-01",

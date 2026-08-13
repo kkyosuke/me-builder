@@ -109,7 +109,8 @@ export async function loadCompatibilitySharePreviewData(
     dependencies.getPreviewSource(accountData, accountId, at),
     dependencies.getShareProfile(accountData, accountId),
   ]);
-  // 招待へ関係カテゴリを保存するまでは、特定の関係を前提にしない診断だけを共有する。
+  // 招待へ関係カテゴリを保存するまでは、既存の相性共有が暗黙に想定してきた
+  // partnerと、特定の関係を前提にしないgeneralだけを共有する。
   // 関係カテゴリ対応後は「招待カテゴリと一致する診断 + general」へ広げる。
   const shareableDiagnoses = source.answeredDiagnoses.flatMap(
     ({
@@ -119,7 +120,7 @@ export async function loadCompatibilitySharePreviewData(
       answers,
       scoringConfig,
     }): CompatibilitySharePreviewDiagnosis[] => {
-      if (relationshipCategory !== "general") return [];
+      if (relationshipCategory !== "partner" && relationshipCategory !== "general") return [];
       try {
         const scoring = dependencies.scoreAnswers(answers, scoringConfig);
         return scoring && scoringConfig
@@ -142,7 +143,7 @@ export async function loadCompatibilitySharePreviewData(
   const shareProfile = shareProfileResult.type === "available" ? shareProfileResult.profile : null;
   const hasAnswerableDiagnosis = source.diagnoses.some(
     ({ relationshipCategory, availability, responseStatus }) =>
-      relationshipCategory === "general" &&
+      (relationshipCategory === "partner" || relationshipCategory === "general") &&
       availability === "open" &&
       responseStatus !== "answered",
   );

@@ -42,8 +42,8 @@ describe("diagnosis seed catalog version", () => {
       version: seed.match(VERSION_PATTERN)?.[1],
       contentHash: createHash("sha256").update(content).digest("hex").slice(0, 16),
     }).toEqual({
-      version: "2",
-      contentHash: "dacdb87ccd7098b9",
+      version: "3",
+      contentHash: "be6a62e303d3a5ee",
     });
   });
 });

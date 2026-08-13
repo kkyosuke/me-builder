@@ -223,7 +223,7 @@ describe("loadCompatibilitySharePreviewData", () => {
           diagnoses: [
             {
               id: "valid",
-              relationshipCategory: "general",
+              relationshipCategory: "partner",
               availability: "open",
               responseStatus: "answered",
             },
@@ -269,7 +269,7 @@ describe("loadCompatibilitySharePreviewData", () => {
     expect(data.nextAction).toBeNull();
   });
 
-  it("招待に関係カテゴリを保存するまではgeneral以外を共有対象にしない", async () => {
+  it("招待に関係カテゴリを保存するまではpartnerとgeneral以外を共有対象にしない", async () => {
     const scoreAnswers = vi.fn();
     const data = await loadCompatibilitySharePreviewData(
       {
@@ -282,19 +282,19 @@ describe("loadCompatibilitySharePreviewData", () => {
         getPreviewSource: vi.fn().mockResolvedValue({
           diagnoses: [
             {
-              id: "partner-open",
-              relationshipCategory: "partner",
+              id: "work-open",
+              relationshipCategory: "work",
               availability: "open",
               responseStatus: "unanswered",
             },
           ],
           answeredDiagnoses: [
             {
-              id: "partner-answered",
-              title: "パートナーとの会話",
-              relationshipCategory: "partner",
+              id: "work-answered",
+              title: "仕事での会話",
+              relationshipCategory: "work",
               answers: [],
-              scoringConfig: { id: "config-partner" },
+              scoringConfig: { id: "config-work" },
             },
           ],
         }),

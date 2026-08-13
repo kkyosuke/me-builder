@@ -42,13 +42,13 @@ seedは必ずmigration適用後に実行します。localでは開発者が明�
 
 | 表示順 | Diagnosis ID | タイトル | Relationship Category | Question Version | 受付開始 |
 | ---: | --- | --- | --- | --- | --- |
-| 10 | `relationship-priority` | 自分と相手の優先・境界線 | `general` | すべてversion 1 | 2026-08-04 00:00:00 UTC |
-| 20 | `money-values` | お金と消費 | `general` | すべてversion 1 | 2026-08-04 00:00:00 UTC |
-| 30 | `leisure-style` | インドア・アウトドアと余暇 | `general` | すべてversion 1 | 2026-08-04 00:00:00 UTC |
-| 40 | `time-planning` | 時間と予定 | `general` | すべてversion 1 | 2026-08-04 00:00:00 UTC |
-| 50 | `conversation-emotion` | 会話と感情表現 | `general` | すべてversion 1 | 2026-08-04 00:00:00 UTC |
+| 10 | `relationship-priority` | 自分と相手の優先・境界線 | `partner` | すべてversion 1 | 2026-08-04 00:00:00 UTC |
+| 20 | `money-values` | お金と消費 | `partner` | すべてversion 1 | 2026-08-04 00:00:00 UTC |
+| 30 | `leisure-style` | インドア・アウトドアと余暇 | `partner` | すべてversion 1 | 2026-08-04 00:00:00 UTC |
+| 40 | `time-planning` | 時間と予定 | `partner` | すべてversion 1 | 2026-08-04 00:00:00 UTC |
+| 50 | `conversation-emotion` | 会話と感情表現 | `partner` | すべてversion 1 | 2026-08-04 00:00:00 UTC |
 
-いずれも終了日時を持たず、Question Versionは`approved`、Diagnosisは`published`として登録します。既存の質問は特定の関係を前提に書かれていないため`general`とし、関係別のDiagnosisは質問内容を確定してから追加します。Diagnosisには一覧表示用の短い説明、表示順、版付き採点設定への参照を持たせます。Choiceは「いいえ」「はい」の2件です。表示順は診断内容ではなく一覧上の優先順位として変更でき、将来の差し込みに備えて10刻みで設定します。
+いずれも終了日時を持たず、Question Versionは`approved`、Diagnosisは`published`として登録します。既存の質問は交際、家計、パートナーとの余暇、一緒に過ごす時間、愛情表現など、パートナーとの関係を前提にしているため`partner`とします。Relationship Category追加時のmigrationで既存行へ入る`general`は、上記5件に限りseedの条件付きUPSERTで`partner`へ補正します。すでに別カテゴリを持つ行は上書きしません。Diagnosisには一覧表示用の短い説明、表示順、版付き採点設定への参照を持たせます。Choiceは「いいえ」「はい」の2件です。表示順は診断内容ではなく一覧上の優先順位として変更でき、将来の差し込みに備えて10刻みで設定します。
 
 ## 5. 実行方法
 
@@ -94,6 +94,7 @@ SQL末尾の検証クエリは、現在のseedだけを適用した場合に次�
 件数だけでなく、次も確認します。
 
 - Diagnosisが`published`で、受付開始日時を過ぎている
+- 既存5件のRelationship Categoryが`partner`である
 - 1つのDiagnosisにposition 0から9までの10問がある
 - 各Question Versionが`approved`である
 - 各Question Versionにposition 0の「いいえ」とposition 1の「はい」がある
