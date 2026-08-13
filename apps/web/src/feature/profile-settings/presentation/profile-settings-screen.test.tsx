@@ -98,6 +98,7 @@ describe("ProfileSettingsScreen", () => {
   });
 
   it("管理者だけに管理者画面へのリンクを表示する", () => {
+    const onOpenAdmin = vi.fn();
     const { rerender } = render(
       <ProfileSettingsScreen
         avatar={null}
@@ -105,6 +106,7 @@ describe("ProfileSettingsScreen", () => {
         theme="dark"
         fontSize="medium"
         onBack={vi.fn()}
+        onOpenAdmin={onOpenAdmin}
         onOpenAvatar={vi.fn()}
         onThemeChange={vi.fn()}
         onFontSizeChange={vi.fn()}
@@ -120,15 +122,17 @@ describe("ProfileSettingsScreen", () => {
         theme="dark"
         fontSize="medium"
         onBack={vi.fn()}
+        onOpenAdmin={onOpenAdmin}
         onOpenAvatar={vi.fn()}
         onThemeChange={vi.fn()}
         onFontSizeChange={vi.fn()}
       />,
     );
 
-    expect(screen.getByRole("link", { name: /管理者画面を開く/ }).getAttribute("href")).toBe(
-      "/admin",
-    );
+    const adminLink = screen.getByRole("link", { name: /管理者画面を開く/ });
+    expect(adminLink.getAttribute("href")).toBe("/admin");
+    fireEvent.click(adminLink);
+    expect(onOpenAdmin).toHaveBeenCalledOnce();
   });
 
   it("プロフィール取得中はアバター操作をSkeletonに置き換える", () => {
