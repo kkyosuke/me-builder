@@ -529,6 +529,38 @@ describe("App", () => {
     );
   });
 
+  it("主ナビゲーションの切り替えでプロフィール画像と取得済み状態を維持する", async () => {
+    window.history.replaceState({}, "", "/diagnosis");
+    mocks.fetchAccountProfile.mockResolvedValue({
+      role: "user",
+      displayName: "テスト",
+      avatar: {
+        source: "uploaded",
+        url: "data:image/png;base64,c2F2ZWQ=",
+        updatedAt: "2026-08-11T00:00:00.000Z",
+      },
+    });
+
+    render(<App />);
+
+    const profileButton = await screen.findByRole("button", { name: "プロフィールを開く" });
+    await waitFor(() =>
+      expect(profileButton.querySelector("img")?.getAttribute("src")).toBe(
+        "data:image/png;base64,c2F2ZWQ=",
+      ),
+    );
+    expect(mocks.fetchAccountProfile).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(await screen.findByRole("link", { name: "わたし" }));
+
+    await waitFor(() => expect(window.location.pathname).toBe("/me"));
+    expect(profileButton.isConnected).toBe(true);
+    expect(profileButton.querySelector("img")?.getAttribute("src")).toBe(
+      "data:image/png;base64,c2F2ZWQ=",
+    );
+    expect(mocks.fetchAccountProfile).toHaveBeenCalledTimes(1);
+  });
+
   it("保存画像の取得前にLINE画像を先に表示しない", async () => {
     const linePictureUrl = "https://example.com/line-profile.jpg";
     let resolveProfile: ((profile: unknown) => void) | undefined;
