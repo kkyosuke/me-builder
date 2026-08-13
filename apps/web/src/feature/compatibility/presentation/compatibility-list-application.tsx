@@ -20,8 +20,10 @@ export default function CompatibilityListApplication() {
       );
       setSharingMessage(
         destination === "line"
-          ? "LINEの共有先を開きました。"
-          : "端末の共有先を開きました。LINEを選んで送信してください。",
+          ? "LINEで招待を送信しました。"
+          : destination === "system"
+            ? "招待を共有しました。"
+            : "送信をキャンセルしました。",
       );
     } catch (error) {
       setSharingMessage(error instanceof Error ? error.message : "LINEで送信できませんでした。");

@@ -156,7 +156,14 @@ describe("Web recovery flows E2E", () => {
 
     render(<App />);
 
-    expect(await screen.findByRole("heading", { name: "診断を読み込めませんでした" })).toBeTruthy();
+    expect(await screen.findByRole("status", { name: "診断結果を読み込み中" })).toBeTruthy();
+    expect(
+      await screen.findByRole(
+        "heading",
+        { name: "診断を読み込めませんでした" },
+        { timeout: 2_000 },
+      ),
+    ).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "もう一度読み込む" }));
 
     expect(await screen.findByRole("heading", { name: "テスト診断" })).toBeTruthy();

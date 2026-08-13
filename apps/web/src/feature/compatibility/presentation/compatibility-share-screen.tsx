@@ -13,7 +13,7 @@ import type {
   CompatibilityShareConsent,
   CompatibilityShareConsentBlockingReason,
 } from "../model/compatibility-share-consent";
-import { CompatibilityPrivacyDisclosure } from "./components/compatibility-disclosure";
+import { CompatibilityPrivacyNotice } from "./components/compatibility-disclosure";
 import { CompatibilityShareScope } from "./components/compatibility-share-content";
 import { CompatibilityBackHeader, CompatibilityProfileAvatar } from "./components/compatibility-ui";
 
@@ -60,6 +60,7 @@ function ShareConsentContent({
   onIssue,
   onRetryConsent,
   onShareToLine,
+  isSharing,
   sharingMessage,
 }: {
   consent: CompatibilityShareConsent;
@@ -68,6 +69,7 @@ function ShareConsentContent({
   onIssue: () => void;
   onRetryConsent: () => void;
   onShareToLine: (url: string) => void;
+  isSharing: boolean;
   sharingMessage: string | null;
 }) {
   const displayName = consent.displayName ?? "あなた";
@@ -96,6 +98,33 @@ function ShareConsentContent({
 
       <CompatibilityShareScope headingId="share-scope-heading" />
 
+      <CompatibilityPrivacyNotice
+        title="共有されない詳細"
+        footer="相手が承諾するまで、共有は始まりません。共有は後から終了できます。"
+        status={
+          invitationState.status === "success" ? (
+            <div className="flex items-start gap-2 text-emerald-950 dark:text-emerald-100">
+              <CheckCircle2 className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
+              <div className="min-w-0 flex-1">
+                <h3 className="font-bold">招待リンクを発行しました</h3>
+                <p className="mt-2 text-sm leading-relaxed text-emerald-900 dark:text-emerald-200">
+                  このリンクは1人が承諾すると使用済みになります。有効期限は
+                  {new Date(invitationState.data.expiresAt).toLocaleDateString("ja-JP")}です。
+                </p>
+                <p className="mt-3 break-all rounded-xl bg-white/80 p-3 text-xs text-slate-700 dark:bg-slate-950/60 dark:text-slate-300">
+                  {invitationState.data.invitationUrl}
+                </p>
+                {sharingMessage && (
+                  <output className="mt-3 block text-sm text-slate-700 dark:text-slate-300">
+                    {sharingMessage}
+                  </output>
+                )}
+              </div>
+            </div>
+          ) : undefined
+        }
+      />
+
       {guide && (
         <section className="mt-8 rounded-2xl border border-sky-300/60 bg-sky-50 p-4 dark:border-sky-500/30 dark:bg-sky-950/30">
           <p className="text-sm leading-relaxed text-sky-950 dark:text-sky-100">{guide.message}</p>
@@ -122,53 +151,37 @@ function ShareConsentContent({
         </section>
       )}
 
-      {invitationState.status === "success" ? (
-        <section className="mt-8 mb-8 rounded-3xl border border-emerald-300 bg-emerald-50 p-5 dark:border-emerald-700 dark:bg-emerald-950/30">
-          <h2 className="flex items-center gap-2 font-bold text-emerald-950 dark:text-emerald-100">
-            <CheckCircle2 className="size-5" aria-hidden="true" />
-            招待リンクを発行しました
-          </h2>
-          <p className="mt-2 text-sm leading-relaxed text-emerald-900 dark:text-emerald-200">
-            このリンクは1人が承諾すると使用済みになります。有効期限は
-            {new Date(invitationState.data.expiresAt).toLocaleDateString("ja-JP")}です。
-          </p>
-          <p className="mt-3 break-all rounded-xl bg-white/80 p-3 text-xs text-slate-700 dark:bg-slate-950/60 dark:text-slate-300">
-            {invitationState.data.invitationUrl}
-          </p>
-          {sharingMessage && (
-            <output className="mt-3 block text-center text-sm text-slate-700 dark:text-slate-300">
-              {sharingMessage}
-            </output>
-          )}
-        </section>
-      ) : (
-        <>
-          {invitationState.status === "error" && (
-            <div
-              role="alert"
-              className="mt-8 rounded-2xl border border-red-300 bg-red-50 p-4 text-sm text-red-800 dark:border-red-700 dark:bg-red-950/30 dark:text-red-200"
-            >
-              <p>{invitationState.message}</p>
-              <button type="button" onClick={onRetryConsent} className="mt-2 font-bold underline">
-                共有の確認を再読み込み
-              </button>
-            </div>
-          )}
-        </>
+      {invitationState.status === "error" && (
+        <div
+          role="alert"
+          className="mt-8 rounded-2xl border border-red-300 bg-red-50 p-4 text-sm text-red-800 dark:border-red-700 dark:bg-red-950/30 dark:text-red-200"
+        >
+          <p>{invitationState.message}</p>
+          <button type="button" onClick={onRetryConsent} className="mt-2 font-bold underline">
+            共有の確認を再読み込み
+          </button>
+        </div>
       )}
 
       <footer className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 shadow-[0_-8px_30px_rgba(15,23,42,0.12)] backdrop-blur dark:border-slate-700 dark:bg-slate-900/95">
-        <div className="mx-auto w-full max-w-2xl space-y-3 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-8">
-          <CompatibilityPrivacyDisclosure footer="相手が承諾するまで、共有は始まりません。共有は後から終了できます。" />
+        <div className="mx-auto w-full max-w-2xl px-4 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-8">
           {invitationState.status === "success" ? (
             <div className="grid h-12 grid-cols-2 gap-2">
               <button
                 type="button"
+                disabled={isSharing}
                 onClick={() => onShareToLine(invitationState.data.invitationUrl)}
-                className="flex h-12 min-w-0 items-center justify-center gap-2 rounded-2xl bg-[#06c755] px-2 text-sm font-bold text-white"
+                className="flex h-12 min-w-0 items-center justify-center gap-2 rounded-2xl bg-[#06c755] px-2 text-sm font-bold text-white disabled:cursor-wait disabled:opacity-60"
               >
-                <MessageCircle className="size-5 shrink-0" aria-hidden="true" />
-                友だちに送る
+                {isSharing ? (
+                  <LoaderCircle
+                    className="size-5 shrink-0 animate-spin motion-reduce:animate-none"
+                    aria-hidden="true"
+                  />
+                ) : (
+                  <MessageCircle className="size-5 shrink-0" aria-hidden="true" />
+                )}
+                {isSharing ? "共有先を開いています" : "友だちに送る"}
               </button>
               <button
                 type="button"
@@ -213,6 +226,7 @@ export function CompatibilityShareScreen({
   onIssue = () => undefined,
   onRetry,
   onShareToLine = () => undefined,
+  isSharing = false,
   sharingMessage = null,
   state,
 }: {
@@ -221,11 +235,12 @@ export function CompatibilityShareScreen({
   onIssue?: () => void;
   onRetry: () => void;
   onShareToLine?: (url: string) => void;
+  isSharing?: boolean;
   sharingMessage?: string | null;
   state: AsyncState<CompatibilityShareConsent>;
 }) {
   return (
-    <main className="mx-auto min-h-dvh w-full max-w-2xl px-4 pt-6 pb-44 sm:px-8">
+    <main className="mx-auto min-h-dvh w-full max-w-2xl px-4 pt-6 pb-28 sm:px-8">
       <CompatibilityBackHeader />
       {(state.status === "idle" || state.status === "loading") && <ShareConsentSkeleton />}
       {state.status === "error" && (
@@ -255,6 +270,7 @@ export function CompatibilityShareScreen({
           onIssue={onIssue}
           onRetryConsent={onRetry}
           onShareToLine={onShareToLine}
+          isSharing={isSharing}
         />
       )}
     </main>

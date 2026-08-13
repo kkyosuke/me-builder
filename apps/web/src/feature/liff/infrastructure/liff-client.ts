@@ -15,11 +15,15 @@ export function getLiffIdToken(): string | null {
   }
 }
 
-/** LIFFの共有先選択を開き、LINEの友だちへテキストを送れる場合だけtrueを返す。 */
-export async function shareLiffTextMessage(text: string): Promise<boolean> {
-  if (!liff.isApiAvailable("shareTargetPicker")) return false;
-  await liff.shareTargetPicker([{ type: "text", text }]);
-  return true;
+/**
+ * LIFFの共有先選択を開始する。利用できない場合は同期的にnullを返し、呼び出し側が
+ * ユーザー操作の権限を失う前にWeb Share APIへ切り替えられるようにする。
+ */
+export function shareLiffTextMessage(text: string): Promise<"sent" | "cancelled"> | null {
+  if (!liff.isApiAvailable("shareTargetPicker")) return null;
+  return liff
+    .shareTargetPicker([{ type: "text", text }], { isMultiple: false })
+    .then((result) => (result ? "sent" : "cancelled"));
 }
 
 /**

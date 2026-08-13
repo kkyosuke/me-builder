@@ -7,7 +7,10 @@ import {
 import { DiagnosisDetailScreen } from "./components/diagnosis-detail-screen";
 import { DiagnosisGuidance } from "./components/diagnosis-guidance";
 import { DiagnosisHome } from "./components/diagnosis-home";
-import { DiagnosisDetailSkeleton } from "./components/diagnosis-loading-skeleton";
+import {
+  DiagnosisAnswerSkeleton,
+  DiagnosisResultSkeleton,
+} from "./components/diagnosis-loading-skeleton";
 import { DiagnosisResultView } from "./components/diagnosis-result";
 import { useDiagnosisDetail } from "./hooks/use-diagnosis-detail";
 import { useDiagnosisList } from "./hooks/use-diagnosis-list";
@@ -51,6 +54,10 @@ export default function DiagnosisApplication() {
     />
   );
 
+  if (isDirectResultPath && diagnoses.state.status === "loading") {
+    content = <DiagnosisResultSkeleton />;
+  }
+
   if (isDirectResultPath && diagnoses.state.status === "success" && !directDiagnosis) {
     content = (
       <DiagnosisGuidance
@@ -64,7 +71,12 @@ export default function DiagnosisApplication() {
   }
 
   if (detail.state.status === "loading") {
-    content = <DiagnosisDetailSkeleton />;
+    content =
+      detail.state.destination === "result" ? (
+        <DiagnosisResultSkeleton />
+      ) : (
+        <DiagnosisAnswerSkeleton />
+      );
   } else if (detail.state.status === "error") {
     content = (
       <DiagnosisGuidance

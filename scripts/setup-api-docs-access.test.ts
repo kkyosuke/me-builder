@@ -29,7 +29,6 @@ describe("setup-api-docs-access", () => {
       .fn<typeof fetch>()
       .mockResolvedValueOnce(response([], { total_pages: 1 }))
       .mockResolvedValueOnce(response({ id: "app-1", name: "me-builder-api-docs-preview" }))
-      .mockResolvedValueOnce(response([], { total_pages: 1 }))
       .mockResolvedValueOnce(response({ id: "policy-1" }));
 
     await setupApiDocsAccess({
@@ -52,7 +51,7 @@ describe("setup-api-docs-access", () => {
     ]);
     expect(JSON.stringify(application)).not.toContain("/api/health");
 
-    const policyRequest = fetchMock.mock.calls[3];
+    const policyRequest = fetchMock.mock.calls[2];
     expect(policyRequest?.[1]?.method).toBe("POST");
     expect(JSON.parse(String(policyRequest?.[1]?.body))).toMatchObject({
       decision: "allow",
@@ -64,17 +63,18 @@ describe("setup-api-docs-access", () => {
     const fetchMock = vi
       .fn<typeof fetch>()
       .mockResolvedValueOnce(
-        response([{ id: "app-1", name: "me-builder-api-docs-production" }], {
-          total_pages: 1,
-        }),
-      )
-      .mockResolvedValueOnce(
         response(
           [
             {
-              id: "policy-1",
-              name: "Allow me-builder API docs developers",
-              decision: "allow",
+              id: "app-1",
+              name: "me-builder-api-docs-production",
+              policies: [
+                {
+                  id: "policy-1",
+                  name: "Allow me-builder API docs developers",
+                  decision: "allow",
+                },
+              ],
             },
           ],
           { total_pages: 1 },
@@ -92,8 +92,56 @@ describe("setup-api-docs-access", () => {
       fetch: fetchMock,
     });
 
+    expect(fetchMock.mock.calls[1]?.[1]?.method).toBe("PUT");
     expect(fetchMock.mock.calls[2]?.[1]?.method).toBe("PUT");
-    expect(fetchMock.mock.calls[3]?.[1]?.method).toBe("PUT");
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/policies?page="))).toBe(
+      false,
+    );
+  });
+
+  it("既存policyが同じ設定なら更新APIを呼ばない", async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        response(
+          [
+            {
+              id: "app-1",
+              name: "me-builder-api-docs-preview",
+              policies: [
+                {
+                  id: "policy-1",
+                  name: "Allow me-builder API docs developers",
+                  decision: "allow",
+                  include: [
+                    { email: { email: "ops@example.com" } },
+                    { email: { email: "dev@example.com" } },
+                  ],
+                  exclude: [],
+                  require: [],
+                  precedence: 1,
+                  session_duration: "24h",
+                },
+              ],
+            },
+          ],
+          { total_pages: 1 },
+        ),
+      )
+      .mockResolvedValueOnce(response({ id: "app-1", name: "me-builder-api-docs-preview" }));
+
+    await setupApiDocsAccess({
+      environment: "preview",
+      accountId: "account-1",
+      apiToken: "token",
+      baseDomain: "stg.example.com",
+      allowedEmails: ["dev@example.com", "ops@example.com"],
+      fetch: fetchMock,
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[1]?.[1]?.method).toBe("PUT");
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/policies/"))).toBe(false);
   });
 
   it("同じ保護対象を持つ既存Applicationをpolicy検査後に引き継ぐ", async () => {
@@ -106,12 +154,12 @@ describe("setup-api-docs-access", () => {
               id: "legacy-app",
               name: "Legacy API docs",
               domain: "api.stg.example.com/api/openapi.json",
+              policies: [],
             },
           ],
           { total_pages: 1 },
         ),
       )
-      .mockResolvedValueOnce(response([], { total_pages: 1 }))
       .mockResolvedValueOnce(response({ id: "legacy-app", name: "me-builder-api-docs-preview" }))
       .mockResolvedValueOnce(response({ id: "policy-1" }));
 
@@ -124,25 +172,24 @@ describe("setup-api-docs-access", () => {
       fetch: fetchMock,
     });
 
-    expect(fetchMock.mock.calls[1]?.[1]?.method).toBeUndefined();
-    expect(String(fetchMock.mock.calls[1]?.[0])).toContain("/legacy-app/policies");
-    expect(fetchMock.mock.calls[2]?.[1]?.method).toBe("PUT");
-    expect(String(fetchMock.mock.calls[2]?.[0])).toMatch(/\/access\/apps\/legacy-app$/);
+    expect(fetchMock.mock.calls[1]?.[1]?.method).toBe("PUT");
+    expect(String(fetchMock.mock.calls[1]?.[0])).toMatch(/\/access\/apps\/legacy-app$/);
+    expect(fetchMock.mock.calls[2]?.[1]?.method).toBe("POST");
   });
 
   it("未知のpolicyがある場合は安全側に停止する", async () => {
-    const fetchMock = vi
-      .fn<typeof fetch>()
-      .mockResolvedValueOnce(
-        response([{ id: "app-1", name: "me-builder-api-docs-production" }], {
-          total_pages: 1,
-        }),
-      )
-      .mockResolvedValueOnce(
-        response([{ id: "policy-2", name: "Allow everyone", decision: "allow" }], {
-          total_pages: 1,
-        }),
-      );
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValueOnce(
+      response(
+        [
+          {
+            id: "app-1",
+            name: "me-builder-api-docs-production",
+            policies: [{ id: "policy-2", name: "Allow everyone", decision: "allow" }],
+          },
+        ],
+        { total_pages: 1 },
+      ),
+    );
 
     await expect(
       setupApiDocsAccess({
@@ -155,7 +202,7 @@ describe("setup-api-docs-access", () => {
       }),
     ).rejects.toThrow("Unmanaged policies exist");
 
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("Cloudflare APIのmessageが欠けていてもundefinedをエラーへ出さない", async () => {
@@ -177,6 +224,30 @@ describe("setup-api-docs-access", () => {
       }),
     ).rejects.toThrow(
       "Cloudflare API POST /access/apps failed (1010). Verify that the account's Zero Trust organization is initialized",
+    );
+  });
+
+  it("埋め込みpolicyがない旧レスポンスで1010になった場合も必要な権限を案内する", async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        response([{ id: "app-1", name: "me-builder-api-docs-preview" }], { total_pages: 1 }),
+      )
+      .mockResolvedValueOnce(
+        Response.json({ success: false, errors: [{ code: 1010 }], result: null }, { status: 403 }),
+      );
+
+    await expect(
+      setupApiDocsAccess({
+        environment: "preview",
+        accountId: "account-1",
+        apiToken: "token",
+        baseDomain: "stg.example.com",
+        allowedEmails: ["dev@example.com"],
+        fetch: fetchMock,
+      }),
+    ).rejects.toThrow(
+      "Cloudflare API GET /access/apps/app-1/policies?page=1&per_page=50 failed (1010). Verify that the account's Zero Trust organization is initialized",
     );
   });
 });

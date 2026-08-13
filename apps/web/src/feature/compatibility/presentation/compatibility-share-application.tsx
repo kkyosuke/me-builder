@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useLiffSession } from "../../liff";
 import {
   copyCompatibilityInvitationUrl,
@@ -12,9 +12,15 @@ export default function CompatibilityShareApplication() {
   const { acquireIdToken } = useLiffSession();
   const { state, reload } = useCompatibilityShareConsent({ acquireIdToken });
   const invitation = useCompatibilityInvitationIssue({ acquireIdToken });
+  const sharing = useRef(false);
+  const [isSharing, setIsSharing] = useState(false);
   const [sharingMessage, setSharingMessage] = useState<string | null>(null);
 
   const shareToLine = async (url: string) => {
+    if (sharing.current) return;
+    sharing.current = true;
+    setIsSharing(true);
+    setSharingMessage(null);
     try {
       const destination = await shareCompatibilityInvitationToLine(
         state.status === "success" ? state.data.displayName : null,
@@ -22,11 +28,16 @@ export default function CompatibilityShareApplication() {
       );
       setSharingMessage(
         destination === "line"
-          ? "LINEの共有先を開きました。"
-          : "端末の共有先を開きました。LINEを選んで送信してください。",
+          ? "LINEで招待を送信しました。"
+          : destination === "system"
+            ? "招待を共有しました。"
+            : "送信をキャンセルしました。",
       );
     } catch (error) {
       setSharingMessage(error instanceof Error ? error.message : "LINEで共有できませんでした。");
+    } finally {
+      sharing.current = false;
+      setIsSharing(false);
     }
   };
 
@@ -45,6 +56,7 @@ export default function CompatibilityShareApplication() {
     <CompatibilityShareScreen
       state={state}
       invitationState={invitation.state}
+      isSharing={isSharing}
       sharingMessage={sharingMessage}
       onIssue={() => void invitation.issue()}
       onRetry={() => void reload()}

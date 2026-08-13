@@ -104,18 +104,26 @@ describe("shareLiffTextMessage", () => {
 
   it("共有先選択を利用できる場合はテキストメッセージだけを渡す", async () => {
     mockLiff.isApiAvailable.mockReturnValue(true);
-    mockLiff.shareTargetPicker.mockResolvedValue(undefined);
+    mockLiff.shareTargetPicker.mockResolvedValue({ status: "success" });
 
-    await expect(shareLiffTextMessage("招待メッセージ")).resolves.toBe(true);
-    expect(mockLiff.shareTargetPicker).toHaveBeenCalledWith([
-      { type: "text", text: "招待メッセージ" },
-    ]);
+    await expect(shareLiffTextMessage("招待メッセージ")).resolves.toBe("sent");
+    expect(mockLiff.shareTargetPicker).toHaveBeenCalledWith(
+      [{ type: "text", text: "招待メッセージ" }],
+      { isMultiple: false },
+    );
   });
 
-  it("共有先選択を利用できなければSDKを呼ばずfalseを返す", async () => {
+  it("共有先選択を閉じた場合はキャンセルを返す", async () => {
+    mockLiff.isApiAvailable.mockReturnValue(true);
+    mockLiff.shareTargetPicker.mockResolvedValue(undefined);
+
+    await expect(shareLiffTextMessage("招待メッセージ")).resolves.toBe("cancelled");
+  });
+
+  it("共有先選択を利用できなければSDKを呼ばず同期的にnullを返す", () => {
     mockLiff.isApiAvailable.mockReturnValue(false);
 
-    await expect(shareLiffTextMessage("招待メッセージ")).resolves.toBe(false);
+    expect(shareLiffTextMessage("招待メッセージ")).toBeNull();
     expect(mockLiff.shareTargetPicker).not.toHaveBeenCalled();
   });
 });
