@@ -21,7 +21,7 @@
 | [プロフィール設定体験設計](../docs/product/profile-settings-experience.md) | 共通ヘッダー右上の入口、プロフィール画面、アバター設定への接続、ライト・ダークテーマの選択と保存 |
 | [アバター設定体験設計](../docs/product/avatar-experience.md) | LINEプロフィール画像の初期表示、端末画像の選択・プレビュー・設定、差し替え・削除の体験と責務境界 |
 | [ストレスの手がかりとAIセルフケア相談体験設計](../docs/product/self-care-ai-consultation-experience.md) | 本人向けの負荷の手がかり、早期サイン、対処、相談先の表示とAI相談、安全上の切り替え |
-| [日記チャット体験設計](../docs/product/diary-chat-experience.md) | 日々の声かけから出来事と行動原理を探り、記憶を使って助言する対話体験と応答時間 |
+| [日記チャット体験設計](../docs/product/diary-chat-experience.md) | 日々の声かけの配信判断と段階導入、出来事と行動原理を探り、記憶を使って助言する対話体験と応答時間 |
 | [日記チャット実装設計](../docs/architecture/diary-chat-implementation-design.md) | 日記チャットのAccountDataモデル、Cloudflare実行基盤、プロンプト、ガードレール、応答期限 |
 | [管理者向け統計ダッシュボード設計](../docs/architecture/admin-statistics-dashboard.md) | 管理者認可、Gemini・LINE統計の項目、取得元、障害時の表示 |
 | [Phase 1 診断体験設計](../docs/diagnosis/diagnosis-experience.md) | 診断一覧、回答、回答内容、LINE通知、リッチメニューのUIと遷移、縦切りの完了条件 |

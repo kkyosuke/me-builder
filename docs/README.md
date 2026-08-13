@@ -50,7 +50,7 @@ docs/
 - [プロフィール設定体験設計](product/profile-settings-experience.md) — 右上の入口、アバター設定への接続、ライト・ダークテーマの選択と保存
 - [アバター設定体験設計](product/avatar-experience.md) — LINEプロフィール画像の初期表示、端末画像の選択・プレビュー・設定、差し替え・削除
 - [ストレスの手がかりとAIセルフケア相談体験設計](product/self-care-ai-consultation-experience.md) — 自分用のセルフケア情報、AI相談、安全上の切り替え
-- [日記チャット体験設計](product/diary-chat-experience.md) — 日々の声かけから出来事と行動原理を探り、記憶を使って助言する対話体験と応答時間
+- [日記チャット体験設計](product/diary-chat-experience.md) — 日々の声かけの配信判断と段階導入、出来事と行動原理を探り、記憶を使って助言する対話体験と応答時間
 
 ### 診断を設計する
 
