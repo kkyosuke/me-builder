@@ -69,10 +69,13 @@ describe("DiagnosisDetailScreen", () => {
     );
     expect(screen.queryByText("最初の質問")).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: "診断をはじめる" }));
+    const startButton = screen.getByRole("button", { name: "診断をはじめる" });
+    startButton.focus();
+    fireEvent.click(startButton);
 
     expect(screen.getByText("最初の質問")).toBeTruthy();
     expect(screen.getByText(/回答は1問ずつ保存されます/)).toBeTruthy();
+    expect(screen.getByRole("heading", { name: diagnosis.title })).toBe(document.activeElement);
   });
 
   it("保存済み回答があれば導入を挟まず最初の未回答から再開する", () => {

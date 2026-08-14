@@ -1,5 +1,5 @@
 import { ArrowLeft, ArrowRight, Sparkles } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { DiagnosisDefinition } from "../../model/diagnosis-definition";
 import {
   getRelationshipCategoryAnswerContext,
@@ -107,7 +107,14 @@ export function DiagnosisDetailScreen({
   onComplete: Parameters<typeof SwipeDiagnosis>[0]["onComplete"];
 }) {
   const [introductionDismissed, setIntroductionDismissed] = useState(false);
+  const questionHeadingRef = useRef<HTMLHeadingElement>(null);
   const showIntroduction = initialAnswers.length === 0 && !introductionDismissed;
+
+  useEffect(() => {
+    if (introductionDismissed) {
+      questionHeadingRef.current?.focus();
+    }
+  }, [introductionDismissed]);
 
   return (
     <main className="mx-auto min-h-dvh w-full max-w-2xl px-4 py-5 sm:px-8 sm:py-8">
@@ -138,6 +145,7 @@ export function DiagnosisDetailScreen({
           </p>
           <SwipeDiagnosis
             diagnosis={diagnosis}
+            headingRef={questionHeadingRef}
             initialAnswers={initialAnswers}
             onBack={onBack}
             onSaveAnswer={onSaveAnswer}
