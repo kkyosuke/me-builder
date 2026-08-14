@@ -62,7 +62,7 @@ export async function processDailyPromptMessage(
               dependency: "account-data",
             }),
           },
-          "[Daily prompt] failed at daily-prompt.context -> continue with generic weekday prompt",
+          "[Daily prompt] failed at daily-prompt.context -> continue without newly selected weekday context",
         );
         return undefined;
       });

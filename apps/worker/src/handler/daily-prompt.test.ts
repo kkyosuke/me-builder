@@ -1,5 +1,5 @@
 import { D1, line } from "@me-builder/lib";
-import type { DailyPromptQueueMessage, Message } from "@me-builder/shared";
+import { type DailyPromptQueueMessage, type Message, logger } from "@me-builder/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getWorkerConfig } from "../config";
 import type { CloudflareBindings } from "../config/cloudflare";
@@ -135,6 +135,40 @@ describe("daily prompt queue consumer", () => {
       promptVersion: "daily-check-in-fri-v1",
     });
     expect(pushMessage).toHaveBeenCalledOnce();
+    expect(message.ack).toHaveBeenCalledOnce();
+  });
+
+  it("曜日文脈の取得失敗時も既存配送に固定された個別化文面を再配送する", async () => {
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => undefined);
+    execute.mockRejectedValueOnce(new Error("AccountData unavailable")).mockResolvedValueOnce({
+      type: "ready",
+      deliveryId: "daily-prompt:2026-08-14",
+      promptVersion: "daily-check-in-day-off-v1",
+    });
+    const message = createMessage();
+
+    await processDailyPromptMessage(message, bindings(), config);
+
+    expect(pushMessage).toHaveBeenCalledWith(
+      {
+        to: "U_line",
+        messages: [
+          {
+            type: "text",
+            text: "今日は、普段だとお休みの日だったかな。\n違っていたら気にせず、今日のことを話したいところから聞かせて。",
+          },
+        ],
+      },
+      expect.stringMatching(/^[0-9a-f-]{36}$/),
+    );
+    expect(warn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "daily-prompt.weekday-context.failed",
+        outcome: "degraded",
+        disposition: "continue",
+      }),
+      "[Daily prompt] failed at daily-prompt.context -> continue without newly selected weekday context",
+    );
     expect(message.ack).toHaveBeenCalledOnce();
   });
 
