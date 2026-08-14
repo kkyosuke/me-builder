@@ -123,6 +123,85 @@ describe("Compatibility flow", () => {
     expect(onCancel).toHaveBeenCalledWith(pending.relationshipId);
   });
 
+  it("相性一覧を全部・パートナー・家族・友達・仕事で絞り込む", () => {
+    const onCategoryFilterChange = vi.fn();
+    render(
+      <CompatibilityListScreen
+        categoryFilter="family"
+        state={{
+          status: "success",
+          data: {
+            items: [
+              {
+                relationshipId: "1".repeat(64),
+                relationshipCategory: "family",
+                status: "accepted",
+                partnerDisplayName: "家族の相手",
+                readiness: { status: "ready", comparableThemeCount: 2 },
+              },
+              {
+                relationshipId: "2".repeat(64),
+                relationshipCategory: "friend",
+                status: "pending",
+                expiresAt: "2026-08-26T00:00:00.000Z",
+                invitationUrl: "https://example.com/friend",
+              },
+            ],
+          },
+        }}
+        onRetry={vi.fn()}
+        onCancel={vi.fn()}
+        onCategoryFilterChange={onCategoryFilterChange}
+        onResend={vi.fn()}
+      />,
+    );
+
+    const filters = screen.getByRole("group", { name: "関係カテゴリで絞り込む" });
+    expect(Array.from(filters.querySelectorAll("button"), (button) => button.textContent)).toEqual([
+      "全部",
+      "パートナー",
+      "家族",
+      "友達",
+      "仕事",
+    ]);
+    expect(screen.getByRole("button", { name: "家族" }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("heading", { name: "家族の相手さん" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "返事待ち" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "友達" }));
+    expect(onCategoryFilterChange).toHaveBeenCalledWith("friend");
+  });
+
+  it("選択カテゴリに対象がなくても一覧全体の空状態と区別する", () => {
+    render(
+      <CompatibilityListScreen
+        categoryFilter="work"
+        state={{
+          status: "success",
+          data: {
+            items: [
+              {
+                relationshipId: "1".repeat(64),
+                relationshipCategory: "partner",
+                status: "pending",
+                expiresAt: "2026-08-26T00:00:00.000Z",
+                invitationUrl: "https://example.com/partner",
+              },
+            ],
+          },
+        }}
+        onRetry={vi.fn()}
+        onCancel={vi.fn()}
+        onResend={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByRole("heading", { name: "このカテゴリの相手・招待はありません" }),
+    ).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "まだ共有中の相手はいません" })).toBeNull();
+  });
+
   it("招待の取消中は一覧をSkeletonに戻さず対象カードだけにSpinnerを表示する", () => {
     const cancellingId = "1".repeat(64);
     render(
