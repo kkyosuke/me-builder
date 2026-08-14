@@ -31,6 +31,16 @@ const blockingReasonMessages: Record<CompatibilityShareConsentBlockingReason, st
   display_name_unavailable: "LINEの表示名を確認できませんでした。",
 };
 
+const categorySelectorClassNames: Record<
+  CompatibilityRelationshipCategory,
+  { accent: string; focus: string }
+> = {
+  partner: { accent: "accent-rose-500", focus: "focus-within:ring-rose-500" },
+  family: { accent: "accent-amber-500", focus: "focus-within:ring-amber-500" },
+  friend: { accent: "accent-emerald-500", focus: "focus-within:ring-emerald-500" },
+  work: { accent: "accent-blue-500", focus: "focus-within:ring-blue-500" },
+};
+
 const nextActionGuides = {
   diagnosis: {
     message: "診断に答えると、2人で比べられるテーマが増えます。",
@@ -113,7 +123,7 @@ function RelationshipCategorySelector({
         <span className="flex w-full items-baseline justify-between gap-3">
           <span className="font-bold text-slate-950 dark:text-slate-50">相手との関係</span>
           <span className="shrink-0 text-xs font-semibold text-slate-500 dark:text-slate-400">
-            一つ選択してください
+            {value === null ? "一つ選択してください" : "必要なら変更できます"}
           </span>
         </span>
       </legend>
@@ -123,10 +133,11 @@ function RelationshipCategorySelector({
       <div className="mt-3 grid grid-cols-2 gap-2">
         {compatibilityRelationshipCategoryValues.map((category) => {
           const selected = value === category;
+          const selectorClassName = categorySelectorClassNames[category];
           return (
             <label
               key={category}
-              className={`flex min-h-12 cursor-pointer items-center gap-2.5 rounded-2xl border px-3 py-2 text-sm font-bold transition focus-within:ring-2 focus-within:ring-sky-500 focus-within:ring-offset-2 ${
+              className={`flex min-h-12 cursor-pointer items-center gap-2.5 rounded-2xl border px-3 py-2 text-sm font-bold transition focus-within:ring-2 focus-within:ring-offset-2 ${selectorClassName.focus} ${
                 selected
                   ? `border-current ring-2 ring-current/20 ${getRelationshipCategoryBadgeClassName(category)}`
                   : "border-slate-300 bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
@@ -138,7 +149,7 @@ function RelationshipCategorySelector({
                 value={category}
                 checked={selected}
                 onChange={() => onChange(category)}
-                className="size-5 shrink-0 accent-rose-500"
+                className={`size-5 shrink-0 ${selectorClassName.accent}`}
               />
               <span>{getRelationshipCategoryLabel(category)}</span>
             </label>
@@ -333,7 +344,7 @@ export function CompatibilityShareScreen({
   onShareToLine = () => undefined,
   isSharing = false,
   sharingMessage = null,
-  relationshipCategory = null,
+  relationshipCategory = "partner",
   onRelationshipCategoryChange = () => undefined,
   state,
 }: {

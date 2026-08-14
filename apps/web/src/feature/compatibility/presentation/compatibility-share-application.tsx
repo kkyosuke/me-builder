@@ -12,7 +12,7 @@ import { useCompatibilityShareConsent } from "./hooks/use-compatibility-share-co
 export default function CompatibilityShareApplication() {
   const { acquireIdToken } = useLiffSession();
   const [relationshipCategory, setRelationshipCategory] =
-    useState<CompatibilityRelationshipCategory | null>(null);
+    useState<CompatibilityRelationshipCategory>("partner");
   const { state, reload } = useCompatibilityShareConsent({
     acquireIdToken,
     relationshipCategory,
@@ -66,9 +66,7 @@ export default function CompatibilityShareApplication() {
       sharingMessage={sharingMessage}
       relationshipCategory={relationshipCategory}
       onRelationshipCategoryChange={setRelationshipCategory}
-      onIssue={() => {
-        if (relationshipCategory) void invitation.issue(relationshipCategory);
-      }}
+      onIssue={() => void invitation.issue(relationshipCategory)}
       onRetry={() => void reload()}
       onShareToLine={(url) => void shareToLine(url)}
       onCopyLink={(url) => void copyLink(url)}
