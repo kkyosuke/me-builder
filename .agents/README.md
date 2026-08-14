@@ -18,13 +18,13 @@
 | [全体画面遷移設計](../docs/product/screen-navigation.md) | LINEとWebをまたぐ入口、主ナビゲーション、右上のプロフィール、診断・相性・わたしのまとめ・セルフケア・AI相談・管理者画面の接続 |
 | [わたしのまとめ仕様](../docs/product/profile-summary-experience.md) | 診断と日記からAI生成した版付きの「わたしのまとめ」、診断テーマ、導線、状態、受け入れ条件 |
 | [相性診断・うつし共有体験設計](../docs/product/compatibility-experience.md) | 1対1の招待リンク、LINE共有、双方の同意、相性一覧、「私について」と「2人について」、共有終了の体験 |
-| [成長・報酬体験の提案](../docs/product/progression-reward-experience.md) | Brainの成長イベントによる上限のないうつしレベル、現在のかけら数、ペア単位のふたりレベル、安全上の制約 |
+| [成長・報酬体験の提案](../docs/product/progression-reward-experience.md) | Brainの成長イベントによる上限のないうつしレベル、集めたかけらと有効なかけら、ペア単位のふたりレベル、安全上の制約 |
 | [プロフィール設定体験設計](../docs/product/profile-settings-experience.md) | 共通ヘッダー右上の入口、プロフィール画面、アバター設定への接続、ライト・ダークテーマの選択と保存 |
 | [アバター設定体験設計](../docs/product/avatar-experience.md) | LINEプロフィール画像の初期表示、端末画像の選択・プレビュー・設定、差し替え・削除の体験と責務境界 |
 | [ストレスの手がかりとAIセルフケア相談体験設計](../docs/product/self-care-ai-consultation-experience.md) | 本人向けの負荷の手がかり、早期サイン、対処、相談先の表示とAI相談、安全上の切り替え |
 | [日記チャット体験設計](../docs/product/diary-chat-experience.md) | 日々の声かけの配信判断・個別化情報・段階導入、出来事と行動原理を探り、記憶を使って助言する対話体験と応答時間 |
 | [日記チャット実装設計](../docs/architecture/diary-chat-implementation-design.md) | 日記チャットのAccountDataモデル、声かけコンテキストの保存、Cloudflare実行基盤、プロンプト、ガードレール、応答期限 |
-| [管理者向け統計ダッシュボード設計](../docs/architecture/admin-statistics-dashboard.md) | 管理者認可、Gemini・LINE統計の項目、取得元、障害時の表示 |
+| [管理者向けダッシュボード設計](../docs/architecture/admin-statistics-dashboard.md) | 管理者認可、Account一覧、成長projection、Gemini・LINE統計、障害時の表示 |
 | [Phase 1 診断体験設計](../docs/diagnosis/diagnosis-experience.md) | 診断一覧、回答、回答内容、LINE通知、リッチメニューのUIと遷移、縦切りの完了条件 |
 | [Phase 1 診断ドメイン設計](../docs/diagnosis/diagnosis-domain-design.md) | Question、Diagnosis、DiagnosisResponseの集約、状態、不変条件、Account / Sourceとの関係 |
 | [人間関係の価値観診断候補](../docs/diagnosis/content/relationship-values-diagnosis.md) | 人間関係で違いが問題になりやすい価値観の分類、質問作成時の原則 |

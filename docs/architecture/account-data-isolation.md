@@ -16,7 +16,7 @@
 
 - Accountの本人確認とIdentity統合は[ドメイン設計](../domain/domain-design.md)を正とします
 - Brain Itemの用途別開示は[Brainのラベル・アクセス制御設計](../domain/brain/brain-access-label-design.md)を正とします
-- 管理者の認可方式と統計項目は[管理者向け統計ダッシュボード設計](admin-statistics-dashboard.md)を正とします
+- 管理者の認可方式、Account一覧の項目、統計項目は[管理者向けダッシュボード設計](admin-statistics-dashboard.md)を正とします
 
 ## 2. 前提
 
@@ -46,7 +46,7 @@ flowchart LR
 | 個人コンテンツroot | Source Record、Conversation Session、Diagnosis Response、Brain Item、プロフィール要約 | AccountData SQLite | Objectに固定したAccountだけを保存 |
 | Account所有descendant | payload、message、turn、answer、edge、revision、projection request | AccountData SQLite | 所有rootと同じObject内で参照 |
 | 複数Account間の共有関係 | 相性招待、双方の同意 | 関係ごとの専用Durable Object | 片方のAccountDataへ正本を寄せない |
-| 全体運用 | 管理者統計、配送先解決 | 共有D1 | 原文・Brain Item本文を保存しない |
+| 全体運用 | 管理者統計、Account成長projection、配送先解決 | 共有D1 | 原文・Brain Item本文を保存しない |
 
 新しいデータの保存先は、次の順で判定します。
 
@@ -96,7 +96,7 @@ AccountData SQLiteでは、Object identityとAccount所有rootだけが`account_
 
 projection retryや期限切れSession終了は各AccountData Objectのalarmで処理します。共有D1からAccount所有行を全走査しません。
 
-管理者統計は管理者認可後の集計専用経路に限定します。AccountDataから共有D1へ送る場合も非機密な集計projectionだけとし、原文やBrain Item本文を含めません。
+管理者統計とAccount一覧は管理者認可後の専用経路に限定します。AccountDataから共有D1へ送る場合も非機密な集計projectionだけとし、原文やBrain Item本文を含めません。
 
 ## 5. 現在のAccount所有関係
 
