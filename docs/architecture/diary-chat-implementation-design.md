@@ -89,7 +89,7 @@ flowchart TD
 | ingest Worker | 冪等な原本保存、Account解決、Coordinator通知 | 会話順序の独自判断、AI生成 |
 | Coordinator | Account内の順序、連投集約、Session、Turn lease、外部I/Oのoutboxと締切 | 原本やBrain Itemの正本保持 |
 | generate Worker | Context構築、安全判定、prompt実行、出力検証 | Account IDや権限をモデルへ決めさせること |
-| daily prompt job | 日本時間18時の対象列挙、Queue投入、固定文面のLINE Push | Cron内での全件Push、本人情報を使った文面生成 |
+| daily prompt job | 日本時間18時の対象列挙、Queue投入、曜日別一般文面のLINE Push | Cron内での全件Push、本人情報を使った文面生成 |
 | AccountData | 原本、Session、message、Brain Item、Diagnosis回答、Account内maintenance | 会話の実行lock、他Accountのデータ保持 |
 | 共有D1 | Identity解決、公開Question・Diagnosis catalog | Account所有原文、Brain Item本文 |
 | Vectorize | 利用可能なBrain Itemの候補検索 | 認可、削除・撤回・無効化状態の最終判定 |
@@ -142,7 +142,7 @@ AccountDataはactive Session境界、未処理Diagnosis projection、未処理Br
 
 基本版は別のデプロイ単位を増やさず、`apps/worker`のCron、job、Queue consumerとして実装します。Cloudflare CronはUTCで指定するため毎日09:00 UTCに起動し、`Asia/Tokyo`の当日を配送日として固定します。Cronは共有D1からactiveなLINE Account IDだけをページング取得し、本文やLINE user IDを含めずDaily Prompt Queueへ投入します。Cron内ではLINE Pushを行いません。
 
-consumerはAccountDataで同じ日本日付の配送状態、停止意思、active Session、配送準備後の本人発言を確認します。直前の声かけが未回答なら翌日の1回を休み、未回答が3回続いていれば新しい本人発言まで自動休止します。停止発言より後に本人から新しい日記メッセージが届いた場合は停止状態を解除しますが、すでに終端化した当日分を作り直さず、次の送信可能な日から再開します。Queueの配送日が処理時点の日本日付と一致しない場合は期限切れとして送信しません。送信対象の場合だけ共有D1から現在有効なLINE identityを解決し、Account IDと日本日付から作る決定的なLINE retry keyで固定文面をPushします。LINE受付後の状態保存に失敗してQueueが再配送されても、同じretry keyを再利用し、送信直前の可否を再評価します。
+consumerはAccountDataで同じ日本日付の配送状態、停止意思、active Session、配送準備後の本人発言を確認します。直前の声かけが未回答なら翌日の1回を休み、未回答が3回続いていれば新しい本人発言まで自動休止します。停止発言より後に本人から新しい日記メッセージが届いた場合は停止状態を解除しますが、すでに終端化した当日分を作り直さず、次の送信可能な日から再開します。Queueの配送日が処理時点の日本日付と一致しない場合は期限切れとして送信しません。送信対象の場合は`Asia/Tokyo`の配送日から曜日別の一般文面versionを決め、AccountDataの配送行へ固定します。共有D1から現在有効なLINE identityを解決し、Account IDと日本日付から作る決定的なLINE retry keyで文面をPushします。LINE受付後の状態保存に失敗してQueueが再配送されても、同じretry keyと配送行に保存した文面versionを再利用し、送信直前の可否を再評価します。
 
 ```mermaid
 sequenceDiagram
@@ -161,7 +161,7 @@ sequenceDiagram
     else 送信対象
         AD-->>W: pending delivery ID
         W->>D1: 現在有効なLINE identityを解決
-        W->>L: 固定文面をretry key付きPush
+        W->>L: 配送行の文面versionをretry key付きPush
         W->>AD: deliveredを記録
     end
 ```
@@ -391,7 +391,7 @@ Brain Itemを含むAccount所有データのquery境界は、[Accountデータ�
 | `attributes.promptContext` | 未対応 | 種別ごとのschemaとEvidence整合検証を追加する |
 | 曜日・本人情報からの声かけ候補取得 | 未対応 | active、Valid Time、Evidence、Access Policyを再検証して必要最小限を返す |
 | 時刻帯・声かけ方針の自動選択 | 未対応 | 本人の明言を優先し、本人自身の返信実績が不足する間は18時の標準候補へ戻す選択器を追加する。クライアントからAccount IDや選択結果を指定させない |
-| 18時の能動配信 | 固定文面、専用Queue、AccountDataの配送状態まで実装済み | 本人情報による時刻・文面調整は[日記チャット体験設計](../product/diary-chat-experience.md)の後続段階で追加する |
+| 18時の能動配信 | 曜日別一般文面、専用Queue、AccountDataの配送状態まで実装済み | 本人情報による時刻・文面調整は[日記チャット体験設計](../product/diary-chat-experience.md)の後続段階で追加する |
 
 開発用の確認機能は、本人確認済みAccountに対して、一覧取得用の`brain.listActive`とVector実体確認用の`brain.findActiveVectorEntry`をAccountData RPCへ公開します。`brain.listActive`はactiveかつ未削除のItem、未削除Evidence、最新のVector同期jobと対応表の有無を最大100件返します。Web UIは各Itemに同期状態、試行回数、失敗code、次回試行時刻を表示します。`applied`はVectorizeが更新を受け付けてAccountDataへ完了記録した状態であり、Vectorize上の実体確認とは区別します。
 
@@ -449,12 +449,12 @@ Vectorizeへのupsertまたはdelete受付後に`applied`とmutation IDを記録
 
 ### 4.9 `daily_prompt_deliveries`
 
-18時の声かけはAccountDataにAccountと日本日付ごとの配送状態を保存します。本文はコード上のversion付き固定文面を正とし、このtableへ複製しません。
+18時の声かけはAccountDataにAccountと日本日付ごとの配送状態を保存します。本文はコード上のversion付き曜日別一般文面を正とし、このtableへ複製しません。段階1の文面versionも、作成済み配送の再送互換性のため残します。
 
 | 列 | 用途 |
 | --- | --- |
 | `id`, `account_id`, `local_date` | 配送ID、所有Account、`Asia/Tokyo`の配送日。`(account_id, local_date)`を一意にする |
-| `prompt_version` | 使用した固定文面のversion |
+| `prompt_version` | 配送準備時に選んだ曜日別文面のversion。再配送でも変更しない |
 | `status` | `pending` / `delivered` / `skipped` / `failed` |
 | `skip_reason` | `manual_stopped` / `stale` / `active_session` / `user_activity` / `recent_unanswered` / `auto_paused`。本文や推定理由は保存しない |
 | `failure_stage` | 再試行不能で終端した工程の安全なcode |

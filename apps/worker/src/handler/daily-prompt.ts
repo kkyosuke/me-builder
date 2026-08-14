@@ -14,7 +14,7 @@ import {
   getLineDeliveryFailureKind,
   pushLineTextWithRetryKey,
 } from "../infrastructure/line-delivery";
-import { DAILY_PROMPT_VERSION, getDailyPromptText } from "../prompt/daily-prompt";
+import { getDailyPromptText, getDailyPromptVersion } from "../prompt/daily-prompt";
 
 /** wrangler.tomlのmax_retries=5に初回配送を加えた最大試行回数。 */
 export const DAILY_PROMPT_MAX_ATTEMPTS = 6;
@@ -33,9 +33,10 @@ export async function processDailyPromptMessage(
   let deliveryId: string | undefined;
 
   try {
+    const promptVersion = getDailyPromptVersion(message.body.localDate);
     const preparation = await accountData.execute("conversation.prepareDailyPrompt", {
       localDate: message.body.localDate,
-      promptVersion: DAILY_PROMPT_VERSION,
+      promptVersion,
     });
     if (preparation.type === "not-ready") {
       message.ack();
