@@ -10,7 +10,7 @@ describe("diary Brain prompt", () => {
   });
 
   it("追跡可能なprompt versionを持つ", () => {
-    expect(DIARY_BRAIN_PROMPT_VERSION).toBe("diary-brain-v4");
+    expect(DIARY_BRAIN_PROMPT_VERSION).toBe("diary-brain-v5");
   });
 
   it("属性マスタと明言のみ保存する境界を含む", () => {

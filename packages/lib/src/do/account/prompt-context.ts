@@ -19,13 +19,9 @@ const OccupationPromptContextSchema = v.strictObject({
 
 const WeeklyRhythmPromptContextSchema = v.strictObject({
   kind: v.literal("weekly_rhythm"),
-  scheduleMode: v.picklist([
-    "weekends_off",
-    "weekdays_active_weekends_off",
-    "fixed_weekly",
-    "variable_shift",
-    "irregular",
-  ]),
+  scheduleMode: v.picklist(["fixed_weekly", "variable_shift", "irregular"]),
+  activeWeekdays: v.exactOptional(v.pipe(v.array(WeekdaySchema), v.minLength(1), v.maxLength(7))),
+  daysOff: v.exactOptional(v.pipe(v.array(WeekdaySchema), v.minLength(1), v.maxLength(7))),
 });
 
 const RecurringSchedulePromptContextSchema = v.strictObject({
@@ -127,6 +123,9 @@ const WEEKDAY_EVIDENCE: Readonly<Record<(typeof PROMPT_CONTEXT_WEEKDAYS)[number]
   sunday: /日曜(?:日)?|毎日曜/u,
 };
 
+const THIRD_PARTY_SUBJECT =
+  /娘|息子|友達|友人|知人|夫|妻|母|父|子ども|子供|その子|彼氏|彼女|彼|その人|あの人|相手|家族|兄|姉|弟|妹|同僚|上司|部下/u;
+
 function normalize(value: string): string {
   return value.normalize("NFKC").replace(/\s+/gu, " ").trim();
 }
@@ -160,13 +159,7 @@ export function findPrecedingAssistantBodies(
 
 function isSelfOccupationQuestion(value: string): boolean {
   const question = normalize(value);
-  if (
-    /娘|息子|友達|夫|妻|母|父|子ども|子供|その子|彼氏|彼女|その人|あの人|相手|家族|兄|姉|弟|妹|同僚/u.test(
-      question,
-    )
-  ) {
-    return false;
-  }
+  if (THIRD_PARTY_SUBJECT.test(question)) return false;
   return (
     /(?:どんな|何の|なんの).{0,8}(?:仕事|職業|立場)/u.test(question) ||
     /(?:仕事|職業|立場).{0,8}(?:何|なに|どんな)/u.test(question) ||
@@ -180,7 +173,15 @@ function isOccupationGrounded(
   precedingAssistantBodies: readonly string[],
 ): boolean {
   const occupation = normalize(occupationInput);
-  if (/(?:なの|なんだ|です|だよ)$/u.test(occupation)) return false;
+  if (
+    THIRD_PARTY_SUBJECT.test(occupation) ||
+    /^(?:私は|自分は|仕事は|職業は|普段は|今は)/u.test(occupation) ||
+    /(?:(?:なの|なんだ|です|でした|だ|だよ)|として働いている|の仕事をしている)(?:[。.!！])?$/u.test(
+      occupation,
+    )
+  ) {
+    return false;
+  }
   if (statement === occupation) {
     return precedingAssistantBodies.some(isSelfOccupationQuestion);
   }
@@ -196,9 +197,28 @@ function isOccupationGrounded(
   return hasSelfSubject && hasOccupationPredicate;
 }
 
+function hasWeekdayEvidence(
+  statement: string,
+  weekday: (typeof PROMPT_CONTEXT_WEEKDAYS)[number],
+): boolean {
+  if (["monday", "tuesday", "wednesday", "thursday", "friday"].includes(weekday)) {
+    if (/平日/u.test(statement)) return true;
+  }
+  if (weekday === "saturday" || weekday === "sunday") {
+    if (/土日|週末/u.test(statement)) return true;
+  }
+  return WEEKDAY_EVIDENCE[weekday].test(statement);
+}
+
+function hasUniqueWeekdays(
+  weekdays: readonly (typeof PROMPT_CONTEXT_WEEKDAYS)[number][] | undefined,
+): boolean {
+  return !weekdays || new Set(weekdays).size === weekdays.length;
+}
+
 function isWeeklyRhythmGrounded(
   statement: string,
-  scheduleMode: Extract<PromptContext, { kind: "weekly_rhythm" }>["scheduleMode"],
+  promptContext: Extract<PromptContext, { kind: "weekly_rhythm" }>,
 ): boolean {
   const hasWeekendsOff =
     !/(?:土日|週末).{0,8}(?:休み.{0,4}(?:ではない|じゃない|でない|ではありません|じゃありません)|休まない|休めない)/u.test(
@@ -208,28 +228,48 @@ function isWeeklyRhythmGrounded(
     /固定.{0,8}(?:ではない|じゃない|でない|ではありません|じゃありません|されていない|されてない|されてません|じゃなく)|曜日.{0,8}(?:決まっていない|決まってない|決まってません|決まらない)/u.test(
       statement,
     );
-  switch (scheduleMode) {
-    case "weekends_off":
-      return hasWeekendsOff;
-    case "weekdays_active_weekends_off":
-      return /平日.{0,8}(?:働|勤務|仕事|稼働|出社)/u.test(statement) && hasWeekendsOff;
+  const irregularSchedule = /不規則|ばらばら|バラバラ|日によって.{0,8}(?:違う|変わる)/u.test(
+    statement,
+  );
+  const activeWeekdays = promptContext.activeWeekdays;
+  const daysOff = promptContext.daysOff;
+  if (!hasUniqueWeekdays(activeWeekdays) || !hasUniqueWeekdays(daysOff)) return false;
+  if (activeWeekdays?.some((weekday) => daysOff?.includes(weekday))) return false;
+  switch (promptContext.scheduleMode) {
     case "fixed_weekly": {
-      if (nonFixedSchedule) return false;
-      return (
-        /固定|曜日.{0,8}決ま/u.test(statement) && /休み|勤務|仕事|働|予定|曜日/u.test(statement)
-      );
+      if (nonFixedSchedule || irregularSchedule || (!activeWeekdays && !daysOff)) return false;
+      const hasFixedCycle = /固定|毎週|曜日.{0,8}決ま|平日|土日|週末/u.test(statement);
+      const activeWeekdaysAreGrounded =
+        !activeWeekdays ||
+        (/(?:働|勤務|仕事|稼働|出社|可動)/u.test(statement) &&
+          activeWeekdays.every((weekday) => hasWeekdayEvidence(statement, weekday)));
+      const daysOffAreGrounded =
+        !daysOff ||
+        (/(?:休み|休む|休業|休日|固定休)/u.test(statement) &&
+          daysOff.every((weekday) => hasWeekdayEvidence(statement, weekday)) &&
+          (!(daysOff.includes("saturday") && daysOff.includes("sunday")) || hasWeekendsOff));
+      return hasFixedCycle && activeWeekdaysAreGrounded && daysOffAreGrounded;
     }
     case "variable_shift":
       return (
-        /不定休|休み.{0,10}(?:決まっていない|決まってない|決まってません|変わる|一定じゃない)/u.test(
-          statement,
-        ) ||
-        nonFixedSchedule ||
-        (/シフト/u.test(statement) && /休み|勤務|仕事|働|予定|曜日/u.test(statement))
+        (!activeWeekdays &&
+          !daysOff &&
+          !irregularSchedule &&
+          /不定休|休み.{0,10}(?:決まっていない|決まってない|決まってません|変わる|一定じゃない)/u.test(
+            statement,
+          )) ||
+        (!activeWeekdays && !daysOff && !irregularSchedule && nonFixedSchedule) ||
+        (!activeWeekdays &&
+          !daysOff &&
+          !irregularSchedule &&
+          /シフト/u.test(statement) &&
+          /休み|勤務|仕事|働|予定|曜日/u.test(statement))
       );
     case "irregular":
       return (
-        /不規則|ばらばら|バラバラ|日によって.{0,8}(?:違う|変わる)/u.test(statement) &&
+        !activeWeekdays &&
+        !daysOff &&
+        irregularSchedule &&
         /休み|勤務|仕事|働|予定|曜日|生活/u.test(statement)
       );
   }
@@ -262,7 +302,7 @@ export function isPromptContextGrounded(
     case "occupation":
       return isOccupationGrounded(statement, promptContext.occupation, precedingAssistantBodies);
     case "weekly_rhythm":
-      return isWeeklyRhythmGrounded(statement, promptContext.scheduleMode);
+      return isWeeklyRhythmGrounded(statement, promptContext);
     case "recurring_schedule": {
       if (!statement.includes(normalize(promptContext.activity))) return false;
       if (!/毎週|いつも|普段|毎[月火水木金土日]曜/u.test(statement)) return false;
@@ -310,7 +350,13 @@ export function arePromptContextsEqual(left: PromptContext, right: PromptContext
         right.kind === "occupation" && normalize(left.occupation) === normalize(right.occupation)
       );
     case "weekly_rhythm":
-      return right.kind === "weekly_rhythm" && left.scheduleMode === right.scheduleMode;
+      return (
+        right.kind === "weekly_rhythm" &&
+        left.scheduleMode === right.scheduleMode &&
+        [...(left.activeWeekdays ?? [])].sort().join("\0") ===
+          [...(right.activeWeekdays ?? [])].sort().join("\0") &&
+        [...(left.daysOff ?? [])].sort().join("\0") === [...(right.daysOff ?? [])].sort().join("\0")
+      );
     case "recurring_schedule":
       return (
         right.kind === "recurring_schedule" &&
@@ -331,7 +377,15 @@ export function arePromptContextsEqual(left: PromptContext, right: PromptContext
 /** 永続化済みattributesを信頼せず、検証済みの声かけ属性だけを読む。 */
 export function parsePromptContext(value: unknown): PromptContext | undefined {
   const parsed = v.safeParse(PromptContextSchema, value);
-  return parsed.success ? parsed.output : undefined;
+  if (!parsed.success) return undefined;
+  if (parsed.output.kind !== "weekly_rhythm") return parsed.output;
+  const { activeWeekdays, daysOff, scheduleMode } = parsed.output;
+  if (!hasUniqueWeekdays(activeWeekdays) || !hasUniqueWeekdays(daysOff)) return undefined;
+  if (activeWeekdays?.some((weekday) => daysOff?.includes(weekday))) return undefined;
+  if (scheduleMode === "fixed_weekly") {
+    return activeWeekdays || daysOff ? parsed.output : undefined;
+  }
+  return activeWeekdays || daysOff ? undefined : parsed.output;
 }
 
 /** 永続化済みattributesを信頼せず、検証済みの声かけ属性だけを読む。 */

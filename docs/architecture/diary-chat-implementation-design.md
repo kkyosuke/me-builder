@@ -377,11 +377,15 @@ Brain Itemを含むAccount所有データのquery境界は、[Accountデータ�
 
 `promptContext.kind`は、少なくとも`occupation`、`weekly_rhythm`、`recurring_schedule`、`rest_window`、`question_style`を区別します。具体的なJSON schemaはValibotをSSoTとし、自由なキーや未検証のモデル出力をそのまま保存しません。曜日は列挙値、時間は検証済みの時刻帯または生活上の区切りだけを許可します。
 
+`weekly_rhythm.scheduleMode`は`fixed_weekly`、`variable_shift`、`irregular`の排他的な3値とします。土日休みを独立modeにせず、固定の勤務・可動曜日は`activeWeekdays`、固定の休みは`daysOff`へ曜日列挙値で保持します。これにより「土日休み」と「平日稼働・土日休み」を競合するmodeとして二重保存せず、水曜固定休のような曜日差も失いません。`variable_shift`と`irregular`には固定曜日を付けません。
+
 保存対象の属性マスタと収集目標は`packages/lib/src/do/account/prompt-context.ts`をコード上のSSoTとします。属性マスタはkindごとに許可するBrain分類、優先度、構造化値のschemaを持ちます。収集目標は未取得項目の達成率ではなく、自然な会話で確認候補を選ぶための優先順と上限です。初期実装では高優先の5属性を対象とし、本人が明言した命題だけを既存の日記Brain Item抽出経路で保存します。既存Itemへ構造化属性を補う場合は、その属性を生成したprompt versionも別に記録します。未回答を再質問する制御と、保存した属性を声かけへ利用する処理は別の後続段階とします。
 
 取得時点を`attributes_json`へ重複保存しません。Brain Itemの`created_at`はItem作成時刻、`valid_from` / `valid_to`は命題の有効期間です。本人から最初と最後に得た時点は、activeな`supports` Evidenceが参照するSource Recordの記録時刻から`firstObservedAt` / `lastObservedAt`として導出します。この導出はAccountDataのBrain queryで実装済みです。同じ命題を再度得た場合はEvidenceを追加し、`created_at`を上書きせず`lastObservedAt`だけが新しくなります。
 
 職業や週間リズムが変わった場合は、古いItemの`attributes_json`を書き換えません。新しいSource Recordを根拠に新しいBrain Itemを作り、`brain_item_revisions`で旧Itemを`superseded`へ移します。これにより「いつ知ったか」と「いつ変わったか」を分けて追跡できます。
+
+同一checkpoint内の意味重複判定が競合する`promptContext`をまとめようとした場合は、構造化属性の決定的検証を優先して候補を分離します。既存Itemとの意味重複判定が異なる職業・週間リズムを指した場合もEvidence追加にはせず、上記の改訂として保存します。モデル判定の競合だけを理由にcheckpoint全体を再試行しません。
 
 現行実装との差分は次のとおりです。
 

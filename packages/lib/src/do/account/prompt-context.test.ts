@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   PROMPT_CONTEXT_ATTRIBUTE_MASTER,
   PROMPT_CONTEXT_COLLECTION_GOAL,
+  type PromptContext,
   PromptContextSchema,
   arePromptContextsEqual,
   findPrecedingAssistantBodies,
@@ -36,7 +37,15 @@ describe("prompt context attribute master", () => {
       "休みはシフトで変わるよ",
       { kind: "weekly_rhythm", scheduleMode: "variable_shift" },
     ],
-    ["behavior_pattern", "土日休みだよ", { kind: "weekly_rhythm", scheduleMode: "weekends_off" }],
+    [
+      "behavior_pattern",
+      "土日休みだよ",
+      {
+        kind: "weekly_rhythm",
+        scheduleMode: "fixed_weekly",
+        daysOff: ["saturday", "sunday"],
+      },
+    ],
     [
       "behavior_pattern",
       "毎週月曜は塾に行っている",
@@ -75,6 +84,14 @@ describe("prompt context attribute master", () => {
         occupation: "看護師",
       }),
     ).toBe(false);
+    expect(
+      isPromptContextGrounded(
+        "identity",
+        "友達は看護師",
+        { kind: "occupation", occupation: "友達は看護師" },
+        ["そういえばどんな仕事してるの？"],
+      ),
+    ).toBe(false);
   });
 
   it("単語だけの職業は本人への直前質問がある場合だけ受理する", () => {
@@ -111,6 +128,7 @@ describe("prompt context attribute master", () => {
       isPromptContextGrounded("behavior_pattern", "休みは固定じゃない", {
         kind: "weekly_rhythm",
         scheduleMode: "fixed_weekly",
+        daysOff: ["sunday"],
       }),
     ).toBe(false);
     expect(
@@ -121,13 +139,46 @@ describe("prompt context attribute master", () => {
     ).toBe(true);
   });
 
-  it("土日が休みではないという明言をweekends_offとして扱わない", () => {
+  it("固定曜日は曜日を伴う場合だけ受理する", () => {
     expect(
       isPromptContextGrounded("behavior_pattern", "土日は休みじゃない", {
         kind: "weekly_rhythm",
-        scheduleMode: "weekends_off",
+        scheduleMode: "fixed_weekly",
+        daysOff: ["saturday", "sunday"],
       }),
     ).toBe(false);
+    expect(
+      isPromptContextGrounded("behavior_pattern", "水曜が固定の休み", {
+        kind: "weekly_rhythm",
+        scheduleMode: "fixed_weekly",
+        daysOff: ["wednesday"],
+      }),
+    ).toBe(true);
+    expect(
+      isPromptContextGrounded("behavior_pattern", "水曜が固定の休み", {
+        kind: "weekly_rhythm",
+        scheduleMode: "fixed_weekly",
+      }),
+    ).toBe(false);
+  });
+
+  it("平日勤務・土日休みを1つの正規形で保持する", () => {
+    const promptContext: PromptContext = {
+      kind: "weekly_rhythm",
+      scheduleMode: "fixed_weekly",
+      activeWeekdays: ["monday", "tuesday", "wednesday", "thursday", "friday"],
+      daysOff: ["saturday", "sunday"],
+    };
+    expect(isPromptContextGrounded("behavior_pattern", "平日は仕事で土日休み", promptContext)).toBe(
+      true,
+    );
+    expect(
+      arePromptContextsEqual(promptContext, {
+        ...promptContext,
+        activeWeekdays: ["friday", "thursday", "wednesday", "tuesday", "monday"],
+        daysOff: ["sunday", "saturday"],
+      }),
+    ).toBe(true);
   });
 
   it("occupationへ発言全文を入れた候補を拒否する", () => {
@@ -136,6 +187,14 @@ describe("prompt context attribute master", () => {
         kind: "occupation",
         occupation: "看護師なの",
       }),
+    ).toBe(false);
+    expect(
+      isPromptContextGrounded(
+        "identity",
+        "看護師だ",
+        { kind: "occupation", occupation: "看護師だ" },
+        ["どんな仕事してるの？"],
+      ),
     ).toBe(false);
   });
 
@@ -165,6 +224,20 @@ describe("prompt context attribute master", () => {
     ).toEqual({ kind: "occupation", occupation: "看護師" });
     expect(
       readPromptContext({ promptContext: { kind: "occupation", occupation: "" } }),
+    ).toBeUndefined();
+    expect(
+      readPromptContext({
+        promptContext: { kind: "weekly_rhythm", scheduleMode: "fixed_weekly" },
+      }),
+    ).toBeUndefined();
+    expect(
+      readPromptContext({
+        promptContext: {
+          kind: "weekly_rhythm",
+          scheduleMode: "variable_shift",
+          daysOff: ["sunday"],
+        },
+      }),
     ).toBeUndefined();
     expect(readPromptContext({ promptContext: { kind: "unknown" } })).toBeUndefined();
   });

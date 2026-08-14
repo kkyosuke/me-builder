@@ -4,6 +4,7 @@ import type { CloudflareBindings } from "../config";
 import { getWorkerConfig } from "../config";
 import {
   type BrainDedupDependencies,
+  type DiaryBrainDedupCandidate,
   consolidateDiaryBrainCandidates,
   decideDiaryBrainDuplicates,
 } from "./brain-dedup";
@@ -142,7 +143,7 @@ describe("decideDiaryBrainDuplicates", () => {
   });
 
   it("同じcheckpoint内の意味的に同じ候補を代表候補へまとめる", async () => {
-    const candidates = [
+    const candidates: DiaryBrainDedupCandidate[] = [
       candidate,
       {
         category: "preference" as const,
@@ -233,14 +234,16 @@ describe("decideDiaryBrainDuplicates", () => {
   });
 
   it("同一命題へ競合する声かけ属性を統合しない", () => {
-    const candidates = [
+    const candidates: DiaryBrainDedupCandidate[] = [
       {
         category: "behavior_pattern" as const,
         statement: "平日は働いて土日は休み",
         sourceMessageIds: ["message-1"],
         promptContext: {
           kind: "weekly_rhythm" as const,
-          scheduleMode: "weekdays_active_weekends_off" as const,
+          scheduleMode: "fixed_weekly" as const,
+          activeWeekdays: ["monday", "tuesday", "wednesday", "thursday", "friday"],
+          daysOff: ["saturday", "sunday"],
         },
       },
       {
@@ -251,7 +254,7 @@ describe("decideDiaryBrainDuplicates", () => {
       },
     ];
 
-    expect(() =>
+    expect(
       consolidateDiaryBrainCandidates(candidates, [
         { deduplication: "none" },
         {
@@ -260,7 +263,18 @@ describe("decideDiaryBrainDuplicates", () => {
           dedupPromptVersion: "brain-dedup-v2",
         },
       ]),
-    ).toThrow("Diary Brain candidate deduplication prompt context conflict");
+    ).toEqual([
+      expect.objectContaining({
+        statement: "平日は働いて土日は休み",
+        promptContext: expect.objectContaining({ scheduleMode: "fixed_weekly" }),
+        deduplication: "none",
+      }),
+      expect.objectContaining({
+        statement: "休みはシフトで変わる",
+        promptContext: { kind: "weekly_rhythm", scheduleMode: "variable_shift" },
+        deduplication: "none",
+      }),
+    ]);
   });
 
   it("NFKCと空白だけが異なる候補をexact統合して各Evidenceのstatementを保持する", async () => {

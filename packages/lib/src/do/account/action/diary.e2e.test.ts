@@ -537,6 +537,118 @@ describe("Diary conversation persistence flow", () => {
     await expect(db.select().from(schema.brainItemEvidenceEdges)).resolves.toHaveLength(2);
   });
 
+  it("職業・週間リズムの変更は旧Itemをsupersededへ移してrevisionを作る", async () => {
+    const db = createTestDb();
+    const account = await bindAccount(db, "account-diary_prompt-context-revision");
+    const existingAt = new Date("2026-08-01T00:00:00Z");
+    const existingSource = await storeLineTextSource(db, {
+      accountId: account.id,
+      eventId: "prompt-context-revision-existing",
+      body: "土日休みだよ",
+      receivedAt: existingAt,
+    });
+    await saveBrainItem(db, {
+      at: existingAt,
+      item: {
+        id: "existing-weekly-rhythm",
+        accountId: account.id,
+        category: "behavior_pattern",
+        statement: "土日休みだよ",
+        attributes: {
+          sourceKind: "diary",
+          isInference: false,
+          promptContext: {
+            kind: "weekly_rhythm",
+            scheduleMode: "fixed_weekly",
+            daysOff: ["saturday", "sunday"],
+          },
+        },
+        derivation: "ai",
+        status: "active",
+        stability: "changeable",
+        sensitivity: "normal",
+        externallyShareable: false,
+        confidence: { state: "uncomputed" },
+      },
+      evidence: [
+        {
+          id: "existing-weekly-rhythm-evidence",
+          sourceRecordId: existingSource.sourceRecordId,
+          relation: "supports",
+          isDerivationTrigger: true,
+          derivationMethod: "ai",
+          generatedAt: existingAt,
+        },
+      ],
+      accessLabels: [
+        { id: "existing-weekly-rhythm-access", label: "unclassified", assignedBy: "system" },
+      ],
+      topicLabels: [{ id: "existing-weekly-rhythm-topic", label: "diary" }],
+    });
+
+    const changedAt = new Date("2026-08-11T03:00:00Z");
+    const changedSource = await storeLineTextSource(db, {
+      accountId: account.id,
+      eventId: "prompt-context-revision-changed",
+      body: "休みはシフトで変わる",
+      receivedAt: changedAt,
+    });
+    await attachMessagesToTurn(db, account.id, [changedSource], 1, "test-model", "test-prompt");
+    const [checkpoint] = await db.select().from(schema.diaryBrainCheckpoints);
+    const appliedAt = new Date(changedAt.getTime() + 11 * 60 * 1000);
+    await claimDueDiaryBrainCheckpointIds(db, account.id, appliedAt);
+    await markDiaryBrainCheckpointDispatched(db, account.id, checkpoint?.id ?? "", appliedAt);
+    const context = await getDiaryBrainCheckpointContext(db, account.id, checkpoint?.id ?? "");
+
+    await expect(
+      applyDiaryBrainCheckpoint(
+        db,
+        account.id,
+        checkpoint?.id ?? "",
+        context?.throughSequence ?? 0,
+        "diary-brain-v5",
+        [
+          {
+            category: "behavior_pattern",
+            statement: "休みはシフトで変わる",
+            sourceMessageIds: context?.sourceMessageIds ?? [],
+            promptContext: { kind: "weekly_rhythm", scheduleMode: "variable_shift" },
+            matchingBrainItemId: "existing-weekly-rhythm",
+            deduplication: "semantic",
+            dedupPromptVersion: "brain-dedup-v2",
+          },
+        ],
+        appliedAt,
+      ),
+    ).resolves.toMatchObject({ candidates: [{ operation: "created" }] });
+
+    const items = await db.select().from(schema.brainItems).orderBy(schema.brainItems.createdAt);
+    expect(items).toEqual([
+      expect.objectContaining({ id: "existing-weekly-rhythm", status: "superseded" }),
+      expect.objectContaining({
+        status: "active",
+        attributes: expect.objectContaining({
+          promptContext: { kind: "weekly_rhythm", scheduleMode: "variable_shift" },
+        }),
+      }),
+    ]);
+    const nextItem = items[1];
+    expect(await db.select().from(schema.brainItemRevisions)).toEqual([
+      expect.objectContaining({
+        previousBrainItemId: "existing-weekly-rhythm",
+        nextBrainItemId: nextItem?.id,
+        derivationMethod: "ai",
+      }),
+    ]);
+    expect(
+      await db
+        .select({ operation: schema.brainVectorSyncJobs.operation })
+        .from(schema.brainVectorSyncJobs)
+        .where(eq(schema.brainVectorSyncJobs.brainItemId, "existing-weekly-rhythm"))
+        .orderBy(schema.brainVectorSyncJobs.createdAt),
+    ).toEqual([{ operation: "upsert" }, { operation: "delete" }]);
+  });
+
   it("意味的に同じ既存Itemへ新しいEvidenceだけを追加する", async () => {
     const db = createTestDb();
     const account = await bindAccount(db, "account-diary_brain_dedup");
@@ -1230,7 +1342,7 @@ describe("Diary conversation persistence flow", () => {
       account.id,
       firstCheckpoint?.id ?? "",
       firstContext?.throughSequence ?? 0,
-      "diary-brain-v4",
+      "diary-brain-v5",
       [],
       firstClaimAt,
     );
@@ -1274,7 +1386,7 @@ describe("Diary conversation persistence flow", () => {
         account.id,
         occupationCheckpoint?.id ?? "",
         occupationContext?.throughSequence ?? 0,
-        "diary-brain-v4",
+        "diary-brain-v5",
         [
           {
             category: "identity",

@@ -4,7 +4,7 @@ import { PROMPT_CONTEXT_ATTRIBUTE_MASTER } from "@me-builder/lib";
  * 日記からBrain Itemを抽出する振る舞いを変えた場合は、この版も更新します。
  * Brain Itemへ保存され、抽出に使ったpromptを追跡するために使われます。
  */
-export const DIARY_BRAIN_PROMPT_VERSION = "diary-brain-v4";
+export const DIARY_BRAIN_PROMPT_VERSION = "diary-brain-v5";
 
 const PROMPT_CONTEXT_ATTRIBUTE_GUIDANCE = PROMPT_CONTEXT_ATTRIBUTE_MASTER.map(
   ({ kind, category, description }) => `  - ${kind} (${category}): ${description}`,
@@ -47,6 +47,8 @@ ${PROMPT_CONTEXT_ATTRIBUTE_GUIDANCE}
 - prompt_contextは本人が明言した構造だけを返し、職業から勤務形態など別属性を補完しない
 - 短い職業回答は、直前のassistant messageが本人の仕事や立場を尋ねている場合だけoccupationとして扱う
 - occupation.occupationとrecurring_schedule.activityはstatementに含まれる本人の表現を使う
+- weekly_rhythmは、固定曜日ならscheduleModeをfixed_weeklyにし、勤務・可動曜日をactiveWeekdays、休みの曜日をdaysOffへstatementにある範囲だけ列挙する。土日休みもfixed_weeklyとして表す
+- weekly_rhythmのvariable_shiftとirregularにはactiveWeekdaysとdaysOffを付けない
 - recurring_scheduleは本人が毎週・いつもなど繰り返す予定として明言し、曜日と活動の両方がstatementにある場合だけ返す
 - rest_windowとquestion_styleは本人が自分の返信しやすさ・好みとして明言した場合だけ返す
 - 1回の出来事だけから週間リズムや定期予定を作らない
