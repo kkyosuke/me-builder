@@ -75,6 +75,50 @@ flowchart LR
 | `503` | D1またはAccountData bindingがない | `{ "error": "Service Unavailable" }` |
 | `500` | 未処理のサーバーエラー | `{ "error": "Internal Server Error" }` |
 
+### `GET /api/compatibility/share-content`
+
+本人が「わたし」で、相手へ開示される現在の内容をカテゴリ別に確認します。必須の`relationshipCategory` query parameterへ`partner`、`family`、`friend`、`work`のいずれかを指定します。相手や相性関係を指定するAPIではなく、選んだカテゴリの相手へ共有を開始した場合に使われる本人の共有表示を返します。
+
+```json
+{
+  "relationshipCategory": "partner",
+  "aboutMe": {
+    "profileSummaryVersionId": "profile-summary-version-id",
+    "generatedAt": "2026-08-15T00:00:00.000Z",
+    "statements": [
+      {
+        "key": "core_values",
+        "label": "まず知ってほしいこと",
+        "statement": "私は、一緒に楽しむ時間を大切にしたいです"
+      }
+    ]
+  },
+  "themes": [
+    {
+      "diagnosisId": "relationship-priority",
+      "title": "自分と相手の優先・境界線",
+      "parameters": [
+        {
+          "id": "togetherness",
+          "label": "一緒に過ごす時間",
+          "lowLabel": "自分の時間を大切にする",
+          "highLabel": "一緒の時間を大切にする",
+          "position": 72,
+          "statement": "一緒に過ごす時間を大切にする傾向があります"
+        }
+      ]
+    }
+  ],
+  "nextAction": null
+}
+```
+
+`themes`には指定カテゴリと`general`のDiagnosisだけを含めます。`aboutMe`を開示できない場合は`null`、共有できる診断テーマがない場合は空配列です。`nextAction`は、共有専用プロフィールprojectionがなければ`profile-summary`、それ以外で共有可能なテーマがなく現在回答できる対象Diagnosisがあれば`diagnosis`、それ以外は`null`です。
+
+相性シートと同じ共有表示の組み立て処理を使い、生の回答、具体的な出来事、日記・会話本文、自由記述、Source Record、Brain Item本文、内部根拠ID、Account ID、各種指紋、表示名を返しません。成功・エラーを問わず`Cache-Control: no-store`を付けます。
+
+認証・基盤の共通エラーは共有の可否と同じです。`relationshipCategory`がない、`general`、または定義外の場合は`400`と`{ "error": "Invalid request" }`を返します。
+
 ## 4. 招待リンク発行
 
 ### `POST /api/compatibility/invitations`

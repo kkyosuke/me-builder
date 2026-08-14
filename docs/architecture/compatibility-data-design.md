@@ -159,6 +159,5 @@ AccountDataの一覧RPCは、内部的に`pending`、`reserved`、`active`の参
 
 - HTTP path、request / response形式、画面キャッシュ
 - 相性シートの文章と比較候補の具体的な生成契約
-- 相手へ渡る内容を本人が一覧する画面と、そのAPI
 - terminalデータの削除保留期間とAccount削除時の物理削除手順
 - 通知outboxとLINE再通知頻度

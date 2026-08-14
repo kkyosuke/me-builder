@@ -297,6 +297,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/compatibility/share-content": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** 本人が相手へ開示する現在の内容をカテゴリ別に確認する */
+    get: operations["getCompatibilityShareContent"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/diagnoses": {
     parameters: {
       query?: never;
@@ -2460,6 +2477,117 @@ export interface operations {
             avatarUrl: string | null;
             canShare: boolean;
             blockingReasons: "display_name_unavailable"[];
+            nextAction: ("diagnosis" | "profile-summary") | null;
+          };
+        };
+      };
+      /** @description 関係カテゴリが不正 */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Invalid request";
+          };
+        };
+      };
+      /** @description LIFF IDトークンを検証できない */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Unauthorized";
+          };
+        };
+      };
+      /** @description 対応するAccountが存在しない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Account not found";
+            /** @constant */
+            reason: "friendship_required";
+          };
+        };
+      };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
+          };
+        };
+      };
+      /** @description D1 bindingが設定されていない */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Service Unavailable";
+          };
+        };
+      };
+    };
+  };
+  getCompatibilityShareContent: {
+    parameters: {
+      query: {
+        /** @description 選択した関係カテゴリとgeneralの共有表示を返す */
+        relationshipCategory: "partner" | "family" | "friend" | "work";
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 本人が相手へ開示できる現在の内容 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @enum {string} */
+            relationshipCategory: "partner" | "family" | "friend" | "work";
+            aboutMe: {
+              profileSummaryVersionId: string;
+              /** Format: date-time */
+              generatedAt: string;
+              statements: {
+                key: string;
+                label: string;
+                statement: string;
+              }[];
+            } | null;
+            themes: {
+              diagnosisId: string;
+              title: string;
+              parameters: {
+                id: string;
+                label: string;
+                lowLabel: string;
+                highLabel: string;
+                position: number;
+                statement: string;
+              }[];
+            }[];
             nextAction: ("diagnosis" | "profile-summary") | null;
           };
         };

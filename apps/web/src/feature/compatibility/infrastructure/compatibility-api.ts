@@ -14,9 +14,12 @@ import type {
   CompatibilityRelationshipList,
 } from "../model/compatibility-relationship";
 import type { CompatibilityShareConsent } from "../model/compatibility-share-consent";
+import type { CompatibilityShareContent } from "../model/compatibility-share-content";
 
-type ApiResponse =
+type ShareConsentApiResponse =
   operations["getCompatibilityShareConsent"]["responses"][200]["content"]["application/json"];
+type ShareContentApiResponse =
+  operations["getCompatibilityShareContent"]["responses"][200]["content"]["application/json"];
 type InvitationApiResponse =
   operations["issueCompatibilityInvitation"]["responses"][201]["content"]["application/json"];
 type InvitationPreviewApiResponse =
@@ -57,7 +60,14 @@ const ResponseSchema = v.object({
   canShare: v.boolean(),
   blockingReasons: v.array(v.picklist(["display_name_unavailable"])),
   nextAction: v.nullable(v.picklist(["diagnosis", "profile-summary"])),
-}) satisfies v.GenericSchema<ApiResponse>;
+}) satisfies v.GenericSchema<ShareConsentApiResponse>;
+
+const ShareContentResponseSchema = v.object({
+  relationshipCategory: v.picklist(compatibilityRelationshipCategoryValues),
+  aboutMe: v.nullable(ShareProfileSchema),
+  themes: v.array(ShareThemeSchema),
+  nextAction: v.nullable(v.picklist(["diagnosis", "profile-summary"])),
+}) satisfies v.GenericSchema<ShareContentApiResponse>;
 
 const InvitationResponseSchema = v.object({
   invitationUrl: v.pipe(v.string(), v.url()),
@@ -194,6 +204,38 @@ export async function fetchCompatibilityShareConsent(
   }
 
   return v.parse(ResponseSchema, await response.json());
+}
+
+export async function fetchCompatibilityShareContent(
+  apiUrl: string | undefined,
+  idToken: string,
+  relationshipCategory: CompatibilityRelationshipCategory,
+  signal?: AbortSignal,
+): Promise<CompatibilityShareContent> {
+  const query = `?relationshipCategory=${encodeURIComponent(relationshipCategory)}`;
+  const response = await createHttpClient(apiUrl).request(
+    `/api/compatibility/share-content${query}`,
+    {
+      headers: { Authorization: `Bearer ${idToken}` },
+      ...(signal ? { signal } : {}),
+    },
+  );
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error("本人確認に失敗しました。LINEから開き直してください。");
+    }
+    if (response.status === 404) {
+      throw new Error(FRIENDSHIP_REQUIRED_MESSAGE);
+    }
+    throw new Error(`共有内容の取得に失敗しました (HTTP ${response.status})`);
+  }
+
+  const content = v.parse(ShareContentResponseSchema, await response.json());
+  if (content.relationshipCategory !== relationshipCategory) {
+    throw new Error("共有内容の関係カテゴリが一致しません。");
+  }
+  return content;
 }
 
 export async function issueCompatibilityInvitation(

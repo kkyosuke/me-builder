@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { CompatibilityShareContentSection } from "../../compatibility";
 import { useLiffSession } from "../../liff";
 import type { ProfileSummaryVersioning } from "../model/profile-summary";
 import { ProfileSummaryScreen } from "./profile-summary-screen";
@@ -37,6 +38,8 @@ export default function ProfileApplication() {
       {...(versioning ? { versioning } : {})}
       {...(result && result.versions.length > 1 ? { onSelectVersion: setSelectedVersionId } : {})}
       {...(result ? { onRegenerate: () => void summary.generate() } : {})}
-    />
+    >
+      <CompatibilityShareContentSection acquireIdToken={liffSession.acquireIdToken} />
+    </ProfileSummaryScreen>
   );
 }

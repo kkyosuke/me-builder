@@ -7,6 +7,7 @@ import {
   fetchCompatibilityRelationship,
   fetchCompatibilityRelationships,
   fetchCompatibilityShareConsent,
+  fetchCompatibilityShareContent,
   issueCompatibilityInvitation,
 } from "./compatibility-api";
 
@@ -99,6 +100,64 @@ describe("fetchCompatibilityShareConsent", () => {
 
     await expect(fetchCompatibilityShareConsent(undefined, "id-token")).rejects.toThrow(
       "本人確認に失敗しました",
+    );
+  });
+});
+
+describe("fetchCompatibilityShareContent", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("選んだカテゴリを送り、本人に開示される内容を取得する", async () => {
+    const content = {
+      relationshipCategory: "partner",
+      ...shareContent,
+      nextAction: null,
+    };
+    const fetchMock = vi.fn().mockResolvedValue(Response.json(content));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      fetchCompatibilityShareContent("https://api.example.com", "id-token", "partner"),
+    ).resolves.toEqual(content);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.example.com/api/compatibility/share-content?relationshipCategory=partner",
+      expect.objectContaining({ headers: { Authorization: "Bearer id-token" } }),
+    );
+  });
+
+  it("契約外の共有内容を受け入れない", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        Response.json({
+          relationshipCategory: "partner",
+          aboutMe: null,
+          themes: [],
+          nextAction: "unknown",
+        }),
+      ),
+    );
+
+    await expect(
+      fetchCompatibilityShareContent(undefined, "id-token", "partner"),
+    ).rejects.toThrow();
+  });
+
+  it("要求と異なるカテゴリの共有内容を受け入れない", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        Response.json({
+          relationshipCategory: "work",
+          aboutMe: null,
+          themes: [],
+          nextAction: null,
+        }),
+      ),
+    );
+
+    await expect(fetchCompatibilityShareContent(undefined, "id-token", "partner")).rejects.toThrow(
+      "関係カテゴリが一致しません",
     );
   });
 });

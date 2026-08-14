@@ -29,6 +29,7 @@ import { compatibilityRelationshipRoute } from "./contract/compatibility/relatio
 import { compatibilityRelationshipEndRoute } from "./contract/compatibility/relationship-end";
 import { compatibilityRelationshipsRoute } from "./contract/compatibility/relationships";
 import { compatibilityShareConsentRoute } from "./contract/compatibility/share-consent";
+import { compatibilityShareContentRoute } from "./contract/compatibility/share-content";
 import { resetDevelopmentAccountDataRoute } from "./contract/development/account-data-reset";
 import { saveDiagnosisAnswerRoute } from "./contract/diagnosis/answer";
 import { diagnosisAnswersRoute } from "./contract/diagnosis/answers";
@@ -60,6 +61,7 @@ import {
   getCompatibilityRelationship,
   getCompatibilityRelationships,
   getCompatibilityShareConsentContents,
+  getCompatibilityShareContentContents,
   postCompatibilityInvitation,
   postCompatibilityInvitationAcceptance,
 } from "./controller/compatibility";
@@ -232,6 +234,11 @@ app.get(
   "/api/compatibility/share-consent",
   compatibilityShareConsentRoute,
   getCompatibilityShareConsentContents,
+);
+app.get(
+  "/api/compatibility/share-content",
+  compatibilityShareContentRoute,
+  getCompatibilityShareContentContents,
 );
 
 app.get("/api/diagnoses", diagnosisListRoute, getDiagnoses);

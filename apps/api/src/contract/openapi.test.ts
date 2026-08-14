@@ -15,6 +15,7 @@ describe("GET /api/openapi.json", () => {
     expect(document.openapi).toBe("3.1.0");
     expect(document.paths["/api/diagnoses"]?.get).toBeDefined();
     expect(document.paths["/api/compatibility/share-consent"]?.get).toBeDefined();
+    expect(document.paths["/api/compatibility/share-content"]?.get).toBeDefined();
     expect(document.paths["/api/compatibility/invitations"]?.post).toBeDefined();
     // 表示内容の確認tokenは受け取らず、招待時に選ぶ関係カテゴリだけを本文で受け取る。
     expect(document.paths["/api/compatibility/invitations"]?.post).toMatchObject({
@@ -42,6 +43,19 @@ describe("GET /api/openapi.json", () => {
           name: "relationshipCategory",
           in: "query",
           required: false,
+          schema: {
+            type: "string",
+            enum: ["partner", "family", "friend", "work"],
+          },
+        },
+      ],
+    });
+    expect(document.paths["/api/compatibility/share-content"]?.get).toMatchObject({
+      parameters: [
+        {
+          name: "relationshipCategory",
+          in: "query",
+          required: true,
           schema: {
             type: "string",
             enum: ["partner", "family", "friend", "work"],

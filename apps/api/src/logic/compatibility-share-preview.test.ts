@@ -2,6 +2,7 @@ import type { D1 } from "@me-builder/lib";
 import { describe, expect, it, vi } from "vitest";
 import {
   getCompatibilityShareConsent,
+  getCompatibilityShareContent,
   loadCompatibilitySharePreviewData,
 } from "./compatibility-share-preview";
 
@@ -20,6 +21,90 @@ const shareProfile = {
   fingerprint: "b".repeat(64),
 };
 const availableShareProfile = { type: "available" as const, profile: shareProfile };
+
+describe("getCompatibilityShareContent", () => {
+  it("選択カテゴリの共有表示だけを返し、表示名や内部指紋を返さない", async () => {
+    const result = await getCompatibilityShareContent(
+      {
+        idToken: "id-token",
+        lineLoginChannelId: "channel-id",
+        db,
+        relationshipCategory: "partner",
+        at,
+      },
+      {
+        createSession: vi.fn().mockResolvedValue({
+          type: "resolved",
+          session: { accountId: "account-1", role: "user", displayName: "あおい" },
+        }),
+        getPreviewSource: vi.fn().mockResolvedValue({
+          diagnoses: [],
+          answeredDiagnoses: [
+            {
+              id: "partner-diagnosis",
+              title: "パートナーとの時間",
+              relationshipCategory: "partner",
+              answers: [],
+              scoringConfig: { id: "config-1" },
+            },
+          ],
+        }),
+        getShareProfile: vi.fn().mockResolvedValue(availableShareProfile),
+        scoreAnswers: vi.fn().mockReturnValue({
+          scoringVersion: 1,
+          balancedLabel: "状況に応じて決めたい",
+          parameters: [
+            {
+              id: "planning",
+              label: "予定を決めるタイミング",
+              lowLabel: "その場で決めたい",
+              highLabel: "早めに決めたい",
+              score: 78,
+              coverage: 100,
+              band: "high",
+            },
+          ],
+        }),
+      },
+    );
+
+    expect(result).toMatchObject({
+      type: "resolved",
+      content: {
+        relationshipCategory: "partner",
+        aboutMe: { statements: shareProfile.statements },
+        themes: [{ diagnosisId: "partner-diagnosis" }],
+        nextAction: null,
+      },
+    });
+    expect(JSON.stringify(result)).not.toContain("displayName");
+    expect(JSON.stringify(result)).not.toContain("fingerprint");
+  });
+
+  it("本人を解決できない場合は共有表示を読まない", async () => {
+    const getPreviewSource = vi.fn();
+    const getShareProfile = vi.fn();
+    const result = await getCompatibilityShareContent(
+      {
+        idToken: undefined,
+        lineLoginChannelId: undefined,
+        db,
+        relationshipCategory: "family",
+        at,
+      },
+      {
+        createSession: vi.fn().mockResolvedValue({ type: "unauthenticated", reason: "missing" }),
+        getPreviewSource,
+        getShareProfile,
+        scoreAnswers: vi.fn(),
+      },
+    );
+
+    expect(result).toEqual({ type: "unauthenticated", reason: "missing" });
+    expect(getPreviewSource).not.toHaveBeenCalled();
+    expect(getShareProfile).not.toHaveBeenCalled();
+  });
+});
 
 describe("getCompatibilityShareConsent", () => {
   it("共有可否と表示名だけを返し、共有される内容を返さない", async () => {
