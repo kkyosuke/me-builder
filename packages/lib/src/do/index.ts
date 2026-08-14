@@ -57,6 +57,7 @@ export {
   parsePromptContext,
   PROMPT_CONTEXT_ATTRIBUTE_MASTER,
   PROMPT_CONTEXT_COLLECTION_GOAL,
+  PROMPT_CONTEXT_COLLECTION_THEME_MASTER,
   PROMPT_CONTEXT_WEEKDAYS,
   PromptContextSchema,
   readPromptContext,
@@ -64,6 +65,8 @@ export {
 export type {
   PromptContext,
   PromptContextAttributeDefinition,
+  PromptContextCollectionThemeDefinition,
+  PromptContextCollectionThemeId,
   PromptContextKind,
   PromptContextPriority,
 } from "./account/prompt-context";

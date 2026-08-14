@@ -61,6 +61,12 @@ export type PromptContextAttributeDefinition = Readonly<{
   description: string;
 }>;
 
+export type PromptContextCollectionThemeDefinition = Readonly<{
+  id: string;
+  kinds: readonly PromptContextKind[];
+  description: string;
+}>;
+
 /**
  * 保存対象属性の初期マスタ。
  *
@@ -99,11 +105,28 @@ export const PROMPT_CONTEXT_ATTRIBUTE_MASTER = [
   },
 ] as const satisfies readonly PromptContextAttributeDefinition[];
 
+/** 確認質問を同じ会話の流れで扱える属性へまとめた収集テーマ。 */
+export const PROMPT_CONTEXT_COLLECTION_THEME_MASTER = [
+  {
+    id: "life_schedule",
+    kinds: ["occupation", "weekly_rhythm", "recurring_schedule"],
+    description: "仕事・学校など今の立場から、週間リズムや曜日別予定へつながるテーマ",
+  },
+  {
+    id: "conversation_preference",
+    kinds: ["rest_window", "question_style"],
+    description: "一息つきやすい時間と、返信しやすい聞かれ方を扱うテーマ",
+  },
+] as const satisfies readonly PromptContextCollectionThemeDefinition[];
+
+export type PromptContextCollectionThemeId =
+  (typeof PROMPT_CONTEXT_COLLECTION_THEME_MASTER)[number]["id"];
+
 /** 未取得欄の達成率を作らず、会話を優先して属性を集めるための目標設定。 */
 export const PROMPT_CONTEXT_COLLECTION_GOAL = {
-  prioritizedKinds: PROMPT_CONTEXT_ATTRIBUTE_MASTER.map(({ kind }) => kind),
-  maxAttributeGroupsPerSession: 1,
-  maxConfirmationQuestionsPerGroup: 2,
+  prioritizedThemeIds: PROMPT_CONTEXT_COLLECTION_THEME_MASTER.map(({ id }) => id),
+  maxCollectionThemesPerSession: 1,
+  maxConfirmationQuestionsPerTheme: 2,
   requireCompletion: false,
   retryUnanswered: false,
   extractionMode: "explicit_only",

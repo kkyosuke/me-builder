@@ -379,7 +379,14 @@ Brain Itemを含むAccount所有データのquery境界は、[Accountデータ�
 
 `weekly_rhythm.scheduleMode`は`fixed_weekly`、`variable_shift`、`irregular`の排他的な3値とします。土日休みを独立modeにせず、固定の勤務・可動曜日は`activeWeekdays`、固定の休みは`daysOff`へ曜日列挙値で保持します。これにより「土日休み」と「平日稼働・土日休み」を競合するmodeとして二重保存せず、水曜固定休のような曜日差も失いません。`variable_shift`と`irregular`には固定曜日を付けません。
 
-保存対象の属性マスタと収集目標は`packages/lib/src/do/account/prompt-context.ts`をコード上のSSoTとします。属性マスタはkindごとに許可するBrain分類、優先度、構造化値のschemaを持ちます。収集目標は未取得項目の達成率ではなく、自然な会話で確認候補を選ぶための優先順と上限です。初期実装では高優先の5属性を対象とし、本人が明言した命題だけを既存の日記Brain Item抽出経路で保存します。既存Itemへ構造化属性を補う場合は、その属性を生成したprompt versionも別に記録します。未回答を再質問する制御と、保存した属性を声かけへ利用する処理は別の後続段階とします。
+保存対象の属性マスタ、収集テーマ、収集目標は`packages/lib/src/do/account/prompt-context.ts`をコード上のSSoTとします。属性マスタはkindごとに許可するBrain分類、優先度、構造化値のschemaを持ちます。収集テーマは同じ会話の流れで確認できる属性kindを重複なくまとめ、収集目標は未取得項目の達成率ではなく、自然な会話でテーマを選ぶための優先順と上限を持ちます。
+
+| 収集テーマ | 対象属性 | 会話の流れ |
+| --- | --- | --- |
+| `life_schedule` | `occupation`、`weekly_rhythm`、`recurring_schedule` | 仕事・学校など今の立場から、週間リズムや曜日別予定へつなぐ |
+| `conversation_preference` | `rest_window`、`question_style` | 一息つきやすい時間から、返信しやすい聞かれ方へつなぐ |
+
+1セッションでシステムから確認するテーマは最大1件、そのテーマ内の確認質問は最大2件とします。この上限はシステム側からの質問にだけ適用し、本人が自然に複数テーマの属性を明言した場合の抽出・保存は制限しません。初期実装では高優先の5属性を対象とし、本人が明言した命題だけを既存の日記Brain Item抽出経路で保存します。既存Itemへ構造化属性を補う場合は、その属性を生成したprompt versionも別に記録します。未回答を再質問する制御と、保存した属性を声かけへ利用する処理は別の後続段階とします。
 
 取得時点を`attributes_json`へ重複保存しません。Brain Itemの`created_at`はItem作成時刻、`valid_from` / `valid_to`は命題の有効期間です。本人から最初と最後に得た時点は、activeな`supports` Evidenceが参照するSource Recordの記録時刻から`firstObservedAt` / `lastObservedAt`として導出します。この導出はAccountDataのBrain queryで実装済みです。同じ命題を再度得た場合はEvidenceを追加し、`created_at`を上書きせず`lastObservedAt`だけが新しくなります。
 
