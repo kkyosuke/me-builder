@@ -17,7 +17,8 @@ apps/web/public/images/diagnoses/
 ├── money-values.jpg
 ├── leisure-style.jpg
 ├── time-planning.jpg
-└── conversation-emotion.jpg
+├── conversation-emotion.jpg
+└── life-priorities.jpg
 ```
 
 ## 3. 共通スタイル
@@ -63,7 +64,23 @@ Materials/textures: Matte paper and soft clay, subtle depth and shadows.
 Constraints: No text, no letters, no numbers, no logos, no watermark, no brand marks. Avoid making verbal expression, quiet support, advice, or empathy look superior to another communication style.
 ```
 
-## 6. 新しい診断へ展開する手順
+## 6. 「優先順位と人生の方向性」生成プロンプト
+
+```text
+Use case: stylized-concept
+Asset type: 16:9 diagnosis card thumbnail for a web application
+Primary request: Create a polished 3D paper-cut/clay-style illustration representing life priorities, personal direction, balancing stability with challenge, meaningful work, close relationships, personal wellbeing, and future preparation.
+Scene/backdrop: A calm abstract scene with a central branching path that gently divides toward several equally weighted symbolic destinations and reconnects on the horizon, suggesting that priorities can change and coexist.
+Subject: Balanced abstract symbols integrated around the path: a small sprouting plant for growth, a simple house for stability, a warm pair of matching circles or seats for close relationships, a subtle heart-and-leaf form for wellbeing, and a distant star for aspiration. Keep every symbol equal in visual weight; no people required.
+Style/medium: Soft layered 3D paper-cut / clay render matching a premium editorial app illustration.
+Composition/framing: Wide 16:9, centered, clear silhouettes, important objects away from edges, suitable for a small card crop.
+Lighting/mood: Warm soft studio lighting, calm, reflective, hopeful, welcoming.
+Color palette: Deep navy background, muted slate blue, warm cream, coral accents, small golden accents; consistent with the existing me-builder diagnosis thumbnails.
+Materials/textures: Matte paper and soft clay, subtle depth and shadows.
+Constraints: No text, no letters, no numbers, no logos, no watermark, no brand marks. Do not make stability, challenge, work, relationships, wellbeing, or preparation look superior to another. Avoid scales, rankings, trophies, money symbols, corporate logos, religious imagery, or political symbols.
+```
+
+## 7. 新しい診断へ展開する手順
 
 1. §4の`Primary request`、`Scene/backdrop`、`Subject`を新しい診断のテーマへ置き換える
 2. §3の共通スタイルと`Composition/framing`、`Constraints`を維持する

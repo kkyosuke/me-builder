@@ -20,6 +20,7 @@ const diagnosisThumbnails: Record<string, string> = {
   "leisure-style": "/images/diagnoses/leisure-style.jpg",
   "time-planning": "/images/diagnoses/time-planning.jpg",
   "conversation-emotion": "/images/diagnoses/conversation-emotion.jpg",
+  "life-priorities": "/images/diagnoses/life-priorities.jpg",
 };
 
 function getDiagnosisThumbnail(diagnosisId: string) {

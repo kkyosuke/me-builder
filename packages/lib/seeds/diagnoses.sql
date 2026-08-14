@@ -8,7 +8,8 @@
 --
 -- Timestamps: 2026-08-04T00:00:00.000Z for the initial diagnoses and
 -- 2026-08-06T00:00:00.000Z for leisure-style and time-planning, and
--- 2026-08-09T00:00:00.000Z for conversation-emotion
+-- 2026-08-09T00:00:00.000Z for conversation-emotion, and
+-- 2026-08-14T00:00:00.000Z for life-priorities
 -- (Unix seconds, Drizzle timestamp mode).
 
 INSERT OR IGNORE INTO questions (id, created_at, updated_at, is_deleted) VALUES
@@ -61,7 +62,17 @@ INSERT OR IGNORE INTO questions (id, created_at, updated_at, is_deleted) VALUES
   ('q-conversation-emotion-07', 1786233600, 1786233600, 0),
   ('q-conversation-emotion-08', 1786233600, 1786233600, 0),
   ('q-conversation-emotion-09', 1786233600, 1786233600, 0),
-  ('q-conversation-emotion-10', 1786233600, 1786233600, 0);
+  ('q-conversation-emotion-10', 1786233600, 1786233600, 0),
+  ('q-life-priorities-01', 1786665600, 1786665600, 0),
+  ('q-life-priorities-02', 1786665600, 1786665600, 0),
+  ('q-life-priorities-03', 1786665600, 1786665600, 0),
+  ('q-life-priorities-04', 1786665600, 1786665600, 0),
+  ('q-life-priorities-05', 1786665600, 1786665600, 0),
+  ('q-life-priorities-06', 1786665600, 1786665600, 0),
+  ('q-life-priorities-07', 1786665600, 1786665600, 0),
+  ('q-life-priorities-08', 1786665600, 1786665600, 0),
+  ('q-life-priorities-09', 1786665600, 1786665600, 0),
+  ('q-life-priorities-10', 1786665600, 1786665600, 0);
 --> statement-breakpoint
 
 INSERT OR IGNORE INTO question_versions (
@@ -124,7 +135,17 @@ INSERT OR IGNORE INTO question_versions (
   (1786233600, 1786233600, 0, 'q-conversation-emotion-07', 1, 'approved', '弱さや不安は、相手に話す前に、まず自分の中で整理したい。', 'single_choice', 1786233600),
   (1786233600, 1786233600, 0, 'q-conversation-emotion-08', 1, 'approved', '希望はすぐ言葉にせず、相手の様子やタイミングを見て伝えたい。', 'single_choice', 1786233600),
   (1786233600, 1786233600, 0, 'q-conversation-emotion-09', 1, 'approved', '悩みを話したときは、気持ちへの共感より具体的な解決策を一緒に考えてほしい。', 'single_choice', 1786233600),
-  (1786233600, 1786233600, 0, 'q-conversation-emotion-10', 1, 'approved', '愛情は言葉で確かめなくても、行動や態度から感じ取れれば十分だ。', 'single_choice', 1786233600);
+  (1786233600, 1786233600, 0, 'q-conversation-emotion-10', 1, 'approved', '愛情は言葉で確かめなくても、行動や態度から感じ取れれば十分だ。', 'single_choice', 1786233600),
+  (1786665600, 1786665600, 0, 'q-life-priorities-01', 1, 'approved', '安定した生活より、新しい挑戦を選びたい。', 'single_choice', 1786665600),
+  (1786665600, 1786665600, 0, 'q-life-priorities-02', 1, 'approved', '収入が減っても、自分の好きな仕事を選びたい。', 'single_choice', 1786665600),
+  (1786665600, 1786665600, 0, 'q-life-priorities-03', 1, 'approved', '仕事より、家族や親しい人との時間を優先したい。', 'single_choice', 1786665600),
+  (1786665600, 1786665600, 0, 'q-life-priorities-04', 1, 'approved', '忙しくても、趣味の時間を確保したい。', 'single_choice', 1786665600),
+  (1786665600, 1786665600, 0, 'q-life-priorities-05', 1, 'approved', '今の楽しみより、将来への備えを優先したい。', 'single_choice', 1786665600),
+  (1786665600, 1786665600, 0, 'q-life-priorities-06', 1, 'approved', '健康のためなら、仕事や予定を減らしてもよい。', 'single_choice', 1786665600),
+  (1786665600, 1786665600, 0, 'q-life-priorities-07', 1, 'approved', '周囲の期待より、自分が納得できる選択をしたい。', 'single_choice', 1786665600),
+  (1786665600, 1786665600, 0, 'q-life-priorities-08', 1, 'approved', '生活の変化が少ないことに安心を感じる。', 'single_choice', 1786665600),
+  (1786665600, 1786665600, 0, 'q-life-priorities-09', 1, 'approved', '成功することより、心穏やかに暮らすことが大切だ。', 'single_choice', 1786665600),
+  (1786665600, 1786665600, 0, 'q-life-priorities-10', 1, 'approved', '身近な人とは、人生で優先したいものが近いほうがよい。', 'single_choice', 1786665600);
 --> statement-breakpoint
 
 INSERT OR IGNORE INTO question_choices (
@@ -138,8 +159,8 @@ INSERT OR IGNORE INTO question_choices (
   position
 )
 SELECT
-  CASE WHEN id LIKE 'q-conversation-emotion-%' THEN 1786233600 WHEN id LIKE 'q-leisure-style-%' OR id LIKE 'q-time-planning-%' THEN 1785974400 ELSE 1785801600 END,
-  CASE WHEN id LIKE 'q-conversation-emotion-%' THEN 1786233600 WHEN id LIKE 'q-leisure-style-%' OR id LIKE 'q-time-planning-%' THEN 1785974400 ELSE 1785801600 END,
+  CASE WHEN id LIKE 'q-life-priorities-%' THEN 1786665600 WHEN id LIKE 'q-conversation-emotion-%' THEN 1786233600 WHEN id LIKE 'q-leisure-style-%' OR id LIKE 'q-time-planning-%' THEN 1785974400 ELSE 1785801600 END,
+  CASE WHEN id LIKE 'q-life-priorities-%' THEN 1786665600 WHEN id LIKE 'q-conversation-emotion-%' THEN 1786233600 WHEN id LIKE 'q-leisure-style-%' OR id LIKE 'q-time-planning-%' THEN 1785974400 ELSE 1785801600 END,
   0,
   id,
   1,
@@ -168,7 +189,11 @@ WHERE id IN (
   'q-conversation-emotion-03', 'q-conversation-emotion-04',
   'q-conversation-emotion-05', 'q-conversation-emotion-06',
   'q-conversation-emotion-07', 'q-conversation-emotion-08',
-  'q-conversation-emotion-09', 'q-conversation-emotion-10'
+  'q-conversation-emotion-09', 'q-conversation-emotion-10',
+  'q-life-priorities-01', 'q-life-priorities-02', 'q-life-priorities-03',
+  'q-life-priorities-04', 'q-life-priorities-05', 'q-life-priorities-06',
+  'q-life-priorities-07', 'q-life-priorities-08', 'q-life-priorities-09',
+  'q-life-priorities-10'
 );
 --> statement-breakpoint
 
@@ -183,8 +208,8 @@ INSERT OR IGNORE INTO question_choices (
   position
 )
 SELECT
-  CASE WHEN id LIKE 'q-conversation-emotion-%' THEN 1786233600 WHEN id LIKE 'q-leisure-style-%' OR id LIKE 'q-time-planning-%' THEN 1785974400 ELSE 1785801600 END,
-  CASE WHEN id LIKE 'q-conversation-emotion-%' THEN 1786233600 WHEN id LIKE 'q-leisure-style-%' OR id LIKE 'q-time-planning-%' THEN 1785974400 ELSE 1785801600 END,
+  CASE WHEN id LIKE 'q-life-priorities-%' THEN 1786665600 WHEN id LIKE 'q-conversation-emotion-%' THEN 1786233600 WHEN id LIKE 'q-leisure-style-%' OR id LIKE 'q-time-planning-%' THEN 1785974400 ELSE 1785801600 END,
+  CASE WHEN id LIKE 'q-life-priorities-%' THEN 1786665600 WHEN id LIKE 'q-conversation-emotion-%' THEN 1786233600 WHEN id LIKE 'q-leisure-style-%' OR id LIKE 'q-time-planning-%' THEN 1785974400 ELSE 1785801600 END,
   0,
   id,
   1,
@@ -213,7 +238,11 @@ WHERE id IN (
   'q-conversation-emotion-03', 'q-conversation-emotion-04',
   'q-conversation-emotion-05', 'q-conversation-emotion-06',
   'q-conversation-emotion-07', 'q-conversation-emotion-08',
-  'q-conversation-emotion-09', 'q-conversation-emotion-10'
+  'q-conversation-emotion-09', 'q-conversation-emotion-10',
+  'q-life-priorities-01', 'q-life-priorities-02', 'q-life-priorities-03',
+  'q-life-priorities-04', 'q-life-priorities-05', 'q-life-priorities-06',
+  'q-life-priorities-07', 'q-life-priorities-08', 'q-life-priorities-09',
+  'q-life-priorities-10'
 );
 --> statement-breakpoint
 
@@ -386,6 +415,39 @@ INSERT OR IGNORE INTO diagnosis_scoring_configs (
       "highMinimum":65,
       "balancedLabel":"状況に応じて伝え方を選ぶ"
     }'
+  ),
+  (
+    'life-priorities-v1',
+    1786665600,
+    1786665600,
+    0,
+    1,
+    '{
+      "parameters": [
+        {"id":"challenge-orientation","label":"変化と挑戦","lowLabel":"安定や継続を重視","highLabel":"変化や挑戦を重視"},
+        {"id":"self-directed-fulfillment","label":"納得感ある選択","lowLabel":"外から見える条件を重視","highLabel":"自分の納得感を重視"},
+        {"id":"close-relationship-priority","label":"身近な人との調和","lowLabel":"個人の予定や判断を重視","highLabel":"身近な人との時間や近さを重視"},
+        {"id":"personal-wellbeing","label":"自分の時間と健康","lowLabel":"仕事や予定を優先しやすい","highLabel":"趣味や健康を優先しやすい"},
+        {"id":"future-stability","label":"将来への備え","lowLabel":"今の楽しみや変化を重視","highLabel":"将来の備えや安定を重視"}
+      ],
+      "choiceScores": {"yes":1,"no":-1},
+      "questions": {
+        "q-life-priorities-01":{"questionVersion":1,"weights":{"challenge-orientation":1}},
+        "q-life-priorities-02":{"questionVersion":1,"weights":{"challenge-orientation":0.5,"self-directed-fulfillment":1}},
+        "q-life-priorities-03":{"questionVersion":1,"weights":{"close-relationship-priority":1}},
+        "q-life-priorities-04":{"questionVersion":1,"weights":{"self-directed-fulfillment":0.5,"personal-wellbeing":1}},
+        "q-life-priorities-05":{"questionVersion":1,"weights":{"future-stability":1}},
+        "q-life-priorities-06":{"questionVersion":1,"weights":{"self-directed-fulfillment":0.5,"personal-wellbeing":1}},
+        "q-life-priorities-07":{"questionVersion":1,"weights":{"self-directed-fulfillment":1}},
+        "q-life-priorities-08":{"questionVersion":1,"weights":{"challenge-orientation":-1,"future-stability":0.5}},
+        "q-life-priorities-09":{"questionVersion":1,"weights":{"self-directed-fulfillment":1,"personal-wellbeing":0.5}},
+        "q-life-priorities-10":{"questionVersion":1,"weights":{"close-relationship-priority":1}}
+      },
+      "minimumCoverage":0.6,
+      "lowMaximum":35,
+      "highMinimum":65,
+      "balancedLabel":"状況に応じて優先するものを選ぶ"
+    }'
   );
 --> statement-breakpoint
 
@@ -407,7 +469,8 @@ INSERT INTO diagnoses (
   ('money-values', 1785801600, 1785801600, 0, 'お金と消費', '貯蓄、支出、共有、公平性、リスクに関する傾向を見ます。', 'partner', 'money-values-v1', 20, 1785801600, 'published', 1785801600),
   ('leisure-style', 1785974400, 1785974400, 0, 'インドア・アウトドアと余暇', '休日の過ごし方、体験、趣味の共有、活動量に関する傾向を見ます。', 'partner', 'leisure-style-v1', 30, 1785801600, 'published', 1785974400),
   ('time-planning', 1785974400, 1785974400, 0, '時間と予定', '予定の立て方、変更への柔軟性、時間の約束、一緒の時間に関する傾向を見ます。', 'partner', 'time-planning-v1', 40, 1785801600, 'published', 1785974400),
-  ('conversation-emotion', 1786233600, 1786233600, 0, '会話と感情表現', '共感、愛情表現、希望の伝え方、支え方、感情の共有に関する傾向を見ます。', 'partner', 'conversation-emotion-v1', 50, 1785801600, 'published', 1786233600)
+  ('conversation-emotion', 1786233600, 1786233600, 0, '会話と感情表現', '共感、愛情表現、希望の伝え方、支え方、感情の共有に関する傾向を見ます。', 'partner', 'conversation-emotion-v1', 50, 1785801600, 'published', 1786233600),
+  ('life-priorities', 1786665600, 1786665600, 0, '優先順位と人生の方向性', '挑戦、仕事、身近な人、自分の時間、健康、将来の備えに関する傾向を見ます。', 'general', 'life-priorities-v1', 60, 1786665600, 'published', 1786665600)
 ON CONFLICT(id) DO UPDATE SET
   description = CASE
     WHEN diagnoses.description = '' THEN excluded.description
@@ -491,21 +554,31 @@ INSERT OR IGNORE INTO diagnosis_questions (
   ('dq-conversation-emotion-07', 1786233600, 1786233600, 0, 'conversation-emotion', 'q-conversation-emotion-07', 1, 6),
   ('dq-conversation-emotion-08', 1786233600, 1786233600, 0, 'conversation-emotion', 'q-conversation-emotion-08', 1, 7),
   ('dq-conversation-emotion-09', 1786233600, 1786233600, 0, 'conversation-emotion', 'q-conversation-emotion-09', 1, 8),
-  ('dq-conversation-emotion-10', 1786233600, 1786233600, 0, 'conversation-emotion', 'q-conversation-emotion-10', 1, 9);
+  ('dq-conversation-emotion-10', 1786233600, 1786233600, 0, 'conversation-emotion', 'q-conversation-emotion-10', 1, 9),
+  ('dq-life-priorities-01', 1786665600, 1786665600, 0, 'life-priorities', 'q-life-priorities-01', 1, 0),
+  ('dq-life-priorities-02', 1786665600, 1786665600, 0, 'life-priorities', 'q-life-priorities-02', 1, 1),
+  ('dq-life-priorities-03', 1786665600, 1786665600, 0, 'life-priorities', 'q-life-priorities-03', 1, 2),
+  ('dq-life-priorities-04', 1786665600, 1786665600, 0, 'life-priorities', 'q-life-priorities-04', 1, 3),
+  ('dq-life-priorities-05', 1786665600, 1786665600, 0, 'life-priorities', 'q-life-priorities-05', 1, 4),
+  ('dq-life-priorities-06', 1786665600, 1786665600, 0, 'life-priorities', 'q-life-priorities-06', 1, 5),
+  ('dq-life-priorities-07', 1786665600, 1786665600, 0, 'life-priorities', 'q-life-priorities-07', 1, 6),
+  ('dq-life-priorities-08', 1786665600, 1786665600, 0, 'life-priorities', 'q-life-priorities-08', 1, 7),
+  ('dq-life-priorities-09', 1786665600, 1786665600, 0, 'life-priorities', 'q-life-priorities-09', 1, 8),
+  ('dq-life-priorities-10', 1786665600, 1786665600, 0, 'life-priorities', 'q-life-priorities-10', 1, 9);
 --> statement-breakpoint
 
 -- AccountDataがsnapshotを再同期するか判断する版。
 -- このseedのcatalog内容を変更したら、必ずversionを1つ上げる。
-INSERT INTO catalog_versions (catalog_id, version, updated_at) VALUES ('diagnosis', 3, 1786665600)
+INSERT INTO catalog_versions (catalog_id, version, updated_at) VALUES ('diagnosis', 4, 1786665600)
   ON CONFLICT(catalog_id) DO UPDATE SET version = excluded.version, updated_at = excluded.updated_at;
 --> statement-breakpoint
 
--- Expected result: diagnosis_count=5, question_version_count=50,
--- choice_count=100, diagnosis_question_count=50, scoring_config_count=5, catalog_version=3.
+-- Expected result: diagnosis_count=6, question_version_count=60,
+-- choice_count=120, diagnosis_question_count=60, scoring_config_count=6, catalog_version=4.
 SELECT
-  (SELECT COUNT(*) FROM diagnoses WHERE id IN ('relationship-priority', 'money-values', 'leisure-style', 'time-planning', 'conversation-emotion') AND state = 'published' AND relationship_category = 'partner' AND description <> '' AND is_deleted = 0) AS diagnosis_count,
-  (SELECT COUNT(*) FROM question_versions WHERE version = 1 AND state = 'approved' AND is_deleted = 0 AND (question_id LIKE 'q-relationship-priority-%' OR question_id LIKE 'q-money-%' OR question_id LIKE 'q-leisure-style-%' OR question_id LIKE 'q-time-planning-%' OR question_id LIKE 'q-conversation-emotion-%')) AS question_version_count,
-  (SELECT COUNT(*) FROM question_choices WHERE question_version = 1 AND is_deleted = 0 AND (question_id LIKE 'q-relationship-priority-%' OR question_id LIKE 'q-money-%' OR question_id LIKE 'q-leisure-style-%' OR question_id LIKE 'q-time-planning-%' OR question_id LIKE 'q-conversation-emotion-%')) AS choice_count,
-  (SELECT COUNT(*) FROM diagnosis_questions WHERE diagnosis_id IN ('relationship-priority', 'money-values', 'leisure-style', 'time-planning', 'conversation-emotion') AND is_deleted = 0) AS diagnosis_question_count,
-  (SELECT COUNT(*) FROM diagnosis_scoring_configs WHERE id IN ('relationship-priority-v1', 'money-values-v1', 'leisure-style-v1', 'time-planning-v1', 'conversation-emotion-v1') AND version = 1 AND is_deleted = 0) AS scoring_config_count,
+  (SELECT COUNT(*) FROM diagnoses WHERE ((id IN ('relationship-priority', 'money-values', 'leisure-style', 'time-planning', 'conversation-emotion') AND relationship_category = 'partner') OR (id = 'life-priorities' AND relationship_category = 'general')) AND state = 'published' AND description <> '' AND is_deleted = 0) AS diagnosis_count,
+  (SELECT COUNT(*) FROM question_versions WHERE version = 1 AND state = 'approved' AND is_deleted = 0 AND (question_id LIKE 'q-relationship-priority-%' OR question_id LIKE 'q-money-%' OR question_id LIKE 'q-leisure-style-%' OR question_id LIKE 'q-time-planning-%' OR question_id LIKE 'q-conversation-emotion-%' OR question_id LIKE 'q-life-priorities-%')) AS question_version_count,
+  (SELECT COUNT(*) FROM question_choices WHERE question_version = 1 AND is_deleted = 0 AND (question_id LIKE 'q-relationship-priority-%' OR question_id LIKE 'q-money-%' OR question_id LIKE 'q-leisure-style-%' OR question_id LIKE 'q-time-planning-%' OR question_id LIKE 'q-conversation-emotion-%' OR question_id LIKE 'q-life-priorities-%')) AS choice_count,
+  (SELECT COUNT(*) FROM diagnosis_questions WHERE diagnosis_id IN ('relationship-priority', 'money-values', 'leisure-style', 'time-planning', 'conversation-emotion', 'life-priorities') AND is_deleted = 0) AS diagnosis_question_count,
+  (SELECT COUNT(*) FROM diagnosis_scoring_configs WHERE id IN ('relationship-priority-v1', 'money-values-v1', 'leisure-style-v1', 'time-planning-v1', 'conversation-emotion-v1', 'life-priorities-v1') AND version = 1 AND is_deleted = 0) AS scoring_config_count,
   (SELECT version FROM catalog_versions WHERE catalog_id = 'diagnosis') AS catalog_version;
