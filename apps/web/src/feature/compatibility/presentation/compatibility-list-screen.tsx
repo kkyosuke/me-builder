@@ -56,7 +56,11 @@ export function CompatibilityListScreen({
         <p className="text-sm font-semibold tracking-wider text-rose-700 dark:text-rose-300">
           2人を知る
         </p>
-        <h1 className="mt-2 text-3xl font-bold text-slate-950 dark:text-slate-50">
+        <h1
+          tabIndex={-1}
+          data-main-route-heading="compatibility"
+          className="mt-2 text-3xl font-bold text-slate-950 focus:outline-none dark:text-slate-50"
+        >
           ふたりの見取り図
         </h1>
         <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-400">

@@ -815,7 +815,11 @@ export function ProfileSummaryScreen({
         <p className="text-sm font-semibold tracking-wider text-sky-700 dark:text-sky-300">
           私を知る
         </p>
-        <h1 className="mt-2 text-3xl font-bold text-slate-950 dark:text-slate-50">
+        <h1
+          tabIndex={-1}
+          data-main-route-heading="me"
+          className="mt-2 text-3xl font-bold text-slate-950 focus:outline-none dark:text-slate-50"
+        >
           わたしのまとめ
         </h1>
         <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-400">

@@ -18,6 +18,27 @@ describe("MainNavigation", () => {
     vi.clearAllMocks();
   });
 
+  it("通常のタップでは文書を再読み込みせず履歴と表示ルートを更新する", () => {
+    window.history.replaceState({}, "", "/me");
+    const handlePopState = vi.fn();
+    window.addEventListener("popstate", handlePopState);
+    render(<MainNavigation current="me" />);
+
+    expect(fireEvent.click(screen.getByRole("link", { name: "診断" }))).toBe(false);
+    expect(window.location.pathname).toBe("/diagnosis");
+    expect(handlePopState).toHaveBeenCalledTimes(1);
+
+    window.removeEventListener("popstate", handlePopState);
+  });
+
+  it("現在の項目を押しても再読み込みしない", () => {
+    window.history.replaceState({}, "", "/me");
+    render(<MainNavigation current="me" />);
+
+    expect(fireEvent.click(screen.getByRole("link", { name: "わたし" }))).toBe(false);
+    expect(window.location.pathname).toBe("/me");
+  });
+
   it("移動先へポインターまたはフォーカスを向けた時だけ先読みする", () => {
     render(<MainNavigation current="me" />);
 

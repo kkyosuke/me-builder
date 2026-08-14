@@ -134,7 +134,13 @@ export function DiagnosisHome({
         <p className="text-sm font-semibold tracking-wider text-sky-700 dark:text-sky-300">
           私をひもとく
         </p>
-        <h1 className="mt-2 text-3xl font-bold text-slate-950 dark:text-slate-50">わたしの診断</h1>
+        <h1
+          tabIndex={-1}
+          data-main-route-heading="diagnosis"
+          className="mt-2 text-3xl font-bold text-slate-950 dark:text-slate-50 focus:outline-none"
+        >
+          わたしの診断
+        </h1>
         <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
           答えたいカードを選んでください。
         </p>

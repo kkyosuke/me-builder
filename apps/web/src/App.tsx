@@ -1,4 +1,4 @@
-import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { LoadingState } from "./components/loading-state";
 import { RouteErrorBoundary } from "./components/route-error-boundary";
 import { config } from "./config";
@@ -40,6 +40,7 @@ const ProfileSettingsScreen = lazy(loadProfileSettingsScreen);
 const AvatarSettingsScreen = lazy(loadAvatarSettingsScreen);
 
 type ProfileView = "closed" | "profile" | "avatar";
+type MainRoute = "compatibility" | "diagnosis" | "me";
 
 const DEVELOPMENT_ENVIRONMENTS = new Set(["development", "local", "preview", "test"]);
 
@@ -91,6 +92,67 @@ function uploadedAvatar(profile: AccountProfile): AvatarSelection | null {
     : null;
 }
 
+function restoreWindowScroll(top: number): () => void {
+  let animationFrameId: number | null = null;
+  let resizeObserver: ResizeObserver | null = null;
+  let timeoutId: number | null = null;
+  let stopped = false;
+
+  const stop = () => {
+    if (stopped) return;
+    stopped = true;
+    if (animationFrameId !== null) window.cancelAnimationFrame(animationFrameId);
+    resizeObserver?.disconnect();
+    if (timeoutId !== null) window.clearTimeout(timeoutId);
+  };
+  const apply = () => {
+    animationFrameId = null;
+    window.scrollTo(0, top);
+    if (Math.abs(window.scrollY - top) <= 1) stop();
+  };
+  const schedule = () => {
+    if (stopped || animationFrameId !== null) return;
+    animationFrameId = window.requestAnimationFrame(apply);
+  };
+
+  apply();
+  if (!stopped && typeof ResizeObserver !== "undefined") {
+    resizeObserver = new ResizeObserver(schedule);
+    resizeObserver.observe(document.body);
+  }
+  if (!stopped) timeoutId = window.setTimeout(stop, 5_000);
+
+  return stop;
+}
+
+function focusMainRouteHeading(container: HTMLElement, route: MainRoute): () => void {
+  let mutationObserver: MutationObserver | null = null;
+  let timeoutId: number | null = null;
+  let stopped = false;
+
+  const stop = () => {
+    if (stopped) return;
+    stopped = true;
+    mutationObserver?.disconnect();
+    if (timeoutId !== null) window.clearTimeout(timeoutId);
+  };
+  const focus = (): boolean => {
+    const heading = container.querySelector<HTMLElement>(`[data-main-route-heading="${route}"]`);
+    if (!heading) return false;
+    heading.focus({ preventScroll: true });
+    return true;
+  };
+
+  if (focus()) return stop;
+  mutationObserver = new MutationObserver(() => {
+    if (focus()) stop();
+  });
+  mutationObserver.observe(container, { childList: true, subtree: true });
+  timeoutId = window.setTimeout(stop, 5_000);
+
+  return stop;
+}
+
 function AppContents() {
   const colorTheme = useColorTheme();
   const fontSize = useFontSize();
@@ -115,6 +177,8 @@ function AppContents() {
   const isMePath = mainPathname === "/me" || mainPathname?.startsWith("/me/");
   const isProfileOpen = profileView !== "closed";
   const currentMainRoute = isCompatibilityPath ? "compatibility" : isMePath ? "me" : "diagnosis";
+  const mainRouteScrollPositions = useRef(new Map<MainRoute, number>());
+  const previousMainRoute = useRef<MainRoute | null>(null);
   const [avatar, setAvatar] = useState<AvatarSelection | null>(null);
   const [accountRole, setAccountRole] = useState<"user" | "admin" | null>(null);
   const [profileLinePictureUrl, setProfileLinePictureUrl] = useState<string | undefined>();
@@ -133,6 +197,36 @@ function AppContents() {
     setAccountRole(profile.role);
     setProfileLinePictureUrl(profile.avatar?.source === "line" ? profile.avatar.url : undefined);
     setProfileReadState({ status: "ready" });
+  }, []);
+
+  useLayoutEffect(() => {
+    const previous = previousMainRoute.current;
+    if (previous === null) {
+      previousMainRoute.current = currentMainRoute;
+      return;
+    }
+    if (previous === currentMainRoute) return;
+
+    mainRouteScrollPositions.current.set(previous, window.scrollY);
+    previousMainRoute.current = currentMainRoute;
+    const stopScrollRestoration = restoreWindowScroll(
+      mainRouteScrollPositions.current.get(currentMainRoute) ?? 0,
+    );
+    const stopFocusRestoration = applicationContentRef.current
+      ? focusMainRouteHeading(applicationContentRef.current, currentMainRoute)
+      : () => undefined;
+    return () => {
+      stopScrollRestoration();
+      stopFocusRestoration();
+    };
+  }, [currentMainRoute]);
+
+  useEffect(() => {
+    const previousScrollRestoration = window.history.scrollRestoration;
+    window.history.scrollRestoration = "manual";
+    return () => {
+      window.history.scrollRestoration = previousScrollRestoration;
+    };
   }, []);
 
   useEffect(() => {

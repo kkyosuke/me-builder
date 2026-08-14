@@ -1,4 +1,5 @@
 import { Brain, CalendarDays, HeartHandshake } from "lucide-react";
+import type { MouseEvent } from "react";
 import { preloadMainApplication } from "../routes";
 
 type MainNavigationItem = "compatibility" | "diagnosis" | "me";
@@ -8,6 +9,31 @@ const items = [
   { id: "diagnosis", href: "/diagnosis", label: "診断", icon: CalendarDays },
   { id: "compatibility", href: "/compatibility", label: "相性", icon: HeartHandshake },
 ] as const;
+
+function isPlainPrimaryClick(event: MouseEvent<HTMLAnchorElement>): boolean {
+  return (
+    event.button === 0 &&
+    !event.altKey &&
+    !event.ctrlKey &&
+    !event.metaKey &&
+    !event.shiftKey &&
+    event.currentTarget.target !== "_blank" &&
+    !event.currentTarget.hasAttribute("download")
+  );
+}
+
+function navigateWithinApp(
+  event: MouseEvent<HTMLAnchorElement>,
+  href: string,
+  isCurrent: boolean,
+): void {
+  if (!isPlainPrimaryClick(event)) return;
+  event.preventDefault();
+  if (isCurrent) return;
+
+  window.history.pushState({}, "", href);
+  window.dispatchEvent(new PopStateEvent("popstate", { state: window.history.state }));
+}
 
 /** 一般利用者向けルート画面で、同じ位置と順序を保つ主ナビゲーション。 */
 export function MainNavigation({ current }: { current: MainNavigationItem }) {
@@ -28,6 +54,7 @@ export function MainNavigation({ current }: { current: MainNavigationItem }) {
               key={item.id}
               href={item.href}
               aria-current={isCurrent ? "page" : undefined}
+              onClick={(event) => navigateWithinApp(event, item.href, isCurrent)}
               onPointerEnter={preloadDestination}
               onFocus={preloadDestination}
               className={`flex min-h-12 items-center justify-center gap-2 rounded-xl text-sm ${

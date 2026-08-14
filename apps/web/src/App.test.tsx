@@ -190,6 +190,7 @@ describe("App", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.history.replaceState({}, "", "/");
+    vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
     window.localStorage.clear();
     document.documentElement.className = "";
     document.documentElement.style.colorScheme = "";
@@ -527,6 +528,89 @@ describe("App", () => {
         "data:image/png;base64,c2F2ZWQ=",
       ),
     );
+  });
+
+  it("主ナビゲーションの切り替えでプロフィール画像と取得済み状態を維持する", async () => {
+    window.history.replaceState({}, "", "/diagnosis");
+    mocks.fetchAccountProfile.mockResolvedValue({
+      role: "user",
+      displayName: "テスト",
+      avatar: {
+        source: "uploaded",
+        url: "data:image/png;base64,c2F2ZWQ=",
+        updatedAt: "2026-08-11T00:00:00.000Z",
+      },
+    });
+
+    render(<App />);
+
+    const profileButton = await screen.findByRole("button", { name: "プロフィールを開く" });
+    await waitFor(() =>
+      expect(profileButton.querySelector("img")?.getAttribute("src")).toBe(
+        "data:image/png;base64,c2F2ZWQ=",
+      ),
+    );
+    expect(mocks.fetchAccountProfile).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(await screen.findByRole("link", { name: "わたし" }));
+
+    await waitFor(() => expect(window.location.pathname).toBe("/me"));
+    expect(profileButton.isConnected).toBe(true);
+    expect(profileButton.querySelector("img")?.getAttribute("src")).toBe(
+      "data:image/png;base64,c2F2ZWQ=",
+    );
+    expect(mocks.fetchAccountProfile).toHaveBeenCalledTimes(1);
+  });
+
+  it("主画面ごとのスクロール位置へ戻し、初めての画面では先頭を表示する", async () => {
+    window.history.replaceState({}, "", "/diagnosis");
+    let scrollY = 480;
+    const scrollYSpy = vi.spyOn(window, "scrollY", "get").mockImplementation(() => scrollY);
+    const scrollToSpy = vi.mocked(window.scrollTo).mockImplementation((_x, y) => {
+      scrollY = y ?? scrollY;
+    });
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("link", { name: "わたし" }));
+
+    await waitFor(() => expect(window.location.pathname).toBe("/me"));
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByRole("heading", { name: "わたしのまとめ" })),
+    );
+    expect(scrollToSpy).toHaveBeenLastCalledWith(0, 0);
+
+    scrollY = 260;
+    fireEvent.click(await screen.findByRole("link", { name: "診断" }));
+
+    await waitFor(() => expect(window.location.pathname).toBe("/diagnosis"));
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByRole("heading", { name: "わたしの診断" })),
+    );
+    expect(scrollToSpy).toHaveBeenLastCalledWith(0, 480);
+
+    scrollY = 720;
+    fireEvent.click(await screen.findByRole("link", { name: "わたし" }));
+
+    await waitFor(() => expect(window.location.pathname).toBe("/me"));
+    expect(scrollToSpy).toHaveBeenLastCalledWith(0, 260);
+
+    scrollY = 340;
+    fireEvent.click(await screen.findByRole("link", { name: "相性" }));
+
+    await waitFor(() => expect(window.location.pathname).toBe("/compatibility"));
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole("heading", { name: "ふたりの見取り図" }),
+      ),
+    );
+    expect(scrollToSpy).toHaveBeenLastCalledWith(0, 0);
+
+    scrollY = 190;
+    fireEvent.click(await screen.findByRole("link", { name: "わたし" }));
+
+    await waitFor(() => expect(window.location.pathname).toBe("/me"));
+    expect(scrollToSpy).toHaveBeenLastCalledWith(0, 340);
+    scrollYSpy.mockRestore();
   });
 
   it("保存画像の取得前にLINE画像を先に表示しない", async () => {
