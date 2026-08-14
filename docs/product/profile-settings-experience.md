@@ -194,7 +194,7 @@ flowchart LR
 - 文字サイズ機能はブラウザ内の選択、初回描画前の復元、Web全体への反映を担当する
 - アバター機能はLINE画像を使う初期表示とAccount所有画像の変更を担当し、詳細はアバター設計へ閉じる
 - Web UIはテーマと文字サイズをAccount設定とみなしてAPIへ送らず、アバターのAccount IDをクライアント指定しない
-- 管理者導線の表示判定はクライアント申告のroleを使わず、サーバーがIDトークンを検証して解決したAccount roleを使う。管理者画面とAPIの認可境界は[管理者向け統計ダッシュボード設計](../architecture/admin-statistics-dashboard.md)を正とする
+- 管理者導線の表示判定はクライアント申告のroleを使わず、サーバーがIDトークンを検証して解決したAccount roleを使う。管理者画面とAPIの認可境界は[管理者向けダッシュボード設計](../architecture/admin-statistics-dashboard.md)を正とする
 
 ## 11. アクセシビリティとレスポンシブ表示
 

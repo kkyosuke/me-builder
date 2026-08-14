@@ -1,12 +1,12 @@
-# 管理者向け統計ダッシュボード設計
+# 管理者向けダッシュボード設計
 
 ## 1. 目的
 
-運用者が、外部サービスの利用量をme-builder内で確認できるようにします。対象はVertex AI Express ModeのGeminiとLINE Messaging APIです。
+運用者が、Accountの利用状況と外部サービスの利用量をme-builder内で確認できるようにします。Account一覧では表示名、うつしレベル、かけら数などの運用に必要な集計値を扱い、外部サービス統計ではVertex AI Express ModeのGeminiとLINE Messaging APIを扱います。
 
-この文書は管理者の認可境界、統計項目、取得元、障害時の表示を所有します。一般利用者の診断体験、各外部サービスの呼び出し処理、データベースの物理設計は所有しません。
+この文書は管理者の認可境界、ダッシュボードの画面構成、Account一覧の表示項目、統計項目、取得元、障害時の表示を所有します。一般利用者の診断体験、レベル式、各外部サービスの呼び出し処理、データベースの物理設計は所有しません。
 
-Accountの責務は[ドメイン設計](../domain/domain-design.md)、実行基盤は[インフラ・システム構成](infrastructure-architecture.md)を正とします。
+Accountの責務は[ドメイン設計](../domain/domain-design.md)、うつしレベルとかけら数の定義は[成長・報酬体験の提案](../product/progression-reward-experience.md)、実行基盤は[インフラ・システム構成](infrastructure-architecture.md)を正とします。
 
 ## 2. 認可境界
 
@@ -20,7 +20,75 @@ Accountの責務は[ドメイン設計](../domain/domain-design.md)、実行基�
 
 将来、運用権限が複数種類必要になった場合にroleの複数化を検討します。初期段階では汎用的なRBACを導入しません。
 
-## 3. 最初に表示する統計
+Account一覧の取得も統計と同じ認可境界を使います。名前やレベルを表示できても、Accountの行から日記、診断回答、Brain Itemのstatement、Evidence本文へ遷移する権限は付与しません。
+
+## 3. 画面構成
+
+管理者画面の上部に「Account」と「利用統計」の2つのタブを置きます。最初に「Account」を表示し、タブの選択はURLへ反映して再読み込みと履歴移動で復元します。
+
+```text
+管理者ダッシュボード
+├── Account
+│   ├── Account数
+│   ├── 名前・Account IDの検索
+│   └── Account一覧
+└── 利用統計
+    ├── Gemini
+    └── LINE
+```
+
+Account一覧と利用統計は独立して取得します。一方が失敗しても、取得できたタブは表示します。
+
+## 4. Account一覧
+
+### 4.1 表示項目
+
+一覧では、次の項目を1 Accountにつき1行表示します。
+
+| 項目 | 表示 | 取得元 |
+| --- | --- | --- |
+| 名前 | 最後に本人確認できたLINE表示名。未取得なら「名前未取得」 | 検証済みLINEプロフィールの運用snapshot |
+| Account ID | me-builder内部ID | 共有D1のAccount |
+| role / status | `user` / `admin`、利用状態 | 共有D1のAccount |
+| うつしレベル | 現在のレベルと計算版 | AccountDataから共有D1へ出した集計projection |
+| 集めたかけら | これまで集めたBrain Item数 | 同上 |
+| 有効なかけら | 現在`active`なBrain Item数 | 同上 |
+| 登録日 | Account作成日時 | 共有D1のAccount |
+| 最終成長日時 | 最後に成長イベントを反映した日時。未反映なら「まだ成長記録がありません」 | 集計projection |
+
+名前はLINE user IDではなく、本人確認時にLINEから得た表示名のsnapshotです。LIFF認証またはLINEプロフィールを正当に取得できた処理で更新し、クライアントが任意に送った名前を保存しません。LINE user ID、ID token、アクセストークンは一覧へ返しません。
+
+うつしレベル、集めたかけら、有効なかけらは、[成長・報酬体験の提案 §4](../product/progression-reward-experience.md#4-うつしレベル)と同じ結果を表示します。管理者画面独自の計算式や補正を持ちません。
+
+### 4.2 一覧操作
+
+- 初期表示は登録日の新しい順とする
+- 名前の部分一致、または完全なAccount IDで検索できる
+- roleとstatusで絞り込める
+- 登録日、うつしレベル、集めたかけら、最終成長日時で並べ替えられる
+- 1ページ50件を上限にcursorで次ページを取得する
+- 横幅がある画面は表、狭い画面は同じ項目をAccountごとのカードで表示する
+- 初期段階では詳細画面を設けず、一覧行を日記、診断回答、Brain Item本文へのリンクにしない
+
+検索結果が0件の場合は条件を残したまま空状態を表示します。再取得中は表示済みの一覧を維持し、一覧全体をSkeletonへ戻しません。
+
+### 4.3 Account横断projection
+
+うつしレベルとBrain ItemはAccountDataの個人コンテンツであり、一覧APIが50個のAccountDataへ都度問い合わせる方式にはしません。AccountDataで成長値またはかけら数が変わったとき、次の非機密な集計値だけを共有D1へprojectionします。
+
+- Account ID
+- うつしレベルと計算版
+- 累積成長値
+- 集めたかけら数
+- 有効なかけら数
+- 最終成長日時
+- projection更新日時
+
+Brain Itemのstatement、分類ごとの内容、Evidence、Source Record、診断回答、日記本文はprojectionへ含めません。一覧にprojectionがまだないAccountは削除せず、「レベル集計中」と表示します。projection更新日時を画面へ表示できるようにし、値が古い可能性を運用者が区別できるようにします。
+
+Account一覧の閲覧は、管理者Account、検索・絞り込み条件、取得件数、取得時刻を監査ログへ記録します。検索語が表示名またはAccount IDを含むため、通常のアプリケーションログへ検索語そのものを出しません。
+
+## 5. 最初に表示する統計
 
 期間は当月1日から現在までとし、画面上に集計期間と最終取得時刻を表示します。
 
@@ -56,12 +124,15 @@ Googleの`usageMetadata`はtoken数であり、請求額の確定値ではあり
 
 確定費用が必要になった場合は、[Cloud BillingのStandard usage cost export](https://cloud.google.com/billing/docs/how-to/export-data-bigquery)をBigQueryへ出力し、GeminiのSKUを集計する経路を別途設計します。この値は請求アカウント側の確定費用に近い全体額を確認する用途とし、me-builderの内部Account別概算へ按分しません。Cloud Billing側の行には内部Account IDがなく、無料枠やcredit適用後の全体額を各Accountへ正確に対応付けられないためです。
 
-## 4. データフロー
+## 6. データフロー
 
 ```mermaid
 flowchart LR
-    A[Admin Web UI] -->|LINE ID token| API[Admin Statistics API]
+    A[Admin Web UI] -->|LINE ID token| API[Admin API]
     API -->|resolve Account / require admin| D1[(D1)]
+    LIFF[Verified LINE session] -->|display name snapshot| D1
+    AD[(AccountData)] -->|level / piece count projection| D1
+    API -->|account page / aggregate only| D1
     W[Queue Worker] -->|responseId + usageMetadata| D1
     API -->|当月token集計 / 公開単価で概算| D1
     API -->|Channel access token| LINE[LINE Messaging API]
@@ -71,8 +142,12 @@ flowchart LR
 
 外部サービスのtokenは必要なServerだけに配布し、Web UIへ返しません。LINE Channel access tokenはAPI Serverへ、Vertex AI API keyはQueue Workerへだけ配布します。Cloudflareへデプロイするための`CLOUDFLARE_DEPLOY_API_TOKEN`はCDだけで使用します。
 
-## 5. 取得失敗時の扱い
+## 7. 取得失敗時の扱い
 
+- Account一覧と利用統計は独立して取得し、一方の失敗で管理者画面全体を非表示にしない
+- Accountの成長projectionが未作成なら行を残して「レベル集計中」と表示する
+- 表示名を取得できない場合もAccount IDで行を表示し、外部APIへ一覧表示のたびに名前を取りに行かない
+- AccountDataへ直接問い合わせてprojection欠落をその場で補完せず、非同期projectionの再処理対象とする
 - GeminiのD1集計とLINE外部取得は独立して実行し、一方の失敗で他方を非表示にしない
 - D1エラー、外部APIエラー、レスポンス不正を区別できる状態を各sectionに返す
 - 外部APIのエラー本文やsecretをクライアントへ返さない

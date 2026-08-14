@@ -47,6 +47,7 @@ docs/
 - [全体画面遷移設計](product/screen-navigation.md) — LINEとWebをまたぐ入口と、利用者・管理者向け画面の全体遷移
 - [わたしのまとめ仕様](product/profile-summary-experience.md) — 診断と日記からAI生成した版付きの「わたしのまとめ」と診断テーマの表示規則
 - [相性診断・うつし共有体験設計](product/compatibility-experience.md) — 招待リンクとLINE共有、双方の同意、相性一覧、「それぞれについて」と「2人について」、共有終了
+- [成長・報酬体験の提案](product/progression-reward-experience.md) — Brainの成長イベントによる上限のないレベル、集めたかけらと有効なかけら、ペア単位の共有レベル
 - [プロフィール設定体験設計](product/profile-settings-experience.md) — 右上の入口、アバター設定への接続、ライト・ダークテーマの選択と保存
 - [アバター設定体験設計](product/avatar-experience.md) — LINEプロフィール画像の初期表示、端末画像の選択・プレビュー・設定、差し替え・削除
 - [ストレスの手がかりとAIセルフケア相談体験設計](product/self-care-ai-consultation-experience.md) — 自分用のセルフケア情報、AI相談、安全上の切り替え
@@ -85,7 +86,7 @@ docs/
 - [Accountデータ分離設計](architecture/account-data-isolation.md) — 1 Account = 1 AccountData DO、保存先の判定規則、内部module、共有D1が保存するもの
 - [相性共有データ実装設計](architecture/compatibility-data-design.md) — 1関係 = 1 CompatibilityData DO、Account別一覧参照、相手単位の継続同意、状態遷移
 - [日記チャット実装設計](architecture/diary-chat-implementation-design.md) — 日記チャットのAccountDataモデル、声かけコンテキストの保存、実行基盤、プロンプト、ガードレール、応答期限
-- [管理者向け統計ダッシュボード設計](architecture/admin-statistics-dashboard.md) — 管理者認可とGemini・LINEの利用統計
+- [管理者向けダッシュボード設計](architecture/admin-statistics-dashboard.md) — 管理者認可、Account一覧、うつしレベル・かけら数、Gemini・LINEの利用統計
 - [キャラクターデザイン](design/character-design.md) — うつし・ミラの設定とデザインアセット
 - [診断seed運用](development/diagnosis-seed.md) — 診断をD1へ登録するseedの配置、実行、更新、検証方法
 - [診断サムネイル生成](development/diagnosis-thumbnail-generation.md) — 診断一覧用サムネイルの生成プロンプトと配置手順
