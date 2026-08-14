@@ -215,9 +215,9 @@ describe("GET /api/diagnoses local D1 E2E", () => {
         lastAnsweredAt: string | null;
       }>;
     };
-    expect(initialBody.diagnoses).toHaveLength(7);
+    expect(initialBody.diagnoses).toHaveLength(8);
     expect(initialBody.diagnoses.map(({ displayOrder }) => displayOrder)).toEqual([
-      10, 20, 30, 40, 50, 60, 70,
+      10, 20, 30, 40, 50, 60, 70, 80,
     ]);
     expect(initialBody.diagnoses.find(({ id }) => id === "life-priorities")).toMatchObject({
       relationshipCategory: "general",
@@ -226,6 +226,11 @@ describe("GET /api/diagnoses local D1 E2E", () => {
     });
     expect(initialBody.diagnoses.find(({ id }) => id === "work-values")).toMatchObject({
       relationshipCategory: "general",
+      responseStatus: "unanswered",
+      questionCount: 10,
+    });
+    expect(initialBody.diagnoses.find(({ id }) => id === "work-supervisor-style")).toMatchObject({
+      relationshipCategory: "work",
       responseStatus: "unanswered",
       questionCount: 10,
     });

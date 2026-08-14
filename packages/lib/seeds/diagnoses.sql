@@ -9,7 +9,7 @@
 -- Timestamps: 2026-08-04T00:00:00.000Z for the initial diagnoses and
 -- 2026-08-06T00:00:00.000Z for leisure-style and time-planning, and
 -- 2026-08-09T00:00:00.000Z for conversation-emotion, and
--- 2026-08-14T00:00:00.000Z for life-priorities and work-values
+-- 2026-08-14T00:00:00.000Z for life-priorities, work-values, and work-supervisor-style
 -- (Unix seconds, Drizzle timestamp mode).
 
 INSERT OR IGNORE INTO questions (id, created_at, updated_at, is_deleted) VALUES
@@ -82,7 +82,17 @@ INSERT OR IGNORE INTO questions (id, created_at, updated_at, is_deleted) VALUES
   ('q-work-values-07', 1786665600, 1786665600, 0),
   ('q-work-values-08', 1786665600, 1786665600, 0),
   ('q-work-values-09', 1786665600, 1786665600, 0),
-  ('q-work-values-10', 1786665600, 1786665600, 0);
+  ('q-work-values-10', 1786665600, 1786665600, 0),
+  ('q-work-supervisor-style-01', 1786665600, 1786665600, 0),
+  ('q-work-supervisor-style-02', 1786665600, 1786665600, 0),
+  ('q-work-supervisor-style-03', 1786665600, 1786665600, 0),
+  ('q-work-supervisor-style-04', 1786665600, 1786665600, 0),
+  ('q-work-supervisor-style-05', 1786665600, 1786665600, 0),
+  ('q-work-supervisor-style-06', 1786665600, 1786665600, 0),
+  ('q-work-supervisor-style-07', 1786665600, 1786665600, 0),
+  ('q-work-supervisor-style-08', 1786665600, 1786665600, 0),
+  ('q-work-supervisor-style-09', 1786665600, 1786665600, 0),
+  ('q-work-supervisor-style-10', 1786665600, 1786665600, 0);
 --> statement-breakpoint
 
 INSERT OR IGNORE INTO question_versions (
@@ -165,7 +175,17 @@ INSERT OR IGNORE INTO question_versions (
   (1786665600, 1786665600, 0, 'q-work-values-07', 1, 'approved', '収入が少し下がっても、雇用や働く時間が安定しているほうがよい。', 'single_choice', 1786665600),
   (1786665600, 1786665600, 0, 'q-work-values-08', 1, 'approved', '大きな成果を狙うより、無理なく続けられる仕事がよい。', 'single_choice', 1786665600),
   (1786665600, 1786665600, 0, 'q-work-values-09', 1, 'approved', '昇進や評価のためでも、私生活の時間は減らしたくない。', 'single_choice', 1786665600),
-  (1786665600, 1786665600, 0, 'q-work-values-10', 1, 'approved', '必要であれば、勤務時間外でも仕事の連絡に対応したい。', 'single_choice', 1786665600);
+  (1786665600, 1786665600, 0, 'q-work-values-10', 1, 'approved', '必要であれば、勤務時間外でも仕事の連絡に対応したい。', 'single_choice', 1786665600),
+  (1786665600, 1786665600, 0, 'q-work-supervisor-style-01', 1, 'approved', '上司から同じ種類の仕事を任され続けると、別の役割や課題にも取り組みたくなる。', 'single_choice', 1786665600),
+  (1786665600, 1786665600, 0, 'q-work-supervisor-style-02', 1, 'approved', '上司に希望を伝えるなら、新しい役割より慣れた仕事を深めることを選びたい。', 'single_choice', 1786665600),
+  (1786665600, 1786665600, 0, 'q-work-supervisor-style-03', 1, 'approved', '上司とは、仕事の用件だけでなく普段から会話しておきたい。', 'single_choice', 1786665600),
+  (1786665600, 1786665600, 0, 'q-work-supervisor-style-04', 1, 'approved', '上司とのやり取りは、必要な報告や相談に絞りたい。', 'single_choice', 1786665600),
+  (1786665600, 1786665600, 0, 'q-work-supervisor-style-05', 1, 'approved', '仕事の進め方は、上司に細かく確認するより自分に任せてほしい。', 'single_choice', 1786665600),
+  (1786665600, 1786665600, 0, 'q-work-supervisor-style-06', 1, 'approved', '自分で進めるより、上司と方針を確認しながら取り組みたい。', 'single_choice', 1786665600),
+  (1786665600, 1786665600, 0, 'q-work-supervisor-style-07', 1, 'approved', '上司からのフィードバックは、節目だけでなくこまめに受けたい。', 'single_choice', 1786665600),
+  (1786665600, 1786665600, 0, 'q-work-supervisor-style-08', 1, 'approved', '上司からの評価や助言は、途中より仕事が一区切りついた時に受けたい。', 'single_choice', 1786665600),
+  (1786665600, 1786665600, 0, 'q-work-supervisor-style-09', 1, 'approved', '上司と意見が違っても、自分の考えを率直に伝えたい。', 'single_choice', 1786665600),
+  (1786665600, 1786665600, 0, 'q-work-supervisor-style-10', 1, 'approved', '上司と意見が違うときは、自分の考えを通すより上司の判断を優先したい。', 'single_choice', 1786665600);
 --> statement-breakpoint
 
 INSERT OR IGNORE INTO question_choices (
@@ -179,8 +199,8 @@ INSERT OR IGNORE INTO question_choices (
   position
 )
 SELECT
-  CASE WHEN id LIKE 'q-life-priorities-%' OR id LIKE 'q-work-values-%' THEN 1786665600 WHEN id LIKE 'q-conversation-emotion-%' THEN 1786233600 WHEN id LIKE 'q-leisure-style-%' OR id LIKE 'q-time-planning-%' THEN 1785974400 ELSE 1785801600 END,
-  CASE WHEN id LIKE 'q-life-priorities-%' OR id LIKE 'q-work-values-%' THEN 1786665600 WHEN id LIKE 'q-conversation-emotion-%' THEN 1786233600 WHEN id LIKE 'q-leisure-style-%' OR id LIKE 'q-time-planning-%' THEN 1785974400 ELSE 1785801600 END,
+  CASE WHEN id LIKE 'q-life-priorities-%' OR id LIKE 'q-work-values-%' OR id LIKE 'q-work-supervisor-style-%' THEN 1786665600 WHEN id LIKE 'q-conversation-emotion-%' THEN 1786233600 WHEN id LIKE 'q-leisure-style-%' OR id LIKE 'q-time-planning-%' THEN 1785974400 ELSE 1785801600 END,
+  CASE WHEN id LIKE 'q-life-priorities-%' OR id LIKE 'q-work-values-%' OR id LIKE 'q-work-supervisor-style-%' THEN 1786665600 WHEN id LIKE 'q-conversation-emotion-%' THEN 1786233600 WHEN id LIKE 'q-leisure-style-%' OR id LIKE 'q-time-planning-%' THEN 1785974400 ELSE 1785801600 END,
   0,
   id,
   1,
@@ -217,7 +237,12 @@ WHERE id IN (
   'q-work-values-01', 'q-work-values-02', 'q-work-values-03',
   'q-work-values-04', 'q-work-values-05', 'q-work-values-06',
   'q-work-values-07', 'q-work-values-08', 'q-work-values-09',
-  'q-work-values-10'
+  'q-work-values-10',
+  'q-work-supervisor-style-01', 'q-work-supervisor-style-02',
+  'q-work-supervisor-style-03', 'q-work-supervisor-style-04',
+  'q-work-supervisor-style-05', 'q-work-supervisor-style-06',
+  'q-work-supervisor-style-07', 'q-work-supervisor-style-08',
+  'q-work-supervisor-style-09', 'q-work-supervisor-style-10'
 );
 --> statement-breakpoint
 
@@ -232,8 +257,8 @@ INSERT OR IGNORE INTO question_choices (
   position
 )
 SELECT
-  CASE WHEN id LIKE 'q-life-priorities-%' OR id LIKE 'q-work-values-%' THEN 1786665600 WHEN id LIKE 'q-conversation-emotion-%' THEN 1786233600 WHEN id LIKE 'q-leisure-style-%' OR id LIKE 'q-time-planning-%' THEN 1785974400 ELSE 1785801600 END,
-  CASE WHEN id LIKE 'q-life-priorities-%' OR id LIKE 'q-work-values-%' THEN 1786665600 WHEN id LIKE 'q-conversation-emotion-%' THEN 1786233600 WHEN id LIKE 'q-leisure-style-%' OR id LIKE 'q-time-planning-%' THEN 1785974400 ELSE 1785801600 END,
+  CASE WHEN id LIKE 'q-life-priorities-%' OR id LIKE 'q-work-values-%' OR id LIKE 'q-work-supervisor-style-%' THEN 1786665600 WHEN id LIKE 'q-conversation-emotion-%' THEN 1786233600 WHEN id LIKE 'q-leisure-style-%' OR id LIKE 'q-time-planning-%' THEN 1785974400 ELSE 1785801600 END,
+  CASE WHEN id LIKE 'q-life-priorities-%' OR id LIKE 'q-work-values-%' OR id LIKE 'q-work-supervisor-style-%' THEN 1786665600 WHEN id LIKE 'q-conversation-emotion-%' THEN 1786233600 WHEN id LIKE 'q-leisure-style-%' OR id LIKE 'q-time-planning-%' THEN 1785974400 ELSE 1785801600 END,
   0,
   id,
   1,
@@ -270,7 +295,12 @@ WHERE id IN (
   'q-work-values-01', 'q-work-values-02', 'q-work-values-03',
   'q-work-values-04', 'q-work-values-05', 'q-work-values-06',
   'q-work-values-07', 'q-work-values-08', 'q-work-values-09',
-  'q-work-values-10'
+  'q-work-values-10',
+  'q-work-supervisor-style-01', 'q-work-supervisor-style-02',
+  'q-work-supervisor-style-03', 'q-work-supervisor-style-04',
+  'q-work-supervisor-style-05', 'q-work-supervisor-style-06',
+  'q-work-supervisor-style-07', 'q-work-supervisor-style-08',
+  'q-work-supervisor-style-09', 'q-work-supervisor-style-10'
 );
 --> statement-breakpoint
 
@@ -509,6 +539,39 @@ INSERT OR IGNORE INTO diagnosis_scoring_configs (
       "highMinimum":65,
       "balancedLabel":"状況に応じて働き方を選ぶ"
     }'
+  ),
+  (
+    'work-supervisor-style-v1',
+    1786665600,
+    1786665600,
+    0,
+    1,
+    '{
+      "parameters": [
+        {"id":"work-novelty","label":"仕事の変化","lowLabel":"慣れた仕事を深めたい","highLabel":"新しい役割を試したい"},
+        {"id":"supervisor-closeness","label":"上司との距離","lowLabel":"必要な連携に絞りたい","highLabel":"普段から関わりたい"},
+        {"id":"supervisor-autonomy","label":"進め方の自立度","lowLabel":"方針を確認したい","highLabel":"自分に任せてほしい"},
+        {"id":"supervisor-feedback","label":"フィードバック頻度","lowLabel":"節目に受けたい","highLabel":"こまめに受けたい"},
+        {"id":"supervisor-openness","label":"意見の伝え方","lowLabel":"上司の判断を優先","highLabel":"自分の考えを伝えたい"}
+      ],
+      "choiceScores": {"yes":1,"no":-1},
+      "questions": {
+        "q-work-supervisor-style-01":{"questionVersion":1,"weights":{"work-novelty":1}},
+        "q-work-supervisor-style-02":{"questionVersion":1,"weights":{"work-novelty":-1}},
+        "q-work-supervisor-style-03":{"questionVersion":1,"weights":{"supervisor-closeness":1}},
+        "q-work-supervisor-style-04":{"questionVersion":1,"weights":{"supervisor-closeness":-1}},
+        "q-work-supervisor-style-05":{"questionVersion":1,"weights":{"supervisor-autonomy":1}},
+        "q-work-supervisor-style-06":{"questionVersion":1,"weights":{"supervisor-autonomy":-1}},
+        "q-work-supervisor-style-07":{"questionVersion":1,"weights":{"supervisor-feedback":1}},
+        "q-work-supervisor-style-08":{"questionVersion":1,"weights":{"supervisor-feedback":-1}},
+        "q-work-supervisor-style-09":{"questionVersion":1,"weights":{"supervisor-openness":1}},
+        "q-work-supervisor-style-10":{"questionVersion":1,"weights":{"supervisor-openness":-1}}
+      },
+      "minimumCoverage":0.6,
+      "lowMaximum":35,
+      "highMinimum":65,
+      "balancedLabel":"状況に応じて上司との関わり方を選ぶ"
+    }'
   );
 --> statement-breakpoint
 
@@ -532,7 +595,8 @@ INSERT INTO diagnoses (
   ('time-planning', 1785974400, 1785974400, 0, '時間と予定', '予定の立て方、変更への柔軟性、時間の約束、一緒の時間に関する傾向を見ます。', 'partner', 'time-planning-v1', 40, 1785801600, 'published', 1785974400),
   ('conversation-emotion', 1786233600, 1786233600, 0, '会話と感情表現', '共感、愛情表現、希望の伝え方、支え方、感情の共有に関する傾向を見ます。', 'partner', 'conversation-emotion-v1', 50, 1785801600, 'published', 1786233600),
   ('life-priorities', 1786665600, 1786665600, 0, '優先順位と人生の方向性', '挑戦、仕事、身近な人、自分の時間、健康、将来の備えに関する傾向を見ます。', 'general', 'life-priorities-v1', 60, 1786665600, 'published', 1786665600),
-  ('work-values', 1786665600, 1786665600, 0, '仕事の価値観・働き方', '裁量、成長、報酬、安定、仕事と生活のバランスに関する傾向を見ます。', 'general', 'work-values-v1', 70, 1786665600, 'published', 1786665600)
+  ('work-values', 1786665600, 1786665600, 0, '仕事の価値観・働き方', '裁量、成長、報酬、安定、仕事と生活のバランスに関する傾向を見ます。', 'general', 'work-values-v1', 70, 1786665600, 'published', 1786665600),
+  ('work-supervisor-style', 1786665600, 1786665600, 0, '仕事の変化・上司との関わり方', '仕事の変化への関心と、上司との距離、相談、フィードバック、意見の伝え方に関する傾向を見ます。', 'work', 'work-supervisor-style-v1', 80, 1786665600, 'published', 1786665600)
 ON CONFLICT(id) DO UPDATE SET
   description = CASE
     WHEN diagnoses.description = '' THEN excluded.description
@@ -636,21 +700,31 @@ INSERT OR IGNORE INTO diagnosis_questions (
   ('dq-work-values-07', 1786665600, 1786665600, 0, 'work-values', 'q-work-values-07', 1, 6),
   ('dq-work-values-08', 1786665600, 1786665600, 0, 'work-values', 'q-work-values-08', 1, 7),
   ('dq-work-values-09', 1786665600, 1786665600, 0, 'work-values', 'q-work-values-09', 1, 8),
-  ('dq-work-values-10', 1786665600, 1786665600, 0, 'work-values', 'q-work-values-10', 1, 9);
+  ('dq-work-values-10', 1786665600, 1786665600, 0, 'work-values', 'q-work-values-10', 1, 9),
+  ('dq-work-supervisor-style-01', 1786665600, 1786665600, 0, 'work-supervisor-style', 'q-work-supervisor-style-01', 1, 0),
+  ('dq-work-supervisor-style-02', 1786665600, 1786665600, 0, 'work-supervisor-style', 'q-work-supervisor-style-02', 1, 1),
+  ('dq-work-supervisor-style-03', 1786665600, 1786665600, 0, 'work-supervisor-style', 'q-work-supervisor-style-03', 1, 2),
+  ('dq-work-supervisor-style-04', 1786665600, 1786665600, 0, 'work-supervisor-style', 'q-work-supervisor-style-04', 1, 3),
+  ('dq-work-supervisor-style-05', 1786665600, 1786665600, 0, 'work-supervisor-style', 'q-work-supervisor-style-05', 1, 4),
+  ('dq-work-supervisor-style-06', 1786665600, 1786665600, 0, 'work-supervisor-style', 'q-work-supervisor-style-06', 1, 5),
+  ('dq-work-supervisor-style-07', 1786665600, 1786665600, 0, 'work-supervisor-style', 'q-work-supervisor-style-07', 1, 6),
+  ('dq-work-supervisor-style-08', 1786665600, 1786665600, 0, 'work-supervisor-style', 'q-work-supervisor-style-08', 1, 7),
+  ('dq-work-supervisor-style-09', 1786665600, 1786665600, 0, 'work-supervisor-style', 'q-work-supervisor-style-09', 1, 8),
+  ('dq-work-supervisor-style-10', 1786665600, 1786665600, 0, 'work-supervisor-style', 'q-work-supervisor-style-10', 1, 9);
 --> statement-breakpoint
 
 -- AccountDataがsnapshotを再同期するか判断する版。
 -- このseedのcatalog内容を変更したら、必ずversionを1つ上げる。
-INSERT INTO catalog_versions (catalog_id, version, updated_at) VALUES ('diagnosis', 5, 1786665600)
+INSERT INTO catalog_versions (catalog_id, version, updated_at) VALUES ('diagnosis', 6, 1786665600)
   ON CONFLICT(catalog_id) DO UPDATE SET version = excluded.version, updated_at = excluded.updated_at;
 --> statement-breakpoint
 
--- Expected result: diagnosis_count=7, question_version_count=70,
--- choice_count=140, diagnosis_question_count=70, scoring_config_count=7, catalog_version=5.
+-- Expected result: diagnosis_count=8, question_version_count=80,
+-- choice_count=160, diagnosis_question_count=80, scoring_config_count=8, catalog_version=6.
 SELECT
-  (SELECT COUNT(*) FROM diagnoses WHERE ((id IN ('relationship-priority', 'money-values', 'leisure-style', 'time-planning', 'conversation-emotion') AND relationship_category = 'partner') OR (id IN ('life-priorities', 'work-values') AND relationship_category = 'general')) AND state = 'published' AND description <> '' AND is_deleted = 0) AS diagnosis_count,
-  (SELECT COUNT(*) FROM question_versions WHERE version = 1 AND state = 'approved' AND is_deleted = 0 AND (question_id LIKE 'q-relationship-priority-%' OR question_id LIKE 'q-money-%' OR question_id LIKE 'q-leisure-style-%' OR question_id LIKE 'q-time-planning-%' OR question_id LIKE 'q-conversation-emotion-%' OR question_id LIKE 'q-life-priorities-%' OR question_id LIKE 'q-work-values-%')) AS question_version_count,
-  (SELECT COUNT(*) FROM question_choices WHERE question_version = 1 AND is_deleted = 0 AND (question_id LIKE 'q-relationship-priority-%' OR question_id LIKE 'q-money-%' OR question_id LIKE 'q-leisure-style-%' OR question_id LIKE 'q-time-planning-%' OR question_id LIKE 'q-conversation-emotion-%' OR question_id LIKE 'q-life-priorities-%' OR question_id LIKE 'q-work-values-%')) AS choice_count,
-  (SELECT COUNT(*) FROM diagnosis_questions WHERE diagnosis_id IN ('relationship-priority', 'money-values', 'leisure-style', 'time-planning', 'conversation-emotion', 'life-priorities', 'work-values') AND is_deleted = 0) AS diagnosis_question_count,
-  (SELECT COUNT(*) FROM diagnosis_scoring_configs WHERE id IN ('relationship-priority-v1', 'money-values-v1', 'leisure-style-v1', 'time-planning-v1', 'conversation-emotion-v1', 'life-priorities-v1', 'work-values-v1') AND version = 1 AND is_deleted = 0) AS scoring_config_count,
+  (SELECT COUNT(*) FROM diagnoses WHERE ((id IN ('relationship-priority', 'money-values', 'leisure-style', 'time-planning', 'conversation-emotion') AND relationship_category = 'partner') OR (id IN ('life-priorities', 'work-values') AND relationship_category = 'general') OR (id = 'work-supervisor-style' AND relationship_category = 'work')) AND state = 'published' AND description <> '' AND is_deleted = 0) AS diagnosis_count,
+  (SELECT COUNT(*) FROM question_versions WHERE version = 1 AND state = 'approved' AND is_deleted = 0 AND (question_id LIKE 'q-relationship-priority-%' OR question_id LIKE 'q-money-%' OR question_id LIKE 'q-leisure-style-%' OR question_id LIKE 'q-time-planning-%' OR question_id LIKE 'q-conversation-emotion-%' OR question_id LIKE 'q-life-priorities-%' OR question_id LIKE 'q-work-values-%' OR question_id LIKE 'q-work-supervisor-style-%')) AS question_version_count,
+  (SELECT COUNT(*) FROM question_choices WHERE question_version = 1 AND is_deleted = 0 AND (question_id LIKE 'q-relationship-priority-%' OR question_id LIKE 'q-money-%' OR question_id LIKE 'q-leisure-style-%' OR question_id LIKE 'q-time-planning-%' OR question_id LIKE 'q-conversation-emotion-%' OR question_id LIKE 'q-life-priorities-%' OR question_id LIKE 'q-work-values-%' OR question_id LIKE 'q-work-supervisor-style-%')) AS choice_count,
+  (SELECT COUNT(*) FROM diagnosis_questions WHERE diagnosis_id IN ('relationship-priority', 'money-values', 'leisure-style', 'time-planning', 'conversation-emotion', 'life-priorities', 'work-values', 'work-supervisor-style') AND is_deleted = 0) AS diagnosis_question_count,
+  (SELECT COUNT(*) FROM diagnosis_scoring_configs WHERE id IN ('relationship-priority-v1', 'money-values-v1', 'leisure-style-v1', 'time-planning-v1', 'conversation-emotion-v1', 'life-priorities-v1', 'work-values-v1', 'work-supervisor-style-v1') AND version = 1 AND is_deleted = 0) AS scoring_config_count,
   (SELECT version FROM catalog_versions WHERE catalog_id = 'diagnosis') AS catalog_version;
