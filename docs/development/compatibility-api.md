@@ -278,13 +278,31 @@ sequenceDiagram
       "relationshipId": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
       "status": "accepted",
       "relationshipCategory": "friend",
-      "partnerDisplayName": "はる"
+      "partnerDisplayName": "はる",
+      "readiness": {
+        "status": "waiting",
+        "nextAction": "diagnosis"
+      }
+    },
+    {
+      "relationshipId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "status": "accepted",
+      "relationshipCategory": "family",
+      "partnerDisplayName": "あおい",
+      "readiness": {
+        "status": "ready",
+        "comparableThemeCount": 3
+      }
     }
   ]
 }
 ```
 
-`pending`は本人が発行した利用可能な招待だけです。`invitationUrl`は発行時と同じ正規LIFF URLで、一覧からLINEへ再送する場合に使います。受信者がリンクを開いただけでは一覧参照を作らないため、未承諾の受信者側一覧には現れません。`accepted`は本人が当事者である成立中の関係だけです。取消・期限切れ・終了を検出した参照はAccountData側で非表示へ同期し、レスポンスへ含めません。
+`pending`は本人が発行した利用可能な招待だけです。`invitationUrl`は発行時と同じ正規LIFF URLで、一覧からLINEへ再送する場合に使います。受信者がリンクを開いただけでは一覧参照を作らないため、未承諾の受信者側一覧には現れません。
+
+成立中の関係は、デプロイ中や既に開かれているWebとの後方互換性を保つため、外側の`status`を`accepted`のまま維持します。一覧の取得時点で詳細APIと同じ現在の共有内容を判定し、`readiness.status`で、比較可能なら`ready`、まだ比較できなければ`waiting`を返します。`ready`の`comparableThemeCount`は双方に共通する比較可能な診断テーマ数です。`waiting`の`nextAction`は詳細APIと同じく、閲覧者自身の共有プロフィールを開示できなければ`profile-summary`、共通テーマがなく閲覧者がまだ回答できる診断を持つ場合は`diagnosis`、本人側に必要な操作がなければ`null`です。これにより、相手側だけの準備待ちでは本人へ不要な操作を促しません。
+
+取消・期限切れ・終了を検出した参照はAccountData側で非表示へ同期し、レスポンスへ含めません。成立中の関係は一覧を取得するたびに現在の共有内容から判定し、過去の比較可能状態をキャッシュしません。
 
 認証・基盤の共通エラーは共有の可否と同じです。成功レスポンスへ相手のAccount IDや相性シート本文を含めません。成功・エラーを問わず`Cache-Control: no-store`を付けます。
 

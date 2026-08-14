@@ -1880,6 +1880,17 @@ export interface operations {
                   /** @constant */
                   status: "accepted";
                   partnerDisplayName: string;
+                  readiness:
+                    | {
+                        /** @constant */
+                        status: "ready";
+                        comparableThemeCount: number;
+                      }
+                    | {
+                        /** @constant */
+                        status: "waiting";
+                        nextAction: ("diagnosis" | "profile-summary") | null;
+                      };
                 }
             )[];
           };

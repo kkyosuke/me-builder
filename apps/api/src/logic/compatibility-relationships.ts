@@ -7,6 +7,7 @@ import {
   compatibilityDataFor,
 } from "@me-builder/lib";
 import { createCompatibilityInvitationUrl } from "./compatibility-invitation-url";
+import { resolveCompatibilityRelationshipContents } from "./compatibility-relationship";
 import { createLiffSession } from "./liff-session";
 
 type CompatibilityRelationshipListItem =
@@ -22,6 +23,12 @@ type CompatibilityRelationshipListItem =
       relationshipCategory: CompatibilityRelationship["relationshipCategory"];
       status: "accepted";
       partnerDisplayName: string;
+      readiness:
+        | Readonly<{ status: "ready"; comparableThemeCount: number }>
+        | Readonly<{
+            status: "waiting";
+            nextAction: "diagnosis" | "profile-summary" | null;
+          }>;
     }>;
 
 export type CompatibilityRelationshipsOutcome =
@@ -37,6 +44,7 @@ type Params = Readonly<{
   accountData: AccountDataNamespace;
   compatibilityData: CompatibilityDataNamespace;
   liffId: string;
+  at?: Date;
 }>;
 
 /** AccountDataの一覧projectionを正本へ同期し、外部公開可能な最小カードへ変換する。 */
@@ -47,6 +55,7 @@ export async function listCompatibilityRelationships({
   accountData,
   compatibilityData,
   liffId,
+  at = new Date(),
 }: Params): Promise<CompatibilityRelationshipsOutcome> {
   const session = await createLiffSession({ idToken, lineLoginChannelId, db });
   if (session.type !== "resolved") return session;
@@ -75,14 +84,30 @@ export async function listCompatibilityRelationships({
         relationship.inviterAccountId === accountId
           ? relationship.inviteeDisplayName
           : relationship.inviterDisplayName;
-      return partnerDisplayName
-        ? {
-            relationshipId: reference.relationshipId,
-            relationshipCategory: relationship.relationshipCategory,
-            status: "accepted",
-            partnerDisplayName,
-          }
-        : null;
+      if (!partnerDisplayName) return null;
+      const contents = await resolveCompatibilityRelationshipContents({
+        canonical: relationship,
+        viewerAccountId: accountId,
+        accountData,
+        at,
+      });
+      if (!contents) return null;
+      return {
+        relationshipId: reference.relationshipId,
+        relationshipCategory: relationship.relationshipCategory,
+        status: "accepted",
+        partnerDisplayName,
+        readiness:
+          contents.status === "ready"
+            ? {
+                status: "ready",
+                comparableThemeCount: contents.viewer.themes.length,
+              }
+            : {
+                status: "waiting",
+                nextAction: contents.nextAction,
+              },
+      };
     }),
   );
   return { type: "resolved", items: items.filter((item) => item !== null) };

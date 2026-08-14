@@ -17,6 +17,15 @@ export type CompatibilityRelationshipListItem =
       relationshipCategory: CompatibilityRelationshipCategory;
       status: "accepted";
       partnerDisplayName: string;
+      readiness:
+        | {
+            status: "ready";
+            comparableThemeCount: number;
+          }
+        | {
+            status: "waiting";
+            nextAction: "diagnosis" | "profile-summary" | null;
+          };
     };
 
 export type CompatibilityRelationshipList = {

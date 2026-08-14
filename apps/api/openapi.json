@@ -2653,13 +2653,51 @@
                               "partnerDisplayName": {
                                 "type": "string",
                                 "minLength": 1
+                              },
+                              "readiness": {
+                                "oneOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "status": {
+                                        "const": "ready"
+                                      },
+                                      "comparableThemeCount": {
+                                        "type": "integer",
+                                        "minimum": 1
+                                      }
+                                    },
+                                    "required": ["status", "comparableThemeCount"]
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "status": {
+                                        "const": "waiting"
+                                      },
+                                      "nextAction": {
+                                        "anyOf": [
+                                          {
+                                            "enum": ["diagnosis", "profile-summary"],
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "required": ["status", "nextAction"]
+                                  }
+                                ]
                               }
                             },
                             "required": [
                               "relationshipId",
                               "relationshipCategory",
                               "status",
-                              "partnerDisplayName"
+                              "partnerDisplayName",
+                              "readiness"
                             ]
                           }
                         ]

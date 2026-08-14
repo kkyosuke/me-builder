@@ -1,4 +1,5 @@
 import { AlertCircle, RefreshCw } from "lucide-react";
+import { useState } from "react";
 import {
   diagnosisCategoryHref,
   getRelationshipCategoryBadgeClassName,
@@ -7,6 +8,10 @@ import {
 import { useLiffSession } from "../../liff";
 import { toCompatibilityPerson } from "../model/compatibility-relationship-view";
 import { CompatibilityResultScreen } from "./compatibility-result-screen";
+import {
+  CompatibilityEndSharing,
+  CompatibilitySharingEndedScreen,
+} from "./components/compatibility-end-sharing";
 import { CompatibilityBackHeader } from "./components/compatibility-ui";
 import { useCompatibilityRelationship } from "./hooks/use-compatibility-relationship";
 
@@ -41,6 +46,7 @@ export default function CompatibilityResultApplication({
 }) {
   const { acquireIdToken } = useLiffSession();
   const relationship = useCompatibilityRelationship({ acquireIdToken, relationshipId });
+  const [confirmingEnd, setConfirmingEnd] = useState(false);
 
   if (relationship.state.status === "loading") {
     return (
@@ -73,6 +79,7 @@ export default function CompatibilityResultApplication({
     );
   }
   if (relationship.state.status !== "success") return null;
+  if (relationship.ending.status === "success") return <CompatibilitySharingEndedScreen />;
   if (relationship.state.data.status === "waiting") {
     // nextActionがnullのときは相手側の準備待ちで、閲覧者の操作では解消できない。
     const waiting = waitingGuides[relationship.state.data.nextAction ?? "partner"];
@@ -98,6 +105,13 @@ export default function CompatibilityResultApplication({
             {waiting.label}
           </a>
         </section>
+        <CompatibilityEndSharing
+          confirming={confirmingEnd}
+          endingState={relationship.ending}
+          onRequest={() => setConfirmingEnd(true)}
+          onCancel={() => setConfirmingEnd(false)}
+          onEnd={() => void relationship.end()}
+        />
       </main>
     );
   }

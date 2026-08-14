@@ -97,6 +97,16 @@ const RelationshipListResponseSchema = v.object({
         relationshipCategory: v.picklist(compatibilityRelationshipCategoryValues),
         status: v.literal("accepted"),
         partnerDisplayName: NonEmptyStringSchema,
+        readiness: v.variant("status", [
+          v.object({
+            status: v.literal("ready"),
+            comparableThemeCount: v.pipe(v.number(), v.integer(), v.minValue(1)),
+          }),
+          v.object({
+            status: v.literal("waiting"),
+            nextAction: v.nullable(v.picklist(["diagnosis", "profile-summary"])),
+          }),
+        ]),
       }),
     ]),
   ),

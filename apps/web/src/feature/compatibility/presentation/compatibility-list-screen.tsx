@@ -11,6 +11,7 @@ import { MainNavigation } from "../../../components/main-navigation";
 import { SkeletonBlock, SkeletonLoader } from "../../../components/skeleton";
 import type { AsyncState } from "../../../model/async-state";
 import {
+  diagnosisCategoryHref,
   getRelationshipCategoryBadgeClassName,
   getRelationshipCategoryLabel,
 } from "../../diagnosis/model/relationship-category";
@@ -20,6 +21,39 @@ import type {
 } from "../model/compatibility-relationship";
 
 type PendingItem = Extract<CompatibilityRelationshipListItem, { status: "pending" }>;
+type AcceptedItem = Extract<CompatibilityRelationshipListItem, { status: "accepted" }>;
+type ReadyItem = AcceptedItem & {
+  readiness: Extract<AcceptedItem["readiness"], { status: "ready" }>;
+};
+type WaitingItem = AcceptedItem & {
+  readiness: Extract<AcceptedItem["readiness"], { status: "waiting" }>;
+};
+
+function waitingGuide(item: WaitingItem): {
+  message: string;
+  href: string | null;
+  label: string | null;
+} {
+  if (item.readiness.nextAction === "diagnosis") {
+    return {
+      message: "この関係で比べられる診断に答えると、相性シートへ自動で反映されます。",
+      href: diagnosisCategoryHref(item.relationshipCategory),
+      label: "診断を行う",
+    };
+  }
+  if (item.readiness.nextAction === "profile-summary") {
+    return {
+      message: "「わたしのまとめ」を作ると、あなたの「私について」が共有されます。",
+      href: "/me",
+      label: "わたしのまとめを作る",
+    };
+  }
+  return {
+    message: "あなたの共有内容はそろっています。相手の準備が終わると自動で表示されます。",
+    href: null,
+    label: null,
+  };
+}
 
 function ListSkeleton() {
   return (
@@ -51,6 +85,10 @@ export function CompatibilityListScreen({
 }) {
   const accepted =
     state.status === "success" ? state.data.items.filter((x) => x.status === "accepted") : [];
+  const ready = accepted.filter((item): item is ReadyItem => item.readiness.status === "ready");
+  const waiting = accepted.filter(
+    (item): item is WaitingItem => item.readiness.status === "waiting",
+  );
   const pending =
     state.status === "success" ? state.data.items.filter((x) => x.status === "pending") : [];
 
@@ -114,22 +152,22 @@ export function CompatibilityListScreen({
             </section>
           )}
 
-          {accepted.length > 0 && (
+          {ready.length > 0 && (
             <section aria-labelledby="available-heading" className="mt-9">
               <h2
                 id="available-heading"
                 className="text-lg font-bold text-slate-950 dark:text-slate-50"
               >
-                相性シート
+                結果を見られる相手
               </h2>
               <div className="mt-3 space-y-3">
-                {accepted.map((item) => (
+                {ready.map((item) => (
                   <article
                     key={item.relationshipId}
                     className="rounded-3xl border border-rose-200 bg-white p-5 shadow-lg shadow-slate-950/5 dark:border-rose-900/50 dark:bg-slate-800"
                   >
                     <p className="text-xs font-bold text-emerald-700 dark:text-emerald-300">
-                      共有中
+                      結果あり
                     </p>
                     <p
                       className={`mt-2 w-fit rounded-full px-2.5 py-1 text-xs font-bold ${getRelationshipCategoryBadgeClassName(item.relationshipCategory)}`}
@@ -139,6 +177,9 @@ export function CompatibilityListScreen({
                     <h3 className="mt-1 text-lg font-bold text-slate-950 dark:text-slate-50">
                       {item.partnerDisplayName}さん
                     </h3>
+                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                      {item.readiness.comparableThemeCount}つのテーマで比較できます
+                    </p>
                     <a
                       href={`/compatibility/relationships/${item.relationshipId}`}
                       className="mt-4 flex min-h-11 items-center justify-between rounded-xl bg-slate-950 px-4 text-sm font-bold text-white dark:bg-slate-50 dark:text-slate-950"
@@ -148,6 +189,59 @@ export function CompatibilityListScreen({
                     </a>
                   </article>
                 ))}
+              </div>
+            </section>
+          )}
+
+          {waiting.length > 0 && (
+            <section aria-labelledby="waiting-heading" className="mt-9">
+              <h2
+                id="waiting-heading"
+                className="text-lg font-bold text-slate-950 dark:text-slate-50"
+              >
+                準備中
+              </h2>
+              <div className="mt-3 space-y-3">
+                {waiting.map((item) => {
+                  const guide = waitingGuide(item);
+                  return (
+                    <article
+                      key={item.relationshipId}
+                      className="rounded-3xl border border-amber-200 bg-white p-5 shadow-lg shadow-slate-950/5 dark:border-amber-900/50 dark:bg-slate-800"
+                    >
+                      <p className="text-xs font-bold text-amber-700 dark:text-amber-300">
+                        {item.readiness.nextAction ? "あなたの準備待ち" : "相手の準備待ち"}
+                      </p>
+                      <p
+                        className={`mt-2 w-fit rounded-full px-2.5 py-1 text-xs font-bold ${getRelationshipCategoryBadgeClassName(item.relationshipCategory)}`}
+                      >
+                        {getRelationshipCategoryLabel(item.relationshipCategory)}
+                      </p>
+                      <h3 className="mt-1 text-lg font-bold text-slate-950 dark:text-slate-50">
+                        {item.partnerDisplayName}さん
+                      </h3>
+                      <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+                        {guide.message}
+                      </p>
+                      {guide.href && guide.label && (
+                        <a
+                          href={guide.href}
+                          className="mt-4 flex min-h-11 items-center justify-between rounded-xl bg-amber-400 px-4 text-sm font-bold text-amber-950"
+                        >
+                          {guide.label}
+                          <ArrowRight className="size-4" aria-hidden="true" />
+                        </a>
+                      )}
+                      <a
+                        href={`/compatibility/relationships/${item.relationshipId}`}
+                        className={`${guide.href ? "mt-2" : "mt-4"} flex min-h-11 items-center justify-between rounded-xl border border-amber-300 px-4 text-sm font-bold text-amber-900 dark:border-amber-700 dark:text-amber-200`}
+                      >
+                        共有の確認・終了
+                        <ArrowRight className="size-4" aria-hidden="true" />
+                      </a>
+                    </article>
+                  );
+                })}
               </div>
             </section>
           )}
