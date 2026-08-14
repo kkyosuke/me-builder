@@ -123,6 +123,85 @@ describe("Compatibility flow", () => {
     expect(onCancel).toHaveBeenCalledWith(pending.relationshipId);
   });
 
+  it("相性一覧を全部・パートナー・家族・友達・仕事で絞り込む", () => {
+    const onCategoryFilterChange = vi.fn();
+    render(
+      <CompatibilityListScreen
+        categoryFilter="family"
+        state={{
+          status: "success",
+          data: {
+            items: [
+              {
+                relationshipId: "1".repeat(64),
+                relationshipCategory: "family",
+                status: "accepted",
+                partnerDisplayName: "家族の相手",
+                readiness: { status: "ready", comparableThemeCount: 2 },
+              },
+              {
+                relationshipId: "2".repeat(64),
+                relationshipCategory: "friend",
+                status: "pending",
+                expiresAt: "2026-08-26T00:00:00.000Z",
+                invitationUrl: "https://example.com/friend",
+              },
+            ],
+          },
+        }}
+        onRetry={vi.fn()}
+        onCancel={vi.fn()}
+        onCategoryFilterChange={onCategoryFilterChange}
+        onResend={vi.fn()}
+      />,
+    );
+
+    const filters = screen.getByRole("group", { name: "関係カテゴリで絞り込む" });
+    expect(Array.from(filters.querySelectorAll("button"), (button) => button.textContent)).toEqual([
+      "全部",
+      "パートナー",
+      "家族",
+      "友達",
+      "仕事",
+    ]);
+    expect(screen.getByRole("button", { name: "家族" }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("heading", { name: "家族の相手さん" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "返事待ち" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "友達" }));
+    expect(onCategoryFilterChange).toHaveBeenCalledWith("friend");
+  });
+
+  it("選択カテゴリに対象がなくても一覧全体の空状態と区別する", () => {
+    render(
+      <CompatibilityListScreen
+        categoryFilter="work"
+        state={{
+          status: "success",
+          data: {
+            items: [
+              {
+                relationshipId: "1".repeat(64),
+                relationshipCategory: "partner",
+                status: "pending",
+                expiresAt: "2026-08-26T00:00:00.000Z",
+                invitationUrl: "https://example.com/partner",
+              },
+            ],
+          },
+        }}
+        onRetry={vi.fn()}
+        onCancel={vi.fn()}
+        onResend={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByRole("heading", { name: "このカテゴリの相手・招待はありません" }),
+    ).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "まだ共有中の相手はいません" })).toBeNull();
+  });
+
   it("招待の取消中は一覧をSkeletonに戻さず対象カードだけにSpinnerを表示する", () => {
     const cancellingId = "1".repeat(64);
     render(
@@ -181,7 +260,7 @@ describe("Compatibility flow", () => {
     );
 
     expect(screen.getByText("うさぎさんから招待")).toBeTruthy();
-    expect(screen.getByText("一つ選択してください")).toBeTruthy();
+    expect(screen.getByText("必要なら変更できます")).toBeTruthy();
     expect(document.querySelector('img[src="https://profile.line-scdn.net/me"]')).not.toBeNull();
     expect(screen.getByRole("heading", { name: "共有されるもの" })).toBeTruthy();
     expect(screen.getByText(/これから増える分も自動で/)).toBeTruthy();
@@ -203,7 +282,7 @@ describe("Compatibility flow", () => {
     render(<CompatibilityShareScreen state={{ status: "loading" }} onRetry={vi.fn()} />);
 
     expect(screen.getByRole("heading", { name: "うつしをシェア" })).toBeTruthy();
-    expect(screen.getByText("一つ選択してください")).toBeTruthy();
+    expect(screen.getByText("必要なら変更できます")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "共有されるもの" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "共有されない詳細" })).toBeTruthy();
     expect(screen.getByLabelText("共有者の情報を読み込み中")).toBeTruthy();
@@ -214,6 +293,45 @@ describe("Compatibility flow", () => {
     expect(
       screen.getByRole("button", { name: "共有して招待リンクを発行する" }).hasAttribute("disabled"),
     ).toBe(true);
+  });
+
+  it("共有カテゴリはパートナーを初期選択し、選択マークと枠をカテゴリ色に揃える", () => {
+    render(
+      <CompatibilityShareScreen
+        state={{
+          status: "success",
+          data: {
+            displayName: "うさぎ",
+            avatarUrl: null,
+            canShare: true,
+            blockingReasons: [],
+            nextAction: null,
+          },
+        }}
+        onRetry={vi.fn()}
+      />,
+    );
+
+    const categoryColors = [
+      ["パートナー", "accent-rose-500", "focus-within:ring-rose-500"],
+      ["家族", "accent-amber-500", "focus-within:ring-amber-500"],
+      ["友達", "accent-emerald-500", "focus-within:ring-emerald-500"],
+      ["仕事", "accent-blue-500", "focus-within:ring-blue-500"],
+    ] as const;
+    for (const [label, accentClassName, focusClassName] of categoryColors) {
+      const radio = screen.getByRole("radio", { name: label });
+      expect(radio.classList.contains(accentClassName)).toBe(true);
+      expect(radio.closest("label")?.classList.contains(focusClassName)).toBe(true);
+    }
+
+    const partnerRadio = screen.getByRole("radio", { name: "パートナー" }) as HTMLInputElement;
+    const partnerLabel = partnerRadio.closest("label");
+    expect(partnerRadio.checked).toBe(true);
+    expect(partnerLabel?.classList.contains("border-current")).toBe(true);
+    expect(partnerLabel?.classList.contains("bg-rose-100")).toBe(true);
+    expect(
+      screen.getByRole("button", { name: "共有して招待リンクを発行する" }).hasAttribute("disabled"),
+    ).toBe(false);
   });
 
   it("関係カテゴリを選ぶまで招待リンクを発行できない", () => {

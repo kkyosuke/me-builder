@@ -1,11 +1,15 @@
 // @vitest-environment jsdom
 
+import type { CompatibilityRelationshipCategory } from "@me-builder/lib/compatibility";
 import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import CompatibilityShareApplication from "./compatibility-share-application";
 
 const mocks = vi.hoisted(() => ({
-  screenProps: null as null | { onShareToLine: (url: string) => void },
+  screenProps: null as null | {
+    onShareToLine: (url: string) => void;
+    relationshipCategory: CompatibilityRelationshipCategory;
+  },
   shareCompatibilityInvitationToLine: vi.fn(),
 }));
 
@@ -15,7 +19,10 @@ vi.mock("../infrastructure/compatibility-invitation-sharing", () => ({
   shareCompatibilityInvitationToLine: mocks.shareCompatibilityInvitationToLine,
 }));
 vi.mock("./compatibility-share-screen", () => ({
-  CompatibilityShareScreen: (props: { onShareToLine: (url: string) => void }) => {
+  CompatibilityShareScreen: (props: {
+    onShareToLine: (url: string) => void;
+    relationshipCategory: CompatibilityRelationshipCategory;
+  }) => {
     mocks.screenProps = props;
     return null;
   },
@@ -54,6 +61,12 @@ describe("CompatibilityShareApplication", () => {
     cleanup();
     mocks.screenProps = null;
     vi.clearAllMocks();
+  });
+
+  it("共有画面ではパートナーを初期選択する", () => {
+    render(<CompatibilityShareApplication />);
+
+    expect(mocks.screenProps?.relationshipCategory).toBe("partner");
   });
 
   it("共有処理中の連打では共有先を二重に開かない", () => {

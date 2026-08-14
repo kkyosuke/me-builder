@@ -11,8 +11,11 @@ import { MainNavigation } from "../../../components/main-navigation";
 import { SkeletonBlock, SkeletonLoader } from "../../../components/skeleton";
 import type { AsyncState } from "../../../model/async-state";
 import {
+  type RelationshipCategoryFilter,
   diagnosisCategoryHref,
+  filterableRelationshipCategoryValues,
   getRelationshipCategoryBadgeClassName,
+  getRelationshipCategoryFilterClassName,
   getRelationshipCategoryLabel,
 } from "../../diagnosis/model/relationship-category";
 import type {
@@ -67,30 +70,37 @@ function ListSkeleton() {
 }
 
 export function CompatibilityListScreen({
+  categoryFilter = "all",
   state,
   operation = { status: "idle" },
   cancellingRelationshipId = null,
   sharingMessage,
   onRetry,
   onCancel,
+  onCategoryFilterChange = () => undefined,
   onResend,
 }: {
+  categoryFilter?: RelationshipCategoryFilter;
   state: AsyncState<CompatibilityRelationshipList>;
   operation?: AsyncState<string>;
   cancellingRelationshipId?: string | null;
   sharingMessage?: string | null;
   onRetry: () => void;
   onCancel: (relationshipId: string) => void;
+  onCategoryFilterChange?: (filter: RelationshipCategoryFilter) => void;
   onResend: (item: PendingItem) => void;
 }) {
-  const accepted =
-    state.status === "success" ? state.data.items.filter((x) => x.status === "accepted") : [];
+  const allItems = state.status === "success" ? state.data.items : [];
+  const filteredItems =
+    categoryFilter === "all"
+      ? allItems
+      : allItems.filter((item) => item.relationshipCategory === categoryFilter);
+  const accepted = filteredItems.filter((x) => x.status === "accepted");
   const ready = accepted.filter((item): item is ReadyItem => item.readiness.status === "ready");
   const waiting = accepted.filter(
     (item): item is WaitingItem => item.readiness.status === "waiting",
   );
-  const pending =
-    state.status === "success" ? state.data.items.filter((x) => x.status === "pending") : [];
+  const pending = filteredItems.filter((x) => x.status === "pending");
 
   return (
     <main className="mx-auto min-h-dvh w-full max-w-2xl px-4 py-8 pb-28 sm:px-8">
@@ -141,6 +151,30 @@ export function CompatibilityListScreen({
 
       {state.status === "success" && (
         <>
+          {allItems.length > 0 && (
+            <fieldset className="-mx-4 mt-8 flex min-w-0 gap-2 overflow-x-auto border-0 px-4 pt-0 pb-1 sm:mx-0 sm:px-0">
+              <legend className="sr-only">関係カテゴリで絞り込む</legend>
+              <button
+                type="button"
+                aria-pressed={categoryFilter === "all"}
+                onClick={() => onCategoryFilterChange("all")}
+                className="shrink-0 rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-rose-400 aria-pressed:border-rose-500 aria-pressed:bg-rose-100 aria-pressed:text-rose-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:aria-pressed:border-rose-500 dark:aria-pressed:bg-rose-950 dark:aria-pressed:text-rose-100"
+              >
+                全部
+              </button>
+              {filterableRelationshipCategoryValues.map((category) => (
+                <button
+                  type="button"
+                  key={category}
+                  aria-pressed={categoryFilter === category}
+                  onClick={() => onCategoryFilterChange(category)}
+                  className={`shrink-0 rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-rose-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 ${getRelationshipCategoryFilterClassName(category)}`}
+                >
+                  {getRelationshipCategoryLabel(category)}
+                </button>
+              ))}
+            </fieldset>
+          )}
           {state.data.items.length === 0 && (
             <section className="mt-8 rounded-3xl border border-slate-200 bg-white p-6 text-center dark:border-slate-700 dark:bg-slate-800">
               <h2 className="font-bold text-slate-950 dark:text-slate-50">
@@ -148,6 +182,16 @@ export function CompatibilityListScreen({
               </h2>
               <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
                 うつしをLINEで送って、2人の相性シートを作ってみましょう。
+              </p>
+            </section>
+          )}
+          {allItems.length > 0 && filteredItems.length === 0 && (
+            <section className="mt-8 rounded-3xl border border-slate-200 bg-white p-6 text-center dark:border-slate-700 dark:bg-slate-800">
+              <h2 className="font-bold text-slate-950 dark:text-slate-50">
+                このカテゴリの相手・招待はありません
+              </h2>
+              <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+                別のカテゴリを選ぶか、新しくうつしをシェアしてください。
               </p>
             </section>
           )}
