@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   type RelationshipCategoryFilter,
   relationshipCategoryFilterFromSearch,
@@ -16,6 +16,13 @@ export default function CompatibilityListApplication() {
   const [categoryFilter, setCategoryFilter] = useState<RelationshipCategoryFilter>(() =>
     relationshipCategoryFilterFromSearch(window.location.search),
   );
+
+  useEffect(() => {
+    const syncCategoryFilterWithHistory = () =>
+      setCategoryFilter(relationshipCategoryFilterFromSearch(window.location.search));
+    window.addEventListener("popstate", syncCategoryFilterWithHistory);
+    return () => window.removeEventListener("popstate", syncCategoryFilterWithHistory);
+  }, []);
 
   const changeCategoryFilter = useCallback((filter: RelationshipCategoryFilter) => {
     setCategoryFilter(filter);

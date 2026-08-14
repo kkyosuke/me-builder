@@ -20,6 +20,9 @@ export function useCompatibilityShareConsent({
   const loading = useRef(false);
   const request = useRef<AbortController | null>(null);
   const avatarObjectUrl = useRef<string | null>(null);
+  const relationshipCategoryRef = useRef(relationshipCategory);
+  const loadedGuidanceCategory = useRef<CompatibilityRelationshipCategory | null>(null);
+  relationshipCategoryRef.current = relationshipCategory;
 
   const load = useCallback(async () => {
     if (loading.current) return;
@@ -29,6 +32,7 @@ export function useCompatibilityShareConsent({
     request.current = controller;
     if (mounted.current) setState({ status: "loading" });
     try {
+      const category = relationshipCategoryRef.current;
       const idToken = await acquireIdToken(controller.signal);
       if (controller.signal.aborted) return;
       if (!idToken) {
@@ -37,7 +41,7 @@ export function useCompatibilityShareConsent({
       const consent = await fetchCompatibilityShareConsent(
         config.apiUrl,
         idToken,
-        undefined,
+        category ?? undefined,
         controller.signal,
       );
       const avatarBlob = await fetchCompatibilityAvatarImage(
@@ -50,6 +54,7 @@ export function useCompatibilityShareConsent({
         const nextAvatarObjectUrl = avatarBlob ? URL.createObjectURL(avatarBlob) : null;
         if (avatarObjectUrl.current) URL.revokeObjectURL(avatarObjectUrl.current);
         avatarObjectUrl.current = nextAvatarObjectUrl;
+        loadedGuidanceCategory.current = category;
         setState({
           status: "success",
           data: { ...consent, avatarUrl: nextAvatarObjectUrl },
@@ -87,6 +92,7 @@ export function useCompatibilityShareConsent({
           controller.signal,
         );
         if (mounted.current && !controller.signal.aborted) {
+          loadedGuidanceCategory.current = category;
           setState((current) =>
             current.status === "success"
               ? {
@@ -120,7 +126,13 @@ export function useCompatibilityShareConsent({
   }, [load]);
 
   useEffect(() => {
-    if (!relationshipCategory || state.status !== "success") return;
+    if (
+      !relationshipCategory ||
+      state.status !== "success" ||
+      loadedGuidanceCategory.current === relationshipCategory
+    ) {
+      return;
+    }
     void refreshGuidance(relationshipCategory);
   }, [relationshipCategory, refreshGuidance, state.status]);
 

@@ -45,6 +45,23 @@ describe("useCompatibilityShareConsent", () => {
     );
   });
 
+  it("初期選択カテゴリを最初の取得へ含め、案内を再取得しない", async () => {
+    vi.mocked(fetchCompatibilityShareConsent).mockResolvedValue(consent);
+    const acquireIdToken = vi.fn().mockResolvedValue("id-token");
+    const { result } = renderHook(() =>
+      useCompatibilityShareConsent({ acquireIdToken, relationshipCategory: "partner" }),
+    );
+
+    await waitFor(() => expect(result.current.state.status).toBe("success"));
+    expect(fetchCompatibilityShareConsent).toHaveBeenCalledTimes(1);
+    expect(fetchCompatibilityShareConsent).toHaveBeenCalledWith(
+      undefined,
+      "id-token",
+      "partner",
+      expect.anything(),
+    );
+  });
+
   it("カテゴリ変更時は案内だけを再取得し、プロフィール画像を再取得しない", async () => {
     const consentWithAvatar = { ...consent, avatarUrl: "/api/profile/avatar" };
     vi.mocked(fetchCompatibilityShareConsent)

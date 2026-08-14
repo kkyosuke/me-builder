@@ -949,7 +949,7 @@ describe("App", () => {
     expect(mocks.fetchDiagnosisList).not.toHaveBeenCalled();
   });
 
-  it("/compatibility/shareでは共有可否APIの結果から共有の範囲を表示する", async () => {
+  it("/compatibility/shareではパートナー向け共有可否APIの結果から共有の範囲を表示する", async () => {
     window.history.replaceState({}, "", "/compatibility/share");
 
     render(<App />);
@@ -960,7 +960,7 @@ describe("App", () => {
     expect(mocks.fetchCompatibilityShareConsent).toHaveBeenCalledWith(
       "https://api.example.com",
       "dummy.id.token",
-      undefined,
+      "partner",
       expect.anything(),
     );
     expect(mocks.fetchDiagnosisList).not.toHaveBeenCalled();

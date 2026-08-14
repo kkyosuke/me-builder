@@ -59,4 +59,23 @@ describe("CompatibilityListApplication category filter", () => {
       "/compatibility?from=test#list",
     );
   });
+
+  it("ブラウザの履歴移動時にURLから選択を復元する", () => {
+    window.history.replaceState({}, "", "/compatibility?category=partner");
+    render(<CompatibilityListApplication />);
+
+    expect(mocks.screenProps?.categoryFilter).toBe("partner");
+
+    act(() => {
+      window.history.pushState({}, "", "/compatibility?category=friend");
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+    expect(mocks.screenProps?.categoryFilter).toBe("friend");
+
+    act(() => {
+      window.history.pushState({}, "", "/compatibility?category=unknown");
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+    expect(mocks.screenProps?.categoryFilter).toBe("all");
+  });
 });
