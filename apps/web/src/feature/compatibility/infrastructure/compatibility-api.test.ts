@@ -216,16 +216,16 @@ describe("compatibility relationship APIs", () => {
         {
           relationshipId: "2".repeat(64),
           relationshipCategory: "friend",
-          status: "waiting",
+          status: "accepted",
           partnerDisplayName: "はる",
-          nextAction: "diagnosis",
+          readiness: { status: "waiting", nextAction: "diagnosis" },
         },
         {
           relationshipId: "3".repeat(64),
           relationshipCategory: "family",
-          status: "ready",
+          status: "accepted",
           partnerDisplayName: "あおい",
-          comparableThemeCount: 3,
+          readiness: { status: "ready", comparableThemeCount: 3 },
         },
       ],
     };

@@ -21,16 +21,14 @@ type CompatibilityRelationshipListItem =
   | Readonly<{
       relationshipId: string;
       relationshipCategory: CompatibilityRelationship["relationshipCategory"];
-      status: "ready";
+      status: "accepted";
       partnerDisplayName: string;
-      comparableThemeCount: number;
-    }>
-  | Readonly<{
-      relationshipId: string;
-      relationshipCategory: CompatibilityRelationship["relationshipCategory"];
-      status: "waiting";
-      partnerDisplayName: string;
-      nextAction: "diagnosis" | "profile-summary" | null;
+      readiness:
+        | Readonly<{ status: "ready"; comparableThemeCount: number }>
+        | Readonly<{
+            status: "waiting";
+            nextAction: "diagnosis" | "profile-summary" | null;
+          }>;
     }>;
 
 export type CompatibilityRelationshipsOutcome =
@@ -94,21 +92,22 @@ export async function listCompatibilityRelationships({
         at,
       });
       if (!contents) return null;
-      return contents.status === "ready"
-        ? {
-            relationshipId: reference.relationshipId,
-            relationshipCategory: relationship.relationshipCategory,
-            status: "ready",
-            partnerDisplayName,
-            comparableThemeCount: contents.viewer.themes.length,
-          }
-        : {
-            relationshipId: reference.relationshipId,
-            relationshipCategory: relationship.relationshipCategory,
-            status: "waiting",
-            partnerDisplayName,
-            nextAction: contents.nextAction,
-          };
+      return {
+        relationshipId: reference.relationshipId,
+        relationshipCategory: relationship.relationshipCategory,
+        status: "accepted",
+        partnerDisplayName,
+        readiness:
+          contents.status === "ready"
+            ? {
+                status: "ready",
+                comparableThemeCount: contents.viewer.themes.length,
+              }
+            : {
+                status: "waiting",
+                nextAction: contents.nextAction,
+              },
+      };
     }),
   );
   return { type: "resolved", items: items.filter((item) => item !== null) };

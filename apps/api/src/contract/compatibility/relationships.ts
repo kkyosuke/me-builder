@@ -19,16 +19,18 @@ export const CompatibilityRelationshipsResponseSchema = v.object({
       v.object({
         relationshipId: compatibilityRelationshipId.schema,
         relationshipCategory: v.picklist(compatibilityRelationshipCategoryValues),
-        status: v.literal("ready"),
+        status: v.literal("accepted"),
         partnerDisplayName: v.pipe(v.string(), v.nonEmpty()),
-        comparableThemeCount: v.pipe(v.number(), v.integer(), v.minValue(1)),
-      }),
-      v.object({
-        relationshipId: compatibilityRelationshipId.schema,
-        relationshipCategory: v.picklist(compatibilityRelationshipCategoryValues),
-        status: v.literal("waiting"),
-        partnerDisplayName: v.pipe(v.string(), v.nonEmpty()),
-        nextAction: v.nullable(v.picklist(["diagnosis", "profile-summary"])),
+        readiness: v.variant("status", [
+          v.object({
+            status: v.literal("ready"),
+            comparableThemeCount: v.pipe(v.number(), v.integer(), v.minValue(1)),
+          }),
+          v.object({
+            status: v.literal("waiting"),
+            nextAction: v.nullable(v.picklist(["diagnosis", "profile-summary"])),
+          }),
+        ]),
       }),
     ]),
   ),

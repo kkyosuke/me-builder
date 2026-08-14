@@ -95,16 +95,18 @@ const RelationshipListResponseSchema = v.object({
       v.object({
         relationshipId: RelationshipIdSchema,
         relationshipCategory: v.picklist(compatibilityRelationshipCategoryValues),
-        status: v.literal("ready"),
+        status: v.literal("accepted"),
         partnerDisplayName: NonEmptyStringSchema,
-        comparableThemeCount: v.pipe(v.number(), v.integer(), v.minValue(1)),
-      }),
-      v.object({
-        relationshipId: RelationshipIdSchema,
-        relationshipCategory: v.picklist(compatibilityRelationshipCategoryValues),
-        status: v.literal("waiting"),
-        partnerDisplayName: NonEmptyStringSchema,
-        nextAction: v.nullable(v.picklist(["diagnosis", "profile-summary"])),
+        readiness: v.variant("status", [
+          v.object({
+            status: v.literal("ready"),
+            comparableThemeCount: v.pipe(v.number(), v.integer(), v.minValue(1)),
+          }),
+          v.object({
+            status: v.literal("waiting"),
+            nextAction: v.nullable(v.picklist(["diagnosis", "profile-summary"])),
+          }),
+        ]),
       }),
     ]),
   ),

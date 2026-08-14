@@ -379,10 +379,10 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
         items: [
           {
             relationshipId,
-            status: "waiting",
+            status: "accepted",
             relationshipCategory: "partner",
             partnerDisplayName: "あおい",
-            nextAction: "profile-summary",
+            readiness: { status: "waiting", nextAction: "profile-summary" },
           },
         ],
       });
@@ -412,10 +412,10 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
         items: [
           {
             relationshipId,
-            status: "ready",
+            status: "accepted",
             relationshipCategory: "partner",
             partnerDisplayName: "あおい",
-            comparableThemeCount: 1,
+            readiness: { status: "ready", comparableThemeCount: 1 },
           },
         ],
       });
@@ -524,10 +524,10 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
           items: [
             {
               relationshipId,
-              status: "ready",
+              status: "accepted",
               relationshipCategory: "partner",
               partnerDisplayName: participants[partnerRole].name,
-              comparableThemeCount: 1,
+              readiness: { status: "ready", comparableThemeCount: 1 },
             },
           ],
         });

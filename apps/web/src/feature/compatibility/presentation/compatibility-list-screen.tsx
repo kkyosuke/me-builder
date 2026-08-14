@@ -21,21 +21,27 @@ import type {
 } from "../model/compatibility-relationship";
 
 type PendingItem = Extract<CompatibilityRelationshipListItem, { status: "pending" }>;
-type WaitingItem = Extract<CompatibilityRelationshipListItem, { status: "waiting" }>;
+type AcceptedItem = Extract<CompatibilityRelationshipListItem, { status: "accepted" }>;
+type ReadyItem = AcceptedItem & {
+  readiness: Extract<AcceptedItem["readiness"], { status: "ready" }>;
+};
+type WaitingItem = AcceptedItem & {
+  readiness: Extract<AcceptedItem["readiness"], { status: "waiting" }>;
+};
 
 function waitingGuide(item: WaitingItem): {
   message: string;
   href: string | null;
   label: string | null;
 } {
-  if (item.nextAction === "diagnosis") {
+  if (item.readiness.nextAction === "diagnosis") {
     return {
       message: "この関係で比べられる診断に答えると、相性シートへ自動で反映されます。",
       href: diagnosisCategoryHref(item.relationshipCategory),
       label: "診断を行う",
     };
   }
-  if (item.nextAction === "profile-summary") {
+  if (item.readiness.nextAction === "profile-summary") {
     return {
       message: "「わたしのまとめ」を作ると、あなたの「私について」が共有されます。",
       href: "/me",
@@ -77,10 +83,12 @@ export function CompatibilityListScreen({
   onCancel: (relationshipId: string) => void;
   onResend: (item: PendingItem) => void;
 }) {
-  const ready =
-    state.status === "success" ? state.data.items.filter((x) => x.status === "ready") : [];
-  const waiting =
-    state.status === "success" ? state.data.items.filter((x) => x.status === "waiting") : [];
+  const accepted =
+    state.status === "success" ? state.data.items.filter((x) => x.status === "accepted") : [];
+  const ready = accepted.filter((item): item is ReadyItem => item.readiness.status === "ready");
+  const waiting = accepted.filter(
+    (item): item is WaitingItem => item.readiness.status === "waiting",
+  );
   const pending =
     state.status === "success" ? state.data.items.filter((x) => x.status === "pending") : [];
 
@@ -170,7 +178,7 @@ export function CompatibilityListScreen({
                       {item.partnerDisplayName}さん
                     </h3>
                     <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                      {item.comparableThemeCount}つのテーマで比較できます
+                      {item.readiness.comparableThemeCount}つのテーマで比較できます
                     </p>
                     <a
                       href={`/compatibility/relationships/${item.relationshipId}`}
@@ -202,7 +210,7 @@ export function CompatibilityListScreen({
                       className="rounded-3xl border border-amber-200 bg-white p-5 shadow-lg shadow-slate-950/5 dark:border-amber-900/50 dark:bg-slate-800"
                     >
                       <p className="text-xs font-bold text-amber-700 dark:text-amber-300">
-                        {item.nextAction ? "あなたの準備待ち" : "相手の準備待ち"}
+                        {item.readiness.nextAction ? "あなたの準備待ち" : "相手の準備待ち"}
                       </p>
                       <p
                         className={`mt-2 w-fit rounded-full px-2.5 py-1 text-xs font-bold ${getRelationshipCategoryBadgeClassName(item.relationshipCategory)}`}
@@ -224,6 +232,13 @@ export function CompatibilityListScreen({
                           <ArrowRight className="size-4" aria-hidden="true" />
                         </a>
                       )}
+                      <a
+                        href={`/compatibility/relationships/${item.relationshipId}`}
+                        className={`${guide.href ? "mt-2" : "mt-4"} flex min-h-11 items-center justify-between rounded-xl border border-amber-300 px-4 text-sm font-bold text-amber-900 dark:border-amber-700 dark:text-amber-200`}
+                      >
+                        共有の確認・終了
+                        <ArrowRight className="size-4" aria-hidden="true" />
+                      </a>
                     </article>
                   );
                 })}

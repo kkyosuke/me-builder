@@ -15,16 +15,17 @@ export type CompatibilityRelationshipListItem =
   | {
       relationshipId: string;
       relationshipCategory: CompatibilityRelationshipCategory;
-      status: "ready";
+      status: "accepted";
       partnerDisplayName: string;
-      comparableThemeCount: number;
-    }
-  | {
-      relationshipId: string;
-      relationshipCategory: CompatibilityRelationshipCategory;
-      status: "waiting";
-      partnerDisplayName: string;
-      nextAction: "diagnosis" | "profile-summary" | null;
+      readiness:
+        | {
+            status: "ready";
+            comparableThemeCount: number;
+          }
+        | {
+            status: "waiting";
+            nextAction: "diagnosis" | "profile-summary" | null;
+          };
     };
 
 export type CompatibilityRelationshipList = {

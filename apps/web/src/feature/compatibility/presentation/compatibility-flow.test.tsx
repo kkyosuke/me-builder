@@ -59,30 +59,30 @@ describe("Compatibility flow", () => {
               {
                 relationshipId: "2".repeat(64),
                 relationshipCategory: "family",
-                status: "ready",
+                status: "accepted",
                 partnerDisplayName: "あおい",
-                comparableThemeCount: 3,
+                readiness: { status: "ready", comparableThemeCount: 3 },
               },
               {
                 relationshipId: "3".repeat(64),
                 relationshipCategory: "friend",
-                status: "waiting",
+                status: "accepted",
                 partnerDisplayName: "はる",
-                nextAction: "diagnosis",
+                readiness: { status: "waiting", nextAction: "diagnosis" },
               },
               {
                 relationshipId: "4".repeat(64),
                 relationshipCategory: "work",
-                status: "waiting",
+                status: "accepted",
                 partnerDisplayName: "なつ",
-                nextAction: "profile-summary",
+                readiness: { status: "waiting", nextAction: "profile-summary" },
               },
               {
                 relationshipId: "5".repeat(64),
                 relationshipCategory: "partner",
-                status: "waiting",
+                status: "accepted",
                 partnerDisplayName: "ふゆ",
-                nextAction: null,
+                readiness: { status: "waiting", nextAction: null },
               },
             ],
           },
@@ -108,8 +108,13 @@ describe("Compatibility flow", () => {
       "/me",
     );
     expect(
-      screen.getByRole("heading", { name: "ふゆさん" }).closest("article")?.querySelector("a"),
-    ).toBeNull();
+      screen
+        .getByRole("heading", { name: "ふゆさん" })
+        .closest("article")
+        ?.querySelector("a")
+        ?.getAttribute("href"),
+    ).toBe(`/compatibility/relationships/${"5".repeat(64)}`);
+    expect(screen.getAllByRole("link", { name: "共有の確認・終了" })).toHaveLength(3);
     expect(screen.getByRole("link", { name: "相性" }).getAttribute("aria-current")).toBe("page");
 
     fireEvent.click(screen.getByRole("button", { name: "LINEでもう一度送る" }));

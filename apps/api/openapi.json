@@ -2648,51 +2648,46 @@
                                 "type": "string"
                               },
                               "status": {
-                                "const": "ready"
+                                "const": "accepted"
                               },
                               "partnerDisplayName": {
                                 "type": "string",
                                 "minLength": 1
                               },
-                              "comparableThemeCount": {
-                                "type": "integer",
-                                "minimum": 1
-                              }
-                            },
-                            "required": [
-                              "relationshipId",
-                              "relationshipCategory",
-                              "status",
-                              "partnerDisplayName",
-                              "comparableThemeCount"
-                            ]
-                          },
-                          {
-                            "type": "object",
-                            "properties": {
-                              "relationshipId": {
-                                "type": "string",
-                                "pattern": "^[a-f0-9]{64}$"
-                              },
-                              "relationshipCategory": {
-                                "enum": ["partner", "family", "friend", "work"],
-                                "type": "string"
-                              },
-                              "status": {
-                                "const": "waiting"
-                              },
-                              "partnerDisplayName": {
-                                "type": "string",
-                                "minLength": 1
-                              },
-                              "nextAction": {
-                                "anyOf": [
+                              "readiness": {
+                                "oneOf": [
                                   {
-                                    "enum": ["diagnosis", "profile-summary"],
-                                    "type": "string"
+                                    "type": "object",
+                                    "properties": {
+                                      "status": {
+                                        "const": "ready"
+                                      },
+                                      "comparableThemeCount": {
+                                        "type": "integer",
+                                        "minimum": 1
+                                      }
+                                    },
+                                    "required": ["status", "comparableThemeCount"]
                                   },
                                   {
-                                    "type": "null"
+                                    "type": "object",
+                                    "properties": {
+                                      "status": {
+                                        "const": "waiting"
+                                      },
+                                      "nextAction": {
+                                        "anyOf": [
+                                          {
+                                            "enum": ["diagnosis", "profile-summary"],
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "required": ["status", "nextAction"]
                                   }
                                 ]
                               }
@@ -2702,7 +2697,7 @@
                               "relationshipCategory",
                               "status",
                               "partnerDisplayName",
-                              "nextAction"
+                              "readiness"
                             ]
                           }
                         ]

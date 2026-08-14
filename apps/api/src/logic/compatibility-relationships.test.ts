@@ -159,9 +159,9 @@ describe("listCompatibilityRelationships", () => {
         {
           relationshipId: acceptedRelationshipId,
           relationshipCategory: "partner",
-          status: "ready",
+          status: "accepted",
           partnerDisplayName: "はる",
-          comparableThemeCount: 1,
+          readiness: { status: "ready", comparableThemeCount: 1 },
         },
       ],
     });
@@ -197,9 +197,9 @@ describe("listCompatibilityRelationships", () => {
         {
           relationshipId: acceptedRelationshipId,
           relationshipCategory: "partner",
-          status: "ready",
+          status: "accepted",
           partnerDisplayName: "あおい",
-          comparableThemeCount: 1,
+          readiness: { status: "ready", comparableThemeCount: 1 },
         },
       ],
     });
@@ -236,7 +236,7 @@ describe("listCompatibilityRelationships", () => {
 
     expect(outcome.type).toBe("resolved");
     if (outcome.type !== "resolved") throw new Error("outcome should be resolved");
-    expect(outcome.items.map((item) => item.status)).toEqual(["pending", "ready"]);
+    expect(outcome.items.map((item) => item.status)).toEqual(["pending", "accepted"]);
   });
 
   it.each(["diagnosis", "profile-summary", null] as const)(
@@ -257,9 +257,9 @@ describe("listCompatibilityRelationships", () => {
           {
             relationshipId: acceptedRelationshipId,
             relationshipCategory: "partner",
-            status: "waiting",
+            status: "accepted",
             partnerDisplayName: "はる",
-            nextAction,
+            readiness: { status: "waiting", nextAction },
           },
         ],
       });
