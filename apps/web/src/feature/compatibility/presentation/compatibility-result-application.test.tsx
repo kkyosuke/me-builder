@@ -53,7 +53,7 @@ describe("CompatibilityResultApplication waiting state", () => {
 
     expect(screen.getByText(/共通の診断テーマがまだありません/)).toBeTruthy();
     expect(screen.getByRole("link", { name: "診断を見る" }).getAttribute("href")).toBe(
-      "/diagnosis",
+      "/diagnosis?category=partner",
     );
   });
 

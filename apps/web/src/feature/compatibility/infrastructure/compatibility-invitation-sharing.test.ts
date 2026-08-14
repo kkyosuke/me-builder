@@ -12,17 +12,17 @@ describe("compatibility invitation sharing", () => {
   beforeEach(() => vi.clearAllMocks());
   afterEach(() => vi.unstubAllGlobals());
 
-  it("送信者、承諾前は共有されないこと、招待URLをLINE共有文に含める", async () => {
+  it("送信者、関係性、承諾前は共有されないこと、招待URLをLINE共有文に含める", async () => {
     vi.mocked(shareLiffTextMessage).mockReturnValue(Promise.resolve("sent"));
     const url = `https://example.com/compatibility/invitations/${"1".repeat(64)}`;
 
-    await shareCompatibilityInvitationToLine("あおい", url);
+    await shareCompatibilityInvitationToLine("あおい", "partner", url);
 
     expect(shareLiffTextMessage).toHaveBeenCalledWith(
-      compatibilityInvitationMessage("あおい", url),
+      compatibilityInvitationMessage("あおい", "partner", url),
     );
-    expect(compatibilityInvitationMessage("あおい", url)).toBe(
-      `あおいさんから相性診断の招待が届いています。\n内容を確認して承諾するまで、情報の共有は始まりません。\n${url}`,
+    expect(compatibilityInvitationMessage("あおい", "partner", url)).toBe(
+      `あおいさんから相性診断（関係: パートナー）の招待が届いています。\n内容を確認して承諾するまで、情報の共有は始まりません。\n${url}`,
     );
   });
 
@@ -41,7 +41,7 @@ describe("compatibility invitation sharing", () => {
     vi.stubGlobal("navigator", { share });
 
     await expect(
-      shareCompatibilityInvitationToLine("あおい", "https://example.com/invitation"),
+      shareCompatibilityInvitationToLine("あおい", "work", "https://example.com/invitation"),
     ).resolves.toBe("system");
     expect(share).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -55,7 +55,7 @@ describe("compatibility invitation sharing", () => {
     vi.mocked(shareLiffTextMessage).mockReturnValue(Promise.resolve("cancelled"));
 
     await expect(
-      shareCompatibilityInvitationToLine("あおい", "https://example.com/invitation"),
+      shareCompatibilityInvitationToLine("あおい", "friend", "https://example.com/invitation"),
     ).resolves.toBe("cancelled");
   });
 
@@ -65,7 +65,7 @@ describe("compatibility invitation sharing", () => {
     vi.stubGlobal("navigator", { share });
 
     await expect(
-      shareCompatibilityInvitationToLine("あおい", "https://example.com/invitation"),
+      shareCompatibilityInvitationToLine("あおい", "family", "https://example.com/invitation"),
     ).resolves.toBe("cancelled");
   });
 });

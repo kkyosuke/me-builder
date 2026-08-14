@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { DiagnosisListItem } from "./diagnosis-list-item";
 import {
   applySavedProgress,
+  createDiagnosisDetailHistoryState,
+  diagnosisDetailIdFromHistoryState,
   diagnosisResultIdFromPathname,
   isDiagnosisResultPathname,
   resolveDiagnosisDestination,
@@ -47,6 +49,21 @@ describe("diagnosisResultIdFromPathname", () => {
     expect(diagnosisResultIdFromPathname("/diagnosis")).toBeNull();
     expect(diagnosisResultIdFromPathname("/diagnosis/%E0%A4%A/answers")).toBeNull();
     expect(isDiagnosisResultPathname("/diagnosis/%E0%A4%A/answers")).toBe(true);
+  });
+});
+
+describe("diagnosis detail history state", () => {
+  it("既存の履歴stateを残して診断IDを保存し、復元する", () => {
+    const state = createDiagnosisDetailHistoryState({ existing: "value" }, "diagnosis-1");
+
+    expect(state).toMatchObject({ existing: "value" });
+    expect(diagnosisDetailIdFromHistoryState(state)).toBe("diagnosis-1");
+  });
+
+  it("診断詳細ではない履歴stateを無視する", () => {
+    expect(diagnosisDetailIdFromHistoryState(null)).toBeNull();
+    expect(diagnosisDetailIdFromHistoryState({})).toBeNull();
+    expect(diagnosisDetailIdFromHistoryState({ "me-builder-diagnosis-detail-id": "" })).toBeNull();
   });
 });
 

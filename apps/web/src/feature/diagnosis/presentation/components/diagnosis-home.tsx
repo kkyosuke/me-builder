@@ -1,5 +1,4 @@
 import { ArrowRight, ChevronDown, RotateCw } from "lucide-react";
-import { useState } from "react";
 import { MainNavigation } from "../../../../components/main-navigation";
 import type { AsyncState } from "../../../../model/async-state";
 import type { DiagnosisListItem } from "../../model/diagnosis-list-item";
@@ -100,16 +99,22 @@ function DiagnosisSection({
 }
 
 export function DiagnosisHome({
+  categoryFilter,
   diagnoses,
+  isAnsweredOpen,
+  onAnsweredOpenChange,
+  onCategoryFilterChange,
   onOpenDiagnosis,
   onRetry,
 }: {
+  categoryFilter: RelationshipCategoryFilter;
   diagnoses: AsyncState<DiagnosisListItem[]>;
+  isAnsweredOpen: boolean;
+  onAnsweredOpenChange: (isOpen: boolean) => void;
+  onCategoryFilterChange: (filter: RelationshipCategoryFilter) => void;
   onOpenDiagnosis: (diagnosis: DiagnosisListItem) => void;
   onRetry: () => void;
 }) {
-  const [isAnsweredOpen, setIsAnsweredOpen] = useState(false);
-  const [categoryFilter, setCategoryFilter] = useState<RelationshipCategoryFilter>("all");
   const filteredDiagnoses =
     diagnoses.status === "success"
       ? filterDiagnosesByRelationshipCategory(diagnoses.data, categoryFilter)
@@ -141,7 +146,7 @@ export function DiagnosisHome({
           <button
             type="button"
             aria-pressed={categoryFilter === "all"}
-            onClick={() => setCategoryFilter("all")}
+            onClick={() => onCategoryFilterChange("all")}
             className="shrink-0 rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-sky-400 aria-pressed:border-sky-500 aria-pressed:bg-sky-100 aria-pressed:text-sky-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:aria-pressed:border-sky-500 dark:aria-pressed:bg-sky-950 dark:aria-pressed:text-sky-100"
           >
             全部
@@ -151,7 +156,7 @@ export function DiagnosisHome({
               type="button"
               key={category}
               aria-pressed={categoryFilter === category}
-              onClick={() => setCategoryFilter(category)}
+              onClick={() => onCategoryFilterChange(category)}
               className={`shrink-0 rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-sky-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 ${getRelationshipCategoryFilterClassName(category)}`}
             >
               {getRelationshipCategoryLabel(category)}
@@ -207,7 +212,7 @@ export function DiagnosisHome({
                   type="button"
                   aria-expanded={isAnsweredOpen}
                   aria-controls="answered-diagnoses"
-                  onClick={() => setIsAnsweredOpen((current) => !current)}
+                  onClick={() => onAnsweredOpenChange(!isAnsweredOpen)}
                   className="flex w-full items-center justify-between rounded-2xl border border-slate-200 dark:border-slate-700 bg-white/60 dark:bg-slate-800/60 px-4 py-3 text-left transition hover:border-slate-300 dark:hover:border-slate-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400"
                 >
                   <span

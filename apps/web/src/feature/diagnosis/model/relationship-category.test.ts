@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { DiagnosisListItem } from "./diagnosis-list-item";
 import {
+  diagnosisCategoryHref,
   filterDiagnosesByRelationshipCategory,
   getRelationshipCategoryAnswerContext,
   getRelationshipCategoryBadgeClassName,
   getRelationshipCategoryFilterClassName,
+  relationshipCategoryFilterFromSearch,
 } from "./relationship-category";
 
 function diagnosis(
@@ -58,5 +60,13 @@ describe("relationship category filter", () => {
     ["general", "普段の自分"],
   ] as const)("%s の回答時に思い浮かべる対象を返す", (category, expected) => {
     expect(getRelationshipCategoryAnswerContext(category)).toContain(expected);
+  });
+
+  it("categoryクエリから初期絞り込みを決め、未指定・無効値はallへ戻す", () => {
+    expect(relationshipCategoryFilterFromSearch("?category=family")).toBe("family");
+    expect(relationshipCategoryFilterFromSearch("?category=general")).toBe("all");
+    expect(relationshipCategoryFilterFromSearch("?category=unknown")).toBe("all");
+    expect(relationshipCategoryFilterFromSearch("")).toBe("all");
+    expect(diagnosisCategoryHref("friend")).toBe("/diagnosis?category=friend");
   });
 });

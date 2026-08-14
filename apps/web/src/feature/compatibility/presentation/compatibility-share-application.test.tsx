@@ -21,7 +21,17 @@ vi.mock("./compatibility-share-screen", () => ({
   },
 }));
 vi.mock("./hooks/use-compatibility-invitation-issue", () => ({
-  useCompatibilityInvitationIssue: () => ({ state: { status: "idle" }, issue: vi.fn() }),
+  useCompatibilityInvitationIssue: () => ({
+    state: {
+      status: "success",
+      data: {
+        invitationUrl: "https://example.com/invitation",
+        expiresAt: "2026-08-26T00:00:00.000Z",
+        relationshipCategory: "family",
+      },
+    },
+    issue: vi.fn(),
+  }),
 }));
 vi.mock("./hooks/use-compatibility-share-consent", () => ({
   useCompatibilityShareConsent: () => ({
@@ -59,5 +69,10 @@ describe("CompatibilityShareApplication", () => {
     });
 
     expect(mocks.shareCompatibilityInvitationToLine).toHaveBeenCalledOnce();
+    expect(mocks.shareCompatibilityInvitationToLine).toHaveBeenCalledWith(
+      "うさぎ",
+      "family",
+      "https://example.com/invitation",
+    );
   });
 });

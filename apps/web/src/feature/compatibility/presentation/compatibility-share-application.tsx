@@ -22,13 +22,14 @@ export default function CompatibilityShareApplication() {
   const [isSharing, setIsSharing] = useState(false);
   const [sharingMessage, setSharingMessage] = useState<string | null>(null);
   const shareToLine = async (url: string) => {
-    if (sharing.current) return;
+    if (sharing.current || invitation.state.status !== "success") return;
     sharing.current = true;
     setIsSharing(true);
     setSharingMessage(null);
     try {
       const destination = await shareCompatibilityInvitationToLine(
         state.status === "success" ? state.data.displayName : null,
+        invitation.state.data.relationshipCategory,
         url,
       );
       setSharingMessage(
