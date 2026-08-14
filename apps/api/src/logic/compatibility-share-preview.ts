@@ -1,5 +1,6 @@
 import {
   type AccountDataNamespace,
+  type CompatibilityRelationshipCategory,
   type CompatibilitySharePreviewDiagnosis,
   type CompatibilitySharePreviewTheme,
   type D1,
@@ -34,6 +35,7 @@ type Params = {
   lineLoginChannelId: string | undefined;
   db: D1.shared.Client;
   accountData?: AccountDataNamespace;
+  relationshipCategory?: CompatibilityRelationshipCategory;
   at?: Date;
 };
 
@@ -97,11 +99,13 @@ export async function loadCompatibilitySharePreviewData(
     verifiedDisplayName,
     accountData,
     at,
+    relationshipCategory,
   }: {
     accountId: string;
     verifiedDisplayName: string | undefined;
     accountData: AccountDataNamespace | undefined;
     at: Date;
+    relationshipCategory?: CompatibilityRelationshipCategory;
   },
   dependencies: CompatibilitySharePreviewDataDependencies = compatibilitySharePreviewDataDependencies,
 ): Promise<CompatibilitySharePreviewData> {
@@ -109,9 +113,10 @@ export async function loadCompatibilitySharePreviewData(
     dependencies.getPreviewSource(accountData, accountId, at),
     dependencies.getShareProfile(accountData, accountId),
   ]);
-  // 招待へ関係カテゴリを保存するまでは、既存の相性共有が暗黙に想定してきた
-  // partnerと、特定の関係を前提にしないgeneralだけを共有する。
-  // 関係カテゴリ対応後は「招待カテゴリと一致する診断 + general」へ広げる。
+  const isCategoryShareable = (category: string) =>
+    category === "general" ||
+    relationshipCategory === undefined ||
+    category === relationshipCategory;
   const shareableDiagnoses = source.answeredDiagnoses.flatMap(
     ({
       id,
@@ -120,7 +125,7 @@ export async function loadCompatibilitySharePreviewData(
       answers,
       scoringConfig,
     }): CompatibilitySharePreviewDiagnosis[] => {
-      if (relationshipCategory !== "partner" && relationshipCategory !== "general") return [];
+      if (!isCategoryShareable(relationshipCategory)) return [];
       try {
         const scoring = dependencies.scoreAnswers(answers, scoringConfig);
         return scoring && scoringConfig
@@ -143,7 +148,7 @@ export async function loadCompatibilitySharePreviewData(
   const shareProfile = shareProfileResult.type === "available" ? shareProfileResult.profile : null;
   const hasAnswerableDiagnosis = source.diagnoses.some(
     ({ relationshipCategory, availability, responseStatus }) =>
-      (relationshipCategory === "partner" || relationshipCategory === "general") &&
+      isCategoryShareable(relationshipCategory) &&
       availability === "open" &&
       responseStatus !== "answered",
   );
@@ -169,7 +174,7 @@ export async function loadCompatibilitySharePreviewData(
 
 /** 本人が招待リンクを発行する前に確認する、共有可否だけを返す。 */
 export async function getCompatibilityShareConsent(
-  { idToken, lineLoginChannelId, db, accountData, at = new Date() }: Params,
+  { idToken, lineLoginChannelId, db, accountData, relationshipCategory, at = new Date() }: Params,
   dependencies: Dependencies = defaultDependencies,
 ): Promise<CompatibilityShareConsentOutcome> {
   const session = await dependencies.createSession({ idToken, lineLoginChannelId, db });
@@ -180,6 +185,7 @@ export async function getCompatibilityShareConsent(
       accountId: session.session.accountId,
       verifiedDisplayName: session.session.displayName,
       accountData,
+      ...(relationshipCategory ? { relationshipCategory } : {}),
       at,
     },
     dependencies,

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { resolveCompatibilityInvitationId } from "../feature/compatibility/model/compatibility-route";
 import CompatibilityApplication from "../feature/compatibility/presentation/compatibility-application";
@@ -88,9 +88,11 @@ describe("LIFF compatibility share link journey", () => {
     mocks.issueCompatibilityInvitation.mockResolvedValue({
       invitationUrl,
       expiresAt: "2026-08-26T00:00:00.000Z",
+      relationshipCategory: "partner",
     });
     mocks.shareCompatibilityInvitationToLine.mockResolvedValue("line");
     mocks.fetchCompatibilityInvitation.mockResolvedValue({
+      relationshipCategory: "partner",
       inviter: {
         displayName: "あおい",
         avatarUrl: `/api/compatibility/invitations/${relationshipId}/avatar`,
@@ -105,6 +107,7 @@ describe("LIFF compatibility share link journey", () => {
     mocks.fetchCompatibilityRelationship.mockResolvedValue({
       relationshipId,
       status: "ready",
+      relationshipCategory: "partner",
       partner: { displayName: "あおい", aboutMe: profile, themes: [inviterTheme] },
       viewer: { displayName: "はる", aboutMe: profile, themes: [recipientTheme] },
     });
@@ -114,7 +117,16 @@ describe("LIFF compatibility share link journey", () => {
     window.history.replaceState({}, "", "/compatibility/share");
     render(<CompatibilityApplication />);
 
+    fireEvent.click(await screen.findByRole("radio", { name: "パートナー" }));
     fireEvent.click(await screen.findByRole("button", { name: "共有して招待リンクを発行する" }));
+    await waitFor(() =>
+      expect(mocks.issueCompatibilityInvitation).toHaveBeenCalledWith(
+        undefined,
+        "recipient-token",
+        "partner",
+        expect.any(AbortSignal),
+      ),
+    );
     fireEvent.click(await screen.findByRole("button", { name: "友だちに送る" }));
     expect(mocks.shareCompatibilityInvitationToLine).toHaveBeenCalledWith("あおい", invitationUrl);
 

@@ -1,4 +1,8 @@
 import {
+  type CompatibilityRelationshipCategory,
+  compatibilityRelationshipCategoryValues,
+} from "@me-builder/lib/compatibility";
+import {
   AlertCircle,
   CheckCircle2,
   Copy,
@@ -8,6 +12,10 @@ import {
   Send,
 } from "lucide-react";
 import type { AsyncState } from "../../../model/async-state";
+import {
+  getRelationshipCategoryBadgeClassName,
+  getRelationshipCategoryLabel,
+} from "../../diagnosis/model/relationship-category";
 import type { CompatibilityInvitation } from "../model/compatibility-invitation";
 import type {
   CompatibilityShareConsent,
@@ -53,6 +61,51 @@ function ShareConsentSkeleton() {
   );
 }
 
+function RelationshipCategorySelector({
+  disabled,
+  onChange,
+  value,
+}: {
+  disabled: boolean;
+  onChange: (category: CompatibilityRelationshipCategory) => void;
+  value: CompatibilityRelationshipCategory | null;
+}) {
+  return (
+    <fieldset className="mt-7" disabled={disabled}>
+      <legend className="font-bold text-slate-950 dark:text-slate-50">相手との関係</legend>
+      <p className="mt-1 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+        選んだ関係に合う診断と、人間関係全般の診断を2人の相性に使います。
+      </p>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        {compatibilityRelationshipCategoryValues.map((category) => {
+          const selected = value === category;
+          return (
+            <label
+              key={category}
+              className={`flex min-h-12 cursor-pointer items-center justify-center rounded-2xl border px-3 py-2 text-sm font-bold transition focus-within:ring-2 focus-within:ring-sky-500 focus-within:ring-offset-2 ${
+                selected
+                  ? `border-current ring-2 ring-current/20 ${getRelationshipCategoryBadgeClassName(category)}`
+                  : "border-slate-300 bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+              } ${disabled ? "cursor-not-allowed opacity-70" : ""}`}
+            >
+              <input
+                type="radio"
+                name="relationship-category"
+                value={category}
+                checked={selected}
+                onChange={() => onChange(category)}
+                className="sr-only"
+              />
+              {getRelationshipCategoryLabel(category)}
+            </label>
+          );
+        })}
+      </div>
+      {value === null && <p className="mt-2 text-xs text-rose-700">関係を1つ選んでください。</p>}
+    </fieldset>
+  );
+}
+
 function ShareConsentContent({
   consent,
   invitationState,
@@ -62,6 +115,8 @@ function ShareConsentContent({
   onShareToLine,
   isSharing,
   sharingMessage,
+  relationshipCategory,
+  onRelationshipCategoryChange,
 }: {
   consent: CompatibilityShareConsent;
   invitationState: AsyncState<CompatibilityInvitation>;
@@ -71,6 +126,8 @@ function ShareConsentContent({
   onShareToLine: (url: string) => void;
   isSharing: boolean;
   sharingMessage: string | null;
+  relationshipCategory: CompatibilityRelationshipCategory | null;
+  onRelationshipCategoryChange: (category: CompatibilityRelationshipCategory) => void;
 }) {
   const displayName = consent.displayName ?? "あなた";
   const guide = consent.nextAction ? nextActionGuides[consent.nextAction] : null;
@@ -95,6 +152,12 @@ function ShareConsentContent({
       <p className="mt-4 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
         この相手とうつしをシェアしていいかだけを確認します。共有した後は、増えた分も自動で共有されます。共有される内容は「わたし」からいつでも確認できます。
       </p>
+
+      <RelationshipCategorySelector
+        value={relationshipCategory}
+        disabled={invitationState.status === "loading" || invitationState.status === "success"}
+        onChange={onRelationshipCategoryChange}
+      />
 
       <CompatibilityShareScope headingId="share-scope-heading" />
 
@@ -195,7 +258,11 @@ function ShareConsentContent({
           ) : (
             <button
               type="button"
-              disabled={!consent.canShare || invitationState.status === "loading"}
+              disabled={
+                !consent.canShare ||
+                relationshipCategory === null ||
+                invitationState.status === "loading"
+              }
               onClick={onIssue}
               className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-rose-500 px-5 font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 dark:disabled:bg-slate-800 dark:disabled:text-slate-400"
             >
@@ -209,9 +276,11 @@ function ShareConsentContent({
               )}
               {invitationState.status === "loading"
                 ? "招待リンクを発行中"
-                : consent.canShare
-                  ? "共有して招待リンクを発行する"
-                  : "招待リンクを発行できません"}
+                : !consent.canShare
+                  ? "招待リンクを発行できません"
+                  : relationshipCategory
+                    ? "共有して招待リンクを発行する"
+                    : "相手との関係を選んでください"}
             </button>
           )}
         </div>
@@ -228,6 +297,8 @@ export function CompatibilityShareScreen({
   onShareToLine = () => undefined,
   isSharing = false,
   sharingMessage = null,
+  relationshipCategory = null,
+  onRelationshipCategoryChange = () => undefined,
   state,
 }: {
   invitationState?: AsyncState<CompatibilityInvitation>;
@@ -237,6 +308,8 @@ export function CompatibilityShareScreen({
   onShareToLine?: (url: string) => void;
   isSharing?: boolean;
   sharingMessage?: string | null;
+  relationshipCategory?: CompatibilityRelationshipCategory | null;
+  onRelationshipCategoryChange?: (category: CompatibilityRelationshipCategory) => void;
   state: AsyncState<CompatibilityShareConsent>;
 }) {
   return (
@@ -266,6 +339,8 @@ export function CompatibilityShareScreen({
           consent={state.data}
           invitationState={invitationState}
           sharingMessage={sharingMessage}
+          relationshipCategory={relationshipCategory}
+          onRelationshipCategoryChange={onRelationshipCategoryChange}
           onCopyLink={onCopyLink}
           onIssue={onIssue}
           onRetryConsent={onRetry}

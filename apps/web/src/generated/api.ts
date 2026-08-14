@@ -1454,7 +1454,14 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: never;
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          relationshipCategory: "partner" | "family" | "friend" | "work";
+        };
+      };
+    };
     responses: {
       /** @description 発行した招待リンクと有効期限 */
       201: {
@@ -1467,6 +1474,20 @@ export interface operations {
             invitationUrl: string;
             /** Format: date-time */
             expiresAt: string;
+            /** @enum {string} */
+            relationshipCategory: "partner" | "family" | "friend" | "work";
+          };
+        };
+      };
+      /** @description 関係カテゴリが不正 */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Invalid request";
           };
         };
       };
@@ -1656,6 +1677,8 @@ export interface operations {
         };
         content: {
           "application/json": {
+            /** @enum {string} */
+            relationshipCategory: "partner" | "family" | "friend" | "work";
             inviter: {
               displayName: string;
               avatarUrl: string | null;
@@ -1841,6 +1864,8 @@ export interface operations {
             items: (
               | {
                   relationshipId: string;
+                  /** @enum {string} */
+                  relationshipCategory: "partner" | "family" | "friend" | "work";
                   /** @constant */
                   status: "pending";
                   /** Format: date-time */
@@ -1850,6 +1875,8 @@ export interface operations {
                 }
               | {
                   relationshipId: string;
+                  /** @enum {string} */
+                  relationshipCategory: "partner" | "family" | "friend" | "work";
                   /** @constant */
                   status: "accepted";
                   partnerDisplayName: string;
@@ -1930,6 +1957,8 @@ export interface operations {
           "application/json":
             | {
                 relationshipId: string;
+                /** @enum {string} */
+                relationshipCategory: "partner" | "family" | "friend" | "work";
                 /** @constant */
                 status: "ready";
                 partner: {
@@ -1985,6 +2014,8 @@ export interface operations {
               }
             | {
                 relationshipId: string;
+                /** @enum {string} */
+                relationshipCategory: "partner" | "family" | "friend" | "work";
                 /** @constant */
                 status: "waiting";
                 nextAction: ("diagnosis" | "profile-summary") | null;
@@ -2378,7 +2409,10 @@ export interface operations {
   };
   getCompatibilityShareConsent: {
     parameters: {
-      query?: never;
+      query?: {
+        /** @description 選択した関係カテゴリとgeneralを対象に次の案内を判定する */
+        relationshipCategory?: "partner" | "family" | "friend" | "work";
+      };
       header?: never;
       path?: never;
       cookie?: never;
@@ -2397,6 +2431,18 @@ export interface operations {
             canShare: boolean;
             blockingReasons: "display_name_unavailable"[];
             nextAction: ("diagnosis" | "profile-summary") | null;
+          };
+        };
+      };
+      /** @description 関係カテゴリが不正 */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Invalid request";
           };
         };
       };

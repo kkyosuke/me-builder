@@ -1965,9 +1965,29 @@
                     "expiresAt": {
                       "type": "string",
                       "format": "date-time"
+                    },
+                    "relationshipCategory": {
+                      "enum": ["partner", "family", "friend", "work"],
+                      "type": "string"
                     }
                   },
-                  "required": ["invitationUrl", "expiresAt"]
+                  "required": ["invitationUrl", "expiresAt", "relationshipCategory"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "関係カテゴリが不正",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Invalid request"
+                    }
+                  },
+                  "required": ["error"]
                 }
               }
             }
@@ -2055,6 +2075,23 @@
                   },
                   "required": ["error"]
                 }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "relationshipCategory": {
+                    "enum": ["partner", "family", "friend", "work"],
+                    "type": "string"
+                  }
+                },
+                "required": ["relationshipCategory"]
               }
             }
           }
@@ -2231,6 +2268,10 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "relationshipCategory": {
+                      "enum": ["partner", "family", "friend", "work"],
+                      "type": "string"
+                    },
                     "inviter": {
                       "type": "object",
                       "properties": {
@@ -2307,6 +2348,7 @@
                     }
                   },
                   "required": [
+                    "relationshipCategory",
                     "inviter",
                     "recipient",
                     "expiresAt",
@@ -2570,6 +2612,10 @@
                                 "type": "string",
                                 "pattern": "^[a-f0-9]{64}$"
                               },
+                              "relationshipCategory": {
+                                "enum": ["partner", "family", "friend", "work"],
+                                "type": "string"
+                              },
                               "status": {
                                 "const": "pending"
                               },
@@ -2582,7 +2628,13 @@
                                 "format": "uri"
                               }
                             },
-                            "required": ["relationshipId", "status", "expiresAt", "invitationUrl"]
+                            "required": [
+                              "relationshipId",
+                              "relationshipCategory",
+                              "status",
+                              "expiresAt",
+                              "invitationUrl"
+                            ]
                           },
                           {
                             "type": "object",
@@ -2590,6 +2642,10 @@
                               "relationshipId": {
                                 "type": "string",
                                 "pattern": "^[a-f0-9]{64}$"
+                              },
+                              "relationshipCategory": {
+                                "enum": ["partner", "family", "friend", "work"],
+                                "type": "string"
                               },
                               "status": {
                                 "const": "accepted"
@@ -2599,7 +2655,12 @@
                                 "minLength": 1
                               }
                             },
-                            "required": ["relationshipId", "status", "partnerDisplayName"]
+                            "required": [
+                              "relationshipId",
+                              "relationshipCategory",
+                              "status",
+                              "partnerDisplayName"
+                            ]
                           }
                         ]
                       }
@@ -2703,6 +2764,10 @@
                         "relationshipId": {
                           "type": "string",
                           "pattern": "^[a-f0-9]{64}$"
+                        },
+                        "relationshipCategory": {
+                          "enum": ["partner", "family", "friend", "work"],
+                          "type": "string"
                         },
                         "status": {
                           "const": "ready"
@@ -2922,7 +2987,13 @@
                           "required": ["displayName", "aboutMe", "themes"]
                         }
                       },
-                      "required": ["relationshipId", "status", "partner", "viewer"]
+                      "required": [
+                        "relationshipId",
+                        "relationshipCategory",
+                        "status",
+                        "partner",
+                        "viewer"
+                      ]
                     },
                     {
                       "type": "object",
@@ -2930,6 +3001,10 @@
                         "relationshipId": {
                           "type": "string",
                           "pattern": "^[a-f0-9]{64}$"
+                        },
+                        "relationshipCategory": {
+                          "enum": ["partner", "family", "friend", "work"],
+                          "type": "string"
                         },
                         "status": {
                           "const": "waiting"
@@ -2946,7 +3021,7 @@
                           ]
                         }
                       },
-                      "required": ["relationshipId", "status", "nextAction"]
+                      "required": ["relationshipId", "relationshipCategory", "status", "nextAction"]
                     }
                   ]
                 }
@@ -3565,6 +3640,18 @@
             "liffIdToken": []
           }
         ],
+        "parameters": [
+          {
+            "name": "relationshipCategory",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["partner", "family", "friend", "work"]
+            },
+            "description": "選択した関係カテゴリとgeneralを対象に次の案内を判定する"
+          }
+        ],
         "responses": {
           "200": {
             "description": "相手へ表示される表示名と画像path、共有を始められるかどうか",
@@ -3624,6 +3711,22 @@
                     "blockingReasons",
                     "nextAction"
                   ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "関係カテゴリが不正",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Invalid request"
+                    }
+                  },
+                  "required": ["error"]
                 }
               }
             }

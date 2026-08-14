@@ -17,7 +17,12 @@ function renderWaiting(nextAction: "diagnosis" | "profile-summary" | null) {
   mocks.useCompatibilityRelationship.mockReturnValue({
     state: {
       status: "success",
-      data: { relationshipId, status: "waiting", nextAction },
+      data: {
+        relationshipId,
+        status: "waiting",
+        relationshipCategory: "partner",
+        nextAction,
+      },
     },
     ending: { status: "idle" },
     reload: vi.fn(),

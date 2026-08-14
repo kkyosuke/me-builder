@@ -21,6 +21,7 @@ describe("CompatibilityData Workers runtime E2E", () => {
       stub.createInvitation(relationshipId, {
         inviterAccountId,
         inviterDisplayName: "送信者",
+        relationshipCategory: "partner",
       }),
     ).resolves.toMatchObject({ outcome: "created", relationship: { status: "pending" } });
 
@@ -28,6 +29,7 @@ describe("CompatibilityData Workers runtime E2E", () => {
     expect(invitation).toEqual({
       id: relationshipId,
       inviterDisplayName: "送信者",
+      relationshipCategory: "partner",
       expiresAt: expect.any(Date),
       isOwnInvitation: false,
     });
@@ -85,6 +87,7 @@ describe("CompatibilityData Workers runtime E2E", () => {
     await relationship.createInvitation(relationshipId, {
       inviterAccountId,
       inviterDisplayName: "送信者",
+      relationshipCategory: "family",
     });
     await inviter.execute("compatibility.addOutgoingReference", {
       relationshipId,
@@ -126,6 +129,7 @@ describe("CompatibilityData Workers runtime E2E", () => {
     await relationship.createInvitation(relationshipId, {
       inviterAccountId,
       inviterDisplayName: "送信者",
+      relationshipCategory: "friend",
     });
     await inviter.execute("compatibility.addOutgoingReference", {
       relationshipId,
@@ -147,6 +151,7 @@ describe("CompatibilityData Workers runtime E2E", () => {
     await relationship.createInvitation(relationshipId, {
       inviterAccountId,
       inviterDisplayName: "送信者",
+      relationshipCategory: "work",
     });
     await inviter.execute("compatibility.addOutgoingReference", {
       relationshipId,
@@ -189,10 +194,12 @@ describe("CompatibilityData Workers runtime E2E", () => {
       aToB.createInvitation(relationshipAtoB, {
         inviterAccountId: accountA,
         inviterDisplayName: "A",
+        relationshipCategory: "partner",
       }),
       bToA.createInvitation(relationshipBtoA, {
         inviterAccountId: accountB,
         inviterDisplayName: "B",
+        relationshipCategory: "partner",
       }),
       aData.execute("compatibility.addOutgoingReference", {
         relationshipId: relationshipAtoB,

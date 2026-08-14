@@ -16,10 +16,39 @@ describe("GET /api/openapi.json", () => {
     expect(document.paths["/api/diagnoses"]?.get).toBeDefined();
     expect(document.paths["/api/compatibility/share-consent"]?.get).toBeDefined();
     expect(document.paths["/api/compatibility/invitations"]?.post).toBeDefined();
-    // 共有の同意はリクエスト本文を持たず、表示内容の確認tokenも受け取らない。
-    expect(document.paths["/api/compatibility/invitations"]?.post).not.toHaveProperty(
-      "requestBody",
-    );
+    // 表示内容の確認tokenは受け取らず、招待時に選ぶ関係カテゴリだけを本文で受け取る。
+    expect(document.paths["/api/compatibility/invitations"]?.post).toMatchObject({
+      requestBody: {
+        required: true,
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              properties: {
+                relationshipCategory: {
+                  type: "string",
+                  enum: ["partner", "family", "friend", "work"],
+                },
+              },
+              required: ["relationshipCategory"],
+            },
+          },
+        },
+      },
+    });
+    expect(document.paths["/api/compatibility/share-consent"]?.get).toMatchObject({
+      parameters: [
+        {
+          name: "relationshipCategory",
+          in: "query",
+          required: false,
+          schema: {
+            type: "string",
+            enum: ["partner", "family", "friend", "work"],
+          },
+        },
+      ],
+    });
     expect(document.paths["/api/diagnoses/{diagnosisId}/answers"]?.get).toBeDefined();
     expect(document.paths["/api/profile"]?.get).toBeDefined();
     expect(document.paths["/api/profile/avatar"]?.get).toBeDefined();

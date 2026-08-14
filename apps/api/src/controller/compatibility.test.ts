@@ -38,9 +38,16 @@ function outcome(value: CompatibilityShareConsentOutcome) {
   getCompatibilityShareConsent.mockResolvedValue(value);
 }
 
-function request(env: Record<string, unknown> = {}, authorization = "Bearer dummy.id.token") {
+function request(
+  env: Record<string, unknown> = {},
+  authorization = "Bearer dummy.id.token",
+  relationshipCategory?: string,
+) {
+  const query = relationshipCategory
+    ? `?relationshipCategory=${encodeURIComponent(relationshipCategory)}`
+    : "";
   return app.request(
-    "/api/compatibility/share-consent",
+    `/api/compatibility/share-consent${query}`,
     { headers: { Authorization: authorization } },
     {
       LIFF_ID: "2010850319-Yl63upAR",
@@ -66,10 +73,14 @@ describe("GET /api/compatibility/share-consent", () => {
       },
     });
 
-    const response = await request({
-      AVATAR_BUCKET: dummyAvatarBucket,
-      LINE_CHANNEL_ACCESS_TOKEN: "line-token",
-    });
+    const response = await request(
+      {
+        AVATAR_BUCKET: dummyAvatarBucket,
+        LINE_CHANNEL_ACCESS_TOKEN: "line-token",
+      },
+      "Bearer dummy.id.token",
+      "family",
+    );
 
     expect(response.status).toBe(200);
     expect(response.headers.get("Cache-Control")).toBe("no-store");
@@ -85,8 +96,17 @@ describe("GET /api/compatibility/share-consent", () => {
         idToken: "dummy.id.token",
         lineLoginChannelId: "2010850319",
         accountData: dummyAccountData,
+        relationshipCategory: "family",
       }),
     );
+  });
+
+  it.each(["general", "other"])('関係カテゴリ"%s"を400で拒否する', async (category) => {
+    const response = await request({}, "Bearer dummy.id.token", category);
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "Invalid request" });
+    expect(getCompatibilityShareConsent).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -138,12 +158,19 @@ describe("GET /api/compatibility/share-consent", () => {
 describe("POST /api/compatibility/invitations", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  function issueRequest(env: Record<string, unknown> = {}) {
+  function issueRequest(
+    env: Record<string, unknown> = {},
+    body: unknown = { relationshipCategory: "partner" },
+  ) {
     return app.request(
       "/api/compatibility/invitations",
       {
         method: "POST",
-        headers: { Authorization: "Bearer dummy.id.token" },
+        headers: {
+          Authorization: "Bearer dummy.id.token",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
       },
       {
         LIFF_ID: "2010850319-Yl63upAR",
@@ -161,6 +188,7 @@ describe("POST /api/compatibility/invitations", () => {
       type: "created",
       invitationUrl: `https://liff.line.me/2010850319-Yl63upAR/compatibility/invitations/${"1".repeat(64)}`,
       expiresAt: "2026-08-26T00:00:00.000Z",
+      relationshipCategory: "partner",
     });
 
     const response = await issueRequest();
@@ -169,6 +197,7 @@ describe("POST /api/compatibility/invitations", () => {
     expect(await response.json()).toEqual({
       invitationUrl: `https://liff.line.me/2010850319-Yl63upAR/compatibility/invitations/${"1".repeat(64)}`,
       expiresAt: "2026-08-26T00:00:00.000Z",
+      relationshipCategory: "partner",
     });
     expect(issueCompatibilityInvitation).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -179,8 +208,22 @@ describe("POST /api/compatibility/invitations", () => {
         },
         accountData: dummyAccountData,
         compatibilityData: dummyCompatibilityData,
+        relationshipCategory: "partner",
       }),
     );
+  });
+
+  it.each([
+    {},
+    { relationshipCategory: "general" },
+    { relationshipCategory: "other" },
+    { relationshipCategory: null },
+  ])("関係カテゴリが未選択または対象外なら400で拒否する", async (body) => {
+    const response = await issueRequest({}, body);
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "Invalid request" });
+    expect(issueCompatibilityInvitation).not.toHaveBeenCalled();
   });
 
   it("share-unavailableを409へ変換する", async () => {
@@ -223,6 +266,7 @@ describe("GET /api/compatibility/invitations/:relationshipId", () => {
 
   const relationshipId = "1".repeat(64);
   const invitation = {
+    relationshipCategory: "family",
     inviter: {
       displayName: "あおい",
       avatarUrl: `/api/compatibility/invitations/${relationshipId}/avatar`,

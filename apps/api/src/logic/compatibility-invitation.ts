@@ -1,6 +1,7 @@
 import {
   type AccountDataNamespace,
   type CompatibilityDataNamespace,
+  type CompatibilityRelationshipCategory,
   type ConfiguredLiff,
   type D1,
   createCompatibilityInvitationWithReference,
@@ -9,7 +10,12 @@ import { createCompatibilityInvitationUrl } from "./compatibility-invitation-url
 import { createLiffSession } from "./liff-session";
 
 export type CompatibilityInvitationIssueOutcome =
-  | Readonly<{ type: "created"; invitationUrl: string; expiresAt: string }>
+  | Readonly<{
+      type: "created";
+      invitationUrl: string;
+      expiresAt: string;
+      relationshipCategory: CompatibilityRelationshipCategory;
+    }>
   | Readonly<{ type: "share-unavailable" }>
   | Readonly<{ type: "not-configured" }>
   | Readonly<{ type: "unauthenticated"; reason: string }>
@@ -21,6 +27,7 @@ type Params = Readonly<{
   db: D1.shared.Client;
   accountData: AccountDataNamespace;
   compatibilityData: CompatibilityDataNamespace;
+  relationshipCategory: CompatibilityRelationshipCategory;
 }>;
 
 type Dependencies = Readonly<{
@@ -35,7 +42,7 @@ const defaultDependencies: Dependencies = {
 
 /** 本人が共有へ同意した時点の表示名だけを固定し、1人用の招待を発行する。 */
 export async function issueCompatibilityInvitation(
-  { idToken, liff, db, accountData, compatibilityData }: Params,
+  { idToken, liff, db, accountData, compatibilityData, relationshipCategory }: Params,
   dependencies: Dependencies = defaultDependencies,
 ): Promise<CompatibilityInvitationIssueOutcome> {
   const session = await dependencies.createSession({
@@ -52,11 +59,13 @@ export async function issueCompatibilityInvitation(
   const result = await dependencies.createInvitation(accountData, compatibilityData, {
     inviterAccountId: session.session.accountId,
     inviterDisplayName,
+    relationshipCategory,
   });
   const invitationUrl = createCompatibilityInvitationUrl(liff.liffId, result.relationship.id);
   return {
     type: "created",
     invitationUrl,
     expiresAt: result.relationship.expiresAt.toISOString(),
+    relationshipCategory: result.relationship.relationshipCategory,
   };
 }

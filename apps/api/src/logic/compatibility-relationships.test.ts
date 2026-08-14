@@ -43,6 +43,7 @@ function acceptedRelationship(
     inviteeAccountId: partnerAccountId,
     inviterDisplayName: "あおい",
     inviteeDisplayName: "はる",
+    relationshipCategory: "partner",
     status: "accepted",
     expiresAt,
     acceptedAt: consentedAt,
@@ -64,7 +65,7 @@ function namespaces({
   relationships = {},
 }: {
   references: readonly CompatibilityReference[];
-  previews?: Record<string, { expiresAt: Date } | null>;
+  previews?: Record<string, { expiresAt: Date; relationshipCategory?: "partner" } | null>;
   relationships?: Record<string, CompatibilityRelationship | null>;
 }) {
   const execute = vi.fn(async (id: string, operation: string) => {
@@ -78,7 +79,13 @@ function namespaces({
 
   const getInvitationPreview = vi.fn(async (relationshipId: string) => {
     const preview = previews[relationshipId] ?? null;
-    return preview ? { ...preview, id: relationshipId } : null;
+    return preview
+      ? {
+          ...preview,
+          id: relationshipId,
+          relationshipCategory: preview.relationshipCategory ?? "partner",
+        }
+      : null;
   });
   const getRelationship = vi.fn(
     async (relationshipId: string) => relationships[relationshipId] ?? null,
@@ -121,6 +128,7 @@ describe("listCompatibilityRelationships", () => {
       items: [
         {
           relationshipId: pendingRelationshipId,
+          relationshipCategory: "partner",
           status: "pending",
           expiresAt: expiresAt.toISOString(),
           invitationUrl: `https://liff.line.me/${liffId}/compatibility/invitations/${pendingRelationshipId}`,
@@ -142,6 +150,7 @@ describe("listCompatibilityRelationships", () => {
       items: [
         {
           relationshipId: acceptedRelationshipId,
+          relationshipCategory: "partner",
           status: "accepted",
           partnerDisplayName: "はる",
         },
@@ -178,6 +187,7 @@ describe("listCompatibilityRelationships", () => {
       items: [
         {
           relationshipId: acceptedRelationshipId,
+          relationshipCategory: "partner",
           status: "accepted",
           partnerDisplayName: "あおい",
         },

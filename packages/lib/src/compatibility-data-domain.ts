@@ -10,6 +10,7 @@ import {
   type CreateCompatibilityInvitationResult,
   type EndCompatibilityRelationshipResult,
   compatibilityRelationshipId,
+  isCompatibilityRelationshipCategory,
 } from "./compatibility-data";
 
 function assertNonEmpty(value: string, field: string): void {
@@ -42,13 +43,17 @@ export function decideCompatibilityInvitationCreation(
   }
   assertNonEmpty(input.inviterAccountId, "inviterAccountId");
   assertNonEmpty(input.inviterDisplayName, "inviterDisplayName");
+  if (!isCompatibilityRelationshipCategory(input.relationshipCategory)) {
+    throw new Error("relationshipCategory must identify a specific relationship");
+  }
   assertValidDate(createdAt, "createdAt");
 
   if (existing) {
     if (
       existing.id !== relationshipId ||
       existing.inviterAccountId !== input.inviterAccountId ||
-      existing.inviterDisplayName !== input.inviterDisplayName.trim()
+      existing.inviterDisplayName !== input.inviterDisplayName.trim() ||
+      existing.relationshipCategory !== input.relationshipCategory
     ) {
       throw new Error("Compatibility invitation conflicts with persisted relationship");
     }
@@ -61,6 +66,7 @@ export function decideCompatibilityInvitationCreation(
     inviteeAccountId: null,
     inviterDisplayName: input.inviterDisplayName.trim(),
     inviteeDisplayName: null,
+    relationshipCategory: input.relationshipCategory,
     status: "pending",
     expiresAt: new Date(createdAt.getTime() + COMPATIBILITY_INVITATION_TTL_MS),
     acceptedAt: null,
@@ -97,6 +103,7 @@ export function createCompatibilityInvitationPreview(
   return {
     id: relationship.id,
     inviterDisplayName: relationship.inviterDisplayName,
+    relationshipCategory: relationship.relationshipCategory,
     expiresAt: relationship.expiresAt,
     isOwnInvitation: relationship.inviterAccountId === viewerAccountId,
   };
@@ -112,6 +119,7 @@ export function createCompatibilityInvitationAcceptanceContext(
   }
   return {
     inviterAccountId: relationship.inviterAccountId,
+    relationshipCategory: relationship.relationshipCategory,
     expiresAt: relationship.expiresAt,
   };
 }

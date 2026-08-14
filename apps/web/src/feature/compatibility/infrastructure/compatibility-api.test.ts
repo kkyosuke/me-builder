@@ -69,6 +69,18 @@ describe("fetchCompatibilityShareConsent", () => {
     );
   });
 
+  it("選んだ関係カテゴリをquery parameterで送る", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(Response.json(consent));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchCompatibilityShareConsent("https://api.example.com", "id-token", "family");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.example.com/api/compatibility/share-consent?relationshipCategory=family",
+      expect.objectContaining({ headers: { Authorization: "Bearer id-token" } }),
+    );
+  });
+
   it("契約外の共有可否を受け入れない", async () => {
     vi.stubGlobal(
       "fetch",
@@ -94,28 +106,35 @@ describe("fetchCompatibilityShareConsent", () => {
 describe("issueCompatibilityInvitation", () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it("リクエスト本文を送らず、発行したURLを受け取る", async () => {
+  it("選んだ関係カテゴリを送り、発行したURLを受け取る", async () => {
     const invitation = {
       invitationUrl: `https://example.com/compatibility/invitations/${"1".repeat(64)}`,
       expiresAt: "2026-08-26T00:00:00.000Z",
+      relationshipCategory: "family",
     };
     const fetchMock = vi.fn().mockResolvedValue(Response.json(invitation, { status: 201 }));
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(
-      issueCompatibilityInvitation("https://api.example.com", "id-token"),
+      issueCompatibilityInvitation("https://api.example.com", "id-token", "family"),
     ).resolves.toEqual(invitation);
     expect(fetchMock).toHaveBeenCalledWith(
       "https://api.example.com/api/compatibility/invitations",
-      expect.objectContaining({ method: "POST", headers: { Authorization: "Bearer id-token" } }),
+      expect.objectContaining({
+        method: "POST",
+        headers: {
+          Authorization: "Bearer id-token",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ relationshipCategory: "family" }),
+      }),
     );
-    expect(fetchMock.mock.calls[0]?.[1]).not.toHaveProperty("body");
   });
 
   it("共有を開始できない競合を利用者向けメッセージへ変換する", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 409 })));
 
-    await expect(issueCompatibilityInvitation(undefined, "id-token")).rejects.toThrow(
+    await expect(issueCompatibilityInvitation(undefined, "id-token", "partner")).rejects.toThrow(
       "いまは共有を始められません",
     );
   });
@@ -127,6 +146,7 @@ describe("fetchCompatibilityInvitation", () => {
   it("認証付きで関係IDの招待内容を取得する", async () => {
     const relationshipId = "1".repeat(64);
     const invitation = {
+      relationshipCategory: "friend",
       inviter: {
         displayName: "あおい",
         avatarUrl: `/api/compatibility/invitations/${relationshipId}/avatar`,
@@ -188,6 +208,7 @@ describe("compatibility relationship APIs", () => {
       items: [
         {
           relationshipId,
+          relationshipCategory: "work",
           status: "pending",
           expiresAt: "2026-08-26T00:00:00.000Z",
           invitationUrl: `https://liff.line.me/test/compatibility/invitations/${relationshipId}`,
@@ -226,6 +247,7 @@ describe("compatibility relationship APIs", () => {
     const relationshipId = "3".repeat(64);
     const data = {
       relationshipId,
+      relationshipCategory: "partner",
       status: "ready",
       partner: { displayName: "あおい", ...shareContent },
       viewer: { displayName: "はる", ...shareContent },

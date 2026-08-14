@@ -2,6 +2,7 @@ import {
   type AccountDataNamespace,
   type CompatibilityDataNamespace,
   type CompatibilityInvitationPreview,
+  type CompatibilityRelationshipCategory,
   type D1,
   compatibilityDataFor,
   compatibilityRelationshipId,
@@ -13,6 +14,7 @@ type CompatibilityInvitationBlockingReason = "display_name_unavailable";
 
 /** 受信者が承諾前に見るのは、招待者が誰かと自分が共有を始められるかだけ。 */
 type CompatibilityInvitationContents = Readonly<{
+  relationshipCategory: CompatibilityRelationshipCategory;
   inviter: Readonly<{ displayName: string; avatarUrl: string | null }>;
   recipient: Readonly<{ displayName: string | null; avatarUrl: string | null }>;
   expiresAt: string;
@@ -56,6 +58,7 @@ type CompatibilityInvitationRecipientOutcome =
       inviteeAccountId: string;
       inviteeDisplayName: string | null;
       inviterDisplayName: string;
+      relationshipCategory: CompatibilityRelationshipCategory;
       expiresAt: Date;
     }
   | Exclude<CompatibilityInvitationPreviewOutcome, { type: "resolved" }>;
@@ -89,6 +92,7 @@ async function resolveCompatibilityInvitationRecipient(
     inviteeAccountId: session.session.accountId,
     inviteeDisplayName: session.session.displayName?.trim() || null,
     inviterDisplayName: preview.inviterDisplayName,
+    relationshipCategory: preview.relationshipCategory,
     expiresAt: preview.expiresAt,
   };
 }
@@ -107,6 +111,7 @@ export async function getCompatibilityInvitationContents(
     verifiedDisplayName: recipient.inviteeDisplayName ?? undefined,
     accountData: params.accountData,
     at: params.at ?? new Date(),
+    relationshipCategory: recipient.relationshipCategory,
   });
   const blockingReasons: CompatibilityInvitationBlockingReason[] =
     recipient.inviteeDisplayName === null ? ["display_name_unavailable"] : [];
@@ -114,6 +119,7 @@ export async function getCompatibilityInvitationContents(
   return {
     type: "resolved",
     invitation: {
+      relationshipCategory: recipient.relationshipCategory,
       inviter: {
         displayName: recipient.inviterDisplayName,
         avatarUrl: `/api/compatibility/invitations/${encodeURIComponent(params.relationshipId)}/avatar`,

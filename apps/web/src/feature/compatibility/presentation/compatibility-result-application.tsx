@@ -1,4 +1,8 @@
 import { AlertCircle, RefreshCw } from "lucide-react";
+import {
+  getRelationshipCategoryBadgeClassName,
+  getRelationshipCategoryLabel,
+} from "../../diagnosis/model/relationship-category";
 import { useLiffSession } from "../../liff";
 import { toCompatibilityPerson } from "../model/compatibility-relationship-view";
 import { CompatibilityResultScreen } from "./compatibility-result-screen";
@@ -75,6 +79,11 @@ export default function CompatibilityResultApplication({
       <main className="mx-auto min-h-dvh w-full max-w-2xl px-4 py-6 sm:px-8">
         <CompatibilityBackHeader />
         <section className="mt-8 rounded-3xl border border-amber-300 bg-amber-50 p-6 dark:bg-amber-950/30">
+          <p
+            className={`mb-3 w-fit rounded-full px-3 py-1.5 text-sm font-bold ${getRelationshipCategoryBadgeClassName(relationship.state.data.relationshipCategory)}`}
+          >
+            {getRelationshipCategoryLabel(relationship.state.data.relationshipCategory)}
+          </p>
           <h1 className="text-xl font-bold">{waiting.title}</h1>
           <p className="mt-2 text-sm">{waiting.message}</p>
           <a
@@ -92,6 +101,7 @@ export default function CompatibilityResultApplication({
     <CompatibilityResultScreen
       me={toCompatibilityPerson(relationship.state.data.viewer, "sky")}
       partner={toCompatibilityPerson(relationship.state.data.partner, "violet")}
+      relationshipCategory={relationship.state.data.relationshipCategory}
       endingState={relationship.ending}
       onEnd={() => void relationship.end()}
     />

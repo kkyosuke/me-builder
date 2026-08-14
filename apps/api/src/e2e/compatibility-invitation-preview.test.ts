@@ -115,11 +115,22 @@ async function issueInvitationForInviter(): Promise<string> {
   expect(await consentResponse.json()).toMatchObject({ canShare: true });
   const issueResponse = await app.request(
     "/api/compatibility/invitations",
-    { method: "POST", headers: { Authorization: "Bearer inviter-token" } },
+    {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer inviter-token",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ relationshipCategory: "partner" }),
+    },
     env(),
   );
   expect(issueResponse.status).toBe(201);
-  const issued = (await issueResponse.json()) as { invitationUrl: string };
+  const issued = (await issueResponse.json()) as {
+    invitationUrl: string;
+    relationshipCategory: string;
+  };
+  expect(issued.relationshipCategory).toBe("partner");
   expect(issued.invitationUrl).toMatch(
     /^https:\/\/liff\.line\.me\/1234567890-testliff\/compatibility\/invitations\/[a-f0-9]{64}$/,
   );
@@ -284,6 +295,7 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
       expect(previewResponse.status).toBe(200);
       const preview = await previewResponse.json();
       expect(preview).toEqual({
+        relationshipCategory: "partner",
         inviter: {
           displayName: "あおい",
           avatarUrl: `/api/compatibility/invitations/${relationshipId}/avatar`,
@@ -332,6 +344,7 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
       );
       expect(previewResponse.status).toBe(200);
       expect(await previewResponse.json()).toMatchObject({
+        relationshipCategory: "partner",
         canAccept: true,
         blockingReasons: [],
         nextAction: "profile-summary",
@@ -354,6 +367,7 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
       expect(await waitingResponse.json()).toEqual({
         relationshipId,
         status: "waiting",
+        relationshipCategory: "partner",
         nextAction: "profile-summary",
       });
 
@@ -369,6 +383,7 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
       expect(readyResponse.status).toBe(200);
       expect(await readyResponse.json()).toMatchObject({
         status: "ready",
+        relationshipCategory: "partner",
         partner: { displayName: "あおい" },
         viewer: { displayName: "はる" },
       });
@@ -395,6 +410,7 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
           expect.objectContaining({
             relationshipId,
             status: "pending",
+            relationshipCategory: "partner",
             invitationUrl: `https://liff.line.me/1234567890-testliff/compatibility/invitations/${relationshipId}`,
           }),
         ],
@@ -438,6 +454,7 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
         expect(detailResponse.status).toBe(200);
         const detail = (await detailResponse.json()) as {
           status: string;
+          relationshipCategory: string;
           partner: {
             displayName: string;
             aboutMe: { statements: { statement: string }[] };
@@ -452,6 +469,7 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
         const partnerRole = role === "inviter" ? "recipient" : "inviter";
         expect(detail).toMatchObject({
           status: "ready",
+          relationshipCategory: "partner",
           partner: { displayName: participants[partnerRole].name },
           viewer: { displayName: participants[role].name },
         });
@@ -475,6 +493,7 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
             {
               relationshipId,
               status: "accepted",
+              relationshipCategory: "partner",
               partnerDisplayName: participants[partnerRole].name,
             },
           ],

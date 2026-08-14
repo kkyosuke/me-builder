@@ -84,6 +84,7 @@ describe("getCompatibilityRelationshipContents", () => {
       inviteeAccountId: "account-invitee",
       inviterDisplayName: "あおい",
       inviteeDisplayName: "はる",
+      relationshipCategory: "friend",
       status: "accepted",
     });
   });
@@ -96,11 +97,20 @@ describe("getCompatibilityRelationshipContents", () => {
     await expect(getCompatibilityRelationshipContents(params)).resolves.toMatchObject({
       type: "resolved",
       relationship: {
+        relationshipCategory: "friend",
         status: "ready",
         partner: { displayName: "はる", themes: [{ diagnosisId: "shared" }] },
         viewer: { displayName: "あおい", themes: [{ diagnosisId: "shared" }] },
       },
     });
+    expect(mocks.loadSharePreviewData).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ relationshipCategory: "friend" }),
+    );
+    expect(mocks.loadSharePreviewData).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ relationshipCategory: "friend" }),
+    );
   });
 
   it("片方で表示できないテーマは比較に使わず、回答できる診断が残っていれば案内する", async () => {
@@ -111,7 +121,12 @@ describe("getCompatibilityRelationshipContents", () => {
 
     await expect(getCompatibilityRelationshipContents(params)).resolves.toEqual({
       type: "resolved",
-      relationship: { relationshipId, status: "waiting", nextAction: "diagnosis" },
+      relationship: {
+        relationshipId,
+        relationshipCategory: "friend",
+        status: "waiting",
+        nextAction: "diagnosis",
+      },
     });
   });
 
@@ -128,7 +143,12 @@ describe("getCompatibilityRelationshipContents", () => {
 
     await expect(getCompatibilityRelationshipContents(params)).resolves.toEqual({
       type: "resolved",
-      relationship: { relationshipId, status: "waiting", nextAction: null },
+      relationship: {
+        relationshipId,
+        relationshipCategory: "friend",
+        status: "waiting",
+        nextAction: null,
+      },
     });
   });
 
@@ -141,7 +161,12 @@ describe("getCompatibilityRelationshipContents", () => {
 
     await expect(getCompatibilityRelationshipContents(params)).resolves.toEqual({
       type: "resolved",
-      relationship: { relationshipId, status: "waiting", nextAction: "profile-summary" },
+      relationship: {
+        relationshipId,
+        relationshipCategory: "friend",
+        status: "waiting",
+        nextAction: "profile-summary",
+      },
     });
   });
 
@@ -154,7 +179,12 @@ describe("getCompatibilityRelationshipContents", () => {
 
     await expect(getCompatibilityRelationshipContents(params)).resolves.toEqual({
       type: "resolved",
-      relationship: { relationshipId, status: "waiting", nextAction: null },
+      relationship: {
+        relationshipId,
+        relationshipCategory: "friend",
+        status: "waiting",
+        nextAction: null,
+      },
     });
   });
 

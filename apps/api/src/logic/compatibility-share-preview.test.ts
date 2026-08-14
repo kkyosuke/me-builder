@@ -121,6 +121,39 @@ describe("getCompatibilityShareConsent", () => {
     });
   });
 
+  it("選択した関係カテゴリとgeneralだけで次の案内を判定する", async () => {
+    const result = await getCompatibilityShareConsent(
+      {
+        idToken: "id-token",
+        lineLoginChannelId: "channel-id",
+        db,
+        relationshipCategory: "family",
+        at,
+      },
+      {
+        createSession: vi.fn().mockResolvedValue({
+          type: "resolved",
+          session: { accountId: "account-1", role: "user", displayName: "あおい" },
+        }),
+        getPreviewSource: vi.fn().mockResolvedValue({
+          diagnoses: [
+            {
+              id: "work-open",
+              relationshipCategory: "work",
+              availability: "open",
+              responseStatus: "unanswered",
+            },
+          ],
+          answeredDiagnoses: [],
+        }),
+        getShareProfile: vi.fn().mockResolvedValue(availableShareProfile),
+        scoreAnswers: vi.fn(),
+      },
+    );
+
+    expect(result).toMatchObject({ consent: { nextAction: null } });
+  });
+
   it("表示名を確認できない場合だけ共有を開始できない", async () => {
     const result = await getCompatibilityShareConsent(
       { idToken: "id-token", lineLoginChannelId: "channel-id", db, at },
@@ -269,18 +302,39 @@ describe("loadCompatibilitySharePreviewData", () => {
     expect(data.nextAction).toBeNull();
   });
 
-  it("招待に関係カテゴリを保存するまではpartnerとgeneral以外を共有対象にしない", async () => {
-    const scoreAnswers = vi.fn();
+  it("選択した関係カテゴリとgeneral以外を共有対象にしない", async () => {
+    const scoreAnswers = vi.fn().mockReturnValue({
+      scoringVersion: 1,
+      balancedLabel: "状況に応じて決めたい",
+      parameters: [
+        {
+          id: "planning",
+          label: "予定を決めるタイミング",
+          lowLabel: "その場で決めたい",
+          highLabel: "早めに決めたい",
+          score: 78,
+          coverage: 100,
+          band: "high",
+        },
+      ],
+    });
     const data = await loadCompatibilitySharePreviewData(
       {
         accountId: "account-1",
         verifiedDisplayName: "あおい",
         accountData: undefined,
         at,
+        relationshipCategory: "partner",
       },
       {
         getPreviewSource: vi.fn().mockResolvedValue({
           diagnoses: [
+            {
+              id: "partner-open",
+              relationshipCategory: "partner",
+              availability: "open",
+              responseStatus: "unanswered",
+            },
             {
               id: "work-open",
               relationshipCategory: "work",
@@ -289,6 +343,20 @@ describe("loadCompatibilitySharePreviewData", () => {
             },
           ],
           answeredDiagnoses: [
+            {
+              id: "partner-answered",
+              title: "パートナーとの会話",
+              relationshipCategory: "partner",
+              answers: [],
+              scoringConfig: { id: "config-partner" },
+            },
+            {
+              id: "general-answered",
+              title: "人間関係全般",
+              relationshipCategory: "general",
+              answers: [],
+              scoringConfig: { id: "config-general" },
+            },
             {
               id: "work-answered",
               title: "仕事での会話",
@@ -303,9 +371,12 @@ describe("loadCompatibilitySharePreviewData", () => {
       },
     );
 
-    expect(data.themes).toEqual([]);
-    expect(data.hasAnswerableDiagnosis).toBe(false);
+    expect(data.themes.map(({ diagnosisId }) => diagnosisId)).toEqual([
+      "partner-answered",
+      "general-answered",
+    ]);
+    expect(data.hasAnswerableDiagnosis).toBe(true);
     expect(data.nextAction).toBeNull();
-    expect(scoreAnswers).not.toHaveBeenCalled();
+    expect(scoreAnswers).toHaveBeenCalledTimes(2);
   });
 });

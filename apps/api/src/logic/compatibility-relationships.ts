@@ -1,6 +1,7 @@
 import {
   type AccountDataNamespace,
   type CompatibilityDataNamespace,
+  type CompatibilityRelationship,
   type D1,
   accountDataFor,
   compatibilityDataFor,
@@ -11,12 +12,14 @@ import { createLiffSession } from "./liff-session";
 type CompatibilityRelationshipListItem =
   | Readonly<{
       relationshipId: string;
+      relationshipCategory: CompatibilityRelationship["relationshipCategory"];
       status: "pending";
       expiresAt: string;
       invitationUrl: string;
     }>
   | Readonly<{
       relationshipId: string;
+      relationshipCategory: CompatibilityRelationship["relationshipCategory"];
       status: "accepted";
       partnerDisplayName: string;
     }>;
@@ -59,6 +62,7 @@ export async function listCompatibilityRelationships({
         return preview
           ? {
               relationshipId: reference.relationshipId,
+              relationshipCategory: preview.relationshipCategory,
               status: "pending",
               expiresAt: preview.expiresAt.toISOString(),
               invitationUrl: createCompatibilityInvitationUrl(liffId, reference.relationshipId),
@@ -74,6 +78,7 @@ export async function listCompatibilityRelationships({
       return partnerDisplayName
         ? {
             relationshipId: reference.relationshipId,
+            relationshipCategory: relationship.relationshipCategory,
             status: "accepted",
             partnerDisplayName,
           }

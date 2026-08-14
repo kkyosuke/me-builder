@@ -1,3 +1,4 @@
+import type { CompatibilityRelationshipCategory } from "@me-builder/lib/compatibility";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { config } from "../../../../config";
 import type { AsyncState } from "../../../../model/async-state";
@@ -14,32 +15,36 @@ export function useCompatibilityInvitationIssue({
 
   useEffect(() => () => request.current?.abort(), []);
 
-  const issue = useCallback(async () => {
-    if (request.current) return;
-    const controller = new AbortController();
-    request.current = controller;
-    setState({ status: "loading" });
-    try {
-      const idToken = await acquireIdToken(controller.signal);
-      if (controller.signal.aborted) return;
-      if (!idToken) throw new Error("LINEから相性共有画面を開いてください。");
-      const invitation = await issueCompatibilityInvitation(
-        config.apiUrl,
-        idToken,
-        controller.signal,
-      );
-      if (!controller.signal.aborted) setState({ status: "success", data: invitation });
-    } catch (error) {
-      if (!controller.signal.aborted) {
-        setState({
-          status: "error",
-          message: error instanceof Error ? error.message : "招待リンクを発行できませんでした。",
-        });
+  const issue = useCallback(
+    async (relationshipCategory: CompatibilityRelationshipCategory) => {
+      if (request.current) return;
+      const controller = new AbortController();
+      request.current = controller;
+      setState({ status: "loading" });
+      try {
+        const idToken = await acquireIdToken(controller.signal);
+        if (controller.signal.aborted) return;
+        if (!idToken) throw new Error("LINEから相性共有画面を開いてください。");
+        const invitation = await issueCompatibilityInvitation(
+          config.apiUrl,
+          idToken,
+          relationshipCategory,
+          controller.signal,
+        );
+        if (!controller.signal.aborted) setState({ status: "success", data: invitation });
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          setState({
+            status: "error",
+            message: error instanceof Error ? error.message : "招待リンクを発行できませんでした。",
+          });
+        }
+      } finally {
+        if (request.current === controller) request.current = null;
       }
-    } finally {
-      if (request.current === controller) request.current = null;
-    }
-  }, [acquireIdToken]);
+    },
+    [acquireIdToken],
+  );
 
   return { state, issue };
 }

@@ -5,6 +5,8 @@ import * as v from "valibot";
 import { getConfig } from "../config";
 import {
   CompatibilityInvitationConflictSchema,
+  InvalidCompatibilityInvitationRequestSchema,
+  IssueCompatibilityInvitationRequestSchema,
   IssueCompatibilityInvitationResponseSchema,
 } from "../contract/compatibility/invitation";
 import {
@@ -21,7 +23,11 @@ import {
   CompatibilityRelationshipUnavailableSchema,
 } from "../contract/compatibility/relationship";
 import { CompatibilityRelationshipsResponseSchema } from "../contract/compatibility/relationships";
-import { CompatibilityShareConsentResponseSchema } from "../contract/compatibility/share-consent";
+import {
+  CompatibilityShareConsentQuerySchema,
+  CompatibilityShareConsentResponseSchema,
+  InvalidCompatibilityShareConsentRequestSchema,
+} from "../contract/compatibility/share-consent";
 import {
   AccountNotFoundErrorSchema,
   ServiceUnavailableErrorSchema,
@@ -49,11 +55,24 @@ export async function getCompatibilityShareConsentContents(c: Context<AppEnv>): 
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   }
 
+  const parsed = v.safeParse(CompatibilityShareConsentQuerySchema, {
+    relationshipCategory: c.req.query("relationshipCategory"),
+  });
+  if (!parsed.success) {
+    return c.json(
+      v.parse(InvalidCompatibilityShareConsentRequestSchema, { error: "Invalid request" }),
+      400,
+    );
+  }
+
   const outcome = await getCompatibilityShareConsent({
     idToken: bearerToken(c.req.header("authorization")),
     lineLoginChannelId: getConfig(c.env).lineLoginChannelId,
     db: D1.shared.client.create(c.env.DB),
     accountData: c.env.ACCOUNT_DATA,
+    ...(parsed.output.relationshipCategory
+      ? { relationshipCategory: parsed.output.relationshipCategory }
+      : {}),
   });
 
   switch (outcome.type) {
@@ -90,7 +109,25 @@ export async function postCompatibilityInvitation(c: Context<AppEnv>): Promise<R
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   }
 
+  let input: unknown;
+  try {
+    input = await c.req.json();
+  } catch {
+    return c.json(
+      v.parse(InvalidCompatibilityInvitationRequestSchema, { error: "Invalid request" }),
+      400,
+    );
+  }
+  const parsed = v.safeParse(IssueCompatibilityInvitationRequestSchema, input);
+  if (!parsed.success) {
+    return c.json(
+      v.parse(InvalidCompatibilityInvitationRequestSchema, { error: "Invalid request" }),
+      400,
+    );
+  }
+
   const outcome = await issueCompatibilityInvitation({
+    relationshipCategory: parsed.output.relationshipCategory,
     idToken: bearerToken(c.req.header("authorization")),
     liff: {
       liffId: currentConfig.liffId,

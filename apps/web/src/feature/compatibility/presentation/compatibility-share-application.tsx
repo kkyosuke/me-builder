@@ -1,3 +1,4 @@
+import type { CompatibilityRelationshipCategory } from "@me-builder/lib/compatibility";
 import { useRef, useState } from "react";
 import { useLiffSession } from "../../liff";
 import {
@@ -10,12 +11,16 @@ import { useCompatibilityShareConsent } from "./hooks/use-compatibility-share-co
 
 export default function CompatibilityShareApplication() {
   const { acquireIdToken } = useLiffSession();
-  const { state, reload } = useCompatibilityShareConsent({ acquireIdToken });
+  const [relationshipCategory, setRelationshipCategory] =
+    useState<CompatibilityRelationshipCategory | null>(null);
+  const { state, reload } = useCompatibilityShareConsent({
+    acquireIdToken,
+    relationshipCategory,
+  });
   const invitation = useCompatibilityInvitationIssue({ acquireIdToken });
   const sharing = useRef(false);
   const [isSharing, setIsSharing] = useState(false);
   const [sharingMessage, setSharingMessage] = useState<string | null>(null);
-
   const shareToLine = async (url: string) => {
     if (sharing.current) return;
     sharing.current = true;
@@ -58,7 +63,11 @@ export default function CompatibilityShareApplication() {
       invitationState={invitation.state}
       isSharing={isSharing}
       sharingMessage={sharingMessage}
-      onIssue={() => void invitation.issue()}
+      relationshipCategory={relationshipCategory}
+      onRelationshipCategoryChange={setRelationshipCategory}
+      onIssue={() => {
+        if (relationshipCategory) void invitation.issue(relationshipCategory);
+      }}
       onRetry={() => void reload()}
       onShareToLine={(url) => void shareToLine(url)}
       onCopyLink={(url) => void copyLink(url)}

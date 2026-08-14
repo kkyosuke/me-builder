@@ -1,6 +1,11 @@
+import type { CompatibilityRelationshipCategory } from "@me-builder/lib/compatibility";
 import { LoaderCircle, ShieldCheck } from "lucide-react";
 import { useEffect, useRef } from "react";
 import type { AsyncState } from "../../../model/async-state";
+import {
+  getRelationshipCategoryBadgeClassName,
+  getRelationshipCategoryLabel,
+} from "../../diagnosis/model/relationship-category";
 import type { CompatibilityPerson } from "../model/compatibility";
 import {
   CompatibilityPairSheet,
@@ -13,11 +18,13 @@ import { useCompatibilitySectionSwipe } from "./hooks/use-compatibility-section-
 export function CompatibilityResultScreen({
   me,
   partner,
+  relationshipCategory,
   endingState = { status: "idle" },
   onEnd = () => undefined,
 }: {
   me: CompatibilityPerson;
   partner: CompatibilityPerson;
+  relationshipCategory: CompatibilityRelationshipCategory;
   endingState?: AsyncState<null>;
   onEnd?: () => void;
 }) {
@@ -73,6 +80,11 @@ export function CompatibilityResultScreen({
       </div>
       <p className="mt-5 text-sm font-semibold tracking-wider text-rose-700 dark:text-rose-300">
         {partner.name}さん × わたし
+      </p>
+      <p
+        className={`mt-2 w-fit rounded-full px-3 py-1.5 text-sm font-bold ${getRelationshipCategoryBadgeClassName(relationshipCategory)}`}
+      >
+        {getRelationshipCategoryLabel(relationshipCategory)}
       </p>
       <h1 className="mt-1 text-3xl font-bold text-slate-950 dark:text-slate-50">2人の相性シート</h1>
       <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-400">

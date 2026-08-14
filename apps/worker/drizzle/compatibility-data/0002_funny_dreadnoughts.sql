@@ -1,0 +1,1 @@
+ALTER TABLE `compatibility_relationships` ADD `relationship_category` text NOT NULL;

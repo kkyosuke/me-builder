@@ -17,7 +17,10 @@ import {
   resetAllDevelopmentBrainVectorSyncJobsRoute,
   resetDevelopmentBrainVectorSyncJobRoute,
 } from "./contract/brain/dev-vector-sync-jobs";
-import { issueCompatibilityInvitationRoute } from "./contract/compatibility/invitation";
+import {
+  issueCompatibilityInvitationRequestValidator,
+  issueCompatibilityInvitationRoute,
+} from "./contract/compatibility/invitation";
 import { acceptCompatibilityInvitationRoute } from "./contract/compatibility/invitation-accept";
 import { compatibilityInvitationAvatarRoute } from "./contract/compatibility/invitation-avatar";
 import { compatibilityInvitationCancelRoute } from "./contract/compatibility/invitation-cancel";
@@ -177,6 +180,7 @@ app.post(
 app.post(
   "/api/compatibility/invitations",
   issueCompatibilityInvitationRoute,
+  issueCompatibilityInvitationRequestValidator,
   postCompatibilityInvitation,
 );
 app.get(
