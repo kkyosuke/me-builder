@@ -1,6 +1,7 @@
 import {
   type ConversationContextMessage,
   type DiaryBrainCategory,
+  type PromptContext,
   accountDataFor,
   buildDiaryTemporalSearchText,
   resolveDiaryTemporalContext,
@@ -37,6 +38,7 @@ export type DiaryBrainDedupCandidate = Readonly<{
   category: DiaryBrainCategory;
   statement: string;
   sourceMessageIds: readonly string[];
+  promptContext?: PromptContext;
 }>;
 
 export type DiaryBrainDedupDecision = Readonly<{

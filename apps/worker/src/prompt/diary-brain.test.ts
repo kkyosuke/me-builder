@@ -10,6 +10,12 @@ describe("diary Brain prompt", () => {
   });
 
   it("追跡可能なprompt versionを持つ", () => {
-    expect(DIARY_BRAIN_PROMPT_VERSION).toMatch(/^diary-brain-v\d+$/u);
+    expect(DIARY_BRAIN_PROMPT_VERSION).toBe("diary-brain-v3");
+  });
+
+  it("属性マスタと明言のみ保存する境界を含む", () => {
+    expect(DIARY_BRAIN_SYSTEM_PROMPT).toContain("occupation (identity)");
+    expect(DIARY_BRAIN_SYSTEM_PROMPT).toContain("職業から勤務形態など別属性を補完しない");
+    expect(DIARY_BRAIN_SYSTEM_PROMPT).toContain("本人が明言した独立した命題だけを候補");
   });
 });

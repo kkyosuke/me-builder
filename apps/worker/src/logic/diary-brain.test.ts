@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { getWorkerConfig } from "../config";
 import {
   buildDevelopmentBrainItemMessage,
+  createDiaryBrainResponseJsonSchema,
   generateDiaryBrainCandidates,
   validateDiaryBrainCandidates,
 } from "./diary-brain";
@@ -22,6 +23,10 @@ describe("diary Brain checkpoint", () => {
       sequence: 2,
     },
   ];
+
+  it("属性schemaをGeminiへ渡すJSON Schemaへ変換できる", () => {
+    expect(createDiaryBrainResponseJsonSchema()).toMatchObject({ type: "object" });
+  });
 
   it("checkpoint内の複数messageを根拠にしたMemory候補を受け入れる", () => {
     const raw = JSON.stringify({
@@ -110,6 +115,98 @@ describe("diary Brain checkpoint", () => {
         ),
       ).toEqual([candidate]);
     }
+  });
+
+  it("本人が明言した職業と週間リズムを別の声かけ属性として受け入れる", () => {
+    const attributeMessages = [
+      {
+        id: "occupation-message",
+        role: "user" as const,
+        body: "看護師なの",
+        sequence: 1,
+      },
+      {
+        id: "rhythm-message",
+        role: "user" as const,
+        body: "休みはシフトで変わるよ",
+        sequence: 2,
+      },
+    ];
+    const candidates = [
+      {
+        category: "identity",
+        statement: "看護師なの",
+        source_message_ids: ["occupation-message"],
+        is_inference: false,
+        prompt_context: { kind: "occupation", occupation: "看護師" },
+      },
+      {
+        category: "behavior_pattern",
+        statement: "休みはシフトで変わるよ",
+        source_message_ids: ["rhythm-message"],
+        is_inference: false,
+        prompt_context: { kind: "weekly_rhythm", scheduleMode: "variable_shift" },
+      },
+    ] as const;
+
+    expect(
+      validateDiaryBrainCandidates(
+        JSON.stringify({ brain_item_candidates: candidates }),
+        attributeMessages,
+        attributeMessages.map(({ id }) => id),
+      ),
+    ).toEqual(candidates);
+  });
+
+  it("本人が明言していない声かけ属性を候補単位で破棄する", () => {
+    const log = vi.spyOn(logger, "error").mockImplementation(() => undefined);
+    const raw = JSON.stringify({
+      brain_item_candidates: [
+        {
+          category: "behavior_pattern",
+          statement: "看護師なの",
+          source_message_ids: ["occupation-message"],
+          is_inference: false,
+          prompt_context: { kind: "weekly_rhythm", scheduleMode: "variable_shift" },
+        },
+      ],
+    });
+
+    expect(
+      validateDiaryBrainCandidates(
+        raw,
+        [{ id: "occupation-message", role: "user", body: "看護師なの", sequence: 1 }],
+        ["occupation-message"],
+      ),
+    ).toEqual([]);
+    expect(log).toHaveBeenCalledWith(
+      { candidateIndex: 0, validationReason: "ungrounded_prompt_context" },
+      "Skipped invalid Diary Brain candidate",
+    );
+    log.mockRestore();
+  });
+
+  it("occupation属性のないidentity候補を破棄する", () => {
+    const log = vi.spyOn(logger, "error").mockImplementation(() => undefined);
+    const candidate = {
+      category: "identity",
+      statement: "看護師なの",
+      source_message_ids: ["occupation-message"],
+      is_inference: false,
+    } as const;
+
+    expect(
+      validateDiaryBrainCandidates(
+        JSON.stringify({ brain_item_candidates: [candidate] }),
+        [{ id: "occupation-message", role: "user", body: "看護師なの", sequence: 1 }],
+        ["occupation-message"],
+      ),
+    ).toEqual([]);
+    expect(log).toHaveBeenCalledWith(
+      { candidateIndex: 0, validationReason: "identity_without_occupation" },
+      "Skipped invalid Diary Brain candidate",
+    );
+    log.mockRestore();
   });
 
   it("checkpoint外のmessageを参照する候補だけをlog付きで破棄する", () => {

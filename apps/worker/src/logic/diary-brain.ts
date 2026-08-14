@@ -1,4 +1,8 @@
-import { DIARY_BRAIN_CATEGORIES } from "@me-builder/lib";
+import {
+  DIARY_BRAIN_CATEGORIES,
+  PromptContextSchema,
+  isPromptContextGrounded,
+} from "@me-builder/lib";
 import type { ConversationContextMessage, DiaryBrainCategory } from "@me-builder/lib";
 import { logger } from "@me-builder/shared";
 import { toJsonSchema } from "@valibot/to-json-schema";
@@ -23,6 +27,7 @@ const CandidateSchema = v.strictObject({
     v.maxLength(20),
   ),
   is_inference: v.literal(false),
+  prompt_context: v.exactOptional(PromptContextSchema),
 });
 const ResponseSchema = v.strictObject({
   brain_item_candidates: v.pipe(v.array(CandidateSchema), v.maxLength(3)),
@@ -30,6 +35,10 @@ const ResponseSchema = v.strictObject({
 const ResponseEnvelopeSchema = v.strictObject({
   brain_item_candidates: v.pipe(v.array(v.unknown()), v.maxLength(3)),
 });
+
+export function createDiaryBrainResponseJsonSchema(): Record<string, unknown> {
+  return toJsonSchema(ResponseSchema) as Record<string, unknown>;
+}
 
 function normalizeEvidenceText(value: string): string {
   return value.normalize("NFKC").replace(/\s+/gu, " ").trim();
@@ -68,6 +77,17 @@ export function validateDiaryBrainCandidates(
     const statement = candidate.statement.trim();
     if (!statement) {
       logRejectedCandidate(candidateIndex, "empty_statement");
+      continue;
+    }
+    if (candidate.category === "identity" && candidate.prompt_context?.kind !== "occupation") {
+      logRejectedCandidate(candidateIndex, "identity_without_occupation");
+      continue;
+    }
+    if (
+      candidate.prompt_context &&
+      !isPromptContextGrounded(candidate.category, statement, candidate.prompt_context)
+    ) {
+      logRejectedCandidate(candidateIndex, "ungrounded_prompt_context");
       continue;
     }
     const unique = new Set(candidate.source_message_ids);
@@ -123,7 +143,7 @@ export async function generateDiaryBrainCandidates(
       messages: messages.map(({ id, role, body }) => ({ id, role, body })),
     },
   });
-  const schema = toJsonSchema(ResponseSchema) as Record<string, unknown>;
+  const schema = createDiaryBrainResponseJsonSchema();
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const raw = await generateStructuredText(client, {
       model: workerConfig.geminiModel,

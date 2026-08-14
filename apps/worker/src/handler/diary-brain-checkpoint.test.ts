@@ -65,10 +65,16 @@ describe("processDiaryBrainCheckpointMessage", () => {
       body: "辛い食べ物が苦手",
       receivedAt: new Date(receivedAt.getTime() + 1_000),
     });
+    const third = await DO.account.action.diary.storeLineTextSource(db, {
+      accountId,
+      eventId: "event-3",
+      body: "看護師なの",
+      receivedAt: new Date(receivedAt.getTime() + 2_000),
+    });
     await DO.account.action.diary.attachMessagesToTurn(
       db,
       accountId,
-      [first, second],
+      [first, second, third],
       1,
       "test-model",
       "test-prompt",
@@ -86,7 +92,7 @@ describe("processDiaryBrainCheckpointMessage", () => {
       accountId,
       checkpointId,
     );
-    const [firstMessageId, secondMessageId] = context?.sourceMessageIds ?? [];
+    const [firstMessageId, secondMessageId, thirdMessageId] = context?.sourceMessageIds ?? [];
     generateDiaryBrainCandidates.mockResolvedValue([
       {
         category: "preference",
@@ -100,6 +106,13 @@ describe("processDiaryBrainCheckpointMessage", () => {
         source_message_ids: [secondMessageId],
         is_inference: false,
       },
+      {
+        category: "identity",
+        statement: "看護師なの",
+        source_message_ids: [thirdMessageId],
+        is_inference: false,
+        prompt_context: { kind: "occupation", occupation: "看護師" },
+      },
     ]);
     decideDiaryBrainDuplicates.mockResolvedValue([
       { deduplication: "none" },
@@ -108,6 +121,7 @@ describe("processDiaryBrainCheckpointMessage", () => {
         deduplication: "semantic",
         dedupPromptVersion: "brain-dedup-v2",
       },
+      { deduplication: "none" },
     ]);
 
     const execute = vi.fn(async (_accountId: string, operation: string, ...args: unknown[]) => {
@@ -162,9 +176,17 @@ describe("processDiaryBrainCheckpointMessage", () => {
         category: "preference",
         statement: "辛いものは あまり食べられない",
       }),
+      expect.objectContaining({
+        category: "identity",
+        statement: "看護師なの",
+        attributes: expect.objectContaining({
+          promptContext: { kind: "occupation", occupation: "看護師" },
+          promptContextPromptVersion: "diary-brain-v3",
+        }),
+      }),
     ]);
     await expect(db.select().from(DO.account.schema.brainItemEvidenceEdges)).resolves.toHaveLength(
-      2,
+      3,
     );
     await expect(db.select().from(DO.account.schema.diaryBrainCheckpointItems)).resolves.toEqual([
       expect.objectContaining({
@@ -172,6 +194,7 @@ describe("processDiaryBrainCheckpointMessage", () => {
         deduplication: "semantic",
         dedupPromptVersion: "brain-dedup-v2",
       }),
+      expect.objectContaining({ operation: "created", deduplication: "none" }),
     ]);
   });
 });

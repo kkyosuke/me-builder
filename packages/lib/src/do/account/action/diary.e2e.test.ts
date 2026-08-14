@@ -230,6 +230,23 @@ describe("Diary conversation persistence flow", () => {
         ],
       ),
     ).rejects.toThrow("evidence validation failed");
+    await expect(
+      applyDiaryBrainCheckpoint(
+        db,
+        account.id,
+        checkpoint?.id ?? "",
+        checkpointContext?.throughSequence ?? 0,
+        "diary-brain-test",
+        [
+          {
+            category: "behavior_pattern",
+            statement: "今日は少し疲れた",
+            sourceMessageIds: checkpointContext?.sourceMessageIds.slice(0, 1) ?? [],
+            promptContext: { kind: "weekly_rhythm", scheduleMode: "variable_shift" },
+          },
+        ],
+      ),
+    ).rejects.toThrow("Diary Brain candidate validation failed");
     await expect(db.select().from(schema.brainItems)).resolves.toHaveLength(0);
     expect(
       db
@@ -423,6 +440,101 @@ describe("Diary conversation persistence flow", () => {
         }),
       }),
     ]);
+  });
+
+  it("既存の同一Brain Itemへ声かけ属性と新しいEvidenceを追加する", async () => {
+    const db = createTestDb();
+    const account = await bindAccount(db, "account-diary_prompt-context-dedup");
+    const existingAt = new Date("2026-08-01T00:00:00Z");
+    const existingSource = await storeLineTextSource(db, {
+      accountId: account.id,
+      eventId: "prompt-context-existing-source",
+      body: "看護師なの",
+      receivedAt: existingAt,
+    });
+    await saveBrainItem(db, {
+      at: existingAt,
+      item: {
+        id: "existing-occupation",
+        accountId: account.id,
+        category: "identity",
+        statement: "看護師なの",
+        attributes: { sourceKind: "diary", isInference: false },
+        derivation: "ai",
+        status: "active",
+        stability: "changeable",
+        sensitivity: "normal",
+        externallyShareable: false,
+        confidence: { state: "uncomputed" },
+      },
+      evidence: [
+        {
+          id: "existing-occupation-evidence",
+          sourceRecordId: existingSource.sourceRecordId,
+          relation: "supports",
+          isDerivationTrigger: true,
+          derivationMethod: "ai",
+          generatedAt: existingAt,
+        },
+      ],
+      accessLabels: [
+        { id: "existing-occupation-access", label: "unclassified", assignedBy: "system" },
+      ],
+      topicLabels: [{ id: "existing-occupation-topic", label: "diary" }],
+    });
+
+    const receivedAt = new Date("2026-08-11T03:00:00Z");
+    const newSource = await storeLineTextSource(db, {
+      accountId: account.id,
+      eventId: "prompt-context-new-source",
+      body: "看護師なの",
+      receivedAt,
+    });
+    await attachMessagesToTurn(db, account.id, [newSource], 1, "test-model", "test-prompt");
+    const [checkpoint] = await db.select().from(schema.diaryBrainCheckpoints);
+    await claimDueDiaryBrainCheckpointIds(
+      db,
+      account.id,
+      new Date(receivedAt.getTime() + 11 * 60 * 1000),
+    );
+    await markDiaryBrainCheckpointDispatched(db, account.id, checkpoint?.id ?? "");
+    const context = await getDiaryBrainCheckpointContext(db, account.id, checkpoint?.id ?? "");
+
+    await expect(
+      applyDiaryBrainCheckpoint(
+        db,
+        account.id,
+        checkpoint?.id ?? "",
+        context?.throughSequence ?? 0,
+        "diary-brain-v3",
+        [
+          {
+            category: "identity",
+            statement: "看護師なの",
+            sourceMessageIds: context?.sourceMessageIds ?? [],
+            promptContext: { kind: "occupation", occupation: "看護師" },
+          },
+        ],
+        receivedAt,
+      ),
+    ).resolves.toMatchObject({
+      candidates: [{ operation: "evidence_added", deduplication: "exact" }],
+    });
+    expect(
+      db
+        .select({ attributes: schema.brainItems.attributes })
+        .from(schema.brainItems)
+        .where(eq(schema.brainItems.id, "existing-occupation"))
+        .get(),
+    ).toEqual({
+      attributes: {
+        sourceKind: "diary",
+        isInference: false,
+        promptContext: { kind: "occupation", occupation: "看護師" },
+        promptContextPromptVersion: "diary-brain-v3",
+      },
+    });
+    await expect(db.select().from(schema.brainItemEvidenceEdges)).resolves.toHaveLength(2);
   });
 
   it("意味的に同じ既存Itemへ新しいEvidenceだけを追加する", async () => {

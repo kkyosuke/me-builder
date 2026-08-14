@@ -3,6 +3,13 @@ import { and, asc, desc, eq, gte, inArray, isNull, lte, or, sql } from "drizzle-
 import type { BatchItem } from "drizzle-orm/batch";
 import type { AccountDataDatabase } from "../database";
 import {
+  type PromptContext,
+  arePromptContextsEqual,
+  isPromptContextGrounded,
+  parsePromptContext,
+  readPromptContext,
+} from "../prompt-context";
+import {
   accountDataIdentity,
   brainItemAccessLabels,
   brainItemEvidenceEdges,
@@ -34,6 +41,7 @@ const BRAIN_CHECKPOINT_HARD_CAP_MS = 30 * 60 * 1000;
 const BRAIN_CHECKPOINT_MAX_USER_MESSAGES = 10;
 const BRAIN_CHECKPOINT_MAX_USER_MESSAGE_CHARS = 5_000;
 export const DIARY_BRAIN_CATEGORIES = [
+  "identity",
   "memory",
   "behavior_pattern",
   "value_motivation",
@@ -44,6 +52,7 @@ export const DIARY_BRAIN_CATEGORIES = [
 export type DiaryBrainCategory = (typeof DIARY_BRAIN_CATEGORIES)[number];
 const DIARY_BRAIN_CATEGORY_SET = new Set<string>(DIARY_BRAIN_CATEGORIES);
 const DIARY_BRAIN_STABILITY: Record<DiaryBrainCategory, "temporary" | "changeable" | "stable"> = {
+  identity: "changeable",
   memory: "stable",
   behavior_pattern: "changeable",
   value_motivation: "changeable",
@@ -1032,6 +1041,7 @@ export async function getTurnContext(
 export type DiaryBrainCheckpointCandidate = Readonly<{
   category: DiaryBrainCategory;
   statement: string;
+  promptContext?: PromptContext;
   sourceMessageIds: readonly string[];
   evidenceStatements?: readonly Readonly<{
     sourceMessageId: string;
@@ -1334,6 +1344,9 @@ export async function applyDiaryBrainCheckpoint(
   const appliedCandidateIndexByItemId = new Map<string, number>();
   const groupedCandidates = new Map<string, DiaryBrainCheckpointCandidate>();
   for (const candidate of candidates) {
+    const promptContext = candidate.promptContext
+      ? parsePromptContext(candidate.promptContext)
+      : undefined;
     const messageIds = [...new Set(candidate.sourceMessageIds)];
     const evidenceStatements =
       candidate.evidenceStatements ??
@@ -1354,6 +1367,10 @@ export async function applyDiaryBrainCheckpoint(
     if (
       !DIARY_BRAIN_CATEGORY_SET.has(candidate.category) ||
       !candidate.statement.trim() ||
+      (candidate.promptContext && !promptContext) ||
+      (candidate.category === "identity" && promptContext?.kind !== "occupation") ||
+      (promptContext &&
+        !isPromptContextGrounded(candidate.category, candidate.statement, promptContext)) ||
       messageIds.length === 0 ||
       messageIds.length !== candidate.sourceMessageIds.length ||
       evidenceStatements.length !== messageIds.length ||
@@ -1369,15 +1386,26 @@ export async function applyDiaryBrainCheckpoint(
     if (!grouped) {
       groupedCandidates.set(key, {
         ...candidate,
+        ...(promptContext ? { promptContext } : {}),
         statement: candidate.statement.trim(),
         evidenceStatements,
       });
       continue;
     }
+    if (
+      grouped.promptContext &&
+      candidate.promptContext &&
+      !arePromptContextsEqual(grouped.promptContext, candidate.promptContext)
+    ) {
+      throw new Error("Diary Brain candidate prompt context conflict");
+    }
     const sameMatch = grouped.matchingBrainItemId === candidate.matchingBrainItemId;
     groupedCandidates.set(key, {
       category: grouped.category,
       statement: grouped.statement,
+      ...(grouped.promptContext || candidate.promptContext
+        ? { promptContext: grouped.promptContext ?? candidate.promptContext }
+        : {}),
       sourceMessageIds: [...new Set([...grouped.sourceMessageIds, ...messageIds])],
       evidenceStatements: [
         ...(grouped.evidenceStatements ?? []),
@@ -1544,6 +1572,40 @@ export async function applyDiaryBrainCheckpoint(
 
     if (matchedItem) {
       const brainItemId = matchedItem.id;
+      const existingPromptContext = readPromptContext(matchedItem.attributes);
+      if (
+        candidate.promptContext &&
+        existingPromptContext &&
+        !arePromptContextsEqual(candidate.promptContext, existingPromptContext)
+      ) {
+        throw new Error("Diary Brain matched prompt context conflict");
+      }
+      if (candidate.promptContext && !existingPromptContext) {
+        const existingAttributes =
+          matchedItem.attributes && typeof matchedItem.attributes === "object"
+            ? matchedItem.attributes
+            : {};
+        statements.push(
+          db
+            .update(brainItems)
+            .set({
+              attributes: {
+                ...existingAttributes,
+                promptContext: candidate.promptContext,
+                promptContextPromptVersion: promptVersion,
+              },
+              updatedAt: at,
+            })
+            .where(
+              and(
+                eq(brainItems.id, brainItemId),
+                eq(brainItems.accountId, accountId),
+                eq(brainItems.status, "active"),
+                eq(brainItems.isDeleted, false),
+              ),
+            ),
+        );
+      }
       statements.push(
         ...sources.map((source) =>
           db
@@ -1628,6 +1690,8 @@ export async function applyDiaryBrainCheckpoint(
           checkpointId,
           promptVersion,
           isInference: false,
+          ...(candidate.promptContext ? { promptContext: candidate.promptContext } : {}),
+          ...(candidate.promptContext ? { promptContextPromptVersion: promptVersion } : {}),
           ...(temporalContext ? { temporalContext } : {}),
         },
         derivation: "ai",

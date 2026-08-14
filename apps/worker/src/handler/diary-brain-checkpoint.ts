@@ -117,6 +117,7 @@ export async function processDiaryBrainCheckpointMessage(
       category: candidate.category,
       statement: candidate.statement,
       sourceMessageIds: candidate.source_message_ids,
+      ...(candidate.prompt_context ? { promptContext: candidate.prompt_context } : {}),
     })),
     messages: context.messages,
     accountId: message.body.accountId,
@@ -138,6 +139,7 @@ export async function processDiaryBrainCheckpointMessage(
       category: candidate.category,
       statement: candidate.statement,
       sourceMessageIds: candidate.source_message_ids,
+      ...(candidate.prompt_context ? { promptContext: candidate.prompt_context } : {}),
     })),
     deduplication,
   );
@@ -150,6 +152,7 @@ export async function processDiaryBrainCheckpointMessage(
       category: candidate.category,
       statement: candidate.statement,
       sourceMessageIds: candidate.sourceMessageIds,
+      ...(candidate.promptContext ? { promptContext: candidate.promptContext } : {}),
       evidenceStatements: candidate.evidenceStatements,
       ...(candidate.deduplication !== "none"
         ? {

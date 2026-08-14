@@ -377,6 +377,8 @@ Brain Itemを含むAccount所有データのquery境界は、[Accountデータ�
 
 `promptContext.kind`は、少なくとも`occupation`、`weekly_rhythm`、`recurring_schedule`、`rest_window`、`question_style`を区別します。具体的なJSON schemaはValibotをSSoTとし、自由なキーや未検証のモデル出力をそのまま保存しません。曜日は列挙値、時間は検証済みの時刻帯または生活上の区切りだけを許可します。
 
+保存対象の属性マスタと収集目標は`packages/lib/src/do/account/prompt-context.ts`をコード上のSSoTとします。属性マスタはkindごとに許可するBrain分類、優先度、構造化値のschemaを持ちます。収集目標は未取得項目の達成率ではなく、自然な会話で確認候補を選ぶための優先順と上限です。初期実装では高優先の5属性を対象とし、本人が明言した命題だけを既存の日記Brain Item抽出経路で保存します。既存Itemへ構造化属性を補う場合は、その属性を生成したprompt versionも別に記録します。未回答を再質問する制御と、保存した属性を声かけへ利用する処理は別の後続段階とします。
+
 取得時点を`attributes_json`へ重複保存しません。Brain Itemの`created_at`はItem作成時刻、`valid_from` / `valid_to`は命題の有効期間です。本人から最初と最後に得た時点は、activeな`supports` Evidenceが参照するSource Recordの記録時刻から`firstObservedAt` / `lastObservedAt`として導出します。この導出はAccountDataのBrain queryで実装済みです。同じ命題を再度得た場合はEvidenceを追加し、`created_at`を上書きせず`lastObservedAt`だけが新しくなります。
 
 職業や週間リズムが変わった場合は、古いItemの`attributes_json`を書き換えません。新しいSource Recordを根拠に新しいBrain Itemを作り、`brain_item_revisions`で旧Itemを`superseded`へ移します。これにより「いつ知ったか」と「いつ変わったか」を分けて追跡できます。
@@ -387,8 +389,8 @@ Brain Itemを含むAccount所有データのquery境界は、[Accountデータ�
 | --- | --- | --- |
 | Brain Item、Evidence、Valid Time | 実装済み | 既存構造を利用する |
 | `firstObservedAt` / `lastObservedAt` | Evidenceからの導出を実装済み | 声かけ候補取得でも返す |
-| 日記からの`identity`生成 | 未対応 | 候補category、prompt、Valibot schema、stability規則へ追加する |
-| `attributes.promptContext` | 未対応 | 種別ごとのschemaとEvidence整合検証を追加する |
+| 日記からの`identity`生成 | 実装済み | 本人が明言した現在の立場・職業だけを候補にする |
+| `attributes.promptContext` | 高優先5属性のschema、属性マスタ、収集目標、Evidence整合検証まで実装済み | 自然な確認質問と中・低優先属性は後続で追加する |
 | 曜日・本人情報からの声かけ候補取得 | 未対応 | active、Valid Time、Evidence、Access Policyを再検証して必要最小限を返す |
 | 時刻帯・声かけ方針の自動選択 | 未対応 | 本人の明言を優先し、本人自身の返信実績が不足する間は18時の標準候補へ戻す選択器を追加する。クライアントからAccount IDや選択結果を指定させない |
 | 18時の能動配信 | 曜日別一般文面、専用Queue、AccountDataの配送状態まで実装済み | 本人情報による時刻・文面調整は[日記チャット体験設計](../product/diary-chat-experience.md)の後続段階で追加する |
@@ -696,9 +698,9 @@ flowchart TD
 
 日記候補の入力、起動条件、検証、Brain Item登録、否定・修正、重複・改訂は[Brain Item生成設計 §7](../domain/brain/brain-item-generation-design.md#7-日記チャットからの生成)を正とします。
 
-Brain Item抽出は会話返信とは別のsystem prompt、prompt version、Valibot schemaを使います。AccountData alarmがBrain Checkpoint QueueへIDだけを送り、consumerが削除・撤回されていないuser messageを最大10件、各5,000文字まで読み直してGeminiへ渡します。Chat Turn Queueと物理的に分離するため、Brain変換のAI待ちや再配送は通常返信を待たせません。上限超過本文はSource Recordとして保持したまま変換対象から外します。本人が明言した命題は`memory`、`behavior_pattern`、`value_motivation`、`decision_system`、`preference`、`goal`の6分類から最大3件を生成し、未明言の動機や傾向を推定しません。JSON・出力envelope不正またはproviderの一時失敗はQueueを失敗させて再試行し、個別候補のschema・Evidence・重複違反、空白statement、根拠user message本文にそのまま含まれないstatementは理由コードだけをlogへ残して候補単位で除外します。安全経路または正常な空配列は0件として適用します。相対日付を含むstatementの保存とVectorize検索時の扱いは[Brain Item生成設計](../domain/brain/brain-item-generation-design.md)を正とします。候補の保存はAccountData actionだけが行い、モデルへDBや外部I/Oのtoolを公開しません。
+Brain Item抽出は会話返信とは別のsystem prompt、prompt version、Valibot schemaを使います。AccountData alarmがBrain Checkpoint QueueへIDだけを送り、consumerが削除・撤回されていないuser messageを最大10件、各5,000文字まで読み直してGeminiへ渡します。Chat Turn Queueと物理的に分離するため、Brain変換のAI待ちや再配送は通常返信を待たせません。上限超過本文はSource Recordとして保持したまま変換対象から外します。本人が明言した命題は`identity`、`memory`、`behavior_pattern`、`value_motivation`、`decision_system`、`preference`、`goal`の7分類から最大3件を生成し、`identity`は本人が明言した現在の立場・職業に限ります。未明言の動機や傾向は推定しません。JSON・出力envelope不正またはproviderの一時失敗はQueueを失敗させて再試行し、個別候補のschema・Evidence・重複違反、空白statement、根拠user message本文にそのまま含まれないstatementは理由コードだけをlogへ残して候補単位で除外します。安全経路または正常な空配列は0件として適用します。相対日付を含むstatementの保存とVectorize検索時の扱いは[Brain Item生成設計](../domain/brain/brain-item-generation-design.md)を正とします。候補の保存はAccountData actionだけが行い、モデルへDBや外部I/Oのtoolを公開しません。
 
-声かけコンテキストを生成する段階では、既存6分類へ`identity`を追加し、候補schemaへ検証済みの`promptContext`を追加します。抽出モデルが「看護師」から変動シフトを補完することは禁止し、職業と週間リズムは別候補・別Evidenceとして扱います。構造化属性の値が根拠本文で検証できない候補はBrain Item全体を保存せず、自由記述の`attributes_json`へ縮退しません。
+声かけコンテキストの生成では、候補schemaへ検証済みの`promptContext`を持たせます。抽出モデルが「看護師」から変動シフトを補完することは禁止し、職業と週間リズムは別候補・別Evidenceとして扱います。構造化属性の値が根拠本文で検証できない候補はBrain Item全体を保存せず、自由記述の`attributes_json`へ縮退しません。
 
 ## 8. ガードレール
 
