@@ -2648,18 +2648,61 @@
                                 "type": "string"
                               },
                               "status": {
-                                "const": "accepted"
+                                "const": "ready"
                               },
                               "partnerDisplayName": {
                                 "type": "string",
                                 "minLength": 1
+                              },
+                              "comparableThemeCount": {
+                                "type": "integer",
+                                "minimum": 1
                               }
                             },
                             "required": [
                               "relationshipId",
                               "relationshipCategory",
                               "status",
-                              "partnerDisplayName"
+                              "partnerDisplayName",
+                              "comparableThemeCount"
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "relationshipId": {
+                                "type": "string",
+                                "pattern": "^[a-f0-9]{64}$"
+                              },
+                              "relationshipCategory": {
+                                "enum": ["partner", "family", "friend", "work"],
+                                "type": "string"
+                              },
+                              "status": {
+                                "const": "waiting"
+                              },
+                              "partnerDisplayName": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "nextAction": {
+                                "anyOf": [
+                                  {
+                                    "enum": ["diagnosis", "profile-summary"],
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "relationshipId",
+                              "relationshipCategory",
+                              "status",
+                              "partnerDisplayName",
+                              "nextAction"
                             ]
                           }
                         ]

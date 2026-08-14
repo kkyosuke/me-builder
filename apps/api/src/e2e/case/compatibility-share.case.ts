@@ -84,7 +84,9 @@ export const compatibilityShareCases = {
         relationshipStatus: "accepted",
         detailStatusBeforePreparation: "waiting",
         detailNextActionBeforePreparation: "profile-summary",
+        listStatusBeforePreparation: "waiting",
         detailStatusAfterPreparation: "ready",
+        listStatusAfterPreparation: "ready",
         reconsentRequired: false,
       },
     },
@@ -163,7 +165,7 @@ export const compatibilityShareCases = {
       body: {
         senderBeforeAcceptance: "pending",
         recipientBeforeAcceptance: "empty",
-        bothAfterAcceptance: "accepted",
+        bothAfterAcceptance: "ready",
       },
     },
   },

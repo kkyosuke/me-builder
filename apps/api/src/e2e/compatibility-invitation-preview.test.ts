@@ -370,6 +370,22 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
         relationshipCategory: "partner",
         nextAction: "profile-summary",
       });
+      const waitingListResponse = await app.request(
+        "/api/compatibility/relationships",
+        { headers: { Authorization: "Bearer recipient-token" } },
+        env(),
+      );
+      expect(await waitingListResponse.json()).toEqual({
+        items: [
+          {
+            relationshipId,
+            status: "waiting",
+            relationshipCategory: "partner",
+            partnerDisplayName: "あおい",
+            nextAction: "profile-summary",
+          },
+        ],
+      });
 
       // 追加の同意なしに、そろった内容がそのまま相性シートへ反映される。
       await completeDiagnosis("recipient-token");
@@ -386,6 +402,22 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
         relationshipCategory: "partner",
         partner: { displayName: "あおい" },
         viewer: { displayName: "はる" },
+      });
+      const readyListResponse = await app.request(
+        "/api/compatibility/relationships",
+        { headers: { Authorization: "Bearer recipient-token" } },
+        env(),
+      );
+      expect(await readyListResponse.json()).toEqual({
+        items: [
+          {
+            relationshipId,
+            status: "ready",
+            relationshipCategory: "partner",
+            partnerDisplayName: "あおい",
+            comparableThemeCount: 1,
+          },
+        ],
       });
     },
     e2eTimeoutMs,
@@ -492,9 +524,10 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
           items: [
             {
               relationshipId,
-              status: "accepted",
+              status: "ready",
               relationshipCategory: "partner",
               partnerDisplayName: participants[partnerRole].name,
+              comparableThemeCount: 1,
             },
           ],
         });

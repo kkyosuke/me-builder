@@ -202,7 +202,7 @@ describe("fetchCompatibilityInvitation", () => {
 describe("compatibility relationship APIs", () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it("一覧から再送可能なLIFF URLを取得する", async () => {
+  it("一覧から返事待ち・準備中・結果ありの現在状態を取得する", async () => {
     const relationshipId = "1".repeat(64);
     const data = {
       items: [
@@ -212,6 +212,20 @@ describe("compatibility relationship APIs", () => {
           status: "pending",
           expiresAt: "2026-08-26T00:00:00.000Z",
           invitationUrl: `https://liff.line.me/test/compatibility/invitations/${relationshipId}`,
+        },
+        {
+          relationshipId: "2".repeat(64),
+          relationshipCategory: "friend",
+          status: "waiting",
+          partnerDisplayName: "はる",
+          nextAction: "diagnosis",
+        },
+        {
+          relationshipId: "3".repeat(64),
+          relationshipCategory: "family",
+          status: "ready",
+          partnerDisplayName: "あおい",
+          comparableThemeCount: 3,
         },
       ],
     };

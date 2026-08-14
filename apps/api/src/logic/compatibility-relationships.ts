@@ -7,6 +7,7 @@ import {
   compatibilityDataFor,
 } from "@me-builder/lib";
 import { createCompatibilityInvitationUrl } from "./compatibility-invitation-url";
+import { resolveCompatibilityRelationshipContents } from "./compatibility-relationship";
 import { createLiffSession } from "./liff-session";
 
 type CompatibilityRelationshipListItem =
@@ -20,8 +21,16 @@ type CompatibilityRelationshipListItem =
   | Readonly<{
       relationshipId: string;
       relationshipCategory: CompatibilityRelationship["relationshipCategory"];
-      status: "accepted";
+      status: "ready";
       partnerDisplayName: string;
+      comparableThemeCount: number;
+    }>
+  | Readonly<{
+      relationshipId: string;
+      relationshipCategory: CompatibilityRelationship["relationshipCategory"];
+      status: "waiting";
+      partnerDisplayName: string;
+      nextAction: "diagnosis" | "profile-summary" | null;
     }>;
 
 export type CompatibilityRelationshipsOutcome =
@@ -37,6 +46,7 @@ type Params = Readonly<{
   accountData: AccountDataNamespace;
   compatibilityData: CompatibilityDataNamespace;
   liffId: string;
+  at?: Date;
 }>;
 
 /** AccountDataの一覧projectionを正本へ同期し、外部公開可能な最小カードへ変換する。 */
@@ -47,6 +57,7 @@ export async function listCompatibilityRelationships({
   accountData,
   compatibilityData,
   liffId,
+  at = new Date(),
 }: Params): Promise<CompatibilityRelationshipsOutcome> {
   const session = await createLiffSession({ idToken, lineLoginChannelId, db });
   if (session.type !== "resolved") return session;
@@ -75,14 +86,29 @@ export async function listCompatibilityRelationships({
         relationship.inviterAccountId === accountId
           ? relationship.inviteeDisplayName
           : relationship.inviterDisplayName;
-      return partnerDisplayName
+      if (!partnerDisplayName) return null;
+      const contents = await resolveCompatibilityRelationshipContents({
+        canonical: relationship,
+        viewerAccountId: accountId,
+        accountData,
+        at,
+      });
+      if (!contents) return null;
+      return contents.status === "ready"
         ? {
             relationshipId: reference.relationshipId,
             relationshipCategory: relationship.relationshipCategory,
-            status: "accepted",
+            status: "ready",
             partnerDisplayName,
+            comparableThemeCount: contents.viewer.themes.length,
           }
-        : null;
+        : {
+            relationshipId: reference.relationshipId,
+            relationshipCategory: relationship.relationshipCategory,
+            status: "waiting",
+            partnerDisplayName,
+            nextAction: contents.nextAction,
+          };
     }),
   );
   return { type: "resolved", items: items.filter((item) => item !== null) };

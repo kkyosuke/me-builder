@@ -7,8 +7,12 @@ import type {
 } from "@me-builder/lib";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { createLiffSession } = vi.hoisted(() => ({ createLiffSession: vi.fn() }));
+const { createLiffSession, resolveCompatibilityRelationshipContents } = vi.hoisted(() => ({
+  createLiffSession: vi.fn(),
+  resolveCompatibilityRelationshipContents: vi.fn(),
+}));
 vi.mock("./liff-session", () => ({ createLiffSession }));
+vi.mock("./compatibility-relationship", () => ({ resolveCompatibilityRelationshipContents }));
 
 const { listCompatibilityRelationships } = await import("./compatibility-relationships");
 
@@ -115,6 +119,10 @@ describe("listCompatibilityRelationships", () => {
       type: "resolved",
       session: { accountId, role: "user", displayName: "あおい" },
     });
+    resolveCompatibilityRelationshipContents.mockResolvedValue({
+      status: "ready",
+      viewer: { themes: [{}] },
+    });
   });
 
   it("pendingの招待は再送できる正規LIFF URLと期限を返す", async () => {
@@ -137,7 +145,7 @@ describe("listCompatibilityRelationships", () => {
     });
   });
 
-  it("成立中の関係は相手の表示名だけを返し、Account IDを外へ出さない", async () => {
+  it("比較できる関係は相手の表示名とテーマ数を返し、Account IDを外へ出さない", async () => {
     const { accountData, compatibilityData } = namespaces({
       references: [reference({ relationshipId: acceptedRelationshipId, status: "active" })],
       relationships: { [acceptedRelationshipId]: acceptedRelationship() },
@@ -151,8 +159,9 @@ describe("listCompatibilityRelationships", () => {
         {
           relationshipId: acceptedRelationshipId,
           relationshipCategory: "partner",
-          status: "accepted",
+          status: "ready",
           partnerDisplayName: "はる",
+          comparableThemeCount: 1,
         },
       ],
     });
@@ -188,8 +197,9 @@ describe("listCompatibilityRelationships", () => {
         {
           relationshipId: acceptedRelationshipId,
           relationshipCategory: "partner",
-          status: "accepted",
+          status: "ready",
           partnerDisplayName: "あおい",
+          comparableThemeCount: 1,
         },
       ],
     });
@@ -226,8 +236,35 @@ describe("listCompatibilityRelationships", () => {
 
     expect(outcome.type).toBe("resolved");
     if (outcome.type !== "resolved") throw new Error("outcome should be resolved");
-    expect(outcome.items.map((item) => item.status)).toEqual(["pending", "accepted"]);
+    expect(outcome.items.map((item) => item.status)).toEqual(["pending", "ready"]);
   });
+
+  it.each(["diagnosis", "profile-summary", null] as const)(
+    "準備中の関係は本人の次の操作だけを返す (%s)",
+    async (nextAction) => {
+      resolveCompatibilityRelationshipContents.mockResolvedValueOnce({
+        status: "waiting",
+        nextAction,
+      });
+      const { accountData, compatibilityData } = namespaces({
+        references: [reference({ relationshipId: acceptedRelationshipId, status: "active" })],
+        relationships: { [acceptedRelationshipId]: acceptedRelationship() },
+      });
+
+      await expect(request(accountData, compatibilityData)).resolves.toEqual({
+        type: "resolved",
+        items: [
+          {
+            relationshipId: acceptedRelationshipId,
+            relationshipCategory: "partner",
+            status: "waiting",
+            partnerDisplayName: "はる",
+            nextAction,
+          },
+        ],
+      });
+    },
+  );
 
   it("参照が無ければ空の一覧を返す", async () => {
     const { accountData, compatibilityData } = namespaces({ references: [] });

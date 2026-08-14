@@ -39,7 +39,7 @@ describe("Compatibility flow", () => {
     expect(loader.querySelector("div[aria-hidden='true'] > .space-y-3")).toBeTruthy();
   });
 
-  it("APIの一覧で共有中と返事待ちを区別し、再送と取消を操作できる", () => {
+  it("APIの一覧で結果あり・準備中・返事待ちを区別し、必要な操作だけを表示する", () => {
     const onCancel = vi.fn();
     const onResend = vi.fn();
     const pending = {
@@ -59,8 +59,30 @@ describe("Compatibility flow", () => {
               {
                 relationshipId: "2".repeat(64),
                 relationshipCategory: "family",
-                status: "accepted",
+                status: "ready",
                 partnerDisplayName: "あおい",
+                comparableThemeCount: 3,
+              },
+              {
+                relationshipId: "3".repeat(64),
+                relationshipCategory: "friend",
+                status: "waiting",
+                partnerDisplayName: "はる",
+                nextAction: "diagnosis",
+              },
+              {
+                relationshipId: "4".repeat(64),
+                relationshipCategory: "work",
+                status: "waiting",
+                partnerDisplayName: "なつ",
+                nextAction: "profile-summary",
+              },
+              {
+                relationshipId: "5".repeat(64),
+                relationshipCategory: "partner",
+                status: "waiting",
+                partnerDisplayName: "ふゆ",
+                nextAction: null,
               },
             ],
           },
@@ -72,9 +94,22 @@ describe("Compatibility flow", () => {
     );
 
     expect(screen.getByRole("heading", { name: "ふたりの見取り図" })).toBeTruthy();
-    expect(screen.getByText("共有中")).toBeTruthy();
+    expect(screen.getByText("結果あり")).toBeTruthy();
+    expect(screen.getByText("3つのテーマで比較できます")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "準備中" })).toBeTruthy();
+    expect(screen.getAllByText("あなたの準備待ち")).toHaveLength(2);
+    expect(screen.getByText("相手の準備待ち")).toBeTruthy();
     expect(screen.getByText("返事待ち")).toBeTruthy();
     expect(screen.getByRole("link", { name: "2人の相性シートを見る" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "診断を行う" }).getAttribute("href")).toBe(
+      "/diagnosis?category=friend",
+    );
+    expect(screen.getByRole("link", { name: "わたしのまとめを作る" }).getAttribute("href")).toBe(
+      "/me",
+    );
+    expect(
+      screen.getByRole("heading", { name: "ふゆさん" }).closest("article")?.querySelector("a"),
+    ).toBeNull();
     expect(screen.getByRole("link", { name: "相性" }).getAttribute("aria-current")).toBe("page");
 
     fireEvent.click(screen.getByRole("button", { name: "LINEでもう一度送る" }));

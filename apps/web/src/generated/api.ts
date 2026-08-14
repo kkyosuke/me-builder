@@ -1878,8 +1878,18 @@ export interface operations {
                   /** @enum {string} */
                   relationshipCategory: "partner" | "family" | "friend" | "work";
                   /** @constant */
-                  status: "accepted";
+                  status: "ready";
                   partnerDisplayName: string;
+                  comparableThemeCount: number;
+                }
+              | {
+                  relationshipId: string;
+                  /** @enum {string} */
+                  relationshipCategory: "partner" | "family" | "friend" | "work";
+                  /** @constant */
+                  status: "waiting";
+                  partnerDisplayName: string;
+                  nextAction: ("diagnosis" | "profile-summary") | null;
                 }
             )[];
           };

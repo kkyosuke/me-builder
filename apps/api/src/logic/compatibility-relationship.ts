@@ -21,7 +21,7 @@ type Person = Readonly<{
   themes: readonly CompatibilitySharePreviewTheme[];
 }>;
 
-type CompatibilityRelationshipContents =
+export type CompatibilityRelationshipContents =
   | Readonly<{
       relationshipId: string;
       relationshipCategory: CompatibilityRelationship["relationshipCategory"];
@@ -78,29 +78,22 @@ function orderedThemes(
   });
 }
 
-/**
- * 成立中の関係について、双方の現在の共有内容から相性シートを組み立てる。
- * 共有は関係が続く限り自動で最新化されるため、過去の同意内容と照合しない。
- */
-export async function getCompatibilityRelationshipContents({
-  relationshipId,
-  idToken,
-  lineLoginChannelId,
-  db,
-  accountData,
-  compatibilityData,
-  at = new Date(),
-}: Params): Promise<CompatibilityRelationshipOutcome> {
-  if (!compatibilityRelationshipId.isValid(relationshipId)) return { type: "unavailable" };
-  const session = await createLiffSession({ idToken, lineLoginChannelId, db });
-  if (session.type !== "resolved") return session;
+type ResolveCompatibilityRelationshipContentsParams = Readonly<{
+  canonical: CompatibilityRelationship;
+  viewerAccountId: string;
+  accountData: AccountDataNamespace;
+  at: Date;
+}>;
 
-  const canonical = await compatibilityDataFor(compatibilityData, relationshipId).getRelationship(
-    session.session.accountId,
-  );
-  if (!canonical) return { type: "unavailable" };
-  const participants = participantDetails(canonical, session.session.accountId);
-  if (!participants) return { type: "unavailable" };
+/** 成立中の関係と現在の共有内容から、一覧と詳細で共通の準備状態を組み立てる。 */
+export async function resolveCompatibilityRelationshipContents({
+  canonical,
+  viewerAccountId,
+  accountData,
+  at,
+}: ResolveCompatibilityRelationshipContentsParams): Promise<CompatibilityRelationshipContents | null> {
+  const participants = participantDetails(canonical, viewerAccountId);
+  if (!participants) return null;
 
   const [inviterData, inviteeData] = await Promise.all([
     loadCompatibilitySharePreviewData({
@@ -128,19 +121,16 @@ export async function getCompatibilityRelationshipContents({
 
   if (!inviterAboutMe || !inviteeAboutMe || commonDiagnosisIds.length === 0) {
     return {
-      type: "resolved",
-      relationship: {
-        relationshipId,
-        relationshipCategory: canonical.relationshipCategory,
-        status: "waiting",
-        // 閲覧者がまだ回答できる診断を持つ場合だけ診断へ案内する。
-        // 回答し終えている場合は相手の準備待ちであり、本人の操作では解消できない。
-        nextAction: !viewerData.aboutMe
-          ? "profile-summary"
-          : commonDiagnosisIds.length === 0 && viewerData.hasAnswerableDiagnosis
-            ? "diagnosis"
-            : null,
-      },
+      relationshipId: canonical.id,
+      relationshipCategory: canonical.relationshipCategory,
+      status: "waiting",
+      // 閲覧者がまだ回答できる診断を持つ場合だけ診断へ案内する。
+      // 回答し終えている場合は相手の準備待ちであり、本人の操作では解消できない。
+      nextAction: !viewerData.aboutMe
+        ? "profile-summary"
+        : commonDiagnosisIds.length === 0 && viewerData.hasAnswerableDiagnosis
+          ? "diagnosis"
+          : null,
     };
   }
 
@@ -155,13 +145,44 @@ export async function getCompatibilityRelationshipContents({
     themes: orderedThemes(inviteeData, commonDiagnosisIds),
   };
   return {
+    relationshipId: canonical.id,
+    relationshipCategory: canonical.relationshipCategory,
+    status: "ready",
+    partner: participants.viewerIsInviter ? invitee : inviter,
+    viewer: participants.viewerIsInviter ? inviter : invitee,
+  };
+}
+
+/**
+ * 成立中の関係について、双方の現在の共有内容から相性シートを組み立てる。
+ * 共有は関係が続く限り自動で最新化されるため、過去の同意内容と照合しない。
+ */
+export async function getCompatibilityRelationshipContents({
+  relationshipId,
+  idToken,
+  lineLoginChannelId,
+  db,
+  accountData,
+  compatibilityData,
+  at = new Date(),
+}: Params): Promise<CompatibilityRelationshipOutcome> {
+  if (!compatibilityRelationshipId.isValid(relationshipId)) return { type: "unavailable" };
+  const session = await createLiffSession({ idToken, lineLoginChannelId, db });
+  if (session.type !== "resolved") return session;
+
+  const canonical = await compatibilityDataFor(compatibilityData, relationshipId).getRelationship(
+    session.session.accountId,
+  );
+  if (!canonical) return { type: "unavailable" };
+  const relationship = await resolveCompatibilityRelationshipContents({
+    canonical,
+    viewerAccountId: session.session.accountId,
+    accountData,
+    at,
+  });
+  if (!relationship) return { type: "unavailable" };
+  return {
     type: "resolved",
-    relationship: {
-      relationshipId,
-      relationshipCategory: canonical.relationshipCategory,
-      status: "ready",
-      partner: participants.viewerIsInviter ? invitee : inviter,
-      viewer: participants.viewerIsInviter ? inviter : invitee,
-    },
+    relationship,
   };
 }
