@@ -225,7 +225,7 @@ describe("GET /api/diagnoses local D1 E2E", () => {
       questionCount: 10,
     });
     expect(initialBody.diagnoses.find(({ id }) => id === "work-values")).toMatchObject({
-      relationshipCategory: "work",
+      relationshipCategory: "general",
       responseStatus: "unanswered",
       questionCount: 10,
     });

@@ -691,16 +691,16 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
       expect(response.status).toBe(200);
       expect(await response.json()).toMatchObject({
         id: "work-values",
-        relationshipCategory: "work",
+        relationshipCategory: "general",
         scoring: {
           scoringVersion: 1,
           balancedLabel: "状況に応じて働き方を選ぶ",
           parameters: [
-            expect.objectContaining({ id: "work-autonomy", score: 100, coverage: 100 }),
-            expect.objectContaining({ id: "growth-orientation", score: 80, coverage: 100 }),
+            expect.objectContaining({ id: "work-autonomy", score: 50, coverage: 100 }),
+            expect.objectContaining({ id: "growth-orientation", score: 40, coverage: 100 }),
             expect.objectContaining({ id: "compensation-priority", score: 80, coverage: 100 }),
             expect.objectContaining({ id: "work-stability", score: 75, coverage: 100 }),
-            expect.objectContaining({ id: "work-life-boundary", score: 86, coverage: 100 }),
+            expect.objectContaining({ id: "work-life-boundary", score: 67, coverage: 100 }),
           ],
         },
       });

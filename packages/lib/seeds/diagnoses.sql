@@ -157,15 +157,15 @@ INSERT OR IGNORE INTO question_versions (
   (1786665600, 1786665600, 0, 'q-life-priorities-09', 1, 'approved', '成功することより、心穏やかに暮らすことが大切だ。', 'single_choice', 1786665600),
   (1786665600, 1786665600, 0, 'q-life-priorities-10', 1, 'approved', '身近な人とは、人生で優先したいものが近いほうがよい。', 'single_choice', 1786665600),
   (1786665600, 1786665600, 0, 'q-work-values-01', 1, 'approved', '手順が決められた仕事より、自分で進め方を決められる仕事が合う。', 'single_choice', 1786665600),
-  (1786665600, 1786665600, 0, 'q-work-values-02', 1, 'approved', '明確な指示を待つより、自分で判断して動きたい。', 'single_choice', 1786665600),
+  (1786665600, 1786665600, 0, 'q-work-values-02', 1, 'approved', '自分で進め方を決めるより、明確な方針や手順に沿って働きたい。', 'single_choice', 1786665600),
   (1786665600, 1786665600, 0, 'q-work-values-03', 1, 'approved', '今できる仕事を安定して続けるより、難しい仕事に挑戦したい。', 'single_choice', 1786665600),
-  (1786665600, 1786665600, 0, 'q-work-values-04', 1, 'approved', '忙しくなっても、新しい知識やスキルを得られる仕事を選びたい。', 'single_choice', 1786665600),
+  (1786665600, 1786665600, 0, 'q-work-values-04', 1, 'approved', '新しい知識やスキルを増やすより、今できる仕事を深く身につけたい。', 'single_choice', 1786665600),
   (1786665600, 1786665600, 0, 'q-work-values-05', 1, 'approved', '仕事内容への納得感より、収入や待遇の良さを優先したい。', 'single_choice', 1786665600),
   (1786665600, 1786665600, 0, 'q-work-values-06', 1, 'approved', '仕事内容や肩書きより、成果が収入に反映されることを重視したい。', 'single_choice', 1786665600),
   (1786665600, 1786665600, 0, 'q-work-values-07', 1, 'approved', '収入が少し下がっても、雇用や働く時間が安定しているほうがよい。', 'single_choice', 1786665600),
   (1786665600, 1786665600, 0, 'q-work-values-08', 1, 'approved', '大きな成果を狙うより、無理なく続けられる仕事がよい。', 'single_choice', 1786665600),
   (1786665600, 1786665600, 0, 'q-work-values-09', 1, 'approved', '昇進や評価のためでも、私生活の時間は減らしたくない。', 'single_choice', 1786665600),
-  (1786665600, 1786665600, 0, 'q-work-values-10', 1, 'approved', '仕事の連絡には、勤務時間外は対応しないようにしたい。', 'single_choice', 1786665600);
+  (1786665600, 1786665600, 0, 'q-work-values-10', 1, 'approved', '必要であれば、勤務時間外でも仕事の連絡に対応したい。', 'single_choice', 1786665600);
 --> statement-breakpoint
 
 INSERT OR IGNORE INTO question_choices (
@@ -494,15 +494,15 @@ INSERT OR IGNORE INTO diagnosis_scoring_configs (
       "choiceScores": {"yes":1,"no":-1},
       "questions": {
         "q-work-values-01":{"questionVersion":1,"weights":{"work-autonomy":1}},
-        "q-work-values-02":{"questionVersion":1,"weights":{"work-autonomy":1}},
+        "q-work-values-02":{"questionVersion":1,"weights":{"work-autonomy":-1}},
         "q-work-values-03":{"questionVersion":1,"weights":{"growth-orientation":1,"work-stability":-0.5}},
-        "q-work-values-04":{"questionVersion":1,"weights":{"growth-orientation":1,"work-life-boundary":-0.5}},
+        "q-work-values-04":{"questionVersion":1,"weights":{"growth-orientation":-1}},
         "q-work-values-05":{"questionVersion":1,"weights":{"compensation-priority":1}},
         "q-work-values-06":{"questionVersion":1,"weights":{"compensation-priority":1}},
         "q-work-values-07":{"questionVersion":1,"weights":{"compensation-priority":-0.5,"work-stability":1}},
         "q-work-values-08":{"questionVersion":1,"weights":{"growth-orientation":-0.5,"work-stability":0.5,"work-life-boundary":1}},
         "q-work-values-09":{"questionVersion":1,"weights":{"work-life-boundary":1}},
-        "q-work-values-10":{"questionVersion":1,"weights":{"work-life-boundary":1}}
+        "q-work-values-10":{"questionVersion":1,"weights":{"work-life-boundary":-1}}
       },
       "minimumCoverage":0.6,
       "lowMaximum":35,
@@ -532,7 +532,7 @@ INSERT INTO diagnoses (
   ('time-planning', 1785974400, 1785974400, 0, '時間と予定', '予定の立て方、変更への柔軟性、時間の約束、一緒の時間に関する傾向を見ます。', 'partner', 'time-planning-v1', 40, 1785801600, 'published', 1785974400),
   ('conversation-emotion', 1786233600, 1786233600, 0, '会話と感情表現', '共感、愛情表現、希望の伝え方、支え方、感情の共有に関する傾向を見ます。', 'partner', 'conversation-emotion-v1', 50, 1785801600, 'published', 1786233600),
   ('life-priorities', 1786665600, 1786665600, 0, '優先順位と人生の方向性', '挑戦、仕事、身近な人、自分の時間、健康、将来の備えに関する傾向を見ます。', 'general', 'life-priorities-v1', 60, 1786665600, 'published', 1786665600),
-  ('work-values', 1786665600, 1786665600, 0, '仕事の価値観・働き方', '裁量、成長、報酬、安定、仕事と生活のバランスに関する傾向を見ます。', 'work', 'work-values-v1', 70, 1786665600, 'published', 1786665600)
+  ('work-values', 1786665600, 1786665600, 0, '仕事の価値観・働き方', '裁量、成長、報酬、安定、仕事と生活のバランスに関する傾向を見ます。', 'general', 'work-values-v1', 70, 1786665600, 'published', 1786665600)
 ON CONFLICT(id) DO UPDATE SET
   description = CASE
     WHEN diagnoses.description = '' THEN excluded.description
@@ -648,7 +648,7 @@ INSERT INTO catalog_versions (catalog_id, version, updated_at) VALUES ('diagnosi
 -- Expected result: diagnosis_count=7, question_version_count=70,
 -- choice_count=140, diagnosis_question_count=70, scoring_config_count=7, catalog_version=5.
 SELECT
-  (SELECT COUNT(*) FROM diagnoses WHERE ((id IN ('relationship-priority', 'money-values', 'leisure-style', 'time-planning', 'conversation-emotion') AND relationship_category = 'partner') OR (id = 'life-priorities' AND relationship_category = 'general') OR (id = 'work-values' AND relationship_category = 'work')) AND state = 'published' AND description <> '' AND is_deleted = 0) AS diagnosis_count,
+  (SELECT COUNT(*) FROM diagnoses WHERE ((id IN ('relationship-priority', 'money-values', 'leisure-style', 'time-planning', 'conversation-emotion') AND relationship_category = 'partner') OR (id IN ('life-priorities', 'work-values') AND relationship_category = 'general')) AND state = 'published' AND description <> '' AND is_deleted = 0) AS diagnosis_count,
   (SELECT COUNT(*) FROM question_versions WHERE version = 1 AND state = 'approved' AND is_deleted = 0 AND (question_id LIKE 'q-relationship-priority-%' OR question_id LIKE 'q-money-%' OR question_id LIKE 'q-leisure-style-%' OR question_id LIKE 'q-time-planning-%' OR question_id LIKE 'q-conversation-emotion-%' OR question_id LIKE 'q-life-priorities-%' OR question_id LIKE 'q-work-values-%')) AS question_version_count,
   (SELECT COUNT(*) FROM question_choices WHERE question_version = 1 AND is_deleted = 0 AND (question_id LIKE 'q-relationship-priority-%' OR question_id LIKE 'q-money-%' OR question_id LIKE 'q-leisure-style-%' OR question_id LIKE 'q-time-planning-%' OR question_id LIKE 'q-conversation-emotion-%' OR question_id LIKE 'q-life-priorities-%' OR question_id LIKE 'q-work-values-%')) AS choice_count,
   (SELECT COUNT(*) FROM diagnosis_questions WHERE diagnosis_id IN ('relationship-priority', 'money-values', 'leisure-style', 'time-planning', 'conversation-emotion', 'life-priorities', 'work-values') AND is_deleted = 0) AS diagnosis_question_count,

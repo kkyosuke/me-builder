@@ -280,15 +280,15 @@
 ### 3.21 仕事の価値観・働き方
 
 1. 手順が決められた仕事より、自分で進め方を決められる仕事が合う。
-2. 明確な指示を待つより、自分で判断して動きたい。
+2. 自分で進め方を決めるより、明確な方針や手順に沿って働きたい。
 3. 今できる仕事を安定して続けるより、難しい仕事に挑戦したい。
-4. 忙しくなっても、新しい知識やスキルを得られる仕事を選びたい。
+4. 新しい知識やスキルを増やすより、今できる仕事を深く身につけたい。
 5. 仕事内容への納得感より、収入や待遇の良さを優先したい。
 6. 仕事内容や肩書きより、成果が収入に反映されることを重視したい。
 7. 収入が少し下がっても、雇用や働く時間が安定しているほうがよい。
 8. 大きな成果を狙うより、無理なく続けられる仕事がよい。
 9. 昇進や評価のためでも、私生活の時間は減らしたくない。
-10. 仕事の連絡には、勤務時間外は対応しないようにしたい。
+10. 必要であれば、勤務時間外でも仕事の連絡に対応したい。
 
 ## 4. 回答から傾向を出すために必要な設計
 
@@ -319,7 +319,7 @@
 - 算出規則と、結果に使用した質問を本人が確認できるようにする
 - 回答数が足りない場合や回答が食い違う場合は、無理にラベルを付けない
 
-公開済み診断の質問と傾向軸の対応、計算式、表示条件は、[自分と相手の優先・境界線](../scoring/relationship-priority-parameter-design.md)、[お金と消費](../scoring/money-values-parameter-design.md)、[インドア・アウトドアと余暇](../scoring/leisure-style-parameter-design.md)、[時間と予定](../scoring/time-planning-parameter-design.md)、[会話と感情表現](../scoring/conversation-emotion-parameter-design.md)の各パラメータ変換設計を正とします。他の話題の対応は、質問の審査と合わせて後続で定義します。
+公開済み診断の質問と傾向軸の対応、計算式、表示条件は、[自分と相手の優先・境界線](../scoring/relationship-priority-parameter-design.md)、[お金と消費](../scoring/money-values-parameter-design.md)、[インドア・アウトドアと余暇](../scoring/leisure-style-parameter-design.md)、[時間と予定](../scoring/time-planning-parameter-design.md)、[会話と感情表現](../scoring/conversation-emotion-parameter-design.md)、[優先順位と人生の方向性](../scoring/life-priorities-parameter-design.md)、[仕事の価値観・働き方](../scoring/work-values-parameter-design.md)の各パラメータ変換設計を正とします。他の話題の対応は、質問の審査と合わせて後続で定義します。
 
 ## 5. 公開単位
 
