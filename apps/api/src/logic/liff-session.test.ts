@@ -97,15 +97,17 @@ describe("createLiffSession", () => {
     expect(new Set(identities.map((i) => i.accountId)).size).toBe(1);
   });
 
-  it("2 回目の呼び出しでも identity が増えないこと", async () => {
-    await D1.shared.action.account.upsertIdentity(db, { provider: "line", providerAccountId: SUB });
+  it("友だち追加前に2回呼び出してもAccountとidentityが増えないこと", async () => {
     mockVerifyEndpoint({ json: validClaims });
 
     await call();
     const second = await call();
 
     expect(second.type).toBe("resolved");
-    expect(await db.select().from(D1.shared.schema.accountIdentities).all()).toHaveLength(2);
+    expect(await db.select().from(D1.shared.schema.accounts).all()).toHaveLength(1);
+    expect(await db.select().from(D1.shared.schema.accountIdentities).all()).toEqual([
+      expect.objectContaining({ provider: "line_login", providerAccountId: SUB }),
+    ]);
   });
 
   it("ID トークンが無い場合は unauthenticated を返し、検証エンドポイントを呼ばないこと", async () => {
@@ -147,13 +149,23 @@ describe("createLiffSession", () => {
     expect(result.type).toBe("unauthenticated");
   });
 
-  it("該当する Account が無い場合は account-not-found を返し、Account を作らないこと", async () => {
+  it("該当するAccountが無い場合はWeb利用用のAccountを作って解決すること", async () => {
     mockVerifyEndpoint({ json: validClaims });
 
     const result = await call();
 
-    expect(result.type).toBe("account-not-found");
-    expect(await db.select().from(D1.shared.schema.accounts).all()).toHaveLength(0);
+    expect(result).toEqual({
+      type: "resolved",
+      session: expect.objectContaining({
+        accountId: expect.any(String),
+        role: "user",
+        displayName: "うつし",
+      }),
+    });
+    expect(await db.select().from(D1.shared.schema.accounts).all()).toHaveLength(1);
+    expect(await db.select().from(D1.shared.schema.accountIdentities).all()).toEqual([
+      expect.objectContaining({ provider: "line_login", providerAccountId: SUB }),
+    ]);
   });
 
   it("戻り値に HTTP のステータスコードを含めないこと", async () => {

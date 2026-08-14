@@ -204,8 +204,9 @@
   - **クライアントから送られてきた識別子は受け付けません。** `liff.getProfile()` が返す値そのものは LINE から取得した本物ですが、サーバー側では「LINE の API が返した値の転送」と「手で書かれた値」を区別できないため、`userId` を識別子として使うと他人になりすませます。本人の識別子は必ず ID トークンの検証で得た `sub` を使います。
   - 用途で使い分けます。**画面表示**（`displayName` / `pictureUrl`）は `liff.getProfile()` の値でよく（嘘をつけても本人の画面の表示が変わるだけ）、**本人の識別・認可**は検証済みの `sub` だけを使います。検証は `packages/lib` の `line.idToken.verify`（LINE の `POST /oauth2/v2.1/verify` へ委譲）で行い、`aud` が LINE Login チャネル ID と一致することを受け取り側でも確認します。
   - エンドポイントは `POST /api/line/liff/session`。
-  - Account の解決は `D1.shared.action.account.resolveAccountByLineLogin` に集約します。`line_login` の identity → 同じ値の `line` の identity（同一プロバイダーなら userId が一致する）の順に探し、後者で見つかった場合は `line_login` を同じ Account へ紐づけます。
-  - **どちらも見つからない場合は Account を作らず 404 を返します。** アカウント作成の起点は LINE 公式アカウントの友だち追加です（[プロジェクト概要 §5](../../docs/product/project-overview.md#5-アカウントと本人識別)）。userId が一致しない構成での紐づけ手段は未設計です。
+  - LINE Login側のAccount解決は `D1.shared.action.account.resolveAccountByLineLogin` に集約します。`line_login` の identity → 同じ値の `line` の identity（同一プロバイダーならuserIdが一致する）の順に探し、後者で見つかった場合は`line_login`を同じAccountへ紐づけます。どちらも見つからない場合は、検証済みの`sub`から`line_login` identity付きのAccountを作成します。
+  - Messaging API側のAccount解決は`D1.shared.action.account.resolveAccountByLineMessagingApi`に集約します。Account作成の競合で同じ人物が2つに分かれないよう、まず同じ値の`line_login` identityを冪等に解決してから`line` identityを追加します。Webから先に利用したAccountも、後日の友だち追加またはメッセージで同じAccountへ接続します。
+  - `line_login` identityだけを持つAccountはWeb機能を利用できます。LINEからの日記入力、通知、日々の声かけは`line` identityが追加されるまで利用できません。Account作成起点と利用可能範囲は[プロジェクト概要 §5](../../docs/product/project-overview.md#5-アカウントと本人識別)を正とします。
   - 既存の Account へログイン手段を追加するのは `D1.shared.action.account.linkIdentity` です。`upsertIdentity` は見つからなければ新規 Account を作るため、この用途に使ってはいけません。
   - `LINE_LOGIN_CHANNEL_ID` は `apps/api` へ配布します。LIFF 設定の形式検証と解決は `packages/lib` の LINE 設定を正とし、`apps/api`・`apps/web`・`apps/worker` から共用します。未設定の場合は `LIFF_ID` の接頭辞から補完します。明示した場合は接頭辞と一致しなければならず、不正な設定ではビルド・デプロイやリクエスト処理を開始しません。ID トークン・アクセストークン・`sub` はレスポンスにもログにも含めません。
   - **`accountId` をクライアントへ返しません。** セッションとトークンの管理方式は[ドメイン設計](../../docs/domain/domain-design.md)で未決定であり、返すと後続リクエストで「クライアントが送ってきた `accountId`」を信頼する実装を誘発します。返すのは表示に使う `displayName` / `pictureUrl` と、管理者導線の表示に使う検証済みAccountの`role`だけです。`role`は表示判定のための情報であり、管理者API側の認可を省略する根拠にはしません。

@@ -6,7 +6,7 @@ import { accountIdentities, accounts } from "../schema/account";
 /**
  * ログイン手段の提供元。
  *
- * - `line`: Messaging API で得られる userId（友だち追加が起点）
+ * - `line`: Messaging API で得られる userId（友だち追加またはメッセージの受信後だけ保持）
  * - `line_login`: LINE Login / LIFF の ID トークンの `sub`
  *
  * LINE の userId は**プロバイダー単位**で一意なので、Messaging API チャネルと
@@ -147,16 +147,16 @@ function isUniqueViolation(err: unknown): boolean {
  * 2. 無ければ `line` の identity を同じ値で探す。見つかれば Messaging API チャネルと
  *    LINE Login チャネルが同一プロバイダー配下で userId が一致しているので、その
  *    Account へ `line_login` を追加して紐づける
- * 3. どちらも無ければ `undefined` を返す。**新規 Account は作りません。**
- *    アカウント作成の起点は LINE 公式アカウントの友だち追加であり
- *    ([プロジェクト概要 §5](../../../../../docs/product/project-overview.md#5-アカウントと本人識別))、
- *    userId が一致しない構成での紐づけ手段は別途設計します
+ * 3. どちらも無ければ、検証済みの `sub` で `line_login` identity付きのAccountを作る
+ *
+ * `line` identityはここでは先回りして作りません。友だち追加前のAccountを通知対象へ
+ * 含めないため、Messaging APIのWebhookを実際に受け付けた時点でだけ追加します。
  */
 export async function resolveAccountByLineLogin(
   db: SharedD1Client,
   sub: string,
   role: "user" | "admin" = "user",
-): Promise<UpsertIdentityResult | undefined> {
+): Promise<UpsertIdentityResult> {
   const byLogin = await findByIdentity(db, "line_login", sub);
   if (byLogin) {
     return await applyRequestedRole(db, byLogin, role);
@@ -164,7 +164,11 @@ export async function resolveAccountByLineLogin(
 
   const byMessagingApi = await findByIdentity(db, "line", sub);
   if (!byMessagingApi) {
-    return undefined;
+    return await upsertIdentity(db, {
+      provider: "line_login",
+      providerAccountId: sub,
+      role,
+    });
   }
 
   const identity = await linkIdentity(db, {
@@ -179,6 +183,44 @@ export async function resolveAccountByLineLogin(
   );
 
   return await applyRequestedRole(db, { account: byMessagingApi.account, identity }, role);
+}
+
+/**
+ * Messaging APIのuserIdからAccountを解決し、LINE機能を利用できるidentityを追加します。
+ *
+ * `line_login`を先に解決することで、LIFFとWebhookが空のDBへ同時に到着しても、両方が
+ * 同じ `(provider, providerAccountId)` の一意制約を競合点として使い、Accountを二重作成
+ * しないようにします。Messaging APIチャネルとLINE Loginチャネルが同一プロバイダー
+ * 配下にあり、userIdと`sub`が一致することが前提です。
+ */
+export async function resolveAccountByLineMessagingApi(
+  db: SharedD1Client,
+  providerAccountId: string,
+  role: "user" | "admin" = "user",
+): Promise<UpsertIdentityResult> {
+  const byMessagingApi = await findByIdentity(db, "line", providerAccountId);
+  if (byMessagingApi) {
+    await linkIdentity(db, {
+      accountId: byMessagingApi.account.id,
+      provider: "line_login",
+      providerAccountId,
+    });
+    return await applyRequestedRole(db, byMessagingApi, role);
+  }
+
+  const canonical = await resolveAccountByLineLogin(db, providerAccountId, role);
+  const identity = await linkIdentity(db, {
+    accountId: canonical.account.id,
+    provider: "line",
+    providerAccountId,
+  });
+
+  logger.info(
+    { accountId: canonical.account.id },
+    "Linked Messaging API identity to the LINE account",
+  );
+
+  return { account: canonical.account, identity };
 }
 
 /** Accountに紐づく有効なMessaging API identityを配送時に解決する。 */

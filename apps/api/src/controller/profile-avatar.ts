@@ -101,14 +101,6 @@ export async function getProfileAvatarImageContents(c: Context<AppEnv>): Promise
       return avatarImageResponse(outcome.image);
     case "unavailable":
       return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
-    case "account-not-found":
-      return c.json(
-        v.parse(AccountNotFoundErrorSchema, {
-          error: "Account not found",
-          reason: "friendship_required",
-        }),
-        404,
-      );
     case "not-configured":
     case "unauthenticated":
       return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);

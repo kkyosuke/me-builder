@@ -64,19 +64,21 @@ export const diagnosisListCases = {
       },
     },
   },
-  accountNotFound: {
+  webFirstAccountCreation: {
     id: "LIST-004",
-    name: "検証済みの本人に対応するAccountが無い場合は404を返すこと",
+    name: "友だち追加前でも検証済みの本人用Accountを作成して一覧を返すこと",
     in: {
       method: "GET",
       path: "/api/diagnoses",
       authorization: "Bearer unknown-token",
     },
     out: {
-      status: 404,
+      status: 200,
       body: {
-        error: "Account not found",
-        reason: "friendship_required",
+        diagnoses: {
+          count: 10,
+          responseStatus: "unanswered",
+        },
       },
     },
   },

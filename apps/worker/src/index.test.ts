@@ -28,7 +28,7 @@ vi.spyOn(line.client, "create").mockReturnValue({
   pushMessage: mockPushMessage,
   replyMessage: mockReplyMessage,
 } as unknown as ReturnType<typeof line.client.create>);
-vi.spyOn(D1.shared.action.account, "upsertIdentity").mockResolvedValue({
+vi.spyOn(D1.shared.action.account, "resolveAccountByLineMessagingApi").mockResolvedValue({
   account: {
     id: "account-1",
     status: "active",
