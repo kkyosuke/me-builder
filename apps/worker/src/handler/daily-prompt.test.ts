@@ -1,5 +1,5 @@
 import { D1, line } from "@me-builder/lib";
-import type { DailyPromptQueueMessage, Message } from "@me-builder/shared";
+import { type DailyPromptQueueMessage, type Message, logger } from "@me-builder/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getWorkerConfig } from "../config";
 import type { CloudflareBindings } from "../config/cloudflare";
@@ -40,19 +40,23 @@ const config = getWorkerConfig({
 
 describe("daily prompt queue consumer", () => {
   beforeEach(() => {
-    execute.mockReset().mockImplementation((accountId: string, operation: string) => {
-      if (accountId !== "account-1") throw new Error("Unexpected account");
-      if (operation === "conversation.prepareDailyPrompt") {
-        return {
-          type: "ready",
-          deliveryId: "daily-prompt:2026-08-14",
-          promptVersion: "daily-check-in-fri-v1",
-        };
-      }
-      if (operation === "conversation.markDailyPromptDelivered") return true;
-      if (operation === "conversation.markDailyPromptFailed") return true;
-      throw new Error(`Unexpected operation: ${operation}`);
-    });
+    execute
+      .mockReset()
+      .mockImplementation(async (accountId: string, operation: string, ...args: unknown[]) => {
+        if (accountId !== "account-1") throw new Error("Unexpected account");
+        if (operation === "brain.selectDailyPromptWeekdayContext") return undefined;
+        if (operation === "conversation.prepareDailyPrompt") {
+          const input = args[0] as { promptVersion: string };
+          return {
+            type: "ready",
+            deliveryId: "daily-prompt:2026-08-14",
+            promptVersion: input.promptVersion,
+          };
+        }
+        if (operation === "conversation.markDailyPromptDelivered") return true;
+        if (operation === "conversation.markDailyPromptFailed") return true;
+        throw new Error(`Unexpected operation: ${operation}`);
+      });
     pushMessage.mockReset().mockResolvedValue({});
     vi.spyOn(line.client, "create").mockReturnValue({
       pushMessage,
@@ -91,8 +95,85 @@ describe("daily prompt queue consumer", () => {
     expect(message.retry).not.toHaveBeenCalled();
   });
 
+  it("保存済みの曜日文脈に対応する定型文をPushする", async () => {
+    execute.mockResolvedValueOnce("day_off");
+    const message = createMessage();
+
+    await processDailyPromptMessage(message, bindings(), config);
+
+    expect(execute).toHaveBeenCalledWith(
+      "account-1",
+      "brain.selectDailyPromptWeekdayContext",
+      "friday",
+    );
+    expect(execute).toHaveBeenCalledWith("account-1", "conversation.prepareDailyPrompt", {
+      localDate: "2026-08-14",
+      promptVersion: "daily-check-in-day-off-v1",
+    });
+    expect(pushMessage).toHaveBeenCalledWith(
+      {
+        to: "U_line",
+        messages: [
+          {
+            type: "text",
+            text: "今日は、普段だとお休みの日だったかな。\n違っていたら気にせず、今日のことを話したいところから聞かせて。",
+          },
+        ],
+      },
+      expect.stringMatching(/^[0-9a-f-]{36}$/),
+    );
+  });
+
+  it("曜日文脈の取得に失敗しても曜日別一般文面へ戻す", async () => {
+    execute.mockRejectedValueOnce(new Error("AccountData unavailable"));
+    const message = createMessage();
+
+    await processDailyPromptMessage(message, bindings(), config);
+
+    expect(execute).toHaveBeenCalledWith("account-1", "conversation.prepareDailyPrompt", {
+      localDate: "2026-08-14",
+      promptVersion: "daily-check-in-fri-v1",
+    });
+    expect(pushMessage).toHaveBeenCalledOnce();
+    expect(message.ack).toHaveBeenCalledOnce();
+  });
+
+  it("曜日文脈の取得失敗時も既存配送に固定された個別化文面を再配送する", async () => {
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => undefined);
+    execute.mockRejectedValueOnce(new Error("AccountData unavailable")).mockResolvedValueOnce({
+      type: "ready",
+      deliveryId: "daily-prompt:2026-08-14",
+      promptVersion: "daily-check-in-day-off-v1",
+    });
+    const message = createMessage();
+
+    await processDailyPromptMessage(message, bindings(), config);
+
+    expect(pushMessage).toHaveBeenCalledWith(
+      {
+        to: "U_line",
+        messages: [
+          {
+            type: "text",
+            text: "今日は、普段だとお休みの日だったかな。\n違っていたら気にせず、今日のことを話したいところから聞かせて。",
+          },
+        ],
+      },
+      expect.stringMatching(/^[0-9a-f-]{36}$/),
+    );
+    expect(warn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "daily-prompt.weekday-context.failed",
+        outcome: "degraded",
+        disposition: "continue",
+      }),
+      "[Daily prompt] failed at daily-prompt.context -> continue without newly selected weekday context",
+    );
+    expect(message.ack).toHaveBeenCalledOnce();
+  });
+
   it("既存配送に固定された段階1の文面versionを再配送でも使う", async () => {
-    execute.mockResolvedValueOnce({
+    execute.mockResolvedValueOnce(undefined).mockResolvedValueOnce({
       type: "ready",
       deliveryId: "daily-prompt:2026-08-14",
       promptVersion: "daily-check-in-v1",
@@ -117,7 +198,7 @@ describe("daily prompt queue consumer", () => {
   });
 
   it("AccountDataがskipした日はLINEを呼ばずackする", async () => {
-    execute.mockResolvedValueOnce({
+    execute.mockResolvedValueOnce(undefined).mockResolvedValueOnce({
       type: "not-ready",
       status: "skipped",
       reason: "recent_unanswered",

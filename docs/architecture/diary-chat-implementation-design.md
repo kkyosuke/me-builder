@@ -89,7 +89,7 @@ flowchart TD
 | ingest Worker | 冪等な原本保存、Account解決、Coordinator通知 | 会話順序の独自判断、AI生成 |
 | Coordinator | Account内の順序、連投集約、Session、Turn lease、外部I/Oのoutboxと締切 | 原本やBrain Itemの正本保持 |
 | generate Worker | Context構築、安全判定、prompt実行、出力検証 | Account IDや権限をモデルへ決めさせること |
-| daily prompt job | 日本時間18時の対象列挙、Queue投入、曜日別一般文面のLINE Push | Cron内での全件Push、本人情報を使った文面生成 |
+| daily prompt job | 日本時間18時の対象列挙、Queue投入、曜日とAccountDataが選んだ文脈に対応する版付き定型文のLINE Push | Cron内での全件Push、本人情報からの自由文生成 |
 | AccountData | 原本、Session、message、Brain Item、Diagnosis回答、Account内maintenance | 会話の実行lock、他Accountのデータ保持 |
 | 共有D1 | Identity解決、公開Question・Diagnosis catalog | Account所有原文、Brain Item本文 |
 | Vectorize | 利用可能なBrain Itemの候補検索 | 認可、削除・撤回・無効化状態の最終判定 |
@@ -386,7 +386,7 @@ Brain Itemを含むAccount所有データのquery境界は、[Accountデータ�
 | `life_schedule` | `occupation`、`weekly_rhythm`、`recurring_schedule` | 仕事・学校など今の立場から、週間リズムや曜日別予定へつなぐ |
 | `conversation_preference` | `rest_window`、`question_style` | 一息つきやすい時間から、返信しやすい聞かれ方へつなぐ |
 
-1セッションでシステムから確認するテーマは最大1件、そのテーマ内の確認質問は最大2件とします。この上限はシステム側からの質問にだけ適用し、本人が自然に複数テーマの属性を明言した場合の抽出・保存は制限しません。初期実装では高優先の5属性を対象とし、本人が明言した命題だけを既存の日記Brain Item抽出経路で保存します。既存Itemへ構造化属性を補う場合は、その属性を生成したprompt versionも別に記録します。保存した属性を能動配信の文面へ利用する処理は別の後続段階とします。
+1セッションでシステムから確認するテーマは最大1件、そのテーマ内の確認質問は最大2件とします。この上限はシステム側からの質問にだけ適用し、本人が自然に複数テーマの属性を明言した場合の抽出・保存は制限しません。初期実装では高優先の5属性を対象とし、本人が明言した命題だけを既存の日記Brain Item抽出経路で保存します。既存Itemへ構造化属性を補う場合は、その属性を生成したprompt versionも別に記録します。
 
 自然な確認質問では、activeかつValid Time内で、根拠とAccess Labelが有効な`promptContext.kind`をAccountDataから取得します。収集目標は保存済みkindと同じSessionで質問済みのテーマ・kindを除外し、質問可能な候補だけを日記チャットのsystem promptへ渡します。最初の質問前は複数テーマを候補にできますが、モデルが1件を選んで質問した時点で`chat_turns.collection_theme_id`と`collection_kind`へ記録し、以後は同じテーマだけを候補にします。質問済みkindは未回答でも再候補にせず、2問に達したSessionでは候補を渡しません。
 
@@ -398,17 +398,27 @@ Brain Itemを含むAccount所有データのquery境界は、[Accountデータ�
 
 同一checkpoint内の意味重複判定が競合する`promptContext`をまとめようとした場合は、構造化属性の決定的検証を優先して候補を分離します。既存Itemとの意味重複判定が異なる職業・週間リズムを指した場合もEvidence追加にはせず、上記の改訂として保存します。モデル判定の競合だけを理由にcheckpoint全体を再試行しません。
 
+18時の声かけでは、Workerが配送日の曜日をAccountDataへ渡し、AccountDataが本人所有、active、Valid Time内、未削除、activeなAccess Labelと`supports` Evidenceを持つBrain Itemだけを再検証します。利用候補は次の優先順で1件に絞ります。
+
+1. 当日の曜日を含む`recurring_schedule`
+2. `fixed_weekly`で当日の曜日を`daysOff`に含む`weekly_rhythm`
+3. `fixed_weekly`で当日の曜日を`activeWeekdays`に含む`weekly_rhythm`
+
+`variable_shift`と`irregular`は固定曜日を断定できないため、曜日別個別化には使いません。AccountDataからWorkerへ返すのは`recurring_schedule`、`day_off`、`active_day`の区分だけとし、予定名、Brain Item本文、Source Record本文、各IDは返しません。Workerは区分に対応するレビュー済み定型文を選び、候補がない場合や候補取得に失敗した場合は曜日別一般文面へ戻します。定型文は予定や感情を断定せず、本人が訂正したり別の話題を選べる表現にします。
+
+選んだ定型文は`daily_prompt_deliveries.prompt_version`へ配送準備時に固定します。Queue再配送時にBrain Itemが更新されても、既存配送は保存済みversionの本文を使い、別文面による追加通知へ変えません。当日の日中の終了済み会話と前日の継続話題は、この曜日文脈より優先する後続段階として扱います。
+
 現行実装との差分は次のとおりです。
 
 | 要素 | 現在 | 声かけ個別化で必要な対応 |
 | --- | --- | --- |
 | Brain Item、Evidence、Valid Time | 実装済み | 既存構造を利用する |
-| `firstObservedAt` / `lastObservedAt` | Evidenceからの導出を実装済み | 声かけ候補取得でも返す |
+| `firstObservedAt` / `lastObservedAt` | Evidenceからの導出を実装済み | BrainのEvidenceから導出し、通知用の区分には含めない |
 | 日記からの`identity`生成 | 実装済み | 本人が明言した現在の立場・職業だけを候補にする |
 | `attributes.promptContext` | 高優先5属性のschema、抽出・保存、Session上限付きの自然な確認質問まで実装済み | 中・低優先属性は後続で追加する |
-| 曜日・本人情報からの声かけ候補取得 | 未対応 | active、Valid Time、Evidence、Access Policyを再検証して必要最小限を返す |
+| 曜日・本人情報からの声かけ候補取得 | `recurring_schedule`と`fixed_weekly`を再検証し、予定名を含まない3区分から1件を返す処理まで実装済み | 当日の日中と前日の継続文脈を後続で追加する |
 | 時刻帯・声かけ方針の自動選択 | 未対応 | 本人の明言を優先し、本人自身の返信実績が不足する間は18時の標準候補へ戻す選択器を追加する。クライアントからAccount IDや選択結果を指定させない |
-| 18時の能動配信 | 曜日別一般文面、専用Queue、AccountDataの配送状態まで実装済み | 本人情報による時刻・文面調整は[日記チャット体験設計](../product/diary-chat-experience.md)の後続段階で追加する |
+| 18時の能動配信 | 曜日別一般文面、曜日文脈の版付き定型文、専用Queue、AccountDataの配送状態まで実装済み | 日中・前日文脈と本人情報による時刻調整は[日記チャット体験設計](../product/diary-chat-experience.md)の後続段階で追加する |
 
 開発用の確認機能は、本人確認済みAccountに対して、一覧取得用の`brain.listActive`とVector実体確認用の`brain.findActiveVectorEntry`をAccountData RPCへ公開します。`brain.listActive`はactiveかつ未削除のItem、未削除Evidence、最新のVector同期jobと対応表の有無を最大100件返します。Web UIは各Itemに同期状態、試行回数、失敗code、次回試行時刻を表示します。`applied`はVectorizeが更新を受け付けてAccountDataへ完了記録した状態であり、Vectorize上の実体確認とは区別します。
 
@@ -466,12 +476,12 @@ Vectorizeへのupsertまたはdelete受付後に`applied`とmutation IDを記録
 
 ### 4.9 `daily_prompt_deliveries`
 
-18時の声かけはAccountDataにAccountと日本日付ごとの配送状態を保存します。本文はコード上のversion付き曜日別一般文面を正とし、このtableへ複製しません。段階1の文面versionも、作成済み配送の再送互換性のため残します。
+18時の声かけはAccountDataにAccountと日本日付ごとの配送状態を保存します。本文はコード上のversion付き曜日別一般文面または曜日文脈の定型文を正とし、このtableへ複製しません。段階1の文面versionも、作成済み配送の再送互換性のため残します。
 
 | 列 | 用途 |
 | --- | --- |
 | `id`, `account_id`, `local_date` | 配送ID、所有Account、`Asia/Tokyo`の配送日。`(account_id, local_date)`を一意にする |
-| `prompt_version` | 配送準備時に選んだ曜日別文面のversion。再配送でも変更しない |
+| `prompt_version` | 配送準備時に選んだ曜日別一般文面または曜日文脈定型文のversion。再配送でも変更しない |
 | `status` | `pending` / `delivered` / `skipped` / `failed` |
 | `skip_reason` | `manual_stopped` / `stale` / `active_session` / `user_activity` / `recent_unanswered` / `auto_paused`。本文や推定理由は保存しない |
 | `failure_stage` | 再試行不能で終端した工程の安全なcode |

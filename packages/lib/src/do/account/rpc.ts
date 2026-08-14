@@ -48,6 +48,10 @@ export type AccountDataActions = {
     [at?: Date],
     typeof brain.listActivePromptContextKinds
   >;
+  "brain.selectDailyPromptWeekdayContext": RpcAction<
+    [weekday: Parameters<typeof brain.selectDailyPromptWeekdayContext>[2], at?: Date],
+    typeof brain.selectDailyPromptWeekdayContext
+  >;
   "brain.loadSemanticDedupCandidates": RpcAction<
     [vectorIds: readonly string[], categories: readonly string[]],
     typeof brain.loadBrainSemanticDedupCandidates

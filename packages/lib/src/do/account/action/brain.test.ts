@@ -6,6 +6,7 @@ import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { describe, expect, it } from "vitest";
 import type { AccountDataDatabase } from "../database";
 import { accountSchema as schema } from "../database";
+import type { PromptContext } from "../prompt-context";
 import {
   type SaveBrainItemInput,
   claimDueBrainVectorSyncJobs,
@@ -22,6 +23,7 @@ import {
   resetAllFailedBrainVectorSyncJobs,
   resetFailedBrainVectorSyncJob,
   saveBrainItem,
+  selectDailyPromptWeekdayContext,
 } from "./brain";
 
 function createTestDb(): AccountDataDatabase {
@@ -82,6 +84,54 @@ async function insertAccountsAndSources(db: AccountDataDatabase) {
     id: "source-1",
     accountId: "account-1",
     kind: "user_input",
+  });
+}
+
+async function savePromptContextFixture(
+  db: AccountDataDatabase,
+  input: Readonly<{
+    suffix: string;
+    category: string;
+    promptContext: PromptContext;
+    isInference?: boolean;
+    at?: Date;
+  }>,
+) {
+  const at = input.at ?? new Date("2026-08-10T00:00:00Z");
+  const sourceRecordId = `source-${input.suffix}`;
+  await db.insert(schema.sourceRecords).values({
+    id: sourceRecordId,
+    accountId: "account-1",
+    kind: "user_input",
+    createdAt: at,
+    updatedAt: at,
+  });
+  const base = createInput();
+  return await saveBrainItem(db, {
+    at,
+    item: {
+      ...base.item,
+      id: `brain-${input.suffix}`,
+      category: input.category,
+      statement: `声かけ属性 ${input.suffix}`,
+      attributes: {
+        sourceKind: "diary",
+        isInference: input.isInference ?? false,
+        promptContext: input.promptContext,
+      },
+    },
+    evidence: [
+      {
+        id: `evidence-${input.suffix}`,
+        sourceRecordId,
+        relation: "supports",
+        isDerivationTrigger: true,
+        derivationMethod: "ai",
+        generatedAt: at,
+      },
+    ],
+    accessLabels: [{ id: `access-${input.suffix}`, label: "unclassified", assignedBy: "system" }],
+    topicLabels: [{ id: `topic-${input.suffix}`, label: "diary" }],
   });
 }
 
@@ -542,6 +592,169 @@ describe("listActivePromptContextKinds", () => {
       .set({ isDeleted: true, deletedAt: at, updatedAt: at })
       .where(eq(schema.brainItemAccessLabels.id, "access-1"));
     await expect(listActivePromptContextKinds(db, "account-1", at)).resolves.toEqual([]);
+  });
+});
+
+describe("selectDailyPromptWeekdayContext", () => {
+  it("同じ曜日では定期予定を週間リズムより優先し、予定名を返さない", async () => {
+    const db = createTestDb();
+    await insertAccountsAndSources(db);
+    const at = new Date("2026-08-10T09:00:00Z");
+    await savePromptContextFixture(db, {
+      suffix: "day-off",
+      category: "behavior_pattern",
+      promptContext: {
+        kind: "weekly_rhythm",
+        scheduleMode: "fixed_weekly",
+        daysOff: ["monday"],
+      },
+      at,
+    });
+    await savePromptContextFixture(db, {
+      suffix: "lesson",
+      category: "behavior_pattern",
+      promptContext: {
+        kind: "recurring_schedule",
+        activity: "英会話教室",
+        weekdays: ["monday"],
+      },
+      at,
+    });
+
+    await expect(selectDailyPromptWeekdayContext(db, "account-1", "monday", at)).resolves.toBe(
+      "recurring_schedule",
+    );
+    await expect(
+      selectDailyPromptWeekdayContext(db, "account-1", "tuesday", at),
+    ).resolves.toBeUndefined();
+  });
+
+  it.each([
+    [
+      "固定休",
+      {
+        kind: "weekly_rhythm",
+        scheduleMode: "fixed_weekly",
+        daysOff: ["monday"],
+      },
+      "day_off",
+    ],
+    [
+      "固定活動日",
+      {
+        kind: "weekly_rhythm",
+        scheduleMode: "fixed_weekly",
+        activeWeekdays: ["monday"],
+      },
+      "active_day",
+    ],
+    ["変動シフト", { kind: "weekly_rhythm", scheduleMode: "variable_shift" }, undefined],
+  ] satisfies ReadonlyArray<readonly [string, PromptContext, string | undefined]>)(
+    "%sを安全な曜日区分へ変換する",
+    async (_name, promptContext, expected) => {
+      const db = createTestDb();
+      await insertAccountsAndSources(db);
+      const at = new Date("2026-08-10T09:00:00Z");
+      await savePromptContextFixture(db, {
+        suffix: "rhythm",
+        category: "behavior_pattern",
+        promptContext,
+        at,
+      });
+
+      await expect(selectDailyPromptWeekdayContext(db, "account-1", "monday", at)).resolves.toBe(
+        expected,
+      );
+    },
+  );
+
+  it("推定、分類不一致、無効なAccess Labelを個別化へ使わない", async () => {
+    const db = createTestDb();
+    await insertAccountsAndSources(db);
+    const at = new Date("2026-08-10T09:00:00Z");
+    await savePromptContextFixture(db, {
+      suffix: "inferred",
+      category: "behavior_pattern",
+      promptContext: {
+        kind: "recurring_schedule",
+        activity: "習い事",
+        weekdays: ["monday"],
+      },
+      isInference: true,
+      at,
+    });
+    await savePromptContextFixture(db, {
+      suffix: "wrong-category",
+      category: "identity",
+      promptContext: {
+        kind: "recurring_schedule",
+        activity: "習い事",
+        weekdays: ["monday"],
+      },
+      at,
+    });
+    await savePromptContextFixture(db, {
+      suffix: "deleted-access",
+      category: "behavior_pattern",
+      promptContext: {
+        kind: "weekly_rhythm",
+        scheduleMode: "fixed_weekly",
+        daysOff: ["monday"],
+      },
+      at,
+    });
+    await db
+      .update(schema.brainItemAccessLabels)
+      .set({ isDeleted: true, deletedAt: at, updatedAt: at })
+      .where(eq(schema.brainItemAccessLabels.id, "access-deleted-access"));
+
+    await expect(
+      selectDailyPromptWeekdayContext(db, "account-1", "monday", at),
+    ).resolves.toBeUndefined();
+  });
+
+  it("有効期間外、旧版、根拠削除済みの属性を個別化へ使わない", async () => {
+    const db = createTestDb();
+    await insertAccountsAndSources(db);
+    const at = new Date("2026-08-10T09:00:00Z");
+    await savePromptContextFixture(db, {
+      suffix: "lifecycle",
+      category: "behavior_pattern",
+      promptContext: {
+        kind: "recurring_schedule",
+        activity: "習い事",
+        weekdays: ["monday"],
+      },
+      at,
+    });
+
+    await db
+      .update(schema.brainItems)
+      .set({ validFrom: new Date(at.getTime() + 1_000), updatedAt: at })
+      .where(eq(schema.brainItems.id, "brain-lifecycle"));
+    await expect(
+      selectDailyPromptWeekdayContext(db, "account-1", "monday", at),
+    ).resolves.toBeUndefined();
+
+    await db
+      .update(schema.brainItems)
+      .set({ validFrom: null, status: "superseded", updatedAt: at })
+      .where(eq(schema.brainItems.id, "brain-lifecycle"));
+    await expect(
+      selectDailyPromptWeekdayContext(db, "account-1", "monday", at),
+    ).resolves.toBeUndefined();
+
+    await db
+      .update(schema.brainItems)
+      .set({ status: "active", updatedAt: at })
+      .where(eq(schema.brainItems.id, "brain-lifecycle"));
+    await db
+      .update(schema.sourceRecords)
+      .set({ isDeleted: true, deletedAt: at, updatedAt: at })
+      .where(eq(schema.sourceRecords.id, "source-lifecycle"));
+    await expect(
+      selectDailyPromptWeekdayContext(db, "account-1", "monday", at),
+    ).resolves.toBeUndefined();
   });
 });
 

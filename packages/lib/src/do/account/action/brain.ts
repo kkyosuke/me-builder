@@ -3,6 +3,7 @@ import type { AccountDataDatabase } from "../database";
 import {
   PROMPT_CONTEXT_ATTRIBUTE_MASTER,
   type PromptContextKind,
+  type PromptContextWeekday,
   readPromptContext,
 } from "../prompt-context";
 import {
@@ -128,6 +129,9 @@ export type BrainSemanticDedupCandidate = Readonly<{
   isInference: boolean;
 }>;
 
+/** 通知へ予定名や本文を出さず、曜日に合う定型文だけを選ぶための区分。 */
+export type DailyPromptWeekdayContext = "recurring_schedule" | "day_off" | "active_day";
+
 /** 自然な確認質問の重複を避けるため、現在利用できる声かけ属性のkindだけを返す。 */
 export async function listActivePromptContextKinds(
   db: AccountDataDatabase,
@@ -179,6 +183,81 @@ export async function listActivePromptContextKinds(
   return PROMPT_CONTEXT_ATTRIBUTE_MASTER.map(({ kind }) => kind).filter((kind) =>
     collected.has(kind),
   );
+}
+
+/**
+ * 現在利用できる明言済みの曜日情報を再検証し、通知に必要な区分を1件だけ返す。
+ * 予定名、Brain Item ID、Evidence IDはAccountDataの外へ返さない。
+ */
+export async function selectDailyPromptWeekdayContext(
+  db: AccountDataDatabase,
+  accountId: string,
+  weekday: PromptContextWeekday,
+  at = new Date(),
+): Promise<DailyPromptWeekdayContext | undefined> {
+  const rows = await db
+    .select({
+      category: brainItems.category,
+      attributes: brainItems.attributes,
+      derivation: brainItems.derivation,
+    })
+    .from(brainItems)
+    .innerJoin(
+      brainItemAccessLabels,
+      and(
+        eq(brainItemAccessLabels.brainItemId, brainItems.id),
+        eq(brainItemAccessLabels.isDeleted, false),
+      ),
+    )
+    .innerJoin(
+      brainItemEvidenceEdges,
+      and(
+        eq(brainItemEvidenceEdges.brainItemId, brainItems.id),
+        eq(brainItemEvidenceEdges.relation, "supports"),
+        eq(brainItemEvidenceEdges.isDeleted, false),
+      ),
+    )
+    .innerJoin(
+      sourceRecords,
+      and(
+        eq(sourceRecords.id, brainItemEvidenceEdges.sourceRecordId),
+        eq(sourceRecords.accountId, accountId),
+        eq(sourceRecords.isDeleted, false),
+      ),
+    )
+    .where(
+      and(
+        eq(brainItems.accountId, accountId),
+        eq(brainItems.category, "behavior_pattern"),
+        eq(brainItems.status, "active"),
+        eq(brainItems.isDeleted, false),
+        or(isNull(brainItems.validFrom), lte(brainItems.validFrom, at)),
+        or(isNull(brainItems.validTo), gt(brainItems.validTo, at)),
+      ),
+    )
+    .all();
+
+  let hasDayOff = false;
+  let hasActiveDay = false;
+  for (const row of rows) {
+    if (brainItemIsInference(row.attributes, row.derivation)) continue;
+    const promptContext = readPromptContext(row.attributes);
+    if (!promptContext) continue;
+    const definition = PROMPT_CONTEXT_ATTRIBUTE_MASTER.find(
+      ({ kind }) => kind === promptContext.kind,
+    );
+    if (definition?.category !== row.category) continue;
+    if (promptContext.kind === "recurring_schedule" && promptContext.weekdays.includes(weekday)) {
+      return "recurring_schedule";
+    }
+    if (promptContext.kind !== "weekly_rhythm" || promptContext.scheduleMode !== "fixed_weekly") {
+      continue;
+    }
+    if (promptContext.daysOff?.includes(weekday)) hasDayOff = true;
+    if (promptContext.activeWeekdays?.includes(weekday)) hasActiveDay = true;
+  }
+  if (hasDayOff) return "day_off";
+  return hasActiveDay ? "active_day" : undefined;
 }
 
 function brainItemIsInference(attributes: unknown, derivation: "ai" | "deterministic"): boolean {

@@ -27,6 +27,7 @@ export type {
   AppliedBrainVectorSync,
   BrainChatContextMemory,
   BrainSemanticDedupCandidate,
+  DailyPromptWeekdayContext,
   FailedBrainVectorSyncJob,
   FailedBrainVectorSyncJobList,
 } from "./account/action/brain";
@@ -73,4 +74,5 @@ export type {
   PromptContextCollectionTarget,
   PromptContextKind,
   PromptContextPriority,
+  PromptContextWeekday,
 } from "./account/prompt-context";
