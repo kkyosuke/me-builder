@@ -48,8 +48,9 @@ seedは必ずmigration適用後に実行します。localでは開発者が明�
 | 40 | `time-planning` | 時間と予定 | `partner` | すべてversion 1 | 2026-08-04 00:00:00 UTC |
 | 50 | `conversation-emotion` | 会話と感情表現 | `partner` | すべてversion 1 | 2026-08-04 00:00:00 UTC |
 | 60 | `life-priorities` | 優先順位と人生の方向性 | `general` | すべてversion 1 | 2026-08-14 00:00:00 UTC |
+| 70 | `work-values` | 仕事の価値観・働き方 | `work` | すべてversion 1 | 2026-08-14 00:00:00 UTC |
 
-いずれも終了日時を持たず、Question Versionは`approved`、Diagnosisは`published`として登録します。先行5件の質問は交際、家計、パートナーとの余暇、一緒に過ごす時間、愛情表現など、パートナーとの関係を前提にしているため`partner`とします。「優先順位と人生の方向性」は、特定の関係を前提にせず本人の仕事、健康、趣味、安定、挑戦を尋ねるため`general`とします。Relationship Category追加時のmigrationで既存行へ入る`general`は、先行5件に限りseedの条件付きUPSERTで`partner`へ補正します。すでに別カテゴリを持つ行は上書きしません。Diagnosisには一覧表示用の短い説明、表示順、版付き採点設定への参照を持たせます。Choiceは「いいえ」「はい」の2件です。表示順は診断内容ではなく一覧上の優先順位として変更でき、将来の差し込みに備えて10刻みで設定します。
+いずれも終了日時を持たず、Question Versionは`approved`、Diagnosisは`published`として登録します。先行5件の質問は交際、家計、パートナーとの余暇、一緒に過ごす時間、愛情表現など、パートナーとの関係を前提にしているため`partner`とします。「優先順位と人生の方向性」は、特定の関係を前提にせず本人の仕事、健康、趣味、安定、挑戦を尋ねるため`general`とします。「仕事の価値観・働き方」は、仕事、雇用、待遇、勤務時間、評価を判断対象にするため`work`とします。Relationship Category追加時のmigrationで既存行へ入る`general`は、先行5件に限りseedの条件付きUPSERTで`partner`へ補正します。すでに別カテゴリを持つ行は上書きしません。Diagnosisには一覧表示用の短い説明、表示順、版付き採点設定への参照を持たせます。Choiceは「いいえ」「はい」の2件です。表示順は診断内容ではなく一覧上の優先順位として変更でき、将来の差し込みに備えて10刻みで設定します。
 
 ## 5. 実行方法
 
@@ -86,16 +87,16 @@ SQL末尾の検証クエリは、現在のseedだけを適用した場合に次�
 
 | 項目 | 期待値 |
 | --- | ---: |
-| Diagnosis | 6 |
-| Question Version | 60 |
-| Choice | 120 |
-| Diagnosis Question | 60 |
-| Diagnosis Scoring Config | 6 |
+| Diagnosis | 7 |
+| Question Version | 70 |
+| Choice | 140 |
+| Diagnosis Question | 70 |
+| Diagnosis Scoring Config | 7 |
 
 件数だけでなく、次も確認します。
 
 - Diagnosisが`published`で、受付開始日時を過ぎている
-- 先行5件のRelationship Categoryが`partner`であり、「優先順位と人生の方向性」が`general`である
+- 先行5件のRelationship Categoryが`partner`であり、「優先順位と人生の方向性」が`general`、「仕事の価値観・働き方」が`work`である
 - 1つのDiagnosisにposition 0から9までの10問がある
 - 各Question Versionが`approved`である
 - 各Question Versionにposition 0の「いいえ」とposition 1の「はい」がある

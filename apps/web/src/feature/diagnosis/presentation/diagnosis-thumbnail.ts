@@ -5,6 +5,7 @@ const diagnosisThumbnails: Record<string, string> = {
   "time-planning": "/images/diagnoses/time-planning.jpg",
   "conversation-emotion": "/images/diagnoses/conversation-emotion.jpg",
   "life-priorities": "/images/diagnoses/life-priorities.jpg",
+  "work-values": "/images/diagnoses/work-values.jpg",
 };
 
 export function getDiagnosisThumbnail(diagnosisId: string): string {
