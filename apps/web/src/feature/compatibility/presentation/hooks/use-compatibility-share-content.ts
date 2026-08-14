@@ -7,8 +7,10 @@ import type { CompatibilityShareContent } from "../../model/compatibility-share-
 
 export function useCompatibilityShareContent({
   acquireIdToken,
+  latestProfileSummaryVersionId,
 }: {
   acquireIdToken: (signal: AbortSignal) => Promise<string | null>;
+  latestProfileSummaryVersionId: string | null | undefined;
 }) {
   const [relationshipCategory, setRelationshipCategory] =
     useState<CompatibilityRelationshipCategory>("partner");
@@ -18,6 +20,7 @@ export function useCompatibilityShareContent({
   const cache = useRef<
     Partial<Record<CompatibilityRelationshipCategory, CompatibilityShareContent>>
   >({});
+  const cachedProfileSummaryVersionId = useRef(latestProfileSummaryVersionId);
   const request = useRef<AbortController | null>(null);
 
   const load = useCallback(
@@ -59,8 +62,18 @@ export function useCompatibilityShareContent({
   );
 
   useEffect(() => {
-    void load(relationshipCategory);
-  }, [load, relationshipCategory]);
+    const profileSummaryChanged =
+      latestProfileSummaryVersionId !== undefined &&
+      cachedProfileSummaryVersionId.current !== undefined &&
+      cachedProfileSummaryVersionId.current !== latestProfileSummaryVersionId;
+    if (profileSummaryChanged) {
+      cache.current = {};
+    }
+    if (latestProfileSummaryVersionId !== undefined) {
+      cachedProfileSummaryVersionId.current = latestProfileSummaryVersionId;
+    }
+    void load(relationshipCategory, profileSummaryChanged);
+  }, [latestProfileSummaryVersionId, load, relationshipCategory]);
 
   useEffect(
     () => () => {

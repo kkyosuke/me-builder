@@ -15,6 +15,9 @@ export default function ProfileApplication() {
       result.versions.find(({ isLatest }) => isLatest) ??
       result.versions[0])
     : undefined;
+  const latestVersionId = result
+    ? (result.versions.find(({ isLatest }) => isLatest)?.id ?? result.versions[0]?.id ?? null)
+    : undefined;
   const screenState =
     summary.state.status === "success"
       ? {
@@ -39,7 +42,10 @@ export default function ProfileApplication() {
       {...(result && result.versions.length > 1 ? { onSelectVersion: setSelectedVersionId } : {})}
       {...(result ? { onRegenerate: () => void summary.generate() } : {})}
     >
-      <CompatibilityShareContentSection acquireIdToken={liffSession.acquireIdToken} />
+      <CompatibilityShareContentSection
+        acquireIdToken={liffSession.acquireIdToken}
+        latestProfileSummaryVersionId={latestVersionId}
+      />
     </ProfileSummaryScreen>
   );
 }

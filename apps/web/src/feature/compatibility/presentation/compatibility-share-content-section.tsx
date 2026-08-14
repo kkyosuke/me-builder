@@ -1,9 +1,11 @@
-import type { CompatibilityRelationshipCategory } from "@me-builder/lib/compatibility";
+import {
+  type CompatibilityRelationshipCategory,
+  compatibilityRelationshipCategoryValues,
+} from "@me-builder/lib/compatibility";
 import { BookOpenText, HeartHandshake, RefreshCw, ShieldCheck } from "lucide-react";
 import type { AsyncState } from "../../../model/async-state";
 import {
   diagnosisCategoryHref,
-  filterableRelationshipCategoryValues,
   getRelationshipCategoryFilterClassName,
   getRelationshipCategoryLabel,
 } from "../../diagnosis/model/relationship-category";
@@ -153,12 +155,12 @@ export function CompatibilityShareContentSectionScreen({
         うつしで共有される内容
       </h2>
       <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-        招待した相手が承諾したあと、選んだ関係に応じて次の内容が共有されます。
+        招待が承諾され、2人の共有が始まったあと、選んだ関係に応じて次の内容が共有されます。
       </p>
 
       <fieldset className="-mx-4 mt-5 flex min-w-0 gap-2 overflow-x-auto border-0 px-4 pt-0 pb-1 sm:mx-0 sm:px-0">
         <legend className="sr-only">共有内容を確認する関係カテゴリ</legend>
-        {filterableRelationshipCategoryValues.map((category) => (
+        {compatibilityRelationshipCategoryValues.map((category) => (
           <button
             type="button"
             key={category}
@@ -207,10 +209,15 @@ export function CompatibilityShareContentSectionScreen({
 
 export function CompatibilityShareContentSection({
   acquireIdToken,
+  latestProfileSummaryVersionId,
 }: {
   acquireIdToken: (signal: AbortSignal) => Promise<string | null>;
+  latestProfileSummaryVersionId: string | null | undefined;
 }) {
-  const content = useCompatibilityShareContent({ acquireIdToken });
+  const content = useCompatibilityShareContent({
+    acquireIdToken,
+    latestProfileSummaryVersionId,
+  });
   return (
     <CompatibilityShareContentSectionScreen
       relationshipCategory={content.relationshipCategory}

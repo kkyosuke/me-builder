@@ -798,6 +798,7 @@ export function ProfileSummaryScreen({
   onRetry,
   onSelectVersion,
   onRegenerate,
+  children,
 }: {
   state: AsyncState<ProfileSummaryResult>;
   generationNotice?: ProfileSummaryGenerationNotice | null;
@@ -806,6 +807,7 @@ export function ProfileSummaryScreen({
   onRetry: () => void;
   onSelectVersion?: (versionId: string) => void;
   onRegenerate?: () => void;
+  children?: ReactNode;
 }) {
   return (
     <main className="mx-auto min-h-dvh w-full max-w-2xl px-4 py-8 pb-28 sm:px-8">
@@ -875,6 +877,8 @@ export function ProfileSummaryScreen({
           {state.data.summary && <NextAction action={state.data.nextAction} />}
         </>
       )}
+
+      {children}
 
       <MainNavigation current="me" />
     </main>

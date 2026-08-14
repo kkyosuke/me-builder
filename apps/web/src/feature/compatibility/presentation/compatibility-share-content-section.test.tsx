@@ -52,9 +52,11 @@ describe("CompatibilityShareContentSectionScreen", () => {
     );
 
     expect(screen.getByRole("heading", { name: "うつしで共有される内容" })).toBeTruthy();
+    expect(screen.getByText(/招待が承諾され、2人の共有が始まったあと/)).toBeTruthy();
     expect(screen.getByRole("button", { name: "パートナー" }).getAttribute("aria-pressed")).toBe(
       "true",
     );
+    expect(screen.queryByRole("button", { name: "自分自身" })).toBeNull();
     expect(screen.getByText("「私は、一緒に楽しむ時間を大切にしたいです」")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "時間と予定" })).toBeTruthy();
     expect(screen.getByText("私は、予定を早めに決めておけると安心します。")).toBeTruthy();
