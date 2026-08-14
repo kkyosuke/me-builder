@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import type { AsyncState } from "../../../model/async-state";
 import {
+  diagnosisCategoryHref,
   getRelationshipCategoryBadgeClassName,
   getRelationshipCategoryLabel,
 } from "../../diagnosis/model/relationship-category";
@@ -131,6 +132,10 @@ function ShareConsentContent({
 }) {
   const displayName = consent.displayName ?? "あなた";
   const guide = consent.nextAction ? nextActionGuides[consent.nextAction] : null;
+  const guideHref =
+    guide && consent.nextAction === "diagnosis" && relationshipCategory
+      ? diagnosisCategoryHref(relationshipCategory)
+      : guide?.href;
 
   return (
     <>
@@ -192,7 +197,7 @@ function ShareConsentContent({
         <section className="mt-8 rounded-2xl border border-sky-300/60 bg-sky-50 p-4 dark:border-sky-500/30 dark:bg-sky-950/30">
           <p className="text-sm leading-relaxed text-sky-950 dark:text-sky-100">{guide.message}</p>
           <a
-            href={guide.href}
+            href={guideHref}
             className="mt-3 flex min-h-11 items-center justify-center rounded-xl bg-sky-300 px-4 py-2 text-sm font-bold text-sky-950"
           >
             {guide.label}

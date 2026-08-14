@@ -1,4 +1,6 @@
+import type { CompatibilityRelationshipCategory } from "@me-builder/lib/compatibility";
 import { BookOpenText, HeartHandshake, Lightbulb, MessageCircleQuestion } from "lucide-react";
+import { diagnosisCategoryHref } from "../../../diagnosis/model/relationship-category";
 import type { CompatibilityPerson, CompatibilityTheme } from "../../model/compatibility";
 import { CompatibilityAvatar } from "./compatibility-ui";
 
@@ -133,9 +135,11 @@ function AxisComparison({
 export function CompatibilityPairSheet({
   me,
   partner,
+  relationshipCategory,
 }: {
   me: CompatibilityPerson;
   partner: CompatibilityPerson;
+  relationshipCategory: CompatibilityRelationshipCategory;
 }) {
   const pairs = me.themes.flatMap((theme) => {
     const partnerTheme = partner.themes.find((candidate) => candidate.id === theme.id);
@@ -217,7 +221,7 @@ export function CompatibilityPairSheet({
           回答が増えると、比較できるテーマも増えていきます。
         </p>
         <a
-          href="/diagnosis"
+          href={diagnosisCategoryHref(relationshipCategory)}
           className="mt-3 inline-flex min-h-10 items-center text-sm font-bold text-sky-700 dark:text-sky-300"
         >
           診断を見てみる

@@ -16,6 +16,7 @@ export default function CompatibilityListApplication() {
     try {
       const destination = await shareCompatibilityInvitationToLine(
         profile?.displayName ?? null,
+        item.relationshipCategory,
         item.invitationUrl,
       );
       setSharingMessage(

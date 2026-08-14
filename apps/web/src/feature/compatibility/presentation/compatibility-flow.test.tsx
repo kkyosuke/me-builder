@@ -260,7 +260,7 @@ describe("Compatibility flow", () => {
 
     expect(screen.getByText(/2人で比べられるテーマが増えます/)).toBeTruthy();
     expect(screen.getByRole("link", { name: "診断を始める" }).getAttribute("href")).toBe(
-      "/diagnosis",
+      "/diagnosis?category=partner",
     );
     expect(
       screen.getByRole("button", { name: "共有して招待リンクを発行する" }).hasAttribute("disabled"),
@@ -298,7 +298,7 @@ describe("Compatibility flow", () => {
       expiresAt: "2026-08-26T00:00:00.000Z",
       canAccept: true,
       blockingReasons: [],
-      nextAction: null,
+      nextAction: "diagnosis",
     };
     const onAccept = vi.fn();
     render(
@@ -318,6 +318,9 @@ describe("Compatibility flow", () => {
     expect(screen.queryByText(/傾向があります/)).toBeNull();
     expect(screen.queryByRole("checkbox")).toBeNull();
     expect(screen.getByText(/日記やLINEの会話本文/)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "診断を見る" }).getAttribute("href")).toBe(
+      "/diagnosis?category=family",
+    );
     expect(screen.getByRole("button", { name: "相性を見てみる" }).hasAttribute("disabled")).toBe(
       false,
     );
@@ -381,6 +384,9 @@ describe("Compatibility flow", () => {
     expect(screen.getByRole("heading", { name: "あおいさんについて" })).toBeTruthy();
 
     fireEvent.click(screen.getByRole("tab", { name: "2人について" }));
+    expect(screen.getByRole("link", { name: "診断を見てみる" }).getAttribute("href")).toBe(
+      "/diagnosis?category=partner",
+    );
 
     fireEvent.click(screen.getByRole("button", { name: "共有を終了する" }));
     expect(

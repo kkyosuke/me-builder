@@ -128,7 +128,11 @@ describe("LIFF compatibility share link journey", () => {
       ),
     );
     fireEvent.click(await screen.findByRole("button", { name: "友だちに送る" }));
-    expect(mocks.shareCompatibilityInvitationToLine).toHaveBeenCalledWith("あおい", invitationUrl);
+    expect(mocks.shareCompatibilityInvitationToLine).toHaveBeenCalledWith(
+      "あおい",
+      "partner",
+      invitationUrl,
+    );
 
     await act(async () => {
       window.history.pushState({}, "", `/compatibility/invitations/${relationshipId}`);

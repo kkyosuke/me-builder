@@ -1,9 +1,13 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useLiffSession } from "../../liff";
 import {
   diagnosisResultIdFromPathname,
   isDiagnosisResultPathname,
 } from "../model/diagnosis-navigation";
+import {
+  type RelationshipCategoryFilter,
+  relationshipCategoryFilterFromSearch,
+} from "../model/relationship-category";
 import { DiagnosisDetailScreen } from "./components/diagnosis-detail-screen";
 import { DiagnosisGuidance } from "./components/diagnosis-guidance";
 import { DiagnosisHome } from "./components/diagnosis-home";
@@ -23,7 +27,13 @@ export default function DiagnosisApplication() {
     idToken: diagnoses.idToken,
     onProgress: diagnoses.updateProgress,
   });
+  const [categoryFilter, setCategoryFilter] = useState<RelationshipCategoryFilter>(() =>
+    relationshipCategoryFilterFromSearch(window.location.search),
+  );
+  const [isAnsweredOpen, setIsAnsweredOpen] = useState(false);
   const openedDirectDiagnosisId = useRef<string | null>(null);
+  const listScrollY = useRef<number | null>(null);
+  const shouldRestoreListScroll = useRef(false);
   const isDirectResultPath = isDiagnosisResultPathname(window.location.pathname);
   const directDiagnosisId = diagnosisResultIdFromPathname(window.location.pathname);
   const fromProfile = new URLSearchParams(window.location.search).get("from") === "me";
@@ -33,6 +43,54 @@ export default function DiagnosisApplication() {
     directDiagnosisId && diagnoses.state.status === "success"
       ? diagnoses.state.data.find(({ id }) => id === directDiagnosisId)
       : undefined;
+
+  const openDiagnosis = useCallback(
+    (diagnosis: Parameters<typeof detail.open>[0]) => {
+      listScrollY.current = window.scrollY;
+      void detail.open(diagnosis);
+    },
+    [detail.open],
+  );
+
+  const closeDetail = useCallback(() => {
+    if (!directDiagnosisId && listScrollY.current !== null) {
+      shouldRestoreListScroll.current = true;
+    }
+    detail.close();
+  }, [detail.close, directDiagnosisId]);
+
+  const deferQuestion = useCallback(
+    (questionId: string) => {
+      if (!directDiagnosisId && listScrollY.current !== null) {
+        shouldRestoreListScroll.current = true;
+      }
+      return detail.deferQuestion(questionId);
+    },
+    [detail.deferQuestion, directDiagnosisId],
+  );
+
+  const changeCategoryFilter = useCallback((filter: RelationshipCategoryFilter) => {
+    setCategoryFilter(filter);
+    const url = new URL(window.location.href);
+    if (filter === "all") {
+      url.searchParams.delete("category");
+    } else {
+      url.searchParams.set("category", filter);
+    }
+    window.history.replaceState(
+      window.history.state,
+      "",
+      `${url.pathname}${url.search}${url.hash}`,
+    );
+  }, []);
+
+  useLayoutEffect(() => {
+    if (detail.state.status !== "idle" || !shouldRestoreListScroll.current) return;
+    shouldRestoreListScroll.current = false;
+    const scrollY = listScrollY.current ?? 0;
+    const frame = window.requestAnimationFrame(() => window.scrollTo(0, scrollY));
+    return () => window.cancelAnimationFrame(frame);
+  }, [detail.state.status]);
 
   useEffect(() => {
     if (
@@ -49,8 +107,12 @@ export default function DiagnosisApplication() {
 
   let content = (
     <DiagnosisHome
+      categoryFilter={categoryFilter}
       diagnoses={diagnoses.state}
-      onOpenDiagnosis={(diagnosis) => void detail.open(diagnosis)}
+      isAnsweredOpen={isAnsweredOpen}
+      onAnsweredOpenChange={setIsAnsweredOpen}
+      onCategoryFilterChange={changeCategoryFilter}
+      onOpenDiagnosis={openDiagnosis}
       onRetry={() => void diagnoses.load()}
     />
   );
@@ -63,7 +125,7 @@ export default function DiagnosisApplication() {
     content = (
       <DiagnosisGuidance
         kind="invalid-link"
-        onBack={detail.close}
+        onBack={closeDetail}
         onRetry={() => void diagnoses.load()}
         backHref={directBackHref}
         backLabel={directBackLabel}
@@ -84,7 +146,7 @@ export default function DiagnosisApplication() {
     content = (
       <DiagnosisGuidance
         kind="load-error"
-        onBack={detail.close}
+        onBack={closeDetail}
         {...(directDiagnosis
           ? {
               onRetry: () => void detail.open(directDiagnosis),
@@ -100,7 +162,7 @@ export default function DiagnosisApplication() {
       content = (
         <DiagnosisResultView
           result={detailContent.result}
-          onBack={detail.close}
+          onBack={closeDetail}
           {...(directDiagnosisId
             ? {
                 backHref: fromProfile ? "/me" : "/diagnosis",
@@ -115,9 +177,9 @@ export default function DiagnosisApplication() {
         <DiagnosisDetailScreen
           diagnosis={detailContent.diagnosis}
           initialAnswers={detailContent.initialAnswers}
-          onBack={detail.close}
+          onBack={closeDetail}
           onSaveAnswer={detail.saveAnswer}
-          onDeferQuestion={detail.deferQuestion}
+          onDeferQuestion={deferQuestion}
           onComplete={() => void detail.openCompletedResult()}
         />
       );
@@ -126,7 +188,7 @@ export default function DiagnosisApplication() {
       content = (
         <DiagnosisGuidance
           kind={detailContent.kind}
-          onBack={detail.close}
+          onBack={closeDetail}
           {...(directDiagnosisId ? { backHref: directBackHref, backLabel: directBackLabel } : {})}
         />
       );

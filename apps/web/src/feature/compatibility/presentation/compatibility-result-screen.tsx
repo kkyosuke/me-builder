@@ -154,7 +154,11 @@ export function CompatibilityResultScreen({
             aria-hidden={result.state.section !== "pair"}
             className="w-1/2 shrink-0 px-2"
           >
-            <CompatibilityPairSheet me={me} partner={partner} />
+            <CompatibilityPairSheet
+              me={me}
+              partner={partner}
+              relationshipCategory={relationshipCategory}
+            />
           </div>
         </div>
       </div>

@@ -13,7 +13,7 @@ export const filterableRelationshipCategoryValues = [
   "work",
 ] as const satisfies readonly RelationshipCategory[];
 
-type FilterableRelationshipCategory = (typeof filterableRelationshipCategoryValues)[number];
+export type FilterableRelationshipCategory = (typeof filterableRelationshipCategoryValues)[number];
 
 const labels: Record<RelationshipCategory, string> = {
   partner: "パートナー",
@@ -68,6 +68,17 @@ export function getRelationshipCategoryFilterClassName(
 }
 
 export type RelationshipCategoryFilter = "all" | FilterableRelationshipCategory;
+
+export function relationshipCategoryFilterFromSearch(search: string): RelationshipCategoryFilter {
+  const category = new URLSearchParams(search).get("category");
+  return filterableRelationshipCategoryValues.some((value) => value === category)
+    ? (category as FilterableRelationshipCategory)
+    : "all";
+}
+
+export function diagnosisCategoryHref(category: FilterableRelationshipCategory): string {
+  return `/diagnosis?category=${category}`;
+}
 
 export function filterDiagnosesByRelationshipCategory(
   diagnoses: readonly DiagnosisListItem[],

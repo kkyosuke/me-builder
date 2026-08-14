@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { DiagnosisListItem } from "../../model/diagnosis-list-item";
+import type { RelationshipCategoryFilter } from "../../model/relationship-category";
 import { DiagnosisHome } from "./diagnosis-home";
 
 function diagnosis(overrides: Partial<DiagnosisListItem>): DiagnosisListItem {
@@ -23,12 +25,31 @@ function diagnosis(overrides: Partial<DiagnosisListItem>): DiagnosisListItem {
   };
 }
 
+function StatefulDiagnosisHome(
+  props: Omit<
+    React.ComponentProps<typeof DiagnosisHome>,
+    "categoryFilter" | "isAnsweredOpen" | "onAnsweredOpenChange" | "onCategoryFilterChange"
+  >,
+) {
+  const [categoryFilter, setCategoryFilter] = useState<RelationshipCategoryFilter>("all");
+  const [isAnsweredOpen, setIsAnsweredOpen] = useState(false);
+  return (
+    <DiagnosisHome
+      {...props}
+      categoryFilter={categoryFilter}
+      isAnsweredOpen={isAnsweredOpen}
+      onAnsweredOpenChange={setIsAnsweredOpen}
+      onCategoryFilterChange={setCategoryFilter}
+    />
+  );
+}
+
 describe("DiagnosisHome", () => {
   afterEach(() => cleanup());
 
   it("診断一覧の取得中はカードのSkeletonを表示する", () => {
     render(
-      <DiagnosisHome
+      <StatefulDiagnosisHome
         diagnoses={{ status: "loading" }}
         onOpenDiagnosis={vi.fn()}
         onRetry={vi.fn()}
@@ -41,7 +62,7 @@ describe("DiagnosisHome", () => {
 
   it("主ナビゲーションで診断を現在位置として表示する", () => {
     render(
-      <DiagnosisHome
+      <StatefulDiagnosisHome
         diagnoses={{ status: "success", data: [] }}
         onOpenDiagnosis={vi.fn()}
         onRetry={vi.fn()}
@@ -63,7 +84,7 @@ describe("DiagnosisHome", () => {
 
   it("回答途中のカードだけに進捗を x/x 形式で表示する", () => {
     render(
-      <DiagnosisHome
+      <StatefulDiagnosisHome
         diagnoses={{
           status: "success",
           data: [
@@ -105,7 +126,7 @@ describe("DiagnosisHome", () => {
 
   it("カテゴリラベルを表示し、一覧をチップで絞り込む", () => {
     render(
-      <DiagnosisHome
+      <StatefulDiagnosisHome
         diagnoses={{
           status: "success",
           data: [
@@ -155,7 +176,7 @@ describe("DiagnosisHome", () => {
 
   it("カテゴリが1種類だけでも全カテゴリの絞り込みを表示する", () => {
     render(
-      <DiagnosisHome
+      <StatefulDiagnosisHome
         diagnoses={{
           status: "success",
           data: [diagnosis({ id: "general", title: "自分自身の診断" })],
@@ -178,7 +199,7 @@ describe("DiagnosisHome", () => {
 
   it("診断ごとのサムネイルと未知の診断用フォールバックを表示する", () => {
     render(
-      <DiagnosisHome
+      <StatefulDiagnosisHome
         diagnoses={{
           status: "success",
           data: [

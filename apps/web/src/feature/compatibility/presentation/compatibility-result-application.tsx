@@ -1,5 +1,6 @@
 import { AlertCircle, RefreshCw } from "lucide-react";
 import {
+  diagnosisCategoryHref,
   getRelationshipCategoryBadgeClassName,
   getRelationshipCategoryLabel,
 } from "../../diagnosis/model/relationship-category";
@@ -75,6 +76,10 @@ export default function CompatibilityResultApplication({
   if (relationship.state.data.status === "waiting") {
     // nextActionがnullのときは相手側の準備待ちで、閲覧者の操作では解消できない。
     const waiting = waitingGuides[relationship.state.data.nextAction ?? "partner"];
+    const waitingHref =
+      relationship.state.data.nextAction === "diagnosis"
+        ? diagnosisCategoryHref(relationship.state.data.relationshipCategory)
+        : waiting.href;
     return (
       <main className="mx-auto min-h-dvh w-full max-w-2xl px-4 py-6 sm:px-8">
         <CompatibilityBackHeader />
@@ -87,7 +92,7 @@ export default function CompatibilityResultApplication({
           <h1 className="text-xl font-bold">{waiting.title}</h1>
           <p className="mt-2 text-sm">{waiting.message}</p>
           <a
-            href={waiting.href}
+            href={waitingHref}
             className="mt-5 flex min-h-11 items-center justify-center rounded-xl bg-amber-300 font-bold text-amber-950"
           >
             {waiting.label}
