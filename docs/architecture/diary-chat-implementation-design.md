@@ -142,7 +142,7 @@ AccountDataはactive Session境界、未処理Diagnosis projection、未処理Br
 
 基本版は別のデプロイ単位を増やさず、`apps/worker`のCron、job、Queue consumerとして実装します。Cloudflare CronはUTCで指定するため毎日09:00 UTCに起動し、`Asia/Tokyo`の当日を配送日として固定します。Cronは共有D1からactiveなLINE Account IDだけをページング取得し、本文やLINE user IDを含めずDaily Prompt Queueへ投入します。Cron内ではLINE Pushを行いません。
 
-consumerはAccountDataで同じ日本日付の配送状態、停止意思、active Session、配送準備後の本人発言を確認します。直前の声かけが未回答なら翌日の1回を休み、未回答が3回続いていれば新しい本人発言まで自動休止します。Queueの配送日が処理時点の日本日付と一致しない場合は期限切れとして送信しません。送信対象の場合だけ共有D1から現在有効なLINE identityを解決し、Account IDと日本日付から作る決定的なLINE retry keyで固定文面をPushします。LINE受付後の状態保存に失敗してQueueが再配送されても、同じretry keyを再利用し、送信直前の可否を再評価します。
+consumerはAccountDataで同じ日本日付の配送状態、停止意思、active Session、配送準備後の本人発言を確認します。直前の声かけが未回答なら翌日の1回を休み、未回答が3回続いていれば新しい本人発言まで自動休止します。停止発言より後に本人から新しい日記メッセージが届いた場合は停止状態を解除しますが、すでに終端化した当日分を作り直さず、次の送信可能な日から再開します。Queueの配送日が処理時点の日本日付と一致しない場合は期限切れとして送信しません。送信対象の場合だけ共有D1から現在有効なLINE identityを解決し、Account IDと日本日付から作る決定的なLINE retry keyで固定文面をPushします。LINE受付後の状態保存に失敗してQueueが再配送されても、同じretry keyを再利用し、送信直前の可否を再評価します。
 
 ```mermaid
 sequenceDiagram
@@ -463,16 +463,16 @@ Vectorizeへのupsertまたはdelete受付後に`applied`とmutation IDを記録
 
 Queue再配送で`pending`を読み直した場合も、停止意思、現在の日本日付、active Session、配送準備後の本人発言を再評価します。送信可能な場合だけ同じ配送IDとretry keyで再送し、送信不能になっていれば`skipped`へ終端化します。`delivered`、`skipped`、`failed`は同じ日付の再配送で新しいPushを作りません。本人のLINE発言をAccountDataへ原本保存するtransactionで未回答の`pending` / `delivered`を回答済みにし、翌日休止と自動休止を解除します。
 
-停止意思は確定的な停止表現だけをアプリケーションルールで判定し、Source Record保存と同じAccountData transactionで`daily_prompt_preferences`へ反映します。曖昧な発言をAI推定だけで停止扱いにしません。停止時点で当日の`pending`配送も`manual_stopped`として終端化し、以後は新しい配送を作りません。
+停止意思は確定的な表現だけをアプリケーションルールで判定し、Source Record保存と同じAccountData transactionで`daily_prompt_preferences`へ反映します。曖昧な発言をAI推定だけで停止扱いにしません。停止時点で当日の`pending`配送も`manual_stopped`として終端化し、停止中は新しい配送を作りません。その停止発言より後の通常の日記メッセージを保存した場合は状態を`active`へ戻しますが、すでに終端化した当日分を再送しません。Webhookの再配送や順序逆転で古い状態へ戻らないよう、現在の`controlled_at`より新しい本人発言だけをミリ秒精度で反映します。
 
 ### 4.10 `daily_prompt_preferences`
 
 | 列 | 用途 |
 | --- | --- |
 | `account_id` | 所有Account。Accountごとに最大1行 |
-| `status` | `stopped`。行がない場合を初期状態の有効として扱う |
-| `stopped_at` | 本人の停止意思を受け付けた時刻 |
-| `stopped_source_record_id` | 停止意思の根拠となるSource Record |
+| `status` | `active` / `stopped`。行がない場合も初期状態の有効として扱う |
+| `controlled_at` | 現在状態を決めた本人発言の受付時刻。古いWebhookを無視するミリ秒精度の比較基準 |
+| `control_source_record_id` | 現在状態を決めた本人発言のSource Record |
 | `updated_at` | 最終更新時刻 |
 
 ### 4.11 ConversationCoordinatorのローカルSQLite

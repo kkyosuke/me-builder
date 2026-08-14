@@ -128,6 +128,63 @@ describe("AccountData Workers runtime E2E", () => {
     });
   });
 
+  it("停止済み設定を保持したまま再開可能なschemaへ移行できる", async () => {
+    const accountId = crypto.randomUUID();
+    const stub = env.ACCOUNT_DATA.getByName(accountId);
+
+    await runInDurableObject(stub, async (instance: AccountData, state) => {
+      state.storage.sql.exec(
+        "INSERT INTO source_records (id, created_at, updated_at, is_deleted, account_id, kind, access_label, original_ref) VALUES ('migration-stop-source', 1, 1, 0, ?, 'user_input', 'private', 'line:migration-stop')",
+        accountId,
+      );
+      state.storage.sql.exec("PRAGMA foreign_keys=OFF");
+      state.storage.sql.exec("DROP TABLE daily_prompt_preferences");
+      state.storage.sql.exec(`CREATE TABLE daily_prompt_preferences (
+        account_id text PRIMARY KEY NOT NULL,
+        status text NOT NULL,
+        stopped_at integer NOT NULL,
+        stopped_source_record_id text NOT NULL,
+        updated_at integer NOT NULL,
+        FOREIGN KEY (account_id) REFERENCES account_data_identity(account_id),
+        FOREIGN KEY (stopped_source_record_id) REFERENCES source_records(id)
+      )`);
+      state.storage.sql.exec(
+        "INSERT INTO daily_prompt_preferences (account_id, status, stopped_at, stopped_source_record_id, updated_at) VALUES (?, 'stopped', 2, 'migration-stop-source', 2)",
+        accountId,
+      );
+      state.storage.sql.exec("DELETE FROM __drizzle_migrations WHERE created_at >= 1786666843277");
+
+      const repository = Reflect.get(instance, "repository") as { initialize(): Promise<void> };
+      await expect(repository.initialize()).resolves.toBeUndefined();
+
+      expect(
+        state.storage.sql
+          .exec<{ name: string }>("PRAGMA table_info(daily_prompt_preferences)")
+          .toArray()
+          .map(({ name }) => name),
+      ).toEqual([
+        "account_id",
+        "status",
+        "controlled_at",
+        "control_source_record_id",
+        "updated_at",
+      ]);
+      expect(
+        state.storage.sql
+          .exec<{
+            status: string;
+            controlled_at: number;
+            control_source_record_id: string;
+          }>("SELECT status, controlled_at, control_source_record_id FROM daily_prompt_preferences")
+          .one(),
+      ).toEqual({
+        status: "stopped",
+        controlled_at: 2_000,
+        control_source_record_id: "migration-stop-source",
+      });
+    });
+  });
+
   it("既存0000 baselineのAccountデータを保ったまま後続migrationを適用できる", async () => {
     const accountId = crypto.randomUUID();
     const stub = env.ACCOUNT_DATA.getByName(accountId);
