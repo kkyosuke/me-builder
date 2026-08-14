@@ -1,16 +1,14 @@
 import { useState } from "react";
 import { config } from "../../../config";
+import { shouldShowProgressionPreview } from "../../../model/progression-preview";
 import { useLiffSession } from "../../liff";
 import type { ProfileSummaryVersioning } from "../model/profile-summary";
 import type { UtsushiProgression } from "../model/progression";
 import { ProfileSummaryScreen } from "./profile-summary-screen";
 import { useProfileSummary } from "./use-profile-summary";
 
-const UI_PREVIEW_ENVIRONMENTS = new Set(["development", "local", "preview", "test"]);
-
 function progressionPreview(): UtsushiProgression | undefined {
-  if (!UI_PREVIEW_ENVIRONMENTS.has(config.environment ?? "")) return undefined;
-  if (new URLSearchParams(window.location.search).get("progression-preview") !== "1") {
+  if (!shouldShowProgressionPreview(config.environment, window.location.search)) {
     return undefined;
   }
   return {

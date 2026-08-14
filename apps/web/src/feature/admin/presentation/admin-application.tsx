@@ -1,11 +1,10 @@
 import { config } from "../../../config";
+import { shouldShowProgressionPreview } from "../../../model/progression-preview";
 import { useLiffSession } from "../../liff";
 import type { AdminAccountPage } from "../model/account";
 import { AdminAccountsScreen } from "./admin-accounts-screen";
 import { AdminStatisticsScreen } from "./admin-statistics-screen";
 import { useAdminStatistics } from "./use-admin-statistics";
-
-const UI_PREVIEW_ENVIRONMENTS = new Set(["development", "local", "preview", "test"]);
 
 const previewAccounts: AdminAccountPage = {
   total: 3,
@@ -55,10 +54,7 @@ const previewAccounts: AdminAccountPage = {
 };
 
 function progressionPreviewEnabled(): boolean {
-  return (
-    UI_PREVIEW_ENVIRONMENTS.has(config.environment ?? "") &&
-    new URLSearchParams(window.location.search).get("progression-preview") === "1"
-  );
+  return shouldShowProgressionPreview(config.environment, window.location.search);
 }
 
 export default function AdminApplication() {
