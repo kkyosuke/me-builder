@@ -677,6 +677,37 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
     e2eTimeoutMs,
   );
 
+  it(
+    "仕事の価値観・働き方の回答を5つのパラメータへ採点する",
+    async () => {
+      for (let index = 1; index <= 10; index += 1) {
+        const suffix = String(index).padStart(2, "0");
+        const response = await putAnswer(`dq-work-values-${suffix}`, "yes", "work-values");
+        expect(response.status).toBe(200);
+      }
+
+      const response = await getAnswers("work-values");
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({
+        id: "work-values",
+        relationshipCategory: "general",
+        scoring: {
+          scoringVersion: 1,
+          balancedLabel: "状況に応じて働き方を選ぶ",
+          parameters: [
+            expect.objectContaining({ id: "work-autonomy", score: 50, coverage: 100 }),
+            expect.objectContaining({ id: "growth-orientation", score: 40, coverage: 100 }),
+            expect.objectContaining({ id: "compensation-priority", score: 80, coverage: 100 }),
+            expect.objectContaining({ id: "work-stability", score: 75, coverage: 100 }),
+            expect.objectContaining({ id: "work-life-boundary", score: 67, coverage: 100 }),
+          ],
+        },
+      });
+    },
+    e2eTimeoutMs,
+  );
+
   it(`${diagnosisAnswerCases.missingContents.id}: ${diagnosisAnswerCases.missingContents.name}`, async () => {
     const response = await getAnswers();
     expect(response.status).toBe(404);

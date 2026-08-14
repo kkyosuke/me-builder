@@ -18,7 +18,8 @@ apps/web/public/images/diagnoses/
 ├── leisure-style.jpg
 ├── time-planning.jpg
 ├── conversation-emotion.jpg
-└── life-priorities.jpg
+├── life-priorities.jpg
+└── work-values.jpg
 ```
 
 ## 3. 共通スタイル
@@ -80,7 +81,23 @@ Materials/textures: Matte paper and soft clay, subtle depth and shadows.
 Constraints: No text, no letters, no numbers, no logos, no watermark, no brand marks. Do not make stability, challenge, work, relationships, wellbeing, or preparation look superior to another. Avoid scales, rankings, trophies, money symbols, corporate logos, religious imagery, or political symbols.
 ```
 
-## 7. 新しい診断へ展開する手順
+## 7. 「仕事の価値観・働き方」生成プロンプト
+
+```text
+Use case: stylized-concept
+Asset type: 16:9 diagnosis card thumbnail for a web application
+Primary request: Create a polished 3D paper-cut/clay-style illustration representing work values and working style: autonomy, growth, compensation, stability, and boundaries between work and personal life.
+Scene/backdrop: A calm abstract workspace with a central simple desk and five equally weighted visual directions arranged around it, suggesting that different work priorities can coexist.
+Subject: Balanced abstract symbols integrated around the workspace: adjustable modular pieces for autonomy, rising steps with a small sprout for growth, plain golden disks without currency marks for compensation, a steady anchor-like base for stability, and a clock beside a small home-and-leaf form for work-life boundaries. Keep every symbol equal in visual weight; no people required.
+Style/medium: Soft layered 3D paper-cut / clay render matching a premium editorial app illustration.
+Composition/framing: Wide 16:9, centered, clear silhouettes, important objects away from edges, suitable for a small card crop.
+Lighting/mood: Warm soft studio lighting, calm, thoughtful, capable, welcoming.
+Color palette: Deep navy background, muted slate blue, warm cream, coral accents, small golden accents; consistent with the existing me-builder diagnosis thumbnails.
+Materials/textures: Matte paper and soft clay, subtle depth and shadows.
+Constraints: No text, no letters, no numbers, no logos, no watermark, no brand marks, no currency symbols. Do not make autonomy, growth, compensation, stability, or personal-life boundaries look superior to another. Avoid corporate logos, rankings, trophies, realistic money, religious imagery, or political symbols.
+```
+
+## 8. 新しい診断へ展開する手順
 
 1. §4の`Primary request`、`Scene/backdrop`、`Subject`を新しい診断のテーマへ置き換える
 2. §3の共通スタイルと`Composition/framing`、`Constraints`を維持する

@@ -55,7 +55,20 @@ async function prepareDatabase(db: D1Database): Promise<void> {
   // 運営が表示順を変更した場合と、migrationの初期値generalが残る場合に、
   // seedの再実行で正式な公開定義へ戻ることを確認する。
   await db
-    .prepare("UPDATE diagnoses SET display_order = 999, relationship_category = 'general'")
+    .prepare(
+      `UPDATE diagnoses
+       SET display_order = 999,
+           relationship_category = CASE
+             WHEN id IN (
+               'relationship-priority',
+               'money-values',
+               'leisure-style',
+               'time-planning',
+               'conversation-emotion'
+             ) THEN 'general'
+             ELSE relationship_category
+           END`,
+    )
     .run();
   await applySeed(db, seed);
 
@@ -202,11 +215,16 @@ describe("GET /api/diagnoses local D1 E2E", () => {
         lastAnsweredAt: string | null;
       }>;
     };
-    expect(initialBody.diagnoses).toHaveLength(6);
+    expect(initialBody.diagnoses).toHaveLength(7);
     expect(initialBody.diagnoses.map(({ displayOrder }) => displayOrder)).toEqual([
-      10, 20, 30, 40, 50, 60,
+      10, 20, 30, 40, 50, 60, 70,
     ]);
     expect(initialBody.diagnoses.find(({ id }) => id === "life-priorities")).toMatchObject({
+      relationshipCategory: "general",
+      responseStatus: "unanswered",
+      questionCount: 10,
+    });
+    expect(initialBody.diagnoses.find(({ id }) => id === "work-values")).toMatchObject({
       relationshipCategory: "general",
       responseStatus: "unanswered",
       questionCount: 10,
