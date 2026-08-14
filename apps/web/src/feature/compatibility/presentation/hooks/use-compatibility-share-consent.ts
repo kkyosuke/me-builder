@@ -1,3 +1,4 @@
+import type { CompatibilityRelationshipCategory } from "@me-builder/lib/compatibility";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { config } from "../../../../config";
 import type { AsyncState } from "../../../../model/async-state";
@@ -7,8 +8,10 @@ import type { CompatibilityShareConsent } from "../../model/compatibility-share-
 
 export function useCompatibilityShareConsent({
   acquireIdToken,
+  relationshipCategory,
 }: {
   acquireIdToken: (signal: AbortSignal) => Promise<string | null>;
+  relationshipCategory: CompatibilityRelationshipCategory | null;
 }) {
   const [state, setState] = useState<AsyncState<CompatibilityShareConsent>>({
     status: "loading",
@@ -34,6 +37,7 @@ export function useCompatibilityShareConsent({
       const consent = await fetchCompatibilityShareConsent(
         config.apiUrl,
         idToken,
+        undefined,
         controller.signal,
       );
       const avatarBlob = await fetchCompatibilityAvatarImage(
@@ -63,6 +67,42 @@ export function useCompatibilityShareConsent({
     }
   }, [acquireIdToken]);
 
+  const refreshGuidance = useCallback(
+    async (category: CompatibilityRelationshipCategory) => {
+      request.current?.abort();
+      const controller = new AbortController();
+      request.current = controller;
+      setState((current) =>
+        current.status === "success"
+          ? { status: "success", data: { ...current.data, nextAction: null } }
+          : current,
+      );
+      try {
+        const idToken = await acquireIdToken(controller.signal);
+        if (controller.signal.aborted || !idToken) return;
+        const consent = await fetchCompatibilityShareConsent(
+          config.apiUrl,
+          idToken,
+          category,
+          controller.signal,
+        );
+        if (mounted.current && !controller.signal.aborted) {
+          setState((current) =>
+            current.status === "success"
+              ? {
+                  status: "success",
+                  data: { ...consent, avatarUrl: current.data.avatarUrl },
+                }
+              : current,
+          );
+        }
+      } catch {
+        // 案内の再取得に失敗しても、確認済みの共有可否とプロフィール表示は維持する。
+      }
+    },
+    [acquireIdToken],
+  );
+
   useEffect(() => {
     mounted.current = true;
     let active = true;
@@ -78,6 +118,11 @@ export function useCompatibilityShareConsent({
       loading.current = false;
     };
   }, [load]);
+
+  useEffect(() => {
+    if (!relationshipCategory || state.status !== "success") return;
+    void refreshGuidance(relationshipCategory);
+  }, [relationshipCategory, refreshGuidance, state.status]);
 
   return { state, reload: load };
 }

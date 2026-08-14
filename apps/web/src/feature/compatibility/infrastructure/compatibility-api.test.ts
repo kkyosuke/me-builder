@@ -69,6 +69,18 @@ describe("fetchCompatibilityShareConsent", () => {
     );
   });
 
+  it("選んだ関係カテゴリをquery parameterで送る", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(Response.json(consent));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchCompatibilityShareConsent("https://api.example.com", "id-token", "family");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.example.com/api/compatibility/share-consent?relationshipCategory=family",
+      expect.objectContaining({ headers: { Authorization: "Bearer id-token" } }),
+    );
+  });
+
   it("契約外の共有可否を受け入れない", async () => {
     vi.stubGlobal(
       "fetch",

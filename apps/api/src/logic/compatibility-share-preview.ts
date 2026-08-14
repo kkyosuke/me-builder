@@ -35,6 +35,7 @@ type Params = {
   lineLoginChannelId: string | undefined;
   db: D1.shared.Client;
   accountData?: AccountDataNamespace;
+  relationshipCategory?: CompatibilityRelationshipCategory;
   at?: Date;
 };
 
@@ -173,7 +174,7 @@ export async function loadCompatibilitySharePreviewData(
 
 /** 本人が招待リンクを発行する前に確認する、共有可否だけを返す。 */
 export async function getCompatibilityShareConsent(
-  { idToken, lineLoginChannelId, db, accountData, at = new Date() }: Params,
+  { idToken, lineLoginChannelId, db, accountData, relationshipCategory, at = new Date() }: Params,
   dependencies: Dependencies = defaultDependencies,
 ): Promise<CompatibilityShareConsentOutcome> {
   const session = await dependencies.createSession({ idToken, lineLoginChannelId, db });
@@ -184,6 +185,7 @@ export async function getCompatibilityShareConsent(
       accountId: session.session.accountId,
       verifiedDisplayName: session.session.displayName,
       accountData,
+      ...(relationshipCategory ? { relationshipCategory } : {}),
       at,
     },
     dependencies,

@@ -121,6 +121,39 @@ describe("getCompatibilityShareConsent", () => {
     });
   });
 
+  it("選択した関係カテゴリとgeneralだけで次の案内を判定する", async () => {
+    const result = await getCompatibilityShareConsent(
+      {
+        idToken: "id-token",
+        lineLoginChannelId: "channel-id",
+        db,
+        relationshipCategory: "family",
+        at,
+      },
+      {
+        createSession: vi.fn().mockResolvedValue({
+          type: "resolved",
+          session: { accountId: "account-1", role: "user", displayName: "あおい" },
+        }),
+        getPreviewSource: vi.fn().mockResolvedValue({
+          diagnoses: [
+            {
+              id: "work-open",
+              relationshipCategory: "work",
+              availability: "open",
+              responseStatus: "unanswered",
+            },
+          ],
+          answeredDiagnoses: [],
+        }),
+        getShareProfile: vi.fn().mockResolvedValue(availableShareProfile),
+        scoreAnswers: vi.fn(),
+      },
+    );
+
+    expect(result).toMatchObject({ consent: { nextAction: null } });
+  });
+
   it("表示名を確認できない場合だけ共有を開始できない", async () => {
     const result = await getCompatibilityShareConsent(
       { idToken: "id-token", lineLoginChannelId: "channel-id", db, at },

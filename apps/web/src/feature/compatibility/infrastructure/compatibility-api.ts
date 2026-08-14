@@ -159,12 +159,19 @@ async function notFoundError(response: Response, unavailableMessage: string): Pr
 export async function fetchCompatibilityShareConsent(
   apiUrl: string | undefined,
   idToken: string,
+  relationshipCategory?: CompatibilityRelationshipCategory,
   signal?: AbortSignal,
 ): Promise<CompatibilityShareConsent> {
-  const response = await createHttpClient(apiUrl).request("/api/compatibility/share-consent", {
-    headers: { Authorization: `Bearer ${idToken}` },
-    ...(signal ? { signal } : {}),
-  });
+  const query = relationshipCategory
+    ? `?relationshipCategory=${encodeURIComponent(relationshipCategory)}`
+    : "";
+  const response = await createHttpClient(apiUrl).request(
+    `/api/compatibility/share-consent${query}`,
+    {
+      headers: { Authorization: `Bearer ${idToken}` },
+      ...(signal ? { signal } : {}),
+    },
+  );
 
   if (!response.ok) {
     if (response.status === 401) {

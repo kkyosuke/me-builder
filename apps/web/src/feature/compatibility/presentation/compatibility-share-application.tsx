@@ -11,14 +11,16 @@ import { useCompatibilityShareConsent } from "./hooks/use-compatibility-share-co
 
 export default function CompatibilityShareApplication() {
   const { acquireIdToken } = useLiffSession();
-  const { state, reload } = useCompatibilityShareConsent({ acquireIdToken });
+  const [relationshipCategory, setRelationshipCategory] =
+    useState<CompatibilityRelationshipCategory | null>(null);
+  const { state, reload } = useCompatibilityShareConsent({
+    acquireIdToken,
+    relationshipCategory,
+  });
   const invitation = useCompatibilityInvitationIssue({ acquireIdToken });
   const sharing = useRef(false);
   const [isSharing, setIsSharing] = useState(false);
   const [sharingMessage, setSharingMessage] = useState<string | null>(null);
-  const [relationshipCategory, setRelationshipCategory] =
-    useState<CompatibilityRelationshipCategory | null>(null);
-
   const shareToLine = async (url: string) => {
     if (sharing.current) return;
     sharing.current = true;

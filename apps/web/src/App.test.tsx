@@ -959,6 +959,7 @@ describe("App", () => {
     expect(mocks.fetchCompatibilityShareConsent).toHaveBeenCalledWith(
       "https://api.example.com",
       "dummy.id.token",
+      undefined,
       expect.anything(),
     );
     expect(mocks.fetchDiagnosisList).not.toHaveBeenCalled();

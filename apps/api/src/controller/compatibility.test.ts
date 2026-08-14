@@ -38,9 +38,16 @@ function outcome(value: CompatibilityShareConsentOutcome) {
   getCompatibilityShareConsent.mockResolvedValue(value);
 }
 
-function request(env: Record<string, unknown> = {}, authorization = "Bearer dummy.id.token") {
+function request(
+  env: Record<string, unknown> = {},
+  authorization = "Bearer dummy.id.token",
+  relationshipCategory?: string,
+) {
+  const query = relationshipCategory
+    ? `?relationshipCategory=${encodeURIComponent(relationshipCategory)}`
+    : "";
   return app.request(
-    "/api/compatibility/share-consent",
+    `/api/compatibility/share-consent${query}`,
     { headers: { Authorization: authorization } },
     {
       LIFF_ID: "2010850319-Yl63upAR",
@@ -66,10 +73,14 @@ describe("GET /api/compatibility/share-consent", () => {
       },
     });
 
-    const response = await request({
-      AVATAR_BUCKET: dummyAvatarBucket,
-      LINE_CHANNEL_ACCESS_TOKEN: "line-token",
-    });
+    const response = await request(
+      {
+        AVATAR_BUCKET: dummyAvatarBucket,
+        LINE_CHANNEL_ACCESS_TOKEN: "line-token",
+      },
+      "Bearer dummy.id.token",
+      "family",
+    );
 
     expect(response.status).toBe(200);
     expect(response.headers.get("Cache-Control")).toBe("no-store");
@@ -85,8 +96,17 @@ describe("GET /api/compatibility/share-consent", () => {
         idToken: "dummy.id.token",
         lineLoginChannelId: "2010850319",
         accountData: dummyAccountData,
+        relationshipCategory: "family",
       }),
     );
+  });
+
+  it.each(["general", "other"])('関係カテゴリ"%s"を400で拒否する', async (category) => {
+    const response = await request({}, "Bearer dummy.id.token", category);
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "Invalid request" });
+    expect(getCompatibilityShareConsent).not.toHaveBeenCalled();
   });
 
   it.each([

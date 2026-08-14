@@ -36,7 +36,7 @@ R2 objectの欠落・メタデータ不一致、Messaging APIの取得失敗、L
 
 ### `GET /api/compatibility/share-consent`
 
-本人が招待リンクを発行する前に、相手へ表示される名前と共有を始められるかどうかを返します。共有される具体的な内容は返しません。
+本人が招待リンクを発行する前に、相手へ表示される名前と共有を始められるかどうかを返します。共有される具体的な内容は返しません。招待相手との関係を選んだ後は、任意の`relationshipCategory` query parameterへ`partner`、`family`、`friend`、`work`のいずれかを指定します。
 
 ```mermaid
 flowchart LR
@@ -61,7 +61,7 @@ flowchart LR
 | --- | --- |
 | `display_name_unavailable` | 検証済みIDトークンに表示名がない |
 
-共有できる内容がまだない状態でも共有は開始できます。`nextAction`は、共有専用プロフィールprojectionを開示できなければ`profile-summary`、それ以外で共有可能なテーマがなく現在回答できる未完了Diagnosisがあれば`diagnosis`、それ以外は`null`です。これは本人への案内だけに使い、発行可否には影響しません。
+共有できる内容がまだない状態でも共有は開始できます。`nextAction`は、共有専用プロフィールprojectionを開示できなければ`profile-summary`、それ以外で共有可能なテーマがなく現在回答できる未完了Diagnosisがあれば`diagnosis`、それ以外は`null`です。`relationshipCategory`を指定した場合、共有可能なテーマと未完了Diagnosisは指定カテゴリと`general`に絞って判定します。これは本人への案内だけに使い、発行可否には影響しません。
 
 このAPIは共有可否の読み取りモデルです。共有専用プロフィールの文章、診断テーマ、パラメータの位置、生の回答、具体的な出来事、日記・会話本文、Source Record、Brain Item本文、内部根拠ID、Account ID、各種指紋を返しません。プロフィール画像をブラウザや中継キャッシュへ保持させないため、成功・エラーを問わず`Cache-Control: no-store`を付けます。
 
@@ -69,6 +69,7 @@ flowchart LR
 
 | HTTP | 条件 | レスポンス |
 | --- | --- | --- |
+| `400` | `relationshipCategory`が`partner`、`family`、`friend`、`work`以外である | `{ "error": "Invalid request" }` |
 | `401` | IDトークンがない、検証できない、またはLINE Login設定がない | `{ "error": "Unauthorized" }` |
 | `404` | 検証済みLINE Accountに対応するAccountがない | `{ "error": "Account not found", "reason": "friendship_required" }` |
 | `503` | D1またはAccountData bindingがない | `{ "error": "Service Unavailable" }` |

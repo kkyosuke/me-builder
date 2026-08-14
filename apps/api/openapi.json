@@ -1950,36 +1950,6 @@
             "liffIdToken": []
           }
         ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "kind": "schema",
-                "type": "object",
-                "expects": "Object",
-                "async": false,
-                "entries": {
-                  "relationshipCategory": {
-                    "kind": "schema",
-                    "type": "picklist",
-                    "expects": "(\"partner\" | \"family\" | \"friend\" | \"work\")",
-                    "async": false,
-                    "options": ["partner", "family", "friend", "work"],
-                    "~standard": {
-                      "version": 1,
-                      "vendor": "valibot"
-                    }
-                  }
-                },
-                "~standard": {
-                  "version": 1,
-                  "vendor": "valibot"
-                }
-              }
-            }
-          }
-        },
         "responses": {
           "201": {
             "description": "発行した招待リンクと有効期限",
@@ -2105,6 +2075,23 @@
                   },
                   "required": ["error"]
                 }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "relationshipCategory": {
+                    "enum": ["partner", "family", "friend", "work"],
+                    "type": "string"
+                  }
+                },
+                "required": ["relationshipCategory"]
               }
             }
           }
@@ -3653,6 +3640,18 @@
             "liffIdToken": []
           }
         ],
+        "parameters": [
+          {
+            "name": "relationshipCategory",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["partner", "family", "friend", "work"]
+            },
+            "description": "選択した関係カテゴリとgeneralを対象に次の案内を判定する"
+          }
+        ],
         "responses": {
           "200": {
             "description": "相手へ表示される表示名と画像path、共有を始められるかどうか",
@@ -3712,6 +3711,22 @@
                     "blockingReasons",
                     "nextAction"
                   ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "関係カテゴリが不正",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Invalid request"
+                    }
+                  },
+                  "required": ["error"]
                 }
               }
             }
