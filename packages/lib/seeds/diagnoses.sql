@@ -245,7 +245,7 @@ INSERT OR IGNORE INTO question_versions (
   (1786719600, 1786719600, 0, 'q-decision-making-style-04', 1, 'approved', '締切まで一週間ある申し込みをするか迷ったときは、すぐには決めず、締切が近づくまで考えたい。', 'single_choice', 1786719600),
   (1786719600, 1786719600, 0, 'q-decision-making-style-05', 1, 'approved', '二つの選択肢に大きな差がないときは、最初にしっくりきた方を選びたい。', 'single_choice', 1786719600),
   (1786719600, 1786719600, 0, 'q-decision-making-style-06', 1, 'approved', '二つの選択肢に大きな差がないときも、選ぶ理由を言葉にできる方を選びたい。', 'single_choice', 1786719600),
-  (1786719600, 1786719600, 0, 'q-decision-making-style-07', 1, 'approved', '初めて経験することを始めるか迷ったときは、決める前に経験者の意見を聞きたい。', 'single_choice', 1786719600),
+  (1786719600, 1786719600, 0, 'q-decision-making-style-07', 1, 'approved', '初めて経験することを始めるか迷ったときは、自分の考えを固める前に経験者の意見を聞きたい。', 'single_choice', 1786719600),
   (1786719600, 1786719600, 0, 'q-decision-making-style-08', 1, 'approved', '初めて経験することを始めるか迷ったときは、経験者に聞く前に自分の考えを固めたい。', 'single_choice', 1786719600),
   (1786719600, 1786719600, 0, 'q-decision-making-style-09', 1, 'approved', '予定を決めたあとに重要な新しい情報が分かったときは、決めた内容を見直したい。', 'single_choice', 1786719600),
   (1786719600, 1786719600, 0, 'q-decision-making-style-10', 1, 'approved', '予定を決めたあとに新しい情報が分かっても、大きな問題がなければ最初に決めた内容で進めたい。', 'single_choice', 1786719600);
@@ -743,7 +743,7 @@ INSERT OR IGNORE INTO diagnosis_scoring_configs (
         {"id":"decision-information","label":"情報の集め方","lowLabel":"必要な情報に絞って決めたい","highLabel":"複数の情報を比べて決めたい"},
         {"id":"decision-timing","label":"決める時期","lowLabel":"期限近くまで考えたい","highLabel":"早めに方向を決めたい"},
         {"id":"decision-intuition","label":"判断のよりどころ","lowLabel":"理由を言葉にして選びたい","highLabel":"最初の感覚を取り入れたい"},
-        {"id":"decision-consultation","label":"相談の取り入れ方","lowLabel":"まず自分の考えを固めたい","highLabel":"決める前に意見を聞きたい"},
+        {"id":"decision-consultation","label":"相談の取り入れ方","lowLabel":"まず自分の考えを固めたい","highLabel":"まず意見を聞きたい"},
         {"id":"decision-reconsideration","label":"決定の見直し","lowLabel":"決めた方針で進めたい","highLabel":"新しい情報があれば見直したい"}
       ],
       "choiceScores": {"yes":1,"no":-1},

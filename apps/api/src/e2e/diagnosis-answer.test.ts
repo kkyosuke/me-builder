@@ -862,7 +862,14 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
             expect.objectContaining({ id: "decision-information", score: 100, coverage: 100 }),
             expect.objectContaining({ id: "decision-timing", score: 100, coverage: 100 }),
             expect.objectContaining({ id: "decision-intuition", score: 100, coverage: 100 }),
-            expect.objectContaining({ id: "decision-consultation", score: 100, coverage: 100 }),
+            expect.objectContaining({
+              id: "decision-consultation",
+              label: "相談の取り入れ方",
+              lowLabel: "まず自分の考えを固めたい",
+              highLabel: "まず意見を聞きたい",
+              score: 100,
+              coverage: 100,
+            }),
             expect.objectContaining({
               id: "decision-reconsideration",
               score: 100,
