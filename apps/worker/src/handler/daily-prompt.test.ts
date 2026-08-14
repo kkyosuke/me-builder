@@ -46,7 +46,7 @@ describe("daily prompt queue consumer", () => {
         return {
           type: "ready",
           deliveryId: "daily-prompt:2026-08-14",
-          promptVersion: "daily-check-in-v1",
+          promptVersion: "daily-check-in-fri-v1",
         };
       }
       if (operation === "conversation.markDailyPromptDelivered") return true;
@@ -62,8 +62,43 @@ describe("daily prompt queue consumer", () => {
 
   afterEach(() => vi.restoreAllMocks());
 
-  it("固定文面をretry key付きで1回Pushして配送済みにする", async () => {
+  it("配送日の曜日別文面をretry key付きで1回Pushして配送済みにする", async () => {
     const message = createMessage();
+    await processDailyPromptMessage(message, bindings(), config);
+
+    expect(execute).toHaveBeenCalledWith("account-1", "conversation.prepareDailyPrompt", {
+      localDate: "2026-08-14",
+      promptVersion: "daily-check-in-fri-v1",
+    });
+    expect(pushMessage).toHaveBeenCalledWith(
+      {
+        to: "U_line",
+        messages: [
+          {
+            type: "text",
+            text: "今日、少しでも話しておきたいことはある？",
+          },
+        ],
+      },
+      expect.stringMatching(/^[0-9a-f-]{36}$/),
+    );
+    expect(execute).toHaveBeenCalledWith(
+      "account-1",
+      "conversation.markDailyPromptDelivered",
+      "daily-prompt:2026-08-14",
+    );
+    expect(message.ack).toHaveBeenCalledOnce();
+    expect(message.retry).not.toHaveBeenCalled();
+  });
+
+  it("既存配送に固定された段階1の文面versionを再配送でも使う", async () => {
+    execute.mockResolvedValueOnce({
+      type: "ready",
+      deliveryId: "daily-prompt:2026-08-14",
+      promptVersion: "daily-check-in-v1",
+    });
+    const message = createMessage();
+
     await processDailyPromptMessage(message, bindings(), config);
 
     expect(pushMessage).toHaveBeenCalledWith(
@@ -78,13 +113,7 @@ describe("daily prompt queue consumer", () => {
       },
       expect.stringMatching(/^[0-9a-f-]{36}$/),
     );
-    expect(execute).toHaveBeenCalledWith(
-      "account-1",
-      "conversation.markDailyPromptDelivered",
-      "daily-prompt:2026-08-14",
-    );
     expect(message.ack).toHaveBeenCalledOnce();
-    expect(message.retry).not.toHaveBeenCalled();
   });
 
   it("AccountDataがskipした日はLINEを呼ばずackする", async () => {

@@ -56,6 +56,38 @@ describe("daily prompt delivery", () => {
     ).resolves.toEqual({ type: "not-ready", status: "delivered" });
   });
 
+  it("pending配送は再準備時に新しい文面versionへ差し替えない", async () => {
+    const db = createTestDb();
+    const at = new Date("2026-08-14T09:00:00.000Z");
+    await expect(
+      prepareDailyPrompt(db, ACCOUNT_ID, {
+        localDate: "2026-08-14",
+        promptVersion: "daily-check-in-fri-v1",
+        at,
+      }),
+    ).resolves.toMatchObject({
+      type: "ready",
+      promptVersion: "daily-check-in-fri-v1",
+    });
+
+    await expect(
+      prepareDailyPrompt(db, ACCOUNT_ID, {
+        localDate: "2026-08-14",
+        promptVersion: "daily-check-in-fri-v2",
+        at: new Date(at.getTime() + 30_000),
+      }),
+    ).resolves.toMatchObject({
+      type: "ready",
+      promptVersion: "daily-check-in-fri-v1",
+    });
+    expect(
+      await db
+        .select({ promptVersion: schema.dailyPromptDeliveries.promptVersion })
+        .from(schema.dailyPromptDeliveries)
+        .get(),
+    ).toEqual({ promptVersion: "daily-check-in-fri-v1" });
+  });
+
   it("active Sessionがあれば当日の声かけをskipする", async () => {
     const db = createTestDb();
     const at = new Date("2026-08-14T09:00:00.000Z");
