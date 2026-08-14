@@ -202,10 +202,15 @@ describe("GET /api/diagnoses local D1 E2E", () => {
         lastAnsweredAt: string | null;
       }>;
     };
-    expect(initialBody.diagnoses).toHaveLength(5);
+    expect(initialBody.diagnoses).toHaveLength(6);
     expect(initialBody.diagnoses.map(({ displayOrder }) => displayOrder)).toEqual([
-      10, 20, 30, 40, 50,
+      10, 20, 30, 40, 50, 60,
     ]);
+    expect(initialBody.diagnoses.find(({ id }) => id === "life-priorities")).toMatchObject({
+      relationshipCategory: "general",
+      responseStatus: "unanswered",
+      questionCount: 10,
+    });
     expect(initialBody.diagnoses.every(({ description }) => description.length > 0)).toBe(true);
     expect(
       initialBody.diagnoses.every(({ responseStatus }) => responseStatus === "unanswered"),

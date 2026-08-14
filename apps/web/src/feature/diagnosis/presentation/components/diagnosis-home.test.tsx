@@ -158,7 +158,7 @@ describe("DiagnosisHome", () => {
       <DiagnosisHome
         diagnoses={{
           status: "success",
-          data: [diagnosis({ id: "general", title: "人間関係全般の診断" })],
+          data: [diagnosis({ id: "general", title: "自分自身の診断" })],
         }}
         onOpenDiagnosis={vi.fn()}
         onRetry={vi.fn()}
@@ -167,9 +167,9 @@ describe("DiagnosisHome", () => {
 
     const filters = within(screen.getByRole("group", { name: "関係カテゴリで絞り込む" }));
     expect(filters.getByRole("button", { name: "パートナー" })).toBeTruthy();
-    expect(filters.queryByRole("button", { name: "人間関係全般" })).toBeNull();
+    expect(filters.queryByRole("button", { name: "自分自身" })).toBeNull();
     expect(
-      within(screen.getByRole("button", { name: /人間関係全般の診断/ })).getByText("人間関係全般"),
+      within(screen.getByRole("button", { name: /自分自身の診断/ })).getByText("自分自身"),
     ).toBeTruthy();
 
     fireEvent.click(filters.getByRole("button", { name: "パートナー" }));
@@ -184,7 +184,12 @@ describe("DiagnosisHome", () => {
           data: [
             diagnosis({ id: "conversation-emotion", title: "会話と感情表現" }),
             diagnosis({ id: "time-planning", title: "時間と予定" }),
-            diagnosis({ id: "new-diagnosis", title: "新しい診断", displayOrder: 3 }),
+            diagnosis({
+              id: "life-priorities",
+              title: "優先順位と人生の方向性",
+              displayOrder: 3,
+            }),
+            diagnosis({ id: "new-diagnosis", title: "新しい診断", displayOrder: 4 }),
           ],
         }}
         onOpenDiagnosis={vi.fn()}
@@ -194,6 +199,7 @@ describe("DiagnosisHome", () => {
 
     const conversationEmotionCard = screen.getByRole("button", { name: /会話と感情表現/ });
     const timePlanningCard = screen.getByRole("button", { name: /時間と予定/ });
+    const lifePrioritiesCard = screen.getByRole("button", { name: /優先順位と人生の方向性/ });
     const fallbackCard = screen.getByRole("button", { name: /新しい診断/ });
 
     expect(conversationEmotionCard.querySelector("img")?.getAttribute("src")).toBe(
@@ -201,6 +207,9 @@ describe("DiagnosisHome", () => {
     );
     expect(timePlanningCard.querySelector("img")?.getAttribute("src")).toBe(
       "/images/diagnoses/time-planning.jpg",
+    );
+    expect(lifePrioritiesCard.querySelector("img")?.getAttribute("src")).toBe(
+      "/images/diagnoses/life-priorities.jpg",
     );
     expect(fallbackCard.querySelector("img")?.getAttribute("src")).toBe(
       "/images/diagnoses/default.jpg",

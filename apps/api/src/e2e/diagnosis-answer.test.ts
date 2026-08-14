@@ -631,6 +631,45 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
     e2eTimeoutMs,
   );
 
+  it(
+    "優先順位と人生の方向性の回答を5つのパラメータへ採点する",
+    async () => {
+      for (let index = 1; index <= 10; index += 1) {
+        const suffix = String(index).padStart(2, "0");
+        const response = await putAnswer(`dq-life-priorities-${suffix}`, "yes", "life-priorities");
+        expect(response.status).toBe(200);
+      }
+
+      const response = await getAnswers("life-priorities");
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({
+        id: "life-priorities",
+        relationshipCategory: "general",
+        scoring: {
+          scoringVersion: 1,
+          balancedLabel: "状況に応じて優先するものを選ぶ",
+          parameters: [
+            expect.objectContaining({ id: "challenge-orientation", score: 60, coverage: 100 }),
+            expect.objectContaining({
+              id: "self-directed-fulfillment",
+              score: 100,
+              coverage: 100,
+            }),
+            expect.objectContaining({
+              id: "close-relationship-priority",
+              score: 100,
+              coverage: 100,
+            }),
+            expect.objectContaining({ id: "personal-wellbeing", score: 100, coverage: 100 }),
+            expect.objectContaining({ id: "future-stability", score: 100, coverage: 100 }),
+          ],
+        },
+      });
+    },
+    e2eTimeoutMs,
+  );
+
   it(`${diagnosisAnswerCases.missingContents.id}: ${diagnosisAnswerCases.missingContents.name}`, async () => {
     const response = await getAnswers();
     expect(response.status).toBe(404);

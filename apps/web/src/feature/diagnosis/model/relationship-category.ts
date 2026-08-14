@@ -20,7 +20,7 @@ const labels: Record<RelationshipCategory, string> = {
   family: "家族",
   friend: "友達",
   work: "仕事",
-  general: "人間関係全般",
+  general: "自分自身",
 };
 
 const badgeClassNames: Record<RelationshipCategory, string> = {
