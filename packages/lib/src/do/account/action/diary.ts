@@ -434,7 +434,7 @@ export async function storeLineTextSource(
     body: string;
     receivedAt: Date;
     resetEpoch?: number;
-    dailyPromptControl?: "stop";
+    dailyPromptControl?: "stop" | "resume";
   },
 ): Promise<StoredLineSource> {
   if (input.resetEpoch !== undefined) {
@@ -455,8 +455,14 @@ export async function storeLineTextSource(
       and(eq(sourceRecords.accountId, input.accountId), eq(sourceRecords.originalRef, originalRef)),
     )
     .get();
-  const sourceRecordId =
-    existing?.id ?? `line-${await sha256(`${input.accountId}:${input.eventId}`)}`;
+  if (existing) {
+    return {
+      sourceRecordId: existing.id,
+      eventId: input.eventId,
+      receivedAt: input.receivedAt,
+    };
+  }
+  const sourceRecordId = `line-${await sha256(`${input.accountId}:${input.eventId}`)}`;
   const now = new Date();
 
   const statements: BatchItem<"sqlite">[] = [
@@ -490,11 +496,17 @@ export async function storeLineTextSource(
           eq(dailyPromptDeliveries.accountId, input.accountId),
           inArray(dailyPromptDeliveries.status, ["pending", "delivered"]),
           isNull(dailyPromptDeliveries.respondedAt),
+          lte(dailyPromptDeliveries.createdAt, input.receivedAt),
           eq(dailyPromptDeliveries.isDeleted, false),
         ),
       ),
   ];
-  if (input.dailyPromptControl === "stop") {
+  if (input.dailyPromptControl) {
+    const controlStatus = input.dailyPromptControl === "stop" ? "stopped" : "active";
+    const controlledAtEpochSeconds = Math.floor(input.receivedAt.getTime() / 1_000);
+    const isNewerControl = sql`${dailyPromptPreferences.controlledAt} < ${controlledAtEpochSeconds}
+      OR (${dailyPromptPreferences.controlledAt} = ${controlledAtEpochSeconds}
+        AND ${dailyPromptPreferences.controlSourceRecordId} < ${sourceRecordId})`;
     statements.splice(
       2,
       0,
@@ -502,31 +514,44 @@ export async function storeLineTextSource(
         .insert(dailyPromptPreferences)
         .values({
           accountId: input.accountId,
-          status: "stopped",
-          stoppedAt: input.receivedAt,
-          stoppedSourceRecordId: sourceRecordId,
+          status: controlStatus,
+          controlledAt: input.receivedAt,
+          controlSourceRecordId: sourceRecordId,
           updatedAt: now,
         })
         .onConflictDoUpdate({
           target: dailyPromptPreferences.accountId,
           set: {
-            status: "stopped",
-            stoppedAt: input.receivedAt,
-            stoppedSourceRecordId: sourceRecordId,
+            status: controlStatus,
+            controlledAt: input.receivedAt,
+            controlSourceRecordId: sourceRecordId,
             updatedAt: now,
           },
+          setWhere: isNewerControl,
         }),
-      db
-        .update(dailyPromptDeliveries)
-        .set({ status: "skipped", skipReason: "manual_stopped", updatedAt: now })
-        .where(
-          and(
-            eq(dailyPromptDeliveries.accountId, input.accountId),
-            eq(dailyPromptDeliveries.status, "pending"),
-            eq(dailyPromptDeliveries.isDeleted, false),
-          ),
-        ),
     );
+    if (input.dailyPromptControl === "stop") {
+      statements.splice(
+        3,
+        0,
+        db
+          .update(dailyPromptDeliveries)
+          .set({ status: "skipped", skipReason: "manual_stopped", updatedAt: now })
+          .where(
+            and(
+              eq(dailyPromptDeliveries.accountId, input.accountId),
+              eq(dailyPromptDeliveries.status, "pending"),
+              eq(dailyPromptDeliveries.isDeleted, false),
+              sql`EXISTS (
+                SELECT 1 FROM ${dailyPromptPreferences}
+                WHERE ${dailyPromptPreferences.accountId} = ${input.accountId}
+                  AND ${dailyPromptPreferences.status} = 'stopped'
+                  AND ${dailyPromptPreferences.controlSourceRecordId} = ${sourceRecordId}
+              )`,
+            ),
+          ),
+      );
+    }
   }
   await db.batch(statements);
 

@@ -11,6 +11,7 @@ import m0009 from "./0009_misty_zarda.sql";
 import m0010 from "./0010_gorgeous_red_wolf.sql";
 import m0011 from "./0011_fine_colonel_america.sql";
 import m0012 from "./0012_smiling_ricochet.sql";
+import m0013 from "./0013_flat_silver_samurai.sql";
 import journal from "./meta/_journal.json";
 
 export default {
@@ -29,5 +30,6 @@ export default {
     m0010,
     m0011,
     m0012,
+    m0013,
   },
 };
