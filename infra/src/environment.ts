@@ -24,6 +24,8 @@ export function resourceNames(environment: Environment) {
       profileSummaryDeadLetter: `me-builder-profile-summary-dlq-${environment}`,
       brainVector: `me-builder-brain-vector-queue-${environment}`,
       brainVectorDeadLetter: `me-builder-brain-vector-dlq-${environment}`,
+      dailyPrompt: `me-builder-daily-prompt-queue-${environment}`,
+      dailyPromptDeadLetter: `me-builder-daily-prompt-dlq-${environment}`,
     },
   } as const;
 }

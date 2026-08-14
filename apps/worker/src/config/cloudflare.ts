@@ -3,6 +3,7 @@ import type { AccountDataNamespace } from "@me-builder/lib";
 import type {
   BrainVectorSyncQueueMessage,
   ChatTurnQueueMessage,
+  DailyPromptQueueMessage,
   DiaryBrainCheckpointQueueMessage,
   Queue,
 } from "@me-builder/shared";
@@ -18,6 +19,7 @@ export type CloudflareBindings = {
     chatTurn: Queue<ChatTurnQueueMessage> | undefined;
     brainCheckpoint: Queue<DiaryBrainCheckpointQueueMessage> | undefined;
     brainVector?: Queue<BrainVectorSyncQueueMessage> | undefined;
+    dailyPrompt?: Queue<DailyPromptQueueMessage> | undefined;
   };
   vector?: { brain: Env["BRAIN_VECTOR_INDEX"] };
 };
@@ -34,6 +36,7 @@ export function getCloudflareBindings(env: Env): CloudflareBindings {
       chatTurn: env.CHAT_TURN_QUEUE,
       brainCheckpoint: env.BRAIN_CHECKPOINT_QUEUE,
       brainVector: env.BRAIN_VECTOR_QUEUE,
+      dailyPrompt: env.DAILY_PROMPT_QUEUE,
     },
     vector: { brain: env.BRAIN_VECTOR_INDEX },
   };

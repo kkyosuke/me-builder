@@ -20,6 +20,8 @@ function manifest(environment: "preview" | "production", databaseId: string) {
       profileSummaryDeadLetter: { id: "8", name: `me-builder-profile-summary-dlq-${suffix}` },
       brainVector: { id: "9", name: `me-builder-brain-vector-queue-${suffix}` },
       brainVectorDeadLetter: { id: "10", name: `me-builder-brain-vector-dlq-${suffix}` },
+      dailyPrompt: { id: "11", name: `me-builder-daily-prompt-queue-${suffix}` },
+      dailyPromptDeadLetter: { id: "12", name: `me-builder-daily-prompt-dlq-${suffix}` },
     },
   });
 }
@@ -37,6 +39,9 @@ describe("renderWranglerConfigs", () => {
     expect(configs.worker).toContain('binding = "PROFILE_SUMMARY_QUEUE"');
     expect(configs.worker).toContain('binding = "BRAIN_VECTOR_QUEUE"');
     expect(configs.worker).toContain('binding = "BRAIN_VECTOR_INDEX"');
+    expect(configs.worker).toContain('queue = "me-builder-daily-prompt-queue-production"');
+    expect(configs.worker).toContain('binding = "DAILY_PROMPT_QUEUE"');
+    expect(configs.worker).toContain('crons = ["0 9 * * *"]');
     expect(configs.api).toContain('index_name = "me-builder-brain-preview"');
     expect(configs.api).not.toContain('index_name = "me-builder-brain-production"');
     expect(configs.api).toContain('bucket_name = "me-builder-avatar-preview"');

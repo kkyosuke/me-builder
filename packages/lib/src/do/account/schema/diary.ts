@@ -73,6 +73,56 @@ export const conversationMessages = sqliteTable(
   ],
 );
 
+/** 本人が明示した日次声かけの停止状態と、その根拠となる発言を保持する。 */
+export const dailyPromptPreferences = sqliteTable("daily_prompt_preferences", {
+  accountId: text("account_id")
+    .primaryKey()
+    .references(() => accountDataIdentity.accountId),
+  status: text("status", { enum: ["stopped"] }).notNull(),
+  stoppedAt: integer("stopped_at", { mode: "timestamp" }).notNull(),
+  stoppedSourceRecordId: text("stopped_source_record_id")
+    .notNull()
+    .references(() => sourceRecords.id),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+});
+
+/** 日本時間の日付ごとに、固定声かけの送信可否とLINE配送結果を保持する。 */
+export const dailyPromptDeliveries = sqliteTable(
+  "daily_prompt_deliveries",
+  {
+    ...baseSchema,
+    accountId: text("account_id")
+      .notNull()
+      .references(() => accountDataIdentity.accountId),
+    localDate: text("local_date").notNull(),
+    promptVersion: text("prompt_version").notNull(),
+    status: text("status", { enum: ["pending", "delivered", "skipped", "failed"] })
+      .notNull()
+      .default("pending"),
+    skipReason: text("skip_reason", {
+      enum: [
+        "manual_stopped",
+        "stale",
+        "active_session",
+        "user_activity",
+        "recent_unanswered",
+        "auto_paused",
+      ],
+    }),
+    failureStage: text("failure_stage"),
+    deliveredAt: integer("delivered_at", { mode: "timestamp" }),
+    respondedAt: integer("responded_at", { mode: "timestamp" }),
+  },
+  (table) => [
+    uniqueIndex("daily_prompt_delivery_account_date_idx").on(table.accountId, table.localDate),
+    index("daily_prompt_delivery_account_status_idx").on(
+      table.accountId,
+      table.status,
+      table.localDate,
+    ),
+  ],
+);
+
 export const chatTurns = sqliteTable(
   "chat_turns",
   {

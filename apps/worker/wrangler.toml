@@ -10,6 +10,9 @@ enabled = true
 [observability.logs]
 invocation_logs = false
 
+[triggers]
+crons = ["0 9 * * *"]
+
 [[queues.consumers]]
 queue = "me-builder-webhook-queue-local"
 dead_letter_queue = "me-builder-webhook-dlq-local"
@@ -35,6 +38,11 @@ queue = "me-builder-brain-vector-queue-local"
 dead_letter_queue = "me-builder-brain-vector-dlq-local"
 max_retries = 5
 
+[[queues.consumers]]
+queue = "me-builder-daily-prompt-queue-local"
+dead_letter_queue = "me-builder-daily-prompt-dlq-local"
+max_retries = 5
+
 [[queues.producers]]
 queue = "me-builder-chat-turn-queue-local"
 binding = "CHAT_TURN_QUEUE"
@@ -50,6 +58,10 @@ binding = "PROFILE_SUMMARY_QUEUE"
 [[queues.producers]]
 queue = "me-builder-brain-vector-queue-local"
 binding = "BRAIN_VECTOR_QUEUE"
+
+[[queues.producers]]
+queue = "me-builder-daily-prompt-queue-local"
+binding = "DAILY_PROMPT_QUEUE"
 
 [[durable_objects.bindings]]
 name = "CONVERSATION_COORDINATOR"
@@ -95,6 +107,9 @@ ENVIRONMENT = "local"
 [env.local]
 name = "me-builder-worker-local"
 
+[env.local.triggers]
+crons = ["0 9 * * *"]
+
 [[env.local.queues.consumers]]
 queue = "me-builder-webhook-queue-local"
 dead_letter_queue = "me-builder-webhook-dlq-local"
@@ -120,6 +135,11 @@ queue = "me-builder-brain-vector-queue-local"
 dead_letter_queue = "me-builder-brain-vector-dlq-local"
 max_retries = 5
 
+[[env.local.queues.consumers]]
+queue = "me-builder-daily-prompt-queue-local"
+dead_letter_queue = "me-builder-daily-prompt-dlq-local"
+max_retries = 5
+
 [[env.local.queues.producers]]
 queue = "me-builder-chat-turn-queue-local"
 binding = "CHAT_TURN_QUEUE"
@@ -135,6 +155,10 @@ binding = "PROFILE_SUMMARY_QUEUE"
 [[env.local.queues.producers]]
 queue = "me-builder-brain-vector-queue-local"
 binding = "BRAIN_VECTOR_QUEUE"
+
+[[env.local.queues.producers]]
+queue = "me-builder-daily-prompt-queue-local"
+binding = "DAILY_PROMPT_QUEUE"
 
 [[env.local.durable_objects.bindings]]
 name = "CONVERSATION_COORDINATOR"
@@ -163,6 +187,9 @@ ENVIRONMENT = "local"
 [env.preview]
 name = "me-builder-worker-preview"
 
+[env.preview.triggers]
+crons = ["0 9 * * *"]
+
 [[env.preview.queues.consumers]]
 queue = "me-builder-webhook-queue-preview"
 dead_letter_queue = "me-builder-webhook-dlq-preview"
@@ -188,6 +215,11 @@ queue = "me-builder-brain-vector-queue-preview"
 dead_letter_queue = "me-builder-brain-vector-dlq-preview"
 max_retries = 5
 
+[[env.preview.queues.consumers]]
+queue = "me-builder-daily-prompt-queue-preview"
+dead_letter_queue = "me-builder-daily-prompt-dlq-preview"
+max_retries = 5
+
 [[env.preview.queues.producers]]
 queue = "me-builder-chat-turn-queue-preview"
 binding = "CHAT_TURN_QUEUE"
@@ -203,6 +235,10 @@ binding = "PROFILE_SUMMARY_QUEUE"
 [[env.preview.queues.producers]]
 queue = "me-builder-brain-vector-queue-preview"
 binding = "BRAIN_VECTOR_QUEUE"
+
+[[env.preview.queues.producers]]
+queue = "me-builder-daily-prompt-queue-preview"
+binding = "DAILY_PROMPT_QUEUE"
 
 [[env.preview.durable_objects.bindings]]
 name = "CONVERSATION_COORDINATOR"
@@ -231,6 +267,9 @@ ENVIRONMENT = "preview"
 [env.production]
 name = "me-builder-worker-production"
 
+[env.production.triggers]
+crons = ["0 9 * * *"]
+
 [[env.production.queues.consumers]]
 queue = "me-builder-webhook-queue-production"
 dead_letter_queue = "me-builder-webhook-dlq-production"
@@ -256,6 +295,11 @@ queue = "me-builder-brain-vector-queue-production"
 dead_letter_queue = "me-builder-brain-vector-dlq-production"
 max_retries = 5
 
+[[env.production.queues.consumers]]
+queue = "me-builder-daily-prompt-queue-production"
+dead_letter_queue = "me-builder-daily-prompt-dlq-production"
+max_retries = 5
+
 [[env.production.queues.producers]]
 queue = "me-builder-chat-turn-queue-production"
 binding = "CHAT_TURN_QUEUE"
@@ -271,6 +315,10 @@ binding = "PROFILE_SUMMARY_QUEUE"
 [[env.production.queues.producers]]
 queue = "me-builder-brain-vector-queue-production"
 binding = "BRAIN_VECTOR_QUEUE"
+
+[[env.production.queues.producers]]
+queue = "me-builder-daily-prompt-queue-production"
+binding = "DAILY_PROMPT_QUEUE"
 
 [[env.production.durable_objects.bindings]]
 name = "CONVERSATION_COORDINATOR"

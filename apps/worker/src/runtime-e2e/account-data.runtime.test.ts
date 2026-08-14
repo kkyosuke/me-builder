@@ -143,6 +143,8 @@ describe("AccountData Workers runtime E2E", () => {
       state.storage.sql.exec("DROP TABLE brain_vector_entries");
       state.storage.sql.exec("DROP TABLE brain_vector_sync_jobs");
       state.storage.sql.exec("DROP TABLE diary_chat_brain_usage_audits");
+      state.storage.sql.exec("DROP TABLE daily_prompt_preferences");
+      state.storage.sql.exec("DROP TABLE daily_prompt_deliveries");
       state.storage.sql.exec("DROP INDEX diary_brain_checkpoint_item_brain_idx");
       state.storage.sql.exec(
         "ALTER TABLE diary_brain_checkpoint_items DROP COLUMN dedup_prompt_version",
@@ -153,6 +155,7 @@ describe("AccountData Workers runtime E2E", () => {
         "CREATE UNIQUE INDEX diary_brain_checkpoint_item_brain_idx ON diary_brain_checkpoint_items (brain_item_id)",
       );
       state.storage.sql.exec("ALTER TABLE account_data_identity DROP COLUMN reset_epoch");
+      state.storage.sql.exec("ALTER TABLE diagnoses DROP COLUMN relationship_category");
       state.storage.sql.exec("DELETE FROM __drizzle_migrations WHERE created_at > 1786361220917");
 
       const repository = Reflect.get(instance, "repository") as {
@@ -238,6 +241,8 @@ describe("AccountData Workers runtime E2E", () => {
         generatedAt.getTime(),
       );
       state.storage.sql.exec("DROP TABLE diary_chat_brain_usage_audits");
+      state.storage.sql.exec("DROP TABLE daily_prompt_preferences");
+      state.storage.sql.exec("DROP TABLE daily_prompt_deliveries");
       state.storage.sql.exec("DROP INDEX diary_brain_checkpoint_item_brain_idx");
       state.storage.sql.exec(
         "ALTER TABLE diary_brain_checkpoint_items DROP COLUMN dedup_prompt_version",
@@ -248,6 +253,7 @@ describe("AccountData Workers runtime E2E", () => {
         "CREATE UNIQUE INDEX diary_brain_checkpoint_item_brain_idx ON diary_brain_checkpoint_items (brain_item_id)",
       );
       state.storage.sql.exec("ALTER TABLE account_data_identity DROP COLUMN reset_epoch");
+      state.storage.sql.exec("ALTER TABLE diagnoses DROP COLUMN relationship_category");
       state.storage.sql.exec("DELETE FROM __drizzle_migrations WHERE created_at >= 1786415351981");
 
       const repository = Reflect.get(instance, "repository") as {

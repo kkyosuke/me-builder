@@ -172,6 +172,28 @@ describe("Worker", () => {
     );
   });
 
+  it("明示的な声かけ停止をAccountDataへ渡し、通常の日記会話も継続する", async () => {
+    const { batch, message } = createBatch("毎日の声かけを停止してください");
+    const db = {} as D1.shared.Client;
+
+    await handleQueueBatch(batch, db, getWorkerConfig({ ENVIRONMENT: "test" }), {
+      d1: db,
+      do: { conversation: coordinatorNamespace, accountData: accountDataNamespace },
+      queue: { chatTurn: undefined, brainCheckpoint: undefined },
+    });
+
+    expect(mockAccountDataExecute).toHaveBeenCalledWith(
+      "account-1",
+      "conversation.storeLineTextSource",
+      expect.objectContaining({
+        body: "毎日の声かけを停止してください",
+        dailyPromptControl: "stop",
+      }),
+    );
+    expect(mockAcceptMessage).toHaveBeenCalledOnce();
+    expect(message.ack).toHaveBeenCalledOnce();
+  });
+
   it("AccountDataの失敗を安全に分類し、同じ相関IDで再試行を記録する", async () => {
     const { batch, message } = createBatch("今日は散歩した");
     mockAccountDataExecute.mockRejectedValueOnce(

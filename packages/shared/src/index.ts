@@ -5,3 +5,4 @@ export * from "./utils/env";
 export * from "./utils/logger";
 export * from "./utils/operational-error";
 export * from "./utils/operational-log";
+export * from "./utils/tokyo-date";

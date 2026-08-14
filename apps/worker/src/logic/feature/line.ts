@@ -157,6 +157,7 @@ export async function processLineWebhook(
     }
 
     const receivedAt = new Date(event.timestamp);
+    const dailyPromptControl = line.text.classifyDailyPromptControl(event.message.text);
     if (!accountDataNamespace) {
       throw new OperationalError({
         code: "ACCOUNT_DATA_BINDING_MISSING",
@@ -189,6 +190,7 @@ export async function processLineWebhook(
           eventId,
           body: event.message.text,
           receivedAt,
+          ...(dailyPromptControl ? { dailyPromptControl } : {}),
           ...(resetEpoch === undefined ? {} : { resetEpoch }),
         },
       );

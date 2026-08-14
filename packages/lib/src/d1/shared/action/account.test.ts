@@ -1,11 +1,17 @@
 import path from "node:path";
 import Database from "better-sqlite3";
+import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { describe, expect, it } from "vitest";
 import type { SharedD1Client } from "../client";
 import * as schema from "../schema";
-import { linkIdentity, resolveAccountByLineLogin, upsertIdentity } from "./account";
+import {
+  linkIdentity,
+  listActiveLineAccountIds,
+  resolveAccountByLineLogin,
+  upsertIdentity,
+} from "./account";
 
 function createTestDb(): SharedD1Client {
   const sqlite = new Database(":memory:");
@@ -78,6 +84,39 @@ describe("upsertIdentity", () => {
       role: "admin",
     });
     expect(promoted.account.role).toBe("admin");
+  });
+});
+
+describe("listActiveLineAccountIds", () => {
+  it("activeなLINE identityだけをAccount ID順にページングする", async () => {
+    const db = createTestDb();
+    const lineA = await upsertIdentity(db, { provider: "line", providerAccountId: "U_a" });
+    const lineB = await upsertIdentity(db, { provider: "line", providerAccountId: "U_b" });
+    await upsertIdentity(db, { provider: "google", providerAccountId: "google-only" });
+
+    const expected = [lineA.account.id, lineB.account.id].sort();
+    const firstAccountId = expected[0];
+    const secondAccountId = expected[1];
+    if (!firstAccountId || !secondAccountId) throw new Error("LINE Account fixtures are missing");
+    await expect(listActiveLineAccountIds(db, { limit: 1 })).resolves.toEqual([firstAccountId]);
+    await expect(
+      listActiveLineAccountIds(db, { afterAccountId: firstAccountId, limit: 1 }),
+    ).resolves.toEqual([secondAccountId]);
+  });
+
+  it("削除済みidentityと範囲外limitを受け付けない", async () => {
+    const db = createTestDb();
+    const deleted = await upsertIdentity(db, {
+      provider: "line",
+      providerAccountId: "U_deleted",
+    });
+    await db
+      .update(schema.accountIdentities)
+      .set({ isDeleted: true, deletedAt: new Date() })
+      .where(eq(schema.accountIdentities.id, deleted.identity.id));
+
+    await expect(listActiveLineAccountIds(db)).resolves.toEqual([]);
+    await expect(listActiveLineAccountIds(db, { limit: 101 })).rejects.toThrow(/between 1 and 100/);
   });
 });
 
