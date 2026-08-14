@@ -225,7 +225,12 @@ describe("DiagnosisHome", () => {
               title: "家族との距離感・支え合い",
               displayOrder: 6,
             }),
-            diagnosis({ id: "new-diagnosis", title: "新しい診断", displayOrder: 7 }),
+            diagnosis({
+              id: "friendship-style",
+              title: "友達との距離感・付き合い方",
+              displayOrder: 7,
+            }),
+            diagnosis({ id: "new-diagnosis", title: "新しい診断", displayOrder: 8 }),
           ],
         }}
         onOpenDiagnosis={vi.fn()}
@@ -242,6 +247,9 @@ describe("DiagnosisHome", () => {
     });
     const familySupportStyleCard = screen.getByRole("button", {
       name: /家族との距離感・支え合い/,
+    });
+    const friendshipStyleCard = screen.getByRole("button", {
+      name: /友達との距離感・付き合い方/,
     });
     const fallbackCard = screen.getByRole("button", { name: /新しい診断/ });
 
@@ -262,6 +270,9 @@ describe("DiagnosisHome", () => {
     );
     expect(familySupportStyleCard.querySelector("img")?.getAttribute("src")).toBe(
       "/images/diagnoses/family-support-style.jpg",
+    );
+    expect(friendshipStyleCard.querySelector("img")?.getAttribute("src")).toBe(
+      "/images/diagnoses/friendship-style.jpg",
     );
     expect(fallbackCard.querySelector("img")?.getAttribute("src")).toBe(
       "/images/diagnoses/default.jpg",

@@ -316,6 +316,19 @@
 9. 家族と一緒に過ごす予定は、早めに相談して決めたい。
 10. 家族と一緒に過ごす予定は、直前に都合を合わせて決めてもよい。
 
+### 3.24 友達との距離感・付き合い方
+
+1. 友達としばらく連絡を取っていないと気づいたときは、用事がなくても自分から連絡したい。
+2. 友達としばらく連絡を取っていないと気づいても、次の用事ができるまで連絡しなくてよい。
+3. 友達と会う予定を立てるときは、直前に誘うより早めに日程を相談したい。
+4. 友達と会う予定を立てるときは、早めに決めるより直前に都合を合わせたい。
+5. 自分が悩んでいるときは、友達から聞かれなくても早めに話したい。
+6. 自分が悩んでいるときは、友達から聞かれるまで自分からは話さずにおきたい。
+7. 仲のよい友達同士がまだ会ったことがないときは、機会を作って紹介したい。
+8. 仲のよい友達同士がまだ会ったことがないときも、無理に紹介せずそれぞれ別に付き合いたい。
+9. 友達の言葉に引っかかったときは、一人で考えるよりその場で理由を確かめたい。
+10. 友達の言葉に引っかかったときは、その場で確かめるより一度自分の中で整理してから話したい。
+
 ## 4. 回答から傾向を出すために必要な設計
 
 この質問集だけでは、「貯蓄重視」などの傾向を論理的に算出できません。現時点で定義しているのは質問候補までであり、質問と傾向軸の対応、回答の向き、集計方法は未定義です。1問への回答だけで人物の傾向を確定しません。
@@ -345,7 +358,7 @@
 - 算出規則と、結果に使用した質問を本人が確認できるようにする
 - 回答数が足りない場合や回答が食い違う場合は、無理にラベルを付けない
 
-公開済み診断の質問と傾向軸の対応、計算式、表示条件は、[自分と相手の優先・境界線](../scoring/relationship-priority-parameter-design.md)、[お金と消費](../scoring/money-values-parameter-design.md)、[インドア・アウトドアと余暇](../scoring/leisure-style-parameter-design.md)、[時間と予定](../scoring/time-planning-parameter-design.md)、[会話と感情表現](../scoring/conversation-emotion-parameter-design.md)、[優先順位と人生の方向性](../scoring/life-priorities-parameter-design.md)、[仕事の価値観・働き方](../scoring/work-values-parameter-design.md)、[仕事の変化・周囲との関わり方](../scoring/work-relationship-style-parameter-design.md)、[家族との距離感・支え合い](../scoring/family-support-style-parameter-design.md)の各パラメータ変換設計を正とします。他の話題の対応は、質問の審査と合わせて後続で定義します。
+公開済み診断の質問と傾向軸の対応、計算式、表示条件は、[自分と相手の優先・境界線](../scoring/relationship-priority-parameter-design.md)、[お金と消費](../scoring/money-values-parameter-design.md)、[インドア・アウトドアと余暇](../scoring/leisure-style-parameter-design.md)、[時間と予定](../scoring/time-planning-parameter-design.md)、[会話と感情表現](../scoring/conversation-emotion-parameter-design.md)、[優先順位と人生の方向性](../scoring/life-priorities-parameter-design.md)、[仕事の価値観・働き方](../scoring/work-values-parameter-design.md)、[仕事の変化・周囲との関わり方](../scoring/work-relationship-style-parameter-design.md)、[家族との距離感・支え合い](../scoring/family-support-style-parameter-design.md)、[友達との距離感・付き合い方](../scoring/friendship-style-parameter-design.md)の各パラメータ変換設計を正とします。他の話題の対応は、質問の審査と合わせて後続で定義します。
 
 ## 5. 公開単位
 
