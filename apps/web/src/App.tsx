@@ -22,6 +22,7 @@ import {
   loadAdminApplication,
   loadAvatarSettingsScreen,
   loadCompatibilityApplication,
+  loadDevelopmentBrainItemsApplication,
   loadDiagnosisApplication,
   loadMainApplication,
   loadProfileApplication,
@@ -38,8 +39,9 @@ const DiagnosisApplication = lazy(loadDiagnosisApplication);
 const ProfileApplication = lazy(loadProfileApplication);
 const ProfileSettingsScreen = lazy(loadProfileSettingsScreen);
 const AvatarSettingsScreen = lazy(loadAvatarSettingsScreen);
+const DevelopmentBrainItemsApplication = lazy(loadDevelopmentBrainItemsApplication);
 
-type ProfileView = "closed" | "profile" | "avatar";
+type ProfileView = "closed" | "profile" | "avatar" | "brain-items";
 type MainRoute = "compatibility" | "diagnosis" | "me";
 
 const DEVELOPMENT_ENVIRONMENTS = new Set(["development", "local", "preview", "test"]);
@@ -49,6 +51,9 @@ const PROFILE_RETURN_PATHNAME_STATE_KEY = "me-builder-profile-return-pathname";
 
 function resolveProfileView(pathname: string): ProfileView {
   if (pathname.startsWith("/profile/avatar")) return "avatar";
+  if (pathname.startsWith("/profile/brain-items")) {
+    return DEVELOPMENT_ENVIRONMENTS.has(config.environment ?? "") ? "brain-items" : "profile";
+  }
   if (pathname === "/profile" || pathname.startsWith("/profile/")) return "profile";
   return "closed";
 }
@@ -56,7 +61,7 @@ function resolveProfileView(pathname: string): ProfileView {
 function historyProfileView(state: unknown): Exclude<ProfileView, "closed"> | null {
   if (!state || typeof state !== "object") return null;
   const value = (state as Record<string, unknown>)[PROFILE_HISTORY_STATE_KEY];
-  return value === "profile" || value === "avatar" ? value : null;
+  return value === "profile" || value === "avatar" || value === "brain-items" ? value : null;
 }
 
 function historyProfileReturnPathname(state: unknown): string | null {
@@ -347,8 +352,28 @@ function AppContents() {
     setNavigation((current) => ({ ...current, profileView: "avatar" }));
   };
 
+  const openBrainItems = () => {
+    window.history.pushState(
+      { [PROFILE_HISTORY_STATE_KEY]: "brain-items" },
+      "",
+      "/profile/brain-items",
+    );
+    setNavigation((current) => ({ ...current, profileView: "brain-items" }));
+  };
+
   const closeAvatar = () => {
     if (historyProfileView(window.history.state) === "avatar") {
+      setNavigation((current) => ({ ...current, profileView: "profile" }));
+      window.history.back();
+      return;
+    }
+
+    window.history.replaceState({}, "", "/profile");
+    setNavigation((current) => ({ ...current, profileView: "profile" }));
+  };
+
+  const closeBrainItems = () => {
+    if (historyProfileView(window.history.state) === "brain-items") {
       setNavigation((current) => ({ ...current, profileView: "profile" }));
       window.history.back();
       return;
@@ -425,7 +450,8 @@ function AppContents() {
             <ProfileSettingsScreen
               avatar={avatar}
               isAdmin={accountRole === "admin"}
-              isInactive={profileView === "avatar"}
+              isInactive={profileView !== "profile"}
+              inactiveFocusTarget={profileView === "brain-items" ? "brain-items" : "avatar"}
               isProfileLoading={profileReadState.status === "loading"}
               profileError={profileReadState.status === "error" ? profileReadState.message : null}
               linePictureUrl={linePictureUrl}
@@ -434,6 +460,8 @@ function AppContents() {
               onBack={closeProfile}
               onOpenAdmin={openAdmin}
               onOpenAvatar={openAvatar}
+              canOpenBrainItems={DEVELOPMENT_ENVIRONMENTS.has(config.environment ?? "")}
+              onOpenBrainItems={openBrainItems}
               onRetryProfile={() => setProfileReloadKey((current) => current + 1)}
               canResetAccountData={DEVELOPMENT_ENVIRONMENTS.has(config.environment ?? "")}
               onResetAccountData={resetAccountData}
@@ -456,6 +484,17 @@ function AppContents() {
               onBack={closeAvatar}
               onSave={saveAvatar}
             />
+          </Suspense>
+        </RouteErrorBoundary>
+      )}
+      {profileView === "brain-items" && DEVELOPMENT_ENVIRONMENTS.has(config.environment ?? "") && (
+        <RouteErrorBoundary>
+          <Suspense
+            fallback={
+              <LoadingState message="Brain Item一覧を読み込んでいます..." variant="overlay" />
+            }
+          >
+            <DevelopmentBrainItemsApplication onBack={closeBrainItems} />
           </Suspense>
         </RouteErrorBoundary>
       )}

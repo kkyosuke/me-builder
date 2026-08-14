@@ -123,7 +123,7 @@ describe("Compatibility flow", () => {
     expect(onCancel).toHaveBeenCalledWith(pending.relationshipId);
   });
 
-  it("相性一覧を全部・パートナー・家族・友達・仕事で絞り込む", () => {
+  it("相性一覧に自分自身を含む共通の絞り込みを表示する", () => {
     const onCategoryFilterChange = vi.fn();
     render(
       <CompatibilityListScreen
@@ -163,6 +163,7 @@ describe("Compatibility flow", () => {
       "家族",
       "友達",
       "仕事",
+      "自分自身",
     ]);
     expect(screen.getByRole("button", { name: "家族" }).getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByRole("heading", { name: "家族の相手さん" })).toBeTruthy();
@@ -170,6 +171,9 @@ describe("Compatibility flow", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "友達" }));
     expect(onCategoryFilterChange).toHaveBeenCalledWith("friend");
+
+    fireEvent.click(screen.getByRole("button", { name: "自分自身" }));
+    expect(onCategoryFilterChange).toHaveBeenCalledWith("general");
   });
 
   it("選択カテゴリに対象がなくても一覧全体の空状態と区別する", () => {

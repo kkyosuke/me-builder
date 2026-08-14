@@ -156,6 +156,7 @@ describe("DiagnosisHome", () => {
       "家族",
       "友達",
       "仕事",
+      "自分自身",
     ]);
     expect(screen.getByRole("button", { name: /パートナー向け診断/ })).toBeTruthy();
     expect(screen.getByRole("button", { name: /仕事向け診断/ })).toBeTruthy();
@@ -188,13 +189,22 @@ describe("DiagnosisHome", () => {
 
     const filters = within(screen.getByRole("group", { name: "関係カテゴリで絞り込む" }));
     expect(filters.getByRole("button", { name: "パートナー" })).toBeTruthy();
-    expect(filters.queryByRole("button", { name: "自分自身" })).toBeNull();
+    expect(filters.getByRole("button", { name: "自分自身" })).toBeTruthy();
     expect(
       within(screen.getByRole("button", { name: /自分自身の診断/ })).getByText("自分自身"),
     ).toBeTruthy();
 
     fireEvent.click(filters.getByRole("button", { name: "パートナー" }));
     expect(screen.getByText("このカテゴリの診断はありません。")).toBeTruthy();
+
+    fireEvent.click(filters.getByRole("button", { name: "自分自身" }));
+    expect(screen.getByRole("button", { name: /自分自身の診断/ })).toBeTruthy();
+    expect(filters.getByRole("button", { name: "自分自身" }).getAttribute("aria-pressed")).toBe(
+      "true",
+    );
+    expect(filters.getByRole("button", { name: "自分自身" }).className).toContain(
+      "aria-pressed:bg-slate-100",
+    );
   });
 
   it("診断ごとのサムネイルと未知の診断用フォールバックを表示する", () => {

@@ -1,5 +1,6 @@
 import {
   ArrowLeft,
+  Brain,
   ChevronRight,
   Moon,
   RefreshCw,
@@ -43,6 +44,7 @@ export function ProfileSettingsScreen({
   avatar,
   isAdmin = false,
   isInactive = false,
+  inactiveFocusTarget = "avatar",
   isProfileLoading = false,
   profileError = null,
   linePictureUrl,
@@ -51,6 +53,8 @@ export function ProfileSettingsScreen({
   onBack,
   onOpenAdmin,
   onOpenAvatar,
+  canOpenBrainItems = false,
+  onOpenBrainItems,
   onRetryProfile,
   canResetAccountData = false,
   onResetAccountData,
@@ -60,6 +64,7 @@ export function ProfileSettingsScreen({
   avatar: AvatarSelection | null;
   isAdmin?: boolean;
   isInactive?: boolean;
+  inactiveFocusTarget?: "avatar" | "brain-items";
   isProfileLoading?: boolean;
   profileError?: string | null;
   linePictureUrl?: string | undefined;
@@ -68,6 +73,8 @@ export function ProfileSettingsScreen({
   onBack: () => void;
   onOpenAdmin?: () => void;
   onOpenAvatar: () => void;
+  canOpenBrainItems?: boolean;
+  onOpenBrainItems?: () => void;
   onRetryProfile?: () => void;
   canResetAccountData?: boolean;
   onResetAccountData?: () => Promise<ResetDevelopmentAccountDataResult>;
@@ -77,7 +84,9 @@ export function ProfileSettingsScreen({
   const dialogRef = useRef<HTMLDialogElement>(null);
   const backButtonRef = useRef<HTMLButtonElement>(null);
   const avatarButtonRef = useRef<HTMLButtonElement>(null);
+  const brainItemsLinkRef = useRef<HTMLAnchorElement>(null);
   const wasInactiveRef = useRef(isInactive);
+  const inactiveFocusTargetRef = useRef(inactiveFocusTarget);
   const [resetState, setResetState] = useState<AsyncState<string>>({ status: "idle" });
 
   const resetAccountData = useCallback(async () => {
@@ -117,16 +126,21 @@ export function ProfileSettingsScreen({
     dialogRef.current?.toggleAttribute("inert", isInactive);
     if (isInactive) {
       wasInactiveRef.current = true;
+      inactiveFocusTargetRef.current = inactiveFocusTarget;
       return;
     }
 
     if (wasInactiveRef.current) {
-      avatarButtonRef.current?.focus();
+      if (inactiveFocusTargetRef.current === "brain-items") {
+        brainItemsLinkRef.current?.focus();
+      } else {
+        avatarButtonRef.current?.focus();
+      }
     } else {
       backButtonRef.current?.focus();
     }
     wasInactiveRef.current = false;
-  }, [isInactive]);
+  }, [inactiveFocusTarget, isInactive]);
 
   return (
     <dialog
@@ -377,50 +391,89 @@ export function ProfileSettingsScreen({
           </section>
         )}
 
-        {canResetAccountData && onResetAccountData && (
+        {((canOpenBrainItems && onOpenBrainItems) ||
+          (canResetAccountData && onResetAccountData)) && (
           <section
-            aria-labelledby="development-data-reset-heading"
-            className="mt-8 rounded-2xl border border-dashed border-rose-400/40 bg-rose-400/5 p-4"
+            aria-labelledby="development-tools-heading"
+            className="mt-8 rounded-2xl border border-dashed border-violet-400/40 bg-violet-400/5 p-4"
           >
-            <p className="text-xs font-semibold tracking-wider text-rose-700 dark:text-rose-300">
+            <p className="text-xs font-semibold tracking-wider text-violet-700 dark:text-violet-300">
               DEV ONLY
             </p>
             <h2
-              id="development-data-reset-heading"
+              id="development-tools-heading"
               className="mt-1 text-sm font-bold text-slate-950 dark:text-white"
             >
               開発用データ操作
             </h2>
-            <p className="mt-2 text-xs leading-relaxed text-slate-600 dark:text-slate-400">
-              診断、日記、Brain
-              Item、わたしのまとめを物理削除し、すべてのVectorを非同期で削除します。Account、アバター、相性関係は残ります。
-            </p>
-            <button
-              type="button"
-              onClick={() => void resetAccountData()}
-              disabled={resetState.status === "loading"}
-              className="mt-3 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-rose-400/50 px-4 py-2 text-sm font-bold text-rose-700 transition hover:bg-rose-400/10 disabled:cursor-wait disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-500 dark:text-rose-200"
-            >
-              {resetState.status === "loading" ? (
-                <RefreshCw
-                  className="size-4 animate-spin motion-reduce:animate-none"
-                  aria-hidden="true"
-                />
-              ) : (
-                <Trash2 className="size-4" aria-hidden="true" />
-              )}
-              {resetState.status === "loading" ? "削除しています..." : "自分のデータを全削除"}
-            </button>
-            {(resetState.status === "success" || resetState.status === "error") && (
-              <output
-                className={`mt-3 block text-xs ${
-                  resetState.status === "success"
-                    ? "text-emerald-700 dark:text-emerald-300"
-                    : "text-rose-700 dark:text-rose-300"
-                }`}
+            {canOpenBrainItems && onOpenBrainItems && (
+              <a
+                ref={brainItemsLinkRef}
+                href="/profile/brain-items"
+                onClick={(event: MouseEvent<HTMLAnchorElement>) => {
+                  if (
+                    event.defaultPrevented ||
+                    event.button !== 0 ||
+                    event.metaKey ||
+                    event.ctrlKey ||
+                    event.shiftKey ||
+                    event.altKey
+                  ) {
+                    return;
+                  }
+                  event.preventDefault();
+                  onOpenBrainItems();
+                }}
+                className="mt-3 flex w-full items-center gap-3 rounded-xl border border-violet-300/60 bg-white p-3 text-left transition hover:border-violet-400 hover:bg-violet-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 dark:border-violet-800 dark:bg-slate-800 dark:hover:bg-violet-950/30"
               >
-                {resetState.status === "success" ? resetState.data : resetState.message}
-              </output>
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-violet-500/15 text-violet-700 dark:text-violet-300">
+                  <Brain className="size-5" aria-hidden="true" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-bold text-slate-950 dark:text-white">
+                    Brain Item一覧を開く
+                  </span>
+                  <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
+                    保存済みItemとVectorの同期状態を確認
+                  </span>
+                </span>
+                <ChevronRight className="size-5 text-slate-400" aria-hidden="true" />
+              </a>
+            )}
+            {canResetAccountData && onResetAccountData && (
+              <div className="mt-4 border-t border-rose-300/50 pt-4 dark:border-rose-900">
+                <p className="text-xs leading-relaxed text-slate-600 dark:text-slate-400">
+                  診断、日記、Brain
+                  Item、わたしのまとめを物理削除し、すべてのVectorを非同期で削除します。Account、アバター、相性関係は残ります。
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void resetAccountData()}
+                  disabled={resetState.status === "loading"}
+                  className="mt-3 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-rose-400/50 px-4 py-2 text-sm font-bold text-rose-700 transition hover:bg-rose-400/10 disabled:cursor-wait disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-500 dark:text-rose-200"
+                >
+                  {resetState.status === "loading" ? (
+                    <RefreshCw
+                      className="size-4 animate-spin motion-reduce:animate-none"
+                      aria-hidden="true"
+                    />
+                  ) : (
+                    <Trash2 className="size-4" aria-hidden="true" />
+                  )}
+                  {resetState.status === "loading" ? "削除しています..." : "自分のデータを全削除"}
+                </button>
+                {(resetState.status === "success" || resetState.status === "error") && (
+                  <output
+                    className={`mt-3 block text-xs ${
+                      resetState.status === "success"
+                        ? "text-emerald-700 dark:text-emerald-300"
+                        : "text-rose-700 dark:text-rose-300"
+                    }`}
+                  >
+                    {resetState.status === "success" ? resetState.data : resetState.message}
+                  </output>
+                )}
+              </div>
             )}
           </section>
         )}

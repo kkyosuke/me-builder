@@ -43,10 +43,10 @@ describe("CompatibilityListApplication category filter", () => {
   });
 
   it("URLから選択を復元し、変更時にcategory queryだけを同期する", () => {
-    window.history.replaceState({}, "", "/compatibility?category=family&from=test#list");
+    window.history.replaceState({}, "", "/compatibility?category=general&from=test#list");
     render(<CompatibilityListApplication />);
 
-    expect(mocks.screenProps?.categoryFilter).toBe("family");
+    expect(mocks.screenProps?.categoryFilter).toBe("general");
     act(() => mocks.screenProps?.onCategoryFilterChange("work"));
     expect(mocks.screenProps?.categoryFilter).toBe("work");
     expect(window.location.pathname + window.location.search + window.location.hash).toBe(

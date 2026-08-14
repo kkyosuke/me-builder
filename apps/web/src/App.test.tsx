@@ -751,7 +751,7 @@ describe("App", () => {
     expect(mocks.fetchDiagnosisList).not.toHaveBeenCalled();
   });
 
-  it("/meでは診断・日記レコードから生成したまとめを表示し、診断一覧は取得しない", async () => {
+  it("/meでは診断・日記レコードから生成したまとめだけを表示する", async () => {
     window.history.replaceState({}, "", "/me");
 
     render(<App />);
@@ -764,6 +764,21 @@ describe("App", () => {
       "dummy.id.token",
       expect.any(AbortSignal),
     );
+    expect(screen.queryByRole("heading", { name: "Brain Item一覧" })).toBeNull();
+    expect(mocks.fetchDevelopmentBrainItems).not.toHaveBeenCalled();
+    expect(mocks.fetchDiagnosisList).not.toHaveBeenCalled();
+  });
+
+  it("開発環境ではプロフィールからBrain Item一覧の別ページを開いて戻れる", async () => {
+    window.history.replaceState({}, "", "/me");
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "プロフィールを開く" }));
+    const brainItemsLink = await screen.findByRole("link", { name: /Brain Item一覧を開く/ });
+    fireEvent.click(brainItemsLink);
+
+    expect(window.location.pathname).toBe("/profile/brain-items");
+    expect(await screen.findByRole("dialog", { name: "開発用Brainデータ" })).toBeTruthy();
     expect(await screen.findByRole("heading", { name: "Brain Item一覧" })).toBeTruthy();
     expect(screen.getByText("公園を散歩した")).toBeTruthy();
     expect(mocks.fetchDevelopmentBrainItems).toHaveBeenCalledWith(
@@ -771,7 +786,12 @@ describe("App", () => {
       "dummy.id.token",
       expect.any(AbortSignal),
     );
-    expect(mocks.fetchDiagnosisList).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "プロフィールへ戻る" }));
+    await waitFor(() => expect(window.location.pathname).toBe("/profile"));
+    expect(await screen.findByRole("dialog", { name: "プロフィール" })).toBeTruthy();
+    expect(screen.queryByRole("dialog", { name: "開発用Brainデータ" })).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole("link", { name: /Brain Item一覧を開く/ }));
   });
 
   it("/meではGET APIが返した過去版の本文へ切り替えられる", async () => {
@@ -880,7 +900,7 @@ describe("App", () => {
     expect(await screen.findByRole("heading", { name: "見通しを持って動く" })).toBeTruthy();
     expect(mocks.initializeLiff).toHaveBeenCalledTimes(1);
     expect(mocks.fetchProfileSummary).toHaveBeenCalledTimes(1);
-    expect(mocks.fetchDevelopmentBrainItems).toHaveBeenCalledTimes(1);
+    expect(mocks.fetchDevelopmentBrainItems).not.toHaveBeenCalled();
   });
 
   it("productionのわたし画面ではBrain Item一覧を取得も表示もしない", async () => {

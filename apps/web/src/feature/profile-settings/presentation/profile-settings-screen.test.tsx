@@ -204,4 +204,26 @@ describe("ProfileSettingsScreen", () => {
     expect(await screen.findByText(/本人データを削除しました（15件）/)).toBeTruthy();
     expect(onResetAccountData).toHaveBeenCalledOnce();
   });
+
+  it("開発環境ではBrain Item一覧へのリンクを表示する", () => {
+    const onOpenBrainItems = vi.fn();
+    render(
+      <ProfileSettingsScreen
+        avatar={null}
+        canOpenBrainItems
+        theme="dark"
+        fontSize="medium"
+        onBack={vi.fn()}
+        onOpenAvatar={vi.fn()}
+        onOpenBrainItems={onOpenBrainItems}
+        onThemeChange={vi.fn()}
+        onFontSizeChange={vi.fn()}
+      />,
+    );
+
+    const link = screen.getByRole("link", { name: /Brain Item一覧を開く/ });
+    expect(link.getAttribute("href")).toBe("/profile/brain-items");
+    fireEvent.click(link);
+    expect(onOpenBrainItems).toHaveBeenCalledOnce();
+  });
 });

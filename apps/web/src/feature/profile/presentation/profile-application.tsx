@@ -1,17 +1,12 @@
 import { useState } from "react";
-import { config } from "../../../config";
-import { DevelopmentBrainItems, useDevelopmentBrainItems } from "../../brain";
 import { useLiffSession } from "../../liff";
 import type { ProfileSummaryVersioning } from "../model/profile-summary";
 import { ProfileSummaryScreen } from "./profile-summary-screen";
 import { useProfileSummary } from "./use-profile-summary";
 
-const DEVELOPMENT_ENVIRONMENTS = new Set(["development", "local", "preview", "test"]);
-
 export default function ProfileApplication() {
   const liffSession = useLiffSession();
   const summary = useProfileSummary({ acquireIdToken: liffSession.acquireIdToken });
-  const showDevelopmentBrainItems = DEVELOPMENT_ENVIRONMENTS.has(config.environment ?? "");
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const result = summary.state.status === "success" ? summary.state.data : null;
   const selectedVersion = result
@@ -33,10 +28,6 @@ export default function ProfileApplication() {
         generation: result.generation,
       }
     : undefined;
-  const brainItems = useDevelopmentBrainItems({
-    enabled: showDevelopmentBrainItems,
-    acquireIdToken: liffSession.acquireIdToken,
-  });
   return (
     <ProfileSummaryScreen
       state={screenState}
@@ -46,15 +37,6 @@ export default function ProfileApplication() {
       {...(versioning ? { versioning } : {})}
       {...(result && result.versions.length > 1 ? { onSelectVersion: setSelectedVersionId } : {})}
       {...(result ? { onRegenerate: () => void summary.generate() } : {})}
-    >
-      {showDevelopmentBrainItems && (
-        <DevelopmentBrainItems
-          state={brainItems.state}
-          vectorStates={brainItems.vectorStates}
-          onRetry={() => void brainItems.reload()}
-          onVerifyVector={(brainItemId) => void brainItems.verifyVector(brainItemId)}
-        />
-      )}
-    </ProfileSummaryScreen>
+    />
   );
 }

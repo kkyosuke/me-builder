@@ -40,6 +40,12 @@ export const loadProfileApplication = memoizeModuleLoader<LazyApplicationModule>
   })),
 );
 
+export const loadDevelopmentBrainItemsApplication = memoizeModuleLoader(() =>
+  import("./feature/brain").then((feature) => ({
+    default: feature.DevelopmentBrainItemsApplication,
+  })),
+);
+
 export const loadProfileSettingsScreen = memoizeModuleLoader(() =>
   import("./feature/profile-settings/presentation/profile-settings-screen").then((feature) => ({
     default: feature.ProfileSettingsScreen,
