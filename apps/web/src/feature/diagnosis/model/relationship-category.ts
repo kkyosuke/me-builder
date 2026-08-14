@@ -11,6 +11,7 @@ export const filterableRelationshipCategoryValues = [
   "family",
   "friend",
   "work",
+  "general",
 ] as const satisfies readonly RelationshipCategory[];
 
 export type FilterableRelationshipCategory = (typeof filterableRelationshipCategoryValues)[number];
@@ -47,6 +48,8 @@ const filterClassNames: Record<FilterableRelationshipCategory, string> = {
   friend:
     "aria-pressed:border-emerald-500 aria-pressed:bg-emerald-100 aria-pressed:text-emerald-900 dark:aria-pressed:border-emerald-500 dark:aria-pressed:bg-emerald-950 dark:aria-pressed:text-emerald-100",
   work: "aria-pressed:border-blue-500 aria-pressed:bg-blue-100 aria-pressed:text-blue-900 dark:aria-pressed:border-blue-500 dark:aria-pressed:bg-blue-950 dark:aria-pressed:text-blue-100",
+  general:
+    "aria-pressed:border-slate-500 aria-pressed:bg-slate-100 aria-pressed:text-slate-900 dark:aria-pressed:border-slate-500 dark:aria-pressed:bg-slate-700 dark:aria-pressed:text-slate-100",
 };
 
 export function getRelationshipCategoryLabel(category: RelationshipCategory): string {

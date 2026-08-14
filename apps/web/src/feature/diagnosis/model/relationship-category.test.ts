@@ -40,6 +40,9 @@ describe("relationship category filter", () => {
     expect(filterDiagnosesByRelationshipCategory(diagnoses, "work").map(({ id }) => id)).toEqual([
       "work",
     ]);
+    expect(filterDiagnosesByRelationshipCategory(diagnoses, "general").map(({ id }) => id)).toEqual(
+      ["general"],
+    );
     expect(filterDiagnosesByRelationshipCategory(diagnoses, "all")).toEqual(diagnoses);
   });
 
@@ -50,6 +53,9 @@ describe("relationship category filter", () => {
     expect(getRelationshipCategoryBadgeClassName("friend")).toContain("bg-emerald-100");
     expect(getRelationshipCategoryBadgeClassName("work")).toContain("bg-blue-100");
     expect(getRelationshipCategoryBadgeClassName("general")).toContain("bg-slate-100");
+    expect(getRelationshipCategoryFilterClassName("general")).toContain(
+      "aria-pressed:bg-slate-100",
+    );
   });
 
   it.each([
@@ -64,7 +70,7 @@ describe("relationship category filter", () => {
 
   it("categoryクエリから初期絞り込みを決め、未指定・無効値はallへ戻す", () => {
     expect(relationshipCategoryFilterFromSearch("?category=family")).toBe("family");
-    expect(relationshipCategoryFilterFromSearch("?category=general")).toBe("all");
+    expect(relationshipCategoryFilterFromSearch("?category=general")).toBe("general");
     expect(relationshipCategoryFilterFromSearch("?category=unknown")).toBe("all");
     expect(relationshipCategoryFilterFromSearch("")).toBe("all");
     expect(diagnosisCategoryHref("friend")).toBe("/diagnosis?category=friend");

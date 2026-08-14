@@ -1,2 +1,1 @@
-export { DevelopmentBrainItems } from "./presentation/development-brain-items";
-export { useDevelopmentBrainItems } from "./presentation/use-development-brain-items";
+export { default as DevelopmentBrainItemsApplication } from "./presentation/development-brain-items-application";
