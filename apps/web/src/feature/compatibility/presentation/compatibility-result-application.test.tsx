@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import CompatibilityResultApplication from "./compatibility-result-application";
 
@@ -13,7 +13,11 @@ vi.mock("./hooks/use-compatibility-relationship", () => ({
 
 const relationshipId = "1".repeat(64);
 
-function renderWaiting(nextAction: "diagnosis" | "profile-summary" | null) {
+function renderWaiting(
+  nextAction: "diagnosis" | "profile-summary" | null,
+  ending: { status: "idle" } | { status: "success"; data: null } = { status: "idle" },
+) {
+  const end = vi.fn();
   mocks.useCompatibilityRelationship.mockReturnValue({
     state: {
       status: "success",
@@ -24,11 +28,12 @@ function renderWaiting(nextAction: "diagnosis" | "profile-summary" | null) {
         nextAction,
       },
     },
-    ending: { status: "idle" },
+    ending,
     reload: vi.fn(),
-    end: vi.fn(),
+    end,
   });
   render(<CompatibilityResultApplication relationshipId={relationshipId} />);
+  return { end };
 }
 
 describe("CompatibilityResultApplication waiting state", () => {
@@ -63,6 +68,24 @@ describe("CompatibilityResultApplication waiting state", () => {
     expect(screen.getByText(/「私について」がまだありません/)).toBeTruthy();
     expect(screen.getByRole("link", { name: "わたしの傾向を作る" }).getAttribute("href")).toBe(
       "/me",
+    );
+  });
+
+  it("準備中でも確認後に共有を終了できる", () => {
+    const { end } = renderWaiting(null);
+
+    fireEvent.click(screen.getByRole("button", { name: "共有を終了する" }));
+    expect(screen.getByText(/2人ともこの相性シートを見られなくなります/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "共有を終了" }));
+    expect(end).toHaveBeenCalledOnce();
+  });
+
+  it("準備中の共有終了後も完了画面から一覧へ戻れる", () => {
+    renderWaiting(null, { status: "success", data: null });
+
+    expect(screen.getByRole("heading", { name: "共有を終了しました" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "相性一覧へ戻る" }).getAttribute("href")).toBe(
+      "/compatibility",
     );
   });
 });
