@@ -744,6 +744,50 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
     e2eTimeoutMs,
   );
 
+  it(
+    "家族との距離感・支え合いの回答を5つのパラメータへ採点する",
+    async () => {
+      for (let index = 1; index <= 10; index += 1) {
+        const suffix = String(index).padStart(2, "0");
+        const choiceId = index % 2 === 1 ? "yes" : "no";
+        const response = await putAnswer(
+          `dq-family-support-style-${suffix}`,
+          choiceId,
+          "family-support-style",
+        );
+        expect(response.status).toBe(200);
+      }
+
+      const response = await getAnswers("family-support-style");
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({
+        id: "family-support-style",
+        relationshipCategory: "family",
+        scoring: {
+          scoringVersion: 1,
+          balancedLabel: "状況に応じて家族との関わり方を選ぶ",
+          parameters: [
+            expect.objectContaining({ id: "family-contact", score: 100, coverage: 100 }),
+            expect.objectContaining({ id: "family-disclosure", score: 100, coverage: 100 }),
+            expect.objectContaining({
+              id: "family-support-approach",
+              score: 100,
+              coverage: 100,
+            }),
+            expect.objectContaining({
+              id: "family-conflict-timing",
+              score: 100,
+              coverage: 100,
+            }),
+            expect.objectContaining({ id: "family-planning", score: 100, coverage: 100 }),
+          ],
+        },
+      });
+    },
+    e2eTimeoutMs,
+  );
+
   it(`${diagnosisAnswerCases.missingContents.id}: ${diagnosisAnswerCases.missingContents.name}`, async () => {
     const response = await getAnswers();
     expect(response.status).toBe(404);

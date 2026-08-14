@@ -303,6 +303,19 @@
 9. 会議で相手と意見が違うときも、自分の考えを率直に伝えたい。
 10. 会議で相手と意見が違うときは、自分の考えを伝えるより相手の判断に合わせたい。
 
+### 3.23 家族との距離感・支え合い
+
+1. 家族としばらく会えない時期には、用事がなくても定期的に連絡を取りたい。
+2. 家族としばらく会えない時期には、必要な用事があるときだけ連絡すればよい。
+3. 自分が困りごとを抱えたときは、深刻になる前に家族へ話したい。
+4. 自分が困りごとを抱えたときは、助けが必要になるまで家族には話さずにおきたい。
+5. 家族が悩みを話したときは、具体策を考えるより先に気持ちを聞きたい。
+6. 家族が悩みを話したときは、気持ちを聞くより先に具体的にできることを考えたい。
+7. 家族と意見が食い違ったときは、時間を置くよりその場で話し合いたい。
+8. 家族と意見が食い違ったときは、その場で話すより時間を置いてから話し合いたい。
+9. 家族と一緒に過ごす予定は、早めに相談して決めたい。
+10. 家族と一緒に過ごす予定は、直前に都合を合わせて決めてもよい。
+
 ## 4. 回答から傾向を出すために必要な設計
 
 この質問集だけでは、「貯蓄重視」などの傾向を論理的に算出できません。現時点で定義しているのは質問候補までであり、質問と傾向軸の対応、回答の向き、集計方法は未定義です。1問への回答だけで人物の傾向を確定しません。
@@ -332,7 +345,7 @@
 - 算出規則と、結果に使用した質問を本人が確認できるようにする
 - 回答数が足りない場合や回答が食い違う場合は、無理にラベルを付けない
 
-公開済み診断の質問と傾向軸の対応、計算式、表示条件は、[自分と相手の優先・境界線](../scoring/relationship-priority-parameter-design.md)、[お金と消費](../scoring/money-values-parameter-design.md)、[インドア・アウトドアと余暇](../scoring/leisure-style-parameter-design.md)、[時間と予定](../scoring/time-planning-parameter-design.md)、[会話と感情表現](../scoring/conversation-emotion-parameter-design.md)、[優先順位と人生の方向性](../scoring/life-priorities-parameter-design.md)、[仕事の価値観・働き方](../scoring/work-values-parameter-design.md)、[仕事の変化・周囲との関わり方](../scoring/work-relationship-style-parameter-design.md)の各パラメータ変換設計を正とします。他の話題の対応は、質問の審査と合わせて後続で定義します。
+公開済み診断の質問と傾向軸の対応、計算式、表示条件は、[自分と相手の優先・境界線](../scoring/relationship-priority-parameter-design.md)、[お金と消費](../scoring/money-values-parameter-design.md)、[インドア・アウトドアと余暇](../scoring/leisure-style-parameter-design.md)、[時間と予定](../scoring/time-planning-parameter-design.md)、[会話と感情表現](../scoring/conversation-emotion-parameter-design.md)、[優先順位と人生の方向性](../scoring/life-priorities-parameter-design.md)、[仕事の価値観・働き方](../scoring/work-values-parameter-design.md)、[仕事の変化・周囲との関わり方](../scoring/work-relationship-style-parameter-design.md)、[家族との距離感・支え合い](../scoring/family-support-style-parameter-design.md)の各パラメータ変換設計を正とします。他の話題の対応は、質問の審査と合わせて後続で定義します。
 
 ## 5. 公開単位
 
