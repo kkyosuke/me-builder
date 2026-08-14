@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   PROMPT_CONTEXT_ATTRIBUTE_MASTER,
   PROMPT_CONTEXT_COLLECTION_GOAL,
+  PROMPT_CONTEXT_COLLECTION_THEME_MASTER,
   type PromptContext,
   PromptContextSchema,
   arePromptContextsEqual,
@@ -22,12 +23,31 @@ describe("prompt context attribute master", () => {
       "question_style",
     ]);
     expect(PROMPT_CONTEXT_COLLECTION_GOAL).toMatchObject({
-      maxAttributeGroupsPerSession: 1,
-      maxConfirmationQuestionsPerGroup: 2,
+      prioritizedThemeIds: ["life_schedule", "conversation_preference"],
+      maxCollectionThemesPerSession: 1,
+      maxConfirmationQuestionsPerTheme: 2,
       requireCompletion: false,
       retryUnanswered: false,
       extractionMode: "explicit_only",
     });
+  });
+
+  it("全属性を重複なく収集テーマへ割り当てる", () => {
+    const themeKinds = PROMPT_CONTEXT_COLLECTION_THEME_MASTER.flatMap(({ kinds }) => kinds);
+    expect(themeKinds).toHaveLength(new Set(themeKinds).size);
+    expect([...themeKinds].sort()).toEqual(
+      PROMPT_CONTEXT_ATTRIBUTE_MASTER.map(({ kind }) => kind).sort(),
+    );
+    expect(PROMPT_CONTEXT_COLLECTION_THEME_MASTER).toEqual([
+      expect.objectContaining({
+        id: "life_schedule",
+        kinds: ["occupation", "weekly_rhythm", "recurring_schedule"],
+      }),
+      expect.objectContaining({
+        id: "conversation_preference",
+        kinds: ["rest_window", "question_style"],
+      }),
+    ]);
   });
 
   it.each([
