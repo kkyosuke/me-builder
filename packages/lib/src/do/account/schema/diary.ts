@@ -73,13 +73,13 @@ export const conversationMessages = sqliteTable(
   ],
 );
 
-/** 本人が明示した日次声かけの制御状態と、その根拠となる最新発言を保持する。 */
+/** 日次声かけの状態と、その状態を決めた最新の本人発言を保持する。 */
 export const dailyPromptPreferences = sqliteTable("daily_prompt_preferences", {
   accountId: text("account_id")
     .primaryKey()
     .references(() => accountDataIdentity.accountId),
   status: text("status", { enum: ["active", "stopped"] }).notNull(),
-  controlledAt: integer("controlled_at", { mode: "timestamp" }).notNull(),
+  controlledAt: integer("controlled_at", { mode: "timestamp_ms" }).notNull(),
   controlSourceRecordId: text("control_source_record_id")
     .notNull()
     .references(() => sourceRecords.id),

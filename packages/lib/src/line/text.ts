@@ -1,5 +1,5 @@
 export type LineTextIntent = "diagnosis-request" | "diary";
-export type DailyPromptControl = "stop" | "resume";
+export type DailyPromptControl = "stop";
 
 const DIAGNOSIS_KEYWORDS = [
   "診断",
@@ -26,10 +26,6 @@ const DAILY_PROMPT_STOP_PATTERNS = [
   /^(?:モウ)?送ラナイデ(?:クダサイ)?$/,
 ] as const;
 
-const DAILY_PROMPT_RESUME_PATTERNS = [
-  /^(?:毎日(?:ノ)?|日々(?:ノ)?|18時(?:ノ)?)?(?:声カケ|声掛ケ|メッセージ|通知)(?:ヲ)?(?:再開シテ|マタ送ッテ)(?:クダサイ)?$/,
-] as const;
-
 /** LINEテキストを決定的な完全一致ルールでroutingする。 */
 export function classifyLineText(text: string): LineTextIntent {
   const normalized = normalize(text);
@@ -38,12 +34,12 @@ export function classifyLineText(text: string): LineTextIntent {
     : "diary";
 }
 
-/** 誤操作を避けるため、声かけの停止・再開の意味が確定する表現だけを判定する。 */
+/** 誤停止を避けるため、声かけ停止の意味が確定する表現だけを判定する。 */
 export function classifyDailyPromptControl(text: string): DailyPromptControl | undefined {
   const normalized = normalizeControlText(text);
-  if (DAILY_PROMPT_STOP_PATTERNS.some((pattern) => pattern.test(normalized))) return "stop";
-  if (DAILY_PROMPT_RESUME_PATTERNS.some((pattern) => pattern.test(normalized))) return "resume";
-  return undefined;
+  return DAILY_PROMPT_STOP_PATTERNS.some((pattern) => pattern.test(normalized))
+    ? "stop"
+    : undefined;
 }
 
 export const lineText = {

@@ -179,7 +179,7 @@ describe("AccountData Workers runtime E2E", () => {
           .one(),
       ).toEqual({
         status: "stopped",
-        controlled_at: 2,
+        controlled_at: 2_000,
         control_source_record_id: "migration-stop-source",
       });
     });

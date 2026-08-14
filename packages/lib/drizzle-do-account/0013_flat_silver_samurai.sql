@@ -9,7 +9,7 @@ CREATE TABLE `__new_daily_prompt_preferences` (
 	FOREIGN KEY (`control_source_record_id`) REFERENCES `source_records`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
-INSERT INTO `__new_daily_prompt_preferences`("account_id", "status", "controlled_at", "control_source_record_id", "updated_at") SELECT "account_id", "status", "stopped_at", "stopped_source_record_id", "updated_at" FROM `daily_prompt_preferences`;--> statement-breakpoint
+INSERT INTO `__new_daily_prompt_preferences`("account_id", "status", "controlled_at", "control_source_record_id", "updated_at") SELECT "account_id", "status", "stopped_at" * 1000, "stopped_source_record_id", "updated_at" FROM `daily_prompt_preferences`;--> statement-breakpoint
 DROP TABLE `daily_prompt_preferences`;--> statement-breakpoint
 ALTER TABLE `__new_daily_prompt_preferences` RENAME TO `daily_prompt_preferences`;--> statement-breakpoint
 PRAGMA foreign_keys=ON;

@@ -13,21 +13,13 @@ describe("classifyDailyPromptControl", () => {
   });
 
   it.each([
-    "声かけを再開して",
-    "毎日の声掛けを再開してください",
-    "18時のメッセージをまた送って",
-    "通知をまた送ってください",
-  ])("確定的な再開表現を判定する: %s", (text) => {
-    expect(classifyDailyPromptControl(text)).toBe("resume");
-  });
-
-  it.each([
     "今日は通知を見ていない",
     "声かけはどういう仕組み？",
     "今日はもう送らないで寝る",
+    "声かけを再開して",
     "また送って",
     "通知を見られるようになった",
-  ])("曖昧な発言を制御操作として扱わない: %s", (text) => {
+  ])("停止表現以外を制御操作として扱わない: %s", (text) => {
     expect(classifyDailyPromptControl(text)).toBeUndefined();
   });
 });

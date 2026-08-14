@@ -194,7 +194,7 @@ describe("daily prompt delivery", () => {
     });
   });
 
-  it("明示的な再開発言を根拠付きで保持し、終端済みの当日分は再送せず翌日から再開する", async () => {
+  it("停止後の通常メッセージで再開し、終端済みの当日分は再送せず翌日から送る", async () => {
     const db = createTestDb();
     await prepareDailyPrompt(db, ACCOUNT_ID, {
       localDate: "2026-08-14",
@@ -208,19 +208,18 @@ describe("daily prompt delivery", () => {
       receivedAt: new Date("2026-08-14T10:00:00.000Z"),
       dailyPromptControl: "stop",
     });
-    const resumed = await storeLineTextSource(db, {
+    const resumedByMessage = await storeLineTextSource(db, {
       accountId: ACCOUNT_ID,
-      eventId: "resume-message",
-      body: "毎日の声かけを再開してください",
+      eventId: "ordinary-message",
+      body: "今日は仕事が大変だった",
       receivedAt: new Date("2026-08-14T11:00:00.000Z"),
-      dailyPromptControl: "resume",
     });
 
     expect(await db.select().from(schema.dailyPromptPreferences).get()).toMatchObject({
       accountId: ACCOUNT_ID,
       status: "active",
       controlledAt: new Date("2026-08-14T11:00:00.000Z"),
-      controlSourceRecordId: resumed.sourceRecordId,
+      controlSourceRecordId: resumedByMessage.sourceRecordId,
     });
     await expect(
       prepareDailyPrompt(db, ACCOUNT_ID, {
@@ -242,7 +241,7 @@ describe("daily prompt delivery", () => {
     ).resolves.toMatchObject({ type: "ready" });
   });
 
-  it("再開後に古い停止Webhookが再配送・遅延到着しても停止状態へ戻さない", async () => {
+  it("通常メッセージでの再開後に古い停止Webhookが届いても停止状態へ戻さない", async () => {
     const db = createTestDb();
     const stopInput = {
       accountId: ACCOUNT_ID,
@@ -252,12 +251,11 @@ describe("daily prompt delivery", () => {
       dailyPromptControl: "stop" as const,
     };
     await storeLineTextSource(db, stopInput);
-    const resumed = await storeLineTextSource(db, {
+    const resumedByMessage = await storeLineTextSource(db, {
       accountId: ACCOUNT_ID,
-      eventId: "new-resume-message",
-      body: "毎日の声かけを再開してください",
+      eventId: "new-ordinary-message",
+      body: "今日は仕事が大変だった",
       receivedAt: new Date("2026-08-14T11:00:00.000Z"),
-      dailyPromptControl: "resume",
     });
     const nextDay = await prepareDailyPrompt(db, ACCOUNT_ID, {
       localDate: "2026-08-15",
@@ -278,7 +276,7 @@ describe("daily prompt delivery", () => {
     expect(await db.select().from(schema.dailyPromptPreferences).get()).toMatchObject({
       status: "active",
       controlledAt: new Date("2026-08-14T11:00:00.000Z"),
-      controlSourceRecordId: resumed.sourceRecordId,
+      controlSourceRecordId: resumedByMessage.sourceRecordId,
     });
     expect(
       await db
@@ -287,6 +285,29 @@ describe("daily prompt delivery", () => {
         .where(eq(schema.dailyPromptDeliveries.localDate, "2026-08-15"))
         .get(),
     ).toEqual({ status: "pending" });
+  });
+
+  it("停止と次のメッセージが同じ秒でもミリ秒順で再開する", async () => {
+    const db = createTestDb();
+    await storeLineTextSource(db, {
+      accountId: ACCOUNT_ID,
+      eventId: "same-second-stop",
+      body: "声かけを止めて",
+      receivedAt: new Date("2026-08-14T10:00:00.100Z"),
+      dailyPromptControl: "stop",
+    });
+    const resumedByMessage = await storeLineTextSource(db, {
+      accountId: ACCOUNT_ID,
+      eventId: "same-second-message",
+      body: "今日は仕事が大変だった",
+      receivedAt: new Date("2026-08-14T10:00:00.900Z"),
+    });
+
+    expect(await db.select().from(schema.dailyPromptPreferences).get()).toMatchObject({
+      status: "active",
+      controlledAt: new Date("2026-08-14T10:00:00.900Z"),
+      controlSourceRecordId: resumedByMessage.sourceRecordId,
+    });
   });
 
   it("未回答の翌日を休み、3回未回答なら本人の新着まで自動休止する", async () => {
