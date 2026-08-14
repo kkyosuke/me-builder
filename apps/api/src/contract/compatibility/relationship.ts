@@ -1,4 +1,7 @@
-import { compatibilityRelationshipId } from "@me-builder/lib";
+import {
+  compatibilityRelationshipCategoryValues,
+  compatibilityRelationshipId,
+} from "@me-builder/lib";
 import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
 import * as v from "valibot";
 import { authenticatedErrors, jsonResponse } from "../shared/errors";
@@ -16,12 +19,14 @@ const PersonSchema = v.object({
 export const CompatibilityRelationshipResponseSchema = v.variant("status", [
   v.object({
     relationshipId: compatibilityRelationshipId.schema,
+    relationshipCategory: v.picklist(compatibilityRelationshipCategoryValues),
     status: v.literal("ready"),
     partner: PersonSchema,
     viewer: PersonSchema,
   }),
   v.object({
     relationshipId: compatibilityRelationshipId.schema,
+    relationshipCategory: v.picklist(compatibilityRelationshipCategoryValues),
     status: v.literal("waiting"),
     nextAction: v.nullable(v.picklist(["diagnosis", "profile-summary"])),
   }),

@@ -44,6 +44,7 @@ describe("Compatibility flow", () => {
     const onResend = vi.fn();
     const pending = {
       relationshipId: "1".repeat(64),
+      relationshipCategory: "partner" as const,
       status: "pending" as const,
       expiresAt: "2026-08-26T00:00:00.000Z",
       invitationUrl: `https://liff.line.me/test/compatibility/invitations/${"1".repeat(64)}`,
@@ -57,6 +58,7 @@ describe("Compatibility flow", () => {
               pending,
               {
                 relationshipId: "2".repeat(64),
+                relationshipCategory: "family",
                 status: "accepted",
                 partnerDisplayName: "あおい",
               },
@@ -91,12 +93,14 @@ describe("Compatibility flow", () => {
             items: [
               {
                 relationshipId: cancellingId,
+                relationshipCategory: "friend",
                 status: "pending",
                 expiresAt: "2026-08-26T00:00:00.000Z",
                 invitationUrl: "https://example.com/first",
               },
               {
                 relationshipId: "2".repeat(64),
+                relationshipCategory: "work",
                 status: "pending",
                 expiresAt: "2026-08-27T00:00:00.000Z",
                 invitationUrl: "https://example.com/second",
@@ -130,6 +134,7 @@ describe("Compatibility flow", () => {
     render(
       <CompatibilityShareScreen
         state={{ status: "success", data: consent }}
+        relationshipCategory="partner"
         onIssue={onIssue}
         onRetry={vi.fn()}
       />,
@@ -153,6 +158,34 @@ describe("Compatibility flow", () => {
     expect(onIssue).toHaveBeenCalledOnce();
   });
 
+  it("関係カテゴリを選ぶまで招待リンクを発行できない", () => {
+    const onRelationshipCategoryChange = vi.fn();
+    render(
+      <CompatibilityShareScreen
+        state={{
+          status: "success",
+          data: {
+            displayName: "うさぎ",
+            avatarUrl: null,
+            canShare: true,
+            blockingReasons: [],
+            nextAction: null,
+          },
+        }}
+        relationshipCategory={null}
+        onIssue={vi.fn()}
+        onRelationshipCategoryChange={onRelationshipCategoryChange}
+        onRetry={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByRole("button", { name: "相手との関係を選んでください" }).hasAttribute("disabled"),
+    ).toBe(true);
+    fireEvent.click(screen.getByRole("radio", { name: "家族" }));
+    expect(onRelationshipCategoryChange).toHaveBeenCalledWith("family");
+  });
+
   it("発行後に固定フッターから友だちへの送信とコピーを選べる", () => {
     const invitationUrl = `https://example.com/compatibility/invitations/${"1".repeat(64)}`;
     const onShareToLine = vi.fn();
@@ -171,10 +204,15 @@ describe("Compatibility flow", () => {
         }}
         invitationState={{
           status: "success",
-          data: { invitationUrl, expiresAt: "2026-08-26T00:00:00.000Z" },
+          data: {
+            invitationUrl,
+            expiresAt: "2026-08-26T00:00:00.000Z",
+            relationshipCategory: "partner",
+          },
         }}
         onCopyLink={onCopyLink}
         onRetry={vi.fn()}
+        relationshipCategory="partner"
         onShareToLine={onShareToLine}
       />,
     );
@@ -216,6 +254,7 @@ describe("Compatibility flow", () => {
           },
         }}
         onRetry={vi.fn()}
+        relationshipCategory="partner"
       />,
     );
 
@@ -253,6 +292,7 @@ describe("Compatibility flow", () => {
 
   it("受信者は共有していいかだけを確認して承諾できる", () => {
     const invitation: CompatibilityInvitationPreview = {
+      relationshipCategory: "family",
       inviter: { displayName: "あおい", avatarUrl: "https://profile.line-scdn.net/inviter" },
       recipient: { displayName: "はる", avatarUrl: null },
       expiresAt: "2026-08-26T00:00:00.000Z",
@@ -287,7 +327,14 @@ describe("Compatibility flow", () => {
 
   it("人物ごとの資料と2人の共通点・違いをタブとスワイプで切り替える", () => {
     const onEnd = vi.fn();
-    const { rerender } = render(<CompatibilityResultScreen me={me} partner={aoi} onEnd={onEnd} />);
+    const { rerender } = render(
+      <CompatibilityResultScreen
+        me={me}
+        partner={aoi}
+        relationshipCategory="partner"
+        onEnd={onEnd}
+      />,
+    );
 
     expect(screen.getByRole("heading", { name: "2人の相性シート" })).toBeTruthy();
     expect(
@@ -345,6 +392,7 @@ describe("Compatibility flow", () => {
       <CompatibilityResultScreen
         me={me}
         partner={aoi}
+        relationshipCategory="partner"
         onEnd={onEnd}
         endingState={{ status: "loading" }}
       />,
@@ -357,6 +405,7 @@ describe("Compatibility flow", () => {
       <CompatibilityResultScreen
         me={me}
         partner={aoi}
+        relationshipCategory="partner"
         onEnd={onEnd}
         endingState={{ status: "success", data: null }}
       />,

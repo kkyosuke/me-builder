@@ -7,7 +7,12 @@
       "entry": ["index.ts", "scripts/*.ts", "src/cleanup-worker.ts"]
     },
     "apps/worker": {
-      "entry": ["src/**/*.test.ts", "src/account-data/drizzle-schema.ts", "drizzle*.config.ts"]
+      "entry": [
+        "src/**/*.test.ts",
+        "src/account-data/drizzle-schema.ts",
+        "src/compatibility-data/schema.ts",
+        "drizzle*.config.ts"
+      ]
     }
   }
 }

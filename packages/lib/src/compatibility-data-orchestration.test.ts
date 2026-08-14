@@ -30,6 +30,7 @@ describe("compatibility data orchestration", () => {
       {
         inviterAccountId: "account-a",
         inviterDisplayName: "送信者",
+        relationshipCategory: "partner",
       },
       relationshipId,
     );
@@ -66,6 +67,7 @@ describe("compatibility data orchestration", () => {
         {
           inviterAccountId: "account-a",
           inviterDisplayName: "送信者",
+          relationshipCategory: "partner",
         },
         "1".repeat(64),
       ),
@@ -99,6 +101,7 @@ describe("compatibility data orchestration", () => {
           async getInvitationAcceptanceContext() {
             return {
               inviterAccountId: "account-a",
+              relationshipCategory: "partner",
               expiresAt: new Date("2026-08-23T00:00:00.000Z"),
             };
           },

@@ -5,6 +5,7 @@ export type E2eCase = {
     method: string;
     path: string;
     authorization: string | null;
+    body?: Readonly<Record<string, unknown>>;
     setup?: readonly string[];
   };
   out: {

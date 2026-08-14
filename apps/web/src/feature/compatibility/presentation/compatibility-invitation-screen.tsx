@@ -1,6 +1,10 @@
 import { AlertCircle, HeartHandshake, RefreshCw } from "lucide-react";
 import { SkeletonBlock, SkeletonLoader } from "../../../components/skeleton";
 import type { AsyncState } from "../../../model/async-state";
+import {
+  getRelationshipCategoryBadgeClassName,
+  getRelationshipCategoryLabel,
+} from "../../diagnosis/model/relationship-category";
 import type {
   CompatibilityInvitationPreview,
   CompatibilityInvitationPreviewBlockingReason,
@@ -102,11 +106,17 @@ function InvitationContents({
         <p className="mt-5 text-sm font-semibold text-violet-700 dark:text-violet-300">
           {inviterName}さんから招待が届いています
         </p>
+        <p
+          className={`mx-auto mt-3 w-fit rounded-full px-3 py-1.5 text-sm font-bold ${getRelationshipCategoryBadgeClassName(invitation.relationshipCategory)}`}
+        >
+          関係: {getRelationshipCategoryLabel(invitation.relationshipCategory)}
+        </p>
         <h1 className="mt-1 text-2xl font-bold text-slate-950 dark:text-slate-50">
           2人の相性を見てみませんか？
         </h1>
         <p className="mt-3 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-          診断から見える範囲で、お互いの大切にしたいことを資料にまとめます。承諾すると、これから増える分もお互いへ自動で共有されます。
+          {getRelationshipCategoryLabel(invitation.relationshipCategory)}
+          としての診断と、人間関係全般の診断から見える範囲で、お互いの大切にしたいことを資料にまとめます。承諾すると、これから増える分もお互いへ自動で共有されます。
         </p>
         <p className="mt-3 text-xs text-slate-500">
           招待の有効期限: {new Date(invitation.expiresAt).toLocaleDateString("ja-JP")}

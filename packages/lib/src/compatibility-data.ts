@@ -1,4 +1,5 @@
 import * as v from "valibot";
+import type { RelationshipCategory } from "./diagnosis/relationship-category";
 
 const COMPATIBILITY_RELATIONSHIP_ID_PATTERN = /^[a-f0-9]{64}$/;
 const CompatibilityRelationshipIdSchema = v.pipe(
@@ -21,6 +22,23 @@ export type CompatibilityRelationshipStatus =
   | "expired"
   | "ended";
 
+/** 特定の相手を表す、相性共有で選択可能な関係カテゴリ。 */
+export const compatibilityRelationshipCategoryValues = [
+  "partner",
+  "family",
+  "friend",
+  "work",
+] as const satisfies readonly RelationshipCategory[];
+
+export type CompatibilityRelationshipCategory =
+  (typeof compatibilityRelationshipCategoryValues)[number];
+
+export function isCompatibilityRelationshipCategory(
+  value: unknown,
+): value is CompatibilityRelationshipCategory {
+  return compatibilityRelationshipCategoryValues.some((category) => category === value);
+}
+
 export const COMPATIBILITY_INVITATION_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 
 /** URLへ埋め込める、Account情報を含まない256 bitの関係IDを発行する。 */
@@ -40,6 +58,7 @@ export type CompatibilityRelationship = Readonly<{
   inviteeAccountId: string | null;
   inviterDisplayName: string;
   inviteeDisplayName: string | null;
+  relationshipCategory: CompatibilityRelationshipCategory;
   status: CompatibilityRelationshipStatus;
   expiresAt: Date;
   acceptedAt: Date | null;
@@ -53,6 +72,7 @@ export type CompatibilityRelationship = Readonly<{
 export type CreateCompatibilityInvitationInput = Readonly<{
   inviterAccountId: string;
   inviterDisplayName: string;
+  relationshipCategory: CompatibilityRelationshipCategory;
 }>;
 
 export type AcceptCompatibilityInvitationInput = Readonly<{
@@ -64,6 +84,7 @@ export type AcceptCompatibilityInvitationInput = Readonly<{
 export type CompatibilityInvitationPreview = Readonly<{
   id: string;
   inviterDisplayName: string;
+  relationshipCategory: CompatibilityRelationshipCategory;
   expiresAt: Date;
   isOwnInvitation: boolean;
 }>;
@@ -71,6 +92,7 @@ export type CompatibilityInvitationPreview = Readonly<{
 /** 承諾時の重複確認に使う、画面へ返さない内部context。 */
 export type CompatibilityInvitationAcceptanceContext = Readonly<{
   inviterAccountId: string;
+  relationshipCategory: CompatibilityRelationshipCategory;
   expiresAt: Date;
 }>;
 

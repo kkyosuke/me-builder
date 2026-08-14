@@ -5,6 +5,8 @@ import * as v from "valibot";
 import { getConfig } from "../config";
 import {
   CompatibilityInvitationConflictSchema,
+  InvalidCompatibilityInvitationRequestSchema,
+  IssueCompatibilityInvitationRequestSchema,
   IssueCompatibilityInvitationResponseSchema,
 } from "../contract/compatibility/invitation";
 import {
@@ -90,7 +92,25 @@ export async function postCompatibilityInvitation(c: Context<AppEnv>): Promise<R
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   }
 
+  let input: unknown;
+  try {
+    input = await c.req.json();
+  } catch {
+    return c.json(
+      v.parse(InvalidCompatibilityInvitationRequestSchema, { error: "Invalid request" }),
+      400,
+    );
+  }
+  const parsed = v.safeParse(IssueCompatibilityInvitationRequestSchema, input);
+  if (!parsed.success) {
+    return c.json(
+      v.parse(InvalidCompatibilityInvitationRequestSchema, { error: "Invalid request" }),
+      400,
+    );
+  }
+
   const outcome = await issueCompatibilityInvitation({
+    relationshipCategory: parsed.output.relationshipCategory,
     idToken: bearerToken(c.req.header("authorization")),
     liff: {
       liffId: currentConfig.liffId,

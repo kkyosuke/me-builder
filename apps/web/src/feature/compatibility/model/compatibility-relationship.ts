@@ -1,3 +1,4 @@
+import type { CompatibilityRelationshipCategory } from "@me-builder/lib/compatibility";
 import type {
   CompatibilitySharePreviewTheme,
   CompatibilityShareProfile,
@@ -6,12 +7,14 @@ import type {
 export type CompatibilityRelationshipListItem =
   | {
       relationshipId: string;
+      relationshipCategory: CompatibilityRelationshipCategory;
       status: "pending";
       expiresAt: string;
       invitationUrl: string;
     }
   | {
       relationshipId: string;
+      relationshipCategory: CompatibilityRelationshipCategory;
       status: "accepted";
       partnerDisplayName: string;
     };
@@ -29,12 +32,14 @@ export type CompatibilityRelationshipPerson = {
 export type CompatibilityRelationship =
   | {
       relationshipId: string;
+      relationshipCategory: CompatibilityRelationshipCategory;
       status: "ready";
       partner: CompatibilityRelationshipPerson;
       viewer: CompatibilityRelationshipPerson;
     }
   | {
       relationshipId: string;
+      relationshipCategory: CompatibilityRelationshipCategory;
       status: "waiting";
       nextAction: "diagnosis" | "profile-summary" | null;
     };

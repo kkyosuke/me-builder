@@ -10,6 +10,9 @@ export const compatibilityRelationships = sqliteTable(
     inviteeAccountId: text("invitee_account_id"),
     inviterDisplayName: text("inviter_display_name").notNull(),
     inviteeDisplayName: text("invitee_display_name"),
+    relationshipCategory: text("relationship_category", {
+      enum: ["partner", "family", "friend", "work"],
+    }).notNull(),
     // 表示内容単位の同意を廃止したため書き込まない。削除は後続releaseのcontractで行う。
     offeredProfileSummaryVersionId: text("offered_profile_summary_version_id"),
     offeredProfileFingerprint: text("offered_profile_fingerprint"),
@@ -48,7 +51,7 @@ export const compatibilityRelationships = sqliteTable(
 );
 
 /** 表示内容単位の同意を廃止した後は書き込まない。削除は後続releaseのcontractで行う。 */
-const compatibilityOfferedThemes = sqliteTable(
+export const compatibilityOfferedThemes = sqliteTable(
   "compatibility_offered_themes",
   {
     relationshipId: text("relationship_id")
@@ -62,7 +65,7 @@ const compatibilityOfferedThemes = sqliteTable(
 );
 
 /** 表示内容単位の同意を廃止した後は書き込まない。削除は後続releaseのcontractで行う。 */
-const compatibilityAcceptedThemes = sqliteTable(
+export const compatibilityAcceptedThemes = sqliteTable(
   "compatibility_accepted_themes",
   {
     relationshipId: text("relationship_id").notNull(),

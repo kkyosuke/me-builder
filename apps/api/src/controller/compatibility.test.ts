@@ -138,12 +138,19 @@ describe("GET /api/compatibility/share-consent", () => {
 describe("POST /api/compatibility/invitations", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  function issueRequest(env: Record<string, unknown> = {}) {
+  function issueRequest(
+    env: Record<string, unknown> = {},
+    body: unknown = { relationshipCategory: "partner" },
+  ) {
     return app.request(
       "/api/compatibility/invitations",
       {
         method: "POST",
-        headers: { Authorization: "Bearer dummy.id.token" },
+        headers: {
+          Authorization: "Bearer dummy.id.token",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
       },
       {
         LIFF_ID: "2010850319-Yl63upAR",
@@ -161,6 +168,7 @@ describe("POST /api/compatibility/invitations", () => {
       type: "created",
       invitationUrl: `https://liff.line.me/2010850319-Yl63upAR/compatibility/invitations/${"1".repeat(64)}`,
       expiresAt: "2026-08-26T00:00:00.000Z",
+      relationshipCategory: "partner",
     });
 
     const response = await issueRequest();
@@ -169,6 +177,7 @@ describe("POST /api/compatibility/invitations", () => {
     expect(await response.json()).toEqual({
       invitationUrl: `https://liff.line.me/2010850319-Yl63upAR/compatibility/invitations/${"1".repeat(64)}`,
       expiresAt: "2026-08-26T00:00:00.000Z",
+      relationshipCategory: "partner",
     });
     expect(issueCompatibilityInvitation).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -179,8 +188,22 @@ describe("POST /api/compatibility/invitations", () => {
         },
         accountData: dummyAccountData,
         compatibilityData: dummyCompatibilityData,
+        relationshipCategory: "partner",
       }),
     );
+  });
+
+  it.each([
+    {},
+    { relationshipCategory: "general" },
+    { relationshipCategory: "other" },
+    { relationshipCategory: null },
+  ])("関係カテゴリが未選択または対象外なら400で拒否する", async (body) => {
+    const response = await issueRequest({}, body);
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "Invalid request" });
+    expect(issueCompatibilityInvitation).not.toHaveBeenCalled();
   });
 
   it("share-unavailableを409へ変換する", async () => {
@@ -223,6 +246,7 @@ describe("GET /api/compatibility/invitations/:relationshipId", () => {
 
   const relationshipId = "1".repeat(64);
   const invitation = {
+    relationshipCategory: "family",
     inviter: {
       displayName: "あおい",
       avatarUrl: `/api/compatibility/invitations/${relationshipId}/avatar`,

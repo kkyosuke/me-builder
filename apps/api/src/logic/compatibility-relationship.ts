@@ -24,12 +24,14 @@ type Person = Readonly<{
 type CompatibilityRelationshipContents =
   | Readonly<{
       relationshipId: string;
+      relationshipCategory: CompatibilityRelationship["relationshipCategory"];
       status: "ready";
       partner: Person;
       viewer: Person;
     }>
   | Readonly<{
       relationshipId: string;
+      relationshipCategory: CompatibilityRelationship["relationshipCategory"];
       status: "waiting";
       nextAction: "diagnosis" | "profile-summary" | null;
     }>;
@@ -106,12 +108,14 @@ export async function getCompatibilityRelationshipContents({
       verifiedDisplayName: participants.inviter.displayName,
       accountData,
       at,
+      relationshipCategory: canonical.relationshipCategory,
     }),
     loadCompatibilitySharePreviewData({
       accountId: participants.invitee.accountId,
       verifiedDisplayName: participants.invitee.displayName,
       accountData,
       at,
+      relationshipCategory: canonical.relationshipCategory,
     }),
   ]);
   const viewerData = participants.viewerIsInviter ? inviterData : inviteeData;
@@ -127,6 +131,7 @@ export async function getCompatibilityRelationshipContents({
       type: "resolved",
       relationship: {
         relationshipId,
+        relationshipCategory: canonical.relationshipCategory,
         status: "waiting",
         // 閲覧者がまだ回答できる診断を持つ場合だけ診断へ案内する。
         // 回答し終えている場合は相手の準備待ちであり、本人の操作では解消できない。
@@ -153,6 +158,7 @@ export async function getCompatibilityRelationshipContents({
     type: "resolved",
     relationship: {
       relationshipId,
+      relationshipCategory: canonical.relationshipCategory,
       status: "ready",
       partner: participants.viewerIsInviter ? invitee : inviter,
       viewer: participants.viewerIsInviter ? inviter : invitee,

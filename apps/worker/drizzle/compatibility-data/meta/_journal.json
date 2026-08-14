@@ -15,6 +15,13 @@
       "when": 1786501218356,
       "tag": "0001_yummy_radioactive_man",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1786667172848,
+      "tag": "0002_funny_dreadnoughts",
+      "breakpoints": true
     }
   ]
 }

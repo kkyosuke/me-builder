@@ -1,1 +1,5 @@
-export { compatibilityRelationshipId } from "../compatibility-data";
+export {
+  type CompatibilityRelationshipCategory,
+  compatibilityRelationshipCategoryValues,
+  compatibilityRelationshipId,
+} from "../compatibility-data";

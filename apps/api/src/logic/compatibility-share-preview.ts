@@ -1,5 +1,6 @@
 import {
   type AccountDataNamespace,
+  type CompatibilityRelationshipCategory,
   type CompatibilitySharePreviewDiagnosis,
   type CompatibilitySharePreviewTheme,
   type D1,
@@ -97,11 +98,13 @@ export async function loadCompatibilitySharePreviewData(
     verifiedDisplayName,
     accountData,
     at,
+    relationshipCategory,
   }: {
     accountId: string;
     verifiedDisplayName: string | undefined;
     accountData: AccountDataNamespace | undefined;
     at: Date;
+    relationshipCategory?: CompatibilityRelationshipCategory;
   },
   dependencies: CompatibilitySharePreviewDataDependencies = compatibilitySharePreviewDataDependencies,
 ): Promise<CompatibilitySharePreviewData> {
@@ -109,9 +112,10 @@ export async function loadCompatibilitySharePreviewData(
     dependencies.getPreviewSource(accountData, accountId, at),
     dependencies.getShareProfile(accountData, accountId),
   ]);
-  // 招待へ関係カテゴリを保存するまでは、既存の相性共有が暗黙に想定してきた
-  // partnerと、特定の関係を前提にしないgeneralだけを共有する。
-  // 関係カテゴリ対応後は「招待カテゴリと一致する診断 + general」へ広げる。
+  const isCategoryShareable = (category: string) =>
+    category === "general" ||
+    relationshipCategory === undefined ||
+    category === relationshipCategory;
   const shareableDiagnoses = source.answeredDiagnoses.flatMap(
     ({
       id,
@@ -120,7 +124,7 @@ export async function loadCompatibilitySharePreviewData(
       answers,
       scoringConfig,
     }): CompatibilitySharePreviewDiagnosis[] => {
-      if (relationshipCategory !== "partner" && relationshipCategory !== "general") return [];
+      if (!isCategoryShareable(relationshipCategory)) return [];
       try {
         const scoring = dependencies.scoreAnswers(answers, scoringConfig);
         return scoring && scoringConfig
@@ -143,7 +147,7 @@ export async function loadCompatibilitySharePreviewData(
   const shareProfile = shareProfileResult.type === "available" ? shareProfileResult.profile : null;
   const hasAnswerableDiagnosis = source.diagnoses.some(
     ({ relationshipCategory, availability, responseStatus }) =>
-      (relationshipCategory === "partner" || relationshipCategory === "general") &&
+      isCategoryShareable(relationshipCategory) &&
       availability === "open" &&
       responseStatus !== "answered",
   );

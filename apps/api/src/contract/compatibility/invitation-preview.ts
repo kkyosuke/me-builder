@@ -1,3 +1,4 @@
+import { compatibilityRelationshipCategoryValues } from "@me-builder/lib";
 import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
 import * as v from "valibot";
 import { AccountNotFoundErrorSchema, authenticatedErrors, jsonResponse } from "../shared/errors";
@@ -5,6 +6,7 @@ import { AccountNotFoundErrorSchema, authenticatedErrors, jsonResponse } from ".
 const NonEmptyStringSchema = v.pipe(v.string(), v.nonEmpty());
 
 export const CompatibilityInvitationPreviewResponseSchema = v.object({
+  relationshipCategory: v.picklist(compatibilityRelationshipCategoryValues),
   inviter: v.object({
     displayName: NonEmptyStringSchema,
     avatarUrl: v.nullable(NonEmptyStringSchema),

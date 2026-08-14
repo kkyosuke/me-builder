@@ -125,7 +125,14 @@ async function getCompatibilityShareConsent(): Promise<Response> {
 async function issueCompatibilityInvitation(): Promise<Response> {
   return app.request(
     "/api/compatibility/invitations",
-    { method: "POST", headers: { Authorization: "Bearer known-token" } },
+    {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer known-token",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ relationshipCategory: "partner" }),
+    },
     env(),
   );
 }

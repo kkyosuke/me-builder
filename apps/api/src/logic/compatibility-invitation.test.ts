@@ -19,6 +19,7 @@ function dependencies(overrides: Record<string, unknown> = {}) {
       relationship: {
         id: relationshipId,
         expiresAt,
+        relationshipCategory: "family",
       },
     }),
   };
@@ -38,6 +39,7 @@ describe("issueCompatibilityInvitation", () => {
         db,
         accountData,
         compatibilityData,
+        relationshipCategory: "family",
       },
       deps,
     );
@@ -46,6 +48,7 @@ describe("issueCompatibilityInvitation", () => {
       type: "created",
       invitationUrl: `https://liff.line.me/1234567890-testliff/compatibility/invitations/${relationshipId}`,
       expiresAt: expiresAt.toISOString(),
+      relationshipCategory: "family",
     });
     expect(deps.createSession).toHaveBeenCalledWith({
       idToken: "id-token",
@@ -55,6 +58,7 @@ describe("issueCompatibilityInvitation", () => {
     expect(deps.createInvitation).toHaveBeenCalledWith(accountData, compatibilityData, {
       inviterAccountId: "account-1",
       inviterDisplayName: "あおい",
+      relationshipCategory: "family",
     });
   });
 
@@ -72,6 +76,7 @@ describe("issueCompatibilityInvitation", () => {
           db,
           accountData,
           compatibilityData,
+          relationshipCategory: "friend",
         },
         deps,
       ),
@@ -98,6 +103,7 @@ describe("issueCompatibilityInvitation", () => {
           db,
           accountData,
           compatibilityData,
+          relationshipCategory: "work",
         },
         deps,
       ),

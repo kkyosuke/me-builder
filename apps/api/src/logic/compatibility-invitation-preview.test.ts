@@ -59,6 +59,7 @@ function dependencies(overrides: Record<string, unknown> = {}) {
     getInvitationPreview: vi.fn().mockResolvedValue({
       id: relationshipId,
       inviterDisplayName: "あおい",
+      relationshipCategory: "family",
       expiresAt,
       isOwnInvitation: false,
     }),
@@ -86,6 +87,7 @@ describe("getCompatibilityInvitationContents", () => {
     await expect(getCompatibilityInvitationContents(params(), deps)).resolves.toEqual({
       type: "resolved",
       invitation: {
+        relationshipCategory: "family",
         inviter: {
           displayName: "あおい",
           avatarUrl: `/api/compatibility/invitations/${relationshipId}/avatar`,
@@ -99,7 +101,10 @@ describe("getCompatibilityInvitationContents", () => {
     });
     expect(deps.loadSharePreviewData).toHaveBeenCalledOnce();
     expect(deps.loadSharePreviewData).toHaveBeenCalledWith(
-      expect.objectContaining({ accountId: "account-recipient" }),
+      expect.objectContaining({
+        accountId: "account-recipient",
+        relationshipCategory: "family",
+      }),
     );
   });
 
@@ -140,6 +145,7 @@ describe("getCompatibilityInvitationContents", () => {
       getInvitationPreview: vi.fn().mockResolvedValue({
         id: relationshipId,
         inviterDisplayName: "あおい",
+        relationshipCategory: "family",
         expiresAt,
         isOwnInvitation: true,
       }),

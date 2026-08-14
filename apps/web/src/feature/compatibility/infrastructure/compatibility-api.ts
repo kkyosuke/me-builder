@@ -1,4 +1,8 @@
-import { compatibilityRelationshipId } from "@me-builder/lib/compatibility";
+import {
+  type CompatibilityRelationshipCategory,
+  compatibilityRelationshipCategoryValues,
+  compatibilityRelationshipId,
+} from "@me-builder/lib/compatibility";
 import * as v from "valibot";
 import type { operations } from "../../../generated/api";
 import { createHttpClient } from "../../../infrastructure/http-client";
@@ -58,9 +62,11 @@ const ResponseSchema = v.object({
 const InvitationResponseSchema = v.object({
   invitationUrl: v.pipe(v.string(), v.url()),
   expiresAt: v.pipe(v.string(), v.isoTimestamp()),
+  relationshipCategory: v.picklist(compatibilityRelationshipCategoryValues),
 }) satisfies v.GenericSchema<InvitationApiResponse>;
 
 const InvitationPreviewResponseSchema = v.object({
+  relationshipCategory: v.picklist(compatibilityRelationshipCategoryValues),
   inviter: v.object({
     displayName: NonEmptyStringSchema,
     avatarUrl: v.nullable(NonEmptyStringSchema),
@@ -81,12 +87,14 @@ const RelationshipListResponseSchema = v.object({
     v.variant("status", [
       v.object({
         relationshipId: RelationshipIdSchema,
+        relationshipCategory: v.picklist(compatibilityRelationshipCategoryValues),
         status: v.literal("pending"),
         expiresAt: v.pipe(v.string(), v.isoTimestamp()),
         invitationUrl: v.pipe(v.string(), v.url()),
       }),
       v.object({
         relationshipId: RelationshipIdSchema,
+        relationshipCategory: v.picklist(compatibilityRelationshipCategoryValues),
         status: v.literal("accepted"),
         partnerDisplayName: NonEmptyStringSchema,
       }),
@@ -102,12 +110,14 @@ const RelationshipPersonSchema = v.object({
 const RelationshipResponseSchema = v.variant("status", [
   v.object({
     relationshipId: RelationshipIdSchema,
+    relationshipCategory: v.picklist(compatibilityRelationshipCategoryValues),
     status: v.literal("ready"),
     partner: RelationshipPersonSchema,
     viewer: RelationshipPersonSchema,
   }),
   v.object({
     relationshipId: RelationshipIdSchema,
+    relationshipCategory: v.picklist(compatibilityRelationshipCategoryValues),
     status: v.literal("waiting"),
     nextAction: v.nullable(v.picklist(["diagnosis", "profile-summary"])),
   }),
@@ -172,11 +182,13 @@ export async function fetchCompatibilityShareConsent(
 export async function issueCompatibilityInvitation(
   apiUrl: string | undefined,
   idToken: string,
+  relationshipCategory: CompatibilityRelationshipCategory,
   signal?: AbortSignal,
 ): Promise<CompatibilityInvitation> {
   const response = await createHttpClient(apiUrl).request("/api/compatibility/invitations", {
     method: "POST",
-    headers: { Authorization: `Bearer ${idToken}` },
+    headers: { Authorization: `Bearer ${idToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ relationshipCategory }),
     ...(signal ? { signal } : {}),
   });
 

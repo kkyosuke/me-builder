@@ -16,10 +16,8 @@ describe("GET /api/openapi.json", () => {
     expect(document.paths["/api/diagnoses"]?.get).toBeDefined();
     expect(document.paths["/api/compatibility/share-consent"]?.get).toBeDefined();
     expect(document.paths["/api/compatibility/invitations"]?.post).toBeDefined();
-    // 共有の同意はリクエスト本文を持たず、表示内容の確認tokenも受け取らない。
-    expect(document.paths["/api/compatibility/invitations"]?.post).not.toHaveProperty(
-      "requestBody",
-    );
+    // 表示内容の確認tokenは受け取らず、招待時に選ぶ関係カテゴリだけを本文で受け取る。
+    expect(document.paths["/api/compatibility/invitations"]?.post).toHaveProperty("requestBody");
     expect(document.paths["/api/diagnoses/{diagnosisId}/answers"]?.get).toBeDefined();
     expect(document.paths["/api/profile"]?.get).toBeDefined();
     expect(document.paths["/api/profile/avatar"]?.get).toBeDefined();

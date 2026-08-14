@@ -18,6 +18,7 @@ function invitationInput() {
   return {
     inviterAccountId: "account-inviter",
     inviterDisplayName: " 送信者 ",
+    relationshipCategory: "partner",
   } as const;
 }
 
@@ -39,6 +40,7 @@ describe("compatibility data domain", () => {
     expect(relationship).toMatchObject({
       id: relationshipId,
       inviterDisplayName: "送信者",
+      relationshipCategory: "partner",
       status: "pending",
       createdAt,
       expiresAt,
@@ -51,6 +53,14 @@ describe("compatibility data domain", () => {
         createdAt,
       ),
     ).toThrow("inviterDisplayName is required");
+    expect(() =>
+      decideCompatibilityInvitationCreation(
+        null,
+        relationshipId,
+        { ...invitationInput(), relationshipCategory: "general" } as never,
+        createdAt,
+      ),
+    ).toThrow("relationshipCategory must identify a specific relationship");
   });
 
   it("同じ招待commandを冪等に扱い、異なる送信者は競合として拒否する", () => {
@@ -82,11 +92,13 @@ describe("compatibility data domain", () => {
     ).toEqual({
       id: relationshipId,
       inviterDisplayName: "送信者",
+      relationshipCategory: "partner",
       expiresAt,
       isOwnInvitation: false,
     });
     expect(createCompatibilityInvitationAcceptanceContext(relationship, createdAt)).toEqual({
       inviterAccountId: "account-inviter",
+      relationshipCategory: "partner",
       expiresAt,
     });
     expect(expireCompatibilityRelationship(relationship, new Date(expiresAt.getTime() - 1))).toBe(

@@ -1,3 +1,4 @@
+import type { CompatibilityRelationshipCategory } from "@me-builder/lib/compatibility";
 import { useRef, useState } from "react";
 import { useLiffSession } from "../../liff";
 import {
@@ -15,6 +16,8 @@ export default function CompatibilityShareApplication() {
   const sharing = useRef(false);
   const [isSharing, setIsSharing] = useState(false);
   const [sharingMessage, setSharingMessage] = useState<string | null>(null);
+  const [relationshipCategory, setRelationshipCategory] =
+    useState<CompatibilityRelationshipCategory | null>(null);
 
   const shareToLine = async (url: string) => {
     if (sharing.current) return;
@@ -58,7 +61,11 @@ export default function CompatibilityShareApplication() {
       invitationState={invitation.state}
       isSharing={isSharing}
       sharingMessage={sharingMessage}
-      onIssue={() => void invitation.issue()}
+      relationshipCategory={relationshipCategory}
+      onRelationshipCategoryChange={setRelationshipCategory}
+      onIssue={() => {
+        if (relationshipCategory) void invitation.issue(relationshipCategory);
+      }}
       onRetry={() => void reload()}
       onShareToLine={(url) => void shareToLine(url)}
       onCopyLink={(url) => void copyLink(url)}

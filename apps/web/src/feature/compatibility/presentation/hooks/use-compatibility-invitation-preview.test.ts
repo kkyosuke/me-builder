@@ -15,6 +15,7 @@ vi.mock("../../infrastructure/compatibility-avatar-api", () => ({
 
 const relationshipId = "1".repeat(64);
 const invitation = {
+  relationshipCategory: "friend" as const,
   inviter: {
     displayName: "あおい",
     avatarUrl: `/api/compatibility/invitations/${relationshipId}/avatar`,

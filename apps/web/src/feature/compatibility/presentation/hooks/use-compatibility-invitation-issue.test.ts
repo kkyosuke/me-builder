@@ -14,12 +14,13 @@ describe("useCompatibilityInvitationIssue", () => {
     const invitation = {
       invitationUrl: `https://example.com/compatibility/invitations/${"1".repeat(64)}`,
       expiresAt: "2026-08-26T00:00:00.000Z",
+      relationshipCategory: "family" as const,
     };
     vi.mocked(issueCompatibilityInvitation).mockResolvedValue(invitation);
     const acquireIdToken = vi.fn().mockResolvedValue("id-token");
     const { result } = renderHook(() => useCompatibilityInvitationIssue({ acquireIdToken }));
 
-    act(() => void result.current.issue());
+    act(() => void result.current.issue("family"));
 
     await waitFor(() =>
       expect(result.current.state).toEqual({ status: "success", data: invitation }),
@@ -27,6 +28,7 @@ describe("useCompatibilityInvitationIssue", () => {
     expect(issueCompatibilityInvitation).toHaveBeenCalledWith(
       undefined,
       "id-token",
+      "family",
       expect.any(AbortSignal),
     );
   });

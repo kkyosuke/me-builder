@@ -33,6 +33,7 @@ export const compatibilityShareCases = {
       method: "POST",
       path: "/api/compatibility/invitations",
       authorization: "Bearer known-token",
+      body: { relationshipCategory: "partner" },
       setup: ["共有できる内容がまだない状態でも発行できることを含める"],
     },
     out: {
@@ -41,6 +42,7 @@ export const compatibilityShareCases = {
         invitationUrlPattern:
           "^https://liff\\.line\\.me/1234567890-testliff/compatibility/invitations/[a-f0-9]{64}$",
         expiresAt: "CompatibilityDataが決定する14日後のISO日時",
+        relationshipCategory: "partner",
         senderReferenceStatus: "pending",
       },
     },
@@ -60,6 +62,7 @@ export const compatibilityShareCases = {
         inviterDisplayName: "あおい",
         recipientDisplayName: "はる",
         canAccept: true,
+        relationshipCategory: "partner",
         relationshipStatus: "pending",
         recipientReferenceCount: 0,
         excludedFields: ["aboutMe", "themes", "accountId", "fingerprint", "choiceId", "evidenceId"],

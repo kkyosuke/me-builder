@@ -78,7 +78,11 @@ flowchart LR
 
 ### `POST /api/compatibility/invitations`
 
-共有へ同意した本人が、1人だけが承諾できる招待リンクを発行します。リクエスト本文はありません。クライアントはAccount ID、表示名、共有プロフィール、診断結果、確認tokenを送りません。
+共有へ同意した本人が、1人だけが承諾できる招待リンクを発行します。クライアントは相手との関係を`partner`、`family`、`friend`、`work`から1つ選び、`relationshipCategory`として送ります。Account ID、表示名、共有プロフィール、診断結果、確認tokenは送りません。
+
+```json
+{ "relationshipCategory": "partner" }
+```
 
 API Serverは検証済みIDトークンから本人と表示名を解決し、表示名を取得できる場合だけ、256 bitの不透明な関係IDでCompatibilityDataへ`pending`招待を作成し、送信者のAccountDataへ一覧参照を保存します。招待リンクへAccount IDを含めません。
 
@@ -88,11 +92,11 @@ sequenceDiagram
     participant API
     participant AccountData
     participant CompatibilityData
-    Web->>API: POST（本文なし）
+    Web->>API: POST relationshipCategory
     API->>API: 検証済み表示名を解決
     API->>CompatibilityData: pending招待を作成
     API->>AccountData: 送信者の返事待ち参照を追加
-    API-->>Web: invitationUrl, expiresAt
+    API-->>Web: invitationUrl, expiresAt, relationshipCategory
 ```
 
 成功時は`201`を返します。`expiresAt`はCompatibilityDataが決定した14日後の期限です。
@@ -100,12 +104,14 @@ sequenceDiagram
 ```json
 {
   "invitationUrl": "https://liff.line.me/1234567890-AbCdEfGh/compatibility/invitations/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-  "expiresAt": "2026-08-26T00:00:00.000Z"
+  "expiresAt": "2026-08-26T00:00:00.000Z",
+  "relationshipCategory": "partner"
 }
 ```
 
 | HTTP | 条件 | レスポンス |
 | --- | --- | --- |
+| `400` | 関係カテゴリがない、`general`、または定義外である | `{ "error": "Invalid request" }` |
 | `409` | 相手へ表示する名前を確認できず共有を開始できない | `{ "error": "Compatibility invitation unavailable", "reason": "share_unavailable" }` |
 
 `invitationUrl`はLINE内でLIFFとして開ける`https://liff.line.me/{LIFF_ID}/compatibility/invitations/{relationshipId}`です。LIFFは設定済みのWeb endpointへpathを`liff.state`として引き継ぎ、Web UIが招待画面を解決します。
@@ -134,6 +140,7 @@ sequenceDiagram
 
 ```json
 {
+  "relationshipCategory": "partner",
   "inviter": {
     "displayName": "あおい",
     "avatarUrl": "/api/compatibility/invitations/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/avatar"
@@ -150,7 +157,7 @@ sequenceDiagram
 
 `GET /api/compatibility/invitations/:relationshipId/avatar`は、招待確認APIと同じBearer認証を要求し、受信者としてpending招待を確認できる場合だけ送信者の現在画像を返します。送信者Accountは招待contextから決め、path、query、bodyでAccount IDを受け取りません。画像がなければ`204`、招待が無効なら`404`、自分の招待なら`409`とし、画像応答には`Cache-Control: no-store`と`X-Content-Type-Options: nosniff`を付けます。
 
-`canAccept`は受信者の検証済み表示名がある場合だけ`true`です。`blockingReasons`は共有の可否と同じ`display_name_unavailable`だけを返します。`nextAction`は受信者への案内であり、承諾可否には影響しません。共有できる内容がまだない場合も承諾でき、双方の内容がそろった時点で追加の同意なしに相性シートを表示します。
+`relationshipCategory`は送信者が招待発行時に選んだ関係カテゴリで、受信者はこの値を確認して承諾します。`canAccept`は受信者の検証済み表示名がある場合だけ`true`です。`blockingReasons`は共有の可否と同じ`display_name_unavailable`だけを返します。`nextAction`は受信者への案内であり、承諾可否には影響しません。共有できる内容がまだない場合も承諾でき、双方の内容がそろった時点で追加の同意なしに相性シートを表示します。
 
 | HTTP | 条件 | レスポンス |
 | --- | --- | --- |
@@ -209,6 +216,7 @@ sequenceDiagram
 {
   "relationshipId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "status": "ready",
+  "relationshipCategory": "partner",
   "partner": {
     "displayName": "あおい",
     "aboutMe": {
@@ -230,12 +238,13 @@ sequenceDiagram
 }
 ```
 
-双方の`themes`は、取得時点で双方が共有できるDiagnosisの共通部分だけを同じ順序で返します。過去に同意した表示内容とは照合せず、双方の最新の共有専用プロフィールと診断表示を使います。双方の「私について」を開示でき、共通テーマが1件以上ある場合だけ`ready`にします。それ以外では片方だけの内容を返さず、次の待機状態を返します。
+双方の`themes`は、取得時点で双方が共有できるDiagnosisのうち、招待で選んだ`relationshipCategory`または`general`に該当する共通部分だけを同じ順序で返します。過去に同意した表示内容とは照合せず、双方の最新の共有専用プロフィールと診断表示を使います。双方の「私について」を開示でき、共通テーマが1件以上ある場合だけ`ready`にします。それ以外では片方だけの内容を返さず、次の待機状態を返します。
 
 ```json
 {
   "relationshipId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "status": "waiting",
+  "relationshipCategory": "partner",
   "nextAction": "diagnosis"
 }
 ```
@@ -260,12 +269,14 @@ sequenceDiagram
     {
       "relationshipId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "status": "pending",
+      "relationshipCategory": "partner",
       "expiresAt": "2026-08-26T00:00:00.000Z",
       "invitationUrl": "https://liff.line.me/1234567890-AbCdEfGh/compatibility/invitations/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     },
     {
       "relationshipId": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
       "status": "accepted",
+      "relationshipCategory": "friend",
       "partnerDisplayName": "はる"
     }
   ]

@@ -10,6 +10,10 @@ import {
 import { MainNavigation } from "../../../components/main-navigation";
 import { SkeletonBlock, SkeletonLoader } from "../../../components/skeleton";
 import type { AsyncState } from "../../../model/async-state";
+import {
+  getRelationshipCategoryBadgeClassName,
+  getRelationshipCategoryLabel,
+} from "../../diagnosis/model/relationship-category";
 import type {
   CompatibilityRelationshipList,
   CompatibilityRelationshipListItem,
@@ -127,6 +131,11 @@ export function CompatibilityListScreen({
                     <p className="text-xs font-bold text-emerald-700 dark:text-emerald-300">
                       共有中
                     </p>
+                    <p
+                      className={`mt-2 w-fit rounded-full px-2.5 py-1 text-xs font-bold ${getRelationshipCategoryBadgeClassName(item.relationshipCategory)}`}
+                    >
+                      {getRelationshipCategoryLabel(item.relationshipCategory)}
+                    </p>
                     <h3 className="mt-1 text-lg font-bold text-slate-950 dark:text-slate-50">
                       {item.partnerDisplayName}さん
                     </h3>
@@ -168,6 +177,11 @@ export function CompatibilityListScreen({
                           <h3 className="font-bold text-slate-950 dark:text-slate-50">
                             招待リンク
                           </h3>
+                          <p
+                            className={`mt-2 w-fit rounded-full px-2.5 py-1 text-xs font-bold ${getRelationshipCategoryBadgeClassName(item.relationshipCategory)}`}
+                          >
+                            {getRelationshipCategoryLabel(item.relationshipCategory)}
+                          </p>
                           <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
                             期限: {new Date(item.expiresAt).toLocaleDateString("ja-JP")}
                           </p>

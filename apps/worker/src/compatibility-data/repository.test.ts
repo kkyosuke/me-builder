@@ -40,6 +40,7 @@ function invitationInput() {
   return {
     inviterAccountId: "account-inviter",
     inviterDisplayName: "送信者",
+    relationshipCategory: "partner",
   } as const;
 }
 
@@ -62,6 +63,7 @@ describe("CompatibilityDataRepository", () => {
       id: relationshipId,
       inviterAccountId: "account-inviter",
       inviteeAccountId: null,
+      relationshipCategory: "partner",
       status: "pending",
       createdAt,
       expiresAt,
@@ -76,6 +78,7 @@ describe("CompatibilityDataRepository", () => {
     expect(repository.getInvitationPreview("account-invitee", createdAt)).toEqual({
       id: relationshipId,
       inviterDisplayName: "送信者",
+      relationshipCategory: "partner",
       expiresAt,
       isOwnInvitation: false,
     });
