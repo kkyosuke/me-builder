@@ -10,6 +10,7 @@ import {
   linkIdentity,
   listActiveLineAccountIds,
   resolveAccountByLineLogin,
+  resolveAccountByLineMessagingApi,
   upsertIdentity,
 } from "./account";
 
@@ -21,10 +22,10 @@ function createTestDb(): SharedD1Client {
 
   Object.defineProperty(db, "batch", {
     value: async (queries: readonly unknown[]) => {
-      const results = [];
-      for (const q of queries) {
-        results.push(await q);
-      }
+      let results: unknown[] = [];
+      sqlite.transaction(() => {
+        results = queries.map((query) => (query as { run: () => unknown }).run());
+      })();
       return results;
     },
     writable: true,
@@ -189,13 +190,18 @@ describe("linkIdentity", () => {
 });
 
 describe("resolveAccountByLineLogin", () => {
-  it("該当する identity が無ければ undefined を返し、Account を作らないこと", async () => {
+  it("該当するidentityが無ければWeb利用用のAccountとline_loginだけを作ること", async () => {
     const db = createTestDb();
 
     const resolved = await resolveAccountByLineLogin(db, "U_unknown");
 
-    expect(resolved).toBeUndefined();
-    expect(await db.select().from(schema.accounts).all()).toHaveLength(0);
+    expect(resolved.identity.provider).toBe("line_login");
+    expect(await db.select().from(schema.accounts).all()).toHaveLength(1);
+    expect(await db.select().from(schema.accountIdentities).all()).toEqual([
+      expect.objectContaining({ provider: "line_login", accountId: resolved.account.id }),
+    ]);
+    // 友だち追加前なのでLINE通知・日々の声かけの対象にはしない。
+    await expect(listActiveLineAccountIds(db)).resolves.toEqual([]);
   });
 
   it("userId が一致する場合（同一プロバイダー）に friends 追加で作られた Account を引き当て、line_login を紐づけること", async () => {
@@ -252,5 +258,65 @@ describe("resolveAccountByLineLogin", () => {
     const resolved = await resolveAccountByLineLogin(db, "U_admin", "admin");
 
     expect(resolved?.account.role).toBe("admin");
+  });
+});
+
+describe("resolveAccountByLineMessagingApi", () => {
+  it("空DBへの友だち追加でAccountと両方のLINE identityを作ること", async () => {
+    const db = createTestDb();
+
+    const resolved = await resolveAccountByLineMessagingApi(db, "U_follow_first");
+
+    expect(resolved.identity.provider).toBe("line");
+    expect(await db.select().from(schema.accounts).all()).toHaveLength(1);
+    const identities = await db.select().from(schema.accountIdentities).all();
+    expect(identities.map(({ provider }) => provider).sort()).toEqual(["line", "line_login"]);
+    expect(new Set(identities.map(({ accountId }) => accountId))).toEqual(
+      new Set([resolved.account.id]),
+    );
+    await expect(listActiveLineAccountIds(db)).resolves.toEqual([resolved.account.id]);
+  });
+
+  it("Webから作られたAccountへ後日のMessaging API identityを追加すること", async () => {
+    const db = createTestDb();
+    const webAccount = await resolveAccountByLineLogin(db, "U_web_first");
+
+    const messagingAccount = await resolveAccountByLineMessagingApi(db, "U_web_first");
+
+    expect(messagingAccount.account.id).toBe(webAccount.account.id);
+    expect(await db.select().from(schema.accounts).all()).toHaveLength(1);
+    const identities = await db.select().from(schema.accountIdentities).all();
+    expect(identities.map(({ provider }) => provider).sort()).toEqual(["line", "line_login"]);
+  });
+
+  it("旧データのline identityへline_loginを補い、同じAccountを使うこと", async () => {
+    const db = createTestDb();
+    const existing = await upsertIdentity(db, {
+      provider: "line",
+      providerAccountId: "U_existing_line",
+    });
+
+    const resolved = await resolveAccountByLineMessagingApi(db, "U_existing_line");
+
+    expect(resolved.account.id).toBe(existing.account.id);
+    expect(await db.select().from(schema.accounts).all()).toHaveLength(1);
+    expect(
+      (await db.select().from(schema.accountIdentities).all())
+        .map(({ provider }) => provider)
+        .sort(),
+    ).toEqual(["line", "line_login"]);
+  });
+
+  it("LIFFと友だち追加が同時でもAccountを二重作成しないこと", async () => {
+    const db = createTestDb();
+
+    const [login, messaging] = await Promise.all([
+      resolveAccountByLineLogin(db, "U_concurrent_entry"),
+      resolveAccountByLineMessagingApi(db, "U_concurrent_entry"),
+    ]);
+
+    expect(messaging.account.id).toBe(login.account.id);
+    expect(await db.select().from(schema.accounts).all()).toHaveLength(1);
+    expect(await db.select().from(schema.accountIdentities).all()).toHaveLength(2);
   });
 });

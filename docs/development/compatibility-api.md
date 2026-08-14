@@ -71,7 +71,6 @@ flowchart LR
 | --- | --- | --- |
 | `400` | `relationshipCategory`が`partner`、`family`、`friend`、`work`以外である | `{ "error": "Invalid request" }` |
 | `401` | IDトークンがない、検証できない、またはLINE Login設定がない | `{ "error": "Unauthorized" }` |
-| `404` | 検証済みLINE Accountに対応するAccountがない | `{ "error": "Account not found", "reason": "friendship_required" }` |
 | `503` | D1またはAccountData bindingがない | `{ "error": "Service Unavailable" }` |
 | `500` | 未処理のサーバーエラー | `{ "error": "Internal Server Error" }` |
 

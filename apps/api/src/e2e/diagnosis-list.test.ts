@@ -296,14 +296,30 @@ describe("GET /api/diagnoses local D1 E2E", () => {
     expect(await response.json()).toEqual({ error: "Unauthorized" });
   });
 
-  it(`${diagnosisListCases.accountNotFound.id}: ${diagnosisListCases.accountNotFound.name}`, async () => {
+  it(`${diagnosisListCases.webFirstAccountCreation.id}: ${diagnosisListCases.webFirstAccountCreation.name}`, async () => {
     const response = await request("unknown-token");
 
-    expect(response.status).toBe(404);
-    expect(await response.json()).toEqual({
-      error: "Account not found",
-      reason: "friendship_required",
-    });
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      diagnoses: Array<{ responseStatus: string; answeredCount: number }>;
+    };
+    expect(body.diagnoses).toHaveLength(10);
+    expect(body.diagnoses).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ responseStatus: "unanswered", answeredCount: 0 }),
+      ]),
+    );
+
+    const created = await database
+      .prepare(
+        `SELECT a.id, i.provider
+         FROM accounts a
+         INNER JOIN account_identities i ON i.account_id = a.id
+         WHERE i.provider_account_id = ? AND a.is_deleted = 0 AND i.is_deleted = 0`,
+      )
+      .bind("unknown-line-user")
+      .all<{ id: string; provider: string }>();
+    expect(created.results).toEqual([expect.objectContaining({ provider: "line_login" })]);
   });
 });
 

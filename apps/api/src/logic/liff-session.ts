@@ -34,9 +34,7 @@ export type LiffSessionOutcome =
   /** LINE Login チャネル ID が未設定で検証そのものができない（サーバー側の設定漏れ） */
   | { type: "not-configured" }
   /** ID トークンが無い、または検証に失敗した */
-  | { type: "unauthenticated"; reason: string }
-  /** 検証はできたが、対応する Account が存在しない */
-  | { type: "account-not-found" };
+  | { type: "unauthenticated"; reason: string };
 
 export async function createLiffSession({
   idToken,
@@ -66,14 +64,6 @@ export async function createLiffSession({
     verified.claims.sub,
     resolveLineAccountRole(verified.claims.sub, adminLineUserIds),
   );
-
-  if (!resolved) {
-    // アカウント作成の起点は LINE 公式アカウントの友だち追加
-    // ([プロジェクト概要 §5](../../../../docs/product/project-overview.md#5-アカウントと本人識別))。
-    // Messaging API と LINE Login で userId が一致しない構成での紐づけ手段は別途設計する。
-    logger.info("No account found for the verified LINE Login identity");
-    return { type: "account-not-found" };
-  }
 
   logger.info("Resolved account for the LIFF session");
 
