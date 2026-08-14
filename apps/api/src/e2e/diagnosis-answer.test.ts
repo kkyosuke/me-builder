@@ -795,6 +795,46 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
     e2eTimeoutMs,
   );
 
+  it(
+    "友達との距離感・付き合い方の回答を5つのパラメータへ採点する",
+    async () => {
+      for (let index = 1; index <= 10; index += 1) {
+        const suffix = String(index).padStart(2, "0");
+        const choiceId = index % 2 === 1 ? "yes" : "no";
+        const response = await putAnswer(
+          `dq-friendship-style-${suffix}`,
+          choiceId,
+          "friendship-style",
+        );
+        expect(response.status).toBe(200);
+      }
+
+      const response = await getAnswers("friendship-style");
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({
+        id: "friendship-style",
+        relationshipCategory: "friend",
+        scoring: {
+          scoringVersion: 1,
+          balancedLabel: "状況に応じて友達との付き合い方を選ぶ",
+          parameters: [
+            expect.objectContaining({ id: "friend-contact", score: 100, coverage: 100 }),
+            expect.objectContaining({ id: "friend-planning", score: 100, coverage: 100 }),
+            expect.objectContaining({ id: "friend-disclosure", score: 100, coverage: 100 }),
+            expect.objectContaining({ id: "friend-circle", score: 100, coverage: 100 }),
+            expect.objectContaining({
+              id: "friend-conflict-timing",
+              score: 100,
+              coverage: 100,
+            }),
+          ],
+        },
+      });
+    },
+    e2eTimeoutMs,
+  );
+
   it(`${diagnosisAnswerCases.missingContents.id}: ${diagnosisAnswerCases.missingContents.name}`, async () => {
     const response = await getAnswers();
     expect(response.status).toBe(404);

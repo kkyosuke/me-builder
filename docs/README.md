@@ -68,6 +68,7 @@ docs/
 - [「仕事の価値観・働き方」パラメータ変換設計](diagnosis/scoring/work-values-parameter-design.md) — 7つ目の診断固有のパラメータ、重み、表示設定、Relationship Category
 - [「仕事の変化・周囲との関わり方」パラメータ変換設計](diagnosis/scoring/work-relationship-style-parameter-design.md) — 8つ目の診断固有のパラメータ、重み、表示設定、Relationship Category
 - [「家族との距離感・支え合い」パラメータ変換設計](diagnosis/scoring/family-support-style-parameter-design.md) — 9つ目の診断固有のパラメータ、重み、表示設定、Relationship Category
+- [「友達との距離感・付き合い方」パラメータ変換設計](diagnosis/scoring/friendship-style-parameter-design.md) — 10個目の診断固有のパラメータ、重み、表示設定、Relationship Category
 
 ### ドメインを設計する
 

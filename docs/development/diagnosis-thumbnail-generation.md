@@ -21,7 +21,8 @@ apps/web/public/images/diagnoses/
 ├── life-priorities.jpg
 ├── work-values.jpg
 ├── work-relationship-style.jpg
-└── family-support-style.jpg
+├── family-support-style.jpg
+└── friendship-style.jpg
 ```
 
 ## 3. 共通スタイル
@@ -131,7 +132,23 @@ Materials/textures: Matte paper and soft clay, subtle depth and shadows.
 Constraints: Exactly two equal figures. No third figure. No text, no letters, no numbers, no logos, no watermark, no brand marks. Do not depict a stereotyped nuclear family or assign size differences, fixed ages, genders, hierarchy, or roles. Do not make frequent contact, privacy, listening, practical help, immediate discussion, waiting, advance planning, or flexibility look superior.
 ```
 
-## 10. 新しい診断へ展開する手順
+## 10. 「友達との距離感・付き合い方」生成プロンプト
+
+```text
+Use case: stylized-concept
+Asset type: 16:9 diagnosis card thumbnail for a web application
+Primary request: Create a polished 3D paper-cut/clay-style illustration representing different ways friends stay connected: starting a conversation, planning time together, sharing worries, introducing friend circles, and talking through uncomfortable moments.
+Scene/backdrop: A calm abstract social space with exactly two equal rounded friends seated face-to-face on the same horizontal baseline. Balanced communication arcs, blank planning tiles, a small shared speech form, and separate circles that can gently connect suggest the different friendship choices without favoring one approach.
+Subject: Exactly two mirror-balanced abstract friend figures with equal head diameter, body size, pose, vertical position, and visual weight. Use different palette colors only. Neither figure should lead, follow, support, or depend on the other.
+Style/medium: Soft layered 3D paper-cut / clay render matching a premium editorial app illustration.
+Composition/framing: Wide 16:9, centered, clear silhouettes, important objects away from edges, suitable for a small card crop.
+Lighting/mood: Warm soft studio lighting, relaxed, open, respectful, welcoming.
+Color palette: Deep navy background, muted slate blue, warm cream, coral accents, small golden accents; consistent with the existing me-builder diagnosis thumbnails.
+Materials/textures: Matte paper and soft clay, subtle depth and shadows.
+Constraints: Exactly two equal figures. No third figure. No text, no letters, no numbers, no logos, no watermark, no brand marks, no hearts, no romantic symbols. Do not assign ages, genders, hierarchy, or fixed social roles. Do not make frequent contact, waiting for a reason, advance planning, spontaneity, sharing worries, privacy, connecting friend circles, keeping circles separate, immediate discussion, or taking time to reflect look superior.
+```
+
+## 11. 新しい診断へ展開する手順
 
 1. §4の`Primary request`、`Scene/backdrop`、`Subject`を新しい診断のテーマへ置き換える
 2. §3の共通スタイルと`Composition/framing`、`Constraints`を維持する

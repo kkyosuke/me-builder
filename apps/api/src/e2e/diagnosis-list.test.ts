@@ -215,9 +215,9 @@ describe("GET /api/diagnoses local D1 E2E", () => {
         lastAnsweredAt: string | null;
       }>;
     };
-    expect(initialBody.diagnoses).toHaveLength(9);
+    expect(initialBody.diagnoses).toHaveLength(10);
     expect(initialBody.diagnoses.map(({ displayOrder }) => displayOrder)).toEqual([
-      10, 20, 30, 40, 50, 60, 70, 80, 90,
+      10, 20, 30, 40, 50, 60, 70, 80, 90, 100,
     ]);
     expect(initialBody.diagnoses.find(({ id }) => id === "life-priorities")).toMatchObject({
       relationshipCategory: "general",
@@ -236,6 +236,11 @@ describe("GET /api/diagnoses local D1 E2E", () => {
     });
     expect(initialBody.diagnoses.find(({ id }) => id === "family-support-style")).toMatchObject({
       relationshipCategory: "family",
+      responseStatus: "unanswered",
+      questionCount: 10,
+    });
+    expect(initialBody.diagnoses.find(({ id }) => id === "friendship-style")).toMatchObject({
+      relationshipCategory: "friend",
       responseStatus: "unanswered",
       questionCount: 10,
     });
@@ -440,6 +445,35 @@ describe("GET /api/diagnoses/:diagnosisId local D1 E2E", () => {
       "家族と意見が食い違ったときは、その場で話すより時間を置いてから話し合いたい。",
       "家族と一緒に過ごす予定は、早めに相談して決めたい。",
       "家族と一緒に過ごす予定は、直前に都合を合わせて決めてもよい。",
+    ]);
+  });
+
+  it("友達との距離感・付き合い方の状況ベース10問をseedから返すこと", async () => {
+    const response = await request("known-token", "/api/diagnoses/friendship-style");
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      id: string;
+      title: string;
+      relationshipCategory: string;
+      questions: Array<{ diagnosisQuestionId: string; text: string }>;
+    };
+
+    expect(body).toMatchObject({
+      id: "friendship-style",
+      title: "友達との距離感・付き合い方",
+      relationshipCategory: "friend",
+    });
+    expect(body.questions.map(({ text }) => text)).toEqual([
+      "友達としばらく連絡を取っていないと気づいたときは、用事がなくても自分から連絡したい。",
+      "友達としばらく連絡を取っていないと気づいても、次の用事ができるまで連絡しなくてよい。",
+      "友達と会う予定を立てるときは、直前に誘うより早めに日程を相談したい。",
+      "友達と会う予定を立てるときは、早めに決めるより直前に都合を合わせたい。",
+      "自分が悩んでいるときは、友達から聞かれなくても早めに話したい。",
+      "自分が悩んでいるときは、友達から聞かれるまで自分からは話さずにおきたい。",
+      "仲のよい友達同士がまだ会ったことがないときは、機会を作って紹介したい。",
+      "仲のよい友達同士がまだ会ったことがないときも、無理に紹介せずそれぞれ別に付き合いたい。",
+      "友達の言葉に引っかかったときは、一人で考えるよりその場で理由を確かめたい。",
+      "友達の言葉に引っかかったときは、その場で確かめるより一度自分の中で整理してから話したい。",
     ]);
   });
 
