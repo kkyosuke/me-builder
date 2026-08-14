@@ -24,12 +24,19 @@ describe("GET /api/admin/statistics", () => {
           requestCount: 1,
           inputTokens: 10,
           outputTokens: 20,
+          costEstimate: {
+            status: "available",
+            currency: "USD",
+            amount: 0.000053,
+            pricingAsOf: "2026-08-15",
+          },
           accounts: [
             {
               accountId: "account-1",
               requestCount: 1,
               inputTokens: 10,
               outputTokens: 20,
+              estimatedCostUsd: 0.000053,
             },
           ],
         },

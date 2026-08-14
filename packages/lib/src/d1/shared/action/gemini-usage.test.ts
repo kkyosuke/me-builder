@@ -18,7 +18,7 @@ const usage = {
   responseId: "response-1",
   accountId: "account-1",
   operation: "diary_chat" as const,
-  model: "gemini-test",
+  model: "gemini-3.5-flash-lite-001",
   promptTokenCount: 100,
   candidatesTokenCount: 20,
   thoughtsTokenCount: 5,
@@ -61,9 +61,72 @@ describe("Gemini usage actions", () => {
       cachedContentTokens: 20,
       toolUsePromptTokens: 4,
       totalTokens: 214,
+      costEstimate: {
+        status: "available",
+        currency: "USD",
+        amount: 0.0001908,
+        pricingAsOf: "2026-08-15",
+      },
       accounts: [
-        { accountId: "account-1", requestCount: 1, inputTokens: 100, outputTokens: 20 },
-        { accountId: "account-2", requestCount: 1, inputTokens: 50, outputTokens: 30 },
+        {
+          accountId: "account-1",
+          requestCount: 1,
+          inputTokens: 100,
+          outputTokens: 20,
+          estimatedCostUsd: 0.0000904,
+        },
+        {
+          accountId: "account-2",
+          requestCount: 1,
+          inputTokens: 50,
+          outputTokens: 30,
+          estimatedCostUsd: 0.0001004,
+        },
+      ],
+    });
+  });
+
+  it("単価未対応モデルを含む場合は料金を算出しない", async () => {
+    const db = createTestDb();
+    await storeGeminiUsage(db, { ...usage, model: "gemini-future" });
+
+    const summary = await summarizeGeminiUsage(
+      db,
+      new Date("2026-08-01T00:00:00.000Z"),
+      new Date("2026-09-01T00:00:00.000Z"),
+    );
+
+    expect(summary.costEstimate).toEqual({
+      status: "unavailable",
+      issues: [{ reason: "unsupported-model", models: ["gemini-future"] }],
+    });
+    expect(summary.accounts[0]?.estimatedCostUsd).toBeNull();
+  });
+
+  it("単価未対応と不正なtoken利用量を区別する", async () => {
+    const db = createTestDb();
+    await storeGeminiUsage(db, {
+      ...usage,
+      responseId: "unsupported",
+      model: "gemini-future",
+    });
+    await storeGeminiUsage(db, {
+      ...usage,
+      responseId: "invalid",
+      cachedContentTokenCount: usage.promptTokenCount + 1,
+    });
+
+    const summary = await summarizeGeminiUsage(
+      db,
+      new Date("2026-08-01T00:00:00.000Z"),
+      new Date("2026-09-01T00:00:00.000Z"),
+    );
+
+    expect(summary.costEstimate).toEqual({
+      status: "unavailable",
+      issues: [
+        { reason: "unsupported-model", models: ["gemini-future"] },
+        { reason: "invalid-usage", models: ["gemini-3.5-flash-lite-001"] },
       ],
     });
   });

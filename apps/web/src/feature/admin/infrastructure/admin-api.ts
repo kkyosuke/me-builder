@@ -22,12 +22,30 @@ const ResponseSchema = v.object({
       requestCount: v.number(),
       inputTokens: v.number(),
       outputTokens: v.number(),
+      costEstimate: v.union([
+        v.object({
+          status: v.literal("available"),
+          currency: v.literal("USD"),
+          amount: v.number(),
+          pricingAsOf: v.string(),
+        }),
+        v.object({
+          status: v.literal("unavailable"),
+          issues: v.array(
+            v.object({
+              reason: v.picklist(["unsupported-model", "invalid-usage", "overflow"]),
+              models: v.array(v.string()),
+            }),
+          ),
+        }),
+      ]),
       accounts: v.array(
         v.object({
           accountId: v.string(),
           requestCount: v.number(),
           inputTokens: v.number(),
           outputTokens: v.number(),
+          estimatedCostUsd: v.nullable(v.number()),
         }),
       ),
     }),

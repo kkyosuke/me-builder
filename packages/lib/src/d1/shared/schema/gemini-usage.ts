@@ -6,7 +6,9 @@ export const geminiUsageRecords = sqliteTable(
   {
     responseId: text("response_id").primaryKey(),
     accountId: text("account_id").notNull(),
-    operation: text("operation", { enum: ["diary_chat", "diary_brain"] }).notNull(),
+    operation: text("operation", {
+      enum: ["diary_chat", "diary_brain", "profile_summary"],
+    }).notNull(),
     model: text("model").notNull(),
     promptTokenCount: integer("prompt_token_count").notNull().default(0),
     candidatesTokenCount: integer("candidates_token_count").notNull().default(0),

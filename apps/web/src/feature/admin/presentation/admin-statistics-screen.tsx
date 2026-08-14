@@ -4,6 +4,17 @@ import type { AsyncState } from "../../../model/async-state";
 import type { AdminStatistics } from "../model/statistics";
 
 const number = new Intl.NumberFormat("ja-JP");
+const usd = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  minimumFractionDigits: 4,
+  maximumFractionDigits: 6,
+});
+const costIssueLabel = {
+  "unsupported-model": "単価未対応モデル",
+  "invalid-usage": "不正なtoken利用量",
+  overflow: "料金計算の桁あふれ",
+} as const;
 
 function Unavailable({ reason }: { reason: "not-configured" | "upstream-error" }) {
   return (
@@ -48,10 +59,18 @@ function Gemini({ value }: { value: AdminStatistics["gemini"] }) {
         <Unavailable reason={value.reason} />
       ) : (
         <>
-          <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Metric label="成功レスポンス" value={number.format(value.requestCount)} />
             <Metric label="入力token" value={number.format(value.inputTokens)} />
             <Metric label="出力token" value={number.format(value.outputTokens)} />
+            <Metric
+              label="生成概算料金（USD）"
+              value={
+                value.costEstimate.status === "available"
+                  ? usd.format(value.costEstimate.amount)
+                  : "算出不可"
+              }
+            />
           </dl>
           <h3 className="mt-5 text-sm font-semibold">Account別利用量</h3>
           {value.accounts.length === 0 ? (
@@ -63,7 +82,7 @@ function Gemini({ value }: { value: AdminStatistics["gemini"] }) {
               aria-label="Account別利用量。横にスクロールできます"
               className="mt-2 max-w-full overflow-x-auto overscroll-x-contain rounded-2xl border border-slate-200 dark:border-slate-700"
             >
-              <table className="w-full min-w-xl text-left text-sm">
+              <table className="w-full min-w-2xl text-left text-sm">
                 <thead className="bg-slate-50 text-xs text-slate-500 dark:bg-slate-900 dark:text-slate-400">
                   <tr>
                     <th scope="col" className="px-4 py-3 font-medium">
@@ -77,6 +96,9 @@ function Gemini({ value }: { value: AdminStatistics["gemini"] }) {
                     </th>
                     <th scope="col" className="px-4 py-3 text-right font-medium">
                       出力token
+                    </th>
+                    <th scope="col" className="px-4 py-3 text-right font-medium">
+                      生成概算料金（USD）
                     </th>
                   </tr>
                 </thead>
@@ -98,6 +120,11 @@ function Gemini({ value }: { value: AdminStatistics["gemini"] }) {
                       <td className="px-4 py-3 text-right tabular-nums">
                         {number.format(account.outputTokens)}
                       </td>
+                      <td className="px-4 py-3 text-right tabular-nums">
+                        {account.estimatedCostUsd === null
+                          ? "算出不可"
+                          : usd.format(account.estimatedCostUsd)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -108,7 +135,30 @@ function Gemini({ value }: { value: AdminStatistics["gemini"] }) {
       )}
       <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
         Google Vertex AIレスポンスのusageMetadataを集計しています。
+        {value.status === "available" && value.costEstimate.status === "available"
+          ? ` 料金は${value.costEstimate.pricingAsOf}時点のStandard・Global公開単価による概算です。`
+          : ""}
+        Embedding、無料枠、クレジット、税、為替は含まないため、実請求額とは異なります。単価は
+        <a
+          href="https://cloud.google.com/vertex-ai/generative-ai/pricing"
+          target="_blank"
+          rel="noreferrer"
+          className="underline underline-offset-2"
+        >
+          Google公式料金表
+        </a>
+        を参照しています。
       </p>
+      {value.status === "available" && value.costEstimate.status === "unavailable" ? (
+        <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+          概算料金を算出できません。
+          {value.costEstimate.issues.map((issue) => (
+            <span key={issue.reason} className="ml-1">
+              {costIssueLabel[issue.reason]}: {issue.models.join("、")}
+            </span>
+          ))}
+        </p>
+      ) : null}
     </Card>
   );
 }

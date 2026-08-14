@@ -4,7 +4,7 @@ import type { GeminiUsageRecorder } from "./gemini-client";
 
 export function createGeminiUsageRecorder(
   db: D1.shared.Client,
-  operation: "diary_chat" | "diary_brain",
+  operation: "diary_chat" | "diary_brain" | "profile_summary",
   accountId: string,
 ): GeminiUsageRecorder {
   return async (usage) => {

@@ -9,11 +9,21 @@ export type AdminStatistics = {
     requestCount: number;
     inputTokens: number;
     outputTokens: number;
+    costEstimate:
+      | { status: "available"; currency: "USD"; amount: number; pricingAsOf: string }
+      | {
+          status: "unavailable";
+          issues: Array<{
+            reason: "unsupported-model" | "invalid-usage" | "overflow";
+            models: string[];
+          }>;
+        };
     accounts: Array<{
       accountId: string;
       requestCount: number;
       inputTokens: number;
       outputTokens: number;
+      estimatedCostUsd: number | null;
     }>;
   }>;
   line: StatisticsSection<{
