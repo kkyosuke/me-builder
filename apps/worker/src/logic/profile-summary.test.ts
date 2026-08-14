@@ -516,6 +516,18 @@ describe("generateProfileSummary", () => {
     expect(generateStructuredResponse).toHaveBeenCalledTimes(2);
   });
 
+  it("各生成レスポンスの利用量を記録するcallbackを渡す", async () => {
+    const onUsage = vi.fn();
+    generateStructuredResponse.mockResolvedValue({ text: validResponse, finishReason: "STOP" });
+
+    await generateProfileSummary(context, workerConfig, onUsage);
+
+    expect(generateStructuredResponse).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ onUsage }),
+    );
+  });
+
   it("最後の試行の理由を失敗結果へ残す", async () => {
     generateStructuredResponse
       .mockResolvedValueOnce({ text: "{}", finishReason: "STOP" })

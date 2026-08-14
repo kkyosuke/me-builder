@@ -15,7 +15,21 @@ const statistics = {
     requestCount: 12,
     inputTokens: 0,
     outputTokens: 0,
-    accounts: [{ accountId: "account-1", requestCount: 12, inputTokens: 0, outputTokens: 0 }],
+    costEstimate: {
+      status: "available" as const,
+      currency: "USD" as const,
+      amount: 0,
+      pricingAsOf: "2026-08-15",
+    },
+    accounts: [
+      {
+        accountId: "account-1",
+        requestCount: 12,
+        inputTokens: 0,
+        outputTokens: 0,
+        estimatedCostUsd: 0,
+      },
+    ],
   },
   line: {
     status: "available" as const,

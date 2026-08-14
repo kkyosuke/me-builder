@@ -13,6 +13,7 @@ import {
   toSafeOperationalErrorFields,
 } from "@me-builder/shared";
 import type { CloudflareBindings, WorkerConfig } from "../config";
+import { createGeminiUsageRecorder } from "../infrastructure/gemini-usage";
 import type {
   CompatibilityShareRejectionRule,
   ProfileSummaryGenerationFailureReason,
@@ -127,7 +128,11 @@ export async function processProfileSummaryGenerationMessage(
       });
       return;
     }
-    const generated = await generateProfileSummary(context, workerConfig);
+    const generated = await generateProfileSummary(
+      context,
+      workerConfig,
+      createGeminiUsageRecorder(cf.d1, "profile_summary", message.body.accountId),
+    );
     if (generated.type === "failed") {
       throw new OperationalError({
         ...GENERATION_FAILURES[generated.reason],

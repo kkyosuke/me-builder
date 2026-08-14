@@ -68,6 +68,60 @@
                             "outputTokens": {
                               "type": "number"
                             },
+                            "costEstimate": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "status": {
+                                      "const": "available"
+                                    },
+                                    "currency": {
+                                      "const": "USD"
+                                    },
+                                    "amount": {
+                                      "type": "number"
+                                    },
+                                    "pricingAsOf": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": ["status", "currency", "amount", "pricingAsOf"]
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "status": {
+                                      "const": "unavailable"
+                                    },
+                                    "issues": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "reason": {
+                                            "enum": [
+                                              "unsupported-model",
+                                              "invalid-usage",
+                                              "overflow"
+                                            ],
+                                            "type": "string"
+                                          },
+                                          "models": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string"
+                                            }
+                                          }
+                                        },
+                                        "required": ["reason", "models"]
+                                      }
+                                    }
+                                  },
+                                  "required": ["status", "issues"]
+                                }
+                              ]
+                            },
                             "accounts": {
                               "type": "array",
                               "items": {
@@ -84,13 +138,24 @@
                                   },
                                   "outputTokens": {
                                     "type": "number"
+                                  },
+                                  "estimatedCostUsd": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
                                   }
                                 },
                                 "required": [
                                   "accountId",
                                   "requestCount",
                                   "inputTokens",
-                                  "outputTokens"
+                                  "outputTokens",
+                                  "estimatedCostUsd"
                                 ]
                               }
                             }
@@ -100,6 +165,7 @@
                             "requestCount",
                             "inputTokens",
                             "outputTokens",
+                            "costEstimate",
                             "accounts"
                           ]
                         },

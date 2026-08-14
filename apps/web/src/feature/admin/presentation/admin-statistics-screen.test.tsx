@@ -29,6 +29,12 @@ describe("AdminStatisticsScreen", () => {
               requestCount: 0,
               inputTokens: 0,
               outputTokens: 0,
+              costEstimate: {
+                status: "available",
+                currency: "USD",
+                amount: 0,
+                pricingAsOf: "2026-08-15",
+              },
               accounts: [],
             },
             line: {
@@ -62,8 +68,20 @@ describe("AdminStatisticsScreen", () => {
               requestCount: 12,
               inputTokens: 0,
               outputTokens: 0,
+              costEstimate: {
+                status: "available",
+                currency: "USD",
+                amount: 0,
+                pricingAsOf: "2026-08-15",
+              },
               accounts: [
-                { accountId: "account-1", requestCount: 12, inputTokens: 0, outputTokens: 0 },
+                {
+                  accountId: "account-1",
+                  requestCount: 12,
+                  inputTokens: 0,
+                  outputTokens: 0,
+                  estimatedCostUsd: 0,
+                },
               ],
             },
             line: {
@@ -103,12 +121,19 @@ describe("AdminStatisticsScreen", () => {
               requestCount: 1,
               inputTokens: 2,
               outputTokens: 3,
+              costEstimate: {
+                status: "available",
+                currency: "USD",
+                amount: 0.0000081,
+                pricingAsOf: "2026-08-15",
+              },
               accounts: [
                 {
                   accountId: "very-long-account-id-that-must-not-expand-the-dashboard",
                   requestCount: 1,
                   inputTokens: 2,
                   outputTokens: 3,
+                  estimatedCostUsd: 0.0000081,
                 },
               ],
             },
@@ -132,5 +157,95 @@ describe("AdminStatisticsScreen", () => {
     expect(scrollRegion.parentElement?.closest("section")?.classList.contains("min-w-0")).toBe(
       true,
     );
+  });
+
+  it("Geminiの概算料金と実請求額ではない旨を表示する", () => {
+    render(
+      <AdminStatisticsScreen
+        state={{
+          status: "success",
+          data: {
+            period: {
+              start: "2026-08-01T00:00:00.000Z",
+              end: "2026-08-08T00:00:00.000Z",
+            },
+            fetchedAt: "2026-08-08T00:00:00.000Z",
+            gemini: {
+              status: "available",
+              requestCount: 1,
+              inputTokens: 100,
+              outputTokens: 20,
+              costEstimate: {
+                status: "available",
+                currency: "USD",
+                amount: 0.00008,
+                pricingAsOf: "2026-08-15",
+              },
+              accounts: [
+                {
+                  accountId: "account-1",
+                  requestCount: 1,
+                  inputTokens: 100,
+                  outputTokens: 20,
+                  estimatedCostUsd: 0.00008,
+                },
+              ],
+            },
+            line: {
+              status: "available",
+              billableMessages: 0,
+              monthlyLimit: 5000,
+              replyMessages: 0,
+            },
+          },
+        }}
+        onReload={vi.fn()}
+      />,
+    );
+
+    expect(screen.getAllByText("$0.00008")).toHaveLength(2);
+    expect(screen.getByText(/実請求額とは異なります/)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Google公式料金表" })).toBeTruthy();
+  });
+
+  it("概算料金を算出できない理由を区別して表示する", () => {
+    render(
+      <AdminStatisticsScreen
+        state={{
+          status: "success",
+          data: {
+            period: {
+              start: "2026-08-01T00:00:00.000Z",
+              end: "2026-08-08T00:00:00.000Z",
+            },
+            fetchedAt: "2026-08-08T00:00:00.000Z",
+            gemini: {
+              status: "available",
+              requestCount: 2,
+              inputTokens: 100,
+              outputTokens: 20,
+              costEstimate: {
+                status: "unavailable",
+                issues: [
+                  { reason: "unsupported-model", models: ["gemini-future"] },
+                  { reason: "invalid-usage", models: ["gemini-3.5-flash-lite-001"] },
+                ],
+              },
+              accounts: [],
+            },
+            line: {
+              status: "available",
+              billableMessages: 0,
+              monthlyLimit: 5000,
+              replyMessages: 0,
+            },
+          },
+        }}
+        onReload={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(/単価未対応モデル: gemini-future/)).toBeTruthy();
+    expect(screen.getByText(/不正なtoken利用量: gemini-3.5-flash-lite-001/)).toBeTruthy();
   });
 });

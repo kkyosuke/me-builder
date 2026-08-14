@@ -22,11 +22,26 @@ export type AdminStatisticsOutcome =
               requestCount: number;
               inputTokens: number;
               outputTokens: number;
+              costEstimate:
+                | {
+                    status: "available";
+                    currency: "USD";
+                    amount: number;
+                    pricingAsOf: string;
+                  }
+                | {
+                    status: "unavailable";
+                    issues: Array<{
+                      reason: "unsupported-model" | "invalid-usage" | "overflow";
+                      models: string[];
+                    }>;
+                  };
               accounts: Array<{
                 accountId: string;
                 requestCount: number;
                 inputTokens: number;
                 outputTokens: number;
+                estimatedCostUsd: number | null;
               }>;
             }
           | UnavailableSection;
@@ -96,6 +111,7 @@ export async function getAdminStatistics(params: Params): Promise<AdminStatistic
               requestCount: geminiResult.value.requestCount,
               inputTokens: geminiResult.value.inputTokens,
               outputTokens: geminiResult.value.outputTokens,
+              costEstimate: geminiResult.value.costEstimate,
               accounts: geminiResult.value.accounts,
             }
           : { status: "unavailable", reason: "upstream-error" },

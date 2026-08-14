@@ -442,11 +442,30 @@ export interface operations {
                   requestCount: number;
                   inputTokens: number;
                   outputTokens: number;
+                  costEstimate:
+                    | {
+                        /** @constant */
+                        status: "available";
+                        /** @constant */
+                        currency: "USD";
+                        amount: number;
+                        pricingAsOf: string;
+                      }
+                    | {
+                        /** @constant */
+                        status: "unavailable";
+                        issues: {
+                          /** @enum {string} */
+                          reason: "unsupported-model" | "invalid-usage" | "overflow";
+                          models: string[];
+                        }[];
+                      };
                   accounts: {
                     accountId: string;
                     requestCount: number;
                     inputTokens: number;
                     outputTokens: number;
+                    estimatedCostUsd: number | null;
                   }[];
                 }
               | {

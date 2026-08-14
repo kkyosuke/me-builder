@@ -105,6 +105,12 @@ describe("processProfileSummaryGenerationMessage", () => {
 
     await processProfileSummaryGenerationMessage(message, cf, workerConfig);
 
+    expect(generateProfileSummary).toHaveBeenCalledWith(
+      expect.anything(),
+      workerConfig,
+      expect.any(Function),
+    );
+
     expect(execute).toHaveBeenCalledWith(
       "account-1",
       "profileSummary.completeGeneration",

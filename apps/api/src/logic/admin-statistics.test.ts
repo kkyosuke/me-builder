@@ -34,7 +34,21 @@ describe("getAdminStatistics", () => {
         requestCount: 2,
         inputTokens: 120,
         outputTokens: 40,
-        accounts: [{ accountId: "account-1", requestCount: 2, inputTokens: 120, outputTokens: 40 }],
+        costEstimate: {
+          status: "available",
+          currency: "USD",
+          amount: 0.000136,
+          pricingAsOf: "2026-08-15",
+        },
+        accounts: [
+          {
+            accountId: "account-1",
+            requestCount: 2,
+            inputTokens: 120,
+            outputTokens: 40,
+            estimatedCostUsd: 0.000136,
+          },
+        ],
       }),
       getLineUsage: vi.fn().mockResolvedValue({
         billableMessages: 3,
@@ -50,6 +64,7 @@ describe("getAdminStatistics", () => {
           requestCount: 2,
           inputTokens: 120,
           outputTokens: 40,
+          costEstimate: { status: "available", amount: 0.000136 },
           accounts: [{ accountId: "account-1" }],
         },
         line: { status: "available", billableMessages: 3, replyMessages: 8 },
@@ -65,7 +80,21 @@ describe("getAdminStatistics", () => {
         requestCount: 2,
         inputTokens: 120,
         outputTokens: 40,
-        accounts: [{ accountId: "account-1", requestCount: 2, inputTokens: 120, outputTokens: 40 }],
+        costEstimate: {
+          status: "available",
+          currency: "USD",
+          amount: 0.000136,
+          pricingAsOf: "2026-08-15",
+        },
+        accounts: [
+          {
+            accountId: "account-1",
+            requestCount: 2,
+            inputTokens: 120,
+            outputTokens: 40,
+            estimatedCostUsd: 0.000136,
+          },
+        ],
       }),
       getLineUsage: vi.fn().mockRejectedValue(new Error("LINE unavailable")),
     });

@@ -7,7 +7,11 @@ import type {
 import { toJsonSchema } from "@valibot/to-json-schema";
 import * as v from "valibot";
 import type { WorkerConfig } from "../config";
-import { createGeminiClient, generateStructuredResponse } from "../infrastructure/gemini-client";
+import {
+  type GeminiUsageRecorder,
+  createGeminiClient,
+  generateStructuredResponse,
+} from "../infrastructure/gemini-client";
 import { PROFILE_SUMMARY_SYSTEM_PROMPT } from "../prompt/profile-summary";
 
 const InsightSchema = v.strictObject({
@@ -260,6 +264,7 @@ const GENERATION_MAX_OUTPUT_TOKENS = 8_000;
 export async function generateProfileSummary(
   context: ProfileSummaryGenerationContext,
   workerConfig: WorkerConfig,
+  onUsage?: GeminiUsageRecorder,
 ): Promise<ProfileSummaryGenerationOutcome> {
   if (!workerConfig.googleVertexAiApiKey) {
     return { type: "failed", reason: "ai_credentials_missing" };
@@ -287,6 +292,7 @@ export async function generateProfileSummary(
       systemInstruction: PROFILE_SUMMARY_SYSTEM_PROMPT,
       responseJsonSchema,
       maxOutputTokens: GENERATION_MAX_OUTPUT_TOKENS,
+      ...(onUsage ? { onUsage } : {}),
     });
     const truncated = response.finishReason === "MAX_TOKENS";
     if (!response.text) {
