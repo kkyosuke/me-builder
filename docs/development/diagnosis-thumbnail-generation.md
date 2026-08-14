@@ -20,7 +20,7 @@ apps/web/public/images/diagnoses/
 ├── conversation-emotion.jpg
 ├── life-priorities.jpg
 ├── work-values.jpg
-└── work-supervisor-style.jpg
+└── work-relationship-style.jpg
 ```
 
 ## 3. 共通スタイル
@@ -98,14 +98,14 @@ Materials/textures: Matte paper and soft clay, subtle depth and shadows.
 Constraints: No text, no letters, no numbers, no logos, no watermark, no brand marks, no currency symbols. Do not make autonomy, growth, compensation, stability, or personal-life boundaries look superior to another. Avoid corporate logos, rankings, trophies, realistic money, religious imagery, or political symbols.
 ```
 
-## 8. 「仕事の変化・上司との関わり方」生成プロンプト
+## 8. 「仕事の変化・周囲との関わり方」生成プロンプト
 
 ```text
 Use case: stylized-concept
 Asset type: 16:9 diagnosis card thumbnail for a web application
-Primary request: Create a polished 3D paper-cut/clay-style illustration representing desire for change in work and different ways of relating to a supervisor: everyday distance, autonomy, feedback, and expressing a different opinion.
-Scene/backdrop: A calm abstract workplace with two equal abstract figures facing each other across a simple desk. Around them, balanced branching task cards suggest staying with a familiar task or trying a new one, while speech bubbles and gentle connection lines suggest different communication distances.
-Subject: Two equal abstract workplace figures, neither dominant, with modular task shapes, one close and one wider communication arc, a small feedback loop, and two diverging speech forms that remain connected. Keep every symbol equal in visual weight.
+Primary request: Create a polished 3D paper-cut/clay-style illustration representing desire for change in work and different ways of relating to people at work: everyday distance, autonomy, feedback, and expressing a different opinion.
+Scene/backdrop: A calm abstract workplace with two equal abstract coworkers facing each other across a simple desk. Around them, balanced branching task cards suggest staying with a familiar task or trying a new one, while speech bubbles and gentle connection lines suggest different communication distances.
+Subject: Two equal abstract workplace figures, neither dominant and with no hierarchy, with modular task shapes, one close and one wider communication arc, a small feedback loop, and two diverging speech forms that remain connected. Keep every symbol equal in visual weight.
 Style/medium: Soft layered 3D paper-cut / clay render matching a premium editorial app illustration.
 Composition/framing: Wide 16:9, centered, clear silhouettes, important objects away from edges, suitable for a small card crop.
 Lighting/mood: Warm soft studio lighting, calm, respectful, thoughtful, welcoming.

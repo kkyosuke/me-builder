@@ -43,7 +43,7 @@ describe("diagnosis seed catalog version", () => {
       contentHash: createHash("sha256").update(content).digest("hex").slice(0, 16),
     }).toEqual({
       version: "6",
-      contentHash: "d203e0b8cd3363c5",
+      contentHash: "cc6677c9b0241ec6",
     });
   });
 });

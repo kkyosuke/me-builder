@@ -216,8 +216,8 @@ describe("DiagnosisHome", () => {
               displayOrder: 4,
             }),
             diagnosis({
-              id: "work-supervisor-style",
-              title: "仕事の変化・上司との関わり方",
+              id: "work-relationship-style",
+              title: "仕事の変化・周囲との関わり方",
               displayOrder: 5,
             }),
             diagnosis({ id: "new-diagnosis", title: "新しい診断", displayOrder: 6 }),
@@ -233,7 +233,7 @@ describe("DiagnosisHome", () => {
     const lifePrioritiesCard = screen.getByRole("button", { name: /優先順位と人生の方向性/ });
     const workValuesCard = screen.getByRole("button", { name: /仕事の価値観・働き方/ });
     const workSupervisorStyleCard = screen.getByRole("button", {
-      name: /仕事の変化・上司との関わり方/,
+      name: /仕事の変化・周囲との関わり方/,
     });
     const fallbackCard = screen.getByRole("button", { name: /新しい診断/ });
 
@@ -250,7 +250,7 @@ describe("DiagnosisHome", () => {
       "/images/diagnoses/work-values.jpg",
     );
     expect(workSupervisorStyleCard.querySelector("img")?.getAttribute("src")).toBe(
-      "/images/diagnoses/work-supervisor-style.jpg",
+      "/images/diagnoses/work-relationship-style.jpg",
     );
     expect(fallbackCard.querySelector("img")?.getAttribute("src")).toBe(
       "/images/diagnoses/default.jpg",

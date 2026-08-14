@@ -709,34 +709,34 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
   );
 
   it(
-    "仕事の変化・上司との関わり方の回答を5つのパラメータへ採点する",
+    "仕事の変化・周囲との関わり方の回答を5つのパラメータへ採点する",
     async () => {
       for (let index = 1; index <= 10; index += 1) {
         const suffix = String(index).padStart(2, "0");
         const choiceId = index % 2 === 1 ? "yes" : "no";
         const response = await putAnswer(
-          `dq-work-supervisor-style-${suffix}`,
+          `dq-work-relationship-style-${suffix}`,
           choiceId,
-          "work-supervisor-style",
+          "work-relationship-style",
         );
         expect(response.status).toBe(200);
       }
 
-      const response = await getAnswers("work-supervisor-style");
+      const response = await getAnswers("work-relationship-style");
 
       expect(response.status).toBe(200);
       expect(await response.json()).toMatchObject({
-        id: "work-supervisor-style",
+        id: "work-relationship-style",
         relationshipCategory: "work",
         scoring: {
           scoringVersion: 1,
-          balancedLabel: "状況に応じて上司との関わり方を選ぶ",
+          balancedLabel: "状況に応じて仕事での関わり方を選ぶ",
           parameters: [
             expect.objectContaining({ id: "work-novelty", score: 100, coverage: 100 }),
-            expect.objectContaining({ id: "supervisor-closeness", score: 100, coverage: 100 }),
-            expect.objectContaining({ id: "supervisor-autonomy", score: 100, coverage: 100 }),
-            expect.objectContaining({ id: "supervisor-feedback", score: 100, coverage: 100 }),
-            expect.objectContaining({ id: "supervisor-openness", score: 100, coverage: 100 }),
+            expect.objectContaining({ id: "workplace-closeness", score: 100, coverage: 100 }),
+            expect.objectContaining({ id: "workplace-autonomy", score: 100, coverage: 100 }),
+            expect.objectContaining({ id: "workplace-feedback", score: 100, coverage: 100 }),
+            expect.objectContaining({ id: "workplace-openness", score: 100, coverage: 100 }),
           ],
         },
       });

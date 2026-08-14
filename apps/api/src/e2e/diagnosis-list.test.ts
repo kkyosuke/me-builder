@@ -229,7 +229,7 @@ describe("GET /api/diagnoses local D1 E2E", () => {
       responseStatus: "unanswered",
       questionCount: 10,
     });
-    expect(initialBody.diagnoses.find(({ id }) => id === "work-supervisor-style")).toMatchObject({
+    expect(initialBody.diagnoses.find(({ id }) => id === "work-relationship-style")).toMatchObject({
       relationshipCategory: "work",
       responseStatus: "unanswered",
       questionCount: 10,
@@ -377,6 +377,36 @@ describe("GET /api/diagnoses/:diagnosisId local D1 E2E", () => {
       diagnosisQuestionId: "dq-time-planning-01",
       text: "休日の予定は、前日までに決めておきたい。",
     });
+  });
+
+  it("仕事の変化・周囲との関わり方の状況ベース10問をseedから返すこと", async () => {
+    const response = await request("known-token", "/api/diagnoses/work-relationship-style");
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      id: string;
+      title: string;
+      relationshipCategory: string;
+      questions: Array<{ diagnosisQuestionId: string; text: string }>;
+    };
+
+    expect(body).toMatchObject({
+      id: "work-relationship-style",
+      title: "仕事の変化・周囲との関わり方",
+      relationshipCategory: "work",
+    });
+    expect(body.questions.map(({ text }) => text)).toEqual([
+      "慣れた仕事と新しい仕事を選べる場面では、新しい役割や課題に取り組みたい。",
+      "慣れた仕事と新しい仕事を選べる場面では、慣れた仕事をさらに深めたい。",
+      "日々一緒に働く相手とは、用件がないときも普段から会話しておきたい。",
+      "日々一緒に働く相手との会話は、必要な報告や相談に絞りたい。",
+      "進め方を選べる仕事では、相手に細かく確認するより自分の判断で進めたい。",
+      "進め方を選べる仕事では、自分だけで決めるより相手と方針を確認しながら取り組みたい。",
+      "長く続く仕事では、一区切りを待たず相手からこまめに意見をもらいたい。",
+      "長く続く仕事では、途中より一区切りついた時に相手から意見をもらいたい。",
+      "会議で相手と意見が違うときも、自分の考えを率直に伝えたい。",
+      "会議で相手と意見が違うときは、自分の考えを伝えるより相手の判断に合わせたい。",
+    ]);
+    expect(body.questions.every(({ text }) => !text.includes("上司"))).toBe(true);
   });
 
   it(`${diagnosisDetailCases.notFound.id}: ${diagnosisDetailCases.notFound.name}`, async () => {
