@@ -158,7 +158,7 @@ describe("DiagnosisHome", () => {
       <DiagnosisHome
         diagnoses={{
           status: "success",
-          data: [diagnosis({ id: "general", title: "人間関係全般の診断" })],
+          data: [diagnosis({ id: "general", title: "自分自身の診断" })],
         }}
         onOpenDiagnosis={vi.fn()}
         onRetry={vi.fn()}
@@ -167,9 +167,9 @@ describe("DiagnosisHome", () => {
 
     const filters = within(screen.getByRole("group", { name: "関係カテゴリで絞り込む" }));
     expect(filters.getByRole("button", { name: "パートナー" })).toBeTruthy();
-    expect(filters.queryByRole("button", { name: "人間関係全般" })).toBeNull();
+    expect(filters.queryByRole("button", { name: "自分自身" })).toBeNull();
     expect(
-      within(screen.getByRole("button", { name: /人間関係全般の診断/ })).getByText("人間関係全般"),
+      within(screen.getByRole("button", { name: /自分自身の診断/ })).getByText("自分自身"),
     ).toBeTruthy();
 
     fireEvent.click(filters.getByRole("button", { name: "パートナー" }));
