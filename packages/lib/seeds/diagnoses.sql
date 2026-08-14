@@ -612,7 +612,7 @@ INSERT OR IGNORE INTO diagnosis_scoring_configs (
     1,
     '{
       "parameters": [
-        {"id":"family-contact","label":"連絡の頻度","lowLabel":"必要なときに連絡したい","highLabel":"普段から連絡したい"},
+        {"id":"family-contact","label":"会えない時期の連絡","lowLabel":"用事があるときに連絡したい","highLabel":"会えない時期も定期的に連絡したい"},
         {"id":"family-disclosure","label":"悩みの共有","lowLabel":"必要になるまで自分で整理したい","highLabel":"早めに家族へ話したい"},
         {"id":"family-support-approach","label":"悩みへの支え方","lowLabel":"具体策を先に考えたい","highLabel":"気持ちを先に聞きたい"},
         {"id":"family-conflict-timing","label":"意見を話す時期","lowLabel":"時間を置いて話したい","highLabel":"その場で話したい"},

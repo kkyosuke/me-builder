@@ -768,7 +768,14 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
           scoringVersion: 1,
           balancedLabel: "状況に応じて家族との関わり方を選ぶ",
           parameters: [
-            expect.objectContaining({ id: "family-contact", score: 100, coverage: 100 }),
+            expect.objectContaining({
+              id: "family-contact",
+              label: "会えない時期の連絡",
+              lowLabel: "用事があるときに連絡したい",
+              highLabel: "会えない時期も定期的に連絡したい",
+              score: 100,
+              coverage: 100,
+            }),
             expect.objectContaining({ id: "family-disclosure", score: 100, coverage: 100 }),
             expect.objectContaining({
               id: "family-support-approach",
