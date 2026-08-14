@@ -10,6 +10,8 @@ export const PROMPT_CONTEXT_WEEKDAYS = [
   "sunday",
 ] as const;
 
+export type PromptContextWeekday = (typeof PROMPT_CONTEXT_WEEKDAYS)[number];
+
 const WeekdaySchema = v.picklist(PROMPT_CONTEXT_WEEKDAYS);
 
 const OccupationPromptContextSchema = v.strictObject({

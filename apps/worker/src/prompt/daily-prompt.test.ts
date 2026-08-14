@@ -3,6 +3,7 @@ import {
   LEGACY_DAILY_PROMPT_VERSION,
   getDailyPromptText,
   getDailyPromptVersion,
+  getDailyPromptWeekday,
 } from "./daily-prompt";
 
 describe("daily prompt", () => {
@@ -37,6 +38,32 @@ describe("daily prompt", () => {
 
   it.each(["", "2026-8-10", "2026-02-30", "invalid"])("不正な配送日を拒否する: %s", (localDate) => {
     expect(() => getDailyPromptVersion(localDate)).toThrow("Daily prompt date is invalid");
+  });
+
+  it("配送日を声かけ属性と共通の曜日へ変換する", () => {
+    expect(getDailyPromptWeekday("2026-08-10")).toBe("monday");
+    expect(getDailyPromptWeekday("2026-08-16")).toBe("sunday");
+  });
+
+  it.each([
+    [
+      "recurring_schedule",
+      "daily-check-in-recurring-schedule-v1",
+      "今日は、いつもの予定がある日だったかな。\n落ち着いたら、今日のことを話したいところから聞かせて。",
+    ],
+    [
+      "day_off",
+      "daily-check-in-day-off-v1",
+      "今日は、普段だとお休みの日だったかな。\n違っていたら気にせず、今日のことを話したいところから聞かせて。",
+    ],
+    [
+      "active_day",
+      "daily-check-in-active-day-v1",
+      "今日は、普段だと予定のある日だったかな。\n落ち着いたら、今日のことをひとことだけでも聞かせて。",
+    ],
+  ] as const)("%sでは予定名を含まない版付き定型文を選ぶ", (context, version, text) => {
+    expect(getDailyPromptVersion("2026-08-10", context)).toBe(version);
+    expect(getDailyPromptText(version)).toBe(text);
   });
 
   it("段階1の固定文面versionを既存配送向けに保持する", () => {

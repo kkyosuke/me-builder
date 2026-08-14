@@ -14,7 +14,11 @@ import {
   getLineDeliveryFailureKind,
   pushLineTextWithRetryKey,
 } from "../infrastructure/line-delivery";
-import { getDailyPromptText, getDailyPromptVersion } from "../prompt/daily-prompt";
+import {
+  getDailyPromptText,
+  getDailyPromptVersion,
+  getDailyPromptWeekday,
+} from "../prompt/daily-prompt";
 
 /** wrangler.tomlのmax_retries=5に初回配送を加えた最大試行回数。 */
 export const DAILY_PROMPT_MAX_ATTEMPTS = 6;
@@ -33,7 +37,36 @@ export async function processDailyPromptMessage(
   let deliveryId: string | undefined;
 
   try {
-    const promptVersion = getDailyPromptVersion(message.body.localDate);
+    const weekdayContext = await accountData
+      .execute(
+        "brain.selectDailyPromptWeekdayContext",
+        getDailyPromptWeekday(message.body.localDate),
+      )
+      .catch((error: unknown) => {
+        logger.warn(
+          {
+            event: "daily-prompt.weekday-context.failed",
+            service: "worker",
+            environment: workerConfig.environment,
+            component: "daily-prompt",
+            queueMessageId: message.id,
+            localDate: message.body.localDate,
+            attempt: message.attempts,
+            outcome: "degraded",
+            disposition: "continue",
+            ...toSafeOperationalErrorFields(error, {
+              code: "DAILY_PROMPT_WEEKDAY_CONTEXT_LOAD_FAILED",
+              category: "dependency",
+              stage: "daily-prompt.context",
+              retryable: false,
+              dependency: "account-data",
+            }),
+          },
+          "[Daily prompt] failed at daily-prompt.context -> continue with generic weekday prompt",
+        );
+        return undefined;
+      });
+    const promptVersion = getDailyPromptVersion(message.body.localDate, weekdayContext);
     const preparation = await accountData.execute("conversation.prepareDailyPrompt", {
       localDate: message.body.localDate,
       promptVersion,
