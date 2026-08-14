@@ -9,6 +9,7 @@ import { DiagnosisGuidance } from "./components/diagnosis-guidance";
 import { DiagnosisHome } from "./components/diagnosis-home";
 import {
   DiagnosisAnswerSkeleton,
+  DiagnosisIntroductionSkeleton,
   DiagnosisResultSkeleton,
 } from "./components/diagnosis-loading-skeleton";
 import { DiagnosisResultView } from "./components/diagnosis-result";
@@ -74,6 +75,8 @@ export default function DiagnosisApplication() {
     content =
       detail.state.destination === "result" ? (
         <DiagnosisResultSkeleton />
+      ) : detail.state.showIntroduction ? (
+        <DiagnosisIntroductionSkeleton />
       ) : (
         <DiagnosisAnswerSkeleton />
       );

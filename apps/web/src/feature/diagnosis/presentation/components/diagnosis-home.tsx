@@ -12,20 +12,8 @@ import {
   getRelationshipCategoryFilterClassName,
   getRelationshipCategoryLabel,
 } from "../../model/relationship-category";
+import { getDiagnosisThumbnail } from "../diagnosis-thumbnail";
 import { DiagnosisListSkeleton } from "./diagnosis-loading-skeleton";
-
-const diagnosisThumbnails: Record<string, string> = {
-  "relationship-priority": "/images/diagnoses/relationship-priority.jpg",
-  "money-values": "/images/diagnoses/money-values.jpg",
-  "leisure-style": "/images/diagnoses/leisure-style.jpg",
-  "time-planning": "/images/diagnoses/time-planning.jpg",
-  "conversation-emotion": "/images/diagnoses/conversation-emotion.jpg",
-  "life-priorities": "/images/diagnoses/life-priorities.jpg",
-};
-
-function getDiagnosisThumbnail(diagnosisId: string) {
-  return diagnosisThumbnails[diagnosisId] ?? "/images/diagnoses/default.jpg";
-}
 
 function DiagnosisCard({
   diagnosis,

@@ -189,6 +189,7 @@ function ResultOpeningPending() {
  */
 export function SwipeDiagnosis({
   diagnosis,
+  headingRef,
   initialAnswers = [],
   onBack,
   onSaveAnswer,
@@ -196,6 +197,7 @@ export function SwipeDiagnosis({
   onComplete,
 }: {
   diagnosis: DiagnosisDefinition;
+  headingRef?: RefObject<HTMLHeadingElement>;
   initialAnswers?: DiagnosisAnswer[];
   onBack: () => void;
   onSaveAnswer: (answer: DiagnosisAnswer) => Promise<{ acceptedAt: string }>;
@@ -412,7 +414,9 @@ export function SwipeDiagnosis({
   return (
     <section className="flex flex-col gap-4">
       <header className="flex items-baseline justify-between">
-        <h2 className="text-lg font-bold">{diagnosis.title}</h2>
+        <h2 ref={headingRef} tabIndex={-1} className="text-lg font-bold outline-none">
+          {diagnosis.title}
+        </h2>
         <p className="text-sm text-slate-600 dark:text-slate-400" aria-live="polite">
           {`${finished ? total : Math.min(answeredCount + 1, total)} / ${total}`}
         </p>

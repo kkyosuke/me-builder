@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { DiagnosisListItem } from "./diagnosis-list-item";
 import {
   filterDiagnosesByRelationshipCategory,
+  getRelationshipCategoryAnswerContext,
   getRelationshipCategoryBadgeClassName,
   getRelationshipCategoryFilterClassName,
 } from "./relationship-category";
@@ -47,5 +48,15 @@ describe("relationship category filter", () => {
     expect(getRelationshipCategoryBadgeClassName("friend")).toContain("bg-emerald-100");
     expect(getRelationshipCategoryBadgeClassName("work")).toContain("bg-blue-100");
     expect(getRelationshipCategoryBadgeClassName("general")).toContain("bg-slate-100");
+  });
+
+  it.each([
+    ["partner", "パートナーとの関係"],
+    ["family", "家族との関係"],
+    ["friend", "友達との関係"],
+    ["work", "仕事で関わる人との関係"],
+    ["general", "普段の自分"],
+  ] as const)("%s の回答時に思い浮かべる対象を返す", (category, expected) => {
+    expect(getRelationshipCategoryAnswerContext(category)).toContain(expected);
   });
 });

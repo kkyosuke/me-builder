@@ -994,12 +994,16 @@ describe("App", () => {
     vi.restoreAllMocks();
   });
 
-  it("受付中かつ未回答なら回答画面へ進み、1問ずつ保存することを表示する", async () => {
+  it("受付中かつ未回答なら導入を経て回答画面へ進む", async () => {
     render(<App />);
 
     fireEvent.click(await screen.findByRole("button", { name: /テスト診断/ }));
 
-    expect(await screen.findByText("回答UI: テスト診断")).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "テスト診断" })).toBeTruthy();
+    expect(screen.getByText(/普段の自分を思い浮かべて/)).toBeTruthy();
+    expect(screen.queryByText("回答UI: テスト診断")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "診断をはじめる" }));
+    expect(screen.getByText("回答UI: テスト診断")).toBeTruthy();
     expect(screen.getByText(/回答は1問ずつ保存されます/)).toBeTruthy();
     expect(mocks.fetchDiagnosisProgress).toHaveBeenCalledWith(
       "https://api.example.com",
@@ -1026,7 +1030,8 @@ describe("App", () => {
     expect(screen.queryByText("回答UI: テスト診断")).toBeNull();
 
     await act(async () => vi.advanceTimersByTime(1));
-    expect(screen.getByText("回答UI: テスト診断")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "テスト診断" })).toBeTruthy();
+    expect(screen.queryByText("回答UI: テスト診断")).toBeNull();
   });
 
   it("dev環境ではプロフィール最下部から本人データを全削除する", async () => {
@@ -1080,6 +1085,7 @@ describe("App", () => {
   it("回答UIの選択を保存APIへ接続する", async () => {
     render(<App />);
     fireEvent.click(await screen.findByRole("button", { name: /テスト診断/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "診断をはじめる" }));
     fireEvent.click(await screen.findByRole("button", { name: "テスト回答" }));
     await waitFor(() =>
       expect(mocks.saveDiagnosisAnswer).toHaveBeenCalledWith(
@@ -1095,6 +1101,7 @@ describe("App", () => {
   it("全回答の保存完了後は保存済み回答を取得して結果画面へ進む", async () => {
     render(<App />);
     fireEvent.click(await screen.findByRole("button", { name: /テスト診断/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "診断をはじめる" }));
 
     fireEvent.click(await screen.findByRole("button", { name: "テスト完了" }));
 
@@ -1200,6 +1207,7 @@ describe("App", () => {
     render(<App />);
 
     fireEvent.click(await screen.findByRole("button", { name: /テスト診断/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "診断をはじめる" }));
     await screen.findByText("回答UI: テスト診断");
     expect(mocks.fetchDiagnosisProgress).toHaveBeenCalledTimes(1);
 
@@ -1267,7 +1275,9 @@ describe("App", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: /テスト診断/ }));
 
-    expect(await screen.findByText("回答UI: API追加診断")).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "API追加診断" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "診断をはじめる" }));
+    expect(screen.getByText("回答UI: API追加診断")).toBeTruthy();
     expect(mocks.fetchDiagnosisDefinition).toHaveBeenCalledWith(
       "https://api.example.com",
       "dummy.id.token",
