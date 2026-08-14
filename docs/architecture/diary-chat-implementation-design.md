@@ -386,7 +386,11 @@ Brain Itemを含むAccount所有データのquery境界は、[Accountデータ�
 | `life_schedule` | `occupation`、`weekly_rhythm`、`recurring_schedule` | 仕事・学校など今の立場から、週間リズムや曜日別予定へつなぐ |
 | `conversation_preference` | `rest_window`、`question_style` | 一息つきやすい時間から、返信しやすい聞かれ方へつなぐ |
 
-1セッションでシステムから確認するテーマは最大1件、そのテーマ内の確認質問は最大2件とします。この上限はシステム側からの質問にだけ適用し、本人が自然に複数テーマの属性を明言した場合の抽出・保存は制限しません。初期実装では高優先の5属性を対象とし、本人が明言した命題だけを既存の日記Brain Item抽出経路で保存します。既存Itemへ構造化属性を補う場合は、その属性を生成したprompt versionも別に記録します。未回答を再質問する制御と、保存した属性を声かけへ利用する処理は別の後続段階とします。
+1セッションでシステムから確認するテーマは最大1件、そのテーマ内の確認質問は最大2件とします。この上限はシステム側からの質問にだけ適用し、本人が自然に複数テーマの属性を明言した場合の抽出・保存は制限しません。初期実装では高優先の5属性を対象とし、本人が明言した命題だけを既存の日記Brain Item抽出経路で保存します。既存Itemへ構造化属性を補う場合は、その属性を生成したprompt versionも別に記録します。保存した属性を能動配信の文面へ利用する処理は別の後続段階とします。
+
+自然な確認質問では、activeかつValid Time内で、根拠とAccess Labelが有効な`promptContext.kind`をAccountDataから取得します。収集目標は保存済みkindと同じSessionで質問済みのテーマ・kindを除外し、質問可能な候補だけを日記チャットのsystem promptへ渡します。最初の質問前は複数テーマを候補にできますが、モデルが1件を選んで質問した時点で`chat_turns.collection_theme_id`と`collection_kind`へ記録し、以後は同じテーマだけを候補にします。質問済みkindは未回答でも再候補にせず、2問に達したSessionでは候補を渡しません。
+
+候補は質問命令ではありません。モデルは本人の最新発言に直接つながる手がかりがあり、日記への応答を邪魔しない場合だけ1属性を選べます。構造化出力のテーマとkindが許可候補に一致し、主質問が1件の場合だけ保存します。候補取得に失敗した場合、安全routeへ切り替えた場合、または自然につながらない場合は属性確認を行わず、通常の日記応答を続けます。
 
 取得時点を`attributes_json`へ重複保存しません。Brain Itemの`created_at`はItem作成時刻、`valid_from` / `valid_to`は命題の有効期間です。本人から最初と最後に得た時点は、activeな`supports` Evidenceが参照するSource Recordの記録時刻から`firstObservedAt` / `lastObservedAt`として導出します。この導出はAccountDataのBrain queryで実装済みです。同じ命題を再度得た場合はEvidenceを追加し、`created_at`を上書きせず`lastObservedAt`だけが新しくなります。
 
@@ -401,7 +405,7 @@ Brain Itemを含むAccount所有データのquery境界は、[Accountデータ�
 | Brain Item、Evidence、Valid Time | 実装済み | 既存構造を利用する |
 | `firstObservedAt` / `lastObservedAt` | Evidenceからの導出を実装済み | 声かけ候補取得でも返す |
 | 日記からの`identity`生成 | 実装済み | 本人が明言した現在の立場・職業だけを候補にする |
-| `attributes.promptContext` | 高優先5属性のschema、属性マスタ、収集目標、Evidence整合検証まで実装済み | 自然な確認質問と中・低優先属性は後続で追加する |
+| `attributes.promptContext` | 高優先5属性のschema、抽出・保存、Session上限付きの自然な確認質問まで実装済み | 中・低優先属性は後続で追加する |
 | 曜日・本人情報からの声かけ候補取得 | 未対応 | active、Valid Time、Evidence、Access Policyを再検証して必要最小限を返す |
 | 時刻帯・声かけ方針の自動選択 | 未対応 | 本人の明言を優先し、本人自身の返信実績が不足する間は18時の標準候補へ戻す選択器を追加する。クライアントからAccount IDや選択結果を指定させない |
 | 18時の能動配信 | 曜日別一般文面、専用Queue、AccountDataの配送状態まで実装済み | 本人情報による時刻・文面調整は[日記チャット体験設計](../product/diary-chat-experience.md)の後続段階で追加する |

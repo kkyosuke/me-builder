@@ -323,6 +323,8 @@ describe("LINE diary chat delivery E2E", () => {
         reply: generatedReply,
         main_question_count: 1,
         end_session: false,
+        collection_theme_id: "none",
+        collection_kind: "none",
         safety: { route: "normal", restricted_advice: false },
         used_memory_ids: [],
       }),
@@ -411,6 +413,85 @@ describe("LINE diary chat delivery E2E", () => {
     ).resolves.toEqual({ acquired: false, reason: "stale" });
   });
 
+  it("自然な属性確認を許可済み候補から生成し、Sessionの質問履歴へ記録する", async () => {
+    const { bindings, queuedTurn } = await ingestDiary("今日は仕事がつらかった", "collection");
+    mockGenerateContent.mockResolvedValueOnce({
+      text: JSON.stringify({
+        mode: "explore",
+        reply: "仕事がつらかったんだね。そういえば、どんな仕事をしているの？",
+        main_question_count: 1,
+        end_session: false,
+        collection_theme_id: "life_schedule",
+        collection_kind: "occupation",
+        safety: { route: "normal", restricted_advice: false },
+        used_memory_ids: [],
+      }),
+    });
+
+    await processChatTurnMessage(createQueueMessage(queuedTurn), bindings, workerConfig);
+
+    expect(mockGenerateContent.mock.calls[0]?.[0]?.config?.systemInstruction).toContain(
+      "life_schedule: occupation, weekly_rhythm, recurring_schedule",
+    );
+    expect(await accountDataStore.db.select().from(DO.account.schema.chatTurns)).toEqual([
+      expect.objectContaining({
+        status: "delivered",
+        collectionThemeId: "life_schedule",
+        collectionKind: "occupation",
+      }),
+    ]);
+  });
+
+  it("保存済み属性の取得に失敗したら属性確認候補をモデルへ渡さない", async () => {
+    const { bindings, queuedTurn } = await ingestDiary(
+      "今日は仕事がつらかった",
+      "collection-state-failure",
+    );
+    const originalAccountData = bindings.do.accountData;
+    if (!originalAccountData) throw new Error("Expected AccountData binding");
+    const unavailableAccountData = {
+      getByName(name: string) {
+        const rpc = originalAccountData.getByName(name);
+        return {
+          execute(accountId: string, operation: string, ...args: unknown[]) {
+            if (operation === "brain.listActivePromptContextKinds") {
+              return Promise.reject(new Error("AccountData unavailable"));
+            }
+            return (rpc.execute as (...parameters: unknown[]) => Promise<unknown>)(
+              accountId,
+              operation,
+              ...args,
+            );
+          },
+        };
+      },
+    } as unknown as NonNullable<CloudflareBindings["do"]["accountData"]>;
+    const warnLog = vi.spyOn(logger, "warn");
+
+    await processChatTurnMessage(
+      createQueueMessage(queuedTurn),
+      {
+        ...bindings,
+        do: { ...bindings.do, accountData: unavailableAccountData },
+      },
+      workerConfig,
+    );
+
+    expect(mockGenerateContent.mock.calls[0]?.[0]?.config?.systemInstruction).toContain(
+      "この応答では声かけ属性を確認する質問をしない",
+    );
+    expect(mockGenerateContent.mock.calls[0]?.[0]?.config?.systemInstruction).not.toContain(
+      "life_schedule: occupation",
+    );
+    expect(warnLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "prompt-context.collection-state.failed",
+        outcome: "degraded",
+      }),
+      expect.stringContaining("continue without collection candidates"),
+    );
+  });
+
   it("現在TurnでVectorize検索し、AccountDataで再認可した記憶をContext Packageへ入れる", async () => {
     const diaryText = "今日は疲れたので、落ち着く方法を探したい";
     const { bindings, providerAccountId, queuedTurn } = await ingestDiary(
@@ -469,6 +550,8 @@ describe("LINE diary chat delivery E2E", () => {
         reply: generatedReply,
         main_question_count: 0,
         end_session: false,
+        collection_theme_id: "none",
+        collection_kind: "none",
         safety: { route: "normal", restricted_advice: false },
         used_memory_ids: ["memory-1"],
       }),

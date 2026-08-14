@@ -13,6 +13,7 @@ describe("diary chat prompt", () => {
     expect(DIARY_CHAT_SYSTEM_PROMPT).toContain("質問がなければ0");
     expect(DIARY_CHAT_SYSTEM_PROMPT).toContain("aiであることだけを理由に推定扱いしない");
     expect(DIARY_CHAT_SYSTEM_PROMPT).toContain("is_inferenceがtrue");
+    expect(DIARY_CHAT_SYSTEM_PROMPT).toContain("この応答では声かけ属性を確認する質問をしない");
   });
 
   it("追跡可能なprompt versionを持つ", () => {
@@ -35,6 +36,25 @@ describe("diary chat prompt", () => {
     expect(() =>
       buildDiaryChatSystemPrompt({ objective: " ", conversationGuidance: "短く返す" }),
     ).toThrow();
+  });
+
+  it("収集候補を質問の指示にせず、自然につながる場合だけ許可する", () => {
+    const prompt = buildDiaryChatSystemPrompt({
+      objective: "今日の記録を残す。",
+      conversationGuidance: "まず受け止める。",
+      collectionCandidates: [
+        {
+          themeId: "life_schedule",
+          kinds: ["occupation", "weekly_rhythm"],
+          remainingQuestionCount: 2,
+        },
+      ],
+    });
+
+    expect(prompt).toContain("候補は質問の指示ではありません");
+    expect(prompt).toContain("life_schedule: occupation, weekly_rhythm（このSessionで残り2問）");
+    expect(prompt).toContain("本人の最新発言に直接つながる手がかり");
+    expect(prompt).toContain("属性を埋めることだけを目的に質問せず");
   });
 
   it("承認済み方針を切り替え、不明な方針は既定へ戻す", () => {

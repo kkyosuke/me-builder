@@ -383,6 +383,138 @@ describe("Diary conversation persistence flow", () => {
     ]);
   });
 
+  it("収集質問をSessionへ記録し、同じテーマ2問までに制限する", async () => {
+    const db = createTestDb();
+    const account = await bindAccount(db, "account-collection-limit");
+    const saveQuestionTurn = async (
+      eventId: string,
+      body: string,
+      generationEpoch: number,
+      collectionTarget: {
+        themeId: "life_schedule";
+        kind: "occupation" | "weekly_rhythm" | "recurring_schedule";
+      },
+    ) => {
+      const source = await storeLineTextSource(db, {
+        accountId: account.id,
+        eventId,
+        body,
+        receivedAt: new Date(`2026-08-07T00:0${generationEpoch}:00.000Z`),
+      });
+      const turn = await attachMessagesToTurn(
+        db,
+        account.id,
+        [source],
+        generationEpoch,
+        "test-model",
+        "test-prompt",
+      );
+      await markTurnGenerating(db, turn.turnId);
+      await saveAssistantResponse(db, account.id, {
+        turnId: turn.turnId,
+        body: "自然な確認質問",
+        endSession: false,
+        collectionTarget,
+      });
+      await markTurnDelivered(db, turn.turnId);
+      return turn;
+    };
+
+    await saveQuestionTurn("collection-1", "仕事が大変だった", 1, {
+      themeId: "life_schedule",
+      kind: "occupation",
+    });
+    const secondTurn = await saveQuestionTurn("collection-2", "看護師なの", 2, {
+      themeId: "life_schedule",
+      kind: "weekly_rhythm",
+    });
+    expect(await getTurnContext(db, secondTurn.turnId, 20)).toMatchObject({
+      collectionAskedTargets: [
+        { themeId: "life_schedule", kind: "occupation" },
+        { themeId: "life_schedule", kind: "weekly_rhythm" },
+      ],
+    });
+
+    const thirdSource = await storeLineTextSource(db, {
+      accountId: account.id,
+      eventId: "collection-3",
+      body: "休みはシフトで変わるよ",
+      receivedAt: new Date("2026-08-07T00:03:00.000Z"),
+    });
+    const thirdTurn = await attachMessagesToTurn(
+      db,
+      account.id,
+      [thirdSource],
+      3,
+      "test-model",
+      "test-prompt",
+    );
+    await markTurnGenerating(db, thirdTurn.turnId);
+    await expect(
+      saveAssistantResponse(db, account.id, {
+        turnId: thirdTurn.turnId,
+        body: "3問目は保存しない",
+        endSession: false,
+        collectionTarget: { themeId: "life_schedule", kind: "recurring_schedule" },
+      }),
+    ).rejects.toThrow("exceeds the Session collection goal");
+  });
+
+  it("配送前に失敗した属性質問はSessionの質問履歴へ含めない", async () => {
+    const db = createTestDb();
+    const account = await bindAccount(db, "account-failed-collection-question");
+    const firstSource = await storeLineTextSource(db, {
+      accountId: account.id,
+      eventId: "failed-collection-1",
+      body: "今日は仕事が大変だった",
+      receivedAt: new Date("2026-08-07T01:00:00.000Z"),
+    });
+    const firstTurn = await attachMessagesToTurn(
+      db,
+      account.id,
+      [firstSource],
+      1,
+      "test-model",
+      "test-prompt",
+    );
+    await markTurnGenerating(db, firstTurn.turnId);
+    await saveAssistantResponse(db, account.id, {
+      turnId: firstTurn.turnId,
+      body: "どんな仕事をしているの？",
+      endSession: false,
+      collectionTarget: { themeId: "life_schedule", kind: "occupation" },
+    });
+    await expect(markTurnFailed(db, firstTurn.turnId, "final_delivery")).resolves.toBe(true);
+
+    const secondSource = await storeLineTextSource(db, {
+      accountId: account.id,
+      eventId: "failed-collection-2",
+      body: "夕食後ならゆっくりできる",
+      receivedAt: new Date("2026-08-07T01:01:00.000Z"),
+    });
+    const secondTurn = await attachMessagesToTurn(
+      db,
+      account.id,
+      [secondSource],
+      2,
+      "test-model",
+      "test-prompt",
+    );
+    await expect(getTurnContext(db, secondTurn.turnId, 20)).resolves.toMatchObject({
+      collectionAskedTargets: [],
+    });
+
+    await markTurnGenerating(db, secondTurn.turnId);
+    await expect(
+      saveAssistantResponse(db, account.id, {
+        turnId: secondTurn.turnId,
+        body: "一息つきやすいのは夕食後？",
+        endSession: false,
+        collectionTarget: { themeId: "conversation_preference", kind: "rest_window" },
+      }),
+    ).resolves.toEqual(expect.any(String));
+  });
+
   it("Memory以外の分類と相対日付を解決したstatementを保存する", async () => {
     const db = createTestDb();
     const account = await bindAccount(db, "account-diary_category_e2e");

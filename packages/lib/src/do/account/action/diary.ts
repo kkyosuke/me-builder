@@ -4,10 +4,13 @@ import type { BatchItem } from "drizzle-orm/batch";
 import type { AccountDataDatabase } from "../database";
 import {
   type PromptContext,
+  type PromptContextCollectionTarget,
   arePromptContextsEqual,
+  buildPromptContextCollectionCandidates,
   findPrecedingAssistantBodies,
   isPromptContextGrounded,
   parsePromptContext,
+  parsePromptContextCollectionTarget,
   readPromptContext,
 } from "../prompt-context";
 import {
@@ -960,6 +963,32 @@ export type ConversationContextMessage = {
   recordedAt?: Date;
 };
 
+async function listCollectionAskedTargets(
+  db: AccountDataDatabase,
+  sessionId: string,
+  throughSequence?: number,
+): Promise<PromptContextCollectionTarget[]> {
+  const rows = await db
+    .select({
+      themeId: chatTurns.collectionThemeId,
+      kind: chatTurns.collectionKind,
+    })
+    .from(chatTurns)
+    .where(
+      and(
+        eq(chatTurns.sessionId, sessionId),
+        inArray(chatTurns.status, ["delivery_pending", "delivered", "delivery_unknown"]),
+        ...(throughSequence === undefined ? [] : [lte(chatTurns.throughSequence, throughSequence)]),
+      ),
+    )
+    .orderBy(asc(chatTurns.fromSequence), asc(chatTurns.throughSequence), asc(chatTurns.id))
+    .all();
+  return rows.flatMap(({ themeId, kind }) => {
+    const target = parsePromptContextCollectionTarget(themeId, kind);
+    return target ? [target] : [];
+  });
+}
+
 /** Turnと同じSessionの直近messageを、Account所有権を含むjoinで取得する。 */
 export async function getTurnContext(
   db: AccountDataDatabase,
@@ -971,6 +1000,7 @@ export async function getTurnContext(
       conversationPolicyId: string;
       messages: ConversationContextMessage[];
       currentUserMessageIds: string[];
+      collectionAskedTargets: PromptContextCollectionTarget[];
     }
   | undefined
 > {
@@ -987,6 +1017,12 @@ export async function getTurnContext(
     .where(eq(chatTurns.id, turnId))
     .get();
   if (!turn) return undefined;
+
+  const collectionAskedTargets = await listCollectionAskedTargets(
+    db,
+    turn.sessionId,
+    turn.throughSequence,
+  );
 
   const rows = await db
     .select({
@@ -1041,6 +1077,7 @@ export async function getTurnContext(
           role === "user" && sequence >= turn.fromSequence && sequence <= turn.throughSequence,
       )
       .map(({ id }) => id),
+    collectionAskedTargets,
   };
 }
 
@@ -2042,6 +2079,7 @@ export async function saveAssistantResponse(
     turnId: string;
     body: string;
     endSession: boolean;
+    collectionTarget?: PromptContextCollectionTarget;
     brainUsages?: readonly Readonly<{
       brainItemId: string;
       sourceRecordIds: readonly string[];
@@ -2060,6 +2098,15 @@ export async function saveAssistantResponse(
     .get();
   if (!turn?.sessionId) throw new Error("Chat turn is not ready for an assistant response");
   if (turn.responseMessageId) return turn.responseMessageId;
+  const collectionTarget = input.collectionTarget
+    ? parsePromptContextCollectionTarget(
+        input.collectionTarget.themeId,
+        input.collectionTarget.kind,
+      )
+    : undefined;
+  if (input.collectionTarget && !collectionTarget) {
+    throw new Error("Diary chat collection target is not defined by the collection theme master");
+  }
 
   const session = await db
     .select()
@@ -2068,6 +2115,20 @@ export async function saveAssistantResponse(
     .get();
   if (!session) throw new Error("Conversation session was not found");
   if (session.accountId !== accountId) throw new Error("Conversation account mismatch");
+  if (collectionTarget) {
+    const askedTargets = await listCollectionAskedTargets(db, session.id);
+    const candidates = buildPromptContextCollectionCandidates({
+      collectedKinds: [],
+      askedTargets,
+    });
+    const allowed = candidates.some(
+      ({ themeId, kinds }) =>
+        themeId === collectionTarget.themeId && kinds.includes(collectionTarget.kind),
+    );
+    if (!allowed) {
+      throw new Error("Diary chat collection target exceeds the Session collection goal");
+    }
+  }
   const brainUsages = input.brainUsages ?? [];
   const brainItemIds = brainUsages.map(({ brainItemId }) => brainItemId);
   const evidenceSourceRecordIds = brainUsages.flatMap(({ sourceRecordIds }) => sourceRecordIds);
@@ -2102,6 +2163,8 @@ export async function saveAssistantResponse(
         status: "delivery_pending",
         responseMessageId: messageId,
         endSession: input.endSession,
+        collectionThemeId: collectionTarget?.themeId,
+        collectionKind: collectionTarget?.kind,
         finalReplyRequestedAt: now,
         updatedAt: now,
       })

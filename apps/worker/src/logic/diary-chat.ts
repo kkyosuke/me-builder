@@ -1,4 +1,10 @@
-import type { BrainChatContextMemory, ConversationContextMessage } from "@me-builder/lib";
+import {
+  type BrainChatContextMemory,
+  type ConversationContextMessage,
+  type PromptContextCollectionCandidate,
+  type PromptContextCollectionTarget,
+  parsePromptContextCollectionTarget,
+} from "@me-builder/lib";
 import { toJsonSchema } from "@valibot/to-json-schema";
 import * as v from "valibot";
 import type { WorkerConfig } from "../config";
@@ -27,6 +33,8 @@ const DiaryChatResponseSchema = v.strictObject({
   reply: v.pipe(v.string(), v.minLength(1), v.maxLength(5000)),
   main_question_count: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(1)),
   end_session: v.boolean(),
+  collection_theme_id: v.pipe(v.string(), v.minLength(1), v.maxLength(100)),
+  collection_kind: v.pipe(v.string(), v.minLength(1), v.maxLength(100)),
   safety: v.strictObject({
     route: SafetyRouteSchema,
     restricted_advice: v.boolean(),
@@ -38,7 +46,12 @@ const MEMORY_EVIDENCE_CHARACTER_LIMIT = 1_000;
 const DEVELOPMENT_BRAIN_STATEMENT_CHARACTER_LIMIT = 500;
 const DEVELOPMENT_BRAIN_USAGE_ENVIRONMENTS = new Set(["dev", "development", "local", "preview"]);
 
-export type DiaryChatResponse = v.InferOutput<typeof DiaryChatResponseSchema>;
+type RawDiaryChatResponse = v.InferOutput<typeof DiaryChatResponseSchema>;
+export type DiaryChatResponse = Omit<
+  RawDiaryChatResponse,
+  "collection_theme_id" | "collection_kind"
+> &
+  Readonly<{ collection_target?: PromptContextCollectionTarget }>;
 export type SafetyRoute = v.InferOutput<typeof SafetyRouteSchema>;
 
 const routeRank: Record<SafetyRoute, number> = {
@@ -87,6 +100,7 @@ export function validateDiaryChatResponse(
   raw: string,
   preclassifiedRoute: SafetyRoute,
   allowedMemoryIds: readonly string[] = [],
+  collectionCandidates: readonly PromptContextCollectionCandidate[] = [],
 ): DiaryChatResponse | undefined {
   let json: unknown;
   try {
@@ -96,10 +110,29 @@ export function validateDiaryChatResponse(
   }
   const parsed = v.safeParse(DiaryChatResponseSchema, json);
   if (!parsed.success) return undefined;
+  const { collection_theme_id: themeId, collection_kind: kind, ...response } = parsed.output;
+  const hasNoCollectionTarget = themeId === "none" && kind === "none";
+  const collectionTarget = hasNoCollectionTarget
+    ? undefined
+    : parsePromptContextCollectionTarget(themeId, kind);
   const safetyRoute = stricterSafetyRoute(preclassifiedRoute, parsed.output.safety.route);
+  if (
+    (!hasNoCollectionTarget && !collectionTarget) ||
+    (collectionTarget && parsed.output.main_question_count !== 1) ||
+    (collectionTarget && safetyRoute !== "normal") ||
+    (collectionTarget &&
+      !collectionCandidates.some(
+        (candidate) =>
+          candidate.themeId === collectionTarget.themeId &&
+          candidate.kinds.includes(collectionTarget.kind),
+      ))
+  ) {
+    return undefined;
+  }
   const allowed = new Set(allowedMemoryIds);
   return {
-    ...parsed.output,
+    ...response,
+    ...(collectionTarget ? { collection_target: collectionTarget } : {}),
     used_memory_ids: [...new Set(parsed.output.used_memory_ids)].filter((id) => allowed.has(id)),
     safety: {
       route: safetyRoute,
@@ -198,6 +231,7 @@ export async function generateDiaryChatResponse(
     googleVertexAiApiKey: workerConfig.googleVertexAiApiKey,
   });
   const brainMemories = context?.brainMemories ?? [];
+  const collectionCandidates = context?.prompt?.collectionCandidates ?? [];
   const contents = JSON.stringify({
     context_package: buildDiaryChatContextPackage(messages, safetyRoute, brainMemories),
   });
@@ -216,7 +250,7 @@ export async function generateDiaryChatResponse(
       ...(context?.onUsage ? { onUsage: context.onUsage } : {}),
     });
     const validated = raw
-      ? validateDiaryChatResponse(raw, safetyRoute, allowedMemoryIds)
+      ? validateDiaryChatResponse(raw, safetyRoute, allowedMemoryIds, collectionCandidates)
       : undefined;
     if (validated) return validated;
   }

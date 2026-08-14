@@ -7,9 +7,11 @@ import {
   type PromptContext,
   PromptContextSchema,
   arePromptContextsEqual,
+  buildPromptContextCollectionCandidates,
   findPrecedingAssistantBodies,
   isPromptContextGrounded,
   parsePromptContext,
+  parsePromptContextCollectionTarget,
   readPromptContext,
 } from "./prompt-context";
 
@@ -48,6 +50,64 @@ describe("prompt context attribute master", () => {
         kinds: ["rest_window", "question_style"],
       }),
     ]);
+  });
+
+  it("未取得属性を優先順の収集候補として返す", () => {
+    expect(
+      buildPromptContextCollectionCandidates({
+        collectedKinds: ["occupation", "rest_window"],
+        askedTargets: [],
+      }),
+    ).toEqual([
+      {
+        themeId: "life_schedule",
+        kinds: ["weekly_rhythm", "recurring_schedule"],
+        remainingQuestionCount: 2,
+      },
+      {
+        themeId: "conversation_preference",
+        kinds: ["question_style"],
+        remainingQuestionCount: 2,
+      },
+    ]);
+  });
+
+  it("Sessionで質問を始めたテーマだけを継続し、質問済み属性を再質問しない", () => {
+    expect(
+      buildPromptContextCollectionCandidates({
+        collectedKinds: [],
+        askedTargets: [{ themeId: "life_schedule", kind: "occupation" }],
+      }),
+    ).toEqual([
+      {
+        themeId: "life_schedule",
+        kinds: ["weekly_rhythm", "recurring_schedule"],
+        remainingQuestionCount: 1,
+      },
+    ]);
+  });
+
+  it("1テーマ2問の上限に達したら候補を返さない", () => {
+    expect(
+      buildPromptContextCollectionCandidates({
+        collectedKinds: [],
+        askedTargets: [
+          { themeId: "life_schedule", kind: "occupation" },
+          { themeId: "life_schedule", kind: "weekly_rhythm" },
+        ],
+      }),
+    ).toEqual([]);
+  });
+
+  it("マスタ上で同じテーマに属する永続値だけを収集対象として読む", () => {
+    expect(parsePromptContextCollectionTarget("life_schedule", "occupation")).toEqual({
+      themeId: "life_schedule",
+      kind: "occupation",
+    });
+    expect(
+      parsePromptContextCollectionTarget("conversation_preference", "occupation"),
+    ).toBeUndefined();
+    expect(parsePromptContextCollectionTarget("unknown", "occupation")).toBeUndefined();
   });
 
   it.each([
