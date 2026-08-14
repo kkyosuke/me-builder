@@ -1,4 +1,4 @@
-export type AdminAccountProgression =
+type AdminAccountProgression =
   | Readonly<{
       status: "ready";
       level: number;
