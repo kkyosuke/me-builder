@@ -65,6 +65,9 @@ docs/
 - [「時間と予定」パラメータ変換設計](diagnosis/scoring/time-planning-parameter-design.md) — 4つ目の診断固有のパラメータ、重み、表示設定
 - [「会話と感情表現」パラメータ変換設計](diagnosis/scoring/conversation-emotion-parameter-design.md) — 5つ目の診断固有のパラメータ、重み、表示設定
 - [「優先順位と人生の方向性」パラメータ変換設計](diagnosis/scoring/life-priorities-parameter-design.md) — 6つ目の診断固有のパラメータ、重み、表示設定、Relationship Category
+- [「仕事の価値観・働き方」パラメータ変換設計](diagnosis/scoring/work-values-parameter-design.md) — 7つ目の診断固有のパラメータ、重み、表示設定、Relationship Category
+- [「仕事の変化・周囲との関わり方」パラメータ変換設計](diagnosis/scoring/work-relationship-style-parameter-design.md) — 8つ目の診断固有のパラメータ、重み、表示設定、Relationship Category
+- [「家族との距離感・支え合い」パラメータ変換設計](diagnosis/scoring/family-support-style-parameter-design.md) — 9つ目の診断固有のパラメータ、重み、表示設定、Relationship Category
 
 ### ドメインを設計する
 

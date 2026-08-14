@@ -50,3 +50,23 @@ export type {
   DiaryTemporalContext,
   DiaryTemporalResolution,
 } from "./account/action/diary-temporal";
+export {
+  arePromptContextsEqual,
+  findPrecedingAssistantBodies,
+  isPromptContextGrounded,
+  parsePromptContext,
+  PROMPT_CONTEXT_ATTRIBUTE_MASTER,
+  PROMPT_CONTEXT_COLLECTION_GOAL,
+  PROMPT_CONTEXT_COLLECTION_THEME_MASTER,
+  PROMPT_CONTEXT_WEEKDAYS,
+  PromptContextSchema,
+  readPromptContext,
+} from "./account/prompt-context";
+export type {
+  PromptContext,
+  PromptContextAttributeDefinition,
+  PromptContextCollectionThemeDefinition,
+  PromptContextCollectionThemeId,
+  PromptContextKind,
+  PromptContextPriority,
+} from "./account/prompt-context";

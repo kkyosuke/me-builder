@@ -677,6 +677,124 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
     e2eTimeoutMs,
   );
 
+  it(
+    "仕事の価値観・働き方の回答を5つのパラメータへ採点する",
+    async () => {
+      for (let index = 1; index <= 10; index += 1) {
+        const suffix = String(index).padStart(2, "0");
+        const response = await putAnswer(`dq-work-values-${suffix}`, "yes", "work-values");
+        expect(response.status).toBe(200);
+      }
+
+      const response = await getAnswers("work-values");
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({
+        id: "work-values",
+        relationshipCategory: "general",
+        scoring: {
+          scoringVersion: 1,
+          balancedLabel: "状況に応じて働き方を選ぶ",
+          parameters: [
+            expect.objectContaining({ id: "work-autonomy", score: 50, coverage: 100 }),
+            expect.objectContaining({ id: "growth-orientation", score: 40, coverage: 100 }),
+            expect.objectContaining({ id: "compensation-priority", score: 80, coverage: 100 }),
+            expect.objectContaining({ id: "work-stability", score: 75, coverage: 100 }),
+            expect.objectContaining({ id: "work-life-boundary", score: 67, coverage: 100 }),
+          ],
+        },
+      });
+    },
+    e2eTimeoutMs,
+  );
+
+  it(
+    "仕事の変化・周囲との関わり方の回答を5つのパラメータへ採点する",
+    async () => {
+      for (let index = 1; index <= 10; index += 1) {
+        const suffix = String(index).padStart(2, "0");
+        const choiceId = index % 2 === 1 ? "yes" : "no";
+        const response = await putAnswer(
+          `dq-work-relationship-style-${suffix}`,
+          choiceId,
+          "work-relationship-style",
+        );
+        expect(response.status).toBe(200);
+      }
+
+      const response = await getAnswers("work-relationship-style");
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({
+        id: "work-relationship-style",
+        relationshipCategory: "work",
+        scoring: {
+          scoringVersion: 1,
+          balancedLabel: "状況に応じて仕事での関わり方を選ぶ",
+          parameters: [
+            expect.objectContaining({ id: "work-novelty", score: 100, coverage: 100 }),
+            expect.objectContaining({ id: "workplace-closeness", score: 100, coverage: 100 }),
+            expect.objectContaining({ id: "workplace-autonomy", score: 100, coverage: 100 }),
+            expect.objectContaining({ id: "workplace-feedback", score: 100, coverage: 100 }),
+            expect.objectContaining({ id: "workplace-openness", score: 100, coverage: 100 }),
+          ],
+        },
+      });
+    },
+    e2eTimeoutMs,
+  );
+
+  it(
+    "家族との距離感・支え合いの回答を5つのパラメータへ採点する",
+    async () => {
+      for (let index = 1; index <= 10; index += 1) {
+        const suffix = String(index).padStart(2, "0");
+        const choiceId = index % 2 === 1 ? "yes" : "no";
+        const response = await putAnswer(
+          `dq-family-support-style-${suffix}`,
+          choiceId,
+          "family-support-style",
+        );
+        expect(response.status).toBe(200);
+      }
+
+      const response = await getAnswers("family-support-style");
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({
+        id: "family-support-style",
+        relationshipCategory: "family",
+        scoring: {
+          scoringVersion: 1,
+          balancedLabel: "状況に応じて家族との関わり方を選ぶ",
+          parameters: [
+            expect.objectContaining({
+              id: "family-contact",
+              label: "会えない時期の連絡",
+              lowLabel: "用事があるときに連絡したい",
+              highLabel: "会えない時期も定期的に連絡したい",
+              score: 100,
+              coverage: 100,
+            }),
+            expect.objectContaining({ id: "family-disclosure", score: 100, coverage: 100 }),
+            expect.objectContaining({
+              id: "family-support-approach",
+              score: 100,
+              coverage: 100,
+            }),
+            expect.objectContaining({
+              id: "family-conflict-timing",
+              score: 100,
+              coverage: 100,
+            }),
+            expect.objectContaining({ id: "family-planning", score: 100, coverage: 100 }),
+          ],
+        },
+      });
+    },
+    e2eTimeoutMs,
+  );
+
   it(`${diagnosisAnswerCases.missingContents.id}: ${diagnosisAnswerCases.missingContents.name}`, async () => {
     const response = await getAnswers();
     expect(response.status).toBe(404);

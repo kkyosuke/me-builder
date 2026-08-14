@@ -181,6 +181,7 @@ describe("Compatibility flow", () => {
     );
 
     expect(screen.getByText("うさぎさんから招待")).toBeTruthy();
+    expect(screen.getByText("一つ選択してください")).toBeTruthy();
     expect(document.querySelector('img[src="https://profile.line-scdn.net/me"]')).not.toBeNull();
     expect(screen.getByRole("heading", { name: "共有されるもの" })).toBeTruthy();
     expect(screen.getByText(/これから増える分も自動で/)).toBeTruthy();
@@ -196,6 +197,23 @@ describe("Compatibility flow", () => {
     expect(issueButton.hasAttribute("disabled")).toBe(false);
     fireEvent.click(issueButton);
     expect(onIssue).toHaveBeenCalledOnce();
+  });
+
+  it("共有画面の固定内容は初回取得を待たずに表示する", () => {
+    render(<CompatibilityShareScreen state={{ status: "loading" }} onRetry={vi.fn()} />);
+
+    expect(screen.getByRole("heading", { name: "うつしをシェア" })).toBeTruthy();
+    expect(screen.getByText("一つ選択してください")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "共有されるもの" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "共有されない詳細" })).toBeTruthy();
+    expect(screen.getByLabelText("共有者の情報を読み込み中")).toBeTruthy();
+    expect(screen.queryByLabelText("共有の確認を読み込み中")).toBeNull();
+    expect(
+      screen.getByRole("radio", { name: "家族" }).closest("fieldset")?.hasAttribute("disabled"),
+    ).toBe(true);
+    expect(
+      screen.getByRole("button", { name: "共有して招待リンクを発行する" }).hasAttribute("disabled"),
+    ).toBe(true);
   });
 
   it("関係カテゴリを選ぶまで招待リンクを発行できない", () => {
@@ -220,9 +238,11 @@ describe("Compatibility flow", () => {
     );
 
     expect(
-      screen.getByRole("button", { name: "相手との関係を選んでください" }).hasAttribute("disabled"),
+      screen.getByRole("button", { name: "共有して招待リンクを発行する" }).hasAttribute("disabled"),
     ).toBe(true);
-    fireEvent.click(screen.getByRole("radio", { name: "家族" }));
+    const familyRadio = screen.getByRole("radio", { name: "家族" });
+    expect(familyRadio.classList.contains("sr-only")).toBe(false);
+    fireEvent.click(familyRadio);
     expect(onRelationshipCategoryChange).toHaveBeenCalledWith("family");
   });
 

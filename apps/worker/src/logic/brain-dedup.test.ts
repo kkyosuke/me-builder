@@ -4,6 +4,7 @@ import type { CloudflareBindings } from "../config";
 import { getWorkerConfig } from "../config";
 import {
   type BrainDedupDependencies,
+  type DiaryBrainDedupCandidate,
   consolidateDiaryBrainCandidates,
   decideDiaryBrainDuplicates,
 } from "./brain-dedup";
@@ -142,7 +143,7 @@ describe("decideDiaryBrainDuplicates", () => {
   });
 
   it("同じcheckpoint内の意味的に同じ候補を代表候補へまとめる", async () => {
-    const candidates = [
+    const candidates: DiaryBrainDedupCandidate[] = [
       candidate,
       {
         category: "preference" as const,
@@ -198,6 +199,82 @@ describe("decideDiaryBrainDuplicates", () => {
       },
     ]);
     expect(harness.dependencies.generateDecision).toHaveBeenCalledOnce();
+  });
+
+  it("統合される候補だけが持つ声かけ属性を代表候補へ引き継ぐ", () => {
+    const candidates = [
+      {
+        category: "behavior_pattern" as const,
+        statement: "休みはシフト制",
+        sourceMessageIds: ["message-1"],
+      },
+      {
+        category: "behavior_pattern" as const,
+        statement: "休みはシフトで変わる",
+        sourceMessageIds: ["message-2"],
+        promptContext: { kind: "weekly_rhythm" as const, scheduleMode: "variable_shift" as const },
+      },
+    ];
+
+    expect(
+      consolidateDiaryBrainCandidates(candidates, [
+        { deduplication: "none" },
+        {
+          matchingCandidateIndex: 0,
+          deduplication: "semantic",
+          dedupPromptVersion: "brain-dedup-v2",
+        },
+      ]),
+    ).toEqual([
+      expect.objectContaining({
+        statement: "休みはシフト制",
+        promptContext: { kind: "weekly_rhythm", scheduleMode: "variable_shift" },
+      }),
+    ]);
+  });
+
+  it("同一命題へ競合する声かけ属性を統合しない", () => {
+    const candidates: DiaryBrainDedupCandidate[] = [
+      {
+        category: "behavior_pattern" as const,
+        statement: "平日は働いて土日は休み",
+        sourceMessageIds: ["message-1"],
+        promptContext: {
+          kind: "weekly_rhythm" as const,
+          scheduleMode: "fixed_weekly" as const,
+          activeWeekdays: ["monday", "tuesday", "wednesday", "thursday", "friday"],
+          daysOff: ["saturday", "sunday"],
+        },
+      },
+      {
+        category: "behavior_pattern" as const,
+        statement: "休みはシフトで変わる",
+        sourceMessageIds: ["message-2"],
+        promptContext: { kind: "weekly_rhythm" as const, scheduleMode: "variable_shift" as const },
+      },
+    ];
+
+    expect(
+      consolidateDiaryBrainCandidates(candidates, [
+        { deduplication: "none" },
+        {
+          matchingCandidateIndex: 0,
+          deduplication: "semantic",
+          dedupPromptVersion: "brain-dedup-v2",
+        },
+      ]),
+    ).toEqual([
+      expect.objectContaining({
+        statement: "平日は働いて土日は休み",
+        promptContext: expect.objectContaining({ scheduleMode: "fixed_weekly" }),
+        deduplication: "none",
+      }),
+      expect.objectContaining({
+        statement: "休みはシフトで変わる",
+        promptContext: { kind: "weekly_rhythm", scheduleMode: "variable_shift" },
+        deduplication: "none",
+      }),
+    ]);
   });
 
   it("NFKCと空白だけが異なる候補をexact統合して各Evidenceのstatementを保持する", async () => {

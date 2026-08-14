@@ -18,7 +18,10 @@ apps/web/public/images/diagnoses/
 ├── leisure-style.jpg
 ├── time-planning.jpg
 ├── conversation-emotion.jpg
-└── life-priorities.jpg
+├── life-priorities.jpg
+├── work-values.jpg
+├── work-relationship-style.jpg
+└── family-support-style.jpg
 ```
 
 ## 3. 共通スタイル
@@ -80,7 +83,55 @@ Materials/textures: Matte paper and soft clay, subtle depth and shadows.
 Constraints: No text, no letters, no numbers, no logos, no watermark, no brand marks. Do not make stability, challenge, work, relationships, wellbeing, or preparation look superior to another. Avoid scales, rankings, trophies, money symbols, corporate logos, religious imagery, or political symbols.
 ```
 
-## 7. 新しい診断へ展開する手順
+## 7. 「仕事の価値観・働き方」生成プロンプト
+
+```text
+Use case: stylized-concept
+Asset type: 16:9 diagnosis card thumbnail for a web application
+Primary request: Create a polished 3D paper-cut/clay-style illustration representing work values and working style: autonomy, growth, compensation, stability, and boundaries between work and personal life.
+Scene/backdrop: A calm abstract workspace with a central simple desk and five equally weighted visual directions arranged around it, suggesting that different work priorities can coexist.
+Subject: Balanced abstract symbols integrated around the workspace: adjustable modular pieces for autonomy, rising steps with a small sprout for growth, plain golden disks without currency marks for compensation, a steady anchor-like base for stability, and a clock beside a small home-and-leaf form for work-life boundaries. Keep every symbol equal in visual weight; no people required.
+Style/medium: Soft layered 3D paper-cut / clay render matching a premium editorial app illustration.
+Composition/framing: Wide 16:9, centered, clear silhouettes, important objects away from edges, suitable for a small card crop.
+Lighting/mood: Warm soft studio lighting, calm, thoughtful, capable, welcoming.
+Color palette: Deep navy background, muted slate blue, warm cream, coral accents, small golden accents; consistent with the existing me-builder diagnosis thumbnails.
+Materials/textures: Matte paper and soft clay, subtle depth and shadows.
+Constraints: No text, no letters, no numbers, no logos, no watermark, no brand marks, no currency symbols. Do not make autonomy, growth, compensation, stability, or personal-life boundaries look superior to another. Avoid corporate logos, rankings, trophies, realistic money, religious imagery, or political symbols.
+```
+
+## 8. 「仕事の変化・周囲との関わり方」生成プロンプト
+
+```text
+Use case: stylized-concept
+Asset type: 16:9 diagnosis card thumbnail for a web application
+Primary request: Create a polished 3D paper-cut/clay-style illustration representing desire for change in work and different ways of relating to people at work: everyday distance, autonomy, feedback, and expressing a different opinion.
+Scene/backdrop: A calm abstract workplace with two equal abstract coworkers facing each other across a simple desk. Around them, balanced branching task cards suggest staying with a familiar task or trying a new one, while speech bubbles and gentle connection lines suggest different communication distances.
+Subject: Two equal abstract workplace figures, neither dominant and with no hierarchy, with modular task shapes, one close and one wider communication arc, a small feedback loop, and two diverging speech forms that remain connected. Keep every symbol equal in visual weight.
+Style/medium: Soft layered 3D paper-cut / clay render matching a premium editorial app illustration.
+Composition/framing: Wide 16:9, centered, clear silhouettes, important objects away from edges, suitable for a small card crop.
+Lighting/mood: Warm soft studio lighting, calm, respectful, thoughtful, welcoming.
+Color palette: Deep navy background, muted slate blue, warm cream, coral accents, small golden accents; consistent with the existing me-builder diagnosis thumbnails.
+Materials/textures: Matte paper and soft clay, subtle depth and shadows.
+Constraints: No text, no letters, no numbers, no logos, no watermark, no brand marks. Do not make either figure look more powerful or superior. Avoid corporate logos, rankings, trophies, realistic office signage, religious imagery, or political symbols.
+```
+
+## 9. 「家族との距離感・支え合い」生成プロンプト
+
+```text
+Use case: stylized-concept
+Asset type: 16:9 diagnosis card thumbnail for a web application
+Primary request: Create a polished 3D paper-cut/clay-style illustration representing different ways family members stay connected and support one another: contact, sharing worries, listening or offering practical help, resolving disagreements, and planning shared time.
+Scene/backdrop: A calm abstract home-like space with exactly two identical rounded figures seated face-to-face on the same horizontal baseline, connected by balanced arcs at close and wider distances. A simple glowing house outline is centered behind them. Balanced speech bubbles, an open hand-like support form, a pause-and-reconnect loop, and blank planning tiles suggest the different interactions without favoring one approach.
+Subject: Exactly two mirror-symmetric abstract family figures with equal head diameter, body size, pose, vertical position, and visual weight. Use different palette colors only. Neither figure should lead or depend on another, and neither should imply a fixed family role.
+Style/medium: Soft layered 3D paper-cut / clay render matching a premium editorial app illustration.
+Composition/framing: Wide 16:9, centered, clear silhouettes, important objects away from edges, suitable for a small card crop.
+Lighting/mood: Warm soft studio lighting, calm, caring, respectful, welcoming.
+Color palette: Deep navy background, muted slate blue, warm cream, coral accents, small golden accents; consistent with the existing me-builder diagnosis thumbnails.
+Materials/textures: Matte paper and soft clay, subtle depth and shadows.
+Constraints: Exactly two equal figures. No third figure. No text, no letters, no numbers, no logos, no watermark, no brand marks. Do not depict a stereotyped nuclear family or assign size differences, fixed ages, genders, hierarchy, or roles. Do not make frequent contact, privacy, listening, practical help, immediate discussion, waiting, advance planning, or flexibility look superior.
+```
+
+## 10. 新しい診断へ展開する手順
 
 1. §4の`Primary request`、`Scene/backdrop`、`Subject`を新しい診断のテーマへ置き換える
 2. §3の共通スタイルと`Composition/framing`、`Constraints`を維持する

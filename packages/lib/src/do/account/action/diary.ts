@@ -3,9 +3,18 @@ import { and, asc, desc, eq, gte, inArray, isNull, lte, or, sql } from "drizzle-
 import type { BatchItem } from "drizzle-orm/batch";
 import type { AccountDataDatabase } from "../database";
 import {
+  type PromptContext,
+  arePromptContextsEqual,
+  findPrecedingAssistantBodies,
+  isPromptContextGrounded,
+  parsePromptContext,
+  readPromptContext,
+} from "../prompt-context";
+import {
   accountDataIdentity,
   brainItemAccessLabels,
   brainItemEvidenceEdges,
+  brainItemRevisions,
   brainItemTopicLabels,
   brainItems,
   brainVectorSyncJobs,
@@ -34,6 +43,7 @@ const BRAIN_CHECKPOINT_HARD_CAP_MS = 30 * 60 * 1000;
 const BRAIN_CHECKPOINT_MAX_USER_MESSAGES = 10;
 const BRAIN_CHECKPOINT_MAX_USER_MESSAGE_CHARS = 5_000;
 export const DIARY_BRAIN_CATEGORIES = [
+  "identity",
   "memory",
   "behavior_pattern",
   "value_motivation",
@@ -44,6 +54,7 @@ export const DIARY_BRAIN_CATEGORIES = [
 export type DiaryBrainCategory = (typeof DIARY_BRAIN_CATEGORIES)[number];
 const DIARY_BRAIN_CATEGORY_SET = new Set<string>(DIARY_BRAIN_CATEGORIES);
 const DIARY_BRAIN_STABILITY: Record<DiaryBrainCategory, "temporary" | "changeable" | "stable"> = {
+  identity: "changeable",
   memory: "stable",
   behavior_pattern: "changeable",
   value_motivation: "changeable",
@@ -66,6 +77,10 @@ export const DIARY_BRAIN_CHECKPOINT_DISPATCH_LEASE_MS = 60 * 60 * 1000;
 /** Queue内の最大6配送を5回まで投入し、合計30配送で恒久失敗を終端化する。 */
 export const DIARY_BRAIN_CHECKPOINT_MAX_DISPATCH_ATTEMPTS = 5;
 const CONVERSATION_POLICY_EXPLORATION_RATE = 0.2;
+
+function isRevisionedPromptContextKind(kind: PromptContext["kind"]): boolean {
+  return kind === "occupation" || kind === "weekly_rhythm";
+}
 
 export type ConversationPolicyStat = {
   policyId: string;
@@ -1032,6 +1047,7 @@ export async function getTurnContext(
 export type DiaryBrainCheckpointCandidate = Readonly<{
   category: DiaryBrainCategory;
   statement: string;
+  promptContext?: PromptContext;
   sourceMessageIds: readonly string[];
   evidenceStatements?: readonly Readonly<{
     sourceMessageId: string;
@@ -1277,12 +1293,18 @@ export async function getDiaryBrainCheckpointContext(
     .where(
       and(
         eq(conversationMessages.sessionId, checkpoint.sessionId),
-        gte(conversationMessages.sequence, checkpoint.fromSequence),
+        gte(conversationMessages.sequence, Math.max(1, checkpoint.fromSequence - 1)),
         lte(conversationMessages.sequence, checkpoint.throughSequence),
         eq(conversationMessages.isDeleted, false),
-        eq(conversationMessages.role, "user"),
-        eq(sourceRecords.accountId, accountId),
-        eq(sourceRecords.isDeleted, false),
+        or(
+          and(
+            eq(conversationMessages.role, "user"),
+            gte(conversationMessages.sequence, checkpoint.fromSequence),
+            eq(sourceRecords.accountId, accountId),
+            eq(sourceRecords.isDeleted, false),
+          ),
+          eq(conversationMessages.role, "assistant"),
+        ),
       ),
     )
     .orderBy(conversationMessages.sequence)
@@ -1332,8 +1354,12 @@ export async function applyDiaryBrainCheckpoint(
   const statements: BatchItem<"sqlite">[] = [];
   const appliedCandidates: AppliedDiaryBrainCheckpointCandidate[] = [];
   const appliedCandidateIndexByItemId = new Map<string, number>();
+  const scheduledSupersededItemIds = new Set<string>();
   const groupedCandidates = new Map<string, DiaryBrainCheckpointCandidate>();
   for (const candidate of candidates) {
+    const promptContext = candidate.promptContext
+      ? parsePromptContext(candidate.promptContext)
+      : undefined;
     const messageIds = [...new Set(candidate.sourceMessageIds)];
     const evidenceStatements =
       candidate.evidenceStatements ??
@@ -1354,6 +1380,15 @@ export async function applyDiaryBrainCheckpoint(
     if (
       !DIARY_BRAIN_CATEGORY_SET.has(candidate.category) ||
       !candidate.statement.trim() ||
+      (candidate.promptContext && !promptContext) ||
+      (candidate.category === "identity" && promptContext?.kind !== "occupation") ||
+      (promptContext &&
+        !isPromptContextGrounded(
+          candidate.category,
+          candidate.statement,
+          promptContext,
+          findPrecedingAssistantBodies(context.messages, messageIds),
+        )) ||
       messageIds.length === 0 ||
       messageIds.length !== candidate.sourceMessageIds.length ||
       evidenceStatements.length !== messageIds.length ||
@@ -1369,15 +1404,26 @@ export async function applyDiaryBrainCheckpoint(
     if (!grouped) {
       groupedCandidates.set(key, {
         ...candidate,
+        ...(promptContext ? { promptContext } : {}),
         statement: candidate.statement.trim(),
         evidenceStatements,
       });
+      continue;
+    }
+    if (
+      grouped.promptContext &&
+      promptContext &&
+      !arePromptContextsEqual(grouped.promptContext, promptContext)
+    ) {
       continue;
     }
     const sameMatch = grouped.matchingBrainItemId === candidate.matchingBrainItemId;
     groupedCandidates.set(key, {
       category: grouped.category,
       statement: grouped.statement,
+      ...(grouped.promptContext || candidate.promptContext
+        ? { promptContext: grouped.promptContext ?? candidate.promptContext }
+        : {}),
       sourceMessageIds: [...new Set([...grouped.sourceMessageIds, ...messageIds])],
       evidenceStatements: [
         ...(grouped.evidenceStatements ?? []),
@@ -1482,6 +1528,12 @@ export async function applyDiaryBrainCheckpoint(
         ? requestedItem.attributes.isInference
         : requestedItem?.derivation === "ai";
     const requestedTemporalContext = readDiaryTemporalContext(requestedItem?.attributes);
+    const requestedPromptContext = readPromptContext(requestedItem?.attributes);
+    const requestedPromptContextConflicts = Boolean(
+      candidate.promptContext &&
+        requestedPromptContext &&
+        !arePromptContextsEqual(candidate.promptContext, requestedPromptContext),
+    );
     const requestedDeduplicationIsValid =
       candidate.deduplication === "semantic" ||
       (candidate.deduplication === "exact" &&
@@ -1495,10 +1547,11 @@ export async function applyDiaryBrainCheckpoint(
       requestedDeduplicationIsValid &&
       requestedItem.category === candidate.category &&
       !requestedIsInference &&
-      !temporalContextsConflict(temporalContext, requestedTemporalContext)
+      !temporalContextsConflict(temporalContext, requestedTemporalContext) &&
+      !requestedPromptContextConflicts
         ? requestedItem
         : undefined;
-    if (candidate.matchingBrainItemId && !requestedMatch) {
+    if (candidate.matchingBrainItemId && !requestedMatch && !requestedPromptContextConflicts) {
       throw new Error("Diary Brain requested match revalidation failed");
     }
     const exactItems = requestedMatch
@@ -1523,6 +1576,7 @@ export async function applyDiaryBrainCheckpoint(
           )
           .all();
     const exactMatch = exactItems.find((item) => {
+      const itemPromptContext = readPromptContext(item.attributes);
       const isInference =
         item.attributes &&
         typeof item.attributes === "object" &&
@@ -1532,10 +1586,76 @@ export async function applyDiaryBrainCheckpoint(
           : item.derivation === "ai";
       return (
         !isInference &&
-        !temporalContextsConflict(temporalContext, readDiaryTemporalContext(item.attributes))
+        !temporalContextsConflict(temporalContext, readDiaryTemporalContext(item.attributes)) &&
+        (!candidate.promptContext ||
+          !itemPromptContext ||
+          arePromptContextsEqual(candidate.promptContext, itemPromptContext))
       );
     });
-    const matchedItem = requestedMatch ?? exactMatch;
+    const promptContextItems = candidate.promptContext
+      ? await db
+          .select({
+            id: brainItems.id,
+            category: brainItems.category,
+            statement: brainItems.statement,
+            attributes: brainItems.attributes,
+            derivation: brainItems.derivation,
+          })
+          .from(brainItems)
+          .where(
+            and(
+              eq(brainItems.accountId, accountId),
+              eq(brainItems.category, candidate.category),
+              eq(brainItems.status, "active"),
+              eq(brainItems.isDeleted, false),
+            ),
+          )
+          .all()
+      : [];
+    const candidatePromptContext = candidate.promptContext;
+    const promptContextMatch = candidatePromptContext
+      ? promptContextItems.find((item) => {
+          const itemPromptContext = readPromptContext(item.attributes);
+          const isInference =
+            item.attributes &&
+            typeof item.attributes === "object" &&
+            "isInference" in item.attributes &&
+            typeof item.attributes.isInference === "boolean"
+              ? item.attributes.isInference
+              : item.derivation === "ai";
+          return (
+            !isInference &&
+            itemPromptContext &&
+            arePromptContextsEqual(candidatePromptContext, itemPromptContext) &&
+            !temporalContextsConflict(temporalContext, readDiaryTemporalContext(item.attributes))
+          );
+        })
+      : undefined;
+    const matchedItem = requestedMatch ?? exactMatch ?? promptContextMatch;
+    const supersededItems =
+      !matchedItem &&
+      candidate.promptContext &&
+      isRevisionedPromptContextKind(candidate.promptContext.kind)
+        ? promptContextItems.filter((item) => {
+            const itemPromptContext = readPromptContext(item.attributes);
+            if (
+              !itemPromptContext ||
+              itemPromptContext.kind !== candidate.promptContext?.kind ||
+              arePromptContextsEqual(candidate.promptContext, itemPromptContext)
+            ) {
+              return false;
+            }
+            const isInference =
+              item.attributes &&
+              typeof item.attributes === "object" &&
+              "isInference" in item.attributes &&
+              typeof item.attributes.isInference === "boolean"
+                ? item.attributes.isInference
+                : item.derivation === "ai";
+            return !isInference && !scheduledSupersededItemIds.has(item.id);
+          })
+        : [];
+    for (const item of supersededItems) scheduledSupersededItemIds.add(item.id);
     const actualDeduplication = requestedMatch
       ? (candidate.deduplication ?? "none")
       : exactMatch
@@ -1544,6 +1664,33 @@ export async function applyDiaryBrainCheckpoint(
 
     if (matchedItem) {
       const brainItemId = matchedItem.id;
+      const existingPromptContext = readPromptContext(matchedItem.attributes);
+      if (candidate.promptContext && !existingPromptContext) {
+        const existingAttributes =
+          matchedItem.attributes && typeof matchedItem.attributes === "object"
+            ? matchedItem.attributes
+            : {};
+        statements.push(
+          db
+            .update(brainItems)
+            .set({
+              attributes: {
+                ...existingAttributes,
+                promptContext: candidate.promptContext,
+                promptContextPromptVersion: promptVersion,
+              },
+              updatedAt: at,
+            })
+            .where(
+              and(
+                eq(brainItems.id, brainItemId),
+                eq(brainItems.accountId, accountId),
+                eq(brainItems.status, "active"),
+                eq(brainItems.isDeleted, false),
+              ),
+            ),
+        );
+      }
       statements.push(
         ...sources.map((source) =>
           db
@@ -1628,6 +1775,8 @@ export async function applyDiaryBrainCheckpoint(
           checkpointId,
           promptVersion,
           isInference: false,
+          ...(candidate.promptContext ? { promptContext: candidate.promptContext } : {}),
+          ...(candidate.promptContext ? { promptContextPromptVersion: promptVersion } : {}),
           ...(temporalContext ? { temporalContext } : {}),
         },
         derivation: "ai",
@@ -1673,6 +1822,35 @@ export async function applyDiaryBrainCheckpoint(
         label: "diary",
         ...lifecycle,
       }),
+      ...supersededItems.flatMap((item) => [
+        db
+          .update(brainItems)
+          .set({ status: "superseded", updatedAt: at })
+          .where(
+            and(
+              eq(brainItems.id, item.id),
+              eq(brainItems.accountId, accountId),
+              eq(brainItems.status, "active"),
+              eq(brainItems.isDeleted, false),
+            ),
+          ),
+        db.insert(brainItemRevisions).values({
+          id: crypto.randomUUID(),
+          previousBrainItemId: item.id,
+          nextBrainItemId: brainItemId,
+          derivationMethod: "ai",
+          ...lifecycle,
+        }),
+        db.insert(brainVectorSyncJobs).values({
+          id: `${item.id}:${at.getTime()}:delete`,
+          brainItemId: item.id,
+          itemRevision: at.getTime(),
+          operation: "delete",
+          status: "pending",
+          nextAttemptAt: at,
+          ...lifecycle,
+        }),
+      ]),
       db.insert(diaryBrainCheckpointItems).values({
         id: crypto.randomUUID(),
         checkpointId,
