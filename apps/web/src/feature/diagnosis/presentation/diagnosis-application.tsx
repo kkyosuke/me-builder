@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useLiffSession } from "../../liff";
 import {
+  createDiagnosisDetailHistoryState,
+  diagnosisDetailIdFromHistoryState,
   diagnosisResultIdFromPathname,
   isDiagnosisResultPathname,
 } from "../model/diagnosis-navigation";
@@ -32,6 +34,10 @@ export default function DiagnosisApplication() {
   );
   const [isAnsweredOpen, setIsAnsweredOpen] = useState(false);
   const openedDirectDiagnosisId = useRef<string | null>(null);
+  const openedHistoryDiagnosisId = useRef<string | null>(null);
+  const isHistoryDetailOpen = useRef(
+    diagnosisDetailIdFromHistoryState(window.history.state) !== null,
+  );
   const listScrollY = useRef<number | null>(null);
   const shouldRestoreListScroll = useRef(false);
   const isDirectResultPath = isDiagnosisResultPathname(window.location.pathname);
@@ -46,7 +52,15 @@ export default function DiagnosisApplication() {
 
   const openDiagnosis = useCallback(
     (diagnosis: Parameters<typeof detail.open>[0]) => {
+      if (isHistoryDetailOpen.current) return;
       listScrollY.current = window.scrollY;
+      window.history.pushState(
+        createDiagnosisDetailHistoryState(window.history.state, diagnosis.id),
+        "",
+        `${window.location.pathname}${window.location.search}${window.location.hash}`,
+      );
+      isHistoryDetailOpen.current = true;
+      openedHistoryDiagnosisId.current = diagnosis.id;
       void detail.open(diagnosis);
     },
     [detail.open],
@@ -56,15 +70,41 @@ export default function DiagnosisApplication() {
     if (!directDiagnosisId && listScrollY.current !== null) {
       shouldRestoreListScroll.current = true;
     }
+    if (
+      !directDiagnosisId &&
+      isHistoryDetailOpen.current &&
+      diagnosisDetailIdFromHistoryState(window.history.state)
+    ) {
+      isHistoryDetailOpen.current = false;
+      openedHistoryDiagnosisId.current = null;
+      detail.close();
+      window.history.back();
+      return;
+    }
+    isHistoryDetailOpen.current = false;
+    openedHistoryDiagnosisId.current = null;
     detail.close();
   }, [detail.close, directDiagnosisId]);
 
   const deferQuestion = useCallback(
-    (questionId: string) => {
+    async (questionId: string) => {
       if (!directDiagnosisId && listScrollY.current !== null) {
         shouldRestoreListScroll.current = true;
       }
-      return detail.deferQuestion(questionId);
+      const shouldRemoveDetailHistory =
+        !directDiagnosisId &&
+        isHistoryDetailOpen.current &&
+        diagnosisDetailIdFromHistoryState(window.history.state) !== null;
+      await detail.deferQuestion(questionId);
+      if (
+        shouldRemoveDetailHistory &&
+        isHistoryDetailOpen.current &&
+        diagnosisDetailIdFromHistoryState(window.history.state)
+      ) {
+        isHistoryDetailOpen.current = false;
+        openedHistoryDiagnosisId.current = null;
+        window.history.back();
+      }
     },
     [detail.deferQuestion, directDiagnosisId],
   );
@@ -91,6 +131,38 @@ export default function DiagnosisApplication() {
     const frame = window.requestAnimationFrame(() => window.scrollTo(0, scrollY));
     return () => window.cancelAnimationFrame(frame);
   }, [detail.state.status]);
+
+  const syncDetailWithHistory = useCallback(() => {
+    if (directDiagnosisId) return;
+    const historyDiagnosisId = diagnosisDetailIdFromHistoryState(window.history.state);
+    if (!historyDiagnosisId) {
+      if (!isHistoryDetailOpen.current) return;
+      isHistoryDetailOpen.current = false;
+      openedHistoryDiagnosisId.current = null;
+      listScrollY.current ??= 0;
+      shouldRestoreListScroll.current = true;
+      detail.close();
+      return;
+    }
+    if (
+      diagnoses.state.status !== "success" ||
+      (isHistoryDetailOpen.current && openedHistoryDiagnosisId.current === historyDiagnosisId)
+    ) {
+      return;
+    }
+    const diagnosis = diagnoses.state.data.find(({ id }) => id === historyDiagnosisId);
+    if (!diagnosis) return;
+    listScrollY.current = listScrollY.current === null ? 0 : window.scrollY;
+    isHistoryDetailOpen.current = true;
+    openedHistoryDiagnosisId.current = historyDiagnosisId;
+    void detail.open(diagnosis);
+  }, [detail.close, detail.open, diagnoses.state, directDiagnosisId]);
+
+  useEffect(() => {
+    syncDetailWithHistory();
+    window.addEventListener("popstate", syncDetailWithHistory);
+    return () => window.removeEventListener("popstate", syncDetailWithHistory);
+  }, [syncDetailWithHistory]);
 
   useEffect(() => {
     if (

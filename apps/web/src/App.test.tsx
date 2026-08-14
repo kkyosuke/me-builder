@@ -10,6 +10,7 @@ import type {
   DiagnosisListItem,
   DiagnosisResult,
 } from "./feature/diagnosis";
+import { diagnosisDetailIdFromHistoryState } from "./feature/diagnosis/model/diagnosis-navigation";
 import { ProfileSummaryGenerationUnavailableError } from "./feature/profile/model/profile-summary";
 import { OperationError } from "./infrastructure/errors";
 
@@ -1011,6 +1012,69 @@ describe("App", () => {
       "diagnosis-1",
       expect.any(AbortSignal),
     );
+  });
+
+  it("診断詳細を端末の戻る・進むで開閉し、一覧の状態と位置を復元する", async () => {
+    window.history.replaceState({}, "", "/diagnosis?category=partner");
+    mocks.fetchDiagnosisList.mockResolvedValue([
+      diagnosis({
+        id: "closed-partner",
+        title: "受付終了の診断",
+        relationshipCategory: "partner",
+        availability: "closed",
+      }),
+      diagnosis({
+        id: "answered-partner",
+        title: "回答済みの診断",
+        relationshipCategory: "partner",
+        responseStatus: "answered",
+        answeredCount: 10,
+        lastAnsweredAt: "2026-08-06T00:00:00.000Z",
+      }),
+    ]);
+    let scrollY = 420;
+    const scrollYSpy = vi.spyOn(window, "scrollY", "get").mockImplementation(() => scrollY);
+    const scrollToSpy = vi.mocked(window.scrollTo).mockImplementation((_x, y) => {
+      scrollY = y ?? scrollY;
+    });
+    render(<App />);
+
+    const partnerFilter = await screen.findByRole("button", { name: "パートナー" });
+    expect(partnerFilter.getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: /^回答済み 1件$/ }));
+    expect(
+      screen.getByRole("button", { name: /^回答済み 1件$/ }).getAttribute("aria-expanded"),
+    ).toBe("true");
+
+    fireEvent.click(screen.getByRole("button", { name: /受付終了の診断/ }));
+    expect(screen.getByRole("heading", { name: "この診断は受付を終了しました" })).toBeTruthy();
+    expect(diagnosisDetailIdFromHistoryState(window.history.state)).toBe("closed-partner");
+
+    act(() => window.history.back());
+
+    expect(await screen.findByRole("heading", { name: "わたしの診断" })).toBeTruthy();
+    expect(diagnosisDetailIdFromHistoryState(window.history.state)).toBeNull();
+    expect(screen.getByRole("button", { name: "パートナー" }).getAttribute("aria-pressed")).toBe(
+      "true",
+    );
+    expect(
+      screen.getByRole("button", { name: /^回答済み 1件$/ }).getAttribute("aria-expanded"),
+    ).toBe("true");
+    expect(screen.getByRole("button", { name: /回答済みの診断/ })).toBeTruthy();
+    await waitFor(() => expect(scrollToSpy).toHaveBeenLastCalledWith(0, 420));
+
+    act(() => window.history.forward());
+
+    expect(
+      await screen.findByRole("heading", { name: "この診断は受付を終了しました" }),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "診断一覧へ" }));
+    expect(await screen.findByRole("heading", { name: "わたしの診断" })).toBeTruthy();
+    await waitFor(() => expect(diagnosisDetailIdFromHistoryState(window.history.state)).toBeNull());
+    expect(screen.getByRole("button", { name: "パートナー" }).getAttribute("aria-pressed")).toBe(
+      "true",
+    );
+    scrollYSpy.mockRestore();
   });
 
   it("回答取得が即時完了しても回答画面のSkeletonを400ms表示する", async () => {

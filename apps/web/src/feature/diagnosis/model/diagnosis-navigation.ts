@@ -2,6 +2,25 @@ import type { DiagnosisListItem } from "./diagnosis-list-item";
 
 export type DiagnosisDestination = "answer" | "result" | "closed";
 
+const DIAGNOSIS_DETAIL_HISTORY_STATE_KEY = "me-builder-diagnosis-detail-id";
+
+export function diagnosisDetailIdFromHistoryState(state: unknown): string | null {
+  if (!state || typeof state !== "object") return null;
+  const value = (state as Record<string, unknown>)[DIAGNOSIS_DETAIL_HISTORY_STATE_KEY];
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+export function createDiagnosisDetailHistoryState(
+  currentState: unknown,
+  diagnosisId: string,
+): Record<string, unknown> {
+  const state =
+    currentState && typeof currentState === "object" && !Array.isArray(currentState)
+      ? (currentState as Record<string, unknown>)
+      : {};
+  return { ...state, [DIAGNOSIS_DETAIL_HISTORY_STATE_KEY]: diagnosisId };
+}
+
 export function isDiagnosisResultPathname(pathname: string): boolean {
   return /^\/diagnosis\/[^/]+\/answers\/?$/.test(pathname);
 }
