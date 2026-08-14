@@ -230,6 +230,23 @@ describe("Diary conversation persistence flow", () => {
         ],
       ),
     ).rejects.toThrow("evidence validation failed");
+    await expect(
+      applyDiaryBrainCheckpoint(
+        db,
+        account.id,
+        checkpoint?.id ?? "",
+        checkpointContext?.throughSequence ?? 0,
+        "diary-brain-test",
+        [
+          {
+            category: "behavior_pattern",
+            statement: "今日は少し疲れた",
+            sourceMessageIds: checkpointContext?.sourceMessageIds.slice(0, 1) ?? [],
+            promptContext: { kind: "weekly_rhythm", scheduleMode: "variable_shift" },
+          },
+        ],
+      ),
+    ).rejects.toThrow("Diary Brain candidate validation failed");
     await expect(db.select().from(schema.brainItems)).resolves.toHaveLength(0);
     expect(
       db
@@ -423,6 +440,213 @@ describe("Diary conversation persistence flow", () => {
         }),
       }),
     ]);
+  });
+
+  it("既存の同一Brain Itemへ声かけ属性と新しいEvidenceを追加する", async () => {
+    const db = createTestDb();
+    const account = await bindAccount(db, "account-diary_prompt-context-dedup");
+    const existingAt = new Date("2026-08-01T00:00:00Z");
+    const existingSource = await storeLineTextSource(db, {
+      accountId: account.id,
+      eventId: "prompt-context-existing-source",
+      body: "看護師なの",
+      receivedAt: existingAt,
+    });
+    await saveBrainItem(db, {
+      at: existingAt,
+      item: {
+        id: "existing-occupation",
+        accountId: account.id,
+        category: "identity",
+        statement: "看護師なの",
+        attributes: { sourceKind: "diary", isInference: false },
+        derivation: "ai",
+        status: "active",
+        stability: "changeable",
+        sensitivity: "normal",
+        externallyShareable: false,
+        confidence: { state: "uncomputed" },
+      },
+      evidence: [
+        {
+          id: "existing-occupation-evidence",
+          sourceRecordId: existingSource.sourceRecordId,
+          relation: "supports",
+          isDerivationTrigger: true,
+          derivationMethod: "ai",
+          generatedAt: existingAt,
+        },
+      ],
+      accessLabels: [
+        { id: "existing-occupation-access", label: "unclassified", assignedBy: "system" },
+      ],
+      topicLabels: [{ id: "existing-occupation-topic", label: "diary" }],
+    });
+
+    const receivedAt = new Date("2026-08-11T03:00:00Z");
+    const newSource = await storeLineTextSource(db, {
+      accountId: account.id,
+      eventId: "prompt-context-new-source",
+      body: "看護師なの",
+      receivedAt,
+    });
+    await attachMessagesToTurn(db, account.id, [newSource], 1, "test-model", "test-prompt");
+    const [checkpoint] = await db.select().from(schema.diaryBrainCheckpoints);
+    await claimDueDiaryBrainCheckpointIds(
+      db,
+      account.id,
+      new Date(receivedAt.getTime() + 11 * 60 * 1000),
+    );
+    await markDiaryBrainCheckpointDispatched(db, account.id, checkpoint?.id ?? "");
+    const context = await getDiaryBrainCheckpointContext(db, account.id, checkpoint?.id ?? "");
+
+    await expect(
+      applyDiaryBrainCheckpoint(
+        db,
+        account.id,
+        checkpoint?.id ?? "",
+        context?.throughSequence ?? 0,
+        "diary-brain-v3",
+        [
+          {
+            category: "identity",
+            statement: "看護師なの",
+            sourceMessageIds: context?.sourceMessageIds ?? [],
+            promptContext: { kind: "occupation", occupation: "看護師" },
+          },
+        ],
+        receivedAt,
+      ),
+    ).resolves.toMatchObject({
+      candidates: [{ operation: "evidence_added", deduplication: "exact" }],
+    });
+    expect(
+      db
+        .select({ attributes: schema.brainItems.attributes })
+        .from(schema.brainItems)
+        .where(eq(schema.brainItems.id, "existing-occupation"))
+        .get(),
+    ).toEqual({
+      attributes: {
+        sourceKind: "diary",
+        isInference: false,
+        promptContext: { kind: "occupation", occupation: "看護師" },
+        promptContextPromptVersion: "diary-brain-v3",
+      },
+    });
+    await expect(db.select().from(schema.brainItemEvidenceEdges)).resolves.toHaveLength(2);
+  });
+
+  it("職業・週間リズムの変更は旧Itemをsupersededへ移してrevisionを作る", async () => {
+    const db = createTestDb();
+    const account = await bindAccount(db, "account-diary_prompt-context-revision");
+    const existingAt = new Date("2026-08-01T00:00:00Z");
+    const existingSource = await storeLineTextSource(db, {
+      accountId: account.id,
+      eventId: "prompt-context-revision-existing",
+      body: "土日休みだよ",
+      receivedAt: existingAt,
+    });
+    await saveBrainItem(db, {
+      at: existingAt,
+      item: {
+        id: "existing-weekly-rhythm",
+        accountId: account.id,
+        category: "behavior_pattern",
+        statement: "土日休みだよ",
+        attributes: {
+          sourceKind: "diary",
+          isInference: false,
+          promptContext: {
+            kind: "weekly_rhythm",
+            scheduleMode: "fixed_weekly",
+            daysOff: ["saturday", "sunday"],
+          },
+        },
+        derivation: "ai",
+        status: "active",
+        stability: "changeable",
+        sensitivity: "normal",
+        externallyShareable: false,
+        confidence: { state: "uncomputed" },
+      },
+      evidence: [
+        {
+          id: "existing-weekly-rhythm-evidence",
+          sourceRecordId: existingSource.sourceRecordId,
+          relation: "supports",
+          isDerivationTrigger: true,
+          derivationMethod: "ai",
+          generatedAt: existingAt,
+        },
+      ],
+      accessLabels: [
+        { id: "existing-weekly-rhythm-access", label: "unclassified", assignedBy: "system" },
+      ],
+      topicLabels: [{ id: "existing-weekly-rhythm-topic", label: "diary" }],
+    });
+
+    const changedAt = new Date("2026-08-11T03:00:00Z");
+    const changedSource = await storeLineTextSource(db, {
+      accountId: account.id,
+      eventId: "prompt-context-revision-changed",
+      body: "休みはシフトで変わる",
+      receivedAt: changedAt,
+    });
+    await attachMessagesToTurn(db, account.id, [changedSource], 1, "test-model", "test-prompt");
+    const [checkpoint] = await db.select().from(schema.diaryBrainCheckpoints);
+    const appliedAt = new Date(changedAt.getTime() + 11 * 60 * 1000);
+    await claimDueDiaryBrainCheckpointIds(db, account.id, appliedAt);
+    await markDiaryBrainCheckpointDispatched(db, account.id, checkpoint?.id ?? "", appliedAt);
+    const context = await getDiaryBrainCheckpointContext(db, account.id, checkpoint?.id ?? "");
+
+    await expect(
+      applyDiaryBrainCheckpoint(
+        db,
+        account.id,
+        checkpoint?.id ?? "",
+        context?.throughSequence ?? 0,
+        "diary-brain-v5",
+        [
+          {
+            category: "behavior_pattern",
+            statement: "休みはシフトで変わる",
+            sourceMessageIds: context?.sourceMessageIds ?? [],
+            promptContext: { kind: "weekly_rhythm", scheduleMode: "variable_shift" },
+            matchingBrainItemId: "existing-weekly-rhythm",
+            deduplication: "semantic",
+            dedupPromptVersion: "brain-dedup-v2",
+          },
+        ],
+        appliedAt,
+      ),
+    ).resolves.toMatchObject({ candidates: [{ operation: "created" }] });
+
+    const items = await db.select().from(schema.brainItems).orderBy(schema.brainItems.createdAt);
+    expect(items).toEqual([
+      expect.objectContaining({ id: "existing-weekly-rhythm", status: "superseded" }),
+      expect.objectContaining({
+        status: "active",
+        attributes: expect.objectContaining({
+          promptContext: { kind: "weekly_rhythm", scheduleMode: "variable_shift" },
+        }),
+      }),
+    ]);
+    const nextItem = items[1];
+    expect(await db.select().from(schema.brainItemRevisions)).toEqual([
+      expect.objectContaining({
+        previousBrainItemId: "existing-weekly-rhythm",
+        nextBrainItemId: nextItem?.id,
+        derivationMethod: "ai",
+      }),
+    ]);
+    expect(
+      await db
+        .select({ operation: schema.brainVectorSyncJobs.operation })
+        .from(schema.brainVectorSyncJobs)
+        .where(eq(schema.brainVectorSyncJobs.brainItemId, "existing-weekly-rhythm"))
+        .orderBy(schema.brainVectorSyncJobs.createdAt),
+    ).toEqual([{ operation: "upsert" }, { operation: "delete" }]);
   });
 
   it("意味的に同じ既存Itemへ新しいEvidenceだけを追加する", async () => {
@@ -1066,8 +1290,123 @@ describe("Diary conversation persistence flow", () => {
     await expect(
       getDiaryBrainCheckpointContext(db, account.id, checkpoint?.id ?? ""),
     ).resolves.toMatchObject({
-      messages: [expect.objectContaining({ role: "user", body: "残す発言" })],
+      messages: [
+        expect.objectContaining({ role: "assistant", body: "削除対象の内容を含むassistant応答" }),
+        expect.objectContaining({ role: "user", body: "残す発言" }),
+      ],
     });
+  });
+
+  it("直前の本人向け質問を文脈に含め、短い職業回答を保存する", async () => {
+    const db = createTestDb();
+    const account = await bindAccount(db, "account-brain_short-occupation");
+    const firstReceivedAt = new Date("2026-08-07T00:00:00.000Z");
+    const firstSource = await storeLineTextSource(db, {
+      accountId: account.id,
+      eventId: "brain-short-occupation-1",
+      body: "今日は仕事が大変だった",
+      receivedAt: firstReceivedAt,
+    });
+    const firstTurn = await attachMessagesToTurn(
+      db,
+      account.id,
+      [firstSource],
+      1,
+      "test-model",
+      "test-prompt",
+    );
+    await markTurnGenerating(db, firstTurn.turnId);
+    await saveAssistantResponse(db, account.id, {
+      turnId: firstTurn.turnId,
+      body: "そういえばどんな仕事してるの？",
+      endSession: false,
+    });
+    await markTurnDelivered(db, firstTurn.turnId);
+
+    const [firstCheckpoint] = await db.select().from(schema.diaryBrainCheckpoints);
+    const firstClaimAt = new Date(firstReceivedAt.getTime() + 10 * 60 * 1000);
+    await claimDueDiaryBrainCheckpointIds(db, account.id, firstClaimAt);
+    await markDiaryBrainCheckpointDispatched(
+      db,
+      account.id,
+      firstCheckpoint?.id ?? "",
+      firstClaimAt,
+    );
+    const firstContext = await getDiaryBrainCheckpointContext(
+      db,
+      account.id,
+      firstCheckpoint?.id ?? "",
+    );
+    await applyDiaryBrainCheckpoint(
+      db,
+      account.id,
+      firstCheckpoint?.id ?? "",
+      firstContext?.throughSequence ?? 0,
+      "diary-brain-v5",
+      [],
+      firstClaimAt,
+    );
+
+    const occupationReceivedAt = new Date(firstReceivedAt.getTime() + 11 * 60 * 1000);
+    const occupationSource = await storeLineTextSource(db, {
+      accountId: account.id,
+      eventId: "brain-short-occupation-2",
+      body: "看護師",
+      receivedAt: occupationReceivedAt,
+    });
+    await attachMessagesToTurn(db, account.id, [occupationSource], 2, "test-model", "test-prompt");
+    const checkpoints = await db
+      .select()
+      .from(schema.diaryBrainCheckpoints)
+      .orderBy(schema.diaryBrainCheckpoints.fromSequence);
+    const occupationCheckpoint = checkpoints.at(-1);
+    const occupationClaimAt = new Date(occupationReceivedAt.getTime() + 10 * 60 * 1000);
+    await claimDueDiaryBrainCheckpointIds(db, account.id, occupationClaimAt);
+    await markDiaryBrainCheckpointDispatched(
+      db,
+      account.id,
+      occupationCheckpoint?.id ?? "",
+      occupationClaimAt,
+    );
+    const occupationContext = await getDiaryBrainCheckpointContext(
+      db,
+      account.id,
+      occupationCheckpoint?.id ?? "",
+    );
+    expect(occupationContext?.messages).toMatchObject([
+      { role: "assistant", body: "そういえばどんな仕事してるの？" },
+      { role: "user", body: "看護師" },
+    ]);
+    const occupationMessageId = occupationContext?.messages.find(({ role }) => role === "user")?.id;
+    if (!occupationMessageId) throw new Error("職業回答のmessageが見つかりません");
+
+    await expect(
+      applyDiaryBrainCheckpoint(
+        db,
+        account.id,
+        occupationCheckpoint?.id ?? "",
+        occupationContext?.throughSequence ?? 0,
+        "diary-brain-v5",
+        [
+          {
+            category: "identity",
+            statement: "看護師",
+            sourceMessageIds: [occupationMessageId],
+            promptContext: { kind: "occupation", occupation: "看護師" },
+          },
+        ],
+        occupationClaimAt,
+      ),
+    ).resolves.toMatchObject({ candidates: [{ operation: "created" }] });
+    await expect(db.select().from(schema.brainItems)).resolves.toEqual([
+      expect.objectContaining({
+        category: "identity",
+        statement: "看護師",
+        attributes: expect.objectContaining({
+          promptContext: { kind: "occupation", occupation: "看護師" },
+        }),
+      }),
+    ]);
   });
 
   it("最後の発言から10分間新着がなければBrain checkpointを起動する", async () => {

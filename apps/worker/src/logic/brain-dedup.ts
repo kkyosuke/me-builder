@@ -1,7 +1,9 @@
 import {
   type ConversationContextMessage,
   type DiaryBrainCategory,
+  type PromptContext,
   accountDataFor,
+  arePromptContextsEqual,
   buildDiaryTemporalSearchText,
   resolveDiaryTemporalContext,
 } from "@me-builder/lib";
@@ -37,6 +39,7 @@ export type DiaryBrainDedupCandidate = Readonly<{
   category: DiaryBrainCategory;
   statement: string;
   sourceMessageIds: readonly string[];
+  promptContext?: PromptContext;
 }>;
 
 export type DiaryBrainDedupDecision = Readonly<{
@@ -110,15 +113,36 @@ export function consolidateDiaryBrainCandidates(
     }
     return current;
   };
-  const consolidated = new Map<number, ConsolidatedDiaryBrainCandidate>();
+  const consolidated = new Map<
+    number,
+    ConsolidatedDiaryBrainCandidate & Readonly<{ memberIndices: readonly number[] }>
+  >();
+  const effectiveRootByCandidate = new Map<number, number>();
   for (const [candidateIndex, candidate] of candidates.entries()) {
-    const root = rootIndex(candidateIndex);
-    const rootCandidate = candidates[root];
-    const rootDecision = decisions[root];
+    const requestedRoot = rootIndex(candidateIndex);
+    const parentIndex = decisions[candidateIndex]?.matchingCandidateIndex;
+    let root =
+      parentIndex === undefined
+        ? requestedRoot
+        : (effectiveRootByCandidate.get(parentIndex) ?? requestedRoot);
+    let existing = consolidated.get(root);
+    if (
+      existing?.promptContext &&
+      candidate.promptContext &&
+      !arePromptContextsEqual(existing.promptContext, candidate.promptContext)
+    ) {
+      // AIの同一命題判定より、決定的に検証済みの構造化属性を優先する。
+      root = candidateIndex;
+      existing = undefined;
+    }
+    effectiveRootByCandidate.set(candidateIndex, root);
+    const rootCandidate = existing ? candidates[root] : candidate;
+    const rootDecision = existing ? decisions[root] : decisions[candidateIndex];
     if (!rootCandidate || !rootDecision) {
       throw new Error("Diary Brain candidate deduplication root is missing");
     }
-    const existing = consolidated.get(root);
+    const promptContext = existing?.promptContext ?? rootCandidate.promptContext;
+    const mergedPromptContext = promptContext ?? candidate.promptContext;
     const sourceMessageIds = [
       ...new Set([...(existing?.sourceMessageIds ?? []), ...candidate.sourceMessageIds]),
     ];
@@ -133,7 +157,15 @@ export function consolidateDiaryBrainCandidates(
         evidenceStatements.set(sourceMessageId, candidate.statement);
       }
     }
-    const groupDecisions = decisions.filter((_, index) => rootIndex(index) === root);
+    const memberIndices = [...(existing?.memberIndices ?? []), candidateIndex];
+    const groupDecisions = memberIndices.flatMap((index) => {
+      const decision = decisions[index];
+      if (!decision) return [];
+      if (index === root && decision.matchingCandidateIndex !== undefined) {
+        return [{ deduplication: "none" as const }];
+      }
+      return [decision];
+    });
     const semanticDecision = groupDecisions.find(
       (decision) => decision.deduplication === "semantic",
     );
@@ -144,6 +176,7 @@ export function consolidateDiaryBrainCandidates(
         : "none";
     consolidated.set(root, {
       ...rootCandidate,
+      ...(mergedPromptContext ? { promptContext: mergedPromptContext } : {}),
       sourceMessageIds,
       evidenceStatements: [...evidenceStatements].map(([sourceMessageId, statement]) => ({
         sourceMessageId,
@@ -156,9 +189,10 @@ export function consolidateDiaryBrainCandidates(
       ...(semanticDecision?.dedupPromptVersion
         ? { dedupPromptVersion: semanticDecision.dedupPromptVersion }
         : {}),
+      memberIndices,
     });
   }
-  return [...consolidated.values()];
+  return [...consolidated.values()].map(({ memberIndices: _, ...candidate }) => candidate);
 }
 
 /** Vectorは比較対象の絞り込みにだけ使い、同一命題の最終判断は専用AIへ分離する。 */
