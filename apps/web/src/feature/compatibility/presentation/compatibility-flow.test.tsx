@@ -296,39 +296,57 @@ describe("Compatibility flow", () => {
   });
 
   it("共有カテゴリはパートナーを初期選択し、選択マークと枠をカテゴリ色に揃える", () => {
-    render(
-      <CompatibilityShareScreen
-        state={{
-          status: "success",
-          data: {
-            displayName: "うさぎ",
-            avatarUrl: null,
-            canShare: true,
-            blockingReasons: [],
-            nextAction: null,
-          },
-        }}
-        onRetry={vi.fn()}
-      />,
+    const state = {
+      status: "success" as const,
+      data: {
+        displayName: "うさぎ",
+        avatarUrl: null,
+        canShare: true,
+        blockingReasons: [],
+        nextAction: null,
+      },
+    };
+    const onRetry = vi.fn();
+    const { rerender } = render(<CompatibilityShareScreen state={state} onRetry={onRetry} />);
+
+    expect((screen.getByRole("radio", { name: "パートナー" }) as HTMLInputElement).checked).toBe(
+      true,
     );
 
     const categoryColors = [
-      ["パートナー", "accent-rose-500", "focus-within:ring-rose-500"],
-      ["家族", "accent-amber-500", "focus-within:ring-amber-500"],
-      ["友達", "accent-emerald-500", "focus-within:ring-emerald-500"],
-      ["仕事", "accent-blue-500", "focus-within:ring-blue-500"],
+      ["partner", "パートナー", "accent-rose-500", "focus-within:ring-rose-500", "border-rose-500"],
+      ["family", "家族", "accent-amber-500", "focus-within:ring-amber-500", "border-amber-500"],
+      [
+        "friend",
+        "友達",
+        "accent-emerald-500",
+        "focus-within:ring-emerald-500",
+        "border-emerald-500",
+      ],
+      ["work", "仕事", "accent-blue-500", "focus-within:ring-blue-500", "border-blue-500"],
     ] as const;
-    for (const [label, accentClassName, focusClassName] of categoryColors) {
-      const radio = screen.getByRole("radio", { name: label });
+    for (const [
+      category,
+      label,
+      accentClassName,
+      focusClassName,
+      borderClassName,
+    ] of categoryColors) {
+      rerender(
+        <CompatibilityShareScreen
+          state={state}
+          relationshipCategory={category}
+          onRetry={onRetry}
+        />,
+      );
+      const radio = screen.getByRole("radio", { name: label }) as HTMLInputElement;
+      const categoryLabel = radio.closest("label");
+      expect(radio.checked).toBe(true);
       expect(radio.classList.contains(accentClassName)).toBe(true);
-      expect(radio.closest("label")?.classList.contains(focusClassName)).toBe(true);
+      expect(categoryLabel?.classList.contains(focusClassName)).toBe(true);
+      expect(categoryLabel?.classList.contains(borderClassName)).toBe(true);
     }
 
-    const partnerRadio = screen.getByRole("radio", { name: "パートナー" }) as HTMLInputElement;
-    const partnerLabel = partnerRadio.closest("label");
-    expect(partnerRadio.checked).toBe(true);
-    expect(partnerLabel?.classList.contains("border-current")).toBe(true);
-    expect(partnerLabel?.classList.contains("bg-rose-100")).toBe(true);
     expect(
       screen.getByRole("button", { name: "共有して招待リンクを発行する" }).hasAttribute("disabled"),
     ).toBe(false);

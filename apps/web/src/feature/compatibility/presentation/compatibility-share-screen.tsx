@@ -15,7 +15,6 @@ import { SkeletonBlock, SkeletonLoader } from "../../../components/skeleton";
 import type { AsyncState } from "../../../model/async-state";
 import {
   diagnosisCategoryHref,
-  getRelationshipCategoryBadgeClassName,
   getRelationshipCategoryLabel,
 } from "../../diagnosis/model/relationship-category";
 import type { CompatibilityInvitation } from "../model/compatibility-invitation";
@@ -33,12 +32,32 @@ const blockingReasonMessages: Record<CompatibilityShareConsentBlockingReason, st
 
 const categorySelectorClassNames: Record<
   CompatibilityRelationshipCategory,
-  { accent: string; focus: string }
+  { accent: string; focus: string; selected: string }
 > = {
-  partner: { accent: "accent-rose-500", focus: "focus-within:ring-rose-500" },
-  family: { accent: "accent-amber-500", focus: "focus-within:ring-amber-500" },
-  friend: { accent: "accent-emerald-500", focus: "focus-within:ring-emerald-500" },
-  work: { accent: "accent-blue-500", focus: "focus-within:ring-blue-500" },
+  partner: {
+    accent: "accent-rose-500",
+    focus: "focus-within:ring-rose-500",
+    selected:
+      "border-rose-500 bg-rose-100 text-rose-800 ring-rose-500/20 dark:border-rose-500 dark:bg-rose-950 dark:text-rose-200",
+  },
+  family: {
+    accent: "accent-amber-500",
+    focus: "focus-within:ring-amber-500",
+    selected:
+      "border-amber-500 bg-amber-100 text-amber-800 ring-amber-500/20 dark:border-amber-500 dark:bg-amber-950 dark:text-amber-200",
+  },
+  friend: {
+    accent: "accent-emerald-500",
+    focus: "focus-within:ring-emerald-500",
+    selected:
+      "border-emerald-500 bg-emerald-100 text-emerald-800 ring-emerald-500/20 dark:border-emerald-500 dark:bg-emerald-950 dark:text-emerald-200",
+  },
+  work: {
+    accent: "accent-blue-500",
+    focus: "focus-within:ring-blue-500",
+    selected:
+      "border-blue-500 bg-blue-100 text-blue-800 ring-blue-500/20 dark:border-blue-500 dark:bg-blue-950 dark:text-blue-200",
+  },
 };
 
 const nextActionGuides = {
@@ -139,7 +158,7 @@ function RelationshipCategorySelector({
               key={category}
               className={`flex min-h-12 cursor-pointer items-center gap-2.5 rounded-2xl border px-3 py-2 text-sm font-bold transition focus-within:ring-2 focus-within:ring-offset-2 ${selectorClassName.focus} ${
                 selected
-                  ? `border-current ring-2 ring-current/20 ${getRelationshipCategoryBadgeClassName(category)}`
+                  ? `ring-2 ${selectorClassName.selected}`
                   : "border-slate-300 bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
               } ${disabled ? "cursor-not-allowed opacity-70" : ""}`}
             >
