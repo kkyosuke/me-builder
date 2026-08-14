@@ -44,6 +44,8 @@ describe("diary chat guardrails", () => {
       reply: "それは落ち込むよね。いちばん悔しかったのはどこ？",
       main_question_count: 1,
       end_session: false,
+      collection_theme_id: "none",
+      collection_kind: "none",
       safety: { route: "normal", restricted_advice: false },
       used_memory_ids: [],
     });
@@ -56,6 +58,8 @@ describe("diary chat guardrails", () => {
       reply: "以前うまくいった方法も選択肢にできそうです。",
       main_question_count: 0,
       end_session: false,
+      collection_theme_id: "none",
+      collection_kind: "none",
       safety: { route: "normal", restricted_advice: false },
       used_memory_ids: ["memory-1", "memory-unknown", "memory-1"],
     });
@@ -63,6 +67,88 @@ describe("diary chat guardrails", () => {
     expect(validateDiaryChatResponse(raw, "normal", ["memory-1"])?.used_memory_ids).toEqual([
       "memory-1",
     ]);
+  });
+
+  it("許可済み候補の属性確認質問だけを収集対象として返す", () => {
+    const raw = JSON.stringify({
+      mode: "explore",
+      reply: "仕事が大変だったんだね。そういえば、どんな仕事をしているの？",
+      main_question_count: 1,
+      end_session: false,
+      collection_theme_id: "life_schedule",
+      collection_kind: "occupation",
+      safety: { route: "normal", restricted_advice: false },
+      used_memory_ids: [],
+    });
+    const candidates = [
+      {
+        themeId: "life_schedule" as const,
+        kinds: ["occupation" as const],
+        remainingQuestionCount: 2,
+      },
+    ];
+
+    expect(validateDiaryChatResponse(raw, "normal", [], candidates)?.collection_target).toEqual({
+      themeId: "life_schedule",
+      kind: "occupation",
+    });
+    expect(validateDiaryChatResponse(raw, "normal")).toBeUndefined();
+  });
+
+  it("属性確認を記録する場合は主質問1件を必須にする", () => {
+    const raw = JSON.stringify({
+      mode: "listen",
+      reply: "仕事が大変だったんだね。",
+      main_question_count: 0,
+      end_session: false,
+      collection_theme_id: "life_schedule",
+      collection_kind: "occupation",
+      safety: { route: "normal", restricted_advice: false },
+      used_memory_ids: [],
+    });
+
+    expect(
+      validateDiaryChatResponse(
+        raw,
+        "normal",
+        [],
+        [
+          {
+            themeId: "life_schedule",
+            kinds: ["occupation"],
+            remainingQuestionCount: 2,
+          },
+        ],
+      ),
+    ).toBeUndefined();
+  });
+
+  it("モデルが安全routeを強化した応答では属性確認を許可しない", () => {
+    const raw = JSON.stringify({
+      mode: "organize",
+      reply: "安全を優先しよう。ところで、どんな仕事をしているの？",
+      main_question_count: 1,
+      end_session: false,
+      collection_theme_id: "life_schedule",
+      collection_kind: "occupation",
+      safety: { route: "self_harm_possible", restricted_advice: true },
+      used_memory_ids: [],
+    });
+
+    expect(
+      validateDiaryChatResponse(
+        raw,
+        "normal",
+        [],
+        [
+          {
+            themeId: "life_schedule",
+            kinds: ["occupation"],
+            remainingQuestionCount: 2,
+          },
+        ],
+      ),
+    ).toBeUndefined();
   });
 
   it("事前分類よりモデルの安全routeを弱めない", () => {

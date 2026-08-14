@@ -15,6 +15,8 @@ export const brainActions = {
     vectorIds: readonly string[],
     at?: Date,
   ) => DO.account.action.brain.loadBrainChatContextMemories(db, accountId, vectorIds, at),
+  "brain.listActivePromptContextKinds": (db: DO.account.Database, accountId: string, at?: Date) =>
+    DO.account.action.brain.listActivePromptContextKinds(db, accountId, at),
   "brain.loadSemanticDedupCandidates": (
     db: DO.account.Database,
     accountId: string,

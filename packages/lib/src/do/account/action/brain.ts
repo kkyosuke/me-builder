@@ -1,6 +1,11 @@
 import { and, asc, desc, eq, gt, inArray, isNull, lte, max, min, or, sql } from "drizzle-orm";
 import type { AccountDataDatabase } from "../database";
 import {
+  PROMPT_CONTEXT_ATTRIBUTE_MASTER,
+  type PromptContextKind,
+  readPromptContext,
+} from "../prompt-context";
+import {
   brainItemAccessLabels,
   brainItemEvidenceEdges,
   brainItemRevisions,
@@ -122,6 +127,59 @@ export type BrainSemanticDedupCandidate = Readonly<{
   comparisonText: string;
   isInference: boolean;
 }>;
+
+/** 自然な確認質問の重複を避けるため、現在利用できる声かけ属性のkindだけを返す。 */
+export async function listActivePromptContextKinds(
+  db: AccountDataDatabase,
+  accountId: string,
+  at = new Date(),
+): Promise<readonly PromptContextKind[]> {
+  const rows = await db
+    .select({ attributes: brainItems.attributes })
+    .from(brainItems)
+    .innerJoin(
+      brainItemAccessLabels,
+      and(
+        eq(brainItemAccessLabels.brainItemId, brainItems.id),
+        eq(brainItemAccessLabels.isDeleted, false),
+      ),
+    )
+    .innerJoin(
+      brainItemEvidenceEdges,
+      and(
+        eq(brainItemEvidenceEdges.brainItemId, brainItems.id),
+        eq(brainItemEvidenceEdges.relation, "supports"),
+        eq(brainItemEvidenceEdges.isDeleted, false),
+      ),
+    )
+    .innerJoin(
+      sourceRecords,
+      and(
+        eq(sourceRecords.id, brainItemEvidenceEdges.sourceRecordId),
+        eq(sourceRecords.accountId, accountId),
+        eq(sourceRecords.isDeleted, false),
+      ),
+    )
+    .where(
+      and(
+        eq(brainItems.accountId, accountId),
+        eq(brainItems.status, "active"),
+        eq(brainItems.isDeleted, false),
+        or(isNull(brainItems.validFrom), lte(brainItems.validFrom, at)),
+        or(isNull(brainItems.validTo), gt(brainItems.validTo, at)),
+      ),
+    )
+    .all();
+  const collected = new Set(
+    rows.flatMap(({ attributes }) => {
+      const promptContext = readPromptContext(attributes);
+      return promptContext ? [promptContext.kind] : [];
+    }),
+  );
+  return PROMPT_CONTEXT_ATTRIBUTE_MASTER.map(({ kind }) => kind).filter((kind) =>
+    collected.has(kind),
+  );
+}
 
 function brainItemIsInference(attributes: unknown, derivation: "ai" | "deterministic"): boolean {
   return attributes &&

@@ -150,6 +150,9 @@ export const chatTurns = sqliteTable(
     model: text("model").notNull(),
     // TODO: 安全性経路の監視・監査要件を定義した段階でsafety_routeを追加する。
     endSession: integer("end_session", { mode: "boolean" }).notNull().default(false),
+    /** 自然な確認質問を出した場合だけ、収集テーマと対象属性を対で保持する。 */
+    collectionThemeId: text("collection_theme_id"),
+    collectionKind: text("collection_kind"),
     attemptCount: integer("attempt_count").notNull().default(0),
     failureStage: text("failure_stage"),
     receivedAt: integer("received_at", { mode: "timestamp" }).notNull(),

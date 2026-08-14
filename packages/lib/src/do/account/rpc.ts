@@ -44,6 +44,10 @@ export type AccountDataActions = {
     [vectorIds: readonly string[], at?: Date],
     typeof brain.loadBrainChatContextMemories
   >;
+  "brain.listActivePromptContextKinds": RpcAction<
+    [at?: Date],
+    typeof brain.listActivePromptContextKinds
+  >;
   "brain.loadSemanticDedupCandidates": RpcAction<
     [vectorIds: readonly string[], categories: readonly string[]],
     typeof brain.loadBrainSemanticDedupCandidates

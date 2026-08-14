@@ -99,6 +99,13 @@
       "when": 1786666843277,
       "tag": "0013_flat_silver_samurai",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1786680481681,
+      "tag": "0014_flimsy_valkyrie",
+      "breakpoints": true
     }
   ]
 }

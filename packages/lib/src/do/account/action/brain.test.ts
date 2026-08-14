@@ -15,6 +15,7 @@ import {
   findBrainItemForAccount,
   getBrainVectorSyncTarget,
   listActiveBrainItems,
+  listActivePromptContextKinds,
   listFailedBrainVectorSyncJobs,
   loadBrainChatContextMemories,
   loadBrainSemanticDedupCandidates,
@@ -510,6 +511,37 @@ describe("saveBrainItem", () => {
       type: "source-account-mismatch",
     });
     await expect(db.select().from(schema.brainItems)).resolves.toHaveLength(0);
+  });
+});
+
+describe("listActivePromptContextKinds", () => {
+  it("activeで根拠とAccess Labelが有効な声かけ属性だけをマスタ順で返す", async () => {
+    const db = createTestDb();
+    await insertAccountsAndSources(db);
+    const at = new Date("2026-08-10T00:00:00Z");
+    const input = createInput({
+      at,
+      item: {
+        ...createInput().item,
+        category: "identity",
+        statement: "看護師として働いている",
+        attributes: {
+          sourceKind: "diary",
+          isInference: false,
+          promptContext: { kind: "occupation", occupation: "看護師" },
+        },
+      },
+    });
+    await saveBrainItem(db, input);
+
+    await expect(listActivePromptContextKinds(db, "account-1", at)).resolves.toEqual([
+      "occupation",
+    ]);
+    await db
+      .update(schema.brainItemAccessLabels)
+      .set({ isDeleted: true, deletedAt: at, updatedAt: at })
+      .where(eq(schema.brainItemAccessLabels.id, "access-1"));
+    await expect(listActivePromptContextKinds(db, "account-1", at)).resolves.toEqual([]);
   });
 });
 

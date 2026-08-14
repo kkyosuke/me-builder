@@ -122,6 +122,17 @@ export const PROMPT_CONTEXT_COLLECTION_THEME_MASTER = [
 export type PromptContextCollectionThemeId =
   (typeof PROMPT_CONTEXT_COLLECTION_THEME_MASTER)[number]["id"];
 
+export type PromptContextCollectionTarget = Readonly<{
+  themeId: PromptContextCollectionThemeId;
+  kind: PromptContextKind;
+}>;
+
+export type PromptContextCollectionCandidate = Readonly<{
+  themeId: PromptContextCollectionThemeId;
+  kinds: readonly PromptContextKind[];
+  remainingQuestionCount: number;
+}>;
+
 /** 未取得欄の達成率を作らず、会話を優先して属性を集めるための目標設定。 */
 export const PROMPT_CONTEXT_COLLECTION_GOAL = {
   prioritizedThemeIds: PROMPT_CONTEXT_COLLECTION_THEME_MASTER.map(({ id }) => id),
@@ -131,6 +142,56 @@ export const PROMPT_CONTEXT_COLLECTION_GOAL = {
   retryUnanswered: false,
   extractionMode: "explicit_only",
 } as const;
+
+const COLLECTION_THEME_BY_ID = new Map(
+  PROMPT_CONTEXT_COLLECTION_THEME_MASTER.map((theme) => [theme.id, theme]),
+);
+
+/** 永続化した文字列を、マスタ上で同じテーマに属する収集対象だけへ絞る。 */
+export function parsePromptContextCollectionTarget(
+  themeId: unknown,
+  kind: unknown,
+): PromptContextCollectionTarget | undefined {
+  if (typeof themeId !== "string" || typeof kind !== "string") return undefined;
+  const theme = COLLECTION_THEME_BY_ID.get(themeId as PromptContextCollectionThemeId);
+  if (!theme || !theme.kinds.some((candidateKind) => candidateKind === kind)) return undefined;
+  return { themeId: theme.id, kind: kind as PromptContextKind };
+}
+
+/**
+ * 保存済み属性とSession内の質問履歴から、モデルへ提示できる収集候補を返す。
+ * 実際に質問するかと、現在の会話に自然につながる候補の選択はモデルが判断する。
+ */
+export function buildPromptContextCollectionCandidates(input: {
+  collectedKinds: readonly PromptContextKind[];
+  askedTargets: readonly PromptContextCollectionTarget[];
+}): readonly PromptContextCollectionCandidate[] {
+  const askedThemeIds = [...new Set(input.askedTargets.map(({ themeId }) => themeId))];
+  if (
+    input.askedTargets.length >= PROMPT_CONTEXT_COLLECTION_GOAL.maxConfirmationQuestionsPerTheme ||
+    askedThemeIds.length > PROMPT_CONTEXT_COLLECTION_GOAL.maxCollectionThemesPerSession
+  ) {
+    return [];
+  }
+
+  const allowedThemeIds =
+    askedThemeIds.length > 0 ? askedThemeIds : PROMPT_CONTEXT_COLLECTION_GOAL.prioritizedThemeIds;
+  const collectedKinds = new Set(input.collectedKinds);
+  const askedKinds = new Set(input.askedTargets.map(({ kind }) => kind));
+  const remainingQuestionCount =
+    PROMPT_CONTEXT_COLLECTION_GOAL.maxConfirmationQuestionsPerTheme - input.askedTargets.length;
+
+  return allowedThemeIds.flatMap((themeId) => {
+    const theme = COLLECTION_THEME_BY_ID.get(themeId);
+    if (!theme) return [];
+    const kinds = theme.kinds.filter(
+      (kind) =>
+        !collectedKinds.has(kind) &&
+        (PROMPT_CONTEXT_COLLECTION_GOAL.retryUnanswered || !askedKinds.has(kind)),
+    );
+    return kinds.length > 0 ? [{ themeId, kinds, remainingQuestionCount }] : [];
+  });
+}
 
 const DEFINITION_BY_KIND = new Map(
   PROMPT_CONTEXT_ATTRIBUTE_MASTER.map((definition) => [definition.kind, definition]),

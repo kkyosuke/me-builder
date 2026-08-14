@@ -52,9 +52,11 @@ export type {
 } from "./account/action/diary-temporal";
 export {
   arePromptContextsEqual,
+  buildPromptContextCollectionCandidates,
   findPrecedingAssistantBodies,
   isPromptContextGrounded,
   parsePromptContext,
+  parsePromptContextCollectionTarget,
   PROMPT_CONTEXT_ATTRIBUTE_MASTER,
   PROMPT_CONTEXT_COLLECTION_GOAL,
   PROMPT_CONTEXT_COLLECTION_THEME_MASTER,
@@ -65,8 +67,10 @@ export {
 export type {
   PromptContext,
   PromptContextAttributeDefinition,
+  PromptContextCollectionCandidate,
   PromptContextCollectionThemeDefinition,
   PromptContextCollectionThemeId,
+  PromptContextCollectionTarget,
   PromptContextKind,
   PromptContextPriority,
 } from "./account/prompt-context";

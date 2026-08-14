@@ -1,4 +1,4 @@
-import { accountDataFor } from "@me-builder/lib";
+import { accountDataFor, buildPromptContextCollectionCandidates } from "@me-builder/lib";
 import {
   type ChatTurnQueueMessage,
   type ConversationCoordinatorRpc,
@@ -501,21 +501,54 @@ export async function processChatTurnMessage(
 
     const generationController = controller;
     const safetyRoute = classifySafety(context.messages, context.currentUserMessageIds);
-    const brainMemories =
+    const [brainMemories, collectedPromptContextKinds] =
       pendingResponse || safetyRoute !== "normal"
+        ? [[], []]
+        : await Promise.all([
+            loadBrainContextMemories({
+              cf,
+              workerConfig,
+              accountId: message.body.accountId,
+              messages: context.messages,
+              currentUserMessageIds: context.currentUserMessageIds,
+              ...(generationController.signal ? { signal: generationController.signal } : {}),
+            }),
+            accountDataClient
+              .execute("brain.listActivePromptContextKinds")
+              .catch((error: unknown) => {
+                logger.warn(
+                  {
+                    event: "prompt-context.collection-state.failed",
+                    service: "worker",
+                    environment: workerConfig.environment,
+                    component: "chat-turn",
+                    outcome: "degraded",
+                    disposition: "continue",
+                    ...toSafeOperationalErrorFields(error, {
+                      code: "PROMPT_CONTEXT_COLLECTION_STATE_LOAD_FAILED",
+                      category: "dependency",
+                      stage: "context.prompt-context",
+                      retryable: false,
+                      dependency: "account-data",
+                    }),
+                  },
+                  "[Prompt context] failed at context.prompt-context -> continue without collection candidates",
+                );
+                return undefined;
+              }),
+          ]);
+    const collectionCandidates =
+      pendingResponse || safetyRoute !== "normal" || collectedPromptContextKinds === undefined
         ? []
-        : await loadBrainContextMemories({
-            cf,
-            workerConfig,
-            accountId: message.body.accountId,
-            messages: context.messages,
-            currentUserMessageIds: context.currentUserMessageIds,
-            ...(generationController.signal ? { signal: generationController.signal } : {}),
+        : buildPromptContextCollectionCandidates({
+            collectedKinds: collectedPromptContextKinds,
+            askedTargets: context.collectionAskedTargets,
           });
     const response = pendingResponse
       ? {
           reply: pendingResponse.body,
           endSession: pendingResponse.endSession,
+          collectionTarget: undefined,
           brainUsages: [],
           usedBrainItems: pendingResponse.usedBrainItems,
         }
@@ -530,6 +563,7 @@ export async function processChatTurnMessage(
                 conversationGuidance: getDiaryChatConversationGuidance(
                   context.conversationPolicyId,
                 ),
+                collectionCandidates,
               },
             }).then((generated) => {
               const memoryByContextId = new Map<string, (typeof brainMemories)[number]>(
@@ -542,6 +576,7 @@ export async function processChatTurnMessage(
               return {
                 reply: generated.reply,
                 endSession: generated.end_session,
+                collectionTarget: generated.collection_target,
                 usedBrainItems: usedMemories,
                 brainUsages: usedMemories.map((memory) => ({
                   brainItemId: memory.brainItemId,
@@ -592,6 +627,7 @@ export async function processChatTurnMessage(
             turnId: message.body.turnId,
             body: response.reply,
             endSession: response.endSession,
+            ...(response.collectionTarget ? { collectionTarget: response.collectionTarget } : {}),
             brainUsages: response.brainUsages,
           }),
         {

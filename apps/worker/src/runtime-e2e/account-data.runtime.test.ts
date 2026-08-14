@@ -152,6 +152,8 @@ describe("AccountData Workers runtime E2E", () => {
         "INSERT INTO daily_prompt_preferences (account_id, status, stopped_at, stopped_source_record_id, updated_at) VALUES (?, 'stopped', 2, 'migration-stop-source', 2)",
         accountId,
       );
+      state.storage.sql.exec("ALTER TABLE chat_turns DROP COLUMN collection_kind");
+      state.storage.sql.exec("ALTER TABLE chat_turns DROP COLUMN collection_theme_id");
       state.storage.sql.exec("DELETE FROM __drizzle_migrations WHERE created_at >= 1786666843277");
 
       const repository = Reflect.get(instance, "repository") as { initialize(): Promise<void> };
@@ -213,6 +215,8 @@ describe("AccountData Workers runtime E2E", () => {
       );
       state.storage.sql.exec("ALTER TABLE account_data_identity DROP COLUMN reset_epoch");
       state.storage.sql.exec("ALTER TABLE diagnoses DROP COLUMN relationship_category");
+      state.storage.sql.exec("ALTER TABLE chat_turns DROP COLUMN collection_kind");
+      state.storage.sql.exec("ALTER TABLE chat_turns DROP COLUMN collection_theme_id");
       state.storage.sql.exec("DELETE FROM __drizzle_migrations WHERE created_at > 1786361220917");
 
       const repository = Reflect.get(instance, "repository") as {
@@ -234,6 +238,12 @@ describe("AccountData Workers runtime E2E", () => {
           )
           .one().name,
       ).toBe("diary_chat_brain_usage_audits");
+      expect(
+        state.storage.sql
+          .exec<{ name: string }>("PRAGMA table_info(chat_turns)")
+          .toArray()
+          .map(({ name }) => name),
+      ).toEqual(expect.arrayContaining(["collection_theme_id", "collection_kind"]));
       expect(
         state.storage.sql
           .exec<{ name: string }>(
@@ -311,6 +321,8 @@ describe("AccountData Workers runtime E2E", () => {
       );
       state.storage.sql.exec("ALTER TABLE account_data_identity DROP COLUMN reset_epoch");
       state.storage.sql.exec("ALTER TABLE diagnoses DROP COLUMN relationship_category");
+      state.storage.sql.exec("ALTER TABLE chat_turns DROP COLUMN collection_kind");
+      state.storage.sql.exec("ALTER TABLE chat_turns DROP COLUMN collection_theme_id");
       state.storage.sql.exec("DELETE FROM __drizzle_migrations WHERE created_at >= 1786415351981");
 
       const repository = Reflect.get(instance, "repository") as {
