@@ -10,7 +10,9 @@
 -- 2026-08-06T00:00:00.000Z for leisure-style and time-planning, and
 -- 2026-08-09T00:00:00.000Z for conversation-emotion, and
 -- 2026-08-14T00:00:00.000Z for life-priorities, work-values,
--- work-relationship-style, family-support-style, and friendship-style
+-- work-relationship-style, family-support-style, and friendship-style, and
+-- 2026-08-14T15:00:00.000Z (2026-08-15T00:00:00.000+09:00) for
+-- decision-making-style
 -- (Unix seconds, Drizzle timestamp mode).
 
 INSERT OR IGNORE INTO questions (id, created_at, updated_at, is_deleted) VALUES
@@ -113,7 +115,17 @@ INSERT OR IGNORE INTO questions (id, created_at, updated_at, is_deleted) VALUES
   ('q-friendship-style-07', 1786665600, 1786665600, 0),
   ('q-friendship-style-08', 1786665600, 1786665600, 0),
   ('q-friendship-style-09', 1786665600, 1786665600, 0),
-  ('q-friendship-style-10', 1786665600, 1786665600, 0);
+  ('q-friendship-style-10', 1786665600, 1786665600, 0),
+  ('q-decision-making-style-01', 1786719600, 1786719600, 0),
+  ('q-decision-making-style-02', 1786719600, 1786719600, 0),
+  ('q-decision-making-style-03', 1786719600, 1786719600, 0),
+  ('q-decision-making-style-04', 1786719600, 1786719600, 0),
+  ('q-decision-making-style-05', 1786719600, 1786719600, 0),
+  ('q-decision-making-style-06', 1786719600, 1786719600, 0),
+  ('q-decision-making-style-07', 1786719600, 1786719600, 0),
+  ('q-decision-making-style-08', 1786719600, 1786719600, 0),
+  ('q-decision-making-style-09', 1786719600, 1786719600, 0),
+  ('q-decision-making-style-10', 1786719600, 1786719600, 0);
 --> statement-breakpoint
 
 INSERT OR IGNORE INTO question_versions (
@@ -226,7 +238,17 @@ INSERT OR IGNORE INTO question_versions (
   (1786665600, 1786665600, 0, 'q-friendship-style-07', 1, 'approved', '仲のよい友達同士がまだ会ったことがないときは、機会を作って紹介したい。', 'single_choice', 1786665600),
   (1786665600, 1786665600, 0, 'q-friendship-style-08', 1, 'approved', '仲のよい友達同士がまだ会ったことがないときも、無理に紹介せずそれぞれ別に付き合いたい。', 'single_choice', 1786665600),
   (1786665600, 1786665600, 0, 'q-friendship-style-09', 1, 'approved', '友達の言葉に引っかかったときは、一人で考えるよりその場で理由を確かめたい。', 'single_choice', 1786665600),
-  (1786665600, 1786665600, 0, 'q-friendship-style-10', 1, 'approved', '友達の言葉に引っかかったときは、その場で確かめるより一度自分の中で整理してから話したい。', 'single_choice', 1786665600);
+  (1786665600, 1786665600, 0, 'q-friendship-style-10', 1, 'approved', '友達の言葉に引っかかったときは、その場で確かめるより一度自分の中で整理してから話したい。', 'single_choice', 1786665600),
+  (1786719600, 1786719600, 0, 'q-decision-making-style-01', 1, 'approved', '初めて買う道具を選ぶときは、候補を一つに絞る前に複数のレビューを比べたい。', 'single_choice', 1786719600),
+  (1786719600, 1786719600, 0, 'q-decision-making-style-02', 1, 'approved', '初めて買う道具を選ぶときは、必要な条件を満たす候補が見つかれば、それ以上は調べずに決めたい。', 'single_choice', 1786719600),
+  (1786719600, 1786719600, 0, 'q-decision-making-style-03', 1, 'approved', '締切まで一週間ある申し込みをするか迷ったときは、早めに参加するか決めたい。', 'single_choice', 1786719600),
+  (1786719600, 1786719600, 0, 'q-decision-making-style-04', 1, 'approved', '締切まで一週間ある申し込みをするか迷ったときは、すぐには決めず、締切が近づくまで考えたい。', 'single_choice', 1786719600),
+  (1786719600, 1786719600, 0, 'q-decision-making-style-05', 1, 'approved', '二つの選択肢に大きな差がないときは、最初にしっくりきた方を選びたい。', 'single_choice', 1786719600),
+  (1786719600, 1786719600, 0, 'q-decision-making-style-06', 1, 'approved', '二つの選択肢に大きな差がないときも、選ぶ理由を言葉にできる方を選びたい。', 'single_choice', 1786719600),
+  (1786719600, 1786719600, 0, 'q-decision-making-style-07', 1, 'approved', '初めて経験することを始めるか迷ったときは、決める前に経験者の意見を聞きたい。', 'single_choice', 1786719600),
+  (1786719600, 1786719600, 0, 'q-decision-making-style-08', 1, 'approved', '初めて経験することを始めるか迷ったときは、経験者に聞く前に自分の考えを固めたい。', 'single_choice', 1786719600),
+  (1786719600, 1786719600, 0, 'q-decision-making-style-09', 1, 'approved', '予定を決めたあとに重要な新しい情報が分かったときは、決めた内容を見直したい。', 'single_choice', 1786719600),
+  (1786719600, 1786719600, 0, 'q-decision-making-style-10', 1, 'approved', '予定を決めたあとに新しい情報が分かっても、大きな問題がなければ最初に決めた内容で進めたい。', 'single_choice', 1786719600);
 --> statement-breakpoint
 
 INSERT OR IGNORE INTO question_choices (
@@ -240,8 +262,8 @@ INSERT OR IGNORE INTO question_choices (
   position
 )
 SELECT
-  CASE WHEN id LIKE 'q-life-priorities-%' OR id LIKE 'q-work-values-%' OR id LIKE 'q-work-relationship-style-%' OR id LIKE 'q-family-support-style-%' OR id LIKE 'q-friendship-style-%' THEN 1786665600 WHEN id LIKE 'q-conversation-emotion-%' THEN 1786233600 WHEN id LIKE 'q-leisure-style-%' OR id LIKE 'q-time-planning-%' THEN 1785974400 ELSE 1785801600 END,
-  CASE WHEN id LIKE 'q-life-priorities-%' OR id LIKE 'q-work-values-%' OR id LIKE 'q-work-relationship-style-%' OR id LIKE 'q-family-support-style-%' OR id LIKE 'q-friendship-style-%' THEN 1786665600 WHEN id LIKE 'q-conversation-emotion-%' THEN 1786233600 WHEN id LIKE 'q-leisure-style-%' OR id LIKE 'q-time-planning-%' THEN 1785974400 ELSE 1785801600 END,
+  CASE WHEN id LIKE 'q-decision-making-style-%' THEN 1786719600 WHEN id LIKE 'q-life-priorities-%' OR id LIKE 'q-work-values-%' OR id LIKE 'q-work-relationship-style-%' OR id LIKE 'q-family-support-style-%' OR id LIKE 'q-friendship-style-%' THEN 1786665600 WHEN id LIKE 'q-conversation-emotion-%' THEN 1786233600 WHEN id LIKE 'q-leisure-style-%' OR id LIKE 'q-time-planning-%' THEN 1785974400 ELSE 1785801600 END,
+  CASE WHEN id LIKE 'q-decision-making-style-%' THEN 1786719600 WHEN id LIKE 'q-life-priorities-%' OR id LIKE 'q-work-values-%' OR id LIKE 'q-work-relationship-style-%' OR id LIKE 'q-family-support-style-%' OR id LIKE 'q-friendship-style-%' THEN 1786665600 WHEN id LIKE 'q-conversation-emotion-%' THEN 1786233600 WHEN id LIKE 'q-leisure-style-%' OR id LIKE 'q-time-planning-%' THEN 1785974400 ELSE 1785801600 END,
   0,
   id,
   1,
@@ -293,7 +315,12 @@ WHERE id IN (
   'q-friendship-style-03', 'q-friendship-style-04',
   'q-friendship-style-05', 'q-friendship-style-06',
   'q-friendship-style-07', 'q-friendship-style-08',
-  'q-friendship-style-09', 'q-friendship-style-10'
+  'q-friendship-style-09', 'q-friendship-style-10',
+  'q-decision-making-style-01', 'q-decision-making-style-02',
+  'q-decision-making-style-03', 'q-decision-making-style-04',
+  'q-decision-making-style-05', 'q-decision-making-style-06',
+  'q-decision-making-style-07', 'q-decision-making-style-08',
+  'q-decision-making-style-09', 'q-decision-making-style-10'
 );
 --> statement-breakpoint
 
@@ -308,8 +335,8 @@ INSERT OR IGNORE INTO question_choices (
   position
 )
 SELECT
-  CASE WHEN id LIKE 'q-life-priorities-%' OR id LIKE 'q-work-values-%' OR id LIKE 'q-work-relationship-style-%' OR id LIKE 'q-family-support-style-%' OR id LIKE 'q-friendship-style-%' THEN 1786665600 WHEN id LIKE 'q-conversation-emotion-%' THEN 1786233600 WHEN id LIKE 'q-leisure-style-%' OR id LIKE 'q-time-planning-%' THEN 1785974400 ELSE 1785801600 END,
-  CASE WHEN id LIKE 'q-life-priorities-%' OR id LIKE 'q-work-values-%' OR id LIKE 'q-work-relationship-style-%' OR id LIKE 'q-family-support-style-%' OR id LIKE 'q-friendship-style-%' THEN 1786665600 WHEN id LIKE 'q-conversation-emotion-%' THEN 1786233600 WHEN id LIKE 'q-leisure-style-%' OR id LIKE 'q-time-planning-%' THEN 1785974400 ELSE 1785801600 END,
+  CASE WHEN id LIKE 'q-decision-making-style-%' THEN 1786719600 WHEN id LIKE 'q-life-priorities-%' OR id LIKE 'q-work-values-%' OR id LIKE 'q-work-relationship-style-%' OR id LIKE 'q-family-support-style-%' OR id LIKE 'q-friendship-style-%' THEN 1786665600 WHEN id LIKE 'q-conversation-emotion-%' THEN 1786233600 WHEN id LIKE 'q-leisure-style-%' OR id LIKE 'q-time-planning-%' THEN 1785974400 ELSE 1785801600 END,
+  CASE WHEN id LIKE 'q-decision-making-style-%' THEN 1786719600 WHEN id LIKE 'q-life-priorities-%' OR id LIKE 'q-work-values-%' OR id LIKE 'q-work-relationship-style-%' OR id LIKE 'q-family-support-style-%' OR id LIKE 'q-friendship-style-%' THEN 1786665600 WHEN id LIKE 'q-conversation-emotion-%' THEN 1786233600 WHEN id LIKE 'q-leisure-style-%' OR id LIKE 'q-time-planning-%' THEN 1785974400 ELSE 1785801600 END,
   0,
   id,
   1,
@@ -361,7 +388,12 @@ WHERE id IN (
   'q-friendship-style-03', 'q-friendship-style-04',
   'q-friendship-style-05', 'q-friendship-style-06',
   'q-friendship-style-07', 'q-friendship-style-08',
-  'q-friendship-style-09', 'q-friendship-style-10'
+  'q-friendship-style-09', 'q-friendship-style-10',
+  'q-decision-making-style-01', 'q-decision-making-style-02',
+  'q-decision-making-style-03', 'q-decision-making-style-04',
+  'q-decision-making-style-05', 'q-decision-making-style-06',
+  'q-decision-making-style-07', 'q-decision-making-style-08',
+  'q-decision-making-style-09', 'q-decision-making-style-10'
 );
 --> statement-breakpoint
 
@@ -699,6 +731,39 @@ INSERT OR IGNORE INTO diagnosis_scoring_configs (
       "highMinimum":65,
       "balancedLabel":"状況に応じて友達との付き合い方を選ぶ"
     }'
+  ),
+  (
+    'decision-making-style-v1',
+    1786719600,
+    1786719600,
+    0,
+    1,
+    '{
+      "parameters": [
+        {"id":"decision-information","label":"情報の集め方","lowLabel":"必要な情報に絞って決めたい","highLabel":"複数の情報を比べて決めたい"},
+        {"id":"decision-timing","label":"決める時期","lowLabel":"期限近くまで考えたい","highLabel":"早めに方向を決めたい"},
+        {"id":"decision-intuition","label":"判断のよりどころ","lowLabel":"理由を言葉にして選びたい","highLabel":"最初の感覚を取り入れたい"},
+        {"id":"decision-consultation","label":"相談の取り入れ方","lowLabel":"まず自分の考えを固めたい","highLabel":"決める前に意見を聞きたい"},
+        {"id":"decision-reconsideration","label":"決定の見直し","lowLabel":"決めた方針で進めたい","highLabel":"新しい情報があれば見直したい"}
+      ],
+      "choiceScores": {"yes":1,"no":-1},
+      "questions": {
+        "q-decision-making-style-01":{"questionVersion":1,"weights":{"decision-information":1}},
+        "q-decision-making-style-02":{"questionVersion":1,"weights":{"decision-information":-1}},
+        "q-decision-making-style-03":{"questionVersion":1,"weights":{"decision-timing":1}},
+        "q-decision-making-style-04":{"questionVersion":1,"weights":{"decision-timing":-1}},
+        "q-decision-making-style-05":{"questionVersion":1,"weights":{"decision-intuition":1}},
+        "q-decision-making-style-06":{"questionVersion":1,"weights":{"decision-intuition":-1}},
+        "q-decision-making-style-07":{"questionVersion":1,"weights":{"decision-consultation":1}},
+        "q-decision-making-style-08":{"questionVersion":1,"weights":{"decision-consultation":-1}},
+        "q-decision-making-style-09":{"questionVersion":1,"weights":{"decision-reconsideration":1}},
+        "q-decision-making-style-10":{"questionVersion":1,"weights":{"decision-reconsideration":-1}}
+      },
+      "minimumCoverage":0.6,
+      "lowMaximum":35,
+      "highMinimum":65,
+      "balancedLabel":"状況に応じて決め方を使い分ける"
+    }'
   );
 --> statement-breakpoint
 
@@ -725,7 +790,8 @@ INSERT INTO diagnoses (
   ('work-values', 1786665600, 1786665600, 0, '仕事の価値観・働き方', '裁量、成長、報酬、安定、仕事と生活のバランスに関する傾向を見ます。', 'general', 'work-values-v1', 70, 1786665600, 'published', 1786665600),
   ('work-relationship-style', 1786665600, 1786665600, 0, '仕事の変化・周囲との関わり方', '仕事の変化への関心と、仕事で関わる相手との距離、相談、意見をもらう頻度、意見の伝え方に関する傾向を見ます。', 'work', 'work-relationship-style-v1', 80, 1786665600, 'published', 1786665600),
   ('family-support-style', 1786665600, 1786665600, 0, '家族との距離感・支え合い', '家族との連絡、悩みの共有、支え方、意見が違うときの話し方、予定の調整に関する傾向を見ます。', 'family', 'family-support-style-v1', 90, 1786665600, 'published', 1786665600),
-  ('friendship-style', 1786665600, 1786665600, 0, '友達との距離感・付き合い方', '友達との連絡、会う予定、悩みの共有、友達同士の紹介、違和感を話す時期に関する傾向を見ます。', 'friend', 'friendship-style-v1', 100, 1786665600, 'published', 1786665600)
+  ('friendship-style', 1786665600, 1786665600, 0, '友達との距離感・付き合い方', '友達との連絡、会う予定、悩みの共有、友達同士の紹介、違和感を話す時期に関する傾向を見ます。', 'friend', 'friendship-style-v1', 100, 1786665600, 'published', 1786665600),
+  ('decision-making-style', 1786719600, 1786719600, 0, '決め方・迷いとの向き合い方', '情報収集、決める時期、直感、周囲への相談、決定の見直しに関する傾向を見ます。', 'general', 'decision-making-style-v1', 110, 1786719600, 'published', 1786719600)
 ON CONFLICT(id) DO UPDATE SET
   description = CASE
     WHEN diagnoses.description = '' THEN excluded.description
@@ -859,21 +925,31 @@ INSERT OR IGNORE INTO diagnosis_questions (
   ('dq-friendship-style-07', 1786665600, 1786665600, 0, 'friendship-style', 'q-friendship-style-07', 1, 6),
   ('dq-friendship-style-08', 1786665600, 1786665600, 0, 'friendship-style', 'q-friendship-style-08', 1, 7),
   ('dq-friendship-style-09', 1786665600, 1786665600, 0, 'friendship-style', 'q-friendship-style-09', 1, 8),
-  ('dq-friendship-style-10', 1786665600, 1786665600, 0, 'friendship-style', 'q-friendship-style-10', 1, 9);
+  ('dq-friendship-style-10', 1786665600, 1786665600, 0, 'friendship-style', 'q-friendship-style-10', 1, 9),
+  ('dq-decision-making-style-01', 1786719600, 1786719600, 0, 'decision-making-style', 'q-decision-making-style-01', 1, 0),
+  ('dq-decision-making-style-02', 1786719600, 1786719600, 0, 'decision-making-style', 'q-decision-making-style-02', 1, 1),
+  ('dq-decision-making-style-03', 1786719600, 1786719600, 0, 'decision-making-style', 'q-decision-making-style-03', 1, 2),
+  ('dq-decision-making-style-04', 1786719600, 1786719600, 0, 'decision-making-style', 'q-decision-making-style-04', 1, 3),
+  ('dq-decision-making-style-05', 1786719600, 1786719600, 0, 'decision-making-style', 'q-decision-making-style-05', 1, 4),
+  ('dq-decision-making-style-06', 1786719600, 1786719600, 0, 'decision-making-style', 'q-decision-making-style-06', 1, 5),
+  ('dq-decision-making-style-07', 1786719600, 1786719600, 0, 'decision-making-style', 'q-decision-making-style-07', 1, 6),
+  ('dq-decision-making-style-08', 1786719600, 1786719600, 0, 'decision-making-style', 'q-decision-making-style-08', 1, 7),
+  ('dq-decision-making-style-09', 1786719600, 1786719600, 0, 'decision-making-style', 'q-decision-making-style-09', 1, 8),
+  ('dq-decision-making-style-10', 1786719600, 1786719600, 0, 'decision-making-style', 'q-decision-making-style-10', 1, 9);
 --> statement-breakpoint
 
 -- AccountDataがsnapshotを再同期するか判断する版。
 -- このseedのcatalog内容を変更したら、必ずversionを1つ上げる。
-INSERT INTO catalog_versions (catalog_id, version, updated_at) VALUES ('diagnosis', 8, 1786665600)
+INSERT INTO catalog_versions (catalog_id, version, updated_at) VALUES ('diagnosis', 9, 1786719600)
   ON CONFLICT(catalog_id) DO UPDATE SET version = excluded.version, updated_at = excluded.updated_at;
 --> statement-breakpoint
 
--- Expected result: diagnosis_count=10, question_version_count=100,
--- choice_count=200, diagnosis_question_count=100, scoring_config_count=10, catalog_version=8.
+-- Expected result: diagnosis_count=11, question_version_count=110,
+-- choice_count=220, diagnosis_question_count=110, scoring_config_count=11, catalog_version=9.
 SELECT
-  (SELECT COUNT(*) FROM diagnoses WHERE ((id IN ('relationship-priority', 'money-values', 'leisure-style', 'time-planning', 'conversation-emotion') AND relationship_category = 'partner') OR (id IN ('life-priorities', 'work-values') AND relationship_category = 'general') OR (id = 'work-relationship-style' AND relationship_category = 'work') OR (id = 'family-support-style' AND relationship_category = 'family') OR (id = 'friendship-style' AND relationship_category = 'friend')) AND state = 'published' AND description <> '' AND is_deleted = 0) AS diagnosis_count,
-  (SELECT COUNT(*) FROM question_versions WHERE version = 1 AND state = 'approved' AND is_deleted = 0 AND (question_id LIKE 'q-relationship-priority-%' OR question_id LIKE 'q-money-%' OR question_id LIKE 'q-leisure-style-%' OR question_id LIKE 'q-time-planning-%' OR question_id LIKE 'q-conversation-emotion-%' OR question_id LIKE 'q-life-priorities-%' OR question_id LIKE 'q-work-values-%' OR question_id LIKE 'q-work-relationship-style-%' OR question_id LIKE 'q-family-support-style-%' OR question_id LIKE 'q-friendship-style-%')) AS question_version_count,
-  (SELECT COUNT(*) FROM question_choices WHERE question_version = 1 AND is_deleted = 0 AND (question_id LIKE 'q-relationship-priority-%' OR question_id LIKE 'q-money-%' OR question_id LIKE 'q-leisure-style-%' OR question_id LIKE 'q-time-planning-%' OR question_id LIKE 'q-conversation-emotion-%' OR question_id LIKE 'q-life-priorities-%' OR question_id LIKE 'q-work-values-%' OR question_id LIKE 'q-work-relationship-style-%' OR question_id LIKE 'q-family-support-style-%' OR question_id LIKE 'q-friendship-style-%')) AS choice_count,
-  (SELECT COUNT(*) FROM diagnosis_questions WHERE diagnosis_id IN ('relationship-priority', 'money-values', 'leisure-style', 'time-planning', 'conversation-emotion', 'life-priorities', 'work-values', 'work-relationship-style', 'family-support-style', 'friendship-style') AND is_deleted = 0) AS diagnosis_question_count,
-  (SELECT COUNT(*) FROM diagnosis_scoring_configs WHERE id IN ('relationship-priority-v1', 'money-values-v1', 'leisure-style-v1', 'time-planning-v1', 'conversation-emotion-v1', 'life-priorities-v1', 'work-values-v1', 'work-relationship-style-v1', 'family-support-style-v1', 'friendship-style-v1') AND version = 1 AND is_deleted = 0) AS scoring_config_count,
+  (SELECT COUNT(*) FROM diagnoses WHERE ((id IN ('relationship-priority', 'money-values', 'leisure-style', 'time-planning', 'conversation-emotion') AND relationship_category = 'partner') OR (id IN ('life-priorities', 'work-values', 'decision-making-style') AND relationship_category = 'general') OR (id = 'work-relationship-style' AND relationship_category = 'work') OR (id = 'family-support-style' AND relationship_category = 'family') OR (id = 'friendship-style' AND relationship_category = 'friend')) AND state = 'published' AND description <> '' AND is_deleted = 0) AS diagnosis_count,
+  (SELECT COUNT(*) FROM question_versions WHERE version = 1 AND state = 'approved' AND is_deleted = 0 AND (question_id LIKE 'q-relationship-priority-%' OR question_id LIKE 'q-money-%' OR question_id LIKE 'q-leisure-style-%' OR question_id LIKE 'q-time-planning-%' OR question_id LIKE 'q-conversation-emotion-%' OR question_id LIKE 'q-life-priorities-%' OR question_id LIKE 'q-work-values-%' OR question_id LIKE 'q-work-relationship-style-%' OR question_id LIKE 'q-family-support-style-%' OR question_id LIKE 'q-friendship-style-%' OR question_id LIKE 'q-decision-making-style-%')) AS question_version_count,
+  (SELECT COUNT(*) FROM question_choices WHERE question_version = 1 AND is_deleted = 0 AND (question_id LIKE 'q-relationship-priority-%' OR question_id LIKE 'q-money-%' OR question_id LIKE 'q-leisure-style-%' OR question_id LIKE 'q-time-planning-%' OR question_id LIKE 'q-conversation-emotion-%' OR question_id LIKE 'q-life-priorities-%' OR question_id LIKE 'q-work-values-%' OR question_id LIKE 'q-work-relationship-style-%' OR question_id LIKE 'q-family-support-style-%' OR question_id LIKE 'q-friendship-style-%' OR question_id LIKE 'q-decision-making-style-%')) AS choice_count,
+  (SELECT COUNT(*) FROM diagnosis_questions WHERE diagnosis_id IN ('relationship-priority', 'money-values', 'leisure-style', 'time-planning', 'conversation-emotion', 'life-priorities', 'work-values', 'work-relationship-style', 'family-support-style', 'friendship-style', 'decision-making-style') AND is_deleted = 0) AS diagnosis_question_count,
+  (SELECT COUNT(*) FROM diagnosis_scoring_configs WHERE id IN ('relationship-priority-v1', 'money-values-v1', 'leisure-style-v1', 'time-planning-v1', 'conversation-emotion-v1', 'life-priorities-v1', 'work-values-v1', 'work-relationship-style-v1', 'family-support-style-v1', 'friendship-style-v1', 'decision-making-style-v1') AND version = 1 AND is_deleted = 0) AS scoring_config_count,
   (SELECT version FROM catalog_versions WHERE catalog_id = 'diagnosis') AS catalog_version;
