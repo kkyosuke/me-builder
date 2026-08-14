@@ -32,7 +32,11 @@ type DiagnosisDetailContent =
 
 type DiagnosisDetailState =
   | { status: "idle" }
-  | { status: "loading"; destination: Exclude<DiagnosisDestination, "closed"> }
+  | {
+      status: "loading";
+      destination: Exclude<DiagnosisDestination, "closed">;
+      showIntroduction: boolean;
+    }
   | { status: "success"; data: DiagnosisDetailContent }
   | { status: "error"; message: string };
 
@@ -84,7 +88,14 @@ export function useDiagnosisDetail({ idToken, onProgress }: UseDiagnosisDetailOp
       request.current?.abort();
       const controller = new AbortController();
       request.current = controller;
-      setState({ status: "loading", destination });
+      setState({
+        status: "loading",
+        destination,
+        showIntroduction:
+          destination === "answer" &&
+          diagnosis.responseStatus === "unanswered" &&
+          diagnosis.answeredCount === 0,
+      });
       const minimumLoading = waitForMinimumLoading();
       try {
         await answerSaver.waitForPendingSaves(diagnosis.id);
@@ -185,7 +196,7 @@ export function useDiagnosisDetail({ idToken, onProgress }: UseDiagnosisDetailOp
     request.current?.abort();
     const controller = new AbortController();
     request.current = controller;
-    setState({ status: "loading", destination: "result" });
+    setState({ status: "loading", destination: "result", showIntroduction: false });
     const minimumLoading = waitForMinimumLoading();
     const completedProgress = {
       responseStatus: "answered" as const,

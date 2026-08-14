@@ -23,6 +23,14 @@ const labels: Record<RelationshipCategory, string> = {
   general: "自分自身",
 };
 
+const answerContexts: Record<RelationshipCategory, string> = {
+  partner: "パートナーとの関係を思い浮かべて答えてください。",
+  family: "家族との関係を思い浮かべて答えてください。",
+  friend: "友達との関係を思い浮かべて答えてください。",
+  work: "仕事で関わる人との関係を思い浮かべて答えてください。",
+  general: "特定の相手ではなく、普段の自分を思い浮かべて答えてください。",
+};
+
 const badgeClassNames: Record<RelationshipCategory, string> = {
   partner: "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-200",
   family: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200",
@@ -43,6 +51,10 @@ const filterClassNames: Record<FilterableRelationshipCategory, string> = {
 
 export function getRelationshipCategoryLabel(category: RelationshipCategory): string {
   return labels[category];
+}
+
+export function getRelationshipCategoryAnswerContext(category: RelationshipCategory): string {
+  return answerContexts[category];
 }
 
 export function getRelationshipCategoryBadgeClassName(category: RelationshipCategory): string {

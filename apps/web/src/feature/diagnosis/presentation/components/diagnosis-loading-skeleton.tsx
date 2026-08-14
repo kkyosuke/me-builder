@@ -61,6 +61,28 @@ export function DiagnosisAnswerSkeleton() {
   );
 }
 
+export function DiagnosisIntroductionSkeleton() {
+  return (
+    <main className="mx-auto min-h-dvh w-full max-w-2xl px-4 py-5 sm:px-8 sm:py-8">
+      <SkeletonLoader label="診断回答を読み込み中">
+        <SkeletonBlock className="mb-5 h-9 w-28 rounded-xl" />
+        <div className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-2xl shadow-slate-950/10 dark:border-slate-700 dark:bg-slate-800">
+          <SkeletonBlock className="aspect-video w-full rounded-none" />
+          <div className="p-5 sm:p-7">
+            <SkeletonBlock className="h-3 w-36 rounded-full" />
+            <SkeletonBlock className="mt-4 h-7 w-4/5 rounded-full" />
+            <SkeletonBlock className="mt-4 h-3 w-full rounded-full" />
+            <SkeletonBlock className="mt-2 h-3 w-3/4 rounded-full" />
+            <SkeletonBlock className="mt-6 h-24 w-full rounded-2xl" />
+            <SkeletonBlock className="mx-auto mt-5 h-3 w-4/5 rounded-full" />
+            <SkeletonBlock className="mt-4 h-12 w-full rounded-2xl" />
+          </div>
+        </div>
+      </SkeletonLoader>
+    </main>
+  );
+}
+
 function DiagnosisParameterSkeleton() {
   return (
     <div className="py-3.5">
