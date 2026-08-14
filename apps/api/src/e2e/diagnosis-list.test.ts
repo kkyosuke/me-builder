@@ -215,9 +215,9 @@ describe("GET /api/diagnoses local D1 E2E", () => {
         lastAnsweredAt: string | null;
       }>;
     };
-    expect(initialBody.diagnoses).toHaveLength(8);
+    expect(initialBody.diagnoses).toHaveLength(9);
     expect(initialBody.diagnoses.map(({ displayOrder }) => displayOrder)).toEqual([
-      10, 20, 30, 40, 50, 60, 70, 80,
+      10, 20, 30, 40, 50, 60, 70, 80, 90,
     ]);
     expect(initialBody.diagnoses.find(({ id }) => id === "life-priorities")).toMatchObject({
       relationshipCategory: "general",
@@ -231,6 +231,11 @@ describe("GET /api/diagnoses local D1 E2E", () => {
     });
     expect(initialBody.diagnoses.find(({ id }) => id === "work-relationship-style")).toMatchObject({
       relationshipCategory: "work",
+      responseStatus: "unanswered",
+      questionCount: 10,
+    });
+    expect(initialBody.diagnoses.find(({ id }) => id === "family-support-style")).toMatchObject({
+      relationshipCategory: "family",
       responseStatus: "unanswered",
       questionCount: 10,
     });
@@ -407,6 +412,35 @@ describe("GET /api/diagnoses/:diagnosisId local D1 E2E", () => {
       "会議で相手と意見が違うときは、自分の考えを伝えるより相手の判断に合わせたい。",
     ]);
     expect(body.questions.every(({ text }) => !text.includes("上司"))).toBe(true);
+  });
+
+  it("家族との距離感・支え合いの状況ベース10問をseedから返すこと", async () => {
+    const response = await request("known-token", "/api/diagnoses/family-support-style");
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      id: string;
+      title: string;
+      relationshipCategory: string;
+      questions: Array<{ diagnosisQuestionId: string; text: string }>;
+    };
+
+    expect(body).toMatchObject({
+      id: "family-support-style",
+      title: "家族との距離感・支え合い",
+      relationshipCategory: "family",
+    });
+    expect(body.questions.map(({ text }) => text)).toEqual([
+      "家族としばらく会えない時期には、用事がなくても定期的に連絡を取りたい。",
+      "家族としばらく会えない時期には、必要な用事があるときだけ連絡すればよい。",
+      "自分が困りごとを抱えたときは、深刻になる前に家族へ話したい。",
+      "自分が困りごとを抱えたときは、助けが必要になるまで家族には話さずにおきたい。",
+      "家族が悩みを話したときは、具体策を考えるより先に気持ちを聞きたい。",
+      "家族が悩みを話したときは、気持ちを聞くより先に具体的にできることを考えたい。",
+      "家族と意見が食い違ったときは、時間を置くよりその場で話し合いたい。",
+      "家族と意見が食い違ったときは、その場で話すより時間を置いてから話し合いたい。",
+      "家族と一緒に過ごす予定は、早めに相談して決めたい。",
+      "家族と一緒に過ごす予定は、直前に都合を合わせて決めてもよい。",
+    ]);
   });
 
   it(`${diagnosisDetailCases.notFound.id}: ${diagnosisDetailCases.notFound.name}`, async () => {

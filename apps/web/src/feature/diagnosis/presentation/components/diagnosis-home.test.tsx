@@ -220,7 +220,12 @@ describe("DiagnosisHome", () => {
               title: "仕事の変化・周囲との関わり方",
               displayOrder: 5,
             }),
-            diagnosis({ id: "new-diagnosis", title: "新しい診断", displayOrder: 6 }),
+            diagnosis({
+              id: "family-support-style",
+              title: "家族との距離感・支え合い",
+              displayOrder: 6,
+            }),
+            diagnosis({ id: "new-diagnosis", title: "新しい診断", displayOrder: 7 }),
           ],
         }}
         onOpenDiagnosis={vi.fn()}
@@ -232,8 +237,11 @@ describe("DiagnosisHome", () => {
     const timePlanningCard = screen.getByRole("button", { name: /時間と予定/ });
     const lifePrioritiesCard = screen.getByRole("button", { name: /優先順位と人生の方向性/ });
     const workValuesCard = screen.getByRole("button", { name: /仕事の価値観・働き方/ });
-    const workSupervisorStyleCard = screen.getByRole("button", {
+    const workRelationshipStyleCard = screen.getByRole("button", {
       name: /仕事の変化・周囲との関わり方/,
+    });
+    const familySupportStyleCard = screen.getByRole("button", {
+      name: /家族との距離感・支え合い/,
     });
     const fallbackCard = screen.getByRole("button", { name: /新しい診断/ });
 
@@ -249,8 +257,11 @@ describe("DiagnosisHome", () => {
     expect(workValuesCard.querySelector("img")?.getAttribute("src")).toBe(
       "/images/diagnoses/work-values.jpg",
     );
-    expect(workSupervisorStyleCard.querySelector("img")?.getAttribute("src")).toBe(
+    expect(workRelationshipStyleCard.querySelector("img")?.getAttribute("src")).toBe(
       "/images/diagnoses/work-relationship-style.jpg",
+    );
+    expect(familySupportStyleCard.querySelector("img")?.getAttribute("src")).toBe(
+      "/images/diagnoses/family-support-style.jpg",
     );
     expect(fallbackCard.querySelector("img")?.getAttribute("src")).toBe(
       "/images/diagnoses/default.jpg",
