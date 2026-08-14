@@ -158,6 +158,74 @@ describe("diary Brain checkpoint", () => {
     ).toEqual(candidates);
   });
 
+  it("本人の職業を尋ねた直後の短い回答をoccupationとして受理する", () => {
+    const candidate = {
+      category: "identity",
+      statement: "看護師",
+      source_message_ids: ["occupation-message"],
+      is_inference: false,
+      prompt_context: { kind: "occupation", occupation: "看護師" },
+    } as const;
+    const messages = [
+      {
+        id: "occupation-question",
+        role: "assistant" as const,
+        body: "そういえばどんな仕事してるの？",
+        sequence: 1,
+      },
+      {
+        id: "occupation-message",
+        role: "user" as const,
+        body: "看護師",
+        sequence: 2,
+      },
+    ];
+
+    expect(
+      validateDiaryBrainCandidates(
+        JSON.stringify({ brain_item_candidates: [candidate] }),
+        messages,
+        ["occupation-message"],
+      ),
+    ).toEqual([candidate]);
+  });
+
+  it("第三者の職業を尋ねた直後の短い回答を本人のoccupationにしない", () => {
+    const log = vi.spyOn(logger, "error").mockImplementation(() => undefined);
+    const raw = JSON.stringify({
+      brain_item_candidates: [
+        {
+          category: "identity",
+          statement: "看護師",
+          source_message_ids: ["occupation-message"],
+          is_inference: false,
+          prompt_context: { kind: "occupation", occupation: "看護師" },
+        },
+      ],
+    });
+
+    expect(
+      validateDiaryBrainCandidates(
+        raw,
+        [
+          {
+            id: "occupation-question",
+            role: "assistant",
+            body: "お姉さんはどんな仕事をしているの？",
+            sequence: 1,
+          },
+          { id: "occupation-message", role: "user", body: "看護師", sequence: 2 },
+        ],
+        ["occupation-message"],
+      ),
+    ).toEqual([]);
+    expect(log).toHaveBeenCalledWith(
+      { candidateIndex: 0, validationReason: "ungrounded_prompt_context" },
+      "Skipped invalid Diary Brain candidate",
+    );
+    log.mockRestore();
+  });
+
   it("本人が明言していない声かけ属性を候補単位で破棄する", () => {
     const log = vi.spyOn(logger, "error").mockImplementation(() => undefined);
     const raw = JSON.stringify({

@@ -52,6 +52,7 @@ export type {
 } from "./account/action/diary-temporal";
 export {
   arePromptContextsEqual,
+  findPrecedingAssistantBodies,
   isPromptContextGrounded,
   parsePromptContext,
   PROMPT_CONTEXT_ATTRIBUTE_MASTER,

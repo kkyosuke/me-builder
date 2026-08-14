@@ -1,6 +1,7 @@
 import {
   DIARY_BRAIN_CATEGORIES,
   PromptContextSchema,
+  findPrecedingAssistantBodies,
   isPromptContextGrounded,
 } from "@me-builder/lib";
 import type { ConversationContextMessage, DiaryBrainCategory } from "@me-builder/lib";
@@ -85,7 +86,12 @@ export function validateDiaryBrainCandidates(
     }
     if (
       candidate.prompt_context &&
-      !isPromptContextGrounded(candidate.category, statement, candidate.prompt_context)
+      !isPromptContextGrounded(
+        candidate.category,
+        statement,
+        candidate.prompt_context,
+        findPrecedingAssistantBodies(messages, candidate.source_message_ids),
+      )
     ) {
       logRejectedCandidate(candidateIndex, "ungrounded_prompt_context");
       continue;

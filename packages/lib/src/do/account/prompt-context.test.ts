@@ -5,6 +5,7 @@ import {
   PROMPT_CONTEXT_COLLECTION_GOAL,
   PromptContextSchema,
   arePromptContextsEqual,
+  findPrecedingAssistantBodies,
   isPromptContextGrounded,
   parsePromptContext,
   readPromptContext,
@@ -35,6 +36,7 @@ describe("prompt context attribute master", () => {
       "休みはシフトで変わるよ",
       { kind: "weekly_rhythm", scheduleMode: "variable_shift" },
     ],
+    ["behavior_pattern", "土日休みだよ", { kind: "weekly_rhythm", scheduleMode: "weekends_off" }],
     [
       "behavior_pattern",
       "毎週月曜は塾に行っている",
@@ -71,6 +73,59 @@ describe("prompt context attribute master", () => {
       isPromptContextGrounded("identity", "友達は看護師なの", {
         kind: "occupation",
         occupation: "看護師",
+      }),
+    ).toBe(false);
+  });
+
+  it("単語だけの職業は本人への直前質問がある場合だけ受理する", () => {
+    const promptContext = { kind: "occupation", occupation: "看護師" } as const;
+    expect(isPromptContextGrounded("identity", "看護師", promptContext)).toBe(false);
+    expect(
+      isPromptContextGrounded("identity", "看護師", promptContext, [
+        "そういえばどんな仕事してるの？",
+      ]),
+    ).toBe(true);
+    expect(
+      isPromptContextGrounded("identity", "看護師", promptContext, [
+        "お姉さんはどんな仕事をしているの？",
+      ]),
+    ).toBe(false);
+  });
+
+  it("Evidenceへ直接先行するassistant messageだけを補助文脈にする", () => {
+    expect(
+      findPrecedingAssistantBodies(
+        [
+          { id: "assistant-1", role: "assistant", body: "どんな仕事してるの？", sequence: 1 },
+          { id: "user-1", role: "user", body: "看護師", sequence: 2 },
+          { id: "assistant-2", role: "assistant", body: "休みは固定？", sequence: 3 },
+          { id: "user-2", role: "user", body: "固定じゃない", sequence: 4 },
+        ],
+        ["user-1"],
+      ),
+    ).toEqual(["どんな仕事してるの？"]);
+  });
+
+  it("固定ではないという明言をfixed_weeklyとして扱わない", () => {
+    expect(
+      isPromptContextGrounded("behavior_pattern", "休みは固定じゃない", {
+        kind: "weekly_rhythm",
+        scheduleMode: "fixed_weekly",
+      }),
+    ).toBe(false);
+    expect(
+      isPromptContextGrounded("behavior_pattern", "休みは固定じゃない", {
+        kind: "weekly_rhythm",
+        scheduleMode: "variable_shift",
+      }),
+    ).toBe(true);
+  });
+
+  it("土日が休みではないという明言をweekends_offとして扱わない", () => {
+    expect(
+      isPromptContextGrounded("behavior_pattern", "土日は休みじゃない", {
+        kind: "weekly_rhythm",
+        scheduleMode: "weekends_off",
       }),
     ).toBe(false);
   });

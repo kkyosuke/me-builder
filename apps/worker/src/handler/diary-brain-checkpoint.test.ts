@@ -181,7 +181,7 @@ describe("processDiaryBrainCheckpointMessage", () => {
         statement: "看護師なの",
         attributes: expect.objectContaining({
           promptContext: { kind: "occupation", occupation: "看護師" },
-          promptContextPromptVersion: "diary-brain-v3",
+          promptContextPromptVersion: "diary-brain-v4",
         }),
       }),
     ]);

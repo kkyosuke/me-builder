@@ -3,6 +3,7 @@ import {
   type DiaryBrainCategory,
   type PromptContext,
   accountDataFor,
+  arePromptContextsEqual,
   buildDiaryTemporalSearchText,
   resolveDiaryTemporalContext,
 } from "@me-builder/lib";
@@ -121,6 +122,15 @@ export function consolidateDiaryBrainCandidates(
       throw new Error("Diary Brain candidate deduplication root is missing");
     }
     const existing = consolidated.get(root);
+    const promptContext = existing?.promptContext ?? rootCandidate.promptContext;
+    if (
+      promptContext &&
+      candidate.promptContext &&
+      !arePromptContextsEqual(promptContext, candidate.promptContext)
+    ) {
+      throw new Error("Diary Brain candidate deduplication prompt context conflict");
+    }
+    const mergedPromptContext = promptContext ?? candidate.promptContext;
     const sourceMessageIds = [
       ...new Set([...(existing?.sourceMessageIds ?? []), ...candidate.sourceMessageIds]),
     ];
@@ -146,6 +156,7 @@ export function consolidateDiaryBrainCandidates(
         : "none";
     consolidated.set(root, {
       ...rootCandidate,
+      ...(mergedPromptContext ? { promptContext: mergedPromptContext } : {}),
       sourceMessageIds,
       evidenceStatements: [...evidenceStatements].map(([sourceMessageId, statement]) => ({
         sourceMessageId,

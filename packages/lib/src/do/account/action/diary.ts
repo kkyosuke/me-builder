@@ -5,6 +5,7 @@ import type { AccountDataDatabase } from "../database";
 import {
   type PromptContext,
   arePromptContextsEqual,
+  findPrecedingAssistantBodies,
   isPromptContextGrounded,
   parsePromptContext,
   readPromptContext,
@@ -1287,12 +1288,18 @@ export async function getDiaryBrainCheckpointContext(
     .where(
       and(
         eq(conversationMessages.sessionId, checkpoint.sessionId),
-        gte(conversationMessages.sequence, checkpoint.fromSequence),
+        gte(conversationMessages.sequence, Math.max(1, checkpoint.fromSequence - 1)),
         lte(conversationMessages.sequence, checkpoint.throughSequence),
         eq(conversationMessages.isDeleted, false),
-        eq(conversationMessages.role, "user"),
-        eq(sourceRecords.accountId, accountId),
-        eq(sourceRecords.isDeleted, false),
+        or(
+          and(
+            eq(conversationMessages.role, "user"),
+            gte(conversationMessages.sequence, checkpoint.fromSequence),
+            eq(sourceRecords.accountId, accountId),
+            eq(sourceRecords.isDeleted, false),
+          ),
+          eq(conversationMessages.role, "assistant"),
+        ),
       ),
     )
     .orderBy(conversationMessages.sequence)
@@ -1370,7 +1377,12 @@ export async function applyDiaryBrainCheckpoint(
       (candidate.promptContext && !promptContext) ||
       (candidate.category === "identity" && promptContext?.kind !== "occupation") ||
       (promptContext &&
-        !isPromptContextGrounded(candidate.category, candidate.statement, promptContext)) ||
+        !isPromptContextGrounded(
+          candidate.category,
+          candidate.statement,
+          promptContext,
+          findPrecedingAssistantBodies(context.messages, messageIds),
+        )) ||
       messageIds.length === 0 ||
       messageIds.length !== candidate.sourceMessageIds.length ||
       evidenceStatements.length !== messageIds.length ||
