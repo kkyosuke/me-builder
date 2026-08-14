@@ -11,6 +11,7 @@ import {
   RefreshCw,
   Send,
 } from "lucide-react";
+import { SkeletonBlock, SkeletonLoader } from "../../../components/skeleton";
 import type { AsyncState } from "../../../model/async-state";
 import {
   diagnosisCategoryHref,
@@ -43,22 +44,57 @@ const nextActionGuides = {
   },
 } as const;
 
-function ShareConsentSkeleton() {
+function ShareConsentProfile({
+  onRetry,
+  state,
+}: {
+  onRetry: () => void;
+  state: AsyncState<CompatibilityShareConsent>;
+}) {
+  if (state.status === "idle" || state.status === "loading") {
+    return (
+      <SkeletonLoader label="共有者の情報を読み込み中" className="mt-5">
+        <div className="flex min-h-20 items-center gap-4">
+          <SkeletonBlock className="size-20 shrink-0 rounded-full" />
+          <SkeletonBlock className="h-5 w-36 rounded-full" />
+        </div>
+      </SkeletonLoader>
+    );
+  }
+
+  if (state.status === "error") {
+    return (
+      <section role="alert" className="mt-5 rounded-2xl border border-red-400/30 bg-red-400/10 p-4">
+        <p className="font-bold text-red-700 dark:text-red-300">
+          共有者の情報を確認できませんでした
+        </p>
+        <p className="mt-1 text-sm leading-relaxed text-slate-700 dark:text-slate-300">
+          {state.message}
+        </p>
+        <button
+          type="button"
+          onClick={onRetry}
+          className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-xl bg-red-300 px-4 py-2 text-sm font-semibold text-slate-950"
+        >
+          <RefreshCw className="size-4" aria-hidden="true" />
+          再試行
+        </button>
+      </section>
+    );
+  }
+
+  const displayName = state.data.displayName ?? "あなた";
   return (
-    <output
-      aria-label="共有の確認を読み込み中"
-      aria-live="polite"
-      className="mt-8 block animate-pulse space-y-3 motion-reduce:animate-none"
-    >
-      <span className="sr-only">共有の確認を読み込んでいます</span>
-      {["first", "second", "third"].map((key) => (
-        <span
-          key={key}
-          aria-hidden="true"
-          className="block h-36 rounded-2xl bg-slate-200 dark:bg-slate-800"
-        />
-      ))}
-    </output>
+    <div className="mt-5 flex min-h-20 items-center gap-4">
+      <CompatibilityProfileAvatar
+        imageUrl={state.data.avatarUrl}
+        displayName={displayName}
+        tone="sky"
+      />
+      <p className="text-sm font-semibold tracking-wider text-rose-700 dark:text-rose-300">
+        {displayName}さんから招待
+      </p>
+    </div>
   );
 }
 
@@ -73,7 +109,14 @@ function RelationshipCategorySelector({
 }) {
   return (
     <fieldset className="mt-7" disabled={disabled}>
-      <legend className="font-bold text-slate-950 dark:text-slate-50">相手との関係</legend>
+      <legend className="w-full">
+        <span className="flex w-full items-baseline justify-between gap-3">
+          <span className="font-bold text-slate-950 dark:text-slate-50">相手との関係</span>
+          <span className="shrink-0 text-xs font-semibold text-slate-500 dark:text-slate-400">
+            一つ選択してください
+          </span>
+        </span>
+      </legend>
       <p className="mt-1 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
         選んだ関係に合う診断と、人間関係全般の診断を2人の相性に使います。
       </p>
@@ -83,7 +126,7 @@ function RelationshipCategorySelector({
           return (
             <label
               key={category}
-              className={`flex min-h-12 cursor-pointer items-center justify-center rounded-2xl border px-3 py-2 text-sm font-bold transition focus-within:ring-2 focus-within:ring-sky-500 focus-within:ring-offset-2 ${
+              className={`flex min-h-12 cursor-pointer items-center gap-2.5 rounded-2xl border px-3 py-2 text-sm font-bold transition focus-within:ring-2 focus-within:ring-sky-500 focus-within:ring-offset-2 ${
                 selected
                   ? `border-current ring-2 ring-current/20 ${getRelationshipCategoryBadgeClassName(category)}`
                   : "border-slate-300 bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
@@ -95,20 +138,18 @@ function RelationshipCategorySelector({
                 value={category}
                 checked={selected}
                 onChange={() => onChange(category)}
-                className="sr-only"
+                className="size-5 shrink-0 accent-rose-500"
               />
-              {getRelationshipCategoryLabel(category)}
+              <span>{getRelationshipCategoryLabel(category)}</span>
             </label>
           );
         })}
       </div>
-      {value === null && <p className="mt-2 text-xs text-rose-700">関係を1つ選んでください。</p>}
     </fieldset>
   );
 }
 
 function ShareConsentContent({
-  consent,
   invitationState,
   onCopyLink,
   onIssue,
@@ -118,8 +159,8 @@ function ShareConsentContent({
   sharingMessage,
   relationshipCategory,
   onRelationshipCategoryChange,
+  state,
 }: {
-  consent: CompatibilityShareConsent;
   invitationState: AsyncState<CompatibilityInvitation>;
   onCopyLink: (url: string) => void;
   onIssue: () => void;
@@ -129,38 +170,31 @@ function ShareConsentContent({
   sharingMessage: string | null;
   relationshipCategory: CompatibilityRelationshipCategory | null;
   onRelationshipCategoryChange: (category: CompatibilityRelationshipCategory) => void;
+  state: AsyncState<CompatibilityShareConsent>;
 }) {
-  const displayName = consent.displayName ?? "あなた";
-  const guide = consent.nextAction ? nextActionGuides[consent.nextAction] : null;
+  const consent = state.status === "success" ? state.data : null;
+  const guide = consent?.nextAction ? nextActionGuides[consent.nextAction] : null;
   const guideHref =
-    guide && consent.nextAction === "diagnosis" && relationshipCategory
+    guide && consent?.nextAction === "diagnosis" && relationshipCategory
       ? diagnosisCategoryHref(relationshipCategory)
       : guide?.href;
 
   return (
     <>
-      <div className="mt-5 flex items-center gap-4">
-        <CompatibilityProfileAvatar
-          imageUrl={consent.avatarUrl}
-          displayName={displayName}
-          tone="sky"
-        />
-        <div>
-          <p className="text-sm font-semibold tracking-wider text-rose-700 dark:text-rose-300">
-            {displayName}さんから招待
-          </p>
-          <h1 className="mt-1 text-3xl font-bold text-slate-950 dark:text-slate-50">
-            うつしをシェア
-          </h1>
-        </div>
-      </div>
+      <h1 className="mt-5 text-3xl font-bold text-slate-950 dark:text-slate-50">うつしをシェア</h1>
       <p className="mt-4 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
         この相手とうつしをシェアしていいかだけを確認します。共有した後は、増えた分も自動で共有されます。共有される内容は「わたし」からいつでも確認できます。
       </p>
 
+      <ShareConsentProfile state={state} onRetry={onRetryConsent} />
+
       <RelationshipCategorySelector
         value={relationshipCategory}
-        disabled={invitationState.status === "loading" || invitationState.status === "success"}
+        disabled={
+          state.status !== "success" ||
+          invitationState.status === "loading" ||
+          invitationState.status === "success"
+        }
         onChange={onRelationshipCategoryChange}
       />
 
@@ -204,8 +238,7 @@ function ShareConsentContent({
           </a>
         </section>
       )}
-
-      {consent.blockingReasons.length > 0 && (
+      {consent && consent.blockingReasons.length > 0 && (
         <section className="mt-8 rounded-2xl border border-amber-300/60 bg-amber-50 p-4 dark:border-amber-500/30 dark:bg-amber-950/30">
           <h2 className="flex items-center gap-2 font-bold text-amber-950 dark:text-amber-100">
             <AlertCircle className="size-5" aria-hidden="true" />
@@ -264,7 +297,7 @@ function ShareConsentContent({
             <button
               type="button"
               disabled={
-                !consent.canShare ||
+                !consent?.canShare ||
                 relationshipCategory === null ||
                 invitationState.status === "loading"
               }
@@ -281,11 +314,9 @@ function ShareConsentContent({
               )}
               {invitationState.status === "loading"
                 ? "招待リンクを発行中"
-                : !consent.canShare
+                : consent && !consent.canShare
                   ? "招待リンクを発行できません"
-                  : relationshipCategory
-                    ? "共有して招待リンクを発行する"
-                    : "相手との関係を選んでください"}
+                  : "共有して招待リンクを発行する"}
             </button>
           )}
         </div>
@@ -320,39 +351,18 @@ export function CompatibilityShareScreen({
   return (
     <main className="mx-auto min-h-dvh w-full max-w-2xl px-4 pt-6 pb-28 sm:px-8">
       <CompatibilityBackHeader />
-      {(state.status === "idle" || state.status === "loading") && <ShareConsentSkeleton />}
-      {state.status === "error" && (
-        <section className="mt-8 rounded-3xl border border-red-400/30 bg-red-400/10 p-6 text-center">
-          <p className="font-bold text-red-700 dark:text-red-300">
-            共有の確認を表示できませんでした
-          </p>
-          <p className="mt-2 text-sm leading-relaxed text-slate-700 dark:text-slate-300">
-            {state.message}
-          </p>
-          <button
-            type="button"
-            onClick={onRetry}
-            className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-xl bg-red-300 px-4 py-2 text-sm font-semibold text-slate-950"
-          >
-            <RefreshCw className="size-4" aria-hidden="true" />
-            再試行
-          </button>
-        </section>
-      )}
-      {state.status === "success" && (
-        <ShareConsentContent
-          consent={state.data}
-          invitationState={invitationState}
-          sharingMessage={sharingMessage}
-          relationshipCategory={relationshipCategory}
-          onRelationshipCategoryChange={onRelationshipCategoryChange}
-          onCopyLink={onCopyLink}
-          onIssue={onIssue}
-          onRetryConsent={onRetry}
-          onShareToLine={onShareToLine}
-          isSharing={isSharing}
-        />
-      )}
+      <ShareConsentContent
+        state={state}
+        invitationState={invitationState}
+        sharingMessage={sharingMessage}
+        relationshipCategory={relationshipCategory}
+        onRelationshipCategoryChange={onRelationshipCategoryChange}
+        onCopyLink={onCopyLink}
+        onIssue={onIssue}
+        onRetryConsent={onRetry}
+        onShareToLine={onShareToLine}
+        isSharing={isSharing}
+      />
     </main>
   );
 }
