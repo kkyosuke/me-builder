@@ -290,6 +290,19 @@
 9. 昇進や評価のためでも、私生活の時間は減らしたくない。
 10. 必要であれば、勤務時間外でも仕事の連絡に対応したい。
 
+### 3.22 仕事の変化・周囲との関わり方
+
+1. 慣れた仕事と新しい仕事を選べる場面では、新しい役割や課題に取り組みたい。
+2. 慣れた仕事と新しい仕事を選べる場面では、慣れた仕事をさらに深めたい。
+3. 日々一緒に働く相手とは、用件がないときも普段から会話しておきたい。
+4. 日々一緒に働く相手との会話は、必要な報告や相談に絞りたい。
+5. 進め方を選べる仕事では、相手に細かく確認するより自分の判断で進めたい。
+6. 進め方を選べる仕事では、自分だけで決めるより相手と方針を確認しながら取り組みたい。
+7. 長く続く仕事では、一区切りを待たず相手からこまめに意見をもらいたい。
+8. 長く続く仕事では、途中より一区切りついた時に相手から意見をもらいたい。
+9. 会議で相手と意見が違うときも、自分の考えを率直に伝えたい。
+10. 会議で相手と意見が違うときは、自分の考えを伝えるより相手の判断に合わせたい。
+
 ## 4. 回答から傾向を出すために必要な設計
 
 この質問集だけでは、「貯蓄重視」などの傾向を論理的に算出できません。現時点で定義しているのは質問候補までであり、質問と傾向軸の対応、回答の向き、集計方法は未定義です。1問への回答だけで人物の傾向を確定しません。
@@ -319,7 +332,7 @@
 - 算出規則と、結果に使用した質問を本人が確認できるようにする
 - 回答数が足りない場合や回答が食い違う場合は、無理にラベルを付けない
 
-公開済み診断の質問と傾向軸の対応、計算式、表示条件は、[自分と相手の優先・境界線](../scoring/relationship-priority-parameter-design.md)、[お金と消費](../scoring/money-values-parameter-design.md)、[インドア・アウトドアと余暇](../scoring/leisure-style-parameter-design.md)、[時間と予定](../scoring/time-planning-parameter-design.md)、[会話と感情表現](../scoring/conversation-emotion-parameter-design.md)、[優先順位と人生の方向性](../scoring/life-priorities-parameter-design.md)、[仕事の価値観・働き方](../scoring/work-values-parameter-design.md)の各パラメータ変換設計を正とします。他の話題の対応は、質問の審査と合わせて後続で定義します。
+公開済み診断の質問と傾向軸の対応、計算式、表示条件は、[自分と相手の優先・境界線](../scoring/relationship-priority-parameter-design.md)、[お金と消費](../scoring/money-values-parameter-design.md)、[インドア・アウトドアと余暇](../scoring/leisure-style-parameter-design.md)、[時間と予定](../scoring/time-planning-parameter-design.md)、[会話と感情表現](../scoring/conversation-emotion-parameter-design.md)、[優先順位と人生の方向性](../scoring/life-priorities-parameter-design.md)、[仕事の価値観・働き方](../scoring/work-values-parameter-design.md)、[仕事の変化・周囲との関わり方](../scoring/work-relationship-style-parameter-design.md)の各パラメータ変換設計を正とします。他の話題の対応は、質問の審査と合わせて後続で定義します。
 
 ## 5. 公開単位
 

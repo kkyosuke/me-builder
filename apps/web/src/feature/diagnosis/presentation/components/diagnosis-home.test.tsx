@@ -215,7 +215,12 @@ describe("DiagnosisHome", () => {
               title: "仕事の価値観・働き方",
               displayOrder: 4,
             }),
-            diagnosis({ id: "new-diagnosis", title: "新しい診断", displayOrder: 5 }),
+            diagnosis({
+              id: "work-relationship-style",
+              title: "仕事の変化・周囲との関わり方",
+              displayOrder: 5,
+            }),
+            diagnosis({ id: "new-diagnosis", title: "新しい診断", displayOrder: 6 }),
           ],
         }}
         onOpenDiagnosis={vi.fn()}
@@ -227,6 +232,9 @@ describe("DiagnosisHome", () => {
     const timePlanningCard = screen.getByRole("button", { name: /時間と予定/ });
     const lifePrioritiesCard = screen.getByRole("button", { name: /優先順位と人生の方向性/ });
     const workValuesCard = screen.getByRole("button", { name: /仕事の価値観・働き方/ });
+    const workSupervisorStyleCard = screen.getByRole("button", {
+      name: /仕事の変化・周囲との関わり方/,
+    });
     const fallbackCard = screen.getByRole("button", { name: /新しい診断/ });
 
     expect(conversationEmotionCard.querySelector("img")?.getAttribute("src")).toBe(
@@ -240,6 +248,9 @@ describe("DiagnosisHome", () => {
     );
     expect(workValuesCard.querySelector("img")?.getAttribute("src")).toBe(
       "/images/diagnoses/work-values.jpg",
+    );
+    expect(workSupervisorStyleCard.querySelector("img")?.getAttribute("src")).toBe(
+      "/images/diagnoses/work-relationship-style.jpg",
     );
     expect(fallbackCard.querySelector("img")?.getAttribute("src")).toBe(
       "/images/diagnoses/default.jpg",
