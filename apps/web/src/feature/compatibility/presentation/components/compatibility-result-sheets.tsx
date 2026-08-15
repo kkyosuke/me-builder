@@ -1,5 +1,6 @@
 import type { CompatibilityRelationshipCategory } from "@me-builder/lib/compatibility";
 import { BookOpenText, HeartHandshake, Lightbulb, MessageCircleQuestion } from "lucide-react";
+import { InternalLink } from "../../../../components/internal-link";
 import { diagnosisCategoryHref } from "../../../diagnosis/model/relationship-category";
 import type { CompatibilityPerson, CompatibilityTheme } from "../../model/compatibility";
 import { CompatibilityAvatar } from "./compatibility-ui";
@@ -220,12 +221,13 @@ export function CompatibilityPairSheet({
         <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
           回答が増えると、比較できるテーマも増えていきます。
         </p>
-        <a
+        <InternalLink
           href={diagnosisCategoryHref(relationshipCategory)}
+          preloadRoute="diagnosis"
           className="mt-3 inline-flex min-h-10 items-center text-sm font-bold text-sky-700 dark:text-sky-300"
         >
           診断を見てみる
-        </a>
+        </InternalLink>
       </section>
     </div>
   );

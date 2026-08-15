@@ -1,5 +1,7 @@
 import { LoaderCircle, ShieldCheck } from "lucide-react";
+import { InternalLink } from "../../../../components/internal-link";
 import type { AsyncState } from "../../../../model/async-state";
+import { preloadCompatibilityRoute } from "../compatibility-route-loaders";
 
 export function CompatibilitySharingEndedScreen() {
   return (
@@ -14,12 +16,13 @@ export function CompatibilitySharingEndedScreen() {
         <p className="mt-3 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
           2人ともこの相性シートを見られなくなりました。もう一度始めるには、新しい招待と双方の承諾が必要です。
         </p>
-        <a
+        <InternalLink
           href="/compatibility"
+          onPreload={() => preloadCompatibilityRoute("list")}
           className="mt-6 flex min-h-12 items-center justify-center rounded-2xl bg-slate-950 px-5 py-3 font-bold text-white dark:bg-slate-50 dark:text-slate-950"
         >
           相性一覧へ戻る
-        </a>
+        </InternalLink>
       </section>
     </main>
   );

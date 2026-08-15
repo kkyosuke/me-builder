@@ -67,7 +67,7 @@ describe("CompatibilityResultApplication waiting state", () => {
 
     expect(screen.getByText(/「私について」がまだありません/)).toBeTruthy();
     expect(screen.getByRole("link", { name: "わたしの傾向を作る" }).getAttribute("href")).toBe(
-      "/me",
+      "/me?shareCategory=partner",
     );
   });
 

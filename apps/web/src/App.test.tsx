@@ -37,6 +37,7 @@ const mocks = vi.hoisted(() => ({
   fetchDevelopmentBrainItems: vi.fn(),
   normalizeAvatarImage: vi.fn(),
   fetchCompatibilityShareConsent: vi.fn(),
+  fetchCompatibilityShareContent: vi.fn(),
   fetchCompatibilityInvitation: vi.fn(),
   fetchCompatibilityRelationships: vi.fn(),
   fetchCompatibilityRelationship: vi.fn(),
@@ -83,6 +84,7 @@ vi.mock("./feature/profile-settings/model/normalize-avatar-image", () => ({
 }));
 vi.mock("./feature/compatibility/infrastructure/compatibility-api", () => ({
   fetchCompatibilityShareConsent: mocks.fetchCompatibilityShareConsent,
+  fetchCompatibilityShareContent: mocks.fetchCompatibilityShareContent,
   fetchCompatibilityInvitation: mocks.fetchCompatibilityInvitation,
   fetchCompatibilityRelationships: mocks.fetchCompatibilityRelationships,
   fetchCompatibilityRelationship: mocks.fetchCompatibilityRelationship,
@@ -333,7 +335,14 @@ describe("App", () => {
       blockingReasons: [],
       nextAction: null,
     });
+    mocks.fetchCompatibilityShareContent.mockResolvedValue({
+      relationshipCategory: "partner",
+      aboutMe: null,
+      themes: [],
+      nextAction: null,
+    });
     mocks.fetchCompatibilityInvitation.mockResolvedValue({
+      relationshipCategory: "friend",
       inviter: { displayName: "あおい", avatarUrl: null },
       recipient: { displayName: "テスト", avatarUrl: null },
       expiresAt: "2026-08-26T00:00:00.000Z",
@@ -984,6 +993,44 @@ describe("App", () => {
       expect.anything(),
     );
     expect(mocks.fetchDiagnosisList).not.toHaveBeenCalled();
+  });
+
+  it("相性内のリンクからカテゴリを保ってわたしへ移動し、プロフィールを再取得しない", async () => {
+    window.history.replaceState({}, "", "/compatibility");
+    mocks.fetchAccountProfile.mockResolvedValue({
+      role: "user",
+      displayName: "テスト",
+      avatar: {
+        source: "uploaded",
+        url: "data:image/png;base64,c2F2ZWQ=",
+        updatedAt: "2026-08-11T00:00:00.000Z",
+      },
+    });
+
+    render(<App />);
+
+    const profileButton = await screen.findByRole("button", { name: "プロフィールを開く" });
+    await waitFor(() => expect(mocks.fetchAccountProfile).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByRole("link", { name: "うつしをシェア" }));
+
+    expect(await screen.findByRole("heading", { name: "うつしをシェア" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("link", { name: "「わたし」" }));
+
+    await waitFor(() =>
+      expect(window.location.pathname + window.location.search).toBe("/me?shareCategory=partner"),
+    );
+    expect(await screen.findByRole("heading", { name: "わたしのまとめ" })).toBeTruthy();
+    expect(profileButton.isConnected).toBe(true);
+    expect(profileButton.querySelector("img")?.getAttribute("src")).toBe(
+      "data:image/png;base64,c2F2ZWQ=",
+    );
+    expect(mocks.fetchAccountProfile).toHaveBeenCalledTimes(1);
+    expect(mocks.fetchCompatibilityShareContent).toHaveBeenCalledWith(
+      "https://api.example.com",
+      "dummy.id.token",
+      "partner",
+      expect.any(AbortSignal),
+    );
   });
 
   it("LIFFの招待リンクから相性の確認画面を直接表示する", async () => {

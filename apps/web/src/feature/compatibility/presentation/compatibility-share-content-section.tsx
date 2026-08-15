@@ -3,6 +3,7 @@ import {
   compatibilityRelationshipCategoryValues,
 } from "@me-builder/lib/compatibility";
 import { BookOpenText, HeartHandshake, RefreshCw, ShieldCheck } from "lucide-react";
+import { InternalLink } from "../../../components/internal-link";
 import type { AsyncState } from "../../../model/async-state";
 import {
   diagnosisCategoryHref,
@@ -73,12 +74,13 @@ function Themes({ content }: { content: CompatibilityShareContent }) {
         <p className="mt-3 text-sm leading-relaxed text-slate-700 dark:text-slate-300">
           このカテゴリで共有できる診断テーマはまだありません。
         </p>
-        <a
+        <InternalLink
           href={diagnosisCategoryHref(content.relationshipCategory)}
+          preloadRoute="diagnosis"
           className="mt-3 inline-flex min-h-11 items-center rounded-xl bg-violet-600 px-4 text-sm font-bold text-white hover:bg-violet-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500"
         >
           {getRelationshipCategoryLabel(content.relationshipCategory)}の診断を見る
-        </a>
+        </InternalLink>
       </section>
     );
   }

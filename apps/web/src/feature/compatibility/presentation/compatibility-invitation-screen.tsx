@@ -1,4 +1,5 @@
 import { AlertCircle, HeartHandshake, RefreshCw } from "lucide-react";
+import { InternalLink } from "../../../components/internal-link";
 import { SkeletonBlock, SkeletonLoader } from "../../../components/skeleton";
 import type { AsyncState } from "../../../model/async-state";
 import {
@@ -6,11 +7,13 @@ import {
   getRelationshipCategoryBadgeClassName,
   getRelationshipCategoryLabel,
 } from "../../diagnosis/model/relationship-category";
+import { compatibilityShareContentHref } from "../model/compatibility-category-navigation";
 import type {
   CompatibilityInvitationPreview,
   CompatibilityInvitationPreviewBlockingReason,
 } from "../model/compatibility-invitation-preview";
 import type { CompatibilityInvitationAcceptance } from "../model/compatibility-relationship";
+import { preloadCompatibilityRoute } from "./compatibility-route-loaders";
 import { CompatibilityPrivacyNotice } from "./components/compatibility-disclosure";
 import { CompatibilityShareScope } from "./components/compatibility-share-content";
 import { CompatibilityBackHeader, CompatibilityProfileAvatar } from "./components/compatibility-ui";
@@ -22,12 +25,10 @@ const blockingReasonMessages: Record<CompatibilityInvitationPreviewBlockingReaso
 const nextActionGuides = {
   diagnosis: {
     message: "診断に答えると、2人で比べられるテーマが増えます。",
-    href: "/diagnosis",
     label: "診断を見る",
   },
   "profile-summary": {
     message: "「わたしのまとめ」ができると、あなたの「私について」も共有されます。",
-    href: "/me",
     label: "わたしの傾向を作る",
   },
 } as const;
@@ -66,12 +67,13 @@ function InvitationError({ message, onRetry }: { message: string; onRetry: () =>
         <RefreshCw className="size-4" aria-hidden="true" />
         再試行
       </button>
-      <a
+      <InternalLink
         href="/compatibility"
+        onPreload={() => preloadCompatibilityRoute("list")}
         className="mt-3 flex min-h-11 items-center justify-center text-sm font-bold text-slate-500"
       >
         相性一覧へ戻る
-      </a>
+      </InternalLink>
     </section>
   );
 }
@@ -90,7 +92,7 @@ function InvitationContents({
   const guideHref =
     invitation.nextAction === "diagnosis"
       ? diagnosisCategoryHref(invitation.relationshipCategory)
-      : guide?.href;
+      : compatibilityShareContentHref(invitation.relationshipCategory);
 
   return (
     <>
@@ -138,12 +140,13 @@ function InvitationContents({
       {guide && (
         <section className="mt-8 rounded-2xl border border-sky-300/60 bg-sky-50 p-4 dark:border-sky-500/30 dark:bg-sky-950/30">
           <p className="text-sm leading-relaxed text-sky-950 dark:text-sky-100">{guide.message}</p>
-          <a
+          <InternalLink
             href={guideHref}
+            preloadRoute={invitation.nextAction === "diagnosis" ? "diagnosis" : "me"}
             className="mt-3 flex min-h-11 items-center justify-center rounded-xl bg-sky-300 px-4 py-2 text-sm font-bold text-sky-950"
           >
             {guide.label}
-          </a>
+          </InternalLink>
         </section>
       )}
 
@@ -166,12 +169,13 @@ function InvitationContents({
           <h2 className="font-bold text-emerald-950 dark:text-emerald-100">
             2人の相性シートを作りました
           </h2>
-          <a
+          <InternalLink
             href={`/compatibility/relationships/${acceptanceState.data.relationshipId}`}
+            onPreload={() => preloadCompatibilityRoute("result")}
             className="mt-4 flex min-h-12 items-center justify-center rounded-2xl bg-emerald-600 px-5 font-bold text-white"
           >
             相性シートを見る
-          </a>
+          </InternalLink>
         </section>
       ) : (
         <button
@@ -196,12 +200,13 @@ function InvitationContents({
           {acceptanceState.message}
         </p>
       )}
-      <a
+      <InternalLink
         href="/compatibility"
+        onPreload={() => preloadCompatibilityRoute("list")}
         className="mt-3 flex min-h-11 items-center justify-center text-sm font-bold text-slate-500"
       >
         今は承諾しない
-      </a>
+      </InternalLink>
     </>
   );
 }

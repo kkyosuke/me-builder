@@ -1,11 +1,13 @@
 import { AlertCircle, RefreshCw } from "lucide-react";
 import { useState } from "react";
+import { InternalLink } from "../../../components/internal-link";
 import {
   diagnosisCategoryHref,
   getRelationshipCategoryBadgeClassName,
   getRelationshipCategoryLabel,
 } from "../../diagnosis/model/relationship-category";
 import { useLiffSession } from "../../liff";
+import { compatibilityShareContentHref } from "../model/compatibility-category-navigation";
 import { toCompatibilityPerson } from "../model/compatibility-relationship-view";
 import { CompatibilityResultScreen } from "./compatibility-result-screen";
 import {
@@ -20,21 +22,18 @@ const waitingGuides = {
     title: "相性シートを表示する準備が必要です",
     message:
       "共有できる「私について」がまだありません。わたしのまとめを作ると、追加の確認なしで共有されます。",
-    href: "/me",
     label: "わたしの傾向を作る",
   },
   diagnosis: {
     title: "相性シートを表示する準備が必要です",
     message:
       "2人で比べられる共通の診断テーマがまだありません。診断に答えると、追加の確認なしで共有されます。",
-    href: "/diagnosis",
     label: "診断を見る",
   },
   partner: {
     title: "相手の準備を待っています",
     message:
       "あなたの共有内容はそろっています。相手の準備が終わると、追加の確認なしでこの相性シートを表示できます。",
-    href: "/compatibility",
     label: "相性一覧へ戻る",
   },
 } as const;
@@ -86,7 +85,9 @@ export default function CompatibilityResultApplication({
     const waitingHref =
       relationship.state.data.nextAction === "diagnosis"
         ? diagnosisCategoryHref(relationship.state.data.relationshipCategory)
-        : waiting.href;
+        : relationship.state.data.nextAction === "profile-summary"
+          ? compatibilityShareContentHref(relationship.state.data.relationshipCategory)
+          : "/compatibility";
     return (
       <main className="mx-auto min-h-dvh w-full max-w-2xl px-4 py-6 sm:px-8">
         <CompatibilityBackHeader />
@@ -98,12 +99,19 @@ export default function CompatibilityResultApplication({
           </p>
           <h1 className="text-xl font-bold">{waiting.title}</h1>
           <p className="mt-2 text-sm">{waiting.message}</p>
-          <a
+          <InternalLink
             href={waitingHref}
+            preloadRoute={
+              relationship.state.data.nextAction === "diagnosis"
+                ? "diagnosis"
+                : relationship.state.data.nextAction === "profile-summary"
+                  ? "me"
+                  : "compatibility"
+            }
             className="mt-5 flex min-h-11 items-center justify-center rounded-xl bg-amber-300 font-bold text-amber-950"
           >
             {waiting.label}
-          </a>
+          </InternalLink>
         </section>
         <CompatibilityEndSharing
           confirming={confirmingEnd}
