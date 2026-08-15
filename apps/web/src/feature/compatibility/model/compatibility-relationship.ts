@@ -43,6 +43,15 @@ export type CompatibilityUnavailableTheme = {
   title: string;
 };
 
+export type CompatibilityPairProgression = {
+  level: number;
+  growthValue: number;
+  currentLevelThreshold: number;
+  nextLevelThreshold: number;
+  comparableThemeCount: number;
+  marks: number[];
+};
+
 export type CompatibilityRelationship =
   | {
       relationshipId: string;
@@ -51,6 +60,7 @@ export type CompatibilityRelationship =
       partner: CompatibilityRelationshipPerson;
       viewer: CompatibilityRelationshipPerson;
       unavailableThemes: CompatibilityUnavailableTheme[];
+      progression: CompatibilityPairProgression;
     }
   | {
       relationshipId: string;

@@ -5,13 +5,17 @@ import { getCompatibilityRelationshipContents } from "./compatibility-relationsh
 const mocks = vi.hoisted(() => ({
   createLiffSession: vi.fn(),
   getRelationship: vi.fn(),
+  synchronizeProgression: vi.fn(),
   loadSharePreviewData: vi.fn(),
 }));
 
 vi.mock("./liff-session", () => ({ createLiffSession: mocks.createLiffSession }));
 vi.mock("@me-builder/lib", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@me-builder/lib")>()),
-  compatibilityDataFor: () => ({ getRelationship: mocks.getRelationship }),
+  compatibilityDataFor: () => ({
+    getRelationship: mocks.getRelationship,
+    synchronizeProgression: mocks.synchronizeProgression,
+  }),
 }));
 vi.mock("./compatibility-share-preview", () => ({
   loadCompatibilitySharePreviewData: mocks.loadSharePreviewData,
@@ -90,6 +94,14 @@ describe("getCompatibilityRelationshipContents", () => {
       relationshipCategory: "friend",
       status: "accepted",
     });
+    mocks.synchronizeProgression.mockResolvedValue({
+      level: 2,
+      growthValue: 3,
+      currentLevelThreshold: 3,
+      nextLevelThreshold: 12,
+      comparableThemeCount: 1,
+      marks: [2],
+    });
   });
 
   it("双方が表示できる共通テーマから、相手を先にした相性シートを組み立てる", async () => {
@@ -122,6 +134,9 @@ describe("getCompatibilityRelationshipContents", () => {
       2,
       expect.objectContaining({ relationshipCategory: "friend" }),
     );
+    expect(mocks.synchronizeProgression).toHaveBeenCalledWith("account-inviter", [
+      { diagnosisId: "shared", fingerprint: expect.stringMatching(/^[0-9a-f]{64}$/) },
+    ]);
   });
 
   it("片方で表示できないテーマは比較に使わず、回答できる診断が残っていれば案内する", async () => {

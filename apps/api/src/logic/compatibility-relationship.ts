@@ -1,6 +1,8 @@
 import {
   type AccountDataNamespace,
   type CompatibilityDataNamespace,
+  type CompatibilityPairProgression,
+  type CompatibilityPairThemeFingerprint,
   type CompatibilityRelationship,
   type CompatibilitySharePreviewTheme,
   type D1,
@@ -26,21 +28,27 @@ type UnavailableTheme = Readonly<{
   title: string;
 }>;
 
-export type CompatibilityRelationshipContents =
-  | Readonly<{
-      relationshipId: string;
-      relationshipCategory: CompatibilityRelationship["relationshipCategory"];
-      status: "ready";
-      partner: Person;
-      viewer: Person;
-      unavailableThemes: readonly UnavailableTheme[];
-    }>
+type CompatibilityReadyContents = Readonly<{
+  relationshipId: string;
+  relationshipCategory: CompatibilityRelationship["relationshipCategory"];
+  status: "ready";
+  partner: Person;
+  viewer: Person;
+  unavailableThemes: readonly UnavailableTheme[];
+}>;
+
+type CompatibilityResolvedContents =
+  | CompatibilityReadyContents
   | Readonly<{
       relationshipId: string;
       relationshipCategory: CompatibilityRelationship["relationshipCategory"];
       status: "waiting";
       nextAction: "diagnosis" | "profile-summary" | null;
     }>;
+
+export type CompatibilityRelationshipContents =
+  | Readonly<CompatibilityReadyContents & { progression: CompatibilityPairProgression }>
+  | Exclude<CompatibilityResolvedContents, CompatibilityReadyContents>;
 
 export type CompatibilityRelationshipOutcome =
   | { type: "resolved"; relationship: CompatibilityRelationshipContents }
@@ -107,13 +115,51 @@ type ResolveCompatibilityRelationshipContentsParams = Readonly<{
   at: Date;
 }>;
 
+async function sha256(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function pairThemeFingerprints(
+  relationship: CompatibilityReadyContents,
+): Promise<CompatibilityPairThemeFingerprint[]> {
+  const partnerThemes = new Map(
+    relationship.partner.themes.map((theme) => [theme.diagnosisId, theme] as const),
+  );
+  return Promise.all(
+    relationship.viewer.themes.flatMap((viewerTheme) => {
+      const partnerTheme = partnerThemes.get(viewerTheme.diagnosisId);
+      if (!partnerTheme) return [];
+      const serialize = (theme: CompatibilitySharePreviewTheme) =>
+        JSON.stringify(
+          [...theme.parameters]
+            .sort((left, right) => left.id.localeCompare(right.id))
+            .map(({ id, label, lowLabel, highLabel, position }) => ({
+              id,
+              label,
+              lowLabel,
+              highLabel,
+              position,
+            })),
+        );
+      const sides = [serialize(viewerTheme), serialize(partnerTheme)].sort();
+      return [
+        sha256(JSON.stringify([viewerTheme.diagnosisId, ...sides])).then((fingerprint) => ({
+          diagnosisId: viewerTheme.diagnosisId,
+          fingerprint,
+        })),
+      ];
+    }),
+  );
+}
+
 /** 成立中の関係と現在の共有内容から、一覧と詳細で共通の準備状態を組み立てる。 */
 export async function resolveCompatibilityRelationshipContents({
   canonical,
   viewerAccountId,
   accountData,
   at,
-}: ResolveCompatibilityRelationshipContentsParams): Promise<CompatibilityRelationshipContents | null> {
+}: ResolveCompatibilityRelationshipContentsParams): Promise<CompatibilityResolvedContents | null> {
   const participants = participantDetails(canonical, viewerAccountId);
   if (!participants) return null;
 
@@ -198,9 +244,8 @@ export async function getCompatibilityRelationshipContents({
   const session = await createLiffSession({ idToken, lineLoginChannelId, db });
   if (session.type !== "resolved") return session;
 
-  const canonical = await compatibilityDataFor(compatibilityData, relationshipId).getRelationship(
-    session.session.accountId,
-  );
+  const relationshipData = compatibilityDataFor(compatibilityData, relationshipId);
+  const canonical = await relationshipData.getRelationship(session.session.accountId);
   if (!canonical) return { type: "unavailable" };
   const relationship = await resolveCompatibilityRelationshipContents({
     canonical,
@@ -209,6 +254,17 @@ export async function getCompatibilityRelationshipContents({
     at,
   });
   if (!relationship) return { type: "unavailable" };
+  if (relationship.status === "ready") {
+    const progression = await relationshipData.synchronizeProgression(
+      session.session.accountId,
+      await pairThemeFingerprints(relationship),
+    );
+    if (!progression) return { type: "unavailable" };
+    return {
+      type: "resolved",
+      relationship: { ...relationship, progression },
+    };
+  }
   return {
     type: "resolved",
     relationship,

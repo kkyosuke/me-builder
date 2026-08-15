@@ -2579,6 +2579,14 @@ export interface operations {
                   diagnosisId: string;
                   title: string;
                 }[];
+                progression: {
+                  level: number;
+                  growthValue: number;
+                  currentLevelThreshold: number;
+                  nextLevelThreshold: number;
+                  comparableThemeCount: number;
+                  marks: number[];
+                };
               }
             | {
                 relationshipId: string;

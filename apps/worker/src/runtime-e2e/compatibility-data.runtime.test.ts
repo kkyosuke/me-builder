@@ -63,11 +63,23 @@ describe("CompatibilityData Workers runtime E2E", () => {
       outcome: "accepted",
       relationship: { status: "accepted" },
     });
+    const themes = [{ diagnosisId: "values", fingerprint: "sha256:first" }];
+    await expect(
+      stub.synchronizeProgression(relationshipId, inviterAccountId, themes),
+    ).resolves.toMatchObject({ level: 2, growthValue: 3, marks: [2] });
+    await expect(
+      stub.synchronizeProgression(relationshipId, inviteeAccountId, themes),
+    ).resolves.toMatchObject({ level: 2, growthValue: 3 });
 
     await runInDurableObject(stub, async (instance: CompatibilityData, state) => {
       expect(
         state.storage.sql
           .exec<{ count: number }>("SELECT count(*) AS count FROM compatibility_relationships")
+          .one().count,
+      ).toBe(1);
+      expect(
+        state.storage.sql
+          .exec<{ count: number }>("SELECT count(*) AS count FROM compatibility_progression_themes")
           .one().count,
       ).toBe(1);
       await expect(instance.getRelationship("another-relationship", "account")).rejects.toThrow(

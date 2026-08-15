@@ -1,6 +1,9 @@
 import {
   type CompatibilityDataNamespace,
   type CompatibilityRelationship,
+  compatibilityPairProgressionLevel,
+  compatibilityPairProgressionMarks,
+  compatibilityPairProgressionThreshold,
   createCompatibilityInvitationAcceptanceContext,
   createCompatibilityInvitationPreview,
   decideCompatibilityInvitationAcceptance,
@@ -18,6 +21,8 @@ export type CompatibilityDataTestStore = Readonly<{
 /** API E2Eで、関係名ごとのCompatibilityData状態だけを再現するtest double。 */
 export function createCompatibilityDataTestStore(): CompatibilityDataTestStore {
   const relationships = new Map<string, CompatibilityRelationship>();
+  const progressionThemes = new Map<string, Map<string, string>>();
+  const progressionGrowth = new Map<string, number>();
   const namespace: CompatibilityDataNamespace = {
     getByName(name) {
       return {
@@ -73,6 +78,33 @@ export function createCompatibilityDataTestStore(): CompatibilityDataTestStore {
             relationships.get(name) ?? null,
             actorAccountId,
           );
+        },
+        async synchronizeProgression(relationshipId, actorAccountId, themes) {
+          if (relationshipId !== name) throw new Error("CompatibilityData test routing mismatch");
+          if (
+            !getAcceptedCompatibilityRelationship(relationships.get(name) ?? null, actorAccountId)
+          ) {
+            return null;
+          }
+          const saved = progressionThemes.get(name) ?? new Map<string, string>();
+          let growthValue = progressionGrowth.get(name) ?? 0;
+          for (const theme of themes) {
+            const fingerprint = saved.get(theme.diagnosisId);
+            growthValue +=
+              fingerprint === undefined ? 3 : fingerprint === theme.fingerprint ? 0 : 1;
+            saved.set(theme.diagnosisId, theme.fingerprint);
+          }
+          progressionThemes.set(name, saved);
+          progressionGrowth.set(name, growthValue);
+          const level = compatibilityPairProgressionLevel(growthValue);
+          return {
+            level,
+            growthValue,
+            currentLevelThreshold: compatibilityPairProgressionThreshold(level),
+            nextLevelThreshold: compatibilityPairProgressionThreshold(level + 1),
+            comparableThemeCount: themes.length,
+            marks: compatibilityPairProgressionMarks(level),
+          };
         },
         async endRelationship(relationshipId, actorAccountId) {
           if (relationshipId !== name) throw new Error("CompatibilityData test routing mismatch");

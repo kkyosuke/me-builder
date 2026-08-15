@@ -151,4 +151,41 @@ describe("CompatibilityDataRepository", () => {
     ).toBe("expired");
     expect(repository.cancelInvitation("account-inviter", expiresAt).outcome).toBe("unavailable");
   });
+
+  it("比較テーマの新規・変化だけをふたりレベルへ冪等に反映する", async () => {
+    const repository = createRepository();
+    await repository.initialize();
+    repository.createInvitation(relationshipId, invitationInput(), createdAt);
+    repository.acceptInvitation(
+      { inviteeAccountId: "account-invitee", inviteeDisplayName: "受信者" },
+      new Date("2026-08-10T00:00:00.000Z"),
+    );
+    const firstComparedAt = new Date("2026-08-11T00:00:00.000Z");
+    const theme = [{ diagnosisId: "values", fingerprint: "sha256:first" }];
+
+    expect(
+      repository.synchronizeProgression("account-outsider", theme, firstComparedAt),
+    ).toBeNull();
+    expect(repository.synchronizeProgression("account-inviter", theme, firstComparedAt)).toEqual({
+      level: 2,
+      growthValue: 3,
+      currentLevelThreshold: 3,
+      nextLevelThreshold: 12,
+      comparableThemeCount: 1,
+      marks: [2],
+    });
+    expect(
+      repository.synchronizeProgression("account-invitee", theme, firstComparedAt),
+    ).toMatchObject({ growthValue: 3 });
+    expect(
+      repository.synchronizeProgression(
+        "account-invitee",
+        [{ diagnosisId: "values", fingerprint: "sha256:changed" }],
+        new Date("2026-08-12T00:00:00.000Z"),
+      ),
+    ).toMatchObject({ growthValue: 4, level: 2 });
+
+    repository.endRelationship("account-inviter", new Date("2026-08-13T00:00:00.000Z"));
+    expect(repository.synchronizeProgression("account-invitee", theme, firstComparedAt)).toBeNull();
+  });
 });

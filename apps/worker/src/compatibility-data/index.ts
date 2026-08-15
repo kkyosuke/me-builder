@@ -1,6 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
 import {
   type AcceptCompatibilityInvitationInput,
+  type CompatibilityPairThemeFingerprint,
   type CreateCompatibilityInvitationInput,
   accountDataFor,
 } from "@me-builder/lib";
@@ -83,6 +84,15 @@ export class CompatibilityData extends DurableObject<Env> {
   async getRelationship(relationshipId: string, actorAccountId: string) {
     this.assertRouting(relationshipId);
     return this.repository.getRelationship(actorAccountId, new Date());
+  }
+
+  async synchronizeProgression(
+    relationshipId: string,
+    actorAccountId: string,
+    themes: readonly CompatibilityPairThemeFingerprint[],
+  ) {
+    this.assertRouting(relationshipId);
+    return this.repository.synchronizeProgression(actorAccountId, themes, new Date());
   }
 
   async endRelationship(relationshipId: string, actorAccountId: string) {

@@ -124,6 +124,38 @@ export type EndCompatibilityRelationshipResult =
     }>
   | Readonly<{ outcome: "not-found" | "unavailable" }>;
 
+export type CompatibilityPairThemeFingerprint = Readonly<{
+  diagnosisId: string;
+  fingerprint: string;
+}>;
+
+export type CompatibilityPairProgression = Readonly<{
+  level: number;
+  growthValue: number;
+  currentLevelThreshold: number;
+  nextLevelThreshold: number;
+  comparableThemeCount: number;
+  marks: readonly number[];
+}>;
+
+export function compatibilityPairProgressionThreshold(level: number): number {
+  if (!Number.isSafeInteger(level) || level < 1)
+    throw new Error("Pair progression level must be a positive integer");
+  return 3 * (level - 1) ** 2;
+}
+
+export function compatibilityPairProgressionLevel(growthValue: number): number {
+  if (!Number.isSafeInteger(growthValue) || growthValue < 0)
+    throw new Error("Pair progression growth must be a non-negative safe integer");
+  return Math.floor(Math.sqrt(growthValue / 3)) + 1;
+}
+
+export function compatibilityPairProgressionMarks(level: number): number[] {
+  const marks = [2, 5];
+  for (let milestone = 10; milestone <= level; milestone += 10) marks.push(milestone);
+  return marks.filter((milestone) => milestone <= level);
+}
+
 /** raw SQLiteを公開しない、1相性関係の永続化RPC境界。 */
 export interface CompatibilityDataRpc {
   createInvitation(
@@ -149,6 +181,11 @@ export interface CompatibilityDataRpc {
     relationshipId: string,
     actorAccountId: string,
   ): Promise<CompatibilityRelationship | null>;
+  synchronizeProgression(
+    relationshipId: string,
+    actorAccountId: string,
+    themes: readonly CompatibilityPairThemeFingerprint[],
+  ): Promise<CompatibilityPairProgression | null>;
   endRelationship(
     relationshipId: string,
     actorAccountId: string,
@@ -182,6 +219,12 @@ export function compatibilityDataFor(
     },
     getRelationship(actorAccountId: string) {
       return object.getRelationship(relationshipId, actorAccountId);
+    },
+    synchronizeProgression(
+      actorAccountId: string,
+      themes: readonly CompatibilityPairThemeFingerprint[],
+    ) {
+      return object.synchronizeProgression(relationshipId, actorAccountId, themes);
     },
     endRelationship(actorAccountId: string) {
       return object.endRelationship(relationshipId, actorAccountId);
