@@ -143,11 +143,15 @@ async function issueInvitationForInviter(): Promise<string> {
   return relationshipId;
 }
 
-async function completeDiagnosis(token: string): Promise<void> {
+async function completeDiagnosis(
+  token: string,
+  diagnosisId = "relationship-priority",
+  questionIdPrefix = diagnosisId,
+): Promise<void> {
   for (let index = 1; index <= 10; index += 1) {
-    const questionId = `dq-relationship-priority-${String(index).padStart(2, "0")}`;
+    const questionId = `dq-${questionIdPrefix}-${String(index).padStart(2, "0")}`;
     const response = await app.request(
-      `/api/diagnoses/relationship-priority/answers/${questionId}`,
+      `/api/diagnoses/${diagnosisId}/answers/${questionId}`,
       {
         method: "PUT",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
@@ -279,6 +283,35 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
     vi.unstubAllGlobals();
     await miniflare.dispose();
   });
+
+  it(
+    "既存の採点設定に関わり方文がない場合はseed再適用で補完する",
+    async () => {
+      await database
+        .prepare(
+          `UPDATE diagnosis_scoring_configs
+           SET definition = json_remove(definition, '$.parameters[0].relationshipRequests')
+           WHERE id = 'relationship-priority-v1'`,
+        )
+        .run();
+
+      await applySqlFile(database, await readFile(diagnosisSeed, "utf8"));
+
+      expect(
+        await database
+          .prepare(
+            `SELECT json_extract(
+               definition,
+               '$.parameters[0].relationshipRequests.low'
+             ) AS request
+             FROM diagnosis_scoring_configs
+             WHERE id = 'relationship-priority-v1'`,
+          )
+          .first(),
+      ).toEqual({ request: "自分の希望を聞く時間を作ってもらえるとうれしいです。" });
+    },
+    e2eTimeoutMs,
+  );
 
   it(
     `${compatibilityShareCases.previewInvitation.id}: ${compatibilityShareCases.previewInvitation.name}`,
@@ -431,6 +464,7 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
     `${compatibilityShareCases.shareJourney.id}: LIFF共有から招待表示・承諾・相性シート・共有終了まで完了できること`,
     async () => {
       await Promise.all([completeDiagnosis("inviter-token"), completeDiagnosis("recipient-token")]);
+      await completeDiagnosis("inviter-token", "money-values", "money");
       await Promise.all([
         generateShareProfile("inviter", "私は、先の見通しを持って動けると安心します"),
         generateShareProfile("recipient", "私は、予定に余白があると心地よく感じます"),
@@ -493,13 +527,19 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
           relationshipCategory: string;
           partner: {
             displayName: string;
-            aboutMe: { statements: { statement: string }[] };
-            themes: unknown[];
+            aboutMe: { generatedAt: string; statements: { statement: string }[] };
+            themes: Array<{
+              diagnosisId: string;
+              parameters: Array<{ band: string; request?: string }>;
+            }>;
           };
           viewer: {
             displayName: string;
-            aboutMe: { statements: { statement: string }[] };
-            themes: unknown[];
+            aboutMe: { generatedAt: string; statements: { statement: string }[] };
+            themes: Array<{
+              diagnosisId: string;
+              parameters: Array<{ band: string; request?: string }>;
+            }>;
           };
           progression: {
             level: number;
@@ -507,6 +547,7 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
             comparableThemeCount: number;
             marks: number[];
           };
+          unavailableThemes: Array<{ diagnosisId: string; title: string }>;
         };
         const partnerRole = role === "inviter" ? "recipient" : "inviter";
         expect(detail).toMatchObject({
@@ -523,6 +564,28 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
         });
         expect(detail.partner.themes).toHaveLength(1);
         expect(detail.viewer.themes).toHaveLength(1);
+        expect(detail.unavailableThemes).toEqual([
+          { diagnosisId: "money-values", title: "お金と消費" },
+        ]);
+        expect(detail.partner.aboutMe.generatedAt).toBe("2026-08-12T00:00:00.000Z");
+        expect(detail.viewer.aboutMe.generatedAt).toBe("2026-08-12T00:00:00.000Z");
+        for (const person of [detail.partner, detail.viewer]) {
+          expect(person.themes[0]?.diagnosisId).toBe("relationship-priority");
+          expect(person.themes[0]?.parameters.map(({ band }) => band).sort()).toEqual([
+            "balanced",
+            "balanced",
+            "high",
+            "low",
+          ]);
+          expect(person.themes[0]?.parameters).toEqual(
+            expect.arrayContaining([
+              expect.objectContaining({
+                band: "low",
+                request: "自分の希望を聞く時間を作ってもらえるとうれしいです。",
+              }),
+            ]),
+          );
+        }
         const inviterSide = role === "inviter" ? detail.viewer : detail.partner;
         expect(inviterSide.aboutMe.statements).toEqual(
           expect.arrayContaining([

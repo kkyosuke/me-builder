@@ -2,13 +2,13 @@
 
 import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { RelationshipCategoryFilter } from "../../diagnosis/model/relationship-category";
+import type { CompatibilityRelationshipCategoryFilter } from "../model/compatibility-category-navigation";
 import CompatibilityListApplication from "./compatibility-list-application";
 
 const mocks = vi.hoisted(() => ({
   screenProps: null as null | {
-    categoryFilter: RelationshipCategoryFilter;
-    onCategoryFilterChange: (filter: RelationshipCategoryFilter) => void;
+    categoryFilter: CompatibilityRelationshipCategoryFilter;
+    onCategoryFilterChange: (filter: CompatibilityRelationshipCategoryFilter) => void;
   },
 }));
 
@@ -17,8 +17,8 @@ vi.mock("../../liff", () => ({
 }));
 vi.mock("./compatibility-list-screen", () => ({
   CompatibilityListScreen: (props: {
-    categoryFilter: RelationshipCategoryFilter;
-    onCategoryFilterChange: (filter: RelationshipCategoryFilter) => void;
+    categoryFilter: CompatibilityRelationshipCategoryFilter;
+    onCategoryFilterChange: (filter: CompatibilityRelationshipCategoryFilter) => void;
   }) => {
     mocks.screenProps = props;
     return null;
@@ -46,7 +46,7 @@ describe("CompatibilityListApplication category filter", () => {
     window.history.replaceState({}, "", "/compatibility?category=general&from=test#list");
     render(<CompatibilityListApplication />);
 
-    expect(mocks.screenProps?.categoryFilter).toBe("general");
+    expect(mocks.screenProps?.categoryFilter).toBe("all");
     act(() => mocks.screenProps?.onCategoryFilterChange("work"));
     expect(mocks.screenProps?.categoryFilter).toBe("work");
     expect(window.location.pathname + window.location.search + window.location.hash).toBe(

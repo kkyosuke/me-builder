@@ -1,3 +1,4 @@
+import { compatibilityRelationshipCategoryValues } from "@me-builder/lib/compatibility";
 import {
   AlertCircle,
   ArrowRight,
@@ -12,14 +13,15 @@ import { MainNavigation } from "../../../components/main-navigation";
 import { SkeletonBlock, SkeletonLoader } from "../../../components/skeleton";
 import type { AsyncState } from "../../../model/async-state";
 import {
-  type RelationshipCategoryFilter,
   diagnosisCategoryHref,
-  filterableRelationshipCategoryValues,
   getRelationshipCategoryBadgeClassName,
   getRelationshipCategoryFilterClassName,
   getRelationshipCategoryLabel,
 } from "../../diagnosis/model/relationship-category";
-import { compatibilityShareContentHref } from "../model/compatibility-category-navigation";
+import {
+  type CompatibilityRelationshipCategoryFilter,
+  compatibilityShareContentHref,
+} from "../model/compatibility-category-navigation";
 import type {
   CompatibilityRelationshipList,
   CompatibilityRelationshipListItem,
@@ -112,7 +114,7 @@ export function CompatibilityListScreen({
   onCategoryFilterChange = () => undefined,
   onResend,
 }: {
-  categoryFilter?: RelationshipCategoryFilter;
+  categoryFilter?: CompatibilityRelationshipCategoryFilter;
   state: AsyncState<CompatibilityRelationshipList>;
   isRefreshing?: boolean;
   refreshError?: string | null;
@@ -122,7 +124,7 @@ export function CompatibilityListScreen({
   onRetry: () => void;
   onRefresh?: () => void;
   onCancel: (relationshipId: string) => void;
-  onCategoryFilterChange?: (filter: RelationshipCategoryFilter) => void;
+  onCategoryFilterChange?: (filter: CompatibilityRelationshipCategoryFilter) => void;
   onResend: (item: PendingItem) => void;
 }) {
   const allItems = state.status === "success" ? state.data.items : [];
@@ -209,7 +211,7 @@ export function CompatibilityListScreen({
               >
                 全部
               </button>
-              {filterableRelationshipCategoryValues.map((category) => (
+              {compatibilityRelationshipCategoryValues.map((category) => (
                 <button
                   type="button"
                   key={category}

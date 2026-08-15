@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   compatibilityCategoryFromSearch,
+  compatibilityRelationshipCategoryFilterFromSearch,
   compatibilityShareContentHref,
 } from "./compatibility-category-navigation";
 
@@ -35,6 +36,13 @@ describe("compatibility category navigation", () => {
     expect(compatibilityCategoryFromSearch("?shareCategory=general", "shareCategory")).toBe(
       "partner",
     );
+  });
+
+  it("相性一覧の絞り込みでは共有対象だけを復元する", () => {
+    expect(compatibilityRelationshipCategoryFilterFromSearch("?category=family")).toBe("family");
+    expect(compatibilityRelationshipCategoryFilterFromSearch("?category=general")).toBe("all");
+    expect(compatibilityRelationshipCategoryFilterFromSearch("?category=unknown")).toBe("all");
+    expect(compatibilityRelationshipCategoryFilterFromSearch("")).toBe("all");
   });
 
   it("選択カテゴリを本人向け共有内容確認のURLへ引き継ぐ", () => {

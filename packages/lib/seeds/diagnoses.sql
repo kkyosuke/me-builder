@@ -16,6 +16,7 @@
 -- 2026-08-15T00:00:00.000Z for work-priority-style, and
 -- 2026-08-15T01:00:00.000Z for family-expectation-choice, and
 -- 2026-08-15T02:00:00.000Z for friend-trust-boundaries
+-- 2026-08-15T03:00:00.000Z for the initial relationship request metadata backfill
 -- (Unix seconds, Drizzle timestamp mode).
 
 INSERT OR IGNORE INTO questions (id, created_at, updated_at, is_deleted) VALUES
@@ -501,12 +502,12 @@ INSERT OR IGNORE INTO diagnosis_scoring_configs (
   (
     'relationship-priority-v1',
     1785801600,
-    1785801600,
+    1786762800,
     0,
     1,
     '{
       "parameters": [
-        {"id":"priority-balance","label":"自分／相手の優先","lowLabel":"相手を優先しやすい","highLabel":"自分の余裕を優先しやすい"},
+        {"id":"priority-balance","label":"自分／相手の優先","lowLabel":"相手を優先しやすい","highLabel":"自分の余裕を優先しやすい","relationshipRequests":{"low":"自分の希望を聞く時間を作ってもらえるとうれしいです。","balanced":"状況に応じて相談してもらえるとうれしいです。","high":"相手の希望も確認してもらえるとうれしいです。"}},
         {"id":"autonomy","label":"自律／相談","lowLabel":"相談・共有を重視","highLabel":"個人の判断を尊重"},
         {"id":"boundary-expression","label":"境界の表明","lowLabel":"内側で調整しやすい","highLabel":"境界を伝えやすい"},
         {"id":"support-flexibility","label":"支援の柔軟性","lowLabel":"自分の予定を守りやすい","highLabel":"相手のために調整しやすい"}
@@ -956,7 +957,17 @@ INSERT OR IGNORE INTO diagnosis_scoring_configs (
       "highMinimum":65,
       "balancedLabel":"状況に応じて友達との境界を調整する"
     }'
-  );
+  )
+ON CONFLICT(id) DO UPDATE SET
+  updated_at = excluded.updated_at,
+  definition = json_set(
+    diagnosis_scoring_configs.definition,
+    '$.parameters[0].relationshipRequests',
+    json_extract(excluded.definition, '$.parameters[0].relationshipRequests')
+  )
+WHERE excluded.id = 'relationship-priority-v1'
+  AND json_type(excluded.definition, '$.parameters[0].relationshipRequests') = 'object'
+  AND json_type(diagnosis_scoring_configs.definition, '$.parameters[0].relationshipRequests') IS NULL;
 --> statement-breakpoint
 
 INSERT INTO diagnoses (
@@ -1165,12 +1176,12 @@ INSERT OR IGNORE INTO diagnosis_questions (
 
 -- AccountDataがsnapshotを再同期するか判断する版。
 -- このseedのcatalog内容を変更したら、必ずversionを1つ上げる。
-INSERT INTO catalog_versions (catalog_id, version, updated_at) VALUES ('diagnosis', 12, 1786759200)
+INSERT INTO catalog_versions (catalog_id, version, updated_at) VALUES ('diagnosis', 13, 1786762800)
   ON CONFLICT(catalog_id) DO UPDATE SET version = excluded.version, updated_at = excluded.updated_at;
 --> statement-breakpoint
 
 -- Expected result: diagnosis_count=14, question_version_count=140,
--- choice_count=280, diagnosis_question_count=140, scoring_config_count=14, catalog_version=12.
+-- choice_count=280, diagnosis_question_count=140, scoring_config_count=14, catalog_version=13.
 SELECT
   (SELECT COUNT(*) FROM diagnoses WHERE ((id IN ('relationship-priority', 'money-values', 'leisure-style', 'time-planning', 'conversation-emotion') AND relationship_category = 'partner') OR (id IN ('life-priorities', 'work-values', 'decision-making-style') AND relationship_category = 'general') OR (id IN ('work-relationship-style', 'work-priority-style') AND relationship_category = 'work') OR (id IN ('family-support-style', 'family-expectation-choice') AND relationship_category = 'family') OR (id IN ('friendship-style', 'friend-trust-boundaries') AND relationship_category = 'friend')) AND state = 'published' AND description <> '' AND is_deleted = 0) AS diagnosis_count,
   (SELECT COUNT(*) FROM question_versions WHERE version = 1 AND state = 'approved' AND is_deleted = 0 AND (question_id LIKE 'q-relationship-priority-%' OR question_id LIKE 'q-money-%' OR question_id LIKE 'q-leisure-style-%' OR question_id LIKE 'q-time-planning-%' OR question_id LIKE 'q-conversation-emotion-%' OR question_id LIKE 'q-life-priorities-%' OR question_id LIKE 'q-work-values-%' OR question_id LIKE 'q-work-relationship-style-%' OR question_id LIKE 'q-family-support-style-%' OR question_id LIKE 'q-friendship-style-%' OR question_id LIKE 'q-decision-making-style-%' OR question_id LIKE 'q-work-priority-style-%' OR question_id LIKE 'q-family-expectation-choice-%' OR question_id LIKE 'q-friend-trust-boundaries-%')) AS question_version_count,

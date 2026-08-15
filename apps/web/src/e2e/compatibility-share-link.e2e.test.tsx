@@ -2,6 +2,8 @@
 
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { CompatibilityInvitationPreview } from "../feature/compatibility/model/compatibility-invitation-preview";
+import type { CompatibilityRelationship } from "../feature/compatibility/model/compatibility-relationship";
 import { resolveCompatibilityInvitationId } from "../feature/compatibility/model/compatibility-route";
 import CompatibilityApplication from "../feature/compatibility/presentation/compatibility-application";
 import CompatibilityInvitationApplication from "../feature/compatibility/presentation/compatibility-invitation-application";
@@ -62,24 +64,31 @@ describe("LIFF compatibility share link journey", () => {
       generatedAt: "2026-08-12T00:00:00.000Z",
       statements: [{ key: "planning", label: "予定", statement: "私は見通しを大切にします" }],
     };
+    const inviterParameter = {
+      id: "planning",
+      label: "予定の立て方",
+      lowLabel: "その場で決めたい",
+      highLabel: "早めに決めたい",
+      position: 78,
+      statement: "私は早めに予定を決めたいです",
+      request: "予定は早めに相談してもらえるとうれしいです",
+      band: "high" as const,
+    };
     const inviterTheme = {
       diagnosisId: "time-planning",
       title: "時間と予定",
-      parameters: [
-        {
-          id: "planning",
-          label: "予定の立て方",
-          lowLabel: "その場で決めたい",
-          highLabel: "早めに決めたい",
-          position: 78,
-          statement: "私は早めに予定を決めたいです",
-        },
-      ],
+      parameters: [inviterParameter],
     };
     const recipientTheme = {
       ...inviterTheme,
       parameters: [
-        { ...inviterTheme.parameters[0], position: 30, statement: "私は余白を残したいです" },
+        {
+          ...inviterParameter,
+          position: 30,
+          statement: "私は余白を残したいです",
+          request: "急がず相談してもらえるとうれしいです",
+          band: "low" as const,
+        },
       ],
     };
 
@@ -109,13 +118,23 @@ describe("LIFF compatibility share link journey", () => {
       nextAction: null,
     });
     mocks.acceptCompatibilityInvitation.mockResolvedValue({ relationshipId, status: "accepted" });
-    mocks.fetchCompatibilityRelationship.mockResolvedValue({
+    const relationship = {
       relationshipId,
       status: "ready",
       relationshipCategory: "partner",
       partner: { displayName: "あおい", aboutMe: profile, themes: [inviterTheme] },
       viewer: { displayName: "はる", aboutMe: profile, themes: [recipientTheme] },
-    });
+      unavailableThemes: [{ diagnosisId: "money-values", title: "お金と消費" }],
+      progression: {
+        level: 2,
+        growthValue: 3,
+        currentLevelThreshold: 3,
+        nextLevelThreshold: 12,
+        comparableThemeCount: 1,
+        marks: [2],
+      },
+    } satisfies CompatibilityRelationship;
+    mocks.fetchCompatibilityRelationship.mockResolvedValue(relationship);
     mocks.endCompatibilityRelationship.mockResolvedValue(undefined);
     mocks.fetchCompatibilityRelationships.mockResolvedValue({ items: [] });
 
@@ -158,6 +177,13 @@ describe("LIFF compatibility share link journey", () => {
     });
     expect(await screen.findByRole("heading", { name: "2人の相性シート" })).toBeTruthy();
     expect(screen.getAllByRole("heading", { name: "あおいさんについて" })).toHaveLength(1);
+    expect(screen.getAllByText("共有プロフィール生成日時")).toHaveLength(2);
+    expect(screen.getAllByText(/2026年8月12日/)).toHaveLength(2);
+    expect(screen.getByText("予定は早めに相談してもらえるとうれしいです")).toBeTruthy();
+    expect(screen.getByText("急がず相談してもらえるとうれしいです")).toBeTruthy();
+    fireEvent.click(screen.getByRole("tab", { name: "2人について" }));
+    expect(screen.getByText(/異なる傾向が見えています/)).toBeTruthy();
+    expect(screen.getByText("「お金と消費」は、現在は2人分を比較できません。")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "共有を終了する" }));
     fireEvent.click(screen.getByRole("button", { name: "共有を終了" }));
     expect(await screen.findByRole("heading", { name: "共有を終了しました" })).toBeTruthy();
@@ -182,7 +208,8 @@ describe("LIFF compatibility share link journey", () => {
       `https://liff.line.me/${liffId}/compatibility/invitations/${relationshipId}`,
     );
     const liffState = invitationUrl.pathname.slice(`/${liffId}`.length);
-    mocks.fetchCompatibilityInvitation.mockResolvedValue({
+    const invitation = {
+      relationshipCategory: "partner",
       inviter: {
         displayName: "あおい",
         avatarUrl: `/api/compatibility/invitations/${relationshipId}/avatar`,
@@ -192,7 +219,8 @@ describe("LIFF compatibility share link journey", () => {
       canAccept: true,
       blockingReasons: [],
       nextAction: "diagnosis",
-    });
+    } satisfies CompatibilityInvitationPreview;
+    mocks.fetchCompatibilityInvitation.mockResolvedValue(invitation);
     mocks.fetchCompatibilityAvatarImage
       .mockResolvedValueOnce(new Blob([Uint8Array.from([1])]))
       .mockResolvedValueOnce(null);

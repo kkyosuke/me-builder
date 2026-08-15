@@ -34,7 +34,7 @@ seedは必ずmigration適用後に実行します。localでは開発者が明�
 
 `INSERT OR IGNORE`は同じ主キーの既存行を変更しません。そのため再実行前には、既存行がseedの期待内容と一致しているかを確認します。意図しない差分がある場合、SQLの上書き更新で解消せず、Question VersionまたはDiagnosisを新しく作ります。
 
-スキーマ拡張で既存行に新しい必須項目を追加した場合だけ、空の初期値を正式な値へ補完する条件付き`UPSERT`を許可します。既に値がある行は更新対象にせず、公開済み内容の変更には使いません。
+スキーマ拡張で既存行に新しい必須項目を追加した場合だけ、空の初期値を正式な値へ補完する条件付き`UPSERT`を許可します。採点値へ影響しない`relationshipRequests`を初めて導入するときも、対象プロパティが未設定の既存採点設定に限り、審査済み文を条件付き`UPSERT`で補完できます。いずれも既に値がある行は更新対象にせず、公開済み内容の改訂には使いません。`relationshipRequests`の補完時もcatalog versionを上げ、既存AccountDataへ更新後のsnapshotを同期させます。
 
 ## 4. 登録する診断
 
@@ -109,6 +109,7 @@ SQL末尾の検証クエリは、現在のseedだけを適用した場合に次�
 - 各Question Versionにposition 0の「いいえ」とposition 1の「はい」がある
 - 各Diagnosisが対応するversion 1の採点設定を参照している
 - 各Diagnosisの表示順が登録表と一致する
+- `relationship-priority-v1`の`priority-balance`に、低・中央・高の審査済み`relationshipRequests`がある
 - seedを2回実行しても件数と内容が変わらない
 - 採点設定とQuestion ID、Question Version、Choice IDが一致する
 - `catalog_versions`の`diagnosis`が今回のseedのversionと一致する
