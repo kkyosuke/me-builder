@@ -2,13 +2,14 @@ import {
   type ActivateCompatibilityReferenceResult,
   type CompatibilityReference,
   type CompatibilityReferenceRole,
+  type CompatibilityRelationshipCategory,
   D1,
   DIAGNOSIS_CATALOG_ID,
   DO,
   type ReleaseCompatibilityReservationResult,
   type ReserveCompatibilityReferenceResult,
 } from "@me-builder/lib";
-import { and, asc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/durable-sqlite";
 import { migrate } from "drizzle-orm/durable-sqlite/migrator";
 import migrations from "../../../../packages/lib/drizzle-do-account/migrations.js";
@@ -144,7 +145,11 @@ export class AccountDataRepository {
 
   addOutgoingCompatibilityReference(
     accountId: string,
-    input: Readonly<{ relationshipId: string; createdAt: Date }>,
+    input: Readonly<{
+      relationshipId: string;
+      relationshipCategory: CompatibilityRelationshipCategory;
+      createdAt: Date;
+    }>,
   ): CompatibilityReference {
     const existing = this.database
       .select()
@@ -156,7 +161,8 @@ export class AccountDataRepository {
         existing.accountId !== accountId ||
         existing.role !== "inviter" ||
         existing.status !== "pending" ||
-        existing.partnerAccountId !== null
+        existing.partnerAccountId !== null ||
+        existing.relationshipCategory !== input.relationshipCategory
       ) {
         throw new Error("Compatibility reference conflicts with persisted outgoing invitation");
       }
@@ -168,6 +174,7 @@ export class AccountDataRepository {
       accountId,
       role: "inviter" as const,
       partnerAccountId: null,
+      relationshipCategory: input.relationshipCategory,
       status: "pending" as const,
       createdAt: input.createdAt,
       updatedAt: input.createdAt,
@@ -178,7 +185,12 @@ export class AccountDataRepository {
 
   reserveIncomingCompatibilityReference(
     accountId: string,
-    input: Readonly<{ relationshipId: string; partnerAccountId: string; createdAt: Date }>,
+    input: Readonly<{
+      relationshipId: string;
+      partnerAccountId: string;
+      relationshipCategory: CompatibilityRelationshipCategory;
+      createdAt: Date;
+    }>,
   ): ReserveCompatibilityReferenceResult {
     const existing = this.database
       .select()
@@ -190,6 +202,7 @@ export class AccountDataRepository {
         existing.accountId === accountId &&
         existing.role === "invitee" &&
         existing.partnerAccountId === input.partnerAccountId &&
+        existing.relationshipCategory === input.relationshipCategory &&
         (existing.status === "reserved" || existing.status === "active")
       ) {
         return { outcome: "unchanged", reference: existing };
@@ -204,6 +217,7 @@ export class AccountDataRepository {
       accountId,
       role: "invitee" as const,
       partnerAccountId: input.partnerAccountId,
+      relationshipCategory: input.relationshipCategory,
       status: "reserved" as const,
       createdAt: input.createdAt,
       updatedAt: input.createdAt,
@@ -214,7 +228,12 @@ export class AccountDataRepository {
 
   reserveOutgoingCompatibilityReference(
     accountId: string,
-    input: Readonly<{ relationshipId: string; partnerAccountId: string; updatedAt: Date }>,
+    input: Readonly<{
+      relationshipId: string;
+      partnerAccountId: string;
+      relationshipCategory: CompatibilityRelationshipCategory;
+      updatedAt: Date;
+    }>,
   ): ReserveCompatibilityReferenceResult {
     const existing = this.database
       .select()
@@ -228,13 +247,17 @@ export class AccountDataRepository {
       existing.accountId !== accountId ||
       existing.role !== "inviter" ||
       existing.status === "ended" ||
-      (existing.partnerAccountId !== null && existing.partnerAccountId !== input.partnerAccountId)
+      (existing.partnerAccountId !== null &&
+        existing.partnerAccountId !== input.partnerAccountId) ||
+      (existing.relationshipCategory !== null &&
+        existing.relationshipCategory !== input.relationshipCategory)
     ) {
       return { outcome: "conflict", reference: existing };
     }
     if (
       (existing.status === "reserved" || existing.status === "active") &&
-      existing.partnerAccountId === input.partnerAccountId
+      existing.partnerAccountId === input.partnerAccountId &&
+      existing.relationshipCategory === input.relationshipCategory
     ) {
       return { outcome: "unchanged", reference: existing };
     }
@@ -245,6 +268,7 @@ export class AccountDataRepository {
       .update(compatibilityReferences)
       .set({
         partnerAccountId: input.partnerAccountId,
+        relationshipCategory: input.relationshipCategory,
         status: "reserved",
         updatedAt: input.updatedAt,
       })
@@ -323,6 +347,7 @@ export class AccountDataRepository {
       relationshipId: string;
       partnerAccountId: string;
       role: CompatibilityReferenceRole;
+      relationshipCategory: CompatibilityRelationshipCategory;
       updatedAt: Date;
     }>,
   ): ActivateCompatibilityReferenceResult {
@@ -334,12 +359,19 @@ export class AccountDataRepository {
     if (!existing || existing.accountId !== accountId || existing.role !== input.role) {
       throw new Error("Compatibility reference to activate was not found");
     }
-    if (existing.status === "active" && existing.partnerAccountId === input.partnerAccountId) {
+    if (
+      existing.status === "active" &&
+      existing.partnerAccountId === input.partnerAccountId &&
+      existing.relationshipCategory === input.relationshipCategory
+    ) {
       return { outcome: "unchanged", reference: existing };
     }
     if (
       existing.status === "ended" ||
-      (existing.partnerAccountId !== null && existing.partnerAccountId !== input.partnerAccountId)
+      (existing.partnerAccountId !== null &&
+        existing.partnerAccountId !== input.partnerAccountId) ||
+      (existing.relationshipCategory !== null &&
+        existing.relationshipCategory !== input.relationshipCategory)
     ) {
       return { outcome: "conflict", reference: existing };
     }
@@ -352,6 +384,7 @@ export class AccountDataRepository {
       .update(compatibilityReferences)
       .set({
         partnerAccountId: input.partnerAccountId,
+        relationshipCategory: input.relationshipCategory,
         status: "active",
         updatedAt: input.updatedAt,
       })
@@ -416,6 +449,47 @@ export class AccountDataRepository {
       )
       .orderBy(asc(compatibilityReferences.createdAt))
       .all();
+  }
+
+  /** 同じ相手・関係カテゴリで最後に終了した参照だけを、再同意時の移送元として返す。 */
+  listCompatibilityProgressionHistoryReferences(
+    accountId: string,
+    input: Readonly<{
+      partnerAccountId: string;
+      relationshipCategory: CompatibilityRelationshipCategory;
+    }>,
+  ): CompatibilityReference[] {
+    const categorized = this.database
+      .select()
+      .from(compatibilityReferences)
+      .where(
+        and(
+          eq(compatibilityReferences.accountId, accountId),
+          eq(compatibilityReferences.partnerAccountId, input.partnerAccountId),
+          eq(compatibilityReferences.relationshipCategory, input.relationshipCategory),
+          eq(compatibilityReferences.status, "ended"),
+        ),
+      )
+      .orderBy(desc(compatibilityReferences.updatedAt))
+      .limit(1)
+      .get();
+    // 0025より前の終了参照は関係カテゴリを持たない。初回移送時だけ最大3件を
+    // CompatibilityDataで照合し、以後は現在関係のstateがあるため再走査しない。
+    const legacy = this.database
+      .select()
+      .from(compatibilityReferences)
+      .where(
+        and(
+          eq(compatibilityReferences.accountId, accountId),
+          eq(compatibilityReferences.partnerAccountId, input.partnerAccountId),
+          isNull(compatibilityReferences.relationshipCategory),
+          eq(compatibilityReferences.status, "ended"),
+        ),
+      )
+      .orderBy(desc(compatibilityReferences.updatedAt))
+      .limit(3)
+      .all();
+    return [...(categorized ? [categorized] : []), ...legacy];
   }
 
   private findOpenCompatibilityReference(partnerAccountId: string) {

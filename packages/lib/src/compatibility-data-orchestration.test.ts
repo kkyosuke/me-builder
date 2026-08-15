@@ -41,6 +41,7 @@ describe("compatibility data orchestration", () => {
     );
     expect(addReference).toHaveBeenCalledWith("account-a", "compatibility.addOutgoingReference", {
       relationshipId,
+      relationshipCategory: "partner",
       createdAt,
     });
   });
@@ -150,6 +151,7 @@ describe("compatibility data orchestration", () => {
         async getInvitationAcceptanceContext() {
           return {
             inviterAccountId: "account-a",
+            relationshipCategory: "partner",
             expiresAt: new Date("2026-08-23T00:00:00.000Z"),
           };
         },
@@ -159,6 +161,7 @@ describe("compatibility data orchestration", () => {
             relationship: {
               inviterAccountId: "account-a",
               inviteeAccountId: "account-b",
+              relationshipCategory: "partner",
               acceptedAt: canonicalAcceptedAt,
             },
           };

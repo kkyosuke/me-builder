@@ -6,6 +6,7 @@ import {
   type CompatibilityRelationship,
   type CompatibilitySharePreviewTheme,
   type D1,
+  accountDataFor,
   compatibilityDataFor,
   compatibilityRelationshipId,
   selectCommonCompatibilityDiagnoses,
@@ -153,6 +154,38 @@ async function pairThemeFingerprints(
   );
 }
 
+async function restorePairProgressionIfNeeded(
+  canonical: CompatibilityRelationship,
+  actorAccountId: string,
+  accountData: AccountDataNamespace,
+  compatibilityData: CompatibilityDataNamespace,
+): Promise<void> {
+  const current = compatibilityDataFor(compatibilityData, canonical.id);
+  if (await current.hasProgressionState(actorAccountId)) return;
+  const participants = participantDetails(canonical, actorAccountId);
+  if (!participants) return;
+  const partnerAccountId = participants.viewerIsInviter
+    ? participants.invitee.accountId
+    : participants.inviter.accountId;
+  const history = await accountDataFor(accountData, actorAccountId).execute(
+    "compatibility.listProgressionHistoryReferences",
+    {
+      partnerAccountId,
+      relationshipCategory: canonical.relationshipCategory,
+    },
+  );
+  for (const reference of history) {
+    if (reference.relationshipId === canonical.id) continue;
+    const snapshot = await compatibilityDataFor(
+      compatibilityData,
+      reference.relationshipId,
+    ).getProgressionResumeSnapshot(actorAccountId);
+    if (!snapshot || snapshot.relationshipCategory !== canonical.relationshipCategory) continue;
+    await current.restoreProgression(actorAccountId, snapshot);
+    return;
+  }
+}
+
 /** 成立中の関係と現在の共有内容から、一覧と詳細で共通の準備状態を組み立てる。 */
 export async function resolveCompatibilityRelationshipContents({
   canonical,
@@ -256,6 +289,12 @@ export async function getCompatibilityRelationshipContents({
   if (!relationship) return { type: "unavailable" };
   if (relationship.status === "ready") {
     try {
+      await restorePairProgressionIfNeeded(
+        canonical,
+        session.session.accountId,
+        accountData,
+        compatibilityData,
+      );
       const progression = await relationshipData.synchronizeProgression(
         session.session.accountId,
         await pairThemeFingerprints(relationship),

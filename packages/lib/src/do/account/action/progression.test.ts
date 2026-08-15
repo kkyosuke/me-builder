@@ -244,6 +244,59 @@ describe("Utsushi progression", () => {
     ).toBe(false);
   });
 
+  it("遅延同期でも出来事の発生時刻と当時の有効性を使い、無効Itemは加点しない", async () => {
+    const db = createTestDb();
+    const accountId = "delayed-progression-account";
+    const initializedAt = new Date("2026-08-15T00:00:00.000Z");
+    const occurredAt = new Date("2026-08-15T01:00:00.000Z");
+    const deletedAt = new Date("2026-08-15T02:00:00.000Z");
+    const readAt = new Date("2026-08-15T03:00:00.000Z");
+    await db.insert(schema.accountDataIdentity).values({ singleton: 1, accountId });
+    await readUtsushiProgression(db, accountId, initializedAt);
+    await insertItem(db, accountId, "item-earned", "goal", occurredAt);
+    await db
+      .update(schema.brainItems)
+      .set({ isDeleted: true, deletedAt, updatedAt: deletedAt })
+      .where(eq(schema.brainItems.id, "item-earned"));
+    await db.batch([
+      db.insert(schema.brainItems).values({
+        id: "item-invalid",
+        accountId,
+        category: "goal",
+        statement: "invalid statement",
+        attributes: {},
+        derivation: "deterministic",
+        status: "invalidated",
+        stability: "changeable",
+        sensitivity: "normal",
+        externallyShareable: false,
+        confidence: {},
+        createdAt: occurredAt,
+        updatedAt: occurredAt,
+      }),
+      progressionPendingStatement(db, {
+        accountId,
+        originType: "brain_item",
+        originId: "item-invalid",
+        at: occurredAt,
+      }),
+    ]);
+
+    await expect(readUtsushiProgression(db, accountId, readAt)).resolves.toMatchObject({
+      growthValue: 3,
+      collectedPieces: 1,
+      activePieces: 0,
+      recentChanges: [{ kind: "new_piece", growthDelta: 3, occurredAt: occurredAt.toISOString() }],
+    });
+    expect(
+      db
+        .select({ growthDelta: schema.progressionEvents.growthDelta })
+        .from(schema.progressionEvents)
+        .where(eq(schema.progressionEvents.originId, "item-invalid"))
+        .get(),
+    ).toEqual({ growthDelta: 0 });
+  });
+
   it("同じ本文hashのEvidenceを再送しても成長値を増やさない", async () => {
     const db = createTestDb();
     const accountId = "duplicate-evidence-account";
@@ -403,5 +456,25 @@ describe("Utsushi progression", () => {
         { level: 10, categories: ["goal", "preference"] },
       ],
     });
+
+    const deletedAt = new Date("2026-08-19T00:00:00.000Z");
+    await db
+      .update(schema.brainItems)
+      .set({ isDeleted: true, deletedAt, updatedAt: deletedAt })
+      .where(eq(schema.brainItems.category, "preference"));
+    await expect(readUtsushiProgression(db, accountId, deletedAt)).resolves.toMatchObject({
+      milestoneCards: [
+        { level: 30, categories: [] },
+        { level: 20, categories: ["identity"] },
+        { level: 10, categories: ["goal"] },
+      ],
+    });
+    expect(
+      db
+        .select({ categoriesJson: schema.progressionMilestones.categoriesJson })
+        .from(schema.progressionMilestones)
+        .where(eq(schema.progressionMilestones.level, 10))
+        .get(),
+    ).toEqual({ categoriesJson: JSON.stringify(["goal"]) });
   });
 });

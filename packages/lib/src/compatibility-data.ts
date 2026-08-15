@@ -138,6 +138,14 @@ export type CompatibilityPairProgression = Readonly<{
   marks: readonly number[];
 }>;
 
+/** 再同意時に移送できる、比較内容を含まないふたり進行度。 */
+export type CompatibilityPairProgressionResumeSnapshot = Readonly<{
+  relationshipCategory: CompatibilityRelationshipCategory;
+  growthValue: number;
+  highestLevel: number;
+  endedAt: Date;
+}>;
+
 export function compatibilityPairProgressionThreshold(level: number): number {
   if (!Number.isSafeInteger(level) || level < 1)
     throw new Error("Pair progression level must be a positive integer");
@@ -186,6 +194,16 @@ export interface CompatibilityDataRpc {
     actorAccountId: string,
     themes: readonly CompatibilityPairThemeFingerprint[],
   ): Promise<CompatibilityPairProgression | null>;
+  hasProgressionState(relationshipId: string, actorAccountId: string): Promise<boolean>;
+  getProgressionResumeSnapshot(
+    relationshipId: string,
+    actorAccountId: string,
+  ): Promise<CompatibilityPairProgressionResumeSnapshot | null>;
+  restoreProgression(
+    relationshipId: string,
+    actorAccountId: string,
+    snapshot: CompatibilityPairProgressionResumeSnapshot,
+  ): Promise<boolean>;
   endRelationship(
     relationshipId: string,
     actorAccountId: string,
@@ -226,6 +244,18 @@ export function compatibilityDataFor(
     ) {
       return object.synchronizeProgression(relationshipId, actorAccountId, themes);
     },
+    hasProgressionState(actorAccountId: string) {
+      return object.hasProgressionState(relationshipId, actorAccountId);
+    },
+    getProgressionResumeSnapshot(actorAccountId: string) {
+      return object.getProgressionResumeSnapshot(relationshipId, actorAccountId);
+    },
+    restoreProgression(
+      actorAccountId: string,
+      snapshot: CompatibilityPairProgressionResumeSnapshot,
+    ) {
+      return object.restoreProgression(relationshipId, actorAccountId, snapshot);
+    },
     endRelationship(actorAccountId: string) {
       return object.endRelationship(relationshipId, actorAccountId);
     },
@@ -240,6 +270,7 @@ export type CompatibilityReference = Readonly<{
   accountId: string;
   role: CompatibilityReferenceRole;
   partnerAccountId: string | null;
+  relationshipCategory: CompatibilityRelationshipCategory | null;
   status: CompatibilityReferenceStatus;
   createdAt: Date;
   updatedAt: Date;

@@ -5,6 +5,10 @@ import { getCompatibilityRelationshipContents } from "./compatibility-relationsh
 const mocks = vi.hoisted(() => ({
   createLiffSession: vi.fn(),
   getRelationship: vi.fn(),
+  hasProgressionState: vi.fn(),
+  getProgressionResumeSnapshot: vi.fn(),
+  restoreProgression: vi.fn(),
+  accountExecute: vi.fn(),
   synchronizeProgression: vi.fn(),
   loadSharePreviewData: vi.fn(),
 }));
@@ -14,8 +18,12 @@ vi.mock("@me-builder/lib", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@me-builder/lib")>()),
   compatibilityDataFor: () => ({
     getRelationship: mocks.getRelationship,
+    hasProgressionState: mocks.hasProgressionState,
+    getProgressionResumeSnapshot: mocks.getProgressionResumeSnapshot,
+    restoreProgression: mocks.restoreProgression,
     synchronizeProgression: mocks.synchronizeProgression,
   }),
+  accountDataFor: () => ({ execute: mocks.accountExecute }),
 }));
 vi.mock("./compatibility-share-preview", () => ({
   loadCompatibilitySharePreviewData: mocks.loadSharePreviewData,
@@ -94,6 +102,8 @@ describe("getCompatibilityRelationshipContents", () => {
       relationshipCategory: "friend",
       status: "accepted",
     });
+    mocks.hasProgressionState.mockResolvedValue(true);
+    mocks.restoreProgression.mockResolvedValue(true);
     mocks.synchronizeProgression.mockResolvedValue({
       level: 2,
       growthValue: 3,
@@ -154,6 +164,33 @@ describe("getCompatibilityRelationshipContents", () => {
         progression: null,
       },
     });
+  });
+
+  it("同じ相手・関係カテゴリの再同意では終了済み進行度を初回だけ復元する", async () => {
+    const historyRelationshipId = "2".repeat(64);
+    const snapshot = {
+      relationshipCategory: "friend",
+      growthValue: 27,
+      highestLevel: 4,
+      endedAt: new Date("2026-08-12T00:00:00.000Z"),
+    } as const;
+    mocks.loadSharePreviewData
+      .mockResolvedValueOnce(shareData({ displayName: "あおい", themes: [theme("shared")] }))
+      .mockResolvedValueOnce(shareData({ displayName: "はる", themes: [theme("shared")] }));
+    mocks.hasProgressionState.mockResolvedValue(false);
+    mocks.accountExecute.mockResolvedValue([{ relationshipId: historyRelationshipId }]);
+    mocks.getProgressionResumeSnapshot.mockResolvedValue(snapshot);
+
+    await getCompatibilityRelationshipContents(params);
+
+    expect(mocks.accountExecute).toHaveBeenCalledWith(
+      "compatibility.listProgressionHistoryReferences",
+      { partnerAccountId: "account-invitee", relationshipCategory: "friend" },
+    );
+    expect(mocks.restoreProgression).toHaveBeenCalledWith("account-inviter", snapshot);
+    expect(mocks.restoreProgression.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.synchronizeProgression.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
+    );
   });
 
   it("片方で表示できないテーマは比較に使わず、回答できる診断が残っていれば案内する", async () => {

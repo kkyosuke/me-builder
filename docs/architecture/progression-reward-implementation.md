@@ -13,7 +13,9 @@
 - `progression_item_states`: Item単位で加点済みのEvidence fingerprintを保持するcache
 - `progression_pending_events`: Brain更新と進行度確定の間をつなぐoutbox
 
-Evidence fingerprintは、本文payloadがある場合はそのcontent hash、ない場合はSource Record IDを使用します。同じcontent hashの再送は別edgeでも加点しません。意味的重複はBrain Item生成時の既存Item照合を先に通し、進行度処理が本文をモデルへ再送して追加判定することはしません。
+Evidence fingerprintは、本文payloadがある場合はそのcontent hash、ない場合はSource Record IDを使用します。同じcontent hashの再送は別edgeでも加点しません。意味的重複はBrain Item生成時の既存Item照合を先に通し、その判定と同じtransactionで`duplicate_evidence`の`+0` eventを確定して、初回集計を後から行っても加点対象へ戻しません。進行度処理が本文をモデルへ再送して追加判定することはしません。
+
+pending eventの`created_at`を利用者向けの出来事発生時刻とし、進行度を後から読んだ時刻へ置き換えません。pending後にItemが削除・置換されていても、発生時点でactiveだった確定済みの歩みは維持します。発生時点ですでに無効、削除済み、期間外だったItemは加点しません。
 
 Revisionは作成時に`correction`か`temporal`を確定します。診断の再回答による置換は`correction`、日記から時点の異なる状態を保存する置換は`temporal`とし、進行度読込時に由来を推測し直しません。
 
@@ -33,18 +35,18 @@ Revisionは作成時に`correction`か`temporal`を確定します。診断の�
 
 10レベルごとの到達をAccountDataで一度だけmaterializeします。カードへ保存するのは到達レベル、到達日時、前の節目から増えたかけら数、分類名だけです。statement、Evidence、Source Record IDは保存しません。
 
-カードは本人向け進行度APIから取得し、「わたしのまとめ」で表示します。画像生成を必須にせず、Web上の静的カードとして保存可能にします。
+カードは本人向け進行度APIから取得し、「わたしのまとめ」で表示します。到達日時は閾値を越えた成長eventの発生時刻を使います。Brain Item削除後は、その分類を持つ非削除Itemが残っていない場合、保存済みカードの分類snapshotからも削除します。画像生成を必須にせず、Web上の静的カードとして保存可能にします。
 
 ## 6. ふたりレベル
 
-ふたりレベルの正本はCompatibilityData SQLiteに置きます。管理単位はrelationship IDとRelationship Categoryの組み合わせです。比較可能な診断テーマが初めて増えたとき、または比較結果のfingerprintが変わったときだけ、本文を含まないpair eventを一度だけ追加します。
+ふたりレベルの正本はCompatibilityData SQLiteに置きます。利用者から見た管理単位は2つのAccountとRelationship Categoryの組み合わせです。物理的には成立中のrelationship IDのCompatibilityDataへ保存し、同じAccountペア・同じRelationship Categoryで再同意したときは、終了済みCompatibilityDataから内容を持たない累積値と最高到達レベルだけを新しいCompatibilityDataへ一度だけ移します。比較可能な診断テーマが初めて増えたとき、または比較結果のfingerprintが変わったときだけ、本文を含まないpair eventを一度だけ追加します。
 
-共有終了中はAPIから進行度としるしを返しません。終了時に比較テーマのfingerprintと現在の比較テーマ数を削除し、累積値と最高到達レベルだけを内容を持たない集計として残します。同じ関係の再同意後に再表示します。招待発行・送信・承諾だけではeventを作りません。
+共有終了中はAPIから進行度としるしを返しません。終了時に比較テーマのfingerprintと現在の比較テーマ数を削除し、累積値と最高到達レベルだけを内容を持たない集計として残します。再同意後の最初の相性シート読込では、現在の関係に進行度がまだなければAccountDataの同じ相手・同じRelationship Categoryの終了参照を1件だけ引き、集計を移してから現在の比較テーマを`+0`の基準として保存します。カテゴリ列追加前の終了参照だけは最新3件を上限にCompatibilityDataで照合します。この互換処理も初回だけで、通常読込では履歴を走査しません。招待発行・送信・承諾だけではeventを作りません。
 
 ## 7. 障害時と費用
 
 - 進行度更新に失敗しても診断結果、日記返信、共有結果は成功させる
-- AccountDataとCompatibilityDataのalarmで未確定eventを再試行する
+- AccountDataの未確定eventはalarmで再試行し、ふたり進行度は相性シートの次回読込で再試行する
 - 一覧取得でAccount数分のDurable Objectを呼ばず、管理者一覧だけ共有D1 projectionを使う
 - 本文を追加の報酬判定専用モデルへ送らず、既存のBrain・相性生成結果を利用する
 - API失敗時も診断、記録、共有終了などの中核操作をレベルで制限しない

@@ -971,6 +971,16 @@ describe("Diary conversation persistence flow", () => {
         dedupPromptVersion: "brain-dedup-v1",
       }),
     ]);
+    expect(
+      db
+        .select({
+          kind: schema.progressionEvents.kind,
+          growthDelta: schema.progressionEvents.growthDelta,
+        })
+        .from(schema.progressionEvents)
+        .where(eq(schema.progressionEvents.originType, "evidence"))
+        .get(),
+    ).toEqual({ kind: "duplicate_evidence", growthDelta: 0 });
     await expect(
       getDiaryBrainCheckpointDevelopmentNotification(db, account.id, checkpoint?.id ?? ""),
     ).resolves.toEqual({

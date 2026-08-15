@@ -23,6 +23,7 @@ describe("AccountData compatibility projection reconciliation", () => {
             getRelationship: vi.fn().mockResolvedValue({
               inviterAccountId: "account-a",
               inviteeAccountId: "account-b",
+              relationshipCategory: "friend",
               acceptedAt,
             }),
           }),
@@ -40,6 +41,7 @@ describe("AccountData compatibility projection reconciliation", () => {
       relationshipId: "1".repeat(64),
       partnerAccountId: "account-b",
       role: "inviter",
+      relationshipCategory: "friend",
       updatedAt: acceptedAt,
     });
   });

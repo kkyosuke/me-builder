@@ -188,4 +188,56 @@ describe("CompatibilityDataRepository", () => {
     repository.endRelationship("account-inviter", new Date("2026-08-13T00:00:00.000Z"));
     expect(repository.synchronizeProgression("account-invitee", theme, firstComparedAt)).toBeNull();
   });
+
+  it("共有終了後の累積値を同じカテゴリの再同意へ移し、現在テーマを二重加算しない", async () => {
+    const previous = createRepository();
+    const current = createRepository();
+    await previous.initialize();
+    await current.initialize();
+    previous.createInvitation(relationshipId, invitationInput(), createdAt);
+    previous.acceptInvitation(
+      { inviteeAccountId: "account-invitee", inviteeDisplayName: "受信者" },
+      new Date("2026-08-10T00:00:00.000Z"),
+    );
+    const theme = [{ diagnosisId: "values", fingerprint: "sha256:first" }];
+    previous.synchronizeProgression("account-inviter", theme, new Date("2026-08-11T00:00:00.000Z"));
+    previous.endRelationship("account-inviter", new Date("2026-08-12T00:00:00.000Z"));
+    const snapshot = previous.getProgressionResumeSnapshot("account-inviter");
+    expect(snapshot).toMatchObject({
+      relationshipCategory: "partner",
+      growthValue: 3,
+      highestLevel: 2,
+    });
+    expect(previous.getProgressionResumeSnapshot("account-outsider")).toBeNull();
+
+    const nextRelationshipId = "2".repeat(64);
+    current.createInvitation(nextRelationshipId, invitationInput(), createdAt);
+    current.acceptInvitation(
+      { inviteeAccountId: "account-invitee", inviteeDisplayName: "受信者" },
+      new Date("2026-08-13T00:00:00.000Z"),
+    );
+    expect(current.hasProgressionState("account-inviter", createdAt)).toBe(false);
+    expect(
+      snapshot &&
+        current.restoreProgression(
+          "account-inviter",
+          snapshot,
+          new Date("2026-08-13T00:01:00.000Z"),
+        ),
+    ).toBe(true);
+    expect(
+      current.synchronizeProgression(
+        "account-inviter",
+        theme,
+        new Date("2026-08-13T00:02:00.000Z"),
+      ),
+    ).toMatchObject({ growthValue: 3, level: 2, comparableThemeCount: 1 });
+    expect(
+      current.synchronizeProgression(
+        "account-inviter",
+        [{ diagnosisId: "values", fingerprint: "sha256:changed" }],
+        new Date("2026-08-14T00:00:00.000Z"),
+      ),
+    ).toMatchObject({ growthValue: 4, level: 2 });
+  });
 });

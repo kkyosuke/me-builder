@@ -16,7 +16,11 @@ const actions = {
   "compatibility.addOutgoingReference": async (
     db: DO.account.Database,
     accountId: string,
-    input: Readonly<{ relationshipId: string; createdAt: Date }>,
+    input: Readonly<{
+      relationshipId: string;
+      relationshipCategory: "partner" | "family" | "friend" | "work";
+      createdAt: Date;
+    }>,
   ) => {
     const table = DO.account.schema.compatibilityReferences;
     const existing = await db
@@ -30,6 +34,7 @@ const actions = {
       accountId,
       role: "inviter" as const,
       partnerAccountId: null,
+      relationshipCategory: input.relationshipCategory,
       status: "pending" as const,
       createdAt: input.createdAt,
       updatedAt: input.createdAt,
@@ -40,7 +45,12 @@ const actions = {
   "compatibility.reserveIncomingReference": async (
     db: DO.account.Database,
     accountId: string,
-    input: Readonly<{ relationshipId: string; partnerAccountId: string; createdAt: Date }>,
+    input: Readonly<{
+      relationshipId: string;
+      partnerAccountId: string;
+      relationshipCategory: "partner" | "family" | "friend" | "work";
+      createdAt: Date;
+    }>,
   ) => {
     const table = DO.account.schema.compatibilityReferences;
     const existing = await db
@@ -53,6 +63,7 @@ const actions = {
         existing.accountId === accountId &&
         existing.role === "invitee" &&
         existing.partnerAccountId === input.partnerAccountId &&
+        existing.relationshipCategory === input.relationshipCategory &&
         (existing.status === "reserved" || existing.status === "active");
       return { outcome: matches ? "unchanged" : "conflict", reference: existing } as const;
     }
@@ -61,6 +72,7 @@ const actions = {
       accountId,
       role: "invitee" as const,
       partnerAccountId: input.partnerAccountId,
+      relationshipCategory: input.relationshipCategory,
       status: "reserved" as const,
       createdAt: input.createdAt,
       updatedAt: input.createdAt,
@@ -71,7 +83,12 @@ const actions = {
   "compatibility.reserveOutgoingReference": async (
     db: DO.account.Database,
     accountId: string,
-    input: Readonly<{ relationshipId: string; partnerAccountId: string; updatedAt: Date }>,
+    input: Readonly<{
+      relationshipId: string;
+      partnerAccountId: string;
+      relationshipCategory: "partner" | "family" | "friend" | "work";
+      updatedAt: Date;
+    }>,
   ) => {
     const table = DO.account.schema.compatibilityReferences;
     const existing = await db
@@ -95,6 +112,7 @@ const actions = {
     const reference = {
       ...existing,
       partnerAccountId: input.partnerAccountId,
+      relationshipCategory: input.relationshipCategory,
       status: "reserved" as const,
       updatedAt: input.updatedAt,
     };
@@ -136,6 +154,7 @@ const actions = {
       relationshipId: string;
       partnerAccountId: string;
       role: "inviter" | "invitee";
+      relationshipCategory: "partner" | "family" | "friend" | "work";
       updatedAt: Date;
     }>,
   ) => {
@@ -156,7 +175,12 @@ const actions = {
       return { outcome: "conflict", reference: existing } as const;
     }
     if (existing.status === "active") return { outcome: "unchanged", reference: existing } as const;
-    const reference = { ...existing, status: "active" as const, updatedAt: input.updatedAt };
+    const reference = {
+      ...existing,
+      relationshipCategory: input.relationshipCategory,
+      status: "active" as const,
+      updatedAt: input.updatedAt,
+    };
     await db.update(table).set(reference).where(eq(table.relationshipId, input.relationshipId));
     return { outcome: "activated", reference } as const;
   },
@@ -185,6 +209,26 @@ const actions = {
         reference.accountId === accountId &&
         (reference.status === "pending" || reference.status === "active"),
     );
+  },
+  "compatibility.listProgressionHistoryReferences": async (
+    db: DO.account.Database,
+    accountId: string,
+    input: Readonly<{
+      partnerAccountId: string;
+      relationshipCategory: "partner" | "family" | "friend" | "work";
+    }>,
+  ) => {
+    const references = await db.select().from(DO.account.schema.compatibilityReferences);
+    return references
+      .filter(
+        (reference) =>
+          reference.accountId === accountId &&
+          reference.partnerAccountId === input.partnerAccountId &&
+          reference.relationshipCategory === input.relationshipCategory &&
+          reference.status === "ended",
+      )
+      .sort((left, right) => right.updatedAt.getTime() - left.updatedAt.getTime())
+      .slice(0, 1);
   },
   "brain.listFailedVectorSyncJobs": (db: DO.account.Database, _accountId: string) =>
     DO.account.action.brain.listFailedBrainVectorSyncJobs(db),

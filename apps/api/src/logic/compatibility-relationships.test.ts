@@ -30,6 +30,7 @@ function reference(overrides: Partial<CompatibilityReference>): CompatibilityRef
     accountId,
     role: "inviter",
     partnerAccountId: null,
+    relationshipCategory: null,
     status: "pending",
     createdAt: new Date("2026-08-11T00:00:00.000Z"),
     updatedAt: new Date("2026-08-11T00:00:00.000Z"),

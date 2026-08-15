@@ -26,6 +26,7 @@ export async function createCompatibilityInvitationWithReference(
       "compatibility.addOutgoingReference",
       {
         relationshipId,
+        relationshipCategory: input.relationshipCategory,
         createdAt: result.relationship.createdAt,
       },
     );
@@ -57,6 +58,7 @@ function createReservationSteps(
   relationshipId: string,
   inviterAccountId: string,
   inviteeAccountId: string,
+  relationshipCategory: CompatibilityRelationship["relationshipCategory"],
   at: Date,
 ): ReservationStep[] {
   const inviter = accountDataFor(namespace, inviterAccountId);
@@ -68,6 +70,7 @@ function createReservationSteps(
         inviter.execute("compatibility.reserveOutgoingReference", {
           relationshipId,
           partnerAccountId: inviteeAccountId,
+          relationshipCategory,
           updatedAt: at,
         }),
       release: () => inviter.execute("compatibility.releaseReservation", relationshipId, at),
@@ -78,6 +81,7 @@ function createReservationSteps(
         invitee.execute("compatibility.reserveIncomingReference", {
           relationshipId,
           partnerAccountId: inviterAccountId,
+          relationshipCategory,
           createdAt: at,
         }),
       release: () => invitee.execute("compatibility.releaseReservation", relationshipId, at),
@@ -98,6 +102,7 @@ async function activateCompatibilityReferences(
   relationshipId: string,
   inviterAccountId: string,
   inviteeAccountId: string,
+  relationshipCategory: CompatibilityRelationship["relationshipCategory"],
   acceptedAt: Date,
 ): Promise<void> {
   const participants = [
@@ -111,6 +116,7 @@ async function activateCompatibilityReferences(
         relationshipId,
         partnerAccountId: participant.partnerAccountId,
         role: participant.role,
+        relationshipCategory,
         updatedAt: acceptedAt,
       },
     );
@@ -143,6 +149,7 @@ export async function acceptCompatibilityInvitationWithReferences(
         relationshipId,
         result.relationship.inviterAccountId,
         inviteeAccountId,
+        result.relationship.relationshipCategory,
         acceptedAt,
       );
     }
@@ -158,6 +165,7 @@ export async function acceptCompatibilityInvitationWithReferences(
     relationshipId,
     context.inviterAccountId,
     input.inviteeAccountId,
+    context.relationshipCategory,
     at,
   );
   try {
@@ -203,6 +211,7 @@ export async function acceptCompatibilityInvitationWithReferences(
     relationshipId,
     context.inviterAccountId,
     input.inviteeAccountId,
+    result.relationship.relationshipCategory,
     acceptedAt,
   );
   return result;

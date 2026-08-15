@@ -1,0 +1,1 @@
+ALTER TABLE `compatibility_references` ADD `relationship_category` text;

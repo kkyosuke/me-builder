@@ -179,6 +179,7 @@ describe("AccountDataRepository", () => {
     const reserved = repository.reserveIncomingCompatibilityReference("account-1", {
       relationshipId: "relationship-1",
       partnerAccountId: "account-2",
+      relationshipCategory: "friend",
       createdAt: at,
     });
     expect(reserved.outcome).toBe("reserved");
@@ -186,6 +187,7 @@ describe("AccountDataRepository", () => {
       repository.reserveIncomingCompatibilityReference("account-1", {
         relationshipId: "relationship-2",
         partnerAccountId: "account-2",
+        relationshipCategory: "friend",
         createdAt: at,
       }),
     ).toMatchObject({
@@ -198,6 +200,7 @@ describe("AccountDataRepository", () => {
         relationshipId: "relationship-1",
         partnerAccountId: "account-2",
         role: "invitee",
+        relationshipCategory: "friend",
         updatedAt: at,
       }).outcome,
     ).toBe("activated");
@@ -219,6 +222,7 @@ describe("AccountDataRepository", () => {
     repository.bindAccount("account-1");
     const reference = repository.addOutgoingCompatibilityReference("account-1", {
       relationshipId: "relationship-1",
+      relationshipCategory: "partner",
       createdAt: new Date("2026-08-09T00:00:00.000Z"),
     });
 
@@ -230,6 +234,40 @@ describe("AccountDataRepository", () => {
     });
   });
 
+  it("同じ相手・関係カテゴリで最後に終了した参照だけを進行度履歴として返す", async () => {
+    const repository = createRepository();
+    await repository.initialize();
+    repository.bindAccount("account-1");
+    const older = new Date("2026-08-09T00:00:00.000Z");
+    const newer = new Date("2026-08-10T00:00:00.000Z");
+    for (const [relationshipId, relationshipCategory, at] of [
+      ["relationship-old", "friend", older],
+      ["relationship-new", "friend", newer],
+      ["relationship-other-category", "family", newer],
+    ] as const) {
+      repository.reserveIncomingCompatibilityReference("account-1", {
+        relationshipId,
+        partnerAccountId: "account-2",
+        relationshipCategory,
+        createdAt: at,
+      });
+      repository.endCompatibilityReference("account-1", relationshipId, at);
+    }
+
+    expect(
+      repository.listCompatibilityProgressionHistoryReferences("account-1", {
+        partnerAccountId: "account-2",
+        relationshipCategory: "friend",
+      }),
+    ).toEqual([expect.objectContaining({ relationshipId: "relationship-new", status: "ended" })]);
+    expect(
+      repository.listCompatibilityProgressionHistoryReferences("account-1", {
+        partnerAccountId: "account-other",
+        relationshipCategory: "friend",
+      }),
+    ).toEqual([]);
+  });
+
   it("送受信を問わず同じ相手の予約を1件に制限し、予約を再試行可能に解放する", async () => {
     const repository = createRepository();
     await repository.initialize();
@@ -237,6 +275,7 @@ describe("AccountDataRepository", () => {
     const at = new Date("2026-08-09T00:00:00.000Z");
     repository.addOutgoingCompatibilityReference("account-1", {
       relationshipId: "relationship-outgoing",
+      relationshipCategory: "family",
       createdAt: at,
     });
 
@@ -244,6 +283,7 @@ describe("AccountDataRepository", () => {
       repository.reserveOutgoingCompatibilityReference("account-1", {
         relationshipId: "relationship-outgoing",
         partnerAccountId: "account-2",
+        relationshipCategory: "family",
         updatedAt: at,
       }),
     ).toMatchObject({
@@ -254,6 +294,7 @@ describe("AccountDataRepository", () => {
       repository.reserveIncomingCompatibilityReference("account-1", {
         relationshipId: "relationship-incoming",
         partnerAccountId: "account-2",
+        relationshipCategory: "family",
         createdAt: at,
       }),
     ).toMatchObject({
@@ -296,6 +337,7 @@ describe("AccountDataRepository", () => {
       repository.reserveIncomingCompatibilityReference("account-1", {
         relationshipId: "relationship-incoming",
         partnerAccountId: "account-2",
+        relationshipCategory: "family",
         createdAt: at,
       }).outcome,
     ).toBe("reserved");

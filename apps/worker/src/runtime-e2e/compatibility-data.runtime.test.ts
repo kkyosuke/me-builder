@@ -3,12 +3,81 @@ import { env } from "cloudflare:workers";
 import {
   acceptCompatibilityInvitationWithReferences,
   accountDataFor,
+  compatibilityDataFor,
+  createCompatibilityInvitationWithReference,
   createCompatibilityRelationshipId,
+  endCompatibilityRelationshipWithReferences,
 } from "@me-builder/lib";
 import { describe, expect, it } from "vitest";
 import type { CompatibilityData } from "../compatibility-data";
 
 describe("CompatibilityData Workers runtime E2E", () => {
+  it("同じAccountペア・関係カテゴリの再同意でふたりレベルを復元する", async () => {
+    const inviterAccountId = crypto.randomUUID();
+    const inviteeAccountId = crypto.randomUUID();
+    const previousRelationshipId = createCompatibilityRelationshipId();
+    const currentRelationshipId = createCompatibilityRelationshipId();
+    const invitation = {
+      inviterAccountId,
+      inviterDisplayName: "送信者",
+      relationshipCategory: "friend",
+    } as const;
+    const acceptance = { inviteeAccountId, inviteeDisplayName: "受信者" } as const;
+
+    await createCompatibilityInvitationWithReference(
+      env.ACCOUNT_DATA,
+      env.COMPATIBILITY_DATA,
+      invitation,
+      previousRelationshipId,
+    );
+    await acceptCompatibilityInvitationWithReferences(
+      env.ACCOUNT_DATA,
+      env.COMPATIBILITY_DATA,
+      previousRelationshipId,
+      acceptance,
+    );
+    const previous = compatibilityDataFor(env.COMPATIBILITY_DATA, previousRelationshipId);
+    const themes = [{ diagnosisId: "values", fingerprint: "sha256:first" }];
+    await expect(previous.synchronizeProgression(inviterAccountId, themes)).resolves.toMatchObject({
+      growthValue: 3,
+      level: 2,
+    });
+    await endCompatibilityRelationshipWithReferences(
+      env.ACCOUNT_DATA,
+      env.COMPATIBILITY_DATA,
+      previousRelationshipId,
+      inviterAccountId,
+    );
+
+    await createCompatibilityInvitationWithReference(
+      env.ACCOUNT_DATA,
+      env.COMPATIBILITY_DATA,
+      invitation,
+      currentRelationshipId,
+    );
+    await acceptCompatibilityInvitationWithReferences(
+      env.ACCOUNT_DATA,
+      env.COMPATIBILITY_DATA,
+      currentRelationshipId,
+      acceptance,
+    );
+    const history = await accountDataFor(env.ACCOUNT_DATA, inviterAccountId).execute(
+      "compatibility.listProgressionHistoryReferences",
+      { partnerAccountId: inviteeAccountId, relationshipCategory: "friend" },
+    );
+    expect(history[0]?.relationshipId).toBe(previousRelationshipId);
+    const snapshot = await previous.getProgressionResumeSnapshot(inviterAccountId);
+    expect(snapshot).not.toBeNull();
+    const current = compatibilityDataFor(env.COMPATIBILITY_DATA, currentRelationshipId);
+    if (!snapshot) throw new Error("Expected progression resume snapshot");
+    await expect(current.restoreProgression(inviterAccountId, snapshot)).resolves.toBe(true);
+    await expect(current.synchronizeProgression(inviterAccountId, themes)).resolves.toMatchObject({
+      growthValue: 3,
+      level: 2,
+      comparableThemeCount: 1,
+    });
+  });
+
   it("関係ごとのSQLiteへ招待と同意を保存し、別名でroutingされたRPCを拒否する", async () => {
     const relationshipId = createCompatibilityRelationshipId();
     const inviterAccountId = crypto.randomUUID();
@@ -47,16 +116,19 @@ describe("CompatibilityData Workers runtime E2E", () => {
     });
     await inviter.execute("compatibility.addOutgoingReference", {
       relationshipId,
+      relationshipCategory: "partner",
       createdAt: new Date(),
     });
     await inviter.execute("compatibility.reserveOutgoingReference", {
       relationshipId,
       partnerAccountId: inviteeAccountId,
+      relationshipCategory: "partner",
       updatedAt: new Date(),
     });
     await invitee.execute("compatibility.reserveIncomingReference", {
       relationshipId,
       partnerAccountId: inviterAccountId,
+      relationshipCategory: "partner",
       createdAt: new Date(),
     });
     await expect(stub.acceptInvitation(relationshipId, acceptance)).resolves.toMatchObject({
@@ -166,16 +238,19 @@ describe("CompatibilityData Workers runtime E2E", () => {
     });
     await inviter.execute("compatibility.addOutgoingReference", {
       relationshipId,
+      relationshipCategory: "family",
       createdAt: new Date(),
     });
     await inviter.execute("compatibility.reserveOutgoingReference", {
       relationshipId,
       partnerAccountId: inviteeAccountId,
+      relationshipCategory: "family",
       updatedAt: new Date(),
     });
     await invitee.execute("compatibility.reserveIncomingReference", {
       relationshipId,
       partnerAccountId: inviterAccountId,
+      relationshipCategory: "family",
       createdAt: new Date(),
     });
     await relationship.acceptInvitation(relationshipId, {
@@ -208,6 +283,7 @@ describe("CompatibilityData Workers runtime E2E", () => {
     });
     await inviter.execute("compatibility.addOutgoingReference", {
       relationshipId,
+      relationshipCategory: "friend",
       createdAt: new Date(),
     });
     await relationship.cancelInvitation(relationshipId, inviterAccountId);
@@ -230,16 +306,19 @@ describe("CompatibilityData Workers runtime E2E", () => {
     });
     await inviter.execute("compatibility.addOutgoingReference", {
       relationshipId,
+      relationshipCategory: "work",
       createdAt: new Date(),
     });
     await inviter.execute("compatibility.reserveOutgoingReference", {
       relationshipId,
       partnerAccountId: inviteeAccountId,
+      relationshipCategory: "work",
       updatedAt: new Date(),
     });
     await invitee.execute("compatibility.reserveIncomingReference", {
       relationshipId,
       partnerAccountId: inviterAccountId,
+      relationshipCategory: "work",
       createdAt: new Date(),
     });
     await relationship.acceptInvitation(relationshipId, {
@@ -278,10 +357,12 @@ describe("CompatibilityData Workers runtime E2E", () => {
       }),
       aData.execute("compatibility.addOutgoingReference", {
         relationshipId: relationshipAtoB,
+        relationshipCategory: "partner",
         createdAt: new Date(),
       }),
       bData.execute("compatibility.addOutgoingReference", {
         relationshipId: relationshipBtoA,
+        relationshipCategory: "partner",
         createdAt: new Date(),
       }),
     ]);

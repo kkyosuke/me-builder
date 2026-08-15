@@ -94,10 +94,11 @@ erDiagram
 | `account_id` | このAccountData Objectへ固定された所有者 |
 | `role` | `inviter`または`invitee` |
 | `partner_account_id` | 承諾後の相手。未承諾の送信者参照ではNULL |
+| `relationship_category` | 招待時に選んだ関係分類。再同意時の進行度履歴を1件で引くために保持 |
 | `status` | `pending`、`reserved`、`active`、`ended` |
 | `created_at` / `updated_at` | ローカルprojectionの更新時刻 |
 
-`reserved`または`active`の`partner_account_id`へ部分一意indexを置き、同じ相手との承諾処理をAccountData Object内で直列化します。`reserved`は送信者・受信者の双方で別DO更新の途中だけに使い、相性一覧には表示しません。`ended`は監査と冪等な再試行のため保持しますが、通常一覧から除外します。
+`reserved`または`active`の`partner_account_id`へ部分一意indexを置き、同じ相手との承諾処理をAccountData Object内で直列化します。`reserved`は送信者・受信者の双方で別DO更新の途中だけに使い、相性一覧には表示しません。`ended`は監査、冪等な再試行、同じ相手・同じ関係分類へ内容を持たないふたり進行度を移すために保持しますが、通常一覧から除外します。進行度の移送元は`partner_account_id`と`relationship_category`が一致する最新の1件だけを取得し、終了履歴を都度走査しません。カテゴリ列追加前の終了参照に限り、互換処理として同じ相手の最新3件までを照合します。
 
 ## 6. 状態遷移と整合性
 

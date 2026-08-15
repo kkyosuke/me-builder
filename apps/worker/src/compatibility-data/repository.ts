@@ -5,6 +5,7 @@ import {
   type CompatibilityInvitationAcceptanceContext,
   type CompatibilityInvitationPreview,
   type CompatibilityPairProgression,
+  type CompatibilityPairProgressionResumeSnapshot,
   type CompatibilityPairThemeFingerprint,
   type CompatibilityRelationship,
   type CreateCompatibilityInvitationInput,
@@ -150,6 +151,76 @@ export class CompatibilityDataRepository {
     return getAcceptedCompatibilityRelationship(this.readRelationship(), actorAccountId);
   }
 
+  hasProgressionState(actorAccountId: string, at: Date): boolean {
+    if (!this.getRelationship(actorAccountId, at)) return false;
+    return Boolean(
+      this.db
+        .select({ singleton: compatibilityProgressionStates.singleton })
+        .from(compatibilityProgressionStates)
+        .where(eq(compatibilityProgressionStates.singleton, 1))
+        .get(),
+    );
+  }
+
+  getProgressionResumeSnapshot(
+    actorAccountId: string,
+  ): CompatibilityPairProgressionResumeSnapshot | null {
+    const relationship = this.readRelationship();
+    if (
+      !relationship ||
+      relationship.status !== "ended" ||
+      !relationship.endedAt ||
+      (relationship.inviterAccountId !== actorAccountId &&
+        relationship.inviteeAccountId !== actorAccountId)
+    ) {
+      return null;
+    }
+    const state = this.db
+      .select()
+      .from(compatibilityProgressionStates)
+      .where(eq(compatibilityProgressionStates.singleton, 1))
+      .get();
+    if (!state || state.growthValue <= 0) return null;
+    return {
+      relationshipCategory: relationship.relationshipCategory,
+      growthValue: state.growthValue,
+      highestLevel: state.highestLevel,
+      endedAt: relationship.endedAt,
+    };
+  }
+
+  restoreProgression(
+    actorAccountId: string,
+    snapshot: CompatibilityPairProgressionResumeSnapshot,
+    at: Date,
+  ): boolean {
+    const relationship = this.getRelationship(actorAccountId, at);
+    if (!relationship || relationship.relationshipCategory !== snapshot.relationshipCategory) {
+      return false;
+    }
+    if (
+      !Number.isSafeInteger(snapshot.growthValue) ||
+      snapshot.growthValue <= 0 ||
+      !Number.isSafeInteger(snapshot.highestLevel) ||
+      snapshot.highestLevel < compatibilityPairProgressionLevel(snapshot.growthValue)
+    ) {
+      throw new Error("Compatibility progression resume snapshot is invalid");
+    }
+    if (this.hasProgressionState(actorAccountId, at)) return false;
+    this.db
+      .insert(compatibilityProgressionStates)
+      .values({
+        singleton: 1,
+        growthValue: snapshot.growthValue,
+        highestLevel: snapshot.highestLevel,
+        comparableThemeCount: 0,
+        createdAt: at,
+        updatedAt: at,
+      })
+      .run();
+    return true;
+  }
+
   synchronizeProgression(
     actorAccountId: string,
     themes: readonly CompatibilityPairThemeFingerprint[],
@@ -171,6 +242,13 @@ export class CompatibilityDataRepository {
       .from(compatibilityProgressionStates)
       .where(eq(compatibilityProgressionStates.singleton, 1))
       .get();
+    // 共有終了後は比較fingerprintを消すため、再同意直後の現在値は差分ではなく
+    // 新しい基準として保存する。累積値を維持しつつ同じテーマの二重加算を防ぐ。
+    const isResumeBaseline =
+      Boolean(existingState) &&
+      existingState?.growthValue !== 0 &&
+      existingState?.comparableThemeCount === 0 &&
+      existingThemes.size === 0;
     let growthDelta = 0;
     const themeChanges: Array<
       | { type: "insert"; theme: CompatibilityPairThemeFingerprint }
@@ -179,7 +257,7 @@ export class CompatibilityDataRepository {
     for (const theme of uniqueThemes) {
       const existing = existingThemes.get(theme.diagnosisId);
       if (!existing) {
-        growthDelta += 3;
+        if (!isResumeBaseline) growthDelta += 3;
         themeChanges.push({ type: "insert", theme });
       } else if (existing.resultFingerprint !== theme.fingerprint) {
         growthDelta += 1;

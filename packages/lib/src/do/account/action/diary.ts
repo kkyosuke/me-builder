@@ -44,7 +44,7 @@ import {
   readDiaryTemporalContext,
   resolveDiaryTemporalContext,
 } from "./diary-temporal";
-import { progressionPendingStatement } from "./progression";
+import { progressionIgnoredEvidenceStatement, progressionPendingStatement } from "./progression";
 
 const SESSION_INACTIVITY_MS = 6 * 60 * 60 * 1000;
 const SESSION_HARD_CAP_MS = 24 * 60 * 60 * 1000;
@@ -2333,12 +2333,14 @@ export async function applyDiaryBrainCheckpoint(
                 ...lifecycle,
               })
               .onConflictDoNothing(),
-            progressionPendingStatement(db, {
-              accountId,
-              originType: "evidence",
-              originId: evidenceId,
-              at,
-            }),
+            actualDeduplication === "semantic"
+              ? progressionIgnoredEvidenceStatement(db, { accountId, evidenceId, at })
+              : progressionPendingStatement(db, {
+                  accountId,
+                  originType: "evidence",
+                  originId: evidenceId,
+                  at,
+                }),
           ];
         }),
       );

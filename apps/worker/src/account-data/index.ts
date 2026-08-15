@@ -289,6 +289,7 @@ export class AccountData extends DurableObject<Env> {
           relationshipId: reference.relationshipId,
           partnerAccountId,
           role: reference.role,
+          relationshipCategory: relationship.relationshipCategory,
           updatedAt: acceptedAt,
         });
         if (activation.outcome === "conflict") {

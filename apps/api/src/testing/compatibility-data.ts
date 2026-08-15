@@ -88,10 +88,17 @@ export function createCompatibilityDataTestStore(): CompatibilityDataTestStore {
           }
           const saved = progressionThemes.get(name) ?? new Map<string, string>();
           let growthValue = progressionGrowth.get(name) ?? 0;
+          const resumeBaseline = growthValue > 0 && saved.size === 0;
           for (const theme of themes) {
             const fingerprint = saved.get(theme.diagnosisId);
             growthValue +=
-              fingerprint === undefined ? 3 : fingerprint === theme.fingerprint ? 0 : 1;
+              fingerprint === undefined
+                ? resumeBaseline
+                  ? 0
+                  : 3
+                : fingerprint === theme.fingerprint
+                  ? 0
+                  : 1;
             saved.set(theme.diagnosisId, theme.fingerprint);
           }
           progressionThemes.set(name, saved);
@@ -106,6 +113,51 @@ export function createCompatibilityDataTestStore(): CompatibilityDataTestStore {
             marks: compatibilityPairProgressionMarks(level),
           };
         },
+        async hasProgressionState(relationshipId, actorAccountId) {
+          if (relationshipId !== name) throw new Error("CompatibilityData test routing mismatch");
+          return Boolean(
+            getAcceptedCompatibilityRelationship(relationships.get(name) ?? null, actorAccountId) &&
+              progressionGrowth.has(name),
+          );
+        },
+        async getProgressionResumeSnapshot(relationshipId, actorAccountId) {
+          if (relationshipId !== name) throw new Error("CompatibilityData test routing mismatch");
+          const relationship = relationships.get(name);
+          const growthValue = progressionGrowth.get(name) ?? 0;
+          if (
+            !relationship ||
+            relationship.status !== "ended" ||
+            !relationship.endedAt ||
+            growthValue <= 0 ||
+            (relationship.inviterAccountId !== actorAccountId &&
+              relationship.inviteeAccountId !== actorAccountId)
+          ) {
+            return null;
+          }
+          return {
+            relationshipCategory: relationship.relationshipCategory,
+            growthValue,
+            highestLevel: compatibilityPairProgressionLevel(growthValue),
+            endedAt: relationship.endedAt,
+          };
+        },
+        async restoreProgression(relationshipId, actorAccountId, snapshot) {
+          if (relationshipId !== name) throw new Error("CompatibilityData test routing mismatch");
+          const relationship = getAcceptedCompatibilityRelationship(
+            relationships.get(name) ?? null,
+            actorAccountId,
+          );
+          if (
+            !relationship ||
+            relationship.relationshipCategory !== snapshot.relationshipCategory ||
+            progressionGrowth.has(name)
+          ) {
+            return false;
+          }
+          progressionGrowth.set(name, snapshot.growthValue);
+          progressionThemes.set(name, new Map());
+          return true;
+        },
         async endRelationship(relationshipId, actorAccountId) {
           if (relationshipId !== name) throw new Error("CompatibilityData test routing mismatch");
           const result = decideCompatibilityRelationshipEnd(
@@ -113,7 +165,10 @@ export function createCompatibilityDataTestStore(): CompatibilityDataTestStore {
             actorAccountId,
             new Date(),
           );
-          if (result.outcome === "ended") relationships.set(name, result.relationship);
+          if (result.outcome === "ended") {
+            relationships.set(name, result.relationship);
+            progressionThemes.delete(name);
+          }
           return result;
         },
       };

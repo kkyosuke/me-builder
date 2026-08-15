@@ -2,6 +2,7 @@ import type {
   ActivateCompatibilityReferenceResult,
   CompatibilityReference,
   CompatibilityReferenceRole,
+  CompatibilityRelationshipCategory,
   ReleaseCompatibilityReservationResult,
   ReserveCompatibilityReferenceResult,
 } from "../../compatibility-data";
@@ -87,13 +88,27 @@ export type AccountDataActions = {
     typeof brain.resetAllFailedBrainVectorSyncJobs
   >;
   "compatibility.addOutgoingReference": (
-    input: Readonly<{ relationshipId: string; createdAt: Date }>,
+    input: Readonly<{
+      relationshipId: string;
+      relationshipCategory: CompatibilityRelationshipCategory;
+      createdAt: Date;
+    }>,
   ) => Promise<CompatibilityReference>;
   "compatibility.reserveIncomingReference": (
-    input: Readonly<{ relationshipId: string; partnerAccountId: string; createdAt: Date }>,
+    input: Readonly<{
+      relationshipId: string;
+      partnerAccountId: string;
+      relationshipCategory: CompatibilityRelationshipCategory;
+      createdAt: Date;
+    }>,
   ) => Promise<ReserveCompatibilityReferenceResult>;
   "compatibility.reserveOutgoingReference": (
-    input: Readonly<{ relationshipId: string; partnerAccountId: string; updatedAt: Date }>,
+    input: Readonly<{
+      relationshipId: string;
+      partnerAccountId: string;
+      relationshipCategory: CompatibilityRelationshipCategory;
+      updatedAt: Date;
+    }>,
   ) => Promise<ReserveCompatibilityReferenceResult>;
   "compatibility.releaseReservation": (
     relationshipId: string,
@@ -111,6 +126,7 @@ export type AccountDataActions = {
       relationshipId: string;
       partnerAccountId: string;
       role: CompatibilityReferenceRole;
+      relationshipCategory: CompatibilityRelationshipCategory;
       updatedAt: Date;
     }>,
   ) => Promise<ActivateCompatibilityReferenceResult>;
@@ -119,6 +135,12 @@ export type AccountDataActions = {
     endedAt: Date,
   ) => Promise<CompatibilityReference | null>;
   "compatibility.listVisibleReferences": () => Promise<readonly CompatibilityReference[]>;
+  "compatibility.listProgressionHistoryReferences": (
+    input: Readonly<{
+      partnerAccountId: string;
+      relationshipCategory: CompatibilityRelationshipCategory;
+    }>,
+  ) => Promise<readonly CompatibilityReference[]>;
   "source.hasActive": RpcAction<[], typeof source.hasActiveSourceRecords>;
   "profileSummary.read": (
     at?: Date,

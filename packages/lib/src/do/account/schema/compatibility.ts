@@ -12,6 +12,9 @@ export const compatibilityReferences = sqliteTable(
       .references(() => accountDataIdentity.accountId),
     role: text("role", { enum: ["inviter", "invitee"] }).notNull(),
     partnerAccountId: text("partner_account_id"),
+    relationshipCategory: text("relationship_category", {
+      enum: ["partner", "family", "friend", "work"],
+    }),
     status: text("status", { enum: ["pending", "reserved", "active", "ended"] }).notNull(),
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
     updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
