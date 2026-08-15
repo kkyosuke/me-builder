@@ -184,10 +184,10 @@ describe("shared D1 clean baseline migration", () => {
     sqlite.close();
   });
 
-  it("表示名column追加時に既存のアバターmetadataを維持する", () => {
+  it("0006の表示名column追加時に既存のアバターmetadataを維持する", () => {
     const sqlite = new Database(":memory:");
     const migrations = readdirSync(migrationsDirectory)
-      .filter((filename) => /^000[0-4]_.+\.sql$/.test(filename))
+      .filter((filename) => /^000[0-5]_.+\.sql$/.test(filename))
       .sort();
     for (const file of migrations) {
       sqlite.exec(readFileSync(path.join(migrationsDirectory, file), "utf8"));
@@ -208,9 +208,7 @@ describe("shared D1 clean baseline migration", () => {
       )
       .run();
 
-    sqlite.exec(
-      readFileSync(path.join(migrationsDirectory, "0005_opposite_excalibur.sql"), "utf8"),
-    );
+    sqlite.exec(readFileSync(path.join(migrationsDirectory, "0006_plain_paladin.sql"), "utf8"));
 
     expect(
       sqlite
