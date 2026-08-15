@@ -101,6 +101,7 @@ docs/
 - [プロフィールAPI契約](development/profile-api.md) — 本人プロフィールとアバター画像の取得・保存・削除API契約
 - [相性API契約](development/compatibility-api.md) — Web UIとAPI Server間の相性API契約
 - [API契約とクライアント型の生成](development/api-contract-generation.md) — HTTP契約の配置とOpenAPI・Web UI用型の生成運用
+- [サービス利用規約の公開運用](development/service-terms-release.md) — 規約versionの追加、本文hash検証、Preview確認、公開後の訂正手順
 - [アプリケーション運用ログ方針](development/operational-logging.md) — 一連の処理を追跡し、エラー原因と最終結果を判断できる運用ログの目的と進め方
 - [本番データベースマイグレーション運用](development/production-migration-operations.md) — forward-only、expand-contract、適用順序、D1とDurable Objectの復旧方針
 - [Brain Item残タスク](development/brain-item-remaining-tasks.md) — Brain Item生成・意味的重複判定・Vectorize利用に残っている検証、品質改善、延期中の機能

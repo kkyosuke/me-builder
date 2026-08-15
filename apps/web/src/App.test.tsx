@@ -53,6 +53,7 @@ vi.mock("./config", () => ({
 }));
 vi.mock("./feature/legal", () => ({
   ServiceTermsGate: ({ children }: { children: ReactNode }) => children,
+  ServiceTermsAcceptanceHistory: () => null,
 }));
 vi.mock("./feature/liff/infrastructure/liff-client", () => ({
   initializeLiff: mocks.initializeLiff,

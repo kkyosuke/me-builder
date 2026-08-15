@@ -65,6 +65,7 @@
 | [開発用AccountデータリセットAPI契約](../docs/development/development-account-data-reset-api.md) | 開発環境で本人の個人コンテンツを初期化するAPI、削除対象、維持対象、Vector削除、プロフィール画面の操作 |
 | [相性API契約](../docs/development/compatibility-api.md) | Web UIとAPI Server間の相性APIのパス、認証、入出力、エラー契約 |
 | [API契約とクライアント型の生成](../docs/development/api-contract-generation.md) | API ServerのHTTP契約の配置、OpenAPI documentとWeb UI用TypeScript型の生成運用 |
+| [サービス利用規約の公開運用](../docs/development/service-terms-release.md) | 規約versionの追加、再同意要否の確認、本文hash検証、Preview確認、forward-onlyな訂正手順 |
 | [アプリケーション運用ログ方針](../docs/development/operational-logging.md) | 一連の処理を追跡し、エラー原因と最終結果を判断できる運用ログの目的と進め方 |
 | [本番データベースマイグレーション運用](../docs/development/production-migration-operations.md) | 本番D1とDurable Objectのforward-only、expand-contract、適用順序、障害時の復旧方針 |
 | [Brain Item残タスク](../docs/development/brain-item-remaining-tasks.md) | Brain Item生成・意味的重複判定・Vectorize利用に残っている検証、品質改善、延期中の機能 |

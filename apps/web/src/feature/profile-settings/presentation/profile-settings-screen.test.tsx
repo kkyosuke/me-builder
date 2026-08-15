@@ -17,6 +17,7 @@ describe("ProfileSettingsScreen", () => {
         onOpenAvatar={vi.fn()}
         onThemeChange={vi.fn()}
         onFontSizeChange={vi.fn()}
+        serviceTermsAcceptanceHistory={<p>同意履歴の内容</p>}
       />,
     );
 
@@ -28,6 +29,7 @@ describe("ProfileSettingsScreen", () => {
     expect(screen.getByRole("link", { name: /利用規約を確認/ }).getAttribute("href")).toBe(
       "/terms",
     );
+    expect(screen.getByText("同意履歴の内容")).toBeTruthy();
     expect((screen.getByRole("radio", { name: "中" }) as HTMLInputElement).checked).toBe(true);
   });
 

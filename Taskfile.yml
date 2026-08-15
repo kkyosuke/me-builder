@@ -76,6 +76,11 @@ tasks:
     cmds:
       - bun run generate:api
 
+  terms:verify:
+    desc: 'Verify service terms versions, publication order, and content hashes'
+    cmds:
+      - bunx vitest run packages/shared/src/legal/service-terms.test.ts
+
   infra:generate:
     desc: 'Generate Wrangler TOML files from committed Pulumi stack outputs'
     cmds:

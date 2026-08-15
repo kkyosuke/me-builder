@@ -177,6 +177,106 @@
         }
       }
     },
+    "/api/legal/terms/acceptances": {
+      "get": {
+        "operationId": "getServiceTermsAcceptanceHistory",
+        "tags": ["Legal"],
+        "summary": "本人の利用規約同意履歴を取得する",
+        "security": [
+          {
+            "liffIdToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "現在有効・過去を区別した本人の同意履歴",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "acceptances": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "documentKey": {
+                            "const": "terms_of_service"
+                          },
+                          "version": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "documentHash": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "pattern": "^sha256:[0-9a-f]{64}$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "acceptedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "status": {
+                            "enum": ["current", "past"],
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "documentKey",
+                          "version",
+                          "documentHash",
+                          "acceptedAt",
+                          "status"
+                        ]
+                      }
+                    }
+                  },
+                  "required": ["acceptances"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "LIFF IDトークンを検証できない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Unauthorized"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "D1 bindingが設定されていない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Service Unavailable"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/legal/terms/acceptance": {
       "put": {
         "operationId": "acceptServiceTerms",

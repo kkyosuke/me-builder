@@ -21,6 +21,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/legal/terms/acceptances": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** 本人の利用規約同意履歴を取得する */
+    get: operations["getServiceTermsAcceptanceHistory"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/legal/terms/acceptance": {
     parameters: {
       query?: never;
@@ -533,6 +550,61 @@ export interface operations {
               documentHash: string | null;
               acceptedAt: string | null;
             };
+          };
+        };
+      };
+      /** @description LIFF IDトークンを検証できない */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Unauthorized";
+          };
+        };
+      };
+      /** @description D1 bindingが設定されていない */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Service Unavailable";
+          };
+        };
+      };
+    };
+  };
+  getServiceTermsAcceptanceHistory: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 現在有効・過去を区別した本人の同意履歴 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            acceptances: {
+              /** @constant */
+              documentKey: "terms_of_service";
+              version: string;
+              documentHash: string | null;
+              /** Format: date-time */
+              acceptedAt: string;
+              /** @enum {string} */
+              status: "current" | "past";
+            }[];
           };
         };
       };

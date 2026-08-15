@@ -8,7 +8,11 @@ import { describe, expect, it } from "vitest";
 import type { SharedD1Client } from "../client";
 import * as schema from "../schema";
 import { upsertIdentity } from "./account";
-import { acceptCurrentTerms, findCurrentTermsAcceptance } from "./agreement";
+import {
+  acceptCurrentTerms,
+  findCurrentTermsAcceptance,
+  listTermsAcceptanceHistory,
+} from "./agreement";
 
 function createTestDb(): SharedD1Client {
   const sqlite = new Database(":memory:");
@@ -96,5 +100,28 @@ describe("account agreement acceptance", () => {
     await expect(findCurrentTermsAcceptance(db, account.id)).resolves.toMatchObject({
       id: second.id,
     });
+    await expect(listTermsAcceptanceHistory(db, account.id)).resolves.toMatchObject([
+      { id: second.id, isDeleted: false },
+      { id: first.id, isDeleted: true },
+    ]);
+  });
+
+  it("別Accountの記録を含めずに同意履歴を返す", async () => {
+    const db = createTestDb();
+    const first = await upsertIdentity(db, {
+      provider: "line_login",
+      providerAccountId: "U_terms_history_first",
+    });
+    const second = await upsertIdentity(db, {
+      provider: "line_login",
+      providerAccountId: "U_terms_history_second",
+    });
+    await acceptCurrentTerms(db, first.account.id, new Date("2026-08-15T01:00:00Z"));
+    await acceptCurrentTerms(db, second.account.id, new Date("2026-08-15T02:00:00Z"));
+
+    const history = await listTermsAcceptanceHistory(db, first.account.id);
+
+    expect(history).toHaveLength(1);
+    expect(history[0]?.accountId).toBe(first.account.id);
   });
 });

@@ -11,12 +11,14 @@ type Params = {
 type Dependencies = {
   createSession: typeof resolveLiffSession;
   findAcceptance: typeof D1.shared.action.agreement.findCurrentTermsAcceptance;
+  listAcceptanceHistory: typeof D1.shared.action.agreement.listTermsAcceptanceHistory;
   accept: typeof D1.shared.action.agreement.acceptCurrentTerms;
 };
 
 const defaultDependencies: Dependencies = {
   createSession: resolveLiffSession,
   findAcceptance: D1.shared.action.agreement.findCurrentTermsAcceptance,
+  listAcceptanceHistory: D1.shared.action.agreement.listTermsAcceptanceHistory,
   accept: D1.shared.action.agreement.acceptCurrentTerms,
 };
 
@@ -50,4 +52,26 @@ export async function acceptServiceTerms(
   }
   const acceptance = await dependencies.accept(params.db, session.session.accountId);
   return { type: "accepted" as const, acceptance };
+}
+
+export async function getServiceTermsAcceptanceHistory(
+  params: Params,
+  dependencies: Dependencies = defaultDependencies,
+) {
+  const session = await dependencies.createSession(params);
+  if (session.type !== "resolved") return session;
+  const [currentAcceptance, history] = await Promise.all([
+    dependencies.findAcceptance(params.db, session.session.accountId),
+    dependencies.listAcceptanceHistory(params.db, session.session.accountId),
+  ]);
+  return {
+    type: "resolved" as const,
+    acceptances: history.map((acceptance) => ({
+      documentKey: acceptance.documentKey,
+      version: acceptance.documentVersion,
+      documentHash: acceptance.documentHash,
+      acceptedAt: acceptance.acceptedAt,
+      status: currentAcceptance?.id === acceptance.id ? ("current" as const) : ("past" as const),
+    })),
+  };
 }

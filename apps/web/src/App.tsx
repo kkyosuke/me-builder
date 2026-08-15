@@ -2,7 +2,7 @@ import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useRef, useSta
 import { LoadingState } from "./components/loading-state";
 import { RouteErrorBoundary } from "./components/route-error-boundary";
 import { config } from "./config";
-import { ServiceTermsGate } from "./feature/legal";
+import { ServiceTermsAcceptanceHistory, ServiceTermsGate } from "./feature/legal";
 import { LiffSessionProvider, useLiffSession } from "./feature/liff";
 import { getLiffIdToken } from "./feature/liff/infrastructure/liff-client";
 import {
@@ -422,6 +422,7 @@ function AppContents() {
               onResetAccountData={resetAccountData}
               onThemeChange={colorTheme.setTheme}
               onFontSizeChange={fontSize.setFontSize}
+              serviceTermsAcceptanceHistory={<ServiceTermsAcceptanceHistory />}
             />
           </Suspense>
         </RouteErrorBoundary>
