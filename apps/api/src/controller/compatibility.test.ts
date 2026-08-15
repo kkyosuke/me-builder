@@ -2,10 +2,14 @@ import type { D1Database, R2Bucket } from "@cloudflare/workers-types";
 import type { AccountDataNamespace, CompatibilityDataNamespace } from "@me-builder/lib";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { app } from "../index";
-import type { CompatibilityShareConsentOutcome } from "../logic/compatibility-share-preview";
+import type {
+  CompatibilityShareConsentOutcome,
+  CompatibilityShareContentOutcome,
+} from "../logic/compatibility-share-preview";
 
-const { getCompatibilityShareConsent } = vi.hoisted(() => ({
+const { getCompatibilityShareConsent, getCompatibilityShareContent } = vi.hoisted(() => ({
   getCompatibilityShareConsent: vi.fn(),
+  getCompatibilityShareContent: vi.fn(),
 }));
 const { issueCompatibilityInvitation } = vi.hoisted(() => ({
   issueCompatibilityInvitation: vi.fn(),
@@ -19,7 +23,10 @@ const { getCompatibilityInvitationAvatar } = vi.hoisted(() => ({
 const { endCompatibilityRelationship } = vi.hoisted(() => ({
   endCompatibilityRelationship: vi.fn(),
 }));
-vi.mock("../logic/compatibility-share-preview", () => ({ getCompatibilityShareConsent }));
+vi.mock("../logic/compatibility-share-preview", () => ({
+  getCompatibilityShareConsent,
+  getCompatibilityShareContent,
+}));
 vi.mock("../logic/compatibility-invitation", () => ({ issueCompatibilityInvitation }));
 vi.mock("../logic/compatibility-invitation-preview", () => ({
   getCompatibilityInvitationContents,
@@ -152,6 +159,90 @@ describe("GET /api/compatibility/share-consent", () => {
 
     expect(response.status).toBe(503);
     expect(getCompatibilityShareConsent).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET /api/compatibility/share-content", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  function contentRequest(category?: string, env: Record<string, unknown> = {}) {
+    const query = category ? `?relationshipCategory=${encodeURIComponent(category)}` : "";
+    return app.request(
+      `/api/compatibility/share-content${query}`,
+      { headers: { Authorization: "Bearer dummy.id.token" } },
+      {
+        LIFF_ID: "2010850319-Yl63upAR",
+        DB: dummyDb,
+        ACCOUNT_DATA: dummyAccountData,
+        ...env,
+      },
+    );
+  }
+
+  function contentOutcome(value: CompatibilityShareContentOutcome) {
+    getCompatibilityShareContent.mockResolvedValue(value);
+  }
+
+  it("resolvedを200の共有内容へ変換する", async () => {
+    contentOutcome({
+      type: "resolved",
+      content: {
+        relationshipCategory: "partner",
+        aboutMe: null,
+        themes: [],
+        nextAction: "profile-summary",
+      },
+    });
+
+    const response = await contentRequest("partner");
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    expect(await response.json()).toEqual({
+      relationshipCategory: "partner",
+      aboutMe: null,
+      themes: [],
+      nextAction: "profile-summary",
+    });
+    expect(getCompatibilityShareContent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        idToken: "dummy.id.token",
+        lineLoginChannelId: "2010850319",
+        accountData: dummyAccountData,
+        relationshipCategory: "partner",
+      }),
+    );
+  });
+
+  it.each([undefined, "general", "other"])('関係カテゴリ"%s"を400で拒否する', async (category) => {
+    const response = await contentRequest(category);
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "Invalid request" });
+    expect(getCompatibilityShareContent).not.toHaveBeenCalled();
+  });
+
+  it("Accountがなければ404を返す", async () => {
+    contentOutcome({ type: "account-not-found" });
+
+    const response = await contentRequest("friend");
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({
+      error: "Account not found",
+      reason: "friendship_required",
+    });
+  });
+
+  it("storage bindingがなければlogicを呼ばず503を返す", async () => {
+    const response = await app.request(
+      "/api/compatibility/share-content?relationshipCategory=work",
+      { headers: { Authorization: "Bearer dummy.id.token" } },
+      { LIFF_ID: "2010850319-Yl63upAR" },
+    );
+
+    expect(response.status).toBe(503);
+    expect(getCompatibilityShareContent).not.toHaveBeenCalled();
   });
 });
 

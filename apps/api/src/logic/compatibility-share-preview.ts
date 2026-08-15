@@ -27,6 +27,20 @@ export type CompatibilityShareConsentOutcome =
   | { type: "unauthenticated"; reason: string }
   | { type: "account-not-found" };
 
+export type CompatibilityShareContentOutcome =
+  | {
+      type: "resolved";
+      content: {
+        relationshipCategory: CompatibilityRelationshipCategory;
+        aboutMe: CompatibilityShareAboutMe | null;
+        themes: readonly CompatibilitySharePreviewTheme[];
+        nextAction: "diagnosis" | "profile-summary" | null;
+      };
+    }
+  | { type: "not-configured" }
+  | { type: "unauthenticated"; reason: string }
+  | { type: "account-not-found" };
+
 /** 共有開始を止める理由は、相手へ表示する名前を確認できない場合だけに限る。 */
 type CompatibilityShareConsentBlockingReason = "display_name_unavailable";
 
@@ -199,6 +213,43 @@ export async function getCompatibilityShareConsent(
       avatarUrl: "/api/profile/avatar",
       canShare: blockingReasons.length === 0,
       blockingReasons,
+      nextAction: data.nextAction,
+    },
+  };
+}
+
+/** 本人が「わたし」で確認する、選択カテゴリの現在の共有表示だけを返す。 */
+export async function getCompatibilityShareContent(
+  {
+    idToken,
+    lineLoginChannelId,
+    db,
+    accountData,
+    relationshipCategory,
+    at = new Date(),
+  }: Params & { relationshipCategory: CompatibilityRelationshipCategory },
+  dependencies: Dependencies = defaultDependencies,
+): Promise<CompatibilityShareContentOutcome> {
+  const session = await dependencies.createSession({ idToken, lineLoginChannelId, db });
+  if (session.type !== "resolved") return session;
+
+  const data = await loadCompatibilitySharePreviewData(
+    {
+      accountId: session.session.accountId,
+      verifiedDisplayName: session.session.displayName,
+      accountData,
+      relationshipCategory,
+      at,
+    },
+    dependencies,
+  );
+
+  return {
+    type: "resolved",
+    content: {
+      relationshipCategory,
+      aboutMe: data.aboutMe,
+      themes: data.themes,
       nextAction: data.nextAction,
     },
   };

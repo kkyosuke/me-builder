@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { CompatibilityShareContentSection } from "../../compatibility";
 import { useLiffSession } from "../../liff";
 import type { ProfileSummaryVersioning } from "../model/profile-summary";
 import { ProfileSummaryScreen } from "./profile-summary-screen";
@@ -13,6 +14,9 @@ export default function ProfileApplication() {
     ? (result.versions.find(({ id }) => id === selectedVersionId) ??
       result.versions.find(({ isLatest }) => isLatest) ??
       result.versions[0])
+    : undefined;
+  const latestVersionId = result
+    ? (result.versions.find(({ isLatest }) => isLatest)?.id ?? result.versions[0]?.id ?? null)
     : undefined;
   const screenState =
     summary.state.status === "success"
@@ -37,6 +41,11 @@ export default function ProfileApplication() {
       {...(versioning ? { versioning } : {})}
       {...(result && result.versions.length > 1 ? { onSelectVersion: setSelectedVersionId } : {})}
       {...(result ? { onRegenerate: () => void summary.generate() } : {})}
-    />
+    >
+      <CompatibilityShareContentSection
+        acquireIdToken={liffSession.acquireIdToken}
+        latestProfileSummaryVersionId={latestVersionId}
+      />
+    </ProfileSummaryScreen>
   );
 }

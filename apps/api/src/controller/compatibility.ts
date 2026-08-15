@@ -29,6 +29,11 @@ import {
   InvalidCompatibilityShareConsentRequestSchema,
 } from "../contract/compatibility/share-consent";
 import {
+  CompatibilityShareContentQuerySchema,
+  CompatibilityShareContentResponseSchema,
+  InvalidCompatibilityShareContentRequestSchema,
+} from "../contract/compatibility/share-content";
+import {
   AccountNotFoundErrorSchema,
   ServiceUnavailableErrorSchema,
   UnauthorizedErrorSchema,
@@ -41,7 +46,10 @@ import { getCompatibilityInvitationContents } from "../logic/compatibility-invit
 import { getCompatibilityRelationshipContents } from "../logic/compatibility-relationship";
 import { endCompatibilityRelationship } from "../logic/compatibility-relationship-end";
 import { listCompatibilityRelationships } from "../logic/compatibility-relationships";
-import { getCompatibilityShareConsent } from "../logic/compatibility-share-preview";
+import {
+  getCompatibilityShareConsent,
+  getCompatibilityShareContent,
+} from "../logic/compatibility-share-preview";
 import { operationalHttpPath } from "../operational-http-path";
 import type { AppEnv } from "../types";
 import { bearerToken } from "./auth";
@@ -78,6 +86,49 @@ export async function getCompatibilityShareConsentContents(c: Context<AppEnv>): 
   switch (outcome.type) {
     case "resolved":
       return c.json(v.parse(CompatibilityShareConsentResponseSchema, outcome.consent));
+    case "account-not-found":
+      return c.json(
+        v.parse(AccountNotFoundErrorSchema, {
+          error: "Account not found",
+          reason: "friendship_required",
+        }),
+        404,
+      );
+    case "not-configured":
+    case "unauthenticated":
+      return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
+  }
+}
+
+/** `GET /api/compatibility/share-content` — 本人が開示する現在の内容を返す。 */
+export async function getCompatibilityShareContentContents(c: Context<AppEnv>): Promise<Response> {
+  c.header("Cache-Control", "no-store");
+  if (!c.env?.DB || !c.env.ACCOUNT_DATA) {
+    logger.error({ path: c.req.path }, "Compatibility share content storage is not configured");
+    return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
+  }
+
+  const parsed = v.safeParse(CompatibilityShareContentQuerySchema, {
+    relationshipCategory: c.req.query("relationshipCategory"),
+  });
+  if (!parsed.success) {
+    return c.json(
+      v.parse(InvalidCompatibilityShareContentRequestSchema, { error: "Invalid request" }),
+      400,
+    );
+  }
+
+  const outcome = await getCompatibilityShareContent({
+    idToken: bearerToken(c.req.header("authorization")),
+    lineLoginChannelId: getConfig(c.env).lineLoginChannelId,
+    db: D1.shared.client.create(c.env.DB),
+    accountData: c.env.ACCOUNT_DATA,
+    relationshipCategory: parsed.output.relationshipCategory,
+  });
+
+  switch (outcome.type) {
+    case "resolved":
+      return c.json(v.parse(CompatibilityShareContentResponseSchema, outcome.content));
     case "account-not-found":
       return c.json(
         v.parse(AccountNotFoundErrorSchema, {
