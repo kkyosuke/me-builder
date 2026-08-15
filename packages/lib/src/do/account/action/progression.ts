@@ -13,7 +13,7 @@ import {
 } from "../schema";
 
 const INITIALIZATION_ORIGIN_ID = "progression-v1";
-export const UTSUSHI_PROGRESSION_CALCULATION_VERSION = 1;
+const UTSUSHI_PROGRESSION_CALCULATION_VERSION = 1;
 
 export type UtsushiProgression = Readonly<{
   level: number;
