@@ -20,6 +20,9 @@ export default defineConfig({
   test: {
     globals: true,
     environment: "node",
+    // Node 24+ の実験的Web Storageは保存先未指定だとundefinedになり、
+    // jsdomのwindow.localStorageを上書きするため、test workerでは無効化する。
+    execArgv: ["--no-experimental-webstorage"],
     include: ["**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}"],
     exclude: ["**/node_modules/**", "**/dist/**", "apps/worker/src/runtime-e2e/**"],
   },
