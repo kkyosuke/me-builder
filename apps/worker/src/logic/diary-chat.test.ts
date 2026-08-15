@@ -160,36 +160,39 @@ describe("diary chat guardrails", () => {
     expect(stricterSafetyRoute("self_harm_possible", "normal")).toBe("self_harm_possible");
   });
 
-  it("通常routeで質問を残さずSessionを終える応答だけ同日フォローを許可する", () => {
-    const valid = JSON.stringify({
-      mode: "close",
-      reply: "いったんここまでにしよう。またあとで聞かせてね。",
-      main_question_count: 0,
-      end_session: true,
-      daily_prompt_follow_up: "same_day",
-      collection_theme_id: "none",
-      collection_kind: "none",
-      safety: { route: "normal", restricted_advice: false },
-      used_memory_ids: [],
-    });
-    const openSession = JSON.stringify({
-      ...JSON.parse(valid),
-      end_session: false,
-    });
-    const unansweredQuestion = JSON.stringify({
-      ...JSON.parse(valid),
-      main_question_count: 1,
-    });
-    const unsafe = JSON.stringify({
-      ...JSON.parse(valid),
-      safety: { route: "high_stakes", restricted_advice: true },
-    });
+  it.each(["same_day", "next_day"] as const)(
+    "通常routeで質問を残さずSessionを終える応答だけ%sフォローを許可する",
+    (followUp) => {
+      const valid = JSON.stringify({
+        mode: "close",
+        reply: "いったんここまでにしよう。またあとで聞かせてね。",
+        main_question_count: 0,
+        end_session: true,
+        daily_prompt_follow_up: followUp,
+        collection_theme_id: "none",
+        collection_kind: "none",
+        safety: { route: "normal", restricted_advice: false },
+        used_memory_ids: [],
+      });
+      const openSession = JSON.stringify({
+        ...JSON.parse(valid),
+        end_session: false,
+      });
+      const unansweredQuestion = JSON.stringify({
+        ...JSON.parse(valid),
+        main_question_count: 1,
+      });
+      const unsafe = JSON.stringify({
+        ...JSON.parse(valid),
+        safety: { route: "high_stakes", restricted_advice: true },
+      });
 
-    expect(validateDiaryChatResponse(valid, "normal")?.daily_prompt_follow_up).toBe("same_day");
-    expect(validateDiaryChatResponse(openSession, "normal")).toBeUndefined();
-    expect(validateDiaryChatResponse(unansweredQuestion, "normal")).toBeUndefined();
-    expect(validateDiaryChatResponse(unsafe, "normal")).toBeUndefined();
-  });
+      expect(validateDiaryChatResponse(valid, "normal")?.daily_prompt_follow_up).toBe(followUp);
+      expect(validateDiaryChatResponse(openSession, "normal")).toBeUndefined();
+      expect(validateDiaryChatResponse(unansweredQuestion, "normal")).toBeUndefined();
+      expect(validateDiaryChatResponse(unsafe, "normal")).toBeUndefined();
+    },
+  );
 
   it("自傷の可能性を検知して危機向けfallbackを返す", () => {
     const route = classifySafety([

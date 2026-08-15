@@ -578,9 +578,9 @@ export async function processChatTurnMessage(
                 reply: generated.reply,
                 endSession: generated.end_session,
                 dailyPromptFollowUp:
-                  generated.daily_prompt_follow_up === "same_day"
-                    ? ("same_day" as const)
-                    : undefined,
+                  generated.daily_prompt_follow_up === "none"
+                    ? undefined
+                    : generated.daily_prompt_follow_up,
                 collectionTarget: generated.collection_target,
                 usedBrainItems: usedMemories,
                 brainUsages: usedMemories.map((memory) => ({

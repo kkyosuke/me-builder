@@ -46,6 +46,7 @@ describe("daily prompt queue consumer", () => {
         if (accountId !== "account-1") throw new Error("Unexpected account");
         if (operation === "brain.selectDailyPromptWeekdayContext") return undefined;
         if (operation === "conversation.selectDailyPromptSameDayContext") return undefined;
+        if (operation === "conversation.selectDailyPromptPreviousDayContext") return undefined;
         if (operation === "conversation.prepareDailyPrompt") {
           const input = args[0] as { promptVersion: string };
           return {
@@ -155,6 +156,79 @@ describe("daily prompt queue consumer", () => {
     );
   });
 
+  it("曜日文脈を前日フォローより優先し、不要な前日検索を行わない", async () => {
+    execute.mockResolvedValueOnce("day_off");
+    const message = createMessage();
+
+    await processDailyPromptMessage(message, bindings(), config);
+
+    expect(execute).not.toHaveBeenCalledWith(
+      "account-1",
+      "conversation.selectDailyPromptPreviousDayContext",
+      expect.anything(),
+    );
+    expect(execute).toHaveBeenCalledWith("account-1", "conversation.prepareDailyPrompt", {
+      localDate: "2026-08-14",
+      promptVersion: "daily-check-in-day-off-v1",
+    });
+  });
+
+  it("上位文脈がなければ前日フォローの本文を含まない定型文をPushする", async () => {
+    execute
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce("next_day");
+    const message = createMessage();
+
+    await processDailyPromptMessage(message, bindings(), config);
+
+    expect(execute).toHaveBeenCalledWith(
+      "account-1",
+      "conversation.selectDailyPromptPreviousDayContext",
+      "2026-08-14",
+    );
+    expect(execute).toHaveBeenCalledWith("account-1", "conversation.prepareDailyPrompt", {
+      localDate: "2026-08-14",
+      promptVersion: "daily-check-in-previous-day-follow-up-v1",
+    });
+    expect(pushMessage).toHaveBeenCalledWith(
+      {
+        to: "U_line",
+        messages: [
+          {
+            type: "text",
+            text: "昨日話していたこと、今日は何か動きがあった？\n特になければ、今日の別のことでも大丈夫だよ。",
+          },
+        ],
+      },
+      expect.stringMatching(/^[0-9a-f-]{36}$/),
+    );
+  });
+
+  it("前日フォローの取得に失敗しても曜日別一般文面で継続する", async () => {
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => undefined);
+    execute
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error("AccountData unavailable"));
+    const message = createMessage();
+
+    await processDailyPromptMessage(message, bindings(), config);
+
+    expect(execute).toHaveBeenCalledWith("account-1", "conversation.prepareDailyPrompt", {
+      localDate: "2026-08-14",
+      promptVersion: "daily-check-in-fri-v1",
+    });
+    expect(warn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "daily-prompt.previous-day-context.failed",
+        outcome: "degraded",
+        disposition: "continue",
+      }),
+      "[Daily prompt] failed to load previous-day context -> continue without it",
+    );
+  });
+
   it("同日フォローの取得に失敗しても取得済みの曜日文脈で継続する", async () => {
     const warn = vi.spyOn(logger, "warn").mockImplementation(() => undefined);
     execute
@@ -198,6 +272,7 @@ describe("daily prompt queue consumer", () => {
     execute
       .mockRejectedValueOnce(new Error("AccountData unavailable"))
       .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce({
         type: "ready",
         deliveryId: "daily-prompt:2026-08-14",
@@ -234,6 +309,7 @@ describe("daily prompt queue consumer", () => {
     execute
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce({
         type: "ready",
         deliveryId: "daily-prompt:2026-08-14",
@@ -260,6 +336,7 @@ describe("daily prompt queue consumer", () => {
 
   it("AccountDataがskipした日はLINEを呼ばずackする", async () => {
     execute
+      .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce({

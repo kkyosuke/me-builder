@@ -406,11 +406,13 @@ Brain Itemを含むAccount所有データのquery境界は、[Accountデータ�
 
 `variable_shift`と`irregular`は固定曜日を断定できないため、曜日別個別化には使いません。AccountDataからWorkerへ返すのは`recurring_schedule`、`day_off`、`active_day`の区分だけとし、予定名、Brain Item本文、Source Record本文、各IDは返しません。Workerは区分に対応するレビュー済み定型文を選び、候補がない場合や候補取得に失敗した場合は曜日別一般文面へ戻します。定型文は予定や感情を断定せず、本人が訂正したり別の話題を選べる表現にします。
 
-選んだ定型文は`daily_prompt_deliveries.prompt_version`へ配送準備時に固定します。Queue再配送時にBrain Itemが更新されても、既存配送は保存済みversionの本文を使い、別文面による追加通知へ変えません。当日の日中の終了済み会話はこの曜日文脈より優先し、前日の継続話題は曜日文脈の後に評価する後続段階として扱います。
+選んだ定型文は`daily_prompt_deliveries.prompt_version`へ配送準備時に固定します。Queue再配送時にBrain Itemが更新されても、既存配送は保存済みversionの本文を使い、別文面による追加通知へ変えません。当日の日中の終了済み会話はこの曜日文脈より優先し、前日の継続話題は曜日文脈の後に評価します。
 
-当日の日中の会話は、日記チャットの構造化応答に`daily_prompt_follow_up`を持たせ、`none`または`same_day`だけを許可します。`same_day`は、安全routeが通常で、主質問を残さずSessionを終了する応答に限り、本人の最新発言から同日中に続きを聞くことが自然な場合だけ選びます。本人が終了、拒否、保留を示した場合、話題が完了している場合、機微な内容を具体的に持ち出す必要がある場合は`none`にします。検証済みの値は`chat_turns.daily_prompt_follow_up`へ保存し、本文や話題名は複製しません。
+当日と翌日の会話への引き継ぎは、日記チャットの構造化応答に`daily_prompt_follow_up`を持たせ、`none`、`same_day`、`next_day`だけを許可します。`same_day`は本人の最新発言から同日中に続きを聞くことが自然な場合、`next_day`は本人が「明日やる」「また明日話したい」など翌日へ続く意思を明示した場合だけ選びます。いずれも安全routeが通常で、主質問を残さずSessionを終了する応答に限ります。本人が終了、拒否、保留を示した場合、話題が完了している場合、機微な内容を具体的に持ち出す必要がある場合は`none`にします。検証済みの値は`chat_turns.daily_prompt_follow_up`へ保存し、本文や話題名は複製しません。
 
-18時の選択では、先に18時時点で期限切れのSessionを閉じてから、配送日の日本時間内に最後に閉じたSessionだけを確認します。そのSessionが明示的に閉じられ、最後の配送済みTurnが`same_day`で、根拠となる本人のSource Recordが削除されていない場合だけ、Workerへ`same_day`区分を返します。終了後に別のSessionが閉じられていれば、古いSessionの候補へ戻りません。Queue処理が遅延または再試行されても文脈の締切は配送日の18時に固定し、18時より後の会話を日中文脈へ含めません。Workerは`same_day`、曜日文脈、曜日別一般文面の順に選び、`same_day`でも会話本文を含まないレビュー済み定型文を使います。候補取得後に新しいSessionが始まった場合は、配送準備時の再検証で送信しません。
+18時の選択では、先に18時時点で期限切れのSessionを閉じてから、配送日の日本時間内に最後に閉じたSessionだけを確認します。そのSessionが明示的に閉じられ、最後の配送済みTurnが`same_day`で、そのTurnに含まれる本人のSource Recordがすべて配送日中に受信され、現在も削除されていない場合だけ、Workerへ`same_day`区分を返します。終了後に別のSessionが閉じられていれば、古いSessionの候補へ戻りません。Queue処理が遅延または再試行されても文脈の締切は配送日の18時に固定し、18時より後の会話を日中文脈へ含めません。Workerは`same_day`、曜日文脈、曜日別一般文面の順に選び、`same_day`でも会話本文を含まないレビュー済み定型文を使います。候補取得後に新しいSessionが始まった場合は、配送準備時の再検証で送信しません。
+
+前日の継続は、配送日の直前の日本日付に本人発言を含む最後のSessionだけを確認します。そのSessionが前日中に明示的に閉じられ、最後の配送済みTurnが`next_day`で、そのTurnに含まれる本人のSource Recordがすべて前日中に受信され、現在も削除されていない場合だけ、Workerへ`next_day`区分を返します。後から始まったSessionが未終了または日付をまたいで終了していれば、古い候補へ戻りません。`next_day`は翌日の配送だけで失効し、2日以上前の候補へ戻りません。Workerの文面選択は`same_day`、曜日文脈、`next_day`、曜日別一般文面の順とし、前日のSessionを再開せず、本文を含まないレビュー済み定型文から新しいSessionの入口を作ります。
 
 現行実装との差分は次のとおりです。
 
@@ -421,9 +423,9 @@ Brain Itemを含むAccount所有データのquery境界は、[Accountデータ�
 | 日記からの`identity`生成 | 実装済み | 本人が明言した現在の立場・職業だけを候補にする |
 | `attributes.promptContext` | 高優先5属性のschema、抽出・保存、Session上限付きの自然な確認質問まで実装済み | 中・低優先属性は後続で追加する |
 | 曜日・本人情報からの声かけ候補取得 | `recurring_schedule`と`fixed_weekly`を再検証し、予定名を含まない3区分から1件を返す処理まで実装済み | 中・低優先属性は後続で追加する |
-| 当日の日中の文脈 | 最新の終了済みSessionが許可した`same_day`区分を、本文なしで固定文面へ反映する処理まで実装済み | 前日の継続文脈は後続で追加する |
+| 当日・前日の文脈 | 最新の終了済みSessionが許可した`same_day`または`next_day`区分を、本文なしで固定文面へ反映する処理まで実装済み | 中・低優先属性との組み合わせは後続で追加する |
 | 時刻帯・声かけ方針の自動選択 | 未対応 | 本人の明言を優先し、本人自身の返信実績が不足する間は18時の標準候補へ戻す選択器を追加する。クライアントからAccount IDや選択結果を指定させない |
-| 18時の能動配信 | 曜日別一般文面、曜日文脈と当日の日中文脈の版付き定型文、専用Queue、AccountDataの配送状態まで実装済み | 前日文脈と本人情報による時刻調整は[日記チャット体験設計](../product/diary-chat-experience.md)の後続段階で追加する |
+| 18時の能動配信 | 曜日別一般文面、曜日文脈、当日と前日の文脈の版付き定型文、専用Queue、AccountDataの配送状態まで実装済み | 本人情報による時刻調整は[日記チャット体験設計](../product/diary-chat-experience.md)の後続段階で追加する |
 
 開発用の確認機能は、本人確認済みAccountに対して、一覧取得用の`brain.listActive`とVector実体確認用の`brain.findActiveVectorEntry`をAccountData RPCへ公開します。`brain.listActive`はactiveかつ未削除のItem、未削除Evidence、最新のVector同期jobと対応表の有無を最大100件返します。Web UIは各Itemに同期状態、試行回数、失敗code、次回試行時刻を表示します。`applied`はVectorizeが更新を受け付けてAccountDataへ完了記録した状態であり、Vectorize上の実体確認とは区別します。
 

@@ -1,4 +1,5 @@
 import type {
+  DailyPromptPreviousDayContext,
   DailyPromptSameDayContext,
   DailyPromptWeekdayContext,
   PromptContextWeekday,
@@ -26,6 +27,10 @@ const DAILY_PROMPT_VERSION_BY_WEEKDAY_CONTEXT = {
 const DAILY_PROMPT_VERSION_BY_SAME_DAY_CONTEXT = {
   same_day: "daily-check-in-same-day-follow-up-v1",
 } as const satisfies Readonly<Record<DailyPromptSameDayContext, string>>;
+
+const DAILY_PROMPT_VERSION_BY_PREVIOUS_DAY_CONTEXT = {
+  next_day: "daily-check-in-previous-day-follow-up-v1",
+} as const satisfies Readonly<Record<DailyPromptPreviousDayContext, string>>;
 
 const PROMPT_CONTEXT_WEEKDAY_BY_DAY = [
   "sunday",
@@ -56,6 +61,8 @@ const DAILY_PROMPTS: Readonly<Record<string, string>> = {
     "今日は、普段だと予定のある日だったかな。\n落ち着いたら、今日のことをひとことだけでも聞かせて。",
   "daily-check-in-same-day-follow-up-v1":
     "日中に話してくれたこと、その後はどう？\n話題を変えて、今日全体のことを話しても大丈夫だよ。",
+  "daily-check-in-previous-day-follow-up-v1":
+    "昨日話していたこと、今日は何か動きがあった？\n特になければ、今日の別のことでも大丈夫だよ。",
 };
 
 /** Asia/Tokyoで解決済みの配送日を声かけコンテキストの曜日へ変換する。 */
@@ -81,10 +88,14 @@ export function getDailyPromptVersion(
   localDate: string,
   weekdayContext?: DailyPromptWeekdayContext,
   sameDayContext?: DailyPromptSameDayContext,
+  previousDayContext?: DailyPromptPreviousDayContext,
 ): string {
   getDailyPromptWeekday(localDate);
   if (sameDayContext) return DAILY_PROMPT_VERSION_BY_SAME_DAY_CONTEXT[sameDayContext];
   if (weekdayContext) return DAILY_PROMPT_VERSION_BY_WEEKDAY_CONTEXT[weekdayContext];
+  if (previousDayContext) {
+    return DAILY_PROMPT_VERSION_BY_PREVIOUS_DAY_CONTEXT[previousDayContext];
+  }
   const parsed = new Date(`${localDate}T00:00:00.000Z`);
   const version = DAILY_PROMPT_VERSION_BY_WEEKDAY[parsed.getUTCDay()];
   if (!version) throw new Error("Daily prompt weekday is invalid");

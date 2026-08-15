@@ -28,7 +28,7 @@ const SafetyRouteSchema = v.picklist([
   "imminent_danger",
   "abuse_or_violence",
 ]);
-const DailyPromptFollowUpSchema = v.picklist(["none", "same_day"]);
+const DailyPromptFollowUpSchema = v.picklist(["none", "same_day", "next_day"]);
 const DiaryChatResponseSchema = v.strictObject({
   mode: ModeSchema,
   reply: v.pipe(v.string(), v.minLength(1), v.maxLength(5000)),
@@ -118,7 +118,7 @@ export function validateDiaryChatResponse(
     ? undefined
     : parsePromptContextCollectionTarget(themeId, kind);
   const safetyRoute = stricterSafetyRoute(preclassifiedRoute, parsed.output.safety.route);
-  const hasSameDayFollowUp = parsed.output.daily_prompt_follow_up === "same_day";
+  const hasDailyPromptFollowUp = parsed.output.daily_prompt_follow_up !== "none";
   if (
     (!hasNoCollectionTarget && !collectionTarget) ||
     (collectionTarget && parsed.output.main_question_count !== 1) ||
@@ -129,7 +129,7 @@ export function validateDiaryChatResponse(
           candidate.themeId === collectionTarget.themeId &&
           candidate.kinds.includes(collectionTarget.kind),
       )) ||
-    (hasSameDayFollowUp &&
+    (hasDailyPromptFollowUp &&
       (!parsed.output.end_session ||
         parsed.output.main_question_count !== 0 ||
         safetyRoute !== "normal"))

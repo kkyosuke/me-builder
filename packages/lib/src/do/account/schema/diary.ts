@@ -151,7 +151,7 @@ export const chatTurns = sqliteTable(
     // TODO: 安全性経路の監視・監査要件を定義した段階でsafety_routeを追加する。
     endSession: integer("end_session", { mode: "boolean" }).notNull().default(false),
     /** 終了後の日次声かけで使える、本文を含まない継続区分。 */
-    dailyPromptFollowUp: text("daily_prompt_follow_up", { enum: ["same_day"] }),
+    dailyPromptFollowUp: text("daily_prompt_follow_up", { enum: ["same_day", "next_day"] }),
     /** 自然な確認質問を出した場合だけ、収集テーマと対象属性を対で保持する。 */
     collectionThemeId: text("collection_theme_id"),
     collectionKind: text("collection_kind"),
