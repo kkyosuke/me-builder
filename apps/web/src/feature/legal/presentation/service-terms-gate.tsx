@@ -53,6 +53,7 @@ export function ServiceTermsGate({ children }: { children: ReactNode }) {
         state.idToken,
         state.data.document.version,
       );
+      window.history.replaceState({}, "", "/me");
       setState({
         ...state,
         data: {

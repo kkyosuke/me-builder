@@ -410,6 +410,44 @@ describe("GET /api/diagnoses local D1 E2E", () => {
     expect(count?.count).toBe(1);
   });
 
+  it("削除済みの同じversionへ再同意し、新しい有効な証跡で本人機能を再開する", async () => {
+    await database
+      .prepare(
+        `UPDATE account_agreement_acceptances
+         SET is_deleted = 1, deleted_at = ?, updated_at = ?
+         WHERE account_id = ?`,
+      )
+      .bind(timestamp + 1, timestamp + 1, "account-e2e")
+      .run();
+
+    const response = await requestLegal("known-token", "/api/legal/terms/acceptance", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ version: currentServiceTerms.version }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      version: currentServiceTerms.version,
+      documentHash: currentServiceTerms.contentHash,
+    });
+    const histories = await database
+      .prepare(
+        `SELECT id, is_deleted AS isDeleted
+         FROM account_agreement_acceptances
+         WHERE account_id = ?`,
+      )
+      .bind("account-e2e")
+      .all<{ id: string; isDeleted: number }>();
+    expect(histories.results).toHaveLength(2);
+    expect(histories.results.filter((acceptance) => acceptance.isDeleted === 0)).toHaveLength(1);
+    expect(histories.results.filter((acceptance) => acceptance.isDeleted === 1)).toHaveLength(1);
+    expect(new Set(histories.results.map((acceptance) => acceptance.id)).size).toBe(2);
+
+    const feature = await request("known-token");
+    expect(feature.status).toBe(200);
+  });
+
   it("表示後にversionが変わった同意要求を409にし、履歴を追加しない", async () => {
     const response = await requestLegal("known-token", "/api/legal/terms/acceptance", {
       method: "PUT",

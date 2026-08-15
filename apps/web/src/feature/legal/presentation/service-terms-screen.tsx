@@ -21,7 +21,7 @@ export function ServiceTermsScreen({
     <div className="min-h-dvh bg-slate-50 text-slate-950 dark:bg-slate-900 dark:text-white">
       <header className="sticky top-0 z-10 border-b border-slate-200/80 bg-white/95 backdrop-blur dark:border-slate-700 dark:bg-slate-900/95">
         <div className="mx-auto flex min-h-16 max-w-2xl items-center px-4 sm:px-8">
-          {onBack && (
+          {onBack && !acceptance.required && (
             <button
               type="button"
               onClick={onBack}

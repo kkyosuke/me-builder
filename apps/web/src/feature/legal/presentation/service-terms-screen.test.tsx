@@ -12,7 +12,7 @@ const status: ServiceTermsStatus = {
     contentHash: "sha256:9e0143a66c525bc4784e2a6a5b0e16f511189e98b66f2da90dcb6d43cfe01836",
     requiresReacceptance: true,
     publishedAt: "2026-08-15T00:00:00+09:00",
-    title: "うつし サービス利用規約",
+    title: "かがみ サービス利用規約",
     summary: "サービスの説明",
     sections: [{ heading: "1. 規約への同意", paragraphs: ["規約本文です。"] }],
   },
@@ -24,13 +24,15 @@ describe("ServiceTermsScreen", () => {
 
   it("規約versionと全文を表示し、明示確認まで同意できない", () => {
     const onAccept = vi.fn();
-    render(<ServiceTermsScreen status={status} onAccept={onAccept} />);
+    render(<ServiceTermsScreen status={status} onAccept={onAccept} onBack={vi.fn()} />);
 
-    expect(screen.getByRole("heading", { name: "うつし サービス利用規約" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "かがみ サービス利用規約" })).toBeTruthy();
     expect(screen.getByText(/version 2026-08-15/)).toBeTruthy();
     expect(screen.getByText("規約本文です。")).toBeTruthy();
     const button = screen.getByRole("button", { name: "同意して利用を始める" });
     expect((button as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.queryByRole("button", { name: "利用規約を閉じる" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "同意しない" })).toBeNull();
 
     fireEvent.click(screen.getByRole("checkbox", { name: /利用規約の内容を確認/ }));
     expect((button as HTMLButtonElement).disabled).toBe(false);

@@ -34,7 +34,7 @@ describe("service terms controller", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("no-store");
     expect(await response.json()).toMatchObject({
-      document: { version: "2026-08-15" },
+      document: { version: currentServiceTerms.version },
       acceptance: { required: true, acceptedVersion: null, documentHash: null, acceptedAt: null },
     });
   });
@@ -46,7 +46,7 @@ describe("service terms controller", () => {
         id: "acceptance-1",
         accountId: "account-1",
         documentKey: "terms_of_service",
-        documentVersion: "2026-08-15",
+        documentVersion: currentServiceTerms.version,
         documentHash: currentServiceTerms.contentHash,
         acceptedAt: "2026-08-15T01:23:45.000Z",
         createdAt: new Date(),
@@ -60,14 +60,14 @@ describe("service terms controller", () => {
       {
         method: "PUT",
         headers: { Authorization: "Bearer token", "Content-Type": "application/json" },
-        body: JSON.stringify({ version: "2026-08-15" }),
+        body: JSON.stringify({ version: currentServiceTerms.version }),
       },
       { DB: db, LIFF_ID: "2010850319-Yl63upAR" },
     );
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
       documentKey: "terms_of_service",
-      version: "2026-08-15",
+      version: currentServiceTerms.version,
       documentHash: currentServiceTerms.contentHash,
       acceptedAt: "2026-08-15T01:23:45.000Z",
     });
@@ -76,7 +76,7 @@ describe("service terms controller", () => {
   it("古いversionへの同意を409にする", async () => {
     vi.mocked(acceptServiceTerms).mockResolvedValue({
       type: "version-conflict",
-      currentVersion: "2026-08-15",
+      currentVersion: currentServiceTerms.version,
     });
     const response = await app.request(
       "/api/legal/terms/acceptance",
