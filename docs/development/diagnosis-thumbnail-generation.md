@@ -25,7 +25,8 @@ apps/web/public/images/diagnoses/
 ├── friendship-style.jpg
 ├── decision-making-style.jpg
 ├── work-priority-style.jpg
-└── family-expectation-choice.jpg
+├── family-expectation-choice.jpg
+└── friend-trust-boundaries.jpg
 ```
 
 ## 3. 共通スタイル
@@ -213,7 +214,23 @@ Edit the generated diagnosis thumbnail with one targeted change only: rebalance 
 Edit the current diagnosis thumbnail with one targeted change only: change only the outer background and distant negative-space backdrop to a rich deep navy, matching the existing me-builder diagnosis thumbnail background style. Keep both branching path surfaces warm-neutral and identically balanced. Preserve every object, position, shape, scale, lighting relationship, 16:9 framing, and matte paper/clay texture. The family-conversation side and individual-choice side must remain equal in brightness, color temperature, saturation, contrast, visual prominence, open space, and emotional tone. Do not darken one side more than the other. Preserve all constraints: no text, letters, numbers, logos, watermark, rankings, checkmarks, crosses, trophies, chains, barriers, conflict imagery, specific family structure, gender, age, culture, religion, or politics.
 ```
 
-## 14. 新しい診断へ展開する手順
+## 14. 「友達との信頼・秘密・境界線」生成プロンプト
+
+```text
+Use case: stylized-concept
+Asset type: 16:9 diagnosis card thumbnail for a web application
+Primary request: Create a polished 3D paper-cut/clay-style illustration representing trust, confidentiality, privacy, promises, and personal boundaries between friends, without suggesting that one boundary style is better.
+Scene/backdrop: A calm abstract friendship scene on a rich deep navy backdrop. Place exactly two equal rounded friend figures on the same horizontal baseline, facing a central shared space. In the center, show two balanced blank speech forms partly sheltered by a gentle folded-paper enclosure, suggesting a private conversation. Around them, include a small blank photo tile with a neutral permission ring, two matching promise tokens connected by a loose ribbon, and two equally open boundary arcs. Keep symbols abstract and non-readable.
+Subject: Exactly two mirror-balanced abstract friend figures with equal head diameter, body size, pose, vertical position, lighting, and visual weight. Use different palette colors only. The privacy, sharing, early-notice, later-notice, immediate-boundary, and delayed-boundary ideas must all feel equally valid and welcoming.
+Style/medium: Soft layered 3D paper-cut and clay render matching a premium editorial app illustration.
+Composition/framing: Wide 16:9 landscape, centered, clear silhouettes, important objects away from edges, suitable for a small web card crop.
+Lighting/mood: Warm soft studio lighting, calm, trustworthy, respectful, thoughtful, welcoming.
+Color palette: Rich deep navy background, muted slate blue, warm cream, coral accents, small golden accents; distribute warm and cool colors evenly across both figures and both sides.
+Materials/textures: Matte paper and soft clay, subtle depth and soft shadows.
+Constraints: Exactly two equal figures. No third figure. No text, letters, numbers, logos, watermark, brand marks, hearts, locks, keys, chains, warning signs, checkmarks, crosses, surveillance imagery, or romantic symbols. Do not assign age, gender, hierarchy, dependency, or fixed social roles. Do not make stricter confidentiality, contextual sharing, asking permission, anonymous consultation, per-photo consent, prior agreement, early notice, waiting until confirmed, immediate boundary-setting, or delayed boundary-setting look safer, kinder, more moral, or superior.
+```
+
+## 15. 新しい診断へ展開する手順
 
 1. §4の`Primary request`、`Scene/backdrop`、`Subject`を新しい診断のテーマへ置き換える
 2. §3の共通スタイルと`Composition/framing`、`Constraints`を維持する

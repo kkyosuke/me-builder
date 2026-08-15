@@ -234,9 +234,9 @@ describe("GET /api/diagnoses local D1 E2E", () => {
         lastAnsweredAt: string | null;
       }>;
     };
-    expect(initialBody.diagnoses).toHaveLength(13);
+    expect(initialBody.diagnoses).toHaveLength(14);
     expect(initialBody.diagnoses.map(({ displayOrder }) => displayOrder)).toEqual([
-      10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130,
+      10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140,
     ]);
     expect(initialBody.diagnoses.find(({ id }) => id === "life-priorities")).toMatchObject({
       relationshipCategory: "general",
@@ -277,6 +277,11 @@ describe("GET /api/diagnoses local D1 E2E", () => {
       initialBody.diagnoses.find(({ id }) => id === "family-expectation-choice"),
     ).toMatchObject({
       relationshipCategory: "family",
+      responseStatus: "unanswered",
+      questionCount: 10,
+    });
+    expect(initialBody.diagnoses.find(({ id }) => id === "friend-trust-boundaries")).toMatchObject({
+      relationshipCategory: "friend",
       responseStatus: "unanswered",
       questionCount: 10,
     });
@@ -455,7 +460,7 @@ describe("GET /api/diagnoses local D1 E2E", () => {
     const body = (await response.json()) as {
       diagnoses: Array<{ responseStatus: string; answeredCount: number }>;
     };
-    expect(body.diagnoses).toHaveLength(13);
+    expect(body.diagnoses).toHaveLength(14);
     expect(body.diagnoses).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ responseStatus: "unanswered", answeredCount: 0 }),
@@ -730,6 +735,35 @@ describe("GET /api/diagnoses/:diagnosisId local D1 E2E", () => {
       "結婚を考えている相手について家族が心配しているときは、家族が納得していなくても、自分の考えが決まっていれば結婚へ進みたい。",
       "住む場所を選ぶとき、自分の希望と家族の近くで暮らすことが両立しなければ、家族との近さを優先したい。",
       "住む場所を選ぶとき、希望する地域が家族から離れていても、自分の生活条件を優先したい。",
+    ]);
+  });
+
+  it("友達との信頼・秘密・境界線の状況ベース10問をseedから返すこと", async () => {
+    const response = await request("known-token", "/api/diagnoses/friend-trust-boundaries");
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      id: string;
+      title: string;
+      relationshipCategory: string;
+      questions: Array<{ diagnosisQuestionId: string; text: string }>;
+    };
+
+    expect(body).toMatchObject({
+      id: "friend-trust-boundaries",
+      title: "友達との信頼・秘密・境界線",
+      relationshipCategory: "friend",
+    });
+    expect(body.questions.map(({ text }) => text)).toEqual([
+      "友達が、共通の友達も知っている個人的な出来事を話したときは、秘密だと言われていなくても、本人に確認するまでほかの人には話さずにおきたい。",
+      "友達が、共通の友達も知っている個人的な出来事を話したときは、秘密だと言われていなければ、本人に確認せず共通の友達との会話で触れてもよい。",
+      "友達の悩みについて自分だけでは助言できず、詳しい人に相談したいときは、誰のことか分からない話し方でも、本人に確認してから相談したい。",
+      "友達の悩みについて自分だけでは助言できず、詳しい人に相談したいときは、誰のことか分からない話し方にできれば、本人に確認せず相談してもよい。",
+      "あらかじめ投稿してよい範囲を決めている友達との写真をSNSへ載せるときも、写真ごとに本人へ確認したい。",
+      "あらかじめ投稿してよい範囲を決めている友達との写真をSNSへ載せるときは、その範囲内なら写真ごとの確認はしなくてよい。",
+      "友達との約束を変える可能性が出たものの、まだ予定が確定していないときは、可能性の段階で早めに伝えたい。",
+      "友達との約束を変える可能性が出たものの、まだ予定が確定していないときは、変更が確定するまで伝えず、まず自分で調整したい。",
+      "友達に答えたくない個人的なことを聞かれたときは、その場で答えたくないと伝えたい。",
+      "友達に答えたくない個人的なことを聞かれたときは、その場では話題を変え、あとで落ち着いてから境界を伝えたい。",
     ]);
   });
 

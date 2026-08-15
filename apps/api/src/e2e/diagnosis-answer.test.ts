@@ -1005,6 +1005,65 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
     e2eTimeoutMs,
   );
 
+  it(
+    "友達との信頼・秘密・境界線の回答を5つのパラメータへ採点する",
+    async () => {
+      for (let index = 1; index <= 10; index += 1) {
+        const suffix = String(index).padStart(2, "0");
+        const choiceId = index % 2 === 1 ? "yes" : "no";
+        const response = await putAnswer(
+          `dq-friend-trust-boundaries-${suffix}`,
+          choiceId,
+          "friend-trust-boundaries",
+        );
+        expect(response.status).toBe(200);
+      }
+
+      const response = await getAnswers("friend-trust-boundaries");
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({
+        id: "friend-trust-boundaries",
+        relationshipCategory: "friend",
+        scoring: {
+          scoringVersion: 1,
+          balancedLabel: "状況に応じて友達との境界を調整する",
+          parameters: [
+            expect.objectContaining({
+              id: "friend-private-story-sharing",
+              label: "個人的な話の共有",
+              lowLabel: "共有範囲を状況で判断したい",
+              highLabel: "本人に確認してから共有したい",
+              score: 100,
+              coverage: 100,
+            }),
+            expect.objectContaining({
+              id: "friend-advice-permission",
+              score: 100,
+              coverage: 100,
+            }),
+            expect.objectContaining({
+              id: "friend-photo-consent",
+              score: 100,
+              coverage: 100,
+            }),
+            expect.objectContaining({
+              id: "friend-promise-change-notice",
+              score: 100,
+              coverage: 100,
+            }),
+            expect.objectContaining({
+              id: "friend-boundary-response",
+              score: 100,
+              coverage: 100,
+            }),
+          ],
+        },
+      });
+    },
+    e2eTimeoutMs,
+  );
+
   it(`${diagnosisAnswerCases.missingContents.id}: ${diagnosisAnswerCases.missingContents.name}`, async () => {
     const response = await getAnswers();
     expect(response.status).toBe(404);

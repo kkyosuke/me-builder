@@ -255,7 +255,12 @@ describe("DiagnosisHome", () => {
               title: "家族の期待と自分の選択",
               displayOrder: 10,
             }),
-            diagnosis({ id: "new-diagnosis", title: "新しい診断", displayOrder: 11 }),
+            diagnosis({
+              id: "friend-trust-boundaries",
+              title: "友達との信頼・秘密・境界線",
+              displayOrder: 11,
+            }),
+            diagnosis({ id: "new-diagnosis", title: "新しい診断", displayOrder: 12 }),
           ],
         }}
         onOpenDiagnosis={vi.fn()}
@@ -284,6 +289,9 @@ describe("DiagnosisHome", () => {
     });
     const familyExpectationChoiceCard = screen.getByRole("button", {
       name: /家族の期待と自分の選択/,
+    });
+    const friendTrustBoundariesCard = screen.getByRole("button", {
+      name: /友達との信頼・秘密・境界線/,
     });
     const fallbackCard = screen.getByRole("button", { name: /新しい診断/ });
 
@@ -316,6 +324,9 @@ describe("DiagnosisHome", () => {
     );
     expect(familyExpectationChoiceCard.querySelector("img")?.getAttribute("src")).toBe(
       "/images/diagnoses/family-expectation-choice.jpg",
+    );
+    expect(friendTrustBoundariesCard.querySelector("img")?.getAttribute("src")).toBe(
+      "/images/diagnoses/friend-trust-boundaries.jpg",
     );
     expect(fallbackCard.querySelector("img")?.getAttribute("src")).toBe(
       "/images/diagnoses/default.jpg",

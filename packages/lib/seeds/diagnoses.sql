@@ -14,7 +14,8 @@
 -- 2026-08-14T15:00:00.000Z (2026-08-15T00:00:00.000+09:00) for
 -- decision-making-style, and
 -- 2026-08-15T00:00:00.000Z for work-priority-style, and
--- 2026-08-15T01:00:00.000Z for family-expectation-choice
+-- 2026-08-15T01:00:00.000Z for family-expectation-choice, and
+-- 2026-08-15T02:00:00.000Z for friend-trust-boundaries
 -- (Unix seconds, Drizzle timestamp mode).
 
 INSERT OR IGNORE INTO questions (id, created_at, updated_at, is_deleted) VALUES
@@ -147,7 +148,17 @@ INSERT OR IGNORE INTO questions (id, created_at, updated_at, is_deleted) VALUES
   ('q-family-expectation-choice-07', 1786755600, 1786755600, 0),
   ('q-family-expectation-choice-08', 1786755600, 1786755600, 0),
   ('q-family-expectation-choice-09', 1786755600, 1786755600, 0),
-  ('q-family-expectation-choice-10', 1786755600, 1786755600, 0);
+  ('q-family-expectation-choice-10', 1786755600, 1786755600, 0),
+  ('q-friend-trust-boundaries-01', 1786759200, 1786759200, 0),
+  ('q-friend-trust-boundaries-02', 1786759200, 1786759200, 0),
+  ('q-friend-trust-boundaries-03', 1786759200, 1786759200, 0),
+  ('q-friend-trust-boundaries-04', 1786759200, 1786759200, 0),
+  ('q-friend-trust-boundaries-05', 1786759200, 1786759200, 0),
+  ('q-friend-trust-boundaries-06', 1786759200, 1786759200, 0),
+  ('q-friend-trust-boundaries-07', 1786759200, 1786759200, 0),
+  ('q-friend-trust-boundaries-08', 1786759200, 1786759200, 0),
+  ('q-friend-trust-boundaries-09', 1786759200, 1786759200, 0),
+  ('q-friend-trust-boundaries-10', 1786759200, 1786759200, 0);
 --> statement-breakpoint
 
 INSERT OR IGNORE INTO question_versions (
@@ -290,7 +301,17 @@ INSERT OR IGNORE INTO question_versions (
   (1786755600, 1786755600, 0, 'q-family-expectation-choice-07', 1, 'approved', '結婚を考えている相手について家族が心配しているときは、自分の考えが決まっていても、家族が納得するまで結婚へ進むのを待ちたい。', 'single_choice', 1786755600),
   (1786755600, 1786755600, 0, 'q-family-expectation-choice-08', 1, 'approved', '結婚を考えている相手について家族が心配しているときは、家族が納得していなくても、自分の考えが決まっていれば結婚へ進みたい。', 'single_choice', 1786755600),
   (1786755600, 1786755600, 0, 'q-family-expectation-choice-09', 1, 'approved', '住む場所を選ぶとき、自分の希望と家族の近くで暮らすことが両立しなければ、家族との近さを優先したい。', 'single_choice', 1786755600),
-  (1786755600, 1786755600, 0, 'q-family-expectation-choice-10', 1, 'approved', '住む場所を選ぶとき、希望する地域が家族から離れていても、自分の生活条件を優先したい。', 'single_choice', 1786755600);
+  (1786755600, 1786755600, 0, 'q-family-expectation-choice-10', 1, 'approved', '住む場所を選ぶとき、希望する地域が家族から離れていても、自分の生活条件を優先したい。', 'single_choice', 1786755600),
+  (1786759200, 1786759200, 0, 'q-friend-trust-boundaries-01', 1, 'approved', '友達が、共通の友達も知っている個人的な出来事を話したときは、秘密だと言われていなくても、本人に確認するまでほかの人には話さずにおきたい。', 'single_choice', 1786759200),
+  (1786759200, 1786759200, 0, 'q-friend-trust-boundaries-02', 1, 'approved', '友達が、共通の友達も知っている個人的な出来事を話したときは、秘密だと言われていなければ、本人に確認せず共通の友達との会話で触れてもよい。', 'single_choice', 1786759200),
+  (1786759200, 1786759200, 0, 'q-friend-trust-boundaries-03', 1, 'approved', '友達の悩みについて自分だけでは助言できず、詳しい人に相談したいときは、誰のことか分からない話し方でも、本人に確認してから相談したい。', 'single_choice', 1786759200),
+  (1786759200, 1786759200, 0, 'q-friend-trust-boundaries-04', 1, 'approved', '友達の悩みについて自分だけでは助言できず、詳しい人に相談したいときは、誰のことか分からない話し方にできれば、本人に確認せず相談してもよい。', 'single_choice', 1786759200),
+  (1786759200, 1786759200, 0, 'q-friend-trust-boundaries-05', 1, 'approved', 'あらかじめ投稿してよい範囲を決めている友達との写真をSNSへ載せるときも、写真ごとに本人へ確認したい。', 'single_choice', 1786759200),
+  (1786759200, 1786759200, 0, 'q-friend-trust-boundaries-06', 1, 'approved', 'あらかじめ投稿してよい範囲を決めている友達との写真をSNSへ載せるときは、その範囲内なら写真ごとの確認はしなくてよい。', 'single_choice', 1786759200),
+  (1786759200, 1786759200, 0, 'q-friend-trust-boundaries-07', 1, 'approved', '友達との約束を変える可能性が出たものの、まだ予定が確定していないときは、可能性の段階で早めに伝えたい。', 'single_choice', 1786759200),
+  (1786759200, 1786759200, 0, 'q-friend-trust-boundaries-08', 1, 'approved', '友達との約束を変える可能性が出たものの、まだ予定が確定していないときは、変更が確定するまで伝えず、まず自分で調整したい。', 'single_choice', 1786759200),
+  (1786759200, 1786759200, 0, 'q-friend-trust-boundaries-09', 1, 'approved', '友達に答えたくない個人的なことを聞かれたときは、その場で答えたくないと伝えたい。', 'single_choice', 1786759200),
+  (1786759200, 1786759200, 0, 'q-friend-trust-boundaries-10', 1, 'approved', '友達に答えたくない個人的なことを聞かれたときは、その場では話題を変え、あとで落ち着いてから境界を伝えたい。', 'single_choice', 1786759200);
 --> statement-breakpoint
 
 INSERT OR IGNORE INTO question_choices (
@@ -304,8 +325,8 @@ INSERT OR IGNORE INTO question_choices (
   position
 )
 SELECT
-  CASE WHEN id LIKE 'q-family-expectation-choice-%' THEN 1786755600 WHEN id LIKE 'q-work-priority-style-%' THEN 1786752000 WHEN id LIKE 'q-decision-making-style-%' THEN 1786719600 WHEN id LIKE 'q-life-priorities-%' OR id LIKE 'q-work-values-%' OR id LIKE 'q-work-relationship-style-%' OR id LIKE 'q-family-support-style-%' OR id LIKE 'q-friendship-style-%' THEN 1786665600 WHEN id LIKE 'q-conversation-emotion-%' THEN 1786233600 WHEN id LIKE 'q-leisure-style-%' OR id LIKE 'q-time-planning-%' THEN 1785974400 ELSE 1785801600 END,
-  CASE WHEN id LIKE 'q-family-expectation-choice-%' THEN 1786755600 WHEN id LIKE 'q-work-priority-style-%' THEN 1786752000 WHEN id LIKE 'q-decision-making-style-%' THEN 1786719600 WHEN id LIKE 'q-life-priorities-%' OR id LIKE 'q-work-values-%' OR id LIKE 'q-work-relationship-style-%' OR id LIKE 'q-family-support-style-%' OR id LIKE 'q-friendship-style-%' THEN 1786665600 WHEN id LIKE 'q-conversation-emotion-%' THEN 1786233600 WHEN id LIKE 'q-leisure-style-%' OR id LIKE 'q-time-planning-%' THEN 1785974400 ELSE 1785801600 END,
+  CASE WHEN id LIKE 'q-friend-trust-boundaries-%' THEN 1786759200 WHEN id LIKE 'q-family-expectation-choice-%' THEN 1786755600 WHEN id LIKE 'q-work-priority-style-%' THEN 1786752000 WHEN id LIKE 'q-decision-making-style-%' THEN 1786719600 WHEN id LIKE 'q-life-priorities-%' OR id LIKE 'q-work-values-%' OR id LIKE 'q-work-relationship-style-%' OR id LIKE 'q-family-support-style-%' OR id LIKE 'q-friendship-style-%' THEN 1786665600 WHEN id LIKE 'q-conversation-emotion-%' THEN 1786233600 WHEN id LIKE 'q-leisure-style-%' OR id LIKE 'q-time-planning-%' THEN 1785974400 ELSE 1785801600 END,
+  CASE WHEN id LIKE 'q-friend-trust-boundaries-%' THEN 1786759200 WHEN id LIKE 'q-family-expectation-choice-%' THEN 1786755600 WHEN id LIKE 'q-work-priority-style-%' THEN 1786752000 WHEN id LIKE 'q-decision-making-style-%' THEN 1786719600 WHEN id LIKE 'q-life-priorities-%' OR id LIKE 'q-work-values-%' OR id LIKE 'q-work-relationship-style-%' OR id LIKE 'q-family-support-style-%' OR id LIKE 'q-friendship-style-%' THEN 1786665600 WHEN id LIKE 'q-conversation-emotion-%' THEN 1786233600 WHEN id LIKE 'q-leisure-style-%' OR id LIKE 'q-time-planning-%' THEN 1785974400 ELSE 1785801600 END,
   0,
   id,
   1,
@@ -372,7 +393,12 @@ WHERE id IN (
   'q-family-expectation-choice-03', 'q-family-expectation-choice-04',
   'q-family-expectation-choice-05', 'q-family-expectation-choice-06',
   'q-family-expectation-choice-07', 'q-family-expectation-choice-08',
-  'q-family-expectation-choice-09', 'q-family-expectation-choice-10'
+  'q-family-expectation-choice-09', 'q-family-expectation-choice-10',
+  'q-friend-trust-boundaries-01', 'q-friend-trust-boundaries-02',
+  'q-friend-trust-boundaries-03', 'q-friend-trust-boundaries-04',
+  'q-friend-trust-boundaries-05', 'q-friend-trust-boundaries-06',
+  'q-friend-trust-boundaries-07', 'q-friend-trust-boundaries-08',
+  'q-friend-trust-boundaries-09', 'q-friend-trust-boundaries-10'
 );
 --> statement-breakpoint
 
@@ -387,8 +413,8 @@ INSERT OR IGNORE INTO question_choices (
   position
 )
 SELECT
-  CASE WHEN id LIKE 'q-family-expectation-choice-%' THEN 1786755600 WHEN id LIKE 'q-work-priority-style-%' THEN 1786752000 WHEN id LIKE 'q-decision-making-style-%' THEN 1786719600 WHEN id LIKE 'q-life-priorities-%' OR id LIKE 'q-work-values-%' OR id LIKE 'q-work-relationship-style-%' OR id LIKE 'q-family-support-style-%' OR id LIKE 'q-friendship-style-%' THEN 1786665600 WHEN id LIKE 'q-conversation-emotion-%' THEN 1786233600 WHEN id LIKE 'q-leisure-style-%' OR id LIKE 'q-time-planning-%' THEN 1785974400 ELSE 1785801600 END,
-  CASE WHEN id LIKE 'q-family-expectation-choice-%' THEN 1786755600 WHEN id LIKE 'q-work-priority-style-%' THEN 1786752000 WHEN id LIKE 'q-decision-making-style-%' THEN 1786719600 WHEN id LIKE 'q-life-priorities-%' OR id LIKE 'q-work-values-%' OR id LIKE 'q-work-relationship-style-%' OR id LIKE 'q-family-support-style-%' OR id LIKE 'q-friendship-style-%' THEN 1786665600 WHEN id LIKE 'q-conversation-emotion-%' THEN 1786233600 WHEN id LIKE 'q-leisure-style-%' OR id LIKE 'q-time-planning-%' THEN 1785974400 ELSE 1785801600 END,
+  CASE WHEN id LIKE 'q-friend-trust-boundaries-%' THEN 1786759200 WHEN id LIKE 'q-family-expectation-choice-%' THEN 1786755600 WHEN id LIKE 'q-work-priority-style-%' THEN 1786752000 WHEN id LIKE 'q-decision-making-style-%' THEN 1786719600 WHEN id LIKE 'q-life-priorities-%' OR id LIKE 'q-work-values-%' OR id LIKE 'q-work-relationship-style-%' OR id LIKE 'q-family-support-style-%' OR id LIKE 'q-friendship-style-%' THEN 1786665600 WHEN id LIKE 'q-conversation-emotion-%' THEN 1786233600 WHEN id LIKE 'q-leisure-style-%' OR id LIKE 'q-time-planning-%' THEN 1785974400 ELSE 1785801600 END,
+  CASE WHEN id LIKE 'q-friend-trust-boundaries-%' THEN 1786759200 WHEN id LIKE 'q-family-expectation-choice-%' THEN 1786755600 WHEN id LIKE 'q-work-priority-style-%' THEN 1786752000 WHEN id LIKE 'q-decision-making-style-%' THEN 1786719600 WHEN id LIKE 'q-life-priorities-%' OR id LIKE 'q-work-values-%' OR id LIKE 'q-work-relationship-style-%' OR id LIKE 'q-family-support-style-%' OR id LIKE 'q-friendship-style-%' THEN 1786665600 WHEN id LIKE 'q-conversation-emotion-%' THEN 1786233600 WHEN id LIKE 'q-leisure-style-%' OR id LIKE 'q-time-planning-%' THEN 1785974400 ELSE 1785801600 END,
   0,
   id,
   1,
@@ -455,7 +481,12 @@ WHERE id IN (
   'q-family-expectation-choice-03', 'q-family-expectation-choice-04',
   'q-family-expectation-choice-05', 'q-family-expectation-choice-06',
   'q-family-expectation-choice-07', 'q-family-expectation-choice-08',
-  'q-family-expectation-choice-09', 'q-family-expectation-choice-10'
+  'q-family-expectation-choice-09', 'q-family-expectation-choice-10',
+  'q-friend-trust-boundaries-01', 'q-friend-trust-boundaries-02',
+  'q-friend-trust-boundaries-03', 'q-friend-trust-boundaries-04',
+  'q-friend-trust-boundaries-05', 'q-friend-trust-boundaries-06',
+  'q-friend-trust-boundaries-07', 'q-friend-trust-boundaries-08',
+  'q-friend-trust-boundaries-09', 'q-friend-trust-boundaries-10'
 );
 --> statement-breakpoint
 
@@ -892,6 +923,39 @@ INSERT OR IGNORE INTO diagnosis_scoring_configs (
       "highMinimum":65,
       "balancedLabel":"選択に応じて家族の意向を取り入れる"
     }'
+  ),
+  (
+    'friend-trust-boundaries-v1',
+    1786759200,
+    1786759200,
+    0,
+    1,
+    '{
+      "parameters": [
+        {"id":"friend-private-story-sharing","label":"個人的な話の共有","lowLabel":"共有範囲を状況で判断したい","highLabel":"本人に確認してから共有したい"},
+        {"id":"friend-advice-permission","label":"別の人へ相談するとき","lowLabel":"匿名にして相談したい","highLabel":"本人に確認してから相談したい"},
+        {"id":"friend-photo-consent","label":"写真を公開するとき","lowLabel":"事前合意の範囲で公開したい","highLabel":"写真ごとに確認したい"},
+        {"id":"friend-promise-change-notice","label":"約束変更の共有","lowLabel":"変更が決まってから伝えたい","highLabel":"可能性の段階で伝えたい"},
+        {"id":"friend-boundary-response","label":"個人的な質問への境界","lowLabel":"あとで落ち着いて伝えたい","highLabel":"その場で伝えたい"}
+      ],
+      "choiceScores": {"yes":1,"no":-1},
+      "questions": {
+        "q-friend-trust-boundaries-01":{"questionVersion":1,"weights":{"friend-private-story-sharing":1}},
+        "q-friend-trust-boundaries-02":{"questionVersion":1,"weights":{"friend-private-story-sharing":-1}},
+        "q-friend-trust-boundaries-03":{"questionVersion":1,"weights":{"friend-advice-permission":1}},
+        "q-friend-trust-boundaries-04":{"questionVersion":1,"weights":{"friend-advice-permission":-1}},
+        "q-friend-trust-boundaries-05":{"questionVersion":1,"weights":{"friend-photo-consent":1}},
+        "q-friend-trust-boundaries-06":{"questionVersion":1,"weights":{"friend-photo-consent":-1}},
+        "q-friend-trust-boundaries-07":{"questionVersion":1,"weights":{"friend-promise-change-notice":1}},
+        "q-friend-trust-boundaries-08":{"questionVersion":1,"weights":{"friend-promise-change-notice":-1}},
+        "q-friend-trust-boundaries-09":{"questionVersion":1,"weights":{"friend-boundary-response":1}},
+        "q-friend-trust-boundaries-10":{"questionVersion":1,"weights":{"friend-boundary-response":-1}}
+      },
+      "minimumCoverage":0.6,
+      "lowMaximum":35,
+      "highMinimum":65,
+      "balancedLabel":"状況に応じて友達との境界を調整する"
+    }'
   );
 --> statement-breakpoint
 
@@ -921,7 +985,8 @@ INSERT INTO diagnoses (
   ('friendship-style', 1786665600, 1786665600, 0, '友達との距離感・付き合い方', '友達との連絡、会う予定、悩みの共有、友達同士の紹介、違和感を話す時期に関する傾向を見ます。', 'friend', 'friendship-style-v1', 100, 1786665600, 'published', 1786665600),
   ('decision-making-style', 1786719600, 1786719600, 0, '決め方・迷いとの向き合い方', '情報収集、決める時期、直感、周囲への相談、決定の見直しに関する傾向を見ます。', 'general', 'decision-making-style-v1', 110, 1786719600, 'published', 1786719600),
   ('work-priority-style', 1786752000, 1786752000, 0, '仕事の進め方・優先順位', '仕上げの区切り、並行作業、提出のタイミング、計画変更、途中経過の共有に関する傾向を見ます。', 'work', 'work-priority-style-v1', 120, 1786752000, 'published', 1786752000),
-  ('family-expectation-choice', 1786755600, 1786755600, 0, '家族の期待と自分の選択', '家族への相談、進路、働き方の変更、結婚、住む場所を選ぶときに、家族の意向をどのように取り入れたいかを見ます。', 'family', 'family-expectation-choice-v1', 130, 1786755600, 'published', 1786755600)
+  ('family-expectation-choice', 1786755600, 1786755600, 0, '家族の期待と自分の選択', '家族への相談、進路、働き方の変更、結婚、住む場所を選ぶときに、家族の意向をどのように取り入れたいかを見ます。', 'family', 'family-expectation-choice-v1', 130, 1786755600, 'published', 1786755600),
+  ('friend-trust-boundaries', 1786759200, 1786759200, 0, '友達との信頼・秘密・境界線', '個人的な話や相談内容の扱い、写真公開の確認、約束変更を伝える時期、答えにくい質問への境界の示し方を見ます。', 'friend', 'friend-trust-boundaries-v1', 140, 1786759200, 'published', 1786759200)
 ON CONFLICT(id) DO UPDATE SET
   description = CASE
     WHEN diagnoses.description = '' THEN excluded.description
@@ -1085,21 +1150,31 @@ INSERT OR IGNORE INTO diagnosis_questions (
   ('dq-family-expectation-choice-07', 1786755600, 1786755600, 0, 'family-expectation-choice', 'q-family-expectation-choice-07', 1, 6),
   ('dq-family-expectation-choice-08', 1786755600, 1786755600, 0, 'family-expectation-choice', 'q-family-expectation-choice-08', 1, 7),
   ('dq-family-expectation-choice-09', 1786755600, 1786755600, 0, 'family-expectation-choice', 'q-family-expectation-choice-09', 1, 8),
-  ('dq-family-expectation-choice-10', 1786755600, 1786755600, 0, 'family-expectation-choice', 'q-family-expectation-choice-10', 1, 9);
+  ('dq-family-expectation-choice-10', 1786755600, 1786755600, 0, 'family-expectation-choice', 'q-family-expectation-choice-10', 1, 9),
+  ('dq-friend-trust-boundaries-01', 1786759200, 1786759200, 0, 'friend-trust-boundaries', 'q-friend-trust-boundaries-01', 1, 0),
+  ('dq-friend-trust-boundaries-02', 1786759200, 1786759200, 0, 'friend-trust-boundaries', 'q-friend-trust-boundaries-02', 1, 1),
+  ('dq-friend-trust-boundaries-03', 1786759200, 1786759200, 0, 'friend-trust-boundaries', 'q-friend-trust-boundaries-03', 1, 2),
+  ('dq-friend-trust-boundaries-04', 1786759200, 1786759200, 0, 'friend-trust-boundaries', 'q-friend-trust-boundaries-04', 1, 3),
+  ('dq-friend-trust-boundaries-05', 1786759200, 1786759200, 0, 'friend-trust-boundaries', 'q-friend-trust-boundaries-05', 1, 4),
+  ('dq-friend-trust-boundaries-06', 1786759200, 1786759200, 0, 'friend-trust-boundaries', 'q-friend-trust-boundaries-06', 1, 5),
+  ('dq-friend-trust-boundaries-07', 1786759200, 1786759200, 0, 'friend-trust-boundaries', 'q-friend-trust-boundaries-07', 1, 6),
+  ('dq-friend-trust-boundaries-08', 1786759200, 1786759200, 0, 'friend-trust-boundaries', 'q-friend-trust-boundaries-08', 1, 7),
+  ('dq-friend-trust-boundaries-09', 1786759200, 1786759200, 0, 'friend-trust-boundaries', 'q-friend-trust-boundaries-09', 1, 8),
+  ('dq-friend-trust-boundaries-10', 1786759200, 1786759200, 0, 'friend-trust-boundaries', 'q-friend-trust-boundaries-10', 1, 9);
 --> statement-breakpoint
 
 -- AccountDataがsnapshotを再同期するか判断する版。
 -- このseedのcatalog内容を変更したら、必ずversionを1つ上げる。
-INSERT INTO catalog_versions (catalog_id, version, updated_at) VALUES ('diagnosis', 11, 1786755600)
+INSERT INTO catalog_versions (catalog_id, version, updated_at) VALUES ('diagnosis', 12, 1786759200)
   ON CONFLICT(catalog_id) DO UPDATE SET version = excluded.version, updated_at = excluded.updated_at;
 --> statement-breakpoint
 
--- Expected result: diagnosis_count=13, question_version_count=130,
--- choice_count=260, diagnosis_question_count=130, scoring_config_count=13, catalog_version=11.
+-- Expected result: diagnosis_count=14, question_version_count=140,
+-- choice_count=280, diagnosis_question_count=140, scoring_config_count=14, catalog_version=12.
 SELECT
-  (SELECT COUNT(*) FROM diagnoses WHERE ((id IN ('relationship-priority', 'money-values', 'leisure-style', 'time-planning', 'conversation-emotion') AND relationship_category = 'partner') OR (id IN ('life-priorities', 'work-values', 'decision-making-style') AND relationship_category = 'general') OR (id IN ('work-relationship-style', 'work-priority-style') AND relationship_category = 'work') OR (id IN ('family-support-style', 'family-expectation-choice') AND relationship_category = 'family') OR (id = 'friendship-style' AND relationship_category = 'friend')) AND state = 'published' AND description <> '' AND is_deleted = 0) AS diagnosis_count,
-  (SELECT COUNT(*) FROM question_versions WHERE version = 1 AND state = 'approved' AND is_deleted = 0 AND (question_id LIKE 'q-relationship-priority-%' OR question_id LIKE 'q-money-%' OR question_id LIKE 'q-leisure-style-%' OR question_id LIKE 'q-time-planning-%' OR question_id LIKE 'q-conversation-emotion-%' OR question_id LIKE 'q-life-priorities-%' OR question_id LIKE 'q-work-values-%' OR question_id LIKE 'q-work-relationship-style-%' OR question_id LIKE 'q-family-support-style-%' OR question_id LIKE 'q-friendship-style-%' OR question_id LIKE 'q-decision-making-style-%' OR question_id LIKE 'q-work-priority-style-%' OR question_id LIKE 'q-family-expectation-choice-%')) AS question_version_count,
-  (SELECT COUNT(*) FROM question_choices WHERE question_version = 1 AND is_deleted = 0 AND (question_id LIKE 'q-relationship-priority-%' OR question_id LIKE 'q-money-%' OR question_id LIKE 'q-leisure-style-%' OR question_id LIKE 'q-time-planning-%' OR question_id LIKE 'q-conversation-emotion-%' OR question_id LIKE 'q-life-priorities-%' OR question_id LIKE 'q-work-values-%' OR question_id LIKE 'q-work-relationship-style-%' OR question_id LIKE 'q-family-support-style-%' OR question_id LIKE 'q-friendship-style-%' OR question_id LIKE 'q-decision-making-style-%' OR question_id LIKE 'q-work-priority-style-%' OR question_id LIKE 'q-family-expectation-choice-%')) AS choice_count,
-  (SELECT COUNT(*) FROM diagnosis_questions WHERE diagnosis_id IN ('relationship-priority', 'money-values', 'leisure-style', 'time-planning', 'conversation-emotion', 'life-priorities', 'work-values', 'work-relationship-style', 'family-support-style', 'friendship-style', 'decision-making-style', 'work-priority-style', 'family-expectation-choice') AND is_deleted = 0) AS diagnosis_question_count,
-  (SELECT COUNT(*) FROM diagnosis_scoring_configs WHERE id IN ('relationship-priority-v1', 'money-values-v1', 'leisure-style-v1', 'time-planning-v1', 'conversation-emotion-v1', 'life-priorities-v1', 'work-values-v1', 'work-relationship-style-v1', 'family-support-style-v1', 'friendship-style-v1', 'decision-making-style-v1', 'work-priority-style-v1', 'family-expectation-choice-v1') AND version = 1 AND is_deleted = 0) AS scoring_config_count,
+  (SELECT COUNT(*) FROM diagnoses WHERE ((id IN ('relationship-priority', 'money-values', 'leisure-style', 'time-planning', 'conversation-emotion') AND relationship_category = 'partner') OR (id IN ('life-priorities', 'work-values', 'decision-making-style') AND relationship_category = 'general') OR (id IN ('work-relationship-style', 'work-priority-style') AND relationship_category = 'work') OR (id IN ('family-support-style', 'family-expectation-choice') AND relationship_category = 'family') OR (id IN ('friendship-style', 'friend-trust-boundaries') AND relationship_category = 'friend')) AND state = 'published' AND description <> '' AND is_deleted = 0) AS diagnosis_count,
+  (SELECT COUNT(*) FROM question_versions WHERE version = 1 AND state = 'approved' AND is_deleted = 0 AND (question_id LIKE 'q-relationship-priority-%' OR question_id LIKE 'q-money-%' OR question_id LIKE 'q-leisure-style-%' OR question_id LIKE 'q-time-planning-%' OR question_id LIKE 'q-conversation-emotion-%' OR question_id LIKE 'q-life-priorities-%' OR question_id LIKE 'q-work-values-%' OR question_id LIKE 'q-work-relationship-style-%' OR question_id LIKE 'q-family-support-style-%' OR question_id LIKE 'q-friendship-style-%' OR question_id LIKE 'q-decision-making-style-%' OR question_id LIKE 'q-work-priority-style-%' OR question_id LIKE 'q-family-expectation-choice-%' OR question_id LIKE 'q-friend-trust-boundaries-%')) AS question_version_count,
+  (SELECT COUNT(*) FROM question_choices WHERE question_version = 1 AND is_deleted = 0 AND (question_id LIKE 'q-relationship-priority-%' OR question_id LIKE 'q-money-%' OR question_id LIKE 'q-leisure-style-%' OR question_id LIKE 'q-time-planning-%' OR question_id LIKE 'q-conversation-emotion-%' OR question_id LIKE 'q-life-priorities-%' OR question_id LIKE 'q-work-values-%' OR question_id LIKE 'q-work-relationship-style-%' OR question_id LIKE 'q-family-support-style-%' OR question_id LIKE 'q-friendship-style-%' OR question_id LIKE 'q-decision-making-style-%' OR question_id LIKE 'q-work-priority-style-%' OR question_id LIKE 'q-family-expectation-choice-%' OR question_id LIKE 'q-friend-trust-boundaries-%')) AS choice_count,
+  (SELECT COUNT(*) FROM diagnosis_questions WHERE diagnosis_id IN ('relationship-priority', 'money-values', 'leisure-style', 'time-planning', 'conversation-emotion', 'life-priorities', 'work-values', 'work-relationship-style', 'family-support-style', 'friendship-style', 'decision-making-style', 'work-priority-style', 'family-expectation-choice', 'friend-trust-boundaries') AND is_deleted = 0) AS diagnosis_question_count,
+  (SELECT COUNT(*) FROM diagnosis_scoring_configs WHERE id IN ('relationship-priority-v1', 'money-values-v1', 'leisure-style-v1', 'time-planning-v1', 'conversation-emotion-v1', 'life-priorities-v1', 'work-values-v1', 'work-relationship-style-v1', 'family-support-style-v1', 'friendship-style-v1', 'decision-making-style-v1', 'work-priority-style-v1', 'family-expectation-choice-v1', 'friend-trust-boundaries-v1') AND version = 1 AND is_deleted = 0) AS scoring_config_count,
   (SELECT version FROM catalog_versions WHERE catalog_id = 'diagnosis') AS catalog_version;
