@@ -368,6 +368,19 @@
 9. 住む場所を選ぶとき、自分の希望と家族の近くで暮らすことが両立しなければ、家族との近さを優先したい。
 10. 住む場所を選ぶとき、希望する地域が家族から離れていても、自分の生活条件を優先したい。
 
+### 3.28 友達との信頼・秘密・境界線
+
+1. 友達が、共通の友達も知っている個人的な出来事を話したときは、秘密だと言われていなくても、本人に確認するまでほかの人には話さずにおきたい。
+2. 友達が、共通の友達も知っている個人的な出来事を話したときは、秘密だと言われていなければ、本人に確認せず共通の友達との会話で触れてもよい。
+3. 友達の悩みについて自分だけでは助言できず、詳しい人に相談したいときは、誰のことか分からない話し方でも、本人に確認してから相談したい。
+4. 友達の悩みについて自分だけでは助言できず、詳しい人に相談したいときは、誰のことか分からない話し方にできれば、本人に確認せず相談してもよい。
+5. あらかじめ投稿してよい範囲を決めている友達との写真をSNSへ載せるときも、写真ごとに本人へ確認したい。
+6. あらかじめ投稿してよい範囲を決めている友達との写真をSNSへ載せるときは、その範囲内なら写真ごとの確認はしなくてよい。
+7. 友達との約束を変える可能性が出たものの、まだ予定が確定していないときは、可能性の段階で早めに伝えたい。
+8. 友達との約束を変える可能性が出たものの、まだ予定が確定していないときは、変更が確定するまで伝えず、まず自分で調整したい。
+9. 友達に答えたくない個人的なことを聞かれたときは、その場で答えたくないと伝えたい。
+10. 友達に答えたくない個人的なことを聞かれたときは、その場では話題を変え、あとで落ち着いてから境界を伝えたい。
+
 ## 4. 回答から傾向を出すために必要な設計
 
 この質問集だけでは、「貯蓄重視」などの傾向を論理的に算出できません。現時点で定義しているのは質問候補までであり、質問と傾向軸の対応、回答の向き、集計方法は未定義です。1問への回答だけで人物の傾向を確定しません。
@@ -397,7 +410,7 @@
 - 算出規則と、結果に使用した質問を本人が確認できるようにする
 - 回答数が足りない場合や回答が食い違う場合は、無理にラベルを付けない
 
-公開済み診断の質問と傾向軸の対応、計算式、表示条件は、[自分と相手の優先・境界線](../scoring/relationship-priority-parameter-design.md)、[お金と消費](../scoring/money-values-parameter-design.md)、[インドア・アウトドアと余暇](../scoring/leisure-style-parameter-design.md)、[時間と予定](../scoring/time-planning-parameter-design.md)、[会話と感情表現](../scoring/conversation-emotion-parameter-design.md)、[優先順位と人生の方向性](../scoring/life-priorities-parameter-design.md)、[仕事の価値観・働き方](../scoring/work-values-parameter-design.md)、[仕事の変化・周囲との関わり方](../scoring/work-relationship-style-parameter-design.md)、[家族との距離感・支え合い](../scoring/family-support-style-parameter-design.md)、[友達との距離感・付き合い方](../scoring/friendship-style-parameter-design.md)、[決め方・迷いとの向き合い方](../scoring/decision-making-style-parameter-design.md)、[仕事の進め方・優先順位](../scoring/work-priority-style-parameter-design.md)、[家族の期待と自分の選択](../scoring/family-expectation-choice-parameter-design.md)の各パラメータ変換設計を正とします。他の話題の対応は、質問の審査と合わせて後続で定義します。
+公開済み診断の質問と傾向軸の対応、計算式、表示条件は、[自分と相手の優先・境界線](../scoring/relationship-priority-parameter-design.md)、[お金と消費](../scoring/money-values-parameter-design.md)、[インドア・アウトドアと余暇](../scoring/leisure-style-parameter-design.md)、[時間と予定](../scoring/time-planning-parameter-design.md)、[会話と感情表現](../scoring/conversation-emotion-parameter-design.md)、[優先順位と人生の方向性](../scoring/life-priorities-parameter-design.md)、[仕事の価値観・働き方](../scoring/work-values-parameter-design.md)、[仕事の変化・周囲との関わり方](../scoring/work-relationship-style-parameter-design.md)、[家族との距離感・支え合い](../scoring/family-support-style-parameter-design.md)、[友達との距離感・付き合い方](../scoring/friendship-style-parameter-design.md)、[決め方・迷いとの向き合い方](../scoring/decision-making-style-parameter-design.md)、[仕事の進め方・優先順位](../scoring/work-priority-style-parameter-design.md)、[家族の期待と自分の選択](../scoring/family-expectation-choice-parameter-design.md)、[友達との信頼・秘密・境界線](../scoring/friend-trust-boundaries-parameter-design.md)の各パラメータ変換設計を正とします。他の話題の対応は、質問の審査と合わせて後続で定義します。
 
 ## 5. 公開単位
 

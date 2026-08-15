@@ -75,6 +75,7 @@ docs/
 - [「決め方・迷いとの向き合い方」パラメータ変換設計](diagnosis/scoring/decision-making-style-parameter-design.md) — 11個目の診断固有のパラメータ、重み、表示設定、Relationship Category
 - [「仕事の進め方・優先順位」パラメータ変換設計](diagnosis/scoring/work-priority-style-parameter-design.md) — 12個目の診断固有のパラメータ、重み、表示設定、Relationship Category
 - [「家族の期待と自分の選択」パラメータ変換設計](diagnosis/scoring/family-expectation-choice-parameter-design.md) — 13個目の診断固有のパラメータ、重み、表示設定、Relationship Category
+- [「友達との信頼・秘密・境界線」パラメータ変換設計](diagnosis/scoring/friend-trust-boundaries-parameter-design.md) — 14個目の診断固有のパラメータ、重み、表示設定、Relationship Category
 
 ### ドメインを設計する
 
