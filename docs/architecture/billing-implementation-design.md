@@ -80,6 +80,14 @@ AI返信の月次枠は、FreeではUTC暦月、契約Planでは`AccountPlanAssi
 
 本人向けの`GET /api/profile/entitlement`はPlan、付与元、適用開始、利用可能期限と、AI返信・まとめ生成の上限、確定量、予約量、残量、次回更新日時だけを返します。支払者Account IDや決済事業者の識別子は返しません。provider障害時は`safe-default`としてFree権限を表示し、有料権限を推測しません。
 
+### 3.4 ファミリー席の保存境界
+
+共有D1の`family_packs`と`family_seats`には、支払者Account、4つの固定slot、招待ID、参加Account、席状態と状態変更日時だけを保存します。日記、診断、プロフィール、質問履歴などの個人コンテンツは保存しません。支払者自身がslot 1を使い、参加者はslot 2〜4を使うため、1契約で利用できるのは支払者を含む最大4 Accountです。
+
+live状態は`invited | active`とし、pack内のslotと参加中Accountをpartial unique indexで一意にします。招待予約と承諾はこのDB制約を最終競合判定に使い、同時操作でも5席目や複数packへの参加を許可しません。取消、退出、席からの削除、契約終了は履歴行を消さず、それぞれ`cancelled | left | removed | ended`へ遷移させます。
+
+このmembershipはPlan付与だけを表します。同じpackへの参加を、相性共有、Relationship Category、個人コンテンツ閲覧の同意として扱いません。それらは既存の本人同意境界で個別に判定します。
+
 ## 4. 状態の変換
 
 有効な`trialing`または`active`契約はPrice catalogでPlanへ変換します。期間末解約予約中も期限までは現在Planを維持します。`past_due`などの猶予期間は商取引条件確定後の状態遷移で扱い、未知statusや未知Priceは有料権限を付与しません。契約終了後は既存データを削除せずFreeへ戻します。

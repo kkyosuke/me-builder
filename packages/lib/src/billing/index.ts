@@ -1,5 +1,6 @@
 export * from "./account-plan-assignment";
 export * from "./entitlement";
+export * from "./family-seat";
 export * from "./fake-provider";
 export * from "./provider";
 export * from "./stripe-adapter";
