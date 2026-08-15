@@ -1007,6 +1007,241 @@
         }
       }
     },
+    "/api/admin/billing/reconciliation": {
+      "post": {
+        "operationId": "reconcileAdminBillingProjection",
+        "tags": ["Admin"],
+        "summary": "Stripeの現在契約と課金projectionの差分を確認・修復する",
+        "security": [
+          {
+            "liffIdToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "kind": "schema",
+                "type": "object",
+                "expects": "Object",
+                "async": false,
+                "entries": {
+                  "accountId": {
+                    "kind": "schema",
+                    "type": "string",
+                    "expects": "string",
+                    "async": false,
+                    "~standard": {
+                      "version": 1,
+                      "vendor": "valibot"
+                    },
+                    "pipe": [
+                      {
+                        "kind": "schema",
+                        "type": "string",
+                        "expects": "string",
+                        "async": false,
+                        "~standard": {
+                          "version": 1,
+                          "vendor": "valibot"
+                        }
+                      },
+                      {
+                        "kind": "validation",
+                        "type": "uuid",
+                        "async": false,
+                        "expects": null,
+                        "requirement": {}
+                      }
+                    ]
+                  },
+                  "mode": {
+                    "kind": "schema",
+                    "type": "optional",
+                    "expects": "((\"dry-run\" | \"apply\") | undefined)",
+                    "async": false,
+                    "wrapped": {
+                      "kind": "schema",
+                      "type": "picklist",
+                      "expects": "(\"dry-run\" | \"apply\")",
+                      "async": false,
+                      "options": ["dry-run", "apply"],
+                      "~standard": {
+                        "version": 1,
+                        "vendor": "valibot"
+                      }
+                    },
+                    "default": "dry-run",
+                    "~standard": {
+                      "version": 1,
+                      "vendor": "valibot"
+                    }
+                  }
+                },
+                "~standard": {
+                  "version": 1,
+                  "vendor": "valibot"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "再照合結果",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "operationId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "mode": {
+                      "enum": ["dry-run", "apply"],
+                      "type": "string"
+                    },
+                    "differenceFields": {
+                      "type": "array",
+                      "items": {
+                        "enum": [
+                          "projection",
+                          "status",
+                          "plan",
+                          "periodStart",
+                          "periodEnd",
+                          "cancelAtPeriodEnd",
+                          "trialEnd"
+                        ],
+                        "type": "string"
+                      }
+                    },
+                    "repaired": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["operationId", "mode", "differenceFields", "repaired"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "リクエストが不正",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Invalid request"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "LIFF IDトークンを検証できない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Unauthorized"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "管理者権限がない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Forbidden"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "認証Accountまたは対象Customerがない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "error": {
+                          "const": "Account not found"
+                        },
+                        "reason": {
+                          "const": "friendship_required"
+                        }
+                      },
+                      "required": ["error", "reason"]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "error": {
+                          "const": "Billing customer not found"
+                        }
+                      },
+                      "required": ["error"]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "未処理のサーバーエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Internal Server Error"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "D1 bindingが設定されていない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Service Unavailable"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/profile-summary": {
       "get": {
         "operationId": "getProfileSummary",

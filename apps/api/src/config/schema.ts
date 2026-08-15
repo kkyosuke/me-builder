@@ -33,6 +33,7 @@ export const ConfigSchema = v.object({
       (val) => val === undefined || (typeof val === "object" && val !== null && "send" in val),
     ),
   ),
+  billingPricePlanMap: v.optional(v.record(v.string(), v.picklist(["lite", "full", "family"])), {}),
 });
 
 export type ApiConfig = v.InferOutput<typeof ConfigSchema>;

@@ -71,3 +71,23 @@ export const billingProcessedEvents = sqliteTable(
   },
   (table) => [index("billing_processed_object_idx").on(table.objectId, table.eventCreatedAt)],
 );
+
+export const billingReconciliationAudits = sqliteTable(
+  "billing_reconciliation_audits",
+  {
+    operationId: text("operation_id").primaryKey(),
+    adminAccountId: text("admin_account_id")
+      .notNull()
+      .references(() => accounts.id),
+    targetAccountId: text("target_account_id")
+      .notNull()
+      .references(() => accounts.id),
+    mode: text("mode", { enum: ["dry-run", "apply"] }).notNull(),
+    differenceFields: text("difference_fields", { mode: "json" }).$type<string[]>().notNull(),
+    result: text("result", { enum: ["no-difference", "difference", "repaired"] }).notNull(),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  },
+  (table) => [
+    index("billing_reconciliation_target_idx").on(table.targetAccountId, table.createdAt),
+  ],
+);

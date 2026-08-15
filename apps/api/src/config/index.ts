@@ -7,6 +7,24 @@ export { ConfigSchema, type ApiConfig };
 
 const DEVELOPMENT_ENVIRONMENTS = new Set(["development", "local", "preview", "test"]);
 
+function parseBillingPricePlanMap(
+  raw: string | undefined,
+): Record<string, "lite" | "full" | "family"> {
+  if (!raw) return {};
+  try {
+    const value: unknown = JSON.parse(raw);
+    if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+    return Object.fromEntries(
+      Object.entries(value).filter(
+        (entry): entry is [string, "lite" | "full" | "family"] =>
+          entry[0].length > 0 && ["lite", "full", "family"].includes(String(entry[1])),
+      ),
+    );
+  } catch {
+    return {};
+  }
+}
+
 export function isDevelopmentEnvironment(environment: string): boolean {
   return DEVELOPMENT_ENVIRONMENTS.has(environment);
 }
@@ -63,6 +81,7 @@ export function getConfig(env?: Record<string, unknown>): ApiConfig {
     billingQueue: rawBillingQueue,
     stripeSecretKey: getEnv("STRIPE_SECRET_KEY", env),
     stripeWebhookSecret: getEnv("STRIPE_WEBHOOK_SECRET", env),
+    billingPricePlanMap: parseBillingPricePlanMap(getEnv("BILLING_PRICE_PLAN_MAP", env)),
     liffId: liffConfiguration.liffId,
     lineLoginChannelId: liffConfiguration.lineLoginChannelId,
     adminLineUserIds,
