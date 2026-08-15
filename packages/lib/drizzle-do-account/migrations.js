@@ -21,6 +21,7 @@ import m0019 from "./0019_nebulous_whistler.sql";
 import m0020 from "./0020_superb_orphan.sql";
 import m0021 from "./0021_dry_hammerhead.sql";
 import m0022 from "./0022_light_deathstrike.sql";
+import m0023 from "./0023_wet_jimmy_woo.sql";
 import journal from "./meta/_journal.json";
 
 export default {
@@ -49,5 +50,6 @@ export default {
     m0020,
     m0021,
     m0022,
+    m0023,
   },
 };
