@@ -20,6 +20,9 @@ export function ServiceSiteFooter() {
           <a className="font-semibold hover:underline" href="/terms">
             利用規約
           </a>
+          <a className="font-semibold hover:underline" href="/privacy">
+            プライバシーポリシー
+          </a>
         </nav>
       </div>
       <p className="border-t border-violet-100 px-4 py-5 text-center text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
