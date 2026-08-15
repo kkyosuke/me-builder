@@ -7,6 +7,7 @@ import type { CompatibilityRelationship } from "../feature/compatibility/model/c
 import { resolveCompatibilityInvitationId } from "../feature/compatibility/model/compatibility-route";
 import CompatibilityApplication from "../feature/compatibility/presentation/compatibility-application";
 import CompatibilityInvitationApplication from "../feature/compatibility/presentation/compatibility-invitation-application";
+import CompatibilityResultApplication from "../feature/compatibility/presentation/compatibility-result-application";
 
 const mocks = vi.hoisted(() => ({
   acquireIdToken: vi.fn().mockResolvedValue("recipient-token"),
@@ -251,5 +252,46 @@ describe("LIFF compatibility share link journey", () => {
       relationshipId,
       expect.any(AbortSignal),
     );
+  });
+
+  it("ふたり進行度の同期に失敗しても相性シート本体を表示する", async () => {
+    const relationshipId = "3".repeat(64);
+    const profile = {
+      profileSummaryVersionId: "profile-1",
+      generatedAt: "2026-08-12T00:00:00.000Z",
+      statements: [{ key: "planning", label: "予定", statement: "私は見通しを大切にします" }],
+    };
+    const theme = {
+      diagnosisId: "time-planning",
+      title: "時間と予定",
+      parameters: [
+        {
+          id: "planning",
+          label: "予定の立て方",
+          lowLabel: "その場で決めたい",
+          highLabel: "早めに決めたい",
+          position: 78,
+          statement: "私は早めに予定を決めたいです",
+          request: "予定は早めに相談してもらえるとうれしいです",
+          band: "high" as const,
+        },
+      ],
+    };
+    mocks.fetchCompatibilityRelationship.mockResolvedValue({
+      relationshipId,
+      status: "ready",
+      relationshipCategory: "partner",
+      partner: { displayName: "あおい", aboutMe: profile, themes: [theme] },
+      viewer: { displayName: "はる", aboutMe: profile, themes: [theme] },
+      unavailableThemes: [],
+      progression: null,
+    } satisfies CompatibilityRelationship);
+
+    render(<CompatibilityResultApplication relationshipId={relationshipId} />);
+
+    expect(await screen.findByRole("heading", { name: "2人の相性シート" })).toBeTruthy();
+    expect(screen.getAllByRole("heading", { name: "あおいさんについて" })).toHaveLength(1);
+    expect(screen.getByRole("status").textContent).toContain("相性シートはそのまま確認できます");
+    expect(screen.queryByText("2人について比べられた歩み")).toBeNull();
   });
 });

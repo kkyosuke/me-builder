@@ -82,9 +82,72 @@ describe("CompatibilityData Workers runtime E2E", () => {
           .exec<{ count: number }>("SELECT count(*) AS count FROM compatibility_progression_themes")
           .one().count,
       ).toBe(1);
+      state.storage.sql.exec(
+        "UPDATE compatibility_relationships SET offered_profile_summary_version_id = ?, offered_profile_fingerprint = ?, offered_profile_consented_at = ?, accepted_profile_summary_version_id = ?, accepted_profile_fingerprint = ?, accepted_profile_consented_at = ?",
+        "offered-version",
+        "offered-fingerprint",
+        Date.now(),
+        "accepted-version",
+        "accepted-fingerprint",
+        Date.now(),
+      );
+      state.storage.sql.exec(
+        "INSERT INTO compatibility_offered_themes (relationship_id, diagnosis_id, result_fingerprint, consented_at) VALUES (?, ?, ?, ?)",
+        relationshipId,
+        "legacy-theme",
+        "legacy-offered-fingerprint",
+        Date.now(),
+      );
+      state.storage.sql.exec(
+        "INSERT INTO compatibility_accepted_themes (relationship_id, diagnosis_id, result_fingerprint, consented_at) VALUES (?, ?, ?, ?)",
+        relationshipId,
+        "legacy-theme",
+        "legacy-accepted-fingerprint",
+        Date.now(),
+      );
       await expect(instance.getRelationship("another-relationship", "account")).rejects.toThrow(
         "CompatibilityData RPC relationship does not match object name",
       );
+    });
+
+    await stub.endRelationship(relationshipId, inviterAccountId);
+    await runInDurableObject(stub, async (_instance: CompatibilityData, state) => {
+      expect(
+        state.storage.sql
+          .exec<{ count: number }>("SELECT count(*) AS count FROM compatibility_progression_themes")
+          .one().count,
+      ).toBe(0);
+      expect(
+        state.storage.sql
+          .exec<{
+            growth_value: number;
+            highest_level: number;
+            comparable_theme_count: number;
+          }>(
+            "SELECT growth_value, highest_level, comparable_theme_count FROM compatibility_progression_states",
+          )
+          .one(),
+      ).toEqual({ growth_value: 3, highest_level: 2, comparable_theme_count: 0 });
+      expect(
+        state.storage.sql
+          .exec<{ count: number }>("SELECT count(*) AS count FROM compatibility_offered_themes")
+          .one().count,
+      ).toBe(0);
+      expect(
+        state.storage.sql
+          .exec<{ count: number }>("SELECT count(*) AS count FROM compatibility_accepted_themes")
+          .one().count,
+      ).toBe(0);
+      expect(
+        state.storage.sql
+          .exec<{
+            offered_profile_fingerprint: string | null;
+            accepted_profile_fingerprint: string | null;
+          }>(
+            "SELECT offered_profile_fingerprint, accepted_profile_fingerprint FROM compatibility_relationships",
+          )
+          .one(),
+      ).toEqual({ offered_profile_fingerprint: null, accepted_profile_fingerprint: null });
     });
   });
 

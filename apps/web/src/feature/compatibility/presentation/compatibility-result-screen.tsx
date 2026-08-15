@@ -40,7 +40,7 @@ export function CompatibilityResultScreen({
   partner: CompatibilityPerson;
   relationshipCategory: CompatibilityRelationshipCategory;
   unavailableThemes?: CompatibilityUnavailableTheme[];
-  progression: CompatibilityPairProgression;
+  progression: CompatibilityPairProgression | null;
   isRefreshing?: boolean;
   refreshError?: string | null;
   endingState?: AsyncState<null>;
@@ -105,52 +105,59 @@ export function CompatibilityResultScreen({
         回答から見える範囲で作った、私たちを知るための資料です。人物や関係の良し悪しを決めるものではありません。
       </p>
 
-      <section
-        aria-labelledby="pair-progression-heading"
-        className="mt-5 rounded-2xl border border-rose-200 bg-gradient-to-br from-rose-50 to-violet-50 p-4 dark:border-rose-900 dark:from-rose-950/40 dark:to-violet-950/40"
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="flex items-center gap-1.5 text-xs font-semibold text-rose-700 dark:text-rose-300">
-              <Sparkles className="size-4" aria-hidden="true" />
-              2人について比べられた歩み
-            </p>
-            <h2
-              id="pair-progression-heading"
-              className="mt-1 text-xl font-black text-slate-950 dark:text-slate-50"
-            >
-              ふたり Lv.{progression.level}
-            </h2>
+      {progression && (
+        <section
+          aria-labelledby="pair-progression-heading"
+          className="mt-5 rounded-2xl border border-rose-200 bg-gradient-to-br from-rose-50 to-violet-50 p-4 dark:border-rose-900 dark:from-rose-950/40 dark:to-violet-950/40"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="flex items-center gap-1.5 text-xs font-semibold text-rose-700 dark:text-rose-300">
+                <Sparkles className="size-4" aria-hidden="true" />
+                2人について比べられた歩み
+              </p>
+              <h2
+                id="pair-progression-heading"
+                className="mt-1 text-xl font-black text-slate-950 dark:text-slate-50"
+              >
+                ふたり Lv.{progression.level}
+              </h2>
+            </div>
+            <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+              {progression.comparableThemeCount}テーマ
+            </span>
           </div>
-          <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
-            {progression.comparableThemeCount}テーマ
-          </span>
-        </div>
-        <progress
-          aria-label={`ふたりレベル${progression.level}の進み具合`}
-          className="mt-3 h-2 w-full accent-rose-500"
-          max={progression.nextLevelThreshold - progression.currentLevelThreshold}
-          value={Math.max(0, progression.growthValue - progression.currentLevelThreshold)}
-        />
-        {progression.marks.length > 0 && (
-          <div className="mt-3">
-            <p className="text-xs font-bold text-rose-800 dark:text-rose-200">ふたりのしるし</p>
-            <ul className="mt-1 flex flex-wrap gap-1.5" aria-label="獲得したふたりのしるし">
-              {progression.marks.map((level) => (
-                <li
-                  key={level}
-                  className="rounded-full bg-white px-2.5 py-1 text-xs font-bold tabular-nums text-rose-700 shadow-sm dark:bg-slate-800 dark:text-rose-300"
-                >
-                  Lv.{level}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-        <p className="mt-3 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
-          相性の良し悪しではなく、2人について比較できる材料が更新された歩みです。
-        </p>
-      </section>
+          <progress
+            aria-label={`ふたりレベル${progression.level}の進み具合`}
+            className="mt-3 h-2 w-full accent-rose-500"
+            max={progression.nextLevelThreshold - progression.currentLevelThreshold}
+            value={Math.max(0, progression.growthValue - progression.currentLevelThreshold)}
+          />
+          {progression.marks.length > 0 && (
+            <div className="mt-3">
+              <p className="text-xs font-bold text-rose-800 dark:text-rose-200">ふたりのしるし</p>
+              <ul className="mt-1 flex flex-wrap gap-1.5" aria-label="獲得したふたりのしるし">
+                {progression.marks.map((level) => (
+                  <li
+                    key={level}
+                    className="rounded-full bg-white px-2.5 py-1 text-xs font-bold tabular-nums text-rose-700 shadow-sm dark:bg-slate-800 dark:text-rose-300"
+                  >
+                    Lv.{level}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <p className="mt-3 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+            相性の良し悪しではなく、2人について比較できる材料が更新された歩みです。
+          </p>
+        </section>
+      )}
+      {!progression && (
+        <output className="mt-5 block rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+          ふたりの歩みは一時的に表示できません。相性シートはそのまま確認できます。
+        </output>
+      )}
 
       <div
         className="relative mt-7 grid grid-cols-2 rounded-2xl bg-slate-100 p-1 dark:bg-slate-800"

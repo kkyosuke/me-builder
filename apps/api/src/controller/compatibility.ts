@@ -408,6 +408,12 @@ export async function getCompatibilityRelationship(c: Context<AppEnv>): Promise<
   });
   switch (outcome.type) {
     case "resolved":
+      if (outcome.relationship.status === "ready" && outcome.relationship.progression === null) {
+        logger.warn(
+          { path: operationalHttpPath(c.req.path) },
+          "Compatibility pair progression is temporarily unavailable",
+        );
+      }
       return c.json(v.parse(CompatibilityRelationshipResponseSchema, outcome.relationship));
     case "unavailable":
       return c.json(
