@@ -23,6 +23,7 @@ import {
   resetAllFailedBrainVectorSyncJobs,
   resetFailedBrainVectorSyncJob,
   saveBrainItem,
+  selectDailyPromptStrategyPreference,
   selectDailyPromptWeekdayContext,
 } from "./brain";
 
@@ -755,6 +756,58 @@ describe("selectDailyPromptWeekdayContext", () => {
     await expect(
       selectDailyPromptWeekdayContext(db, "account-1", "monday", at),
     ).resolves.toBeUndefined();
+  });
+});
+
+describe("selectDailyPromptStrategyPreference", () => {
+  it.each([
+    ["brief", "brief"],
+    ["event_first", "event_first"],
+    ["feeling_first", "feeling_first"],
+    ["no_choices", "standard"],
+  ] as const)("明言された%sをレビュー済み方針%sへ変換する", async (style, expected) => {
+    const db = createTestDb();
+    await insertAccountsAndSources(db);
+    const at = new Date("2026-08-10T09:00:00Z");
+    await savePromptContextFixture(db, {
+      suffix: style,
+      category: "preference",
+      promptContext: { kind: "question_style", style },
+      at,
+    });
+
+    await expect(selectDailyPromptStrategyPreference(db, "account-1", at)).resolves.toBe(expected);
+  });
+
+  it("推定、分類不一致、削除済み根拠を方針選択へ使わない", async () => {
+    const db = createTestDb();
+    await insertAccountsAndSources(db);
+    const at = new Date("2026-08-10T09:00:00Z");
+    await savePromptContextFixture(db, {
+      suffix: "inferred-style",
+      category: "preference",
+      promptContext: { kind: "question_style", style: "brief" },
+      isInference: true,
+      at,
+    });
+    await savePromptContextFixture(db, {
+      suffix: "wrong-style-category",
+      category: "identity",
+      promptContext: { kind: "question_style", style: "event_first" },
+      at,
+    });
+    await savePromptContextFixture(db, {
+      suffix: "deleted-style-source",
+      category: "preference",
+      promptContext: { kind: "question_style", style: "feeling_first" },
+      at,
+    });
+    await db
+      .update(schema.sourceRecords)
+      .set({ isDeleted: true, deletedAt: at, updatedAt: at })
+      .where(eq(schema.sourceRecords.id, "source-deleted-style-source"));
+
+    await expect(selectDailyPromptStrategyPreference(db, "account-1", at)).resolves.toBeUndefined();
   });
 });
 

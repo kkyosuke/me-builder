@@ -451,6 +451,7 @@ describe("daily prompt delivery", () => {
       prepareDailyPrompt(db, ACCOUNT_ID, {
         localDate: "2026-08-14",
         promptVersion: "daily-check-in-fri-v1",
+        promptStrategy: "brief",
         at,
       }),
     ).resolves.toMatchObject({
@@ -462,6 +463,7 @@ describe("daily prompt delivery", () => {
       prepareDailyPrompt(db, ACCOUNT_ID, {
         localDate: "2026-08-14",
         promptVersion: "daily-check-in-fri-v2",
+        promptStrategy: "feeling_first",
         at: new Date(at.getTime() + 30_000),
       }),
     ).resolves.toMatchObject({
@@ -470,10 +472,13 @@ describe("daily prompt delivery", () => {
     });
     expect(
       await db
-        .select({ promptVersion: schema.dailyPromptDeliveries.promptVersion })
+        .select({
+          promptVersion: schema.dailyPromptDeliveries.promptVersion,
+          promptStrategy: schema.dailyPromptDeliveries.promptStrategy,
+        })
         .from(schema.dailyPromptDeliveries)
         .get(),
-    ).toEqual({ promptVersion: "daily-check-in-fri-v1" });
+    ).toEqual({ promptVersion: "daily-check-in-fri-v1", promptStrategy: "brief" });
   });
 
   it("active Sessionがあれば当日の声かけをskipする", async () => {

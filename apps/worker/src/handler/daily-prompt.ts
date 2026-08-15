@@ -127,15 +127,44 @@ export async function processDailyPromptMessage(
               );
               return undefined;
             });
+    const promptStrategy = await accountData
+      .execute("brain.selectDailyPromptStrategyPreference")
+      .catch((error: unknown) => {
+        logger.warn(
+          {
+            event: "daily-prompt.strategy-preference.failed",
+            service: "worker",
+            environment: workerConfig.environment,
+            component: "daily-prompt",
+            queueMessageId: message.id,
+            localDate: message.body.localDate,
+            attempt: message.attempts,
+            outcome: "degraded",
+            disposition: "continue",
+            ...toSafeOperationalErrorFields(error, {
+              code: "DAILY_PROMPT_STRATEGY_PREFERENCE_LOAD_FAILED",
+              category: "dependency",
+              stage: "daily-prompt.strategy",
+              retryable: false,
+              dependency: "account-data",
+            }),
+          },
+          "[Daily prompt] failed to load strategy preference -> continue with standard strategy",
+        );
+        return undefined;
+      });
+    const selectedPromptStrategy = promptStrategy ?? "standard";
     const promptVersion = getDailyPromptVersion(
       message.body.localDate,
       weekdayContext,
       sameDayContext,
       previousDayContext,
+      selectedPromptStrategy,
     );
     const preparation = await accountData.execute("conversation.prepareDailyPrompt", {
       localDate: message.body.localDate,
       promptVersion,
+      promptStrategy: selectedPromptStrategy,
     });
     if (preparation.type === "not-ready") {
       message.ack();

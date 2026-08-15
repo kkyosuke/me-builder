@@ -43,6 +43,22 @@ const QuestionStylePromptContextSchema = v.strictObject({
   style: v.picklist(["brief", "event_first", "feeling_first", "no_choices"]),
 });
 
+export const DAILY_PROMPT_STRATEGIES = [
+  "standard",
+  "brief",
+  "event_first",
+  "feeling_first",
+] as const;
+
+export type DailyPromptStrategy = (typeof DAILY_PROMPT_STRATEGIES)[number];
+
+/** 本人が明言した聞かれ方を、レビュー済みの日次声かけ方針へ閉じ込める。 */
+export function dailyPromptStrategyFromQuestionStyle(
+  style: Extract<PromptContext, { kind: "question_style" }>["style"],
+): DailyPromptStrategy {
+  return style === "no_choices" ? "standard" : style;
+}
+
 /** Brain Itemのattributes.promptContextへ保存できる構造のSSoT。 */
 export const PromptContextSchema = v.variant("kind", [
   OccupationPromptContextSchema,

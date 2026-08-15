@@ -8,6 +8,7 @@ import {
   PromptContextSchema,
   arePromptContextsEqual,
   buildPromptContextCollectionCandidates,
+  dailyPromptStrategyFromQuestionStyle,
   findPrecedingAssistantBodies,
   isPromptContextGrounded,
   parsePromptContext,
@@ -16,6 +17,15 @@ import {
 } from "./prompt-context";
 
 describe("prompt context attribute master", () => {
+  it.each([
+    ["brief", "brief"],
+    ["event_first", "event_first"],
+    ["feeling_first", "feeling_first"],
+    ["no_choices", "standard"],
+  ] as const)("聞かれ方%sをレビュー済み方針%sへ閉じ込める", (style, expected) => {
+    expect(dailyPromptStrategyFromQuestionStyle(style)).toBe(expected);
+  });
+
   it("高優先の5属性と非強制の収集目標をSSoTとして公開する", () => {
     expect(PROMPT_CONTEXT_ATTRIBUTE_MASTER.map(({ kind }) => kind)).toEqual([
       "occupation",

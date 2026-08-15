@@ -96,6 +96,11 @@ export const dailyPromptDeliveries = sqliteTable(
       .references(() => accountDataIdentity.accountId),
     localDate: text("local_date").notNull(),
     promptVersion: text("prompt_version").notNull(),
+    promptStrategy: text("prompt_strategy", {
+      enum: ["standard", "brief", "event_first", "feeling_first"],
+    })
+      .notNull()
+      .default("standard"),
     status: text("status", { enum: ["pending", "delivered", "skipped", "failed"] })
       .notNull()
       .default("pending"),

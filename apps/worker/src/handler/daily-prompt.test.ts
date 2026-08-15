@@ -45,6 +45,7 @@ describe("daily prompt queue consumer", () => {
       .mockImplementation(async (accountId: string, operation: string, ...args: unknown[]) => {
         if (accountId !== "account-1") throw new Error("Unexpected account");
         if (operation === "brain.selectDailyPromptWeekdayContext") return undefined;
+        if (operation === "brain.selectDailyPromptStrategyPreference") return undefined;
         if (operation === "conversation.selectDailyPromptSameDayContext") return undefined;
         if (operation === "conversation.selectDailyPromptPreviousDayContext") return undefined;
         if (operation === "conversation.prepareDailyPrompt") {
@@ -75,6 +76,7 @@ describe("daily prompt queue consumer", () => {
     expect(execute).toHaveBeenCalledWith("account-1", "conversation.prepareDailyPrompt", {
       localDate: "2026-08-14",
       promptVersion: "daily-check-in-fri-v1",
+      promptStrategy: "standard",
     });
     expect(pushMessage).toHaveBeenCalledWith(
       {
@@ -97,6 +99,36 @@ describe("daily prompt queue consumer", () => {
     expect(message.retry).not.toHaveBeenCalled();
   });
 
+  it("本人が明言した聞かれ方をレビュー済み方針へ変換して固定する", async () => {
+    execute
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce("brief");
+    const message = createMessage();
+
+    await processDailyPromptMessage(message, bindings(), config);
+
+    expect(execute).toHaveBeenCalledWith("account-1", "brain.selectDailyPromptStrategyPreference");
+    expect(execute).toHaveBeenCalledWith("account-1", "conversation.prepareDailyPrompt", {
+      localDate: "2026-08-14",
+      promptVersion: "daily-check-in-fri-v1:brief-v1",
+      promptStrategy: "brief",
+    });
+    expect(pushMessage).toHaveBeenCalledWith(
+      {
+        to: "U_line",
+        messages: [
+          {
+            type: "text",
+            text: "今日、少しでも話しておきたいことはある？\nひとことだけでも大丈夫だよ。",
+          },
+        ],
+      },
+      expect.stringMatching(/^[0-9a-f-]{36}$/),
+    );
+  });
+
   it("保存済みの曜日文脈に対応する定型文をPushする", async () => {
     execute.mockResolvedValueOnce("day_off");
     const message = createMessage();
@@ -111,6 +143,7 @@ describe("daily prompt queue consumer", () => {
     expect(execute).toHaveBeenCalledWith("account-1", "conversation.prepareDailyPrompt", {
       localDate: "2026-08-14",
       promptVersion: "daily-check-in-day-off-v1",
+      promptStrategy: "standard",
     });
     expect(pushMessage).toHaveBeenCalledWith(
       {
@@ -141,6 +174,7 @@ describe("daily prompt queue consumer", () => {
     expect(execute).toHaveBeenCalledWith("account-1", "conversation.prepareDailyPrompt", {
       localDate: "2026-08-14",
       promptVersion: "daily-check-in-same-day-follow-up-v1",
+      promptStrategy: "standard",
     });
     expect(pushMessage).toHaveBeenCalledWith(
       {
@@ -170,6 +204,7 @@ describe("daily prompt queue consumer", () => {
     expect(execute).toHaveBeenCalledWith("account-1", "conversation.prepareDailyPrompt", {
       localDate: "2026-08-14",
       promptVersion: "daily-check-in-day-off-v1",
+      promptStrategy: "standard",
     });
   });
 
@@ -190,6 +225,7 @@ describe("daily prompt queue consumer", () => {
     expect(execute).toHaveBeenCalledWith("account-1", "conversation.prepareDailyPrompt", {
       localDate: "2026-08-14",
       promptVersion: "daily-check-in-previous-day-follow-up-v1",
+      promptStrategy: "standard",
     });
     expect(pushMessage).toHaveBeenCalledWith(
       {
@@ -218,6 +254,7 @@ describe("daily prompt queue consumer", () => {
     expect(execute).toHaveBeenCalledWith("account-1", "conversation.prepareDailyPrompt", {
       localDate: "2026-08-14",
       promptVersion: "daily-check-in-fri-v1",
+      promptStrategy: "standard",
     });
     expect(warn).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -241,6 +278,7 @@ describe("daily prompt queue consumer", () => {
     expect(execute).toHaveBeenCalledWith("account-1", "conversation.prepareDailyPrompt", {
       localDate: "2026-08-14",
       promptVersion: "daily-check-in-day-off-v1",
+      promptStrategy: "standard",
     });
     expect(warn).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -262,6 +300,7 @@ describe("daily prompt queue consumer", () => {
     expect(execute).toHaveBeenCalledWith("account-1", "conversation.prepareDailyPrompt", {
       localDate: "2026-08-14",
       promptVersion: "daily-check-in-fri-v1",
+      promptStrategy: "standard",
     });
     expect(pushMessage).toHaveBeenCalledOnce();
     expect(message.ack).toHaveBeenCalledOnce();
@@ -273,10 +312,12 @@ describe("daily prompt queue consumer", () => {
       .mockRejectedValueOnce(new Error("AccountData unavailable"))
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce({
         type: "ready",
         deliveryId: "daily-prompt:2026-08-14",
         promptVersion: "daily-check-in-day-off-v1",
+        promptStrategy: "standard",
       });
     const message = createMessage();
 
@@ -310,10 +351,12 @@ describe("daily prompt queue consumer", () => {
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce({
         type: "ready",
         deliveryId: "daily-prompt:2026-08-14",
         promptVersion: "daily-check-in-v1",
+        promptStrategy: "standard",
       });
     const message = createMessage();
 
@@ -336,6 +379,7 @@ describe("daily prompt queue consumer", () => {
 
   it("AccountDataがskipした日はLINEを呼ばずackする", async () => {
     execute
+      .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(undefined)

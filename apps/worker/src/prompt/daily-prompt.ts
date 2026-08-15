@@ -1,6 +1,7 @@
 import type {
   DailyPromptPreviousDayContext,
   DailyPromptSameDayContext,
+  DailyPromptStrategy,
   DailyPromptWeekdayContext,
   PromptContextWeekday,
 } from "@me-builder/lib";
@@ -65,6 +66,30 @@ const DAILY_PROMPTS: Readonly<Record<string, string>> = {
     "昨日話していたこと、今日は何か動きがあった？\n特になければ、今日の別のことでも大丈夫だよ。",
 };
 
+const DAILY_PROMPT_OPENING_BY_VERSION: Readonly<Record<string, string>> = {
+  [LEGACY_DAILY_PROMPT_VERSION]: "今日はどうだった？",
+  "daily-check-in-mon-v1": "今日はどんな一日だった？",
+  "daily-check-in-tue-v1": "今日、ちょっと気になったことや心に残ったことはあった？",
+  "daily-check-in-wed-v1": "今日はどんなことがあった？",
+  "daily-check-in-thu-v1": "今日を振り返ると、どんな場面が浮かぶ？",
+  "daily-check-in-fri-v1": "今日、少しでも話しておきたいことはある？",
+  "daily-check-in-sat-v1": "今日はどんなふうに過ごした？",
+  "daily-check-in-sun-v1": "今日はどんな一日だった？",
+  "daily-check-in-recurring-schedule-v1": "今日は、いつもの予定がある日だったかな。",
+  "daily-check-in-day-off-v1": "今日は、普段だとお休みの日だったかな。",
+  "daily-check-in-active-day-v1": "今日は、普段だと予定のある日だったかな。",
+  "daily-check-in-same-day-follow-up-v1": "日中に話してくれたこと、その後はどう？",
+  "daily-check-in-previous-day-follow-up-v1": "昨日話していたこと、今日は何か動きがあった？",
+};
+
+const DAILY_PROMPT_STRATEGY_SUFFIX: Readonly<
+  Record<Exclude<DailyPromptStrategy, "standard">, string>
+> = {
+  brief: "ひとことだけでも大丈夫だよ。",
+  event_first: "まずは、いちばん印象に残った出来事から聞かせて。",
+  feeling_first: "今の気分から、話せる範囲で聞かせて。",
+};
+
 /** Asia/Tokyoで解決済みの配送日を声かけコンテキストの曜日へ変換する。 */
 export function getDailyPromptWeekday(localDate: string): PromptContextWeekday {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(localDate)) throw new Error("Daily prompt date is invalid");
@@ -89,22 +114,31 @@ export function getDailyPromptVersion(
   weekdayContext?: DailyPromptWeekdayContext,
   sameDayContext?: DailyPromptSameDayContext,
   previousDayContext?: DailyPromptPreviousDayContext,
+  strategy: DailyPromptStrategy = "standard",
 ): string {
   getDailyPromptWeekday(localDate);
-  if (sameDayContext) return DAILY_PROMPT_VERSION_BY_SAME_DAY_CONTEXT[sameDayContext];
-  if (weekdayContext) return DAILY_PROMPT_VERSION_BY_WEEKDAY_CONTEXT[weekdayContext];
+  let baseVersion: string | undefined;
+  if (sameDayContext) baseVersion = DAILY_PROMPT_VERSION_BY_SAME_DAY_CONTEXT[sameDayContext];
+  else if (weekdayContext) baseVersion = DAILY_PROMPT_VERSION_BY_WEEKDAY_CONTEXT[weekdayContext];
   if (previousDayContext) {
-    return DAILY_PROMPT_VERSION_BY_PREVIOUS_DAY_CONTEXT[previousDayContext];
+    baseVersion ??= DAILY_PROMPT_VERSION_BY_PREVIOUS_DAY_CONTEXT[previousDayContext];
   }
-  const parsed = new Date(`${localDate}T00:00:00.000Z`);
-  const version = DAILY_PROMPT_VERSION_BY_WEEKDAY[parsed.getUTCDay()];
-  if (!version) throw new Error("Daily prompt weekday is invalid");
-  return version;
+  if (!baseVersion) {
+    const parsed = new Date(`${localDate}T00:00:00.000Z`);
+    baseVersion = DAILY_PROMPT_VERSION_BY_WEEKDAY[parsed.getUTCDay()];
+  }
+  if (!baseVersion) throw new Error("Daily prompt weekday is invalid");
+  return strategy === "standard" ? baseVersion : `${baseVersion}:${strategy}-v1`;
 }
 
 /** Queue再配送時も準備時に固定したversionと同じ本文を返す。 */
 export function getDailyPromptText(version: string): string {
   const text = DAILY_PROMPTS[version];
-  if (!text) throw new Error("Daily prompt version is not supported");
-  return text;
+  if (text) return text;
+  const match = /^(.*):(brief|event_first|feeling_first)-v1$/.exec(version);
+  const baseVersion = match?.[1];
+  const strategy = match?.[2] as Exclude<DailyPromptStrategy, "standard"> | undefined;
+  const opening = baseVersion ? DAILY_PROMPT_OPENING_BY_VERSION[baseVersion] : undefined;
+  if (!opening || !strategy) throw new Error("Daily prompt version is not supported");
+  return `${opening}\n${DAILY_PROMPT_STRATEGY_SUFFIX[strategy]}`;
 }
