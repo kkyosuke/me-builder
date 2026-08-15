@@ -48,6 +48,10 @@ export const diaryActions = {
     DO.account.action.diary.listDailyPromptStrategyStats(db, accountId),
   "conversation.selectDailyPromptStrategy": (db: DO.account.Database, accountId: string) =>
     DO.account.action.diary.selectDailyPromptStrategy(db, accountId),
+  "conversation.listDailyPromptTimeStats": (db: DO.account.Database, accountId: string) =>
+    DO.account.action.diary.listDailyPromptTimeStats(db, accountId),
+  "conversation.selectDailyPromptLocalHour": (db: DO.account.Database, accountId: string) =>
+    DO.account.action.diary.selectDailyPromptLocalHour(db, accountId),
   "conversation.attachMessagesToTurn": (
     db: DO.account.Database,
     accountId: string,

@@ -28,6 +28,7 @@ import {
 
 /** wrangler.tomlのmax_retries=5に初回配送を加えた最大試行回数。 */
 export const DAILY_PROMPT_MAX_ATTEMPTS = 6;
+type DailyPromptSelectionSource = "explicit" | "learned" | "fallback";
 
 export async function processDailyPromptMessage(
   message: Message<DailyPromptQueueMessage>,
@@ -41,6 +42,10 @@ export async function processDailyPromptMessage(
   }
   const accountData = accountDataFor(accountDataNamespace, message.body.accountId);
   let deliveryId: string | undefined;
+  let selectedLocalHour: DailyPromptLocalHour | undefined;
+  let timeSelectionSource: DailyPromptSelectionSource | undefined;
+  let selectedPromptStrategy: "standard" | "brief" | "event_first" | "feeling_first" | undefined;
+  let promptStrategySource: DailyPromptSelectionSource | undefined;
 
   try {
     const localHour = message.body.localHour ?? 18;
@@ -80,7 +85,41 @@ export async function processDailyPromptMessage(
         );
         return undefined;
       });
-    const selectedLocalHour = preferredLocalHour ?? 18;
+    const learnedLocalHour =
+      preferredLocalHour === undefined
+        ? await accountData.execute("conversation.selectDailyPromptLocalHour").catch((error) => {
+            logger.warn(
+              {
+                event: "daily-prompt.time-selection.failed",
+                service: "worker",
+                environment: workerConfig.environment,
+                component: "daily-prompt",
+                queueMessageId: message.id,
+                localDate: message.body.localDate,
+                localHour: scheduledLocalHour,
+                attempt: message.attempts,
+                outcome: "degraded",
+                disposition: "continue",
+                ...toSafeOperationalErrorFields(error, {
+                  code: "DAILY_PROMPT_TIME_SELECTION_FAILED",
+                  category: "dependency",
+                  stage: "daily-prompt.schedule",
+                  retryable: false,
+                  dependency: "account-data",
+                }),
+              },
+              "[Daily prompt] failed to select learned time -> continue with 18:00",
+            );
+            return undefined;
+          })
+        : undefined;
+    selectedLocalHour = preferredLocalHour ?? learnedLocalHour ?? 18;
+    timeSelectionSource =
+      preferredLocalHour !== undefined
+        ? "explicit"
+        : learnedLocalHour !== undefined
+          ? "learned"
+          : "fallback";
     const dueLocalHour = await accountData.execute(
       "conversation.resolveDailyPromptDueHour",
       message.body.localDate,
@@ -240,7 +279,13 @@ export async function processDailyPromptMessage(
           );
           return undefined;
         });
-    const selectedPromptStrategy = promptStrategy ?? learnedPromptStrategy ?? "standard";
+    selectedPromptStrategy = promptStrategy ?? learnedPromptStrategy ?? "standard";
+    promptStrategySource =
+      promptStrategy !== undefined
+        ? "explicit"
+        : learnedPromptStrategy !== undefined
+          ? "learned"
+          : "fallback";
     const promptVersion = getDailyPromptVersion(
       message.body.localDate,
       weekdayContext,
@@ -344,6 +389,10 @@ export async function processDailyPromptMessage(
       outcome: "succeeded",
       disposition: "ack",
       stage: "daily-prompt.deliver",
+      selectedLocalHour,
+      timeSelectionSource,
+      promptStrategy: selectedPromptStrategy,
+      promptStrategySource,
     });
   } catch (error) {
     const operationalError = toOperationalError(error, {
@@ -385,6 +434,10 @@ function logResult(
     stage: string;
     resultCode?: string;
     error?: unknown;
+    selectedLocalHour?: DailyPromptLocalHour;
+    timeSelectionSource?: DailyPromptSelectionSource;
+    promptStrategy?: "standard" | "brief" | "event_first" | "feeling_first";
+    promptStrategySource?: DailyPromptSelectionSource;
   }>,
 ): void {
   const durationMs = Date.now() - startedAt;
@@ -409,6 +462,12 @@ function logResult(
     outcome: details.outcome,
     disposition: details.disposition,
     stage: details.stage,
+    ...(details.selectedLocalHour === undefined
+      ? {}
+      : { selectedLocalHour: details.selectedLocalHour }),
+    ...(details.timeSelectionSource ? { timeSelectionSource: details.timeSelectionSource } : {}),
+    ...(details.promptStrategy ? { promptStrategy: details.promptStrategy } : {}),
+    ...(details.promptStrategySource ? { promptStrategySource: details.promptStrategySource } : {}),
     ...(details.resultCode ? { resultCode: details.resultCode } : {}),
     ...(safeError ?? {}),
     durationMs,

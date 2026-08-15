@@ -89,6 +89,8 @@ export const DAILY_PROMPT_STRATEGY_METRIC_WINDOW = 90;
 export const DAILY_PROMPT_STANDARD_BASELINE_OPPORTUNITIES = 3;
 export const DAILY_PROMPT_STRATEGY_INITIAL_OPPORTUNITIES = 2;
 const DAILY_PROMPT_STRATEGY_EXPLORATION_RATE = 0.2;
+export const DAILY_PROMPT_TIME_INITIAL_OPPORTUNITIES = 2;
+const DAILY_PROMPT_TIME_EXPLORATION_RATE = 0.2;
 
 function isRevisionedPromptContextKind(kind: PromptContext["kind"]): boolean {
   return kind === "occupation" || kind === "weekly_rhythm";
@@ -193,7 +195,16 @@ export type DailyPromptStrategyStat = Readonly<{
   stopCount: number;
 }>;
 
-function dailyPromptStrategyScore(stat: DailyPromptStrategyStat): number {
+export type DailyPromptTimeStat = Readonly<{
+  localHour: DailyPromptLocalHour;
+  deliveryOpportunityCount: number;
+  responseCount: number;
+  stopCount: number;
+}>;
+
+function dailyPromptOutcomeScore(
+  stat: Pick<DailyPromptStrategyStat, "deliveryOpportunityCount" | "responseCount" | "stopCount">,
+): number {
   if (stat.deliveryOpportunityCount === 0) return Number.NEGATIVE_INFINITY;
   return (stat.responseCount - 2 * stat.stopCount) / stat.deliveryOpportunityCount;
 }
@@ -232,14 +243,78 @@ export function chooseDailyPromptStrategy(
   const highestScore = Math.max(
     ...DAILY_PROMPT_STRATEGIES.map((strategy) => {
       const stat = statsByStrategy.get(strategy);
-      return stat ? dailyPromptStrategyScore(stat) : Number.NEGATIVE_INFINITY;
+      return stat ? dailyPromptOutcomeScore(stat) : Number.NEGATIVE_INFINITY;
     }),
   );
   const bestStrategies = DAILY_PROMPT_STRATEGIES.filter((strategy) => {
     const stat = statsByStrategy.get(strategy);
-    return stat ? dailyPromptStrategyScore(stat) === highestScore : false;
+    return stat ? dailyPromptOutcomeScore(stat) === highestScore : false;
   });
   return randomItem(bestStrategies, random);
+}
+
+function hasCompletedDailyPromptStrategyCalibration(
+  stats: readonly DailyPromptStrategyStat[],
+): boolean {
+  const statsByStrategy = new Map(stats.map((stat) => [stat.promptStrategy, stat]));
+  return DAILY_PROMPT_STRATEGIES.every(
+    (strategy) =>
+      (statsByStrategy.get(strategy)?.deliveryOpportunityCount ?? 0) >=
+      (strategy === "standard"
+        ? DAILY_PROMPT_STANDARD_BASELINE_OPPORTUNITIES
+        : DAILY_PROMPT_STRATEGY_INITIAL_OPPORTUNITIES),
+  );
+}
+
+/** 方針の初期観測を終えてから、本人内の結果だけで時刻の活用と探索を選ぶ。 */
+export function chooseDailyPromptLocalHour(
+  timeStats: readonly DailyPromptTimeStat[],
+  strategyStats: readonly DailyPromptStrategyStat[],
+  random: () => number = Math.random,
+): DailyPromptLocalHour {
+  if (!hasCompletedDailyPromptStrategyCalibration(strategyStats)) return 18;
+
+  const statsByHour = new Map(timeStats.map((stat) => [stat.localHour, stat]));
+  const baselineOpportunities = statsByHour.get(18)?.deliveryOpportunityCount ?? 0;
+  if (baselineOpportunities < DAILY_PROMPT_STANDARD_BASELINE_OPPORTUNITIES) return 18;
+
+  const alternatives = DAILY_PROMPT_LOCAL_HOURS.filter((localHour) => localHour !== 18);
+  const underObserved = alternatives.filter(
+    (localHour) =>
+      (statsByHour.get(localHour)?.deliveryOpportunityCount ?? 0) <
+      DAILY_PROMPT_TIME_INITIAL_OPPORTUNITIES,
+  );
+  if (underObserved.length > 0) {
+    const fewestOpportunities = Math.min(
+      ...underObserved.map(
+        (localHour) => statsByHour.get(localHour)?.deliveryOpportunityCount ?? 0,
+      ),
+    );
+    return randomItem(
+      underObserved.filter(
+        (localHour) =>
+          (statsByHour.get(localHour)?.deliveryOpportunityCount ?? 0) === fewestOpportunities,
+      ),
+      random,
+    );
+  }
+
+  if (random() < DAILY_PROMPT_TIME_EXPLORATION_RATE) {
+    return randomItem(DAILY_PROMPT_LOCAL_HOURS, random);
+  }
+  const highestScore = Math.max(
+    ...DAILY_PROMPT_LOCAL_HOURS.map((localHour) => {
+      const stat = statsByHour.get(localHour);
+      return stat ? dailyPromptOutcomeScore(stat) : Number.NEGATIVE_INFINITY;
+    }),
+  );
+  return randomItem(
+    DAILY_PROMPT_LOCAL_HOURS.filter((localHour) => {
+      const stat = statsByHour.get(localHour);
+      return stat ? dailyPromptOutcomeScore(stat) === highestScore : false;
+    }),
+    random,
+  );
 }
 
 type DailyPromptSkipReason =
@@ -818,12 +893,61 @@ export async function listDailyPromptStrategyStats(
   );
 }
 
+/** 本人の直近配送だけを、固定した配送時刻ごとの結果へ集計する。 */
+export async function listDailyPromptTimeStats(
+  db: AccountDataDatabase,
+  accountId: string,
+): Promise<readonly DailyPromptTimeStat[]> {
+  const deliveries = await db
+    .select({
+      localHour: dailyPromptDeliveries.deliveryLocalHour,
+      responseKind: dailyPromptDeliveries.responseKind,
+    })
+    .from(dailyPromptDeliveries)
+    .where(
+      and(
+        eq(dailyPromptDeliveries.accountId, accountId),
+        eq(dailyPromptDeliveries.status, "delivered"),
+        eq(dailyPromptDeliveries.isDeleted, false),
+      ),
+    )
+    .orderBy(desc(dailyPromptDeliveries.localDate))
+    .limit(DAILY_PROMPT_STRATEGY_METRIC_WINDOW)
+    .all();
+  const aggregate = new Map<DailyPromptLocalHour, DailyPromptTimeStat>();
+  for (const delivery of deliveries) {
+    const current = aggregate.get(delivery.localHour) ?? {
+      localHour: delivery.localHour,
+      deliveryOpportunityCount: 0,
+      responseCount: 0,
+      stopCount: 0,
+    };
+    aggregate.set(delivery.localHour, {
+      ...current,
+      deliveryOpportunityCount: current.deliveryOpportunityCount + 1,
+      responseCount: current.responseCount + (delivery.responseKind === "reply" ? 1 : 0),
+      stopCount: current.stopCount + (delivery.responseKind === "stop" ? 1 : 0),
+    });
+  }
+  return [...aggregate.values()].sort((left, right) => left.localHour - right.localHour);
+}
+
 export async function selectDailyPromptStrategy(
   db: AccountDataDatabase,
   accountId: string,
   random: () => number = Math.random,
 ): Promise<DailyPromptStrategy> {
   return chooseDailyPromptStrategy(await listDailyPromptStrategyStats(db, accountId), random);
+}
+
+export async function selectDailyPromptLocalHour(
+  db: AccountDataDatabase,
+  accountId: string,
+  random: () => number = Math.random,
+): Promise<DailyPromptLocalHour> {
+  const strategyStats = await listDailyPromptStrategyStats(db, accountId);
+  const timeStats = await listDailyPromptTimeStats(db, accountId);
+  return chooseDailyPromptLocalHour(timeStats, strategyStats, random);
 }
 
 /** LINE eventを不変なSource Recordとして冪等に保存する。 */

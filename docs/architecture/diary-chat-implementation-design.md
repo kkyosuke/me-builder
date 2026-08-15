@@ -424,8 +424,8 @@ Brain Itemを含むAccount所有データのquery境界は、[Accountデータ�
 | `attributes.promptContext` | 高優先5属性のschema、抽出・保存、Session上限付きの自然な確認質問まで実装済み | 中・低優先属性は後続で追加する |
 | 曜日・本人情報からの声かけ候補取得 | `recurring_schedule`と`fixed_weekly`を再検証し、予定名を含まない3区分から1件を返す処理まで実装済み | 中・低優先属性は後続で追加する |
 | 当日・前日の文脈 | 最新の終了済みSessionが許可した`same_day`または`next_day`区分を、本文なしで固定文面へ反映する処理まで実装済み | 中・低優先属性との組み合わせは後続で追加する |
-| 時刻帯・声かけ方針の自動選択 | activeな`question_style`または本人内実績から方針を選び、activeな`rest_window`の明言を18・20・21時の候補へ写像して配送へ固定する処理まで実装済み | 本人内の返信実績による時刻帯選択を後続で追加する。クライアントからAccount IDや選択結果を指定させない |
-| 日次の能動配信 | 18・20・21時のCron、曜日別一般文面、曜日文脈、当日と前日の文脈の版付き定型文、専用Queue、AccountDataの配送状態まで実装済み | 時刻帯ごとの本人内実績による選択を追加する |
+| 時刻帯・声かけ方針の自動選択 | activeな`question_style`または本人内実績から方針を選び、activeな`rest_window`または本人内実績から18・20・21時の候補を選んで配送へ固定する処理まで実装済み | 中・低優先属性による補助は後続で追加する。クライアントからAccount IDや選択結果を指定させない |
+| 日次の能動配信 | 18・20・21時のCron、本人内実績による選択、曜日別一般文面、曜日文脈、当日と前日の文脈の版付き定型文、専用Queue、AccountDataの配送状態まで実装済み | 実運用の停止率と返信率を確認して候補と初期観測数を再評価する |
 
 開発用の確認機能は、本人確認済みAccountに対して、一覧取得用の`brain.listActive`とVector実体確認用の`brain.findActiveVectorEntry`をAccountData RPCへ公開します。`brain.listActive`はactiveかつ未削除のItem、未削除Evidence、最新のVector同期jobと対応表の有無を最大100件返します。Web UIは各Itemに同期状態、試行回数、失敗code、次回試行時刻を表示します。`applied`はVectorizeが更新を受け付けてAccountDataへ完了記録した状態であり、Vectorize上の実体確認とは区別します。
 
@@ -483,13 +483,13 @@ Vectorizeへのupsertまたはdelete受付後に`applied`とmutation IDを記録
 
 ### 4.9 `daily_prompt_deliveries`
 
-18時の声かけはAccountDataにAccountと日本日付ごとの配送状態を保存します。本文はコード上のversion付き曜日別一般文面または曜日文脈の定型文を正とし、このtableへ複製しません。段階1の文面versionも、作成済み配送の再送互換性のため残します。
+日次の声かけはAccountDataにAccountと日本日付ごとの配送状態を保存します。本文はコード上のversion付き曜日別一般文面または曜日文脈の定型文を正とし、このtableへ複製しません。段階1の文面versionも、作成済み配送の再送互換性のため残します。
 
 | 列 | 用途 |
 | --- | --- |
 | `id`, `account_id`, `local_date` | 配送ID、所有Account、`Asia/Tokyo`の配送日。`(account_id, local_date)`を一意にする |
 | `prompt_version` | 配送準備時に選んだ曜日別一般文面または曜日文脈定型文のversion。再配送でも変更しない |
-| `prompt_strategy` | `standard`、`brief`、`event_first`、`feeling_first`のレビュー済み方針。activeな`question_style`の明言があれば対応する方針を選び、なければ`standard`へ戻す。再配送でも変更しない |
+| `prompt_strategy` | `standard`、`brief`、`event_first`、`feeling_first`のレビュー済み方針。activeな`question_style`の明言、本人内実績、`standard`へのフォールバックの順で選ぶ。再配送でも変更しない |
 | `delivery_local_hour` | 配送準備時に選んだ18、20、21のいずれか。既存pending配送の再送では現在の属性より優先する |
 | `status` | `pending` / `delivered` / `skipped` / `failed` |
 | `skip_reason` | `manual_stopped` / `stale` / `active_session` / `user_activity` / `recent_unanswered` / `auto_paused`。本文や推定理由は保存しない |
@@ -852,7 +852,7 @@ finalまたは失敗案内のretryは90秒で止めます。90秒時点で結果
 
 初期段階で計測するのは各処理段階のlatency、38秒final率、90秒final率、retry、DLQ、DOの`pending_queue`滞留時間、重複抑止、schema違反、Googleレスポンス由来のtoken数、モデル別失敗率です。token数はGoogleの`responseId`単位で共有D1へ保存し、管理者統計では当月分を集計します。安全性経路の集計は、保存する分類と監査要件を決めた後に追加します。
 
-logへ出せる識別子は環境、Queue message ID、Turn ID、Session IDの一方向hash、prompt version、処理段階です。Account ID、LINE user ID、reply token、日記本文、Context Package、生成本文、Brain Item本文は出しません。
+logへ出せる識別子は環境、Queue message ID、Turn ID、Session IDの一方向hash、prompt version、処理段階です。日次の声かけでは、本文を含まない選択結果として時刻帯、声かけ方針、それぞれの選択元（本人の明言、本人内実績、フォールバック）も記録します。Account ID、LINE user ID、reply token、日記本文、Context Package、生成本文、Brain Item本文は出しません。
 
 `dev` / `development` / `local` / `preview`では、モデルが回答へ実際に反映したBrain Itemがある場合だけ、通常返信と同じLINE API requestの2通目へ`[dev] 使用したBrain Item`として分類とstatementを追加します。検索候補だっただけのItem、Brain Item ID、Source Record ID、Evidence本文は表示しません。使用0件では追加表示せず、`test`と`production`では常に表示しません。通常返信は加工せずassistant messageへ保存し、開発用表示を含む配送message列はConversationCoordinatorのoutboxへ固定して再配送時の内容と順序を維持します。
 

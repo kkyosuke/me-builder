@@ -180,6 +180,8 @@ export type AccountDataActions = {
     typeof diary.listDailyPromptStrategyStats
   >;
   "conversation.selectDailyPromptStrategy": RpcAction<[], typeof diary.selectDailyPromptStrategy>;
+  "conversation.listDailyPromptTimeStats": RpcAction<[], typeof diary.listDailyPromptTimeStats>;
+  "conversation.selectDailyPromptLocalHour": RpcAction<[], typeof diary.selectDailyPromptLocalHour>;
   "conversation.attachMessagesToTurn": RpcAction<
     [
       inputs: Parameters<typeof diary.attachMessagesToTurn>[2],

@@ -817,7 +817,7 @@ describe("selectDailyPromptTimePreference", () => {
     ["after_returning_home", undefined, 20],
     ["after_dinner", undefined, 21],
     ["fixed_time", "20:30", 20],
-    ["variable", undefined, undefined],
+    ["variable", undefined, 18],
   ] as const)("明言された%sを候補時刻へ変換する", async (window, localTime, expected) => {
     const db = createTestDb();
     await insertAccountsAndSources(db);

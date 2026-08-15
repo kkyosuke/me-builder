@@ -7,8 +7,10 @@ import { describe, expect, it } from "vitest";
 import type { AccountDataDatabase } from "../database";
 import { accountSchema as schema } from "../database";
 import {
+  chooseDailyPromptLocalHour,
   chooseDailyPromptStrategy,
   listDailyPromptStrategyStats,
+  listDailyPromptTimeStats,
   markDailyPromptDelivered,
   prepareDailyPrompt,
   resolveDailyPromptDueHour,
@@ -19,6 +21,33 @@ import {
 
 const ACCOUNT_ID = "account-1";
 const PROMPT_VERSION = "daily-check-in-v1";
+
+const CALIBRATED_STRATEGY_STATS = [
+  {
+    promptStrategy: "standard" as const,
+    deliveryOpportunityCount: 3,
+    responseCount: 1,
+    stopCount: 0,
+  },
+  {
+    promptStrategy: "brief" as const,
+    deliveryOpportunityCount: 2,
+    responseCount: 1,
+    stopCount: 0,
+  },
+  {
+    promptStrategy: "event_first" as const,
+    deliveryOpportunityCount: 2,
+    responseCount: 1,
+    stopCount: 0,
+  },
+  {
+    promptStrategy: "feeling_first" as const,
+    deliveryOpportunityCount: 2,
+    responseCount: 1,
+    stopCount: 0,
+  },
+];
 
 function createTestDb(): AccountDataDatabase {
   const sqlite = new Database(":memory:");
@@ -154,6 +183,82 @@ describe("daily prompt delivery", () => {
     expect(chooseDailyPromptStrategy(stats, () => 0.5)).toBe("brief");
     const randomValues = [0.1, 0.99];
     expect(chooseDailyPromptStrategy(stats, () => randomValues.shift() ?? 0)).toBe("feeling_first");
+  });
+
+  it("方針の初期観測が終わるまでは送信時刻を18時へ固定する", () => {
+    expect(
+      chooseDailyPromptLocalHour(
+        [
+          {
+            localHour: 21,
+            deliveryOpportunityCount: 10,
+            responseCount: 10,
+            stopCount: 0,
+          },
+        ],
+        CALIBRATED_STRATEGY_STATS.slice(0, -1),
+        () => 0.99,
+      ),
+    ).toBe(18);
+  });
+
+  it("方針の初期観測後は18時を基準に20時と21時を順に観測する", () => {
+    const baseline = [
+      {
+        localHour: 18 as const,
+        deliveryOpportunityCount: 3,
+        responseCount: 1,
+        stopCount: 0,
+      },
+    ];
+    expect(chooseDailyPromptLocalHour(baseline, CALIBRATED_STRATEGY_STATS, () => 0)).toBe(20);
+    expect(
+      chooseDailyPromptLocalHour(
+        [
+          ...baseline,
+          {
+            localHour: 20,
+            deliveryOpportunityCount: 2,
+            responseCount: 1,
+            stopCount: 0,
+          },
+        ],
+        CALIBRATED_STRATEGY_STATS,
+        () => 0,
+      ),
+    ).toBe(21);
+  });
+
+  it("時刻の初期観測後は停止を強く減点した最高時刻を活用し探索も続ける", () => {
+    const timeStats = [
+      {
+        localHour: 18 as const,
+        deliveryOpportunityCount: 3,
+        responseCount: 1,
+        stopCount: 1,
+      },
+      {
+        localHour: 20 as const,
+        deliveryOpportunityCount: 2,
+        responseCount: 2,
+        stopCount: 0,
+      },
+      {
+        localHour: 21 as const,
+        deliveryOpportunityCount: 2,
+        responseCount: 1,
+        stopCount: 0,
+      },
+    ];
+    expect(chooseDailyPromptLocalHour(timeStats, CALIBRATED_STRATEGY_STATS, () => 0.5)).toBe(20);
+    const randomValues = [0.1, 0.99];
+    expect(
+      chooseDailyPromptLocalHour(
+        timeStats,
+        CALIBRATED_STRATEGY_STATS,
+        () => randomValues.shift() ?? 0,
+      ),
+    ).toBe(21);
   });
 
   it("配送日の最新の終了済みSessionが許可した同日フォローだけを返す", async () => {
@@ -616,6 +721,7 @@ describe("daily prompt delivery", () => {
         localDate: "2026-08-12",
         promptVersion: "daily-check-in-wed-v1:event_first-v1",
         promptStrategy: "event_first",
+        deliveryLocalHour: 20,
         status: "delivered",
         deliveredAt: secondAt,
         createdAt: secondAt,
@@ -651,6 +757,20 @@ describe("daily prompt delivery", () => {
       },
       {
         promptStrategy: "event_first",
+        deliveryOpportunityCount: 1,
+        responseCount: 1,
+        stopCount: 0,
+      },
+    ]);
+    await expect(listDailyPromptTimeStats(db, ACCOUNT_ID)).resolves.toEqual([
+      {
+        localHour: 18,
+        deliveryOpportunityCount: 1,
+        responseCount: 0,
+        stopCount: 0,
+      },
+      {
+        localHour: 20,
         deliveryOpportunityCount: 1,
         responseCount: 1,
         stopCount: 0,
