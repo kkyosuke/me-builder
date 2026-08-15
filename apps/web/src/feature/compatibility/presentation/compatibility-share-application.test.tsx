@@ -8,6 +8,7 @@ import CompatibilityShareApplication from "./compatibility-share-application";
 const mocks = vi.hoisted(() => ({
   screenProps: null as null | {
     onShareToLine: (url: string) => void;
+    onRelationshipCategoryChange: (category: CompatibilityRelationshipCategory) => void;
     relationshipCategory: CompatibilityRelationshipCategory;
   },
   shareCompatibilityInvitationToLine: vi.fn(),
@@ -21,6 +22,7 @@ vi.mock("../infrastructure/compatibility-invitation-sharing", () => ({
 vi.mock("./compatibility-share-screen", () => ({
   CompatibilityShareScreen: (props: {
     onShareToLine: (url: string) => void;
+    onRelationshipCategoryChange: (category: CompatibilityRelationshipCategory) => void;
     relationshipCategory: CompatibilityRelationshipCategory;
   }) => {
     mocks.screenProps = props;
@@ -60,13 +62,38 @@ describe("CompatibilityShareApplication", () => {
   afterEach(() => {
     cleanup();
     mocks.screenProps = null;
+    window.history.replaceState({}, "", "/compatibility/share");
     vi.clearAllMocks();
   });
 
   it("共有画面ではパートナーを初期選択する", () => {
+    window.history.replaceState({}, "", "/compatibility/share");
     render(<CompatibilityShareApplication />);
 
     expect(mocks.screenProps?.relationshipCategory).toBe("partner");
+  });
+
+  it("URLからカテゴリを復元し、選択変更をURLへ反映する", () => {
+    window.history.replaceState({}, "", "/compatibility/share?category=family&from=test");
+    render(<CompatibilityShareApplication />);
+
+    expect(mocks.screenProps?.relationshipCategory).toBe("family");
+    act(() => mocks.screenProps?.onRelationshipCategoryChange("work"));
+    expect(mocks.screenProps?.relationshipCategory).toBe("work");
+    expect(window.location.pathname + window.location.search).toBe(
+      "/compatibility/share?category=work&from=test",
+    );
+  });
+
+  it("LIFF復帰URLからカテゴリを復元する", () => {
+    window.history.replaceState(
+      {},
+      "",
+      `/?liff.state=${encodeURIComponent("/compatibility/share?category=family")}`,
+    );
+    render(<CompatibilityShareApplication />);
+
+    expect(mocks.screenProps?.relationshipCategory).toBe("family");
   });
 
   it("共有処理中の連打では共有先を二重に開かない", () => {

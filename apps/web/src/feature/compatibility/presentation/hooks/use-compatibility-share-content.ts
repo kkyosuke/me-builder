@@ -4,6 +4,7 @@ import { config } from "../../../../config";
 import type { AsyncState } from "../../../../model/async-state";
 import { fetchCompatibilityShareContent } from "../../infrastructure/compatibility-api";
 import type { CompatibilityShareContent } from "../../model/compatibility-share-content";
+import { useCompatibilityCategoryQuery } from "./use-compatibility-category-query";
 
 export function useCompatibilityShareContent({
   acquireIdToken,
@@ -12,8 +13,8 @@ export function useCompatibilityShareContent({
   acquireIdToken: (signal: AbortSignal) => Promise<string | null>;
   latestProfileSummaryVersionId: string | null | undefined;
 }) {
-  const [relationshipCategory, setRelationshipCategory] =
-    useState<CompatibilityRelationshipCategory>("partner");
+  const { relationshipCategory, changeRelationshipCategory: changeCategoryQuery } =
+    useCompatibilityCategoryQuery("shareCategory");
   const [state, setState] = useState<AsyncState<CompatibilityShareContent>>({
     status: "loading",
   });
@@ -88,9 +89,9 @@ export function useCompatibilityShareContent({
       request.current?.abort();
       const cached = cache.current[category];
       setState(cached ? { status: "success", data: cached } : { status: "loading" });
-      setRelationshipCategory(category);
+      changeCategoryQuery(category);
     },
-    [relationshipCategory],
+    [changeCategoryQuery, relationshipCategory],
   );
 
   return {
