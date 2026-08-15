@@ -404,4 +404,34 @@ describe("Utsushi progression", () => {
       ],
     });
   });
+
+  it("複数の10レベル節目を一度に越えても途中の成長カードを欠落させない", async () => {
+    const db = createTestDb();
+    const accountId = "milestone-jump-account";
+    const at = new Date("2026-08-15T00:00:00.000Z");
+    await db.insert(schema.accountDataIdentity).values({ singleton: 1, accountId });
+    await insertItem(db, accountId, "item-1", "goal", at);
+    await readUtsushiProgression(db, accountId, at);
+    await db
+      .update(schema.progressionStates)
+      .set({ growthValue: 4_205, collectedPieces: 35, highestLevel: 30 })
+      .where(eq(schema.progressionStates.accountId, accountId));
+
+    const reachedAt = new Date("2026-08-16T00:00:00.000Z");
+    await expect(readUtsushiProgression(db, accountId, reachedAt)).resolves.toMatchObject({
+      milestoneCards: [
+        { level: 30, collectedPiecesDelta: 0, categories: [] },
+        { level: 20, collectedPiecesDelta: 0, categories: [] },
+        {
+          level: 10,
+          reachedAt: reachedAt.toISOString(),
+          collectedPiecesDelta: 35,
+          categories: ["goal"],
+        },
+      ],
+    });
+    expect(
+      (await db.select().from(schema.progressionMilestones).all()).map(({ level }) => level).sort(),
+    ).toEqual([10, 20, 30]);
+  });
 });

@@ -810,39 +810,43 @@ export async function readUtsushiProgression(
   const categories = activeCategories.map(({ category }) => category);
   const milestoneLevel = Math.floor(level / 10) * 10;
   const latestSavedMilestone = savedMilestones[0];
-  const shouldSaveMilestone =
-    milestoneLevel >= 10 && (latestSavedMilestone?.level ?? 0) < milestoneLevel;
-  const newMilestone = shouldSaveMilestone
-    ? {
-        level: milestoneLevel,
-        reachedAt: at,
-        collectedPiecesDelta: Math.max(
-          0,
-          collectedPieces - (latestSavedMilestone?.collectedPiecesTotal ?? 0),
-        ),
-        collectedPiecesTotal: collectedPieces,
-        categoriesJson: JSON.stringify(categories),
-      }
-    : null;
-  if (newMilestone) {
-    await db
-      .insert(progressionMilestones)
-      .values({
-        id: `progression:milestone:v1:${accountId}:${newMilestone.level}`,
-        accountId,
-        level: newMilestone.level,
-        collectedPiecesDelta: newMilestone.collectedPiecesDelta,
-        collectedPiecesTotal: newMilestone.collectedPiecesTotal,
-        categoriesJson: newMilestone.categoriesJson,
-        createdAt: newMilestone.reachedAt,
-        updatedAt: newMilestone.reachedAt,
-      })
-      .onConflictDoNothing();
+  const latestSavedLevel = latestSavedMilestone?.level ?? 0;
+  const missingMilestoneLevels = Array.from(
+    { length: Math.max(0, Math.floor((milestoneLevel - latestSavedLevel) / 10)) },
+    (_, index) => latestSavedLevel + (index + 1) * 10,
+  );
+  const newMilestones = missingMilestoneLevels.map((missingLevel, index) => ({
+    level: missingLevel,
+    reachedAt: at,
+    collectedPiecesDelta:
+      index === 0
+        ? Math.max(0, collectedPieces - (latestSavedMilestone?.collectedPiecesTotal ?? 0))
+        : 0,
+    collectedPiecesTotal: collectedPieces,
+    categoriesJson: JSON.stringify(categories),
+  }));
+  if (newMilestones.length > 0) {
+    await db.batch(
+      newMilestones.map((newMilestone) =>
+        db
+          .insert(progressionMilestones)
+          .values({
+            id: `progression:milestone:v1:${accountId}:${newMilestone.level}`,
+            accountId,
+            level: newMilestone.level,
+            collectedPiecesDelta: newMilestone.collectedPiecesDelta,
+            collectedPiecesTotal: newMilestone.collectedPiecesTotal,
+            categoriesJson: newMilestone.categoriesJson,
+            createdAt: newMilestone.reachedAt,
+            updatedAt: newMilestone.reachedAt,
+          })
+          .onConflictDoNothing(),
+      ),
+    );
   }
-  const milestoneCards = [
-    ...(newMilestone ? [newMilestone] : []),
-    ...savedMilestones.filter(({ level: savedLevel }) => savedLevel !== newMilestone?.level),
-  ].slice(0, 4);
+  const milestoneCards = [...newMilestones, ...savedMilestones]
+    .sort((left, right) => right.level - left.level)
+    .slice(0, 4);
   return {
     level,
     growthValue,

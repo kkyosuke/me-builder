@@ -211,6 +211,18 @@ describe("AccountDataRepository", () => {
 
     repository.endCompatibilityReference("account-1", "relationship-1", at);
     expect(repository.listVisibleCompatibilityReferences("account-1")).toEqual([]);
+    expect(repository.listEndedCompatibilityReferencesForPartner("account-1", "account-2")).toEqual(
+      [
+        expect.objectContaining({
+          relationshipId: "relationship-1",
+          partnerAccountId: "account-2",
+          status: "ended",
+        }),
+      ],
+    );
+    expect(repository.listEndedCompatibilityReferencesForPartner("account-1", "account-3")).toEqual(
+      [],
+    );
   });
 
   it("未承諾の送信参照には相手Accountを保存しない", async () => {

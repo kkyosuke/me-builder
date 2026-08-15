@@ -177,6 +177,20 @@ const actions = {
     await db.update(table).set(reference).where(eq(table.relationshipId, relationshipId));
     return reference;
   },
+  "compatibility.listEndedReferencesForPartner": async (
+    db: DO.account.Database,
+    accountId: string,
+    partnerAccountId: string,
+  ) => {
+    const table = DO.account.schema.compatibilityReferences;
+    const references = await db.select().from(table);
+    return references.filter(
+      (reference) =>
+        reference.accountId === accountId &&
+        reference.partnerAccountId === partnerAccountId &&
+        reference.status === "ended",
+    );
+  },
   "compatibility.listVisibleReferences": async (db: DO.account.Database, accountId: string) => {
     const table = DO.account.schema.compatibilityReferences;
     const references = await db.select().from(table);

@@ -106,6 +106,23 @@ export function createCompatibilityDataTestStore(): CompatibilityDataTestStore {
             marks: compatibilityPairProgressionMarks(level),
           };
         },
+        async getEndedProgressionArchive(relationshipId, actorAccountId, relationshipCategory) {
+          if (relationshipId !== name) throw new Error("CompatibilityData test routing mismatch");
+          const relationship = relationships.get(name);
+          if (
+            !relationship ||
+            relationship.status !== "ended" ||
+            relationship.relationshipCategory !== relationshipCategory ||
+            (relationship.inviterAccountId !== actorAccountId &&
+              relationship.inviteeAccountId !== actorAccountId)
+          ) {
+            return null;
+          }
+          const growthValue = progressionGrowth.get(name);
+          return growthValue === undefined
+            ? null
+            : { growthValue, highestLevel: compatibilityPairProgressionLevel(growthValue) };
+        },
         async endRelationship(relationshipId, actorAccountId) {
           if (relationshipId !== name) throw new Error("CompatibilityData test routing mismatch");
           const result = decideCompatibilityRelationshipEnd(

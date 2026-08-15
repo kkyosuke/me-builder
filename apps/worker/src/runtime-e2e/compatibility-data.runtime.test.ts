@@ -111,6 +111,8 @@ describe("CompatibilityData Workers runtime E2E", () => {
     });
 
     await stub.endRelationship(relationshipId, inviterAccountId);
+    await inviter.execute("compatibility.endReference", relationshipId, new Date());
+    await invitee.execute("compatibility.endReference", relationshipId, new Date());
     await runInDurableObject(stub, async (_instance: CompatibilityData, state) => {
       expect(
         state.storage.sql
@@ -149,6 +151,40 @@ describe("CompatibilityData Workers runtime E2E", () => {
           .one(),
       ).toEqual({ offered_profile_fingerprint: null, accepted_profile_fingerprint: null });
     });
+
+    const resumedRelationshipId = createCompatibilityRelationshipId();
+    const resumed = env.COMPATIBILITY_DATA.getByName(resumedRelationshipId);
+    await resumed.createInvitation(resumedRelationshipId, {
+      inviterAccountId: inviteeAccountId,
+      inviterDisplayName: "受信者",
+      relationshipCategory: "partner",
+    });
+    await invitee.execute("compatibility.addOutgoingReference", {
+      relationshipId: resumedRelationshipId,
+      createdAt: new Date(),
+    });
+    await invitee.execute("compatibility.reserveOutgoingReference", {
+      relationshipId: resumedRelationshipId,
+      partnerAccountId: inviterAccountId,
+      updatedAt: new Date(),
+    });
+    await inviter.execute("compatibility.reserveIncomingReference", {
+      relationshipId: resumedRelationshipId,
+      partnerAccountId: inviteeAccountId,
+      createdAt: new Date(),
+    });
+    await resumed.acceptInvitation(resumedRelationshipId, {
+      inviteeAccountId: inviterAccountId,
+      inviteeDisplayName: "送信者",
+    });
+    await expect(
+      resumed.synchronizeProgression(resumedRelationshipId, inviterAccountId, themes),
+    ).resolves.toMatchObject({ level: 2, growthValue: 3, comparableThemeCount: 1 });
+    await expect(
+      resumed.synchronizeProgression(resumedRelationshipId, inviteeAccountId, [
+        { diagnosisId: "values", fingerprint: "sha256:resumed-change" },
+      ]),
+    ).resolves.toMatchObject({ level: 2, growthValue: 4 });
   });
 
   it("AccountData一覧を正本へ同期し、承諾済みをactive化して終了済みを除外する", async () => {

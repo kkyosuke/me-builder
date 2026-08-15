@@ -138,6 +138,12 @@ export type CompatibilityPairProgression = Readonly<{
   marks: readonly number[];
 }>;
 
+/** 終了済み関係から再同意後へ引き継げる、内容を持たないペア集計。 */
+export type CompatibilityPairProgressionArchive = Readonly<{
+  growthValue: number;
+  highestLevel: number;
+}>;
+
 export function compatibilityPairProgressionThreshold(level: number): number {
   if (!Number.isSafeInteger(level) || level < 1)
     throw new Error("Pair progression level must be a positive integer");
@@ -186,6 +192,11 @@ export interface CompatibilityDataRpc {
     actorAccountId: string,
     themes: readonly CompatibilityPairThemeFingerprint[],
   ): Promise<CompatibilityPairProgression | null>;
+  getEndedProgressionArchive(
+    relationshipId: string,
+    actorAccountId: string,
+    relationshipCategory: CompatibilityRelationshipCategory,
+  ): Promise<CompatibilityPairProgressionArchive | null>;
   endRelationship(
     relationshipId: string,
     actorAccountId: string,
@@ -225,6 +236,16 @@ export function compatibilityDataFor(
       themes: readonly CompatibilityPairThemeFingerprint[],
     ) {
       return object.synchronizeProgression(relationshipId, actorAccountId, themes);
+    },
+    getEndedProgressionArchive(
+      actorAccountId: string,
+      relationshipCategory: CompatibilityRelationshipCategory,
+    ) {
+      return object.getEndedProgressionArchive(
+        relationshipId,
+        actorAccountId,
+        relationshipCategory,
+      );
     },
     endRelationship(actorAccountId: string) {
       return object.endRelationship(relationshipId, actorAccountId);

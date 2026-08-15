@@ -118,6 +118,9 @@ export type AccountDataActions = {
     relationshipId: string,
     endedAt: Date,
   ) => Promise<CompatibilityReference | null>;
+  "compatibility.listEndedReferencesForPartner": (
+    partnerAccountId: string,
+  ) => Promise<readonly CompatibilityReference[]>;
   "compatibility.listVisibleReferences": () => Promise<readonly CompatibilityReference[]>;
   "source.hasActive": RpcAction<[], typeof source.hasActiveSourceRecords>;
   "profileSummary.read": (

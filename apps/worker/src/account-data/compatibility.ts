@@ -49,4 +49,9 @@ export const compatibilityActions = {
     relationshipId: string,
     endedAt: Date,
   ) => repository.endCompatibilityReference(accountId, relationshipId, endedAt),
+  "compatibility.listEndedReferencesForPartner": (
+    repository: AccountDataRepository,
+    accountId: string,
+    partnerAccountId: string,
+  ) => repository.listEndedCompatibilityReferencesForPartner(accountId, partnerAccountId),
 } as const;

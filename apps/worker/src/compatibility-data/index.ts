@@ -2,12 +2,19 @@ import { DurableObject } from "cloudflare:workers";
 import {
   type AcceptCompatibilityInvitationInput,
   type CompatibilityPairThemeFingerprint,
+  type CompatibilityRelationship,
   type CreateCompatibilityInvitationInput,
   accountDataFor,
+  compatibilityDataFor,
 } from "@me-builder/lib";
 import { logger, toSafeOperationalErrorFields } from "@me-builder/shared";
 import type { Env } from "../types";
 import { CompatibilityDataRepository } from "./repository";
+
+const PROGRESSION_RESTORED_KEY = "pairProgressionRestoredV1";
+const PROGRESSION_BASELINE_REQUIRED_KEY = "pairProgressionBaselineRequiredV1";
+const PROGRESSION_RESTORE_ACTOR_KEY = "pairProgressionRestoreActorV1";
+const ALARM_RETRY_MS = 30_000;
 
 /** 1つの招待と、成立後の1対1相性関係をprivate SQLiteに保存する。 */
 export class CompatibilityData extends DurableObject<Env> {
@@ -92,7 +99,31 @@ export class CompatibilityData extends DurableObject<Env> {
     themes: readonly CompatibilityPairThemeFingerprint[],
   ) {
     this.assertRouting(relationshipId);
-    return this.repository.synchronizeProgression(actorAccountId, themes, new Date());
+    const at = new Date();
+    const relationship = this.repository.getRelationship(actorAccountId, at);
+    if (!relationship) return null;
+    await this.ensureProgressionRestored(relationship, actorAccountId, at);
+    const establishBaseline =
+      (await this.ctx.storage.get<boolean>(PROGRESSION_BASELINE_REQUIRED_KEY)) === true;
+    const progression = this.repository.synchronizeProgression(
+      actorAccountId,
+      themes,
+      at,
+      establishBaseline,
+    );
+    if (progression && establishBaseline) {
+      await this.ctx.storage.delete(PROGRESSION_BASELINE_REQUIRED_KEY);
+    }
+    return progression;
+  }
+
+  async getEndedProgressionArchive(
+    relationshipId: string,
+    actorAccountId: string,
+    relationshipCategory: CompatibilityRelationship["relationshipCategory"],
+  ) {
+    this.assertRouting(relationshipId);
+    return this.repository.getEndedProgressionArchive(actorAccountId, relationshipCategory);
   }
 
   async endRelationship(relationshipId: string, actorAccountId: string) {
@@ -105,6 +136,16 @@ export class CompatibilityData extends DurableObject<Env> {
     // 記録したうえで再送出し、Cloudflareのalarm再試行は従来どおり効かせる。
     try {
       this.repository.expirePending(new Date());
+      const actorAccountId = await this.ctx.storage.get<string>(PROGRESSION_RESTORE_ACTOR_KEY);
+      if (actorAccountId) {
+        const at = new Date();
+        const relationship = this.repository.getRelationship(actorAccountId, at);
+        if (relationship) {
+          await this.ensureProgressionRestored(relationship, actorAccountId, at);
+        } else {
+          await this.ctx.storage.delete(PROGRESSION_RESTORE_ACTOR_KEY);
+        }
+      }
     } catch (error) {
       logger.error(
         {
@@ -116,12 +157,72 @@ export class CompatibilityData extends DurableObject<Env> {
           ...toSafeOperationalErrorFields(error, {
             code: "COMPATIBILITY_DATA_ALARM_FAILED",
             category: "unknown",
-            stage: "alarm.expire-pending",
+            stage: "alarm.maintain-compatibility",
             retryable: true,
           }),
         },
-        "[CompatibilityData] alarm failed at alarm.expire-pending -> alarm-retry (pending invitations were not expired)",
+        "[CompatibilityData] alarm failed at alarm.maintain-compatibility -> alarm-retry",
       );
+      throw error;
+    }
+  }
+
+  private async ensureProgressionRestored(
+    relationship: CompatibilityRelationship,
+    actorAccountId: string,
+    at: Date,
+  ): Promise<void> {
+    if ((await this.ctx.storage.get<boolean>(PROGRESSION_RESTORED_KEY)) === true) return;
+    const inviteeAccountId = relationship.inviteeAccountId;
+    if (!inviteeAccountId) {
+      throw new Error("Accepted compatibility relationship must have both participants");
+    }
+    const partnerAccountId =
+      actorAccountId === relationship.inviterAccountId
+        ? inviteeAccountId
+        : relationship.inviterAccountId;
+    try {
+      const accountNamespace = this.env.ACCOUNT_DATA;
+      const compatibilityNamespace = this.env.COMPATIBILITY_DATA;
+      if (!accountNamespace || !compatibilityNamespace) {
+        throw new Error("Pair progression restoration bindings are required");
+      }
+      const endedReferences = await accountDataFor(accountNamespace, actorAccountId).execute(
+        "compatibility.listEndedReferencesForPartner",
+        partnerAccountId,
+      );
+      const archives = await Promise.all(
+        endedReferences
+          .filter(({ relationshipId }) => relationshipId !== relationship.id)
+          .map(({ relationshipId }) =>
+            compatibilityDataFor(compatibilityNamespace, relationshipId).getEndedProgressionArchive(
+              actorAccountId,
+              relationship.relationshipCategory,
+            ),
+          ),
+      );
+      const archive = archives.reduce<Readonly<{
+        growthValue: number;
+        highestLevel: number;
+      }> | null>((merged, candidate) => {
+        if (!candidate) return merged;
+        return {
+          growthValue: Math.max(merged?.growthValue ?? 0, candidate.growthValue),
+          highestLevel: Math.max(merged?.highestLevel ?? 1, candidate.highestLevel),
+        };
+      }, null);
+      if (archive) {
+        const restored = this.repository.restoreProgressionArchive(actorAccountId, archive, at);
+        if (restored.baselineRequired) {
+          await this.ctx.storage.put(PROGRESSION_BASELINE_REQUIRED_KEY, true);
+        }
+      }
+      await this.ctx.storage.put(PROGRESSION_RESTORED_KEY, true);
+      await this.ctx.storage.delete(PROGRESSION_RESTORE_ACTOR_KEY);
+      await this.ctx.storage.deleteAlarm();
+    } catch (error) {
+      await this.ctx.storage.put(PROGRESSION_RESTORE_ACTOR_KEY, actorAccountId);
+      await this.ctx.storage.setAlarm(new Date(Date.now() + ALARM_RETRY_MS));
       throw error;
     }
   }

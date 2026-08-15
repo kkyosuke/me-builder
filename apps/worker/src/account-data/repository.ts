@@ -8,7 +8,7 @@ import {
   type ReleaseCompatibilityReservationResult,
   type ReserveCompatibilityReferenceResult,
 } from "@me-builder/lib";
-import { and, asc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/durable-sqlite";
 import { migrate } from "drizzle-orm/durable-sqlite/migrator";
 import migrations from "../../../../packages/lib/drizzle-do-account/migrations.js";
@@ -415,6 +415,24 @@ export class AccountDataRepository {
         ),
       )
       .orderBy(asc(compatibilityReferences.createdAt))
+      .all();
+  }
+
+  listEndedCompatibilityReferencesForPartner(
+    accountId: string,
+    partnerAccountId: string,
+  ): CompatibilityReference[] {
+    return this.database
+      .select()
+      .from(compatibilityReferences)
+      .where(
+        and(
+          eq(compatibilityReferences.accountId, accountId),
+          eq(compatibilityReferences.partnerAccountId, partnerAccountId),
+          eq(compatibilityReferences.status, "ended"),
+        ),
+      )
+      .orderBy(desc(compatibilityReferences.updatedAt))
       .all();
   }
 

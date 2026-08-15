@@ -187,5 +187,71 @@ describe("CompatibilityDataRepository", () => {
 
     repository.endRelationship("account-inviter", new Date("2026-08-13T00:00:00.000Z"));
     expect(repository.synchronizeProgression("account-invitee", theme, firstComparedAt)).toBeNull();
+    expect(repository.getEndedProgressionArchive("account-invitee", "partner")).toEqual({
+      growthValue: 4,
+      highestLevel: 2,
+    });
+    expect(repository.getEndedProgressionArchive("account-outsider", "partner")).toBeNull();
+    expect(repository.getEndedProgressionArchive("account-invitee", "friend")).toBeNull();
+  });
+
+  it("終了済み集計を復元し、最初の現在テーマを二重加点しない", async () => {
+    const repository = createRepository();
+    await repository.initialize();
+    repository.createInvitation(relationshipId, invitationInput(), createdAt);
+    const acceptedAt = new Date("2026-08-10T00:00:00.000Z");
+    repository.acceptInvitation(
+      { inviteeAccountId: "account-invitee", inviteeDisplayName: "受信者" },
+      acceptedAt,
+    );
+
+    expect(
+      repository.restoreProgressionArchive(
+        "account-invitee",
+        { growthValue: 4, highestLevel: 2 },
+        acceptedAt,
+      ),
+    ).toEqual({ baselineRequired: true });
+    expect(
+      repository.synchronizeProgression(
+        "account-invitee",
+        [{ diagnosisId: "values", fingerprint: "sha256:current" }],
+        acceptedAt,
+        true,
+      ),
+    ).toMatchObject({ growthValue: 4, level: 2, comparableThemeCount: 1 });
+    expect(
+      repository.synchronizeProgression(
+        "account-invitee",
+        [{ diagnosisId: "values", fingerprint: "sha256:changed" }],
+        new Date("2026-08-11T00:00:00.000Z"),
+      ),
+    ).toMatchObject({ growthValue: 5, level: 2 });
+  });
+
+  it("終了済み集計が0なら再同意後の最初の比較テーマを新規加点する", async () => {
+    const repository = createRepository();
+    await repository.initialize();
+    repository.createInvitation(relationshipId, invitationInput(), createdAt);
+    const acceptedAt = new Date("2026-08-10T00:00:00.000Z");
+    repository.acceptInvitation(
+      { inviteeAccountId: "account-invitee", inviteeDisplayName: "受信者" },
+      acceptedAt,
+    );
+
+    expect(
+      repository.restoreProgressionArchive(
+        "account-invitee",
+        { growthValue: 0, highestLevel: 1 },
+        acceptedAt,
+      ),
+    ).toEqual({ baselineRequired: false });
+    expect(
+      repository.synchronizeProgression(
+        "account-invitee",
+        [{ diagnosisId: "values", fingerprint: "sha256:first" }],
+        acceptedAt,
+      ),
+    ).toMatchObject({ growthValue: 3, level: 2, comparableThemeCount: 1 });
   });
 });

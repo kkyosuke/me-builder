@@ -5,6 +5,7 @@ import {
   type CompatibilityInvitationAcceptanceContext,
   type CompatibilityInvitationPreview,
   type CompatibilityPairProgression,
+  type CompatibilityPairProgressionArchive,
   type CompatibilityPairThemeFingerprint,
   type CompatibilityRelationship,
   type CreateCompatibilityInvitationInput,
@@ -154,6 +155,7 @@ export class CompatibilityDataRepository {
     actorAccountId: string,
     themes: readonly CompatibilityPairThemeFingerprint[],
     at: Date,
+    establishBaseline = false,
   ): CompatibilityPairProgression | null {
     if (!this.getRelationship(actorAccountId, at)) return null;
     const uniqueThemes = [...new Map(themes.map((theme) => [theme.diagnosisId, theme])).values()]
@@ -179,10 +181,10 @@ export class CompatibilityDataRepository {
     for (const theme of uniqueThemes) {
       const existing = existingThemes.get(theme.diagnosisId);
       if (!existing) {
-        growthDelta += 3;
+        if (!establishBaseline) growthDelta += 3;
         themeChanges.push({ type: "insert", theme });
       } else if (existing.resultFingerprint !== theme.fingerprint) {
-        growthDelta += 1;
+        if (!establishBaseline) growthDelta += 1;
         themeChanges.push({ type: "update", theme });
       }
     }
@@ -242,6 +244,85 @@ export class CompatibilityDataRepository {
       comparableThemeCount,
       marks: compatibilityPairProgressionMarks(highestLevel),
     };
+  }
+
+  getEndedProgressionArchive(
+    actorAccountId: string,
+    relationshipCategory: CompatibilityRelationship["relationshipCategory"],
+  ): CompatibilityPairProgressionArchive | null {
+    const relationship = this.readRelationship();
+    if (
+      !relationship ||
+      relationship.status !== "ended" ||
+      relationship.relationshipCategory !== relationshipCategory ||
+      (relationship.inviterAccountId !== actorAccountId &&
+        relationship.inviteeAccountId !== actorAccountId)
+    ) {
+      return null;
+    }
+    const state = this.db
+      .select({
+        growthValue: compatibilityProgressionStates.growthValue,
+        highestLevel: compatibilityProgressionStates.highestLevel,
+      })
+      .from(compatibilityProgressionStates)
+      .where(eq(compatibilityProgressionStates.singleton, 1))
+      .get();
+    return state ?? null;
+  }
+
+  restoreProgressionArchive(
+    actorAccountId: string,
+    archive: CompatibilityPairProgressionArchive,
+    at: Date,
+  ): Readonly<{ baselineRequired: boolean }> {
+    if (!this.getRelationship(actorAccountId, at)) {
+      throw new Error("Pair progression can only be restored into an accepted relationship");
+    }
+    if (
+      !Number.isSafeInteger(archive.growthValue) ||
+      archive.growthValue < 0 ||
+      !Number.isSafeInteger(archive.highestLevel) ||
+      archive.highestLevel < 1
+    ) {
+      throw new Error("Pair progression archive is invalid");
+    }
+    const existing = this.db
+      .select()
+      .from(compatibilityProgressionStates)
+      .where(eq(compatibilityProgressionStates.singleton, 1))
+      .get();
+    if (existing) {
+      const growthValue = Math.max(existing.growthValue, archive.growthValue);
+      const highestLevel = Math.max(
+        existing.highestLevel,
+        archive.highestLevel,
+        compatibilityPairProgressionLevel(growthValue),
+      );
+      if (growthValue !== existing.growthValue || highestLevel !== existing.highestLevel) {
+        this.db
+          .update(compatibilityProgressionStates)
+          .set({ growthValue, highestLevel, updatedAt: at })
+          .where(eq(compatibilityProgressionStates.singleton, 1))
+          .run();
+      }
+      return { baselineRequired: false };
+    }
+    this.db
+      .insert(compatibilityProgressionStates)
+      .values({
+        singleton: 1,
+        growthValue: archive.growthValue,
+        highestLevel: Math.max(
+          archive.highestLevel,
+          compatibilityPairProgressionLevel(archive.growthValue),
+        ),
+        comparableThemeCount: 0,
+        createdAt: at,
+        updatedAt: at,
+      })
+      .run();
+    return { baselineRequired: archive.growthValue > 0 };
   }
 
   endRelationship(actorAccountId: string, at: Date): EndCompatibilityRelationshipResult {

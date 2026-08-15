@@ -12,7 +12,7 @@
 
 相性関係は2つのAccountに属するため、片方の`AccountData`へ正本を置きません。推測困難な招待IDから決定的に選ぶ`CompatibilityData` Durable Objectを1関係につき1つ作り、そのprivate SQLiteを招待と同意のSSoTにします。
 
-同意は相手単位の継続同意です。`CompatibilityData`は誰と誰が、いつ共有へ同意したかだけを保存し、共有した表示内容や指紋を保存しません。相性シートは表示時点で双方の`AccountData`から都度組み立てます。
+同意は相手単位の継続同意です。`CompatibilityData`は誰と誰が、いつ共有へ同意したかを保存し、相性シートは表示時点で双方の`AccountData`から都度組み立てます。共有中のふたりレベルに限り、表示本文や回答を含まない比較結果fingerprintを現在のrelationshipへ保存します。保存目的と共有終了・再同意時の扱いは[成長・報酬実装設計](progression-reward-implementation.md#6-ふたりレベル)を正とします。
 
 各`AccountData`には、自分の一覧を組み立て、同じ相手との重複関係を防ぐための`compatibility_references`だけを保存します。共有D1には相性関係、表示名、同意、診断結果を保存しません。
 
@@ -47,6 +47,7 @@ flowchart LR
 | 共有用の一人称文章と内部根拠参照 | 各AccountData SQLiteの専用projection | 本人向けまとめや生の根拠を関係データへ複製しない |
 | 生の回答、パラメータ値、表示文章 | 各AccountData SQLiteから都度計算 | 相性関係へ個人データを複製しない |
 | Accountごとの相性一覧参照 | 各AccountData SQLite | 全Account走査なしで本人の一覧を取得する |
+| ふたりレベルの累積値、最高到達レベル、共有中の比較結果fingerprint | CompatibilityData SQLite | ペアの進行度を片方のAccount所有にせず、共有終了時に内容を削除して再同意後の集計復元だけを可能にする |
 | Question、Diagnosis、Scoring Config | 共有D1 | 全Account共通の公開catalogである |
 
 表示名は検証済みLINE ID tokenの`name`を招待発行時と承諾時にsnapshotとして保存します。既存関係の表示名をプロフィール変更へ自動追従させません。
@@ -97,7 +98,7 @@ erDiagram
 | `status` | `pending`、`reserved`、`active`、`ended` |
 | `created_at` / `updated_at` | ローカルprojectionの更新時刻 |
 
-`reserved`または`active`の`partner_account_id`へ部分一意indexを置き、同じ相手との承諾処理をAccountData Object内で直列化します。`reserved`は送信者・受信者の双方で別DO更新の途中だけに使い、相性一覧には表示しません。`ended`は監査と冪等な再試行のため保持しますが、通常一覧から除外します。
+`reserved`または`active`の`partner_account_id`へ部分一意indexを置き、同じ相手との承諾処理をAccountData Object内で直列化します。`reserved`は送信者・受信者の双方で別DO更新の途中だけに使い、相性一覧には表示しません。`ended`は監査と冪等な再試行、および同じペア・同じRelationship Categoryの再同意後に内容を持たないふたりレベル集計を探すため保持します。通常一覧からは除外し、終了済み参照を画面や公開APIへ返しません。
 
 ## 6. 状態遷移と整合性
 
@@ -144,6 +145,8 @@ AccountDataの一覧RPCは、内部的に`pending`、`reserved`、`active`の参
 - 承諾前に双方のAccountDataを同じ順序で予約し、同じ2人のaccepted関係を重複作成しない
 - CompatibilityDataは双方の予約を確認できないpending招待の承諾を拒否する
 - 共有終了後は相手の内容を返さず、以降の更新も共有しない
+- 同じペア・同じRelationship Categoryの再同意後だけ、終了済み関係から内容を持たないふたりレベル集計を復元する
+- 再同意前は終了済み参照とふたりレベル集計を画面および公開APIへ返さない
 - 内部根拠の削除・無効化後は共有専用projectionを返さない
 - 相性シートは保存済みの過去の表示内容ではなく、表示時点の双方の内容から組み立てる
 
