@@ -642,6 +642,8 @@ describe("daily prompt delivery", () => {
       type: "ready",
       deliveryId: "daily-prompt:2026-08-14",
       promptVersion: PROMPT_VERSION,
+      promptStrategy: "standard",
+      promptStrategySource: "fallback",
     });
     if (first.type !== "ready") throw new Error("Daily prompt was not prepared");
     await expect(markDailyPromptDelivered(db, ACCOUNT_ID, first.deliveryId, at)).resolves.toBe(
@@ -665,11 +667,14 @@ describe("daily prompt delivery", () => {
         localDate: "2026-08-14",
         promptVersion: "daily-check-in-fri-v1",
         promptStrategy: "brief",
+        promptStrategySource: "explicit",
         at,
       }),
     ).resolves.toMatchObject({
       type: "ready",
       promptVersion: "daily-check-in-fri-v1",
+      promptStrategy: "brief",
+      promptStrategySource: "explicit",
     });
 
     await expect(
@@ -677,21 +682,29 @@ describe("daily prompt delivery", () => {
         localDate: "2026-08-14",
         promptVersion: "daily-check-in-fri-v2",
         promptStrategy: "feeling_first",
+        promptStrategySource: "learned",
         at: new Date(at.getTime() + 30_000),
       }),
     ).resolves.toMatchObject({
       type: "ready",
       promptVersion: "daily-check-in-fri-v1",
+      promptStrategy: "brief",
+      promptStrategySource: "explicit",
     });
     expect(
       await db
         .select({
           promptVersion: schema.dailyPromptDeliveries.promptVersion,
           promptStrategy: schema.dailyPromptDeliveries.promptStrategy,
+          promptStrategySource: schema.dailyPromptDeliveries.promptStrategySource,
         })
         .from(schema.dailyPromptDeliveries)
         .get(),
-    ).toEqual({ promptVersion: "daily-check-in-fri-v1", promptStrategy: "brief" });
+    ).toEqual({
+      promptVersion: "daily-check-in-fri-v1",
+      promptStrategy: "brief",
+      promptStrategySource: "explicit",
+    });
   });
 
   it("日別の時刻計画を最初の選択で固定し、選択時刻だけで配送を準備する", async () => {

@@ -63,11 +63,17 @@ describe("daily prompt queue consumer", () => {
         if (operation === "conversation.selectDailyPromptSameDayContext") return undefined;
         if (operation === "conversation.selectDailyPromptPreviousDayContext") return undefined;
         if (operation === "conversation.prepareDailyPrompt") {
-          const input = args[0] as { promptVersion: string };
+          const input = args[0] as {
+            promptVersion: string;
+            promptStrategy: "standard" | "brief" | "event_first" | "feeling_first";
+            promptStrategySource: "explicit" | "learned" | "fallback";
+          };
           return {
             type: "ready",
             deliveryId: "daily-prompt:2026-08-14",
             promptVersion: input.promptVersion,
+            promptStrategy: input.promptStrategy,
+            promptStrategySource: input.promptStrategySource,
           };
         }
         if (operation === "conversation.markDailyPromptDelivered") return true;
@@ -91,6 +97,7 @@ describe("daily prompt queue consumer", () => {
       localDate: "2026-08-14",
       promptVersion: "daily-check-in-fri-v1",
       promptStrategy: "standard",
+      promptStrategySource: "learned",
       scheduledLocalHour: 18,
       selectedLocalHour: 18,
     });
@@ -140,6 +147,7 @@ describe("daily prompt queue consumer", () => {
       localDate: "2026-08-14",
       promptVersion: "daily-check-in-fri-v1",
       promptStrategy: "standard",
+      promptStrategySource: "learned",
       scheduledLocalHour: 20,
       selectedLocalHour: 20,
     });
@@ -175,6 +183,7 @@ describe("daily prompt queue consumer", () => {
       localDate: "2026-08-14",
       promptVersion: "daily-check-in-fri-v1",
       promptStrategy: "standard",
+      promptStrategySource: "learned",
       scheduledLocalHour: 20,
       selectedLocalHour: 20,
     });
@@ -203,6 +212,7 @@ describe("daily prompt queue consumer", () => {
       localDate: "2026-08-14",
       promptVersion: "daily-check-in-fri-v1",
       promptStrategy: "standard",
+      promptStrategySource: "learned",
       scheduledLocalHour: 21,
       selectedLocalHour: 21,
     });
@@ -237,6 +247,7 @@ describe("daily prompt queue consumer", () => {
       localDate: "2026-08-14",
       promptVersion: "daily-check-in-fri-v1:brief-v1",
       promptStrategy: "brief",
+      promptStrategySource: "explicit",
       scheduledLocalHour: 18,
       selectedLocalHour: 18,
     });
@@ -273,6 +284,7 @@ describe("daily prompt queue consumer", () => {
       localDate: "2026-08-14",
       promptVersion: "daily-check-in-fri-v1:feeling_first-v1",
       promptStrategy: "feeling_first",
+      promptStrategySource: "learned",
       scheduledLocalHour: 18,
       selectedLocalHour: 18,
     });
@@ -297,6 +309,7 @@ describe("daily prompt queue consumer", () => {
       localDate: "2026-08-14",
       promptVersion: "daily-check-in-day-off-v1",
       promptStrategy: "standard",
+      promptStrategySource: "learned",
       scheduledLocalHour: 18,
       selectedLocalHour: 18,
     });
@@ -335,6 +348,7 @@ describe("daily prompt queue consumer", () => {
       localDate: "2026-08-14",
       promptVersion: "daily-check-in-same-day-follow-up-v1",
       promptStrategy: "standard",
+      promptStrategySource: "learned",
       scheduledLocalHour: 18,
       selectedLocalHour: 18,
     });
@@ -371,6 +385,7 @@ describe("daily prompt queue consumer", () => {
       localDate: "2026-08-14",
       promptVersion: "daily-check-in-day-off-v1",
       promptStrategy: "standard",
+      promptStrategySource: "learned",
       scheduledLocalHour: 18,
       selectedLocalHour: 18,
     });
@@ -397,6 +412,7 @@ describe("daily prompt queue consumer", () => {
       localDate: "2026-08-14",
       promptVersion: "daily-check-in-previous-day-follow-up-v1",
       promptStrategy: "standard",
+      promptStrategySource: "learned",
       scheduledLocalHour: 18,
       selectedLocalHour: 18,
     });
@@ -431,6 +447,7 @@ describe("daily prompt queue consumer", () => {
       localDate: "2026-08-14",
       promptVersion: "daily-check-in-fri-v1",
       promptStrategy: "standard",
+      promptStrategySource: "learned",
       scheduledLocalHour: 18,
       selectedLocalHour: 18,
     });
@@ -460,6 +477,7 @@ describe("daily prompt queue consumer", () => {
       localDate: "2026-08-14",
       promptVersion: "daily-check-in-day-off-v1",
       promptStrategy: "standard",
+      promptStrategySource: "learned",
       scheduledLocalHour: 18,
       selectedLocalHour: 18,
     });
@@ -488,6 +506,7 @@ describe("daily prompt queue consumer", () => {
       localDate: "2026-08-14",
       promptVersion: "daily-check-in-fri-v1",
       promptStrategy: "standard",
+      promptStrategySource: "learned",
       scheduledLocalHour: 18,
       selectedLocalHour: 18,
     });
@@ -574,6 +593,49 @@ describe("daily prompt queue consumer", () => {
     expect(message.ack).toHaveBeenCalledOnce();
   });
 
+  it("再配送では現在の選択ではなく配送行に固定した方針と選択元を本文・ログへ使う", async () => {
+    const info = vi.spyOn(logger, "info").mockImplementation(() => undefined);
+    execute
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(18)
+      .mockResolvedValueOnce({ selectedLocalHour: 18, selectionSource: "learned" })
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce("feeling_first")
+      .mockResolvedValueOnce({
+        type: "ready",
+        deliveryId: "daily-prompt:2026-08-14",
+        promptVersion: "daily-check-in-fri-v1:brief-v1",
+        promptStrategy: "brief",
+        promptStrategySource: "explicit",
+      });
+    const message = createMessage(2);
+
+    await processDailyPromptMessage(message, bindings(), config);
+
+    expect(pushMessage).toHaveBeenCalledWith(
+      {
+        to: "U_line",
+        messages: [
+          {
+            type: "text",
+            text: "今日、少しでも話しておきたいことはある？\nひとことだけでも大丈夫だよ。",
+          },
+        ],
+      },
+      expect.stringMatching(/^[0-9a-f-]{36}$/),
+    );
+    expect(info).toHaveBeenCalledWith(
+      expect.objectContaining({
+        stage: "daily-prompt.deliver",
+        promptStrategy: "brief",
+        promptStrategySource: "explicit",
+      }),
+      expect.any(String),
+    );
+  });
+
   it("AccountDataがskipした日はLINEを呼ばずackする", async () => {
     execute
       .mockResolvedValueOnce(undefined)
@@ -610,6 +672,22 @@ describe("daily prompt queue consumer", () => {
       "conversation.markDailyPromptDelivered",
       expect.anything(),
     );
+  });
+
+  it("最終配送機会の一時障害は配送をfailedへ終端化してDLQへ送る", async () => {
+    pushMessage.mockRejectedValueOnce(new Error("network unavailable"));
+    const message = createMessage(6);
+
+    await processDailyPromptMessage(message, bindings(), config);
+
+    expect(execute).toHaveBeenCalledWith(
+      "account-1",
+      "conversation.markDailyPromptFailed",
+      "daily-prompt:2026-08-14",
+      "line.push",
+    );
+    expect(message.retry).toHaveBeenCalledOnce();
+    expect(message.ack).not.toHaveBeenCalled();
   });
 
   it("LINEが4xxで拒否した配送をfailedにして再試行しない", async () => {

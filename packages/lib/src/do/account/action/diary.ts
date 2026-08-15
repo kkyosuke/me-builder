@@ -182,8 +182,16 @@ async function sha256(value: string): Promise<string> {
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
+export type DailyPromptSelectionSource = "explicit" | "learned" | "fallback";
+
 export type DailyPromptPreparation =
-  | Readonly<{ type: "ready"; deliveryId: string; promptVersion: string }>
+  | Readonly<{
+      type: "ready";
+      deliveryId: string;
+      promptVersion: string;
+      promptStrategy: DailyPromptStrategy;
+      promptStrategySource?: DailyPromptSelectionSource;
+    }>
   | Readonly<{
       type: "not-ready";
       status: "delivered" | "skipped" | "failed" | "not-due";
@@ -203,8 +211,6 @@ export type DailyPromptTimeStat = Readonly<{
   responseCount: number;
   stopCount: number;
 }>;
-
-export type DailyPromptSelectionSource = "explicit" | "learned" | "fallback";
 
 export type DailyPromptSchedule = Readonly<{
   selectedLocalHour: DailyPromptLocalHour;
@@ -558,6 +564,7 @@ async function skipDailyPrompt(
     localDate: string;
     promptVersion: string;
     promptStrategy: DailyPromptStrategy;
+    promptStrategySource?: DailyPromptSelectionSource;
     deliveryLocalHour: DailyPromptLocalHour;
     reason: DailyPromptSkipReason;
     at: Date;
@@ -583,6 +590,7 @@ async function skipDailyPrompt(
       localDate: input.localDate,
       promptVersion: input.promptVersion,
       promptStrategy: input.promptStrategy,
+      promptStrategySource: input.promptStrategySource,
       deliveryLocalHour: input.deliveryLocalHour,
       status: "skipped",
       skipReason: input.reason,
@@ -630,6 +638,7 @@ export async function prepareDailyPrompt(
     localDate: string;
     promptVersion: string;
     promptStrategy?: DailyPromptStrategy;
+    promptStrategySource?: DailyPromptSelectionSource;
     scheduledLocalHour?: DailyPromptLocalHour;
     selectedLocalHour?: DailyPromptLocalHour;
     at?: Date;
@@ -639,6 +648,7 @@ export async function prepareDailyPrompt(
   if (!input.promptVersion.trim()) throw new Error("Daily prompt version is required");
   const at = input.at ?? new Date();
   const promptStrategy = input.promptStrategy ?? "standard";
+  const promptStrategySource = input.promptStrategySource ?? "fallback";
   const scheduledLocalHour = input.scheduledLocalHour ?? 18;
   const selectedLocalHour = input.selectedLocalHour ?? 18;
   if (
@@ -672,6 +682,7 @@ export async function prepareDailyPrompt(
       localDate: input.localDate,
       promptVersion: existing?.promptVersion ?? input.promptVersion,
       promptStrategy: existing?.promptStrategy ?? promptStrategy,
+      promptStrategySource: existing?.promptStrategySource ?? promptStrategySource,
       deliveryLocalHour: existing?.deliveryLocalHour ?? scheduledLocalHour,
       reason: "stale",
       at,
@@ -689,6 +700,7 @@ export async function prepareDailyPrompt(
       localDate: input.localDate,
       promptVersion: existing?.promptVersion ?? input.promptVersion,
       promptStrategy: existing?.promptStrategy ?? promptStrategy,
+      promptStrategySource: existing?.promptStrategySource ?? promptStrategySource,
       deliveryLocalHour: existing?.deliveryLocalHour ?? scheduledLocalHour,
       reason: "manual_stopped",
       at,
@@ -700,6 +712,9 @@ export async function prepareDailyPrompt(
       localDate: input.localDate,
       promptVersion: existing.promptVersion,
       promptStrategy: existing.promptStrategy,
+      ...(existing.promptStrategySource
+        ? { promptStrategySource: existing.promptStrategySource }
+        : {}),
       deliveryLocalHour: existing.deliveryLocalHour,
       reason: "user_activity",
       at,
@@ -711,6 +726,7 @@ export async function prepareDailyPrompt(
       localDate: input.localDate,
       promptVersion: existing?.promptVersion ?? input.promptVersion,
       promptStrategy: existing?.promptStrategy ?? promptStrategy,
+      promptStrategySource: existing?.promptStrategySource ?? promptStrategySource,
       deliveryLocalHour: existing?.deliveryLocalHour ?? scheduledLocalHour,
       reason: "active_session",
       at,
@@ -721,6 +737,10 @@ export async function prepareDailyPrompt(
       type: "ready",
       deliveryId: existing.id,
       promptVersion: existing.promptVersion,
+      promptStrategy: existing.promptStrategy,
+      ...(existing.promptStrategySource
+        ? { promptStrategySource: existing.promptStrategySource }
+        : {}),
     };
   }
 
@@ -751,6 +771,7 @@ export async function prepareDailyPrompt(
       localDate: input.localDate,
       promptVersion: input.promptVersion,
       promptStrategy,
+      promptStrategySource,
       deliveryLocalHour: scheduledLocalHour,
       reason: "auto_paused",
       at,
@@ -763,6 +784,7 @@ export async function prepareDailyPrompt(
       localDate: input.localDate,
       promptVersion: input.promptVersion,
       promptStrategy,
+      promptStrategySource,
       deliveryLocalHour: scheduledLocalHour,
       reason: "recent_unanswered",
       at,
@@ -776,6 +798,7 @@ export async function prepareDailyPrompt(
     localDate: input.localDate,
     promptVersion: input.promptVersion,
     promptStrategy,
+    promptStrategySource,
     deliveryLocalHour: scheduledLocalHour,
     status: "pending",
     createdAt: at,
@@ -785,6 +808,8 @@ export async function prepareDailyPrompt(
     type: "ready",
     deliveryId,
     promptVersion: input.promptVersion,
+    promptStrategy,
+    promptStrategySource,
   };
 }
 

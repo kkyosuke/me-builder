@@ -301,6 +301,7 @@ export async function processDailyPromptMessage(
       localDate: message.body.localDate,
       promptVersion,
       promptStrategy: selectedPromptStrategy,
+      promptStrategySource,
       scheduledLocalHour,
       selectedLocalHour,
     });
@@ -320,6 +321,8 @@ export async function processDailyPromptMessage(
       return;
     }
     deliveryId = preparation.deliveryId;
+    selectedPromptStrategy = preparation.promptStrategy;
+    promptStrategySource = preparation.promptStrategySource;
 
     const lineIdentity = await D1.shared.action.account.findLineIdentityByAccountId(
       cf.d1,
@@ -396,7 +399,7 @@ export async function processDailyPromptMessage(
       selectedLocalHour,
       timeSelectionSource,
       promptStrategy: selectedPromptStrategy,
-      promptStrategySource,
+      ...(promptStrategySource ? { promptStrategySource } : {}),
     });
   } catch (error) {
     const operationalError = toOperationalError(error, {
@@ -406,7 +409,7 @@ export async function processDailyPromptMessage(
       retryable: true,
     });
     const isFinalAttempt = message.attempts >= DAILY_PROMPT_MAX_ATTEMPTS;
-    if (!operationalError.retryable && deliveryId) {
+    if ((!operationalError.retryable || isFinalAttempt) && deliveryId) {
       await accountData.execute(
         "conversation.markDailyPromptFailed",
         deliveryId,
