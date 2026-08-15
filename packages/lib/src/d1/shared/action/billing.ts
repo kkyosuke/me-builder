@@ -1,3 +1,4 @@
+import { logger } from "@me-builder/shared";
 import { and, eq, gt } from "drizzle-orm";
 import type {
   AccountPlanAssignment,
@@ -80,8 +81,14 @@ export async function applyBillingProjection(
   });
   if (processed) return "duplicate";
 
+  const owner = await db.query.billingCustomers.findFirst({
+    where: (table, { eq }) => eq(table.providerCustomerId, input.subscription.customerId),
+  });
+  if (!owner || owner.accountId !== input.accountId) {
+    throw new BillingCustomerOwnershipError();
+  }
   const current = await db.query.billingSubscriptionProjections.findFirst({
-    where: (table, { eq }) => eq(table.providerSubscriptionId, input.subscription.id),
+    where: (table, { eq }) => eq(table.providerCustomerId, input.subscription.customerId),
   });
   const disposition =
     current && current.lastEventCreatedAt.getTime() > input.event.createdAt.getTime()
@@ -120,7 +127,7 @@ export async function applyBillingProjection(
   await db.batch([
     eventInsert,
     db.insert(billingSubscriptionProjections).values(values).onConflictDoUpdate({
-      target: billingSubscriptionProjections.providerSubscriptionId,
+      target: billingSubscriptionProjections.providerCustomerId,
       set: values,
     }),
   ]);
@@ -135,16 +142,31 @@ export class D1AccountPlanAssignmentProvider implements AccountPlanAssignmentPro
   constructor(private readonly db: SharedD1Client) {}
 
   async findCurrent(accountId: string, at = new Date()): Promise<AccountPlanAssignment> {
-    const rows = await this.db
-      .select()
-      .from(billingSubscriptionProjections)
-      .where(
-        and(
-          eq(billingSubscriptionProjections.accountId, accountId),
-          gt(billingSubscriptionProjections.currentPeriodEnd, at),
-        ),
-      )
-      .all();
+    let rows: Array<typeof billingSubscriptionProjections.$inferSelect>;
+    try {
+      rows = await this.db
+        .select()
+        .from(billingSubscriptionProjections)
+        .where(
+          and(
+            eq(billingSubscriptionProjections.accountId, accountId),
+            gt(billingSubscriptionProjections.currentPeriodEnd, at),
+          ),
+        )
+        .all();
+    } catch {
+      logger.error(
+        {
+          event: "billing.plan-assignment.degraded",
+          service: "lib",
+          errorCode: "BILLING_PROJECTION_READ_FAILED",
+          outcome: "degraded",
+          disposition: "free-plan-fallback",
+        },
+        "[Billing assignment] projection read failed -> Free fallback",
+      );
+      return freePlanAssignment(accountId, at);
+    }
     const current = rows
       .filter(
         (row) => (row.status === "active" || row.status === "trialing") && row.planCode !== null,

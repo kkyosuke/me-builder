@@ -84,6 +84,80 @@ describe("billing projection", () => {
     expect(projection).toMatchObject({ status: "active", planCode: "full" });
   });
 
+  it("同じCustomerのSubscription差し替えへ収束し、旧Subscriptionのeventを拒否する", async () => {
+    const db = createTestDb();
+    const owner = await account(db, "U_billing_replacement");
+    await linkBillingCustomer(db, { accountId: owner.id, providerCustomerId: "cus_1" });
+    await applyBillingProjection(db, {
+      accountId: owner.id,
+      event: {
+        id: "evt_initial_subscription",
+        type: "customer.subscription.created",
+        objectId: "sub_1",
+        createdAt: new Date("2026-08-15T01:00:00Z"),
+      },
+      subscription,
+      planCode: "full",
+    });
+
+    const replacement = { ...subscription, id: "sub_2", priceId: "price_lite" };
+    await expect(
+      applyBillingProjection(db, {
+        accountId: owner.id,
+        event: {
+          id: "evt_replacement",
+          type: "customer.subscription.created",
+          objectId: "sub_2",
+          createdAt: new Date("2026-08-15T03:00:00Z"),
+        },
+        subscription: replacement,
+        planCode: "lite",
+      }),
+    ).resolves.toBe("applied");
+    await expect(
+      applyBillingProjection(db, {
+        accountId: owner.id,
+        event: {
+          id: "evt_old_subscription",
+          type: "customer.subscription.deleted",
+          objectId: "sub_1",
+          createdAt: new Date("2026-08-15T02:00:00Z"),
+        },
+        subscription: { ...subscription, status: "canceled" },
+        planCode: null,
+      }),
+    ).resolves.toBe("stale");
+
+    const projections = await db.query.billingSubscriptionProjections.findMany();
+    expect(projections).toHaveLength(1);
+    expect(projections[0]).toMatchObject({
+      providerSubscriptionId: "sub_2",
+      status: "active",
+      planCode: "lite",
+    });
+  });
+
+  it("Customer所有者と異なるAccountへのprojection適用を拒否する", async () => {
+    const db = createTestDb();
+    const owner = await account(db, "U_billing_owner");
+    const other = await account(db, "U_billing_intruder");
+    await linkBillingCustomer(db, { accountId: owner.id, providerCustomerId: "cus_1" });
+
+    await expect(
+      applyBillingProjection(db, {
+        accountId: other.id,
+        event: {
+          id: "evt_wrong_owner",
+          type: "customer.subscription.created",
+          objectId: "sub_1",
+          createdAt: new Date("2026-08-15T01:00:00Z"),
+        },
+        subscription,
+        planCode: "full",
+      }),
+    ).rejects.toBeInstanceOf(BillingCustomerOwnershipError);
+  });
+
   it("別Accountのprojectionを返さない", async () => {
     const db = createTestDb();
     const owner = await account(db, "U_plan_owner");
@@ -114,5 +188,18 @@ describe("billing projection", () => {
       accountId: other.id,
       plan: "free",
     });
+  });
+
+  it("projection取得障害では有料権限を付与せずFreeへ倒す", async () => {
+    const failingDb = {
+      select() {
+        throw new Error("D1 unavailable");
+      },
+    } as unknown as SharedD1Client;
+    const provider = new D1AccountPlanAssignmentProvider(failingDb);
+
+    await expect(
+      provider.findCurrent("account-with-outage", new Date("2026-08-15T00:00:00Z")),
+    ).resolves.toMatchObject({ accountId: "account-with-outage", plan: "free" });
   });
 });
