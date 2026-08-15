@@ -945,6 +945,66 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
     e2eTimeoutMs,
   );
 
+  it(
+    "家族の期待と自分の選択の回答を5つのパラメータへ採点する",
+    async () => {
+      for (let index = 1; index <= 10; index += 1) {
+        const suffix = String(index).padStart(2, "0");
+        const choiceId = index % 2 === 1 ? "yes" : "no";
+        const response = await putAnswer(
+          `dq-family-expectation-choice-${suffix}`,
+          choiceId,
+          "family-expectation-choice",
+        );
+        expect(response.status).toBe(200);
+      }
+
+      const response = await getAnswers("family-expectation-choice");
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({
+        id: "family-expectation-choice",
+        relationshipCategory: "family",
+        scoring: {
+          scoringVersion: 1,
+          balancedLabel: "選択に応じて家族の意向を取り入れる",
+          parameters: [
+            expect.objectContaining({
+              id: "family-choice-consultation",
+              label: "大きな選択の相談",
+              lowLabel: "自分の考えを固めてから話したい",
+              highLabel: "早い段階で家族に相談したい",
+              score: 100,
+              coverage: 100,
+            }),
+            expect.objectContaining({
+              id: "family-career-direction",
+              score: 100,
+              coverage: 100,
+            }),
+            expect.objectContaining({
+              id: "family-work-change-agreement",
+              score: 100,
+              coverage: 100,
+            }),
+            expect.objectContaining({
+              id: "family-partnership-agreement",
+              label: "結婚の選択",
+              score: 100,
+              coverage: 100,
+            }),
+            expect.objectContaining({
+              id: "family-residence-priority",
+              score: 100,
+              coverage: 100,
+            }),
+          ],
+        },
+      });
+    },
+    e2eTimeoutMs,
+  );
+
   it(`${diagnosisAnswerCases.missingContents.id}: ${diagnosisAnswerCases.missingContents.name}`, async () => {
     const response = await getAnswers();
     expect(response.status).toBe(404);

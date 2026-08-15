@@ -250,7 +250,12 @@ describe("DiagnosisHome", () => {
               title: "仕事の進め方・優先順位",
               displayOrder: 9,
             }),
-            diagnosis({ id: "new-diagnosis", title: "新しい診断", displayOrder: 10 }),
+            diagnosis({
+              id: "family-expectation-choice",
+              title: "家族の期待と自分の選択",
+              displayOrder: 10,
+            }),
+            diagnosis({ id: "new-diagnosis", title: "新しい診断", displayOrder: 11 }),
           ],
         }}
         onOpenDiagnosis={vi.fn()}
@@ -276,6 +281,9 @@ describe("DiagnosisHome", () => {
     });
     const workPriorityStyleCard = screen.getByRole("button", {
       name: /仕事の進め方・優先順位/,
+    });
+    const familyExpectationChoiceCard = screen.getByRole("button", {
+      name: /家族の期待と自分の選択/,
     });
     const fallbackCard = screen.getByRole("button", { name: /新しい診断/ });
 
@@ -305,6 +313,9 @@ describe("DiagnosisHome", () => {
     );
     expect(workPriorityStyleCard.querySelector("img")?.getAttribute("src")).toBe(
       "/images/diagnoses/work-priority-style.jpg",
+    );
+    expect(familyExpectationChoiceCard.querySelector("img")?.getAttribute("src")).toBe(
+      "/images/diagnoses/family-expectation-choice.jpg",
     );
     expect(fallbackCard.querySelector("img")?.getAttribute("src")).toBe(
       "/images/diagnoses/default.jpg",

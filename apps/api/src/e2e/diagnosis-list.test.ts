@@ -234,9 +234,9 @@ describe("GET /api/diagnoses local D1 E2E", () => {
         lastAnsweredAt: string | null;
       }>;
     };
-    expect(initialBody.diagnoses).toHaveLength(12);
+    expect(initialBody.diagnoses).toHaveLength(13);
     expect(initialBody.diagnoses.map(({ displayOrder }) => displayOrder)).toEqual([
-      10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120,
+      10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130,
     ]);
     expect(initialBody.diagnoses.find(({ id }) => id === "life-priorities")).toMatchObject({
       relationshipCategory: "general",
@@ -270,6 +270,13 @@ describe("GET /api/diagnoses local D1 E2E", () => {
     });
     expect(initialBody.diagnoses.find(({ id }) => id === "work-priority-style")).toMatchObject({
       relationshipCategory: "work",
+      responseStatus: "unanswered",
+      questionCount: 10,
+    });
+    expect(
+      initialBody.diagnoses.find(({ id }) => id === "family-expectation-choice"),
+    ).toMatchObject({
+      relationshipCategory: "family",
       responseStatus: "unanswered",
       questionCount: 10,
     });
@@ -448,7 +455,7 @@ describe("GET /api/diagnoses local D1 E2E", () => {
     const body = (await response.json()) as {
       diagnoses: Array<{ responseStatus: string; answeredCount: number }>;
     };
-    expect(body.diagnoses).toHaveLength(12);
+    expect(body.diagnoses).toHaveLength(13);
     expect(body.diagnoses).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ responseStatus: "unanswered", answeredCount: 0 }),
@@ -695,6 +702,35 @@ describe("GET /api/diagnoses/:diagnosisId local D1 E2E", () => {
       "数日かかる仕事では、最初の進み具合を全体が形になってから共有したい。",
     ]);
     expect(body.questions.every(({ text }) => !text.includes("上司"))).toBe(true);
+  });
+
+  it("家族の期待と自分の選択の状況ベース10問をseedから返すこと", async () => {
+    const response = await request("known-token", "/api/diagnoses/family-expectation-choice");
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      id: string;
+      title: string;
+      relationshipCategory: string;
+      questions: Array<{ diagnosisQuestionId: string; text: string }>;
+    };
+
+    expect(body).toMatchObject({
+      id: "family-expectation-choice",
+      title: "家族の期待と自分の選択",
+      relationshipCategory: "family",
+    });
+    expect(body.questions.map(({ text }) => text)).toEqual([
+      "今後に関わる大きな選択で迷ったときは、自分の考えを固める前に家族へ相談したい。",
+      "今後に関わる大きな選択で迷ったときは、家族へ相談する前に自分の考えを固めたい。",
+      "興味のある進路と家族が安心する進路が異なるときは、自分の関心より家族の安心を優先したい。",
+      "興味のある進路と家族が安心する進路が異なるときは、家族の安心より自分の関心を優先したい。",
+      "働き方を大きく変えると決めたときは、家族が納得してから進めたい。",
+      "働き方を大きく変えると決めたときは、家族が納得していなくても、自分の考えが決まっていれば進めたい。",
+      "結婚を考えている相手について家族が心配しているときは、自分の考えが決まっていても、家族が納得するまで結婚へ進むのを待ちたい。",
+      "結婚を考えている相手について家族が心配しているときは、家族が納得していなくても、自分の考えが決まっていれば結婚へ進みたい。",
+      "住む場所を選ぶとき、自分の希望と家族の近くで暮らすことが両立しなければ、家族との近さを優先したい。",
+      "住む場所を選ぶとき、希望する地域が家族から離れていても、自分の生活条件を優先したい。",
+    ]);
   });
 
   it(`${diagnosisDetailCases.notFound.id}: ${diagnosisDetailCases.notFound.name}`, async () => {
