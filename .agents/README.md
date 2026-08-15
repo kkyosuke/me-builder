@@ -16,6 +16,7 @@
 | [ドキュメントガイド](../docs/README.md) | `docs/` のディレクトリ構造、文書の探し方、全ドキュメントへの入口 |
 | [プロジェクト概要](../docs/product/project-overview.md) | 目的、主要要件、MVP、ロードマップ、Phase 1の入力体験とログイン手段 |
 | [サービス紹介サイト設計](../docs/product/service-site-design.md) | 未ログインの公開サイトの役割、サイトマップ、トップページ構成、CTA、掲載原則、公開前の確認事項 |
+| [サブスクリプション・料金プラン設計](../docs/product/subscription-plan-design.md) | Free、Lite、Full、ファミリーパックの価格、利用権限、AI利用上限、トライアル、変更・解約、家族内のプライバシー境界 |
 | [全体画面遷移設計](../docs/product/screen-navigation.md) | LINEとWebをまたぐ入口、主ナビゲーション、右上のプロフィール、診断・相性・わたしのまとめ・セルフケア・AI相談・管理者画面の接続 |
 | [わたしのまとめ仕様](../docs/product/profile-summary-experience.md) | 診断と日記からAI生成した版付きの「わたしのまとめ」、診断テーマ、導線、状態、受け入れ条件 |
 | [相性診断・うつし共有体験設計](../docs/product/compatibility-experience.md) | 1対1の招待リンク、LINE共有、双方の同意、相性一覧、「私について」と「2人について」、共有終了の体験 |
