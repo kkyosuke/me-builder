@@ -25,7 +25,7 @@ const document = {
   contentHash: "sha256:test",
   requiresReacceptance: true,
   publishedAt: "2026-08-15T00:00:00+09:00",
-  title: "うつし サービス利用規約",
+  title: "かがみ サービス利用規約",
   summary: "サービスの説明",
   sections: [{ heading: "1. 規約への同意", paragraphs: ["規約本文です。"] }],
 };
@@ -66,6 +66,7 @@ describe("ServiceTermsGate", () => {
 
     await waitFor(() => expect(screen.getByText("主機能")).toBeTruthy());
     expect(mocks.accept).toHaveBeenCalledWith(undefined, "id-token", document.version);
+    expect(window.location.pathname).toBe("/me");
   });
 
   it("現在versionへ同意済みなら規約を再表示せず主機能を表示する", async () => {

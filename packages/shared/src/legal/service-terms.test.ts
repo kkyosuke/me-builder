@@ -24,6 +24,15 @@ describe("service terms documents", () => {
     expect(serviceTermsDocumentsSatisfyingCurrentRequirement).toContain(currentServiceTerms);
   });
 
+  it("最新規約ではサービス名をかがみとし、公開済みの旧版は変更しない", () => {
+    expect(currentServiceTerms).toMatchObject({
+      version: "2026-08-15-2",
+      title: "かがみ サービス利用規約",
+    });
+    expect(currentServiceTerms.summary).toContain("かがみは");
+    expect(serviceTermsDocuments[0]?.title).toBe("うつし サービス利用規約");
+  });
+
   it("軽微改定では改定前の同意を継続して有効にする", () => {
     const important = {
       ...currentServiceTerms,

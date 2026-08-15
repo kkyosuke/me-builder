@@ -1,0 +1,2 @@
+DROP INDEX `account_agreement_version_idx`;--> statement-breakpoint
+CREATE UNIQUE INDEX `account_agreement_version_idx` ON `account_agreement_acceptances` (`account_id`,`document_key`,`document_version`,`document_hash`) WHERE is_deleted = 0;

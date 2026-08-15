@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { index, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 import { baseSchema } from "../../../table/base";
 import { accounts } from "./account";
@@ -16,12 +17,9 @@ export const accountAgreementAcceptances = sqliteTable(
     acceptedAt: text("accepted_at").notNull(),
   },
   (table) => [
-    uniqueIndex("account_agreement_version_idx").on(
-      table.accountId,
-      table.documentKey,
-      table.documentVersion,
-      table.documentHash,
-    ),
+    uniqueIndex("account_agreement_version_idx")
+      .on(table.accountId, table.documentKey, table.documentVersion, table.documentHash)
+      .where(sql`is_deleted = 0`),
     index("account_agreement_current_idx").on(
       table.documentKey,
       table.documentVersion,

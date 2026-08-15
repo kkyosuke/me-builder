@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
-import { currentServiceTerms } from "@me-builder/shared";
+import { currentServiceTerms, serviceTermsDocuments } from "@me-builder/shared";
 import Database from "better-sqlite3";
 import { describe, expect, it } from "vitest";
 
@@ -115,7 +115,71 @@ describe("shared D1 clean baseline migration", () => {
     const acceptance = sqlite
       .prepare("SELECT document_hash AS documentHash FROM account_agreement_acceptances")
       .get() as { documentHash: string };
-    expect(acceptance.documentHash).toBe(currentServiceTerms.contentHash);
+    expect(acceptance.documentHash).toBe(serviceTermsDocuments[0].contentHash);
+    sqlite.close();
+  });
+
+  it("0005で削除済み同意と同じversionへの再同意を許可する", () => {
+    const sqlite = new Database(":memory:");
+    sqlite.pragma("foreign_keys = ON");
+    const existingMigrations = readdirSync(migrationsDirectory)
+      .filter((filename) => /^000[0-4]_.+\.sql$/.test(filename))
+      .sort();
+    for (const file of existingMigrations) {
+      sqlite.exec(readFileSync(path.join(migrationsDirectory, file), "utf8"));
+    }
+    sqlite
+      .prepare(
+        `INSERT INTO accounts (id, created_at, updated_at, is_deleted, status)
+         VALUES ('account-reaccept', 1, 1, 0, 'active')`,
+      )
+      .run();
+    sqlite
+      .prepare(
+        `INSERT INTO account_agreement_acceptances (
+           id, created_at, updated_at, deleted_at, is_deleted, account_id,
+           document_key, document_version, document_hash, accepted_at
+         ) VALUES ('acceptance-deleted', 1, 2, 2, 1, 'account-reaccept',
+           'terms_of_service', ?, ?, '2026-08-15T00:00:00.000Z')`,
+      )
+      .run(currentServiceTerms.version, currentServiceTerms.contentHash);
+
+    const migration = readdirSync(migrationsDirectory).find((filename) =>
+      /^0005_.+\.sql$/.test(filename),
+    );
+    if (!migration) throw new Error("0005 migration is missing");
+    sqlite.exec(readFileSync(path.join(migrationsDirectory, migration), "utf8"));
+    sqlite
+      .prepare(
+        `INSERT INTO account_agreement_acceptances (
+           id, created_at, updated_at, is_deleted, account_id,
+           document_key, document_version, document_hash, accepted_at
+         ) VALUES ('acceptance-active', 3, 3, 0, 'account-reaccept',
+           'terms_of_service', ?, ?, '2026-08-15T01:00:00.000Z')`,
+      )
+      .run(currentServiceTerms.version, currentServiceTerms.contentHash);
+
+    const acceptances = sqlite
+      .prepare(
+        `SELECT id, is_deleted AS isDeleted
+         FROM account_agreement_acceptances
+         WHERE account_id = 'account-reaccept'
+         ORDER BY id`,
+      )
+      .all() as Array<{ id: string; isDeleted: number }>;
+    expect(acceptances).toEqual([
+      { id: "acceptance-active", isDeleted: 0 },
+      { id: "acceptance-deleted", isDeleted: 1 },
+    ]);
+    const indexSql = sqlite
+      .prepare(
+        `SELECT sql FROM sqlite_master
+         WHERE type = 'index' AND name = 'account_agreement_version_idx'`,
+      )
+      .pluck()
+      .get() as string;
+    expect(indexSql).toContain("WHERE is_deleted = 0");
+    expect(sqlite.pragma("foreign_key_check")).toEqual([]);
     sqlite.close();
   });
 });

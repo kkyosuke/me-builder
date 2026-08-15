@@ -59,5 +59,9 @@ export async function acceptCurrentTerms(
     isDeleted: false,
   };
   await db.insert(accountAgreementAcceptances).values(acceptance).onConflictDoNothing();
-  return (await findCurrentTermsAcceptance(db, accountId)) ?? acceptance;
+  const persisted = await findCurrentTermsAcceptance(db, accountId);
+  if (!persisted) {
+    throw new Error("Failed to persist current terms acceptance");
+  }
+  return persisted;
 }

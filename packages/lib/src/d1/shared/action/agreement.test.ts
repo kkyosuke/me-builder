@@ -1,6 +1,7 @@
 import path from "node:path";
 import { currentServiceTerms } from "@me-builder/shared";
 import Database from "better-sqlite3";
+import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { describe, expect, it } from "vitest";
@@ -39,7 +40,7 @@ describe("account agreement acceptance", () => {
     expect(accepted).toMatchObject({
       accountId: account.id,
       documentKey: "terms_of_service",
-      documentVersion: "2026-08-15",
+      documentVersion: currentServiceTerms.version,
       documentHash: currentServiceTerms.contentHash,
       acceptedAt: "2026-08-15T01:23:45.000Z",
     });
@@ -59,5 +60,41 @@ describe("account agreement acceptance", () => {
     expect(second.id).toBe(first.id);
     expect(second.acceptedAt).toBe(first.acceptedAt);
     expect(await db.select().from(schema.accountAgreementAcceptances).all()).toHaveLength(1);
+  });
+
+  it("削除済みの同じversionへ再同意すると、新しい有効な履歴を追記する", async () => {
+    const db = createTestDb();
+    const { account } = await upsertIdentity(db, {
+      provider: "line_login",
+      providerAccountId: "U_terms_reaccept",
+    });
+    const first = await acceptCurrentTerms(db, account.id, new Date("2026-08-15T01:00:00Z"));
+    const deletedAt = new Date("2026-08-15T01:30:00Z");
+    await db
+      .update(schema.accountAgreementAcceptances)
+      .set({ isDeleted: true, deletedAt, updatedAt: deletedAt })
+      .where(eq(schema.accountAgreementAcceptances.id, first.id));
+
+    const second = await acceptCurrentTerms(db, account.id, new Date("2026-08-15T02:00:00Z"));
+
+    expect(second).toMatchObject({
+      accountId: account.id,
+      documentVersion: currentServiceTerms.version,
+      documentHash: currentServiceTerms.contentHash,
+      acceptedAt: "2026-08-15T02:00:00.000Z",
+      isDeleted: false,
+    });
+    expect(second.id).not.toBe(first.id);
+    const histories = await db.select().from(schema.accountAgreementAcceptances).all();
+    expect(histories).toHaveLength(2);
+    expect(histories).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: first.id, isDeleted: true }),
+        expect.objectContaining({ id: second.id, isDeleted: false }),
+      ]),
+    );
+    await expect(findCurrentTermsAcceptance(db, account.id)).resolves.toMatchObject({
+      id: second.id,
+    });
   });
 });

@@ -18,7 +18,7 @@ function dependencies(acceptance?: { acceptedAt: string }) {
             id: "acceptance-1",
             accountId: "account-1",
             documentKey: "terms_of_service" as const,
-            documentVersion: "2026-08-15",
+            documentVersion: currentServiceTerms.version,
             documentHash: currentServiceTerms.contentHash,
             acceptedAt: acceptance.acceptedAt,
             createdAt: new Date(),
@@ -32,7 +32,7 @@ function dependencies(acceptance?: { acceptedAt: string }) {
       id: "acceptance-1",
       accountId: "account-1",
       documentKey: "terms_of_service" as const,
-      documentVersion: "2026-08-15",
+      documentVersion: currentServiceTerms.version,
       documentHash: currentServiceTerms.contentHash,
       acceptedAt: "2026-08-15T01:23:45.000Z",
       createdAt: new Date(),
@@ -52,7 +52,7 @@ describe("service terms", () => {
     );
     expect(result).toMatchObject({
       type: "resolved",
-      document: { documentKey: "terms_of_service", version: "2026-08-15" },
+      document: { documentKey: "terms_of_service", version: currentServiceTerms.version },
       acceptance: { required: true, acceptedAt: null },
     });
   });
@@ -74,14 +74,22 @@ describe("service terms", () => {
       { idToken: "token", lineLoginChannelId: "channel", db, version: "2026-01-01" },
       deps,
     );
-    expect(result).toEqual({ type: "version-conflict", currentVersion: "2026-08-15" });
+    expect(result).toEqual({
+      type: "version-conflict",
+      currentVersion: currentServiceTerms.version,
+    });
     expect(deps.accept).not.toHaveBeenCalled();
   });
 
   it("現在versionの同意を認証済みAccountへ保存する", async () => {
     const deps = dependencies();
     const result = await acceptServiceTerms(
-      { idToken: "token", lineLoginChannelId: "channel", db, version: "2026-08-15" },
+      {
+        idToken: "token",
+        lineLoginChannelId: "channel",
+        db,
+        version: currentServiceTerms.version,
+      },
       deps,
     );
     expect(result).toMatchObject({ type: "accepted", acceptance: { accountId: "account-1" } });
