@@ -4,6 +4,7 @@ import { RouteErrorBoundary } from "./components/route-error-boundary";
 import { config } from "./config";
 import { issueRecoveryCode } from "./feature/account-recovery/infrastructure/account-recovery-api";
 import { AccountRecoveryScreen } from "./feature/account-recovery/presentation/account-recovery-screen";
+import { createCustomerPortalSession } from "./feature/billing/infrastructure/billing-api";
 import { ServiceTermsAcceptanceHistory, ServiceTermsGate } from "./feature/legal";
 import { LiffSessionProvider, useLiffSession } from "./feature/liff";
 import { getLiffIdToken } from "./feature/liff/infrastructure/liff-client";
@@ -367,6 +368,14 @@ function AppContents() {
     return await issueRecoveryCode(config.apiUrl, idToken);
   };
 
+  const openBillingPortal = async (): Promise<void> => {
+    const controller = new AbortController();
+    const idToken = getLiffIdToken() ?? (await liffSession.acquireIdToken(controller.signal));
+    if (!idToken) throw new Error("LINEからプロフィールを開き直してください。");
+    const url = await createCustomerPortalSession(config.apiUrl, idToken, controller.signal);
+    window.location.assign(url);
+  };
+
   return (
     <>
       {!isAdminPath && profileView === "closed" && (
@@ -424,6 +433,7 @@ function AppContents() {
               onBack={closeProfile}
               onOpenAdmin={openAdmin}
               onOpenAvatar={openAvatar}
+              onOpenBillingPortal={openBillingPortal}
               canOpenBrainItems={DEVELOPMENT_ENVIRONMENTS.has(config.environment ?? "")}
               onOpenBrainItems={openBrainItems}
               onRetryProfile={() => setProfileReloadKey((current) => current + 1)}

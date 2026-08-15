@@ -2,6 +2,7 @@ import {
   ArrowLeft,
   Brain,
   ChevronRight,
+  CreditCard,
   FileText,
   Moon,
   RefreshCw,
@@ -54,6 +55,7 @@ export function ProfileSettingsScreen({
   onBack,
   onOpenAdmin,
   onOpenAvatar,
+  onOpenBillingPortal,
   canOpenBrainItems = false,
   onOpenBrainItems,
   onRetryProfile,
@@ -76,6 +78,7 @@ export function ProfileSettingsScreen({
   onBack: () => void;
   onOpenAdmin?: () => void;
   onOpenAvatar: () => void;
+  onOpenBillingPortal?: () => Promise<void>;
   canOpenBrainItems?: boolean;
   onOpenBrainItems?: () => void;
   onRetryProfile?: () => void;
@@ -96,6 +99,20 @@ export function ProfileSettingsScreen({
   const [recoveryCodeState, setRecoveryCodeState] = useState<
     AsyncState<{ code: string; expiresAt: string }>
   >({ status: "idle" });
+  const [billingState, setBillingState] = useState<AsyncState<string>>({ status: "idle" });
+
+  const openBillingPortal = useCallback(async () => {
+    if (!onOpenBillingPortal) return;
+    setBillingState({ status: "loading" });
+    try {
+      await onOpenBillingPortal();
+    } catch (error) {
+      setBillingState({
+        status: "error",
+        message: errorMessage(error, "契約管理を開けませんでした。"),
+      });
+    }
+  }, [onOpenBillingPortal]);
 
   const resetAccountData = useCallback(async () => {
     if (!onResetAccountData) return;
@@ -197,6 +214,41 @@ export function ProfileSettingsScreen({
             </div>
           </div>
         </section>
+
+        {onOpenBillingPortal && (
+          <section aria-labelledby="billing-setting-heading" className="mt-8">
+            <h2
+              id="billing-setting-heading"
+              className="px-1 text-sm font-bold tracking-wider text-slate-500 dark:text-slate-400"
+            >
+              契約とお支払い
+            </h2>
+            <button
+              type="button"
+              onClick={() => void openBillingPortal()}
+              disabled={billingState.status === "loading"}
+              className="mt-3 flex min-h-16 w-full items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-sky-300 hover:bg-sky-50/50 disabled:cursor-wait disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:border-slate-700 dark:bg-slate-800 dark:hover:border-sky-700 dark:hover:bg-sky-950/20"
+            >
+              <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-700 dark:bg-sky-400/15 dark:text-sky-200">
+                <CreditCard className="size-5" aria-hidden="true" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block font-bold text-slate-950 dark:text-white">
+                  {billingState.status === "loading" ? "契約管理を開いています..." : "契約を管理"}
+                </span>
+                <span className="mt-1 block text-sm text-slate-500 dark:text-slate-400">
+                  支払方法、請求履歴、プラン変更、解約を確認
+                </span>
+              </span>
+              <ChevronRight className="size-5 text-slate-400" aria-hidden="true" />
+            </button>
+            {billingState.status === "error" && (
+              <p role="alert" className="mt-3 px-1 text-sm text-rose-700 dark:text-rose-300">
+                {billingState.message}
+              </p>
+            )}
+          </section>
+        )}
 
         <section aria-labelledby="avatar-setting-heading" className="mt-8">
           <h2

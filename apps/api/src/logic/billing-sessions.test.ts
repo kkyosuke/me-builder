@@ -4,7 +4,7 @@ import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { describe, expect, it, vi } from "vitest";
-import { createBillingCheckoutSession } from "./billing-sessions";
+import { createBillingCheckoutSession, createBillingPortalSession } from "./billing-sessions";
 
 function createTestDb(): D1.shared.Client {
   const sqlite = new Database(":memory:");
@@ -131,5 +131,55 @@ describe("billing sessions", () => {
       }),
     ).resolves.toEqual({ type: "unavailable", reason: "existing_subscription" });
     expect(createCheckoutSession).not.toHaveBeenCalled();
+  });
+
+  it("creates a portal only for the authenticated Account customer", async () => {
+    const { db, owner, createSession } = await setup();
+    const other = await D1.shared.action.account.upsertIdentity(db, {
+      provider: "line_login",
+      providerAccountId: crypto.randomUUID(),
+    });
+    await D1.shared.action.billing.linkBillingCustomer(db, {
+      accountId: owner.id,
+      providerCustomerId: "cus_owner",
+    });
+    await D1.shared.action.billing.linkBillingCustomer(db, {
+      accountId: other.account.id,
+      providerCustomerId: "cus_other",
+    });
+    const createPortalSession = vi.fn().mockResolvedValue({
+      url: "https://billing.stripe.test/portal",
+    });
+    const provider = new billing.FakeBillingProvider({ createPortalSession });
+    await expect(
+      createBillingPortalSession({
+        idToken: "token",
+        lineLoginChannelId: "channel",
+        db,
+        provider,
+        webOrigin: "https://app.example.test",
+        createSession,
+      }),
+    ).resolves.toEqual({ type: "created", url: "https://billing.stripe.test/portal" });
+    expect(createPortalSession).toHaveBeenCalledWith({
+      customerId: "cus_owner",
+      returnUrl: "https://app.example.test/profile?billing=portal-return",
+    });
+  });
+
+  it("Customer対応がない本人にはPortalを作成しない", async () => {
+    const { db, createSession } = await setup();
+    const createPortalSession = vi.fn();
+    await expect(
+      createBillingPortalSession({
+        idToken: "token",
+        lineLoginChannelId: "channel",
+        db,
+        provider: new billing.FakeBillingProvider({ createPortalSession }),
+        webOrigin: "https://app.example.test",
+        createSession,
+      }),
+    ).resolves.toEqual({ type: "unavailable", reason: "customer_not_found" });
+    expect(createPortalSession).not.toHaveBeenCalled();
   });
 });
