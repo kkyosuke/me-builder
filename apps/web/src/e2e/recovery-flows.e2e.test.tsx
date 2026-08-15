@@ -34,6 +34,8 @@ const progression = {
   collectedPieces: 2,
   activePieces: 2,
   categoryCount: 2,
+  calculationVersion: 1,
+  highestLevel: 2,
 };
 const acceptedTermsStatus = {
   document: currentServiceTerms,

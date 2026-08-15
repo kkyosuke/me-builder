@@ -48,6 +48,8 @@ const emptyProgression = {
   collectedPieces: 0,
   activePieces: 0,
   categoryCount: 0,
+  calculationVersion: 1,
+  highestLevel: 1,
 };
 
 describe("Admin Account progression projection", () => {

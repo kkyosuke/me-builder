@@ -1709,6 +1709,14 @@
                     "categoryCount": {
                       "type": "integer",
                       "minimum": 0
+                    },
+                    "calculationVersion": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "highestLevel": {
+                      "type": "integer",
+                      "minimum": 1
                     }
                   },
                   "required": [
@@ -1718,7 +1726,9 @@
                     "nextLevelThreshold",
                     "collectedPieces",
                     "activePieces",
-                    "categoryCount"
+                    "categoryCount",
+                    "calculationVersion",
+                    "highestLevel"
                   ]
                 }
               }

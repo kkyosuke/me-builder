@@ -12,6 +12,8 @@ export const ProfileProgressionResponseSchema = v.object({
   collectedPieces: NonNegativeIntegerSchema,
   activePieces: NonNegativeIntegerSchema,
   categoryCount: NonNegativeIntegerSchema,
+  calculationVersion: v.pipe(v.number(), v.integer(), v.minValue(1)),
+  highestLevel: v.pipe(v.number(), v.integer(), v.minValue(1)),
 });
 
 export const profileProgressionRoute = describeRoute({

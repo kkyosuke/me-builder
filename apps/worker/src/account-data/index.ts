@@ -374,8 +374,7 @@ export class AccountData extends DurableObject<Env> {
       if (
         projectionState &&
         !projectionState.retryPending &&
-        projectionState.calculationVersion ===
-          D1.shared.action.adminAccount.UTSUSHI_PROGRESSION_CALCULATION_VERSION &&
+        projectionState.calculationVersion === progression.calculationVersion &&
         projectionState.growthValue === progression.growthValue &&
         projectionState.collectedPieces === progression.collectedPieces &&
         projectionState.activePieces === progression.activePieces
@@ -390,7 +389,7 @@ export class AccountData extends DurableObject<Env> {
       );
       await this.ctx.storage.put(PROGRESSION_PROJECTION_STATE_KEY, {
         retryPending: false,
-        calculationVersion: D1.shared.action.adminAccount.UTSUSHI_PROGRESSION_CALCULATION_VERSION,
+        calculationVersion: progression.calculationVersion,
         growthValue: progression.growthValue,
         collectedPieces: progression.collectedPieces,
         activePieces: progression.activePieces,

@@ -118,7 +118,7 @@ export async function upsertAccountProgressionProjection(
     .insert(accountProgressionProjections)
     .values({
       accountId,
-      calculationVersion: UTSUSHI_PROGRESSION_CALCULATION_VERSION,
+      calculationVersion: progression.calculationVersion,
       level: progression.level,
       growthValue: progression.growthValue,
       collectedPieces: progression.collectedPieces,
@@ -129,7 +129,7 @@ export async function upsertAccountProgressionProjection(
     .onConflictDoUpdate({
       target: accountProgressionProjections.accountId,
       set: {
-        calculationVersion: UTSUSHI_PROGRESSION_CALCULATION_VERSION,
+        calculationVersion: progression.calculationVersion,
         level: progression.level,
         growthValue: progression.growthValue,
         collectedPieces: progression.collectedPieces,

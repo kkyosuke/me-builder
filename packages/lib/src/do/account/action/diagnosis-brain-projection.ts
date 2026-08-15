@@ -307,6 +307,7 @@ async function saveProjection(
               revisionId: `diagnosis-projection:${head.id}:${head.currentBrainItemId}`,
               brainItemId: head.currentBrainItemId,
               derivationMethod: "deterministic" as const,
+              changeKind: "correction" as const,
             },
           }
         : {}),

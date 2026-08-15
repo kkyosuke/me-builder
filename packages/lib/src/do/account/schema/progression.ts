@@ -18,12 +18,15 @@ export const progressionEvents = sqliteTable(
       enum: [
         "initialization",
         "new_item",
+        "initial_evidence",
         "evidence_added",
+        "duplicate_evidence",
         "temporal_revision",
         "correction_revision",
         "inference_item",
       ],
     }).notNull(),
+    calculationVersion: integer("calculation_version").notNull().default(1),
     growthDelta: integer("growth_delta").notNull(),
     collectedPieceDelta: integer("collected_piece_delta").notNull(),
   },
@@ -47,6 +50,8 @@ export const progressionStates = sqliteTable(
       .references(() => accountDataIdentity.accountId),
     growthValue: integer("growth_value").notNull().default(0),
     collectedPieces: integer("collected_pieces").notNull().default(0),
+    calculationVersion: integer("calculation_version").notNull().default(1),
+    highestLevel: integer("highest_level").notNull().default(1),
   },
   (table) => [uniqueIndex("progression_state_account_idx").on(table.accountId)],
 );
@@ -61,6 +66,9 @@ export const progressionItemStates = sqliteTable(
       .references(() => accountDataIdentity.accountId),
     brainItemId: text("brain_item_id").notNull(),
     recognizedEvidenceCount: integer("recognized_evidence_count").notNull().default(0),
+    recognizedEvidenceFingerprintsJson: text("recognized_evidence_fingerprints_json")
+      .notNull()
+      .default("[]"),
   },
   (table) => [
     uniqueIndex("progression_item_state_item_idx").on(table.accountId, table.brainItemId),

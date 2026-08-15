@@ -6,6 +6,8 @@ export type UtsushiProgression = Readonly<{
   collectedPieces: number;
   activePieces: number;
   categoryCount: number;
+  calculationVersion: number;
+  highestLevel: number;
 }>;
 
 export function progressionPercentage(progression: UtsushiProgression): number {

@@ -20,6 +20,8 @@ describe("ProgressionSummaryCard", () => {
             collectedPieces: 58,
             activePieces: 48,
             categoryCount: 6,
+            calculationVersion: 1,
+            highestLevel: 12,
           },
         }}
       />,

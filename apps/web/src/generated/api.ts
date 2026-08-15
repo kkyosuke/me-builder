@@ -1312,6 +1312,8 @@ export interface operations {
             collectedPieces: number;
             activePieces: number;
             categoryCount: number;
+            calculationVersion: number;
+            highestLevel: number;
           };
         };
       };

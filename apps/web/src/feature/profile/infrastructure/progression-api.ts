@@ -15,6 +15,8 @@ const ResponseSchema = v.object({
   collectedPieces: CountSchema,
   activePieces: CountSchema,
   categoryCount: CountSchema,
+  calculationVersion: v.pipe(CountSchema, v.minValue(1)),
+  highestLevel: v.pipe(CountSchema, v.minValue(1)),
 }) satisfies v.GenericSchema<ApiResponse>;
 
 export async function fetchProfileProgression(

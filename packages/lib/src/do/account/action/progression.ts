@@ -8,10 +8,12 @@ import {
   progressionItemStates,
   progressionPendingEvents,
   progressionStates,
+  sourceRecordTextPayloads,
   sourceRecords,
 } from "../schema";
 
 const INITIALIZATION_ORIGIN_ID = "progression-v1";
+const UTSUSHI_PROGRESSION_CALCULATION_VERSION = 1;
 
 export type UtsushiProgression = Readonly<{
   level: number;
@@ -21,6 +23,8 @@ export type UtsushiProgression = Readonly<{
   collectedPieces: number;
   activePieces: number;
   categoryCount: number;
+  calculationVersion: number;
+  highestLevel: number;
 }>;
 
 type ProgressionEventKind = typeof progressionEvents.$inferInsert.kind;
@@ -36,13 +40,28 @@ function isInference(attributes: unknown, derivation: "ai" | "deterministic"): b
     : derivation === "ai";
 }
 
-function isDiaryItem(attributes: unknown): boolean {
-  return (
-    attributes !== null &&
-    typeof attributes === "object" &&
-    "sourceKind" in attributes &&
-    attributes.sourceKind === "diary"
-  );
+function evidenceFingerprint(sourceRecordId: string, contentHash: string | null): string {
+  return contentHash ? `content:${contentHash}` : `source:${sourceRecordId}`;
+}
+
+function readEvidenceFingerprints(value: string): Set<string> {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return new Set(
+      Array.isArray(parsed)
+        ? parsed.filter((entry): entry is string => typeof entry === "string")
+        : [],
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+function growthForKind(kind: ProgressionEventKind): number {
+  if (kind === "new_item") return 3;
+  if (kind === "evidence_added") return 1;
+  if (kind === "temporal_revision") return 2;
+  return 0;
 }
 
 function eventId(originType: ProgressionOriginType, originId: string): string {
@@ -92,6 +111,7 @@ function eventStatement(
       originType: input.originType,
       originId: input.originId,
       kind: input.kind,
+      calculationVersion: UTSUSHI_PROGRESSION_CALCULATION_VERSION,
       growthDelta: input.growthDelta,
       collectedPieceDelta: input.collectedPieceDelta,
       createdAt: input.at,
@@ -117,7 +137,12 @@ export function progressionLevel(growthValue: number): number {
   return Math.floor(Math.sqrt(growthValue / 5)) + 1;
 }
 
-type ProgressionTotals = Readonly<{ growthValue: number; collectedPieces: number }>;
+type ProgressionTotals = Readonly<{
+  growthValue: number;
+  collectedPieces: number;
+  calculationVersion: number;
+  highestLevel: number;
+}>;
 
 function isAvailableItem(
   item: Readonly<{
@@ -149,25 +174,25 @@ function itemProgressionEvent(
       validFrom: Date | null;
       validTo: Date | null;
     };
-    revision: boolean;
+    revisionKind: "correction" | "temporal" | null;
     initialization: boolean;
     at: Date;
   }>,
 ): Readonly<{ statement: D1BatchStatement; growthDelta: number; collectedPieceDelta: number }> {
   const inference = isInference(input.item.attributes, input.item.derivation);
-  const temporalRevision = input.revision && isDiaryItem(input.item.attributes);
+  const temporalRevision = input.revisionKind === "temporal";
   const availableAtInitialization = isAvailableItem(input.item, input.at);
   const growthDelta =
     input.initialization && !availableAtInitialization
       ? 0
       : temporalRevision
         ? 2
-        : input.revision || inference
+        : input.revisionKind || inference
           ? 0
           : 3;
   const kind: ProgressionEventKind = temporalRevision
     ? "temporal_revision"
-    : input.revision
+    : input.revisionKind
       ? "correction_revision"
       : inference
         ? "inference_item"
@@ -217,7 +242,10 @@ async function initializeProgressionEvents(
       .where(eq(brainItems.accountId, accountId))
       .all(),
     db
-      .select({ nextBrainItemId: brainItemRevisions.nextBrainItemId })
+      .select({
+        nextBrainItemId: brainItemRevisions.nextBrainItemId,
+        changeKind: brainItemRevisions.changeKind,
+      })
       .from(brainItemRevisions)
       .where(eq(brainItemRevisions.isDeleted, false))
       .all(),
@@ -225,6 +253,8 @@ async function initializeProgressionEvents(
       .select({
         id: brainItemEvidenceEdges.id,
         brainItemId: brainItemEvidenceEdges.brainItemId,
+        sourceRecordId: brainItemEvidenceEdges.sourceRecordId,
+        contentHash: sourceRecordTextPayloads.contentHash,
         relation: brainItemEvidenceEdges.relation,
         edgeIsDeleted: brainItemEvidenceEdges.isDeleted,
         sourceIsDeleted: sourceRecords.isDeleted,
@@ -239,6 +269,10 @@ async function initializeProgressionEvents(
       .from(brainItemEvidenceEdges)
       .innerJoin(brainItems, eq(brainItems.id, brainItemEvidenceEdges.brainItemId))
       .innerJoin(sourceRecords, eq(sourceRecords.id, brainItemEvidenceEdges.sourceRecordId))
+      .leftJoin(
+        sourceRecordTextPayloads,
+        eq(sourceRecordTextPayloads.sourceRecordId, sourceRecords.id),
+      )
       .leftJoin(
         progressionEvents,
         and(
@@ -263,8 +297,10 @@ async function initializeProgressionEvents(
       )
       .all(),
   ]);
-  const revisedItemIds = new Set(revisions.map(({ nextBrainItemId }) => nextBrainItemId));
-  const validEvidencePositionByItem = new Map<string, number>();
+  const revisionKindByItemId = new Map(
+    revisions.map(({ nextBrainItemId, changeKind }) => [nextBrainItemId, changeKind] as const),
+  );
+  const evidenceFingerprintsByItem = new Map<string, Set<string>>();
   const statements: D1BatchStatement[] = [];
   let growthValue = existingEvents.reduce((sum, event) => sum + event.growthDelta, 0);
   let collectedPieces = existingEvents.reduce((sum, event) => sum + event.collectedPieceDelta, 0);
@@ -284,16 +320,27 @@ async function initializeProgressionEvents(
         at,
       ) &&
       !isInference(evidence.itemAttributes, evidence.itemDerivation);
-    const position = validEvidencePositionByItem.get(evidence.brainItemId) ?? 0;
-    if (valid) validEvidencePositionByItem.set(evidence.brainItemId, position + 1);
+    const fingerprints = evidenceFingerprintsByItem.get(evidence.brainItemId) ?? new Set<string>();
+    const fingerprint = evidenceFingerprint(evidence.sourceRecordId, evidence.contentHash);
+    const duplicate = fingerprints.has(fingerprint);
+    const position = fingerprints.size;
+    if (valid && !duplicate) {
+      fingerprints.add(fingerprint);
+      evidenceFingerprintsByItem.set(evidence.brainItemId, fingerprints);
+    }
     if (evidence.progressionEventId) continue;
-    const growthDelta = valid && position > 0 ? 1 : 0;
+    const growthDelta = valid && !duplicate && position > 0 ? 1 : 0;
+    const kind: ProgressionEventKind = duplicate
+      ? "duplicate_evidence"
+      : position === 0
+        ? "initial_evidence"
+        : "evidence_added";
     statements.push(
       eventStatement(db, {
         accountId,
         originType: "evidence",
         originId: evidence.id,
-        kind: "evidence_added",
+        kind,
         growthDelta,
         collectedPieceDelta: 0,
         at,
@@ -307,7 +354,7 @@ async function initializeProgressionEvents(
       const event = itemProgressionEvent(db, {
         accountId,
         item,
-        revision: revisedItemIds.has(item.id),
+        revisionKind: revisionKindByItemId.get(item.id) ?? null,
         initialization: true,
         at,
       });
@@ -322,7 +369,10 @@ async function initializeProgressionEvents(
           id: `progression:item-state:v1:${item.id}`,
           accountId,
           brainItemId: item.id,
-          recognizedEvidenceCount: validEvidencePositionByItem.get(item.id) ?? 0,
+          recognizedEvidenceCount: evidenceFingerprintsByItem.get(item.id)?.size ?? 0,
+          recognizedEvidenceFingerprintsJson: JSON.stringify([
+            ...(evidenceFingerprintsByItem.get(item.id) ?? []),
+          ]),
           createdAt: at,
           updatedAt: at,
         })
@@ -355,6 +405,8 @@ async function initializeProgressionEvents(
       accountId,
       growthValue,
       collectedPieces,
+      calculationVersion: UTSUSHI_PROGRESSION_CALCULATION_VERSION,
+      highestLevel: progressionLevel(growthValue),
       createdAt: at,
       updatedAt: at,
     }),
@@ -362,7 +414,12 @@ async function initializeProgressionEvents(
   const [first, ...rest] = statements;
   if (!first) throw new Error("Progression initialization statements are missing");
   await db.batch([first, ...rest]);
-  return { growthValue, collectedPieces };
+  return {
+    growthValue,
+    collectedPieces,
+    calculationVersion: UTSUSHI_PROGRESSION_CALCULATION_VERSION,
+    highestLevel: progressionLevel(growthValue),
+  };
 }
 
 /** 初回だけ既存Brainを集計し、その後はBrain更新時に積んだ差分だけを反映する。 */
@@ -371,15 +428,54 @@ async function synchronizeProgressionEvents(
   accountId: string,
   at: Date,
 ): Promise<ProgressionTotals> {
-  const state = await db
+  let state = await db
     .select({
       growthValue: progressionStates.growthValue,
       collectedPieces: progressionStates.collectedPieces,
+      calculationVersion: progressionStates.calculationVersion,
+      highestLevel: progressionStates.highestLevel,
     })
     .from(progressionStates)
     .where(and(eq(progressionStates.accountId, accountId), eq(progressionStates.isDeleted, false)))
     .get();
   if (!state) return initializeProgressionEvents(db, accountId, at);
+  if (state.calculationVersion !== UTSUSHI_PROGRESSION_CALCULATION_VERSION) {
+    const events = await db
+      .select({ id: progressionEvents.id, kind: progressionEvents.kind })
+      .from(progressionEvents)
+      .where(
+        and(eq(progressionEvents.accountId, accountId), eq(progressionEvents.isDeleted, false)),
+      )
+      .all();
+    const growthValue = events.reduce((sum, event) => sum + growthForKind(event.kind), 0);
+    const highestLevel = Math.max(state.highestLevel, progressionLevel(growthValue));
+    const updates = events.map((event) =>
+      db
+        .update(progressionEvents)
+        .set({
+          calculationVersion: UTSUSHI_PROGRESSION_CALCULATION_VERSION,
+          growthDelta: growthForKind(event.kind),
+          updatedAt: at,
+        })
+        .where(eq(progressionEvents.id, event.id)),
+    );
+    const stateUpdate = db
+      .update(progressionStates)
+      .set({
+        growthValue,
+        calculationVersion: UTSUSHI_PROGRESSION_CALCULATION_VERSION,
+        highestLevel,
+        updatedAt: at,
+      })
+      .where(eq(progressionStates.accountId, accountId));
+    await db.batch([stateUpdate, ...updates]);
+    state = {
+      ...state,
+      growthValue,
+      calculationVersion: UTSUSHI_PROGRESSION_CALCULATION_VERSION,
+      highestLevel,
+    };
+  }
 
   const pending = await db
     .select({ id: progressionPendingEvents.id })
@@ -419,7 +515,10 @@ async function synchronizeProgressionEvents(
       .where(isNull(progressionEvents.id))
       .all(),
     db
-      .select({ nextBrainItemId: brainItemRevisions.nextBrainItemId })
+      .select({
+        nextBrainItemId: brainItemRevisions.nextBrainItemId,
+        changeKind: brainItemRevisions.changeKind,
+      })
       .from(brainItemRevisions)
       .innerJoin(
         progressionPendingEvents,
@@ -435,6 +534,8 @@ async function synchronizeProgressionEvents(
       .select({
         id: brainItemEvidenceEdges.id,
         brainItemId: brainItemEvidenceEdges.brainItemId,
+        sourceRecordId: brainItemEvidenceEdges.sourceRecordId,
+        contentHash: sourceRecordTextPayloads.contentHash,
         relation: brainItemEvidenceEdges.relation,
         edgeIsDeleted: brainItemEvidenceEdges.isDeleted,
         sourceIsDeleted: sourceRecords.isDeleted,
@@ -457,6 +558,10 @@ async function synchronizeProgressionEvents(
       .innerJoin(brainItems, eq(brainItems.id, brainItemEvidenceEdges.brainItemId))
       .innerJoin(sourceRecords, eq(sourceRecords.id, brainItemEvidenceEdges.sourceRecordId))
       .leftJoin(
+        sourceRecordTextPayloads,
+        eq(sourceRecordTextPayloads.sourceRecordId, sourceRecords.id),
+      )
+      .leftJoin(
         progressionEvents,
         and(
           eq(progressionEvents.accountId, accountId),
@@ -471,6 +576,8 @@ async function synchronizeProgressionEvents(
       .select({
         brainItemId: progressionItemStates.brainItemId,
         recognizedEvidenceCount: progressionItemStates.recognizedEvidenceCount,
+        recognizedEvidenceFingerprintsJson:
+          progressionItemStates.recognizedEvidenceFingerprintsJson,
       })
       .from(progressionItemStates)
       .innerJoin(
@@ -488,12 +595,14 @@ async function synchronizeProgressionEvents(
       .where(eq(progressionItemStates.accountId, accountId))
       .all(),
   ]);
-  const revisedItemIds = new Set(revisions.map(({ nextBrainItemId }) => nextBrainItemId));
-  const evidenceCountByItem = new Map(
-    itemEvidenceStates.map(({ brainItemId, recognizedEvidenceCount }) => [
-      brainItemId,
-      recognizedEvidenceCount,
-    ]),
+  const revisionKindByItemId = new Map(
+    revisions.map(({ nextBrainItemId, changeKind }) => [nextBrainItemId, changeKind] as const),
+  );
+  const evidenceFingerprintsByItem = new Map(
+    itemEvidenceStates.map(
+      ({ brainItemId, recognizedEvidenceFingerprintsJson }) =>
+        [brainItemId, readEvidenceFingerprints(recognizedEvidenceFingerprintsJson)] as const,
+    ),
   );
   const affectedItemIds = new Set(items.map(({ id }) => id));
   const statements: D1BatchStatement[] = [];
@@ -504,14 +613,16 @@ async function synchronizeProgressionEvents(
     const event = itemProgressionEvent(db, {
       accountId,
       item,
-      revision: revisedItemIds.has(item.id),
+      revisionKind: revisionKindByItemId.get(item.id) ?? null,
       initialization: false,
       at,
     });
     statements.push(event.statement);
     growthDelta += event.growthDelta;
     collectedPieceDelta += event.collectedPieceDelta;
-    if (!evidenceCountByItem.has(item.id)) evidenceCountByItem.set(item.id, 0);
+    if (!evidenceFingerprintsByItem.has(item.id)) {
+      evidenceFingerprintsByItem.set(item.id, new Set());
+    }
   }
 
   for (const evidence of evidenceRows) {
@@ -529,22 +640,31 @@ async function synchronizeProgressionEvents(
         at,
       ) &&
       !isInference(evidence.itemAttributes, evidence.itemDerivation);
-    const evidenceCount = evidenceCountByItem.get(evidence.brainItemId) ?? 0;
-    const eventGrowthDelta = valid && evidenceCount > 0 ? 1 : 0;
+    const fingerprints = evidenceFingerprintsByItem.get(evidence.brainItemId) ?? new Set<string>();
+    const fingerprint = evidenceFingerprint(evidence.sourceRecordId, evidence.contentHash);
+    const duplicate = fingerprints.has(fingerprint);
+    const evidenceCount = fingerprints.size;
+    const eventGrowthDelta = valid && !duplicate && evidenceCount > 0 ? 1 : 0;
+    const kind: ProgressionEventKind = duplicate
+      ? "duplicate_evidence"
+      : evidenceCount === 0
+        ? "initial_evidence"
+        : "evidence_added";
     statements.push(
       eventStatement(db, {
         accountId,
         originType: "evidence",
         originId: evidence.id,
-        kind: "evidence_added",
+        kind,
         growthDelta: eventGrowthDelta,
         collectedPieceDelta: 0,
         at,
       }),
     );
     growthDelta += eventGrowthDelta;
-    if (valid) {
-      evidenceCountByItem.set(evidence.brainItemId, evidenceCount + 1);
+    if (valid && !duplicate) {
+      fingerprints.add(fingerprint);
+      evidenceFingerprintsByItem.set(evidence.brainItemId, fingerprints);
       affectedItemIds.add(evidence.brainItemId);
     }
   }
@@ -557,14 +677,20 @@ async function synchronizeProgressionEvents(
           id: `progression:item-state:v1:${brainItemId}`,
           accountId,
           brainItemId,
-          recognizedEvidenceCount: evidenceCountByItem.get(brainItemId) ?? 0,
+          recognizedEvidenceCount: evidenceFingerprintsByItem.get(brainItemId)?.size ?? 0,
+          recognizedEvidenceFingerprintsJson: JSON.stringify([
+            ...(evidenceFingerprintsByItem.get(brainItemId) ?? []),
+          ]),
           createdAt: at,
           updatedAt: at,
         })
         .onConflictDoUpdate({
           target: [progressionItemStates.accountId, progressionItemStates.brainItemId],
           set: {
-            recognizedEvidenceCount: evidenceCountByItem.get(brainItemId) ?? 0,
+            recognizedEvidenceCount: evidenceFingerprintsByItem.get(brainItemId)?.size ?? 0,
+            recognizedEvidenceFingerprintsJson: JSON.stringify([
+              ...(evidenceFingerprintsByItem.get(brainItemId) ?? []),
+            ]),
             updatedAt: at,
           },
         }),
@@ -573,6 +699,8 @@ async function synchronizeProgressionEvents(
   const totals = {
     growthValue: state.growthValue + growthDelta,
     collectedPieces: state.collectedPieces + collectedPieceDelta,
+    calculationVersion: UTSUSHI_PROGRESSION_CALCULATION_VERSION,
+    highestLevel: Math.max(state.highestLevel, progressionLevel(state.growthValue + growthDelta)),
   };
   statements.push(
     db.delete(progressionPendingEvents).where(eq(progressionPendingEvents.accountId, accountId)),
@@ -614,7 +742,7 @@ export async function readUtsushiProgression(
   ]);
   const growthValue = totals.growthValue;
   const collectedPieces = totals.collectedPieces;
-  const level = progressionLevel(growthValue);
+  const level = Math.max(progressionLevel(growthValue), totals.highestLevel);
   return {
     level,
     growthValue,
@@ -623,5 +751,7 @@ export async function readUtsushiProgression(
     collectedPieces,
     activePieces: active?.activePieces ?? 0,
     categoryCount: active?.categoryCount ?? 0,
+    calculationVersion: totals.calculationVersion,
+    highestLevel: totals.highestLevel,
   };
 }
