@@ -124,4 +124,29 @@ describe("useCompatibilityShareContent", () => {
     expect(mocks.fetchCompatibilityShareContent.mock.calls[0]?.[2]).toBe("friend");
     expect(mocks.fetchCompatibilityShareContent.mock.calls[0]?.[3]).toBeInstanceOf(AbortSignal);
   });
+
+  it("LIFF復帰URLで指定されたカテゴリを最初に取得する", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      `/?liff.state=${encodeURIComponent("/me?shareCategory=friend")}`,
+    );
+    mocks.fetchCompatibilityShareContent.mockResolvedValue({
+      relationshipCategory: "friend",
+      aboutMe: null,
+      themes: [],
+      nextAction: "profile-summary",
+    });
+    const acquireIdToken = vi.fn(async () => "id-token");
+    const { result } = renderHook(() =>
+      useCompatibilityShareContent({
+        acquireIdToken,
+        latestProfileSummaryVersionId: "summary-version-1",
+      }),
+    );
+
+    await waitFor(() => expect(result.current.state.status).toBe("success"));
+    expect(result.current.relationshipCategory).toBe("friend");
+    expect(mocks.fetchCompatibilityShareContent.mock.calls[0]?.[2]).toBe("friend");
+  });
 });

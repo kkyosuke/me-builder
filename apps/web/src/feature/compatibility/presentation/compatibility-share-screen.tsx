@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import { SkeletonBlock, SkeletonLoader } from "../../../components/skeleton";
 import type { AsyncState } from "../../../model/async-state";
+import { navigateWithinApp } from "../../../model/internal-navigation";
+import { preloadMainApplication } from "../../../routes";
 import {
   diagnosisCategoryHref,
   getRelationshipCategoryLabel,
@@ -209,6 +211,7 @@ function ShareConsentContent({
     guide && consent?.nextAction === "diagnosis" && relationshipCategory
       ? diagnosisCategoryHref(relationshipCategory)
       : guide?.href;
+  const shareContentHref = compatibilityShareContentHref(relationshipCategory ?? "partner");
 
   return (
     <>
@@ -216,7 +219,10 @@ function ShareConsentContent({
       <p className="mt-4 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
         この相手とうつしをシェアしていいかだけを確認します。共有した後は、増えた分も自動で共有されます。共有される内容は
         <a
-          href={compatibilityShareContentHref(relationshipCategory ?? "partner")}
+          href={shareContentHref}
+          onClick={(event) => navigateWithinApp(event, shareContentHref)}
+          onPointerEnter={() => preloadMainApplication("me")}
+          onFocus={() => preloadMainApplication("me")}
           className="font-bold text-sky-700 underline underline-offset-4 dark:text-sky-300"
         >
           「わたし」

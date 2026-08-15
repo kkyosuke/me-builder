@@ -23,7 +23,10 @@ function firePointer(
 }
 
 describe("Compatibility flow", () => {
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    window.history.replaceState({}, "", "/");
+  });
 
   it("一覧読み込み中のスケルトンカード間に余白を空ける", () => {
     render(
@@ -283,6 +286,33 @@ describe("Compatibility flow", () => {
     expect(issueButton.hasAttribute("disabled")).toBe(false);
     fireEvent.click(issueButton);
     expect(onIssue).toHaveBeenCalledOnce();
+  });
+
+  it("共有内容の確認は選択カテゴリを保ったままアプリ内でわたしへ移動する", () => {
+    window.history.replaceState({}, "", "/compatibility/share?category=family");
+    const handlePopState = vi.fn();
+    window.addEventListener("popstate", handlePopState);
+    render(
+      <CompatibilityShareScreen
+        state={{
+          status: "success",
+          data: {
+            displayName: "わたし",
+            avatarUrl: null,
+            canShare: true,
+            blockingReasons: [],
+            nextAction: null,
+          },
+        }}
+        relationshipCategory="family"
+        onRetry={vi.fn()}
+      />,
+    );
+
+    expect(fireEvent.click(screen.getByRole("link", { name: "「わたし」" }))).toBe(false);
+    expect(window.location.pathname + window.location.search).toBe("/me?shareCategory=family");
+    expect(handlePopState).toHaveBeenCalledOnce();
+    window.removeEventListener("popstate", handlePopState);
   });
 
   it("共有画面の固定内容は初回取得を待たずに表示する", () => {

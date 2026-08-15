@@ -85,6 +85,17 @@ describe("CompatibilityShareApplication", () => {
     );
   });
 
+  it("LIFF復帰URLからカテゴリを復元する", () => {
+    window.history.replaceState(
+      {},
+      "",
+      `/?liff.state=${encodeURIComponent("/compatibility/share?category=family")}`,
+    );
+    render(<CompatibilityShareApplication />);
+
+    expect(mocks.screenProps?.relationshipCategory).toBe("family");
+  });
+
   it("共有処理中の連打では共有先を二重に開かない", () => {
     mocks.shareCompatibilityInvitationToLine.mockReturnValue(new Promise(() => undefined));
     render(<CompatibilityShareApplication />);

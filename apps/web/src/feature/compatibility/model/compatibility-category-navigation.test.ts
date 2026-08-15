@@ -12,6 +12,21 @@ describe("compatibility category navigation", () => {
     );
   });
 
+  it("LIFF復帰URLではliff.state内のカテゴリを復元する", () => {
+    expect(
+      compatibilityCategoryFromSearch(
+        `?liff.state=${encodeURIComponent("/compatibility/share?category=family")}`,
+        "category",
+      ),
+    ).toBe("family");
+    expect(
+      compatibilityCategoryFromSearch(
+        `?liff.state=${encodeURIComponent("/me?shareCategory=friend#share-content")}`,
+        "shareCategory",
+      ),
+    ).toBe("friend");
+  });
+
   it("未指定、定義外、共有対象外のカテゴリはパートナーへ戻す", () => {
     expect(compatibilityCategoryFromSearch("", "shareCategory")).toBe("partner");
     expect(compatibilityCategoryFromSearch("?shareCategory=unknown", "shareCategory")).toBe(
