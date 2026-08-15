@@ -28,7 +28,7 @@ export type UtsushiProgression = Readonly<{
   recentChanges: readonly UtsushiProgressionChange[];
 }>;
 
-export type UtsushiProgressionChange = Readonly<{
+type UtsushiProgressionChange = Readonly<{
   kind: "new_piece" | "evidence_deepened" | "temporal_change";
   growthDelta: number;
   occurredAt: string;
