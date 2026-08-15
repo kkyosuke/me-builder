@@ -985,6 +985,7 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
             }),
             expect.objectContaining({
               id: "family-partnership-agreement",
+              label: "結婚の選択",
               score: 100,
               coverage: 100,
             }),

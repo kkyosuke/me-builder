@@ -287,8 +287,8 @@ INSERT OR IGNORE INTO question_versions (
   (1786755600, 1786755600, 0, 'q-family-expectation-choice-04', 1, 'approved', '興味のある進路と家族が安心する進路が異なるときは、家族の安心より自分の関心を優先したい。', 'single_choice', 1786755600),
   (1786755600, 1786755600, 0, 'q-family-expectation-choice-05', 1, 'approved', '働き方を大きく変えると決めたときは、家族が納得してから進めたい。', 'single_choice', 1786755600),
   (1786755600, 1786755600, 0, 'q-family-expectation-choice-06', 1, 'approved', '働き方を大きく変えると決めたときは、家族が納得していなくても、自分の考えが決まっていれば進めたい。', 'single_choice', 1786755600),
-  (1786755600, 1786755600, 0, 'q-family-expectation-choice-07', 1, 'approved', '交際や結婚について家族が心配しているときは、自分の考えが決まっていても、家族が納得するまで決定を待ちたい。', 'single_choice', 1786755600),
-  (1786755600, 1786755600, 0, 'q-family-expectation-choice-08', 1, 'approved', '交際や結婚について家族が心配しているときは、家族が納得していなくても、自分の考えが決まっていれば決定を進めたい。', 'single_choice', 1786755600),
+  (1786755600, 1786755600, 0, 'q-family-expectation-choice-07', 1, 'approved', '結婚を考えている相手について家族が心配しているときは、自分の考えが決まっていても、家族が納得するまで結婚へ進むのを待ちたい。', 'single_choice', 1786755600),
+  (1786755600, 1786755600, 0, 'q-family-expectation-choice-08', 1, 'approved', '結婚を考えている相手について家族が心配しているときは、家族が納得していなくても、自分の考えが決まっていれば結婚へ進みたい。', 'single_choice', 1786755600),
   (1786755600, 1786755600, 0, 'q-family-expectation-choice-09', 1, 'approved', '住む場所を選ぶとき、自分の希望と家族の近くで暮らすことが両立しなければ、家族との近さを優先したい。', 'single_choice', 1786755600),
   (1786755600, 1786755600, 0, 'q-family-expectation-choice-10', 1, 'approved', '住む場所を選ぶとき、希望する地域が家族から離れていても、自分の生活条件を優先したい。', 'single_choice', 1786755600);
 --> statement-breakpoint
@@ -871,7 +871,7 @@ INSERT OR IGNORE INTO diagnosis_scoring_configs (
         {"id":"family-choice-consultation","label":"大きな選択の相談","lowLabel":"自分の考えを固めてから話したい","highLabel":"早い段階で家族に相談したい"},
         {"id":"family-career-direction","label":"進路を選ぶ基準","lowLabel":"自分の関心を優先したい","highLabel":"家族の安心を優先したい"},
         {"id":"family-work-change-agreement","label":"働き方を変えるとき","lowLabel":"自分の判断で進めたい","highLabel":"家族の納得を得て進めたい"},
-        {"id":"family-partnership-agreement","label":"交際・結婚の選択","lowLabel":"自分の判断で進めたい","highLabel":"家族の納得を待ちたい"},
+        {"id":"family-partnership-agreement","label":"結婚の選択","lowLabel":"自分の判断で進めたい","highLabel":"家族の納得を待ちたい"},
         {"id":"family-residence-priority","label":"住む場所を選ぶ基準","lowLabel":"自分の生活条件を優先したい","highLabel":"家族との近さを優先したい"}
       ],
       "choiceScores": {"yes":1,"no":-1},
@@ -921,7 +921,7 @@ INSERT INTO diagnoses (
   ('friendship-style', 1786665600, 1786665600, 0, '友達との距離感・付き合い方', '友達との連絡、会う予定、悩みの共有、友達同士の紹介、違和感を話す時期に関する傾向を見ます。', 'friend', 'friendship-style-v1', 100, 1786665600, 'published', 1786665600),
   ('decision-making-style', 1786719600, 1786719600, 0, '決め方・迷いとの向き合い方', '情報収集、決める時期、直感、周囲への相談、決定の見直しに関する傾向を見ます。', 'general', 'decision-making-style-v1', 110, 1786719600, 'published', 1786719600),
   ('work-priority-style', 1786752000, 1786752000, 0, '仕事の進め方・優先順位', '仕上げの区切り、並行作業、提出のタイミング、計画変更、途中経過の共有に関する傾向を見ます。', 'work', 'work-priority-style-v1', 120, 1786752000, 'published', 1786752000),
-  ('family-expectation-choice', 1786755600, 1786755600, 0, '家族の期待と自分の選択', '家族への相談、進路、働き方の変更、交際や結婚、住む場所を選ぶときに、家族の意向をどのように取り入れたいかを見ます。', 'family', 'family-expectation-choice-v1', 130, 1786755600, 'published', 1786755600)
+  ('family-expectation-choice', 1786755600, 1786755600, 0, '家族の期待と自分の選択', '家族への相談、進路、働き方の変更、結婚、住む場所を選ぶときに、家族の意向をどのように取り入れたいかを見ます。', 'family', 'family-expectation-choice-v1', 130, 1786755600, 'published', 1786755600)
 ON CONFLICT(id) DO UPDATE SET
   description = CASE
     WHEN diagnoses.description = '' THEN excluded.description
