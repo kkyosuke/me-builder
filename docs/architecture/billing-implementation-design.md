@@ -17,7 +17,7 @@
 - CheckoutやPortalの画面仕様
 - Account復旧の本人確認手順
 
-価格と権限は[サブスクリプション・料金プラン設計](../product/subscription-plan-design.md)、実装順は[サブスクリプション実装残タスク](../development/subscription-remaining-tasks.md)を正とします。Account復旧の本人確認は後続設計へ委ねます。
+価格と権限は[サブスクリプション・料金プラン設計](../product/subscription-plan-design.md)、実装順は[サブスクリプション実装残タスク](../development/subscription-remaining-tasks.md)、本人確認は[Account復旧設計](account-recovery-design.md)を正とします。
 
 ## 2. 正本と保存境界
 
