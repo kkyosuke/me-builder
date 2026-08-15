@@ -19,6 +19,7 @@ import type { AvatarSelection } from "./feature/profile-settings/model/avatar";
 import { ProfileMenuButton } from "./feature/profile-settings/presentation/components/profile-menu-button";
 import { useColorTheme, useFontSize } from "./feature/theme";
 import { resolveRequestedPathname } from "./infrastructure/requested-pathname";
+import { restoreWindowScroll } from "./model/scroll-restoration";
 import {
   getIdleMainApplicationRoutes,
   loadAdminApplication,
@@ -82,39 +83,6 @@ function uploadedAvatar(profile: AccountProfile): AvatarSelection | null {
   return profile.avatar?.source === "uploaded"
     ? { kind: "uploaded", dataUrl: profile.avatar.url, fileName: "" }
     : null;
-}
-
-function restoreWindowScroll(top: number): () => void {
-  let animationFrameId: number | null = null;
-  let resizeObserver: ResizeObserver | null = null;
-  let timeoutId: number | null = null;
-  let stopped = false;
-
-  const stop = () => {
-    if (stopped) return;
-    stopped = true;
-    if (animationFrameId !== null) window.cancelAnimationFrame(animationFrameId);
-    resizeObserver?.disconnect();
-    if (timeoutId !== null) window.clearTimeout(timeoutId);
-  };
-  const apply = () => {
-    animationFrameId = null;
-    window.scrollTo(0, top);
-    if (Math.abs(window.scrollY - top) <= 1) stop();
-  };
-  const schedule = () => {
-    if (stopped || animationFrameId !== null) return;
-    animationFrameId = window.requestAnimationFrame(apply);
-  };
-
-  apply();
-  if (!stopped && typeof ResizeObserver !== "undefined") {
-    resizeObserver = new ResizeObserver(schedule);
-    resizeObserver.observe(document.body);
-  }
-  if (!stopped) timeoutId = window.setTimeout(stop, 5_000);
-
-  return stop;
 }
 
 function focusMainRouteHeading(container: HTMLElement, route: MainRoute): () => void {

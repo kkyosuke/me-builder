@@ -4,14 +4,18 @@ import {
   resolveCompatibilityInvitationId,
   resolveCompatibilityRelationshipId,
 } from "../model/compatibility-route";
+import {
+  loadCompatibilityInvitationApplication,
+  loadCompatibilityListApplication,
+  loadCompatibilityResultApplication,
+  loadCompatibilityShareApplication,
+} from "./compatibility-route-loaders";
 import { useCompatibilityRoute } from "./hooks/use-compatibility-route";
 
-const CompatibilityInvitationApplication = lazy(
-  () => import("./compatibility-invitation-application"),
-);
-const CompatibilityListApplication = lazy(() => import("./compatibility-list-application"));
-const CompatibilityResultApplication = lazy(() => import("./compatibility-result-application"));
-const CompatibilityShareApplication = lazy(() => import("./compatibility-share-application"));
+const CompatibilityInvitationApplication = lazy(loadCompatibilityInvitationApplication);
+const CompatibilityListApplication = lazy(loadCompatibilityListApplication);
+const CompatibilityResultApplication = lazy(loadCompatibilityResultApplication);
+const CompatibilityShareApplication = lazy(loadCompatibilityShareApplication);
 
 export default function CompatibilityApplication() {
   const { pathname, route } = useCompatibilityRoute();

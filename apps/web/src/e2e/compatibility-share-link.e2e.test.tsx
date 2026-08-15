@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resolveCompatibilityInvitationId } from "../feature/compatibility/model/compatibility-route";
 import CompatibilityApplication from "../feature/compatibility/presentation/compatibility-application";
 import CompatibilityInvitationApplication from "../feature/compatibility/presentation/compatibility-invitation-application";
@@ -44,9 +44,14 @@ vi.mock("../feature/liff", () => ({
 }));
 
 describe("LIFF compatibility share link journey", () => {
+  beforeEach(() => {
+    vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
+  });
+
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
+    vi.restoreAllMocks();
   });
 
   it("共有リンク発行からLINE送信・承諾・相性表示・共有終了までUIで完了する", async () => {
@@ -118,7 +123,11 @@ describe("LIFF compatibility share link journey", () => {
     render(<CompatibilityApplication />);
 
     fireEvent.click(await screen.findByRole("radio", { name: "パートナー" }));
-    fireEvent.click(await screen.findByRole("button", { name: "共有して招待リンクを発行する" }));
+    const issueButton = await screen.findByRole("button", {
+      name: "共有して招待リンクを発行する",
+    });
+    await waitFor(() => expect(issueButton.hasAttribute("disabled")).toBe(false));
+    fireEvent.click(issueButton);
     await waitFor(() =>
       expect(mocks.issueCompatibilityInvitation).toHaveBeenCalledWith(
         undefined,

@@ -7,6 +7,7 @@ import {
   RotateCw,
   Send,
 } from "lucide-react";
+import { InternalLink } from "../../../components/internal-link";
 import { MainNavigation } from "../../../components/main-navigation";
 import { SkeletonBlock, SkeletonLoader } from "../../../components/skeleton";
 import type { AsyncState } from "../../../model/async-state";
@@ -18,10 +19,12 @@ import {
   getRelationshipCategoryFilterClassName,
   getRelationshipCategoryLabel,
 } from "../../diagnosis/model/relationship-category";
+import { compatibilityShareContentHref } from "../model/compatibility-category-navigation";
 import type {
   CompatibilityRelationshipList,
   CompatibilityRelationshipListItem,
 } from "../model/compatibility-relationship";
+import { preloadCompatibilityRoute } from "./compatibility-route-loaders";
 
 type PendingItem = Extract<CompatibilityRelationshipListItem, { status: "pending" }>;
 type AcceptedItem = Extract<CompatibilityRelationshipListItem, { status: "accepted" }>;
@@ -47,7 +50,7 @@ function waitingGuide(item: WaitingItem): {
   if (item.readiness.nextAction === "profile-summary") {
     return {
       message: "「わたしのまとめ」を作ると、あなたの「私について」が共有されます。",
-      href: "/me",
+      href: compatibilityShareContentHref(item.relationshipCategory),
       label: "わたしのまとめを作る",
     };
   }
@@ -111,6 +114,7 @@ export function CompatibilityListScreen({
         <h1
           tabIndex={-1}
           data-main-route-heading="compatibility"
+          data-compatibility-route-heading="list"
           className="mt-2 text-3xl font-bold text-slate-950 focus:outline-none dark:text-slate-50"
         >
           ふたりの見取り図
@@ -118,8 +122,9 @@ export function CompatibilityListScreen({
         <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
           2人の共通点や違いを、これからの会話のきっかけにします。
         </p>
-        <a
+        <InternalLink
           href="/compatibility/share"
+          onPreload={() => preloadCompatibilityRoute("share")}
           className="mt-6 flex min-h-12 items-center justify-between rounded-2xl bg-rose-400 px-5 py-3 font-bold text-rose-950 shadow-lg shadow-rose-500/20"
         >
           <span className="flex items-center gap-2">
@@ -127,7 +132,7 @@ export function CompatibilityListScreen({
             うつしをシェア
           </span>
           <ArrowRight className="size-5" aria-hidden="true" />
-        </a>
+        </InternalLink>
       </header>
 
       {state.status === "loading" && <ListSkeleton />}
@@ -224,13 +229,14 @@ export function CompatibilityListScreen({
                     <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
                       {item.readiness.comparableThemeCount}つのテーマで比較できます
                     </p>
-                    <a
+                    <InternalLink
                       href={`/compatibility/relationships/${item.relationshipId}`}
+                      onPreload={() => preloadCompatibilityRoute("result")}
                       className="mt-4 flex min-h-11 items-center justify-between rounded-xl bg-slate-950 px-4 text-sm font-bold text-white dark:bg-slate-50 dark:text-slate-950"
                     >
                       2人の相性シートを見る
                       <ArrowRight className="size-4" aria-hidden="true" />
-                    </a>
+                    </InternalLink>
                   </article>
                 ))}
               </div>
@@ -268,21 +274,25 @@ export function CompatibilityListScreen({
                         {guide.message}
                       </p>
                       {guide.href && guide.label && (
-                        <a
+                        <InternalLink
                           href={guide.href}
+                          preloadRoute={
+                            item.readiness.nextAction === "diagnosis" ? "diagnosis" : "me"
+                          }
                           className="mt-4 flex min-h-11 items-center justify-between rounded-xl bg-amber-400 px-4 text-sm font-bold text-amber-950"
                         >
                           {guide.label}
                           <ArrowRight className="size-4" aria-hidden="true" />
-                        </a>
+                        </InternalLink>
                       )}
-                      <a
+                      <InternalLink
                         href={`/compatibility/relationships/${item.relationshipId}`}
+                        onPreload={() => preloadCompatibilityRoute("result")}
                         className={`${guide.href ? "mt-2" : "mt-4"} flex min-h-11 items-center justify-between rounded-xl border border-amber-300 px-4 text-sm font-bold text-amber-900 dark:border-amber-700 dark:text-amber-200`}
                       >
                         共有の確認・終了
                         <ArrowRight className="size-4" aria-hidden="true" />
-                      </a>
+                      </InternalLink>
                     </article>
                   );
                 })}

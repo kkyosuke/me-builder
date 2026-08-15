@@ -70,7 +70,13 @@ export function CompatibilityResultScreen({
       >
         {getRelationshipCategoryLabel(relationshipCategory)}
       </p>
-      <h1 className="mt-1 text-3xl font-bold text-slate-950 dark:text-slate-50">2人の相性シート</h1>
+      <h1
+        tabIndex={-1}
+        data-compatibility-route-heading="result"
+        className="mt-1 text-3xl font-bold text-slate-950 focus:outline-none dark:text-slate-50"
+      >
+        2人の相性シート
+      </h1>
       <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
         回答から見える範囲で作った、私たちを知るための資料です。人物や関係の良し悪しを決めるものではありません。
       </p>

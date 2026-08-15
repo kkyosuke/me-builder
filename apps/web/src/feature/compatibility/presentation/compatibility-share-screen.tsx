@@ -11,10 +11,9 @@ import {
   RefreshCw,
   Send,
 } from "lucide-react";
+import { InternalLink } from "../../../components/internal-link";
 import { SkeletonBlock, SkeletonLoader } from "../../../components/skeleton";
 import type { AsyncState } from "../../../model/async-state";
-import { navigateWithinApp } from "../../../model/internal-navigation";
-import { preloadMainApplication } from "../../../routes";
 import {
   diagnosisCategoryHref,
   getRelationshipCategoryLabel,
@@ -66,12 +65,10 @@ const categorySelectorClassNames: Record<
 const nextActionGuides = {
   diagnosis: {
     message: "診断に答えると、2人で比べられるテーマが増えます。",
-    href: "/diagnosis",
     label: "診断を始める",
   },
   "profile-summary": {
     message: "「わたしのまとめ」ができると、「私について」も共有されます。",
-    href: "/me",
     label: "わたしの傾向を作る",
   },
 } as const;
@@ -208,25 +205,29 @@ function ShareConsentContent({
   const consent = state.status === "success" ? state.data : null;
   const guide = consent?.nextAction ? nextActionGuides[consent.nextAction] : null;
   const guideHref =
-    guide && consent?.nextAction === "diagnosis" && relationshipCategory
+    consent?.nextAction === "diagnosis" && relationshipCategory
       ? diagnosisCategoryHref(relationshipCategory)
-      : guide?.href;
+      : compatibilityShareContentHref(relationshipCategory ?? "partner");
   const shareContentHref = compatibilityShareContentHref(relationshipCategory ?? "partner");
 
   return (
     <>
-      <h1 className="mt-5 text-3xl font-bold text-slate-950 dark:text-slate-50">うつしをシェア</h1>
+      <h1
+        tabIndex={-1}
+        data-compatibility-route-heading="share"
+        className="mt-5 text-3xl font-bold text-slate-950 focus:outline-none dark:text-slate-50"
+      >
+        うつしをシェア
+      </h1>
       <p className="mt-4 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
         この相手とうつしをシェアしていいかだけを確認します。共有した後は、増えた分も自動で共有されます。共有される内容は
-        <a
+        <InternalLink
           href={shareContentHref}
-          onClick={(event) => navigateWithinApp(event, shareContentHref)}
-          onPointerEnter={() => preloadMainApplication("me")}
-          onFocus={() => preloadMainApplication("me")}
+          preloadRoute="me"
           className="font-bold text-sky-700 underline underline-offset-4 dark:text-sky-300"
         >
           「わたし」
-        </a>
+        </InternalLink>
         からいつでも確認できます。
       </p>
 
@@ -274,12 +275,13 @@ function ShareConsentContent({
       {guide && (
         <section className="mt-8 rounded-2xl border border-sky-300/60 bg-sky-50 p-4 dark:border-sky-500/30 dark:bg-sky-950/30">
           <p className="text-sm leading-relaxed text-sky-950 dark:text-sky-100">{guide.message}</p>
-          <a
+          <InternalLink
             href={guideHref}
+            preloadRoute={consent?.nextAction === "diagnosis" ? "diagnosis" : "me"}
             className="mt-3 flex min-h-11 items-center justify-center rounded-xl bg-sky-300 px-4 py-2 text-sm font-bold text-sky-950"
           >
             {guide.label}
-          </a>
+          </InternalLink>
         </section>
       )}
       {consent && consent.blockingReasons.length > 0 && (

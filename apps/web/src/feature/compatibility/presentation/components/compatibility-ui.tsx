@@ -1,6 +1,9 @@
 import { ArrowLeft } from "lucide-react";
 import { useState } from "react";
+import { InternalLink } from "../../../../components/internal-link";
 import type { CompatibilityPerson } from "../../model/compatibility";
+import { resolveCompatibilityRoute } from "../../model/compatibility-route";
+import { preloadCompatibilityRoute } from "../compatibility-route-loaders";
 
 export function CompatibilityAvatar({
   person,
@@ -73,13 +76,14 @@ export function CompatibilityBackHeader({
 }) {
   return (
     <header>
-      <a
+      <InternalLink
         href={href}
+        onPreload={() => preloadCompatibilityRoute(resolveCompatibilityRoute(href))}
         className="inline-flex min-h-11 items-center gap-2 rounded-xl pr-3 text-sm font-bold text-sky-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400 dark:text-sky-200"
       >
         <ArrowLeft className="size-5" aria-hidden="true" />
         {label}
-      </a>
+      </InternalLink>
     </header>
   );
 }

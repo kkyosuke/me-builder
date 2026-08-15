@@ -1,5 +1,7 @@
 import { LoaderCircle, ShieldCheck } from "lucide-react";
+import { InternalLink } from "../../../../components/internal-link";
 import type { AsyncState } from "../../../../model/async-state";
+import { preloadCompatibilityRoute } from "../compatibility-route-loaders";
 
 export function CompatibilitySharingEndedScreen() {
   return (
@@ -8,18 +10,23 @@ export function CompatibilitySharingEndedScreen() {
         <span className="mx-auto flex size-16 items-center justify-center rounded-3xl bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300">
           <ShieldCheck className="size-8" aria-hidden="true" />
         </span>
-        <h1 className="mt-5 text-2xl font-bold text-slate-950 dark:text-slate-50">
+        <h1
+          tabIndex={-1}
+          data-compatibility-route-heading="result"
+          className="mt-5 text-2xl font-bold text-slate-950 focus:outline-none dark:text-slate-50"
+        >
           共有を終了しました
         </h1>
         <p className="mt-3 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
           2人ともこの相性シートを見られなくなりました。もう一度始めるには、新しい招待と双方の承諾が必要です。
         </p>
-        <a
+        <InternalLink
           href="/compatibility"
+          onPreload={() => preloadCompatibilityRoute("list")}
           className="mt-6 flex min-h-12 items-center justify-center rounded-2xl bg-slate-950 px-5 py-3 font-bold text-white dark:bg-slate-50 dark:text-slate-950"
         >
           相性一覧へ戻る
-        </a>
+        </InternalLink>
       </section>
     </main>
   );

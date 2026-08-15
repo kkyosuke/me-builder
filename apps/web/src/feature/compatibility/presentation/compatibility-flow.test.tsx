@@ -108,7 +108,7 @@ describe("Compatibility flow", () => {
       "/diagnosis?category=friend",
     );
     expect(screen.getByRole("link", { name: "わたしのまとめを作る" }).getAttribute("href")).toBe(
-      "/me",
+      "/me?shareCategory=work",
     );
     expect(
       screen
@@ -500,6 +500,29 @@ describe("Compatibility flow", () => {
     ).toBe(false);
   });
 
+  it("共有画面からわたしのまとめへ選択中のカテゴリを引き継ぐ", () => {
+    render(
+      <CompatibilityShareScreen
+        state={{
+          status: "success",
+          data: {
+            displayName: "うさぎ",
+            avatarUrl: null,
+            canShare: true,
+            blockingReasons: [],
+            nextAction: "profile-summary",
+          },
+        }}
+        onRetry={vi.fn()}
+        relationshipCategory="family"
+      />,
+    );
+
+    expect(screen.getByRole("link", { name: "わたしの傾向を作る" }).getAttribute("href")).toBe(
+      "/me?shareCategory=family",
+    );
+  });
+
   it("表示名を確認できない場合は招待リンクを発行できない", () => {
     render(
       <CompatibilityShareScreen
@@ -559,6 +582,30 @@ describe("Compatibility flow", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "相性を見てみる" }));
     expect(onAccept).toHaveBeenCalledOnce();
+  });
+
+  it("招待の確認からわたしのまとめへ関係カテゴリを引き継ぐ", () => {
+    render(
+      <CompatibilityInvitationScreen
+        state={{
+          status: "success",
+          data: {
+            relationshipCategory: "friend",
+            inviter: { displayName: "あおい", avatarUrl: null },
+            recipient: { displayName: "はる", avatarUrl: null },
+            expiresAt: "2026-08-26T00:00:00.000Z",
+            canAccept: true,
+            blockingReasons: [],
+            nextAction: "profile-summary",
+          },
+        }}
+        onRetry={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("link", { name: "わたしの傾向を作る" }).getAttribute("href")).toBe(
+      "/me?shareCategory=friend",
+    );
   });
 
   it("人物ごとの資料と2人の共通点・違いをタブとスワイプで切り替える", () => {
