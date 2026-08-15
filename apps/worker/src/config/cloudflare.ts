@@ -1,4 +1,4 @@
-import { D1 } from "@me-builder/lib";
+import { D1, billing } from "@me-builder/lib";
 import type { AccountDataNamespace } from "@me-builder/lib";
 import type {
   BrainVectorSyncQueueMessage,
@@ -11,6 +11,7 @@ import type { Env } from "../types";
 
 export type CloudflareBindings = {
   d1: D1.shared.Client;
+  planAssignmentProvider?: billing.AccountPlanAssignmentProvider;
   do: {
     conversation: Env["CONVERSATION_COORDINATOR"];
     accountData?: AccountDataNamespace;
@@ -28,6 +29,8 @@ export type CloudflareBindings = {
 export function getCloudflareBindings(env: Env): CloudflareBindings {
   return {
     d1: D1.shared.client.create(env.DB),
+    planAssignmentProvider:
+      env.ACCOUNT_PLAN_ASSIGNMENT_PROVIDER ?? new billing.FakeAccountPlanAssignmentProvider(),
     do: {
       conversation: env.CONVERSATION_COORDINATOR,
       ...(env.ACCOUNT_DATA ? { accountData: env.ACCOUNT_DATA } : {}),

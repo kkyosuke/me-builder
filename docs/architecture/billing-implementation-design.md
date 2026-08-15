@@ -72,6 +72,14 @@ stateDiagram-v2
 
 予約中と確定済みを合わせて上限判定し、AccountDataの直列RPCとSQLiteの条件付きinsertをatomic境界にします。期間が変わっても過去行を削除せず、同じ期間内の上限変更は既存利用量を引き継ぎます。共有D1へrequest単位の利用履歴や個人内容を複製しません。
 
+### 3.3 機能境界への接続
+
+AI返信はChat Turn ID、プロフィール要約はGeneration IDをrequest IDとして、Workerが生成前に利用枠を予約します。プロフィール要約のAPIは受付前にも残量を確認しますが、競合を含む最終判定はWorkerのatomicな予約です。上限到達時も入力済みの日記と生成済みのまとめ版は残し、閲覧、本人データの訂正・削除・エクスポート、共有停止を制限しません。切迫した危機表現の固定安全案内はAIを呼ばず、利用枠の予約対象にも含めません。
+
+AI返信の月次枠は、FreeではUTC暦月、契約Planでは`AccountPlanAssignment.effectiveAt`を起点とする月ごとの期間です。Freeのまとめ枠はUnix epochから区切る固定90日窓とし、APIとWorkerは共通のperiod resolverから同じkeyと境界を得ます。意味検索は共通Entitlementの期間をAccountDataの最終再認可へ渡し、Freeは30日、Liteは365日、Fullとファミリーは期間制限なしで候補を絞ります。
+
+本人向けの`GET /api/profile/entitlement`はPlan、付与元、適用開始、利用可能期限と、AI返信・まとめ生成の上限、確定量、予約量、残量、次回更新日時だけを返します。支払者Account IDや決済事業者の識別子は返しません。provider障害時は`safe-default`としてFree権限を表示し、有料権限を推測しません。
+
 ## 4. 状態の変換
 
 有効な`trialing`または`active`契約はPrice catalogでPlanへ変換します。期間末解約予約中も期限までは現在Planを維持します。`past_due`などの猶予期間は商取引条件確定後の状態遷移で扱い、未知statusや未知Priceは有料権限を付与しません。契約終了後は既存データを削除せずFreeへ戻します。

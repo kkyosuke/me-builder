@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, inArray, isNull, lte, max, min, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, inArray, isNull, lte, max, min, or, sql } from "drizzle-orm";
 import type { AccountDataDatabase } from "../database";
 import {
   type DailyPromptLocalHour,
@@ -1156,6 +1156,7 @@ export async function loadBrainChatContextMemories(
   accountId: string,
   vectorIds: readonly string[],
   at = new Date(),
+  notBefore?: Date,
 ): Promise<readonly BrainChatContextMemory[]> {
   const candidateVectorIds = [...new Set(vectorIds.filter((id) => id.length > 0))].slice(
     0,
@@ -1222,6 +1223,7 @@ export async function loadBrainChatContextMemories(
               eq(brainItemEvidenceEdges.isDeleted, false),
               eq(sourceRecords.accountId, accountId),
               eq(sourceRecords.isDeleted, false),
+              ...(notBefore ? [gte(sourceRecords.createdAt, notBefore)] : []),
             ),
           )
           .groupBy(brainItemEvidenceEdges.brainItemId)
@@ -1259,6 +1261,7 @@ export async function loadBrainChatContextMemories(
                 eq(brainItemEvidenceEdges.isDeleted, false),
                 eq(sourceRecords.accountId, accountId),
                 eq(sourceRecords.isDeleted, false),
+                ...(notBefore ? [gte(sourceRecords.createdAt, notBefore)] : []),
               ),
             )
             .orderBy(desc(brainItemEvidenceEdges.generatedAt), desc(brainItemEvidenceEdges.id))

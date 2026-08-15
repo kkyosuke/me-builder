@@ -1,5 +1,5 @@
 import type { Queue } from "@cloudflare/workers-types";
-import type { AccountDataNamespace, CompatibilityDataNamespace } from "@me-builder/lib";
+import type { AccountDataNamespace, CompatibilityDataNamespace, billing } from "@me-builder/lib";
 import type {
   BrainVectorSyncQueueMessage,
   ChatTurnQueueMessage,
@@ -45,4 +45,6 @@ export type Env = Omit<
   CONVERSATION_COORDINATOR?: WorkerBindings["CONVERSATION_COORDINATOR"];
   ACCOUNT_DATA?: AccountDataNamespace;
   COMPATIBILITY_DATA?: CompatibilityDataNamespace;
+  /** テスト・previewの注入境界。未指定時はFreeへ安全に縮退する。 */
+  ACCOUNT_PLAN_ASSIGNMENT_PROVIDER?: billing.AccountPlanAssignmentProvider;
 };

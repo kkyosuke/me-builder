@@ -99,13 +99,13 @@ flowchart LR
 ```mermaid
 flowchart TD
     A[決済側<br/>SUB-A-001〜SUB-A-020] --> I[AccountPlanAssignment]
-    I --> L[Lite機能側<br/>本人データ操作 / SUB-B-005〜SUB-B-007 / SUB-B-016]
+    I --> L[Lite機能側<br/>本人データ操作 / SUB-B-006〜SUB-B-007 / SUB-B-016]
     L --> U[Full機能側<br/>SUB-B-008〜SUB-B-011 / SUB-B-016]
     U --> F[ファミリー機能側<br/>SUB-B-012〜SUB-B-016]
     F --> R[段階公開<br/>SUB-B-017]
 ```
 
-決済側は`SUB-A-001`〜`SUB-A-020`で単独検証します。Liteは本人データの訂正・削除・エクスポート、`SUB-B-005`〜`SUB-B-007`、`SUB-B-016`、Fullはさらに`SUB-B-008`〜`SUB-B-011`、ファミリーパックはさらに`SUB-B-012`〜`SUB-B-015`を完了してから、`SUB-B-017`で決済側と統合します。未完了のPlanは購入対象へ出しません。
+決済側は`SUB-A-001`〜`SUB-A-020`で単独検証します。Liteは本人データの訂正・削除・エクスポート、`SUB-B-006`〜`SUB-B-007`、`SUB-B-016`、Fullはさらに`SUB-B-008`〜`SUB-B-011`、ファミリーパックはさらに`SUB-B-012`〜`SUB-B-015`を完了してから、`SUB-B-017`で決済側と統合します。未完了のPlanは購入対象へ出しません。
 
 ## 6. 並行して着手できる前提タスク
 
@@ -274,23 +274,11 @@ flowchart TD
 
 完了条件は、LINE Account喪失を想定したE2Eで、有料契約を復旧または解約できることです。
 
-## 9. ブランチB: 利用権限と上限
-
-### SUB-B-005 利用権限を機能と画面へ接続する
-
-依存: 共通Entitlement判定、AI利用量ledger
-
-- AI返信、まとめ生成、検索期間などを共通Entitlementで制御し、API / Workerを最終境界にする
-- 契約状態、更新日、Plan、上限、残量を本人へ表示する
-- downgrade後の閲覧を維持し、削除、エクスポート、安全案内、共有停止を制限しない
-
-完了条件は、全PlanをE2Eで確認し、URL直打ちでも上位機能を実行できないことです。
-
 ## 10. ブランチB: Lite・Fullの継続価値
 
 ### SUB-B-006 Liteの週次振り返りを実装する
 
-依存: `SUB-B-005`
+依存: 共通Entitlementの機能接続
 
 - 確認済みの診断と日記から週1回の振り返りを生成・保存・表示する
 - 同じ週の重複生成、AI失敗、再試行、通知停止を扱う
@@ -300,7 +288,7 @@ flowchart TD
 
 ### SUB-B-007 Free・Liteの関係性を考慮した質問を実装する
 
-依存: `SUB-B-005`
+依存: 共通Entitlementの機能接続
 
 - 相手とRelationship Categoryを確認し、1 turnに1問まで質問する
 - Freeは現在の発言、Liteは現在Sessionと本人の関連診断だけを参照する
@@ -320,7 +308,7 @@ flowchart TD
 
 ### SUB-B-009 Fullの月ごとの変化を実装する
 
-依存: `SUB-B-005`, `SUB-B-006`
+依存: `SUB-B-006`
 
 - 月単位の変化、継続中Goal、根拠を版付きで生成・表示する
 - Liteの短い表示とFullの横断表示を同じ生成規則から分岐する
@@ -330,7 +318,7 @@ flowchart TD
 
 ### SUB-B-010 Fullの行動フォローアップを実装する
 
-依存: `SUB-B-005`, `SUB-B-008`
+依存: `SUB-B-008`
 
 - 本人が合意したGoalと次の一歩だけを継続対象にする
 - Liteは1件、Fullは複数Goalから現在の話題に関係する1件を扱う
@@ -340,7 +328,7 @@ flowchart TD
 
 ### SUB-B-011 Fullの個別化セルフケアを実装する
 
-依存: `SUB-B-005`, `SUB-B-008`
+依存: `SUB-B-008`
 
 - 確認済みの合った・合わなかった対処と最近の状態だけを相談へ利用する
 - Free、Lite、Fullの差を共通の安全判定へ接続する

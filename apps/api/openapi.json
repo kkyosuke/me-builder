@@ -2533,7 +2533,7 @@
             }
           },
           "409": {
-            "description": "生成に利用できる記録がない",
+            "description": "記録不足、再生成不要、または利用上限",
             "content": {
               "application/json": {
                 "schema": {
@@ -2543,7 +2543,11 @@
                       "const": "Profile summary generation unavailable"
                     },
                     "reason": {
-                      "enum": ["source_record_required", "regeneration_not_required"],
+                      "enum": [
+                        "source_record_required",
+                        "regeneration_not_required",
+                        "limit_reached"
+                      ],
                       "type": "string"
                     }
                   },
@@ -2704,6 +2708,209 @@
           },
           "503": {
             "description": "D1またはPrivate R2 bindingが設定されていない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Service Unavailable"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/profile/entitlement": {
+      "get": {
+        "operationId": "getProfileEntitlement",
+        "tags": ["Profile"],
+        "summary": "本人のPlanとAI利用上限・残量を取得する",
+        "security": [
+          {
+            "liffIdToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "本人の現在の利用権限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "enum": ["free", "active", "safe-default"],
+                      "type": "string"
+                    },
+                    "plan": {
+                      "enum": ["free", "lite", "full", "family"],
+                      "type": "string"
+                    },
+                    "source": {
+                      "enum": ["free", "subscription", "family-seat"],
+                      "type": "string"
+                    },
+                    "effectiveAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "availableUntil": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "aiReply": {
+                      "type": "object",
+                      "properties": {
+                        "limit": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "used": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "reserved": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "remaining": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "periodStartsAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "resetsAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "limit",
+                        "used",
+                        "reserved",
+                        "remaining",
+                        "periodStartsAt",
+                        "resetsAt"
+                      ]
+                    },
+                    "profileSummary": {
+                      "type": "object",
+                      "properties": {
+                        "limit": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "used": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "reserved": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "remaining": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "periodStartsAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "resetsAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "limit",
+                        "used",
+                        "reserved",
+                        "remaining",
+                        "periodStartsAt",
+                        "resetsAt"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "plan",
+                    "source",
+                    "effectiveAt",
+                    "availableUntil",
+                    "aiReply",
+                    "profileSummary"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "LIFF IDトークンを検証できない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Unauthorized"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "対応するAccountが存在しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Account not found"
+                    },
+                    "reason": {
+                      "const": "friendship_required"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "未処理のサーバーエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Internal Server Error"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "D1 bindingが設定されていない",
             "content": {
               "application/json": {
                 "schema": {

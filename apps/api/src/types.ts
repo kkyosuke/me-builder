@@ -3,6 +3,7 @@ import type {
   AccountDataNamespace,
   CompatibilityDataNamespace,
   ConversationCoordinatorNamespace,
+  billing,
 } from "@me-builder/lib";
 import type {
   BillingQueueMessage,
@@ -49,6 +50,8 @@ type Env = Omit<
   COMPATIBILITY_DATA?: CompatibilityDataNamespace;
   CONVERSATION_COORDINATOR?: ConversationCoordinatorNamespace;
   BRAIN_VECTOR_INDEX?: ApiBindings["BRAIN_VECTOR_INDEX"];
+  /** テスト・previewの注入境界。未指定時はFreeへ安全に縮退する。 */
+  ACCOUNT_PLAN_ASSIGNMENT_PROVIDER?: billing.AccountPlanAssignmentProvider;
 };
 
 export type AppEnv = {

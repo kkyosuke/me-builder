@@ -4,6 +4,7 @@ import type { D1Database } from "@cloudflare/workers-types";
 import {
   D1,
   DO,
+  billing,
   buildDiaryTemporalSearchText,
   line,
   resolveDiaryTemporalContext,
@@ -148,6 +149,24 @@ function createQueueMessage(
 async function turnStatus(turnId: string): Promise<string | undefined> {
   const turns = await accountDataStore.db.select().from(DO.account.schema.chatTurns);
   return turns.find((turn) => turn.id === turnId)?.status;
+}
+
+async function exhaustFreeAiReplyUsage(accountId: string): Promise<void> {
+  const at = new Date();
+  const entitlement = await new billing.EntitlementService(
+    new billing.FakeAccountPlanAssignmentProvider(),
+  ).resolve(accountId, at);
+  const period = billing.resolveEntitlementUsagePeriod(entitlement, "ai-reply", at);
+  for (let index = 0; index < entitlement.policy.aiReply.limit; index += 1) {
+    const requestId = `exhausted-ai-reply-${index}`;
+    await DO.account.action.aiUsage.reserveAiUsage(
+      accountDataStore.db,
+      accountId,
+      { requestId, kind: "ai-reply", period, limit: entitlement.policy.aiReply.limit },
+      at,
+    );
+    await DO.account.action.aiUsage.commitAiUsage(accountDataStore.db, accountId, requestId, at);
+  }
 }
 
 type DiaryEventInput = {
@@ -422,6 +441,38 @@ describe("LINE diary chat delivery E2E", () => {
     await expect(
       coordinator.acquireGeneration(queuedTurn.turnId, queuedTurn.generationEpoch),
     ).resolves.toEqual({ acquired: false, reason: "stale" });
+  });
+
+  it("Free上限到達時はURLやQueue直実行でもAIを呼ばず、入力保存と固定案内を維持する", async () => {
+    const diaryText = "今日は公園を歩いた";
+    const { bindings, queuedTurn } = await ingestDiary(diaryText, "free-limit");
+    await exhaustFreeAiReplyUsage(queuedTurn.accountId);
+
+    await processChatTurnMessage(createQueueMessage(queuedTurn), bindings, workerConfig);
+
+    expect(mockGenerateContent).not.toHaveBeenCalled();
+    expect(mockPushMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        messages: [expect.objectContaining({ text: expect.stringContaining("AI返信上限") })],
+      }),
+      expect.any(String),
+    );
+    const sources = await accountDataStore.db
+      .select()
+      .from(DO.account.schema.sourceRecordTextPayloads);
+    expect(sources.some(({ body }) => body === diaryText)).toBe(true);
+  });
+
+  it("Free上限到達後も切迫した危機表現は利用枠を使わず安全案内へ切り替える", async () => {
+    const { bindings, queuedTurn } = await ingestDiary("今すぐ死ぬ準備をしている", "safety-limit");
+    await exhaustFreeAiReplyUsage(queuedTurn.accountId);
+
+    await processChatTurnMessage(createQueueMessage(queuedTurn), bindings, workerConfig);
+
+    expect(mockGenerateContent).not.toHaveBeenCalled();
+    const deliveredText = mockPushMessage.mock.calls[0]?.[0]?.messages?.[0]?.text;
+    expect(deliveredText).toContain("緊急窓口");
+    expect(deliveredText).not.toContain("AI返信上限");
   });
 
   it("自然な属性確認を許可済み候補から生成し、Sessionの質問履歴へ記録する", async () => {

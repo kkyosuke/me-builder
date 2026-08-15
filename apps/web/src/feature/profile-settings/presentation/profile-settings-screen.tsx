@@ -17,6 +17,7 @@ import type { ColorTheme } from "../../theme/model/color-theme";
 import type { FontSize } from "../../theme/model/font-size";
 import type { ResetDevelopmentAccountDataResult } from "../infrastructure/development-account-data-api";
 import { type AvatarSelection, getAvatarName } from "../model/avatar";
+import type { ProfileEntitlement } from "../model/entitlement";
 import { AvatarPreview } from "./components/avatar-preview";
 
 const themes = [
@@ -49,6 +50,7 @@ export function ProfileSettingsScreen({
   inactiveFocusTarget = "avatar",
   isProfileLoading = false,
   profileError = null,
+  entitlement,
   linePictureUrl,
   theme,
   fontSize,
@@ -73,6 +75,7 @@ export function ProfileSettingsScreen({
   inactiveFocusTarget?: "avatar" | "brain-items";
   isProfileLoading?: boolean;
   profileError?: string | null;
+  entitlement?: AsyncState<ProfileEntitlement>;
   linePictureUrl?: string | undefined;
   theme: ColorTheme;
   fontSize: FontSize;
@@ -248,6 +251,91 @@ export function ProfileSettingsScreen({
               <p role="alert" className="mt-3 px-1 text-sm text-rose-700 dark:text-rose-300">
                 {billingState.message}
               </p>
+            )}
+          </section>
+        )}
+
+        {entitlement && (
+          <section aria-labelledby="subscription-heading" className="mt-8">
+            <h2
+              id="subscription-heading"
+              className="px-1 text-sm font-bold tracking-wider text-slate-500 dark:text-slate-400"
+            >
+              利用プラン
+            </h2>
+            {entitlement.status === "loading" || entitlement.status === "idle" ? (
+              <output
+                aria-busy="true"
+                aria-label="利用プランを読み込んでいます"
+                className="mt-3 block min-h-36 animate-pulse rounded-2xl bg-slate-200 motion-reduce:animate-none dark:bg-slate-700"
+              />
+            ) : entitlement.status === "error" ? (
+              <p
+                role="alert"
+                className="mt-3 rounded-2xl bg-rose-50 p-4 text-sm text-rose-900 dark:bg-rose-400/10 dark:text-rose-100"
+              >
+                {entitlement.message}
+              </p>
+            ) : (
+              <div className="mt-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+                <div className="flex items-center gap-3">
+                  <span className="flex size-11 items-center justify-center rounded-xl bg-sky-100 text-sky-700 dark:bg-sky-400/15 dark:text-sky-200">
+                    <CreditCard className="size-5" aria-hidden="true" />
+                  </span>
+                  <div>
+                    <p className="text-lg font-bold text-slate-950 dark:text-white">
+                      {
+                        (
+                          {
+                            free: "Free",
+                            lite: "Lite",
+                            full: "Full",
+                            family: "ファミリーパック",
+                          } as const
+                        )[entitlement.data.plan]
+                      }
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      {entitlement.data.status === "safe-default"
+                        ? "確認中（Free権限で利用中）"
+                        : entitlement.data.status === "free"
+                          ? "無料プラン"
+                          : "契約中"}
+                    </p>
+                  </div>
+                </div>
+                <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+                  <div>
+                    <dt className="text-slate-500 dark:text-slate-400">AI返信</dt>
+                    <dd className="mt-1 font-bold text-slate-950 dark:text-white">
+                      残り {entitlement.data.aiReply.remaining} / {entitlement.data.aiReply.limit}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-slate-500 dark:text-slate-400">まとめ生成</dt>
+                    <dd className="mt-1 font-bold text-slate-950 dark:text-white">
+                      残り {entitlement.data.profileSummary.remaining} /{" "}
+                      {entitlement.data.profileSummary.limit}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-slate-500 dark:text-slate-400">利用開始</dt>
+                    <dd className="mt-1 text-slate-700 dark:text-slate-200">
+                      {new Intl.DateTimeFormat("ja-JP", { dateStyle: "medium" }).format(
+                        new Date(entitlement.data.effectiveAt),
+                      )}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-slate-500 dark:text-slate-400">次回更新</dt>
+                    <dd className="mt-1 text-slate-700 dark:text-slate-200">
+                      {new Intl.DateTimeFormat("ja-JP", { dateStyle: "medium" }).format(
+                        new Date(entitlement.data.aiReply.resetsAt),
+                      )}
+                    </dd>
+                  </div>
+                </dl>
+              </div>
             )}
           </section>
         )}

@@ -86,7 +86,7 @@ export const ProfileSummaryGenerationAcceptedSchema = v.object({
 
 export const ProfileSummaryGenerationUnavailableSchema = v.object({
   error: v.literal("Profile summary generation unavailable"),
-  reason: v.picklist(["source_record_required", "regeneration_not_required"]),
+  reason: v.picklist(["source_record_required", "regeneration_not_required", "limit_reached"]),
 });
 
 export const profileSummaryRoute = describeRoute({
@@ -113,7 +113,10 @@ export const profileSummaryGenerationRoute = describeRoute({
       "生成要求を受け付けた、または処理中の要求を返した",
       ProfileSummaryGenerationAcceptedSchema,
     ),
-    409: jsonResponse("生成に利用できる記録がない", ProfileSummaryGenerationUnavailableSchema),
+    409: jsonResponse(
+      "記録不足、再生成不要、または利用上限",
+      ProfileSummaryGenerationUnavailableSchema,
+    ),
     ...authenticatedErrors,
   },
 } satisfies DescribeRouteOptions);

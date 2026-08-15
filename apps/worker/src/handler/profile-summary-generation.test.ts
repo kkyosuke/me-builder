@@ -95,6 +95,12 @@ describe("processProfileSummaryGenerationMessage", () => {
         };
       }
       if (operation === "profileSummary.completeGeneration") return true;
+      if (operation === "aiUsage.reserve") {
+        return { outcome: "reserved", reservation: {}, usage: { remaining: 0 } };
+      }
+      if (operation === "aiUsage.commit" || operation === "aiUsage.release") {
+        return { outcome: "committed", reservation: {} };
+      }
       return undefined;
     });
   });
@@ -199,5 +205,29 @@ describe("processProfileSummaryGenerationMessage", () => {
       }),
       expect.any(String),
     );
+  });
+
+  it("利用上限到達時はQueue直実行でもAIを呼ばず失敗状態を確定する", async () => {
+    execute.mockImplementation(async (_accountId: string, operation: string) => {
+      if (operation === "profileSummary.loadGenerationContext")
+        return { generationId: "generation-1" };
+      if (operation === "aiUsage.reserve") {
+        return { outcome: "limit-reached", reservation: null, usage: { remaining: 0 } };
+      }
+      return undefined;
+    });
+    const message = createMessage();
+
+    await processProfileSummaryGenerationMessage(message, cf, workerConfig);
+
+    expect(generateProfileSummary).not.toHaveBeenCalled();
+    expect(execute).toHaveBeenCalledWith(
+      "account-1",
+      "profileSummary.failGeneration",
+      "generation-1",
+      expect.stringContaining("上限"),
+    );
+    expect(message.ack).toHaveBeenCalledOnce();
+    expect(message.retry).not.toHaveBeenCalled();
   });
 });

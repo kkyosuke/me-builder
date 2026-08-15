@@ -1,4 +1,4 @@
-import { type AccountDataNamespace, type D1, accountDataFor } from "@me-builder/lib";
+import { type AccountDataNamespace, type D1, accountDataFor, billing } from "@me-builder/lib";
 import {
   type ProfileSummaryGenerationQueueMessage,
   type Queue,
@@ -16,7 +16,7 @@ export type RequestProfileSummaryGenerationOutcome =
     }>
   | Readonly<{
       type: "unavailable";
-      reason: "source_record_required" | "regeneration_not_required";
+      reason: "source_record_required" | "regeneration_not_required" | "limit_reached";
     }>
   | Readonly<{ type: "not-configured" }>
   | Readonly<{ type: "unauthenticated"; reason: string }>
@@ -30,6 +30,7 @@ type Params = Readonly<{
   queue?: Queue<ProfileSummaryGenerationQueueMessage>;
   at?: Date;
   allowUnchangedRegeneration?: boolean;
+  planAssignmentProvider?: billing.AccountPlanAssignmentProvider;
 }>;
 
 export async function requestProfileSummaryGeneration({
@@ -40,11 +41,25 @@ export async function requestProfileSummaryGeneration({
   queue,
   at = new Date(),
   allowUnchangedRegeneration = false,
+  planAssignmentProvider = new billing.FakeAccountPlanAssignmentProvider(),
 }: Params): Promise<RequestProfileSummaryGenerationOutcome> {
   const session = await createLiffSession({ idToken, lineLoginChannelId, db });
   if (session.type !== "resolved") return session;
   if (!accountData || !queue) throw new Error("Profile Summary generation binding is missing");
   const account = accountDataFor(accountData, session.session.accountId);
+  const entitlement = await new billing.EntitlementService(planAssignmentProvider).resolve(
+    session.session.accountId,
+    at,
+  );
+  const period = billing.resolveEntitlementUsagePeriod(entitlement, "profile-summary", at);
+  const usage = await account.execute(
+    "aiUsage.read",
+    "profile-summary",
+    period,
+    entitlement.policy.profileSummary.limit,
+    at,
+  );
+  if (usage.remaining === 0) return { type: "unavailable", reason: "limit_reached" };
   const request = await account.execute(
     "profileSummary.requestGeneration",
     at,

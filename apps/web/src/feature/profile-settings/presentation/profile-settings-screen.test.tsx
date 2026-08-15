@@ -276,4 +276,50 @@ describe("ProfileSettingsScreen", () => {
     fireEvent.click(link);
     expect(onOpenBrainItems).toHaveBeenCalledOnce();
   });
+
+  it("契約Plan、更新日、AI上限と残量を本人へ表示する", () => {
+    render(
+      <ProfileSettingsScreen
+        avatar={null}
+        entitlement={{
+          status: "success",
+          data: {
+            status: "active",
+            plan: "lite",
+            source: "subscription",
+            effectiveAt: "2026-08-01T00:00:00.000Z",
+            availableUntil: null,
+            aiReply: {
+              limit: 150,
+              used: 10,
+              reserved: 1,
+              remaining: 139,
+              periodStartsAt: "2026-08-01T00:00:00.000Z",
+              resetsAt: "2026-09-01T00:00:00.000Z",
+            },
+            profileSummary: {
+              limit: 4,
+              used: 1,
+              reserved: 0,
+              remaining: 3,
+              periodStartsAt: "2026-08-01T00:00:00.000Z",
+              resetsAt: "2026-09-01T00:00:00.000Z",
+            },
+          },
+        }}
+        theme="dark"
+        fontSize="medium"
+        onBack={vi.fn()}
+        onOpenAvatar={vi.fn()}
+        onThemeChange={vi.fn()}
+        onFontSizeChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "利用プラン" })).toBeTruthy();
+    expect(screen.getByText("Lite")).toBeTruthy();
+    expect(screen.getByText("残り 139 / 150")).toBeTruthy();
+    expect(screen.getByText("残り 3 / 4")).toBeTruthy();
+    expect(screen.getByText("2026/09/01")).toBeTruthy();
+  });
 });

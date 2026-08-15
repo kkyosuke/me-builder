@@ -155,14 +155,18 @@ GETで保存画像の不整合を検出した場合、共有D1のメタデータ
 
 認証失敗時にAccountやobjectの存在を開示しません。保存画像のメタデータとR2 objectの欠落・不一致は`200`のプロフィール応答へ縮退し、不整合の詳細をクライアントへ開示しません。
 
-## 9. プライバシーと運用ログ
+## 9. 利用プラン表示
+
+`GET /api/profile/entitlement`はLIFF IDトークンで解決した本人について、現在Plan、契約状態、付与元、適用開始、利用可能期限、AI返信とまとめ生成の上限・利用量・予約量・残量・次回更新日時を返します。`Cache-Control: no-store`とし、Account ID、支払者Account ID、Stripeの識別子を応答へ含めません。値の解決規則とAPI / Workerの実行境界は[課金・Plan紐付け実装設計](../architecture/billing-implementation-design.md#33-機能境界への接続)を正とします。
+
+## 10. プライバシーと運用ログ
 
 - 画像bytes、Data URL、元ファイル名、Account ID、LINE user ID、R2 object keyをログへ出さない
 - R2 bucketは公開せず、API Server bindingからだけ読み書きする
 - 画像を人物判定、属性推定、AI加工、Brain Item生成へ利用しない
 - Content-Type、byte size、検査結果、最終outcomeなど、原因特定に必要な非識別情報だけを構造化ログへ残す
 
-## 10. 完了条件
+## 11. 完了条件
 
 - Account IDをクライアント指定せず、認証済みの本人だけを読み書きできる
 - GET 1回で表示名、role、現在のアバターを取得できる
@@ -175,3 +179,4 @@ GETで保存画像の不整合を検出した場合、共有D1のメタデータ
 - 不正形式、形式偽装、過大画像、非正方形画像を拒否できる
 - 別AccountのプロフィールやR2 objectを取得・更新できない
 - OpenAPIとWeb UI用の生成型へ契約が反映される
+- 本人がプロフィール画面でPlan、契約状態、更新日、AI上限と残量を確認できる

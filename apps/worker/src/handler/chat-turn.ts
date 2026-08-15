@@ -1,4 +1,4 @@
-import { accountDataFor, buildPromptContextCollectionCandidates } from "@me-builder/lib";
+import { accountDataFor, billing, buildPromptContextCollectionCandidates } from "@me-builder/lib";
 import {
   type ChatTurnQueueMessage,
   type ConversationCoordinatorRpc,
@@ -139,6 +139,7 @@ export async function processChatTurnMessage(
   let controller: AbortController | undefined;
   let timeout: ReturnType<typeof setTimeout> | undefined;
   let failureDeliveryAttempted = false;
+  let aiUsageReserved = false;
   let settleFailureDelivery:
     | (() => Promise<"failure-notice-delivered" | "failure-notice-permanent-failure" | undefined>)
     | undefined;
@@ -337,6 +338,10 @@ export async function processChatTurnMessage(
           dependency: "conversation-coordinator",
         },
       );
+      if (aiUsageReserved) {
+        await accountDataClient.execute("aiUsage.release", message.body.turnId);
+        aiUsageReserved = false;
+      }
       return failureDelivery.status === "delivered"
         ? "failure-notice-delivered"
         : "failure-notice-permanent-failure";
@@ -462,6 +467,10 @@ export async function processChatTurnMessage(
           dependency: "conversation-coordinator",
         },
       );
+      if (aiUsageReserved) {
+        await accountDataClient.execute("aiUsage.release", message.body.turnId);
+        aiUsageReserved = false;
+      }
       message.ack();
       logTerminal(message, workerConfig, startedAt, traceFields, {
         outcome: "discarded",
@@ -501,8 +510,45 @@ export async function processChatTurnMessage(
 
     const generationController = controller;
     const safetyRoute = classifySafety(context.messages, context.currentUserMessageIds);
+    const entitlement = await new billing.EntitlementService(
+      cf.planAssignmentProvider ?? new billing.FakeAccountPlanAssignmentProvider(),
+    ).resolve(message.body.accountId);
+    const aiReplyPeriod = billing.resolveEntitlementUsagePeriod(entitlement, "ai-reply");
+    const aiReplyReservation =
+      safetyRoute !== "normal"
+        ? undefined
+        : await atBoundary(
+            () =>
+              accountDataClient.execute("aiUsage.reserve", {
+                requestId: message.body.turnId,
+                kind: "ai-reply",
+                period: aiReplyPeriod,
+                limit: entitlement.policy.aiReply.limit,
+              }),
+            {
+              code: "AI_REPLY_USAGE_RESERVATION_FAILED",
+              category: "dependency",
+              stage: "entitlement.reserve",
+              retryable: true,
+              dependency: "account-data",
+            },
+          );
+    aiUsageReserved =
+      aiReplyReservation?.outcome === "reserved" || aiReplyReservation?.outcome === "existing";
+    const quotaResponse =
+      aiReplyReservation?.outcome === "limit-reached"
+        ? {
+            reply:
+              "今の利用期間のAI返信上限に達しました。書いてくれた内容は保存されています。次の利用期間になると、またAI返信を利用できます。",
+            endSession: false,
+            dailyPromptFollowUp: undefined,
+            collectionTarget: undefined,
+            brainUsages: [],
+            usedBrainItems: [],
+          }
+        : undefined;
     const [brainMemories, collectedPromptContextKinds] =
-      pendingResponse || safetyRoute !== "normal"
+      pendingResponse || safetyRoute !== "normal" || quotaResponse
         ? [[], []]
         : await Promise.all([
             loadBrainContextMemories({
@@ -511,6 +557,7 @@ export async function processChatTurnMessage(
               accountId: message.body.accountId,
               messages: context.messages,
               currentUserMessageIds: context.currentUserMessageIds,
+              semanticSearchDays: entitlement.policy.semanticSearchDays,
               ...(generationController.signal ? { signal: generationController.signal } : {}),
             }),
             accountDataClient
@@ -538,65 +585,75 @@ export async function processChatTurnMessage(
               }),
           ]);
     const collectionCandidates =
-      pendingResponse || safetyRoute !== "normal" || collectedPromptContextKinds === undefined
+      pendingResponse ||
+      safetyRoute !== "normal" ||
+      quotaResponse ||
+      collectedPromptContextKinds === undefined
         ? []
         : buildPromptContextCollectionCandidates({
             collectedKinds: collectedPromptContextKinds,
             askedTargets: context.collectionAskedTargets,
           });
-    const response = pendingResponse
-      ? {
-          reply: pendingResponse.body,
-          endSession: pendingResponse.endSession,
-          dailyPromptFollowUp: undefined,
-          collectionTarget: undefined,
-          brainUsages: [],
-          usedBrainItems: pendingResponse.usedBrainItems,
-        }
-      : await atBoundary(
-          () =>
-            generateDiaryChatResponse(context.messages, workerConfig, generationController.signal, {
-              currentUserMessageIds: context.currentUserMessageIds,
-              brainMemories,
-              onUsage: createGeminiUsageRecorder(cf.d1, "diary_chat", message.body.accountId),
-              prompt: {
-                objective: DEFAULT_DIARY_CHAT_PROMPT_OPTIONS.objective,
-                conversationGuidance: getDiaryChatConversationGuidance(
-                  context.conversationPolicyId,
-                ),
-                collectionCandidates,
-              },
-            }).then((generated) => {
-              const memoryByContextId = new Map<string, (typeof brainMemories)[number]>(
-                brainMemories.map((memory, index) => [`memory-${index + 1}`, memory] as const),
-              );
-              const usedMemories = generated.used_memory_ids.flatMap((id) => {
-                const memory = memoryByContextId.get(id);
-                return memory ? [memory] : [];
-              });
-              return {
-                reply: generated.reply,
-                endSession: generated.end_session,
-                dailyPromptFollowUp:
-                  generated.daily_prompt_follow_up === "none"
-                    ? undefined
-                    : generated.daily_prompt_follow_up,
-                collectionTarget: generated.collection_target,
-                usedBrainItems: usedMemories,
-                brainUsages: usedMemories.map((memory) => ({
-                  brainItemId: memory.brainItemId,
-                  sourceRecordIds: memory.evidence.map(({ sourceRecordId }) => sourceRecordId),
-                })),
-              };
-            }),
-          {
-            code: "DIARY_CHAT_GENERATION_FAILED",
-            category: "dependency",
-            stage: "ai.generate",
-            retryable: true,
-            dependency: "google-ai",
-          },
-        );
+    const response = quotaResponse
+      ? quotaResponse
+      : pendingResponse
+        ? {
+            reply: pendingResponse.body,
+            endSession: pendingResponse.endSession,
+            dailyPromptFollowUp: undefined,
+            collectionTarget: undefined,
+            brainUsages: [],
+            usedBrainItems: pendingResponse.usedBrainItems,
+          }
+        : await atBoundary(
+            () =>
+              generateDiaryChatResponse(
+                context.messages,
+                workerConfig,
+                generationController.signal,
+                {
+                  currentUserMessageIds: context.currentUserMessageIds,
+                  brainMemories,
+                  onUsage: createGeminiUsageRecorder(cf.d1, "diary_chat", message.body.accountId),
+                  prompt: {
+                    objective: DEFAULT_DIARY_CHAT_PROMPT_OPTIONS.objective,
+                    conversationGuidance: getDiaryChatConversationGuidance(
+                      context.conversationPolicyId,
+                    ),
+                    collectionCandidates,
+                  },
+                },
+              ).then((generated) => {
+                const memoryByContextId = new Map<string, (typeof brainMemories)[number]>(
+                  brainMemories.map((memory, index) => [`memory-${index + 1}`, memory] as const),
+                );
+                const usedMemories = generated.used_memory_ids.flatMap((id) => {
+                  const memory = memoryByContextId.get(id);
+                  return memory ? [memory] : [];
+                });
+                return {
+                  reply: generated.reply,
+                  endSession: generated.end_session,
+                  dailyPromptFollowUp:
+                    generated.daily_prompt_follow_up === "none"
+                      ? undefined
+                      : generated.daily_prompt_follow_up,
+                  collectionTarget: generated.collection_target,
+                  usedBrainItems: usedMemories,
+                  brainUsages: usedMemories.map((memory) => ({
+                    brainItemId: memory.brainItemId,
+                    sourceRecordIds: memory.evidence.map(({ sourceRecordId }) => sourceRecordId),
+                  })),
+                };
+              }),
+            {
+              code: "DIARY_CHAT_GENERATION_FAILED",
+              category: "dependency",
+              stage: "ai.generate",
+              retryable: true,
+              dependency: "google-ai",
+            },
+          );
     const developmentBrainUsageMessage = buildDevelopmentBrainUsageMessage(
       response.usedBrainItems,
       workerConfig.environment,
@@ -682,6 +739,10 @@ export async function processChatTurnMessage(
       });
     }
     if (delivery.status === "superseded" || delivery.status === "permanent_failure") {
+      if (aiUsageReserved) {
+        await accountDataClient.execute("aiUsage.release", message.body.turnId);
+        aiUsageReserved = false;
+      }
       await atBoundary(
         () =>
           accountDataClient.execute(
@@ -742,6 +803,16 @@ export async function processChatTurnMessage(
         stage: "turn.deliver",
         retryable: true,
       });
+    }
+    if (aiUsageReserved) {
+      await atBoundary(() => accountDataClient.execute("aiUsage.commit", message.body.turnId), {
+        code: "AI_REPLY_USAGE_COMMIT_FAILED",
+        category: "dependency",
+        stage: "entitlement.commit",
+        retryable: true,
+        dependency: "account-data",
+      });
+      aiUsageReserved = false;
     }
     if (response.endSession) {
       await atBoundary(
@@ -826,6 +897,14 @@ export async function processChatTurnMessage(
             dependency: "conversation-coordinator",
           },
         );
+      } catch (releaseError) {
+        error = releaseError;
+      }
+    }
+    if (aiUsageReserved && accountData && message.attempts >= CHAT_TURN_MAX_ATTEMPTS) {
+      try {
+        await accountData.execute("aiUsage.release", message.body.turnId);
+        aiUsageReserved = false;
       } catch (releaseError) {
         error = releaseError;
       }

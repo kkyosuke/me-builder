@@ -62,6 +62,7 @@ export async function loadBrainContextMemories(
     accountId: string;
     messages: readonly ConversationContextMessage[];
     currentUserMessageIds: readonly string[];
+    semanticSearchDays?: number | null;
     signal?: AbortSignal;
   }>,
   dependencies: BrainContextDependencies = defaultDependencies,
@@ -113,10 +114,15 @@ export async function loadBrainContextMemories(
         const vectorIds = result.matches
           .filter(({ score }) => Number.isFinite(score) && score >= BRAIN_SEARCH_MINIMUM_SCORE)
           .map(({ id }) => id);
-        return accountDataFor(accountDataNamespace, input.accountId).execute(
-          "brain.loadChatContextMemories",
-          vectorIds,
-        );
+        const at = new Date();
+        const notBefore =
+          input.semanticSearchDays == null
+            ? undefined
+            : new Date(at.getTime() - input.semanticSearchDays * 24 * 60 * 60 * 1_000);
+        const account = accountDataFor(accountDataNamespace, input.accountId);
+        return notBefore
+          ? account.execute("brain.loadChatContextMemories", vectorIds, at, notBefore)
+          : account.execute("brain.loadChatContextMemories", vectorIds);
       })(),
     ]);
   } catch (error) {
