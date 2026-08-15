@@ -44,6 +44,7 @@ docs/
 ### プロダクト全体を知る
 
 - [プロジェクト概要](product/project-overview.md) — 目的、主要要件、MVP、ロードマップ、Phase 1の入力体験とログイン手段
+- [サービス紹介サイト設計](product/service-site-design.md) — 未ログインの公開サイトの役割、サイトマップ、トップページ構成、CTA、掲載原則、公開前の確認事項
 - [全体画面遷移設計](product/screen-navigation.md) — LINEとWebをまたぐ入口と、利用者・管理者向け画面の全体遷移
 - [わたしのまとめ仕様](product/profile-summary-experience.md) — 診断と日記からAI生成した版付きの「わたしのまとめ」と診断テーマの表示規則
 - [相性診断・うつし共有体験設計](product/compatibility-experience.md) — 招待リンクとLINE共有、双方の同意、相性一覧、「それぞれについて」と「2人について」、共有終了
