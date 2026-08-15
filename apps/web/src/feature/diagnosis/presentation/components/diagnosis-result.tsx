@@ -1,4 +1,6 @@
 import { ArrowLeft, CheckCircle2, ChevronDown, Clock3, Sparkles } from "lucide-react";
+import type { AsyncState } from "../../../../model/async-state";
+import type { UtsushiProgression } from "../../../profile/model/progression";
 import type { DiagnosisResult } from "../../model/diagnosis-result";
 import {
   getRelationshipCategoryBadgeClassName,
@@ -21,11 +23,13 @@ export function DiagnosisResultView({
   onBack,
   backHref,
   backLabel = "診断一覧",
+  progression,
 }: {
   result: DiagnosisResult;
   onBack: () => void;
   backHref?: string;
   backLabel?: string;
+  progression?: AsyncState<UtsushiProgression>;
 }) {
   const scoring = result.scoring;
 
@@ -78,6 +82,33 @@ export function DiagnosisResultView({
           {`${result.answeredCount} / ${result.questionCount}問に回答`}
         </p>
       </header>
+
+      {progression && (
+        <section
+          aria-labelledby="diagnosis-progression-heading"
+          className="mt-5 rounded-2xl border border-violet-200 bg-violet-50/70 p-4 dark:border-violet-800 dark:bg-violet-950/30"
+        >
+          <h2
+            id="diagnosis-progression-heading"
+            className="text-sm font-bold text-violet-900 dark:text-violet-100"
+          >
+            わたしのまとめへの反映
+          </h2>
+          {progression.status === "idle" || progression.status === "loading" ? (
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+              回答から見つかったことを反映しています。
+            </p>
+          ) : progression.status === "success" ? (
+            <p className="mt-1 text-sm text-slate-700 dark:text-slate-200">
+              うつし Lv.{progression.data.level}。反映された理由は、わたしのまとめで確認できます。
+            </p>
+          ) : (
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+              反映は続いています。あとから、わたしのまとめで確認できます。
+            </p>
+          )}
+        </section>
+      )}
 
       {scoring ? (
         <section aria-labelledby="profile-heading" className="mt-5">

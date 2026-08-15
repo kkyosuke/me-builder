@@ -15,6 +15,13 @@ describe("fetchProfileProgression", () => {
       categoryCount: 2,
       calculationVersion: 1,
       highestLevel: 2,
+      recentChanges: [
+        {
+          kind: "new_piece" as const,
+          growthDelta: 3,
+          occurredAt: "2026-08-15T00:00:00.000Z",
+        },
+      ],
     };
     const fetchMock = vi.fn().mockResolvedValue(Response.json(progression));
     vi.stubGlobal("fetch", fetchMock);
@@ -42,6 +49,7 @@ describe("fetchProfileProgression", () => {
           categoryCount: 0,
           calculationVersion: 1,
           highestLevel: 1,
+          recentChanges: [],
         }),
       ),
     );

@@ -7,6 +7,11 @@ type ApiResponse =
   operations["getProfileProgression"]["responses"][200]["content"]["application/json"];
 
 const CountSchema = v.pipe(v.number(), v.safeInteger(), v.minValue(0));
+const ProgressionChangeSchema = v.object({
+  kind: v.picklist(["new_piece", "evidence_deepened", "temporal_change"]),
+  growthDelta: v.pipe(CountSchema, v.minValue(1)),
+  occurredAt: v.pipe(v.string(), v.isoTimestamp()),
+});
 const ResponseSchema = v.object({
   level: v.pipe(CountSchema, v.minValue(1)),
   growthValue: CountSchema,
@@ -17,6 +22,7 @@ const ResponseSchema = v.object({
   categoryCount: CountSchema,
   calculationVersion: v.pipe(CountSchema, v.minValue(1)),
   highestLevel: v.pipe(CountSchema, v.minValue(1)),
+  recentChanges: v.pipe(v.array(ProgressionChangeSchema), v.maxLength(3)),
 }) satisfies v.GenericSchema<ApiResponse>;
 
 export async function fetchProfileProgression(

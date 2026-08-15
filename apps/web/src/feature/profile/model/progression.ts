@@ -8,6 +8,13 @@ export type UtsushiProgression = Readonly<{
   categoryCount: number;
   calculationVersion: number;
   highestLevel: number;
+  recentChanges: readonly UtsushiProgressionChange[];
+}>;
+
+export type UtsushiProgressionChange = Readonly<{
+  kind: "new_piece" | "evidence_deepened" | "temporal_change";
+  growthDelta: number;
+  occurredAt: string;
 }>;
 
 export function progressionPercentage(progression: UtsushiProgression): number {

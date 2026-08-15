@@ -82,6 +82,23 @@ describe("DiagnosisHome", () => {
     ).toEqual(["わたし", "診断", "相性"]);
   });
 
+  it("診断の探索を邪魔しない小さなうつしレベルを表示する", () => {
+    render(
+      <StatefulDiagnosisHome
+        diagnoses={{ status: "success", data: [] }}
+        onOpenDiagnosis={vi.fn()}
+        onRetry={vi.fn()}
+        progressionLevel={12}
+      />,
+    );
+
+    const level = screen.getByRole("link", {
+      name: "うつしレベル12、わたしのまとめを見る",
+    });
+    expect(level.textContent).toBe("うつし Lv.12");
+    expect(level.getAttribute("href")).toBe("/me");
+  });
+
   it("回答途中のカードだけに進捗を x/x 形式で表示する", () => {
     render(
       <StatefulDiagnosisHome

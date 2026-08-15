@@ -107,4 +107,37 @@ describe("DiagnosisResultView", () => {
     expect(screen.getByText("回答内容（1件）")).toBeTruthy();
     expect(screen.queryByRole("group", { name: "回答から見える傾向の一覧" })).toBeNull();
   });
+
+  it("回答結果を先に置き、確定したうつしレベルの反映先を案内する", () => {
+    render(
+      <DiagnosisResultView
+        result={result}
+        onBack={vi.fn()}
+        progression={{
+          status: "success",
+          data: {
+            level: 4,
+            growthValue: 46,
+            currentLevelThreshold: 45,
+            nextLevelThreshold: 80,
+            collectedPieces: 8,
+            activePieces: 7,
+            categoryCount: 3,
+            calculationVersion: 1,
+            highestLevel: 4,
+            recentChanges: [],
+          },
+        }}
+      />,
+    );
+
+    const resultHeading = screen.getByRole("heading", { name: "価値観診断" });
+    const progressionHeading = screen.getByRole("heading", {
+      name: "わたしのまとめへの反映",
+    });
+    expect(
+      resultHeading.compareDocumentPosition(progressionHeading) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(screen.getByText(/うつし Lv.4/)).toBeTruthy();
+  });
 });

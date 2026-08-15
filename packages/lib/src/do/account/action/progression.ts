@@ -1,4 +1,4 @@
-import { and, asc, count, countDistinct, eq, gt, isNull, lte, or } from "drizzle-orm";
+import { and, asc, count, countDistinct, desc, eq, gt, isNull, lte, or } from "drizzle-orm";
 import type { AccountDataDatabase } from "../database";
 import {
   brainItemEvidenceEdges,
@@ -25,6 +25,13 @@ export type UtsushiProgression = Readonly<{
   categoryCount: number;
   calculationVersion: number;
   highestLevel: number;
+  recentChanges: readonly UtsushiProgressionChange[];
+}>;
+
+export type UtsushiProgressionChange = Readonly<{
+  kind: "new_piece" | "evidence_deepened" | "temporal_change";
+  growthDelta: number;
+  occurredAt: string;
 }>;
 
 type ProgressionEventKind = typeof progressionEvents.$inferInsert.kind;
@@ -721,8 +728,8 @@ export async function readUtsushiProgression(
   accountId: string,
   at = new Date(),
 ): Promise<UtsushiProgression> {
-  const [totals, active] = await Promise.all([
-    synchronizeProgressionEvents(db, accountId, at),
+  const totals = await synchronizeProgressionEvents(db, accountId, at);
+  const [active, recentEvents] = await Promise.all([
     db
       .select({
         activePieces: count(brainItems.id),
@@ -739,6 +746,23 @@ export async function readUtsushiProgression(
         ),
       )
       .get(),
+    db
+      .select({
+        kind: progressionEvents.kind,
+        growthDelta: progressionEvents.growthDelta,
+        occurredAt: progressionEvents.createdAt,
+      })
+      .from(progressionEvents)
+      .where(
+        and(
+          eq(progressionEvents.accountId, accountId),
+          eq(progressionEvents.isDeleted, false),
+          gt(progressionEvents.growthDelta, 0),
+        ),
+      )
+      .orderBy(desc(progressionEvents.createdAt), desc(progressionEvents.id))
+      .limit(3)
+      .all(),
   ]);
   const growthValue = totals.growthValue;
   const collectedPieces = totals.collectedPieces;
@@ -753,5 +777,18 @@ export async function readUtsushiProgression(
     categoryCount: active?.categoryCount ?? 0,
     calculationVersion: totals.calculationVersion,
     highestLevel: totals.highestLevel,
+    recentChanges: recentEvents.flatMap((event): UtsushiProgressionChange[] => {
+      const kind =
+        event.kind === "new_item"
+          ? "new_piece"
+          : event.kind === "evidence_added"
+            ? "evidence_deepened"
+            : event.kind === "temporal_revision"
+              ? "temporal_change"
+              : null;
+      return kind
+        ? [{ kind, growthDelta: event.growthDelta, occurredAt: event.occurredAt.toISOString() }]
+        : [];
+    }),
   };
 }

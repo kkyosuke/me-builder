@@ -3,6 +3,11 @@ import * as v from "valibot";
 import { authenticatedErrors, jsonResponse } from "../shared/errors";
 
 const NonNegativeIntegerSchema = v.pipe(v.number(), v.integer(), v.minValue(0));
+const ProgressionChangeSchema = v.object({
+  kind: v.picklist(["new_piece", "evidence_deepened", "temporal_change"]),
+  growthDelta: v.pipe(v.number(), v.integer(), v.minValue(1)),
+  occurredAt: v.pipe(v.string(), v.isoTimestamp()),
+});
 
 export const ProfileProgressionResponseSchema = v.object({
   level: v.pipe(v.number(), v.integer(), v.minValue(1)),
@@ -14,6 +19,7 @@ export const ProfileProgressionResponseSchema = v.object({
   categoryCount: NonNegativeIntegerSchema,
   calculationVersion: v.pipe(v.number(), v.integer(), v.minValue(1)),
   highestLevel: v.pipe(v.number(), v.integer(), v.minValue(1)),
+  recentChanges: v.pipe(v.array(ProgressionChangeSchema), v.maxLength(3)),
 });
 
 export const profileProgressionRoute = describeRoute({
