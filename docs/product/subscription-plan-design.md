@@ -21,7 +21,7 @@
 - 決済事業者、API、テーブル、Webhookの実装方式
 - 利用規約、特定商取引に関する表示、返金条件の法務本文
 
-これらは[日記チャット体験設計](diary-chat-experience.md)、[わたしのまとめ仕様](profile-summary-experience.md)、[相性診断・うつし共有体験設計](compatibility-experience.md)、[ストレスの手がかりとAIセルフケア相談体験設計](self-care-ai-consultation-experience.md)、[Accountデータ分離設計](../architecture/account-data-isolation.md)、[サービス利用規約・同意体験設計](service-terms-consent-experience.md)を正とします。
+これらは[日記チャット体験設計](diary-chat-experience.md)、[わたしのまとめ仕様](profile-summary-experience.md)、[相性診断・うつし共有体験設計](compatibility-experience.md)、[ストレスの手がかりとAIセルフケア相談体験設計](self-care-ai-consultation-experience.md)、[Accountデータ分離設計](../architecture/account-data-isolation.md)、[サービス利用規約・同意体験設計](service-terms-consent-experience.md)を正とします。Stripeを利用する初期実装方針、実装順、PR単位の完了条件は[サブスクリプション実装残タスク](../development/subscription-remaining-tasks.md)で管理します。
 
 ## 2. 結論
 
@@ -227,7 +227,7 @@ Lite、Full、ファミリーパックには、Accountごとに最初の1回だ�
 
 ### 8.1 アップグレード
 
-Freeから有料プラン、LiteからFullまたはファミリーパックへの変更は、価格と次回更新日を確認した後に反映します。日割り、差額請求、年額から月額への切り替え方法は決済事業者の選定と一緒に後続設計で決め、画面上で確定前の金額を推測しません。
+Freeから有料プラン、LiteからFullまたはファミリーパックへの変更は、価格と次回更新日を確認した後に反映します。日割り、差額請求、年額から月額への切り替え方法はStripeの制約と商取引条件を確認して後続設計で決め、画面上で確定前の金額を推測しません。
 
 ### 8.2 ダウングレードと解約
 
