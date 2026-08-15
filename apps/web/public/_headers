@@ -1,0 +1,17 @@
+/app*
+  X-Robots-Tag: noindex, nofollow
+
+/diagnosis*
+  X-Robots-Tag: noindex, nofollow
+
+/me*
+  X-Robots-Tag: noindex, nofollow
+
+/compatibility*
+  X-Robots-Tag: noindex, nofollow
+
+/profile*
+  X-Robots-Tag: noindex, nofollow
+
+/admin*
+  X-Robots-Tag: noindex, nofollow
