@@ -139,6 +139,8 @@ flowchart LR
 | --- | --- |
 | [app-icon.png](../assets/app-icon.png) | アイコン用の正方形画像 |
 | [banner.png](../assets/banner.png) | バナー用の横長画像 |
+| [brand-mark.png](../assets/brand-mark.png) | 胸の鏡、宝石、光、花のモチーフから構成したサービス紹介サイト用のロゴマーク |
+| [service-site-character-guides.png](../assets/service-site-character-guides.png) | サービス紹介サイトで、うつしと本を持つミラの案内役としての関係を示す画像 |
 
 ## 6. アセットの置き場所と命名規則
 
@@ -147,6 +149,8 @@ docs/
 └── assets/
     ├── app-icon.png
     ├── banner.png
+    ├── brand-mark.png
+    ├── service-site-character-guides.png
     └── characters/
         ├── mira-expression-sheet-with-book.png
         ├── mira-expression-sheet.png

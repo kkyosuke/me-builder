@@ -1,8 +1,8 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { App } from "./App";
 import { initializeColorTheme, initializeFontSize } from "./feature/theme";
 import "./index.css";
+import { RootApplication } from "./root-application";
 
 // Reactの初回描画前に保存済みテーマを反映し、配色のちらつきを防ぎます。
 initializeColorTheme();
@@ -23,7 +23,7 @@ const rootElement = document.getElementById("root");
 if (rootElement) {
   ReactDOM.createRoot(rootElement).render(
     <React.StrictMode>
-      <App />
+      <RootApplication />
     </React.StrictMode>,
   );
 }
