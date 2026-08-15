@@ -23,6 +23,11 @@ export const brainActions = {
     weekday: Parameters<typeof DO.account.action.brain.selectDailyPromptWeekdayContext>[2],
     at?: Date,
   ) => DO.account.action.brain.selectDailyPromptWeekdayContext(db, accountId, weekday, at),
+  "brain.selectDailyPromptStrategyPreference": (
+    db: DO.account.Database,
+    accountId: string,
+    at?: Date,
+  ) => DO.account.action.brain.selectDailyPromptStrategyPreference(db, accountId, at),
   "brain.loadSemanticDedupCandidates": (
     db: DO.account.Database,
     accountId: string,

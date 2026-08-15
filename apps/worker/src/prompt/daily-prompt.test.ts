@@ -82,6 +82,17 @@ describe("daily prompt", () => {
     );
   });
 
+  it.each([
+    ["brief", "ひとことだけでも大丈夫だよ。"],
+    ["event_first", "まずは、いちばん印象に残った出来事から聞かせて。"],
+    ["feeling_first", "今の気分から、話せる範囲で聞かせて。"],
+  ] as const)("%s方針を文脈の入口と組み合わせて版を固定する", (strategy, suffix) => {
+    const version = getDailyPromptVersion("2026-08-10", "day_off", undefined, undefined, strategy);
+
+    expect(version).toBe(`daily-check-in-day-off-v1:${strategy}-v1`);
+    expect(getDailyPromptText(version)).toBe(`今日は、普段だとお休みの日だったかな。\n${suffix}`);
+  });
+
   it("曜日文脈を前日フォローより優先する", () => {
     expect(getDailyPromptVersion("2026-08-10", "day_off", undefined, "next_day")).toBe(
       "daily-check-in-day-off-v1",

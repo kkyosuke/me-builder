@@ -3,6 +3,7 @@ import { and, asc, desc, eq, gte, inArray, isNull, lt, lte, or, sql } from "driz
 import type { BatchItem } from "drizzle-orm/batch";
 import type { AccountDataDatabase } from "../database";
 import {
+  type DailyPromptStrategy,
   type PromptContext,
   type PromptContextCollectionTarget,
   arePromptContextsEqual,
@@ -401,6 +402,7 @@ async function skipDailyPrompt(
     accountId: string;
     localDate: string;
     promptVersion: string;
+    promptStrategy: DailyPromptStrategy;
     reason: DailyPromptSkipReason;
     at: Date;
   }>,
@@ -424,6 +426,7 @@ async function skipDailyPrompt(
       accountId: input.accountId,
       localDate: input.localDate,
       promptVersion: input.promptVersion,
+      promptStrategy: input.promptStrategy,
       status: "skipped",
       skipReason: input.reason,
       createdAt: input.at,
@@ -466,11 +469,17 @@ async function isDailyPromptStopped(db: AccountDataDatabase, accountId: string):
 export async function prepareDailyPrompt(
   db: AccountDataDatabase,
   accountId: string,
-  input: Readonly<{ localDate: string; promptVersion: string; at?: Date }>,
+  input: Readonly<{
+    localDate: string;
+    promptVersion: string;
+    promptStrategy?: DailyPromptStrategy;
+    at?: Date;
+  }>,
 ): Promise<DailyPromptPreparation> {
   assertLocalDate(input.localDate);
   if (!input.promptVersion.trim()) throw new Error("Daily prompt version is required");
   const at = input.at ?? new Date();
+  const promptStrategy = input.promptStrategy ?? "standard";
   const existing = await db
     .select()
     .from(dailyPromptDeliveries)
@@ -495,6 +504,7 @@ export async function prepareDailyPrompt(
       accountId,
       localDate: input.localDate,
       promptVersion: existing?.promptVersion ?? input.promptVersion,
+      promptStrategy: existing?.promptStrategy ?? promptStrategy,
       reason: "stale",
       at,
     });
@@ -504,6 +514,7 @@ export async function prepareDailyPrompt(
       accountId,
       localDate: input.localDate,
       promptVersion: existing?.promptVersion ?? input.promptVersion,
+      promptStrategy: existing?.promptStrategy ?? promptStrategy,
       reason: "manual_stopped",
       at,
     });
@@ -513,6 +524,7 @@ export async function prepareDailyPrompt(
       accountId,
       localDate: input.localDate,
       promptVersion: existing.promptVersion,
+      promptStrategy: existing.promptStrategy,
       reason: "user_activity",
       at,
     });
@@ -522,12 +534,17 @@ export async function prepareDailyPrompt(
       accountId,
       localDate: input.localDate,
       promptVersion: existing?.promptVersion ?? input.promptVersion,
+      promptStrategy: existing?.promptStrategy ?? promptStrategy,
       reason: "active_session",
       at,
     });
   }
   if (existing) {
-    return { type: "ready", deliveryId: existing.id, promptVersion: existing.promptVersion };
+    return {
+      type: "ready",
+      deliveryId: existing.id,
+      promptVersion: existing.promptVersion,
+    };
   }
 
   const latestDelivered = await db
@@ -556,6 +573,7 @@ export async function prepareDailyPrompt(
       accountId,
       localDate: input.localDate,
       promptVersion: input.promptVersion,
+      promptStrategy,
       reason: "auto_paused",
       at,
     });
@@ -566,6 +584,7 @@ export async function prepareDailyPrompt(
       accountId,
       localDate: input.localDate,
       promptVersion: input.promptVersion,
+      promptStrategy,
       reason: "recent_unanswered",
       at,
     });
@@ -577,11 +596,16 @@ export async function prepareDailyPrompt(
     accountId,
     localDate: input.localDate,
     promptVersion: input.promptVersion,
+    promptStrategy,
     status: "pending",
     createdAt: at,
     updatedAt: at,
   });
-  return { type: "ready", deliveryId, promptVersion: input.promptVersion };
+  return {
+    type: "ready",
+    deliveryId,
+    promptVersion: input.promptVersion,
+  };
 }
 
 export async function markDailyPromptDelivered(

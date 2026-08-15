@@ -1,9 +1,11 @@
 import { and, asc, desc, eq, gt, inArray, isNull, lte, max, min, or, sql } from "drizzle-orm";
 import type { AccountDataDatabase } from "../database";
 import {
+  type DailyPromptStrategy,
   PROMPT_CONTEXT_ATTRIBUTE_MASTER,
   type PromptContextKind,
   type PromptContextWeekday,
+  dailyPromptStrategyFromQuestionStyle,
   readPromptContext,
 } from "../prompt-context";
 import {
@@ -132,6 +134,68 @@ export type BrainSemanticDedupCandidate = Readonly<{
 
 /** 通知へ予定名や本文を出さず、曜日に合う定型文だけを選ぶための区分。 */
 export type DailyPromptWeekdayContext = "recurring_schedule" | "day_off" | "active_day";
+
+/** 現在有効な本人の明言だけから、日次声かけのレビュー済み方針を返す。 */
+export async function selectDailyPromptStrategyPreference(
+  db: AccountDataDatabase,
+  accountId: string,
+  at = new Date(),
+): Promise<DailyPromptStrategy | undefined> {
+  const rows = await db
+    .select({
+      category: brainItems.category,
+      attributes: brainItems.attributes,
+      derivation: brainItems.derivation,
+    })
+    .from(brainItems)
+    .innerJoin(
+      brainItemAccessLabels,
+      and(
+        eq(brainItemAccessLabels.brainItemId, brainItems.id),
+        eq(brainItemAccessLabels.isDeleted, false),
+      ),
+    )
+    .innerJoin(
+      brainItemEvidenceEdges,
+      and(
+        eq(brainItemEvidenceEdges.brainItemId, brainItems.id),
+        eq(brainItemEvidenceEdges.relation, "supports"),
+        eq(brainItemEvidenceEdges.isDeleted, false),
+      ),
+    )
+    .innerJoin(
+      sourceRecords,
+      and(
+        eq(sourceRecords.id, brainItemEvidenceEdges.sourceRecordId),
+        eq(sourceRecords.accountId, accountId),
+        eq(sourceRecords.isDeleted, false),
+      ),
+    )
+    .where(
+      and(
+        eq(brainItems.accountId, accountId),
+        eq(brainItems.category, "preference"),
+        eq(brainItems.status, "active"),
+        eq(brainItems.isDeleted, false),
+        or(isNull(brainItems.validFrom), lte(brainItems.validFrom, at)),
+        or(isNull(brainItems.validTo), gt(brainItems.validTo, at)),
+      ),
+    )
+    .orderBy(desc(sourceRecords.createdAt), desc(brainItems.createdAt))
+    .all();
+
+  for (const row of rows) {
+    if (brainItemIsInference(row.attributes, row.derivation)) continue;
+    const promptContext = readPromptContext(row.attributes);
+    if (promptContext?.kind !== "question_style") continue;
+    const definition = PROMPT_CONTEXT_ATTRIBUTE_MASTER.find(
+      ({ kind }) => kind === promptContext.kind,
+    );
+    if (definition?.category !== row.category) continue;
+    return dailyPromptStrategyFromQuestionStyle(promptContext.style);
+  }
+  return undefined;
+}
 
 /** 自然な確認質問の重複を避けるため、現在利用できる声かけ属性のkindだけを返す。 */
 export async function listActivePromptContextKinds(

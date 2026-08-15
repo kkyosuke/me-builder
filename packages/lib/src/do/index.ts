@@ -58,6 +58,8 @@ export type {
 export {
   arePromptContextsEqual,
   buildPromptContextCollectionCandidates,
+  dailyPromptStrategyFromQuestionStyle,
+  DAILY_PROMPT_STRATEGIES,
   findPrecedingAssistantBodies,
   isPromptContextGrounded,
   parsePromptContext,
@@ -70,6 +72,7 @@ export {
   readPromptContext,
 } from "./account/prompt-context";
 export type {
+  DailyPromptStrategy,
   PromptContext,
   PromptContextAttributeDefinition,
   PromptContextCollectionCandidate,

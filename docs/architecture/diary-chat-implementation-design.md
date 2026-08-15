@@ -424,7 +424,7 @@ Brain Itemを含むAccount所有データのquery境界は、[Accountデータ�
 | `attributes.promptContext` | 高優先5属性のschema、抽出・保存、Session上限付きの自然な確認質問まで実装済み | 中・低優先属性は後続で追加する |
 | 曜日・本人情報からの声かけ候補取得 | `recurring_schedule`と`fixed_weekly`を再検証し、予定名を含まない3区分から1件を返す処理まで実装済み | 中・低優先属性は後続で追加する |
 | 当日・前日の文脈 | 最新の終了済みSessionが許可した`same_day`または`next_day`区分を、本文なしで固定文面へ反映する処理まで実装済み | 中・低優先属性との組み合わせは後続で追加する |
-| 時刻帯・声かけ方針の自動選択 | 未対応 | 本人の明言を優先し、本人自身の返信実績が不足する間は18時の標準候補へ戻す選択器を追加する。クライアントからAccount IDや選択結果を指定させない |
+| 時刻帯・声かけ方針の自動選択 | 18時固定のまま、activeな`question_style`からレビュー済み方針を選び、配送へ固定する処理まで実装済み | 本人内の配送実績による方針選択と、`rest_window`・返信実績による時刻帯選択を後続で追加する。クライアントからAccount IDや選択結果を指定させない |
 | 18時の能動配信 | 曜日別一般文面、曜日文脈、当日と前日の文脈の版付き定型文、専用Queue、AccountDataの配送状態まで実装済み | 本人情報による時刻調整は[日記チャット体験設計](../product/diary-chat-experience.md)の後続段階で追加する |
 
 開発用の確認機能は、本人確認済みAccountに対して、一覧取得用の`brain.listActive`とVector実体確認用の`brain.findActiveVectorEntry`をAccountData RPCへ公開します。`brain.listActive`はactiveかつ未削除のItem、未削除Evidence、最新のVector同期jobと対応表の有無を最大100件返します。Web UIは各Itemに同期状態、試行回数、失敗code、次回試行時刻を表示します。`applied`はVectorizeが更新を受け付けてAccountDataへ完了記録した状態であり、Vectorize上の実体確認とは区別します。
@@ -489,6 +489,7 @@ Vectorizeへのupsertまたはdelete受付後に`applied`とmutation IDを記録
 | --- | --- |
 | `id`, `account_id`, `local_date` | 配送ID、所有Account、`Asia/Tokyo`の配送日。`(account_id, local_date)`を一意にする |
 | `prompt_version` | 配送準備時に選んだ曜日別一般文面または曜日文脈定型文のversion。再配送でも変更しない |
+| `prompt_strategy` | `standard`、`brief`、`event_first`、`feeling_first`のレビュー済み方針。activeな`question_style`の明言があれば対応する方針を選び、なければ`standard`へ戻す。再配送でも変更しない |
 | `status` | `pending` / `delivered` / `skipped` / `failed` |
 | `skip_reason` | `manual_stopped` / `stale` / `active_session` / `user_activity` / `recent_unanswered` / `auto_paused`。本文や推定理由は保存しない |
 | `failure_stage` | 再試行不能で終端した工程の安全なcode |
