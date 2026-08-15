@@ -1,7 +1,8 @@
 import { BarChart3, Users } from "lucide-react";
+import { config } from "../../../config";
 
 export function AdminPreviewNavigation({ current }: { current: "accounts" | "statistics" }) {
-  const suffix = "?progression-preview=1";
+  const suffix = config.environment === "preview" ? "" : "?progression-preview=1";
   return (
     <nav
       aria-label="管理者メニュー"

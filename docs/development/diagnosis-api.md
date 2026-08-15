@@ -239,7 +239,6 @@ Diagnosisが`published`かつ削除されておらず、サーバー時刻が受
 | HTTP | 条件 | レスポンス |
 | --- | --- | --- |
 | `401` | Bearerトークンがない、検証できない、または検証設定がない | `{ "error": "Unauthorized" }` |
-| `404` | トークンは有効だが対応するAccountがない | `{ "error": "Account not found", "reason": "friendship_required" }` |
 | `503` | D1 bindingがない | `{ "error": "Service Unavailable" }` |
 | `500` | 未処理のサーバーエラー | `{ "error": "Internal Server Error" }` |
 

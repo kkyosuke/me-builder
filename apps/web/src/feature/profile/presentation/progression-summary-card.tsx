@@ -51,10 +51,6 @@ function ProgressionCard({ progression }: { progression: UtsushiProgression }) {
           />
           <div
             aria-hidden="true"
-            data-progress-value={Math.min(
-              progression.nextLevelThreshold,
-              Math.max(progression.currentLevelThreshold, progression.growthValue),
-            )}
             className="h-2.5 overflow-hidden rounded-full bg-violet-100 dark:bg-violet-950"
           >
             <div

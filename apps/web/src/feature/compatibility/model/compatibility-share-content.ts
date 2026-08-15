@@ -18,3 +18,11 @@ export type CompatibilityShareProfile = {
   generatedAt: string;
   statements: Array<{ key: string; label: string; statement: string }>;
 };
+
+export type CompatibilityShareContent = {
+  relationshipCategory: CompatibilityRelationshipCategory;
+  aboutMe: CompatibilityShareProfile | null;
+  themes: CompatibilitySharePreviewTheme[];
+  nextAction: "diagnosis" | "profile-summary" | null;
+};
+import type { CompatibilityRelationshipCategory } from "@me-builder/lib/compatibility";

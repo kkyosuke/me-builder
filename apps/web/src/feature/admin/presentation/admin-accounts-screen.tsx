@@ -25,6 +25,9 @@ function ProgressionValues({ account }: { account: AdminAccount }) {
       <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
         計算版 v{account.progression.calculationVersion}
       </p>
+      <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+        集計更新 {dateTime.format(new Date(account.progression.projectedAt))}
+      </p>
     </div>
   );
 }

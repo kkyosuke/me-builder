@@ -835,6 +835,53 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
     e2eTimeoutMs,
   );
 
+  it(
+    "決め方・迷いとの向き合い方の回答を5つのパラメータへ採点する",
+    async () => {
+      for (let index = 1; index <= 10; index += 1) {
+        const suffix = String(index).padStart(2, "0");
+        const choiceId = index % 2 === 1 ? "yes" : "no";
+        const response = await putAnswer(
+          `dq-decision-making-style-${suffix}`,
+          choiceId,
+          "decision-making-style",
+        );
+        expect(response.status).toBe(200);
+      }
+
+      const response = await getAnswers("decision-making-style");
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({
+        id: "decision-making-style",
+        relationshipCategory: "general",
+        scoring: {
+          scoringVersion: 1,
+          balancedLabel: "状況に応じて決め方を使い分ける",
+          parameters: [
+            expect.objectContaining({ id: "decision-information", score: 100, coverage: 100 }),
+            expect.objectContaining({ id: "decision-timing", score: 100, coverage: 100 }),
+            expect.objectContaining({ id: "decision-intuition", score: 100, coverage: 100 }),
+            expect.objectContaining({
+              id: "decision-consultation",
+              label: "相談の取り入れ方",
+              lowLabel: "まず自分の考えを固めたい",
+              highLabel: "まず意見を聞きたい",
+              score: 100,
+              coverage: 100,
+            }),
+            expect.objectContaining({
+              id: "decision-reconsideration",
+              score: 100,
+              coverage: 100,
+            }),
+          ],
+        },
+      });
+    },
+    e2eTimeoutMs,
+  );
+
   it(`${diagnosisAnswerCases.missingContents.id}: ${diagnosisAnswerCases.missingContents.name}`, async () => {
     const response = await getAnswers();
     expect(response.status).toBe(404);

@@ -46,6 +46,7 @@ describe("AdminAccountsScreen", () => {
     expect(screen.getAllByText("山田 花子").length).toBeGreaterThan(0);
     expect(screen.getAllByText("account-user").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Lv.12").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/集計更新/).length).toBeGreaterThan(0);
     expect(screen.getAllByText("レベル集計中").length).toBeGreaterThan(0);
     expect(screen.getByText("UIプレビュー用のサンプルデータです")).toBeTruthy();
   });

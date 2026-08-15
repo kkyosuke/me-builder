@@ -64,7 +64,7 @@ export default function AdminApplication() {
     return (
       <AdminAccountsScreen
         state={{ status: "success", data: previewAccounts }}
-        onReload={() => undefined}
+        onReload={() => window.location.reload()}
       />
     );
   }

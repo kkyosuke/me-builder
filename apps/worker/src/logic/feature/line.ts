@@ -249,14 +249,16 @@ async function ensureAccountIdentity(
   db: D1.shared.Client,
   providerAccountId: string | undefined,
   workerConfig: WorkerConfig,
-): Promise<Awaited<ReturnType<typeof D1.shared.action.account.upsertIdentity>> | undefined> {
+): Promise<
+  Awaited<ReturnType<typeof D1.shared.action.account.resolveAccountByLineMessagingApi>> | undefined
+> {
   if (!providerAccountId) return undefined;
   try {
-    return await D1.shared.action.account.upsertIdentity(db, {
-      provider: "line",
+    return await D1.shared.action.account.resolveAccountByLineMessagingApi(
+      db,
       providerAccountId,
-      role: resolveLineAccountRole(providerAccountId, workerConfig.adminLineUserIds),
-    });
+      resolveLineAccountRole(providerAccountId, workerConfig.adminLineUserIds),
+    );
   } catch (error) {
     throw toOperationalError(error, {
       code: "LINE_ACCOUNT_RESOLUTION_FAILED",
