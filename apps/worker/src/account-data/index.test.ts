@@ -48,7 +48,7 @@ describe("AccountData compatibility projection reconciliation", () => {
 describe("AccountData progression projection", () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it("確定した本人進行度だけを共有D1へ同期する", async () => {
+  it("確定した本人進行度だけを共有D1へ同期し、同じ値を再書き込みしない", async () => {
     const progression = {
       level: 2,
       growthValue: 7,
@@ -63,12 +63,20 @@ describe("AccountData progression projection", () => {
     const upsert = vi
       .spyOn(D1.shared.action.adminAccount, "upsertAccountProgressionProjection")
       .mockResolvedValue();
-    const removeRetryMarker = vi.fn().mockResolvedValue(undefined);
+    let storedState: unknown;
+    const putProjectionState = vi.fn(async (_key: string, value: unknown) => {
+      storedState = value;
+    });
     const instance = Object.create(AccountData.prototype) as AccountData;
     Object.assign(instance as unknown as Record<string, unknown>, {
       accountId: "account-1",
       repository: { client: {} },
-      ctx: { storage: { delete: removeRetryMarker } },
+      ctx: {
+        storage: {
+          get: vi.fn(async () => storedState),
+          put: putProjectionState,
+        },
+      },
       env: { DB: {} },
     });
 
@@ -77,9 +85,21 @@ describe("AccountData progression projection", () => {
         syncProgressionProjection(value: typeof progression): Promise<void>;
       }
     ).syncProgressionProjection(progression);
+    await (
+      instance as unknown as {
+        syncProgressionProjection(value: typeof progression): Promise<void>;
+      }
+    ).syncProgressionProjection(progression);
 
     expect(upsert).toHaveBeenCalledWith(shared, "account-1", progression, expect.any(Date));
-    expect(removeRetryMarker).toHaveBeenCalledWith("progressionProjectionPending");
+    expect(upsert).toHaveBeenCalledTimes(1);
+    expect(putProjectionState).toHaveBeenCalledWith("progressionProjectionState", {
+      retryPending: false,
+      calculationVersion: 1,
+      growthValue: 7,
+      collectedPieces: 2,
+      activePieces: 2,
+    });
   });
 });
 

@@ -22,7 +22,7 @@ export const AdminAccountsQuerySchema = v.object({
   role: v.optional(v.picklist(["user", "admin"])),
   status: v.optional(v.literal("active")),
   sort: v.optional(v.picklist(["created", "level", "pieces", "growth"])),
-  cursor: v.optional(v.pipe(v.string(), v.nonEmpty())),
+  cursor: v.optional(v.pipe(v.string(), v.nonEmpty(), v.maxLength(512))),
 });
 
 export const AdminAccountsResponseSchema = v.object({
@@ -69,7 +69,12 @@ export const adminAccountsRoute = describeRoute({
       required: false,
       schema: { type: "string", enum: ["created", "level", "pieces", "growth"] },
     },
-    { name: "cursor", in: "query", required: false, schema: { type: "string" } },
+    {
+      name: "cursor",
+      in: "query",
+      required: false,
+      schema: { type: "string", maxLength: 512 },
+    },
   ],
   responses: {
     200: jsonResponse("管理者向けAccount一覧", AdminAccountsResponseSchema),

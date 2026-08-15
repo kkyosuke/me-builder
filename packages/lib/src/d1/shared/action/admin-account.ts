@@ -7,6 +7,7 @@ import { accountProgressionProjections } from "../schema/progression";
 
 export const UTSUSHI_PROGRESSION_CALCULATION_VERSION = 1;
 export const ADMIN_ACCOUNT_PAGE_LIMIT = 50;
+export const ADMIN_ACCOUNT_CURSOR_MAX_LENGTH = 512;
 
 export type AdminAccountSort = "created" | "level" | "pieces" | "growth";
 
@@ -38,6 +39,7 @@ function encodeCursor(payload: CursorPayload): string {
 
 function decodeCursor(cursor: string, sort: AdminAccountSort): CursorPayload {
   try {
+    if (cursor.length > ADMIN_ACCOUNT_CURSOR_MAX_LENGTH) throw new Error("cursor is too long");
     const base64 = cursor.replaceAll("-", "+").replaceAll("_", "/");
     const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
     const parsed = JSON.parse(atob(padded)) as Partial<CursorPayload>;

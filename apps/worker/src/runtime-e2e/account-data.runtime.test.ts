@@ -99,6 +99,39 @@ describe("AccountData Workers runtime E2E", () => {
     });
   });
 
+  it("本人進行度の確定値を管理者一覧用の共有D1 projectionへ同期する", async () => {
+    const accountId = crypto.randomUUID();
+    const now = Date.now();
+    await env.DB.prepare("INSERT INTO accounts (id, created_at, updated_at) VALUES (?, ?, ?)")
+      .bind(accountId, now, now)
+      .run();
+
+    await expect(
+      env.ACCOUNT_DATA.getByName(accountId).execute(accountId, "progression.read", new Date(now)),
+    ).resolves.toMatchObject({
+      level: 1,
+      growthValue: 0,
+      collectedPieces: 0,
+      activePieces: 0,
+    });
+
+    await expect(
+      env.DB.prepare(
+        `SELECT calculation_version AS calculationVersion, level, growth_value AS growthValue,
+                collected_pieces AS collectedPieces, active_pieces AS activePieces
+           FROM account_progression_projections WHERE account_id = ?`,
+      )
+        .bind(accountId)
+        .first(),
+    ).resolves.toEqual({
+      calculationVersion: 1,
+      level: 1,
+      growthValue: 0,
+      collectedPieces: 0,
+      activePieces: 0,
+    });
+  });
+
   it("Worker runtimeのQueue bindingから未配送のまとめ生成要求を再送する", async () => {
     const accountId = crypto.randomUUID();
     const generationId = crypto.randomUUID();

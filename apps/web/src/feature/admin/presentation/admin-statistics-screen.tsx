@@ -189,22 +189,25 @@ function Line({ value }: { value: AdminStatistics["line"] }) {
   );
 }
 
-function StatisticsSkeleton({ showPreviewNavigation }: { showPreviewNavigation: boolean }) {
+function StatisticsSkeleton({ showNavigation }: { showNavigation: boolean }) {
   return (
     <main className="mx-auto min-h-dvh w-full min-w-0 max-w-4xl px-4 py-16 sm:px-8">
-      <SkeletonLoader label="統計情報を読み込み中">
+      {showNavigation ? (
         <header className="mb-6">
-          <SkeletonBlock className="h-4 w-16 rounded-full" />
-          {showPreviewNavigation && (
-            <>
-              <SkeletonBlock className="mt-3 h-9 w-72 rounded-full" />
-              <SkeletonBlock className="mt-3 h-4 w-80 max-w-full rounded-full" />
-              <SkeletonBlock className="mt-5 h-11 w-full rounded-2xl" />
-            </>
-          )}
+          <p className="text-sm font-medium text-violet-600 dark:text-violet-400">Admin</p>
+          <h1 className="mt-1 text-3xl font-bold">管理者ダッシュボード</h1>
+          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+            Accountの利用状況とサービス利用量を確認します。
+          </p>
+          <AdminNavigation current="statistics" />
+        </header>
+      ) : null}
+      <SkeletonLoader label="統計情報を読み込み中">
+        <header className={showNavigation ? "mt-6 mb-6" : "mb-6"}>
+          {!showNavigation && <SkeletonBlock className="h-4 w-16 rounded-full" />}
           <div className="flex items-center justify-between gap-3">
             <SkeletonBlock
-              className={`${showPreviewNavigation ? "mt-6 h-6 w-24" : "mt-2 h-9 w-40"} rounded-full`}
+              className={`${showNavigation ? "h-6 w-24" : "mt-2 h-9 w-40"} rounded-full`}
             />
             <SkeletonBlock className="h-10 w-20 rounded-full" />
           </div>
@@ -253,20 +256,32 @@ export function AdminStatisticsScreen({
   onReload: () => void;
 }) {
   if (state.status === "loading" || state.status === "idle") {
-    return <StatisticsSkeleton showPreviewNavigation={showPreviewNavigation} />;
+    return <StatisticsSkeleton showNavigation={showNavigation} />;
   }
   if (state.status === "error")
     return (
-      <main className="mx-auto flex min-h-dvh max-w-xl flex-col items-center justify-center gap-4 px-5 text-center">
-        <AlertCircle className="size-10 text-rose-500" />
-        <p>{state.message}</p>
-        <button
-          type="button"
-          onClick={onReload}
-          className="rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white dark:bg-white dark:text-slate-900"
-        >
-          再読み込み
-        </button>
+      <main className="mx-auto min-h-dvh w-full min-w-0 max-w-4xl px-4 py-16 sm:px-8">
+        {showNavigation ? (
+          <header>
+            <p className="text-sm font-medium text-violet-600 dark:text-violet-400">Admin</p>
+            <h1 className="mt-1 text-3xl font-bold">管理者ダッシュボード</h1>
+            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+              Accountの利用状況とサービス利用量を確認します。
+            </p>
+            <AdminNavigation current="statistics" />
+          </header>
+        ) : null}
+        <section className="flex min-h-[50vh] flex-col items-center justify-center gap-4 text-center">
+          <AlertCircle className="size-10 text-rose-500" aria-hidden="true" />
+          <p>{state.message}</p>
+          <button
+            type="button"
+            onClick={onReload}
+            className="rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white dark:bg-white dark:text-slate-900"
+          >
+            再読み込み
+          </button>
+        </section>
       </main>
     );
   const { data } = state;

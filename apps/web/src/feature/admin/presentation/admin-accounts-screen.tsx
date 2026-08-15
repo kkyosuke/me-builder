@@ -172,17 +172,15 @@ function AccountTable({ accounts }: { accounts: readonly AdminAccount[] }) {
 function AccountsSkeleton() {
   return (
     <main className="mx-auto min-h-dvh w-full max-w-6xl px-4 py-12 sm:px-8">
+      <header>
+        <p className="text-sm font-medium text-violet-600 dark:text-violet-400">Admin</p>
+        <h1 className="text-3xl font-bold">管理者ダッシュボード</h1>
+        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+          Accountの利用状況とサービス利用量を確認します。
+        </p>
+        <AdminNavigation current="accounts" />
+      </header>
       <SkeletonLoader label="Account一覧を読み込み中">
-        <SkeletonBlock className="h-4 w-16 rounded-full" />
-        <SkeletonBlock className="mt-3 h-6 w-56 rounded-full" />
-        <div className="mt-3 flex items-center justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <SkeletonBlock className="h-9 w-72 max-w-full rounded-full" />
-            <SkeletonBlock className="mt-3 h-4 w-80 max-w-full rounded-full" />
-          </div>
-          <SkeletonBlock className="h-10 w-20 shrink-0 rounded-full" />
-        </div>
-        <SkeletonBlock className="mt-5 h-11 w-full rounded-2xl" />
         <div className="mt-6">
           <SkeletonBlock className="h-6 w-28 rounded-full" />
           <SkeletonBlock className="mt-2 h-4 w-32 rounded-full" />
@@ -230,16 +228,26 @@ export function AdminAccountsScreen({
   if (state.status === "idle" || state.status === "loading") return <AccountsSkeleton />;
   if (state.status === "error") {
     return (
-      <main className="mx-auto flex min-h-dvh max-w-xl flex-col items-center justify-center gap-4 px-5 text-center">
-        <AlertCircle className="size-10 text-rose-500" aria-hidden="true" />
-        <p>{state.message}</p>
-        <button
-          type="button"
-          onClick={onReload}
-          className="rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white dark:bg-white dark:text-slate-900"
-        >
-          再読み込み
-        </button>
+      <main className="mx-auto min-h-dvh w-full max-w-6xl px-4 py-12 sm:px-8">
+        <header>
+          <p className="text-sm font-medium text-violet-600 dark:text-violet-400">Admin</p>
+          <h1 className="text-3xl font-bold">管理者ダッシュボード</h1>
+          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+            Accountの利用状況とサービス利用量を確認します。
+          </p>
+          <AdminNavigation current="accounts" />
+        </header>
+        <section className="flex min-h-[50vh] flex-col items-center justify-center gap-4 text-center">
+          <AlertCircle className="size-10 text-rose-500" aria-hidden="true" />
+          <p>{state.message}</p>
+          <button
+            type="button"
+            onClick={onReload}
+            className="rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white dark:bg-white dark:text-slate-900"
+          >
+            再読み込み
+          </button>
+        </section>
       </main>
     );
   }

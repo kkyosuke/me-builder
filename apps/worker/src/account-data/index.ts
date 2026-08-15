@@ -29,7 +29,16 @@ const actions = {
 } as const;
 
 const ALARM_RETRY_MS = 30_000;
-const PROGRESSION_PROJECTION_PENDING_KEY = "progressionProjectionPending";
+const PROGRESSION_PROJECTION_STATE_KEY = "progressionProjectionState";
+type ProgressionProjectionState =
+  | Readonly<{ retryPending: true }>
+  | Readonly<{
+      retryPending: false;
+      calculationVersion: number;
+      growthValue: number;
+      collectedPieces: number;
+      activePieces: number;
+    }>;
 const progressionProjectionOperations = new Set<AccountDataOperation>([
   "diagnosis.deleteAccountData",
   "diagnosisProjection.processLatest",
@@ -142,10 +151,10 @@ export class AccountData extends DurableObject<Env> {
           await DO.account.action.diagnosisBrainProjection.processPendingDiagnosisBrainProjections(
             this.repository.client,
           );
-        const projectionRetryPending = await this.ctx.storage.get<boolean>(
-          PROGRESSION_PROJECTION_PENDING_KEY,
+        const progressionProjectionState = await this.ctx.storage.get<ProgressionProjectionState>(
+          PROGRESSION_PROJECTION_STATE_KEY,
         );
-        if (diagnosisProjection.applied > 0 || projectionRetryPending) {
+        if (diagnosisProjection.applied > 0 || progressionProjectionState?.retryPending) {
           await this.syncProgressionProjection();
         }
         await dispatchUndispatchedProfileSummaryGenerations(
@@ -359,15 +368,35 @@ export class AccountData extends DurableObject<Env> {
           this.accountId,
           projectedAt,
         ));
+      const projectionState = await this.ctx.storage.get<ProgressionProjectionState>(
+        PROGRESSION_PROJECTION_STATE_KEY,
+      );
+      if (
+        projectionState &&
+        !projectionState.retryPending &&
+        projectionState.calculationVersion ===
+          D1.shared.action.adminAccount.UTSUSHI_PROGRESSION_CALCULATION_VERSION &&
+        projectionState.growthValue === progression.growthValue &&
+        projectionState.collectedPieces === progression.collectedPieces &&
+        projectionState.activePieces === progression.activePieces
+      ) {
+        return;
+      }
       await D1.shared.action.adminAccount.upsertAccountProgressionProjection(
         D1.shared.client.create(this.env.DB),
         this.accountId,
         progression,
         projectedAt,
       );
-      await this.ctx.storage.delete(PROGRESSION_PROJECTION_PENDING_KEY);
+      await this.ctx.storage.put(PROGRESSION_PROJECTION_STATE_KEY, {
+        retryPending: false,
+        calculationVersion: D1.shared.action.adminAccount.UTSUSHI_PROGRESSION_CALCULATION_VERSION,
+        growthValue: progression.growthValue,
+        collectedPieces: progression.collectedPieces,
+        activePieces: progression.activePieces,
+      } satisfies ProgressionProjectionState);
     } catch (error) {
-      await this.ctx.storage.put(PROGRESSION_PROJECTION_PENDING_KEY, true);
+      await this.ctx.storage.put(PROGRESSION_PROJECTION_STATE_KEY, { retryPending: true });
       logger.warn(
         {
           event: "account-progression.projection.deferred",

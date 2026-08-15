@@ -5,7 +5,11 @@ import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { describe, expect, it } from "vitest";
 import type { SharedD1Client } from "../client";
 import * as schema from "../schema";
-import { listAdminAccounts, upsertAccountProgressionProjection } from "./admin-account";
+import {
+  InvalidAdminAccountCursorError,
+  listAdminAccounts,
+  upsertAccountProgressionProjection,
+} from "./admin-account";
 import { saveVerifiedDisplayName } from "./profile";
 
 function createTestDb(): SharedD1Client {
@@ -137,5 +141,13 @@ describe("Admin Account list", () => {
       ...(first.nextCursor ? { cursor: first.nextCursor } : {}),
     });
     expect(second.accounts.map(({ id }) => id)).toEqual(["account-1"]);
+  });
+
+  it("過大なcursorをDBへ渡す前に拒否する", async () => {
+    const db = createTestDb();
+
+    await expect(listAdminAccounts(db, { cursor: "a".repeat(513) })).rejects.toBeInstanceOf(
+      InvalidAdminAccountCursorError,
+    );
   });
 });

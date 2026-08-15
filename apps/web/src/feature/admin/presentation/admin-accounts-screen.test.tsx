@@ -97,4 +97,13 @@ describe("AdminAccountsScreen", () => {
     expect(onPreviousPage).toHaveBeenCalledOnce();
     expect(onNextPage).toHaveBeenCalledOnce();
   });
+
+  it("一覧取得に失敗しても利用統計へ移動できる", () => {
+    renderScreen({ state: { status: "error", message: "取得に失敗しました" } });
+
+    expect(screen.getByText("取得に失敗しました")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "利用統計" }).getAttribute("href")).toBe(
+      "/admin/statistics",
+    );
+  });
 });

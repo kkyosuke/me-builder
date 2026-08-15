@@ -13,6 +13,19 @@ describe("AdminStatisticsScreen", () => {
     expect(screen.getByRole("status", { name: "統計情報を読み込み中" })).toBeTruthy();
   });
 
+  it("統計取得に失敗してもAccount一覧へ移動できる", () => {
+    render(
+      <AdminStatisticsScreen
+        state={{ status: "error", message: "取得に失敗しました" }}
+        showNavigation
+        onReload={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("取得に失敗しました")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Account" }).getAttribute("href")).toBe("/admin");
+  });
+
   it("LINE返信数が前日までの集計であることを表示する", () => {
     render(
       <AdminStatisticsScreen
