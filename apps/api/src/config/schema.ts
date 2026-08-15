@@ -1,4 +1,4 @@
-import type { Queue, WebhookQueueMessage } from "@me-builder/shared";
+import type { BillingQueueMessage, Queue, WebhookQueueMessage } from "@me-builder/shared";
 import * as v from "valibot";
 
 export const ConfigSchema = v.object({
@@ -23,6 +23,13 @@ export const ConfigSchema = v.object({
   webhookQueueName: v.optional(v.string()),
   webhookQueue: v.optional(
     v.custom<Queue<WebhookQueueMessage>>(
+      (val) => val === undefined || (typeof val === "object" && val !== null && "send" in val),
+    ),
+  ),
+  stripeSecretKey: v.optional(v.string()),
+  stripeWebhookSecret: v.optional(v.string()),
+  billingQueue: v.optional(
+    v.custom<Queue<BillingQueueMessage>>(
       (val) => val === undefined || (typeof val === "object" && val !== null && "send" in val),
     ),
   ),

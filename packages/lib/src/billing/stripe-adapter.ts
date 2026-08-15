@@ -108,6 +108,22 @@ export class StripeBillingProvider implements BillingProvider {
         id: event.id,
         type: event.type,
         objectId: object.id,
+        objectType:
+          typeof (object as { object?: unknown }).object === "string"
+            ? (object as { object: string }).object
+            : "unknown",
+        customerId: stripeId((object as { customer?: unknown }).customer),
+        subscriptionId:
+          (object as { object?: unknown }).object === "subscription"
+            ? object.id
+            : (stripeId((object as { subscription?: unknown }).subscription) ??
+              stripeId(
+                (
+                  object as {
+                    parent?: { subscription_details?: { subscription?: unknown } };
+                  }
+                ).parent?.subscription_details?.subscription,
+              )),
         createdAt: fromUnixSeconds(event.created),
       };
     } catch (error) {
@@ -122,6 +138,14 @@ export class StripeBillingProvider implements BillingProvider {
       throw classifyStripeError(error);
     }
   }
+}
+
+function stripeId(value: unknown): string | null {
+  if (typeof value === "string") return value;
+  if (value && typeof value === "object" && typeof (value as { id?: unknown }).id === "string") {
+    return (value as { id: string }).id;
+  }
+  return null;
 }
 
 function mapSubscription(subscription: Stripe.Subscription): BillingSubscription {

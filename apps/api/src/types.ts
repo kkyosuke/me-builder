@@ -31,6 +31,8 @@ type Env = Omit<
   LINE_WEBHOOK_URL?: string;
   LIFF_ID?: string;
   LINE_LOGIN_CHANNEL_ID?: string;
+  STRIPE_SECRET_KEY?: string;
+  STRIPE_WEBHOOK_SECRET?: string;
   ADMIN_LINE_USER_IDS?: string;
   BASE_URL?: string;
   WEB_ORIGIN?: string;

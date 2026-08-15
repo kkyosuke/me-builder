@@ -73,6 +73,9 @@ export interface BillingQueueMessage {
   eventId: string;
   eventType: string;
   objectId: string;
+  objectType: string;
+  customerId: string | null;
+  subscriptionId: string | null;
   createdAt: string;
 }
 

@@ -41,6 +41,7 @@ export function getConfig(env?: Record<string, unknown>): ApiConfig {
 
   const rawWebhookQueueName = getEnv(["WEBHOOK_QUEUE_NAME", "WEBHOOK_QUEUE"], env);
   const rawWebhookQueue = env?.WEBHOOK_QUEUE;
+  const rawBillingQueue = env?.BILLING_QUEUE;
 
   const liffConfiguration = resolveLiffConfiguration({
     liffId: getEnv("LIFF_ID", env),
@@ -59,6 +60,9 @@ export function getConfig(env?: Record<string, unknown>): ApiConfig {
     lineWebhookUrl: rawLineWebhookUrl,
     webhookQueueName: rawWebhookQueueName,
     webhookQueue: rawWebhookQueue,
+    billingQueue: rawBillingQueue,
+    stripeSecretKey: getEnv("STRIPE_SECRET_KEY", env),
+    stripeWebhookSecret: getEnv("STRIPE_WEBHOOK_SECRET", env),
     liffId: liffConfiguration.liffId,
     lineLoginChannelId: liffConfiguration.lineLoginChannelId,
     adminLineUserIds,
