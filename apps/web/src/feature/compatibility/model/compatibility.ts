@@ -13,6 +13,7 @@ export type CompatibilityPerson = {
   name: string;
   initial: string;
   color: "sky" | "violet";
+  profileGeneratedAt: string;
   statements: string[];
   themes: CompatibilityTheme[];
 };

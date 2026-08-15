@@ -5,6 +5,15 @@ import { diagnosisCategoryHref } from "../../../diagnosis/model/relationship-cat
 import type { CompatibilityPerson, CompatibilityTheme } from "../../model/compatibility";
 import { CompatibilityAvatar } from "./compatibility-ui";
 
+const profileGeneratedAtFormatter = new Intl.DateTimeFormat("ja-JP", {
+  year: "numeric",
+  month: "long",
+  day: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  timeZone: "Asia/Tokyo",
+});
+
 export function CompatibilityPersonSheet({
   isMe,
   person,
@@ -89,6 +98,18 @@ export function CompatibilityPersonSheet({
           </ul>
         </section>
       )}
+
+      <section className="mt-6 border-t border-slate-200 pt-5 dark:border-slate-700">
+        <h3 className="font-bold text-slate-950 dark:text-slate-50">この資料のもと</h3>
+        <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-xs leading-relaxed">
+          <dt className="font-bold text-slate-500 dark:text-slate-400">共有プロフィール生成日時</dt>
+          <dd className="text-slate-700 dark:text-slate-300">
+            {profileGeneratedAtFormatter.format(new Date(person.profileGeneratedAt))}
+          </dd>
+          <dt className="font-bold text-slate-500 dark:text-slate-400">利用した情報</dt>
+          <dd className="text-slate-700 dark:text-slate-300">共有プロフィール・診断結果</dd>
+        </dl>
+      </section>
     </article>
   );
 }

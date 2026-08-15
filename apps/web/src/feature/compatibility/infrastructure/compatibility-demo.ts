@@ -4,6 +4,7 @@ export const me: CompatibilityPerson = {
   name: "わたし",
   initial: "わ",
   color: "sky",
+  profileGeneratedAt: "2026-08-15T00:00:00.000Z",
   statements: [
     "私は、予定を早めに決めておけると安心します。",
     "私は、一緒に楽しむ時間を大切にしたいです。",
@@ -46,6 +47,7 @@ export const aoi: CompatibilityPerson = {
   name: "あおい",
   initial: "あ",
   color: "violet",
+  profileGeneratedAt: "2026-08-14T00:00:00.000Z",
   statements: [
     "私は、見通しを持って動けると心地よく感じます。",
     "私は、自分で決められる余白を大切にしたいです。",

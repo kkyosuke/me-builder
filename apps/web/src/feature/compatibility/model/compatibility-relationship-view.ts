@@ -9,6 +9,7 @@ export function toCompatibilityPerson(
     name: person.displayName,
     initial: person.displayName.slice(0, 1),
     color,
+    profileGeneratedAt: person.aboutMe.generatedAt,
     statements: person.aboutMe.statements.map((statement) => statement.statement),
     themes: person.themes.flatMap((theme) =>
       theme.parameters.map((parameter) => ({
