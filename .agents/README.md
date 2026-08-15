@@ -43,6 +43,7 @@
 | [「友達との距離感・付き合い方」パラメータ変換設計](../docs/diagnosis/scoring/friendship-style-parameter-design.md) | 10個目の診断固有の5パラメータ、質問ごとの重み、表示設定、Relationship Category |
 | [「決め方・迷いとの向き合い方」パラメータ変換設計](../docs/diagnosis/scoring/decision-making-style-parameter-design.md) | 11個目の診断固有の5パラメータ、質問ごとの重み、表示設定、Relationship Category |
 | [「仕事の進め方・優先順位」パラメータ変換設計](../docs/diagnosis/scoring/work-priority-style-parameter-design.md) | 12個目の診断固有の5パラメータ、質問ごとの重み、表示設定、Relationship Category |
+| [「家族の期待と自分の選択」パラメータ変換設計](../docs/diagnosis/scoring/family-expectation-choice-parameter-design.md) | 13個目の診断固有の5パラメータ、質問ごとの重み、表示設定、Relationship Category |
 | [ドメイン設計](../docs/domain/domain-design.md) | Account / Brain / Sourceの責務・境界、Diagnosisの位置づけ、ドメイン間の関係、設計順序と進捗 |
 | [Brain内部情報の分類](../docs/domain/brain/brain-content-taxonomy.md) | Brain Itemの分類名、定義、具体例、分類とは別に持つ共通属性、意思決定での利用方法 |
 | [Brain Item生成設計](../docs/domain/brain/brain-item-generation-design.md) | Source RecordからBrain Itemを生成する共通入出力、診断と日記の変換差分、登録・本人確認のタイミング |
