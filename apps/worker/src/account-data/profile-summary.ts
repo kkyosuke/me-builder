@@ -2,6 +2,8 @@ import { type CompleteProfileSummaryGenerationInput, DO } from "@me-builder/lib"
 
 /** Profile Summary generation and immutable version operations owned by one AccountData Object. */
 export const profileSummaryActions = {
+  "progression.read": (db: DO.account.Database, accountId: string, at?: Date) =>
+    DO.account.action.progression.readUtsushiProgression(db, accountId, at),
   "profileSummary.read": (
     db: DO.account.Database,
     accountId: string,

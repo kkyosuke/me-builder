@@ -33,6 +33,7 @@ const mocks = vi.hoisted(() => ({
   resetDevelopmentAccountData: vi.fn(),
   restoreDiagnosisProgress: vi.fn(),
   fetchProfileSummary: vi.fn(),
+  fetchProfileProgression: vi.fn(),
   requestProfileSummaryGeneration: vi.fn(),
   fetchDevelopmentBrainItems: vi.fn(),
   normalizeAvatarImage: vi.fn(),
@@ -74,6 +75,9 @@ vi.mock("./feature/diagnosis/model/answers", () => ({
 vi.mock("./feature/profile/infrastructure/profile-api", () => ({
   fetchProfileSummary: mocks.fetchProfileSummary,
   requestProfileSummaryGeneration: mocks.requestProfileSummaryGeneration,
+}));
+vi.mock("./feature/profile/infrastructure/progression-api", () => ({
+  fetchProfileProgression: mocks.fetchProfileProgression,
 }));
 vi.mock("./feature/brain/infrastructure/brain-api", () => ({
   fetchDevelopmentBrainItems: mocks.fetchDevelopmentBrainItems,
@@ -189,6 +193,15 @@ function diagnosis(overrides: Partial<DiagnosisListItem> = {}): DiagnosisListIte
 
 describe("App", () => {
   beforeEach(() => {
+    const localStorageValues = new Map<string, string>();
+    Object.defineProperty(window, "localStorage", {
+      configurable: true,
+      value: {
+        clear: () => localStorageValues.clear(),
+        getItem: (key: string) => localStorageValues.get(key) ?? null,
+        setItem: (key: string, value: string) => localStorageValues.set(key, value),
+      },
+    });
     vi.clearAllMocks();
     window.history.replaceState({}, "", "/");
     vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
@@ -206,6 +219,15 @@ describe("App", () => {
       role: "user",
       displayName: "テスト",
       avatar: null,
+    });
+    mocks.fetchProfileProgression.mockResolvedValue({
+      level: 1,
+      growthValue: 0,
+      currentLevelThreshold: 0,
+      nextLevelThreshold: 5,
+      collectedPieces: 0,
+      activePieces: 0,
+      categoryCount: 0,
     });
     mocks.saveAccountAvatar.mockImplementation(
       async (_apiUrl: string, _idToken: string, nextAvatar: { dataUrl: string }) => ({

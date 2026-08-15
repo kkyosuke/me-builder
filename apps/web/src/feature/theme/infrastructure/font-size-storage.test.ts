@@ -1,9 +1,21 @@
 // @vitest-environment jsdom
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { initializeFontSize, readFontSize, saveFontSize } from "./font-size-storage";
 
 describe("font size storage", () => {
+  beforeEach(() => {
+    const values = new Map<string, string>();
+    Object.defineProperty(window, "localStorage", {
+      configurable: true,
+      value: {
+        clear: () => values.clear(),
+        getItem: (key: string) => values.get(key) ?? null,
+        setItem: (key: string, value: string) => values.set(key, value),
+      },
+    });
+  });
+
   afterEach(() => {
     window.localStorage.clear();
     document.documentElement.classList.remove(

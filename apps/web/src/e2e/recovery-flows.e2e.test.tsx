@@ -25,6 +25,15 @@ vi.mock("../feature/liff/infrastructure/liff-client", () => ({
 }));
 
 const accountProfile = { role: "user", avatar: null };
+const progression = {
+  level: 2,
+  growthValue: 7,
+  currentLevelThreshold: 5,
+  nextLevelThreshold: 20,
+  collectedPieces: 2,
+  activePieces: 2,
+  categoryCount: 2,
+};
 const diagnosisList = {
   diagnoses: [
     {
@@ -199,6 +208,7 @@ describe("Web recovery flows E2E", () => {
       const url = urlOf(input);
       const method = init?.method ?? "GET";
       if (url.pathname === "/api/profile") return Response.json(accountProfile);
+      if (url.pathname === "/api/profile/progression") return Response.json(progression);
       if (url.pathname === "/api/profile-summary" && method === "GET") {
         summaryReads += 1;
         return Response.json(
@@ -223,5 +233,34 @@ describe("Web recovery flows E2E", () => {
     await waitFor(() => expect(summaryReads).toBe(3));
     expect(generationPosts).toBe(1);
     expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("本人の進行度APIを読み、診断の有無に依存せずうつしレベルを表示する", async () => {
+    const summary = summaryResponse({
+      id: "version-1",
+      headline: "進行度と一緒に表示するまとめ",
+      status: "idle",
+      canRegenerate: false,
+    });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = urlOf(input);
+      if (url.pathname === "/api/profile") return Response.json(accountProfile);
+      if (url.pathname === "/api/profile-summary") return Response.json(summary);
+      if (url.pathname === "/api/profile/progression") return Response.json(progression);
+      throw new Error(`Unexpected E2E request: ${url.pathname}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    window.history.replaceState({}, "", "/me");
+
+    render(<App />);
+
+    expect(await screen.findByText("Lv.2")).toBeTruthy();
+    expect(screen.getByText("わたしのかけら")).toBeTruthy();
+    expect(screen.getByText("分類の広がり")).toBeTruthy();
+    expect(screen.queryByText("UIプレビュー用のサンプルデータです")).toBeNull();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.example.com/api/profile/progression",
+      expect.objectContaining({ headers: { Authorization: "Bearer dummy.id.token" } }),
+    );
   });
 });

@@ -17,6 +17,7 @@ import type * as development from "./action/development";
 import type * as diagnosis from "./action/diagnosis";
 import type * as diagnosisBrainProjection from "./action/diagnosis-brain-projection";
 import type * as diary from "./action/diary";
+import type * as progression from "./action/progression";
 import type * as source from "./action/source";
 
 type ActionResult<T> = T extends (...args: never[]) => infer TResult ? Awaited<TResult> : never;
@@ -137,6 +138,7 @@ export type AccountDataActions = {
     message: string,
     failedAt?: Date,
   ) => Promise<void>;
+  "progression.read": RpcAction<[at?: Date], typeof progression.readUtsushiProgression>;
   "conversation.storeLineTextSource": RpcAction<
     [WithoutAccountId<Parameters<typeof diary.storeLineTextSource>[1]>],
     typeof diary.storeLineTextSource
