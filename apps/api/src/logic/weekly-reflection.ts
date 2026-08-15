@@ -34,10 +34,15 @@ export async function getWeeklyReflections({
   const session = await createLiffSession({ idToken, lineLoginChannelId, db });
   if (session.type !== "resolved") return session;
   if (!accountData) throw new Error("ACCOUNT_DATA binding is not configured");
-  const [readModel, entitlement] = await Promise.all([
-    accountDataFor(accountData, session.session.accountId).execute("weeklyReflection.read", at),
-    new billing.EntitlementService(planAssignmentProvider).resolve(session.session.accountId, at),
-  ]);
+  const entitlement = await new billing.EntitlementService(planAssignmentProvider).resolve(
+    session.session.accountId,
+    at,
+  );
+  const readModel = await accountDataFor(accountData, session.session.accountId).execute(
+    "weeklyReflection.read",
+    at,
+    entitlement.policy.monthlyChange,
+  );
   return {
     type: "resolved",
     ...readModel,

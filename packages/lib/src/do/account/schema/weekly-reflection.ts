@@ -1,5 +1,5 @@
 import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
-import type { WeeklyReflectionContent } from "../../../weekly-reflection";
+import type { MonthlyChangeContent, WeeklyReflectionContent } from "../../../weekly-reflection";
 import { accountDataIdentity } from "./identity";
 
 export const weeklyReflectionGenerations = sqliteTable(
@@ -46,4 +46,26 @@ export const weeklyReflections = sqliteTable(
     content: text("content_json", { mode: "json" }).notNull().$type<WeeklyReflectionContent>(),
   },
   (table) => [index("weekly_reflection_generated_idx").on(table.generatedAt)],
+);
+
+export const monthlyChangeVersions = sqliteTable(
+  "monthly_change_versions",
+  {
+    id: text("id").primaryKey(),
+    accountId: text("account_id")
+      .notNull()
+      .references(() => accountDataIdentity.accountId),
+    month: text("month").notNull(),
+    version: integer("version").notNull(),
+    generatedAt: integer("generated_at", { mode: "timestamp_ms" }).notNull(),
+    content: text("content_json", { mode: "json" }).notNull().$type<MonthlyChangeContent>(),
+  },
+  (table) => [
+    uniqueIndex("monthly_change_account_month_version_idx").on(
+      table.accountId,
+      table.month,
+      table.version,
+    ),
+    index("monthly_change_generated_idx").on(table.accountId, table.generatedAt),
+  ],
 );

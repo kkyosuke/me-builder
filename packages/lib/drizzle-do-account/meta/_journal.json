@@ -204,6 +204,13 @@
       "when": 1786844133306,
       "tag": "0028_lethal_vermin",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "6",
+      "when": 1786844196389,
+      "tag": "0029_steady_ben_urich",
+      "breakpoints": true
     }
   ]
 }

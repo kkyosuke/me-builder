@@ -189,7 +189,10 @@ export type AccountDataActions = {
     message: string,
     failedAt?: Date,
   ) => Promise<void>;
-  "weeklyReflection.read": RpcAction<[at?: Date], typeof weeklyReflection.readWeeklyReflections>;
+  "weeklyReflection.read": RpcAction<
+    [at?: Date, monthlyMode?: "none" | "brief" | "full"],
+    typeof weeklyReflection.readWeeklyReflections
+  >;
   "weeklyReflection.requestGeneration": RpcAction<
     [requestedAt?: Date],
     typeof weeklyReflection.requestWeeklyReflectionGeneration

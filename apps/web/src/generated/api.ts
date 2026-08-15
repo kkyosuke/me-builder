@@ -2110,6 +2110,19 @@ export interface operations {
               }[];
               recordCount: number;
             }[];
+            monthlyChanges: {
+              month: string;
+              version: number;
+              /** Format: date-time */
+              generatedAt: string;
+              /** @enum {string} */
+              mode: "brief" | "full" | "archived";
+              headline: string;
+              previousMonthHeadline: string | null;
+              changes: string[];
+              ongoingGoals: string[];
+              evidenceWeekStarts: string[];
+            }[];
             generation: {
               /** Format: date */
               weekStart: string;

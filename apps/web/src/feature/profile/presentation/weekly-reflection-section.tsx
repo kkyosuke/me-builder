@@ -76,6 +76,40 @@ export function WeeklyReflectionSection({
           通知を停止しているため、完成通知は送信しません。
         </p>
       ) : null}
+      {state.data.monthlyChanges[0] ? (
+        <article className="mt-6 rounded-3xl border border-violet-100 p-5 dark:border-violet-900">
+          <p className="text-xs text-slate-500">
+            {state.data.monthlyChanges[0].month}・第{state.data.monthlyChanges[0].version}版
+          </p>
+          <h3 className="mt-1 font-semibold">月ごとの変化</h3>
+          <p className="mt-2 text-sm">{state.data.monthlyChanges[0].headline}</p>
+          {state.data.monthlyChanges[0].previousMonthHeadline ? (
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+              前月: {state.data.monthlyChanges[0].previousMonthHeadline}
+            </p>
+          ) : null}
+          {state.data.monthlyChanges[0].ongoingGoals.length > 0 ? (
+            <div className="mt-3">
+              <p className="text-xs font-medium text-slate-500">継続中の小さな一歩</p>
+              <ul className="mt-1 list-disc space-y-1 pl-5 text-sm">
+                {state.data.monthlyChanges[0].ongoingGoals.map((goal) => (
+                  <li key={goal}>{goal}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          <p className="mt-3 text-xs text-slate-400">
+            根拠: {state.data.monthlyChanges[0].evidenceWeekStarts.join("、")} の振り返り
+          </p>
+          {state.data.monthlyChanges[0].mode !== "full" ? (
+            <p className="mt-2 text-xs text-slate-500">
+              {state.data.monthlyChanges[0].mode === "archived"
+                ? "プラン変更前に作成した結果を短い表示で閲覧しています。"
+                : "Liteでは月の要点を短く表示します。Fullでは前月との横断表示が使えます。"}
+            </p>
+          ) : null}
+        </article>
+      ) : null}
     </section>
   );
 }

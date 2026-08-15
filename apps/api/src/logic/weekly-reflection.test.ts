@@ -31,6 +31,7 @@ const readModel = {
       recordCount: 1,
     },
   ],
+  monthlyChanges: [],
   generation: {
     weekStart: "2026-08-10",
     status: "idle" as const,
@@ -40,7 +41,7 @@ const readModel = {
   },
 };
 
-function provider(plan: "free" | "lite") {
+function provider(plan: "free" | "lite" | "full") {
   return new billing.FakeAccountPlanAssignmentProvider([
     {
       accountId: "account-1",
@@ -90,6 +91,23 @@ describe("weekly reflection entitlement", () => {
       }),
     ).resolves.toEqual({ type: "unavailable", reason: "feature_unavailable" });
     expect(send).not.toHaveBeenCalled();
+    expect(execute).toHaveBeenCalledWith("account-1", "weeklyReflection.read", at, "none");
+  });
+
+  it.each([
+    ["lite", "brief"],
+    ["full", "full"],
+  ] as const)("%sの月次表示modeをAccountDataへ渡す", async (plan, mode) => {
+    execute.mockResolvedValue(readModel);
+    await getWeeklyReflections({
+      idToken: "token",
+      lineLoginChannelId: "channel",
+      db: {} as D1.shared.Client,
+      accountData,
+      planAssignmentProvider: provider(plan),
+      at,
+    });
+    expect(execute).toHaveBeenCalledWith("account-1", "weeklyReflection.read", at, mode);
   });
 
   it("Liteは生成要求をAccountDataへ保存してQueueへ本文なしで渡す", async () => {

@@ -27,6 +27,7 @@ import m0025 from "./0025_robust_sugar_man.sql";
 import m0026 from "./0026_flimsy_speed_demon.sql";
 import m0027 from "./0027_nappy_blizzard.sql";
 import m0028 from "./0028_lethal_vermin.sql";
+import m0029 from "./0029_steady_ben_urich.sql";
 import journal from "./meta/_journal.json";
 
 export default {
@@ -61,5 +62,6 @@ export default {
     m0026,
     m0027,
     m0028,
+    m0029,
   },
 };

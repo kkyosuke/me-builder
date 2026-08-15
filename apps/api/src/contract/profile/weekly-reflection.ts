@@ -20,6 +20,19 @@ const ReflectionSchema = v.object({
 
 export const WeeklyReflectionResponseSchema = v.object({
   reflections: v.array(ReflectionSchema),
+  monthlyChanges: v.array(
+    v.object({
+      month: v.pipe(v.string(), v.regex(/^\d{4}-\d{2}$/)),
+      version: v.pipe(v.number(), v.safeInteger(), v.minValue(1)),
+      generatedAt: v.pipe(v.string(), v.isoTimestamp()),
+      mode: v.picklist(["brief", "full", "archived"]),
+      headline: Text,
+      previousMonthHeadline: v.nullable(Text),
+      changes: v.array(Text),
+      ongoingGoals: v.array(Text),
+      evidenceWeekStarts: v.array(v.pipe(v.string(), v.isoDate())),
+    }),
+  ),
   generation: v.object({
     weekStart: v.pipe(v.string(), v.isoDate()),
     status: v.picklist(["idle", "queued", "generating", "completed", "failed"]),
