@@ -25,6 +25,9 @@ describe("ProfileSettingsScreen", () => {
     expect(screen.getByRole("radiogroup", { name: "表示テーマ" })).toBeTruthy();
     expect((screen.getByRole("radio", { name: /ダーク/ }) as HTMLInputElement).checked).toBe(true);
     expect(screen.getByRole("radiogroup", { name: "文字サイズ" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: /利用規約を確認/ }).getAttribute("href")).toBe(
+      "/terms",
+    );
     expect((screen.getByRole("radio", { name: "中" }) as HTMLInputElement).checked).toBe(true);
   });
 

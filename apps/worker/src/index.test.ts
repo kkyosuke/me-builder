@@ -49,6 +49,9 @@ vi.spyOn(D1.shared.action.account, "resolveAccountByLineMessagingApi").mockResol
     isDeleted: false,
   },
 });
+const mockHasAcceptedCurrentTerms = vi
+  .spyOn(D1.shared.action.agreement, "hasAcceptedCurrentTerms")
+  .mockResolvedValue(true);
 
 function createBatch(
   text: string,
@@ -121,6 +124,7 @@ describe("Worker", () => {
     mockInfoLog.mockClear();
     mockWarnLog.mockClear();
     mockErrorLog.mockClear();
+    mockHasAcceptedCurrentTerms.mockReset().mockResolvedValue(true);
   });
 
   it("日記を原本保存してCoordinatorへ渡し、受付配送はAPI側の予約へ委ねる", async () => {

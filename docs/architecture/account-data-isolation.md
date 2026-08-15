@@ -41,7 +41,7 @@ flowchart LR
 
 | 区分 | 例 | 保存先 | 参照規則 |
 | --- | --- | --- | --- |
-| Account運営 | Account、Identity、role、status、アバターメタデータ | 共有D1 | 認証済み`account_id`と運営権限で参照 |
+| Account運営 | Account、Identity、role、status、アバターメタデータ、規約同意履歴 | 共有D1 | 認証済み`account_id`と運営権限で参照 |
 | 全Account共通 | Question、Diagnosis、Scoring Config | 共有D1 | 公開状態など各ドメインの条件で参照 |
 | 個人コンテンツroot | Source Record、Conversation Session、Diagnosis Response、Brain Item、プロフィール要約 | AccountData SQLite | Objectに固定したAccountだけを保存 |
 | Account所有descendant | payload、message、turn、answer、edge、revision、projection request | AccountData SQLite | 所有rootと同じObject内で参照 |
@@ -106,6 +106,7 @@ projection retryや期限切れSession終了は各AccountData Objectのalarmで�
 erDiagram
     accounts ||--o{ account_identities : owns
     accounts ||--o| account_profiles : configures
+    accounts ||--o{ account_agreement_acceptances : accepts
 ```
 
 AccountData内のAccount所有rootは、共有D1のAccount行ではなく、Objectへ固定したidentityを親にします。

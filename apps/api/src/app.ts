@@ -36,6 +36,11 @@ import { diagnosisAnswersRoute } from "./contract/diagnosis/answers";
 import { deferDiagnosisQuestionRoute } from "./contract/diagnosis/deferred-question";
 import { diagnosisDetailRoute } from "./contract/diagnosis/detail";
 import { diagnosisListRoute } from "./contract/diagnosis/list";
+import {
+  acceptServiceTermsRequestValidator,
+  acceptServiceTermsRoute,
+  getServiceTermsRoute,
+} from "./contract/legal/terms";
 import { openApiOptions } from "./contract/openapi";
 import {
   deleteProfileAvatarRoute,
@@ -74,6 +79,7 @@ import {
   putDiagnosisAnswer,
   putDiagnosisDeferredQuestion,
 } from "./controller/diagnosis";
+import { getServiceTermsContents, putServiceTermsAcceptance } from "./controller/legal";
 import { postLineWebhook } from "./controller/line";
 import {
   getProfileProgressionContents,
@@ -159,6 +165,14 @@ app.get("/api/health", (c) => {
 });
 
 app.post("/api/line/webhook", postLineWebhook);
+
+app.get("/api/legal/terms", getServiceTermsRoute, getServiceTermsContents);
+app.put(
+  "/api/legal/terms/acceptance",
+  acceptServiceTermsRoute,
+  acceptServiceTermsRequestValidator,
+  putServiceTermsAcceptance,
+);
 
 app.get("/api/admin/statistics", adminStatisticsRoute, getStatistics);
 

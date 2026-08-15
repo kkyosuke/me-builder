@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { StrictMode } from "react";
+import { type ReactNode, StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import type {
@@ -49,6 +49,9 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("./config", () => ({
   config: mocks.config,
+}));
+vi.mock("./feature/legal", () => ({
+  ServiceTermsGate: ({ children }: { children: ReactNode }) => children,
 }));
 vi.mock("./feature/liff/infrastructure/liff-client", () => ({
   initializeLiff: mocks.initializeLiff,

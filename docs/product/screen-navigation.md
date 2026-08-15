@@ -232,7 +232,7 @@ flowchart LR
 
 ## 5. 認証と要求画面への復帰
 
-認証は独立した目的地ではなく、要求された画面へ入る前の共通ゲートです。
+認証は独立した目的地ではなく、要求された画面へ入る前の共通ゲートです。Account解決後の利用規約確認は[サービス利用規約・同意体験設計](service-terms-consent-experience.md)を正とします。
 
 ```mermaid
 sequenceDiagram
@@ -240,6 +240,7 @@ sequenceDiagram
     participant E as Web共通入口
     participant L as LIFF / LINE Login
     participant A as Account解決
+    participant T as 利用規約同意
     participant S as 要求された画面
 
     U->>E: URLを開く
@@ -247,7 +248,9 @@ sequenceDiagram
     E->>L: 本人確認
     L->>A: 検証済みの本人性を渡す
     alt Accountを解決できる
-        A-->>E: 利用可
+        A-->>E: Account解決
+        E->>T: 現在versionの同意を確認
+        T-->>E: 同意済み、または同意を記録
         E-->>S: 元の要求画面を再判定して表示
     else Accountがない
         A-->>E: Accountなし

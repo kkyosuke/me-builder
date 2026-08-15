@@ -1,0 +1,120 @@
+# サービス利用規約・同意体験設計
+
+## 1. 目的と所有範囲
+
+この文書は、サービス利用規約の版管理、Accountごとの同意記録、同意画面を表示するタイミング、同意前後の利用可能範囲を定義します。
+
+この文書が所有しないもの:
+
+- Accountの本人確認と作成は[プロジェクト概要](project-overview.md#5-アカウントと本人識別)を正とします
+- Account運営情報と個人コンテンツの保存先は[Accountデータ分離設計](../architecture/account-data-isolation.md)を正とします
+- 相手ごとの共有同意は[相性診断・うつし共有体験設計](compatibility-experience.md)を正とします
+- 公開中の正確な規約本文は[`service-terms.ts`](../../packages/shared/src/legal/service-terms.ts)を正とします
+
+## 2. 結論
+
+規約は、LIFF／LINE Loginによる本人確認とAccount解決が成功した直後、診断・日記・プロフィールなどの本人データを取得または作成する前に表示します。本人を特定する前には「誰が同意したか」を保存できず、機能利用後では同意前にデータ処理が始まるため、この間を共通ゲートにします。
+
+```mermaid
+sequenceDiagram
+    participant U as 利用者
+    participant L as LIFF / LINE Login
+    participant A as API / Shared D1
+    participant W as Web機能
+
+    U->>L: Webを開く
+    L->>A: 検証済みIDトークン
+    A->>A: Accountを解決
+    A->>A: 現在の同意必須versionを満たす同意を確認
+    alt 未同意
+        A-->>U: 規約本文とversionを表示
+        U->>A: 明示的に同意
+        A->>A: Account・version・本文hash・同意日時を保存
+    end
+    A-->>W: 要求されていた画面を表示
+```
+
+同意済みのversionが現在の同意必須version以降である間は、起動のたびに同意画面を出しません。重要な改定では新しい同意必須versionを公開し、同じゲートで再同意を求めます。軽微な改定では公開versionだけを追加し、既存利用者の利用を止めません。プロフィールからは、現在の本文、version、本人の同意日時をいつでも確認できます。
+
+## 3. 規約の版管理
+
+- 文書識別子は`terms_of_service`とする
+- versionは公開日を表す`YYYY-MM-DD`とし、同日に複数版を出す場合は末尾へ連番を付ける
+- 公開済みversionの本文は編集・削除しない。改定は新しいversionを追加する
+- 本文の表示内容が変わる場合は、誤字修正を含めて新しい公開versionを追加し、本文hashも新しくする
+- 利用者の権利、料金、個人情報・入力データの利用目的や提供先、禁止事項、責任範囲などに重要な影響がある変更は`requiresReacceptance`を有効にし、同意必須versionを更新する
+- 誤字修正や意味を変えない説明の明確化は`requiresReacceptance`を無効にし、既存利用者は再同意なしでそのまま利用できる
+- 新規利用者は、同意必須version以降に軽微な改定がある場合も、表示時点の最新versionへ同意する
+- 現在の同意必須versionは、公開済み文書一覧のうち最後に`requiresReacceptance`が有効なversionとする
+- AI学習、第三者提供、相性共有など目的の異なる任意同意を利用規約へ束ねない。将来は別の文書識別子と同意履歴で扱う
+
+## 4. 同意記録
+
+共有D1へ、Account ID、文書識別子、文書version、同意時の本文hash、同意日時を追記型で保存します。同じAccount・文書・version・本文hashへの再送は最初の記録を返し、日時を上書きしません。本文の正本はコード上の公開済み文書一覧で不変管理し、DBのversionと本文hashを照合することで、誰がどの内容まで同意したかを確認できるようにします。
+
+Account IDはクライアントから受け取らず、検証済みIDトークンからサーバーが解決します。LINE user ID、IDトークン、User-Agent、IPアドレスは同意の証明に不要なため保存しません。
+
+```mermaid
+erDiagram
+    accounts ||--o{ account_agreement_acceptances : accepts
+    account_agreement_acceptances {
+        string document_key
+        string document_version
+        string document_hash
+        string accepted_at
+    }
+```
+
+## 5. 画面と状態
+
+初回同意画面は規約タイトル、要約、version、適用日、全文、確認チェック、同意ボタンを表示します。チェックは初期状態で未選択とし、明示的な操作後だけ同意を送信します。
+
+- 読み込み中: 規約と同意状態を確認中であることを表示する
+- 未同意: 主機能をマウントせず、規約画面だけを表示する
+- 保存中: 二重送信を防ぎ、進行状態をボタンへ表示する
+- version競合: 最新本文を再取得し、古い画面のversionへ同意させない
+- 失敗: 入力済みチェックだけで利用可にせず、再試行を表示する
+- 同意済み閲覧: 同意ボタンを出さず、同意日時を表示する
+
+## 6. 同意前の利用範囲
+
+同意前に許可するのは、本人確認、Account解決、規約本文・同意状態の取得、同意記録だけです。診断回答、日記、プロフィール要約、相性共有など本人コンテンツのAPIは、画面表示の有無にかかわらずサーバー側で拒否します。
+
+友だち追加だけではWeb同意画面を表示できないため、同意前のAccountを定時通知の対象にしません。未同意のAccountからLINEメッセージを受けた場合は、日記保存や診断要求の処理を開始せず、規約画面のLIFFリンクをreplyで案内します。同意後に利用者がメッセージを送り直した時点で処理します。replyできない設定・eventでも本人コンテンツは保存しません。
+
+```mermaid
+sequenceDiagram
+    participant U as 利用者
+    participant M as LINE Messaging API
+    participant A as Worker / Shared D1
+    participant L as LIFF規約画面
+
+    U->>M: テキストを送信
+    M->>A: 署名検証済みevent
+    A->>A: Account解決・同意確認
+    alt 未同意
+        A-->>U: 「同意してください」+ LIFFリンク
+        U->>L: 規約を確認して同意
+        U->>M: メッセージを再送
+    else 同意済み
+        A->>A: 診断要求または日記を処理
+    end
+```
+
+## 7. 受け入れ条件
+
+- 初回の検証済みLIFF利用では、主画面より先に現在の規約が表示される
+- 同意完了まで主画面のAPI取得を開始しない
+- 同意後の再訪では同じversionを再表示しない
+- 重要改定による新しい同意必須versionでは再同意が必要になる
+- 軽微な改定では既存の同意済み利用者がそのまま利用できる
+- Account、文書識別子、version、本文hash、最初の同意日時を確認できる
+- 別Accountの同意を利用できない
+- プロフィールから規約本文と同意日時を確認できる
+- 未同意のLINEメッセージは本人コンテンツへ保存せず、規約画面へのリンクを返信する
+
+## 8. 本番公開前の確認
+
+- 運営者の正式名称と問い合わせ窓口を確定し、規約本文とサービス画面へ表示する
+- 取り扱う個人情報、利用目的、外部送信先、保存・削除方法を記載したプライバシーポリシーを別文書として用意する
+- 実際の事業形態と提供機能に照らして、利用規約とプライバシーポリシーの法務レビューを受ける

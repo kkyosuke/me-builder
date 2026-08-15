@@ -4,7 +4,7 @@ import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createLiffSession } from "./liff-session";
+import { createLiffSession, resolveLiffSession } from "./liff-session";
 
 const CHANNEL_ID = "2010850319";
 const SUB = "U0000000000000000000000000000000";
@@ -55,7 +55,7 @@ const validClaims = {
   picture: "https://example.com/picture.jpg",
 };
 
-describe("createLiffSession", () => {
+describe("LIFF session resolution", () => {
   let db: D1.shared.Client;
 
   beforeEach(() => {
@@ -68,7 +68,7 @@ describe("createLiffSession", () => {
 
   // 既定引数は使わない。`call(undefined)` が既定値へ落ちて「未設定」を表現できなくなる。
   const call = (channelId = CHANNEL_ID) =>
-    createLiffSession({ idToken: ID_TOKEN, lineLoginChannelId: channelId, db });
+    resolveLiffSession({ idToken: ID_TOKEN, lineLoginChannelId: channelId, db });
 
   it("友だち追加で作られた Account を引き当て、表示用の情報だけを返すこと", async () => {
     const followed = await D1.shared.action.account.upsertIdentity(db, {
@@ -114,7 +114,7 @@ describe("createLiffSession", () => {
     const fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);
 
-    const result = await createLiffSession({
+    const result = await resolveLiffSession({
       idToken: undefined,
       lineLoginChannelId: CHANNEL_ID,
       db,
@@ -177,5 +177,35 @@ describe("createLiffSession", () => {
     // logic は HTTP を知らない。ステータスコードへの変換は controller の責務
     expect(result).not.toHaveProperty("status");
     expect(result).not.toHaveProperty("body");
+  });
+
+  it("本人機能は未同意のAccountを拒否すること", async () => {
+    mockVerifyEndpoint({ json: validClaims });
+
+    const result = await createLiffSession({
+      idToken: ID_TOKEN,
+      lineLoginChannelId: CHANNEL_ID,
+      db,
+    });
+
+    expect(result).toEqual({ type: "unauthenticated", reason: "terms_not_accepted" });
+    expect(await db.select().from(D1.shared.schema.accounts).all()).toHaveLength(1);
+  });
+
+  it("現在の同意要件を満たしたAccountは本人機能を利用できること", async () => {
+    mockVerifyEndpoint({ json: validClaims });
+    const identity = await D1.shared.action.account.resolveAccountByLineLogin(db, SUB);
+    await D1.shared.action.agreement.acceptCurrentTerms(db, identity.account.id);
+
+    const result = await createLiffSession({
+      idToken: ID_TOKEN,
+      lineLoginChannelId: CHANNEL_ID,
+      db,
+    });
+
+    expect(result).toMatchObject({
+      type: "resolved",
+      session: { accountId: identity.account.id, role: "user" },
+    });
   });
 });

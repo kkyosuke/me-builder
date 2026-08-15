@@ -47,6 +47,7 @@ docs/
 - [全体画面遷移設計](product/screen-navigation.md) — LINEとWebをまたぐ入口と、利用者・管理者向け画面の全体遷移
 - [わたしのまとめ仕様](product/profile-summary-experience.md) — 診断と日記からAI生成した版付きの「わたしのまとめ」と診断テーマの表示規則
 - [相性診断・うつし共有体験設計](product/compatibility-experience.md) — 招待リンクとLINE共有、双方の同意、相性一覧、「それぞれについて」と「2人について」、共有終了
+- [サービス利用規約・同意体験設計](product/service-terms-consent-experience.md) — 規約の版管理、Accountごとの同意履歴、初回・改定時の同意ゲート
 - [成長・報酬体験の提案](product/progression-reward-experience.md) — Brainの成長イベントによる上限のないレベル、集めたかけらと有効なかけら、ペア単位の共有レベル
 - [プロフィール設定体験設計](product/profile-settings-experience.md) — 右上の入口、アバター設定への接続、ライト・ダークテーマの選択と保存
 - [アバター設定体験設計](product/avatar-experience.md) — LINEプロフィール画像の初期表示、端末画像の選択・プレビュー・設定、差し替え・削除

@@ -57,6 +57,10 @@ async function prepareAccount(db: D1Database): Promise<void> {
         "line-summary-e2e",
       ),
   ]);
+  await D1.shared.action.agreement.acceptCurrentTerms(
+    D1.shared.client.create(db),
+    "account-summary-e2e",
+  );
 }
 
 async function insertDiaryMessage(

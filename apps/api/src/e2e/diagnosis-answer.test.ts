@@ -57,6 +57,10 @@ async function prepareDatabase(db: D1Database): Promise<void> {
     )
     .bind("identity-answer-e2e", timestamp, timestamp, "account-answer-e2e", "line-answer-e2e")
     .run();
+  await D1.shared.action.agreement.acceptCurrentTerms(
+    D1.shared.client.create(db),
+    "account-answer-e2e",
+  );
 }
 
 function mockLineVerification(): void {

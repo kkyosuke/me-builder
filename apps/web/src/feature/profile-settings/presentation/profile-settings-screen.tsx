@@ -2,6 +2,7 @@ import {
   ArrowLeft,
   Brain,
   ChevronRight,
+  FileText,
   Moon,
   RefreshCw,
   Shield,
@@ -390,6 +391,23 @@ export function ProfileSettingsScreen({
             </a>
           </section>
         )}
+
+        <section aria-labelledby="legal-heading" className="mt-8">
+          <h2
+            id="legal-heading"
+            className="px-1 text-sm font-bold tracking-wider text-slate-500 dark:text-slate-400"
+          >
+            サービス情報
+          </h2>
+          <a
+            href="/terms"
+            className="mt-3 flex min-h-14 w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 font-bold shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:border-slate-700 dark:bg-slate-800"
+          >
+            <FileText className="size-5 text-sky-600 dark:text-sky-300" aria-hidden="true" />
+            <span className="flex-1">利用規約を確認</span>
+            <ChevronRight className="size-5 text-slate-400" aria-hidden="true" />
+          </a>
+        </section>
 
         {((canOpenBrainItems && onOpenBrainItems) ||
           (canResetAccountData && onResetAccountData)) && (
