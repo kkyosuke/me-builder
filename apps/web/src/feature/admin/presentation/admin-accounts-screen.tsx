@@ -175,9 +175,30 @@ function AccountsSkeleton() {
     <main className="mx-auto min-h-dvh w-full max-w-6xl px-4 py-12 sm:px-8">
       <SkeletonLoader label="Account一覧を読み込み中">
         <SkeletonBlock className="h-4 w-16 rounded-full" />
-        <SkeletonBlock className="mt-3 h-9 w-72 rounded-full" />
-        <SkeletonBlock className="mt-8 h-11 w-full rounded-2xl" />
-        <SkeletonBlock className="mt-4 h-64 w-full rounded-3xl" />
+        <SkeletonBlock className="mt-3 h-6 w-56 rounded-full" />
+        <div className="mt-3 flex items-center justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <SkeletonBlock className="h-9 w-72 max-w-full rounded-full" />
+            <SkeletonBlock className="mt-3 h-4 w-80 max-w-full rounded-full" />
+          </div>
+          <SkeletonBlock className="h-10 w-20 shrink-0 rounded-full" />
+        </div>
+        <SkeletonBlock className="mt-5 h-11 w-full rounded-2xl" />
+        <div className="mt-6">
+          <SkeletonBlock className="h-6 w-28 rounded-full" />
+          <SkeletonBlock className="mt-2 h-4 w-32 rounded-full" />
+        </div>
+        <div className="mt-4 grid gap-3 rounded-2xl bg-slate-100 p-3 sm:grid-cols-2 lg:grid-cols-[minmax(16rem,1fr)_9rem_9rem_12rem] dark:bg-slate-800/70">
+          {["search", "role", "status", "sort"].map((key) => (
+            <SkeletonBlock key={key} className="h-10 rounded-xl" />
+          ))}
+        </div>
+        <div className="mt-4 grid gap-3 lg:hidden">
+          {["first", "second"].map((key) => (
+            <SkeletonBlock key={key} className="h-44 rounded-2xl" />
+          ))}
+        </div>
+        <SkeletonBlock className="mt-4 hidden h-64 w-full rounded-2xl lg:block" />
       </SkeletonLoader>
     </main>
   );

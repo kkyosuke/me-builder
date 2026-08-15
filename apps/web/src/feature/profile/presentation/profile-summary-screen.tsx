@@ -61,50 +61,72 @@ function SummarySkeleton() {
     <output aria-label="わたしのまとめを読み込み中" className="block" aria-live="polite">
       <span className="sr-only">わたしのまとめを読み込んでいます</span>
       <div aria-hidden="true" className="animate-pulse motion-reduce:animate-none">
-        <div className="relative mt-8 pb-4">
-          <div className="absolute inset-x-5 top-3 bottom-1 rounded-3xl bg-violet-100 dark:bg-violet-950/60" />
-          <div className="absolute inset-x-3 top-1.5 bottom-2.5 rounded-3xl bg-sky-100 dark:bg-sky-950/70" />
-          <div className="relative rounded-3xl border border-slate-200 bg-white p-5 shadow-xl shadow-slate-950/10 sm:p-6 dark:border-slate-700 dark:bg-slate-800">
-            <div className="flex items-start gap-3">
-              <div className="size-12 shrink-0 rounded-2xl bg-slate-200 dark:bg-slate-700" />
-              <div className="flex-1">
-                <div className="h-3 w-20 rounded-full bg-slate-200 dark:bg-slate-700" />
-                <div className="mt-3 h-5 w-4/5 rounded-full bg-slate-200 dark:bg-slate-700" />
+        <section className="mt-8" data-skeleton-region="summary-card">
+          <div className="mb-3 flex min-h-9 items-center gap-1.5">
+            <div className="size-4 rounded-full bg-slate-200 dark:bg-slate-700" />
+            <div className="h-4 w-28 rounded-full bg-slate-200 dark:bg-slate-700" />
+          </div>
+          <div className="relative pb-4">
+            <div className="relative rounded-3xl border border-slate-200 bg-white p-5 shadow-xl shadow-slate-950/10 sm:p-6 dark:border-slate-700 dark:bg-slate-800">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 flex-1 items-start gap-3">
+                  <div className="size-12 shrink-0 rounded-2xl bg-slate-200 dark:bg-slate-700" />
+                  <div className="min-w-0 flex-1">
+                    <div className="h-3 w-20 rounded-full bg-slate-200 dark:bg-slate-700" />
+                    <div className="mt-3 h-5 w-4/5 rounded-full bg-slate-200 dark:bg-slate-700" />
+                  </div>
+                </div>
+                <div className="shrink-0">
+                  <div className="ml-auto h-3 w-12 rounded-full bg-slate-200 dark:bg-slate-700" />
+                  <div className="mt-2 h-3 w-20 rounded-full bg-slate-200 dark:bg-slate-700" />
+                </div>
+              </div>
+              <div className="mt-5 space-y-3">
+                {["first", "second", "third"].map((key, index) => (
+                  <div key={key} className="rounded-2xl bg-slate-100 p-4 dark:bg-slate-900/60">
+                    <div className="flex items-center gap-2">
+                      <div className="size-6 rounded-full bg-slate-300 dark:bg-slate-700" />
+                      <div
+                        className={`h-4 rounded-full bg-slate-300 dark:bg-slate-700 ${index === 1 ? "w-2/5" : "w-3/5"}`}
+                      />
+                    </div>
+                    <div className="mt-2 h-3 w-full rounded-full bg-slate-200 dark:bg-slate-700" />
+                    <div className="mt-2 h-3 w-4/5 rounded-full bg-slate-200 dark:bg-slate-700" />
+                    <div className="mt-3 flex items-center gap-2">
+                      <div className="h-3 w-8 rounded-full bg-slate-200 dark:bg-slate-700" />
+                      <div className="h-5 w-12 rounded-full bg-slate-200 dark:bg-slate-700" />
+                      <div className="h-3 w-7 rounded-full bg-slate-200 dark:bg-slate-700" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-5 grid grid-cols-3 gap-3 border-t border-slate-200 pt-4 dark:border-slate-700">
+                {["diagnosis", "diary", "latest"].map((key) => (
+                  <div
+                    key={key}
+                    className="mx-auto h-8 w-16 rounded-xl bg-slate-200 dark:bg-slate-700"
+                  />
+                ))}
               </div>
             </div>
-            <div className="mt-5 space-y-3">
-              {["first", "second", "third"].map((key, index) => (
-                <div key={key} className="rounded-2xl bg-slate-100 p-4 dark:bg-slate-900/60">
-                  <div className="flex items-center gap-2">
-                    <div className="size-6 rounded-full bg-slate-300 dark:bg-slate-700" />
-                    <div
-                      className={`h-4 rounded-full bg-slate-300 dark:bg-slate-700 ${index === 1 ? "w-2/5" : "w-3/5"}`}
-                    />
-                  </div>
-                  <div className="mt-3 h-3 w-full rounded-full bg-slate-200 dark:bg-slate-700" />
-                  <div className="mt-2 h-3 w-4/5 rounded-full bg-slate-200 dark:bg-slate-700" />
-                </div>
-              ))}
-            </div>
-            <div className="mt-5 grid grid-cols-3 gap-3 border-t border-slate-200 pt-4 dark:border-slate-700">
-              {["diagnosis", "diary", "latest"].map((key) => (
-                <div
-                  key={key}
-                  className="mx-auto h-8 w-16 rounded-xl bg-slate-200 dark:bg-slate-700"
-                />
-              ))}
-            </div>
           </div>
-        </div>
+        </section>
 
         <div className="mt-4 h-3 w-5/6 rounded-full bg-slate-200 dark:bg-slate-700" />
-        <div className="mt-8 h-5 w-40 rounded-full bg-slate-200 dark:bg-slate-700" />
+        <div className="mt-8 flex items-center gap-2" data-skeleton-region="summary-sources">
+          <div className="size-5 rounded-md bg-slate-200 dark:bg-slate-700" />
+          <div className="h-5 w-36 rounded-full bg-slate-200 dark:bg-slate-700" />
+        </div>
         <div className="mt-3 grid grid-cols-2 gap-3">
           {["diagnosis", "diary"].map((key) => (
             <div
               key={key}
-              className="h-28 rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800"
-            />
+              className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800"
+            >
+              <div className="size-5 rounded-md bg-slate-200 dark:bg-slate-700" />
+              <div className="mt-3 h-4 w-24 rounded-full bg-slate-200 dark:bg-slate-700" />
+              <div className="mt-2 h-3 w-16 rounded-full bg-slate-200 dark:bg-slate-700" />
+            </div>
           ))}
         </div>
       </div>

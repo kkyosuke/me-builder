@@ -189,18 +189,30 @@ function Line({ value }: { value: AdminStatistics["line"] }) {
   );
 }
 
-function StatisticsSkeleton() {
+function StatisticsSkeleton({ showPreviewNavigation }: { showPreviewNavigation: boolean }) {
   return (
     <main className="mx-auto min-h-dvh w-full min-w-0 max-w-4xl px-4 py-16 sm:px-8">
       <SkeletonLoader label="統計情報を読み込み中">
         <header className="mb-6">
           <SkeletonBlock className="h-4 w-16 rounded-full" />
-          <SkeletonBlock className="mt-3 h-9 w-40 rounded-full" />
+          {showPreviewNavigation && (
+            <>
+              <SkeletonBlock className="mt-3 h-9 w-72 rounded-full" />
+              <SkeletonBlock className="mt-3 h-4 w-80 max-w-full rounded-full" />
+              <SkeletonBlock className="mt-5 h-11 w-full rounded-2xl" />
+            </>
+          )}
+          <div className="flex items-center justify-between gap-3">
+            <SkeletonBlock
+              className={`${showPreviewNavigation ? "mt-6 h-6 w-24" : "mt-2 h-9 w-40"} rounded-full`}
+            />
+            <SkeletonBlock className="h-10 w-20 rounded-full" />
+          </div>
           <SkeletonBlock className="mt-3 h-4 w-56 rounded-full" />
         </header>
         <div className="grid gap-5">
           {[
-            { key: "gemini", metricKeys: ["request", "input", "output"] },
+            { key: "gemini", metricKeys: ["request", "input", "output", "cost"] },
             { key: "line", metricKeys: ["billable", "limit", "reply"] },
           ].map(({ key, metricKeys }) => (
             <section
@@ -211,7 +223,9 @@ function StatisticsSkeleton() {
                 <SkeletonBlock className="size-5 rounded-md" />
                 <SkeletonBlock className="h-5 w-24 rounded-full" />
               </div>
-              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              <div
+                className={`mt-4 grid gap-3 sm:grid-cols-2 ${key === "gemini" ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}
+              >
                 {metricKeys.map((metricKey) => (
                   <div key={metricKey} className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900">
                     <SkeletonBlock className="h-3 w-20 rounded-full" />
@@ -238,7 +252,9 @@ export function AdminStatisticsScreen({
   showPreviewNavigation?: boolean;
   onReload: () => void;
 }) {
-  if (state.status === "loading" || state.status === "idle") return <StatisticsSkeleton />;
+  if (state.status === "loading" || state.status === "idle") {
+    return <StatisticsSkeleton showPreviewNavigation={showPreviewNavigation} />;
+  }
   if (state.status === "error")
     return (
       <main className="mx-auto flex min-h-dvh max-w-xl flex-col items-center justify-center gap-4 px-5 text-center">

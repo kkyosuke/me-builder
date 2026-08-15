@@ -89,4 +89,24 @@ describe("CompatibilityShareContentSectionScreen", () => {
       "/diagnosis?category=friend",
     );
   });
+
+  it("読み込み中も表示後と同じ3つの領域を同じ順序で確保する", () => {
+    render(
+      <CompatibilityShareContentSectionScreen
+        relationshipCategory="partner"
+        state={{ status: "loading" }}
+        onRelationshipCategoryChange={vi.fn()}
+        onRetry={vi.fn()}
+      />,
+    );
+
+    const loader = screen.getByRole("status", { name: "共有される内容を読み込み中" });
+    expect(
+      Array.from(loader.querySelectorAll("[data-skeleton-region]")).map((element) =>
+        element.getAttribute("data-skeleton-region"),
+      ),
+    ).toEqual(["about-me", "themes", "privacy-notice"]);
+    expect(loader.classList.contains("mt-5")).toBe(true);
+    expect(loader.classList.contains("space-y-4")).toBe(true);
+  });
 });

@@ -36,17 +36,57 @@ const nextActionGuides = {
 function InvitationSkeleton() {
   return (
     <SkeletonLoader label="招待内容を読み込み中" className="mt-5">
-      <div className="rounded-3xl border border-slate-200 p-5 dark:border-slate-800">
-        <div className="flex justify-center gap-4">
+      <section className="rounded-3xl border border-violet-300/30 bg-white p-5 text-center dark:bg-slate-800">
+        <div className="flex items-center justify-center gap-3">
           <SkeletonBlock className="size-20 rounded-3xl" />
+          <SkeletonBlock className="size-7 rounded-full" />
           <SkeletonBlock className="size-20 rounded-3xl" />
         </div>
-        <SkeletonBlock className="mx-auto mt-5 h-5 w-40 rounded-full" />
-        <SkeletonBlock className="mx-auto mt-3 h-8 w-64 rounded-full" />
-      </div>
-      {["scope", "privacy"].map((key) => (
-        <SkeletonBlock key={key} className="mt-5 h-40 w-full rounded-3xl" />
-      ))}
+        <SkeletonBlock className="mx-auto mt-5 h-4 w-48 rounded-full" />
+        <SkeletonBlock className="mx-auto mt-3 h-8 w-28 rounded-full" />
+        <SkeletonBlock className="mx-auto mt-2 h-7 w-64 rounded-full" />
+        <SkeletonBlock className="mx-auto mt-4 h-3 w-full rounded-full" />
+        <SkeletonBlock className="mx-auto mt-2 h-3 w-5/6 rounded-full" />
+        <SkeletonBlock className="mx-auto mt-4 h-3 w-36 rounded-full" />
+      </section>
+
+      <section className="mt-8">
+        <SkeletonBlock className="h-6 w-36 rounded-full" />
+        <div className="mt-4 space-y-3">
+          {["about-me", "themes", "updates"].map((key) => (
+            <div
+              key={key}
+              className="flex gap-3 rounded-2xl border border-violet-300 bg-violet-50 p-4 dark:border-violet-700 dark:bg-violet-950/30"
+            >
+              <SkeletonBlock className="mt-0.5 size-5 shrink-0 rounded-md" />
+              <div className="min-w-0 flex-1">
+                <SkeletonBlock className="h-4 w-3/5 rounded-full" />
+                <SkeletonBlock className="mt-2 h-3 w-full rounded-full" />
+                <SkeletonBlock className="mt-2 h-3 w-4/5 rounded-full" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="mt-8 rounded-3xl border border-emerald-300/40 bg-emerald-50 p-5 dark:border-emerald-700/40 dark:bg-emerald-950/30">
+        <div className="flex items-center gap-2">
+          <SkeletonBlock className="size-5 rounded-md" />
+          <SkeletonBlock className="h-4 w-32 rounded-full" />
+        </div>
+        <div className="mt-3 space-y-2">
+          {["answers", "conversation", "free-text"].map((key) => (
+            <SkeletonBlock key={key} className="h-3 w-4/5 rounded-full" />
+          ))}
+        </div>
+        <div className="mt-4 flex items-start gap-2 border-t border-emerald-300/40 pt-4">
+          <SkeletonBlock className="size-4 shrink-0 rounded-md" />
+          <div className="min-w-0 flex-1">
+            <SkeletonBlock className="h-3 w-full rounded-full" />
+            <SkeletonBlock className="mt-2 h-3 w-3/4 rounded-full" />
+          </div>
+        </div>
+      </section>
     </SkeletonLoader>
   );
 }

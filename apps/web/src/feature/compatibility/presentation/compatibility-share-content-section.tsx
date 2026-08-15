@@ -4,6 +4,7 @@ import {
 } from "@me-builder/lib/compatibility";
 import { BookOpenText, HeartHandshake, RefreshCw, ShieldCheck } from "lucide-react";
 import { InternalLink } from "../../../components/internal-link";
+import { SkeletonBlock, SkeletonLoader } from "../../../components/skeleton";
 import type { AsyncState } from "../../../model/async-state";
 import {
   diagnosisCategoryHref,
@@ -15,16 +16,60 @@ import { useCompatibilityShareContent } from "./hooks/use-compatibility-share-co
 
 function ShareContentSkeleton() {
   return (
-    <output aria-busy="true" aria-label="共有される内容を読み込み中" className="mt-5 space-y-4">
+    <SkeletonLoader label="共有される内容を読み込み中" className="mt-5 space-y-4">
+      <section
+        data-skeleton-region="about-me"
+        className="rounded-2xl border border-sky-200 bg-sky-50/70 p-4 dark:border-sky-800 dark:bg-sky-950/30"
+      >
+        <div className="flex items-center gap-2">
+          <SkeletonBlock className="size-5 shrink-0 rounded-md" />
+          <SkeletonBlock className="h-5 w-20 rounded-full" />
+        </div>
+        <div className="mt-3 space-y-3">
+          {["first", "second"].map((key) => (
+            <div key={key} className="rounded-xl bg-white/80 p-3 dark:bg-slate-900/60">
+              <SkeletonBlock className="h-3 w-32 rounded-full" />
+              <SkeletonBlock className="mt-2 h-3 w-full rounded-full" />
+              <SkeletonBlock className="mt-2 h-3 w-4/5 rounded-full" />
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section
+        data-skeleton-region="themes"
+        className="rounded-2xl border border-violet-200 bg-violet-50/70 p-4 dark:border-violet-800 dark:bg-violet-950/30"
+      >
+        <div className="flex items-center gap-2">
+          <SkeletonBlock className="size-5 shrink-0 rounded-md" />
+          <SkeletonBlock className="h-5 w-36 rounded-full" />
+        </div>
+        <div className="mt-3 rounded-xl bg-white/80 p-4 dark:bg-slate-900/60">
+          <SkeletonBlock className="h-4 w-28 rounded-full" />
+          <div className="mt-3">
+            <SkeletonBlock className="h-3 w-36 rounded-full" />
+            <SkeletonBlock className="mt-2 h-3 w-full rounded-full" />
+            <SkeletonBlock className="mt-2 h-3 w-4/5 rounded-full" />
+            <SkeletonBlock className="mt-4 h-2 w-full rounded-full" />
+            <div className="mt-2 flex justify-between gap-3">
+              <SkeletonBlock className="h-3 w-20 rounded-full" />
+              <SkeletonBlock className="h-3 w-20 rounded-full" />
+            </div>
+          </div>
+        </div>
+      </section>
+
       <div
-        aria-hidden="true"
-        className="h-28 animate-pulse rounded-2xl bg-slate-200 motion-reduce:animate-none dark:bg-slate-700"
-      />
-      <div
-        aria-hidden="true"
-        className="h-40 animate-pulse rounded-2xl bg-slate-200 motion-reduce:animate-none dark:bg-slate-700"
-      />
-    </output>
+        data-skeleton-region="privacy-notice"
+        className="flex items-start gap-2 rounded-2xl bg-slate-100 p-4 dark:bg-slate-800"
+      >
+        <SkeletonBlock className="mt-0.5 size-4 shrink-0 rounded-md" />
+        <div className="min-w-0 flex-1">
+          <SkeletonBlock className="h-3 w-full rounded-full" />
+          <SkeletonBlock className="mt-2 h-3 w-3/4 rounded-full" />
+        </div>
+      </div>
+    </SkeletonLoader>
   );
 }
 

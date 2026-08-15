@@ -112,13 +112,42 @@ function ProgressionCard({ progression }: { progression: UtsushiProgression }) {
 function ProgressionSkeleton() {
   return (
     <SkeletonLoader label="うつしレベルを読み込み中" className="mt-6">
-      <section className="rounded-3xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800">
-        <SkeletonBlock className="h-3 w-24 rounded-full" />
-        <SkeletonBlock className="mt-3 h-8 w-36 rounded-full" />
-        <SkeletonBlock className="mt-6 h-2.5 w-full rounded-full" />
-        <div className="mt-6 grid grid-cols-2 gap-4">
-          <SkeletonBlock className="h-16 rounded-2xl" />
-          <SkeletonBlock className="h-16 rounded-2xl" />
+      <section
+        data-skeleton-region="progression-card"
+        className="overflow-hidden rounded-3xl border border-violet-200 bg-white shadow-sm dark:border-violet-800/60 dark:bg-slate-800"
+      >
+        <div className="p-5 sm:p-6">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-1.5">
+                <SkeletonBlock className="size-4 rounded-md" />
+                <SkeletonBlock className="h-3 w-24 rounded-full" />
+              </div>
+              <SkeletonBlock className="mt-3 h-8 w-36 rounded-full" />
+            </div>
+            <SkeletonBlock className="h-6 w-24 rounded-full" />
+          </div>
+          <SkeletonBlock className="mt-5 h-2.5 w-full rounded-full" />
+          <div className="mt-2 flex justify-end">
+            <SkeletonBlock className="h-3 w-32 rounded-full" />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 border-t border-violet-200/70 dark:border-violet-800/60">
+          {["pieces", "categories"].map((key, index) => (
+            <div
+              key={key}
+              className={`p-4 ${index === 0 ? "border-r border-violet-200/70 dark:border-violet-800/60" : ""}`}
+            >
+              <div className="flex items-center gap-1.5">
+                <SkeletonBlock className="size-4 rounded-md" />
+                <SkeletonBlock className="h-3 w-20 rounded-full" />
+              </div>
+              <SkeletonBlock className="mt-3 h-5 w-28 rounded-full" />
+            </div>
+          ))}
+        </div>
+        <div className="border-t border-violet-200/70 px-5 py-3 dark:border-violet-800/60">
+          <SkeletonBlock className="h-3 w-4/5 rounded-full" />
         </div>
       </section>
     </SkeletonLoader>

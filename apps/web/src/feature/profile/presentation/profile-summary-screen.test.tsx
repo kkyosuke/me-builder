@@ -80,6 +80,8 @@ describe("ProfileSummaryScreen", () => {
 
     expect(screen.getByRole("status", { name: "わたしのまとめを読み込み中" })).toBeTruthy();
     expect(screen.queryByText("記録からまとめを作っています...")).toBeNull();
+    expect(document.querySelector('[data-skeleton-region="summary-card"]')).toBeTruthy();
+    expect(document.querySelector('[data-skeleton-region="summary-sources"]')).toBeTruthy();
   });
 
   it("生成したまとめ、根拠、入力範囲を表示する", () => {

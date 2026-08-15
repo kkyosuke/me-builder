@@ -34,28 +34,28 @@ const blockingReasonMessages: Record<CompatibilityShareConsentBlockingReason, st
 
 const categorySelectorClassNames: Record<
   CompatibilityRelationshipCategory,
-  { accent: string; focus: string; selected: string }
+  { mark: string; focus: string; selected: string }
 > = {
   partner: {
-    accent: "accent-rose-500",
+    mark: "bg-rose-500 ring-rose-500",
     focus: "focus-within:ring-rose-500",
     selected:
       "border-rose-500 bg-rose-100 text-rose-800 ring-rose-500/20 dark:border-rose-500 dark:bg-rose-950 dark:text-rose-200",
   },
   family: {
-    accent: "accent-amber-500",
+    mark: "bg-amber-500 ring-amber-500",
     focus: "focus-within:ring-amber-500",
     selected:
       "border-amber-500 bg-amber-100 text-amber-800 ring-amber-500/20 dark:border-amber-500 dark:bg-amber-950 dark:text-amber-200",
   },
   friend: {
-    accent: "accent-emerald-500",
+    mark: "bg-emerald-500 ring-emerald-500",
     focus: "focus-within:ring-emerald-500",
     selected:
       "border-emerald-500 bg-emerald-100 text-emerald-800 ring-emerald-500/20 dark:border-emerald-500 dark:bg-emerald-950 dark:text-emerald-200",
   },
   work: {
-    accent: "accent-blue-500",
+    mark: "bg-blue-500 ring-blue-500",
     focus: "focus-within:ring-blue-500",
     selected:
       "border-blue-500 bg-blue-100 text-blue-800 ring-blue-500/20 dark:border-blue-500 dark:bg-blue-950 dark:text-blue-200",
@@ -168,7 +168,11 @@ function RelationshipCategorySelector({
                 value={category}
                 checked={selected}
                 onChange={() => onChange(category)}
-                className={`size-5 shrink-0 ${selectorClassName.accent}`}
+                className={`size-5 shrink-0 appearance-none rounded-full ${
+                  selected
+                    ? `border-[5px] border-white ring-1 ${selectorClassName.mark}`
+                    : "border-2 border-slate-400 bg-white dark:border-slate-500 dark:bg-slate-800"
+                }`}
               />
               <span>{getRelationshipCategoryLabel(category)}</span>
             </label>

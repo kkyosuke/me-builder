@@ -39,5 +39,6 @@ describe("ProgressionSummaryCard", () => {
     render(<ProgressionSummaryCard state={{ status: "loading" }} />);
 
     expect(screen.getByRole("status", { name: "うつしレベルを読み込み中" })).toBeTruthy();
+    expect(document.querySelector('[data-skeleton-region="progression-card"]')).toBeTruthy();
   });
 });
