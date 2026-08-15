@@ -394,8 +394,14 @@ export function ServiceSiteHomeScreen() {
             <p className="mx-auto mt-4 max-w-2xl leading-7 text-violet-100">
               日記と診断を手がかりに、今の自分を自分のペースで振り返れます。
             </p>
-            <div className="mt-8 flex justify-center">
+            <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
               <LineFriendAddButton />
+              <a
+                href="/terms"
+                className="inline-flex min-h-11 items-center justify-center rounded-full border border-white/60 px-6 font-bold text-white hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+              >
+                利用規約とデータの扱いを見る
+              </a>
             </div>
           </div>
         </section>

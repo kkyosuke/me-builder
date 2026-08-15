@@ -1,7 +1,7 @@
 export function ServiceSiteFooter() {
   return (
     <footer className="border-t border-violet-100 bg-white dark:border-slate-700 dark:bg-slate-950">
-      <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
+      <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 sm:px-6 md:grid-cols-[1fr_auto] lg:px-8">
         <div>
           <a
             href="/"
@@ -16,6 +16,11 @@ export function ServiceSiteFooter() {
             運営者の正式名称と窓口は、一般公開前に掲載します。
           </p>
         </div>
+        <nav aria-label="フッターナビゲーション" className="grid content-start gap-3 text-sm">
+          <a className="font-semibold hover:underline" href="/terms">
+            利用規約
+          </a>
+        </nav>
       </div>
       <p className="border-t border-violet-100 px-4 py-5 text-center text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
         © 2026 かがみ
