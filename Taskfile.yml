@@ -150,6 +150,21 @@ tasks:
     cmds:
       - bun scripts/setup-api-docs-access.ts production
 
+  billing:setup:local:
+    desc: 'Reconcile Stripe sandbox billing catalog for local development'
+    cmds:
+      - bun --cwd apps/api billing:setup local
+
+  billing:setup:preview:
+    desc: 'Reconcile Stripe sandbox billing catalog for Preview'
+    cmds:
+      - bun --cwd apps/api billing:setup preview
+
+  billing:setup:production:
+    desc: 'Reconcile Stripe live billing catalog for Production'
+    cmds:
+      - bun --cwd apps/api billing:setup production
+
   line:rich-menu:preview:
     desc: 'Register the preview LINE rich menu as the default'
     cmds:

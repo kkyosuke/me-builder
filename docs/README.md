@@ -108,6 +108,7 @@ docs/
 - [本番データベースマイグレーション運用](development/production-migration-operations.md) — forward-only、expand-contract、適用順序、D1とDurable Objectの復旧方針
 - [サービス紹介サイト残タスク](development/service-site-remaining-tasks.md) — サービス紹介サイトで未完了の意思決定、法務確認、実環境検証と完了条件
 - [サブスクリプション実装残タスク](development/subscription-remaining-tasks.md) — AccountとPlanの紐付け前後をA・B系列に分けた番号付きPR単位の残作業
+- [Stripe課金環境セットアップ](development/stripe-billing-setup.md) — Stripe商品catalog、Portal、Webhookの再現と環境設定
 - [Brain Item残タスク](development/brain-item-remaining-tasks.md) — Brain Item生成・意味的重複判定・Vectorize利用に残っている検証、品質改善、延期中の機能
 - [アバター設定残タスク](development/avatar-remaining-tasks.md) — アバター設定に残っている実ブラウザE2E、LIFF実端末確認、Private R2の運用改善
 - [わたしのまとめ残タスク](development/profile-summary-remaining-tasks.md) — 「わたしのまとめ」で未完了の実環境検証と完了条件

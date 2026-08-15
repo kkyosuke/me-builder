@@ -23,6 +23,11 @@ jobs:
       GOOGLE_VERTEX_AI_API_KEY: ${{ secrets.GOOGLE_VERTEX_AI_API_KEY }}
       CHAT_DELIVERY_SECRET: ${{ secrets.CHAT_DELIVERY_SECRET }}
       BRAIN_VECTOR_HMAC_SECRET: ${{ secrets.BRAIN_VECTOR_HMAC_SECRET }}
+      STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+      STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+      BILLING_PRICE_PLAN_MAP: ${{ vars.BILLING_PRICE_PLAN_MAP }}
+      BILLING_LOOKUP_KEY_MAP: ${{ vars.BILLING_LOOKUP_KEY_MAP }}
+      BILLING_PORTAL_CONFIGURATION_ID: ${{ vars.BILLING_PORTAL_CONFIGURATION_ID }}
       CLOUDFLARE_ACCESS_ALLOWED_EMAILS: ${{ vars.CLOUDFLARE_ACCESS_ALLOWED_EMAILS }}
       ADMIN_LINE_USER_IDS: ${{ secrets.ADMIN_LINE_USER_IDS }}
       # LIFF Server API は LINE Login チャネルのチャネルアクセストークンを要求する。
@@ -120,15 +125,17 @@ jobs:
                 .filter(([, value]) => value),
             );
             const apiConfiguration = Object.fromEntries(
-              [["LINE_LOGIN_CHANNEL_ID", process.env.LINE_LOGIN_CHANNEL_ID]]
+              [["LINE_LOGIN_CHANNEL_ID", process.env.LINE_LOGIN_CHANNEL_ID], ["STRIPE_WEBHOOK_SECRET", process.env.STRIPE_WEBHOOK_SECRET], ["BILLING_LOOKUP_KEY_MAP", process.env.BILLING_LOOKUP_KEY_MAP], ["BILLING_PORTAL_CONFIGURATION_ID", process.env.BILLING_PORTAL_CONFIGURATION_ID]]
                 .filter(([, value]) => value),
             );
             const workerOnlySecrets = Object.fromEntries(
-              [["GOOGLE_VERTEX_AI_API_KEY", process.env.GOOGLE_VERTEX_AI_API_KEY], ["CHAT_DELIVERY_SECRET", process.env.CHAT_DELIVERY_SECRET], ["BRAIN_VECTOR_HMAC_SECRET", process.env.BRAIN_VECTOR_HMAC_SECRET]]
+              [["GOOGLE_VERTEX_AI_API_KEY", process.env.GOOGLE_VERTEX_AI_API_KEY], ["CHAT_DELIVERY_SECRET", process.env.CHAT_DELIVERY_SECRET], ["BRAIN_VECTOR_HMAC_SECRET", process.env.BRAIN_VECTOR_HMAC_SECRET], ["STRIPE_SECRET_KEY", process.env.STRIPE_SECRET_KEY], ["BILLING_PRICE_PLAN_MAP", process.env.BILLING_PRICE_PLAN_MAP]]
                 .filter(([, value]) => value),
             );
             await Bun.write(process.env.API_SECRETS_FILE, JSON.stringify({
               LINE_CHANNEL_SECRET: process.env.LINE_CHANNEL_SECRET,
+              ...(process.env.STRIPE_SECRET_KEY ? { STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY } : {}),
+              ...(process.env.BILLING_PRICE_PLAN_MAP ? { BILLING_PRICE_PLAN_MAP: process.env.BILLING_PRICE_PLAN_MAP } : {}),
               ...optionalSecrets,
               ...apiConfiguration,
             }));

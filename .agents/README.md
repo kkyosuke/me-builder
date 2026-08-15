@@ -73,6 +73,7 @@
 | [アプリケーション運用ログ方針](../docs/development/operational-logging.md) | 一連の処理を追跡し、エラー原因と最終結果を判断できる運用ログの目的と進め方 |
 | [本番データベースマイグレーション運用](../docs/development/production-migration-operations.md) | 本番D1とDurable Objectのforward-only、expand-contract、適用順序、障害時の復旧方針 |
 | [サブスクリプション実装残タスク](../docs/development/subscription-remaining-tasks.md) | AccountとPlanを紐づける決済系列と、紐付け後の利用権限・機能系列に分けた番号付きPR単位の残作業 |
+| [Stripe課金環境セットアップ](../docs/development/stripe-billing-setup.md) | 商品catalog、Customer Portal、Webhook endpointの再現、環境設定とSecret配布 |
 | [Brain Item残タスク](../docs/development/brain-item-remaining-tasks.md) | Brain Item生成・意味的重複判定・Vectorize利用に残っている検証、品質改善、延期中の機能 |
 | [アバター設定残タスク](../docs/development/avatar-remaining-tasks.md) | アバター設定で未完了の実ブラウザE2E、LIFF実端末確認、Private R2孤立objectの運用改善 |
 | [わたしのまとめ残タスク](../docs/development/profile-summary-remaining-tasks.md) | 「わたしのまとめ」で未完了の実環境検証、完了条件、検証後の追跡先 |

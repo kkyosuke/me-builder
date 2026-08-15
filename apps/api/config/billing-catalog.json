@@ -1,0 +1,37 @@
+{
+  "currency": "jpy",
+  "products": [
+    {
+      "key": "lite",
+      "name": "me-builder Lite",
+      "prices": [
+        { "interval": "month", "unitAmount": 780, "lookupKey": "me_builder_lite_jpy_month" },
+        { "interval": "year", "unitAmount": 7800, "lookupKey": "me_builder_lite_jpy_year" }
+      ]
+    },
+    {
+      "key": "full",
+      "name": "me-builder Full",
+      "prices": [
+        { "interval": "month", "unitAmount": 1480, "lookupKey": "me_builder_full_jpy_month" },
+        { "interval": "year", "unitAmount": 14800, "lookupKey": "me_builder_full_jpy_year" }
+      ]
+    },
+    {
+      "key": "family",
+      "name": "me-builder ファミリーパック",
+      "prices": [
+        { "interval": "month", "unitAmount": 2980, "lookupKey": "me_builder_family_jpy_month" },
+        { "interval": "year", "unitAmount": 29800, "lookupKey": "me_builder_family_jpy_year" }
+      ]
+    }
+  ],
+  "webhookEvents": [
+    "customer.subscription.created",
+    "customer.subscription.updated",
+    "customer.subscription.deleted",
+    "customer.subscription.trial_will_end",
+    "invoice.paid",
+    "invoice.payment_failed"
+  ]
+}
