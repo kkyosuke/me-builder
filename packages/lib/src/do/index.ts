@@ -63,7 +63,9 @@ export type {
 export {
   arePromptContextsEqual,
   buildPromptContextCollectionCandidates,
+  dailyPromptLocalHourFromRestWindow,
   dailyPromptStrategyFromQuestionStyle,
+  DAILY_PROMPT_LOCAL_HOURS,
   DAILY_PROMPT_STRATEGIES,
   findPrecedingAssistantBodies,
   isPromptContextGrounded,
@@ -77,6 +79,7 @@ export {
   readPromptContext,
 } from "./account/prompt-context";
 export type {
+  DailyPromptLocalHour,
   DailyPromptStrategy,
   PromptContext,
   PromptContextAttributeDefinition,

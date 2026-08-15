@@ -1,10 +1,12 @@
 import { and, asc, desc, eq, gt, inArray, isNull, lte, max, min, or, sql } from "drizzle-orm";
 import type { AccountDataDatabase } from "../database";
 import {
+  type DailyPromptLocalHour,
   type DailyPromptStrategy,
   PROMPT_CONTEXT_ATTRIBUTE_MASTER,
   type PromptContextKind,
   type PromptContextWeekday,
+  dailyPromptLocalHourFromRestWindow,
   dailyPromptStrategyFromQuestionStyle,
   readPromptContext,
 } from "../prompt-context";
@@ -193,6 +195,68 @@ export async function selectDailyPromptStrategyPreference(
     );
     if (definition?.category !== row.category) continue;
     return dailyPromptStrategyFromQuestionStyle(promptContext.style);
+  }
+  return undefined;
+}
+
+/** 現在有効な本人の明言を、許可済みの日次声かけ時刻へ写像する。 */
+export async function selectDailyPromptTimePreference(
+  db: AccountDataDatabase,
+  accountId: string,
+  at = new Date(),
+): Promise<DailyPromptLocalHour | undefined> {
+  const rows = await db
+    .select({
+      category: brainItems.category,
+      attributes: brainItems.attributes,
+      derivation: brainItems.derivation,
+    })
+    .from(brainItems)
+    .innerJoin(
+      brainItemAccessLabels,
+      and(
+        eq(brainItemAccessLabels.brainItemId, brainItems.id),
+        eq(brainItemAccessLabels.isDeleted, false),
+      ),
+    )
+    .innerJoin(
+      brainItemEvidenceEdges,
+      and(
+        eq(brainItemEvidenceEdges.brainItemId, brainItems.id),
+        eq(brainItemEvidenceEdges.relation, "supports"),
+        eq(brainItemEvidenceEdges.isDeleted, false),
+      ),
+    )
+    .innerJoin(
+      sourceRecords,
+      and(
+        eq(sourceRecords.id, brainItemEvidenceEdges.sourceRecordId),
+        eq(sourceRecords.accountId, accountId),
+        eq(sourceRecords.isDeleted, false),
+      ),
+    )
+    .where(
+      and(
+        eq(brainItems.accountId, accountId),
+        eq(brainItems.category, "preference"),
+        eq(brainItems.status, "active"),
+        eq(brainItems.isDeleted, false),
+        or(isNull(brainItems.validFrom), lte(brainItems.validFrom, at)),
+        or(isNull(brainItems.validTo), gt(brainItems.validTo, at)),
+      ),
+    )
+    .orderBy(desc(sourceRecords.createdAt), desc(brainItems.createdAt))
+    .all();
+
+  for (const row of rows) {
+    if (brainItemIsInference(row.attributes, row.derivation)) continue;
+    const promptContext = readPromptContext(row.attributes);
+    if (promptContext?.kind !== "rest_window") continue;
+    const definition = PROMPT_CONTEXT_ATTRIBUTE_MASTER.find(
+      ({ kind }) => kind === promptContext.kind,
+    );
+    if (definition?.category !== row.category) continue;
+    return dailyPromptLocalHourFromRestWindow(promptContext);
   }
   return undefined;
 }

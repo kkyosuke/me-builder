@@ -24,6 +24,7 @@ import {
   resetFailedBrainVectorSyncJob,
   saveBrainItem,
   selectDailyPromptStrategyPreference,
+  selectDailyPromptTimePreference,
   selectDailyPromptWeekdayContext,
 } from "./brain";
 
@@ -808,6 +809,46 @@ describe("selectDailyPromptStrategyPreference", () => {
       .where(eq(schema.sourceRecords.id, "source-deleted-style-source"));
 
     await expect(selectDailyPromptStrategyPreference(db, "account-1", at)).resolves.toBeUndefined();
+  });
+});
+
+describe("selectDailyPromptTimePreference", () => {
+  it.each([
+    ["after_returning_home", undefined, 20],
+    ["after_dinner", undefined, 21],
+    ["fixed_time", "20:30", 20],
+    ["variable", undefined, undefined],
+  ] as const)("明言された%sを候補時刻へ変換する", async (window, localTime, expected) => {
+    const db = createTestDb();
+    await insertAccountsAndSources(db);
+    const at = new Date("2026-08-10T09:00:00Z");
+    await savePromptContextFixture(db, {
+      suffix: `time-${window}`,
+      category: "preference",
+      promptContext: {
+        kind: "rest_window",
+        window,
+        ...(localTime ? { localTime } : {}),
+      },
+      at,
+    });
+
+    await expect(selectDailyPromptTimePreference(db, "account-1", at)).resolves.toBe(expected);
+  });
+
+  it("推定された一息つきやすい時間を配送時刻へ使わない", async () => {
+    const db = createTestDb();
+    await insertAccountsAndSources(db);
+    const at = new Date("2026-08-10T09:00:00Z");
+    await savePromptContextFixture(db, {
+      suffix: "inferred-time",
+      category: "preference",
+      promptContext: { kind: "rest_window", window: "after_dinner" },
+      isInference: true,
+      at,
+    });
+
+    await expect(selectDailyPromptTimePreference(db, "account-1", at)).resolves.toBeUndefined();
   });
 });
 

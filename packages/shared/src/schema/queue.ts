@@ -60,6 +60,8 @@ export interface DailyPromptQueueMessage {
   accountId: string;
   /** Asia/Tokyoで解決済みのYYYY-MM-DD。 */
   localDate: string;
+  /** Asia/Tokyoの候補時刻。省略形は18時固定だった既存messageとの互換用。 */
+  localHour?: number;
 }
 
 export type { Queue, Message, MessageBatch };

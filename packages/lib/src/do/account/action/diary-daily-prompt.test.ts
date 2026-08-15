@@ -11,6 +11,7 @@ import {
   listDailyPromptStrategyStats,
   markDailyPromptDelivered,
   prepareDailyPrompt,
+  resolveDailyPromptDueHour,
   selectDailyPromptPreviousDayContext,
   selectDailyPromptSameDayContext,
   storeLineTextSource,
@@ -550,6 +551,47 @@ describe("daily prompt delivery", () => {
         .from(schema.dailyPromptDeliveries)
         .get(),
     ).toEqual({ promptVersion: "daily-check-in-fri-v1", promptStrategy: "brief" });
+  });
+
+  it("選択時刻だけで配送を準備し、pending時刻を現在の明言より優先する", async () => {
+    const db = createTestDb();
+    const at = new Date("2026-08-14T09:00:00.000Z");
+    await expect(
+      prepareDailyPrompt(db, ACCOUNT_ID, {
+        localDate: "2026-08-14",
+        promptVersion: PROMPT_VERSION,
+        scheduledLocalHour: 18,
+        selectedLocalHour: 20,
+        at,
+      }),
+    ).resolves.toEqual({ type: "not-ready", status: "not-due" });
+    await expect(db.select().from(schema.dailyPromptDeliveries)).resolves.toHaveLength(0);
+
+    await expect(
+      prepareDailyPrompt(db, ACCOUNT_ID, {
+        localDate: "2026-08-14",
+        promptVersion: PROMPT_VERSION,
+        scheduledLocalHour: 20,
+        selectedLocalHour: 20,
+        at: new Date("2026-08-14T11:00:00.000Z"),
+      }),
+    ).resolves.toMatchObject({ type: "ready" });
+    await expect(resolveDailyPromptDueHour(db, ACCOUNT_ID, "2026-08-14", 18)).resolves.toBe(20);
+    await expect(
+      prepareDailyPrompt(db, ACCOUNT_ID, {
+        localDate: "2026-08-14",
+        promptVersion: PROMPT_VERSION,
+        scheduledLocalHour: 18,
+        selectedLocalHour: 18,
+        at,
+      }),
+    ).resolves.toEqual({ type: "not-ready", status: "not-due" });
+    expect(
+      await db
+        .select({ deliveryLocalHour: schema.dailyPromptDeliveries.deliveryLocalHour })
+        .from(schema.dailyPromptDeliveries)
+        .get(),
+    ).toEqual({ deliveryLocalHour: 20 });
   });
 
   it("本人発言を直前の未回答配送1件だけへ対応づけ、方針別に集計する", async () => {

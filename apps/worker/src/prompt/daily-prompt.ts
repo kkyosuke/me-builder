@@ -1,4 +1,5 @@
 import type {
+  DailyPromptLocalHour,
   DailyPromptPreviousDayContext,
   DailyPromptSameDayContext,
   DailyPromptStrategy,
@@ -103,9 +104,12 @@ export function getDailyPromptWeekday(localDate: string): PromptContextWeekday {
 }
 
 /** 配送日の18:00 JSTを、日中文脈選択の固定された締切として返す。 */
-export function getDailyPromptContextCutoffAt(localDate: string): Date {
+export function getDailyPromptContextCutoffAt(
+  localDate: string,
+  localHour: DailyPromptLocalHour = 18,
+): Date {
   getDailyPromptWeekday(localDate);
-  return new Date(`${localDate}T18:00:00.000+09:00`);
+  return new Date(`${localDate}T${localHour.toString().padStart(2, "0")}:00:00.000+09:00`);
 }
 
 /** 配送日と利用可能な曜日文脈から、版付き定型文を選ぶ。 */

@@ -8,12 +8,17 @@ import { processDailyPromptMessage } from "./daily-prompt";
 const execute = vi.fn();
 const pushMessage = vi.fn();
 
-function createMessage(attempts = 1): Message<DailyPromptQueueMessage> {
+function createMessage(attempts = 1, localHour?: number): Message<DailyPromptQueueMessage> {
   return {
     id: "queue-message-1",
     attempts,
     timestamp: new Date("2026-08-14T09:00:00.000Z"),
-    body: { type: "daily-prompt", accountId: "account-1", localDate: "2026-08-14" },
+    body: {
+      type: "daily-prompt",
+      accountId: "account-1",
+      localDate: "2026-08-14",
+      ...(localHour === undefined ? {} : { localHour }),
+    },
     ack: vi.fn(),
     retry: vi.fn(),
   } as unknown as Message<DailyPromptQueueMessage>;
@@ -45,7 +50,9 @@ describe("daily prompt queue consumer", () => {
       .mockImplementation(async (accountId: string, operation: string, ...args: unknown[]) => {
         if (accountId !== "account-1") throw new Error("Unexpected account");
         if (operation === "brain.selectDailyPromptWeekdayContext") return undefined;
+        if (operation === "brain.selectDailyPromptTimePreference") return undefined;
         if (operation === "brain.selectDailyPromptStrategyPreference") return undefined;
+        if (operation === "conversation.resolveDailyPromptDueHour") return args[1] ?? 18;
         if (operation === "conversation.selectDailyPromptStrategy") return "standard";
         if (operation === "conversation.selectDailyPromptSameDayContext") return undefined;
         if (operation === "conversation.selectDailyPromptPreviousDayContext") return undefined;
@@ -78,6 +85,8 @@ describe("daily prompt queue consumer", () => {
       localDate: "2026-08-14",
       promptVersion: "daily-check-in-fri-v1",
       promptStrategy: "standard",
+      scheduledLocalHour: 18,
+      selectedLocalHour: 18,
     });
     expect(pushMessage).toHaveBeenCalledWith(
       {
@@ -100,8 +109,63 @@ describe("daily prompt queue consumer", () => {
     expect(message.retry).not.toHaveBeenCalled();
   });
 
+  it("明言された20時候補だけを配送し、締切と配送行へ時刻を固定する", async () => {
+    execute.mockResolvedValueOnce(20).mockResolvedValueOnce(20);
+    const message = createMessage(1, 20);
+
+    await processDailyPromptMessage(message, bindings(), config);
+
+    expect(execute).toHaveBeenCalledWith(
+      "account-1",
+      "conversation.selectDailyPromptSameDayContext",
+      "2026-08-14",
+      new Date("2026-08-14T11:00:00.000Z"),
+    );
+    expect(execute).toHaveBeenCalledWith("account-1", "conversation.prepareDailyPrompt", {
+      localDate: "2026-08-14",
+      promptVersion: "daily-check-in-fri-v1",
+      promptStrategy: "standard",
+      scheduledLocalHour: 20,
+      selectedLocalHour: 20,
+    });
+    expect(pushMessage).toHaveBeenCalledOnce();
+  });
+
+  it("候補時刻が選択時刻と違えば文脈を取得せず終了する", async () => {
+    execute.mockResolvedValueOnce(21).mockResolvedValueOnce(21);
+    const message = createMessage(1, 20);
+
+    await processDailyPromptMessage(message, bindings(), config);
+
+    expect(execute).not.toHaveBeenCalledWith(
+      "account-1",
+      "brain.selectDailyPromptWeekdayContext",
+      expect.anything(),
+    );
+    expect(pushMessage).not.toHaveBeenCalled();
+    expect(message.ack).toHaveBeenCalledOnce();
+  });
+
+  it("pending配送の再送時刻を現在の明言より優先する", async () => {
+    execute.mockResolvedValueOnce(18).mockResolvedValueOnce(20);
+    const message = createMessage(2, 20);
+
+    await processDailyPromptMessage(message, bindings(), config);
+
+    expect(execute).toHaveBeenCalledWith("account-1", "conversation.prepareDailyPrompt", {
+      localDate: "2026-08-14",
+      promptVersion: "daily-check-in-fri-v1",
+      promptStrategy: "standard",
+      scheduledLocalHour: 20,
+      selectedLocalHour: 18,
+    });
+    expect(pushMessage).toHaveBeenCalledOnce();
+  });
+
   it("本人が明言した聞かれ方をレビュー済み方針へ変換して固定する", async () => {
     execute
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(18)
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(undefined)
@@ -116,6 +180,8 @@ describe("daily prompt queue consumer", () => {
       localDate: "2026-08-14",
       promptVersion: "daily-check-in-fri-v1:brief-v1",
       promptStrategy: "brief",
+      scheduledLocalHour: 18,
+      selectedLocalHour: 18,
     });
     expect(pushMessage).toHaveBeenCalledWith(
       {
@@ -134,6 +200,8 @@ describe("daily prompt queue consumer", () => {
   it("明言がなければ本人内の返信実績から選んだ方針を固定する", async () => {
     execute
       .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(18)
+      .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(undefined)
@@ -147,11 +215,16 @@ describe("daily prompt queue consumer", () => {
       localDate: "2026-08-14",
       promptVersion: "daily-check-in-fri-v1:feeling_first-v1",
       promptStrategy: "feeling_first",
+      scheduledLocalHour: 18,
+      selectedLocalHour: 18,
     });
   });
 
   it("保存済みの曜日文脈に対応する定型文をPushする", async () => {
-    execute.mockResolvedValueOnce("day_off");
+    execute
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(18)
+      .mockResolvedValueOnce("day_off");
     const message = createMessage();
 
     await processDailyPromptMessage(message, bindings(), config);
@@ -165,6 +238,8 @@ describe("daily prompt queue consumer", () => {
       localDate: "2026-08-14",
       promptVersion: "daily-check-in-day-off-v1",
       promptStrategy: "standard",
+      scheduledLocalHour: 18,
+      selectedLocalHour: 18,
     });
     expect(pushMessage).toHaveBeenCalledWith(
       {
@@ -181,7 +256,11 @@ describe("daily prompt queue consumer", () => {
   });
 
   it("同日フォローを曜日文脈より優先して本文を含まない定型文をPushする", async () => {
-    execute.mockResolvedValueOnce("day_off").mockResolvedValueOnce("same_day");
+    execute
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(18)
+      .mockResolvedValueOnce("day_off")
+      .mockResolvedValueOnce("same_day");
     const message = createMessage();
 
     await processDailyPromptMessage(message, bindings(), config);
@@ -196,6 +275,8 @@ describe("daily prompt queue consumer", () => {
       localDate: "2026-08-14",
       promptVersion: "daily-check-in-same-day-follow-up-v1",
       promptStrategy: "standard",
+      scheduledLocalHour: 18,
+      selectedLocalHour: 18,
     });
     expect(pushMessage).toHaveBeenCalledWith(
       {
@@ -212,7 +293,10 @@ describe("daily prompt queue consumer", () => {
   });
 
   it("曜日文脈を前日フォローより優先し、不要な前日検索を行わない", async () => {
-    execute.mockResolvedValueOnce("day_off");
+    execute
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(18)
+      .mockResolvedValueOnce("day_off");
     const message = createMessage();
 
     await processDailyPromptMessage(message, bindings(), config);
@@ -226,11 +310,15 @@ describe("daily prompt queue consumer", () => {
       localDate: "2026-08-14",
       promptVersion: "daily-check-in-day-off-v1",
       promptStrategy: "standard",
+      scheduledLocalHour: 18,
+      selectedLocalHour: 18,
     });
   });
 
   it("上位文脈がなければ前日フォローの本文を含まない定型文をPushする", async () => {
     execute
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(18)
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce("next_day");
@@ -247,6 +335,8 @@ describe("daily prompt queue consumer", () => {
       localDate: "2026-08-14",
       promptVersion: "daily-check-in-previous-day-follow-up-v1",
       promptStrategy: "standard",
+      scheduledLocalHour: 18,
+      selectedLocalHour: 18,
     });
     expect(pushMessage).toHaveBeenCalledWith(
       {
@@ -266,6 +356,8 @@ describe("daily prompt queue consumer", () => {
     const warn = vi.spyOn(logger, "warn").mockImplementation(() => undefined);
     execute
       .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(18)
+      .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(undefined)
       .mockRejectedValueOnce(new Error("AccountData unavailable"));
     const message = createMessage();
@@ -276,6 +368,8 @@ describe("daily prompt queue consumer", () => {
       localDate: "2026-08-14",
       promptVersion: "daily-check-in-fri-v1",
       promptStrategy: "standard",
+      scheduledLocalHour: 18,
+      selectedLocalHour: 18,
     });
     expect(warn).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -290,6 +384,8 @@ describe("daily prompt queue consumer", () => {
   it("同日フォローの取得に失敗しても取得済みの曜日文脈で継続する", async () => {
     const warn = vi.spyOn(logger, "warn").mockImplementation(() => undefined);
     execute
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(18)
       .mockResolvedValueOnce("day_off")
       .mockRejectedValueOnce(new Error("AccountData unavailable"));
     const message = createMessage();
@@ -300,6 +396,8 @@ describe("daily prompt queue consumer", () => {
       localDate: "2026-08-14",
       promptVersion: "daily-check-in-day-off-v1",
       promptStrategy: "standard",
+      scheduledLocalHour: 18,
+      selectedLocalHour: 18,
     });
     expect(warn).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -313,7 +411,10 @@ describe("daily prompt queue consumer", () => {
   });
 
   it("曜日文脈の取得に失敗しても曜日別一般文面へ戻す", async () => {
-    execute.mockRejectedValueOnce(new Error("AccountData unavailable"));
+    execute
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(18)
+      .mockRejectedValueOnce(new Error("AccountData unavailable"));
     const message = createMessage();
 
     await processDailyPromptMessage(message, bindings(), config);
@@ -322,6 +423,8 @@ describe("daily prompt queue consumer", () => {
       localDate: "2026-08-14",
       promptVersion: "daily-check-in-fri-v1",
       promptStrategy: "standard",
+      scheduledLocalHour: 18,
+      selectedLocalHour: 18,
     });
     expect(pushMessage).toHaveBeenCalledOnce();
     expect(message.ack).toHaveBeenCalledOnce();
@@ -330,6 +433,8 @@ describe("daily prompt queue consumer", () => {
   it("曜日文脈の取得失敗時も既存配送に固定された個別化文面を再配送する", async () => {
     const warn = vi.spyOn(logger, "warn").mockImplementation(() => undefined);
     execute
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(18)
       .mockRejectedValueOnce(new Error("AccountData unavailable"))
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(undefined)
@@ -371,6 +476,8 @@ describe("daily prompt queue consumer", () => {
   it("既存配送に固定された段階1の文面versionを再配送でも使う", async () => {
     execute
       .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(18)
+      .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(undefined)
@@ -402,6 +509,8 @@ describe("daily prompt queue consumer", () => {
 
   it("AccountDataがskipした日はLINEを呼ばずackする", async () => {
     execute
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(18)
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(undefined)

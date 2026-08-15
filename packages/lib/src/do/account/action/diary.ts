@@ -3,7 +3,9 @@ import { and, asc, desc, eq, gte, inArray, isNull, lt, lte, or, sql } from "driz
 import type { BatchItem } from "drizzle-orm/batch";
 import type { AccountDataDatabase } from "../database";
 import {
+  DAILY_PROMPT_LOCAL_HOURS,
   DAILY_PROMPT_STRATEGIES,
+  type DailyPromptLocalHour,
   type DailyPromptStrategy,
   type PromptContext,
   type PromptContextCollectionTarget,
@@ -180,7 +182,7 @@ export type DailyPromptPreparation =
   | Readonly<{ type: "ready"; deliveryId: string; promptVersion: string }>
   | Readonly<{
       type: "not-ready";
-      status: "delivered" | "skipped" | "failed";
+      status: "delivered" | "skipped" | "failed" | "not-due";
       reason?: DailyPromptSkipReason;
     }>;
 
@@ -464,6 +466,7 @@ async function skipDailyPrompt(
     localDate: string;
     promptVersion: string;
     promptStrategy: DailyPromptStrategy;
+    deliveryLocalHour: DailyPromptLocalHour;
     reason: DailyPromptSkipReason;
     at: Date;
   }>,
@@ -488,6 +491,7 @@ async function skipDailyPrompt(
       localDate: input.localDate,
       promptVersion: input.promptVersion,
       promptStrategy: input.promptStrategy,
+      deliveryLocalHour: input.deliveryLocalHour,
       status: "skipped",
       skipReason: input.reason,
       createdAt: input.at,
@@ -534,6 +538,8 @@ export async function prepareDailyPrompt(
     localDate: string;
     promptVersion: string;
     promptStrategy?: DailyPromptStrategy;
+    scheduledLocalHour?: DailyPromptLocalHour;
+    selectedLocalHour?: DailyPromptLocalHour;
     at?: Date;
   }>,
 ): Promise<DailyPromptPreparation> {
@@ -541,6 +547,14 @@ export async function prepareDailyPrompt(
   if (!input.promptVersion.trim()) throw new Error("Daily prompt version is required");
   const at = input.at ?? new Date();
   const promptStrategy = input.promptStrategy ?? "standard";
+  const scheduledLocalHour = input.scheduledLocalHour ?? 18;
+  const selectedLocalHour = input.selectedLocalHour ?? 18;
+  if (
+    !DAILY_PROMPT_LOCAL_HOURS.includes(scheduledLocalHour) ||
+    !DAILY_PROMPT_LOCAL_HOURS.includes(selectedLocalHour)
+  ) {
+    throw new Error("Daily prompt local hour is invalid");
+  }
   const existing = await db
     .select()
     .from(dailyPromptDeliveries)
@@ -566,9 +580,16 @@ export async function prepareDailyPrompt(
       localDate: input.localDate,
       promptVersion: existing?.promptVersion ?? input.promptVersion,
       promptStrategy: existing?.promptStrategy ?? promptStrategy,
+      deliveryLocalHour: existing?.deliveryLocalHour ?? scheduledLocalHour,
       reason: "stale",
       at,
     });
+  }
+  if (existing?.status === "pending" && existing.deliveryLocalHour !== scheduledLocalHour) {
+    return { type: "not-ready", status: "not-due" };
+  }
+  if (!existing && scheduledLocalHour !== selectedLocalHour) {
+    return { type: "not-ready", status: "not-due" };
   }
   if (await isDailyPromptStopped(db, accountId)) {
     return await skipDailyPrompt(db, {
@@ -576,6 +597,7 @@ export async function prepareDailyPrompt(
       localDate: input.localDate,
       promptVersion: existing?.promptVersion ?? input.promptVersion,
       promptStrategy: existing?.promptStrategy ?? promptStrategy,
+      deliveryLocalHour: existing?.deliveryLocalHour ?? scheduledLocalHour,
       reason: "manual_stopped",
       at,
     });
@@ -586,6 +608,7 @@ export async function prepareDailyPrompt(
       localDate: input.localDate,
       promptVersion: existing.promptVersion,
       promptStrategy: existing.promptStrategy,
+      deliveryLocalHour: existing.deliveryLocalHour,
       reason: "user_activity",
       at,
     });
@@ -596,6 +619,7 @@ export async function prepareDailyPrompt(
       localDate: input.localDate,
       promptVersion: existing?.promptVersion ?? input.promptVersion,
       promptStrategy: existing?.promptStrategy ?? promptStrategy,
+      deliveryLocalHour: existing?.deliveryLocalHour ?? scheduledLocalHour,
       reason: "active_session",
       at,
     });
@@ -635,6 +659,7 @@ export async function prepareDailyPrompt(
       localDate: input.localDate,
       promptVersion: input.promptVersion,
       promptStrategy,
+      deliveryLocalHour: scheduledLocalHour,
       reason: "auto_paused",
       at,
     });
@@ -646,6 +671,7 @@ export async function prepareDailyPrompt(
       localDate: input.localDate,
       promptVersion: input.promptVersion,
       promptStrategy,
+      deliveryLocalHour: scheduledLocalHour,
       reason: "recent_unanswered",
       at,
     });
@@ -658,6 +684,7 @@ export async function prepareDailyPrompt(
     localDate: input.localDate,
     promptVersion: input.promptVersion,
     promptStrategy,
+    deliveryLocalHour: scheduledLocalHour,
     status: "pending",
     createdAt: at,
     updatedAt: at,
@@ -667,6 +694,32 @@ export async function prepareDailyPrompt(
     deliveryId,
     promptVersion: input.promptVersion,
   };
+}
+
+/** 再送中のpending時刻を現在の明言より優先し、Queueが処理すべき候補時刻を返す。 */
+export async function resolveDailyPromptDueHour(
+  db: AccountDataDatabase,
+  accountId: string,
+  localDate: string,
+  selectedLocalHour: DailyPromptLocalHour,
+): Promise<DailyPromptLocalHour> {
+  assertLocalDate(localDate);
+  if (!DAILY_PROMPT_LOCAL_HOURS.includes(selectedLocalHour)) {
+    throw new Error("Daily prompt local hour is invalid");
+  }
+  const existing = await db
+    .select({ deliveryLocalHour: dailyPromptDeliveries.deliveryLocalHour })
+    .from(dailyPromptDeliveries)
+    .where(
+      and(
+        eq(dailyPromptDeliveries.accountId, accountId),
+        eq(dailyPromptDeliveries.localDate, localDate),
+        eq(dailyPromptDeliveries.status, "pending"),
+        eq(dailyPromptDeliveries.isDeleted, false),
+      ),
+    )
+    .get();
+  return existing?.deliveryLocalHour ?? selectedLocalHour;
 }
 
 export async function markDailyPromptDelivered(

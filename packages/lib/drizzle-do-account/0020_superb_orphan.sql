@@ -1,0 +1,1 @@
+ALTER TABLE `daily_prompt_deliveries` ADD `delivery_local_hour` integer DEFAULT 18 NOT NULL;

@@ -52,6 +52,12 @@ describe("daily prompt", () => {
     );
   });
 
+  it("時刻帯を変更した場合はその候補時刻を日中文脈の締切にする", () => {
+    expect(getDailyPromptContextCutoffAt("2026-08-14", 21)).toEqual(
+      new Date("2026-08-14T12:00:00.000Z"),
+    );
+  });
+
   it.each([
     [
       "recurring_schedule",

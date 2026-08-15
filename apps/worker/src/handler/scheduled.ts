@@ -1,9 +1,9 @@
 import { logger, toSafeOperationalErrorFields } from "@me-builder/shared";
 import { getCloudflareBindings, getWorkerConfig } from "../config";
-import { enqueueDailyPrompts, toTokyoLocalDate } from "../job/daily-prompt";
+import { enqueueDailyPrompts, toTokyoLocalDate, toTokyoLocalHour } from "../job/daily-prompt";
 import type { Env } from "../types";
 
-/** 09:00 UTC = 18:00 JSTのCronをDaily Prompt Queueへfan-outする。 */
+/** 09:00・11:00・12:00 UTCのCronを18・20・21時のDaily Prompt Queueへfan-outする。 */
 export async function scheduledHandler(
   controller: ScheduledController,
   env: Env,
@@ -26,6 +26,7 @@ export async function scheduledHandler(
         environment: workerConfig.environment,
         component: "daily-prompt-scheduler",
         localDate: toTokyoLocalDate(controller.scheduledTime),
+        localHour: toTokyoLocalHour(controller.scheduledTime),
         enqueuedCount,
         outcome: "succeeded",
         durationMs: Date.now() - startedAt,
