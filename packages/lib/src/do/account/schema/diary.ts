@@ -87,6 +87,25 @@ export const dailyPromptPreferences = sqliteTable("daily_prompt_preferences", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
 });
 
+/** 同じ日本日付の候補処理で再選択しないよう、時刻と選択元を1回だけ固定する。 */
+export const dailyPromptSchedules = sqliteTable(
+  "daily_prompt_schedules",
+  {
+    ...baseSchema,
+    accountId: text("account_id")
+      .notNull()
+      .references(() => accountDataIdentity.accountId),
+    localDate: text("local_date").notNull(),
+    selectedLocalHour: integer("selected_local_hour").$type<DailyPromptLocalHour>().notNull(),
+    selectionSource: text("selection_source", {
+      enum: ["explicit", "learned", "fallback"],
+    }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("daily_prompt_schedule_account_date_idx").on(table.accountId, table.localDate),
+  ],
+);
+
 /** 日本時間の日付ごとに、固定声かけの送信可否とLINE配送結果を保持する。 */
 export const dailyPromptDeliveries = sqliteTable(
   "daily_prompt_deliveries",

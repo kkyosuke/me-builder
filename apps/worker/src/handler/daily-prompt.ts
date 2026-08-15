@@ -2,6 +2,8 @@ import {
   D1,
   DAILY_PROMPT_LOCAL_HOURS,
   type DailyPromptLocalHour,
+  type DailyPromptSelectionSource,
+  type DailyPromptStrategy,
   accountDataFor,
 } from "@me-builder/lib";
 import type { DailyPromptQueueMessage, Message, OperationalOutcome } from "@me-builder/shared";
@@ -41,6 +43,10 @@ export async function processDailyPromptMessage(
   }
   const accountData = accountDataFor(accountDataNamespace, message.body.accountId);
   let deliveryId: string | undefined;
+  let selectedLocalHour: DailyPromptLocalHour | undefined;
+  let timeSelectionSource: DailyPromptSelectionSource | undefined;
+  let selectedPromptStrategy: DailyPromptStrategy | undefined;
+  let promptStrategySource: DailyPromptSelectionSource | undefined;
 
   try {
     const localHour = message.body.localHour ?? 18;
@@ -80,13 +86,50 @@ export async function processDailyPromptMessage(
         );
         return undefined;
       });
-    const selectedLocalHour = preferredLocalHour ?? 18;
-    const dueLocalHour = await accountData.execute(
-      "conversation.resolveDailyPromptDueHour",
+    const learnedLocalHour =
+      preferredLocalHour === undefined
+        ? await accountData.execute("conversation.selectDailyPromptLocalHour").catch((error) => {
+            logger.warn(
+              {
+                event: "daily-prompt.time-selection.failed",
+                service: "worker",
+                environment: workerConfig.environment,
+                component: "daily-prompt",
+                queueMessageId: message.id,
+                localDate: message.body.localDate,
+                localHour: scheduledLocalHour,
+                attempt: message.attempts,
+                outcome: "degraded",
+                disposition: "continue",
+                ...toSafeOperationalErrorFields(error, {
+                  code: "DAILY_PROMPT_TIME_SELECTION_FAILED",
+                  category: "dependency",
+                  stage: "daily-prompt.schedule",
+                  retryable: false,
+                  dependency: "account-data",
+                }),
+              },
+              "[Daily prompt] failed to select learned time -> continue with 18:00",
+            );
+            return undefined;
+          })
+        : undefined;
+    const proposedLocalHour = preferredLocalHour ?? learnedLocalHour ?? 18;
+    const proposedSelectionSource: DailyPromptSelectionSource =
+      preferredLocalHour !== undefined
+        ? "explicit"
+        : learnedLocalHour !== undefined
+          ? "learned"
+          : "fallback";
+    const schedule = await accountData.execute(
+      "conversation.resolveDailyPromptSchedule",
       message.body.localDate,
-      selectedLocalHour,
+      proposedLocalHour,
+      proposedSelectionSource,
     );
-    if (dueLocalHour !== scheduledLocalHour) {
+    selectedLocalHour = schedule.selectedLocalHour;
+    timeSelectionSource = schedule.selectionSource;
+    if (selectedLocalHour !== scheduledLocalHour) {
       message.ack();
       logResult(message, workerConfig, startedAt, {
         outcome: "succeeded",
@@ -240,7 +283,13 @@ export async function processDailyPromptMessage(
           );
           return undefined;
         });
-    const selectedPromptStrategy = promptStrategy ?? learnedPromptStrategy ?? "standard";
+    selectedPromptStrategy = promptStrategy ?? learnedPromptStrategy ?? "standard";
+    promptStrategySource =
+      promptStrategy !== undefined
+        ? "explicit"
+        : learnedPromptStrategy !== undefined
+          ? "learned"
+          : "fallback";
     const promptVersion = getDailyPromptVersion(
       message.body.localDate,
       weekdayContext,
@@ -344,6 +393,10 @@ export async function processDailyPromptMessage(
       outcome: "succeeded",
       disposition: "ack",
       stage: "daily-prompt.deliver",
+      selectedLocalHour,
+      timeSelectionSource,
+      promptStrategy: selectedPromptStrategy,
+      promptStrategySource,
     });
   } catch (error) {
     const operationalError = toOperationalError(error, {
@@ -385,6 +438,10 @@ function logResult(
     stage: string;
     resultCode?: string;
     error?: unknown;
+    selectedLocalHour?: DailyPromptLocalHour;
+    timeSelectionSource?: DailyPromptSelectionSource;
+    promptStrategy?: DailyPromptStrategy;
+    promptStrategySource?: DailyPromptSelectionSource;
   }>,
 ): void {
   const durationMs = Date.now() - startedAt;
@@ -409,6 +466,12 @@ function logResult(
     outcome: details.outcome,
     disposition: details.disposition,
     stage: details.stage,
+    ...(details.selectedLocalHour === undefined
+      ? {}
+      : { selectedLocalHour: details.selectedLocalHour }),
+    ...(details.timeSelectionSource ? { timeSelectionSource: details.timeSelectionSource } : {}),
+    ...(details.promptStrategy ? { promptStrategy: details.promptStrategy } : {}),
+    ...(details.promptStrategySource ? { promptStrategySource: details.promptStrategySource } : {}),
     ...(details.resultCode ? { resultCode: details.resultCode } : {}),
     ...(safeError ?? {}),
     durationMs,

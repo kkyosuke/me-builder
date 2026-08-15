@@ -82,10 +82,20 @@ describe("deleteAllDevelopmentAccountData", () => {
       receivedAt: new Date("2026-08-13T00:00:00.000Z"),
       dailyPromptControl: "stop",
     });
+    db.insert(schema.dailyPromptSchedules)
+      .values({
+        id: "daily-prompt-schedule:2026-08-13",
+        accountId,
+        localDate: "2026-08-13",
+        selectedLocalHour: 20,
+        selectionSource: "learned",
+      })
+      .run();
 
     await deleteAllDevelopmentAccountData(db, accountId, 1);
 
     expect(db.select().from(schema.dailyPromptPreferences).all()).toEqual([]);
+    expect(db.select().from(schema.dailyPromptSchedules).all()).toEqual([]);
     expect(db.select().from(schema.sourceRecords).all()).toEqual([]);
   });
 

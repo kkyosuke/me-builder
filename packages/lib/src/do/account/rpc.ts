@@ -155,9 +155,13 @@ export type AccountDataActions = {
     [input: Parameters<typeof diary.prepareDailyPrompt>[2]],
     typeof diary.prepareDailyPrompt
   >;
-  "conversation.resolveDailyPromptDueHour": RpcAction<
-    [localDate: string, selectedLocalHour: Parameters<typeof diary.resolveDailyPromptDueHour>[3]],
-    typeof diary.resolveDailyPromptDueHour
+  "conversation.resolveDailyPromptSchedule": RpcAction<
+    [
+      localDate: string,
+      selectedLocalHour: Parameters<typeof diary.resolveDailyPromptSchedule>[3],
+      selectionSource: Parameters<typeof diary.resolveDailyPromptSchedule>[4],
+    ],
+    typeof diary.resolveDailyPromptSchedule
   >;
   "conversation.selectDailyPromptSameDayContext": RpcAction<
     [localDate: string, at?: Date],
@@ -180,6 +184,8 @@ export type AccountDataActions = {
     typeof diary.listDailyPromptStrategyStats
   >;
   "conversation.selectDailyPromptStrategy": RpcAction<[], typeof diary.selectDailyPromptStrategy>;
+  "conversation.listDailyPromptTimeStats": RpcAction<[], typeof diary.listDailyPromptTimeStats>;
+  "conversation.selectDailyPromptLocalHour": RpcAction<[], typeof diary.selectDailyPromptLocalHour>;
   "conversation.attachMessagesToTurn": RpcAction<
     [
       inputs: Parameters<typeof diary.attachMessagesToTurn>[2],

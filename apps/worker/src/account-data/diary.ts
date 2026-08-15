@@ -13,13 +13,20 @@ export const diaryActions = {
     accountId: string,
     input: Parameters<typeof DO.account.action.diary.prepareDailyPrompt>[2],
   ) => DO.account.action.diary.prepareDailyPrompt(db, accountId, input),
-  "conversation.resolveDailyPromptDueHour": (
+  "conversation.resolveDailyPromptSchedule": (
     db: DO.account.Database,
     accountId: string,
     localDate: string,
-    selectedLocalHour: Parameters<typeof DO.account.action.diary.resolveDailyPromptDueHour>[3],
+    selectedLocalHour: Parameters<typeof DO.account.action.diary.resolveDailyPromptSchedule>[3],
+    selectionSource: Parameters<typeof DO.account.action.diary.resolveDailyPromptSchedule>[4],
   ) =>
-    DO.account.action.diary.resolveDailyPromptDueHour(db, accountId, localDate, selectedLocalHour),
+    DO.account.action.diary.resolveDailyPromptSchedule(
+      db,
+      accountId,
+      localDate,
+      selectedLocalHour,
+      selectionSource,
+    ),
   "conversation.selectDailyPromptSameDayContext": (
     db: DO.account.Database,
     accountId: string,
@@ -48,6 +55,10 @@ export const diaryActions = {
     DO.account.action.diary.listDailyPromptStrategyStats(db, accountId),
   "conversation.selectDailyPromptStrategy": (db: DO.account.Database, accountId: string) =>
     DO.account.action.diary.selectDailyPromptStrategy(db, accountId),
+  "conversation.listDailyPromptTimeStats": (db: DO.account.Database, accountId: string) =>
+    DO.account.action.diary.listDailyPromptTimeStats(db, accountId),
+  "conversation.selectDailyPromptLocalHour": (db: DO.account.Database, accountId: string) =>
+    DO.account.action.diary.selectDailyPromptLocalHour(db, accountId),
   "conversation.attachMessagesToTurn": (
     db: DO.account.Database,
     accountId: string,

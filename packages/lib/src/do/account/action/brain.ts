@@ -256,7 +256,7 @@ export async function selectDailyPromptTimePreference(
       ({ kind }) => kind === promptContext.kind,
     );
     if (definition?.category !== row.category) continue;
-    return dailyPromptLocalHourFromRestWindow(promptContext);
+    return dailyPromptLocalHourFromRestWindow(promptContext) ?? 18;
   }
   return undefined;
 }
