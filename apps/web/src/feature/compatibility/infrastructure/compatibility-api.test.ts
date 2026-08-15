@@ -328,6 +328,14 @@ describe("compatibility relationship APIs", () => {
       unavailableThemes: [{ diagnosisId: "money", title: "お金と消費" }],
       partner: { displayName: "あおい", ...shareContent },
       viewer: { displayName: "はる", ...shareContent },
+      progression: {
+        level: 2,
+        growthValue: 3,
+        currentLevelThreshold: 3,
+        nextLevelThreshold: 12,
+        comparableThemeCount: 1,
+        marks: [2],
+      },
     };
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json(data)));
     await expect(

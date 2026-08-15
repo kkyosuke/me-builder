@@ -163,6 +163,7 @@ export default function CompatibilityResultApplication({
       partner={toCompatibilityPerson(relationship.state.data.partner, "violet")}
       relationshipCategory={relationship.state.data.relationshipCategory}
       unavailableThemes={relationship.state.data.unavailableThemes}
+      progression={relationship.state.data.progression}
       isRefreshing={relationship.isRefreshing}
       refreshError={relationship.refreshError}
       endingState={relationship.ending}

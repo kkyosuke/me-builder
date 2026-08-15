@@ -22,6 +22,15 @@ function firePointer(
   fireEvent(target, event);
 }
 
+const pairProgression = {
+  level: 2,
+  growthValue: 3,
+  currentLevelThreshold: 3,
+  nextLevelThreshold: 12,
+  comparableThemeCount: 2,
+  marks: [2],
+};
+
 describe("Compatibility flow", () => {
   afterEach(() => {
     cleanup();
@@ -661,14 +670,21 @@ describe("Compatibility flow", () => {
         partner={partnerWithUndecided}
         relationshipCategory="partner"
         unavailableThemes={[{ diagnosisId: "money", title: "お金と消費" }]}
+        progression={pairProgression}
         onEnd={onEnd}
       />,
     );
 
     expect(screen.getByRole("heading", { name: "2人の相性シート" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "ふたり Lv.2" })).toBeTruthy();
+    expect(screen.getByText("ふたりのしるし")).toBeTruthy();
+    expect(screen.getByRole("list", { name: "獲得したふたりのしるし" }).textContent).toContain(
+      "Lv.2",
+    );
+    expect(screen.getByRole("progressbar", { name: "ふたりレベル2の進み具合" })).toBeTruthy();
     expect(
       screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent),
-    ).toEqual(["あおいさんについて", "わたしについて"]);
+    ).toEqual(["ふたり Lv.2", "あおいさんについて", "わたしについて"]);
     expect(screen.getAllByRole("heading", { name: "この資料のもと" })).toHaveLength(2);
     expect(screen.getAllByText("共有プロフィール生成日時")).toHaveLength(2);
     expect(screen.getAllByText("共有プロフィール・診断結果")).toHaveLength(2);
@@ -735,6 +751,7 @@ describe("Compatibility flow", () => {
         me={me}
         partner={aoi}
         relationshipCategory="partner"
+        progression={pairProgression}
         onEnd={onEnd}
         endingState={{ status: "loading" }}
       />,
@@ -748,6 +765,7 @@ describe("Compatibility flow", () => {
         me={me}
         partner={aoi}
         relationshipCategory="partner"
+        progression={pairProgression}
         onEnd={onEnd}
         endingState={{ status: "success", data: null }}
       />,

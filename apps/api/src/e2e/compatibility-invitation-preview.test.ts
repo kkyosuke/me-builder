@@ -501,6 +501,12 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
             aboutMe: { statements: { statement: string }[] };
             themes: unknown[];
           };
+          progression: {
+            level: number;
+            growthValue: number;
+            comparableThemeCount: number;
+            marks: number[];
+          };
         };
         const partnerRole = role === "inviter" ? "recipient" : "inviter";
         expect(detail).toMatchObject({
@@ -508,6 +514,12 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
           relationshipCategory: "partner",
           partner: { displayName: participants[partnerRole].name },
           viewer: { displayName: participants[role].name },
+          progression: {
+            level: 2,
+            growthValue: 3,
+            comparableThemeCount: 1,
+            marks: [2],
+          },
         });
         expect(detail.partner.themes).toHaveLength(1);
         expect(detail.viewer.themes).toHaveLength(1);

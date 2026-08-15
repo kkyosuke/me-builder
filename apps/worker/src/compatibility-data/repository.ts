@@ -4,10 +4,15 @@ import {
   type CancelCompatibilityInvitationResult,
   type CompatibilityInvitationAcceptanceContext,
   type CompatibilityInvitationPreview,
+  type CompatibilityPairProgression,
+  type CompatibilityPairThemeFingerprint,
   type CompatibilityRelationship,
   type CreateCompatibilityInvitationInput,
   type CreateCompatibilityInvitationResult,
   type EndCompatibilityRelationshipResult,
+  compatibilityPairProgressionLevel,
+  compatibilityPairProgressionMarks,
+  compatibilityPairProgressionThreshold,
   createCompatibilityInvitationAcceptanceContext,
   createCompatibilityInvitationPreview,
   decideCompatibilityInvitationAcceptance,
@@ -21,14 +26,19 @@ import { eq } from "drizzle-orm";
 import { type DrizzleSqliteDODatabase, drizzle } from "drizzle-orm/durable-sqlite";
 import { migrate } from "drizzle-orm/durable-sqlite/migrator";
 import migrations from "../../drizzle/compatibility-data/migrations.js";
-import { compatibilityDataSchema, compatibilityRelationships } from "./schema";
+import {
+  compatibilityDataSchema,
+  compatibilityProgressionStates,
+  compatibilityProgressionThemes,
+  compatibilityRelationships,
+} from "./schema";
 
 type CompatibilityDatabase = DrizzleSqliteDODatabase<typeof compatibilityDataSchema>;
 
 export class CompatibilityDataRepository {
   private readonly db: CompatibilityDatabase;
 
-  constructor(storage: DurableObjectStorage) {
+  constructor(private readonly storage: DurableObjectStorage) {
     this.db = drizzle(storage, { schema: compatibilityDataSchema });
   }
 
@@ -136,6 +146,100 @@ export class CompatibilityDataRepository {
   getRelationship(actorAccountId: string, at: Date): CompatibilityRelationship | null {
     this.expirePending(at);
     return getAcceptedCompatibilityRelationship(this.readRelationship(), actorAccountId);
+  }
+
+  synchronizeProgression(
+    actorAccountId: string,
+    themes: readonly CompatibilityPairThemeFingerprint[],
+    at: Date,
+  ): CompatibilityPairProgression | null {
+    if (!this.getRelationship(actorAccountId, at)) return null;
+    const uniqueThemes = [...new Map(themes.map((theme) => [theme.diagnosisId, theme])).values()]
+      .filter(({ diagnosisId, fingerprint }) => diagnosisId.length > 0 && fingerprint.length > 0)
+      .sort((left, right) => left.diagnosisId.localeCompare(right.diagnosisId));
+    const existingThemes = new Map(
+      this.db
+        .select()
+        .from(compatibilityProgressionThemes)
+        .all()
+        .map((theme) => [theme.diagnosisId, theme] as const),
+    );
+    const existingState = this.db
+      .select()
+      .from(compatibilityProgressionStates)
+      .where(eq(compatibilityProgressionStates.singleton, 1))
+      .get();
+    let growthDelta = 0;
+    const themeChanges: Array<
+      | { type: "insert"; theme: CompatibilityPairThemeFingerprint }
+      | { type: "update"; theme: CompatibilityPairThemeFingerprint }
+    > = [];
+    for (const theme of uniqueThemes) {
+      const existing = existingThemes.get(theme.diagnosisId);
+      if (!existing) {
+        growthDelta += 3;
+        themeChanges.push({ type: "insert", theme });
+      } else if (existing.resultFingerprint !== theme.fingerprint) {
+        growthDelta += 1;
+        themeChanges.push({ type: "update", theme });
+      }
+    }
+    const growthValue = (existingState?.growthValue ?? 0) + growthDelta;
+    const level = compatibilityPairProgressionLevel(growthValue);
+    const highestLevel = Math.max(existingState?.highestLevel ?? 1, level);
+    const comparableThemeCount = uniqueThemes.length;
+    const shouldUpdateState =
+      !existingState ||
+      growthDelta > 0 ||
+      existingState.comparableThemeCount !== comparableThemeCount;
+    if (themeChanges.length > 0 || shouldUpdateState) {
+      this.storage.transactionSync(() => {
+        for (const change of themeChanges) {
+          if (change.type === "insert") {
+            this.db
+              .insert(compatibilityProgressionThemes)
+              .values({
+                diagnosisId: change.theme.diagnosisId,
+                resultFingerprint: change.theme.fingerprint,
+                firstComparedAt: at,
+                updatedAt: at,
+              })
+              .run();
+          } else {
+            this.db
+              .update(compatibilityProgressionThemes)
+              .set({ resultFingerprint: change.theme.fingerprint, updatedAt: at })
+              .where(eq(compatibilityProgressionThemes.diagnosisId, change.theme.diagnosisId))
+              .run();
+          }
+        }
+        if (shouldUpdateState) {
+          this.db
+            .insert(compatibilityProgressionStates)
+            .values({
+              singleton: 1,
+              growthValue,
+              highestLevel,
+              comparableThemeCount,
+              createdAt: existingState?.createdAt ?? at,
+              updatedAt: at,
+            })
+            .onConflictDoUpdate({
+              target: compatibilityProgressionStates.singleton,
+              set: { growthValue, highestLevel, comparableThemeCount, updatedAt: at },
+            })
+            .run();
+        }
+      });
+    }
+    return {
+      level: highestLevel,
+      growthValue,
+      currentLevelThreshold: compatibilityPairProgressionThreshold(highestLevel),
+      nextLevelThreshold: compatibilityPairProgressionThreshold(highestLevel + 1),
+      comparableThemeCount,
+      marks: compatibilityPairProgressionMarks(highestLevel),
+    };
   }
 
   endRelationship(actorAccountId: string, at: Date): EndCompatibilityRelationshipResult {

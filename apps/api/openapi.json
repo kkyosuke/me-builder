@@ -4001,6 +4001,46 @@
                             },
                             "required": ["diagnosisId", "title"]
                           }
+                        },
+                        "progression": {
+                          "type": "object",
+                          "properties": {
+                            "level": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "growthValue": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "currentLevelThreshold": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "nextLevelThreshold": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "comparableThemeCount": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "marks": {
+                              "type": "array",
+                              "items": {
+                                "type": "integer",
+                                "minimum": 2
+                              }
+                            }
+                          },
+                          "required": [
+                            "level",
+                            "growthValue",
+                            "currentLevelThreshold",
+                            "nextLevelThreshold",
+                            "comparableThemeCount",
+                            "marks"
+                          ]
                         }
                       },
                       "required": [
@@ -4009,7 +4049,8 @@
                         "status",
                         "partner",
                         "viewer",
-                        "unavailableThemes"
+                        "unavailableThemes",
+                        "progression"
                       ]
                     },
                     {

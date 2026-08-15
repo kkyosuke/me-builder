@@ -134,6 +134,14 @@ const UnavailableThemeSchema = v.object({
   diagnosisId: NonEmptyStringSchema,
   title: NonEmptyStringSchema,
 });
+const PairProgressionSchema = v.object({
+  level: v.pipe(v.number(), v.safeInteger(), v.minValue(1)),
+  growthValue: v.pipe(v.number(), v.safeInteger(), v.minValue(0)),
+  currentLevelThreshold: v.pipe(v.number(), v.safeInteger(), v.minValue(0)),
+  nextLevelThreshold: v.pipe(v.number(), v.safeInteger(), v.minValue(1)),
+  comparableThemeCount: v.pipe(v.number(), v.safeInteger(), v.minValue(1)),
+  marks: v.array(v.pipe(v.number(), v.safeInteger(), v.minValue(2))),
+});
 const RelationshipResponseSchema = v.variant("status", [
   v.object({
     relationshipId: RelationshipIdSchema,
@@ -142,6 +150,7 @@ const RelationshipResponseSchema = v.variant("status", [
     partner: RelationshipPersonSchema,
     viewer: RelationshipPersonSchema,
     unavailableThemes: v.array(UnavailableThemeSchema),
+    progression: PairProgressionSchema,
   }),
   v.object({
     relationshipId: RelationshipIdSchema,

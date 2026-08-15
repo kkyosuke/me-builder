@@ -15,6 +15,14 @@ const PersonSchema = v.object({
   aboutMe: CompatibilityShareProfileSchema,
   themes: v.pipe(v.array(CompatibilitySharePreviewThemeSchema), v.minLength(1)),
 });
+const PairProgressionSchema = v.object({
+  level: v.pipe(v.number(), v.integer(), v.minValue(1)),
+  growthValue: v.pipe(v.number(), v.integer(), v.minValue(0)),
+  currentLevelThreshold: v.pipe(v.number(), v.integer(), v.minValue(0)),
+  nextLevelThreshold: v.pipe(v.number(), v.integer(), v.minValue(1)),
+  comparableThemeCount: v.pipe(v.number(), v.integer(), v.minValue(1)),
+  marks: v.array(v.pipe(v.number(), v.integer(), v.minValue(2))),
+});
 
 const UnavailableThemeSchema = v.object({
   diagnosisId: v.pipe(v.string(), v.nonEmpty()),
@@ -29,6 +37,7 @@ export const CompatibilityRelationshipResponseSchema = v.variant("status", [
     partner: PersonSchema,
     viewer: PersonSchema,
     unavailableThemes: v.array(UnavailableThemeSchema),
+    progression: PairProgressionSchema,
   }),
   v.object({
     relationshipId: compatibilityRelationshipId.schema,

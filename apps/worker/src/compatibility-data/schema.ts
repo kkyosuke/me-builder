@@ -85,8 +85,34 @@ export const compatibilityAcceptedThemes = sqliteTable(
   ],
 );
 
+/** 比較済みテーマの指紋。表示本文や回答は保存しない。 */
+export const compatibilityProgressionThemes = sqliteTable("compatibility_progression_themes", {
+  diagnosisId: text("diagnosis_id").primaryKey(),
+  resultFingerprint: text("result_fingerprint").notNull(),
+  firstComparedAt: integer("first_compared_at", { mode: "timestamp_ms" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+});
+
+/** ペア単位の累積値。関係の内容やAccount IDは持たない。 */
+export const compatibilityProgressionStates = sqliteTable(
+  "compatibility_progression_states",
+  {
+    singleton: integer("singleton").primaryKey(),
+    growthValue: integer("growth_value").notNull().default(0),
+    highestLevel: integer("highest_level").notNull().default(1),
+    comparableThemeCount: integer("comparable_theme_count").notNull().default(0),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [
+    check("compatibility_progression_state_singleton_check", sql`${table.singleton} = 1`),
+  ],
+);
+
 export const compatibilityDataSchema = {
   compatibilityAcceptedThemes,
   compatibilityOfferedThemes,
+  compatibilityProgressionStates,
+  compatibilityProgressionThemes,
   compatibilityRelationships,
 };
