@@ -30,6 +30,79 @@ export async function listPersonalData(
   };
 }
 
+export async function requestPersonalDataExport(
+  params: CommonParams & { at?: Date },
+): Promise<PersonalDataOutcome<{ result: Awaited<ReturnType<typeof requestExport>> }>> {
+  const session = await createLiffSession(params);
+  if (session.type !== "resolved") return session;
+  return {
+    type: "resolved",
+    result: await requestExport(params.accountData, session.session.accountId, params.at),
+  };
+}
+
+function requestExport(accountData: AccountDataNamespace, accountId: string, at?: Date) {
+  return accountDataFor(accountData, accountId).execute("personalDataExport.request", at);
+}
+
+export async function getPersonalDataExport(
+  params: CommonParams & { exportId: string; at?: Date },
+): Promise<PersonalDataOutcome<{ result: Awaited<ReturnType<typeof readExportStatus>> }>> {
+  const session = await createLiffSession(params);
+  if (session.type !== "resolved") return session;
+  return {
+    type: "resolved",
+    result: await readExportStatus(
+      params.accountData,
+      session.session.accountId,
+      params.exportId,
+      params.at,
+    ),
+  };
+}
+
+function readExportStatus(
+  accountData: AccountDataNamespace,
+  accountId: string,
+  exportId: string,
+  at?: Date,
+) {
+  return accountDataFor(accountData, accountId).execute(
+    "personalDataExport.readStatus",
+    exportId,
+    at,
+  );
+}
+
+export async function downloadPersonalDataExport(
+  params: CommonParams & { exportId: string; at?: Date },
+): Promise<PersonalDataOutcome<{ result: Awaited<ReturnType<typeof readExportArchive>> }>> {
+  const session = await createLiffSession(params);
+  if (session.type !== "resolved") return session;
+  return {
+    type: "resolved",
+    result: await readExportArchive(
+      params.accountData,
+      session.session.accountId,
+      params.exportId,
+      params.at,
+    ),
+  };
+}
+
+function readExportArchive(
+  accountData: AccountDataNamespace,
+  accountId: string,
+  exportId: string,
+  at?: Date,
+) {
+  return accountDataFor(accountData, accountId).execute(
+    "personalDataExport.readArchive",
+    exportId,
+    at,
+  );
+}
+
 function listRecords(accountData: AccountDataNamespace, accountId: string) {
   return accountDataFor(accountData, accountId).execute("source.listPersonalData");
 }

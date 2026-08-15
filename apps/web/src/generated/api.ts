@@ -313,6 +313,57 @@ export interface paths {
     patch: operations["correctPersonalDataRecord"];
     trace?: never;
   };
+  "/api/personal-data/exports": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** 本人データarchiveの非同期生成を要求する */
+    post: operations["requestPersonalDataExport"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/personal-data/exports/{exportId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** 本人データarchiveの生成状態と期限を取得する */
+    get: operations["getPersonalDataExportStatus"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/personal-data/exports/{exportId}/download": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** 期限内の本人データarchiveをdownloadする */
+    get: operations["downloadPersonalDataExport"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/dev/brain-items": {
     parameters: {
       query?: never;
@@ -2700,6 +2751,268 @@ export interface operations {
           "application/json": {
             /** @constant */
             error: "Invalid personal data mutation";
+          };
+        };
+      };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
+          };
+        };
+      };
+      /** @description AccountData bindingが設定されていない */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Service Unavailable";
+          };
+        };
+      };
+    };
+  };
+  requestPersonalDataExport: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 生成要求 */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @enum {string} */
+            outcome?: "created" | "unchanged";
+            export: {
+              id: string;
+              /** @enum {string} */
+              status: "queued" | "generating" | "ready" | "failed" | "expired";
+              /** Format: date-time */
+              requestedAt: string;
+              completedAt: string | null;
+              expiresAt: string | null;
+              downloadUrl?: string;
+            };
+          };
+        };
+      };
+      /** @description LIFF IDトークンを検証できない */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Unauthorized";
+          };
+        };
+      };
+      /** @description 対応するAccountが存在しない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Account not found";
+            /** @constant */
+            reason: "friendship_required";
+          };
+        };
+      };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
+          };
+        };
+      };
+      /** @description AccountData bindingが設定されていない */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Service Unavailable";
+          };
+        };
+      };
+    };
+  };
+  getPersonalDataExportStatus: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        exportId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 生成状態 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @enum {string} */
+            outcome?: "created" | "unchanged";
+            export: {
+              id: string;
+              /** @enum {string} */
+              status: "queued" | "generating" | "ready" | "failed" | "expired";
+              /** Format: date-time */
+              requestedAt: string;
+              completedAt: string | null;
+              expiresAt: string | null;
+              downloadUrl?: string;
+            };
+          };
+        };
+      };
+      /** @description LIFF IDトークンを検証できない */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Unauthorized";
+          };
+        };
+      };
+      /** @description 本人が所有するexport要求がない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Personal data export not found";
+          };
+        };
+      };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
+          };
+        };
+      };
+      /** @description AccountData bindingが設定されていない */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Service Unavailable";
+          };
+        };
+      };
+    };
+  };
+  downloadPersonalDataExport: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        exportId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 本人データarchive */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            [key: string]: unknown;
+          };
+        };
+      };
+      /** @description LIFF IDトークンを検証できない */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Unauthorized";
+          };
+        };
+      };
+      /** @description 本人が所有するexport要求がない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Personal data export not found";
+          };
+        };
+      };
+      /** @description 生成中または生成失敗 */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Personal data export is not ready";
+          };
+        };
+      };
+      /** @description download期限切れ */
+      410: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Personal data export expired";
           };
         };
       };

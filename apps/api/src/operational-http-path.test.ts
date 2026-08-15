@@ -28,4 +28,14 @@ describe("operationalHttpPath", () => {
       "/api/personal-data/records/:sourceRecordId",
     );
   });
+
+  it.each([
+    ["/api/personal-data/exports/export-1", "/api/personal-data/exports/:exportId"],
+    [
+      "/api/personal-data/exports/export-1/download",
+      "/api/personal-data/exports/:exportId/download",
+    ],
+  ])("Export IDを運用ログへ含めない: %s", (path, expected) => {
+    expect(operationalHttpPath(path)).toBe(expected);
+  });
 });

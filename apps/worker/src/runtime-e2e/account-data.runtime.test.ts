@@ -236,6 +236,7 @@ describe("AccountData Workers runtime E2E", () => {
       state.storage.sql.exec("DROP TABLE progression_item_states");
       state.storage.sql.exec("DROP TABLE progression_states");
       state.storage.sql.exec("DROP TABLE progression_events");
+      state.storage.sql.exec("DROP TABLE personal_data_exports");
       state.storage.sql.exec("DELETE FROM __drizzle_migrations WHERE created_at >= 1786666843277");
 
       const repository = Reflect.get(instance, "repository") as { initialize(): Promise<void> };
@@ -490,6 +491,7 @@ describe("AccountData Workers runtime E2E", () => {
       state.storage.sql.exec("DROP TABLE progression_item_states");
       state.storage.sql.exec("DROP TABLE progression_states");
       state.storage.sql.exec("DROP TABLE progression_events");
+      state.storage.sql.exec("DROP TABLE personal_data_exports");
       state.storage.sql.exec("DELETE FROM __drizzle_migrations WHERE created_at > 1786361220917");
 
       const repository = Reflect.get(instance, "repository") as {
@@ -623,6 +625,7 @@ describe("AccountData Workers runtime E2E", () => {
       state.storage.sql.exec("DROP TABLE progression_item_states");
       state.storage.sql.exec("DROP TABLE progression_states");
       state.storage.sql.exec("DROP TABLE progression_events");
+      state.storage.sql.exec("DROP TABLE personal_data_exports");
       state.storage.sql.exec("DELETE FROM __drizzle_migrations WHERE created_at >= 1786415351981");
 
       const repository = Reflect.get(instance, "repository") as {

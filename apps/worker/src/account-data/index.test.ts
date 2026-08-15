@@ -172,6 +172,10 @@ describe("AccountData alarm", () => {
       DO.account.action.profileSummary,
       "listUndispatchedProfileSummaryGenerationIds",
     ).mockResolvedValue([]);
+    vi.spyOn(
+      DO.account.action.personalDataExport,
+      "processPendingPersonalDataExport",
+    ).mockResolvedValue({ processed: false });
   });
 
   afterEach(() => vi.restoreAllMocks());
@@ -220,6 +224,9 @@ describe("AccountData alarm", () => {
       generationId: "generation-1",
     });
     expect(markDispatched).toHaveBeenCalledWith({}, "account-1", "generation-1");
+    expect(
+      DO.account.action.personalDataExport.processPendingPersonalDataExport,
+    ).toHaveBeenCalledWith({}, "account-1");
   });
 
   it("Queue投入失敗時も永続状態から次のalarmを明示的に設定する", async () => {

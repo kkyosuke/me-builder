@@ -4,6 +4,12 @@ import type { Context } from "hono";
 import * as v from "valibot";
 import { getConfig } from "../config";
 import {
+  PersonalDataExportExpiredSchema,
+  PersonalDataExportNotFoundSchema,
+  PersonalDataExportNotReadySchema,
+  PersonalDataExportResponseSchema,
+} from "../contract/personal-data/exports";
+import {
   CorrectPersonalDataRecordRequestSchema,
   InvalidPersonalDataMutationSchema,
   PersonalDataMutationResponseSchema,
@@ -15,7 +21,14 @@ import {
   ServiceUnavailableErrorSchema,
   UnauthorizedErrorSchema,
 } from "../contract/shared/errors";
-import { correctPersonalData, deletePersonalData, listPersonalData } from "../logic/personal-data";
+import {
+  correctPersonalData,
+  deletePersonalData,
+  downloadPersonalDataExport,
+  getPersonalDataExport,
+  listPersonalData,
+  requestPersonalDataExport,
+} from "../logic/personal-data";
 import type { AppEnv } from "../types";
 import { bearerToken } from "./auth";
 
@@ -137,4 +150,82 @@ export async function deletePersonalDataRecordContents(c: Context<AppEnv>): Prom
       invalidatedBrainItemCount: outcome.result.invalidatedBrainItemCount,
     }),
   );
+}
+
+function exportResponse(result: {
+  id: string;
+  status: "queued" | "generating" | "ready" | "failed" | "expired";
+  requestedAt: string;
+  completedAt: string | null;
+  expiresAt: string | null;
+}) {
+  return v.parse(PersonalDataExportResponseSchema, {
+    export: {
+      ...result,
+      ...(result.status === "ready"
+        ? { downloadUrl: `/api/personal-data/exports/${encodeURIComponent(result.id)}/download` }
+        : {}),
+    },
+  });
+}
+
+export async function postPersonalDataExport(c: Context<AppEnv>): Promise<Response> {
+  const deps = dependencies(c);
+  if (!deps) return unavailable(c);
+  const outcome = await requestPersonalDataExport(deps);
+  if (outcome.type !== "resolved") return authError(c, outcome.type);
+  c.header("Cache-Control", "no-store");
+  return c.json({ ...exportResponse(outcome.result.export), outcome: outcome.result.outcome }, 202);
+}
+
+export async function getPersonalDataExportStatus(c: Context<AppEnv>): Promise<Response> {
+  const deps = dependencies(c);
+  if (!deps) return unavailable(c);
+  const outcome = await getPersonalDataExport({
+    ...deps,
+    exportId: c.req.param("exportId") ?? "",
+  });
+  if (outcome.type !== "resolved") return authError(c, outcome.type);
+  if (!outcome.result) {
+    return c.json(
+      v.parse(PersonalDataExportNotFoundSchema, { error: "Personal data export not found" }),
+      404,
+    );
+  }
+  c.header("Cache-Control", "no-store");
+  return c.json(exportResponse(outcome.result));
+}
+
+export async function downloadPersonalDataExportContents(c: Context<AppEnv>): Promise<Response> {
+  const deps = dependencies(c);
+  if (!deps) return unavailable(c);
+  const exportId = c.req.param("exportId") ?? "";
+  const outcome = await downloadPersonalDataExport({ ...deps, exportId });
+  if (outcome.type !== "resolved") return authError(c, outcome.type);
+  if (outcome.result.type === "not-found") {
+    return c.json(
+      v.parse(PersonalDataExportNotFoundSchema, { error: "Personal data export not found" }),
+      404,
+    );
+  }
+  if (outcome.result.type === "expired") {
+    return c.json(
+      v.parse(PersonalDataExportExpiredSchema, { error: "Personal data export expired" }),
+      410,
+    );
+  }
+  if (outcome.result.type === "not-ready") {
+    return c.json(
+      v.parse(PersonalDataExportNotReadySchema, { error: "Personal data export is not ready" }),
+      409,
+    );
+  }
+  return new Response(JSON.stringify(outcome.result.archive), {
+    headers: {
+      "Cache-Control": "private, no-store",
+      "Content-Disposition": `attachment; filename="me-builder-personal-data-${exportId}.json"`,
+      "Content-Type": "application/json; charset=utf-8",
+      Expires: new Date(outcome.result.expiresAt).toUTCString(),
+    },
+  });
 }

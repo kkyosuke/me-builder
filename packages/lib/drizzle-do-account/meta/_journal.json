@@ -183,6 +183,13 @@
       "when": 1786794027891,
       "tag": "0025_robust_sugar_man",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "6",
+      "when": 1786843897869,
+      "tag": "0026_flimsy_speed_demon",
+      "breakpoints": true
     }
   ]
 }

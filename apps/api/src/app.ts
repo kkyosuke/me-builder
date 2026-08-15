@@ -55,6 +55,11 @@ import {
 } from "./contract/legal/terms";
 import { openApiOptions } from "./contract/openapi";
 import {
+  downloadPersonalDataExportRoute,
+  personalDataExportStatusRoute,
+  requestPersonalDataExportRoute,
+} from "./contract/personal-data/exports";
+import {
   correctPersonalDataRecordRoute,
   deletePersonalDataRecordRoute,
   personalDataRecordsRoute,
@@ -118,8 +123,11 @@ import {
 import { postLineWebhook } from "./controller/line";
 import {
   deletePersonalDataRecordContents,
+  downloadPersonalDataExportContents,
+  getPersonalDataExportStatus,
   getPersonalDataRecords,
   patchPersonalDataRecord,
+  postPersonalDataExport,
 } from "./controller/personal-data";
 import {
   getProfileProgressionContents,
@@ -259,6 +267,17 @@ app.delete(
   "/api/personal-data/records/:sourceRecordId",
   deletePersonalDataRecordRoute,
   deletePersonalDataRecordContents,
+);
+app.post("/api/personal-data/exports", requestPersonalDataExportRoute, postPersonalDataExport);
+app.get(
+  "/api/personal-data/exports/:exportId",
+  personalDataExportStatusRoute,
+  getPersonalDataExportStatus,
+);
+app.get(
+  "/api/personal-data/exports/:exportId/download",
+  downloadPersonalDataExportRoute,
+  downloadPersonalDataExportContents,
 );
 
 app.get("/api/dev/brain-items", developmentBrainItemsRoute, getDevelopmentBrainItems);

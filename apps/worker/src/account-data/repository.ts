@@ -497,6 +497,20 @@ export class AccountDataRepository {
       .orderBy(asc(DO.account.schema.profileSummaryGenerations.requestedAt))
       .limit(1)
       .get();
+    const personalDataExport = this.database
+      .select({ requestedAt: DO.account.schema.personalDataExports.requestedAt })
+      .from(DO.account.schema.personalDataExports)
+      .where(eq(DO.account.schema.personalDataExports.status, "queued"))
+      .orderBy(asc(DO.account.schema.personalDataExports.requestedAt))
+      .limit(1)
+      .get();
+    const expiringPersonalDataExport = this.database
+      .select({ expiresAt: DO.account.schema.personalDataExports.expiresAt })
+      .from(DO.account.schema.personalDataExports)
+      .where(eq(DO.account.schema.personalDataExports.status, "ready"))
+      .orderBy(asc(DO.account.schema.personalDataExports.expiresAt))
+      .limit(1)
+      .get();
     const candidates = [
       session
         ? Math.min(
@@ -511,6 +525,8 @@ export class AccountDataRepository {
         ? profileSummaryGeneration.requestedAt.getTime() +
           DO.account.action.profileSummary.PROFILE_SUMMARY_DISPATCH_RECOVERY_MS
         : null,
+      personalDataExport?.requestedAt.getTime() ?? null,
+      expiringPersonalDataExport?.expiresAt?.getTime() ?? null,
     ].filter((value): value is number => value !== null);
     return candidates.length > 0 ? Math.min(...candidates) : null;
   }

@@ -103,6 +103,7 @@ docs/
 - [診断API契約](development/diagnosis-api.md) — Web UIとAPI Server間の診断API契約
 - [プロフィールAPI契約](development/profile-api.md) — 本人プロフィールとアバター画像の取得・保存・削除API契約
 - [本人入力データ訂正・削除API契約](development/personal-data-api.md) — 診断回答・日記の訂正、削除と派生物への波及契約
+- [本人データエクスポート実装契約](development/personal-data-export.md) — 本人archiveのデータ境界、非同期生成、期限付きdownload契約
 - [相性API契約](development/compatibility-api.md) — Web UIとAPI Server間の相性API契約
 - [API契約とクライアント型の生成](development/api-contract-generation.md) — HTTP契約の配置とOpenAPI・Web UI用型の生成運用
 - [サービス利用規約の公開運用](development/service-terms-release.md) — 規約versionの追加、本文hash検証、Preview確認、公開後の訂正手順
