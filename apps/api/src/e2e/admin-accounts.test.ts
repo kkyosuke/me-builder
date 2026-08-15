@@ -70,6 +70,7 @@ async function prepareAccounts(db: D1Database): Promise<void> {
       categoryCount: 2,
       calculationVersion: 1,
       highestLevel: 2,
+      isProcessing: false,
       recentChanges: [],
       milestoneCards: [],
     },

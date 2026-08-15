@@ -4,6 +4,7 @@ import {
   compatibilityPairProgressionMarks,
   compatibilityPairProgressionThreshold,
   compatibilityRelationshipId,
+  createCompatibilityPairProgressionArchiveId,
   createCompatibilityRelationshipId,
 } from "./compatibility-data";
 
@@ -15,6 +16,28 @@ describe("compatibility pair progression", () => {
     ]);
     expect(compatibilityPairProgressionMarks(29)).toEqual([2, 5, 10, 20]);
     expect(compatibilityPairProgressionMarks(30)).toEqual([2, 5, 10, 20, 30]);
+  });
+
+  it("Account順序に依存せずカテゴリごとに異なるarchive IDを返す", async () => {
+    const forward = await createCompatibilityPairProgressionArchiveId(
+      "account-a",
+      "account-b",
+      "partner",
+    );
+    const reverse = await createCompatibilityPairProgressionArchiveId(
+      "account-b",
+      "account-a",
+      "partner",
+    );
+    const work = await createCompatibilityPairProgressionArchiveId(
+      "account-a",
+      "account-b",
+      "work",
+    );
+
+    expect(forward).toBe(reverse);
+    expect(compatibilityRelationshipId.isValid(forward)).toBe(true);
+    expect(work).not.toBe(forward);
   });
 });
 

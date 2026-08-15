@@ -412,7 +412,7 @@ export class AccountData extends DurableObject<Env> {
         },
         "[Account progression] deferred at progression.project -> alarm-retry",
       );
-      await this.scheduleMaintenanceRetry();
+      await this.scheduleMaintenanceRetry(true);
     }
   }
 
@@ -423,10 +423,18 @@ export class AccountData extends DurableObject<Env> {
     if (current === null || desired < current) await this.ctx.storage.setAlarm(desired);
   }
 
-  private async scheduleMaintenanceRetry(): Promise<void> {
+  private async scheduleMaintenanceRetry(prioritizeProjectionRetry = false): Promise<void> {
     const retryAt = Date.now() + ALARM_RETRY_MS;
     const desired = this.repository.nextMaintenanceAt();
-    await this.ctx.storage.setAlarm(desired === null ? retryAt : Math.max(retryAt, desired));
+    await this.ctx.storage.setAlarm(
+      desired === null
+        ? retryAt
+        : prioritizeProjectionRetry
+          ? desired > Date.now()
+            ? Math.min(retryAt, desired)
+            : retryAt
+          : Math.max(retryAt, desired),
+    );
   }
 
   private async runExclusive<TResult>(operation: () => Promise<TResult>): Promise<TResult> {

@@ -1718,6 +1718,9 @@
                       "type": "integer",
                       "minimum": 1
                     },
+                    "isProcessing": {
+                      "type": "boolean"
+                    },
                     "recentChanges": {
                       "type": "array",
                       "items": {
@@ -1780,6 +1783,7 @@
                     "categoryCount",
                     "calculationVersion",
                     "highestLevel",
+                    "isProcessing",
                     "recentChanges",
                     "milestoneCards"
                   ]

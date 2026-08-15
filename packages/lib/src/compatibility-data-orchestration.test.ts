@@ -131,6 +131,7 @@ describe("compatibility data orchestration", () => {
   it("承諾正本のacceptedAtを双方の有効参照へ投影する", async () => {
     const canonicalAcceptedAt = new Date("2026-08-12T00:15:00.000Z");
     const activationInputs: Array<{ accountId: string; updatedAt: Date }> = [];
+    const restoreProgressionSnapshot = vi.fn().mockResolvedValue(true);
     const accountNamespace = {
       getByName(accountId: string) {
         return {
@@ -150,6 +151,7 @@ describe("compatibility data orchestration", () => {
         async getInvitationAcceptanceContext() {
           return {
             inviterAccountId: "account-a",
+            relationshipCategory: "partner",
             expiresAt: new Date("2026-08-23T00:00:00.000Z"),
           };
         },
@@ -157,12 +159,21 @@ describe("compatibility data orchestration", () => {
           return {
             outcome: "accepted",
             relationship: {
+              id: "1".repeat(64),
               inviterAccountId: "account-a",
               inviteeAccountId: "account-b",
+              relationshipCategory: "partner",
               acceptedAt: canonicalAcceptedAt,
             },
           };
         },
+        async readProgressionArchive() {
+          return {
+            growthValue: 12,
+            highestLevel: 3,
+          };
+        },
+        restoreProgressionSnapshot,
       }),
     } as unknown as CompatibilityDataNamespace;
 
@@ -177,6 +188,11 @@ describe("compatibility data orchestration", () => {
       { accountId: "account-a", updatedAt: canonicalAcceptedAt },
       { accountId: "account-b", updatedAt: canonicalAcceptedAt },
     ]);
+    expect(restoreProgressionSnapshot).toHaveBeenCalledWith(
+      "1".repeat(64),
+      "account-a",
+      expect.objectContaining({ growthValue: 12 }),
+    );
   });
 
   it("招待の正本を取り消した後に送信者の一覧参照を終了する", async () => {
@@ -243,6 +259,9 @@ describe("compatibility data orchestration", () => {
     } as unknown as AccountDataNamespace;
     const compatibilityNamespace = {
       getByName: () => ({
+        async getRelationship() {
+          return null;
+        },
         async endRelationship() {
           calls.push("canonical.end");
           return {
@@ -303,6 +322,9 @@ describe("compatibility data orchestration", () => {
     };
     const compatibilityNamespace = {
       getByName: () => ({
+        async getRelationship() {
+          return null;
+        },
         async endRelationship() {
           canonicalAttempt += 1;
           return { outcome: canonicalAttempt === 1 ? "ended" : "unchanged", relationship };

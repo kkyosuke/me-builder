@@ -125,6 +125,7 @@ describe("DiagnosisResultView", () => {
             categoryCount: 3,
             calculationVersion: 1,
             highestLevel: 4,
+            isProcessing: false,
             recentChanges: [],
             milestoneCards: [],
           },
@@ -140,5 +141,34 @@ describe("DiagnosisResultView", () => {
       resultHeading.compareDocumentPosition(progressionHeading) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(screen.getByText(/うつし Lv.4/)).toBeTruthy();
+  });
+
+  it("projectionが未確定の間は反映中と案内する", () => {
+    render(
+      <DiagnosisResultView
+        result={result}
+        onBack={vi.fn()}
+        progression={{
+          status: "success",
+          data: {
+            level: 4,
+            growthValue: 46,
+            currentLevelThreshold: 45,
+            nextLevelThreshold: 80,
+            collectedPieces: 8,
+            activePieces: 7,
+            categoryCount: 3,
+            calculationVersion: 1,
+            highestLevel: 4,
+            isProcessing: true,
+            recentChanges: [],
+            milestoneCards: [],
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByText("回答から見つかったことを反映しています。")).toBeTruthy();
+    expect(screen.queryByText(/うつし Lv.4/)).toBeNull();
   });
 });

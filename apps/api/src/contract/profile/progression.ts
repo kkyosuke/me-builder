@@ -25,6 +25,7 @@ export const ProfileProgressionResponseSchema = v.object({
   categoryCount: NonNegativeIntegerSchema,
   calculationVersion: v.pipe(v.number(), v.integer(), v.minValue(1)),
   highestLevel: v.pipe(v.number(), v.integer(), v.minValue(1)),
+  isProcessing: v.boolean(),
   recentChanges: v.pipe(v.array(ProgressionChangeSchema), v.maxLength(3)),
   milestoneCards: v.pipe(v.array(MilestoneCardSchema), v.maxLength(3)),
 });

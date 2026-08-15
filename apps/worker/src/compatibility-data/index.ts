@@ -1,6 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
 import {
   type AcceptCompatibilityInvitationInput,
+  type CompatibilityPairProgressionSnapshot,
   type CompatibilityPairThemeFingerprint,
   type CreateCompatibilityInvitationInput,
   accountDataFor,
@@ -93,6 +94,30 @@ export class CompatibilityData extends DurableObject<Env> {
   ) {
     this.assertRouting(relationshipId);
     return this.repository.synchronizeProgression(actorAccountId, themes, new Date());
+  }
+
+  async getProgressionSnapshot(relationshipId: string, actorAccountId: string) {
+    this.assertRouting(relationshipId);
+    return this.repository.getProgressionSnapshot(actorAccountId);
+  }
+
+  async restoreProgressionSnapshot(
+    relationshipId: string,
+    actorAccountId: string,
+    snapshot: CompatibilityPairProgressionSnapshot,
+  ) {
+    this.assertRouting(relationshipId);
+    return this.repository.restoreProgressionSnapshot(actorAccountId, snapshot, new Date());
+  }
+
+  async readProgressionArchive(archiveId: string) {
+    this.assertRouting(archiveId);
+    return this.repository.readProgressionArchive();
+  }
+
+  async mergeProgressionArchive(archiveId: string, snapshot: CompatibilityPairProgressionSnapshot) {
+    this.assertRouting(archiveId);
+    this.repository.mergeProgressionArchive(snapshot, new Date());
   }
 
   async endRelationship(relationshipId: string, actorAccountId: string) {

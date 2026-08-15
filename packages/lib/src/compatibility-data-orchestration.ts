@@ -6,6 +6,8 @@ import {
   type CreateCompatibilityInvitationInput,
   type CreateCompatibilityInvitationResult,
   compatibilityDataFor,
+  compatibilityProgressionArchiveFor,
+  createCompatibilityPairProgressionArchiveId,
   createCompatibilityRelationshipId,
 } from "./compatibility-data";
 import { type AccountDataNamespace, accountDataFor } from "./do/account/rpc";
@@ -120,6 +122,44 @@ async function activateCompatibilityReferences(
   }
 }
 
+async function restoreCompatibilityPairProgression(
+  namespace: CompatibilityDataNamespace,
+  relationship: CompatibilityRelationship,
+): Promise<void> {
+  const inviteeAccountId = relationship.inviteeAccountId;
+  if (!inviteeAccountId) return;
+  const archiveId = await createCompatibilityPairProgressionArchiveId(
+    relationship.inviterAccountId,
+    inviteeAccountId,
+    relationship.relationshipCategory,
+  );
+  const snapshot = await compatibilityProgressionArchiveFor(namespace, archiveId).read();
+  if (!snapshot) return;
+  await compatibilityDataFor(namespace, relationship.id).restoreProgressionSnapshot(
+    relationship.inviterAccountId,
+    snapshot,
+  );
+}
+
+async function archiveCompatibilityPairProgression(
+  namespace: CompatibilityDataNamespace,
+  relationship: CompatibilityRelationship,
+  actorAccountId: string,
+): Promise<void> {
+  const inviteeAccountId = relationship.inviteeAccountId;
+  if (!inviteeAccountId) return;
+  const snapshot = await compatibilityDataFor(namespace, relationship.id).getProgressionSnapshot(
+    actorAccountId,
+  );
+  if (!snapshot) return;
+  const archiveId = await createCompatibilityPairProgressionArchiveId(
+    relationship.inviterAccountId,
+    inviteeAccountId,
+    relationship.relationshipCategory,
+  );
+  await compatibilityProgressionArchiveFor(namespace, archiveId).merge(snapshot);
+}
+
 /** 同じAccountペアの承諾を双方のAccountDataで直列化してから正本を更新する。 */
 export async function acceptCompatibilityInvitationWithReferences(
   accountNamespace: AccountDataNamespace,
@@ -145,6 +185,7 @@ export async function acceptCompatibilityInvitationWithReferences(
         inviteeAccountId,
         acceptedAt,
       );
+      await restoreCompatibilityPairProgression(compatibilityNamespace, result.relationship);
     }
     return result;
   }
@@ -205,6 +246,7 @@ export async function acceptCompatibilityInvitationWithReferences(
     input.inviteeAccountId,
     acceptedAt,
   );
+  await restoreCompatibilityPairProgression(compatibilityNamespace, result.relationship);
   return result;
 }
 
@@ -240,9 +282,12 @@ export async function endCompatibilityRelationshipWithReferences(
   relationshipId: string,
   actorAccountId: string,
 ) {
-  const result = await compatibilityDataFor(compatibilityNamespace, relationshipId).endRelationship(
-    actorAccountId,
-  );
+  const relationshipData = compatibilityDataFor(compatibilityNamespace, relationshipId);
+  const current = await relationshipData.getRelationship(actorAccountId);
+  if (current) {
+    await archiveCompatibilityPairProgression(compatibilityNamespace, current, actorAccountId);
+  }
+  const result = await relationshipData.endRelationship(actorAccountId);
   if (result.outcome === "ended" || result.outcome === "unchanged") {
     const { endedAt, inviteeAccountId } = result.relationship;
     if (!inviteeAccountId || !endedAt) {

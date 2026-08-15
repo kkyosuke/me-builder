@@ -1,9 +1,11 @@
-import { and, asc, count, desc, eq, gt, isNull, lte, or } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, inArray, isNull, lte, or } from "drizzle-orm";
 import type { AccountDataDatabase } from "../database";
 import {
   brainItemEvidenceEdges,
   brainItemRevisions,
   brainItems,
+  diagnosisBrainProjectionRequests,
+  diagnosisResponses,
   progressionEvents,
   progressionItemStates,
   progressionMilestones,
@@ -26,6 +28,7 @@ export type UtsushiProgression = Readonly<{
   categoryCount: number;
   calculationVersion: number;
   highestLevel: number;
+  isProcessing: boolean;
   recentChanges: readonly UtsushiProgressionChange[];
   milestoneCards: readonly UtsushiMilestoneCard[];
 }>;
@@ -127,6 +130,7 @@ function eventStatement(
     kind: ProgressionEventKind;
     growthDelta: number;
     collectedPieceDelta: number;
+    category: string | null;
     at: Date;
   }>,
 ): D1BatchStatement {
@@ -141,6 +145,7 @@ function eventStatement(
       calculationVersion: UTSUSHI_PROGRESSION_CALCULATION_VERSION,
       growthDelta: input.growthDelta,
       collectedPieceDelta: input.collectedPieceDelta,
+      category: input.category,
       createdAt: input.at,
       updatedAt: input.at,
     })
@@ -194,6 +199,7 @@ function itemProgressionEvent(
     accountId: string;
     item: {
       id: string;
+      category: string;
       attributes: unknown;
       derivation: "ai" | "deterministic";
       status: "active" | "superseded" | "invalidated";
@@ -203,26 +209,29 @@ function itemProgressionEvent(
     };
     revisionKind: "correction" | "temporal" | null;
     initialization: boolean;
+    availabilityAt: Date;
     at: Date;
   }>,
 ): Readonly<{ statement: D1BatchStatement; growthDelta: number; collectedPieceDelta: number }> {
   const inference = isInference(input.item.attributes, input.item.derivation);
   const temporalRevision = input.revisionKind === "temporal";
-  const availableAtInitialization = isAvailableItem(input.item, input.at);
+  const availableAtInitialization = isAvailableItem(input.item, input.availabilityAt);
   const growthDelta =
     input.initialization && !availableAtInitialization
       ? 0
-      : temporalRevision
-        ? 2
-        : input.revisionKind || inference
-          ? 0
-          : 3;
-  const kind: ProgressionEventKind = temporalRevision
-    ? "temporal_revision"
-    : input.revisionKind
-      ? "correction_revision"
       : inference
-        ? "inference_item"
+        ? 0
+        : temporalRevision
+          ? 2
+          : input.revisionKind
+            ? 0
+            : 3;
+  const kind: ProgressionEventKind = inference
+    ? "inference_item"
+    : temporalRevision
+      ? "temporal_revision"
+      : input.revisionKind
+        ? "correction_revision"
         : "new_item";
   const collectedPieceDelta = input.initialization && !availableAtInitialization ? 0 : 1;
   return {
@@ -233,6 +242,7 @@ function itemProgressionEvent(
       kind,
       growthDelta,
       collectedPieceDelta,
+      category: input.item.category,
       at: input.at,
     }),
     growthDelta,
@@ -249,12 +259,14 @@ async function initializeProgressionEvents(
     db
       .select({
         id: brainItems.id,
+        category: brainItems.category,
         attributes: brainItems.attributes,
         derivation: brainItems.derivation,
         status: brainItems.status,
         isDeleted: brainItems.isDeleted,
         validFrom: brainItems.validFrom,
         validTo: brainItems.validTo,
+        occurredAt: brainItems.createdAt,
         progressionEventId: progressionEvents.id,
       })
       .from(brainItems)
@@ -286,11 +298,13 @@ async function initializeProgressionEvents(
         edgeIsDeleted: brainItemEvidenceEdges.isDeleted,
         sourceIsDeleted: sourceRecords.isDeleted,
         itemAttributes: brainItems.attributes,
+        itemCategory: brainItems.category,
         itemDerivation: brainItems.derivation,
         itemStatus: brainItems.status,
         itemIsDeleted: brainItems.isDeleted,
         itemValidFrom: brainItems.validFrom,
         itemValidTo: brainItems.validTo,
+        occurredAt: brainItemEvidenceEdges.createdAt,
         progressionEventId: progressionEvents.id,
       })
       .from(brainItemEvidenceEdges)
@@ -357,11 +371,13 @@ async function initializeProgressionEvents(
     }
     if (evidence.progressionEventId) continue;
     const growthDelta = valid && !duplicate && position > 0 ? 1 : 0;
-    const kind: ProgressionEventKind = duplicate
-      ? "duplicate_evidence"
-      : position === 0
-        ? "initial_evidence"
-        : "evidence_added";
+    const kind: ProgressionEventKind = !valid
+      ? "ignored_evidence"
+      : duplicate
+        ? "duplicate_evidence"
+        : position === 0
+          ? "initial_evidence"
+          : "evidence_added";
     statements.push(
       eventStatement(db, {
         accountId,
@@ -370,7 +386,8 @@ async function initializeProgressionEvents(
         kind,
         growthDelta,
         collectedPieceDelta: 0,
-        at,
+        category: evidence.itemCategory,
+        at: evidence.occurredAt,
       }),
     );
     growthValue += growthDelta;
@@ -383,7 +400,8 @@ async function initializeProgressionEvents(
         item,
         revisionKind: revisionKindByItemId.get(item.id) ?? null,
         initialization: true,
-        at,
+        availabilityAt: at,
+        at: item.occurredAt,
       });
       statements.push(event.statement);
       growthValue += event.growthDelta;
@@ -421,6 +439,7 @@ async function initializeProgressionEvents(
         kind: "initialization",
         growthDelta: 0,
         collectedPieceDelta: 0,
+        category: null,
         at,
       }),
     );
@@ -515,12 +534,14 @@ async function synchronizeProgressionEvents(
     db
       .select({
         id: brainItems.id,
+        category: brainItems.category,
         attributes: brainItems.attributes,
         derivation: brainItems.derivation,
         status: brainItems.status,
         isDeleted: brainItems.isDeleted,
         validFrom: brainItems.validFrom,
         validTo: brainItems.validTo,
+        occurredAt: progressionPendingEvents.createdAt,
       })
       .from(brainItems)
       .innerJoin(
@@ -567,11 +588,13 @@ async function synchronizeProgressionEvents(
         edgeIsDeleted: brainItemEvidenceEdges.isDeleted,
         sourceIsDeleted: sourceRecords.isDeleted,
         itemAttributes: brainItems.attributes,
+        itemCategory: brainItems.category,
         itemDerivation: brainItems.derivation,
         itemStatus: brainItems.status,
         itemIsDeleted: brainItems.isDeleted,
         itemValidFrom: brainItems.validFrom,
         itemValidTo: brainItems.validTo,
+        occurredAt: progressionPendingEvents.createdAt,
       })
       .from(brainItemEvidenceEdges)
       .innerJoin(
@@ -642,7 +665,8 @@ async function synchronizeProgressionEvents(
       item,
       revisionKind: revisionKindByItemId.get(item.id) ?? null,
       initialization: false,
-      at,
+      availabilityAt: item.occurredAt,
+      at: item.occurredAt,
     });
     statements.push(event.statement);
     growthDelta += event.growthDelta;
@@ -664,7 +688,7 @@ async function synchronizeProgressionEvents(
           validFrom: evidence.itemValidFrom,
           validTo: evidence.itemValidTo,
         },
-        at,
+        evidence.occurredAt,
       ) &&
       !isInference(evidence.itemAttributes, evidence.itemDerivation);
     const fingerprints = evidenceFingerprintsByItem.get(evidence.brainItemId) ?? new Set<string>();
@@ -672,11 +696,13 @@ async function synchronizeProgressionEvents(
     const duplicate = fingerprints.has(fingerprint);
     const evidenceCount = fingerprints.size;
     const eventGrowthDelta = valid && !duplicate && evidenceCount > 0 ? 1 : 0;
-    const kind: ProgressionEventKind = duplicate
-      ? "duplicate_evidence"
-      : evidenceCount === 0
-        ? "initial_evidence"
-        : "evidence_added";
+    const kind: ProgressionEventKind = !valid
+      ? "ignored_evidence"
+      : duplicate
+        ? "duplicate_evidence"
+        : evidenceCount === 0
+          ? "initial_evidence"
+          : "evidence_added";
     statements.push(
       eventStatement(db, {
         accountId,
@@ -685,7 +711,8 @@ async function synchronizeProgressionEvents(
         kind,
         growthDelta: eventGrowthDelta,
         collectedPieceDelta: 0,
-        at,
+        category: evidence.itemCategory,
+        at: evidence.occurredAt,
       }),
     );
     growthDelta += eventGrowthDelta;
@@ -749,7 +776,7 @@ export async function readUtsushiProgression(
   at = new Date(),
 ): Promise<UtsushiProgression> {
   const totals = await synchronizeProgressionEvents(db, accountId, at);
-  const [activeCategories, recentEvents, savedMilestones] = await Promise.all([
+  const [activeCategories, recentEvents, savedMilestones, pendingProjection] = await Promise.all([
     db
       .select({
         category: brainItems.category,
@@ -801,48 +828,119 @@ export async function readUtsushiProgression(
         ),
       )
       .orderBy(desc(progressionMilestones.level))
-      .limit(4)
       .all(),
+    db
+      .select({ id: diagnosisBrainProjectionRequests.id })
+      .from(diagnosisBrainProjectionRequests)
+      .innerJoin(
+        diagnosisResponses,
+        eq(diagnosisResponses.id, diagnosisBrainProjectionRequests.diagnosisResponseId),
+      )
+      .where(
+        and(
+          eq(diagnosisResponses.accountId, accountId),
+          inArray(diagnosisBrainProjectionRequests.status, ["pending", "failed"]),
+          eq(diagnosisBrainProjectionRequests.isDeleted, false),
+        ),
+      )
+      .get(),
   ]);
   const growthValue = totals.growthValue;
   const collectedPieces = totals.collectedPieces;
   const level = Math.max(progressionLevel(growthValue), totals.highestLevel);
   const categories = activeCategories.map(({ category }) => category);
   const milestoneLevel = Math.floor(level / 10) * 10;
-  const latestSavedMilestone = savedMilestones[0];
-  const shouldSaveMilestone =
-    milestoneLevel >= 10 && (latestSavedMilestone?.level ?? 0) < milestoneLevel;
-  const newMilestone = shouldSaveMilestone
-    ? {
-        level: milestoneLevel,
-        reachedAt: at,
-        collectedPiecesDelta: Math.max(
-          0,
-          collectedPieces - (latestSavedMilestone?.collectedPiecesTotal ?? 0),
-        ),
-        collectedPiecesTotal: collectedPieces,
-        categoriesJson: JSON.stringify(categories),
-      }
-    : null;
-  if (newMilestone) {
-    await db
-      .insert(progressionMilestones)
-      .values({
-        id: `progression:milestone:v1:${accountId}:${newMilestone.level}`,
-        accountId,
-        level: newMilestone.level,
-        collectedPiecesDelta: newMilestone.collectedPiecesDelta,
-        collectedPiecesTotal: newMilestone.collectedPiecesTotal,
-        categoriesJson: newMilestone.categoriesJson,
-        createdAt: newMilestone.reachedAt,
-        updatedAt: newMilestone.reachedAt,
+  const savedMilestoneLevels = new Set(savedMilestones.map(({ level: savedLevel }) => savedLevel));
+  const savedMilestonesByLevel = new Map(
+    savedMilestones.map((milestone) => [milestone.level, milestone] as const),
+  );
+  const missingMilestoneLevels = Array.from(
+    { length: Math.floor(milestoneLevel / 10) },
+    (_, index) => (index + 1) * 10,
+  ).filter((candidateLevel) => !savedMilestoneLevels.has(candidateLevel));
+  const newMilestones: Array<{
+    level: number;
+    reachedAt: Date;
+    collectedPiecesDelta: number;
+    collectedPiecesTotal: number;
+    categoriesJson: string;
+  }> = [];
+  if (missingMilestoneLevels.length > 0) {
+    const timeline = await db
+      .select({
+        growthDelta: progressionEvents.growthDelta,
+        collectedPieceDelta: progressionEvents.collectedPieceDelta,
+        category: progressionEvents.category,
+        occurredAt: progressionEvents.createdAt,
       })
-      .onConflictDoNothing();
+      .from(progressionEvents)
+      .where(
+        and(eq(progressionEvents.accountId, accountId), eq(progressionEvents.isDeleted, false)),
+      )
+      .orderBy(asc(progressionEvents.createdAt), asc(progressionEvents.id))
+      .all();
+    let timelineGrowth = 0;
+    let timelinePieces = 0;
+    let previousMilestonePieces = 0;
+    let nextMilestoneLevel = 10;
+    const cumulativeCategories = new Set<string>();
+    for (const event of timeline) {
+      timelineGrowth += event.growthDelta;
+      timelinePieces += event.collectedPieceDelta;
+      if (event.growthDelta > 0 && event.category) cumulativeCategories.add(event.category);
+      while (
+        nextMilestoneLevel <= milestoneLevel &&
+        timelineGrowth >= progressionThreshold(nextMilestoneLevel)
+      ) {
+        if (!savedMilestoneLevels.has(nextMilestoneLevel)) {
+          newMilestones.push({
+            level: nextMilestoneLevel,
+            reachedAt: event.occurredAt,
+            collectedPiecesDelta: Math.max(0, timelinePieces - previousMilestonePieces),
+            collectedPiecesTotal: timelinePieces,
+            categoriesJson: JSON.stringify([...cumulativeCategories].sort()),
+          });
+        }
+        previousMilestonePieces =
+          savedMilestonesByLevel.get(nextMilestoneLevel)?.collectedPiecesTotal ?? timelinePieces;
+        nextMilestoneLevel += 10;
+      }
+    }
+    while (nextMilestoneLevel <= milestoneLevel) {
+      if (!savedMilestoneLevels.has(nextMilestoneLevel)) {
+        newMilestones.push({
+          level: nextMilestoneLevel,
+          reachedAt: at,
+          collectedPiecesDelta: Math.max(0, collectedPieces - previousMilestonePieces),
+          collectedPiecesTotal: collectedPieces,
+          categoriesJson: JSON.stringify(categories),
+        });
+      }
+      previousMilestonePieces =
+        savedMilestonesByLevel.get(nextMilestoneLevel)?.collectedPiecesTotal ?? collectedPieces;
+      nextMilestoneLevel += 10;
+    }
+    await db.batch(
+      newMilestones.map((milestone) =>
+        db
+          .insert(progressionMilestones)
+          .values({
+            id: `progression:milestone:v1:${accountId}:${milestone.level}`,
+            accountId,
+            level: milestone.level,
+            collectedPiecesDelta: milestone.collectedPiecesDelta,
+            collectedPiecesTotal: milestone.collectedPiecesTotal,
+            categoriesJson: milestone.categoriesJson,
+            createdAt: milestone.reachedAt,
+            updatedAt: milestone.reachedAt,
+          })
+          .onConflictDoNothing(),
+      ),
+    );
   }
-  const milestoneCards = [
-    ...(newMilestone ? [newMilestone] : []),
-    ...savedMilestones.filter(({ level: savedLevel }) => savedLevel !== newMilestone?.level),
-  ].slice(0, 4);
+  const milestoneCards = [...newMilestones, ...savedMilestones]
+    .sort((left, right) => right.level - left.level)
+    .slice(0, 4);
   return {
     level,
     growthValue,
@@ -853,6 +951,7 @@ export async function readUtsushiProgression(
     categoryCount: activeCategories.length,
     calculationVersion: totals.calculationVersion,
     highestLevel: totals.highestLevel,
+    isProcessing: Boolean(pendingProjection),
     recentChanges: recentEvents.flatMap((event): UtsushiProgressionChange[] => {
       const kind =
         event.kind === "new_item"

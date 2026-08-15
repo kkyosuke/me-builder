@@ -15,6 +15,7 @@ describe("fetchProfileProgression", () => {
       categoryCount: 2,
       calculationVersion: 1,
       highestLevel: 2,
+      isProcessing: false,
       recentChanges: [
         {
           kind: "new_piece" as const,
@@ -57,6 +58,7 @@ describe("fetchProfileProgression", () => {
           categoryCount: 0,
           calculationVersion: 1,
           highestLevel: 1,
+          isProcessing: false,
           recentChanges: [],
           milestoneCards: [],
         }),

@@ -167,9 +167,9 @@ function ProgressionCard({ progression }: { progression: UtsushiProgression }) {
             最近育ったこと
           </h3>
           <ul className="mt-2 space-y-2">
-            {progression.recentChanges.map((change) => (
+            {progression.recentChanges.map((change, index) => (
               <li
-                key={`${change.kind}:${change.occurredAt}`}
+                key={`${change.kind}:${change.occurredAt}:${index}`}
                 className="flex items-center justify-between gap-3 text-sm"
               >
                 <span className="text-slate-700 dark:text-slate-200">
