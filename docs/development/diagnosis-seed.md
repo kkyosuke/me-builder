@@ -54,8 +54,9 @@ seedは必ずmigration適用後に実行します。localでは開発者が明�
 | 100 | `friendship-style` | 友達との距離感・付き合い方 | `friend` | すべてversion 1 | 2026-08-14 00:00:00 UTC |
 | 110 | `decision-making-style` | 決め方・迷いとの向き合い方 | `general` | すべてversion 1 | 2026-08-14 15:00:00 UTC（2026-08-15 00:00:00 JST） |
 | 120 | `work-priority-style` | 仕事の進め方・優先順位 | `work` | すべてversion 1 | 2026-08-15 00:00:00 UTC（2026-08-15 09:00:00 JST） |
+| 130 | `family-expectation-choice` | 家族の期待と自分の選択 | `family` | すべてversion 1 | 2026-08-15 01:00:00 UTC（2026-08-15 10:00:00 JST） |
 
-いずれも終了日時を持たず、Question Versionは`approved`、Diagnosisは`published`として登録します。先行5件の質問は交際、家計、パートナーとの余暇、一緒に過ごす時間、愛情表現など、パートナーとの関係を前提にしているため`partner`とします。「優先順位と人生の方向性」「仕事の価値観・働き方」「決め方・迷いとの向き合い方」は、特定の相手との関係を前提にせず本人の価値観や意思決定を尋ねるため`general`とします。「仕事の変化・周囲との関わり方」と「仕事の進め方・優先順位」は、仕事で関わる相手または個人作業を含む仕事の場面を前提にするため`work`とします。「家族との距離感・支え合い」は、親、子、きょうだいなど家族との場面を前提にするため`family`とします。「友達との距離感・付き合い方」は、友達との連絡、予定、悩みの共有などの場面を前提にするため`friend`とします。Relationship Category追加時のmigrationで既存行へ入る`general`は、先行5件に限りseedの条件付きUPSERTで`partner`へ補正します。すでに別カテゴリを持つ行は上書きしません。Diagnosisには一覧表示用の短い説明、表示順、版付き採点設定への参照を持たせます。Choiceは「いいえ」「はい」の2件です。表示順は診断内容ではなく一覧上の優先順位として変更でき、将来の差し込みに備えて10刻みで設定します。
+いずれも終了日時を持たず、Question Versionは`approved`、Diagnosisは`published`として登録します。先行5件の質問は交際、家計、パートナーとの余暇、一緒に過ごす時間、愛情表現など、パートナーとの関係を前提にしているため`partner`とします。「優先順位と人生の方向性」「仕事の価値観・働き方」「決め方・迷いとの向き合い方」は、特定の相手との関係を前提にせず本人の価値観や意思決定を尋ねるため`general`とします。「仕事の変化・周囲との関わり方」と「仕事の進め方・優先順位」は、仕事で関わる相手または個人作業を含む仕事の場面を前提にするため`work`とします。「家族との距離感・支え合い」と「家族の期待と自分の選択」は、回答時に思い浮かべた家族との場面を前提にするため`family`とします。「友達との距離感・付き合い方」は、友達との連絡、予定、悩みの共有などの場面を前提にするため`friend`とします。Relationship Category追加時のmigrationで既存行へ入る`general`は、先行5件に限りseedの条件付きUPSERTで`partner`へ補正します。すでに別カテゴリを持つ行は上書きしません。Diagnosisには一覧表示用の短い説明、表示順、版付き採点設定への参照を持たせます。Choiceは「いいえ」「はい」の2件です。表示順は診断内容ではなく一覧上の優先順位として変更でき、将来の差し込みに備えて10刻みで設定します。
 
 ## 5. 実行方法
 
@@ -92,16 +93,16 @@ SQL末尾の検証クエリは、現在のseedだけを適用した場合に次�
 
 | 項目 | 期待値 |
 | --- | ---: |
-| Diagnosis | 11 |
-| Question Version | 110 |
-| Choice | 220 |
-| Diagnosis Question | 110 |
-| Diagnosis Scoring Config | 11 |
+| Diagnosis | 13 |
+| Question Version | 130 |
+| Choice | 260 |
+| Diagnosis Question | 130 |
+| Diagnosis Scoring Config | 13 |
 
 件数だけでなく、次も確認します。
 
 - Diagnosisが`published`で、受付開始日時を過ぎている
-- 先行5件のRelationship Categoryが`partner`であり、「優先順位と人生の方向性」「仕事の価値観・働き方」「決め方・迷いとの向き合い方」が`general`、「仕事の変化・周囲との関わり方」が`work`、「家族との距離感・支え合い」が`family`、「友達との距離感・付き合い方」が`friend`である
+- 先行5件のRelationship Categoryが`partner`であり、「優先順位と人生の方向性」「仕事の価値観・働き方」「決め方・迷いとの向き合い方」が`general`、「仕事の変化・周囲との関わり方」「仕事の進め方・優先順位」が`work`、「家族との距離感・支え合い」「家族の期待と自分の選択」が`family`、「友達との距離感・付き合い方」が`friend`である
 - 1つのDiagnosisにposition 0から9までの10問がある
 - 各Question Versionが`approved`である
 - 各Question Versionにposition 0の「いいえ」とposition 1の「はい」がある

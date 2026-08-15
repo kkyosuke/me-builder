@@ -24,7 +24,8 @@ apps/web/public/images/diagnoses/
 ├── family-support-style.jpg
 ├── friendship-style.jpg
 ├── decision-making-style.jpg
-└── work-priority-style.jpg
+├── work-priority-style.jpg
+└── family-expectation-choice.jpg
 ```
 
 ## 3. 共通スタイル
@@ -182,7 +183,37 @@ Materials/textures: Matte paper and soft clay, subtle depth and shadows.
 Constraints: No text, no letters, no numbers, no logos, no watermark, no brand marks. Do not make speed, refinement, sequential work, parallel work, early submission, using the available time, reprioritizing, keeping a plan, early sharing, or sharing after work takes shape look superior. Avoid rankings, checkmarks, crosses, trophies, corporate logos, realistic office signage, religious imagery, or political symbols.
 ```
 
-## 13. 新しい診断へ展開する手順
+## 13. 「家族の期待と自分の選択」生成プロンプト
+
+最初のプロンプトで生成後、両側の色と明るさを均等にし、共通スタイルの背景へ揃える調整を行います。
+
+```text
+Use case: stylized-concept
+Asset type: 16:9 diagnosis card thumbnail for a web application
+Primary request: Create a polished neutral illustration representing how a person balances family expectations with their own choices about advice, education or career direction, work changes, relationships, and where to live.
+Scene/backdrop: A calm abstract decision landscape with a central blank circular platform and two equally prominent open paths. One path is accompanied by a small inclusive cluster of varied abstract family tokens around an open conversation circle; the other is accompanied by a single neutral decision token and a blank compass-like shape. Place balanced blank route tiles suggesting study, work, close relationships, and location around the platform without text or recognizable symbols.
+Subject: Abstract family and individual choice tokens, an open conversation circle, balanced branching paths, blank planning tiles, a small house-like form and a location marker-like form. The family-supported path and self-directed path must have equal size, lighting, prominence, openness, and visual weight.
+Style/medium: Soft layered 3D paper-cut and clay render matching a premium editorial app illustration.
+Composition/framing: Wide 16:9, centered, clear silhouettes, important objects away from edges, suitable for a small card crop.
+Lighting/mood: Warm soft studio lighting, calm, respectful, thoughtful, welcoming.
+Color palette: Deep navy background, muted slate blue, warm cream, coral accents, small golden accents; consistent with the existing me-builder diagnosis thumbnails.
+Materials/textures: Matte paper and soft clay, subtle depth and shadows.
+Constraints: No text, no letters, no numbers, no logos, no watermark, no brand marks. Do not imply a specific family structure, gender, age, marriage status, cohabitation, or culture. Do not make following family expectations or making an independent choice look safer, happier, more successful, more moral, or superior. Avoid rankings, checkmarks, crosses, trophies, chains, barriers, conflict imagery, corporate logos, realistic signage, religious imagery, or political symbols.
+```
+
+中立性を調整したプロンプトは次のとおりです。
+
+```text
+Edit the generated diagnosis thumbnail with one targeted change only: rebalance the two choice paths so the family-conversation side and the individual-choice side have the same warm-neutral color temperature, overall brightness, contrast, saturation, visual prominence, open space, and perceived emotional tone. Mix the muted slate blue, warm cream, coral, and small golden accents evenly across both sides instead of assigning warm colors to one path and cool dark colors to the other. Keep the central blank platform, family token group, individual token, house form, location marker, compass, branching paths, blank tiles, 16:9 framing, matte paper/clay style, and all object positions essentially unchanged. Both paths must look equally welcoming and equally valid. Preserve all constraints: no text, letters, numbers, logos, watermark, rankings, checkmarks, crosses, trophies, chains, barriers, conflict imagery, specific family structure, gender, age, culture, religion, or politics.
+```
+
+背景を共通スタイルへ揃えた最終プロンプトは次のとおりです。
+
+```text
+Edit the current diagnosis thumbnail with one targeted change only: change only the outer background and distant negative-space backdrop to a rich deep navy, matching the existing me-builder diagnosis thumbnail background style. Keep both branching path surfaces warm-neutral and identically balanced. Preserve every object, position, shape, scale, lighting relationship, 16:9 framing, and matte paper/clay texture. The family-conversation side and individual-choice side must remain equal in brightness, color temperature, saturation, contrast, visual prominence, open space, and emotional tone. Do not darken one side more than the other. Preserve all constraints: no text, letters, numbers, logos, watermark, rankings, checkmarks, crosses, trophies, chains, barriers, conflict imagery, specific family structure, gender, age, culture, religion, or politics.
+```
+
+## 14. 新しい診断へ展開する手順
 
 1. §4の`Primary request`、`Scene/backdrop`、`Subject`を新しい診断のテーマへ置き換える
 2. §3の共通スタイルと`Composition/framing`、`Constraints`を維持する
