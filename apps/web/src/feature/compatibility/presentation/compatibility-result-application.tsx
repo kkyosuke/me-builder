@@ -97,7 +97,15 @@ export default function CompatibilityResultApplication({
           ? compatibilityShareContentHref(relationship.state.data.relationshipCategory)
           : "/compatibility";
     return (
-      <main className="mx-auto min-h-dvh w-full max-w-2xl px-4 py-6 sm:px-8">
+      <main
+        aria-busy={relationship.isRefreshing || undefined}
+        className="mx-auto min-h-dvh w-full max-w-2xl px-4 py-6 sm:px-8"
+      >
+        {relationship.isRefreshing && (
+          <output aria-live="polite" className="sr-only">
+            相性シートの最新状態を確認しています
+          </output>
+        )}
         <CompatibilityBackHeader />
         <section className="mt-8 rounded-3xl border border-amber-300 bg-amber-50 p-6 dark:bg-amber-950/30">
           <p
@@ -146,6 +154,7 @@ export default function CompatibilityResultApplication({
       me={toCompatibilityPerson(relationship.state.data.viewer, "sky")}
       partner={toCompatibilityPerson(relationship.state.data.partner, "violet")}
       relationshipCategory={relationship.state.data.relationshipCategory}
+      isRefreshing={relationship.isRefreshing}
       endingState={relationship.ending}
       onEnd={() => void relationship.end()}
     />

@@ -23,12 +23,14 @@ export function CompatibilityResultScreen({
   me,
   partner,
   relationshipCategory,
+  isRefreshing = false,
   endingState = { status: "idle" },
   onEnd = () => undefined,
 }: {
   me: CompatibilityPerson;
   partner: CompatibilityPerson;
   relationshipCategory: CompatibilityRelationshipCategory;
+  isRefreshing?: boolean;
   endingState?: AsyncState<null>;
   onEnd?: () => void;
 }) {
@@ -55,7 +57,15 @@ export function CompatibilityResultScreen({
   }
 
   return (
-    <main className="mx-auto min-h-dvh w-full max-w-2xl px-4 py-6 pb-12 sm:px-8">
+    <main
+      aria-busy={isRefreshing || undefined}
+      className="mx-auto min-h-dvh w-full max-w-2xl px-4 py-6 pb-12 sm:px-8"
+    >
+      {isRefreshing && (
+        <output aria-live="polite" className="sr-only">
+          相性シートの最新状態を確認しています
+        </output>
+      )}
       <CompatibilityBackHeader />
       <div className="mt-5 flex items-center gap-3">
         <CompatibilityAvatar person={partner} size="lg" />

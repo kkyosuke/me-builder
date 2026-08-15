@@ -64,6 +64,7 @@ export default function CompatibilityListApplication() {
     <CompatibilityListScreen
       categoryFilter={categoryFilter}
       state={relationships.state}
+      isRefreshing={relationships.isRefreshing}
       operation={relationships.operation}
       cancellingRelationshipId={relationships.cancellingRelationshipId}
       sharingMessage={sharingMessage}

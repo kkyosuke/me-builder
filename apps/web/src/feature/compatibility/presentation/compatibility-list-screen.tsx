@@ -75,6 +75,7 @@ function ListSkeleton() {
 export function CompatibilityListScreen({
   categoryFilter = "all",
   state,
+  isRefreshing = false,
   operation = { status: "idle" },
   cancellingRelationshipId = null,
   sharingMessage,
@@ -85,6 +86,7 @@ export function CompatibilityListScreen({
 }: {
   categoryFilter?: RelationshipCategoryFilter;
   state: AsyncState<CompatibilityRelationshipList>;
+  isRefreshing?: boolean;
   operation?: AsyncState<string>;
   cancellingRelationshipId?: string | null;
   sharingMessage?: string | null;
@@ -106,7 +108,15 @@ export function CompatibilityListScreen({
   const pending = filteredItems.filter((x) => x.status === "pending");
 
   return (
-    <main className="mx-auto min-h-dvh w-full max-w-2xl px-4 py-8 pb-28 sm:px-8">
+    <main
+      aria-busy={isRefreshing || undefined}
+      className="mx-auto min-h-dvh w-full max-w-2xl px-4 py-8 pb-28 sm:px-8"
+    >
+      {isRefreshing && (
+        <output aria-live="polite" className="sr-only">
+          相性一覧の最新状態を確認しています
+        </output>
+      )}
       <header>
         <p className="text-sm font-semibold tracking-wider text-rose-700 dark:text-rose-300">
           2人を知る
