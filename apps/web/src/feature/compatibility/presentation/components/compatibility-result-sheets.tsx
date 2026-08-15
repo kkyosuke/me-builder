@@ -87,7 +87,7 @@ export function CompatibilityPersonSheet({
           <ul className="mt-3 space-y-2 text-sm leading-relaxed text-slate-700 dark:text-slate-300">
             {person.themes
               .filter((theme) => theme.request)
-              .slice(0, 2)
+              .slice(0, 3)
               .map((theme) => (
                 <li key={theme.id} className="flex gap-2">
                   <span className="text-rose-500" aria-hidden="true">

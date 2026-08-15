@@ -34,6 +34,7 @@ const ParameterSchema = v.object({
   highLabel: NonEmptyStringSchema,
   position: v.pipe(v.number(), v.safeInteger(), v.minValue(0), v.maxValue(100)),
   statement: NonEmptyStringSchema,
+  request: v.exactOptional(NonEmptyStringSchema),
 });
 const ShareProfileSchema = v.object({
   profileSummaryVersionId: NonEmptyStringSchema,

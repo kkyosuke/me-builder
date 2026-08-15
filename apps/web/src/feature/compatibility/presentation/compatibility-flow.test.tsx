@@ -673,6 +673,7 @@ describe("Compatibility flow", () => {
     expect(screen.getAllByText("共有プロフィール・診断結果")).toHaveLength(2);
     expect(screen.getByText("2026年8月14日 09:00")).toBeTruthy();
     expect(screen.getByText("2026年8月15日 09:00")).toBeTruthy();
+    expect(screen.getByText("気になる場所を気軽に提案し合えるとうれしいです。")).toBeTruthy();
 
     expect(screen.getByRole("tab", { name: "それぞれについて" })).toBeTruthy();
     const peoplePanel = screen.getByRole("tabpanel");

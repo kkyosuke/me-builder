@@ -155,6 +155,12 @@ function Themes({ content }: { content: CompatibilityShareContent }) {
                   <p className="mt-1 text-sm leading-relaxed text-slate-700 dark:text-slate-300">
                     {parameter.statement}
                   </p>
+                  {parameter.request && (
+                    <p className="mt-2 rounded-xl bg-rose-50 px-3 py-2 text-sm leading-relaxed text-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
+                      <span className="block text-xs font-bold">こうしてもらえるとうれしい</span>
+                      {parameter.request}
+                    </p>
+                  )}
                   <span className="relative mt-3 block h-2 rounded-full bg-slate-200 dark:bg-slate-700">
                     <span
                       className="absolute top-1/2 size-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-violet-500 shadow dark:border-slate-900"
