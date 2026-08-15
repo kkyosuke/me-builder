@@ -15,3 +15,6 @@
 
 /admin*
   X-Robots-Tag: noindex, nofollow
+
+/privacy*
+  X-Robots-Tag: noindex, nofollow

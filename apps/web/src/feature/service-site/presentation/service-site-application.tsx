@@ -1,6 +1,7 @@
 import type { ServiceSiteRoute } from "../model/service-site-route";
 import { ServiceSiteLayout } from "./components/service-site-layout";
 import { ServiceSiteHomeScreen } from "./service-site-home-screen";
+import { ServiceSitePrivacyScreen } from "./service-site-privacy-screen";
 import { ServiceSiteTermsScreen } from "./service-site-terms-screen";
 
 export function ServiceSiteApplication({ route }: { route: ServiceSiteRoute }) {
@@ -8,6 +9,7 @@ export function ServiceSiteApplication({ route }: { route: ServiceSiteRoute }) {
     <ServiceSiteLayout>
       {route === "home" && <ServiceSiteHomeScreen />}
       {route === "terms" && <ServiceSiteTermsScreen />}
+      {route === "privacy" && <ServiceSitePrivacyScreen />}
     </ServiceSiteLayout>
   );
 }
