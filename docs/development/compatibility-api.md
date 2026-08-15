@@ -286,11 +286,21 @@ sequenceDiagram
       "statements": []
     },
     "themes": []
+  },
+  "progression": {
+    "level": 2,
+    "growthValue": 3,
+    "currentLevelThreshold": 3,
+    "nextLevelThreshold": 12,
+    "comparableThemeCount": 1,
+    "marks": [2]
   }
 }
 ```
 
 双方の`themes`は、取得時点で双方が共有できるDiagnosisのうち、招待で選んだ`relationshipCategory`または`general`に該当し、採点設定IDと版が一致する共通部分だけを同じ順序で返します。`unavailableThemes`には片方だけが共有できるか採点設定が一致しないDiagnosisのIDとタイトルを重複なく返し、比較できない側や理由は返しません。過去に同意した表示内容とは照合せず、双方の最新の共有専用プロフィールと診断表示を使います。双方の「私について」を開示でき、共通テーマが1件以上ある場合だけ`ready`にします。それ以外では片方だけの内容を返さず、次の待機状態を返します。
+
+`progression`はふたりレベルと獲得済みのふたりのしるしを返します。進行度の同期だけが一時的に失敗した場合は`progression: null`へ縮退し、相性シート本体を`ready`のまま返します。
 
 ```json
 {

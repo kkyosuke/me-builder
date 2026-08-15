@@ -343,6 +343,24 @@ describe("compatibility relationship APIs", () => {
     ).resolves.toEqual(data);
   });
 
+  it("ふたり進行度だけ利用できない相性シートを取得する", async () => {
+    const relationshipId = "3".repeat(64);
+    const data = {
+      relationshipId,
+      relationshipCategory: "partner",
+      status: "ready",
+      unavailableThemes: [],
+      partner: { displayName: "あおい", ...shareContent },
+      viewer: { displayName: "はる", ...shareContent },
+      progression: null,
+    };
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json(data)));
+
+    await expect(
+      fetchCompatibilityRelationship(undefined, "id-token", relationshipId),
+    ).resolves.toEqual(data);
+  });
+
   it.each([
     ["invitation", cancelCompatibilityInvitation, "/api/compatibility/invitations/"],
     ["relationship", endCompatibilityRelationship, "/api/compatibility/relationships/"],

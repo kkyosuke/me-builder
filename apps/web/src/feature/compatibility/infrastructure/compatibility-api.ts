@@ -150,7 +150,7 @@ const RelationshipResponseSchema = v.variant("status", [
     partner: RelationshipPersonSchema,
     viewer: RelationshipPersonSchema,
     unavailableThemes: v.array(UnavailableThemeSchema),
-    progression: PairProgressionSchema,
+    progression: v.nullable(PairProgressionSchema),
   }),
   v.object({
     relationshipId: RelationshipIdSchema,

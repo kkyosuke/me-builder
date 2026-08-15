@@ -60,7 +60,7 @@ export type CompatibilityRelationship =
       partner: CompatibilityRelationshipPerson;
       viewer: CompatibilityRelationshipPerson;
       unavailableThemes: CompatibilityUnavailableTheme[];
-      progression: CompatibilityPairProgression;
+      progression: CompatibilityPairProgression | null;
     }
   | {
       relationshipId: string;

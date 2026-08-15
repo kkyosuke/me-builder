@@ -4003,43 +4003,50 @@
                           }
                         },
                         "progression": {
-                          "type": "object",
-                          "properties": {
-                            "level": {
-                              "type": "integer",
-                              "minimum": 1
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "level": {
+                                  "type": "integer",
+                                  "minimum": 1
+                                },
+                                "growthValue": {
+                                  "type": "integer",
+                                  "minimum": 0
+                                },
+                                "currentLevelThreshold": {
+                                  "type": "integer",
+                                  "minimum": 0
+                                },
+                                "nextLevelThreshold": {
+                                  "type": "integer",
+                                  "minimum": 1
+                                },
+                                "comparableThemeCount": {
+                                  "type": "integer",
+                                  "minimum": 1
+                                },
+                                "marks": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "integer",
+                                    "minimum": 2
+                                  }
+                                }
+                              },
+                              "required": [
+                                "level",
+                                "growthValue",
+                                "currentLevelThreshold",
+                                "nextLevelThreshold",
+                                "comparableThemeCount",
+                                "marks"
+                              ]
                             },
-                            "growthValue": {
-                              "type": "integer",
-                              "minimum": 0
-                            },
-                            "currentLevelThreshold": {
-                              "type": "integer",
-                              "minimum": 0
-                            },
-                            "nextLevelThreshold": {
-                              "type": "integer",
-                              "minimum": 1
-                            },
-                            "comparableThemeCount": {
-                              "type": "integer",
-                              "minimum": 1
-                            },
-                            "marks": {
-                              "type": "array",
-                              "items": {
-                                "type": "integer",
-                                "minimum": 2
-                              }
+                            {
+                              "type": "null"
                             }
-                          },
-                          "required": [
-                            "level",
-                            "growthValue",
-                            "currentLevelThreshold",
-                            "nextLevelThreshold",
-                            "comparableThemeCount",
-                            "marks"
                           ]
                         }
                       },

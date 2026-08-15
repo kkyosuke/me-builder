@@ -2586,7 +2586,7 @@ export interface operations {
                   nextLevelThreshold: number;
                   comparableThemeCount: number;
                   marks: number[];
-                };
+                } | null;
               }
             | {
                 relationshipId: string;

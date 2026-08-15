@@ -47,7 +47,7 @@ type CompatibilityResolvedContents =
     }>;
 
 type CompatibilityRelationshipContents =
-  | Readonly<CompatibilityReadyContents & { progression: CompatibilityPairProgression }>
+  | Readonly<CompatibilityReadyContents & { progression: CompatibilityPairProgression | null }>
   | Exclude<CompatibilityResolvedContents, CompatibilityReadyContents>;
 
 export type CompatibilityRelationshipOutcome =
@@ -255,15 +255,22 @@ export async function getCompatibilityRelationshipContents({
   });
   if (!relationship) return { type: "unavailable" };
   if (relationship.status === "ready") {
-    const progression = await relationshipData.synchronizeProgression(
-      session.session.accountId,
-      await pairThemeFingerprints(relationship),
-    );
-    if (!progression) return { type: "unavailable" };
-    return {
-      type: "resolved",
-      relationship: { ...relationship, progression },
-    };
+    try {
+      const progression = await relationshipData.synchronizeProgression(
+        session.session.accountId,
+        await pairThemeFingerprints(relationship),
+      );
+      if (!progression) return { type: "unavailable" };
+      return {
+        type: "resolved",
+        relationship: { ...relationship, progression },
+      };
+    } catch {
+      return {
+        type: "resolved",
+        relationship: { ...relationship, progression: null },
+      };
+    }
   }
   return {
     type: "resolved",

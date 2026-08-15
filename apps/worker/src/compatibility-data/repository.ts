@@ -27,7 +27,9 @@ import { type DrizzleSqliteDODatabase, drizzle } from "drizzle-orm/durable-sqlit
 import { migrate } from "drizzle-orm/durable-sqlite/migrator";
 import migrations from "../../drizzle/compatibility-data/migrations.js";
 import {
+  compatibilityAcceptedThemes,
   compatibilityDataSchema,
+  compatibilityOfferedThemes,
   compatibilityProgressionStates,
   compatibilityProgressionThemes,
   compatibilityRelationships,
@@ -246,16 +248,32 @@ export class CompatibilityDataRepository {
     const relationship = this.readRelationship();
     const decision = decideCompatibilityRelationshipEnd(relationship, actorAccountId, at);
     if (decision.outcome !== "ended") return decision;
-    this.db
-      .update(compatibilityRelationships)
-      .set({
-        status: decision.relationship.status,
-        endedAt: decision.relationship.endedAt,
-        endedByAccountId: decision.relationship.endedByAccountId,
-        updatedAt: decision.relationship.updatedAt,
-      })
-      .where(eq(compatibilityRelationships.singleton, 1))
-      .run();
+    this.storage.transactionSync(() => {
+      this.db
+        .update(compatibilityRelationships)
+        .set({
+          status: decision.relationship.status,
+          endedAt: decision.relationship.endedAt,
+          endedByAccountId: decision.relationship.endedByAccountId,
+          offeredProfileSummaryVersionId: null,
+          offeredProfileFingerprint: null,
+          offeredProfileConsentedAt: null,
+          acceptedProfileSummaryVersionId: null,
+          acceptedProfileFingerprint: null,
+          acceptedProfileConsentedAt: null,
+          updatedAt: decision.relationship.updatedAt,
+        })
+        .where(eq(compatibilityRelationships.singleton, 1))
+        .run();
+      this.db.delete(compatibilityAcceptedThemes).run();
+      this.db.delete(compatibilityOfferedThemes).run();
+      this.db.delete(compatibilityProgressionThemes).run();
+      this.db
+        .update(compatibilityProgressionStates)
+        .set({ comparableThemeCount: 0, updatedAt: at })
+        .where(eq(compatibilityProgressionStates.singleton, 1))
+        .run();
+    });
     const ended = this.readRelationship();
     if (!ended) throw new Error("Ended compatibility relationship was not persisted");
     return { outcome: "ended", relationship: ended };

@@ -139,6 +139,23 @@ describe("getCompatibilityRelationshipContents", () => {
     ]);
   });
 
+  it("ふたり進行度の同期だけが失敗しても相性シートを返す", async () => {
+    mocks.loadSharePreviewData
+      .mockResolvedValueOnce(shareData({ displayName: "あおい", themes: [theme("shared")] }))
+      .mockResolvedValueOnce(shareData({ displayName: "はる", themes: [theme("shared")] }));
+    mocks.synchronizeProgression.mockRejectedValue(new Error("progression unavailable"));
+
+    await expect(getCompatibilityRelationshipContents(params)).resolves.toMatchObject({
+      type: "resolved",
+      relationship: {
+        status: "ready",
+        partner: { displayName: "はる" },
+        viewer: { displayName: "あおい" },
+        progression: null,
+      },
+    });
+  });
+
   it("片方で表示できないテーマは比較に使わず、回答できる診断が残っていれば案内する", async () => {
     // 回答済みでも採点できないDiagnosisは共有表示から落ちるため、themesの共通部分で判定する。
     mocks.loadSharePreviewData

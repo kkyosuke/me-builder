@@ -37,7 +37,7 @@ export const CompatibilityRelationshipResponseSchema = v.variant("status", [
     partner: PersonSchema,
     viewer: PersonSchema,
     unavailableThemes: v.array(UnavailableThemeSchema),
-    progression: PairProgressionSchema,
+    progression: v.nullable(PairProgressionSchema),
   }),
   v.object({
     relationshipId: compatibilityRelationshipId.schema,
