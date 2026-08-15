@@ -99,6 +99,29 @@ describe("deleteAllDevelopmentAccountData", () => {
     expect(db.select().from(schema.sourceRecords).all()).toEqual([]);
   });
 
+  it("成長カードを含む進行度データを削除する", async () => {
+    const db = createTestDb();
+    const accountId = "account-1";
+    const at = new Date("2026-08-13T00:00:00.000Z");
+    db.insert(schema.accountDataIdentity).values({ singleton: 1, accountId }).run();
+    db.insert(schema.progressionMilestones)
+      .values({
+        id: "progression:milestone:v1:account-1:10",
+        accountId,
+        level: 10,
+        collectedPiecesDelta: 12,
+        collectedPiecesTotal: 12,
+        categoriesJson: JSON.stringify(["preference"]),
+        createdAt: at,
+        updatedAt: at,
+      })
+      .run();
+
+    await deleteAllDevelopmentAccountData(db, accountId, 1, at);
+
+    expect(db.select().from(schema.progressionMilestones).all()).toEqual([]);
+  });
+
   it("処理中upsertがdelete後に完了しても補正deleteを再登録する", async () => {
     const db = createTestDb();
     const accountId = "account-1";
