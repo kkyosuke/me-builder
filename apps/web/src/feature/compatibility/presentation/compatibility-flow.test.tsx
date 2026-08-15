@@ -39,7 +39,8 @@ describe("Compatibility flow", () => {
     );
 
     const loader = screen.getByLabelText("相性一覧を読み込み中");
-    expect(loader.querySelector("div[aria-hidden='true'] > .space-y-3")).toBeTruthy();
+    const relationships = loader.querySelector('[data-skeleton-region="relationships"]');
+    expect(relationships?.querySelector(".mt-3.space-y-3")).toBeTruthy();
   });
 
   it("一覧の再検証失敗時は表示済みカードを残して再確認できる", () => {
@@ -385,16 +386,10 @@ describe("Compatibility flow", () => {
     );
 
     const categoryColors = [
-      ["partner", "パートナー", "accent-rose-500", "focus-within:ring-rose-500", "border-rose-500"],
-      ["family", "家族", "accent-amber-500", "focus-within:ring-amber-500", "border-amber-500"],
-      [
-        "friend",
-        "友達",
-        "accent-emerald-500",
-        "focus-within:ring-emerald-500",
-        "border-emerald-500",
-      ],
-      ["work", "仕事", "accent-blue-500", "focus-within:ring-blue-500", "border-blue-500"],
+      ["partner", "パートナー", "bg-rose-500", "focus-within:ring-rose-500", "border-rose-500"],
+      ["family", "家族", "bg-amber-500", "focus-within:ring-amber-500", "border-amber-500"],
+      ["friend", "友達", "bg-emerald-500", "focus-within:ring-emerald-500", "border-emerald-500"],
+      ["work", "仕事", "bg-blue-500", "focus-within:ring-blue-500", "border-blue-500"],
     ] as const;
     for (const [
       category,
@@ -413,6 +408,8 @@ describe("Compatibility flow", () => {
       const radio = screen.getByRole("radio", { name: label }) as HTMLInputElement;
       const categoryLabel = radio.closest("label");
       expect(radio.checked).toBe(true);
+      expect(radio.classList.contains("appearance-none")).toBe(true);
+      expect(radio.classList.contains("border-white")).toBe(true);
       expect(radio.classList.contains(accentClassName)).toBe(true);
       expect(categoryLabel?.classList.contains(focusClassName)).toBe(true);
       expect(categoryLabel?.classList.contains(borderClassName)).toBe(true);

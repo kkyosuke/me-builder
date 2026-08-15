@@ -65,10 +65,35 @@ function waitingGuide(item: WaitingItem): {
 function ListSkeleton() {
   return (
     <SkeletonLoader label="相性一覧を読み込み中" className="mt-8">
-      <div className="space-y-3">
-        <SkeletonBlock className="h-36 rounded-3xl" />
-        <SkeletonBlock className="h-32 rounded-3xl" />
+      <div className="flex gap-2 overflow-hidden pb-1">
+        {["all", "partner", "family", "friend", "work"].map((key, index) => (
+          <SkeletonBlock
+            key={key}
+            className={`h-9 shrink-0 rounded-full ${index === 0 ? "w-16" : "w-20"}`}
+          />
+        ))}
       </div>
+      <section className="mt-9" data-skeleton-region="relationships">
+        <SkeletonBlock className="h-5 w-36 rounded-full" />
+        <div className="mt-3 space-y-3">
+          {["first", "second"].map((key) => (
+            <div
+              key={key}
+              className="rounded-3xl border border-rose-200 bg-white p-5 dark:border-rose-900/50 dark:bg-slate-800"
+            >
+              <SkeletonBlock className="h-3 w-16 rounded-full" />
+              <div className="mt-3 flex items-center gap-3">
+                <SkeletonBlock className="size-14 shrink-0 rounded-2xl" />
+                <div className="min-w-0 flex-1">
+                  <SkeletonBlock className="h-5 w-32 rounded-full" />
+                  <SkeletonBlock className="mt-2 h-3 w-20 rounded-full" />
+                </div>
+              </div>
+              <SkeletonBlock className="mt-4 h-11 w-full rounded-xl" />
+            </div>
+          ))}
+        </div>
+      </section>
     </SkeletonLoader>
   );
 }
