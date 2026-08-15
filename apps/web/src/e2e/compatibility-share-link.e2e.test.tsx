@@ -56,7 +56,7 @@ describe("LIFF compatibility share link journey", () => {
     vi.restoreAllMocks();
   });
 
-  it("共有リンク発行からLINE送信・承諾・相性表示・共有終了までUIで完了する", async () => {
+  it("共有リンク発行からLINE送信・承諾・ふたりレベル表示・共有終了までUIで完了する", async () => {
     const relationshipId = "2".repeat(64);
     const invitationUrl = `https://liff.line.me/1234567890-testliff/compatibility/invitations/${relationshipId}`;
     const profile = {
@@ -177,6 +177,7 @@ describe("LIFF compatibility share link journey", () => {
     });
     expect(await screen.findByRole("heading", { name: "2人の相性シート" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "ふたり Lv.2" })).toBeTruthy();
+    expect(screen.getByRole("progressbar", { name: "ふたりレベル2の進み具合" })).toBeTruthy();
     expect(screen.getByRole("list", { name: "獲得したふたりのしるし" }).textContent).toContain(
       "Lv.2",
     );
