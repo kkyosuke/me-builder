@@ -128,6 +128,10 @@ const RelationshipPersonSchema = v.object({
   aboutMe: ShareProfileSchema,
   themes: v.pipe(v.array(ShareThemeSchema), v.minLength(1)),
 });
+const UnavailableThemeSchema = v.object({
+  diagnosisId: NonEmptyStringSchema,
+  title: NonEmptyStringSchema,
+});
 const RelationshipResponseSchema = v.variant("status", [
   v.object({
     relationshipId: RelationshipIdSchema,
@@ -135,6 +139,7 @@ const RelationshipResponseSchema = v.variant("status", [
     status: v.literal("ready"),
     partner: RelationshipPersonSchema,
     viewer: RelationshipPersonSchema,
+    unavailableThemes: v.array(UnavailableThemeSchema),
   }),
   v.object({
     relationshipId: RelationshipIdSchema,

@@ -16,6 +16,11 @@ const PersonSchema = v.object({
   themes: v.pipe(v.array(CompatibilitySharePreviewThemeSchema), v.minLength(1)),
 });
 
+const UnavailableThemeSchema = v.object({
+  diagnosisId: v.pipe(v.string(), v.nonEmpty()),
+  title: v.pipe(v.string(), v.nonEmpty()),
+});
+
 export const CompatibilityRelationshipResponseSchema = v.variant("status", [
   v.object({
     relationshipId: compatibilityRelationshipId.schema,
@@ -23,6 +28,7 @@ export const CompatibilityRelationshipResponseSchema = v.variant("status", [
     status: v.literal("ready"),
     partner: PersonSchema,
     viewer: PersonSchema,
+    unavailableThemes: v.array(UnavailableThemeSchema),
   }),
   v.object({
     relationshipId: compatibilityRelationshipId.schema,

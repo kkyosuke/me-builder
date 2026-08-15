@@ -641,11 +641,25 @@ describe("Compatibility flow", () => {
 
   it("人物ごとの資料と2人の共通点・違いをタブとスワイプで切り替える", () => {
     const onEnd = vi.fn();
+    const referenceTheme = me.themes[0];
+    if (!referenceTheme) throw new Error("デモ用テーマが必要です");
+    const undecidedTheme = {
+      ...referenceTheme,
+      id: "undecided",
+      title: "まだ判断できない軸",
+      position: 50,
+    };
+    const meWithUndecided = { ...me, themes: [...me.themes, undecidedTheme] };
+    const partnerWithUndecided = {
+      ...aoi,
+      themes: [...aoi.themes, { ...undecidedTheme, position: 70 }],
+    };
     const { rerender } = render(
       <CompatibilityResultScreen
-        me={me}
-        partner={aoi}
+        me={meWithUndecided}
+        partner={partnerWithUndecided}
         relationshipCategory="partner"
+        unavailableThemes={[{ diagnosisId: "money", title: "お金と消費" }]}
         onEnd={onEnd}
       />,
     );
@@ -700,6 +714,12 @@ describe("Compatibility flow", () => {
     expect(screen.getByRole("heading", { name: "あおいさんについて" })).toBeTruthy();
 
     fireEvent.click(screen.getByRole("tab", { name: "2人について" }));
+    expect(
+      screen.getByText("「お金と消費」は、2人分の比較に必要な回答がまだそろっていません。"),
+    ).toBeTruthy();
+    expect(
+      screen.getByText("「まだ判断できない軸」は、回答から共通点や違いをまだはっきり言えません。"),
+    ).toBeTruthy();
     expect(screen.getByRole("link", { name: "診断を見てみる" }).getAttribute("href")).toBe(
       "/diagnosis?category=partner",
     );

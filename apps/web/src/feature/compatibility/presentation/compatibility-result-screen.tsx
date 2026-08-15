@@ -7,6 +7,7 @@ import {
   getRelationshipCategoryLabel,
 } from "../../diagnosis/model/relationship-category";
 import type { CompatibilityPerson } from "../model/compatibility";
+import type { CompatibilityUnavailableTheme } from "../model/compatibility-relationship";
 import {
   CompatibilityEndSharing,
   CompatibilitySharingEndedScreen,
@@ -24,6 +25,7 @@ export function CompatibilityResultScreen({
   me,
   partner,
   relationshipCategory,
+  unavailableThemes = [],
   isRefreshing = false,
   refreshError = null,
   endingState = { status: "idle" },
@@ -33,6 +35,7 @@ export function CompatibilityResultScreen({
   me: CompatibilityPerson;
   partner: CompatibilityPerson;
   relationshipCategory: CompatibilityRelationshipCategory;
+  unavailableThemes?: CompatibilityUnavailableTheme[];
   isRefreshing?: boolean;
   refreshError?: string | null;
   endingState?: AsyncState<null>;
@@ -164,6 +167,7 @@ export function CompatibilityResultScreen({
               me={me}
               partner={partner}
               relationshipCategory={relationshipCategory}
+              unavailableThemes={unavailableThemes}
             />
           </div>
         </div>

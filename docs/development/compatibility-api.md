@@ -261,6 +261,12 @@ sequenceDiagram
   "relationshipId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "status": "ready",
   "relationshipCategory": "partner",
+  "unavailableThemes": [
+    {
+      "diagnosisId": "money-values",
+      "title": "お金と消費"
+    }
+  ],
   "partner": {
     "displayName": "あおい",
     "aboutMe": {
@@ -282,7 +288,7 @@ sequenceDiagram
 }
 ```
 
-双方の`themes`は、取得時点で双方が共有できるDiagnosisのうち、招待で選んだ`relationshipCategory`または`general`に該当する共通部分だけを同じ順序で返します。過去に同意した表示内容とは照合せず、双方の最新の共有専用プロフィールと診断表示を使います。双方の「私について」を開示でき、共通テーマが1件以上ある場合だけ`ready`にします。それ以外では片方だけの内容を返さず、次の待機状態を返します。
+双方の`themes`は、取得時点で双方が共有できるDiagnosisのうち、招待で選んだ`relationshipCategory`または`general`に該当する共通部分だけを同じ順序で返します。`unavailableThemes`には片方だけが共有できるDiagnosisのIDとタイトルを重複なく返し、どちらの回答が不足しているかは返しません。過去に同意した表示内容とは照合せず、双方の最新の共有専用プロフィールと診断表示を使います。双方の「私について」を開示でき、共通テーマが1件以上ある場合だけ`ready`にします。それ以外では片方だけの内容を返さず、次の待機状態を返します。
 
 ```json
 {

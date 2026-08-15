@@ -3,6 +3,7 @@ import { BookOpenText, HeartHandshake, Lightbulb, MessageCircleQuestion } from "
 import { InternalLink } from "../../../../components/internal-link";
 import { diagnosisCategoryHref } from "../../../diagnosis/model/relationship-category";
 import type { CompatibilityPerson, CompatibilityTheme } from "../../model/compatibility";
+import type { CompatibilityUnavailableTheme } from "../../model/compatibility-relationship";
 import { CompatibilityAvatar } from "./compatibility-ui";
 
 const profileGeneratedAtFormatter = new Intl.DateTimeFormat("ja-JP", {
@@ -158,10 +159,12 @@ export function CompatibilityPairSheet({
   me,
   partner,
   relationshipCategory,
+  unavailableThemes,
 }: {
   me: CompatibilityPerson;
   partner: CompatibilityPerson;
   relationshipCategory: CompatibilityRelationshipCategory;
+  unavailableThemes: CompatibilityUnavailableTheme[];
 }) {
   const pairs = me.themes.flatMap((theme) => {
     const partnerTheme = partner.themes.find((candidate) => candidate.id === theme.id);
@@ -177,6 +180,8 @@ export function CompatibilityPairSheet({
       (band(theme.position) === "low" && band(partnerTheme.position) === "high") ||
       (band(theme.position) === "high" && band(partnerTheme.position) === "low"),
   );
+  const describedIds = new Set([...common, ...different].map(({ theme }) => theme.id));
+  const undecided = pairs.filter(({ theme }) => !describedIds.has(theme.id));
 
   return (
     <div className="space-y-4">
@@ -239,9 +244,24 @@ export function CompatibilityPairSheet({
 
       <section className="rounded-3xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800">
         <h2 className="font-bold text-slate-950 dark:text-slate-50">まだ分からないこと</h2>
-        <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-          回答が増えると、比較できるテーマも増えていきます。
-        </p>
+        {unavailableThemes.length > 0 || undecided.length > 0 ? (
+          <ul className="mt-2 space-y-2 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+            {unavailableThemes.map((theme) => (
+              <li key={theme.diagnosisId}>
+                「{theme.title}」は、2人分の比較に必要な回答がまだそろっていません。
+              </li>
+            ))}
+            {undecided.map(({ theme }) => (
+              <li key={theme.id}>
+                「{theme.title}」は、回答から共通点や違いをまだはっきり言えません。
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+            現在比較できるテーマは、すべて上に表示しています。
+          </p>
+        )}
         <InternalLink
           href={diagnosisCategoryHref(relationshipCategory)}
           preloadRoute="diagnosis"

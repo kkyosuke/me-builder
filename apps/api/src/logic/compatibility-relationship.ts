@@ -21,6 +21,11 @@ type Person = Readonly<{
   themes: readonly CompatibilitySharePreviewTheme[];
 }>;
 
+type UnavailableTheme = Readonly<{
+  diagnosisId: string;
+  title: string;
+}>;
+
 export type CompatibilityRelationshipContents =
   | Readonly<{
       relationshipId: string;
@@ -28,6 +33,7 @@ export type CompatibilityRelationshipContents =
       status: "ready";
       partner: Person;
       viewer: Person;
+      unavailableThemes: readonly UnavailableTheme[];
     }>
   | Readonly<{
       relationshipId: string;
@@ -76,6 +82,22 @@ function orderedThemes(
     const theme = byId.get(diagnosisId);
     return theme ? [theme] : [];
   });
+}
+
+/** 双方の共通部分に含まれない診断を、回答者を明かさず一度だけ返す。 */
+function unavailableThemes(
+  primary: readonly CompatibilitySharePreviewTheme[],
+  secondary: readonly CompatibilitySharePreviewTheme[],
+  commonDiagnosisIds: readonly string[],
+): UnavailableTheme[] {
+  const commonIds = new Set(commonDiagnosisIds);
+  const themes = new Map<string, string>();
+  for (const theme of [...primary, ...secondary]) {
+    if (!commonIds.has(theme.diagnosisId) && !themes.has(theme.diagnosisId)) {
+      themes.set(theme.diagnosisId, theme.title);
+    }
+  }
+  return [...themes].map(([diagnosisId, title]) => ({ diagnosisId, title }));
 }
 
 type ResolveCompatibilityRelationshipContentsParams = Readonly<{
@@ -150,6 +172,11 @@ export async function resolveCompatibilityRelationshipContents({
     status: "ready",
     partner: participants.viewerIsInviter ? invitee : inviter,
     viewer: participants.viewerIsInviter ? inviter : invitee,
+    unavailableThemes: unavailableThemes(
+      inviterData.themes,
+      inviteeData.themes,
+      commonDiagnosisIds,
+    ),
   };
 }
 

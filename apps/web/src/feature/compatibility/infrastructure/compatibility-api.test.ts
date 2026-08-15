@@ -323,6 +323,7 @@ describe("compatibility relationship APIs", () => {
       relationshipId,
       relationshipCategory: "partner",
       status: "ready",
+      unavailableThemes: [{ diagnosisId: "money", title: "お金と消費" }],
       partner: { displayName: "あおい", ...shareContent },
       viewer: { displayName: "はる", ...shareContent },
     };
