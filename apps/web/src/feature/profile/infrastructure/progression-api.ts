@@ -28,6 +28,7 @@ const ResponseSchema = v.object({
   categoryCount: CountSchema,
   calculationVersion: v.pipe(CountSchema, v.minValue(1)),
   highestLevel: v.pipe(CountSchema, v.minValue(1)),
+  isProcessing: v.boolean(),
   recentChanges: v.pipe(v.array(ProgressionChangeSchema), v.maxLength(3)),
   milestoneCards: v.pipe(v.array(MilestoneCardSchema), v.maxLength(3)),
 }) satisfies v.GenericSchema<ApiResponse>;

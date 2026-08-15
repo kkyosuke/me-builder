@@ -8,6 +8,7 @@ export type UtsushiProgression = Readonly<{
   categoryCount: number;
   calculationVersion: number;
   highestLevel: number;
+  isProcessing: boolean;
   recentChanges: readonly UtsushiProgressionChange[];
   milestoneCards: readonly UtsushiMilestoneCard[];
 }>;

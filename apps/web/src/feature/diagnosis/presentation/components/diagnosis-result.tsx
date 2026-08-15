@@ -94,13 +94,15 @@ export function DiagnosisResultView({
           >
             わたしのまとめへの反映
           </h2>
-          {progression.status === "idle" || progression.status === "loading" ? (
+          {progression.status === "idle" ||
+          progression.status === "loading" ||
+          (progression.status === "success" && progression.data.isProcessing) ? (
             <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
               回答から見つかったことを反映しています。
             </p>
           ) : progression.status === "success" ? (
             <p className="mt-1 text-sm text-slate-700 dark:text-slate-200">
-              うつし Lv.{progression.data.level}。反映された理由は、わたしのまとめで確認できます。
+              うつし Lv.{progression.data.level}。回答の反映が完了しました。
             </p>
           ) : (
             <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">

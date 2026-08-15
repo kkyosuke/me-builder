@@ -132,4 +132,65 @@ describe("Durable Object clean baseline migrations", () => {
         .all(),
     ).toEqual([{ origin_type: "evidence", origin_id: "edge-2" }]);
   });
+
+  it("AccountDataの既存進行度イベントへBrainカテゴリを引き継ぐ", () => {
+    const directory = MIGRATION_DIRECTORIES[0];
+    if (!directory) throw new Error("AccountData migration directory is missing");
+    const files = readdirSync(directory)
+      .filter((filename) => /^\d{4}_.+\.sql$/.test(filename))
+      .sort();
+    const database = new Database(":memory:");
+    const apply = (filename: string) => {
+      for (const statement of readFileSync(path.join(directory, filename), "utf8")
+        .split("--> statement-breakpoint")
+        .map((sql) => sql.trim())
+        .filter(Boolean)) {
+        database.exec(statement);
+      }
+    };
+    for (const filename of files.slice(0, -1)) apply(filename);
+    database.exec(`
+      INSERT INTO account_data_identity (singleton, account_id) VALUES (1, 'account-1');
+      INSERT INTO source_records
+        (id, created_at, updated_at, is_deleted, account_id, kind, access_label)
+      VALUES ('source-1', 1, 1, false, 'account-1', 'user_input', 'private');
+      INSERT INTO brain_items
+        (id, created_at, updated_at, is_deleted, account_id, category, statement,
+         attributes_json, derivation, status, stability, sensitivity, externally_shareable,
+         confidence_json)
+      VALUES
+        ('item-1', 1, 1, false, 'account-1', 'preference', 'coffee', '{}',
+         'deterministic', 'active', 'changeable', 'normal', false, '{}');
+      INSERT INTO brain_item_evidence_edges
+        (id, created_at, updated_at, is_deleted, brain_item_id, source_record_id, relation,
+         is_derivation_trigger, derivation_method, generated_at)
+      VALUES
+        ('edge-1', 2, 2, false, 'item-1', 'source-1', 'supports', false,
+         'deterministic', 2);
+      INSERT INTO progression_events
+        (id, created_at, updated_at, is_deleted, account_id, origin_type, origin_id, kind,
+         growth_delta, collected_piece_delta)
+      VALUES
+        ('progression:v1:brain_item:item-1', 1, 1, false, 'account-1', 'brain_item',
+         'item-1', 'new_item', 3, 1),
+        ('progression:v1:evidence:edge-1', 2, 2, false, 'account-1', 'evidence',
+         'edge-1', 'evidence_added', 1, 1),
+        ('progression:v1:initialization:progression-v1', 3, 3, false, 'account-1',
+         'initialization', 'progression-v1', 'initialization', 0, 0);
+    `);
+
+    const upgrade = files.at(-1);
+    if (!upgrade) throw new Error("Progression category migration is missing");
+    apply(upgrade);
+
+    expect(
+      database
+        .prepare("SELECT origin_type, category FROM progression_events ORDER BY created_at")
+        .all(),
+    ).toEqual([
+      { origin_type: "brain_item", category: "preference" },
+      { origin_type: "evidence", category: "preference" },
+      { origin_type: "initialization", category: null },
+    ]);
+  });
 });

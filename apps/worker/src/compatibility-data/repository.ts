@@ -5,6 +5,7 @@ import {
   type CompatibilityInvitationAcceptanceContext,
   type CompatibilityInvitationPreview,
   type CompatibilityPairProgression,
+  type CompatibilityPairProgressionSnapshot,
   type CompatibilityPairThemeFingerprint,
   type CompatibilityRelationship,
   type CreateCompatibilityInvitationInput,
@@ -171,6 +172,11 @@ export class CompatibilityDataRepository {
       .from(compatibilityProgressionStates)
       .where(eq(compatibilityProgressionStates.singleton, 1))
       .get();
+    const restoringBaseline =
+      existingState !== undefined &&
+      existingState.growthValue !== 0 &&
+      existingState.comparableThemeCount === 0 &&
+      existingThemes.size === 0;
     let growthDelta = 0;
     const themeChanges: Array<
       | { type: "insert"; theme: CompatibilityPairThemeFingerprint }
@@ -179,7 +185,7 @@ export class CompatibilityDataRepository {
     for (const theme of uniqueThemes) {
       const existing = existingThemes.get(theme.diagnosisId);
       if (!existing) {
-        growthDelta += 3;
+        if (!restoringBaseline) growthDelta += 3;
         themeChanges.push({ type: "insert", theme });
       } else if (existing.resultFingerprint !== theme.fingerprint) {
         growthDelta += 1;
@@ -244,6 +250,40 @@ export class CompatibilityDataRepository {
     };
   }
 
+  getProgressionSnapshot(actorAccountId: string): CompatibilityPairProgressionSnapshot | null {
+    const relationship = this.readRelationship();
+    if (
+      !relationship ||
+      (relationship.status !== "accepted" && relationship.status !== "ended") ||
+      (relationship.inviterAccountId !== actorAccountId &&
+        relationship.inviteeAccountId !== actorAccountId)
+    ) {
+      return null;
+    }
+    return this.readProgressionSnapshot();
+  }
+
+  restoreProgressionSnapshot(
+    actorAccountId: string,
+    snapshot: CompatibilityPairProgressionSnapshot,
+    at: Date,
+  ): boolean {
+    if (!this.getRelationship(actorAccountId, at)) return false;
+    return this.mergeProgressionSnapshot(snapshot, at);
+  }
+
+  readProgressionArchive(): CompatibilityPairProgressionSnapshot | null {
+    if (this.readRelationship()) return null;
+    return this.readProgressionSnapshot();
+  }
+
+  mergeProgressionArchive(snapshot: CompatibilityPairProgressionSnapshot, at: Date): void {
+    if (this.readRelationship()) {
+      throw new Error("Progression archive cannot share a relationship object");
+    }
+    this.mergeProgressionSnapshot(snapshot, at);
+  }
+
   endRelationship(actorAccountId: string, at: Date): EndCompatibilityRelationshipResult {
     const relationship = this.readRelationship();
     const decision = decideCompatibilityRelationshipEnd(relationship, actorAccountId, at);
@@ -289,6 +329,62 @@ export class CompatibilityDataRepository {
       .set({ status: expired.status, updatedAt: expired.updatedAt })
       .where(eq(compatibilityRelationships.singleton, 1))
       .run();
+    return true;
+  }
+
+  private readProgressionSnapshot(): CompatibilityPairProgressionSnapshot | null {
+    const state = this.db
+      .select()
+      .from(compatibilityProgressionStates)
+      .where(eq(compatibilityProgressionStates.singleton, 1))
+      .get();
+    if (!state) return null;
+    return {
+      growthValue: state.growthValue,
+      highestLevel: state.highestLevel,
+    };
+  }
+
+  private mergeProgressionSnapshot(
+    snapshot: CompatibilityPairProgressionSnapshot,
+    at: Date,
+  ): boolean {
+    const existing = this.db
+      .select()
+      .from(compatibilityProgressionStates)
+      .where(eq(compatibilityProgressionStates.singleton, 1))
+      .get();
+    if (
+      existing &&
+      (existing.growthValue > snapshot.growthValue ||
+        (existing.growthValue === snapshot.growthValue &&
+          existing.highestLevel >= snapshot.highestLevel))
+    ) {
+      return false;
+    }
+    this.storage.transactionSync(() => {
+      this.db.delete(compatibilityProgressionThemes).run();
+      this.db
+        .insert(compatibilityProgressionStates)
+        .values({
+          singleton: 1,
+          growthValue: snapshot.growthValue,
+          highestLevel: snapshot.highestLevel,
+          comparableThemeCount: 0,
+          createdAt: existing?.createdAt ?? at,
+          updatedAt: at,
+        })
+        .onConflictDoUpdate({
+          target: compatibilityProgressionStates.singleton,
+          set: {
+            growthValue: snapshot.growthValue,
+            highestLevel: snapshot.highestLevel,
+            comparableThemeCount: 0,
+            updatedAt: at,
+          },
+        })
+        .run();
+    });
     return true;
   }
 

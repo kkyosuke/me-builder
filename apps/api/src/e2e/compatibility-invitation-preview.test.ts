@@ -636,6 +636,24 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
         );
         expect(detailResponse.status).toBe(404);
       }
+
+      const resumedRelationshipId = await issueInvitationForInviter();
+      const resumedAcceptance = await app.request(
+        `/api/compatibility/invitations/${resumedRelationshipId}/accept`,
+        { method: "POST", headers: { Authorization: "Bearer recipient-token" } },
+        env(),
+      );
+      expect(resumedAcceptance.status).toBe(200);
+      const resumedDetail = await app.request(
+        `/api/compatibility/relationships/${resumedRelationshipId}`,
+        { headers: { Authorization: "Bearer inviter-token" } },
+        env(),
+      );
+      expect(resumedDetail.status).toBe(200);
+      expect(await resumedDetail.json()).toMatchObject({
+        relationshipCategory: "partner",
+        progression: { level: 2, growthValue: 3, comparableThemeCount: 1, marks: [2] },
+      });
     },
     e2eTimeoutMs,
   );

@@ -236,6 +236,7 @@ describe("App", () => {
       categoryCount: 0,
       calculationVersion: 1,
       highestLevel: 1,
+      isProcessing: false,
       recentChanges: [],
       milestoneCards: [],
     });

@@ -22,6 +22,7 @@ describe("ProgressionSummaryCard", () => {
             categoryCount: 6,
             calculationVersion: 1,
             highestLevel: 12,
+            isProcessing: false,
             recentChanges: [
               {
                 kind: "evidence_deepened",

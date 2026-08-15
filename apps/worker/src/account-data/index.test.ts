@@ -59,6 +59,7 @@ describe("AccountData progression projection", () => {
       categoryCount: 2,
       calculationVersion: 1,
       highestLevel: 2,
+      isProcessing: false,
       recentChanges: [],
       milestoneCards: [],
     };
@@ -104,6 +105,64 @@ describe("AccountData progression projection", () => {
       collectedPieces: 2,
       activePieces: 2,
     });
+  });
+
+  it("進行度projection失敗時は他のmaintenanceが先でも30秒後に再試行する", async () => {
+    const now = new Date("2026-08-15T00:00:00.000Z").getTime();
+    vi.spyOn(Date, "now").mockReturnValue(now);
+    vi.spyOn(logger, "warn").mockImplementation(() => undefined);
+    vi.spyOn(D1.shared.client, "create").mockReturnValue({} as D1.shared.Client);
+    vi.spyOn(D1.shared.action.adminAccount, "upsertAccountProgressionProjection").mockRejectedValue(
+      new Error("temporary D1 outage"),
+    );
+    const setAlarm = vi.fn(async () => undefined);
+    const instance = Object.create(AccountData.prototype) as AccountData;
+    Object.assign(instance as unknown as Record<string, unknown>, {
+      accountId: "account-1",
+      repository: { client: {}, nextMaintenanceAt: () => now + 60 * 60 * 1000 },
+      ctx: {
+        storage: {
+          get: vi.fn(async () => undefined),
+          put: vi.fn(async () => undefined),
+          setAlarm,
+        },
+      },
+      env: { DB: {} },
+    });
+
+    await (
+      instance as unknown as {
+        syncProgressionProjection(value: {
+          level: number;
+          growthValue: number;
+          currentLevelThreshold: number;
+          nextLevelThreshold: number;
+          collectedPieces: number;
+          activePieces: number;
+          categoryCount: number;
+          calculationVersion: number;
+          highestLevel: number;
+          isProcessing: boolean;
+          recentChanges: [];
+          milestoneCards: [];
+        }): Promise<void>;
+      }
+    ).syncProgressionProjection({
+      level: 1,
+      growthValue: 0,
+      currentLevelThreshold: 0,
+      nextLevelThreshold: 5,
+      collectedPieces: 0,
+      activePieces: 0,
+      categoryCount: 0,
+      calculationVersion: 1,
+      highestLevel: 1,
+      isProcessing: false,
+      recentChanges: [],
+      milestoneCards: [],
+    });
+
+    expect(setAlarm).toHaveBeenCalledWith(now + 30_000);
   });
 });
 

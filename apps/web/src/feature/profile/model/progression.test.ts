@@ -13,6 +13,7 @@ describe("progression presentation values", () => {
       categoryCount: 6,
       calculationVersion: 1,
       highestLevel: 12,
+      isProcessing: false,
       recentChanges: [],
       milestoneCards: [],
     };
@@ -31,6 +32,7 @@ describe("progression presentation values", () => {
       categoryCount: 0,
       calculationVersion: 1,
       highestLevel: 1,
+      isProcessing: false,
       recentChanges: [],
       milestoneCards: [],
     };

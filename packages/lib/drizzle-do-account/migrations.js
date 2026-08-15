@@ -23,6 +23,7 @@ import m0021 from "./0021_dry_hammerhead.sql";
 import m0022 from "./0022_light_deathstrike.sql";
 import m0023 from "./0023_wet_jimmy_woo.sql";
 import m0024 from "./0024_wild_betty_ross.sql";
+import m0025 from "./0025_robust_sugar_man.sql";
 import journal from "./meta/_journal.json";
 
 export default {
@@ -53,5 +54,6 @@ export default {
     m0022,
     m0023,
     m0024,
+    m0025,
   },
 };

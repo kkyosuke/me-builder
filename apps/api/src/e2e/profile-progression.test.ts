@@ -165,6 +165,7 @@ describe("Profile progression API local E2E", () => {
       categoryCount: 0,
       calculationVersion: 1,
       highestLevel: 1,
+      isProcessing: false,
       recentChanges: [],
       milestoneCards: [],
     });
@@ -184,6 +185,7 @@ describe("Profile progression API local E2E", () => {
       categoryCount: 2,
       calculationVersion: 1,
       highestLevel: 2,
+      isProcessing: false,
       recentChanges: expect.arrayContaining([
         expect.objectContaining({ kind: "new_piece", growthDelta: 3 }),
         expect.objectContaining({ kind: "evidence_deepened", growthDelta: 1 }),
@@ -204,6 +206,7 @@ describe("Profile progression API local E2E", () => {
       categoryCount: 1,
       calculationVersion: 1,
       highestLevel: 2,
+      isProcessing: false,
     });
   });
 });

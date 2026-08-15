@@ -138,6 +138,28 @@ export type CompatibilityPairProgression = Readonly<{
   marks: readonly number[];
 }>;
 
+/** 再共有時に引き継ぐ、本文やAccount IDを含まないペア進行度snapshot。 */
+export type CompatibilityPairProgressionSnapshot = Readonly<{
+  growthValue: number;
+  highestLevel: number;
+}>;
+
+/** Accountの順序に依存しない、ペアと関係カテゴリ専用のarchive IDを作る。 */
+export async function createCompatibilityPairProgressionArchiveId(
+  firstAccountId: string,
+  secondAccountId: string,
+  relationshipCategory: CompatibilityRelationshipCategory,
+): Promise<string> {
+  const accounts = [firstAccountId, secondAccountId].sort();
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(
+      JSON.stringify(["pair-progression-v1", relationshipCategory, ...accounts]),
+    ),
+  );
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
 export function compatibilityPairProgressionThreshold(level: number): number {
   if (!Number.isSafeInteger(level) || level < 1)
     throw new Error("Pair progression level must be a positive integer");
@@ -186,6 +208,20 @@ export interface CompatibilityDataRpc {
     actorAccountId: string,
     themes: readonly CompatibilityPairThemeFingerprint[],
   ): Promise<CompatibilityPairProgression | null>;
+  getProgressionSnapshot(
+    relationshipId: string,
+    actorAccountId: string,
+  ): Promise<CompatibilityPairProgressionSnapshot | null>;
+  restoreProgressionSnapshot(
+    relationshipId: string,
+    actorAccountId: string,
+    snapshot: CompatibilityPairProgressionSnapshot,
+  ): Promise<boolean>;
+  readProgressionArchive(archiveId: string): Promise<CompatibilityPairProgressionSnapshot | null>;
+  mergeProgressionArchive(
+    archiveId: string,
+    snapshot: CompatibilityPairProgressionSnapshot,
+  ): Promise<void>;
   endRelationship(
     relationshipId: string,
     actorAccountId: string,
@@ -226,8 +262,32 @@ export function compatibilityDataFor(
     ) {
       return object.synchronizeProgression(relationshipId, actorAccountId, themes);
     },
+    getProgressionSnapshot(actorAccountId: string) {
+      return object.getProgressionSnapshot(relationshipId, actorAccountId);
+    },
+    restoreProgressionSnapshot(
+      actorAccountId: string,
+      snapshot: CompatibilityPairProgressionSnapshot,
+    ) {
+      return object.restoreProgressionSnapshot(relationshipId, actorAccountId, snapshot);
+    },
     endRelationship(actorAccountId: string) {
       return object.endRelationship(relationshipId, actorAccountId);
+    },
+  };
+}
+
+export function compatibilityProgressionArchiveFor(
+  namespace: CompatibilityDataNamespace,
+  archiveId: string,
+) {
+  const object = namespace.getByName(archiveId);
+  return {
+    read() {
+      return object.readProgressionArchive(archiveId);
+    },
+    merge(snapshot: CompatibilityPairProgressionSnapshot) {
+      return object.mergeProgressionArchive(archiveId, snapshot);
     },
   };
 }

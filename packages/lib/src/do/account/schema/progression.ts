@@ -21,6 +21,7 @@ export const progressionEvents = sqliteTable(
         "initial_evidence",
         "evidence_added",
         "duplicate_evidence",
+        "ignored_evidence",
         "temporal_revision",
         "correction_revision",
         "inference_item",
@@ -29,6 +30,7 @@ export const progressionEvents = sqliteTable(
     calculationVersion: integer("calculation_version").notNull().default(1),
     growthDelta: integer("growth_delta").notNull(),
     collectedPieceDelta: integer("collected_piece_delta").notNull(),
+    category: text("category"),
   },
   (table) => [
     uniqueIndex("progression_event_origin_idx").on(

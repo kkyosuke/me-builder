@@ -259,7 +259,9 @@ export default function DiagnosisApplication() {
           onSaveAnswer={detail.saveAnswer}
           onDeferQuestion={deferQuestion}
           onComplete={() => {
-            void detail.openCompletedResult().then(() => progression.reload());
+            void detail
+              .openCompletedResult()
+              .then(() => progression.reload({ expectProcessing: true }));
           }}
         />
       );

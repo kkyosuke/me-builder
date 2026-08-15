@@ -8,7 +8,7 @@
 
 うつし進行度の正本はAccountData SQLiteに置きます。Brain更新と同じtransactionで本文を含まないpending eventを作り、進行度読込時に確定eventへ一度だけ変換します。
 
-- `progression_events`: origin、出来事種別、計算版、成長差分、かけら差分を保持する追記型の事実
+- `progression_events`: origin、出来事種別、計算版、発生日時、成長差分、かけら差分、分類を保持する追記型の事実
 - `progression_states`: Account単位の累積値、計算版、最高到達レベルを保持するcache
 - `progression_item_states`: Item単位で加点済みのEvidence fingerprintを保持するcache
 - `progression_pending_events`: Brain更新と進行度確定の間をつなぐoutbox
@@ -25,21 +25,21 @@ Revisionは作成時に`correction`か`temporal`を確定します。診断の�
 
 ## 4. 本人向けフィードバック
 
-本人向け進行度APIは累積値に加え、本文やBrain Item IDを含まない最近の成長差分を返します。差分は`new_item`、`evidence_added`、`temporal_revision`だけを利用者向けの3種類へ写し、`+0`の再処理や訂正は成功として処理しても報酬表示しません。
+本人向け進行度APIは累積値に加え、本文やBrain Item IDを含まない最近の成長差分と、診断projectionの処理中状態を返します。差分は`new_item`、`evidence_added`、`temporal_revision`だけを利用者向けの3種類へ写し、`+0`の再処理や訂正は成功として処理しても報酬表示しません。
 
 診断結果は先に表示し、Brain反映が完了するまでは「反映中」とします。確定後は診断結果を隠さず、その下へ成長差分を静的に表示します。日記返信には差分を混ぜず、「わたしのまとめ」で後から確認します。
 
 ## 5. 成長カード
 
-10レベルごとの到達をAccountDataで一度だけmaterializeします。カードへ保存するのは到達レベル、到達日時、前の節目から増えたかけら数、分類名だけです。statement、Evidence、Source Record IDは保存しません。
+10レベルごとの到達をAccountDataで一度だけmaterializeします。一度の同期で複数の節目を跨いだ場合も未保存の節目を順に作ります。カードへ保存するのは到達レベル、到達eventの日時、前の節目から増えたかけら数、その区間で成長した分類名だけです。statement、Evidence、Source Record IDは保存しません。
 
 カードは本人向け進行度APIから取得し、「わたしのまとめ」で表示します。画像生成を必須にせず、Web上の静的カードとして保存可能にします。
 
 ## 6. ふたりレベル
 
-ふたりレベルの正本はCompatibilityData SQLiteに置きます。管理単位はrelationship IDとRelationship Categoryの組み合わせです。比較可能な診断テーマが初めて増えたとき、または比較結果のfingerprintが変わったときだけ、本文を含まないpair eventを一度だけ追加します。
+ふたりレベルの正本はCompatibilityData SQLiteに置きます。成立中はrelationship ID単位で更新し、共有終了時にAccount IDを順序非依存に正規化したペアとRelationship Categoryから作るhash IDのarchiveへ、累積値と最高到達レベルだけを退避します。比較済みfingerprintと現在の比較テーマ数は終了時に削除します。
 
-共有終了中はAPIから進行度としるしを返しません。終了時に比較テーマのfingerprintと現在の比較テーマ数を削除し、累積値と最高到達レベルだけを内容を持たない集計として残します。同じ関係の再同意後に再表示します。招待発行・送信・承諾だけではeventを作りません。
+共有終了中はAPIから進行度としるしを返しません。同じ2つのAccountとRelationship Categoryで再同意したときはarchiveから新しいrelationshipへ集計値を復元し、最初の比較同期は現在のテーマを加点なしのbaselineとして登録します。その後、比較可能な診断テーマが初めて増えたとき、または比較結果のfingerprintが変わったときだけ加点します。異なるカテゴリへは引き継がず、招待発行・送信・承諾だけでは加点しません。
 
 ## 7. 障害時と費用
 

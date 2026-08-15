@@ -125,8 +125,47 @@ describe("Utsushi progression", () => {
       categoryCount: 0,
       calculationVersion: 1,
       highestLevel: 1,
+      isProcessing: false,
       recentChanges: [],
       milestoneCards: [],
+    });
+  });
+
+  it("診断projectionが未確定の間だけ処理中を返す", async () => {
+    const db = createTestDb();
+    const accountId = "processing-account";
+    const at = new Date("2026-08-15T00:00:00.000Z");
+    await db.insert(schema.accountDataIdentity).values({ singleton: 1, accountId });
+    await db.insert(schema.diagnoses).values({
+      id: "processing-diagnosis",
+      title: "診断",
+      opensAt: at,
+      state: "published",
+      publishedAt: at,
+    });
+    await db.insert(schema.diagnosisResponses).values({
+      id: "processing-response",
+      accountId,
+      diagnosisId: "processing-diagnosis",
+      revision: 1,
+    });
+    await db.insert(schema.diagnosisBrainProjectionRequests).values({
+      id: "processing-request",
+      diagnosisResponseId: "processing-response",
+      responseRevision: 1,
+      status: "pending",
+      nextAttemptAt: at,
+    });
+
+    await expect(readUtsushiProgression(db, accountId, at)).resolves.toMatchObject({
+      isProcessing: true,
+    });
+    await db
+      .update(schema.diagnosisBrainProjectionRequests)
+      .set({ status: "applied", updatedAt: at })
+      .where(eq(schema.diagnosisBrainProjectionRequests.id, "processing-request"));
+    await expect(readUtsushiProgression(db, accountId, at)).resolves.toMatchObject({
+      isProcessing: false,
     });
   });
 
@@ -139,7 +178,14 @@ describe("Utsushi progression", () => {
     await insertSource(db, accountId, "source-2", at);
     await insertItem(db, accountId, "item-1", "preference", at);
     await insertEvidence(db, accountId, "edge-1", "item-1", "source-1", at);
-    await insertEvidence(db, accountId, "edge-2", "item-1", "source-2", new Date(at.getTime() + 1));
+    await insertEvidence(
+      db,
+      accountId,
+      "edge-2",
+      "item-1",
+      "source-2",
+      new Date(at.getTime() + 1_000),
+    );
     await db.insert(schema.brainItems).values({
       id: "inference-1",
       accountId,
@@ -166,18 +212,19 @@ describe("Utsushi progression", () => {
       categoryCount: 2,
       calculationVersion: 1,
       highestLevel: 1,
+      isProcessing: false,
       recentChanges: [
         {
           kind: "evidence_deepened",
           growthDelta: 1,
-          occurredAt: "2026-08-15T00:00:00.000Z",
+          occurredAt: "2026-08-15T00:00:01.000Z",
         },
         { kind: "new_piece", growthDelta: 3, occurredAt: "2026-08-15T00:00:00.000Z" },
       ],
       milestoneCards: [],
     });
 
-    const later = new Date(at.getTime() + 10);
+    const later = new Date(at.getTime() + 24 * 60 * 60 * 1000);
     await insertSource(db, accountId, "source-3", later);
     await insertItem(db, accountId, "item-2", "goal", later);
     await insertEvidence(db, accountId, "edge-3", "item-2", "source-3", later);
@@ -191,13 +238,14 @@ describe("Utsushi progression", () => {
       categoryCount: 3,
       calculationVersion: 1,
       highestLevel: 2,
+      isProcessing: false,
       recentChanges: [
+        { kind: "new_piece", growthDelta: 3, occurredAt: later.toISOString() },
         {
           kind: "evidence_deepened",
           growthDelta: 1,
-          occurredAt: at.toISOString(),
+          occurredAt: new Date(at.getTime() + 1_000).toISOString(),
         },
-        { kind: "new_piece", growthDelta: 3, occurredAt: at.toISOString() },
         { kind: "new_piece", growthDelta: 3, occurredAt: at.toISOString() },
       ],
       milestoneCards: [],
@@ -309,6 +357,7 @@ describe("Utsushi progression", () => {
       growthValue: 5,
       calculationVersion: 1,
       highestLevel: 2,
+      isProcessing: false,
     });
   });
 
@@ -327,6 +376,7 @@ describe("Utsushi progression", () => {
     await expect(readUtsushiProgression(db, accountId, at)).resolves.toMatchObject({
       level: 10,
       highestLevel: 10,
+      isProcessing: false,
       growthValue: 3,
     });
   });
@@ -403,5 +453,72 @@ describe("Utsushi progression", () => {
         { level: 10, categories: ["goal", "preference"] },
       ],
     });
+  });
+
+  it("複数の10レベル節目を一度に跨いでも各カードを一度ずつ保存する", async () => {
+    const db = createTestDb();
+    const accountId = "skipped-milestone-account";
+    const at = new Date("2026-08-15T00:00:00.000Z");
+    await db.insert(schema.accountDataIdentity).values({ singleton: 1, accountId });
+    await readUtsushiProgression(db, accountId, at);
+    await db
+      .update(schema.progressionStates)
+      .set({ growthValue: 2_000, collectedPieces: 30, highestLevel: 21 })
+      .where(eq(schema.progressionStates.accountId, accountId));
+
+    const result = await readUtsushiProgression(db, accountId, at);
+    expect(result.milestoneCards.map(({ level }) => level)).toEqual([20, 10]);
+    expect(
+      (await db.select().from(schema.progressionMilestones).all()).map(({ level }) => level).sort(),
+    ).toEqual([10, 20]);
+  });
+
+  it("推定Itemの時間Revisionと無効Evidenceを加点対象にしない", async () => {
+    const db = createTestDb();
+    const accountId = "ignored-growth-account";
+    const at = new Date("2026-08-15T00:00:00.000Z");
+    await db.insert(schema.accountDataIdentity).values({ singleton: 1, accountId });
+    await insertSource(db, accountId, "source-1", at);
+    await insertItem(db, accountId, "item-1", "goal", at);
+    await insertEvidence(db, accountId, "edge-1", "item-1", "source-1", at);
+    await readUtsushiProgression(db, accountId, at);
+
+    const later = new Date("2026-08-16T00:00:00.000Z");
+    await insertSource(db, accountId, "source-2", later);
+    await insertItem(db, accountId, "inference-revision", "goal", later, {
+      isInference: true,
+    });
+    await db.insert(schema.brainItemRevisions).values({
+      id: "revision-inference",
+      previousBrainItemId: "item-1",
+      nextBrainItemId: "inference-revision",
+      derivationMethod: "ai",
+      changeKind: "temporal",
+      createdAt: later,
+      updatedAt: later,
+    });
+    await insertEvidence(db, accountId, "edge-2", "item-1", "source-2", later);
+    await db
+      .update(schema.sourceRecords)
+      .set({ isDeleted: true, deletedAt: later, updatedAt: later })
+      .where(eq(schema.sourceRecords.id, "source-2"));
+
+    await expect(readUtsushiProgression(db, accountId, later)).resolves.toMatchObject({
+      growthValue: 3,
+    });
+    const ignoredEvents = await db
+      .select({
+        kind: schema.progressionEvents.kind,
+        growthDelta: schema.progressionEvents.growthDelta,
+      })
+      .from(schema.progressionEvents)
+      .where(eq(schema.progressionEvents.accountId, accountId))
+      .all();
+    expect(ignoredEvents).toEqual(
+      expect.arrayContaining([
+        { kind: "inference_item", growthDelta: 0 },
+        { kind: "ignored_evidence", growthDelta: 0 },
+      ]),
+    );
   });
 });
