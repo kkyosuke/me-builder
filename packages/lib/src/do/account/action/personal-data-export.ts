@@ -24,6 +24,7 @@ import {
   profileSummaryVersions,
 } from "../schema/profile-summary";
 import { progressionMilestones, progressionStates } from "../schema/progression";
+import { selfCareConfirmations } from "../schema/self-care-context";
 import { sourceRecordRevisions, sourceRecords } from "../schema/source";
 import { weeklyReflectionGenerations, weeklyReflections } from "../schema/weekly-reflection";
 
@@ -57,6 +58,7 @@ type PersonalDataArchive = Readonly<{
   profileSummaries: readonly unknown[];
   weeklyReflections: readonly unknown[];
   goalFollowUps: readonly unknown[];
+  selfCareConfirmations: readonly unknown[];
   compatibilityShareProjections: readonly unknown[];
   preferences: Readonly<{ dailyPrompt: unknown | null }>;
   progression: Readonly<{ state: unknown | null; milestones: readonly unknown[] }>;
@@ -360,6 +362,12 @@ async function buildPersonalDataArchive(
     .where(eq(goalFollowUps.accountId, accountId))
     .orderBy(asc(goalFollowUps.agreedAt), asc(goalFollowUps.id))
     .all();
+  const selfCareRows = await db
+    .select()
+    .from(selfCareConfirmations)
+    .where(eq(selfCareConfirmations.accountId, accountId))
+    .orderBy(asc(selfCareConfirmations.confirmedAt), asc(selfCareConfirmations.id))
+    .all();
   const dailyPrompt = await db
     .select()
     .from(dailyPromptPreferences)
@@ -522,6 +530,14 @@ async function buildPersonalDataArchive(
       nextStep: row.nextStep,
       status: row.status,
       agreedAt: row.agreedAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    })),
+    selfCareConfirmations: selfCareRows.map((row) => ({
+      id: row.id,
+      brainItemId: row.brainItemId,
+      kind: row.kind,
+      status: row.status,
+      confirmedAt: row.confirmedAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     })),
     compatibilityShareProjections: shareRows.map((row) => ({

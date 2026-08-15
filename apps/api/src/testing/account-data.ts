@@ -473,6 +473,24 @@ const actions = {
     at?: Date,
   ) =>
     DO.account.action.goalFollowUp.selectGoalFollowUpMemory(db, accountId, mode, currentText, at),
+  "selfCareContext.read": (db: DO.account.Database, accountId: string) =>
+    DO.account.action.selfCareContext.readSelfCareConfirmations(db, accountId),
+  "selfCareContext.confirm": (
+    db: DO.account.Database,
+    accountId: string,
+    brainItemId: string,
+    kind: Parameters<typeof DO.account.action.selfCareContext.confirmSelfCareContext>[3],
+    at?: Date,
+  ) =>
+    DO.account.action.selfCareContext.confirmSelfCareContext(db, accountId, brainItemId, kind, at),
+  "selfCareContext.revoke": (db: DO.account.Database, accountId: string, id: string, at?: Date) =>
+    DO.account.action.selfCareContext.revokeSelfCareContext(db, accountId, id, at),
+  "selfCareContext.selectMemories": (
+    db: DO.account.Database,
+    accountId: string,
+    mode: "general" | "confirmed" | "personalized-history",
+    at?: Date,
+  ) => DO.account.action.selfCareContext.selectSelfCareContextMemories(db, accountId, mode, at),
 } as const;
 
 const MIGRATIONS_FOLDER = path.resolve(__dirname, "../../../../packages/lib/drizzle-do-account");

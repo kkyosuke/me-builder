@@ -27,6 +27,7 @@ import {
   buildRelationshipQuestionPlan,
   selectFullRelationshipHistory,
 } from "../logic/relationship-question";
+import { shouldLoadSelfCareContext } from "../logic/self-care-context";
 import {
   DEFAULT_DIARY_CHAT_PROMPT_OPTIONS,
   getDiaryChatConversationGuidance,
@@ -579,9 +580,15 @@ export async function processChatTurnMessage(
       .filter(({ id, role }) => role === "user" && context.currentUserMessageIds.includes(id))
       .map(({ body }) => body)
       .join("\n");
-    const [loadedBrainMemories, relationshipDiagnoses, collectedPromptContextKinds, goalFollowUp] =
+    const [
+      loadedBrainMemories,
+      relationshipDiagnoses,
+      collectedPromptContextKinds,
+      goalFollowUp,
+      selfCareMemories,
+    ] =
       pendingResponse || safetyRoute !== "normal" || quotaResponse
-        ? [[], [], [], null]
+        ? [[], [], [], null, []]
         : await Promise.all([
             initialRelationshipPlan.active && relationshipQuestionMode !== "confirmed-history"
               ? Promise.resolve([])
@@ -674,6 +681,36 @@ export async function processChatTurnMessage(
                     return null;
                   })
               : Promise.resolve(null),
+            !initialRelationshipPlan.active &&
+            shouldLoadSelfCareContext({
+              mode: entitlement.policy.selfCareContext,
+              safetyRoute,
+              currentText: currentUserText,
+            })
+              ? accountDataClient
+                  .execute("selfCareContext.selectMemories", entitlement.policy.selfCareContext)
+                  .catch((error: unknown) => {
+                    logger.warn(
+                      {
+                        event: "self-care.context.failed",
+                        service: "worker",
+                        environment: workerConfig.environment,
+                        component: "chat-turn",
+                        outcome: "degraded",
+                        disposition: "continue",
+                        ...toSafeOperationalErrorFields(error, {
+                          code: "SELF_CARE_CONTEXT_LOAD_FAILED",
+                          category: "dependency",
+                          stage: "context.self-care",
+                          retryable: false,
+                          dependency: "account-data",
+                        }),
+                      },
+                      "[Self-care] failed to load confirmed context",
+                    );
+                    return [];
+                  })
+              : Promise.resolve([]),
           ]);
     const relationshipPlan = buildRelationshipQuestionPlan({
       accountId: message.body.accountId,
@@ -685,7 +722,7 @@ export async function processChatTurnMessage(
     const scopedBrainMemories = relationshipPlan.active
       ? selectFullRelationshipHistory(relationshipPlan.context, loadedBrainMemories)
       : loadedBrainMemories;
-    const brainMemories = goalFollowUp
+    const goalMemories = goalFollowUp
       ? [
           ...scopedBrainMemories.filter(
             ({ brainItemId }) => brainItemId !== goalFollowUp.brainItemId,
@@ -693,6 +730,11 @@ export async function processChatTurnMessage(
           goalFollowUp,
         ]
       : scopedBrainMemories;
+    const selfCareIds = new Set(selfCareMemories.map(({ brainItemId }) => brainItemId));
+    const brainMemories = [
+      ...goalMemories.filter(({ brainItemId }) => !selfCareIds.has(brainItemId)),
+      ...selfCareMemories,
+    ];
     const collectionCandidates =
       pendingResponse ||
       safetyRoute !== "normal" ||
