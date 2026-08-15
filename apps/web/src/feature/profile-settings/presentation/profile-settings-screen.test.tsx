@@ -105,6 +105,25 @@ describe("ProfileSettingsScreen", () => {
     expect(onOpenBillingPortal).toHaveBeenCalledOnce();
   });
 
+  it("本人入力データの確認画面を開く", () => {
+    const onOpenPersonalData = vi.fn();
+    render(
+      <ProfileSettingsScreen
+        avatar={null}
+        theme="dark"
+        fontSize="medium"
+        onBack={vi.fn()}
+        onOpenAvatar={vi.fn()}
+        onOpenPersonalData={onOpenPersonalData}
+        onThemeChange={vi.fn()}
+        onFontSizeChange={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /入力データを確認・訂正・削除/ }));
+    expect(onOpenPersonalData).toHaveBeenCalledOnce();
+  });
+
   it("アバター変更中はプロフィールを操作対象から外す", () => {
     render(
       <ProfileSettingsScreen

@@ -67,6 +67,7 @@
 | [Stripe課金環境の同期運用](../docs/development/stripe-billing-setup.md) | Product・Price・Webhook・Customer PortalとCloudflare secretをDashboard操作なしで同期する運用 |
 | [診断API契約](../docs/development/diagnosis-api.md) | Web UIとAPI Server間の診断APIのパス、認証、入出力、エラー契約 |
 | [プロフィールAPI契約](../docs/development/profile-api.md) | 本人プロフィール、アバター画像、うつしレベル進行度のAPI契約と保存境界 |
+| [本人入力データ訂正・削除API契約](../docs/development/personal-data-api.md) | 現在有効な診断回答・日記の一覧、訂正、削除と派生物への波及契約 |
 | [開発用AccountデータリセットAPI契約](../docs/development/development-account-data-reset-api.md) | 開発環境で本人の個人コンテンツを初期化するAPI、削除対象、維持対象、Vector削除、プロフィール画面の操作 |
 | [相性API契約](../docs/development/compatibility-api.md) | Web UIとAPI Server間の相性APIのパス、認証、入出力、エラー契約 |
 | [API契約とクライアント型の生成](../docs/development/api-contract-generation.md) | API ServerのHTTP契約の配置、OpenAPI documentとWeb UI用TypeScript型の生成運用 |

@@ -69,6 +69,33 @@ describe("GET /api/openapi.json", () => {
     expect(document.paths["/api/profile/avatar"]?.get).toBeDefined();
     expect(document.paths["/api/profile/avatar"]?.put).toBeDefined();
     expect(document.paths["/api/profile/avatar"]?.delete).toBeDefined();
+    expect(document.paths["/api/personal-data/records"]?.get).toBeDefined();
+    expect(document.paths["/api/personal-data/records/{sourceRecordId}"]?.patch).toMatchObject({
+      requestBody: {
+        content: {
+          "application/json": {
+            schema: {
+              oneOf: [
+                {
+                  properties: {
+                    kind: { const: "diagnosis" },
+                    choiceId: { type: "string", minLength: 1 },
+                  },
+                },
+                {
+                  properties: {
+                    kind: { const: "diary" },
+                    value: { type: "string", minLength: 1, maxLength: 5_000 },
+                  },
+                },
+              ],
+              discriminator: { propertyName: "kind" },
+            },
+          },
+        },
+      },
+    });
+    expect(document.paths["/api/personal-data/records/{sourceRecordId}"]?.delete).toBeDefined();
     expect(document.paths["/api/legal/terms/acceptances"]?.get).toBeDefined();
     expect(
       document.paths["/api/compatibility/invitations/{relationshipId}/avatar"]?.get,

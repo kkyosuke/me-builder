@@ -118,6 +118,25 @@ async function getAnswers(diagnosisId = "relationship-priority"): Promise<Respon
   );
 }
 
+async function personalDataRequest(
+  pathname = "/api/personal-data/records",
+  method: "GET" | "PATCH" | "DELETE" = "GET",
+  body?: unknown,
+): Promise<Response> {
+  return app.request(
+    pathname,
+    {
+      method,
+      headers: {
+        Authorization: "Bearer known-token",
+        ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+      },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    },
+    env(),
+  );
+}
+
 async function getCompatibilityShareConsent(): Promise<Response> {
   return app.request(
     "/api/compatibility/share-consent",
@@ -391,6 +410,113 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
       .get() as { choice_id: string } | undefined;
     expect(persisted?.choice_id).toBe("yes");
     expect(await countRows("source_records")).toBe(1);
+  });
+
+  it("課金情報なしで診断回答と日記を訂正・削除し、現在一覧へ収束させる", async () => {
+    expect((await putAnswer("dq-relationship-priority-01", "yes")).status).toBe(200);
+    const diagnosisListResponse = await personalDataRequest();
+    expect(diagnosisListResponse.status).toBe(200);
+    const diagnosisList = (await diagnosisListResponse.json()) as {
+      records: Array<{ id: string; kind: string; value: string }>;
+    };
+    const diagnosisRecord = diagnosisList.records.find(({ kind }) => kind === "diagnosis");
+    expect(diagnosisRecord).toMatchObject({ value: "はい" });
+    if (!diagnosisRecord) throw new Error("訂正対象の診断回答がありません");
+
+    const diagnosisCorrection = await personalDataRequest(
+      `/api/personal-data/records/${diagnosisRecord.id}`,
+      "PATCH",
+      { kind: "diagnosis", choiceId: "no" },
+    );
+    expect(diagnosisCorrection.status).toBe(200);
+    const diagnosisCorrectionBody = (await diagnosisCorrection.json()) as {
+      outcome: string;
+      recordId: string;
+    };
+    expect(diagnosisCorrectionBody).toMatchObject({ outcome: "updated" });
+    expect(diagnosisCorrectionBody.recordId).not.toBe(diagnosisRecord.id);
+
+    const diagnosisDeletion = await personalDataRequest(
+      `/api/personal-data/records/${diagnosisCorrectionBody.recordId}`,
+      "DELETE",
+    );
+    expect(diagnosisDeletion.status).toBe(200);
+    expect(await diagnosisDeletion.json()).toMatchObject({ outcome: "deleted" });
+
+    const diaryAt = new Date(timestamp + 10_000);
+    const diarySource = await DO.account.action.diary.storeLineTextSource(accountDataStore.db, {
+      accountId: "account-answer-e2e",
+      eventId: "personal-data-diary-e2e",
+      body: "訂正前の日記",
+      receivedAt: diaryAt,
+    });
+    accountDataStore.raw
+      .prepare(
+        `INSERT INTO conversation_sessions (
+           id, created_at, updated_at, is_deleted, account_id, status, started_at,
+           last_user_message_at, conversation_policy_id, reply_opportunity_count,
+           reply_count, awaiting_reply, next_sequence
+         ) VALUES (?, ?, ?, 0, ?, 'closed', ?, ?, 'reflective', 0, 0, 0, 2)`,
+      )
+      .run(
+        "personal-data-session",
+        diaryAt.getTime(),
+        diaryAt.getTime(),
+        "account-answer-e2e",
+        diaryAt.getTime(),
+        diaryAt.getTime(),
+      );
+    accountDataStore.raw
+      .prepare(
+        `INSERT INTO conversation_messages (
+           id, created_at, updated_at, is_deleted, session_id, sequence, role,
+           source_record_id, channel
+         ) VALUES (?, ?, ?, 0, ?, 1, 'user', ?, 'line')`,
+      )
+      .run(
+        "personal-data-message",
+        diaryAt.getTime(),
+        diaryAt.getTime(),
+        "personal-data-session",
+        diarySource.sourceRecordId,
+      );
+
+    const diaryCorrection = await personalDataRequest(
+      `/api/personal-data/records/${diarySource.sourceRecordId}`,
+      "PATCH",
+      { kind: "diary", value: "訂正後の日記" },
+    );
+    expect(diaryCorrection.status).toBe(200);
+    const diaryCorrectionBody = (await diaryCorrection.json()) as {
+      outcome: string;
+      recordId: string;
+    };
+    expect(diaryCorrectionBody).toMatchObject({ outcome: "updated" });
+
+    const currentResponse = await personalDataRequest();
+    const current = (await currentResponse.json()) as {
+      records: Array<{ id: string; kind: string; value: string }>;
+    };
+    expect(current.records).toEqual([
+      expect.objectContaining({
+        id: diaryCorrectionBody.recordId,
+        kind: "diary",
+        value: "訂正後の日記",
+      }),
+    ]);
+
+    const diaryDeletion = await personalDataRequest(
+      `/api/personal-data/records/${diaryCorrectionBody.recordId}`,
+      "DELETE",
+    );
+    expect(diaryDeletion.status).toBe(200);
+    expect(await personalDataRequest().then((response) => response.json())).toEqual({
+      records: [],
+    });
+    const oldDiaryBody = accountDataStore.raw
+      .prepare("SELECT body FROM source_record_text_payloads WHERE source_record_id = ?")
+      .get(diarySource.sourceRecordId) as { body: string } | undefined;
+    expect(oldDiaryBody?.body).toBe("訂正前の日記");
   });
 
   it(
