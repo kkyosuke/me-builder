@@ -1,6 +1,6 @@
 import { D1 } from "@me-builder/lib";
 import { currentServiceTerms } from "@me-builder/shared";
-import { createLiffSession } from "./liff-session";
+import { resolveLiffSession } from "./liff-session";
 
 type Params = {
   idToken: string | undefined;
@@ -9,13 +9,13 @@ type Params = {
 };
 
 type Dependencies = {
-  createSession: typeof createLiffSession;
+  createSession: typeof resolveLiffSession;
   findAcceptance: typeof D1.shared.action.agreement.findCurrentTermsAcceptance;
   accept: typeof D1.shared.action.agreement.acceptCurrentTerms;
 };
 
 const defaultDependencies: Dependencies = {
-  createSession: createLiffSession,
+  createSession: resolveLiffSession,
   findAcceptance: D1.shared.action.agreement.findCurrentTermsAcceptance,
   accept: D1.shared.action.agreement.acceptCurrentTerms,
 };
@@ -32,6 +32,8 @@ export async function getServiceTermsStatus(
     document: currentServiceTerms,
     acceptance: {
       required: !acceptance,
+      acceptedVersion: acceptance?.documentVersion ?? null,
+      documentHash: acceptance?.documentHash ?? null,
       acceptedAt: acceptance?.acceptedAt ?? null,
     },
   };

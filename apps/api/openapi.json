@@ -43,6 +43,13 @@
                           "type": "string",
                           "minLength": 1
                         },
+                        "contentHash": {
+                          "type": "string",
+                          "pattern": "^sha256:[0-9a-f]{64}$"
+                        },
+                        "requiresReacceptance": {
+                          "type": "boolean"
+                        },
                         "publishedAt": {
                           "type": "string",
                           "format": "date-time"
@@ -79,6 +86,8 @@
                       "required": [
                         "documentKey",
                         "version",
+                        "contentHash",
+                        "requiresReacceptance",
                         "publishedAt",
                         "title",
                         "summary",
@@ -90,6 +99,28 @@
                       "properties": {
                         "required": {
                           "type": "boolean"
+                        },
+                        "acceptedVersion": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "documentHash": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^sha256:[0-9a-f]{64}$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         },
                         "acceptedAt": {
                           "anyOf": [
@@ -103,7 +134,7 @@
                           ]
                         }
                       },
-                      "required": ["required", "acceptedAt"]
+                      "required": ["required", "acceptedVersion", "documentHash", "acceptedAt"]
                     }
                   },
                   "required": ["document", "acceptance"]
@@ -171,12 +202,16 @@
                       "type": "string",
                       "minLength": 1
                     },
+                    "documentHash": {
+                      "type": "string",
+                      "pattern": "^sha256:[0-9a-f]{64}$"
+                    },
                     "acceptedAt": {
                       "type": "string",
                       "format": "date-time"
                     }
                   },
-                  "required": ["documentKey", "version", "acceptedAt"]
+                  "required": ["documentKey", "version", "documentHash", "acceptedAt"]
                 }
               }
             }

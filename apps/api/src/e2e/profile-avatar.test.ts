@@ -1,6 +1,7 @@
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import type { D1Database, R2Bucket } from "@cloudflare/workers-types";
+import { D1 } from "@me-builder/lib";
 import { logger } from "@me-builder/shared";
 import { Miniflare } from "miniflare";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -78,6 +79,10 @@ async function prepareAccount(db: D1Database): Promise<void> {
         "line-profile-e2e",
       ),
   ]);
+  await D1.shared.action.agreement.acceptCurrentTerms(
+    D1.shared.client.create(db),
+    "account-profile-e2e",
+  );
 }
 
 function bindings() {

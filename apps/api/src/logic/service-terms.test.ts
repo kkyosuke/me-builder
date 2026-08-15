@@ -1,4 +1,5 @@
 import type { D1 } from "@me-builder/lib";
+import { currentServiceTerms } from "@me-builder/shared";
 import { describe, expect, it, vi } from "vitest";
 import { acceptServiceTerms, getServiceTermsStatus } from "./service-terms";
 
@@ -18,6 +19,7 @@ function dependencies(acceptance?: { acceptedAt: string }) {
             accountId: "account-1",
             documentKey: "terms_of_service" as const,
             documentVersion: "2026-08-15",
+            documentHash: currentServiceTerms.contentHash,
             acceptedAt: acceptance.acceptedAt,
             createdAt: new Date(),
             updatedAt: new Date(),
@@ -31,6 +33,7 @@ function dependencies(acceptance?: { acceptedAt: string }) {
       accountId: "account-1",
       documentKey: "terms_of_service" as const,
       documentVersion: "2026-08-15",
+      documentHash: currentServiceTerms.contentHash,
       acceptedAt: "2026-08-15T01:23:45.000Z",
       createdAt: new Date(),
       updatedAt: new Date(),

@@ -19,7 +19,12 @@ describe("service terms controller", () => {
     vi.mocked(getServiceTermsStatus).mockResolvedValue({
       type: "resolved",
       document,
-      acceptance: { required: true, acceptedAt: null },
+      acceptance: {
+        required: true,
+        acceptedVersion: null,
+        documentHash: null,
+        acceptedAt: null,
+      },
     });
     const response = await app.request(
       "/api/legal/terms",
@@ -30,7 +35,7 @@ describe("service terms controller", () => {
     expect(response.headers.get("cache-control")).toBe("no-store");
     expect(await response.json()).toMatchObject({
       document: { version: "2026-08-15" },
-      acceptance: { required: true, acceptedAt: null },
+      acceptance: { required: true, acceptedVersion: null, documentHash: null, acceptedAt: null },
     });
   });
 
@@ -42,6 +47,7 @@ describe("service terms controller", () => {
         accountId: "account-1",
         documentKey: "terms_of_service",
         documentVersion: "2026-08-15",
+        documentHash: currentServiceTerms.contentHash,
         acceptedAt: "2026-08-15T01:23:45.000Z",
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -62,6 +68,7 @@ describe("service terms controller", () => {
     expect(await response.json()).toEqual({
       documentKey: "terms_of_service",
       version: "2026-08-15",
+      documentHash: currentServiceTerms.contentHash,
       acceptedAt: "2026-08-15T01:23:45.000Z",
     });
   });

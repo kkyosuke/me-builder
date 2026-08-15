@@ -2,6 +2,7 @@ import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import type { D1Database } from "@cloudflare/workers-types";
 import { D1 } from "@me-builder/lib";
+import { currentServiceTerms } from "@me-builder/shared";
 import { Miniflare } from "miniflare";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { app } from "../index";
@@ -87,6 +88,7 @@ async function prepareDatabase(db: D1Database): Promise<void> {
     )
     .bind("identity-e2e", timestamp, timestamp, "account-e2e", "line-user-e2e")
     .run();
+  await D1.shared.action.agreement.acceptCurrentTerms(D1.shared.client.create(db), "account-e2e");
 }
 
 function mockLineVerification(): void {
@@ -307,6 +309,26 @@ describe("GET /api/diagnoses local D1 E2E", () => {
   });
 
   it(`${diagnosisListCases.webFirstAccountCreation.id}: ${diagnosisListCases.webFirstAccountCreation.name}`, async () => {
+    const beforeAcceptance = await request("unknown-token");
+    expect(beforeAcceptance.status).toBe(401);
+    const acceptance = await app.request(
+      "/api/legal/terms/acceptance",
+      {
+        method: "PUT",
+        headers: {
+          Authorization: "Bearer unknown-token",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ version: currentServiceTerms.version }),
+      },
+      {
+        DB: database,
+        LINE_LOGIN_CHANNEL_ID: "1234567890",
+        ENVIRONMENT: "test",
+      },
+    );
+    expect(acceptance.status).toBe(200);
+
     const response = await request("unknown-token");
 
     expect(response.status).toBe(200);

@@ -10,6 +10,8 @@ const NonEmptyStringSchema = v.pipe(v.string(), v.nonEmpty());
 const ServiceTermsDocumentSchema = v.object({
   documentKey: v.literal("terms_of_service"),
   version: NonEmptyStringSchema,
+  contentHash: v.pipe(v.string(), v.regex(/^sha256:[0-9a-f]{64}$/)),
+  requiresReacceptance: v.boolean(),
   publishedAt: v.pipe(v.string(), v.isoTimestamp()),
   title: NonEmptyStringSchema,
   summary: NonEmptyStringSchema,
@@ -22,6 +24,8 @@ export const ServiceTermsStatusResponseSchema = v.object({
   document: ServiceTermsDocumentSchema,
   acceptance: v.object({
     required: v.boolean(),
+    acceptedVersion: v.nullable(NonEmptyStringSchema),
+    documentHash: v.nullable(v.pipe(v.string(), v.regex(/^sha256:[0-9a-f]{64}$/))),
     acceptedAt: v.nullable(v.pipe(v.string(), v.isoTimestamp())),
   }),
 });
@@ -33,6 +37,7 @@ export const AcceptServiceTermsRequestSchema = v.object({
 export const AcceptServiceTermsResponseSchema = v.object({
   documentKey: v.literal("terms_of_service"),
   version: NonEmptyStringSchema,
+  documentHash: v.pipe(v.string(), v.regex(/^sha256:[0-9a-f]{64}$/)),
   acceptedAt: v.pipe(v.string(), v.isoTimestamp()),
 });
 

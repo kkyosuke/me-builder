@@ -13,6 +13,8 @@ const StatusSchema = v.object({
   document: v.object({
     documentKey: v.literal("terms_of_service"),
     version: NonEmptyStringSchema,
+    contentHash: v.pipe(v.string(), v.regex(/^sha256:[0-9a-f]{64}$/)),
+    requiresReacceptance: v.boolean(),
     publishedAt: v.pipe(v.string(), v.isoTimestamp()),
     title: NonEmptyStringSchema,
     summary: NonEmptyStringSchema,
@@ -22,12 +24,15 @@ const StatusSchema = v.object({
   }),
   acceptance: v.object({
     required: v.boolean(),
+    acceptedVersion: v.nullable(NonEmptyStringSchema),
+    documentHash: v.nullable(v.pipe(v.string(), v.regex(/^sha256:[0-9a-f]{64}$/))),
     acceptedAt: v.nullable(v.pipe(v.string(), v.isoTimestamp())),
   }),
 }) satisfies v.GenericSchema<StatusResponse>;
 const AcceptanceSchema = v.object({
   documentKey: v.literal("terms_of_service"),
   version: NonEmptyStringSchema,
+  documentHash: v.pipe(v.string(), v.regex(/^sha256:[0-9a-f]{64}$/)),
   acceptedAt: v.pipe(v.string(), v.isoTimestamp()),
 }) satisfies v.GenericSchema<AcceptanceResponse>;
 
@@ -61,7 +66,7 @@ export async function acceptServiceTerms(
   idToken: string,
   version: string,
   signal?: AbortSignal,
-): Promise<string> {
+): Promise<{ acceptedAt: string; version: string; documentHash: string }> {
   const response = await createHttpClient(apiUrl).request("/api/legal/terms/acceptance", {
     method: "PUT",
     headers: { Authorization: `Bearer ${idToken}`, "Content-Type": "application/json" },
@@ -72,5 +77,10 @@ export async function acceptServiceTerms(
     throw new ServiceTermsVersionConflictError();
   }
   if (!response.ok) throw errorFor(response.status);
-  return v.parse(AcceptanceSchema, await response.json()).acceptedAt;
+  const acceptance = v.parse(AcceptanceSchema, await response.json());
+  return {
+    acceptedAt: acceptance.acceptedAt,
+    version: acceptance.version,
+    documentHash: acceptance.documentHash,
+  };
 }

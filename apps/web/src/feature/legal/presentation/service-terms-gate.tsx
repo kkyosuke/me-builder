@@ -1,6 +1,7 @@
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { LoadingState } from "../../../components/loading-state";
 import { config } from "../../../config";
+import { resolveRequestedPathname } from "../../../infrastructure/requested-pathname";
 import { useLiffSession } from "../../liff";
 import {
   ServiceTermsVersionConflictError,
@@ -47,7 +48,7 @@ export function ServiceTermsGate({ children }: { children: ReactNode }) {
     setSubmitting(true);
     setSubmitError(null);
     try {
-      const acceptedAt = await acceptServiceTerms(
+      const acceptance = await acceptServiceTerms(
         config.apiUrl,
         state.idToken,
         state.data.document.version,
@@ -56,7 +57,12 @@ export function ServiceTermsGate({ children }: { children: ReactNode }) {
         ...state,
         data: {
           ...state.data,
-          acceptance: { required: false, acceptedAt },
+          acceptance: {
+            required: false,
+            acceptedVersion: acceptance.version,
+            documentHash: acceptance.documentHash,
+            acceptedAt: acceptance.acceptedAt,
+          },
         },
       });
     } catch (error) {
@@ -89,7 +95,7 @@ export function ServiceTermsGate({ children }: { children: ReactNode }) {
     );
   }
 
-  const viewingTerms = window.location.pathname === "/terms";
+  const viewingTerms = resolveRequestedPathname() === "/terms";
   if (state.data.acceptance.required || viewingTerms) {
     return (
       <ServiceTermsScreen

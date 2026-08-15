@@ -1,4 +1,5 @@
 import path from "node:path";
+import { currentServiceTerms } from "@me-builder/shared";
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
@@ -39,6 +40,7 @@ describe("account agreement acceptance", () => {
       accountId: account.id,
       documentKey: "terms_of_service",
       documentVersion: "2026-08-15",
+      documentHash: currentServiceTerms.contentHash,
       acceptedAt: "2026-08-15T01:23:45.000Z",
     });
     await expect(findCurrentTermsAcceptance(db, account.id)).resolves.toMatchObject(accepted);

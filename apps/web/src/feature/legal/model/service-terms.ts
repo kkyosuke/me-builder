@@ -1,6 +1,8 @@
 type ServiceTerms = Readonly<{
   documentKey: "terms_of_service";
   version: string;
+  contentHash: string;
+  requiresReacceptance: boolean;
   publishedAt: string;
   title: string;
   summary: string;
@@ -9,5 +11,10 @@ type ServiceTerms = Readonly<{
 
 export type ServiceTermsStatus = Readonly<{
   document: ServiceTerms;
-  acceptance: Readonly<{ required: boolean; acceptedAt: string | null }>;
+  acceptance: Readonly<{
+    required: boolean;
+    acceptedVersion: string | null;
+    documentHash: string | null;
+    acceptedAt: string | null;
+  }>;
 }>;

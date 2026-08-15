@@ -71,6 +71,7 @@ export async function putServiceTermsAcceptance(c: Context<AppEnv>): Promise<Res
     v.parse(AcceptServiceTermsResponseSchema, {
       documentKey: outcome.acceptance.documentKey,
       version: outcome.acceptance.documentVersion,
+      documentHash: outcome.acceptance.documentHash,
       acceptedAt: outcome.acceptance.acceptedAt,
     }),
   );

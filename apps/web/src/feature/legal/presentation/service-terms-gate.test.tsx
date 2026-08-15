@@ -22,6 +22,8 @@ vi.mock("../infrastructure/service-terms-api", () => ({
 const document = {
   documentKey: "terms_of_service" as const,
   version: "2026-08-15",
+  contentHash: "sha256:test",
+  requiresReacceptance: true,
   publishedAt: "2026-08-15T00:00:00+09:00",
   title: "うつし サービス利用規約",
   summary: "サービスの説明",
@@ -32,7 +34,11 @@ describe("ServiceTermsGate", () => {
   beforeEach(() => {
     window.history.replaceState(null, "", "/");
     mocks.acquireIdToken.mockResolvedValue("id-token");
-    mocks.accept.mockResolvedValue("2026-08-15T01:23:45.000Z");
+    mocks.accept.mockResolvedValue({
+      acceptedAt: "2026-08-15T01:23:45.000Z",
+      version: document.version,
+      documentHash: document.contentHash,
+    });
   });
 
   afterEach(() => {
@@ -43,7 +49,7 @@ describe("ServiceTermsGate", () => {
   it("未同意では主機能をマウントせず、保存完了後に表示する", async () => {
     mocks.fetchStatus.mockResolvedValue({
       document,
-      acceptance: { required: true, acceptedAt: null },
+      acceptance: { required: true, acceptedVersion: null, documentHash: null, acceptedAt: null },
     });
 
     render(
@@ -65,7 +71,12 @@ describe("ServiceTermsGate", () => {
   it("現在versionへ同意済みなら規約を再表示せず主機能を表示する", async () => {
     mocks.fetchStatus.mockResolvedValue({
       document,
-      acceptance: { required: false, acceptedAt: "2026-08-15T01:23:45.000Z" },
+      acceptance: {
+        required: false,
+        acceptedVersion: document.version,
+        documentHash: document.contentHash,
+        acceptedAt: "2026-08-15T01:23:45.000Z",
+      },
     });
 
     render(
@@ -79,13 +90,48 @@ describe("ServiceTermsGate", () => {
     expect(mocks.accept).not.toHaveBeenCalled();
   });
 
+  it("LIFF deep linkのterms指定では同意済みでも規約を表示する", async () => {
+    window.history.replaceState(null, "", "/?liff.state=%2Fterms");
+    mocks.fetchStatus.mockResolvedValue({
+      document,
+      acceptance: {
+        required: false,
+        acceptedVersion: document.version,
+        documentHash: document.contentHash,
+        acceptedAt: "2026-08-15T01:23:45.000Z",
+      },
+    });
+
+    render(
+      <ServiceTermsGate>
+        <p>主機能</p>
+      </ServiceTermsGate>,
+    );
+
+    expect(await screen.findByRole("heading", { name: document.title })).toBeTruthy();
+    expect(screen.queryByText("主機能")).toBeNull();
+  });
+
   it("表示中にversionが変わったら最新本文を再取得する", async () => {
     const latestDocument = { ...document, version: "2026-08-15-2", summary: "改定後の説明" };
     mocks.fetchStatus
-      .mockResolvedValueOnce({ document, acceptance: { required: true, acceptedAt: null } })
+      .mockResolvedValueOnce({
+        document,
+        acceptance: {
+          required: true,
+          acceptedVersion: null,
+          documentHash: null,
+          acceptedAt: null,
+        },
+      })
       .mockResolvedValueOnce({
         document: latestDocument,
-        acceptance: { required: true, acceptedAt: null },
+        acceptance: {
+          required: true,
+          acceptedVersion: null,
+          documentHash: null,
+          acceptedAt: null,
+        },
       });
     const { ServiceTermsVersionConflictError } = await import(
       "../infrastructure/service-terms-api"

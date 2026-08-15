@@ -18,6 +18,7 @@ import {
 import type { AvatarSelection } from "./feature/profile-settings/model/avatar";
 import { ProfileMenuButton } from "./feature/profile-settings/presentation/components/profile-menu-button";
 import { useColorTheme, useFontSize } from "./feature/theme";
+import { resolveRequestedPathname } from "./infrastructure/requested-pathname";
 import {
   getIdleMainApplicationRoutes,
   loadAdminApplication,
@@ -69,21 +70,6 @@ function historyProfileReturnPathname(state: unknown): string | null {
   if (!state || typeof state !== "object") return null;
   const value = (state as Record<string, unknown>)[PROFILE_RETURN_PATHNAME_STATE_KEY];
   return typeof value === "string" && value.startsWith("/") ? value : null;
-}
-
-function resolveRequestedPathname(): string {
-  if (typeof window === "undefined") {
-    return "/diagnosis";
-  }
-  if (window.location.pathname !== "/") {
-    return window.location.pathname;
-  }
-
-  const liffState = new URLSearchParams(window.location.search).get("liff.state");
-  if (!liffState?.startsWith("/")) {
-    return window.location.pathname;
-  }
-  return liffState.split(/[?#]/, 1)[0] ?? window.location.pathname;
 }
 
 function errorMessage(error: unknown): string {

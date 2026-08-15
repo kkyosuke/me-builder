@@ -1,5 +1,6 @@
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
+import { currentServiceTerms } from "@me-builder/shared";
 import Database from "better-sqlite3";
 import { describe, expect, it } from "vitest";
 
@@ -82,6 +83,39 @@ describe("shared D1 clean baseline migration", () => {
     for (const table of PERSONAL_CONTENT_TABLES) {
       expect(tableNames.has(table), table).toBe(false);
     }
+    sqlite.close();
+  });
+
+  it("既存の規約同意へ本文hashをbackfillして証跡を維持する", () => {
+    const sqlite = new Database(":memory:");
+    const migrations = readdirSync(migrationsDirectory)
+      .filter((filename) => /^000[0-3]_.+\.sql$/.test(filename))
+      .sort();
+    for (const file of migrations) {
+      sqlite.exec(readFileSync(path.join(migrationsDirectory, file), "utf8"));
+    }
+    sqlite
+      .prepare(
+        `INSERT INTO accounts (id, created_at, updated_at, is_deleted, status)
+         VALUES ('account-1', 1, 1, 0, 'active')`,
+      )
+      .run();
+    sqlite
+      .prepare(
+        `INSERT INTO account_agreement_acceptances (
+           id, created_at, updated_at, is_deleted, account_id,
+           document_key, document_version, accepted_at
+         ) VALUES ('acceptance-1', 1, 1, 0, 'account-1',
+           'terms_of_service', '2026-08-15', '2026-08-15T00:00:00.000Z')`,
+      )
+      .run();
+
+    sqlite.exec(readFileSync(path.join(migrationsDirectory, "0004_glossy_patch.sql"), "utf8"));
+
+    const acceptance = sqlite
+      .prepare("SELECT document_hash AS documentHash FROM account_agreement_acceptances")
+      .get() as { documentHash: string };
+    expect(acceptance.documentHash).toBe(currentServiceTerms.contentHash);
     sqlite.close();
   });
 });

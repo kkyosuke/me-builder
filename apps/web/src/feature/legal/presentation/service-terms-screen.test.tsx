@@ -9,12 +9,14 @@ const status: ServiceTermsStatus = {
   document: {
     documentKey: "terms_of_service",
     version: "2026-08-15",
+    contentHash: "sha256:9e0143a66c525bc4784e2a6a5b0e16f511189e98b66f2da90dcb6d43cfe01836",
+    requiresReacceptance: true,
     publishedAt: "2026-08-15T00:00:00+09:00",
     title: "うつし サービス利用規約",
     summary: "サービスの説明",
     sections: [{ heading: "1. 規約への同意", paragraphs: ["規約本文です。"] }],
   },
-  acceptance: { required: true, acceptedAt: null },
+  acceptance: { required: true, acceptedVersion: null, documentHash: null, acceptedAt: null },
 };
 
 describe("ServiceTermsScreen", () => {
@@ -41,7 +43,12 @@ describe("ServiceTermsScreen", () => {
       <ServiceTermsScreen
         status={{
           ...status,
-          acceptance: { required: false, acceptedAt: "2026-08-15T01:23:45.000Z" },
+          acceptance: {
+            required: false,
+            acceptedVersion: status.document.version,
+            documentHash: status.document.contentHash,
+            acceptedAt: "2026-08-15T01:23:45.000Z",
+          },
         }}
         onBack={vi.fn()}
       />,

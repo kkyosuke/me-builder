@@ -1,5 +1,9 @@
-import { currentServiceTerms, logger } from "@me-builder/shared";
-import { and, asc, eq, gt } from "drizzle-orm";
+import {
+  currentServiceTerms,
+  logger,
+  serviceTermsDocumentsSatisfyingCurrentRequirement,
+} from "@me-builder/shared";
+import { and, asc, eq, gt, or } from "drizzle-orm";
 import type { SharedD1Client } from "../client";
 import { accountIdentities, accounts } from "../schema/account";
 import { accountAgreementAcceptances } from "../schema/agreement";
@@ -260,7 +264,14 @@ export async function listActiveLineAccountIds(
     eq(accounts.status, "active"),
     eq(accounts.isDeleted, false),
     eq(accountAgreementAcceptances.documentKey, currentServiceTerms.documentKey),
-    eq(accountAgreementAcceptances.documentVersion, currentServiceTerms.version),
+    or(
+      ...serviceTermsDocumentsSatisfyingCurrentRequirement.map((document) =>
+        and(
+          eq(accountAgreementAcceptances.documentVersion, document.version),
+          eq(accountAgreementAcceptances.documentHash, document.contentHash),
+        ),
+      ),
+    ),
     eq(accountAgreementAcceptances.isDeleted, false),
     ...(input.afterAccountId ? [gt(accounts.id, input.afterAccountId)] : []),
   ];

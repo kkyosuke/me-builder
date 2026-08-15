@@ -6,6 +6,8 @@ export type ServiceTermsSection = Readonly<{
 export type ServiceTermsDocument = Readonly<{
   documentKey: "terms_of_service";
   version: string;
+  contentHash: `sha256:${string}`;
+  requiresReacceptance: boolean;
   publishedAt: string;
   title: string;
   summary: string;
@@ -17,6 +19,8 @@ export const serviceTermsDocuments = [
   {
     documentKey: "terms_of_service",
     version: "2026-08-15",
+    contentHash: "sha256:9e0143a66c525bc4784e2a6a5b0e16f511189e98b66f2da90dcb6d43cfe01836",
+    requiresReacceptance: true,
     publishedAt: "2026-08-15T00:00:00+09:00",
     title: "うつし サービス利用規約",
     summary:
@@ -93,7 +97,7 @@ export const serviceTermsDocuments = [
       {
         heading: "11. 利用終了とデータ",
         paragraphs: [
-          "利用者は、サービス内で提供される手段により本人データを削除できます。法令上または不正利用防止・紛争対応上の保存義務がある情報は、必要な期間に限り保持することがあります。",
+          "本人データの削除を希望する場合は、運営者がサービス内に表示する問い合わせ窓口へご連絡ください。法令上または不正利用防止・紛争対応上の保存義務がある情報は、必要な期間に限り保持することがあります。",
         ],
       },
       {
@@ -108,3 +112,15 @@ export const serviceTermsDocuments = [
 
 export const currentServiceTerms =
   serviceTermsDocuments[serviceTermsDocuments.length - 1] ?? serviceTermsDocuments[0];
+
+let requiredDocumentIndex = 0;
+for (const [index, document] of serviceTermsDocuments.entries()) {
+  if (document.requiresReacceptance) requiredDocumentIndex = index;
+}
+
+/** 既存利用者が現在の利用条件を満たす同意対象。新規同意は常に最新versionへ記録する。 */
+export const serviceTermsDocumentsSatisfyingCurrentRequirement =
+  serviceTermsDocuments.slice(requiredDocumentIndex);
+
+export const currentRequiredServiceTerms =
+  serviceTermsDocumentsSatisfyingCurrentRequirement[0] ?? currentServiceTerms;

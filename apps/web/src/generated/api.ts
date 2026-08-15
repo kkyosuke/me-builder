@@ -482,6 +482,8 @@ export interface operations {
               /** @constant */
               documentKey: "terms_of_service";
               version: string;
+              contentHash: string;
+              requiresReacceptance: boolean;
               /** Format: date-time */
               publishedAt: string;
               title: string;
@@ -493,6 +495,8 @@ export interface operations {
             };
             acceptance: {
               required: boolean;
+              acceptedVersion: string | null;
+              documentHash: string | null;
               acceptedAt: string | null;
             };
           };
@@ -549,6 +553,7 @@ export interface operations {
             /** @constant */
             documentKey: "terms_of_service";
             version: string;
+            documentHash: string;
             /** Format: date-time */
             acceptedAt: string;
           };

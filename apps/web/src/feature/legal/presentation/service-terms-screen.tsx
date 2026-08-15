@@ -60,9 +60,10 @@ export function ServiceTermsScreen({
           ))}
         </article>
 
-        {!acceptance.required && acceptance.acceptedAt && (
+        {!acceptance.required && acceptance.acceptedVersion && acceptance.acceptedAt && (
           <p className="mt-6 flex items-center gap-2 rounded-2xl bg-emerald-50 p-4 text-sm font-bold text-emerald-800 dark:bg-emerald-400/10 dark:text-emerald-200">
             <CheckCircle2 className="size-5" aria-hidden="true" />
+            version {acceptance.acceptedVersion}・
             {new Date(acceptance.acceptedAt).toLocaleString("ja-JP")} に同意済み
           </p>
         )}
