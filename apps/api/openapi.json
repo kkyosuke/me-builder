@@ -3780,6 +3780,10 @@
                                         "request": {
                                           "type": "string",
                                           "minLength": 1
+                                        },
+                                        "band": {
+                                          "enum": ["low", "balanced", "high"],
+                                          "type": "string"
                                         }
                                       },
                                       "required": [
@@ -3788,7 +3792,8 @@
                                         "lowLabel",
                                         "highLabel",
                                         "position",
-                                        "statement"
+                                        "statement",
+                                        "band"
                                       ]
                                     },
                                     "minItems": 1
@@ -3891,6 +3896,10 @@
                                         "request": {
                                           "type": "string",
                                           "minLength": 1
+                                        },
+                                        "band": {
+                                          "enum": ["low", "balanced", "high"],
+                                          "type": "string"
                                         }
                                       },
                                       "required": [
@@ -3899,7 +3908,8 @@
                                         "lowLabel",
                                         "highLabel",
                                         "position",
-                                        "statement"
+                                        "statement",
+                                        "band"
                                       ]
                                     },
                                     "minItems": 1
@@ -4869,6 +4879,10 @@
                                 "request": {
                                   "type": "string",
                                   "minLength": 1
+                                },
+                                "band": {
+                                  "enum": ["low", "balanced", "high"],
+                                  "type": "string"
                                 }
                               },
                               "required": [
@@ -4877,7 +4891,8 @@
                                 "lowLabel",
                                 "highLabel",
                                 "position",
-                                "statement"
+                                "statement",
+                                "band"
                               ]
                             },
                             "minItems": 1

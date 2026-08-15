@@ -19,6 +19,7 @@ export const me: CompatibilityPerson = {
       position: 78,
       statement: "私は、予定を早めに決めておけると安心します。",
       request: "予定が変わるときは、早めに相談してもらえるとうれしいです。",
+      band: "high",
     },
     {
       id: "holiday",
@@ -29,6 +30,7 @@ export const me: CompatibilityPerson = {
       position: 68,
       statement: "私は、一緒に楽しむ時間を大切にしたいです。",
       request: "したいことを一緒に相談できるとうれしいです。",
+      band: "high",
     },
     {
       id: "spending",
@@ -39,6 +41,7 @@ export const me: CompatibilityPerson = {
       position: 74,
       statement: "私は、思い出に残る体験へお金を使いたいです。",
       request: "大きな予定は、予算も一緒に話せるとうれしいです。",
+      band: "high",
     },
   ],
 };
@@ -62,6 +65,7 @@ export const aoi: CompatibilityPerson = {
       position: 70,
       statement: "私は、見通しを持って動けると心地よく感じます。",
       request: "決まっていることを先に共有してもらえるとうれしいです。",
+      band: "high",
     },
     {
       id: "holiday",
@@ -72,6 +76,7 @@ export const aoi: CompatibilityPerson = {
       position: 28,
       statement: "私は、自分で決められる余白を大切にしたいです。",
       request: "一人で考える時間も尊重してもらえるとうれしいです。",
+      band: "low",
     },
     {
       id: "spending",
@@ -82,6 +87,7 @@ export const aoi: CompatibilityPerson = {
       position: 81,
       statement: "私は、休日には新しい体験を楽しみたいです。",
       request: "気になる場所を気軽に提案し合えるとうれしいです。",
+      band: "high",
     },
   ],
 };

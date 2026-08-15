@@ -56,7 +56,7 @@ function waitingGuide(item: WaitingItem): {
     };
   }
   return {
-    message: "あなたの共有内容はそろっています。相手の準備が終わると自動で表示されます。",
+    message: "現在は2人分を比較できません。比較できる状態になると自動で表示されます。",
     href: null,
     label: null,
   };
@@ -302,7 +302,7 @@ export function CompatibilityListScreen({
                       className="rounded-3xl border border-amber-200 bg-white p-5 shadow-lg shadow-slate-950/5 dark:border-amber-900/50 dark:bg-slate-800"
                     >
                       <p className="text-xs font-bold text-amber-700 dark:text-amber-300">
-                        {item.readiness.nextAction ? "あなたの準備待ち" : "相手の準備待ち"}
+                        {item.readiness.nextAction ? "あなたの準備待ち" : "比較の準備中"}
                       </p>
                       <p
                         className={`mt-2 w-fit rounded-full px-2.5 py-1 text-xs font-bold ${getRelationshipCategoryBadgeClassName(item.relationshipCategory)}`}

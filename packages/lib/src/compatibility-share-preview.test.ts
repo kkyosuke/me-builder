@@ -52,6 +52,8 @@ describe("buildCompatibilitySharePreviewThemes", () => {
       {
         diagnosisId: "diagnosis-1",
         title: "時間と予定",
+        scoringConfigId: "time-planning-v1",
+        scoringVersion: 1,
         parameters: [
           {
             id: "low",
@@ -60,6 +62,7 @@ describe("buildCompatibilitySharePreviewThemes", () => {
             highLabel: "早めに決めたい",
             position: 20,
             statement: "「その場で決めたい」傾向があります",
+            band: "low",
           },
           {
             id: "balanced",
@@ -68,6 +71,7 @@ describe("buildCompatibilitySharePreviewThemes", () => {
             highLabel: "多め",
             position: 50,
             statement: "「状況に応じて決めたい」傾向があります",
+            band: "balanced",
           },
           {
             id: "high",
@@ -77,6 +81,7 @@ describe("buildCompatibilitySharePreviewThemes", () => {
             position: 80,
             statement: "「すばやく」傾向があります",
             request: "早めに共有してもらえるとうれしいです。",
+            band: "high",
           },
         ],
       },
@@ -84,25 +89,11 @@ describe("buildCompatibilitySharePreviewThemes", () => {
   });
 
   it("双方が現在共有できるDiagnosisの共通部分だけを、primary側の順序で選ぶ", () => {
-    const diagnosis = (diagnosisId: string) => ({
+    const diagnosis = (diagnosisId: string, scoringVersion = 1) => ({
       diagnosisId,
       title: diagnosisId,
       scoringConfigId: `${diagnosisId}-v1`,
-      scoring: {
-        scoringVersion: 1,
-        balancedLabel: "状況による",
-        parameters: [
-          {
-            id: "planning",
-            label: "予定",
-            lowLabel: "その場",
-            highLabel: "早め",
-            score: 80,
-            coverage: 100,
-            band: "high" as const,
-          },
-        ],
-      },
+      scoringVersion,
     });
 
     expect(
@@ -112,6 +103,12 @@ describe("buildCompatibilitySharePreviewThemes", () => {
       ),
     ).toEqual(["diagnosis-1", "diagnosis-3"]);
     expect(selectCommonCompatibilityDiagnoses([diagnosis("diagnosis-1")], [])).toEqual([]);
+    expect(
+      selectCommonCompatibilityDiagnoses(
+        [diagnosis("diagnosis-1", 1)],
+        [diagnosis("diagnosis-1", 2)],
+      ),
+    ).toEqual([]);
   });
 
   it("計算不能なパラメータと空になったDiagnosisを共有対象から除外する", () => {

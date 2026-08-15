@@ -2526,6 +2526,8 @@ export interface operations {
                       position: number;
                       statement: string;
                       request?: string;
+                      /** @enum {string} */
+                      band: "low" | "balanced" | "high";
                     }[];
                   }[];
                 };
@@ -2552,6 +2554,8 @@ export interface operations {
                       position: number;
                       statement: string;
                       request?: string;
+                      /** @enum {string} */
+                      band: "low" | "balanced" | "high";
                     }[];
                   }[];
                 };
@@ -3088,6 +3092,8 @@ export interface operations {
                 position: number;
                 statement: string;
                 request?: string;
+                /** @enum {string} */
+                band: "low" | "balanced" | "high";
               }[];
             }[];
             nextAction: ("diagnosis" | "profile-summary") | null;

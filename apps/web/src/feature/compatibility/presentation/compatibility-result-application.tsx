@@ -32,10 +32,10 @@ const waitingGuides = {
       "2人で比べられる共通の診断テーマがまだありません。診断に答えると、追加の確認なしで共有されます。",
     label: "診断を見る",
   },
-  partner: {
-    title: "相手の準備を待っています",
+  waiting: {
+    title: "比較の準備を待っています",
     message:
-      "あなたの共有内容はそろっています。相手の準備が終わると、追加の確認なしでこの相性シートを表示できます。",
+      "現在の共有内容では、2人で比較できる共通の診断テーマがありません。比較できる状態になると、追加の確認なしでこの相性シートを表示できます。",
     label: "相性一覧へ戻る",
   },
 } as const;
@@ -88,8 +88,9 @@ export default function CompatibilityResultApplication({
   if (relationship.state.status !== "success") return null;
   if (relationship.ending.status === "success") return <CompatibilitySharingEndedScreen />;
   if (relationship.state.data.status === "waiting") {
-    // nextActionがnullのときは相手側の準備待ちで、閲覧者の操作では解消できない。
-    const waiting = waitingGuides[relationship.state.data.nextAction ?? "partner"];
+    // nextActionがnullのときは、相手の準備や採点設定版の不一致など
+    // 閲覧者の操作では解消できない状態を中立な文言で案内する。
+    const waiting = waitingGuides[relationship.state.data.nextAction ?? "waiting"];
     const shouldPreloadList = relationship.state.data.nextAction === null;
     const waitingHref =
       relationship.state.data.nextAction === "diagnosis"

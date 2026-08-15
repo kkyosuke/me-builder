@@ -24,6 +24,7 @@ describe("toCompatibilityPerson", () => {
                 position: 80,
                 statement: "「早めに」傾向があります",
                 request: "予定を早めに相談してもらえるとうれしいです。",
+                band: "high",
               },
             ],
           },
@@ -34,6 +35,7 @@ describe("toCompatibilityPerson", () => {
 
     expect(person.themes[0]).toMatchObject({
       request: "予定を早めに相談してもらえるとうれしいです。",
+      band: "high",
     });
   });
 });
