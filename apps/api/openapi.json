@@ -3776,6 +3776,10 @@
                                         "statement": {
                                           "type": "string",
                                           "minLength": 1
+                                        },
+                                        "request": {
+                                          "type": "string",
+                                          "minLength": 1
                                         }
                                       },
                                       "required": [
@@ -3881,6 +3885,10 @@
                                           "maximum": 100
                                         },
                                         "statement": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "request": {
                                           "type": "string",
                                           "minLength": 1
                                         }
@@ -4855,6 +4863,10 @@
                                   "maximum": 100
                                 },
                                 "statement": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "request": {
                                   "type": "string",
                                   "minLength": 1
                                 }

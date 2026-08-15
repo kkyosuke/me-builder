@@ -103,7 +103,8 @@ flowchart LR
           "lowLabel": "自分の時間を大切にする",
           "highLabel": "一緒の時間を大切にする",
           "position": 72,
-          "statement": "一緒に過ごす時間を大切にする傾向があります"
+          "statement": "一緒に過ごす時間を大切にする傾向があります",
+          "request": "一緒に過ごす予定を相談してもらえるとうれしいです。"
         }
       ]
     }
@@ -112,7 +113,7 @@ flowchart LR
 }
 ```
 
-`themes`には指定カテゴリと`general`のDiagnosisだけを含めます。`aboutMe`を開示できない場合は`null`、共有できる診断テーマがない場合は空配列です。`nextAction`は、共有専用プロフィールprojectionがなければ`profile-summary`、それ以外で共有可能なテーマがなく現在回答できる対象Diagnosisがあれば`diagnosis`、それ以外は`null`です。
+`themes`には指定カテゴリと`general`のDiagnosisだけを含めます。parameterの`request`は、現在の帯域に審査済みの関わり方文がある場合だけ返します。`aboutMe`を開示できない場合は`null`、共有できる診断テーマがない場合は空配列です。`nextAction`は、共有専用プロフィールprojectionがなければ`profile-summary`、それ以外で共有可能なテーマがなく現在回答できる対象Diagnosisがあれば`diagnosis`、それ以外は`null`です。
 
 相性シートと同じ共有表示の組み立て処理を使い、生の回答、具体的な出来事、日記・会話本文、自由記述、Source Record、Brain Item本文、内部根拠ID、Account ID、各種指紋、表示名を返しません。成功・エラーを問わず`Cache-Control: no-store`を付けます。
 

@@ -5,6 +5,7 @@ type CompatibilitySharePreviewParameter = {
   highLabel: string;
   position: number;
   statement: string;
+  request?: string | undefined;
 };
 
 export type CompatibilitySharePreviewTheme = {

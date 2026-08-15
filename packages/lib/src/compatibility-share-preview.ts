@@ -7,6 +7,7 @@ export type CompatibilitySharePreviewParameter = Readonly<{
   highLabel: string;
   position: number;
   statement: string;
+  request?: string;
 }>;
 
 export type CompatibilitySharePreviewTheme = Readonly<{
@@ -53,6 +54,7 @@ export function buildCompatibilitySharePreviewThemes(
             highLabel: parameter.highLabel,
             position: parameter.score,
             statement: `「${bandLabel}」傾向があります`,
+            ...(parameter.relationshipRequest ? { request: parameter.relationshipRequest } : {}),
           },
         ];
       },

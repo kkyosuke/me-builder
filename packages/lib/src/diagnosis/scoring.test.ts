@@ -9,7 +9,15 @@ const CONFIG = {
   ],
   definition: {
     parameters: [
-      { id: "planning", label: "計画性", lowLabel: "即興", highLabel: "計画的" },
+      {
+        id: "planning",
+        label: "計画性",
+        lowLabel: "即興",
+        highLabel: "計画的",
+        relationshipRequests: {
+          high: "予定を早めに相談してもらえるとうれしいです。",
+        },
+      },
       { id: "flexibility", label: "柔軟性", lowLabel: "予定を守る", highLabel: "変更を楽しむ" },
     ],
     choiceScores: { yes: 1, neutral: 0, no: -1 },
@@ -49,6 +57,7 @@ describe("scoreDiagnosisAnswers", () => {
           score: 100,
           coverage: 100,
           band: "high",
+          relationshipRequest: "予定を早めに相談してもらえるとうれしいです。",
         },
         {
           id: "flexibility",
@@ -92,6 +101,21 @@ describe("scoreDiagnosisAnswers", () => {
       scoreDiagnosisAnswers([], {
         ...CONFIG,
         definition: { ...CONFIG.definition, minimumCoverage: 2 },
+      }),
+    ).toThrow();
+  });
+
+  it("空の関わり方文設定を拒否する", () => {
+    expect(() =>
+      scoreDiagnosisAnswers([], {
+        ...CONFIG,
+        definition: {
+          ...CONFIG.definition,
+          parameters: CONFIG.definition.parameters.map((parameter) => ({
+            ...parameter,
+            relationshipRequests: {},
+          })),
+        },
       }),
     ).toThrow();
   });

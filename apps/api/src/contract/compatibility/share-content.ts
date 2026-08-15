@@ -12,6 +12,7 @@ const CompatibilitySharePreviewParameterSchema = v.object({
   highLabel: NonEmptyStringSchema,
   position: v.pipe(v.number(), v.safeInteger(), v.minValue(0), v.maxValue(100)),
   statement: NonEmptyStringSchema,
+  request: v.optional(NonEmptyStringSchema),
 });
 
 /** 相性シートで開示する、生の回答を含まない診断テーマの表示形。 */

@@ -2525,6 +2525,7 @@ export interface operations {
                       highLabel: string;
                       position: number;
                       statement: string;
+                      request?: string;
                     }[];
                   }[];
                 };
@@ -2550,6 +2551,7 @@ export interface operations {
                       highLabel: string;
                       position: number;
                       statement: string;
+                      request?: string;
                     }[];
                   }[];
                 };
@@ -3085,6 +3087,7 @@ export interface operations {
                 highLabel: string;
                 position: number;
                 statement: string;
+                request?: string;
               }[];
             }[];
             nextAction: ("diagnosis" | "profile-summary") | null;

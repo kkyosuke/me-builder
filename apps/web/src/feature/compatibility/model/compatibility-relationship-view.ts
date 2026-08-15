@@ -20,7 +20,7 @@ export function toCompatibilityPerson(
         rightLabel: parameter.highLabel,
         position: parameter.position,
         statement: parameter.statement,
-        request: "",
+        request: parameter.request ?? "",
       })),
     ),
   };

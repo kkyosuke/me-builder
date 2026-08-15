@@ -39,6 +39,7 @@ describe("CompatibilityShareContentSectionScreen", () => {
                     highLabel: "早めに決めたい",
                     position: 72,
                     statement: "私は、予定を早めに決めておけると安心します。",
+                    request: "予定を早めに相談してもらえるとうれしいです。",
                   },
                 ],
               },
@@ -60,6 +61,7 @@ describe("CompatibilityShareContentSectionScreen", () => {
     expect(screen.getByText("「私は、一緒に楽しむ時間を大切にしたいです」")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "時間と予定" })).toBeTruthy();
     expect(screen.getByText("私は、予定を早めに決めておけると安心します。")).toBeTruthy();
+    expect(screen.getByText("予定を早めに相談してもらえるとうれしいです。")).toBeTruthy();
     expect(screen.getByText(/生の回答、日記や会話/)).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "家族" }));

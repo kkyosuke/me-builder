@@ -10,6 +10,7 @@ export type ScoredParameter = Readonly<{
   score: number | null;
   coverage: number;
   band: ParameterBand;
+  relationshipRequest?: string;
 }>;
 
 export type DiagnosisScoring = Readonly<{
@@ -64,6 +65,17 @@ const WeightSchema = v.pipe(
   v.check((weight) => weight !== 0, "weightは0にできません"),
 );
 const ScoreBoundarySchema = v.pipe(v.number(), v.finite(), v.minValue(0), v.maxValue(100));
+const RelationshipRequestsSchema = v.pipe(
+  v.object({
+    low: v.optional(NonEmptyStringSchema),
+    balanced: v.optional(NonEmptyStringSchema),
+    high: v.optional(NonEmptyStringSchema),
+  }),
+  v.check(
+    (requests) => Object.values(requests).some((request) => request !== undefined),
+    "relationshipRequestsには1件以上の文が必要です",
+  ),
+);
 
 const ScoringConfigSchema = v.pipe(
   v.object({
@@ -75,6 +87,7 @@ const ScoringConfigSchema = v.pipe(
           label: NonEmptyStringSchema,
           lowLabel: NonEmptyStringSchema,
           highLabel: NonEmptyStringSchema,
+          relationshipRequests: v.optional(RelationshipRequestsSchema),
         }),
       ),
       v.minLength(1),
@@ -222,11 +235,15 @@ function scoreParameters(
       coverage < config.minimumCoverage || answeredWeight === 0
         ? null
         : Math.round(50 + 50 * (weightedSum / answeredWeight));
+    const band = resolveBand(score, config);
+    const { relationshipRequests, ...displayParameter } = parameter;
+    const relationshipRequest = band === "insufficient" ? undefined : relationshipRequests?.[band];
     return {
-      ...parameter,
+      ...displayParameter,
       score,
       coverage: Math.round(coverage * 100),
-      band: resolveBand(score, config),
+      band,
+      ...(relationshipRequest ? { relationshipRequest } : {}),
     };
   });
 

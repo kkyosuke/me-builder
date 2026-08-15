@@ -26,7 +26,7 @@ flowchart LR
 | 設定 | 役割 |
 | --- | --- |
 | `version` | 使用した変換規則を識別する |
-| `parameters` | パラメータID、表示名、低い側・高い側のラベル |
+| `parameters` | パラメータID、表示名、低い側・高い側のラベル、任意の審査済み関わり方文 |
 | `choiceScores` | 回答値を-1〜1へ変換する |
 | `questions` | Question ID、Question Version、パラメータごとの重み |
 | `minimumCoverage` | スコアを表示できる最低回答充足率 |
@@ -49,6 +49,9 @@ flowchart LR
       label: "計画性",
       lowLabel: "即興を好む",
       highLabel: "計画を好む",
+      relationshipRequests: {
+        high: "予定を早めに相談してもらえるとうれしいです。",
+      },
     },
   ],
   choiceScores: { yes: 1, no: -1 },
@@ -68,6 +71,8 @@ flowchart LR
 `choiceScores`はYes／Noに限定しません。たとえば`agree: 1`、`neutral: 0`、`disagree: -1`を設定すれば、同じ計算処理で3択を扱えます。
 
 1問は複数のパラメータへ寄与できます。重みが正なら回答値の正方向、負なら逆方向へ動かします。重みを持たないパラメータには寄与しません。
+
+`relationshipRequests`は相性共有で「こうしてもらえるとうれしい」と表示する、審査済みの一人称の定型文です。`low`、`balanced`、`high`のうち文を用意した帯域だけを設定し、設定がない帯域では関わり方を推測・表示しません。診断結果画面やBrain Itemの本文には表示せず、相性共有専用の表示へだけ渡します。
 
 ## 4. 共通の計算手順
 
@@ -107,6 +112,7 @@ coverage = 回答済み重み ÷ そのパラメータの全重み
 - `minimumCoverage`は0〜1とする
 - 帯域境界は0〜100に置き、`lowMaximum < highMinimum`とする
 - 同じ入力回答と同じ設定版からは、常に同じ出力を返す
+- `relationshipRequests`を設定する場合は、低・中央・高のうち1つ以上に空でない審査済み文を持たせる
 - スコアの向きに良し悪しを持たせない
 - `coverage`を統計的な`Confidence`として扱わない
 
@@ -114,7 +120,7 @@ coverage = 回答済み重み ÷ そのパラメータの全重み
 
 結果は少なくとも、使用したQuestion ID、Question Version、選択値、設定版から再現できる必要があります。
 
-質問文・選択肢を変更する場合はQuestion Versionを追加します。パラメータ、重み、回答値の変換、表示境界を変更する場合は設定版を追加します。過去の回答結果を、新しい設定版で暗黙に読み替えません。
+質問文・選択肢を変更する場合はQuestion Versionを追加します。パラメータ、重み、回答値の変換、表示境界、`relationshipRequests`を変更する場合は設定版を追加します。過去の回答結果を、新しい設定版で暗黙に読み替えません。
 
 ## 7. 新しい診断を追加する手順
 
