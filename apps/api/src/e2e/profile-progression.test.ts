@@ -166,6 +166,7 @@ describe("Profile progression API local E2E", () => {
       calculationVersion: 1,
       highestLevel: 1,
       recentChanges: [],
+      milestoneCards: [],
     });
 
     const at = new Date("2026-08-15T01:00:00.000Z");
@@ -187,6 +188,7 @@ describe("Profile progression API local E2E", () => {
         expect.objectContaining({ kind: "new_piece", growthDelta: 3 }),
         expect.objectContaining({ kind: "evidence_deepened", growthDelta: 1 }),
       ]),
+      milestoneCards: [],
     });
 
     await accountDataStore.db

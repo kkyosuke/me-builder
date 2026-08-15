@@ -22,6 +22,14 @@ describe("fetchProfileProgression", () => {
           occurredAt: "2026-08-15T00:00:00.000Z",
         },
       ],
+      milestoneCards: [
+        {
+          level: 10,
+          reachedAt: "2026-08-15T00:00:00.000Z",
+          collectedPiecesDelta: 20,
+          categories: ["goal"],
+        },
+      ],
     };
     const fetchMock = vi.fn().mockResolvedValue(Response.json(progression));
     vi.stubGlobal("fetch", fetchMock);
@@ -50,6 +58,7 @@ describe("fetchProfileProgression", () => {
           calculationVersion: 1,
           highestLevel: 1,
           recentChanges: [],
+          milestoneCards: [],
         }),
       ),
     );

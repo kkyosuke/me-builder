@@ -1321,6 +1321,13 @@ export interface operations {
               /** Format: date-time */
               occurredAt: string;
             }[];
+            milestoneCards: {
+              level: number;
+              /** Format: date-time */
+              reachedAt: string;
+              collectedPiecesDelta: number;
+              categories: string[];
+            }[];
           };
         };
       };

@@ -29,6 +29,14 @@ describe("ProgressionSummaryCard", () => {
                 occurredAt: "2026-08-15T00:00:00.000Z",
               },
             ],
+            milestoneCards: [
+              {
+                level: 10,
+                reachedAt: "2026-08-15T00:00:00.000Z",
+                collectedPiecesDelta: 42,
+                categories: ["identity", "goal"],
+              },
+            ],
           },
         }}
       />,
@@ -42,6 +50,10 @@ describe("ProgressionSummaryCard", () => {
     expect(screen.getByText("6")).toBeTruthy();
     expect(screen.getByText("かけらの根拠が深まりました")).toBeTruthy();
     expect(screen.getByText("+1")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "10レベルごとの成長カード" })).toBeTruthy();
+    expect(screen.getByText("Lv.10")).toBeTruthy();
+    expect(screen.getByText(/自分らしさ・目標/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "保存" })).toBeTruthy();
     expect(screen.getByText(/優劣や完成度ではなく/)).toBeTruthy();
     expect(screen.queryByText(/me-builder/i)).toBeNull();
   });

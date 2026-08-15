@@ -126,6 +126,7 @@ describe("DiagnosisResultView", () => {
             calculationVersion: 1,
             highestLevel: 4,
             recentChanges: [],
+            milestoneCards: [],
           },
         }}
       />,

@@ -1739,6 +1739,35 @@
                         "required": ["kind", "growthDelta", "occurredAt"]
                       },
                       "maxItems": 3
+                    },
+                    "milestoneCards": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "level": {
+                            "type": "integer",
+                            "minimum": 10,
+                            "multipleOf": 10
+                          },
+                          "reachedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "collectedPiecesDelta": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "categories": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": ["level", "reachedAt", "collectedPiecesDelta", "categories"]
+                      },
+                      "maxItems": 3
                     }
                   },
                   "required": [
@@ -1751,7 +1780,8 @@
                     "categoryCount",
                     "calculationVersion",
                     "highestLevel",
-                    "recentChanges"
+                    "recentChanges",
+                    "milestoneCards"
                   ]
                 }
               }

@@ -237,6 +237,7 @@ describe("App", () => {
       calculationVersion: 1,
       highestLevel: 1,
       recentChanges: [],
+      milestoneCards: [],
     });
     mocks.saveAccountAvatar.mockImplementation(
       async (_apiUrl: string, _idToken: string, nextAvatar: { dataUrl: string }) => ({

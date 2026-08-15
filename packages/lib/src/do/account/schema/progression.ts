@@ -75,6 +75,24 @@ export const progressionItemStates = sqliteTable(
   ],
 );
 
+/** 10レベルごとの成長カード。本文を持たず、到達時点の集計だけを保存する。 */
+export const progressionMilestones = sqliteTable(
+  "progression_milestones",
+  {
+    ...baseSchema,
+    accountId: text("account_id")
+      .notNull()
+      .references(() => accountDataIdentity.accountId),
+    level: integer("level").notNull(),
+    collectedPiecesDelta: integer("collected_pieces_delta").notNull(),
+    collectedPiecesTotal: integer("collected_pieces_total").notNull(),
+    categoriesJson: text("categories_json").notNull().default("[]"),
+  },
+  (table) => [
+    uniqueIndex("progression_milestone_account_level_idx").on(table.accountId, table.level),
+  ],
+);
+
 /** Brain更新batchで積み、次の進行度読込時に差分だけを反映する。 */
 export const progressionPendingEvents = sqliteTable(
   "progression_pending_events",
