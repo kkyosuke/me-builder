@@ -71,6 +71,7 @@ docs/
 - [「家族との距離感・支え合い」パラメータ変換設計](diagnosis/scoring/family-support-style-parameter-design.md) — 9つ目の診断固有のパラメータ、重み、表示設定、Relationship Category
 - [「友達との距離感・付き合い方」パラメータ変換設計](diagnosis/scoring/friendship-style-parameter-design.md) — 10個目の診断固有のパラメータ、重み、表示設定、Relationship Category
 - [「決め方・迷いとの向き合い方」パラメータ変換設計](diagnosis/scoring/decision-making-style-parameter-design.md) — 11個目の診断固有のパラメータ、重み、表示設定、Relationship Category
+- [「仕事の進め方・優先順位」パラメータ変換設計](diagnosis/scoring/work-priority-style-parameter-design.md) — 12個目の診断固有のパラメータ、重み、表示設定、Relationship Category
 
 ### ドメインを設計する
 

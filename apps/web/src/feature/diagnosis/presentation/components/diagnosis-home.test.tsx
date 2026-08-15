@@ -245,7 +245,12 @@ describe("DiagnosisHome", () => {
               title: "決め方・迷いとの向き合い方",
               displayOrder: 8,
             }),
-            diagnosis({ id: "new-diagnosis", title: "新しい診断", displayOrder: 9 }),
+            diagnosis({
+              id: "work-priority-style",
+              title: "仕事の進め方・優先順位",
+              displayOrder: 9,
+            }),
+            diagnosis({ id: "new-diagnosis", title: "新しい診断", displayOrder: 10 }),
           ],
         }}
         onOpenDiagnosis={vi.fn()}
@@ -268,6 +273,9 @@ describe("DiagnosisHome", () => {
     });
     const decisionMakingStyleCard = screen.getByRole("button", {
       name: /決め方・迷いとの向き合い方/,
+    });
+    const workPriorityStyleCard = screen.getByRole("button", {
+      name: /仕事の進め方・優先順位/,
     });
     const fallbackCard = screen.getByRole("button", { name: /新しい診断/ });
 
@@ -294,6 +302,9 @@ describe("DiagnosisHome", () => {
     );
     expect(decisionMakingStyleCard.querySelector("img")?.getAttribute("src")).toBe(
       "/images/diagnoses/decision-making-style.jpg",
+    );
+    expect(workPriorityStyleCard.querySelector("img")?.getAttribute("src")).toBe(
+      "/images/diagnoses/work-priority-style.jpg",
     );
     expect(fallbackCard.querySelector("img")?.getAttribute("src")).toBe(
       "/images/diagnoses/default.jpg",
