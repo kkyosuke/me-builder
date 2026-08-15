@@ -155,6 +155,9 @@ describe("AccountData Workers runtime E2E", () => {
       state.storage.sql.exec("ALTER TABLE chat_turns DROP COLUMN daily_prompt_follow_up");
       state.storage.sql.exec("ALTER TABLE chat_turns DROP COLUMN collection_kind");
       state.storage.sql.exec("ALTER TABLE chat_turns DROP COLUMN collection_theme_id");
+      state.storage.sql.exec("DROP TABLE progression_pending_events");
+      state.storage.sql.exec("DROP TABLE progression_item_states");
+      state.storage.sql.exec("DROP TABLE progression_states");
       state.storage.sql.exec("DROP TABLE progression_events");
       state.storage.sql.exec("DELETE FROM __drizzle_migrations WHERE created_at >= 1786666843277");
 
@@ -220,6 +223,9 @@ describe("AccountData Workers runtime E2E", () => {
       state.storage.sql.exec("ALTER TABLE chat_turns DROP COLUMN daily_prompt_follow_up");
       state.storage.sql.exec("ALTER TABLE chat_turns DROP COLUMN collection_kind");
       state.storage.sql.exec("ALTER TABLE chat_turns DROP COLUMN collection_theme_id");
+      state.storage.sql.exec("DROP TABLE progression_pending_events");
+      state.storage.sql.exec("DROP TABLE progression_item_states");
+      state.storage.sql.exec("DROP TABLE progression_states");
       state.storage.sql.exec("DROP TABLE progression_events");
       state.storage.sql.exec("DELETE FROM __drizzle_migrations WHERE created_at > 1786361220917");
 
@@ -334,6 +340,9 @@ describe("AccountData Workers runtime E2E", () => {
       state.storage.sql.exec("ALTER TABLE chat_turns DROP COLUMN daily_prompt_follow_up");
       state.storage.sql.exec("ALTER TABLE chat_turns DROP COLUMN collection_kind");
       state.storage.sql.exec("ALTER TABLE chat_turns DROP COLUMN collection_theme_id");
+      state.storage.sql.exec("DROP TABLE progression_pending_events");
+      state.storage.sql.exec("DROP TABLE progression_item_states");
+      state.storage.sql.exec("DROP TABLE progression_states");
       state.storage.sql.exec("DROP TABLE progression_events");
       state.storage.sql.exec("DELETE FROM __drizzle_migrations WHERE created_at >= 1786415351981");
 
