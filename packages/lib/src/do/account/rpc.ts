@@ -167,6 +167,10 @@ export type AccountDataActions = {
     [deliveryId: string, failureStage: string, at?: Date],
     typeof diary.markDailyPromptFailed
   >;
+  "conversation.listDailyPromptStrategyStats": RpcAction<
+    [],
+    typeof diary.listDailyPromptStrategyStats
+  >;
   "conversation.attachMessagesToTurn": RpcAction<
     [
       inputs: Parameters<typeof diary.attachMessagesToTurn>[2],

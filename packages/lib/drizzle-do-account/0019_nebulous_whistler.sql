@@ -1,0 +1,1 @@
+ALTER TABLE `daily_prompt_deliveries` ADD `response_kind` text;

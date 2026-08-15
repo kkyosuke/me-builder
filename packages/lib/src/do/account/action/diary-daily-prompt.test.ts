@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import type { AccountDataDatabase } from "../database";
 import { accountSchema as schema } from "../database";
 import {
+  listDailyPromptStrategyStats,
   markDailyPromptDelivered,
   prepareDailyPrompt,
   selectDailyPromptPreviousDayContext,
@@ -479,6 +480,103 @@ describe("daily prompt delivery", () => {
         .from(schema.dailyPromptDeliveries)
         .get(),
     ).toEqual({ promptVersion: "daily-check-in-fri-v1", promptStrategy: "brief" });
+  });
+
+  it("本人発言を直前の未回答配送1件だけへ対応づけ、方針別に集計する", async () => {
+    const db = createTestDb();
+    const firstAt = new Date("2026-08-10T09:00:00.000Z");
+    const secondAt = new Date("2026-08-12T09:00:00.000Z");
+    await db.insert(schema.dailyPromptDeliveries).values([
+      {
+        id: "daily-prompt:2026-08-10",
+        accountId: ACCOUNT_ID,
+        localDate: "2026-08-10",
+        promptVersion: "daily-check-in-mon-v1:brief-v1",
+        promptStrategy: "brief",
+        status: "delivered",
+        deliveredAt: firstAt,
+        createdAt: firstAt,
+        updatedAt: firstAt,
+      },
+      {
+        id: "daily-prompt:2026-08-12",
+        accountId: ACCOUNT_ID,
+        localDate: "2026-08-12",
+        promptVersion: "daily-check-in-wed-v1:event_first-v1",
+        promptStrategy: "event_first",
+        status: "delivered",
+        deliveredAt: secondAt,
+        createdAt: secondAt,
+        updatedAt: secondAt,
+      },
+    ]);
+
+    await storeLineTextSource(db, {
+      accountId: ACCOUNT_ID,
+      eventId: "strategy-response",
+      body: "今日は仕事が進んだ",
+      receivedAt: new Date("2026-08-12T10:00:00.000Z"),
+    });
+
+    expect(
+      await db
+        .select({
+          localDate: schema.dailyPromptDeliveries.localDate,
+          responseKind: schema.dailyPromptDeliveries.responseKind,
+        })
+        .from(schema.dailyPromptDeliveries)
+        .orderBy(schema.dailyPromptDeliveries.localDate),
+    ).toEqual([
+      { localDate: "2026-08-10", responseKind: null },
+      { localDate: "2026-08-12", responseKind: "reply" },
+    ]);
+    await expect(listDailyPromptStrategyStats(db, ACCOUNT_ID)).resolves.toEqual([
+      {
+        promptStrategy: "brief",
+        deliveryOpportunityCount: 1,
+        responseCount: 0,
+        stopCount: 0,
+      },
+      {
+        promptStrategy: "event_first",
+        deliveryOpportunityCount: 1,
+        responseCount: 1,
+        stopCount: 0,
+      },
+    ]);
+  });
+
+  it("停止発言を通常返信と分けて集計する", async () => {
+    const db = createTestDb();
+    const at = new Date("2026-08-14T09:00:00.000Z");
+    await db.insert(schema.dailyPromptDeliveries).values({
+      id: "daily-prompt:2026-08-14",
+      accountId: ACCOUNT_ID,
+      localDate: "2026-08-14",
+      promptVersion: "daily-check-in-fri-v1",
+      promptStrategy: "standard",
+      status: "delivered",
+      deliveredAt: at,
+      createdAt: at,
+      updatedAt: at,
+    });
+
+    await storeLineTextSource(db, {
+      accountId: ACCOUNT_ID,
+      eventId: "strategy-stop",
+      body: "メッセージを止めて",
+      receivedAt: new Date("2026-08-14T10:00:00.000Z"),
+      dailyPromptControl: "stop",
+    });
+
+    await expect(listDailyPromptStrategyStats(db, ACCOUNT_ID)).resolves.toEqual([
+      {
+        promptStrategy: "standard",
+        deliveryOpportunityCount: 1,
+        responseCount: 0,
+        stopCount: 1,
+      },
+    ]);
   });
 
   it("active Sessionがあれば当日の声かけをskipする", async () => {
