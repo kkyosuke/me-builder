@@ -32,6 +32,7 @@ export type {
   FailedBrainVectorSyncJobList,
 } from "./account/action/brain";
 export { BRAIN_VECTOR_SYNC_MAX_ATTEMPTS } from "./account/action/brain";
+export { expireAiUsageReservations } from "./account/action/ai-usage";
 export type { UtsushiProgression } from "./account/action/progression";
 export {
   chooseDailyPromptLocalHour,

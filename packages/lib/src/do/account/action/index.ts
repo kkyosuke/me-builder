@@ -1,3 +1,4 @@
+export * as aiUsage from "./ai-usage";
 export * as brain from "./brain";
 export * as diagnosis from "./diagnosis";
 export * as diagnosisBrainProjection from "./diagnosis-brain-projection";

@@ -2,6 +2,7 @@ import { count, eq } from "drizzle-orm";
 import type { AccountDataDatabase } from "../database";
 import {
   accountDataIdentity,
+  aiUsageRecords,
   brainItemAccessLabels,
   brainItemEvidenceEdges,
   brainItemRevisions,
@@ -120,6 +121,7 @@ export async function deleteAllDevelopmentAccountData(
     db.delete(profileSummaryShareProjections),
     db.delete(profileSummaryVersions),
     db.delete(profileSummaryGenerations),
+    db.delete(aiUsageRecords),
     db.delete(progressionPendingEvents),
     db.delete(progressionItemStates),
     db.delete(progressionMilestones),

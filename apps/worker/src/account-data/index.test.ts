@@ -1,3 +1,4 @@
+import * as meBuilderLib from "@me-builder/lib";
 import { D1, DO } from "@me-builder/lib";
 import { logger } from "@me-builder/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -176,6 +177,7 @@ describe("AccountData alarm", () => {
       DO.account.action.personalDataExport,
       "processPendingPersonalDataExport",
     ).mockResolvedValue({ processed: false });
+    vi.spyOn(meBuilderLib, "expireAiUsageReservations").mockResolvedValue(0);
   });
 
   afterEach(() => vi.restoreAllMocks());

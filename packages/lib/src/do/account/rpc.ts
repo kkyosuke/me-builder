@@ -12,6 +12,7 @@ import type {
   ProfileSummaryReadModel,
   RequestProfileSummaryGenerationResult,
 } from "../../profile-summary";
+import type * as aiUsage from "./action/ai-usage";
 import type * as brain from "./action/brain";
 import type * as development from "./action/development";
 import type * as diagnosis from "./action/diagnosis";
@@ -37,6 +38,16 @@ type DomainAction<TAction extends (...args: never[]) => unknown> = RpcAction<
 >;
 
 export type AccountDataActions = {
+  "aiUsage.reserve": RpcAction<
+    [input: aiUsage.ReserveAiUsageInput, at?: Date],
+    typeof aiUsage.reserveAiUsage
+  >;
+  "aiUsage.commit": RpcAction<[requestId: string, at?: Date], typeof aiUsage.commitAiUsage>;
+  "aiUsage.release": RpcAction<[requestId: string, at?: Date], typeof aiUsage.releaseAiUsage>;
+  "aiUsage.read": RpcAction<
+    [kind: aiUsage.AiUsageKind, period: aiUsage.AiUsagePeriod, limit: number, at?: Date],
+    typeof aiUsage.readAiUsage
+  >;
   "brain.listActive": RpcAction<[], typeof brain.listActiveBrainItems>;
   "brain.findActiveVectorEntry": RpcAction<
     [brainItemId: string],

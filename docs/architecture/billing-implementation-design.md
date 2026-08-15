@@ -56,6 +56,22 @@ flowchart LR
 
 Account不一致、不明なPlan・付与元、不正な日時、適用開始前、期限切れ、provider障害は、有料権限を推測せずFreeへ倒します。ファミリー席はFamily plan、本人とは異なる支払者Account、`family-seat`付与元が揃った場合だけファミリー由来として解決します。原因分類は運用上の区別に使い、決済事業者固有の状態を機能側へ公開しません。
 
+### 3.2 AI利用量ledger
+
+AI返信とプロフィール要約は、生成開始前に共通Entitlementから得た期間・上限でAccountDataへ利用枠を予約します。利用者へ正常に返した処理だけを確定し、開始前の中止は解放します。request IDを冪等keyにするため、QueueやRPCのretryで二重消費しません。
+
+```mermaid
+stateDiagram-v2
+    [*] --> reserved: 上限内で予約
+    reserved --> committed: 完成結果を提供
+    reserved --> released: 中止
+    reserved --> released: 15分timeout
+    committed --> committed: retry
+    released --> released: retry
+```
+
+予約中と確定済みを合わせて上限判定し、AccountDataの直列RPCとSQLiteの条件付きinsertをatomic境界にします。期間が変わっても過去行を削除せず、同じ期間内の上限変更は既存利用量を引き継ぎます。共有D1へrequest単位の利用履歴や個人内容を複製しません。
+
 ## 4. 状態の変換
 
 有効な`trialing`または`active`契約はPrice catalogでPlanへ変換します。期間末解約予約中も期限までは現在Planを維持します。`past_due`などの猶予期間は商取引条件確定後の状態遷移で扱い、未知statusや未知Priceは有料権限を付与しません。契約終了後は既存データを削除せずFreeへ戻します。

@@ -8,10 +8,12 @@ import {
   DIAGNOSIS_CATALOG_ID,
   DO,
   compatibilityDataFor,
+  expireAiUsageReservations,
 } from "@me-builder/lib";
 import { logger, toSafeOperationalErrorFields } from "@me-builder/shared";
 import { eq } from "drizzle-orm";
 import type { Env } from "../types";
+import { aiUsageActions } from "./ai-usage";
 import { brainActions } from "./brain";
 import { compatibilityActions } from "./compatibility";
 import { developmentActions } from "./development";
@@ -22,6 +24,7 @@ import { profileSummaryActions } from "./profile-summary";
 import { AccountDataRepository, type DiagnosisCatalogSnapshot } from "./repository";
 
 const actions = {
+  ...aiUsageActions,
   ...brainActions,
   ...diagnosisActions,
   ...developmentActions,
@@ -168,6 +171,7 @@ export class AccountData extends DurableObject<Env> {
           this.repository.client,
           this.accountId,
         );
+        await expireAiUsageReservations(this.repository.client, this.accountId);
         const checkpointClaim = await DO.account.action.diary.claimDueDiaryBrainCheckpointIds(
           this.repository.client,
           this.accountId,
