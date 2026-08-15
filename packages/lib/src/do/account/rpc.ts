@@ -57,6 +57,10 @@ export type AccountDataActions = {
     [at?: Date],
     typeof brain.selectDailyPromptStrategyPreference
   >;
+  "brain.selectDailyPromptTimePreference": RpcAction<
+    [at?: Date],
+    typeof brain.selectDailyPromptTimePreference
+  >;
   "brain.loadSemanticDedupCandidates": RpcAction<
     [vectorIds: readonly string[], categories: readonly string[]],
     typeof brain.loadBrainSemanticDedupCandidates
@@ -150,6 +154,10 @@ export type AccountDataActions = {
   "conversation.prepareDailyPrompt": RpcAction<
     [input: Parameters<typeof diary.prepareDailyPrompt>[2]],
     typeof diary.prepareDailyPrompt
+  >;
+  "conversation.resolveDailyPromptDueHour": RpcAction<
+    [localDate: string, selectedLocalHour: Parameters<typeof diary.resolveDailyPromptDueHour>[3]],
+    typeof diary.resolveDailyPromptDueHour
   >;
   "conversation.selectDailyPromptSameDayContext": RpcAction<
     [localDate: string, at?: Date],

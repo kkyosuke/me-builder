@@ -28,6 +28,11 @@ export const brainActions = {
     accountId: string,
     at?: Date,
   ) => DO.account.action.brain.selectDailyPromptStrategyPreference(db, accountId, at),
+  "brain.selectDailyPromptTimePreference": (
+    db: DO.account.Database,
+    accountId: string,
+    at?: Date,
+  ) => DO.account.action.brain.selectDailyPromptTimePreference(db, accountId, at),
   "brain.loadSemanticDedupCandidates": (
     db: DO.account.Database,
     accountId: string,

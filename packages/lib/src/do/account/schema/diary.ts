@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 import { baseSchema } from "../../../table/base";
+import type { DailyPromptLocalHour } from "../prompt-context";
 import { brainItems } from "./brain";
 import { accountDataIdentity } from "./identity";
 import { sourceRecords } from "./source";
@@ -101,6 +102,10 @@ export const dailyPromptDeliveries = sqliteTable(
     })
       .notNull()
       .default("standard"),
+    deliveryLocalHour: integer("delivery_local_hour")
+      .$type<DailyPromptLocalHour>()
+      .notNull()
+      .default(18),
     status: text("status", { enum: ["pending", "delivered", "skipped", "failed"] })
       .notNull()
       .default("pending"),

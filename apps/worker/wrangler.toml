@@ -11,7 +11,7 @@ enabled = true
 invocation_logs = false
 
 [triggers]
-crons = ["0 9 * * *"]
+crons = ["0 9,11,12 * * *"]
 
 [[queues.consumers]]
 queue = "me-builder-webhook-queue-local"
@@ -108,7 +108,7 @@ ENVIRONMENT = "local"
 name = "me-builder-worker-local"
 
 [env.local.triggers]
-crons = ["0 9 * * *"]
+crons = ["0 9,11,12 * * *"]
 
 [[env.local.queues.consumers]]
 queue = "me-builder-webhook-queue-local"
@@ -188,7 +188,7 @@ ENVIRONMENT = "local"
 name = "me-builder-worker-preview"
 
 [env.preview.triggers]
-crons = ["0 9 * * *"]
+crons = ["0 9,11,12 * * *"]
 
 [[env.preview.queues.consumers]]
 queue = "me-builder-webhook-queue-preview"
@@ -268,7 +268,7 @@ ENVIRONMENT = "preview"
 name = "me-builder-worker-production"
 
 [env.production.triggers]
-crons = ["0 9 * * *"]
+crons = ["0 9,11,12 * * *"]
 
 [[env.production.queues.consumers]]
 queue = "me-builder-webhook-queue-production"

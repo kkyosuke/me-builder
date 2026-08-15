@@ -1,8 +1,13 @@
-import { D1 } from "@me-builder/lib";
-import { type DailyPromptQueueMessage, type Queue, toTokyoLocalDate } from "@me-builder/shared";
+import { D1, DAILY_PROMPT_LOCAL_HOURS, type DailyPromptLocalHour } from "@me-builder/lib";
+import {
+  type DailyPromptQueueMessage,
+  type Queue,
+  toTokyoLocalDate,
+  toTokyoLocalHour,
+} from "@me-builder/shared";
 
 const ACCOUNT_PAGE_SIZE = 100;
-export { toTokyoLocalDate } from "@me-builder/shared";
+export { toTokyoLocalDate, toTokyoLocalHour } from "@me-builder/shared";
 
 /** Cron内ではPushせず、activeなAccountを1件ずつ専用Queueへ分割する。 */
 export async function enqueueDailyPrompts(
@@ -13,6 +18,10 @@ export async function enqueueDailyPrompts(
   }>,
 ): Promise<number> {
   const localDate = toTokyoLocalDate(input.scheduledTime);
+  const localHour = toTokyoLocalHour(input.scheduledTime);
+  if (!DAILY_PROMPT_LOCAL_HOURS.includes(localHour as DailyPromptLocalHour)) {
+    throw new Error("Daily prompt cron ran outside a supported local hour");
+  }
   let afterAccountId: string | undefined;
   let enqueued = 0;
 
@@ -24,7 +33,7 @@ export async function enqueueDailyPrompts(
     if (accountIds.length === 0) return enqueued;
     await input.queue.sendBatch(
       accountIds.map((accountId) => ({
-        body: { type: "daily-prompt" as const, accountId, localDate },
+        body: { type: "daily-prompt" as const, accountId, localDate, localHour },
       })),
     );
     enqueued += accountIds.length;

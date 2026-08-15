@@ -52,11 +52,29 @@ export const DAILY_PROMPT_STRATEGIES = [
 
 export type DailyPromptStrategy = (typeof DAILY_PROMPT_STRATEGIES)[number];
 
+export const DAILY_PROMPT_LOCAL_HOURS = [18, 20, 21] as const;
+export type DailyPromptLocalHour = (typeof DAILY_PROMPT_LOCAL_HOURS)[number];
+
 /** 本人が明言した聞かれ方を、レビュー済みの日次声かけ方針へ閉じ込める。 */
 export function dailyPromptStrategyFromQuestionStyle(
   style: Extract<PromptContext, { kind: "question_style" }>["style"],
 ): DailyPromptStrategy {
   return style === "no_choices" ? "standard" : style;
+}
+
+/** 生活上の区切りや明言時刻を、許可済みの夕方以降の候補へ写像する。 */
+export function dailyPromptLocalHourFromRestWindow(
+  restWindow: Extract<PromptContext, { kind: "rest_window" }>,
+): DailyPromptLocalHour | undefined {
+  if (restWindow.window === "after_dinner") return 21;
+  if (restWindow.window === "after_returning_home" || restWindow.window === "evening") return 20;
+  if (restWindow.window !== "fixed_time" || !restWindow.localTime) return undefined;
+  const [hourText, minuteText] = restWindow.localTime.split(":");
+  const minutes = Number(hourText) * 60 + Number(minuteText);
+  if (!Number.isFinite(minutes) || minutes < 17 * 60 || minutes > 22 * 60) return undefined;
+  return DAILY_PROMPT_LOCAL_HOURS.reduce((closest, candidate) =>
+    Math.abs(candidate * 60 - minutes) < Math.abs(closest * 60 - minutes) ? candidate : closest,
+  );
 }
 
 /** Brain Itemのattributes.promptContextへ保存できる構造のSSoT。 */

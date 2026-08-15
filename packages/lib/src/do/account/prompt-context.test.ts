@@ -8,6 +8,7 @@ import {
   PromptContextSchema,
   arePromptContextsEqual,
   buildPromptContextCollectionCandidates,
+  dailyPromptLocalHourFromRestWindow,
   dailyPromptStrategyFromQuestionStyle,
   findPrecedingAssistantBodies,
   isPromptContextGrounded,
@@ -17,6 +18,21 @@ import {
 } from "./prompt-context";
 
 describe("prompt context attribute master", () => {
+  it.each([
+    [{ kind: "rest_window", window: "after_returning_home" }, 20],
+    [{ kind: "rest_window", window: "after_dinner" }, 21],
+    [{ kind: "rest_window", window: "evening" }, 20],
+    [{ kind: "rest_window", window: "fixed_time", localTime: "19:00" }, 18],
+    [{ kind: "rest_window", window: "fixed_time", localTime: "20:40" }, 21],
+    [{ kind: "rest_window", window: "variable" }, undefined],
+    [{ kind: "rest_window", window: "fixed_time", localTime: "08:00" }, undefined],
+  ] satisfies ReadonlyArray<readonly [Extract<PromptContext, { kind: "rest_window" }>, unknown]>)(
+    "%jを許可済み候補へ写像する",
+    (restWindow, expected) => {
+      expect(dailyPromptLocalHourFromRestWindow(restWindow)).toBe(expected);
+    },
+  );
+
   it.each([
     ["brief", "brief"],
     ["event_first", "event_first"],

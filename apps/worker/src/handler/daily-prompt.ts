@@ -1,4 +1,9 @@
-import { D1, accountDataFor } from "@me-builder/lib";
+import {
+  D1,
+  DAILY_PROMPT_LOCAL_HOURS,
+  type DailyPromptLocalHour,
+  accountDataFor,
+} from "@me-builder/lib";
 import type { DailyPromptQueueMessage, Message, OperationalOutcome } from "@me-builder/shared";
 import {
   OperationalError,
@@ -38,7 +43,63 @@ export async function processDailyPromptMessage(
   let deliveryId: string | undefined;
 
   try {
-    const contextCutoffAt = getDailyPromptContextCutoffAt(message.body.localDate);
+    const localHour = message.body.localHour ?? 18;
+    if (!DAILY_PROMPT_LOCAL_HOURS.includes(localHour as DailyPromptLocalHour)) {
+      throw new OperationalError({
+        code: "DAILY_PROMPT_LOCAL_HOUR_INVALID",
+        category: "invariant",
+        stage: "daily-prompt.schedule",
+        retryable: false,
+      });
+    }
+    const scheduledLocalHour = localHour as DailyPromptLocalHour;
+    const preferredLocalHour = await accountData
+      .execute("brain.selectDailyPromptTimePreference")
+      .catch((error: unknown) => {
+        logger.warn(
+          {
+            event: "daily-prompt.time-preference.failed",
+            service: "worker",
+            environment: workerConfig.environment,
+            component: "daily-prompt",
+            queueMessageId: message.id,
+            localDate: message.body.localDate,
+            localHour: scheduledLocalHour,
+            attempt: message.attempts,
+            outcome: "degraded",
+            disposition: "continue",
+            ...toSafeOperationalErrorFields(error, {
+              code: "DAILY_PROMPT_TIME_PREFERENCE_LOAD_FAILED",
+              category: "dependency",
+              stage: "daily-prompt.schedule",
+              retryable: false,
+              dependency: "account-data",
+            }),
+          },
+          "[Daily prompt] failed to load time preference -> continue with 18:00",
+        );
+        return undefined;
+      });
+    const selectedLocalHour = preferredLocalHour ?? 18;
+    const dueLocalHour = await accountData.execute(
+      "conversation.resolveDailyPromptDueHour",
+      message.body.localDate,
+      selectedLocalHour,
+    );
+    if (dueLocalHour !== scheduledLocalHour) {
+      message.ack();
+      logResult(message, workerConfig, startedAt, {
+        outcome: "succeeded",
+        disposition: "ack",
+        stage: "daily-prompt.not-due",
+        resultCode: "DAILY_PROMPT_NOT_DUE",
+      });
+      return;
+    }
+    const contextCutoffAt = getDailyPromptContextCutoffAt(
+      message.body.localDate,
+      scheduledLocalHour,
+    );
     const weekdayContext = await accountData
       .execute(
         "brain.selectDailyPromptWeekdayContext",
@@ -191,6 +252,8 @@ export async function processDailyPromptMessage(
       localDate: message.body.localDate,
       promptVersion,
       promptStrategy: selectedPromptStrategy,
+      scheduledLocalHour,
+      selectedLocalHour,
     });
     if (preparation.type === "not-ready") {
       message.ack();
@@ -199,9 +262,11 @@ export async function processDailyPromptMessage(
         disposition: "ack",
         stage: "daily-prompt.skip",
         resultCode:
-          preparation.status === "skipped"
-            ? `DAILY_PROMPT_${preparation.reason?.toUpperCase() ?? "SKIPPED"}`
-            : `DAILY_PROMPT_ALREADY_${preparation.status.toUpperCase()}`,
+          preparation.status === "not-due"
+            ? "DAILY_PROMPT_NOT_DUE"
+            : preparation.status === "skipped"
+              ? `DAILY_PROMPT_${preparation.reason?.toUpperCase() ?? "SKIPPED"}`
+              : `DAILY_PROMPT_ALREADY_${preparation.status.toUpperCase()}`,
       });
       return;
     }
@@ -339,6 +404,7 @@ function logResult(
     queueMessageId: message.id,
     messageType: "daily-prompt",
     localDate: message.body.localDate,
+    localHour: message.body.localHour ?? 18,
     attempt: message.attempts,
     outcome: details.outcome,
     disposition: details.disposition,
