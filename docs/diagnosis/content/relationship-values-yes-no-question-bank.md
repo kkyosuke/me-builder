@@ -342,6 +342,19 @@
 9. 予定を決めたあとに重要な新しい情報が分かったときは、決めた内容を見直したい。
 10. 予定を決めたあとに新しい情報が分かっても、大きな問題がなければ最初に決めた内容で進めたい。
 
+### 3.26 仕事の進め方・優先順位
+
+1. 提出期限まで二日ある資料が必要な内容を満たしたときは、細部を整えるより次の仕事へ進みたい。
+2. 提出期限まで二日ある資料が必要な内容を満たしても、次の仕事へ進む前に細部を整えたい。
+3. 同じ週が締切の二つの仕事を任されたときは、両方に少しずつ着手して並行して進めたい。
+4. 同じ週が締切の二つの仕事を任されたときは、一方を終えてからもう一方に着手したい。
+5. 期限の二日前に提出できる状態になった仕事は、その時点で提出したい。
+6. 期限の二日前に提出できる状態になった仕事も、期限近くまで見直してから提出したい。
+7. 一週間の作業計画を決めたあと、期限に余裕のある新しい依頼が入ったときは、優先順位を組み替えて早めに着手したい。
+8. 一週間の作業計画を決めたあと、期限に余裕のある新しい依頼が入っても、まず当初の計画どおり進めたい。
+9. 数日かかる仕事では、最初の進み具合を全体が形になる前に共有したい。
+10. 数日かかる仕事では、最初の進み具合を全体が形になってから共有したい。
+
 ## 4. 回答から傾向を出すために必要な設計
 
 この質問集だけでは、「貯蓄重視」などの傾向を論理的に算出できません。現時点で定義しているのは質問候補までであり、質問と傾向軸の対応、回答の向き、集計方法は未定義です。1問への回答だけで人物の傾向を確定しません。
@@ -371,7 +384,7 @@
 - 算出規則と、結果に使用した質問を本人が確認できるようにする
 - 回答数が足りない場合や回答が食い違う場合は、無理にラベルを付けない
 
-公開済み診断の質問と傾向軸の対応、計算式、表示条件は、[自分と相手の優先・境界線](../scoring/relationship-priority-parameter-design.md)、[お金と消費](../scoring/money-values-parameter-design.md)、[インドア・アウトドアと余暇](../scoring/leisure-style-parameter-design.md)、[時間と予定](../scoring/time-planning-parameter-design.md)、[会話と感情表現](../scoring/conversation-emotion-parameter-design.md)、[優先順位と人生の方向性](../scoring/life-priorities-parameter-design.md)、[仕事の価値観・働き方](../scoring/work-values-parameter-design.md)、[仕事の変化・周囲との関わり方](../scoring/work-relationship-style-parameter-design.md)、[家族との距離感・支え合い](../scoring/family-support-style-parameter-design.md)、[友達との距離感・付き合い方](../scoring/friendship-style-parameter-design.md)、[決め方・迷いとの向き合い方](../scoring/decision-making-style-parameter-design.md)の各パラメータ変換設計を正とします。他の話題の対応は、質問の審査と合わせて後続で定義します。
+公開済み診断の質問と傾向軸の対応、計算式、表示条件は、[自分と相手の優先・境界線](../scoring/relationship-priority-parameter-design.md)、[お金と消費](../scoring/money-values-parameter-design.md)、[インドア・アウトドアと余暇](../scoring/leisure-style-parameter-design.md)、[時間と予定](../scoring/time-planning-parameter-design.md)、[会話と感情表現](../scoring/conversation-emotion-parameter-design.md)、[優先順位と人生の方向性](../scoring/life-priorities-parameter-design.md)、[仕事の価値観・働き方](../scoring/work-values-parameter-design.md)、[仕事の変化・周囲との関わり方](../scoring/work-relationship-style-parameter-design.md)、[家族との距離感・支え合い](../scoring/family-support-style-parameter-design.md)、[友達との距離感・付き合い方](../scoring/friendship-style-parameter-design.md)、[決め方・迷いとの向き合い方](../scoring/decision-making-style-parameter-design.md)、[仕事の進め方・優先順位](../scoring/work-priority-style-parameter-design.md)の各パラメータ変換設計を正とします。他の話題の対応は、質問の審査と合わせて後続で定義します。
 
 ## 5. 公開単位
 

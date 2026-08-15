@@ -882,6 +882,65 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
     e2eTimeoutMs,
   );
 
+  it(
+    "仕事の進め方・優先順位の回答を5つのパラメータへ採点する",
+    async () => {
+      for (let index = 1; index <= 10; index += 1) {
+        const suffix = String(index).padStart(2, "0");
+        const choiceId = index % 2 === 1 ? "yes" : "no";
+        const response = await putAnswer(
+          `dq-work-priority-style-${suffix}`,
+          choiceId,
+          "work-priority-style",
+        );
+        expect(response.status).toBe(200);
+      }
+
+      const response = await getAnswers("work-priority-style");
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({
+        id: "work-priority-style",
+        relationshipCategory: "work",
+        scoring: {
+          scoringVersion: 1,
+          balancedLabel: "状況に応じて仕事の進め方を選ぶ",
+          parameters: [
+            expect.objectContaining({
+              id: "work-completion-depth",
+              label: "仕上げの区切り",
+              lowLabel: "細部を整えてから進みたい",
+              highLabel: "必要十分で次へ進みたい",
+              score: 100,
+              coverage: 100,
+            }),
+            expect.objectContaining({
+              id: "work-task-parallelism",
+              score: 100,
+              coverage: 100,
+            }),
+            expect.objectContaining({
+              id: "work-deadline-use",
+              score: 100,
+              coverage: 100,
+            }),
+            expect.objectContaining({
+              id: "work-reprioritization",
+              score: 100,
+              coverage: 100,
+            }),
+            expect.objectContaining({
+              id: "work-progress-sharing",
+              score: 100,
+              coverage: 100,
+            }),
+          ],
+        },
+      });
+    },
+    e2eTimeoutMs,
+  );
+
   it(`${diagnosisAnswerCases.missingContents.id}: ${diagnosisAnswerCases.missingContents.name}`, async () => {
     const response = await getAnswers();
     expect(response.status).toBe(404);

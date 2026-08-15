@@ -215,9 +215,9 @@ describe("GET /api/diagnoses local D1 E2E", () => {
         lastAnsweredAt: string | null;
       }>;
     };
-    expect(initialBody.diagnoses).toHaveLength(11);
+    expect(initialBody.diagnoses).toHaveLength(12);
     expect(initialBody.diagnoses.map(({ displayOrder }) => displayOrder)).toEqual([
-      10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110,
+      10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120,
     ]);
     expect(initialBody.diagnoses.find(({ id }) => id === "life-priorities")).toMatchObject({
       relationshipCategory: "general",
@@ -246,6 +246,11 @@ describe("GET /api/diagnoses local D1 E2E", () => {
     });
     expect(initialBody.diagnoses.find(({ id }) => id === "decision-making-style")).toMatchObject({
       relationshipCategory: "general",
+      responseStatus: "unanswered",
+      questionCount: 10,
+    });
+    expect(initialBody.diagnoses.find(({ id }) => id === "work-priority-style")).toMatchObject({
+      relationshipCategory: "work",
       responseStatus: "unanswered",
       questionCount: 10,
     });
@@ -308,7 +313,7 @@ describe("GET /api/diagnoses local D1 E2E", () => {
     const body = (await response.json()) as {
       diagnoses: Array<{ responseStatus: string; answeredCount: number }>;
     };
-    expect(body.diagnoses).toHaveLength(10);
+    expect(body.diagnoses).toHaveLength(12);
     expect(body.diagnoses).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ responseStatus: "unanswered", answeredCount: 0 }),
@@ -525,6 +530,36 @@ describe("GET /api/diagnoses/:diagnosisId local D1 E2E", () => {
       "予定を決めたあとに重要な新しい情報が分かったときは、決めた内容を見直したい。",
       "予定を決めたあとに新しい情報が分かっても、大きな問題がなければ最初に決めた内容で進めたい。",
     ]);
+  });
+
+  it("仕事の進め方・優先順位の状況ベース10問をseedから返すこと", async () => {
+    const response = await request("known-token", "/api/diagnoses/work-priority-style");
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      id: string;
+      title: string;
+      relationshipCategory: string;
+      questions: Array<{ diagnosisQuestionId: string; text: string }>;
+    };
+
+    expect(body).toMatchObject({
+      id: "work-priority-style",
+      title: "仕事の進め方・優先順位",
+      relationshipCategory: "work",
+    });
+    expect(body.questions.map(({ text }) => text)).toEqual([
+      "提出期限まで二日ある資料が必要な内容を満たしたときは、細部を整えるより次の仕事へ進みたい。",
+      "提出期限まで二日ある資料が必要な内容を満たしても、次の仕事へ進む前に細部を整えたい。",
+      "同じ週が締切の二つの仕事を任されたときは、両方に少しずつ着手して並行して進めたい。",
+      "同じ週が締切の二つの仕事を任されたときは、一方を終えてからもう一方に着手したい。",
+      "期限の二日前に提出できる状態になった仕事は、その時点で提出したい。",
+      "期限の二日前に提出できる状態になった仕事も、期限近くまで見直してから提出したい。",
+      "一週間の作業計画を決めたあと、期限に余裕のある新しい依頼が入ったときは、優先順位を組み替えて早めに着手したい。",
+      "一週間の作業計画を決めたあと、期限に余裕のある新しい依頼が入っても、まず当初の計画どおり進めたい。",
+      "数日かかる仕事では、最初の進み具合を全体が形になる前に共有したい。",
+      "数日かかる仕事では、最初の進み具合を全体が形になってから共有したい。",
+    ]);
+    expect(body.questions.every(({ text }) => !text.includes("上司"))).toBe(true);
   });
 
   it(`${diagnosisDetailCases.notFound.id}: ${diagnosisDetailCases.notFound.name}`, async () => {

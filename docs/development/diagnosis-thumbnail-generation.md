@@ -23,7 +23,8 @@ apps/web/public/images/diagnoses/
 ├── work-relationship-style.jpg
 ├── family-support-style.jpg
 ├── friendship-style.jpg
-└── decision-making-style.jpg
+├── decision-making-style.jpg
+└── work-priority-style.jpg
 ```
 
 ## 3. 共通スタイル
@@ -165,7 +166,23 @@ Materials/textures: Matte paper and soft clay, subtle depth and shadows.
 Constraints: No text, no letters, no numbers, no logos, no watermark, no brand marks. Do not make more research, quick decisions, waiting, intuition, explicit reasoning, asking others, deciding independently, reconsidering, or staying with a decision look superior. Avoid scales, rankings, checkmarks, crosses, trophies, or a single highlighted correct path.
 ```
 
-## 12. 新しい診断へ展開する手順
+## 12. 「仕事の進め方・優先順位」生成プロンプト
+
+```text
+Use case: stylized-concept
+Asset type: 16:9 diagnosis card thumbnail for a web application
+Primary request: Create a polished 3D paper-cut/clay-style illustration representing different ways of organizing work: choosing a stopping point for quality, handling tasks sequentially or in parallel, using deadline time, reprioritizing after a new request, and sharing work in progress.
+Scene/backdrop: A calm abstract workspace with two equally prominent task paths arranged around a central blank work surface. One path uses a single layered task stack while the other uses two balanced parallel task cards. A simple hourglass without numbers, movable blank planning tiles, and a gentle outgoing progress arc suggest deadlines, reprioritization, and sharing without favoring one approach.
+Subject: An abstract work-planning landscape made from balanced task cards, layered paper shapes, an hourglass, movable planning tiles, and a neutral progress-sharing arc; no people required. Sequential and parallel arrangements must have equal size, lighting, prominence, and visual weight.
+Style/medium: Soft layered 3D paper-cut / clay render matching a premium editorial app illustration.
+Composition/framing: Wide 16:9, centered, clear silhouettes, important objects away from edges, suitable for a small card crop.
+Lighting/mood: Warm soft studio lighting, calm, capable, thoughtful, welcoming.
+Color palette: Deep navy background, muted slate blue, warm cream, coral accents, small golden accents; consistent with the existing me-builder diagnosis thumbnails.
+Materials/textures: Matte paper and soft clay, subtle depth and shadows.
+Constraints: No text, no letters, no numbers, no logos, no watermark, no brand marks. Do not make speed, refinement, sequential work, parallel work, early submission, using the available time, reprioritizing, keeping a plan, early sharing, or sharing after work takes shape look superior. Avoid rankings, checkmarks, crosses, trophies, corporate logos, realistic office signage, religious imagery, or political symbols.
+```
+
+## 13. 新しい診断へ展開する手順
 
 1. §4の`Primary request`、`Scene/backdrop`、`Subject`を新しい診断のテーマへ置き換える
 2. §3の共通スタイルと`Composition/framing`、`Constraints`を維持する
