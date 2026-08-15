@@ -46,7 +46,7 @@ type CompatibilityResolvedContents =
       nextAction: "diagnosis" | "profile-summary" | null;
     }>;
 
-export type CompatibilityRelationshipContents =
+type CompatibilityRelationshipContents =
   | Readonly<CompatibilityReadyContents & { progression: CompatibilityPairProgression }>
   | Exclude<CompatibilityResolvedContents, CompatibilityReadyContents>;
 
