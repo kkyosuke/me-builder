@@ -296,4 +296,42 @@ describe("diary chat guardrails", () => {
     expect(context.memories[0]?.statement).toHaveLength(2_000);
     expect(context.memories[0]?.evidence[0]?.text).toHaveLength(1_000);
   });
+
+  it("関係性Contextへ本人の関連診断だけを直列化し、所有者IDをモデルへ渡さない", () => {
+    const context = buildDiaryChatContextPackage(messages, "normal", [], {
+      accountId: "account-1",
+      mode: "session-and-diagnosis",
+      personReferenceStatus: "confirmed",
+      category: "friend",
+      diagnoses: [
+        {
+          ownerAccountId: "account-1",
+          diagnosisId: "friend-style",
+          relationshipCategory: "friend",
+          statement: "気持ちを言葉で確認する傾向がある",
+        },
+        {
+          ownerAccountId: "third-party",
+          diagnosisId: "private-third-party",
+          relationshipCategory: "friend",
+          statement: "共有されていない第三者情報",
+        },
+      ],
+    });
+
+    expect(context.relationship_question).toEqual({
+      context_scope: "session-and-diagnosis",
+      person_reference_status: "confirmed",
+      relationship_category: "friend",
+      own_diagnoses: [
+        {
+          diagnosis_id: "friend-style",
+          relationship_category: "friend",
+          statement: "気持ちを言葉で確認する傾向がある",
+        },
+      ],
+    });
+    expect(JSON.stringify(context)).not.toContain("account-1");
+    expect(JSON.stringify(context)).not.toContain("private-third-party");
+  });
 });

@@ -14,7 +14,14 @@ export const brainActions = {
     accountId: string,
     vectorIds: readonly string[],
     at?: Date,
-  ) => DO.account.action.brain.loadBrainChatContextMemories(db, accountId, vectorIds, at),
+    notBefore?: Date,
+  ) =>
+    DO.account.action.brain.loadBrainChatContextMemories(db, accountId, vectorIds, at, notBefore),
+  "brain.loadRelationshipDiagnosisContexts": (
+    db: DO.account.Database,
+    accountId: string,
+    at?: Date,
+  ) => DO.account.action.brain.loadRelationshipDiagnosisContexts(db, accountId, at),
   "brain.listActivePromptContextKinds": (db: DO.account.Database, accountId: string, at?: Date) =>
     DO.account.action.brain.listActivePromptContextKinds(db, accountId, at),
   "brain.selectDailyPromptWeekdayContext": (

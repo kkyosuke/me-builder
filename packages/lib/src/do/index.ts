@@ -30,6 +30,7 @@ export type {
   DailyPromptWeekdayContext,
   FailedBrainVectorSyncJob,
   FailedBrainVectorSyncJobList,
+  RelationshipDiagnosisContext,
 } from "./account/action/brain";
 export { BRAIN_VECTOR_SYNC_MAX_ATTEMPTS } from "./account/action/brain";
 export { expireAiUsageReservations } from "./account/action/ai-usage";
