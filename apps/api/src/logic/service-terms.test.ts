@@ -1,7 +1,11 @@
 import type { D1 } from "@me-builder/lib";
 import { currentServiceTerms } from "@me-builder/shared";
 import { describe, expect, it, vi } from "vitest";
-import { acceptServiceTerms, getServiceTermsStatus } from "./service-terms";
+import {
+  acceptServiceTerms,
+  getServiceTermsAcceptanceHistory,
+  getServiceTermsStatus,
+} from "./service-terms";
 
 const db = {} as D1.shared.Client;
 const session = {
@@ -28,6 +32,7 @@ function dependencies(acceptance?: { acceptedAt: string }) {
           }
         : undefined,
     ),
+    listAcceptanceHistory: vi.fn().mockResolvedValue([]),
     accept: vi.fn().mockResolvedValue({
       id: "acceptance-1",
       accountId: "account-1",
@@ -94,5 +99,60 @@ describe("service terms", () => {
     );
     expect(result).toMatchObject({ type: "accepted", acceptance: { accountId: "account-1" } });
     expect(deps.accept).toHaveBeenCalledWith(db, "account-1");
+  });
+
+  it("本人の同意履歴を現在有効・過去へ分類する", async () => {
+    const deps = dependencies({ acceptedAt: "2026-08-15T02:00:00.000Z" });
+    vi.mocked(deps.findAcceptance).mockResolvedValue({
+      id: "acceptance-current",
+      accountId: "account-1",
+      documentKey: "terms_of_service",
+      documentVersion: currentServiceTerms.version,
+      documentHash: currentServiceTerms.contentHash,
+      acceptedAt: "2026-08-15T02:00:00.000Z",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      deletedAt: null,
+      isDeleted: false,
+    });
+    vi.mocked(deps.listAcceptanceHistory).mockResolvedValue([
+      {
+        id: "acceptance-current",
+        accountId: "account-1",
+        documentKey: "terms_of_service",
+        documentVersion: currentServiceTerms.version,
+        documentHash: currentServiceTerms.contentHash,
+        acceptedAt: "2026-08-15T02:00:00.000Z",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        deletedAt: null,
+        isDeleted: false,
+      },
+      {
+        id: "acceptance-past",
+        accountId: "account-1",
+        documentKey: "terms_of_service",
+        documentVersion: "2026-08-15",
+        documentHash: null,
+        acceptedAt: "2026-08-15T01:00:00.000Z",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        deletedAt: new Date(),
+        isDeleted: true,
+      },
+    ]);
+
+    const result = await getServiceTermsAcceptanceHistory(
+      { idToken: "token", lineLoginChannelId: "channel", db },
+      deps,
+    );
+
+    expect(result).toMatchObject({
+      type: "resolved",
+      acceptances: [
+        { version: currentServiceTerms.version, status: "current" },
+        { version: "2026-08-15", documentHash: null, status: "past" },
+      ],
+    });
   });
 });

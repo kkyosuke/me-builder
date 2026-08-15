@@ -2,7 +2,7 @@ import {
   currentServiceTerms,
   serviceTermsDocumentsSatisfyingCurrentRequirement,
 } from "@me-builder/shared";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import type { SharedD1Client } from "../client";
 import { accountAgreementAcceptances } from "../schema/agreement";
 
@@ -34,6 +34,24 @@ export async function hasAcceptedCurrentTerms(
   accountId: string,
 ): Promise<boolean> {
   return (await findCurrentTermsAcceptance(db, accountId)) !== undefined;
+}
+
+/** 本人の利用規約同意を、無効化済みを含めて新しい順に返す。 */
+export async function listTermsAcceptanceHistory(db: SharedD1Client, accountId: string) {
+  return await db
+    .select()
+    .from(accountAgreementAcceptances)
+    .where(
+      and(
+        eq(accountAgreementAcceptances.accountId, accountId),
+        eq(accountAgreementAcceptances.documentKey, currentServiceTerms.documentKey),
+      ),
+    )
+    .orderBy(
+      desc(accountAgreementAcceptances.acceptedAt),
+      desc(accountAgreementAcceptances.createdAt),
+    )
+    .all();
 }
 
 /** 同じAccount・文書・version・本文hashへの再送は、最初の同意記録を返す。 */

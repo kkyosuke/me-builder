@@ -7,11 +7,16 @@ import {
   AcceptServiceTermsRequestSchema,
   AcceptServiceTermsResponseSchema,
   InvalidServiceTermsRequestSchema,
+  ServiceTermsAcceptanceHistoryResponseSchema,
   ServiceTermsStatusResponseSchema,
   ServiceTermsVersionConflictSchema,
 } from "../contract/legal/terms";
 import { ServiceUnavailableErrorSchema, UnauthorizedErrorSchema } from "../contract/shared/errors";
-import { acceptServiceTerms, getServiceTermsStatus } from "../logic/service-terms";
+import {
+  acceptServiceTerms,
+  getServiceTermsAcceptanceHistory,
+  getServiceTermsStatus,
+} from "../logic/service-terms";
 import type { AppEnv } from "../types";
 import { bearerToken } from "./auth";
 
@@ -73,6 +78,23 @@ export async function putServiceTermsAcceptance(c: Context<AppEnv>): Promise<Res
       version: outcome.acceptance.documentVersion,
       documentHash: outcome.acceptance.documentHash,
       acceptedAt: outcome.acceptance.acceptedAt,
+    }),
+  );
+}
+
+export async function getServiceTermsAcceptanceHistoryContents(
+  c: Context<AppEnv>,
+): Promise<Response> {
+  c.header("Cache-Control", "no-store");
+  const input = params(c);
+  if (!input) return unavailable(c);
+  const outcome = await getServiceTermsAcceptanceHistory(input);
+  if (outcome.type !== "resolved") {
+    return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
+  }
+  return c.json(
+    v.parse(ServiceTermsAcceptanceHistoryResponseSchema, {
+      acceptances: outcome.acceptances,
     }),
   );
 }

@@ -18,3 +18,11 @@ export type ServiceTermsStatus = Readonly<{
     acceptedAt: string | null;
   }>;
 }>;
+
+export type ServiceTermsAcceptanceHistoryItem = Readonly<{
+  documentKey: "terms_of_service";
+  version: string;
+  documentHash: string | null;
+  acceptedAt: string;
+  status: "current" | "past";
+}>;

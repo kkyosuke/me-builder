@@ -40,6 +40,7 @@ import { diagnosisListRoute } from "./contract/diagnosis/list";
 import {
   acceptServiceTermsRequestValidator,
   acceptServiceTermsRoute,
+  getServiceTermsAcceptanceHistoryRoute,
   getServiceTermsRoute,
 } from "./contract/legal/terms";
 import { openApiOptions } from "./contract/openapi";
@@ -80,7 +81,11 @@ import {
   putDiagnosisAnswer,
   putDiagnosisDeferredQuestion,
 } from "./controller/diagnosis";
-import { getServiceTermsContents, putServiceTermsAcceptance } from "./controller/legal";
+import {
+  getServiceTermsAcceptanceHistoryContents,
+  getServiceTermsContents,
+  putServiceTermsAcceptance,
+} from "./controller/legal";
 import { postLineWebhook } from "./controller/line";
 import {
   getProfileProgressionContents,
@@ -168,6 +173,11 @@ app.get("/api/health", (c) => {
 app.post("/api/line/webhook", postLineWebhook);
 
 app.get("/api/legal/terms", getServiceTermsRoute, getServiceTermsContents);
+app.get(
+  "/api/legal/terms/acceptances",
+  getServiceTermsAcceptanceHistoryRoute,
+  getServiceTermsAcceptanceHistoryContents,
+);
 app.put(
   "/api/legal/terms/acceptance",
   acceptServiceTermsRoute,

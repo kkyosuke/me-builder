@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
+import { toTokyoLocalDate } from "../utils/tokyo-date";
 import {
   currentRequiredServiceTerms,
   currentServiceTerms,
@@ -8,7 +9,44 @@ import {
   serviceTermsDocumentsSatisfyingCurrentRequirement,
 } from "./service-terms";
 
+const ISO_TIMESTAMP_WITH_TIMEZONE =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/;
+
+/** 公開済みversionの内容・運用属性を、同意証跡と照合できる状態で固定する。 */
+const publishedServiceTermsHashes: Readonly<Record<string, string>> = {
+  "2026-08-15": "sha256:9e0143a66c525bc4784e2a6a5b0e16f511189e98b66f2da90dcb6d43cfe01836",
+  "2026-08-15-2": "sha256:1ba63664661455bdcd1e6e72c25768657d833c9dc44475e7276a5d862e1b1afc",
+};
+
 describe("service terms documents", () => {
+  it("versionと公開日時を一意かつ公開順で保持する", () => {
+    const versions = new Set<string>();
+    const hashes = new Set<string>();
+    const versionsPerDate = new Map<string, number>();
+    let previousPublishedAt = Number.NEGATIVE_INFINITY;
+
+    for (const document of serviceTermsDocuments) {
+      const version = /^(\d{4}-\d{2}-\d{2})(?:-(\d+))?$/.exec(document.version);
+      expect(version, `${document.version} must be a publication date version`).not.toBeNull();
+      const date = version?.[1] ?? "";
+      const sequence = (versionsPerDate.get(date) ?? 0) + 1;
+      versionsPerDate.set(date, sequence);
+      expect(version?.[2]).toBe(sequence === 1 ? undefined : String(sequence));
+      expect(document.publishedAt).toMatch(ISO_TIMESTAMP_WITH_TIMEZONE);
+      const publishedAt = Date.parse(document.publishedAt);
+      expect(Number.isFinite(publishedAt)).toBe(true);
+      expect(toTokyoLocalDate(publishedAt)).toBe(date);
+      expect(publishedAt).toBeGreaterThan(previousPublishedAt);
+      previousPublishedAt = publishedAt;
+
+      expect(versions.has(document.version)).toBe(false);
+      expect(hashes.has(document.contentHash)).toBe(false);
+      versions.add(document.version);
+      hashes.add(document.contentHash);
+    }
+    expect(serviceTermsDocuments.some((document) => document.requiresReacceptance)).toBe(true);
+  });
+
   it("公開済み本文と運用属性に一致するSHA-256を保持する", () => {
     for (const document of serviceTermsDocuments) {
       const { contentHash, ...content } = document;
@@ -16,6 +54,15 @@ describe("service terms documents", () => {
         .update(JSON.stringify(content))
         .digest("hex")}`;
       expect(contentHash).toBe(expected);
+    }
+  });
+
+  it("全公開済みversionの本文と運用属性を不変のhashで保持する", () => {
+    expect(Object.keys(publishedServiceTermsHashes)).toEqual(
+      serviceTermsDocuments.map((document) => document.version),
+    );
+    for (const document of serviceTermsDocuments) {
+      expect(document.contentHash).toBe(publishedServiceTermsHashes[document.version]);
     }
   });
 
@@ -30,7 +77,12 @@ describe("service terms documents", () => {
       title: "かがみ サービス利用規約",
     });
     expect(currentServiceTerms.summary).toContain("かがみは");
-    expect(serviceTermsDocuments[0]?.title).toBe("うつし サービス利用規約");
+    expect(serviceTermsDocuments[0]).toMatchObject({
+      version: "2026-08-15",
+      contentHash: "sha256:9e0143a66c525bc4784e2a6a5b0e16f511189e98b66f2da90dcb6d43cfe01836",
+      publishedAt: "2026-08-15T00:00:00+09:00",
+      title: "うつし サービス利用規約",
+    });
   });
 
   it("軽微改定では改定前の同意を継続して有効にする", () => {

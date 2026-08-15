@@ -41,6 +41,18 @@ export const AcceptServiceTermsResponseSchema = v.object({
   acceptedAt: v.pipe(v.string(), v.isoTimestamp()),
 });
 
+export const ServiceTermsAcceptanceHistoryResponseSchema = v.object({
+  acceptances: v.array(
+    v.object({
+      documentKey: v.literal("terms_of_service"),
+      version: NonEmptyStringSchema,
+      documentHash: v.nullable(v.pipe(v.string(), v.regex(/^sha256:[0-9a-f]{64}$/))),
+      acceptedAt: v.pipe(v.string(), v.isoTimestamp()),
+      status: v.picklist(["current", "past"]),
+    }),
+  ),
+});
+
 export const ServiceTermsVersionConflictSchema = v.object({
   error: v.literal("Terms version is no longer current"),
   currentVersion: NonEmptyStringSchema,
@@ -84,6 +96,20 @@ export const acceptServiceTermsRoute = describeRoute({
     200: jsonResponse("保存済みの同意記録", AcceptServiceTermsResponseSchema),
     400: jsonResponse("リクエストJSONが不正", InvalidServiceTermsRequestSchema),
     409: jsonResponse("表示後に規約versionが更新された", ServiceTermsVersionConflictSchema),
+    ...commonErrors,
+  },
+} satisfies DescribeRouteOptions);
+
+export const getServiceTermsAcceptanceHistoryRoute = describeRoute({
+  operationId: "getServiceTermsAcceptanceHistory",
+  tags: ["Legal"],
+  summary: "本人の利用規約同意履歴を取得する",
+  security: [{ liffIdToken: [] }],
+  responses: {
+    200: jsonResponse(
+      "現在有効・過去を区別した本人の同意履歴",
+      ServiceTermsAcceptanceHistoryResponseSchema,
+    ),
     ...commonErrors,
   },
 } satisfies DescribeRouteOptions);

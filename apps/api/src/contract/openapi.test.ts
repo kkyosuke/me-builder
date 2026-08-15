@@ -69,6 +69,7 @@ describe("GET /api/openapi.json", () => {
     expect(document.paths["/api/profile/avatar"]?.get).toBeDefined();
     expect(document.paths["/api/profile/avatar"]?.put).toBeDefined();
     expect(document.paths["/api/profile/avatar"]?.delete).toBeDefined();
+    expect(document.paths["/api/legal/terms/acceptances"]?.get).toBeDefined();
     expect(
       document.paths["/api/compatibility/invitations/{relationshipId}/avatar"]?.get,
     ).toBeDefined();

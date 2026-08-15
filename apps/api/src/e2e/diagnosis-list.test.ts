@@ -449,6 +449,15 @@ describe("GET /api/diagnoses local D1 E2E", () => {
     expect(histories.results.filter((acceptance) => acceptance.isDeleted === 1)).toHaveLength(1);
     expect(new Set(histories.results.map((acceptance) => acceptance.id)).size).toBe(2);
 
+    const historyResponse = await requestLegal("known-token", "/api/legal/terms/acceptances");
+    expect(historyResponse.status).toBe(200);
+    expect(await historyResponse.json()).toMatchObject({
+      acceptances: [
+        { version: currentServiceTerms.version, status: "current" },
+        { version: currentServiceTerms.version, status: "past" },
+      ],
+    });
+
     const feature = await request("known-token");
     expect(feature.status).toBe(200);
   });

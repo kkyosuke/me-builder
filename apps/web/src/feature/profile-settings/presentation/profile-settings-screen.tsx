@@ -10,7 +10,7 @@ import {
   Sun,
   Trash2,
 } from "lucide-react";
-import { type MouseEvent, useCallback, useEffect, useRef, useState } from "react";
+import { type MouseEvent, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { type AsyncState, errorMessage } from "../../../model/async-state";
 import type { ColorTheme } from "../../theme/model/color-theme";
 import type { FontSize } from "../../theme/model/font-size";
@@ -61,6 +61,7 @@ export function ProfileSettingsScreen({
   onResetAccountData,
   onThemeChange,
   onFontSizeChange,
+  serviceTermsAcceptanceHistory,
 }: {
   avatar: AvatarSelection | null;
   isAdmin?: boolean;
@@ -81,6 +82,7 @@ export function ProfileSettingsScreen({
   onResetAccountData?: () => Promise<ResetDevelopmentAccountDataResult>;
   onThemeChange: (theme: ColorTheme) => void;
   onFontSizeChange: (fontSize: FontSize) => void;
+  serviceTermsAcceptanceHistory?: ReactNode;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const backButtonRef = useRef<HTMLButtonElement>(null);
@@ -407,6 +409,7 @@ export function ProfileSettingsScreen({
             <span className="flex-1">利用規約を確認</span>
             <ChevronRight className="size-5 text-slate-400" aria-hidden="true" />
           </a>
+          {serviceTermsAcceptanceHistory}
         </section>
 
         {((canOpenBrainItems && onOpenBrainItems) ||

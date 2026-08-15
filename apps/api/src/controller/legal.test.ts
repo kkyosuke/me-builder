@@ -2,10 +2,15 @@ import type { D1Database } from "@cloudflare/workers-types";
 import { currentServiceTerms } from "@me-builder/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { app } from "../app";
-import { acceptServiceTerms, getServiceTermsStatus } from "../logic/service-terms";
+import {
+  acceptServiceTerms,
+  getServiceTermsAcceptanceHistory,
+  getServiceTermsStatus,
+} from "../logic/service-terms";
 
 vi.mock("../logic/service-terms", () => ({
   getServiceTermsStatus: vi.fn(),
+  getServiceTermsAcceptanceHistory: vi.fn(),
   acceptServiceTerms: vi.fn(),
 }));
 
@@ -88,5 +93,40 @@ describe("service terms controller", () => {
       { DB: db, LIFF_ID: "2010850319-Yl63upAR" },
     );
     expect(response.status).toBe(409);
+  });
+
+  it("本人の同意履歴を返す", async () => {
+    vi.mocked(getServiceTermsAcceptanceHistory).mockResolvedValue({
+      type: "resolved",
+      acceptances: [
+        {
+          documentKey: "terms_of_service",
+          version: currentServiceTerms.version,
+          documentHash: currentServiceTerms.contentHash,
+          acceptedAt: "2026-08-15T01:23:45.000Z",
+          status: "current",
+        },
+      ],
+    });
+
+    const response = await app.request(
+      "/api/legal/terms/acceptances",
+      { headers: { Authorization: "Bearer token" } },
+      { DB: db, LIFF_ID: "2010850319-Yl63upAR" },
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(await response.json()).toEqual({
+      acceptances: [
+        {
+          documentKey: "terms_of_service",
+          version: currentServiceTerms.version,
+          documentHash: currentServiceTerms.contentHash,
+          acceptedAt: "2026-08-15T01:23:45.000Z",
+          status: "current",
+        },
+      ],
+    });
   });
 });
