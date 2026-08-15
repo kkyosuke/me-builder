@@ -17,6 +17,7 @@ import m0015 from "./0015_last_killmonger.sql";
 import m0016 from "./0016_salty_grim_reaper.sql";
 import m0017 from "./0017_misty_hellcat.sql";
 import m0018 from "./0018_broken_stature.sql";
+import m0019 from "./0019_nebulous_whistler.sql";
 import journal from "./meta/_journal.json";
 
 export default {
@@ -41,5 +42,6 @@ export default {
     m0016,
     m0017,
     m0018,
+    m0019,
   },
 };

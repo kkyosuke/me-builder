@@ -117,6 +117,7 @@ export const dailyPromptDeliveries = sqliteTable(
     failureStage: text("failure_stage"),
     deliveredAt: integer("delivered_at", { mode: "timestamp" }),
     respondedAt: integer("responded_at", { mode: "timestamp" }),
+    responseKind: text("response_kind", { enum: ["reply", "stop"] }),
   },
   (table) => [
     uniqueIndex("daily_prompt_delivery_account_date_idx").on(table.accountId, table.localDate),

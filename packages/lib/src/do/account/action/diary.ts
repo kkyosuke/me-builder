@@ -82,6 +82,7 @@ export const DIARY_BRAIN_CHECKPOINT_DISPATCH_LEASE_MS = 60 * 60 * 1000;
 /** Queue内の最大6配送を5回まで投入し、合計30配送で恒久失敗を終端化する。 */
 export const DIARY_BRAIN_CHECKPOINT_MAX_DISPATCH_ATTEMPTS = 5;
 const CONVERSATION_POLICY_EXPLORATION_RATE = 0.2;
+export const DAILY_PROMPT_STRATEGY_METRIC_WINDOW = 90;
 
 function isRevisionedPromptContextKind(kind: PromptContext["kind"]): boolean {
   return kind === "occupation" || kind === "weekly_rhythm";
@@ -178,6 +179,13 @@ export type DailyPromptPreparation =
       status: "delivered" | "skipped" | "failed";
       reason?: DailyPromptSkipReason;
     }>;
+
+export type DailyPromptStrategyStat = Readonly<{
+  promptStrategy: DailyPromptStrategy;
+  deliveryOpportunityCount: number;
+  responseCount: number;
+  stopCount: number;
+}>;
 
 type DailyPromptSkipReason =
   | "manual_stopped"
@@ -663,6 +671,47 @@ export async function markDailyPromptFailed(
   return Boolean(updated);
 }
 
+/** 本人の直近配送だけを、レビュー済み方針ごとの結果へ集計する。 */
+export async function listDailyPromptStrategyStats(
+  db: AccountDataDatabase,
+  accountId: string,
+): Promise<readonly DailyPromptStrategyStat[]> {
+  const deliveries = await db
+    .select({
+      promptStrategy: dailyPromptDeliveries.promptStrategy,
+      responseKind: dailyPromptDeliveries.responseKind,
+    })
+    .from(dailyPromptDeliveries)
+    .where(
+      and(
+        eq(dailyPromptDeliveries.accountId, accountId),
+        eq(dailyPromptDeliveries.status, "delivered"),
+        eq(dailyPromptDeliveries.isDeleted, false),
+      ),
+    )
+    .orderBy(desc(dailyPromptDeliveries.localDate))
+    .limit(DAILY_PROMPT_STRATEGY_METRIC_WINDOW)
+    .all();
+  const aggregate = new Map<DailyPromptStrategy, DailyPromptStrategyStat>();
+  for (const delivery of deliveries) {
+    const current = aggregate.get(delivery.promptStrategy) ?? {
+      promptStrategy: delivery.promptStrategy,
+      deliveryOpportunityCount: 0,
+      responseCount: 0,
+      stopCount: 0,
+    };
+    aggregate.set(delivery.promptStrategy, {
+      ...current,
+      deliveryOpportunityCount: current.deliveryOpportunityCount + 1,
+      responseCount: current.responseCount + (delivery.responseKind === "reply" ? 1 : 0),
+      stopCount: current.stopCount + (delivery.responseKind === "stop" ? 1 : 0),
+    });
+  }
+  return [...aggregate.values()].sort((left, right) =>
+    left.promptStrategy.localeCompare(right.promptStrategy),
+  );
+}
+
 /** LINE eventを不変なSource Recordとして冪等に保存する。 */
 export async function storeLineTextSource(
   db: AccountDataDatabase,
@@ -702,6 +751,20 @@ export async function storeLineTextSource(
   }
   const sourceRecordId = `line-${await sha256(`${input.accountId}:${input.eventId}`)}`;
   const now = new Date();
+  const awaitingDailyPrompt = await db
+    .select({ id: dailyPromptDeliveries.id, status: dailyPromptDeliveries.status })
+    .from(dailyPromptDeliveries)
+    .where(
+      and(
+        eq(dailyPromptDeliveries.accountId, input.accountId),
+        inArray(dailyPromptDeliveries.status, ["pending", "delivered"]),
+        isNull(dailyPromptDeliveries.respondedAt),
+        lte(dailyPromptDeliveries.createdAt, input.receivedAt),
+        eq(dailyPromptDeliveries.isDeleted, false),
+      ),
+    )
+    .orderBy(desc(dailyPromptDeliveries.localDate))
+    .get();
 
   const statements: BatchItem<"sqlite">[] = [
     db
@@ -726,27 +789,13 @@ export async function storeLineTextSource(
         createdAt: input.receivedAt,
       })
       .onConflictDoNothing(),
-    db
-      .update(dailyPromptDeliveries)
-      .set({ respondedAt: input.receivedAt, updatedAt: now })
-      .where(
-        and(
-          eq(dailyPromptDeliveries.accountId, input.accountId),
-          inArray(dailyPromptDeliveries.status, ["pending", "delivered"]),
-          isNull(dailyPromptDeliveries.respondedAt),
-          lte(dailyPromptDeliveries.createdAt, input.receivedAt),
-          eq(dailyPromptDeliveries.isDeleted, false),
-        ),
-      ),
   ];
   const controlStatus = input.dailyPromptControl === "stop" ? "stopped" : "active";
   const controlledAtEpochMilliseconds = input.receivedAt.getTime();
   const isNewerControl = sql`${dailyPromptPreferences.controlledAt} < ${controlledAtEpochMilliseconds}
     OR (${dailyPromptPreferences.controlledAt} = ${controlledAtEpochMilliseconds}
       AND ${dailyPromptPreferences.controlSourceRecordId} < ${sourceRecordId})`;
-  statements.splice(
-    2,
-    0,
+  statements.push(
     db
       .insert(dailyPromptPreferences)
       .values({
@@ -768,9 +817,7 @@ export async function storeLineTextSource(
       }),
   );
   if (controlStatus === "stopped") {
-    statements.splice(
-      3,
-      0,
+    statements.push(
       db
         .update(dailyPromptDeliveries)
         .set({ status: "skipped", skipReason: "manual_stopped", updatedAt: now })
@@ -785,6 +832,28 @@ export async function storeLineTextSource(
                 AND ${dailyPromptPreferences.status} = 'stopped'
                 AND ${dailyPromptPreferences.controlSourceRecordId} = ${sourceRecordId}
             )`,
+          ),
+        ),
+    );
+  }
+  if (awaitingDailyPrompt) {
+    statements.push(
+      db
+        .update(dailyPromptDeliveries)
+        .set({
+          respondedAt: input.receivedAt,
+          responseKind:
+            awaitingDailyPrompt.status === "delivered"
+              ? controlStatus === "stopped"
+                ? "stop"
+                : "reply"
+              : null,
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(dailyPromptDeliveries.id, awaitingDailyPrompt.id),
+            isNull(dailyPromptDeliveries.respondedAt),
           ),
         ),
     );

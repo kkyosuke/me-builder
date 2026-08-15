@@ -189,6 +189,7 @@ describe("AccountData Workers runtime E2E", () => {
       state.storage.sql.exec("ALTER TABLE chat_turns DROP COLUMN collection_kind");
       state.storage.sql.exec("ALTER TABLE chat_turns DROP COLUMN collection_theme_id");
       state.storage.sql.exec("ALTER TABLE daily_prompt_deliveries DROP COLUMN prompt_strategy");
+      state.storage.sql.exec("ALTER TABLE daily_prompt_deliveries DROP COLUMN response_kind");
       state.storage.sql.exec("DROP TABLE progression_pending_events");
       state.storage.sql.exec("DROP TABLE progression_item_states");
       state.storage.sql.exec("DROP TABLE progression_states");

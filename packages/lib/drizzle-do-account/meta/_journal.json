@@ -134,6 +134,13 @@
       "when": 1786762187605,
       "tag": "0018_broken_stature",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1786762738312,
+      "tag": "0019_nebulous_whistler",
+      "breakpoints": true
     }
   ]
 }
