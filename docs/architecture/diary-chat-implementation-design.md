@@ -142,7 +142,7 @@ AccountDataはactive Session境界、未処理Diagnosis projection、未処理Br
 
 基本版は別のデプロイ単位を増やさず、`apps/worker`のCron、job、Queue consumerとして実装します。Cloudflare CronはUTCで指定するため毎日09:00、11:00、12:00 UTCに起動し、`Asia/Tokyo`の当日と18、20、21時の候補を固定します。Cronは共有D1からactiveなLINE Account IDだけをページング取得し、本文やLINE user IDを含めず、候補時刻とともにDaily Prompt Queueへ投入します。Cron内ではLINE Pushを行いません。
 
-consumerはAccountDataで候補時刻、同じ日本日付の配送状態、停止意思、active Session、配送準備後の本人発言を確認します。候補時刻が選択時刻と異なる場合は配送行を作らず終了します。直前の声かけが未回答なら翌日の1回を休み、未回答が3回続いていれば新しい本人発言まで自動休止します。停止発言より後に本人から新しい日記メッセージが届いた場合は停止状態を解除しますが、すでに終端化した当日分を作り直さず、次の送信可能な日から再開します。Queueの配送日が処理時点の日本日付と一致しない場合は期限切れとして送信しません。送信対象の場合は`Asia/Tokyo`の配送日から曜日別の一般文面versionを決め、AccountDataの配送行へ選択時刻とともに固定します。共有D1から現在有効なLINE identityを解決し、Account IDと日本日付から作る決定的なLINE retry keyで文面をPushします。LINE受付後の状態保存に失敗してQueueが再配送されても、同じretry keyと配送行に保存した文面version・時刻を再利用し、送信直前の可否を再評価します。
+consumerはAccountDataで候補時刻、同じ日本日付の時刻計画と配送状態、停止意思、active Session、配送準備後の本人発言を確認します。その日で最初に処理した候補は、明言、本人内実績、18時フォールバックの順で選んだ時刻と選択元を`daily_prompt_schedules`へ固定します。後続候補は現在の選択結果で上書きせず、保存済み計画を再利用します。候補時刻が計画時刻と異なる場合は配送行を作らず終了します。直前の声かけが未回答なら翌日の1回を休み、未回答が3回続いていれば新しい本人発言まで自動休止します。停止発言より後に本人から新しい日記メッセージが届いた場合は停止状態を解除しますが、すでに終端化した当日分を作り直さず、次の送信可能な日から再開します。Queueの配送日が処理時点の日本日付と一致しない場合は期限切れとして送信しません。送信対象の場合は`Asia/Tokyo`の配送日から曜日別の一般文面versionを決め、AccountDataの配送行へ計画時刻とともに固定します。共有D1から現在有効なLINE identityを解決し、Account IDと日本日付から作る決定的なLINE retry keyで文面をPushします。LINE受付後の状態保存に失敗してQueueが再配送されても、同じretry keyと時刻計画、配送行に保存した文面versionを再利用し、送信直前の可否を再評価します。
 
 ```mermaid
 sequenceDiagram
@@ -155,8 +155,13 @@ sequenceDiagram
     C->>D1: activeなLINE Account IDをページング取得
     C->>Q: Account ID、日本日付、候補時刻
     Q->>W: at-least-once配送
-    W->>AD: 当日の配送を準備
-    alt 時刻不一致・停止済み・期限切れ・会話中・本人発言あり・翌日休止・自動休止
+    W->>AD: 当日の時刻計画を作成または取得
+    alt 候補時刻と計画時刻が不一致
+        AD-->>W: 送信対象外
+    else 計画時刻と一致
+        W->>AD: 当日の配送を準備
+    end
+    alt 停止済み・期限切れ・会話中・本人発言あり・翌日休止・自動休止
         AD-->>W: skipped
     else 送信対象
         AD-->>W: pending delivery ID
@@ -481,7 +486,18 @@ Vectorizeへのupsertまたはdelete受付後に`applied`とmutation IDを記録
 
 `BRAIN_VECTOR_HMAC_SECRET`は通常のSecretローテーションだけで単独変更してはいけません。変更時は新しいindexを用意し、AccountDataを正として全active Itemを再同期し、検索先を切り替えた後に旧indexを削除します。緊急失効時も同じ再構築手順を使います。個別Itemの削除ではAccountDataの対応表に保存した旧vector IDを使うため、Secret変更前のvectorも削除できます。
 
-### 4.9 `daily_prompt_deliveries`
+### 4.9 `daily_prompt_schedules`
+
+同じ日本日付の18時、20時、21時で時刻選択をやり直さないため、Accountごとの日別計画を配送状態から分けて保存します。最初の候補処理だけが行を作り、後続候補とQueue再配送は保存済みの値を返します。
+
+| 列 | 用途 |
+| --- | --- |
+| `id`, `account_id`, `local_date` | 計画ID、所有Account、`Asia/Tokyo`の日付。`(account_id, local_date)`を一意にする |
+| `selected_local_hour` | 18、20、21のうち、その日に固定した候補時刻 |
+| `selection_source` | `explicit` / `learned` / `fallback`。本文や本人の属性値は保存しない |
+| lifecycle列 | 作成・更新・削除状態 |
+
+### 4.10 `daily_prompt_deliveries`
 
 日次の声かけはAccountDataにAccountと日本日付ごとの配送状態を保存します。本文はコード上のversion付き曜日別一般文面または曜日文脈の定型文を正とし、このtableへ複製しません。段階1の文面versionも、作成済み配送の再送互換性のため残します。
 
@@ -502,7 +518,7 @@ Queue再配送で`pending`を読み直した場合も、停止意思、現在の
 
 停止意思は確定的な表現だけをアプリケーションルールで判定し、Source Record保存と同じAccountData transactionで`daily_prompt_preferences`へ反映します。曖昧な発言をAI推定だけで停止扱いにしません。停止時点で当日の`pending`配送も`manual_stopped`として終端化し、停止中は新しい配送を作りません。その停止発言より後の通常の日記メッセージを保存した場合は状態を`active`へ戻しますが、すでに終端化した当日分を再送しません。Webhookの再配送や順序逆転で古い状態へ戻らないよう、現在の`controlled_at`より新しい本人発言だけをミリ秒精度で反映します。
 
-### 4.10 `daily_prompt_preferences`
+### 4.11 `daily_prompt_preferences`
 
 | 列 | 用途 |
 | --- | --- |
@@ -512,7 +528,7 @@ Queue再配送で`pending`を読み直した場合も、停止意思、現在の
 | `control_source_record_id` | 現在状態を決めた本人発言のSource Record |
 | `updated_at` | 最終更新時刻 |
 
-### 4.11 ConversationCoordinatorのローカルSQLite
+### 4.12 ConversationCoordinatorのローカルSQLite
 
 ConversationCoordinatorのローカルSQLiteはAccount内の連投、生成lease、LINE配送outboxを調停します。会話履歴のSSoTにはせず、履歴復元はAccountDataから行います。schemaとqueryはDrizzleのDurable SQLite driverを通します。
 
@@ -556,7 +572,7 @@ AccountData反映を始める前に対象event IDとgeneration epochを固定bat
 
 AccountData、Queue、LINEを呼び出した後は、Turn ID、generation epoch、lease tokenが現在値と一致するときだけ完了へ進めます。Queue投入前は`pending_queue`として残し、alarmから同じTurn IDを再投入します。AccountData側のevent ID・sequence一意制約と組み合わせ、DO再起動やQueue再配送でも履歴と応答を重複させません。終端化した`local_turns`は削除し、`attached`のevent IDは30日間の冪等期間を経て削除します。
 
-### 4.12 index
+### 4.13 index
 
 - `conversation_sessions(account_id, status)`
 - `source_records(account_id, original_ref)` unique where `original_ref` is not null

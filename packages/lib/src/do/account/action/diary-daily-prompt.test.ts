@@ -13,7 +13,7 @@ import {
   listDailyPromptTimeStats,
   markDailyPromptDelivered,
   prepareDailyPrompt,
-  resolveDailyPromptDueHour,
+  resolveDailyPromptSchedule,
   selectDailyPromptPreviousDayContext,
   selectDailyPromptSameDayContext,
   storeLineTextSource,
@@ -227,6 +227,42 @@ describe("daily prompt delivery", () => {
         () => 0,
       ),
     ).toBe(21);
+  });
+
+  it("聞かれ方を明言した場合は固定方針を3回観測すれば時刻の観測へ進む", () => {
+    const timeStats = [
+      {
+        localHour: 18 as const,
+        deliveryOpportunityCount: 3,
+        responseCount: 1,
+        stopCount: 0,
+      },
+    ];
+    const fixedStrategyStats = [
+      {
+        promptStrategy: "brief" as const,
+        deliveryOpportunityCount: 3,
+        responseCount: 2,
+        stopCount: 0,
+      },
+    ];
+
+    expect(chooseDailyPromptLocalHour(timeStats, fixedStrategyStats, () => 0, "brief")).toBe(20);
+    expect(
+      chooseDailyPromptLocalHour(
+        timeStats,
+        [
+          {
+            promptStrategy: "brief",
+            deliveryOpportunityCount: 2,
+            responseCount: 2,
+            stopCount: 0,
+          },
+        ],
+        () => 0,
+        "brief",
+      ),
+    ).toBe(18);
   });
 
   it("時刻の初期観測後は停止を強く減点した最高時刻を活用し探索も続ける", () => {
@@ -658,9 +694,22 @@ describe("daily prompt delivery", () => {
     ).toEqual({ promptVersion: "daily-check-in-fri-v1", promptStrategy: "brief" });
   });
 
-  it("選択時刻だけで配送を準備し、pending時刻を現在の明言より優先する", async () => {
+  it("日別の時刻計画を最初の選択で固定し、選択時刻だけで配送を準備する", async () => {
     const db = createTestDb();
     const at = new Date("2026-08-14T09:00:00.000Z");
+    await expect(
+      resolveDailyPromptSchedule(db, ACCOUNT_ID, "2026-08-14", 20, "learned", at),
+    ).resolves.toEqual({ selectedLocalHour: 20, selectionSource: "learned" });
+    await expect(
+      resolveDailyPromptSchedule(
+        db,
+        ACCOUNT_ID,
+        "2026-08-14",
+        21,
+        "explicit",
+        new Date(at.getTime() + 60_000),
+      ),
+    ).resolves.toEqual({ selectedLocalHour: 20, selectionSource: "learned" });
     await expect(
       prepareDailyPrompt(db, ACCOUNT_ID, {
         localDate: "2026-08-14",
@@ -681,7 +730,6 @@ describe("daily prompt delivery", () => {
         at: new Date("2026-08-14T11:00:00.000Z"),
       }),
     ).resolves.toMatchObject({ type: "ready" });
-    await expect(resolveDailyPromptDueHour(db, ACCOUNT_ID, "2026-08-14", 18)).resolves.toBe(20);
     await expect(
       prepareDailyPrompt(db, ACCOUNT_ID, {
         localDate: "2026-08-14",
@@ -697,6 +745,7 @@ describe("daily prompt delivery", () => {
         .from(schema.dailyPromptDeliveries)
         .get(),
     ).toEqual({ deliveryLocalHour: 20 });
+    await expect(db.select().from(schema.dailyPromptSchedules)).resolves.toHaveLength(1);
   });
 
   it("本人発言を直前の未回答配送1件だけへ対応づけ、方針別に集計する", async () => {

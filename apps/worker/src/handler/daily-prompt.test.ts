@@ -52,7 +52,12 @@ describe("daily prompt queue consumer", () => {
         if (operation === "brain.selectDailyPromptWeekdayContext") return undefined;
         if (operation === "brain.selectDailyPromptTimePreference") return undefined;
         if (operation === "brain.selectDailyPromptStrategyPreference") return undefined;
-        if (operation === "conversation.resolveDailyPromptDueHour") return args[1] ?? 18;
+        if (operation === "conversation.resolveDailyPromptSchedule") {
+          return {
+            selectedLocalHour: args[1] ?? 18,
+            selectionSource: args[2] ?? "fallback",
+          };
+        }
         if (operation === "conversation.selectDailyPromptLocalHour") return 18;
         if (operation === "conversation.selectDailyPromptStrategy") return "standard";
         if (operation === "conversation.selectDailyPromptSameDayContext") return undefined;
@@ -111,11 +116,20 @@ describe("daily prompt queue consumer", () => {
   });
 
   it("明言された20時候補だけを配送し、締切と配送行へ時刻を固定する", async () => {
-    execute.mockResolvedValueOnce(20).mockResolvedValueOnce(20);
+    execute
+      .mockResolvedValueOnce(20)
+      .mockResolvedValueOnce({ selectedLocalHour: 20, selectionSource: "explicit" });
     const message = createMessage(1, 20);
 
     await processDailyPromptMessage(message, bindings(), config);
 
+    expect(execute).toHaveBeenCalledWith(
+      "account-1",
+      "conversation.resolveDailyPromptSchedule",
+      "2026-08-14",
+      20,
+      "explicit",
+    );
     expect(execute).toHaveBeenCalledWith(
       "account-1",
       "conversation.selectDailyPromptSameDayContext",
@@ -133,7 +147,9 @@ describe("daily prompt queue consumer", () => {
   });
 
   it("候補時刻が選択時刻と違えば文脈を取得せず終了する", async () => {
-    execute.mockResolvedValueOnce(21).mockResolvedValueOnce(21);
+    execute
+      .mockResolvedValueOnce(21)
+      .mockResolvedValueOnce({ selectedLocalHour: 21, selectionSource: "explicit" });
     const message = createMessage(1, 20);
 
     await processDailyPromptMessage(message, bindings(), config);
@@ -147,8 +163,10 @@ describe("daily prompt queue consumer", () => {
     expect(message.ack).toHaveBeenCalledOnce();
   });
 
-  it("pending配送の再送時刻を現在の明言より優先する", async () => {
-    execute.mockResolvedValueOnce(18).mockResolvedValueOnce(20);
+  it("保存済みの日別計画を現在の選択より優先する", async () => {
+    execute
+      .mockResolvedValueOnce(18)
+      .mockResolvedValueOnce({ selectedLocalHour: 20, selectionSource: "learned" });
     const message = createMessage(2, 20);
 
     await processDailyPromptMessage(message, bindings(), config);
@@ -158,19 +176,29 @@ describe("daily prompt queue consumer", () => {
       promptVersion: "daily-check-in-fri-v1",
       promptStrategy: "standard",
       scheduledLocalHour: 20,
-      selectedLocalHour: 18,
+      selectedLocalHour: 20,
     });
     expect(pushMessage).toHaveBeenCalledOnce();
   });
 
   it("明言がなければ本人内の返信実績から選んだ21時だけを配送して選択元を記録する", async () => {
     const info = vi.spyOn(logger, "info").mockImplementation(() => undefined);
-    execute.mockResolvedValueOnce(undefined).mockResolvedValueOnce(21).mockResolvedValueOnce(21);
+    execute
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(21)
+      .mockResolvedValueOnce({ selectedLocalHour: 21, selectionSource: "learned" });
     const message = createMessage(1, 21);
 
     await processDailyPromptMessage(message, bindings(), config);
 
     expect(execute).toHaveBeenCalledWith("account-1", "conversation.selectDailyPromptLocalHour");
+    expect(execute).toHaveBeenCalledWith(
+      "account-1",
+      "conversation.resolveDailyPromptSchedule",
+      "2026-08-14",
+      21,
+      "learned",
+    );
     expect(execute).toHaveBeenCalledWith("account-1", "conversation.prepareDailyPrompt", {
       localDate: "2026-08-14",
       promptVersion: "daily-check-in-fri-v1",
@@ -194,7 +222,7 @@ describe("daily prompt queue consumer", () => {
     execute
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(18)
-      .mockResolvedValueOnce(18)
+      .mockResolvedValueOnce({ selectedLocalHour: 18, selectionSource: "learned" })
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(undefined)
@@ -230,7 +258,7 @@ describe("daily prompt queue consumer", () => {
     execute
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(18)
-      .mockResolvedValueOnce(18)
+      .mockResolvedValueOnce({ selectedLocalHour: 18, selectionSource: "learned" })
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(undefined)
@@ -254,7 +282,7 @@ describe("daily prompt queue consumer", () => {
     execute
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(18)
-      .mockResolvedValueOnce(18)
+      .mockResolvedValueOnce({ selectedLocalHour: 18, selectionSource: "learned" })
       .mockResolvedValueOnce("day_off");
     const message = createMessage();
 
@@ -290,7 +318,7 @@ describe("daily prompt queue consumer", () => {
     execute
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(18)
-      .mockResolvedValueOnce(18)
+      .mockResolvedValueOnce({ selectedLocalHour: 18, selectionSource: "learned" })
       .mockResolvedValueOnce("day_off")
       .mockResolvedValueOnce("same_day");
     const message = createMessage();
@@ -328,7 +356,7 @@ describe("daily prompt queue consumer", () => {
     execute
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(18)
-      .mockResolvedValueOnce(18)
+      .mockResolvedValueOnce({ selectedLocalHour: 18, selectionSource: "learned" })
       .mockResolvedValueOnce("day_off");
     const message = createMessage();
 
@@ -352,7 +380,7 @@ describe("daily prompt queue consumer", () => {
     execute
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(18)
-      .mockResolvedValueOnce(18)
+      .mockResolvedValueOnce({ selectedLocalHour: 18, selectionSource: "learned" })
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce("next_day");
@@ -391,7 +419,7 @@ describe("daily prompt queue consumer", () => {
     execute
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(18)
-      .mockResolvedValueOnce(18)
+      .mockResolvedValueOnce({ selectedLocalHour: 18, selectionSource: "learned" })
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(undefined)
       .mockRejectedValueOnce(new Error("AccountData unavailable"));
@@ -421,7 +449,7 @@ describe("daily prompt queue consumer", () => {
     execute
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(18)
-      .mockResolvedValueOnce(18)
+      .mockResolvedValueOnce({ selectedLocalHour: 18, selectionSource: "learned" })
       .mockResolvedValueOnce("day_off")
       .mockRejectedValueOnce(new Error("AccountData unavailable"));
     const message = createMessage();
@@ -450,7 +478,7 @@ describe("daily prompt queue consumer", () => {
     execute
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(18)
-      .mockResolvedValueOnce(18)
+      .mockResolvedValueOnce({ selectedLocalHour: 18, selectionSource: "learned" })
       .mockRejectedValueOnce(new Error("AccountData unavailable"));
     const message = createMessage();
 
@@ -472,7 +500,7 @@ describe("daily prompt queue consumer", () => {
     execute
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(18)
-      .mockResolvedValueOnce(18)
+      .mockResolvedValueOnce({ selectedLocalHour: 18, selectionSource: "learned" })
       .mockRejectedValueOnce(new Error("AccountData unavailable"))
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(undefined)
@@ -515,7 +543,7 @@ describe("daily prompt queue consumer", () => {
     execute
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(18)
-      .mockResolvedValueOnce(18)
+      .mockResolvedValueOnce({ selectedLocalHour: 18, selectionSource: "learned" })
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(undefined)
@@ -550,7 +578,7 @@ describe("daily prompt queue consumer", () => {
     execute
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(18)
-      .mockResolvedValueOnce(18)
+      .mockResolvedValueOnce({ selectedLocalHour: 18, selectionSource: "learned" })
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(undefined)

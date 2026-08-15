@@ -30,12 +30,14 @@ import {
   conversationSessions,
   dailyPromptDeliveries,
   dailyPromptPreferences,
+  dailyPromptSchedules,
   diaryBrainCheckpointItems,
   diaryBrainCheckpoints,
   diaryChatBrainUsageAudits,
   sourceRecordTextPayloads,
   sourceRecords,
 } from "../schema";
+import { selectDailyPromptStrategyPreference } from "./brain";
 import {
   type DiaryTemporalContext,
   buildDiaryTemporalSearchText,
@@ -202,6 +204,13 @@ export type DailyPromptTimeStat = Readonly<{
   stopCount: number;
 }>;
 
+export type DailyPromptSelectionSource = "explicit" | "learned" | "fallback";
+
+export type DailyPromptSchedule = Readonly<{
+  selectedLocalHour: DailyPromptLocalHour;
+  selectionSource: DailyPromptSelectionSource;
+}>;
+
 function dailyPromptOutcomeScore(
   stat: Pick<DailyPromptStrategyStat, "deliveryOpportunityCount" | "responseCount" | "stopCount">,
 ): number {
@@ -255,8 +264,15 @@ export function chooseDailyPromptStrategy(
 
 function hasCompletedDailyPromptStrategyCalibration(
   stats: readonly DailyPromptStrategyStat[],
+  fixedPromptStrategy?: DailyPromptStrategy,
 ): boolean {
   const statsByStrategy = new Map(stats.map((stat) => [stat.promptStrategy, stat]));
+  if (fixedPromptStrategy) {
+    return (
+      (statsByStrategy.get(fixedPromptStrategy)?.deliveryOpportunityCount ?? 0) >=
+      DAILY_PROMPT_STANDARD_BASELINE_OPPORTUNITIES
+    );
+  }
   return DAILY_PROMPT_STRATEGIES.every(
     (strategy) =>
       (statsByStrategy.get(strategy)?.deliveryOpportunityCount ?? 0) >=
@@ -271,8 +287,9 @@ export function chooseDailyPromptLocalHour(
   timeStats: readonly DailyPromptTimeStat[],
   strategyStats: readonly DailyPromptStrategyStat[],
   random: () => number = Math.random,
+  fixedPromptStrategy?: DailyPromptStrategy,
 ): DailyPromptLocalHour {
-  if (!hasCompletedDailyPromptStrategyCalibration(strategyStats)) return 18;
+  if (!hasCompletedDailyPromptStrategyCalibration(strategyStats, fixedPromptStrategy)) return 18;
 
   const statsByHour = new Map(timeStats.map((stat) => [stat.localHour, stat]));
   const baselineOpportunities = statsByHour.get(18)?.deliveryOpportunityCount ?? 0;
@@ -771,30 +788,48 @@ export async function prepareDailyPrompt(
   };
 }
 
-/** 再送中のpending時刻を現在の明言より優先し、Queueが処理すべき候補時刻を返す。 */
-export async function resolveDailyPromptDueHour(
+/** その日の最初の選択だけを保存し、後続候補とQueue再配送へ同じ計画を返す。 */
+export async function resolveDailyPromptSchedule(
   db: AccountDataDatabase,
   accountId: string,
   localDate: string,
   selectedLocalHour: DailyPromptLocalHour,
-): Promise<DailyPromptLocalHour> {
+  selectionSource: DailyPromptSelectionSource,
+  at = new Date(),
+): Promise<DailyPromptSchedule> {
   assertLocalDate(localDate);
   if (!DAILY_PROMPT_LOCAL_HOURS.includes(selectedLocalHour)) {
     throw new Error("Daily prompt local hour is invalid");
   }
+  if (!(["explicit", "learned", "fallback"] as const).includes(selectionSource)) {
+    throw new Error("Daily prompt selection source is invalid");
+  }
   const existing = await db
-    .select({ deliveryLocalHour: dailyPromptDeliveries.deliveryLocalHour })
-    .from(dailyPromptDeliveries)
+    .select({
+      selectedLocalHour: dailyPromptSchedules.selectedLocalHour,
+      selectionSource: dailyPromptSchedules.selectionSource,
+    })
+    .from(dailyPromptSchedules)
     .where(
       and(
-        eq(dailyPromptDeliveries.accountId, accountId),
-        eq(dailyPromptDeliveries.localDate, localDate),
-        eq(dailyPromptDeliveries.status, "pending"),
-        eq(dailyPromptDeliveries.isDeleted, false),
+        eq(dailyPromptSchedules.accountId, accountId),
+        eq(dailyPromptSchedules.localDate, localDate),
+        eq(dailyPromptSchedules.isDeleted, false),
       ),
     )
     .get();
-  return existing?.deliveryLocalHour ?? selectedLocalHour;
+  if (existing) return existing;
+
+  await db.insert(dailyPromptSchedules).values({
+    id: `daily-prompt-schedule:${localDate}`,
+    accountId,
+    localDate,
+    selectedLocalHour,
+    selectionSource,
+    createdAt: at,
+    updatedAt: at,
+  });
+  return { selectedLocalHour, selectionSource };
 }
 
 export async function markDailyPromptDelivered(
@@ -947,7 +982,8 @@ export async function selectDailyPromptLocalHour(
 ): Promise<DailyPromptLocalHour> {
   const strategyStats = await listDailyPromptStrategyStats(db, accountId);
   const timeStats = await listDailyPromptTimeStats(db, accountId);
-  return chooseDailyPromptLocalHour(timeStats, strategyStats, random);
+  const fixedPromptStrategy = await selectDailyPromptStrategyPreference(db, accountId);
+  return chooseDailyPromptLocalHour(timeStats, strategyStats, random, fixedPromptStrategy);
 }
 
 /** LINE eventを不変なSource Recordとして冪等に保存する。 */

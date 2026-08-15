@@ -2,6 +2,8 @@ import {
   D1,
   DAILY_PROMPT_LOCAL_HOURS,
   type DailyPromptLocalHour,
+  type DailyPromptSelectionSource,
+  type DailyPromptStrategy,
   accountDataFor,
 } from "@me-builder/lib";
 import type { DailyPromptQueueMessage, Message, OperationalOutcome } from "@me-builder/shared";
@@ -28,7 +30,6 @@ import {
 
 /** wrangler.tomlのmax_retries=5に初回配送を加えた最大試行回数。 */
 export const DAILY_PROMPT_MAX_ATTEMPTS = 6;
-type DailyPromptSelectionSource = "explicit" | "learned" | "fallback";
 
 export async function processDailyPromptMessage(
   message: Message<DailyPromptQueueMessage>,
@@ -44,7 +45,7 @@ export async function processDailyPromptMessage(
   let deliveryId: string | undefined;
   let selectedLocalHour: DailyPromptLocalHour | undefined;
   let timeSelectionSource: DailyPromptSelectionSource | undefined;
-  let selectedPromptStrategy: "standard" | "brief" | "event_first" | "feeling_first" | undefined;
+  let selectedPromptStrategy: DailyPromptStrategy | undefined;
   let promptStrategySource: DailyPromptSelectionSource | undefined;
 
   try {
@@ -113,19 +114,22 @@ export async function processDailyPromptMessage(
             return undefined;
           })
         : undefined;
-    selectedLocalHour = preferredLocalHour ?? learnedLocalHour ?? 18;
-    timeSelectionSource =
+    const proposedLocalHour = preferredLocalHour ?? learnedLocalHour ?? 18;
+    const proposedSelectionSource: DailyPromptSelectionSource =
       preferredLocalHour !== undefined
         ? "explicit"
         : learnedLocalHour !== undefined
           ? "learned"
           : "fallback";
-    const dueLocalHour = await accountData.execute(
-      "conversation.resolveDailyPromptDueHour",
+    const schedule = await accountData.execute(
+      "conversation.resolveDailyPromptSchedule",
       message.body.localDate,
-      selectedLocalHour,
+      proposedLocalHour,
+      proposedSelectionSource,
     );
-    if (dueLocalHour !== scheduledLocalHour) {
+    selectedLocalHour = schedule.selectedLocalHour;
+    timeSelectionSource = schedule.selectionSource;
+    if (selectedLocalHour !== scheduledLocalHour) {
       message.ack();
       logResult(message, workerConfig, startedAt, {
         outcome: "succeeded",
@@ -436,7 +440,7 @@ function logResult(
     error?: unknown;
     selectedLocalHour?: DailyPromptLocalHour;
     timeSelectionSource?: DailyPromptSelectionSource;
-    promptStrategy?: "standard" | "brief" | "event_first" | "feeling_first";
+    promptStrategy?: DailyPromptStrategy;
     promptStrategySource?: DailyPromptSelectionSource;
   }>,
 ): void {

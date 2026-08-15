@@ -48,6 +48,8 @@ export type {
   DailyPromptFollowUp,
   DailyPromptPreviousDayContext,
   DailyPromptSameDayContext,
+  DailyPromptSchedule,
+  DailyPromptSelectionSource,
   DailyPromptStrategyStat,
   DailyPromptTimeStat,
   DiaryBrainCategory,

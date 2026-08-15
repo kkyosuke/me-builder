@@ -171,6 +171,7 @@ describe("AccountData Workers runtime E2E", () => {
         accountId,
       );
       state.storage.sql.exec("PRAGMA foreign_keys=OFF");
+      state.storage.sql.exec("DROP TABLE daily_prompt_schedules");
       state.storage.sql.exec("DROP TABLE daily_prompt_preferences");
       state.storage.sql.exec(`CREATE TABLE daily_prompt_preferences (
         account_id text PRIMARY KEY NOT NULL,
@@ -225,6 +226,22 @@ describe("AccountData Workers runtime E2E", () => {
         controlled_at: 2_000,
         control_source_record_id: "migration-stop-source",
       });
+      expect(
+        state.storage.sql
+          .exec<{ name: string }>("PRAGMA table_info(daily_prompt_schedules)")
+          .toArray()
+          .map(({ name }) => name),
+      ).toEqual([
+        "id",
+        "created_at",
+        "updated_at",
+        "deleted_at",
+        "is_deleted",
+        "account_id",
+        "local_date",
+        "selected_local_hour",
+        "selection_source",
+      ]);
     });
   });
 
@@ -243,6 +260,7 @@ describe("AccountData Workers runtime E2E", () => {
       state.storage.sql.exec("DROP TABLE brain_vector_entries");
       state.storage.sql.exec("DROP TABLE brain_vector_sync_jobs");
       state.storage.sql.exec("DROP TABLE diary_chat_brain_usage_audits");
+      state.storage.sql.exec("DROP TABLE daily_prompt_schedules");
       state.storage.sql.exec("DROP TABLE daily_prompt_preferences");
       state.storage.sql.exec("DROP TABLE daily_prompt_deliveries");
       state.storage.sql.exec("DROP INDEX diary_brain_checkpoint_item_brain_idx");
@@ -360,6 +378,7 @@ describe("AccountData Workers runtime E2E", () => {
         generatedAt.getTime(),
       );
       state.storage.sql.exec("DROP TABLE diary_chat_brain_usage_audits");
+      state.storage.sql.exec("DROP TABLE daily_prompt_schedules");
       state.storage.sql.exec("DROP TABLE daily_prompt_preferences");
       state.storage.sql.exec("DROP TABLE daily_prompt_deliveries");
       state.storage.sql.exec("DROP INDEX diary_brain_checkpoint_item_brain_idx");
