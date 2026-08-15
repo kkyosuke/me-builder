@@ -18,6 +18,7 @@ import {
 import { sourceRecordTextPayloads } from "../schema/diary";
 import { sourceRecords } from "../schema/source";
 import { buildDiaryTemporalSearchText, readDiaryTemporalContext } from "./diary-temporal";
+import { progressionPendingStatement } from "./progression";
 
 type LifecycleColumn = "createdAt" | "updatedAt" | "deletedAt" | "isDeleted";
 type EvidenceInsert = typeof brainItemEvidenceEdges.$inferInsert;
@@ -340,6 +341,12 @@ export async function saveBrainItem(
   const itemRevision = changedAt.getTime();
   const statements: D1BatchStatement[] = [
     db.insert(brainItems).values({ ...input.item, ...lifecycle }),
+    progressionPendingStatement(db, {
+      accountId,
+      originType: "brain_item",
+      originId: brainItemId,
+      at: changedAt,
+    }),
     db.insert(brainVectorSyncJobs).values({
       id: `${brainItemId}:${itemRevision}:upsert`,
       brainItemId,
@@ -349,9 +356,15 @@ export async function saveBrainItem(
       nextAttemptAt: changedAt,
       ...lifecycle,
     }),
-    ...input.evidence.map((edge) =>
+    ...input.evidence.flatMap((edge) => [
       db.insert(brainItemEvidenceEdges).values({ ...edge, ...lifecycle, brainItemId }),
-    ),
+      progressionPendingStatement(db, {
+        accountId,
+        originType: "evidence",
+        originId: edge.id,
+        at: changedAt,
+      }),
+    ]),
     ...input.accessLabels.map((label) =>
       db.insert(brainItemAccessLabels).values({ ...label, ...lifecycle, brainItemId }),
     ),

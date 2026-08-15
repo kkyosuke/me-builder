@@ -97,34 +97,39 @@ async function addBrainItem(
       }),
     );
   }
-  await accountDataStore.db.insert(DO.account.schema.brainItems).values({
-    id,
-    accountId,
-    category,
-    statement: `${id} statement`,
-    attributes: {},
-    derivation: "deterministic",
-    status: "active",
-    stability: "changeable",
-    sensitivity: "normal",
-    externallyShareable: false,
-    confidence: {},
-    createdAt: at,
-    updatedAt: at,
-  });
-  await accountDataStore.db.insert(DO.account.schema.brainItemEvidenceEdges).values(
-    sources.map(({ sourceRecordId }, index) => ({
-      id: `${id}-edge-${index}`,
-      brainItemId: id,
-      sourceRecordId,
-      relation: "supports" as const,
-      isDerivationTrigger: index === 0,
-      derivationMethod: "deterministic" as const,
-      generatedAt: new Date(at.getTime() + index),
-      createdAt: new Date(at.getTime() + index),
-      updatedAt: new Date(at.getTime() + index),
-    })),
-  );
+  await expect(
+    DO.account.action.brain.saveBrainItem(accountDataStore.db, {
+      at,
+      item: {
+        id,
+        accountId,
+        category,
+        statement: `${id} statement`,
+        attributes: {},
+        derivation: "deterministic",
+        status: "active",
+        stability: "changeable",
+        sensitivity: "normal",
+        externallyShareable: false,
+        confidence: {},
+      },
+      evidence: sources.map(({ sourceRecordId }, index) => ({
+        id: `${id}-edge-${index}`,
+        sourceRecordId,
+        relation: "supports" as const,
+        isDerivationTrigger: index === 0,
+        derivationMethod: "deterministic" as const,
+        generatedAt: new Date(at.getTime() + index),
+      })),
+      accessLabels: [
+        {
+          id: `${id}-access-label`,
+          label: "unclassified",
+          assignedBy: "system",
+        },
+      ],
+    }),
+  ).resolves.toEqual({ type: "saved", brainItemId: id });
 }
 
 describe("Profile progression API local E2E", () => {

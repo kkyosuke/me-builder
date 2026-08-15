@@ -6,10 +6,17 @@ import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { describe, expect, it } from "vitest";
 import type { AccountDataDatabase } from "../database";
 import { accountSchema as schema } from "../database";
-import { progressionLevel, progressionThreshold, readUtsushiProgression } from "./progression";
+import {
+  progressionLevel,
+  progressionPendingStatement,
+  progressionThreshold,
+  readUtsushiProgression,
+} from "./progression";
 
-function createTestDb(): AccountDataDatabase {
-  const sqlite = new Database(":memory:");
+function createTestDb(queryLog?: string[]): AccountDataDatabase {
+  const sqlite = queryLog
+    ? new Database(":memory:", { verbose: (query) => queryLog.push(String(query)) })
+    : new Database(":memory:");
   sqlite.pragma("foreign_keys = ON");
   const db = drizzle(sqlite, { schema });
   type RunnableQuery = PromiseLike<unknown> & { run(): unknown };
@@ -31,7 +38,7 @@ function insertSource(db: AccountDataDatabase, accountId: string, id: string, at
   });
 }
 
-function insertItem(
+async function insertItem(
   db: AccountDataDatabase,
   accountId: string,
   id: string,
@@ -39,41 +46,48 @@ function insertItem(
   at: Date,
   attributes: unknown = {},
 ) {
-  return db.insert(schema.brainItems).values({
-    id,
-    accountId,
-    category,
-    statement: `${id} statement`,
-    attributes,
-    derivation: "deterministic",
-    status: "active",
-    stability: "changeable",
-    sensitivity: "normal",
-    externallyShareable: false,
-    confidence: {},
-    createdAt: at,
-    updatedAt: at,
-  });
+  await db.batch([
+    db.insert(schema.brainItems).values({
+      id,
+      accountId,
+      category,
+      statement: `${id} statement`,
+      attributes,
+      derivation: "deterministic",
+      status: "active",
+      stability: "changeable",
+      sensitivity: "normal",
+      externallyShareable: false,
+      confidence: {},
+      createdAt: at,
+      updatedAt: at,
+    }),
+    progressionPendingStatement(db, { accountId, originType: "brain_item", originId: id, at }),
+  ]);
 }
 
-function insertEvidence(
+async function insertEvidence(
   db: AccountDataDatabase,
+  accountId: string,
   id: string,
   brainItemId: string,
   sourceRecordId: string,
   at: Date,
 ) {
-  return db.insert(schema.brainItemEvidenceEdges).values({
-    id,
-    brainItemId,
-    sourceRecordId,
-    relation: "supports",
-    isDerivationTrigger: true,
-    derivationMethod: "deterministic",
-    generatedAt: at,
-    createdAt: at,
-    updatedAt: at,
-  });
+  await db.batch([
+    db.insert(schema.brainItemEvidenceEdges).values({
+      id,
+      brainItemId,
+      sourceRecordId,
+      relation: "supports",
+      isDerivationTrigger: true,
+      derivationMethod: "deterministic",
+      generatedAt: at,
+      createdAt: at,
+      updatedAt: at,
+    }),
+    progressionPendingStatement(db, { accountId, originType: "evidence", originId: id, at }),
+  ]);
 }
 
 describe("Utsushi progression", () => {
@@ -106,8 +120,8 @@ describe("Utsushi progression", () => {
     await insertSource(db, accountId, "source-1", at);
     await insertSource(db, accountId, "source-2", at);
     await insertItem(db, accountId, "item-1", "preference", at);
-    await insertEvidence(db, "edge-1", "item-1", "source-1", at);
-    await insertEvidence(db, "edge-2", "item-1", "source-2", new Date(at.getTime() + 1));
+    await insertEvidence(db, accountId, "edge-1", "item-1", "source-1", at);
+    await insertEvidence(db, accountId, "edge-2", "item-1", "source-2", new Date(at.getTime() + 1));
     await db.insert(schema.brainItems).values({
       id: "inference-1",
       accountId,
@@ -137,7 +151,7 @@ describe("Utsushi progression", () => {
     const later = new Date(at.getTime() + 10);
     await insertSource(db, accountId, "source-3", later);
     await insertItem(db, accountId, "item-2", "goal", later);
-    await insertEvidence(db, "edge-3", "item-2", "source-3", later);
+    await insertEvidence(db, accountId, "edge-3", "item-2", "source-3", later);
     const afterAddition = {
       level: 2,
       growthValue: 7,
@@ -159,5 +173,33 @@ describe("Utsushi progression", () => {
       activePieces: 2,
       categoryCount: 2,
     });
+  });
+
+  it("初回同期後は全Evidenceと全イベントを再走査しない", async () => {
+    const queryLog: string[] = [];
+    const db = createTestDb(queryLog);
+    const accountId = "incremental-account";
+    const at = new Date("2026-08-15T00:00:00.000Z");
+    await db.insert(schema.accountDataIdentity).values({ singleton: 1, accountId });
+    await insertSource(db, accountId, "source-1", at);
+    await insertItem(db, accountId, "item-1", "preference", at);
+    await insertEvidence(db, accountId, "edge-1", "item-1", "source-1", at);
+
+    await readUtsushiProgression(db, accountId, at);
+    queryLog.length = 0;
+
+    await expect(readUtsushiProgression(db, accountId, at)).resolves.toMatchObject({
+      growthValue: 3,
+      collectedPieces: 1,
+    });
+    const normalizedQueries = queryLog.map((query) => query.toLowerCase());
+    expect(normalizedQueries.some((query) => query.includes("brain_item_evidence_edges"))).toBe(
+      false,
+    );
+    expect(
+      normalizedQueries.some(
+        (query) => query.includes("sum(") && query.includes("progression_events"),
+      ),
+    ).toBe(false);
   });
 });

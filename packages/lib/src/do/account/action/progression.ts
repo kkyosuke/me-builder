@@ -1,10 +1,13 @@
-import { and, asc, count, countDistinct, eq, gt, isNull, lte, or, sql } from "drizzle-orm";
+import { and, asc, count, countDistinct, eq, gt, isNull, lte, or } from "drizzle-orm";
 import type { AccountDataDatabase } from "../database";
 import {
   brainItemEvidenceEdges,
   brainItemRevisions,
   brainItems,
   progressionEvents,
+  progressionItemStates,
+  progressionPendingEvents,
+  progressionStates,
   sourceRecords,
 } from "../schema";
 
@@ -44,6 +47,29 @@ function isDiaryItem(attributes: unknown): boolean {
 
 function eventId(originType: ProgressionOriginType, originId: string): string {
   return `progression:v1:${originType}:${originId}`;
+}
+
+/** Brainの更新と同じbatchで、進行度へ反映する差分だけを積む。 */
+export function progressionPendingStatement(
+  db: AccountDataDatabase,
+  input: Readonly<{
+    accountId: string;
+    originType: "brain_item" | "evidence";
+    originId: string;
+    at: Date;
+  }>,
+): D1BatchStatement {
+  return db
+    .insert(progressionPendingEvents)
+    .values({
+      id: `progression:pending:v1:${input.originType}:${input.originId}`,
+      accountId: input.accountId,
+      originType: input.originType,
+      originId: input.originId,
+      createdAt: input.at,
+      updatedAt: input.at,
+    })
+    .onConflictDoNothing();
 }
 
 function eventStatement(
@@ -91,141 +117,225 @@ export function progressionLevel(growthValue: number): number {
   return Math.floor(Math.sqrt(growthValue / 5)) + 1;
 }
 
-/**
- * 既存Brainを初回開始値へ変換し、その後に増えたItem / Evidenceを一度だけ記録する。
- * AccountDataはoperationを直列化するため、初期化markerと各eventを同じbatchへ保存できる。
- */
-async function synchronizeProgressionEvents(
+type ProgressionTotals = Readonly<{ growthValue: number; collectedPieces: number }>;
+
+function isAvailableItem(
+  item: Readonly<{
+    status: "active" | "superseded" | "invalidated";
+    isDeleted: boolean;
+    validFrom: Date | null;
+    validTo: Date | null;
+  }>,
+  at: Date,
+): boolean {
+  return (
+    item.status === "active" &&
+    !item.isDeleted &&
+    (!item.validFrom || item.validFrom <= at) &&
+    (!item.validTo || item.validTo > at)
+  );
+}
+
+function itemProgressionEvent(
+  db: AccountDataDatabase,
+  input: Readonly<{
+    accountId: string;
+    item: {
+      id: string;
+      attributes: unknown;
+      derivation: "ai" | "deterministic";
+      status: "active" | "superseded" | "invalidated";
+      isDeleted: boolean;
+      validFrom: Date | null;
+      validTo: Date | null;
+    };
+    revision: boolean;
+    initialization: boolean;
+    at: Date;
+  }>,
+): Readonly<{ statement: D1BatchStatement; growthDelta: number; collectedPieceDelta: number }> {
+  const inference = isInference(input.item.attributes, input.item.derivation);
+  const temporalRevision = input.revision && isDiaryItem(input.item.attributes);
+  const availableAtInitialization = isAvailableItem(input.item, input.at);
+  const growthDelta =
+    input.initialization && !availableAtInitialization
+      ? 0
+      : temporalRevision
+        ? 2
+        : input.revision || inference
+          ? 0
+          : 3;
+  const kind: ProgressionEventKind = temporalRevision
+    ? "temporal_revision"
+    : input.revision
+      ? "correction_revision"
+      : inference
+        ? "inference_item"
+        : "new_item";
+  const collectedPieceDelta = input.initialization && !availableAtInitialization ? 0 : 1;
+  return {
+    statement: eventStatement(db, {
+      accountId: input.accountId,
+      originType: "brain_item",
+      originId: input.item.id,
+      kind,
+      growthDelta,
+      collectedPieceDelta,
+      at: input.at,
+    }),
+    growthDelta,
+    collectedPieceDelta,
+  };
+}
+
+async function initializeProgressionEvents(
   db: AccountDataDatabase,
   accountId: string,
   at: Date,
-): Promise<void> {
-  const initialized = await db
-    .select({ id: progressionEvents.id })
-    .from(progressionEvents)
-    .where(
-      and(
-        eq(progressionEvents.accountId, accountId),
-        eq(progressionEvents.originType, "initialization"),
-        eq(progressionEvents.originId, INITIALIZATION_ORIGIN_ID),
-      ),
-    )
-    .get();
-  const isInitialization = !initialized;
-
-  const missingItems = await db
-    .select({
-      id: brainItems.id,
-      attributes: brainItems.attributes,
-      derivation: brainItems.derivation,
-      status: brainItems.status,
-      isDeleted: brainItems.isDeleted,
-    })
-    .from(brainItems)
-    .leftJoin(
-      progressionEvents,
-      and(
-        eq(progressionEvents.accountId, accountId),
-        eq(progressionEvents.originType, "brain_item"),
-        eq(progressionEvents.originId, brainItems.id),
-      ),
-    )
-    .where(and(eq(brainItems.accountId, accountId), isNull(progressionEvents.id)))
-    .all();
-  const revisions = await db
-    .select({ nextBrainItemId: brainItemRevisions.nextBrainItemId })
-    .from(brainItemRevisions)
-    .where(eq(brainItemRevisions.isDeleted, false))
-    .all();
+): Promise<ProgressionTotals> {
+  const [items, revisions, evidenceRows, existingEvents] = await Promise.all([
+    db
+      .select({
+        id: brainItems.id,
+        attributes: brainItems.attributes,
+        derivation: brainItems.derivation,
+        status: brainItems.status,
+        isDeleted: brainItems.isDeleted,
+        validFrom: brainItems.validFrom,
+        validTo: brainItems.validTo,
+        progressionEventId: progressionEvents.id,
+      })
+      .from(brainItems)
+      .leftJoin(
+        progressionEvents,
+        and(
+          eq(progressionEvents.accountId, accountId),
+          eq(progressionEvents.originType, "brain_item"),
+          eq(progressionEvents.originId, brainItems.id),
+        ),
+      )
+      .where(eq(brainItems.accountId, accountId))
+      .all(),
+    db
+      .select({ nextBrainItemId: brainItemRevisions.nextBrainItemId })
+      .from(brainItemRevisions)
+      .where(eq(brainItemRevisions.isDeleted, false))
+      .all(),
+    db
+      .select({
+        id: brainItemEvidenceEdges.id,
+        brainItemId: brainItemEvidenceEdges.brainItemId,
+        relation: brainItemEvidenceEdges.relation,
+        edgeIsDeleted: brainItemEvidenceEdges.isDeleted,
+        sourceIsDeleted: sourceRecords.isDeleted,
+        itemAttributes: brainItems.attributes,
+        itemDerivation: brainItems.derivation,
+        itemStatus: brainItems.status,
+        itemIsDeleted: brainItems.isDeleted,
+        itemValidFrom: brainItems.validFrom,
+        itemValidTo: brainItems.validTo,
+        progressionEventId: progressionEvents.id,
+      })
+      .from(brainItemEvidenceEdges)
+      .innerJoin(brainItems, eq(brainItems.id, brainItemEvidenceEdges.brainItemId))
+      .innerJoin(sourceRecords, eq(sourceRecords.id, brainItemEvidenceEdges.sourceRecordId))
+      .leftJoin(
+        progressionEvents,
+        and(
+          eq(progressionEvents.accountId, accountId),
+          eq(progressionEvents.originType, "evidence"),
+          eq(progressionEvents.originId, brainItemEvidenceEdges.id),
+        ),
+      )
+      .where(eq(brainItems.accountId, accountId))
+      .orderBy(asc(brainItemEvidenceEdges.createdAt), asc(brainItemEvidenceEdges.id))
+      .all(),
+    db
+      .select({
+        originType: progressionEvents.originType,
+        originId: progressionEvents.originId,
+        growthDelta: progressionEvents.growthDelta,
+        collectedPieceDelta: progressionEvents.collectedPieceDelta,
+      })
+      .from(progressionEvents)
+      .where(
+        and(eq(progressionEvents.accountId, accountId), eq(progressionEvents.isDeleted, false)),
+      )
+      .all(),
+  ]);
   const revisedItemIds = new Set(revisions.map(({ nextBrainItemId }) => nextBrainItemId));
-
-  const evidenceRows = await db
-    .select({
-      id: brainItemEvidenceEdges.id,
-      brainItemId: brainItemEvidenceEdges.brainItemId,
-      relation: brainItemEvidenceEdges.relation,
-      edgeIsDeleted: brainItemEvidenceEdges.isDeleted,
-      sourceIsDeleted: sourceRecords.isDeleted,
-      itemAttributes: brainItems.attributes,
-      itemDerivation: brainItems.derivation,
-      itemStatus: brainItems.status,
-      itemIsDeleted: brainItems.isDeleted,
-    })
-    .from(brainItemEvidenceEdges)
-    .innerJoin(brainItems, eq(brainItems.id, brainItemEvidenceEdges.brainItemId))
-    .innerJoin(sourceRecords, eq(sourceRecords.id, brainItemEvidenceEdges.sourceRecordId))
-    .where(eq(brainItems.accountId, accountId))
-    .orderBy(asc(brainItemEvidenceEdges.createdAt), asc(brainItemEvidenceEdges.id))
-    .all();
-  const recordedEvidence = await db
-    .select({ originId: progressionEvents.originId })
-    .from(progressionEvents)
-    .where(
-      and(eq(progressionEvents.accountId, accountId), eq(progressionEvents.originType, "evidence")),
-    )
-    .all();
-  const recordedEvidenceIds = new Set(recordedEvidence.map(({ originId }) => originId));
   const validEvidencePositionByItem = new Map<string, number>();
   const statements: D1BatchStatement[] = [];
-
-  for (const item of missingItems) {
-    const inference = isInference(item.attributes, item.derivation);
-    const revision = revisedItemIds.has(item.id);
-    const temporalRevision = revision && isDiaryItem(item.attributes);
-    const availableAtInitialization = item.status === "active" && !item.isDeleted;
-    const growthDelta =
-      isInitialization && !availableAtInitialization
-        ? 0
-        : temporalRevision
-          ? 2
-          : revision || inference
-            ? 0
-            : 3;
-    const kind: ProgressionEventKind = temporalRevision
-      ? "temporal_revision"
-      : revision
-        ? "correction_revision"
-        : inference
-          ? "inference_item"
-          : "new_item";
-    statements.push(
-      eventStatement(db, {
-        accountId,
-        originType: "brain_item",
-        originId: item.id,
-        kind,
-        growthDelta,
-        collectedPieceDelta: isInitialization && item.isDeleted ? 0 : 1,
-        at,
-      }),
-    );
-  }
+  let growthValue = existingEvents.reduce((sum, event) => sum + event.growthDelta, 0);
+  let collectedPieces = existingEvents.reduce((sum, event) => sum + event.collectedPieceDelta, 0);
 
   for (const evidence of evidenceRows) {
     const valid =
       evidence.relation === "supports" &&
       !evidence.edgeIsDeleted &&
       !evidence.sourceIsDeleted &&
-      !evidence.itemIsDeleted &&
-      evidence.itemStatus === "active" &&
+      isAvailableItem(
+        {
+          status: evidence.itemStatus,
+          isDeleted: evidence.itemIsDeleted,
+          validFrom: evidence.itemValidFrom,
+          validTo: evidence.itemValidTo,
+        },
+        at,
+      ) &&
       !isInference(evidence.itemAttributes, evidence.itemDerivation);
     const position = validEvidencePositionByItem.get(evidence.brainItemId) ?? 0;
     if (valid) validEvidencePositionByItem.set(evidence.brainItemId, position + 1);
-    if (recordedEvidenceIds.has(evidence.id)) continue;
+    if (evidence.progressionEventId) continue;
+    const growthDelta = valid && position > 0 ? 1 : 0;
     statements.push(
       eventStatement(db, {
         accountId,
         originType: "evidence",
         originId: evidence.id,
         kind: "evidence_added",
-        growthDelta: valid && position > 0 ? 1 : 0,
+        growthDelta,
         collectedPieceDelta: 0,
         at,
       }),
     );
+    growthValue += growthDelta;
   }
 
-  if (isInitialization) {
+  for (const item of items) {
+    if (!item.progressionEventId) {
+      const event = itemProgressionEvent(db, {
+        accountId,
+        item,
+        revision: revisedItemIds.has(item.id),
+        initialization: true,
+        at,
+      });
+      statements.push(event.statement);
+      growthValue += event.growthDelta;
+      collectedPieces += event.collectedPieceDelta;
+    }
+    statements.push(
+      db
+        .insert(progressionItemStates)
+        .values({
+          id: `progression:item-state:v1:${item.id}`,
+          accountId,
+          brainItemId: item.id,
+          recognizedEvidenceCount: validEvidencePositionByItem.get(item.id) ?? 0,
+          createdAt: at,
+          updatedAt: at,
+        })
+        .onConflictDoNothing(),
+    );
+  }
+
+  if (
+    !existingEvents.some(
+      ({ originType, originId }) =>
+        originType === "initialization" && originId === INITIALIZATION_ORIGIN_ID,
+    )
+  ) {
     statements.push(
       eventStatement(db, {
         accountId,
@@ -238,8 +348,243 @@ async function synchronizeProgressionEvents(
       }),
     );
   }
+  statements.push(
+    db.delete(progressionPendingEvents).where(eq(progressionPendingEvents.accountId, accountId)),
+    db.insert(progressionStates).values({
+      id: `progression:state:v1:${accountId}`,
+      accountId,
+      growthValue,
+      collectedPieces,
+      createdAt: at,
+      updatedAt: at,
+    }),
+  );
   const [first, ...rest] = statements;
-  if (first) await db.batch([first, ...rest]);
+  if (!first) throw new Error("Progression initialization statements are missing");
+  await db.batch([first, ...rest]);
+  return { growthValue, collectedPieces };
+}
+
+/** 初回だけ既存Brainを集計し、その後はBrain更新時に積んだ差分だけを反映する。 */
+async function synchronizeProgressionEvents(
+  db: AccountDataDatabase,
+  accountId: string,
+  at: Date,
+): Promise<ProgressionTotals> {
+  const state = await db
+    .select({
+      growthValue: progressionStates.growthValue,
+      collectedPieces: progressionStates.collectedPieces,
+    })
+    .from(progressionStates)
+    .where(and(eq(progressionStates.accountId, accountId), eq(progressionStates.isDeleted, false)))
+    .get();
+  if (!state) return initializeProgressionEvents(db, accountId, at);
+
+  const pending = await db
+    .select({ id: progressionPendingEvents.id })
+    .from(progressionPendingEvents)
+    .where(eq(progressionPendingEvents.accountId, accountId))
+    .get();
+  if (!pending) return state;
+
+  const [items, revisions, evidenceRows, itemEvidenceStates] = await Promise.all([
+    db
+      .select({
+        id: brainItems.id,
+        attributes: brainItems.attributes,
+        derivation: brainItems.derivation,
+        status: brainItems.status,
+        isDeleted: brainItems.isDeleted,
+        validFrom: brainItems.validFrom,
+        validTo: brainItems.validTo,
+      })
+      .from(brainItems)
+      .innerJoin(
+        progressionPendingEvents,
+        and(
+          eq(progressionPendingEvents.accountId, accountId),
+          eq(progressionPendingEvents.originType, "brain_item"),
+          eq(progressionPendingEvents.originId, brainItems.id),
+        ),
+      )
+      .leftJoin(
+        progressionEvents,
+        and(
+          eq(progressionEvents.accountId, accountId),
+          eq(progressionEvents.originType, "brain_item"),
+          eq(progressionEvents.originId, brainItems.id),
+        ),
+      )
+      .where(isNull(progressionEvents.id))
+      .all(),
+    db
+      .select({ nextBrainItemId: brainItemRevisions.nextBrainItemId })
+      .from(brainItemRevisions)
+      .innerJoin(
+        progressionPendingEvents,
+        and(
+          eq(progressionPendingEvents.accountId, accountId),
+          eq(progressionPendingEvents.originType, "brain_item"),
+          eq(progressionPendingEvents.originId, brainItemRevisions.nextBrainItemId),
+        ),
+      )
+      .where(eq(brainItemRevisions.isDeleted, false))
+      .all(),
+    db
+      .select({
+        id: brainItemEvidenceEdges.id,
+        brainItemId: brainItemEvidenceEdges.brainItemId,
+        relation: brainItemEvidenceEdges.relation,
+        edgeIsDeleted: brainItemEvidenceEdges.isDeleted,
+        sourceIsDeleted: sourceRecords.isDeleted,
+        itemAttributes: brainItems.attributes,
+        itemDerivation: brainItems.derivation,
+        itemStatus: brainItems.status,
+        itemIsDeleted: brainItems.isDeleted,
+        itemValidFrom: brainItems.validFrom,
+        itemValidTo: brainItems.validTo,
+      })
+      .from(brainItemEvidenceEdges)
+      .innerJoin(
+        progressionPendingEvents,
+        and(
+          eq(progressionPendingEvents.accountId, accountId),
+          eq(progressionPendingEvents.originType, "evidence"),
+          eq(progressionPendingEvents.originId, brainItemEvidenceEdges.id),
+        ),
+      )
+      .innerJoin(brainItems, eq(brainItems.id, brainItemEvidenceEdges.brainItemId))
+      .innerJoin(sourceRecords, eq(sourceRecords.id, brainItemEvidenceEdges.sourceRecordId))
+      .leftJoin(
+        progressionEvents,
+        and(
+          eq(progressionEvents.accountId, accountId),
+          eq(progressionEvents.originType, "evidence"),
+          eq(progressionEvents.originId, brainItemEvidenceEdges.id),
+        ),
+      )
+      .where(isNull(progressionEvents.id))
+      .orderBy(asc(brainItemEvidenceEdges.createdAt), asc(brainItemEvidenceEdges.id))
+      .all(),
+    db
+      .select({
+        brainItemId: progressionItemStates.brainItemId,
+        recognizedEvidenceCount: progressionItemStates.recognizedEvidenceCount,
+      })
+      .from(progressionItemStates)
+      .innerJoin(
+        brainItemEvidenceEdges,
+        eq(brainItemEvidenceEdges.brainItemId, progressionItemStates.brainItemId),
+      )
+      .innerJoin(
+        progressionPendingEvents,
+        and(
+          eq(progressionPendingEvents.accountId, accountId),
+          eq(progressionPendingEvents.originType, "evidence"),
+          eq(progressionPendingEvents.originId, brainItemEvidenceEdges.id),
+        ),
+      )
+      .where(eq(progressionItemStates.accountId, accountId))
+      .all(),
+  ]);
+  const revisedItemIds = new Set(revisions.map(({ nextBrainItemId }) => nextBrainItemId));
+  const evidenceCountByItem = new Map(
+    itemEvidenceStates.map(({ brainItemId, recognizedEvidenceCount }) => [
+      brainItemId,
+      recognizedEvidenceCount,
+    ]),
+  );
+  const affectedItemIds = new Set(items.map(({ id }) => id));
+  const statements: D1BatchStatement[] = [];
+  let growthDelta = 0;
+  let collectedPieceDelta = 0;
+
+  for (const item of items) {
+    const event = itemProgressionEvent(db, {
+      accountId,
+      item,
+      revision: revisedItemIds.has(item.id),
+      initialization: false,
+      at,
+    });
+    statements.push(event.statement);
+    growthDelta += event.growthDelta;
+    collectedPieceDelta += event.collectedPieceDelta;
+    if (!evidenceCountByItem.has(item.id)) evidenceCountByItem.set(item.id, 0);
+  }
+
+  for (const evidence of evidenceRows) {
+    const valid =
+      evidence.relation === "supports" &&
+      !evidence.edgeIsDeleted &&
+      !evidence.sourceIsDeleted &&
+      isAvailableItem(
+        {
+          status: evidence.itemStatus,
+          isDeleted: evidence.itemIsDeleted,
+          validFrom: evidence.itemValidFrom,
+          validTo: evidence.itemValidTo,
+        },
+        at,
+      ) &&
+      !isInference(evidence.itemAttributes, evidence.itemDerivation);
+    const evidenceCount = evidenceCountByItem.get(evidence.brainItemId) ?? 0;
+    const eventGrowthDelta = valid && evidenceCount > 0 ? 1 : 0;
+    statements.push(
+      eventStatement(db, {
+        accountId,
+        originType: "evidence",
+        originId: evidence.id,
+        kind: "evidence_added",
+        growthDelta: eventGrowthDelta,
+        collectedPieceDelta: 0,
+        at,
+      }),
+    );
+    growthDelta += eventGrowthDelta;
+    if (valid) {
+      evidenceCountByItem.set(evidence.brainItemId, evidenceCount + 1);
+      affectedItemIds.add(evidence.brainItemId);
+    }
+  }
+
+  for (const brainItemId of affectedItemIds) {
+    statements.push(
+      db
+        .insert(progressionItemStates)
+        .values({
+          id: `progression:item-state:v1:${brainItemId}`,
+          accountId,
+          brainItemId,
+          recognizedEvidenceCount: evidenceCountByItem.get(brainItemId) ?? 0,
+          createdAt: at,
+          updatedAt: at,
+        })
+        .onConflictDoUpdate({
+          target: [progressionItemStates.accountId, progressionItemStates.brainItemId],
+          set: {
+            recognizedEvidenceCount: evidenceCountByItem.get(brainItemId) ?? 0,
+            updatedAt: at,
+          },
+        }),
+    );
+  }
+  const totals = {
+    growthValue: state.growthValue + growthDelta,
+    collectedPieces: state.collectedPieces + collectedPieceDelta,
+  };
+  statements.push(
+    db.delete(progressionPendingEvents).where(eq(progressionPendingEvents.accountId, accountId)),
+    db
+      .update(progressionStates)
+      .set({ ...totals, updatedAt: at })
+      .where(eq(progressionStates.accountId, accountId)),
+  );
+  const [first, ...rest] = statements;
+  if (!first) throw new Error("Progression synchronization statements are missing");
+  await db.batch([first, ...rest]);
+  return totals;
 }
 
 /** 本人の累積成長値と、現在利用可能なかけら数を返す。 */
@@ -248,18 +593,8 @@ export async function readUtsushiProgression(
   accountId: string,
   at = new Date(),
 ): Promise<UtsushiProgression> {
-  await synchronizeProgressionEvents(db, accountId, at);
   const [totals, active] = await Promise.all([
-    db
-      .select({
-        growthValue: sql<number>`coalesce(sum(${progressionEvents.growthDelta}), 0)`,
-        collectedPieces: sql<number>`coalesce(sum(${progressionEvents.collectedPieceDelta}), 0)`,
-      })
-      .from(progressionEvents)
-      .where(
-        and(eq(progressionEvents.accountId, accountId), eq(progressionEvents.isDeleted, false)),
-      )
-      .get(),
+    synchronizeProgressionEvents(db, accountId, at),
     db
       .select({
         activePieces: count(brainItems.id),
@@ -277,8 +612,8 @@ export async function readUtsushiProgression(
       )
       .get(),
   ]);
-  const growthValue = Number(totals?.growthValue ?? 0);
-  const collectedPieces = Number(totals?.collectedPieces ?? 0);
+  const growthValue = totals.growthValue;
+  const collectedPieces = totals.collectedPieces;
   const level = progressionLevel(growthValue);
   return {
     level,

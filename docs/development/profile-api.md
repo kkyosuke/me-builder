@@ -11,7 +11,7 @@
 ## 2. 結論
 
 - 本人のプロフィール取得は`GET /api/profile`とし、Account IDをpath、query、bodyで受け取らない
-- うつしレベル進行度は`GET /api/profile/progression`で取得し、AccountDataにある獲得イベントと現在有効なBrain Itemから集計する
+- うつしレベル進行度は`GET /api/profile/progression`で取得し、AccountDataにある差分反映済みの累積値と現在有効なBrain Itemから集計する
 - LIFF IDトークンを検証して解決したAccountだけを読み書きする
 - 取得結果には表示名、role、現在表示するアバターを含める
 - 相性画面など画像をJSONへ埋め込まない利用箇所向けに、`GET /api/profile/avatar`で本人の現在画像をバイナリ返却する
@@ -85,7 +85,7 @@ Web UIはこのAPIを通常の`img` URLとして直接参照せず、LIFF IDト�
 }
 ```
 
-成長イベントはAccountDataで重複排除して累積し、Brain ItemやEvidenceの削除後も`growthValue`と`collectedPieces`を減らしません。`activePieces`と`categoryCount`は取得時点で利用可能なBrain Itemから集計します。既存Accountは初回取得時に現在利用可能なデータから開始値を確定します。データがない場合も`Lv.1`として成功応答を返します。
+成長イベントはBrain更新と同じAccountDataのbatchで未処理差分へ追加し、進行度取得時は未処理差分だけを重複排除して累積値へ反映します。反映済みの全イベントを取得のたびに再走査しません。Brain ItemやEvidenceの削除後も`growthValue`と`collectedPieces`を減らしません。`activePieces`と`categoryCount`は取得時点で利用可能なBrain Itemから集計します。既存Accountは初回取得時に現在利用可能なデータから開始値を確定します。データがない場合も`Lv.1`として成功応答を返します。
 
 応答にBrain Itemのstatement、Evidence、分類名、Account IDは含めません。本人のprivate SQLiteが失敗した場合に架空の進行度へ縮退せず、`500`を返します。
 
@@ -113,7 +113,7 @@ Web UIによる縮小・切り抜きは通信量と操作体験のための一�
 flowchart LR
     W[Web UI] -->|Bearer + image body| API[API Server]
     API -->|LIFF ID token verify<br/>avatar metadata| D1[(Shared D1<br/>Account operation)]
-    API -->|進行度の同期・集計| AD[(AccountData<br/>progression events)]
+    API -->|未処理差分の反映・累積値取得| AD[(AccountData<br/>progression state)]
     API -->|image bytes| R2[(Private R2)]
     API -->|profile / progression JSON| W
     API -->|Bearerで認可したimage response| W

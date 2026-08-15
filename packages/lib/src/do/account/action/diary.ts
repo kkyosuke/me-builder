@@ -38,6 +38,7 @@ import {
   readDiaryTemporalContext,
   resolveDiaryTemporalContext,
 } from "./diary-temporal";
+import { progressionPendingStatement } from "./progression";
 
 const SESSION_INACTIVITY_MS = 6 * 60 * 60 * 1000;
 const SESSION_HARD_CAP_MS = 24 * 60 * 60 * 1000;
@@ -1801,21 +1802,30 @@ export async function applyDiaryBrainCheckpoint(
         );
       }
       statements.push(
-        ...sources.map((source) =>
-          db
-            .insert(brainItemEvidenceEdges)
-            .values({
-              id: crypto.randomUUID(),
-              brainItemId,
-              sourceRecordId: source.id,
-              relation: "supports",
-              isDerivationTrigger: false,
-              derivationMethod: "ai",
-              generatedAt: at,
-              ...lifecycle,
-            })
-            .onConflictDoNothing(),
-        ),
+        ...sources.flatMap((source) => {
+          const evidenceId = crypto.randomUUID();
+          return [
+            db
+              .insert(brainItemEvidenceEdges)
+              .values({
+                id: evidenceId,
+                brainItemId,
+                sourceRecordId: source.id,
+                relation: "supports",
+                isDerivationTrigger: false,
+                derivationMethod: "ai",
+                generatedAt: at,
+                ...lifecycle,
+              })
+              .onConflictDoNothing(),
+            progressionPendingStatement(db, {
+              accountId,
+              originType: "evidence",
+              originId: evidenceId,
+              at,
+            }),
+          ];
+        }),
       );
       const appliedIndex = appliedCandidateIndexByItemId.get(brainItemId);
       if (appliedIndex !== undefined) {
@@ -1897,6 +1907,12 @@ export async function applyDiaryBrainCheckpoint(
         confidence: { state: "uncomputed" },
         ...lifecycle,
       }),
+      progressionPendingStatement(db, {
+        accountId,
+        originType: "brain_item",
+        originId: brainItemId,
+        at,
+      }),
       db.insert(brainVectorSyncJobs).values({
         id: `${brainItemId}:${at.getTime()}:upsert`,
         brainItemId,
@@ -1906,18 +1922,27 @@ export async function applyDiaryBrainCheckpoint(
         nextAttemptAt: at,
         ...lifecycle,
       }),
-      ...sources.map((source) =>
-        db.insert(brainItemEvidenceEdges).values({
-          id: crypto.randomUUID(),
-          brainItemId,
-          sourceRecordId: source.id,
-          relation: "supports",
-          isDerivationTrigger: true,
-          derivationMethod: "ai",
-          generatedAt: at,
-          ...lifecycle,
-        }),
-      ),
+      ...sources.flatMap((source) => {
+        const evidenceId = crypto.randomUUID();
+        return [
+          db.insert(brainItemEvidenceEdges).values({
+            id: evidenceId,
+            brainItemId,
+            sourceRecordId: source.id,
+            relation: "supports",
+            isDerivationTrigger: true,
+            derivationMethod: "ai",
+            generatedAt: at,
+            ...lifecycle,
+          }),
+          progressionPendingStatement(db, {
+            accountId,
+            originType: "evidence",
+            originId: evidenceId,
+            at,
+          }),
+        ];
+      }),
       db.insert(brainItemAccessLabels).values({
         id: crypto.randomUUID(),
         brainItemId,
