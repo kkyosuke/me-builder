@@ -26,6 +26,8 @@ jobs:
     env:
       LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
       BASE_DOMAIN: ${{ vars.BASE_DOMAIN }}
+      STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SANDBOX_SECRET_KEY }}
+      STRIPE_E2E_PRICE_LOOKUP_KEY: ${{ vars.STRIPE_E2E_PRICE_LOOKUP_KEY }}
     steps:
       - uses: actions/checkout@v4
 
@@ -41,3 +43,8 @@ jobs:
       - name: Verify Production LINE Webhook Connectivity
         if: ${{ env.LINE_CHANNEL_ACCESS_TOKEN != '' }}
         run: bun --cwd apps/api scripts/register-webhook.ts --force
+
+      # Test Clockを使う外部E2Eは通常PRのCIから分離し、sandbox Secretがある場合だけ実行する。
+      - name: Verify Stripe Sandbox Billing Lifecycle
+        if: ${{ env.STRIPE_SECRET_KEY != '' && env.STRIPE_E2E_PRICE_LOOKUP_KEY != '' }}
+        run: bun --cwd apps/api billing:test:sandbox
