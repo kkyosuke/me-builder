@@ -164,6 +164,33 @@ describe("loadBrainContextMemories", () => {
     ]);
   });
 
+  it("Full関係性履歴ではrelationship Access LabelをAccountDataで再認可する", async () => {
+    const harness = createHarness();
+    await loadBrainContextMemories(
+      {
+        cf: harness.cf,
+        workerConfig: getWorkerConfig({
+          GOOGLE_VERTEX_AI_API_KEY: "google-key",
+          BRAIN_VECTOR_HMAC_SECRET: "hmac-secret",
+        }),
+        accountId: "account-1",
+        messages,
+        currentUserMessageIds: ["current-1", "current-2"],
+        requiredAccessLabel: "relationship",
+      },
+      harness.dependencies,
+    );
+
+    expect(harness.execute).toHaveBeenCalledWith(
+      "account-1",
+      "brain.loadChatContextMemories",
+      ["vector-2", "vector-1"],
+      expect.any(Date),
+      undefined,
+      "relationship",
+    );
+  });
+
   it("検索専用timeout後も生成用の親signalをabortしない", async () => {
     vi.useFakeTimers();
     const harness = createHarness();

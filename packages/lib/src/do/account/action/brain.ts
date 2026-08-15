@@ -1200,6 +1200,7 @@ export async function loadBrainChatContextMemories(
   vectorIds: readonly string[],
   at = new Date(),
   notBefore?: Date,
+  requiredAccessLabel?: string,
 ): Promise<readonly BrainChatContextMemory[]> {
   const candidateVectorIds = [...new Set(vectorIds.filter((id) => id.length > 0))].slice(
     0,
@@ -1235,6 +1236,7 @@ export async function loadBrainChatContextMemories(
         eq(brainItems.accountId, accountId),
         eq(brainItems.status, "active"),
         eq(brainItems.isDeleted, false),
+        ...(requiredAccessLabel ? [eq(brainItemAccessLabels.label, requiredAccessLabel)] : []),
         or(isNull(brainItems.validFrom), lte(brainItems.validFrom, at)),
         or(isNull(brainItems.validTo), gt(brainItems.validTo, at)),
       ),

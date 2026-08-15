@@ -23,7 +23,10 @@ import {
   classifySafety,
   generateDiaryChatResponse,
 } from "../logic/diary-chat";
-import { buildRelationshipQuestionPlan } from "../logic/relationship-question";
+import {
+  buildRelationshipQuestionPlan,
+  selectFullRelationshipHistory,
+} from "../logic/relationship-question";
 import {
   DEFAULT_DIARY_CHAT_PROMPT_OPTIONS,
   getDiaryChatConversationGuidance,
@@ -572,11 +575,11 @@ export async function processChatTurnMessage(
             usedBrainItems: [],
           }
         : undefined;
-    const [brainMemories, relationshipDiagnoses, collectedPromptContextKinds] =
+    const [loadedBrainMemories, relationshipDiagnoses, collectedPromptContextKinds] =
       pendingResponse || safetyRoute !== "normal" || quotaResponse
         ? [[], [], []]
         : await Promise.all([
-            initialRelationshipPlan.active
+            initialRelationshipPlan.active && relationshipQuestionMode !== "confirmed-history"
               ? Promise.resolve([])
               : loadBrainContextMemories({
                   cf,
@@ -585,6 +588,9 @@ export async function processChatTurnMessage(
                   messages: context.messages,
                   currentUserMessageIds: context.currentUserMessageIds,
                   semanticSearchDays: entitlement.policy.semanticSearchDays,
+                  ...(initialRelationshipPlan.active
+                    ? { requiredAccessLabel: "relationship" }
+                    : {}),
                   ...(generationController.signal ? { signal: generationController.signal } : {}),
                 }),
             initialRelationshipPlan.active && relationshipQuestionMode !== "current-message"
@@ -643,6 +649,9 @@ export async function processChatTurnMessage(
       currentUserMessageIds: context.currentUserMessageIds,
       diagnoses: relationshipDiagnoses,
     });
+    const brainMemories = relationshipPlan.active
+      ? selectFullRelationshipHistory(relationshipPlan.context, loadedBrainMemories)
+      : loadedBrainMemories;
     const collectionCandidates =
       pendingResponse ||
       safetyRoute !== "normal" ||

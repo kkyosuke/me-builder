@@ -21,6 +21,8 @@ describe("diary chat prompt", () => {
     expect(DIARY_CHAT_SYSTEM_PROMPT).toContain("1 turnの主質問は最大1問");
     expect(DIARY_CHAT_SYSTEM_PROMPT).toContain("第三者の未共有情報を推測・補完せず");
     expect(DIARY_CHAT_SYSTEM_PROMPT).toContain("現在Sessionとown_diagnosesだけ");
+    expect(DIARY_CHAT_SYSTEM_PROMPT).toContain("AccountDataが再認可したmemoriesだけ");
+    expect(DIARY_CHAT_SYSTEM_PROMPT).toContain("個人データexport");
   });
 
   it("追跡可能なprompt versionを持つ", () => {

@@ -15,8 +15,16 @@ export const brainActions = {
     vectorIds: readonly string[],
     at?: Date,
     notBefore?: Date,
+    requiredAccessLabel?: string,
   ) =>
-    DO.account.action.brain.loadBrainChatContextMemories(db, accountId, vectorIds, at, notBefore),
+    DO.account.action.brain.loadBrainChatContextMemories(
+      db,
+      accountId,
+      vectorIds,
+      at,
+      notBefore,
+      requiredAccessLabel,
+    ),
   "brain.loadRelationshipDiagnosisContexts": (
     db: DO.account.Database,
     accountId: string,

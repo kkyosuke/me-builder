@@ -63,6 +63,7 @@ export async function loadBrainContextMemories(
     messages: readonly ConversationContextMessage[];
     currentUserMessageIds: readonly string[];
     semanticSearchDays?: number | null;
+    requiredAccessLabel?: string;
     signal?: AbortSignal;
   }>,
   dependencies: BrainContextDependencies = defaultDependencies,
@@ -120,8 +121,14 @@ export async function loadBrainContextMemories(
             ? undefined
             : new Date(at.getTime() - input.semanticSearchDays * 24 * 60 * 60 * 1_000);
         const account = accountDataFor(accountDataNamespace, input.accountId);
-        return notBefore
-          ? account.execute("brain.loadChatContextMemories", vectorIds, at, notBefore)
+        return notBefore || input.requiredAccessLabel
+          ? account.execute(
+              "brain.loadChatContextMemories",
+              vectorIds,
+              at,
+              notBefore,
+              input.requiredAccessLabel,
+            )
           : account.execute("brain.loadChatContextMemories", vectorIds);
       })(),
     ]);

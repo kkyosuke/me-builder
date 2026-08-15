@@ -1011,6 +1011,87 @@ describe("loadBrainSemanticDedupCandidates", () => {
 });
 
 describe("loadBrainChatContextMemories", () => {
+  it("Full関係性履歴はactiveなrelationship Access Labelを持つ本人Itemだけに限定する", async () => {
+    const db = createTestDb();
+    await insertAccountsAndSources(db);
+    const at = new Date("2026-08-10T00:00:00Z");
+    await db.insert(schema.sourceRecordTextPayloads).values({
+      sourceRecordId: "source-1",
+      body: "上司と面談して希望を伝えた",
+      contentHash: "relationship-source",
+    });
+    await saveBrainItem(
+      db,
+      createInput({
+        at,
+        item: {
+          ...createInput().item,
+          id: "relationship-memory",
+          category: "memory",
+          statement: "上司と面談して希望を伝えた",
+        },
+        evidence: [
+          {
+            id: "relationship-evidence",
+            sourceRecordId: "source-1",
+            relation: "supports",
+            isDerivationTrigger: true,
+            derivationMethod: "ai",
+            generatedAt: at,
+          },
+        ],
+        topicLabels: [{ id: "relationship-topic", label: "diary" }],
+        accessLabels: [{ id: "relationship-access", label: "relationship", assignedBy: "owner" }],
+      }),
+    );
+    await saveBrainItem(
+      db,
+      createInput({
+        at,
+        item: {
+          ...createInput().item,
+          id: "unconfirmed-memory",
+          category: "memory",
+          statement: "上司との未確認メモ",
+        },
+        evidence: [
+          {
+            id: "unconfirmed-evidence",
+            sourceRecordId: "source-1",
+            relation: "supports",
+            isDerivationTrigger: true,
+            derivationMethod: "ai",
+            generatedAt: at,
+          },
+        ],
+        topicLabels: [{ id: "unconfirmed-topic", label: "diary" }],
+        accessLabels: [{ id: "unconfirmed-access", label: "unclassified", assignedBy: "system" }],
+      }),
+    );
+    await db.insert(schema.brainVectorEntries).values([
+      {
+        id: "vector-relationship",
+        brainItemId: "relationship-memory",
+        itemRevision: at.getTime(),
+      },
+      {
+        id: "vector-unconfirmed",
+        brainItemId: "unconfirmed-memory",
+        itemRevision: at.getTime(),
+      },
+    ]);
+
+    const result = await loadBrainChatContextMemories(
+      db,
+      "account-1",
+      ["vector-unconfirmed", "vector-relationship"],
+      new Date("2026-08-11T00:00:00Z"),
+      undefined,
+      "relationship",
+    );
+    expect(result.map(({ brainItemId }) => brainItemId)).toEqual(["relationship-memory"]);
+  });
+
   it("Vectorize候補をAccountDataで再認可し、active ItemとEvidenceだけを類似度順で返す", async () => {
     const db = createTestDb();
     await insertAccountsAndSources(db);
