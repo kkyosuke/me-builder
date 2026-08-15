@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useLiffSession } from "../../liff";
+import { useProfileProgression } from "../../profile/presentation/use-profile-progression";
 import {
   createDiagnosisDetailHistoryState,
   diagnosisDetailIdFromHistoryState,
@@ -25,6 +26,7 @@ import { useDiagnosisList } from "./hooks/use-diagnosis-list";
 export default function DiagnosisApplication() {
   const liffSession = useLiffSession();
   const diagnoses = useDiagnosisList({ acquireIdToken: liffSession.acquireIdToken });
+  const progression = useProfileProgression({ acquireIdToken: liffSession.acquireIdToken });
   const detail = useDiagnosisDetail({
     idToken: diagnoses.idToken,
     onProgress: diagnoses.updateProgress,
@@ -186,6 +188,9 @@ export default function DiagnosisApplication() {
       onCategoryFilterChange={changeCategoryFilter}
       onOpenDiagnosis={openDiagnosis}
       onRetry={() => void diagnoses.load()}
+      {...(progression.state.status === "success"
+        ? { progressionLevel: progression.state.data.level }
+        : {})}
     />
   );
 
@@ -235,6 +240,7 @@ export default function DiagnosisApplication() {
         <DiagnosisResultView
           result={detailContent.result}
           onBack={closeDetail}
+          progression={progression.state}
           {...(directDiagnosisId
             ? {
                 backHref: fromProfile ? "/me" : "/diagnosis",
@@ -252,7 +258,9 @@ export default function DiagnosisApplication() {
           onBack={closeDetail}
           onSaveAnswer={detail.saveAnswer}
           onDeferQuestion={deferQuestion}
-          onComplete={() => void detail.openCompletedResult()}
+          onComplete={() => {
+            void detail.openCompletedResult().then(() => progression.reload());
+          }}
         />
       );
     }

@@ -125,6 +125,7 @@ describe("Utsushi progression", () => {
       categoryCount: 0,
       calculationVersion: 1,
       highestLevel: 1,
+      recentChanges: [],
     });
   });
 
@@ -164,6 +165,14 @@ describe("Utsushi progression", () => {
       categoryCount: 2,
       calculationVersion: 1,
       highestLevel: 1,
+      recentChanges: [
+        {
+          kind: "evidence_deepened",
+          growthDelta: 1,
+          occurredAt: "2026-08-15T00:00:00.000Z",
+        },
+        { kind: "new_piece", growthDelta: 3, occurredAt: "2026-08-15T00:00:00.000Z" },
+      ],
     });
 
     const later = new Date(at.getTime() + 10);
@@ -180,6 +189,15 @@ describe("Utsushi progression", () => {
       categoryCount: 3,
       calculationVersion: 1,
       highestLevel: 2,
+      recentChanges: [
+        {
+          kind: "evidence_deepened",
+          growthDelta: 1,
+          occurredAt: at.toISOString(),
+        },
+        { kind: "new_piece", growthDelta: 3, occurredAt: at.toISOString() },
+        { kind: "new_piece", growthDelta: 3, occurredAt: at.toISOString() },
+      ],
     };
     await expect(readUtsushiProgression(db, accountId, later)).resolves.toEqual(afterAddition);
     await expect(readUtsushiProgression(db, accountId, later)).resolves.toEqual(afterAddition);

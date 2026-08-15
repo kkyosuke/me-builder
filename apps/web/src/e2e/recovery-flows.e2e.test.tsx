@@ -36,6 +36,7 @@ const progression = {
   categoryCount: 2,
   calculationVersion: 1,
   highestLevel: 2,
+  recentChanges: [],
 };
 const acceptedTermsStatus = {
   document: currentServiceTerms,

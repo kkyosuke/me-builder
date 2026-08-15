@@ -1314,6 +1314,13 @@ export interface operations {
             categoryCount: number;
             calculationVersion: number;
             highestLevel: number;
+            recentChanges: {
+              /** @enum {string} */
+              kind: "new_piece" | "evidence_deepened" | "temporal_change";
+              growthDelta: number;
+              /** Format: date-time */
+              occurredAt: string;
+            }[];
           };
         };
       };

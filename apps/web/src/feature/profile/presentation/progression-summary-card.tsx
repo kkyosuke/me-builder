@@ -9,6 +9,12 @@ import {
 
 const number = new Intl.NumberFormat("ja-JP");
 
+const changeLabels = {
+  new_piece: "新しいかけらが見つかりました",
+  evidence_deepened: "かけらの根拠が深まりました",
+  temporal_change: "今の自分へ更新されました",
+} as const;
+
 function ProgressionCard({ progression }: { progression: UtsushiProgression }) {
   const percentage = progressionPercentage(progression);
   const remaining = growthUntilNextLevel(progression);
@@ -101,6 +107,35 @@ function ProgressionCard({ progression }: { progression: UtsushiProgression }) {
           </dd>
         </div>
       </dl>
+
+      {progression.recentChanges.length > 0 && (
+        <section
+          aria-labelledby="recent-growth-heading"
+          className="border-t border-violet-200/70 px-5 py-4 dark:border-violet-800/60"
+        >
+          <h3
+            id="recent-growth-heading"
+            className="text-xs font-semibold text-slate-600 dark:text-slate-300"
+          >
+            最近育ったこと
+          </h3>
+          <ul className="mt-2 space-y-2">
+            {progression.recentChanges.map((change) => (
+              <li
+                key={`${change.kind}:${change.occurredAt}`}
+                className="flex items-center justify-between gap-3 text-sm"
+              >
+                <span className="text-slate-700 dark:text-slate-200">
+                  {changeLabels[change.kind]}
+                </span>
+                <strong className="shrink-0 tabular-nums text-violet-700 dark:text-violet-300">
+                  +{number.format(change.growthDelta)}
+                </strong>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <p className="border-t border-violet-200/70 px-5 py-3 text-xs leading-relaxed text-slate-500 dark:border-violet-800/60 dark:text-slate-400">
         このレベルは優劣や完成度ではなく、自分への理解が育った歩みです。

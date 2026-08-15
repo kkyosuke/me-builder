@@ -59,6 +59,7 @@ describe("AccountData progression projection", () => {
       categoryCount: 2,
       calculationVersion: 1,
       highestLevel: 2,
+      recentChanges: [],
     };
     const shared = {} as D1.shared.Client;
     vi.spyOn(D1.shared.client, "create").mockReturnValue(shared);

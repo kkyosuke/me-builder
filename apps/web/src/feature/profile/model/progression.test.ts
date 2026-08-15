@@ -13,6 +13,7 @@ describe("progression presentation values", () => {
       categoryCount: 6,
       calculationVersion: 1,
       highestLevel: 12,
+      recentChanges: [],
     };
 
     expect(growthUntilNextLevel(progression)).toBe(107);
@@ -29,6 +30,7 @@ describe("progression presentation values", () => {
       categoryCount: 0,
       calculationVersion: 1,
       highestLevel: 1,
+      recentChanges: [],
     };
 
     expect(progressionPercentage({ ...base, growthValue: -1 })).toBe(0);

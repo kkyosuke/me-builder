@@ -165,6 +165,7 @@ describe("Profile progression API local E2E", () => {
       categoryCount: 0,
       calculationVersion: 1,
       highestLevel: 1,
+      recentChanges: [],
     });
 
     const at = new Date("2026-08-15T01:00:00.000Z");
@@ -172,7 +173,7 @@ describe("Profile progression API local E2E", () => {
     await addBrainItem("brain-b", "goal", 1, new Date(at.getTime() + 10));
     const grown = await request();
     expect(grown.headers.get("cache-control")).toBe("no-store");
-    expect(await grown.json()).toEqual({
+    expect(await grown.json()).toMatchObject({
       level: 2,
       growthValue: 7,
       currentLevelThreshold: 5,
@@ -182,6 +183,10 @@ describe("Profile progression API local E2E", () => {
       categoryCount: 2,
       calculationVersion: 1,
       highestLevel: 2,
+      recentChanges: expect.arrayContaining([
+        expect.objectContaining({ kind: "new_piece", growthDelta: 3 }),
+        expect.objectContaining({ kind: "evidence_deepened", growthDelta: 1 }),
+      ]),
     });
 
     await accountDataStore.db

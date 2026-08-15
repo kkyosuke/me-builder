@@ -22,6 +22,13 @@ describe("ProgressionSummaryCard", () => {
             categoryCount: 6,
             calculationVersion: 1,
             highestLevel: 12,
+            recentChanges: [
+              {
+                kind: "evidence_deepened",
+                growthDelta: 1,
+                occurredAt: "2026-08-15T00:00:00.000Z",
+              },
+            ],
           },
         }}
       />,
@@ -33,6 +40,8 @@ describe("ProgressionSummaryCard", () => {
     expect(screen.getByText("58")).toBeTruthy();
     expect(screen.getByText("48")).toBeTruthy();
     expect(screen.getByText("6")).toBeTruthy();
+    expect(screen.getByText("かけらの根拠が深まりました")).toBeTruthy();
+    expect(screen.getByText("+1")).toBeTruthy();
     expect(screen.getByText(/優劣や完成度ではなく/)).toBeTruthy();
     expect(screen.queryByText(/me-builder/i)).toBeNull();
   });

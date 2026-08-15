@@ -1717,6 +1717,28 @@
                     "highestLevel": {
                       "type": "integer",
                       "minimum": 1
+                    },
+                    "recentChanges": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "enum": ["new_piece", "evidence_deepened", "temporal_change"],
+                            "type": "string"
+                          },
+                          "growthDelta": {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          "occurredAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": ["kind", "growthDelta", "occurredAt"]
+                      },
+                      "maxItems": 3
                     }
                   },
                   "required": [
@@ -1728,7 +1750,8 @@
                     "activePieces",
                     "categoryCount",
                     "calculationVersion",
-                    "highestLevel"
+                    "highestLevel",
+                    "recentChanges"
                   ]
                 }
               }

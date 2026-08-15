@@ -106,6 +106,7 @@ export function DiagnosisHome({
   onCategoryFilterChange,
   onOpenDiagnosis,
   onRetry,
+  progressionLevel,
 }: {
   categoryFilter: RelationshipCategoryFilter;
   diagnoses: AsyncState<DiagnosisListItem[]>;
@@ -114,6 +115,7 @@ export function DiagnosisHome({
   onCategoryFilterChange: (filter: RelationshipCategoryFilter) => void;
   onOpenDiagnosis: (diagnosis: DiagnosisListItem) => void;
   onRetry: () => void;
+  progressionLevel?: number;
 }) {
   const filteredDiagnoses =
     diagnoses.status === "success"
@@ -125,9 +127,20 @@ export function DiagnosisHome({
   return (
     <main className="mx-auto min-h-dvh w-full max-w-2xl px-4 py-8 pb-28 sm:px-8">
       <header className="mb-8">
-        <p className="text-sm font-semibold tracking-wider text-sky-700 dark:text-sky-300">
-          私をひもとく
-        </p>
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm font-semibold tracking-wider text-sky-700 dark:text-sky-300">
+            私をひもとく
+          </p>
+          {progressionLevel !== undefined && (
+            <a
+              href="/me"
+              aria-label={`うつしレベル${progressionLevel}、わたしのまとめを見る`}
+              className="rounded-full bg-violet-100 px-3 py-1 text-xs font-bold tabular-nums text-violet-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 dark:bg-violet-950 dark:text-violet-300"
+            >
+              うつし Lv.{progressionLevel}
+            </a>
+          )}
+        </div>
         <h1
           tabIndex={-1}
           data-main-route-heading="diagnosis"
