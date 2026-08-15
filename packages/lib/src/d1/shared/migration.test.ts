@@ -11,6 +11,7 @@ const SHARED_D1_TABLES = [
   "account_agreement_acceptances",
   "account_identities",
   "account_profiles",
+  "account_progression_projections",
   "accounts",
   "catalog_versions",
   "diagnoses",
@@ -179,6 +180,53 @@ describe("shared D1 clean baseline migration", () => {
       .pluck()
       .get() as string;
     expect(indexSql).toContain("WHERE is_deleted = 0");
+    expect(sqlite.pragma("foreign_key_check")).toEqual([]);
+    sqlite.close();
+  });
+
+  it("0006の表示名column追加時に既存のアバターmetadataを維持する", () => {
+    const sqlite = new Database(":memory:");
+    const migrations = readdirSync(migrationsDirectory)
+      .filter((filename) => /^000[0-5]_.+\.sql$/.test(filename))
+      .sort();
+    for (const file of migrations) {
+      sqlite.exec(readFileSync(path.join(migrationsDirectory, file), "utf8"));
+    }
+    sqlite
+      .prepare(
+        `INSERT INTO accounts (id, created_at, updated_at, is_deleted, status)
+         VALUES ('account-avatar', 1, 1, 0, 'active')`,
+      )
+      .run();
+    sqlite
+      .prepare(
+        `INSERT INTO account_profiles (
+           account_id, avatar_object_key, avatar_content_type, avatar_byte_size,
+           avatar_etag, avatar_updated_at
+         ) VALUES ('account-avatar', 'accounts/account-avatar/profile/avatar/hash.webp',
+           'image/webp', 1234, 'etag-1', 1000)`,
+      )
+      .run();
+
+    sqlite.exec(readFileSync(path.join(migrationsDirectory, "0006_plain_paladin.sql"), "utf8"));
+
+    expect(
+      sqlite
+        .prepare(
+          `SELECT display_name AS displayName, avatar_object_key AS avatarObjectKey,
+                  avatar_content_type AS avatarContentType, avatar_byte_size AS avatarByteSize,
+                  avatar_etag AS avatarEtag, avatar_updated_at AS avatarUpdatedAt
+           FROM account_profiles WHERE account_id = 'account-avatar'`,
+        )
+        .get(),
+    ).toEqual({
+      displayName: null,
+      avatarObjectKey: "accounts/account-avatar/profile/avatar/hash.webp",
+      avatarContentType: "image/webp",
+      avatarByteSize: 1234,
+      avatarEtag: "etag-1",
+      avatarUpdatedAt: 1000,
+    });
     expect(sqlite.pragma("foreign_key_check")).toEqual([]);
     sqlite.close();
   });

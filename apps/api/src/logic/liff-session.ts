@@ -66,6 +66,14 @@ export async function resolveLiffSession({
     resolveLineAccountRole(verified.claims.sub, adminLineUserIds),
   );
 
+  if (verified.claims.name) {
+    await D1.shared.action.profile.saveVerifiedDisplayName(
+      db,
+      resolved.account.id,
+      verified.claims.name,
+    );
+  }
+
   logger.info("Resolved account for the LIFF session");
 
   return {

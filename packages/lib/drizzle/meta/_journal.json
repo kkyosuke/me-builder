@@ -43,6 +43,13 @@
       "when": 1786762391602,
       "tag": "0005_complete_banshee",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1786765747281,
+      "tag": "0006_plain_paladin",
+      "breakpoints": true
     }
   ]
 }

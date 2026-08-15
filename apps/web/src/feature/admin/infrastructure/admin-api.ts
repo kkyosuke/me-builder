@@ -1,10 +1,13 @@
 import * as v from "valibot";
 import type { operations } from "../../../generated/api";
 import { createHttpClient } from "../../../infrastructure/http-client";
+import type { AdminAccountFilters, AdminAccountPage } from "../model/account";
 import type { AdminStatistics } from "../model/statistics";
 
 type ApiResponse =
   operations["getAdminStatistics"]["responses"][200]["content"]["application/json"];
+type AccountsApiResponse =
+  operations["listAdminAccounts"]["responses"][200]["content"]["application/json"];
 
 const UnavailableSchema = v.object({
   status: v.literal("unavailable"),
@@ -62,6 +65,33 @@ const ResponseSchema = v.object({
   ]),
 }) satisfies v.GenericSchema<ApiResponse>;
 
+const CountSchema = v.pipe(v.number(), v.safeInteger(), v.minValue(0));
+const AccountsResponseSchema = v.object({
+  accounts: v.array(
+    v.object({
+      id: v.pipe(v.string(), v.nonEmpty()),
+      displayName: v.nullable(v.pipe(v.string(), v.nonEmpty())),
+      role: v.picklist(["user", "admin"]),
+      status: v.literal("active"),
+      createdAt: v.pipe(v.string(), v.isoTimestamp()),
+      progression: v.union([
+        v.object({ status: v.literal("pending") }),
+        v.object({
+          status: v.literal("ready"),
+          level: v.pipe(CountSchema, v.minValue(1)),
+          calculationVersion: v.pipe(CountSchema, v.minValue(1)),
+          collectedPieces: CountSchema,
+          activePieces: CountSchema,
+          lastGrowthAt: v.nullable(v.pipe(v.string(), v.isoTimestamp())),
+          projectedAt: v.pipe(v.string(), v.isoTimestamp()),
+        }),
+      ]),
+    }),
+  ),
+  total: CountSchema,
+  nextCursor: v.nullable(v.string()),
+}) satisfies v.GenericSchema<AccountsApiResponse>;
+
 export async function fetchAdminStatistics(
   apiUrl: string | undefined,
   idToken: string,
@@ -78,4 +108,33 @@ export async function fetchAdminStatistics(
     throw new Error(`統計情報の取得に失敗しました (HTTP ${response.status})`);
   }
   return v.parse(ResponseSchema, await response.json());
+}
+
+export async function fetchAdminAccounts(
+  apiUrl: string | undefined,
+  idToken: string,
+  filters: AdminAccountFilters,
+  cursor?: string,
+  signal?: AbortSignal,
+): Promise<AdminAccountPage> {
+  const query = new URLSearchParams();
+  if (filters.query.trim()) query.set("query", filters.query.trim());
+  if (filters.role !== "all") query.set("role", filters.role);
+  if (filters.status !== "all") query.set("status", filters.status);
+  if (filters.sort !== "created") query.set("sort", filters.sort);
+  if (cursor) query.set("cursor", cursor);
+  const suffix = query.size > 0 ? `?${query.toString()}` : "";
+  const response = await createHttpClient(apiUrl).request(`/api/admin/accounts${suffix}`, {
+    headers: { Authorization: `Bearer ${idToken}` },
+    ...(signal ? { signal } : {}),
+  });
+  if (!response.ok) {
+    if (response.status === 403) throw new Error("この画面を表示する管理者権限がありません。");
+    if (response.status === 401) {
+      throw new Error("本人確認に失敗しました。LINEから開き直してください。");
+    }
+    if (response.status === 400) throw new Error("検索条件を確認してください。");
+    throw new Error(`Account一覧の取得に失敗しました (HTTP ${response.status})`);
+  }
+  return v.parse(AccountsResponseSchema, await response.json());
 }

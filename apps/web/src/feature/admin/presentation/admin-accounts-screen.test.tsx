@@ -36,11 +36,27 @@ const page: AdminAccountPage = {
   ],
 };
 
+const filters = { query: "", role: "all", status: "all", sort: "created" } as const;
+
+function renderScreen(overrides: Partial<Parameters<typeof AdminAccountsScreen>[0]> = {}) {
+  return render(
+    <AdminAccountsScreen
+      state={{ status: "success", data: page }}
+      filters={filters}
+      onReload={vi.fn()}
+      onFilterChange={vi.fn()}
+      onNextPage={vi.fn()}
+      onPreviousPage={vi.fn()}
+      {...overrides}
+    />,
+  );
+}
+
 describe("AdminAccountsScreen", () => {
   afterEach(cleanup);
 
   it("名前、ID、レベル、かけら、未集計状態を表示する", () => {
-    render(<AdminAccountsScreen state={{ status: "success", data: page }} onReload={vi.fn()} />);
+    renderScreen();
 
     expect(screen.getByRole("heading", { name: "管理者ダッシュボード" })).toBeTruthy();
     expect(screen.getAllByText("山田 花子").length).toBeGreaterThan(0);
@@ -48,21 +64,46 @@ describe("AdminAccountsScreen", () => {
     expect(screen.getAllByText("Lv.12").length).toBeGreaterThan(0);
     expect(screen.getAllByText(/集計更新/).length).toBeGreaterThan(0);
     expect(screen.getAllByText("レベル集計中").length).toBeGreaterThan(0);
-    expect(screen.getByText("UIプレビュー用のサンプルデータです")).toBeTruthy();
+    expect(screen.queryByText("UIプレビュー用のサンプルデータです")).toBeNull();
   });
 
-  it("表示名の部分一致とroleで一覧を絞り込む", () => {
-    render(<AdminAccountsScreen state={{ status: "success", data: page }} onReload={vi.fn()} />);
+  it("検索と絞り込みをAPI取得側へ通知する", () => {
+    const onFilterChange = vi.fn();
+    renderScreen({ onFilterChange });
 
     fireEvent.change(screen.getByRole("searchbox", { name: "名前・Account IDを検索" }), {
       target: { value: "山田" },
     });
-    expect(screen.getAllByText("山田 花子").length).toBeGreaterThan(0);
-    expect(screen.queryByText("名前未取得")).toBeNull();
-
     fireEvent.change(screen.getByRole("combobox", { name: "roleで絞り込み" }), {
       target: { value: "admin" },
     });
-    expect(screen.getByText("条件に一致するAccountはありません")).toBeTruthy();
+    expect(onFilterChange).toHaveBeenNthCalledWith(1, "query", "山田");
+    expect(onFilterChange).toHaveBeenNthCalledWith(2, "role", "admin");
+  });
+
+  it("cursorページの前後移動を通知する", () => {
+    const onNextPage = vi.fn();
+    const onPreviousPage = vi.fn();
+    renderScreen({
+      state: { status: "success", data: { ...page, nextCursor: "next" } },
+      pageNumber: 2,
+      canGoBack: true,
+      onNextPage,
+      onPreviousPage,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "前のページ" }));
+    fireEvent.click(screen.getByRole("button", { name: "次のページ" }));
+    expect(onPreviousPage).toHaveBeenCalledOnce();
+    expect(onNextPage).toHaveBeenCalledOnce();
+  });
+
+  it("一覧取得に失敗しても利用統計へ移動できる", () => {
+    renderScreen({ state: { status: "error", message: "取得に失敗しました" } });
+
+    expect(screen.getByText("取得に失敗しました")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "利用統計" }).getAttribute("href")).toBe(
+      "/admin/statistics",
+    );
   });
 });

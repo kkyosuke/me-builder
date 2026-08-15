@@ -3,7 +3,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { app } from "../index";
 
 const { getAdminStatistics } = vi.hoisted(() => ({ getAdminStatistics: vi.fn() }));
+const { getAdminAccounts } = vi.hoisted(() => ({ getAdminAccounts: vi.fn() }));
 vi.mock("../logic/admin-statistics", () => ({ getAdminStatistics }));
+vi.mock("../logic/admin-accounts", () => ({ getAdminAccounts }));
 
 const dummyDb = {} as D1Database;
 
@@ -60,5 +62,53 @@ describe("GET /api/admin/statistics", () => {
     expect(await response.json()).toMatchObject({
       gemini: { accounts: [{ accountId: "account-1" }] },
     });
+  });
+});
+
+describe("GET /api/admin/accounts", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("検索条件を渡し、管理者向けAccount一覧をキャッシュさせずに返す", async () => {
+    getAdminAccounts.mockResolvedValue({
+      type: "resolved",
+      page: {
+        total: 1,
+        nextCursor: null,
+        accounts: [
+          {
+            id: "account-1",
+            displayName: "山田 花子",
+            role: "user",
+            status: "active",
+            createdAt: "2026-08-01T00:00:00.000Z",
+            progression: { status: "pending" },
+          },
+        ],
+      },
+    });
+
+    const response = await app.request(
+      "/api/admin/accounts?query=%E5%B1%B1%E7%94%B0&role=user&sort=level",
+      { headers: { Authorization: "Bearer dummy.id.token" } },
+      { LIFF_ID: "2010850319-Yl63upAR", DB: dummyDb },
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(getAdminAccounts).toHaveBeenCalledWith(
+      expect.objectContaining({ input: { query: "山田", role: "user", sort: "level" } }),
+    );
+    expect(await response.json()).toMatchObject({ accounts: [{ id: "account-1" }] });
+  });
+
+  it("不正な検索条件を400として拒否する", async () => {
+    const response = await app.request(
+      "/api/admin/accounts?role=owner",
+      { headers: { Authorization: "Bearer dummy.id.token" } },
+      { LIFF_ID: "2010850319-Yl63upAR", DB: dummyDb },
+    );
+
+    expect(response.status).toBe(400);
+    expect(getAdminAccounts).not.toHaveBeenCalled();
   });
 });

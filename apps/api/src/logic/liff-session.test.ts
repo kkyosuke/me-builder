@@ -95,6 +95,10 @@ describe("LIFF session resolution", () => {
     const identities = await db.select().from(D1.shared.schema.accountIdentities).all();
     expect(identities.map((i) => i.provider).sort()).toEqual(["line", "line_login"]);
     expect(new Set(identities.map((i) => i.accountId)).size).toBe(1);
+    expect(await db.select().from(D1.shared.schema.accountProfiles).get()).toMatchObject({
+      accountId: followed.account.id,
+      displayName: "うつし",
+    });
   });
 
   it("友だち追加前に2回呼び出してもAccountとidentityが増えないこと", async () => {

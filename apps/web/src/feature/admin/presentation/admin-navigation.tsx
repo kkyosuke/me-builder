@@ -1,8 +1,6 @@
 import { BarChart3, Users } from "lucide-react";
-import { config } from "../../../config";
 
-export function AdminPreviewNavigation({ current }: { current: "accounts" | "statistics" }) {
-  const suffix = config.environment === "preview" ? "" : "?progression-preview=1";
+export function AdminNavigation({ current }: { current: "accounts" | "statistics" }) {
   return (
     <nav
       aria-label="管理者メニュー"
@@ -10,7 +8,7 @@ export function AdminPreviewNavigation({ current }: { current: "accounts" | "sta
     >
       <div className="flex gap-6">
         <a
-          href={`/admin${suffix}`}
+          href="/admin"
           aria-current={current === "accounts" ? "page" : undefined}
           className={`flex items-center gap-2 border-b-2 px-1 pb-3 text-sm font-semibold ${
             current === "accounts"
@@ -22,7 +20,7 @@ export function AdminPreviewNavigation({ current }: { current: "accounts" | "sta
           Account
         </a>
         <a
-          href={`/admin/statistics${suffix}`}
+          href="/admin/statistics"
           aria-current={current === "statistics" ? "page" : undefined}
           className={`flex items-center gap-2 border-b-2 px-1 pb-3 text-sm font-semibold ${
             current === "statistics"

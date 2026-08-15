@@ -29,6 +29,23 @@ const actions = {
 } as const;
 
 const ALARM_RETRY_MS = 30_000;
+const PROGRESSION_PROJECTION_STATE_KEY = "progressionProjectionState";
+type ProgressionProjectionState =
+  | Readonly<{ retryPending: true }>
+  | Readonly<{
+      retryPending: false;
+      calculationVersion: number;
+      growthValue: number;
+      collectedPieces: number;
+      activePieces: number;
+    }>;
+const progressionProjectionOperations = new Set<AccountDataOperation>([
+  "diagnosis.deleteAccountData",
+  "diagnosisProjection.processLatest",
+  "conversation.applyDiaryBrainCheckpoint",
+  "development.deleteAllAccountData",
+  "progression.read",
+]);
 
 /** APIからQueueへ渡せなかった生成要求を、永続状態を正として同じIDで再配送する。 */
 export async function dispatchUndispatchedProfileSummaryGenerations(
@@ -116,6 +133,11 @@ export class AccountData extends DurableObject<Env> {
 
       if (operation.startsWith("diagnosis")) await this.syncDiagnosisCatalog();
       const result = await boundAction(this.repository.client, accountId, ...args);
+      if (operation === "progression.read") {
+        await this.syncProgressionProjection(result as AccountDataResult<"progression.read">);
+      } else if (progressionProjectionOperations.has(operation)) {
+        await this.syncProgressionProjection();
+      }
       await this.scheduleMaintenance();
       return result;
     });
@@ -125,9 +147,16 @@ export class AccountData extends DurableObject<Env> {
     await this.runExclusive(async () => {
       try {
         await DO.account.action.diary.closeExpiredSessions(this.repository.client);
-        await DO.account.action.diagnosisBrainProjection.processPendingDiagnosisBrainProjections(
-          this.repository.client,
+        const diagnosisProjection =
+          await DO.account.action.diagnosisBrainProjection.processPendingDiagnosisBrainProjections(
+            this.repository.client,
+          );
+        const progressionProjectionState = await this.ctx.storage.get<ProgressionProjectionState>(
+          PROGRESSION_PROJECTION_STATE_KEY,
         );
+        if (diagnosisProjection.applied > 0 || progressionProjectionState?.retryPending) {
+          await this.syncProgressionProjection();
+        }
         await dispatchUndispatchedProfileSummaryGenerations(
           this.repository.client,
           this.accountId,
@@ -324,6 +353,68 @@ export class AccountData extends DurableObject<Env> {
       diagnoses,
       diagnosisQuestions,
     } satisfies DiagnosisCatalogSnapshot);
+  }
+
+  /** 個人コンテンツを含めず、管理者一覧に必要な現在集計だけを共有D1へ同期する。 */
+  private async syncProgressionProjection(
+    knownProgression?: AccountDataResult<"progression.read">,
+  ): Promise<void> {
+    try {
+      const projectedAt = new Date();
+      const progression =
+        knownProgression ??
+        (await DO.account.action.progression.readUtsushiProgression(
+          this.repository.client,
+          this.accountId,
+          projectedAt,
+        ));
+      const projectionState = await this.ctx.storage.get<ProgressionProjectionState>(
+        PROGRESSION_PROJECTION_STATE_KEY,
+      );
+      if (
+        projectionState &&
+        !projectionState.retryPending &&
+        projectionState.calculationVersion ===
+          D1.shared.action.adminAccount.UTSUSHI_PROGRESSION_CALCULATION_VERSION &&
+        projectionState.growthValue === progression.growthValue &&
+        projectionState.collectedPieces === progression.collectedPieces &&
+        projectionState.activePieces === progression.activePieces
+      ) {
+        return;
+      }
+      await D1.shared.action.adminAccount.upsertAccountProgressionProjection(
+        D1.shared.client.create(this.env.DB),
+        this.accountId,
+        progression,
+        projectedAt,
+      );
+      await this.ctx.storage.put(PROGRESSION_PROJECTION_STATE_KEY, {
+        retryPending: false,
+        calculationVersion: D1.shared.action.adminAccount.UTSUSHI_PROGRESSION_CALCULATION_VERSION,
+        growthValue: progression.growthValue,
+        collectedPieces: progression.collectedPieces,
+        activePieces: progression.activePieces,
+      } satisfies ProgressionProjectionState);
+    } catch (error) {
+      await this.ctx.storage.put(PROGRESSION_PROJECTION_STATE_KEY, { retryPending: true });
+      logger.warn(
+        {
+          event: "account-progression.projection.deferred",
+          service: "worker",
+          component: "account-data",
+          outcome: "deferred",
+          disposition: "alarm-retry",
+          ...toSafeOperationalErrorFields(error, {
+            code: "ACCOUNT_PROGRESSION_PROJECTION_DEFERRED",
+            category: "dependency",
+            stage: "progression.project",
+            retryable: true,
+          }),
+        },
+        "[Account progression] deferred at progression.project -> alarm-retry",
+      );
+      await this.scheduleMaintenanceRetry();
+    }
   }
 
   private async scheduleMaintenance(): Promise<void> {

@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import type { SharedD1Client } from "../client";
 import { type AvatarContentType, accountProfiles } from "../schema/profile";
 
@@ -39,6 +39,25 @@ function toAvatarMetadata(
 
 async function getProfileRow(db: SharedD1Client, accountId: string) {
   return db.select().from(accountProfiles).where(eq(accountProfiles.accountId, accountId)).get();
+}
+
+/** 検証済みLINEプロフィールの表示名だけを、管理画面用の運用snapshotとして保存する。 */
+export async function saveVerifiedDisplayName(
+  db: SharedD1Client,
+  accountId: string,
+  displayName: string,
+  verifiedAt = new Date(),
+): Promise<void> {
+  const normalized = displayName.trim();
+  if (!normalized) return;
+  await db
+    .insert(accountProfiles)
+    .values({ accountId, displayName: normalized, displayNameUpdatedAt: verifiedAt })
+    .onConflictDoUpdate({
+      target: accountProfiles.accountId,
+      set: { displayName: normalized, displayNameUpdatedAt: verifiedAt },
+      setWhere: sql`${accountProfiles.displayName} is not ${normalized}`,
+    });
 }
 
 function matchesCurrent(row: NonNullable<Awaited<ReturnType<typeof getProfileRow>>>) {
