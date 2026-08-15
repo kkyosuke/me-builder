@@ -19,6 +19,18 @@ export const accountRecoveryCredentials = sqliteTable(
   (table) => [index("account_recovery_account_idx").on(table.accountId, table.createdAt)],
 );
 
+export const accountRecoveryRateLimits = sqliteTable(
+  "account_recovery_rate_limits",
+  {
+    keyHash: text("key_hash").primaryKey(),
+    failedAttempts: integer("failed_attempts").notNull().default(0),
+    windowStartedAt: integer("window_started_at", { mode: "timestamp" }).notNull(),
+    lockedUntil: integer("locked_until", { mode: "timestamp" }),
+    updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+  },
+  (table) => [index("account_recovery_locked_until_idx").on(table.lockedUntil)],
+);
+
 export const accountRecoveryAudits = sqliteTable(
   "account_recovery_audits",
   {
@@ -26,6 +38,7 @@ export const accountRecoveryAudits = sqliteTable(
     accountId: text("account_id").references(() => accounts.id),
     action: text("action", { enum: ["issue", "complete"] }).notNull(),
     outcome: text("outcome", { enum: ["succeeded", "rejected"] }).notNull(),
+    reason: text("reason"),
     identityFingerprint: text("identity_fingerprint"),
     createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
   },

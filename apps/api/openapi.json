@@ -93,7 +93,8 @@
                       "enum": [
                         "Paid contract required",
                         "Invalid recovery code",
-                        "Identity conflict"
+                        "Identity conflict",
+                        "Too many recovery attempts"
                       ],
                       "type": "string"
                     }
@@ -233,7 +234,8 @@
                       "enum": [
                         "Paid contract required",
                         "Invalid recovery code",
-                        "Identity conflict"
+                        "Identity conflict",
+                        "Too many recovery attempts"
                       ],
                       "type": "string"
                     }
@@ -289,7 +291,30 @@
                       "enum": [
                         "Paid contract required",
                         "Invalid recovery code",
-                        "Identity conflict"
+                        "Identity conflict",
+                        "Too many recovery attempts"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "復旧試行が一時的に制限されている",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "enum": [
+                        "Paid contract required",
+                        "Invalid recovery code",
+                        "Identity conflict",
+                        "Too many recovery attempts"
                       ],
                       "type": "string"
                     }

@@ -14,7 +14,12 @@ export const AccountRecoveryCompleteResponseSchema = v.object({
   alreadyRecovered: v.boolean(),
 });
 export const AccountRecoveryUnavailableSchema = v.object({
-  error: v.picklist(["Paid contract required", "Invalid recovery code", "Identity conflict"]),
+  error: v.picklist([
+    "Paid contract required",
+    "Invalid recovery code",
+    "Identity conflict",
+    "Too many recovery attempts",
+  ]),
 });
 
 export const accountRecoveryCodeRoute = describeRoute({
@@ -42,6 +47,7 @@ export const accountRecoveryCompleteRoute = describeRoute({
     200: jsonResponse("復旧済みAccount", AccountRecoveryCompleteResponseSchema),
     400: jsonResponse("復旧コードが不正", AccountRecoveryUnavailableSchema),
     409: jsonResponse("Identityが別Accountに接続済み", AccountRecoveryUnavailableSchema),
+    429: jsonResponse("復旧試行が一時的に制限されている", AccountRecoveryUnavailableSchema),
     ...authenticatedErrors,
   },
 } satisfies DescribeRouteOptions);

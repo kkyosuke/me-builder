@@ -18,11 +18,19 @@ export async function issueAccountRecoveryCode(
     db: params.db,
   });
   if (session.type !== "resolved") return { type: session.type } as const;
-  const customer = await D1.shared.action.billing.findBillingCustomerByAccount(
+  const assignment = await new D1.shared.action.billing.D1AccountPlanAssignmentProvider(
     params.db,
-    session.session.accountId,
-  );
-  if (!customer) return { type: "paid-contract-required" } as const;
+  ).findCurrent(session.session.accountId, params.now);
+  if (assignment.plan === "free") {
+    await D1.shared.action.accountRecovery.recordAccountRecoveryAudit(params.db, {
+      accountId: session.session.accountId,
+      action: "issue",
+      outcome: "rejected",
+      reason: "paid-contract-required",
+      ...(params.now ? { now: params.now } : {}),
+    });
+    return { type: "paid-contract-required" } as const;
+  }
 
   const id = crypto.randomUUID();
   const secret = randomBase64Url(32);
@@ -40,32 +48,78 @@ export async function issueAccountRecoveryCode(
   return { type: "issued", code, expiresAt: expiresAt.toISOString() } as const;
 }
 
-export async function recoverAccountWithCode(params: SessionParams & { code: string; now?: Date }) {
+export async function recoverAccountWithCode(
+  params: SessionParams & { code: string; requestKey: string; now?: Date },
+) {
   if (!params.lineLoginChannelId || !params.idToken) return { type: "unauthenticated" } as const;
   const verified = await line.idToken.verify({
     idToken: params.idToken,
     channelId: params.lineLoginChannelId,
   });
   if (!verified.ok) return { type: "unauthenticated" } as const;
+  const now = params.now ?? new Date();
+  const identityFingerprint = await sha256Base64Url(verified.claims.sub);
+  const rateLimitKeys = [
+    await sha256Base64Url(`identity:${identityFingerprint}`),
+    await sha256Base64Url(`request:${params.requestKey}`),
+  ];
+  if (
+    await D1.shared.action.accountRecovery.isAccountRecoveryRateLimited(
+      params.db,
+      rateLimitKeys,
+      now,
+    )
+  ) {
+    await D1.shared.action.accountRecovery.recordAccountRecoveryAudit(params.db, {
+      accountId: null,
+      action: "complete",
+      outcome: "rejected",
+      reason: "rate-limited",
+      identityFingerprint,
+      now,
+    });
+    return { type: "rate-limited" } as const;
+  }
   const [credentialId, secret, ...rest] = params.code.trim().split(".");
-  if (!credentialId || !secret || rest.length > 0) return { type: "invalid-code" } as const;
+  if (!credentialId || !secret || rest.length > 0) {
+    await rejectRecoveryAttempt(params.db, rateLimitKeys, identityFingerprint, null, now);
+    return { type: "invalid-code" } as const;
+  }
   const credential = await D1.shared.action.accountRecovery.findAccountRecoveryCredential(
     params.db,
     credentialId,
   );
   if (!credential || !(await matchesSaltedHash(secret, credential.secretHash))) {
+    await rejectRecoveryAttempt(
+      params.db,
+      rateLimitKeys,
+      identityFingerprint,
+      credential?.accountId ?? null,
+      now,
+    );
     return { type: "invalid-code" } as const;
   }
-  const identityFingerprint = await sha256Base64Url(verified.claims.sub);
   const result = await D1.shared.action.accountRecovery.completeAccountRecovery(params.db, {
     credentialId,
     expectedSecretHash: credential.secretHash,
     newProviderAccountId: verified.claims.sub,
     identityFingerprint,
-    ...(params.now ? { now: params.now } : {}),
+    now,
   });
-  if (result === "conflict") return { type: "identity-conflict" } as const;
-  if (result === "invalid") return { type: "invalid-code" } as const;
+  if (result === "conflict" || result === "invalid") {
+    await rejectRecoveryAttempt(
+      params.db,
+      rateLimitKeys,
+      identityFingerprint,
+      credential.accountId,
+      now,
+      result === "conflict" ? "identity-conflict" : "invalid-code",
+    );
+    return result === "conflict"
+      ? ({ type: "identity-conflict" } as const)
+      : ({ type: "invalid-code" } as const);
+  }
+  await D1.shared.action.accountRecovery.clearAccountRecoveryFailures(params.db, rateLimitKeys);
   const linked = await D1.shared.action.accountRecovery.findAccountRecoveryCredential(
     params.db,
     credentialId,
@@ -75,6 +129,25 @@ export async function recoverAccountWithCode(params: SessionParams & { code: str
     accountId: linked?.accountId ?? credential.accountId,
     alreadyRecovered: result === "already-recovered",
   } as const;
+}
+
+async function rejectRecoveryAttempt(
+  db: D1.shared.Client,
+  rateLimitKeys: readonly string[],
+  identityFingerprint: string,
+  accountId: string | null,
+  now: Date,
+  reason = "invalid-code",
+): Promise<void> {
+  await D1.shared.action.accountRecovery.recordAccountRecoveryFailure(db, rateLimitKeys, now);
+  await D1.shared.action.accountRecovery.recordAccountRecoveryAudit(db, {
+    accountId,
+    action: "complete",
+    outcome: "rejected",
+    reason,
+    identityFingerprint,
+    now,
+  });
 }
 
 function randomBase64Url(length: number): string {

@@ -22,6 +22,7 @@ export async function postAccountRecoveryCode(c: Context<AppEnv>): Promise<Respo
     db: D1.shared.client.create(c.env.DB),
   });
   if (outcome.type === "issued") {
+    c.header("Cache-Control", "no-store");
     return c.json(v.parse(AccountRecoveryCodeResponseSchema, outcome), 201);
   }
   if (outcome.type === "paid-contract-required") {
@@ -51,9 +52,11 @@ export async function postAccountRecoveryComplete(c: Context<AppEnv>): Promise<R
     lineLoginChannelId: getConfig(c.env).lineLoginChannelId,
     db: D1.shared.client.create(c.env.DB),
     code: body.output.code,
+    requestKey: c.req.header("cf-connecting-ip") ?? "unavailable",
   });
   switch (outcome.type) {
     case "recovered":
+      c.header("Cache-Control", "no-store");
       return c.json(
         v.parse(AccountRecoveryCompleteResponseSchema, {
           status: "recovered",
@@ -66,6 +69,11 @@ export async function postAccountRecoveryComplete(c: Context<AppEnv>): Promise<R
       return c.json(
         v.parse(AccountRecoveryUnavailableSchema, { error: "Invalid recovery code" }),
         400,
+      );
+    case "rate-limited":
+      return c.json(
+        v.parse(AccountRecoveryUnavailableSchema, { error: "Too many recovery attempts" }),
+        429,
       );
     case "unauthenticated":
       return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);

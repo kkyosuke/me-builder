@@ -620,7 +620,11 @@ export interface operations {
         content: {
           "application/json": {
             /** @enum {string} */
-            error: "Paid contract required" | "Invalid recovery code" | "Identity conflict";
+            error:
+              | "Paid contract required"
+              | "Invalid recovery code"
+              | "Identity conflict"
+              | "Too many recovery attempts";
           };
         };
       };
@@ -684,7 +688,11 @@ export interface operations {
         content: {
           "application/json": {
             /** @enum {string} */
-            error: "Paid contract required" | "Invalid recovery code" | "Identity conflict";
+            error:
+              | "Paid contract required"
+              | "Invalid recovery code"
+              | "Identity conflict"
+              | "Too many recovery attempts";
           };
         };
       };
@@ -722,7 +730,27 @@ export interface operations {
         content: {
           "application/json": {
             /** @enum {string} */
-            error: "Paid contract required" | "Invalid recovery code" | "Identity conflict";
+            error:
+              | "Paid contract required"
+              | "Invalid recovery code"
+              | "Identity conflict"
+              | "Too many recovery attempts";
+          };
+        };
+      };
+      /** @description 復旧試行が一時的に制限されている */
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @enum {string} */
+            error:
+              | "Paid contract required"
+              | "Invalid recovery code"
+              | "Identity conflict"
+              | "Too many recovery attempts";
           };
         };
       };

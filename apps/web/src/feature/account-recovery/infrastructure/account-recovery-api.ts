@@ -62,7 +62,9 @@ export async function completeRecovery(apiUrl: string | undefined, idToken: stri
     throw new OperationError(
       response.status === 409
         ? "このLINE Accountは別のAccountで利用されています。"
-        : "復旧コードを確認できませんでした。",
+        : response.status === 429
+          ? "試行回数が上限に達しました。しばらく待ってからやり直してください。"
+          : "復旧コードを確認できませんでした。",
       { code: "ACCOUNT_RECOVERY_COMPLETE_FAILED", status: response.status },
     );
   }
