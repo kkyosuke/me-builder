@@ -215,9 +215,9 @@ describe("GET /api/diagnoses local D1 E2E", () => {
         lastAnsweredAt: string | null;
       }>;
     };
-    expect(initialBody.diagnoses).toHaveLength(10);
+    expect(initialBody.diagnoses).toHaveLength(11);
     expect(initialBody.diagnoses.map(({ displayOrder }) => displayOrder)).toEqual([
-      10, 20, 30, 40, 50, 60, 70, 80, 90, 100,
+      10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110,
     ]);
     expect(initialBody.diagnoses.find(({ id }) => id === "life-priorities")).toMatchObject({
       relationshipCategory: "general",
@@ -241,6 +241,11 @@ describe("GET /api/diagnoses local D1 E2E", () => {
     });
     expect(initialBody.diagnoses.find(({ id }) => id === "friendship-style")).toMatchObject({
       relationshipCategory: "friend",
+      responseStatus: "unanswered",
+      questionCount: 10,
+    });
+    expect(initialBody.diagnoses.find(({ id }) => id === "decision-making-style")).toMatchObject({
+      relationshipCategory: "general",
       responseStatus: "unanswered",
       questionCount: 10,
     });
@@ -490,6 +495,35 @@ describe("GET /api/diagnoses/:diagnosisId local D1 E2E", () => {
       "仲のよい友達同士がまだ会ったことがないときも、無理に紹介せずそれぞれ別に付き合いたい。",
       "友達の言葉に引っかかったときは、一人で考えるよりその場で理由を確かめたい。",
       "友達の言葉に引っかかったときは、その場で確かめるより一度自分の中で整理してから話したい。",
+    ]);
+  });
+
+  it("決め方・迷いとの向き合い方の状況ベース10問をseedから返すこと", async () => {
+    const response = await request("known-token", "/api/diagnoses/decision-making-style");
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      id: string;
+      title: string;
+      relationshipCategory: string;
+      questions: Array<{ diagnosisQuestionId: string; text: string }>;
+    };
+
+    expect(body).toMatchObject({
+      id: "decision-making-style",
+      title: "決め方・迷いとの向き合い方",
+      relationshipCategory: "general",
+    });
+    expect(body.questions.map(({ text }) => text)).toEqual([
+      "初めて買う道具を選ぶときは、候補を一つに絞る前に複数のレビューを比べたい。",
+      "初めて買う道具を選ぶときは、必要な条件を満たす候補が見つかれば、それ以上は調べずに決めたい。",
+      "締切まで一週間ある申し込みをするか迷ったときは、早めに参加するか決めたい。",
+      "締切まで一週間ある申し込みをするか迷ったときは、すぐには決めず、締切が近づくまで考えたい。",
+      "二つの選択肢に大きな差がないときは、最初にしっくりきた方を選びたい。",
+      "二つの選択肢に大きな差がないときも、選ぶ理由を言葉にできる方を選びたい。",
+      "初めて経験することを始めるか迷ったときは、自分の考えを固める前に経験者の意見を聞きたい。",
+      "初めて経験することを始めるか迷ったときは、経験者に聞く前に自分の考えを固めたい。",
+      "予定を決めたあとに重要な新しい情報が分かったときは、決めた内容を見直したい。",
+      "予定を決めたあとに新しい情報が分かっても、大きな問題がなければ最初に決めた内容で進めたい。",
     ]);
   });
 

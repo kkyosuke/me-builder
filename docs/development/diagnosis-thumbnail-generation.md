@@ -22,7 +22,8 @@ apps/web/public/images/diagnoses/
 ├── work-values.jpg
 ├── work-relationship-style.jpg
 ├── family-support-style.jpg
-└── friendship-style.jpg
+├── friendship-style.jpg
+└── decision-making-style.jpg
 ```
 
 ## 3. 共通スタイル
@@ -148,7 +149,23 @@ Materials/textures: Matte paper and soft clay, subtle depth and shadows.
 Constraints: Exactly two equal figures. No third figure. No text, no letters, no numbers, no logos, no watermark, no brand marks, no hearts, no romantic symbols. Do not assign ages, genders, hierarchy, or fixed social roles. Do not make frequent contact, waiting for a reason, advance planning, spontaneity, sharing worries, privacy, connecting friend circles, keeping circles separate, immediate discussion, or taking time to reflect look superior.
 ```
 
-## 11. 新しい診断へ展開する手順
+## 11. 「決め方・迷いとの向き合い方」生成プロンプト
+
+```text
+Use case: stylized-concept
+Asset type: 16:9 diagnosis card thumbnail for a web application
+Primary request: Create a polished 3D paper-cut/clay-style illustration representing different ways of making a decision: comparing information, deciding early or near a deadline, using intuition or explicit reasons, asking for input, and reconsidering after new information.
+Scene/backdrop: A calm abstract decision space with a central rounded junction and two equally inviting branching paths that gently reconnect. Balanced blank review cards, a simple hourglass without numbers, a small glowing intuition pebble, a neutral speech form, and a looping route marker suggest the five decision approaches without favoring one.
+Subject: An abstract decision landscape made from balanced symbolic objects; no people required. The two paths must have equal width, lighting, prominence, and visual weight, and neither should appear to be the correct destination.
+Style/medium: Soft layered 3D paper-cut / clay render matching a premium editorial app illustration.
+Composition/framing: Wide 16:9, centered, clear silhouettes, important objects away from edges, suitable for a small card crop.
+Lighting/mood: Warm soft studio lighting, calm, reflective, open, reassuring.
+Color palette: Deep navy background, muted slate blue, warm cream, coral accents, small golden accents; consistent with the existing me-builder diagnosis thumbnails.
+Materials/textures: Matte paper and soft clay, subtle depth and shadows.
+Constraints: No text, no letters, no numbers, no logos, no watermark, no brand marks. Do not make more research, quick decisions, waiting, intuition, explicit reasoning, asking others, deciding independently, reconsidering, or staying with a decision look superior. Avoid scales, rankings, checkmarks, crosses, trophies, or a single highlighted correct path.
+```
+
+## 12. 新しい診断へ展開する手順
 
 1. §4の`Primary request`、`Scene/backdrop`、`Subject`を新しい診断のテーマへ置き換える
 2. §3の共通スタイルと`Composition/framing`、`Constraints`を維持する
