@@ -273,6 +273,7 @@ describe("AccountData Workers runtime E2E", () => {
       state.storage.sql.exec("DROP TABLE progression_events");
       state.storage.sql.exec("DROP TABLE personal_data_exports");
       state.storage.sql.exec("DROP TABLE ai_usage_records");
+      state.storage.sql.exec("DROP TABLE goal_follow_ups");
       state.storage.sql.exec("DROP TABLE monthly_change_versions");
       state.storage.sql.exec("DROP TABLE weekly_reflections");
       state.storage.sql.exec("DROP TABLE weekly_reflection_generations");
@@ -532,6 +533,7 @@ describe("AccountData Workers runtime E2E", () => {
       state.storage.sql.exec("DROP TABLE progression_events");
       state.storage.sql.exec("DROP TABLE personal_data_exports");
       state.storage.sql.exec("DROP TABLE ai_usage_records");
+      state.storage.sql.exec("DROP TABLE goal_follow_ups");
       state.storage.sql.exec("DROP TABLE monthly_change_versions");
       state.storage.sql.exec("DROP TABLE weekly_reflections");
       state.storage.sql.exec("DROP TABLE weekly_reflection_generations");
@@ -670,6 +672,7 @@ describe("AccountData Workers runtime E2E", () => {
       state.storage.sql.exec("DROP TABLE progression_events");
       state.storage.sql.exec("DROP TABLE personal_data_exports");
       state.storage.sql.exec("DROP TABLE ai_usage_records");
+      state.storage.sql.exec("DROP TABLE goal_follow_ups");
       state.storage.sql.exec("DROP TABLE monthly_change_versions");
       state.storage.sql.exec("DROP TABLE weekly_reflections");
       state.storage.sql.exec("DROP TABLE weekly_reflection_generations");

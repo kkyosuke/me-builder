@@ -575,9 +575,13 @@ export async function processChatTurnMessage(
             usedBrainItems: [],
           }
         : undefined;
-    const [loadedBrainMemories, relationshipDiagnoses, collectedPromptContextKinds] =
+    const currentUserText = context.messages
+      .filter(({ id, role }) => role === "user" && context.currentUserMessageIds.includes(id))
+      .map(({ body }) => body)
+      .join("\n");
+    const [loadedBrainMemories, relationshipDiagnoses, collectedPromptContextKinds, goalFollowUp] =
       pendingResponse || safetyRoute !== "normal" || quotaResponse
-        ? [[], [], []]
+        ? [[], [], [], null]
         : await Promise.all([
             initialRelationshipPlan.active && relationshipQuestionMode !== "confirmed-history"
               ? Promise.resolve([])
@@ -641,6 +645,35 @@ export async function processChatTurnMessage(
                 );
                 return undefined;
               }),
+            !initialRelationshipPlan.active && entitlement.policy.features["goal-follow-up"]
+              ? accountDataClient
+                  .execute(
+                    "goalFollowUp.selectMemory",
+                    entitlement.policy.goalFollowUp,
+                    currentUserText,
+                  )
+                  .catch((error: unknown) => {
+                    logger.warn(
+                      {
+                        event: "goal-follow-up.context.failed",
+                        service: "worker",
+                        environment: workerConfig.environment,
+                        component: "chat-turn",
+                        outcome: "degraded",
+                        disposition: "continue",
+                        ...toSafeOperationalErrorFields(error, {
+                          code: "GOAL_FOLLOW_UP_CONTEXT_LOAD_FAILED",
+                          category: "dependency",
+                          stage: "context.goal-follow-up",
+                          retryable: false,
+                          dependency: "account-data",
+                        }),
+                      },
+                      "[Goal follow-up] failed to load context",
+                    );
+                    return null;
+                  })
+              : Promise.resolve(null),
           ]);
     const relationshipPlan = buildRelationshipQuestionPlan({
       accountId: message.body.accountId,
@@ -649,9 +682,17 @@ export async function processChatTurnMessage(
       currentUserMessageIds: context.currentUserMessageIds,
       diagnoses: relationshipDiagnoses,
     });
-    const brainMemories = relationshipPlan.active
+    const scopedBrainMemories = relationshipPlan.active
       ? selectFullRelationshipHistory(relationshipPlan.context, loadedBrainMemories)
       : loadedBrainMemories;
+    const brainMemories = goalFollowUp
+      ? [
+          ...scopedBrainMemories.filter(
+            ({ brainItemId }) => brainItemId !== goalFollowUp.brainItemId,
+          ),
+          goalFollowUp,
+        ]
+      : scopedBrainMemories;
     const collectionCandidates =
       pendingResponse ||
       safetyRoute !== "normal" ||

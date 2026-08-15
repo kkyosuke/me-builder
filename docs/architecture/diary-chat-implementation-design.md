@@ -593,6 +593,12 @@ AccountData、Queue、LINEを呼び出した後は、Turn ID、generation epoch�
 
 保存する完全な月次snapshotはPlanに依存させません。読み取り時に共通Entitlementの`monthlyChange`を使い、Liteは当月の要点とGoalを各1件、Fullは同月内の変化と前月を横断して表示します。Freeへdowngradeした後も生成済みsnapshotをLite相当の短い表示で読めますが、新しい週次・月次生成は開始しません。各表示には版と根拠週を残し、Plan変更で保存済み結果を書き換えません。
 
+### 4.15 本人が合意したGoalのフォローアップ
+
+Brain Itemの`goal`を自動的に継続対象にはしません。本人が明言した非推定のGoalに対し、本人が次の一歩とともに合意した時だけ`goal_follow_ups`へ保存します。Liteは同時に1件、Fullは複数件を保持でき、会話時は現在の話題に関係する有効な1件だけをContextへ追加します。根拠Source Recordを伴わないGoalは利用しません。
+
+完了、停止、次の一歩の訂正は本人操作で状態遷移させ、active以外は会話へ戻しません。未実行、停止、訂正を人物や意欲の評価へ変換しない規則をpromptへ固定します。合意履歴はAccountDataに閉じ、Planを下げた後も読み取りと個人データexportは維持しますが、新しい合意や会話横断利用は開始しません。
+
 ## 5. メッセージ処理とSession制御
 
 ### 5.1 受付から原本保存

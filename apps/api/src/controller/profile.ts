@@ -4,6 +4,14 @@ import type { Context } from "hono";
 import * as v from "valibot";
 import { getConfig, isDevelopmentEnvironment } from "../config";
 import { ProfileEntitlementResponseSchema } from "../contract/profile/entitlement";
+import {
+  AgreeGoalFollowUpRequestSchema,
+  GoalFollowUpListSchema,
+  GoalFollowUpMutationSchema,
+  GoalFollowUpUnavailableSchema,
+  InvalidGoalFollowUpSchema,
+  UpdateGoalFollowUpRequestSchema,
+} from "../contract/profile/goal-follow-up";
 import { ProfileProgressionResponseSchema } from "../contract/profile/progression";
 import {
   ProfileSummaryGenerationAcceptedSchema,
@@ -20,6 +28,7 @@ import {
   ServiceUnavailableErrorSchema,
   UnauthorizedErrorSchema,
 } from "../contract/shared/errors";
+import { agreeGoalFollowUp, getGoalFollowUps, updateGoalFollowUp } from "../logic/goal-follow-up";
 import { getProfileEntitlement } from "../logic/profile-entitlement";
 import { getProfileProgression } from "../logic/profile-progression";
 import { getProfileSummary } from "../logic/profile-summary";
@@ -30,6 +39,114 @@ import {
 } from "../logic/weekly-reflection";
 import type { AppEnv } from "../types";
 import { bearerToken } from "./auth";
+
+function goalFollowUpParams(c: Context<AppEnv>) {
+  if (!c.env?.DB || !c.env.ACCOUNT_DATA) return undefined;
+  const config = getConfig(c.env);
+  return {
+    idToken: bearerToken(c.req.header("authorization")),
+    lineLoginChannelId: config.lineLoginChannelId,
+    db: D1.shared.client.create(c.env.DB),
+    accountData: c.env.ACCOUNT_DATA,
+    ...(c.env.ACCOUNT_PLAN_ASSIGNMENT_PROVIDER
+      ? { planAssignmentProvider: c.env.ACCOUNT_PLAN_ASSIGNMENT_PROVIDER }
+      : {}),
+  };
+}
+
+function goalFollowUpAuthError(c: Context<AppEnv>, type: string) {
+  return type === "account-not-found"
+    ? c.json(
+        v.parse(AccountNotFoundErrorSchema, {
+          error: "Account not found",
+          reason: "friendship_required",
+        }),
+        404,
+      )
+    : c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
+}
+
+export async function getGoalFollowUpContents(c: Context<AppEnv>): Promise<Response> {
+  const params = goalFollowUpParams(c);
+  if (!params) {
+    return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
+  }
+  const outcome = await getGoalFollowUps(params);
+  if (outcome.type !== "resolved") return goalFollowUpAuthError(c, outcome.type);
+  c.header("Cache-Control", "no-store");
+  return c.json(v.parse(GoalFollowUpListSchema, outcome));
+}
+
+export async function postGoalFollowUpAgreement(c: Context<AppEnv>): Promise<Response> {
+  const params = goalFollowUpParams(c);
+  if (!params) {
+    return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
+  }
+  const parsed = v.safeParse(AgreeGoalFollowUpRequestSchema, await c.req.json().catch(() => null));
+  if (!parsed.success) {
+    return c.json(v.parse(InvalidGoalFollowUpSchema, { error: "Invalid goal follow-up" }), 400);
+  }
+  const outcome = await agreeGoalFollowUp({ ...params, ...parsed.output });
+  if (outcome.type === "unavailable") {
+    return c.json(
+      v.parse(GoalFollowUpUnavailableSchema, {
+        error: "Goal follow-up unavailable",
+        reason: outcome.reason,
+      }),
+      409,
+    );
+  }
+  if (outcome.type !== "resolved") return goalFollowUpAuthError(c, outcome.type);
+  if (outcome.result.type !== "agreed") {
+    return c.json(
+      v.parse(GoalFollowUpUnavailableSchema, {
+        error: "Goal follow-up unavailable",
+        reason: outcome.result.type === "goal-not-found" ? "goal_not_found" : "goal_not_confirmed",
+      }),
+      409,
+    );
+  }
+  return c.json(v.parse(GoalFollowUpMutationSchema, { item: outcome.result.item }));
+}
+
+export async function patchGoalFollowUp(c: Context<AppEnv>): Promise<Response> {
+  const params = goalFollowUpParams(c);
+  if (!params) {
+    return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
+  }
+  const parsed = v.safeParse(UpdateGoalFollowUpRequestSchema, await c.req.json().catch(() => null));
+  if (!parsed.success) {
+    return c.json(v.parse(InvalidGoalFollowUpSchema, { error: "Invalid goal follow-up" }), 400);
+  }
+  const outcome = await updateGoalFollowUp({
+    ...params,
+    id: c.req.param("goalFollowUpId") ?? "",
+    input: {
+      ...(parsed.output.status ? { status: parsed.output.status } : {}),
+      ...(parsed.output.nextStep ? { nextStep: parsed.output.nextStep } : {}),
+    },
+  });
+  if (outcome.type === "unavailable") {
+    return c.json(
+      v.parse(GoalFollowUpUnavailableSchema, {
+        error: "Goal follow-up unavailable",
+        reason: outcome.reason,
+      }),
+      409,
+    );
+  }
+  if (outcome.type !== "resolved") return goalFollowUpAuthError(c, outcome.type);
+  if (outcome.result.type === "not-found") {
+    return c.json(
+      v.parse(GoalFollowUpUnavailableSchema, {
+        error: "Goal follow-up unavailable",
+        reason: "goal_not_found",
+      }),
+      409,
+    );
+  }
+  return c.json(v.parse(GoalFollowUpMutationSchema, { item: outcome.result.item }));
+}
 
 export async function getProfileProgressionContents(c: Context<AppEnv>): Promise<Response> {
   if (!c.env?.DB || !c.env.ACCOUNT_DATA) {

@@ -9,4 +9,5 @@ export * from "./conversation-coordinator";
 export * from "./diagnosis";
 export * from "./profile-summary";
 export * from "./weekly-reflection";
+export * from "./goal-follow-up";
 export * as billing from "./billing";

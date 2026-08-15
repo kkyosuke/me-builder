@@ -2985,6 +2985,564 @@
         }
       }
     },
+    "/api/goal-follow-ups": {
+      "get": {
+        "operationId": "getGoalFollowUps",
+        "tags": ["Profile"],
+        "summary": "本人が合意したGoalのフォローアップを取得する",
+        "security": [
+          {
+            "liffIdToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Goalフォローアップ",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "brainItemId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "goal": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "nextStep": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "status": {
+                            "enum": ["active", "completed", "stopped"],
+                            "type": "string"
+                          },
+                          "agreedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "brainItemId",
+                          "goal",
+                          "nextStep",
+                          "status",
+                          "agreedAt",
+                          "updatedAt"
+                        ]
+                      }
+                    },
+                    "canManage": {
+                      "type": "boolean"
+                    },
+                    "activeLimit": {
+                      "anyOf": [
+                        {
+                          "const": 1
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": ["items", "canManage", "activeLimit"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "LIFF IDトークンを検証できない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Unauthorized"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "対応するAccountが存在しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Account not found"
+                    },
+                    "reason": {
+                      "const": "friendship_required"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "未処理のサーバーエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Internal Server Error"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "D1 bindingが設定されていない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Service Unavailable"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "agreeGoalFollowUp",
+        "tags": ["Profile"],
+        "summary": "本人がGoalと次の一歩をフォロー対象として合意する",
+        "security": [
+          {
+            "liffIdToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "brainItemId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "nextStep": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  }
+                },
+                "required": ["brainItemId", "nextStep"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "合意結果",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "item": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "brainItemId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "goal": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "nextStep": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "status": {
+                          "enum": ["active", "completed", "stopped"],
+                          "type": "string"
+                        },
+                        "agreedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "updatedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "brainItemId",
+                        "goal",
+                        "nextStep",
+                        "status",
+                        "agreedAt",
+                        "updatedAt"
+                      ]
+                    }
+                  },
+                  "required": ["item"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "リクエストJSONが不正",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Invalid goal follow-up"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "LIFF IDトークンを検証できない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Unauthorized"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "対応するAccountが存在しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Account not found"
+                    },
+                    "reason": {
+                      "const": "friendship_required"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "操作できない理由",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Goal follow-up unavailable"
+                    },
+                    "reason": {
+                      "enum": [
+                        "feature_unavailable",
+                        "active_limit",
+                        "goal_not_found",
+                        "goal_not_confirmed"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "未処理のサーバーエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Internal Server Error"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "D1 bindingが設定されていない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Service Unavailable"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/goal-follow-ups/{goalFollowUpId}": {
+      "patch": {
+        "operationId": "updateGoalFollowUp",
+        "tags": ["Profile"],
+        "summary": "本人がGoalを完了・停止・訂正する",
+        "security": [
+          {
+            "liffIdToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": ["active", "completed", "stopped"]
+                  },
+                  "nextStep": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  }
+                },
+                "minProperties": 1
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "更新結果",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "item": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "brainItemId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "goal": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "nextStep": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "status": {
+                          "enum": ["active", "completed", "stopped"],
+                          "type": "string"
+                        },
+                        "agreedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "updatedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "brainItemId",
+                        "goal",
+                        "nextStep",
+                        "status",
+                        "agreedAt",
+                        "updatedAt"
+                      ]
+                    }
+                  },
+                  "required": ["item"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "リクエストJSONが不正",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Invalid goal follow-up"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "LIFF IDトークンを検証できない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Unauthorized"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "対応するAccountが存在しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Account not found"
+                    },
+                    "reason": {
+                      "const": "friendship_required"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "操作できない理由",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Goal follow-up unavailable"
+                    },
+                    "reason": {
+                      "enum": [
+                        "feature_unavailable",
+                        "active_limit",
+                        "goal_not_found",
+                        "goal_not_confirmed"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "未処理のサーバーエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Internal Server Error"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "D1 bindingが設定されていない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Service Unavailable"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "goalFollowUpId",
+            "required": true
+          }
+        ]
+      }
+    },
     "/api/profile": {
       "get": {
         "operationId": "getProfile",
