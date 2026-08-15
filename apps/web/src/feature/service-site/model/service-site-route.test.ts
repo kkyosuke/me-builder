@@ -14,6 +14,10 @@ describe("resolveServiceSiteRoute", () => {
     expect(resolveServiceSiteRoute("/privacy")).toBe("privacy");
   });
 
+  it("お問い合わせを公開ページとして扱う", () => {
+    expect(resolveServiceSiteRoute("/contact")).toBe("contact");
+  });
+
   it.each(["/app", "/diagnosis", "/me", "/compatibility/invitations/example"])(
     "%sは本人向けアプリとして扱う",
     (pathname) => {
