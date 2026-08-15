@@ -6,6 +6,7 @@ import {
   fetchCompatibilityRelationship,
 } from "../../infrastructure/compatibility-api";
 import type { CompatibilityRelationship } from "../../model/compatibility-relationship";
+import { isCompatibilityResourceUnavailableError } from "../../model/compatibility-resource-error";
 import { useRevalidateOnResume } from "./use-revalidate-on-resume";
 
 export function useCompatibilityRelationship({
@@ -18,8 +19,10 @@ export function useCompatibilityRelationship({
   const [state, setState] = useState<AsyncState<CompatibilityRelationship>>({ status: "loading" });
   const [ending, setEnding] = useState<AsyncState<null>>({ status: "idle" });
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
   const request = useRef<AbortController | null>(null);
   const endRequest = useRef<AbortController | null>(null);
+  const hasExistingData = useRef(false);
 
   const load = useCallback(
     async (preserveExisting: boolean) => {
@@ -32,8 +35,11 @@ export function useCompatibilityRelationship({
       request.current = controller;
       if (preserveExisting) {
         setIsRefreshing(true);
+        setRefreshError(null);
       } else {
+        hasExistingData.current = false;
         setIsRefreshing(false);
+        setRefreshError(null);
         setState({ status: "loading" });
       }
       try {
@@ -45,13 +51,25 @@ export function useCompatibilityRelationship({
           relationshipId,
           controller.signal,
         );
-        if (!controller.signal.aborted) setState({ status: "success", data });
+        if (!controller.signal.aborted) {
+          hasExistingData.current = true;
+          setRefreshError(null);
+          setState({ status: "success", data });
+        }
       } catch (error) {
         if (!controller.signal.aborted) {
-          setState({
-            status: "error",
-            message: error instanceof Error ? error.message : "相性シートを読み込めませんでした。",
-          });
+          const message =
+            error instanceof Error ? error.message : "相性シートを読み込めませんでした。";
+          if (
+            preserveExisting &&
+            hasExistingData.current &&
+            !isCompatibilityResourceUnavailableError(error)
+          ) {
+            setRefreshError(message);
+          } else {
+            hasExistingData.current = false;
+            setState({ status: "error", message });
+          }
         }
       } finally {
         if (request.current === controller) {
@@ -84,6 +102,7 @@ export function useCompatibilityRelationship({
     request.current?.abort();
     request.current = null;
     setIsRefreshing(false);
+    setRefreshError(null);
     const controller = new AbortController();
     endRequest.current = controller;
     setEnding({ status: "loading" });
@@ -105,5 +124,5 @@ export function useCompatibilityRelationship({
     }
   }, [acquireIdToken, relationshipId]);
 
-  return { state, ending, isRefreshing, reload, refresh, end };
+  return { state, ending, isRefreshing, refreshError, reload, refresh, end };
 }

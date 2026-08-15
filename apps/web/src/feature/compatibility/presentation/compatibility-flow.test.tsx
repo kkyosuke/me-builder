@@ -42,6 +42,40 @@ describe("Compatibility flow", () => {
     expect(loader.querySelector("div[aria-hidden='true'] > .space-y-3")).toBeTruthy();
   });
 
+  it("一覧の再検証失敗時は表示済みカードを残して再確認できる", () => {
+    const onRefresh = vi.fn();
+    render(
+      <CompatibilityListScreen
+        state={{
+          status: "success",
+          data: {
+            items: [
+              {
+                relationshipId: "9".repeat(64),
+                relationshipCategory: "partner",
+                status: "accepted",
+                partnerDisplayName: "あおい",
+                readiness: { status: "ready", comparableThemeCount: 2 },
+              },
+            ],
+          },
+        }}
+        refreshError="ネットワークに接続できません"
+        onRetry={vi.fn()}
+        onRefresh={onRefresh}
+        onCancel={vi.fn()}
+        onResend={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "あおいさん" })).toBeTruthy();
+    expect(screen.getByLabelText("最新状態の確認結果").textContent).toContain(
+      "表示中の内容を残しています",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "もう一度確認" }));
+    expect(onRefresh).toHaveBeenCalledOnce();
+  });
+
   it("APIの一覧で結果あり・準備中・返事待ちを区別し、必要な操作だけを表示する", () => {
     const onCancel = vi.fn();
     const onResend = vi.fn();

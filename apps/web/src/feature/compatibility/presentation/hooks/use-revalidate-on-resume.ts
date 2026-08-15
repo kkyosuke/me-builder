@@ -1,18 +1,18 @@
 import { useEffect } from "react";
 
-const DEFAULT_MINIMUM_INTERVAL_MS = 30_000;
+const DEFAULT_DEDUPLICATION_WINDOW_MS = 1_000;
 
 /** 復帰時にだけ再検証し、同時に発生するfocus/visibility/onlineを1回へまとめる。 */
 export function useRevalidateOnResume(
   revalidate: () => void | Promise<void>,
-  minimumIntervalMs = DEFAULT_MINIMUM_INTERVAL_MS,
+  deduplicationWindowMs = DEFAULT_DEDUPLICATION_WINDOW_MS,
 ): void {
   useEffect(() => {
-    let lastRevalidatedAt = Date.now();
+    let lastRevalidatedAt = Number.NEGATIVE_INFINITY;
 
     const requestRevalidation = () => {
       const now = Date.now();
-      if (now - lastRevalidatedAt < minimumIntervalMs) return;
+      if (now - lastRevalidatedAt < deduplicationWindowMs) return;
       lastRevalidatedAt = now;
       void revalidate();
     };
@@ -33,5 +33,5 @@ export function useRevalidateOnResume(
       window.removeEventListener("online", requestRevalidation);
       window.removeEventListener("pageshow", handlePageShow);
     };
-  }, [minimumIntervalMs, revalidate]);
+  }, [deduplicationWindowMs, revalidate]);
 }

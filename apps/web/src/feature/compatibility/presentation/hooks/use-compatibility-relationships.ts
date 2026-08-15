@@ -6,6 +6,7 @@ import {
   fetchCompatibilityRelationships,
 } from "../../infrastructure/compatibility-api";
 import type { CompatibilityRelationshipList } from "../../model/compatibility-relationship";
+import { isCompatibilityResourceUnavailableError } from "../../model/compatibility-resource-error";
 import { useRevalidateOnResume } from "./use-revalidate-on-resume";
 
 type AcquireIdToken = (signal: AbortSignal) => Promise<string | null>;
@@ -21,8 +22,10 @@ export function useCompatibilityRelationships({
   const [operation, setOperation] = useState<AsyncState<string>>({ status: "idle" });
   const [cancellingRelationshipId, setCancellingRelationshipId] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
   const request = useRef<AbortController | null>(null);
   const operationRequest = useRef<AbortController | null>(null);
+  const hasExistingData = useRef(false);
 
   const load = useCallback(
     async (preserveExisting: boolean) => {
@@ -31,21 +34,36 @@ export function useCompatibilityRelationships({
       request.current = controller;
       if (preserveExisting) {
         setIsRefreshing(true);
+        setRefreshError(null);
       } else {
+        hasExistingData.current = false;
         setIsRefreshing(false);
+        setRefreshError(null);
         setState({ status: "loading" });
       }
       try {
         const token = await acquireIdToken(controller.signal);
         if (!token) throw new Error("LINEから相性画面を開いてください。");
         const data = await fetchCompatibilityRelationships(config.apiUrl, token, controller.signal);
-        if (!controller.signal.aborted) setState({ status: "success", data });
+        if (!controller.signal.aborted) {
+          hasExistingData.current = true;
+          setRefreshError(null);
+          setState({ status: "success", data });
+        }
       } catch (error) {
         if (!controller.signal.aborted) {
-          setState({
-            status: "error",
-            message: error instanceof Error ? error.message : "相性一覧を読み込めませんでした。",
-          });
+          const message =
+            error instanceof Error ? error.message : "相性一覧を読み込めませんでした。";
+          if (
+            preserveExisting &&
+            hasExistingData.current &&
+            !isCompatibilityResourceUnavailableError(error)
+          ) {
+            setRefreshError(message);
+          } else {
+            hasExistingData.current = false;
+            setState({ status: "error", message });
+          }
         }
       } finally {
         if (request.current === controller) {
@@ -79,6 +97,7 @@ export function useCompatibilityRelationships({
       request.current?.abort();
       request.current = null;
       setIsRefreshing(false);
+      setRefreshError(null);
       const controller = new AbortController();
       operationRequest.current = controller;
       setCancellingRelationshipId(relationshipId);
@@ -124,5 +143,14 @@ export function useCompatibilityRelationships({
     [acquireIdToken],
   );
 
-  return { state, operation, cancellingRelationshipId, isRefreshing, reload, refresh, cancel };
+  return {
+    state,
+    operation,
+    cancellingRelationshipId,
+    isRefreshing,
+    refreshError,
+    reload,
+    refresh,
+    cancel,
+  };
 }

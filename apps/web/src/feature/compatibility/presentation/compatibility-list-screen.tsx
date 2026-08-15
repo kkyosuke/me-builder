@@ -25,6 +25,7 @@ import type {
   CompatibilityRelationshipListItem,
 } from "../model/compatibility-relationship";
 import { preloadCompatibilityRoute } from "./compatibility-route-loaders";
+import { CompatibilityRefreshNotice } from "./components/compatibility-refresh-notice";
 
 type PendingItem = Extract<CompatibilityRelationshipListItem, { status: "pending" }>;
 type AcceptedItem = Extract<CompatibilityRelationshipListItem, { status: "accepted" }>;
@@ -76,10 +77,12 @@ export function CompatibilityListScreen({
   categoryFilter = "all",
   state,
   isRefreshing = false,
+  refreshError = null,
   operation = { status: "idle" },
   cancellingRelationshipId = null,
   sharingMessage,
   onRetry,
+  onRefresh = () => undefined,
   onCancel,
   onCategoryFilterChange = () => undefined,
   onResend,
@@ -87,10 +90,12 @@ export function CompatibilityListScreen({
   categoryFilter?: RelationshipCategoryFilter;
   state: AsyncState<CompatibilityRelationshipList>;
   isRefreshing?: boolean;
+  refreshError?: string | null;
   operation?: AsyncState<string>;
   cancellingRelationshipId?: string | null;
   sharingMessage?: string | null;
   onRetry: () => void;
+  onRefresh?: () => void;
   onCancel: (relationshipId: string) => void;
   onCategoryFilterChange?: (filter: RelationshipCategoryFilter) => void;
   onResend: (item: PendingItem) => void;
@@ -144,6 +149,8 @@ export function CompatibilityListScreen({
           <ArrowRight className="size-5" aria-hidden="true" />
         </InternalLink>
       </header>
+
+      {refreshError && <CompatibilityRefreshNotice message={refreshError} onRetry={onRefresh} />}
 
       {state.status === "loading" && <ListSkeleton />}
       {state.status === "error" && (

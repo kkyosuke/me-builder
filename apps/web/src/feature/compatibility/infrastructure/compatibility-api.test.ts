@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { CompatibilityResourceUnavailableError } from "../model/compatibility-resource-error";
 import {
   acceptCompatibilityInvitation,
   cancelCompatibilityInvitation,
@@ -366,6 +367,14 @@ describe("compatibility relationship APIs", () => {
     await expect(
       fetchCompatibilityRelationship(undefined, "id-token", "5".repeat(64)),
     ).rejects.toThrow(message);
+  });
+
+  it("利用できない相性シートを表示破棄対象のエラーへ変換する", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 404 })));
+
+    await expect(
+      fetchCompatibilityRelationship(undefined, "id-token", "5".repeat(64)),
+    ).rejects.toBeInstanceOf(CompatibilityResourceUnavailableError);
   });
 
   it.each([

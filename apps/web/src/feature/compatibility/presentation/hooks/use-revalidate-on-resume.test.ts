@@ -17,11 +17,10 @@ describe("useRevalidateOnResume", () => {
     const revalidate = vi.fn();
     renderHook(() => useRevalidateOnResume(revalidate));
 
-    now += 29_999;
     act(() => window.dispatchEvent(new Event("focus")));
-    expect(revalidate).not.toHaveBeenCalled();
+    expect(revalidate).toHaveBeenCalledOnce();
 
-    now += 1;
+    now += 999;
     act(() => {
       document.dispatchEvent(new Event("visibilitychange"));
       window.dispatchEvent(new Event("focus"));
@@ -29,7 +28,7 @@ describe("useRevalidateOnResume", () => {
     });
     expect(revalidate).toHaveBeenCalledOnce();
 
-    now += 30_000;
+    now += 1;
     act(() => window.dispatchEvent(new Event("online")));
     expect(revalidate).toHaveBeenCalledTimes(2);
   });
@@ -40,7 +39,7 @@ describe("useRevalidateOnResume", () => {
     vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
     const revalidate = vi.fn();
     renderHook(() => useRevalidateOnResume(revalidate));
-    now += 30_000;
+    now += 1_000;
 
     act(() => {
       document.dispatchEvent(new Event("visibilitychange"));

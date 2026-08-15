@@ -15,6 +15,7 @@ import {
   CompatibilityEndSharing,
   CompatibilitySharingEndedScreen,
 } from "./components/compatibility-end-sharing";
+import { CompatibilityRefreshNotice } from "./components/compatibility-refresh-notice";
 import { CompatibilityBackHeader } from "./components/compatibility-ui";
 import { useCompatibilityRelationship } from "./hooks/use-compatibility-relationship";
 
@@ -107,6 +108,12 @@ export default function CompatibilityResultApplication({
           </output>
         )}
         <CompatibilityBackHeader />
+        {relationship.refreshError && (
+          <CompatibilityRefreshNotice
+            message={relationship.refreshError}
+            onRetry={() => void relationship.refresh()}
+          />
+        )}
         <section className="mt-8 rounded-3xl border border-amber-300 bg-amber-50 p-6 dark:bg-amber-950/30">
           <p
             className={`mb-3 w-fit rounded-full px-3 py-1.5 text-sm font-bold ${getRelationshipCategoryBadgeClassName(relationship.state.data.relationshipCategory)}`}
@@ -155,7 +162,9 @@ export default function CompatibilityResultApplication({
       partner={toCompatibilityPerson(relationship.state.data.partner, "violet")}
       relationshipCategory={relationship.state.data.relationshipCategory}
       isRefreshing={relationship.isRefreshing}
+      refreshError={relationship.refreshError}
       endingState={relationship.ending}
+      onRefresh={() => void relationship.refresh()}
       onEnd={() => void relationship.end()}
     />
   );

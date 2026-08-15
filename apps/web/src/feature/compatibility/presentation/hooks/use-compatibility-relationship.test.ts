@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("../../infrastructure/compatibility-api", () => mocks);
 
+import { CompatibilityResourceUnavailableError } from "../../model/compatibility-resource-error";
 import { useCompatibilityRelationship } from "./use-compatibility-relationship";
 
 describe("useCompatibilityRelationship", () => {
@@ -42,7 +43,7 @@ describe("useCompatibilityRelationship", () => {
     );
     await waitFor(() => expect(result.current.state.status).toBe("success"));
 
-    now += 30_000;
+    now += 1_000;
     act(() => window.dispatchEvent(new Event("online")));
 
     await waitFor(() => expect(result.current.isRefreshing).toBe(true));
@@ -79,14 +80,14 @@ describe("useCompatibilityRelationship", () => {
         status: "waiting",
         nextAction: null,
       })
-      .mockRejectedValueOnce(new Error("共有は終了しています。"));
+      .mockRejectedValueOnce(new CompatibilityResourceUnavailableError("共有は終了しています。"));
     const acquireIdToken = vi.fn(async () => "id-token");
     const { result } = renderHook(() =>
       useCompatibilityRelationship({ acquireIdToken, relationshipId }),
     );
     await waitFor(() => expect(result.current.state.status).toBe("success"));
 
-    now += 30_000;
+    now += 1_000;
     act(() => window.dispatchEvent(new Event("focus")));
 
     await waitFor(() => expect(result.current.state.status).toBe("error"));
@@ -95,5 +96,33 @@ describe("useCompatibilityRelationship", () => {
       message: "共有は終了しています。",
     });
     expect(result.current.isRefreshing).toBe(false);
+  });
+
+  it("再検証の通信失敗では表示中のシートを維持して再確認を案内する", async () => {
+    const relationshipId = "3".repeat(64);
+    let now = 1_000;
+    vi.spyOn(Date, "now").mockImplementation(() => now);
+    const readyRelationship = {
+      relationshipId,
+      relationshipCategory: "friend",
+      status: "ready",
+      partner: { displayName: "あおい", aboutMe: { statements: [] }, themes: [] },
+      viewer: { displayName: "はる", aboutMe: { statements: [] }, themes: [] },
+    } as const;
+    mocks.fetchCompatibilityRelationship
+      .mockResolvedValueOnce(readyRelationship)
+      .mockRejectedValueOnce(new TypeError("ネットワークに接続できません"));
+    const acquireIdToken = vi.fn(async () => "id-token");
+    const { result } = renderHook(() =>
+      useCompatibilityRelationship({ acquireIdToken, relationshipId }),
+    );
+    await waitFor(() => expect(result.current.state.status).toBe("success"));
+
+    now += 1_000;
+    act(() => window.dispatchEvent(new Event("focus")));
+
+    await waitFor(() => expect(result.current.refreshError).toBe("ネットワークに接続できません"));
+    expect(result.current.isRefreshing).toBe(false);
+    expect(result.current.state).toEqual({ status: "success", data: readyRelationship });
   });
 });

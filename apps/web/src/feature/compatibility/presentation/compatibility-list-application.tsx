@@ -65,10 +65,12 @@ export default function CompatibilityListApplication() {
       categoryFilter={categoryFilter}
       state={relationships.state}
       isRefreshing={relationships.isRefreshing}
+      refreshError={relationships.refreshError}
       operation={relationships.operation}
       cancellingRelationshipId={relationships.cancellingRelationshipId}
       sharingMessage={sharingMessage}
       onRetry={() => void relationships.reload()}
+      onRefresh={() => void relationships.refresh()}
       onCancel={(relationshipId) => void relationships.cancel(relationshipId)}
       onCategoryFilterChange={changeCategoryFilter}
       onResend={(item) => void resend(item)}

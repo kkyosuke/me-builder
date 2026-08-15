@@ -13,6 +13,7 @@ import type {
   CompatibilityRelationship,
   CompatibilityRelationshipList,
 } from "../model/compatibility-relationship";
+import { CompatibilityResourceUnavailableError } from "../model/compatibility-resource-error";
 import type { CompatibilityShareConsent } from "../model/compatibility-share-consent";
 import type { CompatibilityShareContent } from "../model/compatibility-share-content";
 
@@ -171,9 +172,9 @@ async function notFoundError(response: Response, unavailableMessage: string): Pr
     "reason" in body &&
     body.reason === "friendship_required"
   ) {
-    return new Error(FRIENDSHIP_REQUIRED_MESSAGE);
+    return new CompatibilityResourceUnavailableError(FRIENDSHIP_REQUIRED_MESSAGE);
   }
-  return new Error(unavailableMessage);
+  return new CompatibilityResourceUnavailableError(unavailableMessage);
 }
 
 export async function fetchCompatibilityShareConsent(
