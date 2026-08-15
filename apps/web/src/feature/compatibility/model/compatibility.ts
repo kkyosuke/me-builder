@@ -7,6 +7,7 @@ export type CompatibilityTheme = {
   position: number;
   statement: string;
   request: string;
+  band: "low" | "balanced" | "high";
 };
 
 export type CompatibilityPerson = {

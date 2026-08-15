@@ -6,6 +6,7 @@ type CompatibilitySharePreviewParameter = {
   position: number;
   statement: string;
   request?: string | undefined;
+  band: "low" | "balanced" | "high";
 };
 
 export type CompatibilitySharePreviewTheme = {

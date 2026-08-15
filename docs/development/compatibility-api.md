@@ -104,7 +104,8 @@ flowchart LR
           "highLabel": "一緒の時間を大切にする",
           "position": 72,
           "statement": "一緒に過ごす時間を大切にする傾向があります",
-          "request": "一緒に過ごす予定を相談してもらえるとうれしいです。"
+          "request": "一緒に過ごす予定を相談してもらえるとうれしいです。",
+          "band": "high"
         }
       ]
     }
@@ -113,7 +114,7 @@ flowchart LR
 }
 ```
 
-`themes`には指定カテゴリと`general`のDiagnosisだけを含めます。parameterの`request`は、現在の帯域に審査済みの関わり方文がある場合だけ返します。`aboutMe`を開示できない場合は`null`、共有できる診断テーマがない場合は空配列です。`nextAction`は、共有専用プロフィールprojectionがなければ`profile-summary`、それ以外で共有可能なテーマがなく現在回答できる対象Diagnosisがあれば`diagnosis`、それ以外は`null`です。
+`themes`には指定カテゴリと`general`のDiagnosisだけを含めます。parameterの`band`は採点設定で決まった`low`、`balanced`、`high`のいずれかです。`request`は、現在の帯域に審査済みの関わり方文がある場合だけ返します。`aboutMe`を開示できない場合は`null`、共有できる診断テーマがない場合は空配列です。`nextAction`は、共有専用プロフィールprojectionがなければ`profile-summary`、それ以外で共有可能なテーマがなく現在回答できる対象Diagnosisがあれば`diagnosis`、それ以外は`null`です。
 
 相性シートと同じ共有表示の組み立て処理を使い、生の回答、具体的な出来事、日記・会話本文、自由記述、Source Record、Brain Item本文、内部根拠ID、Account ID、各種指紋、表示名を返しません。成功・エラーを問わず`Cache-Control: no-store`を付けます。
 
@@ -289,7 +290,7 @@ sequenceDiagram
 }
 ```
 
-双方の`themes`は、取得時点で双方が共有できるDiagnosisのうち、招待で選んだ`relationshipCategory`または`general`に該当する共通部分だけを同じ順序で返します。`unavailableThemes`には片方だけが共有できるDiagnosisのIDとタイトルを重複なく返し、どちらの回答が不足しているかは返しません。過去に同意した表示内容とは照合せず、双方の最新の共有専用プロフィールと診断表示を使います。双方の「私について」を開示でき、共通テーマが1件以上ある場合だけ`ready`にします。それ以外では片方だけの内容を返さず、次の待機状態を返します。
+双方の`themes`は、取得時点で双方が共有できるDiagnosisのうち、招待で選んだ`relationshipCategory`または`general`に該当し、採点設定IDと版が一致する共通部分だけを同じ順序で返します。`unavailableThemes`には片方だけが共有できるか採点設定が一致しないDiagnosisのIDとタイトルを重複なく返し、比較できない側や理由は返しません。過去に同意した表示内容とは照合せず、双方の最新の共有専用プロフィールと診断表示を使います。双方の「私について」を開示でき、共通テーマが1件以上ある場合だけ`ready`にします。それ以外では片方だけの内容を返さず、次の待機状態を返します。
 
 ```json
 {
@@ -300,7 +301,7 @@ sequenceDiagram
 }
 ```
 
-`nextAction`は閲覧者自身の共有プロフィールを開示できなければ`profile-summary`、共通テーマがなく閲覧者がまだ回答できる診断が残っていれば`diagnosis`、それ以外は`null`です。閲覧者が回答し終えていて相手の準備だけが足りない場合は、本人の操作では解消できないため`null`にします。
+`nextAction`は閲覧者自身の共有プロフィールを開示できなければ`profile-summary`、共通テーマがなく閲覧者がまだ回答できる診断が残っていれば`diagnosis`、それ以外は`null`です。閲覧者が回答し終えている場合、相手の準備待ちや採点設定版の不一致は本人の操作では解消できないため`null`にし、理由を断定しません。
 
 | HTTP | 条件 | レスポンス |
 | --- | --- | --- |
@@ -350,7 +351,7 @@ sequenceDiagram
 
 `pending`は本人が発行した利用可能な招待だけです。`invitationUrl`は発行時と同じ正規LIFF URLで、一覧からLINEへ再送する場合に使います。受信者がリンクを開いただけでは一覧参照を作らないため、未承諾の受信者側一覧には現れません。
 
-成立中の関係は、デプロイ中や既に開かれているWebとの後方互換性を保つため、外側の`status`を`accepted`のまま維持します。一覧の取得時点で詳細APIと同じ現在の共有内容を判定し、`readiness.status`で、比較可能なら`ready`、まだ比較できなければ`waiting`を返します。`ready`の`comparableThemeCount`は双方に共通する比較可能な診断テーマ数です。`waiting`の`nextAction`は詳細APIと同じく、閲覧者自身の共有プロフィールを開示できなければ`profile-summary`、共通テーマがなく閲覧者がまだ回答できる診断を持つ場合は`diagnosis`、本人側に必要な操作がなければ`null`です。これにより、相手側だけの準備待ちでは本人へ不要な操作を促しません。
+成立中の関係は、デプロイ中や既に開かれているWebとの後方互換性を保つため、外側の`status`を`accepted`のまま維持します。一覧の取得時点で詳細APIと同じ現在の共有内容を判定し、`readiness.status`で、比較可能なら`ready`、まだ比較できなければ`waiting`を返します。`ready`の`comparableThemeCount`は双方に共通する比較可能な診断テーマ数です。`waiting`の`nextAction`は詳細APIと同じく、閲覧者自身の共有プロフィールを開示できなければ`profile-summary`、共通テーマがなく閲覧者がまだ回答できる診断を持つ場合は`diagnosis`、本人側に必要な操作がなければ`null`です。`null`は相手側の準備待ちや採点設定版の不一致を含み、画面では原因を断定せず本人へ不要な操作を促しません。
 
 取消・期限切れ・終了を検出した参照はAccountData側で非表示へ同期し、レスポンスへ含めません。成立中の関係は一覧を取得するたびに現在の共有内容から判定し、過去の比較可能状態をキャッシュしません。
 

@@ -48,11 +48,11 @@ describe("CompatibilityResultApplication waiting state", () => {
     vi.clearAllMocks();
   });
 
-  it("相手側の準備だけが足りない場合は、自分への操作を促さない", () => {
+  it("本人の操作で解消できない準備状態は、原因を断定せず操作を促さない", () => {
     renderWaiting(null);
 
-    expect(screen.getByRole("heading", { name: "相手の準備を待っています" })).toBeTruthy();
-    expect(screen.getByText(/あなたの共有内容はそろっています/)).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "比較の準備を待っています" })).toBeTruthy();
+    expect(screen.getByText(/現在の共有内容では、2人で比較できる/)).toBeTruthy();
     expect(screen.getByRole("link", { name: "相性一覧へ戻る" }).getAttribute("href")).toBe(
       "/compatibility",
     );

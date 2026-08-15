@@ -45,6 +45,7 @@ const shareContent = {
           position: 78,
           statement: "私は、予定を早めに決めておけると安心します。",
           request: "予定を早めに相談してもらえるとうれしいです。",
+          band: "high",
         },
       ],
     },

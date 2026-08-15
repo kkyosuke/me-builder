@@ -3,6 +3,7 @@ import { BookOpenText, HeartHandshake, Lightbulb, MessageCircleQuestion } from "
 import { InternalLink } from "../../../../components/internal-link";
 import { diagnosisCategoryHref } from "../../../diagnosis/model/relationship-category";
 import type { CompatibilityPerson, CompatibilityTheme } from "../../model/compatibility";
+import { compareCompatibilityThemes } from "../../model/compatibility-comparison";
 import type { CompatibilityUnavailableTheme } from "../../model/compatibility-relationship";
 import { CompatibilityAvatar } from "./compatibility-ui";
 
@@ -166,22 +167,7 @@ export function CompatibilityPairSheet({
   relationshipCategory: CompatibilityRelationshipCategory;
   unavailableThemes: CompatibilityUnavailableTheme[];
 }) {
-  const pairs = me.themes.flatMap((theme) => {
-    const partnerTheme = partner.themes.find((candidate) => candidate.id === theme.id);
-    return partnerTheme ? [{ theme, partnerTheme }] : [];
-  });
-  const band = (position: number) => (position < 40 ? "low" : position > 60 ? "high" : "middle");
-  const common = pairs.filter(
-    ({ theme, partnerTheme }) =>
-      band(theme.position) !== "middle" && band(theme.position) === band(partnerTheme.position),
-  );
-  const different = pairs.filter(
-    ({ theme, partnerTheme }) =>
-      (band(theme.position) === "low" && band(partnerTheme.position) === "high") ||
-      (band(theme.position) === "high" && band(partnerTheme.position) === "low"),
-  );
-  const describedIds = new Set([...common, ...different].map(({ theme }) => theme.id));
-  const undecided = pairs.filter(({ theme }) => !describedIds.has(theme.id));
+  const { common, different, undecided } = compareCompatibilityThemes(me, partner);
 
   return (
     <div className="space-y-4">
@@ -247,9 +233,7 @@ export function CompatibilityPairSheet({
         {unavailableThemes.length > 0 || undecided.length > 0 ? (
           <ul className="mt-2 space-y-2 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
             {unavailableThemes.map((theme) => (
-              <li key={theme.diagnosisId}>
-                「{theme.title}」は、2人分の比較に必要な回答がまだそろっていません。
-              </li>
+              <li key={theme.diagnosisId}>「{theme.title}」は、現在は2人分を比較できません。</li>
             ))}
             {undecided.map(({ theme }) => (
               <li key={theme.id}>

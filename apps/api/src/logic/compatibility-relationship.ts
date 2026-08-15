@@ -147,7 +147,8 @@ export async function resolveCompatibilityRelationshipContents({
       relationshipCategory: canonical.relationshipCategory,
       status: "waiting",
       // 閲覧者がまだ回答できる診断を持つ場合だけ診断へ案内する。
-      // 回答し終えている場合は相手の準備待ちであり、本人の操作では解消できない。
+      // 回答済み・相手の準備待ち・採点設定版の不一致など、本人の操作で
+      // 解消できない場合は理由を断定せず案内を出さない。
       nextAction: !viewerData.aboutMe
         ? "profile-summary"
         : commonDiagnosisIds.length === 0 && viewerData.hasAnswerableDiagnosis

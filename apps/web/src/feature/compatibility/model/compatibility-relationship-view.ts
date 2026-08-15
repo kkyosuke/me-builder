@@ -21,6 +21,7 @@ export function toCompatibilityPerson(
         position: parameter.position,
         statement: parameter.statement,
         request: parameter.request ?? "",
+        band: parameter.band,
       })),
     ),
   };

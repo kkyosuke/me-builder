@@ -28,10 +28,12 @@ const params = {
   at: new Date("2026-08-13T00:00:00.000Z"),
 };
 
-function theme(diagnosisId: string) {
+function theme(diagnosisId: string, scoringVersion = 1) {
   return {
     diagnosisId,
     title: diagnosisId,
+    scoringConfigId: `${diagnosisId}-config`,
+    scoringVersion,
     parameters: [
       {
         id: "planning",
@@ -40,6 +42,7 @@ function theme(diagnosisId: string) {
         highLabel: "早め",
         position: 80,
         statement: "「早め」傾向があります",
+        band: "high" as const,
       },
     ],
   };
@@ -134,6 +137,60 @@ describe("getCompatibilityRelationshipContents", () => {
         relationshipCategory: "friend",
         status: "waiting",
         nextAction: "diagnosis",
+      },
+    });
+  });
+
+  it("同じ診断でも採点設定版が異なるテーマは比較に使わない", async () => {
+    mocks.loadSharePreviewData
+      .mockResolvedValueOnce(
+        shareData({
+          displayName: "あおい",
+          themes: [theme("shared"), theme("versioned", 1)],
+        }),
+      )
+      .mockResolvedValueOnce(
+        shareData({
+          displayName: "はる",
+          themes: [theme("shared"), theme("versioned", 2)],
+        }),
+      );
+
+    await expect(getCompatibilityRelationshipContents(params)).resolves.toMatchObject({
+      type: "resolved",
+      relationship: {
+        status: "ready",
+        partner: { themes: [{ diagnosisId: "shared" }] },
+        viewer: { themes: [{ diagnosisId: "shared" }] },
+        unavailableThemes: [{ diagnosisId: "versioned", title: "versioned" }],
+      },
+    });
+  });
+
+  it("採点設定版の不一致だけで比較できない場合は、本人へ不要な操作を案内しない", async () => {
+    mocks.loadSharePreviewData
+      .mockResolvedValueOnce(
+        shareData({
+          displayName: "あおい",
+          hasAnswerableDiagnosis: false,
+          themes: [theme("versioned", 1)],
+        }),
+      )
+      .mockResolvedValueOnce(
+        shareData({
+          displayName: "はる",
+          hasAnswerableDiagnosis: false,
+          themes: [theme("versioned", 2)],
+        }),
+      );
+
+    await expect(getCompatibilityRelationshipContents(params)).resolves.toEqual({
+      type: "resolved",
+      relationship: {
+        relationshipId,
+        relationshipCategory: "friend",
+        status: "waiting",
+        nextAction: null,
       },
     });
   });

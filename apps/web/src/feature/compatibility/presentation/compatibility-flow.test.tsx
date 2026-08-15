@@ -136,7 +136,7 @@ describe("Compatibility flow", () => {
     expect(screen.getByText("3つのテーマで比較できます")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "準備中" })).toBeTruthy();
     expect(screen.getAllByText("あなたの準備待ち")).toHaveLength(2);
-    expect(screen.getByText("相手の準備待ち")).toBeTruthy();
+    expect(screen.getByText("比較の準備中")).toBeTruthy();
     expect(screen.getByText("返事待ち")).toBeTruthy();
     expect(screen.getByRole("link", { name: "2人の相性シートを見る" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "診断を行う" }).getAttribute("href")).toBe(
@@ -648,11 +648,12 @@ describe("Compatibility flow", () => {
       id: "undecided",
       title: "まだ判断できない軸",
       position: 50,
+      band: "balanced" as const,
     };
     const meWithUndecided = { ...me, themes: [...me.themes, undecidedTheme] };
     const partnerWithUndecided = {
       ...aoi,
-      themes: [...aoi.themes, { ...undecidedTheme, position: 70 }],
+      themes: [...aoi.themes, { ...undecidedTheme, position: 70, band: "high" as const }],
     };
     const { rerender } = render(
       <CompatibilityResultScreen
@@ -715,9 +716,7 @@ describe("Compatibility flow", () => {
     expect(screen.getByRole("heading", { name: "あおいさんについて" })).toBeTruthy();
 
     fireEvent.click(screen.getByRole("tab", { name: "2人について" }));
-    expect(
-      screen.getByText("「お金と消費」は、2人分の比較に必要な回答がまだそろっていません。"),
-    ).toBeTruthy();
+    expect(screen.getByText("「お金と消費」は、現在は2人分を比較できません。")).toBeTruthy();
     expect(
       screen.getByText("「まだ判断できない軸」は、回答から共通点や違いをまだはっきり言えません。"),
     ).toBeTruthy();

@@ -517,7 +517,9 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
             expect.objectContaining({ statement: "私は、更新後のまとめに含まれる内容です" }),
           ]),
         );
-        expect(JSON.stringify(detail)).not.toMatch(/accountId|fingerprint|choiceId|evidenceId/);
+        expect(JSON.stringify(detail)).not.toMatch(
+          /accountId|fingerprint|choiceId|evidenceId|scoringConfig/,
+        );
 
         const listResponse = await app.request(
           "/api/compatibility/relationships",
