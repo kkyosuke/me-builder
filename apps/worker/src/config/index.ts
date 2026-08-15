@@ -27,6 +27,25 @@ function parsePositiveInteger(raw: string | undefined, fallback: number): number
   return parsed;
 }
 
+function parseBillingPricePlanMap(
+  raw: string | undefined,
+): Record<string, "lite" | "full" | "family"> {
+  if (!raw) return {};
+  try {
+    const value: unknown = JSON.parse(raw);
+    if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+    return Object.fromEntries(
+      Object.entries(value).filter(
+        (entry): entry is [string, "lite" | "full" | "family"] =>
+          entry[0].length > 0 && ["lite", "full", "family"].includes(String(entry[1])),
+      ),
+    );
+  } catch {
+    logger.warn("Ignored an invalid BILLING_PRICE_PLAN_MAP");
+    return {};
+  }
+}
+
 /**
  * Worker アプリケーションの環境設定を取得・パースして返却します。
  * Cloudflare Workers の c.env や process.env の差分を @me-builder/shared の getEnv で吸収します。
@@ -83,6 +102,8 @@ export function getWorkerConfig(env?: Record<string, unknown>): WorkerConfig {
       DEFAULT_CHAT_CONTEXT_MESSAGE_LIMIT,
     ),
     adminLineUserIds,
+    stripeSecretKey: getEnv("STRIPE_SECRET_KEY", env)?.trim() || undefined,
+    billingPricePlanMap: parseBillingPricePlanMap(getEnv("BILLING_PRICE_PLAN_MAP", env)),
   };
 
   return v.parse(WorkerConfigSchema, rawConfig);

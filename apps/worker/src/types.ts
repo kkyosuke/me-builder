@@ -27,6 +27,8 @@ export type Env = Omit<
   BASE_URL?: string;
   API_URL?: string;
   LINE_CHANNEL_ACCESS_TOKEN?: string;
+  STRIPE_SECRET_KEY?: string;
+  BILLING_PRICE_PLAN_MAP?: string;
   GOOGLE_VERTEX_AI_API_KEY?: string;
   GEMINI_MODEL?: string;
   GEMINI_EMBEDDING_MODEL?: string;

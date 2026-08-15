@@ -64,6 +64,15 @@ export async function findBillingCustomerByAccount(db: SharedD1Client, accountId
   });
 }
 
+export async function findBillingCustomerByProviderCustomerId(
+  db: SharedD1Client,
+  providerCustomerId: string,
+) {
+  return await db.query.billingCustomers.findFirst({
+    where: (table, { eq }) => eq(table.providerCustomerId, providerCustomerId),
+  });
+}
+
 export type ApplyBillingProjectionInput = {
   accountId: string;
   event: { id: string; type: string; objectId: string; createdAt: Date };
