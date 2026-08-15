@@ -8,4 +8,5 @@ export * as personalDataExport from "./personal-data-export";
 export * as profileSummary from "./profile-summary";
 export * as progression from "./progression";
 export * as source from "./source";
+export * as weeklyReflection from "./weekly-reflection";
 export type { ConversationContextMessage } from "./diary";

@@ -7,6 +7,7 @@ import type {
   MessageBatch,
   ProfileSummaryGenerationQueueMessage,
   WebhookQueueMessage,
+  WeeklyReflectionGenerationQueueMessage,
 } from "@me-builder/shared";
 import { logger } from "@me-builder/shared";
 import { toSafeOperationalErrorFields } from "@me-builder/shared";
@@ -23,6 +24,7 @@ export async function queueHandler(
     | DiaryBrainCheckpointQueueMessage
     | BrainVectorSyncQueueMessage
     | ProfileSummaryGenerationQueueMessage
+    | WeeklyReflectionGenerationQueueMessage
   >,
   env: Env,
 ): Promise<void> {

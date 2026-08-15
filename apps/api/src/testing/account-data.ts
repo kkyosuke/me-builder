@@ -374,6 +374,67 @@ const actions = {
       message,
       failedAt,
     ),
+  "weeklyReflection.read": (db: DO.account.Database, accountId: string, at?: Date) =>
+    DO.account.action.weeklyReflection.readWeeklyReflections(db, accountId, at),
+  "weeklyReflection.requestGeneration": (db: DO.account.Database, accountId: string, at?: Date) =>
+    DO.account.action.weeklyReflection.requestWeeklyReflectionGeneration(db, accountId, at),
+  "weeklyReflection.listUndispatchedGenerationIds": (
+    db: DO.account.Database,
+    accountId: string,
+    at?: Date,
+    limit?: number,
+  ) =>
+    DO.account.action.weeklyReflection.listUndispatchedWeeklyReflectionGenerationIds(
+      db,
+      accountId,
+      at,
+      limit,
+    ),
+  "weeklyReflection.markGenerationDispatched": (
+    db: DO.account.Database,
+    accountId: string,
+    generationId: string,
+    at?: Date,
+  ) =>
+    DO.account.action.weeklyReflection.markWeeklyReflectionGenerationDispatched(
+      db,
+      accountId,
+      generationId,
+      at,
+    ),
+  "weeklyReflection.loadGenerationContext": (
+    db: DO.account.Database,
+    accountId: string,
+    generationId: string,
+    at?: Date,
+  ) =>
+    DO.account.action.weeklyReflection.loadWeeklyReflectionGenerationContext(
+      db,
+      accountId,
+      generationId,
+      at,
+    ),
+  "weeklyReflection.completeGeneration": (
+    db: DO.account.Database,
+    accountId: string,
+    input: Parameters<
+      typeof DO.account.action.weeklyReflection.completeWeeklyReflectionGeneration
+    >[2],
+  ) => DO.account.action.weeklyReflection.completeWeeklyReflectionGeneration(db, accountId, input),
+  "weeklyReflection.failGeneration": (
+    db: DO.account.Database,
+    accountId: string,
+    generationId: string,
+    message: string,
+    at?: Date,
+  ) =>
+    DO.account.action.weeklyReflection.failWeeklyReflectionGeneration(
+      db,
+      accountId,
+      generationId,
+      message,
+      at,
+    ),
 } as const;
 
 const MIGRATIONS_FOLDER = path.resolve(__dirname, "../../../../packages/lib/drizzle-do-account");

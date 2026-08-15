@@ -14,12 +14,14 @@ import { aiUsageActions } from "../account-data/ai-usage";
 import { brainActions } from "../account-data/brain";
 import { diagnosisActions } from "../account-data/diagnosis";
 import { diaryActions } from "../account-data/diary";
+import { profileSummaryActions } from "../account-data/profile-summary";
 
 const actions = {
   ...aiUsageActions,
   ...brainActions,
   ...diagnosisActions,
   ...diaryActions,
+  ...profileSummaryActions,
 } as const;
 
 const MIGRATIONS_FOLDER = path.resolve(__dirname, "../../../../packages/lib/drizzle-do-account");

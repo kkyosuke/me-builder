@@ -24,6 +24,7 @@ import {
 } from "../schema/profile-summary";
 import { progressionMilestones, progressionStates } from "../schema/progression";
 import { sourceRecordRevisions, sourceRecords } from "../schema/source";
+import { weeklyReflectionGenerations, weeklyReflections } from "../schema/weekly-reflection";
 
 const PERSONAL_DATA_EXPORT_FORMAT_VERSION = 1;
 const PERSONAL_DATA_EXPORT_TTL_MS = 24 * 60 * 60 * 1_000;
@@ -53,6 +54,7 @@ type PersonalDataArchive = Readonly<{
   brainRevisions: readonly unknown[];
   brainUsageHistory: readonly unknown[];
   profileSummaries: readonly unknown[];
+  weeklyReflections: readonly unknown[];
   compatibilityShareProjections: readonly unknown[];
   preferences: Readonly<{ dailyPrompt: unknown | null }>;
   progression: Readonly<{ state: unknown | null; milestones: readonly unknown[] }>;
@@ -335,6 +337,21 @@ async function buildPersonalDataArchive(
           .from(profileSummaryShareProjections)
           .where(inArray(profileSummaryShareProjections.profileSummaryVersionId, versionIds))
           .all();
+  const weeklyGenerationRows = await db
+    .select({ id: weeklyReflectionGenerations.id })
+    .from(weeklyReflectionGenerations)
+    .where(eq(weeklyReflectionGenerations.accountId, accountId))
+    .all();
+  const weeklyGenerationIds = weeklyGenerationRows.map(({ id }) => id);
+  const weeklyReflectionRows =
+    weeklyGenerationIds.length === 0
+      ? []
+      : await db
+          .select()
+          .from(weeklyReflections)
+          .where(inArray(weeklyReflections.generationId, weeklyGenerationIds))
+          .orderBy(asc(weeklyReflections.weekStart))
+          .all();
   const dailyPrompt = await db
     .select()
     .from(dailyPromptPreferences)
@@ -484,6 +501,12 @@ async function buildPersonalDataArchive(
       sequence: row.sequence,
       generatedAt: row.generatedAt.toISOString(),
       summary: row.summary,
+    })),
+    weeklyReflections: weeklyReflectionRows.map((row) => ({
+      id: row.id,
+      weekStart: row.weekStart,
+      generatedAt: row.generatedAt.toISOString(),
+      content: row.content,
     })),
     compatibilityShareProjections: shareRows.map((row) => ({
       profileSummaryVersionId: row.profileSummaryVersionId,

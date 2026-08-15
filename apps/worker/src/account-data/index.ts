@@ -81,6 +81,30 @@ export async function dispatchUndispatchedProfileSummaryGenerations(
   return generationIds.length;
 }
 
+async function dispatchUndispatchedWeeklyReflections(
+  db: DO.account.Database,
+  accountId: string,
+  queue: Env["PROFILE_SUMMARY_QUEUE"],
+): Promise<number> {
+  const generationIds =
+    await DO.account.action.weeklyReflection.listUndispatchedWeeklyReflectionGenerationIds(
+      db,
+      accountId,
+    );
+  if (generationIds.length > 0 && !queue) {
+    throw new Error("PROFILE_SUMMARY_QUEUE binding is required for weekly reflections");
+  }
+  for (const generationId of generationIds) {
+    await queue?.send({ type: "weekly-reflection-generation", accountId, generationId });
+    await DO.account.action.weeklyReflection.markWeeklyReflectionGenerationDispatched(
+      db,
+      accountId,
+      generationId,
+    );
+  }
+  return generationIds.length;
+}
+
 /** 1 AccountのSource / Brain / Diagnosis / Diary / Profile Summaryをprivate SQLiteに保存する。 */
 export class AccountData extends DurableObject<Env> {
   private readonly accountId: string;
@@ -163,6 +187,11 @@ export class AccountData extends DurableObject<Env> {
           await this.syncProgressionProjection();
         }
         await dispatchUndispatchedProfileSummaryGenerations(
+          this.repository.client,
+          this.accountId,
+          this.env.PROFILE_SUMMARY_QUEUE,
+        );
+        await dispatchUndispatchedWeeklyReflections(
           this.repository.client,
           this.accountId,
           this.env.PROFILE_SUMMARY_QUEUE,

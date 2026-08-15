@@ -21,6 +21,7 @@ import {
   profileSummaryVersions,
 } from "../schema/profile-summary";
 import { sourceRecordRevisions, sourceRecords } from "../schema/source";
+import { weeklyReflectionGenerations, weeklyReflections } from "../schema/weekly-reflection";
 
 type D1BatchStatement = Parameters<AccountDataDatabase["batch"]>[0][number];
 
@@ -249,6 +250,8 @@ function derivedInvalidationStatements(
     db.delete(profileSummaryShareProjections),
     db.delete(profileSummaryVersions),
     db.delete(profileSummaryGenerations),
+    db.delete(weeklyReflections),
+    db.delete(weeklyReflectionGenerations),
   );
   return statements;
 }

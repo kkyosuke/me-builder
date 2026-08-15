@@ -54,6 +54,17 @@ export interface ProfileSummaryGenerationQueueMessage {
   generationId: string;
 }
 
+/** 本文を含めず、AccountDataに保存済みの週次振り返り生成要求だけを参照する。 */
+export interface WeeklyReflectionGenerationQueueMessage {
+  type: "weekly-reflection-generation";
+  accountId: string;
+  generationId: string;
+}
+
+export type ReflectionGenerationQueueMessage =
+  | ProfileSummaryGenerationQueueMessage
+  | WeeklyReflectionGenerationQueueMessage;
+
 /** 本文やLINE identityを含めず、AccountDataで当日の配送可否を再判定する。 */
 export interface DailyPromptQueueMessage {
   type: "daily-prompt";

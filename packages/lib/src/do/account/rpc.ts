@@ -22,6 +22,7 @@ import type * as personalDataExport from "./action/personal-data-export";
 import type * as profileSummary from "./action/profile-summary";
 import type * as progression from "./action/progression";
 import type * as source from "./action/source";
+import type * as weeklyReflection from "./action/weekly-reflection";
 
 type ActionResult<T> = T extends (...args: never[]) => infer TResult ? Awaited<TResult> : never;
 type WithoutAccountId<T> = T extends { accountId: unknown } ? Omit<T, "accountId"> : never;
@@ -184,6 +185,31 @@ export type AccountDataActions = {
     message: string,
     failedAt?: Date,
   ) => Promise<void>;
+  "weeklyReflection.read": RpcAction<[at?: Date], typeof weeklyReflection.readWeeklyReflections>;
+  "weeklyReflection.requestGeneration": RpcAction<
+    [requestedAt?: Date],
+    typeof weeklyReflection.requestWeeklyReflectionGeneration
+  >;
+  "weeklyReflection.listUndispatchedGenerationIds": RpcAction<
+    [at?: Date, limit?: number],
+    typeof weeklyReflection.listUndispatchedWeeklyReflectionGenerationIds
+  >;
+  "weeklyReflection.markGenerationDispatched": RpcAction<
+    [generationId: string, dispatchedAt?: Date],
+    typeof weeklyReflection.markWeeklyReflectionGenerationDispatched
+  >;
+  "weeklyReflection.loadGenerationContext": RpcAction<
+    [generationId: string, startedAt?: Date],
+    typeof weeklyReflection.loadWeeklyReflectionGenerationContext
+  >;
+  "weeklyReflection.completeGeneration": RpcAction<
+    [input: Parameters<typeof weeklyReflection.completeWeeklyReflectionGeneration>[2]],
+    typeof weeklyReflection.completeWeeklyReflectionGeneration
+  >;
+  "weeklyReflection.failGeneration": RpcAction<
+    [generationId: string, message: string, failedAt?: Date],
+    typeof weeklyReflection.failWeeklyReflectionGeneration
+  >;
   "progression.read": RpcAction<[at?: Date], typeof progression.readUtsushiProgression>;
   "conversation.storeLineTextSource": RpcAction<
     [WithoutAccountId<Parameters<typeof diary.storeLineTextSource>[1]>],

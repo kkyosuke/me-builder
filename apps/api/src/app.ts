@@ -73,6 +73,10 @@ import {
 } from "./contract/profile/profile";
 import { profileProgressionRoute } from "./contract/profile/progression";
 import { profileSummaryGenerationRoute, profileSummaryRoute } from "./contract/profile/summary";
+import {
+  weeklyReflectionGenerationRoute,
+  weeklyReflectionRoute,
+} from "./contract/profile/weekly-reflection";
 import { InternalServerErrorSchema } from "./contract/shared/errors";
 import {
   postAccountRecoveryCode,
@@ -134,7 +138,9 @@ import {
   getProfileEntitlementContents,
   getProfileProgressionContents,
   getProfileSummaryContents,
+  getWeeklyReflectionContents,
   postProfileSummaryGeneration,
+  postWeeklyReflectionGeneration,
 } from "./controller/profile";
 import {
   deleteProfileAvatarContents,
@@ -252,6 +258,12 @@ app.post(
   "/api/profile-summary/generations",
   profileSummaryGenerationRoute,
   postProfileSummaryGeneration,
+);
+app.get("/api/weekly-reflections", weeklyReflectionRoute, getWeeklyReflectionContents);
+app.post(
+  "/api/weekly-reflections/generations",
+  weeklyReflectionGenerationRoute,
+  postWeeklyReflectionGeneration,
 );
 app.get("/api/profile", getProfileRoute, getProfileContents);
 app.get("/api/profile/entitlement", profileEntitlementRoute, getProfileEntitlementContents);

@@ -6,5 +6,6 @@ export * from "./diary";
 export * from "./identity";
 export * from "./personal-data-export";
 export * from "./profile-summary";
+export * from "./weekly-reflection";
 export * from "./progression";
 export * from "./source";

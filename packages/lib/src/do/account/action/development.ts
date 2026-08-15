@@ -35,6 +35,8 @@ import {
   sourceRecordRevisions,
   sourceRecordTextPayloads,
   sourceRecords,
+  weeklyReflectionGenerations,
+  weeklyReflections,
 } from "../schema";
 
 export type DeletedDevelopmentAccountData = Readonly<{
@@ -121,6 +123,8 @@ export async function deleteAllDevelopmentAccountData(
     db.delete(profileSummaryShareProjections),
     db.delete(profileSummaryVersions),
     db.delete(profileSummaryGenerations),
+    db.delete(weeklyReflections),
+    db.delete(weeklyReflectionGenerations),
     db.delete(aiUsageRecords),
     db.delete(progressionPendingEvents),
     db.delete(progressionItemStates),

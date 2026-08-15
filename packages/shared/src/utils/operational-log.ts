@@ -16,6 +16,7 @@ export const FLOW_LABEL = {
   "diary-brain-checkpoint": "Diary Brain checkpoint",
   "brain-vector-sync": "Brain vector sync",
   "profile-summary-generation": "Profile summary generation",
+  "weekly-reflection-generation": "Weekly reflection generation",
   "daily-prompt": "Daily prompt",
   billing: "Billing projection",
   "queue-dispatch": "Queue dispatch",

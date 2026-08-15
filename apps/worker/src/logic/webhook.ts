@@ -11,6 +11,7 @@ import {
   type MessageBatch,
   type ProfileSummaryGenerationQueueMessage,
   type WebhookQueueMessage,
+  type WeeklyReflectionGenerationQueueMessage,
   describeQueueMessageResult,
   logger,
   operationalLogLevel,
@@ -29,6 +30,10 @@ import {
   PROFILE_SUMMARY_GENERATION_MAX_ATTEMPTS,
   processProfileSummaryGenerationMessage,
 } from "../handler/profile-summary-generation";
+import {
+  WEEKLY_REFLECTION_MAX_ATTEMPTS,
+  processWeeklyReflectionGenerationMessage,
+} from "../handler/weekly-reflection-generation";
 import { processLineWebhook } from "./feature/line";
 
 /** max_retries = 3では初回と3回の再試行を合わせて4 attemptsになる。 */
@@ -44,6 +49,7 @@ const MAX_ATTEMPTS_BY_FLOW: Record<FlowKey, number | undefined> = {
   "diary-brain-checkpoint": DIARY_BRAIN_CHECKPOINT_MAX_ATTEMPTS,
   "brain-vector-sync": 6,
   "profile-summary-generation": PROFILE_SUMMARY_GENERATION_MAX_ATTEMPTS,
+  "weekly-reflection-generation": WEEKLY_REFLECTION_MAX_ATTEMPTS,
   "daily-prompt": DAILY_PROMPT_MAX_ATTEMPTS,
   billing: BILLING_QUEUE_MAX_ATTEMPTS,
   "queue-dispatch": undefined,
@@ -57,6 +63,7 @@ function flowOf(
     | DiaryBrainCheckpointQueueMessage
     | BrainVectorSyncQueueMessage
     | ProfileSummaryGenerationQueueMessage
+    | WeeklyReflectionGenerationQueueMessage
     | DailyPromptQueueMessage
     | BillingQueueMessage,
 ): FlowKey {
@@ -65,6 +72,7 @@ function flowOf(
   if (body.type === "diary-brain-checkpoint") return "diary-brain-checkpoint";
   if (body.type === "brain-vector-sync") return "brain-vector-sync";
   if (body.type === "profile-summary-generation") return "profile-summary-generation";
+  if (body.type === "weekly-reflection-generation") return "weekly-reflection-generation";
   if (body.type === "daily-prompt") return "daily-prompt";
   if (body.type === "billing-event") return "billing";
   return "queue-dispatch";
@@ -185,6 +193,7 @@ export async function handleQueueBatch(
     | DiaryBrainCheckpointQueueMessage
     | BrainVectorSyncQueueMessage
     | ProfileSummaryGenerationQueueMessage
+    | WeeklyReflectionGenerationQueueMessage
     | DailyPromptQueueMessage
     | BillingQueueMessage
   >,
@@ -226,6 +235,13 @@ export async function handleQueueBatch(
         if (!cf || !workerConfig) throw new Error("Profile Summary bindings are not configured");
         await processProfileSummaryGenerationMessage(
           message as Message<ProfileSummaryGenerationQueueMessage>,
+          cf,
+          workerConfig,
+        );
+      } else if ("type" in message.body && message.body.type === "weekly-reflection-generation") {
+        if (!cf || !workerConfig) throw new Error("Weekly reflection bindings are not configured");
+        await processWeeklyReflectionGenerationMessage(
+          message as Message<WeeklyReflectionGenerationQueueMessage>,
           cf,
           workerConfig,
         );

@@ -10,7 +10,7 @@ import {
 export type GeminiUsageRecordInput = {
   responseId: string;
   accountId: string;
-  operation: "diary_chat" | "diary_brain" | "profile_summary";
+  operation: "diary_chat" | "diary_brain" | "profile_summary" | "weekly_reflection";
   model: string;
   promptTokenCount: number;
   candidatesTokenCount: number;

@@ -1,4 +1,8 @@
-import { type CompleteProfileSummaryGenerationInput, DO } from "@me-builder/lib";
+import {
+  type CompleteProfileSummaryGenerationInput,
+  type CompleteWeeklyReflectionGenerationInput,
+  DO,
+} from "@me-builder/lib";
 
 /** Profile Summary generation and immutable version operations owned by one AccountData Object. */
 export const profileSummaryActions = {
@@ -89,6 +93,73 @@ export const profileSummaryActions = {
     failedAt?: Date,
   ) =>
     DO.account.action.profileSummary.failProfileSummaryGeneration(
+      db,
+      accountId,
+      generationId,
+      message,
+      failedAt,
+    ),
+  "weeklyReflection.read": (db: DO.account.Database, accountId: string, at?: Date) =>
+    DO.account.action.weeklyReflection.readWeeklyReflections(db, accountId, at),
+  "weeklyReflection.requestGeneration": (
+    db: DO.account.Database,
+    accountId: string,
+    requestedAt?: Date,
+  ) =>
+    DO.account.action.weeklyReflection.requestWeeklyReflectionGeneration(
+      db,
+      accountId,
+      requestedAt,
+    ),
+  "weeklyReflection.listUndispatchedGenerationIds": (
+    db: DO.account.Database,
+    accountId: string,
+    at?: Date,
+    limit?: number,
+  ) =>
+    DO.account.action.weeklyReflection.listUndispatchedWeeklyReflectionGenerationIds(
+      db,
+      accountId,
+      at,
+      limit,
+    ),
+  "weeklyReflection.markGenerationDispatched": (
+    db: DO.account.Database,
+    accountId: string,
+    generationId: string,
+    dispatchedAt?: Date,
+  ) =>
+    DO.account.action.weeklyReflection.markWeeklyReflectionGenerationDispatched(
+      db,
+      accountId,
+      generationId,
+      dispatchedAt,
+    ),
+  "weeklyReflection.loadGenerationContext": (
+    db: DO.account.Database,
+    accountId: string,
+    generationId: string,
+    startedAt?: Date,
+  ) =>
+    DO.account.action.weeklyReflection.loadWeeklyReflectionGenerationContext(
+      db,
+      accountId,
+      generationId,
+      startedAt,
+    ),
+  "weeklyReflection.completeGeneration": (
+    db: DO.account.Database,
+    accountId: string,
+    input: CompleteWeeklyReflectionGenerationInput,
+  ) => DO.account.action.weeklyReflection.completeWeeklyReflectionGeneration(db, accountId, input),
+  "weeklyReflection.failGeneration": (
+    db: DO.account.Database,
+    accountId: string,
+    generationId: string,
+    message: string,
+    failedAt?: Date,
+  ) =>
+    DO.account.action.weeklyReflection.failWeeklyReflectionGeneration(
       db,
       accountId,
       generationId,
