@@ -64,6 +64,7 @@
 | [診断seed運用](../docs/development/diagnosis-seed.md) | Question、Question Version、Choice、DiagnosisをD1へ登録するseedの配置、実行、更新、検証方法 |
 | [診断サムネイル生成](../docs/development/diagnosis-thumbnail-generation.md) | 診断一覧用サムネイルの生成プロンプト、共通スタイル、配置手順 |
 | [LINEリッチメニュー運用](../docs/development/line-rich-menu.md) | Messaging APIによるリッチメニューの登録、画像更新、CD運用 |
+| [Stripe課金環境の同期運用](../docs/development/stripe-billing-setup.md) | Product・Price・Webhook・Customer PortalとCloudflare secretをDashboard操作なしで同期する運用 |
 | [診断API契約](../docs/development/diagnosis-api.md) | Web UIとAPI Server間の診断APIのパス、認証、入出力、エラー契約 |
 | [プロフィールAPI契約](../docs/development/profile-api.md) | 本人プロフィール、アバター画像、うつしレベル進行度のAPI契約と保存境界 |
 | [開発用AccountデータリセットAPI契約](../docs/development/development-account-data-reset-api.md) | 開発環境で本人の個人コンテンツを初期化するAPI、削除対象、維持対象、Vector削除、プロフィール画面の操作 |

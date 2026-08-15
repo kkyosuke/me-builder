@@ -125,7 +125,12 @@ export async function postBillingReconciliation(c: Context<AppEnv>): Promise<Res
     lineLoginChannelId: config.lineLoginChannelId,
     adminLineUserIds: config.adminLineUserIds,
     db: D1.shared.client.create(c.env.DB),
-    provider: billing.createStripeBillingProvider({ secretKey: config.stripeSecretKey }),
+    provider: billing.createStripeBillingProvider({
+      secretKey: config.stripeSecretKey,
+      ...(config.stripePortalConfigurationId
+        ? { portalConfigurationId: config.stripePortalConfigurationId }
+        : {}),
+    }),
     accountId: parsed.output.accountId,
     mode: parsed.output.mode,
     pricePlanMap: config.billingPricePlanMap,

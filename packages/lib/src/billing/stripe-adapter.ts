@@ -12,6 +12,7 @@ export const STRIPE_API_VERSION = "2026-07-29.dahlia" as const;
 
 export function createStripeBillingProvider(input: {
   secretKey: string;
+  portalConfigurationId?: string;
   timeoutMs?: number;
   maxNetworkRetries?: number;
 }): BillingProvider {
@@ -22,11 +23,17 @@ export function createStripeBillingProvider(input: {
     maxNetworkRetries: input.maxNetworkRetries ?? 2,
     telemetry: false,
   });
-  return new StripeBillingProvider(stripe);
+  return new StripeBillingProvider(
+    stripe,
+    input.portalConfigurationId ? { portalConfigurationId: input.portalConfigurationId } : {},
+  );
 }
 
 export class StripeBillingProvider implements BillingProvider {
-  constructor(private readonly stripe: Stripe) {}
+  constructor(
+    private readonly stripe: Stripe,
+    private readonly options: { portalConfigurationId?: string } = {},
+  ) {}
 
   async createCustomer(input: { accountId: string }, idempotencyKey: string) {
     return this.call(async () => {
@@ -70,6 +77,9 @@ export class StripeBillingProvider implements BillingProvider {
       const session = await this.stripe.billingPortal.sessions.create({
         customer: input.customerId,
         return_url: input.returnUrl,
+        ...(this.options.portalConfigurationId
+          ? { configuration: this.options.portalConfigurationId }
+          : {}),
       });
       return { url: session.url };
     });

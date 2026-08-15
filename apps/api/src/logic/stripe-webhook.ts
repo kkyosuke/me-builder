@@ -2,14 +2,7 @@ import { billing } from "@me-builder/lib";
 import type { BillingQueueMessage, Queue } from "@me-builder/shared";
 import { logger } from "@me-builder/shared";
 
-const ACCEPTED_STRIPE_EVENT_TYPES = new Set([
-  "customer.subscription.created",
-  "customer.subscription.updated",
-  "customer.subscription.deleted",
-  "customer.subscription.trial_will_end",
-  "invoice.paid",
-  "invoice.payment_failed",
-]);
+const ACCEPTED_STRIPE_EVENT_TYPES = new Set<string>(billing.STRIPE_BILLING_EVENT_TYPES);
 
 export type StripeWebhookOutcome =
   | { type: "accepted"; queued: true; eventId: string }

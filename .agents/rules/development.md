@@ -42,6 +42,8 @@
     - `list-metadata-index`が返す`indexType`は、Cloudflare SDKの型宣言が`'string' | 'number' | 'boolean'`であるのに対し、実際のAPIは`String`のように**先頭を大文字にして返します**。比較するときは大文字小文字を無視してください
     - `task access:setup:preview`: プレビュー環境のOpenAPI documentとSwagger UI用パスをCloudflare Accessで保護
     - `task access:setup:production`: 本番環境のOpenAPI documentとSwagger UI用パスをCloudflare Accessで保護
+    - `task stripe:setup:preview`: Stripe test modeの商品catalog、Webhook、Customer PortalとCloudflare secretを冪等に同期
+    - `task stripe:setup:production`: 明示確認付きでStripe live modeの商品catalog、Webhook、Customer PortalとCloudflare secretを冪等に同期
     - `bun --cwd apps/worker do:generate`: AccountDataのmigrationを`packages/lib/drizzle-do-account/`へ、ConversationCoordinatorとCompatibilityDataのmigrationを`apps/worker/drizzle/<durable-object>/`へ生成
     - `task db:seed:local`: ローカルD1へ診断seedを適用
     - `task db:seed:preview`: プレビューD1へ診断seedを適用

@@ -81,6 +81,7 @@ export function getConfig(env?: Record<string, unknown>): ApiConfig {
     billingQueue: rawBillingQueue,
     stripeSecretKey: getEnv("STRIPE_SECRET_KEY", env),
     stripeWebhookSecret: getEnv("STRIPE_WEBHOOK_SECRET", env),
+    stripePortalConfigurationId: getEnv("STRIPE_PORTAL_CONFIGURATION_ID", env),
     billingPricePlanMap: parseBillingPricePlanMap(getEnv("BILLING_PRICE_PLAN_MAP", env)),
     liffId: liffConfiguration.liffId,
     lineLoginChannelId: liffConfiguration.lineLoginChannelId,

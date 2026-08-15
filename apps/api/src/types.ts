@@ -33,6 +33,7 @@ type Env = Omit<
   LINE_LOGIN_CHANNEL_ID?: string;
   STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
+  STRIPE_PORTAL_CONFIGURATION_ID?: string;
   BILLING_PRICE_PLAN_MAP?: string;
   ADMIN_LINE_USER_IDS?: string;
   BASE_URL?: string;
