@@ -801,7 +801,7 @@ export async function readUtsushiProgression(
         ),
       )
       .orderBy(desc(progressionMilestones.level))
-      .limit(3)
+      .limit(4)
       .all(),
   ]);
   const growthValue = totals.growthValue;
@@ -842,7 +842,7 @@ export async function readUtsushiProgression(
   const milestoneCards = [
     ...(newMilestone ? [newMilestone] : []),
     ...savedMilestones.filter(({ level: savedLevel }) => savedLevel !== newMilestone?.level),
-  ].slice(0, 3);
+  ].slice(0, 4);
   return {
     level,
     growthValue,
@@ -866,11 +866,18 @@ export async function readUtsushiProgression(
         ? [{ kind, growthDelta: event.growthDelta, occurredAt: event.occurredAt.toISOString() }]
         : [];
     }),
-    milestoneCards: milestoneCards.map((milestone) => ({
-      level: milestone.level,
-      reachedAt: milestone.reachedAt.toISOString(),
-      collectedPiecesDelta: milestone.collectedPiecesDelta,
-      categories: readStringArray(milestone.categoriesJson),
-    })),
+    milestoneCards: milestoneCards.slice(0, 3).map((milestone, index) => {
+      const previousCategories = new Set(
+        readStringArray(milestoneCards[index + 1]?.categoriesJson ?? "[]"),
+      );
+      return {
+        level: milestone.level,
+        reachedAt: milestone.reachedAt.toISOString(),
+        collectedPiecesDelta: milestone.collectedPiecesDelta,
+        categories: readStringArray(milestone.categoriesJson).filter(
+          (category) => !previousCategories.has(category),
+        ),
+      };
+    }),
   };
 }

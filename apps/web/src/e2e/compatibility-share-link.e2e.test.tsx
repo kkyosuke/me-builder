@@ -176,6 +176,10 @@ describe("LIFF compatibility share link journey", () => {
       window.dispatchEvent(new PopStateEvent("popstate"));
     });
     expect(await screen.findByRole("heading", { name: "2人の相性シート" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "ふたり Lv.2" })).toBeTruthy();
+    expect(screen.getByRole("list", { name: "獲得したふたりのしるし" }).textContent).toContain(
+      "Lv.2",
+    );
     expect(screen.getAllByRole("heading", { name: "あおいさんについて" })).toHaveLength(1);
     expect(screen.getAllByText("共有プロフィール生成日時")).toHaveLength(2);
     expect(screen.getAllByText(/2026年8月12日/)).toHaveLength(2);
