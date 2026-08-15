@@ -55,6 +55,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/admin/accounts": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** 名前と成長projectionを含むAccount一覧を取得する */
+    get: operations["listAdminAccounts"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/profile-summary": {
     parameters: {
       query?: never;
@@ -704,6 +721,135 @@ export interface operations {
                   /** @enum {string} */
                   reason: "not-configured" | "upstream-error";
                 };
+          };
+        };
+      };
+      /** @description LIFF IDトークンを検証できない */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Unauthorized";
+          };
+        };
+      };
+      /** @description 管理者権限がない */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Forbidden";
+          };
+        };
+      };
+      /** @description 対応するAccountが存在しない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Account not found";
+            /** @constant */
+            reason: "friendship_required";
+          };
+        };
+      };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
+          };
+        };
+      };
+      /** @description D1 bindingが設定されていない */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Service Unavailable";
+          };
+        };
+      };
+    };
+  };
+  listAdminAccounts: {
+    parameters: {
+      query?: {
+        query?: string;
+        role?: "user" | "admin";
+        status?: "active";
+        sort?: "created" | "level" | "pieces" | "growth";
+        cursor?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 管理者向けAccount一覧 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            accounts: {
+              id: string;
+              displayName: string | null;
+              /** @enum {string} */
+              role: "user" | "admin";
+              /** @constant */
+              status: "active";
+              /** Format: date-time */
+              createdAt: string;
+              progression:
+                | {
+                    /** @constant */
+                    status: "pending";
+                  }
+                | {
+                    /** @constant */
+                    status: "ready";
+                    level: number;
+                    calculationVersion: number;
+                    collectedPieces: number;
+                    activePieces: number;
+                    lastGrowthAt: string | null;
+                    /** Format: date-time */
+                    projectedAt: string;
+                  };
+            }[];
+            total: number;
+            nextCursor: string | null;
+          };
+        };
+      };
+      /** @description 検索条件またはcursorが不正 */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Invalid request";
           };
         };
       };

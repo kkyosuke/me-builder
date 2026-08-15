@@ -45,6 +45,44 @@ describe("AccountData compatibility projection reconciliation", () => {
   });
 });
 
+describe("AccountData progression projection", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("確定した本人進行度だけを共有D1へ同期する", async () => {
+    const progression = {
+      level: 2,
+      growthValue: 7,
+      currentLevelThreshold: 5,
+      nextLevelThreshold: 20,
+      collectedPieces: 2,
+      activePieces: 2,
+      categoryCount: 2,
+    };
+    const shared = {} as D1.shared.Client;
+    vi.spyOn(D1.shared.client, "create").mockReturnValue(shared);
+    const upsert = vi
+      .spyOn(D1.shared.action.adminAccount, "upsertAccountProgressionProjection")
+      .mockResolvedValue();
+    const removeRetryMarker = vi.fn().mockResolvedValue(undefined);
+    const instance = Object.create(AccountData.prototype) as AccountData;
+    Object.assign(instance as unknown as Record<string, unknown>, {
+      accountId: "account-1",
+      repository: { client: {} },
+      ctx: { storage: { delete: removeRetryMarker } },
+      env: { DB: {} },
+    });
+
+    await (
+      instance as unknown as {
+        syncProgressionProjection(value: typeof progression): Promise<void>;
+      }
+    ).syncProgressionProjection(progression);
+
+    expect(upsert).toHaveBeenCalledWith(shared, "account-1", progression, expect.any(Date));
+    expect(removeRetryMarker).toHaveBeenCalledWith("progressionProjectionPending");
+  });
+});
+
 describe("AccountData alarm", () => {
   beforeEach(() => {
     vi.spyOn(
@@ -88,7 +126,7 @@ describe("AccountData alarm", () => {
       accountId: "account-1",
       operationTail: Promise.resolve(),
       repository: { client: {}, nextMaintenanceAt: () => null },
-      ctx: { storage: {} },
+      ctx: { storage: { get: vi.fn().mockResolvedValue(false) } },
       env: { PROFILE_SUMMARY_QUEUE: { send } },
     });
 
@@ -132,7 +170,7 @@ describe("AccountData alarm", () => {
         client: {},
         nextMaintenanceAt: () => nextAttemptAt,
       },
-      ctx: { storage: { setAlarm } },
+      ctx: { storage: { get: vi.fn().mockResolvedValue(false), setAlarm } },
       env: {
         CHAT_TURN_QUEUE: { send: chatTurnSend },
         BRAIN_CHECKPOINT_QUEUE: {
@@ -194,7 +232,7 @@ describe("AccountData alarm", () => {
       accountId: "account-1",
       operationTail: Promise.resolve(),
       repository: { client: {}, nextMaintenanceAt: () => null },
-      ctx: { storage: {} },
+      ctx: { storage: { get: vi.fn().mockResolvedValue(false) } },
       env: {},
     });
 
@@ -247,7 +285,7 @@ describe("AccountData alarm", () => {
       accountId: "account-1",
       operationTail: Promise.resolve(),
       repository: { client: {}, nextMaintenanceAt: () => null },
-      ctx: { storage: {} },
+      ctx: { storage: { get: vi.fn().mockResolvedValue(false) } },
       env: {},
     });
 

@@ -1,9 +1,8 @@
 import { AlertCircle, ChevronLeft, ChevronRight, RefreshCw, Search, Users } from "lucide-react";
-import { useMemo, useState } from "react";
 import { SkeletonBlock, SkeletonLoader } from "../../../components/skeleton";
 import type { AsyncState } from "../../../model/async-state";
-import type { AdminAccount, AdminAccountPage } from "../model/account";
-import { AdminPreviewNavigation } from "./admin-preview-navigation";
+import type { AdminAccount, AdminAccountFilters, AdminAccountPage } from "../model/account";
+import { AdminNavigation } from "./admin-navigation";
 
 const number = new Intl.NumberFormat("ja-JP");
 const date = new Intl.DateTimeFormat("ja-JP", { year: "numeric", month: "short", day: "numeric" });
@@ -206,41 +205,28 @@ function AccountsSkeleton() {
 
 export function AdminAccountsScreen({
   state,
+  filters,
+  isRefreshing = false,
+  pageNumber = 1,
+  canGoBack = false,
   onReload,
-}: { state: AsyncState<AdminAccountPage>; onReload: () => void }) {
-  const [query, setQuery] = useState("");
-  const [role, setRole] = useState<"all" | AdminAccount["role"]>("all");
-  const [status, setStatus] = useState<"all" | AdminAccount["status"]>("all");
-  const [sort, setSort] = useState<"created" | "level" | "pieces" | "growth">("created");
-
-  const filteredAccounts = useMemo(() => {
-    if (state.status !== "success") return [];
-    const normalized = query.trim().toLocaleLowerCase("ja-JP");
-    const accounts = state.data.accounts.filter((account) => {
-      const matchesQuery =
-        normalized.length === 0 ||
-        account.id === query.trim() ||
-        account.displayName?.toLocaleLowerCase("ja-JP").includes(normalized);
-      return (
-        matchesQuery &&
-        (role === "all" || account.role === role) &&
-        (status === "all" || account.status === status)
-      );
-    });
-    return [...accounts].sort((left, right) => {
-      if (sort === "created") return right.createdAt.localeCompare(left.createdAt);
-      const leftProgression = left.progression.status === "ready" ? left.progression : null;
-      const rightProgression = right.progression.status === "ready" ? right.progression : null;
-      if (sort === "level") return (rightProgression?.level ?? -1) - (leftProgression?.level ?? -1);
-      if (sort === "pieces") {
-        return (rightProgression?.collectedPieces ?? -1) - (leftProgression?.collectedPieces ?? -1);
-      }
-      return (rightProgression?.lastGrowthAt ?? "").localeCompare(
-        leftProgression?.lastGrowthAt ?? "",
-      );
-    });
-  }, [query, role, sort, state, status]);
-
+  onFilterChange,
+  onNextPage,
+  onPreviousPage,
+}: {
+  state: AsyncState<AdminAccountPage>;
+  filters: AdminAccountFilters;
+  isRefreshing?: boolean;
+  pageNumber?: number;
+  canGoBack?: boolean;
+  onReload: () => void;
+  onFilterChange: <TKey extends keyof AdminAccountFilters>(
+    key: TKey,
+    value: AdminAccountFilters[TKey],
+  ) => void;
+  onNextPage: () => void;
+  onPreviousPage: () => void;
+}) {
   if (state.status === "idle" || state.status === "loading") return <AccountsSkeleton />;
   if (state.status === "error") {
     return (
@@ -262,9 +248,6 @@ export function AdminAccountsScreen({
     <main className="mx-auto min-h-dvh w-full min-w-0 max-w-6xl px-4 py-12 sm:px-8">
       <header>
         <p className="text-sm font-medium text-violet-600 dark:text-violet-400">Admin</p>
-        <p className="mt-2 inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-900 dark:bg-amber-950 dark:text-amber-200">
-          UIプレビュー用のサンプルデータです
-        </p>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-3xl font-bold">管理者ダッシュボード</h1>
@@ -275,13 +258,18 @@ export function AdminAccountsScreen({
           <button
             type="button"
             onClick={onReload}
+            disabled={isRefreshing}
+            aria-label={isRefreshing ? "Account一覧を更新中" : undefined}
             className="flex items-center gap-2 rounded-full border border-slate-300 px-4 py-2 text-sm dark:border-slate-600"
           >
-            <RefreshCw className="size-4" aria-hidden="true" />
-            更新
+            <RefreshCw
+              className={`size-4 ${isRefreshing ? "animate-spin" : ""}`}
+              aria-hidden="true"
+            />
+            {isRefreshing ? "更新中..." : "更新"}
           </button>
         </div>
-        <AdminPreviewNavigation current="accounts" />
+        <AdminNavigation current="accounts" />
       </header>
 
       <section aria-labelledby="accounts-heading" className="mt-6">
@@ -292,7 +280,7 @@ export function AdminAccountsScreen({
               Account
             </h2>
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              全 {number.format(state.data.total)} Account
+              該当 {number.format(state.data.total)} Account
             </p>
           </div>
         </div>
@@ -306,8 +294,8 @@ export function AdminAccountsScreen({
             />
             <input
               type="search"
-              value={query}
-              onChange={(event) => setQuery(event.currentTarget.value)}
+              value={filters.query}
+              onChange={(event) => onFilterChange("query", event.currentTarget.value)}
               placeholder="名前・Account IDを検索"
               className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pr-3 pl-9 text-sm dark:border-slate-600 dark:bg-slate-900"
             />
@@ -315,8 +303,10 @@ export function AdminAccountsScreen({
           <label>
             <span className="sr-only">statusで絞り込み</span>
             <select
-              value={status}
-              onChange={(event) => setStatus(event.currentTarget.value as typeof status)}
+              value={filters.status}
+              onChange={(event) =>
+                onFilterChange("status", event.currentTarget.value as AdminAccountFilters["status"])
+              }
               className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-900"
             >
               <option value="all">すべてのstatus</option>
@@ -326,8 +316,10 @@ export function AdminAccountsScreen({
           <label>
             <span className="sr-only">roleで絞り込み</span>
             <select
-              value={role}
-              onChange={(event) => setRole(event.currentTarget.value as typeof role)}
+              value={filters.role}
+              onChange={(event) =>
+                onFilterChange("role", event.currentTarget.value as AdminAccountFilters["role"])
+              }
               className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-900"
             >
               <option value="all">すべてのrole</option>
@@ -338,8 +330,10 @@ export function AdminAccountsScreen({
           <label>
             <span className="sr-only">並べ替え</span>
             <select
-              value={sort}
-              onChange={(event) => setSort(event.currentTarget.value as typeof sort)}
+              value={filters.sort}
+              onChange={(event) =>
+                onFilterChange("sort", event.currentTarget.value as AdminAccountFilters["sort"])
+              }
               className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-900"
             >
               <option value="created">登録日が新しい順</option>
@@ -351,7 +345,7 @@ export function AdminAccountsScreen({
         </div>
 
         <div className="mt-4">
-          {filteredAccounts.length === 0 ? (
+          {state.data.accounts.length === 0 ? (
             <div className="rounded-3xl border border-dashed border-slate-300 p-10 text-center dark:border-slate-700">
               <p className="font-semibold">条件に一致するAccountはありません</p>
               <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
@@ -360,8 +354,8 @@ export function AdminAccountsScreen({
             </div>
           ) : (
             <>
-              <AccountCards accounts={filteredAccounts} />
-              <AccountTable accounts={filteredAccounts} />
+              <AccountCards accounts={state.data.accounts} />
+              <AccountTable accounts={state.data.accounts} />
             </>
           )}
         </div>
@@ -369,16 +363,18 @@ export function AdminAccountsScreen({
         <nav aria-label="Account一覧のページ" className="mt-5 flex items-center justify-end gap-2">
           <button
             type="button"
-            disabled
+            disabled={!canGoBack || isRefreshing}
+            onClick={onPreviousPage}
             className="rounded-full border border-slate-300 p-2 disabled:opacity-40 dark:border-slate-600"
             aria-label="前のページ"
           >
             <ChevronLeft className="size-4" aria-hidden="true" />
           </button>
-          <span className="px-2 text-sm tabular-nums">1</span>
+          <span className="px-2 text-sm tabular-nums">{number.format(pageNumber)}</span>
           <button
             type="button"
-            disabled={!state.data.nextCursor}
+            disabled={!state.data.nextCursor || isRefreshing}
+            onClick={onNextPage}
             className="rounded-full border border-slate-300 p-2 disabled:opacity-40 dark:border-slate-600"
             aria-label="次のページ"
           >

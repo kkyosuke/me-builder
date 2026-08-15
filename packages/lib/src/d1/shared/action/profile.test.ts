@@ -1,11 +1,17 @@
 import path from "node:path";
 import Database from "better-sqlite3";
+import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { describe, expect, it } from "vitest";
 import type { SharedD1Client } from "../client";
 import * as schema from "../schema";
-import { clearProfileAvatar, getProfileAvatar, setProfileAvatar } from "./profile";
+import {
+  clearProfileAvatar,
+  getProfileAvatar,
+  saveVerifiedDisplayName,
+  setProfileAvatar,
+} from "./profile";
 
 function createTestDb(): SharedD1Client {
   const sqlite = new Database(":memory:");
@@ -119,5 +125,37 @@ describe("Shared D1 account profile avatar", () => {
         objectKey: "accounts/missing-account/profile/avatar/hash.webp",
       }),
     ).rejects.toThrow(/FOREIGN KEY constraint failed/);
+  });
+});
+
+describe("Shared D1 verified display name", () => {
+  it("検証済み表示名をtrimして保存し、同じ値では更新日時を動かさない", async () => {
+    const db = createTestDb();
+    await createAccount(db);
+    const firstAt = new Date("2026-08-15T01:00:00.000Z");
+    await saveVerifiedDisplayName(db, "account-1", "  山田 花子  ", firstAt);
+    await saveVerifiedDisplayName(
+      db,
+      "account-1",
+      "山田 花子",
+      new Date("2026-08-15T02:00:00.000Z"),
+    );
+
+    expect(
+      await db
+        .select()
+        .from(schema.accountProfiles)
+        .where(eq(schema.accountProfiles.accountId, "account-1"))
+        .get(),
+    ).toMatchObject({ displayName: "山田 花子", displayNameUpdatedAt: firstAt });
+  });
+
+  it("表示名の更新でも現在のアバターを維持する", async () => {
+    const db = createTestDb();
+    await createAccount(db);
+    await setProfileAvatar(db, "account-1", avatar);
+    await saveVerifiedDisplayName(db, "account-1", "山田 花子");
+
+    await expect(getProfileAvatar(db, "account-1")).resolves.toEqual(avatar);
   });
 });

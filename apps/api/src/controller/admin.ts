@@ -3,6 +3,11 @@ import { logger } from "@me-builder/shared";
 import type { Context } from "hono";
 import * as v from "valibot";
 import { getConfig } from "../config";
+import {
+  AdminAccountsQuerySchema,
+  AdminAccountsResponseSchema,
+  InvalidAdminAccountsRequestSchema,
+} from "../contract/admin/accounts";
 import { AdminStatisticsResponseSchema } from "../contract/admin/statistics";
 import {
   AccountNotFoundErrorSchema,
@@ -10,9 +15,55 @@ import {
   ServiceUnavailableErrorSchema,
   UnauthorizedErrorSchema,
 } from "../contract/shared/errors";
+import { getAdminAccounts } from "../logic/admin-accounts";
 import { getAdminStatistics } from "../logic/admin-statistics";
 import type { AppEnv } from "../types";
 import { bearerToken } from "./auth";
+
+export async function getAccounts(c: Context<AppEnv>): Promise<Response> {
+  if (!c.env?.DB) {
+    logger.error({ path: c.req.path }, "DB binding is not configured");
+    return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
+  }
+  const parsed = v.safeParse(AdminAccountsQuerySchema, c.req.query());
+  if (!parsed.success) {
+    return c.json(v.parse(InvalidAdminAccountsRequestSchema, { error: "Invalid request" }), 400);
+  }
+  const config = getConfig(c.env);
+  const outcome = await getAdminAccounts({
+    idToken: bearerToken(c.req.header("authorization")),
+    lineLoginChannelId: config.lineLoginChannelId,
+    adminLineUserIds: config.adminLineUserIds,
+    db: D1.shared.client.create(c.env.DB),
+    input: {
+      ...(parsed.output.query !== undefined ? { query: parsed.output.query } : {}),
+      ...(parsed.output.role !== undefined ? { role: parsed.output.role } : {}),
+      ...(parsed.output.status !== undefined ? { status: parsed.output.status } : {}),
+      ...(parsed.output.sort !== undefined ? { sort: parsed.output.sort } : {}),
+      ...(parsed.output.cursor !== undefined ? { cursor: parsed.output.cursor } : {}),
+    },
+  });
+  switch (outcome.type) {
+    case "resolved":
+      c.header("Cache-Control", "no-store");
+      return c.json(v.parse(AdminAccountsResponseSchema, outcome.page));
+    case "invalid-request":
+      return c.json(v.parse(InvalidAdminAccountsRequestSchema, { error: "Invalid request" }), 400);
+    case "forbidden":
+      return c.json(v.parse(ForbiddenErrorSchema, { error: "Forbidden" }), 403);
+    case "account-not-found":
+      return c.json(
+        v.parse(AccountNotFoundErrorSchema, {
+          error: "Account not found",
+          reason: "friendship_required",
+        }),
+        404,
+      );
+    case "not-configured":
+    case "unauthenticated":
+      return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
+  }
+}
 
 export async function getStatistics(c: Context<AppEnv>): Promise<Response> {
   if (!c.env?.DB) {

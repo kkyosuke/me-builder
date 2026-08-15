@@ -10,6 +10,7 @@ import { openAPIRouteHandler } from "hono-openapi";
 import { cors } from "hono/cors";
 import * as v from "valibot";
 import { getConfig } from "./config";
+import { adminAccountsRoute } from "./contract/admin/accounts";
 import { adminStatisticsRoute } from "./contract/admin/statistics";
 import { developmentBrainItemsRoute, developmentBrainVectorRoute } from "./contract/brain/dev-list";
 import {
@@ -51,7 +52,7 @@ import {
 import { profileProgressionRoute } from "./contract/profile/progression";
 import { profileSummaryGenerationRoute, profileSummaryRoute } from "./contract/profile/summary";
 import { InternalServerErrorSchema } from "./contract/shared/errors";
-import { getStatistics } from "./controller/admin";
+import { getAccounts, getStatistics } from "./controller/admin";
 import {
   getDevelopmentBrainItems,
   getDevelopmentBrainVector,
@@ -175,6 +176,7 @@ app.put(
 );
 
 app.get("/api/admin/statistics", adminStatisticsRoute, getStatistics);
+app.get("/api/admin/accounts", adminAccountsRoute, getAccounts);
 
 app.get("/api/profile-summary", profileSummaryRoute, getProfileSummaryContents);
 app.post(

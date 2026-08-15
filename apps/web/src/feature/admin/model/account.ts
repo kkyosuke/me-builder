@@ -24,3 +24,10 @@ export type AdminAccountPage = Readonly<{
   total: number;
   nextCursor: string | null;
 }>;
+
+export type AdminAccountFilters = Readonly<{
+  query: string;
+  role: "all" | AdminAccount["role"];
+  status: "all" | AdminAccount["status"];
+  sort: "created" | "level" | "pieces" | "growth";
+}>;
