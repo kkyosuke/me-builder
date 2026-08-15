@@ -17,6 +17,7 @@ import {
 import { adminAccountsRoute } from "./contract/admin/accounts";
 import { adminBillingReconciliationRoute } from "./contract/admin/billing-reconciliation";
 import { adminStatisticsRoute } from "./contract/admin/statistics";
+import { billingCheckoutSessionRoute } from "./contract/billing/sessions";
 import { developmentBrainItemsRoute, developmentBrainVectorRoute } from "./contract/brain/dev-list";
 import {
   developmentFailedBrainVectorSyncJobsRoute,
@@ -63,7 +64,7 @@ import {
   postAccountRecoveryComplete,
 } from "./controller/account-recovery";
 import { getAccounts, getStatistics, postBillingReconciliation } from "./controller/admin";
-import { postStripeWebhook } from "./controller/billing";
+import { postBillingCheckoutSession, postStripeWebhook } from "./controller/billing";
 import {
   getDevelopmentBrainItems,
   getDevelopmentBrainVector,
@@ -188,6 +189,7 @@ app.post(
   accountRecoveryCompleteRoute,
   postAccountRecoveryComplete,
 );
+app.post("/api/billing/checkout-sessions", billingCheckoutSessionRoute, postBillingCheckoutSession);
 
 app.get("/api/legal/terms", getServiceTermsRoute, getServiceTermsContents);
 app.get(

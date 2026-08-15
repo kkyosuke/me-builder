@@ -45,6 +45,8 @@ export interface BillingProvider {
     idempotencyKey: string,
   ): Promise<{ id: string; url: string }>;
   createPortalSession(input: { customerId: string; returnUrl: string }): Promise<{ url: string }>;
+  findPriceIdByLookupKey(lookupKey: string): Promise<string | null>;
+  hasOpenCheckoutSession(customerId: string): Promise<boolean>;
   retrieveCustomer(customerId: string): Promise<BillingCustomer>;
   retrieveSubscription(subscriptionId: string): Promise<BillingSubscription>;
   listSubscriptions(customerId: string): Promise<readonly BillingSubscription[]>;
