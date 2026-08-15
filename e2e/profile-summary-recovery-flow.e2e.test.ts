@@ -76,6 +76,7 @@ async function prepareAccount(db: LocalD1["database"]): Promise<void> {
       )
       .bind("identity-summary-recovery-e2e", timestamp, timestamp, accountId, lineId),
   ]);
+  await D1.shared.action.agreement.acceptCurrentTerms(D1.shared.client.create(db), accountId);
 }
 
 async function insertDiaryMessage(): Promise<void> {

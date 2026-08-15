@@ -1,7 +1,7 @@
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import type { D1Database } from "@cloudflare/workers-types";
-import { DO } from "@me-builder/lib";
+import { D1, DO } from "@me-builder/lib";
 import { eq } from "drizzle-orm";
 import { Miniflare } from "miniflare";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -50,6 +50,7 @@ async function prepareAccount(db: D1Database): Promise<void> {
       )
       .bind("identity-progression-e2e", timestamp, timestamp, accountId, "line-progression-e2e"),
   ]);
+  await D1.shared.action.agreement.acceptCurrentTerms(D1.shared.client.create(db), accountId);
 }
 
 function mockLineVerification(): void {

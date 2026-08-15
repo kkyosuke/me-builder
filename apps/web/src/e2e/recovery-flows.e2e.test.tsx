@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { currentServiceTerms } from "@me-builder/shared";
 import { cleanup, configure, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "../App";
@@ -33,6 +34,15 @@ const progression = {
   collectedPieces: 2,
   activePieces: 2,
   categoryCount: 2,
+};
+const acceptedTermsStatus = {
+  document: currentServiceTerms,
+  acceptance: {
+    required: false,
+    acceptedVersion: currentServiceTerms.version,
+    documentHash: currentServiceTerms.contentHash,
+    acceptedAt: "2026-08-15T01:23:45.000Z",
+  },
 };
 const diagnosisList = {
   diagnoses: [
@@ -152,6 +162,7 @@ describe("Web recovery flows E2E", () => {
     let resultRequests = 0;
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = urlOf(input);
+      if (url.pathname === "/api/legal/terms") return Response.json(acceptedTermsStatus);
       if (url.pathname === "/api/profile") return Response.json(accountProfile);
       if (url.pathname === "/api/diagnoses") return Response.json(diagnosisList);
       if (url.pathname === "/api/diagnoses/diagnosis-1/answers") {
@@ -207,6 +218,7 @@ describe("Web recovery flows E2E", () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = urlOf(input);
       const method = init?.method ?? "GET";
+      if (url.pathname === "/api/legal/terms") return Response.json(acceptedTermsStatus);
       if (url.pathname === "/api/profile") return Response.json(accountProfile);
       if (url.pathname === "/api/profile/progression") return Response.json(progression);
       if (url.pathname === "/api/profile-summary" && method === "GET") {
@@ -244,6 +256,7 @@ describe("Web recovery flows E2E", () => {
     });
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = urlOf(input);
+      if (url.pathname === "/api/legal/terms") return Response.json(acceptedTermsStatus);
       if (url.pathname === "/api/profile") return Response.json(accountProfile);
       if (url.pathname === "/api/profile-summary") return Response.json(summary);
       if (url.pathname === "/api/profile/progression") return Response.json(progression);
