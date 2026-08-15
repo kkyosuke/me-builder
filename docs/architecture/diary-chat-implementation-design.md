@@ -506,6 +506,7 @@ Vectorizeへのupsertまたはdelete受付後に`applied`とmutation IDを記録
 | `id`, `account_id`, `local_date` | 配送ID、所有Account、`Asia/Tokyo`の配送日。`(account_id, local_date)`を一意にする |
 | `prompt_version` | 配送準備時に選んだ曜日別一般文面または曜日文脈定型文のversion。再配送でも変更しない |
 | `prompt_strategy` | `standard`、`brief`、`event_first`、`feeling_first`のレビュー済み方針。activeな`question_style`の明言、本人内実績、`standard`へのフォールバックの順で選ぶ。再配送でも変更しない |
+| `prompt_strategy_source` | `explicit` / `learned` / `fallback`。配送準備時の方針選択元を固定し、再配送の運用ログでも再利用する。列追加前の既存配送は`null`とし、推測で補完しない |
 | `delivery_local_hour` | 配送準備時に選んだ18、20、21のいずれか。既存pending配送の再送では現在の属性より優先する |
 | `status` | `pending` / `delivered` / `skipped` / `failed` |
 | `skip_reason` | `manual_stopped` / `stale` / `active_session` / `user_activity` / `recent_unanswered` / `auto_paused`。本文や推定理由は保存しない |
@@ -514,7 +515,7 @@ Vectorizeへのupsertまたはdelete受付後に`applied`とmutation IDを記録
 | `response_kind` | 配送後の最初の本人発言を`reply`または`stop`として保持する。1発言を複数配送へ対応づけない |
 | lifecycle列 | 作成・更新・削除状態 |
 
-Queue再配送で`pending`を読み直した場合も、停止意思、現在の日本日付、active Session、配送準備後の本人発言を再評価します。送信可能な場合だけ同じ配送IDとretry keyで再送し、送信不能になっていれば`skipped`へ終端化します。`delivered`、`skipped`、`failed`は同じ日付の再配送で新しいPushを作りません。本人のLINE発言をAccountDataへ原本保存するtransactionで未回答の`pending` / `delivered`を回答済みにし、翌日休止と自動休止を解除します。
+Queue再配送で`pending`を読み直した場合も、停止意思、現在の日本日付、active Session、配送準備後の本人発言を再評価します。送信可能な場合だけ同じ配送IDとretry key、文面方針、方針選択元で再送し、送信不能になっていれば`skipped`へ終端化します。Queueの最終配送機会でも処理できなかった`pending`は`failed`へ終端化してからDLQへ送り、未処理状態を残しません。`delivered`、`skipped`、`failed`は同じ日付の再配送で新しいPushを作りません。本人のLINE発言をAccountDataへ原本保存するtransactionで未回答の`pending` / `delivered`を回答済みにし、翌日休止と自動休止を解除します。
 
 停止意思は確定的な表現だけをアプリケーションルールで判定し、Source Record保存と同じAccountData transactionで`daily_prompt_preferences`へ反映します。曖昧な発言をAI推定だけで停止扱いにしません。停止時点で当日の`pending`配送も`manual_stopped`として終端化し、停止中は新しい配送を作りません。その停止発言より後の通常の日記メッセージを保存した場合は状態を`active`へ戻しますが、すでに終端化した当日分を再送しません。Webhookの再配送や順序逆転で古い状態へ戻らないよう、現在の`controlled_at`より新しい本人発言だけをミリ秒精度で反映します。
 

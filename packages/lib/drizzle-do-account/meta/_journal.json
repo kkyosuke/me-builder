@@ -169,6 +169,13 @@
       "when": 1786788226272,
       "tag": "0023_wet_jimmy_woo",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1786789721282,
+      "tag": "0024_wild_betty_ross",
+      "breakpoints": true
     }
   ]
 }

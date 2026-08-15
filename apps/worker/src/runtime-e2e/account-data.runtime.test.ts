@@ -1,6 +1,7 @@
 import { type D1Migration, applyD1Migrations, runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { DO } from "@me-builder/lib";
+import { toTokyoLocalDate } from "@me-builder/shared";
 import { beforeAll, describe, expect, it } from "vitest";
 import type { AccountData } from "../account-data";
 
@@ -194,6 +195,9 @@ describe("AccountData Workers runtime E2E", () => {
       state.storage.sql.exec("ALTER TABLE daily_prompt_deliveries DROP COLUMN delivery_local_hour");
       state.storage.sql.exec("ALTER TABLE brain_item_revisions DROP COLUMN change_kind");
       state.storage.sql.exec("DROP TABLE progression_milestones");
+      state.storage.sql.exec(
+        "ALTER TABLE daily_prompt_deliveries DROP COLUMN prompt_strategy_source",
+      );
       state.storage.sql.exec("DROP TABLE progression_pending_events");
       state.storage.sql.exec("DROP TABLE progression_item_states");
       state.storage.sql.exec("DROP TABLE progression_states");
@@ -244,7 +248,174 @@ describe("AccountData Workers runtime E2E", () => {
         "selected_local_hour",
         "selection_source",
       ]);
+      expect(
+        state.storage.sql
+          .exec<{ name: string }>("PRAGMA table_info(daily_prompt_deliveries)")
+          .toArray()
+          .map(({ name }) => name),
+      ).toContain("prompt_strategy_source");
     });
+  });
+
+  it("本人の明言と配送実績から方針・時刻を選び、配送後の返信を実SQLiteへ集計する", async () => {
+    const accountId = crypto.randomUUID();
+    const stub = env.ACCOUNT_DATA.getByName(accountId);
+    const now = new Date();
+    const localDate = toTokyoLocalDate(now.getTime());
+    const localMidnight = new Date(`${localDate}T00:00:00.000Z`);
+    const previousLocalDates = Array.from({ length: 5 }, (_, index) => {
+      const date = new Date(localMidnight);
+      date.setUTCDate(date.getUTCDate() - (5 - index));
+      return date.toISOString().slice(0, 10);
+    });
+    const preferenceSource = await stub.execute(accountId, "conversation.storeLineTextSource", {
+      eventId: crypto.randomUUID(),
+      body: "短いひとことなら返しやすい",
+      receivedAt: new Date(now.getTime() - 60_000),
+    });
+
+    await runInDurableObject(stub, async (_instance: AccountData, state) => {
+      const createdAt = Math.floor((now.getTime() - 30_000) / 1_000);
+      state.storage.sql.exec(
+        `INSERT INTO brain_items
+          (id, created_at, updated_at, is_deleted, account_id, category, statement,
+           attributes_json, derivation, status, stability, sensitivity,
+           externally_shareable, confidence_json)
+         VALUES ('daily-prompt-style', ?, ?, 0, ?, 'preference', '短いひとことなら返しやすい',
+           ?, 'ai', 'active', 'changeable', 'normal', 0, '{}')`,
+        createdAt,
+        createdAt,
+        accountId,
+        JSON.stringify({
+          sourceKind: "diary",
+          isInference: false,
+          promptContext: { kind: "question_style", style: "brief" },
+        }),
+      );
+      state.storage.sql.exec(
+        `INSERT INTO brain_item_evidence_edges
+          (id, created_at, updated_at, is_deleted, brain_item_id, source_record_id,
+           relation, is_derivation_trigger, derivation_method, generated_at)
+         VALUES ('daily-prompt-style-evidence', ?, ?, 0, 'daily-prompt-style', ?,
+           'supports', 1, 'ai', ?)`,
+        createdAt,
+        createdAt,
+        preferenceSource.sourceRecordId,
+        createdAt,
+      );
+      state.storage.sql.exec(
+        `INSERT INTO brain_item_access_labels
+          (id, created_at, updated_at, is_deleted, brain_item_id, label, assigned_by)
+         VALUES ('daily-prompt-style-access', ?, ?, 0, 'daily-prompt-style',
+           'unclassified', 'system')`,
+        createdAt,
+        createdAt,
+      );
+
+      for (const [index, historicalLocalDate] of previousLocalDates.entries()) {
+        const deliveryLocalHour = index < 3 ? 18 : 21;
+        const deliveryUtcHour = (deliveryLocalHour - 9).toString().padStart(2, "0");
+        const deliveredAt = Math.floor(
+          new Date(`${historicalLocalDate}T${deliveryUtcHour}:00:00.000Z`).getTime() / 1_000,
+        );
+        state.storage.sql.exec(
+          `INSERT INTO daily_prompt_deliveries
+            (id, created_at, updated_at, is_deleted, account_id, local_date,
+             prompt_version, prompt_strategy, delivery_local_hour, status,
+             delivered_at, responded_at, response_kind)
+           VALUES (?, ?, ?, 0, ?, ?, 'daily-check-in-v1:brief-v1', 'brief', ?,
+             'delivered', ?, ?, 'reply')`,
+          `daily-prompt:${historicalLocalDate}`,
+          deliveredAt,
+          deliveredAt + 1_800,
+          accountId,
+          historicalLocalDate,
+          deliveryLocalHour,
+          deliveredAt,
+          deliveredAt + 1_800,
+        );
+      }
+    });
+
+    await expect(
+      stub.execute(accountId, "brain.selectDailyPromptStrategyPreference"),
+    ).resolves.toBe("brief");
+    await expect(stub.execute(accountId, "conversation.selectDailyPromptLocalHour")).resolves.toBe(
+      20,
+    );
+
+    await expect(
+      stub.execute(accountId, "conversation.resolveDailyPromptSchedule", localDate, 20, "learned"),
+    ).resolves.toEqual({ selectedLocalHour: 20, selectionSource: "learned" });
+    await expect(
+      stub.execute(accountId, "conversation.resolveDailyPromptSchedule", localDate, 21, "explicit"),
+    ).resolves.toEqual({ selectedLocalHour: 20, selectionSource: "learned" });
+    await expect(
+      stub.execute(accountId, "conversation.prepareDailyPrompt", {
+        localDate,
+        promptVersion: "daily-check-in-v1:brief-v1",
+        promptStrategy: "brief",
+        promptStrategySource: "learned",
+        scheduledLocalHour: 18,
+        selectedLocalHour: 20,
+        at: now,
+      }),
+    ).resolves.toEqual({ type: "not-ready", status: "not-due" });
+
+    const prepared = await stub.execute(accountId, "conversation.prepareDailyPrompt", {
+      localDate,
+      promptVersion: "daily-check-in-v1:brief-v1",
+      promptStrategy: "brief",
+      promptStrategySource: "learned",
+      scheduledLocalHour: 20,
+      selectedLocalHour: 20,
+      at: now,
+    });
+    expect(prepared).toEqual({
+      type: "ready",
+      deliveryId: `daily-prompt:${localDate}`,
+      promptVersion: "daily-check-in-v1:brief-v1",
+      promptStrategy: "brief",
+      promptStrategySource: "learned",
+    });
+    if (prepared.type !== "ready") throw new Error("Daily prompt was not prepared");
+    await expect(
+      stub.execute(accountId, "conversation.prepareDailyPrompt", {
+        localDate,
+        promptVersion: "daily-check-in-v1:feeling_first-v1",
+        promptStrategy: "feeling_first",
+        promptStrategySource: "explicit",
+        scheduledLocalHour: 20,
+        selectedLocalHour: 20,
+        at: new Date(now.getTime() + 500),
+      }),
+    ).resolves.toEqual(prepared);
+    await expect(
+      stub.execute(accountId, "conversation.markDailyPromptDelivered", prepared.deliveryId, now),
+    ).resolves.toBe(true);
+    await stub.execute(accountId, "conversation.storeLineTextSource", {
+      eventId: crypto.randomUUID(),
+      body: "今日は落ち着いて過ごせた",
+      receivedAt: new Date(now.getTime() + 1_000),
+    });
+
+    await expect(
+      stub.execute(accountId, "conversation.listDailyPromptStrategyStats"),
+    ).resolves.toEqual([
+      {
+        promptStrategy: "brief",
+        deliveryOpportunityCount: 6,
+        responseCount: 6,
+        stopCount: 0,
+      },
+    ]);
+    await expect(stub.execute(accountId, "conversation.listDailyPromptTimeStats")).resolves.toEqual(
+      [
+        { localHour: 18, deliveryOpportunityCount: 3, responseCount: 3, stopCount: 0 },
+        { localHour: 20, deliveryOpportunityCount: 1, responseCount: 1, stopCount: 0 },
+        { localHour: 21, deliveryOpportunityCount: 2, responseCount: 2, stopCount: 0 },
+      ],
+    );
   });
 
   it("既存0000 baselineのAccountデータを保ったまま後続migrationを適用できる", async () => {

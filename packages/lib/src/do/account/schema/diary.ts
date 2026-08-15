@@ -121,6 +121,9 @@ export const dailyPromptDeliveries = sqliteTable(
     })
       .notNull()
       .default("standard"),
+    promptStrategySource: text("prompt_strategy_source", {
+      enum: ["explicit", "learned", "fallback"],
+    }),
     deliveryLocalHour: integer("delivery_local_hour")
       .$type<DailyPromptLocalHour>()
       .notNull()
