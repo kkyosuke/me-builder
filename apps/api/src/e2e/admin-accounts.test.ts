@@ -71,6 +71,7 @@ async function prepareAccounts(db: D1Database): Promise<void> {
       calculationVersion: 1,
       highestLevel: 2,
       recentChanges: [],
+      milestoneCards: [],
     },
     new Date("2026-08-15T01:00:00.000Z"),
   );

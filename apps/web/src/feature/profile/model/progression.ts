@@ -9,12 +9,20 @@ export type UtsushiProgression = Readonly<{
   calculationVersion: number;
   highestLevel: number;
   recentChanges: readonly UtsushiProgressionChange[];
+  milestoneCards: readonly UtsushiMilestoneCard[];
 }>;
 
 type UtsushiProgressionChange = Readonly<{
   kind: "new_piece" | "evidence_deepened" | "temporal_change";
   growthDelta: number;
   occurredAt: string;
+}>;
+
+export type UtsushiMilestoneCard = Readonly<{
+  level: number;
+  reachedAt: string;
+  collectedPiecesDelta: number;
+  categories: readonly string[];
 }>;
 
 export function progressionPercentage(progression: UtsushiProgression): number {

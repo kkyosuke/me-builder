@@ -51,6 +51,7 @@ const emptyProgression = {
   calculationVersion: 1,
   highestLevel: 1,
   recentChanges: [],
+  milestoneCards: [],
 };
 
 describe("Admin Account progression projection", () => {

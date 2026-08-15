@@ -12,6 +12,12 @@ const ProgressionChangeSchema = v.object({
   growthDelta: v.pipe(CountSchema, v.minValue(1)),
   occurredAt: v.pipe(v.string(), v.isoTimestamp()),
 });
+const MilestoneCardSchema = v.object({
+  level: v.pipe(CountSchema, v.minValue(10), v.multipleOf(10)),
+  reachedAt: v.pipe(v.string(), v.isoTimestamp()),
+  collectedPiecesDelta: CountSchema,
+  categories: v.array(v.string()),
+});
 const ResponseSchema = v.object({
   level: v.pipe(CountSchema, v.minValue(1)),
   growthValue: CountSchema,
@@ -23,6 +29,7 @@ const ResponseSchema = v.object({
   calculationVersion: v.pipe(CountSchema, v.minValue(1)),
   highestLevel: v.pipe(CountSchema, v.minValue(1)),
   recentChanges: v.pipe(v.array(ProgressionChangeSchema), v.maxLength(3)),
+  milestoneCards: v.pipe(v.array(MilestoneCardSchema), v.maxLength(3)),
 }) satisfies v.GenericSchema<ApiResponse>;
 
 export async function fetchProfileProgression(

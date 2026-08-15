@@ -193,6 +193,7 @@ describe("AccountData Workers runtime E2E", () => {
       state.storage.sql.exec("ALTER TABLE daily_prompt_deliveries DROP COLUMN response_kind");
       state.storage.sql.exec("ALTER TABLE daily_prompt_deliveries DROP COLUMN delivery_local_hour");
       state.storage.sql.exec("ALTER TABLE brain_item_revisions DROP COLUMN change_kind");
+      state.storage.sql.exec("DROP TABLE progression_milestones");
       state.storage.sql.exec("DROP TABLE progression_pending_events");
       state.storage.sql.exec("DROP TABLE progression_item_states");
       state.storage.sql.exec("DROP TABLE progression_states");
@@ -279,6 +280,7 @@ describe("AccountData Workers runtime E2E", () => {
       state.storage.sql.exec("ALTER TABLE chat_turns DROP COLUMN collection_kind");
       state.storage.sql.exec("ALTER TABLE chat_turns DROP COLUMN collection_theme_id");
       state.storage.sql.exec("ALTER TABLE brain_item_revisions DROP COLUMN change_kind");
+      state.storage.sql.exec("DROP TABLE progression_milestones");
       state.storage.sql.exec("DROP TABLE progression_pending_events");
       state.storage.sql.exec("DROP TABLE progression_item_states");
       state.storage.sql.exec("DROP TABLE progression_states");
@@ -398,6 +400,7 @@ describe("AccountData Workers runtime E2E", () => {
       state.storage.sql.exec("ALTER TABLE chat_turns DROP COLUMN collection_kind");
       state.storage.sql.exec("ALTER TABLE chat_turns DROP COLUMN collection_theme_id");
       state.storage.sql.exec("ALTER TABLE brain_item_revisions DROP COLUMN change_kind");
+      state.storage.sql.exec("DROP TABLE progression_milestones");
       state.storage.sql.exec("DROP TABLE progression_pending_events");
       state.storage.sql.exec("DROP TABLE progression_item_states");
       state.storage.sql.exec("DROP TABLE progression_states");

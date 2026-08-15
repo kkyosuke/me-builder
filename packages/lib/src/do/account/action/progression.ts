@@ -1,4 +1,4 @@
-import { and, asc, count, countDistinct, desc, eq, gt, isNull, lte, or } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, isNull, lte, or } from "drizzle-orm";
 import type { AccountDataDatabase } from "../database";
 import {
   brainItemEvidenceEdges,
@@ -6,6 +6,7 @@ import {
   brainItems,
   progressionEvents,
   progressionItemStates,
+  progressionMilestones,
   progressionPendingEvents,
   progressionStates,
   sourceRecordTextPayloads,
@@ -26,6 +27,7 @@ export type UtsushiProgression = Readonly<{
   calculationVersion: number;
   highestLevel: number;
   recentChanges: readonly UtsushiProgressionChange[];
+  milestoneCards: readonly UtsushiMilestoneCard[];
 }>;
 
 type UtsushiProgressionChange = Readonly<{
@@ -33,6 +35,24 @@ type UtsushiProgressionChange = Readonly<{
   growthDelta: number;
   occurredAt: string;
 }>;
+
+export type UtsushiMilestoneCard = Readonly<{
+  level: number;
+  reachedAt: string;
+  collectedPiecesDelta: number;
+  categories: readonly string[];
+}>;
+
+function readStringArray(value: string): string[] {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return Array.isArray(parsed)
+      ? parsed.filter((entry): entry is string => typeof entry === "string")
+      : [];
+  } catch {
+    return [];
+  }
+}
 
 type ProgressionEventKind = typeof progressionEvents.$inferInsert.kind;
 type ProgressionOriginType = typeof progressionEvents.$inferInsert.originType;
@@ -729,11 +749,11 @@ export async function readUtsushiProgression(
   at = new Date(),
 ): Promise<UtsushiProgression> {
   const totals = await synchronizeProgressionEvents(db, accountId, at);
-  const [active, recentEvents] = await Promise.all([
+  const [activeCategories, recentEvents, savedMilestones] = await Promise.all([
     db
       .select({
+        category: brainItems.category,
         activePieces: count(brainItems.id),
-        categoryCount: countDistinct(brainItems.category),
       })
       .from(brainItems)
       .where(
@@ -745,7 +765,9 @@ export async function readUtsushiProgression(
           or(isNull(brainItems.validTo), gt(brainItems.validTo, at)),
         ),
       )
-      .get(),
+      .groupBy(brainItems.category)
+      .orderBy(asc(brainItems.category))
+      .all(),
     db
       .select({
         kind: progressionEvents.kind,
@@ -763,18 +785,72 @@ export async function readUtsushiProgression(
       .orderBy(desc(progressionEvents.createdAt), desc(progressionEvents.id))
       .limit(3)
       .all(),
+    db
+      .select({
+        level: progressionMilestones.level,
+        reachedAt: progressionMilestones.createdAt,
+        collectedPiecesDelta: progressionMilestones.collectedPiecesDelta,
+        collectedPiecesTotal: progressionMilestones.collectedPiecesTotal,
+        categoriesJson: progressionMilestones.categoriesJson,
+      })
+      .from(progressionMilestones)
+      .where(
+        and(
+          eq(progressionMilestones.accountId, accountId),
+          eq(progressionMilestones.isDeleted, false),
+        ),
+      )
+      .orderBy(desc(progressionMilestones.level))
+      .limit(3)
+      .all(),
   ]);
   const growthValue = totals.growthValue;
   const collectedPieces = totals.collectedPieces;
   const level = Math.max(progressionLevel(growthValue), totals.highestLevel);
+  const categories = activeCategories.map(({ category }) => category);
+  const milestoneLevel = Math.floor(level / 10) * 10;
+  const latestSavedMilestone = savedMilestones[0];
+  const shouldSaveMilestone =
+    milestoneLevel >= 10 && (latestSavedMilestone?.level ?? 0) < milestoneLevel;
+  const newMilestone = shouldSaveMilestone
+    ? {
+        level: milestoneLevel,
+        reachedAt: at,
+        collectedPiecesDelta: Math.max(
+          0,
+          collectedPieces - (latestSavedMilestone?.collectedPiecesTotal ?? 0),
+        ),
+        collectedPiecesTotal: collectedPieces,
+        categoriesJson: JSON.stringify(categories),
+      }
+    : null;
+  if (newMilestone) {
+    await db
+      .insert(progressionMilestones)
+      .values({
+        id: `progression:milestone:v1:${accountId}:${newMilestone.level}`,
+        accountId,
+        level: newMilestone.level,
+        collectedPiecesDelta: newMilestone.collectedPiecesDelta,
+        collectedPiecesTotal: newMilestone.collectedPiecesTotal,
+        categoriesJson: newMilestone.categoriesJson,
+        createdAt: newMilestone.reachedAt,
+        updatedAt: newMilestone.reachedAt,
+      })
+      .onConflictDoNothing();
+  }
+  const milestoneCards = [
+    ...(newMilestone ? [newMilestone] : []),
+    ...savedMilestones.filter(({ level: savedLevel }) => savedLevel !== newMilestone?.level),
+  ].slice(0, 3);
   return {
     level,
     growthValue,
     currentLevelThreshold: progressionThreshold(level),
     nextLevelThreshold: progressionThreshold(level + 1),
     collectedPieces,
-    activePieces: active?.activePieces ?? 0,
-    categoryCount: active?.categoryCount ?? 0,
+    activePieces: activeCategories.reduce((sum, row) => sum + row.activePieces, 0),
+    categoryCount: activeCategories.length,
     calculationVersion: totals.calculationVersion,
     highestLevel: totals.highestLevel,
     recentChanges: recentEvents.flatMap((event): UtsushiProgressionChange[] => {
@@ -790,5 +866,11 @@ export async function readUtsushiProgression(
         ? [{ kind, growthDelta: event.growthDelta, occurredAt: event.occurredAt.toISOString() }]
         : [];
     }),
+    milestoneCards: milestoneCards.map((milestone) => ({
+      level: milestone.level,
+      reachedAt: milestone.reachedAt.toISOString(),
+      collectedPiecesDelta: milestone.collectedPiecesDelta,
+      categories: readStringArray(milestone.categoriesJson),
+    })),
   };
 }

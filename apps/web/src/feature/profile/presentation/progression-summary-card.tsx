@@ -1,4 +1,4 @@
-import { Layers3, Shapes, Sparkles } from "lucide-react";
+import { Download, Layers3, Shapes, Sparkles } from "lucide-react";
 import { SkeletonBlock, SkeletonLoader } from "../../../components/skeleton";
 import type { AsyncState } from "../../../model/async-state";
 import {
@@ -6,6 +6,7 @@ import {
   growthUntilNextLevel,
   progressionPercentage,
 } from "../model/progression";
+import type { UtsushiMilestoneCard } from "../model/progression";
 
 const number = new Intl.NumberFormat("ja-JP");
 
@@ -14,6 +15,52 @@ const changeLabels = {
   evidence_deepened: "かけらの根拠が深まりました",
   temporal_change: "今の自分へ更新されました",
 } as const;
+
+const categoryLabels: Readonly<Record<string, string>> = {
+  identity: "自分らしさ",
+  memory: "思い出",
+  behavior_pattern: "行動パターン",
+  value_motivation: "価値観",
+  decision_system: "判断のしかた",
+  preference: "好み",
+  goal: "目標",
+};
+
+function categoryLabel(category: string): string {
+  return categoryLabels[category] ?? category;
+}
+
+function reachedDate(value: string): string {
+  return new Intl.DateTimeFormat("ja-JP", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  }).format(new Date(value));
+}
+
+function escapeXml(value: string): string {
+  return value.replace(/[<>&'\"]/g, (character) => {
+    const replacements: Readonly<Record<string, string>> = {
+      "<": "&lt;",
+      ">": "&gt;",
+      "&": "&amp;",
+      "'": "&apos;",
+      '"': "&quot;",
+    };
+    return replacements[character] ?? character;
+  });
+}
+
+function downloadMilestoneCard(card: UtsushiMilestoneCard): void {
+  const categories = card.categories.map(categoryLabel).join("・") || "これまでの歩み";
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630"><defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ede9fe"/><stop offset="0.55" stop-color="#ffffff"/><stop offset="1" stop-color="#e0f2fe"/></linearGradient></defs><rect width="1200" height="630" rx="48" fill="url(#bg)"/><rect x="32" y="32" width="1136" height="566" rx="36" fill="none" stroke="#8b5cf6" stroke-width="4"/><text x="90" y="130" font-family="sans-serif" font-size="34" font-weight="700" fill="#6d28d9">うつし 成長カード</text><text x="90" y="285" font-family="sans-serif" font-size="100" font-weight="800" fill="#0f172a">Lv.${card.level}</text><text x="95" y="360" font-family="sans-serif" font-size="30" fill="#334155">${escapeXml(reachedDate(card.reachedAt))}</text><text x="95" y="440" font-family="sans-serif" font-size="34" font-weight="700" fill="#0f172a">前の節目から かけら +${card.collectedPiecesDelta}</text><text x="95" y="510" font-family="sans-serif" font-size="27" fill="#475569">${escapeXml(categories)}</text><text x="95" y="565" font-family="sans-serif" font-size="22" fill="#64748b">自分への理解が育った歩み</text></svg>`;
+  const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml;charset=utf-8" }));
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `utsushi-level-${card.level}.svg`;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
 
 function ProgressionCard({ progression }: { progression: UtsushiProgression }) {
   const percentage = progressionPercentage(progression);
@@ -134,6 +181,59 @@ function ProgressionCard({ progression }: { progression: UtsushiProgression }) {
               </li>
             ))}
           </ul>
+        </section>
+      )}
+
+      {progression.milestoneCards.length > 0 && (
+        <section
+          aria-labelledby="milestone-card-heading"
+          className="border-t border-violet-200/70 p-5 dark:border-violet-800/60"
+        >
+          <h3
+            id="milestone-card-heading"
+            className="text-sm font-bold text-slate-900 dark:text-slate-100"
+          >
+            10レベルごとの成長カード
+          </h3>
+          <div className="mt-3 space-y-3">
+            {progression.milestoneCards.map((card) => (
+              <article
+                key={card.level}
+                className="rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-100 via-white to-sky-100 p-4 dark:border-violet-800 dark:from-violet-950 dark:via-slate-900 dark:to-sky-950"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold text-violet-700 dark:text-violet-300">
+                      {reachedDate(card.reachedAt)} 到達
+                    </p>
+                    <p className="mt-1 text-3xl font-black tabular-nums text-slate-950 dark:text-slate-50">
+                      Lv.{number.format(card.level)}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => downloadMilestoneCard(card)}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-white px-3 py-2 text-xs font-bold text-violet-700 shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 dark:bg-slate-800 dark:text-violet-300"
+                  >
+                    <Download className="size-4" aria-hidden="true" />
+                    保存
+                  </button>
+                </div>
+                <p className="mt-3 text-sm text-slate-700 dark:text-slate-200">
+                  前の節目から、かけらが
+                  <strong className="mx-1 tabular-nums">
+                    +{number.format(card.collectedPiecesDelta)}
+                  </strong>
+                  個
+                </p>
+                {card.categories.length > 0 && (
+                  <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                    広がった分類: {card.categories.map(categoryLabel).join("・")}
+                  </p>
+                )}
+              </article>
+            ))}
+          </div>
         </section>
       )}
 

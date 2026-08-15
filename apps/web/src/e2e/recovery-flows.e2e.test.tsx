@@ -37,6 +37,7 @@ const progression = {
   calculationVersion: 1,
   highestLevel: 2,
   recentChanges: [],
+  milestoneCards: [],
 };
 const acceptedTermsStatus = {
   document: currentServiceTerms,

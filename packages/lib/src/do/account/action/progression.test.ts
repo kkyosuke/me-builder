@@ -126,6 +126,7 @@ describe("Utsushi progression", () => {
       calculationVersion: 1,
       highestLevel: 1,
       recentChanges: [],
+      milestoneCards: [],
     });
   });
 
@@ -173,6 +174,7 @@ describe("Utsushi progression", () => {
         },
         { kind: "new_piece", growthDelta: 3, occurredAt: "2026-08-15T00:00:00.000Z" },
       ],
+      milestoneCards: [],
     });
 
     const later = new Date(at.getTime() + 10);
@@ -198,6 +200,7 @@ describe("Utsushi progression", () => {
         { kind: "new_piece", growthDelta: 3, occurredAt: at.toISOString() },
         { kind: "new_piece", growthDelta: 3, occurredAt: at.toISOString() },
       ],
+      milestoneCards: [],
     };
     await expect(readUtsushiProgression(db, accountId, later)).resolves.toEqual(afterAddition);
     await expect(readUtsushiProgression(db, accountId, later)).resolves.toEqual(afterAddition);
@@ -325,6 +328,50 @@ describe("Utsushi progression", () => {
       level: 10,
       highestLevel: 10,
       growthValue: 3,
+    });
+  });
+
+  it("10レベルごとの到達を本文なしの成長カードとして一度だけ保存する", async () => {
+    const db = createTestDb();
+    const accountId = "milestone-account";
+    const at = new Date("2026-08-15T00:00:00.000Z");
+    await db.insert(schema.accountDataIdentity).values({ singleton: 1, accountId });
+    await insertItem(db, accountId, "item-1", "goal", at);
+    await insertItem(db, accountId, "item-2", "preference", at);
+    await readUtsushiProgression(db, accountId, at);
+    await db
+      .update(schema.progressionStates)
+      .set({ growthValue: 405, collectedPieces: 12, highestLevel: 10 })
+      .where(eq(schema.progressionStates.accountId, accountId));
+
+    const reachedAt = new Date("2026-08-16T00:00:00.000Z");
+    await expect(readUtsushiProgression(db, accountId, reachedAt)).resolves.toMatchObject({
+      milestoneCards: [
+        {
+          level: 10,
+          reachedAt: reachedAt.toISOString(),
+          collectedPiecesDelta: 12,
+          categories: ["goal", "preference"],
+        },
+      ],
+    });
+    await readUtsushiProgression(db, accountId, reachedAt);
+    expect(await db.select().from(schema.progressionMilestones).all()).toHaveLength(1);
+
+    await db
+      .update(schema.progressionStates)
+      .set({ growthValue: 1_805, collectedPieces: 30, highestLevel: 20 })
+      .where(eq(schema.progressionStates.accountId, accountId));
+    const nextReachedAt = new Date("2026-08-17T00:00:00.000Z");
+    await expect(readUtsushiProgression(db, accountId, nextReachedAt)).resolves.toMatchObject({
+      milestoneCards: [
+        {
+          level: 20,
+          reachedAt: nextReachedAt.toISOString(),
+          collectedPiecesDelta: 18,
+        },
+        { level: 10 },
+      ],
     });
   });
 });
