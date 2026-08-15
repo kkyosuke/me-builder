@@ -17,6 +17,8 @@
       "id": "4453ebb9f7db458ab2a4d409c962faab",
       "name": "me-builder-webhook-dlq-preview"
     },
+    "billing": { "name": "me-builder-billing-queue-preview" },
+    "billingDeadLetter": { "name": "me-builder-billing-dlq-preview" },
     "chatTurn": {
       "id": "7feb7b16606e4d9dbb05960146f10287",
       "name": "me-builder-chat-turn-queue-preview"

@@ -15,6 +15,8 @@ const queueNames = [
   `me-builder-daily-prompt-queue-${environment}`,
   `me-builder-daily-prompt-dlq-${environment}`,
   `me-builder-webhook-dlq-${environment}`,
+  `me-builder-billing-queue-${environment}`,
+  `me-builder-billing-dlq-${environment}`,
 ];
 
 for (const queueName of queueNames) {

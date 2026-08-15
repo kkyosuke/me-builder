@@ -15,6 +15,10 @@ queue = "me-builder-webhook-queue-local"
 binding = "WEBHOOK_QUEUE"
 
 [[queues.producers]]
+queue = "me-builder-billing-queue-local"
+binding = "BILLING_QUEUE"
+
+[[queues.producers]]
 queue = "me-builder-profile-summary-queue-local"
 binding = "PROFILE_SUMMARY_QUEUE"
 
@@ -56,6 +60,10 @@ name = "me-builder-api-local"
 [[env.local.queues.producers]]
 queue = "me-builder-webhook-queue-local"
 binding = "WEBHOOK_QUEUE"
+
+[[env.local.queues.producers]]
+queue = "me-builder-billing-queue-local"
+binding = "BILLING_QUEUE"
 
 [[env.local.queues.producers]]
 queue = "me-builder-profile-summary-queue-local"
@@ -104,6 +112,10 @@ queue = "me-builder-webhook-queue-preview"
 binding = "WEBHOOK_QUEUE"
 
 [[env.preview.queues.producers]]
+queue = "me-builder-billing-queue-preview"
+binding = "BILLING_QUEUE"
+
+[[env.preview.queues.producers]]
 queue = "me-builder-profile-summary-queue-preview"
 binding = "PROFILE_SUMMARY_QUEUE"
 
@@ -148,6 +160,10 @@ routes = [
 [[env.production.queues.producers]]
 queue = "me-builder-webhook-queue-production"
 binding = "WEBHOOK_QUEUE"
+
+[[env.production.queues.producers]]
+queue = "me-builder-billing-queue-production"
+binding = "BILLING_QUEUE"
 
 [[env.production.queues.producers]]
 queue = "me-builder-profile-summary-queue-production"

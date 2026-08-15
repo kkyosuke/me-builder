@@ -64,4 +64,16 @@ export interface DailyPromptQueueMessage {
   localHour?: number;
 }
 
+/** Stripe本文を持たず、署名検証済みeventの再取得に必要な参照だけを渡す。 */
+export interface BillingQueueMessage {
+  type: "billing-event";
+  /** 未指定はdeploy中の初期messageとの互換のためversion 1として扱う。 */
+  version?: 1;
+  traceId: string;
+  eventId: string;
+  eventType: string;
+  objectId: string;
+  createdAt: string;
+}
+
 export type { Queue, Message, MessageBatch };

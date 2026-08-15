@@ -5,6 +5,7 @@ import type {
   ConversationCoordinatorNamespace,
 } from "@me-builder/lib";
 import type {
+  BillingQueueMessage,
   ProfileSummaryGenerationQueueMessage,
   Queue,
   SafeOperationalErrorFields,
@@ -17,6 +18,7 @@ type Env = Omit<
   | "DB"
   | "WEBHOOK_QUEUE"
   | "PROFILE_SUMMARY_QUEUE"
+  | "BILLING_QUEUE"
   | "ACCOUNT_DATA"
   | "COMPATIBILITY_DATA"
   | "CONVERSATION_COORDINATOR"
@@ -34,6 +36,7 @@ type Env = Omit<
   WEB_ORIGIN?: string;
   WEBHOOK_QUEUE?: Queue<WebhookQueueMessage>;
   PROFILE_SUMMARY_QUEUE?: Queue<ProfileSummaryGenerationQueueMessage>;
+  BILLING_QUEUE?: Queue<BillingQueueMessage>;
   DB?: D1Database;
   AVATAR_BUCKET?: R2Bucket;
   ACCOUNT_DATA?: AccountDataNamespace;
