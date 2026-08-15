@@ -9,6 +9,15 @@ import {
   serviceTermsDocumentsSatisfyingCurrentRequirement,
 } from "./service-terms";
 
+const ISO_TIMESTAMP_WITH_TIMEZONE =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/;
+
+/** 公開済みversionの内容・運用属性を、同意証跡と照合できる状態で固定する。 */
+const publishedServiceTermsHashes: Readonly<Record<string, string>> = {
+  "2026-08-15": "sha256:9e0143a66c525bc4784e2a6a5b0e16f511189e98b66f2da90dcb6d43cfe01836",
+  "2026-08-15-2": "sha256:1ba63664661455bdcd1e6e72c25768657d833c9dc44475e7276a5d862e1b1afc",
+};
+
 describe("service terms documents", () => {
   it("versionと公開日時を一意かつ公開順で保持する", () => {
     const versions = new Set<string>();
@@ -23,6 +32,7 @@ describe("service terms documents", () => {
       const sequence = (versionsPerDate.get(date) ?? 0) + 1;
       versionsPerDate.set(date, sequence);
       expect(version?.[2]).toBe(sequence === 1 ? undefined : String(sequence));
+      expect(document.publishedAt).toMatch(ISO_TIMESTAMP_WITH_TIMEZONE);
       const publishedAt = Date.parse(document.publishedAt);
       expect(Number.isFinite(publishedAt)).toBe(true);
       expect(toTokyoLocalDate(publishedAt)).toBe(date);
@@ -44,6 +54,15 @@ describe("service terms documents", () => {
         .update(JSON.stringify(content))
         .digest("hex")}`;
       expect(contentHash).toBe(expected);
+    }
+  });
+
+  it("全公開済みversionの本文と運用属性を不変のhashで保持する", () => {
+    expect(Object.keys(publishedServiceTermsHashes)).toEqual(
+      serviceTermsDocuments.map((document) => document.version),
+    );
+    for (const document of serviceTermsDocuments) {
+      expect(document.contentHash).toBe(publishedServiceTermsHashes[document.version]);
     }
   });
 

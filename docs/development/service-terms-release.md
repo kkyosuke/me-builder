@@ -36,18 +36,17 @@ flowchart TD
 ### 2.1 変更内容を確定する
 
 1. 変更理由と利用者への影響をPRへ記載する
-2. 利用者の権利、料金、データの利用目的・提供先、禁止事項、責任範囲に重要な影響がある場合は、法務確認を完了してから`requiresReacceptance: true`とする
-3. 意味を変えない誤字修正や説明の明確化だけであることを確認できた場合は、`requiresReacceptance: false`とする
-4. 判断が確定していない状態で公開用versionを追加しない
+2. [同意体験設計の版管理規則](../product/service-terms-consent-experience.md#3-規約の版管理)に基づき、プロダクト責任者が`requiresReacceptance`を決定する
+3. 本文の意味に影響する変更は、必要な法務確認を完了する
+4. 再同意要否と内容確認が完了していない状態で公開用versionを追加しない
 
 ### 2.2 新しいversionを追加する
 
-[`service-terms.ts`](../../packages/shared/src/legal/service-terms.ts)の公開済み一覧の末尾へ追加します。既存要素を編集・並べ替え・削除しません。
+[`service-terms.ts`](../../packages/shared/src/legal/service-terms.ts)の公開済み一覧の末尾へ、[版管理規則](../product/service-terms-consent-experience.md#3-規約の版管理)に従って追加します。
 
-- versionは公開日の`YYYY-MM-DD`、同日2件目以降は`YYYY-MM-DD-2`から始まる連番にする
 - `publishedAt`は実際に公開する日時をISO 8601で記録し、Asia/Tokyoでの公開日をversionの日付と一致させ、一覧で単調増加させる
 - `contentHash`以外の公開文書全体を`JSON.stringify`したUTF-8バイト列のSHA-256を保存する
-- 本文表示が変わる場合は、意味を変えない修正でも新versionと新hashを使う
+- 公開済みversionごとの固定hash一覧へ新versionのhashを追加し、既存の固定値は変更しない
 
 ## 3. 自動検証
 
@@ -63,7 +62,7 @@ task terms:verify
 - `publishedAt`の形式、versionとの日付一致、公開順
 - 本文hashの一致とhashの一意性
 - 重要改定が1件以上あり、最新の同意必須versionを解決できること
-- 公開済み旧版の代表値が意図せず変更されていないこと
+- 全公開済みversionの本文と運用属性が固定hashから変更されていないこと
 
 ## 4. Previewとレビュー
 
@@ -79,4 +78,4 @@ PRでは変更理由、`requiresReacceptance`の判断根拠、Preview確認結�
 
 ## 5. 公開後の訂正
 
-公開済みversionは履歴の証拠なので書き換えません。誤りが見つかった場合も、一覧の末尾へ訂正版を新しいversionとして追加します。公開済みversionの削除やhashの差し替えで戻さず、影響に応じて訂正版の`requiresReacceptance`を決めます。
+公開後に誤りが見つかった場合は、[版管理規則](../product/service-terms-consent-experience.md#3-規約の版管理)に従い、一覧の末尾へ訂正版を追加します。訂正版も通常の公開フローを通し、再同意要否を改めて確認します。
