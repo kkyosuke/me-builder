@@ -358,6 +358,21 @@ describe("Utsushi progression", () => {
     await readUtsushiProgression(db, accountId, reachedAt);
     expect(await db.select().from(schema.progressionMilestones).all()).toHaveLength(1);
 
+    await db.insert(schema.brainItems).values({
+      id: "item-3",
+      accountId,
+      category: "identity",
+      statement: "item-3 statement",
+      attributes: {},
+      derivation: "deterministic",
+      status: "active",
+      stability: "changeable",
+      sensitivity: "normal",
+      externallyShareable: false,
+      confidence: {},
+      createdAt: reachedAt,
+      updatedAt: reachedAt,
+    });
     await db
       .update(schema.progressionStates)
       .set({ growthValue: 1_805, collectedPieces: 30, highestLevel: 20 })
@@ -369,8 +384,23 @@ describe("Utsushi progression", () => {
           level: 20,
           reachedAt: nextReachedAt.toISOString(),
           collectedPiecesDelta: 18,
+          categories: ["identity"],
         },
-        { level: 10 },
+        { level: 10, categories: ["goal", "preference"] },
+      ],
+    });
+
+    await db
+      .update(schema.progressionStates)
+      .set({ growthValue: 4_205, collectedPieces: 35, highestLevel: 30 })
+      .where(eq(schema.progressionStates.accountId, accountId));
+    await expect(
+      readUtsushiProgression(db, accountId, new Date("2026-08-18T00:00:00.000Z")),
+    ).resolves.toMatchObject({
+      milestoneCards: [
+        { level: 30, collectedPiecesDelta: 5, categories: [] },
+        { level: 20, categories: ["identity"] },
+        { level: 10, categories: ["goal", "preference"] },
       ],
     });
   });
