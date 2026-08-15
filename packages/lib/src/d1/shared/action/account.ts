@@ -1,7 +1,12 @@
-import { logger } from "@me-builder/shared";
-import { and, asc, eq, gt } from "drizzle-orm";
+import {
+  currentServiceTerms,
+  logger,
+  serviceTermsDocumentsSatisfyingCurrentRequirement,
+} from "@me-builder/shared";
+import { and, asc, eq, gt, or } from "drizzle-orm";
 import type { SharedD1Client } from "../client";
 import { accountIdentities, accounts } from "../schema/account";
+import { accountAgreementAcceptances } from "../schema/agreement";
 
 /**
  * ログイン手段の提供元。
@@ -258,12 +263,23 @@ export async function listActiveLineAccountIds(
     eq(accountIdentities.isDeleted, false),
     eq(accounts.status, "active"),
     eq(accounts.isDeleted, false),
+    eq(accountAgreementAcceptances.documentKey, currentServiceTerms.documentKey),
+    or(
+      ...serviceTermsDocumentsSatisfyingCurrentRequirement.map((document) =>
+        and(
+          eq(accountAgreementAcceptances.documentVersion, document.version),
+          eq(accountAgreementAcceptances.documentHash, document.contentHash),
+        ),
+      ),
+    ),
+    eq(accountAgreementAcceptances.isDeleted, false),
     ...(input.afterAccountId ? [gt(accounts.id, input.afterAccountId)] : []),
   ];
   const rows = await db
     .selectDistinct({ accountId: accounts.id })
     .from(accounts)
     .innerJoin(accountIdentities, eq(accountIdentities.accountId, accounts.id))
+    .innerJoin(accountAgreementAcceptances, eq(accountAgreementAcceptances.accountId, accounts.id))
     .where(and(...filters))
     .orderBy(asc(accounts.id))
     .limit(limit)

@@ -67,6 +67,10 @@ async function prepareDatabase(db: D1Database): Promise<void> {
         participant.lineId,
       )
       .run();
+    await D1.shared.action.agreement.acceptCurrentTerms(
+      D1.shared.client.create(db),
+      participant.accountId,
+    );
   }
 }
 
