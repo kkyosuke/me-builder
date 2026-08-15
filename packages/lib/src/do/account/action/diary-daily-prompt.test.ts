@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import type { AccountDataDatabase } from "../database";
 import { accountSchema as schema } from "../database";
 import {
+  chooseDailyPromptStrategy,
   listDailyPromptStrategyStats,
   markDailyPromptDelivered,
   prepareDailyPrompt,
@@ -85,6 +86,75 @@ async function insertClosedConversation(
 }
 
 describe("daily prompt delivery", () => {
+  it("方針実績が不足する間は標準と未観測候補を固定順序で観測する", () => {
+    expect(chooseDailyPromptStrategy([], () => 0)).toBe("standard");
+    expect(
+      chooseDailyPromptStrategy(
+        [
+          {
+            promptStrategy: "standard",
+            deliveryOpportunityCount: 3,
+            responseCount: 1,
+            stopCount: 0,
+          },
+        ],
+        () => 0,
+      ),
+    ).toBe("brief");
+    expect(
+      chooseDailyPromptStrategy(
+        [
+          {
+            promptStrategy: "standard",
+            deliveryOpportunityCount: 3,
+            responseCount: 1,
+            stopCount: 0,
+          },
+          {
+            promptStrategy: "brief",
+            deliveryOpportunityCount: 1,
+            responseCount: 1,
+            stopCount: 0,
+          },
+        ],
+        () => 0,
+      ),
+    ).toBe("event_first");
+  });
+
+  it("初期観測後は停止を強く減点した本人内の最高方針を選ぶ", () => {
+    const stats = [
+      {
+        promptStrategy: "standard" as const,
+        deliveryOpportunityCount: 3,
+        responseCount: 2,
+        stopCount: 1,
+      },
+      {
+        promptStrategy: "brief" as const,
+        deliveryOpportunityCount: 2,
+        responseCount: 2,
+        stopCount: 0,
+      },
+      {
+        promptStrategy: "event_first" as const,
+        deliveryOpportunityCount: 2,
+        responseCount: 1,
+        stopCount: 1,
+      },
+      {
+        promptStrategy: "feeling_first" as const,
+        deliveryOpportunityCount: 2,
+        responseCount: 1,
+        stopCount: 0,
+      },
+    ];
+
+    expect(chooseDailyPromptStrategy(stats, () => 0.5)).toBe("brief");
+    const randomValues = [0.1, 0.99];
+    expect(chooseDailyPromptStrategy(stats, () => randomValues.shift() ?? 0)).toBe("feeling_first");
+  });
+
   it("配送日の最新の終了済みSessionが許可した同日フォローだけを返す", async () => {
     const db = createTestDb();
     await insertClosedConversation(db, {

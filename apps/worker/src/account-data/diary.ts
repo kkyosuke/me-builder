@@ -39,6 +39,8 @@ export const diaryActions = {
   ) => DO.account.action.diary.markDailyPromptFailed(db, accountId, deliveryId, failureStage, at),
   "conversation.listDailyPromptStrategyStats": (db: DO.account.Database, accountId: string) =>
     DO.account.action.diary.listDailyPromptStrategyStats(db, accountId),
+  "conversation.selectDailyPromptStrategy": (db: DO.account.Database, accountId: string) =>
+    DO.account.action.diary.selectDailyPromptStrategy(db, accountId),
   "conversation.attachMessagesToTurn": (
     db: DO.account.Database,
     accountId: string,
