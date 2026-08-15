@@ -10,7 +10,11 @@ export function CompatibilitySharingEndedScreen() {
         <span className="mx-auto flex size-16 items-center justify-center rounded-3xl bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300">
           <ShieldCheck className="size-8" aria-hidden="true" />
         </span>
-        <h1 className="mt-5 text-2xl font-bold text-slate-950 dark:text-slate-50">
+        <h1
+          tabIndex={-1}
+          data-compatibility-route-heading="result"
+          className="mt-5 text-2xl font-bold text-slate-950 focus:outline-none dark:text-slate-50"
+        >
           共有を終了しました
         </h1>
         <p className="mt-3 text-sm leading-relaxed text-slate-600 dark:text-slate-400">

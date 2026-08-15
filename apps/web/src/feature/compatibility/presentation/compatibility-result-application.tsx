@@ -10,6 +10,7 @@ import { useLiffSession } from "../../liff";
 import { compatibilityShareContentHref } from "../model/compatibility-category-navigation";
 import { toCompatibilityPerson } from "../model/compatibility-relationship-view";
 import { CompatibilityResultScreen } from "./compatibility-result-screen";
+import { preloadCompatibilityRoute } from "./compatibility-route-loaders";
 import {
   CompatibilityEndSharing,
   CompatibilitySharingEndedScreen,
@@ -63,7 +64,13 @@ export default function CompatibilityResultApplication({
         <CompatibilityBackHeader />
         <section className="mt-8 rounded-3xl border border-red-300 bg-red-50 p-6 text-center dark:bg-red-950/30">
           <AlertCircle className="mx-auto size-8 text-red-600" aria-hidden="true" />
-          <h1 className="mt-3 text-xl font-bold">相性シートを表示できませんでした</h1>
+          <h1
+            tabIndex={-1}
+            data-compatibility-route-heading="result"
+            className="mt-3 text-xl font-bold focus:outline-none"
+          >
+            相性シートを表示できませんでした
+          </h1>
           <p className="mt-2 text-sm">{relationship.state.message}</p>
           <button
             type="button"
@@ -82,6 +89,7 @@ export default function CompatibilityResultApplication({
   if (relationship.state.data.status === "waiting") {
     // nextActionがnullのときは相手側の準備待ちで、閲覧者の操作では解消できない。
     const waiting = waitingGuides[relationship.state.data.nextAction ?? "partner"];
+    const shouldPreloadList = relationship.state.data.nextAction === null;
     const waitingHref =
       relationship.state.data.nextAction === "diagnosis"
         ? diagnosisCategoryHref(relationship.state.data.relationshipCategory)
@@ -97,10 +105,19 @@ export default function CompatibilityResultApplication({
           >
             {getRelationshipCategoryLabel(relationship.state.data.relationshipCategory)}
           </p>
-          <h1 className="text-xl font-bold">{waiting.title}</h1>
+          <h1
+            tabIndex={-1}
+            data-compatibility-route-heading="result"
+            className="text-xl font-bold focus:outline-none"
+          >
+            {waiting.title}
+          </h1>
           <p className="mt-2 text-sm">{waiting.message}</p>
           <InternalLink
             href={waitingHref}
+            onPreload={() => {
+              if (shouldPreloadList) preloadCompatibilityRoute("list");
+            }}
             preloadRoute={
               relationship.state.data.nextAction === "diagnosis"
                 ? "diagnosis"

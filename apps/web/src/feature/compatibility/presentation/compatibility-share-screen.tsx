@@ -212,7 +212,13 @@ function ShareConsentContent({
 
   return (
     <>
-      <h1 className="mt-5 text-3xl font-bold text-slate-950 dark:text-slate-50">うつしをシェア</h1>
+      <h1
+        tabIndex={-1}
+        data-compatibility-route-heading="share"
+        className="mt-5 text-3xl font-bold text-slate-950 focus:outline-none dark:text-slate-50"
+      >
+        うつしをシェア
+      </h1>
       <p className="mt-4 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
         この相手とうつしをシェアしていいかだけを確認します。共有した後は、増えた分も自動で共有されます。共有される内容は
         <InternalLink

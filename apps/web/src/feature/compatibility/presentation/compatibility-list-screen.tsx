@@ -114,6 +114,7 @@ export function CompatibilityListScreen({
         <h1
           tabIndex={-1}
           data-main-route-heading="compatibility"
+          data-compatibility-route-heading="list"
           className="mt-2 text-3xl font-bold text-slate-950 focus:outline-none dark:text-slate-50"
         >
           ふたりの見取り図

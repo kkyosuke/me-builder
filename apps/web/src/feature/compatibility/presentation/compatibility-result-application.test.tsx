@@ -4,11 +4,17 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import CompatibilityResultApplication from "./compatibility-result-application";
 
-const mocks = vi.hoisted(() => ({ useCompatibilityRelationship: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  preloadCompatibilityRoute: vi.fn(),
+  useCompatibilityRelationship: vi.fn(),
+}));
 
 vi.mock("../../liff", () => ({ useLiffSession: () => ({ acquireIdToken: vi.fn() }) }));
 vi.mock("./hooks/use-compatibility-relationship", () => ({
   useCompatibilityRelationship: mocks.useCompatibilityRelationship,
+}));
+vi.mock("./compatibility-route-loaders", () => ({
+  preloadCompatibilityRoute: mocks.preloadCompatibilityRoute,
 }));
 
 const relationshipId = "1".repeat(64);
@@ -50,6 +56,8 @@ describe("CompatibilityResultApplication waiting state", () => {
     expect(screen.getByRole("link", { name: "相性一覧へ戻る" }).getAttribute("href")).toBe(
       "/compatibility",
     );
+    fireEvent.pointerEnter(screen.getByRole("link", { name: "相性一覧へ戻る" }));
+    expect(mocks.preloadCompatibilityRoute).toHaveBeenCalledWith("list");
     expect(screen.queryByRole("link", { name: "診断を見る" })).toBeNull();
   });
 
