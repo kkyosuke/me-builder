@@ -654,6 +654,11 @@ describe("Compatibility flow", () => {
     expect(
       screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent),
     ).toEqual(["あおいさんについて", "わたしについて"]);
+    expect(screen.getAllByRole("heading", { name: "この資料のもと" })).toHaveLength(2);
+    expect(screen.getAllByText("共有プロフィール生成日時")).toHaveLength(2);
+    expect(screen.getAllByText("共有プロフィール・診断結果")).toHaveLength(2);
+    expect(screen.getByText("2026年8月14日 09:00")).toBeTruthy();
+    expect(screen.getByText("2026年8月15日 09:00")).toBeTruthy();
 
     expect(screen.getByRole("tab", { name: "それぞれについて" })).toBeTruthy();
     const peoplePanel = screen.getByRole("tabpanel");
