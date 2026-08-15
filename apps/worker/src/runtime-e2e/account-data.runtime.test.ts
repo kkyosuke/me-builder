@@ -133,6 +133,40 @@ describe("AccountData Workers runtime E2E", () => {
     });
   });
 
+  it("本人データの全削除後は保存済みの成長カードを返さない", async () => {
+    const accountId = crypto.randomUUID();
+    const now = Date.now();
+    await env.DB.prepare("INSERT INTO accounts (id, created_at, updated_at) VALUES (?, ?, ?)")
+      .bind(accountId, now, now)
+      .run();
+    const stub = env.ACCOUNT_DATA.getByName(accountId);
+
+    await expect(stub.execute(accountId, "progression.read")).resolves.toMatchObject({ level: 1 });
+    await runInDurableObject(stub, async (_instance: AccountData, state) => {
+      state.storage.sql.exec(
+        `INSERT INTO progression_milestones
+          (id, created_at, updated_at, is_deleted, account_id, level,
+           collected_pieces_delta, collected_pieces_total, categories_json)
+         VALUES ('progression:milestone:v1:runtime-reset:10', ?, ?, 0, ?, 10, 12, 12, '["preference"]')`,
+        now,
+        now,
+        accountId,
+      );
+    });
+    await expect(stub.execute(accountId, "progression.read")).resolves.toMatchObject({
+      milestoneCards: [expect.objectContaining({ level: 10, categories: ["preference"] })],
+    });
+
+    await expect(
+      stub.execute(accountId, "development.deleteAllAccountData", 1, new Date(now)),
+    ).resolves.toMatchObject({ deletedBrainItemCount: 0 });
+    await expect(stub.execute(accountId, "progression.read")).resolves.toMatchObject({
+      level: 1,
+      growthValue: 0,
+      milestoneCards: [],
+    });
+  });
+
   it("Worker runtimeのQueue bindingから未配送のまとめ生成要求を再送する", async () => {
     const accountId = crypto.randomUUID();
     const generationId = crypto.randomUUID();
@@ -510,6 +544,19 @@ describe("AccountData Workers runtime E2E", () => {
           )
           .one(),
       ).toEqual({ brain_item_id: "migration-brain", operation: "upsert", status: "pending" });
+      await expect(
+        DO.account.action.progression.readUtsushiProgression(
+          repository.client,
+          accountId,
+          new Date("2026-08-15T00:00:00.000Z"),
+        ),
+      ).resolves.toMatchObject({
+        level: 1,
+        growthValue: 0,
+        collectedPieces: 1,
+        activePieces: 1,
+        milestoneCards: [],
+      });
     });
   });
 

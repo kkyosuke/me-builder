@@ -153,6 +153,8 @@ AccountDataの一覧RPCは、内部的に`pending`、`reserved`、`active`の参
 
 表示内容単位の同意をやめた後も、`compatibility_offered_themes`、`compatibility_accepted_themes`、および`compatibility_relationships`の共有プロフィール指紋columnは残したまま書き込みを止めます。削除は[本番データベースマイグレーション運用](../development/production-migration-operations.md)のexpand-contractに従い、後続releaseのcontractで行います。
 
+`relationship_category`追加前の既存行が残るObjectでは、既定値なしの`NOT NULL` column追加をそのまま適用できません。適用済みmigrationは編集せず、初期化時に旧行と旧同意snapshotをprivate SQLite内へ一時退避し、既存migrationを空の関係tableへ前進適用してから復元します。旧招待ではRelationship Categoryを双方が確認していないため、`pending`は`cancelled`、`accepted`は`ended`として終端化し、共有を暗黙に継続しません。復元用tableは復元と同じtransactionで削除し、途中失敗時は次回初期化で同じ退避内容から再実行します。
+
 期限切れはCompatibilityDataのalarmで終端化し、一覧取得時にも現在時刻で再判定します。共有D1をCronで全走査しません。
 
 ## 9. この設計で決めないこと

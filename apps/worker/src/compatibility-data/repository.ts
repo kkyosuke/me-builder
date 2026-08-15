@@ -38,6 +38,44 @@ import {
 
 type CompatibilityDatabase = DrizzleSqliteDODatabase<typeof compatibilityDataSchema>;
 
+const RELATIONSHIP_CATEGORY_RECOVERY_TABLE = "compatibility_relationship_category_recovery";
+
+type LegacyRelationshipRow = Readonly<{
+  singleton: number;
+  relationship_id: string;
+  inviter_account_id: string;
+  invitee_account_id: string | null;
+  inviter_display_name: string;
+  invitee_display_name: string | null;
+  offered_profile_summary_version_id?: string | null;
+  offered_profile_fingerprint?: string | null;
+  offered_profile_consented_at?: number | null;
+  accepted_profile_summary_version_id?: string | null;
+  accepted_profile_fingerprint?: string | null;
+  accepted_profile_consented_at?: number | null;
+  status: "pending" | "accepted" | "cancelled" | "expired" | "ended";
+  expires_at: number;
+  accepted_at: number | null;
+  cancelled_at: number | null;
+  ended_at: number | null;
+  ended_by_account_id: string | null;
+  created_at: number;
+  updated_at: number;
+}>;
+
+type LegacyThemeRow = Readonly<{
+  relationship_id: string;
+  diagnosis_id: string;
+  result_fingerprint: string;
+  consented_at: number;
+}>;
+
+type RelationshipCategoryRecovery = Readonly<{
+  relationship: LegacyRelationshipRow;
+  offeredThemes: readonly LegacyThemeRow[];
+  acceptedThemes: readonly LegacyThemeRow[];
+}>;
+
 export class CompatibilityDataRepository {
   private readonly db: CompatibilityDatabase;
 
@@ -46,7 +84,13 @@ export class CompatibilityDataRepository {
   }
 
   async initialize(): Promise<void> {
+    this.backUpRelationshipBeforeCategoryMigration();
     await migrate(this.db, migrations);
+    this.restoreRelationshipAfterCategoryMigration();
+    const relationship = this.readRelationship();
+    if (relationship?.status === "ended") {
+      this.clearRelationshipDetails(relationship.updatedAt);
+    }
   }
 
   createInvitation(
@@ -411,5 +455,189 @@ export class CompatibilityDataRepository {
       createdAt: relationship.createdAt,
       updatedAt: relationship.updatedAt,
     };
+  }
+
+  /** 既定値なしのNOT NULL column追加を、既存関係を失わず前進適用できるようにする。 */
+  private backUpRelationshipBeforeCategoryMigration(): void {
+    const columns = this.storage.sql
+      .exec<{ name: string }>("PRAGMA table_info(compatibility_relationships)")
+      .toArray();
+    if (columns.length === 0 || columns.some(({ name }) => name === "relationship_category")) {
+      return;
+    }
+    const relationship = this.storage.sql
+      .exec<LegacyRelationshipRow>("SELECT * FROM compatibility_relationships")
+      .toArray()[0];
+    if (!relationship) return;
+    const recovery: RelationshipCategoryRecovery = {
+      relationship,
+      offeredThemes: this.storage.sql
+        .exec<LegacyThemeRow>("SELECT * FROM compatibility_offered_themes")
+        .toArray(),
+      acceptedThemes: this.storage.sql
+        .exec<LegacyThemeRow>("SELECT * FROM compatibility_accepted_themes")
+        .toArray(),
+    };
+    this.storage.transactionSync(() => {
+      this.storage.sql.exec(
+        `CREATE TABLE IF NOT EXISTS ${RELATIONSHIP_CATEGORY_RECOVERY_TABLE} (
+          singleton integer PRIMARY KEY NOT NULL,
+          recovery_json text NOT NULL
+        )`,
+      );
+      this.storage.sql.exec(
+        `INSERT INTO ${RELATIONSHIP_CATEGORY_RECOVERY_TABLE} (singleton, recovery_json)
+         VALUES (1, ?)
+         ON CONFLICT(singleton) DO UPDATE SET recovery_json = excluded.recovery_json`,
+        JSON.stringify(recovery),
+      );
+      this.storage.sql.exec("DELETE FROM compatibility_accepted_themes");
+      this.storage.sql.exec("DELETE FROM compatibility_offered_themes");
+      this.storage.sql.exec("DELETE FROM compatibility_relationships");
+    });
+  }
+
+  /** 退避済みの旧関係を、カテゴリへの暗黙同意を作らない終端状態で復元する。 */
+  private restoreRelationshipAfterCategoryMigration(): void {
+    const recoveryTable = this.storage.sql
+      .exec<{ name: string }>(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+        RELATIONSHIP_CATEGORY_RECOVERY_TABLE,
+      )
+      .toArray()[0];
+    if (!recoveryTable) return;
+    const recoveryRow = this.storage.sql
+      .exec<{ recovery_json: string }>(
+        `SELECT recovery_json FROM ${RELATIONSHIP_CATEGORY_RECOVERY_TABLE} WHERE singleton = 1`,
+      )
+      .toArray()[0];
+    if (!recoveryRow) throw new Error("Compatibility relationship migration recovery is missing");
+    const recovery = JSON.parse(recoveryRow.recovery_json) as RelationshipCategoryRecovery;
+    const relationship = recovery.relationship;
+    const status =
+      relationship.status === "pending"
+        ? "cancelled"
+        : relationship.status === "accepted"
+          ? "ended"
+          : relationship.status;
+    const cancelledAt =
+      relationship.status === "pending" ? relationship.updated_at : relationship.cancelled_at;
+    const endedAt =
+      relationship.status === "accepted" ? relationship.updated_at : relationship.ended_at;
+
+    this.storage.transactionSync(() => {
+      this.storage.sql.exec(
+        `INSERT OR IGNORE INTO compatibility_relationships (
+          singleton, relationship_id, inviter_account_id, invitee_account_id,
+          inviter_display_name, invitee_display_name,
+          offered_profile_summary_version_id, offered_profile_fingerprint,
+          offered_profile_consented_at, accepted_profile_summary_version_id,
+          accepted_profile_fingerprint, accepted_profile_consented_at,
+          relationship_category, status, expires_at, accepted_at, cancelled_at,
+          ended_at, ended_by_account_id, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'friend', ?, ?, ?, ?, ?, ?, ?, ?)`,
+        relationship.singleton,
+        relationship.relationship_id,
+        relationship.inviter_account_id,
+        relationship.invitee_account_id,
+        relationship.inviter_display_name,
+        relationship.invitee_display_name,
+        relationship.offered_profile_summary_version_id ?? null,
+        relationship.offered_profile_fingerprint ?? null,
+        relationship.offered_profile_consented_at ?? null,
+        relationship.accepted_profile_summary_version_id ?? null,
+        relationship.accepted_profile_fingerprint ?? null,
+        relationship.accepted_profile_consented_at ?? null,
+        status,
+        relationship.expires_at,
+        relationship.accepted_at,
+        cancelledAt,
+        endedAt,
+        relationship.ended_by_account_id,
+        relationship.created_at,
+        relationship.updated_at,
+      );
+      for (const theme of recovery.offeredThemes) {
+        this.storage.sql.exec(
+          `INSERT OR IGNORE INTO compatibility_offered_themes
+            (relationship_id, diagnosis_id, result_fingerprint, consented_at)
+           VALUES (?, ?, ?, ?)`,
+          theme.relationship_id,
+          theme.diagnosis_id,
+          theme.result_fingerprint,
+          theme.consented_at,
+        );
+      }
+      for (const theme of recovery.acceptedThemes) {
+        this.storage.sql.exec(
+          `INSERT OR IGNORE INTO compatibility_accepted_themes
+            (relationship_id, diagnosis_id, result_fingerprint, consented_at)
+           VALUES (?, ?, ?, ?)`,
+          theme.relationship_id,
+          theme.diagnosis_id,
+          theme.result_fingerprint,
+          theme.consented_at,
+        );
+      }
+      this.storage.sql.exec(`DROP TABLE ${RELATIONSHIP_CATEGORY_RECOVERY_TABLE}`);
+    });
+  }
+
+  /** 修正前に終了済みの関係も、内容を復元できない累積値と最高到達レベルだけ残す。 */
+  private clearRelationshipDetails(at: Date): void {
+    const relationshipDetails = this.db
+      .select({
+        offeredProfileSummaryVersionId: compatibilityRelationships.offeredProfileSummaryVersionId,
+        offeredProfileFingerprint: compatibilityRelationships.offeredProfileFingerprint,
+        offeredProfileConsentedAt: compatibilityRelationships.offeredProfileConsentedAt,
+        acceptedProfileSummaryVersionId: compatibilityRelationships.acceptedProfileSummaryVersionId,
+        acceptedProfileFingerprint: compatibilityRelationships.acceptedProfileFingerprint,
+        acceptedProfileConsentedAt: compatibilityRelationships.acceptedProfileConsentedAt,
+      })
+      .from(compatibilityRelationships)
+      .where(eq(compatibilityRelationships.singleton, 1))
+      .get();
+    const offeredTheme = this.db.select().from(compatibilityOfferedThemes).get();
+    const acceptedTheme = this.db.select().from(compatibilityAcceptedThemes).get();
+    const progressionTheme = this.db.select().from(compatibilityProgressionThemes).get();
+    const state = this.db
+      .select({ comparableThemeCount: compatibilityProgressionStates.comparableThemeCount })
+      .from(compatibilityProgressionStates)
+      .where(eq(compatibilityProgressionStates.singleton, 1))
+      .get();
+    const hasRelationshipDetails =
+      relationshipDetails && Object.values(relationshipDetails).some((value) => value !== null);
+    if (
+      !hasRelationshipDetails &&
+      !offeredTheme &&
+      !acceptedTheme &&
+      !progressionTheme &&
+      (!state || state.comparableThemeCount === 0)
+    ) {
+      return;
+    }
+    this.storage.transactionSync(() => {
+      this.db
+        .update(compatibilityRelationships)
+        .set({
+          offeredProfileSummaryVersionId: null,
+          offeredProfileFingerprint: null,
+          offeredProfileConsentedAt: null,
+          acceptedProfileSummaryVersionId: null,
+          acceptedProfileFingerprint: null,
+          acceptedProfileConsentedAt: null,
+          updatedAt: at,
+        })
+        .where(eq(compatibilityRelationships.singleton, 1))
+        .run();
+      this.db.delete(compatibilityAcceptedThemes).run();
+      this.db.delete(compatibilityOfferedThemes).run();
+      this.db.delete(compatibilityProgressionThemes).run();
+      this.db
+        .update(compatibilityProgressionStates)
+        .set({ comparableThemeCount: 0, updatedAt: at })
+        .where(eq(compatibilityProgressionStates.singleton, 1))
+        .run();
+    });
   }
 }
