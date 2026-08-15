@@ -2,6 +2,7 @@ import { AlertCircle, Bot, MessageCircle, RefreshCw } from "lucide-react";
 import { SkeletonBlock, SkeletonLoader } from "../../../components/skeleton";
 import type { AsyncState } from "../../../model/async-state";
 import type { AdminStatistics } from "../model/statistics";
+import { AdminPreviewNavigation } from "./admin-preview-navigation";
 
 const number = new Intl.NumberFormat("ja-JP");
 const usd = new Intl.NumberFormat("en-US", {
@@ -229,8 +230,14 @@ function StatisticsSkeleton() {
 export function AdminStatisticsScreen({
   state,
   isRefreshing = false,
+  showPreviewNavigation = false,
   onReload,
-}: { state: AsyncState<AdminStatistics>; isRefreshing?: boolean; onReload: () => void }) {
+}: {
+  state: AsyncState<AdminStatistics>;
+  isRefreshing?: boolean;
+  showPreviewNavigation?: boolean;
+  onReload: () => void;
+}) {
   if (state.status === "loading" || state.status === "idle") return <StatisticsSkeleton />;
   if (state.status === "error")
     return (
@@ -251,8 +258,21 @@ export function AdminStatisticsScreen({
     <main className="mx-auto min-h-dvh w-full min-w-0 max-w-4xl px-4 py-16 sm:px-8">
       <header className="mb-6">
         <p className="text-sm font-medium text-violet-600 dark:text-violet-400">Admin</p>
+        {showPreviewNavigation ? (
+          <>
+            <h1 className="mt-1 text-3xl font-bold">管理者ダッシュボード</h1>
+            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+              Accountの利用状況とサービス利用量を確認します。
+            </p>
+            <AdminPreviewNavigation current="statistics" />
+          </>
+        ) : null}
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="min-w-0 text-3xl font-bold">利用統計</h1>
+          {showPreviewNavigation ? (
+            <h2 className="mt-6 min-w-0 text-xl font-bold">利用統計</h2>
+          ) : (
+            <h1 className="min-w-0 text-3xl font-bold">利用統計</h1>
+          )}
           <button
             type="button"
             onClick={onReload}

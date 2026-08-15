@@ -27,7 +27,9 @@ import type {
   ProfileSummaryResult,
   ProfileSummaryVersioning,
 } from "../model/profile-summary";
+import type { UtsushiProgression } from "../model/progression";
 import { resolveProfileSummarySwipe, summaryCardDragOffset } from "./profile-summary-card-swipe";
+import { ProgressionSummaryCard } from "./progression-summary-card";
 import type { ProfileSummaryGenerationNotice } from "./use-profile-summary";
 
 const sourceLabels: Record<ProfileRecordSource, string> = {
@@ -792,6 +794,8 @@ function GenerationNotice({
 
 export function ProfileSummaryScreen({
   state,
+  progression,
+  isProgressionPreview = false,
   generationNotice,
   availableDataCounts,
   versioning,
@@ -801,6 +805,8 @@ export function ProfileSummaryScreen({
   children,
 }: {
   state: AsyncState<ProfileSummaryResult>;
+  progression?: AsyncState<UtsushiProgression>;
+  isProgressionPreview?: boolean;
   generationNotice?: ProfileSummaryGenerationNotice | null;
   availableDataCounts?: Readonly<{ diagnosis: number; diary: number }>;
   versioning?: ProfileSummaryVersioning;
@@ -826,6 +832,13 @@ export function ProfileSummaryScreen({
           これまでの診断と記録から見える、今のあなたです。
         </p>
       </header>
+
+      {isProgressionPreview && (
+        <p className="mt-5 rounded-full bg-amber-100 px-3 py-2 text-center text-xs font-semibold text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+          UIプレビュー用のサンプルデータです
+        </p>
+      )}
+      {progression && <ProgressionSummaryCard state={progression} />}
 
       {generationNotice && <GenerationNotice notice={generationNotice} onReload={onRetry} />}
 
