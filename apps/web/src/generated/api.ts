@@ -2553,6 +2553,10 @@ export interface operations {
                     }[];
                   }[];
                 };
+                unavailableThemes: {
+                  diagnosisId: string;
+                  title: string;
+                }[];
               }
             | {
                 relationshipId: string;

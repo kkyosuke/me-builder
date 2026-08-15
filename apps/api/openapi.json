@@ -3903,6 +3903,23 @@
                             }
                           },
                           "required": ["displayName", "aboutMe", "themes"]
+                        },
+                        "unavailableThemes": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "diagnosisId": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "title": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            },
+                            "required": ["diagnosisId", "title"]
+                          }
                         }
                       },
                       "required": [
@@ -3910,7 +3927,8 @@
                         "relationshipCategory",
                         "status",
                         "partner",
-                        "viewer"
+                        "viewer",
+                        "unavailableThemes"
                       ]
                     },
                     {

@@ -91,8 +91,12 @@ describe("getCompatibilityRelationshipContents", () => {
 
   it("双方が表示できる共通テーマから、相手を先にした相性シートを組み立てる", async () => {
     mocks.loadSharePreviewData
-      .mockResolvedValueOnce(shareData({ displayName: "あおい", themes: [theme("shared")] }))
-      .mockResolvedValueOnce(shareData({ displayName: "はる", themes: [theme("shared")] }));
+      .mockResolvedValueOnce(
+        shareData({ displayName: "あおい", themes: [theme("shared"), theme("only-inviter")] }),
+      )
+      .mockResolvedValueOnce(
+        shareData({ displayName: "はる", themes: [theme("shared"), theme("only-invitee")] }),
+      );
 
     await expect(getCompatibilityRelationshipContents(params)).resolves.toMatchObject({
       type: "resolved",
@@ -101,6 +105,10 @@ describe("getCompatibilityRelationshipContents", () => {
         status: "ready",
         partner: { displayName: "はる", themes: [{ diagnosisId: "shared" }] },
         viewer: { displayName: "あおい", themes: [{ diagnosisId: "shared" }] },
+        unavailableThemes: [
+          { diagnosisId: "only-inviter", title: "only-inviter" },
+          { diagnosisId: "only-invitee", title: "only-invitee" },
+        ],
       },
     });
     expect(mocks.loadSharePreviewData).toHaveBeenNthCalledWith(

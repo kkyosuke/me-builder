@@ -38,6 +38,11 @@ export type CompatibilityRelationshipPerson = {
   themes: CompatibilitySharePreviewTheme[];
 };
 
+export type CompatibilityUnavailableTheme = {
+  diagnosisId: string;
+  title: string;
+};
+
 export type CompatibilityRelationship =
   | {
       relationshipId: string;
@@ -45,6 +50,7 @@ export type CompatibilityRelationship =
       status: "ready";
       partner: CompatibilityRelationshipPerson;
       viewer: CompatibilityRelationshipPerson;
+      unavailableThemes: CompatibilityUnavailableTheme[];
     }
   | {
       relationshipId: string;
