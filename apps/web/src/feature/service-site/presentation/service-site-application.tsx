@@ -1,7 +1,13 @@
 import type { ServiceSiteRoute } from "../model/service-site-route";
 import { ServiceSiteLayout } from "./components/service-site-layout";
 import { ServiceSiteHomeScreen } from "./service-site-home-screen";
+import { ServiceSiteTermsScreen } from "./service-site-terms-screen";
 
 export function ServiceSiteApplication({ route }: { route: ServiceSiteRoute }) {
-  return <ServiceSiteLayout>{route === "home" && <ServiceSiteHomeScreen />}</ServiceSiteLayout>;
+  return (
+    <ServiceSiteLayout>
+      {route === "home" && <ServiceSiteHomeScreen />}
+      {route === "terms" && <ServiceSiteTermsScreen />}
+    </ServiceSiteLayout>
+  );
 }

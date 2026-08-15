@@ -17,4 +17,15 @@ describe("renderServiceSiteDocument", () => {
     expect(result).toContain('rel="canonical" href="https://kagami.example.com/"');
     expect(result).toContain('property="og:image"');
   });
+
+  it("利用規約の初期HTMLへ固有metadataを埋め込む", () => {
+    const result = renderServiceSiteDocument(
+      source,
+      serviceSitePageMetadata.terms,
+      "https://kagami.example.com",
+    );
+
+    expect(result).toContain(`<title>${serviceSitePageMetadata.terms.title}</title>`);
+    expect(result).toContain('rel="canonical" href="https://kagami.example.com/terms"');
+  });
 });

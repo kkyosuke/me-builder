@@ -6,6 +6,10 @@ describe("resolveServiceSiteRoute", () => {
     expect(resolveServiceSiteRoute("/")).toBe("home");
   });
 
+  it("利用規約を公開ページとして扱う", () => {
+    expect(resolveServiceSiteRoute("/terms")).toBe("terms");
+  });
+
   it.each(["/app", "/diagnosis", "/me", "/compatibility/invitations/example"])(
     "%sは本人向けアプリとして扱う",
     (pathname) => {
