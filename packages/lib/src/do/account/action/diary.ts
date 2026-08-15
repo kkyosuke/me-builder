@@ -3,6 +3,7 @@ import { and, asc, desc, eq, gte, inArray, isNull, lt, lte, or, sql } from "driz
 import type { BatchItem } from "drizzle-orm/batch";
 import type { AccountDataDatabase } from "../database";
 import {
+  DAILY_PROMPT_STRATEGIES,
   type DailyPromptStrategy,
   type PromptContext,
   type PromptContextCollectionTarget,
@@ -83,6 +84,9 @@ export const DIARY_BRAIN_CHECKPOINT_DISPATCH_LEASE_MS = 60 * 60 * 1000;
 export const DIARY_BRAIN_CHECKPOINT_MAX_DISPATCH_ATTEMPTS = 5;
 const CONVERSATION_POLICY_EXPLORATION_RATE = 0.2;
 export const DAILY_PROMPT_STRATEGY_METRIC_WINDOW = 90;
+export const DAILY_PROMPT_STANDARD_BASELINE_OPPORTUNITIES = 3;
+export const DAILY_PROMPT_STRATEGY_INITIAL_OPPORTUNITIES = 2;
+const DAILY_PROMPT_STRATEGY_EXPLORATION_RATE = 0.2;
 
 function isRevisionedPromptContextKind(kind: PromptContext["kind"]): boolean {
   return kind === "occupation" || kind === "weekly_rhythm";
@@ -186,6 +190,55 @@ export type DailyPromptStrategyStat = Readonly<{
   responseCount: number;
   stopCount: number;
 }>;
+
+function dailyPromptStrategyScore(stat: DailyPromptStrategyStat): number {
+  if (stat.deliveryOpportunityCount === 0) return Number.NEGATIVE_INFINITY;
+  return (stat.responseCount - 2 * stat.stopCount) / stat.deliveryOpportunityCount;
+}
+
+/** 標準観測と各候補の初期観測後、本人内の結果だけで活用と探索を選ぶ。 */
+export function chooseDailyPromptStrategy(
+  stats: readonly DailyPromptStrategyStat[],
+  random: () => number = Math.random,
+): DailyPromptStrategy {
+  const statsByStrategy = new Map(stats.map((stat) => [stat.promptStrategy, stat]));
+  const standardOpportunities = statsByStrategy.get("standard")?.deliveryOpportunityCount ?? 0;
+  if (standardOpportunities < DAILY_PROMPT_STANDARD_BASELINE_OPPORTUNITIES) return "standard";
+
+  const alternatives = DAILY_PROMPT_STRATEGIES.filter((strategy) => strategy !== "standard");
+  const underObserved = alternatives.filter(
+    (strategy) =>
+      (statsByStrategy.get(strategy)?.deliveryOpportunityCount ?? 0) <
+      DAILY_PROMPT_STRATEGY_INITIAL_OPPORTUNITIES,
+  );
+  if (underObserved.length > 0) {
+    const fewestOpportunities = Math.min(
+      ...underObserved.map(
+        (strategy) => statsByStrategy.get(strategy)?.deliveryOpportunityCount ?? 0,
+      ),
+    );
+    const nextStrategies = underObserved.filter(
+      (strategy) =>
+        (statsByStrategy.get(strategy)?.deliveryOpportunityCount ?? 0) === fewestOpportunities,
+    );
+    return randomItem(nextStrategies, random);
+  }
+
+  if (random() < DAILY_PROMPT_STRATEGY_EXPLORATION_RATE) {
+    return randomItem(DAILY_PROMPT_STRATEGIES, random);
+  }
+  const highestScore = Math.max(
+    ...DAILY_PROMPT_STRATEGIES.map((strategy) => {
+      const stat = statsByStrategy.get(strategy);
+      return stat ? dailyPromptStrategyScore(stat) : Number.NEGATIVE_INFINITY;
+    }),
+  );
+  const bestStrategies = DAILY_PROMPT_STRATEGIES.filter((strategy) => {
+    const stat = statsByStrategy.get(strategy);
+    return stat ? dailyPromptStrategyScore(stat) === highestScore : false;
+  });
+  return randomItem(bestStrategies, random);
+}
 
 type DailyPromptSkipReason =
   | "manual_stopped"
@@ -710,6 +763,14 @@ export async function listDailyPromptStrategyStats(
   return [...aggregate.values()].sort((left, right) =>
     left.promptStrategy.localeCompare(right.promptStrategy),
   );
+}
+
+export async function selectDailyPromptStrategy(
+  db: AccountDataDatabase,
+  accountId: string,
+  random: () => number = Math.random,
+): Promise<DailyPromptStrategy> {
+  return chooseDailyPromptStrategy(await listDailyPromptStrategyStats(db, accountId), random);
 }
 
 /** LINE eventを不変なSource Recordとして冪等に保存する。 */

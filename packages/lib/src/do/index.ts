@@ -34,6 +34,9 @@ export type {
 export { BRAIN_VECTOR_SYNC_MAX_ATTEMPTS } from "./account/action/brain";
 export type { UtsushiProgression } from "./account/action/progression";
 export {
+  chooseDailyPromptStrategy,
+  DAILY_PROMPT_STANDARD_BASELINE_OPPORTUNITIES,
+  DAILY_PROMPT_STRATEGY_INITIAL_OPPORTUNITIES,
   DAILY_PROMPT_STRATEGY_METRIC_WINDOW,
   DIARY_BRAIN_CATEGORIES,
   DIARY_BRAIN_CHECKPOINT_MAX_DISPATCH_ATTEMPTS,

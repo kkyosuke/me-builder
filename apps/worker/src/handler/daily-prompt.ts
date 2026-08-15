@@ -153,7 +153,33 @@ export async function processDailyPromptMessage(
         );
         return undefined;
       });
-    const selectedPromptStrategy = promptStrategy ?? "standard";
+    const learnedPromptStrategy = promptStrategy
+      ? undefined
+      : await accountData.execute("conversation.selectDailyPromptStrategy").catch((error) => {
+          logger.warn(
+            {
+              event: "daily-prompt.strategy-selection.failed",
+              service: "worker",
+              environment: workerConfig.environment,
+              component: "daily-prompt",
+              queueMessageId: message.id,
+              localDate: message.body.localDate,
+              attempt: message.attempts,
+              outcome: "degraded",
+              disposition: "continue",
+              ...toSafeOperationalErrorFields(error, {
+                code: "DAILY_PROMPT_STRATEGY_SELECTION_FAILED",
+                category: "dependency",
+                stage: "daily-prompt.strategy",
+                retryable: false,
+                dependency: "account-data",
+              }),
+            },
+            "[Daily prompt] failed to select learned strategy -> continue with standard strategy",
+          );
+          return undefined;
+        });
+    const selectedPromptStrategy = promptStrategy ?? learnedPromptStrategy ?? "standard";
     const promptVersion = getDailyPromptVersion(
       message.body.localDate,
       weekdayContext,

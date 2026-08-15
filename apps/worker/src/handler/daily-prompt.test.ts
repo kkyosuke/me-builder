@@ -46,6 +46,7 @@ describe("daily prompt queue consumer", () => {
         if (accountId !== "account-1") throw new Error("Unexpected account");
         if (operation === "brain.selectDailyPromptWeekdayContext") return undefined;
         if (operation === "brain.selectDailyPromptStrategyPreference") return undefined;
+        if (operation === "conversation.selectDailyPromptStrategy") return "standard";
         if (operation === "conversation.selectDailyPromptSameDayContext") return undefined;
         if (operation === "conversation.selectDailyPromptPreviousDayContext") return undefined;
         if (operation === "conversation.prepareDailyPrompt") {
@@ -110,6 +111,7 @@ describe("daily prompt queue consumer", () => {
     await processDailyPromptMessage(message, bindings(), config);
 
     expect(execute).toHaveBeenCalledWith("account-1", "brain.selectDailyPromptStrategyPreference");
+    expect(execute).not.toHaveBeenCalledWith("account-1", "conversation.selectDailyPromptStrategy");
     expect(execute).toHaveBeenCalledWith("account-1", "conversation.prepareDailyPrompt", {
       localDate: "2026-08-14",
       promptVersion: "daily-check-in-fri-v1:brief-v1",
@@ -127,6 +129,25 @@ describe("daily prompt queue consumer", () => {
       },
       expect.stringMatching(/^[0-9a-f-]{36}$/),
     );
+  });
+
+  it("明言がなければ本人内の返信実績から選んだ方針を固定する", async () => {
+    execute
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce("feeling_first");
+    const message = createMessage();
+
+    await processDailyPromptMessage(message, bindings(), config);
+
+    expect(execute).toHaveBeenCalledWith("account-1", "conversation.selectDailyPromptStrategy");
+    expect(execute).toHaveBeenCalledWith("account-1", "conversation.prepareDailyPrompt", {
+      localDate: "2026-08-14",
+      promptVersion: "daily-check-in-fri-v1:feeling_first-v1",
+      promptStrategy: "feeling_first",
+    });
   });
 
   it("保存済みの曜日文脈に対応する定型文をPushする", async () => {
@@ -313,6 +334,7 @@ describe("daily prompt queue consumer", () => {
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce({
         type: "ready",
         deliveryId: "daily-prompt:2026-08-14",
@@ -352,6 +374,7 @@ describe("daily prompt queue consumer", () => {
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce({
         type: "ready",
         deliveryId: "daily-prompt:2026-08-14",
@@ -379,6 +402,7 @@ describe("daily prompt queue consumer", () => {
 
   it("AccountDataがskipした日はLINEを呼ばずackする", async () => {
     execute
+      .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(undefined)
