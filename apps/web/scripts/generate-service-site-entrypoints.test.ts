@@ -39,4 +39,15 @@ describe("renderServiceSiteDocument", () => {
     expect(result).toContain('name="robots" content="noindex,nofollow"');
     expect(result).toContain('rel="canonical" href="https://kagami.example.com/privacy"');
   });
+
+  it("準備中のお問い合わせ画面を初期HTMLから検索対象外にする", () => {
+    const result = renderServiceSiteDocument(
+      source,
+      serviceSitePageMetadata.contact,
+      "https://kagami.example.com",
+    );
+
+    expect(result).toContain('name="robots" content="noindex,nofollow"');
+    expect(result).toContain('rel="canonical" href="https://kagami.example.com/contact"');
+  });
 });

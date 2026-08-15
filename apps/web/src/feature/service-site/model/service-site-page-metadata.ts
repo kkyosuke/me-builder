@@ -9,6 +9,13 @@ export type ServiceSitePageMetadata = Readonly<{
 }>;
 
 export const serviceSitePageMetadata = {
+  contact: {
+    pathname: "/contact",
+    title: "お問い合わせ（窓口準備中）｜かがみ",
+    description:
+      "かがみへのお問い合わせ種別と、安全に連絡するための注意事項をご案内します。正式な窓口は公開準備中です。",
+    robots: "noindex,nofollow",
+  },
   home: {
     pathname: "/",
     title: "かがみ｜日記と診断で、自分を少しずつ知る",

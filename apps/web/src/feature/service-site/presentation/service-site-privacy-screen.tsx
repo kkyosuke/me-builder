@@ -113,13 +113,19 @@ export function ServiceSitePrivacyScreen() {
             <p className="mt-3 leading-7 text-slate-200">
               現在のサービス利用条件と、規約内で案内しているデータ取扱いの範囲は利用規約から確認できます。
             </p>
-            <div className="mt-6 flex">
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
               <a
                 href="/terms"
                 className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-white px-5 text-sm font-bold text-slate-900 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
               >
                 利用規約を確認する
                 <ExternalLink className="size-4" aria-hidden="true" />
+              </a>
+              <a
+                href="/contact"
+                className="inline-flex min-h-11 items-center justify-center rounded-full border border-white/50 px-5 text-sm font-bold hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+              >
+                お問い合わせについて
               </a>
             </div>
           </section>
