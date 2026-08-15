@@ -36,7 +36,7 @@ type UtsushiProgressionChange = Readonly<{
   occurredAt: string;
 }>;
 
-export type UtsushiMilestoneCard = Readonly<{
+type UtsushiMilestoneCard = Readonly<{
   level: number;
   reachedAt: string;
   collectedPiecesDelta: number;
