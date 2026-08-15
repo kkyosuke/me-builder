@@ -125,6 +125,14 @@ describe("LIFF compatibility share link journey", () => {
       partner: { displayName: "あおい", aboutMe: profile, themes: [inviterTheme] },
       viewer: { displayName: "はる", aboutMe: profile, themes: [recipientTheme] },
       unavailableThemes: [{ diagnosisId: "money-values", title: "お金と消費" }],
+      progression: {
+        level: 2,
+        growthValue: 3,
+        currentLevelThreshold: 3,
+        nextLevelThreshold: 12,
+        comparableThemeCount: 1,
+        marks: [2],
+      },
     } satisfies CompatibilityRelationship;
     mocks.fetchCompatibilityRelationship.mockResolvedValue(relationship);
     mocks.endCompatibilityRelationship.mockResolvedValue(undefined);
