@@ -2,7 +2,7 @@
 
 ## 1. この文書の目的
 
-この文書は、Web UIが本人のプロフィールを取得し、アバター画像を保存・削除するHTTP API契約と保存境界のSSoTです。APIのパス、認証、入出力、画像検査、共有D1とPrivate R2の更新順序、失敗時の扱いを所有します。
+この文書は、Web UIが本人のプロフィールとうつしレベル進行度を取得し、アバター画像を保存・削除するHTTP API契約と保存境界のSSoTです。APIのパス、認証、入出力、画像検査、共有D1、AccountData、Private R2の更新境界と失敗時の扱いを所有します。
 
 プロフィール画面とアバター変更の利用体験は[プロフィール設定体験設計](../product/profile-settings-experience.md)と[アバター設定体験設計](../product/avatar-experience.md)、Account所有データの配置は[Accountデータ分離設計](../architecture/account-data-isolation.md)、Cloudflareサービスの配置は[インフラ・システム構成](../architecture/infrastructure-architecture.md)を正とします。
 
@@ -11,6 +11,7 @@
 ## 2. 結論
 
 - 本人のプロフィール取得は`GET /api/profile`とし、Account IDをpath、query、bodyで受け取らない
+- うつしレベル進行度は`GET /api/profile/progression`で取得し、AccountDataにある差分反映済みの累積値と現在有効なBrain Itemから集計する
 - LIFF IDトークンを検証して解決したAccountだけを読み書きする
 - 取得結果には表示名、role、現在表示するアバターを含める
 - 相性画面など画像をJSONへ埋め込まない利用箇所向けに、`GET /api/profile/avatar`で本人の現在画像をバイナリ返却する
@@ -27,6 +28,7 @@
 | Method | Path | 用途 | 成功時 |
 | --- | --- | --- | --- |
 | `GET` | `/api/profile` | 本人の表示用プロフィールを取得 | `200`とプロフィール |
+| `GET` | `/api/profile/progression` | 本人のうつしレベル進行度を取得 | `200`と進行度 |
 | `GET` | `/api/profile/avatar` | 本人の現在のアバター画像を取得 | `200`と画像、画像がなければ`204` |
 | `PUT` | `/api/profile/avatar` | 現在のアバターを画像bodyで置換 | `200`と更新後プロフィール |
 | `DELETE` | `/api/profile/avatar` | 保存画像を外してLINE画像へ戻す | `200`と更新後プロフィール |
@@ -67,6 +69,26 @@ LINE画像の場合は`source`を`line`、`url`をLINEのHTTPS URL、`updatedAt`
 
 Web UIはこのAPIを通常の`img` URLとして直接参照せず、LIFF IDトークンをAuthorization headerへ付けて取得し、取得したBlobのObject URLを表示に使います。IDトークンをquery parameterや画像URLへ含めません。応答には`Cache-Control: no-store`と`X-Content-Type-Options: nosniff`を付けます。
 
+### 4.2 うつしレベル進行度応答
+
+`GET /api/profile/progression`は、認証で解決した本人のAccountDataから次の表示専用集計を返します。成長値、レベル式、加点条件の意味は[成長・報酬体験の提案](../product/progression-reward-experience.md)を正とします。
+
+```json
+{
+  "level": 2,
+  "growthValue": 8,
+  "currentLevelThreshold": 5,
+  "nextLevelThreshold": 20,
+  "collectedPieces": 2,
+  "activePieces": 2,
+  "categoryCount": 2
+}
+```
+
+成長イベントはBrain更新と同じAccountDataのbatchで未処理差分へ追加し、進行度取得時は未処理差分だけを重複排除して累積値へ反映します。反映済みの全イベントを取得のたびに再走査しません。Brain ItemやEvidenceの削除後も`growthValue`と`collectedPieces`を減らしません。`activePieces`と`categoryCount`は取得時点で利用可能なBrain Itemから集計します。既存Accountは初回取得時に現在利用可能なデータから開始値を確定します。データがない場合も`Lv.1`として成功応答を返します。
+
+応答にBrain Itemのstatement、Evidence、分類名、Account IDは含めません。本人のprivate SQLiteが失敗した場合に架空の進行度へ縮退せず、`500`を返します。
+
 ## 5. アバター保存入力
 
 `PUT /api/profile/avatar`はJSONやmultipartではなく画像本体をrequest bodyとして受け取ります。`Content-Type`は次のいずれかです。
@@ -91,8 +113,9 @@ Web UIによる縮小・切り抜きは通信量と操作体験のための一�
 flowchart LR
     W[Web UI] -->|Bearer + image body| API[API Server]
     API -->|LIFF ID token verify<br/>avatar metadata| D1[(Shared D1<br/>Account operation)]
+    API -->|未処理差分の反映・累積値取得| AD[(AccountData<br/>progression state)]
     API -->|image bytes| R2[(Private R2)]
-    API -->|profile JSON with Data URL| W
+    API -->|profile / progression JSON| W
     API -->|Bearerで認可したimage response| W
 ```
 
@@ -143,6 +166,8 @@ GETで保存画像の不整合を検出した場合、共有D1のメタデータ
 
 - Account IDをクライアント指定せず、認証済みの本人だけを読み書きできる
 - GET 1回で表示名、role、現在のアバターを取得できる
+- Brainがない本人にも`Lv.1`を返し、診断の有無に依存せず進行度を表示できる
+- 同じBrain上の出来事を再読込しても重複加算せず、削除後も累積成長値を下げない
 - PNG、JPEG、WebPの正方形画像をPrivate R2へ保存できる
 - 現在画像のメタデータを共有D1へ保存できる
 - 保存・削除の応答だけで更新後表示へ切り替えられる

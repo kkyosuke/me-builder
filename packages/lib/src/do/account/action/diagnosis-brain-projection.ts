@@ -19,6 +19,7 @@ import {
 } from "../schema/diagnosis";
 import { sourceRecords } from "../schema/source";
 import { saveBrainItem } from "./brain";
+import { progressionPendingStatement } from "./progression";
 
 const PROCESSING_LEASE_MILLISECONDS = 5 * 60 * 1000;
 
@@ -209,27 +210,37 @@ async function saveProjection(
     const missingSourceRecordIds = projection.evidenceSourceRecordIds.filter(
       (sourceRecordId) => !existingSourceRecordIds.has(sourceRecordId),
     );
-    const [firstMissingSourceRecordId, ...remainingMissingSourceRecordIds] = missingSourceRecordIds;
-    if (firstMissingSourceRecordId) {
-      const insertEvidence = (sourceRecordId: string) =>
+    const missingEvidence = missingSourceRecordIds.map((sourceRecordId) => ({
+      id: crypto.randomUUID(),
+      sourceRecordId,
+    }));
+    const [firstMissingEvidence] = missingEvidence;
+    if (firstMissingEvidence) {
+      const statements = missingEvidence.flatMap((evidence) => [
         db
           .insert(brainItemEvidenceEdges)
           .values({
-            id: crypto.randomUUID(),
+            id: evidence.id,
             brainItemId: head.currentBrainItemId,
-            sourceRecordId,
-            relation: "supports",
+            sourceRecordId: evidence.sourceRecordId,
+            relation: "supports" as const,
             isDerivationTrigger: true,
-            derivationMethod: "deterministic",
+            derivationMethod: "deterministic" as const,
             generatedAt: at,
             createdAt: at,
             updatedAt: at,
           })
-          .onConflictDoNothing();
-      await db.batch([
-        insertEvidence(firstMissingSourceRecordId),
-        ...remainingMissingSourceRecordIds.map(insertEvidence),
+          .onConflictDoNothing(),
+        progressionPendingStatement(db, {
+          accountId: input.accountId,
+          originType: "evidence",
+          originId: evidence.id,
+          at,
+        }),
       ]);
+      const [firstStatement, ...remainingStatements] = statements;
+      if (!firstStatement) throw new Error("Diagnosis evidence statements are missing");
+      await db.batch([firstStatement, ...remainingStatements]);
     }
     return;
   }

@@ -3,6 +3,7 @@ import { logger } from "@me-builder/shared";
 import type { Context } from "hono";
 import * as v from "valibot";
 import { getConfig, isDevelopmentEnvironment } from "../config";
+import { ProfileProgressionResponseSchema } from "../contract/profile/progression";
 import {
   ProfileSummaryGenerationAcceptedSchema,
   ProfileSummaryGenerationUnavailableSchema,
@@ -13,10 +14,42 @@ import {
   ServiceUnavailableErrorSchema,
   UnauthorizedErrorSchema,
 } from "../contract/shared/errors";
+import { getProfileProgression } from "../logic/profile-progression";
 import { getProfileSummary } from "../logic/profile-summary";
 import { requestProfileSummaryGeneration } from "../logic/profile-summary-generation";
 import type { AppEnv } from "../types";
 import { bearerToken } from "./auth";
+
+export async function getProfileProgressionContents(c: Context<AppEnv>): Promise<Response> {
+  if (!c.env?.DB || !c.env.ACCOUNT_DATA) {
+    logger.error({ path: c.req.path }, "Profile progression storage binding is not configured");
+    return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
+  }
+  const currentConfig = getConfig(c.env);
+  const outcome = await getProfileProgression({
+    idToken: bearerToken(c.req.header("authorization")),
+    lineLoginChannelId: currentConfig.lineLoginChannelId,
+    db: D1.shared.client.create(c.env.DB),
+    accountData: c.env.ACCOUNT_DATA,
+  });
+  switch (outcome.type) {
+    case "resolved":
+      c.header("Cache-Control", "no-store");
+      return c.json(v.parse(ProfileProgressionResponseSchema, outcome));
+    case "account-not-found":
+      return c.json(
+        v.parse(AccountNotFoundErrorSchema, {
+          error: "Account not found",
+          reason: "friendship_required",
+        }),
+        404,
+      );
+    case "not-configured":
+    case "unauthenticated":
+      return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
+  }
+  throw new Error("Unsupported profile progression outcome");
+}
 
 export async function getProfileSummaryContents(c: Context<AppEnv>): Promise<Response> {
   if (!c.env?.DB || !c.env.ACCOUNT_DATA) {

@@ -32,6 +32,7 @@ export type {
   FailedBrainVectorSyncJobList,
 } from "./account/action/brain";
 export { BRAIN_VECTOR_SYNC_MAX_ATTEMPTS } from "./account/action/brain";
+export type { UtsushiProgression } from "./account/action/progression";
 export {
   DIARY_BRAIN_CATEGORIES,
   DIARY_BRAIN_CHECKPOINT_MAX_DISPATCH_ATTEMPTS,

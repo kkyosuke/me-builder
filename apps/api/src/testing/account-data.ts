@@ -255,6 +255,8 @@ const actions = {
       at,
       allowUnchangedRegeneration,
     ),
+  "progression.read": (db: DO.account.Database, accountId: string, at?: Date) =>
+    DO.account.action.progression.readUtsushiProgression(db, accountId, at),
   "profileSummary.readCompatibilityShareProfile": (db: DO.account.Database, accountId: string) =>
     DO.account.action.profileSummary.readCompatibilityShareProfile(db, accountId),
   "profileSummary.requestGeneration": (

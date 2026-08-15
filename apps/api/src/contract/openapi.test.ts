@@ -65,6 +65,7 @@ describe("GET /api/openapi.json", () => {
     });
     expect(document.paths["/api/diagnoses/{diagnosisId}/answers"]?.get).toBeDefined();
     expect(document.paths["/api/profile"]?.get).toBeDefined();
+    expect(document.paths["/api/profile/progression"]?.get).toBeDefined();
     expect(document.paths["/api/profile/avatar"]?.get).toBeDefined();
     expect(document.paths["/api/profile/avatar"]?.put).toBeDefined();
     expect(document.paths["/api/profile/avatar"]?.delete).toBeDefined();

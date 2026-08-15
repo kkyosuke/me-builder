@@ -48,6 +48,7 @@ import {
   getProfileRoute,
   putProfileAvatarRoute,
 } from "./contract/profile/profile";
+import { profileProgressionRoute } from "./contract/profile/progression";
 import { profileSummaryGenerationRoute, profileSummaryRoute } from "./contract/profile/summary";
 import { InternalServerErrorSchema } from "./contract/shared/errors";
 import { getStatistics } from "./controller/admin";
@@ -80,7 +81,11 @@ import {
 } from "./controller/diagnosis";
 import { getServiceTermsContents, putServiceTermsAcceptance } from "./controller/legal";
 import { postLineWebhook } from "./controller/line";
-import { getProfileSummaryContents, postProfileSummaryGeneration } from "./controller/profile";
+import {
+  getProfileProgressionContents,
+  getProfileSummaryContents,
+  postProfileSummaryGeneration,
+} from "./controller/profile";
 import {
   deleteProfileAvatarContents,
   getProfileAvatarImageContents,
@@ -178,6 +183,7 @@ app.post(
   postProfileSummaryGeneration,
 );
 app.get("/api/profile", getProfileRoute, getProfileContents);
+app.get("/api/profile/progression", profileProgressionRoute, getProfileProgressionContents);
 app.get("/api/profile/avatar", getProfileAvatarImageRoute, getProfileAvatarImageContents);
 app.put("/api/profile/avatar", putProfileAvatarRoute, putProfileAvatar);
 app.delete("/api/profile/avatar", deleteProfileAvatarRoute, deleteProfileAvatarContents);

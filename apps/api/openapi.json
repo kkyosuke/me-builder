@@ -1269,6 +1269,136 @@
         }
       }
     },
+    "/api/profile/progression": {
+      "get": {
+        "operationId": "getProfileProgression",
+        "tags": ["Profile"],
+        "summary": "本人のうつしレベル進行度を取得する",
+        "security": [
+          {
+            "liffIdToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "本人の累積成長値と現在有効なかけら集計",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "level": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "growthValue": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "currentLevelThreshold": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "nextLevelThreshold": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "collectedPieces": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "activePieces": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "categoryCount": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "level",
+                    "growthValue",
+                    "currentLevelThreshold",
+                    "nextLevelThreshold",
+                    "collectedPieces",
+                    "activePieces",
+                    "categoryCount"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "LIFF IDトークンを検証できない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Unauthorized"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "対応するAccountが存在しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Account not found"
+                    },
+                    "reason": {
+                      "const": "friendship_required"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "未処理のサーバーエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Internal Server Error"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "D1 bindingが設定されていない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Service Unavailable"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/profile/avatar": {
       "get": {
         "operationId": "getProfileAvatarImage",
