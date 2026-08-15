@@ -62,6 +62,7 @@ export function ProfileSettingsScreen({
   onThemeChange,
   onFontSizeChange,
   serviceTermsAcceptanceHistory,
+  onIssueRecoveryCode,
 }: {
   avatar: AvatarSelection | null;
   isAdmin?: boolean;
@@ -83,6 +84,7 @@ export function ProfileSettingsScreen({
   onThemeChange: (theme: ColorTheme) => void;
   onFontSizeChange: (fontSize: FontSize) => void;
   serviceTermsAcceptanceHistory?: ReactNode;
+  onIssueRecoveryCode?: () => Promise<{ code: string; expiresAt: string }>;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const backButtonRef = useRef<HTMLButtonElement>(null);
@@ -91,6 +93,9 @@ export function ProfileSettingsScreen({
   const wasInactiveRef = useRef(isInactive);
   const inactiveFocusTargetRef = useRef(inactiveFocusTarget);
   const [resetState, setResetState] = useState<AsyncState<string>>({ status: "idle" });
+  const [recoveryCodeState, setRecoveryCodeState] = useState<
+    AsyncState<{ code: string; expiresAt: string }>
+  >({ status: "idle" });
 
   const resetAccountData = useCallback(async () => {
     if (!onResetAccountData) return;
@@ -411,6 +416,67 @@ export function ProfileSettingsScreen({
           </a>
           {serviceTermsAcceptanceHistory}
         </section>
+
+        {onIssueRecoveryCode && (
+          <section aria-labelledby="account-recovery-heading" className="mt-8">
+            <h2
+              id="account-recovery-heading"
+              className="px-1 text-sm font-bold tracking-wider text-slate-500 dark:text-slate-400"
+            >
+              Account復旧
+            </h2>
+            <div className="mt-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+              <div className="flex items-start gap-3">
+                <Shield
+                  className="mt-0.5 size-5 text-sky-600 dark:text-sky-300"
+                  aria-hidden="true"
+                />
+                <div>
+                  <p className="font-bold">LINE Accountを失ったときに備える</p>
+                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                    一回限りの復旧コードを安全な場所へ保存してください。新しく発行すると以前のコードは使えなくなります。
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={recoveryCodeState.status === "loading"}
+                onClick={() => {
+                  setRecoveryCodeState({ status: "loading" });
+                  void onIssueRecoveryCode()
+                    .then((data) => setRecoveryCodeState({ status: "success", data }))
+                    .catch((error) =>
+                      setRecoveryCodeState({
+                        status: "error",
+                        message:
+                          error instanceof Error
+                            ? error.message
+                            : "復旧コードを発行できませんでした。",
+                      }),
+                    );
+                }}
+                className="mt-4 min-h-11 rounded-xl border border-sky-500 px-4 text-sm font-bold text-sky-700 disabled:opacity-60 dark:text-sky-200"
+              >
+                {recoveryCodeState.status === "loading" ? "発行しています..." : "復旧コードを発行"}
+              </button>
+              {recoveryCodeState.status === "success" && (
+                <output className="mt-4 block rounded-xl bg-slate-100 p-3 dark:bg-slate-900">
+                  <span className="block break-all font-mono text-sm font-bold">
+                    {recoveryCodeState.data.code}
+                  </span>
+                  <span className="mt-2 block text-xs text-slate-500">
+                    有効期限: {new Date(recoveryCodeState.data.expiresAt).toLocaleString("ja-JP")}
+                  </span>
+                </output>
+              )}
+              {recoveryCodeState.status === "error" && (
+                <p role="alert" className="mt-3 text-sm text-rose-700 dark:text-rose-300">
+                  {recoveryCodeState.message}
+                </p>
+              )}
+            </div>
+          </section>
+        )}
 
         {((canOpenBrainItems && onOpenBrainItems) ||
           (canResetAccountData && onResetAccountData)) && (

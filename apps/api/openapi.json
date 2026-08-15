@@ -15,6 +15,325 @@
     }
   },
   "paths": {
+    "/api/account-recovery/codes": {
+      "post": {
+        "operationId": "issueAccountRecoveryCode",
+        "tags": ["Account recovery"],
+        "summary": "有料契約Accountの一回限りの復旧コードを発行する",
+        "security": [
+          {
+            "liffIdToken": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "一度だけ表示する復旧コード",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": ["code", "expiresAt"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "LIFF IDトークンを検証できない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Unauthorized"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "対応するAccountが存在しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Account not found"
+                    },
+                    "reason": {
+                      "const": "friendship_required"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "有料契約がない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "enum": [
+                        "Paid contract required",
+                        "Invalid recovery code",
+                        "Identity conflict"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "未処理のサーバーエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Internal Server Error"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "D1 bindingが設定されていない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Service Unavailable"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/account-recovery/complete": {
+      "post": {
+        "operationId": "completeAccountRecovery",
+        "tags": ["Account recovery"],
+        "summary": "新しいLINE Identityを既存Accountへ再接続する",
+        "security": [
+          {
+            "liffIdToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "kind": "schema",
+                "type": "object",
+                "expects": "Object",
+                "async": false,
+                "entries": {
+                  "code": {
+                    "kind": "schema",
+                    "type": "string",
+                    "expects": "string",
+                    "async": false,
+                    "~standard": {
+                      "version": 1,
+                      "vendor": "valibot"
+                    },
+                    "pipe": [
+                      {
+                        "kind": "schema",
+                        "type": "string",
+                        "expects": "string",
+                        "async": false,
+                        "~standard": {
+                          "version": 1,
+                          "vendor": "valibot"
+                        }
+                      },
+                      {
+                        "kind": "validation",
+                        "type": "non_empty",
+                        "async": false,
+                        "expects": "!0"
+                      },
+                      {
+                        "kind": "validation",
+                        "type": "max_length",
+                        "async": false,
+                        "expects": "<=256",
+                        "requirement": 256
+                      }
+                    ]
+                  }
+                },
+                "~standard": {
+                  "version": 1,
+                  "vendor": "valibot"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "復旧済みAccount",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "const": "recovered"
+                    },
+                    "alreadyRecovered": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["status", "alreadyRecovered"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "復旧コードが不正",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "enum": [
+                        "Paid contract required",
+                        "Invalid recovery code",
+                        "Identity conflict"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "LIFF IDトークンを検証できない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Unauthorized"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "対応するAccountが存在しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Account not found"
+                    },
+                    "reason": {
+                      "const": "friendship_required"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Identityが別Accountに接続済み",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "enum": [
+                        "Paid contract required",
+                        "Invalid recovery code",
+                        "Identity conflict"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "未処理のサーバーエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Internal Server Error"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "D1 bindingが設定されていない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Service Unavailable"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/legal/terms": {
       "get": {
         "operationId": "getServiceTermsStatus",
