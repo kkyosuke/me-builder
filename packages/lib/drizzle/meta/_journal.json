@@ -22,6 +22,20 @@
       "when": 1786652960955,
       "tag": "0002_purple_sabretooth",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1786751419915,
+      "tag": "0003_cynical_wrecker",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1786754618522,
+      "tag": "0004_glossy_patch",
+      "breakpoints": true
     }
   ]
 }

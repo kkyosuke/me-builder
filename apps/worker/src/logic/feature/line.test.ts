@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildDiagnosisReplyText, classifyLineText } from "./line";
+import { buildDiagnosisReplyText, buildTermsAcceptanceReplyText, classifyLineText } from "./line";
 
 const LIFF_ID = "1234567890-abcdefgh";
 const DIARY_TEXT = "今日は散歩をして、久しぶりに本を読んだ。";
@@ -22,6 +22,12 @@ describe("LINE reply formatting", () => {
   it("診断要求にはLIFFリンクだけを返す", () => {
     expect(buildDiagnosisReplyText(LIFF_ID)).toBe(
       `今日の診断に答える\nhttps://liff.line.me/${LIFF_ID}`,
+    );
+  });
+
+  it("未同意では規約画面へのLIFFリンクと再送案内を返す", () => {
+    expect(buildTermsAcceptanceReplyText(LIFF_ID)).toBe(
+      `サービスを利用するには、利用規約への同意が必要です。\n内容を確認して同意したあと、メッセージをもう一度送ってください。\nhttps://liff.line.me/${LIFF_ID}/terms`,
     );
   });
 });

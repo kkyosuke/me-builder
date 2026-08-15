@@ -31,6 +31,10 @@ export function buildDiagnosisReplyText(liffId?: string): string {
     : "いまは診断のリンクをお渡しできません。時間をおいてもう一度お試しください。";
 }
 
+export function buildTermsAcceptanceReplyText(liffId: string): string {
+  return `サービスを利用するには、利用規約への同意が必要です。\n内容を確認して同意したあと、メッセージをもう一度送ってください。\nhttps://liff.line.me/${liffId}/terms`;
+}
+
 export type LineWebhookProcessingResult = {
   outcome: "succeeded" | "degraded" | "discarded";
   stage: string;
@@ -120,6 +124,59 @@ export async function processLineWebhook(
         stage: "account.resolve",
         retryable: false,
       });
+    }
+    let hasAcceptedTerms: boolean;
+    try {
+      hasAcceptedTerms = await D1.shared.action.agreement.hasAcceptedCurrentTerms(
+        db,
+        resolved.account.id,
+      );
+    } catch (error) {
+      throw toOperationalError(error, {
+        code: "LINE_TERMS_ACCEPTANCE_CHECK_FAILED",
+        category: "dependency",
+        stage: "terms.acceptance",
+        retryable: true,
+        dependency: "d1",
+      });
+    }
+    if (!hasAcceptedTerms) {
+      if (!workerConfig.lineChannelAccessToken || !event.replyToken || !workerConfig.liffId) {
+        result = mergeResult(result, {
+          outcome: "degraded",
+          stage: "terms.acceptance",
+          resultCode: "LINE_TERMS_REPLY_NOT_CONFIGURED",
+        });
+        continue;
+      }
+      const replyOutcome = await replyLineText({
+        channelAccessToken: workerConfig.lineChannelAccessToken,
+        replyToken: event.replyToken,
+        texts: [buildTermsAcceptanceReplyText(workerConfig.liffId)],
+      });
+      if (replyOutcome === "unknown") {
+        throw new OperationalError({
+          code: "LINE_TERMS_REPLY_FAILED",
+          category: "dependency",
+          stage: "terms.acceptance",
+          retryable: true,
+          dependency: "line",
+        });
+      }
+      if (replyOutcome === "rejected") {
+        result = mergeResult(result, {
+          outcome: "degraded",
+          stage: "terms.acceptance",
+          resultCode: "LINE_TERMS_REPLY_REJECTED",
+        });
+        continue;
+      }
+      result = mergeResult(result, {
+        outcome: "discarded",
+        stage: "terms.acceptance",
+        resultCode: "LINE_TERMS_ACCEPTANCE_REQUIRED",
+      });
+      continue;
     }
     if (intent === "diagnosis-request") {
       if (!workerConfig.lineChannelAccessToken || !event.replyToken) {

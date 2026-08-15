@@ -217,6 +217,14 @@ async function enqueueLineEvents(
   return traceId;
 }
 
+async function acceptCurrentTermsFor(providerAccountId: string): Promise<void> {
+  const resolved = await D1.shared.action.account.resolveAccountByLineMessagingApi(
+    client,
+    providerAccountId,
+  );
+  await D1.shared.action.agreement.acceptCurrentTerms(client, resolved.account.id);
+}
+
 async function ingestDiaryEvents(events: DiaryEventInput[], suffix: string) {
   const queued: ChatTurnQueueMessage[] = [];
   const harness = createCoordinator(async (message) => {
@@ -228,6 +236,7 @@ async function ingestDiaryEvents(events: DiaryEventInput[], suffix: string) {
   } as unknown as NonNullable<Env["CONVERSATION_COORDINATOR"]>;
   const providerAccountId = `U_diary_delivery_${suffix}`;
   const accountData = accountDataStore.namespace;
+  await acceptCurrentTermsFor(providerAccountId);
 
   const traceId = await enqueueLineEvents(
     events.map((event, index) => ({
@@ -274,6 +283,7 @@ async function ingestDiary(text: string, suffix: string, replyToken?: string) {
   const eventId = `diary-delivery-event-${suffix}`;
   const receivedAt = new Date(Date.now() - 2_000).toISOString();
   const accountData = accountDataStore.namespace;
+  await acceptCurrentTermsFor(providerAccountId);
 
   const traceId = await enqueueLineEvents(
     [

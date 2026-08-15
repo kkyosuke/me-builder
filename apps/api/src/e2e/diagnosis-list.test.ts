@@ -2,6 +2,7 @@ import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import type { D1Database } from "@cloudflare/workers-types";
 import { D1 } from "@me-builder/lib";
+import { currentServiceTerms } from "@me-builder/shared";
 import { Miniflare } from "miniflare";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { app } from "../index";
@@ -87,6 +88,7 @@ async function prepareDatabase(db: D1Database): Promise<void> {
     )
     .bind("identity-e2e", timestamp, timestamp, "account-e2e", "line-user-e2e")
     .run();
+  await D1.shared.action.agreement.acceptCurrentTerms(D1.shared.client.create(db), "account-e2e");
 }
 
 function mockLineVerification(): void {
@@ -177,6 +179,23 @@ async function request(idToken?: string, path = "/api/diagnoses"): Promise<Respo
     LINE_LOGIN_CHANNEL_ID: "1234567890",
     ENVIRONMENT: "test",
   });
+}
+
+async function requestLegal(idToken: string, path = "/api/legal/terms", init?: RequestInit) {
+  const headers = new Headers(init?.headers);
+  headers.set("Authorization", `Bearer ${idToken}`);
+  return await app.request(
+    path,
+    {
+      ...init,
+      headers,
+    },
+    {
+      DB: database,
+      LINE_LOGIN_CHANNEL_ID: "1234567890",
+      ENVIRONMENT: "test",
+    },
+  );
 }
 
 describe("GET /api/diagnoses local D1 E2E", () => {
@@ -306,7 +325,123 @@ describe("GET /api/diagnoses local D1 E2E", () => {
     expect(await response.json()).toEqual({ error: "Unauthorized" });
   });
 
+  it.each([
+    {
+      name: "重要改定前の旧version",
+      version: "2026-01-01",
+      hash: `sha256:${"1".repeat(64)}`,
+      isDeleted: 0,
+    },
+    {
+      name: "本文hashが一致しない記録",
+      version: currentServiceTerms.version,
+      hash: `sha256:${"2".repeat(64)}`,
+      isDeleted: 0,
+    },
+    {
+      name: "削除済みの記録",
+      version: currentServiceTerms.version,
+      hash: currentServiceTerms.contentHash,
+      isDeleted: 1,
+    },
+  ])("$nameでは規約取得だけを許可し、本人機能を401にする", async (acceptance) => {
+    await database
+      .prepare(
+        `UPDATE account_agreement_acceptances
+         SET document_version = ?, document_hash = ?, is_deleted = ?
+         WHERE account_id = ?`,
+      )
+      .bind(acceptance.version, acceptance.hash, acceptance.isDeleted, "account-e2e")
+      .run();
+
+    const terms = await requestLegal("known-token");
+    expect(terms.status).toBe(200);
+    expect(await terms.json()).toMatchObject({
+      acceptance: {
+        required: true,
+        acceptedVersion: null,
+        documentHash: null,
+        acceptedAt: null,
+      },
+    });
+
+    const feature = await request("known-token");
+    expect(feature.status).toBe(401);
+    expect(await feature.json()).toEqual({ error: "Unauthorized" });
+  });
+
+  it("同じversionへの再同意を冪等に扱い、最初の同意証跡を返す", async () => {
+    const before = await database
+      .prepare(
+        `SELECT accepted_at AS acceptedAt
+         FROM account_agreement_acceptances
+         WHERE account_id = ? AND is_deleted = 0`,
+      )
+      .bind("account-e2e")
+      .first<{ acceptedAt: string }>();
+
+    const response = await requestLegal("known-token", "/api/legal/terms/acceptance", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ version: currentServiceTerms.version }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      version: currentServiceTerms.version,
+      documentHash: currentServiceTerms.contentHash,
+      acceptedAt: before?.acceptedAt,
+    });
+    const count = await database
+      .prepare(
+        `SELECT COUNT(*) AS count
+         FROM account_agreement_acceptances
+         WHERE account_id = ?`,
+      )
+      .bind("account-e2e")
+      .first<{ count: number }>();
+    expect(count?.count).toBe(1);
+  });
+
+  it("表示後にversionが変わった同意要求を409にし、履歴を追加しない", async () => {
+    const response = await requestLegal("known-token", "/api/legal/terms/acceptance", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ version: "2026-01-01" }),
+    });
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({
+      error: "Terms version is no longer current",
+      currentVersion: currentServiceTerms.version,
+    });
+    const count = await database
+      .prepare("SELECT COUNT(*) AS count FROM account_agreement_acceptances")
+      .first<{ count: number }>();
+    expect(count?.count).toBe(1);
+  });
+
   it(`${diagnosisListCases.webFirstAccountCreation.id}: ${diagnosisListCases.webFirstAccountCreation.name}`, async () => {
+    const beforeAcceptance = await request("unknown-token");
+    expect(beforeAcceptance.status).toBe(401);
+    const acceptance = await app.request(
+      "/api/legal/terms/acceptance",
+      {
+        method: "PUT",
+        headers: {
+          Authorization: "Bearer unknown-token",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ version: currentServiceTerms.version }),
+      },
+      {
+        DB: database,
+        LINE_LOGIN_CHANNEL_ID: "1234567890",
+        ENVIRONMENT: "test",
+      },
+    );
+    expect(acceptance.status).toBe(200);
+
     const response = await request("unknown-token");
 
     expect(response.status).toBe(200);

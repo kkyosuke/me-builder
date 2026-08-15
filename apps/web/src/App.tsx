@@ -2,6 +2,7 @@ import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useRef, useSta
 import { LoadingState } from "./components/loading-state";
 import { RouteErrorBoundary } from "./components/route-error-boundary";
 import { config } from "./config";
+import { ServiceTermsGate } from "./feature/legal";
 import { LiffSessionProvider, useLiffSession } from "./feature/liff";
 import { getLiffIdToken } from "./feature/liff/infrastructure/liff-client";
 import {
@@ -17,6 +18,7 @@ import {
 import type { AvatarSelection } from "./feature/profile-settings/model/avatar";
 import { ProfileMenuButton } from "./feature/profile-settings/presentation/components/profile-menu-button";
 import { useColorTheme, useFontSize } from "./feature/theme";
+import { resolveRequestedPathname } from "./infrastructure/requested-pathname";
 import { restoreWindowScroll } from "./model/scroll-restoration";
 import {
   getIdleMainApplicationRoutes,
@@ -69,21 +71,6 @@ function historyProfileReturnPathname(state: unknown): string | null {
   if (!state || typeof state !== "object") return null;
   const value = (state as Record<string, unknown>)[PROFILE_RETURN_PATHNAME_STATE_KEY];
   return typeof value === "string" && value.startsWith("/") ? value : null;
-}
-
-function resolveRequestedPathname(): string {
-  if (typeof window === "undefined") {
-    return "/diagnosis";
-  }
-  if (window.location.pathname !== "/") {
-    return window.location.pathname;
-  }
-
-  const liffState = new URLSearchParams(window.location.search).get("liff.state");
-  if (!liffState?.startsWith("/")) {
-    return window.location.pathname;
-  }
-  return liffState.split(/[?#]/, 1)[0] ?? window.location.pathname;
 }
 
 function errorMessage(error: unknown): string {
@@ -473,7 +460,9 @@ function AppContents() {
 export function App() {
   return (
     <LiffSessionProvider>
-      <AppContents />
+      <ServiceTermsGate>
+        <AppContents />
+      </ServiceTermsGate>
     </LiffSessionProvider>
   );
 }

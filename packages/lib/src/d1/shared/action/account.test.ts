@@ -13,6 +13,7 @@ import {
   resolveAccountByLineMessagingApi,
   upsertIdentity,
 } from "./account";
+import { acceptCurrentTerms } from "./agreement";
 
 function createTestDb(): SharedD1Client {
   const sqlite = new Database(":memory:");
@@ -94,6 +95,8 @@ describe("listActiveLineAccountIds", () => {
     const lineA = await upsertIdentity(db, { provider: "line", providerAccountId: "U_a" });
     const lineB = await upsertIdentity(db, { provider: "line", providerAccountId: "U_b" });
     await upsertIdentity(db, { provider: "google", providerAccountId: "google-only" });
+    await acceptCurrentTerms(db, lineA.account.id);
+    await acceptCurrentTerms(db, lineB.account.id);
 
     const expected = [lineA.account.id, lineB.account.id].sort();
     const firstAccountId = expected[0];
@@ -111,6 +114,7 @@ describe("listActiveLineAccountIds", () => {
       provider: "line",
       providerAccountId: "U_deleted",
     });
+    await acceptCurrentTerms(db, deleted.account.id);
     await db
       .update(schema.accountIdentities)
       .set({ isDeleted: true, deletedAt: new Date() })
@@ -200,7 +204,7 @@ describe("resolveAccountByLineLogin", () => {
     expect(await db.select().from(schema.accountIdentities).all()).toEqual([
       expect.objectContaining({ provider: "line_login", accountId: resolved.account.id }),
     ]);
-    // 友だち追加前なのでLINE通知・日々の声かけの対象にはしない。
+    // 規約同意前なのでLINE通知・日々の声かけの対象にはしない。
     await expect(listActiveLineAccountIds(db)).resolves.toEqual([]);
   });
 
@@ -274,6 +278,8 @@ describe("resolveAccountByLineMessagingApi", () => {
     expect(new Set(identities.map(({ accountId }) => accountId))).toEqual(
       new Set([resolved.account.id]),
     );
+    await expect(listActiveLineAccountIds(db)).resolves.toEqual([]);
+    await acceptCurrentTerms(db, resolved.account.id);
     await expect(listActiveLineAccountIds(db)).resolves.toEqual([resolved.account.id]);
   });
 

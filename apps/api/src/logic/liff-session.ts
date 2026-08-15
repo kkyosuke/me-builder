@@ -36,7 +36,8 @@ export type LiffSessionOutcome =
   /** ID トークンが無い、または検証に失敗した */
   | { type: "unauthenticated"; reason: string };
 
-export async function createLiffSession({
+/** 本人確認とAccount解決だけを行う。規約取得・同意API以外から直接呼ばない。 */
+export async function resolveLiffSession({
   idToken,
   lineLoginChannelId,
   db,
@@ -76,4 +77,19 @@ export async function createLiffSession({
       pictureUrl: verified.claims.picture,
     },
   };
+}
+
+/** 本人機能用のセッション。現在の同意要件を満たさないAccountは解決済みとして返さない。 */
+export async function createLiffSession(params: LiffSessionParams): Promise<LiffSessionOutcome> {
+  const outcome = await resolveLiffSession(params);
+  if (outcome.type !== "resolved") return outcome;
+  const accepted = await D1.shared.action.agreement.hasAcceptedCurrentTerms(
+    params.db,
+    outcome.session.accountId,
+  );
+  if (!accepted) {
+    logger.info("Rejected LIFF feature access until the current terms are accepted");
+    return { type: "unauthenticated", reason: "terms_not_accepted" };
+  }
+  return outcome;
 }
