@@ -18,6 +18,7 @@
 | [全体画面遷移設計](../docs/product/screen-navigation.md) | LINEとWebをまたぐ入口、主ナビゲーション、右上のプロフィール、診断・相性・わたしのまとめ・セルフケア・AI相談・管理者画面の接続 |
 | [わたしのまとめ仕様](../docs/product/profile-summary-experience.md) | 診断と日記からAI生成した版付きの「わたしのまとめ」、診断テーマ、導線、状態、受け入れ条件 |
 | [相性診断・うつし共有体験設計](../docs/product/compatibility-experience.md) | 1対1の招待リンク、LINE共有、双方の同意、相性一覧、「私について」と「2人について」、共有終了の体験 |
+| [サービス利用規約・同意体験設計](../docs/product/service-terms-consent-experience.md) | 規約の版管理、Accountごとの同意履歴、初回・改定時の同意ゲート |
 | [成長・報酬体験の提案](../docs/product/progression-reward-experience.md) | Brainの成長イベントによる上限のないうつしレベル、集めたかけらと有効なかけら、ペア単位のふたりレベル、安全上の制約 |
 | [プロフィール設定体験設計](../docs/product/profile-settings-experience.md) | 共通ヘッダー右上の入口、プロフィール画面、アバター設定への接続、ライト・ダークテーマの選択と保存 |
 | [アバター設定体験設計](../docs/product/avatar-experience.md) | LINEプロフィール画像の初期表示、端末画像の選択・プレビュー・設定、差し替え・削除の体験と責務境界 |

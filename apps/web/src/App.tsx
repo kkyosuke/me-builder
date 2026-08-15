@@ -2,6 +2,7 @@ import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useRef, useSta
 import { LoadingState } from "./components/loading-state";
 import { RouteErrorBoundary } from "./components/route-error-boundary";
 import { config } from "./config";
+import { ServiceTermsGate } from "./feature/legal";
 import { LiffSessionProvider, useLiffSession } from "./feature/liff";
 import { getLiffIdToken } from "./feature/liff/infrastructure/liff-client";
 import {
@@ -505,7 +506,9 @@ function AppContents() {
 export function App() {
   return (
     <LiffSessionProvider>
-      <AppContents />
+      <ServiceTermsGate>
+        <AppContents />
+      </ServiceTermsGate>
     </LiffSessionProvider>
   );
 }

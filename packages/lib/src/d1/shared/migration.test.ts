@@ -7,6 +7,7 @@ const migrationsDirectory = path.resolve(__dirname, "../../../drizzle");
 
 /** 共有D1が保存するのはAccount Identity・運営設定、公開定義、集計projectionだけ。 */
 const SHARED_D1_TABLES = [
+  "account_agreement_acceptances",
   "account_identities",
   "account_profiles",
   "accounts",

@@ -4,6 +4,40 @@
  */
 
 export interface paths {
+  "/api/legal/terms": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** 現在の利用規約と本人の同意状態を取得する */
+    get: operations["getServiceTermsStatus"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/legal/terms/acceptance": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** 現在の利用規約versionへの同意を記録する */
+    put: operations["acceptServiceTerms"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/admin/statistics": {
     parameters: {
       query?: never;
@@ -428,6 +462,149 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+  getServiceTermsStatus: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 現在の規約本文と同意状態 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            document: {
+              /** @constant */
+              documentKey: "terms_of_service";
+              version: string;
+              /** Format: date-time */
+              publishedAt: string;
+              title: string;
+              summary: string;
+              sections: {
+                heading: string;
+                paragraphs: string[];
+              }[];
+            };
+            acceptance: {
+              required: boolean;
+              acceptedAt: string | null;
+            };
+          };
+        };
+      };
+      /** @description LIFF IDトークンを検証できない */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Unauthorized";
+          };
+        };
+      };
+      /** @description D1 bindingが設定されていない */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Service Unavailable";
+          };
+        };
+      };
+    };
+  };
+  acceptServiceTerms: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          version: string;
+        };
+      };
+    };
+    responses: {
+      /** @description 保存済みの同意記録 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            documentKey: "terms_of_service";
+            version: string;
+            /** Format: date-time */
+            acceptedAt: string;
+          };
+        };
+      };
+      /** @description リクエストJSONが不正 */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Invalid request";
+          };
+        };
+      };
+      /** @description LIFF IDトークンを検証できない */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Unauthorized";
+          };
+        };
+      };
+      /** @description 表示後に規約versionが更新された */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms version is no longer current";
+            currentVersion: string;
+          };
+        };
+      };
+      /** @description D1 bindingが設定されていない */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Service Unavailable";
+          };
+        };
+      };
+    };
+  };
   getAdminStatistics: {
     parameters: {
       query?: never;
