@@ -16,6 +16,7 @@ describe("useCompatibilityRelationships", () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
+    vi.restoreAllMocks();
   });
 
   it("取消中のカードIDを公開し、成功後は一覧を再取得せず対象だけを取り除く", async () => {
@@ -87,6 +88,94 @@ describe("useCompatibilityRelationships", () => {
       status: "error",
       message: "取消に失敗しました",
     });
+    expect(result.current.state).toMatchObject({
+      status: "success",
+      data: { items: [{ relationshipId }] },
+    });
+  });
+
+  it("画面へ戻った時は既存一覧を保ったまま最新の準備状況へ更新する", async () => {
+    const relationshipId = "3".repeat(64);
+    let now = 1_000;
+    vi.spyOn(Date, "now").mockImplementation(() => now);
+    mocks.fetchCompatibilityRelationships.mockResolvedValueOnce({
+      items: [
+        {
+          relationshipId,
+          relationshipCategory: "friend",
+          status: "accepted",
+          partnerDisplayName: "あおい",
+          readiness: { status: "waiting", nextAction: null },
+        },
+      ],
+    });
+    let finishRefresh: (value: unknown) => void = () => undefined;
+    mocks.fetchCompatibilityRelationships.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishRefresh = resolve;
+        }),
+    );
+    const acquireIdToken = vi.fn(async () => "id-token");
+    const { result } = renderHook(() => useCompatibilityRelationships({ acquireIdToken }));
+    await waitFor(() => expect(result.current.state.status).toBe("success"));
+
+    now += 1_000;
+    act(() => window.dispatchEvent(new Event("focus")));
+
+    await waitFor(() => expect(result.current.isRefreshing).toBe(true));
+    expect(result.current.state).toMatchObject({
+      status: "success",
+      data: { items: [{ readiness: { status: "waiting" } }] },
+    });
+
+    await act(async () => {
+      finishRefresh({
+        items: [
+          {
+            relationshipId,
+            relationshipCategory: "friend",
+            status: "accepted",
+            partnerDisplayName: "あおい",
+            readiness: { status: "ready", comparableThemeCount: 2 },
+          },
+        ],
+      });
+    });
+
+    expect(result.current.isRefreshing).toBe(false);
+    expect(result.current.state).toMatchObject({
+      status: "success",
+      data: { items: [{ readiness: { status: "ready", comparableThemeCount: 2 } }] },
+    });
+  });
+
+  it("再検証の通信失敗では表示中の一覧を維持して再確認を案内する", async () => {
+    const relationshipId = "4".repeat(64);
+    let now = 1_000;
+    vi.spyOn(Date, "now").mockImplementation(() => now);
+    mocks.fetchCompatibilityRelationships
+      .mockResolvedValueOnce({
+        items: [
+          {
+            relationshipId,
+            relationshipCategory: "partner",
+            status: "accepted",
+            partnerDisplayName: "あおい",
+            readiness: { status: "waiting", nextAction: null },
+          },
+        ],
+      })
+      .mockRejectedValueOnce(new TypeError("ネットワークに接続できません"));
+    const acquireIdToken = vi.fn(async () => "id-token");
+    const { result } = renderHook(() => useCompatibilityRelationships({ acquireIdToken }));
+    await waitFor(() => expect(result.current.state.status).toBe("success"));
+
+    now += 1_000;
+    act(() => window.dispatchEvent(new Event("online")));
+
+    await waitFor(() => expect(result.current.refreshError).toBe("ネットワークに接続できません"));
+    expect(result.current.isRefreshing).toBe(false);
     expect(result.current.state).toMatchObject({
       status: "success",
       data: { items: [{ relationshipId }] },

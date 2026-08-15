@@ -15,6 +15,7 @@ import {
   CompatibilityEndSharing,
   CompatibilitySharingEndedScreen,
 } from "./components/compatibility-end-sharing";
+import { CompatibilityRefreshNotice } from "./components/compatibility-refresh-notice";
 import { CompatibilityBackHeader } from "./components/compatibility-ui";
 import { useCompatibilityRelationship } from "./hooks/use-compatibility-relationship";
 
@@ -97,8 +98,22 @@ export default function CompatibilityResultApplication({
           ? compatibilityShareContentHref(relationship.state.data.relationshipCategory)
           : "/compatibility";
     return (
-      <main className="mx-auto min-h-dvh w-full max-w-2xl px-4 py-6 sm:px-8">
+      <main
+        aria-busy={relationship.isRefreshing || undefined}
+        className="mx-auto min-h-dvh w-full max-w-2xl px-4 py-6 sm:px-8"
+      >
+        {relationship.isRefreshing && (
+          <output aria-live="polite" className="sr-only">
+            相性シートの最新状態を確認しています
+          </output>
+        )}
         <CompatibilityBackHeader />
+        {relationship.refreshError && (
+          <CompatibilityRefreshNotice
+            message={relationship.refreshError}
+            onRetry={() => void relationship.refresh()}
+          />
+        )}
         <section className="mt-8 rounded-3xl border border-amber-300 bg-amber-50 p-6 dark:bg-amber-950/30">
           <p
             className={`mb-3 w-fit rounded-full px-3 py-1.5 text-sm font-bold ${getRelationshipCategoryBadgeClassName(relationship.state.data.relationshipCategory)}`}
@@ -146,7 +161,10 @@ export default function CompatibilityResultApplication({
       me={toCompatibilityPerson(relationship.state.data.viewer, "sky")}
       partner={toCompatibilityPerson(relationship.state.data.partner, "violet")}
       relationshipCategory={relationship.state.data.relationshipCategory}
+      isRefreshing={relationship.isRefreshing}
+      refreshError={relationship.refreshError}
       endingState={relationship.ending}
+      onRefresh={() => void relationship.refresh()}
       onEnd={() => void relationship.end()}
     />
   );

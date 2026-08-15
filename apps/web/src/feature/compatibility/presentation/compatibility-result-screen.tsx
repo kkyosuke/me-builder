@@ -11,6 +11,7 @@ import {
   CompatibilityEndSharing,
   CompatibilitySharingEndedScreen,
 } from "./components/compatibility-end-sharing";
+import { CompatibilityRefreshNotice } from "./components/compatibility-refresh-notice";
 import {
   CompatibilityPairSheet,
   CompatibilityPersonSheet,
@@ -23,13 +24,19 @@ export function CompatibilityResultScreen({
   me,
   partner,
   relationshipCategory,
+  isRefreshing = false,
+  refreshError = null,
   endingState = { status: "idle" },
+  onRefresh = () => undefined,
   onEnd = () => undefined,
 }: {
   me: CompatibilityPerson;
   partner: CompatibilityPerson;
   relationshipCategory: CompatibilityRelationshipCategory;
+  isRefreshing?: boolean;
+  refreshError?: string | null;
   endingState?: AsyncState<null>;
+  onRefresh?: () => void;
   onEnd?: () => void;
 }) {
   const result = useCompatibilityResult();
@@ -55,8 +62,17 @@ export function CompatibilityResultScreen({
   }
 
   return (
-    <main className="mx-auto min-h-dvh w-full max-w-2xl px-4 py-6 pb-12 sm:px-8">
+    <main
+      aria-busy={isRefreshing || undefined}
+      className="mx-auto min-h-dvh w-full max-w-2xl px-4 py-6 pb-12 sm:px-8"
+    >
+      {isRefreshing && (
+        <output aria-live="polite" className="sr-only">
+          相性シートの最新状態を確認しています
+        </output>
+      )}
       <CompatibilityBackHeader />
+      {refreshError && <CompatibilityRefreshNotice message={refreshError} onRetry={onRefresh} />}
       <div className="mt-5 flex items-center gap-3">
         <CompatibilityAvatar person={partner} size="lg" />
         <span className="text-xl font-bold text-slate-400">×</span>

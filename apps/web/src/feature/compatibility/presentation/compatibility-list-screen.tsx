@@ -25,6 +25,7 @@ import type {
   CompatibilityRelationshipListItem,
 } from "../model/compatibility-relationship";
 import { preloadCompatibilityRoute } from "./compatibility-route-loaders";
+import { CompatibilityRefreshNotice } from "./components/compatibility-refresh-notice";
 
 type PendingItem = Extract<CompatibilityRelationshipListItem, { status: "pending" }>;
 type AcceptedItem = Extract<CompatibilityRelationshipListItem, { status: "accepted" }>;
@@ -75,20 +76,26 @@ function ListSkeleton() {
 export function CompatibilityListScreen({
   categoryFilter = "all",
   state,
+  isRefreshing = false,
+  refreshError = null,
   operation = { status: "idle" },
   cancellingRelationshipId = null,
   sharingMessage,
   onRetry,
+  onRefresh = () => undefined,
   onCancel,
   onCategoryFilterChange = () => undefined,
   onResend,
 }: {
   categoryFilter?: RelationshipCategoryFilter;
   state: AsyncState<CompatibilityRelationshipList>;
+  isRefreshing?: boolean;
+  refreshError?: string | null;
   operation?: AsyncState<string>;
   cancellingRelationshipId?: string | null;
   sharingMessage?: string | null;
   onRetry: () => void;
+  onRefresh?: () => void;
   onCancel: (relationshipId: string) => void;
   onCategoryFilterChange?: (filter: RelationshipCategoryFilter) => void;
   onResend: (item: PendingItem) => void;
@@ -106,7 +113,15 @@ export function CompatibilityListScreen({
   const pending = filteredItems.filter((x) => x.status === "pending");
 
   return (
-    <main className="mx-auto min-h-dvh w-full max-w-2xl px-4 py-8 pb-28 sm:px-8">
+    <main
+      aria-busy={isRefreshing || undefined}
+      className="mx-auto min-h-dvh w-full max-w-2xl px-4 py-8 pb-28 sm:px-8"
+    >
+      {isRefreshing && (
+        <output aria-live="polite" className="sr-only">
+          相性一覧の最新状態を確認しています
+        </output>
+      )}
       <header>
         <p className="text-sm font-semibold tracking-wider text-rose-700 dark:text-rose-300">
           2人を知る
@@ -134,6 +149,8 @@ export function CompatibilityListScreen({
           <ArrowRight className="size-5" aria-hidden="true" />
         </InternalLink>
       </header>
+
+      {refreshError && <CompatibilityRefreshNotice message={refreshError} onRetry={onRefresh} />}
 
       {state.status === "loading" && <ListSkeleton />}
       {state.status === "error" && (
