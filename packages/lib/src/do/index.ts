@@ -38,6 +38,7 @@ export {
 } from "./account/action/diary";
 export type {
   ConversationContextMessage,
+  DailyPromptSameDayContext,
   DiaryBrainCategory,
   DiaryBrainCheckpointCandidate,
 } from "./account/action/diary";

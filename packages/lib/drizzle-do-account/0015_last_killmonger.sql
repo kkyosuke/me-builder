@@ -1,0 +1,1 @@
+ALTER TABLE `chat_turns` ADD `daily_prompt_follow_up` text;

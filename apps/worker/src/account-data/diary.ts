@@ -13,6 +13,12 @@ export const diaryActions = {
     accountId: string,
     input: Parameters<typeof DO.account.action.diary.prepareDailyPrompt>[2],
   ) => DO.account.action.diary.prepareDailyPrompt(db, accountId, input),
+  "conversation.selectDailyPromptSameDayContext": (
+    db: DO.account.Database,
+    accountId: string,
+    localDate: string,
+    at?: Date,
+  ) => DO.account.action.diary.selectDailyPromptSameDayContext(db, accountId, localDate, at),
   "conversation.markDailyPromptDelivered": (
     db: DO.account.Database,
     accountId: string,

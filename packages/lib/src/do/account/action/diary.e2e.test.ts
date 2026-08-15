@@ -383,6 +383,49 @@ describe("Diary conversation persistence flow", () => {
     ]);
   });
 
+  it("同日フォローはSessionを終了する応答だけに保存する", async () => {
+    const db = createTestDb();
+    const account = await bindAccount(db, "account-same-day-follow-up");
+    const source = await storeLineTextSource(db, {
+      accountId: account.id,
+      eventId: "same-day-follow-up",
+      body: "用事が終わったら続きを話したい",
+      receivedAt: new Date("2026-08-07T03:00:00.000Z"),
+    });
+    const attached = await attachMessagesToTurn(
+      db,
+      account.id,
+      [source],
+      1,
+      "test-model",
+      "diary-chat-v13",
+    );
+    await markTurnGenerating(db, attached.turnId);
+
+    await expect(
+      saveAssistantResponse(db, account.id, {
+        turnId: attached.turnId,
+        body: "またあとで聞かせてね。",
+        endSession: false,
+        dailyPromptFollowUp: "same_day",
+      }),
+    ).rejects.toThrow("requires the Conversation Session to end");
+
+    await saveAssistantResponse(db, account.id, {
+      turnId: attached.turnId,
+      body: "またあとで聞かせてね。",
+      endSession: true,
+      dailyPromptFollowUp: "same_day",
+    });
+    expect(
+      db
+        .select({ dailyPromptFollowUp: schema.chatTurns.dailyPromptFollowUp })
+        .from(schema.chatTurns)
+        .where(eq(schema.chatTurns.id, attached.turnId))
+        .get(),
+    ).toEqual({ dailyPromptFollowUp: "same_day" });
+  });
+
   it("収集質問をSessionへ記録し、同じテーマ2問までに制限する", async () => {
     const db = createTestDb();
     const account = await bindAccount(db, "account-collection-limit");

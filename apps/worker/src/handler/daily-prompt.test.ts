@@ -45,6 +45,7 @@ describe("daily prompt queue consumer", () => {
       .mockImplementation(async (accountId: string, operation: string, ...args: unknown[]) => {
         if (accountId !== "account-1") throw new Error("Unexpected account");
         if (operation === "brain.selectDailyPromptWeekdayContext") return undefined;
+        if (operation === "conversation.selectDailyPromptSameDayContext") return undefined;
         if (operation === "conversation.prepareDailyPrompt") {
           const input = args[0] as { promptVersion: string };
           return {
@@ -124,6 +125,60 @@ describe("daily prompt queue consumer", () => {
     );
   });
 
+  it("同日フォローを曜日文脈より優先して本文を含まない定型文をPushする", async () => {
+    execute.mockResolvedValueOnce("day_off").mockResolvedValueOnce("same_day");
+    const message = createMessage();
+
+    await processDailyPromptMessage(message, bindings(), config);
+
+    expect(execute).toHaveBeenCalledWith(
+      "account-1",
+      "conversation.selectDailyPromptSameDayContext",
+      "2026-08-14",
+      new Date("2026-08-14T09:00:00.000Z"),
+    );
+    expect(execute).toHaveBeenCalledWith("account-1", "conversation.prepareDailyPrompt", {
+      localDate: "2026-08-14",
+      promptVersion: "daily-check-in-same-day-follow-up-v1",
+    });
+    expect(pushMessage).toHaveBeenCalledWith(
+      {
+        to: "U_line",
+        messages: [
+          {
+            type: "text",
+            text: "日中に話してくれたこと、その後はどう？\n話題を変えて、今日全体のことを話しても大丈夫だよ。",
+          },
+        ],
+      },
+      expect.stringMatching(/^[0-9a-f-]{36}$/),
+    );
+  });
+
+  it("同日フォローの取得に失敗しても取得済みの曜日文脈で継続する", async () => {
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => undefined);
+    execute
+      .mockResolvedValueOnce("day_off")
+      .mockRejectedValueOnce(new Error("AccountData unavailable"));
+    const message = createMessage();
+
+    await processDailyPromptMessage(message, bindings(), config);
+
+    expect(execute).toHaveBeenCalledWith("account-1", "conversation.prepareDailyPrompt", {
+      localDate: "2026-08-14",
+      promptVersion: "daily-check-in-day-off-v1",
+    });
+    expect(warn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "daily-prompt.same-day-context.failed",
+        outcome: "degraded",
+        disposition: "continue",
+      }),
+      "[Daily prompt] failed to load same-day context -> continue without it",
+    );
+    expect(message.ack).toHaveBeenCalledOnce();
+  });
+
   it("曜日文脈の取得に失敗しても曜日別一般文面へ戻す", async () => {
     execute.mockRejectedValueOnce(new Error("AccountData unavailable"));
     const message = createMessage();
@@ -140,11 +195,14 @@ describe("daily prompt queue consumer", () => {
 
   it("曜日文脈の取得失敗時も既存配送に固定された個別化文面を再配送する", async () => {
     const warn = vi.spyOn(logger, "warn").mockImplementation(() => undefined);
-    execute.mockRejectedValueOnce(new Error("AccountData unavailable")).mockResolvedValueOnce({
-      type: "ready",
-      deliveryId: "daily-prompt:2026-08-14",
-      promptVersion: "daily-check-in-day-off-v1",
-    });
+    execute
+      .mockRejectedValueOnce(new Error("AccountData unavailable"))
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce({
+        type: "ready",
+        deliveryId: "daily-prompt:2026-08-14",
+        promptVersion: "daily-check-in-day-off-v1",
+      });
     const message = createMessage();
 
     await processDailyPromptMessage(message, bindings(), config);
@@ -173,11 +231,14 @@ describe("daily prompt queue consumer", () => {
   });
 
   it("既存配送に固定された段階1の文面versionを再配送でも使う", async () => {
-    execute.mockResolvedValueOnce(undefined).mockResolvedValueOnce({
-      type: "ready",
-      deliveryId: "daily-prompt:2026-08-14",
-      promptVersion: "daily-check-in-v1",
-    });
+    execute
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce({
+        type: "ready",
+        deliveryId: "daily-prompt:2026-08-14",
+        promptVersion: "daily-check-in-v1",
+      });
     const message = createMessage();
 
     await processDailyPromptMessage(message, bindings(), config);
@@ -198,11 +259,14 @@ describe("daily prompt queue consumer", () => {
   });
 
   it("AccountDataがskipした日はLINEを呼ばずackする", async () => {
-    execute.mockResolvedValueOnce(undefined).mockResolvedValueOnce({
-      type: "not-ready",
-      status: "skipped",
-      reason: "recent_unanswered",
-    });
+    execute
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce({
+        type: "not-ready",
+        status: "skipped",
+        reason: "recent_unanswered",
+      });
     const message = createMessage();
 
     await processDailyPromptMessage(message, bindings(), config);

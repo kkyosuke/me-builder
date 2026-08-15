@@ -1,5 +1,5 @@
 import { toTokyoLocalDate } from "@me-builder/shared";
-import { and, asc, desc, eq, gte, inArray, isNull, lte, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import type { AccountDataDatabase } from "../database";
 import {
@@ -185,6 +185,8 @@ type DailyPromptSkipReason =
   | "recent_unanswered"
   | "auto_paused";
 
+export type DailyPromptSameDayContext = "same_day";
+
 function assertLocalDate(localDate: string): void {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(localDate)) throw new Error("Daily prompt date is invalid");
   const parsed = new Date(`${localDate}T00:00:00.000Z`);
@@ -197,6 +199,76 @@ function nextLocalDate(localDate: string): string {
   const parsed = new Date(`${localDate}T00:00:00.000Z`);
   parsed.setUTCDate(parsed.getUTCDate() + 1);
   return parsed.toISOString().slice(0, 10);
+}
+
+/** 配送日の最新の終了済みSessionが、同日中の続きを許可しているかを返す。 */
+export async function selectDailyPromptSameDayContext(
+  db: AccountDataDatabase,
+  accountId: string,
+  localDate: string,
+  at: Date = new Date(),
+): Promise<DailyPromptSameDayContext | undefined> {
+  assertLocalDate(localDate);
+  // 18時時点で期限切れだったSessionも含めてから、配送日の最新Sessionを選ぶ。
+  await closeExpiredSessions(db, at);
+  const localDayStartedAt = new Date(`${localDate}T00:00:00.000+09:00`);
+  const nextLocalDayStartedAt = new Date(`${nextLocalDate(localDate)}T00:00:00.000+09:00`);
+  const latestSession = await db
+    .select({ id: conversationSessions.id, closeReason: conversationSessions.closeReason })
+    .from(conversationSessions)
+    .where(
+      and(
+        eq(conversationSessions.accountId, accountId),
+        eq(conversationSessions.status, "closed"),
+        eq(conversationSessions.isDeleted, false),
+        gte(conversationSessions.closedAt, localDayStartedAt),
+        lt(conversationSessions.closedAt, nextLocalDayStartedAt),
+        lte(conversationSessions.closedAt, at),
+      ),
+    )
+    .orderBy(desc(conversationSessions.closedAt), desc(conversationSessions.id))
+    .get();
+  if (!latestSession || latestSession.closeReason !== "explicit") return undefined;
+
+  const finalTurn = await db
+    .select({
+      fromSequence: chatTurns.fromSequence,
+      throughSequence: chatTurns.throughSequence,
+      endSession: chatTurns.endSession,
+      dailyPromptFollowUp: chatTurns.dailyPromptFollowUp,
+    })
+    .from(chatTurns)
+    .where(
+      and(
+        eq(chatTurns.sessionId, latestSession.id),
+        eq(chatTurns.status, "delivered"),
+        eq(chatTurns.isDeleted, false),
+      ),
+    )
+    .orderBy(desc(chatTurns.throughSequence), desc(chatTurns.id))
+    .get();
+  if (!finalTurn?.endSession || finalTurn.dailyPromptFollowUp !== "same_day") return undefined;
+
+  const activeUserSource = await db
+    .select({ id: sourceRecords.id })
+    .from(conversationMessages)
+    .innerJoin(sourceRecords, eq(sourceRecords.id, conversationMessages.sourceRecordId))
+    .where(
+      and(
+        eq(conversationMessages.sessionId, latestSession.id),
+        eq(conversationMessages.role, "user"),
+        eq(conversationMessages.isDeleted, false),
+        gte(conversationMessages.sequence, finalTurn.fromSequence),
+        lte(conversationMessages.sequence, finalTurn.throughSequence),
+        eq(sourceRecords.accountId, accountId),
+        eq(sourceRecords.isDeleted, false),
+        gte(sourceRecords.createdAt, localDayStartedAt),
+        lt(sourceRecords.createdAt, nextLocalDayStartedAt),
+        lte(sourceRecords.createdAt, at),
+      ),
+    )
+    .get();
+  return activeUserSource ? "same_day" : undefined;
 }
 
 async function skipDailyPrompt(
@@ -2079,6 +2151,7 @@ export async function saveAssistantResponse(
     turnId: string;
     body: string;
     endSession: boolean;
+    dailyPromptFollowUp?: DailyPromptSameDayContext;
     collectionTarget?: PromptContextCollectionTarget;
     brainUsages?: readonly Readonly<{
       brainItemId: string;
@@ -2115,6 +2188,9 @@ export async function saveAssistantResponse(
     .get();
   if (!session) throw new Error("Conversation session was not found");
   if (session.accountId !== accountId) throw new Error("Conversation account mismatch");
+  if (input.dailyPromptFollowUp && !input.endSession) {
+    throw new Error("Daily prompt follow-up requires the Conversation Session to end");
+  }
   if (collectionTarget) {
     const askedTargets = await listCollectionAskedTargets(db, session.id);
     const candidates = buildPromptContextCollectionCandidates({
@@ -2163,6 +2239,7 @@ export async function saveAssistantResponse(
         status: "delivery_pending",
         responseMessageId: messageId,
         endSession: input.endSession,
+        dailyPromptFollowUp: input.dailyPromptFollowUp,
         collectionThemeId: collectionTarget?.themeId,
         collectionKind: collectionTarget?.kind,
         finalReplyRequestedAt: now,

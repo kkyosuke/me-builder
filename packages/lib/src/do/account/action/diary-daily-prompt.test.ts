@@ -6,7 +6,12 @@ import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { describe, expect, it } from "vitest";
 import type { AccountDataDatabase } from "../database";
 import { accountSchema as schema } from "../database";
-import { markDailyPromptDelivered, prepareDailyPrompt, storeLineTextSource } from "./diary";
+import {
+  markDailyPromptDelivered,
+  prepareDailyPrompt,
+  selectDailyPromptSameDayContext,
+  storeLineTextSource,
+} from "./diary";
 
 const ACCOUNT_ID = "account-1";
 const PROMPT_VERSION = "daily-check-in-v1";
@@ -27,7 +32,207 @@ function createTestDb(): AccountDataDatabase {
   return db as unknown as AccountDataDatabase;
 }
 
+async function insertClosedConversation(
+  db: AccountDataDatabase,
+  input: Readonly<{
+    id: string;
+    closedAt: Date;
+    receivedAt?: Date;
+    followUp?: "same_day";
+    closeReason?: "explicit" | "inactive";
+  }>,
+): Promise<string> {
+  const receivedAt = input.receivedAt ?? new Date(input.closedAt.getTime() - 60_000);
+  const source = await storeLineTextSource(db, {
+    accountId: ACCOUNT_ID,
+    eventId: `event-${input.id}`,
+    body: "あとで続きを話したい",
+    receivedAt,
+  });
+  await db.insert(schema.conversationSessions).values({
+    id: input.id,
+    accountId: ACCOUNT_ID,
+    status: "closed",
+    startedAt: new Date(input.closedAt.getTime() - 120_000),
+    lastUserMessageAt: receivedAt,
+    closedAt: input.closedAt,
+    closeReason: input.closeReason ?? "explicit",
+  });
+  await db.insert(schema.conversationMessages).values({
+    id: `message-${input.id}`,
+    sessionId: input.id,
+    sequence: 1,
+    role: "user",
+    sourceRecordId: source.sourceRecordId,
+    channel: "line",
+  });
+  await db.insert(schema.chatTurns).values({
+    id: `turn-${input.id}`,
+    sessionId: input.id,
+    fromSequence: 1,
+    throughSequence: 1,
+    generationEpoch: 1,
+    status: "delivered",
+    promptVersion: "diary-chat-v13",
+    model: "test-model",
+    endSession: true,
+    dailyPromptFollowUp: input.followUp,
+    receivedAt,
+  });
+  return source.sourceRecordId;
+}
+
 describe("daily prompt delivery", () => {
+  it("配送日の最新の終了済みSessionが許可した同日フォローだけを返す", async () => {
+    const db = createTestDb();
+    await insertClosedConversation(db, {
+      id: "same-day-session",
+      closedAt: new Date("2026-08-14T06:00:00.000Z"),
+      followUp: "same_day",
+    });
+
+    await expect(
+      selectDailyPromptSameDayContext(
+        db,
+        ACCOUNT_ID,
+        "2026-08-14",
+        new Date("2026-08-14T09:00:00.000Z"),
+      ),
+    ).resolves.toBe("same_day");
+  });
+
+  it("後から閉じたSessionが同日フォローを許可しなければ古い候補へ戻らない", async () => {
+    const db = createTestDb();
+    await insertClosedConversation(db, {
+      id: "older-session",
+      closedAt: new Date("2026-08-14T05:00:00.000Z"),
+      followUp: "same_day",
+    });
+    await insertClosedConversation(db, {
+      id: "latest-session",
+      closedAt: new Date("2026-08-14T06:00:00.000Z"),
+    });
+
+    await expect(
+      selectDailyPromptSameDayContext(
+        db,
+        ACCOUNT_ID,
+        "2026-08-14",
+        new Date("2026-08-14T09:00:00.000Z"),
+      ),
+    ).resolves.toBeUndefined();
+  });
+
+  it("期限切れの新しいSessionを閉じてから候補を選び、古い候補へ戻らない", async () => {
+    const db = createTestDb();
+    await insertClosedConversation(db, {
+      id: "older-follow-up-session",
+      closedAt: new Date("2026-08-14T00:00:00.000Z"),
+      followUp: "same_day",
+    });
+    await db.insert(schema.conversationSessions).values({
+      id: "newer-expired-session",
+      accountId: ACCOUNT_ID,
+      status: "active",
+      startedAt: new Date("2026-08-14T01:00:00.000Z"),
+      lastUserMessageAt: new Date("2026-08-14T02:00:00.000Z"),
+    });
+
+    await expect(
+      selectDailyPromptSameDayContext(
+        db,
+        ACCOUNT_ID,
+        "2026-08-14",
+        new Date("2026-08-14T09:00:00.000Z"),
+      ),
+    ).resolves.toBeUndefined();
+    expect(
+      db
+        .select({
+          status: schema.conversationSessions.status,
+          closeReason: schema.conversationSessions.closeReason,
+        })
+        .from(schema.conversationSessions)
+        .where(eq(schema.conversationSessions.id, "newer-expired-session"))
+        .get(),
+    ).toEqual({ status: "closed", closeReason: "inactive" });
+  });
+
+  it("18時より後に閉じたSessionを日中文脈へ含めない", async () => {
+    const db = createTestDb();
+    await insertClosedConversation(db, {
+      id: "after-cutoff-session",
+      receivedAt: new Date("2026-08-14T09:04:00.000Z"),
+      closedAt: new Date("2026-08-14T09:05:00.000Z"),
+      followUp: "same_day",
+    });
+
+    await expect(
+      selectDailyPromptSameDayContext(
+        db,
+        ACCOUNT_ID,
+        "2026-08-14",
+        new Date("2026-08-14T09:00:00.000Z"),
+      ),
+    ).resolves.toBeUndefined();
+  });
+
+  it("明示終了でないSessionや削除された本人Sourceを同日フォローへ使わない", async () => {
+    const db = createTestDb();
+    await insertClosedConversation(db, {
+      id: "inactive-session",
+      closedAt: new Date("2026-08-14T05:00:00.000Z"),
+      followUp: "same_day",
+      closeReason: "inactive",
+    });
+    await expect(
+      selectDailyPromptSameDayContext(
+        db,
+        ACCOUNT_ID,
+        "2026-08-14",
+        new Date("2026-08-14T09:00:00.000Z"),
+      ),
+    ).resolves.toBeUndefined();
+
+    const deletedSourceId = await insertClosedConversation(db, {
+      id: "deleted-source-session",
+      closedAt: new Date("2026-08-14T06:00:00.000Z"),
+      followUp: "same_day",
+    });
+    await db
+      .update(schema.sourceRecords)
+      .set({ isDeleted: true })
+      .where(eq(schema.sourceRecords.id, deletedSourceId));
+
+    await expect(
+      selectDailyPromptSameDayContext(
+        db,
+        ACCOUNT_ID,
+        "2026-08-14",
+        new Date("2026-08-14T09:00:00.000Z"),
+      ),
+    ).resolves.toBeUndefined();
+  });
+
+  it("前日に受け取った発言を当日の日中文脈として扱わない", async () => {
+    const db = createTestDb();
+    await insertClosedConversation(db, {
+      id: "previous-day-source-session",
+      receivedAt: new Date("2026-08-13T14:59:00.000Z"),
+      closedAt: new Date("2026-08-13T15:01:00.000Z"),
+      followUp: "same_day",
+    });
+
+    await expect(
+      selectDailyPromptSameDayContext(
+        db,
+        ACCOUNT_ID,
+        "2026-08-14",
+        new Date("2026-08-14T09:00:00.000Z"),
+      ),
+    ).resolves.toBeUndefined();
+  });
+
   it("同じ日本日付を1回だけ準備し、配送済みを再送対象にしない", async () => {
     const db = createTestDb();
     const at = new Date("2026-08-14T09:00:00.000Z");
