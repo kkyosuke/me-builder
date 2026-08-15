@@ -112,6 +112,9 @@ export const brainItemRevisions = sqliteTable(
     derivationMethod: text("derivation_method", {
       enum: ["ai", "deterministic"],
     }).notNull(),
+    changeKind: text("change_kind", { enum: ["correction", "temporal"] })
+      .notNull()
+      .default("correction"),
   },
   (table) => [
     uniqueIndex("brain_item_revision_pair_idx").on(

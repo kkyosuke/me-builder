@@ -13,6 +13,8 @@ describe("fetchProfileProgression", () => {
       collectedPieces: 2,
       activePieces: 2,
       categoryCount: 2,
+      calculationVersion: 1,
+      highestLevel: 2,
     };
     const fetchMock = vi.fn().mockResolvedValue(Response.json(progression));
     vi.stubGlobal("fetch", fetchMock);
@@ -38,6 +40,8 @@ describe("fetchProfileProgression", () => {
           collectedPieces: 0,
           activePieces: 0,
           categoryCount: 0,
+          calculationVersion: 1,
+          highestLevel: 1,
         }),
       ),
     );

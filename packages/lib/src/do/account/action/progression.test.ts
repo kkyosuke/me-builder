@@ -28,14 +28,28 @@ function createTestDb(queryLog?: string[]): AccountDataDatabase {
   return db as unknown as AccountDataDatabase;
 }
 
-function insertSource(db: AccountDataDatabase, accountId: string, id: string, at: Date) {
-  return db.insert(schema.sourceRecords).values({
+async function insertSource(
+  db: AccountDataDatabase,
+  accountId: string,
+  id: string,
+  at: Date,
+  contentHash?: string,
+) {
+  await db.insert(schema.sourceRecords).values({
     id,
     accountId,
     kind: "user_input",
     createdAt: at,
     updatedAt: at,
   });
+  if (contentHash) {
+    await db.insert(schema.sourceRecordTextPayloads).values({
+      sourceRecordId: id,
+      body: `${id} body`,
+      contentHash,
+      createdAt: at,
+    });
+  }
 }
 
 async function insertItem(
@@ -109,6 +123,8 @@ describe("Utsushi progression", () => {
       collectedPieces: 0,
       activePieces: 0,
       categoryCount: 0,
+      calculationVersion: 1,
+      highestLevel: 1,
     });
   });
 
@@ -146,6 +162,8 @@ describe("Utsushi progression", () => {
       collectedPieces: 2,
       activePieces: 2,
       categoryCount: 2,
+      calculationVersion: 1,
+      highestLevel: 1,
     });
 
     const later = new Date(at.getTime() + 10);
@@ -160,6 +178,8 @@ describe("Utsushi progression", () => {
       collectedPieces: 3,
       activePieces: 3,
       categoryCount: 3,
+      calculationVersion: 1,
+      highestLevel: 2,
     };
     await expect(readUtsushiProgression(db, accountId, later)).resolves.toEqual(afterAddition);
     await expect(readUtsushiProgression(db, accountId, later)).resolves.toEqual(afterAddition);
@@ -201,5 +221,92 @@ describe("Utsushi progression", () => {
         (query) => query.includes("sum(") && query.includes("progression_events"),
       ),
     ).toBe(false);
+  });
+
+  it("同じ本文hashのEvidenceを再送しても成長値を増やさない", async () => {
+    const db = createTestDb();
+    const accountId = "duplicate-evidence-account";
+    const at = new Date("2026-08-15T00:00:00.000Z");
+    await db.insert(schema.accountDataIdentity).values({ singleton: 1, accountId });
+    await insertSource(db, accountId, "source-1", at, "same-content");
+    await insertItem(db, accountId, "item-1", "preference", at);
+    await insertEvidence(db, accountId, "edge-1", "item-1", "source-1", at);
+    await expect(readUtsushiProgression(db, accountId, at)).resolves.toMatchObject({
+      growthValue: 3,
+    });
+
+    const later = new Date(at.getTime() + 1);
+    await insertSource(db, accountId, "source-2", later, "same-content");
+    await insertEvidence(db, accountId, "edge-2", "item-1", "source-2", later);
+    await expect(readUtsushiProgression(db, accountId, later)).resolves.toMatchObject({
+      growthValue: 3,
+    });
+    expect(
+      db
+        .select({ kind: schema.progressionEvents.kind })
+        .from(schema.progressionEvents)
+        .where(eq(schema.progressionEvents.originId, "edge-2"))
+        .get(),
+    ).toEqual({ kind: "duplicate_evidence" });
+  });
+
+  it("Revisionの保存済み種別に従い、時間変化だけを加点する", async () => {
+    const db = createTestDb();
+    const accountId = "revision-kind-account";
+    const at = new Date("2026-08-15T00:00:00.000Z");
+    await db.insert(schema.accountDataIdentity).values({ singleton: 1, accountId });
+    await insertItem(db, accountId, "item-1", "goal", at);
+    await readUtsushiProgression(db, accountId, at);
+
+    const temporalAt = new Date(at.getTime() + 1);
+    await insertItem(db, accountId, "item-2", "goal", temporalAt);
+    await db.insert(schema.brainItemRevisions).values({
+      id: "revision-temporal",
+      previousBrainItemId: "item-1",
+      nextBrainItemId: "item-2",
+      derivationMethod: "ai",
+      changeKind: "temporal",
+      createdAt: temporalAt,
+      updatedAt: temporalAt,
+    });
+    await expect(readUtsushiProgression(db, accountId, temporalAt)).resolves.toMatchObject({
+      growthValue: 5,
+    });
+
+    const correctionAt = new Date(at.getTime() + 2);
+    await insertItem(db, accountId, "item-3", "goal", correctionAt);
+    await db.insert(schema.brainItemRevisions).values({
+      id: "revision-correction",
+      previousBrainItemId: "item-2",
+      nextBrainItemId: "item-3",
+      derivationMethod: "ai",
+      changeKind: "correction",
+      createdAt: correctionAt,
+      updatedAt: correctionAt,
+    });
+    await expect(readUtsushiProgression(db, accountId, correctionAt)).resolves.toMatchObject({
+      growthValue: 5,
+      calculationVersion: 1,
+      highestLevel: 2,
+    });
+  });
+
+  it("再計算後も保存済みの最高到達レベルを下回らない", async () => {
+    const db = createTestDb();
+    const accountId = "highest-level-account";
+    const at = new Date("2026-08-15T00:00:00.000Z");
+    await db.insert(schema.accountDataIdentity).values({ singleton: 1, accountId });
+    await insertItem(db, accountId, "item-1", "goal", at);
+    await readUtsushiProgression(db, accountId, at);
+    await db
+      .update(schema.progressionStates)
+      .set({ highestLevel: 10 })
+      .where(eq(schema.progressionStates.accountId, accountId));
+
+    await expect(readUtsushiProgression(db, accountId, at)).resolves.toMatchObject({
+      level: 10,
+      highestLevel: 10,
+      growthValue: 3,
+    });
   });
 });

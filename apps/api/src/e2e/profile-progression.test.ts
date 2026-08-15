@@ -163,6 +163,8 @@ describe("Profile progression API local E2E", () => {
       collectedPieces: 0,
       activePieces: 0,
       categoryCount: 0,
+      calculationVersion: 1,
+      highestLevel: 1,
     });
 
     const at = new Date("2026-08-15T01:00:00.000Z");
@@ -178,6 +180,8 @@ describe("Profile progression API local E2E", () => {
       collectedPieces: 2,
       activePieces: 2,
       categoryCount: 2,
+      calculationVersion: 1,
+      highestLevel: 2,
     });
 
     await accountDataStore.db
@@ -191,6 +195,8 @@ describe("Profile progression API local E2E", () => {
       collectedPieces: 2,
       activePieces: 1,
       categoryCount: 1,
+      calculationVersion: 1,
+      highestLevel: 2,
     });
   });
 });

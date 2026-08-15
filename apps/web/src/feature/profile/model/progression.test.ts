@@ -11,6 +11,8 @@ describe("progression presentation values", () => {
       collectedPieces: 58,
       activePieces: 48,
       categoryCount: 6,
+      calculationVersion: 1,
+      highestLevel: 12,
     };
 
     expect(growthUntilNextLevel(progression)).toBe(107);
@@ -25,6 +27,8 @@ describe("progression presentation values", () => {
       collectedPieces: 0,
       activePieces: 0,
       categoryCount: 0,
+      calculationVersion: 1,
+      highestLevel: 1,
     };
 
     expect(progressionPercentage({ ...base, growthValue: -1 })).toBe(0);

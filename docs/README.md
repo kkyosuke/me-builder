@@ -94,6 +94,7 @@ docs/
 - [相性共有データ実装設計](architecture/compatibility-data-design.md) — 1関係 = 1 CompatibilityData DO、Account別一覧参照、相手単位の継続同意、状態遷移
 - [日記チャット実装設計](architecture/diary-chat-implementation-design.md) — 日記チャットのAccountDataモデル、声かけコンテキストの保存、実行基盤、プロンプト、ガードレール、応答期限
 - [管理者向けダッシュボード設計](architecture/admin-statistics-dashboard.md) — 管理者認可、Account一覧、うつしレベル・かけら数、Gemini・LINEの利用統計
+- [成長・報酬実装設計](architecture/progression-reward-implementation.md) — 進行イベントの計算版、本人向けフィードバック、成長カード、ふたりレベルの保存先と障害境界
 - [キャラクターデザイン](design/character-design.md) — うつし・ミラの設定とデザインアセット
 - [診断seed運用](development/diagnosis-seed.md) — 診断をD1へ登録するseedの配置、実行、更新、検証方法
 - [診断サムネイル生成](development/diagnosis-thumbnail-generation.md) — 診断一覧用サムネイルの生成プロンプトと配置手順

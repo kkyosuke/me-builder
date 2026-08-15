@@ -234,6 +234,8 @@ describe("App", () => {
       collectedPieces: 0,
       activePieces: 0,
       categoryCount: 0,
+      calculationVersion: 1,
+      highestLevel: 1,
     });
     mocks.saveAccountAvatar.mockImplementation(
       async (_apiUrl: string, _idToken: string, nextAvatar: { dataUrl: string }) => ({

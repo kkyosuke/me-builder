@@ -40,6 +40,7 @@ export type SaveBrainItemInput = Readonly<{
     revisionId: string;
     brainItemId: string;
     derivationMethod: "ai" | "deterministic";
+    changeKind?: "correction" | "temporal";
   }>;
 }>;
 
@@ -514,6 +515,7 @@ export async function saveBrainItem(
         previousBrainItemId: input.supersedes.brainItemId,
         nextBrainItemId: brainItemId,
         derivationMethod: input.supersedes.derivationMethod,
+        changeKind: input.supersedes.changeKind ?? "correction",
         ...lifecycle,
       }),
       db.insert(brainVectorSyncJobs).values({

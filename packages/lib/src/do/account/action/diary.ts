@@ -2463,6 +2463,7 @@ export async function applyDiaryBrainCheckpoint(
           previousBrainItemId: item.id,
           nextBrainItemId: brainItemId,
           derivationMethod: "ai",
+          changeKind: "temporal",
           ...lifecycle,
         }),
         db.insert(brainVectorSyncJobs).values({

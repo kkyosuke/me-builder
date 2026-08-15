@@ -68,6 +68,8 @@ async function prepareAccounts(db: D1Database): Promise<void> {
       collectedPieces: 2,
       activePieces: 2,
       categoryCount: 2,
+      calculationVersion: 1,
+      highestLevel: 2,
     },
     new Date("2026-08-15T01:00:00.000Z"),
   );
