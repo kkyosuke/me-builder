@@ -548,6 +548,7 @@ export async function processChatTurnMessage(
       ? {
           reply: pendingResponse.body,
           endSession: pendingResponse.endSession,
+          dailyPromptFollowUp: undefined,
           collectionTarget: undefined,
           brainUsages: [],
           usedBrainItems: pendingResponse.usedBrainItems,
@@ -576,6 +577,10 @@ export async function processChatTurnMessage(
               return {
                 reply: generated.reply,
                 endSession: generated.end_session,
+                dailyPromptFollowUp:
+                  generated.daily_prompt_follow_up === "same_day"
+                    ? ("same_day" as const)
+                    : undefined,
                 collectionTarget: generated.collection_target,
                 usedBrainItems: usedMemories,
                 brainUsages: usedMemories.map((memory) => ({
@@ -627,6 +632,9 @@ export async function processChatTurnMessage(
             turnId: message.body.turnId,
             body: response.reply,
             endSession: response.endSession,
+            ...(response.dailyPromptFollowUp
+              ? { dailyPromptFollowUp: response.dailyPromptFollowUp }
+              : {}),
             ...(response.collectionTarget ? { collectionTarget: response.collectionTarget } : {}),
             brainUsages: response.brainUsages,
           }),

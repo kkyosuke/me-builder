@@ -13,6 +13,7 @@ import m0011 from "./0011_fine_colonel_america.sql";
 import m0012 from "./0012_smiling_ricochet.sql";
 import m0013 from "./0013_flat_silver_samurai.sql";
 import m0014 from "./0014_flimsy_valkyrie.sql";
+import m0015 from "./0015_last_killmonger.sql";
 import journal from "./meta/_journal.json";
 
 export default {
@@ -33,5 +34,6 @@ export default {
     m0012,
     m0013,
     m0014,
+    m0015,
   },
 };

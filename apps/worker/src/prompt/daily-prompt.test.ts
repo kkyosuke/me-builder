@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   LEGACY_DAILY_PROMPT_VERSION,
+  getDailyPromptContextCutoffAt,
   getDailyPromptText,
   getDailyPromptVersion,
   getDailyPromptWeekday,
@@ -45,6 +46,12 @@ describe("daily prompt", () => {
     expect(getDailyPromptWeekday("2026-08-16")).toBe("sunday");
   });
 
+  it("日中文脈の締切を配送日の18:00 JSTへ固定する", () => {
+    expect(getDailyPromptContextCutoffAt("2026-08-14")).toEqual(
+      new Date("2026-08-14T09:00:00.000Z"),
+    );
+  });
+
   it.each([
     [
       "recurring_schedule",
@@ -64,6 +71,15 @@ describe("daily prompt", () => {
   ] as const)("%sでは予定名を含まない版付き定型文を選ぶ", (context, version, text) => {
     expect(getDailyPromptVersion("2026-08-10", context)).toBe(version);
     expect(getDailyPromptText(version)).toBe(text);
+  });
+
+  it("同日フォローを曜日文脈より優先する", () => {
+    const version = getDailyPromptVersion("2026-08-10", "day_off", "same_day");
+
+    expect(version).toBe("daily-check-in-same-day-follow-up-v1");
+    expect(getDailyPromptText(version)).toBe(
+      "日中に話してくれたこと、その後はどう？\n話題を変えて、今日全体のことを話しても大丈夫だよ。",
+    );
   });
 
   it("段階1の固定文面versionを既存配送向けに保持する", () => {

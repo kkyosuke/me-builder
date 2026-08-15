@@ -15,6 +15,7 @@ import {
   pushLineTextWithRetryKey,
 } from "../infrastructure/line-delivery";
 import {
+  getDailyPromptContextCutoffAt,
   getDailyPromptText,
   getDailyPromptVersion,
   getDailyPromptWeekday,
@@ -37,6 +38,7 @@ export async function processDailyPromptMessage(
   let deliveryId: string | undefined;
 
   try {
+    const contextCutoffAt = getDailyPromptContextCutoffAt(message.body.localDate);
     const weekdayContext = await accountData
       .execute(
         "brain.selectDailyPromptWeekdayContext",
@@ -66,7 +68,41 @@ export async function processDailyPromptMessage(
         );
         return undefined;
       });
-    const promptVersion = getDailyPromptVersion(message.body.localDate, weekdayContext);
+    const sameDayContext = await accountData
+      .execute(
+        "conversation.selectDailyPromptSameDayContext",
+        message.body.localDate,
+        contextCutoffAt,
+      )
+      .catch((error: unknown) => {
+        logger.warn(
+          {
+            event: "daily-prompt.same-day-context.failed",
+            service: "worker",
+            environment: workerConfig.environment,
+            component: "daily-prompt",
+            queueMessageId: message.id,
+            localDate: message.body.localDate,
+            attempt: message.attempts,
+            outcome: "degraded",
+            disposition: "continue",
+            ...toSafeOperationalErrorFields(error, {
+              code: "DAILY_PROMPT_SAME_DAY_CONTEXT_LOAD_FAILED",
+              category: "dependency",
+              stage: "daily-prompt.context",
+              retryable: false,
+              dependency: "account-data",
+            }),
+          },
+          "[Daily prompt] failed to load same-day context -> continue without it",
+        );
+        return undefined;
+      });
+    const promptVersion = getDailyPromptVersion(
+      message.body.localDate,
+      weekdayContext,
+      sameDayContext,
+    );
     const preparation = await accountData.execute("conversation.prepareDailyPrompt", {
       localDate: message.body.localDate,
       promptVersion,

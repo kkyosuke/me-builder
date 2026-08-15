@@ -1,4 +1,8 @@
-import type { DailyPromptWeekdayContext, PromptContextWeekday } from "@me-builder/lib";
+import type {
+  DailyPromptSameDayContext,
+  DailyPromptWeekdayContext,
+  PromptContextWeekday,
+} from "@me-builder/lib";
 
 /** 段階1で作成済みの配送を再送できるよう保持する。 */
 export const LEGACY_DAILY_PROMPT_VERSION = "daily-check-in-v1";
@@ -18,6 +22,10 @@ const DAILY_PROMPT_VERSION_BY_WEEKDAY_CONTEXT = {
   day_off: "daily-check-in-day-off-v1",
   active_day: "daily-check-in-active-day-v1",
 } as const satisfies Readonly<Record<DailyPromptWeekdayContext, string>>;
+
+const DAILY_PROMPT_VERSION_BY_SAME_DAY_CONTEXT = {
+  same_day: "daily-check-in-same-day-follow-up-v1",
+} as const satisfies Readonly<Record<DailyPromptSameDayContext, string>>;
 
 const PROMPT_CONTEXT_WEEKDAY_BY_DAY = [
   "sunday",
@@ -46,6 +54,8 @@ const DAILY_PROMPTS: Readonly<Record<string, string>> = {
     "今日は、普段だとお休みの日だったかな。\n違っていたら気にせず、今日のことを話したいところから聞かせて。",
   "daily-check-in-active-day-v1":
     "今日は、普段だと予定のある日だったかな。\n落ち着いたら、今日のことをひとことだけでも聞かせて。",
+  "daily-check-in-same-day-follow-up-v1":
+    "日中に話してくれたこと、その後はどう？\n話題を変えて、今日全体のことを話しても大丈夫だよ。",
 };
 
 /** Asia/Tokyoで解決済みの配送日を声かけコンテキストの曜日へ変換する。 */
@@ -60,12 +70,20 @@ export function getDailyPromptWeekday(localDate: string): PromptContextWeekday {
   return weekday;
 }
 
+/** 配送日の18:00 JSTを、日中文脈選択の固定された締切として返す。 */
+export function getDailyPromptContextCutoffAt(localDate: string): Date {
+  getDailyPromptWeekday(localDate);
+  return new Date(`${localDate}T18:00:00.000+09:00`);
+}
+
 /** 配送日と利用可能な曜日文脈から、版付き定型文を選ぶ。 */
 export function getDailyPromptVersion(
   localDate: string,
   weekdayContext?: DailyPromptWeekdayContext,
+  sameDayContext?: DailyPromptSameDayContext,
 ): string {
   getDailyPromptWeekday(localDate);
+  if (sameDayContext) return DAILY_PROMPT_VERSION_BY_SAME_DAY_CONTEXT[sameDayContext];
   if (weekdayContext) return DAILY_PROMPT_VERSION_BY_WEEKDAY_CONTEXT[weekdayContext];
   const parsed = new Date(`${localDate}T00:00:00.000Z`);
   const version = DAILY_PROMPT_VERSION_BY_WEEKDAY[parsed.getUTCDay()];

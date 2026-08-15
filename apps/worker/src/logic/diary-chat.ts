@@ -28,11 +28,13 @@ const SafetyRouteSchema = v.picklist([
   "imminent_danger",
   "abuse_or_violence",
 ]);
+const DailyPromptFollowUpSchema = v.picklist(["none", "same_day"]);
 const DiaryChatResponseSchema = v.strictObject({
   mode: ModeSchema,
   reply: v.pipe(v.string(), v.minLength(1), v.maxLength(5000)),
   main_question_count: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(1)),
   end_session: v.boolean(),
+  daily_prompt_follow_up: DailyPromptFollowUpSchema,
   collection_theme_id: v.pipe(v.string(), v.minLength(1), v.maxLength(100)),
   collection_kind: v.pipe(v.string(), v.minLength(1), v.maxLength(100)),
   safety: v.strictObject({
@@ -116,6 +118,7 @@ export function validateDiaryChatResponse(
     ? undefined
     : parsePromptContextCollectionTarget(themeId, kind);
   const safetyRoute = stricterSafetyRoute(preclassifiedRoute, parsed.output.safety.route);
+  const hasSameDayFollowUp = parsed.output.daily_prompt_follow_up === "same_day";
   if (
     (!hasNoCollectionTarget && !collectionTarget) ||
     (collectionTarget && parsed.output.main_question_count !== 1) ||
@@ -125,7 +128,11 @@ export function validateDiaryChatResponse(
         (candidate) =>
           candidate.themeId === collectionTarget.themeId &&
           candidate.kinds.includes(collectionTarget.kind),
-      ))
+      )) ||
+    (hasSameDayFollowUp &&
+      (!parsed.output.end_session ||
+        parsed.output.main_question_count !== 0 ||
+        safetyRoute !== "normal"))
   ) {
     return undefined;
   }
@@ -155,6 +162,7 @@ export function buildSafetyFallback(route: SafetyRoute): DiaryChatResponse {
     reply,
     main_question_count: requiresSafetyConfirmation ? 1 : 0,
     end_session: false,
+    daily_prompt_follow_up: "none",
     safety: { route, restricted_advice: route !== "normal" },
     used_memory_ids: [],
   };
