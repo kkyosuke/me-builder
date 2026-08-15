@@ -15,6 +15,7 @@ import {
   accountRecoveryCompleteRoute,
 } from "./contract/account-recovery";
 import { adminAccountsRoute } from "./contract/admin/accounts";
+import { adminBillingHealthRoute } from "./contract/admin/billing-health";
 import { adminBillingReconciliationRoute } from "./contract/admin/billing-reconciliation";
 import { adminStatisticsRoute } from "./contract/admin/statistics";
 import {
@@ -66,7 +67,12 @@ import {
   postAccountRecoveryCode,
   postAccountRecoveryComplete,
 } from "./controller/account-recovery";
-import { getAccounts, getStatistics, postBillingReconciliation } from "./controller/admin";
+import {
+  getAccounts,
+  getBillingHealth,
+  getStatistics,
+  postBillingReconciliation,
+} from "./controller/admin";
 import {
   postBillingCheckoutSession,
   postBillingPortalSession,
@@ -214,6 +220,7 @@ app.put(
 
 app.get("/api/admin/statistics", adminStatisticsRoute, getStatistics);
 app.get("/api/admin/accounts", adminAccountsRoute, getAccounts);
+app.get("/api/admin/billing/health", adminBillingHealthRoute, getBillingHealth);
 app.post(
   "/api/admin/billing/reconciliation",
   adminBillingReconciliationRoute,

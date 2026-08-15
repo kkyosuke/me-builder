@@ -18,7 +18,7 @@
 - Checkout、Portalから戻った後の画面体験
 - 本番課金を開始できるかの法務・税務・提供機能判断
 
-価格とPlanの内容は[サブスクリプション・料金プラン設計](../product/subscription-plan-design.md)、Accountとの紐付けは[課金・Plan紐付け実装設計](../architecture/billing-implementation-design.md)、残るリリースゲートは[サブスクリプション実装残タスク](subscription-remaining-tasks.md)を正とします。
+価格とPlanの内容は[サブスクリプション・料金プラン設計](../product/subscription-plan-design.md)、Accountとの紐付けは[課金・Plan紐付け実装設計](../architecture/billing-implementation-design.md)、障害対応は[課金監視・復旧Runbook](billing-operations-runbook.md)、残るリリースゲートは[サブスクリプション実装残タスク](subscription-remaining-tasks.md)を正とします。
 
 ## 2. 同期する資源
 
@@ -122,6 +122,8 @@ bun scripts/setup-stripe-billing.ts preview --stripe-only
 | `STRIPE_WEBHOOK_SECRET` | `Stripe-Signature`検証 | 不要 |
 | `STRIPE_PORTAL_CONFIGURATION_ID` | 管理対象のCustomer Portal設定をSession作成時に指定 | 不要 |
 | `BILLING_PRICE_PLAN_MAP` | 後続Checkout API用 | Price IDをprovider非依存Planへ変換 |
+| `BILLING_LOOKUP_KEY_MAP` | CheckoutでPlanと請求間隔を許可済みlookup keyへ変換 | いいえ |
+| `BILLING_PROJECTION_STALE_AFTER_SECONDS` | 監視でprojection遅延と判定する猶予秒数（既定900） | いいえ |
 
 Webhook secretはendpoint作成時にだけStripeから返ります。初回実行ではその値を自動配布します。Cloudflareに`STRIPE_WEBHOOK_SECRET`という名前のsecretが無い場合は、前回の配布失敗からも復旧できるようendpointをローテーションして新しいsecretを配布します。既存値を意図的に置き換える場合は、既知の値を`STRIPE_WEBHOOK_SECRET`へ設定して実行します。
 

@@ -44,6 +44,7 @@ jobs:
       GOOGLE_VERTEX_AI_API_KEY: ${{ secrets.GOOGLE_VERTEX_AI_API_KEY }}
       CHAT_DELIVERY_SECRET: ${{ secrets.CHAT_DELIVERY_SECRET }}
       BRAIN_VECTOR_HMAC_SECRET: ${{ secrets.BRAIN_VECTOR_HMAC_SECRET }}
+      BILLING_PROJECTION_STALE_AFTER_SECONDS: ${{ vars.BILLING_PROJECTION_STALE_AFTER_SECONDS }}
       CLOUDFLARE_ACCESS_ALLOWED_EMAILS: ${{ vars.CLOUDFLARE_ACCESS_ALLOWED_EMAILS }}
       ADMIN_LINE_USER_IDS: ${{ secrets.ADMIN_LINE_USER_IDS }}
       # LIFF Server API は LINE Login チャネルのチャネルアクセストークンを要求する。
@@ -129,7 +130,7 @@ jobs:
                 .filter(([, value]) => value),
             );
             const apiConfiguration = Object.fromEntries(
-              [["LINE_LOGIN_CHANNEL_ID", process.env.LINE_LOGIN_CHANNEL_ID]]
+              [["LINE_LOGIN_CHANNEL_ID", process.env.LINE_LOGIN_CHANNEL_ID], ["BILLING_PROJECTION_STALE_AFTER_SECONDS", process.env.BILLING_PROJECTION_STALE_AFTER_SECONDS]]
                 .filter(([, value]) => value),
             );
             const workerOnlySecrets = Object.fromEntries(
