@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
-import {
-  type RelationshipCategoryFilter,
-  relationshipCategoryFilterFromSearch,
-} from "../../diagnosis/model/relationship-category";
 import { useLiffSession } from "../../liff";
 import { shareCompatibilityInvitationToLine } from "../infrastructure/compatibility-invitation-sharing";
+import {
+  type CompatibilityRelationshipCategoryFilter,
+  compatibilityRelationshipCategoryFilterFromSearch,
+} from "../model/compatibility-category-navigation";
 import type { CompatibilityRelationshipListItem } from "../model/compatibility-relationship";
 import { CompatibilityListScreen } from "./compatibility-list-screen";
 import { useCompatibilityRelationships } from "./hooks/use-compatibility-relationships";
@@ -13,18 +13,18 @@ export default function CompatibilityListApplication() {
   const { acquireIdToken, profile } = useLiffSession();
   const relationships = useCompatibilityRelationships({ acquireIdToken });
   const [sharingMessage, setSharingMessage] = useState<string | null>(null);
-  const [categoryFilter, setCategoryFilter] = useState<RelationshipCategoryFilter>(() =>
-    relationshipCategoryFilterFromSearch(window.location.search),
+  const [categoryFilter, setCategoryFilter] = useState<CompatibilityRelationshipCategoryFilter>(
+    () => compatibilityRelationshipCategoryFilterFromSearch(window.location.search),
   );
 
   useEffect(() => {
     const syncCategoryFilterWithHistory = () =>
-      setCategoryFilter(relationshipCategoryFilterFromSearch(window.location.search));
+      setCategoryFilter(compatibilityRelationshipCategoryFilterFromSearch(window.location.search));
     window.addEventListener("popstate", syncCategoryFilterWithHistory);
     return () => window.removeEventListener("popstate", syncCategoryFilterWithHistory);
   }, []);
 
-  const changeCategoryFilter = useCallback((filter: RelationshipCategoryFilter) => {
+  const changeCategoryFilter = useCallback((filter: CompatibilityRelationshipCategoryFilter) => {
     setCategoryFilter(filter);
     const url = new URL(window.location.href);
     if (filter === "all") {

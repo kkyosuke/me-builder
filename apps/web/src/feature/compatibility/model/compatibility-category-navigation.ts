@@ -4,6 +4,14 @@ import {
 } from "@me-builder/lib/compatibility";
 
 export type CompatibilityCategoryQueryParameter = "category" | "shareCategory";
+export type CompatibilityRelationshipCategoryFilter = "all" | CompatibilityRelationshipCategory;
+
+export function compatibilityRelationshipCategoryFilterFromSearch(
+  search: string,
+): CompatibilityRelationshipCategoryFilter {
+  const category = new URLSearchParams(search).get("category");
+  return compatibilityRelationshipCategoryValues.find((value) => value === category) ?? "all";
+}
 
 export function compatibilityCategoryFromSearch(
   search: string,

@@ -120,7 +120,9 @@ coverage = 回答済み重み ÷ そのパラメータの全重み
 
 結果は少なくとも、使用したQuestion ID、Question Version、選択値、設定版から再現できる必要があります。
 
-質問文・選択肢を変更する場合はQuestion Versionを追加します。パラメータ、重み、回答値の変換、表示境界、`relationshipRequests`を変更する場合は設定版を追加します。過去の回答結果を、新しい設定版で暗黙に読み替えません。
+質問文・選択肢を変更する場合はQuestion Versionを追加します。パラメータ、重み、回答値の変換、表示境界を変更する場合は設定版を追加します。既に設定済みの`relationshipRequests`を改訂する場合も設定版を追加し、過去の回答結果を新しい設定版で暗黙に読み替えません。
+
+`relationshipRequests`の初回導入に限り、採点値へ影響せず、かつ対象プロパティが未設定の既存採点設定へ審査済み文を条件付きで補完できます。この互換補完では設定版を変えず、診断catalog versionを上げてAccountDataのsnapshotを再同期します。補完済みの文は上書きしません。具体的なseed手順と制約は[診断seed運用 §3](../../development/diagnosis-seed.md#3-seedの原則)を正とします。
 
 ## 7. 新しい診断を追加する手順
 
@@ -142,6 +144,6 @@ coverage = 回答済み重み ÷ そのパラメータの全重み
 
 ## 9. 現在の実装境界
 
-`diagnosis_scoring_configs`が設定版と設定JSONを保持し、公開済みDiagnosisの`scoring_config_id`は変更しません。API ServerはDBから取得した設定をValibotで検証し、AnswerのQuestion ID、Question Version、Choice IDから表示のたびに結果を再計算します。
+`diagnosis_scoring_configs`が設定版と設定JSONを保持し、公開済みDiagnosisの`scoring_config_id`は変更しません。初回導入時の未設定`relationshipRequests`だけは前節の条件で補完しますが、採点パラメータ、重み、境界、設定版は変更しません。API ServerはDBから取得した設定をValibotで検証し、AnswerのQuestion ID、Question Version、Choice IDから表示のたびに結果を再計算します。
 
 クライアントの算出値は正として扱いません。Brain Item projectionはサーバー側で同じ共通スコアリングエンジンと版付き採点設定を使用します。採点設定を持たないDiagnosisでは回答内容だけを返し、Brain Itemを生成しません。

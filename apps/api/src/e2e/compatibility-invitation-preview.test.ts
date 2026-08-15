@@ -45,25 +45,6 @@ async function prepareDatabase(db: D1Database): Promise<void> {
     await applySqlFile(db, await readFile(path.join(migrationsDirectory, file), "utf8"));
   }
   await applySqlFile(db, await readFile(diagnosisSeed, "utf8"));
-  const scoringConfig = await db
-    .prepare("SELECT definition FROM diagnosis_scoring_configs WHERE id = ?")
-    .bind("relationship-priority-v1")
-    .first<{ definition: string }>();
-  if (!scoringConfig) throw new Error("relationship priority scoring config was not seeded");
-  const scoringDefinition = JSON.parse(scoringConfig.definition) as {
-    parameters: Array<{ relationshipRequests?: Record<string, string> }>;
-  };
-  const firstParameter = scoringDefinition.parameters[0];
-  if (!firstParameter) throw new Error("relationship priority parameter was not seeded");
-  firstParameter.relationshipRequests = {
-    low: "自分の希望を聞く時間を作ってもらえるとうれしいです。",
-    balanced: "状況に応じて相談してもらえるとうれしいです。",
-    high: "相手の希望も確認してもらえるとうれしいです。",
-  };
-  await db
-    .prepare("UPDATE diagnosis_scoring_configs SET definition = ? WHERE id = ?")
-    .bind(JSON.stringify(scoringDefinition), "relationship-priority-v1")
-    .run();
   for (const participant of Object.values(participants)) {
     await db
       .prepare(
@@ -302,6 +283,35 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
     vi.unstubAllGlobals();
     await miniflare.dispose();
   });
+
+  it(
+    "既存の採点設定に関わり方文がない場合はseed再適用で補完する",
+    async () => {
+      await database
+        .prepare(
+          `UPDATE diagnosis_scoring_configs
+           SET definition = json_remove(definition, '$.parameters[0].relationshipRequests')
+           WHERE id = 'relationship-priority-v1'`,
+        )
+        .run();
+
+      await applySqlFile(database, await readFile(diagnosisSeed, "utf8"));
+
+      expect(
+        await database
+          .prepare(
+            `SELECT json_extract(
+               definition,
+               '$.parameters[0].relationshipRequests.low'
+             ) AS request
+             FROM diagnosis_scoring_configs
+             WHERE id = 'relationship-priority-v1'`,
+          )
+          .first(),
+      ).toEqual({ request: "自分の希望を聞く時間を作ってもらえるとうれしいです。" });
+    },
+    e2eTimeoutMs,
+  );
 
   it(
     `${compatibilityShareCases.previewInvitation.id}: ${compatibilityShareCases.previewInvitation.name}`,
