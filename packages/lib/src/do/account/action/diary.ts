@@ -185,7 +185,9 @@ type DailyPromptSkipReason =
   | "recent_unanswered"
   | "auto_paused";
 
-export type DailyPromptSameDayContext = "same_day";
+export type DailyPromptFollowUp = "same_day" | "next_day";
+export type DailyPromptSameDayContext = Extract<DailyPromptFollowUp, "same_day">;
+export type DailyPromptPreviousDayContext = Extract<DailyPromptFollowUp, "next_day">;
 
 function assertLocalDate(localDate: string): void {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(localDate)) throw new Error("Daily prompt date is invalid");
@@ -199,6 +201,57 @@ function nextLocalDate(localDate: string): string {
   const parsed = new Date(`${localDate}T00:00:00.000Z`);
   parsed.setUTCDate(parsed.getUTCDate() + 1);
   return parsed.toISOString().slice(0, 10);
+}
+
+function previousLocalDate(localDate: string): string {
+  const parsed = new Date(`${localDate}T00:00:00.000Z`);
+  parsed.setUTCDate(parsed.getUTCDate() - 1);
+  return parsed.toISOString().slice(0, 10);
+}
+
+async function hasValidDailyPromptFollowUpSources(
+  db: AccountDataDatabase,
+  input: Readonly<{
+    accountId: string;
+    sessionId: string;
+    fromSequence: number;
+    throughSequence: number;
+    windowStartedAt: Date;
+    windowEndedAt: Date;
+    cutoffAt?: Date;
+  }>,
+): Promise<boolean> {
+  const userSources = await db
+    .select({
+      messageIsDeleted: conversationMessages.isDeleted,
+      sourceAccountId: sourceRecords.accountId,
+      sourceIsDeleted: sourceRecords.isDeleted,
+      sourceCreatedAt: sourceRecords.createdAt,
+    })
+    .from(conversationMessages)
+    .leftJoin(sourceRecords, eq(sourceRecords.id, conversationMessages.sourceRecordId))
+    .where(
+      and(
+        eq(conversationMessages.sessionId, input.sessionId),
+        eq(conversationMessages.role, "user"),
+        gte(conversationMessages.sequence, input.fromSequence),
+        lte(conversationMessages.sequence, input.throughSequence),
+      ),
+    )
+    .all();
+  return (
+    userSources.length > 0 &&
+    userSources.every(
+      ({ messageIsDeleted, sourceAccountId, sourceIsDeleted, sourceCreatedAt }) =>
+        !messageIsDeleted &&
+        sourceAccountId === input.accountId &&
+        !sourceIsDeleted &&
+        sourceCreatedAt !== null &&
+        sourceCreatedAt >= input.windowStartedAt &&
+        sourceCreatedAt < input.windowEndedAt &&
+        (!input.cutoffAt || sourceCreatedAt <= input.cutoffAt),
+    )
+  );
 }
 
 /** 配送日の最新の終了済みSessionが、同日中の続きを許可しているかを返す。 */
@@ -249,26 +302,96 @@ export async function selectDailyPromptSameDayContext(
     .get();
   if (!finalTurn?.endSession || finalTurn.dailyPromptFollowUp !== "same_day") return undefined;
 
-  const activeUserSource = await db
-    .select({ id: sourceRecords.id })
+  const hasValidSources = await hasValidDailyPromptFollowUpSources(db, {
+    accountId,
+    sessionId: latestSession.id,
+    fromSequence: finalTurn.fromSequence,
+    throughSequence: finalTurn.throughSequence,
+    windowStartedAt: localDayStartedAt,
+    windowEndedAt: nextLocalDayStartedAt,
+    cutoffAt: at,
+  });
+  return hasValidSources ? "same_day" : undefined;
+}
+
+/** 配送日の前日に本人発言を含む最後のSessionが、翌日の続きを許可しているかを返す。 */
+export async function selectDailyPromptPreviousDayContext(
+  db: AccountDataDatabase,
+  accountId: string,
+  localDate: string,
+): Promise<DailyPromptPreviousDayContext | undefined> {
+  assertLocalDate(localDate);
+  const previousDate = previousLocalDate(localDate);
+  const previousDayStartedAt = new Date(`${previousDate}T00:00:00.000+09:00`);
+  const localDayStartedAt = new Date(`${localDate}T00:00:00.000+09:00`);
+  const latestSession = await db
+    .select({
+      id: conversationSessions.id,
+      status: conversationSessions.status,
+      startedAt: conversationSessions.startedAt,
+      lastUserMessageAt: conversationSessions.lastUserMessageAt,
+      closedAt: conversationSessions.closedAt,
+      closeReason: conversationSessions.closeReason,
+    })
     .from(conversationMessages)
     .innerJoin(sourceRecords, eq(sourceRecords.id, conversationMessages.sourceRecordId))
+    .innerJoin(conversationSessions, eq(conversationSessions.id, conversationMessages.sessionId))
     .where(
       and(
-        eq(conversationMessages.sessionId, latestSession.id),
+        eq(conversationSessions.accountId, accountId),
+        eq(conversationSessions.isDeleted, false),
         eq(conversationMessages.role, "user"),
-        eq(conversationMessages.isDeleted, false),
-        gte(conversationMessages.sequence, finalTurn.fromSequence),
-        lte(conversationMessages.sequence, finalTurn.throughSequence),
         eq(sourceRecords.accountId, accountId),
-        eq(sourceRecords.isDeleted, false),
-        gte(sourceRecords.createdAt, localDayStartedAt),
-        lt(sourceRecords.createdAt, nextLocalDayStartedAt),
-        lte(sourceRecords.createdAt, at),
+        gte(sourceRecords.createdAt, previousDayStartedAt),
+        lt(sourceRecords.createdAt, localDayStartedAt),
       ),
     )
+    .orderBy(
+      desc(sourceRecords.createdAt),
+      desc(conversationSessions.startedAt),
+      desc(conversationSessions.id),
+    )
     .get();
-  return activeUserSource ? "same_day" : undefined;
+  if (
+    !latestSession ||
+    latestSession.status !== "closed" ||
+    latestSession.closeReason !== "explicit" ||
+    !latestSession.closedAt ||
+    latestSession.lastUserMessageAt >= localDayStartedAt ||
+    latestSession.closedAt < previousDayStartedAt ||
+    latestSession.closedAt >= localDayStartedAt
+  ) {
+    return undefined;
+  }
+
+  const finalTurn = await db
+    .select({
+      fromSequence: chatTurns.fromSequence,
+      throughSequence: chatTurns.throughSequence,
+      endSession: chatTurns.endSession,
+      dailyPromptFollowUp: chatTurns.dailyPromptFollowUp,
+    })
+    .from(chatTurns)
+    .where(
+      and(
+        eq(chatTurns.sessionId, latestSession.id),
+        eq(chatTurns.status, "delivered"),
+        eq(chatTurns.isDeleted, false),
+      ),
+    )
+    .orderBy(desc(chatTurns.throughSequence), desc(chatTurns.id))
+    .get();
+  if (!finalTurn?.endSession || finalTurn.dailyPromptFollowUp !== "next_day") return undefined;
+
+  const hasValidSources = await hasValidDailyPromptFollowUpSources(db, {
+    accountId,
+    sessionId: latestSession.id,
+    fromSequence: finalTurn.fromSequence,
+    throughSequence: finalTurn.throughSequence,
+    windowStartedAt: previousDayStartedAt,
+    windowEndedAt: localDayStartedAt,
+  });
+  return hasValidSources ? "next_day" : undefined;
 }
 
 async function skipDailyPrompt(
@@ -2151,7 +2274,7 @@ export async function saveAssistantResponse(
     turnId: string;
     body: string;
     endSession: boolean;
-    dailyPromptFollowUp?: DailyPromptSameDayContext;
+    dailyPromptFollowUp?: DailyPromptFollowUp;
     collectionTarget?: PromptContextCollectionTarget;
     brainUsages?: readonly Readonly<{
       brainItemId: string;

@@ -74,11 +74,26 @@ describe("daily prompt", () => {
   });
 
   it("同日フォローを曜日文脈より優先する", () => {
-    const version = getDailyPromptVersion("2026-08-10", "day_off", "same_day");
+    const version = getDailyPromptVersion("2026-08-10", "day_off", "same_day", "next_day");
 
     expect(version).toBe("daily-check-in-same-day-follow-up-v1");
     expect(getDailyPromptText(version)).toBe(
       "日中に話してくれたこと、その後はどう？\n話題を変えて、今日全体のことを話しても大丈夫だよ。",
+    );
+  });
+
+  it("曜日文脈を前日フォローより優先する", () => {
+    expect(getDailyPromptVersion("2026-08-10", "day_off", undefined, "next_day")).toBe(
+      "daily-check-in-day-off-v1",
+    );
+  });
+
+  it("上位文脈がなければ前日フォローの固定文面を選ぶ", () => {
+    const version = getDailyPromptVersion("2026-08-10", undefined, undefined, "next_day");
+
+    expect(version).toBe("daily-check-in-previous-day-follow-up-v1");
+    expect(getDailyPromptText(version)).toBe(
+      "昨日話していたこと、今日は何か動きがあった？\n特になければ、今日の別のことでも大丈夫だよ。",
     );
   });
 

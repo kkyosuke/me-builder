@@ -19,6 +19,11 @@ export const diaryActions = {
     localDate: string,
     at?: Date,
   ) => DO.account.action.diary.selectDailyPromptSameDayContext(db, accountId, localDate, at),
+  "conversation.selectDailyPromptPreviousDayContext": (
+    db: DO.account.Database,
+    accountId: string,
+    localDate: string,
+  ) => DO.account.action.diary.selectDailyPromptPreviousDayContext(db, accountId, localDate),
   "conversation.markDailyPromptDelivered": (
     db: DO.account.Database,
     accountId: string,

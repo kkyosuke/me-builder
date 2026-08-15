@@ -149,6 +149,10 @@ export type AccountDataActions = {
     [localDate: string, at?: Date],
     typeof diary.selectDailyPromptSameDayContext
   >;
+  "conversation.selectDailyPromptPreviousDayContext": RpcAction<
+    [localDate: string],
+    typeof diary.selectDailyPromptPreviousDayContext
+  >;
   "conversation.markDailyPromptDelivered": RpcAction<
     [deliveryId: string, at?: Date],
     typeof diary.markDailyPromptDelivered

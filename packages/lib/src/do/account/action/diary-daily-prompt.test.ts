@@ -9,6 +9,7 @@ import { accountSchema as schema } from "../database";
 import {
   markDailyPromptDelivered,
   prepareDailyPrompt,
+  selectDailyPromptPreviousDayContext,
   selectDailyPromptSameDayContext,
   storeLineTextSource,
 } from "./diary";
@@ -38,7 +39,7 @@ async function insertClosedConversation(
     id: string;
     closedAt: Date;
     receivedAt?: Date;
-    followUp?: "same_day";
+    followUp?: "same_day" | "next_day";
     closeReason?: "explicit" | "inactive";
   }>,
 ): Promise<string> {
@@ -230,6 +231,188 @@ describe("daily prompt delivery", () => {
         "2026-08-14",
         new Date("2026-08-14T09:00:00.000Z"),
       ),
+    ).resolves.toBeUndefined();
+  });
+
+  it("直前の日本日付で最新のSessionが許可した翌日フォローを返す", async () => {
+    const db = createTestDb();
+    await insertClosedConversation(db, {
+      id: "previous-day-follow-up-session",
+      closedAt: new Date("2026-08-13T06:00:00.000Z"),
+      followUp: "next_day",
+    });
+
+    await expect(selectDailyPromptPreviousDayContext(db, ACCOUNT_ID, "2026-08-14")).resolves.toBe(
+      "next_day",
+    );
+  });
+
+  it("前日の後続Sessionが翌日フォローを許可しなければ古い候補へ戻らない", async () => {
+    const db = createTestDb();
+    await insertClosedConversation(db, {
+      id: "older-previous-day-session",
+      closedAt: new Date("2026-08-13T05:00:00.000Z"),
+      followUp: "next_day",
+    });
+    await insertClosedConversation(db, {
+      id: "latest-previous-day-session",
+      closedAt: new Date("2026-08-13T06:00:00.000Z"),
+    });
+
+    await expect(
+      selectDailyPromptPreviousDayContext(db, ACCOUNT_ID, "2026-08-14"),
+    ).resolves.toBeUndefined();
+  });
+
+  it("前日に後から始まったSessionが未終了なら古い翌日候補へ戻らない", async () => {
+    const db = createTestDb();
+    await insertClosedConversation(db, {
+      id: "older-next-day-session",
+      closedAt: new Date("2026-08-13T05:00:00.000Z"),
+      followUp: "next_day",
+    });
+    const laterActiveSource = await storeLineTextSource(db, {
+      accountId: ACCOUNT_ID,
+      eventId: "later-active-previous-day-message",
+      body: "もう少し話したい",
+      receivedAt: new Date("2026-08-13T07:00:00.000Z"),
+    });
+    await db.insert(schema.conversationSessions).values({
+      id: "later-active-previous-day-session",
+      accountId: ACCOUNT_ID,
+      status: "active",
+      startedAt: new Date("2026-08-13T06:00:00.000Z"),
+      lastUserMessageAt: new Date("2026-08-13T07:00:00.000Z"),
+    });
+    await db.insert(schema.conversationMessages).values({
+      id: "later-active-previous-day-conversation-message",
+      sessionId: "later-active-previous-day-session",
+      sequence: 1,
+      role: "user",
+      sourceRecordId: laterActiveSource.sourceRecordId,
+      channel: "line",
+    });
+
+    await expect(
+      selectDailyPromptPreviousDayContext(db, ACCOUNT_ID, "2026-08-14"),
+    ).resolves.toBeUndefined();
+  });
+
+  it("前日から当日へまたいだ後続Sessionがあれば古い翌日候補へ戻らない", async () => {
+    const db = createTestDb();
+    await insertClosedConversation(db, {
+      id: "older-cross-day-next-day-session",
+      closedAt: new Date("2026-08-13T05:00:00.000Z"),
+      followUp: "next_day",
+    });
+    const previousDaySource = await storeLineTextSource(db, {
+      accountId: ACCOUNT_ID,
+      eventId: "cross-day-previous-day-message",
+      body: "まだ少し話したい",
+      receivedAt: new Date("2026-08-13T14:50:00.000Z"),
+    });
+    const currentDaySource = await storeLineTextSource(db, {
+      accountId: ACCOUNT_ID,
+      eventId: "cross-day-current-day-message",
+      body: "今日はここまでにする",
+      receivedAt: new Date("2026-08-13T15:05:00.000Z"),
+    });
+    await db.insert(schema.conversationSessions).values({
+      id: "cross-day-session",
+      accountId: ACCOUNT_ID,
+      status: "closed",
+      startedAt: new Date("2026-08-13T14:50:00.000Z"),
+      lastUserMessageAt: new Date("2026-08-13T15:05:00.000Z"),
+      closedAt: new Date("2026-08-13T15:06:00.000Z"),
+      closeReason: "explicit",
+    });
+    await db.insert(schema.conversationMessages).values([
+      {
+        id: "cross-day-previous-day-conversation-message",
+        sessionId: "cross-day-session",
+        sequence: 1,
+        role: "user",
+        sourceRecordId: previousDaySource.sourceRecordId,
+        channel: "line",
+      },
+      {
+        id: "cross-day-current-day-conversation-message",
+        sessionId: "cross-day-session",
+        sequence: 2,
+        role: "user",
+        sourceRecordId: currentDaySource.sourceRecordId,
+        channel: "line",
+      },
+    ]);
+
+    await expect(
+      selectDailyPromptPreviousDayContext(db, ACCOUNT_ID, "2026-08-14"),
+    ).resolves.toBeUndefined();
+  });
+
+  it("2日以上前の候補や削除された本人Sourceを翌日フォローへ使わない", async () => {
+    const db = createTestDb();
+    await insertClosedConversation(db, {
+      id: "two-days-old-session",
+      closedAt: new Date("2026-08-12T06:00:00.000Z"),
+      followUp: "next_day",
+    });
+    await expect(
+      selectDailyPromptPreviousDayContext(db, ACCOUNT_ID, "2026-08-14"),
+    ).resolves.toBeUndefined();
+
+    const deletedSourceId = await insertClosedConversation(db, {
+      id: "deleted-previous-day-source-session",
+      closedAt: new Date("2026-08-13T06:00:00.000Z"),
+      followUp: "next_day",
+    });
+    await db
+      .update(schema.sourceRecords)
+      .set({ isDeleted: true })
+      .where(eq(schema.sourceRecords.id, deletedSourceId));
+
+    await expect(
+      selectDailyPromptPreviousDayContext(db, ACCOUNT_ID, "2026-08-14"),
+    ).resolves.toBeUndefined();
+  });
+
+  it("複数Sourceを含むTurnの一部が削除済みなら翌日フォローを使わない", async () => {
+    const db = createTestDb();
+    await insertClosedConversation(db, {
+      id: "partially-deleted-source-session",
+      receivedAt: new Date("2026-08-13T05:58:00.000Z"),
+      closedAt: new Date("2026-08-13T06:00:00.000Z"),
+      followUp: "next_day",
+    });
+    const deletedSource = await storeLineTextSource(db, {
+      accountId: ACCOUNT_ID,
+      eventId: "partially-deleted-next-day-intent",
+      body: "明日また話したい",
+      receivedAt: new Date("2026-08-13T05:59:00.000Z"),
+    });
+    await db.insert(schema.conversationMessages).values({
+      id: "message-partially-deleted-next-day-intent",
+      sessionId: "partially-deleted-source-session",
+      sequence: 2,
+      role: "user",
+      sourceRecordId: deletedSource.sourceRecordId,
+      channel: "line",
+    });
+    await db
+      .update(schema.conversationSessions)
+      .set({ lastUserMessageAt: new Date("2026-08-13T05:59:00.000Z") })
+      .where(eq(schema.conversationSessions.id, "partially-deleted-source-session"));
+    await db
+      .update(schema.chatTurns)
+      .set({ throughSequence: 2 })
+      .where(eq(schema.chatTurns.id, "turn-partially-deleted-source-session"));
+    await db
+      .update(schema.sourceRecords)
+      .set({ isDeleted: true })
+      .where(eq(schema.sourceRecords.id, deletedSource.sourceRecordId));
+
+    await expect(
+      selectDailyPromptPreviousDayContext(db, ACCOUNT_ID, "2026-08-14"),
     ).resolves.toBeUndefined();
   });
 
