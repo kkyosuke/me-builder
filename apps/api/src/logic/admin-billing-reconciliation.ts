@@ -77,7 +77,11 @@ export async function reconcileAdminBillingProjection(
     } else {
       await D1.shared.action.billing.expireBillingProjection(params.db, params.accountId, now);
     }
-    repaired = true;
+    const repairedProjection = await D1.shared.action.billing.findBillingProjectionByAccount(
+      params.db,
+      params.accountId,
+    );
+    repaired = compareProjection(current, expectedPlan, repairedProjection).length === 0;
   }
   const result =
     differenceFields.length === 0 ? "no-difference" : repaired ? "repaired" : "difference";
@@ -122,6 +126,7 @@ function compareProjection(
   }
   if (!actual) return ["projection"];
   return [
+    ...(actual.providerSubscriptionId === expected.id ? [] : ["subscription"]),
     ...(actual.status === expected.status ? [] : ["status"]),
     ...(actual.planCode === expectedPlan ? [] : ["plan"]),
     ...(sameDate(actual.currentPeriodStart, expected.currentPeriodStart) ? [] : ["periodStart"]),

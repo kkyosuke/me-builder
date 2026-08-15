@@ -60,7 +60,12 @@ describe("admin billing reconciliation", () => {
         objectId: current.id,
         createdAt: new Date("2026-08-10T00:00:00Z"),
       },
-      subscription: { ...current, status: "past_due", priceId: "price_lite" },
+      subscription: {
+        ...current,
+        id: "sub_stale",
+        status: "past_due",
+        priceId: "price_lite",
+      },
       planCode: "lite",
     });
     const provider = new billing.FakeBillingProvider({ listSubscriptions: async () => [current] });
@@ -85,7 +90,7 @@ describe("admin billing reconciliation", () => {
     await expect(run("dry-run")).resolves.toMatchObject({
       type: "resolved",
       reconciliation: {
-        differenceFields: expect.arrayContaining(["status", "plan"]),
+        differenceFields: expect.arrayContaining(["subscription", "status", "plan"]),
         repaired: false,
       },
     });
@@ -107,5 +112,60 @@ describe("admin billing reconciliation", () => {
     expect(await db.select().from(D1.shared.schema.billingReconciliationAudits).all()).toHaveLength(
       3,
     );
+    await expect(
+      D1.shared.action.billing.findBillingProjectionByAccount(db, target.account.id),
+    ).resolves.toMatchObject({ providerSubscriptionId: current.id });
+  });
+
+  it("projection更新がstale拒否された場合は修復済みと報告しない", async () => {
+    const db = createTestDb();
+    const admin = await D1.shared.action.account.upsertIdentity(db, {
+      provider: "line_login",
+      providerAccountId: "U_reconcile_stale_admin",
+    });
+    const target = await D1.shared.action.account.upsertIdentity(db, {
+      provider: "line_login",
+      providerAccountId: "U_reconcile_stale_target",
+    });
+    await db
+      .update(D1.shared.schema.accounts)
+      .set({ role: "admin" })
+      .where(eq(D1.shared.schema.accounts.id, admin.account.id));
+    await D1.shared.action.billing.linkBillingCustomer(db, {
+      accountId: target.account.id,
+      providerCustomerId: current.customerId,
+    });
+    await D1.shared.action.billing.applyBillingProjection(db, {
+      accountId: target.account.id,
+      event: {
+        id: "evt_from_future",
+        type: "customer.subscription.updated",
+        objectId: current.id,
+        createdAt: new Date("2026-08-20T00:00:00Z"),
+      },
+      subscription: { ...current, status: "past_due" },
+      planCode: "full",
+    });
+
+    const outcome = await reconcileAdminBillingProjection({
+      idToken: "token",
+      lineLoginChannelId: "channel",
+      adminLineUserIds: [],
+      db,
+      provider: new billing.FakeBillingProvider({ listSubscriptions: async () => [current] }),
+      accountId: target.account.id,
+      mode: "apply",
+      pricePlanMap: { price_full: "full" },
+      now: new Date("2026-08-15T00:00:00Z"),
+      createSession: vi.fn().mockResolvedValue({
+        type: "resolved",
+        session: { accountId: admin.account.id, role: "admin" },
+      }),
+    });
+
+    expect(outcome).toMatchObject({
+      type: "resolved",
+      reconciliation: { differenceFields: ["status"], repaired: false },
+    });
   });
 });
