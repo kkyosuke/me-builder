@@ -32,6 +32,7 @@ describe("ProgressionSummaryCard", () => {
     expect(screen.getByText("48")).toBeTruthy();
     expect(screen.getByText("6")).toBeTruthy();
     expect(screen.getByText(/優劣や完成度ではなく/)).toBeTruthy();
+    expect(screen.queryByText(/me-builder/i)).toBeNull();
   });
 
   it("初回取得中は専用Skeletonを表示する", () => {

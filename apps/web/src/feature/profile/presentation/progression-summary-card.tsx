@@ -107,7 +107,7 @@ function ProgressionCard({ progression }: { progression: UtsushiProgression }) {
       </dl>
 
       <p className="border-t border-violet-200/70 px-5 py-3 text-xs leading-relaxed text-slate-500 dark:border-violet-800/60 dark:text-slate-400">
-        レベルは優劣や完成度ではなく、me-builderで自分への理解が育った歩みです。
+        このレベルは優劣や完成度ではなく、自分への理解が育った歩みです。
       </p>
     </section>
   );
