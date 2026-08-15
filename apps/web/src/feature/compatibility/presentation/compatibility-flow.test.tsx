@@ -268,6 +268,9 @@ describe("Compatibility flow", () => {
     expect(document.querySelector('img[src="https://profile.line-scdn.net/me"]')).not.toBeNull();
     expect(screen.getByRole("heading", { name: "共有されるもの" })).toBeTruthy();
     expect(screen.getByText(/これから増える分も自動で/)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "「わたし」" }).getAttribute("href")).toBe(
+      "/me?shareCategory=partner",
+    );
     expect(screen.queryByText(/傾向があります/)).toBeNull();
     expect(screen.queryByRole("heading", { name: "まず知ってほしいこと" })).toBeNull();
     expect(screen.queryByRole("checkbox")).toBeNull();

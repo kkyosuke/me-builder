@@ -14,6 +14,7 @@ import { useCompatibilityShareContent } from "./use-compatibility-share-content"
 describe("useCompatibilityShareContent", () => {
   afterEach(() => {
     cleanup();
+    window.history.replaceState({}, "", "/me");
     vi.clearAllMocks();
   });
 
@@ -98,5 +99,29 @@ describe("useCompatibilityShareContent", () => {
       "family",
       "partner",
     ]);
+  });
+
+  it("URLで指定されたカテゴリを最初に取得する", async () => {
+    window.history.replaceState({}, "", "/me?shareCategory=friend");
+    mocks.fetchCompatibilityShareContent.mockResolvedValue({
+      relationshipCategory: "friend",
+      aboutMe: null,
+      themes: [],
+      nextAction: "profile-summary",
+    });
+    const acquireIdToken = vi.fn(async () => "id-token");
+    const { result } = renderHook(() =>
+      useCompatibilityShareContent({
+        acquireIdToken,
+        latestProfileSummaryVersionId: "summary-version-1",
+      }),
+    );
+
+    expect(result.current.relationshipCategory).toBe("friend");
+    await waitFor(() => expect(result.current.state.status).toBe("success"));
+    expect(mocks.fetchCompatibilityShareContent).toHaveBeenCalledOnce();
+    expect(mocks.fetchCompatibilityShareContent.mock.calls[0]?.[1]).toBe("id-token");
+    expect(mocks.fetchCompatibilityShareContent.mock.calls[0]?.[2]).toBe("friend");
+    expect(mocks.fetchCompatibilityShareContent.mock.calls[0]?.[3]).toBeInstanceOf(AbortSignal);
   });
 });

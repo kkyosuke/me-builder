@@ -17,6 +17,7 @@ import {
   diagnosisCategoryHref,
   getRelationshipCategoryLabel,
 } from "../../diagnosis/model/relationship-category";
+import { compatibilityShareContentHref } from "../model/compatibility-category-navigation";
 import type { CompatibilityInvitation } from "../model/compatibility-invitation";
 import type {
   CompatibilityShareConsent,
@@ -213,7 +214,14 @@ function ShareConsentContent({
     <>
       <h1 className="mt-5 text-3xl font-bold text-slate-950 dark:text-slate-50">うつしをシェア</h1>
       <p className="mt-4 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-        この相手とうつしをシェアしていいかだけを確認します。共有した後は、増えた分も自動で共有されます。共有される内容は「わたし」からいつでも確認できます。
+        この相手とうつしをシェアしていいかだけを確認します。共有した後は、増えた分も自動で共有されます。共有される内容は
+        <a
+          href={compatibilityShareContentHref(relationshipCategory ?? "partner")}
+          className="font-bold text-sky-700 underline underline-offset-4 dark:text-sky-300"
+        >
+          「わたし」
+        </a>
+        からいつでも確認できます。
       </p>
 
       <ShareConsentProfile state={state} onRetry={onRetryConsent} />
