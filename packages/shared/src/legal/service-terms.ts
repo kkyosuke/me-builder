@@ -113,14 +113,21 @@ export const serviceTermsDocuments = [
 export const currentServiceTerms =
   serviceTermsDocuments[serviceTermsDocuments.length - 1] ?? serviceTermsDocuments[0];
 
-let requiredDocumentIndex = 0;
-for (const [index, document] of serviceTermsDocuments.entries()) {
-  if (document.requiresReacceptance) requiredDocumentIndex = index;
+/** 最後の重要改定以降に公開された、現在の利用条件を満たす同意対象を返す。 */
+export function getServiceTermsDocumentsSatisfyingCurrentRequirement(
+  documents: readonly ServiceTermsDocument[],
+): readonly ServiceTermsDocument[] {
+  if (documents.length === 0) return [];
+  let requiredDocumentIndex = 0;
+  for (const [index, document] of documents.entries()) {
+    if (document.requiresReacceptance) requiredDocumentIndex = index;
+  }
+  return documents.slice(requiredDocumentIndex);
 }
 
 /** 既存利用者が現在の利用条件を満たす同意対象。新規同意は常に最新versionへ記録する。 */
 export const serviceTermsDocumentsSatisfyingCurrentRequirement =
-  serviceTermsDocuments.slice(requiredDocumentIndex);
+  getServiceTermsDocumentsSatisfyingCurrentRequirement(serviceTermsDocuments);
 
 export const currentRequiredServiceTerms =
   serviceTermsDocumentsSatisfyingCurrentRequirement[0] ?? currentServiceTerms;
