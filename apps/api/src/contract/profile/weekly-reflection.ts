@@ -1,6 +1,6 @@
 import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
 import * as v from "valibot";
-import { authenticatedErrors, jsonResponse } from "../shared/errors";
+import { authenticatedErrors, currentTermsPolicyError, jsonResponse } from "../shared/errors";
 
 const Text = v.pipe(v.string(), v.nonEmpty());
 const ItemSchema = v.object({
@@ -62,6 +62,7 @@ export const weeklyReflectionRoute = describeRoute({
   responses: {
     200: jsonResponse("保存済み週次振り返り", WeeklyReflectionResponseSchema),
     ...authenticatedErrors,
+    ...currentTermsPolicyError,
   },
 } satisfies DescribeRouteOptions);
 
@@ -74,5 +75,6 @@ export const weeklyReflectionGenerationRoute = describeRoute({
     202: jsonResponse("生成要求を受け付けた", WeeklyReflectionGenerationAcceptedSchema),
     409: jsonResponse("生成できない理由", WeeklyReflectionGenerationUnavailableSchema),
     ...authenticatedErrors,
+    ...currentTermsPolicyError,
   },
 } satisfies DescribeRouteOptions);

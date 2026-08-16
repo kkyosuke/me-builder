@@ -5,7 +5,7 @@ import {
   logger,
   toSafeOperationalErrorFields,
 } from "@me-builder/shared";
-import { createLiffSession } from "./liff-session";
+import type { AuthenticatedActor } from "./authentication/types";
 
 export type RequestProfileSummaryGenerationOutcome =
   | Readonly<{
@@ -17,14 +17,10 @@ export type RequestProfileSummaryGenerationOutcome =
   | Readonly<{
       type: "unavailable";
       reason: "source_record_required" | "regeneration_not_required" | "limit_reached";
-    }>
-  | Readonly<{ type: "not-configured" }>
-  | Readonly<{ type: "unauthenticated"; reason: string }>
-  | Readonly<{ type: "account-not-found" }>;
+    }>;
 
 type Params = Readonly<{
-  idToken: string | undefined;
-  lineLoginChannelId: string | undefined;
+  actor: AuthenticatedActor;
   db: D1.shared.Client;
   accountData?: AccountDataNamespace;
   queue?: Queue<ProfileSummaryGenerationQueueMessage>;
@@ -34,8 +30,7 @@ type Params = Readonly<{
 }>;
 
 export async function requestProfileSummaryGeneration({
-  idToken,
-  lineLoginChannelId,
+  actor,
   db,
   accountData,
   queue,
@@ -43,13 +38,11 @@ export async function requestProfileSummaryGeneration({
   allowUnchangedRegeneration = false,
   planAssignmentProvider,
 }: Params): Promise<RequestProfileSummaryGenerationOutcome> {
-  const session = await createLiffSession({ idToken, lineLoginChannelId, db });
-  if (session.type !== "resolved") return session;
   if (!accountData || !queue) throw new Error("Profile Summary generation binding is missing");
-  const account = accountDataFor(accountData, session.session.accountId);
+  const account = accountDataFor(accountData, actor.accountId);
   const entitlement = await new billing.EntitlementService(
     new billing.FamilyAwareAccountPlanAssignmentProvider(db, planAssignmentProvider),
-  ).resolve(session.session.accountId, at);
+  ).resolve(actor.accountId, at);
   const period = billing.resolveEntitlementUsagePeriod(entitlement, "profile-summary", at);
   const usage = await account.execute(
     "aiUsage.read",
@@ -70,7 +63,7 @@ export async function requestProfileSummaryGeneration({
     try {
       await queue.send({
         type: "profile-summary-generation",
-        accountId: session.session.accountId,
+        accountId: actor.accountId,
         generationId: request.generationId,
       });
       dispatched = true;

@@ -1,14 +1,13 @@
 import {
   type AccountDataNamespace,
-  type D1,
   type DO,
   type DiagnosisScoring,
   type ProfileSummaryReadModel,
   accountDataFor,
 } from "@me-builder/lib";
 import { logger, toSafeOperationalErrorFields } from "@me-builder/shared";
+import type { AuthenticatedActor } from "./authentication/types";
 import { scoreDiagnosisAnswers } from "./diagnosis-scoring";
-import { createLiffSession } from "./liff-session";
 
 type ProfileDiagnosisTheme = Readonly<{
   id: string;
@@ -19,27 +18,20 @@ type ProfileDiagnosisTheme = Readonly<{
   scoring: DiagnosisScoring | null;
 }>;
 
-export type ProfileSummaryOutcome =
-  | (ProfileSummaryReadModel & {
-      type: "resolved";
-      diagnosisThemes: ProfileDiagnosisTheme[];
-      nextAction: "diagnosis" | "chat";
-    })
-  | { type: "not-configured" }
-  | { type: "unauthenticated"; reason: string }
-  | { type: "account-not-found" };
+export type ProfileSummaryOutcome = ProfileSummaryReadModel & {
+  type: "resolved";
+  diagnosisThemes: ProfileDiagnosisTheme[];
+  nextAction: "diagnosis" | "chat";
+};
 
 type Params = {
-  idToken: string | undefined;
-  lineLoginChannelId: string | undefined;
-  db: D1.shared.Client;
+  actor: AuthenticatedActor;
   accountData?: AccountDataNamespace;
   at?: Date;
   allowUnchangedRegeneration?: boolean;
 };
 
 type Dependencies = {
-  createSession: typeof createLiffSession;
   getDiagnosisSource: (
     accountData: AccountDataNamespace | undefined,
     accountId: string,
@@ -54,7 +46,6 @@ type Dependencies = {
 };
 
 const defaultDependencies: Dependencies = {
-  createSession: createLiffSession,
   getDiagnosisSource: (accountData, accountId, at) => {
     if (!accountData) throw new Error("ACCOUNT_DATA binding is not configured");
     return accountDataFor(accountData, accountId).execute("diagnosis.getAnsweredSource", at);
@@ -71,27 +62,12 @@ const defaultDependencies: Dependencies = {
 
 /** 本人のまとめを返し、実際の診断進捗だけから次の行動を決める。 */
 export async function getProfileSummary(
-  {
-    idToken,
-    lineLoginChannelId,
-    db,
-    accountData,
-    at = new Date(),
-    allowUnchangedRegeneration = false,
-  }: Params,
+  { actor, accountData, at = new Date(), allowUnchangedRegeneration = false }: Params,
   dependencies: Dependencies = defaultDependencies,
 ): Promise<ProfileSummaryOutcome> {
-  const session = await dependencies.createSession({ idToken, lineLoginChannelId, db });
-  if (session.type !== "resolved") return session;
-
   const [diagnosisSource, readModel] = await Promise.all([
-    dependencies.getDiagnosisSource(accountData, session.session.accountId, at),
-    dependencies.readProfileSummary(
-      accountData,
-      session.session.accountId,
-      at,
-      allowUnchangedRegeneration,
-    ),
+    dependencies.getDiagnosisSource(accountData, actor.accountId, at),
+    dependencies.readProfileSummary(accountData, actor.accountId, at, allowUnchangedRegeneration),
   ]);
   const diagnoses = diagnosisSource.diagnoses;
   const hasAnswerableDiagnosis = diagnoses.some(

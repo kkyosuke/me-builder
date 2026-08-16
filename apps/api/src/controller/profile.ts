@@ -23,11 +23,7 @@ import {
   WeeklyReflectionGenerationUnavailableSchema,
   WeeklyReflectionResponseSchema,
 } from "../contract/profile/weekly-reflection";
-import {
-  AccountNotFoundErrorSchema,
-  ServiceUnavailableErrorSchema,
-  UnauthorizedErrorSchema,
-} from "../contract/shared/errors";
+import { ServiceUnavailableErrorSchema } from "../contract/shared/errors";
 import { agreeGoalFollowUp, getGoalFollowUps, updateGoalFollowUp } from "../logic/goal-follow-up";
 import { getProfileEntitlement } from "../logic/profile-entitlement";
 import { getProfileProgression } from "../logic/profile-progression";
@@ -39,7 +35,6 @@ import {
 } from "../logic/weekly-reflection";
 import { authenticatedActor } from "../middleware/authentication";
 import type { AppEnv } from "../types";
-import { bearerToken } from "./auth";
 
 function planAssignmentProvider(c: Context<AppEnv>, db: D1.shared.Client) {
   return (
@@ -50,27 +45,13 @@ function planAssignmentProvider(c: Context<AppEnv>, db: D1.shared.Client) {
 
 function goalFollowUpParams(c: Context<AppEnv>) {
   if (!c.env?.DB || !c.env.ACCOUNT_DATA) return undefined;
-  const config = getConfig(c.env);
   const db = D1.shared.client.create(c.env.DB);
   return {
-    idToken: bearerToken(c.req.header("authorization")),
-    lineLoginChannelId: config.lineLoginChannelId,
+    actor: authenticatedActor(c),
     db,
     accountData: c.env.ACCOUNT_DATA,
     planAssignmentProvider: planAssignmentProvider(c, db),
   };
-}
-
-function goalFollowUpAuthError(c: Context<AppEnv>, type: string) {
-  return type === "account-not-found"
-    ? c.json(
-        v.parse(AccountNotFoundErrorSchema, {
-          error: "Account not found",
-          reason: "friendship_required",
-        }),
-        404,
-      )
-    : c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
 }
 
 export async function getGoalFollowUpContents(c: Context<AppEnv>): Promise<Response> {
@@ -79,7 +60,6 @@ export async function getGoalFollowUpContents(c: Context<AppEnv>): Promise<Respo
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   }
   const outcome = await getGoalFollowUps(params);
-  if (outcome.type !== "resolved") return goalFollowUpAuthError(c, outcome.type);
   c.header("Cache-Control", "no-store");
   return c.json(v.parse(GoalFollowUpListSchema, outcome));
 }
@@ -103,7 +83,6 @@ export async function postGoalFollowUpAgreement(c: Context<AppEnv>): Promise<Res
       409,
     );
   }
-  if (outcome.type !== "resolved") return goalFollowUpAuthError(c, outcome.type);
   if (outcome.result.type !== "agreed") {
     return c.json(
       v.parse(GoalFollowUpUnavailableSchema, {
@@ -147,7 +126,6 @@ export async function patchGoalFollowUp(c: Context<AppEnv>): Promise<Response> {
       409,
     );
   }
-  if (outcome.type !== "resolved") return goalFollowUpAuthError(c, outcome.type);
   if (outcome.result.type !== "updated") {
     return c.json(
       v.parse(GoalFollowUpUnavailableSchema, {
@@ -197,9 +175,7 @@ export async function getProfileSummaryContents(c: Context<AppEnv>): Promise<Res
 
   const currentConfig = getConfig(c.env);
   const outcome = await getProfileSummary({
-    idToken: bearerToken(c.req.header("authorization")),
-    lineLoginChannelId: currentConfig.lineLoginChannelId,
-    db: D1.shared.client.create(c.env.DB),
+    actor: authenticatedActor(c),
     accountData: c.env.ACCOUNT_DATA,
     allowUnchangedRegeneration: isDevelopmentEnvironment(currentConfig.environment),
   });
@@ -216,17 +192,6 @@ export async function getProfileSummaryContents(c: Context<AppEnv>): Promise<Res
           nextAction: outcome.nextAction,
         }),
       );
-    case "account-not-found":
-      return c.json(
-        v.parse(AccountNotFoundErrorSchema, {
-          error: "Account not found",
-          reason: "friendship_required",
-        }),
-        404,
-      );
-    case "not-configured":
-    case "unauthenticated":
-      return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
   }
 }
 
@@ -238,8 +203,7 @@ export async function postProfileSummaryGeneration(c: Context<AppEnv>): Promise<
   const currentConfig = getConfig(c.env);
   const db = D1.shared.client.create(c.env.DB);
   const outcome = await requestProfileSummaryGeneration({
-    idToken: bearerToken(c.req.header("authorization")),
-    lineLoginChannelId: currentConfig.lineLoginChannelId,
+    actor: authenticatedActor(c),
     db,
     accountData: c.env.ACCOUNT_DATA,
     queue: c.env.PROFILE_SUMMARY_QUEUE,
@@ -257,17 +221,6 @@ export async function postProfileSummaryGeneration(c: Context<AppEnv>): Promise<
         }),
         409,
       );
-    case "account-not-found":
-      return c.json(
-        v.parse(AccountNotFoundErrorSchema, {
-          error: "Account not found",
-          reason: "friendship_required",
-        }),
-        404,
-      );
-    case "not-configured":
-    case "unauthenticated":
-      return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
   }
 }
 
@@ -275,11 +228,9 @@ export async function getWeeklyReflectionContents(c: Context<AppEnv>): Promise<R
   if (!c.env?.DB || !c.env.ACCOUNT_DATA) {
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   }
-  const currentConfig = getConfig(c.env);
   const db = D1.shared.client.create(c.env.DB);
   const outcome = await getWeeklyReflections({
-    idToken: bearerToken(c.req.header("authorization")),
-    lineLoginChannelId: currentConfig.lineLoginChannelId,
+    actor: authenticatedActor(c),
     db,
     accountData: c.env.ACCOUNT_DATA,
     planAssignmentProvider: planAssignmentProvider(c, db),
@@ -288,17 +239,6 @@ export async function getWeeklyReflectionContents(c: Context<AppEnv>): Promise<R
     case "resolved":
       c.header("Cache-Control", "no-store");
       return c.json(v.parse(WeeklyReflectionResponseSchema, outcome));
-    case "account-not-found":
-      return c.json(
-        v.parse(AccountNotFoundErrorSchema, {
-          error: "Account not found",
-          reason: "friendship_required",
-        }),
-        404,
-      );
-    case "not-configured":
-    case "unauthenticated":
-      return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
   }
 }
 
@@ -306,11 +246,9 @@ export async function postWeeklyReflectionGeneration(c: Context<AppEnv>): Promis
   if (!c.env?.DB || !c.env.ACCOUNT_DATA || !c.env.PROFILE_SUMMARY_QUEUE) {
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   }
-  const currentConfig = getConfig(c.env);
   const db = D1.shared.client.create(c.env.DB);
   const outcome = await requestWeeklyReflectionGeneration({
-    idToken: bearerToken(c.req.header("authorization")),
-    lineLoginChannelId: currentConfig.lineLoginChannelId,
+    actor: authenticatedActor(c),
     db,
     accountData: c.env.ACCOUNT_DATA,
     queue: c.env.PROFILE_SUMMARY_QUEUE,
@@ -327,16 +265,5 @@ export async function postWeeklyReflectionGeneration(c: Context<AppEnv>): Promis
         }),
         409,
       );
-    case "account-not-found":
-      return c.json(
-        v.parse(AccountNotFoundErrorSchema, {
-          error: "Account not found",
-          reason: "friendship_required",
-        }),
-        404,
-      );
-    case "not-configured":
-    case "unauthenticated":
-      return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
   }
 }

@@ -2529,6 +2529,20 @@ export interface operations {
           };
         };
       };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
+          };
+        };
+      };
       /** @description 未処理のサーバーエラー */
       500: {
         headers: {
@@ -2615,6 +2629,20 @@ export interface operations {
             error: "Profile summary generation unavailable";
             /** @enum {string} */
             reason: "source_record_required" | "regeneration_not_required" | "limit_reached";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };
@@ -2729,6 +2757,20 @@ export interface operations {
           };
         };
       };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
+          };
+        };
+      };
       /** @description 未処理のサーバーエラー */
       500: {
         headers: {
@@ -2818,6 +2860,20 @@ export interface operations {
           };
         };
       };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
+          };
+        };
+      };
       /** @description 未処理のサーバーエラー */
       500: {
         headers: {
@@ -2900,6 +2956,20 @@ export interface operations {
             error: "Account not found";
             /** @constant */
             reason: "friendship_required";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };
@@ -3023,6 +3093,20 @@ export interface operations {
           };
         };
       };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
+          };
+        };
+      };
       /** @description 未処理のサーバーエラー */
       500: {
         headers: {
@@ -3143,6 +3227,20 @@ export interface operations {
               | "active_limit"
               | "goal_not_found"
               | "goal_not_confirmed";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };
@@ -4168,6 +4266,20 @@ export interface operations {
           };
         };
       };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
+          };
+        };
+      };
       /** @description 未処理のサーバーエラー */
       500: {
         headers: {
@@ -4286,6 +4398,20 @@ export interface operations {
           };
         };
       };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
+          };
+        };
+      };
       /** @description 未処理のサーバーエラー */
       500: {
         headers: {
@@ -4395,6 +4521,20 @@ export interface operations {
             error: "Self-care context unavailable";
             /** @enum {string} */
             reason: "feature_unavailable" | "brain_item_not_found" | "not_confirmed";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };
