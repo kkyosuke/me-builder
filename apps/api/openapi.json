@@ -7072,6 +7072,9 @@
         "summary": "本人が管理または参加しているファミリー席を取得する",
         "security": [
           {
+            "applicationSession": []
+          },
+          {
             "liffIdToken": []
           }
         ],
@@ -7284,6 +7287,9 @@
         "summary": "支払者が48時間有効な1回限りの招待を発行する",
         "security": [
           {
+            "applicationSession": []
+          },
+          {
             "liffIdToken": []
           }
         ],
@@ -7492,6 +7498,9 @@
         "tags": ["Family"],
         "summary": "参加者が招待を承諾する",
         "security": [
+          {
+            "applicationSession": []
+          },
           {
             "liffIdToken": []
           }
@@ -7712,6 +7721,9 @@
         "summary": "参加者が招待を辞退する",
         "security": [
           {
+            "applicationSession": []
+          },
+          {
             "liffIdToken": []
           }
         ],
@@ -7931,6 +7943,9 @@
         "summary": "支払者が招待中の席を取り消す",
         "security": [
           {
+            "applicationSession": []
+          },
+          {
             "liffIdToken": []
           }
         ],
@@ -8143,6 +8158,9 @@
         "summary": "支払者が参加者を席から外す",
         "security": [
           {
+            "applicationSession": []
+          },
+          {
             "liffIdToken": []
           }
         ],
@@ -8354,6 +8372,9 @@
         "tags": ["Family"],
         "summary": "参加者がファミリーパックから退出する",
         "security": [
+          {
+            "applicationSession": []
+          },
           {
             "liffIdToken": []
           }

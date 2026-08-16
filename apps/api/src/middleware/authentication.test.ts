@@ -37,6 +37,8 @@ describe("authentication middleware", () => {
     ["https://web.example", "wrong-token", 403],
   ] as const)("application session更新でOriginとCSRFを検証する", async (origin, csrf, status) => {
     const app = new Hono<AppEnv>();
+    const put = vi.fn().mockResolvedValue(undefined);
+    const now = new Date();
     const middleware = createAuthenticationMiddleware(async (c) => {
       c.set("authenticationSource", "application-session");
       c.set("applicationSessionToken", "session-token");
@@ -55,18 +57,20 @@ describe("authentication middleware", () => {
           get: async () => ({
             accountId: "account-1",
             authenticationMethod: "liff",
-            authenticatedAt: "2026-08-16T00:00:00.000Z",
-            issuedAt: "2026-08-16T00:00:00.000Z",
-            lastSeenAt: "2026-08-16T00:00:00.000Z",
-            expiresAt: "2026-08-17T00:00:00.000Z",
+            authenticatedAt: now.toISOString(),
+            issuedAt: now.toISOString(),
+            lastSeenAt: now.toISOString(),
+            expiresAt: new Date(now.getTime() + 60_000).toISOString(),
             sessionVersion: 1,
             csrfToken: "csrf-token",
           }),
+          put,
         } as never,
       },
     );
 
     expect(response.status).toBe(status);
+    expect(put).toHaveBeenCalledTimes(status === 200 ? 1 : 0);
   });
 
   it("移行期間の旧Bearer更新にはapplication session用CSRFを要求しない", async () => {

@@ -25,10 +25,26 @@ async function resolveRequestAuthentication(c: Context<AppEnv>): Promise<Authent
   if (!c.env?.DB) {
     return { type: "unauthenticated", reason: "authentication_not_configured" };
   }
+  const config = getConfig(c.env);
+  const authorization = c.req.header("authorization");
+  // 移行中に明示されたBearerを古いcookieで上書きしない。不正なBearerでもcookieへ
+  // fallbackせず、LIFFが確認したAccountをrequestの正とする。
+  if (authorization !== undefined) {
+    const result = await authenticateLiff({
+      idToken: bearerToken(authorization),
+      db: D1.shared.client.create(c.env.DB),
+      verifier: createLineCredentialVerifier(config.lineLoginChannelId),
+      adminLineUserIds: config.adminLineUserIds,
+    });
+    if (result.type === "authenticated") c.set("authenticationSource", "legacy-bearer");
+    return result;
+  }
   const applicationSession = createApplicationSessionService(c.env);
   const sessionToken = getCookie(c, APPLICATION_SESSION_COOKIE);
   if (applicationSession && sessionToken) {
-    const actor = await applicationSession.sessions.verify(sessionToken);
+    const actor = await applicationSession.sessions.verify(sessionToken, {
+      refreshIdle: ["GET", "HEAD", "OPTIONS"].includes(c.req.method),
+    });
     if (actor) {
       const [account, profile] = await Promise.all([
         applicationSession.db.query.accounts.findFirst({
@@ -52,15 +68,7 @@ async function resolveRequestAuthentication(c: Context<AppEnv>): Promise<Authent
       }
     }
   }
-  const config = getConfig(c.env);
-  const result = await authenticateLiff({
-    idToken: bearerToken(c.req.header("authorization")),
-    db: D1.shared.client.create(c.env.DB),
-    verifier: createLineCredentialVerifier(config.lineLoginChannelId),
-    adminLineUserIds: config.adminLineUserIds,
-  });
-  if (result.type === "authenticated") c.set("authenticationSource", "legacy-bearer");
-  return result;
+  return { type: "unauthenticated", reason: "credential_missing" };
 }
 
 /** 同じContextでは認証resolverを1度だけ実行し、後続middlewareとcontrollerへ共有する。 */
@@ -99,7 +107,7 @@ async function applicationSessionMutationAllowed(c: Context<AppEnv>): Promise<bo
   const runtime = createApplicationSessionService(c.env);
   const sessionToken = c.get("applicationSessionToken");
   if (!runtime || !sessionToken) return false;
-  return await runtime.sessions.verifyCsrf(sessionToken, c.req.header(CSRF_HEADER));
+  return await runtime.sessions.verifyCsrf(sessionToken, c.req.header(CSRF_HEADER), true);
 }
 
 export function authenticatedActor(c: Context<AppEnv>): AuthenticatedActor {

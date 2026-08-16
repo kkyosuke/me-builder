@@ -152,11 +152,29 @@ export class ApplicationSessionService {
     await this.store.delete(referenceHash);
   }
 
-  async verifyCsrf(sessionToken: string, csrfToken: string | undefined): Promise<boolean> {
+  async verifyCsrf(
+    sessionToken: string,
+    csrfToken: string | undefined,
+    refreshIdle = false,
+  ): Promise<boolean> {
     if (!csrfToken) return false;
-    const record = await this.store.get(await hash(sessionToken));
+    const referenceHash = await hash(sessionToken);
+    const record = await this.store.get(referenceHash);
     if (!record) return false;
-    return constantTimeEqual(record.csrfToken, csrfToken);
+    if (!constantTimeEqual(record.csrfToken, csrfToken)) return false;
+    if (refreshIdle) {
+      const now = this.now();
+      const expiresAt = Date.parse(record.expiresAt);
+      if (
+        expiresAt <= now.getTime() ||
+        Date.parse(record.lastSeenAt) + this.policy.idleTtlMs <= now.getTime()
+      ) {
+        return false;
+      }
+      const ttl = Math.max(1, Math.ceil((expiresAt - now.getTime()) / 1_000));
+      await this.store.put(referenceHash, { ...record, lastSeenAt: now.toISOString() }, ttl);
+    }
+    return true;
   }
 
   async clientState(

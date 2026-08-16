@@ -165,15 +165,27 @@ describe("ApplicationSessionService", () => {
   });
 
   it("sessionに結びついたCSRF tokenだけを受け入れる", async () => {
-    const sessions = new ApplicationSessionService(new MemoryStore(), new MemoryVersions());
+    const store = new MemoryStore();
+    let now = new Date("2026-08-17T00:00:00.000Z");
+    const sessions = new ApplicationSessionService(
+      store,
+      new MemoryVersions(),
+      { absoluteTtlMs: 10_000, idleTtlMs: 5_000 },
+      () => now,
+    );
     const issued = await sessions.issue(actor);
+    const issuedLastSeenAt = [...store.records.values()][0]?.lastSeenAt;
 
-    await expect(sessions.verifyCsrf(issued?.sessionToken ?? "", issued?.csrfToken)).resolves.toBe(
-      true,
-    );
-    await expect(sessions.verifyCsrf(issued?.sessionToken ?? "", "wrong-token")).resolves.toBe(
-      false,
-    );
+    now = new Date("2026-08-17T00:00:04.000Z");
+    await expect(
+      sessions.verifyCsrf(issued?.sessionToken ?? "", "wrong-token", true),
+    ).resolves.toBe(false);
+    expect([...store.records.values()][0]?.lastSeenAt).toBe(issuedLastSeenAt);
+
+    await expect(
+      sessions.verifyCsrf(issued?.sessionToken ?? "", issued?.csrfToken, true),
+    ).resolves.toBe(true);
+    expect([...store.records.values()][0]?.lastSeenAt).toBe(now.toISOString());
   });
 
   it("停止または削除済みAccountにはsessionを発行しない", async () => {

@@ -125,6 +125,9 @@ describe("GET /api/openapi.json", () => {
     expect(document.paths["/api/diagnoses"]?.get).toMatchObject({
       security: [{ applicationSession: [] }, { liffIdToken: [] }],
     });
+    expect(document.paths["/api/family/seats"]?.get).toMatchObject({
+      security: [{ applicationSession: [] }, { liffIdToken: [] }],
+    });
 
     const generatedDocument = JSON.parse(
       await readFile(new URL("../../openapi.json", import.meta.url), "utf8"),
