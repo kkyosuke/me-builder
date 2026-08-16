@@ -97,8 +97,6 @@ export async function reconcileAdminBillingProjection(
   logger.info(
     {
       event: "admin.billing.reconciled",
-      adminAccountId: session.session.accountId,
-      targetAccountId: params.accountId,
       operationId,
       mode: params.mode,
       differenceCount: differenceFields.length,

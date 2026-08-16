@@ -9,8 +9,11 @@ const toMessage = (error: unknown): string =>
 export function getLiffIdToken(): string | null {
   try {
     return liff.getIDToken();
-  } catch (error) {
-    logger.warn(`ID トークンを取得できませんでした: ${toMessage(error)}`);
+  } catch {
+    logger.warn(
+      { event: "liff.id-token.failed", outcome: "failed", reason: "sdk-error" },
+      "ID トークンを取得できませんでした",
+    );
     return null;
   }
 }
@@ -45,7 +48,10 @@ export async function initializeLiff(liffId: string | undefined): Promise<LiffSt
   try {
     await liff.init({ liffId });
   } catch (error) {
-    logger.warn(`LIFF の初期化に失敗しました: ${toMessage(error)}`);
+    logger.warn(
+      { event: "liff.initialize.failed", outcome: "failed", reason: "sdk-error" },
+      "LIFF の初期化に失敗しました",
+    );
     return { status: "error", message: `LIFF の初期化に失敗しました: ${toMessage(error)}` };
   }
 
@@ -70,7 +76,10 @@ export async function initializeLiff(liffId: string | undefined): Promise<LiffSt
       },
     };
   } catch (error) {
-    logger.warn(`LIFF のプロフィール取得に失敗しました: ${toMessage(error)}`);
+    logger.warn(
+      { event: "liff.profile.failed", outcome: "failed", reason: "sdk-error" },
+      "LIFF のプロフィール取得に失敗しました",
+    );
     return { status: "error", message: `プロフィールの取得に失敗しました: ${toMessage(error)}` };
   }
 }

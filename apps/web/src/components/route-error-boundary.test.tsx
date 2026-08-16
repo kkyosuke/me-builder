@@ -71,7 +71,14 @@ describe("RouteErrorBoundary", () => {
     );
 
     expect(screen.getByRole("heading", { name: "画面を読み込めませんでした" })).toBeTruthy();
-    expect(mocks.loggerError).toHaveBeenCalledOnce();
+    expect(mocks.loggerError).toHaveBeenCalledWith(
+      {
+        event: "web.route-render.failed",
+        outcome: "failed",
+        reason: "render-error",
+      },
+      "画面の描画に失敗しました",
+    );
     fireEvent.click(screen.getByRole("button", { name: "再読み込み" }));
     expect(onReload).toHaveBeenCalledOnce();
   });

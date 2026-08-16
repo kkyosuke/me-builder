@@ -108,6 +108,16 @@ export function ProfileSettingsScreen({
   >({ status: "idle" });
   const [billingState, setBillingState] = useState<AsyncState<string>>({ status: "idle" });
 
+  const planDate =
+    entitlement?.status === "success"
+      ? entitlement.data.source === "free"
+        ? { label: "AI利用枠リセット", value: entitlement.data.aiReply.resetsAt }
+        : {
+            label: "利用可能期限",
+            value: entitlement.data.availableUntil,
+          }
+      : null;
+
   const openBillingPortal = useCallback(async () => {
     if (!onOpenBillingPortal) return;
     setBillingState({ status: "loading" });
@@ -244,7 +254,7 @@ export function ProfileSettingsScreen({
                   {billingState.status === "loading" ? "契約管理を開いています..." : "契約を管理"}
                 </span>
                 <span className="mt-1 block text-sm text-slate-500 dark:text-slate-400">
-                  支払方法、請求履歴、プラン変更、解約を確認
+                  支払方法、請求履歴、解約を確認
                 </span>
               </span>
               <ChevronRight className="size-5 text-slate-400" aria-hidden="true" />
@@ -329,11 +339,13 @@ export function ProfileSettingsScreen({
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-slate-500 dark:text-slate-400">次回更新</dt>
+                    <dt className="text-slate-500 dark:text-slate-400">{planDate?.label}</dt>
                     <dd className="mt-1 text-slate-700 dark:text-slate-200">
-                      {new Intl.DateTimeFormat("ja-JP", { dateStyle: "medium" }).format(
-                        new Date(entitlement.data.aiReply.resetsAt),
-                      )}
+                      {planDate?.value
+                        ? new Intl.DateTimeFormat("ja-JP", { dateStyle: "medium" }).format(
+                            new Date(planDate.value),
+                          )
+                        : "期限なし"}
                     </dd>
                   </div>
                 </dl>

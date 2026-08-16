@@ -53,8 +53,15 @@ export class RouteErrorBoundary extends Component<
     return { failed: true };
   }
 
-  componentDidCatch(error: Error, info: ErrorInfo): void {
-    logger.error({ err: error, componentStack: info.componentStack }, "画面の描画に失敗しました");
+  componentDidCatch(error: Error, _info: ErrorInfo): void {
+    logger.error(
+      {
+        event: "web.route-render.failed",
+        outcome: "failed",
+        reason: "render-error",
+      },
+      "画面の描画に失敗しました",
+    );
     recoverFromChunkLoadFailure(error, {
       appVersion,
       currentUrl: window.location.href,
