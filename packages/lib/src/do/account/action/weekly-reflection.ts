@@ -90,6 +90,7 @@ async function materializeMonthlyChange(
   db: AccountDataDatabase,
   accountId: string,
   generatedAt: Date,
+  evidenceWeekStart: string,
 ): Promise<void> {
   const month = generatedAt.toLocaleDateString("en-CA", {
     timeZone: "Asia/Tokyo",
@@ -105,15 +106,20 @@ async function materializeMonthlyChange(
   const current = reflections.filter(({ weekStart }) => weekStart.startsWith(month));
   if (current.length === 0) return;
   const prior = reflections.filter(({ weekStart }) => weekStart.startsWith(previousMonth(month)));
-  const last = await db
-    .select({ version: monthlyChangeVersions.version })
+  const existingVersions = await db
+    .select({ version: monthlyChangeVersions.version, content: monthlyChangeVersions.content })
     .from(monthlyChangeVersions)
     .where(
       and(eq(monthlyChangeVersions.accountId, accountId), eq(monthlyChangeVersions.month, month)),
     )
     .orderBy(desc(monthlyChangeVersions.version))
-    .get();
-  const version = (last?.version ?? 0) + 1;
+    .all();
+  if (
+    existingVersions.some(({ content }) => content.evidenceWeekStarts.includes(evidenceWeekStart))
+  ) {
+    return;
+  }
+  const version = (existingVersions[0]?.version ?? 0) + 1;
   const ongoingGoals = current.flatMap(({ content }) =>
     content.items.filter(({ kind }) => kind === "next-step").map(({ description }) => description),
   );
@@ -283,7 +289,16 @@ export async function loadWeeklyReflectionGenerationContext(
     )
     .get();
   if (!generation) return null;
-  if (generation.status === "completed" || generation.status === "failed") return null;
+  if (generation.status === "completed") {
+    await materializeMonthlyChange(
+      db,
+      accountId,
+      generation.finishedAt ?? startedAt,
+      generation.weekStart,
+    );
+    return null;
+  }
+  if (generation.status === "failed") return null;
   if (generation.status === "queued") {
     await db
       .update(weeklyReflectionGenerations)
@@ -408,7 +423,7 @@ export async function completeWeeklyReflectionGeneration(
       })
       .where(eq(weeklyReflectionGenerations.id, input.generationId)),
   ]);
-  await materializeMonthlyChange(db, accountId, input.generatedAt);
+  await materializeMonthlyChange(db, accountId, input.generatedAt, generation.weekStart);
   return true;
 }
 

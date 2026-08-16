@@ -1,5 +1,6 @@
 import path from "node:path";
 import Database from "better-sqlite3";
+import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { describe, expect, it } from "vitest";
@@ -180,6 +181,25 @@ describe("weekly reflection", () => {
       evidenceWeekStarts: ["2026-08-10", "2026-08-03"],
     });
     expect(full.monthlyChanges[0]?.ongoingGoals).toHaveLength(2);
+
+    const augustGeneration = await requestWeeklyReflectionGeneration(db, ACCOUNT_ID, NOW);
+    if (!("generationId" in augustGeneration)) throw new Error("generation was not found");
+    await expect(
+      loadWeeklyReflectionGenerationContext(db, ACCOUNT_ID, augustGeneration.generationId, NOW),
+    ).resolves.toBeNull();
+    const replayed = await readWeeklyReflections(db, ACCOUNT_ID, NOW, "full");
+    expect(replayed.monthlyChanges.filter(({ month }) => month === "2026-08")).toHaveLength(2);
+
+    await db
+      .delete(schema.monthlyChangeVersions)
+      .where(eq(schema.monthlyChangeVersions.month, "2026-08"));
+    await expect(
+      loadWeeklyReflectionGenerationContext(db, ACCOUNT_ID, augustGeneration.generationId, NOW),
+    ).resolves.toBeNull();
+    const recovered = await readWeeklyReflections(db, ACCOUNT_ID, NOW, "full");
+    expect(recovered.monthlyChanges.filter(({ month }) => month === "2026-08")).toEqual([
+      expect.objectContaining({ evidenceWeekStarts: ["2026-08-10", "2026-08-03"] }),
+    ]);
 
     const lite = await readWeeklyReflections(db, ACCOUNT_ID, NOW, "brief");
     expect(lite.monthlyChanges[0]).toMatchObject({
