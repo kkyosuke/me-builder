@@ -1,4 +1,4 @@
-import { type ReactNode, useCallback, useEffect, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { LoadingState } from "../../../components/loading-state";
 import { config } from "../../../config";
 import {
@@ -16,43 +16,66 @@ import { serviceTermsAcceptanceDestination } from "../model/service-terms-naviga
 import { ServiceTermsScreen } from "./service-terms-screen";
 
 type GateState =
-  | { status: "loading" }
-  | { status: "error"; message: string }
-  | { status: "ready"; data: ServiceTermsStatus };
+  | { status: "loading"; revision: number | null }
+  | { status: "error"; revision: number; message: string }
+  | { status: "ready"; revision: number; data: ServiceTermsStatus };
 
 export function ServiceTermsGate({ children }: { children: ReactNode }) {
   const authSession = useAuthSession();
-  const [state, setState] = useState<GateState>({ status: "loading" });
+  const authenticatedRevision =
+    authSession.state.status === "authenticated" ? authSession.state.revision : null;
+  const authenticatedRevisionRef = useRef(authenticatedRevision);
+  authenticatedRevisionRef.current = authenticatedRevision;
+  const requestRef = useRef<AbortController | null>(null);
+  const [state, setState] = useState<GateState>({ status: "loading", revision: null });
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (state.status !== "loading") return;
-    if (authSession.state.status !== "authenticated") return;
+  const loadTerms = useCallback(() => {
+    if (authenticatedRevision === null) return;
+    requestRef.current?.abort();
     const controller = new AbortController();
+    requestRef.current = controller;
+    setState({ status: "loading", revision: authenticatedRevision });
+    setSubmitting(false);
+    setSubmitError(null);
     void (async () => {
       try {
         const data = await fetchServiceTermsStatus(config.apiUrl, controller.signal);
-        if (!controller.signal.aborted) setState({ status: "ready", data });
+        if (!controller.signal.aborted) {
+          setState({ status: "ready", revision: authenticatedRevision, data });
+        }
       } catch (error) {
         if (!controller.signal.aborted) {
           setState({
             status: "error",
+            revision: authenticatedRevision,
             message: error instanceof Error ? error.message : "利用規約を確認できませんでした。",
           });
         }
+      } finally {
+        if (requestRef.current === controller) requestRef.current = null;
       }
     })();
-    return () => controller.abort();
-  }, [authSession.state.status, state.status]);
+  }, [authenticatedRevision]);
+
+  useEffect(() => {
+    loadTerms();
+    return () => {
+      requestRef.current?.abort();
+      requestRef.current = null;
+    };
+  }, [loadTerms]);
 
   const accept = useCallback(async () => {
     if (state.status !== "ready") return;
+    const submittedRevision = state.revision;
     const destination = serviceTermsAcceptanceDestination(resolveRequestedLocation());
     setSubmitting(true);
     setSubmitError(null);
     try {
       const acceptance = await acceptServiceTerms(config.apiUrl, state.data.document.version);
+      if (authenticatedRevisionRef.current !== submittedRevision) return;
       window.history.replaceState({}, "", destination);
       setState({
         ...state,
@@ -67,15 +90,16 @@ export function ServiceTermsGate({ children }: { children: ReactNode }) {
         },
       });
     } catch (error) {
+      if (authenticatedRevisionRef.current !== submittedRevision) return;
       if (error instanceof ServiceTermsVersionConflictError) {
-        setState({ status: "loading" });
+        loadTerms();
         return;
       }
       setSubmitError(error instanceof Error ? error.message : "同意を記録できませんでした。");
     } finally {
       setSubmitting(false);
     }
-  }, [state]);
+  }, [loadTerms, state]);
 
   if (authSession.state.status === "checking" || authSession.state.status === "redirecting") {
     return <LoadingState message="利用条件を確認しています..." />;
@@ -101,7 +125,7 @@ export function ServiceTermsGate({ children }: { children: ReactNode }) {
       </main>
     );
   }
-  if (state.status === "loading") {
+  if (state.status === "loading" || state.revision !== authenticatedRevision) {
     return <LoadingState message="利用条件を確認しています..." />;
   }
   if (state.status === "error") {
@@ -113,7 +137,7 @@ export function ServiceTermsGate({ children }: { children: ReactNode }) {
         </p>
         <button
           type="button"
-          onClick={() => setState({ status: "loading" })}
+          onClick={loadTerms}
           className="mt-6 min-h-11 rounded-xl bg-sky-600 px-5 font-bold text-white"
         >
           再試行

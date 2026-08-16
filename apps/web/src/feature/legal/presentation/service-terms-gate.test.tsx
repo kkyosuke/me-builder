@@ -5,7 +5,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ServiceTermsGate } from "./service-terms-gate";
 
 const mocks = vi.hoisted(() => ({
-  authState: { status: "authenticated" } as { status: string; message?: string },
+  authState: { status: "authenticated", revision: 1 } as {
+    status: string;
+    revision?: number;
+    message?: string;
+  },
   retry: vi.fn(),
   fetchStatus: vi.fn(),
   accept: vi.fn(),
@@ -34,7 +38,7 @@ const document = {
 describe("ServiceTermsGate", () => {
   beforeEach(() => {
     window.history.replaceState(null, "", "/");
-    mocks.authState = { status: "authenticated" };
+    mocks.authState = { status: "authenticated", revision: 1 };
     mocks.accept.mockResolvedValue({
       acceptedAt: "2026-08-15T01:23:45.000Z",
       version: document.version,
@@ -114,6 +118,45 @@ describe("ServiceTermsGate", () => {
     expect(await screen.findByText("主機能")).toBeTruthy();
     expect(screen.queryByRole("heading", { name: document.title })).toBeNull();
     expect(mocks.accept).not.toHaveBeenCalled();
+  });
+
+  it("Account切替時は前Accountの同意状態を破棄して新しいsessionで再確認する", async () => {
+    mocks.fetchStatus
+      .mockResolvedValueOnce({
+        document,
+        acceptance: {
+          required: false,
+          acceptedVersion: document.version,
+          documentHash: document.contentHash,
+          acceptedAt: "2026-08-15T01:23:45.000Z",
+        },
+      })
+      .mockResolvedValueOnce({
+        document,
+        acceptance: {
+          required: true,
+          acceptedVersion: null,
+          documentHash: null,
+          acceptedAt: null,
+        },
+      });
+    const { rerender } = render(
+      <ServiceTermsGate>
+        <p>主機能</p>
+      </ServiceTermsGate>,
+    );
+    expect(await screen.findByText("主機能")).toBeTruthy();
+
+    mocks.authState = { status: "authenticated", revision: 2 };
+    rerender(
+      <ServiceTermsGate>
+        <p>主機能</p>
+      </ServiceTermsGate>,
+    );
+
+    expect(screen.queryByText("主機能")).toBeNull();
+    expect(await screen.findByRole("heading", { name: document.title })).toBeTruthy();
+    expect(mocks.fetchStatus).toHaveBeenCalledTimes(2);
   });
 
   it("LIFF deep linkのterms指定では同意済みでも規約を表示する", async () => {
