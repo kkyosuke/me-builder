@@ -348,6 +348,37 @@ describe("SSO identity controller", () => {
     expect(JSON.stringify(log.mock.calls)).not.toContain("transferred");
   });
 
+  it("IdP障害はキャンセル成功率へ混ぜずtrace付きの外部障害として記録する", async () => {
+    const log = vi.spyOn(logger, "error").mockImplementation(() => undefined);
+    mocks.cancelAuthentication.mockResolvedValue({
+      purpose: "login",
+      returnTo: "/diagnosis/result",
+      traceId: "trace-provider-failure",
+    });
+    const response = await testApp("/api/auth/sso/callback", getSsoCallback).request(
+      "https://api.example.com/api/auth/sso/callback?state=opaque&error=temporarily_unavailable",
+      { headers: { Cookie: "__Host-me_builder_sso_callback_state=opaque" } },
+      env,
+    );
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get("location")).toBe(
+      "https://stg.example.com/diagnosis/result?sso=error",
+    );
+    expect(log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "sso.callback.failed",
+        traceId: "trace-provider-failure",
+        stage: "authorization.callback",
+        errorCode: "SSO_PROVIDER_CALLBACK_FAILED",
+        errorCategory: "external",
+        retryable: true,
+      }),
+      expect.stringContaining("SSO_PROVIDER_CALLBACK_FAILED"),
+    );
+    expect(JSON.stringify(log.mock.calls)).not.toMatch(/opaque|temporarily_unavailable/u);
+  });
+
   it("最後のIdentity解除は409にして保持する", async () => {
     mocks.unlink.mockRejectedValue(new mocks.CannotUnlinkLastIdentityError());
     const response = await testApp("/api/auth/sso/identity", deleteSsoIdentity).request(

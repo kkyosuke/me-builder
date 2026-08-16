@@ -121,6 +121,30 @@ function logSsoStarted(input: {
   );
 }
 
+function logSsoCallbackFailure(input: {
+  traceId?: string;
+  stage: "authorization.callback" | "callback.complete";
+  errorCode: "SSO_PROVIDER_CALLBACK_FAILED" | "SSO_CALLBACK_FAILED";
+  errorCategory: "external" | "unknown";
+  retryable: boolean;
+}): void {
+  logger.error(
+    {
+      event: "sso.callback.failed",
+      service: "api",
+      component: "sso",
+      ...(input.traceId ? { traceId: input.traceId } : {}),
+      outcome: "failed",
+      disposition: "web-redirect",
+      stage: input.stage,
+      errorCode: input.errorCode,
+      errorCategory: input.errorCategory,
+      retryable: input.retryable,
+    },
+    `[SSO] failed at ${input.stage} -> web-redirect (${input.errorCode}, category:${input.errorCategory})`,
+  );
+}
+
 export async function getSsoIdentityStatusContents(c: Context<AppEnv>): Promise<Response> {
   c.header("Cache-Control", "no-store");
   if (getConfig(c.env).ssoRolloutMode === "disabled" || !c.env?.DB) return unavailable(c);
@@ -201,8 +225,20 @@ export async function getSsoCallback(c: Context<AppEnv>): Promise<Response> {
     return redirectToWeb(c, "/profile?sso=error");
   }
   try {
-    if (c.req.query("error")) {
+    const providerError = c.req.query("error");
+    if (providerError) {
       const cancelled = await cancelSsoAuthentication({ state, store: dependencies.store });
+      if (providerError !== "access_denied") {
+        logSsoCallbackFailure({
+          ...(cancelled.traceId ? { traceId: cancelled.traceId } : {}),
+          stage: "authorization.callback",
+          errorCode: "SSO_PROVIDER_CALLBACK_FAILED",
+          errorCategory: "external",
+          retryable:
+            providerError === "server_error" || providerError === "temporarily_unavailable",
+        });
+        return redirectToWeb(c, resultPath(cancelled.returnTo, "error"));
+      }
       logger.warn(
         {
           event: "sso.callback.cancelled",
@@ -285,20 +321,12 @@ export async function getSsoCallback(c: Context<AppEnv>): Promise<Response> {
     );
     return redirectToWeb(c, resultPath(completed.returnTo, "linked"));
   } catch {
-    logger.error(
-      {
-        event: "sso.callback.failed",
-        service: "api",
-        component: "sso",
-        outcome: "failed",
-        disposition: "web-redirect",
-        stage: "callback.complete",
-        errorCode: "SSO_CALLBACK_FAILED",
-        errorCategory: "unknown",
-        retryable: false,
-      },
-      "[SSO] failed at callback.complete -> web-redirect (SSO_CALLBACK_FAILED, category:unknown)",
-    );
+    logSsoCallbackFailure({
+      stage: "callback.complete",
+      errorCode: "SSO_CALLBACK_FAILED",
+      errorCategory: "unknown",
+      retryable: false,
+    });
     return redirectToWeb(c, "/profile?sso=error");
   }
 }
