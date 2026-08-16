@@ -128,6 +128,18 @@ async function sessionReference(cookie: string): Promise<string> {
   return `session:v2:${hash}`;
 }
 
+async function recoverySecretHash(secret: string, salt: string): Promise<string> {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(`${salt}:${secret}`),
+  );
+  const encoded = btoa(String.fromCharCode(...new Uint8Array(digest)))
+    .replaceAll("+", "-")
+    .replaceAll("/", "_")
+    .replace(/=+$/u, "");
+  return `v1.${salt}.${encoded}`;
+}
+
 describe("application session local D1/KV E2E", () => {
   beforeEach(async () => {
     miniflare = new Miniflare({
@@ -338,5 +350,61 @@ describe("application session local D1/KV E2E", () => {
         pictureUrl: "https://example.com/profile-b.jpg",
       },
     });
+  });
+
+  it("復旧コードで認証中のLINE Identityを既存Accountへ移し、双方の旧sessionを失効する", async () => {
+    const targetSession = await exchange("credential-a");
+    const targetCookie = cookieFrom(targetSession);
+    const sourceSession = await exchange("credential-b");
+    const sourceCookie = cookieFrom(sourceSession);
+    const { csrfToken } = (await sourceSession.json()) as { csrfToken: string };
+
+    const credentialId = "recovery-e2e";
+    const secret = "recovery-secret";
+    const now = new Date();
+    await D1.shared.action.accountRecovery.issueAccountRecoveryCredential(
+      D1.shared.client.create(database),
+      {
+        id: credentialId,
+        accountId: "account-a",
+        secretHash: await recoverySecretHash(secret, "recovery-salt"),
+        expiresAt: new Date(now.getTime() + 60_000),
+        now,
+      },
+    );
+
+    const recovered = await app.request(
+      "/api/account-recovery/complete",
+      {
+        method: "POST",
+        headers: {
+          Cookie: sourceCookie,
+          Origin: webOrigin,
+          "X-CSRF-Token": csrfToken,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ code: `${credentialId}.${secret}` }),
+      },
+      bindings(),
+    );
+
+    expect(recovered.status).toBe(200);
+    expect(await recovered.json()).toEqual({ status: "recovered", alreadyRecovered: false });
+    expect((await getSession(targetCookie)).status).toBe(401);
+    expect((await getSession(sourceCookie)).status).toBe(401);
+
+    const transferred = await database
+      .prepare(
+        `SELECT account_id
+         FROM account_identities
+         WHERE provider = 'line_login' AND provider_account_id = ? AND is_deleted = 0`,
+      )
+      .bind("line-subject-b")
+      .first<{ account_id: string }>();
+    expect(transferred?.account_id).toBe("account-a");
+
+    const reexchanged = await exchange("credential-b");
+    expect(reexchanged.status).toBe(200);
+    expect((await getSession(cookieFrom(reexchanged))).status).toBe(200);
   });
 });
