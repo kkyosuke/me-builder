@@ -90,6 +90,7 @@ docs/
 ### システム・デザイン・開発運用を確認する
 
 - [インフラ・システム構成](architecture/infrastructure-architecture.md) — Cloudflareを利用するシステム構成とサービス配置
+- [Web認証・アプリケーションセッション設計](architecture/web-authentication-design.md) — LIFF／SSOを同じAccountとprovider非依存sessionへ収束させる認証境界と移行順序
 - [Accountデータ分離設計](architecture/account-data-isolation.md) — 1 Account = 1 AccountData DO、保存先の判定規則、内部module、共有D1が保存するもの
 - [相性共有データ実装設計](architecture/compatibility-data-design.md) — 1関係 = 1 CompatibilityData DO、Account別一覧参照、相手単位の継続同意、状態遷移
 - [日記チャット実装設計](architecture/diary-chat-implementation-design.md) — 日記チャットのAccountDataモデル、声かけコンテキストの保存、実行基盤、プロンプト、ガードレール、応答期限
@@ -109,6 +110,7 @@ docs/
 - [サービス利用規約の公開運用](development/service-terms-release.md) — 規約versionの追加、本文hash検証、Preview確認、公開後の訂正手順
 - [アプリケーション運用ログ方針](development/operational-logging.md) — 一連の処理を追跡し、エラー原因と最終結果を判断できる運用ログの目的と進め方
 - [本番データベースマイグレーション運用](development/production-migration-operations.md) — forward-only、expand-contract、適用順序、D1とDurable Objectの復旧方針
+- [Web認証・SSO実装残タスク](development/web-authentication-remaining-tasks.md) — API共通認証、Web／LIFF移行、SSO追加の番号付きPR、依存順、完了条件
 - [Subscription Plan機能のPreview検証](development/subscription-preview-plan-verification.md) — 決済サービスなしでPlan切替、利用上限、本人データ、安全案内、Family境界を確認する手順
 - [SubscriptionのProduction段階公開](development/subscription-production-rollout.md) — 新規購入の段階公開、緊急停止・再開、実取引、30日・90日価格検証の手順
 - [サービス紹介サイト残タスク](development/service-site-remaining-tasks.md) — サービス紹介サイトで未完了の意思決定、法務確認、実環境検証と完了条件

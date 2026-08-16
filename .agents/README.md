@@ -55,6 +55,7 @@
 | [Source Recordのライフサイクル設計](../docs/domain/source/source-record-lifecycle-design.md) | Source Recordの不変性、訂正・削除・取り消し・撤回、Brain Itemへの波及、エクスポート範囲 |
 | [Brainのラベル・アクセス制御設計](../docs/domain/brain/brain-access-label-design.md) | Topic Label、Access Label、Access Profile、MCP提供時の原則、Source Recordの既定ラベル |
 | [インフラ・システム構成](../docs/architecture/infrastructure-architecture.md) | Cloudflareを全面的に採用したインフラ基盤、システム構成、サービス配置 |
+| [Web認証・アプリケーションセッション設計](../docs/architecture/web-authentication-design.md) | LIFF／SSOの入口選択、外部Identity検証、Account解決、provider非依存session、認証と認可の境界、移行順序 |
 | [課金・Plan紐付け実装設計](../docs/architecture/billing-implementation-design.md) | Stripe、Billing Queue、共有D1、AccountPlanAssignmentの境界と収束原則 |
 | [Account復旧設計](../docs/architecture/account-recovery-design.md) | LINE Account喪失時の復旧資格情報、Identity再接続、監査、復旧不能時の境界 |
 | [Accountデータ分離設計](../docs/architecture/account-data-isolation.md) | 1 Account = 1 AccountData DO、保存先の判定規則、内部module、共有D1が保存するもの |
@@ -74,6 +75,7 @@
 | [サービス利用規約の公開運用](../docs/development/service-terms-release.md) | 規約versionの追加、再同意要否の確認、本文hash検証、Preview確認、forward-onlyな訂正手順 |
 | [アプリケーション運用ログ方針](../docs/development/operational-logging.md) | 一連の処理を追跡し、エラー原因と最終結果を判断できる運用ログの目的と進め方 |
 | [本番データベースマイグレーション運用](../docs/development/production-migration-operations.md) | 本番D1とDurable Objectのforward-only、expand-contract、適用順序、障害時の復旧方針 |
+| [Web認証・SSO実装残タスク](../docs/development/web-authentication-remaining-tasks.md) | API共通認証、Web／LIFF移行、SSO追加を番号付きPRへ分けた依存順、完了条件、リリースゲート |
 | [サブスクリプション実装残タスク](../docs/development/subscription-remaining-tasks.md) | AccountとPlanを紐づける決済系列と、紐付け後の利用権限・機能系列に分けた番号付きPR単位の残作業 |
 | [Brain Item残タスク](../docs/development/brain-item-remaining-tasks.md) | Brain Item生成・意味的重複判定・Vectorize利用に残っている検証、品質改善、延期中の機能 |
 | [アバター設定残タスク](../docs/development/avatar-remaining-tasks.md) | アバター設定で未完了の実ブラウザE2E、LIFF実端末確認、Private R2孤立objectの運用改善 |
