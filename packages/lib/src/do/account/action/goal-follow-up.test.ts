@@ -160,4 +160,25 @@ describe("goal follow-up", () => {
       ),
     ).resolves.toBeNull();
   });
+
+  it("Liteの進行中上限を合意・再開と同じAccountData操作内で判定する", async () => {
+    const db = createTestDb();
+    await addGoal(db, { id: "first", statement: "最初の目標" });
+    await addGoal(db, { id: "second", statement: "次の目標" });
+    const first = await agreeGoalFollowUp(db, ACCOUNT_ID, "first", "一歩進める", AT, 1);
+    expect(first).toMatchObject({ type: "agreed" });
+
+    await expect(
+      agreeGoalFollowUp(db, ACCOUNT_ID, "second", "二歩目を進める", AT, 1),
+    ).resolves.toEqual({ type: "active-limit-reached" });
+    if (first.type !== "agreed") throw new Error("goal agreement failed");
+    await expect(
+      updateGoalFollowUp(db, ACCOUNT_ID, first.item.id, { status: "completed" }, AT, 1),
+    ).resolves.toMatchObject({ type: "updated" });
+    const second = await agreeGoalFollowUp(db, ACCOUNT_ID, "second", "二歩目を進める", AT, 1);
+    expect(second).toMatchObject({ type: "agreed" });
+    await expect(
+      updateGoalFollowUp(db, ACCOUNT_ID, first.item.id, { status: "active" }, AT, 1),
+    ).resolves.toEqual({ type: "active-limit-reached" });
+  });
 });

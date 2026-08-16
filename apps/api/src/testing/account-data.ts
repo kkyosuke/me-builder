@@ -447,14 +447,24 @@ const actions = {
     brainItemId: string,
     nextStep: string,
     at?: Date,
-  ) => DO.account.action.goalFollowUp.agreeGoalFollowUp(db, accountId, brainItemId, nextStep, at),
+    activeLimit?: number | null,
+  ) =>
+    DO.account.action.goalFollowUp.agreeGoalFollowUp(
+      db,
+      accountId,
+      brainItemId,
+      nextStep,
+      at,
+      activeLimit,
+    ),
   "goalFollowUp.update": (
     db: DO.account.Database,
     accountId: string,
     id: string,
     input: Parameters<typeof DO.account.action.goalFollowUp.updateGoalFollowUp>[3],
     at?: Date,
-  ) => DO.account.action.goalFollowUp.updateGoalFollowUp(db, accountId, id, input, at),
+    activeLimit?: number | null,
+  ) => DO.account.action.goalFollowUp.updateGoalFollowUp(db, accountId, id, input, at, activeLimit),
   "goalFollowUp.selectMemory": (
     db: DO.account.Database,
     accountId: string,

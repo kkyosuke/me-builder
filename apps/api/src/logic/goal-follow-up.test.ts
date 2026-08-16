@@ -56,9 +56,7 @@ describe("goal follow-up entitlement", () => {
   });
 
   it("Liteは同時に1件だけを本人の合意対象にする", async () => {
-    execute.mockResolvedValue({
-      items: [{ id: "follow-1", brainItemId: "goal-1", status: "active" }],
-    });
+    execute.mockResolvedValue({ type: "active-limit-reached" });
     await expect(
       agreeGoalFollowUp({
         ...common,
@@ -67,13 +65,13 @@ describe("goal follow-up entitlement", () => {
         planAssignmentProvider: provider("lite"),
       }),
     ).resolves.toEqual({ type: "unavailable", reason: "active_limit" });
-    expect(execute).toHaveBeenCalledWith("account-1", "goalFollowUp.read");
-    expect(execute).not.toHaveBeenCalledWith(
+    expect(execute).toHaveBeenCalledWith(
       "account-1",
       "goalFollowUp.agree",
-      expect.anything(),
-      expect.anything(),
-      expect.anything(),
+      "goal-2",
+      "靴を出す",
+      at,
+      1,
     );
   });
 
@@ -107,6 +105,7 @@ describe("goal follow-up entitlement", () => {
       "goal-2",
       "一行書く",
       at,
+      null,
     );
     expect(execute).toHaveBeenNthCalledWith(
       2,
@@ -115,6 +114,7 @@ describe("goal follow-up entitlement", () => {
       "follow-2",
       { status: "completed", nextStep: "二行書く" },
       at,
+      null,
     );
   });
 });

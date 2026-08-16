@@ -101,7 +101,12 @@ export async function postGoalFollowUpAgreement(c: Context<AppEnv>): Promise<Res
     return c.json(
       v.parse(GoalFollowUpUnavailableSchema, {
         error: "Goal follow-up unavailable",
-        reason: outcome.result.type === "goal-not-found" ? "goal_not_found" : "goal_not_confirmed",
+        reason:
+          outcome.result.type === "goal-not-found"
+            ? "goal_not_found"
+            : outcome.result.type === "active-limit-reached"
+              ? "active_limit"
+              : "goal_not_confirmed",
       }),
       409,
     );
@@ -136,11 +141,11 @@ export async function patchGoalFollowUp(c: Context<AppEnv>): Promise<Response> {
     );
   }
   if (outcome.type !== "resolved") return goalFollowUpAuthError(c, outcome.type);
-  if (outcome.result.type === "not-found") {
+  if (outcome.result.type !== "updated") {
     return c.json(
       v.parse(GoalFollowUpUnavailableSchema, {
         error: "Goal follow-up unavailable",
-        reason: "goal_not_found",
+        reason: outcome.result.type === "active-limit-reached" ? "active_limit" : "goal_not_found",
       }),
       409,
     );

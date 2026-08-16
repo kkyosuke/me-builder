@@ -44,22 +44,16 @@ export async function agreeGoalFollowUp(
   if (!context.entitlement.policy.features["goal-follow-up"]) {
     return { type: "unavailable" as const, reason: "feature_unavailable" as const };
   }
-  if (context.entitlement.policy.goalFollowUp === "selected-one") {
-    const current = await context.account.execute("goalFollowUp.read");
-    if (
-      current.items.some(
-        ({ status, brainItemId }) => status === "active" && brainItemId !== params.brainItemId,
-      )
-    ) {
-      return { type: "unavailable" as const, reason: "active_limit" as const };
-    }
-  }
   const result = await context.account.execute(
     "goalFollowUp.agree",
     params.brainItemId,
     params.nextStep,
     params.at,
+    context.entitlement.policy.goalFollowUp === "selected-one" ? 1 : null,
   );
+  if (result.type === "active-limit-reached") {
+    return { type: "unavailable" as const, reason: "active_limit" as const };
+  }
   return { type: "resolved" as const, result };
 }
 
@@ -75,20 +69,15 @@ export async function updateGoalFollowUp(
   if (!context.entitlement.policy.features["goal-follow-up"]) {
     return { type: "unavailable" as const, reason: "feature_unavailable" as const };
   }
-  if (
-    params.input.status === "active" &&
-    context.entitlement.policy.goalFollowUp === "selected-one"
-  ) {
-    const current = await context.account.execute("goalFollowUp.read");
-    if (current.items.some(({ id, status }) => id !== params.id && status === "active")) {
-      return { type: "unavailable" as const, reason: "active_limit" as const };
-    }
-  }
   const result = await context.account.execute(
     "goalFollowUp.update",
     params.id,
     params.input,
     params.at,
+    context.entitlement.policy.goalFollowUp === "selected-one" ? 1 : null,
   );
+  if (result.type === "active-limit-reached") {
+    return { type: "unavailable" as const, reason: "active_limit" as const };
+  }
   return { type: "resolved" as const, result };
 }

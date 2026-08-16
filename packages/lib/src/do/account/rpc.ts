@@ -220,11 +220,16 @@ export type AccountDataActions = {
   >;
   "goalFollowUp.read": RpcAction<[], typeof goalFollowUp.readGoalFollowUps>;
   "goalFollowUp.agree": RpcAction<
-    [brainItemId: string, nextStep: string, at?: Date],
+    [brainItemId: string, nextStep: string, at?: Date, activeLimit?: number | null],
     typeof goalFollowUp.agreeGoalFollowUp
   >;
   "goalFollowUp.update": RpcAction<
-    [id: string, input: Parameters<typeof goalFollowUp.updateGoalFollowUp>[3], at?: Date],
+    [
+      id: string,
+      input: Parameters<typeof goalFollowUp.updateGoalFollowUp>[3],
+      at?: Date,
+      activeLimit?: number | null,
+    ],
     typeof goalFollowUp.updateGoalFollowUp
   >;
   "goalFollowUp.selectMemory": RpcAction<

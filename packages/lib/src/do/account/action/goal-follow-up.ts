@@ -64,6 +64,7 @@ export async function agreeGoalFollowUp(
   brainItemId: string,
   nextStep: string,
   at = new Date(),
+  activeLimit: number | null = null,
 ): Promise<AgreeGoalFollowUpResult> {
   const normalized = nextStep.trim();
   if (!normalized || normalized.length > 500) return { type: "goal-not-confirmed" };
@@ -89,6 +90,16 @@ export async function agreeGoalFollowUp(
     .get();
   if (!goal) return { type: "goal-not-found" };
   if (isInference(goal.attributes, goal.derivation)) return { type: "goal-not-confirmed" };
+  if (activeLimit !== null) {
+    const active = await db
+      .select({ brainItemId: goalFollowUps.brainItemId })
+      .from(goalFollowUps)
+      .where(and(eq(goalFollowUps.accountId, accountId), eq(goalFollowUps.status, "active")))
+      .all();
+    if (active.filter((candidate) => candidate.brainItemId !== brainItemId).length >= activeLimit) {
+      return { type: "active-limit-reached" };
+    }
+  }
   const id = crypto.randomUUID();
   await db
     .insert(goalFollowUps)
@@ -118,9 +129,20 @@ export async function updateGoalFollowUp(
   id: string,
   input: Readonly<{ status?: GoalFollowUpStatus; nextStep?: string }>,
   at = new Date(),
+  activeLimit: number | null = null,
 ): Promise<UpdateGoalFollowUpResult> {
   const nextStep = input.nextStep?.trim();
   if (nextStep !== undefined && (!nextStep || nextStep.length > 500)) return { type: "not-found" };
+  if (input.status === "active" && activeLimit !== null) {
+    const active = await db
+      .select({ id: goalFollowUps.id })
+      .from(goalFollowUps)
+      .where(and(eq(goalFollowUps.accountId, accountId), eq(goalFollowUps.status, "active")))
+      .all();
+    if (active.filter((candidate) => candidate.id !== id).length >= activeLimit) {
+      return { type: "active-limit-reached" };
+    }
+  }
   const updated = await db
     .update(goalFollowUps)
     .set({

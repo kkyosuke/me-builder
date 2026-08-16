@@ -14,8 +14,8 @@ export type GoalFollowUpReadModel = Readonly<{ items: readonly GoalFollowUp[] }>
 
 export type AgreeGoalFollowUpResult =
   | Readonly<{ type: "agreed"; item: GoalFollowUp }>
-  | Readonly<{ type: "goal-not-found" | "goal-not-confirmed" }>;
+  | Readonly<{ type: "goal-not-found" | "goal-not-confirmed" | "active-limit-reached" }>;
 
 export type UpdateGoalFollowUpResult =
   | Readonly<{ type: "updated"; item: GoalFollowUp }>
-  | Readonly<{ type: "not-found" }>;
+  | Readonly<{ type: "not-found" | "active-limit-reached" }>;
