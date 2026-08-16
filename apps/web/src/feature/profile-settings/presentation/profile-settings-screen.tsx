@@ -16,6 +16,7 @@ import { type AsyncState, errorMessage } from "../../../model/async-state";
 import type { ColorTheme } from "../../theme/model/color-theme";
 import type { FontSize } from "../../theme/model/font-size";
 import type { ResetDevelopmentAccountDataResult } from "../infrastructure/development-account-data-api";
+import type { SsoIdentityStatus } from "../infrastructure/sso-identity-api";
 import { type AvatarSelection, getAvatarName } from "../model/avatar";
 import type { ProfileEntitlement } from "../model/entitlement";
 import { AvatarPreview } from "./components/avatar-preview";
@@ -70,6 +71,9 @@ export function ProfileSettingsScreen({
   onFontSizeChange,
   serviceTermsAcceptanceHistory,
   onIssueRecoveryCode,
+  ssoIdentity,
+  onLinkSsoIdentity,
+  onUnlinkSsoIdentity,
 }: {
   avatar: AvatarSelection | null;
   isAdmin?: boolean;
@@ -97,6 +101,9 @@ export function ProfileSettingsScreen({
   onFontSizeChange: (fontSize: FontSize) => void;
   serviceTermsAcceptanceHistory?: ReactNode;
   onIssueRecoveryCode?: () => Promise<{ code: string; expiresAt: string }>;
+  ssoIdentity?: AsyncState<SsoIdentityStatus>;
+  onLinkSsoIdentity?: () => void;
+  onUnlinkSsoIdentity?: () => Promise<void>;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const backButtonRef = useRef<HTMLButtonElement>(null);
@@ -110,6 +117,7 @@ export function ProfileSettingsScreen({
     AsyncState<{ code: string; expiresAt: string }>
   >({ status: "idle" });
   const [billingState, setBillingState] = useState<AsyncState<string>>({ status: "idle" });
+  const [ssoMutationState, setSsoMutationState] = useState<AsyncState<string>>({ status: "idle" });
 
   const planDate =
     entitlement?.status === "success"
@@ -584,6 +592,94 @@ export function ProfileSettingsScreen({
               </span>
               <ChevronRight className="size-5 text-slate-400" aria-hidden="true" />
             </a>
+          </section>
+        )}
+
+        {ssoIdentity && onLinkSsoIdentity && onUnlinkSsoIdentity && (
+          <section aria-labelledby="sso-identity-heading" className="mt-8">
+            <h2
+              id="sso-identity-heading"
+              className="px-1 text-sm font-bold tracking-wider text-slate-500 dark:text-slate-400"
+            >
+              ログイン方法
+            </h2>
+            <div className="mt-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+              <div className="flex items-start gap-3">
+                <Shield
+                  className="mt-0.5 size-5 text-violet-600 dark:text-violet-300"
+                  aria-hidden="true"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="font-bold">外部ブラウザ SSO</p>
+                  {ssoIdentity.status === "loading" && (
+                    <output className="mt-1 block text-sm text-slate-500 dark:text-slate-400">
+                      接続状態を確認しています...
+                    </output>
+                  )}
+                  {ssoIdentity.status === "error" && (
+                    <p role="alert" className="mt-1 text-sm text-rose-700 dark:text-rose-300">
+                      {ssoIdentity.message}
+                    </p>
+                  )}
+                  {ssoIdentity.status === "success" && (
+                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                      {ssoIdentity.data.linked
+                        ? "接続済みです。外部ブラウザから同じAccountへログインできます。"
+                        : "未接続です。現在のAccountへSSOを追加できます。"}
+                    </p>
+                  )}
+                </div>
+              </div>
+              {ssoIdentity.status === "success" &&
+                (ssoIdentity.data.linked ? (
+                  <button
+                    type="button"
+                    disabled={!ssoIdentity.data.canUnlink || ssoMutationState.status === "loading"}
+                    onClick={() => {
+                      if (!window.confirm("外部ブラウザ SSO の接続を解除しますか？")) return;
+                      setSsoMutationState({ status: "loading" });
+                      void onUnlinkSsoIdentity()
+                        .then(() =>
+                          setSsoMutationState({ status: "success", data: "SSOを解除しました。" }),
+                        )
+                        .catch((error) =>
+                          setSsoMutationState({
+                            status: "error",
+                            message: errorMessage(error, "SSOを解除できませんでした。"),
+                          }),
+                        );
+                    }}
+                    className="mt-4 min-h-11 rounded-xl border border-rose-400 px-4 text-sm font-bold text-rose-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-rose-300"
+                  >
+                    SSO接続を解除
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={onLinkSsoIdentity}
+                    className="mt-4 min-h-11 rounded-xl border border-violet-500 px-4 text-sm font-bold text-violet-700 dark:text-violet-200"
+                  >
+                    SSOを接続
+                  </button>
+                ))}
+              {ssoIdentity.status === "success" &&
+                ssoIdentity.data.linked &&
+                !ssoIdentity.data.canUnlink && (
+                  <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                    最後のログイン方法は解除できません。
+                  </p>
+                )}
+              {ssoMutationState.status === "success" && (
+                <output className="mt-3 block text-sm text-emerald-700 dark:text-emerald-300">
+                  {ssoMutationState.data}
+                </output>
+              )}
+              {ssoMutationState.status === "error" && (
+                <p role="alert" className="mt-3 text-sm text-rose-700 dark:text-rose-300">
+                  {ssoMutationState.message}
+                </p>
+              )}
+            </div>
           </section>
         )}
 

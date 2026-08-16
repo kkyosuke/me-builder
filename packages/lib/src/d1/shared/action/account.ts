@@ -20,6 +20,20 @@ import { accountAgreementAcceptances } from "../schema/agreement";
  */
 export type IdentityProvider = "line" | "line_login" | "google" | "auth0";
 
+export class CannotUnlinkLastIdentityError extends Error {
+  constructor() {
+    super("Cannot unlink the last login identity");
+    this.name = "CannotUnlinkLastIdentityError";
+  }
+}
+
+export class IdentityAlreadyLinkedError extends Error {
+  constructor() {
+    super("Identity is already linked to another account");
+    this.name = "IdentityAlreadyLinkedError";
+  }
+}
+
 export type UpsertIdentityInput = {
   provider: IdentityProvider;
   providerAccountId: string;
@@ -114,7 +128,7 @@ export async function unlinkIdentity(
   if (unlinked) return;
   const providers = await listLoginIdentityProviders(db, input.accountId);
   if (!providers.includes(input.provider)) return;
-  throw new Error("Cannot unlink the last login identity");
+  throw new CannotUnlinkLastIdentityError();
 }
 
 async function applyRequestedRole(
@@ -248,7 +262,7 @@ function assertSameAccount(
   accountId: string,
 ): typeof accountIdentities.$inferSelect {
   if (existing.identity.accountId !== accountId) {
-    throw new Error("Identity is already linked to another account");
+    throw new IdentityAlreadyLinkedError();
   }
   return existing.identity;
 }

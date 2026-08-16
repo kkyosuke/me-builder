@@ -19,6 +19,12 @@ import { adminBillingHealthRoute } from "./contract/admin/billing-health";
 import { adminBillingReconciliationRoute } from "./contract/admin/billing-reconciliation";
 import { adminStatisticsRoute } from "./contract/admin/statistics";
 import {
+  completeSsoCallbackRoute,
+  getSsoIdentityStatusRoute,
+  startSsoIdentityLinkRoute,
+  unlinkSsoIdentityRoute,
+} from "./contract/auth/sso-identity";
+import {
   applicationSessionRoute,
   liffAuthenticationExchangeRoute,
   logoutApplicationSessionRoute,
@@ -205,6 +211,12 @@ import {
   getSelfCareContextContents,
   postSelfCareContextConfirmation,
 } from "./controller/self-care-context";
+import {
+  deleteSsoIdentity,
+  getSsoCallback,
+  getSsoIdentityLink,
+  getSsoIdentityStatusContents,
+} from "./controller/sso-identity";
 import { requireAuthentication } from "./middleware/authentication";
 import {
   requireAdmin,
@@ -292,6 +304,25 @@ app.post(
   postWebClientError,
 );
 app.post("/api/line/webhook", postLineWebhook);
+app.get(
+  "/api/auth/sso/identity",
+  getSsoIdentityStatusRoute,
+  requireAuthentication,
+  getSsoIdentityStatusContents,
+);
+app.delete(
+  "/api/auth/sso/identity",
+  unlinkSsoIdentityRoute,
+  requireAuthentication,
+  deleteSsoIdentity,
+);
+app.get(
+  "/api/auth/sso/link",
+  startSsoIdentityLinkRoute,
+  requireAuthentication,
+  getSsoIdentityLink,
+);
+app.get("/api/auth/sso/callback", completeSsoCallbackRoute, getSsoCallback);
 app.post("/api/billing/webhook", postStripeWebhook);
 app.post(
   "/api/auth/liff/exchange",

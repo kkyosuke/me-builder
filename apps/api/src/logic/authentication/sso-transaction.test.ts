@@ -4,6 +4,7 @@ import {
   type SsoAuthenticationTransaction,
   type SsoAuthenticationTransactionStore,
   type SsoServerClient,
+  cancelSsoIdentityLinking,
   completeSsoAuthentication,
   completeSsoIdentityLinking,
   completeSsoLogin,
@@ -348,5 +349,24 @@ describe("SSO authentication transaction", () => {
         now: () => 1_000,
       }),
     ).rejects.toEqual(new SsoAuthenticationError("transaction_purpose_mismatch"));
+  });
+
+  it("IdPでキャンセルしたlink transactionも再送できない", async () => {
+    const store = createMemoryStore();
+    store.transactions.set("cancel-state", {
+      purpose: "link",
+      initiatingAccountId: "account-1",
+      nonce: "nonce",
+      codeVerifier: "verifier",
+      returnTo: "/profile",
+      expiresAt: 2_000,
+    });
+
+    await expect(
+      cancelSsoIdentityLinking({ state: "cancel-state", store, now: () => 1_000 }),
+    ).resolves.toEqual({ returnTo: "/profile" });
+    await expect(
+      cancelSsoIdentityLinking({ state: "cancel-state", store, now: () => 1_000 }),
+    ).rejects.toEqual(new SsoAuthenticationError("transaction_missing"));
   });
 });

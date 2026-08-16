@@ -18,6 +18,12 @@ import {
   fetchAccountProfile,
   saveAccountAvatar,
 } from "./feature/profile-settings/infrastructure/profile-api";
+import {
+  type SsoIdentityStatus,
+  fetchSsoIdentityStatus,
+  ssoIdentityLinkUrl,
+  unlinkSsoIdentity,
+} from "./feature/profile-settings/infrastructure/sso-identity-api";
 import type { AvatarSelection } from "./feature/profile-settings/model/avatar";
 import type { ProfileEntitlement } from "./feature/profile-settings/model/entitlement";
 import { ProfileMenuButton } from "./feature/profile-settings/presentation/components/profile-menu-button";
@@ -177,6 +183,9 @@ function AppContents() {
     status: "loading",
   });
   const [accountDataResetKey, setAccountDataResetKey] = useState(0);
+  const [ssoIdentityState, setSsoIdentityState] = useState<AsyncState<SsoIdentityStatus>>({
+    status: "loading",
+  });
   const linePictureUrl =
     profileReadState.status === "ready"
       ? (profileLinePictureUrl ??
@@ -286,6 +295,22 @@ function AppContents() {
   useEffect(() => {
     if (!isProfileOpen) return;
     return scheduleIdlePreloadAfter(loadProfileSettingsScreen, preloadAvatarSettingsScreen);
+  }, [isProfileOpen]);
+
+  useEffect(() => {
+    if (!isProfileOpen || config.ssoRolloutMode === "disabled") return;
+    const controller = new AbortController();
+    setSsoIdentityState({ status: "loading" });
+    void fetchSsoIdentityStatus(config.apiUrl, controller.signal)
+      .then((data) => {
+        if (!controller.signal.aborted) setSsoIdentityState({ status: "success", data });
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted) {
+          setSsoIdentityState({ status: "error", message: errorMessage(error) });
+        }
+      });
+    return () => controller.abort();
   }, [isProfileOpen]);
 
   useEffect(() => {
@@ -498,6 +523,15 @@ function AppContents() {
     window.location.assign(url);
   };
 
+  const linkSsoIdentity = () => {
+    window.location.assign(ssoIdentityLinkUrl(config.apiUrl, "/profile?sso=linking"));
+  };
+
+  const disconnectSsoIdentity = async (): Promise<void> => {
+    await unlinkSsoIdentity(config.apiUrl);
+    setSsoIdentityState({ status: "success", data: { linked: false, canUnlink: false } });
+  };
+
   return (
     <>
       {!isAdminPath && profileView === "closed" && (
@@ -577,6 +611,13 @@ function AppContents() {
               onFontSizeChange={fontSize.setFontSize}
               serviceTermsAcceptanceHistory={<ServiceTermsAcceptanceHistory />}
               onIssueRecoveryCode={createRecoveryCode}
+              {...(config.ssoRolloutMode === "disabled"
+                ? {}
+                : {
+                    ssoIdentity: ssoIdentityState,
+                    onLinkSsoIdentity: linkSsoIdentity,
+                    onUnlinkSsoIdentity: disconnectSsoIdentity,
+                  })}
             />
           </Suspense>
         </RouteErrorBoundary>
