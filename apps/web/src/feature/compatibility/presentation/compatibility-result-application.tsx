@@ -6,7 +6,6 @@ import {
   getRelationshipCategoryBadgeClassName,
   getRelationshipCategoryLabel,
 } from "../../diagnosis/model/relationship-category";
-import { useLiffSession } from "../../liff";
 import { compatibilityShareContentHref } from "../model/compatibility-category-navigation";
 import { toCompatibilityPerson } from "../model/compatibility-relationship-view";
 import { CompatibilityResultScreen } from "./compatibility-result-screen";
@@ -45,8 +44,7 @@ export default function CompatibilityResultApplication({
 }: {
   relationshipId: string | null;
 }) {
-  const { acquireIdToken } = useLiffSession();
-  const relationship = useCompatibilityRelationship({ acquireIdToken, relationshipId });
+  const relationship = useCompatibilityRelationship({ relationshipId });
   const [confirmingEnd, setConfirmingEnd] = useState(false);
 
   if (relationship.state.status === "loading") {

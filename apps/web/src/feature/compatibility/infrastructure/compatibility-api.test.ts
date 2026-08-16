@@ -55,7 +55,7 @@ const shareContent = {
 describe("fetchCompatibilityShareConsent", () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it("認証付きで共有可否を取得する", async () => {
+  it("アプリセッション付きで共有可否を取得する", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify(consent), {
         status: 200,
@@ -64,12 +64,12 @@ describe("fetchCompatibilityShareConsent", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(
-      fetchCompatibilityShareConsent("https://api.example.com", "id-token"),
-    ).resolves.toEqual(consent);
+    await expect(fetchCompatibilityShareConsent("https://api.example.com")).resolves.toEqual(
+      consent,
+    );
     expect(fetchMock).toHaveBeenCalledWith(
       "https://api.example.com/api/compatibility/share-consent",
-      expect.objectContaining({ headers: { Authorization: "Bearer id-token" } }),
+      expect.objectContaining({ credentials: "include" }),
     );
   });
 
@@ -77,11 +77,11 @@ describe("fetchCompatibilityShareConsent", () => {
     const fetchMock = vi.fn().mockResolvedValue(Response.json(consent));
     vi.stubGlobal("fetch", fetchMock);
 
-    await fetchCompatibilityShareConsent("https://api.example.com", "id-token", "family");
+    await fetchCompatibilityShareConsent("https://api.example.com", "family");
 
     expect(fetchMock).toHaveBeenCalledWith(
       "https://api.example.com/api/compatibility/share-consent?relationshipCategory=family",
-      expect.objectContaining({ headers: { Authorization: "Bearer id-token" } }),
+      expect.objectContaining({ credentials: "include" }),
     );
   });
 
@@ -95,14 +95,14 @@ describe("fetchCompatibilityShareConsent", () => {
         ),
     );
 
-    await expect(fetchCompatibilityShareConsent(undefined, "id-token")).rejects.toThrow();
+    await expect(fetchCompatibilityShareConsent(undefined)).rejects.toThrow();
   });
 
   it("認証失敗を利用者向けメッセージへ変換する", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 401 })));
 
-    await expect(fetchCompatibilityShareConsent(undefined, "id-token")).rejects.toThrow(
-      "本人確認に失敗しました",
+    await expect(fetchCompatibilityShareConsent(undefined)).rejects.toThrow(
+      "本人確認の有効期限が切れました",
     );
   });
 });
@@ -120,11 +120,11 @@ describe("fetchCompatibilityShareContent", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(
-      fetchCompatibilityShareContent("https://api.example.com", "id-token", "partner"),
+      fetchCompatibilityShareContent("https://api.example.com", "partner"),
     ).resolves.toEqual(content);
     expect(fetchMock).toHaveBeenCalledWith(
       "https://api.example.com/api/compatibility/share-content?relationshipCategory=partner",
-      expect.objectContaining({ headers: { Authorization: "Bearer id-token" } }),
+      expect.objectContaining({ credentials: "include" }),
     );
   });
 
@@ -141,9 +141,7 @@ describe("fetchCompatibilityShareContent", () => {
       ),
     );
 
-    await expect(
-      fetchCompatibilityShareContent(undefined, "id-token", "partner"),
-    ).rejects.toThrow();
+    await expect(fetchCompatibilityShareContent(undefined, "partner")).rejects.toThrow();
   });
 
   it("要求と異なるカテゴリの共有内容を受け入れない", async () => {
@@ -159,7 +157,7 @@ describe("fetchCompatibilityShareContent", () => {
       ),
     );
 
-    await expect(fetchCompatibilityShareContent(undefined, "id-token", "partner")).rejects.toThrow(
+    await expect(fetchCompatibilityShareContent(undefined, "partner")).rejects.toThrow(
       "関係カテゴリが一致しません",
     );
   });
@@ -178,25 +176,24 @@ describe("issueCompatibilityInvitation", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(
-      issueCompatibilityInvitation("https://api.example.com", "id-token", "family"),
+      issueCompatibilityInvitation("https://api.example.com", "family"),
     ).resolves.toEqual(invitation);
     expect(fetchMock).toHaveBeenCalledWith(
       "https://api.example.com/api/compatibility/invitations",
       expect.objectContaining({
         method: "POST",
-        headers: {
-          Authorization: "Bearer id-token",
-          "Content-Type": "application/json",
-        },
+        credentials: "include",
         body: JSON.stringify({ relationshipCategory: "family" }),
       }),
     );
+    const requestHeaders = new Headers(fetchMock.mock.calls[0]?.[1]?.headers);
+    expect(requestHeaders.get("Content-Type")).toBe("application/json");
   });
 
   it("共有を開始できない競合を利用者向けメッセージへ変換する", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 409 })));
 
-    await expect(issueCompatibilityInvitation(undefined, "id-token", "partner")).rejects.toThrow(
+    await expect(issueCompatibilityInvitation(undefined, "partner")).rejects.toThrow(
       "いまは共有を始められません",
     );
   });
@@ -205,7 +202,7 @@ describe("issueCompatibilityInvitation", () => {
 describe("fetchCompatibilityInvitation", () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it("認証付きで関係IDの招待内容を取得する", async () => {
+  it("アプリセッション付きで関係IDの招待内容を取得する", async () => {
     const relationshipId = "1".repeat(64);
     const invitation = {
       relationshipCategory: "friend",
@@ -223,11 +220,11 @@ describe("fetchCompatibilityInvitation", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(
-      fetchCompatibilityInvitation("https://api.example.com", "id-token", relationshipId),
+      fetchCompatibilityInvitation("https://api.example.com", relationshipId),
     ).resolves.toEqual(invitation);
     expect(fetchMock).toHaveBeenCalledWith(
       `https://api.example.com/api/compatibility/invitations/${relationshipId}`,
-      expect.objectContaining({ headers: { Authorization: "Bearer id-token" } }),
+      expect.objectContaining({ credentials: "include" }),
     );
   });
 
@@ -237,9 +234,7 @@ describe("fetchCompatibilityInvitation", () => {
   ])("HTTP %sを利用者向けメッセージへ変換する", async (status, message) => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status })));
 
-    await expect(
-      fetchCompatibilityInvitation(undefined, "id-token", "1".repeat(64)),
-    ).rejects.toThrow(message);
+    await expect(fetchCompatibilityInvitation(undefined, "1".repeat(64))).rejects.toThrow(message);
   });
 
   it("Accountがなければ友だち追加を案内する", async () => {
@@ -255,9 +250,9 @@ describe("fetchCompatibilityInvitation", () => {
         ),
     );
 
-    await expect(
-      fetchCompatibilityInvitation(undefined, "id-token", "1".repeat(64)),
-    ).rejects.toThrow("LINE公式アカウントを友だち追加");
+    await expect(fetchCompatibilityInvitation(undefined, "1".repeat(64))).rejects.toThrow(
+      "LINE公式アカウントを友だち追加",
+    );
   });
 });
 
@@ -294,10 +289,10 @@ describe("compatibility relationship APIs", () => {
     const fetchMock = vi.fn().mockResolvedValue(Response.json(data));
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(fetchCompatibilityRelationships(undefined, "id-token")).resolves.toEqual(data);
+    await expect(fetchCompatibilityRelationships(undefined)).resolves.toEqual(data);
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/compatibility/relationships",
-      expect.objectContaining({ headers: { Authorization: "Bearer id-token" } }),
+      expect.objectContaining({ credentials: "include" }),
     );
   });
 
@@ -308,12 +303,12 @@ describe("compatibility relationship APIs", () => {
       .mockResolvedValue(Response.json({ relationshipId, status: "accepted" }));
     vi.stubGlobal("fetch", fetchMock);
 
-    await acceptCompatibilityInvitation(undefined, "id-token", relationshipId);
+    await acceptCompatibilityInvitation(undefined, relationshipId);
     expect(fetchMock).toHaveBeenCalledWith(
       `/api/compatibility/invitations/${relationshipId}/accept`,
       expect.objectContaining({
         method: "POST",
-        headers: { Authorization: "Bearer id-token" },
+        credentials: "include",
       }),
     );
     expect(fetchMock.mock.calls[0]?.[1]).not.toHaveProperty("body");
@@ -338,9 +333,7 @@ describe("compatibility relationship APIs", () => {
       },
     };
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json(data)));
-    await expect(
-      fetchCompatibilityRelationship(undefined, "id-token", relationshipId),
-    ).resolves.toEqual(data);
+    await expect(fetchCompatibilityRelationship(undefined, relationshipId)).resolves.toEqual(data);
   });
 
   it("ふたり進行度だけ利用できない相性シートを取得する", async () => {
@@ -356,9 +349,7 @@ describe("compatibility relationship APIs", () => {
     };
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json(data)));
 
-    await expect(
-      fetchCompatibilityRelationship(undefined, "id-token", relationshipId),
-    ).resolves.toEqual(data);
+    await expect(fetchCompatibilityRelationship(undefined, relationshipId)).resolves.toEqual(data);
   });
 
   it.each([
@@ -368,7 +359,7 @@ describe("compatibility relationship APIs", () => {
     const relationshipId = "4".repeat(64);
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
     vi.stubGlobal("fetch", fetchMock);
-    await operation(undefined, "id-token", relationshipId);
+    await operation(undefined, relationshipId);
     expect(fetchMock).toHaveBeenCalledWith(
       `${prefix}${relationshipId}`,
       expect.objectContaining({ method: "DELETE" }),
@@ -378,32 +369,30 @@ describe("compatibility relationship APIs", () => {
   it.each([
     [404, "この招待は利用できません"],
     [409, "この招待は承諾できません"],
-    [401, "本人確認に失敗しました"],
+    [401, "本人確認の有効期限が切れました"],
   ])("承諾のHTTP %sを利用者向けメッセージへ変換する", async (status, message) => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status })));
 
-    await expect(
-      acceptCompatibilityInvitation(undefined, "id-token", "5".repeat(64)),
-    ).rejects.toThrow(message);
+    await expect(acceptCompatibilityInvitation(undefined, "5".repeat(64))).rejects.toThrow(message);
   });
 
   it.each([
     [404, "この相性シートは利用できません"],
-    [401, "本人確認に失敗しました"],
+    [401, "本人確認の有効期限が切れました"],
   ])("相性シート取得のHTTP %sを利用者向けメッセージへ変換する", async (status, message) => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status })));
 
-    await expect(
-      fetchCompatibilityRelationship(undefined, "id-token", "5".repeat(64)),
-    ).rejects.toThrow(message);
+    await expect(fetchCompatibilityRelationship(undefined, "5".repeat(64))).rejects.toThrow(
+      message,
+    );
   });
 
   it("利用できない相性シートを表示破棄対象のエラーへ変換する", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 404 })));
 
-    await expect(
-      fetchCompatibilityRelationship(undefined, "id-token", "5".repeat(64)),
-    ).rejects.toBeInstanceOf(CompatibilityResourceUnavailableError);
+    await expect(fetchCompatibilityRelationship(undefined, "5".repeat(64))).rejects.toBeInstanceOf(
+      CompatibilityResourceUnavailableError,
+    );
   });
 
   it.each([
@@ -414,9 +403,7 @@ describe("compatibility relationship APIs", () => {
     async (_name, operation, message) => {
       vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 404 })));
 
-      const failure = await operation(undefined, "id-token", "6".repeat(64)).catch(
-        (error: unknown) => error,
-      );
+      const failure = await operation(undefined, "6".repeat(64)).catch((error: unknown) => error);
       expect(failure).toBeInstanceOf(Error);
       expect((failure as Error).message).toContain(message);
       expect((failure as Error).message).not.toContain("404");
@@ -424,10 +411,10 @@ describe("compatibility relationship APIs", () => {
   );
 
   it.each([
-    ["accept", () => acceptCompatibilityInvitation(undefined, "t", "7".repeat(64))],
-    ["relationship", () => fetchCompatibilityRelationship(undefined, "t", "7".repeat(64))],
-    ["cancel", () => cancelCompatibilityInvitation(undefined, "t", "7".repeat(64))],
-    ["end", () => endCompatibilityRelationship(undefined, "t", "7".repeat(64))],
+    ["accept", () => acceptCompatibilityInvitation(undefined, "7".repeat(64))],
+    ["relationship", () => fetchCompatibilityRelationship(undefined, "7".repeat(64))],
+    ["cancel", () => cancelCompatibilityInvitation(undefined, "7".repeat(64))],
+    ["end", () => endCompatibilityRelationship(undefined, "7".repeat(64))],
   ] as const)("%sでもAccountがなければ友だち追加を案内する", async (_name, operation) => {
     vi.stubGlobal(
       "fetch",

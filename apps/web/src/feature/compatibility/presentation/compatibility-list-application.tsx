@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useLiffSession } from "../../liff";
+import { useAuthSession } from "../../auth";
 import { shareCompatibilityInvitationToLine } from "../infrastructure/compatibility-invitation-sharing";
 import {
   type CompatibilityRelationshipCategoryFilter,
@@ -10,8 +10,8 @@ import { CompatibilityListScreen } from "./compatibility-list-screen";
 import { useCompatibilityRelationships } from "./hooks/use-compatibility-relationships";
 
 export default function CompatibilityListApplication() {
-  const { acquireIdToken, profile } = useLiffSession();
-  const relationships = useCompatibilityRelationships({ acquireIdToken });
+  const authSession = useAuthSession();
+  const relationships = useCompatibilityRelationships();
   const [sharingMessage, setSharingMessage] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<CompatibilityRelationshipCategoryFilter>(
     () => compatibilityRelationshipCategoryFilterFromSearch(window.location.search),
@@ -44,7 +44,9 @@ export default function CompatibilityListApplication() {
   ) => {
     try {
       const destination = await shareCompatibilityInvitationToLine(
-        profile?.displayName ?? null,
+        authSession.state.status === "authenticated"
+          ? (authSession.state.profile.displayName ?? null)
+          : null,
         item.relationshipCategory,
         item.invitationUrl,
       );

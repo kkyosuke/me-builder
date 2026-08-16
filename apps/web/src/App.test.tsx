@@ -1130,7 +1130,6 @@ describe("App", () => {
     await waitFor(() =>
       expect(mocks.fetchCompatibilityShareConsent).toHaveBeenCalledWith(
         "https://api.example.com",
-        "dummy.id.token",
         "partner",
         expect.anything(),
       ),
@@ -1170,7 +1169,6 @@ describe("App", () => {
     expect(mocks.fetchAccountProfile).toHaveBeenCalledTimes(1);
     expect(mocks.fetchCompatibilityShareContent).toHaveBeenCalledWith(
       "https://api.example.com",
-      "dummy.id.token",
       "partner",
       expect.any(AbortSignal),
     );
@@ -1192,11 +1190,49 @@ describe("App", () => {
     expect(screen.getByText("あおいさんから招待が届いています")).toBeTruthy();
     expect(mocks.fetchCompatibilityInvitation).toHaveBeenCalledWith(
       "https://api.example.com",
-      "dummy.id.token",
       relationshipId,
       expect.anything(),
     );
     expect(mocks.fetchDiagnosisList).not.toHaveBeenCalled();
+  });
+
+  it("招待表示中のセッション切替で前アカウントの参加者を破棄して再判定する", async () => {
+    const relationshipId = "2".repeat(64);
+    window.history.replaceState({}, "", `/compatibility/invitations/${relationshipId}`);
+    mocks.fetchCompatibilityInvitation
+      .mockResolvedValueOnce({
+        relationshipCategory: "friend",
+        inviter: { displayName: "切替前の招待者", avatarUrl: null },
+        recipient: { displayName: "切替前", avatarUrl: null },
+        expiresAt: "2026-08-26T00:00:00.000Z",
+        canAccept: true,
+        blockingReasons: [],
+        nextAction: null,
+      })
+      .mockResolvedValueOnce({
+        relationshipCategory: "friend",
+        inviter: { displayName: "切替後の招待者", avatarUrl: null },
+        recipient: { displayName: "切替後", avatarUrl: null },
+        expiresAt: "2026-08-26T00:00:00.000Z",
+        canAccept: false,
+        blockingReasons: [],
+        nextAction: null,
+      });
+    const view = render(<App />);
+
+    expect(await screen.findByText("切替前の招待者さんから招待が届いています")).toBeTruthy();
+
+    mocks.authState = {
+      status: "authenticated",
+      profile: { displayName: "切替後", pictureUrl: undefined },
+      role: "user",
+      revision: 2,
+    };
+    view.rerender(<App />);
+
+    expect(await screen.findByText("切替後の招待者さんから招待が届いています")).toBeTruthy();
+    expect(screen.queryByText("切替前の招待者さんから招待が届いています")).toBeNull();
+    expect(mocks.fetchCompatibilityInvitation).toHaveBeenCalledTimes(2);
   });
 
   afterEach(() => {

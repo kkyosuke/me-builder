@@ -5,7 +5,7 @@ import {
 } from "@me-builder/lib/compatibility";
 import * as v from "valibot";
 import type { operations } from "../../../generated/api";
-import { createHttpClient } from "../../../infrastructure/http-client";
+import { createAuthenticatedHttpClient } from "../../../infrastructure/http-client";
 import type { CompatibilityInvitation } from "../model/compatibility-invitation";
 import type { CompatibilityInvitationPreview } from "../model/compatibility-invitation-preview";
 import type {
@@ -167,10 +167,11 @@ const InvitationAcceptanceResponseSchema = v.object({
 
 const FRIENDSHIP_REQUIRED_MESSAGE =
   "利用するには、先にLINE公式アカウントを友だち追加してください。";
+const SESSION_EXPIRED_MESSAGE = "本人確認の有効期限が切れました。もう一度お試しください。";
 
 function authenticatedError(response: Response): Error | null {
   if (response.status === 401) {
-    return new Error("本人確認に失敗しました。LINEから開き直してください。");
+    return new Error(SESSION_EXPIRED_MESSAGE);
   }
   return null;
 }
@@ -195,24 +196,22 @@ async function notFoundError(response: Response, unavailableMessage: string): Pr
 
 export async function fetchCompatibilityShareConsent(
   apiUrl: string | undefined,
-  idToken: string,
   relationshipCategory?: CompatibilityRelationshipCategory,
   signal?: AbortSignal,
 ): Promise<CompatibilityShareConsent> {
   const query = relationshipCategory
     ? `?relationshipCategory=${encodeURIComponent(relationshipCategory)}`
     : "";
-  const response = await createHttpClient(apiUrl).request(
+  const response = await createAuthenticatedHttpClient(apiUrl).request(
     `/api/compatibility/share-consent${query}`,
     {
-      headers: { Authorization: `Bearer ${idToken}` },
       ...(signal ? { signal } : {}),
     },
   );
 
   if (!response.ok) {
     if (response.status === 401) {
-      throw new Error("本人確認に失敗しました。LINEから開き直してください。");
+      throw new Error(SESSION_EXPIRED_MESSAGE);
     }
     if (response.status === 404) {
       throw new Error("利用するには、先にLINE公式アカウントを友だち追加してください。");
@@ -225,22 +224,20 @@ export async function fetchCompatibilityShareConsent(
 
 export async function fetchCompatibilityShareContent(
   apiUrl: string | undefined,
-  idToken: string,
   relationshipCategory: CompatibilityRelationshipCategory,
   signal?: AbortSignal,
 ): Promise<CompatibilityShareContent> {
   const query = `?relationshipCategory=${encodeURIComponent(relationshipCategory)}`;
-  const response = await createHttpClient(apiUrl).request(
+  const response = await createAuthenticatedHttpClient(apiUrl).request(
     `/api/compatibility/share-content${query}`,
     {
-      headers: { Authorization: `Bearer ${idToken}` },
       ...(signal ? { signal } : {}),
     },
   );
 
   if (!response.ok) {
     if (response.status === 401) {
-      throw new Error("本人確認に失敗しました。LINEから開き直してください。");
+      throw new Error(SESSION_EXPIRED_MESSAGE);
     }
     if (response.status === 404) {
       throw new Error(FRIENDSHIP_REQUIRED_MESSAGE);
@@ -257,20 +254,22 @@ export async function fetchCompatibilityShareContent(
 
 export async function issueCompatibilityInvitation(
   apiUrl: string | undefined,
-  idToken: string,
   relationshipCategory: CompatibilityRelationshipCategory,
   signal?: AbortSignal,
 ): Promise<CompatibilityInvitation> {
-  const response = await createHttpClient(apiUrl).request("/api/compatibility/invitations", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${idToken}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ relationshipCategory }),
-    ...(signal ? { signal } : {}),
-  });
+  const response = await createAuthenticatedHttpClient(apiUrl).request(
+    "/api/compatibility/invitations",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ relationshipCategory }),
+      ...(signal ? { signal } : {}),
+    },
+  );
 
   if (!response.ok) {
     if (response.status === 401) {
-      throw new Error("本人確認に失敗しました。LINEから開き直してください。");
+      throw new Error(SESSION_EXPIRED_MESSAGE);
     }
     if (response.status === 404) {
       throw new Error("利用するには、先にLINE公式アカウントを友だち追加してください。");
@@ -286,21 +285,19 @@ export async function issueCompatibilityInvitation(
 
 export async function fetchCompatibilityInvitation(
   apiUrl: string | undefined,
-  idToken: string,
   relationshipId: string,
   signal?: AbortSignal,
 ): Promise<CompatibilityInvitationPreview> {
-  const response = await createHttpClient(apiUrl).request(
+  const response = await createAuthenticatedHttpClient(apiUrl).request(
     `/api/compatibility/invitations/${encodeURIComponent(relationshipId)}`,
     {
-      headers: { Authorization: `Bearer ${idToken}` },
       ...(signal ? { signal } : {}),
     },
   );
 
   if (!response.ok) {
     if (response.status === 401) {
-      throw new Error("本人確認に失敗しました。LINEから開き直してください。");
+      throw new Error(SESSION_EXPIRED_MESSAGE);
     }
     if (response.status === 404) {
       throw await notFoundError(
@@ -319,13 +316,14 @@ export async function fetchCompatibilityInvitation(
 
 export async function fetchCompatibilityRelationships(
   apiUrl: string | undefined,
-  idToken: string,
   signal?: AbortSignal,
 ): Promise<CompatibilityRelationshipList> {
-  const response = await createHttpClient(apiUrl).request("/api/compatibility/relationships", {
-    headers: { Authorization: `Bearer ${idToken}` },
-    ...(signal ? { signal } : {}),
-  });
+  const response = await createAuthenticatedHttpClient(apiUrl).request(
+    "/api/compatibility/relationships",
+    {
+      ...(signal ? { signal } : {}),
+    },
+  );
   if (!response.ok) {
     if (response.status === 404) {
       throw new Error("利用するには、先にLINE公式アカウントを友だち追加してください。");
@@ -340,15 +338,13 @@ export async function fetchCompatibilityRelationships(
 
 export async function acceptCompatibilityInvitation(
   apiUrl: string | undefined,
-  idToken: string,
   relationshipId: string,
   signal?: AbortSignal,
 ): Promise<CompatibilityInvitationAcceptance> {
-  const response = await createHttpClient(apiUrl).request(
+  const response = await createAuthenticatedHttpClient(apiUrl).request(
     `/api/compatibility/invitations/${encodeURIComponent(relationshipId)}/accept`,
     {
       method: "POST",
-      headers: { Authorization: `Bearer ${idToken}` },
       ...(signal ? { signal } : {}),
     },
   );
@@ -371,14 +367,12 @@ export async function acceptCompatibilityInvitation(
 
 export async function fetchCompatibilityRelationship(
   apiUrl: string | undefined,
-  idToken: string,
   relationshipId: string,
   signal?: AbortSignal,
 ): Promise<CompatibilityRelationship> {
-  const response = await createHttpClient(apiUrl).request(
+  const response = await createAuthenticatedHttpClient(apiUrl).request(
     `/api/compatibility/relationships/${encodeURIComponent(relationshipId)}`,
     {
-      headers: { Authorization: `Bearer ${idToken}` },
       ...(signal ? { signal } : {}),
     },
   );
@@ -398,14 +392,12 @@ export async function fetchCompatibilityRelationship(
 
 async function deleteCompatibilityResource(
   apiUrl: string | undefined,
-  idToken: string,
   path: string,
   messages: Readonly<{ failure: string; gone: string }>,
   signal?: AbortSignal,
 ): Promise<void> {
-  const response = await createHttpClient(apiUrl).request(path, {
+  const response = await createAuthenticatedHttpClient(apiUrl).request(path, {
     method: "DELETE",
-    headers: { Authorization: `Bearer ${idToken}` },
     ...(signal ? { signal } : {}),
   });
   if (!response.ok) {
@@ -418,13 +410,11 @@ async function deleteCompatibilityResource(
 
 export function cancelCompatibilityInvitation(
   apiUrl: string | undefined,
-  idToken: string,
   relationshipId: string,
   signal?: AbortSignal,
 ): Promise<void> {
   return deleteCompatibilityResource(
     apiUrl,
-    idToken,
     `/api/compatibility/invitations/${encodeURIComponent(relationshipId)}`,
     {
       failure: "招待の取り消しに失敗しました",
@@ -436,13 +426,11 @@ export function cancelCompatibilityInvitation(
 
 export function endCompatibilityRelationship(
   apiUrl: string | undefined,
-  idToken: string,
   relationshipId: string,
   signal?: AbortSignal,
 ): Promise<void> {
   return deleteCompatibilityResource(
     apiUrl,
-    idToken,
     `/api/compatibility/relationships/${encodeURIComponent(relationshipId)}`,
     {
       failure: "共有の終了に失敗しました",

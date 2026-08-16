@@ -14,7 +14,6 @@ const mocks = vi.hoisted(() => ({
   shareCompatibilityInvitationToLine: vi.fn(),
 }));
 
-vi.mock("../../liff", () => ({ useLiffSession: () => ({ acquireIdToken: vi.fn() }) }));
 vi.mock("../infrastructure/compatibility-invitation-sharing", () => ({
   copyCompatibilityInvitationUrl: vi.fn(),
   shareCompatibilityInvitationToLine: mocks.shareCompatibilityInvitationToLine,

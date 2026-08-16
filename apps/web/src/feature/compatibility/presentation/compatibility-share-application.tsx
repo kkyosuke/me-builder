@@ -1,5 +1,4 @@
 import { useRef, useState } from "react";
-import { useLiffSession } from "../../liff";
 import {
   copyCompatibilityInvitationUrl,
   shareCompatibilityInvitationToLine,
@@ -10,14 +9,12 @@ import { useCompatibilityInvitationIssue } from "./hooks/use-compatibility-invit
 import { useCompatibilityShareConsent } from "./hooks/use-compatibility-share-consent";
 
 export default function CompatibilityShareApplication() {
-  const { acquireIdToken } = useLiffSession();
   const { relationshipCategory, changeRelationshipCategory } =
     useCompatibilityCategoryQuery("category");
   const { state, reload } = useCompatibilityShareConsent({
-    acquireIdToken,
     relationshipCategory,
   });
-  const invitation = useCompatibilityInvitationIssue({ acquireIdToken });
+  const invitation = useCompatibilityInvitationIssue();
   const sharing = useRef(false);
   const [isSharing, setIsSharing] = useState(false);
   const [sharingMessage, setSharingMessage] = useState<string | null>(null);
