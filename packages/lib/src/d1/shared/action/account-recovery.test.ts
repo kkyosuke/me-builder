@@ -1,5 +1,6 @@
 import path from "node:path";
 import Database from "better-sqlite3";
+import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { describe, expect, it } from "vitest";
@@ -27,6 +28,40 @@ function createTestDb(): SharedD1Client {
 }
 
 describe("account recovery action", () => {
+  it("コード発行後に削除されたAccountへIdentityを再接続しない", async () => {
+    const db = createTestDb();
+    const target = await upsertIdentity(db, {
+      provider: "line_login",
+      providerAccountId: "line-old",
+    });
+    await issueAccountRecoveryCredential(db, {
+      id: "credential-deleted",
+      accountId: target.account.id,
+      secretHash: "secret-hash",
+      expiresAt: new Date("2026-09-01T00:00:00Z"),
+      now: new Date("2026-08-01T00:00:00Z"),
+    });
+    await db
+      .update(schema.accounts)
+      .set({ isDeleted: true, deletedAt: new Date("2026-08-10T00:00:00Z") })
+      .where(eq(schema.accounts.id, target.account.id));
+
+    await expect(
+      completeAccountRecovery(db, {
+        credentialId: "credential-deleted",
+        expectedSecretHash: "secret-hash",
+        newProviderAccountId: "line-new",
+        identityFingerprint: "identity-fingerprint",
+        now: new Date("2026-08-15T00:00:00Z"),
+      }),
+    ).resolves.toBe("invalid");
+    await expect(
+      db.query.accountIdentities.findFirst({
+        where: (table, { eq }) => eq(table.providerAccountId, "line-new"),
+      }),
+    ).resolves.toBeUndefined();
+  });
+
   it("Messaging API側で別Accountに接続済みのLINE Identityを拒否する", async () => {
     const db = createTestDb();
     const target = await upsertIdentity(db, {
