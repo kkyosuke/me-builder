@@ -172,4 +172,32 @@ describe("family seat persistence", () => {
     ).toHaveLength(1);
     await expect(createFamilyPack(db, member)).rejects.toThrow();
   });
+
+  it("一意制約以外のD1エラーを所属競合へ誤変換しない", async () => {
+    const db = createTestDb();
+    const payer = await account(db, "error-payer");
+    const member = await account(db, "error-member");
+    await createFamilyPack(db, payer);
+    await reserveFamilySeat(db, payer, "error-invitation");
+    const failingDb = new Proxy(db, {
+      get(target, property, receiver) {
+        if (property !== "update") return Reflect.get(target, property, receiver);
+        return () => ({
+          set: () => ({
+            where: () => ({
+              returning: () => ({
+                get: () => {
+                  throw new Error("D1_ERROR: FOREIGN KEY constraint failed: SQLITE_CONSTRAINT");
+                },
+              }),
+            }),
+          }),
+        });
+      },
+    }) as SharedD1Client;
+
+    await expect(activateFamilySeat(failingDb, "error-invitation", member)).rejects.toThrow(
+      "FOREIGN KEY constraint failed",
+    );
+  });
 });

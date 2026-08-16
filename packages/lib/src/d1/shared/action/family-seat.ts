@@ -42,8 +42,8 @@ function isUniqueViolation(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return (
     message.includes("UNIQUE constraint failed") ||
-    message.includes("SQLITE_CONSTRAINT") ||
-    message.includes("D1_ERROR")
+    message.includes("SQLITE_CONSTRAINT_UNIQUE") ||
+    message.includes("SQLITE_CONSTRAINT_PRIMARYKEY")
   );
 }
 
