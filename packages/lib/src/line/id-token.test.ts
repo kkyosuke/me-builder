@@ -140,7 +140,8 @@ describe("line.idToken.verify の経過時間チェック", () => {
   });
 
   it("maxAgeSeconds の範囲内なら受け入れること", async () => {
-    mockFetch({ json: claimsIssuedAgo(60) });
+    const claims = claimsIssuedAgo(60);
+    mockFetch({ json: claims });
 
     const result = await idToken.verify({
       idToken: ID_TOKEN,
@@ -148,7 +149,21 @@ describe("line.idToken.verify の経過時間チェック", () => {
       maxAgeSeconds: 300,
     });
 
-    expect(result.ok).toBe(true);
+    expect(result).toMatchObject({
+      ok: true,
+      claims: { issuedAt: new Date(claims.iat * 1_000) },
+    });
+  });
+
+  it("iat が数値でなければ認証時刻として受け入れないこと", async () => {
+    mockFetch({
+      json: { iss: "https://access.line.me", sub: SUB, aud: CHANNEL_ID, iat: "invalid" },
+    });
+
+    expect(await idToken.verify({ idToken: ID_TOKEN, channelId: CHANNEL_ID })).toEqual({
+      ok: false,
+      reason: "iat が不正です",
+    });
   });
 
   it("既定では LINE の有効期間 (1 時間) と同じ扱いにすること", async () => {

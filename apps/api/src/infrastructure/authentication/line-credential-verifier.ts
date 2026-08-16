@@ -25,7 +25,9 @@ export function createLineCredentialVerifier(
           providerKey: "line_login",
           subject: verified.claims.sub,
           authenticationMethod: "liff",
-          authenticatedAt: now(),
+          // 再認証policyへ検証時刻を渡すと、古いcredentialの再送が新しい認証に
+          // 見えてしまう。LINEが返したiatを正とし、古いmock等で欠ける場合だけ補完する。
+          authenticatedAt: verified.claims.issuedAt ?? now(),
           ...((verified.claims.name || verified.claims.picture) && {
             displayProfile: {
               ...(verified.claims.name ? { displayName: verified.claims.name } : {}),

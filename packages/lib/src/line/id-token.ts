@@ -44,6 +44,8 @@ export type VerifyIdTokenParams = {
 export type VerifiedIdToken = {
   /** LINE Login の userId。本人識別子なので画面表示もログ出力もしません */
   sub: string;
+  /** IDトークンの発行時刻。再認証policyでは検証時刻の代わりにこの値を使います */
+  issuedAt?: Date;
   name?: string;
   picture?: string;
 };
@@ -107,7 +109,11 @@ async function verify({
 
   // 発行からの経過時間を確認する。exp は LINE 側で検証されるが、
   // nonce を使えない分、受け入れる期間を自分で絞れるようにしておく。
+  let issuedAt: Date | undefined;
   if (body.iat !== undefined) {
+    if (typeof body.iat !== "number" || !Number.isFinite(body.iat)) {
+      return { ok: false, reason: "iat が不正です" };
+    }
     const ageSeconds = Math.floor(Date.now() / 1000) - body.iat;
     if (ageSeconds > maxAgeSeconds) {
       logger.warn({ ageSeconds, maxAgeSeconds }, "[LINE ID Token] 発行から時間が経ちすぎています");
@@ -115,12 +121,14 @@ async function verify({
     }
     // 上限を絞る判断材料として経過時間だけ残す (トークン本体は出力しない)
     logger.info({ ageSeconds }, "[LINE ID Token] 検証に成功しました");
+    issuedAt = new Date(body.iat * 1_000);
   }
 
   return {
     ok: true,
     claims: {
       sub: body.sub,
+      ...(issuedAt ? { issuedAt } : {}),
       ...(body.name ? { name: body.name } : {}),
       ...(body.picture ? { picture: body.picture } : {}),
     },
