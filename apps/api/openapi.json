@@ -359,6 +359,18 @@
             "applicationSession": []
           }
         ],
+        "parameters": [
+          {
+            "name": "returnTo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 2048
+            },
+            "description": "認証後に復元する同一originの相対path"
+          }
+        ],
         "responses": {
           "302": {
             "description": "Auth0認可endpointへredirect"

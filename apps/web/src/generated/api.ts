@@ -1362,7 +1362,10 @@ export interface operations {
   };
   startSsoIdentityLink: {
     parameters: {
-      query?: never;
+      query?: {
+        /** @description 認証後に復元する同一originの相対path */
+        returnTo?: string;
+      };
       header?: never;
       path?: never;
       cookie?: never;
