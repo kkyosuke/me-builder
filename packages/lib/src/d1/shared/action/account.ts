@@ -100,7 +100,7 @@ export async function listLoginIdentityProviders(
   return identities.map(({ provider }) => provider as IdentityProvider);
 }
 
-/** 最後のログイン手段を残す条件を同じUPDATE文で評価してIdentityを解除します。 */
+/** 別providerのログイン手段を残す条件を同じUPDATE文で評価してIdentityを解除します。 */
 export async function unlinkIdentity(
   db: SharedD1Client,
   input: { accountId: string; provider: IdentityProvider },
@@ -119,7 +119,8 @@ export async function unlinkIdentity(
           FROM account_identities AS active_identity
           WHERE active_identity.account_id = ${input.accountId}
             AND active_identity.is_deleted = 0
-        ) > 1`,
+            AND active_identity.provider <> ${input.provider}
+        ) > 0`,
       ),
     )
     .returning({ id: accountIdentities.id })

@@ -254,6 +254,49 @@ describe("unlinkIdentity", () => {
     await expect(listLoginIdentityProviders(db, first.account.id)).resolves.toEqual(["auth0"]);
     await expect(listLoginIdentityProviders(db, other.account.id)).resolves.toEqual(["auth0"]);
   });
+
+  it("同じproviderのIdentityが複数あってもログイン手段をすべて解除しないこと", async () => {
+    const db = createTestDb();
+    const first = await upsertIdentity(db, {
+      provider: "auth0",
+      providerAccountId: "auth0|first",
+    });
+    await linkIdentity(db, {
+      accountId: first.account.id,
+      provider: "auth0",
+      providerAccountId: "auth0|second",
+    });
+
+    await expect(
+      unlinkIdentity(db, { accountId: first.account.id, provider: "auth0" }),
+    ).rejects.toThrow("last login identity");
+    await expect(listLoginIdentityProviders(db, first.account.id)).resolves.toEqual([
+      "auth0",
+      "auth0",
+    ]);
+  });
+
+  it("別providerが残る場合は同じproviderのIdentityをまとめて解除できること", async () => {
+    const db = createTestDb();
+    const first = await upsertIdentity(db, {
+      provider: "line_login",
+      providerAccountId: "U_multiple_auth0",
+    });
+    await linkIdentity(db, {
+      accountId: first.account.id,
+      provider: "auth0",
+      providerAccountId: "auth0|first",
+    });
+    await linkIdentity(db, {
+      accountId: first.account.id,
+      provider: "auth0",
+      providerAccountId: "auth0|second",
+    });
+
+    await unlinkIdentity(db, { accountId: first.account.id, provider: "auth0" });
+
+    await expect(listLoginIdentityProviders(db, first.account.id)).resolves.toEqual(["line_login"]);
+  });
 });
 
 describe("resolveAccountByLineLogin", () => {

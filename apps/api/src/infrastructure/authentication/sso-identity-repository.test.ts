@@ -62,12 +62,17 @@ describe("SSO identity repository adapters", () => {
   it("subjectを返さずlink状態と最後のIdentity解除可否だけを返す", async () => {
     const linked = dependencies(["line_login", "auth0"]);
     const only = dependencies(["auth0"]);
+    const duplicateOnly = dependencies(["auth0", "auth0"]);
 
     await expect(getSsoIdentityStatus(db, "account-1", linked as never)).resolves.toEqual({
       linked: true,
       canUnlink: true,
     });
     await expect(getSsoIdentityStatus(db, "account-2", only as never)).resolves.toEqual({
+      linked: true,
+      canUnlink: false,
+    });
+    await expect(getSsoIdentityStatus(db, "account-3", duplicateOnly as never)).resolves.toEqual({
       linked: true,
       canUnlink: false,
     });

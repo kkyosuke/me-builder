@@ -58,7 +58,7 @@ export async function getSsoIdentityStatus(
   const providers = await dependencies.listLoginIdentityProviders(db, accountId);
   return {
     linked: providers.includes("auth0"),
-    canUnlink: providers.includes("auth0") && providers.length > 1,
+    canUnlink: providers.includes("auth0") && providers.some((provider) => provider !== "auth0"),
   };
 }
 
