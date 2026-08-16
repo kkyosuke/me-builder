@@ -18,6 +18,7 @@ import {
   type DiaryChatPromptOptions,
   buildDiaryChatSystemPrompt,
 } from "../prompt/diary-chat";
+import type { RelationshipQuestionContext } from "./relationship-question";
 
 const ModeSchema = v.picklist(["listen", "explore", "organize", "advise", "close"]);
 const SafetyRouteSchema = v.picklist([
@@ -76,7 +77,7 @@ function classifySafetyText(text: string): SafetyRoute {
 }
 
 export function classifySafety(
-  messages: ConversationContextMessage[],
+  messages: readonly ConversationContextMessage[],
   currentUserMessageIds?: string[],
 ): SafetyRoute {
   const currentIds = currentUserMessageIds ? new Set(currentUserMessageIds) : undefined;
@@ -172,6 +173,7 @@ export function buildDiaryChatContextPackage(
   messages: readonly ConversationContextMessage[],
   safetyRoute: SafetyRoute,
   brainMemories: readonly BrainChatContextMemory[] = [],
+  relationshipQuestion?: RelationshipQuestionContext,
 ) {
   return {
     safety_route: safetyRoute,
@@ -193,6 +195,22 @@ export function buildDiaryChatContextPackage(
         recorded_at: recordedAt,
       })),
     })),
+    ...(relationshipQuestion
+      ? {
+          relationship_question: {
+            context_scope: relationshipQuestion.mode,
+            person_reference_status: relationshipQuestion.personReferenceStatus,
+            relationship_category: relationshipQuestion.category ?? "unconfirmed",
+            own_diagnoses: relationshipQuestion.diagnoses
+              .filter(({ ownerAccountId }) => ownerAccountId === relationshipQuestion.accountId)
+              .map(({ diagnosisId, relationshipCategory, statement }) => ({
+                diagnosis_id: diagnosisId,
+                relationship_category: relationshipCategory,
+                statement: statement.slice(0, MEMORY_STATEMENT_CHARACTER_LIMIT),
+              })),
+          },
+        }
+      : {}),
   };
 }
 
@@ -219,12 +237,13 @@ export function buildDevelopmentBrainUsageMessage(
 }
 
 export async function generateDiaryChatResponse(
-  messages: ConversationContextMessage[],
+  messages: readonly ConversationContextMessage[],
   workerConfig: WorkerConfig,
   signal?: AbortSignal,
   context?: {
     currentUserMessageIds?: string[];
     brainMemories?: readonly BrainChatContextMemory[];
+    relationshipQuestion?: RelationshipQuestionContext;
     prompt?: DiaryChatPromptOptions;
     onUsage?: GeminiUsageRecorder;
   },
@@ -241,7 +260,12 @@ export async function generateDiaryChatResponse(
   const brainMemories = context?.brainMemories ?? [];
   const collectionCandidates = context?.prompt?.collectionCandidates ?? [];
   const contents = JSON.stringify({
-    context_package: buildDiaryChatContextPackage(messages, safetyRoute, brainMemories),
+    context_package: buildDiaryChatContextPackage(
+      messages,
+      safetyRoute,
+      brainMemories,
+      context?.relationshipQuestion,
+    ),
   });
   const schema = toJsonSchema(DiaryChatResponseSchema) as Record<string, unknown>;
   const allowedMemoryIds = brainMemories.map((_, index) => `memory-${index + 1}`);

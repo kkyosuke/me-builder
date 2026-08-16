@@ -463,6 +463,141 @@ describe("LINE diary chat delivery E2E", () => {
     expect(sources.some(({ body }) => body === diaryText)).toBe(true);
   });
 
+  it("Freeの関係性質問は現在の発言だけをContextにし、相手と区分を1問で確認する", async () => {
+    const { bindings, queuedTurn } = await ingestDiary(
+      "あの人と揉めてしまって、どう話せばいいか迷っている",
+      "relationship-free",
+    );
+
+    await processChatTurnMessage(createQueueMessage(queuedTurn), bindings, workerConfig);
+
+    const prompt = JSON.parse(mockGenerateContent.mock.calls[0]?.[0]?.contents).context_package;
+    expect(prompt.messages).toEqual([
+      expect.objectContaining({
+        role: "user",
+        body: "あの人と揉めてしまって、どう話せばいいか迷っている",
+      }),
+    ]);
+    expect(prompt.memories).toEqual([]);
+    expect(prompt.relationship_question).toEqual({
+      context_scope: "current-message",
+      person_reference_status: "needs-confirmation",
+      relationship_category: "unconfirmed",
+      own_diagnoses: [],
+    });
+    expect(mockGenerateContent.mock.calls[0]?.[0]?.config?.systemInstruction).toContain(
+      "その相手はどんな関係の方？",
+    );
+  });
+
+  it("Liteの関係性質問は現在Sessionと本人の関連診断だけをContextにする", async () => {
+    const { bindings, queuedTurn } = await ingestDiary(
+      "職場の同僚と意見がぶつかった",
+      "relationship-lite",
+    );
+    const at = new Date("2026-08-15T00:00:00Z");
+    await accountDataStore.db.insert(DO.account.schema.diagnosisScoringConfigs).values({
+      id: "relationship-lite-scoring",
+      version: 1,
+      definition: {},
+    });
+    await accountDataStore.db.insert(DO.account.schema.diagnoses).values([
+      {
+        id: "work-relationship-style",
+        title: "仕事の関係性",
+        relationshipCategory: "work",
+        scoringConfigId: "relationship-lite-scoring",
+        opensAt: at,
+        state: "published",
+      },
+      {
+        id: "partner-relationship-style",
+        title: "パートナーとの関係性",
+        relationshipCategory: "partner",
+        scoringConfigId: "relationship-lite-scoring",
+        opensAt: at,
+        state: "published",
+      },
+    ]);
+    await accountDataStore.db.insert(DO.account.schema.brainItems).values([
+      {
+        id: "work-relationship-brain",
+        accountId: queuedTurn.accountId,
+        category: "preference",
+        statement: "考えを整理してから伝える傾向がある",
+        attributes: {},
+        derivation: "deterministic",
+        status: "active",
+        stability: "changeable",
+        sensitivity: "normal",
+        externallyShareable: false,
+        confidence: {},
+      },
+      {
+        id: "partner-relationship-brain",
+        accountId: queuedTurn.accountId,
+        category: "preference",
+        statement: "パートナーには早めの相談を好む傾向がある",
+        attributes: {},
+        derivation: "deterministic",
+        status: "active",
+        stability: "changeable",
+        sensitivity: "normal",
+        externallyShareable: false,
+        confidence: {},
+      },
+    ]);
+    await accountDataStore.db.insert(DO.account.schema.diagnosisBrainProjectionHeads).values([
+      {
+        id: "work-relationship-head",
+        accountId: queuedTurn.accountId,
+        diagnosisId: "work-relationship-style",
+        scoringConfigId: "relationship-lite-scoring",
+        scoringConfigVersion: 1,
+        parameterId: "communication",
+        currentBrainItemId: "work-relationship-brain",
+        contentSignature: "work",
+      },
+      {
+        id: "partner-relationship-head",
+        accountId: queuedTurn.accountId,
+        diagnosisId: "partner-relationship-style",
+        scoringConfigId: "relationship-lite-scoring",
+        scoringConfigVersion: 1,
+        parameterId: "communication",
+        currentBrainItemId: "partner-relationship-brain",
+        contentSignature: "partner",
+      },
+    ]);
+    bindings.planAssignmentProvider = new billing.FakeAccountPlanAssignmentProvider([
+      {
+        accountId: queuedTurn.accountId,
+        plan: "lite",
+        source: "subscription",
+        effectiveAt: new Date(0).toISOString(),
+        availableUntil: null,
+        payerAccountId: queuedTurn.accountId,
+      },
+    ]);
+
+    await processChatTurnMessage(createQueueMessage(queuedTurn), bindings, workerConfig);
+
+    const prompt = JSON.parse(mockGenerateContent.mock.calls[0]?.[0]?.contents).context_package;
+    expect(prompt.relationship_question).toMatchObject({
+      context_scope: "session-and-diagnosis",
+      person_reference_status: "confirmed",
+      relationship_category: "work",
+      own_diagnoses: [
+        {
+          diagnosis_id: "work-relationship-style",
+          relationship_category: "work",
+          statement: "考えを整理してから伝える傾向がある",
+        },
+      ],
+    });
+    expect(JSON.stringify(prompt)).not.toContain("partner-relationship-style");
+  });
+
   it("Free上限到達後も切迫した危機表現は利用枠を使わず安全案内へ切り替える", async () => {
     const { bindings, queuedTurn } = await ingestDiary("今すぐ死ぬ準備をしている", "safety-limit");
     await exhaustFreeAiReplyUsage(queuedTurn.accountId);

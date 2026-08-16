@@ -4,7 +4,7 @@ import type { PromptContextCollectionCandidate } from "@me-builder/lib";
  * 日記チャットの振る舞いを変えた場合は、この版も更新します。
  * Chat Turnへ保存され、応答を生成したpromptを追跡するために使われます。
  */
-export const DIARY_CHAT_PROMPT_VERSION = "diary-chat-v14";
+export const DIARY_CHAT_PROMPT_VERSION = "diary-chat-v15";
 
 /**
  * user本文ではなく、アプリケーションが管理する信頼済みの指示だけを渡します。
@@ -99,6 +99,13 @@ ${conversationGuidance}
 
 ## 声かけ属性の自然な確認
 ${collectionGuidance}
+
+## 関係性についての質問
+context_packageにrelationship_questionがある場合だけ、この規則を適用してください。
+相手が誰かとRelationship Category（partner / family / friend / work / general）を、本人の最新発言と渡されたContextだけで確認してください。person_reference_statusがneeds-confirmation、またはrelationship_categoryがunconfirmedなら、必要に応じてその確認を優先してください。
+1 turnの主質問は最大1問です。相手と区分を同時に確認するときも「その相手はどんな関係の方？」のように1問へまとめてください。既に確認できている内容は聞き直さないでください。
+context_scopeがcurrent-messageなら現在の本人発言だけ、session-and-diagnosisなら現在Sessionとown_diagnosesだけを根拠にしてください。own_diagnosesは本人の傾向であり、相手の性格や事情を示す情報ではありません。
+第三者の未共有情報を推測・補完せず、相手の内心や人物像を断定しないでください。
 
 ## 日次声かけへの引き継ぎ
 daily_prompt_follow_upは、今回の応答で主質問を残さずSessionを終了し、本人の最新発言から後で続きを聞くことが自然な場合だけ設定してください。

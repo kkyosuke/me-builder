@@ -23,6 +23,7 @@ import {
   classifySafety,
   generateDiaryChatResponse,
 } from "../logic/diary-chat";
+import { buildRelationshipQuestionPlan } from "../logic/relationship-question";
 import {
   DEFAULT_DIARY_CHAT_PROMPT_OPTIONS,
   getDiaryChatConversationGuidance,
@@ -531,6 +532,13 @@ export async function processChatTurnMessage(
       cf.planAssignmentProvider ?? new billing.FakeAccountPlanAssignmentProvider(),
     ).resolve(message.body.accountId);
     const aiReplyPeriod = billing.resolveEntitlementUsagePeriod(entitlement, "ai-reply");
+    const relationshipQuestionMode = entitlement.policy.relationshipQuestionContext;
+    const initialRelationshipPlan = buildRelationshipQuestionPlan({
+      accountId: message.body.accountId,
+      mode: relationshipQuestionMode,
+      messages: context.messages,
+      currentUserMessageIds: context.currentUserMessageIds,
+    });
     const aiReplyReservation =
       safetyRoute !== "normal"
         ? undefined
@@ -564,19 +572,46 @@ export async function processChatTurnMessage(
             usedBrainItems: [],
           }
         : undefined;
-    const [brainMemories, collectedPromptContextKinds] =
+    const [brainMemories, relationshipDiagnoses, collectedPromptContextKinds] =
       pendingResponse || safetyRoute !== "normal" || quotaResponse
-        ? [[], []]
+        ? [[], [], []]
         : await Promise.all([
-            loadBrainContextMemories({
-              cf,
-              workerConfig,
-              accountId: message.body.accountId,
-              messages: context.messages,
-              currentUserMessageIds: context.currentUserMessageIds,
-              semanticSearchDays: entitlement.policy.semanticSearchDays,
-              ...(generationController.signal ? { signal: generationController.signal } : {}),
-            }),
+            initialRelationshipPlan.active
+              ? Promise.resolve([])
+              : loadBrainContextMemories({
+                  cf,
+                  workerConfig,
+                  accountId: message.body.accountId,
+                  messages: context.messages,
+                  currentUserMessageIds: context.currentUserMessageIds,
+                  semanticSearchDays: entitlement.policy.semanticSearchDays,
+                  ...(generationController.signal ? { signal: generationController.signal } : {}),
+                }),
+            initialRelationshipPlan.active && relationshipQuestionMode !== "current-message"
+              ? accountDataClient
+                  .execute("brain.loadRelationshipDiagnosisContexts")
+                  .catch((error: unknown) => {
+                    logger.warn(
+                      {
+                        event: "relationship-question.diagnosis-context.failed",
+                        service: "worker",
+                        environment: workerConfig.environment,
+                        component: "chat-turn",
+                        outcome: "degraded",
+                        disposition: "continue",
+                        ...toSafeOperationalErrorFields(error, {
+                          code: "RELATIONSHIP_DIAGNOSIS_CONTEXT_LOAD_FAILED",
+                          category: "dependency",
+                          stage: "context.relationship-diagnosis",
+                          retryable: false,
+                          dependency: "account-data",
+                        }),
+                      },
+                      "[Relationship question] failed to load diagnosis context",
+                    );
+                    return [];
+                  })
+              : Promise.resolve([]),
             accountDataClient
               .execute("brain.listActivePromptContextKinds")
               .catch((error: unknown) => {
@@ -601,6 +636,13 @@ export async function processChatTurnMessage(
                 return undefined;
               }),
           ]);
+    const relationshipPlan = buildRelationshipQuestionPlan({
+      accountId: message.body.accountId,
+      mode: relationshipQuestionMode,
+      messages: context.messages,
+      currentUserMessageIds: context.currentUserMessageIds,
+      diagnoses: relationshipDiagnoses,
+    });
     const collectionCandidates =
       pendingResponse ||
       safetyRoute !== "normal" ||
@@ -625,12 +667,15 @@ export async function processChatTurnMessage(
         : await atBoundary(
             () =>
               generateDiaryChatResponse(
-                context.messages,
+                relationshipPlan.messages,
                 workerConfig,
                 generationController.signal,
                 {
                   currentUserMessageIds: context.currentUserMessageIds,
                   brainMemories,
+                  ...(relationshipPlan.active
+                    ? { relationshipQuestion: relationshipPlan.context }
+                    : {}),
                   onUsage: createGeminiUsageRecorder(cf.d1, "diary_chat", message.body.accountId),
                   prompt: {
                     objective: DEFAULT_DIARY_CHAT_PROMPT_OPTIONS.objective,

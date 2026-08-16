@@ -99,13 +99,13 @@ flowchart LR
 ```mermaid
 flowchart TD
     A[決済側<br/>SUB-A-001〜SUB-A-020] --> I[AccountPlanAssignment]
-    I --> L[Lite機能側<br/>本人データ操作 / SUB-B-007 / SUB-B-016]
+    I --> L[Lite機能側<br/>本人データ操作 / SUB-B-016]
     L --> U[Full機能側<br/>SUB-B-008〜SUB-B-011 / SUB-B-016]
     U --> F[ファミリー機能側<br/>SUB-B-012〜SUB-B-016]
     F --> R[段階公開<br/>SUB-B-017]
 ```
 
-決済側は`SUB-A-001`〜`SUB-A-020`で単独検証します。Liteは本人データの訂正・削除・エクスポート、`SUB-B-007`、`SUB-B-016`、Fullはさらに`SUB-B-008`〜`SUB-B-011`、ファミリーパックはさらに`SUB-B-012`〜`SUB-B-015`を完了してから、`SUB-B-017`で決済側と統合します。未完了のPlanは購入対象へ出しません。
+決済側は`SUB-A-001`〜`SUB-A-020`で単独検証します。Liteは本人データの訂正・削除・エクスポート、関係性を考慮した質問、`SUB-B-016`、Fullはさらに`SUB-B-008`〜`SUB-B-011`、ファミリーパックはさらに`SUB-B-012`〜`SUB-B-015`を完了してから、`SUB-B-017`で決済側と統合します。未完了のPlanは購入対象へ出しません。
 
 ## 6. 並行して着手できる前提タスク
 
@@ -276,19 +276,9 @@ flowchart TD
 
 ## 10. ブランチB: Lite・Fullの継続価値
 
-### SUB-B-007 Free・Liteの関係性を考慮した質問を実装する
-
-依存: 共通Entitlementの機能接続
-
-- 相手とRelationship Categoryを確認し、1 turnに1問まで質問する
-- Freeは現在の発言、Liteは現在Sessionと本人の関連診断だけを参照する
-- 第三者の非共有情報をContext Packageへ含めないnegative testを追加する
-
-完了条件は、日記チャット体験設計の質問順、安全性、Plan差を会話testで再現できることです。
-
 ### SUB-B-008 Fullの確認済み過去情報を関係性質問へ接続する
 
-依存: `SUB-B-007`
+依存: Free・Liteの関係性を考慮した質問（実装済み）
 
 - 確認済みRelationship Style、出来事、Goalを現在の話題に限定して検索する
 - Access Labelの再認可を行い、同名別人、古い情報、削除済み情報を除外する

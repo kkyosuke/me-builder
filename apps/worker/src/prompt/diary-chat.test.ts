@@ -18,6 +18,9 @@ describe("diary chat prompt", () => {
     expect(DIARY_CHAT_SYSTEM_PROMPT).toContain("next_day");
     expect(DIARY_CHAT_SYSTEM_PROMPT).toContain("翌日へ続く意思を明示");
     expect(DIARY_CHAT_SYSTEM_PROMPT).toContain("通常はnone");
+    expect(DIARY_CHAT_SYSTEM_PROMPT).toContain("1 turnの主質問は最大1問");
+    expect(DIARY_CHAT_SYSTEM_PROMPT).toContain("第三者の未共有情報を推測・補完せず");
+    expect(DIARY_CHAT_SYSTEM_PROMPT).toContain("現在Sessionとown_diagnosesだけ");
   });
 
   it("追跡可能なprompt versionを持つ", () => {

@@ -20,6 +20,7 @@ import {
   listFailedBrainVectorSyncJobs,
   loadBrainChatContextMemories,
   loadBrainSemanticDedupCandidates,
+  loadRelationshipDiagnosisContexts,
   resetAllFailedBrainVectorSyncJobs,
   resetFailedBrainVectorSyncJob,
   saveBrainItem,
@@ -563,6 +564,98 @@ describe("saveBrainItem", () => {
       type: "source-account-mismatch",
     });
     await expect(db.select().from(schema.brainItems)).resolves.toHaveLength(0);
+  });
+});
+
+describe("loadRelationshipDiagnosisContexts", () => {
+  it("本人が所有する現在有効な診断projectionだけを最小Contextで返す", async () => {
+    const db = createTestDb();
+    await db.insert(schema.accountDataIdentity).values({ singleton: 1, accountId: "account-1" });
+    const at = new Date("2026-08-15T00:00:00Z");
+    await db.insert(schema.diagnosisScoringConfigs).values({
+      id: "relationship-scoring",
+      version: 1,
+      definition: {},
+    });
+    await db.insert(schema.diagnoses).values([
+      {
+        id: "work-style",
+        title: "仕事の関係性",
+        relationshipCategory: "work",
+        scoringConfigId: "relationship-scoring",
+        opensAt: at,
+        state: "published",
+      },
+      {
+        id: "friend-style",
+        title: "友人との関係性",
+        relationshipCategory: "friend",
+        scoringConfigId: "relationship-scoring",
+        opensAt: at,
+        state: "published",
+      },
+    ]);
+    await db.insert(schema.brainItems).values([
+      {
+        id: "work-brain",
+        accountId: "account-1",
+        category: "preference",
+        statement: "結論を整理してから話す傾向がある",
+        attributes: {},
+        derivation: "deterministic",
+        status: "active",
+        stability: "changeable",
+        sensitivity: "normal",
+        externallyShareable: false,
+        confidence: {},
+      },
+      {
+        id: "deleted-brain",
+        accountId: "account-1",
+        category: "preference",
+        statement: "削除済みの傾向",
+        attributes: {},
+        derivation: "deterministic",
+        status: "active",
+        stability: "changeable",
+        sensitivity: "normal",
+        externallyShareable: false,
+        confidence: {},
+        isDeleted: true,
+        deletedAt: at,
+      },
+    ]);
+    await db.insert(schema.diagnosisBrainProjectionHeads).values([
+      {
+        id: "work-head",
+        accountId: "account-1",
+        diagnosisId: "work-style",
+        scoringConfigId: "relationship-scoring",
+        scoringConfigVersion: 1,
+        parameterId: "planning",
+        currentBrainItemId: "work-brain",
+        contentSignature: "work",
+      },
+      {
+        id: "friend-head",
+        accountId: "account-1",
+        diagnosisId: "friend-style",
+        scoringConfigId: "relationship-scoring",
+        scoringConfigVersion: 1,
+        parameterId: "planning",
+        currentBrainItemId: "deleted-brain",
+        contentSignature: "friend",
+      },
+    ]);
+
+    await expect(loadRelationshipDiagnosisContexts(db, "account-1", at)).resolves.toEqual([
+      {
+        ownerAccountId: "account-1",
+        diagnosisId: "work-style",
+        relationshipCategory: "work",
+        statement: "結論を整理してから話す傾向がある",
+      },
+    ]);
   });
 });
 

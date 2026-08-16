@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, gt, gte, inArray, isNull, lte, max, min, or, sql } from "drizzle-orm";
+import { diagnoses } from "../../../d1/shared/schema/catalog";
 import type { AccountDataDatabase } from "../database";
 import {
   type DailyPromptLocalHour,
@@ -19,6 +20,7 @@ import {
   brainVectorEntries,
   brainVectorSyncJobs,
 } from "../schema/brain";
+import { diagnosisBrainProjectionHeads } from "../schema/diagnosis";
 import { sourceRecordTextPayloads } from "../schema/diary";
 import { sourceRecords } from "../schema/source";
 import { buildDiaryTemporalSearchText, readDiaryTemporalContext } from "./diary-temporal";
@@ -126,6 +128,47 @@ export type BrainChatContextMemory = Readonly<{
     recordedAt: Date;
   }>[];
 }>;
+
+export type RelationshipDiagnosisContext = Readonly<{
+  ownerAccountId: string;
+  diagnosisId: string;
+  relationshipCategory: (typeof diagnoses.$inferSelect)["relationshipCategory"];
+  statement: string;
+}>;
+
+/** 本人DOにある現在有効な診断projectionだけを、関係性質問用の最小表現で返す。 */
+export async function loadRelationshipDiagnosisContexts(
+  db: AccountDataDatabase,
+  accountId: string,
+  at = new Date(),
+): Promise<readonly RelationshipDiagnosisContext[]> {
+  return db
+    .select({
+      ownerAccountId: diagnosisBrainProjectionHeads.accountId,
+      diagnosisId: diagnosisBrainProjectionHeads.diagnosisId,
+      relationshipCategory: diagnoses.relationshipCategory,
+      statement: brainItems.statement,
+    })
+    .from(diagnosisBrainProjectionHeads)
+    .innerJoin(diagnoses, eq(diagnoses.id, diagnosisBrainProjectionHeads.diagnosisId))
+    .innerJoin(brainItems, eq(brainItems.id, diagnosisBrainProjectionHeads.currentBrainItemId))
+    .where(
+      and(
+        eq(diagnosisBrainProjectionHeads.accountId, accountId),
+        eq(brainItems.accountId, accountId),
+        eq(brainItems.status, "active"),
+        eq(brainItems.isDeleted, false),
+        or(isNull(brainItems.validFrom), lte(brainItems.validFrom, at)),
+        or(isNull(brainItems.validTo), gt(brainItems.validTo, at)),
+      ),
+    )
+    .orderBy(
+      asc(diagnosisBrainProjectionHeads.diagnosisId),
+      asc(diagnosisBrainProjectionHeads.parameterId),
+    )
+    .limit(10)
+    .all();
+}
 
 export type BrainSemanticDedupCandidate = Readonly<{
   brainItemId: string;
