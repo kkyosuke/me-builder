@@ -59,6 +59,7 @@ export function ProfileSettingsScreen({
   onOpenAvatar,
   onOpenBillingPortal,
   onOpenPersonalData,
+  onOpenFamily,
   canOpenBrainItems = false,
   onOpenBrainItems,
   onRetryProfile,
@@ -84,6 +85,7 @@ export function ProfileSettingsScreen({
   onOpenAvatar: () => void;
   onOpenBillingPortal?: () => Promise<void>;
   onOpenPersonalData?: () => void;
+  onOpenFamily?: () => void;
   canOpenBrainItems?: boolean;
   onOpenBrainItems?: () => void;
   onRetryProfile?: () => void;
@@ -335,6 +337,16 @@ export function ProfileSettingsScreen({
                     </dd>
                   </div>
                 </dl>
+                {entitlement.data.plan === "family" && onOpenFamily && (
+                  <button
+                    type="button"
+                    onClick={onOpenFamily}
+                    className="mt-5 flex min-h-12 w-full items-center justify-between rounded-xl border border-sky-200 bg-sky-50 px-4 font-bold text-sky-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:border-sky-700 dark:bg-sky-400/10 dark:text-sky-100"
+                  >
+                    ファミリー席を管理
+                    <ChevronRight className="size-5" aria-hidden="true" />
+                  </button>
+                )}
               </div>
             )}
           </section>

@@ -33,6 +33,7 @@ import {
   loadCompatibilityApplication,
   loadDevelopmentBrainItemsApplication,
   loadDiagnosisApplication,
+  loadFamilySeatApplication,
   loadMainApplication,
   loadPersonalDataApplication,
   loadProfileApplication,
@@ -50,9 +51,10 @@ const ProfileApplication = lazy(loadProfileApplication);
 const ProfileSettingsScreen = lazy(loadProfileSettingsScreen);
 const AvatarSettingsScreen = lazy(loadAvatarSettingsScreen);
 const PersonalDataApplication = lazy(loadPersonalDataApplication);
+const FamilySeatApplication = lazy(loadFamilySeatApplication);
 const DevelopmentBrainItemsApplication = lazy(loadDevelopmentBrainItemsApplication);
 
-type ProfileView = "closed" | "profile" | "avatar" | "personal-data" | "brain-items";
+type ProfileView = "closed" | "profile" | "avatar" | "personal-data" | "brain-items" | "family";
 type MainRoute = "compatibility" | "diagnosis" | "me";
 
 const DEVELOPMENT_ENVIRONMENTS = new Set(["development", "local", "preview", "test"]);
@@ -61,6 +63,7 @@ const PROFILE_HISTORY_STATE_KEY = "me-builder-profile-view";
 const PROFILE_RETURN_PATHNAME_STATE_KEY = "me-builder-profile-return-pathname";
 
 function resolveProfileView(pathname: string): ProfileView {
+  if (pathname.startsWith("/profile/family")) return "family";
   if (pathname.startsWith("/profile/avatar")) return "avatar";
   if (pathname.startsWith("/profile/personal-data")) return "personal-data";
   if (pathname.startsWith("/profile/brain-items")) {
@@ -76,7 +79,8 @@ function historyProfileView(state: unknown): Exclude<ProfileView, "closed"> | nu
   return value === "profile" ||
     value === "avatar" ||
     value === "personal-data" ||
-    value === "brain-items"
+    value === "brain-items" ||
+    value === "family"
     ? value
     : null;
 }
@@ -357,6 +361,11 @@ function AppContents() {
     setNavigation((current) => ({ ...current, profileView: "personal-data" }));
   };
 
+  const openFamily = () => {
+    window.history.pushState({ [PROFILE_HISTORY_STATE_KEY]: "family" }, "", "/profile/family");
+    setNavigation((current) => ({ ...current, profileView: "family" }));
+  };
+
   const closeAvatar = () => {
     if (historyProfileView(window.history.state) === "avatar") {
       setNavigation((current) => ({ ...current, profileView: "profile" }));
@@ -386,6 +395,16 @@ function AppContents() {
       return;
     }
 
+    window.history.replaceState({}, "", "/profile");
+    setNavigation((current) => ({ ...current, profileView: "profile" }));
+  };
+
+  const closeFamily = () => {
+    if (historyProfileView(window.history.state) === "family") {
+      setNavigation((current) => ({ ...current, profileView: "profile" }));
+      window.history.back();
+      return;
+    }
     window.history.replaceState({}, "", "/profile");
     setNavigation((current) => ({ ...current, profileView: "profile" }));
   };
@@ -485,6 +504,7 @@ function AppContents() {
               onOpenAvatar={openAvatar}
               onOpenBillingPortal={openBillingPortal}
               onOpenPersonalData={openPersonalData}
+              onOpenFamily={openFamily}
               canOpenBrainItems={DEVELOPMENT_ENVIRONMENTS.has(config.environment ?? "")}
               onOpenBrainItems={openBrainItems}
               onRetryProfile={() => setProfileReloadKey((current) => current + 1)}
@@ -534,6 +554,17 @@ function AppContents() {
               onBack={closePersonalData}
               onChanged={() => setAccountDataResetKey((current) => current + 1)}
             />
+          </Suspense>
+        </RouteErrorBoundary>
+      )}
+      {profileView === "family" && (
+        <RouteErrorBoundary>
+          <Suspense
+            fallback={
+              <LoadingState message="ファミリーパックを読み込んでいます..." variant="overlay" />
+            }
+          >
+            <FamilySeatApplication onBack={closeFamily} />
           </Suspense>
         </RouteErrorBoundary>
       )}
