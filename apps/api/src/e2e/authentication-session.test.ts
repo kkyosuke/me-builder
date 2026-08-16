@@ -266,16 +266,17 @@ describe("application session local D1/KV E2E", () => {
     expect((await getSession(invalidatedCookie)).status).toBe(401);
   });
 
-  it("明示Bearerを古い別Account cookieより優先し、不正Bearerでもfallbackしない", async () => {
+  it("Bearerを認証に使わず、有効なapplication sessionだけを採用する", async () => {
     const first = await exchange("credential-a");
     const cookie = cookieFrom(first);
+    vi.mocked(fetch).mockClear();
 
-    const requestWithAuthorization = (authorization: string) =>
+    const requestWithAuthorization = (authorization: string, includeCookie: boolean) =>
       app.request(
         "/api/auth/session",
         {
           headers: {
-            Cookie: cookie,
+            ...(includeCookie ? { Cookie: cookie } : {}),
             Origin: webOrigin,
             Authorization: authorization,
           },
@@ -283,11 +284,14 @@ describe("application session local D1/KV E2E", () => {
         bindings(),
       );
 
-    // session確認APIはapplication session専用なので、Account Bの有効なBearerが
-    // cookieより優先されればlegacy認証として401になる。
-    expect((await requestWithAuthorization("Bearer credential-b")).status).toBe(401);
-    expect((await requestWithAuthorization("Bearer invalid-credential")).status).toBe(401);
-    expect((await getSession(cookie)).status).toBe(200);
+    const withCookie = await requestWithAuthorization("Bearer credential-b", true);
+    expect(withCookie.status).toBe(200);
+    expect(await withCookie.json()).toMatchObject({
+      displayProfile: { displayName: "利用者A" },
+    });
+    expect((await requestWithAuthorization("Bearer credential-b", false)).status).toBe(401);
+    expect((await requestWithAuthorization("Bearer invalid-credential", false)).status).toBe(401);
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it("logoutは同じAccountで並行発行された全sessionを即時失効する", async () => {
