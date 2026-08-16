@@ -394,7 +394,9 @@ issuerはtenantのHTTPS URLを末尾`/`付きで`SSO_ISSUER_URL`へ、Client ID�
 
 `SSO_ISSUER_URL`と`SSO_CLIENT_ID`は秘密値ではありませんが、環境を誤接続しないようGitHub Environmentのvariableとして配布します。起動時にissuerがHTTPSであること（Localも接続先Auth0はHTTPS）、callbackのoriginが`BASE_URL`、logoutのreturn URLが`WEB_ORIGIN`と一致することを検証します。
 
-段階公開は`SSO_ROLLOUT_MODE`だけで制御します。値は`disabled`（SSO開始・追加とも停止）、`linking`（認証済みAccountからのIdentity追加だけ許可）、`linked-login`（追加済みIdentityの外部ブラウザloginも許可）の3つです。未設定は`disabled`へ安全に倒します。Local、Preview、Productionで値を独立させ、Productionは`AUTH-C-006`の公開操作まで`disabled`を維持します。flagを無効化してもLIFF認証と既存application sessionは停止しません。
+段階公開の経路は`SSO_ROLLOUT_MODE`で制御します。値は`disabled`（SSO開始・追加とも停止）、`linking`（認証済みAccountからのIdentity追加だけ許可）、`linked-login`（追加済みIdentityの外部ブラウザloginも許可）の3つです。未設定は`disabled`へ安全に倒します。Local、Preview、Productionで値を独立させ、Productionは`AUTH-C-006`の公開操作まで`disabled`を維持します。flagを無効化してもLIFF認証と既存application sessionは停止しません。
+
+`linked-login`内の対象割合はAPI Serverの`SSO_ROLLOUT_PERCENT`で0から100の整数として制御し、未設定は0へ倒します。管理者roleは割合にかかわらず対象とし、一般AccountはAccount IDのSHA-256から得た安定bucketが割合未満の場合だけsessionを発行します。Account ID、Auth0 subject、emailのallowlistを環境変数やログへ置きません。0%で運営確認、少数割合、100%の順に上げ、対象外の既知IdentityはAccountを変更せず`rollout_excluded`として拒否します。この割合はSSO callback後のserver-side境界で適用し、Web UIの値だけで認可しません。
 
 ### 9.4 session、link-only期間、logout
 
