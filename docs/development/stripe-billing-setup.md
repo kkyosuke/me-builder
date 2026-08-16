@@ -51,7 +51,42 @@ me_builder_<lite|full|family>_<monthly|yearly>
 
 Previewは`sk_test_...`だけを受け付け、Productionは`sk_live_...`だけを受け付けます。Productionは誤操作防止のため`CONFIRM_STRIPE_LIVE=production`も要求します。
 
-### 3.2 実行コマンド
+### 3.2 GitHub Actionsからの実行
+
+通常の同期は手元へsecretを取得せず、手動workflow `Setup / Stripe Billing` から実行します。`stripe-dev` / `stripe-prd` EnvironmentのRequired reviewersによる承認後に、同期jobが`dev` / `prd` Environmentのsecretへアクセスします。承認をStripe専用Environmentへ分離することで、同じ`dev` / `prd`を使う通常のCDは停止させません。
+
+GitHub Environmentには次を設定します。
+
+| Environment | Secret / Variable | 値 |
+| --- | --- | --- |
+| `dev` | Secret `STRIPE_SECRET_KEY` | Stripe test modeのsecret key |
+| `prd` | Secret `STRIPE_SECRET_KEY` | Stripe live modeのsecret key |
+| `dev` / `prd` | Secret `CLOUDFLARE_DEPLOY_API_TOKEN` | Wranglerで対象Workerのsecretを更新できるtoken |
+| `dev` / `prd` | Variable `CLOUDFLARE_ACCOUNT_ID` | 対象のCloudflare Account ID |
+
+`stripe-dev` / `stripe-prd`は承認専用であり、SecretやVariableは登録しません。Required reviewerを設定し、`stripe-prd`のDeployment branchesは`main`だけを許可します。
+
+Actions画面では対象Environmentと確認文字列を指定します。CLIから実行する場合は、workflowがdefault branchへマージされた後に次を使います。
+
+```bash
+gh workflow run setup-stripe-billing.yml --ref main \
+  -f environment=dev \
+  -f confirmation=sync-dev
+```
+
+Productionは`main`以外から実行できず、`stripe-prd` Environmentの承認と`sync-prd`の確認文字列を要求します。
+
+```bash
+gh workflow run setup-stripe-billing.yml --ref main \
+  -f environment=prd \
+  -f confirmation=sync-prd
+```
+
+`stripe-dev`は検証ブランチからも実行でき、`stripe-prd`はDeployment branchesで`main`だけを許可します。workflowの実行中断でStripeとCloudflareの反映点がずれることを避けるため、同じ同期先への実行は直列化し、開始済みのrunを自動キャンセルしません。
+
+### 3.3 ローカルからの実行
+
+障害調査などでローカルから実行する場合は、値をshell historyへ残しません。
 
 Preview（値をshell historyへ残さない）:
 
