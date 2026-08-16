@@ -1,7 +1,10 @@
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { LoadingState } from "../../../components/loading-state";
 import { config } from "../../../config";
-import { resolveRequestedPathname } from "../../../infrastructure/requested-pathname";
+import {
+  resolveRequestedLocation,
+  resolveRequestedPathname,
+} from "../../../infrastructure/requested-pathname";
 import { useLiffSession } from "../../liff";
 import {
   ServiceTermsVersionConflictError,
@@ -9,6 +12,7 @@ import {
   fetchServiceTermsStatus,
 } from "../infrastructure/service-terms-api";
 import type { ServiceTermsStatus } from "../model/service-terms";
+import { serviceTermsAcceptanceDestination } from "../model/service-terms-navigation";
 import { ServiceTermsScreen } from "./service-terms-screen";
 
 type GateState =
@@ -45,6 +49,7 @@ export function ServiceTermsGate({ children }: { children: ReactNode }) {
 
   const accept = useCallback(async () => {
     if (state.status !== "ready") return;
+    const destination = serviceTermsAcceptanceDestination(resolveRequestedLocation());
     setSubmitting(true);
     setSubmitError(null);
     try {
@@ -53,7 +58,7 @@ export function ServiceTermsGate({ children }: { children: ReactNode }) {
         state.idToken,
         state.data.document.version,
       );
-      window.history.replaceState({}, "", "/me");
+      window.history.replaceState({}, "", destination);
       setState({
         ...state,
         data: {
