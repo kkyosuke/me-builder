@@ -123,7 +123,7 @@ export function getConfig(env?: Record<string, unknown>): ApiConfig {
     billingPricePlanMap: parseBillingPricePlanMap(getEnv("BILLING_PRICE_PLAN_MAP", env)),
     billingLookupKeyMap: parseBillingLookupKeyMap(getEnv("BILLING_LOOKUP_KEY_MAP", env)),
     billingProjectionStaleAfterSeconds: Number(
-      getEnv("BILLING_PROJECTION_STALE_AFTER_SECONDS", env) ?? 900,
+      getEnv("BILLING_PROJECTION_STALE_AFTER_SECONDS", env)?.trim() || 900,
     ),
     liffId: liffConfiguration.liffId,
     lineLoginChannelId: liffConfiguration.lineLoginChannelId,

@@ -7,6 +7,9 @@ export async function verifySubscriptionPreview(input: {
   idToken?: string;
   expectedPlan?: ExpectedPlan;
   fetcher?: typeof fetch;
+  projectionAttempts?: number;
+  projectionPollIntervalMs?: number;
+  sleep?: (milliseconds: number) => Promise<void>;
 }): Promise<{ checks: string[]; plan?: ExpectedPlan; trialEligible?: boolean }> {
   const fetcher = input.fetcher ?? fetch;
   const apiBaseUrl = new URL(input.apiBaseUrl).origin;
@@ -29,21 +32,66 @@ export async function verifySubscriptionPreview(input: {
   }
 
   const headers = { Authorization: `Bearer ${input.idToken}` };
-  const [trial, entitlement] = await Promise.all([
-    readJson(fetcher, new URL("/api/billing/trial-eligibility", apiBaseUrl), headers),
-    readJson(fetcher, new URL("/api/profile/entitlement", apiBaseUrl), headers),
-  ]);
+  const trial = await readJson(
+    fetcher,
+    new URL("/api/billing/trial-eligibility", apiBaseUrl),
+    headers,
+  );
   if (!isRecord(trial) || typeof trial.eligible !== "boolean" || trial.trialDays !== 14) {
     throw new Error("Preview trial eligibility response is invalid");
   }
-  if (!isRecord(entitlement) || !isPlan(entitlement.plan)) {
-    throw new Error("Preview entitlement response is invalid");
-  }
-  if (input.expectedPlan && entitlement.plan !== input.expectedPlan) {
-    throw new Error(`Preview entitlement did not converge to expected plan ${input.expectedPlan}`);
-  }
+  const entitlement = await waitForEntitlementProjection({
+    fetcher,
+    url: new URL("/api/profile/entitlement", apiBaseUrl),
+    headers,
+    expectedPlan: input.expectedPlan,
+    attempts: input.projectionAttempts ?? 20,
+    intervalMs: input.projectionPollIntervalMs ?? 1_500,
+    sleep:
+      input.sleep ??
+      ((milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds))),
+  });
   checks.push("account-trial-eligibility", "account-plan-projection");
   return { checks, plan: entitlement.plan, trialEligible: trial.eligible };
+}
+
+async function waitForEntitlementProjection(input: {
+  fetcher: typeof fetch;
+  url: URL;
+  headers: Record<string, string>;
+  expectedPlan?: ExpectedPlan;
+  attempts: number;
+  intervalMs: number;
+  sleep: (milliseconds: number) => Promise<void>;
+}): Promise<Record<string, unknown> & { plan: ExpectedPlan }> {
+  for (let attempt = 0; attempt < input.attempts; attempt += 1) {
+    const entitlement = await readJson(input.fetcher, input.url, input.headers);
+    if (!isValidEntitlement(entitlement)) {
+      throw new Error("Preview entitlement response is invalid");
+    }
+    if (!input.expectedPlan || entitlement.plan === input.expectedPlan) return entitlement;
+    if (attempt + 1 < input.attempts) await input.sleep(input.intervalMs);
+  }
+  throw new Error(`Preview entitlement did not converge to expected plan ${input.expectedPlan}`);
+}
+
+function isValidEntitlement(
+  value: unknown,
+): value is Record<string, unknown> & { plan: ExpectedPlan } {
+  if (
+    !isRecord(value) ||
+    !isPlan(value.plan) ||
+    (value.status !== "free" && value.status !== "active" && value.status !== "safe-default") ||
+    (value.source !== "free" && value.source !== "subscription" && value.source !== "family-seat")
+  ) {
+    return false;
+  }
+  if (value.plan === "free") {
+    return value.source === "free" && (value.status === "free" || value.status === "safe-default");
+  }
+  return (
+    value.status === "active" && (value.source === "subscription" || value.source === "family-seat")
+  );
 }
 
 async function readJson(
