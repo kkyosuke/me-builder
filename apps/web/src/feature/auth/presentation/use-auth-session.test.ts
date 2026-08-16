@@ -16,13 +16,14 @@ const mocks = vi.hoisted(() => ({
   detectAuthEntryEnvironment: vi.fn(),
   establishLiffAuthSession: vi.fn(),
   establishSsoAuthSession: vi.fn(),
+  consumeSsoCallbackFailure: vi.fn(),
 }));
 
 vi.mock("../../../config", () => ({
   config: mocks.config,
 }));
 vi.mock("../../../infrastructure/requested-pathname", () => ({
-  resolveRequestedPathname: () => "/diagnoses/diagnosis-1",
+  resolveRequestedLocation: () => "/diagnoses/diagnosis-1?from=notification#result",
 }));
 vi.mock("../infrastructure/auth-session-api", () => ({
   fetchAuthSession: mocks.fetchAuthSession,
@@ -33,6 +34,7 @@ vi.mock("../infrastructure/liff-auth-adapter", () => ({
 }));
 vi.mock("../infrastructure/sso-auth-adapter", () => ({
   establishSsoAuthSession: mocks.establishSsoAuthSession,
+  consumeSsoCallbackFailure: mocks.consumeSsoCallbackFailure,
 }));
 
 const authenticated = {
@@ -47,6 +49,7 @@ describe("useAuthSessionState", () => {
     vi.clearAllMocks();
     authSessionRuntime.reset();
     mocks.config.ssoRolloutMode = "disabled";
+    mocks.consumeSsoCallbackFailure.mockReturnValue(undefined);
     mocks.detectAuthEntryEnvironment.mockResolvedValue({
       kind: "external",
       state: { status: "ready", inClient: false },
@@ -130,11 +133,30 @@ describe("useAuthSessionState", () => {
     await waitFor(() => expect(result.current.state.status).toBe("redirecting"));
     expect(mocks.establishSsoAuthSession).toHaveBeenCalledWith(
       "https://api.example.com",
-      "/diagnoses/diagnosis-1",
+      "/diagnoses/diagnosis-1?from=notification#result",
       expect.any(AbortSignal),
     );
     expect(mocks.establishLiffAuthSession).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ["cancelled", "キャンセル"],
+    ["error", "完了できません"],
+  ] as const)(
+    "SSO callbackの%s後は自動再開せず再試行可能なerrorを返す",
+    async (result, message) => {
+      mocks.config.ssoRolloutMode = "linked-login";
+      mocks.fetchAuthSession.mockResolvedValue({ authenticated: false });
+      mocks.consumeSsoCallbackFailure.mockReturnValue(result);
+
+      const { result: hook } = renderHook(() => useAuthSessionState());
+
+      await waitFor(() => expect(hook.current.state.status).toBe("error"));
+      expect(hook.current.state).toMatchObject({ message: expect.stringContaining(message) });
+      expect(mocks.establishSsoAuthSession).not.toHaveBeenCalled();
+      expect(mocks.establishLiffAuthSession).not.toHaveBeenCalled();
+    },
+  );
 
   it("LIFF初期化失敗時はSSOへ自動fallbackせず外部ブラウザ案内を返す", async () => {
     mocks.config.ssoRolloutMode = "linked-login";

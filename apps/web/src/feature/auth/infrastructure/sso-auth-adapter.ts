@@ -3,6 +3,17 @@ export function ssoLoginUrl(apiUrl: string | undefined, returnTo: string): strin
   return `${baseUrl}/api/auth/sso/login?${new URLSearchParams({ returnTo })}`;
 }
 
+/** callback失敗markerを一度だけ読み、再試行時のSSO再開を可能にする。 */
+export function consumeSsoCallbackFailure(): "cancelled" | "error" | undefined {
+  if (typeof window === "undefined") return undefined;
+  const url = new URL(window.location.href);
+  const result = url.searchParams.get("sso");
+  if (result !== "cancelled" && result !== "error") return undefined;
+  url.searchParams.delete("sso");
+  window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+  return result;
+}
+
 /** provider tokenをWebへ戻さず、server-side SSO開始endpointへ遷移する。 */
 export function establishSsoAuthSession(
   apiUrl: string | undefined,

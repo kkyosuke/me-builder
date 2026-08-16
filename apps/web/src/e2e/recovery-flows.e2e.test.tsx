@@ -296,6 +296,7 @@ describe("Web recovery flows E2E", () => {
   it("診断画面のうつしレベルを固定プロフィールアイコンと重ならない位置に表示する", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = urlOf(input);
+      if (url.pathname === "/api/auth/liff/exchange") return Response.json(authSession);
       if (url.pathname === "/api/auth/session") return Response.json(authSession);
       if (url.pathname === "/api/legal/terms") return Response.json(acceptedTermsStatus);
       if (url.pathname === "/api/profile") return Response.json(accountProfile);

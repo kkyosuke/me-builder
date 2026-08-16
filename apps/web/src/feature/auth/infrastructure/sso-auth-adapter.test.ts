@@ -1,5 +1,11 @@
+// @vitest-environment jsdom
+
 import { describe, expect, it, vi } from "vitest";
-import { establishSsoAuthSession, ssoLoginUrl } from "./sso-auth-adapter";
+import {
+  consumeSsoCallbackFailure,
+  establishSsoAuthSession,
+  ssoLoginUrl,
+} from "./sso-auth-adapter";
 
 describe("SSO auth adapter", () => {
   it("要求された相対pathをserver-side SSO開始endpointだけへ渡す", () => {
@@ -23,4 +29,17 @@ describe("SSO auth adapter", () => {
       "https://api.example.com/api/auth/sso/login?returnTo=%2Fadmin",
     );
   });
+
+  it.each(["cancelled", "error"] as const)(
+    "callbackの%s markerだけをURLから一度消費する",
+    (result) => {
+      window.history.replaceState({}, "", `/diagnosis/result?from=share&sso=${result}#answer`);
+
+      expect(consumeSsoCallbackFailure()).toBe(result);
+      expect(`${window.location.pathname}${window.location.search}${window.location.hash}`).toBe(
+        "/diagnosis/result?from=share#answer",
+      );
+      expect(consumeSsoCallbackFailure()).toBeUndefined();
+    },
+  );
 });
