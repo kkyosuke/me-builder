@@ -21,17 +21,16 @@ export async function getProfileEntitlement({
   lineLoginChannelId,
   db,
   accountData,
-  planAssignmentProvider = new billing.FakeAccountPlanAssignmentProvider(),
+  planAssignmentProvider,
   at = new Date(),
 }: Params) {
   const session = await createLiffSession({ idToken, lineLoginChannelId, db });
   if (session.type !== "resolved") return session;
   if (!accountData) throw new Error("AccountData binding is missing");
 
-  const entitlement = await new billing.EntitlementService(planAssignmentProvider).resolve(
-    session.session.accountId,
-    at,
-  );
+  const entitlement = await new billing.EntitlementService(
+    planAssignmentProvider ?? new billing.FamilySeatAccountPlanAssignmentProvider(db),
+  ).resolve(session.session.accountId, at);
   const account = accountDataFor(accountData, session.session.accountId);
   const aiReplyPeriod = billing.resolveEntitlementUsagePeriod(entitlement, "ai-reply", at);
   const profileSummaryPeriod = billing.resolveEntitlementUsagePeriod(
