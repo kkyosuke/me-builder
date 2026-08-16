@@ -37,6 +37,7 @@
         "better-sqlite3": "^13.0.1",
         "drizzle-orm": "^0.45.2",
         "miniflare": "4.20260722.0",
+        "stripe": "^22.5.0",
       },
     },
     "apps/mcp": {

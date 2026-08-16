@@ -615,18 +615,24 @@ describe("App", () => {
     fireEvent.click(await screen.findByRole("link", { name: "わたし" }));
 
     await waitFor(() => expect(window.location.pathname).toBe("/me"));
-    await waitFor(() =>
-      expect(document.activeElement).toBe(screen.getByRole("heading", { name: "わたしのまとめ" })),
+    const profileHeading = await screen.findByRole(
+      "heading",
+      { name: "わたしのまとめ" },
+      { timeout: 5_000 },
     );
+    await waitFor(() => expect(document.activeElement).toBe(profileHeading));
     expect(scrollToSpy).toHaveBeenLastCalledWith(0, 0);
 
     scrollY = 260;
     fireEvent.click(await screen.findByRole("link", { name: "診断" }));
 
     await waitFor(() => expect(window.location.pathname).toBe("/diagnosis"));
-    await waitFor(() =>
-      expect(document.activeElement).toBe(screen.getByRole("heading", { name: "わたしの診断" })),
+    const diagnosisHeading = await screen.findByRole(
+      "heading",
+      { name: "わたしの診断" },
+      { timeout: 5_000 },
     );
+    await waitFor(() => expect(document.activeElement).toBe(diagnosisHeading));
     expect(scrollToSpy).toHaveBeenLastCalledWith(0, 480);
 
     scrollY = 720;

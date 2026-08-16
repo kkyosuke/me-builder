@@ -9,7 +9,10 @@ import {
 
 /** 共有D1の現在のactive席だけを、決済語彙を含まないPlan割当へ変換する。 */
 export class FamilySeatAccountPlanAssignmentProvider implements AccountPlanAssignmentProvider {
-  constructor(private readonly db: SharedD1Client) {}
+  constructor(
+    private readonly db: SharedD1Client,
+    private readonly payerAssignmentProvider?: AccountPlanAssignmentProvider,
+  ) {}
 
   async findCurrent(accountId: string, at = new Date()): Promise<AccountPlanAssignment> {
     const membership = await readActiveFamilySeatByMember(this.db, accountId);
@@ -18,12 +21,21 @@ export class FamilySeatAccountPlanAssignmentProvider implements AccountPlanAssig
     if (!effectiveAt || Date.parse(effectiveAt) > at.getTime()) {
       return freePlanAssignment(accountId, at);
     }
+    const payerAssignment = this.payerAssignmentProvider
+      ? await this.payerAssignmentProvider.findCurrent(membership.pack.payerAccountId, at)
+      : undefined;
+    if (
+      payerAssignment &&
+      (payerAssignment.plan !== "family" || payerAssignment.source !== "subscription")
+    ) {
+      return freePlanAssignment(accountId, at);
+    }
     return Object.freeze({
       accountId,
       plan: "family",
       source: "family-seat",
       effectiveAt,
-      availableUntil: null,
+      availableUntil: payerAssignment?.availableUntil ?? null,
       payerAccountId: membership.pack.payerAccountId,
     });
   }
@@ -45,17 +57,16 @@ const assignmentPriority = (assignment: AccountPlanAssignment): number => {
 /** 通常PlanとFamily席を同じEntitlement境界で解決し、より強い有効な割当を返す。 */
 export class FamilyAwareAccountPlanAssignmentProvider implements AccountPlanAssignmentProvider {
   readonly #family: FamilySeatAccountPlanAssignmentProvider;
+  readonly #primary: AccountPlanAssignmentProvider;
 
-  constructor(
-    db: SharedD1Client,
-    private readonly primary: AccountPlanAssignmentProvider = new FakeAccountPlanAssignmentProvider(),
-  ) {
-    this.#family = new FamilySeatAccountPlanAssignmentProvider(db);
+  constructor(db: SharedD1Client, primary?: AccountPlanAssignmentProvider) {
+    this.#primary = primary ?? new FakeAccountPlanAssignmentProvider();
+    this.#family = new FamilySeatAccountPlanAssignmentProvider(db, primary);
   }
 
   async findCurrent(accountId: string, at = new Date()): Promise<AccountPlanAssignment> {
     const results = await Promise.allSettled([
-      this.primary.findCurrent(accountId, at),
+      this.#primary.findCurrent(accountId, at),
       this.#family.findCurrent(accountId, at),
     ]);
     const assignments = results.flatMap((result) =>

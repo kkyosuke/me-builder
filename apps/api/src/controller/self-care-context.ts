@@ -25,14 +25,15 @@ import { bearerToken } from "./auth";
 function params(c: Context<AppEnv>) {
   if (!c.env?.DB || !c.env.ACCOUNT_DATA) return undefined;
   const config = getConfig(c.env);
+  const db = D1.shared.client.create(c.env.DB);
   return {
     idToken: bearerToken(c.req.header("authorization")),
     lineLoginChannelId: config.lineLoginChannelId,
-    db: D1.shared.client.create(c.env.DB),
+    db,
     accountData: c.env.ACCOUNT_DATA,
-    ...(c.env.ACCOUNT_PLAN_ASSIGNMENT_PROVIDER
-      ? { planAssignmentProvider: c.env.ACCOUNT_PLAN_ASSIGNMENT_PROVIDER }
-      : {}),
+    planAssignmentProvider:
+      c.env.ACCOUNT_PLAN_ASSIGNMENT_PROVIDER ??
+      new D1.shared.action.billing.D1AccountPlanAssignmentProvider(db),
   };
 }
 

@@ -15,7 +15,10 @@ import type { SharedD1Client } from "../d1/shared/client";
 import * as schema from "../d1/shared/schema";
 import { FakeAccountPlanAssignmentProvider } from "./account-plan-assignment";
 import { EntitlementService } from "./entitlement";
-import { FamilyAwareAccountPlanAssignmentProvider } from "./family-seat-assignment-provider";
+import {
+  FamilyAwareAccountPlanAssignmentProvider,
+  FamilySeatAccountPlanAssignmentProvider,
+} from "./family-seat-assignment-provider";
 
 function createTestDb(): SharedD1Client {
   const sqlite = new Database(":memory:");
@@ -119,6 +122,14 @@ describe("FamilySeatAccountPlanAssignmentProvider", () => {
         availableUntil: null,
         payerAccountId: subscriber,
       },
+      {
+        accountId: payer,
+        plan: "family",
+        source: "subscription",
+        effectiveAt: at.toISOString(),
+        availableUntil: null,
+        payerAccountId: payer,
+      },
     ]);
     const service = new EntitlementService(
       new FamilyAwareAccountPlanAssignmentProvider(db, primary),
@@ -146,8 +157,16 @@ describe("FamilySeatAccountPlanAssignmentProvider", () => {
     await activateFamilySeat(db, "failure-invite", member, at);
     const service = new EntitlementService(
       new FamilyAwareAccountPlanAssignmentProvider(db, {
-        findCurrent: async () => {
-          throw new Error("primary unavailable");
+        findCurrent: async (accountId) => {
+          if (accountId === member) throw new Error("primary unavailable");
+          return {
+            accountId,
+            plan: "family",
+            source: "subscription",
+            effectiveAt: at.toISOString(),
+            availableUntil: null,
+            payerAccountId: accountId,
+          };
         },
       }),
     );
@@ -187,5 +206,38 @@ describe("FamilySeatAccountPlanAssignmentProvider", () => {
       plan: "free",
       grantedByFamily: false,
     });
+  });
+
+  it("Family packが残っていても支払者の契約期限で参加者をFreeへ戻す", async () => {
+    const db = createTestDb();
+    const payer = await account(db, "expiring-payer");
+    const member = await account(db, "expiring-member");
+    const startedAt = new Date("2026-08-16T00:00:00.000Z");
+    await createFamilyPack(db, payer, startedAt);
+    await reserveFamilySeat(db, payer, "expiring-invite", startedAt);
+    await activateFamilySeat(db, "expiring-invite", member, startedAt);
+    const payerAssignments = new FakeAccountPlanAssignmentProvider([
+      {
+        accountId: payer,
+        plan: "family",
+        source: "subscription",
+        effectiveAt: startedAt.toISOString(),
+        availableUntil: "2026-08-16T01:00:00.000Z",
+        payerAccountId: payer,
+      },
+    ]);
+    const service = new EntitlementService(
+      new FamilySeatAccountPlanAssignmentProvider(db, payerAssignments),
+    );
+
+    await expect(
+      service.resolve(member, new Date("2026-08-16T00:59:59.000Z")),
+    ).resolves.toMatchObject({
+      plan: "family",
+      availableUntil: "2026-08-16T01:00:00.000Z",
+    });
+    await expect(
+      service.resolve(member, new Date("2026-08-16T01:00:00.000Z")),
+    ).resolves.toMatchObject({ plan: "free", grantedByFamily: false });
   });
 });
