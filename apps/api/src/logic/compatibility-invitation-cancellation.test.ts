@@ -1,11 +1,9 @@
 import type { AccountDataNamespace, CompatibilityDataNamespace } from "@me-builder/lib";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { createLiffSession, cancelCompatibilityInvitationWithReference } = vi.hoisted(() => ({
-  createLiffSession: vi.fn(),
+const { cancelCompatibilityInvitationWithReference } = vi.hoisted(() => ({
   cancelCompatibilityInvitationWithReference: vi.fn(),
 }));
-vi.mock("./liff-session", () => ({ createLiffSession }));
 vi.mock("@me-builder/lib", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@me-builder/lib")>()),
   cancelCompatibilityInvitationWithReference,
@@ -34,10 +32,6 @@ function request(overrides: { relationshipId?: string } = {}) {
 describe("cancelCompatibilityInvitation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    createLiffSession.mockResolvedValue({
-      type: "resolved",
-      session: { accountId, role: "user", displayName: "あおい" },
-    });
   });
 
   it("本人の招待を取り消し、正本と一覧参照の更新を本人IDで実行する", async () => {

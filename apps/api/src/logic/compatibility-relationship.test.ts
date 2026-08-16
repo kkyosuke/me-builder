@@ -3,13 +3,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getCompatibilityRelationshipContents } from "./compatibility-relationship";
 
 const mocks = vi.hoisted(() => ({
-  createLiffSession: vi.fn(),
   getRelationship: vi.fn(),
   synchronizeProgression: vi.fn(),
   loadSharePreviewData: vi.fn(),
 }));
 
-vi.mock("./liff-session", () => ({ createLiffSession: mocks.createLiffSession }));
 vi.mock("@me-builder/lib", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@me-builder/lib")>()),
   compatibilityDataFor: () => ({
@@ -83,10 +81,6 @@ function shareData({
 describe("getCompatibilityRelationshipContents", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.createLiffSession.mockResolvedValue({
-      type: "resolved",
-      session: { accountId: "account-inviter", role: "user", displayName: "あおい" },
-    });
     mocks.getRelationship.mockResolvedValue({
       id: relationshipId,
       inviterAccountId: "account-inviter",

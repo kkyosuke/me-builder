@@ -6,11 +6,9 @@ import type {
 } from "@me-builder/lib";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { createLiffSession, resolveCompatibilityRelationshipContents } = vi.hoisted(() => ({
-  createLiffSession: vi.fn(),
+const { resolveCompatibilityRelationshipContents } = vi.hoisted(() => ({
   resolveCompatibilityRelationshipContents: vi.fn(),
 }));
-vi.mock("./liff-session", () => ({ createLiffSession }));
 vi.mock("./compatibility-relationship", () => ({ resolveCompatibilityRelationshipContents }));
 
 const { listCompatibilityRelationships } = await import("./compatibility-relationships");
@@ -119,10 +117,6 @@ function request(
 describe("listCompatibilityRelationships", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    createLiffSession.mockResolvedValue({
-      type: "resolved",
-      session: { accountId, role: "user", displayName: "あおい" },
-    });
     resolveCompatibilityRelationshipContents.mockResolvedValue({
       status: "ready",
       viewer: { themes: [{}] },
@@ -173,10 +167,6 @@ describe("listCompatibilityRelationships", () => {
   });
 
   it("受信者として成立した関係では送信者を相手として表示する", async () => {
-    createLiffSession.mockResolvedValue({
-      type: "resolved",
-      session: { accountId: partnerAccountId, role: "user", displayName: "はる" },
-    });
     const invitee = reference({
       relationshipId: acceptedRelationshipId,
       accountId: partnerAccountId,
