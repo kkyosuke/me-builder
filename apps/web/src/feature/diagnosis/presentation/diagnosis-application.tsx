@@ -25,10 +25,9 @@ import { useDiagnosisList } from "./hooks/use-diagnosis-list";
 
 export default function DiagnosisApplication() {
   const liffSession = useLiffSession();
-  const diagnoses = useDiagnosisList({ acquireIdToken: liffSession.acquireIdToken });
+  const diagnoses = useDiagnosisList();
   const progression = useProfileProgression({ acquireIdToken: liffSession.acquireIdToken });
   const detail = useDiagnosisDetail({
-    idToken: diagnoses.idToken,
     onProgress: diagnoses.updateProgress,
   });
   const [categoryFilter, setCategoryFilter] = useState<RelationshipCategoryFilter>(() =>

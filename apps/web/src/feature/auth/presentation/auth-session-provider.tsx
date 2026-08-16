@@ -1,4 +1,4 @@
-import { type ReactNode, createContext } from "react";
+import { type ReactNode, createContext, useContext } from "react";
 import { LiffSessionProvider } from "../../liff";
 import type { AuthState } from "../model/auth-state";
 import { useAuthSessionState } from "./use-auth-session";
@@ -22,4 +22,10 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
       <AuthSessionBridge>{children}</AuthSessionBridge>
     </LiffSessionProvider>
   );
+}
+
+export function useAuthSession(): AuthSessionContextValue {
+  const session = useContext(AuthSessionContext);
+  if (!session) throw new Error("useAuthSession must be used within AuthSessionProvider");
+  return session;
 }

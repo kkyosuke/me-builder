@@ -6,7 +6,7 @@ import {
   UnknownError,
   ValidationError,
 } from "../../../infrastructure/errors";
-import { createHttpClient } from "../../../infrastructure/http-client";
+import { createAuthenticatedHttpClient } from "../../../infrastructure/http-client";
 import type { DiagnosisDefinition } from "../model/diagnosis-definition";
 import type { DiagnosisListItem } from "../model/diagnosis-list-item";
 import type { DiagnosisResult } from "../model/diagnosis-result";
@@ -59,14 +59,12 @@ const toDiagnosisListItem = (item: ApiDiagnosisListItem): DiagnosisListItem => (
   lastAnsweredAt: item.lastAnsweredAt,
 });
 
-/** LIFF IDトークンで本人確認し、回答進捗を含む診断一覧を取得する。 */
+/** application sessionで本人確認し、回答進捗を含む診断一覧を取得する。 */
 export async function fetchDiagnosisList(
   apiUrl: string | undefined,
-  idToken: string,
   signal?: AbortSignal,
 ): Promise<DiagnosisListItem[]> {
-  const response = await createHttpClient(apiUrl).request("/api/diagnoses", {
-    headers: { Authorization: `Bearer ${idToken}` },
+  const response = await createAuthenticatedHttpClient(apiUrl).request("/api/diagnoses", {
     ...(signal ? { signal } : {}),
   });
 
@@ -114,17 +112,15 @@ const ApiDiagnosisDetailSchema = v.object({
   ),
 }) satisfies v.GenericSchema<ApiDiagnosisDetailResponse>;
 
-/** LIFF IDトークンで本人確認し、D1で公開された質問を回答画面の定義へ変換する。 */
+/** application sessionで本人確認し、D1で公開された質問を回答画面の定義へ変換する。 */
 export async function fetchDiagnosisDefinition(
   apiUrl: string | undefined,
-  idToken: string,
   diagnosisId: string,
   signal?: AbortSignal,
 ): Promise<DiagnosisDefinition> {
-  const response = await createHttpClient(apiUrl).request(
+  const response = await createAuthenticatedHttpClient(apiUrl).request(
     `/api/diagnoses/${encodeURIComponent(diagnosisId)}`,
     {
-      headers: { Authorization: `Bearer ${idToken}` },
       ...(signal ? { signal } : {}),
     },
   );
@@ -227,18 +223,16 @@ export type SaveDiagnosisAnswerResult = v.InferOutput<typeof SaveDiagnosisAnswer
 /** 1問分のChoice IDを保存し、サーバーが確定した回答時点と最新進捗を返す。 */
 export async function saveDiagnosisAnswer(
   apiUrl: string | undefined,
-  idToken: string,
   diagnosisId: string,
   diagnosisQuestionId: string,
   choiceId: string,
   signal?: AbortSignal,
 ): Promise<SaveDiagnosisAnswerResult> {
-  const response = await createHttpClient(apiUrl).request(
+  const response = await createAuthenticatedHttpClient(apiUrl).request(
     `/api/diagnoses/${encodeURIComponent(diagnosisId)}/answers/${encodeURIComponent(diagnosisQuestionId)}`,
     {
       method: "PUT",
       headers: {
-        Authorization: `Bearer ${idToken}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ choiceId }),
@@ -310,16 +304,14 @@ const DeferDiagnosisQuestionResponseSchema = v.object({
 /** 未回答の1問を「あとで回答」として保存する。 */
 export async function deferDiagnosisQuestion(
   apiUrl: string | undefined,
-  idToken: string,
   diagnosisId: string,
   diagnosisQuestionId: string,
   signal?: AbortSignal,
 ): Promise<ApiDeferDiagnosisQuestionResponse> {
-  const response = await createHttpClient(apiUrl).request(
+  const response = await createAuthenticatedHttpClient(apiUrl).request(
     `/api/diagnoses/${encodeURIComponent(diagnosisId)}/deferred-questions/${encodeURIComponent(diagnosisQuestionId)}`,
     {
       method: "PUT",
-      headers: { Authorization: `Bearer ${idToken}` },
       ...(signal ? { signal } : {}),
     },
   );
@@ -422,15 +414,13 @@ const DiagnosisAnswersResponseSchema = v.object({
 
 async function requestDiagnosisResult(
   apiUrl: string | undefined,
-  idToken: string,
   diagnosisId: string,
   allowMissing: boolean,
   signal?: AbortSignal,
 ): Promise<DiagnosisResult | undefined> {
-  const response = await createHttpClient(apiUrl).request(
+  const response = await createAuthenticatedHttpClient(apiUrl).request(
     `/api/diagnoses/${encodeURIComponent(diagnosisId)}/answers`,
     {
-      headers: { Authorization: `Bearer ${idToken}` },
       ...(signal ? { signal } : {}),
     },
   );
@@ -473,19 +463,17 @@ async function requestDiagnosisResult(
 /** 本人が保存した回答内容とAPIで計算済みの傾向を取得する。 */
 export async function fetchDiagnosisResult(
   apiUrl: string | undefined,
-  idToken: string,
   diagnosisId: string,
   signal?: AbortSignal,
 ): Promise<DiagnosisResult | undefined> {
-  return requestDiagnosisResult(apiUrl, idToken, diagnosisId, false, signal);
+  return requestDiagnosisResult(apiUrl, diagnosisId, false, signal);
 }
 
 /** 回答画面の開始時に現在回答を取得する。回答がまだなければ`undefined`を返す。 */
 export async function fetchDiagnosisProgress(
   apiUrl: string | undefined,
-  idToken: string,
   diagnosisId: string,
   signal?: AbortSignal,
 ): Promise<DiagnosisResult | undefined> {
-  return requestDiagnosisResult(apiUrl, idToken, diagnosisId, true, signal);
+  return requestDiagnosisResult(apiUrl, diagnosisId, true, signal);
 }

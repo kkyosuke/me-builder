@@ -1,26 +1,18 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ServiceTermsAcceptanceHistory } from "./service-terms-acceptance-history";
 
 const mocks = vi.hoisted(() => ({
-  acquireIdToken: vi.fn(),
   fetchHistory: vi.fn(),
 }));
 
-vi.mock("../../liff", () => ({
-  useLiffSession: () => ({ acquireIdToken: mocks.acquireIdToken }),
-}));
 vi.mock("../infrastructure/service-terms-api", () => ({
   fetchServiceTermsAcceptanceHistory: mocks.fetchHistory,
 }));
 
 describe("ServiceTermsAcceptanceHistory", () => {
-  beforeEach(() => {
-    mocks.acquireIdToken.mockResolvedValue("id-token");
-  });
-
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
@@ -54,7 +46,7 @@ describe("ServiceTermsAcceptanceHistory", () => {
     expect(screen.getByText("現在有効")).toBeTruthy();
     expect(screen.getByText("過去の同意")).toBeTruthy();
     expect(screen.getByText(`sha256:${"1".repeat(64)}`)).toBeTruthy();
-    expect(mocks.fetchHistory).toHaveBeenCalledWith(undefined, "id-token", expect.any(AbortSignal));
+    expect(mocks.fetchHistory).toHaveBeenCalledWith(undefined, expect.any(AbortSignal));
   });
 
   it("履歴取得だけを再試行できる", async () => {

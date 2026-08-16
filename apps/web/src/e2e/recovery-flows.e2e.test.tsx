@@ -26,6 +26,12 @@ vi.mock("../feature/liff/infrastructure/liff-client", () => ({
 }));
 
 const accountProfile = { role: "user", avatar: null };
+const authSession = {
+  authenticated: true,
+  profile: { displayName: "テスト" },
+  role: "user",
+  csrfToken: "csrf-test-token",
+};
 const progression = {
   level: 2,
   growthValue: 7,
@@ -167,6 +173,7 @@ describe("Web recovery flows E2E", () => {
     let resultRequests = 0;
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = urlOf(input);
+      if (url.pathname === "/api/auth/session") return Response.json(authSession);
       if (url.pathname === "/api/legal/terms") return Response.json(acceptedTermsStatus);
       if (url.pathname === "/api/profile") return Response.json(accountProfile);
       if (url.pathname === "/api/diagnoses") return Response.json(diagnosisList);
@@ -223,6 +230,7 @@ describe("Web recovery flows E2E", () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = urlOf(input);
       const method = init?.method ?? "GET";
+      if (url.pathname === "/api/auth/session") return Response.json(authSession);
       if (url.pathname === "/api/legal/terms") return Response.json(acceptedTermsStatus);
       if (url.pathname === "/api/profile") return Response.json(accountProfile);
       if (url.pathname === "/api/profile/progression") return Response.json(progression);
@@ -261,6 +269,7 @@ describe("Web recovery flows E2E", () => {
     });
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = urlOf(input);
+      if (url.pathname === "/api/auth/session") return Response.json(authSession);
       if (url.pathname === "/api/legal/terms") return Response.json(acceptedTermsStatus);
       if (url.pathname === "/api/profile") return Response.json(accountProfile);
       if (url.pathname === "/api/profile-summary") return Response.json(summary);

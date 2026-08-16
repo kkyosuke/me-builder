@@ -5,13 +5,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ServiceTermsGate } from "./service-terms-gate";
 
 const mocks = vi.hoisted(() => ({
-  acquireIdToken: vi.fn(),
+  authState: { status: "authenticated" } as { status: string; message?: string },
+  retry: vi.fn(),
   fetchStatus: vi.fn(),
   accept: vi.fn(),
 }));
 
-vi.mock("../../liff", () => ({
-  useLiffSession: () => ({ acquireIdToken: mocks.acquireIdToken }),
+vi.mock("../../auth", () => ({
+  useAuthSession: () => ({ state: mocks.authState, retry: mocks.retry }),
 }));
 vi.mock("../infrastructure/service-terms-api", () => ({
   ServiceTermsVersionConflictError: class extends Error {},
@@ -33,7 +34,7 @@ const document = {
 describe("ServiceTermsGate", () => {
   beforeEach(() => {
     window.history.replaceState(null, "", "/");
-    mocks.acquireIdToken.mockResolvedValue("id-token");
+    mocks.authState = { status: "authenticated" };
     mocks.accept.mockResolvedValue({
       acceptedAt: "2026-08-15T01:23:45.000Z",
       version: document.version,
@@ -65,7 +66,7 @@ describe("ServiceTermsGate", () => {
     fireEvent.click(screen.getByRole("button", { name: "同意して利用を始める" }));
 
     await waitFor(() => expect(screen.getByText("主機能")).toBeTruthy());
-    expect(mocks.accept).toHaveBeenCalledWith(undefined, "id-token", document.version);
+    expect(mocks.accept).toHaveBeenCalledWith(undefined, document.version);
     expect(window.location.pathname).toBe("/me");
   });
 
@@ -175,5 +176,20 @@ describe("ServiceTermsGate", () => {
     expect(await screen.findByText(latestDocument.summary)).toBeTruthy();
     expect(mocks.fetchStatus).toHaveBeenCalledTimes(2);
     expect(screen.queryByText("主機能")).toBeNull();
+  });
+
+  it("session期限切れでは規約APIを呼ばず共通認証を再試行する", async () => {
+    mocks.authState = { status: "unauthenticated" };
+
+    render(
+      <ServiceTermsGate>
+        <p>主機能</p>
+      </ServiceTermsGate>,
+    );
+
+    expect(screen.getByRole("heading", { name: "本人確認が必要です" })).toBeTruthy();
+    expect(mocks.fetchStatus).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "再試行" }));
+    expect(mocks.retry).toHaveBeenCalledOnce();
   });
 });

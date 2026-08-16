@@ -1,1 +1,1 @@
-export { AuthSessionProvider } from "./presentation/auth-session-provider";
+export { AuthSessionProvider, useAuthSession } from "./presentation/auth-session-provider";

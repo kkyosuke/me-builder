@@ -39,8 +39,7 @@ describe("useDiagnosisList", () => {
           finishReload = resolve;
         }),
     );
-    const acquireIdToken = vi.fn(async () => "id-token");
-    const { result } = renderHook(() => useDiagnosisList({ acquireIdToken }));
+    const { result } = renderHook(() => useDiagnosisList());
 
     await waitFor(() => expect(result.current.state.status).toBe("success"));
     await act(async () => undefined);
