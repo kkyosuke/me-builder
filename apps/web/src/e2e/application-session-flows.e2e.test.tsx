@@ -18,7 +18,7 @@ vi.mock("../config", () => ({
   },
 }));
 vi.mock("../feature/liff/infrastructure/liff-client", () => ({
-  initializeLiff: liff.initialize,
+  initializeLiffForAuthExchange: liff.initialize,
   readLiffAuthExchangeCredential: liff.readCredential,
 }));
 
@@ -197,5 +197,53 @@ describe("application session Web E2E", () => {
     expect(screen.queryByText("招待者さんから招待が届いています")).toBeNull();
     await waitFor(() => expect(sessionChecks).toBe(2));
     expect(liff.readCredential).not.toHaveBeenCalled();
+  });
+
+  it("sessionが別Accountへ切り替わったら前Accountの規約同意を破棄する", async () => {
+    let sessionChecks = 0;
+    let termsChecks = 0;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = requestUrl(input);
+      if (url.pathname === "/api/auth/session") {
+        sessionChecks += 1;
+        return Response.json({
+          ...authenticatedSession,
+          profile: { displayName: sessionChecks === 1 ? "Account A" : "Account B" },
+        });
+      }
+      if (url.pathname === "/api/legal/terms") {
+        termsChecks += 1;
+        return Response.json(
+          termsChecks === 1
+            ? acceptedTerms
+            : {
+                document: currentServiceTerms,
+                acceptance: {
+                  required: true,
+                  acceptedVersion: null,
+                  documentHash: null,
+                  acceptedAt: null,
+                },
+              },
+        );
+      }
+      if (url.pathname === "/api/profile") {
+        return Response.json({ role: "user", displayName: "Account A", avatar: null });
+      }
+      if (url.pathname === "/api/profile/entitlement") return Response.json(freeEntitlement);
+      if (url.pathname === `/api/compatibility/invitations/${relationshipId}`) {
+        return new Response(null, { status: 401 });
+      }
+      throw new Error(`Unexpected E2E request: ${url.pathname}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    window.history.replaceState({}, "", `/compatibility/invitations/${relationshipId}`);
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: currentServiceTerms.title })).toBeTruthy();
+    expect(screen.queryByText("招待者さんから招待が届いています")).toBeNull();
+    expect(sessionChecks).toBe(2);
+    expect(termsChecks).toBe(2);
   });
 });
