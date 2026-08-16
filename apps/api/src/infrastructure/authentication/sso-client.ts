@@ -66,17 +66,31 @@ export function createAuth0SsoClient(
   let remoteJwks: ReturnType<typeof createRemoteJWKSet> | undefined;
 
   async function discovery(): Promise<OidcDiscovery> {
-    discoveryPromise ??= (async () => {
-      const response = await fetcher(new URL(".well-known/openid-configuration", issuer));
-      if (!response.ok) throw new SsoProviderError("configuration");
-      const document = v.parse(DiscoverySchema, await response.json());
-      if (document.issuer !== issuer.href) throw new SsoProviderError("configuration");
-      assertTrustedEndpoint(issuer, document.authorization_endpoint);
-      assertTrustedEndpoint(issuer, document.token_endpoint);
-      assertTrustedEndpoint(issuer, document.jwks_uri);
-      return document;
-    })();
-    return await discoveryPromise;
+    const pending =
+      discoveryPromise ??
+      (async () => {
+        try {
+          const response = await fetcher(new URL(".well-known/openid-configuration", issuer));
+          if (!response.ok) throw new SsoProviderError("configuration");
+          const document = v.parse(DiscoverySchema, await response.json());
+          if (document.issuer !== issuer.href) throw new SsoProviderError("configuration");
+          assertTrustedEndpoint(issuer, document.authorization_endpoint);
+          assertTrustedEndpoint(issuer, document.token_endpoint);
+          assertTrustedEndpoint(issuer, document.jwks_uri);
+          return document;
+        } catch (error) {
+          if (error instanceof SsoProviderError) throw error;
+          throw new SsoProviderError("configuration");
+        }
+      })();
+    discoveryPromise = pending;
+    try {
+      return await pending;
+    } catch (error) {
+      // 一時的な取得失敗をWorker isolateの生存期間中ずっと固定しない。
+      if (discoveryPromise === pending) discoveryPromise = undefined;
+      throw error;
+    }
   }
 
   const verifyToken: TokenVerifier =
@@ -95,8 +109,14 @@ export function createAuth0SsoClient(
           algorithms: ["RS256"],
           maxTokenAge: "10 minutes",
           clockTolerance: 5,
+          ...(dependencies.now ? { currentDate: dependencies.now() } : {}),
         });
-        if (protectedHeader.alg !== "RS256" || payload.nonce !== expectedNonce || !payload.sub) {
+        if (
+          protectedHeader.alg !== "RS256" ||
+          payload.nonce !== expectedNonce ||
+          !payload.sub ||
+          !Number.isSafeInteger(payload.iat)
+        ) {
           throw new SsoProviderError("token_invalid");
         }
         const displayName = typeof payload.name === "string" ? payload.name : undefined;
@@ -105,7 +125,7 @@ export function createAuth0SsoClient(
           providerKey: "auth0",
           subject: payload.sub,
           authenticationMethod: "sso",
-          authenticatedAt: dependencies.now?.() ?? new Date(),
+          authenticatedAt: new Date((payload.iat as number) * 1000),
           ...(displayName || pictureUrl
             ? {
                 displayProfile: {
@@ -140,20 +160,30 @@ export function createAuth0SsoClient(
 
     async exchangeAuthorizationCode({ code, codeVerifier, expectedNonce }) {
       const document = await discovery();
-      const response = await fetcher(document.token_endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          grant_type: "authorization_code",
-          client_id: configuration.clientId,
-          client_secret: configuration.clientSecret,
-          code,
-          redirect_uri: configuration.callbackUrl,
-          code_verifier: codeVerifier,
-        }),
-      });
+      let response: Response;
+      try {
+        response = await fetcher(document.token_endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            grant_type: "authorization_code",
+            client_id: configuration.clientId,
+            client_secret: configuration.clientSecret,
+            code,
+            redirect_uri: configuration.callbackUrl,
+            code_verifier: codeVerifier,
+          }),
+        });
+      } catch {
+        throw new SsoProviderError("provider_rejected");
+      }
       if (!response.ok) throw new SsoProviderError("provider_rejected");
-      const token = v.parse(TokenResponseSchema, await response.json()).id_token;
+      let token: string;
+      try {
+        token = v.parse(TokenResponseSchema, await response.json()).id_token;
+      } catch {
+        throw new SsoProviderError("provider_rejected");
+      }
       return await verifyToken(token, document, expectedNonce);
     },
   };

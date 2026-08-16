@@ -41,6 +41,26 @@ describe("createAuth0SsoClient", () => {
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
 
+  it("discoveryの一時失敗をcacheせず次の開始時に再取得する", async () => {
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(null, { status: 503 }))
+      .mockResolvedValueOnce(Response.json(discovery));
+    const client = createAuth0SsoClient(configuration, { fetch: fetcher });
+
+    await expect(
+      client.createAuthorizationUrl({ state: "first", nonce: "nonce", codeChallenge: "challenge" }),
+    ).rejects.toEqual(new SsoProviderError("configuration"));
+    await expect(
+      client.createAuthorizationUrl({
+        state: "second",
+        nonce: "nonce",
+        codeChallenge: "challenge",
+      }),
+    ).resolves.toBeInstanceOf(URL);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
   it("authorization codeをserver-sideで交換し、検証済みidentityを返す", async () => {
     const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
@@ -83,6 +103,7 @@ describe("createAuth0SsoClient", () => {
   it("RS256署名・issuer・audience・nonceを検証してAuth0 identityへ変換する", async () => {
     const { publicKey, privateKey } = await generateKeyPair("RS256");
     const publicJwk = await exportJWK(publicKey);
+    const issuedAtSeconds = Date.parse("2026-08-16T00:00:00.000Z") / 1000;
     const token = await new SignJWT({
       nonce: "expected-nonce",
       name: "Kagami User",
@@ -92,7 +113,7 @@ describe("createAuth0SsoClient", () => {
       .setIssuer(configuration.issuerUrl)
       .setAudience(configuration.clientId)
       .setSubject("auth0|user-1")
-      .setIssuedAt()
+      .setIssuedAt(issuedAtSeconds)
       .setExpirationTime("5m")
       .sign(privateKey);
     const fetcher = vi.fn(async (input: RequestInfo | URL) => {
@@ -104,7 +125,7 @@ describe("createAuth0SsoClient", () => {
       }
       throw new Error(`unexpected URL: ${url}`);
     });
-    const now = new Date("2026-08-16T00:00:00.000Z");
+    const now = new Date("2026-08-16T00:01:00.000Z");
     const client = createAuth0SsoClient(configuration, { fetch: fetcher, now: () => now });
 
     await expect(
@@ -117,7 +138,7 @@ describe("createAuth0SsoClient", () => {
       providerKey: "auth0",
       subject: "auth0|user-1",
       authenticationMethod: "sso",
-      authenticatedAt: now,
+      authenticatedAt: new Date(issuedAtSeconds * 1000),
       displayProfile: {
         displayName: "Kagami User",
         pictureUrl: "https://images.example.com/user.png",

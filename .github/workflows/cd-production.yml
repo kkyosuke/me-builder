@@ -30,6 +30,10 @@ jobs:
       # LINE_LOGIN_CHANNEL_ID は未設定でも LIFF ID の接頭辞から補完される。
       LINE_LOGIN_CHANNEL_ID: ${{ vars.LINE_LOGIN_CHANNEL_ID }}
       LINE_LOGIN_CHANNEL_SECRET: ${{ secrets.LINE_LOGIN_CHANNEL_SECRET }}
+      SSO_ISSUER_URL: ${{ vars.SSO_ISSUER_URL }}
+      SSO_CLIENT_ID: ${{ vars.SSO_CLIENT_ID }}
+      SSO_CLIENT_SECRET: ${{ secrets.SSO_CLIENT_SECRET }}
+      SSO_ROLLOUT_MODE: ${{ vars.SSO_ROLLOUT_MODE }}
       BASE_DOMAIN: ${{ vars.BASE_DOMAIN }}
       VITE_ENVIRONMENT: production
       VITE_BASE_DOMAIN: ${{ vars.BASE_DOMAIN }}
@@ -107,6 +111,15 @@ jobs:
             echo "::error::BRAIN_VECTOR_HMAC_SECRET が GitHub Secrets に設定されていません。Brain Vectorの仮名化に必須です。"
             exit 1
           fi
+          sso_mode="${SSO_ROLLOUT_MODE:-disabled}"
+          case "${sso_mode}" in
+            disabled|linking|linked-login) ;;
+            *) echo "::error::SSO_ROLLOUT_MODE が不正です。"; exit 1 ;;
+          esac
+          if [ "${sso_mode}" != "disabled" ] && { [ -z "${SSO_ISSUER_URL}" ] || [ -z "${SSO_CLIENT_ID}" ] || [ -z "${SSO_CLIENT_SECRET}" ]; }; then
+            echo "::error::SSOを有効にするにはSSO_ISSUER_URL、SSO_CLIENT_ID、SSO_CLIENT_SECRETが必要です。"
+            exit 1
+          fi
 
           umask 077
           secrets_dir="$(mktemp -d "${RUNNER_TEMP}/worker-secrets.XXXXXX")"
@@ -130,6 +143,7 @@ jobs:
             );
             await Bun.write(process.env.API_SECRETS_FILE, JSON.stringify({
               LINE_CHANNEL_SECRET: process.env.LINE_CHANNEL_SECRET,
+              ...(process.env.SSO_CLIENT_SECRET ? { SSO_CLIENT_SECRET: process.env.SSO_CLIENT_SECRET } : {}),
               ...optionalSecrets,
               ...apiConfiguration,
             }));
@@ -140,7 +154,10 @@ jobs:
           '
 
           bun --cwd apps/worker wrangler deploy --env production --secrets-file "${worker_secrets_file}"
-          bun --cwd apps/api wrangler deploy --env production --secrets-file "${api_secrets_file}"
+          api_sso_vars=(--var "SSO_ROLLOUT_MODE:${sso_mode}")
+          if [ -n "${SSO_ISSUER_URL}" ]; then api_sso_vars+=(--var "SSO_ISSUER_URL:${SSO_ISSUER_URL}"); fi
+          if [ -n "${SSO_CLIENT_ID}" ]; then api_sso_vars+=(--var "SSO_CLIENT_ID:${SSO_CLIENT_ID}"); fi
+          bun --cwd apps/api wrangler deploy --env production --secrets-file "${api_secrets_file}" "${api_sso_vars[@]}"
           bun --filter @me-builder/mcp deploy:production
           bun --filter @me-builder/web deploy:production
 
