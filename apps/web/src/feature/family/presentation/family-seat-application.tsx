@@ -19,6 +19,12 @@ function message(error: unknown): string {
   return error instanceof Error ? error.message : "操作を完了できませんでした。";
 }
 
+function clearInvitationTokenFromUrl(): void {
+  const url = new URL(window.location.href);
+  url.searchParams.delete("token");
+  window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+}
+
 export default function FamilySeatApplication({ onBack }: { onBack: () => void }) {
   const { acquireIdToken } = useLiffSession();
   const invitationToken = useMemo(
@@ -125,6 +131,7 @@ export default function FamilySeatApplication({ onBack }: { onBack: () => void }
               "ファミリーパックに参加しました。",
             )
           ) {
+            clearInvitationTokenFromUrl();
             await load();
           }
         })();
@@ -138,6 +145,7 @@ export default function FamilySeatApplication({ onBack }: { onBack: () => void }
               "招待を辞退しました。",
             )
           ) {
+            clearInvitationTokenFromUrl();
             setIsFreeAfterExit(true);
           }
         })();

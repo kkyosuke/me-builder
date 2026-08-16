@@ -79,6 +79,7 @@ describe("family seat user journey", () => {
     fireEvent.click(screen.getByRole("button", { name: "招待を承諾する" }));
     expect(await screen.findByRole("heading", { name: "参加中です" })).toBeTruthy();
     expect(screen.getByText("付与元: ファミリーパック")).toBeTruthy();
+    expect(window.location.search).toBe("");
 
     mocks.leaveFamilyPack.mockResolvedValue({ ...memberSeat, status: "left" });
     fireEvent.click(screen.getByRole("button", { name: "ファミリーパックから退出する" }));
@@ -86,5 +87,15 @@ describe("family seat user journey", () => {
       expect(screen.getByRole("heading", { name: "現在のプラン: Free" })).toBeTruthy(),
     );
     expect(screen.getByText(/本人データはそのまま残ります/)).toBeTruthy();
+  });
+
+  it("招待辞退後に使用済みtokenをブラウザ履歴へ残さない", async () => {
+    window.history.replaceState({}, "", `/profile/family?token=${"b".repeat(43)}&source=line`);
+    mocks.declineFamilyInvitation.mockResolvedValue({ ...memberSeat, status: "cancelled" });
+    render(<FamilySeatApplication onBack={vi.fn()} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "辞退する" }));
+    expect(await screen.findByText("招待を辞退しました。")).toBeTruthy();
+    expect(window.location.search).toBe("?source=line");
   });
 });
