@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 
 const migrationsDirectory = path.resolve(__dirname, "../../../drizzle");
 
-/** 共有D1が保存するのはAccount Identity・運営設定、公開定義、集計projectionだけ。 */
+/** 共有D1が保存するのはAccount Identity・課金membership・運営設定、公開定義、集計projectionだけ。 */
 const SHARED_D1_TABLES = [
   "account_agreement_acceptances",
   "account_identities",
@@ -24,6 +24,8 @@ const SHARED_D1_TABLES = [
   "diagnoses",
   "diagnosis_questions",
   "diagnosis_scoring_configs",
+  "family_packs",
+  "family_seats",
   "gemini_usage_records",
   "question_choices",
   "question_versions",
