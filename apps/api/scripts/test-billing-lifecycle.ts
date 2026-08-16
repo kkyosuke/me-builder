@@ -1,15 +1,10 @@
-import { STRIPE_API_VERSION } from "@me-builder/lib";
+import { STRIPE_API_VERSION, STRIPE_BILLING_CATALOG } from "@me-builder/lib";
 import { logger } from "@me-builder/shared";
 import Stripe from "stripe";
 
 const secretKey = process.env.STRIPE_SECRET_KEY?.trim();
-const lookupKey = process.env.STRIPE_E2E_PRICE_LOOKUP_KEY?.trim();
-if (
-  !secretKey ||
-  !["sk_test_", "rk_test_"].some((prefix) => secretKey.startsWith(prefix)) ||
-  !lookupKey
-) {
-  throw new Error("STRIPE_SECRET_KEY(test mode) and STRIPE_E2E_PRICE_LOOKUP_KEY are required");
+if (!secretKey || !["sk_test_", "rk_test_"].some((prefix) => secretKey.startsWith(prefix))) {
+  throw new Error("STRIPE_SECRET_KEY must be a Stripe sandbox key");
 }
 
 const stripe = new Stripe(secretKey, {
@@ -17,6 +12,8 @@ const stripe = new Stripe(secretKey, {
   httpClient: Stripe.createFetchHttpClient(),
   telemetry: false,
 });
+const DAY_SECONDS = 24 * 60 * 60;
+const HOUR_SECONDS = 60 * 60;
 const initialTime = Math.floor(Date.now() / 1_000) - 60;
 const clock = await stripe.testHelpers.testClocks.create({
   frozen_time: initialTime,
@@ -24,50 +21,181 @@ const clock = await stripe.testHelpers.testClocks.create({
 });
 
 try {
-  const prices = await stripe.prices.list({ lookup_keys: [lookupKey], active: true, limit: 2 });
-  if (prices.data.length !== 1) throw new Error("Sandbox price lookup key must resolve uniquely");
+  const [litePriceId, fullPriceId] = await Promise.all([
+    resolveMonthlyPriceId(stripe, "lite"),
+    resolveMonthlyPriceId(stripe, "full"),
+  ]);
   const customer = await stripe.customers.create({
     test_clock: clock.id,
     metadata: { managed_by: "me-builder-e2e" },
   });
-  const paymentMethod = await stripe.paymentMethods.attach("pm_card_visa", {
+  const successfulPaymentMethod = await stripe.paymentMethods.attach("pm_card_visa", {
     customer: customer.id,
   });
   await stripe.customers.update(customer.id, {
-    invoice_settings: { default_payment_method: paymentMethod.id },
+    invoice_settings: { default_payment_method: successfulPaymentMethod.id },
   });
-  const subscription = await stripe.subscriptions.create({
+  let subscription = await stripe.subscriptions.create({
     customer: customer.id,
-    items: [{ price: prices.data[0].id }],
+    items: [{ price: litePriceId }],
     trial_period_days: 14,
     metadata: { managed_by: "me-builder-e2e" },
   });
-  if (subscription.status !== "trialing") throw new Error("Expected trialing subscription");
+  assertSubscription(subscription, { status: "trialing", priceId: litePriceId });
 
-  await advanceClock(stripe, clock.id, initialTime + 15 * 24 * 60 * 60);
-  const afterTrial = await stripe.subscriptions.retrieve(subscription.id);
-  if (afterTrial.status !== "active") throw new Error("Expected active subscription after trial");
+  await advanceClock(stripe, clock.id, initialTime + 15 * DAY_SECONDS);
+  subscription = await stripe.subscriptions.retrieve(subscription.id);
+  assertSubscription(subscription, { status: "active", priceId: litePriceId });
 
-  await advanceClock(stripe, clock.id, initialTime + 46 * 24 * 60 * 60);
-  const afterRenewal = await stripe.subscriptions.retrieve(subscription.id);
-  if (afterRenewal.status !== "active")
-    throw new Error("Expected active subscription after renewal");
+  // 最初の通常更新を成功させる。invoiceのdraft期間も進めて確定まで待つ。
+  await advancePastCurrentPeriod(stripe, clock.id, subscription);
+  subscription = await stripe.subscriptions.retrieve(subscription.id);
+  assertSubscription(subscription, { status: "active", priceId: litePriceId });
 
-  const canceling = await stripe.subscriptions.update(subscription.id, {
-    cancel_at_period_end: true,
+  // 同じ請求間隔のupgradeは日割り差額を即時請求し、成功時だけ適用する。
+  const itemId = requiredItem(subscription).id;
+  subscription = await stripe.subscriptions.update(subscription.id, {
+    items: [{ id: itemId, price: fullPriceId }],
+    proration_behavior: "always_invoice",
+    payment_behavior: "pending_if_incomplete",
   });
-  if (!canceling.cancel_at_period_end) throw new Error("Expected cancel-at-period-end reservation");
+  assertSubscription(subscription, { status: "active", priceId: fullPriceId });
+
+  // downgradeは現在期間の終了時にLiteへ切り替えるscheduleとして再現する。
+  const schedule = await stripe.subscriptionSchedules.create({
+    from_subscription: subscription.id,
+  });
+  if (!schedule.current_phase) throw new Error("Expected an active subscription schedule phase");
+  await stripe.subscriptionSchedules.update(schedule.id, {
+    end_behavior: "release",
+    phases: [
+      {
+        start_date: schedule.current_phase.start_date,
+        end_date: schedule.current_phase.end_date,
+        items: [{ price: fullPriceId, quantity: 1 }],
+        proration_behavior: "none",
+      },
+      {
+        start_date: schedule.current_phase.end_date,
+        iterations: 1,
+        items: [{ price: litePriceId, quantity: 1 }],
+        proration_behavior: "none",
+      },
+    ],
+    proration_behavior: "none",
+  });
+  await advanceClock(stripe, clock.id, schedule.current_phase.end_date + 2 * HOUR_SECONDS);
+  subscription = await stripe.subscriptions.retrieve(subscription.id);
+  assertSubscription(subscription, { status: "active", priceId: litePriceId });
+  const activeSchedule = await stripe.subscriptionSchedules.retrieve(schedule.id);
+  if (activeSchedule.status === "active") await stripe.subscriptionSchedules.release(schedule.id);
+
+  // Customerへattach後に失敗する公式test PaymentMethodで次回更新をpast_dueにする。
+  const failingPaymentMethod = await stripe.paymentMethods.attach("pm_card_chargeCustomerFail", {
+    customer: customer.id,
+  });
+  await stripe.customers.update(customer.id, {
+    invoice_settings: { default_payment_method: failingPaymentMethod.id },
+  });
+  await advancePastCurrentPeriod(stripe, clock.id, subscription);
+  subscription = await stripe.subscriptions.retrieve(subscription.id);
+  assertSubscription(subscription, { status: "past_due", priceId: litePriceId });
+
+  // 支払方法を戻して失敗invoiceを支払うと同じSubscriptionがactiveへ回復する。
+  await stripe.customers.update(customer.id, {
+    invoice_settings: { default_payment_method: successfulPaymentMethod.id },
+  });
+  const latestInvoiceId = stripeId(subscription.latest_invoice);
+  if (!latestInvoiceId) throw new Error("Expected a failed renewal invoice");
+  await stripe.invoices.pay(latestInvoiceId, { payment_method: successfulPaymentMethod.id });
+  subscription = await stripe.subscriptions.retrieve(subscription.id);
+  assertSubscription(subscription, { status: "active", priceId: litePriceId });
+
+  // 期間末解約は取消可能で、再予約後の期間末にcanceledへ遷移する。
+  subscription = await stripe.subscriptions.update(subscription.id, { cancel_at_period_end: true });
+  if (!subscription.cancel_at_period_end) throw new Error("Expected cancellation reservation");
+  subscription = await stripe.subscriptions.update(subscription.id, {
+    cancel_at_period_end: false,
+  });
+  if (subscription.cancel_at_period_end) throw new Error("Expected subscription resume");
+  subscription = await stripe.subscriptions.update(subscription.id, { cancel_at_period_end: true });
+  await advancePastCurrentPeriod(stripe, clock.id, subscription);
+  subscription = await stripe.subscriptions.retrieve(subscription.id);
+  if (subscription.status !== "canceled") throw new Error("Expected canceled subscription");
+
   logger.info(
-    { scenarios: ["trial", "renewal", "cancel-at-period-end"], outcome: "succeeded" },
+    {
+      scenarios: [
+        "trial",
+        "renewal",
+        "upgrade",
+        "downgrade-at-period-end",
+        "payment-failure",
+        "payment-recovery",
+        "cancel-resume-cancel",
+      ],
+      outcome: "succeeded",
+    },
     "Stripe sandbox billing lifecycle completed",
   );
 } finally {
   await stripe.testHelpers.testClocks.del(clock.id);
 }
 
+async function resolveMonthlyPriceId(client: Stripe, plan: "lite" | "full"): Promise<string> {
+  const desired = STRIPE_BILLING_CATALOG.flatMap((item) => item.prices).find(
+    (price) => price.plan === plan && price.interval === "month",
+  );
+  if (!desired) throw new Error(`Missing ${plan} monthly catalog entry`);
+  const prices = await client.prices.list({
+    lookup_keys: [desired.lookupKey],
+    active: true,
+    limit: 2,
+  });
+  if (prices.data.length !== 1) {
+    throw new Error(`Sandbox lookup key for ${plan} monthly price must resolve uniquely`);
+  }
+  const price = prices.data[0];
+  if (!price) throw new Error(`Missing ${plan} monthly price`);
+  return price.id;
+}
+
+async function advancePastCurrentPeriod(
+  client: Stripe,
+  clockId: string,
+  subscription: Stripe.Subscription,
+): Promise<void> {
+  await advanceClock(
+    client,
+    clockId,
+    requiredItem(subscription).current_period_end + 2 * HOUR_SECONDS,
+  );
+}
+
+function requiredItem(subscription: Stripe.Subscription): Stripe.SubscriptionItem {
+  const item = subscription.items.data[0];
+  if (!item) throw new Error("Expected one subscription item");
+  return item;
+}
+
+function assertSubscription(
+  subscription: Stripe.Subscription,
+  expected: { status: Stripe.Subscription.Status; priceId: string },
+): void {
+  if (subscription.status !== expected.status) {
+    throw new Error(`Expected subscription status ${expected.status}, got ${subscription.status}`);
+  }
+  const priceId = requiredItem(subscription).price.id;
+  if (priceId !== expected.priceId) throw new Error("Unexpected subscription price");
+}
+
+function stripeId(value: string | { id: string } | null): string | null {
+  return typeof value === "string" ? value : (value?.id ?? null);
+}
+
 async function advanceClock(client: Stripe, clockId: string, frozenTime: number): Promise<void> {
   await client.testHelpers.testClocks.advance(clockId, { frozen_time: frozenTime });
-  for (let attempt = 0; attempt < 30; attempt += 1) {
+  for (let attempt = 0; attempt < 60; attempt += 1) {
     const current = await client.testHelpers.testClocks.retrieve(clockId);
     if (current.status === "ready") return;
     if (current.status === "internal_failure") throw new Error("Stripe Test Clock failed");
