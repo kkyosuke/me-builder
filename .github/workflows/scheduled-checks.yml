@@ -54,7 +54,9 @@ jobs:
 
       - uses: ./.github/actions/setup-bun-workspace
 
+      - name: Require Stripe Sandbox Secret
+        run: test -n "$STRIPE_SECRET_KEY"
+
       # Test Clockを使う実接続E2Eは通常PRのCIから分離し、dev sandboxだけで実行する。
       - name: Verify Stripe Sandbox Billing Lifecycle
-        if: ${{ env.STRIPE_SECRET_KEY != '' }}
         run: bun --cwd apps/api billing:test:sandbox

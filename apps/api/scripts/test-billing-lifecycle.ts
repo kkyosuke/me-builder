@@ -21,9 +21,11 @@ const clock = await stripe.testHelpers.testClocks.create({
 });
 
 try {
-  const [litePriceId, fullPriceId] = await Promise.all([
-    resolveMonthlyPriceId(stripe, "lite"),
-    resolveMonthlyPriceId(stripe, "full"),
+  const [litePriceId, fullPriceId, fullYearlyPriceId, portalConfigurations] = await Promise.all([
+    resolvePriceId(stripe, "lite", "month"),
+    resolvePriceId(stripe, "full", "month"),
+    resolvePriceId(stripe, "full", "year"),
+    resolvePortalConfigurations(stripe),
   ]);
   const customer = await stripe.customers.create({
     test_clock: clock.id,
@@ -51,6 +53,23 @@ try {
   await advancePastCurrentPeriod(stripe, clock.id, subscription);
   subscription = await stripe.subscriptions.retrieve(subscription.id);
   assertSubscription(subscription, { status: "active", priceId: litePriceId });
+
+  // hosted UIの操作前に、アプリが使うdeep linkと請求期間policyをsandbox設定で検証する。
+  const sourceItemId = requiredItem(subscription).id;
+  await assertPortalPlanChangeSession(stripe, {
+    configurationId: portalConfigurations.standard,
+    customerId: customer.id,
+    subscriptionId: subscription.id,
+    itemId: sourceItemId,
+    targetPriceId: fullPriceId,
+  });
+  await assertPortalPlanChangeSession(stripe, {
+    configurationId: portalConfigurations.reset,
+    customerId: customer.id,
+    subscriptionId: subscription.id,
+    itemId: sourceItemId,
+    targetPriceId: fullYearlyPriceId,
+  });
 
   // 同じ請求間隔のupgradeは日割り差額を即時請求し、成功時だけ適用する。
   const itemId = requiredItem(subscription).id;
@@ -89,6 +108,50 @@ try {
   assertSubscription(subscription, { status: "active", priceId: litePriceId });
   const activeSchedule = await stripe.subscriptionSchedules.retrieve(schedule.id);
   if (activeSchedule.status === "active") await stripe.subscriptionSchedules.release(schedule.id);
+
+  // 月額から年額へのupgradeは変更日を新しい期間開始日として即時請求する。
+  const annualStart = (await stripe.testHelpers.testClocks.retrieve(clock.id)).frozen_time;
+  subscription = await stripe.subscriptions.update(subscription.id, {
+    items: [{ id: requiredItem(subscription).id, price: fullYearlyPriceId }],
+    billing_cycle_anchor: "now",
+    proration_behavior: "always_invoice",
+    payment_behavior: "pending_if_incomplete",
+  });
+  assertSubscription(subscription, { status: "active", priceId: fullYearlyPriceId });
+  if (Math.abs(requiredItem(subscription).current_period_start - annualStart) > 5 * 60) {
+    throw new Error("Expected annual billing period to start at plan change");
+  }
+
+  // 年額から月額への変更は現在の年額期間を維持し、期間末に適用する。
+  const annualSchedule = await stripe.subscriptionSchedules.create({
+    from_subscription: subscription.id,
+  });
+  if (!annualSchedule.current_phase) throw new Error("Expected an annual schedule phase");
+  await stripe.subscriptionSchedules.update(annualSchedule.id, {
+    end_behavior: "release",
+    phases: [
+      {
+        start_date: annualSchedule.current_phase.start_date,
+        end_date: annualSchedule.current_phase.end_date,
+        items: [{ price: fullYearlyPriceId, quantity: 1 }],
+        proration_behavior: "none",
+      },
+      {
+        start_date: annualSchedule.current_phase.end_date,
+        iterations: 1,
+        items: [{ price: litePriceId, quantity: 1 }],
+        proration_behavior: "none",
+      },
+    ],
+    proration_behavior: "none",
+  });
+  await advanceClock(stripe, clock.id, annualSchedule.current_phase.end_date + 2 * HOUR_SECONDS);
+  subscription = await stripe.subscriptions.retrieve(subscription.id);
+  assertSubscription(subscription, { status: "active", priceId: litePriceId });
+  const currentAnnualSchedule = await stripe.subscriptionSchedules.retrieve(annualSchedule.id);
+  if (currentAnnualSchedule.status === "active") {
+    await stripe.subscriptionSchedules.release(annualSchedule.id);
+  }
 
   // Customerへattach後に失敗する公式test PaymentMethodで次回更新をpast_dueにする。
   const failingPaymentMethod = await stripe.paymentMethods.attach("pm_card_chargeCustomerFail", {
@@ -130,6 +193,9 @@ try {
         "renewal",
         "upgrade",
         "downgrade-at-period-end",
+        "portal-plan-change-deep-links",
+        "monthly-to-yearly-reset",
+        "yearly-to-monthly-at-period-end",
         "payment-failure",
         "payment-recovery",
         "cancel-resume-cancel",
@@ -142,22 +208,90 @@ try {
   await stripe.testHelpers.testClocks.del(clock.id);
 }
 
-async function resolveMonthlyPriceId(client: Stripe, plan: "lite" | "full"): Promise<string> {
+async function resolvePriceId(
+  client: Stripe,
+  plan: "lite" | "full",
+  interval: "month" | "year",
+): Promise<string> {
   const desired = STRIPE_BILLING_CATALOG.flatMap((item) => item.prices).find(
-    (price) => price.plan === plan && price.interval === "month",
+    (price) => price.plan === plan && price.interval === interval,
   );
-  if (!desired) throw new Error(`Missing ${plan} monthly catalog entry`);
+  if (!desired) throw new Error(`Missing ${plan} ${interval} catalog entry`);
   const prices = await client.prices.list({
     lookup_keys: [desired.lookupKey],
     active: true,
     limit: 2,
   });
   if (prices.data.length !== 1) {
-    throw new Error(`Sandbox lookup key for ${plan} monthly price must resolve uniquely`);
+    throw new Error(`Sandbox lookup key for ${plan} ${interval} price must resolve uniquely`);
   }
   const price = prices.data[0];
-  if (!price) throw new Error(`Missing ${plan} monthly price`);
+  if (!price) throw new Error(`Missing ${plan} ${interval} price`);
   return price.id;
+}
+
+async function resolvePortalConfigurations(client: Stripe): Promise<{
+  standard: string;
+  reset: string;
+}> {
+  const configurations = await client.billingPortal.configurations.list({ limit: 100 });
+  const managed = configurations.data.filter(
+    (configuration) => configuration.metadata.managed_by === "me-builder-stripe-catalog",
+  );
+  const management = managed.find(
+    (configuration) => configuration.metadata.portal_mode === "management",
+  );
+  const standard = managed.find(
+    (configuration) => configuration.metadata.portal_mode === "standard",
+  );
+  const reset = managed.find((configuration) => configuration.metadata.portal_mode === "reset");
+  if (!management || !standard || !reset) {
+    throw new Error("Expected management, standard, and reset Portal configurations");
+  }
+  if (management.features.subscription_update.enabled) {
+    throw new Error("Management Portal must not allow plan changes");
+  }
+  if (standard.features.subscription_update.billing_cycle_anchor !== "unchanged") {
+    throw new Error("Standard Portal must preserve the billing cycle");
+  }
+  if (reset.features.subscription_update.billing_cycle_anchor !== "now") {
+    throw new Error("Reset Portal must start a new billing cycle");
+  }
+  return { standard: standard.id, reset: reset.id };
+}
+
+async function assertPortalPlanChangeSession(
+  client: Stripe,
+  input: {
+    configurationId: string;
+    customerId: string;
+    subscriptionId: string;
+    itemId: string;
+    targetPriceId: string;
+  },
+): Promise<void> {
+  const session = await client.billingPortal.sessions.create({
+    customer: input.customerId,
+    configuration: input.configurationId,
+    return_url: "https://example.test/profile/billing",
+    flow_data: {
+      type: "subscription_update_confirm",
+      subscription_update_confirm: {
+        subscription: input.subscriptionId,
+        items: [{ id: input.itemId, price: input.targetPriceId, quantity: 1 }],
+      },
+      after_completion: {
+        type: "redirect",
+        redirect: { return_url: "https://example.test/profile/billing" },
+      },
+    },
+  });
+  if (session.configuration !== input.configurationId) {
+    throw new Error("Portal session used an unexpected configuration");
+  }
+  if (session.flow?.type !== "subscription_update_confirm") {
+    throw new Error("Portal session did not create a plan change confirmation flow");
+  }
 }
 
 async function advancePastCurrentPeriod(
