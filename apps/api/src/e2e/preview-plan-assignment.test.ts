@@ -1,10 +1,7 @@
 import { type AccountDataNamespace, type D1, billing } from "@me-builder/lib";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { listPersonalData } from "../logic/personal-data";
 import { getProfileEntitlement } from "../logic/profile-entitlement";
-
-const { createLiffSession } = vi.hoisted(() => ({ createLiffSession: vi.fn() }));
-vi.mock("../logic/liff-session", () => ({ createLiffSession }));
 
 const accountId = "preview-user";
 const at = new Date("2026-08-16T12:00:00.000Z");
@@ -53,14 +50,6 @@ function assignment(
 }
 
 describe("Preview Plan assignment verification", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    createLiffSession.mockResolvedValue({
-      type: "resolved",
-      session: { accountId, role: "user" },
-    });
-  });
-
   it.each([
     ["lite", "subscription", 150, 4],
     ["full", "subscription", 600, 12],
