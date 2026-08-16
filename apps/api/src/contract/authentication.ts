@@ -51,7 +51,7 @@ export const logoutApplicationSessionRoute = describeRoute({
   operationId: "logoutApplicationSession",
   tags: ["Authentication"],
   summary: "現在のapplication sessionを失効する",
-  security: [{ applicationSession: [] }],
+  security: [{ applicationSession: [], csrfToken: [] }],
   parameters: [
     {
       name: "X-CSRF-Token",

@@ -42,28 +42,37 @@ async function resolveRequestAuthentication(c: Context<AppEnv>): Promise<Authent
   const applicationSession = createApplicationSessionService(c.env);
   const sessionToken = getCookie(c, APPLICATION_SESSION_COOKIE);
   if (applicationSession && sessionToken) {
-    const actor = await applicationSession.sessions.verify(sessionToken, {
+    const verified = await applicationSession.sessions.verify(sessionToken, {
       refreshIdle: ["GET", "HEAD", "OPTIONS"].includes(c.req.method),
     });
-    if (actor) {
+    if (verified) {
       const [account, profile] = await Promise.all([
         applicationSession.db.query.accounts.findFirst({
           columns: { role: true },
-          where: (table, { eq }) => eq(table.id, actor.accountId),
+          where: (table, { eq }) => eq(table.id, verified.actor.accountId),
         }),
         applicationSession.db.query.accountProfiles.findFirst({
           columns: { displayName: true },
-          where: (table, { eq }) => eq(table.accountId, actor.accountId),
+          where: (table, { eq }) => eq(table.accountId, verified.actor.accountId),
         }),
       ]);
       if (account) {
+        const displayName = verified.displayProfile?.displayName ?? profile?.displayName;
+        const pictureUrl = verified.displayProfile?.pictureUrl;
         c.set("authenticationSource", "application-session");
         c.set("applicationSessionToken", sessionToken);
         return {
           type: "authenticated",
-          actor,
+          actor: verified.actor,
           accountRole: account.role,
-          ...(profile?.displayName ? { displayProfile: { displayName: profile.displayName } } : {}),
+          ...(displayName || pictureUrl
+            ? {
+                displayProfile: {
+                  ...(displayName ? { displayName } : {}),
+                  ...(pictureUrl ? { pictureUrl } : {}),
+                },
+              }
+            : {}),
         };
       }
     }

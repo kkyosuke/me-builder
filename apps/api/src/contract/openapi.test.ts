@@ -19,7 +19,7 @@ describe("GET /api/openapi.json", () => {
       security: [{ applicationSession: [] }],
     });
     expect(document.paths["/api/auth/session"]?.delete).toMatchObject({
-      security: [{ applicationSession: [] }],
+      security: [{ applicationSession: [], csrfToken: [] }],
     });
     expect(document.paths["/api/compatibility/share-consent"]?.get).toBeDefined();
     expect(document.paths["/api/compatibility/share-content"]?.get).toBeDefined();
@@ -122,12 +122,40 @@ describe("GET /api/openapi.json", () => {
       in: "cookie",
       name: "__Host-me_builder_session",
     });
+    expect(document.components.securitySchemes.csrfToken).toMatchObject({
+      type: "apiKey",
+      in: "header",
+      name: "X-CSRF-Token",
+    });
     expect(document.paths["/api/diagnoses"]?.get).toMatchObject({
       security: [{ applicationSession: [] }, { liffIdToken: [] }],
     });
     expect(document.paths["/api/family/seats"]?.get).toMatchObject({
       security: [{ applicationSession: [] }, { liffIdToken: [] }],
     });
+
+    for (const [path, pathItem] of Object.entries(document.paths)) {
+      for (const method of ["get", "post", "put", "patch", "delete"] as const) {
+        const operation = pathItem[method] as
+          | { operationId?: string; security?: Array<Record<string, unknown>> }
+          | undefined;
+        const liffRequirements = operation?.security?.filter(
+          (requirement) => "liffIdToken" in requirement,
+        );
+        const applicationSessionRequirements = operation?.security?.filter(
+          (requirement) => "applicationSession" in requirement,
+        );
+        if (liffRequirements?.length && !applicationSessionRequirements?.length) {
+          expect(operation?.operationId).toBe("completeAccountRecovery");
+        }
+        if (method === "get") continue;
+        if (!applicationSessionRequirements?.length) continue;
+        expect(
+          applicationSessionRequirements.every((requirement) => "csrfToken" in requirement),
+          `${method.toUpperCase()} ${path} must document its application-session CSRF requirement`,
+        ).toBe(true);
+      }
+    }
 
     const generatedDocument = JSON.parse(
       await readFile(new URL("../../openapi.json", import.meta.url), "utf8"),

@@ -48,12 +48,14 @@ export async function postLiffAuthenticationExchange(c: Context<AppEnv>): Promis
       ? c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503)
       : c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
   }
-  const issued = await runtime.sessions.issue(result.actor);
+  const previousToken = getCookie(c, APPLICATION_SESSION_COOKIE);
+  // logoutはD1 versionを進めるため、新sessionを発行した後に呼ぶと同じAccountの
+  // 新sessionまで失効する。以前のsessionを先に失効してから現在versionで発行する。
+  if (previousToken) await runtime.sessions.logout(previousToken);
+  const issued = await runtime.sessions.issue(result.actor, result.displayProfile);
   if (!issued) {
     return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
   }
-  const previousToken = getCookie(c, APPLICATION_SESSION_COOKIE);
-  if (previousToken) await runtime.sessions.logout(previousToken);
   setApplicationSessionCookie(c, issued.sessionToken, issued.expiresAt);
   c.header("Cache-Control", "no-store");
   return c.json(sessionResponse(result, issued));
@@ -89,7 +91,10 @@ export async function deleteApplicationSession(c: Context<AppEnv>): Promise<Resp
   if (!runtime) {
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   }
-  await runtime.sessions.logout(c.get("applicationSessionToken"));
+  await runtime.sessions.logout(
+    c.get("applicationSessionToken"),
+    authenticatedSession(c).actor.accountId,
+  );
   deleteCookie(c, APPLICATION_SESSION_COOKIE, {
     path: "/",
     secure: true,

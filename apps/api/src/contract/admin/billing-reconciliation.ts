@@ -39,7 +39,7 @@ export const adminBillingReconciliationRoute = describeRoute({
   operationId: "reconcileAdminBillingProjection",
   tags: ["Admin"],
   summary: "Stripeの現在契約と課金projectionの差分を確認・修復する",
-  security: [{ applicationSession: [] }, { liffIdToken: [] }],
+  security: [{ applicationSession: [], csrfToken: [] }, { liffIdToken: [] }],
   requestBody: {
     required: true,
     content: { "application/json": { schema: AdminBillingReconciliationRequestSchema } },

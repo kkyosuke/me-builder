@@ -108,7 +108,7 @@ export const profileSummaryGenerationRoute = describeRoute({
   operationId: "requestProfileSummaryGeneration",
   tags: ["Profile"],
   summary: "本人の記録から新しいまとめ版のAI生成を要求する",
-  security: [{ applicationSession: [] }, { liffIdToken: [] }],
+  security: [{ applicationSession: [], csrfToken: [] }, { liffIdToken: [] }],
   responses: {
     202: jsonResponse(
       "生成要求を受け付けた、または処理中の要求を返した",

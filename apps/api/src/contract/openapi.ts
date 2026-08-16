@@ -15,6 +15,12 @@ export const openApiOptions = {
           name: "__Host-me_builder_session",
           description: "HttpOnlyのprovider非依存application session",
         },
+        csrfToken: {
+          type: "apiKey",
+          in: "header",
+          name: "X-CSRF-Token",
+          description: "application sessionによる状態変更requestで要求するCSRF token",
+        },
         liffIdToken: {
           type: "http",
           scheme: "bearer",

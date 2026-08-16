@@ -41,7 +41,7 @@ export const requestPersonalDataExportRoute = describeRoute({
   operationId: "requestPersonalDataExport",
   tags: ["Personal Data"],
   summary: "本人データarchiveの非同期生成を要求する",
-  security: [{ applicationSession: [] }, { liffIdToken: [] }],
+  security: [{ applicationSession: [], csrfToken: [] }, { liffIdToken: [] }],
   responses: {
     202: jsonResponse("生成要求", PersonalDataExportResponseSchema),
     ...authenticatedErrors,

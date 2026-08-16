@@ -1604,7 +1604,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -1818,7 +1818,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -1929,7 +1929,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;

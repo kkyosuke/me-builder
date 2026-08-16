@@ -17,7 +17,7 @@ export const acceptCompatibilityInvitationRoute = describeRoute({
   operationId: "acceptCompatibilityInvitation",
   tags: ["Compatibility"],
   summary: "共有へ同意した受信者が相性招待を承諾する",
-  security: [{ applicationSession: [] }, { liffIdToken: [] }],
+  security: [{ applicationSession: [], csrfToken: [] }, { liffIdToken: [] }],
   responses: {
     200: jsonResponse("成立した相性関係", AcceptCompatibilityInvitationResponseSchema),
     ...authenticatedErrors,

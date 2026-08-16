@@ -76,7 +76,7 @@ export const putProfileAvatarRoute = describeRoute({
   operationId: "putProfileAvatar",
   tags: ["Profile"],
   summary: "本人のアバター画像を保存する",
-  security: [{ applicationSession: [] }, { liffIdToken: [] }],
+  security: [{ applicationSession: [], csrfToken: [] }, { liffIdToken: [] }],
   requestBody: {
     required: true,
     content: Object.fromEntries(
@@ -106,7 +106,7 @@ export const deleteProfileAvatarRoute = describeRoute({
   operationId: "deleteProfileAvatar",
   tags: ["Profile"],
   summary: "保存したアバターを外してLINE画像へ戻す",
-  security: [{ applicationSession: [] }, { liffIdToken: [] }],
+  security: [{ applicationSession: [], csrfToken: [] }, { liffIdToken: [] }],
   responses: {
     200: jsonResponse("削除後のプロフィール", ProfileResponseSchema),
     ...profileErrors,

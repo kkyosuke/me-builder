@@ -49,3 +49,13 @@ flowchart LR
 - 明示logout
 
 rotationはversion更新後に新versionのsessionを発行します。logoutは現在のブラウザだけでなく、同じAccountの既存application sessionをすべて失効します。これによりKV deleteの伝播前でも旧sessionを拒否します。
+
+## 4. HTTP境界
+
+session参照は`__Host-me_builder_session` cookieへ保存します。属性は`HttpOnly`、`Secure`、`SameSite=Lax`、`Path=/`とし、`Domain`は付けません。
+
+- `POST /api/auth/liff/exchange`: 許可済みWeb OriginとLIFF IDトークンを検証し、以前のcookie sessionを失効してから新sessionを発行する
+- `GET /api/auth/session`: application sessionだけを受け付け、CSRF tokenを含む表示可能なsession状態を返す
+- `DELETE /api/auth/session`: application session、許可済みOrigin、`X-CSRF-Token`を要求し、Accountの全sessionを失効する
+
+移行期間に機能APIへ`Authorization`が明示された場合は旧LIFF Bearerを優先し、不正なBearerでもcookieへfallbackしません。`POST`、`PUT`、`PATCH`、`DELETE`をapplication sessionで呼ぶ場合、cookieに加えて許可済みOriginの完全一致と`X-CSRF-Token`を必須にします。旧LIFF Bearerはambient credentialではないため、このCSRF tokenを要求しません。

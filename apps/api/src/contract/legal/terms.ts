@@ -91,7 +91,7 @@ export const acceptServiceTermsRoute = describeRoute({
   operationId: "acceptServiceTerms",
   tags: ["Legal"],
   summary: "現在の利用規約versionへの同意を記録する",
-  security: [{ applicationSession: [] }, { liffIdToken: [] }],
+  security: [{ applicationSession: [], csrfToken: [] }, { liffIdToken: [] }],
   responses: {
     200: jsonResponse("保存済みの同意記録", AcceptServiceTermsResponseSchema),
     400: jsonResponse("リクエストJSONが不正", InvalidServiceTermsRequestSchema),

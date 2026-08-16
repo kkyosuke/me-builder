@@ -31,7 +31,7 @@ export const resetDevelopmentAccountDataRoute = describeRoute({
   operationId: "resetDevelopmentAccountData",
   tags: ["Development"],
   summary: "開発環境で本人の個人コンテンツを全削除する",
-  security: [{ applicationSession: [] }, { liffIdToken: [] }],
+  security: [{ applicationSession: [], csrfToken: [] }, { liffIdToken: [] }],
   responses: {
     200: jsonResponse(
       "削除した本人のAccountData件数とVector削除予定件数",
