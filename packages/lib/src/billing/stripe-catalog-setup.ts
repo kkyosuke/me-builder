@@ -95,6 +95,7 @@ export interface PortalSpec {
   products: readonly { productId: string; priceIds: readonly string[] }[];
   billingCycleAnchor?: "unchanged" | "now";
   subscriptionUpdateEnabled?: boolean;
+  scheduleChangesAtPeriodEnd?: boolean;
 }
 
 export interface StripeCatalogApi {
@@ -364,6 +365,7 @@ export async function setupStripeBillingCatalog(input: {
       products: portalProducts,
       billingCycleAnchor: mode === "reset" ? "now" : "unchanged",
       subscriptionUpdateEnabled: mode !== "management",
+      scheduleChangesAtPeriodEnd: mode !== "reset",
     };
     if (portal) {
       await input.api.updatePortalConfiguration(portal.id, portalSpec);
@@ -448,9 +450,16 @@ export const billingPortalConfigurationParams = (
             })),
             billing_cycle_anchor: spec.billingCycleAnchor ?? "unchanged",
             proration_behavior: "always_invoice",
-            schedule_at_period_end: {
-              conditions: [{ type: "decreasing_item_amount" }, { type: "shortening_interval" }],
-            },
+            ...(spec.scheduleChangesAtPeriodEnd === false
+              ? {}
+              : {
+                  schedule_at_period_end: {
+                    conditions: [
+                      { type: "decreasing_item_amount" as const },
+                      { type: "shortening_interval" as const },
+                    ],
+                  },
+                }),
             trial_update_behavior: "continue_trial",
           },
   },

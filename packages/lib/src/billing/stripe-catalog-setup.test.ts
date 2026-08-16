@@ -165,8 +165,10 @@ describe("setupStripeBillingCatalog", () => {
       metadata: { managed_by: "test", portal_mode: "reset" },
       products: [{ productId: "prod_lite", priceIds: ["price_month", "price_year"] }],
       billingCycleAnchor: "now",
+      scheduleChangesAtPeriodEnd: false,
     });
     expect(reset.features.subscription_update).toMatchObject({ billing_cycle_anchor: "now" });
+    expect(reset.features.subscription_update).not.toHaveProperty("schedule_at_period_end");
     const management = billingPortalConfigurationParams({
       webBaseUrl: "https://example.test",
       metadata: { managed_by: "test", portal_mode: "management" },

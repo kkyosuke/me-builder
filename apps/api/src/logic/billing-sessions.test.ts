@@ -383,6 +383,7 @@ describe("billing sessions", () => {
   });
 
   it.each([
+    ["lite", "month", "lite", "year", "now"],
     ["lite", "month", "full", "year", "now"],
     ["family", "year", "lite", "month", "unchanged"],
   ] as const)(

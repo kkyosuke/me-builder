@@ -68,10 +68,7 @@
       "indexes": {
         "provider_account_active_idx": {
           "name": "provider_account_active_idx",
-          "columns": [
-            "provider",
-            "provider_account_id"
-          ],
+          "columns": ["provider", "provider_account_id"],
           "isUnique": true,
           "where": "is_deleted = 0"
         }
@@ -81,12 +78,8 @@
           "name": "account_identities_account_id_accounts_id_fk",
           "tableFrom": "account_identities",
           "tableTo": "accounts",
-          "columnsFrom": [
-            "account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -213,10 +206,7 @@
       "indexes": {
         "account_recovery_audit_account_idx": {
           "name": "account_recovery_audit_account_idx",
-          "columns": [
-            "account_id",
-            "created_at"
-          ],
+          "columns": ["account_id", "created_at"],
           "isUnique": false
         }
       },
@@ -225,12 +215,8 @@
           "name": "account_recovery_audits_account_id_accounts_id_fk",
           "tableFrom": "account_recovery_audits",
           "tableTo": "accounts",
-          "columnsFrom": [
-            "account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -309,10 +295,7 @@
       "indexes": {
         "account_recovery_account_idx": {
           "name": "account_recovery_account_idx",
-          "columns": [
-            "account_id",
-            "created_at"
-          ],
+          "columns": ["account_id", "created_at"],
           "isUnique": false
         }
       },
@@ -321,12 +304,8 @@
           "name": "account_recovery_credentials_account_id_accounts_id_fk",
           "tableFrom": "account_recovery_credentials",
           "tableTo": "accounts",
-          "columnsFrom": [
-            "account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -378,9 +357,7 @@
       "indexes": {
         "account_recovery_locked_until_idx": {
           "name": "account_recovery_locked_until_idx",
-          "columns": [
-            "locked_until"
-          ],
+          "columns": ["locked_until"],
           "isUnique": false
         }
       },
@@ -467,23 +444,13 @@
       "indexes": {
         "account_agreement_version_idx": {
           "name": "account_agreement_version_idx",
-          "columns": [
-            "account_id",
-            "document_key",
-            "document_version",
-            "document_hash"
-          ],
+          "columns": ["account_id", "document_key", "document_version", "document_hash"],
           "isUnique": true,
           "where": "is_deleted = 0"
         },
         "account_agreement_current_idx": {
           "name": "account_agreement_current_idx",
-          "columns": [
-            "document_key",
-            "document_version",
-            "document_hash",
-            "account_id"
-          ],
+          "columns": ["document_key", "document_version", "document_hash", "account_id"],
           "isUnique": false
         }
       },
@@ -492,12 +459,8 @@
           "name": "account_agreement_acceptances_account_id_accounts_id_fk",
           "tableFrom": "account_agreement_acceptances",
           "tableTo": "accounts",
-          "columnsFrom": [
-            "account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -548,9 +511,7 @@
       "indexes": {
         "billing_customer_provider_idx": {
           "name": "billing_customer_provider_idx",
-          "columns": [
-            "provider_customer_id"
-          ],
+          "columns": ["provider_customer_id"],
           "isUnique": true
         }
       },
@@ -559,12 +520,8 @@
           "name": "billing_customers_account_id_accounts_id_fk",
           "tableFrom": "billing_customers",
           "tableTo": "accounts",
-          "columnsFrom": [
-            "account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -622,10 +579,7 @@
       "indexes": {
         "billing_processed_object_idx": {
           "name": "billing_processed_object_idx",
-          "columns": [
-            "object_id",
-            "event_created_at"
-          ],
+          "columns": ["object_id", "event_created_at"],
           "isUnique": false
         }
       },
@@ -690,10 +644,7 @@
       "indexes": {
         "billing_reconciliation_target_idx": {
           "name": "billing_reconciliation_target_idx",
-          "columns": [
-            "target_account_id",
-            "created_at"
-          ],
+          "columns": ["target_account_id", "created_at"],
           "isUnique": false
         }
       },
@@ -702,12 +653,8 @@
           "name": "billing_reconciliation_audits_admin_account_id_accounts_id_fk",
           "tableFrom": "billing_reconciliation_audits",
           "tableTo": "accounts",
-          "columnsFrom": [
-            "admin_account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["admin_account_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -715,12 +662,8 @@
           "name": "billing_reconciliation_audits_target_account_id_accounts_id_fk",
           "tableFrom": "billing_reconciliation_audits",
           "tableTo": "accounts",
-          "columnsFrom": [
-            "target_account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["target_account_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -849,16 +792,12 @@
       "indexes": {
         "billing_subscription_customer_idx": {
           "name": "billing_subscription_customer_idx",
-          "columns": [
-            "provider_customer_id"
-          ],
+          "columns": ["provider_customer_id"],
           "isUnique": true
         },
         "billing_subscription_account_idx": {
           "name": "billing_subscription_account_idx",
-          "columns": [
-            "account_id"
-          ],
+          "columns": ["account_id"],
           "isUnique": false
         }
       },
@@ -867,12 +806,8 @@
           "name": "billing_subscription_projections_account_id_accounts_id_fk",
           "tableFrom": "billing_subscription_projections",
           "tableTo": "accounts",
-          "columnsFrom": [
-            "account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -921,9 +856,7 @@
       "indexes": {
         "billing_trial_subscription_idx": {
           "name": "billing_trial_subscription_idx",
-          "columns": [
-            "provider_subscription_id"
-          ],
+          "columns": ["provider_subscription_id"],
           "isUnique": false
         }
       },
@@ -932,12 +865,8 @@
           "name": "billing_trial_usages_account_id_accounts_id_fk",
           "tableFrom": "billing_trial_usages",
           "tableTo": "accounts",
-          "columnsFrom": [
-            "account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1096,12 +1025,8 @@
           "name": "diagnoses_scoring_config_id_diagnosis_scoring_configs_id_fk",
           "tableFrom": "diagnoses",
           "tableTo": "diagnosis_scoring_configs",
-          "columnsFrom": [
-            "scoring_config_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["scoring_config_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1181,19 +1106,13 @@
       "indexes": {
         "diagnosis_question_active_idx": {
           "name": "diagnosis_question_active_idx",
-          "columns": [
-            "diagnosis_id",
-            "question_id"
-          ],
+          "columns": ["diagnosis_id", "question_id"],
           "isUnique": true,
           "where": "is_deleted = 0"
         },
         "diagnosis_question_position_active_idx": {
           "name": "diagnosis_question_position_active_idx",
-          "columns": [
-            "diagnosis_id",
-            "position"
-          ],
+          "columns": ["diagnosis_id", "position"],
           "isUnique": true,
           "where": "is_deleted = 0"
         }
@@ -1203,12 +1122,8 @@
           "name": "diagnosis_questions_diagnosis_id_diagnoses_id_fk",
           "tableFrom": "diagnosis_questions",
           "tableTo": "diagnoses",
-          "columnsFrom": [
-            "diagnosis_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["diagnosis_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1216,12 +1131,8 @@
           "name": "diagnosis_questions_question_id_questions_id_fk",
           "tableFrom": "diagnosis_questions",
           "tableTo": "questions",
-          "columnsFrom": [
-            "question_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["question_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1229,14 +1140,8 @@
           "name": "diagnosis_questions_question_id_question_version_question_versions_question_id_version_fk",
           "tableFrom": "diagnosis_questions",
           "tableTo": "question_versions",
-          "columnsFrom": [
-            "question_id",
-            "question_version"
-          ],
-          "columnsTo": [
-            "question_id",
-            "version"
-          ],
+          "columnsFrom": ["question_id", "question_version"],
+          "columnsTo": ["question_id", "version"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1383,11 +1288,7 @@
       "indexes": {
         "question_choice_position_idx": {
           "name": "question_choice_position_idx",
-          "columns": [
-            "question_id",
-            "question_version",
-            "position"
-          ],
+          "columns": ["question_id", "question_version", "position"],
           "isUnique": true
         }
       },
@@ -1396,25 +1297,15 @@
           "name": "question_choices_question_id_question_version_question_versions_question_id_version_fk",
           "tableFrom": "question_choices",
           "tableTo": "question_versions",
-          "columnsFrom": [
-            "question_id",
-            "question_version"
-          ],
-          "columnsTo": [
-            "question_id",
-            "version"
-          ],
+          "columnsFrom": ["question_id", "question_version"],
+          "columnsTo": ["question_id", "version"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
         "question_choices_question_id_question_version_choice_id_pk": {
-          "columns": [
-            "question_id",
-            "question_version",
-            "choice_id"
-          ],
+          "columns": ["question_id", "question_version", "choice_id"],
           "name": "question_choices_question_id_question_version_choice_id_pk"
         }
       },
@@ -1513,10 +1404,7 @@
       "indexes": {
         "question_version_active_idx": {
           "name": "question_version_active_idx",
-          "columns": [
-            "question_id",
-            "version"
-          ],
+          "columns": ["question_id", "version"],
           "isUnique": true,
           "where": "is_deleted = 0"
         }
@@ -1526,22 +1414,15 @@
           "name": "question_versions_question_id_questions_id_fk",
           "tableFrom": "question_versions",
           "tableTo": "questions",
-          "columnsFrom": [
-            "question_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["question_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
         "question_versions_question_id_version_pk": {
-          "columns": [
-            "question_id",
-            "version"
-          ],
+          "columns": ["question_id", "version"],
           "name": "question_versions_question_id_version_pk"
         }
       },
@@ -1691,17 +1572,12 @@
       "indexes": {
         "gemini_usage_generated_at_idx": {
           "name": "gemini_usage_generated_at_idx",
-          "columns": [
-            "generated_at"
-          ],
+          "columns": ["generated_at"],
           "isUnique": false
         },
         "gemini_usage_account_generated_at_idx": {
           "name": "gemini_usage_account_generated_at_idx",
-          "columns": [
-            "account_id",
-            "generated_at"
-          ],
+          "columns": ["account_id", "generated_at"],
           "isUnique": false
         }
       },
@@ -1782,9 +1658,7 @@
       "indexes": {
         "family_pack_active_payer_idx": {
           "name": "family_pack_active_payer_idx",
-          "columns": [
-            "payer_account_id"
-          ],
+          "columns": ["payer_account_id"],
           "isUnique": true,
           "where": "status = 'active' and is_deleted = 0"
         }
@@ -1794,12 +1668,8 @@
           "name": "family_packs_payer_account_id_accounts_id_fk",
           "tableFrom": "family_packs",
           "tableTo": "accounts",
-          "columnsFrom": [
-            "payer_account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["payer_account_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1905,24 +1775,17 @@
       "indexes": {
         "family_seat_invitation_seat_idx": {
           "name": "family_seat_invitation_seat_idx",
-          "columns": [
-            "seat_id"
-          ],
+          "columns": ["seat_id"],
           "isUnique": true
         },
         "family_seat_invitation_token_idx": {
           "name": "family_seat_invitation_token_idx",
-          "columns": [
-            "token_hash"
-          ],
+          "columns": ["token_hash"],
           "isUnique": true
         },
         "family_seat_invitation_status_expiry_idx": {
           "name": "family_seat_invitation_status_expiry_idx",
-          "columns": [
-            "status",
-            "expires_at"
-          ],
+          "columns": ["status", "expires_at"],
           "isUnique": false
         }
       },
@@ -1931,12 +1794,8 @@
           "name": "family_seat_invitations_seat_id_family_seats_id_fk",
           "tableFrom": "family_seat_invitations",
           "tableTo": "family_seats",
-          "columnsFrom": [
-            "seat_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["seat_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1944,12 +1803,8 @@
           "name": "family_seat_invitations_inviter_account_id_accounts_id_fk",
           "tableFrom": "family_seat_invitations",
           "tableTo": "accounts",
-          "columnsFrom": [
-            "inviter_account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["inviter_account_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1957,12 +1812,8 @@
           "name": "family_seat_invitations_claimed_by_account_id_accounts_id_fk",
           "tableFrom": "family_seat_invitations",
           "tableTo": "accounts",
-          "columnsFrom": [
-            "claimed_by_account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["claimed_by_account_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2075,35 +1926,24 @@
       "indexes": {
         "family_seat_live_slot_idx": {
           "name": "family_seat_live_slot_idx",
-          "columns": [
-            "pack_id",
-            "slot_number"
-          ],
+          "columns": ["pack_id", "slot_number"],
           "isUnique": true,
           "where": "status in ('invited', 'active') and is_deleted = 0"
         },
         "family_seat_active_account_idx": {
           "name": "family_seat_active_account_idx",
-          "columns": [
-            "member_account_id"
-          ],
+          "columns": ["member_account_id"],
           "isUnique": true,
           "where": "status = 'active' and member_account_id is not null and is_deleted = 0"
         },
         "family_seat_invitation_idx": {
           "name": "family_seat_invitation_idx",
-          "columns": [
-            "invitation_id"
-          ],
+          "columns": ["invitation_id"],
           "isUnique": true
         },
         "family_seat_pack_status_idx": {
           "name": "family_seat_pack_status_idx",
-          "columns": [
-            "pack_id",
-            "status",
-            "slot_number"
-          ],
+          "columns": ["pack_id", "status", "slot_number"],
           "isUnique": false
         }
       },
@@ -2112,12 +1952,8 @@
           "name": "family_seats_pack_id_family_packs_id_fk",
           "tableFrom": "family_seats",
           "tableTo": "family_packs",
-          "columnsFrom": [
-            "pack_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["pack_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -2125,12 +1961,8 @@
           "name": "family_seats_member_account_id_accounts_id_fk",
           "tableFrom": "family_seats",
           "tableTo": "accounts",
-          "columnsFrom": [
-            "member_account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["member_account_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2218,12 +2050,8 @@
           "name": "account_profiles_account_id_accounts_id_fk",
           "tableFrom": "account_profiles",
           "tableTo": "accounts",
-          "columnsFrom": [
-            "account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2304,26 +2132,17 @@
       "indexes": {
         "account_progression_level_idx": {
           "name": "account_progression_level_idx",
-          "columns": [
-            "level",
-            "account_id"
-          ],
+          "columns": ["level", "account_id"],
           "isUnique": false
         },
         "account_progression_pieces_idx": {
           "name": "account_progression_pieces_idx",
-          "columns": [
-            "collected_pieces",
-            "account_id"
-          ],
+          "columns": ["collected_pieces", "account_id"],
           "isUnique": false
         },
         "account_progression_growth_at_idx": {
           "name": "account_progression_growth_at_idx",
-          "columns": [
-            "last_growth_at",
-            "account_id"
-          ],
+          "columns": ["last_growth_at", "account_id"],
           "isUnique": false
         }
       },
@@ -2332,12 +2151,8 @@
           "name": "account_progression_projections_account_id_accounts_id_fk",
           "tableFrom": "account_progression_projections",
           "tableTo": "accounts",
-          "columnsFrom": [
-            "account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
