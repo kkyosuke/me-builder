@@ -152,11 +152,13 @@ async function parseExport(response: Response): Promise<PersonalDataExport> {
 
 export async function requestPersonalDataExport(
   apiUrl: string | undefined,
+  signal?: AbortSignal,
 ): Promise<PersonalDataExport> {
   const response = await createAuthenticatedHttpClient(apiUrl).request(
     "/api/personal-data/exports",
     {
       method: "POST",
+      ...(signal ? { signal } : {}),
     },
   );
   return parseExport(response);
@@ -179,9 +181,13 @@ export async function fetchPersonalDataExport(
 export async function downloadPersonalDataExport(
   apiUrl: string | undefined,
   exportId: string,
+  signal?: AbortSignal,
 ): Promise<Blob> {
   const response = await createAuthenticatedHttpClient(apiUrl).request(
     `/api/personal-data/exports/${encodeURIComponent(exportId)}/download`,
+    {
+      ...(signal ? { signal } : {}),
+    },
   );
   if (!response.ok) throw exportRequestError(response.status);
   return response.blob();

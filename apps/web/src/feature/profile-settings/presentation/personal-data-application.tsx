@@ -17,6 +17,21 @@ function message(error: unknown): string {
   return error instanceof Error ? error.message : "入力データを操作できませんでした。";
 }
 
+function waitForNextPoll(signal: AbortSignal): Promise<void> {
+  if (signal.aborted) return Promise.resolve();
+  return new Promise((resolve) => {
+    const onAbort = () => {
+      window.clearTimeout(timer);
+      resolve();
+    };
+    const timer = window.setTimeout(() => {
+      signal.removeEventListener("abort", onAbort);
+      resolve();
+    }, 1_000);
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
 export function PersonalDataApplication({
   onBack,
   onChanged,
@@ -34,9 +49,11 @@ export function PersonalDataApplication({
   const [reloadKey, setReloadKey] = useState(0);
   const [dataExport, setDataExport] = useState<PersonalDataExport | null>(null);
   const [exportBusy, setExportBusy] = useState(false);
+  const exportRequest = useRef<AbortController | null>(null);
 
   useEffect(() => {
     backButtonRef.current?.focus();
+    return () => exportRequest.current?.abort();
   }, []);
 
   useEffect(() => {
@@ -91,9 +108,11 @@ export function PersonalDataApplication({
     }
   };
 
-  const pollExport = async (exportId: string) => {
+  const pollExport = async (exportId: string, signal: AbortSignal) => {
     for (let attempt = 0; attempt < 120; attempt += 1) {
-      const current = await fetchPersonalDataExport(config.apiUrl, exportId);
+      if (signal.aborted) return;
+      const current = await fetchPersonalDataExport(config.apiUrl, exportId, signal);
+      if (signal.aborted) return;
       setDataExport(current);
       if (
         current.status === "ready" ||
@@ -102,33 +121,49 @@ export function PersonalDataApplication({
       ) {
         return;
       }
-      await new Promise((resolve) => window.setTimeout(resolve, 1_000));
+      await waitForNextPoll(signal);
     }
+    if (signal.aborted) return;
     throw new Error("作成に時間がかかっています。しばらくしてから再試行してください。");
   };
 
   const createExport = async () => {
+    exportRequest.current?.abort();
+    const controller = new AbortController();
+    exportRequest.current = controller;
     setExportBusy(true);
     setError(null);
     try {
-      const created = await requestPersonalDataExport(config.apiUrl);
+      const created = await requestPersonalDataExport(config.apiUrl, controller.signal);
+      if (controller.signal.aborted) return;
       setDataExport(created);
       if (created.status === "queued" || created.status === "generating") {
-        await pollExport(created.id);
+        await pollExport(created.id, controller.signal);
       }
     } catch (caught) {
-      setError(message(caught));
+      if (!controller.signal.aborted) setError(message(caught));
     } finally {
-      setExportBusy(false);
+      if (exportRequest.current === controller) {
+        exportRequest.current = null;
+        if (!controller.signal.aborted) setExportBusy(false);
+      }
     }
   };
 
   const downloadExport = async () => {
     if (!dataExport || dataExport.status !== "ready") return;
+    exportRequest.current?.abort();
+    const controller = new AbortController();
+    exportRequest.current = controller;
     setExportBusy(true);
     setError(null);
     try {
-      const blob = await downloadPersonalDataExport(config.apiUrl, dataExport.id);
+      const blob = await downloadPersonalDataExport(
+        config.apiUrl,
+        dataExport.id,
+        controller.signal,
+      );
+      if (controller.signal.aborted) return;
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
@@ -136,9 +171,12 @@ export function PersonalDataApplication({
       anchor.click();
       URL.revokeObjectURL(url);
     } catch (caught) {
-      setError(message(caught));
+      if (!controller.signal.aborted) setError(message(caught));
     } finally {
-      setExportBusy(false);
+      if (exportRequest.current === controller) {
+        exportRequest.current = null;
+        if (!controller.signal.aborted) setExportBusy(false);
+      }
     }
   };
 

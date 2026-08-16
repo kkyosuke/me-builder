@@ -117,9 +117,41 @@ describe("PersonalDataApplication", () => {
     expect(await screen.findByRole("button", { name: "ダウンロード" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "ダウンロード" }));
 
-    await waitFor(() => expect(mocks.downloadExport).toHaveBeenCalledWith(undefined, "export-1"));
+    await waitFor(() =>
+      expect(mocks.downloadExport).toHaveBeenCalledWith(
+        undefined,
+        "export-1",
+        expect.any(AbortSignal),
+      ),
+    );
     expect(createObjectURL).toHaveBeenCalled();
     expect(click).toHaveBeenCalled();
     expect(revokeObjectURL).toHaveBeenCalledWith("blob:personal-data");
+  });
+
+  it("画面を閉じたら進行中の本人データexport確認を中断する", async () => {
+    mocks.requestExport.mockResolvedValueOnce({
+      id: "export-pending",
+      status: "queued",
+      requestedAt: "2026-08-15T03:00:00.000Z",
+      completedAt: null,
+      expiresAt: null,
+      downloadUrl: null,
+    });
+    let pollSignal: AbortSignal | undefined;
+    mocks.fetchExport.mockImplementationOnce(
+      (_apiUrl: string | undefined, _exportId: string, signal: AbortSignal) => {
+        pollSignal = signal;
+        return new Promise(() => undefined);
+      },
+    );
+    const view = render(<PersonalDataApplication onBack={vi.fn()} />);
+    await screen.findByText("朝は得意ですか？");
+
+    fireEvent.click(screen.getByRole("button", { name: "データを作成" }));
+    await waitFor(() => expect(pollSignal).toBeDefined());
+    view.unmount();
+
+    expect(pollSignal?.aborted).toBe(true);
   });
 });
