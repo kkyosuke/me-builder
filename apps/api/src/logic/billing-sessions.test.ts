@@ -58,8 +58,8 @@ describe("billing sessions", () => {
       expect.objectContaining({
         accountId: owner.id,
         priceId: "price_full_year_v2",
-        successUrl: "https://app.example.test/profile?billing=checkout-return",
-        cancelUrl: "https://app.example.test/profile?billing=checkout-cancel",
+        successUrl: "https://app.example.test/profile/billing?billing=checkout-return",
+        cancelUrl: "https://app.example.test/profile/billing?billing=checkout-cancel",
       }),
       `billing-checkout-${owner.id}`,
     );

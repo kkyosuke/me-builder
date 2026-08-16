@@ -58,6 +58,7 @@ export function ProfileSettingsScreen({
   onOpenAdmin,
   onOpenAvatar,
   onOpenBillingPortal,
+  onOpenBillingPlans,
   onOpenPersonalData,
   onOpenFamily,
   canOpenBrainItems = false,
@@ -84,6 +85,7 @@ export function ProfileSettingsScreen({
   onOpenAdmin?: () => void;
   onOpenAvatar: () => void;
   onOpenBillingPortal?: () => Promise<void>;
+  onOpenBillingPlans?: () => void;
   onOpenPersonalData?: () => void;
   onOpenFamily?: () => void;
   canOpenBrainItems?: boolean;
@@ -356,6 +358,18 @@ export function ProfileSettingsScreen({
                     className="mt-5 flex min-h-12 w-full items-center justify-between rounded-xl border border-sky-200 bg-sky-50 px-4 font-bold text-sky-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:border-sky-700 dark:bg-sky-400/10 dark:text-sky-100"
                   >
                     ファミリー席を管理
+                    <ChevronRight className="size-5" aria-hidden="true" />
+                  </button>
+                )}
+                {onOpenBillingPlans && (
+                  <button
+                    type="button"
+                    onClick={onOpenBillingPlans}
+                    className="mt-5 flex min-h-12 w-full items-center justify-between rounded-xl bg-violet-700 px-4 font-bold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500"
+                  >
+                    {entitlement.data.source === "subscription"
+                      ? "料金プランを比較"
+                      : "有料プランを見る"}
                     <ChevronRight className="size-5" aria-hidden="true" />
                   </button>
                 )}

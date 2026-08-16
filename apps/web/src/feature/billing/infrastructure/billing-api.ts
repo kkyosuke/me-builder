@@ -1,13 +1,118 @@
+import type { BillingInterval, PaidPlanCode } from "@me-builder/shared";
 import * as v from "valibot";
 import type { operations } from "../../../generated/api";
 import { OperationError, ValidationError } from "../../../infrastructure/errors";
 import { createHttpClient } from "../../../infrastructure/http-client";
+import type { BillingPlan } from "../model/billing-plan";
+
+type PlanCatalogResponse =
+  operations["getBillingPlanCatalog"]["responses"][200]["content"]["application/json"];
+const BillingPlanSchema = v.object({
+  code: v.picklist(["lite", "full", "family"]),
+  name: v.string(),
+  description: v.string(),
+  highlights: v.array(v.string()),
+  trialDays: v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1))),
+  prices: v.array(
+    v.object({
+      interval: v.picklist(["month", "year"]),
+      amount: v.pipe(v.number(), v.integer(), v.minValue(1)),
+      currency: v.literal("JPY"),
+    }),
+  ),
+});
+const PlanCatalogResponseSchema = v.object({
+  plans: v.array(BillingPlanSchema),
+}) satisfies v.GenericSchema<PlanCatalogResponse>;
 
 type PortalResponse =
   operations["createBillingPortalSession"]["responses"][201]["content"]["application/json"];
 const PortalResponseSchema = v.object({
   url: v.pipe(v.string(), v.url()),
 }) satisfies v.GenericSchema<PortalResponse>;
+
+export async function fetchBillingPlanCatalog(
+  apiUrl: string | undefined,
+  signal?: AbortSignal,
+): Promise<readonly BillingPlan[]> {
+  let response: Response;
+  try {
+    response = await createHttpClient(apiUrl).request("/api/billing/plans", {
+      ...(signal ? { signal } : {}),
+    });
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    throw new OperationError("料金プランを取得できませんでした。時間をおいて再試行してください。", {
+      code: "BILLING_PLAN_CATALOG_NETWORK_FAILED",
+      cause: error,
+    });
+  }
+  if (!response.ok) {
+    throw new OperationError("料金プランを取得できませんでした。時間をおいて再試行してください。", {
+      code: "BILLING_PLAN_CATALOG_FAILED",
+      status: response.status,
+    });
+  }
+  try {
+    return v.parse(PlanCatalogResponseSchema, await response.json()).plans;
+  } catch (error) {
+    throw new ValidationError("料金プランの応答を確認できませんでした。", {
+      code: "BILLING_PLAN_CATALOG_RESPONSE_INVALID",
+      status: response.status,
+      cause: error,
+    });
+  }
+}
+
+type CheckoutRequest = Readonly<{ plan: PaidPlanCode; interval: BillingInterval }>;
+
+export async function createCheckoutSession(
+  apiUrl: string | undefined,
+  idToken: string,
+  input: CheckoutRequest,
+  signal?: AbortSignal,
+): Promise<string> {
+  let response: Response;
+  try {
+    response = await createHttpClient(apiUrl).request("/api/billing/checkout-sessions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${idToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+      ...(signal ? { signal } : {}),
+    });
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    throw new OperationError("購入手続きを開始できませんでした。時間をおいて再試行してください。", {
+      code: "BILLING_CHECKOUT_NETWORK_FAILED",
+      cause: error,
+    });
+  }
+  if (response.status === 409) {
+    const body = (await response.json().catch(() => null)) as { reason?: string } | null;
+    const message =
+      body?.reason === "existing_subscription"
+        ? "現在の契約があります。契約管理から確認してください。"
+        : body?.reason === "checkout_in_progress"
+          ? "すでに購入手続きが進行中です。開いているStripe画面を確認してください。"
+          : "このプランは現在購入できません。";
+    throw new OperationError(message, { code: "BILLING_CHECKOUT_UNAVAILABLE", status: 409 });
+  }
+  if (!response.ok) {
+    throw new OperationError("購入手続きを開始できませんでした。時間をおいて再試行してください。", {
+      code: "BILLING_CHECKOUT_FAILED",
+      status: response.status,
+    });
+  }
+  try {
+    return v.parse(PortalResponseSchema, await response.json()).url;
+  } catch (error) {
+    throw new ValidationError("購入手続きの応答を確認できませんでした。", {
+      code: "BILLING_CHECKOUT_RESPONSE_INVALID",
+      status: response.status,
+      cause: error,
+    });
+  }
+}
 
 export async function createCustomerPortalSession(
   apiUrl: string | undefined,

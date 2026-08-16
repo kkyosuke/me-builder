@@ -1,10 +1,12 @@
 import { D1, billing } from "@me-builder/lib";
+import { publicBillingPlans } from "@me-builder/shared";
 import type { Context } from "hono";
 import * as v from "valibot";
 import { getConfig } from "../config";
 import {
   BillingCheckoutRequestSchema,
   BillingInvalidRequestSchema,
+  BillingPlanCatalogResponseSchema,
   BillingSessionConflictSchema,
   BillingSessionResponseSchema,
 } from "../contract/billing/sessions";
@@ -47,6 +49,23 @@ export async function postStripeWebhook(c: Context<AppEnv>): Promise<Response> {
     case "not-configured":
       return c.json({ error: "Service Unavailable" }, 503);
   }
+}
+
+export function getBillingPlanCatalog(c: Context<AppEnv>): Response {
+  return c.json(
+    v.parse(BillingPlanCatalogResponseSchema, {
+      plans: publicBillingPlans.map(
+        ({ code, name, description, highlights, trialDays, prices }) => ({
+          code,
+          name,
+          description,
+          highlights: [...highlights],
+          trialDays,
+          prices: prices.map(({ interval, amount, currency }) => ({ interval, amount, currency })),
+        }),
+      ),
+    }),
+  );
 }
 
 export async function postBillingCheckoutSession(c: Context<AppEnv>): Promise<Response> {

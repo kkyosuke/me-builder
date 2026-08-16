@@ -20,6 +20,7 @@ import { adminBillingReconciliationRoute } from "./contract/admin/billing-reconc
 import { adminStatisticsRoute } from "./contract/admin/statistics";
 import {
   billingCheckoutSessionRoute,
+  billingPlanCatalogRoute,
   billingPortalSessionRoute,
 } from "./contract/billing/sessions";
 import { developmentBrainItemsRoute, developmentBrainVectorRoute } from "./contract/brain/dev-list";
@@ -109,6 +110,7 @@ import {
   postBillingReconciliation,
 } from "./controller/admin";
 import {
+  getBillingPlanCatalog,
   postBillingCheckoutSession,
   postBillingPortalSession,
   postStripeWebhook,
@@ -265,6 +267,7 @@ app.post(
   accountRecoveryCompleteRoute,
   postAccountRecoveryComplete,
 );
+app.get("/api/billing/plans", billingPlanCatalogRoute, getBillingPlanCatalog);
 app.post("/api/billing/checkout-sessions", billingCheckoutSessionRoute, postBillingCheckoutSession);
 app.post("/api/billing/portal-sessions", billingPortalSessionRoute, postBillingPortalSession);
 

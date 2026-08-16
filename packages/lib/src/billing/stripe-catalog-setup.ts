@@ -1,3 +1,4 @@
+import { publicBillingPlans } from "@me-builder/shared";
 import Stripe from "stripe";
 import { STRIPE_API_VERSION } from "./stripe-adapter";
 import { STRIPE_BILLING_EVENT_TYPES } from "./stripe-events";
@@ -9,38 +10,17 @@ export type StripeCatalogEnvironment = "preview" | "production";
 export type StripeCatalogPlan = "lite" | "full" | "family";
 type BillingInterval = "month" | "year";
 
-export const STRIPE_BILLING_CATALOG = [
-  {
-    plan: "lite",
-    productId: "me_builder_lite",
-    name: "me-builder Lite",
-    description: "日記と週次の振り返りを無理なく続けるプラン",
-    prices: [
-      { interval: "month", unitAmount: 780, lookupKey: "me_builder_lite_monthly" },
-      { interval: "year", unitAmount: 7_800, lookupKey: "me_builder_lite_yearly" },
-    ],
-  },
-  {
-    plan: "full",
-    productId: "me_builder_full",
-    name: "me-builder Full",
-    description: "過去の記憶を使った助言、変化の確認、セルフケアを利用するプラン",
-    prices: [
-      { interval: "month", unitAmount: 1_480, lookupKey: "me_builder_full_monthly" },
-      { interval: "year", unitAmount: 14_800, lookupKey: "me_builder_full_yearly" },
-    ],
-  },
-  {
-    plan: "family",
-    productId: "me_builder_family",
-    name: "me-builder ファミリーパック",
-    description: "最大4 AccountでFull相当の機能を利用するプラン",
-    prices: [
-      { interval: "month", unitAmount: 2_980, lookupKey: "me_builder_family_monthly" },
-      { interval: "year", unitAmount: 29_800, lookupKey: "me_builder_family_yearly" },
-    ],
-  },
-] as const satisfies readonly {
+export const STRIPE_BILLING_CATALOG = publicBillingPlans.map((plan) => ({
+  plan: plan.code,
+  productId: `me_builder_${plan.code}`,
+  name: `me-builder ${plan.name}`,
+  description: plan.description,
+  prices: plan.prices.map((price) => ({
+    interval: price.interval,
+    unitAmount: price.amount,
+    lookupKey: price.lookupKey,
+  })),
+})) satisfies readonly {
   plan: StripeCatalogPlan;
   productId: string;
   name: string;
@@ -272,7 +252,9 @@ export async function setupStripeBillingCatalog(input: {
       pricePlanMap[price.id] = desiredProduct.plan;
     }
 
-    const monthly = desiredPriceByLookupKey.get(desiredProduct.prices[0].lookupKey);
+    const monthlySpec = desiredProduct.prices.find((price) => price.interval === "month");
+    if (!monthlySpec) throw new Error(`Monthly price spec is missing for ${desiredProduct.plan}`);
+    const monthly = desiredPriceByLookupKey.get(monthlySpec.lookupKey);
     if (!monthly) throw new Error(`Monthly price is missing for ${desiredProduct.plan}`);
     await input.api.setDefaultPrice(product.id, monthly.id);
     updated.push(`product:${desiredProduct.plan}:default-price`);

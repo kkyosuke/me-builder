@@ -67,8 +67,8 @@ export async function createBillingCheckoutSession(
     {
       customerId: customer.providerCustomerId,
       priceId,
-      successUrl: new URL("/profile?billing=checkout-return", origin).toString(),
-      cancelUrl: new URL("/profile?billing=checkout-cancel", origin).toString(),
+      successUrl: new URL("/profile/billing?billing=checkout-return", origin).toString(),
+      cancelUrl: new URL("/profile/billing?billing=checkout-cancel", origin).toString(),
       accountId,
     },
     `billing-checkout-${accountId}`,

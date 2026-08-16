@@ -38,6 +38,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/billing/plans": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** 現在購入できる有料Planと税込価格を取得する */
+    get: operations["getBillingPlanCatalog"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/billing/checkout-sessions": {
     parameters: {
       query?: never;
@@ -1152,6 +1169,42 @@ export interface operations {
           "application/json": {
             /** @constant */
             error: "Service Unavailable";
+          };
+        };
+      };
+    };
+  };
+  getBillingPlanCatalog: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 公開可能なPlan catalog */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            plans: {
+              /** @enum {string} */
+              code: "lite" | "full" | "family";
+              name: string;
+              description: string;
+              highlights: string[];
+              trialDays: number | null;
+              prices: {
+                /** @enum {string} */
+                interval: "month" | "year";
+                amount: number;
+                /** @constant */
+                currency: "JPY";
+              }[];
+            }[];
           };
         };
       };

@@ -107,6 +107,51 @@ describe("ProfileSettingsScreen", () => {
     expect(onOpenBillingPortal).toHaveBeenCalledOnce();
   });
 
+  it("現在Planから料金プラン画面を開く", () => {
+    const onOpenBillingPlans = vi.fn();
+    render(
+      <ProfileSettingsScreen
+        avatar={null}
+        entitlement={{
+          status: "success",
+          data: {
+            status: "free",
+            plan: "free",
+            source: "free",
+            effectiveAt: "2026-08-16T00:00:00.000Z",
+            availableUntil: null,
+            aiReply: {
+              limit: 20,
+              used: 0,
+              reserved: 0,
+              remaining: 20,
+              periodStartsAt: "2026-08-16T00:00:00.000Z",
+              resetsAt: "2026-09-16T00:00:00.000Z",
+            },
+            profileSummary: {
+              limit: 1,
+              used: 0,
+              reserved: 0,
+              remaining: 1,
+              periodStartsAt: "2026-08-16T00:00:00.000Z",
+              resetsAt: "2026-11-14T00:00:00.000Z",
+            },
+          },
+        }}
+        theme="dark"
+        fontSize="medium"
+        onBack={vi.fn()}
+        onOpenAvatar={vi.fn()}
+        onOpenBillingPlans={onOpenBillingPlans}
+        onThemeChange={vi.fn()}
+        onFontSizeChange={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "有料プランを見る" }));
+    expect(onOpenBillingPlans).toHaveBeenCalledOnce();
+  });
+
   it("本人入力データの確認画面を開く", () => {
     const onOpenPersonalData = vi.fn();
     render(

@@ -70,6 +70,12 @@ export const loadFamilySeatApplication = memoizeModuleLoader(() =>
   })),
 );
 
+export const loadBillingPlanApplication = memoizeModuleLoader(() =>
+  import("./feature/billing").then((feature) => ({
+    default: feature.BillingPlanApplication,
+  })),
+);
+
 export function loadMainApplication(route: MainApplicationRoute): Promise<LazyApplicationModule> {
   if (route === "me") return loadProfileApplication();
   if (route === "compatibility") return loadCompatibilityApplication();

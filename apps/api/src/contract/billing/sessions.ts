@@ -7,6 +7,25 @@ export const BillingCheckoutRequestSchema = v.object({
   interval: v.picklist(["month", "year"]),
 });
 
+export const BillingPlanCatalogResponseSchema = v.object({
+  plans: v.array(
+    v.object({
+      code: v.picklist(["lite", "full", "family"]),
+      name: v.string(),
+      description: v.string(),
+      highlights: v.array(v.string()),
+      trialDays: v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1))),
+      prices: v.array(
+        v.object({
+          interval: v.picklist(["month", "year"]),
+          amount: v.pipe(v.number(), v.integer(), v.minValue(1)),
+          currency: v.literal("JPY"),
+        }),
+      ),
+    }),
+  ),
+});
+
 export const BillingSessionResponseSchema = v.object({
   url: v.pipe(v.string(), v.url()),
 });
@@ -37,6 +56,15 @@ export const billingCheckoutSessionRoute = describeRoute({
     400: jsonResponse("リクエストが不正", BillingInvalidRequestSchema),
     409: jsonResponse("購入を開始できない", BillingSessionConflictSchema),
     ...authenticatedErrors,
+  },
+} satisfies DescribeRouteOptions);
+
+export const billingPlanCatalogRoute = describeRoute({
+  operationId: "getBillingPlanCatalog",
+  tags: ["Billing"],
+  summary: "現在購入できる有料Planと税込価格を取得する",
+  responses: {
+    200: jsonResponse("公開可能なPlan catalog", BillingPlanCatalogResponseSchema),
   },
 } satisfies DescribeRouteOptions);
 

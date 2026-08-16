@@ -203,7 +203,9 @@ describe("setupStripeBillingCatalog", () => {
 
   it("管理外の固定Product IDを上書きしない", async () => {
     const api = new FakeStripeCatalogApi();
-    api.products.push({ id: STRIPE_BILLING_CATALOG[0].productId, metadata: {} });
+    const firstProduct = STRIPE_BILLING_CATALOG[0];
+    if (!firstProduct) throw new Error("Expected a billing product");
+    api.products.push({ id: firstProduct.productId, metadata: {} });
 
     await expect(setupStripeBillingCatalog({ api, environment: "preview" })).rejects.toThrow(
       "exists but is not managed",

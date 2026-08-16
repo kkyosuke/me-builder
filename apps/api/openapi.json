@@ -359,6 +359,91 @@
         }
       }
     },
+    "/api/billing/plans": {
+      "get": {
+        "operationId": "getBillingPlanCatalog",
+        "tags": ["Billing"],
+        "summary": "現在購入できる有料Planと税込価格を取得する",
+        "responses": {
+          "200": {
+            "description": "公開可能なPlan catalog",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "plans": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "enum": ["lite", "full", "family"],
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "highlights": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "trialDays": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": 1
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "prices": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "interval": {
+                                  "enum": ["month", "year"],
+                                  "type": "string"
+                                },
+                                "amount": {
+                                  "type": "integer",
+                                  "minimum": 1
+                                },
+                                "currency": {
+                                  "const": "JPY"
+                                }
+                              },
+                              "required": ["interval", "amount", "currency"]
+                            }
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "name",
+                          "description",
+                          "highlights",
+                          "trialDays",
+                          "prices"
+                        ]
+                      }
+                    }
+                  },
+                  "required": ["plans"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/billing/checkout-sessions": {
       "post": {
         "operationId": "createBillingCheckoutSession",
