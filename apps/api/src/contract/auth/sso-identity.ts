@@ -16,6 +16,13 @@ export const LastIdentityConflictSchema = v.object({
 });
 
 const applicationSessionSecurity = [{ applicationSession: [] }];
+const returnToParameter = {
+  name: "returnTo",
+  in: "query",
+  required: false,
+  schema: { type: "string", maxLength: 2048 },
+  description: "認証後に復元する同一originの相対path",
+} as const;
 const commonErrors = {
   401: jsonResponse("application sessionが無効", UnauthorizedErrorSchema),
   503: jsonResponse("SSOまたはstorage bindingが未設定", ServiceUnavailableErrorSchema),
@@ -37,6 +44,7 @@ export const startSsoIdentityLinkRoute = describeRoute({
   tags: ["Authentication"],
   summary: "認証済みAccountへのSSO Identity追加を開始する",
   security: applicationSessionSecurity,
+  parameters: [returnToParameter],
   responses: {
     302: { description: "Auth0認可endpointへredirect" },
     ...commonErrors,
