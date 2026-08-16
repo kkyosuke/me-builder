@@ -10,22 +10,26 @@ export type StripeCatalogEnvironment = "preview" | "production";
 export type StripeCatalogPlan = "lite" | "full" | "family";
 type BillingInterval = "month" | "year";
 
-export const STRIPE_BILLING_CATALOG = publicBillingPlans.map((plan) => ({
-  plan: plan.code,
-  productId: `me_builder_${plan.code}`,
-  name: `me-builder ${plan.name}`,
-  description: plan.description,
-  prices: plan.prices.map((price) => ({
-    interval: price.interval,
-    unitAmount: price.amount,
-    lookupKey: price.lookupKey,
-  })),
-})) satisfies readonly {
-  plan: StripeCatalogPlan;
+export const STRIPE_BILLING_CATALOG = [
+  {
+    productId: "me_builder_subscription",
+    name: "me-builder 有料プラン",
+    description: "Lite、Full、ファミリーパックから選べるme-builderの継続プラン",
+    prices: publicBillingPlans.flatMap((plan) =>
+      plan.prices.map((price) => ({
+        plan: plan.code,
+        interval: price.interval,
+        unitAmount: price.amount,
+        lookupKey: price.lookupKey,
+      })),
+    ),
+  },
+] satisfies readonly {
   productId: string;
   name: string;
   description: string;
   prices: readonly {
+    plan: StripeCatalogPlan;
     interval: BillingInterval;
     unitAmount: number;
     lookupKey: string;
@@ -175,33 +179,28 @@ export async function setupStripeBillingCatalog(input: {
   const created: string[] = [];
   const updated: string[] = [];
   const products = await input.api.listProducts();
-  const productByPlan = new Map<StripeCatalogPlan, CatalogProduct>();
-
-  for (const desired of STRIPE_BILLING_CATALOG) {
-    const managed = products.filter(
-      (product) => isManaged(product.metadata) && product.metadata.plan === desired.plan,
+  const desiredProduct = STRIPE_BILLING_CATALOG[0];
+  if (!desiredProduct) throw new Error("Billing catalog product is missing");
+  const matchedProduct = products.find(
+    (product) => product.id === desiredProduct.productId && isManaged(product.metadata),
+  );
+  const occupied = products.find(
+    (product) => product.id === desiredProduct.productId && !isManaged(product.metadata),
+  );
+  if (!matchedProduct && occupied) {
+    throw new Error(
+      `Stripe product ID ${desiredProduct.productId} exists but is not managed by this setup`,
     );
-    const matched = assertSingle(managed, `managed product for ${desired.plan}`);
-    const occupied = products.find(
-      (product) => product.id === desired.productId && !isManaged(product.metadata),
-    );
-    if (!matched && occupied) {
-      throw new Error(
-        `Stripe product ID ${desired.productId} exists but is not managed by this setup`,
-      );
-    }
-
-    const spec = {
-      name: desired.name,
-      description: desired.description,
-      metadata: managedMetadata(desired.plan),
-    };
-    const product = matched
-      ? await input.api.updateProduct(matched.id, spec)
-      : await input.api.createProduct({ id: desired.productId, ...spec });
-    (matched ? updated : created).push(`product:${desired.plan}`);
-    productByPlan.set(desired.plan, product);
   }
+  const productSpec = {
+    name: desiredProduct.name,
+    description: desiredProduct.description,
+    metadata: managedMetadata(),
+  };
+  const product = matchedProduct
+    ? await input.api.updateProduct(matchedProduct.id, productSpec)
+    : await input.api.createProduct({ id: desiredProduct.productId, ...productSpec });
+  (matchedProduct ? updated : created).push("product:subscription");
 
   const lookupKeys = STRIPE_BILLING_CATALOG.flatMap((product) =>
     product.prices.map((price) => price.lookupKey),
@@ -211,9 +210,6 @@ export async function setupStripeBillingCatalog(input: {
   const pricePlanMap: Record<string, StripeCatalogPlan> = {};
 
   for (const desiredProduct of STRIPE_BILLING_CATALOG) {
-    const product = productByPlan.get(desiredProduct.plan);
-    if (!product) throw new Error(`Managed product is missing for ${desiredProduct.plan}`);
-
     for (const desiredPrice of desiredProduct.prices) {
       const matchingLookupKey = currentPrices.filter(
         (price) => price.lookupKey === desiredPrice.lookupKey,
@@ -221,10 +217,10 @@ export async function setupStripeBillingCatalog(input: {
       const current = assertSingle(matchingLookupKey, `lookup key ${desiredPrice.lookupKey}`);
       if (
         current &&
-        (!isManaged(current.metadata) || current.metadata.plan !== desiredProduct.plan)
+        (!isManaged(current.metadata) || current.metadata.plan !== desiredPrice.plan)
       ) {
         throw new Error(
-          `Stripe lookup key ${desiredPrice.lookupKey} exists but is not managed for ${desiredProduct.plan}`,
+          `Stripe lookup key ${desiredPrice.lookupKey} exists but is not managed for ${desiredPrice.plan}`,
         );
       }
       let price: CatalogPrice;
@@ -241,7 +237,7 @@ export async function setupStripeBillingCatalog(input: {
           interval: desiredPrice.interval,
           lookupKey: desiredPrice.lookupKey,
           transferLookupKey: current !== undefined,
-          metadata: managedMetadata(desiredProduct.plan),
+          metadata: managedMetadata(desiredPrice.plan),
         });
         created.push(`price:${desiredPrice.lookupKey}`);
         if (current?.active) {
@@ -250,24 +246,29 @@ export async function setupStripeBillingCatalog(input: {
         }
       }
       desiredPriceByLookupKey.set(desiredPrice.lookupKey, price);
-      pricePlanMap[price.id] = desiredProduct.plan;
+      pricePlanMap[price.id] = desiredPrice.plan;
     }
-
-    const monthlySpec = desiredProduct.prices.find((price) => price.interval === "month");
-    if (!monthlySpec) throw new Error(`Monthly price spec is missing for ${desiredProduct.plan}`);
-    const monthly = desiredPriceByLookupKey.get(monthlySpec.lookupKey);
-    if (!monthly) throw new Error(`Monthly price is missing for ${desiredProduct.plan}`);
-    await input.api.setDefaultPrice(product.id, monthly.id);
-    updated.push(`product:${desiredProduct.plan}:default-price`);
   }
+  const liteMonthlySpec = desiredProduct.prices.find(
+    (price) => price.plan === "lite" && price.interval === "month",
+  );
+  if (!liteMonthlySpec) throw new Error("Lite monthly price spec is missing");
+  const liteMonthly = desiredPriceByLookupKey.get(liteMonthlySpec.lookupKey);
+  if (!liteMonthly) throw new Error("Lite monthly price is missing");
+  await input.api.setDefaultPrice(product.id, liteMonthly.id);
+  updated.push("product:subscription:default-price");
 
-  for (const desired of STRIPE_BILLING_CATALOG) {
-    const product = productByPlan.get(desired.plan);
-    if (!product) continue;
-    const prices = await input.api.listPricesByProduct(product.id);
-    for (const price of prices) {
-      if (isManaged(price.metadata) && price.metadata.plan === desired.plan) {
-        pricePlanMap[price.id] = desired.plan;
+  // 旧Plan別ProductのPriceも既存契約が参照する間はPlan mapへ残す。
+  const managedProducts = new Map(
+    [...products, product]
+      .filter((candidate) => isManaged(candidate.metadata))
+      .map((candidate) => [candidate.id, candidate]),
+  );
+  for (const managedProduct of managedProducts.values()) {
+    for (const price of await input.api.listPricesByProduct(managedProduct.id)) {
+      const plan = price.metadata.plan;
+      if (isManaged(price.metadata) && (plan === "lite" || plan === "full" || plan === "family")) {
+        pricePlanMap[price.id] = plan;
       }
     }
   }
@@ -335,18 +336,16 @@ export async function setupStripeBillingCatalog(input: {
   const portalSpec = {
     webBaseUrl,
     metadata: portalMetadata,
-    products: STRIPE_BILLING_CATALOG.map((desired) => {
-      const product = productByPlan.get(desired.plan);
-      if (!product) throw new Error(`Managed product is missing for ${desired.plan}`);
-      return {
+    products: [
+      {
         productId: product.id,
-        priceIds: desired.prices.map((price) => {
+        priceIds: desiredProduct.prices.map((price) => {
           const current = desiredPriceByLookupKey.get(price.lookupKey);
           if (!current) throw new Error(`Managed price is missing for ${price.lookupKey}`);
           return current.id;
         }),
-      };
-    }),
+      },
+    ],
   };
   let portalConfigurationId: string;
   if (portal) {
