@@ -41,6 +41,21 @@ flowchart LR
 
 契約が存在しない、期限切れ、projectionを取得できない場合はFreeへ安全側に倒します。ただし取得障害は運用ログで契約不在と区別します。B系列は`AccountPlanAssignmentProvider`のfakeを使い、Stripeなしでcontract testを実行できます。
 
+### 3.1 共通Entitlement解決
+
+機能側は`AccountPlanAssignmentProvider`を`EntitlementService`へ渡し、返された共通policyだけで利用可否と上限を判断します。policyの値は[サブスクリプション・料金プラン設計](../product/subscription-plan-design.md)を正とし、この文書では再定義しません。
+
+```mermaid
+flowchart LR
+    A[AccountPlanAssignmentProvider] --> E[EntitlementService]
+    E -->|有効な割当| P[Plan policy]
+    E -->|取得失敗・不正・期限外| F[Free policy / 原因分類]
+    P --> C[API / Worker / 画面]
+    F --> C
+```
+
+Account不一致、不明なPlan・付与元、不正な日時、適用開始前、期限切れ、provider障害は、有料権限を推測せずFreeへ倒します。ファミリー席はFamily plan、本人とは異なる支払者Account、`family-seat`付与元が揃った場合だけファミリー由来として解決します。原因分類は運用上の区別に使い、決済事業者固有の状態を機能側へ公開しません。
+
 ## 4. 状態の変換
 
 有効な`trialing`または`active`契約はPrice catalogでPlanへ変換します。期間末解約予約中も期限までは現在Planを維持します。`past_due`などの猶予期間は商取引条件確定後の状態遷移で扱い、未知statusや未知Priceは有料権限を付与しません。契約終了後は既存データを削除せずFreeへ戻します。
