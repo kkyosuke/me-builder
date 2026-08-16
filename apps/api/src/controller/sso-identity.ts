@@ -14,7 +14,10 @@ import {
   APPLICATION_SESSION_COOKIE,
   createApplicationSessionService,
 } from "../infrastructure/authentication/application-session-runtime";
-import { createAuth0SsoClient } from "../infrastructure/authentication/sso-client";
+import {
+  SsoProviderError,
+  createAuth0SsoClient,
+} from "../infrastructure/authentication/sso-client";
 import {
   createSsoExistingIdentityResolver,
   createSsoIdentityLinker,
@@ -23,6 +26,8 @@ import {
 } from "../infrastructure/authentication/sso-identity-repository";
 import { createSsoTransactionStore } from "../infrastructure/authentication/sso-transaction-store";
 import {
+  SsoAuthenticationError,
+  SsoCallbackCompletionError,
   cancelSsoAuthentication,
   completeSsoCallback,
   startSsoAuthentication,
@@ -121,6 +126,25 @@ function logSsoStarted(input: {
   );
 }
 
+function logSsoStartFailure(input: { traceId: string; purpose: "link" | "login" }): void {
+  logger.error(
+    {
+      event: "sso.authentication.failed",
+      service: "api",
+      component: "sso",
+      traceId: input.traceId,
+      purpose: input.purpose,
+      outcome: "failed",
+      disposition: "http-response",
+      stage: "authorization.create",
+      errorCode: "SSO_PROVIDER_UNAVAILABLE",
+      errorCategory: "external",
+      retryable: true,
+    },
+    "[SSO] failed at authorization.create -> http-response (SSO_PROVIDER_UNAVAILABLE, category:external)",
+  );
+}
+
 function logSsoCallbackFailure(input: {
   traceId?: string;
   stage: "authorization.callback" | "callback.complete";
@@ -160,14 +184,22 @@ export async function postSsoIdentityLink(c: Context<AppEnv>): Promise<Response>
   const dependencies = configured(c);
   if (!dependencies) return unavailable(c);
   const traceId = crypto.randomUUID();
-  const authorizationUrl = await startSsoIdentityLinking({
-    traceId,
-    initiatingAccountId: authenticatedActor(c).accountId,
-    returnTo: c.req.query("returnTo") ?? "/profile",
-    store: dependencies.store,
-    client: dependencies.client,
-  });
+  let authorizationUrl: URL;
+  try {
+    authorizationUrl = await startSsoIdentityLinking({
+      traceId,
+      initiatingAccountId: authenticatedActor(c).accountId,
+      returnTo: c.req.query("returnTo") ?? "/profile",
+      store: dependencies.store,
+      client: dependencies.client,
+    });
+  } catch (error) {
+    if (!(error instanceof SsoProviderError)) throw error;
+    logSsoStartFailure({ traceId, purpose: "link" });
+    return unavailable(c);
+  }
   if (!setCallbackStateCookie(c, authorizationUrl, dependencies.secureCallback)) {
+    logSsoStartFailure({ traceId, purpose: "link" });
     return unavailable(c);
   }
   logSsoStarted({
@@ -186,13 +218,21 @@ export async function postSsoLogin(c: Context<AppEnv>): Promise<Response> {
     return unavailable(c);
   }
   const traceId = crypto.randomUUID();
-  const authorizationUrl = await startSsoAuthentication({
-    traceId,
-    returnTo: c.req.query("returnTo") ?? "/",
-    store: dependencies.store,
-    client: dependencies.client,
-  });
+  let authorizationUrl: URL;
+  try {
+    authorizationUrl = await startSsoAuthentication({
+      traceId,
+      returnTo: c.req.query("returnTo") ?? "/",
+      store: dependencies.store,
+      client: dependencies.client,
+    });
+  } catch (error) {
+    if (!(error instanceof SsoProviderError)) throw error;
+    logSsoStartFailure({ traceId, purpose: "login" });
+    return unavailable(c);
+  }
   if (!setCallbackStateCookie(c, authorizationUrl, dependencies.secureCallback)) {
+    logSsoStartFailure({ traceId, purpose: "login" });
     return unavailable(c);
   }
   logSsoStarted({ traceId, purpose: "login", rolloutMode: "linked-login" });
@@ -320,14 +360,21 @@ export async function getSsoCallback(c: Context<AppEnv>): Promise<Response> {
       "[SSO] succeeded at identity.link -> web-redirect",
     );
     return redirectToWeb(c, resultPath(completed.returnTo, "linked"));
-  } catch {
+  } catch (error) {
+    const callback =
+      error instanceof SsoAuthenticationError || error instanceof SsoCallbackCompletionError
+        ? error.callback
+        : undefined;
+    const providerFailure =
+      error instanceof SsoCallbackCompletionError && error.failure instanceof SsoProviderError;
     logSsoCallbackFailure({
+      ...(callback?.traceId ? { traceId: callback.traceId } : {}),
       stage: "callback.complete",
-      errorCode: "SSO_CALLBACK_FAILED",
-      errorCategory: "unknown",
-      retryable: false,
+      errorCode: providerFailure ? "SSO_PROVIDER_CALLBACK_FAILED" : "SSO_CALLBACK_FAILED",
+      errorCategory: providerFailure ? "external" : "unknown",
+      retryable: providerFailure && error.failure.reason !== "token_invalid",
     });
-    return redirectToWeb(c, "/profile?sso=error");
+    return redirectToWeb(c, resultPath(callback?.returnTo ?? "/profile", "error"));
   }
 }
 

@@ -5,8 +5,32 @@ import type { AppEnv } from "../types";
 
 const mocks = vi.hoisted(() => {
   class CannotUnlinkLastIdentityError extends Error {}
+  class SsoProviderError extends Error {
+    constructor(readonly reason: "configuration" | "provider_rejected" | "token_invalid") {
+      super(reason);
+    }
+  }
+  class SsoAuthenticationError extends Error {
+    constructor(
+      readonly reason: string,
+      readonly callback?: { traceId?: string; returnTo: string },
+    ) {
+      super(reason);
+    }
+  }
+  class SsoCallbackCompletionError extends Error {
+    constructor(
+      readonly callback: { traceId?: string; returnTo: string },
+      readonly failure: unknown,
+    ) {
+      super("callback failed");
+    }
+  }
   return {
     CannotUnlinkLastIdentityError,
+    SsoProviderError,
+    SsoAuthenticationError,
+    SsoCallbackCompletionError,
     createClient: vi.fn(() => ({ client: true })),
     createStore: vi.fn(() => ({ store: true })),
     createLinker: vi.fn(() => ({ linker: true })),
@@ -43,6 +67,7 @@ vi.mock("@me-builder/lib", async (importOriginal) => {
   };
 });
 vi.mock("../infrastructure/authentication/sso-client", () => ({
+  SsoProviderError: mocks.SsoProviderError,
   createAuth0SsoClient: mocks.createClient,
 }));
 vi.mock("../infrastructure/authentication/application-session-runtime", () => ({
@@ -66,6 +91,8 @@ vi.mock("../infrastructure/authentication/sso-identity-repository", () => ({
   unlinkSsoIdentity: mocks.unlink,
 }));
 vi.mock("../logic/authentication/sso-transaction", () => ({
+  SsoAuthenticationError: mocks.SsoAuthenticationError,
+  SsoCallbackCompletionError: mocks.SsoCallbackCompletionError,
   startSsoIdentityLinking: mocks.startLinking,
   startSsoAuthentication: mocks.startLogin,
   completeSsoCallback: mocks.completeCallback,
@@ -245,6 +272,36 @@ describe("SSO identity controller", () => {
     expect(JSON.stringify(log.mock.calls)).not.toMatch(/sensitive|secret provider/u);
   });
 
+  it("code交換のprovider障害を保存済みtraceと復帰先へ関連付ける", async () => {
+    const log = vi.spyOn(logger, "error").mockImplementation(() => undefined);
+    mocks.completeCallback.mockRejectedValue(
+      new mocks.SsoCallbackCompletionError(
+        { traceId: "trace-token-exchange", returnTo: "/diagnosis/result?from=share" },
+        new mocks.SsoProviderError("provider_rejected"),
+      ),
+    );
+
+    const response = await testApp("/api/auth/sso/callback", getSsoCallback).request(
+      "https://api.example.com/api/auth/sso/callback?state=sensitive-state&code=sensitive-code",
+      { headers: { Cookie: "__Host-me_builder_sso_callback_state=sensitive-state" } },
+      env,
+    );
+
+    expect(response.headers.get("location")).toBe(
+      "https://stg.example.com/diagnosis/result?from=share&sso=error",
+    );
+    expect(log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        traceId: "trace-token-exchange",
+        errorCode: "SSO_PROVIDER_CALLBACK_FAILED",
+        errorCategory: "external",
+        retryable: true,
+      }),
+      expect.stringContaining("SSO_PROVIDER_CALLBACK_FAILED"),
+    );
+    expect(JSON.stringify(log.mock.calls)).not.toMatch(/sensitive/u);
+  });
+
   it("linked-login公開時だけ外部ブラウザのSSOログインを開始する", async () => {
     mocks.startLogin.mockResolvedValue(new URL("https://tenant.auth0.com/authorize?state=login"));
     const response = await testApp("/api/auth/sso/login", postSsoLogin).request(
@@ -291,6 +348,28 @@ describe("SSO identity controller", () => {
       }),
     );
     expect(response.headers.get("set-cookie")).toContain("__Host-me_builder_session=sso-session");
+  });
+
+  it("認可endpoint障害はtrace付きで記録して503へ縮退する", async () => {
+    vi.spyOn(crypto, "randomUUID").mockReturnValue("00000000-0000-4000-8000-000000000003");
+    const log = vi.spyOn(logger, "error").mockImplementation(() => undefined);
+    mocks.startLogin.mockRejectedValue(new mocks.SsoProviderError("configuration"));
+
+    const response = await testApp("/api/auth/sso/login", postSsoLogin).request(
+      "https://api.example.com/api/auth/sso/login",
+      { method: "POST" },
+      { ...env, SSO_ROLLOUT_MODE: "linked-login" },
+    );
+
+    expect(response.status).toBe(503);
+    expect(log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "sso.authentication.failed",
+        traceId: "00000000-0000-4000-8000-000000000003",
+        errorCode: "SSO_PROVIDER_UNAVAILABLE",
+      }),
+      expect.stringContaining("SSO_PROVIDER_UNAVAILABLE"),
+    );
   });
 
   it.each([

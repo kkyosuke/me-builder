@@ -3,6 +3,7 @@ import {
   SsoAuthenticationError,
   type SsoAuthenticationTransaction,
   type SsoAuthenticationTransactionStore,
+  SsoCallbackCompletionError,
   type SsoServerClient,
   cancelSsoAuthentication,
   completeSsoAuthentication,
@@ -146,6 +147,30 @@ describe("SSO authentication transaction", () => {
     ).rejects.toEqual(new SsoAuthenticationError("transaction_missing"));
   });
 
+  it("code交換失敗へ保存済みtraceと復帰先だけを引き継ぐ", async () => {
+    const store = createMemoryStore();
+    const client = createClient();
+    const providerFailure = new Error("sensitive provider response");
+    vi.mocked(client.exchangeAuthorizationCode).mockRejectedValue(providerFailure);
+    store.transactions.set("state", {
+      purpose: "login",
+      traceId: "trace-token-exchange",
+      nonce: "nonce",
+      codeVerifier: "verifier",
+      returnTo: "/diagnosis/result?from=share",
+      expiresAt: 2_000,
+    });
+
+    await expect(
+      completeSsoAuthentication({ state: "state", code: "code", store, client, now: () => 1_000 }),
+    ).rejects.toEqual(
+      new SsoCallbackCompletionError(
+        { traceId: "trace-token-exchange", returnTo: "/diagnosis/result?from=share" },
+        providerFailure,
+      ),
+    );
+  });
+
   it("改ざんされたstateと期限切れtransactionを拒否する", async () => {
     const store = createMemoryStore();
     const client = createClient();
@@ -168,7 +193,10 @@ describe("SSO authentication transaction", () => {
         client,
         now: () => 1_000,
       }),
-    ).rejects.toEqual(new SsoAuthenticationError("transaction_expired"));
+    ).rejects.toMatchObject({
+      reason: "transaction_expired",
+      callback: { returnTo: "/" },
+    });
     expect(client.exchangeAuthorizationCode).not.toHaveBeenCalled();
   });
 
@@ -253,7 +281,7 @@ describe("SSO authentication transaction", () => {
         sessionIssuer,
         now: () => 1_000,
       }),
-    ).rejects.toEqual(new SsoAuthenticationError("identity_unlinked"));
+    ).rejects.toMatchObject({ reason: "identity_unlinked", callback: { returnTo: "/" } });
     expect(sessionIssuer.issue).not.toHaveBeenCalled();
   });
 
@@ -426,7 +454,10 @@ describe("SSO authentication transaction", () => {
         client,
         now: () => 1_000,
       }),
-    ).rejects.toEqual(new SsoAuthenticationError("transaction_purpose_mismatch"));
+    ).rejects.toMatchObject({
+      reason: "transaction_purpose_mismatch",
+      callback: { returnTo: "/" },
+    });
     await expect(
       completeSsoIdentityLinking({
         state: "login-state",
@@ -436,7 +467,10 @@ describe("SSO authentication transaction", () => {
         identityLinker: { link: vi.fn() },
         now: () => 1_000,
       }),
-    ).rejects.toEqual(new SsoAuthenticationError("transaction_purpose_mismatch"));
+    ).rejects.toMatchObject({
+      reason: "transaction_purpose_mismatch",
+      callback: { returnTo: "/" },
+    });
   });
 
   it.each([
