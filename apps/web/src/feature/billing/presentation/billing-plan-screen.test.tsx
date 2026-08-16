@@ -98,6 +98,14 @@ describe("BillingPlanScreen", () => {
           status: "success",
           data: { ...free, status: "active", plan: "family", source: "family-seat" },
         }}
+        checkoutState={{ status: "idle" }}
+        completionMessage={null}
+        onBack={vi.fn()}
+        onCheckout={vi.fn()}
+        onRetry={vi.fn()}
+      />,
+    );
+
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "料金プランを閉じる" }));
     expect(screen.getByText("ファミリーパックに参加中です")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Liteを選ぶ" })).toBeNull();

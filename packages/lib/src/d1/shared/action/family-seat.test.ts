@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import type { SharedD1Client } from "../client";
 import * as schema from "../schema";
 import { upsertIdentity } from "./account";
+import { applyBillingProjection, hasUsedBillingTrial, linkBillingCustomer } from "./billing";
 import {
   acceptFamilySeatInvitation,
   activateFamilySeat,
@@ -43,6 +44,63 @@ async function account(db: SharedD1Client, name: string): Promise<string> {
 }
 
 describe("family seat persistence", () => {
+  it("ファミリーtrial中に参加したAccountへtrial利用履歴を残す", async () => {
+    const db = createTestDb();
+    const payer = await account(db, "trial-payer");
+    const member = await account(db, "trial-member");
+    await linkBillingCustomer(db, {
+      accountId: payer,
+      providerCustomerId: "cus_family_trial",
+      syncedAt: new Date("2026-08-01T00:00:00Z"),
+    });
+    await applyBillingProjection(db, {
+      accountId: payer,
+      event: {
+        id: "evt_family_trial",
+        type: "customer.subscription.created",
+        objectId: "sub_family_trial",
+        createdAt: new Date("2026-08-01T00:00:00Z"),
+      },
+      subscription: {
+        id: "sub_family_trial",
+        customerId: "cus_family_trial",
+        status: "trialing",
+        priceId: "price_family",
+        currentPeriodStart: "2026-08-01T00:00:00.000Z",
+        currentPeriodEnd: "2026-09-01T00:00:00.000Z",
+        cancelAtPeriodEnd: false,
+        trialEnd: "2026-08-15T00:00:00.000Z",
+        createdAt: "2026-08-01T00:00:00.000Z",
+      },
+      planCode: "family",
+      syncedAt: new Date("2026-08-01T00:00:00Z"),
+    });
+    await createFamilyPack(db, payer, new Date("2026-08-01T00:00:00Z"));
+    await createFamilySeatInvitation(db, {
+      payerAccountId: payer,
+      tokenHash: "family-trial-token",
+      expiresAt: new Date("2026-08-20T00:00:00Z"),
+      at: new Date("2026-08-02T00:00:00Z"),
+    });
+
+    await expect(
+      acceptFamilySeatInvitation(
+        db,
+        "family-trial-token",
+        member,
+        new Date("2026-08-03T00:00:00Z"),
+      ),
+    ).resolves.toMatchObject({ type: "updated" });
+
+    await expect(hasUsedBillingTrial(db, member)).resolves.toBe(true);
+    expect(
+      await db
+        .select()
+        .from(schema.billingTrialUsages)
+        .where(eq(schema.billingTrialUsages.providerSubscriptionId, "sub_family_trial")),
+    ).toHaveLength(2);
+  });
+
   it("支払者を含む4 Accountを上限として招待枠を予約する", async () => {
     const db = createTestDb();
     const payer = await account(db, "payer");
@@ -183,18 +241,10 @@ describe("family seat persistence", () => {
     await reserveFamilySeat(db, payer, "error-invitation");
     const failingDb = new Proxy(db, {
       get(target, property, receiver) {
-        if (property !== "update") return Reflect.get(target, property, receiver);
-        return () => ({
-          set: () => ({
-            where: () => ({
-              returning: () => ({
-                get: () => {
-                  throw new Error("D1_ERROR: FOREIGN KEY constraint failed: SQLITE_CONSTRAINT");
-                },
-              }),
-            }),
-          }),
-        });
+        if (property !== "batch") return Reflect.get(target, property, receiver);
+        return () => {
+          throw new Error("D1_ERROR: FOREIGN KEY constraint failed: SQLITE_CONSTRAINT");
+        };
       },
     }) as SharedD1Client;
 

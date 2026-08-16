@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, sql } from "drizzle-orm";
 import type {
   FamilyPack,
   FamilyPackReadModel,
@@ -10,6 +10,7 @@ import type {
 } from "../../../billing/family-seat";
 import type { SharedD1Client } from "../client";
 import { accounts } from "../schema/account";
+import { billingSubscriptionProjections, billingTrialUsages } from "../schema/billing";
 import { familyPacks, familySeatInvitations, familySeats } from "../schema/family-seat";
 
 function iso(value: Date | null): string | null {
@@ -82,6 +83,29 @@ async function activeAccountExists(db: SharedD1Client, accountId: string): Promi
       )
       .get(),
   );
+}
+
+async function familyTrialUsageValues(
+  db: SharedD1Client,
+  payerAccountId: string,
+  memberAccountId: string,
+  at: Date,
+) {
+  const projection = await db.query.billingSubscriptionProjections.findFirst({
+    where: and(
+      eq(billingSubscriptionProjections.accountId, payerAccountId),
+      eq(billingSubscriptionProjections.planCode, "family"),
+      eq(billingSubscriptionProjections.status, "trialing"),
+      gt(billingSubscriptionProjections.trialEnd, at),
+    ),
+  });
+  if (!projection) return null;
+  return {
+    accountId: memberAccountId,
+    providerSubscriptionId: projection.providerSubscriptionId,
+    firstStartedAt: projection.currentPeriodStart ?? projection.providerCreatedAt,
+    createdAt: at,
+  } satisfies typeof billingTrialUsages.$inferInsert;
 }
 
 export async function readFamilyPackByPayer(
@@ -263,18 +287,54 @@ export async function activateFamilySeat(
 ): Promise<FamilySeatMutationResult> {
   if (!(await activeAccountExists(db, memberAccountId))) return { type: "not-found" };
   try {
-    const updated = await db
-      .update(familySeats)
-      .set({ memberAccountId, status: "active", activatedAt: at, updatedAt: at })
+    const pending = await db
+      .select({ payerAccountId: familyPacks.payerAccountId })
+      .from(familySeats)
+      .innerJoin(familyPacks, eq(familyPacks.id, familySeats.packId))
       .where(
         and(
           eq(familySeats.invitationId, invitationId),
           eq(familySeats.status, "invited"),
           eq(familySeats.isDeleted, false),
-          sql`exists (select 1 from family_packs where family_packs.id = ${familySeats.packId} and family_packs.status = 'active' and family_packs.is_deleted = 0)`,
+          eq(familyPacks.status, "active"),
+          eq(familyPacks.isDeleted, false),
         ),
       )
-      .returning()
+      .get();
+    if (!pending) return { type: "invalid-state" };
+    const trialUsage = await familyTrialUsageValues(
+      db,
+      pending.payerAccountId,
+      memberAccountId,
+      at,
+    );
+    const [seatResult] = await db.batch([
+      db
+        .update(familySeats)
+        .set({ memberAccountId, status: "active", activatedAt: at, updatedAt: at })
+        .where(
+          and(
+            eq(familySeats.invitationId, invitationId),
+            eq(familySeats.status, "invited"),
+            eq(familySeats.isDeleted, false),
+            sql`exists (select 1 from family_packs where family_packs.id = ${familySeats.packId} and family_packs.status = 'active' and family_packs.is_deleted = 0)`,
+          ),
+        ),
+      ...(trialUsage
+        ? [db.insert(billingTrialUsages).values(trialUsage).onConflictDoNothing()]
+        : []),
+    ]);
+    if (changed(seatResult) !== 1) return { type: "invalid-state" };
+    const updated = await db
+      .select()
+      .from(familySeats)
+      .where(
+        and(
+          eq(familySeats.invitationId, invitationId),
+          eq(familySeats.memberAccountId, memberAccountId),
+          eq(familySeats.status, "active"),
+        ),
+      )
       .get();
     return updated ? { type: "updated", seat: seatModel(updated) } : { type: "invalid-state" };
   } catch (error) {
@@ -485,6 +545,12 @@ export async function acceptFamilySeatInvitation(
   }
   if (!(await activeAccountExists(db, memberAccountId))) return { type: "not-found" };
   try {
+    const trialUsage = await familyTrialUsageValues(
+      db,
+      current.invitation.inviterAccountId,
+      memberAccountId,
+      at,
+    );
     const [seatResult] = await db.batch([
       db
         .update(familySeats)
@@ -505,6 +571,9 @@ export async function acceptFamilySeatInvitation(
             sql`exists (select 1 from family_seats where family_seats.id = ${current.seat.id} and family_seats.status = 'active' and family_seats.member_account_id = ${memberAccountId})`,
           ),
         ),
+      ...(trialUsage
+        ? [db.insert(billingTrialUsages).values(trialUsage).onConflictDoNothing()]
+        : []),
     ]);
     if (changed(seatResult) !== 1) return { type: "token-used" };
   } catch (error) {

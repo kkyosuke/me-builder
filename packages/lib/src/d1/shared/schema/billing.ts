@@ -83,7 +83,7 @@ export const billingTrialUsages = sqliteTable(
     firstStartedAt: integer("first_started_at", { mode: "timestamp" }).notNull(),
     createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
   },
-  (table) => [uniqueIndex("billing_trial_subscription_idx").on(table.providerSubscriptionId)],
+  (table) => [index("billing_trial_subscription_idx").on(table.providerSubscriptionId)],
 );
 
 export const billingReconciliationAudits = sqliteTable(

@@ -146,9 +146,7 @@ export default function BillingPlanApplication({
             data: catalogResult.value.map((plan) => ({
               ...plan,
               trialDays:
-                trialResult.status === "fulfilled" && trialResult.value
-                  ? plan.trialDays
-                  : null,
+                trialResult.status === "fulfilled" && trialResult.value ? plan.trialDays : null,
             })),
           });
         } else {
