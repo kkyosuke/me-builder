@@ -1,4 +1,5 @@
 import type {
+  BillingQueueMessage,
   BrainVectorSyncQueueMessage,
   ChatTurnQueueMessage,
   DailyPromptQueueMessage,
@@ -16,6 +17,7 @@ import type { Env } from "../types";
 export async function queueHandler(
   batch: MessageBatch<
     | WebhookQueueMessage
+    | BillingQueueMessage
     | ChatTurnQueueMessage
     | DailyPromptQueueMessage
     | DiaryBrainCheckpointQueueMessage

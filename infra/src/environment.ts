@@ -16,6 +16,8 @@ export function resourceNames(environment: Environment) {
     queues: {
       webhook: `me-builder-webhook-queue-${environment}`,
       webhookDeadLetter: `me-builder-webhook-dlq-${environment}`,
+      billing: `me-builder-billing-queue-${environment}`,
+      billingDeadLetter: `me-builder-billing-dlq-${environment}`,
       chatTurn: `me-builder-chat-turn-queue-${environment}`,
       chatTurnDeadLetter: `me-builder-chat-turn-dlq-${environment}`,
       brainCheckpoint: `me-builder-brain-checkpoint-queue-${environment}`,

@@ -34,8 +34,8 @@
     - `task db:migrate:local` (または `task db:migrate`): D1 データベースマイグレーションのローカル適用
     - `task db:migrate:preview`: プレビュー環境への D1 データベースマイグレーション適用
     - `task db:migrate:production`: 本番環境への D1 データベースマイグレーション適用
-    - `task queues:setup:preview`: プレビュー環境の非同期処理用Queue（Chat Turn / Brain Checkpoint / Profile Summary / Brain Vector / Daily Prompt）と各DLQを冪等に作成
-    - `task queues:setup:production`: 本番環境の非同期処理用Queue（Chat Turn / Brain Checkpoint / Profile Summary / Brain Vector / Daily Prompt）と各DLQを冪等に作成
+    - `task queues:setup:preview`: プレビュー環境の非同期処理用Queue（Billing / Chat Turn / Brain Checkpoint / Profile Summary / Brain Vector / Daily Prompt）と各DLQを冪等に作成
+    - `task queues:setup:production`: 本番環境の非同期処理用Queue（Billing / Chat Turn / Brain Checkpoint / Profile Summary / Brain Vector / Daily Prompt）と各DLQを冪等に作成
     - `task vectorize:setup:preview`: プレビュー環境のBrain Vectorize indexと`owner_scope` metadata indexを冪等に作成・検証
     - `task vectorize:setup:production`: 本番環境のBrain Vectorize indexと`owner_scope` metadata indexを冪等に作成・検証
     - metadata indexの作成 (`wrangler vectorize create-metadata-index`) はmutationをキューへ積むだけで、`list-metadata-index`へ現れるまでの時間に保証がありません。**反映をポーリングで待たせないでください**（待っても保証されず、デプロイ時間だけが伸びます）。setupは1回だけ確認し、未反映なら警告を出して続行し、**型違いで既に存在する場合だけ**デプロイを止めます

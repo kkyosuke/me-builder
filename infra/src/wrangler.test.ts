@@ -12,6 +12,8 @@ function manifest(environment: "preview" | "production", databaseId: string) {
     queues: {
       webhook: { id: "1", name: `me-builder-webhook-queue-${suffix}` },
       webhookDeadLetter: { id: "2", name: `me-builder-webhook-dlq-${suffix}` },
+      billing: { id: "13", name: `me-builder-billing-queue-${suffix}` },
+      billingDeadLetter: { id: "14", name: `me-builder-billing-dlq-${suffix}` },
       chatTurn: { id: "3", name: `me-builder-chat-turn-queue-${suffix}` },
       chatTurnDeadLetter: { id: "4", name: `me-builder-chat-turn-dlq-${suffix}` },
       brainCheckpoint: { id: "5", name: `me-builder-brain-checkpoint-queue-${suffix}` },
@@ -34,6 +36,8 @@ describe("renderWranglerConfigs", () => {
     );
     expect(configs.worker).toContain('database_id = "preview-id"');
     expect(configs.api).toContain('queue = "me-builder-webhook-queue-preview"');
+    expect(configs.api).toContain('binding = "BILLING_QUEUE"');
+    expect(configs.worker).toContain('queue = "me-builder-billing-dlq-production"');
     expect(configs.api).toContain('binding = "PROFILE_SUMMARY_QUEUE"');
     expect(configs.worker).toContain('queue = "me-builder-profile-summary-queue-production"');
     expect(configs.worker).toContain('binding = "PROFILE_SUMMARY_QUEUE"');

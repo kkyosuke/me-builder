@@ -19,6 +19,11 @@ dead_letter_queue = "me-builder-webhook-dlq-local"
 max_retries = 3
 
 [[queues.consumers]]
+queue = "me-builder-billing-queue-local"
+dead_letter_queue = "me-builder-billing-dlq-local"
+max_retries = 5
+
+[[queues.consumers]]
 queue = "me-builder-chat-turn-queue-local"
 dead_letter_queue = "me-builder-chat-turn-dlq-local"
 max_retries = 5
@@ -116,6 +121,11 @@ dead_letter_queue = "me-builder-webhook-dlq-local"
 max_retries = 3
 
 [[env.local.queues.consumers]]
+queue = "me-builder-billing-queue-local"
+dead_letter_queue = "me-builder-billing-dlq-local"
+max_retries = 5
+
+[[env.local.queues.consumers]]
 queue = "me-builder-chat-turn-queue-local"
 dead_letter_queue = "me-builder-chat-turn-dlq-local"
 max_retries = 5
@@ -196,6 +206,11 @@ dead_letter_queue = "me-builder-webhook-dlq-preview"
 max_retries = 3
 
 [[env.preview.queues.consumers]]
+queue = "me-builder-billing-queue-preview"
+dead_letter_queue = "me-builder-billing-dlq-preview"
+max_retries = 5
+
+[[env.preview.queues.consumers]]
 queue = "me-builder-chat-turn-queue-preview"
 dead_letter_queue = "me-builder-chat-turn-dlq-preview"
 max_retries = 5
@@ -274,6 +289,11 @@ crons = ["0 9,11,12 * * *"]
 queue = "me-builder-webhook-queue-production"
 dead_letter_queue = "me-builder-webhook-dlq-production"
 max_retries = 3
+
+[[env.production.queues.consumers]]
+queue = "me-builder-billing-queue-production"
+dead_letter_queue = "me-builder-billing-dlq-production"
+max_retries = 5
 
 [[env.production.queues.consumers]]
 queue = "me-builder-chat-turn-queue-production"

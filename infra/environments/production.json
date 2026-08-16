@@ -11,6 +11,8 @@
   "queues": {
     "webhook": { "name": "me-builder-webhook-queue-production" },
     "webhookDeadLetter": { "name": "me-builder-webhook-dlq-production" },
+    "billing": { "name": "me-builder-billing-queue-production" },
+    "billingDeadLetter": { "name": "me-builder-billing-dlq-production" },
     "chatTurn": { "name": "me-builder-chat-turn-queue-production" },
     "chatTurnDeadLetter": { "name": "me-builder-chat-turn-dlq-production" },
     "brainCheckpoint": { "name": "me-builder-brain-checkpoint-queue-production" },
