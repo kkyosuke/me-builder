@@ -69,6 +69,30 @@ describe("ServiceTermsGate", () => {
     expect(window.location.pathname).toBe("/me");
   });
 
+  it("共有リンクからの初回同意後は元の招待画面へ復帰する", async () => {
+    const relationshipId = "1".repeat(64);
+    const invitationPath = `/compatibility/invitations/${relationshipId}`;
+    window.history.replaceState(null, "", `/app?liff.state=${encodeURIComponent(invitationPath)}`);
+    mocks.fetchStatus.mockResolvedValue({
+      document,
+      acceptance: { required: true, acceptedVersion: null, documentHash: null, acceptedAt: null },
+    });
+
+    render(
+      <ServiceTermsGate>
+        <p>招待画面</p>
+      </ServiceTermsGate>,
+    );
+
+    expect(await screen.findByRole("heading", { name: document.title })).toBeTruthy();
+    fireEvent.click(screen.getByRole("checkbox", { name: /利用規約の内容を確認/ }));
+    fireEvent.click(screen.getByRole("button", { name: "同意して利用を始める" }));
+
+    expect(await screen.findByText("招待画面")).toBeTruthy();
+    expect(window.location.pathname).toBe(invitationPath);
+    expect(window.location.search).toBe("");
+  });
+
   it("現在versionへ同意済みなら規約を再表示せず主機能を表示する", async () => {
     mocks.fetchStatus.mockResolvedValue({
       document,

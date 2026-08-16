@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { beforeEach, describe, expect, it } from "vitest";
-import { resolveRequestedPathname } from "./requested-pathname";
+import { resolveRequestedLocation, resolveRequestedPathname } from "./requested-pathname";
 
 describe("resolveRequestedPathname", () => {
   beforeEach(() => {
@@ -17,6 +17,23 @@ describe("resolveRequestedPathname", () => {
   it("pathなしのLIFF起動ではendpointの/appを維持する", () => {
     window.history.replaceState({}, "", "/app?liff.state=%2F");
 
+    expect(resolveRequestedPathname()).toBe("/app");
+  });
+
+  it("LIFF deep linkのqueryとhashを復帰先へ引き継ぐ", () => {
+    window.history.replaceState(
+      {},
+      "",
+      `/app?liff.state=${encodeURIComponent("/compatibility/share?category=family#scope")}`,
+    );
+
+    expect(resolveRequestedLocation()).toBe("/compatibility/share?category=family#scope");
+  });
+
+  it("protocol-relativeなLIFF stateは復帰先として受け付けない", () => {
+    window.history.replaceState({}, "", "/app?liff.state=%2F%2Fevil.example%2Fpath");
+
+    expect(resolveRequestedLocation()).toBe("/app?liff.state=%2F%2Fevil.example%2Fpath");
     expect(resolveRequestedPathname()).toBe("/app");
   });
 });
