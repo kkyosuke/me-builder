@@ -572,6 +572,25 @@ export async function loadProfileSummaryGenerationContext(
   };
 }
 
+/** Queue再送時に生成結果と利用量ledgerを同じ最終状態へ収束させるための最小状態読取。 */
+export async function readProfileSummaryGenerationStatus(
+  db: AccountDataDatabase,
+  accountId: string,
+  generationId: string,
+): Promise<(typeof profileSummaryGenerations.$inferSelect)["status"] | null> {
+  const generation = await db
+    .select({ status: profileSummaryGenerations.status })
+    .from(profileSummaryGenerations)
+    .where(
+      and(
+        eq(profileSummaryGenerations.id, generationId),
+        eq(profileSummaryGenerations.accountId, accountId),
+      ),
+    )
+    .get();
+  return generation?.status ?? null;
+}
+
 export async function completeProfileSummaryGeneration(
   db: AccountDataDatabase,
   accountId: string,

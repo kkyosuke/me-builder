@@ -122,6 +122,15 @@ export async function processProfileSummaryGenerationMessage(
       message.body.generationId,
     );
     if (!context) {
+      const generationStatus = await accountData.execute(
+        "profileSummary.readGenerationStatus",
+        message.body.generationId,
+      );
+      if (generationStatus === "completed") {
+        await accountData.execute("aiUsage.commit", message.body.generationId);
+      } else if (generationStatus === "failed") {
+        await accountData.execute("aiUsage.release", message.body.generationId);
+      }
       message.ack();
       logResult(message, workerConfig, startedAt, {
         outcome: "discarded",

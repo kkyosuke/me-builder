@@ -66,6 +66,16 @@ export const profileSummaryActions = {
       generationId,
       startedAt,
     ),
+  "profileSummary.readGenerationStatus": (
+    db: DO.account.Database,
+    accountId: string,
+    generationId: string,
+  ) =>
+    DO.account.action.profileSummary.readProfileSummaryGenerationStatus(
+      db,
+      accountId,
+      generationId,
+    ),
   "profileSummary.completeGeneration": (
     db: DO.account.Database,
     accountId: string,

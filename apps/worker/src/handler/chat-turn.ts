@@ -381,6 +381,23 @@ export async function processChatTurnMessage(
           dependency: "account-data",
         },
       );
+      await atBoundary(
+        () =>
+          accountDataClient.execute(
+            turnStatus === "delivered" ? "aiUsage.commit" : "aiUsage.release",
+            message.body.turnId,
+          ),
+        {
+          code:
+            turnStatus === "delivered"
+              ? "AI_REPLY_USAGE_COMMIT_FAILED"
+              : "AI_REPLY_USAGE_RELEASE_FAILED",
+          category: "dependency",
+          stage: "entitlement.settle",
+          retryable: true,
+          dependency: "account-data",
+        },
+      );
       if (turnStatus === "delivered") {
         await atBoundary(
           () =>

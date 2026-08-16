@@ -95,6 +95,7 @@ describe("processProfileSummaryGenerationMessage", () => {
         };
       }
       if (operation === "profileSummary.completeGeneration") return true;
+      if (operation === "profileSummary.readGenerationStatus") return "generating";
       if (operation === "aiUsage.reserve") {
         return { outcome: "reserved", reservation: {}, usage: { remaining: 0 } };
       }
@@ -227,6 +228,25 @@ describe("processProfileSummaryGenerationMessage", () => {
       "generation-1",
       expect.stringContaining("上限"),
     );
+    expect(message.ack).toHaveBeenCalledOnce();
+    expect(message.retry).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["completed", "aiUsage.commit"],
+    ["failed", "aiUsage.release"],
+  ] as const)("再送時に%sの生成状態から利用量を収束させる", async (status, operation) => {
+    execute.mockImplementation(async (_accountId: string, currentOperation: string) => {
+      if (currentOperation === "profileSummary.loadGenerationContext") return null;
+      if (currentOperation === "profileSummary.readGenerationStatus") return status;
+      return undefined;
+    });
+    const message = createMessage(2);
+
+    await processProfileSummaryGenerationMessage(message, cf, workerConfig);
+
+    expect(generateProfileSummary).not.toHaveBeenCalled();
+    expect(execute).toHaveBeenCalledWith("account-1", operation, "generation-1");
     expect(message.ack).toHaveBeenCalledOnce();
     expect(message.retry).not.toHaveBeenCalled();
   });
