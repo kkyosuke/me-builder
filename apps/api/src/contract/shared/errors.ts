@@ -9,6 +9,11 @@ export const ForbiddenErrorSchema = v.object({
   error: v.literal("Forbidden"),
 });
 
+export const TermsAcceptanceRequiredErrorSchema = v.object({
+  error: v.literal("Terms acceptance required"),
+  reason: v.literal("terms_not_accepted"),
+});
+
 export const AccountNotFoundErrorSchema = v.object({
   error: v.literal("Account not found"),
   reason: v.literal("friendship_required"),

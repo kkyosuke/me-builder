@@ -1,22 +1,19 @@
 import { D1 } from "@me-builder/lib";
 import { currentServiceTerms } from "@me-builder/shared";
-import { resolveLiffSession } from "./liff-session";
+import type { AuthenticatedActor } from "./authentication/types";
 
 type Params = {
-  idToken: string | undefined;
-  lineLoginChannelId: string | undefined;
+  actor: AuthenticatedActor;
   db: D1.shared.Client;
 };
 
 type Dependencies = {
-  createSession: typeof resolveLiffSession;
   findAcceptance: typeof D1.shared.action.agreement.findCurrentTermsAcceptance;
   listAcceptanceHistory: typeof D1.shared.action.agreement.listTermsAcceptanceHistory;
   accept: typeof D1.shared.action.agreement.acceptCurrentTerms;
 };
 
 const defaultDependencies: Dependencies = {
-  createSession: resolveLiffSession,
   findAcceptance: D1.shared.action.agreement.findCurrentTermsAcceptance,
   listAcceptanceHistory: D1.shared.action.agreement.listTermsAcceptanceHistory,
   accept: D1.shared.action.agreement.acceptCurrentTerms,
@@ -26,9 +23,7 @@ export async function getServiceTermsStatus(
   params: Params,
   dependencies: Dependencies = defaultDependencies,
 ) {
-  const session = await dependencies.createSession(params);
-  if (session.type !== "resolved") return session;
-  const acceptance = await dependencies.findAcceptance(params.db, session.session.accountId);
+  const acceptance = await dependencies.findAcceptance(params.db, params.actor.accountId);
   return {
     type: "resolved" as const,
     document: currentServiceTerms,
@@ -45,12 +40,10 @@ export async function acceptServiceTerms(
   params: Params & { version: string },
   dependencies: Dependencies = defaultDependencies,
 ) {
-  const session = await dependencies.createSession(params);
-  if (session.type !== "resolved") return session;
   if (params.version !== currentServiceTerms.version) {
     return { type: "version-conflict" as const, currentVersion: currentServiceTerms.version };
   }
-  const acceptance = await dependencies.accept(params.db, session.session.accountId);
+  const acceptance = await dependencies.accept(params.db, params.actor.accountId);
   return { type: "accepted" as const, acceptance };
 }
 
@@ -58,11 +51,9 @@ export async function getServiceTermsAcceptanceHistory(
   params: Params,
   dependencies: Dependencies = defaultDependencies,
 ) {
-  const session = await dependencies.createSession(params);
-  if (session.type !== "resolved") return session;
   const [currentAcceptance, history] = await Promise.all([
-    dependencies.findAcceptance(params.db, session.session.accountId),
-    dependencies.listAcceptanceHistory(params.db, session.session.accountId),
+    dependencies.findAcceptance(params.db, params.actor.accountId),
+    dependencies.listAcceptanceHistory(params.db, params.actor.accountId),
   ]);
   return {
     type: "resolved" as const,

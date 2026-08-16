@@ -48,3 +48,5 @@ export function authenticatedActor(c: Context<AppEnv>): AuthenticatedActor {
   if (!actor) throw new Error("Authentication middleware did not resolve an actor");
   return actor;
 }
+
+export const requireAuthentication = createAuthenticationMiddleware();
