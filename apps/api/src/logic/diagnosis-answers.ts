@@ -1,7 +1,7 @@
-import { type AccountDataNamespace, type D1, type DO, accountDataFor } from "@me-builder/lib";
+import { type AccountDataNamespace, type DO, accountDataFor } from "@me-builder/lib";
 import { logger, toSafeOperationalErrorFields } from "@me-builder/shared";
+import type { AuthenticatedActor } from "./authentication/types";
 import { scoreDiagnosisAnswers } from "./diagnosis-scoring";
-import { createLiffSession } from "./liff-session";
 
 type StoredDiagnosisAnswers = Extract<
   Awaited<ReturnType<typeof DO.account.action.diagnosis.findDiagnosisAnswers>>,
@@ -16,22 +16,16 @@ export type DiagnosisAnswersOutcome =
         scoring: ReturnType<typeof scoreDiagnosisAnswers>;
       };
     }
-  | { type: "diagnosis-answers-not-found" }
-  | { type: "not-configured" }
-  | { type: "unauthenticated"; reason: string }
-  | { type: "account-not-found" };
+  | { type: "diagnosis-answers-not-found" };
 
 type Params = {
   diagnosisId: string;
-  idToken: string | undefined;
-  lineLoginChannelId: string | undefined;
-  db: D1.shared.Client;
+  actor: AuthenticatedActor;
   accountData?: AccountDataNamespace;
   at?: Date;
 };
 
 type Dependencies = {
-  createSession: typeof createLiffSession;
   findAnswers: (
     accountData: AccountDataNamespace | undefined,
     accountId: string,
@@ -41,7 +35,6 @@ type Dependencies = {
 };
 
 const defaultDependencies: Dependencies = {
-  createSession: createLiffSession,
   findAnswers: (accountData, accountId, diagnosisId, at) => {
     if (!accountData) throw new Error("ACCOUNT_DATA binding is not configured");
     return accountDataFor(accountData, accountId).execute("diagnosis.findAnswers", diagnosisId, at);
@@ -50,20 +43,10 @@ const defaultDependencies: Dependencies = {
 
 /** 本人確認後に、指定Diagnosisへ保存された本人の回答内容を取得します。 */
 export async function getDiagnosisAnswers(
-  { diagnosisId, idToken, lineLoginChannelId, db, accountData, at = new Date() }: Params,
+  { diagnosisId, actor, accountData, at = new Date() }: Params,
   dependencies: Dependencies = defaultDependencies,
 ): Promise<DiagnosisAnswersOutcome> {
-  const session = await dependencies.createSession({ idToken, lineLoginChannelId, db });
-  if (session.type !== "resolved") {
-    return session;
-  }
-
-  const result = await dependencies.findAnswers(
-    accountData,
-    session.session.accountId,
-    diagnosisId,
-    at,
-  );
+  const result = await dependencies.findAnswers(accountData, actor.accountId, diagnosisId, at);
   if (result.type !== "found") {
     return { type: "diagnosis-answers-not-found" };
   }

@@ -1,9 +1,12 @@
-import type { D1 } from "@me-builder/lib";
 import { describe, expect, it, vi } from "vitest";
 import { getDiagnosisAnswers } from "./diagnosis-answers";
 
-const db = {} as D1.shared.Client;
 const at = new Date("2026-08-05T00:00:00.000Z");
+const actor = {
+  accountId: "account-1",
+  authenticationMethod: "liff" as const,
+  authenticatedAt: at,
+};
 
 describe("getDiagnosisAnswers", () => {
   it("本人確認で解決したAccountの回答を取得する", async () => {
@@ -20,12 +23,8 @@ describe("getDiagnosisAnswers", () => {
     const findAnswers = vi.fn().mockResolvedValue({ type: "found", diagnosis });
 
     const result = await getDiagnosisAnswers(
-      { diagnosisId: "diagnosis-1", idToken: "token", lineLoginChannelId: "channel", db, at },
+      { diagnosisId: "diagnosis-1", actor, at },
       {
-        createSession: vi.fn().mockResolvedValue({
-          type: "resolved",
-          session: { accountId: "account-1", role: "user" },
-        }),
         findAnswers,
       },
     );
@@ -40,12 +39,8 @@ describe("getDiagnosisAnswers", () => {
 
   it("回答がない場合はdiagnosis-answers-not-foundへ変換する", async () => {
     const result = await getDiagnosisAnswers(
-      { diagnosisId: "diagnosis-1", idToken: "token", lineLoginChannelId: "channel", db, at },
+      { diagnosisId: "diagnosis-1", actor, at },
       {
-        createSession: vi.fn().mockResolvedValue({
-          type: "resolved",
-          session: { accountId: "account-1", role: "user" },
-        }),
         findAnswers: vi.fn().mockResolvedValue({ type: "not-found" }),
       },
     );
@@ -80,12 +75,8 @@ describe("getDiagnosisAnswers", () => {
     };
 
     const result = await getDiagnosisAnswers(
-      { diagnosisId: "diagnosis-1", idToken: "token", lineLoginChannelId: "channel", db, at },
+      { diagnosisId: "diagnosis-1", actor, at },
       {
-        createSession: vi.fn().mockResolvedValue({
-          type: "resolved",
-          session: { accountId: "account-1", role: "user" },
-        }),
         findAnswers: vi.fn().mockResolvedValue({ type: "found", diagnosis }),
       },
     );
@@ -95,16 +86,5 @@ describe("getDiagnosisAnswers", () => {
       type: "resolved",
       diagnosis: { ...expectedDiagnosis, scoring: null },
     });
-  });
-
-  it("本人確認できない場合は回答を取得しない", async () => {
-    const findAnswers = vi.fn();
-    const session = { type: "unauthenticated" as const, reason: "invalid" };
-    const result = await getDiagnosisAnswers(
-      { diagnosisId: "diagnosis-1", idToken: undefined, lineLoginChannelId: "channel", db, at },
-      { createSession: vi.fn().mockResolvedValue(session), findAnswers },
-    );
-    expect(result).toEqual(session);
-    expect(findAnswers).not.toHaveBeenCalled();
   });
 });

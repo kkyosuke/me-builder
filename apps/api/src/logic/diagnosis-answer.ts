@@ -1,6 +1,6 @@
-import { type AccountDataNamespace, type D1, type DO, accountDataFor } from "@me-builder/lib";
+import { type AccountDataNamespace, type DO, accountDataFor } from "@me-builder/lib";
 import { logger } from "@me-builder/shared";
-import { createLiffSession } from "./liff-session";
+import type { AuthenticatedActor } from "./authentication/types";
 
 type SavedAnswer = Extract<
   Awaited<ReturnType<typeof DO.account.action.diagnosis.saveDiagnosisAnswer>>,
@@ -13,25 +13,19 @@ export type SaveDiagnosisAnswerOutcome =
   | { type: "diagnosis-closed" }
   | { type: "diagnosis-question-not-found" }
   | { type: "choice-not-found" }
-  | { type: "answer-conflict" }
-  | { type: "not-configured" }
-  | { type: "unauthenticated"; reason: string }
-  | { type: "account-not-found" };
+  | { type: "answer-conflict" };
 
 type SaveDiagnosisAnswerParams = {
   diagnosisId: string;
   diagnosisQuestionId: string;
   choiceId: string;
-  idToken: string | undefined;
-  lineLoginChannelId: string | undefined;
-  db: D1.shared.Client;
+  actor: AuthenticatedActor;
   accountData?: AccountDataNamespace;
   at?: Date;
   scheduleProjection?: (task: () => Promise<void>) => void;
 };
 
 type Dependencies = {
-  createSession: typeof createLiffSession;
   saveAnswer: (
     accountData: AccountDataNamespace | undefined,
     accountId: string,
@@ -48,7 +42,6 @@ type Dependencies = {
 };
 
 const defaultDependencies: Dependencies = {
-  createSession: createLiffSession,
   saveAnswer: (accountData, accountId, input) => {
     if (!accountData) throw new Error("ACCOUNT_DATA binding is not configured");
     return accountDataFor(accountData, accountId).execute("diagnosis.saveAnswer", input);
@@ -69,20 +62,14 @@ export async function saveDiagnosisAnswer(
     diagnosisId,
     diagnosisQuestionId,
     choiceId,
-    idToken,
-    lineLoginChannelId,
-    db,
+    actor,
     accountData,
     at = new Date(),
     scheduleProjection,
   }: SaveDiagnosisAnswerParams,
   dependencies: Dependencies = defaultDependencies,
 ): Promise<SaveDiagnosisAnswerOutcome> {
-  const session = await dependencies.createSession({ idToken, lineLoginChannelId, db });
-  if (session.type !== "resolved") {
-    return session;
-  }
-  const result = await dependencies.saveAnswer(accountData, session.session.accountId, {
+  const result = await dependencies.saveAnswer(accountData, actor.accountId, {
     diagnosisId,
     diagnosisQuestionId,
     choiceId,
@@ -93,7 +80,7 @@ export async function saveDiagnosisAnswer(
       try {
         await (
           dependencies.processLatestProjection ?? defaultDependencies.processLatestProjection
-        )?.(accountData, session.session.accountId, diagnosisId, at);
+        )?.(accountData, actor.accountId, diagnosisId, at);
       } catch (error) {
         logger.error(
           {

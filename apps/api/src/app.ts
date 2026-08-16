@@ -194,6 +194,7 @@ import {
   postSelfCareContextConfirmation,
 } from "./controller/self-care-context";
 import { requireAuthentication } from "./middleware/authentication";
+import { requireCurrentTerms } from "./middleware/authorization";
 import { operationalHttpPath } from "./operational-http-path";
 import type { AppEnv } from "./types";
 
@@ -464,16 +465,38 @@ app.get(
   getCompatibilityShareContentContents,
 );
 
-app.get("/api/diagnoses", diagnosisListRoute, getDiagnoses);
-app.get("/api/diagnoses/:diagnosisId", diagnosisDetailRoute, getDiagnosis);
-app.get("/api/diagnoses/:diagnosisId/answers", diagnosisAnswersRoute, getDiagnosisAnswerContents);
+app.get(
+  "/api/diagnoses",
+  requireAuthentication,
+  requireCurrentTerms,
+  diagnosisListRoute,
+  getDiagnoses,
+);
+app.get(
+  "/api/diagnoses/:diagnosisId",
+  requireAuthentication,
+  requireCurrentTerms,
+  diagnosisDetailRoute,
+  getDiagnosis,
+);
+app.get(
+  "/api/diagnoses/:diagnosisId/answers",
+  requireAuthentication,
+  requireCurrentTerms,
+  diagnosisAnswersRoute,
+  getDiagnosisAnswerContents,
+);
 app.put(
   "/api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId",
+  requireAuthentication,
+  requireCurrentTerms,
   saveDiagnosisAnswerRoute,
   putDiagnosisAnswer,
 );
 app.put(
   "/api/diagnoses/:diagnosisId/deferred-questions/:diagnosisQuestionId",
+  requireAuthentication,
+  requireCurrentTerms,
   deferDiagnosisQuestionRoute,
   putDiagnosisDeferredQuestion,
 );

@@ -39,3 +39,5 @@ export function createCurrentTermsPolicyMiddleware(
     return next();
   };
 }
+
+export const requireCurrentTerms = createCurrentTermsPolicyMiddleware();

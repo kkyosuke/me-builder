@@ -357,7 +357,7 @@ describe("GET /api/diagnoses local D1 E2E", () => {
       hash: currentServiceTerms.contentHash,
       isDeleted: 1,
     },
-  ])("$nameでは規約取得だけを許可し、本人機能を401にする", async (acceptance) => {
+  ])("$nameでは規約取得だけを許可し、本人機能を428にする", async (acceptance) => {
     await database
       .prepare(
         `UPDATE account_agreement_acceptances
@@ -379,8 +379,11 @@ describe("GET /api/diagnoses local D1 E2E", () => {
     });
 
     const feature = await request("known-token");
-    expect(feature.status).toBe(401);
-    expect(await feature.json()).toEqual({ error: "Unauthorized" });
+    expect(feature.status).toBe(428);
+    expect(await feature.json()).toEqual({
+      error: "Terms acceptance required",
+      reason: "terms_not_accepted",
+    });
   });
 
   it("同じversionへの再同意を冪等に扱い、最初の同意証跡を返す", async () => {
@@ -483,7 +486,11 @@ describe("GET /api/diagnoses local D1 E2E", () => {
 
   it(`${diagnosisListCases.webFirstAccountCreation.id}: ${diagnosisListCases.webFirstAccountCreation.name}`, async () => {
     const beforeAcceptance = await request("unknown-token");
-    expect(beforeAcceptance.status).toBe(401);
+    expect(beforeAcceptance.status).toBe(428);
+    expect(await beforeAcceptance.json()).toEqual({
+      error: "Terms acceptance required",
+      reason: "terms_not_accepted",
+    });
     const acceptance = await app.request(
       "/api/legal/terms/acceptance",
       {
