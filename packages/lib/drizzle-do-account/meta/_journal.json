@@ -190,6 +190,13 @@
       "when": 1786843897869,
       "tag": "0026_flimsy_speed_demon",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "6",
+      "when": 1786844025275,
+      "tag": "0027_nappy_blizzard",
+      "breakpoints": true
     }
   ]
 }

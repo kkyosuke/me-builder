@@ -43,7 +43,7 @@ flowchart LR
 | --- | --- | --- | --- |
 | Account運営 | Account、Identity、role、status、アバターメタデータ、規約同意履歴 | 共有D1 | 認証済み`account_id`と運営権限で参照 |
 | 全Account共通 | Question、Diagnosis、Scoring Config | 共有D1 | 公開状態など各ドメインの条件で参照 |
-| 個人コンテンツroot | Source Record、Conversation Session、Diagnosis Response、Brain Item、プロフィール要約 | AccountData SQLite | Objectに固定したAccountだけを保存 |
+| 個人コンテンツroot | Source Record、Conversation Session、Diagnosis Response、Brain Item、プロフィール要約、AI利用量ledger | AccountData SQLite | Objectに固定したAccountだけを保存 |
 | Account所有descendant | payload、message、turn、answer、edge、revision、projection request | AccountData SQLite | 所有rootと同じObject内で参照 |
 | 複数Account間の共有関係 | 相性招待、双方の同意 | 関係ごとの専用Durable Object | 片方のAccountDataへ正本を寄せない |
 | 全体運用 | 管理者統計、Account成長projection、配送先解決 | 共有D1 | 原文・Brain Item本文を保存しない |
@@ -132,6 +132,7 @@ erDiagram
     brain_items ||--o{ brain_item_topic_labels : classifies
     account_data_identity ||--o{ diagnosis_brain_projection_heads : owns
     account_data_identity ||--o{ compatibility_references : lists
+    account_data_identity ||--o{ ai_usage_records : meters
 ```
 
 関係tableが2つのAccount所有rootを結ぶ場合も、両rootは同じAccountData Object内にしか存在しません。通常の外部キーでSource RecordとBrain Item、Diagnosis ResponseとSource Recordを結び、別ObjectのIDは参照先そのものが存在しないため関連付けられません。
@@ -144,6 +145,7 @@ AccountDataは1つのprivate SQLiteを使い、物理databaseをBrain、Diagnosi
 
 ```text
 account-data/
+├── ai-usage.ts
 ├── brain.ts
 ├── diagnosis.ts
 ├── diary.ts

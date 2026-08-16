@@ -167,6 +167,41 @@ describe("AccountData Workers runtime E2E", () => {
     });
   });
 
+  it("AccountData RPCがAI利用量の並行予約を上限内へ直列化する", async () => {
+    const accountId = crypto.randomUUID();
+    const stub = env.ACCOUNT_DATA.getByName(accountId);
+    const at = new Date("2026-08-15T00:00:00.000Z");
+    const period = {
+      key: "2026-08",
+      start: new Date("2026-08-01T00:00:00.000Z"),
+      end: new Date("2026-09-01T00:00:00.000Z"),
+    };
+
+    const results = await Promise.all(
+      Array.from({ length: 10 }, (_, index) =>
+        stub.execute(
+          accountId,
+          "aiUsage.reserve",
+          { requestId: `runtime-${index}`, kind: "ai-reply", period, limit: 3 },
+          at,
+        ),
+      ),
+    );
+
+    expect(results.filter(({ outcome }) => outcome === "reserved")).toHaveLength(3);
+    expect(results.filter(({ outcome }) => outcome === "limit-reached")).toHaveLength(7);
+    await expect(
+      stub.execute(accountId, "aiUsage.read", "ai-reply", period, 3, at),
+    ).resolves.toEqual({
+      kind: "ai-reply",
+      period,
+      limit: 3,
+      reserved: 3,
+      committed: 0,
+      remaining: 0,
+    });
+  });
+
   it("Worker runtimeのQueue bindingから未配送のまとめ生成要求を再送する", async () => {
     const accountId = crypto.randomUUID();
     const generationId = crypto.randomUUID();
@@ -237,6 +272,7 @@ describe("AccountData Workers runtime E2E", () => {
       state.storage.sql.exec("DROP TABLE progression_states");
       state.storage.sql.exec("DROP TABLE progression_events");
       state.storage.sql.exec("DROP TABLE personal_data_exports");
+      state.storage.sql.exec("DROP TABLE ai_usage_records");
       state.storage.sql.exec("DELETE FROM __drizzle_migrations WHERE created_at >= 1786666843277");
 
       const repository = Reflect.get(instance, "repository") as { initialize(): Promise<void> };
@@ -492,6 +528,7 @@ describe("AccountData Workers runtime E2E", () => {
       state.storage.sql.exec("DROP TABLE progression_states");
       state.storage.sql.exec("DROP TABLE progression_events");
       state.storage.sql.exec("DROP TABLE personal_data_exports");
+      state.storage.sql.exec("DROP TABLE ai_usage_records");
       state.storage.sql.exec("DELETE FROM __drizzle_migrations WHERE created_at > 1786361220917");
 
       const repository = Reflect.get(instance, "repository") as {
@@ -626,6 +663,7 @@ describe("AccountData Workers runtime E2E", () => {
       state.storage.sql.exec("DROP TABLE progression_states");
       state.storage.sql.exec("DROP TABLE progression_events");
       state.storage.sql.exec("DROP TABLE personal_data_exports");
+      state.storage.sql.exec("DROP TABLE ai_usage_records");
       state.storage.sql.exec("DELETE FROM __drizzle_migrations WHERE created_at >= 1786415351981");
 
       const repository = Reflect.get(instance, "repository") as {

@@ -166,6 +166,38 @@ describe("AccountDataRepository", () => {
     expect(requested.export.status).toBe("queued");
   });
 
+  it("AI利用予約のtimeoutをmaintenanceとして返す", async () => {
+    const repository = createRepository();
+    await repository.initialize();
+    repository.bindAccount("account-1");
+    const reservedAt = new Date("2026-08-15T00:00:00.000Z");
+    await DO.account.action.aiUsage.reserveAiUsage(
+      repository.client,
+      "account-1",
+      {
+        requestId: "maintenance-reservation",
+        kind: "ai-reply",
+        period: {
+          key: "2026-08",
+          start: new Date("2026-08-01T00:00:00.000Z"),
+          end: new Date("2026-09-01T00:00:00.000Z"),
+        },
+        limit: 20,
+      },
+      reservedAt,
+    );
+
+    expect(repository.nextMaintenanceAt()).toBe(
+      reservedAt.getTime() + DO.account.action.aiUsage.AI_USAGE_RESERVATION_TTL_MS,
+    );
+    await DO.account.action.aiUsage.expireAiUsageReservations(
+      repository.client,
+      "account-1",
+      new Date(reservedAt.getTime() + DO.account.action.aiUsage.AI_USAGE_RESERVATION_TTL_MS),
+    );
+    expect(repository.nextMaintenanceAt()).toBeNull();
+  });
+
   it("別ObjectのAccount所有データをSELECTできない", async () => {
     const first = createRepository();
     const second = createRepository();

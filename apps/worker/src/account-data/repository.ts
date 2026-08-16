@@ -518,6 +518,13 @@ export class AccountDataRepository {
       .orderBy(asc(DO.account.schema.personalDataExports.expiresAt))
       .limit(1)
       .get();
+    const expiringAiUsageReservation = this.database
+      .select({ expiresAt: DO.account.schema.aiUsageRecords.expiresAt })
+      .from(DO.account.schema.aiUsageRecords)
+      .where(eq(DO.account.schema.aiUsageRecords.status, "reserved"))
+      .orderBy(asc(DO.account.schema.aiUsageRecords.expiresAt))
+      .limit(1)
+      .get();
     const candidates = [
       session
         ? Math.min(
@@ -538,6 +545,7 @@ export class AccountDataRepository {
           DO.account.action.personalDataExport.PERSONAL_DATA_EXPORT_GENERATION_TIMEOUT_MS
         : null,
       expiringPersonalDataExport?.expiresAt?.getTime() ?? null,
+      expiringAiUsageReservation?.expiresAt.getTime() ?? null,
     ].filter((value): value is number => value !== null);
     return candidates.length > 0 ? Math.min(...candidates) : null;
   }
