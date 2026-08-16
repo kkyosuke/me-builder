@@ -9,6 +9,31 @@ const mocks = vi.hoisted(() => ({
   deletePersonalData: vi.fn(),
 }));
 vi.mock("../logic/personal-data", () => mocks);
+vi.mock("../middleware/authentication", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../middleware/authentication")>();
+  return {
+    ...actual,
+    requireAuthentication: async (
+      c: Parameters<typeof actual.requireAuthentication>[0],
+      next: () => Promise<void>,
+    ) => {
+      const actor = {
+        accountId: "account-1",
+        authenticationMethod: "liff" as const,
+        authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
+      };
+      c.set("authenticatedActor", actor);
+      await next();
+    },
+  };
+});
+vi.mock("../middleware/authorization", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../middleware/authorization")>();
+  return {
+    ...actual,
+    requireCurrentTerms: async (_c: unknown, next: () => Promise<void>) => next(),
+  };
+});
 
 const bindings = {
   LIFF_ID: "2010850319-Yl63upAR",
@@ -71,7 +96,7 @@ describe("personal data controller", () => {
       expect.objectContaining({
         sourceRecordId: "source-1",
         input: { kind: "diary", value: "訂正後" },
-        idToken: "dummy.id.token",
+        actor: expect.objectContaining({ accountId: "account-1" }),
       }),
     );
   });

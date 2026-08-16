@@ -117,9 +117,11 @@ describe("Preview Plan assignment verification", () => {
 
     provider.set(assignment("free", "free", "2026-09-16T12:05:00.000Z"));
     const records = await listPersonalData({
-      idToken: "preview-token",
-      lineLoginChannelId: "preview-channel",
-      db: {} as D1.shared.Client,
+      actor: {
+        accountId,
+        authenticationMethod: "liff",
+        authenticatedAt: new Date("2026-08-16T12:05:00.000Z"),
+      },
       accountData: accountData.binding,
     });
     expect(records).toMatchObject({

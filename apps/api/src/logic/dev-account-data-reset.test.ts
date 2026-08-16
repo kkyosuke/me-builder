@@ -1,11 +1,14 @@
-import type { AccountDataNamespace, ConversationCoordinatorNamespace, D1 } from "@me-builder/lib";
+import type { AccountDataNamespace, ConversationCoordinatorNamespace } from "@me-builder/lib";
 import { describe, expect, it, vi } from "vitest";
 import { resetDevelopmentAccountData } from "./dev-account-data-reset";
 
-const db = {} as D1.shared.Client;
 const accountData = {} as AccountDataNamespace;
 const conversationCoordinator = {} as ConversationCoordinatorNamespace;
-const session = { type: "resolved", session: { accountId: "account-1" } } as const;
+const actor = {
+  accountId: "account-1",
+  authenticationMethod: "liff" as const,
+  authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
+};
 
 describe("resetDevelopmentAccountData", () => {
   it("本人解決後にCoordinatorを止めてからAccountDataを削除する", async () => {
@@ -30,14 +33,11 @@ describe("resetDevelopmentAccountData", () => {
     await expect(
       resetDevelopmentAccountData(
         {
-          idToken: "token",
-          lineLoginChannelId: "channel",
-          db,
+          actor,
           accountData,
           conversationCoordinator,
         },
         {
-          createSession: vi.fn().mockResolvedValue(session),
           resetCoordinator,
           deleteAccountData,
         },
@@ -46,28 +46,5 @@ describe("resetDevelopmentAccountData", () => {
     expect(order).toEqual(["coordinator", "account-data"]);
     expect(resetCoordinator).toHaveBeenCalledWith(conversationCoordinator, "account-1");
     expect(deleteAccountData).toHaveBeenCalledWith(accountData, "account-1", 7);
-  });
-
-  it("本人を解決できなければ保存先を操作しない", async () => {
-    const resetCoordinator = vi.fn();
-    const deleteAccountData = vi.fn();
-    await expect(
-      resetDevelopmentAccountData(
-        {
-          idToken: undefined,
-          lineLoginChannelId: "channel",
-          db,
-          accountData,
-          conversationCoordinator,
-        },
-        {
-          createSession: vi.fn().mockResolvedValue({ type: "unauthenticated", reason: "missing" }),
-          resetCoordinator,
-          deleteAccountData,
-        },
-      ),
-    ).resolves.toEqual({ type: "unauthenticated", reason: "missing" });
-    expect(resetCoordinator).not.toHaveBeenCalled();
-    expect(deleteAccountData).not.toHaveBeenCalled();
   });
 });

@@ -195,9 +195,11 @@ describe("subscription user journeys", () => {
 
     await expect(
       listPersonalData({
-        idToken: "full-user-token",
-        lineLoginChannelId: "channel",
-        db,
+        actor: {
+          accountId,
+          authenticationMethod: "liff",
+          authenticatedAt: new Date("2026-08-20T00:00:01.000Z"),
+        },
         accountData: accountData.namespace,
       }),
     ).resolves.toMatchObject({
@@ -205,9 +207,11 @@ describe("subscription user journeys", () => {
       records: [{ kind: "diary", value: "有料期間中に残した大切な日記" }],
     });
     const requested = await requestPersonalDataExport({
-      idToken: "full-user-token",
-      lineLoginChannelId: "channel",
-      db,
+      actor: {
+        accountId,
+        authenticationMethod: "liff",
+        authenticatedAt: new Date("2026-08-20T00:01:00.000Z"),
+      },
       accountData: accountData.namespace,
       at: new Date("2026-08-20T00:01:00.000Z"),
     });
@@ -218,9 +222,11 @@ describe("subscription user journeys", () => {
       new Date("2026-08-20T00:01:01.000Z"),
     );
     const archive = await downloadPersonalDataExport({
-      idToken: "full-user-token",
-      lineLoginChannelId: "channel",
-      db,
+      actor: {
+        accountId,
+        authenticationMethod: "liff",
+        authenticatedAt: new Date("2026-08-20T00:01:02.000Z"),
+      },
       accountData: accountData.namespace,
       exportId: requested.result.export.id,
       at: new Date("2026-08-20T00:01:02.000Z"),
@@ -324,9 +330,11 @@ describe("subscription user journeys", () => {
     ).resolves.toMatchObject({ plan: "free", source: "free" });
     await expect(
       listPersonalData({
-        idToken: "member-token",
-        lineLoginChannelId: "channel",
-        db,
+        actor: {
+          accountId: memberId,
+          authenticationMethod: "liff",
+          authenticatedAt: new Date("2026-08-16T00:04:01.000Z"),
+        },
         accountData: memberData.namespace,
       }),
     ).resolves.toMatchObject({

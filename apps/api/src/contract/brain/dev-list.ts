@@ -1,6 +1,11 @@
 import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
 import * as v from "valibot";
-import { AccountNotFoundErrorSchema, authenticatedErrors, jsonResponse } from "../shared/errors";
+import {
+  AccountNotFoundErrorSchema,
+  authenticatedErrors,
+  currentTermsPolicyError,
+  jsonResponse,
+} from "../shared/errors";
 
 const NonEmptyStringSchema = v.pipe(v.string(), v.nonEmpty());
 const TimestampSchema = v.pipe(v.string(), v.isoTimestamp());
@@ -82,6 +87,7 @@ export const developmentBrainItemsRoute = describeRoute({
   responses: {
     200: jsonResponse("本人のactive Brain ItemとEvidence", DevelopmentBrainItemsResponseSchema),
     ...authenticatedErrors,
+    ...currentTermsPolicyError,
     404: jsonResponse(
       "開発環境ではない、または対応するAccountがない",
       v.union([AccountNotFoundErrorSchema, DevelopmentRouteNotFoundErrorSchema]),
@@ -100,6 +106,7 @@ export const developmentBrainVectorRoute = describeRoute({
       DevelopmentBrainVectorResponseSchema,
     ),
     ...authenticatedErrors,
+    ...currentTermsPolicyError,
     404: jsonResponse(
       "開発環境ではない、または対応するAccountがない",
       v.union([AccountNotFoundErrorSchema, DevelopmentRouteNotFoundErrorSchema]),

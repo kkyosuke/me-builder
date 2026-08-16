@@ -1,25 +1,16 @@
 import {
   type AccountDataNamespace,
-  type D1,
   type FailedBrainVectorSyncJobList,
   accountDataFor,
 } from "@me-builder/lib";
-import { createLiffSession } from "./liff-session";
-
-type SessionFailure =
-  | { type: "not-configured" }
-  | { type: "unauthenticated"; reason: string }
-  | { type: "account-not-found" };
+import type { AuthenticatedActor } from "./authentication/types";
 
 type Params = {
-  idToken: string | undefined;
-  lineLoginChannelId: string | undefined;
-  db: D1.shared.Client;
+  actor: AuthenticatedActor;
   accountData?: AccountDataNamespace;
 };
 
 type Dependencies = {
-  createSession: typeof createLiffSession;
   listFailed: (
     accountData: AccountDataNamespace | undefined,
     accountId: string,
@@ -36,7 +27,6 @@ type Dependencies = {
 };
 
 const defaultDependencies: Dependencies = {
-  createSession: createLiffSession,
   listFailed: (accountData, accountId) => {
     if (!accountData) throw new Error("ACCOUNT_DATA binding is not configured");
     return accountDataFor(accountData, accountId).execute("brain.listFailedVectorSyncJobs");
@@ -51,47 +41,40 @@ const defaultDependencies: Dependencies = {
   },
 };
 
-export type DevelopmentFailedBrainVectorSyncJobsOutcome =
-  | ({ type: "resolved" } & FailedBrainVectorSyncJobList)
-  | SessionFailure;
+export type DevelopmentFailedBrainVectorSyncJobsOutcome = {
+  type: "resolved";
+} & FailedBrainVectorSyncJobList;
 
-export type ResetDevelopmentBrainVectorSyncJobOutcome =
-  | { type: "resolved"; reset: boolean }
-  | SessionFailure;
+export type ResetDevelopmentBrainVectorSyncJobOutcome = { type: "resolved"; reset: boolean };
 
-export type ResetAllDevelopmentBrainVectorSyncJobsOutcome =
-  | { type: "resolved"; resetCount: number }
-  | SessionFailure;
+export type ResetAllDevelopmentBrainVectorSyncJobsOutcome = {
+  type: "resolved";
+  resetCount: number;
+};
 
 /** 本人確認済みAccountの終端Vector同期jobだけを開発用に返す。 */
 export async function listDevelopmentFailedBrainVectorSyncJobs(
-  { idToken, lineLoginChannelId, db, accountData }: Params,
+  { actor, accountData }: Params,
   dependencies: Dependencies = defaultDependencies,
 ): Promise<DevelopmentFailedBrainVectorSyncJobsOutcome> {
-  const session = await dependencies.createSession({ idToken, lineLoginChannelId, db });
-  if (session.type !== "resolved") return session;
-  const result = await dependencies.listFailed(accountData, session.session.accountId);
+  const result = await dependencies.listFailed(accountData, actor.accountId);
   return { type: "resolved", ...result };
 }
 
 /** 本人確認済みAccountの指定した終端jobを再試行可能に戻す。 */
 export async function resetDevelopmentBrainVectorSyncJob(
-  { idToken, lineLoginChannelId, db, accountData, jobId }: Params & { jobId: string },
+  { actor, accountData, jobId }: Params & { jobId: string },
   dependencies: Dependencies = defaultDependencies,
 ): Promise<ResetDevelopmentBrainVectorSyncJobOutcome> {
-  const session = await dependencies.createSession({ idToken, lineLoginChannelId, db });
-  if (session.type !== "resolved") return session;
-  const reset = await dependencies.resetFailed(accountData, session.session.accountId, jobId);
+  const reset = await dependencies.resetFailed(accountData, actor.accountId, jobId);
   return { type: "resolved", reset };
 }
 
 /** 本人確認済みAccountの全終端jobを再試行可能に戻す。 */
 export async function resetAllDevelopmentBrainVectorSyncJobs(
-  { idToken, lineLoginChannelId, db, accountData }: Params,
+  { actor, accountData }: Params,
   dependencies: Dependencies = defaultDependencies,
 ): Promise<ResetAllDevelopmentBrainVectorSyncJobsOutcome> {
-  const session = await dependencies.createSession({ idToken, lineLoginChannelId, db });
-  if (session.type !== "resolved") return session;
-  const resetCount = await dependencies.resetAllFailed(accountData, session.session.accountId);
+  const resetCount = await dependencies.resetAllFailed(accountData, actor.accountId);
   return { type: "resolved", resetCount };
 }

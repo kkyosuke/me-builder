@@ -26,6 +26,30 @@ vi.mock("../logic/development-brain-vector-sync-jobs", () => ({
   resetDevelopmentBrainVectorSyncJob: resetDevelopmentFailedBrainVectorSyncJob,
   resetAllDevelopmentBrainVectorSyncJobs: resetAllDevelopmentFailedBrainVectorSyncJobs,
 }));
+vi.mock("../middleware/authentication", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../middleware/authentication")>();
+  return {
+    ...actual,
+    requireAuthentication: async (
+      c: Parameters<typeof actual.requireAuthentication>[0],
+      next: () => Promise<void>,
+    ) => {
+      c.set("authenticatedActor", {
+        accountId: "account-1",
+        authenticationMethod: "liff",
+        authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
+      });
+      await next();
+    },
+  };
+});
+vi.mock("../middleware/authorization", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../middleware/authorization")>();
+  return {
+    ...actual,
+    requireCurrentTerms: async (_c: unknown, next: () => Promise<void>) => next(),
+  };
+});
 
 const dummyDb = {} as D1Database;
 const dummyAccountData = {} as AccountDataNamespace;
@@ -133,14 +157,6 @@ describe("GET /api/dev/brain-items", () => {
     const response = await request("development", false);
     expect(response.status).toBe(503);
     expect(loadDevelopmentBrainItems).not.toHaveBeenCalled();
-  });
-
-  it.each([
-    { type: "not-configured" as const },
-    { type: "unauthenticated" as const, reason: "invalid" },
-  ])("$typeを401へ変換する", async (value) => {
-    outcome(value);
-    expect((await request()).status).toBe(401);
   });
 });
 
@@ -277,7 +293,10 @@ describe("開発用Brain Vector同期job API", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ reset: true });
     expect(resetDevelopmentFailedBrainVectorSyncJob).toHaveBeenCalledWith(
-      expect.objectContaining({ jobId: "job-1", idToken: "dummy.id.token" }),
+      expect.objectContaining({
+        jobId: "job-1",
+        actor: expect.objectContaining({ accountId: "account-1" }),
+      }),
     );
   });
 
@@ -323,32 +342,4 @@ describe("開発用Brain Vector同期job API", () => {
       expect(resetAllDevelopmentFailedBrainVectorSyncJobs).not.toHaveBeenCalled();
     },
   );
-
-  it.each([
-    {
-      path: "/api/dev/brain-vector-sync-jobs/failed",
-      method: "GET",
-      logic: loadDevelopmentFailedBrainVectorSyncJobs,
-    },
-    {
-      path: "/api/dev/brain-vector-sync-jobs/job-1/reset",
-      method: "POST",
-      logic: resetDevelopmentFailedBrainVectorSyncJob,
-    },
-    {
-      path: "/api/dev/brain-vector-sync-jobs/reset-failed",
-      method: "POST",
-      logic: resetAllDevelopmentFailedBrainVectorSyncJobs,
-    },
-  ])("未認証なら$method $pathを401へ変換する", async ({ path, method, logic }) => {
-    logic.mockResolvedValue({ type: "unauthenticated", reason: "invalid" });
-    const response = await app.request(
-      path,
-      { method, headers: authorization },
-      env("development"),
-    );
-    expect(response.status).toBe(401);
-    expect(await response.json()).toEqual({ error: "Unauthorized" });
-    expect(logic).toHaveBeenCalledTimes(1);
-  });
 });

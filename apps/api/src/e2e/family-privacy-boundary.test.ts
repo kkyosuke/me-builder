@@ -75,9 +75,11 @@ describe("family payer privacy boundary", () => {
     const getByName = vi.fn(() => ({ execute }));
     const accountData = { getByName } as unknown as AccountDataNamespace;
     const personalData = await listPersonalData({
-      idToken: "payer-token",
-      lineLoginChannelId: "channel",
-      db,
+      actor: {
+        accountId: payer,
+        authenticationMethod: "liff",
+        authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
+      },
       accountData,
     });
     expect(getByName).toHaveBeenCalledTimes(1);

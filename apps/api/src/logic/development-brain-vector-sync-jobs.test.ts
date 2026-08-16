@@ -1,4 +1,4 @@
-import type { AccountDataNamespace, D1 } from "@me-builder/lib";
+import type { AccountDataNamespace } from "@me-builder/lib";
 import { describe, expect, it, vi } from "vitest";
 import {
   listDevelopmentFailedBrainVectorSyncJobs,
@@ -6,21 +6,18 @@ import {
   resetDevelopmentBrainVectorSyncJob,
 } from "./development-brain-vector-sync-jobs";
 
-const db = {} as D1.shared.Client;
 const accountData = {} as AccountDataNamespace;
 const params = {
-  idToken: "token",
-  lineLoginChannelId: "channel",
-  db,
+  actor: {
+    accountId: "account-1",
+    authenticationMethod: "liff" as const,
+    authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
+  },
   accountData,
 };
 
 function dependencies() {
   return {
-    createSession: vi.fn().mockResolvedValue({
-      type: "resolved",
-      session: { accountId: "account-1", role: "user" },
-    }),
     listFailed: vi.fn().mockResolvedValue({ jobs: [], truncated: false }),
     resetFailed: vi.fn().mockResolvedValue(true),
     resetAllFailed: vi.fn().mockResolvedValue(2),
@@ -46,18 +43,5 @@ describe("development Brain Vector sync jobs", () => {
     expect(deps.listFailed).toHaveBeenCalledWith(accountData, "account-1");
     expect(deps.resetFailed).toHaveBeenCalledWith(accountData, "account-1", "job-1");
     expect(deps.resetAllFailed).toHaveBeenCalledWith(accountData, "account-1");
-  });
-
-  it("本人を解決できなければAccountDataを操作しない", async () => {
-    const deps = dependencies();
-    deps.createSession.mockResolvedValue({ type: "unauthenticated", reason: "invalid" } as never);
-
-    await expect(listDevelopmentFailedBrainVectorSyncJobs(params, deps)).resolves.toEqual({
-      type: "unauthenticated",
-      reason: "invalid",
-    });
-    expect(deps.listFailed).not.toHaveBeenCalled();
-    expect(deps.resetFailed).not.toHaveBeenCalled();
-    expect(deps.resetAllFailed).not.toHaveBeenCalled();
   });
 });

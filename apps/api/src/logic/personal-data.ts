@@ -1,43 +1,33 @@
-import { type AccountDataNamespace, type D1, type DO, accountDataFor } from "@me-builder/lib";
+import { type AccountDataNamespace, type DO, accountDataFor } from "@me-builder/lib";
 import { logger } from "@me-builder/shared";
-import { createLiffSession } from "./liff-session";
+import type { AuthenticatedActor } from "./authentication/types";
 
 type CorrectPersonalDataRecordInput = Parameters<
   typeof DO.account.action.source.correctPersonalDataRecord
 >[3];
 
 type CommonParams = {
-  idToken: string | undefined;
-  lineLoginChannelId: string | undefined;
-  db: D1.shared.Client;
+  actor: AuthenticatedActor;
   accountData: AccountDataNamespace;
 };
 
-export type PersonalDataOutcome<T> =
-  | ({ type: "resolved" } & T)
-  | { type: "not-configured" }
-  | { type: "unauthenticated"; reason: string }
-  | { type: "account-not-found" };
+export type PersonalDataOutcome<T> = { type: "resolved" } & T;
 
 export async function listPersonalData(
   params: CommonParams,
 ): Promise<PersonalDataOutcome<{ records: Awaited<ReturnType<typeof listRecords>> }>> {
-  const session = await createLiffSession(params);
-  if (session.type !== "resolved") return session;
   return {
     type: "resolved",
-    records: await listRecords(params.accountData, session.session.accountId),
+    records: await listRecords(params.accountData, params.actor.accountId),
   };
 }
 
 export async function requestPersonalDataExport(
   params: CommonParams & { at?: Date },
 ): Promise<PersonalDataOutcome<{ result: Awaited<ReturnType<typeof requestExport>> }>> {
-  const session = await createLiffSession(params);
-  if (session.type !== "resolved") return session;
   return {
     type: "resolved",
-    result: await requestExport(params.accountData, session.session.accountId, params.at),
+    result: await requestExport(params.accountData, params.actor.accountId, params.at),
   };
 }
 
@@ -48,13 +38,11 @@ function requestExport(accountData: AccountDataNamespace, accountId: string, at?
 export async function getPersonalDataExport(
   params: CommonParams & { exportId: string; at?: Date },
 ): Promise<PersonalDataOutcome<{ result: Awaited<ReturnType<typeof readExportStatus>> }>> {
-  const session = await createLiffSession(params);
-  if (session.type !== "resolved") return session;
   return {
     type: "resolved",
     result: await readExportStatus(
       params.accountData,
-      session.session.accountId,
+      params.actor.accountId,
       params.exportId,
       params.at,
     ),
@@ -77,13 +65,11 @@ function readExportStatus(
 export async function downloadPersonalDataExport(
   params: CommonParams & { exportId: string; at?: Date },
 ): Promise<PersonalDataOutcome<{ result: Awaited<ReturnType<typeof readExportArchive>> }>> {
-  const session = await createLiffSession(params);
-  if (session.type !== "resolved") return session;
   return {
     type: "resolved",
     result: await readExportArchive(
       params.accountData,
-      session.session.accountId,
+      params.actor.accountId,
       params.exportId,
       params.at,
     ),
@@ -114,9 +100,7 @@ export async function correctPersonalData(
     at?: Date;
   },
 ): Promise<PersonalDataOutcome<{ result: Awaited<ReturnType<typeof correctRecord>> }>> {
-  const session = await createLiffSession(params);
-  if (session.type !== "resolved") return session;
-  const accountId = session.session.accountId;
+  const accountId = params.actor.accountId;
   const result = await correctRecord(
     params.accountData,
     accountId,
@@ -154,9 +138,7 @@ function correctRecord(
 export async function deletePersonalData(
   params: CommonParams & { sourceRecordId: string; at?: Date },
 ): Promise<PersonalDataOutcome<{ result: Awaited<ReturnType<typeof deleteRecord>> }>> {
-  const session = await createLiffSession(params);
-  if (session.type !== "resolved") return session;
-  const accountId = session.session.accountId;
+  const accountId = params.actor.accountId;
   const result = await deleteRecord(
     params.accountData,
     accountId,

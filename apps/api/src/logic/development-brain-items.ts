@@ -1,11 +1,10 @@
 import {
   type AccountDataNamespace,
   type ActiveBrainVectorEntry,
-  type D1,
   type DO,
   accountDataFor,
 } from "@me-builder/lib";
-import { createLiffSession } from "./liff-session";
+import type { AuthenticatedActor } from "./authentication/types";
 
 type DevelopmentBrainItems = Awaited<
   ReturnType<typeof DO.account.action.brain.listActiveBrainItems>
@@ -18,47 +17,35 @@ type DevelopmentBrainVectorMetadata = {
   schemaVersion?: number;
 };
 
-export type DevelopmentBrainItemsOutcome =
-  | ({ type: "resolved" } & DevelopmentBrainItems)
-  | { type: "not-configured" }
-  | { type: "unauthenticated"; reason: string }
-  | { type: "account-not-found" };
+export type DevelopmentBrainItemsOutcome = { type: "resolved" } & DevelopmentBrainItems;
 
 type Params = {
-  idToken: string | undefined;
-  lineLoginChannelId: string | undefined;
-  db: D1.shared.Client;
+  actor: AuthenticatedActor;
   accountData?: AccountDataNamespace;
 };
 
 type Dependencies = {
-  createSession: typeof createLiffSession;
   listActive: (
     accountData: AccountDataNamespace | undefined,
     accountId: string,
   ) => Promise<DevelopmentBrainItems>;
 };
 
-export type DevelopmentBrainVectorOutcome =
-  | {
-      type: "resolved";
-      result:
-        | { state: "not-synced"; checkedAt: Date }
-        | { state: "missing"; entryRevision: number; checkedAt: Date }
-        | {
-            state: "present";
-            entryRevision: number;
-            dimensions: number;
-            metadata: DevelopmentBrainVectorMetadata;
-            checkedAt: Date;
-          };
-    }
-  | { type: "not-configured" }
-  | { type: "unauthenticated"; reason: string }
-  | { type: "account-not-found" };
+export type DevelopmentBrainVectorOutcome = {
+  type: "resolved";
+  result:
+    | { state: "not-synced"; checkedAt: Date }
+    | { state: "missing"; entryRevision: number; checkedAt: Date }
+    | {
+        state: "present";
+        entryRevision: number;
+        dimensions: number;
+        metadata: DevelopmentBrainVectorMetadata;
+        checkedAt: Date;
+      };
+};
 
 type VectorDependencies = {
-  createSession: typeof createLiffSession;
   findEntry: (
     accountData: AccountDataNamespace | undefined,
     accountId: string,
@@ -69,7 +56,6 @@ type VectorDependencies = {
 };
 
 const defaultDependencies: Dependencies = {
-  createSession: createLiffSession,
   listActive: (accountData, accountId) => {
     if (!accountData) throw new Error("ACCOUNT_DATA binding is not configured");
     return accountDataFor(accountData, accountId).execute("brain.listActive");
@@ -77,7 +63,6 @@ const defaultDependencies: Dependencies = {
 };
 
 const defaultVectorDependencies: VectorDependencies = {
-  createSession: createLiffSession,
   findEntry: (accountData, accountId, brainItemId) => {
     if (!accountData) throw new Error("ACCOUNT_DATA binding is not configured");
     return accountDataFor(accountData, accountId).execute(
@@ -91,13 +76,10 @@ const defaultVectorDependencies: VectorDependencies = {
 
 /** 本人確認済みAccountのactive Brain Itemを開発用確認画面へ返す。 */
 export async function getDevelopmentBrainItems(
-  { idToken, lineLoginChannelId, db, accountData }: Params,
+  { actor, accountData }: Params,
   dependencies: Dependencies = defaultDependencies,
 ): Promise<DevelopmentBrainItemsOutcome> {
-  const session = await dependencies.createSession({ idToken, lineLoginChannelId, db });
-  if (session.type !== "resolved") return session;
-
-  const result = await dependencies.listActive(accountData, session.session.accountId);
+  const result = await dependencies.listActive(accountData, actor.accountId);
   return { type: "resolved", ...result };
 }
 
@@ -124,19 +106,14 @@ function scalarMetadata(
 /** AccountDataの対応表を本人scopeで引き、Vectorize上の実体をオンデマンドで照合する。 */
 export async function getDevelopmentBrainVector(
   {
-    idToken,
-    lineLoginChannelId,
-    db,
+    actor,
     accountData,
     vectorIndex,
     brainItemId,
   }: Params & { vectorIndex: BrainVectorIndex; brainItemId: string },
   dependencies: VectorDependencies = defaultVectorDependencies,
 ): Promise<DevelopmentBrainVectorOutcome> {
-  const session = await dependencies.createSession({ idToken, lineLoginChannelId, db });
-  if (session.type !== "resolved") return session;
-
-  const entry = await dependencies.findEntry(accountData, session.session.accountId, brainItemId);
+  const entry = await dependencies.findEntry(accountData, actor.accountId, brainItemId);
   if (!entry) {
     return {
       type: "resolved",
