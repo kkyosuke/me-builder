@@ -1,4 +1,5 @@
 import { D1, billing } from "@me-builder/lib";
+import { BILLING_INITIAL_TRIAL_DAYS } from "@me-builder/shared";
 import { createLiffSession } from "./liff-session";
 
 type BaseParams = {
@@ -10,7 +11,10 @@ type BaseParams = {
   createSession?: typeof createLiffSession;
 };
 
-type AuthParams = Pick<BaseParams, "idToken" | "lineLoginChannelId" | "db" | "createSession">;
+type AuthParams = Pick<
+  BaseParams,
+  "idToken" | "lineLoginChannelId" | "db" | "provider" | "createSession"
+>;
 
 type SessionFailure =
   | { type: "not-configured" | "unauthenticated" | "account-not-found" }
@@ -70,6 +74,12 @@ export async function createBillingCheckoutSession(
     });
   }
   if (!customer) throw new Error("BILLING_CUSTOMER_LINK_FAILED");
+  const providerSubscriptions = await params.provider.listSubscriptions(
+    customer.providerCustomerId,
+  );
+  if (providerSubscriptions.some((subscription) => !isTerminalSubscription(subscription.status))) {
+    return { type: "unavailable", reason: "existing_subscription" };
+  }
   const priceId = await params.provider.findPriceIdByLookupKey(lookupKey);
   if (!priceId) return { type: "unavailable", reason: "plan_unavailable" };
   const latestCheckout = await params.provider.findLatestCheckoutSession(
@@ -85,7 +95,9 @@ export async function createBillingCheckoutSession(
     }
     await params.provider.expireCheckoutSession(latestCheckout.id);
   }
-  const trialEligible = !(await D1.shared.action.billing.hasUsedBillingTrial(params.db, accountId));
+  const trialEligible =
+    !(await D1.shared.action.billing.hasUsedBillingTrial(params.db, accountId)) &&
+    !providerSubscriptions.some((subscription) => subscription.trialEnd !== null);
   const origin = new URL(params.webOrigin).origin;
   const checkout = await params.provider.createCheckoutSession(
     {
@@ -96,7 +108,7 @@ export async function createBillingCheckoutSession(
       accountId,
       plan: params.plan,
       interval: params.interval,
-      ...(trialEligible ? { trialPeriodDays: 14 } : {}),
+      ...(trialEligible ? { trialPeriodDays: BILLING_INITIAL_TRIAL_DAYS } : {}),
     },
     `billing-checkout-${accountId}-${latestCheckout?.id ?? "initial"}`,
   );
@@ -141,13 +153,28 @@ export async function getBillingTrialEligibility(
     db: params.db,
   });
   if (session.type !== "resolved") return { type: session.type };
+  const accountId = session.session.accountId;
+  const usedInProjection = await D1.shared.action.billing.hasUsedBillingTrial(params.db, accountId);
+  const customer = await D1.shared.action.billing.findBillingCustomerByAccount(
+    params.db,
+    accountId,
+  );
+  const providerSubscriptions = customer
+    ? await params.provider.listSubscriptions(customer.providerCustomerId)
+    : [];
   return {
     type: "resolved",
-    eligible: !(await D1.shared.action.billing.hasUsedBillingTrial(
-      params.db,
-      session.session.accountId,
-    )),
+    eligible:
+      !usedInProjection &&
+      !providerSubscriptions.some(
+        (subscription) =>
+          subscription.trialEnd !== null || !isTerminalSubscription(subscription.status),
+      ),
   };
+}
+
+function isTerminalSubscription(status: billing.BillingSubscriptionStatus): boolean {
+  return status === "canceled" || status === "incomplete_expired";
 }
 
 export async function createBillingPortalSession(

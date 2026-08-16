@@ -1,4 +1,8 @@
-import type { BillingInterval, PaidPlanCode } from "@me-builder/shared";
+import {
+  BILLING_INITIAL_TRIAL_DAYS,
+  type BillingInterval,
+  type PaidPlanCode,
+} from "@me-builder/shared";
 import * as v from "valibot";
 import type { operations } from "../../../generated/api";
 import { OperationError, ValidationError } from "../../../infrastructure/errors";
@@ -90,7 +94,10 @@ export async function fetchBillingTrialEligibility(
   }
   try {
     return v.parse(
-      v.object({ eligible: v.boolean(), trialDays: v.literal(14) }),
+      v.object({
+        eligible: v.boolean(),
+        trialDays: v.literal(BILLING_INITIAL_TRIAL_DAYS),
+      }),
       await response.json(),
     ).eligible;
   } catch (error) {

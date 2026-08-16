@@ -1,3 +1,4 @@
+import { BILLING_INITIAL_TRIAL_DAYS } from "@me-builder/shared";
 import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
 import * as v from "valibot";
 import { AccountNotFoundErrorSchema, authenticatedErrors, jsonResponse } from "../shared/errors";
@@ -45,7 +46,7 @@ export const BillingCheckoutSessionNotFoundSchema = v.object({
 
 export const BillingTrialEligibilityResponseSchema = v.object({
   eligible: v.boolean(),
-  trialDays: v.literal(14),
+  trialDays: v.literal(BILLING_INITIAL_TRIAL_DAYS),
 });
 
 export const BillingSessionConflictSchema = v.object({

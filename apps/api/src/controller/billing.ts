@@ -1,5 +1,5 @@
 import { D1, billing } from "@me-builder/lib";
-import { publicBillingPlans } from "@me-builder/shared";
+import { BILLING_INITIAL_TRIAL_DAYS, publicBillingPlans } from "@me-builder/shared";
 import type { Context } from "hono";
 import * as v from "valibot";
 import { getConfig } from "../config";
@@ -76,13 +76,14 @@ export function getBillingPlanCatalog(c: Context<AppEnv>): Response {
 
 export async function getBillingTrialEligibilityResponse(c: Context<AppEnv>): Promise<Response> {
   const config = getConfig(c.env);
-  if (!c.env?.DB) {
+  if (!c.env?.DB || !config.stripeSecretKey) {
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   }
   const outcome = await getBillingTrialEligibility({
     idToken: bearerToken(c.req.header("authorization")),
     lineLoginChannelId: config.lineLoginChannelId,
     db: D1.shared.client.create(c.env.DB),
+    provider: billing.createStripeBillingProvider({ secretKey: config.stripeSecretKey }),
   });
   switch (outcome.type) {
     case "resolved":
@@ -90,7 +91,7 @@ export async function getBillingTrialEligibilityResponse(c: Context<AppEnv>): Pr
       return c.json(
         v.parse(BillingTrialEligibilityResponseSchema, {
           eligible: outcome.eligible,
-          trialDays: 14,
+          trialDays: BILLING_INITIAL_TRIAL_DAYS,
         }),
       );
     case "account-not-found":
