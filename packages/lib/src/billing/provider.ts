@@ -26,6 +26,9 @@ export type BillingWebhookEvent = Readonly<{
   id: string;
   type: string;
   objectId: string;
+  objectType: string;
+  customerId: string | null;
+  subscriptionId: string | null;
   createdAt: string;
 }>;
 

@@ -54,6 +54,7 @@ import { profileProgressionRoute } from "./contract/profile/progression";
 import { profileSummaryGenerationRoute, profileSummaryRoute } from "./contract/profile/summary";
 import { InternalServerErrorSchema } from "./contract/shared/errors";
 import { getAccounts, getStatistics } from "./controller/admin";
+import { postStripeWebhook } from "./controller/billing";
 import {
   getDevelopmentBrainItems,
   getDevelopmentBrainVector,
@@ -171,6 +172,7 @@ app.get("/api/health", (c) => {
 });
 
 app.post("/api/line/webhook", postLineWebhook);
+app.post("/api/billing/webhook", postStripeWebhook);
 
 app.get("/api/legal/terms", getServiceTermsRoute, getServiceTermsContents);
 app.get(
