@@ -21,7 +21,7 @@ vi.mock("../config", () => ({
   },
 }));
 vi.mock("../feature/liff/infrastructure/liff-client", () => ({
-  initializeLiff: liff.initialize,
+  initializeLiffForAuthExchange: liff.initialize,
   readLiffAuthExchangeCredential: liff.readCredential,
 }));
 

@@ -1,14 +1,14 @@
 import {
-  initializeLiff,
+  initializeLiffForAuthExchange,
   readLiffAuthExchangeCredential,
 } from "../../liff/infrastructure/liff-client";
 import type { AuthSessionResponse } from "./auth-session-api";
 import { exchangeLiffCredential } from "./auth-session-api";
 
-let pendingInitialization: ReturnType<typeof initializeLiff> | null = null;
+let pendingInitialization: ReturnType<typeof initializeLiffForAuthExchange> | null = null;
 
 async function initializeForAuthExchange(liffId: string | undefined) {
-  const pending = pendingInitialization ?? initializeLiff(liffId);
+  const pending = pendingInitialization ?? initializeLiffForAuthExchange(liffId);
   pendingInitialization = pending;
   try {
     return await pending;

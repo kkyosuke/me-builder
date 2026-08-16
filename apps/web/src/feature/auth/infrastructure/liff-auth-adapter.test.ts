@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  initializeLiff: vi.fn(),
+  initializeLiffForAuthExchange: vi.fn(),
   readCredential: vi.fn(),
   exchangeLiffCredential: vi.fn(),
 }));
 
 vi.mock("../../liff/infrastructure/liff-client", () => ({
-  initializeLiff: mocks.initializeLiff,
+  initializeLiffForAuthExchange: mocks.initializeLiffForAuthExchange,
   readLiffAuthExchangeCredential: mocks.readCredential,
 }));
 vi.mock("./auth-session-api", () => ({
@@ -19,10 +19,9 @@ import { establishLiffAuthSession } from "./liff-auth-adapter";
 describe("establishLiffAuthSession", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.initializeLiff.mockResolvedValue({
+    mocks.initializeLiffForAuthExchange.mockResolvedValue({
       status: "ready",
       inClient: true,
-      profile: { displayName: "テスト" },
     });
     mocks.readCredential.mockReturnValue("secret.id.token");
     mocks.exchangeLiffCredential.mockResolvedValue({
@@ -40,7 +39,7 @@ describe("establishLiffAuthSession", () => {
       establishLiffAuthSession("https://api.example.com", "test-liff-id", "/me", signal),
     ).resolves.toMatchObject({ authenticated: true });
 
-    expect(mocks.initializeLiff).toHaveBeenCalledWith("test-liff-id");
+    expect(mocks.initializeLiffForAuthExchange).toHaveBeenCalledWith("test-liff-id");
     expect(mocks.exchangeLiffCredential).toHaveBeenCalledWith(
       "https://api.example.com",
       "secret.id.token",
@@ -51,7 +50,7 @@ describe("establishLiffAuthSession", () => {
 
   it("同時の交換要求ではLIFF初期化だけを共有する", async () => {
     let finishInitialization: ((state: unknown) => void) | undefined;
-    mocks.initializeLiff.mockImplementation(
+    mocks.initializeLiffForAuthExchange.mockImplementation(
       () =>
         new Promise((resolve) => {
           finishInitialization = resolve;
@@ -61,11 +60,10 @@ describe("establishLiffAuthSession", () => {
 
     const first = establishLiffAuthSession(undefined, "test-liff-id", "/me", signal);
     const second = establishLiffAuthSession(undefined, "test-liff-id", "/me", signal);
-    expect(mocks.initializeLiff).toHaveBeenCalledTimes(1);
+    expect(mocks.initializeLiffForAuthExchange).toHaveBeenCalledTimes(1);
     finishInitialization?.({
       status: "ready",
       inClient: true,
-      profile: { displayName: "テスト" },
     });
 
     await Promise.all([first, second]);
@@ -73,7 +71,7 @@ describe("establishLiffAuthSession", () => {
   });
 
   it("ログイン遷移中はcredentialを読まずfeature requestを止める", async () => {
-    mocks.initializeLiff.mockResolvedValue({ status: "login-required" });
+    mocks.initializeLiffForAuthExchange.mockResolvedValue({ status: "login-required" });
 
     await expect(
       establishLiffAuthSession(undefined, "test-liff-id", "/me", new AbortController().signal),
