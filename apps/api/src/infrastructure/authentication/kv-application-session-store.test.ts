@@ -35,4 +35,16 @@ describe("KvApplicationSessionStore", () => {
     );
     expect(namespace.delete).toHaveBeenCalledWith("session:v1:reference-hash");
   });
+
+  it("破損したKV recordを削除してfail-closedに扱う", async () => {
+    const namespace = {
+      get: vi.fn().mockResolvedValue({ ...record, expiresAt: "invalid-timestamp" }),
+      put: vi.fn(),
+      delete: vi.fn().mockResolvedValue(undefined),
+    } as unknown as KVNamespace;
+    const store = new KvApplicationSessionStore(namespace);
+
+    await expect(store.get("corrupted-reference")).resolves.toBeUndefined();
+    expect(namespace.delete).toHaveBeenCalledWith("session:v1:corrupted-reference");
+  });
 });

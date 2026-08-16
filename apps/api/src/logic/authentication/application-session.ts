@@ -29,6 +29,7 @@ export type IssuedApplicationSession = Readonly<{
 }>;
 
 type SessionPolicy = Readonly<{ absoluteTtlMs: number; idleTtlMs: number }>;
+type VerifyOptions = Readonly<{ refreshIdle?: boolean }>;
 const defaultPolicy: SessionPolicy = {
   absoluteTtlMs: 30 * 24 * 60 * 60 * 1_000,
   idleTtlMs: 7 * 24 * 60 * 60 * 1_000,
@@ -79,7 +80,10 @@ export class ApplicationSessionService {
     return { sessionToken, csrfToken, expiresAt };
   }
 
-  async verify(sessionToken: string | undefined): Promise<AuthenticatedActor | undefined> {
+  async verify(
+    sessionToken: string | undefined,
+    { refreshIdle = true }: VerifyOptions = {},
+  ): Promise<AuthenticatedActor | undefined> {
     if (!sessionToken) return undefined;
     const referenceHash = await hash(sessionToken);
     const record = await this.store.get(referenceHash);
@@ -93,8 +97,10 @@ export class ApplicationSessionService {
       await this.store.delete(referenceHash);
       return undefined;
     }
-    const ttl = Math.max(1, Math.ceil((Date.parse(record.expiresAt) - now.getTime()) / 1_000));
-    await this.store.put(referenceHash, { ...record, lastSeenAt: now.toISOString() }, ttl);
+    if (refreshIdle) {
+      const ttl = Math.max(1, Math.ceil((Date.parse(record.expiresAt) - now.getTime()) / 1_000));
+      await this.store.put(referenceHash, { ...record, lastSeenAt: now.toISOString() }, ttl);
+    }
     return {
       accountId: record.accountId,
       authenticationMethod: record.authenticationMethod,

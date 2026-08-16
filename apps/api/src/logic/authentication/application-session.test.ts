@@ -96,6 +96,25 @@ describe("ApplicationSessionService", () => {
     expect(absoluteStore.records.size).toBe(0);
   });
 
+  it("明示的に抑止した検証ではidle期限を更新しない", async () => {
+    const store = new MemoryStore();
+    let now = new Date("2026-08-17T00:00:00.000Z");
+    const sessions = new ApplicationSessionService(
+      store,
+      new MemoryVersions(),
+      { absoluteTtlMs: 10_000, idleTtlMs: 5_000 },
+      () => now,
+    );
+    const issued = await sessions.issue(actor);
+    const issuedLastSeenAt = [...store.records.values()][0]?.lastSeenAt;
+
+    now = new Date("2026-08-17T00:00:04.000Z");
+    await expect(sessions.verify(issued?.sessionToken, { refreshIdle: false })).resolves.toEqual(
+      actor,
+    );
+    expect([...store.records.values()][0]?.lastSeenAt).toBe(issuedLastSeenAt);
+  });
+
   it("rotationとlogoutで以前の参照を再利用できない", async () => {
     const store = new MemoryStore();
     let now = new Date("2026-08-17T00:00:00.000Z");
