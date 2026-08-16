@@ -1,6 +1,11 @@
 import { type DescribeRouteOptions, describeRoute, validator } from "hono-openapi";
 import * as v from "valibot";
-import { ForbiddenErrorSchema, authenticatedErrors, jsonResponse } from "../shared/errors";
+import {
+  ForbiddenErrorSchema,
+  authenticatedErrors,
+  currentTermsPolicyError,
+  jsonResponse,
+} from "../shared/errors";
 
 const FamilySeatSchema = v.object({
   id: v.string(),
@@ -60,6 +65,7 @@ const familyErrors = {
   409: jsonResponse("現在の状態では操作できない", FamilyOperationUnavailableSchema),
   403: jsonResponse("本人に操作権限がない", ForbiddenErrorSchema),
   ...authenticatedErrors,
+  ...currentTermsPolicyError,
 };
 
 export const familySeatManagementRoute = describeRoute({

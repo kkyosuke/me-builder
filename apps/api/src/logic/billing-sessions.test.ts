@@ -32,16 +32,17 @@ async function setup() {
     provider: "line_login",
     providerAccountId: crypto.randomUUID(),
   });
-  const createSession = vi.fn().mockResolvedValue({
-    type: "resolved",
-    session: { accountId: owner.account.id, role: "user" },
-  });
-  return { db, owner: owner.account, createSession };
+  const actor = {
+    accountId: owner.account.id,
+    authenticationMethod: "liff" as const,
+    authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
+  };
+  return { db, owner: owner.account, actor };
 }
 
 describe("billing sessions", () => {
   it("server-side lookup key and fixed return URLs are used for checkout", async () => {
-    const { db, owner, createSession } = await setup();
+    const { db, owner, actor } = await setup();
     const createCheckoutSession = vi.fn().mockResolvedValue({
       id: "cs_test",
       url: "https://checkout.stripe.test/session",
@@ -49,12 +50,10 @@ describe("billing sessions", () => {
     const provider = new billing.FakeBillingProvider({ createCheckoutSession });
     await expect(
       createBillingCheckoutSession({
-        idToken: "token",
-        lineLoginChannelId: "channel",
+        actor,
         db,
         provider,
         webOrigin: "https://app.example.test",
-        createSession,
         plan: "full",
         interval: "year",
         lookupKeyMap: { "full.year": "full_year_v2" },
@@ -76,7 +75,7 @@ describe("billing sessions", () => {
   });
 
   it("trial使用済みAccountではCustomerが変わっても2回目を付けない", async () => {
-    const { db, owner, createSession } = await setup();
+    const { db, owner, actor } = await setup();
     await D1.shared.action.billing.linkBillingCustomer(db, {
       accountId: owner.id,
       providerCustomerId: "cus_previous",
@@ -108,12 +107,10 @@ describe("billing sessions", () => {
     });
 
     await createBillingCheckoutSession({
-      idToken: "token",
-      lineLoginChannelId: "channel",
+      actor,
       db,
       provider: new billing.FakeBillingProvider({ createCheckoutSession }),
       webOrigin: "https://app.example.test",
-      createSession,
       plan: "full",
       interval: "month",
       lookupKeyMap: { "full.month": "full_month" },
@@ -126,7 +123,7 @@ describe("billing sessions", () => {
   });
 
   it("projection反映前でもStripeに有効な契約があれば二重購入を止める", async () => {
-    const { db, owner, createSession } = await setup();
+    const { db, owner, actor } = await setup();
     await D1.shared.action.billing.linkBillingCustomer(db, {
       accountId: owner.id,
       providerCustomerId: "cus_active",
@@ -151,12 +148,10 @@ describe("billing sessions", () => {
 
     await expect(
       createBillingCheckoutSession({
-        idToken: "token",
-        lineLoginChannelId: "channel",
+        actor,
         db,
         provider,
         webOrigin: "https://app.example.test",
-        createSession,
         plan: "lite",
         interval: "month",
         lookupKeyMap: { "lite.month": "lite_month" },
@@ -166,7 +161,7 @@ describe("billing sessions", () => {
   });
 
   it("webhook未反映でもStripeのtrial履歴を再利用不可として扱う", async () => {
-    const { db, owner, createSession } = await setup();
+    const { db, owner, actor } = await setup();
     await D1.shared.action.billing.linkBillingCustomer(db, {
       accountId: owner.id,
       providerCustomerId: "cus_trial_history",
@@ -193,12 +188,10 @@ describe("billing sessions", () => {
     });
 
     await createBillingCheckoutSession({
-      idToken: "token",
-      lineLoginChannelId: "channel",
+      actor,
       db,
       provider,
       webOrigin: "https://app.example.test",
-      createSession,
       plan: "full",
       interval: "month",
       lookupKeyMap: { "full.month": "full_month" },
@@ -209,24 +202,20 @@ describe("billing sessions", () => {
     );
     await expect(
       getBillingTrialEligibility({
-        idToken: "token",
-        lineLoginChannelId: "channel",
+        actor,
         db,
         provider,
-        createSession,
       }),
     ).resolves.toEqual({ type: "resolved", eligible: false });
   });
 
   it("rejects an unavailable plan", async () => {
-    const { db, createSession } = await setup();
+    const { db, actor } = await setup();
     const base = {
-      idToken: "token",
-      lineLoginChannelId: "channel",
+      actor,
       db,
       provider: new billing.FakeBillingProvider(),
       webOrigin: "https://app.example.test",
-      createSession,
       plan: "lite" as const,
       interval: "month" as const,
     };
@@ -237,7 +226,7 @@ describe("billing sessions", () => {
   });
 
   it("同じ選択の未完了Checkoutを再利用する", async () => {
-    const { db, createSession } = await setup();
+    const { db, actor } = await setup();
     const createCheckoutSession = vi.fn();
     const provider = new billing.FakeBillingProvider({
       findLatestCheckoutSession: async () => ({
@@ -253,12 +242,10 @@ describe("billing sessions", () => {
 
     await expect(
       createBillingCheckoutSession({
-        idToken: "token",
-        lineLoginChannelId: "channel",
+        actor,
         db,
         provider,
         webOrigin: "https://app.example.test",
-        createSession,
         plan: "lite",
         interval: "month",
         lookupKeyMap: { "lite.month": "lite_month" },
@@ -268,7 +255,7 @@ describe("billing sessions", () => {
   });
 
   it("選択が変わった未完了Checkoutを失効させて新しい世代を作る", async () => {
-    const { db, owner, createSession } = await setup();
+    const { db, owner, actor } = await setup();
     const expireCheckoutSession = vi.fn();
     const createCheckoutSession = vi.fn().mockResolvedValue({
       id: "cs_test_new",
@@ -289,12 +276,10 @@ describe("billing sessions", () => {
 
     await expect(
       createBillingCheckoutSession({
-        idToken: "token",
-        lineLoginChannelId: "channel",
+        actor,
         db,
         provider,
         webOrigin: "https://app.example.test",
-        createSession,
         plan: "full",
         interval: "year",
         lookupKeyMap: { "full.year": "full_year" },
@@ -308,7 +293,7 @@ describe("billing sessions", () => {
   });
 
   it("既存契約がある本人の二重購入を開始しない", async () => {
-    const { db, owner, createSession } = await setup();
+    const { db, owner, actor } = await setup();
     await D1.shared.action.billing.linkBillingCustomer(db, {
       accountId: owner.id,
       providerCustomerId: "cus_subscribed",
@@ -337,12 +322,10 @@ describe("billing sessions", () => {
     const createCheckoutSession = vi.fn();
     await expect(
       createBillingCheckoutSession({
-        idToken: "token",
-        lineLoginChannelId: "channel",
+        actor,
         db,
         provider: new billing.FakeBillingProvider({ createCheckoutSession }),
         webOrigin: "https://app.example.test",
-        createSession,
         plan: "lite",
         interval: "month",
         lookupKeyMap: { "lite.month": "lite_month" },
@@ -352,7 +335,7 @@ describe("billing sessions", () => {
   });
 
   it("ファミリー席を利用中の本人に個人契約を購入させない", async () => {
-    const { db, owner, createSession } = await setup();
+    const { db, owner, actor } = await setup();
     const payer = await D1.shared.action.account.upsertIdentity(db, {
       provider: "line_login",
       providerAccountId: crypto.randomUUID(),
@@ -368,12 +351,10 @@ describe("billing sessions", () => {
 
     await expect(
       createBillingCheckoutSession({
-        idToken: "token",
-        lineLoginChannelId: "channel",
+        actor,
         db,
         provider: new billing.FakeBillingProvider({ createCheckoutSession }),
         webOrigin: "https://app.example.test",
-        createSession,
         plan: "lite",
         interval: "month",
         lookupKeyMap: { "lite.month": "lite_month" },
@@ -389,7 +370,7 @@ describe("billing sessions", () => {
   ] as const)(
     "%s/%sから%s/%sへの変更にbilling cycle policy %sを使う",
     async (currentPlan, currentInterval, targetPlan, targetInterval, expectedAnchor) => {
-      const { db, owner, createSession } = await setup();
+      const { db, owner, actor } = await setup();
       await D1.shared.action.billing.linkBillingCustomer(db, {
         accountId: owner.id,
         providerCustomerId: "cus_change",
@@ -438,12 +419,10 @@ describe("billing sessions", () => {
 
       await expect(
         createBillingPlanChangeSession({
-          idToken: "token",
-          lineLoginChannelId: "channel",
+          actor,
           db,
           provider,
           webOrigin: "https://app.example.test",
-          createSession,
           plan: targetPlan,
           interval: targetInterval,
           lookupKeyMap: { [`${targetPlan}.${targetInterval}`]: "target_lookup" },
@@ -465,7 +444,7 @@ describe("billing sessions", () => {
   );
 
   it("creates a portal only for the authenticated Account customer", async () => {
-    const { db, owner, createSession } = await setup();
+    const { db, owner, actor } = await setup();
     const other = await D1.shared.action.account.upsertIdentity(db, {
       provider: "line_login",
       providerAccountId: crypto.randomUUID(),
@@ -484,12 +463,10 @@ describe("billing sessions", () => {
     const provider = new billing.FakeBillingProvider({ createPortalSession });
     await expect(
       createBillingPortalSession({
-        idToken: "token",
-        lineLoginChannelId: "channel",
+        actor,
         db,
         provider,
         webOrigin: "https://app.example.test",
-        createSession,
       }),
     ).resolves.toEqual({ type: "created", url: "https://billing.stripe.test/portal" });
     expect(createPortalSession).toHaveBeenCalledWith({
@@ -499,7 +476,7 @@ describe("billing sessions", () => {
   });
 
   it("Checkout復帰状態は本人のCustomerに属するSessionだけ返す", async () => {
-    const { db, owner, createSession } = await setup();
+    const { db, owner, actor } = await setup();
     await D1.shared.action.billing.linkBillingCustomer(db, {
       accountId: owner.id,
       providerCustomerId: "cus_owner",
@@ -513,12 +490,10 @@ describe("billing sessions", () => {
       interval: "month",
     });
     const base = {
-      idToken: "token",
-      lineLoginChannelId: "channel",
+      actor,
       db,
       provider: new billing.FakeBillingProvider({ retrieveCheckoutSession }),
       webOrigin: "https://app.example.test",
-      createSession,
       checkoutSessionId: "cs_test_completed",
     };
 
@@ -540,16 +515,14 @@ describe("billing sessions", () => {
   });
 
   it("Customer対応がない本人にはPortalを作成しない", async () => {
-    const { db, createSession } = await setup();
+    const { db, actor } = await setup();
     const createPortalSession = vi.fn();
     await expect(
       createBillingPortalSession({
-        idToken: "token",
-        lineLoginChannelId: "channel",
+        actor,
         db,
         provider: new billing.FakeBillingProvider({ createPortalSession }),
         webOrigin: "https://app.example.test",
-        createSession,
       }),
     ).resolves.toEqual({ type: "unavailable", reason: "customer_not_found" });
     expect(createPortalSession).not.toHaveBeenCalled();

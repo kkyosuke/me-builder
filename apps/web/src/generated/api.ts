@@ -1073,6 +1073,20 @@ export interface operations {
           };
         };
       };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
+          };
+        };
+      };
       /** @description 未処理のサーバーエラー */
       500: {
         headers: {
@@ -1420,6 +1434,20 @@ export interface operations {
           };
         };
       };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
+          };
+        };
+      };
       /** @description 未処理のサーバーエラー */
       500: {
         headers: {
@@ -1703,6 +1731,20 @@ export interface operations {
               | "same_plan"
               | "subscription_not_found"
               | "configuration_missing";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };
@@ -4711,6 +4753,20 @@ export interface operations {
           };
         };
       };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
+          };
+        };
+      };
       /** @description 未処理のサーバーエラー */
       500: {
         headers: {
@@ -4838,6 +4894,20 @@ export interface operations {
               | "invitation_expired"
               | "token_used"
               | "account_already_assigned";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };
@@ -4974,6 +5044,20 @@ export interface operations {
           };
         };
       };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
+          };
+        };
+      };
       /** @description 未処理のサーバーエラー */
       500: {
         headers: {
@@ -5107,6 +5191,20 @@ export interface operations {
           };
         };
       };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
+          };
+        };
+      };
       /** @description 未処理のサーバーエラー */
       500: {
         headers: {
@@ -5233,6 +5331,20 @@ export interface operations {
               | "invitation_expired"
               | "token_used"
               | "account_already_assigned";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };
@@ -5365,6 +5477,20 @@ export interface operations {
           };
         };
       };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
+          };
+        };
+      };
       /** @description 未処理のサーバーエラー */
       500: {
         headers: {
@@ -5489,6 +5615,20 @@ export interface operations {
               | "invitation_expired"
               | "token_used"
               | "account_already_assigned";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };

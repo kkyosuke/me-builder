@@ -1,6 +1,6 @@
 import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
 import * as v from "valibot";
-import { authenticatedErrors, jsonResponse } from "./shared/errors";
+import { authenticatedErrors, currentTermsPolicyError, jsonResponse } from "./shared/errors";
 
 export const AccountRecoveryCodeResponseSchema = v.object({
   code: v.pipe(v.string(), v.nonEmpty()),
@@ -31,6 +31,7 @@ export const accountRecoveryCodeRoute = describeRoute({
     201: jsonResponse("一度だけ表示する復旧コード", AccountRecoveryCodeResponseSchema),
     409: jsonResponse("有料契約がない", AccountRecoveryUnavailableSchema),
     ...authenticatedErrors,
+    ...currentTermsPolicyError,
   },
 } satisfies DescribeRouteOptions);
 

@@ -1,38 +1,28 @@
 import { D1, billing } from "@me-builder/lib";
 import { BILLING_INITIAL_TRIAL_DAYS } from "@me-builder/shared";
-import { createLiffSession } from "./liff-session";
+import type { AuthenticatedActor } from "./authentication/types";
 
 type BaseParams = {
-  idToken: string | undefined;
-  lineLoginChannelId: string | undefined;
+  actor: AuthenticatedActor;
   db: D1.shared.Client;
   provider: billing.BillingProvider;
   webOrigin: string;
-  createSession?: typeof createLiffSession;
 };
 
-type AuthParams = Pick<
-  BaseParams,
-  "idToken" | "lineLoginChannelId" | "db" | "provider" | "createSession"
->;
-
-type SessionFailure =
-  | { type: "not-configured" | "unauthenticated" | "account-not-found" }
-  | {
-      type: "unavailable";
-      reason:
-        | "plan_unavailable"
-        | "existing_subscription"
-        | "family_seat_active"
-        | "checkout_in_progress"
-        | "customer_not_found"
-        | "same_plan"
-        | "subscription_not_found"
-        | "configuration_missing";
-    };
+type SessionFailure = {
+  type: "unavailable";
+  reason:
+    | "plan_unavailable"
+    | "existing_subscription"
+    | "family_seat_active"
+    | "checkout_in_progress"
+    | "customer_not_found"
+    | "same_plan"
+    | "subscription_not_found"
+    | "configuration_missing";
+};
 
 export type CheckoutSessionStatusResult =
-  | Exclude<SessionFailure, { type: "unavailable" }>
   | { type: "not-found" }
   | { type: "found"; status: "open" | "complete" | "expired" };
 
@@ -43,13 +33,7 @@ export async function createBillingCheckoutSession(
     lookupKeyMap: Readonly<Record<string, string>>;
   },
 ): Promise<SessionFailure | { type: "created"; url: string }> {
-  const session = await (params.createSession ?? createLiffSession)({
-    idToken: params.idToken,
-    lineLoginChannelId: params.lineLoginChannelId,
-    db: params.db,
-  });
-  if (session.type !== "resolved") return { type: session.type };
-  const accountId = session.session.accountId;
+  const accountId = params.actor.accountId;
   const lookupKey = params.lookupKeyMap[`${params.plan}.${params.interval}`];
   if (!lookupKey) return { type: "unavailable", reason: "plan_unavailable" };
   const familySeat = await D1.shared.action.familySeat.readActiveFamilySeatByMember(
@@ -121,15 +105,9 @@ export async function createBillingCheckoutSession(
 export async function getBillingCheckoutSessionStatus(
   params: BaseParams & { checkoutSessionId: string },
 ): Promise<CheckoutSessionStatusResult> {
-  const session = await (params.createSession ?? createLiffSession)({
-    idToken: params.idToken,
-    lineLoginChannelId: params.lineLoginChannelId,
-    db: params.db,
-  });
-  if (session.type !== "resolved") return { type: session.type };
   const customer = await D1.shared.action.billing.findBillingCustomerByAccount(
     params.db,
-    session.session.accountId,
+    params.actor.accountId,
   );
   if (!customer) return { type: "not-found" };
   try {
@@ -145,18 +123,9 @@ export async function getBillingCheckoutSessionStatus(
 }
 
 export async function getBillingTrialEligibility(
-  params: AuthParams,
-): Promise<
-  | { type: "resolved"; eligible: boolean }
-  | { type: "not-configured" | "unauthenticated" | "account-not-found" }
-> {
-  const session = await (params.createSession ?? createLiffSession)({
-    idToken: params.idToken,
-    lineLoginChannelId: params.lineLoginChannelId,
-    db: params.db,
-  });
-  if (session.type !== "resolved") return { type: session.type };
-  const accountId = session.session.accountId;
+  params: Pick<BaseParams, "actor" | "db" | "provider">,
+): Promise<{ type: "resolved"; eligible: boolean }> {
+  const accountId = params.actor.accountId;
   const usedInProjection = await D1.shared.action.billing.hasUsedBillingTrial(params.db, accountId);
   const customer = await D1.shared.action.billing.findBillingCustomerByAccount(
     params.db,
@@ -183,15 +152,9 @@ function isTerminalSubscription(status: billing.BillingSubscriptionStatus): bool
 export async function createBillingPortalSession(
   params: BaseParams,
 ): Promise<SessionFailure | { type: "created"; url: string }> {
-  const session = await (params.createSession ?? createLiffSession)({
-    idToken: params.idToken,
-    lineLoginChannelId: params.lineLoginChannelId,
-    db: params.db,
-  });
-  if (session.type !== "resolved") return { type: session.type };
   const customer = await D1.shared.action.billing.findBillingCustomerByAccount(
     params.db,
-    session.session.accountId,
+    params.actor.accountId,
   );
   if (!customer) return { type: "unavailable", reason: "customer_not_found" };
   const providerCustomer = await params.provider.retrieveCustomer(customer.providerCustomerId);
@@ -213,13 +176,7 @@ export async function createBillingPlanChangeSession(
     portalResetAvailable: boolean;
   },
 ): Promise<SessionFailure | { type: "created"; url: string }> {
-  const session = await (params.createSession ?? createLiffSession)({
-    idToken: params.idToken,
-    lineLoginChannelId: params.lineLoginChannelId,
-    db: params.db,
-  });
-  if (session.type !== "resolved") return { type: session.type };
-  const accountId = session.session.accountId;
+  const accountId = params.actor.accountId;
   const [customer, projection] = await Promise.all([
     D1.shared.action.billing.findBillingCustomerByAccount(params.db, accountId),
     D1.shared.action.billing.findBillingProjectionByAccount(params.db, accountId),

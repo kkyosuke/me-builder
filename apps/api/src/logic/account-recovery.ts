@@ -1,29 +1,33 @@
-import { D1, line } from "@me-builder/lib";
-import { createLiffSession } from "./liff-session";
+import { D1 } from "@me-builder/lib";
+import type { AuthenticatedActor } from "./authentication/types";
 
 const RECOVERY_CODE_TTL_MS = 30 * 24 * 60 * 60 * 1_000;
 
-type SessionParams = {
-  idToken: string | undefined;
-  lineLoginChannelId: string | undefined;
+type BaseParams = {
   db: D1.shared.Client;
 };
 
+export type VerifiedRecoveryIdentity = Readonly<{
+  subject: string;
+}>;
+
+export interface AccountSessionInvalidator {
+  invalidateAccountSessions(accountId: string): Promise<void>;
+}
+
+const pendingSessionInvalidator: AccountSessionInvalidator = {
+  async invalidateAccountSessions() {},
+};
+
 export async function issueAccountRecoveryCode(
-  params: SessionParams & { now?: Date; createSession?: typeof createLiffSession },
+  params: BaseParams & { actor: AuthenticatedActor; now?: Date },
 ) {
-  const session = await (params.createSession ?? createLiffSession)({
-    idToken: params.idToken,
-    lineLoginChannelId: params.lineLoginChannelId,
-    db: params.db,
-  });
-  if (session.type !== "resolved") return { type: session.type } as const;
   const assignment = await new D1.shared.action.billing.D1AccountPlanAssignmentProvider(
     params.db,
-  ).findCurrent(session.session.accountId, params.now);
+  ).findCurrent(params.actor.accountId, params.now);
   if (assignment.plan === "free") {
     await D1.shared.action.accountRecovery.recordAccountRecoveryAudit(params.db, {
-      accountId: session.session.accountId,
+      accountId: params.actor.accountId,
       action: "issue",
       outcome: "rejected",
       reason: "paid-contract-required",
@@ -40,7 +44,7 @@ export async function issueAccountRecoveryCode(
   const expiresAt = new Date(now.getTime() + RECOVERY_CODE_TTL_MS);
   await D1.shared.action.accountRecovery.issueAccountRecoveryCredential(params.db, {
     id,
-    accountId: session.session.accountId,
+    accountId: params.actor.accountId,
     secretHash,
     expiresAt,
     now,
@@ -49,16 +53,16 @@ export async function issueAccountRecoveryCode(
 }
 
 export async function recoverAccountWithCode(
-  params: SessionParams & { code: string; requestKey: string; now?: Date },
+  params: BaseParams & {
+    identity: VerifiedRecoveryIdentity;
+    code: string;
+    requestKey: string;
+    now?: Date;
+  },
+  sessionInvalidator: AccountSessionInvalidator = pendingSessionInvalidator,
 ) {
-  if (!params.lineLoginChannelId || !params.idToken) return { type: "unauthenticated" } as const;
-  const verified = await line.idToken.verify({
-    idToken: params.idToken,
-    channelId: params.lineLoginChannelId,
-  });
-  if (!verified.ok) return { type: "unauthenticated" } as const;
   const now = params.now ?? new Date();
-  const identityFingerprint = await sha256Base64Url(verified.claims.sub);
+  const identityFingerprint = await sha256Base64Url(params.identity.subject);
   const rateLimitKeys = [
     await sha256Base64Url(`identity:${identityFingerprint}`),
     await sha256Base64Url(`request:${params.requestKey}`),
@@ -102,7 +106,7 @@ export async function recoverAccountWithCode(
   const result = await D1.shared.action.accountRecovery.completeAccountRecovery(params.db, {
     credentialId,
     expectedSecretHash: credential.secretHash,
-    newProviderAccountId: verified.claims.sub,
+    newProviderAccountId: params.identity.subject,
     identityFingerprint,
     now,
   });
@@ -124,9 +128,11 @@ export async function recoverAccountWithCode(
     params.db,
     credentialId,
   );
+  const accountId = linked?.accountId ?? credential.accountId;
+  await sessionInvalidator.invalidateAccountSessions(accountId);
   return {
     type: "recovered",
-    accountId: linked?.accountId ?? credential.accountId,
+    accountId,
     alreadyRecovered: result === "already-recovered",
   } as const;
 }
