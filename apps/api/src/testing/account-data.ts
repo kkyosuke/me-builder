@@ -246,6 +246,21 @@ const actions = {
     sourceRecordId: string,
     at?: Date,
   ) => DO.account.action.source.deletePersonalDataRecord(db, accountId, sourceRecordId, at),
+  "personalDataExport.request": (db: DO.account.Database, accountId: string, at?: Date) =>
+    DO.account.action.personalDataExport.requestPersonalDataExport(db, accountId, at),
+  "personalDataExport.readStatus": (
+    db: DO.account.Database,
+    accountId: string,
+    exportId: string,
+    at?: Date,
+  ) =>
+    DO.account.action.personalDataExport.readPersonalDataExportStatus(db, accountId, exportId, at),
+  "personalDataExport.readArchive": (
+    db: DO.account.Database,
+    accountId: string,
+    exportId: string,
+    at?: Date,
+  ) => DO.account.action.personalDataExport.readPersonalDataArchive(db, accountId, exportId, at),
   "diagnosisProjection.processLatest": (
     db: DO.account.Database,
     accountId: string,

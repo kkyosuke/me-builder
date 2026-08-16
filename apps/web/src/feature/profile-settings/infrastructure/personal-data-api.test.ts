@@ -2,7 +2,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   correctPersonalDataRecord,
   deletePersonalDataRecord,
+  downloadPersonalDataExport,
+  fetchPersonalDataExport,
   fetchPersonalDataRecords,
+  requestPersonalDataExport,
 } from "./personal-data-api";
 
 describe("personal data api", () => {
@@ -74,6 +77,41 @@ describe("personal data api", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 404 })));
     await expect(deletePersonalDataRecord("", "token", "missing")).rejects.toThrow(
       "すでに削除または訂正",
+    );
+  });
+
+  it("本人データexportの作成・状態確認・downloadを認証付きで行う", async () => {
+    const exportBody = {
+      export: {
+        id: "export-1",
+        status: "ready",
+        requestedAt: "2026-08-15T00:00:00.000Z",
+        completedAt: "2026-08-15T00:00:01.000Z",
+        expiresAt: "2026-08-16T00:00:01.000Z",
+        downloadUrl: "/api/personal-data/exports/export-1/download",
+      },
+    };
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ...exportBody, outcome: "created" })))
+      .mockResolvedValueOnce(new Response(JSON.stringify(exportBody)))
+      .mockResolvedValueOnce(
+        new Response("{}", { headers: { "Content-Type": "application/json" } }),
+      );
+    vi.stubGlobal("fetch", fetch);
+
+    await expect(requestPersonalDataExport("", "token")).resolves.toMatchObject({
+      id: "export-1",
+      status: "ready",
+    });
+    await expect(fetchPersonalDataExport("", "token", "export-1")).resolves.toMatchObject({
+      id: "export-1",
+    });
+    await expect(downloadPersonalDataExport("", "token", "export-1")).resolves.toBeInstanceOf(Blob);
+    expect(fetch).toHaveBeenNthCalledWith(
+      3,
+      "/api/personal-data/exports/export-1/download",
+      expect.objectContaining({ headers: { Authorization: "Bearer token" } }),
     );
   });
 });
