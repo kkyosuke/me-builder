@@ -55,8 +55,11 @@ function assertTrustedEndpoint(issuer: URL, endpoint: string): void {
 
 function assertTrustedCallback(callbackUrl: string): void {
   const callback = new URL(callbackUrl);
+  const loopbackHttp =
+    callback.protocol === "http:" &&
+    ["localhost", "127.0.0.1", "[::1]"].includes(callback.hostname);
   if (
-    !["http:", "https:"].includes(callback.protocol) ||
+    (callback.protocol !== "https:" && !loopbackHttp) ||
     callback.username ||
     callback.password ||
     callback.pathname !== "/api/auth/sso/callback" ||

@@ -234,6 +234,7 @@ describe("createAuth0SsoClient", () => {
     { issuerUrl: "https://tenant.auth0.com/?environment=preview" },
     { issuerUrl: "https://tenant.auth0.com/#issuer" },
     { callbackUrl: "javascript:alert(1)" },
+    { callbackUrl: "http://api.example.com/api/auth/sso/callback" },
     { callbackUrl: "https://api.example.com/api/auth/sso/callback?next=/admin" },
     { callbackUrl: "https://api.example.com/another/callback" },
   ])("曖昧またはbrowserへ送れないissuer/callback設定を拒否する: %o", (overrides) => {
@@ -241,6 +242,18 @@ describe("createAuth0SsoClient", () => {
       new SsoProviderError("configuration"),
     );
   });
+
+  it.each(["localhost", "127.0.0.1", "[::1]"])(
+    "local開発用loopback callbackのHTTPだけを許可する: %s",
+    (hostname) => {
+      expect(() =>
+        createAuth0SsoClient({
+          ...configuration,
+          callbackUrl: `http://${hostname}:8787/api/auth/sso/callback`,
+        }),
+      ).not.toThrow();
+    },
+  );
 
   it("fragmentを含むdiscovery endpointを拒否する", async () => {
     const client = createAuth0SsoClient(configuration, {
