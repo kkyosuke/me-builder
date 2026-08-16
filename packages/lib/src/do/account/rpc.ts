@@ -56,7 +56,7 @@ export type AccountDataActions = {
     typeof brain.findActiveBrainVectorEntry
   >;
   "brain.loadChatContextMemories": RpcAction<
-    [vectorIds: readonly string[], at?: Date, notBefore?: Date],
+    [vectorIds: readonly string[], at?: Date, notBefore?: Date, requiredAccessLabel?: string],
     typeof brain.loadBrainChatContextMemories
   >;
   "brain.loadRelationshipDiagnosisContexts": RpcAction<

@@ -1,6 +1,13 @@
-import type { ConversationContextMessage, RelationshipDiagnosisContext } from "@me-builder/lib";
+import type {
+  BrainChatContextMemory,
+  ConversationContextMessage,
+  RelationshipDiagnosisContext,
+} from "@me-builder/lib";
 import { describe, expect, it } from "vitest";
-import { buildRelationshipQuestionPlan } from "./relationship-question";
+import {
+  buildRelationshipQuestionPlan,
+  selectFullRelationshipHistory,
+} from "./relationship-question";
 
 const messages: ConversationContextMessage[] = [
   { id: "old-user", role: "user", body: "昨日は散歩した", sequence: 1 },
@@ -98,5 +105,65 @@ describe("buildRelationshipQuestionPlan", () => {
         currentUserMessageIds: ["current"],
       }),
     ).toEqual({ active: false, messages: workDiary });
+  });
+});
+
+const fullMemory = (overrides: Partial<BrainChatContextMemory>): BrainChatContextMemory => ({
+  brainItemId: "history-1",
+  category: "memory",
+  statement: "上司と面談して、希望を伝えた",
+  derivation: "ai",
+  isInference: false,
+  status: "active",
+  confidence: { state: "confirmed" },
+  accessLabels: ["relationship"],
+  firstObservedAt: new Date("2026-08-01T00:00:00Z"),
+  lastObservedAt: new Date("2026-08-01T00:00:00Z"),
+  evidence: [
+    {
+      sourceRecordId: "source-1",
+      text: "上司と面談して、希望を伝えた",
+      recordedAt: new Date("2026-08-01T00:00:00Z"),
+    },
+  ],
+  ...overrides,
+});
+
+describe("selectFullRelationshipHistory", () => {
+  it("現在の相手に一致する確認済み出来事とGoalだけを返す", () => {
+    const plan = buildRelationshipQuestionPlan({
+      accountId: "account-1",
+      mode: "confirmed-history",
+      messages: [{ id: "current", role: "user", body: "上司との面談が不安", sequence: 1 }],
+      currentUserMessageIds: ["current"],
+    });
+    if (!plan.active) throw new Error("relationship plan was not activated");
+    const memories = [
+      fullMemory({}),
+      fullMemory({ brainItemId: "goal", category: "goal", statement: "上司へ来週相談したい" }),
+      fullMemory({ brainItemId: "other", statement: "友達と旅行した" }),
+      fullMemory({ brainItemId: "inferred", isInference: true }),
+      fullMemory({ brainItemId: "unsupported", evidence: [] }),
+      fullMemory({ brainItemId: "style", category: "preference" }),
+    ];
+
+    expect(
+      selectFullRelationshipHistory(plan.context, memories).map(({ brainItemId }) => brainItemId),
+    ).toEqual(["history-1", "goal"]);
+  });
+
+  it("同名別人を区別できない固有名の履歴は安全側で利用しない", () => {
+    const plan = buildRelationshipQuestionPlan({
+      accountId: "account-1",
+      mode: "confirmed-history",
+      messages: [{ id: "current", role: "user", body: "田中さんと揉めた", sequence: 1 }],
+      currentUserMessageIds: ["current"],
+    });
+    if (!plan.active) throw new Error("relationship plan was not activated");
+    expect(
+      selectFullRelationshipHistory(plan.context, [
+        fullMemory({ statement: "田中さんと以前相談した" }),
+      ]),
+    ).toEqual([]);
   });
 });

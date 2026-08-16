@@ -598,6 +598,110 @@ describe("LINE diary chat delivery E2E", () => {
     expect(JSON.stringify(prompt)).not.toContain("partner-relationship-style");
   });
 
+  it("Fullは現在の相手に関係する確認済み履歴だけを使い、本人側の根拠を監査保存する", async () => {
+    const diaryText = "上司との面談が不安";
+    const { bindings, queuedTurn } = await ingestDiary(diaryText, "relationship-full");
+    const [source] = await accountDataStore.db.select().from(DO.account.schema.sourceRecords);
+    if (!source) throw new Error("Expected a source record");
+    const at = new Date("2026-08-10T00:00:00Z");
+    await DO.account.action.brain.saveBrainItem(accountDataStore.db, {
+      at,
+      item: {
+        id: "full-relationship-memory",
+        accountId: queuedTurn.accountId,
+        category: "memory",
+        statement: "上司との面談が不安",
+        attributes: { sourceKind: "diary", isInference: false },
+        derivation: "ai",
+        status: "active",
+        stability: "temporary",
+        sensitivity: "normal",
+        externallyShareable: false,
+        confidence: { state: "confirmed" },
+      },
+      evidence: [
+        {
+          id: "full-relationship-evidence",
+          sourceRecordId: source.id,
+          relation: "supports",
+          isDerivationTrigger: true,
+          derivationMethod: "ai",
+          generatedAt: at,
+        },
+      ],
+      accessLabels: [
+        { id: "full-relationship-access", label: "relationship", assignedBy: "owner" },
+      ],
+    });
+    await accountDataStore.db.insert(DO.account.schema.brainVectorEntries).values({
+      id: "vector-full-relationship",
+      brainItemId: "full-relationship-memory",
+      itemRevision: at.getTime(),
+    });
+    bindings.vector = {
+      brain: {
+        query: vi.fn().mockResolvedValue({
+          matches: [{ id: "vector-full-relationship", score: 0.95 }],
+          count: 1,
+        }),
+      } as unknown as VectorizeIndex,
+    };
+    bindings.planAssignmentProvider = new billing.FakeAccountPlanAssignmentProvider([
+      {
+        accountId: queuedTurn.accountId,
+        plan: "full",
+        source: "subscription",
+        effectiveAt: new Date(0).toISOString(),
+        availableUntil: null,
+        payerAccountId: queuedTurn.accountId,
+      },
+    ]);
+    mockGenerateContent.mockResolvedValueOnce({
+      text: JSON.stringify({
+        mode: "explore",
+        reply: "前にも面談を気にしていたんだね。今回は何を一番伝えたい？",
+        main_question_count: 1,
+        end_session: false,
+        daily_prompt_follow_up: "none",
+        collection_theme_id: "none",
+        collection_kind: "none",
+        safety: { route: "normal", restricted_advice: false },
+        used_memory_ids: ["memory-1"],
+      }),
+    });
+
+    await processChatTurnMessage(
+      createQueueMessage(queuedTurn),
+      bindings,
+      getWorkerConfig({
+        ENVIRONMENT: "test",
+        LINE_CHANNEL_ACCESS_TOKEN: "line-token",
+        CHAT_DELIVERY_SECRET: "delivery-secret",
+        GOOGLE_VERTEX_AI_API_KEY: "google-key",
+        BRAIN_VECTOR_HMAC_SECRET: "brain-secret",
+      }),
+    );
+
+    const prompt = JSON.parse(mockGenerateContent.mock.calls[0]?.[0]?.contents).context_package;
+    expect(prompt.memories).toEqual([
+      expect.objectContaining({
+        id: "memory-1",
+        category: "memory",
+        statement: "上司との面談が不安",
+        access_labels: ["relationship"],
+      }),
+    ]);
+    expect(
+      await accountDataStore.db.select().from(DO.account.schema.diaryChatBrainUsageAudits),
+    ).toEqual([
+      expect.objectContaining({
+        turnId: queuedTurn.turnId,
+        brainItemId: "full-relationship-memory",
+        sourceRecordIds: [source.id],
+      }),
+    ]);
+  });
+
   it("Free上限到達後も切迫した危機表現は利用枠を使わず安全案内へ切り替える", async () => {
     const { bindings, queuedTurn } = await ingestDiary("今すぐ死ぬ準備をしている", "safety-limit");
     await exhaustFreeAiReplyUsage(queuedTurn.accountId);
