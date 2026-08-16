@@ -117,6 +117,11 @@ describe("SSO identity controller", () => {
     expect(response.headers.get("location")).toBe(
       "https://tenant.auth0.com/authorize?state=opaque",
     );
+    expect(response.headers.get("set-cookie")).toContain("__Host-me_builder_sso_link_state=opaque");
+    expect(response.headers.get("set-cookie")).toContain("HttpOnly");
+    expect(response.headers.get("set-cookie")).toContain("Secure");
+    expect(response.headers.get("set-cookie")).toContain("SameSite=Lax");
+    expect(response.headers.get("set-cookie")).toContain("Path=/");
     expect(mocks.createStore).toHaveBeenCalledWith(env.SESSION_STORE);
     expect(mocks.startLinking).toHaveBeenCalledWith(
       expect.objectContaining({ initiatingAccountId: "account-at-start", returnTo: "/profile" }),
@@ -127,7 +132,7 @@ describe("SSO identity controller", () => {
     mocks.completeLinking.mockResolvedValue({ providerKey: "auth0", returnTo: "/profile" });
     const response = await testApp("/api/auth/sso/callback", getSsoCallback).request(
       "https://api.example.com/api/auth/sso/callback?state=opaque&code=code",
-      undefined,
+      { headers: { Cookie: "__Host-me_builder_sso_link_state=opaque" } },
       env,
     );
 
@@ -136,19 +141,34 @@ describe("SSO identity controller", () => {
     expect(mocks.completeLinking).toHaveBeenCalledWith(
       expect.objectContaining({ state: "opaque", code: "code" }),
     );
+    expect(response.headers.get("set-cookie")).toContain("Max-Age=0");
   });
 
   it("IdPキャンセルでもtransactionを消費して固定pathへ復帰する", async () => {
     mocks.cancelLinking.mockResolvedValue({ returnTo: "/profile" });
     const response = await testApp("/api/auth/sso/callback", getSsoCallback).request(
       "https://api.example.com/api/auth/sso/callback?state=opaque&error=access_denied",
-      undefined,
+      { headers: { Cookie: "__Host-me_builder_sso_link_state=opaque" } },
       env,
     );
 
     expect(response.status).toBe(302);
     expect(response.headers.get("location")).toBe("https://stg.example.com/profile?sso=cancelled");
     expect(mocks.cancelLinking).toHaveBeenCalledWith(expect.objectContaining({ state: "opaque" }));
+  });
+
+  it("開始browserと一致しないlink callbackをtransaction消費前に拒否する", async () => {
+    const response = await testApp("/api/auth/sso/callback", getSsoCallback).request(
+      "https://api.example.com/api/auth/sso/callback?state=transferred&code=code",
+      { headers: { Cookie: "__Host-me_builder_sso_link_state=another" } },
+      env,
+    );
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get("location")).toBe("https://stg.example.com/profile?sso=error");
+    expect(mocks.completeLinking).not.toHaveBeenCalled();
+    expect(mocks.cancelLinking).not.toHaveBeenCalled();
+    expect(response.headers.get("set-cookie")).toContain("Max-Age=0");
   });
 
   it("最後のIdentity解除は409にして保持する", async () => {

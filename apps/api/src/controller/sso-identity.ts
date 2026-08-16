@@ -1,5 +1,6 @@
 import { D1 } from "@me-builder/lib";
 import type { Context } from "hono";
+import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import * as v from "valibot";
 import { getConfig } from "../config";
 import { LastIdentityConflictSchema, SsoIdentityStatusSchema } from "../contract/auth/sso-identity";
@@ -18,6 +19,20 @@ import {
 } from "../logic/authentication/sso-transaction";
 import { authenticatedActor } from "../middleware/authentication";
 import type { AppEnv } from "../types";
+
+const SSO_LINK_STATE_COOKIE = "me_builder_sso_link_state";
+const SECURE_SSO_LINK_STATE_COOKIE = "__Host-me_builder_sso_link_state";
+const SSO_LINK_STATE_TTL_SECONDS = 10 * 60;
+
+function linkStateCookieOptions(secure: boolean) {
+  return {
+    path: "/",
+    httpOnly: true,
+    secure,
+    sameSite: "Lax" as const,
+    maxAge: SSO_LINK_STATE_TTL_SECONDS,
+  };
+}
 
 function unavailable(c: Context<AppEnv>): Response {
   return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
@@ -38,6 +53,7 @@ function configured(c: Context<AppEnv>) {
   }
   return {
     configuration,
+    secureCallback: new URL(configuration.ssoCallbackUrl).protocol === "https:",
     store: createSsoTransactionStore(c.env.SESSION_STORE),
     client: createAuth0SsoClient({
       issuerUrl: configuration.ssoIssuerUrl,
@@ -80,6 +96,12 @@ export async function getSsoIdentityLink(c: Context<AppEnv>): Promise<Response> 
     store: dependencies.store,
     client: dependencies.client,
   });
+  const state = authorizationUrl.searchParams.get("state");
+  if (!state) return unavailable(c);
+  const cookieName = dependencies.secureCallback
+    ? SECURE_SSO_LINK_STATE_COOKIE
+    : SSO_LINK_STATE_COOKIE;
+  setCookie(c, cookieName, state, linkStateCookieOptions(dependencies.secureCallback));
   return c.redirect(authorizationUrl.href, 302);
 }
 
@@ -88,6 +110,12 @@ export async function getSsoCallback(c: Context<AppEnv>): Promise<Response> {
   const dependencies = configured(c);
   if (!dependencies || !c.env?.DB) return unavailable(c);
   const state = c.req.query("state") ?? "";
+  const cookieName = dependencies.secureCallback
+    ? SECURE_SSO_LINK_STATE_COOKIE
+    : SSO_LINK_STATE_COOKIE;
+  const expectedState = getCookie(c, cookieName);
+  deleteCookie(c, cookieName, linkStateCookieOptions(dependencies.secureCallback));
+  if (!state || state !== expectedState) return redirectToWeb(c, "/profile?sso=error");
   try {
     if (c.req.query("error")) {
       const cancelled = await cancelSsoIdentityLinking({ state, store: dependencies.store });
