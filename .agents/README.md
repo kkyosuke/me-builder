@@ -56,6 +56,7 @@
 | [Brainのラベル・アクセス制御設計](../docs/domain/brain/brain-access-label-design.md) | Topic Label、Access Label、Access Profile、MCP提供時の原則、Source Recordの既定ラベル |
 | [インフラ・システム構成](../docs/architecture/infrastructure-architecture.md) | Cloudflareを全面的に採用したインフラ基盤、システム構成、サービス配置 |
 | [課金・Plan紐付け実装設計](../docs/architecture/billing-implementation-design.md) | Stripe、Billing Queue、共有D1、AccountPlanAssignmentの境界と収束原則 |
+| [Account復旧設計](../docs/architecture/account-recovery-design.md) | LINE Account喪失時の復旧資格情報、Identity再接続、監査、復旧不能時の境界 |
 | [Accountデータ分離設計](../docs/architecture/account-data-isolation.md) | 1 Account = 1 AccountData DO、保存先の判定規則、内部module、共有D1が保存するもの |
 | [相性共有データ実装設計](../docs/architecture/compatibility-data-design.md) | CompatibilityData DO、AccountData一覧参照、相手単位の継続同意、状態遷移、migration規則 |
 | [日記チャット実装設計](../docs/architecture/diary-chat-implementation-design.md) | 日記チャットのAccountDataモデル、声かけコンテキストの保存、実行基盤、プロンプト、ガードレール、応答期限 |
