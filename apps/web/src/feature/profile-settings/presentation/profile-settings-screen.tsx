@@ -234,40 +234,42 @@ export function ProfileSettingsScreen({
           </div>
         </section>
 
-        {onOpenBillingPortal && (
-          <section aria-labelledby="billing-setting-heading" className="mt-8">
-            <h2
-              id="billing-setting-heading"
-              className="px-1 text-sm font-bold tracking-wider text-slate-500 dark:text-slate-400"
-            >
-              契約とお支払い
-            </h2>
-            <button
-              type="button"
-              onClick={() => void openBillingPortal()}
-              disabled={billingState.status === "loading"}
-              className="mt-3 flex min-h-16 w-full items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-sky-300 hover:bg-sky-50/50 disabled:cursor-wait disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:border-slate-700 dark:bg-slate-800 dark:hover:border-sky-700 dark:hover:bg-sky-950/20"
-            >
-              <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-700 dark:bg-sky-400/15 dark:text-sky-200">
-                <CreditCard className="size-5" aria-hidden="true" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block font-bold text-slate-950 dark:text-white">
-                  {billingState.status === "loading" ? "契約管理を開いています..." : "契約を管理"}
+        {onOpenBillingPortal &&
+          entitlement?.status === "success" &&
+          entitlement.data.source === "subscription" && (
+            <section aria-labelledby="billing-setting-heading" className="mt-8">
+              <h2
+                id="billing-setting-heading"
+                className="px-1 text-sm font-bold tracking-wider text-slate-500 dark:text-slate-400"
+              >
+                契約とお支払い
+              </h2>
+              <button
+                type="button"
+                onClick={() => void openBillingPortal()}
+                disabled={billingState.status === "loading"}
+                className="mt-3 flex min-h-16 w-full items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-sky-300 hover:bg-sky-50/50 disabled:cursor-wait disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:border-slate-700 dark:bg-slate-800 dark:hover:border-sky-700 dark:hover:bg-sky-950/20"
+              >
+                <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-700 dark:bg-sky-400/15 dark:text-sky-200">
+                  <CreditCard className="size-5" aria-hidden="true" />
                 </span>
-                <span className="mt-1 block text-sm text-slate-500 dark:text-slate-400">
-                  支払方法、請求履歴、解約を確認
+                <span className="min-w-0 flex-1">
+                  <span className="block font-bold text-slate-950 dark:text-white">
+                    {billingState.status === "loading" ? "契約管理を開いています..." : "契約を管理"}
+                  </span>
+                  <span className="mt-1 block text-sm text-slate-500 dark:text-slate-400">
+                    支払方法、請求履歴、解約を確認
+                  </span>
                 </span>
-              </span>
-              <ChevronRight className="size-5 text-slate-400" aria-hidden="true" />
-            </button>
-            {billingState.status === "error" && (
-              <p role="alert" className="mt-3 px-1 text-sm text-rose-700 dark:text-rose-300">
-                {billingState.message}
-              </p>
-            )}
-          </section>
-        )}
+                <ChevronRight className="size-5 text-slate-400" aria-hidden="true" />
+              </button>
+              {billingState.status === "error" && (
+                <p role="alert" className="mt-3 px-1 text-sm text-rose-700 dark:text-rose-300">
+                  {billingState.message}
+                </p>
+              )}
+            </section>
+          )}
 
         {entitlement && (
           <section aria-labelledby="subscription-heading" className="mt-8">
@@ -281,7 +283,7 @@ export function ProfileSettingsScreen({
               <output
                 aria-busy="true"
                 aria-label="利用プランを読み込んでいます"
-                className="mt-3 block min-h-36 animate-pulse rounded-2xl bg-slate-200 motion-reduce:animate-none dark:bg-slate-700"
+                className="mt-3 block h-28 animate-pulse rounded-2xl bg-slate-200 motion-reduce:animate-none dark:bg-slate-700"
               />
             ) : entitlement.status === "error" ? (
               <p
@@ -291,63 +293,59 @@ export function ProfileSettingsScreen({
                 {entitlement.message}
               </p>
             ) : (
-              <div className="mt-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+              <div className="mt-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800">
                 <div className="flex items-center gap-3">
-                  <span className="flex size-11 items-center justify-center rounded-xl bg-sky-100 text-sky-700 dark:bg-sky-400/15 dark:text-sky-200">
-                    <CreditCard className="size-5" aria-hidden="true" />
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-sky-100 text-sky-700 dark:bg-sky-400/15 dark:text-sky-200">
+                    <CreditCard className="size-4" aria-hidden="true" />
                   </span>
-                  <div>
-                    <p className="text-lg font-bold text-slate-950 dark:text-white">
-                      {
-                        (
-                          {
-                            free: "Free",
-                            lite: "Lite",
-                            full: "Full",
-                            family: "ファミリーパック",
-                          } as const
-                        )[entitlement.data.plan]
-                      }
-                    </p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                      {entitlement.data.status === "safe-default"
-                        ? "確認中（Free権限で利用中）"
-                        : entitlement.data.status === "free"
-                          ? "無料プラン"
-                          : "契約中"}
-                    </p>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-baseline gap-x-2">
+                      <p className="font-bold text-slate-950 dark:text-white">
+                        {
+                          (
+                            {
+                              free: "Free",
+                              lite: "Lite",
+                              full: "Full",
+                              family: "ファミリーパック",
+                            } as const
+                          )[entitlement.data.plan]
+                        }
+                      </p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        {entitlement.data.status === "safe-default"
+                          ? "確認中（Free権限で利用中）"
+                          : entitlement.data.status === "free"
+                            ? "無料プラン"
+                            : "契約中"}
+                      </p>
+                    </div>
+                    <dl className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                      <div className="flex flex-wrap gap-x-1">
+                        <dt>{planDate?.label}</dt>
+                        <dd>
+                          {planDate?.value
+                            ? new Intl.DateTimeFormat("ja-JP", { dateStyle: "medium" }).format(
+                                new Date(planDate.value),
+                              )
+                            : "期限なし"}
+                        </dd>
+                      </div>
+                    </dl>
                   </div>
                 </div>
-                <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-                  <div>
-                    <dt className="text-slate-500 dark:text-slate-400">AI返信</dt>
-                    <dd className="mt-1 font-bold text-slate-950 dark:text-white">
+                <dl className="mt-3 grid grid-cols-2 gap-2">
+                  <div className="rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-900/60">
+                    <dt className="text-xs text-slate-500 dark:text-slate-400">AI返信</dt>
+                    <dd className="text-sm font-bold text-slate-950 dark:text-white">
                       残り {entitlement.data.aiReply.remaining} / {entitlement.data.aiReply.limit}
                     </dd>
                   </div>
-                  <div>
-                    <dt className="text-slate-500 dark:text-slate-400">まとめ生成</dt>
-                    <dd className="mt-1 font-bold text-slate-950 dark:text-white">
+                  <div className="rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-900/60">
+                    <dt className="text-xs text-slate-500 dark:text-slate-400">まとめ生成</dt>
+                    <dd className="text-sm font-bold text-slate-950 dark:text-white">
                       残り {entitlement.data.profileSummary.remaining} /{" "}
                       {entitlement.data.profileSummary.limit}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-slate-500 dark:text-slate-400">利用開始</dt>
-                    <dd className="mt-1 text-slate-700 dark:text-slate-200">
-                      {new Intl.DateTimeFormat("ja-JP", { dateStyle: "medium" }).format(
-                        new Date(entitlement.data.effectiveAt),
-                      )}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-slate-500 dark:text-slate-400">{planDate?.label}</dt>
-                    <dd className="mt-1 text-slate-700 dark:text-slate-200">
-                      {planDate?.value
-                        ? new Intl.DateTimeFormat("ja-JP", { dateStyle: "medium" }).format(
-                            new Date(planDate.value),
-                          )
-                        : "期限なし"}
                     </dd>
                   </div>
                 </dl>
@@ -355,7 +353,7 @@ export function ProfileSettingsScreen({
                   <button
                     type="button"
                     onClick={onOpenFamily}
-                    className="mt-5 flex min-h-12 w-full items-center justify-between rounded-xl border border-sky-200 bg-sky-50 px-4 font-bold text-sky-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:border-sky-700 dark:bg-sky-400/10 dark:text-sky-100"
+                    className="mt-3 flex min-h-11 w-full items-center justify-between rounded-xl border border-sky-200 bg-sky-50 px-4 text-sm font-bold text-sky-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:border-sky-700 dark:bg-sky-400/10 dark:text-sky-100"
                   >
                     ファミリー席を管理
                     <ChevronRight className="size-5" aria-hidden="true" />
@@ -365,11 +363,11 @@ export function ProfileSettingsScreen({
                   <button
                     type="button"
                     onClick={onOpenBillingPlans}
-                    className="mt-5 flex min-h-12 w-full items-center justify-between rounded-xl bg-violet-700 px-4 font-bold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500"
+                    className="mt-3 flex min-h-11 w-full items-center justify-between rounded-xl bg-violet-700 px-4 text-sm font-bold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500"
                   >
                     {entitlement.data.source === "subscription"
                       ? "料金プランを比較"
-                      : "有料プランを見る"}
+                      : "プランをアップグレードする"}
                     <ChevronRight className="size-5" aria-hidden="true" />
                   </button>
                 )}

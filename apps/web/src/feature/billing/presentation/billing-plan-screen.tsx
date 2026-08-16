@@ -35,7 +35,7 @@ export function BillingPlanScreen({
     <dialog
       open
       aria-labelledby="billing-plan-title"
-      className="fixed inset-0 z-50 m-0 h-full max-h-none w-full max-w-none overflow-y-auto bg-slate-50 p-0 text-slate-950 dark:bg-slate-950 dark:text-white"
+      className="fixed inset-0 z-[70] m-0 h-full max-h-none w-full max-w-none overflow-y-auto border-0 bg-slate-50 p-0 text-slate-950 dark:bg-slate-950 dark:text-white"
     >
       <div className="mx-auto min-h-full w-full max-w-5xl px-4 pb-12 pt-[max(1rem,env(safe-area-inset-top))] sm:px-6">
         <header className="flex items-center gap-3">

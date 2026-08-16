@@ -93,6 +93,32 @@ describe("ProfileSettingsScreen", () => {
         onBack={vi.fn()}
         onOpenAvatar={vi.fn()}
         onOpenBillingPortal={onOpenBillingPortal}
+        entitlement={{
+          status: "success",
+          data: {
+            status: "active",
+            plan: "lite",
+            source: "subscription",
+            effectiveAt: "2026-08-01T00:00:00.000Z",
+            availableUntil: "2026-09-01T00:00:00.000Z",
+            aiReply: {
+              limit: 150,
+              used: 0,
+              reserved: 0,
+              remaining: 150,
+              periodStartsAt: "2026-08-01T00:00:00.000Z",
+              resetsAt: "2026-09-01T00:00:00.000Z",
+            },
+            profileSummary: {
+              limit: 4,
+              used: 0,
+              reserved: 0,
+              remaining: 4,
+              periodStartsAt: "2026-08-01T00:00:00.000Z",
+              resetsAt: "2026-09-01T00:00:00.000Z",
+            },
+          },
+        }}
         onThemeChange={vi.fn()}
         onFontSizeChange={vi.fn()}
       />,
@@ -148,7 +174,8 @@ describe("ProfileSettingsScreen", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "有料プランを見る" }));
+    expect(screen.queryByRole("button", { name: /契約を管理/ })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "プランをアップグレードする" }));
     expect(onOpenBillingPlans).toHaveBeenCalledOnce();
   });
 
