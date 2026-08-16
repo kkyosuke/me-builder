@@ -1,10 +1,11 @@
 import { type FormEvent, useState } from "react";
+import { LoadingState } from "../../../components/loading-state";
 import { config } from "../../../config";
-import { useLiffSession } from "../../liff";
+import { useAuthSession } from "../../auth";
 import { completeRecovery } from "../infrastructure/account-recovery-api";
 
 export function AccountRecoveryScreen() {
-  const liffSession = useLiffSession();
+  const authSession = useAuthSession();
   const [code, setCode] = useState("");
   const [state, setState] = useState<"idle" | "submitting" | "recovered">("idle");
   const [error, setError] = useState<string | null>(null);
@@ -14,15 +15,43 @@ export function AccountRecoveryScreen() {
     setState("submitting");
     setError(null);
     try {
-      const idToken = await liffSession.acquireIdToken(new AbortController().signal);
-      if (!idToken) throw new Error("LINEから復旧画面を開き直してください。");
-      await completeRecovery(config.apiUrl, idToken, code.trim());
+      await completeRecovery(config.apiUrl, code.trim());
+      const refreshedSession = await authSession.retry();
+      if (refreshedSession.status !== "authenticated") {
+        throw new Error("復旧後の本人確認を更新できませんでした。もう一度お試しください。");
+      }
       setState("recovered");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Accountを復旧できませんでした。");
       setState("idle");
     }
   };
+
+  if (authSession.state.status === "checking" || authSession.state.status === "redirecting") {
+    return <LoadingState message="本人確認を更新しています..." />;
+  }
+
+  if (authSession.state.status !== "authenticated") {
+    const message =
+      authSession.state.status === "error"
+        ? authSession.state.message
+        : "本人確認の有効期限が切れました。もう一度お試しください。";
+    return (
+      <main className="mx-auto flex min-h-dvh max-w-lg flex-col items-center justify-center px-6 text-center">
+        <h1 className="text-xl font-bold">本人確認が必要です</h1>
+        <p role="alert" className="mt-3 text-sm text-slate-600 dark:text-slate-300">
+          {message}
+        </p>
+        <button
+          type="button"
+          onClick={() => void authSession.retry()}
+          className="mt-6 min-h-11 rounded-xl bg-sky-600 px-5 font-bold text-white"
+        >
+          再試行
+        </button>
+      </main>
+    );
+  }
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-lg flex-col justify-center px-6 py-12">

@@ -1,6 +1,6 @@
 import * as v from "valibot";
 import { OperationError, ValidationError } from "../../../infrastructure/errors";
-import { createHttpClient } from "../../../infrastructure/http-client";
+import { createAuthenticatedHttpClient } from "../../../infrastructure/http-client";
 
 const RecoveryCodeSchema = v.object({
   code: v.pipe(v.string(), v.nonEmpty()),
@@ -14,14 +14,12 @@ const RecoveryCompleteSchema = v.object({
 async function recoveryRequest(
   apiUrl: string | undefined,
   path: string,
-  idToken: string,
   body?: unknown,
 ): Promise<Response> {
   try {
-    return await createHttpClient(apiUrl).request(path, {
+    return await createAuthenticatedHttpClient(apiUrl).request(path, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${idToken}`,
         ...(body === undefined ? {} : { "Content-Type": "application/json" }),
       },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
@@ -34,8 +32,8 @@ async function recoveryRequest(
   }
 }
 
-export async function issueRecoveryCode(apiUrl: string | undefined, idToken: string) {
-  const response = await recoveryRequest(apiUrl, "/api/account-recovery/codes", idToken);
+export async function issueRecoveryCode(apiUrl: string | undefined) {
+  const response = await recoveryRequest(apiUrl, "/api/account-recovery/codes");
   if (!response.ok) {
     throw new OperationError(
       response.status === 409
@@ -54,8 +52,8 @@ export async function issueRecoveryCode(apiUrl: string | undefined, idToken: str
   }
 }
 
-export async function completeRecovery(apiUrl: string | undefined, idToken: string, code: string) {
-  const response = await recoveryRequest(apiUrl, "/api/account-recovery/complete", idToken, {
+export async function completeRecovery(apiUrl: string | undefined, code: string) {
+  const response = await recoveryRequest(apiUrl, "/api/account-recovery/complete", {
     code,
   });
   if (!response.ok) {

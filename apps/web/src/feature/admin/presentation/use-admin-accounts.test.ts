@@ -16,13 +16,11 @@ const firstPage = {
 describe("useAdminAccounts", () => {
   it("cursorで次ページへ進み、前ページへ戻る", async () => {
     vi.mocked(fetchAdminAccounts).mockResolvedValue(firstPage);
-    const acquireIdToken = vi.fn().mockResolvedValue("id-token");
-    const { result } = renderHook(() => useAdminAccounts(acquireIdToken));
+    const { result } = renderHook(() => useAdminAccounts());
 
     await waitFor(() => expect(result.current.state.status).toBe("success"));
     expect(fetchAdminAccounts).toHaveBeenLastCalledWith(
       undefined,
-      "id-token",
       expect.objectContaining({ sort: "created" }),
       undefined,
       expect.any(AbortSignal),
@@ -33,7 +31,6 @@ describe("useAdminAccounts", () => {
     await waitFor(() =>
       expect(fetchAdminAccounts).toHaveBeenLastCalledWith(
         undefined,
-        "id-token",
         expect.objectContaining({ sort: "created" }),
         "next-cursor",
         expect.any(AbortSignal),
@@ -46,8 +43,7 @@ describe("useAdminAccounts", () => {
 
   it("絞り込み変更時は先頭ページから再取得する", async () => {
     vi.mocked(fetchAdminAccounts).mockResolvedValue(firstPage);
-    const acquireIdToken = vi.fn().mockResolvedValue("id-token");
-    const { result } = renderHook(() => useAdminAccounts(acquireIdToken));
+    const { result } = renderHook(() => useAdminAccounts());
     await waitFor(() => expect(result.current.state.status).toBe("success"));
     act(() => result.current.nextPage());
     await waitFor(() => expect(result.current.pageNumber).toBe(2));
@@ -57,7 +53,6 @@ describe("useAdminAccounts", () => {
     await waitFor(() =>
       expect(fetchAdminAccounts).toHaveBeenLastCalledWith(
         undefined,
-        "id-token",
         expect.objectContaining({ role: "admin" }),
         undefined,
         expect.any(AbortSignal),
