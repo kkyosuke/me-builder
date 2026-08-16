@@ -321,13 +321,13 @@ flowchart TD
 
 完了条件は、B系列が未完成でも、Stripeの契約状態とAccountのPlan紐付けが正しく収束することを証明できることです。
 
-### SUB-B-017 Productionを段階的に公開して価格を検証する
+### SUB-B-017 Productionを段階的に公開して価格を検証する ([#303](https://github.com/kkyosuke/me-builder/pull/303))
 
 依存: `SUB-A-020`、Plan紐付け後の機能検証
 
-- release controlと運用手順は実装済み。決済側のPreview検証完了後にcheckoutへ接続する
-- 運営Accountで最初の実取引を行い、金額、税表示、入金、請求書、解約、返金を突合する
-- 少数招待、一般提供の順に進め、実データの30日・90日指標を承認記録へ残す
+- `SUB-A-020`完了後にrelease controlをProductionのcheckoutへ接続する
+- 運営Accountで実取引の金額、税表示、入金、請求書、解約、返金を突合する
+- 少数招待、一般提供の順に進め、30日・90日の実測指標を承認記録へ残す
 
 完了条件は、Productionで新規購入だけを安全に停止・再開でき、実取引と30日・90日の価格検証を完了することです。
 
