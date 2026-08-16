@@ -110,6 +110,7 @@ docs/
 - [アプリケーション運用ログ方針](development/operational-logging.md) — 一連の処理を追跡し、エラー原因と最終結果を判断できる運用ログの目的と進め方
 - [本番データベースマイグレーション運用](development/production-migration-operations.md) — forward-only、expand-contract、適用順序、D1とDurable Objectの復旧方針
 - [Subscription Plan機能のPreview検証](development/subscription-preview-plan-verification.md) — 決済サービスなしでPlan切替、利用上限、本人データ、安全案内、Family境界を確認する手順
+- [SubscriptionのProduction段階公開](development/subscription-production-rollout.md) — 新規購入の段階公開、緊急停止・再開、実取引、30日・90日価格検証の手順
 - [サービス紹介サイト残タスク](development/service-site-remaining-tasks.md) — サービス紹介サイトで未完了の意思決定、法務確認、実環境検証と完了条件
 - [サブスクリプション実装残タスク](development/subscription-remaining-tasks.md) — AccountとPlanの紐付け前後をA・B系列に分けた番号付きPR単位の残作業
 - [Stripe課金環境セットアップ](development/stripe-billing-setup.md) — Stripe商品catalog、Portal、Webhookの再現と環境設定
