@@ -11,6 +11,7 @@ import type { SharedD1Client } from "../client";
 import {
   billingCustomers,
   billingProcessedEvents,
+  billingReconciliationAudits,
   billingSubscriptionProjections,
 } from "../schema/billing";
 
@@ -71,6 +72,38 @@ export async function findBillingCustomerByProviderCustomerId(
   return await db.query.billingCustomers.findFirst({
     where: (table, { eq }) => eq(table.providerCustomerId, providerCustomerId),
   });
+}
+
+export async function findBillingProjectionByAccount(db: SharedD1Client, accountId: string) {
+  return await db.query.billingSubscriptionProjections.findFirst({
+    where: (table, { eq }) => eq(table.accountId, accountId),
+  });
+}
+
+export async function expireBillingProjection(
+  db: SharedD1Client,
+  accountId: string,
+  at = new Date(),
+): Promise<void> {
+  await db
+    .update(billingSubscriptionProjections)
+    .set({
+      status: "canceled",
+      planCode: null,
+      cancelAtPeriodEnd: false,
+      currentPeriodEnd: at,
+      lastEventCreatedAt: at,
+      lastSyncedAt: at,
+      updatedAt: at,
+    })
+    .where(eq(billingSubscriptionProjections.accountId, accountId));
+}
+
+export async function recordBillingReconciliationAudit(
+  db: SharedD1Client,
+  input: typeof billingReconciliationAudits.$inferInsert,
+): Promise<void> {
+  await db.insert(billingReconciliationAudits).values(input);
 }
 
 export type ApplyBillingProjectionInput = {
