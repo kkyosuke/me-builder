@@ -4,6 +4,7 @@ export * from "./family-seat";
 export * from "./family-seat-assignment-provider";
 export * from "./fake-provider";
 export * from "./provider";
+export * from "./purchase-rollout";
 export * from "./stripe-adapter";
 export * from "./stripe-catalog-setup";
 export * from "./stripe-events";
