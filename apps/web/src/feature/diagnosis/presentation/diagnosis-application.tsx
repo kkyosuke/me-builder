@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { useLiffSession } from "../../liff";
 import { useProfileProgression } from "../../profile/presentation/use-profile-progression";
 import {
   createDiagnosisDetailHistoryState,
@@ -24,9 +23,8 @@ import { useDiagnosisDetail } from "./hooks/use-diagnosis-detail";
 import { useDiagnosisList } from "./hooks/use-diagnosis-list";
 
 export default function DiagnosisApplication() {
-  const liffSession = useLiffSession();
   const diagnoses = useDiagnosisList();
-  const progression = useProfileProgression({ acquireIdToken: liffSession.acquireIdToken });
+  const progression = useProfileProgression();
   const detail = useDiagnosisDetail({
     onProgress: diagnoses.updateProgress,
   });

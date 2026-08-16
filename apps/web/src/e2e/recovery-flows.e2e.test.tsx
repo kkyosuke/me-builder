@@ -287,7 +287,7 @@ describe("Web recovery flows E2E", () => {
     expect(screen.queryByText("UIプレビュー用のサンプルデータです")).toBeNull();
     expect(fetchMock).toHaveBeenCalledWith(
       "https://api.example.com/api/profile/progression",
-      expect.objectContaining({ headers: { Authorization: "Bearer dummy.id.token" } }),
+      expect.objectContaining({ credentials: "include" }),
     );
   });
 

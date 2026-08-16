@@ -35,12 +35,10 @@ describe("fetchProfileProgression", () => {
     const fetchMock = vi.fn().mockResolvedValue(Response.json(progression));
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(fetchProfileProgression("https://api.example.com", "id-token")).resolves.toEqual(
-      progression,
-    );
+    await expect(fetchProfileProgression("https://api.example.com")).resolves.toEqual(progression);
     expect(fetchMock).toHaveBeenCalledWith(
       "https://api.example.com/api/profile/progression",
-      expect.objectContaining({ headers: { Authorization: "Bearer id-token" } }),
+      expect.objectContaining({ credentials: "include" }),
     );
   });
 
@@ -65,6 +63,6 @@ describe("fetchProfileProgression", () => {
       ),
     );
 
-    await expect(fetchProfileProgression(undefined, "id-token")).rejects.toThrow();
+    await expect(fetchProfileProgression(undefined)).rejects.toThrow();
   });
 });

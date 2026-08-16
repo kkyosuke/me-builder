@@ -1,8 +1,6 @@
 import { ArrowLeft, Check, Download, FilePenLine, RefreshCw, Trash2 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { config } from "../../../config";
-import { useLiffSession } from "../../liff";
-import { getLiffIdToken } from "../../liff/infrastructure/liff-client";
 import {
   type PersonalDataCorrection,
   type PersonalDataExport,
@@ -26,7 +24,6 @@ export function PersonalDataApplication({
   onBack: () => void;
   onChanged?: () => void;
 }) {
-  const liffSession = useLiffSession();
   const backButtonRef = useRef<HTMLButtonElement>(null);
   const [records, setRecords] = useState<readonly PersonalDataRecord[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -37,16 +34,6 @@ export function PersonalDataApplication({
   const [reloadKey, setReloadKey] = useState(0);
   const [dataExport, setDataExport] = useState<PersonalDataExport | null>(null);
   const [exportBusy, setExportBusy] = useState(false);
-
-  const acquireToken = useCallback(
-    async (signal?: AbortSignal) => {
-      const fallbackSignal = signal ?? new AbortController().signal;
-      const token = getLiffIdToken() ?? (await liffSession.acquireIdToken(fallbackSignal));
-      if (!token) throw new Error("LINEから入力データを開き直してください。");
-      return token;
-    },
-    [liffSession.acquireIdToken],
-  );
 
   useEffect(() => {
     backButtonRef.current?.focus();
@@ -59,9 +46,7 @@ export function PersonalDataApplication({
     setError(null);
     void (async () => {
       try {
-        const token = await acquireToken(controller.signal);
-        if (controller.signal.aborted) return;
-        setRecords(await fetchPersonalDataRecords(config.apiUrl, token, controller.signal));
+        setRecords(await fetchPersonalDataRecords(config.apiUrl, controller.signal));
         setStatus("ready");
       } catch (caught) {
         if (controller.signal.aborted) return;
@@ -70,7 +55,7 @@ export function PersonalDataApplication({
       }
     })();
     return () => controller.abort();
-  }, [acquireToken, reloadKey]);
+  }, [reloadKey]);
 
   const save = async (record: PersonalDataRecord) => {
     const correction: PersonalDataCorrection =
@@ -80,8 +65,7 @@ export function PersonalDataApplication({
     setSavingId(record.id);
     setError(null);
     try {
-      const token = await acquireToken();
-      await correctPersonalDataRecord(config.apiUrl, token, record.id, correction);
+      await correctPersonalDataRecord(config.apiUrl, record.id, correction);
       setEditingId(null);
       onChanged?.();
       setReloadKey((current) => current + 1);
@@ -97,8 +81,7 @@ export function PersonalDataApplication({
     setSavingId(record.id);
     setError(null);
     try {
-      const token = await acquireToken();
-      await deletePersonalDataRecord(config.apiUrl, token, record.id);
+      await deletePersonalDataRecord(config.apiUrl, record.id);
       setRecords((current) => current.filter(({ id }) => id !== record.id));
       onChanged?.();
     } catch (caught) {
@@ -108,9 +91,9 @@ export function PersonalDataApplication({
     }
   };
 
-  const pollExport = async (token: string, exportId: string) => {
+  const pollExport = async (exportId: string) => {
     for (let attempt = 0; attempt < 120; attempt += 1) {
-      const current = await fetchPersonalDataExport(config.apiUrl, token, exportId);
+      const current = await fetchPersonalDataExport(config.apiUrl, exportId);
       setDataExport(current);
       if (
         current.status === "ready" ||
@@ -128,11 +111,10 @@ export function PersonalDataApplication({
     setExportBusy(true);
     setError(null);
     try {
-      const token = await acquireToken();
-      const created = await requestPersonalDataExport(config.apiUrl, token);
+      const created = await requestPersonalDataExport(config.apiUrl);
       setDataExport(created);
       if (created.status === "queued" || created.status === "generating") {
-        await pollExport(token, created.id);
+        await pollExport(created.id);
       }
     } catch (caught) {
       setError(message(caught));
@@ -146,8 +128,7 @@ export function PersonalDataApplication({
     setExportBusy(true);
     setError(null);
     try {
-      const token = await acquireToken();
-      const blob = await downloadPersonalDataExport(config.apiUrl, token, dataExport.id);
+      const blob = await downloadPersonalDataExport(config.apiUrl, dataExport.id);
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;

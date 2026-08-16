@@ -32,8 +32,7 @@ describe("useProfileProgression", () => {
 
   it("診断完了後は既存値を残して処理中へ移り、確定値で更新する", async () => {
     mocks.fetchProfileProgression.mockResolvedValue(progression);
-    const acquireIdToken = vi.fn(async () => "id-token");
-    const { result } = renderHook(() => useProfileProgression({ acquireIdToken }));
+    const { result } = renderHook(() => useProfileProgression());
     await waitFor(() => expect(result.current.state.status).toBe("success"));
 
     let finishReload: (value: typeof progression) => void = () => undefined;
@@ -64,9 +63,9 @@ describe("useProfileProgression", () => {
     });
   });
 
-  it("本人確認情報がなければloadingのままにしない", async () => {
-    const acquireIdToken = vi.fn(async () => null);
-    const { result } = renderHook(() => useProfileProgression({ acquireIdToken }));
+  it("session APIが失敗してもloadingのままにしない", async () => {
+    mocks.fetchProfileProgression.mockRejectedValue(new Error("session expired"));
+    const { result } = renderHook(() => useProfileProgression());
 
     await waitFor(() => expect(result.current.state.status).toBe("error"));
   });

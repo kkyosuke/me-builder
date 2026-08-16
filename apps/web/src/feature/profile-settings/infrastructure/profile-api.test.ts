@@ -26,14 +26,12 @@ describe("profile settings API", () => {
       }),
     );
 
-    await expect(
-      fetchAccountProfile("https://api.example.com/", "id-token"),
-    ).resolves.toMatchObject({
+    await expect(fetchAccountProfile("https://api.example.com/")).resolves.toMatchObject({
       role: "user",
       avatar: { source: "uploaded", url: "data:image/png;base64,AQID" },
     });
     expect(fetchMock).toHaveBeenCalledWith("https://api.example.com/api/profile", {
-      headers: { Authorization: "Bearer id-token" },
+      credentials: "include",
     });
   });
 
@@ -46,7 +44,7 @@ describe("profile settings API", () => {
       }),
     );
 
-    await saveAccountAvatar("https://api.example.com", "id-token", {
+    await saveAccountAvatar("https://api.example.com", {
       kind: "uploaded",
       dataUrl: "data:image/png;base64,AQID",
       fileName: "表示しない.png",
@@ -57,7 +55,7 @@ describe("profile settings API", () => {
     expect(url).toBe("https://api.example.com/api/profile/avatar");
     expect(init).toMatchObject({
       method: "PUT",
-      headers: { Authorization: "Bearer id-token", "Content-Type": "image/png" },
+      credentials: "include",
     });
     expect([...new Uint8Array(init?.body as ArrayBuffer)]).toEqual([1, 2, 3]);
   });
@@ -71,12 +69,12 @@ describe("profile settings API", () => {
       }),
     );
 
-    await expect(deleteAccountAvatar("https://api.example.com", "id-token")).resolves.toMatchObject(
-      { avatar: { source: "line" } },
-    );
+    await expect(deleteAccountAvatar("https://api.example.com")).resolves.toMatchObject({
+      avatar: { source: "line" },
+    });
     expect(fetchMock).toHaveBeenCalledWith("https://api.example.com/api/profile/avatar", {
       method: "DELETE",
-      headers: { Authorization: "Bearer id-token" },
+      credentials: "include",
     });
   });
 
@@ -86,7 +84,7 @@ describe("profile settings API", () => {
     );
 
     await expect(
-      saveAccountAvatar("https://api.example.com", "id-token", {
+      saveAccountAvatar("https://api.example.com", {
         kind: "uploaded",
         dataUrl: "data:image/png;base64,AQID",
         fileName: "broken.png",
@@ -97,7 +95,7 @@ describe("profile settings API", () => {
   it("通信失敗を再試行できるメッセージへ変換する", async () => {
     fetchMock.mockRejectedValueOnce(new TypeError("Failed to fetch"));
 
-    await expect(fetchAccountProfile("https://api.example.com", "id-token")).rejects.toThrow(
+    await expect(fetchAccountProfile("https://api.example.com")).rejects.toThrow(
       "プロフィールの取得に失敗しました。再試行してください。",
     );
   });

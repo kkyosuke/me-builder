@@ -4,7 +4,7 @@ import {
   OperationError,
   ValidationError,
 } from "../../../infrastructure/errors";
-import { createHttpClient } from "../../../infrastructure/http-client";
+import { createAuthenticatedHttpClient } from "../../../infrastructure/http-client";
 
 const NonEmptyStringSchema = v.pipe(v.string(), v.nonEmpty());
 const PersonalDataRecordSchema = v.variant("kind", [
@@ -98,27 +98,27 @@ async function parse<TSchema extends v.GenericSchema>(response: Response, schema
 
 export async function fetchPersonalDataRecords(
   apiUrl: string | undefined,
-  idToken: string,
   signal?: AbortSignal,
 ): Promise<readonly PersonalDataRecord[]> {
-  const response = await createHttpClient(apiUrl).request("/api/personal-data/records", {
-    headers: { Authorization: `Bearer ${idToken}` },
-    ...(signal ? { signal } : {}),
-  });
+  const response = await createAuthenticatedHttpClient(apiUrl).request(
+    "/api/personal-data/records",
+    {
+      ...(signal ? { signal } : {}),
+    },
+  );
   return (await parse(response, RecordsResponseSchema)).records;
 }
 
 export async function correctPersonalDataRecord(
   apiUrl: string | undefined,
-  idToken: string,
   sourceRecordId: string,
   correction: PersonalDataCorrection,
 ): Promise<PersonalDataMutationResult> {
-  const response = await createHttpClient(apiUrl).request(
+  const response = await createAuthenticatedHttpClient(apiUrl).request(
     `/api/personal-data/records/${encodeURIComponent(sourceRecordId)}`,
     {
       method: "PATCH",
-      headers: { Authorization: `Bearer ${idToken}`, "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(correction),
     },
   );
@@ -127,14 +127,12 @@ export async function correctPersonalDataRecord(
 
 export async function deletePersonalDataRecord(
   apiUrl: string | undefined,
-  idToken: string,
   sourceRecordId: string,
 ): Promise<PersonalDataMutationResult> {
-  const response = await createHttpClient(apiUrl).request(
+  const response = await createAuthenticatedHttpClient(apiUrl).request(
     `/api/personal-data/records/${encodeURIComponent(sourceRecordId)}`,
     {
       method: "DELETE",
-      headers: { Authorization: `Bearer ${idToken}` },
     },
   );
   return parse(response, MutationResponseSchema);
@@ -154,25 +152,24 @@ async function parseExport(response: Response): Promise<PersonalDataExport> {
 
 export async function requestPersonalDataExport(
   apiUrl: string | undefined,
-  idToken: string,
 ): Promise<PersonalDataExport> {
-  const response = await createHttpClient(apiUrl).request("/api/personal-data/exports", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${idToken}` },
-  });
+  const response = await createAuthenticatedHttpClient(apiUrl).request(
+    "/api/personal-data/exports",
+    {
+      method: "POST",
+    },
+  );
   return parseExport(response);
 }
 
 export async function fetchPersonalDataExport(
   apiUrl: string | undefined,
-  idToken: string,
   exportId: string,
   signal?: AbortSignal,
 ): Promise<PersonalDataExport> {
-  const response = await createHttpClient(apiUrl).request(
+  const response = await createAuthenticatedHttpClient(apiUrl).request(
     `/api/personal-data/exports/${encodeURIComponent(exportId)}`,
     {
-      headers: { Authorization: `Bearer ${idToken}` },
       ...(signal ? { signal } : {}),
     },
   );
@@ -181,12 +178,10 @@ export async function fetchPersonalDataExport(
 
 export async function downloadPersonalDataExport(
   apiUrl: string | undefined,
-  idToken: string,
   exportId: string,
 ): Promise<Blob> {
-  const response = await createHttpClient(apiUrl).request(
+  const response = await createAuthenticatedHttpClient(apiUrl).request(
     `/api/personal-data/exports/${encodeURIComponent(exportId)}/download`,
-    { headers: { Authorization: `Bearer ${idToken}` } },
   );
   if (!response.ok) throw exportRequestError(response.status);
   return response.blob();

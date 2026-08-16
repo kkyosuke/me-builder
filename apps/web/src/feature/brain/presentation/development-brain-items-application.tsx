@@ -1,16 +1,11 @@
 import { ArrowLeft } from "lucide-react";
 import { useEffect, useRef } from "react";
-import { useLiffSession } from "../../liff";
 import { DevelopmentBrainItems } from "./development-brain-items";
 import { useDevelopmentBrainItems } from "./use-development-brain-items";
 
 export default function DevelopmentBrainItemsApplication({ onBack }: { onBack: () => void }) {
-  const liffSession = useLiffSession();
   const backButtonRef = useRef<HTMLButtonElement>(null);
-  const brainItems = useDevelopmentBrainItems({
-    enabled: true,
-    acquireIdToken: liffSession.acquireIdToken,
-  });
+  const brainItems = useDevelopmentBrainItems({ enabled: true });
 
   useEffect(() => {
     backButtonRef.current?.focus();

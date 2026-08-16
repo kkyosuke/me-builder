@@ -36,11 +36,7 @@ function waitForNextPoll(delayMs: number, signal: AbortSignal): Promise<void> {
   });
 }
 
-export function useProfileSummary({
-  acquireIdToken,
-}: {
-  acquireIdToken: (signal: AbortSignal) => Promise<string | null>;
-}) {
+export function useProfileSummary() {
   const [state, setState] = useState<AsyncState<ProfileSummaryReadResult>>({ status: "loading" });
   const [generationNotice, setGenerationNotice] = useState<ProfileSummaryGenerationNotice | null>(
     null,
@@ -51,43 +47,37 @@ export function useProfileSummary({
   const generationRequest = useRef<AbortController | null>(null);
   const generationInFlight = useRef(false);
 
-  const load = useCallback(
-    async (showLoading = true) => {
-      if (loading.current) return;
-      loading.current = true;
-      request.current?.abort();
-      const controller = new AbortController();
-      request.current = controller;
-      if (mounted.current && showLoading) setState({ status: "loading" });
-      try {
-        const idToken = await acquireIdToken(controller.signal);
-        if (!idToken || controller.signal.aborted) return;
-        const result = await fetchProfileSummary(config.apiUrl, idToken, controller.signal);
-        if (mounted.current && !controller.signal.aborted) {
-          setState({ status: "success", data: result });
-          setGenerationNotice(null);
-        }
-        return result;
-      } catch (error) {
-        if (mounted.current && !controller.signal.aborted) {
-          setState({
-            status: "error",
-            message: error instanceof Error ? error.message : "まとめを生成できませんでした。",
-          });
-        }
-      } finally {
-        if (request.current === controller) loading.current = false;
+  const load = useCallback(async (showLoading = true) => {
+    if (loading.current) return;
+    loading.current = true;
+    request.current?.abort();
+    const controller = new AbortController();
+    request.current = controller;
+    if (mounted.current && showLoading) setState({ status: "loading" });
+    try {
+      const result = await fetchProfileSummary(config.apiUrl, controller.signal);
+      if (mounted.current && !controller.signal.aborted) {
+        setState({ status: "success", data: result });
+        setGenerationNotice(null);
       }
-    },
-    [acquireIdToken],
-  );
+      return result;
+    } catch (error) {
+      if (mounted.current && !controller.signal.aborted) {
+        setState({
+          status: "error",
+          message: error instanceof Error ? error.message : "まとめを生成できませんでした。",
+        });
+      }
+    } finally {
+      if (request.current === controller) loading.current = false;
+    }
+  }, []);
 
   const generate = useCallback(async () => {
     if (generationInFlight.current) return;
     generationInFlight.current = true;
     const controller = new AbortController();
     generationRequest.current = controller;
-    const previousState = state;
     let generationAccepted = false;
     let generationReconciled = false;
     setState((current) => {
@@ -106,17 +96,8 @@ export function useProfileSummary({
     });
     setGenerationNotice(null);
     try {
-      const idToken = await acquireIdToken(controller.signal);
-      if (!idToken || controller.signal.aborted) {
-        if (mounted.current) setState(previousState);
-        return;
-      }
       try {
-        const generation = await requestProfileSummaryGeneration(
-          config.apiUrl,
-          idToken,
-          controller.signal,
-        );
+        const generation = await requestProfileSummaryGeneration(config.apiUrl, controller.signal);
         generationAccepted = true;
         if (mounted.current && !controller.signal.aborted) {
           setState((current) =>
@@ -148,7 +129,7 @@ export function useProfileSummary({
       for (const delayMs of [0, ...PROFILE_SUMMARY_POLL_INTERVALS_MS]) {
         if (delayMs > 0) await waitForNextPoll(delayMs, controller.signal);
         if (controller.signal.aborted) return;
-        const latest = await fetchProfileSummary(config.apiUrl, idToken, controller.signal);
+        const latest = await fetchProfileSummary(config.apiUrl, controller.signal);
         if (mounted.current && !controller.signal.aborted) {
           setState({ status: "success", data: latest });
         }
@@ -176,7 +157,7 @@ export function useProfileSummary({
         generationInFlight.current = false;
       }
     }
-  }, [acquireIdToken, load, state]);
+  }, [load]);
 
   useEffect(() => {
     mounted.current = true;

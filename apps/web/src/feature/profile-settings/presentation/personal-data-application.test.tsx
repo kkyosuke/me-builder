@@ -5,7 +5,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PersonalDataApplication } from "./personal-data-application";
 
 const mocks = vi.hoisted(() => ({
-  acquireIdToken: vi.fn().mockResolvedValue("id-token"),
   fetchRecords: vi.fn(),
   correctRecord: vi.fn(),
   deleteRecord: vi.fn(),
@@ -14,12 +13,6 @@ const mocks = vi.hoisted(() => ({
   downloadExport: vi.fn(),
 }));
 
-vi.mock("../../liff", () => ({
-  useLiffSession: () => ({ acquireIdToken: mocks.acquireIdToken }),
-}));
-vi.mock("../../liff/infrastructure/liff-client", () => ({
-  getLiffIdToken: () => "id-token",
-}));
 vi.mock("../infrastructure/personal-data-api", () => ({
   fetchPersonalDataRecords: mocks.fetchRecords,
   correctPersonalDataRecord: mocks.correctRecord,
@@ -92,7 +85,7 @@ describe("PersonalDataApplication", () => {
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
 
     await waitFor(() =>
-      expect(mocks.correctRecord).toHaveBeenCalledWith(undefined, "id-token", "diagnosis-source", {
+      expect(mocks.correctRecord).toHaveBeenCalledWith(undefined, "diagnosis-source", {
         kind: "diagnosis",
         choiceId: "yes",
       }),
@@ -108,9 +101,7 @@ describe("PersonalDataApplication", () => {
     if (!deleteButton) throw new Error("日記削除buttonがありません");
     fireEvent.click(deleteButton);
 
-    await waitFor(() =>
-      expect(mocks.deleteRecord).toHaveBeenCalledWith(undefined, "id-token", "diary-source"),
-    );
+    await waitFor(() => expect(mocks.deleteRecord).toHaveBeenCalledWith(undefined, "diary-source"));
     expect(screen.queryByText("今日の記録")).toBeNull();
   });
 
@@ -126,9 +117,7 @@ describe("PersonalDataApplication", () => {
     expect(await screen.findByRole("button", { name: "ダウンロード" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "ダウンロード" }));
 
-    await waitFor(() =>
-      expect(mocks.downloadExport).toHaveBeenCalledWith(undefined, "id-token", "export-1"),
-    );
+    await waitFor(() => expect(mocks.downloadExport).toHaveBeenCalledWith(undefined, "export-1"));
     expect(createObjectURL).toHaveBeenCalled();
     expect(click).toHaveBeenCalled();
     expect(revokeObjectURL).toHaveBeenCalledWith("blob:personal-data");
