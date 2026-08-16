@@ -680,7 +680,193 @@
                         "existing_subscription",
                         "family_seat_active",
                         "checkout_in_progress",
-                        "customer_not_found"
+                        "customer_not_found",
+                        "same_plan",
+                        "subscription_not_found",
+                        "configuration_missing"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "未処理のサーバーエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Internal Server Error"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "D1 bindingが設定されていない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Service Unavailable"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/billing/plan-change-sessions": {
+      "post": {
+        "operationId": "createBillingPlanChangeSession",
+        "tags": ["Billing"],
+        "summary": "選択したPlanへのStripe確認画面を作成する",
+        "security": [
+          {
+            "liffIdToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "kind": "schema",
+                "type": "object",
+                "expects": "Object",
+                "async": false,
+                "entries": {
+                  "plan": {
+                    "kind": "schema",
+                    "type": "picklist",
+                    "expects": "(\"lite\" | \"full\" | \"family\")",
+                    "async": false,
+                    "options": ["lite", "full", "family"],
+                    "~standard": {
+                      "version": 1,
+                      "vendor": "valibot"
+                    }
+                  },
+                  "interval": {
+                    "kind": "schema",
+                    "type": "picklist",
+                    "expects": "(\"month\" | \"year\")",
+                    "async": false,
+                    "options": ["month", "year"],
+                    "~standard": {
+                      "version": 1,
+                      "vendor": "valibot"
+                    }
+                  }
+                },
+                "~standard": {
+                  "version": 1,
+                  "vendor": "valibot"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "プラン変更確認用の短命なStripe Portal URL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "url": {
+                      "type": "string",
+                      "format": "uri"
+                    }
+                  },
+                  "required": ["url"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "リクエストが不正",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Invalid request"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "LIFF IDトークンを検証できない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Unauthorized"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "対応するAccountが存在しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Account not found"
+                    },
+                    "reason": {
+                      "const": "friendship_required"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "プラン変更を開始できない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Billing session unavailable"
+                    },
+                    "reason": {
+                      "enum": [
+                        "plan_unavailable",
+                        "existing_subscription",
+                        "checkout_in_progress",
+                        "customer_not_found",
+                        "same_plan",
+                        "subscription_not_found",
+                        "configuration_missing"
                       ],
                       "type": "string"
                     }
@@ -925,7 +1111,10 @@
                         "existing_subscription",
                         "family_seat_active",
                         "checkout_in_progress",
-                        "customer_not_found"
+                        "customer_not_found",
+                        "same_plan",
+                        "subscription_not_found",
+                        "configuration_missing"
                       ],
                       "type": "string"
                     }

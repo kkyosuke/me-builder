@@ -38,7 +38,7 @@ Priceの`lookup_key`は次の形式で固定します。
 me_builder_<lite|full|family>_<monthly|yearly>
 ```
 
-金額はこの文書へ重複して持たず、料金SSoTと`STRIPE_BILLING_CATALOG`を同じ変更で更新します。Stripeが期間末downgradeを同一Product内のPrice間だけに制限するため、Lite、Full、ファミリーパックの6 Priceは共通Productへ所属させ、Price metadataからPlanへ変換します。旧Plan別ProductのPrice IDは既存契約がなくなるまで`BILLING_PRICE_PLAN_MAP`へ残します。Customer Portalは現在の6 Priceだけを変更先に許可し、upgradeは`always_invoice`で日割り差額を即時請求します。金額減少と年額から月額への短縮は`decreasing_item_amount` / `shortening_interval`条件で期間末へ予約し、trial中の変更は`continue_trial`で残期間を維持します。
+金額はこの文書へ重複して持たず、料金SSoTと`STRIPE_BILLING_CATALOG`を同じ変更で更新します。Stripeが期間末downgradeを同一Product内のPrice間だけに制限するため、Lite、Full、ファミリーパックの6 Priceは共通Productへ所属させ、Price metadataからPlanへ変換します。旧Plan別ProductのPrice IDは既存契約がなくなるまで`BILLING_PRICE_PLAN_MAP`へ残します。Customer Portalは現在の6 Priceだけを変更先に許可し、upgradeは`always_invoice`で日割り差額を即時請求します。金額減少と年額から月額への短縮は`decreasing_item_amount` / `shortening_interval`条件で期間末へ予約し、trial中の変更は`continue_trial`で残期間を維持します。月額から年額へのupgradeだけは、変更日を新しい年額期間の開始日にする`billing_cycle_anchor=now`専用設定を使います。それ以外は現在の請求期間を維持する標準設定を使い、アプリで選んだ変更先をPortalの確定画面へdeep linkします。支払方法・解約用の管理Portalではプラン変更を無効にし、この請求ルールを迂回できないようにします。
 
 ## 3. 実行前提
 
@@ -127,6 +127,8 @@ bun scripts/setup-stripe-billing.ts preview --stripe-only
 | `STRIPE_SECRET_KEY` | Webhook署名検証、管理用再照合、後続Checkout API | QueueからStripeの現在状態を再取得 |
 | `STRIPE_WEBHOOK_SECRET` | `Stripe-Signature`検証 | 不要 |
 | `STRIPE_PORTAL_CONFIGURATION_ID` | 管理対象のCustomer Portal設定をSession作成時に指定 | 不要 |
+| `STRIPE_PORTAL_PLAN_CHANGE_CONFIGURATION_ID` | 現在の請求期間を維持する変更確認用Portal設定 | 不要 |
+| `STRIPE_PORTAL_RESET_CONFIGURATION_ID` | 月額から年額へのupgradeで請求期間を変更日にリセットするPortal設定 | 不要 |
 | `BILLING_PRICE_PLAN_MAP` | 後続Checkout API用 | Price IDをprovider非依存Planへ変換 |
 | `BILLING_LOOKUP_KEY_MAP` | CheckoutでPlanと請求間隔を許可済みlookup keyへ変換 | いいえ |
 | `BILLING_PROJECTION_STALE_AFTER_SECONDS` | 監視でprojection遅延と判定する猶予秒数（既定900） | いいえ |

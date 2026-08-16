@@ -21,9 +21,11 @@ export type BillingCheckoutSession = Readonly<{
 
 export type BillingSubscription = Readonly<{
   id: string;
+  itemId?: string | null;
   customerId: string;
   status: BillingSubscriptionStatus;
   priceId: string | null;
+  interval?: "month" | "year" | null;
   currentPeriodStart: string | null;
   currentPeriodEnd: string | null;
   cancelAtPeriodEnd: boolean;
@@ -59,6 +61,12 @@ export interface BillingProvider {
   createPortalSession(input: {
     customerId: string;
     returnUrl: string;
+    planChange?: {
+      subscriptionId: string;
+      itemId: string;
+      targetPriceId: string;
+      billingCycleAnchor: "unchanged" | "now";
+    };
   }): Promise<{ url: string }>;
   findPriceIdByLookupKey(lookupKey: string): Promise<string | null>;
   findLatestCheckoutSession(customerId: string): Promise<BillingCheckoutSession | null>;

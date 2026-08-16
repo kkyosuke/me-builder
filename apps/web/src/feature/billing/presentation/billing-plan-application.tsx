@@ -9,6 +9,7 @@ import type { ProfileEntitlement } from "../../profile-settings/model/entitlemen
 import {
   createCheckoutSession,
   createCustomerPortalSession,
+  createPlanChangeSession,
   fetchBillingPlanCatalog,
   fetchBillingTrialEligibility,
   verifyCheckoutSessionCompletion,
@@ -186,12 +187,21 @@ export default function BillingPlanApplication({
           "ファミリーパックに参加中です。個人契約を購入するには、先にファミリー席から退出してください。",
         );
       }
-      const url = await createCheckoutSession(
-        config.apiUrl,
-        await token(controller.signal),
-        { plan, interval },
-        controller.signal,
-      );
+      const idToken = await token(controller.signal);
+      const url =
+        entitlement.status === "success" && entitlement.data.source === "subscription"
+          ? await createPlanChangeSession(
+              config.apiUrl,
+              idToken,
+              { plan, interval },
+              controller.signal,
+            )
+          : await createCheckoutSession(
+              config.apiUrl,
+              idToken,
+              { plan, interval },
+              controller.signal,
+            );
       navigateToCheckout(url);
     } catch (error) {
       setCheckoutState({ status: "error", message: message(error) });

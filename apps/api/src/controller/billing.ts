@@ -21,6 +21,7 @@ import {
 } from "../contract/shared/errors";
 import {
   createBillingCheckoutSession,
+  createBillingPlanChangeSession,
   createBillingPortalSession,
   getBillingCheckoutSessionStatus,
   getBillingTrialEligibility,
@@ -116,6 +117,14 @@ export async function postBillingCheckoutSession(c: Context<AppEnv>): Promise<Re
   return createBillingSessionResponse(c, "checkout", parsed.output);
 }
 
+export async function postBillingPlanChangeSession(c: Context<AppEnv>): Promise<Response> {
+  const parsed = v.safeParse(BillingCheckoutRequestSchema, await c.req.json().catch(() => null));
+  if (!parsed.success) {
+    return c.json(v.parse(BillingInvalidRequestSchema, { error: "Invalid request" }), 400);
+  }
+  return createBillingSessionResponse(c, "change", parsed.output);
+}
+
 export async function postBillingPortalSession(c: Context<AppEnv>): Promise<Response> {
   return createBillingSessionResponse(c, "portal");
 }
@@ -170,7 +179,7 @@ export async function getBillingCheckoutSession(c: Context<AppEnv>): Promise<Res
 
 async function createBillingSessionResponse(
   c: Context<AppEnv>,
-  kind: "checkout" | "portal",
+  kind: "checkout" | "portal" | "change",
   checkout?: v.InferOutput<typeof BillingCheckoutRequestSchema>,
 ): Promise<Response> {
   const config = getConfig(c.env);
@@ -186,17 +195,30 @@ async function createBillingSessionResponse(
       ...(config.stripePortalConfigurationId
         ? { portalConfigurationId: config.stripePortalConfigurationId }
         : {}),
+      ...(config.stripePortalResetConfigurationId
+        ? { portalResetConfigurationId: config.stripePortalResetConfigurationId }
+        : {}),
+      ...(config.stripePortalPlanChangeConfigurationId
+        ? { portalPlanChangeConfigurationId: config.stripePortalPlanChangeConfigurationId }
+        : {}),
     }),
     webOrigin: config.webOrigin,
   };
-  const outcome =
-    kind === "checkout" && checkout
+  const outcome = checkout
+    ? kind === "checkout"
       ? await createBillingCheckoutSession({
           ...base,
           ...checkout,
           lookupKeyMap: config.billingLookupKeyMap,
         })
-      : await createBillingPortalSession(base);
+      : await createBillingPlanChangeSession({
+          ...base,
+          ...checkout,
+          lookupKeyMap: config.billingLookupKeyMap,
+          portalPlanChangeAvailable: Boolean(config.stripePortalPlanChangeConfigurationId),
+          portalResetAvailable: Boolean(config.stripePortalResetConfigurationId),
+        })
+    : await createBillingPortalSession(base);
   switch (outcome.type) {
     case "created":
       c.header("Cache-Control", "no-store");

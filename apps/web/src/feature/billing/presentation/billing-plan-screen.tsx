@@ -104,11 +104,13 @@ export function BillingPlanScreen({
               ファミリーの利用権と個人契約は併用できません。個人契約を購入するには、先にファミリー席から退出してください。
             </p>
           </section>
-        ) : paidSubscription ? (
-          <section className="mt-6 rounded-2xl border border-sky-200 bg-sky-50 p-5 text-sky-950 dark:border-sky-800 dark:bg-sky-950 dark:text-sky-100">
+        ) : (
+          <>
+            {paidSubscription && (
+              <section className="mt-6 rounded-2xl border border-sky-200 bg-sky-50 p-5 text-sky-950 dark:border-sky-800 dark:bg-sky-950 dark:text-sky-100">
             <h2 className="font-bold">現在の契約があります</h2>
             <p className="mt-2 text-sm">
-              二重購入を防ぐため、新しい購入は開始できません。Stripeでプラン変更、支払方法、請求履歴、解約予約と再開を確認できます。
+              下の一覧から変更先を選べます。支払方法、請求履歴、解約予約と再開は契約管理から確認できます。
             </p>
             <button
               type="button"
@@ -118,125 +120,124 @@ export function BillingPlanScreen({
             >
               {checkoutState.status === "loading"
                 ? "Stripeを開いています..."
-                : "Stripeでプラン変更・契約管理"}
+                : "支払方法・解約・請求履歴を管理"}
             </button>
             {checkoutState.status === "error" && (
               <p role="alert" className="mt-3 text-sm text-rose-700 dark:text-rose-300">
                 {checkoutState.message}
               </p>
             )}
-          </section>
-        ) : (
-          <>
-            <fieldset className="mt-8">
-              <legend className="text-sm font-bold">支払い間隔</legend>
-              <div className="mt-3 grid grid-cols-2 rounded-xl bg-slate-200 p-1 dark:bg-slate-800">
-                {(["month", "year"] as const).map((value) => (
-                  <label
-                    key={value}
-                    className={`flex min-h-11 cursor-pointer items-center justify-center rounded-lg font-bold ${interval === value ? "bg-white text-violet-700 shadow-sm dark:bg-slate-700 dark:text-violet-200" : "text-slate-600 dark:text-slate-300"}`}
-                  >
-                    <input
-                      type="radio"
-                      name="billing-interval"
-                      value={value}
-                      checked={interval === value}
-                      onChange={() => setInterval(value)}
-                      className="sr-only"
-                    />
-                    {value === "month" ? "月額" : "年額"}
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-
-            {plans.status === "loading" || plans.status === "idle" ? (
-              <output
-                aria-busy="true"
-                aria-label="料金プランを読み込んでいます"
-                className="mt-6 grid gap-4 sm:grid-cols-3"
-              >
-                {[0, 1, 2].map((value) => (
-                  <span
-                    key={value}
-                    className="block h-80 animate-pulse rounded-2xl bg-slate-200 motion-reduce:animate-none dark:bg-slate-800"
-                  />
-                ))}
-              </output>
-            ) : plans.status === "error" ? (
-              <div className="mt-6 rounded-2xl bg-rose-50 p-5 dark:bg-rose-950">
-                <p role="alert" className="text-sm text-rose-900 dark:text-rose-100">
-                  {plans.message}
-                </p>
-                <button
-                  type="button"
-                  onClick={onRetry}
-                  className="mt-4 min-h-11 rounded-xl bg-rose-700 px-4 font-bold text-white"
-                >
-                  再試行
-                </button>
-              </div>
-            ) : plans.data.length === 0 ? (
-              <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 text-center dark:border-slate-700 dark:bg-slate-900">
-                <output className="block text-sm text-slate-600 dark:text-slate-300">
-                  購入できる料金プランを表示できませんでした。
-                </output>
-                <button
-                  type="button"
-                  onClick={onRetry}
-                  className="mt-4 min-h-11 rounded-xl border border-violet-400 px-4 font-bold text-violet-700 dark:text-violet-200"
-                >
-                  再読み込み
-                </button>
-              </div>
-            ) : (
-              <div className="mt-6 grid gap-4 sm:grid-cols-3">
-                {plans.data.map((plan) => {
-                  const price = billingPlanPrice(plan, interval);
-                  return (
-                    <article
-                      key={plan.code}
-                      className={`flex flex-col rounded-2xl border bg-white p-5 shadow-sm dark:bg-slate-900 ${plan.code === "full" ? "border-violet-400 ring-1 ring-violet-300 dark:border-violet-600" : "border-slate-200 dark:border-slate-700"}`}
-                    >
-                      <h2 className="text-xl font-bold">{plan.name}</h2>
-                      <p className="mt-2 min-h-16 text-sm text-slate-600 dark:text-slate-300">
-                        {plan.description}
-                      </p>
-                      <p className="mt-4 text-3xl font-bold">
-                        {formatBillingAmount(price.amount)}
-                        <span className="text-sm font-normal text-slate-500">
-                          /{interval === "month" ? "月" : "年"}
-                        </span>
-                      </p>
-                      <p className="mt-1 text-xs text-slate-500">税込・自動更新</p>
-                      {plan.trialDays && (
-                        <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-100">
-                          初回のみ{plan.trialDays}日間無料
-                        </p>
-                      )}
-                      <ul className="mt-5 flex-1 space-y-2 text-sm">
-                        {plan.highlights.map((highlight) => (
-                          <li key={highlight} className="flex gap-2">
-                            <Check
-                              className="mt-0.5 size-4 shrink-0 text-emerald-600"
-                              aria-hidden="true"
-                            />
-                            {highlight}
-                          </li>
-                        ))}
-                      </ul>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedPlan(plan.code)}
-                        className="mt-6 min-h-12 rounded-xl bg-violet-700 px-4 font-bold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500"
-                      >
-                        {plan.name}を選ぶ
-                      </button>
-                    </article>
-                  );
-                })}
-              </div>
+              </section>
             )}
+          <fieldset className="mt-8">
+            <legend className="text-sm font-bold">支払い間隔</legend>
+            <div className="mt-3 grid grid-cols-2 rounded-xl bg-slate-200 p-1 dark:bg-slate-800">
+              {(["month", "year"] as const).map((value) => (
+                <label
+                  key={value}
+                  className={`flex min-h-11 cursor-pointer items-center justify-center rounded-lg font-bold ${interval === value ? "bg-white text-violet-700 shadow-sm dark:bg-slate-700 dark:text-violet-200" : "text-slate-600 dark:text-slate-300"}`}
+                >
+                  <input
+                    type="radio"
+                    name="billing-interval"
+                    value={value}
+                    checked={interval === value}
+                    onChange={() => setInterval(value)}
+                    className="sr-only"
+                  />
+                  {value === "month" ? "月額" : "年額"}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+
+          {plans.status === "loading" || plans.status === "idle" ? (
+            <output
+              aria-busy="true"
+              aria-label="料金プランを読み込んでいます"
+              className="mt-6 grid gap-4 sm:grid-cols-3"
+            >
+              {[0, 1, 2].map((value) => (
+                <span
+                  key={value}
+                  className="block h-80 animate-pulse rounded-2xl bg-slate-200 motion-reduce:animate-none dark:bg-slate-800"
+                />
+              ))}
+            </output>
+          ) : plans.status === "error" ? (
+            <div className="mt-6 rounded-2xl bg-rose-50 p-5 dark:bg-rose-950">
+              <p role="alert" className="text-sm text-rose-900 dark:text-rose-100">
+                {plans.message}
+              </p>
+              <button
+                type="button"
+                onClick={onRetry}
+                className="mt-4 min-h-11 rounded-xl bg-rose-700 px-4 font-bold text-white"
+              >
+                再試行
+              </button>
+            </div>
+          ) : plans.data.length === 0 ? (
+            <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 text-center dark:border-slate-700 dark:bg-slate-900">
+              <output className="block text-sm text-slate-600 dark:text-slate-300">
+                購入できる料金プランを表示できませんでした。
+              </output>
+              <button
+                type="button"
+                onClick={onRetry}
+                className="mt-4 min-h-11 rounded-xl border border-violet-400 px-4 font-bold text-violet-700 dark:text-violet-200"
+              >
+                再読み込み
+              </button>
+            </div>
+          ) : (
+            <div className="mt-6 grid gap-4 sm:grid-cols-3">
+              {plans.data.map((plan) => {
+                const price = billingPlanPrice(plan, interval);
+                return (
+                  <article
+                    key={plan.code}
+                    className={`flex flex-col rounded-2xl border bg-white p-5 shadow-sm dark:bg-slate-900 ${plan.code === "full" ? "border-violet-400 ring-1 ring-violet-300 dark:border-violet-600" : "border-slate-200 dark:border-slate-700"}`}
+                  >
+                    <h2 className="text-xl font-bold">{plan.name}</h2>
+                    <p className="mt-2 min-h-16 text-sm text-slate-600 dark:text-slate-300">
+                      {plan.description}
+                    </p>
+                    <p className="mt-4 text-3xl font-bold">
+                      {formatBillingAmount(price.amount)}
+                      <span className="text-sm font-normal text-slate-500">
+                        /{interval === "month" ? "月" : "年"}
+                      </span>
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">税込・自動更新</p>
+                    {plan.trialDays && (
+                      <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-100">
+                        初回のみ{plan.trialDays}日間無料
+                      </p>
+                    )}
+                    <ul className="mt-5 flex-1 space-y-2 text-sm">
+                      {plan.highlights.map((highlight) => (
+                        <li key={highlight} className="flex gap-2">
+                          <Check
+                            className="mt-0.5 size-4 shrink-0 text-emerald-600"
+                            aria-hidden="true"
+                          />
+                          {highlight}
+                        </li>
+                      ))}
+                    </ul>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedPlan(plan.code)}
+                      className="mt-6 min-h-12 rounded-xl bg-violet-700 px-4 font-bold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500"
+                    >
+                      {plan.name}を選ぶ
+                    </button>
+                  </article>
+                );
+              })}
+            </div>
+          )}
           </>
         )}
 
@@ -251,7 +252,7 @@ export function BillingPlanScreen({
                 aria-hidden="true"
               />
               <h2 id="checkout-confirmation-title" className="text-xl font-bold">
-                申込み内容の確認
+                {paidSubscription ? "変更内容の確認" : "申込み内容の確認"}
               </h2>
             </div>
             <dl className="mt-5 grid gap-3 text-sm sm:grid-cols-2">
@@ -309,7 +310,9 @@ export function BillingPlanScreen({
                 <ExternalLink className="size-4" aria-hidden="true" />
                 {checkoutState.status === "loading"
                   ? "Stripeを開いています..."
-                  : "Stripeで購入手続きへ"}
+                  : paidSubscription
+                    ? "Stripeで変更内容を確認"
+                    : "Stripeで購入手続きへ"}
               </button>
               <button
                 type="button"

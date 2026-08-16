@@ -100,9 +100,11 @@ describe("StripeBillingProvider", () => {
 
     await expect(provider.retrieveSubscription("sub_secret")).resolves.toEqual({
       id: "sub_secret",
+      itemId: null,
       customerId: "cus_secret",
       status: "active",
       priceId: "price_internal",
+      interval: null,
       currentPeriodStart: "2025-08-01T00:00:00.000Z",
       currentPeriodEnd: "2025-09-01T00:00:00.000Z",
       cancelAtPeriodEnd: false,
@@ -146,5 +148,40 @@ describe("StripeBillingProvider", () => {
       return_url: "https://example.com/settings",
       configuration: "bpc_managed",
     });
+  });
+
+  it("月額から年額はbilling cycle reset設定のPortal確認画面を使う", async () => {
+    const create = vi.fn().mockResolvedValue({ url: "https://billing.stripe.test/change" });
+    const provider = new StripeBillingProvider(
+      { billingPortal: { sessions: { create } } } as never,
+      {
+        portalConfigurationId: "bpc_standard",
+        portalResetConfigurationId: "bpc_reset",
+      },
+    );
+
+    await provider.createPortalSession({
+      customerId: "cus_secret",
+      returnUrl: "https://example.com/billing",
+      planChange: {
+        subscriptionId: "sub_secret",
+        itemId: "si_secret",
+        targetPriceId: "price_year",
+        billingCycleAnchor: "now",
+      },
+    });
+
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        configuration: "bpc_reset",
+        flow_data: expect.objectContaining({
+          type: "subscription_update_confirm",
+          subscription_update_confirm: {
+            subscription: "sub_secret",
+            items: [{ id: "si_secret", price: "price_year", quantity: 1 }],
+          },
+        }),
+      }),
+    );
   });
 });

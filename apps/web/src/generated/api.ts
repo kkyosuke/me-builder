@@ -89,6 +89,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/billing/plan-change-sessions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** 選択したPlanへのStripe確認画面を作成する */
+    post: operations["createBillingPlanChangeSession"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/billing/checkout-sessions/{checkoutSessionId}": {
     parameters: {
       query?: never;
@@ -1396,7 +1413,120 @@ export interface operations {
               | "existing_subscription"
               | "family_seat_active"
               | "checkout_in_progress"
-              | "customer_not_found";
+              | "customer_not_found"
+              | "same_plan"
+              | "subscription_not_found"
+              | "configuration_missing";
+          };
+        };
+      };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
+          };
+        };
+      };
+      /** @description D1 bindingが設定されていない */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Service Unavailable";
+          };
+        };
+      };
+    };
+  };
+  createBillingPlanChangeSession: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": Record<string, never>;
+      };
+    };
+    responses: {
+      /** @description プラン変更確認用の短命なStripe Portal URL */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uri */
+            url: string;
+          };
+        };
+      };
+      /** @description リクエストが不正 */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Invalid request";
+          };
+        };
+      };
+      /** @description LIFF IDトークンを検証できない */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Unauthorized";
+          };
+        };
+      };
+      /** @description 対応するAccountが存在しない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Account not found";
+            /** @constant */
+            reason: "friendship_required";
+          };
+        };
+      };
+      /** @description プラン変更を開始できない */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Billing session unavailable";
+            /** @enum {string} */
+            reason:
+              | "plan_unavailable"
+              | "existing_subscription"
+              | "checkout_in_progress"
+              | "customer_not_found"
+              | "same_plan"
+              | "subscription_not_found"
+              | "configuration_missing";
           };
         };
       };
@@ -1568,7 +1698,10 @@ export interface operations {
               | "existing_subscription"
               | "family_seat_active"
               | "checkout_in_progress"
-              | "customer_not_found";
+              | "customer_not_found"
+              | "same_plan"
+              | "subscription_not_found"
+              | "configuration_missing";
           };
         };
       };

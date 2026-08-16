@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createCheckoutSession,
   createCustomerPortalSession,
+  createPlanChangeSession,
   fetchBillingPlanCatalog,
   fetchBillingTrialEligibility,
   verifyCheckoutSessionCompletion,
@@ -129,6 +130,29 @@ describe("billing purchase api", () => {
     await expect(
       createCheckoutSession(undefined, "id-token", { plan: "lite", interval: "month" }),
     ).rejects.toThrow("現在の契約があります");
+  });
+
+  it("本人の変更先だけをPlan change APIへ送る", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ url: "https://billing.stripe.test/change" }), {
+        status: 201,
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      createPlanChangeSession("https://api.example.test", "id-token", {
+        plan: "full",
+        interval: "year",
+      }),
+    ).resolves.toBe("https://billing.stripe.test/change");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.example.test/api/billing/plan-change-sessions",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ plan: "full", interval: "year" }),
+      }),
+    );
   });
 
   it("本人のCheckout Sessionがcompleteの場合だけ復帰を受理する", async () => {

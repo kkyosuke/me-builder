@@ -29,6 +29,8 @@ export const ConfigSchema = v.object({
   stripeSecretKey: v.optional(v.string()),
   stripeWebhookSecret: v.optional(v.string()),
   stripePortalConfigurationId: v.optional(v.string()),
+  stripePortalPlanChangeConfigurationId: v.optional(v.string()),
+  stripePortalResetConfigurationId: v.optional(v.string()),
   billingQueue: v.optional(
     v.custom<Queue<BillingQueueMessage>>(
       (val) => val === undefined || (typeof val === "object" && val !== null && "send" in val),

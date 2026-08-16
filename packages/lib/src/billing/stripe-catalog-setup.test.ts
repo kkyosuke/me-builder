@@ -122,7 +122,7 @@ class FakeStripeCatalogApi implements StripeCatalogApi {
     spec: Parameters<StripeCatalogApi["createPortalConfiguration"]>[0],
   ) {
     this.portalSpecs.push(spec);
-    const portal = { id: "bpc_1", metadata: spec.metadata };
+    const portal = { id: `bpc_${this.portals.length + 1}`, metadata: spec.metadata };
     this.portals.push(portal);
     return portal;
   }
@@ -160,6 +160,20 @@ describe("setupStripeBillingCatalog", () => {
       enabled: true,
       mode: "at_period_end",
     });
+    const reset = billingPortalConfigurationParams({
+      webBaseUrl: "https://example.test",
+      metadata: { managed_by: "test", portal_mode: "reset" },
+      products: [{ productId: "prod_lite", priceIds: ["price_month", "price_year"] }],
+      billingCycleAnchor: "now",
+    });
+    expect(reset.features.subscription_update).toMatchObject({ billing_cycle_anchor: "now" });
+    const management = billingPortalConfigurationParams({
+      webBaseUrl: "https://example.test",
+      metadata: { managed_by: "test", portal_mode: "management" },
+      products: [],
+      subscriptionUpdateEnabled: false,
+    });
+    expect(management.features.subscription_update).toEqual({ enabled: false });
   });
 
   it("空のStripe環境へ商品、月額・年額Price、Webhook、Portalを再現する", async () => {
@@ -185,7 +199,7 @@ describe("setupStripeBillingCatalog", () => {
     ]);
     expect(api.webhooks[0]?.url).toBe("https://api.stg.kagami.kyosuke.dev/api/billing/webhook");
     expect(api.webhookEvents).toEqual(STRIPE_BILLING_EVENT_TYPES);
-    expect(api.portals).toHaveLength(1);
+    expect(api.portals).toHaveLength(3);
     expect(api.portalSpecs[0]?.products).toEqual([
       {
         productId: "me_builder_subscription",
@@ -196,6 +210,9 @@ describe("setupStripeBillingCatalog", () => {
       new Set(["me_builder_subscription"]),
     );
     expect(result.webhookSecret).toBe("whsec_fixture");
+    expect(result.portalConfigurationId).toBe("bpc_1");
+    expect(result.portalPlanChangeConfigurationId).toBe("bpc_2");
+    expect(result.portalResetConfigurationId).toBe("bpc_3");
     expect(result.pricePlanMap).toEqual({
       price_1: "lite",
       price_2: "lite",
@@ -214,7 +231,7 @@ describe("setupStripeBillingCatalog", () => {
     expect(api.products).toHaveLength(1);
     expect(api.prices).toHaveLength(6);
     expect(api.webhooks).toHaveLength(1);
-    expect(api.portals).toHaveLength(1);
+    expect(api.portals).toHaveLength(3);
     expect(second.webhookSecret).toBeNull();
   });
 

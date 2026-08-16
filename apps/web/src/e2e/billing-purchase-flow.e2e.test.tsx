@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   acquireIdToken: vi.fn(),
   fetchTrialEligibility: vi.fn(),
   createPortal: vi.fn(),
+  createPlanChange: vi.fn(),
 }));
 
 vi.mock("../feature/billing/infrastructure/billing-api", () => ({
@@ -20,6 +21,7 @@ vi.mock("../feature/billing/infrastructure/billing-api", () => ({
   verifyCheckoutSessionCompletion: mocks.verifyCheckout,
   fetchBillingTrialEligibility: mocks.fetchTrialEligibility,
   createCustomerPortalSession: mocks.createPortal,
+  createPlanChangeSession: mocks.createPlanChange,
 }));
 vi.mock("../feature/profile-settings/infrastructure/entitlement-api", () => ({
   fetchProfileEntitlement: mocks.fetchEntitlement,
@@ -78,6 +80,7 @@ describe("billing purchase user journey", () => {
     mocks.fetchEntitlement.mockReset().mockResolvedValue(entitlement("free"));
     mocks.fetchTrialEligibility.mockReset().mockResolvedValue(true);
     mocks.createPortal.mockReset().mockResolvedValue("https://billing.stripe.test/portal");
+    mocks.createPlanChange.mockReset().mockResolvedValue("https://billing.stripe.test/plan-change");
   });
   afterEach(cleanup);
 
@@ -164,17 +167,24 @@ describe("billing purchase user journey", () => {
     expect(mocks.fetchEntitlement).not.toHaveBeenCalled();
   });
 
-  it("契約中は二重購入せずStripe Portalからプラン変更できる", async () => {
+  it("契約中は選択した変更内容をStripe Portalで確認する", async () => {
     mocks.fetchEntitlement.mockResolvedValue(entitlement("subscription"));
     const navigate = vi.fn();
     render(<BillingPlanApplication onBack={vi.fn()} navigateToCheckout={navigate} />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Stripeでプラン変更・契約管理" }));
+    fireEvent.click(await screen.findByRole("radio", { name: "年額" }));
+    fireEvent.click(screen.getByRole("button", { name: "Liteを選ぶ" }));
+    fireEvent.click(screen.getByRole("button", { name: "Stripeで変更内容を確認" }));
 
     await waitFor(() =>
-      expect(navigate).toHaveBeenCalledWith("https://billing.stripe.test/portal"),
+      expect(navigate).toHaveBeenCalledWith("https://billing.stripe.test/plan-change"),
     );
-    expect(mocks.createPortal).toHaveBeenCalledWith(undefined, "id-token", expect.any(AbortSignal));
-    expect(screen.queryByRole("button", { name: "Liteを選ぶ" })).toBeNull();
+    expect(mocks.createPlanChange).toHaveBeenCalledWith(
+      undefined,
+      "id-token",
+      { plan: "lite", interval: "year" },
+      expect.any(AbortSignal),
+    );
+    expect(mocks.createCheckout).not.toHaveBeenCalled();
   });
 });

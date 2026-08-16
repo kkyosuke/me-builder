@@ -14,6 +14,8 @@ export const STRIPE_API_VERSION = "2026-07-29.dahlia" as const;
 export function createStripeBillingProvider(input: {
   secretKey: string;
   portalConfigurationId?: string;
+  portalPlanChangeConfigurationId?: string;
+  portalResetConfigurationId?: string;
   timeoutMs?: number;
   maxNetworkRetries?: number;
 }): BillingProvider {
@@ -24,16 +26,25 @@ export function createStripeBillingProvider(input: {
     maxNetworkRetries: input.maxNetworkRetries ?? 2,
     telemetry: false,
   });
-  return new StripeBillingProvider(
-    stripe,
-    input.portalConfigurationId ? { portalConfigurationId: input.portalConfigurationId } : {},
-  );
+  return new StripeBillingProvider(stripe, {
+    ...(input.portalConfigurationId ? { portalConfigurationId: input.portalConfigurationId } : {}),
+    ...(input.portalResetConfigurationId
+      ? { portalResetConfigurationId: input.portalResetConfigurationId }
+      : {}),
+    ...(input.portalPlanChangeConfigurationId
+      ? { portalPlanChangeConfigurationId: input.portalPlanChangeConfigurationId }
+      : {}),
+  });
 }
 
 export class StripeBillingProvider implements BillingProvider {
   constructor(
     private readonly stripe: Stripe,
-    private readonly options: { portalConfigurationId?: string } = {},
+    private readonly options: {
+      portalConfigurationId?: string;
+      portalPlanChangeConfigurationId?: string;
+      portalResetConfigurationId?: string;
+    } = {},
   ) {}
 
   async createCustomer(input: { accountId: string }, idempotencyKey: string) {
@@ -83,13 +94,46 @@ export class StripeBillingProvider implements BillingProvider {
   async createPortalSession(input: {
     customerId: string;
     returnUrl: string;
+    planChange?: {
+      subscriptionId: string;
+      itemId: string;
+      targetPriceId: string;
+      billingCycleAnchor: "unchanged" | "now";
+    };
   }) {
     return this.call(async () => {
       const session = await this.stripe.billingPortal.sessions.create({
         customer: input.customerId,
         return_url: input.returnUrl,
-        ...(this.options.portalConfigurationId
-          ? { configuration: this.options.portalConfigurationId }
+        ...(input.planChange?.billingCycleAnchor === "now"
+          ? this.options.portalResetConfigurationId
+            ? { configuration: this.options.portalResetConfigurationId }
+            : {}
+          : input.planChange && this.options.portalPlanChangeConfigurationId
+            ? { configuration: this.options.portalPlanChangeConfigurationId }
+            : this.options.portalConfigurationId
+              ? { configuration: this.options.portalConfigurationId }
+              : {}),
+        ...(input.planChange
+          ? {
+              flow_data: {
+                type: "subscription_update_confirm" as const,
+                subscription_update_confirm: {
+                  subscription: input.planChange.subscriptionId,
+                  items: [
+                    {
+                      id: input.planChange.itemId,
+                      price: input.planChange.targetPriceId,
+                      quantity: 1,
+                    },
+                  ],
+                },
+                after_completion: {
+                  type: "redirect" as const,
+                  redirect: { return_url: input.returnUrl },
+                },
+              },
+            }
           : {}),
       });
       return { url: session.url };
@@ -221,13 +265,18 @@ function mapCheckoutSession(session: Stripe.Checkout.Session): BillingCheckoutSe
 
 function mapSubscription(subscription: Stripe.Subscription): BillingSubscription {
   const item = subscription.items.data[0];
+  const interval = item?.price.recurring?.interval;
+  const billingInterval: "month" | "year" | null =
+    interval === "month" ? "month" : interval === "year" ? "year" : null;
   const customerId =
     typeof subscription.customer === "string" ? subscription.customer : subscription.customer.id;
   return {
     id: subscription.id,
+    itemId: item?.id ?? null,
     customerId,
     status: billingSubscriptionStatus(subscription.status),
     priceId: item?.price.id ?? null,
+    interval: billingInterval,
     currentPeriodStart: item ? fromUnixSeconds(item.current_period_start) : null,
     currentPeriodEnd: item ? fromUnixSeconds(item.current_period_end) : null,
     cancelAtPeriodEnd: subscription.cancel_at_period_end,

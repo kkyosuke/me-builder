@@ -161,6 +161,57 @@ export async function createCheckoutSession(
   }
 }
 
+export async function createPlanChangeSession(
+  apiUrl: string | undefined,
+  idToken: string,
+  input: CheckoutRequest,
+  signal?: AbortSignal,
+): Promise<string> {
+  let response: Response;
+  try {
+    response = await createHttpClient(apiUrl).request("/api/billing/plan-change-sessions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${idToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+      ...(signal ? { signal } : {}),
+    });
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    throw new OperationError("プラン変更を開始できませんでした。時間をおいて再試行してください。", {
+      code: "BILLING_PLAN_CHANGE_NETWORK_FAILED",
+      cause: error,
+    });
+  }
+  if (response.status === 409) {
+    const body = (await response.json().catch(() => null)) as { reason?: string } | null;
+    const changeMessage =
+      body?.reason === "same_plan"
+        ? "現在と同じプラン・支払い間隔です。"
+        : body?.reason === "configuration_missing"
+          ? "年額への変更準備が完了していません。時間をおいて再試行してください。"
+          : "現在の契約ではこのプランへ変更できません。";
+    throw new OperationError(changeMessage, {
+      code: "BILLING_PLAN_CHANGE_UNAVAILABLE",
+      status: 409,
+    });
+  }
+  if (!response.ok) {
+    throw new OperationError("プラン変更を開始できませんでした。時間をおいて再試行してください。", {
+      code: "BILLING_PLAN_CHANGE_FAILED",
+      status: response.status,
+    });
+  }
+  try {
+    return v.parse(PortalResponseSchema, await response.json()).url;
+  } catch (error) {
+    throw new ValidationError("プラン変更の応答を確認できませんでした。", {
+      code: "BILLING_PLAN_CHANGE_RESPONSE_INVALID",
+      status: response.status,
+      cause: error,
+    });
+  }
+}
+
 export async function verifyCheckoutSessionCompletion(
   apiUrl: string | undefined,
   idToken: string,

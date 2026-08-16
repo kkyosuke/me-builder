@@ -93,6 +93,8 @@ export interface PortalSpec {
   webBaseUrl: string;
   metadata: Record<string, string>;
   products: readonly { productId: string; priceIds: readonly string[] }[];
+  billingCycleAnchor?: "unchanged" | "now";
+  subscriptionUpdateEnabled?: boolean;
 }
 
 export interface StripeCatalogApi {
@@ -117,6 +119,8 @@ export interface StripeBillingCatalogSetupResult {
   pricePlanMap: Readonly<Record<string, StripeCatalogPlan>>;
   webhookSecret: string | null;
   portalConfigurationId: string;
+  portalPlanChangeConfigurationId: string;
+  portalResetConfigurationId: string;
   created: readonly string[];
   updated: readonly string[];
 }
@@ -138,6 +142,10 @@ function managedMetadata(plan?: StripeCatalogPlan): Record<string, string> {
     catalog_version: CATALOG_VERSION,
     ...(plan ? { plan } : {}),
   };
+}
+
+function portalMetadata(mode: "management" | "standard" | "reset"): Record<string, string> {
+  return { ...managedMetadata(), portal_mode: mode };
 }
 
 function isManaged(metadata: Readonly<Record<string, string>>): boolean {
@@ -327,36 +335,48 @@ export async function setupStripeBillingCatalog(input: {
     }
   }
 
-  const portalMetadata = managedMetadata();
   const portals = await input.api.listPortalConfigurations();
-  const portal = assertSingle(
-    portals.filter((configuration) => isManaged(configuration.metadata)),
-    "managed Customer Portal configuration",
-  );
-  const portalSpec = {
-    webBaseUrl,
-    metadata: portalMetadata,
-    products: [
-      {
-        productId: product.id,
-        priceIds: desiredProduct.prices.map((price) => {
-          const current = desiredPriceByLookupKey.get(price.lookupKey);
-          if (!current) throw new Error(`Managed price is missing for ${price.lookupKey}`);
-          return current.id;
-        }),
-      },
-    ],
-  };
-  let portalConfigurationId: string;
-  if (portal) {
-    await input.api.updatePortalConfiguration(portal.id, portalSpec);
-    portalConfigurationId = portal.id;
-    updated.push("customer-portal");
-  } else {
+  const portalProducts = [
+    {
+      productId: product.id,
+      priceIds: desiredProduct.prices.map((price) => {
+        const current = desiredPriceByLookupKey.get(price.lookupKey);
+        if (!current) throw new Error(`Managed price is missing for ${price.lookupKey}`);
+        return current.id;
+      }),
+    },
+  ];
+  const upsertPortal = async (mode: "management" | "standard" | "reset") => {
+    const portal = assertSingle(
+      portals.filter(
+        (configuration) =>
+          isManaged(configuration.metadata) &&
+          (mode === "management"
+            ? !configuration.metadata.portal_mode ||
+              configuration.metadata.portal_mode === "management"
+            : configuration.metadata.portal_mode === mode),
+      ),
+      `managed Customer Portal ${mode} configuration`,
+    );
+    const portalSpec: PortalSpec = {
+      webBaseUrl,
+      metadata: portalMetadata(mode),
+      products: portalProducts,
+      billingCycleAnchor: mode === "reset" ? "now" : "unchanged",
+      subscriptionUpdateEnabled: mode !== "management",
+    };
+    if (portal) {
+      await input.api.updatePortalConfiguration(portal.id, portalSpec);
+      updated.push(`customer-portal:${mode}`);
+      return portal.id;
+    }
     const createdPortal = await input.api.createPortalConfiguration(portalSpec);
-    portalConfigurationId = createdPortal.id;
-    created.push("customer-portal");
-  }
+    created.push(`customer-portal:${mode}`);
+    return createdPortal.id;
+  };
+  const portalConfigurationId = await upsertPortal("management");
+  const portalPlanChangeConfigurationId = await upsertPortal("standard");
+  const portalResetConfigurationId = await upsertPortal("reset");
 
   return {
     pricePlanMap: Object.fromEntries(
@@ -364,6 +384,8 @@ export async function setupStripeBillingCatalog(input: {
     ),
     webhookSecret,
     portalConfigurationId,
+    portalPlanChangeConfigurationId,
+    portalResetConfigurationId,
     created,
     updated,
   };
@@ -414,20 +436,23 @@ export const billingPortalConfigurationParams = (
         options: ["too_expensive", "missing_features", "unused", "other"],
       },
     },
-    subscription_update: {
-      enabled: true,
-      default_allowed_updates: ["price"],
-      products: spec.products.map((product) => ({
-        product: product.productId,
-        prices: [...product.priceIds],
-      })),
-      billing_cycle_anchor: "unchanged",
-      proration_behavior: "always_invoice",
-      schedule_at_period_end: {
-        conditions: [{ type: "decreasing_item_amount" }, { type: "shortening_interval" }],
-      },
-      trial_update_behavior: "continue_trial",
-    },
+    subscription_update:
+      spec.subscriptionUpdateEnabled === false
+        ? { enabled: false }
+        : {
+            enabled: true,
+            default_allowed_updates: ["price"],
+            products: spec.products.map((product) => ({
+              product: product.productId,
+              prices: [...product.priceIds],
+            })),
+            billing_cycle_anchor: spec.billingCycleAnchor ?? "unchanged",
+            proration_behavior: "always_invoice",
+            schedule_at_period_end: {
+              conditions: [{ type: "decreasing_item_amount" }, { type: "shortening_interval" }],
+            },
+            trial_update_behavior: "continue_trial",
+          },
   },
   login_page: { enabled: false },
   metadata: spec.metadata,
