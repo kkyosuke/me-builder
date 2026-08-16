@@ -32,3 +32,31 @@ export type FamilySeatMutationResult =
   | Readonly<{ type: "capacity-reached" }>
   | Readonly<{ type: "account-already-assigned" }>
   | Readonly<{ type: "invalid-state" }>;
+
+export type FamilySeatInvitationStatus =
+  | "pending"
+  | "accepted"
+  | "declined"
+  | "cancelled"
+  | "expired";
+
+export type FamilySeatInvitation = Readonly<{
+  id: string;
+  seatId: string;
+  inviterAccountId: string;
+  status: FamilySeatInvitationStatus;
+  expiresAt: string;
+  claimedByAccountId: string | null;
+  consumedAt: string | null;
+  createdAt: string;
+}>;
+
+export type FamilySeatInvitationMutationResult =
+  | Readonly<{ type: "created"; invitation: FamilySeatInvitation; seat: FamilySeat }>
+  | Readonly<{ type: "updated"; invitation: FamilySeatInvitation; seat: FamilySeat }>
+  | Readonly<{ type: "not-found" }>
+  | Readonly<{ type: "capacity-reached" }>
+  | Readonly<{ type: "expired" }>
+  | Readonly<{ type: "token-used" }>
+  | Readonly<{ type: "account-already-assigned" }>
+  | Readonly<{ type: "forbidden" }>;

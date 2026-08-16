@@ -8,9 +8,11 @@ import type { SharedD1Client } from "../client";
 import * as schema from "../schema";
 import { upsertIdentity } from "./account";
 import {
+  acceptFamilySeatInvitation,
   activateFamilySeat,
   cancelFamilySeat,
   createFamilyPack,
+  createFamilySeatInvitation,
   endFamilyPack,
   leaveFamilySeat,
   readFamilyPackByPayer,
@@ -199,5 +201,36 @@ describe("family seat persistence", () => {
     await expect(activateFamilySeat(failingDb, "error-invitation", member)).rejects.toThrow(
       "FOREIGN KEY constraint failed",
     );
+  });
+
+  it("同じ招待tokenの並行承諾では最初の1 Accountだけを参加させる", async () => {
+    const db = createTestDb();
+    const payer = await account(db, "token-race-payer");
+    const memberA = await account(db, "token-race-a");
+    const memberB = await account(db, "token-race-b");
+    await createFamilyPack(db, payer);
+    await createFamilySeatInvitation(db, {
+      payerAccountId: payer,
+      tokenHash: "hash-of-single-use-token",
+      expiresAt: new Date("2026-08-18T00:00:00.000Z"),
+      at: new Date("2026-08-16T00:00:00.000Z"),
+    });
+
+    const results = await Promise.all([
+      acceptFamilySeatInvitation(
+        db,
+        "hash-of-single-use-token",
+        memberA,
+        new Date("2026-08-16T01:00:00.000Z"),
+      ),
+      acceptFamilySeatInvitation(
+        db,
+        "hash-of-single-use-token",
+        memberB,
+        new Date("2026-08-16T01:00:00.000Z"),
+      ),
+    ]);
+    expect(results.filter(({ type }) => type === "updated")).toHaveLength(1);
+    expect(results.filter(({ type }) => type === "token-used")).toHaveLength(1);
   });
 });

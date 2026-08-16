@@ -59,3 +59,32 @@ export const familySeats = sqliteTable(
     index("family_seat_pack_status_idx").on(table.packId, table.status, table.slotNumber),
   ],
 );
+
+export const familySeatInvitations = sqliteTable(
+  "family_seat_invitations",
+  {
+    ...baseSchema,
+    seatId: text("seat_id")
+      .notNull()
+      .references(() => familySeats.id),
+    inviterAccountId: text("inviter_account_id")
+      .notNull()
+      .references(() => accounts.id),
+    tokenHash: text("token_hash").notNull(),
+    status: text("status", {
+      enum: ["pending", "accepted", "declined", "cancelled", "expired"],
+    }).notNull(),
+    expiresAt: integer("expires_at", { mode: "timestamp" }).notNull(),
+    claimedByAccountId: text("claimed_by_account_id").references(() => accounts.id),
+    consumedAt: integer("consumed_at", { mode: "timestamp" }),
+  },
+  (table) => [
+    uniqueIndex("family_seat_invitation_seat_idx").on(table.seatId),
+    uniqueIndex("family_seat_invitation_token_idx").on(table.tokenHash),
+    index("family_seat_invitation_status_expiry_idx").on(table.status, table.expiresAt),
+    check(
+      "family_seat_invitation_state_check",
+      sql`(${table.status} = 'pending' and ${table.claimedByAccountId} is null and ${table.consumedAt} is null) or (${table.status} = 'accepted' and ${table.claimedByAccountId} is not null and ${table.consumedAt} is not null) or (${table.status} in ('declined', 'cancelled', 'expired') and ${table.consumedAt} is not null)`,
+    ),
+  ],
+);
