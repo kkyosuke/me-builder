@@ -77,16 +77,21 @@ export async function processBillingMessage(
   let resultCode: string | undefined;
   try {
     if (!config.stripeSecretKey) throw new Error("STRIPE_SECRET_KEY_MISSING");
+    let projectedAccountId: string | undefined;
     const result = await convergeBillingEvent({
       message: message.body,
       provider: billing.createStripeBillingProvider({ secretKey: config.stripeSecretKey }),
       store: {
         findCustomer: (providerCustomerId) =>
           D1.shared.action.billing.findBillingCustomerByProviderCustomerId(db, providerCustomerId),
-        apply: (projection) => D1.shared.action.billing.applyBillingProjection(db, projection),
+        apply: (projection) => {
+          projectedAccountId = projection.accountId;
+          return D1.shared.action.billing.applyBillingProjection(db, projection);
+        },
       },
       resolvePlan: (priceId) => (priceId ? (config.billingPricePlanMap[priceId] ?? null) : null),
     });
+    if (projectedAccountId) await reconcileFamilyPack(db, projectedAccountId);
     outcome = result === "ignored" ? "discarded" : "succeeded";
     resultCode = result.toUpperCase();
     message.ack();
@@ -157,4 +162,20 @@ export async function processBillingMessage(
       resultCode,
     }),
   );
+}
+
+/** 現在の決済projectionへFamily packを冪等に追従させる。 */
+export async function reconcileFamilyPack(
+  db: D1.shared.Client,
+  accountId: string,
+  at = new Date(),
+): Promise<void> {
+  const assignment = await new D1.shared.action.billing.D1AccountPlanAssignmentProvider(
+    db,
+  ).findCurrent(accountId, at);
+  if (assignment.plan === "family" && assignment.source === "subscription") {
+    await D1.shared.action.familySeat.createFamilyPack(db, accountId, at);
+    return;
+  }
+  await D1.shared.action.familySeat.endFamilyPack(db, accountId, at);
 }

@@ -40,17 +40,23 @@ import {
 import type { AppEnv } from "../types";
 import { bearerToken } from "./auth";
 
+function planAssignmentProvider(c: Context<AppEnv>, db: D1.shared.Client) {
+  return (
+    c.env.ACCOUNT_PLAN_ASSIGNMENT_PROVIDER ??
+    new D1.shared.action.billing.D1AccountPlanAssignmentProvider(db)
+  );
+}
+
 function goalFollowUpParams(c: Context<AppEnv>) {
   if (!c.env?.DB || !c.env.ACCOUNT_DATA) return undefined;
   const config = getConfig(c.env);
+  const db = D1.shared.client.create(c.env.DB);
   return {
     idToken: bearerToken(c.req.header("authorization")),
     lineLoginChannelId: config.lineLoginChannelId,
-    db: D1.shared.client.create(c.env.DB),
+    db,
     accountData: c.env.ACCOUNT_DATA,
-    ...(c.env.ACCOUNT_PLAN_ASSIGNMENT_PROVIDER
-      ? { planAssignmentProvider: c.env.ACCOUNT_PLAN_ASSIGNMENT_PROVIDER }
-      : {}),
+    planAssignmentProvider: planAssignmentProvider(c, db),
   };
 }
 
@@ -190,14 +196,13 @@ export async function getProfileEntitlementContents(c: Context<AppEnv>): Promise
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   }
   const currentConfig = getConfig(c.env);
+  const db = D1.shared.client.create(c.env.DB);
   const outcome = await getProfileEntitlement({
     idToken: bearerToken(c.req.header("authorization")),
     lineLoginChannelId: currentConfig.lineLoginChannelId,
-    db: D1.shared.client.create(c.env.DB),
+    db,
     accountData: c.env.ACCOUNT_DATA,
-    ...(c.env.ACCOUNT_PLAN_ASSIGNMENT_PROVIDER
-      ? { planAssignmentProvider: c.env.ACCOUNT_PLAN_ASSIGNMENT_PROVIDER }
-      : {}),
+    planAssignmentProvider: planAssignmentProvider(c, db),
   });
   switch (outcome.type) {
     case "resolved":
@@ -256,15 +261,14 @@ export async function postProfileSummaryGeneration(c: Context<AppEnv>): Promise<
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   }
   const currentConfig = getConfig(c.env);
+  const db = D1.shared.client.create(c.env.DB);
   const outcome = await requestProfileSummaryGeneration({
     idToken: bearerToken(c.req.header("authorization")),
     lineLoginChannelId: currentConfig.lineLoginChannelId,
-    db: D1.shared.client.create(c.env.DB),
+    db,
     accountData: c.env.ACCOUNT_DATA,
     queue: c.env.PROFILE_SUMMARY_QUEUE,
-    ...(c.env.ACCOUNT_PLAN_ASSIGNMENT_PROVIDER
-      ? { planAssignmentProvider: c.env.ACCOUNT_PLAN_ASSIGNMENT_PROVIDER }
-      : {}),
+    planAssignmentProvider: planAssignmentProvider(c, db),
     allowUnchangedRegeneration: isDevelopmentEnvironment(currentConfig.environment),
   });
   switch (outcome.type) {
@@ -297,14 +301,13 @@ export async function getWeeklyReflectionContents(c: Context<AppEnv>): Promise<R
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   }
   const currentConfig = getConfig(c.env);
+  const db = D1.shared.client.create(c.env.DB);
   const outcome = await getWeeklyReflections({
     idToken: bearerToken(c.req.header("authorization")),
     lineLoginChannelId: currentConfig.lineLoginChannelId,
-    db: D1.shared.client.create(c.env.DB),
+    db,
     accountData: c.env.ACCOUNT_DATA,
-    ...(c.env.ACCOUNT_PLAN_ASSIGNMENT_PROVIDER
-      ? { planAssignmentProvider: c.env.ACCOUNT_PLAN_ASSIGNMENT_PROVIDER }
-      : {}),
+    planAssignmentProvider: planAssignmentProvider(c, db),
   });
   switch (outcome.type) {
     case "resolved":
@@ -329,15 +332,14 @@ export async function postWeeklyReflectionGeneration(c: Context<AppEnv>): Promis
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   }
   const currentConfig = getConfig(c.env);
+  const db = D1.shared.client.create(c.env.DB);
   const outcome = await requestWeeklyReflectionGeneration({
     idToken: bearerToken(c.req.header("authorization")),
     lineLoginChannelId: currentConfig.lineLoginChannelId,
-    db: D1.shared.client.create(c.env.DB),
+    db,
     accountData: c.env.ACCOUNT_DATA,
     queue: c.env.PROFILE_SUMMARY_QUEUE,
-    ...(c.env.ACCOUNT_PLAN_ASSIGNMENT_PROVIDER
-      ? { planAssignmentProvider: c.env.ACCOUNT_PLAN_ASSIGNMENT_PROVIDER }
-      : {}),
+    planAssignmentProvider: planAssignmentProvider(c, db),
   });
   switch (outcome.type) {
     case "accepted":
