@@ -25,6 +25,7 @@ const SHARED_D1_TABLES = [
   "diagnosis_questions",
   "diagnosis_scoring_configs",
   "family_packs",
+  "family_seat_invitations",
   "family_seats",
   "gemini_usage_records",
   "question_choices",

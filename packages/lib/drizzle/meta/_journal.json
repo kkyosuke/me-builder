@@ -85,6 +85,13 @@
       "when": 1786844342822,
       "tag": "0011_abandoned_silver_centurion",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1786844364937,
+      "tag": "0012_concerned_madame_hydra",
+      "breakpoints": true
     }
   ]
 }

@@ -3,12 +3,14 @@ import type {
   FamilyPack,
   FamilyPackReadModel,
   FamilySeat,
+  FamilySeatInvitation,
+  FamilySeatInvitationMutationResult,
   FamilySeatMutationResult,
   FamilySeatStatus,
 } from "../../../billing/family-seat";
 import type { SharedD1Client } from "../client";
 import { accounts } from "../schema/account";
-import { familyPacks, familySeats } from "../schema/family-seat";
+import { familyPacks, familySeatInvitations, familySeats } from "../schema/family-seat";
 
 function iso(value: Date | null): string | null {
   return value?.toISOString() ?? null;
@@ -37,6 +39,25 @@ const seatModel = (row: typeof familySeats.$inferSelect): FamilySeat => ({
   activatedAt: iso(row.activatedAt),
   terminatedAt: iso(row.terminatedAt),
 });
+
+const invitationModel = (row: typeof familySeatInvitations.$inferSelect): FamilySeatInvitation => ({
+  id: row.id,
+  seatId: row.seatId,
+  inviterAccountId: row.inviterAccountId,
+  status: row.status,
+  expiresAt: row.expiresAt.toISOString(),
+  claimedByAccountId: row.claimedByAccountId,
+  consumedAt: iso(row.consumedAt),
+  createdAt: row.createdAt.toISOString(),
+});
+
+function changed(result: unknown): number {
+  return (
+    (result as { meta?: { changes?: number }; changes?: number } | undefined)?.meta?.changes ??
+    (result as { changes?: number } | undefined)?.changes ??
+    0
+  );
+}
 
 function isUniqueViolation(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
@@ -86,6 +107,28 @@ export async function readFamilyPackByPayer(
     .orderBy(asc(familySeats.slotNumber), asc(familySeats.createdAt))
     .all();
   return { pack: packModel(pack), seats: seats.map(seatModel) };
+}
+
+export async function readActiveFamilySeatByMember(
+  db: SharedD1Client,
+  memberAccountId: string,
+): Promise<Readonly<{ pack: FamilyPack; seat: FamilySeat }> | null> {
+  const row = await db
+    .select({ pack: familyPacks, seat: familySeats })
+    .from(familySeats)
+    .innerJoin(familyPacks, eq(familyPacks.id, familySeats.packId))
+    .where(
+      and(
+        eq(familySeats.memberAccountId, memberAccountId),
+        eq(familySeats.role, "member"),
+        eq(familySeats.status, "active"),
+        eq(familySeats.isDeleted, false),
+        eq(familyPacks.status, "active"),
+        eq(familyPacks.isDeleted, false),
+      ),
+    )
+    .get();
+  return row ? { pack: packModel(row.pack), seat: seatModel(row.seat) } : null;
 }
 
 export async function createFamilyPack(
@@ -322,6 +365,15 @@ export async function endFamilyPack(
           inArray(familySeats.status, ["invited", "active"]),
         ),
       ),
+    db
+      .update(familySeatInvitations)
+      .set({ status: "cancelled", consumedAt: at, updatedAt: at })
+      .where(
+        and(
+          eq(familySeatInvitations.status, "pending"),
+          sql`${familySeatInvitations.seatId} in (select id from family_seats where pack_id = ${current.pack.id})`,
+        ),
+      ),
   ]);
   const pack = await db.select().from(familyPacks).where(eq(familyPacks.id, current.pack.id)).get();
   const seats = await db
@@ -331,4 +383,232 @@ export async function endFamilyPack(
     .orderBy(asc(familySeats.slotNumber), asc(familySeats.createdAt))
     .all();
   return pack ? { pack: packModel(pack), seats: seats.map(seatModel) } : null;
+}
+
+export async function createFamilySeatInvitation(
+  db: SharedD1Client,
+  input: Readonly<{
+    payerAccountId: string;
+    tokenHash: string;
+    expiresAt: Date;
+    at?: Date;
+  }>,
+): Promise<FamilySeatInvitationMutationResult> {
+  const at = input.at ?? new Date();
+  const invitationId = crypto.randomUUID();
+  const reserved = await reserveFamilySeat(db, input.payerAccountId, invitationId, at);
+  if (reserved.type === "not-found") return { type: "not-found" };
+  if (reserved.type === "capacity-reached") return { type: "capacity-reached" };
+  if (reserved.type !== "updated") return { type: "forbidden" };
+  const row: typeof familySeatInvitations.$inferInsert = {
+    id: invitationId,
+    seatId: reserved.seat.id,
+    inviterAccountId: input.payerAccountId,
+    tokenHash: input.tokenHash,
+    status: "pending",
+    expiresAt: input.expiresAt,
+    createdAt: at,
+    updatedAt: at,
+  };
+  try {
+    await db.insert(familySeatInvitations).values(row);
+  } catch (error) {
+    await cancelFamilySeat(db, reserved.seat.id, at);
+    throw error;
+  }
+  return {
+    type: "created",
+    invitation: {
+      id: invitationId,
+      seatId: reserved.seat.id,
+      inviterAccountId: input.payerAccountId,
+      status: "pending",
+      expiresAt: input.expiresAt.toISOString(),
+      claimedByAccountId: null,
+      consumedAt: null,
+      createdAt: at.toISOString(),
+    },
+    seat: reserved.seat,
+  };
+}
+
+async function invitationWithSeat(db: SharedD1Client, tokenHash: string) {
+  return db
+    .select({ invitation: familySeatInvitations, seat: familySeats })
+    .from(familySeatInvitations)
+    .innerJoin(familySeats, eq(familySeats.id, familySeatInvitations.seatId))
+    .where(
+      and(
+        eq(familySeatInvitations.tokenHash, tokenHash),
+        eq(familySeatInvitations.isDeleted, false),
+      ),
+    )
+    .get();
+}
+
+async function expireInvitation(
+  db: SharedD1Client,
+  invitationId: string,
+  seatId: string,
+  at: Date,
+): Promise<void> {
+  await db.batch([
+    db
+      .update(familySeats)
+      .set({ status: "cancelled", terminatedAt: at, updatedAt: at })
+      .where(and(eq(familySeats.id, seatId), eq(familySeats.status, "invited"))),
+    db
+      .update(familySeatInvitations)
+      .set({ status: "expired", consumedAt: at, updatedAt: at })
+      .where(
+        and(
+          eq(familySeatInvitations.id, invitationId),
+          eq(familySeatInvitations.status, "pending"),
+        ),
+      ),
+  ]);
+}
+
+export async function acceptFamilySeatInvitation(
+  db: SharedD1Client,
+  tokenHash: string,
+  memberAccountId: string,
+  at = new Date(),
+): Promise<FamilySeatInvitationMutationResult> {
+  const current = await invitationWithSeat(db, tokenHash);
+  if (!current) return { type: "not-found" };
+  if (current.invitation.inviterAccountId === memberAccountId) return { type: "forbidden" };
+  if (current.invitation.status !== "pending") return { type: "token-used" };
+  if (current.invitation.expiresAt.getTime() <= at.getTime()) {
+    await expireInvitation(db, current.invitation.id, current.seat.id, at);
+    return { type: "expired" };
+  }
+  if (!(await activeAccountExists(db, memberAccountId))) return { type: "not-found" };
+  try {
+    const [seatResult] = await db.batch([
+      db
+        .update(familySeats)
+        .set({ memberAccountId, status: "active", activatedAt: at, updatedAt: at })
+        .where(and(eq(familySeats.id, current.seat.id), eq(familySeats.status, "invited"))),
+      db
+        .update(familySeatInvitations)
+        .set({
+          status: "accepted",
+          claimedByAccountId: memberAccountId,
+          consumedAt: at,
+          updatedAt: at,
+        })
+        .where(
+          and(
+            eq(familySeatInvitations.id, current.invitation.id),
+            eq(familySeatInvitations.status, "pending"),
+            sql`exists (select 1 from family_seats where family_seats.id = ${current.seat.id} and family_seats.status = 'active' and family_seats.member_account_id = ${memberAccountId})`,
+          ),
+        ),
+    ]);
+    if (changed(seatResult) !== 1) return { type: "token-used" };
+  } catch (error) {
+    if (isUniqueViolation(error)) return { type: "account-already-assigned" };
+    throw error;
+  }
+  const updated = await invitationWithSeat(db, tokenHash);
+  return updated
+    ? {
+        type: "updated",
+        invitation: invitationModel(updated.invitation),
+        seat: seatModel(updated.seat),
+      }
+    : { type: "not-found" };
+}
+
+export async function declineFamilySeatInvitation(
+  db: SharedD1Client,
+  tokenHash: string,
+  accountId: string,
+  at = new Date(),
+): Promise<FamilySeatInvitationMutationResult> {
+  const current = await invitationWithSeat(db, tokenHash);
+  if (!current) return { type: "not-found" };
+  if (current.invitation.inviterAccountId === accountId) return { type: "forbidden" };
+  if (current.invitation.status !== "pending") return { type: "token-used" };
+  if (current.invitation.expiresAt.getTime() <= at.getTime()) {
+    await expireInvitation(db, current.invitation.id, current.seat.id, at);
+    return { type: "expired" };
+  }
+  const [, invitationResult] = await db.batch([
+    db
+      .update(familySeats)
+      .set({ status: "cancelled", terminatedAt: at, updatedAt: at })
+      .where(and(eq(familySeats.id, current.seat.id), eq(familySeats.status, "invited"))),
+    db
+      .update(familySeatInvitations)
+      .set({ status: "declined", consumedAt: at, updatedAt: at })
+      .where(
+        and(
+          eq(familySeatInvitations.id, current.invitation.id),
+          eq(familySeatInvitations.status, "pending"),
+          sql`exists (select 1 from family_seats where family_seats.id = ${current.seat.id} and family_seats.status = 'cancelled')`,
+        ),
+      ),
+  ]);
+  if (changed(invitationResult) !== 1) return { type: "token-used" };
+  const updated = await invitationWithSeat(db, tokenHash);
+  return updated
+    ? {
+        type: "updated",
+        invitation: invitationModel(updated.invitation),
+        seat: seatModel(updated.seat),
+      }
+    : { type: "not-found" };
+}
+
+export async function cancelFamilySeatInvitation(
+  db: SharedD1Client,
+  payerAccountId: string,
+  seatId: string,
+  at = new Date(),
+): Promise<FamilySeatInvitationMutationResult> {
+  const pack = await readFamilyPackByPayer(db, payerAccountId);
+  if (!pack) return { type: "forbidden" };
+  if (!pack.seats.some((seat) => seat.id === seatId && seat.status === "invited")) {
+    return { type: "forbidden" };
+  }
+  const invitation = await db
+    .select()
+    .from(familySeatInvitations)
+    .where(
+      and(eq(familySeatInvitations.seatId, seatId), eq(familySeatInvitations.status, "pending")),
+    )
+    .get();
+  if (!invitation) return { type: "token-used" };
+  const [seatResult] = await db.batch([
+    db
+      .update(familySeats)
+      .set({ status: "cancelled", terminatedAt: at, updatedAt: at })
+      .where(and(eq(familySeats.id, seatId), eq(familySeats.status, "invited"))),
+    db
+      .update(familySeatInvitations)
+      .set({ status: "cancelled", consumedAt: at, updatedAt: at })
+      .where(
+        and(
+          eq(familySeatInvitations.id, invitation.id),
+          eq(familySeatInvitations.status, "pending"),
+          sql`exists (select 1 from family_seats where family_seats.id = ${seatId} and family_seats.status = 'cancelled')`,
+        ),
+      ),
+  ]);
+  if (changed(seatResult) !== 1) return { type: "token-used" };
+  const updatedSeat = await db.select().from(familySeats).where(eq(familySeats.id, seatId)).get();
+  const updatedInvitation = await db
+    .select()
+    .from(familySeatInvitations)
+    .where(eq(familySeatInvitations.id, invitation.id))
+    .get();
+  return updatedSeat && updatedInvitation
+    ? {
+        type: "updated",
+        invitation: invitationModel(updatedInvitation),
+        seat: seatModel(updatedSeat),
+      }
+    : { type: "not-found" };
 }

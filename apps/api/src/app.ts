@@ -48,6 +48,16 @@ import { deferDiagnosisQuestionRoute } from "./contract/diagnosis/deferred-quest
 import { diagnosisDetailRoute } from "./contract/diagnosis/detail";
 import { diagnosisListRoute } from "./contract/diagnosis/list";
 import {
+  acceptFamilyInvitationRoute,
+  cancelFamilyInvitationRoute,
+  declineFamilyInvitationRoute,
+  familyInvitationTokenValidator,
+  familySeatManagementRoute,
+  issueFamilyInvitationRoute,
+  leaveFamilyPackRoute,
+  removeFamilyMemberRoute,
+} from "./contract/family/seats";
+import {
   acceptServiceTermsRequestValidator,
   acceptServiceTermsRoute,
   getServiceTermsAcceptanceHistoryRoute,
@@ -130,6 +140,15 @@ import {
   putDiagnosisAnswer,
   putDiagnosisDeferredQuestion,
 } from "./controller/diagnosis";
+import {
+  deleteFamilyInvitation,
+  deleteFamilyMember,
+  deleteOwnFamilyMembership,
+  getFamilySeats,
+  postFamilyInvitation,
+  postFamilyInvitationAcceptance,
+  postFamilyInvitationDecline,
+} from "./controller/family";
 import {
   getServiceTermsAcceptanceHistoryContents,
   getServiceTermsContents,
@@ -315,6 +334,24 @@ app.delete(
   deletePersonalDataRecordRoute,
   deletePersonalDataRecordContents,
 );
+
+app.get("/api/family/seats", familySeatManagementRoute, getFamilySeats);
+app.post("/api/family/invitations", issueFamilyInvitationRoute, postFamilyInvitation);
+app.post(
+  "/api/family/invitations/accept",
+  acceptFamilyInvitationRoute,
+  familyInvitationTokenValidator,
+  postFamilyInvitationAcceptance,
+);
+app.post(
+  "/api/family/invitations/decline",
+  declineFamilyInvitationRoute,
+  familyInvitationTokenValidator,
+  postFamilyInvitationDecline,
+);
+app.delete("/api/family/invitations/:seatId", cancelFamilyInvitationRoute, deleteFamilyInvitation);
+app.delete("/api/family/seats/:seatId", removeFamilyMemberRoute, deleteFamilyMember);
+app.delete("/api/family/membership", leaveFamilyPackRoute, deleteOwnFamilyMembership);
 app.post("/api/personal-data/exports", requestPersonalDataExportRoute, postPersonalDataExport);
 app.get(
   "/api/personal-data/exports/:exportId",
