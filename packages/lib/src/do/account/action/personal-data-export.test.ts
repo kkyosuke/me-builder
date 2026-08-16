@@ -8,6 +8,7 @@ import type { AccountDataDatabase } from "../database";
 import { accountSchema as schema } from "../database";
 import { storeLineTextSource } from "./diary";
 import {
+  PERSONAL_DATA_EXPORT_GENERATION_TIMEOUT_MS,
   processPendingPersonalDataExport,
   readPersonalDataArchive,
   readPersonalDataExportStatus,
@@ -181,5 +182,35 @@ describe("personal data export", () => {
         .where(eq(schema.personalDataExports.id, requested.export.id))
         .get(),
     ).toMatchObject({ status: "expired", archiveJson: null });
+  });
+
+  it("中断されたgenerating要求を失敗へ収束させ、新しい要求を受け付ける", async () => {
+    const db = createTestDb();
+    const { accountId } = await insertRepresentativeAccount(db);
+    const requestedAt = new Date("2026-08-15T02:00:00.000Z");
+    const requested = await requestPersonalDataExport(db, accountId, requestedAt);
+    await db
+      .update(schema.personalDataExports)
+      .set({ status: "generating", startedAt: requestedAt })
+      .where(eq(schema.personalDataExports.id, requested.export.id));
+
+    const recoveredAt = new Date(
+      requestedAt.getTime() + PERSONAL_DATA_EXPORT_GENERATION_TIMEOUT_MS,
+    );
+    const retried = await requestPersonalDataExport(db, accountId, recoveredAt);
+
+    expect(retried).toMatchObject({ outcome: "created", export: { status: "queued" } });
+    expect(retried.export.id).not.toBe(requested.export.id);
+    expect(
+      db
+        .select()
+        .from(schema.personalDataExports)
+        .where(eq(schema.personalDataExports.id, requested.export.id))
+        .get(),
+    ).toMatchObject({
+      status: "failed",
+      archiveJson: null,
+      failureCode: "generation_timeout",
+    });
   });
 });

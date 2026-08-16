@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, lte } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, lte, or } from "drizzle-orm";
 import type { AccountDataDatabase } from "../database";
 import {
   brainItemAccessLabels,
@@ -27,6 +27,7 @@ import { sourceRecordRevisions, sourceRecords } from "../schema/source";
 
 const PERSONAL_DATA_EXPORT_FORMAT_VERSION = 1;
 const PERSONAL_DATA_EXPORT_TTL_MS = 24 * 60 * 60 * 1_000;
+export const PERSONAL_DATA_EXPORT_GENERATION_TIMEOUT_MS = 15 * 60 * 1_000;
 
 type ExportStatus = "queued" | "generating" | "ready" | "failed" | "expired";
 
@@ -86,6 +87,27 @@ function status(row: typeof personalDataExports.$inferSelect): PersonalDataExpor
 }
 
 async function expirePersonalDataExports(db: AccountDataDatabase, accountId: string, at: Date) {
+  await db
+    .update(personalDataExports)
+    .set({
+      status: "failed",
+      archiveJson: null,
+      completedAt: at,
+      failureCode: "generation_timeout",
+    })
+    .where(
+      and(
+        eq(personalDataExports.accountId, accountId),
+        eq(personalDataExports.status, "generating"),
+        or(
+          isNull(personalDataExports.startedAt),
+          lte(
+            personalDataExports.startedAt,
+            new Date(at.getTime() - PERSONAL_DATA_EXPORT_GENERATION_TIMEOUT_MS),
+          ),
+        ),
+      ),
+    );
   await db
     .update(personalDataExports)
     .set({ status: "expired", archiveJson: null })
