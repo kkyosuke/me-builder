@@ -53,7 +53,7 @@ async function fixture() {
 }
 
 describe("account recovery authentication boundary", () => {
-  it("復旧対象をコードから決定し、成功と同一Identityの再送で旧sessionを失効する", async () => {
+  it("復旧対象をコードから決定し、初回成功時だけ旧sessionを失効する", async () => {
     const { db, accountId, code, now } = await fixture();
     const invalidateAccountSessions = vi.fn();
     const params = {
@@ -70,8 +70,8 @@ describe("account recovery authentication boundary", () => {
     await expect(
       recoverAccountWithCode(params, { invalidateAccountSessions }),
     ).resolves.toMatchObject({ type: "recovered", accountId, alreadyRecovered: true });
-    expect(invalidateAccountSessions).toHaveBeenNthCalledWith(1, accountId);
-    expect(invalidateAccountSessions).toHaveBeenNthCalledWith(2, accountId);
+    expect(invalidateAccountSessions).toHaveBeenCalledOnce();
+    expect(invalidateAccountSessions).toHaveBeenCalledWith(accountId);
   });
 
   it("別Accountに接続済みのIdentityを拒否し、sessionを失効しない", async () => {

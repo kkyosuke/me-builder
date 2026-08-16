@@ -129,7 +129,11 @@ export async function recoverAccountWithCode(
     credentialId,
   );
   const accountId = linked?.accountId ?? credential.accountId;
-  await sessionInvalidator.invalidateAccountSessions(accountId);
+  // 冪等な再送より後に発行されたsessionまで失効させない。
+  // Identityを実際に再接続した初回だけ、旧sessionの失効hookを実行する。
+  if (result === "recovered") {
+    await sessionInvalidator.invalidateAccountSessions(accountId);
+  }
   return {
     type: "recovered",
     accountId,
