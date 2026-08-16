@@ -25,6 +25,9 @@ export async function verifySubscriptionPreview(input: {
   assertPublicCatalog(catalog);
   checks.push("public-plan-catalog");
 
+  await verifyBillingRuntimeConfiguration(fetcher, apiBaseUrl);
+  checks.push("billing-runtime-configuration");
+
   if (!input.idToken) {
     if (input.expectedPlan)
       throw new Error("PREVIEW_BILLING_ID_TOKEN is required with expectedPlan");
@@ -53,6 +56,49 @@ export async function verifySubscriptionPreview(input: {
   });
   checks.push("account-trial-eligibility", "account-plan-projection");
   return { checks, plan: entitlement.plan, trialEligible: trial.eligible };
+}
+
+async function verifyBillingRuntimeConfiguration(
+  fetcher: typeof fetch,
+  apiBaseUrl: string,
+): Promise<void> {
+  const jsonRequest = {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ plan: "lite", interval: "month" }),
+  } satisfies RequestInit;
+  await Promise.all([
+    expectStatus(fetcher, new URL("/api/billing/trial-eligibility", apiBaseUrl), 401),
+    expectStatus(fetcher, new URL("/api/billing/checkout-sessions", apiBaseUrl), 401, jsonRequest),
+    expectStatus(
+      fetcher,
+      new URL("/api/billing/plan-change-sessions", apiBaseUrl),
+      401,
+      jsonRequest,
+    ),
+    expectStatus(fetcher, new URL("/api/billing/portal-sessions", apiBaseUrl), 401, {
+      method: "POST",
+    }),
+    expectStatus(fetcher, new URL("/api/billing/webhook", apiBaseUrl), 400, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    }),
+  ]);
+}
+
+async function expectStatus(
+  fetcher: typeof fetch,
+  url: URL,
+  expectedStatus: number,
+  init?: RequestInit,
+): Promise<void> {
+  const response = await fetcher(url, init);
+  if (response.status !== expectedStatus) {
+    throw new Error(
+      `Preview billing runtime configuration failed at ${url.pathname} (${response.status})`,
+    );
+  }
 }
 
 async function waitForEntitlementProjection(input: {

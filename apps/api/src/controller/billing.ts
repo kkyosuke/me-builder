@@ -77,7 +77,7 @@ export function getBillingPlanCatalog(c: Context<AppEnv>): Response {
 
 export async function getBillingTrialEligibilityResponse(c: Context<AppEnv>): Promise<Response> {
   const config = getConfig(c.env);
-  if (!c.env?.DB || !config.stripeSecretKey) {
+  if (!c.env?.DB || !config.stripeSecretKey || !config.lineLoginChannelId) {
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   }
   const outcome = await getBillingTrialEligibility({
@@ -183,7 +183,28 @@ async function createBillingSessionResponse(
   checkout?: v.InferOutput<typeof BillingCheckoutRequestSchema>,
 ): Promise<Response> {
   const config = getConfig(c.env);
-  if (!c.env?.DB || !config.stripeSecretKey || !config.webOrigin) {
+  const completeLookupKeyMap = publicBillingPlans.every((plan) =>
+    plan.prices.every(({ interval }) =>
+      Boolean(config.billingLookupKeyMap[`${plan.code}.${interval}`]),
+    ),
+  );
+  const kindConfigurationAvailable =
+    kind === "portal"
+      ? Boolean(config.stripePortalConfigurationId)
+      : kind === "change"
+        ? Boolean(
+            config.stripePortalPlanChangeConfigurationId &&
+              config.stripePortalResetConfigurationId &&
+              completeLookupKeyMap,
+          )
+        : completeLookupKeyMap;
+  if (
+    !c.env?.DB ||
+    !config.stripeSecretKey ||
+    !config.webOrigin ||
+    !config.lineLoginChannelId ||
+    !kindConfigurationAvailable
+  ) {
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   }
   const base = {

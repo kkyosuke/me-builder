@@ -22,7 +22,7 @@ Plan別の権限、期間境界、Freeへの復帰、本人データの保持、
 
 ### 2.3 デプロイ済みPreview
 
-Preview CDはデプロイ直後に次を実行し、API環境と公開Plan catalogがコミット済み料金SSoTに一致することを確認します。
+Preview CDはデプロイ直後に次を実行し、API環境と公開Plan catalogがコミット済み料金SSoTに一致することを確認します。短命LIFF ID tokenがない場合も、未認証リクエストが本人処理へ入る直前まで到達することと、署名なしWebhookが設定済み経路で拒否されることを使い、D1、Billing Queue、Stripe secret、Webhook secret、6 lookup key、管理・標準変更・請求期間reset用Portal ID、Web origin、LINE Login channel IDの欠落を検出します。この構成probeはCheckoutや契約を作成しません。
 
 ```bash
 task subscription:verify:deployed-preview
