@@ -7,7 +7,7 @@ export const profileSummaryCases = {
     in: {
       method: "GET",
       path: "/api/profile-summary",
-      authorization: "Bearer known-token",
+      session: "known-token",
       setup: ["migrationを適用", "本人AccountへSource Recordを1件登録"],
     },
     out: {
@@ -26,7 +26,7 @@ export const profileSummaryCases = {
     in: {
       method: "GET",
       path: "/api/profile-summary",
-      authorization: "Bearer known-token",
+      session: "known-token",
       setup: ["migrationを適用", "本人AccountへSource Recordを登録しない"],
     },
     out: {
@@ -43,7 +43,7 @@ export const profileSummaryCases = {
     in: {
       method: "POST",
       path: "/api/profile-summary/generations",
-      authorization: "Bearer known-token",
+      session: "known-token",
       setup: ["本人Accountにまとめへ利用できる記録がある"],
     },
     out: {

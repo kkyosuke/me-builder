@@ -113,10 +113,8 @@ describe("GET /api/openapi.json", () => {
     expect(document.paths["/api/dev/brain-vector-sync-jobs/reset-failed"]?.post).toBeDefined();
     expect(document.paths["/api/dev/brain-vector-sync-jobs/{jobId}/reset"]?.post).toBeDefined();
     expect(document.paths["/api/openapi.json"]).toBeUndefined();
-    expect(document.components.securitySchemes.liffIdToken).toMatchObject({
-      type: "http",
-      scheme: "bearer",
-    });
+    expect(document.components.securitySchemes.liffIdToken).toBeUndefined();
+    expect(JSON.stringify(document.paths)).not.toContain('"liffIdToken"');
     expect(document.components.securitySchemes.applicationSession).toMatchObject({
       type: "apiKey",
       in: "cookie",
@@ -128,10 +126,13 @@ describe("GET /api/openapi.json", () => {
       name: "X-CSRF-Token",
     });
     expect(document.paths["/api/diagnoses"]?.get).toMatchObject({
-      security: [{ applicationSession: [] }, { liffIdToken: [] }],
+      security: [{ applicationSession: [] }],
+    });
+    expect(document.paths["/api/account-recovery/complete"]?.post).toMatchObject({
+      security: [{ applicationSession: [], csrfToken: [] }],
     });
     expect(document.paths["/api/family/seats"]?.get).toMatchObject({
-      security: [{ applicationSession: [] }, { liffIdToken: [] }],
+      security: [{ applicationSession: [] }],
     });
 
     for (const [path, pathItem] of Object.entries(document.paths)) {

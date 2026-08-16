@@ -54,7 +54,7 @@ export const saveDiagnosisAnswerRoute = describeRoute({
   operationId: "saveDiagnosisAnswer",
   tags: ["Diagnosis"],
   summary: "診断の1問へ初回回答を保存する",
-  security: [{ applicationSession: [], csrfToken: [] }, { liffIdToken: [] }],
+  security: [{ applicationSession: [], csrfToken: [] }],
   requestBody: {
     required: true,
     content: { "application/json": { schema: SaveDiagnosisAnswerRequestSchema } },

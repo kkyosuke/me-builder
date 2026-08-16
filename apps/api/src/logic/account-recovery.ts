@@ -55,6 +55,7 @@ export async function issueAccountRecoveryCode(
 export async function recoverAccountWithCode(
   params: BaseParams & {
     identity: VerifiedRecoveryIdentity;
+    sourceAccountId: string;
     code: string;
     requestKey: string;
     now?: Date;
@@ -107,6 +108,7 @@ export async function recoverAccountWithCode(
     credentialId,
     expectedSecretHash: credential.secretHash,
     newProviderAccountId: params.identity.subject,
+    sourceAccountId: params.sourceAccountId,
     identityFingerprint,
     now,
   });
@@ -130,9 +132,12 @@ export async function recoverAccountWithCode(
   );
   const accountId = linked?.accountId ?? credential.accountId;
   // 冪等な再送より後に発行されたsessionまで失効させない。
-  // Identityを実際に再接続した初回だけ、旧sessionの失効hookを実行する。
+  // Identityを実際に再接続した初回だけ、復旧先と移管元の旧sessionを失効する。
   if (result === "recovered") {
     await sessionInvalidator.invalidateAccountSessions(accountId);
+    if (params.sourceAccountId !== accountId) {
+      await sessionInvalidator.invalidateAccountSessions(params.sourceAccountId);
+    }
   }
   return {
     type: "recovered",

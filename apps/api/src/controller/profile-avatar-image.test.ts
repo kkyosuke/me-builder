@@ -48,7 +48,7 @@ const dummyAvatarBucket = {} as R2Bucket;
 function request(env: Record<string, unknown> = {}) {
   return app.request(
     "/api/profile/avatar",
-    { headers: { Authorization: "Bearer dummy.id.token" } },
+    {},
     {
       LIFF_ID: "2010850319-Yl63upAR",
       DB: dummyDb,

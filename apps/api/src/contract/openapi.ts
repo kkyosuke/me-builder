@@ -21,12 +21,6 @@ export const openApiOptions = {
           name: "X-CSRF-Token",
           description: "application sessionによる状態変更requestで要求するCSRF token",
         },
-        liffIdToken: {
-          type: "http",
-          scheme: "bearer",
-          bearerFormat: "LIFF ID token",
-          description: "段階移行中の旧LIFF Bearer認証。認証交換以外の新規経路では使用しない",
-        },
       },
     },
   },

@@ -60,7 +60,7 @@ const outcome = (value: DevelopmentBrainItemsOutcome) =>
 function request(environment = "development", withBindings = true) {
   return app.request(
     "/api/dev/brain-items",
-    { headers: { Authorization: "Bearer dummy.id.token" } },
+    {},
     {
       ENVIRONMENT: environment,
       LIFF_ID: "2010850319-Yl63upAR",
@@ -145,7 +145,7 @@ describe("GET /api/dev/brain-items", () => {
   it("ENVIRONMENT未設定では存在を公開せず404を返す", async () => {
     const response = await app.request(
       "/api/dev/brain-items",
-      { headers: { Authorization: "Bearer dummy.id.token" } },
+      {},
       { LIFF_ID: "2010850319-Yl63upAR", DB: dummyDb, ACCOUNT_DATA: dummyAccountData },
     );
 
@@ -177,7 +177,7 @@ describe("GET /api/dev/brain-items/:brainItemId/vector", () => {
 
     const response = await app.request(
       "/api/dev/brain-items/brain-1/vector",
-      { headers: { Authorization: "Bearer dummy.id.token" } },
+      {},
       {
         ENVIRONMENT: "development",
         LIFF_ID: "2010850319-Yl63upAR",
@@ -204,7 +204,7 @@ describe("GET /api/dev/brain-items/:brainItemId/vector", () => {
   it("productionではVectorize bindingがなくても404を返す", async () => {
     const response = await app.request(
       "/api/dev/brain-items/brain-1/vector",
-      { headers: { Authorization: "Bearer dummy.id.token" } },
+      {},
       { ENVIRONMENT: "production" },
     );
 
@@ -215,7 +215,7 @@ describe("GET /api/dev/brain-items/:brainItemId/vector", () => {
   it("ENVIRONMENT未設定ではVectorize bindingがあっても404を返す", async () => {
     const response = await app.request(
       "/api/dev/brain-items/brain-1/vector",
-      { headers: { Authorization: "Bearer dummy.id.token" } },
+      {},
       {
         LIFF_ID: "2010850319-Yl63upAR",
         DB: dummyDb,
@@ -238,7 +238,7 @@ describe("開発用Brain Vector同期job API", () => {
     DB: dummyDb,
     ACCOUNT_DATA: dummyAccountData,
   });
-  const authorization = { Authorization: "Bearer dummy.id.token" };
+  const authorization = {};
 
   it("終端job一覧を本文なしの運用情報として返す", async () => {
     loadDevelopmentFailedBrainVectorSyncJobs.mockResolvedValue({

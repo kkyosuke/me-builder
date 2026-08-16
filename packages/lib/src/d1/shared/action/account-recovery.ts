@@ -145,6 +145,7 @@ export async function completeAccountRecovery(
     credentialId: string;
     expectedSecretHash: string;
     newProviderAccountId: string;
+    sourceAccountId: string;
     identityFingerprint: string;
     now?: Date;
   },
@@ -179,7 +180,12 @@ export async function completeAccountRecovery(
       ? "already-recovered"
       : "invalid";
   }
-  if (existingIdentities.some((identity) => identity.accountId !== accountId)) {
+  if (
+    existingIdentities.some(
+      (identity) =>
+        identity.accountId !== accountId && identity.accountId !== input.sourceAccountId,
+    )
+  ) {
     return "conflict";
   }
 
@@ -198,6 +204,20 @@ export async function completeAccountRecovery(
     return "conflict";
 
   const queries = [];
+  const transferredIdentityIds = existingIdentities
+    .filter(
+      (identity) =>
+        identity.accountId === input.sourceAccountId && accountId !== input.sourceAccountId,
+    )
+    .map((identity) => identity.id);
+  if (transferredIdentityIds.length > 0) {
+    queries.push(
+      db
+        .update(accountIdentities)
+        .set({ accountId, updatedAt: now })
+        .where(inArray(accountIdentities.id, transferredIdentityIds)),
+    );
+  }
   if (!existingIdentities.some((identity) => identity.provider === "line_login")) {
     queries.push(
       db.insert(accountIdentities).values({

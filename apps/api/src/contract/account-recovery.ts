@@ -26,7 +26,7 @@ export const accountRecoveryCodeRoute = describeRoute({
   operationId: "issueAccountRecoveryCode",
   tags: ["Account recovery"],
   summary: "有料契約Accountの一回限りの復旧コードを発行する",
-  security: [{ applicationSession: [], csrfToken: [] }, { liffIdToken: [] }],
+  security: [{ applicationSession: [], csrfToken: [] }],
   responses: {
     201: jsonResponse("一度だけ表示する復旧コード", AccountRecoveryCodeResponseSchema),
     409: jsonResponse("有料契約がない", AccountRecoveryUnavailableSchema),
@@ -39,7 +39,7 @@ export const accountRecoveryCompleteRoute = describeRoute({
   operationId: "completeAccountRecovery",
   tags: ["Account recovery"],
   summary: "新しいLINE Identityを既存Accountへ再接続する",
-  security: [{ liffIdToken: [] }],
+  security: [{ applicationSession: [], csrfToken: [] }],
   requestBody: {
     required: true,
     content: { "application/json": { schema: AccountRecoveryCompleteRequestSchema } },

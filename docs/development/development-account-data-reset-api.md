@@ -12,7 +12,7 @@ AccountDataと共有D1の保存境界は[Accountデータ分離設計](../archit
 
 `ENVIRONMENT` bindingに`development`、`local`、`preview`、`test`のいずれかが明示されている環境だけで利用できます。未設定、空文字、未知値、`production`では`404`を返し、削除処理を実行しません。
 
-クライアントからAccount IDを受け取りません。LIFF ID tokenを他の本人向けAPIと同じ境界で検証し、解決したAccountのAccountDataとConversation Coordinatorだけを操作します。
+クライアントからAccount IDを受け取りません。HttpOnlyのアプリセッションCookieを他の本人向けAPIと同じ境界で検証し、同一OriginとCSRFトークンを確認したうえで、解決したAccountのAccountDataとConversation Coordinatorだけを操作します。
 
 ## 3. 削除対象
 

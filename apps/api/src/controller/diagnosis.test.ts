@@ -56,10 +56,10 @@ const dummyDb = {} as D1Database;
 const dummyAccountData = {} as AccountDataNamespace;
 const LIFF_ID = "2010850319-Yl63upAR";
 
-function request(env: Record<string, unknown> = {}, authorization = "Bearer dummy.id.token") {
+function request(env: Record<string, unknown> = {}) {
   return app.request(
     "/api/diagnoses",
-    { headers: { Authorization: authorization } },
+    {},
     { LIFF_ID, DB: dummyDb, ACCOUNT_DATA: dummyAccountData, ...env },
   );
 }
@@ -95,11 +95,7 @@ describe("GET /api/diagnoses", () => {
   it("DBバインディングが無い場合はlogicを呼ばず503を返すこと", async () => {
     outcome({ type: "resolved", diagnoses: [] });
 
-    const res = await app.request(
-      "/api/diagnoses",
-      { headers: { Authorization: "Bearer dummy.id.token" } },
-      { LIFF_ID },
-    );
+    const res = await app.request("/api/diagnoses", {}, { LIFF_ID });
 
     expect(res.status).toBe(503);
     expect(getDiagnosisList).not.toHaveBeenCalled();
@@ -117,7 +113,6 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId", () => {
       {
         method: "PUT",
         headers: {
-          Authorization: "Bearer dummy.id.token",
           "Content-Type": "application/json",
         },
         body,
@@ -197,7 +192,7 @@ describe("PUT /api/diagnoses/:diagnosisId/deferred-questions/:diagnosisQuestionI
   const put = (withDb = true) =>
     app.request(
       "/api/diagnoses/diagnosis-1/deferred-questions/dq-1",
-      { method: "PUT", headers: { Authorization: "Bearer dummy.id.token" } },
+      { method: "PUT" },
       { LIFF_ID, ...(withDb ? { DB: dummyDb, ACCOUNT_DATA: dummyAccountData } : {}) },
     );
 
@@ -290,7 +285,7 @@ describe("GET /api/diagnoses/:diagnosisId", () => {
 
     const res = await app.request(
       "/api/diagnoses/diagnosis-1",
-      { headers: { Authorization: "Bearer dummy.id.token" } },
+      {},
       { LIFF_ID, DB: dummyDb, ACCOUNT_DATA: dummyAccountData },
     );
 
@@ -312,7 +307,7 @@ describe("GET /api/diagnoses/:diagnosisId", () => {
     detailOutcome({ type });
     const res = await app.request(
       "/api/diagnoses/diagnosis-1",
-      { headers: { Authorization: "Bearer dummy.id.token" } },
+      {},
       { LIFF_ID, DB: dummyDb, ACCOUNT_DATA: dummyAccountData },
     );
     expect(res.status).toBe(status);
@@ -334,7 +329,7 @@ describe("GET /api/diagnoses/:diagnosisId/answers", () => {
   const get = (withDb = true) =>
     app.request(
       "/api/diagnoses/diagnosis-1/answers",
-      { headers: { Authorization: "Bearer dummy.id.token" } },
+      {},
       { LIFF_ID, ...(withDb ? { DB: dummyDb, ACCOUNT_DATA: dummyAccountData } : {}) },
     );
 

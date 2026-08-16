@@ -73,20 +73,6 @@ describe("authentication middleware", () => {
     expect(put).toHaveBeenCalledTimes(status === 200 ? 1 : 0);
   });
 
-  it("移行期間の旧Bearer更新にはapplication session用CSRFを要求しない", async () => {
-    const app = new Hono<AppEnv>();
-    app.post(
-      "/",
-      createAuthenticationMiddleware(async (c) => {
-        c.set("authenticationSource", "legacy-bearer");
-        return { type: "authenticated", actor, accountRole: "user" };
-      }),
-      (c) => c.text("ok"),
-    );
-
-    expect((await app.request("/", { method: "POST" })).status).toBe(200);
-  });
-
   it.each([
     ["credential_missing", 401],
     ["credential_invalid", 401],

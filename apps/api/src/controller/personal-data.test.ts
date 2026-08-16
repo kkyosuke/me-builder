@@ -40,7 +40,7 @@ const bindings = {
   DB: {} as D1Database,
   ACCOUNT_DATA: {} as AccountDataNamespace,
 };
-const headers = { Authorization: "Bearer dummy.id.token" };
+const headers = {};
 
 describe("personal data controller", () => {
   beforeEach(() => vi.clearAllMocks());

@@ -60,7 +60,7 @@ export const diagnosisAnswersRoute = describeRoute({
   operationId: "getDiagnosisAnswers",
   tags: ["Diagnosis"],
   summary: "本人が保存した診断回答内容を取得する",
-  security: [{ applicationSession: [] }, { liffIdToken: [] }],
+  security: [{ applicationSession: [] }],
   responses: {
     200: jsonResponse(
       "質問文・選択肢・回答日時・計算済み傾向を含む本人の回答内容",

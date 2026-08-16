@@ -6,7 +6,7 @@ export const compatibilityInvitationCancelRoute = describeRoute({
   operationId: "cancelCompatibilityInvitation",
   tags: ["Compatibility"],
   summary: "本人が発行中の相性招待を取り消す",
-  security: [{ applicationSession: [], csrfToken: [] }, { liffIdToken: [] }],
+  security: [{ applicationSession: [], csrfToken: [] }],
   responses: {
     204: { description: "招待を取り消した" },
     ...authenticatedErrors,

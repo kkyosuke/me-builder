@@ -59,7 +59,7 @@ export const personalDataRecordsRoute = describeRoute({
   operationId: "listPersonalDataRecords",
   tags: ["Personal Data"],
   summary: "本人が訂正・削除できる診断回答と日記を取得する",
-  security: [{ applicationSession: [] }, { liffIdToken: [] }],
+  security: [{ applicationSession: [] }],
   responses: {
     200: jsonResponse("現在有効な本人入力", PersonalDataRecordsResponseSchema),
     ...authenticatedErrors,
@@ -72,7 +72,7 @@ export const correctPersonalDataRecordRoute = describeRoute({
   operationId: "correctPersonalDataRecord",
   tags: ["Personal Data"],
   summary: "原本を上書きせず新版として訂正する",
-  security: [{ applicationSession: [], csrfToken: [] }, { liffIdToken: [] }],
+  security: [{ applicationSession: [], csrfToken: [] }],
   requestBody: {
     required: true,
     content: {
@@ -113,7 +113,7 @@ export const deletePersonalDataRecordRoute = describeRoute({
   operationId: "deletePersonalDataRecord",
   tags: ["Personal Data"],
   summary: "原本をtombstoneへ遷移し今後の利用を止める",
-  security: [{ applicationSession: [], csrfToken: [] }, { liffIdToken: [] }],
+  security: [{ applicationSession: [], csrfToken: [] }],
   responses: {
     200: jsonResponse("削除受付結果", PersonalDataMutationResponseSchema),
     ...personalDataErrors,

@@ -52,7 +52,7 @@ describe("resolveProfileAvatarImage", () => {
     expect(deps.fetchImage).not.toHaveBeenCalled();
   });
 
-  it("本人は検証済みIDトークンのLINE画像をAPI Serverから取得する", async () => {
+  it("本人は交換時にセッションへ保持したLINE画像をAPI Serverから取得する", async () => {
     const deps = dependencies();
     const avatarBucket = {} as R2Bucket;
 

@@ -43,8 +43,6 @@ vi.mock("../middleware/authentication", async (importOriginal) => {
       c: Parameters<typeof actual.requireAuthentication>[0],
       next: () => Promise<void>,
     ) => {
-      const authorization = c.req.header("authorization");
-      if (!authorization?.startsWith("Bearer ")) return c.json({ error: "Unauthorized" }, 401);
       const actor = {
         accountId: "account-1",
         authenticationMethod: "liff" as const,
@@ -78,17 +76,13 @@ function outcome(value: CompatibilityShareConsentOutcome) {
   getCompatibilityShareConsent.mockResolvedValue(value);
 }
 
-function request(
-  env: Record<string, unknown> = {},
-  authorization = "Bearer dummy.id.token",
-  relationshipCategory?: string,
-) {
+function request(env: Record<string, unknown> = {}, relationshipCategory?: string) {
   const query = relationshipCategory
     ? `?relationshipCategory=${encodeURIComponent(relationshipCategory)}`
     : "";
   return app.request(
     `/api/compatibility/share-consent${query}`,
-    { headers: { Authorization: authorization } },
+    {},
     {
       LIFF_ID: "2010850319-Yl63upAR",
       DB: dummyDb,
@@ -118,7 +112,6 @@ describe("GET /api/compatibility/share-consent", () => {
         AVATAR_BUCKET: dummyAvatarBucket,
         LINE_CHANNEL_ACCESS_TOKEN: "line-token",
       },
-      "Bearer dummy.id.token",
       "family",
     );
 
@@ -142,7 +135,7 @@ describe("GET /api/compatibility/share-consent", () => {
   });
 
   it.each(["general", "other"])('関係カテゴリ"%s"を400で拒否する', async (category) => {
-    const response = await request({}, "Bearer dummy.id.token", category);
+    const response = await request({}, category);
 
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual({ error: "Invalid request" });
@@ -152,7 +145,7 @@ describe("GET /api/compatibility/share-consent", () => {
   it("storage bindingがなければlogicを呼ばず503を返す", async () => {
     const response = await app.request(
       "/api/compatibility/share-consent",
-      { headers: { Authorization: "Bearer dummy.id.token" } },
+      {},
       { LIFF_ID: "2010850319-Yl63upAR" },
     );
 
@@ -168,7 +161,7 @@ describe("GET /api/compatibility/share-content", () => {
     const query = category ? `?relationshipCategory=${encodeURIComponent(category)}` : "";
     return app.request(
       `/api/compatibility/share-content${query}`,
-      { headers: { Authorization: "Bearer dummy.id.token" } },
+      {},
       {
         LIFF_ID: "2010850319-Yl63upAR",
         DB: dummyDb,
@@ -224,7 +217,7 @@ describe("GET /api/compatibility/share-content", () => {
   it("storage bindingがなければlogicを呼ばず503を返す", async () => {
     const response = await app.request(
       "/api/compatibility/share-content?relationshipCategory=work",
-      { headers: { Authorization: "Bearer dummy.id.token" } },
+      {},
       { LIFF_ID: "2010850319-Yl63upAR" },
     );
 
@@ -245,7 +238,6 @@ describe("POST /api/compatibility/invitations", () => {
       {
         method: "POST",
         headers: {
-          Authorization: "Bearer dummy.id.token",
           "Content-Type": "application/json",
         },
         body: JSON.stringify(body),
@@ -357,7 +349,7 @@ describe("GET /api/compatibility/invitations/:relationshipId", () => {
   function invitationRequest(env: Record<string, unknown> = {}) {
     return app.request(
       `/api/compatibility/invitations/${relationshipId}`,
-      { headers: { Authorization: "Bearer dummy.id.token" } },
+      {},
       {
         LIFF_ID: "2010850319-Yl63upAR",
         DB: dummyDb,
@@ -420,7 +412,7 @@ describe("GET /api/compatibility/invitations/:relationshipId/avatar", () => {
   const requestAvatar = (env: Record<string, unknown> = {}) =>
     app.request(
       `/api/compatibility/invitations/${relationshipId}/avatar`,
-      { headers: { Authorization: "Bearer dummy.id.token" } },
+      {},
       {
         LIFF_ID: "2010850319-Yl63upAR",
         DB: dummyDb,
@@ -472,10 +464,10 @@ describe("DELETE /api/compatibility/relationships/:relationshipId", () => {
   beforeEach(() => vi.clearAllMocks());
   const relationshipId = "1".repeat(64);
 
-  function endRequest(env: Record<string, unknown> = {}, authorization = "Bearer dummy.id.token") {
+  function endRequest(env: Record<string, unknown> = {}) {
     return app.request(
       `/api/compatibility/relationships/${relationshipId}`,
-      { method: "DELETE", headers: { Authorization: authorization } },
+      { method: "DELETE" },
       {
         LIFF_ID: "2010850319-Yl63upAR",
         DB: dummyDb,

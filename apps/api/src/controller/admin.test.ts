@@ -77,7 +77,7 @@ describe("GET /api/admin/statistics", () => {
 
     const response = await app.request(
       "/api/admin/statistics",
-      { headers: { Authorization: "Bearer dummy.id.token" } },
+      {},
       { LIFF_ID: "2010850319-Yl63upAR", DB: dummyDb },
     );
 
@@ -113,7 +113,7 @@ describe("GET /api/admin/accounts", () => {
 
     const response = await app.request(
       "/api/admin/accounts?query=%E5%B1%B1%E7%94%B0&role=user&sort=level",
-      { headers: { Authorization: "Bearer dummy.id.token" } },
+      {},
       { LIFF_ID: "2010850319-Yl63upAR", DB: dummyDb },
     );
 
@@ -128,7 +128,7 @@ describe("GET /api/admin/accounts", () => {
   it("不正な検索条件を400として拒否する", async () => {
     const response = await app.request(
       "/api/admin/accounts?role=owner",
-      { headers: { Authorization: "Bearer dummy.id.token" } },
+      {},
       { LIFF_ID: "2010850319-Yl63upAR", DB: dummyDb },
     );
 

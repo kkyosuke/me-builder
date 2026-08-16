@@ -3,9 +3,10 @@ import path from "node:path";
 import type { D1Database } from "@cloudflare/workers-types";
 import { type AccountDataNamespace, D1, DO } from "@me-builder/lib";
 import { Miniflare } from "miniflare";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { app } from "../index";
 import { type AccountDataTestStore, createAccountDataTestStore } from "../testing/account-data";
+import { createApplicationSessionFixture } from "../testing/application-session";
 import {
   type CompatibilityDataTestStore,
   createCompatibilityDataTestStore,
@@ -27,6 +28,8 @@ let database: D1Database;
 let compatibilityDataStore: CompatibilityDataTestStore;
 let stores: Record<keyof typeof participants, AccountDataTestStore>;
 let accountData: AccountDataNamespace;
+let sessionFixture: ReturnType<typeof createApplicationSessionFixture>;
+let sessionHeaders: Record<keyof typeof participants, Record<string, string>>;
 
 async function applySqlFile(db: D1Database, sql: string): Promise<void> {
   for (const statement of sql
@@ -74,46 +77,25 @@ async function prepareDatabase(db: D1Database): Promise<void> {
   }
 }
 
-function mockLineVerification(): void {
-  vi.stubGlobal(
-    "fetch",
-    vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
-      const body =
-        typeof init?.body === "string"
-          ? init.body
-          : init?.body instanceof URLSearchParams
-            ? init.body.toString()
-            : "";
-      const token = new URLSearchParams(body).get("id_token");
-      const participant = token === "inviter-token" ? participants.inviter : participants.recipient;
-      return Response.json({
-        iss: "https://access.line.me",
-        sub: participant.lineId,
-        aud: "1234567890",
-        iat: Math.floor(Date.now() / 1_000),
-        exp: timestamp + 86_400,
-        name: participant.name,
-      });
-    }),
-  );
-}
-
 function env() {
   return {
     DB: database,
     ACCOUNT_DATA: accountData,
     COMPATIBILITY_DATA: compatibilityDataStore.namespace,
-    LINE_LOGIN_CHANNEL_ID: "1234567890",
+    ...sessionFixture.bindings,
     LIFF_ID: "1234567890-testliff",
     ENVIRONMENT: "test",
-    WEB_ORIGIN: "https://example.com",
   };
+}
+
+function headersForToken(token: string): Record<string, string> {
+  return token.startsWith("inviter") ? sessionHeaders.inviter : sessionHeaders.recipient;
 }
 
 async function issueInvitationForInviter(): Promise<string> {
   const consentResponse = await app.request(
     "/api/compatibility/share-consent",
-    { headers: { Authorization: "Bearer inviter-token" } },
+    { headers: sessionHeaders.inviter },
     env(),
   );
   expect(consentResponse.status).toBe(200);
@@ -123,7 +105,7 @@ async function issueInvitationForInviter(): Promise<string> {
     {
       method: "POST",
       headers: {
-        Authorization: "Bearer inviter-token",
+        ...sessionHeaders.inviter,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ relationshipCategory: "partner" }),
@@ -155,7 +137,7 @@ async function completeDiagnosis(
       `/api/diagnoses/${diagnosisId}/answers/${questionId}`,
       {
         method: "PUT",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        headers: { ...headersForToken(token), "Content-Type": "application/json" },
         body: JSON.stringify({ choiceId: "yes" }),
       },
       env(),
@@ -277,11 +259,22 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
       },
     };
     compatibilityDataStore = createCompatibilityDataTestStore();
-    mockLineVerification();
+    sessionFixture = createApplicationSessionFixture(database);
+    sessionHeaders = {
+      inviter: (
+        await sessionFixture.issue(participants.inviter.accountId, {
+          displayName: participants.inviter.name,
+        })
+      ).headers,
+      recipient: (
+        await sessionFixture.issue(participants.recipient.accountId, {
+          displayName: participants.recipient.name,
+        })
+      ).headers,
+    };
   }, e2eTimeoutMs);
 
   afterEach(async () => {
-    vi.unstubAllGlobals();
     await miniflare.dispose();
   });
 
@@ -327,7 +320,7 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
 
       const previewResponse = await app.request(
         `/api/compatibility/invitations/${relationshipId}`,
-        { headers: { Authorization: "Bearer recipient-token" } },
+        { headers: sessionHeaders.recipient },
         env(),
       );
       expect(previewResponse.status).toBe(200);
@@ -356,7 +349,7 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
 
       const ownResponse = await app.request(
         `/api/compatibility/invitations/${relationshipId}`,
-        { headers: { Authorization: "Bearer inviter-token" } },
+        { headers: sessionHeaders.inviter },
         env(),
       );
       expect(ownResponse.status).toBe(409);
@@ -377,7 +370,7 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
 
       const previewResponse = await app.request(
         `/api/compatibility/invitations/${relationshipId}`,
-        { headers: { Authorization: "Bearer recipient-token" } },
+        { headers: sessionHeaders.recipient },
         env(),
       );
       expect(previewResponse.status).toBe(200);
@@ -390,7 +383,7 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
 
       const acceptResponse = await app.request(
         `/api/compatibility/invitations/${relationshipId}/accept`,
-        { method: "POST", headers: { Authorization: "Bearer recipient-token" } },
+        { method: "POST", headers: sessionHeaders.recipient },
         env(),
       );
       expect(acceptResponse.status).toBe(200);
@@ -398,7 +391,7 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
 
       const waitingResponse = await app.request(
         `/api/compatibility/relationships/${relationshipId}`,
-        { headers: { Authorization: "Bearer recipient-token" } },
+        { headers: sessionHeaders.recipient },
         env(),
       );
       expect(waitingResponse.status).toBe(200);
@@ -410,7 +403,7 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
       });
       const waitingListResponse = await app.request(
         "/api/compatibility/relationships",
-        { headers: { Authorization: "Bearer recipient-token" } },
+        { headers: sessionHeaders.recipient },
         env(),
       );
       expect(await waitingListResponse.json()).toEqual({
@@ -431,7 +424,7 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
 
       const readyResponse = await app.request(
         `/api/compatibility/relationships/${relationshipId}`,
-        { headers: { Authorization: "Bearer recipient-token" } },
+        { headers: sessionHeaders.recipient },
         env(),
       );
       expect(readyResponse.status).toBe(200);
@@ -443,7 +436,7 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
       });
       const readyListResponse = await app.request(
         "/api/compatibility/relationships",
-        { headers: { Authorization: "Bearer recipient-token" } },
+        { headers: sessionHeaders.recipient },
         env(),
       );
       expect(await readyListResponse.json()).toEqual({
@@ -473,7 +466,7 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
       const relationshipId = await issueInvitationForInviter();
       const pendingInviterList = await app.request(
         "/api/compatibility/relationships",
-        { headers: { Authorization: "Bearer inviter-token" } },
+        { headers: sessionHeaders.inviter },
         env(),
       );
       expect(await pendingInviterList.json()).toEqual({
@@ -488,14 +481,14 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
       });
       const pendingRecipientList = await app.request(
         "/api/compatibility/relationships",
-        { headers: { Authorization: "Bearer recipient-token" } },
+        { headers: sessionHeaders.recipient },
         env(),
       );
       expect(await pendingRecipientList.json()).toEqual({ items: [] });
 
       const response = await app.request(
         `/api/compatibility/invitations/${relationshipId}/accept`,
-        { method: "POST", headers: { Authorization: "Bearer recipient-token" } },
+        { method: "POST", headers: sessionHeaders.recipient },
         env(),
       );
 
@@ -519,7 +512,7 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
       for (const role of ["inviter", "recipient"] as const) {
         const detailResponse = await app.request(
           `/api/compatibility/relationships/${relationshipId}`,
-          { headers: { Authorization: `Bearer ${role}-token` } },
+          { headers: sessionHeaders[role] },
           env(),
         );
         expect(detailResponse.status).toBe(200);
@@ -599,7 +592,7 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
 
         const listResponse = await app.request(
           "/api/compatibility/relationships",
-          { headers: { Authorization: `Bearer ${role}-token` } },
+          { headers: sessionHeaders[role] },
           env(),
         );
         expect(await listResponse.json()).toEqual({
@@ -617,7 +610,7 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
 
       const endResponse = await app.request(
         `/api/compatibility/relationships/${relationshipId}`,
-        { method: "DELETE", headers: { Authorization: "Bearer recipient-token" } },
+        { method: "DELETE", headers: sessionHeaders.recipient },
         env(),
       );
       expect(endResponse.status).toBe(204);
@@ -626,13 +619,13 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
       for (const role of ["inviter", "recipient"] as const) {
         const listResponse = await app.request(
           "/api/compatibility/relationships",
-          { headers: { Authorization: `Bearer ${role}-token` } },
+          { headers: sessionHeaders[role] },
           env(),
         );
         expect(await listResponse.json()).toEqual({ items: [] });
         const detailResponse = await app.request(
           `/api/compatibility/relationships/${relationshipId}`,
-          { headers: { Authorization: `Bearer ${role}-token` } },
+          { headers: sessionHeaders[role] },
           env(),
         );
         expect(detailResponse.status).toBe(404);
@@ -641,13 +634,13 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
       const resumedRelationshipId = await issueInvitationForInviter();
       const resumedAcceptance = await app.request(
         `/api/compatibility/invitations/${resumedRelationshipId}/accept`,
-        { method: "POST", headers: { Authorization: "Bearer recipient-token" } },
+        { method: "POST", headers: sessionHeaders.recipient },
         env(),
       );
       expect(resumedAcceptance.status).toBe(200);
       const resumedDetail = await app.request(
         `/api/compatibility/relationships/${resumedRelationshipId}`,
-        { headers: { Authorization: "Bearer inviter-token" } },
+        { headers: sessionHeaders.inviter },
         env(),
       );
       expect(resumedDetail.status).toBe(200);
@@ -667,7 +660,7 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
       const relationshipId = await issueInvitationForInviter();
       const cancelResponse = await app.request(
         `/api/compatibility/invitations/${relationshipId}`,
-        { method: "DELETE", headers: { Authorization: "Bearer inviter-token" } },
+        { method: "DELETE", headers: sessionHeaders.inviter },
         env(),
       );
       expect(cancelResponse.status).toBe(204);
@@ -676,7 +669,7 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
 
       const response = await app.request(
         `/api/compatibility/invitations/${relationshipId}`,
-        { headers: { Authorization: "Bearer recipient-token" } },
+        { headers: sessionHeaders.recipient },
         env(),
       );
 
@@ -693,7 +686,7 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
       ).toEqual({ count: 0 });
       const listResponse = await app.request(
         "/api/compatibility/relationships",
-        { headers: { Authorization: "Bearer inviter-token" } },
+        { headers: sessionHeaders.inviter },
         env(),
       );
       expect(await listResponse.json()).toEqual({ items: [] });

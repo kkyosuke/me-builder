@@ -53,12 +53,17 @@ async function fixture() {
 }
 
 describe("account recovery authentication boundary", () => {
-  it("復旧対象をコードから決定し、初回成功時だけ旧sessionを失効する", async () => {
+  it("復旧対象をコードから決定し、初回成功時だけ復旧先と移管元のsessionを失効する", async () => {
     const { db, accountId, code, now } = await fixture();
+    const source = await D1.shared.action.account.upsertIdentity(db, {
+      provider: "line_login",
+      providerAccountId: "new-line-identity",
+    });
     const invalidateAccountSessions = vi.fn();
     const params = {
       db,
       identity: { subject: "new-line-identity" },
+      sourceAccountId: source.account.id,
       code,
       requestKey: "request-key",
       now,
@@ -68,16 +73,24 @@ describe("account recovery authentication boundary", () => {
       recoverAccountWithCode(params, { invalidateAccountSessions }),
     ).resolves.toMatchObject({ type: "recovered", accountId, alreadyRecovered: false });
     await expect(
-      recoverAccountWithCode(params, { invalidateAccountSessions }),
+      recoverAccountWithCode(
+        { ...params, sourceAccountId: accountId },
+        { invalidateAccountSessions },
+      ),
     ).resolves.toMatchObject({ type: "recovered", accountId, alreadyRecovered: true });
-    expect(invalidateAccountSessions).toHaveBeenCalledOnce();
-    expect(invalidateAccountSessions).toHaveBeenCalledWith(accountId);
+    expect(invalidateAccountSessions).toHaveBeenNthCalledWith(1, accountId);
+    expect(invalidateAccountSessions).toHaveBeenNthCalledWith(2, source.account.id);
+    expect(invalidateAccountSessions).toHaveBeenCalledTimes(2);
   });
 
   it("別Accountに接続済みのIdentityを拒否し、sessionを失効しない", async () => {
     const { db, code, now } = await fixture();
-    await D1.shared.action.account.upsertIdentity(db, {
+    const source = await D1.shared.action.account.upsertIdentity(db, {
       provider: "line_login",
+      providerAccountId: "other-account-identity",
+    });
+    await D1.shared.action.account.upsertIdentity(db, {
+      provider: "line",
       providerAccountId: "other-account-identity",
     });
     const invalidateAccountSessions = vi.fn();
@@ -87,6 +100,7 @@ describe("account recovery authentication boundary", () => {
         {
           db,
           identity: { subject: "other-account-identity" },
+          sourceAccountId: source.account.id,
           code,
           requestKey: "request-key",
           now,
@@ -99,20 +113,30 @@ describe("account recovery authentication boundary", () => {
 
   it("使用済みコードを異なるIdentityでは再利用できない", async () => {
     const { db, code, now } = await fixture();
+    const firstSource = await D1.shared.action.account.upsertIdentity(db, {
+      provider: "line_login",
+      providerAccountId: "first-new-identity",
+    });
     await recoverAccountWithCode({
       db,
       identity: { subject: "first-new-identity" },
+      sourceAccountId: firstSource.account.id,
       code,
       requestKey: "first-request",
       now,
     });
     const invalidateAccountSessions = vi.fn();
+    const secondSource = await D1.shared.action.account.upsertIdentity(db, {
+      provider: "line_login",
+      providerAccountId: "second-new-identity",
+    });
 
     await expect(
       recoverAccountWithCode(
         {
           db,
           identity: { subject: "second-new-identity" },
+          sourceAccountId: secondSource.account.id,
           code,
           requestKey: "second-request",
           now,

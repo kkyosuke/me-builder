@@ -58,7 +58,7 @@ export const weeklyReflectionRoute = describeRoute({
   operationId: "getWeeklyReflections",
   tags: ["Profile"],
   summary: "週次振り返りと今週の生成状態を取得する",
-  security: [{ applicationSession: [] }, { liffIdToken: [] }],
+  security: [{ applicationSession: [] }],
   responses: {
     200: jsonResponse("保存済み週次振り返り", WeeklyReflectionResponseSchema),
     ...authenticatedErrors,
@@ -70,7 +70,7 @@ export const weeklyReflectionGenerationRoute = describeRoute({
   operationId: "requestWeeklyReflectionGeneration",
   tags: ["Profile"],
   summary: "今週の振り返り生成を要求する",
-  security: [{ applicationSession: [], csrfToken: [] }, { liffIdToken: [] }],
+  security: [{ applicationSession: [], csrfToken: [] }],
   responses: {
     202: jsonResponse("生成要求を受け付けた", WeeklyReflectionGenerationAcceptedSchema),
     409: jsonResponse("生成できない理由", WeeklyReflectionGenerationUnavailableSchema),

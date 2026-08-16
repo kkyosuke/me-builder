@@ -6,6 +6,7 @@ import { logger } from "@me-builder/shared";
 import { Miniflare } from "miniflare";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { app } from "../index";
+import { createApplicationSessionFixture } from "../testing/application-session";
 
 const repositoryRoot = path.resolve(__dirname, "../../../..");
 const migrationsDirectory = path.join(repositoryRoot, "packages/lib/drizzle");
@@ -16,6 +17,8 @@ const e2eSetupTimeoutMs = 90_000;
 let miniflare: Miniflare;
 let database: D1Database;
 let avatarBucket: R2Bucket;
+let sessionFixture: ReturnType<typeof createApplicationSessionFixture>;
+let sessionHeaders: Record<string, string>;
 
 const squarePngBase64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAE0lEQVQImWP4z8DwHwwZGP6DAQBJyAn3iFfyTAAAAABJRU5ErkJggg==";
@@ -89,13 +92,13 @@ function bindings() {
   return {
     DB: database,
     AVATAR_BUCKET: avatarBucket,
-    LINE_LOGIN_CHANNEL_ID: "1234567890",
+    ...sessionFixture.bindings,
     ENVIRONMENT: "test",
   };
 }
 
-function authorization() {
-  return { Authorization: "Bearer known-token" };
+function sessionHeadersForRequest() {
+  return sessionHeaders;
 }
 
 describe("Profile avatar storage API local E2E", () => {
@@ -110,32 +113,25 @@ describe("Profile avatar storage API local E2E", () => {
     database = (await miniflare.getD1Database("DB")) as D1Database;
     avatarBucket = (await miniflare.getR2Bucket("AVATAR_BUCKET")) as unknown as R2Bucket;
     await prepareAccount(database);
+    sessionFixture = createApplicationSessionFixture(database);
   }, e2eSetupTimeoutMs);
 
-  beforeEach(() => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () =>
-        Response.json({
-          iss: "https://access.line.me",
-          sub: "line-profile-e2e",
-          aud: "1234567890",
-          iat: Math.floor(Date.now() / 1_000),
-          exp: timestamp + 86_400,
-          name: "プロフィール利用者",
-          picture: lineAvatarUrl,
-        }),
-      ),
-    );
+  beforeEach(async () => {
+    sessionHeaders = (
+      await sessionFixture.issue("account-profile-e2e", {
+        displayName: "プロフィール利用者",
+        pictureUrl: lineAvatarUrl,
+      })
+    ).headers;
   });
 
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => vi.restoreAllMocks());
   afterAll(async () => miniflare.dispose());
 
   it("画像を保存し、GET 1回で画像を表示し、削除後はLINE画像へ戻す", async () => {
     const initialProfile = await app.request(
       "/api/profile",
-      { headers: authorization() },
+      { headers: sessionHeadersForRequest() },
       bindings(),
     );
     expect(await initialProfile.json()).toMatchObject({
@@ -149,7 +145,7 @@ describe("Profile avatar storage API local E2E", () => {
       "/api/profile/avatar",
       {
         method: "PUT",
-        headers: { ...authorization(), "Content-Type": "image/png" },
+        headers: { ...sessionHeadersForRequest(), "Content-Type": "image/png" },
         body: bytes.slice().buffer as ArrayBuffer,
       },
       bindings(),
@@ -174,7 +170,11 @@ describe("Profile avatar storage API local E2E", () => {
       avatar_byte_size: bytes.byteLength,
     });
 
-    const profile = await app.request("/api/profile", { headers: authorization() }, bindings());
+    const profile = await app.request(
+      "/api/profile",
+      { headers: sessionHeadersForRequest() },
+      bindings(),
+    );
     expect(profile.status).toBe(200);
     expect(await profile.json()).toMatchObject({
       avatar: { source: "uploaded", url: expect.stringMatching(/^data:image\/png;base64,/) },
@@ -182,7 +182,7 @@ describe("Profile avatar storage API local E2E", () => {
 
     const image = await app.request(
       "/api/profile/avatar",
-      { headers: authorization() },
+      { headers: sessionHeadersForRequest() },
       bindings(),
     );
     expect(image.status).toBe(200);
@@ -192,7 +192,7 @@ describe("Profile avatar storage API local E2E", () => {
 
     const deleted = await app.request(
       "/api/profile/avatar",
-      { method: "DELETE", headers: authorization() },
+      { method: "DELETE", headers: sessionHeadersForRequest() },
       bindings(),
     );
     expect(deleted.status).toBe(200);
@@ -211,7 +211,7 @@ describe("Profile avatar storage API local E2E", () => {
       "/api/profile/avatar",
       {
         method: "PUT",
-        headers: { ...authorization(), "Content-Type": "image/png" },
+        headers: { ...sessionHeadersForRequest(), "Content-Type": "image/png" },
         body: bytes.slice().buffer as ArrayBuffer,
       },
       bindings(),
@@ -224,7 +224,11 @@ describe("Profile avatar storage API local E2E", () => {
     await avatarBucket.delete(stored.key);
     const errorLog = vi.spyOn(logger, "error").mockImplementation(() => undefined);
 
-    const degraded = await app.request("/api/profile", { headers: authorization() }, bindings());
+    const degraded = await app.request(
+      "/api/profile",
+      { headers: sessionHeadersForRequest() },
+      bindings(),
+    );
     expect(degraded.status).toBe(200);
     expect(await degraded.json()).toMatchObject({
       role: "user",
@@ -244,7 +248,7 @@ describe("Profile avatar storage API local E2E", () => {
 
     const deletedMissingAvatar = await app.request(
       "/api/profile/avatar",
-      { method: "DELETE", headers: authorization() },
+      { method: "DELETE", headers: sessionHeadersForRequest() },
       bindings(),
     );
     expect(deletedMissingAvatar.status).toBe(200);
@@ -259,7 +263,7 @@ describe("Profile avatar storage API local E2E", () => {
       "/api/profile/avatar",
       {
         method: "PUT",
-        headers: { ...authorization(), "Content-Type": "image/png" },
+        headers: { ...sessionHeadersForRequest(), "Content-Type": "image/png" },
         body: bytes.slice().buffer as ArrayBuffer,
       },
       bindings(),
@@ -272,7 +276,7 @@ describe("Profile avatar storage API local E2E", () => {
 
     const secondDegraded = await app.request(
       "/api/profile",
-      { headers: authorization() },
+      { headers: sessionHeadersForRequest() },
       bindings(),
     );
     expect(secondDegraded.status).toBe(200);
@@ -281,7 +285,7 @@ describe("Profile avatar storage API local E2E", () => {
       "/api/profile/avatar",
       {
         method: "PUT",
-        headers: { ...authorization(), "Content-Type": "image/png" },
+        headers: { ...sessionHeadersForRequest(), "Content-Type": "image/png" },
         body: bytes.slice().buffer as ArrayBuffer,
       },
       bindings(),
@@ -294,7 +298,7 @@ describe("Profile avatar storage API local E2E", () => {
 
     const cleanup = await app.request(
       "/api/profile/avatar",
-      { method: "DELETE", headers: authorization() },
+      { method: "DELETE", headers: sessionHeadersForRequest() },
       bindings(),
     );
     expect(cleanup.status).toBe(200);
@@ -313,7 +317,7 @@ describe("Profile avatar storage API local E2E", () => {
       "/api/profile/avatar",
       {
         method: "PUT",
-        headers: { ...authorization(), "Content-Type": "image/png" },
+        headers: { ...sessionHeadersForRequest(), "Content-Type": "image/png" },
         body: bytes.slice().buffer as ArrayBuffer,
       },
       bindings(),

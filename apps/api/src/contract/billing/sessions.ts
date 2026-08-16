@@ -69,7 +69,7 @@ export const billingCheckoutSessionRoute = describeRoute({
   operationId: "createBillingCheckoutSession",
   tags: ["Billing"],
   summary: "本人の選択したPlanに対するStripe Checkout Sessionを作成する",
-  security: [{ applicationSession: [], csrfToken: [] }, { liffIdToken: [] }],
+  security: [{ applicationSession: [], csrfToken: [] }],
   requestBody: {
     required: true,
     content: { "application/json": { schema: BillingCheckoutRequestSchema } },
@@ -122,7 +122,7 @@ export const billingPortalSessionRoute = describeRoute({
   operationId: "createBillingPortalSession",
   tags: ["Billing"],
   summary: "本人のStripe Customerに対するCustomer Portal Sessionを作成する",
-  security: [{ applicationSession: [], csrfToken: [] }, { liffIdToken: [] }],
+  security: [{ applicationSession: [], csrfToken: [] }],
   responses: {
     201: jsonResponse("短命なStripe Customer Portal URL", BillingSessionResponseSchema),
     409: jsonResponse("Portalを開始できない", BillingSessionConflictSchema),

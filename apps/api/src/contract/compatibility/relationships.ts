@@ -40,7 +40,7 @@ export const compatibilityRelationshipsRoute = describeRoute({
   operationId: "listCompatibilityRelationships",
   tags: ["Compatibility"],
   summary: "本人の発行中招待と成立中の相性関係を一覧する",
-  security: [{ applicationSession: [] }, { liffIdToken: [] }],
+  security: [{ applicationSession: [] }],
   responses: {
     200: jsonResponse("正本へ同期済みの相性一覧", CompatibilityRelationshipsResponseSchema),
     ...authenticatedErrors,
