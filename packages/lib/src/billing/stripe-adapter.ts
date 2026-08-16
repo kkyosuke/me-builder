@@ -1,0 +1,189 @@
+import Stripe from "stripe";
+import type {
+  BillingCustomer,
+  BillingProvider,
+  BillingProviderErrorKind,
+  BillingSubscription,
+  BillingSubscriptionStatus,
+} from "./provider";
+import { BillingProviderError } from "./provider";
+
+export const STRIPE_API_VERSION = "2026-07-29.dahlia" as const;
+
+export function createStripeBillingProvider(input: {
+  secretKey: string;
+  timeoutMs?: number;
+  maxNetworkRetries?: number;
+}): BillingProvider {
+  const stripe = new Stripe(input.secretKey, {
+    apiVersion: STRIPE_API_VERSION,
+    httpClient: Stripe.createFetchHttpClient(),
+    timeout: input.timeoutMs ?? 10_000,
+    maxNetworkRetries: input.maxNetworkRetries ?? 2,
+    telemetry: false,
+  });
+  return new StripeBillingProvider(stripe);
+}
+
+export class StripeBillingProvider implements BillingProvider {
+  constructor(private readonly stripe: Stripe) {}
+
+  async createCustomer(input: { accountId: string }, idempotencyKey: string) {
+    return this.call(async () => {
+      const customer = await this.stripe.customers.create(
+        { metadata: { account_id: input.accountId } },
+        { idempotencyKey },
+      );
+      return { id: customer.id, deleted: false };
+    });
+  }
+
+  async createCheckoutSession(
+    input: {
+      customerId: string;
+      priceId: string;
+      successUrl: string;
+      cancelUrl: string;
+      accountId: string;
+    },
+    idempotencyKey: string,
+  ) {
+    return this.call(async () => {
+      const session = await this.stripe.checkout.sessions.create(
+        {
+          mode: "subscription",
+          customer: input.customerId,
+          line_items: [{ price: input.priceId, quantity: 1 }],
+          success_url: input.successUrl,
+          cancel_url: input.cancelUrl,
+          client_reference_id: input.accountId,
+        },
+        { idempotencyKey },
+      );
+      if (!session.url) throw new BillingProviderError("provider", false);
+      return { id: session.id, url: session.url };
+    });
+  }
+
+  async createPortalSession(input: { customerId: string; returnUrl: string }) {
+    return this.call(async () => {
+      const session = await this.stripe.billingPortal.sessions.create({
+        customer: input.customerId,
+        return_url: input.returnUrl,
+      });
+      return { url: session.url };
+    });
+  }
+
+  async retrieveCustomer(customerId: string): Promise<BillingCustomer> {
+    return this.call(async () => {
+      const customer = await this.stripe.customers.retrieve(customerId);
+      return { id: customer.id, deleted: customer.deleted === true };
+    });
+  }
+
+  async retrieveSubscription(subscriptionId: string): Promise<BillingSubscription> {
+    return this.call(async () =>
+      mapSubscription(await this.stripe.subscriptions.retrieve(subscriptionId)),
+    );
+  }
+
+  async listSubscriptions(customerId: string): Promise<readonly BillingSubscription[]> {
+    return this.call(async () => {
+      const subscriptions = await this.stripe.subscriptions.list({
+        customer: customerId,
+        status: "all",
+        limit: 100,
+      });
+      return subscriptions.data.map(mapSubscription);
+    });
+  }
+
+  constructWebhookEvent(rawBody: string, signature: string, webhookSecret: string) {
+    try {
+      const event = this.stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
+      const object = event.data.object as { id?: unknown };
+      if (typeof object.id !== "string") throw new BillingProviderError("invalid-request", false);
+      return {
+        id: event.id,
+        type: event.type,
+        objectId: object.id,
+        createdAt: fromUnixSeconds(event.created),
+      };
+    } catch (error) {
+      throw classifyStripeError(error);
+    }
+  }
+
+  private async call<T>(operation: () => Promise<T>): Promise<T> {
+    try {
+      return await operation();
+    } catch (error) {
+      throw classifyStripeError(error);
+    }
+  }
+}
+
+function mapSubscription(subscription: Stripe.Subscription): BillingSubscription {
+  const item = subscription.items.data[0];
+  const customerId =
+    typeof subscription.customer === "string" ? subscription.customer : subscription.customer.id;
+  return {
+    id: subscription.id,
+    customerId,
+    status: billingSubscriptionStatus(subscription.status),
+    priceId: item?.price.id ?? null,
+    currentPeriodStart: item ? fromUnixSeconds(item.current_period_start) : null,
+    currentPeriodEnd: item ? fromUnixSeconds(item.current_period_end) : null,
+    cancelAtPeriodEnd: subscription.cancel_at_period_end,
+    trialEnd: subscription.trial_end ? fromUnixSeconds(subscription.trial_end) : null,
+    createdAt: fromUnixSeconds(subscription.created),
+  };
+}
+
+function billingSubscriptionStatus(status: string): BillingSubscriptionStatus {
+  switch (status) {
+    case "incomplete":
+    case "incomplete_expired":
+    case "trialing":
+    case "active":
+    case "past_due":
+    case "canceled":
+    case "unpaid":
+    case "paused":
+      return status;
+    default:
+      throw new BillingProviderError("provider", false);
+  }
+}
+
+function fromUnixSeconds(value: number): string {
+  return new Date(value * 1_000).toISOString();
+}
+
+export function classifyStripeError(error: unknown): BillingProviderError {
+  if (error instanceof BillingProviderError) return error;
+  const stripeError = error as { type?: unknown; statusCode?: unknown; code?: unknown };
+  const type = typeof stripeError?.type === "string" ? stripeError.type : "";
+  const status = typeof stripeError?.statusCode === "number" ? stripeError.statusCode : undefined;
+  const code = typeof stripeError?.code === "string" ? stripeError.code : "";
+
+  let kind: BillingProviderErrorKind = "unknown";
+  let retryable = false;
+  if (type === "StripeConnectionError") {
+    kind = code === "ETIMEDOUT" ? "timeout" : "network";
+    retryable = true;
+  } else if (type === "StripeRateLimitError") {
+    kind = "rate-limited";
+    retryable = true;
+  } else if (type === "StripeAuthenticationError") kind = "authentication";
+  else if (type === "StripePermissionError") kind = "permission";
+  else if (type === "StripeInvalidRequestError") kind = "invalid-request";
+  else if (type === "StripeIdempotencyError") kind = "idempotency-conflict";
+  else if (type === "StripeSignatureVerificationError") kind = "invalid-signature";
+  else if (type === "StripeAPIError") {
+    kind = "provider";
+    retryable = status === undefined || status >= 500;
+  }
+  return new BillingProviderError(kind, retryable, status, { cause: error });
+}
