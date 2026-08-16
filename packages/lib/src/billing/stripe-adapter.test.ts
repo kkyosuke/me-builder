@@ -53,4 +53,23 @@ describe("StripeBillingProvider", () => {
     const error = new BillingProviderError("provider", true, 503);
     expect(classifyStripeError(error)).toBe(error);
   });
+
+  it("uses the managed Customer Portal configuration when creating a session", async () => {
+    const create = vi.fn().mockResolvedValue({ url: "https://billing.stripe.test/session" });
+    const provider = new StripeBillingProvider(
+      { billingPortal: { sessions: { create } } } as never,
+      { portalConfigurationId: "bpc_managed" },
+    );
+
+    await provider.createPortalSession({
+      customerId: "cus_secret",
+      returnUrl: "https://example.com/settings",
+    });
+
+    expect(create).toHaveBeenCalledWith({
+      customer: "cus_secret",
+      return_url: "https://example.com/settings",
+      configuration: "bpc_managed",
+    });
+  });
 });

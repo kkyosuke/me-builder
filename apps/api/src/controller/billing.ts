@@ -11,7 +11,12 @@ export async function postStripeWebhook(c: Context<AppEnv>): Promise<Response> {
     signature: c.req.header("stripe-signature"),
     webhookSecret: config.stripeWebhookSecret,
     provider: config.stripeSecretKey
-      ? billing.createStripeBillingProvider({ secretKey: config.stripeSecretKey })
+      ? billing.createStripeBillingProvider({
+          secretKey: config.stripeSecretKey,
+          ...(config.stripePortalConfigurationId
+            ? { portalConfigurationId: config.stripePortalConfigurationId }
+            : {}),
+        })
       : undefined,
     queue: config.billingQueue,
   });

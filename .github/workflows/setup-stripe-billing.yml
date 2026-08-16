@@ -1,0 +1,124 @@
+name: Setup / Stripe Billing
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 同期先のGitHub Environment
+        required: true
+        type: choice
+        options:
+          - dev
+          - prd
+      confirmation:
+        description: devは「sync-dev」、prdは「sync-prd」と入力
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# 同じStripe / Cloudflare環境への同期を直列化し、実行中の変更は中断しない。
+concurrency:
+  group: stripe-billing-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  validate-request:
+    name: Validate Stripe Sync Request
+    runs-on: ubuntu-latest
+    env:
+      TARGET_ENVIRONMENT: ${{ inputs.environment }}
+      CONFIRMATION: ${{ inputs.confirmation }}
+      REF_NAME: ${{ github.ref_name }}
+      REF_TYPE: ${{ github.ref_type }}
+    steps:
+      # Environmentの承認とsecret解決より前に、実行元と明示確認を検証する。
+      - name: Validate Target and Confirmation
+        run: |
+          expected_confirmation="sync-${TARGET_ENVIRONMENT}"
+          if [ "${CONFIRMATION}" != "${expected_confirmation}" ]; then
+            echo "::error::確認文字列が一致しません。${expected_confirmation} と入力してください。"
+            exit 1
+          fi
+          if [ "${REF_TYPE}" != "branch" ]; then
+            echo "::error::ブランチを選んで実行してください。tagからは同期できません。"
+            exit 1
+          fi
+          if [ "${TARGET_ENVIRONMENT}" = "prd" ] && [ "${REF_NAME}" != "main" ]; then
+            echo "::error::prdへの同期はmainブランチからだけ実行できます。"
+            exit 1
+          fi
+
+  approve-stripe-sync:
+    name: Approve Stripe Billing Sync (${{ inputs.environment }})
+    needs: validate-request
+    runs-on: ubuntu-latest
+    # Stripe専用Environmentに承認を分離し、通常のdev / prdデプロイは停止させない。
+    environment: stripe-${{ inputs.environment }}
+    steps:
+      - name: Record Approval
+        run: echo "Stripe billing sync to ${TARGET_ENVIRONMENT} was approved."
+        env:
+          TARGET_ENVIRONMENT: ${{ inputs.environment }}
+
+  setup-stripe-billing:
+    name: Sync Stripe Billing (${{ inputs.environment }})
+    needs: approve-stripe-sync
+    runs-on: ubuntu-latest
+    # 同期先Environmentから環境別secretを取得する。承認は前段のStripe専用Environmentで完了済み。
+    environment: ${{ inputs.environment }}
+    env:
+      TARGET_ENVIRONMENT: ${{ inputs.environment }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
+      STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-bun-workspace
+
+      - uses: arduino/setup-task@v2
+        with:
+          version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Validate Stripe and Cloudflare Configuration
+        run: |
+          if [ -z "${STRIPE_SECRET_KEY}" ]; then
+            echo "::error::STRIPE_SECRET_KEY がGitHub Environment ${TARGET_ENVIRONMENT}に設定されていません。"
+            exit 1
+          fi
+          if [ -z "${CLOUDFLARE_ACCOUNT_ID}" ]; then
+            echo "::error::CLOUDFLARE_ACCOUNT_ID がGitHub Environment ${TARGET_ENVIRONMENT}に設定されていません。"
+            exit 1
+          fi
+          if [ -z "${CLOUDFLARE_API_TOKEN}" ]; then
+            echo "::error::CLOUDFLARE_DEPLOY_API_TOKEN がGitHub Environment ${TARGET_ENVIRONMENT}に設定されていません。"
+            exit 1
+          fi
+
+      - name: Sync Stripe Test Mode and Preview Secrets
+        if: inputs.environment == 'dev'
+        run: task stripe:setup:preview
+
+      - name: Sync Stripe Live Mode and Production Secrets
+        if: inputs.environment == 'prd'
+        env:
+          CONFIRM_STRIPE_LIVE: production
+        run: task stripe:setup:production
+
+      - name: Publish Stripe Sync Summary
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          {
+            echo "### Stripe billing sync completed"
+            echo
+            echo "- GitHub Environment: \`${TARGET_ENVIRONMENT}\`"
+            echo "- Source branch: \`${REF_NAME}\`"
+            echo "- Workflow run: [open run](${RUN_URL})"
+            echo "- Stripe Product / Price、Webhook、Customer Portal、Cloudflare secretsを同期しました。"
+          } >> "${GITHUB_STEP_SUMMARY}"

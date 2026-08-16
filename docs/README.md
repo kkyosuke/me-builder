@@ -99,6 +99,7 @@ docs/
 - [診断seed運用](development/diagnosis-seed.md) — 診断をD1へ登録するseedの配置、実行、更新、検証方法
 - [診断サムネイル生成](development/diagnosis-thumbnail-generation.md) — 診断一覧用サムネイルの生成プロンプトと配置手順
 - [LINEリッチメニュー運用](development/line-rich-menu.md) — Messaging APIによるリッチメニューの登録、画像更新、CD運用
+- [Stripe課金環境の同期運用](development/stripe-billing-setup.md) — Product・Price・Webhook・Customer PortalとCloudflare secretをCLIで同期する運用
 - [診断API契約](development/diagnosis-api.md) — Web UIとAPI Server間の診断API契約
 - [プロフィールAPI契約](development/profile-api.md) — 本人プロフィールとアバター画像の取得・保存・削除API契約
 - [相性API契約](development/compatibility-api.md) — Web UIとAPI Server間の相性API契約
