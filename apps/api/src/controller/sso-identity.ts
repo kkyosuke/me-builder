@@ -32,13 +32,13 @@ function configured(c: Context<AppEnv>) {
     !configuration.ssoClientSecret ||
     !configuration.ssoCallbackUrl ||
     !configuration.webOrigin ||
-    !c.env?.AUTH_SESSION_STORE
+    !c.env?.SESSION_STORE
   ) {
     return undefined;
   }
   return {
     configuration,
-    store: createSsoTransactionStore(c.env.AUTH_SESSION_STORE),
+    store: createSsoTransactionStore(c.env.SESSION_STORE),
     client: createAuth0SsoClient({
       issuerUrl: configuration.ssoIssuerUrl,
       clientId: configuration.ssoClientId,

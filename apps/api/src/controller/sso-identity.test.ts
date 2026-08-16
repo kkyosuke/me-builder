@@ -68,7 +68,7 @@ const env = {
   SSO_ISSUER_URL: "https://tenant.auth0.com/",
   SSO_CLIENT_ID: "client-id",
   SSO_CLIENT_SECRET: "client-secret",
-  AUTH_SESSION_STORE: {},
+  SESSION_STORE: {},
   DB: {},
 } as AppEnv["Bindings"];
 
@@ -117,6 +117,7 @@ describe("SSO identity controller", () => {
     expect(response.headers.get("location")).toBe(
       "https://tenant.auth0.com/authorize?state=opaque",
     );
+    expect(mocks.createStore).toHaveBeenCalledWith(env.SESSION_STORE);
     expect(mocks.startLinking).toHaveBeenCalledWith(
       expect.objectContaining({ initiatingAccountId: "account-at-start", returnTo: "/profile" }),
     );
