@@ -36,6 +36,7 @@ export class FakeBillingProvider implements BillingProvider {
       accountId: string;
       plan: "lite" | "full" | "family";
       interval: "month" | "year";
+      trialPeriodDays?: number;
     },
     key: string,
   ): Promise<{ id: string; url: string }> {

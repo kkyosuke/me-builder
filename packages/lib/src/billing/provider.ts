@@ -52,6 +52,7 @@ export interface BillingProvider {
       accountId: string;
       plan: "lite" | "full" | "family";
       interval: "month" | "year";
+      trialPeriodDays?: number;
     },
     idempotencyKey: string,
   ): Promise<{ id: string; url: string }>;

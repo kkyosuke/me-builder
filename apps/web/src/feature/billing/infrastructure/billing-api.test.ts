@@ -3,6 +3,7 @@ import {
   createCheckoutSession,
   createCustomerPortalSession,
   fetchBillingPlanCatalog,
+  fetchBillingTrialEligibility,
   verifyCheckoutSessionCompletion,
 } from "./billing-api";
 
@@ -67,6 +68,21 @@ describe("billing purchase api", () => {
     await expect(fetchBillingPlanCatalog("https://api.example.test")).resolves.toMatchObject([
       { code: "lite", prices: [{ amount: 780 }, { amount: 7_800 }] },
     ]);
+  });
+
+  it("本人のAccount単位のtrial利用可否を返す", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify({ eligible: true, trialDays: 14 })));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      fetchBillingTrialEligibility("https://api.example.test", "id-token"),
+    ).resolves.toBe(true);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.example.test/api/billing/trial-eligibility",
+      expect.objectContaining({ headers: { Authorization: "Bearer id-token" } }),
+    );
   });
 
   it("本人のtokenとPlan選択だけをCheckout APIへ送る", async () => {

@@ -23,6 +23,7 @@ import {
   billingCheckoutSessionStatusRoute,
   billingPlanCatalogRoute,
   billingPortalSessionRoute,
+  billingTrialEligibilityRoute,
 } from "./contract/billing/sessions";
 import { developmentBrainItemsRoute, developmentBrainVectorRoute } from "./contract/brain/dev-list";
 import {
@@ -113,6 +114,7 @@ import {
 import {
   getBillingCheckoutSession,
   getBillingPlanCatalog,
+  getBillingTrialEligibilityResponse,
   postBillingCheckoutSession,
   postBillingPortalSession,
   postStripeWebhook,
@@ -270,6 +272,11 @@ app.post(
   postAccountRecoveryComplete,
 );
 app.get("/api/billing/plans", billingPlanCatalogRoute, getBillingPlanCatalog);
+app.get(
+  "/api/billing/trial-eligibility",
+  billingTrialEligibilityRoute,
+  getBillingTrialEligibilityResponse,
+);
 app.post("/api/billing/checkout-sessions", billingCheckoutSessionRoute, postBillingCheckoutSession);
 app.get(
   "/api/billing/checkout-sessions/:checkoutSessionId",

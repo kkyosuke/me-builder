@@ -10,6 +10,8 @@ type BaseParams = {
   createSession?: typeof createLiffSession;
 };
 
+type AuthParams = Pick<BaseParams, "idToken" | "lineLoginChannelId" | "db" | "createSession">;
+
 type SessionFailure =
   | { type: "not-configured" | "unauthenticated" | "account-not-found" }
   | {
@@ -83,6 +85,7 @@ export async function createBillingCheckoutSession(
     }
     await params.provider.expireCheckoutSession(latestCheckout.id);
   }
+  const trialEligible = !(await D1.shared.action.billing.hasUsedBillingTrial(params.db, accountId));
   const origin = new URL(params.webOrigin).origin;
   const checkout = await params.provider.createCheckoutSession(
     {
@@ -93,6 +96,7 @@ export async function createBillingCheckoutSession(
       accountId,
       plan: params.plan,
       interval: params.interval,
+      ...(trialEligible ? { trialPeriodDays: 14 } : {}),
     },
     `billing-checkout-${accountId}-${latestCheckout?.id ?? "initial"}`,
   );
@@ -123,6 +127,27 @@ export async function getBillingCheckoutSessionStatus(
     }
     throw error;
   }
+}
+
+export async function getBillingTrialEligibility(
+  params: AuthParams,
+): Promise<
+  | { type: "resolved"; eligible: boolean }
+  | { type: "not-configured" | "unauthenticated" | "account-not-found" }
+> {
+  const session = await (params.createSession ?? createLiffSession)({
+    idToken: params.idToken,
+    lineLoginChannelId: params.lineLoginChannelId,
+    db: params.db,
+  });
+  if (session.type !== "resolved") return { type: session.type };
+  return {
+    type: "resolved",
+    eligible: !(await D1.shared.action.billing.hasUsedBillingTrial(
+      params.db,
+      session.session.accountId,
+    )),
+  };
 }
 
 export async function createBillingPortalSession(

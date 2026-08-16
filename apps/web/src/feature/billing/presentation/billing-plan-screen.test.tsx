@@ -98,6 +98,19 @@ describe("BillingPlanScreen", () => {
           status: "success",
           data: { ...free, status: "active", plan: "family", source: "family-seat" },
         }}
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "料金プランを閉じる" }));
+    expect(screen.getByText("ファミリーパックに参加中です")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Liteを選ぶ" })).toBeNull();
+  });
+
+  it("初回対象者へ終了日と終了後の価格・自動更新を開始前に表示する", () => {
+    render(
+      <BillingPlanScreen
+        plans={{
+          status: "success",
+          data: plans.map((plan) => ({ ...plan, trialDays: 14 })),
+        }}
+        entitlement={{ status: "success", data: free }}
         checkoutState={{ status: "idle" }}
         completionMessage={null}
         onBack={vi.fn()}
@@ -106,8 +119,9 @@ describe("BillingPlanScreen", () => {
       />,
     );
 
-    expect(document.activeElement).toBe(screen.getByRole("button", { name: "料金プランを閉じる" }));
-    expect(screen.getByText("ファミリーパックに参加中です")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Liteを選ぶ" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Liteを選ぶ" }));
+    expect(screen.getAllByText(/初回.*14日間無料/)).toHaveLength(2);
+    expect(screen.getByText(/本日開始した場合.*まで無料/)).toBeTruthy();
+    expect(screen.getByText(/無料期間終了後に.*780.*自動更新/)).toBeTruthy();
   });
 });

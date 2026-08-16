@@ -12,6 +12,7 @@ import {
   D1AccountPlanAssignmentProvider,
   applyBillingProjection,
   getBillingOperationalSummary,
+  hasUsedBillingTrial,
   linkBillingCustomer,
 } from "./billing";
 
@@ -44,6 +45,30 @@ async function account(db: SharedD1Client, providerAccountId: string) {
 }
 
 describe("billing projection", () => {
+  it("trial開始をAccountへ一度だけ記録し、終了後も利用済みと判定する", async () => {
+    const db = createTestDb();
+    const owner = await account(db, "U_trial_once");
+    await linkBillingCustomer(db, { accountId: owner.id, providerCustomerId: "cus_1" });
+    await applyBillingProjection(db, {
+      accountId: owner.id,
+      event: {
+        id: "evt_trial_once",
+        type: "customer.subscription.updated",
+        objectId: "sub_1",
+        createdAt: new Date("2026-08-15T00:00:00Z"),
+      },
+      subscription: {
+        ...subscription,
+        status: "active",
+        trialEnd: "2026-08-15T00:00:00.000Z",
+      },
+      planCode: "full",
+    });
+
+    await expect(hasUsedBillingTrial(db, owner.id)).resolves.toBe(true);
+    expect(await db.select().from(schema.billingTrialUsages)).toHaveLength(1);
+  });
+
   it("AccountとCustomerを一意に対応させ、別Accountへの付け替えを拒否する", async () => {
     const db = createTestDb();
     const first = await account(db, "U_billing_1");

@@ -13,6 +13,7 @@ import {
   billingProcessedEvents,
   billingReconciliationAudits,
   billingSubscriptionProjections,
+  billingTrialUsages,
 } from "../schema/billing";
 
 export class BillingCustomerOwnershipError extends Error {
@@ -78,6 +79,14 @@ export async function findBillingProjectionByAccount(db: SharedD1Client, account
   return await db.query.billingSubscriptionProjections.findFirst({
     where: (table, { eq }) => eq(table.accountId, accountId),
   });
+}
+
+export async function hasUsedBillingTrial(db: SharedD1Client, accountId: string): Promise<boolean> {
+  return Boolean(
+    await db.query.billingTrialUsages.findFirst({
+      where: (table, { eq }) => eq(table.accountId, accountId),
+    }),
+  );
 }
 
 export type BillingOperationalSummary = Readonly<{
@@ -200,8 +209,22 @@ export async function applyBillingProjection(
     processedAt: syncedAt,
     disposition,
   });
+  const trialUsageInsert = input.subscription.trialEnd
+    ? db
+        .insert(billingTrialUsages)
+        .values({
+          accountId: input.accountId,
+          providerSubscriptionId: input.subscription.id,
+          firstStartedAt:
+            parseDate(input.subscription.currentPeriodStart) ??
+            new Date(input.subscription.createdAt),
+          createdAt: syncedAt,
+        })
+        .onConflictDoNothing()
+    : null;
   if (disposition === "stale") {
-    await eventInsert;
+    if (trialUsageInsert) await db.batch([eventInsert, trialUsageInsert]);
+    else await eventInsert;
     return disposition;
   }
 
@@ -227,6 +250,7 @@ export async function applyBillingProjection(
       target: billingSubscriptionProjections.providerCustomerId,
       set: values,
     }),
+    ...(trialUsageInsert ? [trialUsageInsert] : []),
   ]);
   return disposition;
 }

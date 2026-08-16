@@ -64,6 +64,44 @@ export async function fetchBillingPlanCatalog(
   }
 }
 
+export async function fetchBillingTrialEligibility(
+  apiUrl: string | undefined,
+  idToken: string,
+  signal?: AbortSignal,
+): Promise<boolean> {
+  let response: Response;
+  try {
+    response = await createHttpClient(apiUrl).request("/api/billing/trial-eligibility", {
+      headers: { Authorization: `Bearer ${idToken}` },
+      ...(signal ? { signal } : {}),
+    });
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    throw new OperationError("トライアルの利用可否を取得できませんでした。", {
+      code: "BILLING_TRIAL_ELIGIBILITY_NETWORK_FAILED",
+      cause: error,
+    });
+  }
+  if (!response.ok) {
+    throw new OperationError("トライアルの利用可否を取得できませんでした。", {
+      code: "BILLING_TRIAL_ELIGIBILITY_FAILED",
+      status: response.status,
+    });
+  }
+  try {
+    return v.parse(
+      v.object({ eligible: v.boolean(), trialDays: v.literal(14) }),
+      await response.json(),
+    ).eligible;
+  } catch (error) {
+    throw new ValidationError("トライアル利用可否の応答を確認できませんでした。", {
+      code: "BILLING_TRIAL_ELIGIBILITY_RESPONSE_INVALID",
+      status: response.status,
+      cause: error,
+    });
+  }
+}
+
 type CheckoutRequest = Readonly<{ plan: PaidPlanCode; interval: BillingInterval }>;
 
 export async function createCheckoutSession(

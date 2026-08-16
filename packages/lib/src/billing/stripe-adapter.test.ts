@@ -51,6 +51,33 @@ describe("StripeBillingProvider", () => {
     expect(list).toHaveBeenCalledWith({ customer: "cus_secret", limit: 1 });
   });
 
+  it("初回対象のCheckoutだけ14日間trialをStripeへ指定する", async () => {
+    const create = vi.fn().mockResolvedValue({
+      id: "cs_trial",
+      url: "https://checkout.stripe.test/session",
+    });
+    const provider = new StripeBillingProvider({ checkout: { sessions: { create } } } as never);
+
+    await provider.createCheckoutSession(
+      {
+        customerId: "cus_trial",
+        priceId: "price_lite",
+        successUrl: "https://example.test/success",
+        cancelUrl: "https://example.test/cancel",
+        accountId: "account_trial",
+        plan: "lite",
+        interval: "month",
+        trialPeriodDays: 14,
+      },
+      "checkout-key",
+    );
+
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({ subscription_data: { trial_period_days: 14 } }),
+      { idempotencyKey: "checkout-key" },
+    );
+  });
+
   it("maps SDK subscriptions to the minimal provider contract", async () => {
     const retrieve = vi.fn().mockResolvedValue({
       id: "sub_secret",

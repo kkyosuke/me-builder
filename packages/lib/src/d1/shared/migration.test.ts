@@ -20,6 +20,7 @@ const SHARED_D1_TABLES = [
   "billing_processed_events",
   "billing_reconciliation_audits",
   "billing_subscription_projections",
+  "billing_trial_usages",
   "catalog_versions",
   "diagnoses",
   "diagnosis_questions",

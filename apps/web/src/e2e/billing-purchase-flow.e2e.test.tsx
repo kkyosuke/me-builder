@@ -10,12 +10,14 @@ const mocks = vi.hoisted(() => ({
   verifyCheckout: vi.fn(),
   fetchEntitlement: vi.fn(),
   acquireIdToken: vi.fn(),
+  fetchTrialEligibility: vi.fn(),
 }));
 
 vi.mock("../feature/billing/infrastructure/billing-api", () => ({
   fetchBillingPlanCatalog: mocks.fetchPlans,
   createCheckoutSession: mocks.createCheckout,
   verifyCheckoutSessionCompletion: mocks.verifyCheckout,
+  fetchBillingTrialEligibility: mocks.fetchTrialEligibility,
 }));
 vi.mock("../feature/profile-settings/infrastructure/entitlement-api", () => ({
   fetchProfileEntitlement: mocks.fetchEntitlement,
@@ -72,6 +74,7 @@ describe("billing purchase user journey", () => {
     mocks.createCheckout.mockReset().mockResolvedValue("https://checkout.stripe.test/session");
     mocks.verifyCheckout.mockReset().mockResolvedValue(undefined);
     mocks.fetchEntitlement.mockReset().mockResolvedValue(entitlement("free"));
+    mocks.fetchTrialEligibility.mockReset().mockResolvedValue(true);
   });
   afterEach(cleanup);
 

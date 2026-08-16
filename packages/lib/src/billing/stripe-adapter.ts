@@ -55,6 +55,7 @@ export class StripeBillingProvider implements BillingProvider {
       accountId: string;
       plan: "lite" | "full" | "family";
       interval: "month" | "year";
+      trialPeriodDays?: number;
     },
     idempotencyKey: string,
   ) {
@@ -68,6 +69,9 @@ export class StripeBillingProvider implements BillingProvider {
           cancel_url: input.cancelUrl,
           client_reference_id: input.accountId,
           metadata: { plan: input.plan, interval: input.interval },
+          ...(input.trialPeriodDays
+            ? { subscription_data: { trial_period_days: input.trialPeriodDays } }
+            : {}),
         },
         { idempotencyKey },
       );

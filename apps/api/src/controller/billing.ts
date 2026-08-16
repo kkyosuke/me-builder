@@ -12,6 +12,7 @@ import {
   BillingPlanCatalogResponseSchema,
   BillingSessionConflictSchema,
   BillingSessionResponseSchema,
+  BillingTrialEligibilityResponseSchema,
 } from "../contract/billing/sessions";
 import {
   AccountNotFoundErrorSchema,
@@ -22,6 +23,7 @@ import {
   createBillingCheckoutSession,
   createBillingPortalSession,
   getBillingCheckoutSessionStatus,
+  getBillingTrialEligibility,
 } from "../logic/billing-sessions";
 import { receiveStripeWebhook } from "../logic/stripe-webhook";
 import type { AppEnv } from "../types";
@@ -70,6 +72,39 @@ export function getBillingPlanCatalog(c: Context<AppEnv>): Response {
       ),
     }),
   );
+}
+
+export async function getBillingTrialEligibilityResponse(c: Context<AppEnv>): Promise<Response> {
+  const config = getConfig(c.env);
+  if (!c.env?.DB) {
+    return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
+  }
+  const outcome = await getBillingTrialEligibility({
+    idToken: bearerToken(c.req.header("authorization")),
+    lineLoginChannelId: config.lineLoginChannelId,
+    db: D1.shared.client.create(c.env.DB),
+  });
+  switch (outcome.type) {
+    case "resolved":
+      c.header("Cache-Control", "no-store");
+      return c.json(
+        v.parse(BillingTrialEligibilityResponseSchema, {
+          eligible: outcome.eligible,
+          trialDays: 14,
+        }),
+      );
+    case "account-not-found":
+      return c.json(
+        v.parse(AccountNotFoundErrorSchema, {
+          error: "Account not found",
+          reason: "friendship_required",
+        }),
+        404,
+      );
+    case "not-configured":
+    case "unauthenticated":
+      return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
+  }
 }
 
 export async function postBillingCheckoutSession(c: Context<AppEnv>): Promise<Response> {

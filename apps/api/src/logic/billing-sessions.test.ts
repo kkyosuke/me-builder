@@ -67,8 +67,59 @@ describe("billing sessions", () => {
         cancelUrl: "https://app.example.test/profile/billing?billing=checkout-cancel",
         plan: "full",
         interval: "year",
+        trialPeriodDays: 14,
       }),
       `billing-checkout-${owner.id}-initial`,
+    );
+  });
+
+  it("trial使用済みAccountではCustomerが変わっても2回目を付けない", async () => {
+    const { db, owner, createSession } = await setup();
+    await D1.shared.action.billing.linkBillingCustomer(db, {
+      accountId: owner.id,
+      providerCustomerId: "cus_previous",
+    });
+    await D1.shared.action.billing.applyBillingProjection(db, {
+      accountId: owner.id,
+      event: {
+        id: "evt_trial_started",
+        type: "customer.subscription.created",
+        objectId: "sub_trial",
+        createdAt: new Date("2026-08-01T00:00:00Z"),
+      },
+      subscription: {
+        id: "sub_trial",
+        customerId: "cus_previous",
+        status: "canceled",
+        priceId: "price_lite",
+        currentPeriodStart: "2026-08-01T00:00:00.000Z",
+        currentPeriodEnd: "2026-08-15T00:00:00.000Z",
+        cancelAtPeriodEnd: false,
+        trialEnd: "2026-08-15T00:00:00.000Z",
+        createdAt: "2026-08-01T00:00:00.000Z",
+      },
+      planCode: "lite",
+    });
+    const createCheckoutSession = vi.fn().mockResolvedValue({
+      id: "cs_paid",
+      url: "https://checkout.stripe.test/paid",
+    });
+
+    await createBillingCheckoutSession({
+      idToken: "token",
+      lineLoginChannelId: "channel",
+      db,
+      provider: new billing.FakeBillingProvider({ createCheckoutSession }),
+      webOrigin: "https://app.example.test",
+      createSession,
+      plan: "full",
+      interval: "month",
+      lookupKeyMap: { "full.month": "full_month" },
+    });
+
+    expect(createCheckoutSession).toHaveBeenCalledWith(
+      expect.not.objectContaining({ trialPeriodDays: expect.anything() }),
+      expect.any(String),
     );
   });
 
