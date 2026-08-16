@@ -172,6 +172,7 @@ describe("Web recovery flows E2E", () => {
     let resultRequests = 0;
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = urlOf(input);
+      if (url.pathname === "/api/auth/liff/exchange") return Response.json(authSession);
       if (url.pathname === "/api/auth/session") return Response.json(authSession);
       if (url.pathname === "/api/legal/terms") return Response.json(acceptedTermsStatus);
       if (url.pathname === "/api/profile") return Response.json(accountProfile);
@@ -229,6 +230,7 @@ describe("Web recovery flows E2E", () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = urlOf(input);
       const method = init?.method ?? "GET";
+      if (url.pathname === "/api/auth/liff/exchange") return Response.json(authSession);
       if (url.pathname === "/api/auth/session") return Response.json(authSession);
       if (url.pathname === "/api/legal/terms") return Response.json(acceptedTermsStatus);
       if (url.pathname === "/api/profile") return Response.json(accountProfile);
@@ -268,6 +270,7 @@ describe("Web recovery flows E2E", () => {
     });
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = urlOf(input);
+      if (url.pathname === "/api/auth/liff/exchange") return Response.json(authSession);
       if (url.pathname === "/api/auth/session") return Response.json(authSession);
       if (url.pathname === "/api/legal/terms") return Response.json(acceptedTermsStatus);
       if (url.pathname === "/api/profile") return Response.json(accountProfile);
