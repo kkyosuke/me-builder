@@ -106,14 +106,24 @@ export default function BillingPlanApplication({
           checkoutSessionId,
           controller.signal,
         );
-        const [nextPlans, nextEntitlement] = await Promise.all([
+        const [catalogResult, entitlementResult] = await Promise.allSettled([
           fetchBillingPlanCatalog(config.apiUrl, controller.signal),
           waitForSubscriptionProjection(
             async (signal) => fetchProfileEntitlement(config.apiUrl, idToken, signal),
             { signal: controller.signal, intervalMs: projectionPollIntervalMs },
           ),
         ]);
-        setPlans({ status: "success", data: nextPlans });
+        if (controller.signal.aborted) return;
+        setPlans(
+          catalogResult.status === "fulfilled"
+            ? { status: "success", data: catalogResult.value }
+            : { status: "error", message: message(catalogResult.reason) },
+        );
+        if (entitlementResult.status === "rejected") {
+          setEntitlement({ status: "error", message: message(entitlementResult.reason) });
+          return;
+        }
+        const nextEntitlement = entitlementResult.value;
         setEntitlement({ status: "success", data: nextEntitlement });
         const planName = {
           free: "Free",
@@ -137,6 +147,11 @@ export default function BillingPlanApplication({
     const controller = new AbortController();
     setCheckoutState({ status: "loading" });
     try {
+      if (entitlement.status === "success" && entitlement.data.source === "family-seat") {
+        throw new Error(
+          "ファミリーパックに参加中です。個人契約を購入するには、先にファミリー席から退出してください。",
+        );
+      }
       const url = await createCheckoutSession(
         config.apiUrl,
         await token(controller.signal),

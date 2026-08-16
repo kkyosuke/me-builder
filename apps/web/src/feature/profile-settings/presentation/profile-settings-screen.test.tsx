@@ -399,6 +399,54 @@ describe("ProfileSettingsScreen", () => {
     expect(screen.queryByText("2026/09/01")).toBeNull();
   });
 
+  it("料金プラン画面から戻ると起点のボタンへフォーカスを戻す", () => {
+    const props = {
+      avatar: null,
+      entitlement: {
+        status: "success" as const,
+        data: {
+          status: "free" as const,
+          plan: "free" as const,
+          source: "free" as const,
+          effectiveAt: "2026-08-16T00:00:00.000Z",
+          availableUntil: null,
+          aiReply: {
+            limit: 20,
+            used: 0,
+            reserved: 0,
+            remaining: 20,
+            periodStartsAt: "2026-08-16T00:00:00.000Z",
+            resetsAt: "2026-09-16T00:00:00.000Z",
+          },
+          profileSummary: {
+            limit: 1,
+            used: 0,
+            reserved: 0,
+            remaining: 1,
+            periodStartsAt: "2026-08-16T00:00:00.000Z",
+            resetsAt: "2026-11-14T00:00:00.000Z",
+          },
+        },
+      },
+      theme: "dark" as const,
+      fontSize: "medium" as const,
+      onBack: vi.fn(),
+      onOpenAvatar: vi.fn(),
+      onOpenBillingPlans: vi.fn(),
+      onThemeChange: vi.fn(),
+      onFontSizeChange: vi.fn(),
+    };
+    const { rerender } = render(
+      <ProfileSettingsScreen {...props} isInactive inactiveFocusTarget="billing" />,
+    );
+
+    rerender(<ProfileSettingsScreen {...props} isInactive={false} inactiveFocusTarget="billing" />);
+
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "プランをアップグレードする" }),
+    );
+  });
+
   it("Free Planでは契約期限ではなくAI利用枠のリセット日を表示する", () => {
     render(
       <ProfileSettingsScreen

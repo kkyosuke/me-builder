@@ -48,6 +48,7 @@ export const BillingSessionConflictSchema = v.object({
   reason: v.picklist([
     "plan_unavailable",
     "existing_subscription",
+    "family_seat_active",
     "checkout_in_progress",
     "customer_not_found",
   ]),

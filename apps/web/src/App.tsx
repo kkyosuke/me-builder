@@ -518,7 +518,13 @@ function AppContents() {
               avatar={avatar}
               isAdmin={accountRole === "admin"}
               isInactive={profileView !== "profile"}
-              inactiveFocusTarget={profileView === "brain-items" ? "brain-items" : "avatar"}
+              inactiveFocusTarget={
+                profileView === "billing"
+                  ? "billing"
+                  : profileView === "brain-items"
+                    ? "brain-items"
+                    : "avatar"
+              }
               isProfileLoading={profileReadState.status === "loading"}
               profileError={profileReadState.status === "error" ? profileReadState.message : null}
               entitlement={entitlementState}

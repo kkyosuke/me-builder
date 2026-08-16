@@ -125,6 +125,30 @@ describe("billing purchase user journey", () => {
     );
   });
 
+  it("Checkout復帰後にカタログ取得だけ失敗しても反映済みの購入完了を表示する", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/profile/billing?billing=checkout-return&session_id=cs_test_completed",
+    );
+    mocks.fetchPlans.mockRejectedValueOnce(new Error("catalog unavailable"));
+    mocks.fetchEntitlement.mockResolvedValueOnce(entitlement("subscription"));
+    const onEntitlementChanged = vi.fn();
+
+    render(
+      <BillingPlanApplication
+        onBack={vi.fn()}
+        onEntitlementChanged={onEntitlementChanged}
+        projectionPollIntervalMs={0}
+      />,
+    );
+
+    expect(await screen.findByText("Liteが利用できるようになりました。")).toBeTruthy();
+    expect(onEntitlementChanged).toHaveBeenCalledWith(
+      expect.objectContaining({ plan: "lite", source: "subscription" }),
+    );
+  });
+
   it("本人のCheckout完了を確認できない復帰URLでは購入完了にしない", async () => {
     window.history.replaceState({}, "", "/profile/billing?billing=checkout-return");
 

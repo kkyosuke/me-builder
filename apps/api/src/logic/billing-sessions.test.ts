@@ -205,6 +205,37 @@ describe("billing sessions", () => {
     expect(createCheckoutSession).not.toHaveBeenCalled();
   });
 
+  it("ファミリー席を利用中の本人に個人契約を購入させない", async () => {
+    const { db, owner, createSession } = await setup();
+    const payer = await D1.shared.action.account.upsertIdentity(db, {
+      provider: "line_login",
+      providerAccountId: crypto.randomUUID(),
+    });
+    await D1.shared.action.familySeat.createFamilyPack(db, payer.account.id);
+    await D1.shared.action.familySeat.reserveFamilySeat(
+      db,
+      payer.account.id,
+      "family-checkout-guard",
+    );
+    await D1.shared.action.familySeat.activateFamilySeat(db, "family-checkout-guard", owner.id);
+    const createCheckoutSession = vi.fn();
+
+    await expect(
+      createBillingCheckoutSession({
+        idToken: "token",
+        lineLoginChannelId: "channel",
+        db,
+        provider: new billing.FakeBillingProvider({ createCheckoutSession }),
+        webOrigin: "https://app.example.test",
+        createSession,
+        plan: "lite",
+        interval: "month",
+        lookupKeyMap: { "lite.month": "lite_month" },
+      }),
+    ).resolves.toEqual({ type: "unavailable", reason: "family_seat_active" });
+    expect(createCheckoutSession).not.toHaveBeenCalled();
+  });
+
   it("creates a portal only for the authenticated Account customer", async () => {
     const { db, owner, createSession } = await setup();
     const other = await D1.shared.action.account.upsertIdentity(db, {

@@ -92,9 +92,11 @@ export async function createCheckoutSession(
     const message =
       body?.reason === "existing_subscription"
         ? "現在の契約があります。契約管理から確認してください。"
-        : body?.reason === "checkout_in_progress"
-          ? "すでに購入手続きが進行中です。開いているStripe画面を確認してください。"
-          : "このプランは現在購入できません。";
+        : body?.reason === "family_seat_active"
+          ? "ファミリーパックに参加中です。個人契約を購入するには、先にファミリー席から退出してください。"
+          : body?.reason === "checkout_in_progress"
+            ? "すでに購入手続きが進行中です。開いているStripe画面を確認してください。"
+            : "このプランは現在購入できません。";
     throw new OperationError(message, { code: "BILLING_CHECKOUT_UNAVAILABLE", status: 409 });
   }
   if (!response.ok) {

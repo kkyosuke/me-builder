@@ -74,7 +74,7 @@ export function ProfileSettingsScreen({
   avatar: AvatarSelection | null;
   isAdmin?: boolean;
   isInactive?: boolean;
-  inactiveFocusTarget?: "avatar" | "brain-items";
+  inactiveFocusTarget?: "avatar" | "brain-items" | "billing";
   isProfileLoading?: boolean;
   profileError?: string | null;
   entitlement?: AsyncState<ProfileEntitlement>;
@@ -102,6 +102,7 @@ export function ProfileSettingsScreen({
   const backButtonRef = useRef<HTMLButtonElement>(null);
   const avatarButtonRef = useRef<HTMLButtonElement>(null);
   const brainItemsLinkRef = useRef<HTMLAnchorElement>(null);
+  const billingPlansButtonRef = useRef<HTMLButtonElement>(null);
   const wasInactiveRef = useRef(isInactive);
   const inactiveFocusTargetRef = useRef(inactiveFocusTarget);
   const [resetState, setResetState] = useState<AsyncState<string>>({ status: "idle" });
@@ -175,7 +176,9 @@ export function ProfileSettingsScreen({
     }
 
     if (wasInactiveRef.current) {
-      if (inactiveFocusTargetRef.current === "brain-items") {
+      if (inactiveFocusTargetRef.current === "billing") {
+        billingPlansButtonRef.current?.focus();
+      } else if (inactiveFocusTargetRef.current === "brain-items") {
         brainItemsLinkRef.current?.focus();
       } else {
         avatarButtonRef.current?.focus();
@@ -367,6 +370,7 @@ export function ProfileSettingsScreen({
                 )}
                 {onOpenBillingPlans && (
                   <button
+                    ref={billingPlansButtonRef}
                     type="button"
                     onClick={onOpenBillingPlans}
                     className="mt-3 flex min-h-11 w-full items-center justify-between rounded-xl bg-violet-700 px-4 text-sm font-bold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500"

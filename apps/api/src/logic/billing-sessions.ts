@@ -17,6 +17,7 @@ type SessionFailure =
       reason:
         | "plan_unavailable"
         | "existing_subscription"
+        | "family_seat_active"
         | "checkout_in_progress"
         | "customer_not_found";
     };
@@ -42,6 +43,11 @@ export async function createBillingCheckoutSession(
   const accountId = session.session.accountId;
   const lookupKey = params.lookupKeyMap[`${params.plan}.${params.interval}`];
   if (!lookupKey) return { type: "unavailable", reason: "plan_unavailable" };
+  const familySeat = await D1.shared.action.familySeat.readActiveFamilySeatByMember(
+    params.db,
+    accountId,
+  );
+  if (familySeat) return { type: "unavailable", reason: "family_seat_active" };
   const existing = await D1.shared.action.billing.findBillingProjectionByAccount(
     params.db,
     accountId,

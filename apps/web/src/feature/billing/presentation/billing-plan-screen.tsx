@@ -1,6 +1,6 @@
 import type { BillingInterval, PaidPlanCode } from "@me-builder/shared";
 import { ArrowLeft, Check, CreditCard, ExternalLink, ShieldCheck } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { AsyncState } from "../../../model/async-state";
 import type { ProfileEntitlement } from "../../profile-settings/model/entitlement";
 import { type BillingPlan, billingPlanPrice, formatBillingAmount } from "../model/billing-plan";
@@ -24,22 +24,30 @@ export function BillingPlanScreen({
 }) {
   const [interval, setInterval] = useState<BillingInterval>("month");
   const [selectedPlan, setSelectedPlan] = useState<PaidPlanCode | null>(null);
+  const backButtonRef = useRef<HTMLButtonElement>(null);
   const selected =
     plans.status === "success"
       ? (plans.data.find((plan) => plan.code === selectedPlan) ?? null)
       : null;
   const paidSubscription =
     entitlement.status === "success" && entitlement.data.source === "subscription";
+  const familySeat = entitlement.status === "success" && entitlement.data.source === "family-seat";
+
+  useEffect(() => {
+    backButtonRef.current?.focus();
+  }, []);
 
   return (
     <dialog
       open
+      aria-modal="true"
       aria-labelledby="billing-plan-title"
       className="fixed inset-0 z-[70] m-0 h-full max-h-none w-full max-w-none overflow-y-auto border-0 bg-slate-50 p-0 text-slate-950 dark:bg-slate-950 dark:text-white"
     >
       <div className="mx-auto min-h-full w-full max-w-5xl px-4 pb-12 pt-[max(1rem,env(safe-area-inset-top))] sm:px-6">
         <header className="flex items-center gap-3">
           <button
+            ref={backButtonRef}
             type="button"
             onClick={onBack}
             aria-label="料金プランを閉じる"
@@ -86,7 +94,14 @@ export function BillingPlanScreen({
           )}
         </section>
 
-        {paidSubscription ? (
+        {familySeat ? (
+          <section className="mt-6 rounded-2xl border border-sky-200 bg-sky-50 p-5 text-sky-950 dark:border-sky-800 dark:bg-sky-950 dark:text-sky-100">
+            <h2 className="font-bold">ファミリーパックに参加中です</h2>
+            <p className="mt-2 text-sm">
+              ファミリーの利用権と個人契約は併用できません。個人契約を購入するには、先にファミリー席から退出してください。
+            </p>
+          </section>
+        ) : paidSubscription ? (
           <section className="mt-6 rounded-2xl border border-sky-200 bg-sky-50 p-5 text-sky-950 dark:border-sky-800 dark:bg-sky-950 dark:text-sky-100">
             <h2 className="font-bold">現在の契約があります</h2>
             <p className="mt-2 text-sm">

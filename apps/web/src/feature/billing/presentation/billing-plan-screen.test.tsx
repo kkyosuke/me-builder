@@ -89,4 +89,25 @@ describe("BillingPlanScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: "再読み込み" }));
     expect(onRetry).toHaveBeenCalledOnce();
   });
+
+  it("表示時に閉じるボタンへフォーカスし、ファミリー参加中は購入操作を表示しない", () => {
+    render(
+      <BillingPlanScreen
+        plans={{ status: "success", data: plans }}
+        entitlement={{
+          status: "success",
+          data: { ...free, status: "active", plan: "family", source: "family-seat" },
+        }}
+        checkoutState={{ status: "idle" }}
+        completionMessage={null}
+        onBack={vi.fn()}
+        onCheckout={vi.fn()}
+        onRetry={vi.fn()}
+      />,
+    );
+
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "料金プランを閉じる" }));
+    expect(screen.getByText("ファミリーパックに参加中です")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Liteを選ぶ" })).toBeNull();
+  });
 });
