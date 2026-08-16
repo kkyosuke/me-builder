@@ -17,7 +17,7 @@
 - アプリケーション運用ログへ記録できる情報
 - Productionへの段階公開手順
 
-Productionへの公開はAUTH-C006で定義する別Runbookが所有します。
+Productionへの公開は[SSO Production段階公開Runbook](sso-production-rollout.md)が所有します。
 
 ## 2. 開始条件
 
