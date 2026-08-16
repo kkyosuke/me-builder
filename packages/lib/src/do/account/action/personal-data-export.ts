@@ -16,6 +16,7 @@ import {
   diaryChatBrainUsageAudits,
   sourceRecordTextPayloads,
 } from "../schema/diary";
+import { goalFollowUps } from "../schema/goal-follow-up";
 import { personalDataExports } from "../schema/personal-data-export";
 import {
   profileSummaryGenerations,
@@ -55,6 +56,7 @@ type PersonalDataArchive = Readonly<{
   brainUsageHistory: readonly unknown[];
   profileSummaries: readonly unknown[];
   weeklyReflections: readonly unknown[];
+  goalFollowUps: readonly unknown[];
   compatibilityShareProjections: readonly unknown[];
   preferences: Readonly<{ dailyPrompt: unknown | null }>;
   progression: Readonly<{ state: unknown | null; milestones: readonly unknown[] }>;
@@ -352,6 +354,12 @@ async function buildPersonalDataArchive(
           .where(inArray(weeklyReflections.generationId, weeklyGenerationIds))
           .orderBy(asc(weeklyReflections.weekStart))
           .all();
+  const goalFollowUpRows = await db
+    .select()
+    .from(goalFollowUps)
+    .where(eq(goalFollowUps.accountId, accountId))
+    .orderBy(asc(goalFollowUps.agreedAt), asc(goalFollowUps.id))
+    .all();
   const dailyPrompt = await db
     .select()
     .from(dailyPromptPreferences)
@@ -507,6 +515,14 @@ async function buildPersonalDataArchive(
       weekStart: row.weekStart,
       generatedAt: row.generatedAt.toISOString(),
       content: row.content,
+    })),
+    goalFollowUps: goalFollowUpRows.map((row) => ({
+      id: row.id,
+      brainItemId: row.brainItemId,
+      nextStep: row.nextStep,
+      status: row.status,
+      agreedAt: row.agreedAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
     })),
     compatibilityShareProjections: shareRows.map((row) => ({
       profileSummaryVersionId: row.profileSummaryVersionId,

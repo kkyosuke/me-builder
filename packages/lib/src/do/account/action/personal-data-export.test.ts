@@ -89,6 +89,15 @@ async function insertRepresentativeAccount(db: AccountDataDatabase) {
     derivationMethod: "ai",
     generatedAt: at,
   });
+  await db.insert(schema.goalFollowUps).values({
+    id: "goal-follow-up-1",
+    accountId,
+    brainItemId: "brain-1",
+    nextStep: "静かな時間を10分作る",
+    status: "completed",
+    agreedAt: at,
+    updatedAt: at,
+  });
   await db.insert(schema.compatibilityReferences).values({
     relationshipId: "relationship-must-not-export",
     accountId,
@@ -150,6 +159,13 @@ describe("personal data export", () => {
       ],
       brainItems: [expect.objectContaining({ statement: "静かな時間が好き" })],
       brainEvidence: [expect.objectContaining({ sourceRecordId: newSource.sourceRecordId })],
+      goalFollowUps: [
+        expect.objectContaining({
+          id: "goal-follow-up-1",
+          nextStep: "静かな時間を10分作る",
+          status: "completed",
+        }),
+      ],
     });
     const serialized = JSON.stringify(result.archive);
     expect(serialized).toContain("訂正前の日記");

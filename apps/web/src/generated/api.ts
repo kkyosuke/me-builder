@@ -259,6 +259,41 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/goal-follow-ups": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** 本人が合意したGoalのフォローアップを取得する */
+    get: operations["getGoalFollowUps"];
+    put?: never;
+    /** 本人がGoalと次の一歩をフォロー対象として合意する */
+    post: operations["agreeGoalFollowUp"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/goal-follow-ups/{goalFollowUpId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** 本人がGoalを完了・停止・訂正する */
+    patch: operations["updateGoalFollowUp"];
+    trace?: never;
+  };
   "/api/profile": {
     parameters: {
       query?: never;
@@ -2249,6 +2284,334 @@ export interface operations {
             error: "Weekly reflection generation unavailable";
             /** @enum {string} */
             reason: "feature_unavailable" | "source_record_required";
+          };
+        };
+      };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
+          };
+        };
+      };
+      /** @description D1 bindingが設定されていない */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Service Unavailable";
+          };
+        };
+      };
+    };
+  };
+  getGoalFollowUps: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Goalフォローアップ */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            items: {
+              id: string;
+              brainItemId: string;
+              goal: string;
+              nextStep: string;
+              /** @enum {string} */
+              status: "active" | "completed" | "stopped";
+              /** Format: date-time */
+              agreedAt: string;
+              /** Format: date-time */
+              updatedAt: string;
+            }[];
+            canManage: boolean;
+            activeLimit: 1 | null;
+          };
+        };
+      };
+      /** @description LIFF IDトークンを検証できない */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Unauthorized";
+          };
+        };
+      };
+      /** @description 対応するAccountが存在しない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Account not found";
+            /** @constant */
+            reason: "friendship_required";
+          };
+        };
+      };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
+          };
+        };
+      };
+      /** @description D1 bindingが設定されていない */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Service Unavailable";
+          };
+        };
+      };
+    };
+  };
+  agreeGoalFollowUp: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          brainItemId: string;
+          nextStep: string;
+        };
+      };
+    };
+    responses: {
+      /** @description 合意結果 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            item: {
+              id: string;
+              brainItemId: string;
+              goal: string;
+              nextStep: string;
+              /** @enum {string} */
+              status: "active" | "completed" | "stopped";
+              /** Format: date-time */
+              agreedAt: string;
+              /** Format: date-time */
+              updatedAt: string;
+            };
+          };
+        };
+      };
+      /** @description リクエストJSONが不正 */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Invalid goal follow-up";
+          };
+        };
+      };
+      /** @description LIFF IDトークンを検証できない */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Unauthorized";
+          };
+        };
+      };
+      /** @description 対応するAccountが存在しない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Account not found";
+            /** @constant */
+            reason: "friendship_required";
+          };
+        };
+      };
+      /** @description 操作できない理由 */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Goal follow-up unavailable";
+            /** @enum {string} */
+            reason:
+              | "feature_unavailable"
+              | "active_limit"
+              | "goal_not_found"
+              | "goal_not_confirmed";
+          };
+        };
+      };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
+          };
+        };
+      };
+      /** @description D1 bindingが設定されていない */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Service Unavailable";
+          };
+        };
+      };
+    };
+  };
+  updateGoalFollowUp: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        goalFollowUpId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          status?: "active" | "completed" | "stopped";
+          nextStep?: string;
+        };
+      };
+    };
+    responses: {
+      /** @description 更新結果 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            item: {
+              id: string;
+              brainItemId: string;
+              goal: string;
+              nextStep: string;
+              /** @enum {string} */
+              status: "active" | "completed" | "stopped";
+              /** Format: date-time */
+              agreedAt: string;
+              /** Format: date-time */
+              updatedAt: string;
+            };
+          };
+        };
+      };
+      /** @description リクエストJSONが不正 */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Invalid goal follow-up";
+          };
+        };
+      };
+      /** @description LIFF IDトークンを検証できない */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Unauthorized";
+          };
+        };
+      };
+      /** @description 対応するAccountが存在しない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Account not found";
+            /** @constant */
+            reason: "friendship_required";
+          };
+        };
+      };
+      /** @description 操作できない理由 */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Goal follow-up unavailable";
+            /** @enum {string} */
+            reason:
+              | "feature_unavailable"
+              | "active_limit"
+              | "goal_not_found"
+              | "goal_not_confirmed";
           };
         };
       };

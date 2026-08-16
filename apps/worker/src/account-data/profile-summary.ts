@@ -170,4 +170,38 @@ export const profileSummaryActions = {
       message,
       failedAt,
     ),
+  "goalFollowUp.read": (db: DO.account.Database, accountId: string) =>
+    DO.account.action.goalFollowUp.readGoalFollowUps(db, accountId),
+  "goalFollowUp.agree": (
+    db: DO.account.Database,
+    accountId: string,
+    brainItemId: string,
+    nextStep: string,
+    at?: Date,
+    activeLimit?: number | null,
+  ) =>
+    DO.account.action.goalFollowUp.agreeGoalFollowUp(
+      db,
+      accountId,
+      brainItemId,
+      nextStep,
+      at,
+      activeLimit,
+    ),
+  "goalFollowUp.update": (
+    db: DO.account.Database,
+    accountId: string,
+    id: string,
+    input: Parameters<typeof DO.account.action.goalFollowUp.updateGoalFollowUp>[3],
+    at?: Date,
+    activeLimit?: number | null,
+  ) => DO.account.action.goalFollowUp.updateGoalFollowUp(db, accountId, id, input, at, activeLimit),
+  "goalFollowUp.selectMemory": (
+    db: DO.account.Database,
+    accountId: string,
+    mode: "none" | "selected-one" | "relevant-active",
+    currentText: string,
+    at?: Date,
+  ) =>
+    DO.account.action.goalFollowUp.selectGoalFollowUpMemory(db, accountId, mode, currentText, at),
 } as const;

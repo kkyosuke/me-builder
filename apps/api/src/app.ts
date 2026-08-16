@@ -66,6 +66,11 @@ import {
 } from "./contract/personal-data/records";
 import { profileEntitlementRoute } from "./contract/profile/entitlement";
 import {
+  goalFollowUpAgreementRoute,
+  goalFollowUpListRoute,
+  goalFollowUpUpdateRoute,
+} from "./contract/profile/goal-follow-up";
+import {
   deleteProfileAvatarRoute,
   getProfileAvatarImageRoute,
   getProfileRoute,
@@ -135,10 +140,13 @@ import {
   postPersonalDataExport,
 } from "./controller/personal-data";
 import {
+  getGoalFollowUpContents,
   getProfileEntitlementContents,
   getProfileProgressionContents,
   getProfileSummaryContents,
   getWeeklyReflectionContents,
+  patchGoalFollowUp,
+  postGoalFollowUpAgreement,
   postProfileSummaryGeneration,
   postWeeklyReflectionGeneration,
 } from "./controller/profile";
@@ -265,6 +273,9 @@ app.post(
   weeklyReflectionGenerationRoute,
   postWeeklyReflectionGeneration,
 );
+app.get("/api/goal-follow-ups", goalFollowUpListRoute, getGoalFollowUpContents);
+app.post("/api/goal-follow-ups", goalFollowUpAgreementRoute, postGoalFollowUpAgreement);
+app.patch("/api/goal-follow-ups/:goalFollowUpId", goalFollowUpUpdateRoute, patchGoalFollowUp);
 app.get("/api/profile", getProfileRoute, getProfileContents);
 app.get("/api/profile/entitlement", profileEntitlementRoute, getProfileEntitlementContents);
 app.get("/api/profile/progression", profileProgressionRoute, getProfileProgressionContents);

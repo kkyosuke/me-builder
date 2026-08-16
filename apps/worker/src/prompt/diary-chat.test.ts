@@ -37,6 +37,8 @@ describe("diary chat prompt", () => {
 
     expect(prompt).toContain("## 会話の目的\n選択の背景にある行動原理を、仮説として探る。");
     expect(prompt).toContain("行動傾向、動機、判断基準、好み、Goalも含まれます");
+    expect(prompt).toContain("本人が継続対象として合意したGoalと次の一歩");
+    expect(prompt).toContain("未実行、完了、停止を性格や意欲の評価に使わず");
     expect(prompt).toContain("## 話し方と質問方法\n短く共感してから、必要な場合だけ質問する。");
     expect(prompt).toContain("## 安全");
   });
