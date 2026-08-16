@@ -19,6 +19,7 @@ import type * as diagnosis from "./action/diagnosis";
 import type * as diagnosisBrainProjection from "./action/diagnosis-brain-projection";
 import type * as diary from "./action/diary";
 import type * as personalDataExport from "./action/personal-data-export";
+import type * as profileSummary from "./action/profile-summary";
 import type * as progression from "./action/progression";
 import type * as source from "./action/source";
 
@@ -54,7 +55,7 @@ export type AccountDataActions = {
     typeof brain.findActiveBrainVectorEntry
   >;
   "brain.loadChatContextMemories": RpcAction<
-    [vectorIds: readonly string[], at?: Date],
+    [vectorIds: readonly string[], at?: Date, notBefore?: Date],
     typeof brain.loadBrainChatContextMemories
   >;
   "brain.listActivePromptContextKinds": RpcAction<
@@ -171,6 +172,10 @@ export type AccountDataActions = {
     generationId: string,
     startedAt?: Date,
   ) => Promise<ProfileSummaryGenerationContext | null>;
+  "profileSummary.readGenerationStatus": RpcAction<
+    [generationId: string],
+    typeof profileSummary.readProfileSummaryGenerationStatus
+  >;
   "profileSummary.completeGeneration": (
     input: CompleteProfileSummaryGenerationInput,
   ) => Promise<boolean>;

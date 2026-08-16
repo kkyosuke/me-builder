@@ -1,4 +1,4 @@
-import { accountDataFor } from "@me-builder/lib";
+import { accountDataFor, billing } from "@me-builder/lib";
 import type {
   Message,
   OperationalErrorDescriptor,
@@ -24,6 +24,8 @@ import { PROFILE_SUMMARY_PROMPT_VERSION } from "../prompt/profile-summary";
 /** wrangler.tomlのmax_retries=5に初回配送を加えた最大試行回数。 */
 export const PROFILE_SUMMARY_GENERATION_MAX_ATTEMPTS = 6;
 const FAILURE_MESSAGE = "新しい版を作成できませんでした。時間をおいて再試行してください。";
+const LIMIT_REACHED_MESSAGE =
+  "今の利用期間のまとめ生成上限に達しました。過去に作成した版は引き続き閲覧できます。";
 
 /**
  * 生成できなかった理由を、運用ログだけで次の行動を決められるコードへ写します。
@@ -113,12 +115,22 @@ export async function processProfileSummaryGenerationMessage(
     });
   }
   const accountData = accountDataFor(accountDataNamespace, message.body.accountId);
+  let usageReserved = false;
   try {
     const context = await accountData.execute(
       "profileSummary.loadGenerationContext",
       message.body.generationId,
     );
     if (!context) {
+      const generationStatus = await accountData.execute(
+        "profileSummary.readGenerationStatus",
+        message.body.generationId,
+      );
+      if (generationStatus === "completed") {
+        await accountData.execute("aiUsage.commit", message.body.generationId);
+      } else if (generationStatus === "failed") {
+        await accountData.execute("aiUsage.release", message.body.generationId);
+      }
       message.ack();
       logResult(message, workerConfig, startedAt, {
         outcome: "discarded",
@@ -128,6 +140,32 @@ export async function processProfileSummaryGenerationMessage(
       });
       return;
     }
+    const entitlement = await new billing.EntitlementService(
+      cf.planAssignmentProvider ?? new billing.FakeAccountPlanAssignmentProvider(),
+    ).resolve(message.body.accountId);
+    const period = billing.resolveEntitlementUsagePeriod(entitlement, "profile-summary");
+    const reservation = await accountData.execute("aiUsage.reserve", {
+      requestId: message.body.generationId,
+      kind: "profile-summary",
+      period,
+      limit: entitlement.policy.profileSummary.limit,
+    });
+    if (reservation.outcome === "limit-reached") {
+      await accountData.execute(
+        "profileSummary.failGeneration",
+        message.body.generationId,
+        LIMIT_REACHED_MESSAGE,
+      );
+      message.ack();
+      logResult(message, workerConfig, startedAt, {
+        outcome: "discarded",
+        disposition: "ack",
+        stage: "entitlement.reserve",
+        resultCode: "PROFILE_SUMMARY_USAGE_LIMIT_REACHED",
+      });
+      return;
+    }
+    usageReserved = true;
     const generated = await generateProfileSummary(
       context,
       workerConfig,
@@ -161,6 +199,8 @@ export async function processProfileSummaryGenerationMessage(
         dependency: "account-data",
       });
     }
+    await accountData.execute("aiUsage.commit", message.body.generationId);
+    usageReserved = false;
     message.ack();
     const shareResultCode = compatibilityShareResultCode(generated);
     logResult(message, workerConfig, startedAt, {
@@ -186,6 +226,10 @@ export async function processProfileSummaryGenerationMessage(
         message.body.generationId,
         FAILURE_MESSAGE,
       );
+      if (usageReserved) {
+        await accountData.execute("aiUsage.release", message.body.generationId);
+        usageReserved = false;
+      }
     }
     if (safeError.retryable) message.retry();
     else message.ack();

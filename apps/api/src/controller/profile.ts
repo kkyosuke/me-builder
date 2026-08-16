@@ -3,6 +3,7 @@ import { logger } from "@me-builder/shared";
 import type { Context } from "hono";
 import * as v from "valibot";
 import { getConfig, isDevelopmentEnvironment } from "../config";
+import { ProfileEntitlementResponseSchema } from "../contract/profile/entitlement";
 import { ProfileProgressionResponseSchema } from "../contract/profile/progression";
 import {
   ProfileSummaryGenerationAcceptedSchema,
@@ -14,6 +15,7 @@ import {
   ServiceUnavailableErrorSchema,
   UnauthorizedErrorSchema,
 } from "../contract/shared/errors";
+import { getProfileEntitlement } from "../logic/profile-entitlement";
 import { getProfileProgression } from "../logic/profile-progression";
 import { getProfileSummary } from "../logic/profile-summary";
 import { requestProfileSummaryGeneration } from "../logic/profile-summary-generation";
@@ -49,6 +51,31 @@ export async function getProfileProgressionContents(c: Context<AppEnv>): Promise
       return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
   }
   throw new Error("Unsupported profile progression outcome");
+}
+
+export async function getProfileEntitlementContents(c: Context<AppEnv>): Promise<Response> {
+  if (!c.env?.DB || !c.env.ACCOUNT_DATA) {
+    logger.error({ path: c.req.path }, "Profile entitlement storage binding is not configured");
+    return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
+  }
+  const currentConfig = getConfig(c.env);
+  const outcome = await getProfileEntitlement({
+    idToken: bearerToken(c.req.header("authorization")),
+    lineLoginChannelId: currentConfig.lineLoginChannelId,
+    db: D1.shared.client.create(c.env.DB),
+    accountData: c.env.ACCOUNT_DATA,
+    ...(c.env.ACCOUNT_PLAN_ASSIGNMENT_PROVIDER
+      ? { planAssignmentProvider: c.env.ACCOUNT_PLAN_ASSIGNMENT_PROVIDER }
+      : {}),
+  });
+  switch (outcome.type) {
+    case "resolved":
+      c.header("Cache-Control", "no-store");
+      return c.json(v.parse(ProfileEntitlementResponseSchema, outcome));
+    case "not-configured":
+    case "unauthenticated":
+      return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
+  }
 }
 
 export async function getProfileSummaryContents(c: Context<AppEnv>): Promise<Response> {
@@ -104,6 +131,9 @@ export async function postProfileSummaryGeneration(c: Context<AppEnv>): Promise<
     db: D1.shared.client.create(c.env.DB),
     accountData: c.env.ACCOUNT_DATA,
     queue: c.env.PROFILE_SUMMARY_QUEUE,
+    ...(c.env.ACCOUNT_PLAN_ASSIGNMENT_PROVIDER
+      ? { planAssignmentProvider: c.env.ACCOUNT_PLAN_ASSIGNMENT_PROVIDER }
+      : {}),
     allowUnchangedRegeneration: isDevelopmentEnvironment(currentConfig.environment),
   });
   switch (outcome.type) {

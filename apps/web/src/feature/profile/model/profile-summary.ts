@@ -65,7 +65,8 @@ export type ProfileSummaryRegenerationReason = "diagnosis" | "brain" | "format" 
 
 export type ProfileSummaryGenerationUnavailableReason =
   | "source_record_required"
-  | "regeneration_not_required";
+  | "regeneration_not_required"
+  | "limit_reached";
 
 export class ProfileSummaryGenerationUnavailableError extends Error {
   readonly reason: ProfileSummaryGenerationUnavailableReason;
@@ -74,7 +75,9 @@ export class ProfileSummaryGenerationUnavailableError extends Error {
     super(
       reason === "source_record_required"
         ? "まとめに使える記録がまだありません。"
-        : "新しい情報がないため、再生成は必要ありません。",
+        : reason === "limit_reached"
+          ? "今の利用期間のまとめ生成上限に達しました。"
+          : "新しい情報がないため、再生成は必要ありません。",
     );
     this.name = "ProfileSummaryGenerationUnavailableError";
     this.reason = reason;

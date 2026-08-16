@@ -1,4 +1,4 @@
-import { DO } from "@me-builder/lib";
+import { DO, PROFILE_SUMMARY_DISPATCH_RECOVERY_MS } from "@me-builder/lib";
 import Database from "better-sqlite3";
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
@@ -133,7 +133,7 @@ describe("AccountDataRepository", () => {
     });
 
     expect(repository.nextMaintenanceAt()).toBe(
-      requestedAt.getTime() + DO.account.action.profileSummary.PROFILE_SUMMARY_DISPATCH_RECOVERY_MS,
+      requestedAt.getTime() + PROFILE_SUMMARY_DISPATCH_RECOVERY_MS,
     );
 
     await DO.account.action.profileSummary.markProfileSummaryGenerationDispatched(

@@ -20,7 +20,11 @@ import type {
   ProfileSummaryRegenerationReason,
   RequestProfileSummaryGenerationResult,
 } from "../../../profile-summary";
-import { createCompatibilityShareProfileFingerprint } from "../../../profile-summary";
+import {
+  PROFILE_SUMMARY_DISPATCH_BATCH_SIZE,
+  PROFILE_SUMMARY_DISPATCH_RECOVERY_MS,
+  createCompatibilityShareProfileFingerprint,
+} from "../../../profile-summary";
 import type { AccountDataDatabase } from "../database";
 import { brainItems } from "../schema/brain";
 import { diagnosisBrainProjectionHeads } from "../schema/diagnosis";
@@ -38,8 +42,6 @@ import { sourceRecords } from "../schema/source";
 
 const PROFILE_SUMMARY_EVIDENCE_LIMIT = 100;
 export const PROFILE_SUMMARY_REGENERATION_INTERVAL_MS = 30 * 24 * 60 * 60 * 1_000;
-export const PROFILE_SUMMARY_DISPATCH_BATCH_SIZE = 10;
-export const PROFILE_SUMMARY_DISPATCH_RECOVERY_MS = 30_000;
 
 async function availableData(db: AccountDataDatabase, accountId: string) {
   const diagnosis = await db
@@ -570,6 +572,25 @@ export async function loadProfileSummaryGenerationContext(
     latestRecordedAt,
     inputSnapshot,
   };
+}
+
+/** Queue再送時に生成結果と利用量ledgerを同じ最終状態へ収束させるための最小状態読取。 */
+export async function readProfileSummaryGenerationStatus(
+  db: AccountDataDatabase,
+  accountId: string,
+  generationId: string,
+): Promise<(typeof profileSummaryGenerations.$inferSelect)["status"] | null> {
+  const generation = await db
+    .select({ status: profileSummaryGenerations.status })
+    .from(profileSummaryGenerations)
+    .where(
+      and(
+        eq(profileSummaryGenerations.id, generationId),
+        eq(profileSummaryGenerations.accountId, accountId),
+      ),
+    )
+    .get();
+  return generation?.status ?? null;
 }
 
 export async function completeProfileSummaryGeneration(

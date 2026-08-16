@@ -242,6 +242,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/profile/entitlement": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** 本人のPlanとAI利用上限・残量を取得する */
+    get: operations["getProfileEntitlement"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/profile/progression": {
     parameters: {
       query?: never;
@@ -1987,7 +2004,7 @@ export interface operations {
           };
         };
       };
-      /** @description 生成に利用できる記録がない */
+      /** @description 記録不足、再生成不要、または利用上限 */
       409: {
         headers: {
           [name: string]: unknown;
@@ -1997,7 +2014,7 @@ export interface operations {
             /** @constant */
             error: "Profile summary generation unavailable";
             /** @enum {string} */
-            reason: "source_record_required" | "regeneration_not_required";
+            reason: "source_record_required" | "regeneration_not_required" | "limit_reached";
           };
         };
       };
@@ -2094,6 +2111,106 @@ export interface operations {
         };
       };
       /** @description D1またはPrivate R2 bindingが設定されていない */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Service Unavailable";
+          };
+        };
+      };
+    };
+  };
+  getProfileEntitlement: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 本人の現在の利用権限 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @enum {string} */
+            status: "free" | "active" | "safe-default";
+            /** @enum {string} */
+            plan: "free" | "lite" | "full" | "family";
+            /** @enum {string} */
+            source: "free" | "subscription" | "family-seat";
+            /** Format: date-time */
+            effectiveAt: string;
+            availableUntil: string | null;
+            aiReply: {
+              limit: number;
+              used: number;
+              reserved: number;
+              remaining: number;
+              /** Format: date-time */
+              periodStartsAt: string;
+              /** Format: date-time */
+              resetsAt: string;
+            };
+            profileSummary: {
+              limit: number;
+              used: number;
+              reserved: number;
+              remaining: number;
+              /** Format: date-time */
+              periodStartsAt: string;
+              /** Format: date-time */
+              resetsAt: string;
+            };
+          };
+        };
+      };
+      /** @description LIFF IDトークンを検証できない */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Unauthorized";
+          };
+        };
+      };
+      /** @description 対応するAccountが存在しない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Account not found";
+            /** @constant */
+            reason: "friendship_required";
+          };
+        };
+      };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
+          };
+        };
+      };
+      /** @description D1 bindingが設定されていない */
       503: {
         headers: {
           [name: string]: unknown;

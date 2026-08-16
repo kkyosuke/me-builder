@@ -12,6 +12,7 @@ import {
   type ResetDevelopmentAccountDataResult,
   resetDevelopmentAccountData,
 } from "./feature/profile-settings/infrastructure/development-account-data-api";
+import { fetchProfileEntitlement } from "./feature/profile-settings/infrastructure/entitlement-api";
 import {
   type AccountProfile,
   deleteAccountAvatar,
@@ -19,9 +20,11 @@ import {
   saveAccountAvatar,
 } from "./feature/profile-settings/infrastructure/profile-api";
 import type { AvatarSelection } from "./feature/profile-settings/model/avatar";
+import type { ProfileEntitlement } from "./feature/profile-settings/model/entitlement";
 import { ProfileMenuButton } from "./feature/profile-settings/presentation/components/profile-menu-button";
 import { useColorTheme, useFontSize } from "./feature/theme";
 import { resolveRequestedPathname } from "./infrastructure/requested-pathname";
+import type { AsyncState } from "./model/async-state";
 import { restoreWindowScroll } from "./model/scroll-restoration";
 import {
   getIdleMainApplicationRoutes,
@@ -157,6 +160,9 @@ function AppContents() {
     { status: "loading" | "ready" } | { status: "error"; message: string }
   >({ status: "loading" });
   const [profileReloadKey, setProfileReloadKey] = useState(0);
+  const [entitlementState, setEntitlementState] = useState<AsyncState<ProfileEntitlement>>({
+    status: "loading",
+  });
   const [accountDataResetKey, setAccountDataResetKey] = useState(0);
   const linePictureUrl =
     profileReadState.status === "ready"
@@ -268,12 +274,27 @@ function AppContents() {
     setProfileReadState((current) =>
       profileReloadKey === 0 && current.status === "ready" ? current : { status: "loading" },
     );
+    setEntitlementState({ status: "loading" });
     void (async () => {
       try {
         const idToken = getLiffIdToken() ?? (await liffSession.acquireIdToken(controller.signal));
         if (controller.signal.aborted) return;
         if (!idToken) throw new Error("LINEからプロフィールを開き直してください。");
         applyAccountProfile(await fetchAccountProfile(config.apiUrl, idToken, controller.signal));
+        try {
+          const entitlement = await fetchProfileEntitlement(
+            config.apiUrl,
+            idToken,
+            controller.signal,
+          );
+          if (!controller.signal.aborted) {
+            setEntitlementState({ status: "success", data: entitlement });
+          }
+        } catch (error) {
+          if (!controller.signal.aborted) {
+            setEntitlementState({ status: "error", message: errorMessage(error) });
+          }
+        }
       } catch (error) {
         if (controller.signal.aborted) return;
         setAccountRole(null);
@@ -455,6 +476,7 @@ function AppContents() {
               inactiveFocusTarget={profileView === "brain-items" ? "brain-items" : "avatar"}
               isProfileLoading={profileReadState.status === "loading"}
               profileError={profileReadState.status === "error" ? profileReadState.message : null}
+              entitlement={entitlementState}
               linePictureUrl={linePictureUrl}
               theme={colorTheme.theme}
               fontSize={fontSize.fontSize}

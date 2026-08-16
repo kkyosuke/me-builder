@@ -64,6 +64,7 @@ import {
   deletePersonalDataRecordRoute,
   personalDataRecordsRoute,
 } from "./contract/personal-data/records";
+import { profileEntitlementRoute } from "./contract/profile/entitlement";
 import {
   deleteProfileAvatarRoute,
   getProfileAvatarImageRoute,
@@ -130,6 +131,7 @@ import {
   postPersonalDataExport,
 } from "./controller/personal-data";
 import {
+  getProfileEntitlementContents,
   getProfileProgressionContents,
   getProfileSummaryContents,
   postProfileSummaryGeneration,
@@ -252,6 +254,7 @@ app.post(
   postProfileSummaryGeneration,
 );
 app.get("/api/profile", getProfileRoute, getProfileContents);
+app.get("/api/profile/entitlement", profileEntitlementRoute, getProfileEntitlementContents);
 app.get("/api/profile/progression", profileProgressionRoute, getProfileProgressionContents);
 app.get("/api/profile/avatar", getProfileAvatarImageRoute, getProfileAvatarImageContents);
 app.put("/api/profile/avatar", putProfileAvatarRoute, putProfileAvatar);

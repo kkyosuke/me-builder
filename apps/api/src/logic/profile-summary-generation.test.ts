@@ -12,6 +12,7 @@ const accountData = {
 } as unknown as AccountDataNamespace;
 const send = vi.fn();
 const queue = { send } as unknown as Queue<ProfileSummaryGenerationQueueMessage>;
+let generationRequest: unknown;
 
 describe("requestProfileSummaryGeneration", () => {
   beforeEach(() => {
@@ -20,15 +21,23 @@ describe("requestProfileSummaryGeneration", () => {
       type: "resolved",
       session: { accountId: "account-1", role: "user" },
     });
+    generationRequest = undefined;
+    execute.mockImplementation(async (_accountId: string, operation: string) => {
+      if (operation === "aiUsage.read") {
+        return { limit: 1, reserved: 0, committed: 0, remaining: 1 };
+      }
+      if (operation === "profileSummary.requestGeneration") return generationRequest;
+      return undefined;
+    });
   });
 
   it("新しい要求を保存して本文を含まないQueue messageを送る", async () => {
-    execute.mockResolvedValueOnce({
+    generationRequest = {
       outcome: "created",
       generationId: "generation-1",
       status: "queued",
       needsDispatch: true,
-    });
+    };
 
     await expect(
       requestProfileSummaryGeneration({
@@ -54,12 +63,12 @@ describe("requestProfileSummaryGeneration", () => {
   });
 
   it("処理中の要求があればQueueへ重複送信しない", async () => {
-    execute.mockResolvedValueOnce({
+    generationRequest = {
       outcome: "existing",
       generationId: "generation-1",
       status: "generating",
       needsDispatch: false,
-    });
+    };
 
     await expect(
       requestProfileSummaryGeneration({
@@ -74,12 +83,12 @@ describe("requestProfileSummaryGeneration", () => {
   });
 
   it("開発環境の無変更再生成許可をAccountDataへ渡す", async () => {
-    execute.mockResolvedValueOnce({
+    generationRequest = {
       outcome: "created",
       generationId: "generation-dev",
       status: "queued",
       needsDispatch: true,
-    });
+    };
 
     await requestProfileSummaryGeneration({
       idToken: "token",
@@ -100,10 +109,10 @@ describe("requestProfileSummaryGeneration", () => {
   });
 
   it("AccountDataの再生成不可理由をQueueへ送らず返す", async () => {
-    execute.mockResolvedValueOnce({
+    generationRequest = {
       outcome: "unavailable",
       reason: "regeneration_not_required",
-    });
+    };
 
     await expect(
       requestProfileSummaryGeneration({
@@ -118,12 +127,12 @@ describe("requestProfileSummaryGeneration", () => {
   });
 
   it("Queue送信に失敗しても要求をqueuedに保ちAlarmで復旧できる", async () => {
-    execute.mockResolvedValueOnce({
+    generationRequest = {
       outcome: "created",
       generationId: "generation-1",
       status: "queued",
       needsDispatch: true,
-    });
+    };
     send.mockRejectedValueOnce(new Error("queue unavailable"));
 
     await expect(
@@ -135,16 +144,16 @@ describe("requestProfileSummaryGeneration", () => {
         queue,
       }),
     ).resolves.toMatchObject({ type: "accepted", status: "queued" });
-    expect(execute).toHaveBeenCalledTimes(1);
+    expect(execute).toHaveBeenCalledTimes(2);
   });
 
   it("未配送の既存要求を同じgeneration IDでQueueへ再送する", async () => {
-    execute.mockResolvedValueOnce({
+    generationRequest = {
       outcome: "existing",
       generationId: "generation-1",
       status: "queued",
       needsDispatch: true,
-    });
+    };
 
     await requestProfileSummaryGeneration({
       idToken: "token",
@@ -159,5 +168,31 @@ describe("requestProfileSummaryGeneration", () => {
       accountId: "account-1",
       generationId: "generation-1",
     });
+  });
+
+  it("利用上限到達時は直POSTでも生成要求を保存・送信しない", async () => {
+    execute.mockImplementation(async (_accountId: string, operation: string) => {
+      if (operation === "aiUsage.read") {
+        return { limit: 1, reserved: 0, committed: 1, remaining: 0 };
+      }
+      throw new Error(`unexpected operation: ${operation}`);
+    });
+
+    await expect(
+      requestProfileSummaryGeneration({
+        idToken: "token",
+        lineLoginChannelId: "channel",
+        db: {} as D1.shared.Client,
+        accountData,
+        queue,
+      }),
+    ).resolves.toEqual({ type: "unavailable", reason: "limit_reached" });
+    expect(send).not.toHaveBeenCalled();
+    expect(execute).not.toHaveBeenCalledWith(
+      "account-1",
+      "profileSummary.requestGeneration",
+      expect.anything(),
+      expect.anything(),
+    );
   });
 });

@@ -10,11 +10,17 @@ import {
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
+import { aiUsageActions } from "../account-data/ai-usage";
 import { brainActions } from "../account-data/brain";
 import { diagnosisActions } from "../account-data/diagnosis";
 import { diaryActions } from "../account-data/diary";
 
-const actions = { ...brainActions, ...diagnosisActions, ...diaryActions } as const;
+const actions = {
+  ...aiUsageActions,
+  ...brainActions,
+  ...diagnosisActions,
+  ...diaryActions,
+} as const;
 
 const MIGRATIONS_FOLDER = path.resolve(__dirname, "../../../../packages/lib/drizzle-do-account");
 

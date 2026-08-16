@@ -5,3 +5,4 @@ export * from "./provider";
 export * from "./stripe-adapter";
 export * from "./stripe-catalog-setup";
 export * from "./stripe-events";
+export * from "./usage-period";
