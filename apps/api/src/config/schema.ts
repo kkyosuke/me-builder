@@ -62,6 +62,11 @@ export const ConfigSchema = v.object({
   lineLoginChannelId: v.optional(v.string()),
   /** 外部ブラウザSSOの段階公開状態。disabledではSSO設定を要求しない。 */
   ssoRolloutMode: v.optional(v.picklist(["disabled", "linking", "linked-login"]), "disabled"),
+  /** 管理者以外のlink済みAccountへSSO sessionを発行する安定割合。 */
+  ssoRolloutPercent: v.optional(
+    v.pipe(v.number(), v.safeInteger(), v.minValue(0), v.maxValue(100)),
+    0,
+  ),
   /** Auth0 tenantのOIDC issuer。末尾slashを含む。 */
   ssoIssuerUrl: v.optional(
     v.pipe(v.string(), v.url(), v.check(isSsoIssuer, "SSO_ISSUER_URL must be a HTTPS origin")),

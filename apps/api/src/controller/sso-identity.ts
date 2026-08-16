@@ -24,6 +24,7 @@ import {
   getSsoIdentityStatus,
   unlinkSsoIdentity,
 } from "../infrastructure/authentication/sso-identity-repository";
+import { createSsoRolloutAuthorizer } from "../infrastructure/authentication/sso-rollout";
 import { createSsoTransactionStore } from "../infrastructure/authentication/sso-transaction-store";
 import {
   SsoAuthenticationError,
@@ -305,6 +306,9 @@ export async function getSsoCallback(c: Context<AppEnv>): Promise<Response> {
       client: dependencies.client,
       identityResolver: createSsoExistingIdentityResolver(runtime.db),
       identityLinker: createSsoIdentityLinker(runtime.db),
+      rolloutAuthorizer: createSsoRolloutAuthorizer(
+        dependencies.configuration.ssoRolloutPercent,
+      ),
       sessionIssuer: {
         async issue(actor) {
           if (previousToken) await runtime.sessions.logout(previousToken, actor.accountId);

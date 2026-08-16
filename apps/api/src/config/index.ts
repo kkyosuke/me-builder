@@ -128,6 +128,7 @@ export function getConfig(env?: Record<string, unknown>): ApiConfig {
     liffId: liffConfiguration.liffId,
     lineLoginChannelId: liffConfiguration.lineLoginChannelId,
     ssoRolloutMode: getEnv("SSO_ROLLOUT_MODE", env),
+    ssoRolloutPercent: Number(getEnv("SSO_ROLLOUT_PERCENT", env) ?? 0),
     ssoIssuerUrl: getEnv("SSO_ISSUER_URL", env),
     ssoClientId: getEnv("SSO_CLIENT_ID", env),
     ssoClientSecret: getEnv("SSO_CLIENT_SECRET", env),
