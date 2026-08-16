@@ -174,10 +174,53 @@ describe("createAuth0SsoClient", () => {
     ).rejects.toEqual(new SsoProviderError("token_invalid"));
   });
 
+  it("複数audienceのID tokenでclient自身がauthorized partyでなければ拒否する", async () => {
+    const { publicKey, privateKey } = await generateKeyPair("RS256");
+    const publicJwk = await exportJWK(publicKey);
+    const token = await new SignJWT({ nonce: "expected-nonce", azp: "another-client" })
+      .setProtectedHeader({ alg: "RS256", kid: "test-key" })
+      .setIssuer(configuration.issuerUrl)
+      .setAudience([configuration.clientId, "another-audience"])
+      .setSubject("auth0|user-1")
+      .setIssuedAt()
+      .setExpirationTime("5m")
+      .sign(privateKey);
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("openid-configuration")) return Response.json(discovery);
+      if (url.endsWith("/oauth/token")) return Response.json({ id_token: token });
+      return Response.json({ keys: [{ ...publicJwk, kid: "test-key", use: "sig" }] });
+    });
+    const client = createAuth0SsoClient(configuration, { fetch: fetcher });
+
+    await expect(
+      client.exchangeAuthorizationCode({
+        code: "code",
+        codeVerifier: "verifier",
+        expectedNonce: "expected-nonce",
+      }),
+    ).rejects.toEqual(new SsoProviderError("token_invalid"));
+  });
+
   it("issuerと異なるoriginのendpointを含むdiscoveryを拒否する", async () => {
     const client = createAuth0SsoClient(configuration, {
       fetch: vi.fn(async () =>
         Response.json({ ...discovery, token_endpoint: "https://evil.example/oauth/token" }),
+      ),
+    });
+
+    await expect(
+      client.createAuthorizationUrl({ state: "state", nonce: "nonce", codeChallenge: "challenge" }),
+    ).rejects.toEqual(new SsoProviderError("configuration"));
+  });
+
+  it("userinfoを埋め込んだdiscovery endpointを拒否する", async () => {
+    const client = createAuth0SsoClient(configuration, {
+      fetch: vi.fn(async () =>
+        Response.json({
+          ...discovery,
+          token_endpoint: "https://user:password@tenant.auth0.com/oauth/token",
+        }),
       ),
     });
 

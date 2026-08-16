@@ -42,7 +42,7 @@ type SsoFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Respon
 
 function assertTrustedEndpoint(issuer: URL, endpoint: string): void {
   const url = new URL(endpoint);
-  if (url.protocol !== "https:" || url.origin !== issuer.origin) {
+  if (url.protocol !== "https:" || url.origin !== issuer.origin || url.username || url.password) {
     throw new SsoProviderError("configuration");
   }
 }
@@ -115,7 +115,10 @@ export function createAuth0SsoClient(
           protectedHeader.alg !== "RS256" ||
           payload.nonce !== expectedNonce ||
           !payload.sub ||
-          !Number.isSafeInteger(payload.iat)
+          !Number.isSafeInteger(payload.iat) ||
+          (Array.isArray(payload.aud) &&
+            payload.aud.length > 1 &&
+            payload.azp !== configuration.clientId)
         ) {
           throw new SsoProviderError("token_invalid");
         }
