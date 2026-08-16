@@ -14,6 +14,13 @@ describe("GET /api/openapi.json", () => {
     expect(response.status).toBe(200);
     expect(document.openapi).toBe("3.1.0");
     expect(document.paths["/api/diagnoses"]?.get).toBeDefined();
+    expect(document.paths["/api/auth/liff/exchange"]?.post).toBeDefined();
+    expect(document.paths["/api/auth/session"]?.get).toMatchObject({
+      security: [{ applicationSession: [] }],
+    });
+    expect(document.paths["/api/auth/session"]?.delete).toMatchObject({
+      security: [{ applicationSession: [] }],
+    });
     expect(document.paths["/api/compatibility/share-consent"]?.get).toBeDefined();
     expect(document.paths["/api/compatibility/share-content"]?.get).toBeDefined();
     expect(document.paths["/api/compatibility/invitations"]?.post).toBeDefined();
@@ -109,6 +116,14 @@ describe("GET /api/openapi.json", () => {
     expect(document.components.securitySchemes.liffIdToken).toMatchObject({
       type: "http",
       scheme: "bearer",
+    });
+    expect(document.components.securitySchemes.applicationSession).toMatchObject({
+      type: "apiKey",
+      in: "cookie",
+      name: "__Host-me_builder_session",
+    });
+    expect(document.paths["/api/diagnoses"]?.get).toMatchObject({
+      security: [{ applicationSession: [] }, { liffIdToken: [] }],
     });
 
     const generatedDocument = JSON.parse(

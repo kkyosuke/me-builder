@@ -4,6 +4,41 @@
  */
 
 export interface paths {
+  "/api/auth/liff/exchange": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** 検証済みLIFF credentialをprovider非依存sessionへ交換する */
+    post: operations["exchangeLiffCredential"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/auth/session": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** 現在のapplication sessionを確認する */
+    get: operations["getApplicationSession"];
+    put?: never;
+    post?: never;
+    /** 現在のapplication sessionを失効する */
+    delete: operations["logoutApplicationSession"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/account-recovery/codes": {
     parameters: {
       query?: never;
@@ -1009,6 +1044,278 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+  exchangeLiffCredential: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": Record<string, never>;
+      };
+    };
+    responses: {
+      /** @description 発行したapplication session */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            authenticated: true;
+            /** @enum {string} */
+            authenticationMethod: "liff" | "sso";
+            /** Format: date-time */
+            authenticatedAt: string;
+            /** Format: date-time */
+            expiresAt: string;
+            csrfToken: string;
+            /** @enum {string} */
+            role: "user" | "admin";
+            displayProfile?: {
+              displayName?: string;
+              /** Format: uri */
+              pictureUrl?: string;
+            };
+          };
+        };
+      };
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Unauthorized";
+          };
+        };
+      };
+      /** @description 許可済みWeb Originではない */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Forbidden";
+          };
+        };
+      };
+      /** @description 対応するAccountが存在しない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Account not found";
+            /** @constant */
+            reason: "friendship_required";
+          };
+        };
+      };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
+          };
+        };
+      };
+      /** @description D1 bindingが設定されていない */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Service Unavailable";
+          };
+        };
+      };
+    };
+  };
+  getApplicationSession: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 現在のapplication session */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            authenticated: true;
+            /** @enum {string} */
+            authenticationMethod: "liff" | "sso";
+            /** Format: date-time */
+            authenticatedAt: string;
+            /** Format: date-time */
+            expiresAt: string;
+            csrfToken: string;
+            /** @enum {string} */
+            role: "user" | "admin";
+            displayProfile?: {
+              displayName?: string;
+              /** Format: uri */
+              pictureUrl?: string;
+            };
+          };
+        };
+      };
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Unauthorized";
+          };
+        };
+      };
+      /** @description 対応するAccountが存在しない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Account not found";
+            /** @constant */
+            reason: "friendship_required";
+          };
+        };
+      };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
+          };
+        };
+      };
+      /** @description D1 bindingが設定されていない */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Service Unavailable";
+          };
+        };
+      };
+    };
+  };
+  logoutApplicationSession: {
+    parameters: {
+      query?: never;
+      header: {
+        "X-CSRF-Token": string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description sessionを失効した */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Unauthorized";
+          };
+        };
+      };
+      /** @description OriginまたはCSRF tokenが一致しない */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Forbidden";
+          };
+        };
+      };
+      /** @description 対応するAccountが存在しない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Account not found";
+            /** @constant */
+            reason: "friendship_required";
+          };
+        };
+      };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
+          };
+        };
+      };
+      /** @description D1 bindingが設定されていない */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Service Unavailable";
+          };
+        };
+      };
+    };
+  };
   issueAccountRecoveryCode: {
     parameters: {
       query?: never;
@@ -1031,7 +1338,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -1155,7 +1462,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -1386,7 +1693,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -1693,7 +2000,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -2064,7 +2371,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -2207,7 +2514,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -2319,7 +2626,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -2446,7 +2753,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -2608,7 +2915,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -2697,7 +3004,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -2836,7 +3143,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -2925,7 +3232,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -3038,7 +3345,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -3154,7 +3461,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -3291,7 +3598,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -3403,7 +3710,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -3517,7 +3824,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -3626,7 +3933,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -3719,7 +4026,7 @@ export interface operations {
         };
         content?: never;
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -3831,7 +4138,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -3961,7 +4268,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -4072,7 +4379,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -4163,7 +4470,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -4278,7 +4585,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -4387,7 +4694,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -4505,7 +4812,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -4631,7 +4938,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -4758,7 +5065,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -4902,7 +5209,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -5049,7 +5356,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -5196,7 +5503,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -5339,7 +5646,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -5482,7 +5789,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -5623,7 +5930,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -5752,7 +6059,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -5851,7 +6158,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -5937,7 +6244,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -6091,7 +6398,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -6210,7 +6517,7 @@ export interface operations {
               };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -6305,7 +6612,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -6429,7 +6736,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -6538,7 +6845,7 @@ export interface operations {
         };
         content?: never;
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -6661,7 +6968,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -6766,7 +7073,7 @@ export interface operations {
         };
         content?: never;
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -6890,7 +7197,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -7059,7 +7366,7 @@ export interface operations {
               };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -7150,7 +7457,7 @@ export interface operations {
         };
         content?: never;
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -7254,7 +7561,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -7345,7 +7652,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -7439,7 +7746,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -7553,7 +7860,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -7681,7 +7988,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -7784,7 +8091,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -7890,7 +8197,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -8031,7 +8338,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -8158,7 +8465,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -8295,7 +8602,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -8428,7 +8735,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;

@@ -164,6 +164,18 @@ describe("ApplicationSessionService", () => {
     expect(store.records.size).toBe(0);
   });
 
+  it("sessionに結びついたCSRF tokenだけを受け入れる", async () => {
+    const sessions = new ApplicationSessionService(new MemoryStore(), new MemoryVersions());
+    const issued = await sessions.issue(actor);
+
+    await expect(sessions.verifyCsrf(issued?.sessionToken ?? "", issued?.csrfToken)).resolves.toBe(
+      true,
+    );
+    await expect(sessions.verifyCsrf(issued?.sessionToken ?? "", "wrong-token")).resolves.toBe(
+      false,
+    );
+  });
+
   it("停止または削除済みAccountにはsessionを発行しない", async () => {
     const versions = new MemoryVersions();
     versions.versions.delete(actor.accountId);

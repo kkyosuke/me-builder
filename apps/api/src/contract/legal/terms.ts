@@ -80,7 +80,7 @@ export const getServiceTermsRoute = describeRoute({
   operationId: "getServiceTermsStatus",
   tags: ["Legal"],
   summary: "現在の利用規約と本人の同意状態を取得する",
-  security: [{ liffIdToken: [] }],
+  security: [{ applicationSession: [] }, { liffIdToken: [] }],
   responses: {
     200: jsonResponse("現在の規約本文と同意状態", ServiceTermsStatusResponseSchema),
     ...commonErrors,
@@ -91,7 +91,7 @@ export const acceptServiceTermsRoute = describeRoute({
   operationId: "acceptServiceTerms",
   tags: ["Legal"],
   summary: "現在の利用規約versionへの同意を記録する",
-  security: [{ liffIdToken: [] }],
+  security: [{ applicationSession: [] }, { liffIdToken: [] }],
   responses: {
     200: jsonResponse("保存済みの同意記録", AcceptServiceTermsResponseSchema),
     400: jsonResponse("リクエストJSONが不正", InvalidServiceTermsRequestSchema),
@@ -104,7 +104,7 @@ export const getServiceTermsAcceptanceHistoryRoute = describeRoute({
   operationId: "getServiceTermsAcceptanceHistory",
   tags: ["Legal"],
   summary: "本人の利用規約同意履歴を取得する",
-  security: [{ liffIdToken: [] }],
+  security: [{ applicationSession: [] }, { liffIdToken: [] }],
   responses: {
     200: jsonResponse(
       "現在有効・過去を区別した本人の同意履歴",

@@ -35,7 +35,7 @@ export const selfCareContextListRoute = describeRoute({
   operationId: "getSelfCareContexts",
   tags: ["Profile"],
   summary: "本人が確認したセルフケア情報を取得する",
-  security: [{ liffIdToken: [] }],
+  security: [{ applicationSession: [] }, { liffIdToken: [] }],
   responses: {
     200: jsonResponse("確認済みセルフケア情報", SelfCareContextListSchema),
     ...authenticatedErrors,
@@ -47,7 +47,7 @@ export const selfCareContextConfirmationRoute = describeRoute({
   operationId: "confirmSelfCareContext",
   tags: ["Profile"],
   summary: "対処の結果または最近の状態を本人が確認する",
-  security: [{ liffIdToken: [] }],
+  security: [{ applicationSession: [] }, { liffIdToken: [] }],
   requestBody: {
     required: true,
     content: {
@@ -70,6 +70,6 @@ export const selfCareContextRevocationRoute = describeRoute({
   operationId: "revokeSelfCareContext",
   tags: ["Profile"],
   summary: "本人が確認を撤回する",
-  security: [{ liffIdToken: [] }],
+  security: [{ applicationSession: [] }, { liffIdToken: [] }],
   responses: { 200: jsonResponse("撤回結果", SelfCareContextMutationSchema), ...errors },
 } satisfies DescribeRouteOptions);

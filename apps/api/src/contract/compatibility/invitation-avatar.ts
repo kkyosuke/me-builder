@@ -15,7 +15,7 @@ export const compatibilityInvitationAvatarRoute = describeRoute({
   operationId: "getCompatibilityInvitationAvatar",
   tags: ["Compatibility"],
   summary: "受信者向けに招待送信者のアバター画像を取得する",
-  security: [{ liffIdToken: [] }],
+  security: [{ applicationSession: [] }, { liffIdToken: [] }],
   responses: {
     200: {
       description: "招待送信者の現在のアバター画像",

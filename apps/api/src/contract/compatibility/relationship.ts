@@ -56,7 +56,7 @@ export const compatibilityRelationshipRoute = describeRoute({
   operationId: "getCompatibilityRelationship",
   tags: ["Compatibility"],
   summary: "成立中の相性関係を双方の現在の内容から組み立てる",
-  security: [{ liffIdToken: [] }],
+  security: [{ applicationSession: [] }, { liffIdToken: [] }],
   responses: {
     200: jsonResponse(
       "相性シート、または比較できるテーマの準備待ち状態",

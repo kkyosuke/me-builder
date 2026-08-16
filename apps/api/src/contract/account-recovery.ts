@@ -26,7 +26,7 @@ export const accountRecoveryCodeRoute = describeRoute({
   operationId: "issueAccountRecoveryCode",
   tags: ["Account recovery"],
   summary: "有料契約Accountの一回限りの復旧コードを発行する",
-  security: [{ liffIdToken: [] }],
+  security: [{ applicationSession: [] }, { liffIdToken: [] }],
   responses: {
     201: jsonResponse("一度だけ表示する復旧コード", AccountRecoveryCodeResponseSchema),
     409: jsonResponse("有料契約がない", AccountRecoveryUnavailableSchema),

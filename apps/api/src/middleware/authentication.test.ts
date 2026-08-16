@@ -4,13 +4,14 @@ import type { AppEnv } from "../types";
 import type { AuthenticationResolver } from "./authentication";
 import { authenticatedActor, createAuthenticationMiddleware } from "./authentication";
 
+const actor = {
+  accountId: "account-1",
+  authenticationMethod: "liff" as const,
+  authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
+};
+
 describe("authentication middleware", () => {
   it("fake verifierのactorをContextへ設定し、同じrequestでは1回だけ解決する", async () => {
-    const actor = {
-      accountId: "account-1",
-      authenticationMethod: "liff" as const,
-      authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
-    };
     const resolver: AuthenticationResolver = vi.fn().mockResolvedValue({
       type: "authenticated",
       actor,
@@ -28,6 +29,58 @@ describe("authentication middleware", () => {
       authenticatedAt: "2026-08-16T00:00:00.000Z",
     });
     expect(resolver).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ["https://web.example", "csrf-token", 200],
+    ["https://attacker.example", "csrf-token", 403],
+    ["https://web.example", "wrong-token", 403],
+  ] as const)("application session更新でOriginとCSRFを検証する", async (origin, csrf, status) => {
+    const app = new Hono<AppEnv>();
+    const middleware = createAuthenticationMiddleware(async (c) => {
+      c.set("authenticationSource", "application-session");
+      c.set("applicationSessionToken", "session-token");
+      return { type: "authenticated", actor, accountRole: "user" };
+    });
+    app.post("/", middleware, (c) => c.text("ok"));
+
+    const response = await app.request(
+      "/",
+      { method: "POST", headers: { Origin: origin, "X-CSRF-Token": csrf } },
+      {
+        ENVIRONMENT: "test",
+        WEB_ORIGIN: "https://web.example",
+        DB: {} as never,
+        SESSION_STORE: {
+          get: async () => ({
+            accountId: "account-1",
+            authenticationMethod: "liff",
+            authenticatedAt: "2026-08-16T00:00:00.000Z",
+            issuedAt: "2026-08-16T00:00:00.000Z",
+            lastSeenAt: "2026-08-16T00:00:00.000Z",
+            expiresAt: "2026-08-17T00:00:00.000Z",
+            sessionVersion: 1,
+            csrfToken: "csrf-token",
+          }),
+        } as never,
+      },
+    );
+
+    expect(response.status).toBe(status);
+  });
+
+  it("移行期間の旧Bearer更新にはapplication session用CSRFを要求しない", async () => {
+    const app = new Hono<AppEnv>();
+    app.post(
+      "/",
+      createAuthenticationMiddleware(async (c) => {
+        c.set("authenticationSource", "legacy-bearer");
+        return { type: "authenticated", actor, accountRole: "user" };
+      }),
+      (c) => c.text("ok"),
+    );
+
+    expect((await app.request("/", { method: "POST" })).status).toBe(200);
   });
 
   it.each([

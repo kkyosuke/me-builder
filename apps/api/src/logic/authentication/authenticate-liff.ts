@@ -31,6 +31,9 @@ export async function authenticateLiff({
     identity.subject,
     resolveLineAccountRole(identity.subject, adminLineUserIds),
   );
+  if (resolved.account.status !== "active" || resolved.account.isDeleted) {
+    return { type: "unauthenticated", reason: "credential_invalid" };
+  }
   if (identity.displayProfile?.displayName) {
     await D1.shared.action.profile.saveVerifiedDisplayName(
       db,
