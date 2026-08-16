@@ -1,4 +1,5 @@
 const SSO_TRANSACTION_TTL_SECONDS = 10 * 60;
+const MAX_RETURN_TO_LENGTH = 2048;
 const RANDOM_VALUE_BYTES = 32;
 
 export type SsoVerifiedIdentity = {
@@ -98,7 +99,12 @@ async function sha256Base64Url(value: string): Promise<string> {
 
 /** callback後に復元してよい同一originの相対pathだけを正規化する。 */
 export function normalizeSsoReturnTo(value: string): string {
-  if (!value.startsWith("/") || value.startsWith("//") || value.includes("\\")) {
+  if (
+    value.length > MAX_RETURN_TO_LENGTH ||
+    !value.startsWith("/") ||
+    value.startsWith("//") ||
+    value.includes("\\")
+  ) {
     throw new SsoAuthenticationError("invalid_return_to");
   }
 

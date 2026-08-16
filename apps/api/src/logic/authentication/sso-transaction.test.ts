@@ -56,6 +56,12 @@ describe("normalizeSsoReturnTo", () => {
       );
     },
   );
+
+  it("上限を超えるreturnToを拒否する", () => {
+    expect(() => normalizeSsoReturnTo(`/${"a".repeat(2048)}`)).toThrowError(
+      expect.objectContaining({ reason: "invalid_return_to" }),
+    );
+  });
 });
 
 describe("SSO authentication transaction", () => {
