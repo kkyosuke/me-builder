@@ -170,6 +170,7 @@ describe("subscription user journeys", () => {
       type: "resolved",
       status: "active",
       plan: "full",
+      availableUntil: "2026-09-01T00:00:00.000Z",
       aiReply: { limit: 600, remaining: 600 },
       profileSummary: { limit: 12, remaining: 12 },
     });

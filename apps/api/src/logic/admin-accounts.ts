@@ -38,7 +38,6 @@ export async function getAdminAccounts(params: Params): Promise<AdminAccountsOut
     logger.info(
       {
         event: "admin.accounts.listed",
-        adminAccountId: session.session.accountId,
         queryPresent: Boolean(input.query?.trim()),
         role: input.role ?? "all",
         status: input.status ?? "all",

@@ -1023,11 +1023,13 @@ describe("App", () => {
     expect(await screen.findByRole("heading", { name: "うつしをシェア" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "共有されるもの" })).toBeTruthy();
     expect(screen.queryByText(/傾向があります/)).toBeNull();
-    expect(mocks.fetchCompatibilityShareConsent).toHaveBeenCalledWith(
-      "https://api.example.com",
-      "dummy.id.token",
-      "partner",
-      expect.anything(),
+    await waitFor(() =>
+      expect(mocks.fetchCompatibilityShareConsent).toHaveBeenCalledWith(
+        "https://api.example.com",
+        "dummy.id.token",
+        "partner",
+        expect.anything(),
+      ),
     );
     expect(mocks.fetchDiagnosisList).not.toHaveBeenCalled();
   });

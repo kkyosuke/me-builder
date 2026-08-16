@@ -11,8 +11,12 @@ const mockLiff = vi.hoisted(() => ({
   isApiAvailable: vi.fn(),
   shareTargetPicker: vi.fn(),
 }));
+const loggerWarn = vi.hoisted(() => vi.fn());
 
 vi.mock("@line/liff", () => ({ default: mockLiff }));
+vi.mock("@me-builder/shared", () => ({
+  logger: { info: vi.fn(), warn: loggerWarn },
+}));
 
 const LIFF_ID = "1234567890-abcdefgh";
 
@@ -80,12 +84,17 @@ describe("initializeLiff", () => {
   });
 
   it("liff.init が失敗しても例外を投げず error を返すこと", async () => {
-    mockLiff.init.mockRejectedValue(new Error("invalid liffId"));
+    mockLiff.init.mockRejectedValue(new Error("invalid liffId for U-secret"));
 
     const state = await initializeLiff(LIFF_ID);
 
     expect(state.status).toBe("error");
     expect(state).toMatchObject({ message: expect.stringContaining("invalid liffId") });
+    expect(loggerWarn).toHaveBeenCalledWith(
+      { event: "liff.initialize.failed", outcome: "failed", reason: "sdk-error" },
+      "LIFF の初期化に失敗しました",
+    );
+    expect(JSON.stringify(loggerWarn.mock.calls)).not.toContain("U-secret");
     expect(mockLiff.login).not.toHaveBeenCalled();
   });
 
@@ -129,6 +138,8 @@ describe("shareLiffTextMessage", () => {
 });
 
 describe("getLiffIdToken", () => {
+  beforeEach(() => vi.clearAllMocks());
+
   it("LIFF SDKのIDトークンを返すこと", () => {
     mockLiff.getIDToken.mockReturnValue("dummy.id.token");
 
@@ -141,5 +152,9 @@ describe("getLiffIdToken", () => {
     });
 
     expect(getLiffIdToken()).toBeNull();
+    expect(loggerWarn).toHaveBeenCalledWith(
+      { event: "liff.id-token.failed", outcome: "failed", reason: "sdk-error" },
+      "ID トークンを取得できませんでした",
+    );
   });
 });

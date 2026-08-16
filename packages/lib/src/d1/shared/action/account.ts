@@ -105,7 +105,7 @@ export async function linkIdentity(
       throw err;
     }
     logger.warn(
-      { accountId: input.accountId, provider: input.provider },
+      { event: "account.identity.link-conflict", provider: input.provider },
       "Unique constraint violation during linkIdentity, fetching the existing identity",
     );
 
@@ -183,7 +183,7 @@ export async function resolveAccountByLineLogin(
   });
 
   logger.info(
-    { accountId: byMessagingApi.account.id },
+    { event: "account.identity.linked", provider: "line_login" },
     "Linked line_login identity to the account found by the Messaging API userId",
   );
 
@@ -221,7 +221,7 @@ export async function resolveAccountByLineMessagingApi(
   });
 
   logger.info(
-    { accountId: canonical.account.id },
+    { event: "account.identity.linked", provider: "line" },
     "Linked Messaging API identity to the LINE account",
   );
 
@@ -338,7 +338,11 @@ export async function upsertIdentity(
       // providerAccountId は本人識別子なのでログへ出さない
       // ([プロジェクト概要 §8](../../../../../docs/product/project-overview.md#8-プライバシーと安全性))
       logger.warn(
-        { err, provider: input.provider },
+        {
+          event: "account.identity.upsert-conflict",
+          provider: input.provider,
+          reason: "unique-constraint",
+        },
         "Unique constraint violation during upsert, fetching existing identity",
       );
 

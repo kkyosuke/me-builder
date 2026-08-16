@@ -99,6 +99,8 @@ describe("ProfileSettingsScreen", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: /契約を管理/ }));
+    expect(screen.getByText("支払方法、請求履歴、解約を確認")).toBeTruthy();
+    expect(screen.queryByText(/プラン変更/)).toBeNull();
     expect((await screen.findByRole("alert")).textContent).toContain(
       "管理できる契約がまだありません",
     );
@@ -277,7 +279,7 @@ describe("ProfileSettingsScreen", () => {
     expect(onOpenBrainItems).toHaveBeenCalledOnce();
   });
 
-  it("契約Plan、更新日、AI上限と残量を本人へ表示する", () => {
+  it("契約Plan、利用可能期限、AI上限と残量を本人へ表示する", () => {
     render(
       <ProfileSettingsScreen
         avatar={null}
@@ -288,7 +290,7 @@ describe("ProfileSettingsScreen", () => {
             plan: "lite",
             source: "subscription",
             effectiveAt: "2026-08-01T00:00:00.000Z",
-            availableUntil: null,
+            availableUntil: "2027-08-01T00:00:00.000Z",
             aiReply: {
               limit: 150,
               used: 10,
@@ -320,6 +322,52 @@ describe("ProfileSettingsScreen", () => {
     expect(screen.getByText("Lite")).toBeTruthy();
     expect(screen.getByText("残り 139 / 150")).toBeTruthy();
     expect(screen.getByText("残り 3 / 4")).toBeTruthy();
+    expect(screen.getByText("利用可能期限")).toBeTruthy();
+    expect(screen.getByText("2027/08/01")).toBeTruthy();
+    expect(screen.queryByText("2026/09/01")).toBeNull();
+  });
+
+  it("Free Planでは契約期限ではなくAI利用枠のリセット日を表示する", () => {
+    render(
+      <ProfileSettingsScreen
+        avatar={null}
+        entitlement={{
+          status: "success",
+          data: {
+            status: "free",
+            plan: "free",
+            source: "free",
+            effectiveAt: "2026-08-01T00:00:00.000Z",
+            availableUntil: null,
+            aiReply: {
+              limit: 20,
+              used: 0,
+              reserved: 0,
+              remaining: 20,
+              periodStartsAt: "2026-08-01T00:00:00.000Z",
+              resetsAt: "2026-09-01T00:00:00.000Z",
+            },
+            profileSummary: {
+              limit: 1,
+              used: 0,
+              reserved: 0,
+              remaining: 1,
+              periodStartsAt: "2026-07-30T00:00:00.000Z",
+              resetsAt: "2026-10-28T00:00:00.000Z",
+            },
+          },
+        }}
+        theme="dark"
+        fontSize="medium"
+        onBack={vi.fn()}
+        onOpenAvatar={vi.fn()}
+        onThemeChange={vi.fn()}
+        onFontSizeChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("AI利用枠リセット")).toBeTruthy();
     expect(screen.getByText("2026/09/01")).toBeTruthy();
+    expect(screen.queryByText("利用可能期限")).toBeNull();
   });
 });
