@@ -215,8 +215,11 @@ export function ProfileSettingsScreen({
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-2xl px-4 py-8 pb-16 sm:px-8">
-        <section className="min-h-62 overflow-hidden rounded-3xl bg-gradient-to-br from-sky-100 via-white to-violet-100 p-6 shadow-lg shadow-slate-950/5 min-[375px]:min-h-50 sm:min-h-40 dark:from-sky-950/60 dark:via-slate-800 dark:to-violet-950/50">
+      <main className="mx-auto w-full max-w-2xl px-4 py-6 pb-16 sm:px-8">
+        <section
+          aria-labelledby="profile-appearance-heading"
+          className="overflow-hidden rounded-3xl bg-gradient-to-br from-sky-100 via-white to-violet-100 p-5 shadow-lg shadow-slate-950/5 sm:p-6 dark:from-sky-950/60 dark:via-slate-800 dark:to-violet-950/50"
+        >
           <div className="flex items-center gap-4">
             <AvatarPreview avatar={avatar} fallbackImageUrl={linePictureUrl} size="lg" />
             <div className="min-w-0">
@@ -224,7 +227,10 @@ export function ProfileSettingsScreen({
                 <Sparkles className="size-4" aria-hidden="true" />
                 YOUR PROFILE
               </p>
-              <h2 className="mt-2 text-2xl font-bold text-slate-950 dark:text-white">
+              <h2
+                id="profile-appearance-heading"
+                className="mt-2 text-2xl font-bold text-slate-950 dark:text-white"
+              >
                 あなたらしい見た目に
               </h2>
               <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
@@ -237,7 +243,7 @@ export function ProfileSettingsScreen({
         {onOpenBillingPortal &&
           entitlement?.status === "success" &&
           entitlement.data.source === "subscription" && (
-            <section aria-labelledby="billing-setting-heading" className="mt-8">
+            <section aria-labelledby="billing-setting-heading" className="mt-6">
               <h2
                 id="billing-setting-heading"
                 className="px-1 text-sm font-bold tracking-wider text-slate-500 dark:text-slate-400"
@@ -272,7 +278,7 @@ export function ProfileSettingsScreen({
           )}
 
         {entitlement && (
-          <section aria-labelledby="subscription-heading" className="mt-8">
+          <section aria-labelledby="subscription-heading" className="mt-6">
             <h2
               id="subscription-heading"
               className="px-1 text-sm font-bold tracking-wider text-slate-500 dark:text-slate-400"
@@ -376,14 +382,14 @@ export function ProfileSettingsScreen({
           </section>
         )}
 
-        <section aria-labelledby="avatar-setting-heading" className="mt-8">
+        <section aria-labelledby="avatar-setting-heading" className="mt-6">
           <h2
             id="avatar-setting-heading"
             className="min-h-5 px-1 text-sm font-bold tracking-wider text-slate-500 dark:text-slate-400"
           >
             アバター
           </h2>
-          <div className="mt-3 min-h-32">
+          <div className="mt-3">
             {isProfileLoading ? (
               <output
                 aria-busy="true"
@@ -438,7 +444,7 @@ export function ProfileSettingsScreen({
           </div>
         </section>
 
-        <section aria-labelledby="theme-setting-heading" className="mt-8">
+        <section aria-labelledby="theme-setting-heading" className="mt-6">
           <h2
             id="theme-setting-heading"
             className="min-h-5 px-1 text-sm font-bold tracking-wider text-slate-500 dark:text-slate-400"
@@ -491,11 +497,11 @@ export function ProfileSettingsScreen({
               );
             })}
           </div>
-          <p className="mt-3 min-h-10 px-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+          <p className="mt-2 px-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
             選んだテーマはこのブラウザに保存され、次に開いたときも使われます。
           </p>
 
-          <div className="mt-6">
+          <div className="mt-4">
             <p
               id="font-size-setting-label"
               className="min-h-5 px-1 text-sm font-bold text-slate-700 dark:text-slate-200"

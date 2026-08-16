@@ -70,4 +70,23 @@ describe("BillingPlanScreen", () => {
 
     expect(onCheckout).toHaveBeenCalledWith("lite", "year");
   });
+
+  it("公開カタログが空なら空白にせず再読み込みを案内する", () => {
+    const onRetry = vi.fn();
+    render(
+      <BillingPlanScreen
+        plans={{ status: "success", data: [] }}
+        entitlement={{ status: "success", data: free }}
+        checkoutState={{ status: "idle" }}
+        completionMessage={null}
+        onBack={vi.fn()}
+        onCheckout={vi.fn()}
+        onRetry={onRetry}
+      />,
+    );
+
+    expect(screen.getByRole("status").textContent).toContain("料金プランを表示できません");
+    fireEvent.click(screen.getByRole("button", { name: "再読み込み" }));
+    expect(onRetry).toHaveBeenCalledOnce();
+  });
 });

@@ -127,7 +127,7 @@ export function DiagnosisHome({
   return (
     <main className="mx-auto min-h-dvh w-full max-w-2xl px-4 py-8 pb-28 sm:px-8">
       <header className="mb-8">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center justify-between gap-3 pr-14 sm:pr-0">
           <p className="text-sm font-semibold tracking-wider text-sky-700 dark:text-sky-300">
             私をひもとく
           </p>

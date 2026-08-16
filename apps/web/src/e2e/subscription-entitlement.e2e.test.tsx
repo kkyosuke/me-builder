@@ -91,6 +91,11 @@ describe("subscription entitlement user journey", () => {
 
     expect(await screen.findByRole("heading", { name: "プロフィール" })).toBeTruthy();
     expect(await screen.findByText("Full")).toBeTruthy();
+    const appearance = screen.getByRole("region", { name: "あなたらしい見た目に" });
+    expect(appearance.className).not.toContain("min-h-");
+    expect(screen.getByRole("region", { name: "アバター" }).className).toContain("mt-6");
+    expect(screen.getByRole("region", { name: "表示" }).className).toContain("mt-6");
+    expect(screen.getByText("文字サイズ").parentElement?.className).toContain("mt-4");
     expect(screen.getByText("利用可能期限")).toBeTruthy();
     expect(screen.getByText("2027/08/01")).toBeTruthy();
     expect(screen.queryByText("2026/09/01")).toBeNull();
@@ -103,12 +108,17 @@ describe("subscription entitlement user journey", () => {
   });
 
   it("Free Planからアップグレード画面をプロフィールより前面に開く", async () => {
+    let entitlementRequests = 0;
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = urlOf(input);
       if (url.pathname === "/api/profile") {
         return Response.json({ role: "user", displayName: "テスト", avatar: null });
       }
       if (url.pathname === "/api/profile/entitlement") {
+        entitlementRequests += 1;
+        if (entitlementRequests > 1) {
+          return Response.json({ error: "Service Unavailable" }, { status: 503 });
+        }
         return Response.json({
           status: "free",
           plan: "free",
@@ -151,7 +161,7 @@ describe("subscription entitlement user journey", () => {
         });
       }
       if (url.pathname === "/api/billing/trial-eligibility") {
-        return Response.json({ eligible: true, trialDays: 14 });
+        return Response.json({ error: "Service Unavailable" }, { status: 503 });
       }
       throw new Error(`Unexpected E2E request: ${url.pathname}`);
     });
@@ -164,6 +174,7 @@ describe("subscription entitlement user journey", () => {
     expect(window.location.pathname).toBe("/profile/billing");
     const billingDialog = await screen.findByRole("dialog", { name: "料金プラン" });
     expect(billingDialog.className).toContain("z-[70]");
+    expect(await screen.findByRole("button", { name: "Liteを選ぶ" })).toBeTruthy();
     const profileDialog = document.querySelector<HTMLDialogElement>(
       'dialog[aria-labelledby="profile-settings-title"]',
     );

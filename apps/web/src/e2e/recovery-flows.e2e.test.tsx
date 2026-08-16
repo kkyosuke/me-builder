@@ -281,4 +281,25 @@ describe("Web recovery flows E2E", () => {
       expect.objectContaining({ headers: { Authorization: "Bearer dummy.id.token" } }),
     );
   });
+
+  it("診断画面のうつしレベルを固定プロフィールアイコンと重ならない位置に表示する", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = urlOf(input);
+      if (url.pathname === "/api/legal/terms") return Response.json(acceptedTermsStatus);
+      if (url.pathname === "/api/profile") return Response.json(accountProfile);
+      if (url.pathname === "/api/diagnoses") return Response.json(diagnosisList);
+      if (url.pathname === "/api/profile/progression") return Response.json(progression);
+      throw new Error(`Unexpected E2E request: ${url.pathname}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    const level = await screen.findByRole("link", {
+      name: "うつしレベル2、わたしのまとめを見る",
+    });
+    const profileButton = await screen.findByRole("button", { name: "プロフィールを開く" });
+    expect(level.parentElement?.className).toContain("pr-14");
+    expect(profileButton.className).toContain("fixed");
+  });
 });

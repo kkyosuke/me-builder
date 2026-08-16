@@ -143,6 +143,19 @@ export function BillingPlanScreen({
                   再試行
                 </button>
               </div>
+            ) : plans.data.length === 0 ? (
+              <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 text-center dark:border-slate-700 dark:bg-slate-900">
+                <output className="block text-sm text-slate-600 dark:text-slate-300">
+                  購入できる料金プランを表示できませんでした。
+                </output>
+                <button
+                  type="button"
+                  onClick={onRetry}
+                  className="mt-4 min-h-11 rounded-xl border border-violet-400 px-4 font-bold text-violet-700 dark:text-violet-200"
+                >
+                  再読み込み
+                </button>
+              </div>
             ) : (
               <div className="mt-6 grid gap-4 sm:grid-cols-3">
                 {plans.data.map((plan) => {

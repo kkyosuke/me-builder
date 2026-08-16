@@ -64,21 +64,23 @@ export default function BillingPlanApplication({
     loadController.current = controller;
     setPlans({ status: "loading" });
     setEntitlement({ status: "loading" });
-    try {
-      const [nextPlans, nextEntitlement] = await Promise.all([
-        fetchBillingPlanCatalog(config.apiUrl, controller.signal),
-        token(controller.signal).then((idToken) =>
-          fetchProfileEntitlement(config.apiUrl, idToken, controller.signal),
-        ),
-      ]);
-      setPlans({ status: "success", data: nextPlans });
-      setEntitlement({ status: "success", data: nextEntitlement });
-    } catch (error) {
-      if (controller.signal.aborted) return;
-      const errorMessage = message(error);
-      setPlans({ status: "error", message: errorMessage });
-      setEntitlement({ status: "error", message: errorMessage });
-    }
+    const [catalogResult, entitlementResult] = await Promise.allSettled([
+      fetchBillingPlanCatalog(config.apiUrl, controller.signal),
+      token(controller.signal).then((idToken) =>
+        fetchProfileEntitlement(config.apiUrl, idToken, controller.signal),
+      ),
+    ]);
+    if (controller.signal.aborted) return;
+    setPlans(
+      catalogResult.status === "fulfilled"
+        ? { status: "success", data: catalogResult.value }
+        : { status: "error", message: message(catalogResult.reason) },
+    );
+    setEntitlement(
+      entitlementResult.status === "fulfilled"
+        ? { status: "success", data: entitlementResult.value }
+        : { status: "error", message: message(entitlementResult.reason) },
+    );
   }, [token]);
 
   useEffect(() => {
