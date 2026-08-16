@@ -64,6 +64,12 @@ export const loadPersonalDataApplication = memoizeModuleLoader(() =>
   })),
 );
 
+export const loadFamilySeatApplication = memoizeModuleLoader(() =>
+  import("./feature/family").then((feature) => ({
+    default: feature.FamilySeatApplication,
+  })),
+);
+
 export function loadMainApplication(route: MainApplicationRoute): Promise<LazyApplicationModule> {
   if (route === "me") return loadProfileApplication();
   if (route === "compatibility") return loadCompatibilityApplication();
