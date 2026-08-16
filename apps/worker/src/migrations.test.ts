@@ -148,7 +148,13 @@ describe("Durable Object clean baseline migrations", () => {
         database.exec(statement);
       }
     };
-    for (const filename of files.slice(0, -1)) apply(filename);
+    const upgradeIndex = files.findIndex((filename) =>
+      readFileSync(path.join(directory, filename), "utf8").includes(
+        "ALTER TABLE `progression_events` ADD `category`",
+      ),
+    );
+    if (upgradeIndex < 0) throw new Error("Progression category migration is missing");
+    for (const filename of files.slice(0, upgradeIndex)) apply(filename);
     database.exec(`
       INSERT INTO account_data_identity (singleton, account_id) VALUES (1, 'account-1');
       INSERT INTO source_records
@@ -179,7 +185,7 @@ describe("Durable Object clean baseline migrations", () => {
          'initialization', 'progression-v1', 'initialization', 0, 0);
     `);
 
-    const upgrade = files.at(-1);
+    const upgrade = files[upgradeIndex];
     if (!upgrade) throw new Error("Progression category migration is missing");
     apply(upgrade);
 

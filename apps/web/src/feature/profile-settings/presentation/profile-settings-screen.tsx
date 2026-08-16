@@ -56,6 +56,7 @@ export function ProfileSettingsScreen({
   onOpenAdmin,
   onOpenAvatar,
   onOpenBillingPortal,
+  onOpenPersonalData,
   canOpenBrainItems = false,
   onOpenBrainItems,
   onRetryProfile,
@@ -79,6 +80,7 @@ export function ProfileSettingsScreen({
   onOpenAdmin?: () => void;
   onOpenAvatar: () => void;
   onOpenBillingPortal?: () => Promise<void>;
+  onOpenPersonalData?: () => void;
   canOpenBrainItems?: boolean;
   onOpenBrainItems?: () => void;
   onRetryProfile?: () => void;
@@ -527,6 +529,31 @@ export function ProfileSettingsScreen({
                 </p>
               )}
             </div>
+          </section>
+        )}
+
+        {onOpenPersonalData && (
+          <section aria-labelledby="personal-data-heading" className="mt-8">
+            <h2
+              id="personal-data-heading"
+              className="px-1 text-sm font-bold tracking-wider text-slate-500 dark:text-slate-400"
+            >
+              あなたのデータ
+            </h2>
+            <button
+              type="button"
+              onClick={onOpenPersonalData}
+              className="mt-3 flex min-h-14 w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-left font-bold shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:border-slate-700 dark:bg-slate-800"
+            >
+              <FileText className="size-5 text-sky-600 dark:text-sky-300" aria-hidden="true" />
+              <span className="flex-1">
+                <span className="block">入力データを確認・訂正・削除</span>
+                <span className="mt-1 block text-xs font-normal text-slate-500 dark:text-slate-400">
+                  診断回答と日記を管理
+                </span>
+              </span>
+              <ChevronRight className="size-5 text-slate-400" aria-hidden="true" />
+            </button>
           </section>
         )}
 

@@ -55,6 +55,11 @@ import {
 } from "./contract/legal/terms";
 import { openApiOptions } from "./contract/openapi";
 import {
+  correctPersonalDataRecordRoute,
+  deletePersonalDataRecordRoute,
+  personalDataRecordsRoute,
+} from "./contract/personal-data/records";
+import {
   deleteProfileAvatarRoute,
   getProfileAvatarImageRoute,
   getProfileRoute,
@@ -111,6 +116,11 @@ import {
   putServiceTermsAcceptance,
 } from "./controller/legal";
 import { postLineWebhook } from "./controller/line";
+import {
+  deletePersonalDataRecordContents,
+  getPersonalDataRecords,
+  patchPersonalDataRecord,
+} from "./controller/personal-data";
 import {
   getProfileProgressionContents,
   getProfileSummaryContents,
@@ -238,6 +248,18 @@ app.get("/api/profile/progression", profileProgressionRoute, getProfileProgressi
 app.get("/api/profile/avatar", getProfileAvatarImageRoute, getProfileAvatarImageContents);
 app.put("/api/profile/avatar", putProfileAvatarRoute, putProfileAvatar);
 app.delete("/api/profile/avatar", deleteProfileAvatarRoute, deleteProfileAvatarContents);
+
+app.get("/api/personal-data/records", personalDataRecordsRoute, getPersonalDataRecords);
+app.patch(
+  "/api/personal-data/records/:sourceRecordId",
+  correctPersonalDataRecordRoute,
+  patchPersonalDataRecord,
+);
+app.delete(
+  "/api/personal-data/records/:sourceRecordId",
+  deletePersonalDataRecordRoute,
+  deletePersonalDataRecordContents,
+);
 
 app.get("/api/dev/brain-items", developmentBrainItemsRoute, getDevelopmentBrainItems);
 app.get(

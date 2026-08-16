@@ -22,4 +22,10 @@ describe("operationalHttpPath", () => {
   ])("相性関係IDを運用ログへ含めない: %s", (path) => {
     expect(operationalHttpPath(path)).toBe("/api/compatibility/relationships/:relationshipId");
   });
+
+  it("Source Record IDを運用ログへ含めない", () => {
+    expect(operationalHttpPath("/api/personal-data/records/source-1")).toBe(
+      "/api/personal-data/records/:sourceRecordId",
+    );
+  });
 });

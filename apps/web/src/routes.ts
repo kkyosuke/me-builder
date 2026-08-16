@@ -58,6 +58,12 @@ export const loadAvatarSettingsScreen = memoizeModuleLoader(() =>
   })),
 );
 
+export const loadPersonalDataApplication = memoizeModuleLoader(() =>
+  import("./feature/profile-settings/presentation/personal-data-application").then((feature) => ({
+    default: feature.PersonalDataApplication,
+  })),
+);
+
 export function loadMainApplication(route: MainApplicationRoute): Promise<LazyApplicationModule> {
   if (route === "me") return loadProfileApplication();
   if (route === "compatibility") return loadCompatibilityApplication();

@@ -120,6 +120,15 @@ export type AccountDataActions = {
   ) => Promise<CompatibilityReference | null>;
   "compatibility.listVisibleReferences": () => Promise<readonly CompatibilityReference[]>;
   "source.hasActive": RpcAction<[], typeof source.hasActiveSourceRecords>;
+  "source.listPersonalData": RpcAction<[], typeof source.listPersonalDataRecords>;
+  "source.correctPersonalData": RpcAction<
+    [sourceRecordId: string, input: source.CorrectPersonalDataRecordInput, at?: Date],
+    typeof source.correctPersonalDataRecord
+  >;
+  "source.deletePersonalData": RpcAction<
+    [sourceRecordId: string, at?: Date],
+    typeof source.deletePersonalDataRecord
+  >;
   "profileSummary.read": (
     at?: Date,
     allowUnchangedRegeneration?: boolean,

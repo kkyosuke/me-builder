@@ -31,6 +31,7 @@ import {
   loadDevelopmentBrainItemsApplication,
   loadDiagnosisApplication,
   loadMainApplication,
+  loadPersonalDataApplication,
   loadProfileApplication,
   loadProfileSettingsScreen,
   preloadAvatarSettingsScreen,
@@ -45,9 +46,10 @@ const DiagnosisApplication = lazy(loadDiagnosisApplication);
 const ProfileApplication = lazy(loadProfileApplication);
 const ProfileSettingsScreen = lazy(loadProfileSettingsScreen);
 const AvatarSettingsScreen = lazy(loadAvatarSettingsScreen);
+const PersonalDataApplication = lazy(loadPersonalDataApplication);
 const DevelopmentBrainItemsApplication = lazy(loadDevelopmentBrainItemsApplication);
 
-type ProfileView = "closed" | "profile" | "avatar" | "brain-items";
+type ProfileView = "closed" | "profile" | "avatar" | "personal-data" | "brain-items";
 type MainRoute = "compatibility" | "diagnosis" | "me";
 
 const DEVELOPMENT_ENVIRONMENTS = new Set(["development", "local", "preview", "test"]);
@@ -57,6 +59,7 @@ const PROFILE_RETURN_PATHNAME_STATE_KEY = "me-builder-profile-return-pathname";
 
 function resolveProfileView(pathname: string): ProfileView {
   if (pathname.startsWith("/profile/avatar")) return "avatar";
+  if (pathname.startsWith("/profile/personal-data")) return "personal-data";
   if (pathname.startsWith("/profile/brain-items")) {
     return DEVELOPMENT_ENVIRONMENTS.has(config.environment ?? "") ? "brain-items" : "profile";
   }
@@ -67,7 +70,12 @@ function resolveProfileView(pathname: string): ProfileView {
 function historyProfileView(state: unknown): Exclude<ProfileView, "closed"> | null {
   if (!state || typeof state !== "object") return null;
   const value = (state as Record<string, unknown>)[PROFILE_HISTORY_STATE_KEY];
-  return value === "profile" || value === "avatar" || value === "brain-items" ? value : null;
+  return value === "profile" ||
+    value === "avatar" ||
+    value === "personal-data" ||
+    value === "brain-items"
+    ? value
+    : null;
 }
 
 function historyProfileReturnPathname(state: unknown): string | null {
@@ -319,6 +327,15 @@ function AppContents() {
     setNavigation((current) => ({ ...current, profileView: "brain-items" }));
   };
 
+  const openPersonalData = () => {
+    window.history.pushState(
+      { [PROFILE_HISTORY_STATE_KEY]: "personal-data" },
+      "",
+      "/profile/personal-data",
+    );
+    setNavigation((current) => ({ ...current, profileView: "personal-data" }));
+  };
+
   const closeAvatar = () => {
     if (historyProfileView(window.history.state) === "avatar") {
       setNavigation((current) => ({ ...current, profileView: "profile" }));
@@ -332,6 +349,17 @@ function AppContents() {
 
   const closeBrainItems = () => {
     if (historyProfileView(window.history.state) === "brain-items") {
+      setNavigation((current) => ({ ...current, profileView: "profile" }));
+      window.history.back();
+      return;
+    }
+
+    window.history.replaceState({}, "", "/profile");
+    setNavigation((current) => ({ ...current, profileView: "profile" }));
+  };
+
+  const closePersonalData = () => {
+    if (historyProfileView(window.history.state) === "personal-data") {
       setNavigation((current) => ({ ...current, profileView: "profile" }));
       window.history.back();
       return;
@@ -434,6 +462,7 @@ function AppContents() {
               onOpenAdmin={openAdmin}
               onOpenAvatar={openAvatar}
               onOpenBillingPortal={openBillingPortal}
+              onOpenPersonalData={openPersonalData}
               canOpenBrainItems={DEVELOPMENT_ENVIRONMENTS.has(config.environment ?? "")}
               onOpenBrainItems={openBrainItems}
               onRetryProfile={() => setProfileReloadKey((current) => current + 1)}
@@ -471,6 +500,18 @@ function AppContents() {
             }
           >
             <DevelopmentBrainItemsApplication onBack={closeBrainItems} />
+          </Suspense>
+        </RouteErrorBoundary>
+      )}
+      {profileView === "personal-data" && (
+        <RouteErrorBoundary>
+          <Suspense
+            fallback={<LoadingState message="入力データを読み込んでいます..." variant="overlay" />}
+          >
+            <PersonalDataApplication
+              onBack={closePersonalData}
+              onChanged={() => setAccountDataResetKey((current) => current + 1)}
+            />
           </Suspense>
         </RouteErrorBoundary>
       )}

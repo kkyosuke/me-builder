@@ -90,4 +90,19 @@ export const brainActions = {
     DO.account.action.brain.resetAllFailedBrainVectorSyncJobs(db, at),
   "source.hasActive": (db: DO.account.Database, accountId: string) =>
     DO.account.action.source.hasActiveSourceRecords(db, accountId),
+  "source.listPersonalData": (db: DO.account.Database, accountId: string) =>
+    DO.account.action.source.listPersonalDataRecords(db, accountId),
+  "source.correctPersonalData": (
+    db: DO.account.Database,
+    accountId: string,
+    sourceRecordId: string,
+    input: Parameters<typeof DO.account.action.source.correctPersonalDataRecord>[3],
+    at?: Date,
+  ) => DO.account.action.source.correctPersonalDataRecord(db, accountId, sourceRecordId, input, at),
+  "source.deletePersonalData": (
+    db: DO.account.Database,
+    accountId: string,
+    sourceRecordId: string,
+    at?: Date,
+  ) => DO.account.action.source.deletePersonalDataRecord(db, accountId, sourceRecordId, at),
 } as const;

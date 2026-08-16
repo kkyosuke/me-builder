@@ -278,6 +278,41 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/personal-data/records": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** 本人が訂正・削除できる診断回答と日記を取得する */
+    get: operations["listPersonalDataRecords"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/personal-data/records/{sourceRecordId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** 原本をtombstoneへ遷移し今後の利用を止める */
+    delete: operations["deletePersonalDataRecord"];
+    options?: never;
+    head?: never;
+    /** 原本を上書きせず新版として訂正する */
+    patch: operations["correctPersonalDataRecord"];
+    trace?: never;
+  };
   "/api/dev/brain-items": {
     parameters: {
       query?: never;
@@ -2396,6 +2431,291 @@ export interface operations {
         };
       };
       /** @description D1またはPrivate R2 bindingが設定されていない */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Service Unavailable";
+          };
+        };
+      };
+    };
+  };
+  listPersonalDataRecords: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 現在有効な本人入力 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            records: (
+              | {
+                  id: string;
+                  /** @constant */
+                  kind: "diagnosis";
+                  title: string;
+                  value: string;
+                  /** Format: date-time */
+                  recordedAt: string;
+                  diagnosisId: string;
+                  choices: {
+                    id: string;
+                    label: string;
+                  }[];
+                }
+              | {
+                  id: string;
+                  /** @constant */
+                  kind: "diary";
+                  /** @constant */
+                  title: "日記";
+                  value: string;
+                  /** Format: date-time */
+                  recordedAt: string;
+                }
+            )[];
+          };
+        };
+      };
+      /** @description LIFF IDトークンを検証できない */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Unauthorized";
+          };
+        };
+      };
+      /** @description 対応するAccountが存在しない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Account not found";
+            /** @constant */
+            reason: "friendship_required";
+          };
+        };
+      };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
+          };
+        };
+      };
+      /** @description AccountData bindingが設定されていない */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Service Unavailable";
+          };
+        };
+      };
+    };
+  };
+  deletePersonalDataRecord: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        sourceRecordId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 削除受付結果 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @enum {string} */
+            outcome: "updated" | "deleted" | "unchanged";
+            recordId: string;
+            invalidatedBrainItemCount: number;
+          };
+        };
+      };
+      /** @description LIFF IDトークンを検証できない */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Unauthorized";
+          };
+        };
+      };
+      /** @description 本人が所有する有効な原本がない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Personal data record not found";
+          };
+        };
+      };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
+          };
+        };
+      };
+      /** @description AccountData bindingが設定されていない */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Service Unavailable";
+          };
+        };
+      };
+    };
+  };
+  correctPersonalDataRecord: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        sourceRecordId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json":
+          | {
+              /** @constant */
+              kind: "diagnosis";
+              choiceId: string;
+            }
+          | {
+              /** @constant */
+              kind: "diary";
+              value: string;
+            };
+      };
+    };
+    responses: {
+      /** @description 訂正結果 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @enum {string} */
+            outcome: "updated" | "deleted" | "unchanged";
+            recordId: string;
+            invalidatedBrainItemCount: number;
+          };
+        };
+      };
+      /** @description bodyまたは種別が不正 */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Invalid personal data mutation";
+          };
+        };
+      };
+      /** @description LIFF IDトークンを検証できない */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Unauthorized";
+          };
+        };
+      };
+      /** @description 本人が所有する有効な原本がない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Personal data record not found";
+          };
+        };
+      };
+      /** @description 診断の選択肢が不正 */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Invalid personal data mutation";
+          };
+        };
+      };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
+          };
+        };
+      };
+      /** @description AccountData bindingが設定されていない */
       503: {
         headers: {
           [name: string]: unknown;
