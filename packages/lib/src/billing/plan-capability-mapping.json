@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "plans": {
+    "free": {
+      "displayName": "Free",
+      "capabilities": {
+        "diary-storage": "enabled",
+        "diagnosis-basic-results": "enabled",
+        "ai-reply": "monthly-20",
+        "relationship-question-context": "current-message",
+        "profile-summary": "rolling-90-days-1",
+        "weekly-reflection": "disabled",
+        "monthly-change": "none",
+        "semantic-search": "30-days",
+        "goal-follow-up": "none",
+        "personalized-self-care": "general",
+        "basic-compatibility-sheet": "enabled",
+        "relationship-reflection": "none",
+        "account-seats": "one"
+      }
+    },
+    "lite": {
+      "displayName": "Lite",
+      "capabilities": {
+        "diary-storage": "enabled",
+        "diagnosis-basic-results": "enabled",
+        "ai-reply": "monthly-150",
+        "relationship-question-context": "session-and-diagnosis",
+        "profile-summary": "monthly-4",
+        "weekly-reflection": "enabled",
+        "monthly-change": "brief",
+        "semantic-search": "one-year",
+        "goal-follow-up": "selected-one",
+        "personalized-self-care": "confirmed",
+        "basic-compatibility-sheet": "enabled",
+        "relationship-reflection": "one",
+        "account-seats": "one"
+      }
+    },
+    "full": {
+      "displayName": "Full",
+      "capabilities": {
+        "diary-storage": "enabled",
+        "diagnosis-basic-results": "enabled",
+        "ai-reply": "monthly-600",
+        "relationship-question-context": "confirmed-history",
+        "profile-summary": "monthly-12",
+        "weekly-reflection": "enabled-full",
+        "monthly-change": "full",
+        "semantic-search": "unlimited",
+        "goal-follow-up": "relevant-active",
+        "personalized-self-care": "personalized-history",
+        "basic-compatibility-sheet": "enabled",
+        "relationship-reflection": "five",
+        "account-seats": "one"
+      }
+    },
+    "family": {
+      "displayName": "ファミリーパック",
+      "capabilities": {
+        "diary-storage": "enabled",
+        "diagnosis-basic-results": "enabled",
+        "ai-reply": "monthly-600",
+        "relationship-question-context": "confirmed-history",
+        "profile-summary": "monthly-12",
+        "weekly-reflection": "enabled-full",
+        "monthly-change": "full",
+        "semantic-search": "unlimited",
+        "goal-follow-up": "relevant-active",
+        "personalized-self-care": "personalized-history",
+        "basic-compatibility-sheet": "enabled",
+        "relationship-reflection": "family-five",
+        "account-seats": "four"
+      }
+    }
+  }
+}

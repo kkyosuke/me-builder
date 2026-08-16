@@ -7,12 +7,16 @@ import {
   planAssignmentSources,
   planCodes,
 } from "./account-plan-assignment";
+import { resolvePlanCapabilityValues } from "./plan-capability";
 
 export const entitlementFeatures = [
+  "diary-storage",
+  "diagnosis-basic-results",
   "weekly-reflection",
   "monthly-change",
   "goal-follow-up",
   "personalized-self-care",
+  "basic-compatibility-sheet",
   "relationship-reflection",
 ] as const;
 export type EntitlementFeature = (typeof entitlementFeatures)[number];
@@ -33,80 +37,37 @@ export type EntitlementPolicy = Readonly<{
   features: Readonly<Record<EntitlementFeature, boolean>>;
 }>;
 
-const policies = {
-  free: {
-    aiReply: { limit: 20, period: "assignment-month" },
-    profileSummary: { limit: 1, period: "rolling-90-days" },
-    semanticSearchDays: 30,
-    relationshipQuestionContext: "current-message",
-    monthlyChange: "none",
-    goalFollowUp: "none",
-    selfCareContext: "general",
-    concurrentRelationshipLimit: 0,
-    familySeatLimit: 0,
-    features: {
-      "weekly-reflection": false,
-      "monthly-change": false,
-      "goal-follow-up": false,
-      "personalized-self-care": false,
-      "relationship-reflection": false,
-    },
-  },
-  lite: {
-    aiReply: { limit: 150, period: "assignment-month" },
-    profileSummary: { limit: 4, period: "assignment-month" },
-    semanticSearchDays: 365,
-    relationshipQuestionContext: "session-and-diagnosis",
-    monthlyChange: "brief",
-    goalFollowUp: "selected-one",
-    selfCareContext: "confirmed",
-    concurrentRelationshipLimit: 1,
-    familySeatLimit: 0,
-    features: {
-      "weekly-reflection": true,
-      "monthly-change": true,
-      "goal-follow-up": true,
-      "personalized-self-care": true,
-      "relationship-reflection": true,
-    },
-  },
-  full: {
-    aiReply: { limit: 600, period: "assignment-month" },
-    profileSummary: { limit: 12, period: "assignment-month" },
-    semanticSearchDays: null,
-    relationshipQuestionContext: "confirmed-history",
-    monthlyChange: "full",
-    goalFollowUp: "relevant-active",
-    selfCareContext: "personalized-history",
-    concurrentRelationshipLimit: 5,
-    familySeatLimit: 0,
-    features: {
-      "weekly-reflection": true,
-      "monthly-change": true,
-      "goal-follow-up": true,
-      "personalized-self-care": true,
-      "relationship-reflection": true,
-    },
-  },
-  family: {
-    aiReply: { limit: 600, period: "assignment-month" },
-    profileSummary: { limit: 12, period: "assignment-month" },
-    semanticSearchDays: null,
-    relationshipQuestionContext: "confirmed-history",
-    monthlyChange: "full",
-    goalFollowUp: "relevant-active",
-    selfCareContext: "personalized-history",
-    concurrentRelationshipLimit: 5,
-    familySeatLimit: 4,
-    features: {
-      "weekly-reflection": true,
-      "monthly-change": true,
-      "goal-follow-up": true,
-      "personalized-self-care": true,
-      "relationship-reflection": true,
-    },
-  },
-} as const satisfies Readonly<Record<PlanCode, EntitlementPolicy>>;
+const policies = Object.freeze(
+  Object.fromEntries(planCodes.map((plan) => [plan, policyFor(plan)])) as Record<
+    PlanCode,
+    EntitlementPolicy
+  >,
+);
+
+function policyFor(plan: PlanCode): EntitlementPolicy {
+  const values = resolvePlanCapabilityValues(plan);
+  return Object.freeze({
+    aiReply: values.aiReply,
+    profileSummary: values.profileSummary,
+    semanticSearchDays: values.semanticSearchDays,
+    relationshipQuestionContext: values.relationshipQuestionContext,
+    monthlyChange: values.monthlyChange,
+    goalFollowUp: values.goalFollowUp,
+    selfCareContext: values.selfCareContext,
+    concurrentRelationshipLimit: values.concurrentRelationshipLimit,
+    familySeatLimit: plan === "family" ? values.accountSeatLimit : 0,
+    features: Object.freeze({
+      "diary-storage": values.diaryStorage,
+      "diagnosis-basic-results": values.diagnosisBasicResults,
+      "weekly-reflection": values.weeklyReflection,
+      "monthly-change": values.monthlyChange !== "none",
+      "goal-follow-up": values.goalFollowUp !== "none",
+      "personalized-self-care": values.selfCareContext !== "general",
+      "basic-compatibility-sheet": values.basicCompatibilitySheet,
+      "relationship-reflection": values.concurrentRelationshipLimit > 0,
+    }),
+  });
+}
 
 export const entitlementFallbackReasons = [
   "provider-unavailable",

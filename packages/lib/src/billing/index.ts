@@ -3,6 +3,7 @@ export * from "./entitlement";
 export * from "./family-seat";
 export * from "./family-seat-assignment-provider";
 export * from "./fake-provider";
+export * from "./plan-capability";
 export * from "./provider";
 export * from "./purchase-rollout";
 export * from "./stripe-adapter";

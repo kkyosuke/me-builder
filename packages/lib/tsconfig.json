@@ -4,8 +4,9 @@
     "composite": true,
     "declaration": true,
     "declarationMap": true,
+    "resolveJsonModule": true,
     "outDir": "./dist",
     "rootDir": "./src"
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*", "src/**/*.json"]
 }

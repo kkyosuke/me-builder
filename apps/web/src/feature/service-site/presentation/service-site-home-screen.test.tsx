@@ -22,6 +22,17 @@ describe("ServiceSiteHomeScreen", () => {
     expect(screen.getByRole("heading", { name: "記録する。見つける。振り返る。" })).toBeTruthy();
   });
 
+  it("共通のPlanマッピングから機能比較を表示する", () => {
+    render(<ServiceSiteHomeScreen />);
+
+    const comparison = screen.getByRole("table", { name: "プランごとの機能と利用範囲" });
+    expect(comparison.textContent).toContain("AIによる意味検索");
+    expect(comparison.textContent).toContain("直近30日");
+    expect(comparison.textContent).toContain("直近1年");
+    expect(comparison.textContent).toContain("保存されている全期間");
+    expect(screen.getByRole("columnheader", { name: "ファミリーパック" })).toBeTruthy();
+  });
+
   it("公開ページ用の検索メタデータを設定する", () => {
     render(<ServiceSiteHomeScreen />);
 

@@ -8,13 +8,9 @@ vi.mock("./App", () => ({
   App: () => <main>本人向けアプリ</main>,
 }));
 
-vi.mock("./feature/service-site", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("./feature/service-site")>();
-  return {
-    ...actual,
-    ServiceSiteApplication: () => <main>サービス紹介トップ</main>,
-  };
-});
+vi.mock("./feature/service-site", () => ({
+  ServiceSiteApplication: () => <main>サービス紹介トップ</main>,
+}));
 
 describe("RootApplication", () => {
   beforeEach(() => {

@@ -1,0 +1,188 @@
+{
+  "schemaVersion": 1,
+  "capabilities": {
+    "diary-storage": {
+      "order": 10,
+      "label": "LINEの日記保存",
+      "description": "LINEで送った日記を本人の記録として保存します。",
+      "kind": "toggle",
+      "options": {
+        "enabled": { "display": "利用可能", "value": true }
+      }
+    },
+    "diagnosis-basic-results": {
+      "order": 20,
+      "label": "公開中の診断と基本結果",
+      "description": "公開中の診断へ回答し、基本結果を確認できます。",
+      "kind": "toggle",
+      "options": {
+        "enabled": { "display": "利用可能", "value": true }
+      }
+    },
+    "ai-reply": {
+      "order": 30,
+      "label": "完成したAI返信",
+      "description": "正常に返されたAI返信の利用上限です。",
+      "kind": "quota",
+      "options": {
+        "monthly-20": {
+          "display": "月20回",
+          "value": { "limit": 20, "period": "assignment-month" }
+        },
+        "monthly-150": {
+          "display": "月150回",
+          "value": { "limit": 150, "period": "assignment-month" }
+        },
+        "monthly-600": {
+          "display": "月600回",
+          "value": { "limit": 600, "period": "assignment-month" }
+        }
+      }
+    },
+    "relationship-question-context": {
+      "order": 40,
+      "label": "関係性を考慮した質問",
+      "description": "質問を考えるときに利用できる本人情報の範囲です。",
+      "kind": "mode",
+      "options": {
+        "current-message": {
+          "display": "現在の発言に明示された関係だけ",
+          "value": "current-message"
+        },
+        "session-and-diagnosis": {
+          "display": "現在Sessionと本人の診断結果",
+          "value": "session-and-diagnosis"
+        },
+        "confirmed-history": {
+          "display": "確認済みの過去の記憶・傾向も利用",
+          "value": "confirmed-history"
+        }
+      }
+    },
+    "profile-summary": {
+      "order": 50,
+      "label": "「わたしのまとめ」生成",
+      "description": "診断と記録からまとめを新しく生成できる回数です。",
+      "kind": "quota",
+      "options": {
+        "rolling-90-days-1": {
+          "display": "初回1回と90日に1回",
+          "value": { "limit": 1, "period": "rolling-90-days" }
+        },
+        "monthly-4": {
+          "display": "月4回",
+          "value": { "limit": 4, "period": "assignment-month" }
+        },
+        "monthly-12": {
+          "display": "月12回",
+          "value": { "limit": 12, "period": "assignment-month" }
+        }
+      }
+    },
+    "weekly-reflection": {
+      "order": 60,
+      "label": "今週の振り返り",
+      "description": "1週間の記録をまとめて振り返ります。",
+      "kind": "toggle",
+      "options": {
+        "disabled": { "display": "なし", "value": false },
+        "enabled": { "display": "週1回", "value": true },
+        "enabled-full": {
+          "display": "週1回、過去との差分と次の一歩を含む",
+          "value": true
+        }
+      }
+    },
+    "monthly-change": {
+      "order": 70,
+      "label": "月ごとの変化",
+      "description": "月をまたいだ変化を表示する詳しさです。",
+      "kind": "mode",
+      "options": {
+        "none": { "display": "なし", "value": "none" },
+        "brief": { "display": "主な変化を短く表示", "value": "brief" },
+        "full": {
+          "display": "根拠、変化、継続中のGoalを横断して表示",
+          "value": "full"
+        }
+      }
+    },
+    "semantic-search": {
+      "order": 80,
+      "label": "AIによる意味検索",
+      "description": "記録から関連する内容を探す対象期間です。",
+      "kind": "lookback",
+      "options": {
+        "30-days": { "display": "直近30日", "value": 30 },
+        "90-days": { "display": "直近90日", "value": 90 },
+        "one-year": { "display": "直近1年", "value": 365 },
+        "unlimited": { "display": "保存されている全期間", "value": null }
+      }
+    },
+    "goal-follow-up": {
+      "order": 90,
+      "label": "行動のフォローアップ",
+      "description": "本人が選んだ行動を後から確認する範囲です。",
+      "kind": "mode",
+      "options": {
+        "none": { "display": "なし", "value": "none" },
+        "selected-one": { "display": "本人が選んだ1件", "value": "selected-one" },
+        "relevant-active": {
+          "display": "継続中Goalから話題に関係する1件",
+          "value": "relevant-active"
+        }
+      }
+    },
+    "personalized-self-care": {
+      "order": 100,
+      "label": "個別化されたAIセルフケア相談",
+      "description": "セルフケア相談で参照できる本人情報の範囲です。",
+      "kind": "mode",
+      "options": {
+        "general": { "display": "一般的な案と安全案内", "value": "general" },
+        "confirmed": {
+          "display": "確認済み情報があれば参照",
+          "value": "confirmed"
+        },
+        "personalized-history": {
+          "display": "対処履歴と最近の状態を参照",
+          "value": "personalized-history"
+        }
+      }
+    },
+    "basic-compatibility-sheet": {
+      "order": 110,
+      "label": "基本の相性シート",
+      "description": "双方が同意した基本の相性シートを確認できます。",
+      "kind": "toggle",
+      "options": {
+        "enabled": { "display": "利用可能", "value": true }
+      }
+    },
+    "relationship-reflection": {
+      "order": 120,
+      "label": "2人の継続的な振り返り",
+      "description": "同時に継続利用できる相性関係の数です。",
+      "kind": "limit",
+      "options": {
+        "none": { "display": "なし", "value": 0 },
+        "one": { "display": "同時に1関係", "value": 1 },
+        "five": { "display": "同時に5関係", "value": 5 },
+        "family-five": {
+          "display": "パック参加者間と、Accountごとに外部5関係",
+          "value": 5
+        }
+      }
+    },
+    "account-seats": {
+      "order": 130,
+      "label": "利用できるAccount数",
+      "description": "1契約で利用権限を付与できるAccount数です。",
+      "kind": "limit",
+      "options": {
+        "one": { "display": "1", "value": 1 },
+        "four": { "display": "最大4", "value": 4 }
+      }
+    }
+  }
+}

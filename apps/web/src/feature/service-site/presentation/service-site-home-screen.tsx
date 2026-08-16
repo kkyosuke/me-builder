@@ -1,3 +1,4 @@
+import { getPlanCapabilityComparison } from "@me-builder/lib/billing/plan-capability";
 import {
   BookOpen,
   Brain,
@@ -17,6 +18,7 @@ import { LineFriendAddButton } from "./components/line-friend-add-button";
 
 const bannerUrl = "/images/service/banner.jpg";
 const characterGuidesUrl = "/images/service/character-guides.jpg";
+const planCapabilityComparison = getPlanCapabilityComparison();
 
 const features = [
   {
@@ -60,7 +62,7 @@ const faqs = [
   {
     question: "無料で使えますか？",
     answer:
-      "料金体系はまだ確定していません。一般公開前に、無料・有料の範囲と条件をこのサイトで案内します。",
+      "Freeと有料プランごとの利用範囲は、このページのプラン比較で案内しています。価格と一般提供の開始日は確定後に案内します。",
   },
   {
     question: "LINE公式アカウントの友だち追加は必要ですか？",
@@ -351,6 +353,65 @@ export function ServiceSiteHomeScreen() {
                   </span>
                 </div>
               ))}
+            </div>
+          </div>
+        </section>
+
+        <section
+          id="plans"
+          aria-labelledby="plans-heading"
+          className="scroll-mt-24 bg-slate-950 px-4 py-20 text-white sm:px-6 lg:px-8"
+        >
+          <div className="mx-auto max-w-7xl">
+            <p className="text-sm font-bold tracking-widest text-violet-300">提供予定のプラン</p>
+            <h2 id="plans-heading" className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">
+              記録は残したまま、使える範囲を選べます。
+            </h2>
+            <p className="mt-4 max-w-3xl leading-7 text-slate-300">
+              下記は現在予定している利用範囲です。価格と一般提供の開始日は確定後に案内します。
+            </p>
+            <p className="mt-4 w-fit rounded-full bg-amber-300/15 px-4 py-2 text-sm font-bold text-amber-200">
+              有料プランは準備中です
+            </p>
+            <div className="mt-10 overflow-x-auto rounded-3xl border border-slate-700 bg-slate-900 shadow-xl">
+              <table className="min-w-[64rem] border-collapse text-left">
+                <caption className="sr-only">プランごとの機能と利用範囲</caption>
+                <thead>
+                  <tr className="border-b border-slate-700 bg-slate-800/80">
+                    <th scope="col" className="sticky left-0 z-10 bg-slate-800 px-5 py-4 text-sm">
+                      機能
+                    </th>
+                    {planCapabilityComparison.plans.map((plan) => (
+                      <th key={plan.code} scope="col" className="min-w-48 px-5 py-4 text-base">
+                        {plan.displayName}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {planCapabilityComparison.capabilities.map((capability) => (
+                    <tr key={capability.id} className="border-b border-slate-800 last:border-0">
+                      <th
+                        scope="row"
+                        className="sticky left-0 z-10 bg-slate-900 px-5 py-5 align-top"
+                      >
+                        <span className="block font-bold">{capability.label}</span>
+                        <span className="mt-1 block max-w-xs text-xs font-normal leading-5 text-slate-400">
+                          {capability.description}
+                        </span>
+                      </th>
+                      {planCapabilityComparison.plans.map((plan) => (
+                        <td
+                          key={plan.code}
+                          className="px-5 py-5 align-top text-sm leading-6 text-slate-200"
+                        >
+                          {capability.plans[plan.code].display}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </section>
