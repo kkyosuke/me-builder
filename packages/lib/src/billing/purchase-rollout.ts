@@ -13,6 +13,25 @@ export type NewPurchaseDecision = Readonly<{
   reason: "eligible" | "new-purchases-paused" | "operator-only" | "invitation-required";
 }>;
 
+function isActiveStage(value: unknown): value is ActivePurchaseRolloutStage {
+  return activePurchaseRolloutStages.includes(value as ActivePurchaseRolloutStage);
+}
+
+function assertPurchaseRolloutState(state: PurchaseRolloutState): void {
+  if (state.stage !== "stopped" && !isActiveStage(state.stage)) {
+    throw new Error("Invalid purchase rollout stage");
+  }
+  if (state.resumeStage !== null && !isActiveStage(state.resumeStage)) {
+    throw new Error("Invalid purchase rollout resume stage");
+  }
+  if (state.stage !== "stopped" && state.resumeStage !== null) {
+    throw new Error("Active purchase rollout must not have a resume stage");
+  }
+  if (!Number.isFinite(Date.parse(state.changedAt))) {
+    throw new Error("Invalid purchase rollout changedAt");
+  }
+}
+
 export function initialPurchaseRolloutState(at = new Date()): PurchaseRolloutState {
   return Object.freeze({ stage: "stopped", resumeStage: null, changedAt: at.toISOString() });
 }
@@ -23,6 +42,8 @@ export function changePurchaseRolloutStage(
   target: ActivePurchaseRolloutStage,
   at = new Date(),
 ): PurchaseRolloutState {
+  assertPurchaseRolloutState(current);
+  if (!isActiveStage(target)) throw new Error("Invalid purchase rollout target stage");
   if (current.stage === "stopped") {
     if (target !== "operators") throw new Error("Purchase rollout must start with operators");
   } else {
@@ -40,6 +61,7 @@ export function stopNewPurchases(
   current: PurchaseRolloutState,
   at = new Date(),
 ): PurchaseRolloutState {
+  assertPurchaseRolloutState(current);
   if (current.stage === "stopped") return current;
   return Object.freeze({
     stage: "stopped",
@@ -52,6 +74,7 @@ export function resumeNewPurchases(
   current: PurchaseRolloutState,
   at = new Date(),
 ): PurchaseRolloutState {
+  assertPurchaseRolloutState(current);
   if (current.stage !== "stopped") return current;
   if (current.resumeStage === null) throw new Error("Purchase rollout has no stage to resume");
   return Object.freeze({
@@ -65,6 +88,7 @@ export function decideNewPurchase(
   state: PurchaseRolloutState,
   audience: Readonly<{ isOperator: boolean; isInvited: boolean }>,
 ): NewPurchaseDecision {
+  assertPurchaseRolloutState(state);
   if (state.stage === "stopped") {
     return Object.freeze({ allowed: false, reason: "new-purchases-paused" });
   }
@@ -106,8 +130,24 @@ export type PriceValidationMetrics = Readonly<{
 export function calculatePriceValidationMetrics(
   counts: PriceValidationCounts,
 ): PriceValidationMetrics {
+  if (!priceValidationWindows.includes(counts.windowDays)) {
+    throw new Error("windowDays must be 30 or 90");
+  }
   for (const [name, value] of Object.entries(counts)) {
     if (!Number.isFinite(value) || value < 0) throw new Error(`${name} must be non-negative`);
+  }
+  const countFields = [
+    "startingPaidAccounts",
+    "retainedPaidAccounts",
+    "planChangeCount",
+    "renewalAttemptCount",
+    "paymentFailureCount",
+    "paidAccountCount",
+    "feedbackCount",
+    "negativeFeedbackCount",
+  ] as const;
+  for (const field of countFields) {
+    if (!Number.isSafeInteger(counts[field])) throw new Error(`${field} must be a whole number`);
   }
   if (counts.retainedPaidAccounts > counts.startingPaidAccounts) {
     throw new Error("retainedPaidAccounts must not exceed startingPaidAccounts");

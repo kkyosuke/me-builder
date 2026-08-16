@@ -78,6 +78,22 @@ describe("purchase rollout", () => {
     expect(() => resumeNewPurchases(initialPurchaseRolloutState())).toThrow("no stage to resume");
   });
 
+  it("永続化された不正な段階状態を購入許可へ倒さない", () => {
+    const invalid = {
+      ...initialPurchaseRolloutState(),
+      stage: "unknown",
+    } as unknown as ReturnType<typeof initialPurchaseRolloutState>;
+    expect(() => decideNewPurchase(invalid, { isOperator: true, isInvited: true })).toThrow(
+      "Invalid purchase rollout stage",
+    );
+    expect(() =>
+      changePurchaseRolloutStage(
+        initialPurchaseRolloutState(),
+        "unknown" as Parameters<typeof changePurchaseRolloutStage>[1],
+      ),
+    ).toThrow("Invalid purchase rollout target stage");
+  });
+
   it.each([30, 90] as const)("%d日価格検証指標を個人識別子なしで計算する", (windowDays) => {
     expect(
       calculatePriceValidationMetrics({
@@ -124,5 +140,14 @@ describe("purchase rollout", () => {
     expect(() =>
       calculatePriceValidationMetrics({ ...empty, renewalAttemptCount: 1, paymentFailureCount: 2 }),
     ).toThrow("must not exceed");
+    expect(() =>
+      calculatePriceValidationMetrics({
+        ...empty,
+        windowDays: 60 as Parameters<typeof calculatePriceValidationMetrics>[0]["windowDays"],
+      }),
+    ).toThrow("windowDays must be 30 or 90");
+    expect(() => calculatePriceValidationMetrics({ ...empty, startingPaidAccounts: 0.5 })).toThrow(
+      "startingPaidAccounts must be a whole number",
+    );
   });
 });
