@@ -41,16 +41,15 @@ export async function requestProfileSummaryGeneration({
   queue,
   at = new Date(),
   allowUnchangedRegeneration = false,
-  planAssignmentProvider = new billing.FakeAccountPlanAssignmentProvider(),
+  planAssignmentProvider,
 }: Params): Promise<RequestProfileSummaryGenerationOutcome> {
   const session = await createLiffSession({ idToken, lineLoginChannelId, db });
   if (session.type !== "resolved") return session;
   if (!accountData || !queue) throw new Error("Profile Summary generation binding is missing");
   const account = accountDataFor(accountData, session.session.accountId);
-  const entitlement = await new billing.EntitlementService(planAssignmentProvider).resolve(
-    session.session.accountId,
-    at,
-  );
+  const entitlement = await new billing.EntitlementService(
+    new billing.FamilyAwareAccountPlanAssignmentProvider(db, planAssignmentProvider),
+  ).resolve(session.session.accountId, at);
   const period = billing.resolveEntitlementUsagePeriod(entitlement, "profile-summary", at);
   const usage = await account.execute(
     "aiUsage.read",

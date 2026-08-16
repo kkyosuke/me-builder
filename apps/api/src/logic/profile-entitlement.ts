@@ -29,7 +29,7 @@ export async function getProfileEntitlement({
   if (!accountData) throw new Error("AccountData binding is missing");
 
   const entitlement = await new billing.EntitlementService(
-    planAssignmentProvider ?? new billing.FamilySeatAccountPlanAssignmentProvider(db),
+    new billing.FamilyAwareAccountPlanAssignmentProvider(db, planAssignmentProvider),
   ).resolve(session.session.accountId, at);
   const account = accountDataFor(accountData, session.session.accountId);
   const aiReplyPeriod = billing.resolveEntitlementUsagePeriod(entitlement, "ai-reply", at);

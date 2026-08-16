@@ -15,7 +15,7 @@ import type { SharedD1Client } from "../d1/shared/client";
 import * as schema from "../d1/shared/schema";
 import { FakeAccountPlanAssignmentProvider } from "./account-plan-assignment";
 import { EntitlementService } from "./entitlement";
-import { FamilySeatAccountPlanAssignmentProvider } from "./family-seat-assignment-provider";
+import { FamilyAwareAccountPlanAssignmentProvider } from "./family-seat-assignment-provider";
 
 function createTestDb(): SharedD1Client {
   const sqlite = new Database(":memory:");
@@ -55,7 +55,7 @@ describe("FamilySeatAccountPlanAssignmentProvider", () => {
     await Promise.all(
       members.map((member, index) => activateFamilySeat(db, `invite-${index}`, member, joinedAt)),
     );
-    const service = new EntitlementService(new FamilySeatAccountPlanAssignmentProvider(db));
+    const service = new EntitlementService(new FamilyAwareAccountPlanAssignmentProvider(db));
 
     for (const member of members) {
       await expect(service.resolve(member, joinedAt)).resolves.toMatchObject({
@@ -91,6 +91,71 @@ describe("FamilySeatAccountPlanAssignmentProvider", () => {
         grantedByFamily: false,
       });
     }
+  });
+
+  it("通常PlanとFamily席を合成し、Family参加者にはFull相当を優先する", async () => {
+    const db = createTestDb();
+    const payer = await account(db, "combined-payer");
+    const member = await account(db, "combined-member");
+    const subscriber = await account(db, "combined-subscriber");
+    const at = new Date("2026-08-16T00:00:00.000Z");
+    await createFamilyPack(db, payer, at);
+    await reserveFamilySeat(db, payer, "combined-invite", at);
+    await activateFamilySeat(db, "combined-invite", member, at);
+    const primary = new FakeAccountPlanAssignmentProvider([
+      {
+        accountId: member,
+        plan: "lite",
+        source: "subscription",
+        effectiveAt: at.toISOString(),
+        availableUntil: null,
+        payerAccountId: member,
+      },
+      {
+        accountId: subscriber,
+        plan: "full",
+        source: "subscription",
+        effectiveAt: at.toISOString(),
+        availableUntil: null,
+        payerAccountId: subscriber,
+      },
+    ]);
+    const service = new EntitlementService(
+      new FamilyAwareAccountPlanAssignmentProvider(db, primary),
+    );
+
+    await expect(service.resolve(member, at)).resolves.toMatchObject({
+      plan: "family",
+      source: "family-seat",
+      payerAccountId: payer,
+    });
+    await expect(service.resolve(subscriber, at)).resolves.toMatchObject({
+      plan: "full",
+      source: "subscription",
+      payerAccountId: subscriber,
+    });
+  });
+
+  it("一方のproviderが失敗しても確認済みの有料割当を利用する", async () => {
+    const db = createTestDb();
+    const payer = await account(db, "failure-payer");
+    const member = await account(db, "failure-member");
+    const at = new Date("2026-08-16T00:00:00.000Z");
+    await createFamilyPack(db, payer, at);
+    await reserveFamilySeat(db, payer, "failure-invite", at);
+    await activateFamilySeat(db, "failure-invite", member, at);
+    const service = new EntitlementService(
+      new FamilyAwareAccountPlanAssignmentProvider(db, {
+        findCurrent: async () => {
+          throw new Error("primary unavailable");
+        },
+      }),
+    );
+
+    await expect(service.resolve(member, at)).resolves.toMatchObject({
+      plan: "family",
+      resolution: "assignment",
+    });
   });
 
   it("fake providerで反映遅延中のFamilyと期限到達後の失効を再現する", async () => {

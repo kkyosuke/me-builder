@@ -27,10 +27,13 @@ export type CloudflareBindings = {
 
 /** Workerへ注入されたCloudflare bindingを、アプリ内で使う名前へ集約する。 */
 export function getCloudflareBindings(env: Env): CloudflareBindings {
+  const d1 = D1.shared.client.create(env.DB);
   return {
-    d1: D1.shared.client.create(env.DB),
-    planAssignmentProvider:
-      env.ACCOUNT_PLAN_ASSIGNMENT_PROVIDER ?? new billing.FakeAccountPlanAssignmentProvider(),
+    d1,
+    planAssignmentProvider: new billing.FamilyAwareAccountPlanAssignmentProvider(
+      d1,
+      env.ACCOUNT_PLAN_ASSIGNMENT_PROVIDER,
+    ),
     do: {
       conversation: env.CONVERSATION_COORDINATOR,
       ...(env.ACCOUNT_DATA ? { accountData: env.ACCOUNT_DATA } : {}),
