@@ -72,10 +72,10 @@ export default function BillingPlanApplication({
     if (controller.signal.aborted) return;
 
     const publicPlans = catalogResult.status === "fulfilled" ? catalogResult.value : null;
-    if (publicPlans) {
+    if (catalogResult.status === "fulfilled") {
       setPlans({
         status: "success",
-        data: publicPlans.map((plan) => ({ ...plan, trialDays: null })),
+        data: catalogResult.value.map((plan) => ({ ...plan, trialDays: null })),
       });
     } else {
       setPlans({ status: "error", message: message(catalogResult.reason) });
