@@ -1,64 +1,58 @@
 import { D1 } from "@me-builder/lib";
 import { logger } from "@me-builder/shared";
 import { type LineUsage, fetchLineUsage } from "../infrastructure/line-statistics";
-import { createLiffSession } from "./liff-session";
+import type { AuthenticatedActor } from "./authentication/types";
 
 type UnavailableSection = {
   status: "unavailable";
   reason: "not-configured" | "upstream-error";
 };
 
-export type AdminStatisticsOutcome =
-  | { type: "not-configured" | "unauthenticated" | "account-not-found" }
-  | { type: "forbidden" }
-  | {
-      type: "resolved";
-      statistics: {
-        period: { start: string; end: string };
-        fetchedAt: string;
-        gemini:
-          | {
-              status: "available";
-              requestCount: number;
-              inputTokens: number;
-              outputTokens: number;
-              costEstimate:
-                | {
-                    status: "available";
-                    currency: "USD";
-                    amount: number;
-                    pricingAsOf: string;
-                  }
-                | {
-                    status: "unavailable";
-                    issues: Array<{
-                      reason: "unsupported-model" | "invalid-usage" | "overflow";
-                      models: string[];
-                    }>;
-                  };
-              accounts: Array<{
-                accountId: string;
-                requestCount: number;
-                inputTokens: number;
-                outputTokens: number;
-                estimatedCostUsd: number | null;
-              }>;
-            }
-          | UnavailableSection;
-        line: ({ status: "available" } & LineUsage) | UnavailableSection;
-      };
-    };
+export type AdminStatisticsOutcome = {
+  type: "resolved";
+  statistics: {
+    period: { start: string; end: string };
+    fetchedAt: string;
+    gemini:
+      | {
+          status: "available";
+          requestCount: number;
+          inputTokens: number;
+          outputTokens: number;
+          costEstimate:
+            | {
+                status: "available";
+                currency: "USD";
+                amount: number;
+                pricingAsOf: string;
+              }
+            | {
+                status: "unavailable";
+                issues: Array<{
+                  reason: "unsupported-model" | "invalid-usage" | "overflow";
+                  models: string[];
+                }>;
+              };
+          accounts: Array<{
+            accountId: string;
+            requestCount: number;
+            inputTokens: number;
+            outputTokens: number;
+            estimatedCostUsd: number | null;
+          }>;
+        }
+      | UnavailableSection;
+    line: ({ status: "available" } & LineUsage) | UnavailableSection;
+  };
+};
 
 type Params = {
-  idToken: string | undefined;
-  lineLoginChannelId: string | undefined;
-  adminLineUserIds: readonly string[];
+  actor: AuthenticatedActor;
   db: D1.shared.Client;
   lineChannelAccessToken: string | undefined;
   now?: Date;
   getLineUsage?: typeof fetchLineUsage;
   getGeminiUsage?: typeof D1.shared.action.geminiUsage.summarizeGeminiUsage;
-  createSession?: typeof createLiffSession;
 };
 
 function startOfJstMonth(now: Date): Date {
@@ -74,15 +68,6 @@ function startOfJstMonth(now: Date): Date {
 }
 
 export async function getAdminStatistics(params: Params): Promise<AdminStatisticsOutcome> {
-  const session = await (params.createSession ?? createLiffSession)({
-    idToken: params.idToken,
-    lineLoginChannelId: params.lineLoginChannelId,
-    adminLineUserIds: params.adminLineUserIds,
-    db: params.db,
-  });
-  if (session.type !== "resolved") return { type: session.type };
-  if (session.session.role !== "admin") return { type: "forbidden" };
-
   const now = params.now ?? new Date();
   const start = startOfJstMonth(now);
   const geminiPromise = (

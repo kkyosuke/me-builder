@@ -3,7 +3,7 @@ import { D1 } from "@me-builder/lib";
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { getAdminBillingHealth } from "./admin-billing-health";
 
 function createTestDb(): D1.shared.Client {
@@ -33,16 +33,14 @@ describe("admin billing health", () => {
       syncedAt: new Date("2026-08-15T00:00:00Z"),
     });
     const outcome = await getAdminBillingHealth({
-      idToken: "token",
-      lineLoginChannelId: "channel",
-      adminLineUserIds: [],
+      actor: {
+        accountId: crypto.randomUUID(),
+        authenticationMethod: "liff",
+        authenticatedAt: new Date("2026-08-15T01:00:00Z"),
+      },
       db,
       staleAfterMs: 15 * 60 * 1_000,
       now: new Date("2026-08-15T01:00:00Z"),
-      createSession: vi.fn().mockResolvedValue({
-        type: "resolved",
-        session: { accountId: crypto.randomUUID(), role: "admin" },
-      }),
     });
     expect(outcome).toMatchObject({
       type: "resolved",
@@ -54,21 +52,5 @@ describe("admin billing health", () => {
     });
     expect(JSON.stringify(outcome)).not.toContain(owner.account.id);
     expect(JSON.stringify(outcome)).not.toContain("cus-without-projection");
-  });
-
-  it("一般利用者へ運用集計を返さない", async () => {
-    await expect(
-      getAdminBillingHealth({
-        idToken: "token",
-        lineLoginChannelId: "channel",
-        adminLineUserIds: [],
-        db: createTestDb(),
-        staleAfterMs: 900_000,
-        createSession: vi.fn().mockResolvedValue({
-          type: "resolved",
-          session: { accountId: crypto.randomUUID(), role: "user" },
-        }),
-      }),
-    ).resolves.toEqual({ type: "forbidden" });
   });
 });

@@ -4,6 +4,7 @@ import {
   AccountNotFoundErrorSchema,
   ForbiddenErrorSchema,
   authenticatedErrors,
+  currentTermsPolicyError,
   jsonResponse,
 } from "../shared/errors";
 
@@ -46,6 +47,7 @@ export const adminBillingReconciliationRoute = describeRoute({
   responses: {
     200: jsonResponse("再照合結果", AdminBillingReconciliationResponseSchema),
     ...authenticatedErrors,
+    ...currentTermsPolicyError,
     400: jsonResponse("リクエストが不正", InvalidBillingReconciliationSchema),
     403: jsonResponse("管理者権限がない", ForbiddenErrorSchema),
     404: jsonResponse(

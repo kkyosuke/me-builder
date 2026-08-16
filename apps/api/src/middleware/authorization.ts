@@ -3,6 +3,7 @@ import type { Context, MiddlewareHandler } from "hono";
 import * as v from "valibot";
 import { isDevelopmentEnvironment } from "../config";
 import {
+  ForbiddenErrorSchema,
   ServiceUnavailableErrorSchema,
   TermsAcceptanceRequiredErrorSchema,
 } from "../contract/shared/errors";
@@ -42,6 +43,34 @@ export function createCurrentTermsPolicyMiddleware(
 }
 
 export const requireCurrentTerms = createCurrentTermsPolicyMiddleware();
+
+export type AdminRoleChecker = (c: Context<AppEnv>, accountId: string) => Promise<boolean>;
+
+const checkCurrentAdminRole: AdminRoleChecker = async (c, accountId) => {
+  if (!c.env?.DB) throw new Error("D1 binding is not configured");
+  const account = await D1.shared.client.create(c.env.DB).query.accounts.findFirst({
+    columns: { role: true, status: true, isDeleted: true },
+    where: (table, { eq }) => eq(table.id, accountId),
+  });
+  return account?.role === "admin" && account.status === "active" && !account.isDeleted;
+};
+
+/** session内の表示用roleを信頼せず、共有D1の現在roleをrequestごとに確認する。 */
+export function createAdminAuthorizationMiddleware(
+  checker: AdminRoleChecker = checkCurrentAdminRole,
+): MiddlewareHandler<AppEnv> {
+  return async (c, next) => {
+    if (!c.env?.DB) {
+      return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
+    }
+    if (!(await checker(c, authenticatedActor(c).accountId))) {
+      return c.json(v.parse(ForbiddenErrorSchema, { error: "Forbidden" }), 403);
+    }
+    return next();
+  };
+}
+
+export const requireAdmin = createAdminAuthorizationMiddleware();
 
 /** Productionでは開発用routeの存在自体を公開しない。 */
 export const requireDevelopmentEnvironment: MiddlewareHandler<AppEnv> = async (c, next) => {

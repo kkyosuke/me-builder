@@ -194,7 +194,11 @@ import {
   postSelfCareContextConfirmation,
 } from "./controller/self-care-context";
 import { requireAuthentication } from "./middleware/authentication";
-import { requireCurrentTerms, requireDevelopmentEnvironment } from "./middleware/authorization";
+import {
+  requireAdmin,
+  requireCurrentTerms,
+  requireDevelopmentEnvironment,
+} from "./middleware/authorization";
 import { operationalHttpPath } from "./operational-http-path";
 import type { AppEnv } from "./types";
 
@@ -331,11 +335,35 @@ app.put(
   putServiceTermsAcceptance,
 );
 
-app.get("/api/admin/statistics", adminStatisticsRoute, getStatistics);
-app.get("/api/admin/accounts", adminAccountsRoute, getAccounts);
-app.get("/api/admin/billing/health", adminBillingHealthRoute, getBillingHealth);
+app.get(
+  "/api/admin/statistics",
+  requireAuthentication,
+  requireCurrentTerms,
+  requireAdmin,
+  adminStatisticsRoute,
+  getStatistics,
+);
+app.get(
+  "/api/admin/accounts",
+  requireAuthentication,
+  requireCurrentTerms,
+  requireAdmin,
+  adminAccountsRoute,
+  getAccounts,
+);
+app.get(
+  "/api/admin/billing/health",
+  requireAuthentication,
+  requireCurrentTerms,
+  requireAdmin,
+  adminBillingHealthRoute,
+  getBillingHealth,
+);
 app.post(
   "/api/admin/billing/reconciliation",
+  requireAuthentication,
+  requireCurrentTerms,
+  requireAdmin,
   adminBillingReconciliationRoute,
   postBillingReconciliation,
 );
