@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => {
     logoutSession: vi.fn(),
     issueSession: vi.fn(),
     startLinking: vi.fn(),
+    startLogin: vi.fn(),
     completeLinking: vi.fn(),
     cancelLinking: vi.fn(),
   };
@@ -63,6 +64,7 @@ vi.mock("../infrastructure/authentication/sso-identity-repository", () => ({
 }));
 vi.mock("../logic/authentication/sso-transaction", () => ({
   startSsoIdentityLinking: mocks.startLinking,
+  startSsoAuthentication: mocks.startLogin,
   completeSsoIdentityLinking: mocks.completeLinking,
   cancelSsoIdentityLinking: mocks.cancelLinking,
 }));
@@ -71,6 +73,7 @@ import {
   deleteSsoIdentity,
   getSsoCallback,
   getSsoIdentityStatusContents,
+  getSsoLogin,
   postSsoIdentityLink,
 } from "./sso-identity";
 
@@ -183,6 +186,18 @@ describe("SSO identity controller", () => {
     expect(response.headers.get("set-cookie")).toContain(
       "__Host-me_builder_session=rotated-session",
     );
+  });
+
+  it("linked-login公開時だけ外部ブラウザのSSOログインを開始する", async () => {
+    mocks.startLogin.mockResolvedValue(new URL("https://tenant.auth0.com/authorize?state=login"));
+    const response = await testApp("/api/auth/sso/login", getSsoLogin).request(
+      "https://api.example.com/api/auth/sso/login?returnTo=%2Fadmin",
+      undefined,
+      { ...env, SSO_ROLLOUT_MODE: "linked-login" },
+    );
+
+    expect(response.status).toBe(302);
+    expect(mocks.startLogin).toHaveBeenCalledWith(expect.objectContaining({ returnTo: "/admin" }));
   });
 
   it("IdPキャンセルでもtransactionを消費して固定pathへ復帰する", async () => {

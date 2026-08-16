@@ -1,8 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { config } from "../../../config";
+import { resolveRequestedPathname } from "../../../infrastructure/requested-pathname";
 import { type AuthSessionResponse, fetchAuthSession } from "../infrastructure/auth-session-api";
 import { authSessionRuntime } from "../infrastructure/auth-session-runtime";
-import { establishLiffAuthSession } from "../infrastructure/liff-auth-adapter";
+import {
+  detectAuthEntryEnvironment,
+  establishLiffAuthSession,
+} from "../infrastructure/liff-auth-adapter";
+import { establishSsoAuthSession } from "../infrastructure/sso-auth-adapter";
 import type { AuthState } from "../model/auth-state";
 
 function errorState(error: unknown): AuthState {
@@ -41,10 +46,29 @@ export function useAuthSessionState() {
 
   const establish = useCallback(
     async (signal: AbortSignal): Promise<AuthState> => {
-      const existing = await fetchAuthSession(config.apiUrl, signal);
-      if (existing.authenticated) return applyResponse(existing);
+      const returnTo = resolveRequestedPathname();
+      const entry = await detectAuthEntryEnvironment(config.liffId);
+      if (entry.kind === "error") {
+        throw new Error(
+          `${entry.message} SSOへ自動切替はしません。再試行するか外部ブラウザで開いてください。`,
+        );
+      }
 
-      const exchanged = await establishLiffAuthSession(config.apiUrl, config.liffId, signal);
+      if (entry.kind === "external") {
+        const existing = await fetchAuthSession(config.apiUrl, signal);
+        if (existing.authenticated) return applyResponse(existing);
+        if (config.ssoRolloutMode === "linked-login") {
+          establishSsoAuthSession(config.apiUrl, returnTo, signal);
+          return { status: "redirecting" };
+        }
+      }
+
+      const exchanged = await establishLiffAuthSession(
+        config.apiUrl,
+        config.liffId,
+        signal,
+        entry.state,
+      );
       if ("redirecting" in exchanged) return { status: "redirecting" };
       return applyResponse(exchanged);
     },

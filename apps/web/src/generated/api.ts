@@ -56,6 +56,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/auth/sso/login": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** 外部ブラウザのSSOログインを開始する */
+    get: operations["startSsoLogin"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/auth/sso/callback": {
     parameters: {
       query?: never;
@@ -1395,6 +1412,39 @@ export interface operations {
             error: "Unauthorized";
           };
         };
+      };
+      /** @description SSOまたはstorage bindingが未設定 */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Service Unavailable";
+          };
+        };
+      };
+    };
+  };
+  startSsoLogin: {
+    parameters: {
+      query?: {
+        /** @description 認証後に復元する同一originの相対path */
+        returnTo?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Auth0認可endpointへredirect */
+      302: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
       /** @description SSOまたはstorage bindingが未設定 */
       503: {

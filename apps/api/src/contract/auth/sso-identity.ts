@@ -56,6 +56,25 @@ export const startSsoIdentityLinkRoute = describeRoute({
   },
 } satisfies DescribeRouteOptions);
 
+export const startSsoLoginRoute = describeRoute({
+  operationId: "startSsoLogin",
+  tags: ["Authentication"],
+  summary: "外部ブラウザのSSOログインを開始する",
+  parameters: [
+    {
+      name: "returnTo",
+      in: "query",
+      required: false,
+      schema: { type: "string", maxLength: 2048 },
+      description: "認証後に復元する同一originの相対path",
+    },
+  ],
+  responses: {
+    302: { description: "Auth0認可endpointへredirect" },
+    503: jsonResponse("SSOまたはstorage bindingが未設定", ServiceUnavailableErrorSchema),
+  },
+} satisfies DescribeRouteOptions);
+
 export const completeSsoCallbackRoute = describeRoute({
   operationId: "completeSsoCallback",
   tags: ["Authentication"],

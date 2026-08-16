@@ -1,9 +1,9 @@
 import liff from "@line/liff";
 import { logger } from "@me-builder/shared";
 
-type LiffAuthExchangeInitialization =
+export type LiffAuthExchangeInitialization =
   | { status: "disabled"; reason: string }
-  | { status: "login-required" }
+  | { status: "login-required"; inClient: boolean }
   | { status: "ready"; inClient: boolean }
   | { status: "error"; message: string };
 
@@ -23,6 +23,11 @@ export function readLiffAuthExchangeCredential(): string | null {
   }
 }
 
+/** 認証入口がLIFF/LINE Loginを選んだ場合だけログイン遷移を開始する。 */
+export function redirectToLiffLogin(): void {
+  liff.login();
+}
+
 /**
  * LIFFの共有先選択を開始する。利用できない場合は同期的にnullを返し、呼び出し側が
  * ユーザー操作の権限を失う前にWeb Share APIへ切り替えられるようにする。
@@ -38,7 +43,7 @@ export function shareLiffTextMessage(text: string): Promise<"sent" | "cancelled"
  * 認証交換のためだけにLIFFを初期化し、ログイン状態を返します。
  *
  * - `liffId` が未設定なら初期化をスキップします（LIFF なしでも画面は動作します）
- * - 未ログインなら `liff.login()` でログイン画面へ遷移します
+ * - 未ログインなら実行環境を含む `login-required` を返し、入口選択後にだけ遷移します
  * - 初期化の失敗は例外を投げず `status: "error"` として返します
  *
  * `liffId` は既定値を持たせず呼び出し側（`config.liffId`）から渡します。既定値にすると
@@ -65,9 +70,8 @@ export async function initializeLiffForAuthExchange(
   const inClient = liff.isInClient();
 
   if (!liff.isLoggedIn()) {
-    logger.info(`LIFF が未ログインのためログイン画面へ遷移します (inClient: ${inClient})`);
-    liff.login();
-    return { status: "login-required" };
+    logger.info(`LIFF が未ログインです (inClient: ${inClient})`);
+    return { status: "login-required", inClient };
   }
 
   logger.info(`LIFF の認証交換準備に成功しました (inClient: ${inClient})`);

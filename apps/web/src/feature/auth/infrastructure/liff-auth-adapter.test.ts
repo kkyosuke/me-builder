@@ -3,18 +3,20 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   initializeLiffForAuthExchange: vi.fn(),
   readCredential: vi.fn(),
+  redirectToLogin: vi.fn(),
   exchangeLiffCredential: vi.fn(),
 }));
 
 vi.mock("../../liff/infrastructure/liff-client", () => ({
   initializeLiffForAuthExchange: mocks.initializeLiffForAuthExchange,
   readLiffAuthExchangeCredential: mocks.readCredential,
+  redirectToLiffLogin: mocks.redirectToLogin,
 }));
 vi.mock("./auth-session-api", () => ({
   exchangeLiffCredential: mocks.exchangeLiffCredential,
 }));
 
-import { establishLiffAuthSession } from "./liff-auth-adapter";
+import { detectAuthEntryEnvironment, establishLiffAuthSession } from "./liff-auth-adapter";
 
 describe("establishLiffAuthSession", () => {
   beforeEach(() => {
@@ -70,12 +72,29 @@ describe("establishLiffAuthSession", () => {
   });
 
   it("ログイン遷移中はcredentialを読まずfeature requestを止める", async () => {
-    mocks.initializeLiffForAuthExchange.mockResolvedValue({ status: "login-required" });
+    mocks.initializeLiffForAuthExchange.mockResolvedValue({
+      status: "login-required",
+      inClient: true,
+    });
 
     await expect(
       establishLiffAuthSession(undefined, "test-liff-id", new AbortController().signal),
     ).resolves.toEqual({ redirecting: true });
+    expect(mocks.redirectToLogin).toHaveBeenCalledOnce();
     expect(mocks.readCredential).not.toHaveBeenCalled();
     expect(mocks.exchangeLiffCredential).not.toHaveBeenCalled();
+  });
+
+  it("LIFF内・外部ブラウザをSDK結果で一意に判定する", async () => {
+    await expect(detectAuthEntryEnvironment("test-liff-id")).resolves.toMatchObject({
+      kind: "liff",
+    });
+    mocks.initializeLiffForAuthExchange.mockResolvedValue({
+      status: "ready",
+      inClient: false,
+    });
+    await expect(detectAuthEntryEnvironment("test-liff-id")).resolves.toMatchObject({
+      kind: "external",
+    });
   });
 });

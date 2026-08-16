@@ -1,6 +1,8 @@
 import {
+  type LiffAuthExchangeInitialization,
   initializeLiffForAuthExchange,
   readLiffAuthExchangeCredential,
+  redirectToLiffLogin,
 } from "../../liff/infrastructure/liff-client";
 import type { AuthSessionResponse } from "./auth-session-api";
 import { exchangeLiffCredential } from "./auth-session-api";
@@ -17,15 +19,34 @@ async function initializeForAuthExchange(liffId: string | undefined) {
   }
 }
 
+export async function detectAuthEntryEnvironment(
+  liffId: string | undefined,
+): Promise<
+  | { kind: "liff"; state: LiffAuthExchangeInitialization }
+  | { kind: "external"; state: LiffAuthExchangeInitialization }
+  | { kind: "error"; message: string }
+> {
+  const state = await initializeForAuthExchange(liffId);
+  if (state.status === "error") return { kind: "error", message: state.message };
+  if ((state.status === "ready" || state.status === "login-required") && state.inClient) {
+    return { kind: "liff", state };
+  }
+  return { kind: "external", state };
+}
+
 /** LIFF credentialをこの境界内だけで読み、application sessionへ交換する。 */
 export async function establishLiffAuthSession(
   apiUrl: string | undefined,
   liffId: string | undefined,
   signal: AbortSignal,
+  initializedState?: LiffAuthExchangeInitialization,
 ): Promise<AuthSessionResponse | { redirecting: true }> {
-  const liffState = await initializeForAuthExchange(liffId);
+  const liffState = initializedState ?? (await initializeForAuthExchange(liffId));
   if (signal.aborted) throw new DOMException("The operation was aborted", "AbortError");
-  if (liffState.status === "login-required") return { redirecting: true };
+  if (liffState.status === "login-required") {
+    redirectToLiffLogin();
+    return { redirecting: true };
+  }
   if (liffState.status !== "ready") {
     throw new Error(
       liffState.status === "error"

@@ -23,6 +23,7 @@ import { createSsoTransactionStore } from "../infrastructure/authentication/sso-
 import {
   cancelSsoIdentityLinking,
   completeSsoIdentityLinking,
+  startSsoAuthentication,
   startSsoIdentityLinking,
 } from "../logic/authentication/sso-transaction";
 import { authenticatedActor } from "../middleware/authentication";
@@ -112,6 +113,20 @@ export async function postSsoIdentityLink(c: Context<AppEnv>): Promise<Response>
     : SSO_LINK_STATE_COOKIE;
   setCookie(c, cookieName, state, linkStateCookieOptions(dependencies.secureCallback));
   return c.json(v.parse(SsoAuthorizationUrlSchema, { authorizationUrl: authorizationUrl.href }));
+}
+
+export async function getSsoLogin(c: Context<AppEnv>): Promise<Response> {
+  c.header("Cache-Control", "no-store");
+  const dependencies = configured(c);
+  if (!dependencies || dependencies.configuration.ssoRolloutMode !== "linked-login") {
+    return unavailable(c);
+  }
+  const authorizationUrl = await startSsoAuthentication({
+    returnTo: c.req.query("returnTo") ?? "/",
+    store: dependencies.store,
+    client: dependencies.client,
+  });
+  return c.redirect(authorizationUrl.href, 302);
 }
 
 export async function getSsoCallback(c: Context<AppEnv>): Promise<Response> {
