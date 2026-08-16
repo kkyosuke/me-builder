@@ -81,6 +81,13 @@ tasks:
     cmds:
       - bunx vitest run packages/shared/src/legal/service-terms.test.ts
 
+  subscription:verify:preview:
+    desc: 'Verify Plan capabilities and privacy boundaries without external billing services'
+    cmds:
+      - bunx vitest run apps/api/src/e2e/preview-plan-assignment.test.ts apps/api/src/e2e/family-privacy-boundary.test.ts
+      - bunx vitest run apps/api/src/e2e/diagnosis-answer.test.ts -t '課金情報なしで診断回答と日記|Free相当でも本人archive'
+      - bunx vitest run apps/worker/src/e2e/diary-chat-delivery-flow.test.ts -t 'Free上限到達後も切迫した危機表現'
+
   infra:generate:
     desc: 'Generate Wrangler TOML files from committed Pulumi stack outputs'
     cmds:
