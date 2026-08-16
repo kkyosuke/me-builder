@@ -36,6 +36,10 @@ export const ConfigSchema = v.object({
   ),
   billingPricePlanMap: v.optional(v.record(v.string(), v.picklist(["lite", "full", "family"])), {}),
   billingLookupKeyMap: v.optional(v.record(v.string(), v.string()), {}),
+  billingProjectionStaleAfterSeconds: v.optional(
+    v.pipe(v.number(), v.safeInteger(), v.minValue(60)),
+    900,
+  ),
 });
 
 export type ApiConfig = v.InferOutput<typeof ConfigSchema>;

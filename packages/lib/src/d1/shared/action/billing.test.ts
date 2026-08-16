@@ -11,6 +11,7 @@ import {
   BillingCustomerOwnershipError,
   D1AccountPlanAssignmentProvider,
   applyBillingProjection,
+  getBillingOperationalSummary,
   linkBillingCustomer,
 } from "./billing";
 
@@ -201,5 +202,47 @@ describe("billing projection", () => {
     await expect(
       provider.findCurrent("account-with-outage", new Date("2026-08-15T00:00:00Z")),
     ).resolves.toMatchObject({ accountId: "account-with-outage", plan: "free" });
+  });
+
+  it("終了済みprojectionと猶予時間内のCustomerを監視遅延に数えない", async () => {
+    const db = createTestDb();
+    const canceledOwner = await account(db, "U_canceled_subscription");
+    await linkBillingCustomer(db, {
+      accountId: canceledOwner.id,
+      providerCustomerId: "cus_canceled",
+      syncedAt: new Date("2026-08-01T00:00:00Z"),
+    });
+    await applyBillingProjection(db, {
+      accountId: canceledOwner.id,
+      event: {
+        id: "evt_canceled",
+        type: "customer.subscription.deleted",
+        objectId: "sub_canceled",
+        createdAt: new Date("2026-08-01T00:00:00Z"),
+      },
+      subscription: {
+        ...subscription,
+        id: "sub_canceled",
+        customerId: "cus_canceled",
+        status: "canceled",
+      },
+      planCode: null,
+    });
+    const recentOwner = await account(db, "U_recent_customer");
+    await linkBillingCustomer(db, {
+      accountId: recentOwner.id,
+      providerCustomerId: "cus_recent",
+      syncedAt: new Date("2026-08-15T00:55:00Z"),
+    });
+
+    await expect(
+      getBillingOperationalSummary(db, {
+        now: new Date("2026-08-15T01:00:00Z"),
+        staleAfterMs: 15 * 60 * 1_000,
+      }),
+    ).resolves.toMatchObject({
+      staleProjectionCount: 0,
+      customerWithoutProjectionCount: 0,
+    });
   });
 });

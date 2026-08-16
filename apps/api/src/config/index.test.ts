@@ -80,9 +80,11 @@ describe("getConfig & ConfigSchema", () => {
         "unknown.month": "must_be_ignored",
       }),
       BILLING_PRICE_PLAN_MAP: JSON.stringify({ price_lite_v2: "lite" }),
+      BILLING_PROJECTION_STALE_AFTER_SECONDS: "1200",
     });
     expect(conf.billingLookupKeyMap).toEqual({ "lite.month": "lite_month_v2" });
     expect(conf.billingPricePlanMap).toEqual({ price_lite_v2: "lite" });
+    expect(conf.billingProjectionStaleAfterSeconds).toBe(1200);
   });
 
   it("LINE_WEBHOOK_URL が明示されている場合は BASE_URL より優先されること", () => {

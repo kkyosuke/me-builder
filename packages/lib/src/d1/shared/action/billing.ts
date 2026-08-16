@@ -80,6 +80,61 @@ export async function findBillingProjectionByAccount(db: SharedD1Client, account
   });
 }
 
+export type BillingOperationalSummary = Readonly<{
+  customerCount: number;
+  activeSubscriptionCount: number;
+  staleProjectionCount: number;
+  customerWithoutProjectionCount: number;
+  projectionWithoutPlanCount: number;
+  statusCounts: Partial<Record<BillingSubscription["status"], number>>;
+  planCounts: Partial<Record<PlanCode, number>>;
+}>;
+
+export async function getBillingOperationalSummary(
+  db: SharedD1Client,
+  input: { now?: Date; staleAfterMs: number },
+): Promise<BillingOperationalSummary> {
+  const now = input.now ?? new Date();
+  const [customers, projections] = await Promise.all([
+    db.select().from(billingCustomers).all(),
+    db.select().from(billingSubscriptionProjections).all(),
+  ]);
+  const projectedCustomerIds = new Set(
+    projections.map((projection) => projection.providerCustomerId),
+  );
+  const statusCounts: BillingOperationalSummary["statusCounts"] = {};
+  const planCounts: BillingOperationalSummary["planCounts"] = {};
+  for (const projection of projections) {
+    statusCounts[projection.status] = (statusCounts[projection.status] ?? 0) + 1;
+    if (projection.planCode)
+      planCounts[projection.planCode] = (planCounts[projection.planCode] ?? 0) + 1;
+  }
+  return {
+    customerCount: customers.length,
+    activeSubscriptionCount: projections.filter(
+      (projection) => projection.status === "active" || projection.status === "trialing",
+    ).length,
+    staleProjectionCount: projections.filter(
+      (projection) =>
+        projection.status !== "canceled" &&
+        projection.status !== "incomplete_expired" &&
+        now.getTime() - projection.lastSyncedAt.getTime() > input.staleAfterMs,
+    ).length,
+    customerWithoutProjectionCount: customers.filter(
+      (customer) =>
+        !projectedCustomerIds.has(customer.providerCustomerId) &&
+        now.getTime() - customer.createdAt.getTime() > input.staleAfterMs,
+    ).length,
+    projectionWithoutPlanCount: projections.filter(
+      (projection) =>
+        (projection.status === "active" || projection.status === "trialing") &&
+        projection.planCode === null,
+    ).length,
+    statusCounts,
+    planCounts,
+  };
+}
+
 export async function expireBillingProjection(
   db: SharedD1Client,
   accountId: string,

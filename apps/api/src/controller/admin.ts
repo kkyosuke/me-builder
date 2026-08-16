@@ -8,6 +8,7 @@ import {
   AdminAccountsResponseSchema,
   InvalidAdminAccountsRequestSchema,
 } from "../contract/admin/accounts";
+import { AdminBillingHealthResponseSchema } from "../contract/admin/billing-health";
 import {
   AdminBillingReconciliationRequestSchema,
   AdminBillingReconciliationResponseSchema,
@@ -22,6 +23,7 @@ import {
   UnauthorizedErrorSchema,
 } from "../contract/shared/errors";
 import { getAdminAccounts } from "../logic/admin-accounts";
+import { getAdminBillingHealth } from "../logic/admin-billing-health";
 import { reconcileAdminBillingProjection } from "../logic/admin-billing-reconciliation";
 import { getAdminStatistics } from "../logic/admin-statistics";
 import type { AppEnv } from "../types";
@@ -154,6 +156,30 @@ export async function postBillingReconciliation(c: Context<AppEnv>): Promise<Res
         }),
         404,
       );
+    case "not-configured":
+    case "unauthenticated":
+      return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
+  }
+}
+
+export async function getBillingHealth(c: Context<AppEnv>): Promise<Response> {
+  if (!c.env?.DB) {
+    return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
+  }
+  const config = getConfig(c.env);
+  const outcome = await getAdminBillingHealth({
+    idToken: bearerToken(c.req.header("authorization")),
+    lineLoginChannelId: config.lineLoginChannelId,
+    adminLineUserIds: config.adminLineUserIds,
+    db: D1.shared.client.create(c.env.DB),
+    staleAfterMs: config.billingProjectionStaleAfterSeconds * 1_000,
+  });
+  switch (outcome.type) {
+    case "resolved":
+      c.header("Cache-Control", "no-store");
+      return c.json(v.parse(AdminBillingHealthResponseSchema, outcome.health));
+    case "forbidden":
+      return c.json(v.parse(ForbiddenErrorSchema, { error: "Forbidden" }), 403);
     case "not-configured":
     case "unauthenticated":
       return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
