@@ -238,6 +238,8 @@ Applicationとpolicyは`scripts/setup-api-docs-access.ts`で冪等に作成・�
 
 ## 7. 関連ドキュメント
 
+LIFFと将来のSSOを同じAccountおよびアプリケーションセッションへ収束させる境界は、[Web認証・アプリケーションセッション設計](web-authentication-design.md)を正とします。
+
 - [Agent向けガイド](../../.agents/README.md)
 - [開発運用ルール](../../.agents/rules/development.md)
 - [プロジェクト概要](../product/project-overview.md)
