@@ -174,6 +174,10 @@ describe("AccountData alarm", () => {
       "listUndispatchedProfileSummaryGenerationIds",
     ).mockResolvedValue([]);
     vi.spyOn(
+      DO.account.action.weeklyReflection,
+      "listUndispatchedWeeklyReflectionGenerationIds",
+    ).mockResolvedValue([]);
+    vi.spyOn(
       DO.account.action.personalDataExport,
       "processPendingPersonalDataExport",
     ).mockResolvedValue({ processed: false });
@@ -190,6 +194,12 @@ describe("AccountData alarm", () => {
     vi.mocked(
       DO.account.action.profileSummary.listUndispatchedProfileSummaryGenerationIds,
     ).mockResolvedValue(["generation-1"]);
+    const markWeeklyDispatched = vi
+      .spyOn(DO.account.action.weeklyReflection, "markWeeklyReflectionGenerationDispatched")
+      .mockResolvedValue(true);
+    vi.mocked(
+      DO.account.action.weeklyReflection.listUndispatchedWeeklyReflectionGenerationIds,
+    ).mockResolvedValue(["weekly-generation-1"]);
     vi.spyOn(DO.account.action.diary, "closeExpiredSessions").mockResolvedValue(0);
     vi.spyOn(
       DO.account.action.diagnosisBrainProjection,
@@ -225,7 +235,13 @@ describe("AccountData alarm", () => {
       accountId: "account-1",
       generationId: "generation-1",
     });
+    expect(send).toHaveBeenCalledWith({
+      type: "weekly-reflection-generation",
+      accountId: "account-1",
+      generationId: "weekly-generation-1",
+    });
     expect(markDispatched).toHaveBeenCalledWith({}, "account-1", "generation-1");
+    expect(markWeeklyDispatched).toHaveBeenCalledWith({}, "account-1", "weekly-generation-1");
     expect(
       DO.account.action.personalDataExport.processPendingPersonalDataExport,
     ).toHaveBeenCalledWith({}, "account-1");

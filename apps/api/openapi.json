@@ -2591,6 +2591,328 @@
         }
       }
     },
+    "/api/weekly-reflections": {
+      "get": {
+        "operationId": "getWeeklyReflections",
+        "tags": ["Profile"],
+        "summary": "週次振り返りと今週の生成状態を取得する",
+        "security": [
+          {
+            "liffIdToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "保存済み週次振り返り",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "reflections": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "weekStart": {
+                            "type": "string",
+                            "format": "date"
+                          },
+                          "generatedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "headline": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "items": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "enum": ["pattern", "value", "next-step", "question"],
+                                  "type": "string"
+                                },
+                                "title": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "description": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "evidenceCount": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 9007199254740991
+                                },
+                                "sources": {
+                                  "type": "array",
+                                  "items": {
+                                    "enum": ["diagnosis", "diary"],
+                                    "type": "string"
+                                  },
+                                  "minItems": 1
+                                }
+                              },
+                              "required": [
+                                "kind",
+                                "title",
+                                "description",
+                                "evidenceCount",
+                                "sources"
+                              ]
+                            },
+                            "minItems": 1,
+                            "maxItems": 3
+                          },
+                          "recordCount": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": ["weekStart", "generatedAt", "headline", "items", "recordCount"]
+                      }
+                    },
+                    "generation": {
+                      "type": "object",
+                      "properties": {
+                        "weekStart": {
+                          "type": "string",
+                          "format": "date"
+                        },
+                        "status": {
+                          "enum": ["idle", "queued", "generating", "completed", "failed"],
+                          "type": "string"
+                        },
+                        "canGenerate": {
+                          "type": "boolean"
+                        },
+                        "message": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "notification": {
+                          "enum": ["pending", "skipped", "not-applicable"],
+                          "type": "string"
+                        }
+                      },
+                      "required": ["weekStart", "status", "canGenerate", "message", "notification"]
+                    },
+                    "canStartNew": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["reflections", "generation", "canStartNew"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "LIFF IDトークンを検証できない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Unauthorized"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "対応するAccountが存在しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Account not found"
+                    },
+                    "reason": {
+                      "const": "friendship_required"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "未処理のサーバーエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Internal Server Error"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "D1 bindingが設定されていない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Service Unavailable"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/weekly-reflections/generations": {
+      "post": {
+        "operationId": "requestWeeklyReflectionGeneration",
+        "tags": ["Profile"],
+        "summary": "今週の振り返り生成を要求する",
+        "security": [
+          {
+            "liffIdToken": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "生成要求を受け付けた",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "generationId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "status": {
+                      "enum": ["queued", "generating", "completed"],
+                      "type": "string"
+                    },
+                    "created": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["generationId", "status", "created"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "LIFF IDトークンを検証できない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Unauthorized"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "対応するAccountが存在しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Account not found"
+                    },
+                    "reason": {
+                      "const": "friendship_required"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "生成できない理由",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Weekly reflection generation unavailable"
+                    },
+                    "reason": {
+                      "enum": ["feature_unavailable", "source_record_required"],
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "未処理のサーバーエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Internal Server Error"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "D1 bindingが設定されていない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Service Unavailable"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/profile": {
       "get": {
         "operationId": "getProfile",

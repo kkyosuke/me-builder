@@ -7,8 +7,8 @@ import type {
 } from "@me-builder/lib";
 import type {
   BillingQueueMessage,
-  ProfileSummaryGenerationQueueMessage,
   Queue,
+  ReflectionGenerationQueueMessage,
   SafeOperationalErrorFields,
   WebhookQueueMessage,
 } from "@me-builder/shared";
@@ -42,7 +42,7 @@ type Env = Omit<
   BASE_URL?: string;
   WEB_ORIGIN?: string;
   WEBHOOK_QUEUE?: Queue<WebhookQueueMessage>;
-  PROFILE_SUMMARY_QUEUE?: Queue<ProfileSummaryGenerationQueueMessage>;
+  PROFILE_SUMMARY_QUEUE?: Queue<ReflectionGenerationQueueMessage>;
   BILLING_QUEUE?: Queue<BillingQueueMessage>;
   DB?: D1Database;
   AVATAR_BUCKET?: R2Bucket;

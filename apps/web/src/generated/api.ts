@@ -225,6 +225,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/weekly-reflections": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** 週次振り返りと今週の生成状態を取得する */
+    get: operations["getWeeklyReflections"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/weekly-reflections/generations": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** 今週の振り返り生成を要求する */
+    post: operations["requestWeeklyReflectionGeneration"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/profile": {
     parameters: {
       query?: never;
@@ -2015,6 +2049,193 @@ export interface operations {
             error: "Profile summary generation unavailable";
             /** @enum {string} */
             reason: "source_record_required" | "regeneration_not_required" | "limit_reached";
+          };
+        };
+      };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
+          };
+        };
+      };
+      /** @description D1 bindingが設定されていない */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Service Unavailable";
+          };
+        };
+      };
+    };
+  };
+  getWeeklyReflections: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 保存済み週次振り返り */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            reflections: {
+              /** Format: date */
+              weekStart: string;
+              /** Format: date-time */
+              generatedAt: string;
+              headline: string;
+              items: {
+                /** @enum {string} */
+                kind: "pattern" | "value" | "next-step" | "question";
+                title: string;
+                description: string;
+                evidenceCount: number;
+                sources: ("diagnosis" | "diary")[];
+              }[];
+              recordCount: number;
+            }[];
+            generation: {
+              /** Format: date */
+              weekStart: string;
+              /** @enum {string} */
+              status: "idle" | "queued" | "generating" | "completed" | "failed";
+              canGenerate: boolean;
+              message: string | null;
+              /** @enum {string} */
+              notification: "pending" | "skipped" | "not-applicable";
+            };
+            canStartNew: boolean;
+          };
+        };
+      };
+      /** @description LIFF IDトークンを検証できない */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Unauthorized";
+          };
+        };
+      };
+      /** @description 対応するAccountが存在しない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Account not found";
+            /** @constant */
+            reason: "friendship_required";
+          };
+        };
+      };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
+          };
+        };
+      };
+      /** @description D1 bindingが設定されていない */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Service Unavailable";
+          };
+        };
+      };
+    };
+  };
+  requestWeeklyReflectionGeneration: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 生成要求を受け付けた */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            generationId: string;
+            /** @enum {string} */
+            status: "queued" | "generating" | "completed";
+            created: boolean;
+          };
+        };
+      };
+      /** @description LIFF IDトークンを検証できない */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Unauthorized";
+          };
+        };
+      };
+      /** @description 対応するAccountが存在しない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Account not found";
+            /** @constant */
+            reason: "friendship_required";
+          };
+        };
+      };
+      /** @description 生成できない理由 */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Weekly reflection generation unavailable";
+            /** @enum {string} */
+            reason: "feature_unavailable" | "source_record_required";
           };
         };
       };

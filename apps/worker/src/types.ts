@@ -5,7 +5,7 @@ import type {
   ChatTurnQueueMessage,
   DailyPromptQueueMessage,
   DiaryBrainCheckpointQueueMessage,
-  ProfileSummaryGenerationQueueMessage,
+  ReflectionGenerationQueueMessage,
 } from "@me-builder/shared";
 
 /** Wrangler生成bindingに、dashboardから配布するSecretとQueue本文型だけを重ねる。 */
@@ -39,7 +39,7 @@ export type Env = Omit<
   CHAT_TURN_QUEUE?: Queue<ChatTurnQueueMessage>;
   BRAIN_CHECKPOINT_QUEUE?: Queue<DiaryBrainCheckpointQueueMessage>;
   BRAIN_VECTOR_QUEUE?: Queue<BrainVectorSyncQueueMessage>;
-  PROFILE_SUMMARY_QUEUE?: Queue<ProfileSummaryGenerationQueueMessage>;
+  PROFILE_SUMMARY_QUEUE?: Queue<ReflectionGenerationQueueMessage>;
   DAILY_PROMPT_QUEUE?: Queue<DailyPromptQueueMessage>;
   BRAIN_VECTOR_INDEX?: WorkerBindings["BRAIN_VECTOR_INDEX"];
   CONVERSATION_COORDINATOR?: WorkerBindings["CONVERSATION_COORDINATOR"];
