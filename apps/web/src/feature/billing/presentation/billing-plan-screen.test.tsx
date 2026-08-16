@@ -82,6 +82,7 @@ describe("BillingPlanScreen", () => {
         completionMessage={null}
         onBack={vi.fn()}
         onCheckout={vi.fn()}
+        onManageSubscription={vi.fn()}
         onRetry={onRetry}
       />,
     );
