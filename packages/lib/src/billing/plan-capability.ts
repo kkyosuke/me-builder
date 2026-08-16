@@ -158,7 +158,17 @@ function selectedOption(plan: PlanCode, capabilityId: CapabilityId): CapabilityO
 }
 
 function quota(plan: PlanCode, capabilityId: CapabilityId): Quota {
-  return selectedValue(plan, capabilityId) as Quota;
+  const value = selectedValue(plan, capabilityId);
+  if (
+    !isRecord(value) ||
+    typeof value.limit !== "number" ||
+    !Number.isInteger(value.limit) ||
+    value.limit < 0 ||
+    (value.period !== "assignment-month" && value.period !== "rolling-90-days")
+  ) {
+    throw new Error(`${capabilityId} must resolve to a quota`);
+  }
+  return Object.freeze({ limit: value.limit, period: value.period });
 }
 
 function aiReplyQuota(plan: PlanCode): AiReplyQuota {
@@ -170,15 +180,25 @@ function aiReplyQuota(plan: PlanCode): AiReplyQuota {
 }
 
 function toggle(plan: PlanCode, capabilityId: CapabilityId): boolean {
-  return selectedValue(plan, capabilityId) as boolean;
+  const value = selectedValue(plan, capabilityId);
+  if (typeof value !== "boolean") throw new Error(`${capabilityId} must resolve to a toggle`);
+  return value;
 }
 
 function lookback(plan: PlanCode, capabilityId: CapabilityId): number | null {
-  return selectedValue(plan, capabilityId) as number | null;
+  const value = selectedValue(plan, capabilityId);
+  if (value !== null && (typeof value !== "number" || !Number.isInteger(value) || value <= 0)) {
+    throw new Error(`${capabilityId} must resolve to a lookback`);
+  }
+  return value;
 }
 
 function limit(plan: PlanCode, capabilityId: CapabilityId): number {
-  return selectedValue(plan, capabilityId) as number;
+  const value = selectedValue(plan, capabilityId);
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 0) {
+    throw new Error(`${capabilityId} must resolve to a limit`);
+  }
+  return value;
 }
 
 function mode<const Values extends readonly string[]>(
@@ -236,7 +256,7 @@ export function validatePlanCapabilityConfiguration(
         typeof optionId !== "string" ||
         !isRecord(definition) ||
         !isRecord(definition.options) ||
-        !(optionId in definition.options)
+        !Object.prototype.hasOwnProperty.call(definition.options, optionId)
       ) {
         throw new Error(`Plan ${plan} selects an unknown option for ${capabilityId}`);
       }
@@ -315,3 +335,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
+
+// 公開表示だけをimportする場合も、既知機能の実行値がresolver契約を満たすことを起動時に確認する。
+for (const plan of planCodes) resolvePlanCapabilityValues(plan);

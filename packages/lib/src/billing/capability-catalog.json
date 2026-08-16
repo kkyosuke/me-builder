@@ -7,7 +7,8 @@
       "description": "LINEで送った日記を本人の記録として保存します。",
       "kind": "toggle",
       "options": {
-        "enabled": { "display": "利用可能", "value": true }
+        "enabled": { "display": "利用可能", "value": true },
+        "enabled-per-account": { "display": "Accountごとに利用可能", "value": true }
       }
     },
     "diagnosis-basic-results": {
@@ -16,7 +17,8 @@
       "description": "公開中の診断へ回答し、基本結果を確認できます。",
       "kind": "toggle",
       "options": {
-        "enabled": { "display": "利用可能", "value": true }
+        "enabled": { "display": "利用可能", "value": true },
+        "enabled-per-account": { "display": "Accountごとに利用可能", "value": true }
       }
     },
     "ai-reply": {
@@ -35,6 +37,10 @@
         },
         "monthly-600": {
           "display": "月600回",
+          "value": { "limit": 600, "period": "assignment-month" }
+        },
+        "monthly-600-per-account": {
+          "display": "1 Accountあたり月600回",
           "value": { "limit": 600, "period": "assignment-month" }
         }
       }
@@ -56,6 +62,10 @@
         "confirmed-history": {
           "display": "確認済みの過去の記憶・傾向も利用",
           "value": "confirmed-history"
+        },
+        "confirmed-history-private-per-account": {
+          "display": "各AccountでFullと同じ。参加者の非共有情報は利用しない",
+          "value": "confirmed-history"
         }
       }
     },
@@ -76,6 +86,10 @@
         "monthly-12": {
           "display": "月12回",
           "value": { "limit": 12, "period": "assignment-month" }
+        },
+        "monthly-12-per-account": {
+          "display": "1 Accountあたり月12回",
+          "value": { "limit": 12, "period": "assignment-month" }
         }
       }
     },
@@ -89,6 +103,10 @@
         "enabled": { "display": "週1回", "value": true },
         "enabled-full": {
           "display": "週1回、過去との差分と次の一歩を含む",
+          "value": true
+        },
+        "enabled-full-per-account": {
+          "display": "1 AccountごとにFullと同じ",
           "value": true
         }
       }
@@ -104,6 +122,10 @@
         "full": {
           "display": "根拠、変化、継続中のGoalを横断して表示",
           "value": "full"
+        },
+        "full-per-account": {
+          "display": "1 AccountごとにFullと同じ",
+          "value": "full"
         }
       }
     },
@@ -116,7 +138,8 @@
         "30-days": { "display": "直近30日", "value": 30 },
         "90-days": { "display": "直近90日", "value": 90 },
         "one-year": { "display": "直近1年", "value": 365 },
-        "unlimited": { "display": "保存されている全期間", "value": null }
+        "unlimited": { "display": "保存されている全期間", "value": null },
+        "unlimited-per-account": { "display": "1 AccountごとにFullと同じ", "value": null }
       }
     },
     "goal-follow-up": {
@@ -129,6 +152,10 @@
         "selected-one": { "display": "本人が選んだ1件", "value": "selected-one" },
         "relevant-active": {
           "display": "継続中Goalから話題に関係する1件",
+          "value": "relevant-active"
+        },
+        "relevant-active-per-account": {
+          "display": "1 AccountごとにFullと同じ",
           "value": "relevant-active"
         }
       }
@@ -146,6 +173,10 @@
         },
         "personalized-history": {
           "display": "対処履歴と最近の状態を参照",
+          "value": "personalized-history"
+        },
+        "personalized-history-per-account": {
+          "display": "1 AccountごとにFullと同じ",
           "value": "personalized-history"
         }
       }

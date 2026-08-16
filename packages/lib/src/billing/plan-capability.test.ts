@@ -36,6 +36,16 @@ describe("Plan capability catalog", () => {
     });
   });
 
+  it("解決したquotaを共有設定から切り離して不変にする", () => {
+    const first = resolvePlanCapabilityValues("full");
+    const second = resolvePlanCapabilityValues("full");
+
+    expect(Object.isFrozen(first.aiReply)).toBe(true);
+    expect(Object.isFrozen(first.profileSummary)).toBe(true);
+    expect(first.profileSummary).not.toBe(second.profileSummary);
+    expect(second.profileSummary).toEqual({ limit: 12, period: "assignment-month" });
+  });
+
   it("公開表示も実行時と同じPlanマッピングから解決する", () => {
     const comparison = getPlanCapabilityComparison();
     const semanticSearch = comparison.capabilities.find(({ id }) => id === "semantic-search");
@@ -50,8 +60,14 @@ describe("Plan capability catalog", () => {
       free: { optionId: "30-days", display: "直近30日" },
       lite: { optionId: "one-year", display: "直近1年" },
       full: { optionId: "unlimited", display: "保存されている全期間" },
-      family: { optionId: "unlimited", display: "保存されている全期間" },
+      family: { optionId: "unlimited-per-account", display: "1 AccountごとにFullと同じ" },
     });
+    const aiReply = comparison.capabilities.find(({ id }) => id === "ai-reply");
+    const relationshipContext = comparison.capabilities.find(
+      ({ id }) => id === "relationship-question-context",
+    );
+    expect(aiReply?.plans.family.display).toBe("1 Accountあたり月600回");
+    expect(relationshipContext?.plans.family.display).toContain("参加者の非共有情報は利用しない");
   });
 
   it("機能の割当漏れと存在しないoptionを設定エラーにする", () => {
@@ -70,6 +86,14 @@ describe("Plan capability catalog", () => {
     };
     unknown.plans.lite.capabilities["semantic-search"] = "unknown";
     expect(() => validatePlanCapabilityConfiguration(capabilityCatalog, unknown)).toThrow(
+      "Plan lite selects an unknown option for semantic-search",
+    );
+
+    const inherited = structuredClone(planCapabilityMapping) as unknown as {
+      plans: { lite: { capabilities: Record<string, string> } };
+    };
+    inherited.plans.lite.capabilities["semantic-search"] = "toString";
+    expect(() => validatePlanCapabilityConfiguration(capabilityCatalog, inherited)).toThrow(
       "Plan lite selects an unknown option for semantic-search",
     );
   });
