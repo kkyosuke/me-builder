@@ -273,6 +273,7 @@ describe("AccountData Workers runtime E2E", () => {
       state.storage.sql.exec("DROP TABLE progression_events");
       state.storage.sql.exec("DROP TABLE personal_data_exports");
       state.storage.sql.exec("DROP TABLE ai_usage_records");
+      state.storage.sql.exec("DROP TABLE monthly_change_versions");
       state.storage.sql.exec("DROP TABLE weekly_reflections");
       state.storage.sql.exec("DROP TABLE weekly_reflection_generations");
       state.storage.sql.exec("DELETE FROM __drizzle_migrations WHERE created_at >= 1786666843277");
@@ -531,6 +532,7 @@ describe("AccountData Workers runtime E2E", () => {
       state.storage.sql.exec("DROP TABLE progression_events");
       state.storage.sql.exec("DROP TABLE personal_data_exports");
       state.storage.sql.exec("DROP TABLE ai_usage_records");
+      state.storage.sql.exec("DROP TABLE monthly_change_versions");
       state.storage.sql.exec("DROP TABLE weekly_reflections");
       state.storage.sql.exec("DROP TABLE weekly_reflection_generations");
       state.storage.sql.exec("DELETE FROM __drizzle_migrations WHERE created_at > 1786361220917");
@@ -668,6 +670,7 @@ describe("AccountData Workers runtime E2E", () => {
       state.storage.sql.exec("DROP TABLE progression_events");
       state.storage.sql.exec("DROP TABLE personal_data_exports");
       state.storage.sql.exec("DROP TABLE ai_usage_records");
+      state.storage.sql.exec("DROP TABLE monthly_change_versions");
       state.storage.sql.exec("DROP TABLE weekly_reflections");
       state.storage.sql.exec("DROP TABLE weekly_reflection_generations");
       state.storage.sql.exec("DELETE FROM __drizzle_migrations WHERE created_at >= 1786415351981");

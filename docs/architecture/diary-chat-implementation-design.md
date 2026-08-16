@@ -587,6 +587,12 @@ AccountData、Queue、LINEを呼び出した後は、Turn ID、generation epoch�
 - `brain_item_evidence_edges(brain_item_id)`と`(source_record_id)`
 - `brain_vector_sync_jobs(status, next_attempt_at)`と`(brain_item_id, item_revision, operation)` unique
 
+### 4.14 週次振り返りから作る版付き月次変化
+
+週次振り返りが完成するたび、同じAccountData内で対象月の結果を`monthly_change_versions`へ追記します。月、版、生成時刻、その月の週次見出し、本人が選べる次の一歩、根拠にした週を保存し、前月の最新見出しがある場合だけ横断比較へ含めます。原本を共有D1へ複製せず、月次結果も本人のAccountDataだけに置きます。
+
+保存する完全な月次snapshotはPlanに依存させません。読み取り時に共通Entitlementの`monthlyChange`を使い、Liteは当月の要点とGoalを各1件、Fullは同月内の変化と前月を横断して表示します。Freeへdowngradeした後も生成済みsnapshotをLite相当の短い表示で読めますが、新しい週次・月次生成は開始しません。各表示には版と根拠週を残し、Plan変更で保存済み結果を書き換えません。
+
 ## 5. メッセージ処理とSession制御
 
 ### 5.1 受付から原本保存

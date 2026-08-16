@@ -1,6 +1,8 @@
 import { and, asc, desc, eq, gte, inArray, isNull, lt, lte } from "drizzle-orm";
 import type {
   CompleteWeeklyReflectionGenerationInput,
+  MonthlyChangeContent,
+  MonthlyChangeView,
   RequestWeeklyReflectionGenerationResult,
   WeeklyReflectionGenerationContext,
   WeeklyReflectionReadModel,
@@ -16,7 +18,11 @@ import {
   sourceRecordTextPayloads,
 } from "../schema/diary";
 import { sourceRecords } from "../schema/source";
-import { weeklyReflectionGenerations, weeklyReflections } from "../schema/weekly-reflection";
+import {
+  monthlyChangeVersions,
+  weeklyReflectionGenerations,
+  weeklyReflections,
+} from "../schema/weekly-reflection";
 
 const EVIDENCE_LIMIT = 80;
 const DISPATCH_RECOVERY_MS = 30_000;
@@ -25,10 +31,17 @@ export async function readWeeklyReflections(
   db: AccountDataDatabase,
   accountId: string,
   at = new Date(),
+  monthlyMode: "none" | "brief" | "full" = "none",
 ): Promise<WeeklyReflectionReadModel> {
   const weekStart = resolveJstWeekStart(at);
-  const [rows, generation] = await Promise.all([
+  const [rows, monthlyRows, generation] = await Promise.all([
     db.select().from(weeklyReflections).orderBy(desc(weeklyReflections.weekStart)).all(),
+    db
+      .select({ content: monthlyChangeVersions.content })
+      .from(monthlyChangeVersions)
+      .where(eq(monthlyChangeVersions.accountId, accountId))
+      .orderBy(desc(monthlyChangeVersions.generatedAt))
+      .all(),
     db
       .select()
       .from(weeklyReflectionGenerations)
@@ -42,6 +55,7 @@ export async function readWeeklyReflections(
   ]);
   return {
     reflections: rows.map(({ content }) => content),
+    monthlyChanges: monthlyRows.map(({ content }) => projectMonthlyChange(content, monthlyMode)),
     generation: {
       weekStart,
       status: generation?.status ?? "idle",
@@ -50,6 +64,83 @@ export async function readWeeklyReflections(
       notification: generation?.notificationStatus ?? "not-applicable",
     },
   };
+}
+
+function projectMonthlyChange(
+  content: MonthlyChangeContent,
+  monthlyMode: "none" | "brief" | "full",
+): MonthlyChangeView {
+  if (monthlyMode === "full") return { ...content, mode: "full" };
+  return {
+    ...content,
+    mode: monthlyMode === "brief" ? "brief" : "archived",
+    previousMonthHeadline: null,
+    changes: content.changes.slice(0, 1),
+    ongoingGoals: content.ongoingGoals.slice(0, 1),
+  };
+}
+
+function previousMonth(month: string): string {
+  const [year, value] = month.split("-").map(Number);
+  const at = new Date(Date.UTC(year ?? 1970, (value ?? 1) - 2, 1));
+  return at.toISOString().slice(0, 7);
+}
+
+async function materializeMonthlyChange(
+  db: AccountDataDatabase,
+  accountId: string,
+  generatedAt: Date,
+  evidenceWeekStart: string,
+): Promise<void> {
+  const month = generatedAt.toLocaleDateString("en-CA", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+  });
+  const reflections = await db
+    .select()
+    .from(weeklyReflections)
+    .where(gte(weeklyReflections.weekStart, `${previousMonth(month)}-01`))
+    .orderBy(desc(weeklyReflections.weekStart))
+    .all();
+  const current = reflections.filter(({ weekStart }) => weekStart.startsWith(month));
+  if (current.length === 0) return;
+  const prior = reflections.filter(({ weekStart }) => weekStart.startsWith(previousMonth(month)));
+  const existingVersions = await db
+    .select({ version: monthlyChangeVersions.version, content: monthlyChangeVersions.content })
+    .from(monthlyChangeVersions)
+    .where(
+      and(eq(monthlyChangeVersions.accountId, accountId), eq(monthlyChangeVersions.month, month)),
+    )
+    .orderBy(desc(monthlyChangeVersions.version))
+    .all();
+  if (
+    existingVersions.some(({ content }) => content.evidenceWeekStarts.includes(evidenceWeekStart))
+  ) {
+    return;
+  }
+  const version = (existingVersions[0]?.version ?? 0) + 1;
+  const ongoingGoals = current.flatMap(({ content }) =>
+    content.items.filter(({ kind }) => kind === "next-step").map(({ description }) => description),
+  );
+  const content = {
+    month,
+    version,
+    generatedAt: generatedAt.toISOString(),
+    headline: current[0]?.content.headline ?? `${month}の振り返り`,
+    previousMonthHeadline: prior[0]?.content.headline ?? null,
+    changes: current.map(({ content: reflection }) => reflection.headline),
+    ongoingGoals: [...new Set(ongoingGoals)],
+    evidenceWeekStarts: current.map(({ weekStart }) => weekStart),
+  };
+  await db.insert(monthlyChangeVersions).values({
+    id: crypto.randomUUID(),
+    accountId,
+    month,
+    version,
+    generatedAt,
+    content,
+  });
 }
 
 export async function requestWeeklyReflectionGeneration(
@@ -198,7 +289,16 @@ export async function loadWeeklyReflectionGenerationContext(
     )
     .get();
   if (!generation) return null;
-  if (generation.status === "completed" || generation.status === "failed") return null;
+  if (generation.status === "completed") {
+    await materializeMonthlyChange(
+      db,
+      accountId,
+      generation.finishedAt ?? startedAt,
+      generation.weekStart,
+    );
+    return null;
+  }
+  if (generation.status === "failed") return null;
   if (generation.status === "queued") {
     await db
       .update(weeklyReflectionGenerations)
@@ -323,6 +423,7 @@ export async function completeWeeklyReflectionGeneration(
       })
       .where(eq(weeklyReflectionGenerations.id, input.generationId)),
   ]);
+  await materializeMonthlyChange(db, accountId, input.generatedAt, generation.weekStart);
   return true;
 }
 

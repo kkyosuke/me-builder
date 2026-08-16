@@ -374,8 +374,12 @@ const actions = {
       message,
       failedAt,
     ),
-  "weeklyReflection.read": (db: DO.account.Database, accountId: string, at?: Date) =>
-    DO.account.action.weeklyReflection.readWeeklyReflections(db, accountId, at),
+  "weeklyReflection.read": (
+    db: DO.account.Database,
+    accountId: string,
+    at?: Date,
+    monthlyMode?: "none" | "brief" | "full",
+  ) => DO.account.action.weeklyReflection.readWeeklyReflections(db, accountId, at, monthlyMode),
   "weeklyReflection.requestGeneration": (db: DO.account.Database, accountId: string, at?: Date) =>
     DO.account.action.weeklyReflection.requestWeeklyReflectionGeneration(db, accountId, at),
   "weeklyReflection.listUndispatchedGenerationIds": (

@@ -26,8 +26,23 @@ export type WeeklyReflectionGenerationState = Readonly<{
 
 export type WeeklyReflectionReadModel = Readonly<{
   reflections: readonly WeeklyReflectionContent[];
+  monthlyChanges: readonly MonthlyChangeView[];
   generation: WeeklyReflectionGenerationState;
 }>;
+
+export type MonthlyChangeContent = Readonly<{
+  month: string;
+  version: number;
+  generatedAt: string;
+  headline: string;
+  previousMonthHeadline: string | null;
+  changes: readonly string[];
+  ongoingGoals: readonly string[];
+  evidenceWeekStarts: readonly string[];
+}>;
+
+export type MonthlyChangeView = MonthlyChangeContent &
+  Readonly<{ mode: "brief" | "full" | "archived" }>;
 
 export type WeeklyReflectionEvidence = Readonly<{
   id: string;

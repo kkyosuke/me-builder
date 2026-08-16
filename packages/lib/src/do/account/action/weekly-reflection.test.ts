@@ -1,5 +1,6 @@
 import path from "node:path";
 import Database from "better-sqlite3";
+import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { describe, expect, it } from "vitest";
@@ -122,6 +123,96 @@ describe("weekly reflection", () => {
     await expect(readWeeklyReflections(db, ACCOUNT_ID, NOW)).resolves.toMatchObject({
       reflections: [{ weekStart: "2026-08-10", recordCount: 1 }],
       generation: { status: "completed", canGenerate: false, notification: "skipped" },
+    });
+  });
+
+  it("2か月の週次結果から版付き月次変化を作り、Lite・Full・downgrade表示を分ける", async () => {
+    const db = createTestDb();
+    const cases = [
+      {
+        suffix: "july",
+        at: new Date("2026-07-20T03:00:00.000Z"),
+        headline: "7月は休む時間を確保しました",
+        goal: "昼休みに5分だけ外へ出る",
+      },
+      {
+        suffix: "august-one",
+        at: new Date("2026-08-03T03:00:00.000Z"),
+        headline: "8月は相談する機会が増えました",
+        goal: "面談前に希望を一つ書く",
+      },
+      {
+        suffix: "august-two",
+        at: NOW,
+        headline: "8月は小さな希望を伝えました",
+        goal: "次の面談でも希望を一つ伝える",
+      },
+    ] as const;
+    for (const item of cases) {
+      await addDiary(db, item.suffix, item.at);
+      const requested = await requestWeeklyReflectionGeneration(db, ACCOUNT_ID, item.at);
+      if (!("generationId" in requested)) throw new Error("generation was not created");
+      await completeWeeklyReflectionGeneration(db, ACCOUNT_ID, {
+        generationId: requested.generationId,
+        generatedAt: item.at,
+        model: "test-model",
+        promptVersion: "weekly-reflection-v1",
+        headline: item.headline,
+        items: [
+          {
+            kind: "next-step",
+            title: "次の一歩",
+            description: item.goal,
+            evidenceCount: 1,
+            sources: ["diary"],
+          },
+        ],
+        evidenceCount: 1,
+      });
+    }
+
+    const full = await readWeeklyReflections(db, ACCOUNT_ID, NOW, "full");
+    expect(full.monthlyChanges[0]).toMatchObject({
+      month: "2026-08",
+      version: 2,
+      mode: "full",
+      previousMonthHeadline: "7月は休む時間を確保しました",
+      changes: ["8月は小さな希望を伝えました", "8月は相談する機会が増えました"],
+      evidenceWeekStarts: ["2026-08-10", "2026-08-03"],
+    });
+    expect(full.monthlyChanges[0]?.ongoingGoals).toHaveLength(2);
+
+    const augustGeneration = await requestWeeklyReflectionGeneration(db, ACCOUNT_ID, NOW);
+    if (!("generationId" in augustGeneration)) throw new Error("generation was not found");
+    await expect(
+      loadWeeklyReflectionGenerationContext(db, ACCOUNT_ID, augustGeneration.generationId, NOW),
+    ).resolves.toBeNull();
+    const replayed = await readWeeklyReflections(db, ACCOUNT_ID, NOW, "full");
+    expect(replayed.monthlyChanges.filter(({ month }) => month === "2026-08")).toHaveLength(2);
+
+    await db
+      .delete(schema.monthlyChangeVersions)
+      .where(eq(schema.monthlyChangeVersions.month, "2026-08"));
+    await expect(
+      loadWeeklyReflectionGenerationContext(db, ACCOUNT_ID, augustGeneration.generationId, NOW),
+    ).resolves.toBeNull();
+    const recovered = await readWeeklyReflections(db, ACCOUNT_ID, NOW, "full");
+    expect(recovered.monthlyChanges.filter(({ month }) => month === "2026-08")).toEqual([
+      expect.objectContaining({ evidenceWeekStarts: ["2026-08-10", "2026-08-03"] }),
+    ]);
+
+    const lite = await readWeeklyReflections(db, ACCOUNT_ID, NOW, "brief");
+    expect(lite.monthlyChanges[0]).toMatchObject({
+      mode: "brief",
+      previousMonthHeadline: null,
+      changes: ["8月は小さな希望を伝えました"],
+      ongoingGoals: ["次の面談でも希望を一つ伝える"],
+    });
+
+    const downgraded = await readWeeklyReflections(db, ACCOUNT_ID, NOW, "none");
+    expect(downgraded.monthlyChanges[0]).toMatchObject({
+      mode: "archived",
+      headline: "8月は小さな希望を伝えました",
     });
   });
 });

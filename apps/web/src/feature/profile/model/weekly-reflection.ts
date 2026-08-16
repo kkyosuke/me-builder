@@ -14,6 +14,17 @@ type WeeklyReflection = Readonly<{
 
 export type WeeklyReflectionResult = Readonly<{
   reflections: readonly WeeklyReflection[];
+  monthlyChanges: readonly Readonly<{
+    month: string;
+    version: number;
+    generatedAt: string;
+    mode: "brief" | "full" | "archived";
+    headline: string;
+    previousMonthHeadline: string | null;
+    changes: readonly string[];
+    ongoingGoals: readonly string[];
+    evidenceWeekStarts: readonly string[];
+  }>[];
   generation: Readonly<{
     weekStart: string;
     status: "idle" | "queued" | "generating" | "completed" | "failed";
