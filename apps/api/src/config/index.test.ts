@@ -128,4 +128,37 @@ describe("getConfig & ConfigSchema", () => {
       }),
     ).toThrow("must match");
   });
+
+  it("SSO無効時はAuth0 secretを要求しないこと", () => {
+    expect(getConfig({ SSO_ROLLOUT_MODE: "disabled" }).ssoRolloutMode).toBe("disabled");
+  });
+
+  it("SSO有効時はAuth0設定と固定callback URLを解決すること", () => {
+    const conf = getConfig({
+      SSO_ROLLOUT_MODE: "linking",
+      SSO_ISSUER_URL: "https://tenant.auth0.com/",
+      SSO_CLIENT_ID: "client-id",
+      SSO_CLIENT_SECRET: "client-secret",
+      BASE_URL: "https://api.example.com/",
+    });
+
+    expect(conf).toEqual(
+      expect.objectContaining({
+        ssoRolloutMode: "linking",
+        ssoIssuerUrl: "https://tenant.auth0.com/",
+        ssoClientId: "client-id",
+        ssoClientSecret: "client-secret",
+        ssoCallbackUrl: "https://api.example.com/api/auth/sso/callback",
+      }),
+    );
+  });
+
+  it("SSO有効時に必要な設定が欠けていれば起動前に拒否すること", () => {
+    expect(() =>
+      getConfig({
+        SSO_ROLLOUT_MODE: "linked-login",
+        SSO_ISSUER_URL: "https://tenant.auth0.com/",
+      }),
+    ).toThrow("SSO_CLIENT_ID");
+  });
 });

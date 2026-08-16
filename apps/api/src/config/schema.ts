@@ -18,6 +18,13 @@ export const ConfigSchema = v.object({
   liffId: v.optional(v.string()),
   /** LINE Login チャネル ID。ID トークンの `aud` の期待値として使います。 */
   lineLoginChannelId: v.optional(v.string()),
+  /** 外部ブラウザSSOの段階公開状態。disabledではSSO設定を要求しない。 */
+  ssoRolloutMode: v.optional(v.picklist(["disabled", "linking", "linked-login"]), "disabled"),
+  /** Auth0 tenantのOIDC issuer。末尾slashを含む。 */
+  ssoIssuerUrl: v.optional(v.pipe(v.string(), v.url())),
+  ssoClientId: v.optional(v.pipe(v.string(), v.nonEmpty())),
+  ssoClientSecret: v.optional(v.pipe(v.string(), v.nonEmpty())),
+  ssoCallbackUrl: v.optional(v.pipe(v.string(), v.url())),
   /** カンマ区切りの設定値を解析した、管理者として扱うLINE user ID。 */
   adminLineUserIds: v.optional(v.array(v.string()), []),
   webhookQueueName: v.optional(v.string()),
