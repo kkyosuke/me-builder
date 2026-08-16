@@ -12,6 +12,10 @@ const record: ApplicationSessionRecord = {
   expiresAt: "2026-08-18T00:00:00.000Z",
   sessionVersion: 1,
   csrfTokenHash: "csrf-hash",
+  displayProfile: {
+    displayName: "利用者A",
+    pictureUrl: "https://example.com/picture.jpg",
+  },
 };
 
 describe("KvApplicationSessionStore", () => {

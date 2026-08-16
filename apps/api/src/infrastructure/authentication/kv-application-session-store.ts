@@ -16,6 +16,12 @@ const applicationSessionRecordSchema = v.object({
   expiresAt: timestamp,
   sessionVersion: v.pipe(v.number(), v.integer(), v.minValue(1)),
   csrfTokenHash: v.pipe(v.string(), v.nonEmpty(), v.maxLength(128)),
+  displayProfile: v.optional(
+    v.object({
+      displayName: v.optional(v.pipe(v.string(), v.maxLength(256))),
+      pictureUrl: v.optional(v.pipe(v.string(), v.url(), v.maxLength(2_048))),
+    }),
+  ),
 });
 
 export class KvApplicationSessionStore implements ApplicationSessionStore {

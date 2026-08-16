@@ -14,8 +14,8 @@ export class D1AccountSessionVersionProvider
     );
   }
 
-  async invalidate(accountId: string): Promise<void> {
-    await D1.shared.action.accountSession.invalidateAccountSessions(this.db, accountId);
+  async invalidate(accountId: string): Promise<number | undefined> {
+    return await D1.shared.action.accountSession.invalidateAccountSessions(this.db, accountId);
   }
 
   async invalidateAccountSessions(accountId: string): Promise<void> {

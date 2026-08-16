@@ -32,7 +32,10 @@ class MemoryVersions implements AccountSessionVersionProvider {
 
   async invalidate(accountId: string) {
     const current = this.versions.get(accountId);
-    if (current !== undefined) this.versions.set(accountId, current + 1);
+    if (current === undefined) return undefined;
+    const next = current + 1;
+    this.versions.set(accountId, next);
+    return next;
   }
 }
 
@@ -54,14 +57,21 @@ describe("ApplicationSessionService", () => {
       () => now,
     );
 
-    const issued = await sessions.issue(actor);
+    const displayProfile = {
+      displayName: "利用者A",
+      pictureUrl: "https://example.com/picture.jpg",
+    };
+    const issued = await sessions.issue(actor, displayProfile);
     expect(issued).toBeDefined();
     const reference = [...store.records.keys()][0];
     expect(reference).toMatch(/^[a-f0-9]{64}$/);
     expect(reference).not.toContain(issued?.sessionToken ?? "unreachable");
 
     now = new Date("2026-08-17T00:00:04.000Z");
-    await expect(sessions.verify(issued?.sessionToken)).resolves.toEqual(actor);
+    await expect(sessions.verify(issued?.sessionToken)).resolves.toEqual({
+      actor,
+      displayProfile,
+    });
     expect([...store.records.values()][0]?.lastSeenAt).toBe(now.toISOString());
   });
 
@@ -109,31 +119,36 @@ describe("ApplicationSessionService", () => {
     const issuedLastSeenAt = [...store.records.values()][0]?.lastSeenAt;
 
     now = new Date("2026-08-17T00:00:04.000Z");
-    await expect(sessions.verify(issued?.sessionToken, { refreshIdle: false })).resolves.toEqual(
-      actor,
-    );
+    await expect(
+      sessions.verify(issued?.sessionToken, { refreshIdle: false }),
+    ).resolves.toEqual({ actor });
     expect([...store.records.values()][0]?.lastSeenAt).toBe(issuedLastSeenAt);
   });
 
-  it("rotationとlogoutで以前の参照を再利用できない", async () => {
+  it("rotationとlogoutはD1 versionを進め、同じAccountの旧sessionを即時失効する", async () => {
     const store = new MemoryStore();
+    const versions = new MemoryVersions();
     let now = new Date("2026-08-17T00:00:00.000Z");
     const sessions = new ApplicationSessionService(
       store,
-      new MemoryVersions(),
+      versions,
       { absoluteTtlMs: 10_000, idleTtlMs: 5_000 },
       () => now,
     );
     const first = await sessions.issue(actor);
+    const sibling = await sessions.issue(actor);
     now = new Date("2026-08-17T00:00:04.000Z");
     const rotated = await sessions.rotate(first?.sessionToken ?? "");
 
     expect(rotated?.sessionToken).not.toBe(first?.sessionToken);
     expect(rotated?.expiresAt).toEqual(first?.expiresAt);
+    expect(versions.versions.get(actor.accountId)).toBe(2);
     await expect(sessions.verify(first?.sessionToken)).resolves.toBeUndefined();
-    await expect(sessions.verify(rotated?.sessionToken)).resolves.toEqual(actor);
+    await expect(sessions.verify(sibling?.sessionToken)).resolves.toBeUndefined();
+    await expect(sessions.verify(rotated?.sessionToken)).resolves.toEqual({ actor });
 
-    await sessions.logout(rotated?.sessionToken);
+    await sessions.logout(rotated?.sessionToken, actor.accountId);
+    expect(versions.versions.get(actor.accountId)).toBe(3);
     await expect(sessions.verify(rotated?.sessionToken)).resolves.toBeUndefined();
   });
 

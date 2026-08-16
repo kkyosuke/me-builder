@@ -1,4 +1,4 @@
-import type { AuthenticatedActor } from "./types";
+import type { AuthenticatedActor, DisplayProfile } from "./types";
 
 export type ApplicationSessionRecord = Readonly<{
   accountId: string;
@@ -9,6 +9,7 @@ export type ApplicationSessionRecord = Readonly<{
   expiresAt: string;
   sessionVersion: number;
   csrfTokenHash: string;
+  displayProfile?: DisplayProfile;
 }>;
 
 export interface ApplicationSessionStore {
@@ -19,13 +20,18 @@ export interface ApplicationSessionStore {
 
 export interface AccountSessionVersionProvider {
   current(accountId: string): Promise<number | undefined>;
-  invalidate(accountId: string): Promise<void>;
+  invalidate(accountId: string): Promise<number | undefined>;
 }
 
 export type IssuedApplicationSession = Readonly<{
   sessionToken: string;
   csrfToken: string;
   expiresAt: Date;
+}>;
+
+export type VerifiedApplicationSession = Readonly<{
+  actor: AuthenticatedActor;
+  displayProfile?: DisplayProfile;
 }>;
 
 type SessionPolicy = Readonly<{ absoluteTtlMs: number; idleTtlMs: number }>;
@@ -43,7 +49,10 @@ export class ApplicationSessionService {
     private readonly now: () => Date = () => new Date(),
   ) {}
 
-  async issue(actor: AuthenticatedActor): Promise<IssuedApplicationSession | undefined> {
+  async issue(
+    actor: AuthenticatedActor,
+    displayProfile?: DisplayProfile,
+  ): Promise<IssuedApplicationSession | undefined> {
     const sessionVersion = await this.versions.current(actor.accountId);
     if (sessionVersion === undefined) return undefined;
     const now = this.now();
@@ -51,6 +60,7 @@ export class ApplicationSessionService {
       actor,
       sessionVersion,
       new Date(now.getTime() + this.policy.absoluteTtlMs),
+      displayProfile,
     );
   }
 
@@ -58,6 +68,7 @@ export class ApplicationSessionService {
     actor: AuthenticatedActor,
     sessionVersion: number,
     expiresAt: Date,
+    displayProfile?: DisplayProfile,
   ): Promise<IssuedApplicationSession | undefined> {
     const now = this.now();
     if (expiresAt.getTime() <= now.getTime()) return undefined;
@@ -74,6 +85,7 @@ export class ApplicationSessionService {
         expiresAt: expiresAt.toISOString(),
         sessionVersion,
         csrfTokenHash: await hash(csrfToken),
+        ...(displayProfile ? { displayProfile } : {}),
       },
       Math.ceil((expiresAt.getTime() - now.getTime()) / 1_000),
     );
@@ -83,7 +95,7 @@ export class ApplicationSessionService {
   async verify(
     sessionToken: string | undefined,
     { refreshIdle = true }: VerifyOptions = {},
-  ): Promise<AuthenticatedActor | undefined> {
+  ): Promise<VerifiedApplicationSession | undefined> {
     if (!sessionToken) return undefined;
     const referenceHash = await hash(sessionToken);
     const record = await this.store.get(referenceHash);
@@ -102,23 +114,42 @@ export class ApplicationSessionService {
       await this.store.put(referenceHash, { ...record, lastSeenAt: now.toISOString() }, ttl);
     }
     return {
-      accountId: record.accountId,
-      authenticationMethod: record.authenticationMethod,
-      authenticatedAt: new Date(record.authenticatedAt),
+      actor: {
+        accountId: record.accountId,
+        authenticationMethod: record.authenticationMethod,
+        authenticatedAt: new Date(record.authenticatedAt),
+      },
+      ...(record.displayProfile ? { displayProfile: record.displayProfile } : {}),
     };
   }
 
   async rotate(sessionToken: string): Promise<IssuedApplicationSession | undefined> {
     const referenceHash = await hash(sessionToken);
     const record = await this.store.get(referenceHash);
-    const actor = await this.verify(sessionToken);
-    if (!record || !actor) return undefined;
+    const verified = await this.verify(sessionToken, { refreshIdle: false });
+    if (!record || !verified) return undefined;
+    const sessionVersion = await this.versions.invalidate(verified.actor.accountId);
+    if (sessionVersion === undefined) {
+      await this.store.delete(referenceHash);
+      return undefined;
+    }
     await this.store.delete(referenceHash);
-    return await this.persist(actor, record.sessionVersion, new Date(record.expiresAt));
+    return await this.persist(
+      verified.actor,
+      sessionVersion,
+      new Date(record.expiresAt),
+      verified.displayProfile,
+    );
   }
 
-  async logout(sessionToken: string | undefined): Promise<void> {
-    if (sessionToken) await this.store.delete(await hash(sessionToken));
+  async logout(sessionToken: string | undefined, accountId?: string): Promise<void> {
+    if (!sessionToken) return;
+    const referenceHash = await hash(sessionToken);
+    const record = accountId ? undefined : await this.store.get(referenceHash);
+    const invalidatedAccountId = accountId ?? record?.accountId;
+    // KV deleteの他拠点反映を待たずに拒否できるよう、logoutはAccount単位で失効する。
+    if (invalidatedAccountId) await this.versions.invalidate(invalidatedAccountId);
+    await this.store.delete(referenceHash);
   }
 
   async invalidateAccountSessions(accountId: string): Promise<void> {
