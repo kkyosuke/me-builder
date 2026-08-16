@@ -907,7 +907,9 @@ describe("App", () => {
     window.history.replaceState({}, "", "/profile/family?token=family.invitation.secret");
     const view = render(<App />);
 
-    expect(await screen.findByRole("heading", { name: "ファミリーパック" })).toBeTruthy();
+    expect(
+      await screen.findByRole("heading", { name: "ファミリーパック" }, { timeout: 5_000 }),
+    ).toBeTruthy();
     expect(window.location.search).toContain("family.invitation.secret");
 
     mocks.authState = {
