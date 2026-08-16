@@ -13,6 +13,7 @@
     "test": "vitest run --dir .",
     "test:e2e": "vitest run --dir src/e2e",
     "register:webhook": "bun scripts/register-webhook.ts",
+    "billing:test:sandbox": "bun scripts/test-billing-lifecycle.ts",
     "register:rich-menu:preview": "bun scripts/register-rich-menu.ts preview",
     "register:rich-menu:production": "bun scripts/register-rich-menu.ts production",
     "deploy:preview": "wrangler deploy --env preview",
@@ -32,6 +33,7 @@
     "@types/bun": "latest",
     "better-sqlite3": "^13.0.1",
     "drizzle-orm": "^0.45.2",
-    "miniflare": "4.20260722.0"
+    "miniflare": "4.20260722.0",
+    "stripe": "^22.5.0"
   }
 }

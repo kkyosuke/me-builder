@@ -112,6 +112,12 @@ Stripeだけを同期し、Cloudflareを変更しない確認には`--stripe-onl
 bun scripts/setup-stripe-billing.ts preview --stripe-only
 ```
 
+### 3.3 契約ライフサイクルのsandbox確認
+
+通常PRのCIはStripeへ接続しません。実接続の回帰は`scheduled-checks.yml`の手動・定期実行で、`apps/api/scripts/test-billing-lifecycle.ts`からsandbox Test Clockを使って確認します。
+
+実行には`STRIPE_SANDBOX_SECRET_KEY`と、sandbox上で一意に解決できる`STRIPE_E2E_PRICE_LOOKUP_KEY`をGitHub Environmentへ設定します。
+
 ## 4. Cloudflareへ配布する値
 
 通常実行はWranglerの標準入力を使い、値をコマンド引数やログへ出さずに次を同期します。
