@@ -9,6 +9,8 @@ type Handlers = Partial<{
   createCustomer: BillingProvider["createCustomer"];
   createCheckoutSession: BillingProvider["createCheckoutSession"];
   createPortalSession: BillingProvider["createPortalSession"];
+  findPriceIdByLookupKey: BillingProvider["findPriceIdByLookupKey"];
+  hasOpenCheckoutSession: BillingProvider["hasOpenCheckoutSession"];
   retrieveCustomer: BillingProvider["retrieveCustomer"];
   retrieveSubscription: BillingProvider["retrieveSubscription"];
   listSubscriptions: BillingProvider["listSubscriptions"];
@@ -43,6 +45,18 @@ export class FakeBillingProvider implements BillingProvider {
   }): Promise<{ url: string }> {
     if (this.handlers.createPortalSession) return this.handlers.createPortalSession(input);
     return { url: input.returnUrl };
+  }
+
+  async findPriceIdByLookupKey(lookupKey: string): Promise<string | null> {
+    if (this.handlers.findPriceIdByLookupKey)
+      return this.handlers.findPriceIdByLookupKey(lookupKey);
+    return `price_${lookupKey}`;
+  }
+
+  async hasOpenCheckoutSession(customerId: string): Promise<boolean> {
+    if (this.handlers.hasOpenCheckoutSession)
+      return this.handlers.hasOpenCheckoutSession(customerId);
+    return false;
   }
 
   async retrieveCustomer(customerId: string): Promise<BillingCustomer> {

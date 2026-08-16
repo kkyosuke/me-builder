@@ -25,6 +25,39 @@ function parseBillingPricePlanMap(
   }
 }
 
+const DEFAULT_BILLING_LOOKUP_KEY_MAP: Readonly<Record<string, string>> = {
+  "lite.month": "me_builder_lite_monthly",
+  "lite.year": "me_builder_lite_yearly",
+  "full.month": "me_builder_full_monthly",
+  "full.year": "me_builder_full_yearly",
+  "family.month": "me_builder_family_monthly",
+  "family.year": "me_builder_family_yearly",
+};
+
+function parseBillingLookupKeyMap(raw: string | undefined): Record<string, string> {
+  if (!raw) return { ...DEFAULT_BILLING_LOOKUP_KEY_MAP };
+  try {
+    const value: unknown = JSON.parse(raw);
+    if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+    const allowed = new Set([
+      "lite.month",
+      "lite.year",
+      "full.month",
+      "full.year",
+      "family.month",
+      "family.year",
+    ]);
+    return Object.fromEntries(
+      Object.entries(value).filter(
+        (entry): entry is [string, string] =>
+          allowed.has(entry[0]) && typeof entry[1] === "string" && entry[1].length > 0,
+      ),
+    );
+  } catch {
+    return {};
+  }
+}
+
 export function isDevelopmentEnvironment(environment: string): boolean {
   return DEVELOPMENT_ENVIRONMENTS.has(environment);
 }
@@ -83,6 +116,7 @@ export function getConfig(env?: Record<string, unknown>): ApiConfig {
     stripeWebhookSecret: getEnv("STRIPE_WEBHOOK_SECRET", env),
     stripePortalConfigurationId: getEnv("STRIPE_PORTAL_CONFIGURATION_ID", env),
     billingPricePlanMap: parseBillingPricePlanMap(getEnv("BILLING_PRICE_PLAN_MAP", env)),
+    billingLookupKeyMap: parseBillingLookupKeyMap(getEnv("BILLING_LOOKUP_KEY_MAP", env)),
     liffId: liffConfiguration.liffId,
     lineLoginChannelId: liffConfiguration.lineLoginChannelId,
     adminLineUserIds,

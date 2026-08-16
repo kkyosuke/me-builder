@@ -35,6 +35,7 @@ type Env = Omit<
   STRIPE_WEBHOOK_SECRET?: string;
   STRIPE_PORTAL_CONFIGURATION_ID?: string;
   BILLING_PRICE_PLAN_MAP?: string;
+  BILLING_LOOKUP_KEY_MAP?: string;
   ADMIN_LINE_USER_IDS?: string;
   BASE_URL?: string;
   WEB_ORIGIN?: string;

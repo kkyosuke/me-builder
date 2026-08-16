@@ -85,6 +85,29 @@ export class StripeBillingProvider implements BillingProvider {
     });
   }
 
+  async findPriceIdByLookupKey(lookupKey: string): Promise<string | null> {
+    return this.call(async () => {
+      const prices = await this.stripe.prices.list({
+        lookup_keys: [lookupKey],
+        active: true,
+        limit: 2,
+      });
+      if (prices.data.length > 1) throw new BillingProviderError("provider", false);
+      return prices.data[0]?.id ?? null;
+    });
+  }
+
+  async hasOpenCheckoutSession(customerId: string): Promise<boolean> {
+    return this.call(async () => {
+      const sessions = await this.stripe.checkout.sessions.list({
+        customer: customerId,
+        status: "open",
+        limit: 1,
+      });
+      return sessions.data.length > 0;
+    });
+  }
+
   async retrieveCustomer(customerId: string): Promise<BillingCustomer> {
     return this.call(async () => {
       const customer = await this.stripe.customers.retrieve(customerId);
