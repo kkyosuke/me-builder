@@ -1,34 +1,78 @@
-# Subscription Plan機能のPreview検証
+# Subscription課金のPreview検証
 
 ## 1. 目的
 
-決済連携の状態と機能側の判定を分離し、`AccountPlanAssignment`を入力としてLite、Full、Family、Freeの体験を検証します。この検証ではStripe Customer、Subscription、Price、Webhookを作成しません。
+Stripe sandboxの契約状態が、認証済みAccountの`AccountPlanAssignment`とWeb表示へ正しく収束することを、通常CI、Stripe Test Clock、共有Previewの3層で確認します。B系列のAI機能が未提供であることを、決済・Plan紐付けの失敗と扱いません。
+
+検証記録へAccount ID、LIFF token、招待token、Customer ID、Subscription ID、日記本文を転記しません。結果は検証番号、期待Plan、実際のPlan、HTTP status、成否だけを残します。
 
 ## 2. 自動検証
 
-次のコマンドは外部サービスへ接続せず、Previewへ反映する前にも実行できます。
+### 2.1 外部接続なし
 
 ```bash
 task subscription:verify:preview
 ```
 
-検証対象は次のとおりです。
+Plan別の権限、期間境界、Freeへの復帰、本人データの保持、Familyの個人内容分離、安全案内をfakeの`AccountPlanAssignment`で確認します。Webhookの重複・順序逆転・欠落とDLQ再処理、購入から現在Plan表示までのWeb E2Eは通常テストに含めます。
 
-| 利用者の操作 | 判定 |
-| --- | --- |
-| Lite、Full、Familyへ切り替える | Plan、付与元、AI返信上限、まとめ生成上限が料金プランのSSoTと一致する |
-| 適用開始前、利用期限到達後、downgrade後に開く | Freeへ戻り、以前に保存した本人データは閲覧できる |
-| 本人データを訂正・削除・エクスポートする | Planや決済情報なしで本人のAccountDataだけを操作する |
-| Familyへ参加・退出する | 参加中だけFull相当となり、支払者から参加者の個人内容を取得できない |
-| AI返信上限へ到達後に危機を伝える | 利用枠を消費する生成を行わず、安全案内を返す |
+### 2.2 Stripe sandbox
 
-## 3. Preview画面での確認
+`Scheduled Checks` workflowの`Stripe Sandbox Billing Lifecycle`は、`dev` EnvironmentのStripe test keyとTest Clockを使います。trial、更新、upgrade、期間末downgrade、支払失敗、回復、解約予約・取消・終了を通常PR CIから分離して確認します。
 
-1. 検証用Accountだけを対象に、運営用providerまたは同じ`AccountPlanAssignment`契約のfixtureでLiteを割り当てます。
-2. `/profile`のPlanと残量を確認し、本人データ画面で日記を訂正してexportを要求します。
-3. Fullへ切り替え、確認済み履歴を使う機能と上限を確認します。
-4. Familyの招待を別の検証用Accountで承諾し、Planだけが共有される説明とFamily表示を確認します。支払者側へ参加者の内容が表示されないことも確認します。
-5. Freeへ切り替え、既存の日記とexportを引き続き閲覧でき、新しい利用だけがFree上限で判定されることを確認します。
-6. 上限到達状態で危機表現を送り、安全案内がPlan判定より優先されることを確認します。
+### 2.3 デプロイ済みPreview
 
-検証記録へAccount ID、招待token、日記本文、Customer IDなどの個人・決済識別子を転記しません。失敗時は対象Plan、付与元、期間、期待した機能名、実際のHTTP statusだけを記録します。
+Preview CDはデプロイ直後に次を実行し、API環境と公開Plan catalogがコミット済み料金SSoTに一致することを確認します。
+
+```bash
+task subscription:verify:deployed-preview
+```
+
+本人の短命LIFF ID tokenを安全に手元へ渡せる場合だけ、同じコマンドでtrial利用可否とprojectionの期待Planも確認できます。値をコマンド引数、履歴、ログへ残しません。
+
+```bash
+read -rs PREVIEW_BILLING_ID_TOKEN
+export PREVIEW_BILLING_ID_TOKEN
+PREVIEW_EXPECTED_PLAN=lite task subscription:verify:deployed-preview
+unset PREVIEW_BILLING_ID_TOKEN
+```
+
+## 3. Previewへ反映する順序
+
+1. stack最上位PRへ`deploy`と`e2e`ラベルを付け、Preview CDと外部接続なしE2Eを完了する
+2. `Setup / Stripe Billing`を対象branch、`dev`、確認文字列`sync-dev`で実行する
+3. 同じbranchの`Scheduled Checks`を手動実行し、Stripe sandbox lifecycleを完了する
+4. Preview LIFFを検証用Accountで開き、公開Planと初回trial表示を確認する
+5. sandboxの支払方法だけを使ってCheckoutを完了し、復帰画面がqueryだけで成功せず、projection反映後に現在Planを表示することを確認する
+
+Stripe同期は共通Product、6つのPlan別Price、Webhook endpoint、Customer Portal configuration、Cloudflare secretsを同時に更新します。旧Price IDは既存契約がなくなるまでPlan mapへ残します。
+
+## 4. AccountとPlanの通し確認
+
+| 検証番号 | 操作 | 合格条件 |
+| --- | --- | --- |
+| `PREVIEW-BILLING-001` | Free Accountで料金プランを開く | 3 Plan、月額・年額、14日trial、終了後価格、自動更新、解約条件が表示される |
+| `PREVIEW-BILLING-002` | LiteをCheckoutで開始して復帰する | projection反映前は待機し、反映後だけLiteと契約管理導線を表示する |
+| `PREVIEW-BILLING-003` | PortalでFullへupgradeする | Stripe確定額の支払成功後にFullへ収束し、失敗時はLiteを維持する |
+| `PREVIEW-BILLING-004` | Liteへdowngradeする | 同一Product内のPrice変更として期間末予約され、期間末まではFullを維持する |
+| `PREVIEW-BILLING-005` | 更新支払を失敗・回復させる | 最初の失敗から7日だけ直前Planを維持し、再通知で延長せず、成功後にactiveへ戻る |
+| `PREVIEW-BILLING-006` | 期間末解約を予約・取消・再予約する | 取消後は継続し、再予約の期間末後にFreeへ戻る。本人データは残る |
+| `PREVIEW-BILLING-007` | 同じWebhookを再送し、古いeventを後着させる | 重複通知を1回だけ処理し、古いeventで新しいPlanへ巻き戻らない |
+| `PREVIEW-BILLING-008` | 使用済みAccountで再購入する | CustomerやPlan付与元を変えても2回目のtrialを付けない |
+| `PREVIEW-BILLING-009` | 別Accountから契約管理を開く | 他AccountのCustomer、契約、請求履歴へ到達できない |
+
+支払失敗の実Account確認はアクセス制限されたStripe sandboxで検証用Customerの支払方法を変更し、識別子を検証記録へ写さずに行います。期間移動とカード失敗そのものの回帰はTest Clock E2Eを正とし、共有PreviewではWebhookからprojectionと画面へ収束する境界を確認します。
+
+## 5. 未完了ゲート
+
+Account復旧後も同じPlanへ到達する検証は`SUB-A-016`の本人確認・Identity再接続実装後に行います。公開規約・通知は`SUB-A-017`、監視・support運用は`SUB-A-019`の完了記録を参照します。これらが未完了の間、この手順の成功をProduction課金開始の承認に使いません。
+
+## 6. 公式仕様の再確認
+
+2026-08-16時点で次を再確認しました。Stripeの仕様とAPI versionはPreview同期ごとに再確認します。
+
+- [Customer Portalの設定](https://docs.stripe.com/customer-management/configure-portal): 期間末downgradeは同一Product内のPrice間で使う
+- [Portal configuration API](https://docs.stripe.com/api/customer_portal/configurations/update): `decreasing_item_amount`と`shortening_interval`で期間末変更を設定できる
+- [Test Clock API](https://docs.stripe.com/billing/testing/test-clocks/api-advanced-usage): 時刻進行後は`ready`を待ち、一度に進められる期間上限を守る
+- [Subscription pending updates](https://docs.stripe.com/billing/subscriptions/pending-updates): 即時請求のupgradeは支払成功時だけ適用する
+- [Stripe test cards](https://docs.stripe.com/testing): server-side testでは実カード番号でなくtest PaymentMethodを使う
