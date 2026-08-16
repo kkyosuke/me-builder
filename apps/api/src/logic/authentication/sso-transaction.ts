@@ -14,6 +14,8 @@ export type SsoVerifiedIdentity = {
 };
 
 type SsoAuthenticationTransactionBase = {
+  /** OAuth stateや本人識別子とは独立した運用ログ用の相関ID。 */
+  traceId?: string | undefined;
   nonce: string;
   codeVerifier: string;
   returnTo: string;
@@ -63,6 +65,7 @@ export class SsoAuthenticationError extends Error {
 }
 
 type StartSsoAuthenticationInput = {
+  traceId?: string;
   returnTo: string;
   store: SsoAuthenticationTransactionStore;
   client: SsoServerClient;
@@ -160,6 +163,7 @@ async function startSsoTransaction(
     state,
     {
       ...purpose,
+      ...(input.traceId ? { traceId: input.traceId } : {}),
       nonce,
       codeVerifier,
       returnTo: normalizeSsoReturnTo(input.returnTo),
@@ -209,12 +213,16 @@ async function consumeAndVerifySsoTransaction(
 /** login callback transactionだけを一度消費し、検証済みIdentityと復帰pathを返す。 */
 export async function completeSsoAuthentication(
   input: CompleteSsoAuthenticationInput,
-): Promise<{ identity: SsoVerifiedIdentity; returnTo: string }> {
+): Promise<{ identity: SsoVerifiedIdentity; returnTo: string; traceId?: string }> {
   const { identity, transaction } = await consumeAndVerifySsoTransaction(input);
   if (transaction.purpose !== "login") {
     throw new SsoAuthenticationError("transaction_purpose_mismatch");
   }
-  return { identity, returnTo: transaction.returnTo };
+  return {
+    identity,
+    returnTo: transaction.returnTo,
+    ...(transaction.traceId ? { traceId: transaction.traceId } : {}),
+  };
 }
 
 /** link済みIdentityだけをAccountへ解決し、共通application sessionを発行する。 */
@@ -223,8 +231,8 @@ export async function completeSsoLogin<SessionResult>(
     identityResolver: SsoExistingIdentityResolver;
     sessionIssuer: SsoApplicationSessionIssuer<SessionResult>;
   },
-): Promise<{ session: SessionResult; returnTo: string }> {
-  const { identity, returnTo } = await completeSsoAuthentication(input);
+): Promise<{ session: SessionResult; returnTo: string; traceId?: string }> {
+  const { identity, returnTo, traceId } = await completeSsoAuthentication(input);
   const account = await input.identityResolver.findAccount({
     providerKey: identity.providerKey,
     subject: identity.subject,
@@ -237,7 +245,7 @@ export async function completeSsoLogin<SessionResult>(
     authenticationMethod: identity.authenticationMethod,
     authenticatedAt: identity.authenticatedAt,
   });
-  return { session, returnTo };
+  return { session, returnTo, ...(traceId ? { traceId } : {}) };
 }
 
 /** login/link callbackを一度だけ消費し、用途に応じた副作用へ分岐する。 */
@@ -248,7 +256,7 @@ export async function completeSsoCallback<SessionResult>(
     sessionIssuer: SsoApplicationSessionIssuer<SessionResult>;
   },
 ): Promise<
-  | { purpose: "login"; session: SessionResult; returnTo: string }
+  | { purpose: "login"; session: SessionResult; returnTo: string; traceId?: string }
   | {
       purpose: "link";
       accountId: string;
@@ -257,6 +265,7 @@ export async function completeSsoCallback<SessionResult>(
       authenticatedAt: Date;
       providerKey: "auth0";
       returnTo: string;
+      traceId?: string;
     }
 > {
   const { identity, transaction } = await consumeAndVerifySsoTransaction(input);
@@ -272,7 +281,12 @@ export async function completeSsoCallback<SessionResult>(
       authenticationMethod: identity.authenticationMethod,
       authenticatedAt: identity.authenticatedAt,
     });
-    return { purpose: "login", session, returnTo: transaction.returnTo };
+    return {
+      purpose: "login",
+      session,
+      returnTo: transaction.returnTo,
+      ...(transaction.traceId ? { traceId: transaction.traceId } : {}),
+    };
   }
 
   const authenticatedIdentityId = await input.identityLinker.link({
@@ -288,6 +302,7 @@ export async function completeSsoCallback<SessionResult>(
     authenticatedAt: identity.authenticatedAt,
     providerKey: identity.providerKey,
     returnTo: transaction.returnTo,
+    ...(transaction.traceId ? { traceId: transaction.traceId } : {}),
   };
 }
 
@@ -301,6 +316,7 @@ export async function completeSsoIdentityLinking(
   authenticatedAt: Date;
   providerKey: "auth0";
   returnTo: string;
+  traceId?: string;
 }> {
   const { identity, transaction } = await consumeAndVerifySsoTransaction(input);
   if (transaction.purpose !== "link") {
@@ -318,6 +334,7 @@ export async function completeSsoIdentityLinking(
     authenticatedAt: identity.authenticatedAt,
     providerKey: identity.providerKey,
     returnTo: transaction.returnTo,
+    ...(transaction.traceId ? { traceId: transaction.traceId } : {}),
   };
 }
 
@@ -326,12 +343,16 @@ export async function cancelSsoAuthentication(input: {
   state: string;
   store: SsoAuthenticationTransactionStore;
   now?: () => number;
-}): Promise<{ purpose: "link" | "login"; returnTo: string }> {
+}): Promise<{ purpose: "link" | "login"; returnTo: string; traceId?: string }> {
   if (!input.state) throw new SsoAuthenticationError("invalid_callback");
   const transaction = await input.store.consume(input.state);
   if (!transaction) throw new SsoAuthenticationError("transaction_missing");
   if (transaction.expiresAt <= (input.now?.() ?? Date.now())) {
     throw new SsoAuthenticationError("transaction_expired");
   }
-  return { purpose: transaction.purpose, returnTo: transaction.returnTo };
+  return {
+    purpose: transaction.purpose,
+    returnTo: transaction.returnTo,
+    ...(transaction.traceId ? { traceId: transaction.traceId } : {}),
+  };
 }

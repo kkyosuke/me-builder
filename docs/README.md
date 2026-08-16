@@ -112,6 +112,7 @@ docs/
 - [本番データベースマイグレーション運用](development/production-migration-operations.md) — forward-only、expand-contract、適用順序、D1とDurable Objectの復旧方針
 - [Web認証・SSO実装残タスク](development/web-authentication-remaining-tasks.md) — API共通認証、Web／LIFF移行、SSO追加の番号付きPR、依存順、完了条件
 - [アプリケーションセッション実装契約](development/application-session-contract.md) — session store、期限、同時session、rotation、logout、D1 versionによる即時失効
+- [SSO Preview検証Runbook](development/sso-preview-verification.md) — LIFF／SSOの成功・失敗経路、機微情報を残さない証跡、SSOだけの切り戻し手順
 - [Subscription Plan機能のPreview検証](development/subscription-preview-plan-verification.md) — 決済サービスなしでPlan切替、利用上限、本人データ、安全案内、Family境界を確認する手順
 - [SubscriptionのProduction段階公開](development/subscription-production-rollout.md) — 新規購入の段階公開、緊急停止・再開、実取引、30日・90日価格検証の手順
 - [サービス紹介サイト残タスク](development/service-site-remaining-tasks.md) — サービス紹介サイトで未完了の意思決定、法務確認、実環境検証と完了条件

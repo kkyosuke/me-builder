@@ -1,4 +1,5 @@
 import { D1 } from "@me-builder/lib";
+import { logger } from "@me-builder/shared";
 import type { Context } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import * as v from "valibot";
@@ -99,6 +100,27 @@ function redirectToWeb(c: Context<AppEnv>, path: string): Response {
   return c.redirect(new URL(path, origin).href, 302);
 }
 
+function logSsoStarted(input: {
+  traceId: string;
+  purpose: "link" | "login";
+  rolloutMode: "linking" | "linked-login";
+}): void {
+  logger.info(
+    {
+      event: "sso.authentication.started",
+      service: "api",
+      component: "sso",
+      traceId: input.traceId,
+      purpose: input.purpose,
+      rolloutMode: input.rolloutMode,
+      outcome: "succeeded",
+      disposition: "auth0-redirect",
+      stage: "authorization.create",
+    },
+    "[SSO] succeeded at authorization.create -> auth0-redirect",
+  );
+}
+
 export async function getSsoIdentityStatusContents(c: Context<AppEnv>): Promise<Response> {
   c.header("Cache-Control", "no-store");
   if (getConfig(c.env).ssoRolloutMode === "disabled" || !c.env?.DB) return unavailable(c);
@@ -113,7 +135,9 @@ export async function postSsoIdentityLink(c: Context<AppEnv>): Promise<Response>
   c.header("Cache-Control", "no-store");
   const dependencies = configured(c);
   if (!dependencies) return unavailable(c);
+  const traceId = crypto.randomUUID();
   const authorizationUrl = await startSsoIdentityLinking({
+    traceId,
     initiatingAccountId: authenticatedActor(c).accountId,
     returnTo: c.req.query("returnTo") ?? "/profile",
     store: dependencies.store,
@@ -122,6 +146,12 @@ export async function postSsoIdentityLink(c: Context<AppEnv>): Promise<Response>
   if (!setCallbackStateCookie(c, authorizationUrl, dependencies.secureCallback)) {
     return unavailable(c);
   }
+  logSsoStarted({
+    traceId,
+    purpose: "link",
+    rolloutMode:
+      dependencies.configuration.ssoRolloutMode === "linked-login" ? "linked-login" : "linking",
+  });
   return c.json(v.parse(SsoAuthorizationUrlSchema, { authorizationUrl: authorizationUrl.href }));
 }
 
@@ -131,7 +161,9 @@ export async function postSsoLogin(c: Context<AppEnv>): Promise<Response> {
   if (!dependencies || dependencies.configuration.ssoRolloutMode !== "linked-login") {
     return unavailable(c);
   }
+  const traceId = crypto.randomUUID();
   const authorizationUrl = await startSsoAuthentication({
+    traceId,
     returnTo: c.req.query("returnTo") ?? "/",
     store: dependencies.store,
     client: dependencies.client,
@@ -139,6 +171,7 @@ export async function postSsoLogin(c: Context<AppEnv>): Promise<Response> {
   if (!setCallbackStateCookie(c, authorizationUrl, dependencies.secureCallback)) {
     return unavailable(c);
   }
+  logSsoStarted({ traceId, purpose: "login", rolloutMode: "linked-login" });
   return c.json(v.parse(SsoAuthorizationUrlSchema, { authorizationUrl: authorizationUrl.href }));
 }
 
@@ -152,10 +185,38 @@ export async function getSsoCallback(c: Context<AppEnv>): Promise<Response> {
     : SSO_CALLBACK_STATE_COOKIE;
   const expectedState = getCookie(c, cookieName);
   deleteCookie(c, cookieName, callbackStateCookieOptions(dependencies.secureCallback));
-  if (!state || state !== expectedState) return redirectToWeb(c, "/profile?sso=error");
+  if (!state || state !== expectedState) {
+    logger.warn(
+      {
+        event: "sso.callback.rejected",
+        service: "api",
+        component: "sso",
+        outcome: "discarded",
+        disposition: "web-redirect",
+        stage: "callback.bind",
+        resultCode: "SSO_CALLBACK_STATE_MISMATCH",
+      },
+      "[SSO] discarded at callback.bind -> web-redirect (SSO_CALLBACK_STATE_MISMATCH)",
+    );
+    return redirectToWeb(c, "/profile?sso=error");
+  }
   try {
     if (c.req.query("error")) {
       const cancelled = await cancelSsoAuthentication({ state, store: dependencies.store });
+      logger.warn(
+        {
+          event: "sso.callback.cancelled",
+          service: "api",
+          component: "sso",
+          ...(cancelled.traceId ? { traceId: cancelled.traceId } : {}),
+          purpose: cancelled.purpose,
+          outcome: "discarded",
+          disposition: "web-redirect",
+          stage: "authorization.callback",
+          resultCode: "SSO_AUTHORIZATION_CANCELLED",
+        },
+        "[SSO] discarded at authorization.callback -> web-redirect (SSO_AUTHORIZATION_CANCELLED)",
+      );
       return redirectToWeb(c, resultPath(cancelled.returnTo, "cancelled"));
     }
     const runtime = createApplicationSessionService(c.env);
@@ -179,6 +240,19 @@ export async function getSsoCallback(c: Context<AppEnv>): Promise<Response> {
     });
     if (completed.purpose === "login") {
       setApplicationSessionCookie(c, completed.session.sessionToken, completed.session.expiresAt);
+      logger.info(
+        {
+          event: "sso.callback.completed",
+          service: "api",
+          component: "sso",
+          ...(completed.traceId ? { traceId: completed.traceId } : {}),
+          purpose: "login",
+          outcome: "succeeded",
+          disposition: "web-redirect",
+          stage: "session.issue",
+        },
+        "[SSO] succeeded at session.issue -> web-redirect",
+      );
       return redirectToWeb(c, completed.returnTo);
     }
     if (previousToken) {
@@ -196,8 +270,35 @@ export async function getSsoCallback(c: Context<AppEnv>): Promise<Response> {
     );
     if (!issued) return unavailable(c);
     setApplicationSessionCookie(c, issued.sessionToken, issued.expiresAt);
+    logger.info(
+      {
+        event: "sso.callback.completed",
+        service: "api",
+        component: "sso",
+        ...(completed.traceId ? { traceId: completed.traceId } : {}),
+        purpose: "link",
+        outcome: "succeeded",
+        disposition: "web-redirect",
+        stage: "identity.link",
+      },
+      "[SSO] succeeded at identity.link -> web-redirect",
+    );
     return redirectToWeb(c, resultPath(completed.returnTo, "linked"));
   } catch {
+    logger.error(
+      {
+        event: "sso.callback.failed",
+        service: "api",
+        component: "sso",
+        outcome: "failed",
+        disposition: "web-redirect",
+        stage: "callback.complete",
+        errorCode: "SSO_CALLBACK_FAILED",
+        errorCategory: "unknown",
+        retryable: false,
+      },
+      "[SSO] failed at callback.complete -> web-redirect (SSO_CALLBACK_FAILED, category:unknown)",
+    );
     return redirectToWeb(c, "/profile?sso=error");
   }
 }

@@ -1,5 +1,6 @@
+import { logger } from "@me-builder/shared";
 import { type Handler, Hono } from "hono";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AppEnv } from "../types";
 
 const mocks = vi.hoisted(() => {
@@ -116,6 +117,7 @@ describe("SSO identity controller", () => {
       expiresAt: new Date("2026-09-16T00:00:00.000Z"),
     });
   });
+  afterEach(() => vi.restoreAllMocks());
 
   it("外部subjectを返さず本人のlink状態だけを返す", async () => {
     mocks.getStatus.mockResolvedValue({ linked: true, canUnlink: true });
@@ -131,6 +133,8 @@ describe("SSO identity controller", () => {
   });
 
   it("認証済みAccountと相対returnToをlink transactionへ固定して認可URLを返す", async () => {
+    vi.spyOn(crypto, "randomUUID").mockReturnValue("00000000-0000-4000-8000-000000000001");
+    const log = vi.spyOn(logger, "info").mockImplementation(() => undefined);
     mocks.startLinking.mockResolvedValue(
       new URL("https://tenant.auth0.com/authorize?state=opaque"),
     );
@@ -153,11 +157,26 @@ describe("SSO identity controller", () => {
     expect(response.headers.get("set-cookie")).toContain("Path=/");
     expect(mocks.createStore).toHaveBeenCalledWith(env.SESSION_STORE);
     expect(mocks.startLinking).toHaveBeenCalledWith(
-      expect.objectContaining({ initiatingAccountId: "account-at-start", returnTo: "/profile" }),
+      expect.objectContaining({
+        traceId: "00000000-0000-4000-8000-000000000001",
+        initiatingAccountId: "account-at-start",
+        returnTo: "/profile",
+      }),
     );
+    expect(log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "sso.authentication.started",
+        traceId: "00000000-0000-4000-8000-000000000001",
+        purpose: "link",
+        outcome: "succeeded",
+      }),
+      "[SSO] succeeded at authorization.create -> auth0-redirect",
+    );
+    expect(JSON.stringify(log.mock.calls)).not.toContain("account-at-start");
   });
 
   it("link callback成功後は保存済みpathだけへ復帰する", async () => {
+    const log = vi.spyOn(logger, "info").mockImplementation(() => undefined);
     mocks.completeCallback.mockResolvedValue({
       purpose: "link",
       accountId: "account-at-start",
@@ -166,6 +185,7 @@ describe("SSO identity controller", () => {
       authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
       providerKey: "auth0",
       returnTo: "/profile",
+      traceId: "00000000-0000-4000-8000-000000000002",
     });
     const response = await testApp("/api/auth/sso/callback", getSsoCallback).request(
       "https://api.example.com/api/auth/sso/callback?state=opaque&code=code",
@@ -191,6 +211,38 @@ describe("SSO identity controller", () => {
     expect(response.headers.get("set-cookie")).toContain(
       "__Host-me_builder_session=rotated-session",
     );
+    expect(log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "sso.callback.completed",
+        traceId: "00000000-0000-4000-8000-000000000002",
+        stage: "identity.link",
+      }),
+      "[SSO] succeeded at identity.link -> web-redirect",
+    );
+    expect(JSON.stringify(log.mock.calls)).not.toMatch(/opaque|code|auth0\|/u);
+  });
+
+  it("callback失敗を生の例外や認証parameterなしで固定分類へ記録する", async () => {
+    const log = vi.spyOn(logger, "error").mockImplementation(() => undefined);
+    mocks.completeCallback.mockRejectedValue(new Error("secret provider response"));
+
+    const response = await testApp("/api/auth/sso/callback", getSsoCallback).request(
+      "https://api.example.com/api/auth/sso/callback?state=sensitive-state&code=sensitive-code",
+      { headers: { Cookie: "__Host-me_builder_sso_callback_state=sensitive-state" } },
+      env,
+    );
+
+    expect(response.status).toBe(302);
+    expect(log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "sso.callback.failed",
+        errorCode: "SSO_CALLBACK_FAILED",
+        errorCategory: "unknown",
+        retryable: false,
+      }),
+      expect.stringContaining("SSO_CALLBACK_FAILED"),
+    );
+    expect(JSON.stringify(log.mock.calls)).not.toMatch(/sensitive|secret provider/u);
   });
 
   it("linked-login公開時だけ外部ブラウザのSSOログインを開始する", async () => {
@@ -247,7 +299,8 @@ describe("SSO identity controller", () => {
   ] as const)(
     "IdPで$purposeをキャンセルしてもtransactionを消費して固定pathへ復帰する",
     async ({ purpose, returnTo }) => {
-      mocks.cancelAuthentication.mockResolvedValue({ purpose, returnTo });
+      const log = vi.spyOn(logger, "warn").mockImplementation(() => undefined);
+      mocks.cancelAuthentication.mockResolvedValue({ purpose, returnTo, traceId: "trace-cancel" });
       const response = await testApp("/api/auth/sso/callback", getSsoCallback).request(
         "https://api.example.com/api/auth/sso/callback?state=opaque&error=access_denied",
         { headers: { Cookie: "__Host-me_builder_sso_callback_state=opaque" } },
@@ -261,10 +314,19 @@ describe("SSO identity controller", () => {
       expect(mocks.cancelAuthentication).toHaveBeenCalledWith(
         expect.objectContaining({ state: "opaque" }),
       );
+      expect(log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: "sso.callback.cancelled",
+          purpose,
+          traceId: "trace-cancel",
+        }),
+        expect.stringContaining("SSO_AUTHORIZATION_CANCELLED"),
+      );
     },
   );
 
   it("開始browserと一致しないlink callbackをtransaction消費前に拒否する", async () => {
+    const log = vi.spyOn(logger, "warn").mockImplementation(() => undefined);
     const response = await testApp("/api/auth/sso/callback", getSsoCallback).request(
       "https://api.example.com/api/auth/sso/callback?state=transferred&code=code",
       { headers: { Cookie: "__Host-me_builder_sso_callback_state=another" } },
@@ -276,6 +338,14 @@ describe("SSO identity controller", () => {
     expect(mocks.completeCallback).not.toHaveBeenCalled();
     expect(mocks.cancelAuthentication).not.toHaveBeenCalled();
     expect(response.headers.get("set-cookie")).toContain("Max-Age=0");
+    expect(log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "sso.callback.rejected",
+        resultCode: "SSO_CALLBACK_STATE_MISMATCH",
+      }),
+      expect.stringContaining("SSO_CALLBACK_STATE_MISMATCH"),
+    );
+    expect(JSON.stringify(log.mock.calls)).not.toContain("transferred");
   });
 
   it("最後のIdentity解除は409にして保持する", async () => {
