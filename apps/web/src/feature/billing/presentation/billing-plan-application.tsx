@@ -8,6 +8,7 @@ import { fetchProfileEntitlement } from "../../profile-settings/infrastructure/e
 import type { ProfileEntitlement } from "../../profile-settings/model/entitlement";
 import {
   createCheckoutSession,
+  createCustomerPortalSession,
   fetchBillingPlanCatalog,
   fetchBillingTrialEligibility,
   verifyCheckoutSessionCompletion,
@@ -197,6 +198,21 @@ export default function BillingPlanApplication({
     }
   };
 
+  const manageSubscription = async () => {
+    const controller = new AbortController();
+    setCheckoutState({ status: "loading" });
+    try {
+      const url = await createCustomerPortalSession(
+        config.apiUrl,
+        await token(controller.signal),
+        controller.signal,
+      );
+      navigateToCheckout(url);
+    } catch (error) {
+      setCheckoutState({ status: "error", message: message(error) });
+    }
+  };
+
   return (
     <BillingPlanScreen
       plans={plans}
@@ -205,6 +221,7 @@ export default function BillingPlanApplication({
       completionMessage={completionMessage}
       onBack={onBack}
       onCheckout={(plan, interval) => void checkout(plan, interval)}
+      onManageSubscription={() => void manageSubscription()}
       onRetry={() => void load()}
     />
   );

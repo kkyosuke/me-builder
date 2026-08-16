@@ -29,7 +29,7 @@
 | Product | 固定Product IDと`managed_by` metadata | Lite、Full、ファミリーパック |
 | Price | 固定`lookup_key`と`managed_by` metadata | 各Productの月額・年額、JPY、税込 |
 | Webhook endpoint | URLまたは`managed_by` metadata | 課金projectionが受け付けるeventだけ |
-| Customer Portal configuration | `managed_by` metadata | 支払方法、請求履歴、期間末解約 |
+| Customer Portal configuration | `managed_by` metadata | 支払方法、請求履歴、プラン変更、期間末解約・再開 |
 | Cloudflare secret | Worker名と環境 | Stripe key、Webhook secret、Price→Plan map |
 
 Priceの`lookup_key`は次の形式で固定します。
@@ -38,7 +38,7 @@ Priceの`lookup_key`は次の形式で固定します。
 me_builder_<lite|full|family>_<monthly|yearly>
 ```
 
-金額はこの文書へ重複して持たず、料金SSoTと`STRIPE_BILLING_CATALOG`を同じ変更で更新します。Customer PortalからのPlan変更は、日割りと適用時期を決める`SUB-A-015`が完了するまで無効にします。
+金額はこの文書へ重複して持たず、料金SSoTと`STRIPE_BILLING_CATALOG`を同じ変更で更新します。Customer Portalは現在の6 Priceだけを変更先に許可し、upgradeは`always_invoice`で日割り差額を即時請求します。金額減少と年額から月額への短縮は`decreasing_item_amount` / `shortening_interval`条件で期間末へ予約し、trial中の変更は`continue_trial`で残期間を維持します。
 
 ## 3. 実行前提
 

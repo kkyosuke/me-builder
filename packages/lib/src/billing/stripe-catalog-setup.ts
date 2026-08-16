@@ -4,7 +4,7 @@ import { STRIPE_API_VERSION } from "./stripe-adapter";
 import { STRIPE_BILLING_EVENT_TYPES } from "./stripe-events";
 
 const MANAGED_BY = "me-builder-stripe-catalog";
-const CATALOG_VERSION = "2026-08-15";
+const CATALOG_VERSION = "2026-08-16";
 
 export type StripeCatalogEnvironment = "preview" | "production";
 export type StripeCatalogPlan = "lite" | "full" | "family";
@@ -85,9 +85,10 @@ interface WebhookSpec {
   metadata: Record<string, string>;
 }
 
-interface PortalSpec {
+export interface PortalSpec {
   webBaseUrl: string;
   metadata: Record<string, string>;
+  products: readonly { productId: string; priceIds: readonly string[] }[];
 }
 
 export interface StripeCatalogApi {
@@ -331,7 +332,22 @@ export async function setupStripeBillingCatalog(input: {
     portals.filter((configuration) => isManaged(configuration.metadata)),
     "managed Customer Portal configuration",
   );
-  const portalSpec = { webBaseUrl, metadata: portalMetadata };
+  const portalSpec = {
+    webBaseUrl,
+    metadata: portalMetadata,
+    products: STRIPE_BILLING_CATALOG.map((desired) => {
+      const product = productByPlan.get(desired.plan);
+      if (!product) throw new Error(`Managed product is missing for ${desired.plan}`);
+      return {
+        productId: product.id,
+        priceIds: desired.prices.map((price) => {
+          const current = desiredPriceByLookupKey.get(price.lookupKey);
+          if (!current) throw new Error(`Managed price is missing for ${price.lookupKey}`);
+          return current.id;
+        }),
+      };
+    }),
+  };
   let portalConfigurationId: string;
   if (portal) {
     await input.api.updatePortalConfiguration(portal.id, portalSpec);
@@ -377,6 +393,47 @@ function mapPrice(price: Stripe.Price): CatalogPrice {
   };
 }
 
+export const billingPortalConfigurationParams = (
+  spec: PortalSpec,
+): Stripe.BillingPortal.ConfigurationCreateParams => ({
+  name: "me-builder billing portal",
+  default_return_url: spec.webBaseUrl,
+  business_profile: {
+    headline: "me-builderの契約とお支払い",
+    privacy_policy_url: `${spec.webBaseUrl}/privacy`,
+    terms_of_service_url: `${spec.webBaseUrl}/terms`,
+  },
+  features: {
+    customer_update: { enabled: true, allowed_updates: ["email", "address", "tax_id"] },
+    invoice_history: { enabled: true },
+    payment_method_update: { enabled: true },
+    subscription_cancel: {
+      enabled: true,
+      mode: "at_period_end",
+      cancellation_reason: {
+        enabled: true,
+        options: ["too_expensive", "missing_features", "unused", "other"],
+      },
+    },
+    subscription_update: {
+      enabled: true,
+      default_allowed_updates: ["price"],
+      products: spec.products.map((product) => ({
+        product: product.productId,
+        prices: [...product.priceIds],
+      })),
+      billing_cycle_anchor: "unchanged",
+      proration_behavior: "always_invoice",
+      schedule_at_period_end: {
+        conditions: [{ type: "decreasing_item_amount" }, { type: "shortening_interval" }],
+      },
+      trial_update_behavior: "continue_trial",
+    },
+  },
+  login_page: { enabled: false },
+  metadata: spec.metadata,
+});
+
 export function createStripeCatalogApi(secretKey: string): StripeCatalogApi {
   const stripe = new Stripe(secretKey, {
     apiVersion: STRIPE_API_VERSION,
@@ -388,33 +445,6 @@ export function createStripeCatalogApi(secretKey: string): StripeCatalogApi {
 
   const all = async <T>(request: Stripe.ApiListPromise<T>): Promise<T[]> =>
     request.autoPagingToArray({ limit: 1_000 });
-
-  const portalParams = (spec: PortalSpec): Stripe.BillingPortal.ConfigurationCreateParams => ({
-    name: "me-builder billing portal",
-    default_return_url: spec.webBaseUrl,
-    business_profile: {
-      headline: "me-builderの契約とお支払い",
-      privacy_policy_url: `${spec.webBaseUrl}/privacy`,
-      terms_of_service_url: `${spec.webBaseUrl}/terms`,
-    },
-    features: {
-      customer_update: { enabled: true, allowed_updates: ["email", "address", "tax_id"] },
-      invoice_history: { enabled: true },
-      payment_method_update: { enabled: true },
-      subscription_cancel: {
-        enabled: true,
-        mode: "at_period_end",
-        cancellation_reason: {
-          enabled: true,
-          options: ["too_expensive", "missing_features", "unused", "other"],
-        },
-      },
-      // Plan変更時の差額・適用時期はSUB-A-015で決定するまでPortalから変更させない。
-      subscription_update: { enabled: false },
-    },
-    login_page: { enabled: false },
-    metadata: spec.metadata,
-  });
 
   return {
     async listProducts() {
@@ -518,12 +548,14 @@ export function createStripeCatalogApi(secretKey: string): StripeCatalogApi {
       );
     },
     async createPortalConfiguration(spec) {
-      const configuration = await stripe.billingPortal.configurations.create(portalParams(spec));
+      const configuration = await stripe.billingPortal.configurations.create(
+        billingPortalConfigurationParams(spec),
+      );
       return { id: configuration.id, metadata: configuration.metadata ?? {} };
     },
     async updatePortalConfiguration(id, spec) {
       await stripe.billingPortal.configurations.update(id, {
-        ...portalParams(spec),
+        ...billingPortalConfigurationParams(spec),
         active: true,
       });
     },

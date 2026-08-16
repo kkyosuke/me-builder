@@ -234,16 +234,6 @@ flowchart TD
 
 完了条件は、別AccountのCustomerへ到達できず、本人が支払方法更新と解約予約を完了できることです。
 
-### SUB-A-015 Plan変更と請求失敗の状態遷移を完成させる
-
-依存: `SUB-A-009`, `SUB-A-013`, `SUB-A-014`
-
-- upgrade、downgrade予約、月額・年額変更、解約取消、再開を扱う
-- `past_due`、`unpaid`、`paused`、`canceled`の利用権限と猶予を実装する
-- 返金・chargebackで本人データを削除せず、同じ通知を重複送信しない
-
-完了条件は、主要な契約状態をsandboxとtable-driven testで再現できることです。
-
 ### SUB-A-016 有料契約のAccount復旧フローを実装する
 
 依存: `SUB-A-003`, `SUB-A-006`

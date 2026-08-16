@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   fetchEntitlement: vi.fn(),
   acquireIdToken: vi.fn(),
   fetchTrialEligibility: vi.fn(),
+  createPortal: vi.fn(),
 }));
 
 vi.mock("../feature/billing/infrastructure/billing-api", () => ({
@@ -18,6 +19,7 @@ vi.mock("../feature/billing/infrastructure/billing-api", () => ({
   createCheckoutSession: mocks.createCheckout,
   verifyCheckoutSessionCompletion: mocks.verifyCheckout,
   fetchBillingTrialEligibility: mocks.fetchTrialEligibility,
+  createCustomerPortalSession: mocks.createPortal,
 }));
 vi.mock("../feature/profile-settings/infrastructure/entitlement-api", () => ({
   fetchProfileEntitlement: mocks.fetchEntitlement,
@@ -75,6 +77,7 @@ describe("billing purchase user journey", () => {
     mocks.verifyCheckout.mockReset().mockResolvedValue(undefined);
     mocks.fetchEntitlement.mockReset().mockResolvedValue(entitlement("free"));
     mocks.fetchTrialEligibility.mockReset().mockResolvedValue(true);
+    mocks.createPortal.mockReset().mockResolvedValue("https://billing.stripe.test/portal");
   });
   afterEach(cleanup);
 
@@ -159,5 +162,19 @@ describe("billing purchase user journey", () => {
 
     expect(await screen.findAllByText(/購入結果を確認できませんでした/)).toHaveLength(2);
     expect(mocks.fetchEntitlement).not.toHaveBeenCalled();
+  });
+
+  it("契約中は二重購入せずStripe Portalからプラン変更できる", async () => {
+    mocks.fetchEntitlement.mockResolvedValue(entitlement("subscription"));
+    const navigate = vi.fn();
+    render(<BillingPlanApplication onBack={vi.fn()} navigateToCheckout={navigate} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Stripeでプラン変更・契約管理" }));
+
+    await waitFor(() =>
+      expect(navigate).toHaveBeenCalledWith("https://billing.stripe.test/portal"),
+    );
+    expect(mocks.createPortal).toHaveBeenCalledWith(undefined, "id-token", expect.any(AbortSignal));
+    expect(screen.queryByRole("button", { name: "Liteを選ぶ" })).toBeNull();
   });
 });

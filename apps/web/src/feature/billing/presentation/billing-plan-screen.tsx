@@ -13,6 +13,7 @@ export function BillingPlanScreen({
   completionMessage,
   onBack,
   onCheckout,
+  onManageSubscription,
   onRetry,
 }: {
   plans: AsyncState<readonly BillingPlan[]>;
@@ -21,6 +22,7 @@ export function BillingPlanScreen({
   completionMessage: string | null;
   onBack: () => void;
   onCheckout: (plan: PaidPlanCode, interval: BillingInterval) => void;
+  onManageSubscription: () => void;
   onRetry: () => void;
 }) {
   const [interval, setInterval] = useState<BillingInterval>("month");
@@ -106,8 +108,23 @@ export function BillingPlanScreen({
           <section className="mt-6 rounded-2xl border border-sky-200 bg-sky-50 p-5 text-sky-950 dark:border-sky-800 dark:bg-sky-950 dark:text-sky-100">
             <h2 className="font-bold">現在の契約があります</h2>
             <p className="mt-2 text-sm">
-              二重購入を防ぐため、新しい購入は開始できません。プロフィールの「契約を管理」から支払方法、請求履歴、解約を確認してください。
+              二重購入を防ぐため、新しい購入は開始できません。Stripeでプラン変更、支払方法、請求履歴、解約予約と再開を確認できます。
             </p>
+            <button
+              type="button"
+              disabled={checkoutState.status === "loading"}
+              onClick={onManageSubscription}
+              className="mt-4 min-h-12 rounded-xl bg-sky-800 px-5 font-bold text-white disabled:cursor-wait disabled:opacity-60"
+            >
+              {checkoutState.status === "loading"
+                ? "Stripeを開いています..."
+                : "Stripeでプラン変更・契約管理"}
+            </button>
+            {checkoutState.status === "error" && (
+              <p role="alert" className="mt-3 text-sm text-rose-700 dark:text-rose-300">
+                {checkoutState.message}
+              </p>
+            )}
           </section>
         ) : (
           <>

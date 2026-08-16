@@ -6,6 +6,7 @@ import {
   type CatalogWebhookEndpoint,
   STRIPE_BILLING_CATALOG,
   type StripeCatalogApi,
+  billingPortalConfigurationParams,
   setupStripeBillingCatalog,
 } from "./stripe-catalog-setup";
 import { STRIPE_BILLING_EVENT_TYPES } from "./stripe-events";
@@ -19,6 +20,7 @@ class FakeStripeCatalogApi implements StripeCatalogApi {
   archivedPriceIds: string[] = [];
   webhookEvents: readonly string[] = [];
   defaultPrices = new Map<string, string>();
+  portalSpecs: Array<Parameters<StripeCatalogApi["createPortalConfiguration"]>[0]> = [];
 
   async listProducts() {
     return this.products;
@@ -119,6 +121,7 @@ class FakeStripeCatalogApi implements StripeCatalogApi {
   async createPortalConfiguration(
     spec: Parameters<StripeCatalogApi["createPortalConfiguration"]>[0],
   ) {
+    this.portalSpecs.push(spec);
     const portal = { id: "bpc_1", metadata: spec.metadata };
     this.portals.push(portal);
     return portal;
@@ -135,6 +138,30 @@ class FakeStripeCatalogApi implements StripeCatalogApi {
 }
 
 describe("setupStripeBillingCatalog", () => {
+  it("Portalでupgrade即時請求、downgrade・年額から月額の期間末予約を設定する", () => {
+    const params = billingPortalConfigurationParams({
+      webBaseUrl: "https://example.test",
+      metadata: { managed_by: "test" },
+      products: [{ productId: "prod_lite", priceIds: ["price_month", "price_year"] }],
+    });
+
+    expect(params.features.subscription_update).toEqual({
+      enabled: true,
+      default_allowed_updates: ["price"],
+      products: [{ product: "prod_lite", prices: ["price_month", "price_year"] }],
+      billing_cycle_anchor: "unchanged",
+      proration_behavior: "always_invoice",
+      schedule_at_period_end: {
+        conditions: [{ type: "decreasing_item_amount" }, { type: "shortening_interval" }],
+      },
+      trial_update_behavior: "continue_trial",
+    });
+    expect(params.features.subscription_cancel).toMatchObject({
+      enabled: true,
+      mode: "at_period_end",
+    });
+  });
+
   it("空のStripe環境へ商品、月額・年額Price、Webhook、Portalを再現する", async () => {
     const api = new FakeStripeCatalogApi();
 
@@ -159,6 +186,11 @@ describe("setupStripeBillingCatalog", () => {
     expect(api.webhooks[0]?.url).toBe("https://api.stg.kagami.kyosuke.dev/api/billing/webhook");
     expect(api.webhookEvents).toEqual(STRIPE_BILLING_EVENT_TYPES);
     expect(api.portals).toHaveLength(1);
+    expect(api.portalSpecs[0]?.products).toEqual([
+      { productId: "me_builder_lite", priceIds: ["price_1", "price_2"] },
+      { productId: "me_builder_full", priceIds: ["price_3", "price_4"] },
+      { productId: "me_builder_family", priceIds: ["price_5", "price_6"] },
+    ]);
     expect(result.webhookSecret).toBe("whsec_fixture");
     expect(result.pricePlanMap).toEqual({
       price_1: "lite",
