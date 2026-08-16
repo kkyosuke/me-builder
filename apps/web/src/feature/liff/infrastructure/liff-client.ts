@@ -5,8 +5,8 @@ import type { LiffState } from "../model/types";
 const toMessage = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
 
-/** 初期化済みのLIFF SDKから、API認証に使うIDトークンを取得する。 */
-export function getLiffIdToken(): string | null {
+/** 認証交換境界だけが、初期化済みLIFF SDKからcredentialを読み出す。 */
+export function readLiffAuthExchangeCredential(): string | null {
   try {
     return liff.getIDToken();
   } catch {

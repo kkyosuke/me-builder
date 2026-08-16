@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getLiffIdToken, initializeLiff, shareLiffTextMessage } from "./liff-client";
+import {
+  initializeLiff,
+  readLiffAuthExchangeCredential,
+  shareLiffTextMessage,
+} from "./liff-client";
 
 const mockLiff = vi.hoisted(() => ({
   init: vi.fn(),
@@ -137,13 +141,13 @@ describe("shareLiffTextMessage", () => {
   });
 });
 
-describe("getLiffIdToken", () => {
+describe("readLiffAuthExchangeCredential", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("LIFF SDKのIDトークンを返すこと", () => {
+  it("認証交換用credentialを返すこと", () => {
     mockLiff.getIDToken.mockReturnValue("dummy.id.token");
 
-    expect(getLiffIdToken()).toBe("dummy.id.token");
+    expect(readLiffAuthExchangeCredential()).toBe("dummy.id.token");
   });
 
   it("IDトークンを取得できない場合はnullを返すこと", () => {
@@ -151,7 +155,7 @@ describe("getLiffIdToken", () => {
       throw new Error("LIFF is not initialized");
     });
 
-    expect(getLiffIdToken()).toBeNull();
+    expect(readLiffAuthExchangeCredential()).toBeNull();
     expect(loggerWarn).toHaveBeenCalledWith(
       { event: "liff.id-token.failed", outcome: "failed", reason: "sdk-error" },
       "ID トークンを取得できませんでした",

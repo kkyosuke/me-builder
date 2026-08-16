@@ -5,7 +5,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import FamilySeatApplication from "../feature/family/presentation/family-seat-application";
 
 const mocks = vi.hoisted(() => ({
-  acquireIdToken: vi.fn().mockResolvedValue("verified-id-token"),
   fetchFamilySeats: vi.fn(),
   issueFamilyInvitation: vi.fn(),
   acceptFamilyInvitation: vi.fn(),
@@ -15,9 +14,6 @@ const mocks = vi.hoisted(() => ({
   leaveFamilyPack: vi.fn(),
 }));
 
-vi.mock("../feature/liff/presentation/liff-session-provider", () => ({
-  useLiffSession: () => ({ acquireIdToken: mocks.acquireIdToken }),
-}));
 vi.mock("../feature/family/infrastructure/family-api", () => ({
   fetchFamilySeats: mocks.fetchFamilySeats,
   issueFamilyInvitation: mocks.issueFamilyInvitation,

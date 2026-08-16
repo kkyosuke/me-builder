@@ -1,5 +1,4 @@
 import { type ReactNode, createContext, useContext } from "react";
-import { LiffSessionProvider } from "../../liff";
 import type { AuthState } from "../model/auth-state";
 import { useAuthSessionState } from "./use-auth-session";
 
@@ -15,13 +14,9 @@ function AuthSessionBridge({ children }: { children: ReactNode }) {
   return <AuthSessionContext.Provider value={session}>{children}</AuthSessionContext.Provider>;
 }
 
-/** provider非依存sessionを共有しつつ、移行期間だけ既存LIFF contextも内包する。 */
+/** provider非依存のapplication sessionをアプリ全体へ共有する。 */
 export function AuthSessionProvider({ children }: { children: ReactNode }) {
-  return (
-    <LiffSessionProvider>
-      <AuthSessionBridge>{children}</AuthSessionBridge>
-    </LiffSessionProvider>
-  );
+  return <AuthSessionBridge>{children}</AuthSessionBridge>;
 }
 
 export function useAuthSession(): AuthSessionContextValue {
