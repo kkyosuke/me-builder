@@ -23,7 +23,8 @@ vi.mock("../feature/liff/infrastructure/liff-client", () => ({
   readLiffAuthExchangeCredential: mocks.readCredential,
   redirectToLiffLogin: mocks.redirectToLiffLogin,
 }));
-vi.mock("../feature/auth/infrastructure/sso-auth-adapter", () => ({
+vi.mock("../feature/auth/infrastructure/sso-auth-adapter", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../feature/auth/infrastructure/sso-auth-adapter")>()),
   establishSsoAuthSession: mocks.establishSsoAuthSession,
 }));
 
@@ -70,7 +71,10 @@ describe("LIFF / SSO entry routing E2E", () => {
       if (url.pathname === "/api/auth/liff/exchange" && init?.method === "POST") {
         return Response.json({
           authenticated: true,
-          profile: { displayName: "LIFF Account" },
+          authenticationMethod: "liff",
+          authenticatedAt: "2026-08-17T00:00:00.000Z",
+          expiresAt: "2026-08-24T00:00:00.000Z",
+          displayProfile: { displayName: "LIFF Account" },
           role: "user",
           csrfToken: "csrf-after-switch",
         });
@@ -119,10 +123,45 @@ describe("LIFF / SSO entry routing E2E", () => {
     expect(await screen.findByText("redirecting")).toBeTruthy();
     expect(mocks.establishSsoAuthSession).toHaveBeenCalledWith(
       "https://api.example.com",
-      "/compatibility/invitations/invite-fixture",
+      "/compatibility/invitations/invite-fixture?from=share",
       expect.any(AbortSignal),
     );
     expect(mocks.redirectToLiffLogin).not.toHaveBeenCalled();
+  });
+
+  it("SSO失敗から戻った外部ブラウザは自動再開せずmarkerだけを消して再試行を待つ", async () => {
+    mocks.initializeLiff.mockResolvedValue({
+      status: "ready",
+      inClient: false,
+      profile: { displayName: "LINE profile" },
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = urlOf(input);
+        if (url.pathname === "/api/auth/session") {
+          return new Response(null, { status: 401 });
+        }
+        throw new Error(`Unexpected E2E request: ${url.pathname}`);
+      }),
+    );
+    window.history.replaceState(
+      {},
+      "",
+      "/compatibility/invitations/invite-fixture?from=share&sso=error#details",
+    );
+
+    render(
+      <AuthSessionProvider>
+        <SessionState />
+      </AuthSessionProvider>,
+    );
+
+    expect(await screen.findByText("error")).toBeTruthy();
+    expect(mocks.establishSsoAuthSession).not.toHaveBeenCalled();
+    expect(`${window.location.pathname}${window.location.search}${window.location.hash}`).toBe(
+      "/compatibility/invitations/invite-fixture?from=share#details",
+    );
   });
 
   it("LIFF初期化失敗は外部SSOへ自動fallbackしない", async () => {

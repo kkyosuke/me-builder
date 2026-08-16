@@ -127,7 +127,13 @@ describe("SSO authentication E2E", () => {
         sessionIssuer,
         now: () => 2_000,
       }),
-    ).rejects.toEqual(new SsoAuthenticationError("rollout_excluded"));
+    ).rejects.toMatchObject({
+      reason: "rollout_excluded",
+      callback: {
+        returnTo: "/compatibility/invitations/invite-fixture",
+        traceId: "00000000-0000-4000-8000-000000000099",
+      },
+    });
 
     const unknownStore = memoryStore();
     const unknownState = await startFlow(unknownStore, client);
@@ -142,7 +148,13 @@ describe("SSO authentication E2E", () => {
         sessionIssuer,
         now: () => 2_000,
       }),
-    ).rejects.toEqual(new SsoAuthenticationError("identity_unlinked"));
+    ).rejects.toMatchObject({
+      reason: "identity_unlinked",
+      callback: {
+        returnTo: "/compatibility/invitations/invite-fixture",
+        traceId: "00000000-0000-4000-8000-000000000099",
+      },
+    });
 
     const allowedStore = memoryStore();
     const allowedState = await startFlow(allowedStore, client);
