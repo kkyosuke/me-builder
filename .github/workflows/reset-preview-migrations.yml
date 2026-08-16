@@ -37,6 +37,7 @@ jobs:
       SSO_CLIENT_ID: ${{ vars.SSO_CLIENT_ID }}
       SSO_CLIENT_SECRET: ${{ secrets.SSO_CLIENT_SECRET }}
       SSO_ROLLOUT_MODE: ${{ vars.SSO_ROLLOUT_MODE }}
+      SSO_ROLLOUT_PERCENT: ${{ vars.SSO_ROLLOUT_PERCENT }}
 
     steps:
       # 実行時に選んだブランチをそのまま使う。migration・seed・deployの内容と、
@@ -94,10 +95,15 @@ jobs:
             exit 1
           fi
           sso_mode="${SSO_ROLLOUT_MODE:-disabled}"
+          sso_percent="${SSO_ROLLOUT_PERCENT:-0}"
           case "${sso_mode}" in
             disabled|linking|linked-login) ;;
             *) echo "::error::SSO_ROLLOUT_MODE が不正です。"; exit 1 ;;
           esac
+          if ! [[ "${sso_percent}" =~ ^([0-9]|[1-9][0-9]|100)$ ]]; then
+            echo "::error::SSO_ROLLOUT_PERCENT は0から100の整数で指定してください。"
+            exit 1
+          fi
           if [ "${sso_mode}" != "disabled" ] && { [ -z "${SSO_ISSUER_URL}" ] || [ -z "${SSO_CLIENT_ID}" ] || [ -z "${SSO_CLIENT_SECRET}" ]; }; then
             echo "::error::SSOを有効にするにはSSO_ISSUER_URL、SSO_CLIENT_ID、SSO_CLIENT_SECRETが必要です。"
             exit 1
@@ -157,7 +163,8 @@ jobs:
 
           bun --cwd apps/worker wrangler deploy --env preview --secrets-file "${worker_secrets_file}"
           sso_mode="${SSO_ROLLOUT_MODE:-disabled}"
-          api_sso_vars=(--var "SSO_ROLLOUT_MODE:${sso_mode}")
+          sso_percent="${SSO_ROLLOUT_PERCENT:-0}"
+          api_sso_vars=(--var "SSO_ROLLOUT_MODE:${sso_mode}" --var "SSO_ROLLOUT_PERCENT:${sso_percent}")
           if [ -n "${SSO_ISSUER_URL}" ]; then api_sso_vars+=(--var "SSO_ISSUER_URL:${SSO_ISSUER_URL}"); fi
           if [ -n "${SSO_CLIENT_ID}" ]; then api_sso_vars+=(--var "SSO_CLIENT_ID:${SSO_CLIENT_ID}"); fi
           bun --cwd apps/api wrangler deploy --env preview --secrets-file "${api_secrets_file}" "${api_sso_vars[@]}"
