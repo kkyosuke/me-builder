@@ -6,6 +6,19 @@
 
 認証方式、Identity、session、段階公開flagの設計は[Web認証・SSO設計](../architecture/web-authentication-design.md)、ログに記録できる情報は[アプリケーション運用ログ方針](operational-logging.md)を正とします。
 
+### 所有する概念
+
+- Previewで行うSSO成功・失敗シナリオと開始条件
+- Previewでの切り戻し確認、証跡形式、完了判定
+
+### 所有しない概念
+
+- 認証、Identity、session、段階公開flagの意味と安全上の規則
+- アプリケーション運用ログへ記録できる情報
+- Productionへの段階公開手順
+
+Productionへの公開は[SSO Production段階公開Runbook](sso-production-rollout.md)が所有します。
+
 ## 2. 開始条件
 
 検証担当者は、次がすべて満たされるまで通し検証を開始しません。
