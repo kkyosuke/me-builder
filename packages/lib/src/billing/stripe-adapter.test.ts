@@ -3,6 +3,54 @@ import { BillingProviderError } from "./provider";
 import { StripeBillingProvider, classifyStripeError } from "./stripe-adapter";
 
 describe("StripeBillingProvider", () => {
+  it("creates checkout with selection metadata and maps the latest session", async () => {
+    const create = vi.fn().mockResolvedValue({
+      id: "cs_test_new",
+      url: "https://checkout.stripe.test/new",
+    });
+    const list = vi.fn().mockResolvedValue({
+      data: [
+        {
+          id: "cs_test_open",
+          customer: "cus_secret",
+          status: "open",
+          url: "https://checkout.stripe.test/open",
+          metadata: { plan: "full", interval: "year" },
+        },
+      ],
+    });
+    const provider = new StripeBillingProvider({
+      checkout: { sessions: { create, list } },
+    } as never);
+
+    await provider.createCheckoutSession(
+      {
+        customerId: "cus_secret",
+        priceId: "price_full_year",
+        successUrl: "https://example.test/success",
+        cancelUrl: "https://example.test/cancel",
+        accountId: "account_secret",
+        plan: "full",
+        interval: "year",
+      },
+      "checkout-generation",
+    );
+
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({ metadata: { plan: "full", interval: "year" } }),
+      { idempotencyKey: "checkout-generation" },
+    );
+    await expect(provider.findLatestCheckoutSession("cus_secret")).resolves.toEqual({
+      id: "cs_test_open",
+      customerId: "cus_secret",
+      status: "open",
+      url: "https://checkout.stripe.test/open",
+      plan: "full",
+      interval: "year",
+    });
+    expect(list).toHaveBeenCalledWith({ customer: "cus_secret", limit: 1 });
+  });
+
   it("maps SDK subscriptions to the minimal provider contract", async () => {
     const retrieve = vi.fn().mockResolvedValue({
       id: "sub_secret",

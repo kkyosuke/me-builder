@@ -114,6 +114,52 @@ export async function createCheckoutSession(
   }
 }
 
+export async function verifyCheckoutSessionCompletion(
+  apiUrl: string | undefined,
+  idToken: string,
+  checkoutSessionId: string,
+  signal?: AbortSignal,
+): Promise<void> {
+  let response: Response;
+  try {
+    response = await createHttpClient(apiUrl).request(
+      `/api/billing/checkout-sessions/${encodeURIComponent(checkoutSessionId)}`,
+      {
+        headers: { Authorization: `Bearer ${idToken}` },
+        ...(signal ? { signal } : {}),
+      },
+    );
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    throw new OperationError("購入結果を確認できませんでした。時間をおいて再試行してください。", {
+      code: "BILLING_CHECKOUT_STATUS_NETWORK_FAILED",
+      cause: error,
+    });
+  }
+  if (!response.ok) {
+    throw new OperationError("購入結果を確認できませんでした。料金プランからやり直してください。", {
+      code: "BILLING_CHECKOUT_STATUS_FAILED",
+      status: response.status,
+    });
+  }
+  const parsed = v.safeParse(
+    v.object({ status: v.picklist(["open", "complete", "expired"]) }),
+    await response.json().catch(() => null),
+  );
+  if (!parsed.success) {
+    throw new ValidationError("購入結果の応答を確認できませんでした。", {
+      code: "BILLING_CHECKOUT_STATUS_RESPONSE_INVALID",
+      status: response.status,
+    });
+  }
+  if (parsed.output.status !== "complete") {
+    throw new OperationError("購入手続きが完了していません。料金プランからやり直してください。", {
+      code: "BILLING_CHECKOUT_NOT_COMPLETE",
+      status: 409,
+    });
+  }
+}
+
 export async function createCustomerPortalSession(
   apiUrl: string | undefined,
   idToken: string,

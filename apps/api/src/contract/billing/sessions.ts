@@ -1,6 +1,6 @@
 import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
 import * as v from "valibot";
-import { authenticatedErrors, jsonResponse } from "../shared/errors";
+import { AccountNotFoundErrorSchema, authenticatedErrors, jsonResponse } from "../shared/errors";
 
 export const BillingCheckoutRequestSchema = v.object({
   plan: v.picklist(["lite", "full", "family"]),
@@ -30,6 +30,19 @@ export const BillingSessionResponseSchema = v.object({
   url: v.pipe(v.string(), v.url()),
 });
 
+export const BillingCheckoutSessionIdSchema = v.pipe(
+  v.string(),
+  v.regex(/^cs_(?:test_|live_)?[A-Za-z0-9]+$/),
+);
+
+export const BillingCheckoutSessionStatusResponseSchema = v.object({
+  status: v.picklist(["open", "complete", "expired"]),
+});
+
+export const BillingCheckoutSessionNotFoundSchema = v.object({
+  error: v.literal("Checkout session not found"),
+});
+
 export const BillingSessionConflictSchema = v.object({
   error: v.literal("Billing session unavailable"),
   reason: v.picklist([
@@ -56,6 +69,21 @@ export const billingCheckoutSessionRoute = describeRoute({
     400: jsonResponse("リクエストが不正", BillingInvalidRequestSchema),
     409: jsonResponse("購入を開始できない", BillingSessionConflictSchema),
     ...authenticatedErrors,
+  },
+} satisfies DescribeRouteOptions);
+
+export const billingCheckoutSessionStatusRoute = describeRoute({
+  operationId: "getBillingCheckoutSessionStatus",
+  tags: ["Billing"],
+  summary: "Checkout Sessionが本人のものであることと完了状態を確認する",
+  security: [{ liffIdToken: [] }],
+  responses: {
+    200: jsonResponse("本人のCheckout Session状態", BillingCheckoutSessionStatusResponseSchema),
+    ...authenticatedErrors,
+    404: jsonResponse(
+      "Accountまたは本人のCheckout Sessionが存在しない",
+      v.union([AccountNotFoundErrorSchema, BillingCheckoutSessionNotFoundSchema]),
+    ),
   },
 } satisfies DescribeRouteOptions);
 

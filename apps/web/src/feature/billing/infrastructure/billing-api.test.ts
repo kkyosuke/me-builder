@@ -3,6 +3,7 @@ import {
   createCheckoutSession,
   createCustomerPortalSession,
   fetchBillingPlanCatalog,
+  verifyCheckoutSessionCompletion,
 } from "./billing-api";
 
 describe("createCustomerPortalSession", () => {
@@ -112,5 +113,30 @@ describe("billing purchase api", () => {
     await expect(
       createCheckoutSession(undefined, "id-token", { plan: "lite", interval: "month" }),
     ).rejects.toThrow("現在の契約があります");
+  });
+
+  it("本人のCheckout Sessionがcompleteの場合だけ復帰を受理する", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify({ status: "complete" }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      verifyCheckoutSessionCompletion("https://api.example.test", "id-token", "cs_test_completed"),
+    ).resolves.toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.example.test/api/billing/checkout-sessions/cs_test_completed",
+      expect.objectContaining({ headers: { Authorization: "Bearer id-token" } }),
+    );
+  });
+
+  it("未完了Checkout Sessionを購入完了として扱わない", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response(JSON.stringify({ status: "open" }), { status: 200 })),
+    );
+    await expect(
+      verifyCheckoutSessionCompletion(undefined, "id-token", "cs_test_open"),
+    ).rejects.toThrow("購入手続きが完了していません");
   });
 });

@@ -5,6 +5,9 @@ import * as v from "valibot";
 import { getConfig } from "../config";
 import {
   BillingCheckoutRequestSchema,
+  BillingCheckoutSessionIdSchema,
+  BillingCheckoutSessionNotFoundSchema,
+  BillingCheckoutSessionStatusResponseSchema,
   BillingInvalidRequestSchema,
   BillingPlanCatalogResponseSchema,
   BillingSessionConflictSchema,
@@ -18,6 +21,7 @@ import {
 import {
   createBillingCheckoutSession,
   createBillingPortalSession,
+  getBillingCheckoutSessionStatus,
 } from "../logic/billing-sessions";
 import { receiveStripeWebhook } from "../logic/stripe-webhook";
 import type { AppEnv } from "../types";
@@ -78,6 +82,54 @@ export async function postBillingCheckoutSession(c: Context<AppEnv>): Promise<Re
 
 export async function postBillingPortalSession(c: Context<AppEnv>): Promise<Response> {
   return createBillingSessionResponse(c, "portal");
+}
+
+export async function getBillingCheckoutSession(c: Context<AppEnv>): Promise<Response> {
+  const checkoutSessionId = v.safeParse(
+    BillingCheckoutSessionIdSchema,
+    c.req.param("checkoutSessionId") ?? "",
+  );
+  if (!checkoutSessionId.success) {
+    return c.json(
+      v.parse(BillingCheckoutSessionNotFoundSchema, { error: "Checkout session not found" }),
+      404,
+    );
+  }
+  const config = getConfig(c.env);
+  if (!c.env?.DB || !config.stripeSecretKey || !config.webOrigin) {
+    return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
+  }
+  const outcome = await getBillingCheckoutSessionStatus({
+    idToken: bearerToken(c.req.header("authorization")),
+    lineLoginChannelId: config.lineLoginChannelId,
+    db: D1.shared.client.create(c.env.DB),
+    provider: billing.createStripeBillingProvider({ secretKey: config.stripeSecretKey }),
+    webOrigin: config.webOrigin,
+    checkoutSessionId: checkoutSessionId.output,
+  });
+  switch (outcome.type) {
+    case "found":
+      c.header("Cache-Control", "no-store");
+      return c.json(
+        v.parse(BillingCheckoutSessionStatusResponseSchema, { status: outcome.status }),
+      );
+    case "not-found":
+      return c.json(
+        v.parse(BillingCheckoutSessionNotFoundSchema, { error: "Checkout session not found" }),
+        404,
+      );
+    case "account-not-found":
+      return c.json(
+        v.parse(AccountNotFoundErrorSchema, {
+          error: "Account not found",
+          reason: "friendship_required",
+        }),
+        404,
+      );
+    case "not-configured":
+    case "unauthenticated":
+      return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
+  }
 }
 
 async function createBillingSessionResponse(

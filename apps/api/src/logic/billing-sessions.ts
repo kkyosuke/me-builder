@@ -1,4 +1,4 @@
-import { D1, type billing } from "@me-builder/lib";
+import { D1, billing } from "@me-builder/lib";
 import { createLiffSession } from "./liff-session";
 
 type BaseParams = {
@@ -20,6 +20,11 @@ type SessionFailure =
         | "checkout_in_progress"
         | "customer_not_found";
     };
+
+export type CheckoutSessionStatusResult =
+  | Exclude<SessionFailure, { type: "unavailable" }>
+  | { type: "not-found" }
+  | { type: "found"; status: "open" | "complete" | "expired" };
 
 export async function createBillingCheckoutSession(
   params: BaseParams & {
@@ -57,23 +62,61 @@ export async function createBillingCheckoutSession(
     });
   }
   if (!customer) throw new Error("BILLING_CUSTOMER_LINK_FAILED");
-  if (await params.provider.hasOpenCheckoutSession(customer.providerCustomerId)) {
-    return { type: "unavailable", reason: "checkout_in_progress" };
-  }
   const priceId = await params.provider.findPriceIdByLookupKey(lookupKey);
   if (!priceId) return { type: "unavailable", reason: "plan_unavailable" };
+  const latestCheckout = await params.provider.findLatestCheckoutSession(
+    customer.providerCustomerId,
+  );
+  if (latestCheckout?.status === "open") {
+    if (
+      latestCheckout.plan === params.plan &&
+      latestCheckout.interval === params.interval &&
+      latestCheckout.url
+    ) {
+      return { type: "created", url: latestCheckout.url };
+    }
+    await params.provider.expireCheckoutSession(latestCheckout.id);
+  }
   const origin = new URL(params.webOrigin).origin;
   const checkout = await params.provider.createCheckoutSession(
     {
       customerId: customer.providerCustomerId,
       priceId,
-      successUrl: new URL("/profile/billing?billing=checkout-return", origin).toString(),
+      successUrl: `${origin}/profile/billing?billing=checkout-return&session_id={CHECKOUT_SESSION_ID}`,
       cancelUrl: new URL("/profile/billing?billing=checkout-cancel", origin).toString(),
       accountId,
+      plan: params.plan,
+      interval: params.interval,
     },
-    `billing-checkout-${accountId}`,
+    `billing-checkout-${accountId}-${latestCheckout?.id ?? "initial"}`,
   );
   return { type: "created", url: checkout.url };
+}
+
+export async function getBillingCheckoutSessionStatus(
+  params: BaseParams & { checkoutSessionId: string },
+): Promise<CheckoutSessionStatusResult> {
+  const session = await (params.createSession ?? createLiffSession)({
+    idToken: params.idToken,
+    lineLoginChannelId: params.lineLoginChannelId,
+    db: params.db,
+  });
+  if (session.type !== "resolved") return { type: session.type };
+  const customer = await D1.shared.action.billing.findBillingCustomerByAccount(
+    params.db,
+    session.session.accountId,
+  );
+  if (!customer) return { type: "not-found" };
+  try {
+    const checkout = await params.provider.retrieveCheckoutSession(params.checkoutSessionId);
+    if (checkout.customerId !== customer.providerCustomerId) return { type: "not-found" };
+    return { type: "found", status: checkout.status };
+  } catch (error) {
+    if (error instanceof billing.BillingProviderError && error.kind === "invalid-request") {
+      return { type: "not-found" };
+    }
+    throw error;
+  }
 }
 
 export async function createBillingPortalSession(

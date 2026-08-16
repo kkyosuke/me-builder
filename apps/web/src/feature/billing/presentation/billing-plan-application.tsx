@@ -1,12 +1,16 @@
 import type { BillingInterval, PaidPlanCode } from "@me-builder/shared";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { config } from "../../../config";
 import type { AsyncState } from "../../../model/async-state";
 import { getLiffIdToken } from "../../liff/infrastructure/liff-client";
 import { useLiffSession } from "../../liff/presentation/liff-session-provider";
 import { fetchProfileEntitlement } from "../../profile-settings/infrastructure/entitlement-api";
 import type { ProfileEntitlement } from "../../profile-settings/model/entitlement";
-import { createCheckoutSession, fetchBillingPlanCatalog } from "../infrastructure/billing-api";
+import {
+  createCheckoutSession,
+  fetchBillingPlanCatalog,
+  verifyCheckoutSessionCompletion,
+} from "../infrastructure/billing-api";
 import type { BillingPlan } from "../model/billing-plan";
 import { waitForSubscriptionProjection } from "../model/checkout-return";
 import { BillingPlanScreen } from "./billing-plan-screen";
@@ -31,6 +35,11 @@ export default function BillingPlanApplication({
     () => new URLSearchParams(window.location.search).get("billing"),
     [],
   );
+  const checkoutSessionId = useMemo(
+    () => new URLSearchParams(window.location.search).get("session_id"),
+    [],
+  );
+  const loadController = useRef<AbortController | null>(null);
   const [plans, setPlans] = useState<AsyncState<readonly BillingPlan[]>>({ status: "loading" });
   const [entitlement, setEntitlement] = useState<AsyncState<ProfileEntitlement>>({
     status: "loading",
@@ -50,7 +59,9 @@ export default function BillingPlanApplication({
   );
 
   const load = useCallback(async () => {
+    loadController.current?.abort();
     const controller = new AbortController();
+    loadController.current = controller;
     setPlans({ status: "loading" });
     setEntitlement({ status: "loading" });
     try {
@@ -63,16 +74,17 @@ export default function BillingPlanApplication({
       setPlans({ status: "success", data: nextPlans });
       setEntitlement({ status: "success", data: nextEntitlement });
     } catch (error) {
+      if (controller.signal.aborted) return;
       const errorMessage = message(error);
       setPlans({ status: "error", message: errorMessage });
       setEntitlement({ status: "error", message: errorMessage });
     }
-    return () => controller.abort();
   }, [token]);
 
   useEffect(() => {
     if (checkoutResult === "checkout-return") return;
     void load();
+    return () => loadController.current?.abort();
   }, [checkoutResult, load]);
 
   useEffect(() => {
@@ -82,10 +94,20 @@ export default function BillingPlanApplication({
     setEntitlement({ status: "loading" });
     void (async () => {
       try {
+        if (!checkoutSessionId) {
+          throw new Error("購入結果を確認できませんでした。料金プランからやり直してください。");
+        }
+        const idToken = await token(controller.signal);
+        await verifyCheckoutSessionCompletion(
+          config.apiUrl,
+          idToken,
+          checkoutSessionId,
+          controller.signal,
+        );
         const [nextPlans, nextEntitlement] = await Promise.all([
           fetchBillingPlanCatalog(config.apiUrl, controller.signal),
           waitForSubscriptionProjection(
-            async (signal) => fetchProfileEntitlement(config.apiUrl, await token(signal), signal),
+            async (signal) => fetchProfileEntitlement(config.apiUrl, idToken, signal),
             { signal: controller.signal, intervalMs: projectionPollIntervalMs },
           ),
         ]);
@@ -107,7 +129,7 @@ export default function BillingPlanApplication({
       }
     })();
     return () => controller.abort();
-  }, [checkoutResult, onEntitlementChanged, projectionPollIntervalMs, token]);
+  }, [checkoutResult, checkoutSessionId, onEntitlementChanged, projectionPollIntervalMs, token]);
 
   const checkout = async (plan: PaidPlanCode, interval: BillingInterval) => {
     const controller = new AbortController();

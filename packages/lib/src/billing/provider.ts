@@ -10,6 +10,15 @@ export type BillingSubscriptionStatus =
 
 export type BillingCustomer = Readonly<{ id: string; deleted: boolean }>;
 
+export type BillingCheckoutSession = Readonly<{
+  id: string;
+  customerId: string;
+  status: "open" | "complete" | "expired";
+  url: string | null;
+  plan: "lite" | "full" | "family" | null;
+  interval: "month" | "year" | null;
+}>;
+
 export type BillingSubscription = Readonly<{
   id: string;
   customerId: string;
@@ -41,6 +50,8 @@ export interface BillingProvider {
       successUrl: string;
       cancelUrl: string;
       accountId: string;
+      plan: "lite" | "full" | "family";
+      interval: "month" | "year";
     },
     idempotencyKey: string,
   ): Promise<{ id: string; url: string }>;
@@ -49,7 +60,9 @@ export interface BillingProvider {
     returnUrl: string;
   }): Promise<{ url: string }>;
   findPriceIdByLookupKey(lookupKey: string): Promise<string | null>;
-  hasOpenCheckoutSession(customerId: string): Promise<boolean>;
+  findLatestCheckoutSession(customerId: string): Promise<BillingCheckoutSession | null>;
+  retrieveCheckoutSession(sessionId: string): Promise<BillingCheckoutSession>;
+  expireCheckoutSession(sessionId: string): Promise<void>;
   retrieveCustomer(customerId: string): Promise<BillingCustomer>;
   retrieveSubscription(subscriptionId: string): Promise<BillingSubscription>;
   listSubscriptions(customerId: string): Promise<readonly BillingSubscription[]>;

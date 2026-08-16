@@ -4,7 +4,11 @@ import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { describe, expect, it, vi } from "vitest";
-import { createBillingCheckoutSession, createBillingPortalSession } from "./billing-sessions";
+import {
+  createBillingCheckoutSession,
+  createBillingPortalSession,
+  getBillingCheckoutSessionStatus,
+} from "./billing-sessions";
 
 function createTestDb(): D1.shared.Client {
   const sqlite = new Database(":memory:");
@@ -58,23 +62,23 @@ describe("billing sessions", () => {
       expect.objectContaining({
         accountId: owner.id,
         priceId: "price_full_year_v2",
-        successUrl: "https://app.example.test/profile/billing?billing=checkout-return",
+        successUrl:
+          "https://app.example.test/profile/billing?billing=checkout-return&session_id={CHECKOUT_SESSION_ID}",
         cancelUrl: "https://app.example.test/profile/billing?billing=checkout-cancel",
+        plan: "full",
+        interval: "year",
       }),
-      `billing-checkout-${owner.id}`,
+      `billing-checkout-${owner.id}-initial`,
     );
   });
 
-  it("rejects an unavailable plan and a second open checkout", async () => {
+  it("rejects an unavailable plan", async () => {
     const { db, createSession } = await setup();
-    const provider = new billing.FakeBillingProvider({
-      hasOpenCheckoutSession: async () => true,
-    });
     const base = {
       idToken: "token",
       lineLoginChannelId: "channel",
       db,
-      provider,
+      provider: new billing.FakeBillingProvider(),
       webOrigin: "https://app.example.test",
       createSession,
       plan: "lite" as const,
@@ -84,9 +88,77 @@ describe("billing sessions", () => {
       type: "unavailable",
       reason: "plan_unavailable",
     });
+  });
+
+  it("同じ選択の未完了Checkoutを再利用する", async () => {
+    const { db, createSession } = await setup();
+    const createCheckoutSession = vi.fn();
+    const provider = new billing.FakeBillingProvider({
+      findLatestCheckoutSession: async () => ({
+        id: "cs_test_open",
+        customerId: "cus_test",
+        status: "open",
+        url: "https://checkout.stripe.test/resume",
+        plan: "lite",
+        interval: "month",
+      }),
+      createCheckoutSession,
+    });
+
     await expect(
-      createBillingCheckoutSession({ ...base, lookupKeyMap: { "lite.month": "lite_month" } }),
-    ).resolves.toEqual({ type: "unavailable", reason: "checkout_in_progress" });
+      createBillingCheckoutSession({
+        idToken: "token",
+        lineLoginChannelId: "channel",
+        db,
+        provider,
+        webOrigin: "https://app.example.test",
+        createSession,
+        plan: "lite",
+        interval: "month",
+        lookupKeyMap: { "lite.month": "lite_month" },
+      }),
+    ).resolves.toEqual({ type: "created", url: "https://checkout.stripe.test/resume" });
+    expect(createCheckoutSession).not.toHaveBeenCalled();
+  });
+
+  it("選択が変わった未完了Checkoutを失効させて新しい世代を作る", async () => {
+    const { db, owner, createSession } = await setup();
+    const expireCheckoutSession = vi.fn();
+    const createCheckoutSession = vi.fn().mockResolvedValue({
+      id: "cs_test_new",
+      url: "https://checkout.stripe.test/new",
+    });
+    const provider = new billing.FakeBillingProvider({
+      findLatestCheckoutSession: async () => ({
+        id: "cs_test_old",
+        customerId: `cus_${owner.id}`,
+        status: "open",
+        url: "https://checkout.stripe.test/old",
+        plan: "lite",
+        interval: "month",
+      }),
+      expireCheckoutSession,
+      createCheckoutSession,
+    });
+
+    await expect(
+      createBillingCheckoutSession({
+        idToken: "token",
+        lineLoginChannelId: "channel",
+        db,
+        provider,
+        webOrigin: "https://app.example.test",
+        createSession,
+        plan: "full",
+        interval: "year",
+        lookupKeyMap: { "full.year": "full_year" },
+      }),
+    ).resolves.toEqual({ type: "created", url: "https://checkout.stripe.test/new" });
+    expect(expireCheckoutSession).toHaveBeenCalledWith("cs_test_old");
+    expect(createCheckoutSession).toHaveBeenCalledWith(
+      expect.objectContaining({ plan: "full", interval: "year" }),
+      `billing-checkout-${owner.id}-cs_test_old`,
+    );
   });
 
   it("既存契約がある本人の二重購入を開始しない", async () => {
@@ -165,6 +237,47 @@ describe("billing sessions", () => {
       customerId: "cus_owner",
       returnUrl: "https://app.example.test/profile?billing=portal-return",
     });
+  });
+
+  it("Checkout復帰状態は本人のCustomerに属するSessionだけ返す", async () => {
+    const { db, owner, createSession } = await setup();
+    await D1.shared.action.billing.linkBillingCustomer(db, {
+      accountId: owner.id,
+      providerCustomerId: "cus_owner",
+    });
+    const retrieveCheckoutSession = vi.fn().mockResolvedValue({
+      id: "cs_test_completed",
+      customerId: "cus_owner",
+      status: "complete",
+      url: null,
+      plan: "lite",
+      interval: "month",
+    });
+    const base = {
+      idToken: "token",
+      lineLoginChannelId: "channel",
+      db,
+      provider: new billing.FakeBillingProvider({ retrieveCheckoutSession }),
+      webOrigin: "https://app.example.test",
+      createSession,
+      checkoutSessionId: "cs_test_completed",
+    };
+
+    await expect(getBillingCheckoutSessionStatus(base)).resolves.toEqual({
+      type: "found",
+      status: "complete",
+    });
+    retrieveCheckoutSession.mockResolvedValueOnce({
+      id: "cs_test_other",
+      customerId: "cus_other",
+      status: "complete",
+      url: null,
+      plan: null,
+      interval: null,
+    });
+    await expect(
+      getBillingCheckoutSessionStatus({ ...base, checkoutSessionId: "cs_test_other" }),
+    ).resolves.toEqual({ type: "not-found" });
   });
 
   it("Customer対応がない本人にはPortalを作成しない", async () => {

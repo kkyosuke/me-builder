@@ -10,7 +10,9 @@ type Handlers = Partial<{
   createCheckoutSession: BillingProvider["createCheckoutSession"];
   createPortalSession: BillingProvider["createPortalSession"];
   findPriceIdByLookupKey: BillingProvider["findPriceIdByLookupKey"];
-  hasOpenCheckoutSession: BillingProvider["hasOpenCheckoutSession"];
+  findLatestCheckoutSession: BillingProvider["findLatestCheckoutSession"];
+  retrieveCheckoutSession: BillingProvider["retrieveCheckoutSession"];
+  expireCheckoutSession: BillingProvider["expireCheckoutSession"];
   retrieveCustomer: BillingProvider["retrieveCustomer"];
   retrieveSubscription: BillingProvider["retrieveSubscription"];
   listSubscriptions: BillingProvider["listSubscriptions"];
@@ -32,6 +34,8 @@ export class FakeBillingProvider implements BillingProvider {
       successUrl: string;
       cancelUrl: string;
       accountId: string;
+      plan: "lite" | "full" | "family";
+      interval: "month" | "year";
     },
     key: string,
   ): Promise<{ id: string; url: string }> {
@@ -53,10 +57,27 @@ export class FakeBillingProvider implements BillingProvider {
     return `price_${lookupKey}`;
   }
 
-  async hasOpenCheckoutSession(customerId: string): Promise<boolean> {
-    if (this.handlers.hasOpenCheckoutSession)
-      return this.handlers.hasOpenCheckoutSession(customerId);
-    return false;
+  async findLatestCheckoutSession(customerId: string) {
+    if (this.handlers.findLatestCheckoutSession)
+      return this.handlers.findLatestCheckoutSession(customerId);
+    return null;
+  }
+
+  async retrieveCheckoutSession(sessionId: string) {
+    if (this.handlers.retrieveCheckoutSession)
+      return this.handlers.retrieveCheckoutSession(sessionId);
+    return {
+      id: sessionId,
+      customerId: "cus_test",
+      status: "complete" as const,
+      url: null,
+      plan: null,
+      interval: null,
+    };
+  }
+
+  async expireCheckoutSession(sessionId: string): Promise<void> {
+    if (this.handlers.expireCheckoutSession) await this.handlers.expireCheckoutSession(sessionId);
   }
 
   async retrieveCustomer(customerId: string): Promise<BillingCustomer> {

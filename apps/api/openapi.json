@@ -624,6 +624,127 @@
         }
       }
     },
+    "/api/billing/checkout-sessions/{checkoutSessionId}": {
+      "get": {
+        "operationId": "getBillingCheckoutSessionStatus",
+        "tags": ["Billing"],
+        "summary": "Checkout Sessionが本人のものであることと完了状態を確認する",
+        "security": [
+          {
+            "liffIdToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "本人のCheckout Session状態",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "enum": ["open", "complete", "expired"],
+                      "type": "string"
+                    }
+                  },
+                  "required": ["status"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "LIFF IDトークンを検証できない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Unauthorized"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Accountまたは本人のCheckout Sessionが存在しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "error": {
+                          "const": "Account not found"
+                        },
+                        "reason": {
+                          "const": "friendship_required"
+                        }
+                      },
+                      "required": ["error", "reason"]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "error": {
+                          "const": "Checkout session not found"
+                        }
+                      },
+                      "required": ["error"]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "未処理のサーバーエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Internal Server Error"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "D1 bindingが設定されていない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Service Unavailable"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "checkoutSessionId",
+            "required": true
+          }
+        ]
+      }
+    },
     "/api/billing/portal-sessions": {
       "post": {
         "operationId": "createBillingPortalSession",

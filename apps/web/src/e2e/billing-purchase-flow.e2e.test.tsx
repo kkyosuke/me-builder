@@ -7,6 +7,7 @@ import type { ProfileEntitlement } from "../feature/profile-settings/model/entit
 const mocks = vi.hoisted(() => ({
   fetchPlans: vi.fn(),
   createCheckout: vi.fn(),
+  verifyCheckout: vi.fn(),
   fetchEntitlement: vi.fn(),
   acquireIdToken: vi.fn(),
 }));
@@ -14,6 +15,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("../feature/billing/infrastructure/billing-api", () => ({
   fetchBillingPlanCatalog: mocks.fetchPlans,
   createCheckoutSession: mocks.createCheckout,
+  verifyCheckoutSessionCompletion: mocks.verifyCheckout,
 }));
 vi.mock("../feature/profile-settings/infrastructure/entitlement-api", () => ({
   fetchProfileEntitlement: mocks.fetchEntitlement,
@@ -68,6 +70,7 @@ describe("billing purchase user journey", () => {
     window.history.replaceState({}, "", "/profile/billing");
     mocks.fetchPlans.mockReset().mockResolvedValue([plan]);
     mocks.createCheckout.mockReset().mockResolvedValue("https://checkout.stripe.test/session");
+    mocks.verifyCheckout.mockReset().mockResolvedValue(undefined);
     mocks.fetchEntitlement.mockReset().mockResolvedValue(entitlement("free"));
   });
   afterEach(cleanup);
@@ -91,7 +94,11 @@ describe("billing purchase user journey", () => {
   });
 
   it("Checkout復帰後はprojectionが反映されてから購入完了を表示する", async () => {
-    window.history.replaceState({}, "", "/profile/billing?billing=checkout-return");
+    window.history.replaceState(
+      {},
+      "",
+      "/profile/billing?billing=checkout-return&session_id=cs_test_completed",
+    );
     mocks.fetchEntitlement
       .mockResolvedValueOnce(entitlement("free"))
       .mockResolvedValueOnce(entitlement("subscription"));
@@ -110,5 +117,20 @@ describe("billing purchase user journey", () => {
     expect(onEntitlementChanged).toHaveBeenCalledWith(
       expect.objectContaining({ plan: "lite", source: "subscription" }),
     );
+    expect(mocks.verifyCheckout).toHaveBeenCalledWith(
+      undefined,
+      "id-token",
+      "cs_test_completed",
+      expect.any(AbortSignal),
+    );
+  });
+
+  it("本人のCheckout完了を確認できない復帰URLでは購入完了にしない", async () => {
+    window.history.replaceState({}, "", "/profile/billing?billing=checkout-return");
+
+    render(<BillingPlanApplication onBack={vi.fn()} projectionPollIntervalMs={0} />);
+
+    expect(await screen.findAllByText(/購入結果を確認できませんでした/)).toHaveLength(2);
+    expect(mocks.fetchEntitlement).not.toHaveBeenCalled();
   });
 });
