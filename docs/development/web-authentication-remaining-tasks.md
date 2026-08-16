@@ -307,16 +307,11 @@ flowchart TD
 
 実装と検証手順はPRへ移し、`AUTH-A-011`のsession発行・失効eventへ接続しました。未完了条件はPreview deploy後にRunbookの実端末／実IdP／rollback結果を記録し、レビューとmergeを完了することです。
 
-### AUTH-C-006 ProductionへSSOを段階公開する
+### AUTH-C-006 ProductionへSSOを段階公開する ([PR #330](https://github.com/kkyosuke/me-builder/pull/330))
 
 依存: `AUTH-C-005`
 
-- 運営Account、SSO link済みの少数Account、対象利用者全体の順に外部ブラウザSSOを有効化する
-- 認証成功率、callback失敗、Account未解決、session失効、LIFFへの影響を個人識別子なしで確認する
-- SSO経路だけを即時停止できることと、停止中もLIFF内の本人機能を利用できることを確認する
-- 外部ブラウザの旧LINE Loginを終了する時点で、公開案内とサポート手順を更新する
-
-完了条件は、ProductionでLIFF内の利用を維持したまま外部ブラウザSSOを安全に停止・再開でき、対象利用者へ段階公開できることです。
+実装と公開RunbookはPRへ移しました。未完了条件は`AUTH-A-011`のsession issuerへ割合gateを接続し、Preview gate完了後にProductionの各phase、即時停止、0%からの再開結果を記録してレビューを完了することです。
 
 ## 8. リリースゲート
 
