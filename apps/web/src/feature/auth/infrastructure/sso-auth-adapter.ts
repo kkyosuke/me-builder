@@ -14,6 +14,19 @@ export function consumeSsoCallbackFailure(): "cancelled" | "error" | undefined {
   return result;
 }
 
+export type SsoIdentityCallbackResult = "linked" | "cancelled" | "error";
+
+/** application sessionが残るIdentity連携callbackの結果をURLから一度だけ消費する。 */
+export function consumeSsoIdentityCallbackResult(): SsoIdentityCallbackResult | undefined {
+  if (typeof window === "undefined") return undefined;
+  const url = new URL(window.location.href);
+  const result = url.searchParams.get("sso");
+  if (result !== "linked" && result !== "cancelled" && result !== "error") return undefined;
+  url.searchParams.delete("sso");
+  window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+  return result;
+}
+
 /** provider tokenをWebへ戻さず、server-side SSO開始endpointへ遷移する。 */
 export function establishSsoAuthSession(
   apiUrl: string | undefined,

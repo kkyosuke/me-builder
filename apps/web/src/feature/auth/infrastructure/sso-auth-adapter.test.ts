@@ -3,6 +3,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   consumeSsoCallbackFailure,
+  consumeSsoIdentityCallbackResult,
   establishSsoAuthSession,
   ssoLoginUrl,
 } from "./sso-auth-adapter";
@@ -40,6 +41,19 @@ describe("SSO auth adapter", () => {
         "/diagnosis/result?from=share#answer",
       );
       expect(consumeSsoCallbackFailure()).toBeUndefined();
+    },
+  );
+
+  it.each(["linked", "cancelled", "error"] as const)(
+    "Identity連携callbackの%s markerを他のURL要素を保って一度だけ消費する",
+    (result) => {
+      window.history.replaceState({}, "", `/profile?from=settings&sso=${result}#login-method`);
+
+      expect(consumeSsoIdentityCallbackResult()).toBe(result);
+      expect(`${window.location.pathname}${window.location.search}${window.location.hash}`).toBe(
+        "/profile?from=settings#login-method",
+      );
+      expect(consumeSsoIdentityCallbackResult()).toBeUndefined();
     },
   );
 });

@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { type MouseEvent, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { type AsyncState, errorMessage } from "../../../model/async-state";
+import type { SsoIdentityCallbackResult } from "../../auth/infrastructure/sso-auth-adapter";
 import type { ColorTheme } from "../../theme/model/color-theme";
 import type { FontSize } from "../../theme/model/font-size";
 import type { ResetDevelopmentAccountDataResult } from "../infrastructure/development-account-data-api";
@@ -72,6 +73,7 @@ export function ProfileSettingsScreen({
   serviceTermsAcceptanceHistory,
   onIssueRecoveryCode,
   ssoIdentity,
+  ssoIdentityCallbackResult,
   onLinkSsoIdentity,
   onUnlinkSsoIdentity,
 }: {
@@ -102,6 +104,7 @@ export function ProfileSettingsScreen({
   serviceTermsAcceptanceHistory?: ReactNode;
   onIssueRecoveryCode?: () => Promise<{ code: string; expiresAt: string }>;
   ssoIdentity?: AsyncState<SsoIdentityStatus>;
+  ssoIdentityCallbackResult?: SsoIdentityCallbackResult;
   onLinkSsoIdentity?: () => Promise<void>;
   onUnlinkSsoIdentity?: () => Promise<void>;
 }) {
@@ -678,6 +681,21 @@ export function ProfileSettingsScreen({
                     最後のログイン方法は解除できません。
                   </p>
                 )}
+              {ssoIdentityCallbackResult === "linked" && (
+                <output className="mt-3 block text-sm text-emerald-700 dark:text-emerald-300">
+                  SSOを接続しました。
+                </output>
+              )}
+              {ssoIdentityCallbackResult === "cancelled" && (
+                <output className="mt-3 block text-sm text-slate-600 dark:text-slate-300">
+                  SSO接続をキャンセルしました。
+                </output>
+              )}
+              {ssoIdentityCallbackResult === "error" && (
+                <p role="alert" className="mt-3 text-sm text-rose-700 dark:text-rose-300">
+                  SSOを接続できませんでした。時間をおいてもう一度お試しください。
+                </p>
+              )}
               {ssoMutationState.status === "success" && (
                 <output className="mt-3 block text-sm text-emerald-700 dark:text-emerald-300">
                   {ssoMutationState.data}
