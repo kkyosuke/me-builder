@@ -72,7 +72,10 @@ export class StripeBillingProvider implements BillingProvider {
     });
   }
 
-  async createPortalSession(input: { customerId: string; returnUrl: string }) {
+  async createPortalSession(input: {
+    customerId: string;
+    returnUrl: string;
+  }) {
     return this.call(async () => {
       const session = await this.stripe.billingPortal.sessions.create({
         customer: input.customerId,

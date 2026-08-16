@@ -13,7 +13,12 @@ export const BillingSessionResponseSchema = v.object({
 
 export const BillingSessionConflictSchema = v.object({
   error: v.literal("Billing session unavailable"),
-  reason: v.picklist(["plan_unavailable", "existing_subscription", "checkout_in_progress"]),
+  reason: v.picklist([
+    "plan_unavailable",
+    "existing_subscription",
+    "checkout_in_progress",
+    "customer_not_found",
+  ]),
 });
 
 export const BillingInvalidRequestSchema = v.object({ error: v.literal("Invalid request") });
@@ -31,6 +36,18 @@ export const billingCheckoutSessionRoute = describeRoute({
     201: jsonResponse("短命なStripe Checkout URL", BillingSessionResponseSchema),
     400: jsonResponse("リクエストが不正", BillingInvalidRequestSchema),
     409: jsonResponse("購入を開始できない", BillingSessionConflictSchema),
+    ...authenticatedErrors,
+  },
+} satisfies DescribeRouteOptions);
+
+export const billingPortalSessionRoute = describeRoute({
+  operationId: "createBillingPortalSession",
+  tags: ["Billing"],
+  summary: "本人のStripe Customerに対するCustomer Portal Sessionを作成する",
+  security: [{ liffIdToken: [] }],
+  responses: {
+    201: jsonResponse("短命なStripe Customer Portal URL", BillingSessionResponseSchema),
+    409: jsonResponse("Portalを開始できない", BillingSessionConflictSchema),
     ...authenticatedErrors,
   },
 } satisfies DescribeRouteOptions);

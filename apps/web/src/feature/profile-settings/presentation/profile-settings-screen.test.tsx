@@ -79,6 +79,32 @@ describe("ProfileSettingsScreen", () => {
     expect(onFontSizeChange).toHaveBeenCalledWith("small");
   });
 
+  it("本人がプロフィールから契約管理を開き、反映待ちなら理由を確認できる", async () => {
+    const onOpenBillingPortal = vi
+      .fn()
+      .mockRejectedValue(
+        new Error("管理できる契約がまだありません。契約反映後に再試行してください。"),
+      );
+    render(
+      <ProfileSettingsScreen
+        avatar={null}
+        theme="dark"
+        fontSize="medium"
+        onBack={vi.fn()}
+        onOpenAvatar={vi.fn()}
+        onOpenBillingPortal={onOpenBillingPortal}
+        onThemeChange={vi.fn()}
+        onFontSizeChange={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /契約を管理/ }));
+    expect((await screen.findByRole("alert")).textContent).toContain(
+      "管理できる契約がまだありません",
+    );
+    expect(onOpenBillingPortal).toHaveBeenCalledOnce();
+  });
+
   it("アバター変更中はプロフィールを操作対象から外す", () => {
     render(
       <ProfileSettingsScreen

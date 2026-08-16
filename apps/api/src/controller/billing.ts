@@ -13,7 +13,10 @@ import {
   ServiceUnavailableErrorSchema,
   UnauthorizedErrorSchema,
 } from "../contract/shared/errors";
-import { createBillingCheckoutSession } from "../logic/billing-sessions";
+import {
+  createBillingCheckoutSession,
+  createBillingPortalSession,
+} from "../logic/billing-sessions";
 import { receiveStripeWebhook } from "../logic/stripe-webhook";
 import type { AppEnv } from "../types";
 import { bearerToken } from "./auth";
@@ -51,6 +54,18 @@ export async function postBillingCheckoutSession(c: Context<AppEnv>): Promise<Re
   if (!parsed.success) {
     return c.json(v.parse(BillingInvalidRequestSchema, { error: "Invalid request" }), 400);
   }
+  return createBillingSessionResponse(c, "checkout", parsed.output);
+}
+
+export async function postBillingPortalSession(c: Context<AppEnv>): Promise<Response> {
+  return createBillingSessionResponse(c, "portal");
+}
+
+async function createBillingSessionResponse(
+  c: Context<AppEnv>,
+  kind: "checkout" | "portal",
+  checkout?: v.InferOutput<typeof BillingCheckoutRequestSchema>,
+): Promise<Response> {
   const config = getConfig(c.env);
   if (!c.env?.DB || !config.stripeSecretKey || !config.webOrigin) {
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
@@ -59,14 +74,22 @@ export async function postBillingCheckoutSession(c: Context<AppEnv>): Promise<Re
     idToken: bearerToken(c.req.header("authorization")),
     lineLoginChannelId: config.lineLoginChannelId,
     db: D1.shared.client.create(c.env.DB),
-    provider: billing.createStripeBillingProvider({ secretKey: config.stripeSecretKey }),
+    provider: billing.createStripeBillingProvider({
+      secretKey: config.stripeSecretKey,
+      ...(config.stripePortalConfigurationId
+        ? { portalConfigurationId: config.stripePortalConfigurationId }
+        : {}),
+    }),
     webOrigin: config.webOrigin,
   };
-  const outcome = await createBillingCheckoutSession({
-    ...base,
-    ...parsed.output,
-    lookupKeyMap: config.billingLookupKeyMap,
-  });
+  const outcome =
+    kind === "checkout" && checkout
+      ? await createBillingCheckoutSession({
+          ...base,
+          ...checkout,
+          lookupKeyMap: config.billingLookupKeyMap,
+        })
+      : await createBillingPortalSession(base);
   switch (outcome.type) {
     case "created":
       c.header("Cache-Control", "no-store");

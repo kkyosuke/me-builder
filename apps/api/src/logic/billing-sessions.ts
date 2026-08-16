@@ -14,7 +14,11 @@ type SessionFailure =
   | { type: "not-configured" | "unauthenticated" | "account-not-found" }
   | {
       type: "unavailable";
-      reason: "plan_unavailable" | "existing_subscription" | "checkout_in_progress";
+      reason:
+        | "plan_unavailable"
+        | "existing_subscription"
+        | "checkout_in_progress"
+        | "customer_not_found";
     };
 
 export async function createBillingCheckoutSession(
@@ -70,4 +74,28 @@ export async function createBillingCheckoutSession(
     `billing-checkout-${accountId}`,
   );
   return { type: "created", url: checkout.url };
+}
+
+export async function createBillingPortalSession(
+  params: BaseParams,
+): Promise<SessionFailure | { type: "created"; url: string }> {
+  const session = await (params.createSession ?? createLiffSession)({
+    idToken: params.idToken,
+    lineLoginChannelId: params.lineLoginChannelId,
+    db: params.db,
+  });
+  if (session.type !== "resolved") return { type: session.type };
+  const customer = await D1.shared.action.billing.findBillingCustomerByAccount(
+    params.db,
+    session.session.accountId,
+  );
+  if (!customer) return { type: "unavailable", reason: "customer_not_found" };
+  const providerCustomer = await params.provider.retrieveCustomer(customer.providerCustomerId);
+  if (providerCustomer.deleted) return { type: "unavailable", reason: "customer_not_found" };
+  const origin = new URL(params.webOrigin).origin;
+  const portal = await params.provider.createPortalSession({
+    customerId: customer.providerCustomerId,
+    returnUrl: new URL("/profile?billing=portal-return", origin).toString(),
+  });
+  return { type: "created", url: portal.url };
 }
