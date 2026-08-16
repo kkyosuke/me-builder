@@ -5,6 +5,7 @@ import {
   D1,
   DIAGNOSIS_CATALOG_ID,
   DO,
+  PROFILE_SUMMARY_DISPATCH_RECOVERY_MS,
   type ReleaseCompatibilityReservationResult,
   type ReserveCompatibilityReferenceResult,
 } from "@me-builder/lib";
@@ -536,8 +537,7 @@ export class AccountDataRepository {
       diaryBrainCheckpoint?.nextAttemptAt.getTime() ?? null,
       brainVectorSync?.nextAttemptAt.getTime() ?? null,
       profileSummaryGeneration
-        ? profileSummaryGeneration.requestedAt.getTime() +
-          DO.account.action.profileSummary.PROFILE_SUMMARY_DISPATCH_RECOVERY_MS
+        ? profileSummaryGeneration.requestedAt.getTime() + PROFILE_SUMMARY_DISPATCH_RECOVERY_MS
         : null,
       personalDataExport?.requestedAt.getTime() ?? null,
       generatingPersonalDataExport

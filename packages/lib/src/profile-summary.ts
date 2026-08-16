@@ -1,5 +1,8 @@
 export type ProfileSummarySource = "diagnosis" | "diary";
 
+export const PROFILE_SUMMARY_DISPATCH_BATCH_SIZE = 10;
+export const PROFILE_SUMMARY_DISPATCH_RECOVERY_MS = 30_000;
+
 export type ProfileSummaryInsight = Readonly<{
   key: string;
   label: string;
