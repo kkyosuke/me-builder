@@ -21,7 +21,7 @@ import {
 } from "../infrastructure/authentication/sso-identity-repository";
 import { createSsoTransactionStore } from "../infrastructure/authentication/sso-transaction-store";
 import {
-  cancelSsoIdentityLinking,
+  cancelSsoAuthentication,
   completeSsoIdentityLinking,
   startSsoAuthentication,
   startSsoIdentityLinking,
@@ -30,18 +30,30 @@ import { authenticatedActor } from "../middleware/authentication";
 import type { AppEnv } from "../types";
 import { setApplicationSessionCookie } from "./authentication";
 
-const SSO_LINK_STATE_COOKIE = "me_builder_sso_link_state";
-const SECURE_SSO_LINK_STATE_COOKIE = "__Host-me_builder_sso_link_state";
-const SSO_LINK_STATE_TTL_SECONDS = 10 * 60;
+const SSO_CALLBACK_STATE_COOKIE = "me_builder_sso_callback_state";
+const SECURE_SSO_CALLBACK_STATE_COOKIE = "__Host-me_builder_sso_callback_state";
+const SSO_CALLBACK_STATE_TTL_SECONDS = 10 * 60;
 
-function linkStateCookieOptions(secure: boolean) {
+function callbackStateCookieOptions(secure: boolean) {
   return {
     path: "/",
     httpOnly: true,
     secure,
     sameSite: "Lax" as const,
-    maxAge: SSO_LINK_STATE_TTL_SECONDS,
+    maxAge: SSO_CALLBACK_STATE_TTL_SECONDS,
   };
+}
+
+function setCallbackStateCookie(
+  c: Context<AppEnv>,
+  authorizationUrl: URL,
+  secure: boolean,
+): boolean {
+  const state = authorizationUrl.searchParams.get("state");
+  if (!state) return false;
+  const cookieName = secure ? SECURE_SSO_CALLBACK_STATE_COOKIE : SSO_CALLBACK_STATE_COOKIE;
+  setCookie(c, cookieName, state, callbackStateCookieOptions(secure));
+  return true;
 }
 
 function unavailable(c: Context<AppEnv>): Response {
@@ -106,12 +118,9 @@ export async function postSsoIdentityLink(c: Context<AppEnv>): Promise<Response>
     store: dependencies.store,
     client: dependencies.client,
   });
-  const state = authorizationUrl.searchParams.get("state");
-  if (!state) return unavailable(c);
-  const cookieName = dependencies.secureCallback
-    ? SECURE_SSO_LINK_STATE_COOKIE
-    : SSO_LINK_STATE_COOKIE;
-  setCookie(c, cookieName, state, linkStateCookieOptions(dependencies.secureCallback));
+  if (!setCallbackStateCookie(c, authorizationUrl, dependencies.secureCallback)) {
+    return unavailable(c);
+  }
   return c.json(v.parse(SsoAuthorizationUrlSchema, { authorizationUrl: authorizationUrl.href }));
 }
 
@@ -126,6 +135,9 @@ export async function getSsoLogin(c: Context<AppEnv>): Promise<Response> {
     store: dependencies.store,
     client: dependencies.client,
   });
+  if (!setCallbackStateCookie(c, authorizationUrl, dependencies.secureCallback)) {
+    return unavailable(c);
+  }
   return c.redirect(authorizationUrl.href, 302);
 }
 
@@ -135,14 +147,14 @@ export async function getSsoCallback(c: Context<AppEnv>): Promise<Response> {
   if (!dependencies || !c.env?.DB) return unavailable(c);
   const state = c.req.query("state") ?? "";
   const cookieName = dependencies.secureCallback
-    ? SECURE_SSO_LINK_STATE_COOKIE
-    : SSO_LINK_STATE_COOKIE;
+    ? SECURE_SSO_CALLBACK_STATE_COOKIE
+    : SSO_CALLBACK_STATE_COOKIE;
   const expectedState = getCookie(c, cookieName);
-  deleteCookie(c, cookieName, linkStateCookieOptions(dependencies.secureCallback));
+  deleteCookie(c, cookieName, callbackStateCookieOptions(dependencies.secureCallback));
   if (!state || state !== expectedState) return redirectToWeb(c, "/profile?sso=error");
   try {
     if (c.req.query("error")) {
-      const cancelled = await cancelSsoIdentityLinking({ state, store: dependencies.store });
+      const cancelled = await cancelSsoAuthentication({ state, store: dependencies.store });
       return redirectToWeb(c, resultPath(cancelled.returnTo, "cancelled"));
     }
     const completed = await completeSsoIdentityLinking({

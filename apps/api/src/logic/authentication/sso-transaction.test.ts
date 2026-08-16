@@ -4,7 +4,7 @@ import {
   type SsoAuthenticationTransaction,
   type SsoAuthenticationTransactionStore,
   type SsoServerClient,
-  cancelSsoIdentityLinking,
+  cancelSsoAuthentication,
   completeSsoAuthentication,
   completeSsoIdentityLinking,
   completeSsoLogin,
@@ -358,22 +358,26 @@ describe("SSO authentication transaction", () => {
     ).rejects.toEqual(new SsoAuthenticationError("transaction_purpose_mismatch"));
   });
 
-  it("IdPでキャンセルしたlink transactionも再送できない", async () => {
-    const store = createMemoryStore();
-    store.transactions.set("cancel-state", {
-      purpose: "link",
-      initiatingAccountId: "account-1",
-      nonce: "nonce",
-      codeVerifier: "verifier",
-      returnTo: "/profile",
-      expiresAt: 2_000,
-    });
+  it.each([
+    { purpose: "login" as const, returnTo: "/diagnosis" },
+    { purpose: "link" as const, initiatingAccountId: "account-1", returnTo: "/profile" },
+  ])(
+    "IdPでキャンセルした$purpose transactionを元のpathへ戻して再送拒否する",
+    async (transaction) => {
+      const store = createMemoryStore();
+      store.transactions.set("cancel-state", {
+        ...transaction,
+        nonce: "nonce",
+        codeVerifier: "verifier",
+        expiresAt: 2_000,
+      });
 
-    await expect(
-      cancelSsoIdentityLinking({ state: "cancel-state", store, now: () => 1_000 }),
-    ).resolves.toEqual({ returnTo: "/profile" });
-    await expect(
-      cancelSsoIdentityLinking({ state: "cancel-state", store, now: () => 1_000 }),
-    ).rejects.toEqual(new SsoAuthenticationError("transaction_missing"));
-  });
+      await expect(
+        cancelSsoAuthentication({ state: "cancel-state", store, now: () => 1_000 }),
+      ).resolves.toEqual({ purpose: transaction.purpose, returnTo: transaction.returnTo });
+      await expect(
+        cancelSsoAuthentication({ state: "cancel-state", store, now: () => 1_000 }),
+      ).rejects.toEqual(new SsoAuthenticationError("transaction_missing"));
+    },
+  );
 });

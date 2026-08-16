@@ -263,20 +263,17 @@ export async function completeSsoIdentityLinking(
   };
 }
 
-/** IdPでキャンセルされたlink transactionも一度だけ消費する。 */
-export async function cancelSsoIdentityLinking(input: {
+/** IdPでキャンセルされたlogin/link transactionを一度だけ消費する。 */
+export async function cancelSsoAuthentication(input: {
   state: string;
   store: SsoAuthenticationTransactionStore;
   now?: () => number;
-}): Promise<{ returnTo: string }> {
+}): Promise<{ purpose: "link" | "login"; returnTo: string }> {
   if (!input.state) throw new SsoAuthenticationError("invalid_callback");
   const transaction = await input.store.consume(input.state);
   if (!transaction) throw new SsoAuthenticationError("transaction_missing");
   if (transaction.expiresAt <= (input.now?.() ?? Date.now())) {
     throw new SsoAuthenticationError("transaction_expired");
   }
-  if (transaction.purpose !== "link") {
-    throw new SsoAuthenticationError("transaction_purpose_mismatch");
-  }
-  return { returnTo: transaction.returnTo };
+  return { purpose: transaction.purpose, returnTo: transaction.returnTo };
 }
