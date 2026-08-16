@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { config } from "../../../config";
 import type { AsyncState } from "../../../model/async-state";
 import {
@@ -35,34 +35,48 @@ export default function FamilySeatApplication({ onBack }: { onBack: () => void }
   const [issuedInvitation, setIssuedInvitation] = useState<FamilyInvitation | null>(null);
   const [completionMessage, setCompletionMessage] = useState<string | null>(null);
   const [isFreeAfterExit, setIsFreeAfterExit] = useState(false);
+  const mounted = useRef(false);
+  const loadRequest = useRef<AbortController | null>(null);
 
   const load = useCallback(async () => {
+    loadRequest.current?.abort();
     const controller = new AbortController();
-    setState({ status: "loading" });
+    loadRequest.current = controller;
+    if (mounted.current) setState({ status: "loading" });
     try {
-      setState({
-        status: "success",
-        data: await fetchFamilySeats(config.apiUrl, controller.signal),
-      });
+      const data = await fetchFamilySeats(config.apiUrl, controller.signal);
+      if (mounted.current && !controller.signal.aborted) {
+        setState({ status: "success", data });
+      }
     } catch (error) {
-      setState({ status: "error", message: message(error) });
+      if (mounted.current && !controller.signal.aborted) {
+        setState({ status: "error", message: message(error) });
+      }
+    } finally {
+      if (loadRequest.current === controller) loadRequest.current = null;
     }
-    return () => controller.abort();
   }, []);
 
   useEffect(() => {
+    mounted.current = true;
     if (!invitationToken) void load();
+    return () => {
+      mounted.current = false;
+      loadRequest.current?.abort();
+      loadRequest.current = null;
+    };
   }, [invitationToken, load]);
 
   const run = async (operation: () => Promise<unknown>, done?: string) => {
     setActionState({ status: "loading" });
     try {
       await operation();
+      if (!mounted.current) return false;
       setActionState({ status: "success", data: done ?? "更新しました。" });
       if (done) setCompletionMessage(done);
       return true;
     } catch (error) {
-      setActionState({ status: "error", message: message(error) });
+      if (mounted.current) setActionState({ status: "error", message: message(error) });
       return false;
     }
   };
@@ -71,11 +85,12 @@ export default function FamilySeatApplication({ onBack }: { onBack: () => void }
     setActionState({ status: "loading" });
     try {
       const invitation = await issueFamilyInvitation(config.apiUrl);
+      if (!mounted.current) return;
       setIssuedInvitation(invitation);
       setActionState({ status: "success", data: "招待リンクを作成しました。" });
       await load();
     } catch (error) {
-      setActionState({ status: "error", message: message(error) });
+      if (mounted.current) setActionState({ status: "error", message: message(error) });
     }
   };
 
