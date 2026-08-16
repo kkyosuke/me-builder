@@ -77,6 +77,11 @@ import {
   putProfileAvatarRoute,
 } from "./contract/profile/profile";
 import { profileProgressionRoute } from "./contract/profile/progression";
+import {
+  selfCareContextConfirmationRoute,
+  selfCareContextListRoute,
+  selfCareContextRevocationRoute,
+} from "./contract/profile/self-care-context";
 import { profileSummaryGenerationRoute, profileSummaryRoute } from "./contract/profile/summary";
 import {
   weeklyReflectionGenerationRoute,
@@ -156,6 +161,11 @@ import {
   getProfileContents,
   putProfileAvatar,
 } from "./controller/profile-avatar";
+import {
+  deleteSelfCareContextConfirmation,
+  getSelfCareContextContents,
+  postSelfCareContextConfirmation,
+} from "./controller/self-care-context";
 import { operationalHttpPath } from "./operational-http-path";
 import type { AppEnv } from "./types";
 
@@ -288,6 +298,17 @@ app.patch(
   "/api/personal-data/records/:sourceRecordId",
   correctPersonalDataRecordRoute,
   patchPersonalDataRecord,
+);
+app.get("/api/self-care/contexts", selfCareContextListRoute, getSelfCareContextContents);
+app.post(
+  "/api/self-care/contexts",
+  selfCareContextConfirmationRoute,
+  postSelfCareContextConfirmation,
+);
+app.delete(
+  "/api/self-care/contexts/:selfCareContextId",
+  selfCareContextRevocationRoute,
+  deleteSelfCareContextConfirmation,
 );
 app.delete(
   "/api/personal-data/records/:sourceRecordId",

@@ -10,4 +10,5 @@ export * from "./diagnosis";
 export * from "./profile-summary";
 export * from "./weekly-reflection";
 export * from "./goal-follow-up";
+export * from "./self-care-context";
 export * as billing from "./billing";

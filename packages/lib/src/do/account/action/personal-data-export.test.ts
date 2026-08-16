@@ -98,6 +98,15 @@ async function insertRepresentativeAccount(db: AccountDataDatabase) {
     agreedAt: at,
     updatedAt: at,
   });
+  await db.insert(schema.selfCareConfirmations).values({
+    id: "self-care-1",
+    accountId,
+    brainItemId: "brain-1",
+    kind: "worked",
+    status: "active",
+    confirmedAt: at,
+    updatedAt: at,
+  });
   await db.insert(schema.compatibilityReferences).values({
     relationshipId: "relationship-must-not-export",
     accountId,
@@ -165,6 +174,9 @@ describe("personal data export", () => {
           nextStep: "静かな時間を10分作る",
           status: "completed",
         }),
+      ],
+      selfCareConfirmations: [
+        expect.objectContaining({ id: "self-care-1", kind: "worked", status: "active" }),
       ],
     });
     const serialized = JSON.stringify(result.archive);

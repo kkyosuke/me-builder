@@ -5,6 +5,7 @@ export * from "./diagnosis";
 export * from "./diary";
 export * from "./identity";
 export * from "./goal-follow-up";
+export * from "./self-care-context";
 export * from "./personal-data-export";
 export * from "./profile-summary";
 export * from "./weekly-reflection";

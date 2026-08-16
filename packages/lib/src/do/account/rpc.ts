@@ -22,6 +22,7 @@ import type * as goalFollowUp from "./action/goal-follow-up";
 import type * as personalDataExport from "./action/personal-data-export";
 import type * as profileSummary from "./action/profile-summary";
 import type * as progression from "./action/progression";
+import type * as selfCareContext from "./action/self-care-context";
 import type * as source from "./action/source";
 import type * as weeklyReflection from "./action/weekly-reflection";
 
@@ -235,6 +236,23 @@ export type AccountDataActions = {
   "goalFollowUp.selectMemory": RpcAction<
     [mode: "none" | "selected-one" | "relevant-active", currentText: string, at?: Date],
     typeof goalFollowUp.selectGoalFollowUpMemory
+  >;
+  "selfCareContext.read": RpcAction<[], typeof selfCareContext.readSelfCareConfirmations>;
+  "selfCareContext.confirm": RpcAction<
+    [
+      brainItemId: string,
+      kind: Parameters<typeof selfCareContext.confirmSelfCareContext>[3],
+      at?: Date,
+    ],
+    typeof selfCareContext.confirmSelfCareContext
+  >;
+  "selfCareContext.revoke": RpcAction<
+    [id: string, at?: Date],
+    typeof selfCareContext.revokeSelfCareContext
+  >;
+  "selfCareContext.selectMemories": RpcAction<
+    [mode: "general" | "confirmed" | "personalized-history", at?: Date],
+    typeof selfCareContext.selectSelfCareContextMemories
   >;
   "progression.read": RpcAction<[at?: Date], typeof progression.readUtsushiProgression>;
   "conversation.storeLineTextSource": RpcAction<

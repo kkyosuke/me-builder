@@ -29,6 +29,7 @@ import m0027 from "./0027_nappy_blizzard.sql";
 import m0028 from "./0028_lethal_vermin.sql";
 import m0029 from "./0029_steady_ben_urich.sql";
 import m0030 from "./0030_fine_silk_fever.sql";
+import m0031 from "./0031_shiny_orphan.sql";
 import journal from "./meta/_journal.json";
 
 export default {
@@ -65,5 +66,6 @@ export default {
     m0028,
     m0029,
     m0030,
+    m0031,
   },
 };
