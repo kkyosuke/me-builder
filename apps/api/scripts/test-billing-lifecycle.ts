@@ -21,12 +21,14 @@ const clock = await stripe.testHelpers.testClocks.create({
 });
 
 try {
-  const [litePriceId, fullPriceId, fullYearlyPriceId, portalConfigurations] = await Promise.all([
-    resolvePriceId(stripe, "lite", "month"),
-    resolvePriceId(stripe, "full", "month"),
-    resolvePriceId(stripe, "full", "year"),
-    resolvePortalConfigurations(stripe),
-  ]);
+  const [litePriceId, liteYearlyPriceId, fullPriceId, fullYearlyPriceId, portalConfigurations] =
+    await Promise.all([
+      resolvePriceId(stripe, "lite", "month"),
+      resolvePriceId(stripe, "lite", "year"),
+      resolvePriceId(stripe, "full", "month"),
+      resolvePriceId(stripe, "full", "year"),
+      resolvePortalConfigurations(stripe),
+    ]);
   const customer = await stripe.customers.create({
     test_clock: clock.id,
     metadata: { managed_by: "me-builder-e2e" },
@@ -68,7 +70,7 @@ try {
     customerId: customer.id,
     subscriptionId: subscription.id,
     itemId: sourceItemId,
-    targetPriceId: fullYearlyPriceId,
+    targetPriceId: liteYearlyPriceId,
   });
 
   // 同じ請求間隔のupgradeは日割り差額を即時請求し、成功時だけ適用する。
@@ -254,8 +256,21 @@ async function resolvePortalConfigurations(client: Stripe): Promise<{
   if (standard.features.subscription_update.billing_cycle_anchor !== "unchanged") {
     throw new Error("Standard Portal must preserve the billing cycle");
   }
+  const standardScheduleTypes =
+    standard.features.subscription_update.schedule_at_period_end.conditions
+      .map(({ type }) => type)
+      .sort();
+  if (
+    standardScheduleTypes.join(",") !==
+    ["decreasing_item_amount", "shortening_interval"].sort().join(",")
+  ) {
+    throw new Error("Standard Portal must schedule only downgrades and interval shortening");
+  }
   if (reset.features.subscription_update.billing_cycle_anchor !== "now") {
     throw new Error("Reset Portal must start a new billing cycle");
+  }
+  if (reset.features.subscription_update.schedule_at_period_end.conditions.length !== 0) {
+    throw new Error("Reset Portal must not schedule monthly-to-yearly changes at period end");
   }
   return { standard: standard.id, reset: reset.id };
 }
