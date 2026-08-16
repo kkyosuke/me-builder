@@ -5,9 +5,11 @@ import {
   type SsoAuthenticationTransactionStore,
   type SsoServerClient,
   completeSsoAuthentication,
+  completeSsoIdentityLinking,
   completeSsoLogin,
   normalizeSsoReturnTo,
   startSsoAuthentication,
+  startSsoIdentityLinking,
 } from "./sso-transaction";
 
 function createMemoryStore(): SsoAuthenticationTransactionStore & {
@@ -81,6 +83,7 @@ describe("SSO authentication transaction", () => {
     const state = authorizationUrl.searchParams.get("state");
     expect(state).toBeTruthy();
     expect(store.transactions.get(state ?? "")).toEqual({
+      purpose: "login",
       nonce: expect.any(String),
       codeVerifier: expect.any(String),
       returnTo: "/settings/account",
@@ -108,6 +111,7 @@ describe("SSO authentication transaction", () => {
     const store = createMemoryStore();
     const client = createClient();
     store.transactions.set("state", {
+      purpose: "login",
       nonce: "nonce",
       codeVerifier: "verifier",
       returnTo: "/settings/account",
@@ -140,6 +144,7 @@ describe("SSO authentication transaction", () => {
     const store = createMemoryStore();
     const client = createClient();
     store.transactions.set("expired", {
+      purpose: "login",
       nonce: "nonce",
       codeVerifier: "verifier",
       returnTo: "/",
@@ -177,6 +182,7 @@ describe("SSO authentication transaction", () => {
     const store = createMemoryStore();
     const client = createClient();
     store.transactions.set("state", {
+      purpose: "login",
       nonce: "nonce",
       codeVerifier: "verifier",
       returnTo: "/diagnoses",
@@ -218,6 +224,7 @@ describe("SSO authentication transaction", () => {
     const store = createMemoryStore();
     const client = createClient();
     store.transactions.set("state", {
+      purpose: "login",
       nonce: "nonce",
       codeVerifier: "verifier",
       returnTo: "/",
@@ -237,5 +244,109 @@ describe("SSO authentication transaction", () => {
       }),
     ).rejects.toEqual(new SsoAuthenticationError("identity_unlinked"));
     expect(sessionIssuer.issue).not.toHaveBeenCalled();
+  });
+
+  it("Identity追加開始時のAccountを短命transactionへ固定する", async () => {
+    const store = createMemoryStore();
+    const client = createClient();
+    let randomSeed = 0;
+
+    const authorizationUrl = await startSsoIdentityLinking({
+      initiatingAccountId: "account-1",
+      returnTo: "/profile?sso=linking",
+      store,
+      client,
+      now: () => 1_000,
+      randomBytes: (size) => new Uint8Array(size).fill(++randomSeed),
+    });
+
+    const state = authorizationUrl.searchParams.get("state") ?? "";
+    expect(store.transactions.get(state)).toEqual({
+      purpose: "link",
+      initiatingAccountId: "account-1",
+      nonce: expect.any(String),
+      codeVerifier: expect.any(String),
+      returnTo: "/profile?sso=linking",
+      expiresAt: 601_000,
+    });
+  });
+
+  it("callback時のsessionではなく開始時に固定したAccountへIdentityを追加する", async () => {
+    const store = createMemoryStore();
+    const client = createClient();
+    store.transactions.set("link-state", {
+      purpose: "link",
+      initiatingAccountId: "account-at-start",
+      nonce: "nonce",
+      codeVerifier: "verifier",
+      returnTo: "/profile?sso=linked",
+      expiresAt: 2_000,
+    });
+    const identityLinker = { link: vi.fn(async () => undefined) };
+
+    await expect(
+      completeSsoIdentityLinking({
+        state: "link-state",
+        code: "code",
+        store,
+        client,
+        identityLinker,
+        now: () => 1_000,
+      }),
+    ).resolves.toEqual({ providerKey: "auth0", returnTo: "/profile?sso=linked" });
+    expect(identityLinker.link).toHaveBeenCalledWith({
+      accountId: "account-at-start",
+      providerKey: "auth0",
+      subject: "auth0|user-1",
+    });
+    await expect(
+      completeSsoIdentityLinking({
+        state: "link-state",
+        code: "code",
+        store,
+        client,
+        identityLinker,
+      }),
+    ).rejects.toEqual(new SsoAuthenticationError("transaction_missing"));
+  });
+
+  it("loginとlinkのstateを別用途のcallbackへ差し替えられない", async () => {
+    const store = createMemoryStore();
+    const client = createClient();
+    store.transactions.set("link-state", {
+      purpose: "link",
+      initiatingAccountId: "account-1",
+      nonce: "nonce",
+      codeVerifier: "verifier",
+      returnTo: "/",
+      expiresAt: 2_000,
+    });
+    store.transactions.set("login-state", {
+      purpose: "login",
+      nonce: "nonce",
+      codeVerifier: "verifier",
+      returnTo: "/",
+      expiresAt: 2_000,
+    });
+
+    await expect(
+      completeSsoAuthentication({
+        state: "link-state",
+        code: "code",
+        store,
+        client,
+        now: () => 1_000,
+      }),
+    ).rejects.toEqual(new SsoAuthenticationError("transaction_purpose_mismatch"));
+    await expect(
+      completeSsoIdentityLinking({
+        state: "login-state",
+        code: "code",
+        store,
+        client,
+        identityLinker: { link: vi.fn() },
+        now: () => 1_000,
+      }),
+    ).rejects.toEqual(new SsoAuthenticationError("transaction_purpose_mismatch"));
   });
 });

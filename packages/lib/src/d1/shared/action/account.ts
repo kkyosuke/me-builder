@@ -18,7 +18,7 @@ import { accountAgreementAcceptances } from "../schema/agreement";
  * LINE Login チャネルが同一プロバイダー配下なら両者は同じ値になります。その場合
  * `line` の identity をそのまま引けます（[resolveAccountByLineLogin](#) の手順 2）。
  */
-export type IdentityProvider = "line" | "line_login" | "google";
+export type IdentityProvider = "line" | "line_login" | "google" | "auth0";
 
 export type UpsertIdentityInput = {
   provider: IdentityProvider;
@@ -54,6 +54,67 @@ async function findByIdentity(
       ),
     )
     .get();
+}
+
+/** 検証済み外部Identityから既存の有効なAccountだけを解決します。 */
+export async function findAccountByIdentity(
+  db: SharedD1Client,
+  provider: IdentityProvider,
+  providerAccountId: string,
+): Promise<UpsertIdentityResult | undefined> {
+  return await findByIdentity(db, provider, providerAccountId);
+}
+
+/** Accountに残る有効なログイン手段を、外部subjectを返さずに列挙します。 */
+export async function listLoginIdentityProviders(
+  db: SharedD1Client,
+  accountId: string,
+): Promise<IdentityProvider[]> {
+  const identities = await db
+    .select({ provider: accountIdentities.provider })
+    .from(accountIdentities)
+    .innerJoin(accounts, eq(accountIdentities.accountId, accounts.id))
+    .where(
+      and(
+        eq(accountIdentities.accountId, accountId),
+        eq(accountIdentities.isDeleted, false),
+        eq(accounts.isDeleted, false),
+      ),
+    )
+    .orderBy(asc(accountIdentities.provider))
+    .all();
+  return identities.map(({ provider }) => provider as IdentityProvider);
+}
+
+/** 最後のログイン手段を残す条件を同じUPDATE文で評価してIdentityを解除します。 */
+export async function unlinkIdentity(
+  db: SharedD1Client,
+  input: { accountId: string; provider: IdentityProvider },
+): Promise<void> {
+  const now = new Date();
+  const unlinked = await db
+    .update(accountIdentities)
+    .set({ isDeleted: true, deletedAt: now, updatedAt: now })
+    .where(
+      and(
+        eq(accountIdentities.accountId, input.accountId),
+        eq(accountIdentities.provider, input.provider),
+        eq(accountIdentities.isDeleted, false),
+        sql`(
+          SELECT COUNT(*)
+          FROM account_identities AS active_identity
+          WHERE active_identity.account_id = ${input.accountId}
+            AND active_identity.is_deleted = 0
+        ) > 1`,
+      ),
+    )
+    .returning({ id: accountIdentities.id })
+    .get();
+
+  if (unlinked) return;
+  const providers = await listLoginIdentityProviders(db, input.accountId);
+  if (!providers.includes(input.provider)) return;
+  throw new Error("Cannot unlink the last login identity");
 }
 
 async function applyRequestedRole(
