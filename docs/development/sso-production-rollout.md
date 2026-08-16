@@ -6,6 +6,17 @@
 
 認証と割合判定の契約は[Web認証・SSO設計](../architecture/web-authentication-design.md)、Previewの通し検証は[SSO Preview検証Runbook](sso-preview-verification.md)を正とします。
 
+### 所有する概念
+
+- ProductionへSSOを段階公開するゲート、phase、監視、停止・再開手順
+- 各phaseで残す証跡と段階公開の完了判定
+
+### 所有しない概念
+
+- 認証、Identity、session、段階公開flagと割合判定の意味
+- Previewでの成功・失敗シナリオと切り戻し判定
+- アプリケーション運用ログへ記録できる情報
+
 ## 2. 公開前ゲート
 
 次がすべて満たされるまでProductionの`SSO_ROLLOUT_MODE`を`disabled`から変更しません。
@@ -19,18 +30,9 @@
 
 release記録には各phaseの最低試行数、観測時間、認証成功率、callback失敗率、Account未解決率、LIFF成功率の許容差を事前に記載します。観測後に基準を緩めません。
 
-## 3. 設定の意味
+## 3. 設定の参照先
 
-| 設定 | 値 | 効果 |
-| --- | --- | --- |
-| `SSO_ROLLOUT_MODE` | `disabled` | SSO開始とIdentity追加を停止する。LIFFと既存sessionは維持する |
-| `SSO_ROLLOUT_MODE` | `linking` | application sessionで認証済みのAccountだけIdentityを追加できる |
-| `SSO_ROLLOUT_MODE` | `linked-login` | link済みIdentityのSSO callbackを割合gateへ進める |
-| `SSO_ROLLOUT_PERCENT` | `0` | 管理者roleだけSSO sessionを発行する |
-| `SSO_ROLLOUT_PERCENT` | `1`〜`99` | 管理者と、安定bucketが割合未満のlink済み一般Accountを対象にする |
-| `SSO_ROLLOUT_PERCENT` | `100` | すべてのlink済みAccountを対象にする |
-
-割合はAccount IDの安定ハッシュで判定するため、同じ割合では同じAccountが対象になります。Account IDやAuth0 subjectのallowlistをsecret、variable、ログ、チケットへ作りません。
+`SSO_ROLLOUT_MODE`と`SSO_ROLLOUT_PERCENT`の値、既定値、対象判定は[Web認証・SSO設計 §9.3](../architecture/web-authentication-design.md#93-環境とurl)を参照します。このRunbookでは、その契約を変更せずphaseごとの操作順だけを定めます。Account IDやAuth0 subjectのallowlistは作りません。
 
 ## 4. 段階公開
 
