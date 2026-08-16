@@ -1522,6 +1522,7 @@ export interface operations {
             reason:
               | "plan_unavailable"
               | "existing_subscription"
+              | "family_seat_active"
               | "checkout_in_progress"
               | "customer_not_found"
               | "same_plan"
