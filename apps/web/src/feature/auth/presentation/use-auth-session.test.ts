@@ -96,6 +96,44 @@ describe("useAuthSessionState", () => {
     expect(result.current.state.status).toBe("authenticated");
   });
 
+  it("再確認失敗時は以前のCSRF tokenを破棄する", async () => {
+    const { result } = renderHook(() => useAuthSessionState());
+    await waitFor(() => expect(result.current.state.status).toBe("authenticated"));
+    mocks.fetchAuthSession.mockRejectedValueOnce(new Error("network error"));
+
+    await act(async () => result.current.retry());
+
+    expect(result.current.state.status).toBe("error");
+    expect(authSessionRuntime.csrfToken()).toBeNull();
+  });
+
+  it("feature requestのAbortでは再確認を止めず、unmount時に止める", async () => {
+    const { result, unmount } = renderHook(() => useAuthSessionState());
+    await waitFor(() => expect(result.current.state.status).toBe("authenticated"));
+    let recheckSignal: AbortSignal | undefined;
+    mocks.fetchAuthSession.mockImplementationOnce(
+      (_url: string, signal: AbortSignal) =>
+        new Promise((_resolve, reject) => {
+          recheckSignal = signal;
+          signal.addEventListener(
+            "abort",
+            () => reject(new DOMException("The operation was aborted", "AbortError")),
+            { once: true },
+          );
+        }),
+    );
+    const featureController = new AbortController();
+
+    const recheck = authSessionRuntime.recheck(featureController.signal);
+    await waitFor(() => expect(recheckSignal).toBeDefined());
+    featureController.abort();
+    await recheck;
+    expect(recheckSignal?.aborted).toBe(false);
+
+    unmount();
+    expect(recheckSignal?.aborted).toBe(true);
+  });
+
   it("unmount時に進行中の確認をAbortする", () => {
     let observedSignal: AbortSignal | undefined;
     mocks.fetchAuthSession.mockImplementation((_url: string, signal: AbortSignal) => {

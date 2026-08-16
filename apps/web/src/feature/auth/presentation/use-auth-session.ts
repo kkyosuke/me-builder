@@ -24,6 +24,7 @@ export function useAuthSessionState() {
   const liffSession = useLiffSession();
   const [state, setState] = useState<AuthState>({ status: "checking" });
   const initializationRef = useRef<Promise<AuthState> | null>(null);
+  const recheckControllerRef = useRef<AbortController | null>(null);
   const revisionRef = useRef(0);
 
   const applyResponse = useCallback((response: AuthSessionResponse): AuthState => {
@@ -68,6 +69,7 @@ export function useAuthSessionState() {
         if (!signal.aborted) setState(nextState);
         return nextState;
       } catch (error) {
+        authSessionRuntime.setCsrfToken(null);
         const nextState = errorState(error);
         if (!signal.aborted) setState(nextState);
         return nextState;
@@ -84,13 +86,22 @@ export function useAuthSessionState() {
     return () => controller.abort();
   }, [refresh]);
 
-  useEffect(
-    () =>
-      authSessionRuntime.installRecheck(async (signal) => {
-        await refresh(signal);
-      }),
-    [refresh],
-  );
+  useEffect(() => {
+    const uninstall = authSessionRuntime.installRecheck(async () => {
+      const controller = new AbortController();
+      recheckControllerRef.current = controller;
+      try {
+        await refresh(controller.signal);
+      } finally {
+        if (recheckControllerRef.current === controller) recheckControllerRef.current = null;
+      }
+    });
+    return () => {
+      uninstall();
+      recheckControllerRef.current?.abort();
+      recheckControllerRef.current = null;
+    };
+  }, [refresh]);
 
   const retry = useCallback(() => {
     setState({ status: "checking" });

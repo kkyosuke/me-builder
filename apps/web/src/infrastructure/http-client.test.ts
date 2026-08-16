@@ -67,6 +67,32 @@ describe("createHttpClient", () => {
     expect(recheck).toHaveBeenCalledTimes(1);
   });
 
+  it("最初のrequestがAbortされても別requestの共有session再確認を継続する", async () => {
+    let finishRecheck: (() => void) | undefined;
+    const recheck = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          finishRecheck = resolve;
+        }),
+    );
+    authSessionRuntime.installRecheck(recheck);
+    const fetchImplementation = vi.fn<typeof fetch>(
+      async () => new Response(null, { status: 401 }),
+    );
+    const client = createAuthenticatedHttpClient("https://api.example.com", fetchImplementation);
+    const firstController = new AbortController();
+
+    const first = client.request("/api/profile", { signal: firstController.signal });
+    await vi.waitFor(() => expect(recheck).toHaveBeenCalledTimes(1));
+    firstController.abort();
+    const second = client.request("/api/diagnoses");
+    await vi.waitFor(() => expect(fetchImplementation).toHaveBeenCalledTimes(2));
+    expect(recheck).toHaveBeenCalledTimes(1);
+
+    finishRecheck?.();
+    await expect(Promise.all([first, second])).resolves.toHaveLength(2);
+  });
+
   it("application session requestにはcookieを含める", async () => {
     const fetchImplementation = vi.fn<typeof fetch>(async () => new Response());
 
