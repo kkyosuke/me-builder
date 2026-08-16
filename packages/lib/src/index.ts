@@ -8,3 +8,4 @@ export * from "./compatibility-share-preview";
 export * from "./conversation-coordinator";
 export * from "./diagnosis";
 export * from "./profile-summary";
+export * as billing from "./billing";
