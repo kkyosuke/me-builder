@@ -1,27 +1,19 @@
 import {
   type AccountDataNamespace,
-  type D1,
   type UtsushiProgression,
   accountDataFor,
 } from "@me-builder/lib";
-import { createLiffSession } from "./liff-session";
+import type { AuthenticatedActor } from "./authentication/types";
 
-export type ProfileProgressionOutcome =
-  | ({ type: "resolved" } & UtsushiProgression)
-  | { type: "not-configured" }
-  | { type: "unauthenticated"; reason: string }
-  | { type: "account-not-found" };
+export type ProfileProgressionOutcome = { type: "resolved" } & UtsushiProgression;
 
 type Params = Readonly<{
-  idToken: string | undefined;
-  lineLoginChannelId: string | undefined;
-  db: D1.shared.Client;
+  actor: AuthenticatedActor;
   accountData?: AccountDataNamespace;
   at?: Date;
 }>;
 
 type Dependencies = Readonly<{
-  createSession: typeof createLiffSession;
   readProgression: (
     accountData: AccountDataNamespace | undefined,
     accountId: string,
@@ -30,7 +22,6 @@ type Dependencies = Readonly<{
 }>;
 
 const defaultDependencies: Dependencies = {
-  createSession: createLiffSession,
   readProgression: (accountData, accountId, at) => {
     if (!accountData) throw new Error("ACCOUNT_DATA binding is not configured");
     return accountDataFor(accountData, accountId).execute("progression.read", at);
@@ -38,13 +29,11 @@ const defaultDependencies: Dependencies = {
 };
 
 export async function getProfileProgression(
-  { idToken, lineLoginChannelId, db, accountData, at = new Date() }: Params,
+  { actor, accountData, at = new Date() }: Params,
   dependencies: Dependencies = defaultDependencies,
 ): Promise<ProfileProgressionOutcome> {
-  const session = await dependencies.createSession({ idToken, lineLoginChannelId, db });
-  if (session.type !== "resolved") return session;
   return {
     type: "resolved",
-    ...(await dependencies.readProgression(accountData, session.session.accountId, at)),
+    ...(await dependencies.readProgression(accountData, actor.accountId, at)),
   };
 }

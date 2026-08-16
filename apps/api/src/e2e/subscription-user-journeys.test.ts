@@ -159,8 +159,11 @@ describe("subscription user journeys", () => {
 
     await expect(
       getProfileEntitlement({
-        idToken: "full-user-token",
-        lineLoginChannelId: "channel",
+        actor: {
+          accountId,
+          authenticationMethod: "liff",
+          authenticatedAt: new Date("2026-08-16T00:01:00.000Z"),
+        },
         db,
         accountData: accountData.namespace,
         planAssignmentProvider: assignments,
@@ -279,8 +282,11 @@ describe("subscription user journeys", () => {
 
     await expect(
       getProfileEntitlement({
-        idToken: "member-token",
-        lineLoginChannelId: "channel",
+        actor: {
+          accountId: memberId,
+          authenticationMethod: "liff",
+          authenticatedAt: new Date("2026-08-16T00:03:00.000Z"),
+        },
         db,
         accountData: memberData.namespace,
         planAssignmentProvider: effectiveAssignments(db),

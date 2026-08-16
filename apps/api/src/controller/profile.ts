@@ -37,6 +37,7 @@ import {
   getWeeklyReflections,
   requestWeeklyReflectionGeneration,
 } from "../logic/weekly-reflection";
+import { authenticatedActor } from "../middleware/authentication";
 import type { AppEnv } from "../types";
 import { bearerToken } from "./auth";
 
@@ -164,30 +165,12 @@ export async function getProfileProgressionContents(c: Context<AppEnv>): Promise
     logger.error({ path: c.req.path }, "Profile progression storage binding is not configured");
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   }
-  const currentConfig = getConfig(c.env);
   const outcome = await getProfileProgression({
-    idToken: bearerToken(c.req.header("authorization")),
-    lineLoginChannelId: currentConfig.lineLoginChannelId,
-    db: D1.shared.client.create(c.env.DB),
+    actor: authenticatedActor(c),
     accountData: c.env.ACCOUNT_DATA,
   });
-  switch (outcome.type) {
-    case "resolved":
-      c.header("Cache-Control", "no-store");
-      return c.json(v.parse(ProfileProgressionResponseSchema, outcome));
-    case "account-not-found":
-      return c.json(
-        v.parse(AccountNotFoundErrorSchema, {
-          error: "Account not found",
-          reason: "friendship_required",
-        }),
-        404,
-      );
-    case "not-configured":
-    case "unauthenticated":
-      return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
-  }
-  throw new Error("Unsupported profile progression outcome");
+  c.header("Cache-Control", "no-store");
+  return c.json(v.parse(ProfileProgressionResponseSchema, outcome));
 }
 
 export async function getProfileEntitlementContents(c: Context<AppEnv>): Promise<Response> {
@@ -195,23 +178,15 @@ export async function getProfileEntitlementContents(c: Context<AppEnv>): Promise
     logger.error({ path: c.req.path }, "Profile entitlement storage binding is not configured");
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   }
-  const currentConfig = getConfig(c.env);
   const db = D1.shared.client.create(c.env.DB);
   const outcome = await getProfileEntitlement({
-    idToken: bearerToken(c.req.header("authorization")),
-    lineLoginChannelId: currentConfig.lineLoginChannelId,
+    actor: authenticatedActor(c),
     db,
     accountData: c.env.ACCOUNT_DATA,
     planAssignmentProvider: planAssignmentProvider(c, db),
   });
-  switch (outcome.type) {
-    case "resolved":
-      c.header("Cache-Control", "no-store");
-      return c.json(v.parse(ProfileEntitlementResponseSchema, outcome));
-    case "not-configured":
-    case "unauthenticated":
-      return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
-  }
+  c.header("Cache-Control", "no-store");
+  return c.json(v.parse(ProfileEntitlementResponseSchema, outcome));
 }
 
 export async function getProfileSummaryContents(c: Context<AppEnv>): Promise<Response> {

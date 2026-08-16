@@ -165,21 +165,16 @@ describe("getProfileAvatarImage", () => {
     await expect(
       getProfileAvatarImage(
         {
-          idToken: "id-token",
-          lineLoginChannelId: "channel-id",
+          actor: {
+            accountId: "account-1",
+            authenticationMethod: "liff",
+            authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
+          },
+          verifiedLinePictureUrl: "https://profile.line-scdn.net/own",
           db,
           avatarBucket: {} as R2Bucket,
         },
         {
-          createSession: vi.fn().mockResolvedValue({
-            type: "resolved",
-            session: {
-              accountId: "account-1",
-              role: "user",
-              displayName: "あおい",
-              pictureUrl: "https://profile.line-scdn.net/own",
-            },
-          }),
           resolveAvatarImage,
         },
       ),

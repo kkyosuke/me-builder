@@ -2,8 +2,11 @@ import { type AccountDataNamespace, type D1, billing } from "@me-builder/lib";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getProfileEntitlement } from "./profile-entitlement";
 
-const { createLiffSession } = vi.hoisted(() => ({ createLiffSession: vi.fn() }));
-vi.mock("./liff-session", () => ({ createLiffSession }));
+const actor = {
+  accountId: "account-1",
+  authenticationMethod: "liff" as const,
+  authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
+};
 
 const execute = vi.fn(
   async (
@@ -28,10 +31,6 @@ const accountData = {
 describe("getProfileEntitlement", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    createLiffSession.mockResolvedValue({
-      type: "resolved",
-      session: { accountId: "account-1", role: "user" },
-    });
   });
 
   it.each([
@@ -55,8 +54,7 @@ describe("getProfileEntitlement", () => {
       ]);
 
       const result = await getProfileEntitlement({
-        idToken: "token",
-        lineLoginChannelId: "channel",
+        actor,
         db: {} as D1.shared.Client,
         accountData,
         planAssignmentProvider: provider,
@@ -80,8 +78,7 @@ describe("getProfileEntitlement", () => {
 
   it("provider障害時は有料権限を推測せずsafe-defaultを表示する", async () => {
     const result = await getProfileEntitlement({
-      idToken: "token",
-      lineLoginChannelId: "channel",
+      actor,
       db: {} as D1.shared.Client,
       accountData,
       planAssignmentProvider: {

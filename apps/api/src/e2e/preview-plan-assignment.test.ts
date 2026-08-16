@@ -73,8 +73,11 @@ describe("Preview Plan assignment verification", () => {
 
       await expect(
         getProfileEntitlement({
-          idToken: "preview-token",
-          lineLoginChannelId: "preview-channel",
+          actor: {
+            accountId,
+            authenticationMethod: "liff",
+            authenticatedAt: at,
+          },
           db: {} as D1.shared.Client,
           accountData: binding,
           planAssignmentProvider: provider,

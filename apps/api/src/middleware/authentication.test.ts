@@ -14,6 +14,7 @@ describe("authentication middleware", () => {
     const resolver: AuthenticationResolver = vi.fn().mockResolvedValue({
       type: "authenticated",
       actor,
+      accountRole: "user",
     });
     const app = new Hono<AppEnv>();
     const middleware = createAuthenticationMiddleware(resolver);

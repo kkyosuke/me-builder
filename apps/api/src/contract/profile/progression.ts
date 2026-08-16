@@ -1,6 +1,6 @@
 import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
 import * as v from "valibot";
-import { authenticatedErrors, jsonResponse } from "../shared/errors";
+import { authenticatedErrors, currentTermsPolicyError, jsonResponse } from "../shared/errors";
 
 const NonNegativeIntegerSchema = v.pipe(v.number(), v.integer(), v.minValue(0));
 const ProgressionChangeSchema = v.object({
@@ -38,5 +38,6 @@ export const profileProgressionRoute = describeRoute({
   responses: {
     200: jsonResponse("本人の累積成長値と現在有効なかけら集計", ProfileProgressionResponseSchema),
     ...authenticatedErrors,
+    ...currentTermsPolicyError,
   },
 } satisfies DescribeRouteOptions);

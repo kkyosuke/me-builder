@@ -1,6 +1,6 @@
 import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
 import * as v from "valibot";
-import { authenticatedErrors, jsonResponse } from "../shared/errors";
+import { authenticatedErrors, currentTermsPolicyError, jsonResponse } from "../shared/errors";
 
 const UsageSchema = v.object({
   limit: v.pipe(v.number(), v.integer(), v.minValue(0)),
@@ -29,5 +29,6 @@ export const profileEntitlementRoute = describeRoute({
   responses: {
     200: jsonResponse("本人の現在の利用権限", ProfileEntitlementResponseSchema),
     ...authenticatedErrors,
+    ...currentTermsPolicyError,
   },
 } satisfies DescribeRouteOptions);

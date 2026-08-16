@@ -49,4 +49,14 @@ export function authenticatedActor(c: Context<AppEnv>): AuthenticatedActor {
   return actor;
 }
 
+export function authenticatedSession(
+  c: Context<AppEnv>,
+): Extract<AuthenticationResult, { type: "authenticated" }> {
+  const result = c.get("authenticationResult");
+  if (result?.type !== "authenticated") {
+    throw new Error("Authentication middleware did not resolve a session");
+  }
+  return result;
+}
+
 export const requireAuthentication = createAuthenticationMiddleware();

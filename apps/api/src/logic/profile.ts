@@ -1,8 +1,8 @@
 import type { R2Bucket } from "@cloudflare/workers-types";
 import { D1 } from "@me-builder/lib";
 import { logger } from "@me-builder/shared";
+import type { AuthenticatedActor } from "./authentication/types";
 import type { ValidAvatarImage } from "./avatar-image";
-import { type LiffSessionOutcome, createLiffSession } from "./liff-session";
 
 type Profile = Readonly<{
   role: "user" | "admin";
@@ -14,32 +14,31 @@ type Profile = Readonly<{
   }> | null;
 }>;
 
-export type ProfileOutcome =
-  | { type: "resolved"; profile: Profile }
-  | { type: "not-configured" }
-  | { type: "unauthenticated"; reason: string }
-  | { type: "account-not-found" };
+export type ProfileOutcome = { type: "resolved"; profile: Profile };
 
 type Params = Readonly<{
-  idToken: string | undefined;
-  lineLoginChannelId: string | undefined;
-  adminLineUserIds?: readonly string[];
+  actor: AuthenticatedActor;
+  accountRole: "user" | "admin";
+  displayProfile?: Readonly<{ displayName?: string; pictureUrl?: string }>;
   db: D1.shared.Client;
   avatarBucket: R2Bucket;
 }>;
 
 type Dependencies = Readonly<{
-  createSession: typeof createLiffSession;
   createObjectId: () => string;
   getAvatar: typeof D1.shared.action.profile.getProfileAvatar;
   setAvatar: typeof D1.shared.action.profile.setProfileAvatar;
   clearAvatar: typeof D1.shared.action.profile.clearProfileAvatar;
 }>;
 
-type ResolvedProfileSession = Extract<LiffSessionOutcome, { type: "resolved" }>["session"];
+type ResolvedProfileSession = Readonly<{
+  accountId: string;
+  role: "user" | "admin";
+  displayName?: string;
+  pictureUrl?: string;
+}>;
 
 const defaultDependencies: Dependencies = {
-  createSession: createLiffSession,
   createObjectId: () => crypto.randomUUID(),
   getAvatar: D1.shared.action.profile.getProfileAvatar,
   setAvatar: D1.shared.action.profile.setProfileAvatar,
@@ -79,21 +78,16 @@ function degradedProfile(
   return { type: "resolved", profile: lineProfile(session) };
 }
 
-async function resolveSession(params: Params, dependencies: Dependencies) {
-  return dependencies.createSession({
-    idToken: params.idToken,
-    lineLoginChannelId: params.lineLoginChannelId,
-    db: params.db,
-    ...(params.adminLineUserIds ? { adminLineUserIds: params.adminLineUserIds } : {}),
-  });
-}
-
 /** PUTが画像bodyを読むより前に本人を確定するための認証境界。 */
-export async function authenticateProfile(
-  params: Params,
-  dependencies: Dependencies = defaultDependencies,
-): Promise<LiffSessionOutcome> {
-  return resolveSession(params, dependencies);
+export function authenticateProfile(params: Params): ResolvedProfileSession {
+  return {
+    accountId: params.actor.accountId,
+    role: params.accountRole,
+    ...(params.displayProfile?.displayName
+      ? { displayName: params.displayProfile.displayName }
+      : {}),
+    ...(params.displayProfile?.pictureUrl ? { pictureUrl: params.displayProfile.pictureUrl } : {}),
+  };
 }
 
 /** 表示名と現在画像を1応答へまとめ、Private R2のkeyは外へ出さない。 */
@@ -101,28 +95,27 @@ export async function getProfile(
   params: Params,
   dependencies: Dependencies = defaultDependencies,
 ): Promise<ProfileOutcome> {
-  const session = await authenticateProfile(params, dependencies);
-  if (session.type !== "resolved") return session;
+  const session = authenticateProfile(params);
 
-  const avatar = await dependencies.getAvatar(params.db, session.session.accountId);
-  if (!avatar) return { type: "resolved", profile: lineProfile(session.session) };
+  const avatar = await dependencies.getAvatar(params.db, session.accountId);
+  if (!avatar) return { type: "resolved", profile: lineProfile(session) };
 
   const object = await params.avatarBucket.get(avatar.objectKey);
-  if (!object) return degradedProfile(session.session, "object-missing");
+  if (!object) return degradedProfile(session, "object-missing");
   const bytes = new Uint8Array(await object.arrayBuffer());
   if (
     bytes.byteLength !== avatar.byteSize ||
     object.etag !== avatar.etag ||
     object.httpMetadata?.contentType !== avatar.contentType
   ) {
-    return degradedProfile(session.session, "metadata-mismatch");
+    return degradedProfile(session, "metadata-mismatch");
   }
 
   return {
     type: "resolved",
     profile: {
-      role: session.session.role,
-      ...(session.session.displayName ? { displayName: session.session.displayName } : {}),
+      role: session.role,
+      ...(session.displayName ? { displayName: session.displayName } : {}),
       avatar: {
         source: "uploaded",
         url: dataUrl(avatar.contentType, bytes),
@@ -206,10 +199,9 @@ export async function deleteProfileAvatar(
   params: Params,
   dependencies: Dependencies = defaultDependencies,
 ): Promise<ProfileOutcome> {
-  const session = await authenticateProfile(params, dependencies);
-  if (session.type !== "resolved") return session;
+  const session = authenticateProfile(params);
 
-  const cleared = await dependencies.clearAvatar(params.db, session.session.accountId);
+  const cleared = await dependencies.clearAvatar(params.db, session.accountId);
   if (cleared.previousObjectKey) {
     try {
       await params.avatarBucket.delete(cleared.previousObjectKey);
@@ -220,5 +212,5 @@ export async function deleteProfileAvatar(
       );
     }
   }
-  return { type: "resolved", profile: lineProfile(session.session) };
+  return { type: "resolved", profile: lineProfile(session) };
 }

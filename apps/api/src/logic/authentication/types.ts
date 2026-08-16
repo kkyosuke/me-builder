@@ -22,6 +22,7 @@ export type AuthenticationResult =
   | {
       type: "authenticated";
       actor: AuthenticatedActor;
+      accountRole: "user" | "admin";
       displayProfile?: DisplayProfile;
     }
   | { type: "unauthenticated"; reason: AuthenticationFailureReason };
