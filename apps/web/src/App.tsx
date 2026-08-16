@@ -2,6 +2,8 @@ import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useRef, useSta
 import { LoadingState } from "./components/loading-state";
 import { RouteErrorBoundary } from "./components/route-error-boundary";
 import { config } from "./config";
+import { issueRecoveryCode } from "./feature/account-recovery/infrastructure/account-recovery-api";
+import { AccountRecoveryScreen } from "./feature/account-recovery/presentation/account-recovery-screen";
 import { ServiceTermsAcceptanceHistory, ServiceTermsGate } from "./feature/legal";
 import { LiffSessionProvider, useLiffSession } from "./feature/liff";
 import { getLiffIdToken } from "./feature/liff/infrastructure/liff-client";
@@ -358,6 +360,13 @@ function AppContents() {
     return result;
   };
 
+  const createRecoveryCode = async () => {
+    const idToken =
+      getLiffIdToken() ?? (await liffSession.acquireIdToken(new AbortController().signal));
+    if (!idToken) throw new Error("LINEからプロフィールを開き直してください。");
+    return await issueRecoveryCode(config.apiUrl, idToken);
+  };
+
   return (
     <>
       {!isAdminPath && profileView === "closed" && (
@@ -423,6 +432,7 @@ function AppContents() {
               onThemeChange={colorTheme.setTheme}
               onFontSizeChange={fontSize.setFontSize}
               serviceTermsAcceptanceHistory={<ServiceTermsAcceptanceHistory />}
+              onIssueRecoveryCode={createRecoveryCode}
             />
           </Suspense>
         </RouteErrorBoundary>
@@ -461,9 +471,13 @@ function AppContents() {
 export function App() {
   return (
     <LiffSessionProvider>
-      <ServiceTermsGate>
-        <AppContents />
-      </ServiceTermsGate>
+      {resolveRequestedPathname() === "/account-recovery" ? (
+        <AccountRecoveryScreen />
+      ) : (
+        <ServiceTermsGate>
+          <AppContents />
+        </ServiceTermsGate>
+      )}
     </LiffSessionProvider>
   );
 }

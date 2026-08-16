@@ -10,6 +10,10 @@ import { openAPIRouteHandler } from "hono-openapi";
 import { cors } from "hono/cors";
 import * as v from "valibot";
 import { getConfig } from "./config";
+import {
+  accountRecoveryCodeRoute,
+  accountRecoveryCompleteRoute,
+} from "./contract/account-recovery";
 import { adminAccountsRoute } from "./contract/admin/accounts";
 import { adminBillingReconciliationRoute } from "./contract/admin/billing-reconciliation";
 import { adminStatisticsRoute } from "./contract/admin/statistics";
@@ -54,6 +58,10 @@ import {
 import { profileProgressionRoute } from "./contract/profile/progression";
 import { profileSummaryGenerationRoute, profileSummaryRoute } from "./contract/profile/summary";
 import { InternalServerErrorSchema } from "./contract/shared/errors";
+import {
+  postAccountRecoveryCode,
+  postAccountRecoveryComplete,
+} from "./controller/account-recovery";
 import { getAccounts, getStatistics, postBillingReconciliation } from "./controller/admin";
 import { postStripeWebhook } from "./controller/billing";
 import {
@@ -174,6 +182,12 @@ app.get("/api/health", (c) => {
 
 app.post("/api/line/webhook", postLineWebhook);
 app.post("/api/billing/webhook", postStripeWebhook);
+app.post("/api/account-recovery/codes", accountRecoveryCodeRoute, postAccountRecoveryCode);
+app.post(
+  "/api/account-recovery/complete",
+  accountRecoveryCompleteRoute,
+  postAccountRecoveryComplete,
+);
 
 app.get("/api/legal/terms", getServiceTermsRoute, getServiceTermsContents);
 app.get(
