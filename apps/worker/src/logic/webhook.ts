@@ -237,7 +237,8 @@ export async function handleQueueBatch(
           workerConfig,
         );
       } else if ("type" in message.body && message.body.type === "billing-event") {
-        await processBillingMessage(message as Message<BillingQueueMessage>);
+        if (!workerConfig) throw new Error("Billing configuration is not configured");
+        await processBillingMessage(message as Message<BillingQueueMessage>, db, workerConfig);
       } else {
         await processWebhookMessage(
           message as Message<WebhookQueueMessage>,

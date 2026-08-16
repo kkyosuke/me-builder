@@ -52,6 +52,13 @@ describe("Worker Config", () => {
     expect(config.geminiModel).toBe("gemini-test-model");
   });
 
+  it("Stripe Price IDをprovider非依存Planへ変換する設定を読む", () => {
+    expect(
+      getWorkerConfig({ BILLING_PRICE_PLAN_MAP: '{"price_lite":"lite","price_full":"full"}' })
+        .billingPricePlanMap,
+    ).toEqual({ price_lite: "lite", price_full: "full" });
+  });
+
   it("日記チャットのContext message件数を環境変数から取得すること", () => {
     expect(getWorkerConfig({ CHAT_CONTEXT_MESSAGE_LIMIT: "12" }).chatContextMessageLimit).toBe(12);
   });

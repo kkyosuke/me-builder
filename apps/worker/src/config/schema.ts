@@ -23,6 +23,8 @@ export const WorkerConfigSchema = v.object({
     DEFAULT_CHAT_CONTEXT_MESSAGE_LIMIT,
   ),
   adminLineUserIds: v.optional(v.array(v.string()), []),
+  stripeSecretKey: v.optional(v.string()),
+  billingPricePlanMap: v.optional(v.record(v.string(), v.picklist(["lite", "full", "family"])), {}),
 });
 
 export type WorkerConfig = v.InferOutput<typeof WorkerConfigSchema>;
