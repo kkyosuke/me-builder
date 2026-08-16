@@ -3,7 +3,6 @@ import type {
   CompatibilityDataNamespace,
   CompatibilityReference,
   CompatibilityRelationship,
-  D1,
 } from "@me-builder/lib";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -21,7 +20,6 @@ const partnerAccountId = "account-2";
 const pendingRelationshipId = "1".repeat(64);
 const acceptedRelationshipId = "2".repeat(64);
 const liffId = "1234567890-abcdefgh";
-const db = {} as D1.shared.Client;
 const expiresAt = new Date("2026-08-26T00:00:00.000Z");
 
 function reference(overrides: Partial<CompatibilityReference>): CompatibilityReference {
@@ -101,11 +99,17 @@ function namespaces({
   return { accountData, compatibilityData, getInvitationPreview, getRelationship };
 }
 
-function request(accountData: AccountDataNamespace, compatibilityData: CompatibilityDataNamespace) {
+function request(
+  accountData: AccountDataNamespace,
+  compatibilityData: CompatibilityDataNamespace,
+  viewerAccountId = accountId,
+) {
   return listCompatibilityRelationships({
-    idToken: "token",
-    lineLoginChannelId: "channel",
-    db,
+    actor: {
+      accountId: viewerAccountId,
+      authenticationMethod: "liff",
+      authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
+    },
     accountData,
     compatibilityData,
     liffId,
@@ -191,7 +195,7 @@ describe("listCompatibilityRelationships", () => {
       })),
     } as unknown as CompatibilityDataNamespace;
 
-    await expect(request(accountData, compatibilityData)).resolves.toEqual({
+    await expect(request(accountData, compatibilityData, partnerAccountId)).resolves.toEqual({
       type: "resolved",
       items: [
         {
@@ -273,17 +277,5 @@ describe("listCompatibilityRelationships", () => {
       type: "resolved",
       items: [],
     });
-  });
-
-  it.each([
-    [{ type: "unauthenticated", reason: "invalid token" }],
-    [{ type: "account-not-found" }],
-    [{ type: "not-configured" }],
-  ])("セッション解決に失敗するとAccountDataへ触れずそのまま返す (%o)", async (session) => {
-    createLiffSession.mockResolvedValue(session);
-    const { accountData, compatibilityData } = namespaces({ references: [] });
-
-    await expect(request(accountData, compatibilityData)).resolves.toEqual(session);
-    expect(accountData.getByName).not.toHaveBeenCalled();
   });
 });

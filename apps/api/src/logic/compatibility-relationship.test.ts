@@ -1,4 +1,4 @@
-import type { AccountDataNamespace, CompatibilityDataNamespace, D1 } from "@me-builder/lib";
+import type { AccountDataNamespace, CompatibilityDataNamespace } from "@me-builder/lib";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getCompatibilityRelationshipContents } from "./compatibility-relationship";
 
@@ -24,9 +24,11 @@ vi.mock("./compatibility-share-preview", () => ({
 const relationshipId = "1".repeat(64);
 const params = {
   relationshipId,
-  idToken: "id-token",
-  lineLoginChannelId: "channel-id",
-  db: {} as D1.shared.Client,
+  actor: {
+    accountId: "account-inviter",
+    authenticationMethod: "liff" as const,
+    authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
+  },
   accountData: {} as AccountDataNamespace,
   compatibilityData: {} as CompatibilityDataNamespace,
   at: new Date("2026-08-13T00:00:00.000Z"),

@@ -1,28 +1,24 @@
 import {
   type AccountDataNamespace,
   type CompatibilityDataNamespace,
-  type D1,
   acceptCompatibilityInvitationWithReferences,
   compatibilityRelationshipId,
 } from "@me-builder/lib";
-import { createLiffSession } from "./liff-session";
+import type { AuthenticatedActor } from "./authentication/types";
 
 type Params = Readonly<{
   relationshipId: string;
-  idToken: string | undefined;
-  lineLoginChannelId: string | undefined;
-  db: D1.shared.Client;
+  actor: AuthenticatedActor;
+  verifiedDisplayName?: string;
   accountData: AccountDataNamespace;
   compatibilityData: CompatibilityDataNamespace;
 }>;
 
 type Dependencies = Readonly<{
-  createSession: typeof createLiffSession;
   acceptInvitation: typeof acceptCompatibilityInvitationWithReferences;
 }>;
 
 const defaultDependencies: Dependencies = {
-  createSession: createLiffSession,
   acceptInvitation: acceptCompatibilityInvitationWithReferences,
 };
 
@@ -31,10 +27,7 @@ export type AcceptCompatibilityInvitationOutcome =
   | { type: "unavailable" }
   | { type: "own-invitation" }
   | { type: "share-unavailable" }
-  | { type: "duplicate-relationship" }
-  | { type: "not-configured" }
-  | { type: "unauthenticated"; reason: string }
-  | { type: "account-not-found" };
+  | { type: "duplicate-relationship" };
 
 /**
  * 受信者の共有同意を、正本と双方の一覧参照へ一体で反映する。
@@ -45,13 +38,7 @@ export async function acceptCompatibilityInvitation(
   dependencies: Dependencies = defaultDependencies,
 ): Promise<AcceptCompatibilityInvitationOutcome> {
   if (!compatibilityRelationshipId.isValid(params.relationshipId)) return { type: "unavailable" };
-  const session = await dependencies.createSession({
-    idToken: params.idToken,
-    lineLoginChannelId: params.lineLoginChannelId,
-    db: params.db,
-  });
-  if (session.type !== "resolved") return session;
-  const inviteeDisplayName = session.session.displayName?.trim();
+  const inviteeDisplayName = params.verifiedDisplayName?.trim();
   if (!inviteeDisplayName) return { type: "share-unavailable" };
 
   const result = await dependencies.acceptInvitation(
@@ -59,7 +46,7 @@ export async function acceptCompatibilityInvitation(
     params.compatibilityData,
     params.relationshipId,
     {
-      inviteeAccountId: session.session.accountId,
+      inviteeAccountId: params.actor.accountId,
       inviteeDisplayName,
     },
   );

@@ -1,4 +1,3 @@
-import type { D1 } from "@me-builder/lib";
 import { describe, expect, it, vi } from "vitest";
 import {
   getCompatibilityShareConsent,
@@ -6,8 +5,12 @@ import {
   loadCompatibilitySharePreviewData,
 } from "./compatibility-share-preview";
 
-const db = {} as D1.shared.Client;
 const at = new Date("2026-08-09T00:00:00.000Z");
+const actor = {
+  accountId: "account-1",
+  authenticationMethod: "liff" as const,
+  authenticatedAt: at,
+};
 const shareProfile = {
   profileSummaryVersionId: "summary-version-1",
   generatedAt: "2026-08-11T00:00:00.000Z",
@@ -26,17 +29,11 @@ describe("getCompatibilityShareContent", () => {
   it("選択カテゴリの共有表示だけを返し、表示名や内部指紋を返さない", async () => {
     const result = await getCompatibilityShareContent(
       {
-        idToken: "id-token",
-        lineLoginChannelId: "channel-id",
-        db,
+        actor,
         relationshipCategory: "partner",
         at,
       },
       {
-        createSession: vi.fn().mockResolvedValue({
-          type: "resolved",
-          session: { accountId: "account-1", role: "user", displayName: "あおい" },
-        }),
         getPreviewSource: vi.fn().mockResolvedValue({
           diagnoses: [],
           answeredDiagnoses: [
@@ -80,38 +77,10 @@ describe("getCompatibilityShareContent", () => {
     expect(JSON.stringify(result)).not.toContain("displayName");
     expect(JSON.stringify(result)).not.toContain("fingerprint");
   });
-
-  it("本人を解決できない場合は共有表示を読まない", async () => {
-    const getPreviewSource = vi.fn();
-    const getShareProfile = vi.fn();
-    const result = await getCompatibilityShareContent(
-      {
-        idToken: undefined,
-        lineLoginChannelId: undefined,
-        db,
-        relationshipCategory: "family",
-        at,
-      },
-      {
-        createSession: vi.fn().mockResolvedValue({ type: "unauthenticated", reason: "missing" }),
-        getPreviewSource,
-        getShareProfile,
-        scoreAnswers: vi.fn(),
-      },
-    );
-
-    expect(result).toEqual({ type: "unauthenticated", reason: "missing" });
-    expect(getPreviewSource).not.toHaveBeenCalled();
-    expect(getShareProfile).not.toHaveBeenCalled();
-  });
 });
 
 describe("getCompatibilityShareConsent", () => {
   it("共有可否と表示名だけを返し、共有される内容を返さない", async () => {
-    const createSession = vi.fn().mockResolvedValue({
-      type: "resolved",
-      session: { accountId: "account-1", role: "user", displayName: " あおい " },
-    });
     const getPreviewSource = vi.fn().mockResolvedValue({
       diagnoses: [
         {
@@ -148,9 +117,8 @@ describe("getCompatibilityShareConsent", () => {
     });
 
     const result = await getCompatibilityShareConsent(
-      { idToken: "id-token", lineLoginChannelId: "channel-id", db, at },
+      { actor, verifiedDisplayName: " あおい ", at },
       {
-        createSession,
         getPreviewSource,
         getShareProfile: vi.fn().mockResolvedValue(availableShareProfile),
         scoreAnswers,
@@ -172,12 +140,8 @@ describe("getCompatibilityShareConsent", () => {
 
   it("共有できる内容がまだなくても共有を開始できる", async () => {
     const result = await getCompatibilityShareConsent(
-      { idToken: "id-token", lineLoginChannelId: "channel-id", db, at },
+      { actor, verifiedDisplayName: "あおい", at },
       {
-        createSession: vi.fn().mockResolvedValue({
-          type: "resolved",
-          session: { accountId: "account-1", role: "user", displayName: "あおい" },
-        }),
         getPreviewSource: vi.fn().mockResolvedValue({
           diagnoses: [
             {
@@ -209,17 +173,12 @@ describe("getCompatibilityShareConsent", () => {
   it("選択した関係カテゴリとgeneralだけで次の案内を判定する", async () => {
     const result = await getCompatibilityShareConsent(
       {
-        idToken: "id-token",
-        lineLoginChannelId: "channel-id",
-        db,
+        actor,
+        verifiedDisplayName: "あおい",
         relationshipCategory: "family",
         at,
       },
       {
-        createSession: vi.fn().mockResolvedValue({
-          type: "resolved",
-          session: { accountId: "account-1", role: "user", displayName: "あおい" },
-        }),
         getPreviewSource: vi.fn().mockResolvedValue({
           diagnoses: [
             {
@@ -241,12 +200,8 @@ describe("getCompatibilityShareConsent", () => {
 
   it("表示名を確認できない場合だけ共有を開始できない", async () => {
     const result = await getCompatibilityShareConsent(
-      { idToken: "id-token", lineLoginChannelId: "channel-id", db, at },
+      { actor, at },
       {
-        createSession: vi.fn().mockResolvedValue({
-          type: "resolved",
-          session: { accountId: "account-1", role: "user" },
-        }),
         getPreviewSource: vi.fn().mockResolvedValue({ diagnoses: [], answeredDiagnoses: [] }),
         getShareProfile: vi.fn().mockResolvedValue(availableShareProfile),
         scoreAnswers: vi.fn(),
@@ -269,12 +224,8 @@ describe("getCompatibilityShareConsent", () => {
     "共有用プロフィールを開示できなければ生成画面へ案内する: $type",
     async (profileResult) => {
       const outcome = await getCompatibilityShareConsent(
-        { idToken: "id-token", lineLoginChannelId: "channel-id", db, at },
+        { actor, verifiedDisplayName: "あおい", at },
         {
-          createSession: vi.fn().mockResolvedValue({
-            type: "resolved",
-            session: { accountId: "account-1", role: "user", displayName: "あおい" },
-          }),
           getPreviewSource: vi.fn().mockResolvedValue({ diagnoses: [], answeredDiagnoses: [] }),
           getShareProfile: vi.fn().mockResolvedValue(profileResult),
           scoreAnswers: vi.fn(),
@@ -286,29 +237,6 @@ describe("getCompatibilityShareConsent", () => {
       });
     },
   );
-
-  it.each([
-    { type: "not-configured" as const },
-    { type: "unauthenticated" as const, reason: "invalid token" },
-    { type: "account-not-found" as const },
-  ])("本人を解決できない場合は診断データを読まない: $type", async (session) => {
-    const getPreviewSource = vi.fn();
-    const getShareProfile = vi.fn();
-
-    const result = await getCompatibilityShareConsent(
-      { idToken: undefined, lineLoginChannelId: undefined, db, at },
-      {
-        createSession: vi.fn().mockResolvedValue(session),
-        getPreviewSource,
-        getShareProfile,
-        scoreAnswers: vi.fn(),
-      },
-    );
-
-    expect(result).toEqual(session);
-    expect(getPreviewSource).not.toHaveBeenCalled();
-    expect(getShareProfile).not.toHaveBeenCalled();
-  });
 });
 
 describe("loadCompatibilitySharePreviewData", () => {

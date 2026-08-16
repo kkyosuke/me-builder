@@ -1,13 +1,15 @@
-import type { AccountDataNamespace, CompatibilityDataNamespace, D1 } from "@me-builder/lib";
+import type { AccountDataNamespace, CompatibilityDataNamespace } from "@me-builder/lib";
 import { describe, expect, it, vi } from "vitest";
 import { endCompatibilityRelationship } from "./compatibility-relationship-end";
 
 const relationshipId = "1".repeat(64);
 const params = {
   relationshipId,
-  idToken: "id-token",
-  lineLoginChannelId: "2010850319",
-  db: {} as D1.shared.Client,
+  actor: {
+    accountId: "account-a",
+    authenticationMethod: "liff" as const,
+    authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
+  },
   accountData: {} as AccountDataNamespace,
   compatibilityData: {} as CompatibilityDataNamespace,
 };
@@ -20,16 +22,6 @@ function dependencies(session: unknown, canonical: unknown = { outcome: "ended" 
 }
 
 describe("endCompatibilityRelationship", () => {
-  it.each([
-    { type: "not-configured" as const },
-    { type: "unauthenticated" as const, reason: "invalid" },
-    { type: "account-not-found" as const },
-  ])("認証結果 $type をそのまま返す", async (session) => {
-    const deps = dependencies(session);
-    await expect(endCompatibilityRelationship(params, deps)).resolves.toEqual(session);
-    expect(deps.endRelationship).not.toHaveBeenCalled();
-  });
-
   it("不正なrelationship IDは本人確認も正本更新も始めない", async () => {
     const deps = dependencies({ type: "resolved", session: { accountId: "account-a" } });
     await expect(

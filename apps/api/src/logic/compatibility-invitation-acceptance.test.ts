@@ -1,18 +1,20 @@
-import type { AccountDataNamespace, CompatibilityDataNamespace, D1 } from "@me-builder/lib";
+import type { AccountDataNamespace, CompatibilityDataNamespace } from "@me-builder/lib";
 import { describe, expect, it, vi } from "vitest";
 import { acceptCompatibilityInvitation } from "./compatibility-invitation-acceptance";
 
 const relationshipId = "1".repeat(64);
-const db = {} as D1.shared.Client;
 const accountData = {} as AccountDataNamespace;
 const compatibilityData = {} as CompatibilityDataNamespace;
 
 function params(overrides: Record<string, unknown> = {}) {
   return {
     relationshipId,
-    idToken: "id-token",
-    lineLoginChannelId: "1234567890",
-    db,
+    actor: {
+      accountId: "account-b",
+      authenticationMethod: "liff" as const,
+      authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
+    },
+    verifiedDisplayName: " 受信者 ",
     accountData,
     compatibilityData,
     ...overrides,
@@ -40,11 +42,6 @@ describe("acceptCompatibilityInvitation", () => {
     await expect(acceptCompatibilityInvitation(params(), deps)).resolves.toEqual({
       type: "accepted",
       relationshipId,
-    });
-    expect(deps.createSession).toHaveBeenCalledWith({
-      idToken: "id-token",
-      lineLoginChannelId: "1234567890",
-      db,
     });
     expect(deps.acceptInvitation).toHaveBeenCalledWith(
       accountData,
@@ -83,21 +80,11 @@ describe("acceptCompatibilityInvitation", () => {
       }),
     });
 
-    await expect(acceptCompatibilityInvitation(params(), deps)).resolves.toEqual({
+    await expect(
+      acceptCompatibilityInvitation(params({ verifiedDisplayName: undefined }), deps),
+    ).resolves.toEqual({
       type: "share-unavailable",
     });
-    expect(deps.acceptInvitation).not.toHaveBeenCalled();
-  });
-
-  it.each([
-    [{ type: "unavailable" }],
-    [{ type: "unauthenticated", reason: "invalid token" }],
-    [{ type: "account-not-found" }],
-    [{ type: "not-configured" }],
-  ])("本人セッションを解決できなければ結果をそのまま返す (%o)", async (outcome) => {
-    const deps = dependencies({ createSession: vi.fn().mockResolvedValue(outcome) });
-
-    await expect(acceptCompatibilityInvitation(params(), deps)).resolves.toEqual(outcome);
     expect(deps.acceptInvitation).not.toHaveBeenCalled();
   });
 

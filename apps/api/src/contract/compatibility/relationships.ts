@@ -4,7 +4,7 @@ import {
 } from "@me-builder/lib";
 import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
 import * as v from "valibot";
-import { authenticatedErrors, jsonResponse } from "../shared/errors";
+import { authenticatedErrors, currentTermsPolicyError, jsonResponse } from "../shared/errors";
 
 export const CompatibilityRelationshipsResponseSchema = v.object({
   items: v.array(
@@ -44,5 +44,6 @@ export const compatibilityRelationshipsRoute = describeRoute({
   responses: {
     200: jsonResponse("正本へ同期済みの相性一覧", CompatibilityRelationshipsResponseSchema),
     ...authenticatedErrors,
+    ...currentTermsPolicyError,
   },
 } satisfies DescribeRouteOptions);

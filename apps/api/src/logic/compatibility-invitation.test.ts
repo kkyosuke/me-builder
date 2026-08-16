@@ -1,12 +1,16 @@
-import type { AccountDataNamespace, CompatibilityDataNamespace, D1 } from "@me-builder/lib";
+import type { AccountDataNamespace, CompatibilityDataNamespace } from "@me-builder/lib";
 import { describe, expect, it, vi } from "vitest";
 import { issueCompatibilityInvitation } from "./compatibility-invitation";
 
 const relationshipId = "1".repeat(64);
 const expiresAt = new Date("2026-08-26T00:00:00.000Z");
-const db = {} as D1.shared.Client;
 const accountData = {} as AccountDataNamespace;
 const compatibilityData = {} as CompatibilityDataNamespace;
+const actor = {
+  accountId: "account-1",
+  authenticationMethod: "liff" as const,
+  authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
+};
 
 function dependencies(overrides: Record<string, unknown> = {}) {
   const base = {
@@ -31,12 +35,9 @@ describe("issueCompatibilityInvitation", () => {
     const deps = dependencies();
     const result = await issueCompatibilityInvitation(
       {
-        idToken: "id-token",
-        liff: {
-          lineLoginChannelId: "1234567890",
-          liffId: "1234567890-testliff",
-        },
-        db,
+        actor,
+        verifiedDisplayName: " あおい ",
+        liffId: "1234567890-testliff",
         accountData,
         compatibilityData,
         relationshipCategory: "family",
@@ -49,11 +50,6 @@ describe("issueCompatibilityInvitation", () => {
       invitationUrl: `https://liff.line.me/1234567890-testliff/compatibility/invitations/${relationshipId}`,
       expiresAt: expiresAt.toISOString(),
       relationshipCategory: "family",
-    });
-    expect(deps.createSession).toHaveBeenCalledWith({
-      idToken: "id-token",
-      lineLoginChannelId: "1234567890",
-      db,
     });
     expect(deps.createInvitation).toHaveBeenCalledWith(accountData, compatibilityData, {
       inviterAccountId: "account-1",
@@ -68,12 +64,9 @@ describe("issueCompatibilityInvitation", () => {
     await expect(
       issueCompatibilityInvitation(
         {
-          idToken: "id-token",
-          liff: {
-            lineLoginChannelId: "1234567890",
-            liffId: "1234567890-testliff",
-          },
-          db,
+          actor,
+          verifiedDisplayName: " あおい ",
+          liffId: "1234567890-testliff",
           accountData,
           compatibilityData,
           relationshipCategory: "friend",
@@ -95,12 +88,8 @@ describe("issueCompatibilityInvitation", () => {
     await expect(
       issueCompatibilityInvitation(
         {
-          idToken: "id-token",
-          liff: {
-            lineLoginChannelId: "1234567890",
-            liffId: "1234567890-testliff",
-          },
-          db,
+          actor,
+          liffId: "1234567890-testliff",
           accountData,
           compatibilityData,
           relationshipCategory: "work",

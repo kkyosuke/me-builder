@@ -3,51 +3,41 @@ import {
   type CompatibilityRelationshipCategory,
   type CompatibilitySharePreviewDiagnosis,
   type CompatibilitySharePreviewTheme,
-  type D1,
   type DO,
   accountDataFor,
   buildCompatibilitySharePreviewThemes,
 } from "@me-builder/lib";
 import { logger } from "@me-builder/shared";
+import type { AuthenticatedActor } from "./authentication/types";
 import { scoreDiagnosisAnswers } from "./diagnosis-scoring";
-import { createLiffSession } from "./liff-session";
 
-export type CompatibilityShareConsentOutcome =
-  | {
-      type: "resolved";
-      consent: {
-        displayName: string | null;
-        avatarUrl: string | null;
-        canShare: boolean;
-        blockingReasons: readonly CompatibilityShareConsentBlockingReason[];
-        nextAction: "diagnosis" | "profile-summary" | null;
-      };
-    }
-  | { type: "not-configured" }
-  | { type: "unauthenticated"; reason: string }
-  | { type: "account-not-found" };
+export type CompatibilityShareConsentOutcome = {
+  type: "resolved";
+  consent: {
+    displayName: string | null;
+    avatarUrl: string | null;
+    canShare: boolean;
+    blockingReasons: readonly CompatibilityShareConsentBlockingReason[];
+    nextAction: "diagnosis" | "profile-summary" | null;
+  };
+};
 
-export type CompatibilityShareContentOutcome =
-  | {
-      type: "resolved";
-      content: {
-        relationshipCategory: CompatibilityRelationshipCategory;
-        aboutMe: CompatibilityShareAboutMe | null;
-        themes: readonly CompatibilitySharePreviewTheme[];
-        nextAction: "diagnosis" | "profile-summary" | null;
-      };
-    }
-  | { type: "not-configured" }
-  | { type: "unauthenticated"; reason: string }
-  | { type: "account-not-found" };
+export type CompatibilityShareContentOutcome = {
+  type: "resolved";
+  content: {
+    relationshipCategory: CompatibilityRelationshipCategory;
+    aboutMe: CompatibilityShareAboutMe | null;
+    themes: readonly CompatibilitySharePreviewTheme[];
+    nextAction: "diagnosis" | "profile-summary" | null;
+  };
+};
 
 /** 共有開始を止める理由は、相手へ表示する名前を確認できない場合だけに限る。 */
 type CompatibilityShareConsentBlockingReason = "display_name_unavailable";
 
 type Params = {
-  idToken: string | undefined;
-  lineLoginChannelId: string | undefined;
-  db: D1.shared.Client;
+  actor: AuthenticatedActor;
+  verifiedDisplayName?: string;
   accountData?: AccountDataNamespace;
   relationshipCategory?: CompatibilityRelationshipCategory;
   at?: Date;
@@ -83,9 +73,7 @@ type CompatibilitySharePreviewDataDependencies = {
   scoreAnswers: typeof scoreDiagnosisAnswers;
 };
 
-type Dependencies = CompatibilitySharePreviewDataDependencies & {
-  createSession: typeof createLiffSession;
-};
+type Dependencies = CompatibilitySharePreviewDataDependencies;
 
 const compatibilitySharePreviewDataDependencies: CompatibilitySharePreviewDataDependencies = {
   getPreviewSource: (accountData, accountId, at) => {
@@ -102,7 +90,6 @@ const compatibilitySharePreviewDataDependencies: CompatibilitySharePreviewDataDe
 };
 
 const defaultDependencies: Dependencies = {
-  createSession: createLiffSession,
   ...compatibilitySharePreviewDataDependencies,
 };
 
@@ -188,16 +175,13 @@ export async function loadCompatibilitySharePreviewData(
 
 /** 本人が招待リンクを発行する前に確認する、共有可否だけを返す。 */
 export async function getCompatibilityShareConsent(
-  { idToken, lineLoginChannelId, db, accountData, relationshipCategory, at = new Date() }: Params,
+  { actor, verifiedDisplayName, accountData, relationshipCategory, at = new Date() }: Params,
   dependencies: Dependencies = defaultDependencies,
 ): Promise<CompatibilityShareConsentOutcome> {
-  const session = await dependencies.createSession({ idToken, lineLoginChannelId, db });
-  if (session.type !== "resolved") return session;
-
   const data = await loadCompatibilitySharePreviewData(
     {
-      accountId: session.session.accountId,
-      verifiedDisplayName: session.session.displayName,
+      accountId: actor.accountId,
+      verifiedDisplayName,
       accountData,
       ...(relationshipCategory ? { relationshipCategory } : {}),
       at,
@@ -221,22 +205,18 @@ export async function getCompatibilityShareConsent(
 /** 本人が「わたし」で確認する、選択カテゴリの現在の共有表示だけを返す。 */
 export async function getCompatibilityShareContent(
   {
-    idToken,
-    lineLoginChannelId,
-    db,
+    actor,
+    verifiedDisplayName,
     accountData,
     relationshipCategory,
     at = new Date(),
   }: Params & { relationshipCategory: CompatibilityRelationshipCategory },
   dependencies: Dependencies = defaultDependencies,
 ): Promise<CompatibilityShareContentOutcome> {
-  const session = await dependencies.createSession({ idToken, lineLoginChannelId, db });
-  if (session.type !== "resolved") return session;
-
   const data = await loadCompatibilitySharePreviewData(
     {
-      accountId: session.session.accountId,
-      verifiedDisplayName: session.session.displayName,
+      accountId: actor.accountId,
+      verifiedDisplayName,
       accountData,
       relationshipCategory,
       at,

@@ -510,42 +510,58 @@ app.get(
 );
 app.post(
   "/api/compatibility/invitations/:relationshipId/accept",
+  requireAuthentication,
+  requireCurrentTerms,
   acceptCompatibilityInvitationRoute,
   postCompatibilityInvitationAcceptance,
 );
 app.post(
   "/api/compatibility/invitations",
+  requireAuthentication,
+  requireCurrentTerms,
   issueCompatibilityInvitationRoute,
   issueCompatibilityInvitationRequestValidator,
   postCompatibilityInvitation,
 );
 app.get(
   "/api/compatibility/invitations/:relationshipId/avatar",
+  requireAuthentication,
+  requireCurrentTerms,
   compatibilityInvitationAvatarRoute,
   getCompatibilityInvitationAvatarContents,
 );
 app.get(
   "/api/compatibility/invitations/:relationshipId",
+  requireAuthentication,
+  requireCurrentTerms,
   compatibilityInvitationPreviewRoute,
   getCompatibilityInvitation,
 );
 app.delete(
   "/api/compatibility/invitations/:relationshipId",
+  requireAuthentication,
+  requireCurrentTerms,
   compatibilityInvitationCancelRoute,
   deleteCompatibilityInvitation,
 );
 app.get(
   "/api/compatibility/relationships",
+  requireAuthentication,
+  requireCurrentTerms,
   compatibilityRelationshipsRoute,
   getCompatibilityRelationships,
 );
 app.get(
   "/api/compatibility/relationships/:relationshipId",
+  requireAuthentication,
+  requireCurrentTerms,
   compatibilityRelationshipRoute,
   getCompatibilityRelationship,
 );
 app.delete(
   "/api/compatibility/relationships/:relationshipId",
+  requireAuthentication,
+  requireCurrentTerms,
   compatibilityRelationshipEndRoute,
   deleteCompatibilityRelationship,
 );
@@ -575,11 +591,15 @@ app.post(
 );
 app.get(
   "/api/compatibility/share-consent",
+  requireAuthentication,
+  requireCurrentTerms,
   compatibilityShareConsentRoute,
   getCompatibilityShareConsentContents,
 );
 app.get(
   "/api/compatibility/share-content",
+  requireAuthentication,
+  requireCurrentTerms,
   compatibilityShareContentRoute,
   getCompatibilityShareContentContents,
 );
