@@ -1,0 +1,224 @@
+import { describe, expect, it, vi } from "vitest";
+import {
+  SsoAuthenticationError,
+  type SsoAuthenticationTransaction,
+  type SsoAuthenticationTransactionStore,
+  type SsoServerClient,
+  completeSsoAuthentication,
+  completeSsoLogin,
+  normalizeSsoReturnTo,
+  startSsoAuthentication,
+} from "./sso-transaction";
+
+function createMemoryStore(): SsoAuthenticationTransactionStore & {
+  transactions: Map<string, SsoAuthenticationTransaction>;
+} {
+  const transactions = new Map<string, SsoAuthenticationTransaction>();
+  return {
+    transactions,
+    async put(state, transaction) {
+      transactions.set(state, transaction);
+    },
+    async consume(state) {
+      const transaction = transactions.get(state);
+      transactions.delete(state);
+      return transaction;
+    },
+  };
+}
+
+function createClient(): SsoServerClient {
+  return {
+    createAuthorizationUrl: vi.fn(async ({ state }) => {
+      return new URL(`https://tenant.auth0.com/authorize?state=${state}`);
+    }),
+    exchangeAuthorizationCode: vi.fn(async () => ({
+      providerKey: "auth0" as const,
+      subject: "auth0|user-1",
+      authenticationMethod: "sso" as const,
+      authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
+    })),
+  };
+}
+
+describe("normalizeSsoReturnTo", () => {
+  it("同一originの絶対pathをquery・fragmentごと保持する", () => {
+    expect(normalizeSsoReturnTo("/diagnoses/result?id=1#profile")).toBe(
+      "/diagnoses/result?id=1#profile",
+    );
+  });
+
+  it.each(["https://evil.example/", "//evil.example/", "/\\evil.example/", "diagnoses"])(
+    "外部originへ遷移しうるreturnToを拒否する: %s",
+    (returnTo) => {
+      expect(() => normalizeSsoReturnTo(returnTo)).toThrowError(
+        expect.objectContaining({ reason: "invalid_return_to" }),
+      );
+    },
+  );
+});
+
+describe("SSO authentication transaction", () => {
+  it("state・nonce・PKCEを短命transactionへ保存して認可URLを作る", async () => {
+    const store = createMemoryStore();
+    const client = createClient();
+    let randomSeed = 0;
+
+    const authorizationUrl = await startSsoAuthentication({
+      returnTo: "/settings/account",
+      store,
+      client,
+      now: () => 1_000,
+      randomBytes: (size) => new Uint8Array(size).fill(++randomSeed),
+    });
+
+    const state = authorizationUrl.searchParams.get("state");
+    expect(state).toBeTruthy();
+    expect(store.transactions.get(state ?? "")).toEqual({
+      nonce: expect.any(String),
+      codeVerifier: expect.any(String),
+      returnTo: "/settings/account",
+      expiresAt: 601_000,
+    });
+    expect(client.createAuthorizationUrl).toHaveBeenCalledWith({
+      state,
+      nonce: expect.any(String),
+      codeChallenge: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/u),
+    });
+  });
+
+  it("callbackでtransactionを一度だけ消費してidentityとreturnToを返す", async () => {
+    const store = createMemoryStore();
+    const client = createClient();
+    store.transactions.set("state", {
+      nonce: "nonce",
+      codeVerifier: "verifier",
+      returnTo: "/settings/account",
+      expiresAt: 2_000,
+    });
+
+    await expect(
+      completeSsoAuthentication({
+        state: "state",
+        code: "authorization-code",
+        store,
+        client,
+        now: () => 1_000,
+      }),
+    ).resolves.toEqual({
+      identity: expect.objectContaining({ providerKey: "auth0", subject: "auth0|user-1" }),
+      returnTo: "/settings/account",
+    });
+    expect(client.exchangeAuthorizationCode).toHaveBeenCalledWith({
+      code: "authorization-code",
+      codeVerifier: "verifier",
+      expectedNonce: "nonce",
+    });
+    await expect(
+      completeSsoAuthentication({ state: "state", code: "code", store, client }),
+    ).rejects.toEqual(new SsoAuthenticationError("transaction_missing"));
+  });
+
+  it("改ざんされたstateと期限切れtransactionを拒否する", async () => {
+    const store = createMemoryStore();
+    const client = createClient();
+    store.transactions.set("expired", {
+      nonce: "nonce",
+      codeVerifier: "verifier",
+      returnTo: "/",
+      expiresAt: 1_000,
+    });
+
+    await expect(
+      completeSsoAuthentication({ state: "tampered", code: "code", store, client }),
+    ).rejects.toEqual(new SsoAuthenticationError("transaction_missing"));
+    await expect(
+      completeSsoAuthentication({
+        state: "expired",
+        code: "code",
+        store,
+        client,
+        now: () => 1_000,
+      }),
+    ).rejects.toEqual(new SsoAuthenticationError("transaction_expired"));
+    expect(client.exchangeAuthorizationCode).not.toHaveBeenCalled();
+  });
+
+  it("stateまたはcodeが欠けるcallbackを拒否する", async () => {
+    const store = createMemoryStore();
+    const client = createClient();
+
+    await expect(
+      completeSsoAuthentication({ state: "", code: "code", store, client }),
+    ).rejects.toEqual(new SsoAuthenticationError("invalid_callback"));
+    await expect(
+      completeSsoAuthentication({ state: "state", code: "", store, client }),
+    ).rejects.toEqual(new SsoAuthenticationError("invalid_callback"));
+  });
+
+  it("link済みIdentityだけを共通session issuerへ渡す", async () => {
+    const store = createMemoryStore();
+    const client = createClient();
+    store.transactions.set("state", {
+      nonce: "nonce",
+      codeVerifier: "verifier",
+      returnTo: "/diagnoses",
+      expiresAt: 2_000,
+    });
+    const identityResolver = {
+      findAccountId: vi.fn(async () => "account-1"),
+    };
+    const sessionIssuer = {
+      issue: vi.fn(async () => ({ cookie: "opaque-cookie" })),
+    };
+
+    await expect(
+      completeSsoLogin({
+        state: "state",
+        code: "code",
+        store,
+        client,
+        identityResolver,
+        sessionIssuer,
+        now: () => 1_000,
+      }),
+    ).resolves.toEqual({
+      session: { cookie: "opaque-cookie" },
+      returnTo: "/diagnoses",
+    });
+    expect(identityResolver.findAccountId).toHaveBeenCalledWith({
+      providerKey: "auth0",
+      subject: "auth0|user-1",
+    });
+    expect(sessionIssuer.issue).toHaveBeenCalledWith({
+      accountId: "account-1",
+      authenticationMethod: "sso",
+      authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
+    });
+  });
+
+  it("未知IdentityはAccountを自動作成せずlink-only結果として拒否する", async () => {
+    const store = createMemoryStore();
+    const client = createClient();
+    store.transactions.set("state", {
+      nonce: "nonce",
+      codeVerifier: "verifier",
+      returnTo: "/",
+      expiresAt: 2_000,
+    });
+    const sessionIssuer = { issue: vi.fn() };
+
+    await expect(
+      completeSsoLogin({
+        state: "state",
+        code: "code",
+        store,
+        client,
+        identityResolver: { findAccountId: vi.fn(async () => undefined) },
+        sessionIssuer,
+        now: () => 1_000,
+      }),
+    ).rejects.toEqual(new SsoAuthenticationError("identity_unlinked"));
+    expect(sessionIssuer.issue).not.toHaveBeenCalled();
+  });
+});
