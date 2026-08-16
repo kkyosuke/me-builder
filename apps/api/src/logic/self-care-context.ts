@@ -15,7 +15,7 @@ async function resolve(params: Common) {
   const session = await createLiffSession(params);
   if (session.type !== "resolved") return session;
   const entitlement = await new billing.EntitlementService(
-    params.planAssignmentProvider ?? new billing.FakeAccountPlanAssignmentProvider(),
+    new billing.FamilyAwareAccountPlanAssignmentProvider(params.db, params.planAssignmentProvider),
   ).resolve(session.session.accountId, params.at);
   return {
     type: "resolved" as const,

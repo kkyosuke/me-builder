@@ -533,7 +533,7 @@ export async function processChatTurnMessage(
     const generationController = controller;
     const safetyRoute = classifySafety(context.messages, context.currentUserMessageIds);
     const entitlement = await new billing.EntitlementService(
-      cf.planAssignmentProvider ?? new billing.FakeAccountPlanAssignmentProvider(),
+      cf.planAssignmentProvider ?? new billing.FamilyAwareAccountPlanAssignmentProvider(cf.d1),
     ).resolve(message.body.accountId);
     const aiReplyPeriod = billing.resolveEntitlementUsagePeriod(entitlement, "ai-reply");
     const relationshipQuestionMode = entitlement.policy.relationshipQuestionContext;

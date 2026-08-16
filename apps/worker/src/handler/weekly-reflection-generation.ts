@@ -33,7 +33,7 @@ export async function processWeeklyReflectionGenerationMessage(
   const account = accountDataFor(namespace, message.body.accountId);
   try {
     const entitlement = await new billing.EntitlementService(
-      cf.planAssignmentProvider ?? new billing.FakeAccountPlanAssignmentProvider(),
+      cf.planAssignmentProvider ?? new billing.FamilyAwareAccountPlanAssignmentProvider(cf.d1),
     ).resolve(message.body.accountId);
     if (!entitlement.policy.features["weekly-reflection"]) {
       await account.execute(

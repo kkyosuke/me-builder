@@ -29,15 +29,14 @@ export async function getWeeklyReflections({
   db,
   accountData,
   at = new Date(),
-  planAssignmentProvider = new billing.FakeAccountPlanAssignmentProvider(),
+  planAssignmentProvider,
 }: CommonParams): Promise<WeeklyReflectionOutcome> {
   const session = await createLiffSession({ idToken, lineLoginChannelId, db });
   if (session.type !== "resolved") return session;
   if (!accountData) throw new Error("ACCOUNT_DATA binding is not configured");
-  const entitlement = await new billing.EntitlementService(planAssignmentProvider).resolve(
-    session.session.accountId,
-    at,
-  );
+  const entitlement = await new billing.EntitlementService(
+    new billing.FamilyAwareAccountPlanAssignmentProvider(db, planAssignmentProvider),
+  ).resolve(session.session.accountId, at);
   const readModel = await accountDataFor(accountData, session.session.accountId).execute(
     "weeklyReflection.read",
     at,
@@ -69,17 +68,16 @@ export async function requestWeeklyReflectionGeneration({
   accountData,
   queue,
   at = new Date(),
-  planAssignmentProvider = new billing.FakeAccountPlanAssignmentProvider(),
+  planAssignmentProvider,
 }: CommonParams & {
   queue?: Queue<ReflectionGenerationQueueMessage>;
 }): Promise<RequestWeeklyReflectionOutcome> {
   const session = await createLiffSession({ idToken, lineLoginChannelId, db });
   if (session.type !== "resolved") return session;
   if (!accountData || !queue) throw new Error("Weekly reflection binding is missing");
-  const entitlement = await new billing.EntitlementService(planAssignmentProvider).resolve(
-    session.session.accountId,
-    at,
-  );
+  const entitlement = await new billing.EntitlementService(
+    new billing.FamilyAwareAccountPlanAssignmentProvider(db, planAssignmentProvider),
+  ).resolve(session.session.accountId, at);
   if (!entitlement.policy.features["weekly-reflection"]) {
     return { type: "unavailable", reason: "feature_unavailable" };
   }

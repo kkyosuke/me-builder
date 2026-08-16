@@ -141,7 +141,7 @@ export async function processProfileSummaryGenerationMessage(
       return;
     }
     const entitlement = await new billing.EntitlementService(
-      cf.planAssignmentProvider ?? new billing.FakeAccountPlanAssignmentProvider(),
+      cf.planAssignmentProvider ?? new billing.FamilyAwareAccountPlanAssignmentProvider(cf.d1),
     ).resolve(message.body.accountId);
     const period = billing.resolveEntitlementUsagePeriod(entitlement, "profile-summary");
     const reservation = await accountData.execute("aiUsage.reserve", {

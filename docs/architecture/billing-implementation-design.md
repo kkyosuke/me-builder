@@ -94,6 +94,10 @@ live状態は`invited | active`とし、pack内のslotと参加中Accountをpart
 
 Webの`/profile/family`は、支払者には4つの固定席と招待リンク、参加者には付与元と退出操作を表示します。招待リンクで開いた画面は承諾前に、共有されるのがPlanだけであることを説明します。退出・辞退後はFreeへ戻ったことと本人データが残ることを表示し、全ロールへ相性共有が別同意であることを常に明示します。
 
+`FamilySeatAccountPlanAssignmentProvider`は共有D1の現在の`active`参加席だけを`family-seat`由来のFamily割当へ変換します。Family policyはFullと同じ機能・利用上限を持ちます。退出、席削除、契約終了後は次の読み取りからFreeを返し、D1取得失敗や未来の開始日時は共通EntitlementがFreeへ安全に縮退させます。
+
+本人データの一覧・訂正・削除・エクスポートは従来どおり認証AccountのAccountDataだけを呼び、family membershipから別Accountのnamespaceを解決しません。Customer Portalは支払者本人の請求情報だけを扱うA系列の境界とし、family APIや参加者画面へPortal URL、Customer ID、Subscription IDを公開しません。運用ログは動的なseat IDをroute patternへ置換し、招待tokenや参加者Account IDを記録しません。
+
 ## 4. 状態の変換
 
 有効な`trialing`または`active`契約はPrice catalogでPlanへ変換します。期間末解約予約中も期限までは現在Planを維持します。`past_due`などの猶予期間は商取引条件確定後の状態遷移で扱い、未知statusや未知Priceは有料権限を付与しません。契約終了後は既存データを削除せずFreeへ戻します。
