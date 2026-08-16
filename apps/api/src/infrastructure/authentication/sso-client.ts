@@ -42,7 +42,27 @@ type SsoFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Respon
 
 function assertTrustedEndpoint(issuer: URL, endpoint: string): void {
   const url = new URL(endpoint);
-  if (url.protocol !== "https:" || url.origin !== issuer.origin || url.username || url.password) {
+  if (
+    url.protocol !== "https:" ||
+    url.origin !== issuer.origin ||
+    url.username ||
+    url.password ||
+    url.hash
+  ) {
+    throw new SsoProviderError("configuration");
+  }
+}
+
+function assertTrustedCallback(callbackUrl: string): void {
+  const callback = new URL(callbackUrl);
+  if (
+    !["http:", "https:"].includes(callback.protocol) ||
+    callback.username ||
+    callback.password ||
+    callback.pathname !== "/api/auth/sso/callback" ||
+    callback.search ||
+    callback.hash
+  ) {
     throw new SsoProviderError("configuration");
   }
 }
@@ -58,9 +78,17 @@ export function createAuth0SsoClient(
 ): SsoServerClient {
   const fetcher = dependencies.fetch ?? globalThis.fetch;
   const issuer = new URL(configuration.issuerUrl);
-  if (issuer.protocol !== "https:" || issuer.pathname !== "/") {
+  if (
+    issuer.protocol !== "https:" ||
+    issuer.pathname !== "/" ||
+    issuer.username ||
+    issuer.password ||
+    issuer.search ||
+    issuer.hash
+  ) {
     throw new SsoProviderError("configuration");
   }
+  assertTrustedCallback(configuration.callbackUrl);
 
   let discoveryPromise: Promise<OidcDiscovery> | undefined;
   let remoteJwks: ReturnType<typeof createRemoteJWKSet> | undefined;

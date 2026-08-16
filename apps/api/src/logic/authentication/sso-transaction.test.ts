@@ -93,6 +93,17 @@ describe("SSO authentication transaction", () => {
     });
   });
 
+  it("認可endpointを解決できない場合は利用不能なtransactionを保存しない", async () => {
+    const store = createMemoryStore();
+    const client = createClient();
+    vi.mocked(client.createAuthorizationUrl).mockRejectedValue(new Error("provider unavailable"));
+
+    await expect(startSsoAuthentication({ returnTo: "/", store, client })).rejects.toThrow(
+      "provider unavailable",
+    );
+    expect(store.transactions.size).toBe(0);
+  });
+
   it("callbackでtransactionを一度だけ消費してidentityとreturnToを返す", async () => {
     const store = createMemoryStore();
     const client = createClient();

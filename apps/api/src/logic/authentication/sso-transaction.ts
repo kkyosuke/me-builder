@@ -124,6 +124,11 @@ export async function startSsoAuthentication(input: StartSsoAuthenticationInput)
   const nonce = base64Url(random(RANDOM_VALUE_BYTES));
   const codeVerifier = base64Url(random(RANDOM_VALUE_BYTES));
   const codeChallenge = await sha256Base64Url(codeVerifier);
+  const authorizationUrl = await input.client.createAuthorizationUrl({
+    state,
+    nonce,
+    codeChallenge,
+  });
 
   await input.store.put(
     state,
@@ -136,7 +141,7 @@ export async function startSsoAuthentication(input: StartSsoAuthenticationInput)
     SSO_TRANSACTION_TTL_SECONDS,
   );
 
-  return await input.client.createAuthorizationUrl({ state, nonce, codeChallenge });
+  return authorizationUrl;
 }
 
 /** callback transactionを一度だけ消費し、検証済みIdentityと復帰pathを返す。 */

@@ -229,6 +229,34 @@ describe("createAuth0SsoClient", () => {
     ).rejects.toEqual(new SsoProviderError("configuration"));
   });
 
+  it.each([
+    { issuerUrl: "https://user@tenant.auth0.com/" },
+    { issuerUrl: "https://tenant.auth0.com/?environment=preview" },
+    { issuerUrl: "https://tenant.auth0.com/#issuer" },
+    { callbackUrl: "javascript:alert(1)" },
+    { callbackUrl: "https://api.example.com/api/auth/sso/callback?next=/admin" },
+    { callbackUrl: "https://api.example.com/another/callback" },
+  ])("曖昧またはbrowserへ送れないissuer/callback設定を拒否する: %o", (overrides) => {
+    expect(() => createAuth0SsoClient({ ...configuration, ...overrides })).toThrowError(
+      new SsoProviderError("configuration"),
+    );
+  });
+
+  it("fragmentを含むdiscovery endpointを拒否する", async () => {
+    const client = createAuth0SsoClient(configuration, {
+      fetch: vi.fn(async () =>
+        Response.json({
+          ...discovery,
+          authorization_endpoint: `${discovery.authorization_endpoint}#ignored`,
+        }),
+      ),
+    });
+
+    await expect(
+      client.createAuthorizationUrl({ state: "state", nonce: "nonce", codeChallenge: "challenge" }),
+    ).rejects.toEqual(new SsoProviderError("configuration"));
+  });
+
   it("providerがcode交換を拒否した場合は内容を露出しない固定errorを返す", async () => {
     const fetcher = vi.fn(async (input: RequestInfo | URL) => {
       return String(input).endsWith("openid-configuration")
