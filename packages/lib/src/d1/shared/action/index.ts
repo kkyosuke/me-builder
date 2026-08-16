@@ -1,5 +1,6 @@
 export * as account from "./account";
 export * as accountRecovery from "./account-recovery";
+export * as accountSession from "./account-session";
 export * as adminAccount from "./admin-account";
 export * as agreement from "./agreement";
 export * as billing from "./billing";

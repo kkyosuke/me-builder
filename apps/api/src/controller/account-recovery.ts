@@ -9,6 +9,7 @@ import {
   AccountRecoveryUnavailableSchema,
 } from "../contract/account-recovery";
 import { ServiceUnavailableErrorSchema, UnauthorizedErrorSchema } from "../contract/shared/errors";
+import { D1AccountSessionVersionProvider } from "../infrastructure/authentication/d1-account-session-version-provider";
 import { createLineCredentialVerifier } from "../infrastructure/authentication/line-credential-verifier";
 import { issueAccountRecoveryCode, recoverAccountWithCode } from "../logic/account-recovery";
 import { authenticatedActor } from "../middleware/authentication";
@@ -60,12 +61,16 @@ export async function postAccountRecoveryComplete(c: Context<AppEnv>): Promise<R
       ? c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503)
       : c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
   }
-  const outcome = await recoverAccountWithCode({
-    identity: { subject: verification.identity.subject },
-    db: D1.shared.client.create(c.env.DB),
-    code: body.output.code,
-    requestKey: c.req.header("cf-connecting-ip") ?? "unavailable",
-  });
+  const db = D1.shared.client.create(c.env.DB);
+  const outcome = await recoverAccountWithCode(
+    {
+      identity: { subject: verification.identity.subject },
+      db,
+      code: body.output.code,
+      requestKey: c.req.header("cf-connecting-ip") ?? "unavailable",
+    },
+    new D1AccountSessionVersionProvider(db),
+  );
   switch (outcome.type) {
     case "recovered":
       c.header("Cache-Control", "no-store");

@@ -1,4 +1,4 @@
-import type { D1Database, R2Bucket } from "@cloudflare/workers-types";
+import type { D1Database, KVNamespace, R2Bucket } from "@cloudflare/workers-types";
 import type {
   AccountDataNamespace,
   CompatibilityDataNamespace,
@@ -18,6 +18,7 @@ import type { AuthenticatedActor, AuthenticationResult } from "./logic/authentic
 type Env = Omit<
   ApiBindings,
   | "DB"
+  | "SESSION_STORE"
   | "WEBHOOK_QUEUE"
   | "PROFILE_SUMMARY_QUEUE"
   | "BILLING_QUEUE"
@@ -48,6 +49,7 @@ type Env = Omit<
   PROFILE_SUMMARY_QUEUE?: Queue<ReflectionGenerationQueueMessage>;
   BILLING_QUEUE?: Queue<BillingQueueMessage>;
   DB?: D1Database;
+  SESSION_STORE?: KVNamespace;
   AVATAR_BUCKET?: R2Bucket;
   ACCOUNT_DATA?: AccountDataNamespace;
   COMPATIBILITY_DATA?: CompatibilityDataNamespace;

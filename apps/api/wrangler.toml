@@ -27,6 +27,10 @@ binding = "DB"
 database_name = "me-builder-db-local"
 database_id = "me-builder-db-local-id"
 
+[[kv_namespaces]]
+binding = "SESSION_STORE"
+id = "me-builder-session-local-id"
+
 [[vectorize]]
 binding = "BRAIN_VECTOR_INDEX"
 index_name = "me-builder-brain-local"
@@ -73,6 +77,10 @@ binding = "PROFILE_SUMMARY_QUEUE"
 binding = "DB"
 database_name = "me-builder-db-local"
 database_id = "me-builder-db-local-id"
+
+[[env.local.kv_namespaces]]
+binding = "SESSION_STORE"
+id = "me-builder-session-local-id"
 
 [[env.local.vectorize]]
 binding = "BRAIN_VECTOR_INDEX"

@@ -9,6 +9,7 @@ function manifest(environment: "preview" | "production", databaseId: string) {
     baseDomain: environment === "preview" ? "preview.example.com" : "example.com",
     database: { id: databaseId, name: `me-builder-db-${suffix}` },
     avatarBucket: { name: `me-builder-avatar-${suffix}` },
+    sessionStore: { id: `${suffix}-session-id`, name: `me-builder-session-${suffix}` },
     queues: {
       webhook: { id: "1", name: `me-builder-webhook-queue-${suffix}` },
       webhookDeadLetter: { id: "2", name: `me-builder-webhook-dlq-${suffix}` },
@@ -51,6 +52,10 @@ describe("renderWranglerConfigs", () => {
     expect(configs.api).toContain('bucket_name = "me-builder-avatar-preview"');
     expect(configs.api).toContain('bucket_name = "me-builder-avatar-production"');
     expect(configs.api).toContain('bucket_name = "me-builder-avatar-local"');
+    expect(configs.api).toContain('id = "me-builder-session-local-id"');
+    expect(configs.api).toContain('id = "preview-session-id"');
+    expect(configs.api).toContain('id = "production-session-id"');
+    expect(configs.api.match(/binding = "SESSION_STORE"/g)).toHaveLength(4);
     expect(configs.api).toContain('WEB_ORIGIN = "https://preview.example.com"');
     expect(configs.api).toContain('WEB_ORIGIN = "https://example.com"');
     expect(configs.api).toContain('WEB_ORIGIN = "http://localhost:5173"');
