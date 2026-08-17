@@ -173,19 +173,19 @@ HTTPの終端ログも同じ読み方に揃えます。
 [API] POST /api/line/webhook -> 200 (35ms)
 ```
 
-### 3.6 Webブラウザの未捕捉エラーをWorkers Logsへ合流させる
+### 3.6 Webブラウザの未捕捉・操作エラーをWorkers Logsへ合流させる
 
-Cloudflare Pagesが配信する静的Web UIの`console`出力は、APIやQueue WorkerのWorkers Logsへは自動的に保存されません。Web UIは未捕捉例外、未処理Promise rejection、React Error Boundaryが捕捉した描画失敗を安全なイベントへ変換し、API Workerの専用受付経路へ送信します。
+Cloudflare Pagesが配信する静的Web UIの`console`出力は、APIやQueue WorkerのWorkers Logsへは自動的に保存されません。Web UIは未捕捉例外、未処理Promise rejection、React Error Boundaryが捕捉した描画失敗に加え、利用者向けエラー表示へ変換して処理済みにした重要操作の失敗を安全なイベントへ変換し、API Workerの専用受付経路へ送信します。処理済み操作エラーを明示的に送らない場合、グローバルエラーハンドラは発火せず、Pages上の失敗がWorkers Logsから欠落します。
 
 ```mermaid
 flowchart LR
-    A[Web / LIFF<br/>未捕捉エラー] --> B[安全な固定schemaへ変換]
+    A[Web / LIFF<br/>未捕捉・重要操作エラー] --> B[安全な固定schemaへ変換]
     B --> C[API Worker<br/>認証・Origin・サイズ・Rate Limit検証]
     C --> D[Pinoの終端ログ1件]
     D --> E[Cloudflare Workers Logs]
 ```
 
-ブラウザから送れるのは、固定のエラー種別、登録route pattern、リリース識別子、固定の例外分類、自サイト配下のJavaScript bundle名と行・列、オンライン状態、自動復旧の有無だけです。`ErrorEvent`が位置を持たない描画失敗と未処理Promise rejectionでは、stackをブラウザ内だけで走査し、最初の自サイトbundle frameを同じ固定項目へ変換します。実URL、query、生の例外message、stack、React component stack、任意の例外objectは送信しません。
+ブラウザから送れるのは、固定のエラー種別、登録route pattern、リリース識別子、固定の例外分類、自サイト配下のJavaScript bundle名と行・列、オンライン状態、自動復旧の有無だけです。重要操作エラーでは、これに固定の操作種別、allowlist済みエラーコード、400から599のHTTP statusだけを加えます。`ErrorEvent`が位置を持たない描画失敗と未処理Promise rejectionでは、stackをブラウザ内だけで走査し、最初の自サイトbundle frameを同じ固定項目へ変換します。実URL、query、生の例外message、stack、React component stack、任意の例外objectは送信しません。
 
 受付経路はログの真正性と正常利用者の受付枠を守るため、HttpOnly Cookieのapplication sessionとCSRF tokenを要求します。application sessionが確立する前のエラーは送信せず、ブラウザconsoleと画面上の復旧導線だけに留めます。受付経路は次で制限します。
 

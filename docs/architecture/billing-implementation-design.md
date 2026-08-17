@@ -102,6 +102,8 @@ Webの`/profile/family`は、支払者には4つの固定席と招待リンク�
 
 有効な`trialing`または`active`契約はPrice catalogでPlanへ変換します。期間末解約予約中も期限までは現在Planを維持します。`past_due`は最初の失敗eventから7日間か契約期間末の早い方まで支払失敗前のPlanを維持し、失敗したupgrade先の権限は付与しません。回復時に失敗開始日時と退避したPlanを消し、支払成功後のPlanへ収束します。猶予を過ぎた`past_due`と`unpaid`、`paused`、`canceled`、未知status、未知Priceは有料権限を付与しません。契約終了、返金、chargebackで既存データを削除せずFreeへ戻します。
 
+Plan変更では、即時請求が必要なupgradeと月額から年額への変更だけをCustomer Portalの`subscription_update_confirm`へdeep linkします。下位Planへの変更と年額から月額への変更は、Stripe Customer Portalが異なるProduct間の期間末変更を扱えないため、APIが本人のSubscriptionに期間末のSubscription Scheduleを作成し、適用日時をWebへ返します。現在期間中のPriceと権限は変更せず、期間末のStripe eventを受けたprojectionで変更後Planへ収束します。Portal configurationの期間末変更条件には依存しません。
+
 ## 5. Webhookと収束
 
 APIはraw bodyで署名を検証し、許可したeventの最小メタデータをQueueへ渡して応答します。Workerはevent payloadを正本として上書きせず、対象CustomerまたはSubscriptionの現在状態をStripeから取得します。

@@ -47,6 +47,9 @@ function errorFingerprint(report: WebClientErrorReport): string {
     report.sourceFile ?? "unknown",
     report.sourceLine ?? 0,
     report.sourceColumn ?? 0,
+    report.operation ?? "unknown",
+    report.operationErrorCode ?? "unknown",
+    report.operationStatus ?? 0,
   ].join(":");
 }
 
@@ -94,6 +97,11 @@ export async function postWebClientError(c: Context<AppEnv>): Promise<Response> 
     ...(output.sourceFile !== undefined ? { sourceFile: output.sourceFile } : {}),
     ...(output.sourceLine !== undefined ? { sourceLine: output.sourceLine } : {}),
     ...(output.sourceColumn !== undefined ? { sourceColumn: output.sourceColumn } : {}),
+    ...(output.operation !== undefined ? { operation: output.operation } : {}),
+    ...(output.operationErrorCode !== undefined
+      ? { operationErrorCode: output.operationErrorCode }
+      : {}),
+    ...(output.operationStatus !== undefined ? { operationStatus: output.operationStatus } : {}),
     online: output.online,
     recovered: output.recovered,
   };

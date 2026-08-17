@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { billingIntervals, paidPlanCodes, publicBillingPlans } from "./plan-catalog";
+import {
+  billingIntervals,
+  billingLookupKey,
+  paidPlanCodes,
+  publicBillingPlans,
+} from "./plan-catalog";
 
 describe("publicBillingPlans", () => {
   it("各有料Planの月額・年額を一意なlookup keyで公開する", () => {
@@ -13,5 +18,6 @@ describe("publicBillingPlans", () => {
       plan.prices.map((price) => price.lookupKey),
     );
     expect(new Set(lookupKeys).size).toBe(lookupKeys.length);
+    expect(billingLookupKey("full", "year")).toBe("me_builder_full_yearly");
   });
 });

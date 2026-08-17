@@ -178,6 +178,43 @@ describe("web error reporter", () => {
     expect(removeEventListener).toHaveBeenCalledWith("unhandledrejection", expect.any(Function));
   });
 
+  it("UIで捕捉した課金操作エラーを固定コードとstatusだけで送る", async () => {
+    const fetch = vi
+      .fn<typeof globalThis.fetch>()
+      .mockResolvedValue(new Response(null, { status: 204 }));
+    const reporter = createWebErrorReporter({
+      apiUrl: "https://api.example",
+      release: "abcdef123456",
+      csrfToken: () => "csrf-session-token",
+      fetch,
+      now: () => 1,
+      browserContext: () => ({
+        origin: "https://web.example",
+        pathname: "/profile/billing",
+        online: true,
+      }),
+    });
+
+    reporter.report({
+      kind: "handled-operation-error",
+      error: new Error("Stripeの生のエラーを送ってはいけない"),
+      operation: "billing-checkout",
+      operationErrorCode: "BILLING_CHECKOUT_FAILED",
+      operationStatus: 503,
+    });
+    await Promise.resolve();
+
+    const body = String(fetch.mock.calls[0]?.[1]?.body);
+    expect(JSON.parse(body)).toMatchObject({
+      kind: "handled-operation-error",
+      route: "/profile/billing",
+      operation: "billing-checkout",
+      operationErrorCode: "BILLING_CHECKOUT_FAILED",
+      operationStatus: 503,
+    });
+    expect(body).not.toContain("Stripeの生のエラー");
+  });
+
   it("CSRF tokenがない間は送信せず、描画エラーの自サイトframeだけを送る", () => {
     let csrfToken: string | null = null;
     const fetch = vi

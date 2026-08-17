@@ -14,6 +14,7 @@ import {
   getBillingOperationalSummary,
   hasUsedBillingTrial,
   linkBillingCustomer,
+  replaceBillingCustomer,
 } from "./billing";
 
 function createTestDb(): SharedD1Client {
@@ -173,6 +174,27 @@ describe("billing projection", () => {
 
     await expect(
       linkBillingCustomer(db, { accountId: second.id, providerCustomerId: "cus_1" }),
+    ).rejects.toBeInstanceOf(BillingCustomerOwnershipError);
+  });
+
+  it("確認済みの旧Customerだけを新しいCustomerへ置き換える", async () => {
+    const db = createTestDb();
+    const owner = await account(db, "U_billing_replace");
+    await linkBillingCustomer(db, { accountId: owner.id, providerCustomerId: "cus_stale" });
+
+    await expect(
+      replaceBillingCustomer(db, {
+        accountId: owner.id,
+        expectedProviderCustomerId: "cus_stale",
+        providerCustomerId: "cus_replacement",
+      }),
+    ).resolves.toMatchObject({ providerCustomerId: "cus_replacement" });
+    await expect(
+      replaceBillingCustomer(db, {
+        accountId: owner.id,
+        expectedProviderCustomerId: "cus_stale",
+        providerCustomerId: "cus_other",
+      }),
     ).rejects.toBeInstanceOf(BillingCustomerOwnershipError);
   });
 

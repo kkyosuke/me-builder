@@ -51,4 +51,9 @@ describe("getWebConfig & WebConfigSchema", () => {
     expect(getWebConfig({ SSO_ROLLOUT_MODE: "linking" }).ssoRolloutMode).toBe("linking");
     expect(() => getWebConfig({ SSO_ROLLOUT_MODE: "unknown" })).toThrow();
   });
+
+  it("GitHub Actionsから渡る空のSSO段階公開状態を未設定として扱うこと", () => {
+    expect(getWebConfig({ SSO_ROLLOUT_MODE: "" }).ssoRolloutMode).toBe("disabled");
+    expect(getWebConfig({ SSO_ROLLOUT_MODE: "   " }).ssoRolloutMode).toBe("disabled");
+  });
 });

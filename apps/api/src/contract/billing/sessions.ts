@@ -59,6 +59,7 @@ export const BillingSessionConflictSchema = v.object({
     "customer_not_found",
     "same_plan",
     "subscription_not_found",
+    "scheduled_change_exists",
     "configuration_missing",
   ]),
 });
@@ -134,14 +135,17 @@ export const billingPortalSessionRoute = describeRoute({
 export const billingPlanChangeSessionRoute = describeRoute({
   operationId: "createBillingPlanChangeSession",
   tags: ["Billing"],
-  summary: "選択したPlanへのStripe確認画面を作成する",
+  summary: "選択したPlanへの即時確認または期間末変更予約を作成する",
   security: [{ applicationSession: [], csrfToken: [] }],
   requestBody: {
     required: true,
     content: { "application/json": { schema: BillingCheckoutRequestSchema } },
   },
   responses: {
-    201: jsonResponse("プラン変更確認用の短命なStripe Portal URL", BillingSessionResponseSchema),
+    201: jsonResponse(
+      "即時変更のStripe Portal URL、または期間末予約後のWeb復帰URL",
+      BillingSessionResponseSchema,
+    ),
     400: jsonResponse("リクエストが不正", BillingInvalidRequestSchema),
     409: jsonResponse("プラン変更を開始できない", BillingSessionConflictSchema),
     ...authenticatedErrors,
