@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ServiceSiteHomeScreen } from "./service-site-home-screen";
 
@@ -46,8 +46,11 @@ describe("ServiceSiteHomeScreen", () => {
         name: "Free、Lite、Full、ファミリーパックの機能比較",
       }),
     ).toBeTruthy();
-    expect(screen.getByRole("rowheader", { name: "わたしのまとめ" })).toBeTruthy();
-    expect(screen.queryByText(/わたしのまとめ 月4回/u)).toBeNull();
-    expect(screen.queryByText(/わたしのまとめ 月12回/u)).toBeNull();
+    const summaryRow = screen.getByRole("row", { name: /わたしのまとめ/u });
+    expect(within(summaryRow).getAllByText("月4回まで※")).toHaveLength(3);
+    expect(within(summaryRow).getByText("1人あたり月4回まで※")).toBeTruthy();
+    expect(screen.getByText(/いずれの生成条件も満たさない場合は回数を消費せず/u)).toBeTruthy();
+    expect(screen.getAllByText("提供準備中")).toHaveLength(6);
+    expect(screen.getByText(/現在は購入できません/u)).toBeTruthy();
   });
 });

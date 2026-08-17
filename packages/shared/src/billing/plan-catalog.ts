@@ -3,6 +3,9 @@ export type PaidPlanCode = (typeof paidPlanCodes)[number];
 export const publicPlanCodes = ["free", ...paidPlanCodes] as const;
 export type PublicPlanCode = (typeof publicPlanCodes)[number];
 
+/** Planの価値差には使わない、全Account共通のまとめ生成月次運用上限。 */
+export const PROFILE_SUMMARY_MONTHLY_LIMIT = 4;
+
 export const billingIntervals = ["month", "year"] as const;
 export type BillingInterval = (typeof billingIntervals)[number];
 
@@ -46,7 +49,12 @@ export const publicPlanFeatures = [
   },
   {
     label: "わたしのまとめ",
-    plans: { free: "利用可能", lite: "利用可能", full: "利用可能", family: "1人ずつ利用可能" },
+    plans: {
+      free: `月${PROFILE_SUMMARY_MONTHLY_LIMIT}回まで※`,
+      lite: `月${PROFILE_SUMMARY_MONTHLY_LIMIT}回まで※`,
+      full: `月${PROFILE_SUMMARY_MONTHLY_LIMIT}回まで※`,
+      family: `1人あたり月${PROFILE_SUMMARY_MONTHLY_LIMIT}回まで※`,
+    },
   },
   {
     label: "AI返信",

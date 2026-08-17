@@ -1,3 +1,4 @@
+import { PROFILE_SUMMARY_MONTHLY_LIMIT } from "@me-builder/shared";
 import {
   type AccountPlanAssignment,
   type AccountPlanAssignmentProvider,
@@ -7,6 +8,8 @@ import {
   planAssignmentSources,
   planCodes,
 } from "./account-plan-assignment";
+
+export { PROFILE_SUMMARY_MONTHLY_LIMIT } from "@me-builder/shared";
 
 export const entitlementFeatures = [
   "weekly-reflection",
@@ -32,9 +35,6 @@ export type EntitlementPolicy = Readonly<{
   familySeatLimit: number;
   features: Readonly<Record<EntitlementFeature, boolean>>;
 }>;
-
-/** Planの価値差には使わない、全Account共通のまとめ生成月次運用上限。 */
-export const PROFILE_SUMMARY_MONTHLY_LIMIT = 12;
 
 const policies = {
   free: {

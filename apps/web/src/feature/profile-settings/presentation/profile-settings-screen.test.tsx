@@ -110,10 +110,10 @@ describe("ProfileSettingsScreen", () => {
               resetsAt: "2026-09-01T00:00:00.000Z",
             },
             profileSummary: {
-              limit: 12,
+              limit: 4,
               used: 0,
               reserved: 0,
-              remaining: 12,
+              remaining: 4,
               periodStartsAt: "2026-08-01T00:00:00.000Z",
               resetsAt: "2026-09-01T00:00:00.000Z",
             },
@@ -155,10 +155,10 @@ describe("ProfileSettingsScreen", () => {
               resetsAt: "2026-09-16T00:00:00.000Z",
             },
             profileSummary: {
-              limit: 12,
+              limit: 4,
               used: 0,
               reserved: 0,
-              remaining: 12,
+              remaining: 4,
               periodStartsAt: "2026-08-16T00:00:00.000Z",
               resetsAt: "2026-09-16T00:00:00.000Z",
             },
@@ -460,10 +460,10 @@ describe("ProfileSettingsScreen", () => {
               resetsAt: "2026-09-01T00:00:00.000Z",
             },
             profileSummary: {
-              limit: 12,
+              limit: 4,
               used: 1,
               reserved: 0,
-              remaining: 11,
+              remaining: 3,
               periodStartsAt: "2026-08-01T00:00:00.000Z",
               resetsAt: "2026-09-01T00:00:00.000Z",
             },
@@ -481,7 +481,7 @@ describe("ProfileSettingsScreen", () => {
     expect(screen.getByRole("heading", { name: "利用プラン" })).toBeTruthy();
     expect(screen.getByText("Lite")).toBeTruthy();
     expect(screen.getByText("残り 139 / 150")).toBeTruthy();
-    expect(screen.getByText("残り 11 / 12")).toBeTruthy();
+    expect(screen.getByText("残り 3 / 4")).toBeTruthy();
     expect(screen.getByText("利用可能期限")).toBeTruthy();
     expect(screen.getByText("2027/08/01")).toBeTruthy();
     expect(screen.queryByText("2026/09/01")).toBeNull();
@@ -507,10 +507,10 @@ describe("ProfileSettingsScreen", () => {
             resetsAt: "2026-09-16T00:00:00.000Z",
           },
           profileSummary: {
-            limit: 12,
+            limit: 4,
             used: 0,
             reserved: 0,
-            remaining: 12,
+            remaining: 4,
             periodStartsAt: "2026-08-16T00:00:00.000Z",
             resetsAt: "2026-09-16T00:00:00.000Z",
           },
@@ -556,10 +556,10 @@ describe("ProfileSettingsScreen", () => {
               resetsAt: "2026-09-01T00:00:00.000Z",
             },
             profileSummary: {
-              limit: 12,
+              limit: 4,
               used: 0,
               reserved: 0,
-              remaining: 12,
+              remaining: 4,
               periodStartsAt: "2026-08-01T00:00:00.000Z",
               resetsAt: "2026-09-01T00:00:00.000Z",
             },

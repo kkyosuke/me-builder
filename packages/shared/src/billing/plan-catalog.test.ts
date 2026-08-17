@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  PROFILE_SUMMARY_MONTHLY_LIMIT,
   billingIntervals,
   billingLookupKey,
   paidPlanCodes,
@@ -26,11 +27,13 @@ describe("publicBillingPlans", () => {
   it("わたしのまとめを全Plan共通機能として公開する", () => {
     const summary = publicPlanFeatures.find((feature) => feature.label === "わたしのまとめ");
 
-    expect(summary).toBeDefined();
+    expect(summary?.plans).toEqual({
+      free: `月${PROFILE_SUMMARY_MONTHLY_LIMIT}回まで※`,
+      lite: `月${PROFILE_SUMMARY_MONTHLY_LIMIT}回まで※`,
+      full: `月${PROFILE_SUMMARY_MONTHLY_LIMIT}回まで※`,
+      family: `1人あたり月${PROFILE_SUMMARY_MONTHLY_LIMIT}回まで※`,
+    });
     expect(Object.keys(summary?.plans ?? {})).toEqual(publicPlanCodes);
-    expect(Object.values(summary?.plans ?? {}).every((value) => value.includes("利用可能"))).toBe(
-      true,
-    );
     expect(publicBillingPlans.flatMap((plan) => plan.highlights).join(" ")).not.toMatch(
       /わたしのまとめ 月/u,
     );

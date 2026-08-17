@@ -51,9 +51,9 @@ function assignment(
 
 describe("Preview Plan assignment verification", () => {
   it.each([
-    ["lite", "subscription", 150, 12],
-    ["full", "subscription", 600, 12],
-    ["family", "family-seat", 600, 12],
+    ["lite", "subscription", 150, 4],
+    ["full", "subscription", 600, 4],
+    ["family", "family-seat", 600, 4],
   ] as const)(
     "fake assignmentを%sへ切り替えると付与元・利用上限を即時検証できる",
     async (plan, source, aiLimit, summaryLimit) => {

@@ -106,12 +106,12 @@ const faqs = [
   {
     question: "無料で使えますか？",
     answer:
-      "はい。FreeではLINEの日記、公開中の診断、わたしのまとめ、基本の相性シートを利用できます。有料PlanではAI返信の回数や継続的な振り返りが広がります。",
+      "はい。FreeではLINEの日記、公開中の診断、わたしのまとめ、基本の相性シートを利用できます。有料Planは提供準備中で、提供開始後はAI返信の回数や継続的な振り返りが広がります。",
   },
   {
     question: "Free、Lite、Full、ファミリーパックは何が違いますか？",
     answer:
-      "わたしのまとめ、診断、日記、基本の相性シートは全Planで利用できます。Liteは週次の振り返り、Fullは過去全体との比較や個別化セルフケア、ファミリーパックは最大4人へのFull相当の提供が主な違いです。",
+      "わたしのまとめ、診断、日記、基本の相性シートは全Plan共通です。提供開始後のLiteは週次の振り返り、Fullは過去全体との比較や個別化セルフケア、ファミリーパックは最大4人へのFull相当の提供が主な違いです。現在、有料Planは提供準備中です。",
   },
   {
     question: "LINE公式アカウントの友だち追加は必要ですか？",
@@ -422,7 +422,10 @@ export function ServiceSiteHomeScreen() {
               自分に合う続け方を選べます。
             </h2>
             <p className="mx-auto mt-4 max-w-3xl text-center leading-7 text-slate-600 dark:text-slate-300">
-              日記、診断、わたしのまとめ、基本の相性シートはすべてのPlanで利用できます。有料Planでは、振り返る時間の長さと継続支援が広がります。
+              日記、診断、わたしのまとめ、基本の相性シートはすべてのPlanで共通の対象機能です。有料Planでは、振り返る時間の長さと継続支援が広がります。
+            </p>
+            <p className="mx-auto mt-3 max-w-3xl text-center text-sm font-bold text-amber-800 dark:text-amber-200">
+              有料Planは提供準備中です。以下は提供開始時の予定価格と機能で、現在は購入できません。
             </p>
 
             <div className="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
@@ -435,6 +438,11 @@ export function ServiceSiteHomeScreen() {
                       : "border-violet-100 dark:border-slate-700"
                   }`}
                 >
+                  {plan.code !== "free" && (
+                    <p className="mb-3 w-fit rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-900 dark:bg-amber-400/15 dark:text-amber-200">
+                      提供準備中
+                    </p>
+                  )}
                   {plan.code === "full" && (
                     <p className="mb-3 w-fit rounded-full bg-violet-100 px-3 py-1 text-xs font-bold text-violet-800 dark:bg-violet-400/15 dark:text-violet-200">
                       しっかり振り返りたい方へ
@@ -455,7 +463,7 @@ export function ServiceSiteHomeScreen() {
                   </p>
                   {plan.trialDays ? (
                     <p className="mt-4 rounded-xl bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-200">
-                      初回{plan.trialDays}日間無料
+                      提供開始時は初回{plan.trialDays}日間無料
                     </p>
                   ) : (
                     <p className="mt-4 rounded-xl bg-sky-50 px-3 py-2 text-sm font-bold text-sky-800 dark:bg-sky-950/60 dark:text-sky-200">
@@ -490,7 +498,16 @@ export function ServiceSiteHomeScreen() {
                     </th>
                     {publicPlanCodes.map((code) => (
                       <th key={code} scope="col" className="min-w-44 px-5 py-4 font-bold">
-                        {publicPlanNames[code]}
+                        <span className="block">{publicPlanNames[code]}</span>
+                        <span
+                          className={`mt-1 block text-xs ${
+                            code === "free"
+                              ? "text-emerald-700 dark:text-emerald-300"
+                              : "text-amber-800 dark:text-amber-200"
+                          }`}
+                        >
+                          {code === "free" ? "利用できます" : "提供準備中"}
+                        </span>
                       </th>
                     ))}
                   </tr>
@@ -518,7 +535,11 @@ export function ServiceSiteHomeScreen() {
               </table>
             </div>
             <p className="mt-5 text-center text-xs leading-6 text-slate-500 dark:text-slate-400">
-              表示価格は税込です。有料Planは選択した期間で自動更新され、初回トライアルの終了後から料金が発生します。
+              ※
+              わたしのまとめは、診断または日記があり、前回から入力が変わった場合、または前回生成から30日以上経過した場合に生成できます。いずれの生成条件も満たさない場合は回数を消費せず、新しい版も生成しません。
+            </p>
+            <p className="mt-2 text-center text-xs leading-6 text-slate-500 dark:text-slate-400">
+              表示価格は税込です。提供開始後、有料Planは選択した期間で自動更新され、初回トライアルの終了後から料金が発生します。
             </p>
           </div>
         </section>
