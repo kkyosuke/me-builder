@@ -650,6 +650,8 @@ Context Packageはgenerate WorkerがAI呼び出しごとにAccountDataから作�
 flowchart LR
     M[現在Turn] --> C[Context Builder]
     R[直近20 message] --> C
+    S[activeな相性共有の表示名とCategory] --> I[現在発言の人物照合]
+    I --> C
     B[Brain Item候補] --> A[Access再検証]
     E[Source Record候補] --> A
     A --> C
@@ -658,20 +660,22 @@ flowchart LR
 ```
 
 1. 現在Sessionと直近messageをAccountDataから取得する。件数は`CHAT_CONTEXT_MESSAGE_LIMIT`で管理し、初期値は20とする
-2. 現在Turnから検索文を作り、現在Accountの`owner_scope`をfilterに指定してVectorizeを検索する
-3. filter適用後の集合からBrain Item候補を上位取得する
-4. AccountDataで`active`、有効期間、Access Policy、削除・撤回・無効化状態を再検証する
-5. 再検証を通過した上位5件を選び、必要なEvidenceのSource Recordを最大3件取得する
-6. 訂正済み旧版、削除済み、撤回済み、拒否済みを除外する
-7. 各要素へ種類、時点、Derivation、推定有無、Confidence、根拠IDを付ける
+2. 現在Turnから検索文を作る。現在の発言にRelationship Categoryが明示され、activeな相性共有相手を一意に照合できる場合だけ、その表示名とRelationship Categoryを検索hintへ加える
+3. 現在Accountの`owner_scope`をfilterに指定してVectorizeを検索する
+4. filter適用後の集合からBrain Item候補を上位取得する
+5. AccountDataで`active`、有効期間、Access Policy、削除・撤回・無効化状態を再検証する
+6. 関係性相談では、現在明示された相手と照合できる本人側の出来事、Goal、本人が明言した相手についての観察だけへ縮める
+7. 再検証を通過した上位5件を選び、必要なEvidenceのSource Recordを最大3件取得する
+8. 訂正済み旧版、削除済み、撤回済み、拒否済みを除外する
+9. 各要素へ種類、時点、Derivation、推定有無、Confidence、根拠IDを付ける
 
 `owner_scope`は環境別Secretを鍵とする`HMAC(account_id)`から作り、Vectorizeのmetadata indexまたはnamespaceへ保存します。生のAccount IDは保存しません。filterはtopKより前に適用し、他Accountの候補に検索枠を消費させません。Vectorizeのmetadataは候補を絞る用途に限定し、認可の根拠にはしないため、AccountData再検証は必ず残します。
 
-実装では現在Turnのuser発言だけを最大10,000文字の`RETRIEVAL_QUERY`としてembeddingします。相対日付はWorkerの処理時刻ではなく、user messageごとのSource Record受信時刻を基準に絶対表現へ変換します。`owner_scope` filter適用後の上位10件を候補にし、cosine scoreが0.7未満の候補は関連なしとして除外します。AccountDataはvector ID対応表から、本人所有、active、未削除、有効期間内、activeなAccess Labelありを再検証し、類似度順の最大5件を返します。支持Evidence原文は未削除の本人Source Recordだけを関連度順のItemから新しい順に選び、Context全体で最大3件にします。Gemini入力時にstatementは1件2,000文字、Evidenceは1件1,000文字を上限にします。検索には2秒の独立timeoutを設け、Vectorize・embedding・再認可の失敗時と同様に、本文を含まないdegraded logを残して記憶なしの通常返信を継続します。検索timeoutは生成全体の90秒deadlineをabortしません。
+実装では現在Turnのuser発言と、一意に照合できた関係人物の検索hintを合わせて最大10,000文字の`RETRIEVAL_QUERY`としてembeddingします。検索hintは相性共有の表示名、Relationship Category、現在発言の関係語だけに限定します。相対日付はWorkerの処理時刻ではなく、user messageごとのSource Record受信時刻を基準に絶対表現へ変換します。`owner_scope` filter適用後の上位10件を候補にし、cosine scoreが0.7未満の候補は関連なしとして除外します。AccountDataはvector ID対応表から、本人所有、active、未削除、有効期間内、activeなAccess Labelありを再検証し、類似度順の最大5件を返します。支持Evidence原文は未削除の本人Source Recordだけを関連度順のItemから新しい順に選び、Context全体で最大3件にします。Gemini入力時にstatementは1件2,000文字、Evidenceは1件1,000文字を上限にします。検索には2秒の独立timeoutを設け、Vectorize・embedding・再認可の失敗時と同様に、本文を含まないdegraded logを残して記憶なしの通常返信を継続します。検索timeoutは生成全体の90秒deadlineをabortしません。
 
-関係性質問ではPlanごとにさらに縮小します。Freeは現在Turn、Liteは現在Sessionと本人の関連診断だけを使います。Fullだけが意味検索候補のうち`relationship` Access LabelをAccountDataで再認可し、本人が明言した出来事とGoalを現在の相手に一致する場合だけ追加します。本人側のRelationship Styleは診断projectionから読み、第三者側のBrainや診断は取得しません。
+関係性質問ではPlanごとにさらに縮小します。Freeは現在Turn、Liteは現在Sessionと本人の関連診断だけを使います。Fullだけが意味検索候補のうち`relationship` Access LabelをAccountDataで再認可し、本人が明言した出来事、Goal、相手についての観察を現在の相手に一致する場合だけ追加します。activeな相性共有から使えるのは照合用の表示名とRelationship Categoryだけで、相手AccountのBrainや診断は検索しません。本人側のRelationship Styleは診断projectionから読みます。
 
-安定した人物IDがない固有名は、同名別人を安全に区別できないため過去履歴へ接続しません。現在発言と過去の本人記録で同じ役割（上司、友人、家族など）が明示される場合だけ利用し、推定、根拠なし、旧版、期限切れ、削除済みを除外します。実際に回答へ使ったBrain ItemとSource Record IDは利用監査へ保存し、本人の個人データexportに含めます。
+activeな相性共有と照合できない固有名は、同名別人を安全に区別できないため過去履歴へ接続しません。照合できる表示名、または現在発言と過去の本人記録で同じ役割（上司、友人、家族など）が明示される場合だけ利用し、推定、根拠なし、旧版、期限切れ、削除済みを除外します。実際に回答へ使ったBrain ItemとSource Record IDは利用監査へ保存し、本人の個人データexportに含めます。
 
 ### token budget
 
@@ -772,7 +776,7 @@ flowchart TD
 
 日記候補の入力、起動条件、検証、Brain Item登録、否定・修正、重複・改訂は[Brain Item生成設計 §7](../domain/brain/brain-item-generation-design.md#7-日記チャットからの生成)を正とします。
 
-Brain Item抽出は会話返信とは別のsystem prompt、prompt version、Valibot schemaを使います。AccountData alarmがBrain Checkpoint QueueへIDだけを送り、consumerが削除・撤回されていないuser messageを最大10件、各5,000文字まで読み直してGeminiへ渡します。短い回答の対象を判定するため、同じ範囲と直前1件のassistant messageも文脈に含めますが、Evidenceにはuser messageだけを許可します。Chat Turn Queueと物理的に分離するため、Brain変換のAI待ちや再配送は通常返信を待たせません。上限超過本文はSource Recordとして保持したまま変換対象から外します。本人が明言した命題は`identity`、`memory`、`behavior_pattern`、`value_motivation`、`decision_system`、`preference`、`goal`の7分類から最大3件を生成し、`identity`は本人が明言した現在の立場・職業に限ります。未明言の動機や傾向は推定しません。JSON・出力envelope不正またはproviderの一時失敗はQueueを失敗させて再試行し、個別候補のschema・Evidence・重複違反、空白statement、根拠user message本文にそのまま含まれないstatementは理由コードだけをlogへ残して候補単位で除外します。安全経路または正常な空配列は0件として適用します。相対日付を含むstatementの保存とVectorize検索時の扱いは[Brain Item生成設計](../domain/brain/brain-item-generation-design.md)を正とします。候補の保存はAccountData actionだけが行い、モデルへDBや外部I/Oのtoolを公開しません。
+Brain Item抽出は会話返信とは別のsystem prompt、prompt version、Valibot schemaを使います。AccountData alarmがBrain Checkpoint QueueへIDだけを送り、consumerが削除・撤回されていないuser messageを最大10件、各5,000文字まで読み直してGeminiへ渡します。短い回答の対象を判定するため、同じ範囲と直前1件のassistant messageも文脈に含めますが、Evidenceにはuser messageだけを許可します。Chat Turn Queueと物理的に分離するため、Brain変換のAI待ちや再配送は通常返信を待たせません。上限超過本文はSource Recordとして保持したまま変換対象から外します。本人が明言した命題は`identity`、`memory`、`behavior_pattern`、`value_motivation`、`decision_system`、`preference`、`goal`の7分類から最大3件を生成し、`identity`は本人が明言した現在の立場・職業に限ります。特定の相手について本人が明言した事実や観察は`memory`とし、相手の未明言の動機や性格を推定しません。JSON・出力envelope不正またはproviderの一時失敗はQueueを失敗させて再試行し、個別候補のschema・Evidence・重複違反、空白statement、根拠user message本文にそのまま含まれないstatementは理由コードだけをlogへ残して候補単位で除外します。安全経路または正常な空配列は0件として適用します。相対日付を含むstatementの保存とVectorize検索時の扱いは[Brain Item生成設計](../domain/brain/brain-item-generation-design.md)を正とします。候補の保存はAccountData actionだけが行い、モデルへDBや外部I/Oのtoolを公開しません。
 
 声かけコンテキストの生成では、候補schemaへ検証済みの`promptContext`を持たせます。抽出モデルが「看護師」から変動シフトを補完することは禁止し、職業と週間リズムは別候補・別Evidenceとして扱います。構造化属性の値が根拠本文で検証できない候補はBrain Item全体を保存せず、自由記述の`attributes_json`へ縮退しません。
 

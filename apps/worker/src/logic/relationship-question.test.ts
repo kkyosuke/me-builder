@@ -6,6 +6,7 @@ import type {
 import { describe, expect, it } from "vitest";
 import {
   buildRelationshipQuestionPlan,
+  buildRelationshipSearchHints,
   selectFullRelationshipHistory,
 } from "./relationship-question";
 
@@ -165,5 +166,45 @@ describe("selectFullRelationshipHistory", () => {
         fullMemory({ statement: "田中さんと以前相談した" }),
       ]),
     ).toEqual([]);
+  });
+
+  it("一意な相性共有相手なら表示名と関係語を同じ人物の検索対象にする", () => {
+    const plan = buildRelationshipQuestionPlan({
+      accountId: "account-1",
+      mode: "confirmed-history",
+      messages: [{ id: "current", role: "user", body: "最近パートナーと喧嘩した", sequence: 1 }],
+      currentUserMessageIds: ["current"],
+      sharedRelationships: [{ relationshipCategory: "partner", partnerDisplayName: "美咲" }],
+    });
+    if (!plan.active) throw new Error("relationship plan was not activated");
+
+    expect(buildRelationshipSearchHints(plan.context)).toEqual(["美咲", "partner", "パートナー"]);
+    expect(plan.context.matchedSharedRelationship).toEqual({
+      relationshipCategory: "partner",
+      partnerDisplayName: "美咲",
+    });
+    expect(
+      selectFullRelationshipHistory(plan.context, [
+        fullMemory({ brainItemId: "named", statement: "美咲は言い争うと一度黙る" }),
+        fullMemory({ brainItemId: "alias", statement: "彼女は土日が休み" }),
+        fullMemory({ brainItemId: "other", statement: "上司は結論を先に聞きたい人" }),
+      ]).map(({ brainItemId }) => brainItemId),
+    ).toEqual(["named", "alias"]);
+  });
+
+  it("共有相手が複数いて一意に照合できない場合は人物を決めつけない", () => {
+    const plan = buildRelationshipQuestionPlan({
+      accountId: "account-1",
+      mode: "confirmed-history",
+      messages: [{ id: "current", role: "user", body: "友達と揉めた", sequence: 1 }],
+      currentUserMessageIds: ["current"],
+      sharedRelationships: [
+        { relationshipCategory: "friend", partnerDisplayName: "美咲" },
+        { relationshipCategory: "friend", partnerDisplayName: "拓海" },
+      ],
+    });
+    if (!plan.active) throw new Error("relationship plan was not activated");
+    expect(plan.context.matchedSharedRelationship).toBeUndefined();
+    expect(buildRelationshipSearchHints(plan.context)).toEqual(["友達"]);
   });
 });

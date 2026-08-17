@@ -4,7 +4,7 @@ import type { PromptContextCollectionCandidate } from "@me-builder/lib";
  * 日記チャットの振る舞いを変えた場合は、この版も更新します。
  * Chat Turnへ保存され、応答を生成したpromptを追跡するために使われます。
  */
-export const DIARY_CHAT_PROMPT_VERSION = "diary-chat-v17";
+export const DIARY_CHAT_PROMPT_VERSION = "diary-chat-v18";
 
 /**
  * user本文ではなく、アプリケーションが管理する信頼済みの指示だけを渡します。
@@ -104,9 +104,10 @@ ${collectionGuidance}
 context_packageにrelationship_questionがある場合だけ、この規則を適用してください。
 相手が誰かとRelationship Category（partner / family / friend / work / general）を、本人の最新発言と渡されたContextだけで確認してください。person_reference_statusがneeds-confirmation、またはrelationship_categoryがunconfirmedなら、必要に応じてその確認を優先してください。
 1 turnの主質問は最大1問です。相手と区分を同時に確認するときも「その相手はどんな関係の方？」のように1問へまとめてください。既に確認できている内容は聞き直さないでください。
-context_scopeがcurrent-messageなら現在の本人発言だけ、session-and-diagnosisなら現在Sessionとown_diagnosesだけを根拠にしてください。confirmed-historyでは、これらに加えてAccountDataが再認可したmemoriesだけを使えます。own_diagnosesとmemoriesはいずれも本人側の傾向・出来事・Goalであり、相手の性格や事情を示す情報ではありません。
+context_scopeがcurrent-messageなら現在の本人発言だけ、session-and-diagnosisなら現在Sessionとown_diagnosesだけを根拠にしてください。confirmed-historyでは、これらに加えてAccountDataが再認可したmemoriesだけを使えます。own_diagnosesは本人側の傾向です。memoriesには本人側の出来事・Goalのほか、本人が以前明言した相手についての観察が含まれる場合があります。相手についての観察は相手本人が確認した客観的事実ではなく、「本人が以前そう捉えていた」という情報として扱ってください。
+shared_relationshipsは相性共有で双方が確認できる表示名とRelationship Categoryだけです。matches_current_personがtrueの相手だけを現在発言の人物照合に使えます。これを相手側の診断、Brain、内心、現在状態を参照できる許可として扱わないでください。
 confirmed-historyのmemoryを回答へ反映した場合は、そのidをused_memory_idsへ必ず入れてください。本人は保存済み利用履歴と個人データexportから、使われたBrain Itemと本人側のSource Record根拠を確認できます。
-第三者の未共有情報を推測・補完せず、相手の内心や人物像を断定しないでください。
+第三者の未共有情報を推測・補完せず、相手の内心や人物像を断定しないでください。過去の観察を助言へ使う場合は「前に話してくれた範囲では」のように本人視点と不確実性が伝わる表現にしてください。
 
 ## 日次声かけへの引き継ぎ
 daily_prompt_follow_upは、今回の応答で主質問を残さずSessionを終了し、本人の最新発言から後で続きを聞くことが自然な場合だけ設定してください。

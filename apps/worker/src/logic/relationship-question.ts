@@ -4,6 +4,7 @@ import type {
   RelationshipDiagnosisContext,
 } from "@me-builder/lib";
 import type { RelationshipCategory } from "@me-builder/lib/diagnosis";
+import type { SharedRelationshipContext } from "./shared-relationship-context";
 
 export type RelationshipQuestionContextMode =
   | "current-message"
@@ -17,8 +18,35 @@ export type RelationshipQuestionContext = Readonly<{
   personReference?: string;
   category?: RelationshipCategory;
   diagnoses: readonly RelationshipDiagnosisContext[];
+  sharedRelationships: readonly SharedRelationshipContext[];
+  matchedSharedRelationship?: SharedRelationshipContext;
 }>;
 
+const CATEGORY_REFERENCE_TERMS: Readonly<
+  Record<Exclude<RelationshipCategory, "general">, readonly string[]>
+> = {
+  partner: ["夫", "妻", "彼氏", "彼女", "恋人", "パートナー", "配偶者", "婚約者"],
+  family: [
+    "母",
+    "父",
+    "両親",
+    "親",
+    "兄",
+    "姉",
+    "弟",
+    "妹",
+    "祖父",
+    "祖母",
+    "家族",
+    "息子",
+    "娘",
+    "子ども",
+    "子供",
+    "きょうだい",
+  ],
+  friend: ["友達", "友だち", "友人", "親友", "幼なじみ"],
+  work: ["上司", "部下", "同僚", "先輩", "後輩", "取引先", "職場", "仕事仲間"],
+};
 const CATEGORY_SIGNALS: Readonly<Record<Exclude<RelationshipCategory, "general">, RegExp>> = {
   partner: /(夫|妻|彼氏|彼女|恋人|パートナー|配偶者|婚約者|partner|spouse)/iu,
   family: /(母|父|両親|親|兄|姉|弟|妹|祖父|祖母|家族|息子|娘|子ども|子供|きょうだい|family)/iu,
@@ -52,19 +80,56 @@ function detectSafePersonReference(text: string): string | undefined {
   return text.match(EXPLICIT_PERSON_SIGNALS)?.[0];
 }
 
-/** Fullでも安定した人物IDがない固有名の履歴は使わず、同じ役割が明示された本人記録だけへ縮める。 */
+function detectSharedRelationship(
+  text: string,
+  category: RelationshipCategory | undefined,
+  sharedRelationships: readonly SharedRelationshipContext[],
+): SharedRelationshipContext | undefined {
+  const named = sharedRelationships.filter(({ partnerDisplayName }) =>
+    text.includes(partnerDisplayName),
+  );
+  if (named.length === 1) return named[0];
+  if (!category || category === "general") return undefined;
+  const categorized = sharedRelationships.filter(
+    ({ relationshipCategory }) => relationshipCategory === category,
+  );
+  return categorized.length === 1 ? categorized[0] : undefined;
+}
+
+/** 現在発言と一意に照合できた共有相手だけをVector検索hintへ加える。 */
+export function buildRelationshipSearchHints(
+  context: RelationshipQuestionContext,
+): readonly string[] {
+  const matched = context.matchedSharedRelationship;
+  if (!matched) return context.personReference ? [context.personReference] : [];
+  return [
+    matched.partnerDisplayName,
+    matched.relationshipCategory,
+    ...(context.personReference ? [context.personReference] : []),
+  ];
+}
+
+/** Fullでも共有相手か同じ役割に照合できない人物履歴は使わず、本人所有の確認済み記録だけへ縮める。 */
 export function selectFullRelationshipHistory(
   context: RelationshipQuestionContext,
   memories: readonly BrainChatContextMemory[],
 ): readonly BrainChatContextMemory[] {
   if (context.mode !== "confirmed-history" || !context.personReference) return [];
+  const matched = context.matchedSharedRelationship;
+  const subjectTerms = matched
+    ? [
+        context.personReference,
+        matched.partnerDisplayName,
+        ...CATEGORY_REFERENCE_TERMS[matched.relationshipCategory],
+      ]
+    : [context.personReference];
   return memories.filter(
     (memory) =>
       FULL_HISTORY_CATEGORIES.has(memory.category) &&
       !memory.isInference &&
       memory.evidence.length > 0 &&
-      !NAMED_PERSON_SIGNAL.test(memory.statement) &&
-      memory.statement.includes(context.personReference as string),
+      (!NAMED_PERSON_SIGNAL.test(memory.statement) || Boolean(matched)) &&
+      subjectTerms.some((term) => memory.statement.includes(term)),
   );
 }
 
@@ -79,6 +144,7 @@ export function buildRelationshipQuestionPlan(
     messages: readonly ConversationContextMessage[];
     currentUserMessageIds: readonly string[];
     diagnoses?: readonly RelationshipDiagnosisContext[];
+    sharedRelationships?: readonly SharedRelationshipContext[];
   }>,
 ):
   | Readonly<{ active: false; messages: readonly ConversationContextMessage[] }>
@@ -89,10 +155,23 @@ export function buildRelationshipQuestionPlan(
     }> {
   const current = currentUserMessages(input.messages, input.currentUserMessageIds);
   const currentText = current.map(({ body }) => body).join("\n");
-  const category = detectCategory(currentText);
-  const personReference = detectSafePersonReference(currentText);
+  const sharedRelationships = input.sharedRelationships ?? [];
+  const detectedCategory = detectCategory(currentText);
+  const matchedSharedRelationship = detectSharedRelationship(
+    currentText,
+    detectedCategory,
+    sharedRelationships,
+  );
+  const category = detectedCategory ?? matchedSharedRelationship?.relationshipCategory;
+  const personReference =
+    detectSafePersonReference(currentText) ??
+    (matchedSharedRelationship && currentText.includes(matchedSharedRelationship.partnerDisplayName)
+      ? matchedSharedRelationship.partnerDisplayName
+      : undefined);
   const active =
-    EXPLICIT_PERSON_SIGNALS.test(currentText) || RELATIONSHIP_SIGNALS.test(currentText);
+    EXPLICIT_PERSON_SIGNALS.test(currentText) ||
+    RELATIONSHIP_SIGNALS.test(currentText) ||
+    Boolean(matchedSharedRelationship && personReference);
   if (!active) return { active: false, messages: input.messages };
 
   const messages = input.mode === "current-message" ? current : input.messages;
@@ -112,10 +191,14 @@ export function buildRelationshipQuestionPlan(
       mode: input.mode,
       personReferenceStatus: EXPLICIT_PERSON_SIGNALS.test(currentText)
         ? "confirmed"
-        : "needs-confirmation",
+        : personReference
+          ? "confirmed"
+          : "needs-confirmation",
       ...(personReference ? { personReference } : {}),
       ...(category ? { category } : {}),
       diagnoses,
+      sharedRelationships,
+      ...(matchedSharedRelationship ? { matchedSharedRelationship } : {}),
     },
   };
 }

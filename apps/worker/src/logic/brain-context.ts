@@ -33,6 +33,7 @@ export function buildBrainSearchQuery(
   messages: readonly ConversationContextMessage[],
   currentUserMessageIds: readonly string[],
   at = new Date(),
+  queryHints: readonly string[] = [],
 ): string | undefined {
   const currentIds = new Set(currentUserMessageIds);
   const query = messages
@@ -48,7 +49,10 @@ export function buildBrainSearchQuery(
     .filter(Boolean)
     .join("\n");
   if (!query) return undefined;
-  return query.slice(-SEARCH_QUERY_CHARACTER_LIMIT);
+  const hints = [...new Set(queryHints.map((hint) => hint.trim()).filter(Boolean))]
+    .map((hint) => `関連人物: ${hint}`)
+    .join("\n");
+  return `${query}${hints ? `\n${hints}` : ""}`.slice(-SEARCH_QUERY_CHARACTER_LIMIT);
 }
 
 /**
@@ -64,6 +68,7 @@ export async function loadBrainContextMemories(
     currentUserMessageIds: readonly string[];
     semanticSearchDays?: number | null;
     requiredAccessLabel?: string;
+    queryHints?: readonly string[];
     signal?: AbortSignal;
   }>,
   dependencies: BrainContextDependencies = defaultDependencies,
@@ -72,7 +77,12 @@ export async function loadBrainContextMemories(
   const accountDataNamespace = input.cf.do.accountData;
   const apiKey = input.workerConfig.googleVertexAiApiKey;
   const hmacSecret = input.workerConfig.brainVectorHmacSecret;
-  const query = buildBrainSearchQuery(input.messages, input.currentUserMessageIds);
+  const query = buildBrainSearchQuery(
+    input.messages,
+    input.currentUserMessageIds,
+    new Date(),
+    input.queryHints,
+  );
   if (!index || !accountDataNamespace || !apiKey || !hmacSecret || !query) return [];
 
   const searchController = new AbortController();

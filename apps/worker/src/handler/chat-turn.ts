@@ -25,9 +25,11 @@ import {
 } from "../logic/diary-chat";
 import {
   buildRelationshipQuestionPlan,
+  buildRelationshipSearchHints,
   selectFullRelationshipHistory,
 } from "../logic/relationship-question";
 import { shouldLoadSelfCareContext } from "../logic/self-care-context";
+import { loadSharedRelationshipContexts } from "../logic/shared-relationship-context";
 import {
   DEFAULT_DIARY_CHAT_PROMPT_OPTIONS,
   getDiaryChatConversationGuidance,
@@ -543,6 +545,39 @@ export async function processChatTurnMessage(
       messages: context.messages,
       currentUserMessageIds: context.currentUserMessageIds,
     });
+    const sharedRelationships =
+      initialRelationshipPlan.active && !pendingResponse && safetyRoute === "normal"
+        ? await loadSharedRelationshipContexts(cf, message.body.accountId).catch(
+            (error: unknown) => {
+              logger.warn(
+                {
+                  event: "relationship-question.shared-context.failed",
+                  service: "worker",
+                  environment: workerConfig.environment,
+                  component: "chat-turn",
+                  outcome: "degraded",
+                  disposition: "continue",
+                  ...toSafeOperationalErrorFields(error, {
+                    code: "SHARED_RELATIONSHIP_CONTEXT_LOAD_FAILED",
+                    category: "dependency",
+                    stage: "context.shared-relationship",
+                    retryable: false,
+                    dependency: "compatibility-data",
+                  }),
+                },
+                "[Relationship question] failed to load shared relationship context",
+              );
+              return [];
+            },
+          )
+        : [];
+    const relationshipContextPlan = buildRelationshipQuestionPlan({
+      accountId: message.body.accountId,
+      mode: relationshipQuestionMode,
+      messages: context.messages,
+      currentUserMessageIds: context.currentUserMessageIds,
+      sharedRelationships,
+    });
     const aiReplyReservation =
       safetyRoute !== "normal"
         ? undefined
@@ -590,7 +625,7 @@ export async function processChatTurnMessage(
       pendingResponse || safetyRoute !== "normal" || quotaResponse
         ? [[], [], [], null, []]
         : await Promise.all([
-            initialRelationshipPlan.active && relationshipQuestionMode !== "confirmed-history"
+            relationshipContextPlan.active && relationshipQuestionMode !== "confirmed-history"
               ? Promise.resolve([])
               : loadBrainContextMemories({
                   cf,
@@ -599,12 +634,15 @@ export async function processChatTurnMessage(
                   messages: context.messages,
                   currentUserMessageIds: context.currentUserMessageIds,
                   semanticSearchDays: entitlement.policy.semanticSearchDays,
-                  ...(initialRelationshipPlan.active
+                  ...(relationshipContextPlan.active
                     ? { requiredAccessLabel: "relationship" }
+                    : {}),
+                  ...(relationshipContextPlan.active
+                    ? { queryHints: buildRelationshipSearchHints(relationshipContextPlan.context) }
                     : {}),
                   ...(generationController.signal ? { signal: generationController.signal } : {}),
                 }),
-            initialRelationshipPlan.active && relationshipQuestionMode !== "current-message"
+            relationshipContextPlan.active && relationshipQuestionMode !== "current-message"
               ? accountDataClient
                   .execute("brain.loadRelationshipDiagnosisContexts")
                   .catch((error: unknown) => {
@@ -652,7 +690,7 @@ export async function processChatTurnMessage(
                 );
                 return undefined;
               }),
-            !initialRelationshipPlan.active && entitlement.policy.features["goal-follow-up"]
+            !relationshipContextPlan.active && entitlement.policy.features["goal-follow-up"]
               ? accountDataClient
                   .execute(
                     "goalFollowUp.selectMemory",
@@ -681,7 +719,7 @@ export async function processChatTurnMessage(
                     return null;
                   })
               : Promise.resolve(null),
-            !initialRelationshipPlan.active &&
+            !relationshipContextPlan.active &&
             shouldLoadSelfCareContext({
               mode: entitlement.policy.selfCareContext,
               safetyRoute,
@@ -718,6 +756,7 @@ export async function processChatTurnMessage(
       messages: context.messages,
       currentUserMessageIds: context.currentUserMessageIds,
       diagnoses: relationshipDiagnoses,
+      sharedRelationships,
     });
     const scopedBrainMemories = relationshipPlan.active
       ? selectFullRelationshipHistory(relationshipPlan.context, loadedBrainMemories)
