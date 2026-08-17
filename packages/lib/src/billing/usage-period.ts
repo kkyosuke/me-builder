@@ -1,26 +1,13 @@
 import type { AiUsageKind, AiUsagePeriod } from "../do/account/action/ai-usage";
 import type { ResolvedEntitlement } from "./entitlement";
 
-const DAY_MS = 24 * 60 * 60 * 1_000;
-const FREE_SUMMARY_PERIOD_MS = 90 * DAY_MS;
-
 /** APIとWorkerが同じ利用枠を参照するための、Plan適用期間からの決定的なperiod解決。 */
 export function resolveEntitlementUsagePeriod(
   entitlement: ResolvedEntitlement,
-  kind: AiUsageKind,
+  _kind: AiUsageKind,
   at = new Date(),
 ): AiUsagePeriod {
   assertValidDate(at);
-  if (
-    kind === "profile-summary" &&
-    entitlement.policy.profileSummary.period === "rolling-90-days"
-  ) {
-    const bucket = Math.floor(at.getTime() / FREE_SUMMARY_PERIOD_MS);
-    const start = new Date(bucket * FREE_SUMMARY_PERIOD_MS);
-    const end = new Date(start.getTime() + FREE_SUMMARY_PERIOD_MS);
-    return { key: `free-summary-90d:${bucket}`, start, end };
-  }
-
   if (entitlement.source === "free") return utcCalendarMonth(at);
   return assignmentMonth(entitlement.effectiveAt, at);
 }

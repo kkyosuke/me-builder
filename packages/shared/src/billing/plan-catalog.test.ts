@@ -4,6 +4,8 @@ import {
   billingLookupKey,
   paidPlanCodes,
   publicBillingPlans,
+  publicPlanCodes,
+  publicPlanFeatures,
 } from "./plan-catalog";
 
 describe("publicBillingPlans", () => {
@@ -19,5 +21,18 @@ describe("publicBillingPlans", () => {
     );
     expect(new Set(lookupKeys).size).toBe(lookupKeys.length);
     expect(billingLookupKey("full", "year")).toBe("me_builder_full_yearly");
+  });
+
+  it("わたしのまとめを全Plan共通機能として公開する", () => {
+    const summary = publicPlanFeatures.find((feature) => feature.label === "わたしのまとめ");
+
+    expect(summary).toBeDefined();
+    expect(Object.keys(summary?.plans ?? {})).toEqual(publicPlanCodes);
+    expect(Object.values(summary?.plans ?? {}).every((value) => value.includes("利用可能"))).toBe(
+      true,
+    );
+    expect(publicBillingPlans.flatMap((plan) => plan.highlights).join(" ")).not.toMatch(
+      /わたしのまとめ 月/u,
+    );
   });
 });

@@ -21,7 +21,7 @@ export type EntitlementPolicy = Readonly<{
   aiReply: Readonly<{ limit: number; period: "assignment-month" }>;
   profileSummary: Readonly<{
     limit: number;
-    period: "assignment-month" | "rolling-90-days";
+    period: "assignment-month";
   }>;
   semanticSearchDays: number | null;
   relationshipQuestionContext: "current-message" | "session-and-diagnosis" | "confirmed-history";
@@ -33,10 +33,13 @@ export type EntitlementPolicy = Readonly<{
   features: Readonly<Record<EntitlementFeature, boolean>>;
 }>;
 
+/** Planの価値差には使わない、全Account共通のまとめ生成月次運用上限。 */
+export const PROFILE_SUMMARY_MONTHLY_LIMIT = 12;
+
 const policies = {
   free: {
     aiReply: { limit: 20, period: "assignment-month" },
-    profileSummary: { limit: 1, period: "rolling-90-days" },
+    profileSummary: { limit: PROFILE_SUMMARY_MONTHLY_LIMIT, period: "assignment-month" },
     semanticSearchDays: 30,
     relationshipQuestionContext: "current-message",
     monthlyChange: "none",
@@ -54,7 +57,7 @@ const policies = {
   },
   lite: {
     aiReply: { limit: 150, period: "assignment-month" },
-    profileSummary: { limit: 4, period: "assignment-month" },
+    profileSummary: { limit: PROFILE_SUMMARY_MONTHLY_LIMIT, period: "assignment-month" },
     semanticSearchDays: 365,
     relationshipQuestionContext: "session-and-diagnosis",
     monthlyChange: "brief",
@@ -72,7 +75,7 @@ const policies = {
   },
   full: {
     aiReply: { limit: 600, period: "assignment-month" },
-    profileSummary: { limit: 12, period: "assignment-month" },
+    profileSummary: { limit: PROFILE_SUMMARY_MONTHLY_LIMIT, period: "assignment-month" },
     semanticSearchDays: null,
     relationshipQuestionContext: "confirmed-history",
     monthlyChange: "full",
@@ -90,7 +93,7 @@ const policies = {
   },
   family: {
     aiReply: { limit: 600, period: "assignment-month" },
-    profileSummary: { limit: 12, period: "assignment-month" },
+    profileSummary: { limit: PROFILE_SUMMARY_MONTHLY_LIMIT, period: "assignment-month" },
     semanticSearchDays: null,
     relationshipQuestionContext: "confirmed-history",
     monthlyChange: "full",

@@ -4,7 +4,7 @@ import { EntitlementService } from "./entitlement";
 import { resolveEntitlementUsagePeriod } from "./usage-period";
 
 describe("resolveEntitlementUsagePeriod", () => {
-  it("FreeのAI返信をUTC暦月、まとめを固定90日窓へ解決する", async () => {
+  it("FreeのAI返信とまとめを同じUTC暦月へ解決する", async () => {
     const at = new Date("2026-08-15T12:00:00.000Z");
     const entitlement = await new EntitlementService(
       new FakeAccountPlanAssignmentProvider(),
@@ -15,9 +15,11 @@ describe("resolveEntitlementUsagePeriod", () => {
       start: new Date("2026-08-01T00:00:00.000Z"),
       end: new Date("2026-09-01T00:00:00.000Z"),
     });
-    const summary = resolveEntitlementUsagePeriod(entitlement, "profile-summary", at);
-    expect(summary.end.getTime() - summary.start.getTime()).toBe(90 * 24 * 60 * 60 * 1_000);
-    expect(at >= summary.start && at < summary.end).toBe(true);
+    expect(resolveEntitlementUsagePeriod(entitlement, "profile-summary", at)).toEqual({
+      key: "free-month:2026-08",
+      start: new Date("2026-08-01T00:00:00.000Z"),
+      end: new Date("2026-09-01T00:00:00.000Z"),
+    });
   });
 
   it("契約開始日を基準に月末をclampして次の期間へ進む", async () => {

@@ -34,8 +34,8 @@ describe("getProfileEntitlement", () => {
   });
 
   it.each([
-    ["free", "free", 20, 1],
-    ["lite", "subscription", 150, 4],
+    ["free", "free", 20, 12],
+    ["lite", "subscription", 150, 12],
     ["full", "subscription", 600, 12],
     ["family", "family-seat", 600, 12],
   ] as const)(

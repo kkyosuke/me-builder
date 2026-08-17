@@ -33,4 +33,21 @@ describe("ServiceSiteHomeScreen", () => {
       "https://kagami.example.com/",
     );
   });
+
+  it("Freeを含む料金プランと利用できる機能を表示する", () => {
+    render(<ServiceSiteHomeScreen />);
+
+    expect(screen.getByRole("heading", { name: "自分に合う続け方を選べます。" })).toBeTruthy();
+    expect(screen.getByText("￥780")).toBeTruthy();
+    expect(screen.getByText("￥1,480")).toBeTruthy();
+    expect(screen.getByText("￥2,980")).toBeTruthy();
+    expect(
+      screen.getByRole("table", {
+        name: "Free、Lite、Full、ファミリーパックの機能比較",
+      }),
+    ).toBeTruthy();
+    expect(screen.getByRole("rowheader", { name: "わたしのまとめ" })).toBeTruthy();
+    expect(screen.queryByText(/わたしのまとめ 月4回/u)).toBeNull();
+    expect(screen.queryByText(/わたしのまとめ 月12回/u)).toBeNull();
+  });
 });

@@ -23,8 +23,8 @@ function assignment(plan: PlanCode): AccountPlanAssignment {
 
 describe("EntitlementService", () => {
   it.each([
-    ["free", 20, 1, 30, false, "current-message"],
-    ["lite", 150, 4, 365, true, "session-and-diagnosis"],
+    ["free", 20, 12, 30, false, "current-message"],
+    ["lite", 150, 12, 365, true, "session-and-diagnosis"],
     ["full", 600, 12, null, true, "confirmed-history"],
     ["family", 600, 12, null, true, "confirmed-history"],
   ] as const)(
