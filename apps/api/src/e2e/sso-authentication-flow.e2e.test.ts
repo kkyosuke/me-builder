@@ -77,7 +77,11 @@ describe("SSO authentication E2E", () => {
         store,
         client,
         identityResolver: {
-          findAccount: vi.fn(async () => ({ accountId: "admin-account", role: "admin" as const })),
+          findAccount: vi.fn(async () => ({
+            accountId: "admin-account",
+            authenticatedIdentityId: "identity-auth0-admin",
+            role: "admin" as const,
+          })),
         },
         rolloutAuthorizer: createSsoRolloutAuthorizer(0),
         sessionIssuer,
@@ -90,6 +94,7 @@ describe("SSO authentication E2E", () => {
     });
     expect(sessionIssuer.issue).toHaveBeenCalledWith({
       accountId: "admin-account",
+      authenticatedIdentityId: "identity-auth0-admin",
       authenticationMethod: "sso",
       authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
     });
@@ -111,7 +116,11 @@ describe("SSO authentication E2E", () => {
     const client = auth0Fixture();
     const sessionIssuer = { issue: vi.fn(async () => ({ cookie: "opaque-session" })) };
     const knownUser = {
-      findAccount: vi.fn(async () => ({ accountId: "known-user", role: "user" as const })),
+      findAccount: vi.fn(async () => ({
+        accountId: "known-user",
+        authenticatedIdentityId: "identity-auth0-user",
+        role: "user" as const,
+      })),
     };
 
     const excludedStore = memoryStore();
