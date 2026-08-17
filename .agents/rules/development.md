@@ -70,7 +70,7 @@
       - 再作成でresource IDが変わったときの反映先は、実行したブランチで変わります。**`main`から実行した場合**は`chore/preview-resource-ids-<run id>`ブランチへcommitしてPRを作成し、同じjobで`bun run ci`が通ったときだけsquash mergeします（`main`はrulesetで直接pushできないため）。検証が落ちたときはPRを開いたまま残します。**それ以外のブランチから実行した場合**は、そのブランチへ直接commitしてpushし、PRは作りません。ブランチの持ち主がそのまま作業を続けられるようにするためで、検証はその人のPRの`ci.yml`が担います。
       - `GITHUB_TOKEN`で作成したPRは`pull_request`イベントを発火せず`ci.yml`が走らないため、GitHubのauto-mergeではなくjob内の検証をマージ条件にします。
     - `setup-stripe-billing.yml` はStripeとCloudflareの課金設定を手動同期します。Environmentごとのsecret、承認、確認文字列、実行方法は[Stripe課金環境の同期運用](../../docs/development/stripe-billing-setup.md)を正とします。
-    - `main` ブランチマージ時には `cd-production.yml` が全検証後に Cloudflare 本番環境へ自動デプロイします。ProductionはMVP中核機能を提供する実環境のため、Cloudflare、公開domain、LINE Messaging API / LINE Login / LIFF、Vertex AI、配送・仮名化secret、API documentationのAccess許可先をデプロイ前に必須検証します。欠落時はデプロイをskipして成功扱いにせず、外部状態を変更する前にjobを失敗させます。
+    - `main` ブランチマージ時には `cd-production.yml` が全検証後に Cloudflare 本番環境へ自動デプロイします。ProductionはMVP中核機能を提供する実環境のため、Cloudflare、公開domain、LINE Messaging API / LINE Login / LIFF、Vertex AI、Stripe課金、配送・仮名化secret、API documentationのAccess許可先をデプロイ前に必須検証します。Stripe課金は同期workflowがCloudflareへ永続化したruntime secret binding名も確認します。欠落時はデプロイをskipして成功扱いにせず、外部状態を変更する前にjobを失敗させます。
     - Bun のセットアップ、キャッシュ、および `bun install --frozen-lockfile` の一連の処理は GitHub Composite Action (`.github/actions/setup-bun-workspace`) に共通化されています。
     - キャッシュは 2 種類あります。依存キャッシュ (`~/.bun/install/cache`) はルートの `bun.lock` のハッシュをキーにします (`**/bun.lock` はツリー全体を走査するため使いません)。型チェックの incremental 情報 (`**/*.tsbuildinfo`) は復元だけを全ワークフローで行い、保存は `main` の `cd-production.yml` だけが行います。PR ごとに保存するとリポジトリのキャッシュ上限 (10GB) を圧迫し、依存キャッシュが追い出されるためです。
     - `tsconfig.json` の `incremental` は、この tsbuildinfo キャッシュを効かせるために有効化しています。無効化するとキャッシュが無意味になります。
