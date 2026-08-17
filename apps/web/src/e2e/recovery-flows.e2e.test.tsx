@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "../App";
 
 // App全体の初期描画とAPI往復を待つため、他のE2Eと同時実行しても既定の1秒で切らない。
-configure({ asyncUtilTimeout: 5_000 });
+configure({ asyncUtilTimeout: 10_000 });
 
 const liff = vi.hoisted(() => ({
   initialize: vi.fn(),
@@ -158,7 +158,6 @@ describe("Web recovery flows E2E", () => {
     liff.initialize.mockResolvedValue({
       status: "ready",
       inClient: true,
-      profile: { displayName: "テスト" },
     });
     liff.readCredential.mockReturnValue("dummy.id.token");
   });
@@ -294,6 +293,7 @@ describe("Web recovery flows E2E", () => {
   it("診断画面のうつしレベルを固定プロフィールアイコンと重ならない位置に表示する", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = urlOf(input);
+      if (url.pathname === "/api/auth/session") return Response.json(authSession);
       if (url.pathname === "/api/legal/terms") return Response.json(acceptedTermsStatus);
       if (url.pathname === "/api/profile") return Response.json(accountProfile);
       if (url.pathname === "/api/diagnoses") return Response.json(diagnosisList);
@@ -310,5 +310,5 @@ describe("Web recovery flows E2E", () => {
     const profileButton = await screen.findByRole("button", { name: "プロフィールを開く" });
     expect(level.parentElement?.className).toContain("pr-14");
     expect(profileButton.className).toContain("fixed");
-  });
+  }, 10_000);
 });

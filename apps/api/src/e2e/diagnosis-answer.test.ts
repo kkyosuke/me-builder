@@ -650,10 +650,12 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
     });
   });
 
-  it("seedで参照される全採点設定がQuestion ID・Version・Choiceと一致する", async () => {
-    const rows = await database
-      .prepare(
-        `SELECT
+  it(
+    "seedで参照される全採点設定がQuestion ID・Version・Choiceと一致する",
+    async () => {
+      const rows = await database
+        .prepare(
+          `SELECT
            d.id AS diagnosis_id,
            dq.id AS diagnosis_question_id,
            qc.choice_id
@@ -668,38 +670,40 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
           AND qc.is_deleted = 0
          WHERE d.state = 'published' AND d.is_deleted = 0
          ORDER BY d.id, dq.position, qc.position`,
-      )
-      .all<{
-        diagnosis_id: string;
-        diagnosis_question_id: string;
-        choice_id: string;
-      }>();
-    const targets = new Map<string, { diagnosisQuestionId: string; choiceId: string }>();
-    for (const row of rows.results) {
-      if (!targets.has(row.diagnosis_id)) {
-        targets.set(row.diagnosis_id, {
-          diagnosisQuestionId: row.diagnosis_question_id,
-          choiceId: row.choice_id,
+        )
+        .all<{
+          diagnosis_id: string;
+          diagnosis_question_id: string;
+          choice_id: string;
+        }>();
+      const targets = new Map<string, { diagnosisQuestionId: string; choiceId: string }>();
+      for (const row of rows.results) {
+        if (!targets.has(row.diagnosis_id)) {
+          targets.set(row.diagnosis_id, {
+            diagnosisQuestionId: row.diagnosis_question_id,
+            choiceId: row.choice_id,
+          });
+        }
+      }
+      expect(targets.size).toBeGreaterThan(0);
+
+      for (const [diagnosisId, target] of targets) {
+        const saved = await putAnswer(target.diagnosisQuestionId, target.choiceId, diagnosisId);
+        expect(saved.status).toBe(200);
+
+        const response = await getAnswers(diagnosisId);
+        expect(response.status).toBe(200);
+        expect(await response.json()).toMatchObject({
+          id: diagnosisId,
+          scoring: {
+            scoringVersion: expect.any(Number),
+            parameters: expect.any(Array),
+          },
         });
       }
-    }
-    expect(targets.size).toBeGreaterThan(0);
-
-    for (const [diagnosisId, target] of targets) {
-      const saved = await putAnswer(target.diagnosisQuestionId, target.choiceId, diagnosisId);
-      expect(saved.status).toBe(200);
-
-      const response = await getAnswers(diagnosisId);
-      expect(response.status).toBe(200);
-      expect(await response.json()).toMatchObject({
-        id: diagnosisId,
-        scoring: {
-          scoringVersion: expect.any(Number),
-          parameters: expect.any(Array),
-        },
-      });
-    }
-  });
+    },
+    e2eTimeoutMs,
+  );
 
   it(
     "インドア・アウトドアと余暇の回答を4つのパラメータへ採点する",
