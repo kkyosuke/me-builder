@@ -67,6 +67,7 @@ describe("createAuth0SsoClient", () => {
       if (url.endsWith("openid-configuration")) return Response.json(discovery);
       if (url.endsWith("/oauth/token")) {
         expect(init?.method).toBe("POST");
+        expect(init?.signal).toBeInstanceOf(AbortSignal);
         expect(init?.headers).toEqual({ "Content-Type": "application/x-www-form-urlencoded" });
         expect(new URLSearchParams(String(init?.body))).toEqual(
           new URLSearchParams({
@@ -98,6 +99,18 @@ describe("createAuth0SsoClient", () => {
       }),
     ).resolves.toEqual(expect.objectContaining({ subject: "auth0|user-1" }));
     expect(verifyToken).toHaveBeenCalledWith("id-token", discovery, "nonce");
+  });
+
+  it("discovery取得にもprovider通信のtimeout signalを渡す", async () => {
+    const fetcher = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      expect(init?.signal).toBeInstanceOf(AbortSignal);
+      return Response.json(discovery);
+    });
+    const client = createAuth0SsoClient(configuration, { fetch: fetcher });
+
+    await expect(
+      client.createAuthorizationUrl({ state: "state", nonce: "nonce", codeChallenge: "challenge" }),
+    ).resolves.toBeInstanceOf(URL);
   });
 
   it("RS256署名・issuer・audience・nonceを検証してAuth0 identityへ変換する", async () => {

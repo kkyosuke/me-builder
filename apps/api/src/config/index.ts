@@ -144,10 +144,11 @@ export function getConfig(env?: Record<string, unknown>): ApiConfig {
     (!parsed.ssoIssuerUrl ||
       !parsed.ssoClientId ||
       !parsed.ssoClientSecret ||
-      !parsed.ssoCallbackUrl)
+      !parsed.ssoCallbackUrl ||
+      !parsed.webOrigin)
   ) {
     throw new Error(
-      "SSO_ISSUER_URL, SSO_CLIENT_ID, SSO_CLIENT_SECRET, and BASE_URL are required when SSO is enabled",
+      "SSO_ISSUER_URL, SSO_CLIENT_ID, SSO_CLIENT_SECRET, BASE_URL, and WEB_ORIGIN are required when SSO is enabled",
     );
   }
   return parsed;

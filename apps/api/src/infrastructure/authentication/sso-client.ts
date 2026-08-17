@@ -16,6 +16,8 @@ const TokenResponseSchema = v.object({
   id_token: v.pipe(v.string(), v.nonEmpty()),
 });
 
+const SSO_PROVIDER_TIMEOUT_MS = 5_000;
+
 type OidcDiscovery = v.InferOutput<typeof DiscoverySchema>;
 
 export type Auth0SsoConfiguration = {
@@ -101,7 +103,9 @@ export function createAuth0SsoClient(
       discoveryPromise ??
       (async () => {
         try {
-          const response = await fetcher(new URL(".well-known/openid-configuration", issuer));
+          const response = await fetcher(new URL(".well-known/openid-configuration", issuer), {
+            signal: AbortSignal.timeout(SSO_PROVIDER_TIMEOUT_MS),
+          });
           if (!response.ok) throw new SsoProviderError("configuration");
           const document = v.parse(DiscoverySchema, await response.json());
           if (document.issuer !== issuer.href) throw new SsoProviderError("configuration");
@@ -207,6 +211,7 @@ export function createAuth0SsoClient(
             redirect_uri: configuration.callbackUrl,
             code_verifier: codeVerifier,
           }),
+          signal: AbortSignal.timeout(SSO_PROVIDER_TIMEOUT_MS),
         });
       } catch {
         throw new SsoProviderError("provider_rejected");
