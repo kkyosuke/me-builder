@@ -10,7 +10,6 @@ export type LiffCredential = {
 
 export function createLineCredentialVerifier(
   lineLoginChannelId: string | undefined,
-  now: () => Date = () => new Date(),
 ): CredentialVerifier<LiffCredential> {
   return {
     async verify({ idToken }): Promise<CredentialVerificationResult> {
@@ -26,8 +25,8 @@ export function createLineCredentialVerifier(
           subject: verified.claims.sub,
           authenticationMethod: "liff",
           // 再認証policyへ検証時刻を渡すと、古いcredentialの再送が新しい認証に
-          // 見えてしまう。LINEが返したiatを正とし、古いmock等で欠ける場合だけ補完する。
-          authenticatedAt: verified.claims.issuedAt ?? now(),
+          // 見えてしまうため、LINEが返したiatを正とする。
+          authenticatedAt: verified.claims.issuedAt,
           ...((verified.claims.name || verified.claims.picture) && {
             displayProfile: {
               ...(verified.claims.name ? { displayName: verified.claims.name } : {}),

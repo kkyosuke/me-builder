@@ -13,10 +13,7 @@ describe("createLineCredentialVerifier", () => {
       ok: true,
       claims: { sub: "secret-subject", issuedAt },
     });
-    const verifier = createLineCredentialVerifier(
-      "channel-id",
-      () => new Date("2026-08-16T00:30:00.000Z"),
-    );
+    const verifier = createLineCredentialVerifier("channel-id");
 
     await expect(verifier.verify({ idToken: "secret-token" })).resolves.toMatchObject({
       type: "verified",
