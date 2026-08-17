@@ -283,7 +283,9 @@ export async function completeSsoLogin<SessionResult>(
   }
   if (!account) throw new SsoAuthenticationError("identity_unlinked", callback);
   try {
-    if (!(await input.rolloutAuthorizer.allows({ accountId: account.accountId, role: account.role }))) {
+    if (
+      !(await input.rolloutAuthorizer.allows({ accountId: account.accountId, role: account.role }))
+    ) {
       throw new SsoAuthenticationError("rollout_excluded", callback);
     }
   } catch (error) {
