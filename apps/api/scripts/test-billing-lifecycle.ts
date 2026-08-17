@@ -217,7 +217,7 @@ try {
 }
 
 async function logStripeAccountReadiness(client: Stripe): Promise<void> {
-  const account = await client.accounts.retrieve();
+  const account = await client.accounts.retrieveCurrent();
   const readiness = {
     businessProfileNameConfigured: Boolean(account.business_profile?.name),
     statementDescriptorConfigured: Boolean(account.settings?.payments?.statement_descriptor),
