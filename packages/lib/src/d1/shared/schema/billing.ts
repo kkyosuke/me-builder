@@ -72,6 +72,20 @@ export const billingProcessedEvents = sqliteTable(
   (table) => [index("billing_processed_object_idx").on(table.objectId, table.eventCreatedAt)],
 );
 
+/** Customerを作り直しても失われない、Account単位の初回trial開始記録。 */
+export const billingTrialUsages = sqliteTable(
+  "billing_trial_usages",
+  {
+    accountId: text("account_id")
+      .primaryKey()
+      .references(() => accounts.id),
+    providerSubscriptionId: text("provider_subscription_id").notNull(),
+    firstStartedAt: integer("first_started_at", { mode: "timestamp" }).notNull(),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  },
+  (table) => [index("billing_trial_subscription_idx").on(table.providerSubscriptionId)],
+);
+
 export const billingReconciliationAudits = sqliteTable(
   "billing_reconciliation_audits",
   {

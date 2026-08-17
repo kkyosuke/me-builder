@@ -1,3 +1,4 @@
+import { BILLING_INITIAL_TRIAL_DAYS } from "@me-builder/shared";
 import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
 import * as v from "valibot";
 import { AccountNotFoundErrorSchema, authenticatedErrors, jsonResponse } from "../shared/errors";
@@ -41,6 +42,11 @@ export const BillingCheckoutSessionStatusResponseSchema = v.object({
 
 export const BillingCheckoutSessionNotFoundSchema = v.object({
   error: v.literal("Checkout session not found"),
+});
+
+export const BillingTrialEligibilityResponseSchema = v.object({
+  eligible: v.boolean(),
+  trialDays: v.literal(BILLING_INITIAL_TRIAL_DAYS),
 });
 
 export const BillingSessionConflictSchema = v.object({
@@ -94,6 +100,17 @@ export const billingPlanCatalogRoute = describeRoute({
   summary: "現在購入できる有料Planと税込価格を取得する",
   responses: {
     200: jsonResponse("公開可能なPlan catalog", BillingPlanCatalogResponseSchema),
+  },
+} satisfies DescribeRouteOptions);
+
+export const billingTrialEligibilityRoute = describeRoute({
+  operationId: "getBillingTrialEligibility",
+  tags: ["Billing"],
+  summary: "本人が初回14日間trialを開始できるか取得する",
+  security: [{ liffIdToken: [] }],
+  responses: {
+    200: jsonResponse("Account単位のtrial利用可否", BillingTrialEligibilityResponseSchema),
+    ...authenticatedErrors,
   },
 } satisfies DescribeRouteOptions);
 

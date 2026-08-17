@@ -9,6 +9,7 @@ import type { ProfileEntitlement } from "../../profile-settings/model/entitlemen
 import {
   createCheckoutSession,
   fetchBillingPlanCatalog,
+  fetchBillingTrialEligibility,
   verifyCheckoutSessionCompletion,
 } from "../infrastructure/billing-api";
 import type { BillingPlan } from "../model/billing-plan";
@@ -64,18 +65,42 @@ export default function BillingPlanApplication({
     loadController.current = controller;
     setPlans({ status: "loading" });
     setEntitlement({ status: "loading" });
-    const [catalogResult, entitlementResult] = await Promise.allSettled([
+    const [catalogResult, tokenResult] = await Promise.allSettled([
       fetchBillingPlanCatalog(config.apiUrl, controller.signal),
-      token(controller.signal).then((idToken) =>
-        fetchProfileEntitlement(config.apiUrl, idToken, controller.signal),
-      ),
+      token(controller.signal),
     ]);
     if (controller.signal.aborted) return;
-    setPlans(
-      catalogResult.status === "fulfilled"
-        ? { status: "success", data: catalogResult.value }
-        : { status: "error", message: message(catalogResult.reason) },
-    );
+
+    const publicPlans = catalogResult.status === "fulfilled" ? catalogResult.value : null;
+    if (catalogResult.status === "fulfilled") {
+      setPlans({
+        status: "success",
+        data: catalogResult.value.map((plan) => ({ ...plan, trialDays: null })),
+      });
+    } else {
+      setPlans({ status: "error", message: message(catalogResult.reason) });
+    }
+
+    if (tokenResult.status === "rejected") {
+      setEntitlement({ status: "error", message: message(tokenResult.reason) });
+      return;
+    }
+
+    const [trialResult, entitlementResult] = await Promise.allSettled([
+      fetchBillingTrialEligibility(config.apiUrl, tokenResult.value, controller.signal),
+      fetchProfileEntitlement(config.apiUrl, tokenResult.value, controller.signal),
+    ]);
+    if (controller.signal.aborted) return;
+
+    if (publicPlans && trialResult.status === "fulfilled") {
+      setPlans({
+        status: "success",
+        data: publicPlans.map((plan) => ({
+          ...plan,
+          trialDays: trialResult.value ? plan.trialDays : null,
+        })),
+      });
+    }
     setEntitlement(
       entitlementResult.status === "fulfilled"
         ? { status: "success", data: entitlementResult.value }
@@ -106,19 +131,27 @@ export default function BillingPlanApplication({
           checkoutSessionId,
           controller.signal,
         );
-        const [catalogResult, entitlementResult] = await Promise.allSettled([
+        const [catalogResult, trialResult, entitlementResult] = await Promise.allSettled([
           fetchBillingPlanCatalog(config.apiUrl, controller.signal),
+          fetchBillingTrialEligibility(config.apiUrl, idToken, controller.signal),
           waitForSubscriptionProjection(
             async (signal) => fetchProfileEntitlement(config.apiUrl, idToken, signal),
             { signal: controller.signal, intervalMs: projectionPollIntervalMs },
           ),
         ]);
         if (controller.signal.aborted) return;
-        setPlans(
-          catalogResult.status === "fulfilled"
-            ? { status: "success", data: catalogResult.value }
-            : { status: "error", message: message(catalogResult.reason) },
-        );
+        if (catalogResult.status === "fulfilled") {
+          setPlans({
+            status: "success",
+            data: catalogResult.value.map((plan) => ({
+              ...plan,
+              trialDays:
+                trialResult.status === "fulfilled" && trialResult.value ? plan.trialDays : null,
+            })),
+          });
+        } else {
+          setPlans({ status: "error", message: message(catalogResult.reason) });
+        }
         if (entitlementResult.status === "rejected") {
           setEntitlement({ status: "error", message: message(entitlementResult.reason) });
           return;

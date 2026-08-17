@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { AsyncState } from "../../../model/async-state";
 import type { ProfileEntitlement } from "../../profile-settings/model/entitlement";
 import { type BillingPlan, billingPlanPrice, formatBillingAmount } from "../model/billing-plan";
+import { expectedTrialEndDate } from "../model/trial";
 
 export function BillingPlanScreen({
   plans,
@@ -191,6 +192,11 @@ export function BillingPlanScreen({
                         </span>
                       </p>
                       <p className="mt-1 text-xs text-slate-500">税込・自動更新</p>
+                      {plan.trialDays && (
+                        <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-100">
+                          初回のみ{plan.trialDays}日間無料
+                        </p>
+                      )}
                       <ul className="mt-5 flex-1 space-y-2 text-sm">
                         {plan.highlights.map((highlight) => (
                           <li key={highlight} className="flex gap-2">
@@ -232,6 +238,17 @@ export function BillingPlanScreen({
               </h2>
             </div>
             <dl className="mt-5 grid gap-3 text-sm sm:grid-cols-2">
+              {selected.trialDays && (
+                <div className="sm:col-span-2 rounded-xl bg-emerald-50 p-4 dark:bg-emerald-950">
+                  <dt className="font-bold text-emerald-800 dark:text-emerald-100">
+                    初回14日間無料トライアル
+                  </dt>
+                  <dd className="mt-1 text-emerald-900 dark:text-emerald-100">
+                    本日開始した場合は{expectedTrialEndDate(selected.trialDays)}まで無料です。
+                    正確な終了日はStripe画面で開始前に確認できます。
+                  </dd>
+                </div>
+              )}
               <div>
                 <dt className="text-slate-500">プラン</dt>
                 <dd className="mt-1 font-bold">{selected.name}</dd>
@@ -245,7 +262,11 @@ export function BillingPlanScreen({
               </div>
               <div>
                 <dt className="text-slate-500">請求</dt>
-                <dd className="mt-1">Stripeで支払方法を登録した後、選択した間隔で自動更新</dd>
+                <dd className="mt-1">
+                  {selected.trialDays
+                    ? `無料期間終了後に${formatBillingAmount(billingPlanPrice(selected, interval).amount)}を請求し、選択した間隔で自動更新`
+                    : "Stripeで支払方法を登録した後、選択した間隔で自動更新"}
+                </dd>
               </div>
               <div>
                 <dt className="text-slate-500">解約</dt>

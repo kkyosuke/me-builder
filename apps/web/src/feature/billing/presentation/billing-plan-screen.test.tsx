@@ -110,4 +110,26 @@ describe("BillingPlanScreen", () => {
     expect(screen.getByText("ファミリーパックに参加中です")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Liteを選ぶ" })).toBeNull();
   });
+
+  it("初回対象者へ終了日と終了後の価格・自動更新を開始前に表示する", () => {
+    render(
+      <BillingPlanScreen
+        plans={{
+          status: "success",
+          data: plans.map((plan) => ({ ...plan, trialDays: 14 })),
+        }}
+        entitlement={{ status: "success", data: free }}
+        checkoutState={{ status: "idle" }}
+        completionMessage={null}
+        onBack={vi.fn()}
+        onCheckout={vi.fn()}
+        onRetry={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Liteを選ぶ" }));
+    expect(screen.getAllByText(/初回.*14日間無料/)).toHaveLength(2);
+    expect(screen.getByText(/本日開始した場合.*まで無料/)).toBeTruthy();
+    expect(screen.getByText(/無料期間終了後に.*780.*自動更新/)).toBeTruthy();
+  });
 });

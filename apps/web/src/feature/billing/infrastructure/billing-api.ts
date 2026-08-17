@@ -1,4 +1,8 @@
-import type { BillingInterval, PaidPlanCode } from "@me-builder/shared";
+import {
+  BILLING_INITIAL_TRIAL_DAYS,
+  type BillingInterval,
+  type PaidPlanCode,
+} from "@me-builder/shared";
 import * as v from "valibot";
 import type { operations } from "../../../generated/api";
 import { OperationError, ValidationError } from "../../../infrastructure/errors";
@@ -58,6 +62,47 @@ export async function fetchBillingPlanCatalog(
   } catch (error) {
     throw new ValidationError("料金プランの応答を確認できませんでした。", {
       code: "BILLING_PLAN_CATALOG_RESPONSE_INVALID",
+      status: response.status,
+      cause: error,
+    });
+  }
+}
+
+export async function fetchBillingTrialEligibility(
+  apiUrl: string | undefined,
+  idToken: string,
+  signal?: AbortSignal,
+): Promise<boolean> {
+  let response: Response;
+  try {
+    response = await createHttpClient(apiUrl).request("/api/billing/trial-eligibility", {
+      headers: { Authorization: `Bearer ${idToken}` },
+      ...(signal ? { signal } : {}),
+    });
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    throw new OperationError("トライアルの利用可否を取得できませんでした。", {
+      code: "BILLING_TRIAL_ELIGIBILITY_NETWORK_FAILED",
+      cause: error,
+    });
+  }
+  if (!response.ok) {
+    throw new OperationError("トライアルの利用可否を取得できませんでした。", {
+      code: "BILLING_TRIAL_ELIGIBILITY_FAILED",
+      status: response.status,
+    });
+  }
+  try {
+    return v.parse(
+      v.object({
+        eligible: v.boolean(),
+        trialDays: v.literal(BILLING_INITIAL_TRIAL_DAYS),
+      }),
+      await response.json(),
+    ).eligible;
+  } catch (error) {
+    throw new ValidationError("トライアル利用可否の応答を確認できませんでした。", {
+      code: "BILLING_TRIAL_ELIGIBILITY_RESPONSE_INVALID",
       status: response.status,
       cause: error,
     });

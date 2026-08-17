@@ -8,6 +8,7 @@ import {
   createBillingCheckoutSession,
   createBillingPortalSession,
   getBillingCheckoutSessionStatus,
+  getBillingTrialEligibility,
 } from "./billing-sessions";
 
 function createTestDb(): D1.shared.Client {
@@ -67,9 +68,153 @@ describe("billing sessions", () => {
         cancelUrl: "https://app.example.test/profile/billing?billing=checkout-cancel",
         plan: "full",
         interval: "year",
+        trialPeriodDays: 14,
       }),
       `billing-checkout-${owner.id}-initial`,
     );
+  });
+
+  it("trial使用済みAccountではCustomerが変わっても2回目を付けない", async () => {
+    const { db, owner, createSession } = await setup();
+    await D1.shared.action.billing.linkBillingCustomer(db, {
+      accountId: owner.id,
+      providerCustomerId: "cus_previous",
+    });
+    await D1.shared.action.billing.applyBillingProjection(db, {
+      accountId: owner.id,
+      event: {
+        id: "evt_trial_started",
+        type: "customer.subscription.created",
+        objectId: "sub_trial",
+        createdAt: new Date("2026-08-01T00:00:00Z"),
+      },
+      subscription: {
+        id: "sub_trial",
+        customerId: "cus_previous",
+        status: "canceled",
+        priceId: "price_lite",
+        currentPeriodStart: "2026-08-01T00:00:00.000Z",
+        currentPeriodEnd: "2026-08-15T00:00:00.000Z",
+        cancelAtPeriodEnd: false,
+        trialEnd: "2026-08-15T00:00:00.000Z",
+        createdAt: "2026-08-01T00:00:00.000Z",
+      },
+      planCode: "lite",
+    });
+    const createCheckoutSession = vi.fn().mockResolvedValue({
+      id: "cs_paid",
+      url: "https://checkout.stripe.test/paid",
+    });
+
+    await createBillingCheckoutSession({
+      idToken: "token",
+      lineLoginChannelId: "channel",
+      db,
+      provider: new billing.FakeBillingProvider({ createCheckoutSession }),
+      webOrigin: "https://app.example.test",
+      createSession,
+      plan: "full",
+      interval: "month",
+      lookupKeyMap: { "full.month": "full_month" },
+    });
+
+    expect(createCheckoutSession).toHaveBeenCalledWith(
+      expect.not.objectContaining({ trialPeriodDays: expect.anything() }),
+      expect.any(String),
+    );
+  });
+
+  it("projection反映前でもStripeに有効な契約があれば二重購入を止める", async () => {
+    const { db, owner, createSession } = await setup();
+    await D1.shared.action.billing.linkBillingCustomer(db, {
+      accountId: owner.id,
+      providerCustomerId: "cus_active",
+    });
+    const createCheckoutSession = vi.fn();
+    const provider = new billing.FakeBillingProvider({
+      listSubscriptions: async () => [
+        {
+          id: "sub_active",
+          customerId: "cus_active",
+          status: "active",
+          priceId: "price_lite",
+          currentPeriodStart: "2026-08-01T00:00:00.000Z",
+          currentPeriodEnd: "2026-09-01T00:00:00.000Z",
+          cancelAtPeriodEnd: false,
+          trialEnd: null,
+          createdAt: "2026-08-01T00:00:00.000Z",
+        },
+      ],
+      createCheckoutSession,
+    });
+
+    await expect(
+      createBillingCheckoutSession({
+        idToken: "token",
+        lineLoginChannelId: "channel",
+        db,
+        provider,
+        webOrigin: "https://app.example.test",
+        createSession,
+        plan: "lite",
+        interval: "month",
+        lookupKeyMap: { "lite.month": "lite_month" },
+      }),
+    ).resolves.toEqual({ type: "unavailable", reason: "existing_subscription" });
+    expect(createCheckoutSession).not.toHaveBeenCalled();
+  });
+
+  it("webhook未反映でもStripeのtrial履歴を再利用不可として扱う", async () => {
+    const { db, owner, createSession } = await setup();
+    await D1.shared.action.billing.linkBillingCustomer(db, {
+      accountId: owner.id,
+      providerCustomerId: "cus_trial_history",
+    });
+    const createCheckoutSession = vi.fn().mockResolvedValue({
+      id: "cs_paid",
+      url: "https://checkout.stripe.test/paid",
+    });
+    const provider = new billing.FakeBillingProvider({
+      listSubscriptions: async () => [
+        {
+          id: "sub_canceled_trial",
+          customerId: "cus_trial_history",
+          status: "canceled",
+          priceId: "price_lite",
+          currentPeriodStart: "2026-07-01T00:00:00.000Z",
+          currentPeriodEnd: "2026-07-15T00:00:00.000Z",
+          cancelAtPeriodEnd: false,
+          trialEnd: "2026-07-15T00:00:00.000Z",
+          createdAt: "2026-07-01T00:00:00.000Z",
+        },
+      ],
+      createCheckoutSession,
+    });
+
+    await createBillingCheckoutSession({
+      idToken: "token",
+      lineLoginChannelId: "channel",
+      db,
+      provider,
+      webOrigin: "https://app.example.test",
+      createSession,
+      plan: "full",
+      interval: "month",
+      lookupKeyMap: { "full.month": "full_month" },
+    });
+    expect(createCheckoutSession).toHaveBeenCalledWith(
+      expect.not.objectContaining({ trialPeriodDays: expect.anything() }),
+      expect.any(String),
+    );
+    await expect(
+      getBillingTrialEligibility({
+        idToken: "token",
+        lineLoginChannelId: "channel",
+        db,
+        provider,
+        createSession,
+      }),
+    ).resolves.toEqual({ type: "resolved", eligible: false });
   });
 
   it("rejects an unavailable plan", async () => {
