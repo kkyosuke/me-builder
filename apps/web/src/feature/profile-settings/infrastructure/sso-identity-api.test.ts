@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { authSessionRuntime } from "../../auth/infrastructure/auth-session-runtime";
-import { fetchSsoIdentityStatus, ssoIdentityLinkUrl, unlinkSsoIdentity } from "./sso-identity-api";
+import {
+  fetchSsoIdentityStatus,
+  startSsoIdentityLink,
+  unlinkSsoIdentity,
+} from "./sso-identity-api";
 
 describe("sso identity api", () => {
   afterEach(() => {
@@ -23,10 +27,26 @@ describe("sso identity api", () => {
     );
   });
 
-  it("link開始URLには同一siteの相対returnToだけを渡す", () => {
-    expect(ssoIdentityLinkUrl("https://api.example.com/", "/profile?sso=linking")).toBe(
+  it("link開始をCSRF token付きPOSTで要求し、認可URLだけを受け取る", async () => {
+    authSessionRuntime.setCsrfToken("csrf-token");
+    const fetcher = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(
+        Response.json({ authorizationUrl: "https://tenant.auth0.com/authorize?state=opaque" }),
+      );
+
+    await expect(
+      startSsoIdentityLink("https://api.example.com/", "/profile?sso=linking"),
+    ).resolves.toBe("https://tenant.auth0.com/authorize?state=opaque");
+    expect(fetcher).toHaveBeenCalledWith(
       "https://api.example.com/api/auth/sso/link?returnTo=%2Fprofile%3Fsso%3Dlinking",
+      expect.objectContaining({
+        method: "POST",
+        credentials: "include",
+        headers: expect.any(Headers),
+      }),
     );
+    expect(new Headers(fetcher.mock.calls[0]?.[1]?.headers).get("X-CSRF-Token")).toBe("csrf-token");
   });
 
   it("解除requestへapplication sessionのCSRF tokenを付ける", async () => {

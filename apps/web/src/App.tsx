@@ -21,7 +21,7 @@ import {
 import {
   type SsoIdentityStatus,
   fetchSsoIdentityStatus,
-  ssoIdentityLinkUrl,
+  startSsoIdentityLink,
   unlinkSsoIdentity,
 } from "./feature/profile-settings/infrastructure/sso-identity-api";
 import type { AvatarSelection } from "./feature/profile-settings/model/avatar";
@@ -523,8 +523,9 @@ function AppContents() {
     window.location.assign(url);
   };
 
-  const linkSsoIdentity = () => {
-    window.location.assign(ssoIdentityLinkUrl(config.apiUrl, "/profile?sso=linking"));
+  const linkSsoIdentity = async (): Promise<void> => {
+    const authorizationUrl = await startSsoIdentityLink(config.apiUrl, "/profile?sso=linking");
+    window.location.assign(authorizationUrl);
   };
 
   const disconnectSsoIdentity = async (): Promise<void> => {

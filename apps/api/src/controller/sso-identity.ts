@@ -3,7 +3,11 @@ import type { Context } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import * as v from "valibot";
 import { getConfig } from "../config";
-import { LastIdentityConflictSchema, SsoIdentityStatusSchema } from "../contract/auth/sso-identity";
+import {
+  LastIdentityConflictSchema,
+  SsoAuthorizationUrlSchema,
+  SsoIdentityStatusSchema,
+} from "../contract/auth/sso-identity";
 import { ServiceUnavailableErrorSchema } from "../contract/shared/errors";
 import { createAuth0SsoClient } from "../infrastructure/authentication/sso-client";
 import {
@@ -86,7 +90,7 @@ export async function getSsoIdentityStatusContents(c: Context<AppEnv>): Promise<
   return c.json(v.parse(SsoIdentityStatusSchema, status));
 }
 
-export async function getSsoIdentityLink(c: Context<AppEnv>): Promise<Response> {
+export async function postSsoIdentityLink(c: Context<AppEnv>): Promise<Response> {
   c.header("Cache-Control", "no-store");
   const dependencies = configured(c);
   if (!dependencies) return unavailable(c);
@@ -102,7 +106,7 @@ export async function getSsoIdentityLink(c: Context<AppEnv>): Promise<Response> 
     ? SECURE_SSO_LINK_STATE_COOKIE
     : SSO_LINK_STATE_COOKIE;
   setCookie(c, cookieName, state, linkStateCookieOptions(dependencies.secureCallback));
-  return c.redirect(authorizationUrl.href, 302);
+  return c.json(v.parse(SsoAuthorizationUrlSchema, { authorizationUrl: authorizationUrl.href }));
 }
 
 export async function getSsoCallback(c: Context<AppEnv>): Promise<Response> {

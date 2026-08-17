@@ -198,8 +198,8 @@ describe("ProfileSettingsScreen", () => {
     expect(onOpenPersonalData).toHaveBeenCalledOnce();
   });
 
-  it("未接続のSSOを現在のAccountへ追加できる", () => {
-    const onLinkSsoIdentity = vi.fn();
+  it("未接続のSSOを現在のAccountへ追加できる", async () => {
+    const onLinkSsoIdentity = vi.fn().mockResolvedValue(undefined);
     render(
       <ProfileSettingsScreen
         avatar={null}

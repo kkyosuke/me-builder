@@ -11,6 +11,10 @@ export const SsoIdentityStatusSchema = v.object({
   canUnlink: v.boolean(),
 });
 
+export const SsoAuthorizationUrlSchema = v.object({
+  authorizationUrl: v.pipe(v.string(), v.url()),
+});
+
 export const LastIdentityConflictSchema = v.object({
   error: v.literal("Last login identity cannot be unlinked"),
 });
@@ -46,7 +50,7 @@ export const startSsoIdentityLinkRoute = describeRoute({
   security: applicationSessionSecurity,
   parameters: [returnToParameter],
   responses: {
-    302: { description: "Auth0認可endpointへredirect" },
+    200: jsonResponse("同じbrowserで開くAuth0認可URL", SsoAuthorizationUrlSchema),
     ...commonErrors,
   },
 } satisfies DescribeRouteOptions);

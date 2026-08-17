@@ -350,7 +350,7 @@
       }
     },
     "/api/auth/sso/link": {
-      "get": {
+      "post": {
         "operationId": "startSsoIdentityLink",
         "tags": ["Authentication"],
         "summary": "認証済みAccountへのSSO Identity追加を開始する",
@@ -372,8 +372,22 @@
           }
         ],
         "responses": {
-          "302": {
-            "description": "Auth0認可endpointへredirect"
+          "200": {
+            "description": "同じbrowserで開くAuth0認可URL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "authorizationUrl": {
+                      "type": "string",
+                      "format": "uri"
+                    }
+                  },
+                  "required": ["authorizationUrl"]
+                }
+              }
+            }
           },
           "401": {
             "description": "application sessionが無効",

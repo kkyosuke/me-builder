@@ -6,6 +6,10 @@ const SsoIdentityStatusSchema = v.object({
   canUnlink: v.boolean(),
 });
 
+const SsoAuthorizationUrlSchema = v.object({
+  authorizationUrl: v.pipe(v.string(), v.url()),
+});
+
 export type SsoIdentityStatus = v.InferOutput<typeof SsoIdentityStatusSchema>;
 
 export async function fetchSsoIdentityStatus(
@@ -19,10 +23,17 @@ export async function fetchSsoIdentityStatus(
   return v.parse(SsoIdentityStatusSchema, await response.json());
 }
 
-export function ssoIdentityLinkUrl(apiUrl: string | undefined, returnTo = "/profile"): string {
-  const baseUrl = (apiUrl ?? "").replace(/\/$/u, "");
+export async function startSsoIdentityLink(
+  apiUrl: string | undefined,
+  returnTo = "/profile",
+): Promise<string> {
   const query = new URLSearchParams({ returnTo });
-  return `${baseUrl}/api/auth/sso/link?${query}`;
+  const response = await createAuthenticatedHttpClient(apiUrl).request(
+    `/api/auth/sso/link?${query}`,
+    { method: "POST" },
+  );
+  if (!response.ok) throw new Error("SSOの接続を開始できませんでした。");
+  return v.parse(SsoAuthorizationUrlSchema, await response.json()).authorizationUrl;
 }
 
 export async function unlinkSsoIdentity(apiUrl: string | undefined): Promise<void> {

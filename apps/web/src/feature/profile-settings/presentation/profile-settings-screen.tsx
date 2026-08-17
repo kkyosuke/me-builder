@@ -102,7 +102,7 @@ export function ProfileSettingsScreen({
   serviceTermsAcceptanceHistory?: ReactNode;
   onIssueRecoveryCode?: () => Promise<{ code: string; expiresAt: string }>;
   ssoIdentity?: AsyncState<SsoIdentityStatus>;
-  onLinkSsoIdentity?: () => void;
+  onLinkSsoIdentity?: () => Promise<void>;
   onUnlinkSsoIdentity?: () => Promise<void>;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -656,8 +656,17 @@ export function ProfileSettingsScreen({
                 ) : (
                   <button
                     type="button"
-                    onClick={onLinkSsoIdentity}
-                    className="mt-4 min-h-11 rounded-xl border border-violet-500 px-4 text-sm font-bold text-violet-700 dark:text-violet-200"
+                    disabled={ssoMutationState.status === "loading"}
+                    onClick={() => {
+                      setSsoMutationState({ status: "loading" });
+                      void onLinkSsoIdentity().catch((error) =>
+                        setSsoMutationState({
+                          status: "error",
+                          message: errorMessage(error, "SSOの接続を開始できませんでした。"),
+                        }),
+                      );
+                    }}
+                    className="mt-4 min-h-11 rounded-xl border border-violet-500 px-4 text-sm font-bold text-violet-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-violet-200"
                   >
                     SSOを接続
                   </button>

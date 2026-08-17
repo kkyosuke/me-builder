@@ -56,8 +56,8 @@ vi.mock("../logic/authentication/sso-transaction", () => ({
 import {
   deleteSsoIdentity,
   getSsoCallback,
-  getSsoIdentityLink,
   getSsoIdentityStatusContents,
+  postSsoIdentityLink,
 } from "./sso-identity";
 
 const env = {
@@ -83,6 +83,7 @@ function testApp(path: string, handler: Handler<AppEnv>) {
     await next();
   });
   app.get(path, handler);
+  app.post(path, handler);
   app.delete(path, handler);
   return app;
 }
@@ -103,20 +104,20 @@ describe("SSO identity controller", () => {
     expect(mocks.getStatus).toHaveBeenCalledWith(expect.anything(), "account-at-start");
   });
 
-  it("認証済みAccountと相対returnToをlink transactionへ固定してAuth0へ遷移する", async () => {
+  it("認証済みAccountと相対returnToをlink transactionへ固定して認可URLを返す", async () => {
     mocks.startLinking.mockResolvedValue(
       new URL("https://tenant.auth0.com/authorize?state=opaque"),
     );
-    const response = await testApp("/api/auth/sso/link", getSsoIdentityLink).request(
+    const response = await testApp("/api/auth/sso/link", postSsoIdentityLink).request(
       "https://api.example.com/api/auth/sso/link?returnTo=%2Fprofile",
-      undefined,
+      { method: "POST" },
       env,
     );
 
-    expect(response.status).toBe(302);
-    expect(response.headers.get("location")).toBe(
-      "https://tenant.auth0.com/authorize?state=opaque",
-    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      authorizationUrl: "https://tenant.auth0.com/authorize?state=opaque",
+    });
     expect(response.headers.get("set-cookie")).toContain("__Host-me_builder_sso_link_state=opaque");
     expect(response.headers.get("set-cookie")).toContain("HttpOnly");
     expect(response.headers.get("set-cookie")).toContain("Secure");
