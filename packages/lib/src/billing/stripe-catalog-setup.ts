@@ -4,7 +4,8 @@ import { STRIPE_API_VERSION } from "./stripe-adapter";
 import { STRIPE_BILLING_EVENT_TYPES } from "./stripe-events";
 
 const MANAGED_BY = "me-builder-stripe-catalog";
-const CATALOG_VERSION = "2026-08-17";
+const CATALOG_VERSION = "2026-08-18";
+export const STRIPE_BILLING_PRODUCT_TAX_CODE = "txcd_10105001";
 
 export type StripeCatalogEnvironment = "preview" | "production";
 export type StripeCatalogPlan = "lite" | "full" | "family";
@@ -15,6 +16,7 @@ export const STRIPE_BILLING_CATALOG = publicBillingPlans.map((plan) => ({
   plan: plan.code,
   name: `me-builder ${plan.name}`,
   description: plan.description,
+  taxCode: STRIPE_BILLING_PRODUCT_TAX_CODE,
   prices: plan.prices.map((price) => ({
     plan: plan.code,
     interval: price.interval,
@@ -26,6 +28,7 @@ export const STRIPE_BILLING_CATALOG = publicBillingPlans.map((plan) => ({
   plan: StripeCatalogPlan;
   name: string;
   description: string;
+  taxCode: string;
   prices: readonly {
     plan: StripeCatalogPlan;
     interval: BillingInterval;
@@ -69,6 +72,7 @@ interface ProductSpec {
   id: string;
   name: string;
   description: string;
+  taxCode: string;
   metadata: Record<string, string>;
 }
 
@@ -203,6 +207,7 @@ export async function setupStripeBillingCatalog(input: {
     const productSpec = {
       name: desiredProduct.name,
       description: desiredProduct.description,
+      taxCode: desiredProduct.taxCode,
       metadata: managedMetadata(desiredProduct.plan),
     };
     const product = matchedProduct
@@ -509,6 +514,7 @@ export function createStripeCatalogApi(secretKey: string): StripeCatalogApi {
           id: spec.id,
           name: spec.name,
           description: spec.description,
+          tax_code: spec.taxCode,
           active: true,
           type: "service",
           metadata: spec.metadata,
@@ -520,6 +526,7 @@ export function createStripeCatalogApi(secretKey: string): StripeCatalogApi {
         await stripe.products.update(id, {
           name: spec.name,
           description: spec.description,
+          tax_code: spec.taxCode,
           active: true,
           metadata: spec.metadata,
         }),

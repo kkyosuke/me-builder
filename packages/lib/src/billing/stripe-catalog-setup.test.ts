@@ -5,6 +5,7 @@ import {
   type CatalogProduct,
   type CatalogWebhookEndpoint,
   STRIPE_BILLING_CATALOG,
+  STRIPE_BILLING_PRODUCT_TAX_CODE,
   type StripeCatalogApi,
   billingPortalConfigurationParams,
   setupStripeBillingCatalog,
@@ -13,6 +14,7 @@ import { STRIPE_BILLING_EVENT_TYPES } from "./stripe-events";
 
 class FakeStripeCatalogApi implements StripeCatalogApi {
   products: CatalogProduct[] = [];
+  productTaxCodes = new Map<string, string>();
   prices: CatalogPrice[] = [];
   webhooks: CatalogWebhookEndpoint[] = [];
   portals: CatalogPortalConfiguration[] = [];
@@ -29,12 +31,14 @@ class FakeStripeCatalogApi implements StripeCatalogApi {
   async createProduct(spec: Parameters<StripeCatalogApi["createProduct"]>[0]) {
     const product = { id: spec.id, metadata: spec.metadata };
     this.products.push(product);
+    this.productTaxCodes.set(spec.id, spec.taxCode);
     return product;
   }
 
   async updateProduct(id: string, spec: Parameters<StripeCatalogApi["updateProduct"]>[1]) {
     const product = { id, metadata: spec.metadata };
     this.products = this.products.map((current) => (current.id === id ? product : current));
+    this.productTaxCodes.set(id, spec.taxCode);
     return product;
   }
 
@@ -208,6 +212,9 @@ describe("setupStripeBillingCatalog", () => {
     const result = await setupStripeBillingCatalog({ api, environment: "preview" });
 
     expect(api.products).toHaveLength(3);
+    expect(new Set(api.productTaxCodes.values())).toEqual(
+      new Set([STRIPE_BILLING_PRODUCT_TAX_CODE]),
+    );
     expect(api.prices).toHaveLength(6);
     expect(
       api.createdPriceSpecs.map(({ lookupKey, unitAmount, interval }) => ({
@@ -265,6 +272,20 @@ describe("setupStripeBillingCatalog", () => {
     expect(api.webhooks).toHaveLength(1);
     expect(api.portals).toHaveLength(3);
     expect(second.webhookSecret).toBeNull();
+  });
+
+  it("既存の管理対象ProductにもManaged Payments用Tax Codeを再同期する", async () => {
+    const api = new FakeStripeCatalogApi();
+    await setupStripeBillingCatalog({ api, environment: "preview" });
+    api.productTaxCodes.clear();
+
+    await setupStripeBillingCatalog({ api, environment: "preview" });
+
+    expect([...api.productTaxCodes.entries()]).toEqual([
+      ["me_builder_lite", STRIPE_BILLING_PRODUCT_TAX_CODE],
+      ["me_builder_full", STRIPE_BILLING_PRODUCT_TAX_CODE],
+      ["me_builder_family", STRIPE_BILLING_PRODUCT_TAX_CODE],
+    ]);
   });
 
   it("価格変更時はlookup keyを新Priceへ移し、旧契約用PriceもPlan mapへ残す", async () => {
