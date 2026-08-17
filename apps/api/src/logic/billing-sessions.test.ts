@@ -56,13 +56,12 @@ describe("billing sessions", () => {
         webOrigin: "https://app.example.test",
         plan: "full",
         interval: "year",
-        lookupKeyMap: { "full.year": "full_year_v2" },
       }),
     ).resolves.toEqual({ type: "created", url: "https://checkout.stripe.test/session" });
     expect(createCheckoutSession).toHaveBeenCalledWith(
       expect.objectContaining({
         accountId: owner.id,
-        priceId: "price_full_year_v2",
+        priceId: "price_me_builder_full_yearly",
         successUrl:
           "https://app.example.test/profile/billing?billing=checkout-return&session_id={CHECKOUT_SESSION_ID}",
         cancelUrl: "https://app.example.test/profile/billing?billing=checkout-cancel",
@@ -70,8 +69,68 @@ describe("billing sessions", () => {
         interval: "year",
         trialPeriodDays: 14,
       }),
-      `billing-checkout-${owner.id}-initial`,
+      expect.stringMatching(
+        new RegExp(
+          `^billing-checkout-${owner.id}-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`,
+        ),
+      ),
     );
+  });
+
+  it("失敗後の新しい論理操作には別のべき等キーを使う", async () => {
+    const { db, owner, actor } = await setup();
+    const createCheckoutSession = vi
+      .fn()
+      .mockRejectedValueOnce(new billing.BillingProviderError("invalid-request", false, 400))
+      .mockResolvedValueOnce({
+        id: "cs_recovered",
+        url: "https://checkout.stripe.test/recovered",
+      });
+
+    const create = () =>
+      createBillingCheckoutSession({
+        actor,
+        db,
+        provider: new billing.FakeBillingProvider({ createCheckoutSession }),
+        webOrigin: "https://app.example.test",
+        plan: "lite",
+        interval: "month",
+      });
+
+    await expect(create()).rejects.toMatchObject({ kind: "invalid-request" });
+    await expect(create()).resolves.toEqual({
+      type: "created",
+      url: "https://checkout.stripe.test/recovered",
+    });
+
+    const keyPattern = new RegExp(
+      `^billing-checkout-${owner.id}-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`,
+    );
+    expect(createCheckoutSession).toHaveBeenCalledTimes(2);
+    const firstKey = createCheckoutSession.mock.calls[0]?.[1];
+    const secondKey = createCheckoutSession.mock.calls[1]?.[1];
+    expect(firstKey).toMatch(keyPattern);
+    expect(secondKey).toMatch(keyPattern);
+    expect(firstKey).not.toBe(secondKey);
+  });
+
+  it("通信障害はCheckout作成を別べき等キーで再実行しない", async () => {
+    const { db, actor } = await setup();
+    const createCheckoutSession = vi
+      .fn()
+      .mockRejectedValue(new billing.BillingProviderError("network", true));
+
+    await expect(
+      createBillingCheckoutSession({
+        actor,
+        db,
+        provider: new billing.FakeBillingProvider({ createCheckoutSession }),
+        webOrigin: "https://app.example.test",
+        plan: "lite",
+        interval: "month",
+      }),
+    ).rejects.toMatchObject({ kind: "network" });
+    expect(createCheckoutSession).toHaveBeenCalledTimes(1);
   });
 
   it("trial使用済みAccountではCustomerが変わっても2回目を付けない", async () => {
@@ -113,7 +172,6 @@ describe("billing sessions", () => {
       webOrigin: "https://app.example.test",
       plan: "full",
       interval: "month",
-      lookupKeyMap: { "full.month": "full_month" },
     });
 
     expect(createCheckoutSession).toHaveBeenCalledWith(
@@ -154,10 +212,82 @@ describe("billing sessions", () => {
         webOrigin: "https://app.example.test",
         plan: "lite",
         interval: "month",
-        lookupKeyMap: { "lite.month": "lite_month" },
       }),
     ).resolves.toEqual({ type: "unavailable", reason: "existing_subscription" });
     expect(createCheckoutSession).not.toHaveBeenCalled();
+  });
+
+  it("削除済みのsandbox Customerを再作成してCheckoutを継続する", async () => {
+    const { db, owner, actor } = await setup();
+    await D1.shared.action.billing.linkBillingCustomer(db, {
+      accountId: owner.id,
+      providerCustomerId: "cus_stale",
+    });
+    const createCustomer = vi.fn().mockResolvedValue({ id: "cus_replacement", deleted: false });
+    const createCheckoutSession = vi.fn().mockResolvedValue({
+      id: "cs_recovered",
+      url: "https://checkout.stripe.test/recovered",
+    });
+    const provider = new billing.FakeBillingProvider({
+      retrieveCustomer: async (customerId) => ({
+        id: customerId,
+        deleted: customerId === "cus_stale",
+      }),
+      createCustomer,
+      createCheckoutSession,
+    });
+
+    await expect(
+      createBillingCheckoutSession({
+        actor,
+        db,
+        provider,
+        webOrigin: "https://app.example.test",
+        plan: "lite",
+        interval: "month",
+      }),
+    ).resolves.toEqual({
+      type: "created",
+      url: "https://checkout.stripe.test/recovered",
+    });
+    expect(createCustomer).toHaveBeenCalledWith(
+      { accountId: owner.id },
+      `billing-customer-${owner.id}-cus_stale`,
+    );
+    expect(createCheckoutSession).toHaveBeenCalledWith(
+      expect.objectContaining({ customerId: "cus_replacement" }),
+      expect.stringMatching(new RegExp(`^billing-checkout-${owner.id}-`)),
+    );
+    await expect(
+      D1.shared.action.billing.findBillingCustomerByAccount(db, owner.id),
+    ).resolves.toMatchObject({ providerCustomerId: "cus_replacement" });
+  });
+
+  it("別sandbox由来で見つからないCustomerも再作成する", async () => {
+    const { db, owner, actor } = await setup();
+    await D1.shared.action.billing.linkBillingCustomer(db, {
+      accountId: owner.id,
+      providerCustomerId: "cus_missing",
+    });
+    const createCustomer = vi.fn().mockResolvedValue({ id: "cus_current", deleted: false });
+    const provider = new billing.FakeBillingProvider({
+      retrieveCustomer: async () => {
+        throw new billing.BillingProviderError("invalid-request", false, 404);
+      },
+      createCustomer,
+    });
+
+    await expect(
+      createBillingCheckoutSession({
+        actor,
+        db,
+        provider,
+        webOrigin: "https://app.example.test",
+        plan: "lite",
+        interval: "month",
+      }),
+    ).resolves.toMatchObject({ type: "created" });
+    expect(createCustomer).toHaveBeenCalledOnce();
   });
 
   it("webhook未反映でもStripeのtrial履歴を再利用不可として扱う", async () => {
@@ -194,7 +324,6 @@ describe("billing sessions", () => {
       webOrigin: "https://app.example.test",
       plan: "full",
       interval: "month",
-      lookupKeyMap: { "full.month": "full_month" },
     });
     expect(createCheckoutSession).toHaveBeenCalledWith(
       expect.not.objectContaining({ trialPeriodDays: expect.anything() }),
@@ -207,22 +336,6 @@ describe("billing sessions", () => {
         provider,
       }),
     ).resolves.toEqual({ type: "resolved", eligible: false });
-  });
-
-  it("rejects an unavailable plan", async () => {
-    const { db, actor } = await setup();
-    const base = {
-      actor,
-      db,
-      provider: new billing.FakeBillingProvider(),
-      webOrigin: "https://app.example.test",
-      plan: "lite" as const,
-      interval: "month" as const,
-    };
-    await expect(createBillingCheckoutSession({ ...base, lookupKeyMap: {} })).resolves.toEqual({
-      type: "unavailable",
-      reason: "plan_unavailable",
-    });
   });
 
   it("同じ選択の未完了Checkoutを再利用する", async () => {
@@ -248,7 +361,6 @@ describe("billing sessions", () => {
         webOrigin: "https://app.example.test",
         plan: "lite",
         interval: "month",
-        lookupKeyMap: { "lite.month": "lite_month" },
       }),
     ).resolves.toEqual({ type: "created", url: "https://checkout.stripe.test/resume" });
     expect(createCheckoutSession).not.toHaveBeenCalled();
@@ -282,13 +394,12 @@ describe("billing sessions", () => {
         webOrigin: "https://app.example.test",
         plan: "full",
         interval: "year",
-        lookupKeyMap: { "full.year": "full_year" },
       }),
     ).resolves.toEqual({ type: "created", url: "https://checkout.stripe.test/new" });
     expect(expireCheckoutSession).toHaveBeenCalledWith("cs_test_old");
     expect(createCheckoutSession).toHaveBeenCalledWith(
       expect.objectContaining({ plan: "full", interval: "year" }),
-      `billing-checkout-${owner.id}-cs_test_old`,
+      expect.stringMatching(new RegExp(`^billing-checkout-${owner.id}-`)),
     );
   });
 
@@ -328,7 +439,6 @@ describe("billing sessions", () => {
         webOrigin: "https://app.example.test",
         plan: "lite",
         interval: "month",
-        lookupKeyMap: { "lite.month": "lite_month" },
       }),
     ).resolves.toEqual({ type: "unavailable", reason: "existing_subscription" });
     expect(createCheckoutSession).not.toHaveBeenCalled();
@@ -357,7 +467,6 @@ describe("billing sessions", () => {
         webOrigin: "https://app.example.test",
         plan: "lite",
         interval: "month",
-        lookupKeyMap: { "lite.month": "lite_month" },
       }),
     ).resolves.toEqual({ type: "unavailable", reason: "family_seat_active" });
     expect(createCheckoutSession).not.toHaveBeenCalled();
@@ -366,7 +475,6 @@ describe("billing sessions", () => {
   it.each([
     ["lite", "month", "lite", "year", "now"],
     ["lite", "month", "full", "year", "now"],
-    ["family", "year", "lite", "month", "unchanged"],
   ] as const)(
     "%s/%sから%s/%sへの変更にbilling cycle policy %sを使う",
     async (currentPlan, currentInterval, targetPlan, targetInterval, expectedAnchor) => {
@@ -425,7 +533,6 @@ describe("billing sessions", () => {
           webOrigin: "https://app.example.test",
           plan: targetPlan,
           interval: targetInterval,
-          lookupKeyMap: { [`${targetPlan}.${targetInterval}`]: "target_lookup" },
           portalPlanChangeAvailable: true,
           portalResetAvailable: true,
         }),
@@ -440,6 +547,96 @@ describe("billing sessions", () => {
           billingCycleAnchor: expectedAnchor,
         },
       });
+    },
+  );
+
+  it.each([
+    ["full", "month", "lite", "month"],
+    ["family", "year", "lite", "month"],
+    ["full", "year", "family", "month"],
+  ] as const)(
+    "%s/%sから%s/%sへの期間末変更をSubscription Scheduleへ予約する",
+    async (currentPlan, currentInterval, targetPlan, targetInterval) => {
+      const { db, owner, actor } = await setup();
+      await D1.shared.action.billing.linkBillingCustomer(db, {
+        accountId: owner.id,
+        providerCustomerId: "cus_change",
+      });
+      await D1.shared.action.billing.applyBillingProjection(db, {
+        accountId: owner.id,
+        event: {
+          id: "evt_scheduled_change_source",
+          type: "customer.subscription.created",
+          objectId: "sub_change",
+          createdAt: new Date("2026-08-01T00:00:00Z"),
+        },
+        subscription: {
+          id: "sub_change",
+          customerId: "cus_change",
+          status: "active",
+          priceId: "price_current",
+          currentPeriodStart: "2026-08-01T00:00:00.000Z",
+          currentPeriodEnd: "2026-09-01T00:00:00.000Z",
+          cancelAtPeriodEnd: false,
+          trialEnd: null,
+          createdAt: "2026-08-01T00:00:00.000Z",
+        },
+        planCode: currentPlan,
+      });
+      const createPortalSession = vi.fn();
+      const scheduleSubscriptionChange = vi.fn().mockResolvedValue({
+        effectiveAt: "2026-09-01T00:00:00.000Z",
+      });
+      const provider = new billing.FakeBillingProvider({
+        retrieveSubscription: async () => ({
+          id: "sub_change",
+          itemId: "si_change",
+          scheduleId: null,
+          customerId: "cus_change",
+          status: "active",
+          priceId: "price_current",
+          interval: currentInterval,
+          currentPeriodStart: "2026-08-01T00:00:00.000Z",
+          currentPeriodEnd: "2026-09-01T00:00:00.000Z",
+          cancelAtPeriodEnd: false,
+          trialEnd: null,
+          createdAt: "2026-08-01T00:00:00.000Z",
+        }),
+        findPriceIdByLookupKey: async () => "price_target",
+        scheduleSubscriptionChange,
+        createPortalSession,
+      });
+
+      const outcome = await createBillingPlanChangeSession({
+        actor,
+        db,
+        provider,
+        webOrigin: "https://app.example.test",
+        plan: targetPlan,
+        interval: targetInterval,
+        portalPlanChangeAvailable: true,
+        portalResetAvailable: true,
+      });
+
+      expect(outcome.type).toBe("created");
+      if (outcome.type !== "created") throw new Error("Expected a scheduled change URL");
+      const returnUrl = new URL(outcome.url);
+      expect(returnUrl.pathname).toBe("/profile/billing");
+      expect(Object.fromEntries(returnUrl.searchParams)).toEqual({
+        billing: "change-scheduled",
+        plan: targetPlan,
+        effective_at: "2026-09-01T00:00:00.000Z",
+      });
+      expect(scheduleSubscriptionChange).toHaveBeenCalledWith(
+        {
+          subscriptionId: "sub_change",
+          currentPriceId: "price_current",
+          targetPriceId: "price_target",
+          targetInterval,
+        },
+        expect.stringMatching(new RegExp(`^billing-plan-change-${owner.id}-`)),
+      );
+      expect(createPortalSession).not.toHaveBeenCalled();
     },
   );
 

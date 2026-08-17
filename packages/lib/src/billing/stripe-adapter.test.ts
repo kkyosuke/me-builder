@@ -101,6 +101,7 @@ describe("StripeBillingProvider", () => {
     await expect(provider.retrieveSubscription("sub_secret")).resolves.toEqual({
       id: "sub_secret",
       itemId: null,
+      scheduleId: null,
       customerId: "cus_secret",
       status: "active",
       priceId: "price_internal",
@@ -111,6 +112,57 @@ describe("StripeBillingProvider", () => {
       trialEnd: null,
       createdAt: "2025-08-01T00:00:00.000Z",
     });
+  });
+
+  it("異なるProductへの期間末変更を冪等なSubscription Scheduleとして作成する", async () => {
+    const create = vi.fn().mockResolvedValue({
+      id: "sub_sched_secret",
+      current_phase: { start_date: 1_754_006_400, end_date: 1_756_684_800 },
+    });
+    const update = vi.fn().mockResolvedValue({ id: "sub_sched_secret" });
+    const provider = new StripeBillingProvider({
+      subscriptionSchedules: { create, update },
+    } as never);
+
+    await expect(
+      provider.scheduleSubscriptionChange(
+        {
+          subscriptionId: "sub_secret",
+          currentPriceId: "price_full_month",
+          currentTrialEnd: "2025-09-01T00:00:00.000Z",
+          targetPriceId: "price_lite_month",
+          targetInterval: "month",
+        },
+        "plan-change-key",
+      ),
+    ).resolves.toEqual({ effectiveAt: "2025-09-01T00:00:00.000Z" });
+    expect(create).toHaveBeenCalledWith(
+      { from_subscription: "sub_secret" },
+      { idempotencyKey: "plan-change-key" },
+    );
+    expect(update).toHaveBeenCalledWith(
+      "sub_sched_secret",
+      {
+        end_behavior: "release",
+        proration_behavior: "none",
+        phases: [
+          {
+            start_date: 1_754_006_400,
+            end_date: 1_756_684_800,
+            items: [{ price: "price_full_month", quantity: 1 }],
+            proration_behavior: "none",
+            trial_end: 1_756_684_800,
+          },
+          {
+            start_date: 1_756_684_800,
+            duration: { interval: "month", interval_count: 1 },
+            items: [{ price: "price_lite_month", quantity: 1 }],
+            proration_behavior: "none",
+          },
+        ],
+      },
+      { idempotencyKey: "plan-change-key-phases" },
+    );
   });
 
   it.each([

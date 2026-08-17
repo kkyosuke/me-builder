@@ -26,7 +26,7 @@
       "post": {
         "operationId": "reportWebClientError",
         "tags": ["Observability"],
-        "summary": "Web UIの安全化済み未捕捉エラーをWorkers Logsへ記録する",
+        "summary": "Web UIの安全化済み未捕捉・操作エラーをWorkers Logsへ記録する",
         "security": [
           {
             "applicationSession": [],
@@ -60,7 +60,8 @@
                       "unhandled-error",
                       "unhandled-rejection",
                       "render-error",
-                      "chunk-load-error"
+                      "chunk-load-error",
+                      "handled-operation-error"
                     ]
                   },
                   "route": {
@@ -123,6 +124,33 @@
                     "type": "integer",
                     "minimum": 1,
                     "maximum": 10000000
+                  },
+                  "operation": {
+                    "type": "string",
+                    "enum": ["billing-checkout", "billing-plan-change", "billing-portal"]
+                  },
+                  "operationErrorCode": {
+                    "type": "string",
+                    "enum": [
+                      "BILLING_CHECKOUT_NETWORK_FAILED",
+                      "BILLING_CHECKOUT_UNAVAILABLE",
+                      "BILLING_CHECKOUT_FAILED",
+                      "BILLING_CHECKOUT_RESPONSE_INVALID",
+                      "BILLING_PLAN_CHANGE_NETWORK_FAILED",
+                      "BILLING_PLAN_CHANGE_UNAVAILABLE",
+                      "BILLING_PLAN_CHANGE_FAILED",
+                      "BILLING_PLAN_CHANGE_RESPONSE_INVALID",
+                      "BILLING_PORTAL_NETWORK_FAILED",
+                      "BILLING_CUSTOMER_NOT_FOUND",
+                      "BILLING_PORTAL_FAILED",
+                      "BILLING_PORTAL_RESPONSE_INVALID",
+                      "UNKNOWN_CLIENT_OPERATION_ERROR"
+                    ]
+                  },
+                  "operationStatus": {
+                    "type": "integer",
+                    "minimum": 400,
+                    "maximum": 599
                   },
                   "online": {
                     "type": "boolean"
@@ -1647,6 +1675,7 @@
                         "customer_not_found",
                         "same_plan",
                         "subscription_not_found",
+                        "scheduled_change_exists",
                         "configuration_missing"
                       ],
                       "type": "string"
@@ -1715,7 +1744,7 @@
       "post": {
         "operationId": "createBillingPlanChangeSession",
         "tags": ["Billing"],
-        "summary": "選択したPlanへのStripe確認画面を作成する",
+        "summary": "選択したPlanへの即時確認または期間末変更予約を作成する",
         "security": [
           {
             "applicationSession": [],
@@ -1765,7 +1794,7 @@
         },
         "responses": {
           "201": {
-            "description": "プラン変更確認用の短命なStripe Portal URL",
+            "description": "即時変更のStripe Portal URL、または期間末予約後のWeb復帰URL",
             "content": {
               "application/json": {
                 "schema": {
@@ -1851,6 +1880,7 @@
                         "customer_not_found",
                         "same_plan",
                         "subscription_not_found",
+                        "scheduled_change_exists",
                         "configuration_missing"
                       ],
                       "type": "string"
@@ -2103,6 +2133,7 @@
                         "customer_not_found",
                         "same_plan",
                         "subscription_not_found",
+                        "scheduled_change_exists",
                         "configuration_missing"
                       ],
                       "type": "string"

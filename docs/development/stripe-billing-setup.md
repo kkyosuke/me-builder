@@ -26,7 +26,7 @@
 
 | 資源 | 識別方法 | 同期内容 |
 | --- | --- | --- |
-| Product | Planごとの固定Product IDと`managed_by` metadata | Lite、Full、ファミリーパックを表す3 Product |
+| Product | Planごとの固定Product IDと`managed_by` metadata | Lite、Full、ファミリーパックを表す3 ProductとTax Code |
 | Price | 固定`lookup_key`と`managed_by` metadata | 各Productの月額・年額、JPY、税込 |
 | Webhook endpoint | URLまたは`managed_by` metadata | 課金projectionが受け付けるeventだけ |
 | Customer Portal configuration | `managed_by` metadata | 支払方法、請求履歴、プラン変更、期間末解約・再開 |
@@ -38,7 +38,11 @@ Priceの`lookup_key`は次の形式で固定します。
 me_builder_<lite|full|family>_<monthly|yearly>
 ```
 
-金額はこの文書へ重複して持たず、料金SSoTと`STRIPE_BILLING_CATALOG`を同じ変更で更新します。Stripe Customer Portalは1 Productにつき同じ課金間隔のPriceを複数許可しないため、Lite、Full、ファミリーパックを別Productにし、各Productへ月額・年額を1件ずつ所属させます。Customer Portal configurationには3 Productと現在の6 Priceを列挙し、アプリで選んだ変更先をPortalの確定画面へdeep linkします。旧ProductのPrice IDは既存契約がなくなるまで`BILLING_PRICE_PLAN_MAP`へ残します。upgradeは`always_invoice`で日割り差額を即時請求します。金額減少と年額から月額への短縮は`decreasing_item_amount` / `shortening_interval`条件で期間末へ予約し、trial中の変更は`continue_trial`で残期間を維持します。同一または上位Planの月額から年額への変更は、変更日を新しい年額期間の開始日にする`billing_cycle_anchor=now`専用設定を使います。この専用設定には`decreasing_item_amount`を含む期間末予約条件を設定せず、年額の月換算額が下がる場合も即時変更を妨げないようにします。それ以外は現在の請求期間を維持する標準設定を使います。支払方法・解約用の管理Portalではプラン変更を無効にし、この請求ルールを迂回できないようにします。
+金額はこの文書へ重複して持たず、料金SSoTと`STRIPE_BILLING_CATALOG`を同じ変更で更新します。Stripe Customer Portalは1 Productにつき同じ課金間隔のPriceを複数許可しないため、Lite、Full、ファミリーパックを別Productにし、各Productへ月額・年額を1件ずつ所属させます。Customer Portal configurationには3 Productと現在の6 Priceを列挙し、アプリで選んだ即時upgrade先をPortalの確定画面へdeep linkします。旧ProductのPrice IDは既存契約がなくなるまで`BILLING_PRICE_PLAN_MAP`へ残します。upgradeは`always_invoice`で日割り差額を即時請求します。同一または上位Planの月額から年額への変更は、変更日を新しい年額期間の開始日にする`billing_cycle_anchor=now`専用設定を使います。それ以外の即時upgradeは現在の請求期間を維持する標準設定を使います。
+
+各ProductにはManaged Paymentsの対象となるクラウド型AIサービス（個人利用）のStripe Tax Code `txcd_10105001`を設定します。同期処理は新規Productだけでなく既存の管理対象ProductにもTax Codeを再適用します。サービス内容または対象顧客を変更する場合は、[StripeのManaged Payments適格Tax Code](https://docs.stripe.com/payments/managed-payments/eligibility#product-tax-code-requirements)と実際の提供内容を照合し、本番同期前に区分を再確認します。
+
+下位Planへの変更と年額から月額への変更は、Customer Portal configurationの期間末変更条件を使いません。StripeはPortalによる期間末変更を同一Product間に限定しており、PlanごとにProductを分けたcatalogでは要件を満たせないためです。APIが本人確認済みSubscriptionからSubscription Scheduleを作成し、現在期間の終了時に選択Priceへ切り替えます。支払方法・解約用の管理Portalではプラン変更を無効にし、この請求ルールを迂回できないようにします。
 
 ## 3. 実行前提
 
@@ -114,9 +118,9 @@ bun scripts/setup-stripe-billing.ts preview --stripe-only
 
 ### 3.3 契約ライフサイクルのsandbox確認
 
-通常PRのCIはStripeへ接続しません。実接続の回帰は`scheduled-checks.yml`の手動・定期実行で、`apps/api/scripts/test-billing-lifecycle.ts`からsandbox Test Clockを使って確認します。
+通常PRのCIはStripeへ接続しません。実接続の回帰は`scheduled-checks.yml`の手動・定期実行で、`apps/api/scripts/test-billing-lifecycle.ts`からCheckout Session作成とsandbox Test Clockを使った課金ライフサイクルを確認します。Checkout作成に失敗した場合は、生のStripeレスポンスを出さず、Stripeの固定エラー種別・コード・パラメータ・request IDを`level=error`で記録します。
 
-実行には`dev` GitHub Environmentの`STRIPE_SECRET_KEY`を設定し、先にStripe catalog同期を完了します。E2Eは料金SSoTのLite・Full月額lookup keyを使い、trial、通常更新、即時upgrade、期間末downgrade、支払失敗と回復、解約予約・取消・終了を再現します。通常CIでは、同じprojectionに対するWebhook重複、順序逆転、subscription event欠落時のCustomer再照合、最終retryのDLQ遷移をfakeで回帰します。
+実行には`dev` GitHub Environmentの`STRIPE_SECRET_KEY`を設定し、先にStripe catalog同期を完了します。E2Eは料金SSoTのLite・Full月額lookup keyを使い、trial、通常更新、Portalによる即時upgrade、APIと同じSubscription Scheduleによる異なるProduct間の期間末downgrade、支払失敗と回復、解約予約・取消・終了を再現します。通常CIでは、同じprojectionに対するWebhook重複、順序逆転、subscription event欠落時のCustomer再照合、最終retryのDLQ遷移をfakeで回帰します。
 
 ## 4. Cloudflareへ配布する値
 
@@ -129,8 +133,7 @@ bun scripts/setup-stripe-billing.ts preview --stripe-only
 | `STRIPE_PORTAL_CONFIGURATION_ID` | 管理対象のCustomer Portal設定をSession作成時に指定 | 不要 |
 | `STRIPE_PORTAL_PLAN_CHANGE_CONFIGURATION_ID` | 現在の請求期間を維持する変更確認用Portal設定 | 不要 |
 | `STRIPE_PORTAL_RESET_CONFIGURATION_ID` | 月額から年額へのupgradeで請求期間を変更日にリセットするPortal設定 | 不要 |
-| `BILLING_PRICE_PLAN_MAP` | 後続Checkout API用 | Price IDをprovider非依存Planへ変換 |
-| `BILLING_LOOKUP_KEY_MAP` | CheckoutでPlanと請求間隔を許可済みlookup keyへ変換 | いいえ |
+| `BILLING_PRICE_PLAN_MAP` | Webhook再照合でPrice IDをprovider非依存Planへ変換 | Price IDをprovider非依存Planへ変換 |
 | `BILLING_PROJECTION_STALE_AFTER_SECONDS` | 監視でprojection遅延と判定する猶予秒数（既定900） | いいえ |
 
 Webhook secretはendpoint作成時にだけStripeから返ります。初回実行ではその値を自動配布します。Cloudflareに`STRIPE_WEBHOOK_SECRET`という名前のsecretが無い場合は、前回の配布失敗からも復旧できるようendpointをローテーションして新しいsecretを配布します。既存値を意図的に置き換える場合は、既知の値を`STRIPE_WEBHOOK_SECRET`へ設定して実行します。
@@ -138,6 +141,8 @@ Webhook secretはendpoint作成時にだけStripeから返ります。初回実�
 ## 5. 冪等性と価格変更
 
 同じ設定で再実行してもProduct、Price、Webhook、Portalを追加しません。管理対象と同じProduct IDを管理外資源が使用している場合や、同じWebhook URLが複数ある場合は、推測で上書きせず停止します。
+
+Customer Portal設定は設定内容の版をmetadataへ持ちます。同じ版は冪等に更新し、版が変わった場合は新しい設定を作成して同じmodeの旧設定を無効化します。ただしStripeのデフォルトPortal設定はAPIから無効化できないため、旧版でもactiveのまま残し、アプリは必ず同期結果の現行設定IDをSession作成時に明示します。Stripe側に古い期間末変更条件が残っても、新しいSessionが旧設定を参照し続けないためのローテーションです。
 
 Stripe Priceの金額と課金間隔は変更できません。料金SSoTを変更した場合、同期処理は次の順で切り替えます。
 
@@ -153,6 +158,7 @@ Stripe Priceの金額と課金間隔は変更できません。料金SSoTを変�
 
 - 終了コードが0である
 - 出力の`created` / `updated`が意図した対象だけである
+- Lite、Full、ファミリーパックの各ProductにTax Codeが設定されている
 - `billingPricePlanMap`に現在の6 Priceと、既存契約が参照する旧Priceが含まれる
 - PreviewのStripe webhookから署名付きeventを送り、Billing Queueへ受理される
 - 同じコマンドを再実行してProduct、Price、Webhook、Portalの数が増えない

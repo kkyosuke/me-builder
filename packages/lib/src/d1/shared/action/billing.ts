@@ -62,6 +62,49 @@ export async function linkBillingCustomer(
   });
 }
 
+/**
+ * Stripe側で削除済み、または現在のsandboxに存在しないCustomerを、
+ * 呼び出し側が確認した旧IDとのCASで置き換える。
+ * 有効な契約がないことの確認はproviderの現在状態を知るapplication層が担う。
+ */
+export async function replaceBillingCustomer(
+  db: SharedD1Client,
+  input: {
+    accountId: string;
+    expectedProviderCustomerId: string;
+    providerCustomerId: string;
+    syncedAt?: Date;
+  },
+) {
+  const syncedAt = input.syncedAt ?? new Date();
+  const ownedByAnotherAccount = await db.query.billingCustomers.findFirst({
+    where: (table, { eq }) => eq(table.providerCustomerId, input.providerCustomerId),
+  });
+  if (ownedByAnotherAccount && ownedByAnotherAccount.accountId !== input.accountId) {
+    throw new BillingCustomerOwnershipError();
+  }
+  await db
+    .update(billingCustomers)
+    .set({
+      providerCustomerId: input.providerCustomerId,
+      updatedAt: syncedAt,
+      lastSyncedAt: syncedAt,
+    })
+    .where(
+      and(
+        eq(billingCustomers.accountId, input.accountId),
+        eq(billingCustomers.providerCustomerId, input.expectedProviderCustomerId),
+      ),
+    );
+  const customer = await db.query.billingCustomers.findFirst({
+    where: (table, { eq }) => eq(table.accountId, input.accountId),
+  });
+  if (customer?.providerCustomerId !== input.providerCustomerId) {
+    throw new BillingCustomerOwnershipError();
+  }
+  return customer;
+}
+
 export async function findBillingCustomerByAccount(db: SharedD1Client, accountId: string) {
   return await db.query.billingCustomers.findFirst({
     where: (table, { eq }) => eq(table.accountId, accountId),

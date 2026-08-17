@@ -3,6 +3,7 @@ export const WEB_CLIENT_ERROR_KINDS = [
   "unhandled-rejection",
   "render-error",
   "chunk-load-error",
+  "handled-operation-error",
 ] as const;
 
 export type WebClientErrorKind = (typeof WEB_CLIENT_ERROR_KINDS)[number];
@@ -21,6 +22,33 @@ export const WEB_CLIENT_ERROR_TYPES = [
 ] as const;
 
 export type WebClientErrorType = (typeof WEB_CLIENT_ERROR_TYPES)[number];
+
+export const WEB_CLIENT_OPERATIONS = [
+  "billing-checkout",
+  "billing-plan-change",
+  "billing-portal",
+] as const;
+
+export type WebClientOperation = (typeof WEB_CLIENT_OPERATIONS)[number];
+
+/** ブラウザから運用ログへ送信してよい、機密情報を含まない固定エラーコード。 */
+export const WEB_CLIENT_OPERATION_ERROR_CODES = [
+  "BILLING_CHECKOUT_NETWORK_FAILED",
+  "BILLING_CHECKOUT_UNAVAILABLE",
+  "BILLING_CHECKOUT_FAILED",
+  "BILLING_CHECKOUT_RESPONSE_INVALID",
+  "BILLING_PLAN_CHANGE_NETWORK_FAILED",
+  "BILLING_PLAN_CHANGE_UNAVAILABLE",
+  "BILLING_PLAN_CHANGE_FAILED",
+  "BILLING_PLAN_CHANGE_RESPONSE_INVALID",
+  "BILLING_PORTAL_NETWORK_FAILED",
+  "BILLING_CUSTOMER_NOT_FOUND",
+  "BILLING_PORTAL_FAILED",
+  "BILLING_PORTAL_RESPONSE_INVALID",
+  "UNKNOWN_CLIENT_OPERATION_ERROR",
+] as const;
+
+export type WebClientOperationErrorCode = (typeof WEB_CLIENT_OPERATION_ERROR_CODES)[number];
 
 export const WEB_CLIENT_ROUTES = [
   "/",
@@ -57,6 +85,9 @@ export type WebClientErrorReport = Readonly<{
   sourceFile?: string;
   sourceLine?: number;
   sourceColumn?: number;
+  operation?: WebClientOperation;
+  operationErrorCode?: WebClientOperationErrorCode;
+  operationStatus?: number;
   online: boolean;
   recovered: boolean;
 }>;

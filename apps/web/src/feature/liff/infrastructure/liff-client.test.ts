@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   initializeLiffForAuthExchange,
+  openLiffWindow,
   readLiffAuthExchangeCredential,
   shareLiffTextMessage,
 } from "./liff-client";
@@ -11,6 +12,7 @@ const mockLiff = vi.hoisted(() => ({
   isLoggedIn: vi.fn(),
   login: vi.fn(),
   getIDToken: vi.fn(),
+  openWindow: vi.fn(),
   isApiAvailable: vi.fn(),
   shareTargetPicker: vi.fn(),
 }));
@@ -22,6 +24,40 @@ vi.mock("@me-builder/shared", () => ({
 }));
 
 const LIFF_ID = "1234567890-abcdefgh";
+
+describe("openLiffWindow", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("LIFFブラウザではLINEのアプリ内ブラウザでURLを開く", () => {
+    mockLiff.isInClient.mockReturnValue(true);
+
+    expect(openLiffWindow("https://checkout.stripe.test/session")).toBe(true);
+    expect(mockLiff.openWindow).toHaveBeenCalledWith({
+      url: "https://checkout.stripe.test/session",
+      external: false,
+    });
+  });
+
+  it("外部ブラウザでは通常navigationへフォールバックさせる", () => {
+    mockLiff.isInClient.mockReturnValue(false);
+
+    expect(openLiffWindow("https://checkout.stripe.test/session")).toBe(false);
+    expect(mockLiff.openWindow).not.toHaveBeenCalled();
+  });
+
+  it("LIFF SDKがURLを開けない場合も通常navigationへフォールバックさせる", () => {
+    mockLiff.isInClient.mockReturnValue(true);
+    mockLiff.openWindow.mockImplementation(() => {
+      throw new Error("LIFF is not initialized");
+    });
+
+    expect(openLiffWindow("https://checkout.stripe.test/session")).toBe(false);
+    expect(loggerWarn).toHaveBeenCalledWith(
+      { event: "liff.window.open.failed", outcome: "failed", reason: "sdk-error" },
+      "LIFF から外部 URL を開けませんでした",
+    );
+  });
+});
 
 describe("initializeLiffForAuthExchange", () => {
   beforeEach(() => {
