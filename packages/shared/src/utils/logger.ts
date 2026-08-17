@@ -72,8 +72,10 @@ export function createLogger(options?: CreateLoggerOptions): Logger {
 
   const { browser: browserOptions, formatters: formatterOptions, ...loggerOptions } = options ?? {};
   const configuredLogFormatter = formatterOptions?.log;
+  const configuredLevelFormatter = formatterOptions?.level;
   const configuredBindingsFormatter = formatterOptions?.bindings;
   const configuredBrowserLogFormatter = browserOptions?.formatters?.log;
+  const configuredBrowserLevelFormatter = browserOptions?.formatters?.level;
 
   return protectChildBindings(
     pino({
@@ -86,6 +88,14 @@ export function createLogger(options?: CreateLoggerOptions): Logger {
         ...browserOptions,
         formatters: {
           ...browserOptions?.formatters,
+          level(label, number) {
+            return {
+              ...(configuredBrowserLevelFormatter
+                ? configuredBrowserLevelFormatter(label, number)
+                : {}),
+              level: label,
+            };
+          },
           log(object) {
             return omitForbiddenLogFields(
               configuredBrowserLogFormatter ? configuredBrowserLogFormatter(object) : object,
@@ -95,6 +105,12 @@ export function createLogger(options?: CreateLoggerOptions): Logger {
       },
       formatters: {
         ...formatterOptions,
+        level(label, number) {
+          return {
+            ...(configuredLevelFormatter ? configuredLevelFormatter(label, number) : {}),
+            level: label,
+          };
+        },
         bindings(bindings) {
           return omitForbiddenLogFields(
             configuredBindingsFormatter ? configuredBindingsFormatter(bindings) : bindings,

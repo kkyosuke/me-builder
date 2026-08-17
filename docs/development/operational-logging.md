@@ -151,6 +151,8 @@ HTTPステータス、Queueのack / retry、フォールバックの採用など
 
 messageをcall siteごとに自由記述すると、同じ結果が違う文言で現れ、文言とフィールドがずれます。終端ログのmessageは構造化フィールドと同じ情報から共通関数で組み立て、次の順に並べます。
 
+Cloudflare Workers Logsのseverityとログ内の同名フィールドが食い違わないよう、構造化ログの`level`は`info`、`warn`、`error`などの文字列で記録します。Pinoの数値levelは出力しません。Workers実行時はそれぞれ対応する`console` methodを通し、Workers Logs上のseverityにも同じlevelを反映します。
+
 ```text
 [処理名] 結果 at 工程 -> 次の挙動 (試行回数/最大試行回数, 所要時間, 結果コード, 原因分類, 依存先)
 ```
