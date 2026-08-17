@@ -42,6 +42,10 @@ class FakeStripeCatalogApi implements StripeCatalogApi {
     this.defaultPrices.set(productId, priceId);
   }
 
+  async clearDefaultPrice(productId: string) {
+    this.defaultPrices.delete(productId);
+  }
+
   async listPricesByLookupKeys(lookupKeys: readonly string[]) {
     return this.prices.filter(
       (price) => price.lookupKey !== null && lookupKeys.includes(price.lookupKey),
@@ -76,6 +80,9 @@ class FakeStripeCatalogApi implements StripeCatalogApi {
   }
 
   async setPriceActive(id: string, active: boolean) {
+    if (!active && [...this.defaultPrices.values()].includes(id)) {
+      throw new Error(`Price ${id} is still the default price`);
+    }
     this.prices = this.prices.map((price) => (price.id === id ? { ...price, active } : price));
     if (!active) this.archivedPriceIds.push(id);
   }
@@ -304,10 +311,14 @@ describe("setupStripeBillingCatalog", () => {
       })),
     );
     api.prices.push(...legacyPrices);
+    const legacyDefaultPrice = legacyPrices[0];
+    if (!legacyDefaultPrice) throw new Error("Legacy default price fixture is missing");
+    api.defaultPrices.set("me_builder_subscription", legacyDefaultPrice.id);
 
     const result = await setupStripeBillingCatalog({ api, environment: "preview" });
 
     expect(api.archivedPriceIds).toEqual(legacyPrices.map((price) => price.id));
+    expect(api.defaultPrices.has("me_builder_subscription")).toBe(false);
     expect(
       api.prices
         .filter((price) => price.lookupKey)

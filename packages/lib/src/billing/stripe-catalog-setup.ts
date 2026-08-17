@@ -101,6 +101,7 @@ export interface StripeCatalogApi {
   createProduct(spec: ProductSpec): Promise<CatalogProduct>;
   updateProduct(id: string, spec: Omit<ProductSpec, "id">): Promise<CatalogProduct>;
   setDefaultPrice(productId: string, priceId: string): Promise<void>;
+  clearDefaultPrice(productId: string): Promise<void>;
   listPricesByLookupKeys(lookupKeys: readonly string[]): Promise<readonly CatalogPrice[]>;
   listPricesByProduct(productId: string): Promise<readonly CatalogPrice[]>;
   createPrice(spec: PriceSpec): Promise<CatalogPrice>;
@@ -251,10 +252,6 @@ export async function setupStripeBillingCatalog(input: {
           metadata: managedMetadata(desiredPrice.plan),
         });
         created.push(`price:${desiredPrice.lookupKey}`);
-        if (current?.active) {
-          await input.api.setPriceActive(current.id, false);
-          updated.push(`price:${current.id}:archived`);
-        }
       }
       desiredPriceByLookupKey.set(desiredPrice.lookupKey, price);
       pricePlanMap[price.id] = desiredPrice.plan;
@@ -279,13 +276,32 @@ export async function setupStripeBillingCatalog(input: {
       .filter((candidate) => isManaged(candidate.metadata))
       .map((candidate) => [candidate.id, candidate]),
   );
+  const desiredProductIds = new Set(
+    [...desiredProductByPlan.values()].map((product) => product.id),
+  );
+  const desiredPriceIds = new Set([...desiredPriceByLookupKey.values()].map((price) => price.id));
+  const pricesToArchive = new Map<string, CatalogPrice>();
   for (const managedProduct of managedProducts.values()) {
     for (const price of await input.api.listPricesByProduct(managedProduct.id)) {
       const plan = price.metadata.plan;
       if (isManaged(price.metadata) && (plan === "lite" || plan === "full" || plan === "family")) {
         pricePlanMap[price.id] = plan;
+        if (price.active && !desiredPriceIds.has(price.id)) pricesToArchive.set(price.id, price);
       }
     }
+  }
+  const legacyProductIds = new Set(
+    [...pricesToArchive.values()]
+      .map((price) => price.productId)
+      .filter((productId) => !desiredProductIds.has(productId)),
+  );
+  for (const productId of legacyProductIds) {
+    await input.api.clearDefaultPrice(productId);
+    updated.push(`product:${productId}:default-price-cleared`);
+  }
+  for (const price of pricesToArchive.values()) {
+    await input.api.setPriceActive(price.id, false);
+    updated.push(`price:${price.id}:archived`);
   }
 
   const webhookMetadata = managedMetadata();
@@ -511,6 +527,9 @@ export function createStripeCatalogApi(secretKey: string): StripeCatalogApi {
     },
     async setDefaultPrice(productId, priceId) {
       await stripe.products.update(productId, { default_price: priceId });
+    },
+    async clearDefaultPrice(productId) {
+      await stripe.products.update(productId, { default_price: "" });
     },
     async listPricesByLookupKeys(lookupKeys) {
       return (await all(stripe.prices.list({ lookup_keys: [...lookupKeys], limit: 100 }))).map(

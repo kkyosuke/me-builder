@@ -143,8 +143,9 @@ Stripe Priceの金額と課金間隔は変更できません。料金SSoTを変�
 
 1. 新しいPriceを作成する
 2. `transfer_lookup_key=true`で固定lookup keyを新Priceへ移す
-3. 旧Priceを新規購入不可にする
-4. 旧Price IDを`BILLING_PRICE_PLAN_MAP`へ残す
+3. Productのdefault priceを現行月額Priceへ切り替える。管理対象外になった旧Productはdefault priceを解除する
+4. 現行6 Price以外の管理対象Priceを新規購入不可にする
+5. 旧Price IDを`BILLING_PRICE_PLAN_MAP`へ残す
 
 既存Subscriptionは旧Priceを参照したまま継続でき、projectionも旧Priceを正しいPlanへ変換できます。旧Priceは既存契約がなくなるまで削除しません。
 
