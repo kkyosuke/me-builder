@@ -1,15 +1,13 @@
-import type { AccountDataNamespace, CompatibilityDataNamespace, D1 } from "@me-builder/lib";
+import type { AccountDataNamespace, CompatibilityDataNamespace } from "@me-builder/lib";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getCompatibilityRelationshipContents } from "./compatibility-relationship";
 
 const mocks = vi.hoisted(() => ({
-  createLiffSession: vi.fn(),
   getRelationship: vi.fn(),
   synchronizeProgression: vi.fn(),
   loadSharePreviewData: vi.fn(),
 }));
 
-vi.mock("./liff-session", () => ({ createLiffSession: mocks.createLiffSession }));
 vi.mock("@me-builder/lib", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@me-builder/lib")>()),
   compatibilityDataFor: () => ({
@@ -24,9 +22,11 @@ vi.mock("./compatibility-share-preview", () => ({
 const relationshipId = "1".repeat(64);
 const params = {
   relationshipId,
-  idToken: "id-token",
-  lineLoginChannelId: "channel-id",
-  db: {} as D1.shared.Client,
+  actor: {
+    accountId: "account-inviter",
+    authenticationMethod: "liff" as const,
+    authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
+  },
   accountData: {} as AccountDataNamespace,
   compatibilityData: {} as CompatibilityDataNamespace,
   at: new Date("2026-08-13T00:00:00.000Z"),
@@ -81,10 +81,6 @@ function shareData({
 describe("getCompatibilityRelationshipContents", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.createLiffSession.mockResolvedValue({
-      type: "resolved",
-      session: { accountId: "account-inviter", role: "user", displayName: "あおい" },
-    });
     mocks.getRelationship.mockResolvedValue({
       id: relationshipId,
       inviterAccountId: "account-inviter",

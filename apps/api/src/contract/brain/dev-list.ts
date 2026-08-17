@@ -1,6 +1,11 @@
 import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
 import * as v from "valibot";
-import { AccountNotFoundErrorSchema, authenticatedErrors, jsonResponse } from "../shared/errors";
+import {
+  AccountNotFoundErrorSchema,
+  authenticatedErrors,
+  currentTermsPolicyError,
+  jsonResponse,
+} from "../shared/errors";
 
 const NonEmptyStringSchema = v.pipe(v.string(), v.nonEmpty());
 const TimestampSchema = v.pipe(v.string(), v.isoTimestamp());
@@ -78,10 +83,11 @@ export const developmentBrainItemsRoute = describeRoute({
   operationId: "getDevelopmentBrainItems",
   tags: ["Development"],
   summary: "開発環境で本人のactive Brain Item一覧を取得する",
-  security: [{ liffIdToken: [] }],
+  security: [{ applicationSession: [] }, { liffIdToken: [] }],
   responses: {
     200: jsonResponse("本人のactive Brain ItemとEvidence", DevelopmentBrainItemsResponseSchema),
     ...authenticatedErrors,
+    ...currentTermsPolicyError,
     404: jsonResponse(
       "開発環境ではない、または対応するAccountがない",
       v.union([AccountNotFoundErrorSchema, DevelopmentRouteNotFoundErrorSchema]),
@@ -93,13 +99,14 @@ export const developmentBrainVectorRoute = describeRoute({
   operationId: "getDevelopmentBrainVector",
   tags: ["Development"],
   summary: "開発環境で本人のBrain Itemに対応するVectorize実体を確認する",
-  security: [{ liffIdToken: [] }],
+  security: [{ applicationSession: [] }, { liffIdToken: [] }],
   responses: {
     200: jsonResponse(
       "AccountDataの対応表とVectorize実体の照合結果",
       DevelopmentBrainVectorResponseSchema,
     ),
     ...authenticatedErrors,
+    ...currentTermsPolicyError,
     404: jsonResponse(
       "開発環境ではない、または対応するAccountがない",
       v.union([AccountNotFoundErrorSchema, DevelopmentRouteNotFoundErrorSchema]),

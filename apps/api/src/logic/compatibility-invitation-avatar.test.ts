@@ -7,8 +7,11 @@ const relationshipId = "a".repeat(64);
 const db = {} as D1.shared.Client;
 const params = {
   relationshipId,
-  idToken: "id-token",
-  lineLoginChannelId: "channel-id",
+  actor: {
+    accountId: "account-recipient",
+    authenticationMethod: "liff" as const,
+    authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
+  },
   db,
   avatarBucket: {} as R2Bucket,
   lineChannelAccessToken: "line-token",

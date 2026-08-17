@@ -1,6 +1,6 @@
 import { and, eq, inArray, isNull, lte, ne, sql } from "drizzle-orm";
 import type { SharedD1Client } from "../client";
-import { accountIdentities } from "../schema/account";
+import { accountIdentities, accounts } from "../schema/account";
 import {
   accountRecoveryAudits,
   accountRecoveryCredentials,
@@ -168,6 +168,12 @@ export async function completeAccountRecovery(
       ),
   });
   const accountId = credential.accountId;
+  const account = await db.query.accounts.findFirst({
+    columns: { status: true, isDeleted: true },
+    where: (table, { eq }) => eq(table.id, accountId),
+  });
+  // コード発行後にAccountが削除・停止された場合も、Identityを再接続しない。
+  if (!account || account.status !== "active" || account.isDeleted) return "invalid";
   if (credential.usedAt) {
     return existingIdentities.some((identity) => identity.accountId === accountId)
       ? "already-recovered"
@@ -207,6 +213,11 @@ export async function completeAccountRecovery(
     );
   }
   queries.push(
+    // Identity再接続と同じD1 batchでversionを進め、旧sessionを即時失効させる。
+    db
+      .update(accounts)
+      .set({ sessionVersion: sql`${accounts.sessionVersion} + 1`, updatedAt: now })
+      .where(eq(accounts.id, credential.accountId)),
     db
       .update(accountIdentities)
       .set({ isDeleted: true, deletedAt: now, updatedAt: now })

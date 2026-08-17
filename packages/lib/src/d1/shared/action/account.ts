@@ -3,7 +3,7 @@ import {
   logger,
   serviceTermsDocumentsSatisfyingCurrentRequirement,
 } from "@me-builder/shared";
-import { and, asc, eq, gt, or } from "drizzle-orm";
+import { and, asc, eq, gt, or, sql } from "drizzle-orm";
 import type { SharedD1Client } from "../client";
 import { accountIdentities, accounts } from "../schema/account";
 import { accountAgreementAcceptances } from "../schema/agreement";
@@ -117,6 +117,63 @@ export async function linkIdentity(
   }
 
   return identity;
+}
+
+/**
+ * Accountからidentityを解除し、既存application sessionを同じD1 batchで失効させます。
+ * 呼び出し側は最後のidentityを解除してよいか等のproduct policyを事前に判定します。
+ */
+export async function unlinkIdentity(
+  db: SharedD1Client,
+  input: Readonly<{ accountId: string; identityId: string; now?: Date }>,
+): Promise<boolean> {
+  const identity = await db.query.accountIdentities.findFirst({
+    columns: { id: true },
+    where: (table, { and, eq }) =>
+      and(
+        eq(table.id, input.identityId),
+        eq(table.accountId, input.accountId),
+        eq(table.isDeleted, false),
+      ),
+  });
+  if (!identity) return false;
+
+  const now = input.now ?? new Date();
+  await db.batch([
+    db
+      .update(accounts)
+      .set({ sessionVersion: sql`${accounts.sessionVersion} + 1`, updatedAt: now })
+      .where(eq(accounts.id, input.accountId)),
+    db
+      .update(accountIdentities)
+      .set({ isDeleted: true, deletedAt: now, updatedAt: now })
+      .where(
+        and(
+          eq(accountIdentities.id, input.identityId),
+          eq(accountIdentities.accountId, input.accountId),
+          eq(accountIdentities.isDeleted, false),
+        ),
+      ),
+  ]);
+  return true;
+}
+
+/** Accountを停止し、その時点までに発行されたsessionを即時失効させます。 */
+export async function stopAccount(
+  db: SharedD1Client,
+  accountId: string,
+  now = new Date(),
+): Promise<boolean> {
+  const [stopped] = await db
+    .update(accounts)
+    .set({
+      status: "stopped",
+      sessionVersion: sql`${accounts.sessionVersion} + 1`,
+      updatedAt: now,
+    })
+    .where(and(eq(accounts.id, accountId), eq(accounts.status, "active")))
+    .returning({ id: accounts.id });
+  return stopped !== undefined;
 }
 
 /**
@@ -310,6 +367,7 @@ export async function upsertIdentity(
     id: accountId,
     status: "active",
     role: input.role ?? "user",
+    sessionVersion: 1,
     createdAt: now,
     updatedAt: now,
     deletedAt: null,

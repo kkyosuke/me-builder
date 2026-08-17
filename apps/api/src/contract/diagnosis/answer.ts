@@ -1,6 +1,11 @@
 import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
 import * as v from "valibot";
-import { AccountNotFoundErrorSchema, authenticatedErrors, jsonResponse } from "../shared/errors";
+import {
+  AccountNotFoundErrorSchema,
+  authenticatedErrors,
+  currentTermsPolicyError,
+  jsonResponse,
+} from "../shared/errors";
 import { DiagnosisClosedErrorSchema, DiagnosisNotFoundErrorSchema } from "./detail";
 
 const NonEmptyStringSchema = v.pipe(v.string(), v.nonEmpty());
@@ -49,7 +54,7 @@ export const saveDiagnosisAnswerRoute = describeRoute({
   operationId: "saveDiagnosisAnswer",
   tags: ["Diagnosis"],
   summary: "診断の1問へ初回回答を保存する",
-  security: [{ liffIdToken: [] }],
+  security: [{ applicationSession: [], csrfToken: [] }, { liffIdToken: [] }],
   requestBody: {
     required: true,
     content: { "application/json": { schema: SaveDiagnosisAnswerRequestSchema } },
@@ -57,6 +62,7 @@ export const saveDiagnosisAnswerRoute = describeRoute({
   responses: {
     200: jsonResponse("保存済み回答と現在の進捗", SaveDiagnosisAnswerResponseSchema),
     ...authenticatedErrors,
+    ...currentTermsPolicyError,
     400: jsonResponse("リクエストJSONが不正", InvalidRequestErrorSchema),
     404: jsonResponse(
       "対応するAccountがない、またはDiagnosisが公開されていない",

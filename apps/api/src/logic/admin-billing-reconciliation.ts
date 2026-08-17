@@ -1,6 +1,6 @@
 import { D1, type billing } from "@me-builder/lib";
 import { logger } from "@me-builder/shared";
-import { createLiffSession } from "./liff-session";
+import type { AuthenticatedActor } from "./authentication/types";
 
 type Mode = "dry-run" | "apply";
 type ReconciliationResult = {
@@ -11,35 +11,22 @@ type ReconciliationResult = {
 };
 
 type Params = {
-  idToken: string | undefined;
-  lineLoginChannelId: string | undefined;
-  adminLineUserIds: readonly string[];
+  actor: AuthenticatedActor;
   db: D1.shared.Client;
   provider: billing.BillingProvider;
   accountId: string;
   mode: Mode;
   pricePlanMap: Readonly<Record<string, "lite" | "full" | "family">>;
   now?: Date;
-  createSession?: typeof createLiffSession;
 };
 
 export type AdminBillingReconciliationOutcome =
-  | { type: "not-configured" | "unauthenticated" | "account-not-found" | "forbidden" }
   | { type: "customer-not-found" }
   | { type: "resolved"; reconciliation: ReconciliationResult };
 
 export async function reconcileAdminBillingProjection(
   params: Params,
 ): Promise<AdminBillingReconciliationOutcome> {
-  const session = await (params.createSession ?? createLiffSession)({
-    idToken: params.idToken,
-    lineLoginChannelId: params.lineLoginChannelId,
-    adminLineUserIds: params.adminLineUserIds,
-    db: params.db,
-  });
-  if (session.type !== "resolved") return { type: session.type };
-  if (session.session.role !== "admin") return { type: "forbidden" };
-
   const customer = await D1.shared.action.billing.findBillingCustomerByAccount(
     params.db,
     params.accountId,
@@ -87,7 +74,7 @@ export async function reconcileAdminBillingProjection(
     differenceFields.length === 0 ? "no-difference" : repaired ? "repaired" : "difference";
   await D1.shared.action.billing.recordBillingReconciliationAudit(params.db, {
     operationId,
-    adminAccountId: session.session.accountId,
+    adminAccountId: params.actor.accountId,
     targetAccountId: params.accountId,
     mode: params.mode,
     differenceFields,
@@ -97,6 +84,8 @@ export async function reconcileAdminBillingProjection(
   logger.info(
     {
       event: "admin.billing.reconciled",
+      adminAccountId: params.actor.accountId,
+      targetAccountId: params.accountId,
       operationId,
       mode: params.mode,
       differenceCount: differenceFields.length,

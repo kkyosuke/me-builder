@@ -1,6 +1,11 @@
 import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
 import * as v from "valibot";
-import { AccountNotFoundErrorSchema, authenticatedErrors, jsonResponse } from "../shared/errors";
+import {
+  AccountNotFoundErrorSchema,
+  authenticatedErrors,
+  currentTermsPolicyError,
+  jsonResponse,
+} from "../shared/errors";
 import { RelationshipCategorySchema } from "./shared";
 
 const NonEmptyStringSchema = v.pipe(v.string(), v.nonEmpty());
@@ -55,13 +60,14 @@ export const diagnosisAnswersRoute = describeRoute({
   operationId: "getDiagnosisAnswers",
   tags: ["Diagnosis"],
   summary: "本人が保存した診断回答内容を取得する",
-  security: [{ liffIdToken: [] }],
+  security: [{ applicationSession: [] }, { liffIdToken: [] }],
   responses: {
     200: jsonResponse(
       "質問文・選択肢・回答日時・計算済み傾向を含む本人の回答内容",
       DiagnosisAnswersResponseSchema,
     ),
     ...authenticatedErrors,
+    ...currentTermsPolicyError,
     404: jsonResponse("対応するAccount、Diagnosis、または回答がない", NotFoundSchema),
   },
 } satisfies DescribeRouteOptions);

@@ -156,6 +156,7 @@ function mockLineVerification(): void {
         iss: "https://access.line.me",
         sub: "line-summary-e2e",
         aud: "1234567890",
+        iat: Math.floor(Date.now() / 1_000),
         exp: timestamp + 86_400,
       }),
     ),

@@ -42,21 +42,20 @@ async function account(db: D1.shared.Client, name: string): Promise<string> {
   ).account.id;
 }
 
-function asAccount(accountId: string, now = new Date("2026-08-16T00:00:00.000Z")) {
+function asAccount(accountId: string) {
   return {
-    now: () => now,
-    createSession: async () => ({
-      type: "resolved" as const,
-      session: { accountId, role: "user" as const },
-    }),
+    accountId,
+    authenticationMethod: "liff" as const,
+    authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
   };
 }
 
-const params = (db: D1.shared.Client) => ({
+const params = (db: D1.shared.Client, accountId: string) => ({
   db,
-  idToken: "verified-token",
-  lineLoginChannelId: "line-login-channel",
+  actor: asAccount(accountId),
 });
+
+const at = (now = new Date("2026-08-16T00:00:00.000Z")) => ({ now: () => now });
 
 describe("family seat API authorization", () => {
   it("支払者だけが招待を取消・参加者を削除でき、返却値に個人内容を含めない", async () => {
@@ -66,28 +65,28 @@ describe("family seat API authorization", () => {
     const thirdParty = await account(db, "third-party");
     await D1.shared.action.familySeat.createFamilyPack(db, payer);
 
-    const issued = await issueFamilySeatInvitation(params(db), asAccount(payer));
+    const issued = await issueFamilySeatInvitation(params(db, payer), at());
     if (issued.type !== "created") throw new Error("invitation fixture was not created");
     await expect(
-      cancelFamilyInvitation({ ...params(db), seatId: issued.seat.id }, asAccount(thirdParty)),
+      cancelFamilyInvitation({ ...params(db, thirdParty), seatId: issued.seat.id }, at()),
     ).resolves.toEqual({ type: "forbidden" });
     await expect(
-      acceptFamilyInvitation({ ...params(db), token: issued.token }, asAccount(payer)),
+      acceptFamilyInvitation({ ...params(db, payer), token: issued.token }, at()),
     ).resolves.toEqual({ type: "forbidden" });
     await expect(
-      acceptFamilyInvitation({ ...params(db), token: issued.token }, asAccount(member)),
+      acceptFamilyInvitation({ ...params(db, member), token: issued.token }, at()),
     ).resolves.toMatchObject({ type: "updated", seat: { status: "active" } });
 
-    const management = await getFamilySeatManagement(params(db), asAccount(payer));
+    const management = await getFamilySeatManagement(params(db, payer));
     expect(management).toMatchObject({ type: "resolved", role: "payer", maxSeats: 4 });
     expect(JSON.stringify(management)).not.toMatch(
       /memberAccountId|invitationId|diary|diagnosis|profile|relationship/i,
     );
     await expect(
-      removeFamilyMember({ ...params(db), seatId: issued.seat.id }, asAccount(thirdParty)),
+      removeFamilyMember({ ...params(db, thirdParty), seatId: issued.seat.id }, at()),
     ).resolves.toEqual({ type: "forbidden" });
     await expect(
-      removeFamilyMember({ ...params(db), seatId: issued.seat.id }, asAccount(payer)),
+      removeFamilyMember({ ...params(db, payer), seatId: issued.seat.id }, at()),
     ).resolves.toMatchObject({ type: "updated", seat: { status: "removed" } });
   });
 
@@ -97,17 +96,17 @@ describe("family seat API authorization", () => {
     const member = await account(db, "single-use-member");
     const attacker = await account(db, "single-use-attacker");
     await D1.shared.action.familySeat.createFamilyPack(db, payer);
-    const issued = await issueFamilySeatInvitation(params(db), asAccount(payer));
+    const issued = await issueFamilySeatInvitation(params(db, payer), at());
     if (issued.type !== "created") throw new Error("invitation fixture was not created");
 
     await expect(
-      acceptFamilyInvitation({ ...params(db), token: issued.token }, asAccount(member)),
+      acceptFamilyInvitation({ ...params(db, member), token: issued.token }, at()),
     ).resolves.toMatchObject({ type: "updated" });
     await expect(
-      acceptFamilyInvitation({ ...params(db), token: issued.token }, asAccount(attacker)),
+      acceptFamilyInvitation({ ...params(db, attacker), token: issued.token }, at()),
     ).resolves.toEqual({ type: "token-used" });
     await expect(
-      declineFamilyInvitation({ ...params(db), token: issued.token }, asAccount(attacker)),
+      declineFamilyInvitation({ ...params(db, attacker), token: issued.token }, at()),
     ).resolves.toEqual({ type: "token-used" });
   });
 
@@ -116,29 +115,26 @@ describe("family seat API authorization", () => {
     const payer = await account(db, "expiry-payer");
     const member = await account(db, "expiry-member");
     await D1.shared.action.familySeat.createFamilyPack(db, payer);
-    const issued = await issueFamilySeatInvitation(params(db), asAccount(payer));
+    const issued = await issueFamilySeatInvitation(params(db, payer), at());
     if (issued.type !== "created") throw new Error("invitation fixture was not created");
     const afterExpiry = new Date("2026-08-18T00:00:00.001Z");
     await expect(
-      acceptFamilyInvitation(
-        { ...params(db), token: issued.token },
-        asAccount(member, afterExpiry),
-      ),
+      acceptFamilyInvitation({ ...params(db, member), token: issued.token }, at(afterExpiry)),
     ).resolves.toEqual({ type: "expired" });
 
-    const replacement = await issueFamilySeatInvitation(params(db), asAccount(payer));
+    const replacement = await issueFamilySeatInvitation(params(db, payer), at());
     if (replacement.type !== "created") throw new Error("replacement fixture was not created");
     await expect(
-      declineFamilyInvitation({ ...params(db), token: replacement.token }, asAccount(member)),
+      declineFamilyInvitation({ ...params(db, member), token: replacement.token }, at()),
     ).resolves.toMatchObject({ type: "updated", seat: { status: "cancelled" } });
 
-    const joining = await issueFamilySeatInvitation(params(db), asAccount(payer));
+    const joining = await issueFamilySeatInvitation(params(db, payer), at());
     if (joining.type !== "created") throw new Error("joining fixture was not created");
-    await acceptFamilyInvitation({ ...params(db), token: joining.token }, asAccount(member));
-    await expect(leaveFamilyPack(params(db), asAccount(payer))).resolves.toEqual({
+    await acceptFamilyInvitation({ ...params(db, member), token: joining.token }, at());
+    await expect(leaveFamilyPack(params(db, payer), at())).resolves.toEqual({
       type: "not-found",
     });
-    await expect(leaveFamilyPack(params(db), asAccount(member))).resolves.toMatchObject({
+    await expect(leaveFamilyPack(params(db, member), at())).resolves.toMatchObject({
       type: "updated",
       seat: { status: "left" },
     });

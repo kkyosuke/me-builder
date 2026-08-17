@@ -29,6 +29,10 @@ function r2(bucket: InfrastructureManifest["avatarBucket"], prefix = "") {
   return `[[${prefix}r2_buckets]]\nbinding = "AVATAR_BUCKET"\nbucket_name = "${bucket.name}"`;
 }
 
+function kv(namespace: NonNullable<InfrastructureManifest["sessionStore"]>, prefix = "") {
+  return `[[${prefix}kv_namespaces]]\nbinding = "SESSION_STORE"\nid = "${namespace.id}"`;
+}
+
 function webVars(baseDomain: string, environment: string) {
   return [`ENVIRONMENT = "${environment}"`, `WEB_ORIGIN = "https://${baseDomain}"`];
 }
@@ -102,6 +106,7 @@ function apiEnvironment(manifest: InfrastructureManifest) {
     "",
     d1(manifest.database, prefix),
   ];
+  if (manifest.sessionStore) config.push("", kv(manifest.sessionStore, prefix));
   if (env !== "production") config.push("", vectorize(env, prefix));
   config.push(
     "",
@@ -152,6 +157,7 @@ export function renderWranglerConfigs(
     baseDomain: "localhost",
     database: localDatabase,
     avatarBucket: { name: "me-builder-avatar-local" },
+    sessionStore: { id: "me-builder-session-local-id", name: "me-builder-session-local" },
     queues: localQueues,
   };
   const worker = [
@@ -254,6 +260,8 @@ export function renderWranglerConfigs(
     "",
     d1(localDatabase, "env.local."),
     "",
+    kv(localManifest.sessionStore, "env.local."),
+    "",
     vectorize("local", "env.local."),
     "",
     r2(localManifest.avatarBucket, "env.local."),
@@ -288,6 +296,8 @@ export function renderWranglerConfigs(
     queueProducer("", localQueues.profileSummary.name, "PROFILE_SUMMARY_QUEUE"),
     "",
     d1(localDatabase),
+    "",
+    kv(localManifest.sessionStore),
     "",
     vectorize("local"),
     "",

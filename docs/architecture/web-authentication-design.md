@@ -20,7 +20,8 @@
 - LINE Account喪失時の本人確認とIdentity再接続 — [Account復旧設計](account-recovery-design.md)
 - 実装の残タスク、依存順、各PRの完了条件 — [Web認証・SSO実装残タスク](../development/web-authentication-remaining-tasks.md)
 - SSO製品、IdP、session storeの物理構造と整合性方式
-- 個別APIのpath、request / response schema、cookie名、セッション有効時間の数値
+- 個別APIのpath、request / response schema
+- cookie名、session store、期限と失効の具体的な実装契約 — [アプリケーションセッション実装契約](../development/application-session-contract.md)
 
 SSO製品はこの設計では選定しません。外部ブラウザ用adapterは、OpenID Connect（OIDC）のAuthorization Code Flow + PKCE相当の性質を満たす認証結果を受け取れることを前提にします。SAMLしか提供しないIdPを採る場合も、アプリケーションからはOIDC等へ仲介する認証基盤の背後に置きます。
 
@@ -149,7 +150,7 @@ SSOだけで新規登録できるようにする判断は別のプロダクト�
 - role、利用規約同意、Plan、データ所有権をcookieの権威ある値にしない
 - セッション固定を防ぐため、認証交換、権限上昇、Identity再接続時にセッションをrotationする
 - Account停止、Identity解除、復旧完了、明示logout時に関連セッションを失効できるようにする
-- 絶対有効期限、idle期限、同時セッション数、session storeのkey構造と失効時の整合性方式は実装前に別途決定する
+- 絶対有効期限、idle期限、同時session、session storeのkey構造と失効時の整合性方式は[アプリケーションセッション実装契約](../development/application-session-contract.md)を正とする
 
 インフラ上のsession storeは[インフラ・システム構成](infrastructure-architecture.md)が割り当てるCloudflare KVを起点にします。KVの整合性だけでAccount停止、Identity解除、復旧完了時の即時失効を満たせない場合は、共有D1のsession version等による再検証を組み合わせます。安全上必要な失効をKVの反映待ちへ任せません。
 
@@ -361,7 +362,6 @@ OpenAPIのsecurity schemeは`liffIdToken`からprovider非依存のアプリケ�
 
 - 採用するSSO製品、OIDC issuer、client登録とSecret配布方法
 - SSOだけの新規Account作成を許可する時期と対象
-- Cloudflare KVのkey構造、即時失効を担う共有D1のsession version、絶対期限、idle期限、同時session数
 - logoutをme-builderだけにするか、IdPのlogoutまで連動するか
 - 再認証を要求する操作と認証からの最大経過時間
 - 既存利用者へSSO Identity追加を案内する画面と段階公開方法

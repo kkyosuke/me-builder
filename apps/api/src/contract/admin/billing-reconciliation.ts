@@ -4,6 +4,7 @@ import {
   AccountNotFoundErrorSchema,
   ForbiddenErrorSchema,
   authenticatedErrors,
+  currentTermsPolicyError,
   jsonResponse,
 } from "../shared/errors";
 
@@ -38,7 +39,7 @@ export const adminBillingReconciliationRoute = describeRoute({
   operationId: "reconcileAdminBillingProjection",
   tags: ["Admin"],
   summary: "Stripeの現在契約と課金projectionの差分を確認・修復する",
-  security: [{ liffIdToken: [] }],
+  security: [{ applicationSession: [], csrfToken: [] }, { liffIdToken: [] }],
   requestBody: {
     required: true,
     content: { "application/json": { schema: AdminBillingReconciliationRequestSchema } },
@@ -46,6 +47,7 @@ export const adminBillingReconciliationRoute = describeRoute({
   responses: {
     200: jsonResponse("再照合結果", AdminBillingReconciliationResponseSchema),
     ...authenticatedErrors,
+    ...currentTermsPolicyError,
     400: jsonResponse("リクエストが不正", InvalidBillingReconciliationSchema),
     403: jsonResponse("管理者権限がない", ForbiddenErrorSchema),
     404: jsonResponse(

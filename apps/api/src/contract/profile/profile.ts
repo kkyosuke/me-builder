@@ -1,10 +1,16 @@
 import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
 import * as v from "valibot";
-import { ServiceUnavailableErrorSchema, authenticatedErrors, jsonResponse } from "../shared/errors";
+import {
+  ServiceUnavailableErrorSchema,
+  authenticatedErrors,
+  currentTermsPolicyError,
+  jsonResponse,
+} from "../shared/errors";
 
 const NonEmptyStringSchema = v.pipe(v.string(), v.nonEmpty());
 const profileErrors = {
   ...authenticatedErrors,
+  ...currentTermsPolicyError,
   503: jsonResponse("D1またはPrivate R2 bindingが設定されていない", ServiceUnavailableErrorSchema),
 };
 
@@ -39,7 +45,7 @@ export const getProfileRoute = describeRoute({
   operationId: "getProfile",
   tags: ["Profile"],
   summary: "本人の表示用プロフィールを取得する",
-  security: [{ liffIdToken: [] }],
+  security: [{ applicationSession: [] }, { liffIdToken: [] }],
   responses: {
     200: jsonResponse("本人の表示名、role、現在表示するアバター", ProfileResponseSchema),
     ...profileErrors,
@@ -50,7 +56,7 @@ export const getProfileAvatarImageRoute = describeRoute({
   operationId: "getProfileAvatarImage",
   tags: ["Profile"],
   summary: "本人の現在のアバター画像を取得する",
-  security: [{ liffIdToken: [] }],
+  security: [{ applicationSession: [] }, { liffIdToken: [] }],
   responses: {
     200: {
       description: "本人の現在のアバター画像",
@@ -70,7 +76,7 @@ export const putProfileAvatarRoute = describeRoute({
   operationId: "putProfileAvatar",
   tags: ["Profile"],
   summary: "本人のアバター画像を保存する",
-  security: [{ liffIdToken: [] }],
+  security: [{ applicationSession: [], csrfToken: [] }, { liffIdToken: [] }],
   requestBody: {
     required: true,
     content: Object.fromEntries(
@@ -100,7 +106,7 @@ export const deleteProfileAvatarRoute = describeRoute({
   operationId: "deleteProfileAvatar",
   tags: ["Profile"],
   summary: "保存したアバターを外してLINE画像へ戻す",
-  security: [{ liffIdToken: [] }],
+  security: [{ applicationSession: [], csrfToken: [] }, { liffIdToken: [] }],
   responses: {
     200: jsonResponse("削除後のプロフィール", ProfileResponseSchema),
     ...profileErrors,

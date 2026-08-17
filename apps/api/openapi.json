@@ -7,20 +7,486 @@
   },
   "components": {
     "securitySchemes": {
+      "applicationSession": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "__Host-me_builder_session",
+        "description": "HttpOnlyのprovider非依存application session"
+      },
+      "csrfToken": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-CSRF-Token",
+        "description": "application sessionによる状態変更requestで要求するCSRF token"
+      },
       "liffIdToken": {
         "type": "http",
         "scheme": "bearer",
-        "bearerFormat": "LIFF ID token"
+        "bearerFormat": "LIFF ID token",
+        "description": "段階移行中の旧LIFF Bearer認証。認証交換以外の新規経路では使用しない"
       }
     }
   },
   "paths": {
+    "/api/auth/liff/exchange": {
+      "post": {
+        "operationId": "exchangeLiffCredential",
+        "tags": ["Authentication"],
+        "summary": "検証済みLIFF credentialをprovider非依存sessionへ交換する",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "kind": "schema",
+                "type": "object",
+                "expects": "Object",
+                "async": false,
+                "entries": {
+                  "idToken": {
+                    "kind": "schema",
+                    "type": "string",
+                    "expects": "string",
+                    "async": false,
+                    "~standard": {
+                      "version": 1,
+                      "vendor": "valibot"
+                    },
+                    "pipe": [
+                      {
+                        "kind": "schema",
+                        "type": "string",
+                        "expects": "string",
+                        "async": false,
+                        "~standard": {
+                          "version": 1,
+                          "vendor": "valibot"
+                        }
+                      },
+                      {
+                        "kind": "validation",
+                        "type": "non_empty",
+                        "async": false,
+                        "expects": "!0"
+                      },
+                      {
+                        "kind": "validation",
+                        "type": "max_length",
+                        "async": false,
+                        "expects": "<=8192",
+                        "requirement": 8192
+                      }
+                    ]
+                  }
+                },
+                "~standard": {
+                  "version": 1,
+                  "vendor": "valibot"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "発行したapplication session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "authenticated": {
+                      "const": true
+                    },
+                    "authenticationMethod": {
+                      "enum": ["liff", "sso"],
+                      "type": "string"
+                    },
+                    "authenticatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "csrfToken": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "role": {
+                      "enum": ["user", "admin"],
+                      "type": "string"
+                    },
+                    "displayProfile": {
+                      "type": "object",
+                      "properties": {
+                        "displayName": {
+                          "type": "string"
+                        },
+                        "pictureUrl": {
+                          "type": "string",
+                          "format": "uri"
+                        }
+                      },
+                      "required": []
+                    }
+                  },
+                  "required": [
+                    "authenticated",
+                    "authenticationMethod",
+                    "authenticatedAt",
+                    "expiresAt",
+                    "csrfToken",
+                    "role"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Unauthorized"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "許可済みWeb Originではない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Forbidden"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "対応するAccountが存在しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Account not found"
+                    },
+                    "reason": {
+                      "const": "friendship_required"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "未処理のサーバーエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Internal Server Error"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "D1 bindingが設定されていない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Service Unavailable"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/session": {
+      "get": {
+        "operationId": "getApplicationSession",
+        "tags": ["Authentication"],
+        "summary": "現在のapplication sessionを確認する",
+        "security": [
+          {
+            "applicationSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "現在のapplication session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "authenticated": {
+                      "const": true
+                    },
+                    "authenticationMethod": {
+                      "enum": ["liff", "sso"],
+                      "type": "string"
+                    },
+                    "authenticatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "csrfToken": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "role": {
+                      "enum": ["user", "admin"],
+                      "type": "string"
+                    },
+                    "displayProfile": {
+                      "type": "object",
+                      "properties": {
+                        "displayName": {
+                          "type": "string"
+                        },
+                        "pictureUrl": {
+                          "type": "string",
+                          "format": "uri"
+                        }
+                      },
+                      "required": []
+                    }
+                  },
+                  "required": [
+                    "authenticated",
+                    "authenticationMethod",
+                    "authenticatedAt",
+                    "expiresAt",
+                    "csrfToken",
+                    "role"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Unauthorized"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "対応するAccountが存在しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Account not found"
+                    },
+                    "reason": {
+                      "const": "friendship_required"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "未処理のサーバーエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Internal Server Error"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "D1 bindingが設定されていない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Service Unavailable"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "logoutApplicationSession",
+        "tags": ["Authentication"],
+        "summary": "現在のapplication sessionを失効する",
+        "security": [
+          {
+            "applicationSession": [],
+            "csrfToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "sessionを失効した"
+          },
+          "401": {
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Unauthorized"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "OriginまたはCSRF tokenが一致しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Forbidden"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "対応するAccountが存在しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Account not found"
+                    },
+                    "reason": {
+                      "const": "friendship_required"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "未処理のサーバーエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Internal Server Error"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "D1 bindingが設定されていない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Service Unavailable"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/account-recovery/codes": {
       "post": {
         "operationId": "issueAccountRecoveryCode",
         "tags": ["Account recovery"],
         "summary": "有料契約Accountの一回限りの復旧コードを発行する",
         "security": [
+          {
+            "applicationSession": [],
+            "csrfToken": []
+          },
           {
             "liffIdToken": []
           }
@@ -48,7 +514,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -100,6 +566,25 @@
                     }
                   },
                   "required": ["error"]
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
+                    }
+                  },
+                  "required": ["error", "reason"]
                 }
               }
             }
@@ -246,7 +731,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -451,6 +936,9 @@
         "summary": "本人が初回14日間trialを開始できるか取得する",
         "security": [
           {
+            "applicationSession": []
+          },
+          {
             "liffIdToken": []
           }
         ],
@@ -475,7 +963,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -550,6 +1038,10 @@
         "tags": ["Billing"],
         "summary": "本人の選択したPlanに対するStripe Checkout Sessionを作成する",
         "security": [
+          {
+            "applicationSession": [],
+            "csrfToken": []
+          },
           {
             "liffIdToken": []
           }
@@ -630,7 +1122,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -683,9 +1175,29 @@
                         "customer_not_found",
                         "same_plan",
                         "subscription_not_found",
+                        "scheduled_change_exists",
                         "configuration_missing"
                       ],
                       "type": "string"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
                     }
                   },
                   "required": ["error", "reason"]
@@ -734,6 +1246,10 @@
         "tags": ["Billing"],
         "summary": "選択したPlanへの即時確認または期間末変更予約を作成する",
         "security": [
+          {
+            "applicationSession": [],
+            "csrfToken": []
+          },
           {
             "liffIdToken": []
           }
@@ -814,7 +1330,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -867,9 +1383,29 @@
                         "customer_not_found",
                         "same_plan",
                         "subscription_not_found",
+                        "scheduled_change_exists",
                         "configuration_missing"
                       ],
                       "type": "string"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
                     }
                   },
                   "required": ["error", "reason"]
@@ -919,6 +1455,9 @@
         "summary": "Checkout Sessionが本人のものであることと完了状態を確認する",
         "security": [
           {
+            "applicationSession": []
+          },
+          {
             "liffIdToken": []
           }
         ],
@@ -941,7 +1480,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -961,29 +1500,13 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "anyOf": [
-                    {
-                      "type": "object",
-                      "properties": {
-                        "error": {
-                          "const": "Account not found"
-                        },
-                        "reason": {
-                          "const": "friendship_required"
-                        }
-                      },
-                      "required": ["error", "reason"]
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "error": {
-                          "const": "Checkout session not found"
-                        }
-                      },
-                      "required": ["error"]
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Checkout session not found"
                     }
-                  ]
+                  },
+                  "required": ["error"]
                 }
               }
             }
@@ -1040,6 +1563,10 @@
         "summary": "本人のStripe Customerに対するCustomer Portal Sessionを作成する",
         "security": [
           {
+            "applicationSession": [],
+            "csrfToken": []
+          },
+          {
             "liffIdToken": []
           }
         ],
@@ -1062,7 +1589,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -1115,9 +1642,29 @@
                         "customer_not_found",
                         "same_plan",
                         "subscription_not_found",
+                        "scheduled_change_exists",
                         "configuration_missing"
                       ],
                       "type": "string"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
                     }
                   },
                   "required": ["error", "reason"]
@@ -1166,6 +1713,9 @@
         "tags": ["Legal"],
         "summary": "現在の利用規約と本人の同意状態を取得する",
         "security": [
+          {
+            "applicationSession": []
+          },
           {
             "liffIdToken": []
           }
@@ -1329,6 +1879,9 @@
         "summary": "本人の利用規約同意履歴を取得する",
         "security": [
           {
+            "applicationSession": []
+          },
+          {
             "liffIdToken": []
           }
         ],
@@ -1428,6 +1981,10 @@
         "tags": ["Legal"],
         "summary": "現在の利用規約versionへの同意を記録する",
         "security": [
+          {
+            "applicationSession": [],
+            "csrfToken": []
+          },
           {
             "liffIdToken": []
           }
@@ -1555,6 +2112,9 @@
         "tags": ["Admin"],
         "summary": "GeminiとLINEの当月利用統計を取得する",
         "security": [
+          {
+            "applicationSession": []
+          },
           {
             "liffIdToken": []
           }
@@ -1772,7 +2332,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -1822,6 +2382,25 @@
               }
             }
           },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
           "500": {
             "description": "未処理のサーバーエラー",
             "content": {
@@ -1863,6 +2442,9 @@
         "tags": ["Admin"],
         "summary": "名前と成長projectionを含むAccount一覧を取得する",
         "security": [
+          {
+            "applicationSession": []
+          },
           {
             "liffIdToken": []
           }
@@ -2067,7 +2649,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -2117,6 +2699,25 @@
               }
             }
           },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
           "500": {
             "description": "未処理のサーバーエラー",
             "content": {
@@ -2158,6 +2759,9 @@
         "tags": ["Admin"],
         "summary": "個人内容を含まない課金projectionの運用状態を確認する",
         "security": [
+          {
+            "applicationSession": []
+          },
           {
             "liffIdToken": []
           }
@@ -2242,7 +2846,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -2292,6 +2896,25 @@
               }
             }
           },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
           "500": {
             "description": "未処理のサーバーエラー",
             "content": {
@@ -2333,6 +2956,10 @@
         "tags": ["Admin"],
         "summary": "Stripeの現在契約と課金projectionの差分を確認・修復する",
         "security": [
+          {
+            "applicationSession": [],
+            "csrfToken": []
+          },
           {
             "liffIdToken": []
           }
@@ -2464,7 +3091,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -2527,6 +3154,25 @@
               }
             }
           },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
           "500": {
             "description": "未処理のサーバーエラー",
             "content": {
@@ -2568,6 +3214,9 @@
         "tags": ["Profile"],
         "summary": "本人の記録から生成したまとめを取得する",
         "security": [
+          {
+            "applicationSession": []
+          },
           {
             "liffIdToken": []
           }
@@ -2891,7 +3540,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -2918,6 +3567,25 @@
                     },
                     "reason": {
                       "const": "friendship_required"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
                     }
                   },
                   "required": ["error", "reason"]
@@ -2967,6 +3635,10 @@
         "summary": "本人の記録から新しいまとめ版のAI生成を要求する",
         "security": [
           {
+            "applicationSession": [],
+            "csrfToken": []
+          },
+          {
             "liffIdToken": []
           }
         ],
@@ -2996,7 +3668,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -3054,6 +3726,25 @@
               }
             }
           },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
           "500": {
             "description": "未処理のサーバーエラー",
             "content": {
@@ -3095,6 +3786,9 @@
         "tags": ["Profile"],
         "summary": "週次振り返りと今週の生成状態を取得する",
         "security": [
+          {
+            "applicationSession": []
+          },
           {
             "liffIdToken": []
           }
@@ -3289,7 +3983,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -3316,6 +4010,25 @@
                     },
                     "reason": {
                       "const": "friendship_required"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
                     }
                   },
                   "required": ["error", "reason"]
@@ -3365,6 +4078,10 @@
         "summary": "今週の振り返り生成を要求する",
         "security": [
           {
+            "applicationSession": [],
+            "csrfToken": []
+          },
+          {
             "liffIdToken": []
           }
         ],
@@ -3394,7 +4111,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -3448,6 +4165,25 @@
               }
             }
           },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
           "500": {
             "description": "未処理のサーバーエラー",
             "content": {
@@ -3489,6 +4225,9 @@
         "tags": ["Profile"],
         "summary": "本人が合意したGoalのフォローアップを取得する",
         "security": [
+          {
+            "applicationSession": []
+          },
           {
             "liffIdToken": []
           }
@@ -3566,7 +4305,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -3593,6 +4332,25 @@
                     },
                     "reason": {
                       "const": "friendship_required"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
                     }
                   },
                   "required": ["error", "reason"]
@@ -3639,6 +4397,10 @@
         "tags": ["Profile"],
         "summary": "本人がGoalと次の一歩をフォロー対象として合意する",
         "security": [
+          {
+            "applicationSession": [],
+            "csrfToken": []
+          },
           {
             "liffIdToken": []
           }
@@ -3738,7 +4500,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -3797,6 +4559,25 @@
               }
             }
           },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
           "500": {
             "description": "未処理のサーバーエラー",
             "content": {
@@ -3838,6 +4619,10 @@
         "tags": ["Profile"],
         "summary": "本人がGoalを完了・停止・訂正する",
         "security": [
+          {
+            "applicationSession": [],
+            "csrfToken": []
+          },
           {
             "liffIdToken": []
           }
@@ -3937,7 +4722,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -3989,6 +4774,25 @@
                         "goal_not_confirmed"
                       ],
                       "type": "string"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
                     }
                   },
                   "required": ["error", "reason"]
@@ -4048,6 +4852,9 @@
         "summary": "本人の表示用プロフィールを取得する",
         "security": [
           {
+            "applicationSession": []
+          },
+          {
             "liffIdToken": []
           }
         ],
@@ -4106,7 +4913,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -4133,6 +4940,25 @@
                     },
                     "reason": {
                       "const": "friendship_required"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
                     }
                   },
                   "required": ["error", "reason"]
@@ -4181,6 +5007,9 @@
         "tags": ["Profile"],
         "summary": "本人のPlanとAI利用上限・残量を取得する",
         "security": [
+          {
+            "applicationSession": []
+          },
           {
             "liffIdToken": []
           }
@@ -4309,7 +5138,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -4336,6 +5165,25 @@
                     },
                     "reason": {
                       "const": "friendship_required"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
                     }
                   },
                   "required": ["error", "reason"]
@@ -4384,6 +5232,9 @@
         "tags": ["Profile"],
         "summary": "本人のうつしレベル進行度を取得する",
         "security": [
+          {
+            "applicationSession": []
+          },
           {
             "liffIdToken": []
           }
@@ -4506,7 +5357,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -4533,6 +5384,25 @@
                     },
                     "reason": {
                       "const": "friendship_required"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
                     }
                   },
                   "required": ["error", "reason"]
@@ -4582,6 +5452,9 @@
         "summary": "本人の現在のアバター画像を取得する",
         "security": [
           {
+            "applicationSession": []
+          },
+          {
             "liffIdToken": []
           }
         ],
@@ -4613,7 +5486,7 @@
             "description": "表示できるアバター画像がない"
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -4640,6 +5513,25 @@
                     },
                     "reason": {
                       "const": "friendship_required"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
                     }
                   },
                   "required": ["error", "reason"]
@@ -4686,6 +5578,10 @@
         "tags": ["Profile"],
         "summary": "本人のアバター画像を保存する",
         "security": [
+          {
+            "applicationSession": [],
+            "csrfToken": []
+          },
           {
             "liffIdToken": []
           }
@@ -4784,7 +5680,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -4866,6 +5762,25 @@
               }
             }
           },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
           "500": {
             "description": "未処理のサーバーエラー",
             "content": {
@@ -4905,6 +5820,10 @@
         "tags": ["Profile"],
         "summary": "保存したアバターを外してLINE画像へ戻す",
         "security": [
+          {
+            "applicationSession": [],
+            "csrfToken": []
+          },
           {
             "liffIdToken": []
           }
@@ -4964,7 +5883,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -4991,6 +5910,25 @@
                     },
                     "reason": {
                       "const": "friendship_required"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
                     }
                   },
                   "required": ["error", "reason"]
@@ -5039,6 +5977,9 @@
         "tags": ["Personal Data"],
         "summary": "本人が訂正・削除できる診断回答と日記を取得する",
         "security": [
+          {
+            "applicationSession": []
+          },
           {
             "liffIdToken": []
           }
@@ -5143,7 +6084,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -5170,6 +6111,25 @@
                     },
                     "reason": {
                       "const": "friendship_required"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
                     }
                   },
                   "required": ["error", "reason"]
@@ -5218,6 +6178,10 @@
         "tags": ["Personal Data"],
         "summary": "原本を上書きせず新版として訂正する",
         "security": [
+          {
+            "applicationSession": [],
+            "csrfToken": []
+          },
           {
             "liffIdToken": []
           }
@@ -5308,7 +6272,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -5351,6 +6315,25 @@
                     }
                   },
                   "required": ["error"]
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
+                    }
+                  },
+                  "required": ["error", "reason"]
                 }
               }
             }
@@ -5405,6 +6388,10 @@
         "summary": "原本をtombstoneへ遷移し今後の利用を止める",
         "security": [
           {
+            "applicationSession": [],
+            "csrfToken": []
+          },
+          {
             "liffIdToken": []
           }
         ],
@@ -5435,7 +6422,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -5462,6 +6449,25 @@
                     }
                   },
                   "required": ["error"]
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
+                    }
+                  },
+                  "required": ["error", "reason"]
                 }
               }
             }
@@ -5517,6 +6523,9 @@
         "tags": ["Profile"],
         "summary": "本人が確認したセルフケア情報を取得する",
         "security": [
+          {
+            "applicationSession": []
+          },
           {
             "liffIdToken": []
           }
@@ -5584,7 +6593,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -5611,6 +6620,25 @@
                     },
                     "reason": {
                       "const": "friendship_required"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
                     }
                   },
                   "required": ["error", "reason"]
@@ -5657,6 +6685,10 @@
         "tags": ["Profile"],
         "summary": "対処の結果または最近の状態を本人が確認する",
         "security": [
+          {
+            "applicationSession": [],
+            "csrfToken": []
+          },
           {
             "liffIdToken": []
           }
@@ -5755,7 +6787,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -5809,6 +6841,25 @@
               }
             }
           },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
           "500": {
             "description": "未処理のサーバーエラー",
             "content": {
@@ -5850,6 +6901,10 @@
         "tags": ["Profile"],
         "summary": "本人が確認を撤回する",
         "security": [
+          {
+            "applicationSession": [],
+            "csrfToken": []
+          },
           {
             "liffIdToken": []
           }
@@ -5927,7 +6982,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -5974,6 +7029,25 @@
                     "reason": {
                       "enum": ["feature_unavailable", "brain_item_not_found", "not_confirmed"],
                       "type": "string"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
                     }
                   },
                   "required": ["error", "reason"]
@@ -6032,6 +7106,9 @@
         "tags": ["Family"],
         "summary": "本人が管理または参加しているファミリー席を取得する",
         "security": [
+          {
+            "applicationSession": []
+          },
           {
             "liffIdToken": []
           }
@@ -6107,7 +7184,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -6184,6 +7261,25 @@
               }
             }
           },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
           "500": {
             "description": "未処理のサーバーエラー",
             "content": {
@@ -6225,6 +7321,10 @@
         "tags": ["Family"],
         "summary": "支払者が48時間有効な1回限りの招待を発行する",
         "security": [
+          {
+            "applicationSession": [],
+            "csrfToken": []
+          },
           {
             "liffIdToken": []
           }
@@ -6297,7 +7397,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -6374,6 +7474,25 @@
               }
             }
           },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
           "500": {
             "description": "未処理のサーバーエラー",
             "content": {
@@ -6415,6 +7534,10 @@
         "tags": ["Family"],
         "summary": "参加者が招待を承諾する",
         "security": [
+          {
+            "applicationSession": [],
+            "csrfToken": []
+          },
           {
             "liffIdToken": []
           }
@@ -6480,7 +7603,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -6550,6 +7673,25 @@
                         "account_already_assigned"
                       ],
                       "type": "string"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
                     }
                   },
                   "required": ["error", "reason"]
@@ -6616,6 +7758,10 @@
         "summary": "参加者が招待を辞退する",
         "security": [
           {
+            "applicationSession": [],
+            "csrfToken": []
+          },
+          {
             "liffIdToken": []
           }
         ],
@@ -6680,7 +7826,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -6750,6 +7896,25 @@
                         "account_already_assigned"
                       ],
                       "type": "string"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
                     }
                   },
                   "required": ["error", "reason"]
@@ -6816,6 +7981,10 @@
         "summary": "支払者が招待中の席を取り消す",
         "security": [
           {
+            "applicationSession": [],
+            "csrfToken": []
+          },
+          {
             "liffIdToken": []
           }
         ],
@@ -6880,7 +8049,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -6950,6 +8119,25 @@
                         "account_already_assigned"
                       ],
                       "type": "string"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
                     }
                   },
                   "required": ["error", "reason"]
@@ -7009,6 +8197,10 @@
         "summary": "支払者が参加者を席から外す",
         "security": [
           {
+            "applicationSession": [],
+            "csrfToken": []
+          },
+          {
             "liffIdToken": []
           }
         ],
@@ -7073,7 +8265,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -7143,6 +8335,25 @@
                         "account_already_assigned"
                       ],
                       "type": "string"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
                     }
                   },
                   "required": ["error", "reason"]
@@ -7202,6 +8413,10 @@
         "summary": "参加者がファミリーパックから退出する",
         "security": [
           {
+            "applicationSession": [],
+            "csrfToken": []
+          },
+          {
             "liffIdToken": []
           }
         ],
@@ -7266,7 +8481,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -7343,6 +8558,25 @@
               }
             }
           },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
           "500": {
             "description": "未処理のサーバーエラー",
             "content": {
@@ -7384,6 +8618,10 @@
         "tags": ["Personal Data"],
         "summary": "本人データarchiveの非同期生成を要求する",
         "security": [
+          {
+            "applicationSession": [],
+            "csrfToken": []
+          },
           {
             "liffIdToken": []
           }
@@ -7451,7 +8689,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -7478,6 +8716,25 @@
                     },
                     "reason": {
                       "const": "friendship_required"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
                     }
                   },
                   "required": ["error", "reason"]
@@ -7526,6 +8783,9 @@
         "tags": ["Personal Data"],
         "summary": "本人データarchiveの生成状態と期限を取得する",
         "security": [
+          {
+            "applicationSession": []
+          },
           {
             "liffIdToken": []
           }
@@ -7593,7 +8853,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -7620,6 +8880,25 @@
                     }
                   },
                   "required": ["error"]
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
+                    }
+                  },
+                  "required": ["error", "reason"]
                 }
               }
             }
@@ -7676,6 +8955,9 @@
         "summary": "期限内の本人データarchiveをdownloadする",
         "security": [
           {
+            "applicationSession": []
+          },
+          {
             "liffIdToken": []
           }
         ],
@@ -7692,7 +8974,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -7755,6 +9037,25 @@
               }
             }
           },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
           "500": {
             "description": "未処理のサーバーエラー",
             "content": {
@@ -7806,6 +9107,9 @@
         "tags": ["Development"],
         "summary": "開発環境で本人のactive Brain Item一覧を取得する",
         "security": [
+          {
+            "applicationSession": []
+          },
           {
             "liffIdToken": []
           }
@@ -7960,7 +9264,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -8007,6 +9311,25 @@
               }
             }
           },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
           "500": {
             "description": "未処理のサーバーエラー",
             "content": {
@@ -8048,6 +9371,9 @@
         "tags": ["Development"],
         "summary": "開発環境で本人のBrain Itemに対応するVectorize実体を確認する",
         "security": [
+          {
+            "applicationSession": []
+          },
           {
             "liffIdToken": []
           }
@@ -8143,7 +9469,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -8186,6 +9512,25 @@
                       "required": ["error"]
                     }
                   ]
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
+                    }
+                  },
+                  "required": ["error", "reason"]
                 }
               }
             }
@@ -8242,6 +9587,10 @@
         "summary": "共有へ同意した受信者が相性招待を承諾する",
         "security": [
           {
+            "applicationSession": [],
+            "csrfToken": []
+          },
+          {
             "liffIdToken": []
           }
         ],
@@ -8267,7 +9616,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -8316,6 +9665,25 @@
                     "reason": {
                       "enum": ["own_invitation", "share_unavailable", "duplicate_relationship"],
                       "type": "string"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
                     }
                   },
                   "required": ["error", "reason"]
@@ -8375,6 +9743,10 @@
         "summary": "共有へ同意した本人が1人用の招待リンクを発行する",
         "security": [
           {
+            "applicationSession": [],
+            "csrfToken": []
+          },
+          {
             "liffIdToken": []
           }
         ],
@@ -8421,7 +9793,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -8467,6 +9839,25 @@
                     },
                     "reason": {
                       "const": "share_unavailable"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
                     }
                   },
                   "required": ["error", "reason"]
@@ -8533,6 +9924,9 @@
         "summary": "受信者向けに招待送信者のアバター画像を取得する",
         "security": [
           {
+            "applicationSession": []
+          },
+          {
             "liffIdToken": []
           }
         ],
@@ -8564,7 +9958,7 @@
             "description": "表示できるアバター画像がない"
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -8633,6 +10027,25 @@
               }
             }
           },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
           "500": {
             "description": "未処理のサーバーエラー",
             "content": {
@@ -8684,6 +10097,9 @@
         "tags": ["Compatibility"],
         "summary": "受信者が承諾前に招待者と共有の意味を確認する",
         "security": [
+          {
+            "applicationSession": []
+          },
           {
             "liffIdToken": []
           }
@@ -8789,7 +10205,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -8858,6 +10274,25 @@
               }
             }
           },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
           "500": {
             "description": "未処理のサーバーエラー",
             "content": {
@@ -8908,6 +10343,10 @@
         "summary": "本人が発行中の相性招待を取り消す",
         "security": [
           {
+            "applicationSession": [],
+            "csrfToken": []
+          },
+          {
             "liffIdToken": []
           }
         ],
@@ -8916,7 +10355,7 @@
             "description": "招待を取り消した"
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -8962,6 +10401,25 @@
                       "required": ["error", "reason"]
                     }
                   ]
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
+                    }
+                  },
+                  "required": ["error", "reason"]
                 }
               }
             }
@@ -9017,6 +10475,9 @@
         "tags": ["Compatibility"],
         "summary": "本人の発行中招待と成立中の相性関係を一覧する",
         "security": [
+          {
+            "applicationSession": []
+          },
           {
             "liffIdToken": []
           }
@@ -9138,7 +10599,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -9165,6 +10626,25 @@
                     },
                     "reason": {
                       "const": "friendship_required"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
                     }
                   },
                   "required": ["error", "reason"]
@@ -9213,6 +10693,9 @@
         "tags": ["Compatibility"],
         "summary": "成立中の相性関係を双方の現在の内容から組み立てる",
         "security": [
+          {
+            "applicationSession": []
+          },
           {
             "liffIdToken": []
           }
@@ -9579,7 +11062,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -9625,6 +11108,25 @@
                       "required": ["error", "reason"]
                     }
                   ]
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
+                    }
+                  },
+                  "required": ["error", "reason"]
                 }
               }
             }
@@ -9679,6 +11181,10 @@
         "summary": "当事者が成立中の相性関係を終了する",
         "security": [
           {
+            "applicationSession": [],
+            "csrfToken": []
+          },
+          {
             "liffIdToken": []
           }
         ],
@@ -9687,7 +11193,7 @@
             "description": "相性関係を終了した"
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -9733,6 +11239,25 @@
                       "required": ["error", "reason"]
                     }
                   ]
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
+                    }
+                  },
+                  "required": ["error", "reason"]
                 }
               }
             }
@@ -9788,6 +11313,9 @@
         "tags": ["Development"],
         "summary": "開発環境で本人の終端Brain Vector同期job一覧を取得する",
         "security": [
+          {
+            "applicationSession": []
+          },
           {
             "liffIdToken": []
           }
@@ -9857,7 +11385,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -9900,6 +11428,25 @@
                       "required": ["error"]
                     }
                   ]
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
+                    }
+                  },
+                  "required": ["error", "reason"]
                 }
               }
             }
@@ -9946,6 +11493,10 @@
         "summary": "開発環境で本人の全終端Brain Vector同期jobを再試行可能に戻す",
         "security": [
           {
+            "applicationSession": [],
+            "csrfToken": []
+          },
+          {
             "liffIdToken": []
           }
         ],
@@ -9969,7 +11520,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -10016,6 +11567,25 @@
               }
             }
           },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
           "500": {
             "description": "未処理のサーバーエラー",
             "content": {
@@ -10058,6 +11628,10 @@
         "summary": "開発環境で本人の終端Brain Vector同期jobを再試行可能に戻す",
         "security": [
           {
+            "applicationSession": [],
+            "csrfToken": []
+          },
+          {
             "liffIdToken": []
           }
         ],
@@ -10079,7 +11653,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -10135,6 +11709,25 @@
               }
             }
           },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
           "500": {
             "description": "未処理のサーバーエラー",
             "content": {
@@ -10186,6 +11779,9 @@
         "tags": ["Compatibility"],
         "summary": "招待発行前に本人の共有可否を確認する",
         "security": [
+          {
+            "applicationSession": []
+          },
           {
             "liffIdToken": []
           }
@@ -10282,7 +11878,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -10309,6 +11905,25 @@
                     },
                     "reason": {
                       "const": "friendship_required"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
                     }
                   },
                   "required": ["error", "reason"]
@@ -10357,6 +11972,9 @@
         "tags": ["Compatibility"],
         "summary": "本人が相手へ開示する現在の内容をカテゴリ別に確認する",
         "security": [
+          {
+            "applicationSession": []
+          },
           {
             "liffIdToken": []
           }
@@ -10531,7 +12149,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -10558,6 +12176,25 @@
                     },
                     "reason": {
                       "const": "friendship_required"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
                     }
                   },
                   "required": ["error", "reason"]
@@ -10606,6 +12243,9 @@
         "tags": ["Diagnosis"],
         "summary": "回答進捗を含む診断一覧を取得する",
         "security": [
+          {
+            "applicationSession": []
+          },
           {
             "liffIdToken": []
           }
@@ -10712,7 +12352,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -10739,6 +12379,25 @@
                     },
                     "reason": {
                       "const": "friendship_required"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
                     }
                   },
                   "required": ["error", "reason"]
@@ -10787,6 +12446,9 @@
         "tags": ["Diagnosis"],
         "summary": "新規回答用の診断詳細を取得する",
         "security": [
+          {
+            "applicationSession": []
+          },
           {
             "liffIdToken": []
           }
@@ -10909,7 +12571,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -10978,6 +12640,25 @@
               }
             }
           },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
           "500": {
             "description": "未処理のサーバーエラー",
             "content": {
@@ -11029,6 +12710,9 @@
         "tags": ["Diagnosis"],
         "summary": "本人が保存した診断回答内容を取得する",
         "security": [
+          {
+            "applicationSession": []
+          },
           {
             "liffIdToken": []
           }
@@ -11212,7 +12896,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -11258,6 +12942,25 @@
                       "required": ["error", "reason"]
                     }
                   ]
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
+                    }
+                  },
+                  "required": ["error", "reason"]
                 }
               }
             }
@@ -11313,6 +13016,10 @@
         "tags": ["Diagnosis"],
         "summary": "診断の1問へ初回回答を保存する",
         "security": [
+          {
+            "applicationSession": [],
+            "csrfToken": []
+          },
           {
             "liffIdToken": []
           }
@@ -11452,7 +13159,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -11557,6 +13264,25 @@
               }
             }
           },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
           "500": {
             "description": "未処理のサーバーエラー",
             "content": {
@@ -11617,6 +13343,10 @@
         "summary": "診断の未回答の1問をあとで回答として保存する",
         "security": [
           {
+            "applicationSession": [],
+            "csrfToken": []
+          },
+          {
             "liffIdToken": []
           }
         ],
@@ -11653,7 +13383,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -11757,6 +13487,25 @@
               }
             }
           },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
           "500": {
             "description": "未処理のサーバーエラー",
             "content": {
@@ -11817,6 +13566,10 @@
         "summary": "開発環境で本人の個人コンテンツを全削除する",
         "security": [
           {
+            "applicationSession": [],
+            "csrfToken": []
+          },
+          {
             "liffIdToken": []
           }
         ],
@@ -11872,7 +13625,7 @@
             }
           },
           "401": {
-            "description": "LIFF IDトークンを検証できない",
+            "description": "application sessionまたは旧LIFF credentialを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -11915,6 +13668,25 @@
                       "required": ["error"]
                     }
                   ]
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
+                    }
+                  },
+                  "required": ["error", "reason"]
                 }
               }
             }

@@ -1,6 +1,11 @@
 import { type DescribeRouteOptions, describeRoute, validator } from "hono-openapi";
 import * as v from "valibot";
-import { ForbiddenErrorSchema, authenticatedErrors, jsonResponse } from "../shared/errors";
+import {
+  ForbiddenErrorSchema,
+  authenticatedErrors,
+  currentTermsPolicyError,
+  jsonResponse,
+} from "../shared/errors";
 
 const FamilySeatSchema = v.object({
   id: v.string(),
@@ -54,19 +59,21 @@ export const familyInvitationTokenValidator = validator(
       : c.json(v.parse(InvalidFamilyInvitationRequestSchema, { error: "Invalid request" }), 400),
 );
 
-const security = [{ liffIdToken: [] }];
+const readSecurity = [{ applicationSession: [] }, { liffIdToken: [] }];
+const mutationSecurity = [{ applicationSession: [], csrfToken: [] }, { liffIdToken: [] }];
 const familyErrors = {
   400: jsonResponse("招待tokenの形式が不正", InvalidFamilyInvitationRequestSchema),
   409: jsonResponse("現在の状態では操作できない", FamilyOperationUnavailableSchema),
   403: jsonResponse("本人に操作権限がない", ForbiddenErrorSchema),
   ...authenticatedErrors,
+  ...currentTermsPolicyError,
 };
 
 export const familySeatManagementRoute = describeRoute({
   operationId: "getFamilySeatManagement",
   tags: ["Family"],
   summary: "本人が管理または参加しているファミリー席を取得する",
-  security,
+  security: readSecurity,
   responses: {
     200: jsonResponse("個人内容を含まない席状態", FamilySeatManagementResponseSchema),
     ...familyErrors,
@@ -77,7 +84,7 @@ export const issueFamilyInvitationRoute = describeRoute({
   operationId: "issueFamilyInvitation",
   tags: ["Family"],
   summary: "支払者が48時間有効な1回限りの招待を発行する",
-  security,
+  security: mutationSecurity,
   responses: {
     201: jsonResponse("発行した招待tokenと席", FamilyInvitationResponseSchema),
     ...familyErrors,
@@ -89,7 +96,7 @@ const mutationRoute = (operationId: string, summary: string) =>
     operationId,
     tags: ["Family"],
     summary,
-    security,
+    security: mutationSecurity,
     responses: {
       200: jsonResponse("更新後の席状態", FamilySeatMutationResponseSchema),
       ...familyErrors,

@@ -1,6 +1,11 @@
 import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
 import * as v from "valibot";
-import { AccountNotFoundErrorSchema, authenticatedErrors, jsonResponse } from "../shared/errors";
+import {
+  AccountNotFoundErrorSchema,
+  authenticatedErrors,
+  currentTermsPolicyError,
+  jsonResponse,
+} from "../shared/errors";
 import {
   CompatibilityInvitationUnavailableSchema,
   OwnCompatibilityInvitationSchema,
@@ -10,7 +15,7 @@ export const compatibilityInvitationAvatarRoute = describeRoute({
   operationId: "getCompatibilityInvitationAvatar",
   tags: ["Compatibility"],
   summary: "受信者向けに招待送信者のアバター画像を取得する",
-  security: [{ liffIdToken: [] }],
+  security: [{ applicationSession: [] }, { liffIdToken: [] }],
   responses: {
     200: {
       description: "招待送信者の現在のアバター画像",
@@ -23,6 +28,7 @@ export const compatibilityInvitationAvatarRoute = describeRoute({
     },
     204: { description: "表示できるアバター画像がない" },
     ...authenticatedErrors,
+    ...currentTermsPolicyError,
     404: jsonResponse(
       "招待または対応するAccountを利用できない",
       v.union([CompatibilityInvitationUnavailableSchema, AccountNotFoundErrorSchema]),

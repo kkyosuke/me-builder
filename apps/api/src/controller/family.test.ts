@@ -12,6 +12,36 @@ const family = vi.hoisted(() => ({
   leaveFamilyPack: vi.fn(),
 }));
 vi.mock("../logic/family-seat-management", () => family);
+vi.mock("../middleware/authentication", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../middleware/authentication")>();
+  return {
+    ...actual,
+    requireAuthentication: async (
+      c: Parameters<typeof actual.requireAuthentication>[0],
+      next: () => Promise<void>,
+    ) => {
+      const actor = {
+        accountId: "account-family-test",
+        authenticationMethod: "liff" as const,
+        authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
+      };
+      c.set("authenticatedActor", actor);
+      c.set("authenticationResult", {
+        type: "authenticated",
+        actor,
+        accountRole: "user",
+      });
+      await next();
+    },
+  };
+});
+vi.mock("../middleware/authorization", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../middleware/authorization")>();
+  return {
+    ...actual,
+    requireCurrentTerms: async (_c: unknown, next: () => Promise<void>) => next(),
+  };
+});
 
 const env = { DB: {} as D1Database, LIFF_ID: "2010850319-Yl63upAR" };
 const headers = { Authorization: "Bearer verified.id.token", "Content-Type": "application/json" };

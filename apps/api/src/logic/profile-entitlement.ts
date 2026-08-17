@@ -5,11 +5,10 @@ import {
   accountDataFor,
   billing,
 } from "@me-builder/lib";
-import { createLiffSession } from "./liff-session";
+import type { AuthenticatedActor } from "./authentication/types";
 
 type Params = Readonly<{
-  idToken: string | undefined;
-  lineLoginChannelId: string | undefined;
+  actor: AuthenticatedActor;
   db: D1.shared.Client;
   accountData?: AccountDataNamespace;
   planAssignmentProvider?: billing.AccountPlanAssignmentProvider;
@@ -17,21 +16,18 @@ type Params = Readonly<{
 }>;
 
 export async function getProfileEntitlement({
-  idToken,
-  lineLoginChannelId,
+  actor,
   db,
   accountData,
   planAssignmentProvider,
   at = new Date(),
 }: Params) {
-  const session = await createLiffSession({ idToken, lineLoginChannelId, db });
-  if (session.type !== "resolved") return session;
   if (!accountData) throw new Error("AccountData binding is missing");
 
   const entitlement = await new billing.EntitlementService(
     new billing.FamilyAwareAccountPlanAssignmentProvider(db, planAssignmentProvider),
-  ).resolve(session.session.accountId, at);
-  const account = accountDataFor(accountData, session.session.accountId);
+  ).resolve(actor.accountId, at);
+  const account = accountDataFor(accountData, actor.accountId);
   const aiReplyPeriod = billing.resolveEntitlementUsagePeriod(entitlement, "ai-reply", at);
   const profileSummaryPeriod = billing.resolveEntitlementUsagePeriod(
     entitlement,

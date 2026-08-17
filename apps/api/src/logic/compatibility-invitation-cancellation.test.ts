@@ -1,11 +1,9 @@
-import type { AccountDataNamespace, CompatibilityDataNamespace, D1 } from "@me-builder/lib";
+import type { AccountDataNamespace, CompatibilityDataNamespace } from "@me-builder/lib";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { createLiffSession, cancelCompatibilityInvitationWithReference } = vi.hoisted(() => ({
-  createLiffSession: vi.fn(),
+const { cancelCompatibilityInvitationWithReference } = vi.hoisted(() => ({
   cancelCompatibilityInvitationWithReference: vi.fn(),
 }));
-vi.mock("./liff-session", () => ({ createLiffSession }));
 vi.mock("@me-builder/lib", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@me-builder/lib")>()),
   cancelCompatibilityInvitationWithReference,
@@ -15,16 +13,17 @@ const { cancelCompatibilityInvitation } = await import("./compatibility-invitati
 
 const relationshipId = "1".repeat(64);
 const accountId = "account-1";
-const db = {} as D1.shared.Client;
 const accountData = {} as AccountDataNamespace;
 const compatibilityData = {} as CompatibilityDataNamespace;
 
 function request(overrides: { relationshipId?: string } = {}) {
   return cancelCompatibilityInvitation({
     relationshipId: overrides.relationshipId ?? relationshipId,
-    idToken: "token",
-    lineLoginChannelId: "channel",
-    db,
+    actor: {
+      accountId,
+      authenticationMethod: "liff",
+      authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
+    },
     accountData,
     compatibilityData,
   });
@@ -33,10 +32,6 @@ function request(overrides: { relationshipId?: string } = {}) {
 describe("cancelCompatibilityInvitation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    createLiffSession.mockResolvedValue({
-      type: "resolved",
-      session: { accountId, role: "user", displayName: "あおい" },
-    });
   });
 
   it("本人の招待を取り消し、正本と一覧参照の更新を本人IDで実行する", async () => {
@@ -72,21 +67,4 @@ describe("cancelCompatibilityInvitation", () => {
     });
     expect(cancelCompatibilityInvitationWithReference).not.toHaveBeenCalled();
   });
-
-  it("本人確認より先に関係IDを信用しない", async () => {
-    createLiffSession.mockResolvedValue({ type: "unauthenticated", reason: "invalid token" });
-
-    await expect(request()).resolves.toEqual({ type: "unauthenticated", reason: "invalid token" });
-    expect(cancelCompatibilityInvitationWithReference).not.toHaveBeenCalled();
-  });
-
-  it.each([[{ type: "account-not-found" }], [{ type: "not-configured" }]])(
-    "セッション解決に失敗するとそのまま返す (%o)",
-    async (session) => {
-      createLiffSession.mockResolvedValue(session);
-
-      await expect(request()).resolves.toEqual(session);
-      expect(cancelCompatibilityInvitationWithReference).not.toHaveBeenCalled();
-    },
-  );
 });

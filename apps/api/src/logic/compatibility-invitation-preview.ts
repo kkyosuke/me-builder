@@ -3,12 +3,11 @@ import {
   type CompatibilityDataNamespace,
   type CompatibilityInvitationPreview,
   type CompatibilityRelationshipCategory,
-  type D1,
   compatibilityDataFor,
   compatibilityRelationshipId,
 } from "@me-builder/lib";
+import type { AuthenticatedActor } from "./authentication/types";
 import { loadCompatibilitySharePreviewData } from "./compatibility-share-preview";
-import { createLiffSession } from "./liff-session";
 
 type CompatibilityInvitationBlockingReason = "display_name_unavailable";
 
@@ -26,23 +25,18 @@ type CompatibilityInvitationContents = Readonly<{
 export type CompatibilityInvitationPreviewOutcome =
   | { type: "resolved"; invitation: CompatibilityInvitationContents }
   | { type: "unavailable" }
-  | { type: "own-invitation" }
-  | { type: "not-configured" }
-  | { type: "unauthenticated"; reason: string }
-  | { type: "account-not-found" };
+  | { type: "own-invitation" };
 
 type Params = Readonly<{
   relationshipId: string;
-  idToken: string | undefined;
-  lineLoginChannelId: string | undefined;
-  db: D1.shared.Client;
+  actor: AuthenticatedActor;
+  verifiedDisplayName?: string;
   accountData: AccountDataNamespace;
   compatibilityData: CompatibilityDataNamespace;
   at?: Date;
 }>;
 
 type Dependencies = Readonly<{
-  createSession: typeof createLiffSession;
   getInvitationPreview: (
     namespace: CompatibilityDataNamespace,
     relationshipId: string,
@@ -64,7 +58,6 @@ type CompatibilityInvitationRecipientOutcome =
   | Exclude<CompatibilityInvitationPreviewOutcome, { type: "resolved" }>;
 
 const defaultDependencies: Dependencies = {
-  createSession: createLiffSession,
   getInvitationPreview: (namespace, relationshipId, viewerAccountId) =>
     compatibilityDataFor(namespace, relationshipId).getInvitationPreview(viewerAccountId),
   loadSharePreviewData: loadCompatibilitySharePreviewData,
@@ -72,25 +65,22 @@ const defaultDependencies: Dependencies = {
 
 /** 本人確認とpending招待の判定だけを行い、AccountDataを読まない。 */
 async function resolveCompatibilityInvitationRecipient(
-  { relationshipId, idToken, lineLoginChannelId, db, compatibilityData }: Params,
+  { relationshipId, actor, verifiedDisplayName, compatibilityData }: Params,
   dependencies: Dependencies = defaultDependencies,
 ): Promise<CompatibilityInvitationRecipientOutcome> {
   if (!compatibilityRelationshipId.isValid(relationshipId)) return { type: "unavailable" };
-  const session = await dependencies.createSession({ idToken, lineLoginChannelId, db });
-  if (session.type !== "resolved") return session;
-
   const preview = await dependencies.getInvitationPreview(
     compatibilityData,
     relationshipId,
-    session.session.accountId,
+    actor.accountId,
   );
   if (!preview) return { type: "unavailable" };
   if (preview.isOwnInvitation) return { type: "own-invitation" };
 
   return {
     type: "resolved",
-    inviteeAccountId: session.session.accountId,
-    inviteeDisplayName: session.session.displayName?.trim() || null,
+    inviteeAccountId: actor.accountId,
+    inviteeDisplayName: verifiedDisplayName?.trim() || null,
     inviterDisplayName: preview.inviterDisplayName,
     relationshipCategory: preview.relationshipCategory,
     expiresAt: preview.expiresAt,

@@ -3,12 +3,9 @@ import { type AccountDataNamespace, D1 } from "@me-builder/lib";
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { getFamilySeatManagement } from "../logic/family-seat-management";
 import { listPersonalData } from "../logic/personal-data";
-
-const { createLiffSession } = vi.hoisted(() => ({ createLiffSession: vi.fn() }));
-vi.mock("../logic/liff-session", () => ({ createLiffSession }));
 
 function createTestDb(): D1.shared.Client {
   const sqlite = new Database(":memory:");
@@ -39,8 +36,6 @@ async function account(db: D1.shared.Client, name: string): Promise<string> {
 }
 
 describe("family payer privacy boundary", () => {
-  beforeEach(() => vi.clearAllMocks());
-
   it("支払者の席API・export境界から参加者のAccount IDと個人内容を取得できない", async () => {
     const db = createTestDb();
     const payer = await account(db, "privacy-payer");
@@ -48,14 +43,12 @@ describe("family payer privacy boundary", () => {
     await D1.shared.action.familySeat.createFamilyPack(db, payer);
     await D1.shared.action.familySeat.reserveFamilySeat(db, payer, "private-invitation");
     await D1.shared.action.familySeat.activateFamilySeat(db, "private-invitation", member);
-    createLiffSession.mockResolvedValue({
-      type: "resolved",
-      session: { accountId: payer, role: "user" },
-    });
-
     const management = await getFamilySeatManagement({
-      idToken: "payer-token",
-      lineLoginChannelId: "channel",
+      actor: {
+        accountId: payer,
+        authenticationMethod: "liff",
+        authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
+      },
       db,
     });
     const serialized = JSON.stringify(management);
@@ -75,9 +68,11 @@ describe("family payer privacy boundary", () => {
     const getByName = vi.fn(() => ({ execute }));
     const accountData = { getByName } as unknown as AccountDataNamespace;
     const personalData = await listPersonalData({
-      idToken: "payer-token",
-      lineLoginChannelId: "channel",
-      db,
+      actor: {
+        accountId: payer,
+        authenticationMethod: "liff",
+        authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
+      },
       accountData,
     });
     expect(getByName).toHaveBeenCalledTimes(1);

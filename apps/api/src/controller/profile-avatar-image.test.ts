@@ -10,6 +10,37 @@ vi.mock("../logic/profile-avatar-image", () => ({
   getProfileAvatarImage,
   resolveProfileAvatarImage,
 }));
+vi.mock("../middleware/authentication", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../middleware/authentication")>();
+  return {
+    ...actual,
+    requireAuthentication: async (
+      c: Parameters<typeof actual.requireAuthentication>[0],
+      next: () => Promise<void>,
+    ) => {
+      const result = {
+        type: "authenticated" as const,
+        actor: {
+          accountId: "account-1",
+          authenticationMethod: "liff" as const,
+          authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
+        },
+        accountRole: "user" as const,
+        displayProfile: { pictureUrl: "https://profile.line-scdn.net/own" },
+      };
+      c.set("authenticationResult", result);
+      c.set("authenticatedActor", result.actor);
+      await next();
+    },
+  };
+});
+vi.mock("../middleware/authorization", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../middleware/authorization")>();
+  return {
+    ...actual,
+    requireCurrentTerms: async (_c: unknown, next: () => Promise<void>) => next(),
+  };
+});
 
 const dummyDb = {} as D1Database;
 const dummyAvatarBucket = {} as R2Bucket;
@@ -45,7 +76,8 @@ describe("GET /api/profile/avatar", () => {
     expect(new Uint8Array(await response.arrayBuffer())).toEqual(Uint8Array.from([1, 2, 3]));
     expect(getProfileAvatarImage).toHaveBeenCalledWith(
       expect.objectContaining({
-        idToken: "dummy.id.token",
+        actor: expect.objectContaining({ accountId: "account-1" }),
+        verifiedLinePictureUrl: "https://profile.line-scdn.net/own",
         avatarBucket: dummyAvatarBucket,
         lineChannelAccessToken: "line-token",
       }),

@@ -1,33 +1,25 @@
 import {
   type AccountDataNamespace,
   type ConversationCoordinatorNamespace,
-  type D1,
   type DO,
   accountDataFor,
   conversationCoordinatorFor,
 } from "@me-builder/lib";
-import { createLiffSession } from "./liff-session";
+import type { AuthenticatedActor } from "./authentication/types";
 
 type DeletedAccountData = Awaited<
   ReturnType<typeof DO.account.action.development.deleteAllDevelopmentAccountData>
 >;
 
-export type ResetDevelopmentAccountDataOutcome =
-  | ({ type: "resolved" } & DeletedAccountData)
-  | { type: "not-configured" }
-  | { type: "unauthenticated"; reason: string }
-  | { type: "account-not-found" };
+export type ResetDevelopmentAccountDataOutcome = { type: "resolved" } & DeletedAccountData;
 
 type Params = {
-  idToken: string | undefined;
-  lineLoginChannelId: string | undefined;
-  db: D1.shared.Client;
+  actor: AuthenticatedActor;
   accountData: AccountDataNamespace;
   conversationCoordinator: ConversationCoordinatorNamespace;
 };
 
 type Dependencies = {
-  createSession: typeof createLiffSession;
   resetCoordinator: (
     namespace: ConversationCoordinatorNamespace,
     accountId: string,
@@ -40,7 +32,6 @@ type Dependencies = {
 };
 
 const defaultDependencies: Dependencies = {
-  createSession: createLiffSession,
   resetCoordinator: (namespace, accountId) =>
     conversationCoordinatorFor(namespace, accountId).resetAccountData(accountId),
   deleteAccountData: (namespace, accountId, resetEpoch) =>
@@ -52,14 +43,7 @@ export async function resetDevelopmentAccountData(
   params: Params,
   dependencies: Dependencies = defaultDependencies,
 ): Promise<ResetDevelopmentAccountDataOutcome> {
-  const session = await dependencies.createSession({
-    idToken: params.idToken,
-    lineLoginChannelId: params.lineLoginChannelId,
-    db: params.db,
-  });
-  if (session.type !== "resolved") return session;
-
-  const accountId = session.session.accountId;
+  const accountId = params.actor.accountId;
   const resetEpoch = await dependencies.resetCoordinator(params.conversationCoordinator, accountId);
   const deleted = await dependencies.deleteAccountData(params.accountData, accountId, resetEpoch);
   return { type: "resolved", ...deleted };

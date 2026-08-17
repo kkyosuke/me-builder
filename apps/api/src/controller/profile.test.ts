@@ -11,6 +11,36 @@ const { requestProfileSummaryGeneration } = vi.hoisted(() => ({
 }));
 vi.mock("../logic/profile-summary", () => ({ getProfileSummary }));
 vi.mock("../logic/profile-summary-generation", () => ({ requestProfileSummaryGeneration }));
+vi.mock("../middleware/authentication", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../middleware/authentication")>();
+  return {
+    ...actual,
+    requireAuthentication: async (
+      c: Parameters<typeof actual.requireAuthentication>[0],
+      next: () => Promise<void>,
+    ) => {
+      const actor = {
+        accountId: "account-1",
+        authenticationMethod: "liff" as const,
+        authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
+      };
+      c.set("authenticatedActor", actor);
+      c.set("authenticationResult", {
+        type: "authenticated",
+        actor,
+        accountRole: "user",
+      });
+      await next();
+    },
+  };
+});
+vi.mock("../middleware/authorization", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../middleware/authorization")>();
+  return {
+    ...actual,
+    requireCurrentTerms: async (_c: unknown, next: () => Promise<void>) => next(),
+  };
+});
 
 const dummyDb = {} as D1Database;
 const dummyAccountData = {} as AccountDataNamespace;
@@ -69,8 +99,7 @@ describe("GET /api/profile-summary", () => {
     });
     expect(getProfileSummary).toHaveBeenCalledWith(
       expect.objectContaining({
-        idToken: "dummy.id.token",
-        lineLoginChannelId: "2010850319",
+        actor: expect.objectContaining({ accountId: "account-1" }),
         allowUnchangedRegeneration: true,
       }),
     );
@@ -91,25 +120,6 @@ describe("GET /api/profile-summary", () => {
     expect(getProfileSummary).toHaveBeenCalledWith(
       expect.objectContaining({ allowUnchangedRegeneration: false }),
     );
-  });
-
-  it.each([
-    { type: "not-configured" as const },
-    { type: "unauthenticated" as const, reason: "invalid" },
-  ])("$typeを401へ変換する", async (value) => {
-    outcome(value);
-    const response = await request();
-    expect(response.status).toBe(401);
-  });
-
-  it("Accountがなければ友だち追加を案内する404を返す", async () => {
-    outcome({ type: "account-not-found" });
-    const response = await request();
-    expect(response.status).toBe(404);
-    expect(await response.json()).toEqual({
-      error: "Account not found",
-      reason: "friendship_required",
-    });
   });
 
   it("DB bindingがなければ503を返す", async () => {

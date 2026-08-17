@@ -1,7 +1,12 @@
 import { compatibilityRelationshipCategoryValues } from "@me-builder/lib";
 import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
 import * as v from "valibot";
-import { AccountNotFoundErrorSchema, authenticatedErrors, jsonResponse } from "../shared/errors";
+import {
+  AccountNotFoundErrorSchema,
+  authenticatedErrors,
+  currentTermsPolicyError,
+  jsonResponse,
+} from "../shared/errors";
 
 const NonEmptyStringSchema = v.pipe(v.string(), v.nonEmpty());
 
@@ -35,13 +40,14 @@ export const compatibilityInvitationPreviewRoute = describeRoute({
   operationId: "getCompatibilityInvitation",
   tags: ["Compatibility"],
   summary: "受信者が承諾前に招待者と共有の意味を確認する",
-  security: [{ liffIdToken: [] }],
+  security: [{ applicationSession: [] }, { liffIdToken: [] }],
   responses: {
     200: jsonResponse(
       "招待者の表示名と受信者の共有可否",
       CompatibilityInvitationPreviewResponseSchema,
     ),
     ...authenticatedErrors,
+    ...currentTermsPolicyError,
     404: jsonResponse(
       "招待または対応するAccountを利用できない",
       v.union([CompatibilityInvitationUnavailableSchema, AccountNotFoundErrorSchema]),

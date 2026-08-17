@@ -3,9 +3,6 @@ import type { ProfileSummaryGenerationQueueMessage, Queue } from "@me-builder/sh
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { requestProfileSummaryGeneration } from "./profile-summary-generation";
 
-const { createLiffSession } = vi.hoisted(() => ({ createLiffSession: vi.fn() }));
-vi.mock("./liff-session", () => ({ createLiffSession }));
-
 const execute = vi.fn();
 const accountData = {
   getByName: vi.fn(() => ({ execute })),
@@ -13,14 +10,15 @@ const accountData = {
 const send = vi.fn();
 const queue = { send } as unknown as Queue<ProfileSummaryGenerationQueueMessage>;
 let generationRequest: unknown;
+const actor = {
+  accountId: "account-1",
+  authenticationMethod: "liff" as const,
+  authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
+};
 
 describe("requestProfileSummaryGeneration", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    createLiffSession.mockResolvedValue({
-      type: "resolved",
-      session: { accountId: "account-1", role: "user" },
-    });
     generationRequest = undefined;
     execute.mockImplementation(async (_accountId: string, operation: string) => {
       if (operation === "aiUsage.read") {
@@ -41,8 +39,7 @@ describe("requestProfileSummaryGeneration", () => {
 
     await expect(
       requestProfileSummaryGeneration({
-        idToken: "token",
-        lineLoginChannelId: "channel",
+        actor,
         db: {} as D1.shared.Client,
         accountData,
         queue,
@@ -72,8 +69,7 @@ describe("requestProfileSummaryGeneration", () => {
 
     await expect(
       requestProfileSummaryGeneration({
-        idToken: "token",
-        lineLoginChannelId: "channel",
+        actor,
         db: {} as D1.shared.Client,
         accountData,
         queue,
@@ -91,8 +87,7 @@ describe("requestProfileSummaryGeneration", () => {
     };
 
     await requestProfileSummaryGeneration({
-      idToken: "token",
-      lineLoginChannelId: "channel",
+      actor,
       db: {} as D1.shared.Client,
       accountData,
       queue,
@@ -116,8 +111,7 @@ describe("requestProfileSummaryGeneration", () => {
 
     await expect(
       requestProfileSummaryGeneration({
-        idToken: "token",
-        lineLoginChannelId: "channel",
+        actor,
         db: {} as D1.shared.Client,
         accountData,
         queue,
@@ -137,8 +131,7 @@ describe("requestProfileSummaryGeneration", () => {
 
     await expect(
       requestProfileSummaryGeneration({
-        idToken: "token",
-        lineLoginChannelId: "channel",
+        actor,
         db: {} as D1.shared.Client,
         accountData,
         queue,
@@ -156,8 +149,7 @@ describe("requestProfileSummaryGeneration", () => {
     };
 
     await requestProfileSummaryGeneration({
-      idToken: "token",
-      lineLoginChannelId: "channel",
+      actor,
       db: {} as D1.shared.Client,
       accountData,
       queue,
@@ -180,8 +172,7 @@ describe("requestProfileSummaryGeneration", () => {
 
     await expect(
       requestProfileSummaryGeneration({
-        idToken: "token",
-        lineLoginChannelId: "channel",
+        actor,
         db: {} as D1.shared.Client,
         accountData,
         queue,

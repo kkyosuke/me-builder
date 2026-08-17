@@ -34,6 +34,15 @@ const avatarBucket = new cloudflare.R2Bucket(
   { protect },
 );
 
+const sessionStore = new cloudflare.WorkersKvNamespace(
+  "sessionStore",
+  {
+    accountId,
+    title: names.sessionStore,
+  },
+  { protect },
+);
+
 const queues = Object.fromEntries(
   Object.entries(names.queues).map(([key, queueName]) => [
     key,
@@ -50,6 +59,10 @@ export const infrastructure = {
   },
   avatarBucket: {
     name: avatarBucket.name,
+  },
+  sessionStore: {
+    id: sessionStore.id,
+    name: sessionStore.title,
   },
   queues: Object.fromEntries(
     Object.entries(queues).map(([key, queue]) => [

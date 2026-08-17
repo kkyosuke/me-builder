@@ -1,6 +1,11 @@
 import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
 import * as v from "valibot";
-import { ForbiddenErrorSchema, authenticatedErrors, jsonResponse } from "../shared/errors";
+import {
+  ForbiddenErrorSchema,
+  authenticatedErrors,
+  currentTermsPolicyError,
+  jsonResponse,
+} from "../shared/errors";
 
 const UnavailableSectionSchema = v.object({
   status: v.literal("unavailable"),
@@ -63,10 +68,11 @@ export const adminStatisticsRoute = describeRoute({
   operationId: "getAdminStatistics",
   tags: ["Admin"],
   summary: "GeminiとLINEの当月利用統計を取得する",
-  security: [{ liffIdToken: [] }],
+  security: [{ applicationSession: [] }, { liffIdToken: [] }],
   responses: {
     200: jsonResponse("管理者向け利用統計", AdminStatisticsResponseSchema),
     403: jsonResponse("管理者権限がない", ForbiddenErrorSchema),
     ...authenticatedErrors,
+    ...currentTermsPolicyError,
   },
 } satisfies DescribeRouteOptions);

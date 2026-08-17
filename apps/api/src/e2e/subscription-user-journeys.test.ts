@@ -18,9 +18,6 @@ import {
 import { getProfileEntitlement } from "../logic/profile-entitlement";
 import { createAccountDataTestStore } from "../testing/account-data";
 
-const { createLiffSession } = vi.hoisted(() => ({ createLiffSession: vi.fn() }));
-vi.mock("../logic/liff-session", () => ({ createLiffSession }));
-
 function createSharedDb(): D1.shared.Client {
   const sqlite = new Database(":memory:");
   const db = drizzle(sqlite, { schema: D1.shared.schema });
@@ -94,11 +91,12 @@ function effectiveAssignments(db: D1.shared.Client) {
   return new billing.FamilyAwareAccountPlanAssignmentProvider(db, subscription);
 }
 
-function signIn(accountId: string): void {
-  createLiffSession.mockResolvedValue({
-    type: "resolved",
-    session: { accountId, role: "user" },
-  });
+function actor(accountId: string, authenticatedAt = "2026-08-16T00:00:00.000Z") {
+  return {
+    accountId,
+    authenticationMethod: "liff" as const,
+    authenticatedAt: new Date(authenticatedAt),
+  };
 }
 
 async function storeDiary(
@@ -154,13 +152,15 @@ describe("subscription user journeys", () => {
       status: "active",
       at: new Date("2026-08-16T00:00:00.000Z"),
     });
-    signIn(accountId);
     const assignments = effectiveAssignments(db);
 
     await expect(
       getProfileEntitlement({
-        idToken: "full-user-token",
-        lineLoginChannelId: "channel",
+        actor: {
+          accountId,
+          authenticationMethod: "liff",
+          authenticatedAt: new Date("2026-08-16T00:01:00.000Z"),
+        },
         db,
         accountData: accountData.namespace,
         planAssignmentProvider: assignments,
@@ -192,9 +192,11 @@ describe("subscription user journeys", () => {
 
     await expect(
       listPersonalData({
-        idToken: "full-user-token",
-        lineLoginChannelId: "channel",
-        db,
+        actor: {
+          accountId,
+          authenticationMethod: "liff",
+          authenticatedAt: new Date("2026-08-20T00:00:01.000Z"),
+        },
         accountData: accountData.namespace,
       }),
     ).resolves.toMatchObject({
@@ -202,9 +204,11 @@ describe("subscription user journeys", () => {
       records: [{ kind: "diary", value: "有料期間中に残した大切な日記" }],
     });
     const requested = await requestPersonalDataExport({
-      idToken: "full-user-token",
-      lineLoginChannelId: "channel",
-      db,
+      actor: {
+        accountId,
+        authenticationMethod: "liff",
+        authenticatedAt: new Date("2026-08-20T00:01:00.000Z"),
+      },
       accountData: accountData.namespace,
       at: new Date("2026-08-20T00:01:00.000Z"),
     });
@@ -215,9 +219,11 @@ describe("subscription user journeys", () => {
       new Date("2026-08-20T00:01:01.000Z"),
     );
     const archive = await downloadPersonalDataExport({
-      idToken: "full-user-token",
-      lineLoginChannelId: "channel",
-      db,
+      actor: {
+        accountId,
+        authenticationMethod: "liff",
+        authenticatedAt: new Date("2026-08-20T00:01:02.000Z"),
+      },
       accountData: accountData.namespace,
       exportId: requested.result.export.id,
       at: new Date("2026-08-20T00:01:02.000Z"),
@@ -257,30 +263,30 @@ describe("subscription user journeys", () => {
       new Date("2026-08-16T00:00:01.000Z"),
     );
 
-    signIn(payerId);
     const invitation = await issueFamilySeatInvitation(
-      { idToken: "payer-token", lineLoginChannelId: "channel", db },
-      { createSession: createLiffSession, now: () => new Date("2026-08-16T00:01:00.000Z") },
+      { actor: actor(payerId), db },
+      { now: () => new Date("2026-08-16T00:01:00.000Z") },
     );
     if (invitation.type !== "created") throw new Error("Family invitation was not created");
 
-    signIn(memberId);
     await expect(
       acceptFamilyInvitation(
         {
-          idToken: "member-token",
-          lineLoginChannelId: "channel",
+          actor: actor(memberId),
           db,
           token: invitation.token,
         },
-        { createSession: createLiffSession, now: () => new Date("2026-08-16T00:02:00.000Z") },
+        { now: () => new Date("2026-08-16T00:02:00.000Z") },
       ),
     ).resolves.toMatchObject({ type: "updated", seat: { role: "member", status: "active" } });
 
     await expect(
       getProfileEntitlement({
-        idToken: "member-token",
-        lineLoginChannelId: "channel",
+        actor: {
+          accountId: memberId,
+          authenticationMethod: "liff",
+          authenticatedAt: new Date("2026-08-16T00:03:00.000Z"),
+        },
         db,
         accountData: memberData.namespace,
         planAssignmentProvider: effectiveAssignments(db),
@@ -294,20 +300,17 @@ describe("subscription user journeys", () => {
       aiReply: { limit: 600 },
     });
 
-    signIn(payerId);
     const payerView = await getFamilySeatManagement({
-      idToken: "payer-token",
-      lineLoginChannelId: "channel",
+      actor: actor(payerId),
       db,
     });
     expect(JSON.stringify(payerView)).not.toContain(memberId);
     expect(JSON.stringify(payerView)).not.toContain("支払者には共有しない参加者の日記");
 
-    signIn(memberId);
     await expect(
       leaveFamilyPack(
-        { idToken: "member-token", lineLoginChannelId: "channel", db },
-        { createSession: createLiffSession, now: () => new Date("2026-08-16T00:04:00.000Z") },
+        { actor: actor(memberId), db },
+        { now: () => new Date("2026-08-16T00:04:00.000Z") },
       ),
     ).resolves.toMatchObject({ type: "updated", seat: { status: "left" } });
     await expect(
@@ -318,9 +321,11 @@ describe("subscription user journeys", () => {
     ).resolves.toMatchObject({ plan: "free", source: "free" });
     await expect(
       listPersonalData({
-        idToken: "member-token",
-        lineLoginChannelId: "channel",
-        db,
+        actor: {
+          accountId: memberId,
+          authenticationMethod: "liff",
+          authenticatedAt: new Date("2026-08-16T00:04:01.000Z"),
+        },
         accountData: memberData.namespace,
       }),
     ).resolves.toMatchObject({

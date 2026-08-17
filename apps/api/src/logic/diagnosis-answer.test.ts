@@ -1,9 +1,12 @@
-import type { D1 } from "@me-builder/lib";
 import { describe, expect, it, vi } from "vitest";
 import { saveDiagnosisAnswer } from "./diagnosis-answer";
 
-const db = {} as D1.shared.Client;
 const at = new Date("2026-08-05T00:00:00.000Z");
+const actor = {
+  accountId: "account-1",
+  authenticationMethod: "liff" as const,
+  authenticatedAt: at,
+};
 
 describe("saveDiagnosisAnswer", () => {
   it("検証済みAccount IDだけをD1 actionへ渡す", async () => {
@@ -29,16 +32,10 @@ describe("saveDiagnosisAnswer", () => {
         diagnosisId: "diagnosis-1",
         diagnosisQuestionId: "dq-1",
         choiceId: "yes",
-        idToken: "token",
-        lineLoginChannelId: "channel",
-        db,
+        actor,
         at,
       },
       {
-        createSession: vi.fn().mockResolvedValue({
-          type: "resolved",
-          session: { accountId: "account-1", role: "user" },
-        }),
         saveAnswer,
       },
     );
@@ -49,25 +46,6 @@ describe("saveDiagnosisAnswer", () => {
       at,
     });
     expect(result).toEqual(saved);
-  });
-
-  it("本人確認できない場合はD1へ書き込まない", async () => {
-    const saveAnswer = vi.fn();
-    const session = { type: "unauthenticated" as const, reason: "invalid" };
-    const result = await saveDiagnosisAnswer(
-      {
-        diagnosisId: "diagnosis-1",
-        diagnosisQuestionId: "dq-1",
-        choiceId: "yes",
-        idToken: undefined,
-        lineLoginChannelId: "channel",
-        db,
-        at,
-      },
-      { createSession: vi.fn().mockResolvedValue(session), saveAnswer },
-    );
-    expect(result).toEqual(session);
-    expect(saveAnswer).not.toHaveBeenCalled();
   });
 
   it("全問回答済みになったときprojection要求をbest-effortで処理する", async () => {
@@ -101,17 +79,11 @@ describe("saveDiagnosisAnswer", () => {
         diagnosisId: "diagnosis-1",
         diagnosisQuestionId: "dq-2",
         choiceId: "yes",
-        idToken: "token",
-        lineLoginChannelId: "channel",
-        db,
+        actor,
         at,
         scheduleProjection,
       },
       {
-        createSession: vi.fn().mockResolvedValue({
-          type: "resolved",
-          session: { accountId: "account-1", role: "user" },
-        }),
         saveAnswer: vi.fn().mockResolvedValue(saved),
         processLatestProjection,
       },

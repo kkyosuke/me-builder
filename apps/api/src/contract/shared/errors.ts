@@ -9,6 +9,11 @@ export const ForbiddenErrorSchema = v.object({
   error: v.literal("Forbidden"),
 });
 
+export const TermsAcceptanceRequiredErrorSchema = v.object({
+  error: v.literal("Terms acceptance required"),
+  reason: v.literal("terms_not_accepted"),
+});
+
 export const AccountNotFoundErrorSchema = v.object({
   error: v.literal("Account not found"),
   reason: v.literal("friendship_required"),
@@ -32,10 +37,17 @@ const jsonResponse = (description: string, schema: Parameters<typeof resolver>[0
 });
 
 export const authenticatedErrors = {
-  401: jsonResponse("LIFF IDトークンを検証できない", UnauthorizedErrorSchema),
+  401: jsonResponse(
+    "application sessionまたは旧LIFF credentialを検証できない",
+    UnauthorizedErrorSchema,
+  ),
   404: jsonResponse("対応するAccountが存在しない", AccountNotFoundErrorSchema),
   503: jsonResponse("D1 bindingが設定されていない", ServiceUnavailableErrorSchema),
   500: jsonResponse("未処理のサーバーエラー", InternalServerErrorSchema),
+};
+
+export const currentTermsPolicyError = {
+  428: jsonResponse("現行利用規約への同意が必要", TermsAcceptanceRequiredErrorSchema),
 };
 
 export { jsonResponse };

@@ -1,7 +1,7 @@
 import { BILLING_INITIAL_TRIAL_DAYS } from "@me-builder/shared";
 import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
 import * as v from "valibot";
-import { AccountNotFoundErrorSchema, authenticatedErrors, jsonResponse } from "../shared/errors";
+import { authenticatedErrors, currentTermsPolicyError, jsonResponse } from "../shared/errors";
 
 export const BillingCheckoutRequestSchema = v.object({
   plan: v.picklist(["lite", "full", "family"]),
@@ -59,6 +59,7 @@ export const BillingSessionConflictSchema = v.object({
     "customer_not_found",
     "same_plan",
     "subscription_not_found",
+    "scheduled_change_exists",
     "configuration_missing",
   ]),
 });
@@ -69,7 +70,7 @@ export const billingCheckoutSessionRoute = describeRoute({
   operationId: "createBillingCheckoutSession",
   tags: ["Billing"],
   summary: "本人の選択したPlanに対するStripe Checkout Sessionを作成する",
-  security: [{ liffIdToken: [] }],
+  security: [{ applicationSession: [], csrfToken: [] }, { liffIdToken: [] }],
   requestBody: {
     required: true,
     content: { "application/json": { schema: BillingCheckoutRequestSchema } },
@@ -79,6 +80,7 @@ export const billingCheckoutSessionRoute = describeRoute({
     400: jsonResponse("リクエストが不正", BillingInvalidRequestSchema),
     409: jsonResponse("購入を開始できない", BillingSessionConflictSchema),
     ...authenticatedErrors,
+    ...currentTermsPolicyError,
   },
 } satisfies DescribeRouteOptions);
 
@@ -86,13 +88,13 @@ export const billingCheckoutSessionStatusRoute = describeRoute({
   operationId: "getBillingCheckoutSessionStatus",
   tags: ["Billing"],
   summary: "Checkout Sessionが本人のものであることと完了状態を確認する",
-  security: [{ liffIdToken: [] }],
+  security: [{ applicationSession: [] }, { liffIdToken: [] }],
   responses: {
     200: jsonResponse("本人のCheckout Session状態", BillingCheckoutSessionStatusResponseSchema),
     ...authenticatedErrors,
     404: jsonResponse(
       "Accountまたは本人のCheckout Sessionが存在しない",
-      v.union([AccountNotFoundErrorSchema, BillingCheckoutSessionNotFoundSchema]),
+      BillingCheckoutSessionNotFoundSchema,
     ),
   },
 } satisfies DescribeRouteOptions);
@@ -110,7 +112,7 @@ export const billingTrialEligibilityRoute = describeRoute({
   operationId: "getBillingTrialEligibility",
   tags: ["Billing"],
   summary: "本人が初回14日間trialを開始できるか取得する",
-  security: [{ liffIdToken: [] }],
+  security: [{ applicationSession: [] }, { liffIdToken: [] }],
   responses: {
     200: jsonResponse("Account単位のtrial利用可否", BillingTrialEligibilityResponseSchema),
     ...authenticatedErrors,
@@ -121,11 +123,12 @@ export const billingPortalSessionRoute = describeRoute({
   operationId: "createBillingPortalSession",
   tags: ["Billing"],
   summary: "本人のStripe Customerに対するCustomer Portal Sessionを作成する",
-  security: [{ liffIdToken: [] }],
+  security: [{ applicationSession: [], csrfToken: [] }, { liffIdToken: [] }],
   responses: {
     201: jsonResponse("短命なStripe Customer Portal URL", BillingSessionResponseSchema),
     409: jsonResponse("Portalを開始できない", BillingSessionConflictSchema),
     ...authenticatedErrors,
+    ...currentTermsPolicyError,
   },
 } satisfies DescribeRouteOptions);
 
@@ -133,7 +136,7 @@ export const billingPlanChangeSessionRoute = describeRoute({
   operationId: "createBillingPlanChangeSession",
   tags: ["Billing"],
   summary: "選択したPlanへの即時確認または期間末変更予約を作成する",
-  security: [{ liffIdToken: [] }],
+  security: [{ applicationSession: [], csrfToken: [] }, { liffIdToken: [] }],
   requestBody: {
     required: true,
     content: { "application/json": { schema: BillingCheckoutRequestSchema } },
@@ -146,5 +149,6 @@ export const billingPlanChangeSessionRoute = describeRoute({
     400: jsonResponse("リクエストが不正", BillingInvalidRequestSchema),
     409: jsonResponse("プラン変更を開始できない", BillingSessionConflictSchema),
     ...authenticatedErrors,
+    ...currentTermsPolicyError,
   },
 } satisfies DescribeRouteOptions);

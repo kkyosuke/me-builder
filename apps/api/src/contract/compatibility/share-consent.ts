@@ -1,7 +1,7 @@
 import { compatibilityRelationshipCategoryValues } from "@me-builder/lib";
 import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
 import * as v from "valibot";
-import { authenticatedErrors, jsonResponse } from "../shared/errors";
+import { authenticatedErrors, currentTermsPolicyError, jsonResponse } from "../shared/errors";
 
 const NonEmptyStringSchema = v.pipe(v.string(), v.nonEmpty());
 
@@ -27,7 +27,7 @@ export const compatibilityShareConsentRoute = describeRoute({
   operationId: "getCompatibilityShareConsent",
   tags: ["Compatibility"],
   summary: "招待発行前に本人の共有可否を確認する",
-  security: [{ liffIdToken: [] }],
+  security: [{ applicationSession: [] }, { liffIdToken: [] }],
   parameters: [
     {
       name: "relationshipCategory",
@@ -44,5 +44,6 @@ export const compatibilityShareConsentRoute = describeRoute({
     ),
     400: jsonResponse("関係カテゴリが不正", InvalidCompatibilityShareConsentRequestSchema),
     ...authenticatedErrors,
+    ...currentTermsPolicyError,
   },
 } satisfies DescribeRouteOptions);

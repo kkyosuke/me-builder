@@ -1,9 +1,13 @@
-import type { AccountDataNamespace, D1 } from "@me-builder/lib";
+import type { AccountDataNamespace } from "@me-builder/lib";
 import { describe, expect, it, vi } from "vitest";
 import { getProfileSummary } from "./profile-summary";
 
-const db = {} as D1.shared.Client;
 const accountData = {} as AccountDataNamespace;
+const actor = {
+  accountId: "account-1",
+  authenticationMethod: "liff" as const,
+  authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
+};
 const readModel = {
   versions: [
     {
@@ -29,10 +33,6 @@ const readModel = {
 
 function dependencies(diagnoses: unknown[]) {
   return {
-    createSession: vi.fn().mockResolvedValue({
-      type: "resolved",
-      session: { accountId: "account-1", role: "user" },
-    }),
     getDiagnosisSource: vi.fn().mockResolvedValue({ diagnoses, answeredDiagnoses: [] }),
     readProfileSummary: vi.fn().mockResolvedValue(readModel),
   };
@@ -42,10 +42,7 @@ describe("getProfileSummary", () => {
   it("受付中の未回答診断があれば診断を次の行動にする", async () => {
     const deps = dependencies([{ availability: "open", responseStatus: "unanswered" }]);
 
-    const result = await getProfileSummary(
-      { idToken: "token", lineLoginChannelId: "channel", db, accountData },
-      deps as never,
-    );
+    const result = await getProfileSummary({ actor, accountData }, deps as never);
 
     expect(result).toMatchObject({ type: "resolved", nextAction: "diagnosis" });
     expect(deps.getDiagnosisSource).toHaveBeenCalledWith(
@@ -66,9 +63,7 @@ describe("getProfileSummary", () => {
 
     await getProfileSummary(
       {
-        idToken: "token",
-        lineLoginChannelId: "channel",
-        db,
+        actor,
         accountData,
         allowUnchangedRegeneration: true,
       },
@@ -89,10 +84,7 @@ describe("getProfileSummary", () => {
       { availability: "closed", responseStatus: "in-progress" },
     ]);
 
-    const result = await getProfileSummary(
-      { idToken: "token", lineLoginChannelId: "channel", db, accountData },
-      deps as never,
-    );
+    const result = await getProfileSummary({ actor, accountData }, deps as never);
 
     expect(result).toMatchObject({ type: "resolved", nextAction: "chat" });
   });
@@ -161,10 +153,7 @@ describe("getProfileSummary", () => {
       })),
     });
 
-    const result = await getProfileSummary(
-      { idToken: "token", lineLoginChannelId: "channel", db, accountData },
-      deps as never,
-    );
+    const result = await getProfileSummary({ actor, accountData }, deps as never);
 
     expect(result).toMatchObject({
       type: "resolved",
@@ -187,10 +176,7 @@ describe("getProfileSummary", () => {
       generation: { status: "idle", canRegenerate: false, reasons: [], message: null },
     });
 
-    const result = await getProfileSummary(
-      { idToken: "token", lineLoginChannelId: "channel", db, accountData },
-      deps as never,
-    );
+    const result = await getProfileSummary({ actor, accountData }, deps as never);
 
     expect(result).toMatchObject({
       type: "resolved",
@@ -203,10 +189,7 @@ describe("getProfileSummary", () => {
   it("AccountDataの保存済み版、現在件数、生成状態を返す", async () => {
     const deps = dependencies([]);
 
-    const result = await getProfileSummary(
-      { idToken: "token", lineLoginChannelId: "channel", db, accountData },
-      deps as never,
-    );
+    const result = await getProfileSummary({ actor, accountData }, deps as never);
 
     expect(result).toMatchObject({
       type: "resolved",
@@ -214,19 +197,5 @@ describe("getProfileSummary", () => {
       availableDataCounts: { diagnosis: 2, diary: 4 },
       generation: { status: "idle", canRegenerate: false, reasons: [], message: null },
     });
-  });
-
-  it("本人を解決できなければ診断進捗を取得しない", async () => {
-    const deps = dependencies([]);
-    deps.createSession.mockResolvedValue({ type: "unauthenticated", reason: "invalid" } as never);
-
-    const result = await getProfileSummary(
-      { idToken: undefined, lineLoginChannelId: "channel", db, accountData },
-      deps as never,
-    );
-
-    expect(result).toEqual({ type: "unauthenticated", reason: "invalid" });
-    expect(deps.getDiagnosisSource).not.toHaveBeenCalled();
-    expect(deps.readProfileSummary).not.toHaveBeenCalled();
   });
 });

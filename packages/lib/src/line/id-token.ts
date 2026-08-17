@@ -30,6 +30,7 @@ const VERIFY_ENDPOINT = "https://api.line.me/oauth2/v2.1/verify";
  * ログへ出力します（トークン本体は出力しません）。
  */
 const DEFAULT_MAX_AGE_SECONDS = 60 * 60;
+const MAX_CLOCK_SKEW_SECONDS = 60;
 
 export type VerifyIdTokenParams = {
   /** クライアントから受け取った ID トークン */
@@ -44,6 +45,8 @@ export type VerifyIdTokenParams = {
 export type VerifiedIdToken = {
   /** LINE Login の userId。本人識別子なので画面表示もログ出力もしません */
   sub: string;
+  /** IDトークンの発行時刻。再認証policyでは検証時刻の代わりにこの値を使います */
+  issuedAt: Date;
   name?: string;
   picture?: string;
 };
@@ -107,20 +110,29 @@ async function verify({
 
   // 発行からの経過時間を確認する。exp は LINE 側で検証されるが、
   // nonce を使えない分、受け入れる期間を自分で絞れるようにしておく。
-  if (body.iat !== undefined) {
-    const ageSeconds = Math.floor(Date.now() / 1000) - body.iat;
-    if (ageSeconds > maxAgeSeconds) {
-      logger.warn({ ageSeconds, maxAgeSeconds }, "[LINE ID Token] 発行から時間が経ちすぎています");
-      return { ok: false, reason: "ID トークンが古すぎます" };
-    }
-    // 上限を絞る判断材料として経過時間だけ残す (トークン本体は出力しない)
-    logger.info({ ageSeconds }, "[LINE ID Token] 検証に成功しました");
+  if (typeof body.iat !== "number" || !Number.isFinite(body.iat)) {
+    return { ok: false, reason: "iat が不正です" };
   }
+  const nowSeconds = Math.floor(Date.now() / 1_000);
+  const ageSeconds = nowSeconds - body.iat;
+  if (ageSeconds > maxAgeSeconds) {
+    logger.warn({ ageSeconds, maxAgeSeconds }, "[LINE ID Token] 発行から時間が経ちすぎています");
+    return { ok: false, reason: "ID トークンが古すぎます" };
+  }
+  if (ageSeconds < -MAX_CLOCK_SKEW_SECONDS) {
+    logger.warn({ ageSeconds }, "[LINE ID Token] 発行時刻が未来に離れすぎています");
+    return { ok: false, reason: "iat が不正です" };
+  }
+  // 小さなclock skewを許容しても、再認証policyへ未来時刻を渡さない。
+  const issuedAt = new Date(Math.min(body.iat, nowSeconds) * 1_000);
+  // 上限を絞る判断材料として経過時間だけ残す (トークン本体は出力しない)
+  logger.info({ ageSeconds }, "[LINE ID Token] 検証に成功しました");
 
   return {
     ok: true,
     claims: {
       sub: body.sub,
+      issuedAt,
       ...(body.name ? { name: body.name } : {}),
       ...(body.picture ? { picture: body.picture } : {}),
     },

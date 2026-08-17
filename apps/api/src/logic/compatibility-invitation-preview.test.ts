@@ -1,11 +1,10 @@
-import type { AccountDataNamespace, CompatibilityDataNamespace, D1 } from "@me-builder/lib";
+import type { AccountDataNamespace, CompatibilityDataNamespace } from "@me-builder/lib";
 import { describe, expect, it, vi } from "vitest";
 import { getCompatibilityInvitationContents } from "./compatibility-invitation-preview";
 
 const relationshipId = "1".repeat(64);
 const accountData = {} as AccountDataNamespace;
 const compatibilityData = {} as CompatibilityDataNamespace;
-const db = {} as D1.shared.Client;
 const expiresAt = new Date("2026-08-26T00:00:00.000Z");
 const theme = {
   diagnosisId: "diagnosis-1",
@@ -71,9 +70,12 @@ function dependencies(overrides: Record<string, unknown> = {}) {
 function params(overrides: Record<string, unknown> = {}) {
   return {
     relationshipId,
-    idToken: "id-token",
-    lineLoginChannelId: "channel-id",
-    db,
+    actor: {
+      accountId: "account-recipient",
+      authenticationMethod: "liff" as const,
+      authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
+    },
+    verifiedDisplayName: "はる",
     accountData,
     compatibilityData,
     ...overrides,
@@ -130,7 +132,9 @@ describe("getCompatibilityInvitationContents", () => {
       loadSharePreviewData: vi.fn().mockResolvedValue(previewData({ displayName: null })),
     });
 
-    await expect(getCompatibilityInvitationContents(params(), deps)).resolves.toMatchObject({
+    await expect(
+      getCompatibilityInvitationContents(params({ verifiedDisplayName: undefined }), deps),
+    ).resolves.toMatchObject({
       type: "resolved",
       invitation: {
         recipient: { displayName: null },
@@ -155,18 +159,6 @@ describe("getCompatibilityInvitationContents", () => {
       type: "own-invitation",
     });
     expect(deps.loadSharePreviewData).not.toHaveBeenCalled();
-  });
-
-  it("本人確認に失敗した場合は招待を読まない", async () => {
-    const deps = dependencies({
-      createSession: vi.fn().mockResolvedValue({ type: "unauthenticated", reason: "invalid" }),
-    });
-
-    await expect(getCompatibilityInvitationContents(params(), deps)).resolves.toEqual({
-      type: "unauthenticated",
-      reason: "invalid",
-    });
-    expect(deps.getInvitationPreview).not.toHaveBeenCalled();
   });
 
   it("不正な関係IDは本人確認を始めず利用不可として扱う", async () => {

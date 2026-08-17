@@ -5,17 +5,16 @@ import {
   type CompatibilityPairThemeFingerprint,
   type CompatibilityRelationship,
   type CompatibilitySharePreviewTheme,
-  type D1,
   compatibilityDataFor,
   compatibilityRelationshipId,
   selectCommonCompatibilityDiagnoses,
 } from "@me-builder/lib";
+import type { AuthenticatedActor } from "./authentication/types";
 import {
   type CompatibilityShareAboutMe,
   type CompatibilitySharePreviewData,
   loadCompatibilitySharePreviewData,
 } from "./compatibility-share-preview";
-import { createLiffSession } from "./liff-session";
 
 type Person = Readonly<{
   displayName: string;
@@ -52,16 +51,11 @@ type CompatibilityRelationshipContents =
 
 export type CompatibilityRelationshipOutcome =
   | { type: "resolved"; relationship: CompatibilityRelationshipContents }
-  | { type: "unavailable" }
-  | { type: "not-configured" }
-  | { type: "unauthenticated"; reason: string }
-  | { type: "account-not-found" };
+  | { type: "unavailable" };
 
 type Params = Readonly<{
   relationshipId: string;
-  idToken: string | undefined;
-  lineLoginChannelId: string | undefined;
-  db: D1.shared.Client;
+  actor: AuthenticatedActor;
   accountData: AccountDataNamespace;
   compatibilityData: CompatibilityDataNamespace;
   at?: Date;
@@ -233,23 +227,18 @@ export async function resolveCompatibilityRelationshipContents({
  */
 export async function getCompatibilityRelationshipContents({
   relationshipId,
-  idToken,
-  lineLoginChannelId,
-  db,
+  actor,
   accountData,
   compatibilityData,
   at = new Date(),
 }: Params): Promise<CompatibilityRelationshipOutcome> {
   if (!compatibilityRelationshipId.isValid(relationshipId)) return { type: "unavailable" };
-  const session = await createLiffSession({ idToken, lineLoginChannelId, db });
-  if (session.type !== "resolved") return session;
-
   const relationshipData = compatibilityDataFor(compatibilityData, relationshipId);
-  const canonical = await relationshipData.getRelationship(session.session.accountId);
+  const canonical = await relationshipData.getRelationship(actor.accountId);
   if (!canonical) return { type: "unavailable" };
   const relationship = await resolveCompatibilityRelationshipContents({
     canonical,
-    viewerAccountId: session.session.accountId,
+    viewerAccountId: actor.accountId,
     accountData,
     at,
   });
@@ -257,7 +246,7 @@ export async function getCompatibilityRelationshipContents({
   if (relationship.status === "ready") {
     try {
       const progression = await relationshipData.synchronizeProgression(
-        session.session.accountId,
+        actor.accountId,
         await pairThemeFingerprints(relationship),
       );
       if (!progression) return { type: "unavailable" };

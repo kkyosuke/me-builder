@@ -1,6 +1,6 @@
 import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
 import * as v from "valibot";
-import { authenticatedErrors, jsonResponse } from "../shared/errors";
+import { authenticatedErrors, currentTermsPolicyError, jsonResponse } from "../shared/errors";
 
 const NonEmptyStringSchema = v.pipe(v.string(), v.nonEmpty());
 const CountSchema = v.pipe(v.number(), v.safeInteger(), v.minValue(0));
@@ -93,13 +93,14 @@ export const profileSummaryRoute = describeRoute({
   operationId: "getProfileSummary",
   tags: ["Profile"],
   summary: "本人の記録から生成したまとめを取得する",
-  security: [{ liffIdToken: [] }],
+  security: [{ applicationSession: [] }, { liffIdToken: [] }],
   responses: {
     200: jsonResponse(
       "本人向けの保存済みまとめ版、現在使えるデータ件数、生成状態と次にできること",
       ProfileSummaryResponseSchema,
     ),
     ...authenticatedErrors,
+    ...currentTermsPolicyError,
   },
 } satisfies DescribeRouteOptions);
 
@@ -107,7 +108,7 @@ export const profileSummaryGenerationRoute = describeRoute({
   operationId: "requestProfileSummaryGeneration",
   tags: ["Profile"],
   summary: "本人の記録から新しいまとめ版のAI生成を要求する",
-  security: [{ liffIdToken: [] }],
+  security: [{ applicationSession: [], csrfToken: [] }, { liffIdToken: [] }],
   responses: {
     202: jsonResponse(
       "生成要求を受け付けた、または処理中の要求を返した",
@@ -118,5 +119,6 @@ export const profileSummaryGenerationRoute = describeRoute({
       ProfileSummaryGenerationUnavailableSchema,
     ),
     ...authenticatedErrors,
+    ...currentTermsPolicyError,
   },
 } satisfies DescribeRouteOptions);

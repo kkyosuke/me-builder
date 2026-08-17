@@ -1,6 +1,11 @@
 import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
 import * as v from "valibot";
-import { ServiceUnavailableErrorSchema, authenticatedErrors, jsonResponse } from "../shared/errors";
+import {
+  ServiceUnavailableErrorSchema,
+  authenticatedErrors,
+  currentTermsPolicyError,
+  jsonResponse,
+} from "../shared/errors";
 
 const NonEmptyStringSchema = v.pipe(v.string(), v.trim(), v.nonEmpty());
 const ChoiceSchema = v.object({ id: NonEmptyStringSchema, label: NonEmptyStringSchema });
@@ -45,6 +50,7 @@ export const InvalidPersonalDataMutationSchema = v.object({
 
 const personalDataErrors = {
   ...authenticatedErrors,
+  ...currentTermsPolicyError,
   404: jsonResponse("本人が所有する有効な原本がない", PersonalDataRecordNotFoundSchema),
   503: jsonResponse("AccountData bindingが設定されていない", ServiceUnavailableErrorSchema),
 };
@@ -53,10 +59,11 @@ export const personalDataRecordsRoute = describeRoute({
   operationId: "listPersonalDataRecords",
   tags: ["Personal Data"],
   summary: "本人が訂正・削除できる診断回答と日記を取得する",
-  security: [{ liffIdToken: [] }],
+  security: [{ applicationSession: [] }, { liffIdToken: [] }],
   responses: {
     200: jsonResponse("現在有効な本人入力", PersonalDataRecordsResponseSchema),
     ...authenticatedErrors,
+    ...currentTermsPolicyError,
     503: jsonResponse("AccountData bindingが設定されていない", ServiceUnavailableErrorSchema),
   },
 } satisfies DescribeRouteOptions);
@@ -65,7 +72,7 @@ export const correctPersonalDataRecordRoute = describeRoute({
   operationId: "correctPersonalDataRecord",
   tags: ["Personal Data"],
   summary: "原本を上書きせず新版として訂正する",
-  security: [{ liffIdToken: [] }],
+  security: [{ applicationSession: [], csrfToken: [] }, { liffIdToken: [] }],
   requestBody: {
     required: true,
     content: {
@@ -106,7 +113,7 @@ export const deletePersonalDataRecordRoute = describeRoute({
   operationId: "deletePersonalDataRecord",
   tags: ["Personal Data"],
   summary: "原本をtombstoneへ遷移し今後の利用を止める",
-  security: [{ liffIdToken: [] }],
+  security: [{ applicationSession: [], csrfToken: [] }, { liffIdToken: [] }],
   responses: {
     200: jsonResponse("削除受付結果", PersonalDataMutationResponseSchema),
     ...personalDataErrors,

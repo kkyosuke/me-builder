@@ -4,6 +4,41 @@
  */
 
 export interface paths {
+  "/api/auth/liff/exchange": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** 検証済みLIFF credentialをprovider非依存sessionへ交換する */
+    post: operations["exchangeLiffCredential"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/auth/session": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** 現在のapplication sessionを確認する */
+    get: operations["getApplicationSession"];
+    put?: never;
+    post?: never;
+    /** 現在のapplication sessionを失効する */
+    delete: operations["logoutApplicationSession"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/account-recovery/codes": {
     parameters: {
       query?: never;
@@ -1009,6 +1044,278 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+  exchangeLiffCredential: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": Record<string, never>;
+      };
+    };
+    responses: {
+      /** @description 発行したapplication session */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            authenticated: true;
+            /** @enum {string} */
+            authenticationMethod: "liff" | "sso";
+            /** Format: date-time */
+            authenticatedAt: string;
+            /** Format: date-time */
+            expiresAt: string;
+            csrfToken: string;
+            /** @enum {string} */
+            role: "user" | "admin";
+            displayProfile?: {
+              displayName?: string;
+              /** Format: uri */
+              pictureUrl?: string;
+            };
+          };
+        };
+      };
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Unauthorized";
+          };
+        };
+      };
+      /** @description 許可済みWeb Originではない */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Forbidden";
+          };
+        };
+      };
+      /** @description 対応するAccountが存在しない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Account not found";
+            /** @constant */
+            reason: "friendship_required";
+          };
+        };
+      };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
+          };
+        };
+      };
+      /** @description D1 bindingが設定されていない */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Service Unavailable";
+          };
+        };
+      };
+    };
+  };
+  getApplicationSession: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 現在のapplication session */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            authenticated: true;
+            /** @enum {string} */
+            authenticationMethod: "liff" | "sso";
+            /** Format: date-time */
+            authenticatedAt: string;
+            /** Format: date-time */
+            expiresAt: string;
+            csrfToken: string;
+            /** @enum {string} */
+            role: "user" | "admin";
+            displayProfile?: {
+              displayName?: string;
+              /** Format: uri */
+              pictureUrl?: string;
+            };
+          };
+        };
+      };
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Unauthorized";
+          };
+        };
+      };
+      /** @description 対応するAccountが存在しない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Account not found";
+            /** @constant */
+            reason: "friendship_required";
+          };
+        };
+      };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
+          };
+        };
+      };
+      /** @description D1 bindingが設定されていない */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Service Unavailable";
+          };
+        };
+      };
+    };
+  };
+  logoutApplicationSession: {
+    parameters: {
+      query?: never;
+      header: {
+        "X-CSRF-Token": string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description sessionを失効した */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Unauthorized";
+          };
+        };
+      };
+      /** @description OriginまたはCSRF tokenが一致しない */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Forbidden";
+          };
+        };
+      };
+      /** @description 対応するAccountが存在しない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Account not found";
+            /** @constant */
+            reason: "friendship_required";
+          };
+        };
+      };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
+          };
+        };
+      };
+      /** @description D1 bindingが設定されていない */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Service Unavailable";
+          };
+        };
+      };
+    };
+  };
   issueAccountRecoveryCode: {
     parameters: {
       query?: never;
@@ -1031,7 +1338,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -1070,6 +1377,20 @@ export interface operations {
               | "Invalid recovery code"
               | "Identity conflict"
               | "Too many recovery attempts";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };
@@ -1141,7 +1462,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -1283,7 +1604,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -1372,7 +1693,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -1416,7 +1737,22 @@ export interface operations {
               | "customer_not_found"
               | "same_plan"
               | "subscription_not_found"
+              | "scheduled_change_exists"
               | "configuration_missing";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };
@@ -1483,7 +1819,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -1527,7 +1863,22 @@ export interface operations {
               | "customer_not_found"
               | "same_plan"
               | "subscription_not_found"
+              | "scheduled_change_exists"
               | "configuration_missing";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };
@@ -1580,7 +1931,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -1598,17 +1949,10 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json":
-            | {
-                /** @constant */
-                error: "Account not found";
-                /** @constant */
-                reason: "friendship_required";
-              }
-            | {
-                /** @constant */
-                error: "Checkout session not found";
-              };
+          "application/json": {
+            /** @constant */
+            error: "Checkout session not found";
+          };
         };
       };
       /** @description 未処理のサーバーエラー */
@@ -1658,7 +2002,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -1702,7 +2046,22 @@ export interface operations {
               | "customer_not_found"
               | "same_plan"
               | "subscription_not_found"
+              | "scheduled_change_exists"
               | "configuration_missing";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };
@@ -2015,7 +2374,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -2050,6 +2409,20 @@ export interface operations {
             error: "Account not found";
             /** @constant */
             reason: "friendship_required";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };
@@ -2144,7 +2517,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -2179,6 +2552,20 @@ export interface operations {
             error: "Account not found";
             /** @constant */
             reason: "friendship_required";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };
@@ -2242,7 +2629,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -2277,6 +2664,20 @@ export interface operations {
             error: "Account not found";
             /** @constant */
             reason: "friendship_required";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };
@@ -2355,7 +2756,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -2396,6 +2797,20 @@ export interface operations {
                 /** @constant */
                 error: "Billing customer not found";
               };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
+          };
         };
       };
       /** @description 未処理のサーバーエラー */
@@ -2503,7 +2918,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -2526,6 +2941,20 @@ export interface operations {
             error: "Account not found";
             /** @constant */
             reason: "friendship_required";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };
@@ -2578,7 +3007,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -2615,6 +3044,20 @@ export interface operations {
             error: "Profile summary generation unavailable";
             /** @enum {string} */
             reason: "source_record_required" | "regeneration_not_required" | "limit_reached";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };
@@ -2703,7 +3146,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -2726,6 +3169,20 @@ export interface operations {
             error: "Account not found";
             /** @constant */
             reason: "friendship_required";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };
@@ -2778,7 +3235,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -2815,6 +3272,20 @@ export interface operations {
             error: "Weekly reflection generation unavailable";
             /** @enum {string} */
             reason: "feature_unavailable" | "source_record_required";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };
@@ -2877,7 +3348,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -2900,6 +3371,20 @@ export interface operations {
             error: "Account not found";
             /** @constant */
             reason: "friendship_required";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };
@@ -2979,7 +3464,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -3020,6 +3505,20 @@ export interface operations {
               | "active_limit"
               | "goal_not_found"
               | "goal_not_confirmed";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };
@@ -3102,7 +3601,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -3143,6 +3642,20 @@ export interface operations {
               | "active_limit"
               | "goal_not_found"
               | "goal_not_confirmed";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };
@@ -3200,7 +3713,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -3223,6 +3736,20 @@ export interface operations {
             error: "Account not found";
             /** @constant */
             reason: "friendship_required";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };
@@ -3300,7 +3827,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -3323,6 +3850,20 @@ export interface operations {
             error: "Account not found";
             /** @constant */
             reason: "friendship_required";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };
@@ -3395,7 +3936,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -3418,6 +3959,20 @@ export interface operations {
             error: "Account not found";
             /** @constant */
             reason: "friendship_required";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };
@@ -3474,7 +4029,7 @@ export interface operations {
         };
         content?: never;
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -3497,6 +4052,20 @@ export interface operations {
             error: "Account not found";
             /** @constant */
             reason: "friendship_required";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };
@@ -3572,7 +4141,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -3634,6 +4203,20 @@ export interface operations {
           };
         };
       };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
+          };
+        };
+      };
       /** @description 未処理のサーバーエラー */
       500: {
         headers: {
@@ -3688,7 +4271,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -3711,6 +4294,20 @@ export interface operations {
             error: "Account not found";
             /** @constant */
             reason: "friendship_required";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };
@@ -3785,7 +4382,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -3808,6 +4405,20 @@ export interface operations {
             error: "Account not found";
             /** @constant */
             reason: "friendship_required";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };
@@ -3862,7 +4473,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -3883,6 +4494,20 @@ export interface operations {
           "application/json": {
             /** @constant */
             error: "Personal data record not found";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };
@@ -3963,7 +4588,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -3996,6 +4621,20 @@ export interface operations {
           "application/json": {
             /** @constant */
             error: "Invalid personal data mutation";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };
@@ -4058,7 +4697,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -4081,6 +4720,20 @@ export interface operations {
             error: "Account not found";
             /** @constant */
             reason: "friendship_required";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };
@@ -4162,7 +4815,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -4199,6 +4852,20 @@ export interface operations {
             error: "Self-care context unavailable";
             /** @enum {string} */
             reason: "feature_unavailable" | "brain_item_not_found" | "not_confirmed";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };
@@ -4274,7 +4941,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -4311,6 +4978,20 @@ export interface operations {
             error: "Self-care context unavailable";
             /** @enum {string} */
             reason: "feature_unavailable" | "brain_item_not_found" | "not_confirmed";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };
@@ -4387,7 +5068,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -4442,6 +5123,20 @@ export interface operations {
               | "invitation_expired"
               | "token_used"
               | "account_already_assigned";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };
@@ -4517,7 +5212,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -4572,6 +5267,20 @@ export interface operations {
               | "invitation_expired"
               | "token_used"
               | "account_already_assigned";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };
@@ -4650,7 +5359,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -4705,6 +5414,20 @@ export interface operations {
               | "invitation_expired"
               | "token_used"
               | "account_already_assigned";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };
@@ -4783,7 +5506,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -4838,6 +5561,20 @@ export interface operations {
               | "invitation_expired"
               | "token_used"
               | "account_already_assigned";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };
@@ -4912,7 +5649,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -4967,6 +5704,20 @@ export interface operations {
               | "invitation_expired"
               | "token_used"
               | "account_already_assigned";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };
@@ -5041,7 +5792,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -5096,6 +5847,20 @@ export interface operations {
               | "invitation_expired"
               | "token_used"
               | "account_already_assigned";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };
@@ -5168,7 +5933,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -5223,6 +5988,20 @@ export interface operations {
               | "invitation_expired"
               | "token_used"
               | "account_already_assigned";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };
@@ -5283,7 +6062,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -5306,6 +6085,20 @@ export interface operations {
             error: "Account not found";
             /** @constant */
             reason: "friendship_required";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };
@@ -5368,7 +6161,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -5389,6 +6182,20 @@ export interface operations {
           "application/json": {
             /** @constant */
             error: "Personal data export not found";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };
@@ -5440,7 +6247,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -5485,6 +6292,20 @@ export interface operations {
           "application/json": {
             /** @constant */
             error: "Personal data export expired";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };
@@ -5580,7 +6401,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -5609,6 +6430,20 @@ export interface operations {
                 /** @constant */
                 error: "Not Found";
               };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
+          };
         };
       };
       /** @description 未処理のサーバーエラー */
@@ -5685,7 +6520,7 @@ export interface operations {
               };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -5714,6 +6549,20 @@ export interface operations {
                 /** @constant */
                 error: "Not Found";
               };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
+          };
         };
       };
       /** @description 未処理のサーバーエラー */
@@ -5766,7 +6615,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -5803,6 +6652,20 @@ export interface operations {
             error: "Compatibility invitation unavailable";
             /** @enum {string} */
             reason: "own_invitation" | "share_unavailable" | "duplicate_relationship";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };
@@ -5876,7 +6739,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -5913,6 +6776,20 @@ export interface operations {
             error: "Compatibility invitation unavailable";
             /** @constant */
             reason: "share_unavailable";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };
@@ -5971,7 +6848,7 @@ export interface operations {
         };
         content?: never;
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -6015,6 +6892,20 @@ export interface operations {
             error: "Compatibility invitation unavailable";
             /** @constant */
             reason: "own_invitation";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };
@@ -6080,7 +6971,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -6124,6 +7015,20 @@ export interface operations {
             error: "Compatibility invitation unavailable";
             /** @constant */
             reason: "own_invitation";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };
@@ -6171,7 +7076,7 @@ export interface operations {
         };
         content?: never;
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -6202,6 +7107,20 @@ export interface operations {
                 /** @constant */
                 reason: "friendship_required";
               };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
+          };
         };
       };
       /** @description 未処理のサーバーエラー */
@@ -6281,7 +7200,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -6304,6 +7223,20 @@ export interface operations {
             error: "Account not found";
             /** @constant */
             reason: "friendship_required";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };
@@ -6436,7 +7369,7 @@ export interface operations {
               };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -6467,6 +7400,20 @@ export interface operations {
                 /** @constant */
                 reason: "friendship_required";
               };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
+          };
         };
       };
       /** @description 未処理のサーバーエラー */
@@ -6513,7 +7460,7 @@ export interface operations {
         };
         content?: never;
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -6544,6 +7491,20 @@ export interface operations {
                 /** @constant */
                 reason: "friendship_required";
               };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
+          };
         };
       };
       /** @description 未処理のサーバーエラー */
@@ -6603,7 +7564,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -6632,6 +7593,20 @@ export interface operations {
                 /** @constant */
                 error: "Not Found";
               };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
+          };
         };
       };
       /** @description 未処理のサーバーエラー */
@@ -6680,7 +7655,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -6709,6 +7684,20 @@ export interface operations {
                 /** @constant */
                 error: "Not Found";
               };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
+          };
         };
       };
       /** @description 未処理のサーバーエラー */
@@ -6760,7 +7749,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -6793,6 +7782,20 @@ export interface operations {
                 /** @constant */
                 error: "Failed vector sync job not found";
               };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
+          };
         };
       };
       /** @description 未処理のサーバーエラー */
@@ -6860,7 +7863,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -6883,6 +7886,20 @@ export interface operations {
             error: "Account not found";
             /** @constant */
             reason: "friendship_required";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };
@@ -6974,7 +7991,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -6997,6 +8014,20 @@ export interface operations {
             error: "Account not found";
             /** @constant */
             reason: "friendship_required";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };
@@ -7063,7 +8094,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -7086,6 +8117,20 @@ export interface operations {
             error: "Account not found";
             /** @constant */
             reason: "friendship_required";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };
@@ -7155,7 +8200,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -7199,6 +8244,20 @@ export interface operations {
             error: "Diagnosis closed";
             /** @constant */
             reason: "diagnosis_closed";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };
@@ -7282,7 +8341,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -7313,6 +8372,20 @@ export interface operations {
                 /** @constant */
                 reason: "diagnosis_answers_not_found";
               };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
+          };
         };
       };
       /** @description 未処理のサーバーエラー */
@@ -7395,7 +8468,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -7463,6 +8536,20 @@ export interface operations {
           };
         };
       };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
+          };
+        };
+      };
       /** @description 未処理のサーバーエラー */
       500: {
         headers: {
@@ -7518,7 +8605,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -7586,6 +8673,20 @@ export interface operations {
           };
         };
       };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
+          };
+        };
+      };
       /** @description 未処理のサーバーエラー */
       500: {
         headers: {
@@ -7637,7 +8738,7 @@ export interface operations {
           };
         };
       };
-      /** @description LIFF IDトークンを検証できない */
+      /** @description application sessionまたは旧LIFF credentialを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -7666,6 +8767,20 @@ export interface operations {
                 /** @constant */
                 error: "Not Found";
               };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
+          };
         };
       };
       /** @description 未処理のサーバーエラー */

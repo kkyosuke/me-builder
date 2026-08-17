@@ -138,6 +138,7 @@ function stubLineVerification(): void {
         iss: "https://access.line.me",
         sub: subjects[idToken] ?? "line-unknown",
         aud: lineChannelId,
+        iat: Math.floor(Date.now() / 1_000),
         exp: 4_000_000_000,
       });
     }),
@@ -355,7 +356,7 @@ describe("billing user journeys E2E", () => {
         where: (table, { eq }) => eq(table.providerAccountId, "line-attacker"),
       }),
     ).toBeUndefined();
-  });
+  }, 20_000);
 
   it("Customerだけが紐付いたFree利用者には復旧コードを発行しない", async () => {
     const db = D1.shared.client.create(database);

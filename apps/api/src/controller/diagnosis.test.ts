@@ -27,6 +27,30 @@ vi.mock("../logic/diagnosis-detail", () => ({ getDiagnosisDetail }));
 vi.mock("../logic/diagnosis-answers", () => ({ getDiagnosisAnswers }));
 vi.mock("../logic/diagnosis-answer", () => ({ saveDiagnosisAnswer }));
 vi.mock("../logic/diagnosis-deferred-question", () => ({ deferDiagnosisQuestion }));
+vi.mock("../middleware/authentication", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../middleware/authentication")>();
+  return {
+    ...actual,
+    requireAuthentication: async (
+      c: Parameters<typeof actual.requireAuthentication>[0],
+      next: () => Promise<void>,
+    ) => {
+      c.set("authenticatedActor", {
+        accountId: "account-1",
+        authenticationMethod: "liff",
+        authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
+      });
+      await next();
+    },
+  };
+});
+vi.mock("../middleware/authorization", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../middleware/authorization")>();
+  return {
+    ...actual,
+    requireCurrentTerms: async (_c: unknown, next: () => Promise<void>) => next(),
+  };
+});
 
 const dummyDb = {} as D1Database;
 const dummyAccountData = {} as AccountDataNamespace;
@@ -64,40 +88,8 @@ describe("GET /api/diagnoses", () => {
     expect(res.headers.get("cache-control")).toBe("no-store");
     expect(await res.json()).toEqual({ diagnoses: [] });
     expect(getDiagnosisList).toHaveBeenCalledWith(
-      expect.objectContaining({ idToken: "dummy.id.token", lineLoginChannelId: "2010850319" }),
+      expect.objectContaining({ actor: expect.objectContaining({ accountId: "account-1" }) }),
     );
-  });
-
-  it.each([
-    ["unauthenticated", { type: "unauthenticated", reason: "invalid" }],
-    ["not-configured", { type: "not-configured" }],
-  ] as const)("%s を401へ変換すること", async (_name, value) => {
-    outcome(value);
-
-    const res = await request();
-
-    expect(res.status).toBe(401);
-    expect(await res.json()).toEqual({ error: "Unauthorized" });
-  });
-
-  it("Bearer形式でない認証情報をIDトークンとして渡さないこと", async () => {
-    outcome({ type: "unauthenticated", reason: "missing" });
-
-    await request({}, "Basic credentials");
-
-    expect(getDiagnosisList).toHaveBeenCalledWith(expect.objectContaining({ idToken: undefined }));
-  });
-
-  it("account-not-found を404へ変換すること", async () => {
-    outcome({ type: "account-not-found" });
-
-    const res = await request();
-
-    expect(res.status).toBe(404);
-    expect(await res.json()).toEqual({
-      error: "Account not found",
-      reason: "friendship_required",
-    });
   });
 
   it("DBバインディングが無い場合はlogicを呼ばず503を返すこと", async () => {
@@ -157,7 +149,7 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId", () => {
         diagnosisId: "diagnosis-1",
         diagnosisQuestionId: "dq-1",
         choiceId: "yes",
-        idToken: "dummy.id.token",
+        actor: expect.objectContaining({ accountId: "account-1" }),
       }),
     );
   });
@@ -183,9 +175,8 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId", () => {
       409,
       { error: "Answer already exists", reason: "answer_change_requires_revision" },
     ],
-    ["unauthenticated", 401, { error: "Unauthorized" }],
   ] as const)("%sをHTTP %sへ変換する", async (type, status, body) => {
-    answerOutcome(type === "unauthenticated" ? { type, reason: "invalid" } : { type });
+    answerOutcome({ type });
     const response = await put();
     expect(response.status).toBe(status);
     expect(await response.json()).toEqual(body);
@@ -234,7 +225,7 @@ describe("PUT /api/diagnoses/:diagnosisId/deferred-questions/:diagnosisQuestionI
       expect.objectContaining({
         diagnosisId: "diagnosis-1",
         diagnosisQuestionId: "dq-1",
-        idToken: "dummy.id.token",
+        actor: expect.objectContaining({ accountId: "account-1" }),
       }),
     );
   });
@@ -252,9 +243,8 @@ describe("PUT /api/diagnoses/:diagnosisId/deferred-questions/:diagnosisQuestionI
       409,
       { error: "Question already answered", reason: "question_already_answered" },
     ],
-    ["unauthenticated", 401, { error: "Unauthorized" }],
   ] as const)("%sをHTTP %sへ変換する", async (type, status, body) => {
-    deferOutcome(type === "unauthenticated" ? { type, reason: "invalid" } : { type });
+    deferOutcome({ type });
     const response = await put();
     expect(response.status).toBe(status);
     expect(await response.json()).toEqual(body);
@@ -308,16 +298,18 @@ describe("GET /api/diagnoses/:diagnosisId", () => {
     expect(res.headers.get("cache-control")).toBe("no-store");
     expect((await res.json()).id).toBe("diagnosis-1");
     expect(getDiagnosisDetail).toHaveBeenCalledWith(
-      expect.objectContaining({ diagnosisId: "diagnosis-1", idToken: "dummy.id.token" }),
+      expect.objectContaining({
+        diagnosisId: "diagnosis-1",
+        actor: expect.objectContaining({ accountId: "account-1" }),
+      }),
     );
   });
 
   it.each([
     ["diagnosis-not-found", 404, { error: "Diagnosis not found", reason: "diagnosis_not_found" }],
     ["diagnosis-closed", 409, { error: "Diagnosis closed", reason: "diagnosis_closed" }],
-    ["unauthenticated", 401, { error: "Unauthorized" }],
   ] as const)("%sをHTTP %sへ変換する", async (type, status, body) => {
-    detailOutcome(type === "unauthenticated" ? { type, reason: "invalid" } : { type });
+    detailOutcome({ type });
     const res = await app.request(
       "/api/diagnoses/diagnosis-1",
       { headers: { Authorization: "Bearer dummy.id.token" } },
@@ -383,7 +375,10 @@ describe("GET /api/diagnoses/:diagnosisId/answers", () => {
       scoring: null,
     });
     expect(getDiagnosisAnswers).toHaveBeenCalledWith(
-      expect.objectContaining({ diagnosisId: "diagnosis-1", idToken: "dummy.id.token" }),
+      expect.objectContaining({
+        diagnosisId: "diagnosis-1",
+        actor: expect.objectContaining({ accountId: "account-1" }),
+      }),
     );
   });
 
@@ -393,10 +388,8 @@ describe("GET /api/diagnoses/:diagnosisId/answers", () => {
       404,
       { error: "Diagnosis answers not found", reason: "diagnosis_answers_not_found" },
     ],
-    ["account-not-found", 404, { error: "Account not found", reason: "friendship_required" }],
-    ["unauthenticated", 401, { error: "Unauthorized" }],
   ] as const)("%sをHTTP %sへ変換する", async (type, status, body) => {
-    answersOutcome(type === "unauthenticated" ? { type, reason: "invalid" } : { type });
+    answersOutcome({ type });
     const response = await get();
     expect(response.status).toBe(status);
     expect(await response.json()).toEqual(body);

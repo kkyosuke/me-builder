@@ -1,7 +1,7 @@
 import { compatibilityRelationshipCategoryValues } from "@me-builder/lib";
 import { type DescribeRouteOptions, describeRoute, validator } from "hono-openapi";
 import * as v from "valibot";
-import { authenticatedErrors, jsonResponse } from "../shared/errors";
+import { authenticatedErrors, currentTermsPolicyError, jsonResponse } from "../shared/errors";
 
 export const IssueCompatibilityInvitationRequestSchema = v.object({
   relationshipCategory: v.picklist(compatibilityRelationshipCategoryValues),
@@ -38,11 +38,12 @@ export const issueCompatibilityInvitationRoute = describeRoute({
   operationId: "issueCompatibilityInvitation",
   tags: ["Compatibility"],
   summary: "共有へ同意した本人が1人用の招待リンクを発行する",
-  security: [{ liffIdToken: [] }],
+  security: [{ applicationSession: [], csrfToken: [] }, { liffIdToken: [] }],
   responses: {
     201: jsonResponse("発行した招待リンクと有効期限", IssueCompatibilityInvitationResponseSchema),
     400: jsonResponse("関係カテゴリが不正", InvalidCompatibilityInvitationRequestSchema),
     409: jsonResponse("現在は共有を開始できない", CompatibilityInvitationConflictSchema),
     ...authenticatedErrors,
+    ...currentTermsPolicyError,
   },
 } satisfies DescribeRouteOptions);

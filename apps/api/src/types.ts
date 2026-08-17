@@ -1,4 +1,4 @@
-import type { D1Database, R2Bucket } from "@cloudflare/workers-types";
+import type { D1Database, KVNamespace, R2Bucket } from "@cloudflare/workers-types";
 import type {
   AccountDataNamespace,
   CompatibilityDataNamespace,
@@ -12,11 +12,13 @@ import type {
   SafeOperationalErrorFields,
   WebhookQueueMessage,
 } from "@me-builder/shared";
+import type { AuthenticatedActor, AuthenticationResult } from "./logic/authentication/types";
 
 /** Wrangler生成bindingに、SecretとQueueの公開契約だけを重ねる。 */
 type Env = Omit<
   ApiBindings,
   | "DB"
+  | "SESSION_STORE"
   | "WEBHOOK_QUEUE"
   | "PROFILE_SUMMARY_QUEUE"
   | "BILLING_QUEUE"
@@ -47,6 +49,7 @@ type Env = Omit<
   PROFILE_SUMMARY_QUEUE?: Queue<ReflectionGenerationQueueMessage>;
   BILLING_QUEUE?: Queue<BillingQueueMessage>;
   DB?: D1Database;
+  SESSION_STORE?: KVNamespace;
   AVATAR_BUCKET?: R2Bucket;
   ACCOUNT_DATA?: AccountDataNamespace;
   COMPATIBILITY_DATA?: CompatibilityDataNamespace;
@@ -59,5 +62,11 @@ type Env = Omit<
 export type AppEnv = {
   Bindings: Env;
   /** onErrorが分類したエラーを、終端ログを持つmiddlewareへ引き渡すための領域。 */
-  Variables: { safeError?: SafeOperationalErrorFields };
+  Variables: {
+    safeError?: SafeOperationalErrorFields;
+    authenticatedActor?: AuthenticatedActor;
+    authenticationResult?: AuthenticationResult;
+    authenticationSource?: "application-session" | "legacy-bearer";
+    applicationSessionToken?: string;
+  };
 };

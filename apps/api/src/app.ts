@@ -19,6 +19,11 @@ import { adminBillingHealthRoute } from "./contract/admin/billing-health";
 import { adminBillingReconciliationRoute } from "./contract/admin/billing-reconciliation";
 import { adminStatisticsRoute } from "./contract/admin/statistics";
 import {
+  applicationSessionRoute,
+  liffAuthenticationExchangeRoute,
+  logoutApplicationSessionRoute,
+} from "./contract/authentication";
+import {
   billingCheckoutSessionRoute,
   billingCheckoutSessionStatusRoute,
   billingPlanCatalogRoute,
@@ -113,6 +118,11 @@ import {
   postBillingReconciliation,
 } from "./controller/admin";
 import {
+  deleteApplicationSession,
+  getApplicationSession,
+  postLiffAuthenticationExchange,
+} from "./controller/authentication";
+import {
   getBillingCheckoutSession,
   getBillingPlanCatalog,
   getBillingTrialEligibilityResponse,
@@ -193,13 +203,20 @@ import {
   getSelfCareContextContents,
   postSelfCareContextConfirmation,
 } from "./controller/self-care-context";
+import { requireAuthentication } from "./middleware/authentication";
+import {
+  requireAdmin,
+  requireCurrentTerms,
+  requireDevelopmentEnvironment,
+} from "./middleware/authorization";
 import { operationalHttpPath } from "./operational-http-path";
 import type { AppEnv } from "./types";
 
 const app = new Hono<AppEnv>();
 const webCors = cors({
   origin: (origin, c) => (origin === getConfig(c.env).webOrigin ? origin : undefined),
-  allowHeaders: ["Authorization", "Content-Type"],
+  allowHeaders: ["Authorization", "Content-Type", "X-CSRF-Token"],
+  credentials: true,
 });
 
 app.use("*", async (c, next) => {
@@ -267,7 +284,25 @@ app.get("/api/health", (c) => {
 
 app.post("/api/line/webhook", postLineWebhook);
 app.post("/api/billing/webhook", postStripeWebhook);
-app.post("/api/account-recovery/codes", accountRecoveryCodeRoute, postAccountRecoveryCode);
+app.post(
+  "/api/auth/liff/exchange",
+  liffAuthenticationExchangeRoute,
+  postLiffAuthenticationExchange,
+);
+app.get("/api/auth/session", requireAuthentication, applicationSessionRoute, getApplicationSession);
+app.delete(
+  "/api/auth/session",
+  requireAuthentication,
+  logoutApplicationSessionRoute,
+  deleteApplicationSession,
+);
+app.post(
+  "/api/account-recovery/codes",
+  requireAuthentication,
+  requireCurrentTerms,
+  accountRecoveryCodeRoute,
+  postAccountRecoveryCode,
+);
 app.post(
   "/api/account-recovery/complete",
   accountRecoveryCompleteRoute,
@@ -276,205 +311,449 @@ app.post(
 app.get("/api/billing/plans", billingPlanCatalogRoute, getBillingPlanCatalog);
 app.get(
   "/api/billing/trial-eligibility",
+  requireAuthentication,
   billingTrialEligibilityRoute,
   getBillingTrialEligibilityResponse,
 );
-app.post("/api/billing/checkout-sessions", billingCheckoutSessionRoute, postBillingCheckoutSession);
+app.post(
+  "/api/billing/checkout-sessions",
+  requireAuthentication,
+  requireCurrentTerms,
+  billingCheckoutSessionRoute,
+  postBillingCheckoutSession,
+);
 app.post(
   "/api/billing/plan-change-sessions",
+  requireAuthentication,
+  requireCurrentTerms,
   billingPlanChangeSessionRoute,
   postBillingPlanChangeSession,
 );
 app.get(
   "/api/billing/checkout-sessions/:checkoutSessionId",
+  requireAuthentication,
   billingCheckoutSessionStatusRoute,
   getBillingCheckoutSession,
 );
-app.post("/api/billing/portal-sessions", billingPortalSessionRoute, postBillingPortalSession);
+app.post(
+  "/api/billing/portal-sessions",
+  requireAuthentication,
+  requireCurrentTerms,
+  billingPortalSessionRoute,
+  postBillingPortalSession,
+);
 
-app.get("/api/legal/terms", getServiceTermsRoute, getServiceTermsContents);
+app.get("/api/legal/terms", requireAuthentication, getServiceTermsRoute, getServiceTermsContents);
 app.get(
   "/api/legal/terms/acceptances",
+  requireAuthentication,
   getServiceTermsAcceptanceHistoryRoute,
   getServiceTermsAcceptanceHistoryContents,
 );
 app.put(
   "/api/legal/terms/acceptance",
+  requireAuthentication,
   acceptServiceTermsRoute,
   acceptServiceTermsRequestValidator,
   putServiceTermsAcceptance,
 );
 
-app.get("/api/admin/statistics", adminStatisticsRoute, getStatistics);
-app.get("/api/admin/accounts", adminAccountsRoute, getAccounts);
-app.get("/api/admin/billing/health", adminBillingHealthRoute, getBillingHealth);
+app.get(
+  "/api/admin/statistics",
+  requireAuthentication,
+  requireCurrentTerms,
+  requireAdmin,
+  adminStatisticsRoute,
+  getStatistics,
+);
+app.get(
+  "/api/admin/accounts",
+  requireAuthentication,
+  requireCurrentTerms,
+  requireAdmin,
+  adminAccountsRoute,
+  getAccounts,
+);
+app.get(
+  "/api/admin/billing/health",
+  requireAuthentication,
+  requireCurrentTerms,
+  requireAdmin,
+  adminBillingHealthRoute,
+  getBillingHealth,
+);
 app.post(
   "/api/admin/billing/reconciliation",
+  requireAuthentication,
+  requireCurrentTerms,
+  requireAdmin,
   adminBillingReconciliationRoute,
   postBillingReconciliation,
 );
 
-app.get("/api/profile-summary", profileSummaryRoute, getProfileSummaryContents);
+app.get(
+  "/api/profile-summary",
+  requireAuthentication,
+  requireCurrentTerms,
+  profileSummaryRoute,
+  getProfileSummaryContents,
+);
 app.post(
   "/api/profile-summary/generations",
+  requireAuthentication,
+  requireCurrentTerms,
   profileSummaryGenerationRoute,
   postProfileSummaryGeneration,
 );
-app.get("/api/weekly-reflections", weeklyReflectionRoute, getWeeklyReflectionContents);
+app.get(
+  "/api/weekly-reflections",
+  requireAuthentication,
+  requireCurrentTerms,
+  weeklyReflectionRoute,
+  getWeeklyReflectionContents,
+);
 app.post(
   "/api/weekly-reflections/generations",
+  requireAuthentication,
+  requireCurrentTerms,
   weeklyReflectionGenerationRoute,
   postWeeklyReflectionGeneration,
 );
-app.get("/api/goal-follow-ups", goalFollowUpListRoute, getGoalFollowUpContents);
-app.post("/api/goal-follow-ups", goalFollowUpAgreementRoute, postGoalFollowUpAgreement);
-app.patch("/api/goal-follow-ups/:goalFollowUpId", goalFollowUpUpdateRoute, patchGoalFollowUp);
-app.get("/api/profile", getProfileRoute, getProfileContents);
-app.get("/api/profile/entitlement", profileEntitlementRoute, getProfileEntitlementContents);
-app.get("/api/profile/progression", profileProgressionRoute, getProfileProgressionContents);
-app.get("/api/profile/avatar", getProfileAvatarImageRoute, getProfileAvatarImageContents);
-app.put("/api/profile/avatar", putProfileAvatarRoute, putProfileAvatar);
-app.delete("/api/profile/avatar", deleteProfileAvatarRoute, deleteProfileAvatarContents);
+app.get(
+  "/api/goal-follow-ups",
+  requireAuthentication,
+  requireCurrentTerms,
+  goalFollowUpListRoute,
+  getGoalFollowUpContents,
+);
+app.post(
+  "/api/goal-follow-ups",
+  requireAuthentication,
+  requireCurrentTerms,
+  goalFollowUpAgreementRoute,
+  postGoalFollowUpAgreement,
+);
+app.patch(
+  "/api/goal-follow-ups/:goalFollowUpId",
+  requireAuthentication,
+  requireCurrentTerms,
+  goalFollowUpUpdateRoute,
+  patchGoalFollowUp,
+);
+app.get(
+  "/api/profile",
+  requireAuthentication,
+  requireCurrentTerms,
+  getProfileRoute,
+  getProfileContents,
+);
+app.get(
+  "/api/profile/entitlement",
+  requireAuthentication,
+  requireCurrentTerms,
+  profileEntitlementRoute,
+  getProfileEntitlementContents,
+);
+app.get(
+  "/api/profile/progression",
+  requireAuthentication,
+  requireCurrentTerms,
+  profileProgressionRoute,
+  getProfileProgressionContents,
+);
+app.get(
+  "/api/profile/avatar",
+  requireAuthentication,
+  requireCurrentTerms,
+  getProfileAvatarImageRoute,
+  getProfileAvatarImageContents,
+);
+app.put(
+  "/api/profile/avatar",
+  requireAuthentication,
+  requireCurrentTerms,
+  putProfileAvatarRoute,
+  putProfileAvatar,
+);
+app.delete(
+  "/api/profile/avatar",
+  requireAuthentication,
+  requireCurrentTerms,
+  deleteProfileAvatarRoute,
+  deleteProfileAvatarContents,
+);
 
-app.get("/api/personal-data/records", personalDataRecordsRoute, getPersonalDataRecords);
+app.get(
+  "/api/personal-data/records",
+  requireAuthentication,
+  requireCurrentTerms,
+  personalDataRecordsRoute,
+  getPersonalDataRecords,
+);
 app.patch(
   "/api/personal-data/records/:sourceRecordId",
+  requireAuthentication,
+  requireCurrentTerms,
   correctPersonalDataRecordRoute,
   patchPersonalDataRecord,
 );
-app.get("/api/self-care/contexts", selfCareContextListRoute, getSelfCareContextContents);
+app.get(
+  "/api/self-care/contexts",
+  requireAuthentication,
+  requireCurrentTerms,
+  selfCareContextListRoute,
+  getSelfCareContextContents,
+);
 app.post(
   "/api/self-care/contexts",
+  requireAuthentication,
+  requireCurrentTerms,
   selfCareContextConfirmationRoute,
   postSelfCareContextConfirmation,
 );
 app.delete(
   "/api/self-care/contexts/:selfCareContextId",
+  requireAuthentication,
+  requireCurrentTerms,
   selfCareContextRevocationRoute,
   deleteSelfCareContextConfirmation,
 );
 app.delete(
   "/api/personal-data/records/:sourceRecordId",
+  requireAuthentication,
+  requireCurrentTerms,
   deletePersonalDataRecordRoute,
   deletePersonalDataRecordContents,
 );
 
-app.get("/api/family/seats", familySeatManagementRoute, getFamilySeats);
-app.post("/api/family/invitations", issueFamilyInvitationRoute, postFamilyInvitation);
+app.get(
+  "/api/family/seats",
+  requireAuthentication,
+  requireCurrentTerms,
+  familySeatManagementRoute,
+  getFamilySeats,
+);
+app.post(
+  "/api/family/invitations",
+  requireAuthentication,
+  requireCurrentTerms,
+  issueFamilyInvitationRoute,
+  postFamilyInvitation,
+);
 app.post(
   "/api/family/invitations/accept",
+  requireAuthentication,
+  requireCurrentTerms,
   acceptFamilyInvitationRoute,
   familyInvitationTokenValidator,
   postFamilyInvitationAcceptance,
 );
 app.post(
   "/api/family/invitations/decline",
+  requireAuthentication,
+  requireCurrentTerms,
   declineFamilyInvitationRoute,
   familyInvitationTokenValidator,
   postFamilyInvitationDecline,
 );
-app.delete("/api/family/invitations/:seatId", cancelFamilyInvitationRoute, deleteFamilyInvitation);
-app.delete("/api/family/seats/:seatId", removeFamilyMemberRoute, deleteFamilyMember);
-app.delete("/api/family/membership", leaveFamilyPackRoute, deleteOwnFamilyMembership);
-app.post("/api/personal-data/exports", requestPersonalDataExportRoute, postPersonalDataExport);
+app.delete(
+  "/api/family/invitations/:seatId",
+  requireAuthentication,
+  requireCurrentTerms,
+  cancelFamilyInvitationRoute,
+  deleteFamilyInvitation,
+);
+app.delete(
+  "/api/family/seats/:seatId",
+  requireAuthentication,
+  requireCurrentTerms,
+  removeFamilyMemberRoute,
+  deleteFamilyMember,
+);
+app.delete(
+  "/api/family/membership",
+  requireAuthentication,
+  requireCurrentTerms,
+  leaveFamilyPackRoute,
+  deleteOwnFamilyMembership,
+);
+app.post(
+  "/api/personal-data/exports",
+  requireAuthentication,
+  requireCurrentTerms,
+  requestPersonalDataExportRoute,
+  postPersonalDataExport,
+);
 app.get(
   "/api/personal-data/exports/:exportId",
+  requireAuthentication,
+  requireCurrentTerms,
   personalDataExportStatusRoute,
   getPersonalDataExportStatus,
 );
 app.get(
   "/api/personal-data/exports/:exportId/download",
+  requireAuthentication,
+  requireCurrentTerms,
   downloadPersonalDataExportRoute,
   downloadPersonalDataExportContents,
 );
 
-app.get("/api/dev/brain-items", developmentBrainItemsRoute, getDevelopmentBrainItems);
+app.get(
+  "/api/dev/brain-items",
+  requireDevelopmentEnvironment,
+  requireAuthentication,
+  requireCurrentTerms,
+  developmentBrainItemsRoute,
+  getDevelopmentBrainItems,
+);
 app.get(
   "/api/dev/brain-items/:brainItemId/vector",
+  requireDevelopmentEnvironment,
+  requireAuthentication,
+  requireCurrentTerms,
   developmentBrainVectorRoute,
   getDevelopmentBrainVector,
 );
 app.post(
   "/api/compatibility/invitations/:relationshipId/accept",
+  requireAuthentication,
+  requireCurrentTerms,
   acceptCompatibilityInvitationRoute,
   postCompatibilityInvitationAcceptance,
 );
 app.post(
   "/api/compatibility/invitations",
+  requireAuthentication,
+  requireCurrentTerms,
   issueCompatibilityInvitationRoute,
   issueCompatibilityInvitationRequestValidator,
   postCompatibilityInvitation,
 );
 app.get(
   "/api/compatibility/invitations/:relationshipId/avatar",
+  requireAuthentication,
+  requireCurrentTerms,
   compatibilityInvitationAvatarRoute,
   getCompatibilityInvitationAvatarContents,
 );
 app.get(
   "/api/compatibility/invitations/:relationshipId",
+  requireAuthentication,
+  requireCurrentTerms,
   compatibilityInvitationPreviewRoute,
   getCompatibilityInvitation,
 );
 app.delete(
   "/api/compatibility/invitations/:relationshipId",
+  requireAuthentication,
+  requireCurrentTerms,
   compatibilityInvitationCancelRoute,
   deleteCompatibilityInvitation,
 );
 app.get(
   "/api/compatibility/relationships",
+  requireAuthentication,
+  requireCurrentTerms,
   compatibilityRelationshipsRoute,
   getCompatibilityRelationships,
 );
 app.get(
   "/api/compatibility/relationships/:relationshipId",
+  requireAuthentication,
+  requireCurrentTerms,
   compatibilityRelationshipRoute,
   getCompatibilityRelationship,
 );
 app.delete(
   "/api/compatibility/relationships/:relationshipId",
+  requireAuthentication,
+  requireCurrentTerms,
   compatibilityRelationshipEndRoute,
   deleteCompatibilityRelationship,
 );
 app.get(
   "/api/dev/brain-vector-sync-jobs/failed",
+  requireDevelopmentEnvironment,
+  requireAuthentication,
+  requireCurrentTerms,
   developmentFailedBrainVectorSyncJobsRoute,
   getDevelopmentFailedBrainVectorSyncJobs,
 );
 app.post(
   "/api/dev/brain-vector-sync-jobs/reset-failed",
+  requireDevelopmentEnvironment,
+  requireAuthentication,
+  requireCurrentTerms,
   resetAllDevelopmentBrainVectorSyncJobsRoute,
   postDevelopmentBrainVectorSyncJobsResetAll,
 );
 app.post(
   "/api/dev/brain-vector-sync-jobs/:jobId/reset",
+  requireDevelopmentEnvironment,
+  requireAuthentication,
+  requireCurrentTerms,
   resetDevelopmentBrainVectorSyncJobRoute,
   postDevelopmentBrainVectorSyncJobReset,
 );
 app.get(
   "/api/compatibility/share-consent",
+  requireAuthentication,
+  requireCurrentTerms,
   compatibilityShareConsentRoute,
   getCompatibilityShareConsentContents,
 );
 app.get(
   "/api/compatibility/share-content",
+  requireAuthentication,
+  requireCurrentTerms,
   compatibilityShareContentRoute,
   getCompatibilityShareContentContents,
 );
 
-app.get("/api/diagnoses", diagnosisListRoute, getDiagnoses);
-app.get("/api/diagnoses/:diagnosisId", diagnosisDetailRoute, getDiagnosis);
-app.get("/api/diagnoses/:diagnosisId/answers", diagnosisAnswersRoute, getDiagnosisAnswerContents);
+app.get(
+  "/api/diagnoses",
+  requireAuthentication,
+  requireCurrentTerms,
+  diagnosisListRoute,
+  getDiagnoses,
+);
+app.get(
+  "/api/diagnoses/:diagnosisId",
+  requireAuthentication,
+  requireCurrentTerms,
+  diagnosisDetailRoute,
+  getDiagnosis,
+);
+app.get(
+  "/api/diagnoses/:diagnosisId/answers",
+  requireAuthentication,
+  requireCurrentTerms,
+  diagnosisAnswersRoute,
+  getDiagnosisAnswerContents,
+);
 app.put(
   "/api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId",
+  requireAuthentication,
+  requireCurrentTerms,
   saveDiagnosisAnswerRoute,
   putDiagnosisAnswer,
 );
 app.put(
   "/api/diagnoses/:diagnosisId/deferred-questions/:diagnosisQuestionId",
+  requireAuthentication,
+  requireCurrentTerms,
   deferDiagnosisQuestionRoute,
   putDiagnosisDeferredQuestion,
 );
-app.delete("/api/dev/account-data", resetDevelopmentAccountDataRoute, deleteDevelopmentAccountData);
+app.delete(
+  "/api/dev/account-data",
+  requireDevelopmentEnvironment,
+  requireAuthentication,
+  requireCurrentTerms,
+  resetDevelopmentAccountDataRoute,
+  deleteDevelopmentAccountData,
+);
 
 // Web UIの型生成にも使う、機械可読なAPI契約。
 app.get("/api/openapi.json", openAPIRouteHandler(app, openApiOptions));

@@ -1,6 +1,11 @@
 import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
 import * as v from "valibot";
-import { AccountNotFoundErrorSchema, authenticatedErrors, jsonResponse } from "../shared/errors";
+import {
+  AccountNotFoundErrorSchema,
+  authenticatedErrors,
+  currentTermsPolicyError,
+  jsonResponse,
+} from "../shared/errors";
 
 const CountSchema = v.pipe(v.number(), v.safeInteger(), v.minValue(0));
 
@@ -26,13 +31,14 @@ export const resetDevelopmentAccountDataRoute = describeRoute({
   operationId: "resetDevelopmentAccountData",
   tags: ["Development"],
   summary: "開発環境で本人の個人コンテンツを全削除する",
-  security: [{ liffIdToken: [] }],
+  security: [{ applicationSession: [], csrfToken: [] }, { liffIdToken: [] }],
   responses: {
     200: jsonResponse(
       "削除した本人のAccountData件数とVector削除予定件数",
       ResetDevelopmentAccountDataResponseSchema,
     ),
     ...authenticatedErrors,
+    ...currentTermsPolicyError,
     404: jsonResponse("開発環境ではない、または対応するAccountがない", ResetNotFoundErrorSchema),
   },
 } satisfies DescribeRouteOptions);

@@ -9,7 +9,9 @@ import {
   AccountRecoveryUnavailableSchema,
 } from "../contract/account-recovery";
 import { ServiceUnavailableErrorSchema, UnauthorizedErrorSchema } from "../contract/shared/errors";
+import { createLineCredentialVerifier } from "../infrastructure/authentication/line-credential-verifier";
 import { issueAccountRecoveryCode, recoverAccountWithCode } from "../logic/account-recovery";
+import { authenticatedActor } from "../middleware/authentication";
 import type { AppEnv } from "../types";
 import { bearerToken } from "./auth";
 
@@ -17,8 +19,7 @@ export async function postAccountRecoveryCode(c: Context<AppEnv>): Promise<Respo
   if (!c.env?.DB)
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   const outcome = await issueAccountRecoveryCode({
-    idToken: bearerToken(c.req.header("authorization")),
-    lineLoginChannelId: getConfig(c.env).lineLoginChannelId,
+    actor: authenticatedActor(c),
     db: D1.shared.client.create(c.env.DB),
   });
   if (outcome.type === "issued") {
@@ -47,10 +48,22 @@ export async function postAccountRecoveryComplete(c: Context<AppEnv>): Promise<R
       400,
     );
   }
+  const idToken = bearerToken(c.req.header("authorization"));
+  if (!idToken) {
+    return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
+  }
+  const verification = await createLineCredentialVerifier(
+    getConfig(c.env).lineLoginChannelId,
+  ).verify({ idToken });
+  if (verification.type === "rejected") {
+    return verification.reason === "authentication_not_configured"
+      ? c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503)
+      : c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
+  }
+  const db = D1.shared.client.create(c.env.DB);
   const outcome = await recoverAccountWithCode({
-    idToken: bearerToken(c.req.header("authorization")),
-    lineLoginChannelId: getConfig(c.env).lineLoginChannelId,
-    db: D1.shared.client.create(c.env.DB),
+    identity: { subject: verification.identity.subject },
+    db,
     code: body.output.code,
     requestKey: c.req.header("cf-connecting-ip") ?? "unavailable",
   });
@@ -75,7 +88,5 @@ export async function postAccountRecoveryComplete(c: Context<AppEnv>): Promise<R
         v.parse(AccountRecoveryUnavailableSchema, { error: "Too many recovery attempts" }),
         429,
       );
-    case "unauthenticated":
-      return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
   }
 }

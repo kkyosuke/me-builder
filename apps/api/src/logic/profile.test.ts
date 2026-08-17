@@ -14,14 +14,11 @@ const image: ValidAvatarImage = {
   height: 1,
 };
 
-const session = {
-  type: "resolved" as const,
-  session: {
-    accountId: "account-1",
-    role: "user" as const,
-    displayName: "利用者",
-    pictureUrl: "https://profile.line-scdn.net/avatar",
-  },
+const profileSession = {
+  accountId: "account-1",
+  role: "user" as const,
+  displayName: "利用者",
+  pictureUrl: "https://profile.line-scdn.net/avatar",
 };
 
 function setup() {
@@ -31,13 +28,17 @@ function setup() {
     delete: vi.fn().mockResolvedValue(undefined),
   } as unknown as R2Bucket;
   const params = {
-    idToken: "token",
-    lineLoginChannelId: "channel",
+    actor: {
+      accountId: "account-1",
+      authenticationMethod: "liff" as const,
+      authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
+    },
+    accountRole: "user" as const,
+    displayProfile: { displayName: "利用者", pictureUrl: profileSession.pictureUrl },
     db: {} as D1.shared.Client,
     avatarBucket,
   };
   const dependencies = {
-    createSession: vi.fn().mockResolvedValue(session),
     createObjectId: vi.fn().mockReturnValue("upload-id"),
     getAvatar: vi.fn(),
     setAvatar: vi.fn(),
@@ -55,7 +56,7 @@ describe("Profile logic", () => {
     dependencies.setAvatar.mockRejectedValue(new Error("D1 unavailable"));
 
     await expect(
-      saveProfileAvatar({ ...params, image }, session.session, dependencies as never),
+      saveProfileAvatar({ ...params, image }, profileSession, dependencies as never),
     ).rejects.toThrow("D1 unavailable");
     expect(avatarBucket.put).toHaveBeenCalledOnce();
     expect(avatarBucket.delete).toHaveBeenCalledWith(
@@ -70,7 +71,7 @@ describe("Profile logic", () => {
     const errorLog = vi.spyOn(logger, "error").mockImplementation(() => undefined);
 
     await expect(
-      saveProfileAvatar({ ...params, image }, session.session, dependencies as never),
+      saveProfileAvatar({ ...params, image }, profileSession, dependencies as never),
     ).rejects.toThrow("D1 update failed");
     expect(avatarBucket.delete).not.toHaveBeenCalled();
     expect(errorLog).toHaveBeenCalledWith(
@@ -103,7 +104,7 @@ describe("Profile logic", () => {
     const errorLog = vi.spyOn(logger, "error").mockImplementation(() => undefined);
 
     await expect(
-      saveProfileAvatar({ ...params, image }, session.session, dependencies as never),
+      saveProfileAvatar({ ...params, image }, profileSession, dependencies as never),
     ).resolves.toMatchObject({ type: "resolved" });
     expect(errorLog).toHaveBeenCalledWith(
       { event: "profile.avatar.cleanup.failed", outcome: "failed" },
@@ -121,8 +122,8 @@ describe("Profile logic", () => {
       return { outcome: "updated", avatar, previousObjectKey };
     });
 
-    await saveProfileAvatar({ ...params, image }, session.session, dependencies as never);
-    await saveProfileAvatar({ ...params, image }, session.session, dependencies as never);
+    await saveProfileAvatar({ ...params, image }, profileSession, dependencies as never);
+    await saveProfileAvatar({ ...params, image }, profileSession, dependencies as never);
 
     expect(avatarBucket.put).toHaveBeenNthCalledWith(
       1,
@@ -175,7 +176,7 @@ describe("Profile logic", () => {
       profile: {
         role: "user",
         displayName: "利用者",
-        avatar: { source: "line", url: session.session.pictureUrl, updatedAt: null },
+        avatar: { source: "line", url: profileSession.pictureUrl, updatedAt: null },
       },
     });
     expect(dependencies.clearAvatar).not.toHaveBeenCalled();
@@ -187,7 +188,7 @@ describe("Profile logic", () => {
       },
       "Profile avatar read degraded to the fallback profile",
     );
-    expect(JSON.stringify(errorLog.mock.calls)).not.toContain(session.session.accountId);
+    expect(JSON.stringify(errorLog.mock.calls)).not.toContain(profileSession.accountId);
     expect(JSON.stringify(errorLog.mock.calls)).not.toContain("missing.png");
   });
 
