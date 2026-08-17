@@ -74,6 +74,62 @@ describe("billing sessions", () => {
     );
   });
 
+  it("Stripeが過去のinvalid requestを再生した場合は新しいべき等キーで復旧する", async () => {
+    const { db, owner, actor } = await setup();
+    const createCheckoutSession = vi
+      .fn()
+      .mockRejectedValueOnce(new billing.BillingProviderError("invalid-request", false, 400))
+      .mockResolvedValueOnce({
+        id: "cs_recovered",
+        url: "https://checkout.stripe.test/recovered",
+      });
+
+    await expect(
+      createBillingCheckoutSession({
+        actor,
+        db,
+        provider: new billing.FakeBillingProvider({ createCheckoutSession }),
+        webOrigin: "https://app.example.test",
+        plan: "lite",
+        interval: "month",
+        lookupKeyMap: { "lite.month": "lite_month" },
+      }),
+    ).resolves.toEqual({ type: "created", url: "https://checkout.stripe.test/recovered" });
+
+    const baseKey = `billing-checkout-${owner.id}-cus_${owner.id}-initial`;
+    expect(createCheckoutSession).toHaveBeenCalledTimes(2);
+    expect(createCheckoutSession).toHaveBeenNthCalledWith(1, expect.any(Object), baseKey);
+    expect(createCheckoutSession).toHaveBeenNthCalledWith(
+      2,
+      expect.any(Object),
+      expect.stringMatching(
+        new RegExp(
+          `^${baseKey}-recovery-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`,
+        ),
+      ),
+    );
+  });
+
+  it("通信障害はCheckout作成を別べき等キーで再実行しない", async () => {
+    const { db, actor } = await setup();
+    const createCheckoutSession = vi
+      .fn()
+      .mockRejectedValue(new billing.BillingProviderError("network", true));
+
+    await expect(
+      createBillingCheckoutSession({
+        actor,
+        db,
+        provider: new billing.FakeBillingProvider({ createCheckoutSession }),
+        webOrigin: "https://app.example.test",
+        plan: "lite",
+        interval: "month",
+        lookupKeyMap: { "lite.month": "lite_month" },
+      }),
+    ).rejects.toMatchObject({ kind: "network" });
+    expect(createCheckoutSession).toHaveBeenCalledTimes(1);
+  });
+
   it("trial使用済みAccountではCustomerが変わっても2回目を付けない", async () => {
     const { db, owner, actor } = await setup();
     await D1.shared.action.billing.linkBillingCustomer(db, {

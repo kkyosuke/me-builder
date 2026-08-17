@@ -98,19 +98,30 @@ export async function createBillingCheckoutSession(
     !(await D1.shared.action.billing.hasUsedBillingTrial(params.db, accountId)) &&
     !providerSubscriptions.some((subscription) => subscription.trialEnd !== null);
   const origin = new URL(params.webOrigin).origin;
-  const checkout = await params.provider.createCheckoutSession(
-    {
-      customerId: customer.providerCustomerId,
-      priceId,
-      successUrl: `${origin}/profile/billing?billing=checkout-return&session_id={CHECKOUT_SESSION_ID}`,
-      cancelUrl: new URL("/profile/billing?billing=checkout-cancel", origin).toString(),
-      accountId,
-      plan: params.plan,
-      interval: params.interval,
-      ...(trialEligible ? { trialPeriodDays: BILLING_INITIAL_TRIAL_DAYS } : {}),
-    },
-    `billing-checkout-${accountId}-${customer.providerCustomerId}-${latestCheckout?.id ?? "initial"}`,
-  );
+  const checkoutInput = {
+    customerId: customer.providerCustomerId,
+    priceId,
+    successUrl: `${origin}/profile/billing?billing=checkout-return&session_id={CHECKOUT_SESSION_ID}`,
+    cancelUrl: new URL("/profile/billing?billing=checkout-cancel", origin).toString(),
+    accountId,
+    plan: params.plan,
+    interval: params.interval,
+    ...(trialEligible ? { trialPeriodDays: BILLING_INITIAL_TRIAL_DAYS } : {}),
+  };
+  const idempotencyKey = `billing-checkout-${accountId}-${customer.providerCustomerId}-${latestCheckout?.id ?? "initial"}`;
+  let checkout: { id: string; url: string };
+  try {
+    checkout = await params.provider.createCheckoutSession(checkoutInput, idempotencyKey);
+  } catch (error) {
+    const staleIdempotencyResult =
+      error instanceof billing.BillingProviderError &&
+      (error.kind === "invalid-request" || error.kind === "idempotency-conflict");
+    if (!staleIdempotencyResult) throw error;
+    checkout = await params.provider.createCheckoutSession(
+      checkoutInput,
+      `${idempotencyKey}-recovery-${crypto.randomUUID()}`,
+    );
+  }
   return { type: "created", url: checkout.url };
 }
 
