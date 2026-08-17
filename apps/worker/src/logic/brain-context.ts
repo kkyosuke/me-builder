@@ -13,6 +13,7 @@ import { createGeminiClient, embedQuery } from "../infrastructure/gemini-client"
 
 const VECTOR_CANDIDATE_LIMIT = 10;
 const SEARCH_QUERY_CHARACTER_LIMIT = 10_000;
+const SEARCH_QUERY_HINTS_CHARACTER_LIMIT = 1_000;
 const BRAIN_SEARCH_TIMEOUT_MS = 2_000;
 const BRAIN_SEARCH_MINIMUM_SCORE = 0.7;
 
@@ -51,8 +52,12 @@ export function buildBrainSearchQuery(
   if (!query) return undefined;
   const hints = [...new Set(queryHints.map((hint) => hint.trim()).filter(Boolean))]
     .map((hint) => `関連人物: ${hint}`)
-    .join("\n");
-  return `${query}${hints ? `\n${hints}` : ""}`.slice(-SEARCH_QUERY_CHARACTER_LIMIT);
+    .join("\n")
+    .slice(0, SEARCH_QUERY_HINTS_CHARACTER_LIMIT);
+  const queryTail = query.slice(-SEARCH_QUERY_CHARACTER_LIMIT);
+  if (!hints) return queryTail;
+  const queryBudget = SEARCH_QUERY_CHARACTER_LIMIT - hints.length - 1;
+  return `${queryTail.slice(-queryBudget)}\n${hints}`;
 }
 
 /**
