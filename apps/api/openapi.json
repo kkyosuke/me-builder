@@ -291,7 +291,8 @@
         "summary": "本人のSSO Identityを解除する",
         "security": [
           {
-            "applicationSession": []
+            "applicationSession": [],
+            "csrfToken": []
           }
         ],
         "responses": {
@@ -356,7 +357,8 @@
         "summary": "認証済みAccountへのSSO Identity追加を開始する",
         "security": [
           {
-            "applicationSession": []
+            "applicationSession": [],
+            "csrfToken": []
           }
         ],
         "parameters": [

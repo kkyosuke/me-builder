@@ -20,6 +20,7 @@ export const LastIdentityConflictSchema = v.object({
 });
 
 const applicationSessionSecurity = [{ applicationSession: [] }];
+const applicationSessionMutationSecurity = [{ applicationSession: [], csrfToken: [] }];
 const returnToParameter = {
   name: "returnTo",
   in: "query",
@@ -47,7 +48,7 @@ export const startSsoIdentityLinkRoute = describeRoute({
   operationId: "startSsoIdentityLink",
   tags: ["Authentication"],
   summary: "認証済みAccountへのSSO Identity追加を開始する",
-  security: applicationSessionSecurity,
+  security: applicationSessionMutationSecurity,
   parameters: [returnToParameter],
   responses: {
     200: jsonResponse("同じbrowserで開くAuth0認可URL", SsoAuthorizationUrlSchema),
@@ -69,7 +70,7 @@ export const unlinkSsoIdentityRoute = describeRoute({
   operationId: "unlinkSsoIdentity",
   tags: ["Authentication"],
   summary: "本人のSSO Identityを解除する",
-  security: applicationSessionSecurity,
+  security: applicationSessionMutationSecurity,
   responses: {
     204: { description: "解除済み" },
     409: jsonResponse("最後のログイン方法なので解除不可", LastIdentityConflictSchema),
