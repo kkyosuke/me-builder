@@ -116,7 +116,7 @@ bun scripts/setup-stripe-billing.ts preview --stripe-only
 
 通常PRのCIはStripeへ接続しません。実接続の回帰は`scheduled-checks.yml`の手動・定期実行で、`apps/api/scripts/test-billing-lifecycle.ts`からsandbox Test Clockを使って確認します。
 
-実行には`STRIPE_SANDBOX_SECRET_KEY`と、sandbox上で一意に解決できる`STRIPE_E2E_PRICE_LOOKUP_KEY`をGitHub Environmentへ設定します。
+実行には`dev` GitHub Environmentの`STRIPE_SECRET_KEY`を設定し、先にStripe catalog同期を完了します。E2Eは料金SSoTのLite・Full月額lookup keyを使い、trial、通常更新、即時upgrade、期間末downgrade、支払失敗と回復、解約予約・取消・終了を再現します。通常CIでは、同じprojectionに対するWebhook重複、順序逆転、subscription event欠落時のCustomer再照合、最終retryのDLQ遷移をfakeで回帰します。
 
 ## 4. Cloudflareへ配布する値
 

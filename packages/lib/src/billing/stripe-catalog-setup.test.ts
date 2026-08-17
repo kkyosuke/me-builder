@@ -168,7 +168,9 @@ describe("setupStripeBillingCatalog", () => {
       scheduleChangesAtPeriodEnd: false,
     });
     expect(reset.features.subscription_update).toMatchObject({ billing_cycle_anchor: "now" });
-    expect(reset.features.subscription_update).not.toHaveProperty("schedule_at_period_end");
+    expect(reset.features.subscription_update).toMatchObject({
+      schedule_at_period_end: { conditions: [] },
+    });
     const management = billingPortalConfigurationParams({
       webBaseUrl: "https://example.test",
       metadata: { managed_by: "test", portal_mode: "management" },

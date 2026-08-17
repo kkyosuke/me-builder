@@ -450,16 +450,12 @@ export const billingPortalConfigurationParams = (
             })),
             billing_cycle_anchor: spec.billingCycleAnchor ?? "unchanged",
             proration_behavior: "always_invoice",
-            ...(spec.scheduleChangesAtPeriodEnd === false
-              ? {}
-              : {
-                  schedule_at_period_end: {
-                    conditions: [
-                      { type: "decreasing_item_amount" as const },
-                      { type: "shortening_interval" as const },
-                    ],
-                  },
-                }),
+            schedule_at_period_end: {
+              conditions:
+                spec.scheduleChangesAtPeriodEnd === false
+                  ? []
+                  : [{ type: "decreasing_item_amount" }, { type: "shortening_interval" }],
+            },
             trial_update_behavior: "continue_trial",
           },
   },
