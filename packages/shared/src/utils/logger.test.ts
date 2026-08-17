@@ -95,6 +95,8 @@ describe("logger", () => {
 
     const serialized = writes.join("");
     expect(serialized).toContain('"event":"logger.output.test"');
+    expect(serialized).toContain('"level":"info"');
+    expect(serialized).not.toContain('"level":30');
     expect(serialized).toContain('"service":"shared-test"');
     expect(serialized).toContain('"component":"child-test"');
     expect(serialized).toContain('"err":"[Object omitted]"');
@@ -103,5 +105,56 @@ describe("logger", () => {
     expect(serialized).not.toContain("child-secret");
     expect(serialized).not.toContain("U-secret");
     expect(serialized).not.toContain('"stack"');
+  });
+
+  it("errorはCloudflare Workers Logsと互換の文字列levelで出力する", () => {
+    const writes: string[] = [];
+    const originalWrite = process.stdout.write;
+    process.stdout.write = ((chunk: string | Uint8Array) => {
+      writes.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+
+    try {
+      const outputLogger = createLogger({ timestamp: false });
+      outputLogger.error({ event: "logger.error.test" }, "failed");
+      outputLogger.flush();
+    } finally {
+      process.stdout.write = originalWrite;
+    }
+
+    const serialized = writes.join("");
+    expect(serialized).toContain('"level":"error"');
+    expect(serialized).not.toContain('"level":50');
+    expect(serialized).toContain('"event":"logger.error.test"');
+  });
+
+  it("カスタムformatterがあってもerrorの文字列levelを保つ", () => {
+    const writes: string[] = [];
+    const originalWrite = process.stdout.write;
+    process.stdout.write = ((chunk: string | Uint8Array) => {
+      writes.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+
+    try {
+      const outputLogger = createLogger({
+        timestamp: false,
+        formatters: {
+          level(_label, number) {
+            return { level: number, customLevel: true };
+          },
+        },
+      });
+      outputLogger.error({ event: "logger.custom-level.test" }, "failed");
+      outputLogger.flush();
+    } finally {
+      process.stdout.write = originalWrite;
+    }
+
+    const serialized = writes.join("");
+    expect(serialized).toContain('"level":"error"');
+    expect(serialized).toContain('"customLevel":true');
+    expect(serialized).not.toContain('"level":50');
   });
 });
