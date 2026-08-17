@@ -356,7 +356,7 @@ describe("billing user journeys E2E", () => {
         where: (table, { eq }) => eq(table.providerAccountId, "line-attacker"),
       }),
     ).toBeUndefined();
-  }, 20_000);
+  });
 
   it("Customerだけが紐付いたFree利用者には復旧コードを発行しない", async () => {
     const db = D1.shared.client.create(database);

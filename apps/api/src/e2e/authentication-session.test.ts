@@ -227,7 +227,7 @@ describe("application session local D1/KV E2E", () => {
     expect((await getSession(cookie)).status).toBe(401);
   });
 
-  it("IdP拒否、絶対期限切れ、D1 version失効を拒否する", async () => {
+  it("IdP拒否、絶対・idle期限切れ、D1 version失効を拒否する", async () => {
     const rejected = await exchange("invalid-credential");
     expect(rejected.status).toBe(401);
     expect(rejected.headers.has("Set-Cookie")).toBe(false);
@@ -244,7 +244,21 @@ describe("application session local D1/KV E2E", () => {
     expect((await getSession(expiredCookie)).status).toBe(401);
 
     const second = await exchange("credential-a");
-    const invalidatedCookie = cookieFrom(second);
+    const idleExpiredCookie = cookieFrom(second);
+    const idleReference = await sessionReference(idleExpiredCookie);
+    const idleRecord = await sessionStore.get<Record<string, unknown>>(idleReference, "json");
+    if (!idleRecord) throw new Error("Application session was not stored");
+    await sessionStore.put(
+      idleReference,
+      JSON.stringify({
+        ...idleRecord,
+        lastSeenAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1_000).toISOString(),
+      }),
+    );
+    expect((await getSession(idleExpiredCookie)).status).toBe(401);
+
+    const third = await exchange("credential-a");
+    const invalidatedCookie = cookieFrom(third);
     await D1.shared.action.accountSession.invalidateAccountSessions(
       D1.shared.client.create(database),
       "account-a",
