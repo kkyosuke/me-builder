@@ -1,5 +1,9 @@
 import { D1, billing } from "@me-builder/lib";
-import { BILLING_INITIAL_TRIAL_DAYS, publicBillingPlans } from "@me-builder/shared";
+import {
+  BILLING_INITIAL_TRIAL_DAYS,
+  OperationalError,
+  publicBillingPlans,
+} from "@me-builder/shared";
 import type { Context } from "hono";
 import * as v from "valibot";
 import { getConfig } from "../config";
@@ -152,6 +156,9 @@ async function createBillingSessionResponse(
   checkout?: v.InferOutput<typeof BillingCheckoutRequestSchema>,
 ): Promise<Response> {
   const config = getConfig(c.env);
+  const database = c.env?.DB;
+  const stripeSecretKey = config.stripeSecretKey;
+  const webOrigin = config.webOrigin;
   const completeLookupKeyMap = publicBillingPlans.every((plan) =>
     plan.prices.every(({ interval }) =>
       Boolean(config.billingLookupKeyMap[`${plan.code}.${interval}`]),
@@ -167,14 +174,36 @@ async function createBillingSessionResponse(
               completeLookupKeyMap,
           )
         : completeLookupKeyMap;
-  if (!c.env?.DB || !config.stripeSecretKey || !config.webOrigin || !kindConfigurationAvailable) {
+  const configurationErrorCode = !database
+    ? "BILLING_DATABASE_NOT_CONFIGURED"
+    : !stripeSecretKey
+      ? "BILLING_STRIPE_NOT_CONFIGURED"
+      : !webOrigin
+        ? "BILLING_WEB_ORIGIN_NOT_CONFIGURED"
+        : !completeLookupKeyMap
+          ? "BILLING_LOOKUP_KEYS_NOT_CONFIGURED"
+          : kind === "portal" && !config.stripePortalConfigurationId
+            ? "BILLING_PORTAL_NOT_CONFIGURED"
+            : kind === "change" && !kindConfigurationAvailable
+              ? "BILLING_PLAN_CHANGE_NOT_CONFIGURED"
+              : undefined;
+  if (configurationErrorCode) {
+    c.set("safeError", {
+      errorCode: configurationErrorCode,
+      errorCategory: "configuration",
+      stage: "billing.configuration.validate",
+      retryable: false,
+    });
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
+  }
+  if (!database || !stripeSecretKey || !webOrigin) {
+    throw new Error("Billing configuration invariant failed");
   }
   const base = {
     actor: authenticatedActor(c),
-    db: D1.shared.client.create(c.env.DB),
+    db: D1.shared.client.create(database),
     provider: billing.createStripeBillingProvider({
-      secretKey: config.stripeSecretKey,
+      secretKey: stripeSecretKey,
       ...(config.stripePortalConfigurationId
         ? { portalConfigurationId: config.stripePortalConfigurationId }
         : {}),
@@ -185,23 +214,51 @@ async function createBillingSessionResponse(
         ? { portalPlanChangeConfigurationId: config.stripePortalPlanChangeConfigurationId }
         : {}),
     }),
-    webOrigin: config.webOrigin,
+    webOrigin,
   };
-  const outcome = checkout
-    ? kind === "checkout"
-      ? await createBillingCheckoutSession({
-          ...base,
-          ...checkout,
-          lookupKeyMap: config.billingLookupKeyMap,
-        })
-      : await createBillingPlanChangeSession({
-          ...base,
-          ...checkout,
-          lookupKeyMap: config.billingLookupKeyMap,
-          portalPlanChangeAvailable: Boolean(config.stripePortalPlanChangeConfigurationId),
-          portalResetAvailable: Boolean(config.stripePortalResetConfigurationId),
-        })
-    : await createBillingPortalSession(base);
+  let outcome: Awaited<ReturnType<typeof createBillingCheckoutSession>>;
+  try {
+    outcome = checkout
+      ? kind === "checkout"
+        ? await createBillingCheckoutSession({
+            ...base,
+            ...checkout,
+            lookupKeyMap: config.billingLookupKeyMap,
+          })
+        : await createBillingPlanChangeSession({
+            ...base,
+            ...checkout,
+            lookupKeyMap: config.billingLookupKeyMap,
+            portalPlanChangeAvailable: Boolean(config.stripePortalPlanChangeConfigurationId),
+            portalResetAvailable: Boolean(config.stripePortalResetConfigurationId),
+          })
+      : await createBillingPortalSession(base);
+  } catch (error) {
+    if (error instanceof billing.BillingProviderError) {
+      throw new OperationalError(
+        {
+          code: error.message,
+          category: error.kind === "timeout" ? "timeout" : "dependency",
+          stage: `billing.${kind}.create`,
+          retryable: error.retryable,
+          dependency: "stripe",
+          ...(error.dependencyStatus === undefined
+            ? {}
+            : { dependencyStatus: error.dependencyStatus }),
+        },
+        error,
+      );
+    }
+    throw new OperationalError(
+      {
+        code: "BILLING_SESSION_CREATE_FAILED",
+        category: "unknown",
+        stage: `billing.${kind}.create`,
+        retryable: false,
+      },
+      error,
+    );
+  }
   switch (outcome.type) {
     case "created":
       c.header("Cache-Control", "no-store");

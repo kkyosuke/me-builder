@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   createPortal: vi.fn(),
   createPlanChange: vi.fn(),
   openLiffWindow: vi.fn(),
+  reportHandledOperationError: vi.fn(),
 }));
 
 vi.mock("../feature/billing/infrastructure/billing-api", () => ({
@@ -28,6 +29,9 @@ vi.mock("../feature/profile-settings/infrastructure/entitlement-api", () => ({
 }));
 vi.mock("../feature/liff/infrastructure/liff-client", () => ({
   openLiffWindow: mocks.openLiffWindow,
+}));
+vi.mock("../infrastructure/web-error-reporter", () => ({
+  reportHandledOperationError: mocks.reportHandledOperationError,
 }));
 import BillingPlanApplication from "../feature/billing/presentation/billing-plan-application";
 
@@ -78,6 +82,7 @@ describe("billing purchase user journey", () => {
     mocks.createPortal.mockReset().mockResolvedValue("https://billing.stripe.test/portal");
     mocks.createPlanChange.mockReset().mockResolvedValue("https://billing.stripe.test/plan-change");
     mocks.openLiffWindow.mockReset().mockReturnValue(true);
+    mocks.reportHandledOperationError.mockReset();
   });
   afterEach(cleanup);
 
@@ -110,6 +115,23 @@ describe("billing purchase user journey", () => {
     expect(
       screen.getByRole("link", { name: "こちらからStripeを開いてください" }).getAttribute("href"),
     ).toBe("https://checkout.stripe.test/session");
+  });
+
+  it("Checkout失敗を画面表示だけで握りつぶさずWeb監視へ送る", async () => {
+    const error = Object.assign(new Error("購入手続きを開始できませんでした。"), {
+      code: "BILLING_CHECKOUT_FAILED",
+      status: 503,
+    });
+    mocks.createCheckout.mockRejectedValue(error);
+    render(<BillingPlanApplication onBack={vi.fn()} />);
+
+    await screen.findByRole("radio", { name: "ノーマル Lite" });
+    fireEvent.click(screen.getByRole("button", { name: /プランを変更する/ }));
+
+    expect((await screen.findByRole("alert")).textContent).toContain(
+      "購入手続きを開始できませんでした",
+    );
+    expect(mocks.reportHandledOperationError).toHaveBeenCalledWith("billing-checkout", error);
   });
 
   it("Checkout復帰後はprojectionが反映されてから購入完了を表示する", async () => {

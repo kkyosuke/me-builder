@@ -1,6 +1,7 @@
 import type { BillingInterval, PaidPlanCode } from "@me-builder/shared";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { config } from "../../../config";
+import { reportHandledOperationError } from "../../../infrastructure/web-error-reporter";
 import type { AsyncState } from "../../../model/async-state";
 import { openLiffWindow } from "../../liff/infrastructure/liff-client";
 import { fetchProfileEntitlement } from "../../profile-settings/infrastructure/entitlement-api";
@@ -187,6 +188,12 @@ export default function BillingPlanApplication({
       setCheckoutState({ status: "success", data: url });
       navigateToCheckout(url);
     } catch (error) {
+      reportHandledOperationError(
+        entitlement.status === "success" && entitlement.data.source === "subscription"
+          ? "billing-plan-change"
+          : "billing-checkout",
+        error,
+      );
       setCheckoutState({ status: "error", message: message(error) });
     }
   };
@@ -199,6 +206,7 @@ export default function BillingPlanApplication({
       setCheckoutState({ status: "success", data: url });
       navigateToCheckout(url);
     } catch (error) {
+      reportHandledOperationError("billing-portal", error);
       setCheckoutState({ status: "error", message: message(error) });
     }
   };
