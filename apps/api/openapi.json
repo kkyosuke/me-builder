@@ -427,7 +427,7 @@
       }
     },
     "/api/auth/sso/login": {
-      "get": {
+      "post": {
         "operationId": "startSsoLogin",
         "tags": ["Authentication"],
         "summary": "外部ブラウザのSSOログインを開始する",
@@ -444,8 +444,22 @@
           }
         ],
         "responses": {
-          "302": {
-            "description": "Auth0認可endpointへredirect"
+          "200": {
+            "description": "同じbrowserで開くAuth0認可URL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "authorizationUrl": {
+                      "type": "string",
+                      "format": "uri"
+                    }
+                  },
+                  "required": ["authorizationUrl"]
+                }
+              }
+            }
           },
           "503": {
             "description": "SSOまたはstorage bindingが未設定",

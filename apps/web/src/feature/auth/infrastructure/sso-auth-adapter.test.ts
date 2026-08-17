@@ -5,30 +5,37 @@ import {
   consumeSsoCallbackFailure,
   consumeSsoIdentityCallbackResult,
   establishSsoAuthSession,
-  ssoLoginUrl,
+  ssoLoginPath,
 } from "./sso-auth-adapter";
 
 describe("SSO auth adapter", () => {
   it("要求された相対pathをserver-side SSO開始endpointだけへ渡す", () => {
-    expect(ssoLoginUrl("https://api.example.com/", "/compatibility/invitations/abc")).toBe(
-      "https://api.example.com/api/auth/sso/login?returnTo=%2Fcompatibility%2Finvitations%2Fabc",
+    expect(ssoLoginPath("/compatibility/invitations/abc")).toBe(
+      "/api/auth/sso/login?returnTo=%2Fcompatibility%2Finvitations%2Fabc",
     );
   });
 
-  it("外部ブラウザをSSOへ遷移しprovider credentialを扱わない", () => {
+  it("同一browserからPOSTで開始して返された認可URLへだけ遷移する", async () => {
     const navigate = vi.fn();
+    const fetcher = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(
+        Response.json({ authorizationUrl: "https://tenant.auth0.com/authorize?state=opaque" }),
+      );
 
-    expect(
+    await expect(
       establishSsoAuthSession(
         "https://api.example.com",
         "/admin",
         new AbortController().signal,
         navigate,
       ),
-    ).toEqual({ redirecting: true });
-    expect(navigate).toHaveBeenCalledWith(
+    ).resolves.toEqual({ redirecting: true });
+    expect(fetcher).toHaveBeenCalledWith(
       "https://api.example.com/api/auth/sso/login?returnTo=%2Fadmin",
+      expect.objectContaining({ method: "POST", credentials: "include" }),
     );
+    expect(navigate).toHaveBeenCalledWith("https://tenant.auth0.com/authorize?state=opaque");
   });
 
   it.each(["cancelled", "error"] as const)(

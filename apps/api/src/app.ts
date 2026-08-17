@@ -216,8 +216,8 @@ import {
   deleteSsoIdentity,
   getSsoCallback,
   getSsoIdentityStatusContents,
-  getSsoLogin,
   postSsoIdentityLink,
+  postSsoLogin,
 } from "./controller/sso-identity";
 import { requireAuthentication } from "./middleware/authentication";
 import {
@@ -324,7 +324,7 @@ app.post(
   requireAuthentication,
   postSsoIdentityLink,
 );
-app.get("/api/auth/sso/login", startSsoLoginRoute, getSsoLogin);
+app.post("/api/auth/sso/login", startSsoLoginRoute, postSsoLogin);
 app.get("/api/auth/sso/callback", completeSsoCallbackRoute, getSsoCallback);
 app.post("/api/billing/webhook", postStripeWebhook);
 app.post(

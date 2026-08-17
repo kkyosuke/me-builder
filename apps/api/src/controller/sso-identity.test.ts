@@ -73,8 +73,8 @@ import {
   deleteSsoIdentity,
   getSsoCallback,
   getSsoIdentityStatusContents,
-  getSsoLogin,
   postSsoIdentityLink,
+  postSsoLogin,
 } from "./sso-identity";
 
 const env = {
@@ -192,13 +192,16 @@ describe("SSO identity controller", () => {
 
   it("linked-login公開時だけ外部ブラウザのSSOログインを開始する", async () => {
     mocks.startLogin.mockResolvedValue(new URL("https://tenant.auth0.com/authorize?state=login"));
-    const response = await testApp("/api/auth/sso/login", getSsoLogin).request(
+    const response = await testApp("/api/auth/sso/login", postSsoLogin).request(
       "https://api.example.com/api/auth/sso/login?returnTo=%2Fadmin",
-      undefined,
+      { method: "POST" },
       { ...env, SSO_ROLLOUT_MODE: "linked-login" },
     );
 
-    expect(response.status).toBe(302);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      authorizationUrl: "https://tenant.auth0.com/authorize?state=login",
+    });
     expect(mocks.startLogin).toHaveBeenCalledWith(expect.objectContaining({ returnTo: "/admin" }));
     expect(response.headers.get("set-cookie")).toContain(
       "__Host-me_builder_sso_callback_state=login",

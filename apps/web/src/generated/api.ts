@@ -63,10 +63,10 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** 外部ブラウザのSSOログインを開始する */
-    get: operations["startSsoLogin"];
+    get?: never;
     put?: never;
-    post?: never;
+    /** 外部ブラウザのSSOログインを開始する */
+    post: operations["startSsoLogin"];
     delete?: never;
     options?: never;
     head?: never;
@@ -1439,12 +1439,17 @@ export interface operations {
     };
     requestBody?: never;
     responses: {
-      /** @description Auth0認可endpointへredirect */
-      302: {
+      /** @description 同じbrowserで開くAuth0認可URL */
+      200: {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": {
+            /** Format: uri */
+            authorizationUrl: string;
+          };
+        };
       };
       /** @description SSOまたはstorage bindingが未設定 */
       503: {

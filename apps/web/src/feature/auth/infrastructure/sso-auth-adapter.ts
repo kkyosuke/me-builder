@@ -1,6 +1,12 @@
-export function ssoLoginUrl(apiUrl: string | undefined, returnTo: string): string {
-  const baseUrl = (apiUrl ?? "").replace(/\/$/u, "");
-  return `${baseUrl}/api/auth/sso/login?${new URLSearchParams({ returnTo })}`;
+import * as v from "valibot";
+import { createAuthenticatedHttpClient } from "../../../infrastructure/http-client";
+
+const SsoAuthorizationUrlSchema = v.object({
+  authorizationUrl: v.pipe(v.string(), v.url()),
+});
+
+export function ssoLoginPath(returnTo: string): string {
+  return `/api/auth/sso/login?${new URLSearchParams({ returnTo })}`;
 }
 
 /** callback失敗markerを一度だけ読み、再試行時のSSO再開を可能にする。 */
@@ -28,13 +34,18 @@ export function consumeSsoIdentityCallbackResult(): SsoIdentityCallbackResult | 
 }
 
 /** provider tokenをWebへ戻さず、server-side SSO開始endpointへ遷移する。 */
-export function establishSsoAuthSession(
+export async function establishSsoAuthSession(
   apiUrl: string | undefined,
   returnTo: string,
   signal: AbortSignal,
   navigate: (url: string) => void = (url) => window.location.assign(url),
-): { redirecting: true } {
+): Promise<{ redirecting: true }> {
   if (signal.aborted) throw new DOMException("The operation was aborted", "AbortError");
-  navigate(ssoLoginUrl(apiUrl, returnTo));
+  const response = await createAuthenticatedHttpClient(apiUrl, globalThis.fetch, {
+    authentication: false,
+  }).request(ssoLoginPath(returnTo), { method: "POST", signal });
+  if (!response.ok) throw new Error("SSO認証を開始できませんでした。");
+  const { authorizationUrl } = v.parse(SsoAuthorizationUrlSchema, await response.json());
+  navigate(authorizationUrl);
   return { redirecting: true };
 }

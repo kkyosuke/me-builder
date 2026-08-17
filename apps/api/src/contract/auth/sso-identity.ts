@@ -62,7 +62,7 @@ export const startSsoLoginRoute = describeRoute({
   summary: "外部ブラウザのSSOログインを開始する",
   parameters: [returnToParameter],
   responses: {
-    302: { description: "Auth0認可endpointへredirect" },
+    200: jsonResponse("同じbrowserで開くAuth0認可URL", SsoAuthorizationUrlSchema),
     503: jsonResponse("SSOまたはstorage bindingが未設定", ServiceUnavailableErrorSchema),
   },
 } satisfies DescribeRouteOptions);

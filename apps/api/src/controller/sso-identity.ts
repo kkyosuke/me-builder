@@ -124,7 +124,7 @@ export async function postSsoIdentityLink(c: Context<AppEnv>): Promise<Response>
   return c.json(v.parse(SsoAuthorizationUrlSchema, { authorizationUrl: authorizationUrl.href }));
 }
 
-export async function getSsoLogin(c: Context<AppEnv>): Promise<Response> {
+export async function postSsoLogin(c: Context<AppEnv>): Promise<Response> {
   c.header("Cache-Control", "no-store");
   const dependencies = configured(c);
   if (!dependencies || dependencies.configuration.ssoRolloutMode !== "linked-login") {
@@ -138,7 +138,7 @@ export async function getSsoLogin(c: Context<AppEnv>): Promise<Response> {
   if (!setCallbackStateCookie(c, authorizationUrl, dependencies.secureCallback)) {
     return unavailable(c);
   }
-  return c.redirect(authorizationUrl.href, 302);
+  return c.json(v.parse(SsoAuthorizationUrlSchema, { authorizationUrl: authorizationUrl.href }));
 }
 
 export async function getSsoCallback(c: Context<AppEnv>): Promise<Response> {

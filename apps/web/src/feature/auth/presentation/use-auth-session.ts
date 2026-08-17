@@ -72,7 +72,7 @@ export function useAuthSessionState() {
                   : "SSO認証を完了できませんでした。時間をおいてもう一度お試しください。",
             };
           }
-          establishSsoAuthSession(config.apiUrl, returnTo, signal);
+          await establishSsoAuthSession(config.apiUrl, returnTo, signal);
           return { status: "redirecting" };
         }
       }
