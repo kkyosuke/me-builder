@@ -40,11 +40,12 @@ export function createSsoIdentityLinker(
 ): SsoIdentityLinker {
   return {
     async link(identity) {
-      await dependencies.linkIdentity(db, {
+      const linked = await dependencies.linkIdentity(db, {
         accountId: identity.accountId,
         provider: identity.providerKey,
         providerAccountId: identity.subject,
       });
+      return linked.id;
     },
   };
 }

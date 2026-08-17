@@ -145,11 +145,14 @@ export async function getSsoCallback(c: Context<AppEnv>): Promise<Response> {
     } else {
       await runtime.sessions.invalidateAccountSessions(completed.accountId);
     }
-    const issued = await runtime.sessions.issue({
-      accountId: completed.accountId,
-      authenticationMethod: completed.authenticationMethod,
-      authenticatedAt: completed.authenticatedAt,
-    });
+    const issued = await runtime.sessions.issue(
+      {
+        accountId: completed.accountId,
+        authenticationMethod: completed.authenticationMethod,
+        authenticatedAt: completed.authenticatedAt,
+      },
+      completed.authenticatedIdentityId,
+    );
     if (!issued) return unavailable(c);
     setApplicationSessionCookie(c, issued.sessionToken, issued.expiresAt);
     return redirectToWeb(c, resultPath(completed.returnTo, "linked"));

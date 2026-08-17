@@ -153,6 +153,7 @@ describe("SSO identity controller", () => {
   it("link callback成功後は保存済みpathだけへ復帰する", async () => {
     mocks.completeLinking.mockResolvedValue({
       accountId: "account-at-start",
+      authenticatedIdentityId: "identity-auth0",
       authenticationMethod: "sso",
       authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
       providerKey: "auth0",
@@ -170,11 +171,14 @@ describe("SSO identity controller", () => {
       expect.objectContaining({ state: "opaque", code: "code" }),
     );
     expect(mocks.invalidateSessions).toHaveBeenCalledWith("account-at-start");
-    expect(mocks.issueSession).toHaveBeenCalledWith({
-      accountId: "account-at-start",
-      authenticationMethod: "sso",
-      authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
-    });
+    expect(mocks.issueSession).toHaveBeenCalledWith(
+      {
+        accountId: "account-at-start",
+        authenticationMethod: "sso",
+        authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
+      },
+      "identity-auth0",
+    );
     expect(response.headers.get("set-cookie")).toContain("Max-Age=0");
     expect(response.headers.get("set-cookie")).toContain(
       "__Host-me_builder_session=rotated-session",

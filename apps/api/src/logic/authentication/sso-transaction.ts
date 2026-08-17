@@ -97,7 +97,7 @@ export interface SsoIdentityLinker {
     accountId: string;
     providerKey: "auth0";
     subject: string;
-  }): Promise<void>;
+  }): Promise<string>;
 }
 
 function secureRandomBytes(size: number): Uint8Array {
@@ -238,6 +238,7 @@ export async function completeSsoIdentityLinking(
   input: CompleteSsoAuthenticationInput & { identityLinker: SsoIdentityLinker },
 ): Promise<{
   accountId: string;
+  authenticatedIdentityId: string;
   authenticationMethod: "sso";
   authenticatedAt: Date;
   providerKey: "auth0";
@@ -247,13 +248,14 @@ export async function completeSsoIdentityLinking(
   if (transaction.purpose !== "link") {
     throw new SsoAuthenticationError("transaction_purpose_mismatch");
   }
-  await input.identityLinker.link({
+  const authenticatedIdentityId = await input.identityLinker.link({
     accountId: transaction.initiatingAccountId,
     providerKey: identity.providerKey,
     subject: identity.subject,
   });
   return {
     accountId: transaction.initiatingAccountId,
+    authenticatedIdentityId,
     authenticationMethod: identity.authenticationMethod,
     authenticatedAt: identity.authenticatedAt,
     providerKey: identity.providerKey,

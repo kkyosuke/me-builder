@@ -283,7 +283,7 @@ describe("SSO authentication transaction", () => {
       returnTo: "/profile?sso=linked",
       expiresAt: 2_000,
     });
-    const identityLinker = { link: vi.fn(async () => undefined) };
+    const identityLinker = { link: vi.fn(async () => "identity-auth0") };
 
     await expect(
       completeSsoIdentityLinking({
@@ -296,6 +296,7 @@ describe("SSO authentication transaction", () => {
       }),
     ).resolves.toEqual({
       accountId: "account-at-start",
+      authenticatedIdentityId: "identity-auth0",
       authenticationMethod: "sso",
       authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
       providerKey: "auth0",

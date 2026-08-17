@@ -45,12 +45,15 @@ describe("SSO identity repository adapters", () => {
 
   it("開始時のAccountへ検証済みsubjectをlinkIdentityで追加する", async () => {
     const deps = dependencies();
+    deps.linkIdentity.mockResolvedValue({ id: "identity-auth0" });
 
-    await createSsoIdentityLinker(db, deps as never).link({
-      accountId: "account-1",
-      providerKey: "auth0",
-      subject: "auth0|subject",
-    });
+    await expect(
+      createSsoIdentityLinker(db, deps as never).link({
+        accountId: "account-1",
+        providerKey: "auth0",
+        subject: "auth0|subject",
+      }),
+    ).resolves.toBe("identity-auth0");
 
     expect(deps.linkIdentity).toHaveBeenCalledWith(db, {
       accountId: "account-1",
