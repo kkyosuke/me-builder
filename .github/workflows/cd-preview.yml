@@ -44,7 +44,7 @@ jobs:
       GOOGLE_VERTEX_AI_API_KEY: ${{ secrets.GOOGLE_VERTEX_AI_API_KEY }}
       CHAT_DELIVERY_SECRET: ${{ secrets.CHAT_DELIVERY_SECRET }}
       BRAIN_VECTOR_HMAC_SECRET: ${{ secrets.BRAIN_VECTOR_HMAC_SECRET }}
-      BILLING_PROJECTION_STALE_AFTER_SECONDS: ${{ vars.BILLING_PROJECTION_STALE_AFTER_SECONDS }}
+      BILLING_PROJECTION_STALE_AFTER_SECONDS: ${{ vars.BILLING_PROJECTION_STALE_AFTER_SECONDS || '900' }}
       CLOUDFLARE_ACCESS_ALLOWED_EMAILS: ${{ vars.CLOUDFLARE_ACCESS_ALLOWED_EMAILS }}
       ADMIN_LINE_USER_IDS: ${{ secrets.ADMIN_LINE_USER_IDS }}
       # LIFF Server API は LINE Login チャネルのチャネルアクセストークンを要求する。
@@ -152,6 +152,10 @@ jobs:
           bun --cwd apps/api wrangler deploy --env preview --secrets-file "${api_secrets_file}"
           bun --filter @me-builder/mcp deploy:preview
           bun --filter @me-builder/web deploy:preview
+
+      - name: Verify Deployed Subscription Catalog (Preview)
+        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
+        run: task subscription:verify:deployed-preview
 
       # URL が変わっていなければ現在の登録状態を 1 回問い合わせるだけで終わる。
       # 登録し直したときだけ LINE Platform からの疎通確認まで実行し、

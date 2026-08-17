@@ -91,6 +91,16 @@ describe("getConfig & ConfigSchema", () => {
     expect(conf.billingProjectionStaleAfterSeconds).toBe(1200);
   });
 
+  it("監視閾値の空環境変数は未設定として既定値を使う", () => {
+    expect(
+      getConfig({ BILLING_PROJECTION_STALE_AFTER_SECONDS: "" }).billingProjectionStaleAfterSeconds,
+    ).toBe(900);
+    expect(
+      getConfig({ BILLING_PROJECTION_STALE_AFTER_SECONDS: "   " })
+        .billingProjectionStaleAfterSeconds,
+    ).toBe(900);
+  });
+
   it("LINE_WEBHOOK_URL が明示されている場合は BASE_URL より優先されること", () => {
     const conf = getConfig({
       BASE_URL: "https://example.com",

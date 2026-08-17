@@ -15,4 +15,75 @@ describe("billing plan catalog", () => {
     });
     expect(JSON.stringify(body)).not.toMatch(/lookupKey|price_|productId/i);
   });
+
+  it("未認証probeで課金runtime構成済みと設定欠落を区別する", async () => {
+    const readyEnv = {
+      DB: {},
+      WEB_ORIGIN: "https://app.example.test",
+      LINE_LOGIN_CHANNEL_ID: "1234567890",
+      STRIPE_SECRET_KEY: "sk_test_preview",
+      STRIPE_WEBHOOK_SECRET: "whsec_preview",
+      STRIPE_PORTAL_CONFIGURATION_ID: "bpc_management",
+      STRIPE_PORTAL_PLAN_CHANGE_CONFIGURATION_ID: "bpc_standard",
+      STRIPE_PORTAL_RESET_CONFIGURATION_ID: "bpc_reset",
+      BILLING_QUEUE: { send: async () => undefined },
+    };
+    const jsonRequest = {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ plan: "lite", interval: "month" }),
+    };
+
+    expect(
+      (await app.request("/api/billing/trial-eligibility", undefined, readyEnv as never)).status,
+    ).toBe(401);
+    expect(
+      (await app.request("/api/billing/checkout-sessions", jsonRequest, readyEnv as never)).status,
+    ).toBe(401);
+    expect(
+      (await app.request("/api/billing/plan-change-sessions", jsonRequest, readyEnv as never))
+        .status,
+    ).toBe(401);
+    expect(
+      (await app.request("/api/billing/portal-sessions", { method: "POST" }, readyEnv as never))
+        .status,
+    ).toBe(401);
+    expect(
+      (await app.request("/api/billing/webhook", { method: "POST", body: "{}" }, readyEnv as never))
+        .status,
+    ).toBe(400);
+
+    expect(
+      (
+        await app.request("/api/billing/portal-sessions", { method: "POST" }, {
+          ...readyEnv,
+          STRIPE_PORTAL_CONFIGURATION_ID: undefined,
+        } as never)
+      ).status,
+    ).toBe(503);
+    expect(
+      (
+        await app.request("/api/billing/plan-change-sessions", jsonRequest, {
+          ...readyEnv,
+          STRIPE_PORTAL_RESET_CONFIGURATION_ID: undefined,
+        } as never)
+      ).status,
+    ).toBe(503);
+    expect(
+      (
+        await app.request("/api/billing/checkout-sessions", jsonRequest, {
+          ...readyEnv,
+          BILLING_LOOKUP_KEY_MAP: '{"lite.month":"only_one"}',
+        } as never)
+      ).status,
+    ).toBe(503);
+    expect(
+      (
+        await app.request("/api/billing/webhook", { method: "POST", body: "{}" }, {
+          ...readyEnv,
+          BILLING_QUEUE: undefined,
+        } as never)
+      ).status,
+    ).toBe(503);
+  });
 });

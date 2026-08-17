@@ -26,7 +26,7 @@
 
 | 資源 | 識別方法 | 同期内容 |
 | --- | --- | --- |
-| Product | 固定Product IDと`managed_by` metadata | Plan変更を期間末予約できる共通の有料プランProduct |
+| Product | Planごとの固定Product IDと`managed_by` metadata | Lite、Full、ファミリーパックを表す3 Product |
 | Price | 固定`lookup_key`と`managed_by` metadata | 各Productの月額・年額、JPY、税込 |
 | Webhook endpoint | URLまたは`managed_by` metadata | 課金projectionが受け付けるeventだけ |
 | Customer Portal configuration | `managed_by` metadata | 支払方法、請求履歴、プラン変更、期間末解約・再開 |
@@ -38,7 +38,7 @@ Priceの`lookup_key`は次の形式で固定します。
 me_builder_<lite|full|family>_<monthly|yearly>
 ```
 
-金額はこの文書へ重複して持たず、料金SSoTと`STRIPE_BILLING_CATALOG`を同じ変更で更新します。Stripeが期間末downgradeを同一Product内のPrice間だけに制限するため、Lite、Full、ファミリーパックの6 Priceは共通Productへ所属させ、Price metadataからPlanへ変換します。旧Plan別ProductのPrice IDは既存契約がなくなるまで`BILLING_PRICE_PLAN_MAP`へ残します。Customer Portalは現在の6 Priceだけを変更先に許可し、upgradeは`always_invoice`で日割り差額を即時請求します。金額減少と年額から月額への短縮は`decreasing_item_amount` / `shortening_interval`条件で期間末へ予約し、trial中の変更は`continue_trial`で残期間を維持します。同一または上位Planの月額から年額への変更は、変更日を新しい年額期間の開始日にする`billing_cycle_anchor=now`専用設定を使います。この専用設定には`decreasing_item_amount`を含む期間末予約条件を設定せず、年額の月換算額が下がる場合も即時変更を妨げないようにします。それ以外は現在の請求期間を維持する標準設定を使い、アプリで選んだ変更先をPortalの確定画面へdeep linkします。支払方法・解約用の管理Portalではプラン変更を無効にし、この請求ルールを迂回できないようにします。
+金額はこの文書へ重複して持たず、料金SSoTと`STRIPE_BILLING_CATALOG`を同じ変更で更新します。Stripe Customer Portalは1 Productにつき同じ課金間隔のPriceを複数許可しないため、Lite、Full、ファミリーパックを別Productにし、各Productへ月額・年額を1件ずつ所属させます。Customer Portal configurationには3 Productと現在の6 Priceを列挙し、アプリで選んだ変更先をPortalの確定画面へdeep linkします。旧ProductのPrice IDは既存契約がなくなるまで`BILLING_PRICE_PLAN_MAP`へ残します。upgradeは`always_invoice`で日割り差額を即時請求します。金額減少と年額から月額への短縮は`decreasing_item_amount` / `shortening_interval`条件で期間末へ予約し、trial中の変更は`continue_trial`で残期間を維持します。同一または上位Planの月額から年額への変更は、変更日を新しい年額期間の開始日にする`billing_cycle_anchor=now`専用設定を使います。この専用設定には`decreasing_item_amount`を含む期間末予約条件を設定せず、年額の月換算額が下がる場合も即時変更を妨げないようにします。それ以外は現在の請求期間を維持する標準設定を使います。支払方法・解約用の管理Portalではプラン変更を無効にし、この請求ルールを迂回できないようにします。
 
 ## 3. 実行前提
 
@@ -143,8 +143,9 @@ Stripe Priceの金額と課金間隔は変更できません。料金SSoTを変�
 
 1. 新しいPriceを作成する
 2. `transfer_lookup_key=true`で固定lookup keyを新Priceへ移す
-3. 旧Priceを新規購入不可にする
-4. 旧Price IDを`BILLING_PRICE_PLAN_MAP`へ残す
+3. Productのdefault priceを現行月額Priceへ切り替える。管理対象外になった旧Productはdefault priceを解除する
+4. 現行6 Price以外の管理対象Priceを新規購入不可にする
+5. 旧Price IDを`BILLING_PRICE_PLAN_MAP`へ残す
 
 既存Subscriptionは旧Priceを参照したまま継続でき、projectionも旧Priceを正しいPlanへ変換できます。旧Priceは既存契約がなくなるまで削除しません。
 

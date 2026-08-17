@@ -274,12 +274,11 @@ flowchart TD
 
 依存: `SUB-A-001`〜`SUB-A-019`
 
-- Stripeの最新料金、Portal制約、API version、Webhook eventを公式情報で再確認する
-- 購入、更新、支払失敗、解約、購入復元から`AccountPlanAssignment`更新までをPreviewで確認する
-- Account復旧後も同じPlanへ到達し、別Accountや古いWebhookで紐付けが変わらないことを確認する
-- B系列のAI利用量や機能実装をこの判定条件へ含めない
+- [Preview検証手順](subscription-preview-plan-verification.md)の`PREVIEW-BILLING-001`〜`009`を共有Previewで実施し、識別子を含まない結果をPRへ残す
+- `SUB-A-016`完了後、Account復旧後も同じPlanへ到達することを追加確認する
+- `SUB-A-017`と`SUB-A-019`の未完了条件をProduction承認から除外しない
 
-完了条件は、B系列が未完成でも、Stripeの契約状態とAccountのPlan紐付けが正しく収束することを証明できることです。
+自動検証と実施手順は実装済みです。完了条件は、B系列が未完成でも、上の共有Preview実施記録とAccount復旧を含め、Stripeの契約状態とAccountのPlan紐付けが正しく収束することを証明できることです。
 
 ### SUB-B-017 Productionを段階的に公開して価格を検証する ([#303](https://github.com/kkyosuke/me-builder/pull/303))
 

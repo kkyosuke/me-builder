@@ -88,6 +88,11 @@ tasks:
       - bunx vitest run apps/api/src/e2e/diagnosis-answer.test.ts -t '課金情報なしで診断回答と日記|Free相当でも本人archive'
       - bunx vitest run apps/worker/src/e2e/diary-chat-delivery-flow.test.ts -t 'Free上限到達後も切迫した危機表現'
 
+  subscription:verify:deployed-preview:
+    desc: 'Verify deployed Preview billing runtime config, catalog, and optional Account projection'
+    cmds:
+      - bun scripts/verify-subscription-preview.ts
+
   infra:generate:
     desc: 'Generate Wrangler TOML files from committed Pulumi stack outputs'
     cmds:
