@@ -32,7 +32,24 @@ export class KvApplicationSessionStore implements ApplicationSessionStore {
     const record = await this.namespace.get<unknown>(storageKey, "json");
     if (record === null) return undefined;
     const parsed = v.safeParse(applicationSessionRecordSchema, record);
-    if (parsed.success) return parsed.output;
+    if (parsed.success) {
+      const { displayProfile, ...session } = parsed.output;
+      return {
+        ...session,
+        ...(displayProfile
+          ? {
+              displayProfile: {
+                ...(displayProfile.displayName !== undefined
+                  ? { displayName: displayProfile.displayName }
+                  : {}),
+                ...(displayProfile.pictureUrl !== undefined
+                  ? { pictureUrl: displayProfile.pictureUrl }
+                  : {}),
+              },
+            }
+          : {}),
+      };
+    }
     await this.namespace.delete(storageKey);
     return undefined;
   }
