@@ -15,7 +15,7 @@ const applicationSessionRecordSchema = v.object({
   lastSeenAt: timestamp,
   expiresAt: timestamp,
   sessionVersion: v.pipe(v.number(), v.integer(), v.minValue(1)),
-  csrfTokenHash: v.pipe(v.string(), v.nonEmpty(), v.maxLength(128)),
+  csrfToken: v.pipe(v.string(), v.nonEmpty(), v.maxLength(128)),
   displayProfile: v.optional(
     v.object({
       displayName: v.optional(v.pipe(v.string(), v.maxLength(256))),

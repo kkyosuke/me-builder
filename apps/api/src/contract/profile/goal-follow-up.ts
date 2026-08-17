@@ -53,7 +53,7 @@ export const goalFollowUpListRoute = describeRoute({
   operationId: "getGoalFollowUps",
   tags: ["Profile"],
   summary: "本人が合意したGoalのフォローアップを取得する",
-  security: [{ liffIdToken: [] }],
+  security: [{ applicationSession: [] }, { liffIdToken: [] }],
   responses: {
     200: jsonResponse("Goalフォローアップ", GoalFollowUpListSchema),
     ...authenticatedErrors,
@@ -65,7 +65,7 @@ export const goalFollowUpAgreementRoute = describeRoute({
   operationId: "agreeGoalFollowUp",
   tags: ["Profile"],
   summary: "本人がGoalと次の一歩をフォロー対象として合意する",
-  security: [{ liffIdToken: [] }],
+  security: [{ applicationSession: [], csrfToken: [] }, { liffIdToken: [] }],
   requestBody: {
     required: true,
     content: {
@@ -88,7 +88,7 @@ export const goalFollowUpUpdateRoute = describeRoute({
   operationId: "updateGoalFollowUp",
   tags: ["Profile"],
   summary: "本人がGoalを完了・停止・訂正する",
-  security: [{ liffIdToken: [] }],
+  security: [{ applicationSession: [], csrfToken: [] }, { liffIdToken: [] }],
   requestBody: {
     required: true,
     content: {

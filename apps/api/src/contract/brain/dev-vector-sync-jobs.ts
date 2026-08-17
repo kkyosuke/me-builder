@@ -52,7 +52,7 @@ export const developmentFailedBrainVectorSyncJobsRoute = describeRoute({
   operationId: "listDevelopmentFailedBrainVectorSyncJobs",
   tags: ["Development"],
   summary: "開発環境で本人の終端Brain Vector同期job一覧を取得する",
-  security: [{ liffIdToken: [] }],
+  security: [{ applicationSession: [] }, { liffIdToken: [] }],
   responses: {
     200: jsonResponse(
       "本人の終端Brain Vector同期job一覧",
@@ -71,7 +71,7 @@ export const resetDevelopmentBrainVectorSyncJobRoute = describeRoute({
   operationId: "resetDevelopmentBrainVectorSyncJob",
   tags: ["Development"],
   summary: "開発環境で本人の終端Brain Vector同期jobを再試行可能に戻す",
-  security: [{ liffIdToken: [] }],
+  security: [{ applicationSession: [], csrfToken: [] }, { liffIdToken: [] }],
   responses: {
     200: jsonResponse("reset結果", ResetDevelopmentBrainVectorSyncJobResponseSchema),
     ...authenticatedErrors,
@@ -87,7 +87,7 @@ export const resetAllDevelopmentBrainVectorSyncJobsRoute = describeRoute({
   operationId: "resetAllDevelopmentBrainVectorSyncJobs",
   tags: ["Development"],
   summary: "開発環境で本人の全終端Brain Vector同期jobを再試行可能に戻す",
-  security: [{ liffIdToken: [] }],
+  security: [{ applicationSession: [], csrfToken: [] }, { liffIdToken: [] }],
   responses: {
     200: jsonResponse("resetしたjob件数", ResetAllDevelopmentBrainVectorSyncJobsResponseSchema),
     ...authenticatedErrors,

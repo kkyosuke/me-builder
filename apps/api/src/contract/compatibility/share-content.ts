@@ -59,7 +59,7 @@ export const compatibilityShareContentRoute = describeRoute({
   operationId: "getCompatibilityShareContent",
   tags: ["Compatibility"],
   summary: "本人が相手へ開示する現在の内容をカテゴリ別に確認する",
-  security: [{ liffIdToken: [] }],
+  security: [{ applicationSession: [] }, { liffIdToken: [] }],
   parameters: [
     {
       name: "relationshipCategory",

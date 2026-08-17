@@ -19,6 +19,11 @@ import { adminBillingHealthRoute } from "./contract/admin/billing-health";
 import { adminBillingReconciliationRoute } from "./contract/admin/billing-reconciliation";
 import { adminStatisticsRoute } from "./contract/admin/statistics";
 import {
+  applicationSessionRoute,
+  liffAuthenticationExchangeRoute,
+  logoutApplicationSessionRoute,
+} from "./contract/authentication";
+import {
   billingCheckoutSessionRoute,
   billingCheckoutSessionStatusRoute,
   billingPlanCatalogRoute,
@@ -113,6 +118,11 @@ import {
   postBillingReconciliation,
 } from "./controller/admin";
 import {
+  deleteApplicationSession,
+  getApplicationSession,
+  postLiffAuthenticationExchange,
+} from "./controller/authentication";
+import {
   getBillingCheckoutSession,
   getBillingPlanCatalog,
   getBillingTrialEligibilityResponse,
@@ -205,7 +215,8 @@ import type { AppEnv } from "./types";
 const app = new Hono<AppEnv>();
 const webCors = cors({
   origin: (origin, c) => (origin === getConfig(c.env).webOrigin ? origin : undefined),
-  allowHeaders: ["Authorization", "Content-Type"],
+  allowHeaders: ["Authorization", "Content-Type", "X-CSRF-Token"],
+  credentials: true,
 });
 
 app.use("*", async (c, next) => {
@@ -273,6 +284,18 @@ app.get("/api/health", (c) => {
 
 app.post("/api/line/webhook", postLineWebhook);
 app.post("/api/billing/webhook", postStripeWebhook);
+app.post(
+  "/api/auth/liff/exchange",
+  liffAuthenticationExchangeRoute,
+  postLiffAuthenticationExchange,
+);
+app.get("/api/auth/session", requireAuthentication, applicationSessionRoute, getApplicationSession);
+app.delete(
+  "/api/auth/session",
+  requireAuthentication,
+  logoutApplicationSessionRoute,
+  deleteApplicationSession,
+);
 app.post(
   "/api/account-recovery/codes",
   requireAuthentication,

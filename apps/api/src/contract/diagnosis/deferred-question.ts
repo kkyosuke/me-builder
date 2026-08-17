@@ -32,7 +32,7 @@ export const deferDiagnosisQuestionRoute = describeRoute({
   operationId: "deferDiagnosisQuestion",
   tags: ["Diagnosis"],
   summary: "診断の未回答の1問をあとで回答として保存する",
-  security: [{ liffIdToken: [] }],
+  security: [{ applicationSession: [], csrfToken: [] }, { liffIdToken: [] }],
   responses: {
     200: jsonResponse("保存済みの延期操作", DeferDiagnosisQuestionResponseSchema),
     ...authenticatedErrors,

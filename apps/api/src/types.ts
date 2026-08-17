@@ -66,5 +66,7 @@ export type AppEnv = {
     safeError?: SafeOperationalErrorFields;
     authenticatedActor?: AuthenticatedActor;
     authenticationResult?: AuthenticationResult;
+    authenticationSource?: "application-session" | "legacy-bearer";
+    applicationSessionToken?: string;
   };
 };

@@ -8,7 +8,7 @@ export type ApplicationSessionRecord = Readonly<{
   lastSeenAt: string;
   expiresAt: string;
   sessionVersion: number;
-  csrfTokenHash: string;
+  csrfToken: string;
   displayProfile?: DisplayProfile;
 }>;
 
@@ -84,7 +84,7 @@ export class ApplicationSessionService {
         lastSeenAt: now.toISOString(),
         expiresAt: expiresAt.toISOString(),
         sessionVersion,
-        csrfTokenHash: await hash(csrfToken),
+        csrfToken,
         ...(displayProfile ? { displayProfile } : {}),
       },
       Math.ceil((expiresAt.getTime() - now.getTime()) / 1_000),
@@ -152,6 +152,39 @@ export class ApplicationSessionService {
     await this.store.delete(referenceHash);
   }
 
+  async verifyCsrf(
+    sessionToken: string,
+    csrfToken: string | undefined,
+    refreshIdle = false,
+  ): Promise<boolean> {
+    if (!csrfToken) return false;
+    const referenceHash = await hash(sessionToken);
+    const record = await this.store.get(referenceHash);
+    if (!record) return false;
+    if (!constantTimeEqual(record.csrfToken, csrfToken)) return false;
+    if (refreshIdle) {
+      const now = this.now();
+      const expiresAt = Date.parse(record.expiresAt);
+      if (
+        expiresAt <= now.getTime() ||
+        Date.parse(record.lastSeenAt) + this.policy.idleTtlMs <= now.getTime()
+      ) {
+        return false;
+      }
+      const ttl = Math.max(1, Math.ceil((expiresAt - now.getTime()) / 1_000));
+      await this.store.put(referenceHash, { ...record, lastSeenAt: now.toISOString() }, ttl);
+    }
+    return true;
+  }
+
+  async clientState(
+    sessionToken: string,
+  ): Promise<Readonly<{ csrfToken: string; expiresAt: Date }> | undefined> {
+    const record = await this.store.get(await hash(sessionToken));
+    if (!record) return undefined;
+    return { csrfToken: record.csrfToken, expiresAt: new Date(record.expiresAt) };
+  }
+
   async invalidateAccountSessions(accountId: string): Promise<void> {
     await this.versions.invalidate(accountId);
   }
@@ -167,4 +200,13 @@ function randomToken(): string {
 async function hash(value: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function constantTimeEqual(left: string, right: string): boolean {
+  if (left.length !== right.length) return false;
+  let difference = 0;
+  for (let index = 0; index < left.length; index += 1) {
+    difference |= left.charCodeAt(index) ^ right.charCodeAt(index);
+  }
+  return difference === 0;
 }

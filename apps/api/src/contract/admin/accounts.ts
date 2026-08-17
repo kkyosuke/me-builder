@@ -53,7 +53,7 @@ export const adminAccountsRoute = describeRoute({
   operationId: "listAdminAccounts",
   tags: ["Admin"],
   summary: "名前と成長projectionを含むAccount一覧を取得する",
-  security: [{ liffIdToken: [] }],
+  security: [{ applicationSession: [] }, { liffIdToken: [] }],
   parameters: [
     { name: "query", in: "query", required: false, schema: { type: "string", maxLength: 100 } },
     {

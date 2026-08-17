@@ -24,7 +24,7 @@ export const adminBillingHealthRoute = describeRoute({
   operationId: "getAdminBillingHealth",
   tags: ["Admin"],
   summary: "個人内容を含まない課金projectionの運用状態を確認する",
-  security: [{ liffIdToken: [] }],
+  security: [{ applicationSession: [] }, { liffIdToken: [] }],
   responses: {
     200: jsonResponse("課金projectionの安全な集計と劣化判定", AdminBillingHealthResponseSchema),
     403: jsonResponse("管理者権限がない", ForbiddenErrorSchema),

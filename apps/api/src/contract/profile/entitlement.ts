@@ -25,7 +25,7 @@ export const profileEntitlementRoute = describeRoute({
   operationId: "getProfileEntitlement",
   tags: ["Profile"],
   summary: "本人のPlanとAI利用上限・残量を取得する",
-  security: [{ liffIdToken: [] }],
+  security: [{ applicationSession: [] }, { liffIdToken: [] }],
   responses: {
     200: jsonResponse("本人の現在の利用権限", ProfileEntitlementResponseSchema),
     ...authenticatedErrors,

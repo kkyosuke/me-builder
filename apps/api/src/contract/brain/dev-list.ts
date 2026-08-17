@@ -83,7 +83,7 @@ export const developmentBrainItemsRoute = describeRoute({
   operationId: "getDevelopmentBrainItems",
   tags: ["Development"],
   summary: "開発環境で本人のactive Brain Item一覧を取得する",
-  security: [{ liffIdToken: [] }],
+  security: [{ applicationSession: [] }, { liffIdToken: [] }],
   responses: {
     200: jsonResponse("本人のactive Brain ItemとEvidence", DevelopmentBrainItemsResponseSchema),
     ...authenticatedErrors,
@@ -99,7 +99,7 @@ export const developmentBrainVectorRoute = describeRoute({
   operationId: "getDevelopmentBrainVector",
   tags: ["Development"],
   summary: "開発環境で本人のBrain Itemに対応するVectorize実体を確認する",
-  security: [{ liffIdToken: [] }],
+  security: [{ applicationSession: [] }, { liffIdToken: [] }],
   responses: {
     200: jsonResponse(
       "AccountDataの対応表とVectorize実体の照合結果",

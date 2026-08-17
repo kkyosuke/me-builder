@@ -41,7 +41,7 @@ export const requestPersonalDataExportRoute = describeRoute({
   operationId: "requestPersonalDataExport",
   tags: ["Personal Data"],
   summary: "本人データarchiveの非同期生成を要求する",
-  security: [{ liffIdToken: [] }],
+  security: [{ applicationSession: [], csrfToken: [] }, { liffIdToken: [] }],
   responses: {
     202: jsonResponse("生成要求", PersonalDataExportResponseSchema),
     ...authenticatedErrors,
@@ -54,7 +54,7 @@ export const personalDataExportStatusRoute = describeRoute({
   operationId: "getPersonalDataExportStatus",
   tags: ["Personal Data"],
   summary: "本人データarchiveの生成状態と期限を取得する",
-  security: [{ liffIdToken: [] }],
+  security: [{ applicationSession: [] }, { liffIdToken: [] }],
   responses: {
     200: jsonResponse("生成状態", PersonalDataExportResponseSchema),
     ...exportErrors,
@@ -65,7 +65,7 @@ export const downloadPersonalDataExportRoute = describeRoute({
   operationId: "downloadPersonalDataExport",
   tags: ["Personal Data"],
   summary: "期限内の本人データarchiveをdownloadする",
-  security: [{ liffIdToken: [] }],
+  security: [{ applicationSession: [] }, { liffIdToken: [] }],
   responses: {
     200: {
       description: "本人データarchive",

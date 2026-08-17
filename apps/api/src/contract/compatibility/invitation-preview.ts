@@ -40,7 +40,7 @@ export const compatibilityInvitationPreviewRoute = describeRoute({
   operationId: "getCompatibilityInvitation",
   tags: ["Compatibility"],
   summary: "受信者が承諾前に招待者と共有の意味を確認する",
-  security: [{ liffIdToken: [] }],
+  security: [{ applicationSession: [] }, { liffIdToken: [] }],
   responses: {
     200: jsonResponse(
       "招待者の表示名と受信者の共有可否",
