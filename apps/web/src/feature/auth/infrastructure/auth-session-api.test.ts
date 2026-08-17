@@ -8,7 +8,7 @@ describe("auth session API", () => {
     const fetchMock = vi.fn<typeof fetch>(async () =>
       Response.json({
         authenticated: true,
-        profile: { displayName: "うさぎ" },
+        displayProfile: { displayName: "うさぎ" },
         role: "user",
         csrfToken: "csrf-token",
       }),
@@ -28,7 +28,6 @@ describe("auth session API", () => {
     const fetchMock = vi.fn<typeof fetch>(async () =>
       Response.json({
         authenticated: true,
-        profile: {},
         role: "admin",
         csrfToken: "csrf-token",
       }),
@@ -38,17 +37,30 @@ describe("auth session API", () => {
     const result = await exchangeLiffCredential(
       "https://api.example.com",
       "secret.id.token",
-      "/diagnoses/diagnosis-1",
       new AbortController().signal,
     );
 
     expect(result).toMatchObject({ authenticated: true, role: "admin" });
     const [url, init] = fetchMock.mock.calls[0] ?? [];
     expect(url).not.toContain("secret.id.token");
-    expect(JSON.parse(String(init?.body))).toEqual({
-      idToken: "secret.id.token",
-      returnTo: "/diagnoses/diagnosis-1",
-    });
+    expect(JSON.parse(String(init?.body))).toEqual({ idToken: "secret.id.token" });
+  });
+
+  it("displayProfileが省略されたsessionも受理する", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({
+          authenticated: true,
+          role: "user",
+          csrfToken: "csrf-token",
+        }),
+      ),
+    );
+
+    await expect(
+      fetchAuthSession("https://api.example.com", new AbortController().signal),
+    ).resolves.toEqual({ authenticated: true, role: "user", csrfToken: "csrf-token" });
   });
 
   it("401を期限切れsessionとして正規化する", async () => {

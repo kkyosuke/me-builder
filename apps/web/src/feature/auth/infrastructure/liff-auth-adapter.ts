@@ -7,11 +7,10 @@ type AcquireLiffCredential = (signal: AbortSignal) => Promise<string | null>;
 export async function establishLiffAuthSession(
   apiUrl: string | undefined,
   acquireCredential: AcquireLiffCredential,
-  returnTo: string,
   signal: AbortSignal,
 ): Promise<AuthSessionResponse | { redirecting: true }> {
   const credential = await acquireCredential(signal);
   if (signal.aborted) throw new DOMException("The operation was aborted", "AbortError");
   if (!credential) return { redirecting: true };
-  return exchangeLiffCredential(apiUrl, credential, returnTo, signal);
+  return exchangeLiffCredential(apiUrl, credential, signal);
 }

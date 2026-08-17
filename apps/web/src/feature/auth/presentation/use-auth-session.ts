@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { config } from "../../../config";
-import { resolveRequestedPathname } from "../../../infrastructure/requested-pathname";
 import { useLiffSession } from "../../liff";
 import { type AuthSessionResponse, fetchAuthSession } from "../infrastructure/auth-session-api";
 import { authSessionRuntime } from "../infrastructure/auth-session-runtime";
@@ -36,7 +35,7 @@ export function useAuthSessionState() {
     revisionRef.current += 1;
     return {
       status: "authenticated",
-      profile: response.profile,
+      profile: response.displayProfile ?? {},
       role: response.role,
       revision: revisionRef.current,
     };
@@ -50,7 +49,6 @@ export function useAuthSessionState() {
       const exchanged = await establishLiffAuthSession(
         config.apiUrl,
         liffSession.acquireIdToken,
-        resolveRequestedPathname(),
         signal,
       );
       if ("redirecting" in exchanged) return { status: "redirecting" };

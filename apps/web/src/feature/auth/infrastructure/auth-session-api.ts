@@ -9,7 +9,7 @@ const DisplayProfileSchema = v.object({
 
 const AuthenticatedSessionSchema = v.object({
   authenticated: v.literal(true),
-  profile: DisplayProfileSchema,
+  displayProfile: v.optional(DisplayProfileSchema),
   role: v.picklist(["user", "admin"]),
   csrfToken: v.pipe(v.string(), v.nonEmpty()),
 });
@@ -36,7 +36,7 @@ const SessionResponseSchema = v.variant("authenticated", [
 export type AuthSessionResponse =
   | {
       authenticated: true;
-      profile: AuthDisplayProfile;
+      displayProfile?: AuthDisplayProfile | undefined;
       role: "user" | "admin";
       csrfToken: string;
     }
@@ -63,7 +63,6 @@ export async function fetchAuthSession(
 export async function exchangeLiffCredential(
   apiUrl: string | undefined,
   idToken: string,
-  returnTo: string,
   signal: AbortSignal,
 ): Promise<AuthSessionResponse> {
   const response = await createAuthenticatedHttpClient(apiUrl, globalThis.fetch, {
@@ -71,7 +70,7 @@ export async function exchangeLiffCredential(
   }).request("/api/auth/liff/exchange", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ idToken, returnTo }),
+    body: JSON.stringify({ idToken }),
     signal,
   });
   return parseSessionResponse(response);

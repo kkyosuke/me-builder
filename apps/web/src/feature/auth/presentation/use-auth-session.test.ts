@@ -12,9 +12,6 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../../../config", () => ({ config: { apiUrl: "https://api.example.com" } }));
-vi.mock("../../../infrastructure/requested-pathname", () => ({
-  resolveRequestedPathname: () => "/diagnoses/diagnosis-1",
-}));
 vi.mock("../../liff", () => ({
   useLiffSession: () => ({ acquireIdToken: mocks.acquireIdToken, profile: null }),
 }));
@@ -27,7 +24,7 @@ vi.mock("../infrastructure/liff-auth-adapter", () => ({
 
 const authenticated = {
   authenticated: true,
-  profile: { displayName: "うさぎ" },
+  displayProfile: { displayName: "うさぎ" },
   role: "user",
   csrfToken: "csrf-token",
 } as const;
@@ -51,7 +48,7 @@ describe("useAuthSessionState", () => {
     expect(mocks.establishLiffAuthSession).not.toHaveBeenCalled();
   });
 
-  it("sessionがなければ要求pathを保ったままLIFF交換する", async () => {
+  it("sessionがなければLIFF credentialをapplication sessionへ交換する", async () => {
     mocks.fetchAuthSession.mockResolvedValue({ authenticated: false });
     mocks.establishLiffAuthSession.mockResolvedValue(authenticated);
     const { result } = renderHook(() => useAuthSessionState());
@@ -60,9 +57,20 @@ describe("useAuthSessionState", () => {
     expect(mocks.establishLiffAuthSession).toHaveBeenCalledWith(
       "https://api.example.com",
       mocks.acquireIdToken,
-      "/diagnoses/diagnosis-1",
       expect.any(AbortSignal),
     );
+  });
+
+  it("表示プロフィールがないsessionは空の表示情報として公開する", async () => {
+    mocks.fetchAuthSession.mockResolvedValue({
+      authenticated: true,
+      role: "user",
+      csrfToken: "csrf-token",
+    });
+    const { result } = renderHook(() => useAuthSessionState());
+
+    await waitFor(() => expect(result.current.state.status).toBe("authenticated"));
+    expect(result.current.state).toMatchObject({ profile: {} });
   });
 
   it("LIFFログイン遷移中はfeature requestを始められる状態にしない", async () => {
