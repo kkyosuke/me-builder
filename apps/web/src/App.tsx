@@ -192,7 +192,7 @@ function AppContents() {
     authSession.state.status === "authenticated" ? authSession.state.revision : 0;
   const sessionRevisionRef = useRef(sessionRevision);
   sessionRevisionRef.current = sessionRevision;
-  const previousSessionRevision = useRef(sessionRevision);
+  const previousSessionRevision = useRef<number | null>(null);
 
   const applyAccountProfile = useCallback((profile: AccountProfile) => {
     setAvatar(uploadedAvatar(profile));
@@ -327,6 +327,11 @@ function AppContents() {
   }, [applyAccountProfile, authSession.state, isAdminPath, profileReloadKey]);
 
   useEffect(() => {
+    if (authSession.state.status !== "authenticated") return;
+    if (previousSessionRevision.current === null) {
+      previousSessionRevision.current = sessionRevision;
+      return;
+    }
     if (previousSessionRevision.current === sessionRevision) return;
     previousSessionRevision.current = sessionRevision;
     mainRouteScrollPositions.current.clear();
@@ -339,7 +344,7 @@ function AppContents() {
       mainPathname: returnPathname,
       profileView: "closed",
     });
-  }, [mainPathname, profileView, sessionRevision]);
+  }, [authSession.state.status, mainPathname, profileView, sessionRevision]);
 
   const openProfile = () => {
     shouldRestoreProfileButtonFocus.current = true;
