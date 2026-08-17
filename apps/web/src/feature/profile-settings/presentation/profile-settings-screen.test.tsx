@@ -93,6 +93,32 @@ describe("ProfileSettingsScreen", () => {
         onBack={vi.fn()}
         onOpenAvatar={vi.fn()}
         onOpenBillingPortal={onOpenBillingPortal}
+        entitlement={{
+          status: "success",
+          data: {
+            status: "active",
+            plan: "lite",
+            source: "subscription",
+            effectiveAt: "2026-08-01T00:00:00.000Z",
+            availableUntil: "2026-09-01T00:00:00.000Z",
+            aiReply: {
+              limit: 150,
+              used: 0,
+              reserved: 0,
+              remaining: 150,
+              periodStartsAt: "2026-08-01T00:00:00.000Z",
+              resetsAt: "2026-09-01T00:00:00.000Z",
+            },
+            profileSummary: {
+              limit: 4,
+              used: 0,
+              reserved: 0,
+              remaining: 4,
+              periodStartsAt: "2026-08-01T00:00:00.000Z",
+              resetsAt: "2026-09-01T00:00:00.000Z",
+            },
+          },
+        }}
         onThemeChange={vi.fn()}
         onFontSizeChange={vi.fn()}
       />,
@@ -105,6 +131,52 @@ describe("ProfileSettingsScreen", () => {
       "管理できる契約がまだありません",
     );
     expect(onOpenBillingPortal).toHaveBeenCalledOnce();
+  });
+
+  it("現在Planから料金プラン画面を開く", () => {
+    const onOpenBillingPlans = vi.fn();
+    render(
+      <ProfileSettingsScreen
+        avatar={null}
+        entitlement={{
+          status: "success",
+          data: {
+            status: "free",
+            plan: "free",
+            source: "free",
+            effectiveAt: "2026-08-16T00:00:00.000Z",
+            availableUntil: null,
+            aiReply: {
+              limit: 20,
+              used: 0,
+              reserved: 0,
+              remaining: 20,
+              periodStartsAt: "2026-08-16T00:00:00.000Z",
+              resetsAt: "2026-09-16T00:00:00.000Z",
+            },
+            profileSummary: {
+              limit: 1,
+              used: 0,
+              reserved: 0,
+              remaining: 1,
+              periodStartsAt: "2026-08-16T00:00:00.000Z",
+              resetsAt: "2026-11-14T00:00:00.000Z",
+            },
+          },
+        }}
+        theme="dark"
+        fontSize="medium"
+        onBack={vi.fn()}
+        onOpenAvatar={vi.fn()}
+        onOpenBillingPlans={onOpenBillingPlans}
+        onThemeChange={vi.fn()}
+        onFontSizeChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: /契約を管理/ })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "プランをアップグレードする" }));
+    expect(onOpenBillingPlans).toHaveBeenCalledOnce();
   });
 
   it("本人入力データの確認画面を開く", () => {
@@ -325,6 +397,54 @@ describe("ProfileSettingsScreen", () => {
     expect(screen.getByText("利用可能期限")).toBeTruthy();
     expect(screen.getByText("2027/08/01")).toBeTruthy();
     expect(screen.queryByText("2026/09/01")).toBeNull();
+  });
+
+  it("料金プラン画面から戻ると起点のボタンへフォーカスを戻す", () => {
+    const props = {
+      avatar: null,
+      entitlement: {
+        status: "success" as const,
+        data: {
+          status: "free" as const,
+          plan: "free" as const,
+          source: "free" as const,
+          effectiveAt: "2026-08-16T00:00:00.000Z",
+          availableUntil: null,
+          aiReply: {
+            limit: 20,
+            used: 0,
+            reserved: 0,
+            remaining: 20,
+            periodStartsAt: "2026-08-16T00:00:00.000Z",
+            resetsAt: "2026-09-16T00:00:00.000Z",
+          },
+          profileSummary: {
+            limit: 1,
+            used: 0,
+            reserved: 0,
+            remaining: 1,
+            periodStartsAt: "2026-08-16T00:00:00.000Z",
+            resetsAt: "2026-11-14T00:00:00.000Z",
+          },
+        },
+      },
+      theme: "dark" as const,
+      fontSize: "medium" as const,
+      onBack: vi.fn(),
+      onOpenAvatar: vi.fn(),
+      onOpenBillingPlans: vi.fn(),
+      onThemeChange: vi.fn(),
+      onFontSizeChange: vi.fn(),
+    };
+    const { rerender } = render(
+      <ProfileSettingsScreen {...props} isInactive inactiveFocusTarget="billing" />,
+    );
+
+    rerender(<ProfileSettingsScreen {...props} isInactive={false} inactiveFocusTarget="billing" />);
+
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "プランをアップグレードする" }),
+    );
   });
 
   it("Free Planでは契約期限ではなくAI利用枠のリセット日を表示する", () => {

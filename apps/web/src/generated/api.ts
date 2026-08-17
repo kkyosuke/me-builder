@@ -38,6 +38,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/billing/plans": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** 現在購入できる有料Planと税込価格を取得する */
+    get: operations["getBillingPlanCatalog"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/billing/checkout-sessions": {
     parameters: {
       query?: never;
@@ -49,6 +66,23 @@ export interface paths {
     put?: never;
     /** 本人の選択したPlanに対するStripe Checkout Sessionを作成する */
     post: operations["createBillingCheckoutSession"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/billing/checkout-sessions/{checkoutSessionId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Checkout Sessionが本人のものであることと完了状態を確認する */
+    get: operations["getBillingCheckoutSessionStatus"];
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -1157,6 +1191,42 @@ export interface operations {
       };
     };
   };
+  getBillingPlanCatalog: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 公開可能なPlan catalog */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            plans: {
+              /** @enum {string} */
+              code: "lite" | "full" | "family";
+              name: string;
+              description: string;
+              highlights: string[];
+              trialDays: number | null;
+              prices: {
+                /** @enum {string} */
+                interval: "month" | "year";
+                amount: number;
+                /** @constant */
+                currency: "JPY";
+              }[];
+            }[];
+          };
+        };
+      };
+    };
+  };
   createBillingCheckoutSession: {
     parameters: {
       query?: never;
@@ -1233,9 +1303,90 @@ export interface operations {
             reason:
               | "plan_unavailable"
               | "existing_subscription"
+              | "family_seat_active"
               | "checkout_in_progress"
               | "customer_not_found";
           };
+        };
+      };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
+          };
+        };
+      };
+      /** @description D1 bindingが設定されていない */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Service Unavailable";
+          };
+        };
+      };
+    };
+  };
+  getBillingCheckoutSessionStatus: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        checkoutSessionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 本人のCheckout Session状態 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @enum {string} */
+            status: "open" | "complete" | "expired";
+          };
+        };
+      };
+      /** @description LIFF IDトークンを検証できない */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Unauthorized";
+          };
+        };
+      };
+      /** @description Accountまたは本人のCheckout Sessionが存在しない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | {
+                /** @constant */
+                error: "Account not found";
+                /** @constant */
+                reason: "friendship_required";
+              }
+            | {
+                /** @constant */
+                error: "Checkout session not found";
+              };
         };
       };
       /** @description 未処理のサーバーエラー */
@@ -1324,6 +1475,7 @@ export interface operations {
             reason:
               | "plan_unavailable"
               | "existing_subscription"
+              | "family_seat_active"
               | "checkout_in_progress"
               | "customer_not_found";
           };

@@ -58,6 +58,7 @@ export function ProfileSettingsScreen({
   onOpenAdmin,
   onOpenAvatar,
   onOpenBillingPortal,
+  onOpenBillingPlans,
   onOpenPersonalData,
   onOpenFamily,
   canOpenBrainItems = false,
@@ -73,7 +74,7 @@ export function ProfileSettingsScreen({
   avatar: AvatarSelection | null;
   isAdmin?: boolean;
   isInactive?: boolean;
-  inactiveFocusTarget?: "avatar" | "brain-items";
+  inactiveFocusTarget?: "avatar" | "brain-items" | "billing";
   isProfileLoading?: boolean;
   profileError?: string | null;
   entitlement?: AsyncState<ProfileEntitlement>;
@@ -84,6 +85,7 @@ export function ProfileSettingsScreen({
   onOpenAdmin?: () => void;
   onOpenAvatar: () => void;
   onOpenBillingPortal?: () => Promise<void>;
+  onOpenBillingPlans?: () => void;
   onOpenPersonalData?: () => void;
   onOpenFamily?: () => void;
   canOpenBrainItems?: boolean;
@@ -100,6 +102,7 @@ export function ProfileSettingsScreen({
   const backButtonRef = useRef<HTMLButtonElement>(null);
   const avatarButtonRef = useRef<HTMLButtonElement>(null);
   const brainItemsLinkRef = useRef<HTMLAnchorElement>(null);
+  const billingPlansButtonRef = useRef<HTMLButtonElement>(null);
   const wasInactiveRef = useRef(isInactive);
   const inactiveFocusTargetRef = useRef(inactiveFocusTarget);
   const [resetState, setResetState] = useState<AsyncState<string>>({ status: "idle" });
@@ -173,7 +176,9 @@ export function ProfileSettingsScreen({
     }
 
     if (wasInactiveRef.current) {
-      if (inactiveFocusTargetRef.current === "brain-items") {
+      if (inactiveFocusTargetRef.current === "billing") {
+        billingPlansButtonRef.current?.focus();
+      } else if (inactiveFocusTargetRef.current === "brain-items") {
         brainItemsLinkRef.current?.focus();
       } else {
         avatarButtonRef.current?.focus();
@@ -213,8 +218,11 @@ export function ProfileSettingsScreen({
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-2xl px-4 py-8 pb-16 sm:px-8">
-        <section className="min-h-62 overflow-hidden rounded-3xl bg-gradient-to-br from-sky-100 via-white to-violet-100 p-6 shadow-lg shadow-slate-950/5 min-[375px]:min-h-50 sm:min-h-40 dark:from-sky-950/60 dark:via-slate-800 dark:to-violet-950/50">
+      <main className="mx-auto w-full max-w-2xl px-4 py-6 pb-16 sm:px-8">
+        <section
+          aria-labelledby="profile-appearance-heading"
+          className="overflow-hidden rounded-3xl bg-gradient-to-br from-sky-100 via-white to-violet-100 p-5 shadow-lg shadow-slate-950/5 sm:p-6 dark:from-sky-950/60 dark:via-slate-800 dark:to-violet-950/50"
+        >
           <div className="flex items-center gap-4">
             <AvatarPreview avatar={avatar} fallbackImageUrl={linePictureUrl} size="lg" />
             <div className="min-w-0">
@@ -222,7 +230,10 @@ export function ProfileSettingsScreen({
                 <Sparkles className="size-4" aria-hidden="true" />
                 YOUR PROFILE
               </p>
-              <h2 className="mt-2 text-2xl font-bold text-slate-950 dark:text-white">
+              <h2
+                id="profile-appearance-heading"
+                className="mt-2 text-2xl font-bold text-slate-950 dark:text-white"
+              >
                 あなたらしい見た目に
               </h2>
               <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
@@ -232,43 +243,45 @@ export function ProfileSettingsScreen({
           </div>
         </section>
 
-        {onOpenBillingPortal && (
-          <section aria-labelledby="billing-setting-heading" className="mt-8">
-            <h2
-              id="billing-setting-heading"
-              className="px-1 text-sm font-bold tracking-wider text-slate-500 dark:text-slate-400"
-            >
-              契約とお支払い
-            </h2>
-            <button
-              type="button"
-              onClick={() => void openBillingPortal()}
-              disabled={billingState.status === "loading"}
-              className="mt-3 flex min-h-16 w-full items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-sky-300 hover:bg-sky-50/50 disabled:cursor-wait disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:border-slate-700 dark:bg-slate-800 dark:hover:border-sky-700 dark:hover:bg-sky-950/20"
-            >
-              <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-700 dark:bg-sky-400/15 dark:text-sky-200">
-                <CreditCard className="size-5" aria-hidden="true" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block font-bold text-slate-950 dark:text-white">
-                  {billingState.status === "loading" ? "契約管理を開いています..." : "契約を管理"}
+        {onOpenBillingPortal &&
+          entitlement?.status === "success" &&
+          entitlement.data.source === "subscription" && (
+            <section aria-labelledby="billing-setting-heading" className="mt-6">
+              <h2
+                id="billing-setting-heading"
+                className="px-1 text-sm font-bold tracking-wider text-slate-500 dark:text-slate-400"
+              >
+                契約とお支払い
+              </h2>
+              <button
+                type="button"
+                onClick={() => void openBillingPortal()}
+                disabled={billingState.status === "loading"}
+                className="mt-3 flex min-h-16 w-full items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-sky-300 hover:bg-sky-50/50 disabled:cursor-wait disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:border-slate-700 dark:bg-slate-800 dark:hover:border-sky-700 dark:hover:bg-sky-950/20"
+              >
+                <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-700 dark:bg-sky-400/15 dark:text-sky-200">
+                  <CreditCard className="size-5" aria-hidden="true" />
                 </span>
-                <span className="mt-1 block text-sm text-slate-500 dark:text-slate-400">
-                  支払方法、請求履歴、解約を確認
+                <span className="min-w-0 flex-1">
+                  <span className="block font-bold text-slate-950 dark:text-white">
+                    {billingState.status === "loading" ? "契約管理を開いています..." : "契約を管理"}
+                  </span>
+                  <span className="mt-1 block text-sm text-slate-500 dark:text-slate-400">
+                    支払方法、請求履歴、解約を確認
+                  </span>
                 </span>
-              </span>
-              <ChevronRight className="size-5 text-slate-400" aria-hidden="true" />
-            </button>
-            {billingState.status === "error" && (
-              <p role="alert" className="mt-3 px-1 text-sm text-rose-700 dark:text-rose-300">
-                {billingState.message}
-              </p>
-            )}
-          </section>
-        )}
+                <ChevronRight className="size-5 text-slate-400" aria-hidden="true" />
+              </button>
+              {billingState.status === "error" && (
+                <p role="alert" className="mt-3 px-1 text-sm text-rose-700 dark:text-rose-300">
+                  {billingState.message}
+                </p>
+              )}
+            </section>
+          )}
 
         {entitlement && (
-          <section aria-labelledby="subscription-heading" className="mt-8">
+          <section aria-labelledby="subscription-heading" className="mt-6">
             <h2
               id="subscription-heading"
               className="px-1 text-sm font-bold tracking-wider text-slate-500 dark:text-slate-400"
@@ -279,7 +292,7 @@ export function ProfileSettingsScreen({
               <output
                 aria-busy="true"
                 aria-label="利用プランを読み込んでいます"
-                className="mt-3 block min-h-36 animate-pulse rounded-2xl bg-slate-200 motion-reduce:animate-none dark:bg-slate-700"
+                className="mt-3 block h-28 animate-pulse rounded-2xl bg-slate-200 motion-reduce:animate-none dark:bg-slate-700"
               />
             ) : entitlement.status === "error" ? (
               <p
@@ -289,63 +302,59 @@ export function ProfileSettingsScreen({
                 {entitlement.message}
               </p>
             ) : (
-              <div className="mt-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+              <div className="mt-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800">
                 <div className="flex items-center gap-3">
-                  <span className="flex size-11 items-center justify-center rounded-xl bg-sky-100 text-sky-700 dark:bg-sky-400/15 dark:text-sky-200">
-                    <CreditCard className="size-5" aria-hidden="true" />
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-sky-100 text-sky-700 dark:bg-sky-400/15 dark:text-sky-200">
+                    <CreditCard className="size-4" aria-hidden="true" />
                   </span>
-                  <div>
-                    <p className="text-lg font-bold text-slate-950 dark:text-white">
-                      {
-                        (
-                          {
-                            free: "Free",
-                            lite: "Lite",
-                            full: "Full",
-                            family: "ファミリーパック",
-                          } as const
-                        )[entitlement.data.plan]
-                      }
-                    </p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                      {entitlement.data.status === "safe-default"
-                        ? "確認中（Free権限で利用中）"
-                        : entitlement.data.status === "free"
-                          ? "無料プラン"
-                          : "契約中"}
-                    </p>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-baseline gap-x-2">
+                      <p className="font-bold text-slate-950 dark:text-white">
+                        {
+                          (
+                            {
+                              free: "Free",
+                              lite: "Lite",
+                              full: "Full",
+                              family: "ファミリーパック",
+                            } as const
+                          )[entitlement.data.plan]
+                        }
+                      </p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        {entitlement.data.status === "safe-default"
+                          ? "確認中（Free権限で利用中）"
+                          : entitlement.data.status === "free"
+                            ? "無料プラン"
+                            : "契約中"}
+                      </p>
+                    </div>
+                    <dl className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                      <div className="flex flex-wrap gap-x-1">
+                        <dt>{planDate?.label}</dt>
+                        <dd>
+                          {planDate?.value
+                            ? new Intl.DateTimeFormat("ja-JP", { dateStyle: "medium" }).format(
+                                new Date(planDate.value),
+                              )
+                            : "期限なし"}
+                        </dd>
+                      </div>
+                    </dl>
                   </div>
                 </div>
-                <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-                  <div>
-                    <dt className="text-slate-500 dark:text-slate-400">AI返信</dt>
-                    <dd className="mt-1 font-bold text-slate-950 dark:text-white">
+                <dl className="mt-3 grid grid-cols-2 gap-2">
+                  <div className="rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-900/60">
+                    <dt className="text-xs text-slate-500 dark:text-slate-400">AI返信</dt>
+                    <dd className="text-sm font-bold text-slate-950 dark:text-white">
                       残り {entitlement.data.aiReply.remaining} / {entitlement.data.aiReply.limit}
                     </dd>
                   </div>
-                  <div>
-                    <dt className="text-slate-500 dark:text-slate-400">まとめ生成</dt>
-                    <dd className="mt-1 font-bold text-slate-950 dark:text-white">
+                  <div className="rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-900/60">
+                    <dt className="text-xs text-slate-500 dark:text-slate-400">まとめ生成</dt>
+                    <dd className="text-sm font-bold text-slate-950 dark:text-white">
                       残り {entitlement.data.profileSummary.remaining} /{" "}
                       {entitlement.data.profileSummary.limit}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-slate-500 dark:text-slate-400">利用開始</dt>
-                    <dd className="mt-1 text-slate-700 dark:text-slate-200">
-                      {new Intl.DateTimeFormat("ja-JP", { dateStyle: "medium" }).format(
-                        new Date(entitlement.data.effectiveAt),
-                      )}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-slate-500 dark:text-slate-400">{planDate?.label}</dt>
-                    <dd className="mt-1 text-slate-700 dark:text-slate-200">
-                      {planDate?.value
-                        ? new Intl.DateTimeFormat("ja-JP", { dateStyle: "medium" }).format(
-                            new Date(planDate.value),
-                          )
-                        : "期限なし"}
                     </dd>
                   </div>
                 </dl>
@@ -353,9 +362,22 @@ export function ProfileSettingsScreen({
                   <button
                     type="button"
                     onClick={onOpenFamily}
-                    className="mt-5 flex min-h-12 w-full items-center justify-between rounded-xl border border-sky-200 bg-sky-50 px-4 font-bold text-sky-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:border-sky-700 dark:bg-sky-400/10 dark:text-sky-100"
+                    className="mt-3 flex min-h-11 w-full items-center justify-between rounded-xl border border-sky-200 bg-sky-50 px-4 text-sm font-bold text-sky-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:border-sky-700 dark:bg-sky-400/10 dark:text-sky-100"
                   >
                     ファミリー席を管理
+                    <ChevronRight className="size-5" aria-hidden="true" />
+                  </button>
+                )}
+                {onOpenBillingPlans && (
+                  <button
+                    ref={billingPlansButtonRef}
+                    type="button"
+                    onClick={onOpenBillingPlans}
+                    className="mt-3 flex min-h-11 w-full items-center justify-between rounded-xl bg-violet-700 px-4 text-sm font-bold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500"
+                  >
+                    {entitlement.data.source === "subscription"
+                      ? "料金プランを比較"
+                      : "プランをアップグレードする"}
                     <ChevronRight className="size-5" aria-hidden="true" />
                   </button>
                 )}
@@ -364,14 +386,14 @@ export function ProfileSettingsScreen({
           </section>
         )}
 
-        <section aria-labelledby="avatar-setting-heading" className="mt-8">
+        <section aria-labelledby="avatar-setting-heading" className="mt-6">
           <h2
             id="avatar-setting-heading"
             className="min-h-5 px-1 text-sm font-bold tracking-wider text-slate-500 dark:text-slate-400"
           >
             アバター
           </h2>
-          <div className="mt-3 min-h-32">
+          <div className="mt-3">
             {isProfileLoading ? (
               <output
                 aria-busy="true"
@@ -426,7 +448,7 @@ export function ProfileSettingsScreen({
           </div>
         </section>
 
-        <section aria-labelledby="theme-setting-heading" className="mt-8">
+        <section aria-labelledby="theme-setting-heading" className="mt-6">
           <h2
             id="theme-setting-heading"
             className="min-h-5 px-1 text-sm font-bold tracking-wider text-slate-500 dark:text-slate-400"
@@ -479,11 +501,11 @@ export function ProfileSettingsScreen({
               );
             })}
           </div>
-          <p className="mt-3 min-h-10 px-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+          <p className="mt-2 px-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
             選んだテーマはこのブラウザに保存され、次に開いたときも使われます。
           </p>
 
-          <div className="mt-6">
+          <div className="mt-4">
             <p
               id="font-size-setting-label"
               className="min-h-5 px-1 text-sm font-bold text-slate-700 dark:text-slate-200"

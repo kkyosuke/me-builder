@@ -30,6 +30,7 @@ import {
   getIdleMainApplicationRoutes,
   loadAdminApplication,
   loadAvatarSettingsScreen,
+  loadBillingPlanApplication,
   loadCompatibilityApplication,
   loadDevelopmentBrainItemsApplication,
   loadDiagnosisApplication,
@@ -52,9 +53,17 @@ const ProfileSettingsScreen = lazy(loadProfileSettingsScreen);
 const AvatarSettingsScreen = lazy(loadAvatarSettingsScreen);
 const PersonalDataApplication = lazy(loadPersonalDataApplication);
 const FamilySeatApplication = lazy(loadFamilySeatApplication);
+const BillingPlanApplication = lazy(loadBillingPlanApplication);
 const DevelopmentBrainItemsApplication = lazy(loadDevelopmentBrainItemsApplication);
 
-type ProfileView = "closed" | "profile" | "avatar" | "personal-data" | "brain-items" | "family";
+type ProfileView =
+  | "closed"
+  | "profile"
+  | "avatar"
+  | "personal-data"
+  | "brain-items"
+  | "family"
+  | "billing";
 type MainRoute = "compatibility" | "diagnosis" | "me";
 
 const DEVELOPMENT_ENVIRONMENTS = new Set(["development", "local", "preview", "test"]);
@@ -63,6 +72,7 @@ const PROFILE_HISTORY_STATE_KEY = "me-builder-profile-view";
 const PROFILE_RETURN_PATHNAME_STATE_KEY = "me-builder-profile-return-pathname";
 
 function resolveProfileView(pathname: string): ProfileView {
+  if (pathname.startsWith("/profile/billing")) return "billing";
   if (pathname.startsWith("/profile/family")) return "family";
   if (pathname.startsWith("/profile/avatar")) return "avatar";
   if (pathname.startsWith("/profile/personal-data")) return "personal-data";
@@ -80,7 +90,8 @@ function historyProfileView(state: unknown): Exclude<ProfileView, "closed"> | nu
     value === "avatar" ||
     value === "personal-data" ||
     value === "brain-items" ||
-    value === "family"
+    value === "family" ||
+    value === "billing"
     ? value
     : null;
 }
@@ -366,6 +377,11 @@ function AppContents() {
     setNavigation((current) => ({ ...current, profileView: "family" }));
   };
 
+  const openBillingPlans = () => {
+    window.history.pushState({ [PROFILE_HISTORY_STATE_KEY]: "billing" }, "", "/profile/billing");
+    setNavigation((current) => ({ ...current, profileView: "billing" }));
+  };
+
   const closeAvatar = () => {
     if (historyProfileView(window.history.state) === "avatar") {
       setNavigation((current) => ({ ...current, profileView: "profile" }));
@@ -401,6 +417,16 @@ function AppContents() {
 
   const closeFamily = () => {
     if (historyProfileView(window.history.state) === "family") {
+      setNavigation((current) => ({ ...current, profileView: "profile" }));
+      window.history.back();
+      return;
+    }
+    window.history.replaceState({}, "", "/profile");
+    setNavigation((current) => ({ ...current, profileView: "profile" }));
+  };
+
+  const closeBillingPlans = () => {
+    if (historyProfileView(window.history.state) === "billing") {
       setNavigation((current) => ({ ...current, profileView: "profile" }));
       window.history.back();
       return;
@@ -492,7 +518,13 @@ function AppContents() {
               avatar={avatar}
               isAdmin={accountRole === "admin"}
               isInactive={profileView !== "profile"}
-              inactiveFocusTarget={profileView === "brain-items" ? "brain-items" : "avatar"}
+              inactiveFocusTarget={
+                profileView === "billing"
+                  ? "billing"
+                  : profileView === "brain-items"
+                    ? "brain-items"
+                    : "avatar"
+              }
               isProfileLoading={profileReadState.status === "loading"}
               profileError={profileReadState.status === "error" ? profileReadState.message : null}
               entitlement={entitlementState}
@@ -503,6 +535,7 @@ function AppContents() {
               onOpenAdmin={openAdmin}
               onOpenAvatar={openAvatar}
               onOpenBillingPortal={openBillingPortal}
+              onOpenBillingPlans={openBillingPlans}
               onOpenPersonalData={openPersonalData}
               onOpenFamily={openFamily}
               canOpenBrainItems={DEVELOPMENT_ENVIRONMENTS.has(config.environment ?? "")}
@@ -565,6 +598,20 @@ function AppContents() {
             }
           >
             <FamilySeatApplication onBack={closeFamily} />
+          </Suspense>
+        </RouteErrorBoundary>
+      )}
+      {profileView === "billing" && (
+        <RouteErrorBoundary>
+          <Suspense
+            fallback={<LoadingState message="料金プランを読み込んでいます..." variant="overlay" />}
+          >
+            <BillingPlanApplication
+              onBack={closeBillingPlans}
+              onEntitlementChanged={(next) =>
+                setEntitlementState({ status: "success", data: next })
+              }
+            />
           </Suspense>
         </RouteErrorBoundary>
       )}

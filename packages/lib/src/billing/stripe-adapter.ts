@@ -1,5 +1,6 @@
 import Stripe from "stripe";
 import type {
+  BillingCheckoutSession,
   BillingCustomer,
   BillingProvider,
   BillingProviderErrorKind,
@@ -52,6 +53,8 @@ export class StripeBillingProvider implements BillingProvider {
       successUrl: string;
       cancelUrl: string;
       accountId: string;
+      plan: "lite" | "full" | "family";
+      interval: "month" | "year";
     },
     idempotencyKey: string,
   ) {
@@ -64,6 +67,7 @@ export class StripeBillingProvider implements BillingProvider {
           success_url: input.successUrl,
           cancel_url: input.cancelUrl,
           client_reference_id: input.accountId,
+          metadata: { plan: input.plan, interval: input.interval },
         },
         { idempotencyKey },
       );
@@ -100,14 +104,26 @@ export class StripeBillingProvider implements BillingProvider {
     });
   }
 
-  async hasOpenCheckoutSession(customerId: string): Promise<boolean> {
+  async findLatestCheckoutSession(customerId: string): Promise<BillingCheckoutSession | null> {
     return this.call(async () => {
       const sessions = await this.stripe.checkout.sessions.list({
         customer: customerId,
-        status: "open",
         limit: 1,
       });
-      return sessions.data.length > 0;
+      const session = sessions.data[0];
+      return session ? mapCheckoutSession(session) : null;
+    });
+  }
+
+  async retrieveCheckoutSession(sessionId: string): Promise<BillingCheckoutSession> {
+    return this.call(async () =>
+      mapCheckoutSession(await this.stripe.checkout.sessions.retrieve(sessionId)),
+    );
+  }
+
+  async expireCheckoutSession(sessionId: string): Promise<void> {
+    await this.call(async () => {
+      await this.stripe.checkout.sessions.expire(sessionId);
     });
   }
 
@@ -182,6 +198,21 @@ function stripeId(value: unknown): string | null {
     return (value as { id: string }).id;
   }
   return null;
+}
+
+function mapCheckoutSession(session: Stripe.Checkout.Session): BillingCheckoutSession {
+  const customerId = stripeId(session.customer);
+  if (!customerId || !session.status) throw new BillingProviderError("provider", false);
+  const plan = session.metadata?.plan;
+  const interval = session.metadata?.interval;
+  return {
+    id: session.id,
+    customerId,
+    status: session.status,
+    url: session.url,
+    plan: plan === "lite" || plan === "full" || plan === "family" ? plan : null,
+    interval: interval === "month" || interval === "year" ? interval : null,
+  };
 }
 
 function mapSubscription(subscription: Stripe.Subscription): BillingSubscription {
