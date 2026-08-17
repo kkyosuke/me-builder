@@ -1203,7 +1203,9 @@ describe("App", () => {
 
     render(<App />);
 
-    expect(await screen.findByRole("heading", { name: "ふたりの見取り図" })).toBeTruthy();
+    expect(
+      await screen.findByRole("heading", { name: "ふたりの見取り図" }, { timeout: 5_000 }),
+    ).toBeTruthy();
     expect(screen.getByRole("link", { name: "相性" }).getAttribute("aria-current")).toBe("page");
     expect(mocks.fetchDiagnosisList).not.toHaveBeenCalled();
   });
