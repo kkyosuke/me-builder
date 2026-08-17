@@ -121,6 +121,7 @@ class FakeStripeCatalogApi implements StripeCatalogApi {
   async createPortalConfiguration(
     spec: Parameters<StripeCatalogApi["createPortalConfiguration"]>[0],
   ) {
+    this.assertUniquePortalIntervals(spec);
     this.portalSpecs.push(spec);
     const portal = { id: `bpc_${this.portals.length + 1}`, metadata: spec.metadata };
     this.portals.push(portal);
@@ -131,9 +132,24 @@ class FakeStripeCatalogApi implements StripeCatalogApi {
     id: string,
     spec: Parameters<StripeCatalogApi["updatePortalConfiguration"]>[1],
   ) {
+    this.assertUniquePortalIntervals(spec);
     this.portals = this.portals.map((portal) =>
       portal.id === id ? { id, metadata: spec.metadata } : portal,
     );
+  }
+
+  private assertUniquePortalIntervals(
+    spec: Parameters<StripeCatalogApi["createPortalConfiguration"]>[0],
+  ) {
+    if (spec.subscriptionUpdateEnabled === false) return;
+    for (const product of spec.products) {
+      const intervals = product.priceIds.map(
+        (priceId) => this.prices.find((price) => price.id === priceId)?.interval,
+      );
+      if (new Set(intervals).size !== intervals.length) {
+        throw new Error(`Portal product ${product.productId} has duplicate billing intervals`);
+      }
+    }
   }
 }
 
@@ -180,12 +196,12 @@ describe("setupStripeBillingCatalog", () => {
     expect(management.features.subscription_update).toEqual({ enabled: false });
   });
 
-  it("空のStripe環境へ商品、月額・年額Price、Webhook、Portalを再現する", async () => {
+  it("空のStripe環境へPlan別商品、月額・年額Price、Webhook、Portalを再現する", async () => {
     const api = new FakeStripeCatalogApi();
 
     const result = await setupStripeBillingCatalog({ api, environment: "preview" });
 
-    expect(api.products).toHaveLength(1);
+    expect(api.products).toHaveLength(3);
     expect(api.prices).toHaveLength(6);
     expect(
       api.createdPriceSpecs.map(({ lookupKey, unitAmount, interval }) => ({
@@ -205,14 +221,19 @@ describe("setupStripeBillingCatalog", () => {
     expect(api.webhookEvents).toEqual(STRIPE_BILLING_EVENT_TYPES);
     expect(api.portals).toHaveLength(3);
     expect(api.portalSpecs[0]?.products).toEqual([
-      {
-        productId: "me_builder_subscription",
-        priceIds: ["price_1", "price_2", "price_3", "price_4", "price_5", "price_6"],
-      },
+      { productId: "me_builder_lite", priceIds: ["price_1", "price_2"] },
+      { productId: "me_builder_full", priceIds: ["price_3", "price_4"] },
+      { productId: "me_builder_family", priceIds: ["price_5", "price_6"] },
     ]);
     expect(new Set(api.prices.map((price) => price.productId))).toEqual(
-      new Set(["me_builder_subscription"]),
+      new Set(["me_builder_lite", "me_builder_full", "me_builder_family"]),
     );
+    for (const portalProduct of api.portalSpecs[0]?.products ?? []) {
+      const intervals = portalProduct.priceIds.map(
+        (priceId) => api.prices.find((price) => price.id === priceId)?.interval,
+      );
+      expect(new Set(intervals).size).toBe(intervals.length);
+    }
     expect(result.webhookSecret).toBe("whsec_fixture");
     expect(result.portalConfigurationId).toBe("bpc_1");
     expect(result.portalPlanChangeConfigurationId).toBe("bpc_2");
@@ -232,7 +253,7 @@ describe("setupStripeBillingCatalog", () => {
     await setupStripeBillingCatalog({ api, environment: "preview" });
     const second = await setupStripeBillingCatalog({ api, environment: "preview" });
 
-    expect(api.products).toHaveLength(1);
+    expect(api.products).toHaveLength(3);
     expect(api.prices).toHaveLength(6);
     expect(api.webhooks).toHaveLength(1);
     expect(api.portals).toHaveLength(3);
@@ -258,16 +279,63 @@ describe("setupStripeBillingCatalog", () => {
     expect(api.createdPriceSpecs.at(-1)?.transferLookupKey).toBe(true);
   });
 
-  it("移行前のPlan別Productを既存契約用Plan mapへ残す", async () => {
+  it("共通Productの6 Priceまで作成済みの失敗状態からPlan別Productへ収束する", async () => {
     const api = new FakeStripeCatalogApi();
     api.products.push({
-      id: "me_builder_lite",
-      metadata: { managed_by: "me-builder-stripe-catalog", plan: "lite" },
+      id: "me_builder_subscription",
+      metadata: { managed_by: "me-builder-stripe-catalog" },
+    });
+    const legacyPrices = STRIPE_BILLING_CATALOG.flatMap((product) =>
+      product.prices.map((price, index) => ({
+        id: `price_common_${product.plan}_${index}`,
+        active: true,
+        productId: "me_builder_subscription",
+        currency: "jpy",
+        unitAmount: price.unitAmount,
+        interval: price.interval,
+        intervalCount: 1,
+        taxBehavior: "inclusive",
+        lookupKey: price.lookupKey,
+        metadata: {
+          managed_by: "me-builder-stripe-catalog",
+          catalog_version: "2026-08-16",
+          plan: product.plan,
+        },
+      })),
+    );
+    api.prices.push(...legacyPrices);
+
+    const result = await setupStripeBillingCatalog({ api, environment: "preview" });
+
+    expect(api.archivedPriceIds).toEqual(legacyPrices.map((price) => price.id));
+    expect(
+      api.prices
+        .filter((price) => price.lookupKey)
+        .map(({ productId, lookupKey }) => ({ productId, lookupKey })),
+    ).toEqual([
+      { productId: "me_builder_lite", lookupKey: "me_builder_lite_monthly" },
+      { productId: "me_builder_lite", lookupKey: "me_builder_lite_yearly" },
+      { productId: "me_builder_full", lookupKey: "me_builder_full_monthly" },
+      { productId: "me_builder_full", lookupKey: "me_builder_full_yearly" },
+      { productId: "me_builder_family", lookupKey: "me_builder_family_monthly" },
+      { productId: "me_builder_family", lookupKey: "me_builder_family_yearly" },
+    ]);
+    for (const legacyPrice of legacyPrices) {
+      expect(result.pricePlanMap[legacyPrice.id]).toBe(legacyPrice.metadata.plan);
+    }
+    expect(api.portalSpecs).toHaveLength(3);
+  });
+
+  it("移行前の共通Productを既存契約用Plan mapへ残す", async () => {
+    const api = new FakeStripeCatalogApi();
+    api.products.push({
+      id: "me_builder_subscription",
+      metadata: { managed_by: "me-builder-stripe-catalog" },
     });
     api.prices.push({
       id: "price_legacy_lite",
       active: false,
-      productId: "me_builder_lite",
+      productId: "me_builder_subscription",
       currency: "jpy",
       unitAmount: 700,
       interval: "month",
@@ -280,7 +348,14 @@ describe("setupStripeBillingCatalog", () => {
     const result = await setupStripeBillingCatalog({ api, environment: "preview" });
 
     expect(result.pricePlanMap.price_legacy_lite).toBe("lite");
-    expect(api.products.map((product) => product.id)).toContain("me_builder_subscription");
+    expect(api.products.map((product) => product.id)).toEqual(
+      expect.arrayContaining([
+        "me_builder_subscription",
+        "me_builder_lite",
+        "me_builder_full",
+        "me_builder_family",
+      ]),
+    );
   });
 
   it("管理外の固定Product IDを上書きしない", async () => {
