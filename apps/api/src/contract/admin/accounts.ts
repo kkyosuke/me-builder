@@ -1,6 +1,11 @@
 import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
 import * as v from "valibot";
-import { ForbiddenErrorSchema, authenticatedErrors, jsonResponse } from "../shared/errors";
+import {
+  ForbiddenErrorSchema,
+  authenticatedErrors,
+  currentTermsPolicyError,
+  jsonResponse,
+} from "../shared/errors";
 
 const CountSchema = v.pipe(v.number(), v.safeInteger(), v.minValue(0));
 const TimestampSchema = v.pipe(v.string(), v.isoTimestamp());
@@ -81,5 +86,6 @@ export const adminAccountsRoute = describeRoute({
     400: jsonResponse("検索条件またはcursorが不正", InvalidAdminAccountsRequestSchema),
     403: jsonResponse("管理者権限がない", ForbiddenErrorSchema),
     ...authenticatedErrors,
+    ...currentTermsPolicyError,
   },
 } satisfies DescribeRouteOptions);

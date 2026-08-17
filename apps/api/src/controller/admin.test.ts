@@ -6,6 +6,30 @@ const { getAdminStatistics } = vi.hoisted(() => ({ getAdminStatistics: vi.fn() }
 const { getAdminAccounts } = vi.hoisted(() => ({ getAdminAccounts: vi.fn() }));
 vi.mock("../logic/admin-statistics", () => ({ getAdminStatistics }));
 vi.mock("../logic/admin-accounts", () => ({ getAdminAccounts }));
+vi.mock("../middleware/authentication", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../middleware/authentication")>();
+  return {
+    ...actual,
+    requireAuthentication: async (
+      c: Parameters<typeof actual.requireAuthentication>[0],
+      next: () => Promise<void>,
+    ) => {
+      const actor = {
+        accountId: "admin-account",
+        authenticationMethod: "liff" as const,
+        authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
+      };
+      c.set("authenticatedActor", actor);
+      c.set("authenticationResult", { type: "authenticated", actor, accountRole: "admin" });
+      await next();
+    },
+  };
+});
+vi.mock("../middleware/authorization", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../middleware/authorization")>();
+  const pass = async (_c: unknown, next: () => Promise<void>) => next();
+  return { ...actual, requireCurrentTerms: pass, requireAdmin: pass };
+});
 
 const dummyDb = {} as D1Database;
 

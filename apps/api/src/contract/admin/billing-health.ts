@@ -1,6 +1,11 @@
 import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
 import * as v from "valibot";
-import { ForbiddenErrorSchema, authenticatedErrors, jsonResponse } from "../shared/errors";
+import {
+  ForbiddenErrorSchema,
+  authenticatedErrors,
+  currentTermsPolicyError,
+  jsonResponse,
+} from "../shared/errors";
 
 const CountSchema = v.pipe(v.number(), v.safeInteger(), v.minValue(0));
 export const AdminBillingHealthResponseSchema = v.object({
@@ -24,5 +29,6 @@ export const adminBillingHealthRoute = describeRoute({
     200: jsonResponse("課金projectionの安全な集計と劣化判定", AdminBillingHealthResponseSchema),
     403: jsonResponse("管理者権限がない", ForbiddenErrorSchema),
     ...authenticatedErrors,
+    ...currentTermsPolicyError,
   },
 } satisfies DescribeRouteOptions);

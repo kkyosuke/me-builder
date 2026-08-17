@@ -16,18 +16,13 @@ import {
   InvalidBillingReconciliationSchema,
 } from "../contract/admin/billing-reconciliation";
 import { AdminStatisticsResponseSchema } from "../contract/admin/statistics";
-import {
-  AccountNotFoundErrorSchema,
-  ForbiddenErrorSchema,
-  ServiceUnavailableErrorSchema,
-  UnauthorizedErrorSchema,
-} from "../contract/shared/errors";
+import { ServiceUnavailableErrorSchema } from "../contract/shared/errors";
 import { getAdminAccounts } from "../logic/admin-accounts";
 import { getAdminBillingHealth } from "../logic/admin-billing-health";
 import { reconcileAdminBillingProjection } from "../logic/admin-billing-reconciliation";
 import { getAdminStatistics } from "../logic/admin-statistics";
+import { authenticatedActor } from "../middleware/authentication";
 import type { AppEnv } from "../types";
-import { bearerToken } from "./auth";
 
 export async function getAccounts(c: Context<AppEnv>): Promise<Response> {
   if (!c.env?.DB) {
@@ -38,11 +33,8 @@ export async function getAccounts(c: Context<AppEnv>): Promise<Response> {
   if (!parsed.success) {
     return c.json(v.parse(InvalidAdminAccountsRequestSchema, { error: "Invalid request" }), 400);
   }
-  const config = getConfig(c.env);
   const outcome = await getAdminAccounts({
-    idToken: bearerToken(c.req.header("authorization")),
-    lineLoginChannelId: config.lineLoginChannelId,
-    adminLineUserIds: config.adminLineUserIds,
+    actor: authenticatedActor(c),
     db: D1.shared.client.create(c.env.DB),
     input: {
       ...(parsed.output.query !== undefined ? { query: parsed.output.query } : {}),
@@ -58,19 +50,6 @@ export async function getAccounts(c: Context<AppEnv>): Promise<Response> {
       return c.json(v.parse(AdminAccountsResponseSchema, outcome.page));
     case "invalid-request":
       return c.json(v.parse(InvalidAdminAccountsRequestSchema, { error: "Invalid request" }), 400);
-    case "forbidden":
-      return c.json(v.parse(ForbiddenErrorSchema, { error: "Forbidden" }), 403);
-    case "account-not-found":
-      return c.json(
-        v.parse(AccountNotFoundErrorSchema, {
-          error: "Account not found",
-          reason: "friendship_required",
-        }),
-        404,
-      );
-    case "not-configured":
-    case "unauthenticated":
-      return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
   }
 }
 
@@ -81,9 +60,7 @@ export async function getStatistics(c: Context<AppEnv>): Promise<Response> {
   }
   const config = getConfig(c.env);
   const outcome = await getAdminStatistics({
-    idToken: bearerToken(c.req.header("authorization")),
-    lineLoginChannelId: config.lineLoginChannelId,
-    adminLineUserIds: config.adminLineUserIds,
+    actor: authenticatedActor(c),
     db: D1.shared.client.create(c.env.DB),
     lineChannelAccessToken: config.lineChannelAccessToken,
   });
@@ -91,19 +68,6 @@ export async function getStatistics(c: Context<AppEnv>): Promise<Response> {
     case "resolved":
       c.header("Cache-Control", "no-store");
       return c.json(v.parse(AdminStatisticsResponseSchema, outcome.statistics));
-    case "forbidden":
-      return c.json(v.parse(ForbiddenErrorSchema, { error: "Forbidden" }), 403);
-    case "account-not-found":
-      return c.json(
-        v.parse(AccountNotFoundErrorSchema, {
-          error: "Account not found",
-          reason: "friendship_required",
-        }),
-        404,
-      );
-    case "not-configured":
-    case "unauthenticated":
-      return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
   }
 }
 
@@ -123,9 +87,7 @@ export async function postBillingReconciliation(c: Context<AppEnv>): Promise<Res
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   }
   const outcome = await reconcileAdminBillingProjection({
-    idToken: bearerToken(c.req.header("authorization")),
-    lineLoginChannelId: config.lineLoginChannelId,
-    adminLineUserIds: config.adminLineUserIds,
+    actor: authenticatedActor(c),
     db: D1.shared.client.create(c.env.DB),
     provider: billing.createStripeBillingProvider({
       secretKey: config.stripeSecretKey,
@@ -146,19 +108,6 @@ export async function postBillingReconciliation(c: Context<AppEnv>): Promise<Res
         v.parse(BillingCustomerNotFoundSchema, { error: "Billing customer not found" }),
         404,
       );
-    case "forbidden":
-      return c.json(v.parse(ForbiddenErrorSchema, { error: "Forbidden" }), 403);
-    case "account-not-found":
-      return c.json(
-        v.parse(AccountNotFoundErrorSchema, {
-          error: "Account not found",
-          reason: "friendship_required",
-        }),
-        404,
-      );
-    case "not-configured":
-    case "unauthenticated":
-      return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
   }
 }
 
@@ -168,9 +117,7 @@ export async function getBillingHealth(c: Context<AppEnv>): Promise<Response> {
   }
   const config = getConfig(c.env);
   const outcome = await getAdminBillingHealth({
-    idToken: bearerToken(c.req.header("authorization")),
-    lineLoginChannelId: config.lineLoginChannelId,
-    adminLineUserIds: config.adminLineUserIds,
+    actor: authenticatedActor(c),
     db: D1.shared.client.create(c.env.DB),
     staleAfterMs: config.billingProjectionStaleAfterSeconds * 1_000,
   });
@@ -178,10 +125,5 @@ export async function getBillingHealth(c: Context<AppEnv>): Promise<Response> {
     case "resolved":
       c.header("Cache-Control", "no-store");
       return c.json(v.parse(AdminBillingHealthResponseSchema, outcome.health));
-    case "forbidden":
-      return c.json(v.parse(ForbiddenErrorSchema, { error: "Forbidden" }), 403);
-    case "not-configured":
-    case "unauthenticated":
-      return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
   }
 }

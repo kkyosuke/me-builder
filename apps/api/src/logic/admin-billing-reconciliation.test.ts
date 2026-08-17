@@ -4,7 +4,7 @@ import Database from "better-sqlite3";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { reconcileAdminBillingProjection } from "./admin-billing-reconciliation";
 
 function createTestDb(): D1.shared.Client {
@@ -69,22 +69,19 @@ describe("admin billing reconciliation", () => {
       planCode: "lite",
     });
     const provider = new billing.FakeBillingProvider({ listSubscriptions: async () => [current] });
-    const createSession = vi.fn().mockResolvedValue({
-      type: "resolved",
-      session: { accountId: admin.account.id, role: "admin" },
-    });
     const run = (mode: "dry-run" | "apply") =>
       reconcileAdminBillingProjection({
-        idToken: "token",
-        lineLoginChannelId: "channel",
-        adminLineUserIds: [],
+        actor: {
+          accountId: admin.account.id,
+          authenticationMethod: "liff",
+          authenticatedAt: new Date("2026-08-15T00:00:00Z"),
+        },
         db,
         provider,
         accountId: target.account.id,
         mode,
         pricePlanMap: { price_full: "full", price_lite: "lite" },
         now: new Date("2026-08-15T00:00:00Z"),
-        createSession,
       });
 
     await expect(run("dry-run")).resolves.toMatchObject({
@@ -148,19 +145,17 @@ describe("admin billing reconciliation", () => {
     });
 
     const outcome = await reconcileAdminBillingProjection({
-      idToken: "token",
-      lineLoginChannelId: "channel",
-      adminLineUserIds: [],
+      actor: {
+        accountId: admin.account.id,
+        authenticationMethod: "liff",
+        authenticatedAt: new Date("2026-08-15T00:00:00Z"),
+      },
       db,
       provider: new billing.FakeBillingProvider({ listSubscriptions: async () => [current] }),
       accountId: target.account.id,
       mode: "apply",
       pricePlanMap: { price_full: "full" },
       now: new Date("2026-08-15T00:00:00Z"),
-      createSession: vi.fn().mockResolvedValue({
-        type: "resolved",
-        session: { accountId: admin.account.id, role: "admin" },
-      }),
     });
 
     expect(outcome).toMatchObject({

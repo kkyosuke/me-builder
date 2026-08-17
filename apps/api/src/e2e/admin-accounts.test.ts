@@ -138,4 +138,33 @@ describe("Admin Account list local E2E", () => {
       ],
     });
   });
+
+  it("認証後に共有D1のroleを失ったAccountをrequestごとに拒否する", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({
+          iss: "https://access.line.me",
+          sub: adminLineId,
+          aud: "1234567890",
+          iat: Math.floor(Date.now() / 1_000),
+          exp: timestamp + 86_400,
+        }),
+      ),
+    );
+    await database
+      .prepare("UPDATE accounts SET role = 'user' WHERE id = ?")
+      .bind(adminAccountId)
+      .run();
+    const response = await app.request(
+      "/api/admin/accounts",
+      { headers: { Authorization: "Bearer previously-admin-token" } },
+      { DB: database, LINE_LOGIN_CHANNEL_ID: "1234567890", ENVIRONMENT: "test" },
+    );
+    expect(response.status).toBe(403);
+    await database
+      .prepare("UPDATE accounts SET role = 'admin' WHERE id = ?")
+      .bind(adminAccountId)
+      .run();
+  });
 });
