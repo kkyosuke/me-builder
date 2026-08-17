@@ -5,11 +5,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { RouteErrorBoundary, recoverFromChunkLoadFailure } from "./route-error-boundary";
 
 const mocks = vi.hoisted(() => ({
-  loggerError: vi.fn(),
+  reportRouteRenderError: vi.fn(),
 }));
 
-vi.mock("@me-builder/shared", () => ({
-  logger: { error: mocks.loggerError },
+vi.mock("../infrastructure/web-error-reporter", () => ({
+  reportRouteRenderError: mocks.reportRouteRenderError,
 }));
 
 function FailedRoute(): never {
@@ -71,14 +71,7 @@ describe("RouteErrorBoundary", () => {
     );
 
     expect(screen.getByRole("heading", { name: "画面を読み込めませんでした" })).toBeTruthy();
-    expect(mocks.loggerError).toHaveBeenCalledWith(
-      {
-        event: "web.route-render.failed",
-        outcome: "failed",
-        reason: "render-error",
-      },
-      "画面の描画に失敗しました",
-    );
+    expect(mocks.reportRouteRenderError).toHaveBeenCalledWith(expect.any(Error), false);
     fireEvent.click(screen.getByRole("button", { name: "再読み込み" }));
     expect(onReload).toHaveBeenCalledOnce();
   });

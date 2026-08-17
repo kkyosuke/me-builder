@@ -4,6 +4,23 @@
  */
 
 export interface paths {
+  "/api/observability/web-errors": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Web UIの安全化済み未捕捉エラーをWorkers Logsへ記録する */
+    post: operations["reportWebClientError"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/auth/liff/exchange": {
     parameters: {
       query?: never;
@@ -1044,6 +1061,152 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+  reportWebClientError: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @constant */
+          schemaVersion: 1;
+          /** @enum {string} */
+          kind: "unhandled-error" | "unhandled-rejection" | "render-error" | "chunk-load-error";
+          /** @enum {string} */
+          route:
+            | "/"
+            | "/terms"
+            | "/privacy"
+            | "/contact"
+            | "/diagnosis"
+            | "/diagnosis/:diagnosisId/answers"
+            | "/compatibility"
+            | "/compatibility/share"
+            | "/compatibility/invitations/:relationshipId"
+            | "/compatibility/relationships/:relationshipId"
+            | "/me"
+            | "/profile"
+            | "/profile/avatar"
+            | "/profile/personal-data"
+            | "/profile/family"
+            | "/profile/billing"
+            | "/profile/brain-items"
+            | "/admin"
+            | "/admin/statistics"
+            | "/account-recovery"
+            | "unknown";
+          release: string;
+          /** @enum {string} */
+          errorType:
+            | "Error"
+            | "TypeError"
+            | "RangeError"
+            | "ReferenceError"
+            | "SyntaxError"
+            | "URIError"
+            | "AggregateError"
+            | "DOMException"
+            | "NonError"
+            | "Unknown";
+          sourceFile?: string;
+          sourceLine?: number;
+          sourceColumn?: number;
+          online: boolean;
+          recovered: boolean;
+        };
+      };
+    };
+    responses: {
+      /** @description ブラウザエラーを受理した */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description request bodyが固定schemaと一致しない */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description application sessionを検証できない */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Unauthorized";
+          };
+        };
+      };
+      /** @description 許可済みWeb Originではない */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description 対応するAccountが存在しない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Account not found";
+            /** @constant */
+            reason: "friendship_required";
+          };
+        };
+      };
+      /** @description request bodyが上限を超えている */
+      413: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description ブラウザエラー受付の流量上限を超えた */
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
+          };
+        };
+      };
+      /** @description D1 bindingが設定されていない */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Service Unavailable";
+          };
+        };
+      };
+    };
+  };
   exchangeLiffCredential: {
     parameters: {
       query?: never;

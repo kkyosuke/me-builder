@@ -72,6 +72,7 @@ import {
   getServiceTermsAcceptanceHistoryRoute,
   getServiceTermsRoute,
 } from "./contract/legal/terms";
+import { webClientErrorReportRoute } from "./contract/observability/web-client-error";
 import { openApiOptions } from "./contract/openapi";
 import {
   downloadPersonalDataExportRoute,
@@ -173,6 +174,7 @@ import {
   putServiceTermsAcceptance,
 } from "./controller/legal";
 import { postLineWebhook } from "./controller/line";
+import { postWebClientError } from "./controller/observability";
 import {
   deletePersonalDataRecordContents,
   downloadPersonalDataExportContents,
@@ -244,6 +246,7 @@ app.onError((err, c) => {
 app.use("*", async (c, next) => {
   const start = Date.now();
   await next();
+  if (c.get("terminalLogOwnedByRoute")) return;
   const responseTimeMs = Date.now() - start;
   const status = c.res.status;
   const path = operationalHttpPath(c.req.path);
@@ -282,6 +285,12 @@ app.get("/api/health", (c) => {
   });
 });
 
+app.post(
+  "/api/observability/web-errors",
+  requireAuthentication,
+  webClientErrorReportRoute,
+  postWebClientError,
+);
 app.post("/api/line/webhook", postLineWebhook);
 app.post("/api/billing/webhook", postStripeWebhook);
 app.post(

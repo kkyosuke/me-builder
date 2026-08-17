@@ -26,6 +26,7 @@ type Env = Omit<
   | "COMPATIBILITY_DATA"
   | "CONVERSATION_COORDINATOR"
   | "BRAIN_VECTOR_INDEX"
+  | "WEB_ERROR_RATE_LIMITER"
   | "WEB_ORIGIN"
 > & {
   ENVIRONMENT?: string;
@@ -55,6 +56,10 @@ type Env = Omit<
   COMPATIBILITY_DATA?: CompatibilityDataNamespace;
   CONVERSATION_COORDINATOR?: ConversationCoordinatorNamespace;
   BRAIN_VECTOR_INDEX?: ApiBindings["BRAIN_VECTOR_INDEX"];
+  /** Wrangler local以外では常に設定する。単体テストでは未設定へ縮退できる。 */
+  WEB_ERROR_RATE_LIMITER?: {
+    limit(options: { key: string }): Promise<{ success: boolean }>;
+  };
   /** テスト・previewの注入境界。未指定時はFreeへ安全に縮退する。 */
   ACCOUNT_PLAN_ASSIGNMENT_PROVIDER?: billing.AccountPlanAssignmentProvider;
 };
@@ -64,6 +69,8 @@ export type AppEnv = {
   /** onErrorが分類したエラーを、終端ログを持つmiddlewareへ引き渡すための領域。 */
   Variables: {
     safeError?: SafeOperationalErrorFields;
+    /** 専用の処理終端ログをrouteが出力し、通常のHTTP終端ログを重ねない場合に使う。 */
+    terminalLogOwnedByRoute?: boolean;
     authenticatedActor?: AuthenticatedActor;
     authenticationResult?: AuthenticationResult;
     authenticationSource?: "application-session";
