@@ -71,7 +71,7 @@ describe("billing sessions", () => {
         interval: "year",
         trialPeriodDays: 14,
       }),
-      `billing-checkout-${owner.id}-initial`,
+      `billing-checkout-${owner.id}-cus_${owner.id}-initial`,
     );
   });
 
@@ -204,6 +204,10 @@ describe("billing sessions", () => {
     expect(createCustomer).toHaveBeenCalledWith(
       { accountId: owner.id },
       `billing-customer-${owner.id}-cus_stale`,
+    );
+    expect(createCheckoutSession).toHaveBeenCalledWith(
+      expect.objectContaining({ customerId: "cus_replacement" }),
+      `billing-checkout-${owner.id}-cus_replacement-initial`,
     );
     await expect(
       D1.shared.action.billing.findBillingCustomerByAccount(db, owner.id),
@@ -378,7 +382,7 @@ describe("billing sessions", () => {
     expect(expireCheckoutSession).toHaveBeenCalledWith("cs_test_old");
     expect(createCheckoutSession).toHaveBeenCalledWith(
       expect.objectContaining({ plan: "full", interval: "year" }),
-      `billing-checkout-${owner.id}-cs_test_old`,
+      `billing-checkout-${owner.id}-cus_${owner.id}-cs_test_old`,
     );
   });
 

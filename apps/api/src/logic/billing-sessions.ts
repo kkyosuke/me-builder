@@ -125,7 +125,7 @@ export async function createBillingCheckoutSession(
       interval: params.interval,
       ...(trialEligible ? { trialPeriodDays: BILLING_INITIAL_TRIAL_DAYS } : {}),
     },
-    `billing-checkout-${accountId}-${latestCheckout?.id ?? "initial"}`,
+    `billing-checkout-${accountId}-${customer.providerCustomerId}-${latestCheckout?.id ?? "initial"}`,
   );
   return { type: "created", url: checkout.url };
 }
