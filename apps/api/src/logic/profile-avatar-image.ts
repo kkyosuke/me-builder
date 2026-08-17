@@ -1,8 +1,8 @@
 import type { R2Bucket } from "@cloudflare/workers-types";
 import { D1, line } from "@me-builder/lib";
 import { logger } from "@me-builder/shared";
+import type { AuthenticatedActor } from "./authentication/types";
 import { MAX_AVATAR_BYTES } from "./avatar-image";
-import { type LiffSessionOutcome, createLiffSession } from "./liff-session";
 
 const SUPPORTED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
@@ -170,38 +170,33 @@ export async function resolveProfileAvatarImage(
 }
 
 type OwnImageParams = Readonly<{
-  idToken: string | undefined;
-  lineLoginChannelId: string | undefined;
+  actor: AuthenticatedActor;
+  verifiedLinePictureUrl?: string;
   db: D1.shared.Client;
   avatarBucket: R2Bucket;
   lineChannelAccessToken?: string | undefined;
 }>;
 
 type OwnImageDependencies = Readonly<{
-  createSession: typeof createLiffSession;
   resolveAvatarImage: typeof resolveProfileAvatarImage;
 }>;
 
 const defaultOwnImageDependencies: OwnImageDependencies = {
-  createSession: createLiffSession,
   resolveAvatarImage: resolveProfileAvatarImage,
 };
 
 export type ProfileAvatarImageOutcome =
   | { type: "resolved"; image: ProfileAvatarImage }
-  | { type: "unavailable" }
-  | Exclude<LiffSessionOutcome, { type: "resolved" }>;
+  | { type: "unavailable" };
 
 /** LIFF本人の現在のプロフィール画像を、Account IDを入力させずに取得する。 */
 export async function getProfileAvatarImage(
   params: OwnImageParams,
   dependencies: OwnImageDependencies = defaultOwnImageDependencies,
 ): Promise<ProfileAvatarImageOutcome> {
-  const session = await dependencies.createSession(params);
-  if (session.type !== "resolved") return session;
   const image = await dependencies.resolveAvatarImage({
-    accountId: session.session.accountId,
-    verifiedLinePictureUrl: session.session.pictureUrl,
+    accountId: params.actor.accountId,
+    verifiedLinePictureUrl: params.verifiedLinePictureUrl,
     db: params.db,
     avatarBucket: params.avatarBucket,
     lineChannelAccessToken: params.lineChannelAccessToken,

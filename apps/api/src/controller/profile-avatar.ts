@@ -4,11 +4,7 @@ import type { Context } from "hono";
 import * as v from "valibot";
 import { getConfig } from "../config";
 import { AvatarInputErrorSchema, ProfileResponseSchema } from "../contract/profile/profile";
-import {
-  AccountNotFoundErrorSchema,
-  ServiceUnavailableErrorSchema,
-  UnauthorizedErrorSchema,
-} from "../contract/shared/errors";
+import { ServiceUnavailableErrorSchema } from "../contract/shared/errors";
 import { MAX_AVATAR_BYTES, validateAvatarImage } from "../logic/avatar-image";
 import {
   type ProfileOutcome,
@@ -18,17 +14,17 @@ import {
   saveProfileAvatar,
 } from "../logic/profile";
 import { getProfileAvatarImage } from "../logic/profile-avatar-image";
+import { authenticatedSession } from "../middleware/authentication";
 import type { AppEnv } from "../types";
-import { bearerToken } from "./auth";
 import { avatarImageResponse } from "./avatar-image-response";
 
 function dependencies(c: Context<AppEnv>) {
-  const currentConfig = getConfig(c.env);
   if (!c.env?.DB || !c.env.AVATAR_BUCKET) return undefined;
+  const session = authenticatedSession(c);
   return {
-    idToken: bearerToken(c.req.header("authorization")),
-    lineLoginChannelId: currentConfig.lineLoginChannelId,
-    adminLineUserIds: currentConfig.adminLineUserIds,
+    actor: session.actor,
+    accountRole: session.accountRole,
+    ...(session.displayProfile ? { displayProfile: session.displayProfile } : {}),
     db: D1.shared.client.create(c.env.DB),
     avatarBucket: c.env.AVATAR_BUCKET,
   };
@@ -40,22 +36,8 @@ function unavailable(c: Context<AppEnv>): Response {
 }
 
 function profileResponse(c: Context<AppEnv>, outcome: ProfileOutcome): Response {
-  switch (outcome.type) {
-    case "resolved":
-      c.header("Cache-Control", "no-store");
-      return c.json(v.parse(ProfileResponseSchema, outcome.profile));
-    case "account-not-found":
-      return c.json(
-        v.parse(AccountNotFoundErrorSchema, {
-          error: "Account not found",
-          reason: "friendship_required",
-        }),
-        404,
-      );
-    case "not-configured":
-    case "unauthenticated":
-      return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
-  }
+  c.header("Cache-Control", "no-store");
+  return c.json(v.parse(ProfileResponseSchema, outcome.profile));
 }
 
 async function readAvatarBody(request: Request): Promise<Uint8Array | "too-large"> {
@@ -93,7 +75,12 @@ export async function getProfileAvatarImageContents(c: Context<AppEnv>): Promise
   const params = dependencies(c);
   if (!params) return unavailable(c);
   const outcome = await getProfileAvatarImage({
-    ...params,
+    actor: params.actor,
+    ...(params.displayProfile?.pictureUrl
+      ? { verifiedLinePictureUrl: params.displayProfile.pictureUrl }
+      : {}),
+    db: params.db,
+    avatarBucket: params.avatarBucket,
     lineChannelAccessToken: getConfig(c.env).lineChannelAccessToken,
   });
   switch (outcome.type) {
@@ -101,17 +88,13 @@ export async function getProfileAvatarImageContents(c: Context<AppEnv>): Promise
       return avatarImageResponse(outcome.image);
     case "unavailable":
       return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
-    case "not-configured":
-    case "unauthenticated":
-      return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
   }
 }
 
 export async function putProfileAvatar(c: Context<AppEnv>): Promise<Response> {
   const params = dependencies(c);
   if (!params) return unavailable(c);
-  const session = await authenticateProfile(params);
-  if (session.type !== "resolved") return profileResponse(c, session);
+  const session = authenticateProfile(params);
 
   const declaredLength = Number(c.req.header("content-length"));
   if (Number.isFinite(declaredLength) && declaredLength > MAX_AVATAR_BYTES) {
@@ -137,10 +120,7 @@ export async function putProfileAvatar(c: Context<AppEnv>): Promise<Response> {
         422,
       );
     case "valid":
-      return profileResponse(
-        c,
-        await saveProfileAvatar({ ...params, image: validation }, session.session),
-      );
+      return profileResponse(c, await saveProfileAvatar({ ...params, image: validation }, session));
   }
 }
 

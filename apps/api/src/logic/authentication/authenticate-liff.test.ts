@@ -37,6 +37,7 @@ describe("authenticateLiff", () => {
         authenticationMethod: "liff",
         authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
       },
+      accountRole: "user",
       displayProfile: { displayName: "うつし" },
     });
     expect(JSON.stringify(result)).not.toContain("secret-subject");

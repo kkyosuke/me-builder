@@ -333,12 +333,48 @@ app.post(
 app.get("/api/goal-follow-ups", goalFollowUpListRoute, getGoalFollowUpContents);
 app.post("/api/goal-follow-ups", goalFollowUpAgreementRoute, postGoalFollowUpAgreement);
 app.patch("/api/goal-follow-ups/:goalFollowUpId", goalFollowUpUpdateRoute, patchGoalFollowUp);
-app.get("/api/profile", getProfileRoute, getProfileContents);
-app.get("/api/profile/entitlement", profileEntitlementRoute, getProfileEntitlementContents);
-app.get("/api/profile/progression", profileProgressionRoute, getProfileProgressionContents);
-app.get("/api/profile/avatar", getProfileAvatarImageRoute, getProfileAvatarImageContents);
-app.put("/api/profile/avatar", putProfileAvatarRoute, putProfileAvatar);
-app.delete("/api/profile/avatar", deleteProfileAvatarRoute, deleteProfileAvatarContents);
+app.get(
+  "/api/profile",
+  requireAuthentication,
+  requireCurrentTerms,
+  getProfileRoute,
+  getProfileContents,
+);
+app.get(
+  "/api/profile/entitlement",
+  requireAuthentication,
+  requireCurrentTerms,
+  profileEntitlementRoute,
+  getProfileEntitlementContents,
+);
+app.get(
+  "/api/profile/progression",
+  requireAuthentication,
+  requireCurrentTerms,
+  profileProgressionRoute,
+  getProfileProgressionContents,
+);
+app.get(
+  "/api/profile/avatar",
+  requireAuthentication,
+  requireCurrentTerms,
+  getProfileAvatarImageRoute,
+  getProfileAvatarImageContents,
+);
+app.put(
+  "/api/profile/avatar",
+  requireAuthentication,
+  requireCurrentTerms,
+  putProfileAvatarRoute,
+  putProfileAvatar,
+);
+app.delete(
+  "/api/profile/avatar",
+  requireAuthentication,
+  requireCurrentTerms,
+  deleteProfileAvatarRoute,
+  deleteProfileAvatarContents,
+);
 
 app.get("/api/personal-data/records", personalDataRecordsRoute, getPersonalDataRecords);
 app.patch(

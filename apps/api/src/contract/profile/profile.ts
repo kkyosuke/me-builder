@@ -1,10 +1,16 @@
 import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
 import * as v from "valibot";
-import { ServiceUnavailableErrorSchema, authenticatedErrors, jsonResponse } from "../shared/errors";
+import {
+  ServiceUnavailableErrorSchema,
+  authenticatedErrors,
+  currentTermsPolicyError,
+  jsonResponse,
+} from "../shared/errors";
 
 const NonEmptyStringSchema = v.pipe(v.string(), v.nonEmpty());
 const profileErrors = {
   ...authenticatedErrors,
+  ...currentTermsPolicyError,
   503: jsonResponse("D1またはPrivate R2 bindingが設定されていない", ServiceUnavailableErrorSchema),
 };
 
