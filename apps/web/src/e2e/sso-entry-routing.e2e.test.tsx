@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({
     liffId: "test-liff-id",
     ssoRolloutMode: "linked-login" as "disabled" | "linking" | "linked-login",
   },
-  initializeLiff: vi.fn(),
+  initializeLiffForAuthExchange: vi.fn(),
   readCredential: vi.fn(),
   redirectToLiffLogin: vi.fn(),
   establishSsoAuthSession: vi.fn(),
@@ -19,7 +19,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("../config", () => ({ config: mocks.config }));
 vi.mock("../feature/liff/infrastructure/liff-client", () => ({
-  initializeLiff: mocks.initializeLiff,
+  initializeLiffForAuthExchange: mocks.initializeLiffForAuthExchange,
   readLiffAuthExchangeCredential: mocks.readCredential,
   redirectToLiffLogin: mocks.redirectToLiffLogin,
 }));
@@ -61,10 +61,9 @@ describe("LIFF / SSO entry routing E2E", () => {
   });
 
   it("LIFF内は既存SSO cookieを採用せずLIFF Identityでsessionを切り替える", async () => {
-    mocks.initializeLiff.mockResolvedValue({
+    mocks.initializeLiffForAuthExchange.mockResolvedValue({
       status: "ready",
       inClient: true,
-      profile: { displayName: "LINE profile" },
     });
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = urlOf(input);
@@ -97,10 +96,9 @@ describe("LIFF / SSO entry routing E2E", () => {
   });
 
   it("外部ブラウザは未認証時にLIFF loginを呼ばず要求pathのSSOを開始する", async () => {
-    mocks.initializeLiff.mockResolvedValue({
+    mocks.initializeLiffForAuthExchange.mockResolvedValue({
       status: "ready",
       inClient: false,
-      profile: { displayName: "LINE profile" },
     });
     vi.stubGlobal(
       "fetch",
@@ -130,10 +128,9 @@ describe("LIFF / SSO entry routing E2E", () => {
   });
 
   it("SSO失敗から戻った外部ブラウザは自動再開せずmarkerだけを消して再試行を待つ", async () => {
-    mocks.initializeLiff.mockResolvedValue({
+    mocks.initializeLiffForAuthExchange.mockResolvedValue({
       status: "ready",
       inClient: false,
-      profile: { displayName: "LINE profile" },
     });
     vi.stubGlobal(
       "fetch",
@@ -165,7 +162,7 @@ describe("LIFF / SSO entry routing E2E", () => {
   });
 
   it("LIFF初期化失敗は外部SSOへ自動fallbackしない", async () => {
-    mocks.initializeLiff.mockResolvedValue({
+    mocks.initializeLiffForAuthExchange.mockResolvedValue({
       status: "error",
       message: "LIFF initialization failed",
     });
