@@ -287,7 +287,7 @@ flowchart TD
 
 依存: `AUTH-C-001`, `AUTH-A-011`
 
-実装と検証はPRへ移しました。未完了条件は`AUTH-A-011`のsession API / KV bindingへの接続、レビュー、mergeです。
+実装と検証はPRへ移し、mainへmerge済みの`AUTH-A-011`が提供するKV bindingへ接続しました。未完了条件はレビューとmergeです。
 
 ### AUTH-C-003 既存AccountへSSO Identityを追加する
 
