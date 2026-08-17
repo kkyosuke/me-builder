@@ -2,7 +2,6 @@ import { AlertCircle, Bot, MessageCircle, RefreshCw } from "lucide-react";
 import { SkeletonBlock, SkeletonLoader } from "../../../components/skeleton";
 import type { AsyncState } from "../../../model/async-state";
 import type { AdminStatistics } from "../model/statistics";
-import { AdminNavigation } from "./admin-navigation";
 
 const number = new Intl.NumberFormat("ja-JP");
 const usd = new Intl.NumberFormat("en-US", {
@@ -189,30 +188,15 @@ function Line({ value }: { value: AdminStatistics["line"] }) {
   );
 }
 
-function StatisticsSkeleton({ showNavigation }: { showNavigation: boolean }) {
+function StatisticsSkeleton() {
   return (
-    <main className="mx-auto min-h-dvh w-full min-w-0 max-w-4xl px-4 py-16 sm:px-8">
-      {showNavigation ? (
-        <header className="mb-6">
-          <p className="text-sm font-medium text-violet-600 dark:text-violet-400">Admin</p>
-          <h1 className="mt-1 text-3xl font-bold">管理者ダッシュボード</h1>
-          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-            Accountの利用状況とサービス利用量を確認します。
-          </p>
-          <AdminNavigation current="statistics" />
-        </header>
-      ) : null}
-      <SkeletonLoader label="統計情報を読み込み中">
-        <header className={showNavigation ? "mt-6 mb-6" : "mb-6"}>
-          {!showNavigation && <SkeletonBlock className="h-4 w-16 rounded-full" />}
-          <div className="flex items-center justify-between gap-3">
-            <SkeletonBlock
-              className={`${showNavigation ? "h-6 w-24" : "mt-2 h-9 w-40"} rounded-full`}
-            />
-            <SkeletonBlock className="h-10 w-20 rounded-full" />
-          </div>
-          <SkeletonBlock className="mt-3 h-4 w-56 rounded-full" />
-        </header>
+    <SkeletonLoader label="統計情報を読み込み中">
+      <section className="mx-auto mt-6 max-w-4xl" aria-label="利用統計">
+        <div className="mb-6 flex items-center justify-between gap-3">
+          <SkeletonBlock className="h-6 w-24 rounded-full" />
+          <SkeletonBlock className="h-10 w-20 rounded-full" />
+        </div>
+        <SkeletonBlock className="mb-6 h-4 w-56 rounded-full" />
         <div className="grid gap-5">
           {[
             { key: "gemini", metricKeys: ["request", "input", "output", "cost"] },
@@ -239,71 +223,45 @@ function StatisticsSkeleton({ showNavigation }: { showNavigation: boolean }) {
             </section>
           ))}
         </div>
-      </SkeletonLoader>
-    </main>
+      </section>
+    </SkeletonLoader>
   );
 }
 
 export function AdminStatisticsScreen({
   state,
   isRefreshing = false,
-  showNavigation = false,
   onReload,
 }: {
   state: AsyncState<AdminStatistics>;
   isRefreshing?: boolean;
-  showNavigation?: boolean;
   onReload: () => void;
 }) {
   if (state.status === "loading" || state.status === "idle") {
-    return <StatisticsSkeleton showNavigation={showNavigation} />;
+    return <StatisticsSkeleton />;
   }
   if (state.status === "error")
     return (
-      <main className="mx-auto min-h-dvh w-full min-w-0 max-w-4xl px-4 py-16 sm:px-8">
-        {showNavigation ? (
-          <header>
-            <p className="text-sm font-medium text-violet-600 dark:text-violet-400">Admin</p>
-            <h1 className="mt-1 text-3xl font-bold">管理者ダッシュボード</h1>
-            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-              Accountの利用状況とサービス利用量を確認します。
-            </p>
-            <AdminNavigation current="statistics" />
-          </header>
-        ) : null}
-        <section className="flex min-h-[50vh] flex-col items-center justify-center gap-4 text-center">
-          <AlertCircle className="size-10 text-rose-500" aria-hidden="true" />
-          <p>{state.message}</p>
-          <button
-            type="button"
-            onClick={onReload}
-            className="rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white dark:bg-white dark:text-slate-900"
-          >
-            再読み込み
-          </button>
-        </section>
-      </main>
+      <section className="mx-auto flex min-h-[50vh] max-w-4xl flex-col items-center justify-center gap-4 text-center">
+        <AlertCircle className="size-10 text-rose-500" aria-hidden="true" />
+        <p>{state.message}</p>
+        <button
+          type="button"
+          onClick={onReload}
+          className="rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white dark:bg-white dark:text-slate-900"
+        >
+          再読み込み
+        </button>
+      </section>
     );
   const { data } = state;
   return (
-    <main className="mx-auto min-h-dvh w-full min-w-0 max-w-4xl px-4 py-16 sm:px-8">
+    <section className="mx-auto mt-6 max-w-4xl min-w-0" aria-labelledby="statistics-heading">
       <header className="mb-6">
-        <p className="text-sm font-medium text-violet-600 dark:text-violet-400">Admin</p>
-        {showNavigation ? (
-          <>
-            <h1 className="mt-1 text-3xl font-bold">管理者ダッシュボード</h1>
-            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-              Accountの利用状況とサービス利用量を確認します。
-            </p>
-            <AdminNavigation current="statistics" />
-          </>
-        ) : null}
         <div className="flex flex-wrap items-center justify-between gap-3">
-          {showNavigation ? (
-            <h2 className="mt-6 min-w-0 text-xl font-bold">利用統計</h2>
-          ) : (
-            <h1 className="min-w-0 text-3xl font-bold">利用統計</h1>
-          )}
+          <h2 id="statistics-heading" className="min-w-0 text-xl font-bold">
+            利用統計
+          </h2>
           <button
             type="button"
             onClick={onReload}
@@ -324,6 +282,6 @@ export function AdminStatisticsScreen({
         <Gemini value={data.gemini} />
         <Line value={data.line} />
       </div>
-    </main>
+    </section>
   );
 }

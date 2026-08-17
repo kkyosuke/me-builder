@@ -2,7 +2,6 @@ import { AlertCircle, ChevronLeft, ChevronRight, RefreshCw, Search, Users } from
 import { SkeletonBlock, SkeletonLoader } from "../../../components/skeleton";
 import type { AsyncState } from "../../../model/async-state";
 import type { AdminAccount, AdminAccountFilters, AdminAccountPage } from "../model/account";
-import { AdminNavigation } from "./admin-navigation";
 
 const number = new Intl.NumberFormat("ja-JP");
 const date = new Intl.DateTimeFormat("ja-JP", { year: "numeric", month: "short", day: "numeric" });
@@ -171,17 +170,9 @@ function AccountTable({ accounts }: { accounts: readonly AdminAccount[] }) {
 
 function AccountsSkeleton() {
   return (
-    <main className="mx-auto min-h-dvh w-full max-w-6xl px-4 py-12 sm:px-8">
-      <header>
-        <p className="text-sm font-medium text-violet-600 dark:text-violet-400">Admin</p>
-        <h1 className="text-3xl font-bold">管理者ダッシュボード</h1>
-        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-          Accountの利用状況とサービス利用量を確認します。
-        </p>
-        <AdminNavigation current="accounts" />
-      </header>
-      <SkeletonLoader label="Account一覧を読み込み中">
-        <div className="mt-6">
+    <SkeletonLoader label="Account一覧を読み込み中">
+      <section className="mt-6" aria-label="アカウント">
+        <div>
           <SkeletonBlock className="h-6 w-28 rounded-full" />
           <SkeletonBlock className="mt-2 h-4 w-32 rounded-full" />
         </div>
@@ -196,8 +187,8 @@ function AccountsSkeleton() {
           ))}
         </div>
         <SkeletonBlock className="mt-4 hidden h-64 w-full rounded-2xl lg:block" />
-      </SkeletonLoader>
-    </main>
+      </section>
+    </SkeletonLoader>
   );
 }
 
@@ -228,168 +219,143 @@ export function AdminAccountsScreen({
   if (state.status === "idle" || state.status === "loading") return <AccountsSkeleton />;
   if (state.status === "error") {
     return (
-      <main className="mx-auto min-h-dvh w-full max-w-6xl px-4 py-12 sm:px-8">
-        <header>
-          <p className="text-sm font-medium text-violet-600 dark:text-violet-400">Admin</p>
-          <h1 className="text-3xl font-bold">管理者ダッシュボード</h1>
-          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-            Accountの利用状況とサービス利用量を確認します。
-          </p>
-          <AdminNavigation current="accounts" />
-        </header>
-        <section className="flex min-h-[50vh] flex-col items-center justify-center gap-4 text-center">
-          <AlertCircle className="size-10 text-rose-500" aria-hidden="true" />
-          <p>{state.message}</p>
-          <button
-            type="button"
-            onClick={onReload}
-            className="rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white dark:bg-white dark:text-slate-900"
-          >
-            再読み込み
-          </button>
-        </section>
-      </main>
+      <section className="flex min-h-[50vh] flex-col items-center justify-center gap-4 text-center">
+        <AlertCircle className="size-10 text-rose-500" aria-hidden="true" />
+        <p>{state.message}</p>
+        <button
+          type="button"
+          onClick={onReload}
+          className="rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white dark:bg-white dark:text-slate-900"
+        >
+          再読み込み
+        </button>
+      </section>
     );
   }
 
   return (
-    <main className="mx-auto min-h-dvh w-full min-w-0 max-w-6xl px-4 py-12 sm:px-8">
-      <header>
-        <p className="text-sm font-medium text-violet-600 dark:text-violet-400">Admin</p>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-3xl font-bold">管理者ダッシュボード</h1>
+    <section aria-labelledby="accounts-heading" className="mt-6">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h2 id="accounts-heading" className="flex items-center gap-2 text-xl font-bold">
+            <Users className="size-5 text-violet-500" aria-hidden="true" />
+            Account
+          </h2>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+            該当 {number.format(state.data.total)} Account
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onReload}
+          disabled={isRefreshing}
+          aria-label={isRefreshing ? "Account一覧を更新中" : undefined}
+          className="flex items-center gap-2 rounded-full border border-slate-300 px-4 py-2 text-sm dark:border-slate-600"
+        >
+          <RefreshCw
+            className={`size-4 ${isRefreshing ? "animate-spin" : ""}`}
+            aria-hidden="true"
+          />
+          {isRefreshing ? "更新中..." : "更新"}
+        </button>
+      </div>
+
+      <div className="mt-4 grid gap-3 rounded-2xl bg-slate-100 p-3 sm:grid-cols-2 lg:grid-cols-[minmax(16rem,1fr)_9rem_9rem_12rem] dark:bg-slate-800/70">
+        <label className="relative">
+          <span className="sr-only">名前・Account IDを検索</span>
+          <Search
+            className="pointer-events-none absolute top-3 left-3 size-4 text-slate-400"
+            aria-hidden="true"
+          />
+          <input
+            type="search"
+            value={filters.query}
+            onChange={(event) => onFilterChange("query", event.currentTarget.value)}
+            placeholder="名前・Account IDを検索"
+            className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pr-3 pl-9 text-sm dark:border-slate-600 dark:bg-slate-900"
+          />
+        </label>
+        <label>
+          <span className="sr-only">statusで絞り込み</span>
+          <select
+            value={filters.status}
+            onChange={(event) =>
+              onFilterChange("status", event.currentTarget.value as AdminAccountFilters["status"])
+            }
+            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-900"
+          >
+            <option value="all">すべてのstatus</option>
+            <option value="active">active</option>
+          </select>
+        </label>
+        <label>
+          <span className="sr-only">roleで絞り込み</span>
+          <select
+            value={filters.role}
+            onChange={(event) =>
+              onFilterChange("role", event.currentTarget.value as AdminAccountFilters["role"])
+            }
+            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-900"
+          >
+            <option value="all">すべてのrole</option>
+            <option value="user">user</option>
+            <option value="admin">admin</option>
+          </select>
+        </label>
+        <label>
+          <span className="sr-only">並べ替え</span>
+          <select
+            value={filters.sort}
+            onChange={(event) =>
+              onFilterChange("sort", event.currentTarget.value as AdminAccountFilters["sort"])
+            }
+            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-900"
+          >
+            <option value="created">登録日が新しい順</option>
+            <option value="level">レベルが高い順</option>
+            <option value="pieces">かけらが多い順</option>
+            <option value="growth">最終成長が新しい順</option>
+          </select>
+        </label>
+      </div>
+
+      <div className="mt-4">
+        {state.data.accounts.length === 0 ? (
+          <div className="rounded-3xl border border-dashed border-slate-300 p-10 text-center dark:border-slate-700">
+            <p className="font-semibold">条件に一致するAccountはありません</p>
             <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-              Accountの利用状況とサービス利用量を確認します。
+              検索条件を変えてください。
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onReload}
-            disabled={isRefreshing}
-            aria-label={isRefreshing ? "Account一覧を更新中" : undefined}
-            className="flex items-center gap-2 rounded-full border border-slate-300 px-4 py-2 text-sm dark:border-slate-600"
-          >
-            <RefreshCw
-              className={`size-4 ${isRefreshing ? "animate-spin" : ""}`}
-              aria-hidden="true"
-            />
-            {isRefreshing ? "更新中..." : "更新"}
-          </button>
-        </div>
-        <AdminNavigation current="accounts" />
-      </header>
+        ) : (
+          <>
+            <AccountCards accounts={state.data.accounts} />
+            <AccountTable accounts={state.data.accounts} />
+          </>
+        )}
+      </div>
 
-      <section aria-labelledby="accounts-heading" className="mt-6">
-        <div className="flex items-end justify-between gap-4">
-          <div>
-            <h2 id="accounts-heading" className="flex items-center gap-2 text-xl font-bold">
-              <Users className="size-5 text-violet-500" aria-hidden="true" />
-              Account
-            </h2>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              該当 {number.format(state.data.total)} Account
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-4 grid gap-3 rounded-2xl bg-slate-100 p-3 sm:grid-cols-2 lg:grid-cols-[minmax(16rem,1fr)_9rem_9rem_12rem] dark:bg-slate-800/70">
-          <label className="relative">
-            <span className="sr-only">名前・Account IDを検索</span>
-            <Search
-              className="pointer-events-none absolute top-3 left-3 size-4 text-slate-400"
-              aria-hidden="true"
-            />
-            <input
-              type="search"
-              value={filters.query}
-              onChange={(event) => onFilterChange("query", event.currentTarget.value)}
-              placeholder="名前・Account IDを検索"
-              className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pr-3 pl-9 text-sm dark:border-slate-600 dark:bg-slate-900"
-            />
-          </label>
-          <label>
-            <span className="sr-only">statusで絞り込み</span>
-            <select
-              value={filters.status}
-              onChange={(event) =>
-                onFilterChange("status", event.currentTarget.value as AdminAccountFilters["status"])
-              }
-              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-900"
-            >
-              <option value="all">すべてのstatus</option>
-              <option value="active">active</option>
-            </select>
-          </label>
-          <label>
-            <span className="sr-only">roleで絞り込み</span>
-            <select
-              value={filters.role}
-              onChange={(event) =>
-                onFilterChange("role", event.currentTarget.value as AdminAccountFilters["role"])
-              }
-              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-900"
-            >
-              <option value="all">すべてのrole</option>
-              <option value="user">user</option>
-              <option value="admin">admin</option>
-            </select>
-          </label>
-          <label>
-            <span className="sr-only">並べ替え</span>
-            <select
-              value={filters.sort}
-              onChange={(event) =>
-                onFilterChange("sort", event.currentTarget.value as AdminAccountFilters["sort"])
-              }
-              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-900"
-            >
-              <option value="created">登録日が新しい順</option>
-              <option value="level">レベルが高い順</option>
-              <option value="pieces">かけらが多い順</option>
-              <option value="growth">最終成長が新しい順</option>
-            </select>
-          </label>
-        </div>
-
-        <div className="mt-4">
-          {state.data.accounts.length === 0 ? (
-            <div className="rounded-3xl border border-dashed border-slate-300 p-10 text-center dark:border-slate-700">
-              <p className="font-semibold">条件に一致するAccountはありません</p>
-              <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                検索条件を変えてください。
-              </p>
-            </div>
-          ) : (
-            <>
-              <AccountCards accounts={state.data.accounts} />
-              <AccountTable accounts={state.data.accounts} />
-            </>
-          )}
-        </div>
-
-        <nav aria-label="Account一覧のページ" className="mt-5 flex items-center justify-end gap-2">
-          <button
-            type="button"
-            disabled={!canGoBack || isRefreshing}
-            onClick={onPreviousPage}
-            className="rounded-full border border-slate-300 p-2 disabled:opacity-40 dark:border-slate-600"
-            aria-label="前のページ"
-          >
-            <ChevronLeft className="size-4" aria-hidden="true" />
-          </button>
-          <span className="px-2 text-sm tabular-nums">{number.format(pageNumber)}</span>
-          <button
-            type="button"
-            disabled={!state.data.nextCursor || isRefreshing}
-            onClick={onNextPage}
-            className="rounded-full border border-slate-300 p-2 disabled:opacity-40 dark:border-slate-600"
-            aria-label="次のページ"
-          >
-            <ChevronRight className="size-4" aria-hidden="true" />
-          </button>
-        </nav>
-      </section>
-    </main>
+      <nav aria-label="Account一覧のページ" className="mt-5 flex items-center justify-end gap-2">
+        <button
+          type="button"
+          disabled={!canGoBack || isRefreshing}
+          onClick={onPreviousPage}
+          className="rounded-full border border-slate-300 p-2 disabled:opacity-40 dark:border-slate-600"
+          aria-label="前のページ"
+        >
+          <ChevronLeft className="size-4" aria-hidden="true" />
+        </button>
+        <span className="px-2 text-sm tabular-nums">{number.format(pageNumber)}</span>
+        <button
+          type="button"
+          disabled={!state.data.nextCursor || isRefreshing}
+          onClick={onNextPage}
+          className="rounded-full border border-slate-300 p-2 disabled:opacity-40 dark:border-slate-600"
+          aria-label="次のページ"
+        >
+          <ChevronRight className="size-4" aria-hidden="true" />
+        </button>
+      </nav>
+    </section>
   );
 }
