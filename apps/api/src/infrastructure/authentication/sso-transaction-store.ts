@@ -6,6 +6,7 @@ import type {
 } from "../../logic/authentication/sso-transaction";
 
 const TransactionEntries = {
+  traceId: v.optional(v.pipe(v.string(), v.nonEmpty())),
   nonce: v.pipe(v.string(), v.nonEmpty()),
   codeVerifier: v.pipe(v.string(), v.nonEmpty()),
   returnTo: v.pipe(v.string(), v.startsWith("/")),

@@ -301,17 +301,11 @@ flowchart TD
 
 実装と検証はPRへ移し、`AUTH-A-011`のsession issuerをSSO callbackへ接続しました。未完了条件は依存PRをmergeし、レビューとmergeを完了することです。
 
-### AUTH-C-005 PreviewでLIFFとSSOを通しで検証する
+### AUTH-C-005 PreviewでLIFFとSSOを通しで検証する ([PR #328](https://github.com/kkyosuke/me-builder/pull/328))
 
 依存: `AUTH-C-004`
 
-- LIFF実端末、外部ブラウザ、直接リンク、相性招待、管理者URLで認証と要求画面復帰を確認する
-- 同じAccountへlinkしたLIFFとSSOが同じプロフィール・診断・相性へ到達することを確認する
-- 別Account cookie、期限切れ、IdP拒否、LIFF初期化失敗、CSRF、logout、復旧後の旧sessionを確認する
-- token、subject、Account ID、個人内容をログやチケットへ残さず結果を追跡できることを確認する
-- SSO開始、callback失敗、session発行・失効を機微情報なしで判断できる運用ログとrunbookを追加する
-
-完了条件は、Previewで主要な成功・失敗経路を再現し、問題時にSSO経路だけを停止してLIFF利用を継続できることです。
+実装と検証手順はPRへ移し、`AUTH-A-011`のsession発行・失効eventへ接続しました。未完了条件はPreview deploy後にRunbookの実端末／実IdP／rollback結果を記録し、レビューとmergeを完了することです。
 
 ### AUTH-C-006 ProductionへSSOを段階公開する
 

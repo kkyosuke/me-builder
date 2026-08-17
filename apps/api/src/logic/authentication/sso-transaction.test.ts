@@ -3,6 +3,7 @@ import {
   SsoAuthenticationError,
   type SsoAuthenticationTransaction,
   type SsoAuthenticationTransactionStore,
+  SsoCallbackCompletionError,
   type SsoServerClient,
   cancelSsoAuthentication,
   completeSsoAuthentication,
@@ -75,6 +76,7 @@ describe("SSO authentication transaction", () => {
     let randomSeed = 0;
 
     const authorizationUrl = await startSsoAuthentication({
+      traceId: "00000000-0000-4000-8000-000000000001",
       returnTo: "/settings/account",
       store,
       client,
@@ -86,6 +88,7 @@ describe("SSO authentication transaction", () => {
     expect(state).toBeTruthy();
     expect(store.transactions.get(state ?? "")).toEqual({
       purpose: "login",
+      traceId: "00000000-0000-4000-8000-000000000001",
       nonce: expect.any(String),
       codeVerifier: expect.any(String),
       returnTo: "/settings/account",
@@ -114,6 +117,7 @@ describe("SSO authentication transaction", () => {
     const client = createClient();
     store.transactions.set("state", {
       purpose: "login",
+      traceId: "00000000-0000-4000-8000-000000000002",
       nonce: "nonce",
       codeVerifier: "verifier",
       returnTo: "/settings/account",
@@ -131,6 +135,7 @@ describe("SSO authentication transaction", () => {
     ).resolves.toEqual({
       identity: expect.objectContaining({ providerKey: "auth0", subject: "auth0|user-1" }),
       returnTo: "/settings/account",
+      traceId: "00000000-0000-4000-8000-000000000002",
     });
     expect(client.exchangeAuthorizationCode).toHaveBeenCalledWith({
       code: "authorization-code",
@@ -140,6 +145,30 @@ describe("SSO authentication transaction", () => {
     await expect(
       completeSsoAuthentication({ state: "state", code: "code", store, client }),
     ).rejects.toEqual(new SsoAuthenticationError("transaction_missing"));
+  });
+
+  it("code交換失敗へ保存済みtraceと復帰先だけを引き継ぐ", async () => {
+    const store = createMemoryStore();
+    const client = createClient();
+    const providerFailure = new Error("sensitive provider response");
+    vi.mocked(client.exchangeAuthorizationCode).mockRejectedValue(providerFailure);
+    store.transactions.set("state", {
+      purpose: "login",
+      traceId: "trace-token-exchange",
+      nonce: "nonce",
+      codeVerifier: "verifier",
+      returnTo: "/diagnosis/result?from=share",
+      expiresAt: 2_000,
+    });
+
+    await expect(
+      completeSsoAuthentication({ state: "state", code: "code", store, client, now: () => 1_000 }),
+    ).rejects.toEqual(
+      new SsoCallbackCompletionError(
+        { traceId: "trace-token-exchange", returnTo: "/diagnosis/result?from=share" },
+        providerFailure,
+      ),
+    );
   });
 
   it("改ざんされたstateと期限切れtransactionを拒否する", async () => {
@@ -164,7 +193,10 @@ describe("SSO authentication transaction", () => {
         client,
         now: () => 1_000,
       }),
-    ).rejects.toEqual(new SsoAuthenticationError("transaction_expired"));
+    ).rejects.toMatchObject({
+      reason: "transaction_expired",
+      callback: { returnTo: "/" },
+    });
     expect(client.exchangeAuthorizationCode).not.toHaveBeenCalled();
   });
 
@@ -249,7 +281,7 @@ describe("SSO authentication transaction", () => {
         sessionIssuer,
         now: () => 1_000,
       }),
-    ).rejects.toEqual(new SsoAuthenticationError("identity_unlinked"));
+    ).rejects.toMatchObject({ reason: "identity_unlinked", callback: { returnTo: "/" } });
     expect(sessionIssuer.issue).not.toHaveBeenCalled();
   });
 
@@ -422,7 +454,10 @@ describe("SSO authentication transaction", () => {
         client,
         now: () => 1_000,
       }),
-    ).rejects.toEqual(new SsoAuthenticationError("transaction_purpose_mismatch"));
+    ).rejects.toMatchObject({
+      reason: "transaction_purpose_mismatch",
+      callback: { returnTo: "/" },
+    });
     await expect(
       completeSsoIdentityLinking({
         state: "login-state",
@@ -432,7 +467,10 @@ describe("SSO authentication transaction", () => {
         identityLinker: { link: vi.fn() },
         now: () => 1_000,
       }),
-    ).rejects.toEqual(new SsoAuthenticationError("transaction_purpose_mismatch"));
+    ).rejects.toMatchObject({
+      reason: "transaction_purpose_mismatch",
+      callback: { returnTo: "/" },
+    });
   });
 
   it.each([
@@ -444,6 +482,7 @@ describe("SSO authentication transaction", () => {
       const store = createMemoryStore();
       store.transactions.set("cancel-state", {
         ...transaction,
+        traceId: "trace-cancel",
         nonce: "nonce",
         codeVerifier: "verifier",
         expiresAt: 2_000,
@@ -451,7 +490,11 @@ describe("SSO authentication transaction", () => {
 
       await expect(
         cancelSsoAuthentication({ state: "cancel-state", store, now: () => 1_000 }),
-      ).resolves.toEqual({ purpose: transaction.purpose, returnTo: transaction.returnTo });
+      ).resolves.toEqual({
+        purpose: transaction.purpose,
+        returnTo: transaction.returnTo,
+        traceId: "trace-cancel",
+      });
       await expect(
         cancelSsoAuthentication({ state: "cancel-state", store, now: () => 1_000 }),
       ).rejects.toEqual(new SsoAuthenticationError("transaction_missing"));
