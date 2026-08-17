@@ -55,7 +55,8 @@ export type SsoAuthenticationFailure =
   | "invalid_return_to"
   | "transaction_expired"
   | "transaction_missing"
-  | "transaction_purpose_mismatch";
+  | "transaction_purpose_mismatch"
+  | "rollout_excluded";
 
 export type SsoCallbackContext = {
   traceId?: string;
@@ -115,6 +116,10 @@ export interface SsoExistingIdentityResolver {
       }
     | undefined
   >;
+}
+
+export interface SsoRolloutAuthorizer {
+  allows(account: { accountId: string; role: "user" | "admin" }): Promise<boolean>;
 }
 
 export interface SsoApplicationSessionIssuer<SessionResult> {
@@ -259,6 +264,7 @@ export async function completeSsoAuthentication(
 export async function completeSsoLogin<SessionResult>(
   input: CompleteSsoAuthenticationInput & {
     identityResolver: SsoExistingIdentityResolver;
+    rolloutAuthorizer: SsoRolloutAuthorizer;
     sessionIssuer: SsoApplicationSessionIssuer<SessionResult>;
   },
 ): Promise<{ session: SessionResult; returnTo: string; traceId?: string }> {
@@ -276,6 +282,16 @@ export async function completeSsoLogin<SessionResult>(
     throw new SsoCallbackCompletionError(callback, error);
   }
   if (!account) throw new SsoAuthenticationError("identity_unlinked", callback);
+  try {
+    if (
+      !(await input.rolloutAuthorizer.allows({ accountId: account.accountId, role: account.role }))
+    ) {
+      throw new SsoAuthenticationError("rollout_excluded", callback);
+    }
+  } catch (error) {
+    if (error instanceof SsoAuthenticationError) throw error;
+    throw new SsoCallbackCompletionError(callback, error);
+  }
 
   let session: SessionResult;
   try {
@@ -296,6 +312,7 @@ export async function completeSsoCallback<SessionResult>(
   input: CompleteSsoAuthenticationInput & {
     identityResolver: SsoExistingIdentityResolver;
     identityLinker: SsoIdentityLinker;
+    rolloutAuthorizer: SsoRolloutAuthorizer;
     sessionIssuer: SsoApplicationSessionIssuer<SessionResult>;
   },
 ): Promise<
@@ -326,6 +343,19 @@ export async function completeSsoCallback<SessionResult>(
       throw new SsoCallbackCompletionError(callback, error);
     }
     if (!account) throw new SsoAuthenticationError("identity_unlinked", callback);
+    try {
+      if (
+        !(await input.rolloutAuthorizer.allows({
+          accountId: account.accountId,
+          role: account.role,
+        }))
+      ) {
+        throw new SsoAuthenticationError("rollout_excluded", callback);
+      }
+    } catch (error) {
+      if (error instanceof SsoAuthenticationError) throw error;
+      throw new SsoCallbackCompletionError(callback, error);
+    }
     let session: SessionResult;
     try {
       session = await input.sessionIssuer.issue({

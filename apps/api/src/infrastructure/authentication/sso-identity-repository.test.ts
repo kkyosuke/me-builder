@@ -19,10 +19,10 @@ function dependencies(providers: Array<"line_login" | "auth0"> = []) {
 }
 
 describe("SSO identity repository adapters", () => {
-  it("既知Auth0 IdentityだけをAccountとIdentity IDへ解決する", async () => {
+  it("既知Auth0 Identityだけを段階公開判定用のAccountとIdentity IDへ解決する", async () => {
     const deps = dependencies();
     deps.findAccountByIdentity.mockResolvedValue({
-      account: { id: "account-1", role: "user" },
+      account: { id: "account-1", role: "admin" },
       identity: { id: "identity-auth0" },
     });
     const resolver = createSsoExistingIdentityResolver(db, deps as never);
@@ -32,7 +32,7 @@ describe("SSO identity repository adapters", () => {
     ).resolves.toEqual({
       accountId: "account-1",
       authenticatedIdentityId: "identity-auth0",
-      role: "user",
+      role: "admin",
     });
     expect(deps.findAccountByIdentity).toHaveBeenCalledWith(db, "auth0", "auth0|subject");
   });

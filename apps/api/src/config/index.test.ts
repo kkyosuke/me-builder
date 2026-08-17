@@ -130,7 +130,9 @@ describe("getConfig & ConfigSchema", () => {
   });
 
   it("SSO無効時はAuth0 secretを要求しないこと", () => {
-    expect(getConfig({ SSO_ROLLOUT_MODE: "disabled" }).ssoRolloutMode).toBe("disabled");
+    const conf = getConfig({ SSO_ROLLOUT_MODE: "disabled" });
+    expect(conf.ssoRolloutMode).toBe("disabled");
+    expect(conf.ssoRolloutPercent).toBe(0);
   });
 
   it("SSO有効時はAuth0設定と固定callback URLを解決すること", () => {
@@ -139,6 +141,7 @@ describe("getConfig & ConfigSchema", () => {
       SSO_ISSUER_URL: "https://tenant.auth0.com/",
       SSO_CLIENT_ID: "client-id",
       SSO_CLIENT_SECRET: "client-secret",
+      SSO_ROLLOUT_PERCENT: "5",
       BASE_URL: "https://api.example.com/",
       WEB_ORIGIN: "https://example.com",
     });
@@ -149,6 +152,7 @@ describe("getConfig & ConfigSchema", () => {
         ssoIssuerUrl: "https://tenant.auth0.com/",
         ssoClientId: "client-id",
         ssoClientSecret: "client-secret",
+        ssoRolloutPercent: 5,
         ssoCallbackUrl: "https://api.example.com/api/auth/sso/callback",
       }),
     );
@@ -199,4 +203,8 @@ describe("getConfig & ConfigSchema", () => {
       ).not.toThrow();
     },
   );
+
+  it.each(["-1", "1.5", "101", "invalid"])("不正なSSO公開割合を拒否すること: %s", (value) => {
+    expect(() => getConfig({ SSO_ROLLOUT_PERCENT: value })).toThrow();
+  });
 });

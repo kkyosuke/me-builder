@@ -47,6 +47,7 @@ type Env = Omit<
   BASE_URL?: string;
   WEB_ORIGIN?: string;
   SSO_ROLLOUT_MODE?: string;
+  SSO_ROLLOUT_PERCENT?: string;
   SSO_ISSUER_URL?: string;
   SSO_CLIENT_ID?: string;
   SSO_CLIENT_SECRET?: string;

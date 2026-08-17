@@ -229,6 +229,7 @@ describe("SSO authentication transaction", () => {
         role: "user" as const,
       })),
     };
+    const rolloutAuthorizer = { allows: vi.fn(async () => true) };
     const sessionIssuer = {
       issue: vi.fn(async () => ({ cookie: "opaque-cookie" })),
     };
@@ -240,6 +241,7 @@ describe("SSO authentication transaction", () => {
         store,
         client,
         identityResolver,
+        rolloutAuthorizer,
         sessionIssuer,
         now: () => 1_000,
       }),
@@ -250,6 +252,10 @@ describe("SSO authentication transaction", () => {
     expect(identityResolver.findAccount).toHaveBeenCalledWith({
       providerKey: "auth0",
       subject: "auth0|user-1",
+    });
+    expect(rolloutAuthorizer.allows).toHaveBeenCalledWith({
+      accountId: "account-1",
+      role: "user",
     });
     expect(sessionIssuer.issue).toHaveBeenCalledWith({
       accountId: "account-1",
@@ -278,6 +284,7 @@ describe("SSO authentication transaction", () => {
         store,
         client,
         identityResolver: { findAccount: vi.fn(async () => undefined) },
+        rolloutAuthorizer: { allows: vi.fn() },
         sessionIssuer,
         now: () => 1_000,
       }),
@@ -312,6 +319,7 @@ describe("SSO authentication transaction", () => {
           })),
         },
         identityLinker,
+        rolloutAuthorizer: { allows: vi.fn(async () => true) },
         sessionIssuer,
         now: () => 1_000,
       }),
@@ -341,6 +349,7 @@ describe("SSO authentication transaction", () => {
         client,
         identityResolver: { findAccount: vi.fn() },
         identityLinker,
+        rolloutAuthorizer: { allows: vi.fn() },
         sessionIssuer,
         now: () => 1_000,
       }),
@@ -353,6 +362,39 @@ describe("SSO authentication transaction", () => {
       providerKey: "auth0",
       returnTo: "/profile",
     });
+    expect(sessionIssuer.issue).not.toHaveBeenCalled();
+  });
+
+  it("割合対象外の既知Identityへsessionを発行しない", async () => {
+    const store = createMemoryStore();
+    const client = createClient();
+    store.transactions.set("state", {
+      purpose: "login",
+      nonce: "nonce",
+      codeVerifier: "verifier",
+      returnTo: "/",
+      expiresAt: 2_000,
+    });
+    const sessionIssuer = { issue: vi.fn() };
+
+    await expect(
+      completeSsoLogin({
+        state: "state",
+        code: "code",
+        store,
+        client,
+        identityResolver: {
+          findAccount: vi.fn(async () => ({
+            accountId: "account-1",
+            authenticatedIdentityId: "identity-auth0",
+            role: "user" as const,
+          })),
+        },
+        rolloutAuthorizer: { allows: vi.fn(async () => false) },
+        sessionIssuer,
+        now: () => 1_000,
+      }),
+    ).rejects.toMatchObject({ reason: "rollout_excluded", callback: { returnTo: "/" } });
     expect(sessionIssuer.issue).not.toHaveBeenCalled();
   });
 

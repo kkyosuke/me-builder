@@ -41,6 +41,14 @@ function webVars(baseDomain: string, environment: string) {
   return [`ENVIRONMENT = "${environment}"`, `WEB_ORIGIN = "https://${baseDomain}"`];
 }
 
+function apiVars(baseDomain: string, environment: string) {
+  return [
+    ...webVars(baseDomain, environment),
+    'SSO_ROLLOUT_MODE = "disabled"',
+    'SSO_ROLLOUT_PERCENT = "0"',
+  ];
+}
+
 function workerEnvironment(manifest: InfrastructureManifest) {
   const env = manifest.environment;
   const q = manifest.queues;
@@ -125,7 +133,7 @@ function apiEnvironment(manifest: InfrastructureManifest) {
     durableObject(prefix, "COMPATIBILITY_DATA", `me-builder-worker-${env}`),
     "",
     `[env.${env}.vars]`,
-    ...webVars(manifest.baseDomain, env),
+    ...apiVars(manifest.baseDomain, env),
   );
   return config.join("\n");
 }
@@ -283,6 +291,8 @@ export function renderWranglerConfigs(
     "[env.local.vars]",
     'ENVIRONMENT = "local"',
     'WEB_ORIGIN = "http://localhost:5173"',
+    'SSO_ROLLOUT_MODE = "disabled"',
+    'SSO_ROLLOUT_PERCENT = "0"',
   ].join("\n");
   const api = [
     header,
@@ -322,6 +332,8 @@ export function renderWranglerConfigs(
     "[vars]",
     'ENVIRONMENT = "local"',
     'WEB_ORIGIN = "http://localhost:5173"',
+    'SSO_ROLLOUT_MODE = "disabled"',
+    'SSO_ROLLOUT_PERCENT = "0"',
     "",
     apiLocal,
     "",
