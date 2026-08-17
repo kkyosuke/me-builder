@@ -25,7 +25,7 @@ vi.mock("../feature/liff/infrastructure/liff-client", () => ({
 const relationshipId = "1".repeat(64);
 const authenticatedSession = {
   authenticated: true,
-  profile: { displayName: "受信者" },
+  displayProfile: { displayName: "受信者" },
   role: "user",
   csrfToken: "csrf-session-token",
 };
@@ -82,7 +82,6 @@ describe("application session Web E2E", () => {
     liff.initialize.mockResolvedValue({
       status: "ready",
       inClient: true,
-      profile: { displayName: "受信者" },
     });
     liff.readCredential.mockReturnValue("secret.liff.credential");
     window.history.replaceState({}, "", "/");
@@ -107,10 +106,7 @@ describe("application session Web E2E", () => {
       if (url.pathname === "/api/auth/liff/exchange") {
         exchangeRequests += 1;
         const body = JSON.parse(String(init?.body));
-        expect(body).toEqual({
-          idToken: "secret.liff.credential",
-          returnTo: `/compatibility/invitations/${relationshipId}`,
-        });
+        expect(body).toEqual({ idToken: "secret.liff.credential" });
         expect(String(input)).not.toContain("secret.liff.credential");
         return Response.json(authenticatedSession);
       }
@@ -208,7 +204,7 @@ describe("application session Web E2E", () => {
         sessionChecks += 1;
         return Response.json({
           ...authenticatedSession,
-          profile: { displayName: sessionChecks === 1 ? "Account A" : "Account B" },
+          displayProfile: { displayName: sessionChecks === 1 ? "Account A" : "Account B" },
         });
       }
       if (url.pathname === "/api/legal/terms") {

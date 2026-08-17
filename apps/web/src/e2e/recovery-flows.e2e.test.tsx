@@ -158,7 +158,6 @@ describe("Web recovery flows E2E", () => {
     liff.initialize.mockResolvedValue({
       status: "ready",
       inClient: true,
-      profile: { displayName: "テスト" },
     });
     liff.readCredential.mockReturnValue("dummy.id.token");
   });
