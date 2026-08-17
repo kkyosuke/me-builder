@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="360" viewBox="0 0 960 360" role="img" aria-labelledby="title description">
+  <title id="title">プロフィールPlanバッジの表示イメージ</title>
+  <desc id="description">Free、Lite、Full、ファミリーパックのプロフィール画像に重なるバッジを横並びで比較した図</desc>
+  <defs>
+    <linearGradient id="page" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f8fafc"/>
+      <stop offset="1" stop-color="#eef2ff"/>
+    </linearGradient>
+    <linearGradient id="avatar" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#e2e8f0"/>
+      <stop offset="1" stop-color="#cbd5e1"/>
+    </linearGradient>
+    <linearGradient id="premium" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#fcd34d"/>
+      <stop offset="1" stop-color="#eab308"/>
+    </linearGradient>
+    <linearGradient id="family" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#7c3aed"/>
+      <stop offset="1" stop-color="#c026d3"/>
+    </linearGradient>
+    <filter id="cardShadow" x="-20%" y="-20%" width="140%" height="160%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#0f172a" flood-opacity="0.08"/>
+    </filter>
+    <filter id="badgeShadow" x="-30%" y="-50%" width="160%" height="220%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#0f172a" flood-opacity="0.25"/>
+    </filter>
+    <g id="person" fill="none" stroke="#64748b" stroke-linecap="round" stroke-linejoin="round" stroke-width="4">
+      <circle cx="0" cy="-8" r="7"/>
+      <path d="M-14 16c1-10 6-15 14-15s13 5 14 15"/>
+    </g>
+    <g id="sparkle" fill="none" stroke="#78350f" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4">
+      <path d="M0-6c.7 3.8 2.2 5.3 6 6-3.8.7-5.3 2.2-6 6-.7-3.8-2.2-5.3-6-6 3.8-.7 5.3-2.2 6-6Z"/>
+    </g>
+    <g id="people" fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
+      <circle cx="-3" cy="-3" r="2.5"/>
+      <circle cx="4" cy="-2" r="2"/>
+      <path d="M-8 5c.5-4 2-6 5-6s4.5 2 5 6M2 5c.3-3 1.3-4.5 3.5-4.5S9 2 9.3 5"/>
+    </g>
+  </defs>
+
+  <rect width="960" height="360" rx="28" fill="url(#page)"/>
+  <text x="48" y="54" fill="#0f172a" font-family="system-ui, sans-serif" font-size="26" font-weight="750">プロフィールのPlanバッジ</text>
+  <text x="48" y="82" fill="#64748b" font-family="system-ui, sans-serif" font-size="14">右上のアバターを見るだけで、現在のPlanを判別できます</text>
+
+  <g transform="translate(48 112)" filter="url(#cardShadow)">
+    <rect width="198" height="198" rx="24" fill="#fff"/>
+    <text x="24" y="36" fill="#475569" font-family="system-ui, sans-serif" font-size="12" font-weight="700" letter-spacing="1.5">FREE</text>
+    <circle cx="99" cy="96" r="42" fill="url(#avatar)" stroke="#fff" stroke-width="5"/>
+    <g transform="translate(99 96)"><use href="#person"/></g>
+    <g transform="translate(113 121)" filter="url(#badgeShadow)">
+      <rect x="-6" y="-11" width="49" height="22" rx="11" fill="#334155" stroke="#fff" stroke-width="3"/>
+      <text x="18.5" y="3.5" fill="#fff" font-family="system-ui, sans-serif" font-size="9" font-weight="850" text-anchor="middle" letter-spacing="1">FREE</text>
+    </g>
+    <text x="99" y="169" fill="#0f172a" font-family="system-ui, sans-serif" font-size="17" font-weight="750" text-anchor="middle">Free</text>
+    <text x="99" y="188" fill="#94a3b8" font-family="system-ui, sans-serif" font-size="11" text-anchor="middle">中立色でシンプルに</text>
+  </g>
+
+  <g transform="translate(270 112)" filter="url(#cardShadow)">
+    <rect width="198" height="198" rx="24" fill="#fff"/>
+    <text x="24" y="36" fill="#b45309" font-family="system-ui, sans-serif" font-size="12" font-weight="700" letter-spacing="1.5">PREMIUM</text>
+    <circle cx="99" cy="96" r="42" fill="url(#avatar)" stroke="#fff" stroke-width="5"/>
+    <g transform="translate(99 96)"><use href="#person"/></g>
+    <g transform="translate(106 121)" filter="url(#badgeShadow)">
+      <rect x="-6" y="-11" width="61" height="22" rx="11" fill="url(#premium)" stroke="#fffbeb" stroke-width="3"/>
+      <g transform="translate(6 0)"><use href="#sparkle"/></g>
+      <text x="32" y="3.5" fill="#78350f" font-family="system-ui, sans-serif" font-size="9" font-weight="850" text-anchor="middle" letter-spacing="1">LITE</text>
+    </g>
+    <text x="99" y="169" fill="#0f172a" font-family="system-ui, sans-serif" font-size="17" font-weight="750" text-anchor="middle">Lite</text>
+    <text x="99" y="188" fill="#b45309" font-family="system-ui, sans-serif" font-size="11" text-anchor="middle">金色＋Plan名</text>
+  </g>
+
+  <g transform="translate(492 112)" filter="url(#cardShadow)">
+    <rect width="198" height="198" rx="24" fill="#fff"/>
+    <text x="24" y="36" fill="#b45309" font-family="system-ui, sans-serif" font-size="12" font-weight="700" letter-spacing="1.5">PREMIUM</text>
+    <circle cx="99" cy="96" r="42" fill="url(#avatar)" stroke="#fff" stroke-width="5"/>
+    <g transform="translate(99 96)"><use href="#person"/></g>
+    <g transform="translate(106 121)" filter="url(#badgeShadow)">
+      <rect x="-6" y="-11" width="61" height="22" rx="11" fill="url(#premium)" stroke="#fffbeb" stroke-width="3"/>
+      <g transform="translate(6 0)"><use href="#sparkle"/></g>
+      <text x="32" y="3.5" fill="#78350f" font-family="system-ui, sans-serif" font-size="9" font-weight="850" text-anchor="middle" letter-spacing="1">FULL</text>
+    </g>
+    <text x="99" y="169" fill="#0f172a" font-family="system-ui, sans-serif" font-size="17" font-weight="750" text-anchor="middle">Full</text>
+    <text x="99" y="188" fill="#b45309" font-family="system-ui, sans-serif" font-size="11" text-anchor="middle">金色＋Plan名</text>
+  </g>
+
+  <g transform="translate(714 112)" filter="url(#cardShadow)">
+    <rect width="198" height="198" rx="24" fill="#fff"/>
+    <text x="24" y="36" fill="#7c3aed" font-family="system-ui, sans-serif" font-size="12" font-weight="700" letter-spacing="1.5">FAMILY</text>
+    <circle cx="99" cy="96" r="42" fill="url(#avatar)" stroke="#fff" stroke-width="5"/>
+    <g transform="translate(99 96)"><use href="#person"/></g>
+    <g transform="translate(99 121)" filter="url(#badgeShadow)">
+      <rect x="-6" y="-11" width="77" height="22" rx="11" fill="url(#family)" stroke="#ede9fe" stroke-width="3"/>
+      <g transform="translate(8 0)"><use href="#people"/></g>
+      <text x="43" y="3.5" fill="#fff" font-family="system-ui, sans-serif" font-size="9" font-weight="850" text-anchor="middle" letter-spacing=".7">FAMILY</text>
+    </g>
+    <text x="99" y="169" fill="#0f172a" font-family="system-ui, sans-serif" font-size="17" font-weight="750" text-anchor="middle">ファミリー</text>
+    <text x="99" y="188" fill="#7c3aed" font-family="system-ui, sans-serif" font-size="11" text-anchor="middle">複数人アイコン付き</text>
+  </g>
+
+  <text x="480" y="340" fill="#94a3b8" font-family="system-ui, sans-serif" font-size="11" text-anchor="middle">※ 実画面では右上の40pxアバター右下へ重ねて表示</text>
+</svg>

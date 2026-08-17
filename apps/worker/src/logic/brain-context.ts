@@ -13,6 +13,7 @@ import { createGeminiClient, embedQuery } from "../infrastructure/gemini-client"
 
 const VECTOR_CANDIDATE_LIMIT = 10;
 const SEARCH_QUERY_CHARACTER_LIMIT = 10_000;
+const SEARCH_QUERY_HINTS_CHARACTER_LIMIT = 1_000;
 const BRAIN_SEARCH_TIMEOUT_MS = 2_000;
 const BRAIN_SEARCH_MINIMUM_SCORE = 0.7;
 
@@ -33,6 +34,7 @@ export function buildBrainSearchQuery(
   messages: readonly ConversationContextMessage[],
   currentUserMessageIds: readonly string[],
   at = new Date(),
+  queryHints: readonly string[] = [],
 ): string | undefined {
   const currentIds = new Set(currentUserMessageIds);
   const query = messages
@@ -48,7 +50,14 @@ export function buildBrainSearchQuery(
     .filter(Boolean)
     .join("\n");
   if (!query) return undefined;
-  return query.slice(-SEARCH_QUERY_CHARACTER_LIMIT);
+  const hints = [...new Set(queryHints.map((hint) => hint.trim()).filter(Boolean))]
+    .map((hint) => `関連人物: ${hint}`)
+    .join("\n")
+    .slice(0, SEARCH_QUERY_HINTS_CHARACTER_LIMIT);
+  const queryTail = query.slice(-SEARCH_QUERY_CHARACTER_LIMIT);
+  if (!hints) return queryTail;
+  const queryBudget = SEARCH_QUERY_CHARACTER_LIMIT - hints.length - 1;
+  return `${queryTail.slice(-queryBudget)}\n${hints}`;
 }
 
 /**
@@ -64,6 +73,7 @@ export async function loadBrainContextMemories(
     currentUserMessageIds: readonly string[];
     semanticSearchDays?: number | null;
     requiredAccessLabel?: string;
+    queryHints?: readonly string[];
     signal?: AbortSignal;
   }>,
   dependencies: BrainContextDependencies = defaultDependencies,
@@ -72,7 +82,12 @@ export async function loadBrainContextMemories(
   const accountDataNamespace = input.cf.do.accountData;
   const apiKey = input.workerConfig.googleVertexAiApiKey;
   const hmacSecret = input.workerConfig.brainVectorHmacSecret;
-  const query = buildBrainSearchQuery(input.messages, input.currentUserMessageIds);
+  const query = buildBrainSearchQuery(
+    input.messages,
+    input.currentUserMessageIds,
+    new Date(),
+    input.queryHints,
+  );
   if (!index || !accountDataNamespace || !apiKey || !hmacSecret || !query) return [];
 
   const searchController = new AbortController();

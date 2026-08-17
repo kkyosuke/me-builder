@@ -23,6 +23,8 @@ describe("diary chat prompt", () => {
     expect(DIARY_CHAT_SYSTEM_PROMPT).toContain("現在Sessionとown_diagnosesだけ");
     expect(DIARY_CHAT_SYSTEM_PROMPT).toContain("AccountDataが再認可したmemoriesだけ");
     expect(DIARY_CHAT_SYSTEM_PROMPT).toContain("個人データexport");
+    expect(DIARY_CHAT_SYSTEM_PROMPT).toContain("shared_relationships");
+    expect(DIARY_CHAT_SYSTEM_PROMPT).toContain("相手本人が確認した客観的事実ではなく");
   });
 
   it("追跡可能なprompt versionを持つ", () => {

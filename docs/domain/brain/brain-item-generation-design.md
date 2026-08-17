@@ -248,7 +248,7 @@ Source Record本文はモデルへの入力には含めますが、モデルの�
 
 ### 7.2 AIの候補出力
 
-AIは会話応答とは独立して、本人が明示した命題を1チェックポイント最大3件提案します。日記から生成する分類は`Memory`、`Behavior Pattern`、`Value / Motivation`、`Decision System`、`Preference`、`Goal`です。いずれも`is_inference = false`であり、`statement`がすべての根拠user message本文にそのまま含まれる候補だけを受け付けます。自由な言い換えを許すと、構造検証だけでは発言にない内容を除外できないため、連続した原文の抜き出しに限定します。本人が明言していない動機や安定した傾向は生成しません。上限は1回の構造化出力と保存負荷を制限するための安全弁です。
+AIは会話応答とは独立して、本人が明示した命題を1チェックポイント最大3件提案します。日記から生成する分類は`Memory`、`Behavior Pattern`、`Value / Motivation`、`Decision System`、`Preference`、`Goal`です。いずれも`is_inference = false`であり、`statement`がすべての根拠user message本文にそのまま含まれる候補だけを受け付けます。自由な言い換えを許すと、構造検証だけでは発言にない内容を除外できないため、連続した原文の抜き出しに限定します。本人が特定の相手について明言した事実や観察は`Memory`にできますが、相手本人が確認した客観的な人物像とは扱いません。本人が明言していない動機や安定した傾向は、本人についても相手についても生成しません。上限は1回の構造化出力と保存負荷を制限するための安全弁です。
 
 ```json
 {
@@ -272,9 +272,10 @@ AIは会話応答とは独立して、本人が明示した命題を1チェッ�
 - safety routeが候補生成を禁止する
 - 発言にない内容を事実として追加している
 - 本人が明言していない性格、価値観、好み、動機、意図、安定した行動パターンを推定している
+- 特定の相手について、本人の原文にない性格、勤務事情、内心を補完している
 - 空のstatement、未定義分類、上限を超えた候補
 
-分類境界は[Brain内部情報の分類](brain-content-taxonomy.md)を正とします。具体的な出来事・経験は`memory`、明示された反復行動は`behavior_pattern`、明示された行動理由は`value_motivation`、選択基準は`decision_system`、具体的な好き嫌いは`preference`、未来の達成意図は`goal`にします。1回の行動だけから反復傾向や動機を推定しません。
+分類境界は[Brain内部情報の分類](brain-content-taxonomy.md)を正とします。具体的な出来事・経験と、本人が特定の相手について明言した観察は`memory`、本人自身について明示された反復行動は`behavior_pattern`、明示された行動理由は`value_motivation`、選択基準は`decision_system`、具体的な好き嫌いは`preference`、未来の達成意図は`goal`にします。1回の行動だけから反復傾向や動機を推定しません。
 
 `statement`に「今日」「昨日」「来月」「来年」などの相対日付がある場合、AIとAccountDataはBrain Itemの命題を原文のまま保存します。AccountDataは根拠Source Recordの受信日時を基準に`Asia/Tokyo`の絶対日付を決定的に解決し、原文、基準日、timezone、解決対応を`attributes.temporalContext`へ分離して保存します。たとえば2026年8月11日の「来月までに転職先を決めたい」は、`statement`を変えず、`来月 = 2026年9月`を時点情報に持ちます。EvidenceのSource Record原文も変更しません。
 

@@ -317,6 +317,11 @@ describe("diary chat guardrails", () => {
           statement: "共有されていない第三者情報",
         },
       ],
+      sharedRelationships: [{ relationshipCategory: "friend", partnerDisplayName: "美咲" }],
+      matchedSharedRelationship: {
+        relationshipCategory: "friend",
+        partnerDisplayName: "美咲",
+      },
     });
 
     expect(context.relationship_question).toEqual({
@@ -328,6 +333,13 @@ describe("diary chat guardrails", () => {
           diagnosis_id: "friend-style",
           relationship_category: "friend",
           statement: "気持ちを言葉で確認する傾向がある",
+        },
+      ],
+      shared_relationships: [
+        {
+          relationship_category: "friend",
+          partner_display_name: "美咲",
+          matches_current_person: true,
         },
       ],
     });
