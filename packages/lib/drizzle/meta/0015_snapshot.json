@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "508f069a-4326-4cf3-af3f-57d044c4cf80",
-  "prevId": "fe2893c3-7fab-4658-a3ab-f4d3f2f94eba",
+  "id": "ab077f8b-1175-43a2-84d1-b7e822da6cb9",
+  "prevId": "b64756cc-8fb7-46b8-841e-d01ad741ba4c",
   "tables": {
     "account_identities": {
       "name": "account_identities",
@@ -857,7 +857,7 @@
         "billing_trial_subscription_idx": {
           "name": "billing_trial_subscription_idx",
           "columns": ["provider_subscription_id"],
-          "isUnique": false
+          "isUnique": true
         }
       },
       "foreignKeys": {
