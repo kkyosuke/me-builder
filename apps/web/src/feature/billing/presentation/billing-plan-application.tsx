@@ -2,7 +2,7 @@ import type { BillingInterval, PaidPlanCode } from "@me-builder/shared";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { config } from "../../../config";
 import type { AsyncState } from "../../../model/async-state";
-import { getLiffIdToken } from "../../liff/infrastructure/liff-client";
+import { getLiffIdToken, openLiffWindow } from "../../liff/infrastructure/liff-client";
 import { useLiffSession } from "../../liff/presentation/liff-session-provider";
 import { fetchProfileEntitlement } from "../../profile-settings/infrastructure/entitlement-api";
 import type { ProfileEntitlement } from "../../profile-settings/model/entitlement";
@@ -43,7 +43,9 @@ function initialCompletionMessage(search: string): string | null {
 export default function BillingPlanApplication({
   onBack,
   onEntitlementChanged,
-  navigateToCheckout = (url) => window.location.assign(url),
+  navigateToCheckout = (url) => {
+    if (!openLiffWindow(url)) window.location.assign(url);
+  },
   projectionPollIntervalMs = 1_500,
 }: {
   onBack: () => void;
@@ -220,6 +222,7 @@ export default function BillingPlanApplication({
               { plan, interval },
               controller.signal,
             );
+      setCheckoutState({ status: "success", data: url });
       navigateToCheckout(url);
     } catch (error) {
       setCheckoutState({ status: "error", message: message(error) });
@@ -235,6 +238,7 @@ export default function BillingPlanApplication({
         await token(controller.signal),
         controller.signal,
       );
+      setCheckoutState({ status: "success", data: url });
       navigateToCheckout(url);
     } catch (error) {
       setCheckoutState({ status: "error", message: message(error) });

@@ -174,7 +174,7 @@ describe("subscription entitlement user journey", () => {
     expect(window.location.pathname).toBe("/profile/billing");
     const billingDialog = await screen.findByRole("dialog", { name: "料金プラン" });
     expect(billingDialog.className).toContain("z-[70]");
-    expect(await screen.findByRole("button", { name: "Liteを選ぶ" })).toBeTruthy();
+    expect(await screen.findByRole("radio", { name: "ノーマル Lite" })).toBeTruthy();
     const profileDialog = document.querySelector<HTMLDialogElement>(
       'dialog[aria-labelledby="profile-settings-title"]',
     );

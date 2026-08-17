@@ -43,7 +43,7 @@ unset PREVIEW_BILLING_ID_TOKEN
 2. `Setup / Stripe Billing`を対象branch、`dev`、確認文字列`sync-dev`で実行する
 3. 同じbranchの`Scheduled Checks`を手動実行し、Stripe sandbox lifecycleを完了する
 4. Preview LIFFを検証用Accountで開き、公開Planと初回trial表示を確認する
-5. sandboxの支払方法だけを使ってCheckoutを完了し、復帰画面がqueryだけで成功せず、projection反映後に現在Planを表示することを確認する
+5. 購入ボタンからLINEのアプリ内ブラウザにStripe Checkoutが開くことを確認する。開かない場合の直接リンクも確認してから、sandboxの支払方法だけを使ってCheckoutを完了し、復帰画面がqueryだけで成功せず、projection反映後に現在Planを表示することを確認する
 
 Stripe同期はPlanごとの3 Product、月額・年額の6 Price、Webhook endpoint、Customer Portal configuration、Cloudflare secretsを同時に更新します。Customer Portalが要求する「1 Product内で課金間隔が一意」を満たしつつ、3 Productすべてを即時upgrade候補へ登録します。異なるProduct間の期間末downgradeはAPIがSubscription Scheduleを作成します。旧ProductのPrice IDは既存契約がなくなるまでPlan mapへ残します。
 

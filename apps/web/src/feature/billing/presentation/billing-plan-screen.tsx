@@ -1,10 +1,23 @@
 import type { BillingInterval, PaidPlanCode } from "@me-builder/shared";
-import { ArrowLeft, Check, CreditCard, ExternalLink, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Check, ExternalLink, ShieldCheck } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { AsyncState } from "../../../model/async-state";
 import type { ProfileEntitlement } from "../../profile-settings/model/entitlement";
 import { type BillingPlan, billingPlanPrice, formatBillingAmount } from "../model/billing-plan";
 import { expectedTrialEndDate } from "../model/trial";
+
+const planNames = {
+  free: "Free",
+  lite: "Lite",
+  full: "Full",
+  family: "ファミリーパック",
+} as const;
+
+const planTabNames = {
+  lite: "ノーマル",
+  full: "プレミアム",
+  family: "ファミリー",
+} as const;
 
 export function BillingPlanScreen({
   plans,
@@ -28,14 +41,17 @@ export function BillingPlanScreen({
   const [interval, setInterval] = useState<BillingInterval>("month");
   const [selectedPlan, setSelectedPlan] = useState<PaidPlanCode | null>(null);
   const backButtonRef = useRef<HTMLButtonElement>(null);
-  const selected =
-    plans.status === "success"
-      ? (plans.data.find((plan) => plan.code === selectedPlan) ?? null)
-      : null;
   const paidSubscription =
     entitlement.status === "success" && entitlement.data.source === "subscription";
   const familySeat = entitlement.status === "success" && entitlement.data.source === "family-seat";
   const currentPlan = entitlement.status === "success" ? entitlement.data.plan : "free";
+  const selected =
+    plans.status === "success"
+      ? (plans.data.find((plan) => plan.code === selectedPlan) ??
+        plans.data.find((plan) => plan.code === currentPlan) ??
+        plans.data[0] ??
+        null)
+      : null;
   const planRank = { free: -1, lite: 0, full: 1, family: 2 } as const;
   const selectedPlanIsDowngrade =
     selected !== null && planRank[selected.code] < planRank[currentPlan];
@@ -44,6 +60,17 @@ export function BillingPlanScreen({
     backButtonRef.current?.focus();
   }, []);
 
+  const actionLabel =
+    checkoutState.status === "loading"
+      ? selectedPlanIsDowngrade
+        ? "変更を予約しています..."
+        : "Stripeを開いています..."
+      : paidSubscription
+        ? selectedPlanIsDowngrade
+          ? "期間末の変更を予約"
+          : "プランを変更する"
+        : "プランを変更する";
+
   return (
     <dialog
       open
@@ -51,7 +78,7 @@ export function BillingPlanScreen({
       aria-labelledby="billing-plan-title"
       className="fixed inset-0 z-[70] m-0 h-full max-h-none w-full max-w-none overflow-y-auto border-0 bg-slate-50 p-0 text-slate-950 dark:bg-slate-950 dark:text-white"
     >
-      <div className="mx-auto min-h-full w-full max-w-5xl px-4 pb-12 pt-[max(1rem,env(safe-area-inset-top))] sm:px-6">
+      <div className="mx-auto min-h-full w-full max-w-3xl px-4 pt-[max(1rem,env(safe-area-inset-top))] sm:px-6">
         <header className="flex items-center gap-3">
           <button
             ref={backButtonRef}
@@ -73,268 +100,252 @@ export function BillingPlanScreen({
         </header>
 
         {completionMessage && (
-          <output className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-100">
+          <output className="mt-4 block rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-bold text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-100">
             {completionMessage}
           </output>
         )}
 
-        <section className="mt-6 rounded-2xl bg-white p-5 shadow-sm dark:bg-slate-900">
-          <h2 className="font-bold">現在のプラン</h2>
-          {entitlement.status === "loading" || entitlement.status === "idle" ? (
-            <output
-              aria-busy="true"
-              aria-label="現在のプランを読み込んでいます"
-              className="mt-3 block h-12 animate-pulse rounded-xl bg-slate-200 motion-reduce:animate-none dark:bg-slate-700"
-            />
-          ) : entitlement.status === "error" ? (
-            <p role="alert" className="mt-3 text-sm text-rose-700 dark:text-rose-300">
-              {entitlement.message}
-            </p>
-          ) : (
-            <p className="mt-2 text-lg font-bold">
-              {
-                ({ free: "Free", lite: "Lite", full: "Full", family: "ファミリーパック" } as const)[
-                  entitlement.data.plan
-                ]
-              }
-            </p>
+        {checkoutState.status === "success" && (
+          <output className="mt-4 block rounded-xl border border-violet-200 bg-violet-50 p-3 text-sm text-violet-950 dark:border-violet-800 dark:bg-violet-950 dark:text-violet-100">
+            Stripe画面を開きました。表示されない場合は
+            <a href={checkoutState.data} className="ml-1 font-bold underline underline-offset-2">
+              こちらからStripeを開いてください
+            </a>
+            。
+          </output>
+        )}
+
+        {checkoutState.status === "error" && (
+          <p
+            role="alert"
+            className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-200"
+          >
+            {checkoutState.message}
+          </p>
+        )}
+
+        <section className="mt-4 flex min-h-16 items-center justify-between gap-4 rounded-xl bg-white px-4 py-3 shadow-sm dark:bg-slate-900">
+          <div>
+            <h2 className="text-xs font-bold text-slate-500 dark:text-slate-400">現在のプラン</h2>
+            {entitlement.status === "loading" || entitlement.status === "idle" ? (
+              <output
+                aria-busy="true"
+                aria-label="現在のプランを読み込んでいます"
+                className="mt-2 block h-6 w-24 animate-pulse rounded bg-slate-200 motion-reduce:animate-none dark:bg-slate-700"
+              />
+            ) : entitlement.status === "error" ? (
+              <p role="alert" className="mt-1 text-sm text-rose-700 dark:text-rose-300">
+                {entitlement.message}
+              </p>
+            ) : (
+              <p className="mt-0.5 text-lg font-bold">{planNames[entitlement.data.plan]}</p>
+            )}
+          </div>
+          {paidSubscription && (
+            <button
+              type="button"
+              disabled={checkoutState.status === "loading"}
+              onClick={onManageSubscription}
+              className="min-h-10 shrink-0 rounded-lg border border-sky-300 px-3 text-sm font-bold text-sky-800 disabled:cursor-wait disabled:opacity-60 dark:border-sky-700 dark:text-sky-200"
+            >
+              契約を管理
+            </button>
           )}
         </section>
 
         {familySeat ? (
-          <section className="mt-6 rounded-2xl border border-sky-200 bg-sky-50 p-5 text-sky-950 dark:border-sky-800 dark:bg-sky-950 dark:text-sky-100">
+          <section className="mt-4 rounded-xl border border-sky-200 bg-sky-50 p-4 text-sky-950 dark:border-sky-800 dark:bg-sky-950 dark:text-sky-100">
             <h2 className="font-bold">ファミリーパックに参加中です</h2>
             <p className="mt-2 text-sm">
-              ファミリーの利用権と個人契約は併用できません。個人契約を購入するには、先にファミリー席から退出してください。
+              個人契約を購入するには、先にファミリー席から退出してください。
             </p>
           </section>
         ) : (
-          <>
-            {paidSubscription && (
-              <section className="mt-6 rounded-2xl border border-sky-200 bg-sky-50 p-5 text-sky-950 dark:border-sky-800 dark:bg-sky-950 dark:text-sky-100">
-                <h2 className="font-bold">現在の契約があります</h2>
-                <p className="mt-2 text-sm">
-                  下の一覧から変更先を選べます。支払方法、請求履歴、解約予約と再開は契約管理から確認できます。
-                </p>
-                <button
-                  type="button"
-                  disabled={checkoutState.status === "loading"}
-                  onClick={onManageSubscription}
-                  className="mt-4 min-h-12 rounded-xl bg-sky-800 px-5 font-bold text-white disabled:cursor-wait disabled:opacity-60"
-                >
-                  {checkoutState.status === "loading"
-                    ? "Stripeを開いています..."
-                    : "支払方法・解約・請求履歴を管理"}
-                </button>
-                {checkoutState.status === "error" && (
-                  <p role="alert" className="mt-3 text-sm text-rose-700 dark:text-rose-300">
-                    {checkoutState.message}
-                  </p>
-                )}
-              </section>
-            )}
-            <fieldset className="mt-8">
-              <legend className="text-sm font-bold">支払い間隔</legend>
-              <div className="mt-3 grid grid-cols-2 rounded-xl bg-slate-200 p-1 dark:bg-slate-800">
-                {(["month", "year"] as const).map((value) => (
-                  <label
-                    key={value}
-                    className={`flex min-h-11 cursor-pointer items-center justify-center rounded-lg font-bold ${interval === value ? "bg-white text-violet-700 shadow-sm dark:bg-slate-700 dark:text-violet-200" : "text-slate-600 dark:text-slate-300"}`}
-                  >
-                    <input
-                      type="radio"
-                      name="billing-interval"
-                      value={value}
-                      checked={interval === value}
-                      onChange={() => setInterval(value)}
-                      className="sr-only"
-                    />
-                    {value === "month" ? "月額" : "年額"}
-                  </label>
-                ))}
-              </div>
-            </fieldset>
+          <section aria-labelledby="plan-selection-title" className="mt-4 pb-2">
+            <h2 id="plan-selection-title" className="text-lg font-bold">
+              プランを選ぶ
+            </h2>
 
             {plans.status === "loading" || plans.status === "idle" ? (
               <output
                 aria-busy="true"
                 aria-label="料金プランを読み込んでいます"
-                className="mt-6 grid gap-4 sm:grid-cols-3"
-              >
-                {[0, 1, 2].map((value) => (
-                  <span
-                    key={value}
-                    className="block h-80 animate-pulse rounded-2xl bg-slate-200 motion-reduce:animate-none dark:bg-slate-800"
-                  />
-                ))}
-              </output>
+                className="mt-3 block h-56 animate-pulse rounded-2xl bg-slate-200 motion-reduce:animate-none dark:bg-slate-800"
+              />
             ) : plans.status === "error" ? (
-              <div className="mt-6 rounded-2xl bg-rose-50 p-5 dark:bg-rose-950">
+              <div className="mt-3 rounded-xl bg-rose-50 p-4 dark:bg-rose-950">
                 <p role="alert" className="text-sm text-rose-900 dark:text-rose-100">
                   {plans.message}
                 </p>
                 <button
                   type="button"
                   onClick={onRetry}
-                  className="mt-4 min-h-11 rounded-xl bg-rose-700 px-4 font-bold text-white"
+                  className="mt-3 min-h-10 rounded-lg bg-rose-700 px-4 font-bold text-white"
                 >
                   再試行
                 </button>
               </div>
             ) : plans.data.length === 0 ? (
-              <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 text-center dark:border-slate-700 dark:bg-slate-900">
+              <div className="mt-3 rounded-xl border border-slate-200 bg-white p-4 text-center dark:border-slate-700 dark:bg-slate-900">
                 <output className="block text-sm text-slate-600 dark:text-slate-300">
                   購入できる料金プランを表示できませんでした。
                 </output>
                 <button
                   type="button"
                   onClick={onRetry}
-                  className="mt-4 min-h-11 rounded-xl border border-violet-400 px-4 font-bold text-violet-700 dark:text-violet-200"
+                  className="mt-3 min-h-10 rounded-lg border border-violet-400 px-4 font-bold text-violet-700 dark:text-violet-200"
                 >
                   再読み込み
                 </button>
               </div>
             ) : (
-              <div className="mt-6 grid gap-4 sm:grid-cols-3">
-                {plans.data.map((plan) => {
-                  const price = billingPlanPrice(plan, interval);
-                  return (
-                    <article
-                      key={plan.code}
-                      className={`flex flex-col rounded-2xl border bg-white p-5 shadow-sm dark:bg-slate-900 ${plan.code === "full" ? "border-violet-400 ring-1 ring-violet-300 dark:border-violet-600" : "border-slate-200 dark:border-slate-700"}`}
-                    >
-                      <h2 className="text-xl font-bold">{plan.name}</h2>
-                      <p className="mt-2 min-h-16 text-sm text-slate-600 dark:text-slate-300">
-                        {plan.description}
-                      </p>
-                      <p className="mt-4 text-3xl font-bold">
-                        {formatBillingAmount(price.amount)}
-                        <span className="text-sm font-normal text-slate-500">
-                          /{interval === "month" ? "月" : "年"}
+              <>
+                <fieldset className="mt-3">
+                  <legend className="sr-only">プラン種別</legend>
+                  <div className="grid grid-cols-3 rounded-xl bg-slate-200 p-1 dark:bg-slate-800">
+                    {plans.data.map((plan) => (
+                      <label
+                        key={plan.code}
+                        className={`flex min-h-12 cursor-pointer flex-col items-center justify-center rounded-lg px-1 text-center ${selected?.code === plan.code ? "bg-white text-violet-700 shadow-sm dark:bg-slate-700 dark:text-violet-200" : "text-slate-600 dark:text-slate-300"}`}
+                      >
+                        <input
+                          type="radio"
+                          name="billing-plan"
+                          value={plan.code}
+                          checked={selected?.code === plan.code}
+                          onChange={() => setSelectedPlan(plan.code)}
+                          className="sr-only"
+                        />
+                        <span className="text-sm font-bold">{planTabNames[plan.code]}</span>
+                        <span className="text-[10px]">{plan.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+
+                <fieldset className="mt-3">
+                  <legend className="sr-only">支払い間隔</legend>
+                  <div className="grid grid-cols-2 rounded-xl bg-slate-200 p-1 dark:bg-slate-800">
+                    {(["month", "year"] as const).map((value) => (
+                      <label
+                        key={value}
+                        className={`flex min-h-10 cursor-pointer items-center justify-center rounded-lg text-sm font-bold ${interval === value ? "bg-white text-violet-700 shadow-sm dark:bg-slate-700 dark:text-violet-200" : "text-slate-600 dark:text-slate-300"}`}
+                      >
+                        <input
+                          type="radio"
+                          name="billing-interval"
+                          value={value}
+                          checked={interval === value}
+                          onChange={() => setInterval(value)}
+                          className="sr-only"
+                        />
+                        {value === "month" ? "月額" : "年額"}
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+
+                {selected && (
+                  <article className="mt-3 rounded-2xl border border-violet-200 bg-white p-4 shadow-sm dark:border-violet-800 dark:bg-slate-900">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-bold text-violet-700 dark:text-violet-200">
+                          {planTabNames[selected.code]}
+                        </p>
+                        <h3 className="text-xl font-bold">{selected.name}</h3>
+                      </div>
+                      <p className="shrink-0 text-right text-2xl font-bold">
+                        {formatBillingAmount(billingPlanPrice(selected, interval).amount)}
+                        <span className="block text-xs font-normal text-slate-500">
+                          税込 / {interval === "month" ? "月" : "年"}
                         </span>
                       </p>
-                      <p className="mt-1 text-xs text-slate-500">税込・自動更新</p>
-                      {plan.trialDays && (
-                        <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-100">
-                          初回のみ{plan.trialDays}日間無料
+                    </div>
+                    <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                      {selected.description}
+                    </p>
+
+                    {selected.trialDays && (
+                      <div className="mt-3 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-900 dark:bg-emerald-950 dark:text-emerald-100">
+                        <p className="font-bold">初回{selected.trialDays}日間無料トライアル</p>
+                        <p className="mt-1">
+                          本日開始した場合は{expectedTrialEndDate(selected.trialDays)}まで無料です。
+                          終了後は
+                          {formatBillingAmount(billingPlanPrice(selected, interval).amount)}を
+                          {interval === "month" ? "毎月" : "毎年"}自動更新します。
                         </p>
-                      )}
-                      <ul className="mt-5 flex-1 space-y-2 text-sm">
-                        {plan.highlights.map((highlight) => (
-                          <li key={highlight} className="flex gap-2">
-                            <Check
-                              className="mt-0.5 size-4 shrink-0 text-emerald-600"
-                              aria-hidden="true"
-                            />
-                            {highlight}
-                          </li>
-                        ))}
-                      </ul>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedPlan(plan.code)}
-                        className="mt-6 min-h-12 rounded-xl bg-violet-700 px-4 font-bold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500"
-                      >
-                        {plan.name}を選ぶ
-                      </button>
-                    </article>
-                  );
-                })}
-              </div>
+                      </div>
+                    )}
+
+                    <ul className="mt-3 grid gap-1.5 text-sm sm:grid-cols-2">
+                      {selected.highlights.map((highlight) => (
+                        <li key={highlight} className="flex gap-2">
+                          <Check
+                            className="mt-0.5 size-4 shrink-0 text-emerald-600"
+                            aria-hidden="true"
+                          />
+                          {highlight}
+                        </li>
+                      ))}
+                    </ul>
+
+                    <dl className="mt-3 grid gap-2 border-t border-slate-200 pt-3 text-xs dark:border-slate-700 sm:grid-cols-2">
+                      <div>
+                        <dt className="font-bold">請求・変更</dt>
+                        <dd className="mt-0.5 text-slate-600 dark:text-slate-300">
+                          {paidSubscription && selectedPlanIsDowngrade
+                            ? "現在の期間終了時に変更し、それまでは現在のプランを維持"
+                            : paidSubscription
+                              ? "Stripeで差額と次回更新日を確認してから変更"
+                              : selected.trialDays
+                                ? "無料期間終了後、選択した間隔で自動更新"
+                                : "支払方法の登録後、選択した間隔で自動更新"}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="font-bold">解約</dt>
+                        <dd className="mt-0.5 text-slate-600 dark:text-slate-300">
+                          契約管理からいつでも期間末解約を予約できます。
+                        </dd>
+                      </div>
+                    </dl>
+                    <p className="mt-3 flex gap-2 text-xs text-slate-500 dark:text-slate-400">
+                      <ShieldCheck className="size-4 shrink-0" aria-hidden="true" />
+                      カード情報はStripeが扱い、me-builderには保存されません。
+                    </p>
+                  </article>
+                )}
+              </>
             )}
-          </>
+          </section>
         )}
 
-        {selected && (
-          <section
-            aria-labelledby="checkout-confirmation-title"
-            className="mt-8 rounded-2xl border-2 border-violet-300 bg-white p-6 shadow-lg dark:border-violet-700 dark:bg-slate-900"
-          >
-            <div className="flex items-center gap-3">
-              <CreditCard
-                className="size-6 text-violet-700 dark:text-violet-200"
-                aria-hidden="true"
-              />
-              <h2 id="checkout-confirmation-title" className="text-xl font-bold">
-                {paidSubscription ? "変更内容の確認" : "申込み内容の確認"}
-              </h2>
-            </div>
-            <dl className="mt-5 grid gap-3 text-sm sm:grid-cols-2">
-              {selected.trialDays && (
-                <div className="sm:col-span-2 rounded-xl bg-emerald-50 p-4 dark:bg-emerald-950">
-                  <dt className="font-bold text-emerald-800 dark:text-emerald-100">
-                    初回14日間無料トライアル
-                  </dt>
-                  <dd className="mt-1 text-emerald-900 dark:text-emerald-100">
-                    本日開始した場合は{expectedTrialEndDate(selected.trialDays)}まで無料です。
-                    正確な終了日はStripe画面で開始前に確認できます。
-                  </dd>
+        {selected && !familySeat && entitlement.status === "success" && (
+          <>
+            <div className="h-28" aria-hidden="true" />
+            <footer className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-slate-50/95 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:px-6">
+              <div className="mx-auto flex max-w-3xl items-center gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-bold">
+                    {planTabNames[selected.code]}（{selected.name}）
+                  </p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {formatBillingAmount(billingPlanPrice(selected, interval).amount)} /
+                    {interval === "month" ? "月" : "年"}
+                  </p>
                 </div>
-              )}
-              <div>
-                <dt className="text-slate-500">プラン</dt>
-                <dd className="mt-1 font-bold">{selected.name}</dd>
+                <button
+                  type="button"
+                  disabled={checkoutState.status === "loading"}
+                  onClick={() => onCheckout(selected.code, interval)}
+                  className="flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-xl bg-violet-700 px-5 font-bold text-white shadow-lg disabled:cursor-wait disabled:opacity-60 sm:min-w-56"
+                >
+                  <ExternalLink className="size-4" aria-hidden="true" />
+                  {actionLabel}
+                </button>
               </div>
-              <div>
-                <dt className="text-slate-500">支払額</dt>
-                <dd className="mt-1 font-bold">
-                  {formatBillingAmount(billingPlanPrice(selected, interval).amount)}（税込）/
-                  {interval === "month" ? "月" : "年"}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-slate-500">請求</dt>
-                <dd className="mt-1">
-                  {paidSubscription && selectedPlanIsDowngrade
-                    ? "現在の期間の終了時に変更。適用までは現在のプランを維持"
-                    : paidSubscription
-                      ? "Stripeの確認画面で差額と次回更新日を確認してから変更"
-                      : selected.trialDays
-                        ? `無料期間終了後に${formatBillingAmount(billingPlanPrice(selected, interval).amount)}を請求し、選択した間隔で自動更新`
-                        : "Stripeで支払方法を登録した後、選択した間隔で自動更新"}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-slate-500">解約</dt>
-                <dd className="mt-1">契約管理からいつでも期間末解約を予約可能</dd>
-              </div>
-            </dl>
-            <p className="mt-5 flex gap-2 rounded-xl bg-slate-100 p-3 text-xs text-slate-700 dark:bg-slate-800 dark:text-slate-200">
-              <ShieldCheck className="size-4 shrink-0" aria-hidden="true" />
-              カード情報はStripeが扱い、me-builderには保存されません。
-            </p>
-            {checkoutState.status === "error" && (
-              <p role="alert" className="mt-4 text-sm text-rose-700 dark:text-rose-300">
-                {checkoutState.message}
-              </p>
-            )}
-            <div className="mt-5 flex flex-col gap-3 sm:flex-row-reverse">
-              <button
-                type="button"
-                disabled={checkoutState.status === "loading"}
-                onClick={() => onCheckout(selected.code, interval)}
-                className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-violet-700 px-5 font-bold text-white disabled:cursor-wait disabled:opacity-60"
-              >
-                <ExternalLink className="size-4" aria-hidden="true" />
-                {checkoutState.status === "loading"
-                  ? selectedPlanIsDowngrade
-                    ? "変更を予約しています..."
-                    : "Stripeを開いています..."
-                  : paidSubscription
-                    ? selectedPlanIsDowngrade
-                      ? "期間末の変更を予約"
-                      : "Stripeで変更内容を確認"
-                    : "Stripeで購入手続きへ"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setSelectedPlan(null)}
-                className="min-h-12 rounded-xl border border-slate-300 px-5 font-bold dark:border-slate-700"
-              >
-                選び直す
-              </button>
-            </div>
-          </section>
+            </footer>
+          </>
         )}
       </div>
     </dialog>

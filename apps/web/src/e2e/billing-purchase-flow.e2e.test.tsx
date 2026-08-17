@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   fetchTrialEligibility: vi.fn(),
   createPortal: vi.fn(),
   createPlanChange: vi.fn(),
+  openLiffWindow: vi.fn(),
 }));
 
 vi.mock("../feature/billing/infrastructure/billing-api", () => ({
@@ -28,6 +29,7 @@ vi.mock("../feature/profile-settings/infrastructure/entitlement-api", () => ({
 }));
 vi.mock("../feature/liff/infrastructure/liff-client", () => ({
   getLiffIdToken: () => "id-token",
+  openLiffWindow: mocks.openLiffWindow,
 }));
 vi.mock("../feature/liff/presentation/liff-session-provider", () => ({
   useLiffSession: () => ({ acquireIdToken: mocks.acquireIdToken }),
@@ -81,6 +83,7 @@ describe("billing purchase user journey", () => {
     mocks.fetchTrialEligibility.mockReset().mockResolvedValue(true);
     mocks.createPortal.mockReset().mockResolvedValue("https://billing.stripe.test/portal");
     mocks.createPlanChange.mockReset().mockResolvedValue("https://billing.stripe.test/plan-change");
+    mocks.openLiffWindow.mockReset().mockReturnValue(true);
   });
   afterEach(cleanup);
 
@@ -88,8 +91,8 @@ describe("billing purchase user journey", () => {
     const navigate = vi.fn();
     render(<BillingPlanApplication onBack={vi.fn()} navigateToCheckout={navigate} />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Liteを選ぶ" }));
-    fireEvent.click(screen.getByRole("button", { name: /Stripeで購入手続きへ/ }));
+    await screen.findByRole("radio", { name: "ノーマル Lite" });
+    fireEvent.click(screen.getByRole("button", { name: /プランを変更する/ }));
 
     await waitFor(() =>
       expect(navigate).toHaveBeenCalledWith("https://checkout.stripe.test/session"),
@@ -100,6 +103,20 @@ describe("billing purchase user journey", () => {
       { plan: "lite", interval: "month" },
       expect.any(AbortSignal),
     );
+  });
+
+  it("LIFFブラウザではCheckoutをLINEのアプリ内ブラウザで開き再表示導線を残す", async () => {
+    render(<BillingPlanApplication onBack={vi.fn()} />);
+
+    await screen.findByRole("radio", { name: "ノーマル Lite" });
+    fireEvent.click(screen.getByRole("button", { name: /プランを変更する/ }));
+
+    await waitFor(() =>
+      expect(mocks.openLiffWindow).toHaveBeenCalledWith("https://checkout.stripe.test/session"),
+    );
+    expect(
+      screen.getByRole("link", { name: "こちらからStripeを開いてください" }).getAttribute("href"),
+    ).toBe("https://checkout.stripe.test/session");
   });
 
   it("Checkout復帰後はprojectionが反映されてから購入完了を表示する", async () => {
@@ -122,7 +139,7 @@ describe("billing purchase user journey", () => {
     );
 
     expect(await screen.findByText("Liteが利用できるようになりました。")).toBeTruthy();
-    expect(screen.getByText("現在の契約があります")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "契約を管理" })).toBeTruthy();
     expect(onEntitlementChanged).toHaveBeenCalledWith(
       expect.objectContaining({ plan: "lite", source: "subscription" }),
     );
@@ -173,8 +190,7 @@ describe("billing purchase user journey", () => {
     render(<BillingPlanApplication onBack={vi.fn()} navigateToCheckout={navigate} />);
 
     fireEvent.click(await screen.findByRole("radio", { name: "年額" }));
-    fireEvent.click(screen.getByRole("button", { name: "Liteを選ぶ" }));
-    fireEvent.click(screen.getByRole("button", { name: "Stripeで変更内容を確認" }));
+    fireEvent.click(screen.getByRole("button", { name: "プランを変更する" }));
 
     await waitFor(() =>
       expect(navigate).toHaveBeenCalledWith("https://billing.stripe.test/plan-change"),
@@ -199,8 +215,8 @@ describe("billing purchase user journey", () => {
     const navigate = vi.fn();
     render(<BillingPlanApplication onBack={vi.fn()} navigateToCheckout={navigate} />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Liteを選ぶ" }));
-    expect(screen.getByText("現在の期間の終了時に変更。適用までは現在のプランを維持")).toBeTruthy();
+    await screen.findByRole("radio", { name: "ノーマル Lite" });
+    expect(screen.getByText("現在の期間終了時に変更し、それまでは現在のプランを維持")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "期間末の変更を予約" }));
 
     await waitFor(() =>
@@ -230,7 +246,7 @@ describe("billing purchase user journey", () => {
         "Liteへの変更を2026年9月1日に予約しました。それまでは現在のプランを利用できます。",
       ),
     ).toBeTruthy();
-    expect(screen.getByText("現在の契約があります")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "契約を管理" })).toBeTruthy();
     expect(mocks.verifyCheckout).not.toHaveBeenCalled();
   });
 });
