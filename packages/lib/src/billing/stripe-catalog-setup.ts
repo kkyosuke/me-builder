@@ -5,6 +5,7 @@ import { STRIPE_BILLING_EVENT_TYPES } from "./stripe-events";
 
 const MANAGED_BY = "me-builder-stripe-catalog";
 const CATALOG_VERSION = "2026-08-18";
+export const PORTAL_CONFIGURATION_VERSION = "2026-08-18-1";
 export const STRIPE_BILLING_PRODUCT_TAX_CODE = "txcd_10105001";
 
 export type StripeCatalogEnvironment = "preview" | "production";
@@ -65,6 +66,7 @@ export interface CatalogWebhookEndpoint {
 
 export interface CatalogPortalConfiguration {
   id: string;
+  active: boolean;
   metadata: Readonly<Record<string, string>>;
 }
 
@@ -117,11 +119,11 @@ export interface StripeCatalogApi {
   listPortalConfigurations(): Promise<readonly CatalogPortalConfiguration[]>;
   createPortalConfiguration(spec: PortalSpec): Promise<CatalogPortalConfiguration>;
   updatePortalConfiguration(id: string, spec: PortalSpec): Promise<void>;
+  deactivatePortalConfiguration(id: string): Promise<void>;
 }
 
 export interface StripeBillingCatalogSetupResult {
   pricePlanMap: Readonly<Record<string, StripeCatalogPlan>>;
-  lookupKeyMap: Readonly<Record<string, string>>;
   webhookSecret: string | null;
   portalConfigurationId: string;
   portalPlanChangeConfigurationId: string;
@@ -150,7 +152,11 @@ function managedMetadata(plan?: StripeCatalogPlan): Record<string, string> {
 }
 
 function portalMetadata(mode: "management" | "standard" | "reset"): Record<string, string> {
-  return { ...managedMetadata(), portal_mode: mode };
+  return {
+    ...managedMetadata(),
+    portal_mode: mode,
+    portal_configuration_version: PORTAL_CONFIGURATION_VERSION,
+  };
 }
 
 function isManaged(metadata: Readonly<Record<string, string>>): boolean {
@@ -378,16 +384,19 @@ export async function setupStripeBillingCatalog(input: {
     };
   });
   const upsertPortal = async (mode: "management" | "standard" | "reset") => {
+    const matchingMode = (configuration: CatalogPortalConfiguration) =>
+      isManaged(configuration.metadata) &&
+      (mode === "management"
+        ? !configuration.metadata.portal_mode || configuration.metadata.portal_mode === "management"
+        : configuration.metadata.portal_mode === mode);
+    const modePortals = portals.filter(matchingMode);
     const portal = assertSingle(
-      portals.filter(
+      modePortals.filter(
         (configuration) =>
-          isManaged(configuration.metadata) &&
-          (mode === "management"
-            ? !configuration.metadata.portal_mode ||
-              configuration.metadata.portal_mode === "management"
-            : configuration.metadata.portal_mode === mode),
+          configuration.active &&
+          configuration.metadata.portal_configuration_version === PORTAL_CONFIGURATION_VERSION,
       ),
-      `managed Customer Portal ${mode} configuration`,
+      `current Customer Portal ${mode} configuration`,
     );
     const portalSpec: PortalSpec = {
       webBaseUrl,
@@ -397,14 +406,22 @@ export async function setupStripeBillingCatalog(input: {
       subscriptionUpdateEnabled: mode !== "management",
       scheduleChangesAtPeriodEnd: false,
     };
+    let portalId: string;
     if (portal) {
       await input.api.updatePortalConfiguration(portal.id, portalSpec);
       updated.push(`customer-portal:${mode}`);
-      return portal.id;
+      portalId = portal.id;
+    } else {
+      const createdPortal = await input.api.createPortalConfiguration(portalSpec);
+      created.push(`customer-portal:${mode}`);
+      portalId = createdPortal.id;
     }
-    const createdPortal = await input.api.createPortalConfiguration(portalSpec);
-    created.push(`customer-portal:${mode}`);
-    return createdPortal.id;
+    for (const previous of modePortals) {
+      if (!previous.active || previous.id === portalId) continue;
+      await input.api.deactivatePortalConfiguration(previous.id);
+      updated.push(`customer-portal:${mode}:previous-disabled`);
+    }
+    return portalId;
   };
   const portalConfigurationId = await upsertPortal("management");
   const portalPlanChangeConfigurationId = await upsertPortal("standard");
@@ -413,11 +430,6 @@ export async function setupStripeBillingCatalog(input: {
   return {
     pricePlanMap: Object.fromEntries(
       Object.entries(pricePlanMap).sort(([left], [right]) => left.localeCompare(right)),
-    ),
-    lookupKeyMap: Object.fromEntries(
-      STRIPE_BILLING_CATALOG.flatMap((product) =>
-        product.prices.map((price) => [`${product.plan}.${price.interval}`, price.lookupKey]),
-      ),
     ),
     webhookSecret,
     portalConfigurationId,
@@ -612,6 +624,7 @@ export function createStripeCatalogApi(secretKey: string): StripeCatalogApi {
       return (await all(stripe.billingPortal.configurations.list({ limit: 100 }))).map(
         (configuration) => ({
           id: configuration.id,
+          active: configuration.active,
           metadata: configuration.metadata ?? {},
         }),
       );
@@ -620,13 +633,20 @@ export function createStripeCatalogApi(secretKey: string): StripeCatalogApi {
       const configuration = await stripe.billingPortal.configurations.create(
         billingPortalConfigurationParams(spec),
       );
-      return { id: configuration.id, metadata: configuration.metadata ?? {} };
+      return {
+        id: configuration.id,
+        active: configuration.active,
+        metadata: configuration.metadata ?? {},
+      };
     },
     async updatePortalConfiguration(id, spec) {
       await stripe.billingPortal.configurations.update(id, {
         ...billingPortalConfigurationParams(spec),
         active: true,
       });
+    },
+    async deactivatePortalConfiguration(id) {
+      await stripe.billingPortal.configurations.update(id, { active: false });
     },
   };
 }

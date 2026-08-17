@@ -134,7 +134,11 @@ class FakeStripeCatalogApi implements StripeCatalogApi {
   ) {
     this.assertUniquePortalIntervals(spec);
     this.portalSpecs.push(spec);
-    const portal = { id: `bpc_${this.portals.length + 1}`, metadata: spec.metadata };
+    const portal = {
+      id: `bpc_${this.portals.length + 1}`,
+      active: true,
+      metadata: spec.metadata,
+    };
     this.portals.push(portal);
     return portal;
   }
@@ -145,7 +149,13 @@ class FakeStripeCatalogApi implements StripeCatalogApi {
   ) {
     this.assertUniquePortalIntervals(spec);
     this.portals = this.portals.map((portal) =>
-      portal.id === id ? { id, metadata: spec.metadata } : portal,
+      portal.id === id ? { id, active: true, metadata: spec.metadata } : portal,
+    );
+  }
+
+  async deactivatePortalConfiguration(id: string) {
+    this.portals = this.portals.map((portal) =>
+      portal.id === id ? { ...portal, active: false } : portal,
     );
   }
 
@@ -260,14 +270,6 @@ describe("setupStripeBillingCatalog", () => {
       price_5: "family",
       price_6: "family",
     });
-    expect(result.lookupKeyMap).toEqual({
-      "lite.month": "me_builder_lite_monthly",
-      "lite.year": "me_builder_lite_yearly",
-      "full.month": "me_builder_full_monthly",
-      "full.year": "me_builder_full_yearly",
-      "family.month": "me_builder_family_monthly",
-      "family.year": "me_builder_family_yearly",
-    });
   });
 
   it("同じ設定で再実行しても商品、Price、Webhook、Portalを増やさない", async () => {
@@ -280,6 +282,42 @@ describe("setupStripeBillingCatalog", () => {
     expect(api.webhooks).toHaveLength(1);
     expect(api.portals).toHaveLength(3);
     expect(second.webhookSecret).toBeNull();
+  });
+
+  it("旧版Portalを更新せず新版へローテーションして無効化する", async () => {
+    const api = new FakeStripeCatalogApi();
+    api.portals.push(
+      {
+        id: "bpc_legacy_management",
+        active: true,
+        metadata: { managed_by: "me-builder-stripe-catalog", portal_mode: "management" },
+      },
+      {
+        id: "bpc_legacy_standard",
+        active: true,
+        metadata: { managed_by: "me-builder-stripe-catalog", portal_mode: "standard" },
+      },
+      {
+        id: "bpc_legacy_reset",
+        active: true,
+        metadata: { managed_by: "me-builder-stripe-catalog", portal_mode: "reset" },
+      },
+    );
+
+    const result = await setupStripeBillingCatalog({ api, environment: "preview" });
+
+    expect(api.portals.filter((portal) => portal.active)).toHaveLength(3);
+    expect(
+      api.portals.filter((portal) => portal.active).map((portal) => portal.metadata.portal_mode),
+    ).toEqual(["management", "standard", "reset"]);
+    expect(api.portals.filter((portal) => portal.id.startsWith("bpc_legacy"))).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ active: false }),
+        expect.objectContaining({ active: false }),
+        expect.objectContaining({ active: false }),
+      ]),
+    );
+    expect(result.portalPlanChangeConfigurationId).not.toBe("bpc_legacy_standard");
   });
 
   it("既存の管理対象ProductにもManaged Payments用Tax Codeを再同期する", async () => {

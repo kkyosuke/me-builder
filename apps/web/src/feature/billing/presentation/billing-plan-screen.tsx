@@ -8,6 +8,7 @@ import {
   billingPlanAnnualSavings,
   billingPlanPrice,
   formatBillingAmount,
+  isBillingPlanDowngrade,
 } from "../model/billing-plan";
 import { expectedTrialEndDate } from "../model/trial";
 
@@ -57,9 +58,8 @@ export function BillingPlanScreen({
         plans.data[0] ??
         null)
       : null;
-  const planRank = { free: -1, lite: 0, full: 1, family: 2 } as const;
   const selectedPlanIsDowngrade =
-    selected !== null && planRank[selected.code] < planRank[currentPlan];
+    selected !== null && isBillingPlanDowngrade(currentPlan, selected.code);
   const annualSavings = selected ? billingPlanAnnualSavings(selected) : null;
 
   useEffect(() => {

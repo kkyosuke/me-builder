@@ -22,6 +22,24 @@ function message(error: unknown): string {
   return error instanceof Error ? error.message : "操作を完了できませんでした。";
 }
 
+async function loadBillingPlans(signal: AbortSignal): Promise<AsyncState<readonly BillingPlan[]>> {
+  const [catalogResult, trialResult] = await Promise.allSettled([
+    fetchBillingPlanCatalog(config.apiUrl, signal),
+    fetchBillingTrialEligibility(config.apiUrl, signal),
+  ]);
+  if (catalogResult.status === "rejected") {
+    return { status: "error", message: message(catalogResult.reason) };
+  }
+  const trialEligible = trialResult.status === "fulfilled" && trialResult.value;
+  return {
+    status: "success",
+    data: catalogResult.value.map((plan) => ({
+      ...plan,
+      trialDays: trialEligible ? plan.trialDays : null,
+    })),
+  };
+}
+
 function initialCompletionMessage(search: string): string | null {
   const params = new URLSearchParams(search);
   const result = params.get("billing");
@@ -62,6 +80,7 @@ export default function BillingPlanApplication({
     [],
   );
   const loadController = useRef<AbortController | null>(null);
+  const operationController = useRef<AbortController | null>(null);
   const [plans, setPlans] = useState<AsyncState<readonly BillingPlan[]>>({ status: "loading" });
   const [entitlement, setEntitlement] = useState<AsyncState<ProfileEntitlement>>({
     status: "loading",
@@ -77,32 +96,16 @@ export default function BillingPlanApplication({
     loadController.current = controller;
     setPlans({ status: "loading" });
     setEntitlement({ status: "loading" });
-    const [catalogResult, trialResult, entitlementResult] = await Promise.allSettled([
-      fetchBillingPlanCatalog(config.apiUrl, controller.signal),
-      fetchBillingTrialEligibility(config.apiUrl, controller.signal),
+    const [plansResult, entitlementResult] = await Promise.allSettled([
+      loadBillingPlans(controller.signal),
       fetchProfileEntitlement(config.apiUrl, controller.signal),
     ]);
     if (controller.signal.aborted) return;
-
-    const publicPlans = catalogResult.status === "fulfilled" ? catalogResult.value : null;
-    if (catalogResult.status === "fulfilled") {
-      setPlans({
-        status: "success",
-        data: catalogResult.value.map((plan) => ({ ...plan, trialDays: null })),
-      });
-    } else {
-      setPlans({ status: "error", message: message(catalogResult.reason) });
-    }
-
-    if (publicPlans && trialResult.status === "fulfilled") {
-      setPlans({
-        status: "success",
-        data: publicPlans.map((plan) => ({
-          ...plan,
-          trialDays: trialResult.value ? plan.trialDays : null,
-        })),
-      });
-    }
+    setPlans(
+      plansResult.status === "fulfilled"
+        ? plansResult.value
+        : { status: "error", message: message(plansResult.reason) },
+    );
     setEntitlement(
       entitlementResult.status === "fulfilled"
         ? { status: "success", data: entitlementResult.value }
@@ -127,27 +130,19 @@ export default function BillingPlanApplication({
           throw new Error("購入結果を確認できませんでした。料金プランからやり直してください。");
         }
         await verifyCheckoutSessionCompletion(config.apiUrl, checkoutSessionId, controller.signal);
-        const [catalogResult, trialResult, entitlementResult] = await Promise.allSettled([
-          fetchBillingPlanCatalog(config.apiUrl, controller.signal),
-          fetchBillingTrialEligibility(config.apiUrl, controller.signal),
+        const [plansResult, entitlementResult] = await Promise.allSettled([
+          loadBillingPlans(controller.signal),
           waitForSubscriptionProjection(
             async (signal) => fetchProfileEntitlement(config.apiUrl, signal),
             { signal: controller.signal, intervalMs: projectionPollIntervalMs },
           ),
         ]);
         if (controller.signal.aborted) return;
-        if (catalogResult.status === "fulfilled") {
-          setPlans({
-            status: "success",
-            data: catalogResult.value.map((plan) => ({
-              ...plan,
-              trialDays:
-                trialResult.status === "fulfilled" && trialResult.value ? plan.trialDays : null,
-            })),
-          });
-        } else {
-          setPlans({ status: "error", message: message(catalogResult.reason) });
-        }
+        setPlans(
+          plansResult.status === "fulfilled"
+            ? plansResult.value
+            : { status: "error", message: message(plansResult.reason) },
+        );
         if (entitlementResult.status === "rejected") {
           setEntitlement({ status: "error", message: message(entitlementResult.reason) });
           return;
@@ -172,44 +167,59 @@ export default function BillingPlanApplication({
     return () => controller.abort();
   }, [checkoutResult, checkoutSessionId, onEntitlementChanged, projectionPollIntervalMs]);
 
-  const checkout = async (plan: PaidPlanCode, interval: BillingInterval) => {
-    const controller = new AbortController();
-    setCheckoutState({ status: "loading" });
-    try {
-      if (entitlement.status === "success" && entitlement.data.source === "family-seat") {
-        throw new Error(
-          "ファミリーパックに参加中です。個人契約を購入するには、先にファミリー席から退出してください。",
-        );
+  useEffect(
+    () => () => {
+      loadController.current?.abort();
+      operationController.current?.abort();
+    },
+    [],
+  );
+
+  const runBillingRedirect = useCallback(
+    async (
+      operation: "billing-checkout" | "billing-plan-change" | "billing-portal",
+      createUrl: (signal: AbortSignal) => Promise<string>,
+    ) => {
+      operationController.current?.abort();
+      const controller = new AbortController();
+      operationController.current = controller;
+      setCheckoutState({ status: "loading" });
+      try {
+        const url = await createUrl(controller.signal);
+        if (controller.signal.aborted) return;
+        setCheckoutState({ status: "success", data: url });
+        navigateToCheckout(url);
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        reportHandledOperationError(operation, error);
+        setCheckoutState({ status: "error", message: message(error) });
       }
-      const url =
-        entitlement.status === "success" && entitlement.data.source === "subscription"
-          ? await createPlanChangeSession(config.apiUrl, { plan, interval }, controller.signal)
-          : await createCheckoutSession(config.apiUrl, { plan, interval }, controller.signal);
-      setCheckoutState({ status: "success", data: url });
-      navigateToCheckout(url);
-    } catch (error) {
-      reportHandledOperationError(
-        entitlement.status === "success" && entitlement.data.source === "subscription"
-          ? "billing-plan-change"
-          : "billing-checkout",
-        error,
-      );
-      setCheckoutState({ status: "error", message: message(error) });
-    }
+    },
+    [navigateToCheckout],
+  );
+
+  const checkout = (plan: PaidPlanCode, interval: BillingInterval) => {
+    const changingPlan =
+      entitlement.status === "success" && entitlement.data.source === "subscription";
+    return runBillingRedirect(
+      changingPlan ? "billing-plan-change" : "billing-checkout",
+      async (signal) => {
+        if (entitlement.status === "success" && entitlement.data.source === "family-seat") {
+          throw new Error(
+            "ファミリーパックに参加中です。個人契約を購入するには、先にファミリー席から退出してください。",
+          );
+        }
+        return changingPlan
+          ? createPlanChangeSession(config.apiUrl, { plan, interval }, signal)
+          : createCheckoutSession(config.apiUrl, { plan, interval }, signal);
+      },
+    );
   };
 
-  const manageSubscription = async () => {
-    const controller = new AbortController();
-    setCheckoutState({ status: "loading" });
-    try {
-      const url = await createCustomerPortalSession(config.apiUrl, controller.signal);
-      setCheckoutState({ status: "success", data: url });
-      navigateToCheckout(url);
-    } catch (error) {
-      reportHandledOperationError("billing-portal", error);
-      setCheckoutState({ status: "error", message: message(error) });
-    }
-  };
+  const manageSubscription = () =>
+    runBillingRedirect("billing-portal", (signal) =>
+      createCustomerPortalSession(config.apiUrl, signal),
+    );
 
   return (
     <BillingPlanScreen

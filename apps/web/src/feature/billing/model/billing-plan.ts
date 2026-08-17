@@ -13,6 +13,15 @@ export type BillingPlan = Readonly<{
   }>[];
 }>;
 
+const billingPlanRank = { free: -1, lite: 0, full: 1, family: 2 } as const;
+
+export function isBillingPlanDowngrade(
+  currentPlan: PaidPlanCode | "free",
+  targetPlan: PaidPlanCode,
+): boolean {
+  return billingPlanRank[targetPlan] < billingPlanRank[currentPlan];
+}
+
 export function billingPlanPrice(plan: BillingPlan, interval: BillingInterval) {
   const price = plan.prices.find((candidate) => candidate.interval === interval);
   if (!price) throw new Error("選択した請求間隔の価格がありません。");

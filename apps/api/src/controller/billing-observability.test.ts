@@ -112,4 +112,24 @@ describe("billing session observability", () => {
     });
     expect(JSON.stringify(calls)).not.toContain("Stripe response body must not be logged");
   });
+
+  it("公開Planに対応するStripe Price不足を設定エラーとして記録する", async () => {
+    const error = vi.spyOn(logger, "error").mockImplementation(() => undefined);
+    vi.spyOn(D1.shared.client, "create").mockReturnValue({} as never);
+    mocks.createCheckout.mockResolvedValue({ type: "unavailable", reason: "plan_unavailable" });
+
+    const response = await app.request(
+      "/api/billing/checkout-sessions",
+      request,
+      configuredEnv() as never,
+    );
+
+    expect(response.status).toBe(503);
+    expect(terminalErrors(error)[0]?.[0]).toMatchObject({
+      status: 503,
+      errorCode: "BILLING_PLAN_NOT_CONFIGURED",
+      errorCategory: "configuration",
+      stage: "billing.configuration.validate",
+    });
+  });
 });

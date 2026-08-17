@@ -56,13 +56,12 @@ describe("billing sessions", () => {
         webOrigin: "https://app.example.test",
         plan: "full",
         interval: "year",
-        lookupKeyMap: { "full.year": "full_year_v2" },
       }),
     ).resolves.toEqual({ type: "created", url: "https://checkout.stripe.test/session" });
     expect(createCheckoutSession).toHaveBeenCalledWith(
       expect.objectContaining({
         accountId: owner.id,
-        priceId: "price_full_year_v2",
+        priceId: "price_me_builder_full_yearly",
         successUrl:
           "https://app.example.test/profile/billing?billing=checkout-return&session_id={CHECKOUT_SESSION_ID}",
         cancelUrl: "https://app.example.test/profile/billing?billing=checkout-cancel",
@@ -70,11 +69,15 @@ describe("billing sessions", () => {
         interval: "year",
         trialPeriodDays: 14,
       }),
-      `billing-checkout-${owner.id}-cus_${owner.id}-initial`,
+      expect.stringMatching(
+        new RegExp(
+          `^billing-checkout-${owner.id}-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`,
+        ),
+      ),
     );
   });
 
-  it("Stripeが過去のinvalid requestを再生した場合は新しいべき等キーで復旧する", async () => {
+  it("失敗後の新しい論理操作には別のべき等キーを使う", async () => {
     const { db, owner, actor } = await setup();
     const createCheckoutSession = vi
       .fn()
@@ -84,7 +87,7 @@ describe("billing sessions", () => {
         url: "https://checkout.stripe.test/recovered",
       });
 
-    await expect(
+    const create = () =>
       createBillingCheckoutSession({
         actor,
         db,
@@ -92,22 +95,23 @@ describe("billing sessions", () => {
         webOrigin: "https://app.example.test",
         plan: "lite",
         interval: "month",
-        lookupKeyMap: { "lite.month": "lite_month" },
-      }),
-    ).resolves.toEqual({ type: "created", url: "https://checkout.stripe.test/recovered" });
+      });
 
-    const baseKey = `billing-checkout-${owner.id}-cus_${owner.id}-initial`;
-    expect(createCheckoutSession).toHaveBeenCalledTimes(2);
-    expect(createCheckoutSession).toHaveBeenNthCalledWith(1, expect.any(Object), baseKey);
-    expect(createCheckoutSession).toHaveBeenNthCalledWith(
-      2,
-      expect.any(Object),
-      expect.stringMatching(
-        new RegExp(
-          `^${baseKey}-recovery-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`,
-        ),
-      ),
+    await expect(create()).rejects.toMatchObject({ kind: "invalid-request" });
+    await expect(create()).resolves.toEqual({
+      type: "created",
+      url: "https://checkout.stripe.test/recovered",
+    });
+
+    const keyPattern = new RegExp(
+      `^billing-checkout-${owner.id}-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`,
     );
+    expect(createCheckoutSession).toHaveBeenCalledTimes(2);
+    const firstKey = createCheckoutSession.mock.calls[0]?.[1];
+    const secondKey = createCheckoutSession.mock.calls[1]?.[1];
+    expect(firstKey).toMatch(keyPattern);
+    expect(secondKey).toMatch(keyPattern);
+    expect(firstKey).not.toBe(secondKey);
   });
 
   it("通信障害はCheckout作成を別べき等キーで再実行しない", async () => {
@@ -124,7 +128,6 @@ describe("billing sessions", () => {
         webOrigin: "https://app.example.test",
         plan: "lite",
         interval: "month",
-        lookupKeyMap: { "lite.month": "lite_month" },
       }),
     ).rejects.toMatchObject({ kind: "network" });
     expect(createCheckoutSession).toHaveBeenCalledTimes(1);
@@ -169,7 +172,6 @@ describe("billing sessions", () => {
       webOrigin: "https://app.example.test",
       plan: "full",
       interval: "month",
-      lookupKeyMap: { "full.month": "full_month" },
     });
 
     expect(createCheckoutSession).toHaveBeenCalledWith(
@@ -210,7 +212,6 @@ describe("billing sessions", () => {
         webOrigin: "https://app.example.test",
         plan: "lite",
         interval: "month",
-        lookupKeyMap: { "lite.month": "lite_month" },
       }),
     ).resolves.toEqual({ type: "unavailable", reason: "existing_subscription" });
     expect(createCheckoutSession).not.toHaveBeenCalled();
@@ -244,7 +245,6 @@ describe("billing sessions", () => {
         webOrigin: "https://app.example.test",
         plan: "lite",
         interval: "month",
-        lookupKeyMap: { "lite.month": "lite_month" },
       }),
     ).resolves.toEqual({
       type: "created",
@@ -256,7 +256,7 @@ describe("billing sessions", () => {
     );
     expect(createCheckoutSession).toHaveBeenCalledWith(
       expect.objectContaining({ customerId: "cus_replacement" }),
-      `billing-checkout-${owner.id}-cus_replacement-initial`,
+      expect.stringMatching(new RegExp(`^billing-checkout-${owner.id}-`)),
     );
     await expect(
       D1.shared.action.billing.findBillingCustomerByAccount(db, owner.id),
@@ -285,7 +285,6 @@ describe("billing sessions", () => {
         webOrigin: "https://app.example.test",
         plan: "lite",
         interval: "month",
-        lookupKeyMap: { "lite.month": "lite_month" },
       }),
     ).resolves.toMatchObject({ type: "created" });
     expect(createCustomer).toHaveBeenCalledOnce();
@@ -325,7 +324,6 @@ describe("billing sessions", () => {
       webOrigin: "https://app.example.test",
       plan: "full",
       interval: "month",
-      lookupKeyMap: { "full.month": "full_month" },
     });
     expect(createCheckoutSession).toHaveBeenCalledWith(
       expect.not.objectContaining({ trialPeriodDays: expect.anything() }),
@@ -338,22 +336,6 @@ describe("billing sessions", () => {
         provider,
       }),
     ).resolves.toEqual({ type: "resolved", eligible: false });
-  });
-
-  it("rejects an unavailable plan", async () => {
-    const { db, actor } = await setup();
-    const base = {
-      actor,
-      db,
-      provider: new billing.FakeBillingProvider(),
-      webOrigin: "https://app.example.test",
-      plan: "lite" as const,
-      interval: "month" as const,
-    };
-    await expect(createBillingCheckoutSession({ ...base, lookupKeyMap: {} })).resolves.toEqual({
-      type: "unavailable",
-      reason: "plan_unavailable",
-    });
   });
 
   it("同じ選択の未完了Checkoutを再利用する", async () => {
@@ -379,7 +361,6 @@ describe("billing sessions", () => {
         webOrigin: "https://app.example.test",
         plan: "lite",
         interval: "month",
-        lookupKeyMap: { "lite.month": "lite_month" },
       }),
     ).resolves.toEqual({ type: "created", url: "https://checkout.stripe.test/resume" });
     expect(createCheckoutSession).not.toHaveBeenCalled();
@@ -413,13 +394,12 @@ describe("billing sessions", () => {
         webOrigin: "https://app.example.test",
         plan: "full",
         interval: "year",
-        lookupKeyMap: { "full.year": "full_year" },
       }),
     ).resolves.toEqual({ type: "created", url: "https://checkout.stripe.test/new" });
     expect(expireCheckoutSession).toHaveBeenCalledWith("cs_test_old");
     expect(createCheckoutSession).toHaveBeenCalledWith(
       expect.objectContaining({ plan: "full", interval: "year" }),
-      `billing-checkout-${owner.id}-cus_${owner.id}-cs_test_old`,
+      expect.stringMatching(new RegExp(`^billing-checkout-${owner.id}-`)),
     );
   });
 
@@ -459,7 +439,6 @@ describe("billing sessions", () => {
         webOrigin: "https://app.example.test",
         plan: "lite",
         interval: "month",
-        lookupKeyMap: { "lite.month": "lite_month" },
       }),
     ).resolves.toEqual({ type: "unavailable", reason: "existing_subscription" });
     expect(createCheckoutSession).not.toHaveBeenCalled();
@@ -488,7 +467,6 @@ describe("billing sessions", () => {
         webOrigin: "https://app.example.test",
         plan: "lite",
         interval: "month",
-        lookupKeyMap: { "lite.month": "lite_month" },
       }),
     ).resolves.toEqual({ type: "unavailable", reason: "family_seat_active" });
     expect(createCheckoutSession).not.toHaveBeenCalled();
@@ -555,7 +533,6 @@ describe("billing sessions", () => {
           webOrigin: "https://app.example.test",
           plan: targetPlan,
           interval: targetInterval,
-          lookupKeyMap: { [`${targetPlan}.${targetInterval}`]: "target_lookup" },
           portalPlanChangeAvailable: true,
           portalResetAvailable: true,
         }),
@@ -637,7 +614,6 @@ describe("billing sessions", () => {
         webOrigin: "https://app.example.test",
         plan: targetPlan,
         interval: targetInterval,
-        lookupKeyMap: { [`${targetPlan}.${targetInterval}`]: "target_lookup" },
         portalPlanChangeAvailable: true,
         portalResetAvailable: true,
       });
@@ -658,7 +634,7 @@ describe("billing sessions", () => {
           targetPriceId: "price_target",
           targetInterval,
         },
-        `billing-plan-change-${owner.id}-sub_change-price_target`,
+        expect.stringMatching(new RegExp(`^billing-plan-change-${owner.id}-`)),
       );
       expect(createPortalSession).not.toHaveBeenCalled();
     },

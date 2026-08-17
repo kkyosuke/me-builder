@@ -133,8 +133,7 @@ bun scripts/setup-stripe-billing.ts preview --stripe-only
 | `STRIPE_PORTAL_CONFIGURATION_ID` | 管理対象のCustomer Portal設定をSession作成時に指定 | 不要 |
 | `STRIPE_PORTAL_PLAN_CHANGE_CONFIGURATION_ID` | 現在の請求期間を維持する変更確認用Portal設定 | 不要 |
 | `STRIPE_PORTAL_RESET_CONFIGURATION_ID` | 月額から年額へのupgradeで請求期間を変更日にリセットするPortal設定 | 不要 |
-| `BILLING_PRICE_PLAN_MAP` | 後続Checkout API用 | Price IDをprovider非依存Planへ変換 |
-| `BILLING_LOOKUP_KEY_MAP` | CheckoutでPlanと請求間隔を許可済みlookup keyへ変換 | いいえ |
+| `BILLING_PRICE_PLAN_MAP` | Webhook再照合でPrice IDをprovider非依存Planへ変換 | Price IDをprovider非依存Planへ変換 |
 | `BILLING_PROJECTION_STALE_AFTER_SECONDS` | 監視でprojection遅延と判定する猶予秒数（既定900） | いいえ |
 
 Webhook secretはendpoint作成時にだけStripeから返ります。初回実行ではその値を自動配布します。Cloudflareに`STRIPE_WEBHOOK_SECRET`という名前のsecretが無い場合は、前回の配布失敗からも復旧できるようendpointをローテーションして新しいsecretを配布します。既存値を意図的に置き換える場合は、既知の値を`STRIPE_WEBHOOK_SECRET`へ設定して実行します。
@@ -142,6 +141,8 @@ Webhook secretはendpoint作成時にだけStripeから返ります。初回実�
 ## 5. 冪等性と価格変更
 
 同じ設定で再実行してもProduct、Price、Webhook、Portalを追加しません。管理対象と同じProduct IDを管理外資源が使用している場合や、同じWebhook URLが複数ある場合は、推測で上書きせず停止します。
+
+Customer Portal設定は設定内容の版をmetadataへ持ちます。同じ版は冪等に更新し、版が変わった場合は新しい設定を作成して同じmodeの旧設定を無効化します。Stripe側に古い期間末変更条件が残っても、新しいSessionが旧設定を参照し続けないためのローテーションです。
 
 Stripe Priceの金額と課金間隔は変更できません。料金SSoTを変更した場合、同期処理は次の順で切り替えます。
 

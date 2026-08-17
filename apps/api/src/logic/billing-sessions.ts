@@ -1,5 +1,10 @@
 import { D1, billing } from "@me-builder/lib";
-import { BILLING_INITIAL_TRIAL_DAYS } from "@me-builder/shared";
+import {
+  BILLING_INITIAL_TRIAL_DAYS,
+  type BillingInterval,
+  type PaidPlanCode,
+  billingLookupKey,
+} from "@me-builder/shared";
 import type { AuthenticatedActor } from "./authentication/types";
 
 type BaseParams = {
@@ -29,14 +34,12 @@ export type CheckoutSessionStatusResult =
 
 export async function createBillingCheckoutSession(
   params: BaseParams & {
-    plan: "lite" | "full" | "family";
-    interval: "month" | "year";
-    lookupKeyMap: Readonly<Record<string, string>>;
+    plan: PaidPlanCode;
+    interval: BillingInterval;
   },
 ): Promise<SessionFailure | { type: "created"; url: string }> {
   const accountId = params.actor.accountId;
-  const lookupKey = params.lookupKeyMap[`${params.plan}.${params.interval}`];
-  if (!lookupKey) return { type: "unavailable", reason: "plan_unavailable" };
+  const lookupKey = billingLookupKey(params.plan, params.interval);
   const familySeat = await D1.shared.action.familySeat.readActiveFamilySeatByMember(
     params.db,
     accountId,
@@ -108,20 +111,10 @@ export async function createBillingCheckoutSession(
     interval: params.interval,
     ...(trialEligible ? { trialPeriodDays: BILLING_INITIAL_TRIAL_DAYS } : {}),
   };
-  const idempotencyKey = `billing-checkout-${accountId}-${customer.providerCustomerId}-${latestCheckout?.id ?? "initial"}`;
-  let checkout: { id: string; url: string };
-  try {
-    checkout = await params.provider.createCheckoutSession(checkoutInput, idempotencyKey);
-  } catch (error) {
-    const staleIdempotencyResult =
-      error instanceof billing.BillingProviderError &&
-      (error.kind === "invalid-request" || error.kind === "idempotency-conflict");
-    if (!staleIdempotencyResult) throw error;
-    checkout = await params.provider.createCheckoutSession(
-      checkoutInput,
-      `${idempotencyKey}-recovery-${crypto.randomUUID()}`,
-    );
-  }
+  const checkout = await params.provider.createCheckoutSession(
+    checkoutInput,
+    `billing-checkout-${accountId}-${crypto.randomUUID()}`,
+  );
   return { type: "created", url: checkout.url };
 }
 
@@ -206,9 +199,8 @@ export async function createBillingPortalSession(
 
 export async function createBillingPlanChangeSession(
   params: BaseParams & {
-    plan: "lite" | "full" | "family";
-    interval: "month" | "year";
-    lookupKeyMap: Readonly<Record<string, string>>;
+    plan: PaidPlanCode;
+    interval: BillingInterval;
     portalPlanChangeAvailable: boolean;
     portalResetAvailable: boolean;
   },
@@ -234,8 +226,7 @@ export async function createBillingPlanChangeSession(
   ) {
     return { type: "unavailable", reason: "subscription_not_found" };
   }
-  const lookupKey = params.lookupKeyMap[`${params.plan}.${params.interval}`];
-  if (!lookupKey) return { type: "unavailable", reason: "plan_unavailable" };
+  const lookupKey = billingLookupKey(params.plan, params.interval);
   const targetPriceId = await params.provider.findPriceIdByLookupKey(lookupKey);
   if (!targetPriceId) return { type: "unavailable", reason: "plan_unavailable" };
   if (targetPriceId === subscription.priceId) {
@@ -258,7 +249,7 @@ export async function createBillingPlanChangeSession(
         targetPriceId,
         targetInterval: params.interval,
       },
-      `billing-plan-change-${accountId}-${subscription.id}-${targetPriceId}`,
+      `billing-plan-change-${accountId}-${crypto.randomUUID()}`,
     );
     const returnUrl = new URL("/profile/billing", origin);
     returnUrl.searchParams.set("billing", "change-scheduled");

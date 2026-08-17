@@ -159,34 +159,15 @@ async function createBillingSessionResponse(
   const database = c.env?.DB;
   const stripeSecretKey = config.stripeSecretKey;
   const webOrigin = config.webOrigin;
-  const completeLookupKeyMap = publicBillingPlans.every((plan) =>
-    plan.prices.every(({ interval }) =>
-      Boolean(config.billingLookupKeyMap[`${plan.code}.${interval}`]),
-    ),
-  );
-  const kindConfigurationAvailable =
-    kind === "portal"
-      ? Boolean(config.stripePortalConfigurationId)
-      : kind === "change"
-        ? Boolean(
-            config.stripePortalPlanChangeConfigurationId &&
-              config.stripePortalResetConfigurationId &&
-              completeLookupKeyMap,
-          )
-        : completeLookupKeyMap;
   const configurationErrorCode = !database
     ? "BILLING_DATABASE_NOT_CONFIGURED"
     : !stripeSecretKey
       ? "BILLING_STRIPE_NOT_CONFIGURED"
       : !webOrigin
         ? "BILLING_WEB_ORIGIN_NOT_CONFIGURED"
-        : !completeLookupKeyMap
-          ? "BILLING_LOOKUP_KEYS_NOT_CONFIGURED"
-          : kind === "portal" && !config.stripePortalConfigurationId
-            ? "BILLING_PORTAL_NOT_CONFIGURED"
-            : kind === "change" && !kindConfigurationAvailable
-              ? "BILLING_PLAN_CHANGE_NOT_CONFIGURED"
-              : undefined;
+        : kind === "portal" && !config.stripePortalConfigurationId
+          ? "BILLING_PORTAL_NOT_CONFIGURED"
+          : undefined;
   if (configurationErrorCode) {
     c.set("safeError", {
       errorCode: configurationErrorCode,
@@ -218,21 +199,24 @@ async function createBillingSessionResponse(
   };
   let outcome: Awaited<ReturnType<typeof createBillingCheckoutSession>>;
   try {
-    outcome = checkout
-      ? kind === "checkout"
-        ? await createBillingCheckoutSession({
-            ...base,
-            ...checkout,
-            lookupKeyMap: config.billingLookupKeyMap,
-          })
-        : await createBillingPlanChangeSession({
-            ...base,
-            ...checkout,
-            lookupKeyMap: config.billingLookupKeyMap,
-            portalPlanChangeAvailable: Boolean(config.stripePortalPlanChangeConfigurationId),
-            portalResetAvailable: Boolean(config.stripePortalResetConfigurationId),
-          })
-      : await createBillingPortalSession(base);
+    switch (kind) {
+      case "checkout":
+        if (!checkout) throw new Error("Checkout request invariant failed");
+        outcome = await createBillingCheckoutSession({ ...base, ...checkout });
+        break;
+      case "change":
+        if (!checkout) throw new Error("Plan change request invariant failed");
+        outcome = await createBillingPlanChangeSession({
+          ...base,
+          ...checkout,
+          portalPlanChangeAvailable: Boolean(config.stripePortalPlanChangeConfigurationId),
+          portalResetAvailable: Boolean(config.stripePortalResetConfigurationId),
+        });
+        break;
+      case "portal":
+        outcome = await createBillingPortalSession(base);
+        break;
+    }
   } catch (error) {
     if (error instanceof billing.BillingProviderError) {
       throw new OperationalError(
@@ -264,6 +248,21 @@ async function createBillingSessionResponse(
       c.header("Cache-Control", "no-store");
       return c.json(v.parse(BillingSessionResponseSchema, { url: outcome.url }), 201);
     case "unavailable":
+      if (outcome.reason === "configuration_missing" || outcome.reason === "plan_unavailable") {
+        c.set("safeError", {
+          errorCode:
+            outcome.reason === "configuration_missing"
+              ? "BILLING_PLAN_CHANGE_NOT_CONFIGURED"
+              : "BILLING_PLAN_NOT_CONFIGURED",
+          errorCategory: "configuration",
+          stage: "billing.configuration.validate",
+          retryable: false,
+        });
+        return c.json(
+          v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }),
+          503,
+        );
+      }
       return c.json(
         v.parse(BillingSessionConflictSchema, {
           error: "Billing session unavailable",

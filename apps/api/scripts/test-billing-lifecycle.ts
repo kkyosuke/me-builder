@@ -2,7 +2,7 @@ import { billing } from "@me-builder/lib";
 import { logger } from "@me-builder/shared";
 import Stripe from "stripe";
 
-const { STRIPE_API_VERSION, STRIPE_BILLING_CATALOG } = billing;
+const { PORTAL_CONFIGURATION_VERSION, STRIPE_API_VERSION, STRIPE_BILLING_CATALOG } = billing;
 
 const secretKey = process.env.STRIPE_SECRET_KEY?.trim();
 if (!secretKey || !["sk_test_", "rk_test_"].some((prefix) => secretKey.startsWith(prefix))) {
@@ -367,7 +367,10 @@ async function resolvePortalConfigurations(client: Stripe): Promise<{
 }> {
   const configurations = await client.billingPortal.configurations.list({ limit: 100 });
   const managed = configurations.data.filter(
-    (configuration) => configuration.metadata.managed_by === "me-builder-stripe-catalog",
+    (configuration) =>
+      configuration.active &&
+      configuration.metadata.managed_by === "me-builder-stripe-catalog" &&
+      configuration.metadata.portal_configuration_version === PORTAL_CONFIGURATION_VERSION,
   );
   const management = managed.find(
     (configuration) => configuration.metadata.portal_mode === "management",

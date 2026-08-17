@@ -4,6 +4,7 @@ import {
   billingPlanAnnualSavings,
   billingPlanPrice,
   formatBillingAmount,
+  isBillingPlanDowngrade,
 } from "./billing-plan";
 
 const plan: BillingPlan = {
@@ -19,6 +20,12 @@ const plan: BillingPlan = {
 };
 
 describe("billing plan", () => {
+  it("Freeと有料Planの順序から期間末変更を判定する", () => {
+    expect(isBillingPlanDowngrade("free", "lite")).toBe(false);
+    expect(isBillingPlanDowngrade("lite", "full")).toBe(false);
+    expect(isBillingPlanDowngrade("family", "full")).toBe(true);
+  });
+
   it("選択した請求間隔の価格を解決する", () => {
     expect(billingPlanPrice(plan, "year").amount).toBe(7_800);
     expect(formatBillingAmount(7_800)).toMatch(/7,800/);

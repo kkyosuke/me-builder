@@ -56,3 +56,11 @@ export const publicBillingPlans = [
     ],
   },
 ] as const satisfies readonly PublicBillingPlan[];
+
+/** 購入・変更APIが使うlookup key。公開Plan catalogから導出し、環境設定へ複製しない。 */
+export function billingLookupKey(plan: PaidPlanCode, interval: BillingInterval): string {
+  const planDefinition = publicBillingPlans.find((candidate) => candidate.code === plan);
+  const price = planDefinition?.prices.find((candidate) => candidate.interval === interval);
+  if (!price) throw new Error(`Billing catalog is missing ${plan}.${interval}`);
+  return price.lookupKey;
+}
