@@ -293,7 +293,7 @@ flowchart TD
 
 依存: `AUTH-C-002`, `AUTH-B-001`
 
-実装と検証はPRへ移しました。未完了条件は`AUTH-A-011`のsession / CSRF基盤への最終接続、依存PRのmerge、レビュー、mergeです。
+実装と検証はPRへ移し、`AUTH-A-011`のsession / CSRF基盤へ接続しました。未完了条件は依存PRのmerge、レビュー、mergeです。
 
 ### AUTH-C-004 LIFF内と外部ブラウザの認証入口を切り替える
 
