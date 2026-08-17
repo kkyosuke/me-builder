@@ -26,7 +26,7 @@
 - 利用者へ見せるエラー文言と画面状態
 - BrainやMCPアクセスの監査ログ
 - 会話、診断、画像などのプロダクトデータの保存規則
-- Cloudflare上の保存期間、通知先、ダッシュボード製品の具体的な設定
+- Cloudflare上の保存期間、通知先、外部転送先の具体的な設定
 
 個々のイベント名やエラーコードは、実装対象のフローごとにこの方針から導き、コードとテストを正とします。会話原文の扱いは[日記チャット体験設計](../product/diary-chat-experience.md#11-安全性とプライバシー)、画像情報の扱いは[アバター設定体験設計](../product/avatar-experience.md#10-プライバシーと安全性)、インフラ全体の境界は[インフラ・システム構成](../architecture/infrastructure-architecture.md)を正とします。
 
@@ -170,6 +170,30 @@ HTTPの終端ログも同じ読み方に揃えます。
 ```text
 [API] POST /api/line/webhook -> 200 (35ms)
 ```
+
+### 3.6 Webブラウザの未捕捉エラーをWorkers Logsへ合流させる
+
+Cloudflare Pagesが配信する静的Web UIの`console`出力は、APIやQueue WorkerのWorkers Logsへは自動的に保存されません。Web UIは未捕捉例外、未処理Promise rejection、React Error Boundaryが捕捉した描画失敗を安全なイベントへ変換し、API Workerの専用受付経路へ送信します。
+
+```mermaid
+flowchart LR
+    A[Web / LIFF<br/>未捕捉エラー] --> B[安全な固定schemaへ変換]
+    B --> C[API Worker<br/>認証・Origin・サイズ・Rate Limit検証]
+    C --> D[Pinoの終端ログ1件]
+    D --> E[Cloudflare Workers Logs]
+```
+
+ブラウザから送れるのは、固定のエラー種別、登録route pattern、リリース識別子、固定の例外分類、自サイト配下のJavaScript bundle名と行・列、オンライン状態、自動復旧の有無だけです。`ErrorEvent`が位置を持たない描画失敗と未処理Promise rejectionでは、stackをブラウザ内だけで走査し、最初の自サイトbundle frameを同じ固定項目へ変換します。実URL、query、生の例外message、stack、React component stack、任意の例外objectは送信しません。
+
+受付経路はログの真正性と正常利用者の受付枠を守るため、HttpOnly Cookieのapplication sessionとCSRF tokenを要求します。application sessionが確立する前のエラーは送信せず、ブラウザconsoleと画面上の復旧導線だけに留めます。受付経路は次で制限します。
+
+- 設定済みWeb Originと一致する`Origin`だけを受け入れる
+- application sessionから認証済みAccountを解決し、CSRF tokenを検証できないrequestを拒否する
+- request bodyはstreamを4 KiBまで読み、超過時点で打ち切って、固定schema以外のフィールドを拒否する
+- Cloudflare Rate Limiting bindingで、認証済みAccountあたり1分300件までに制限する
+- 同じブラウザタブ内の同一エラーは5分間再送しない
+
+送信はbest effortとし、失敗しても利用者操作を止めず、送信失敗自体を再度ブラウザエラーとして送らないようにします。API Workerは受理したブラウザイベントの終端ログを所有するため、そのrequestに対する通常のHTTP成功ログは重ねて出力しません。拒否・流量制限・未処理失敗は通常のHTTP終端ログで判断できる状態を保ちます。
 
 ## 4. 今回のログにある課題
 

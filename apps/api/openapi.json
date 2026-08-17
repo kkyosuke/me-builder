@@ -22,6 +22,205 @@
     }
   },
   "paths": {
+    "/api/observability/web-errors": {
+      "post": {
+        "operationId": "reportWebClientError",
+        "tags": ["Observability"],
+        "summary": "Web UIの安全化済み未捕捉エラーをWorkers Logsへ記録する",
+        "security": [
+          {
+            "applicationSession": [],
+            "csrfToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "schemaVersion",
+                  "kind",
+                  "route",
+                  "release",
+                  "errorType",
+                  "online",
+                  "recovered"
+                ],
+                "properties": {
+                  "schemaVersion": {
+                    "type": "integer",
+                    "const": 1
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "unhandled-error",
+                      "unhandled-rejection",
+                      "render-error",
+                      "chunk-load-error"
+                    ]
+                  },
+                  "route": {
+                    "type": "string",
+                    "enum": [
+                      "/",
+                      "/terms",
+                      "/privacy",
+                      "/contact",
+                      "/diagnosis",
+                      "/diagnosis/:diagnosisId/answers",
+                      "/compatibility",
+                      "/compatibility/share",
+                      "/compatibility/invitations/:relationshipId",
+                      "/compatibility/relationships/:relationshipId",
+                      "/me",
+                      "/profile",
+                      "/profile/avatar",
+                      "/profile/personal-data",
+                      "/profile/family",
+                      "/profile/billing",
+                      "/profile/brain-items",
+                      "/admin",
+                      "/admin/statistics",
+                      "/account-recovery",
+                      "unknown"
+                    ]
+                  },
+                  "release": {
+                    "type": "string",
+                    "pattern": "^(?:development|[a-f0-9]{7,40})$",
+                    "maxLength": 40
+                  },
+                  "errorType": {
+                    "type": "string",
+                    "enum": [
+                      "Error",
+                      "TypeError",
+                      "RangeError",
+                      "ReferenceError",
+                      "SyntaxError",
+                      "URIError",
+                      "AggregateError",
+                      "DOMException",
+                      "NonError",
+                      "Unknown"
+                    ]
+                  },
+                  "sourceFile": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_-]+\\.(?:js|mjs)$",
+                    "maxLength": 120
+                  },
+                  "sourceLine": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10000000
+                  },
+                  "sourceColumn": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10000000
+                  },
+                  "online": {
+                    "type": "boolean"
+                  },
+                  "recovered": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "ブラウザエラーを受理した"
+          },
+          "400": {
+            "description": "request bodyが固定schemaと一致しない"
+          },
+          "401": {
+            "description": "application sessionを検証できない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Unauthorized"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "許可済みWeb Originではない"
+          },
+          "404": {
+            "description": "対応するAccountが存在しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Account not found"
+                    },
+                    "reason": {
+                      "const": "friendship_required"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "request bodyが上限を超えている"
+          },
+          "429": {
+            "description": "ブラウザエラー受付の流量上限を超えた"
+          },
+          "500": {
+            "description": "未処理のサーバーエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Internal Server Error"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "D1 bindingが設定されていない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Service Unavailable"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/liff/exchange": {
       "post": {
         "operationId": "exchangeLiffCredential",

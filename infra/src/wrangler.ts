@@ -33,6 +33,10 @@ function kv(namespace: NonNullable<InfrastructureManifest["sessionStore"]>, pref
   return `[[${prefix}kv_namespaces]]\nbinding = "SESSION_STORE"\nid = "${namespace.id}"`;
 }
 
+function webErrorRateLimit(prefix: string, namespaceId: string) {
+  return `[[${prefix}ratelimits]]\nname = "WEB_ERROR_RATE_LIMITER"\nnamespace_id = "${namespaceId}"\n\n[${prefix}ratelimits.simple]\nlimit = 300\nperiod = 60`;
+}
+
 function webVars(baseDomain: string, environment: string) {
   return [`ENVIRONMENT = "${environment}"`, `WEB_ORIGIN = "https://${baseDomain}"`];
 }
@@ -103,6 +107,8 @@ function apiEnvironment(manifest: InfrastructureManifest) {
     queueProducer(prefix, manifest.queues.billing.name, "BILLING_QUEUE"),
     "",
     queueProducer(prefix, manifest.queues.profileSummary.name, "PROFILE_SUMMARY_QUEUE"),
+    "",
+    webErrorRateLimit(prefix, env === "preview" ? "11002" : "11003"),
     "",
     d1(manifest.database, prefix),
   ];
@@ -258,6 +264,8 @@ export function renderWranglerConfigs(
     "",
     queueProducer("env.local.", localQueues.profileSummary.name, "PROFILE_SUMMARY_QUEUE"),
     "",
+    webErrorRateLimit("env.local.", "11001"),
+    "",
     d1(localDatabase, "env.local."),
     "",
     kv(localManifest.sessionStore, "env.local."),
@@ -294,6 +302,8 @@ export function renderWranglerConfigs(
     queueProducer("", localQueues.billing.name, "BILLING_QUEUE"),
     "",
     queueProducer("", localQueues.profileSummary.name, "PROFILE_SUMMARY_QUEUE"),
+    "",
+    webErrorRateLimit("", "11001"),
     "",
     d1(localDatabase),
     "",

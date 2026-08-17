@@ -22,6 +22,14 @@ binding = "BILLING_QUEUE"
 queue = "me-builder-profile-summary-queue-local"
 binding = "PROFILE_SUMMARY_QUEUE"
 
+[[ratelimits]]
+name = "WEB_ERROR_RATE_LIMITER"
+namespace_id = "11001"
+
+[ratelimits.simple]
+limit = 300
+period = 60
+
 [[d1_databases]]
 binding = "DB"
 database_name = "me-builder-db-local"
@@ -72,6 +80,14 @@ binding = "BILLING_QUEUE"
 [[env.local.queues.producers]]
 queue = "me-builder-profile-summary-queue-local"
 binding = "PROFILE_SUMMARY_QUEUE"
+
+[[env.local.ratelimits]]
+name = "WEB_ERROR_RATE_LIMITER"
+namespace_id = "11001"
+
+[env.local.ratelimits.simple]
+limit = 300
+period = 60
 
 [[env.local.d1_databases]]
 binding = "DB"
@@ -127,6 +143,14 @@ binding = "BILLING_QUEUE"
 queue = "me-builder-profile-summary-queue-preview"
 binding = "PROFILE_SUMMARY_QUEUE"
 
+[[env.preview.ratelimits]]
+name = "WEB_ERROR_RATE_LIMITER"
+namespace_id = "11002"
+
+[env.preview.ratelimits.simple]
+limit = 300
+period = 60
+
 [[env.preview.d1_databases]]
 binding = "DB"
 database_name = "me-builder-db-preview"
@@ -176,6 +200,14 @@ binding = "BILLING_QUEUE"
 [[env.production.queues.producers]]
 queue = "me-builder-profile-summary-queue-production"
 binding = "PROFILE_SUMMARY_QUEUE"
+
+[[env.production.ratelimits]]
+name = "WEB_ERROR_RATE_LIMITER"
+namespace_id = "11003"
+
+[env.production.ratelimits.simple]
+limit = 300
+period = 60
 
 [[env.production.d1_databases]]
 binding = "DB"
