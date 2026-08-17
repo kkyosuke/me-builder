@@ -191,7 +191,7 @@ function Line({ value }: { value: AdminStatistics["line"] }) {
 function StatisticsSkeleton() {
   return (
     <SkeletonLoader label="統計情報を読み込み中">
-      <section className="mt-6 max-w-4xl" aria-label="利用統計">
+      <section className="mx-auto mt-6 max-w-4xl" aria-label="利用統計">
         <div className="mb-6 flex items-center justify-between gap-3">
           <SkeletonBlock className="h-6 w-24 rounded-full" />
           <SkeletonBlock className="h-10 w-20 rounded-full" />
@@ -242,7 +242,7 @@ export function AdminStatisticsScreen({
   }
   if (state.status === "error")
     return (
-      <section className="flex min-h-[50vh] max-w-4xl flex-col items-center justify-center gap-4 text-center">
+      <section className="mx-auto flex min-h-[50vh] max-w-4xl flex-col items-center justify-center gap-4 text-center">
         <AlertCircle className="size-10 text-rose-500" aria-hidden="true" />
         <p>{state.message}</p>
         <button
@@ -256,7 +256,7 @@ export function AdminStatisticsScreen({
     );
   const { data } = state;
   return (
-    <section className="mt-6 max-w-4xl min-w-0" aria-labelledby="statistics-heading">
+    <section className="mx-auto mt-6 max-w-4xl min-w-0" aria-labelledby="statistics-heading">
       <header className="mb-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 id="statistics-heading" className="min-w-0 text-xl font-bold">

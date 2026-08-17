@@ -172,7 +172,7 @@ function AccountsSkeleton() {
   return (
     <SkeletonLoader label="Account一覧を読み込み中">
       <section className="mt-6" aria-label="アカウント">
-        <div className="mt-6">
+        <div>
           <SkeletonBlock className="h-6 w-28 rounded-full" />
           <SkeletonBlock className="mt-2 h-4 w-32 rounded-full" />
         </div>

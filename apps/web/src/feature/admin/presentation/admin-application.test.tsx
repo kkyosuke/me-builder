@@ -60,5 +60,16 @@ describe("AdminApplication", () => {
     expect(screen.getByRole("link", { name: "利用統計" }).getAttribute("aria-current")).toBe(
       "page",
     );
+
+    window.history.replaceState({}, "", "/admin");
+    window.dispatchEvent(new PopStateEvent("popstate"));
+
+    await waitFor(() => expect(screen.getByText("アカウント一覧")).toBeTruthy());
+    expect(screen.getByRole("heading", { name: "管理者ダッシュボード" }).closest("header")).toBe(
+      header,
+    );
+    expect(screen.getByRole("link", { name: "アカウント" }).getAttribute("aria-current")).toBe(
+      "page",
+    );
   });
 });
