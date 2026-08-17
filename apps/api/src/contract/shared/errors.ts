@@ -37,10 +37,7 @@ const jsonResponse = (description: string, schema: Parameters<typeof resolver>[0
 });
 
 export const authenticatedErrors = {
-  401: jsonResponse(
-    "application sessionまたは旧LIFF credentialを検証できない",
-    UnauthorizedErrorSchema,
-  ),
+  401: jsonResponse("application sessionを検証できない", UnauthorizedErrorSchema),
   404: jsonResponse("対応するAccountが存在しない", AccountNotFoundErrorSchema),
   503: jsonResponse("D1 bindingが設定されていない", ServiceUnavailableErrorSchema),
   500: jsonResponse("未処理のサーバーエラー", InternalServerErrorSchema),

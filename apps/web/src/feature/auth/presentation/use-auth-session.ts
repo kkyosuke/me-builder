@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { config } from "../../../config";
-import { useLiffSession } from "../../liff";
 import { type AuthSessionResponse, fetchAuthSession } from "../infrastructure/auth-session-api";
 import { authSessionRuntime } from "../infrastructure/auth-session-runtime";
 import { establishLiffAuthSession } from "../infrastructure/liff-auth-adapter";
@@ -20,7 +19,6 @@ function errorState(error: unknown): AuthState {
 
 /** application sessionの確立と再確認を1つの共有状態として管理する。 */
 export function useAuthSessionState() {
-  const liffSession = useLiffSession();
   const [state, setState] = useState<AuthState>({ status: "checking" });
   const initializationRef = useRef<Promise<AuthState> | null>(null);
   const recheckControllerRef = useRef<AbortController | null>(null);
@@ -46,15 +44,11 @@ export function useAuthSessionState() {
       const existing = await fetchAuthSession(config.apiUrl, signal);
       if (existing.authenticated) return applyResponse(existing);
 
-      const exchanged = await establishLiffAuthSession(
-        config.apiUrl,
-        liffSession.acquireIdToken,
-        signal,
-      );
+      const exchanged = await establishLiffAuthSession(config.apiUrl, config.liffId, signal);
       if ("redirecting" in exchanged) return { status: "redirecting" };
       return applyResponse(exchanged);
     },
-    [applyResponse, liffSession.acquireIdToken],
+    [applyResponse],
   );
 
   const refresh = useCallback(
@@ -80,8 +74,14 @@ export function useAuthSessionState() {
 
   useEffect(() => {
     const controller = new AbortController();
-    void refresh(controller.signal);
-    return () => controller.abort();
+    let active = true;
+    queueMicrotask(() => {
+      if (active) void refresh(controller.signal);
+    });
+    return () => {
+      active = false;
+      controller.abort();
+    };
   }, [refresh]);
 
   useEffect(() => {

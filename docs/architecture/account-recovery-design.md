@@ -23,15 +23,15 @@ AccountとIdentityは[ドメイン設計](../domain/domain-design.md)、保存�
 
 ## 2. 結論
 
-通常の復旧は、旧Identityでログインできる間に本人が発行・保管した一回限りの復旧コードと、新しいLINE Identityの有効なID tokenの両方で認可します。Stripeのメールアドレス、Customer ID、Subscription ID、請求明細だけではAccount所有の証明にしません。
+通常の復旧は、旧Identityでログインできる間に本人が発行・保管した一回限りの復旧コードと、新しいLINE Identityで確立したapplication sessionの両方で認可します。Stripeのメールアドレス、Customer ID、Subscription ID、請求明細だけではAccount所有の証明にしません。
 
 ```mermaid
 flowchart TD
     A[旧Identityで認証済み] --> B[復旧コードを発行]
     B --> C[本人だけがコードを保管]
     C --> D[新しいLINE Identityで認証]
-    D --> E{未使用コードとAccountが一致?}
-    E -->|yes| F[同一transactionでコード消費とIdentity接続]
+    D --> E{未使用コードと移管可能なIdentityが一致?}
+    E -->|yes| F[同一transactionでコード消費・Identity移管・session失効]
     E -->|no| G[情報を伏せて拒否]
     F --> H[同じAccount ID / Plan紐付けを継続]
 ```
@@ -42,8 +42,9 @@ flowchart TD
 
 - 1つの有効な`provider + provider account ID`は高々1つのAccountに属する
 - 復旧コードは1つのAccountにだけ属し、使用または失効後は再利用できない
-- コード消費と新Identity接続は同じtransactionで完了する
-- 新Identityが別Accountへ接続済みなら自動統合せず拒否する
+- コード消費、新Identityの移管、復旧先と移管元のsession version更新は同じtransactionで完了する
+- 新Identityの認証時に作られた移管元Accountからは、現在認証中の`line_login` Identityだけを移す。AccountData、Plan、その他のIdentityは統合しない
+- 新Identityが移管元と復旧先以外のAccountへ接続済みなら自動統合せず拒否する
 - 復旧によってAccount ID、AccountData、`AccountPlanAssignment`を作り直さない
 - リクエスト再送は同じ結果へ収束し、IdentityやAccountを二重作成しない
 - 復旧操作からStripe CustomerやSubscriptionを別Accountへ移動しない
@@ -56,9 +57,9 @@ flowchart TD
 
 ### 4.2 Identity再接続
 
-利用者は新しいLINE Identityで認証した後、復旧コードを入力します。サーバーはコード照合、期限、試行制限、Account状態、新Identityの未接続を確認し、成功時に同一transactionでコードを消費してIdentityを追加します。
+利用者は新しいLINE Identityで認証し、一時的な移管元Accountのapplication sessionを確立した後、復旧コードを入力します。サーバーはコード照合、期限、試行制限、Account状態を確認し、新Identityが現在の移管元Accountだけに接続されている場合に限り、同一transactionでコードを消費してIdentityを復旧先Accountへ移します。同じtransactionで復旧先と移管元のsession versionを進め、両Accountの既存sessionを失効させます。
 
-処理途中で失敗した場合は両方をrollbackします。同じ成功リクエストの再送には成功済みであることだけを返し、Accountの存在、旧Identity、Stripe識別子は返しません。
+処理途中で失敗した場合はコード消費、Identity移管、session失効をすべてrollbackします。同じ成功リクエストの再送には成功済みであることだけを返し、Accountの存在、旧Identity、Stripe識別子は返しません。移管元AccountのAccountData、Plan、他のIdentityは復旧先へ移さず、別Accountの統合として扱いません。
 
 ### 4.3 旧Identityの扱い
 
@@ -68,7 +69,7 @@ flowchart TD
 
 コード照合の失敗応答は、Accountやコードの存在を推測できない同一内容にします。IPの非可逆hashと新Identityのfingerprintごとに15分間の失敗を数え、5回失敗した場合は30分間ロックします。成功、失敗、ロック、コード発行・失効を監査しますが、復旧コード、LINE token、IP、Stripe識別子は記録しません。
 
-新Identityが既存Accountに属する場合、どちらのAccountも削除・統合しません。本人には認証済みのAccountから問い合わせるよう案内し、運営者による統合も別の審査済み手順なしでは行いません。
+新Identityが現在認証中の移管元Accountと復旧先以外のAccountにも属する場合、どのAccountも削除・統合しません。本人には認証済みのAccountから問い合わせるよう案内し、運営者による統合も別の審査済み手順なしでは行いません。
 
 ## 6. 事前コードがない場合
 

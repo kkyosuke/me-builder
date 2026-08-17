@@ -1,19 +1,18 @@
 // @vitest-environment jsdom
 
 import { act, renderHook, waitFor } from "@testing-library/react";
+import { type ReactNode, StrictMode, createElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { authSessionRuntime } from "../infrastructure/auth-session-runtime";
 import { useAuthSessionState } from "./use-auth-session";
 
 const mocks = vi.hoisted(() => ({
-  acquireIdToken: vi.fn(),
   fetchAuthSession: vi.fn(),
   establishLiffAuthSession: vi.fn(),
 }));
 
-vi.mock("../../../config", () => ({ config: { apiUrl: "https://api.example.com" } }));
-vi.mock("../../liff", () => ({
-  useLiffSession: () => ({ acquireIdToken: mocks.acquireIdToken, profile: null }),
+vi.mock("../../../config", () => ({
+  config: { apiUrl: "https://api.example.com", liffId: "test-liff-id" },
 }));
 vi.mock("../infrastructure/auth-session-api", () => ({
   fetchAuthSession: mocks.fetchAuthSession,
@@ -48,6 +47,15 @@ describe("useAuthSessionState", () => {
     expect(mocks.establishLiffAuthSession).not.toHaveBeenCalled();
   });
 
+  it("Strict Modeでもsession確認を多重実行しない", async () => {
+    const wrapper = ({ children }: { children: ReactNode }) =>
+      createElement(StrictMode, null, children);
+    const { result } = renderHook(() => useAuthSessionState(), { wrapper });
+
+    await waitFor(() => expect(result.current.state.status).toBe("authenticated"));
+    expect(mocks.fetchAuthSession).toHaveBeenCalledTimes(1);
+  });
+
   it("sessionがなければLIFF credentialをapplication sessionへ交換する", async () => {
     mocks.fetchAuthSession.mockResolvedValue({ authenticated: false });
     mocks.establishLiffAuthSession.mockResolvedValue(authenticated);
@@ -56,7 +64,7 @@ describe("useAuthSessionState", () => {
     await waitFor(() => expect(result.current.state.status).toBe("authenticated"));
     expect(mocks.establishLiffAuthSession).toHaveBeenCalledWith(
       "https://api.example.com",
-      mocks.acquireIdToken,
+      "test-liff-id",
       expect.any(AbortSignal),
     );
   });
@@ -142,13 +150,14 @@ describe("useAuthSessionState", () => {
     expect(recheckSignal?.aborted).toBe(true);
   });
 
-  it("unmount時に進行中の確認をAbortする", () => {
+  it("unmount時に進行中の確認をAbortする", async () => {
     let observedSignal: AbortSignal | undefined;
     mocks.fetchAuthSession.mockImplementation((_url: string, signal: AbortSignal) => {
       observedSignal = signal;
       return new Promise(() => undefined);
     });
     const { unmount } = renderHook(() => useAuthSessionState());
+    await Promise.resolve();
 
     unmount();
 

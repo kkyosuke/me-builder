@@ -1,7 +1,6 @@
 import { D1 } from "@me-builder/lib";
 import type { Context } from "hono";
 import * as v from "valibot";
-import { getConfig } from "../config";
 import {
   AccountRecoveryCodeResponseSchema,
   AccountRecoveryCompleteRequestSchema,
@@ -9,11 +8,9 @@ import {
   AccountRecoveryUnavailableSchema,
 } from "../contract/account-recovery";
 import { ServiceUnavailableErrorSchema, UnauthorizedErrorSchema } from "../contract/shared/errors";
-import { createLineCredentialVerifier } from "../infrastructure/authentication/line-credential-verifier";
 import { issueAccountRecoveryCode, recoverAccountWithCode } from "../logic/account-recovery";
-import { authenticatedActor } from "../middleware/authentication";
+import { authenticatedActor, authenticatedSession } from "../middleware/authentication";
 import type { AppEnv } from "../types";
-import { bearerToken } from "./auth";
 
 export async function postAccountRecoveryCode(c: Context<AppEnv>): Promise<Response> {
   if (!c.env?.DB)
@@ -48,21 +45,28 @@ export async function postAccountRecoveryComplete(c: Context<AppEnv>): Promise<R
       400,
     );
   }
-  const idToken = bearerToken(c.req.header("authorization"));
-  if (!idToken) {
+  const db = D1.shared.client.create(c.env.DB);
+  const actor = authenticatedActor(c);
+  const authenticatedIdentityId = authenticatedSession(c).authenticatedIdentityId;
+  if (!authenticatedIdentityId) {
     return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
   }
-  const verification = await createLineCredentialVerifier(
-    getConfig(c.env).lineLoginChannelId,
-  ).verify({ idToken });
-  if (verification.type === "rejected") {
-    return verification.reason === "authentication_not_configured"
-      ? c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503)
-      : c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
+  const identity = await db.query.accountIdentities.findFirst({
+    columns: { providerAccountId: true },
+    where: (table, { and, eq }) =>
+      and(
+        eq(table.id, authenticatedIdentityId),
+        eq(table.accountId, actor.accountId),
+        eq(table.provider, "line_login"),
+        eq(table.isDeleted, false),
+      ),
+  });
+  if (!identity) {
+    return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
   }
-  const db = D1.shared.client.create(c.env.DB);
   const outcome = await recoverAccountWithCode({
-    identity: { subject: verification.identity.subject },
+    identity: { id: authenticatedIdentityId, subject: identity.providerAccountId },
+    sourceAccountId: actor.accountId,
     db,
     code: body.output.code,
     requestKey: c.req.header("cf-connecting-ip") ?? "unavailable",

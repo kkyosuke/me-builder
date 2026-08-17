@@ -10,7 +10,7 @@ describe("createHttpClient", () => {
       async () => new Response(null, { status: 204 }),
     );
     const client = createHttpClient("https://api.example.com///", fetchImplementation);
-    const init = { headers: { Authorization: "Bearer token" } };
+    const init = { headers: { "X-Test-Request": "preserved" } };
 
     const response = await client.request("api/diagnoses", init);
 

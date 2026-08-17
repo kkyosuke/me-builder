@@ -12,7 +12,7 @@
 
 - 本人のプロフィール取得は`GET /api/profile`とし、Account IDをpath、query、bodyで受け取らない
 - うつしレベル進行度は`GET /api/profile/progression`で取得し、AccountDataにある差分反映済みの累積値と現在有効なBrain Itemから集計する
-- LIFF IDトークンを検証して解決したAccountだけを読み書きする
+- HttpOnlyのアプリセッションCookieを検証して解決したAccountだけを読み書きする
 - 取得結果には表示名、role、現在表示するアバターを含める
 - 相性画面など画像をJSONへ埋め込まない利用箇所向けに、`GET /api/profile/avatar`で本人の現在画像をバイナリ返却する
 - 保存は`PUT /api/profile/avatar`、削除は`DELETE /api/profile/avatar`とする
@@ -21,7 +21,7 @@
 - 日記、診断回答、Source、Brain、プロフィール要約はAccountDataに残し、アバターメタデータを複製しない
 - アバターの更新間隔による拒否は行わず、`updatedAt`は現在画像の更新日時としてだけ扱う
 
-`/api/accounts/:accountId/profile`は採用しません。本人専用操作へAccount IDを指定させると、認証結果ではなくクライアント入力を認可に使う実装を誘発するためです。`/api/profile`は常にBearerトークンで解決した本人を表します。
+`/api/accounts/:accountId/profile`は採用しません。本人専用操作へAccount IDを指定させると、認証結果ではなくクライアント入力を認可に使う実装を誘発するためです。`/api/profile`は常にアプリセッションで解決した本人を表します。
 
 ## 3. エンドポイント
 
@@ -33,7 +33,7 @@
 | `PUT` | `/api/profile/avatar` | 現在のアバターを画像bodyで置換 | `200`と更新後プロフィール |
 | `DELETE` | `/api/profile/avatar` | 保存画像を外してLINE画像へ戻す | `200`と更新後プロフィール |
 
-すべてのエンドポイントは`Authorization: Bearer <LIFF ID token>`を要求します。Accountを解決できない場合の`401`、`404`は既存の認証済みAPIと同じ契約にします。
+すべてのエンドポイントは`__Host-me_builder_session` Cookieを要求します。変更系リクエストは同一Originと`X-CSRF-Token`も要求します。Accountを解決できない場合の`401`、`404`は既存の認証済みAPIと同じ契約にします。
 
 ## 4. プロフィール応答
 
@@ -54,7 +54,7 @@
 `avatar`の決定順は次のとおりです。
 
 1. 共有D1のAccount運営情報が参照するPrivate R2の保存画像
-2. 検証済みLIFF IDトークンのLINEプロフィール画像
+2. IDトークン交換時に検証してアプリセッションへ保持したLINEプロフィール画像
 3. `null`
 
 LINE画像の場合は`source`を`line`、`url`をLINEのHTTPS URL、`updatedAt`を`null`にします。保存画像はPrivate R2から読み出した内容をData URLとして同じJSONへ含めます。最大512×512pxのプロフィール画像に限定することで、Web UIがプロフィールJSONの後に認証付き画像APIを追加で呼ばずに表示できます。
@@ -65,9 +65,9 @@ LINE画像の場合は`source`を`line`、`url`をLINEのHTTPS URL、`updatedAt`
 
 ### 4.1 画像バイナリ応答
 
-`GET /api/profile/avatar`は、Bearerトークンから解決した本人について、保存画像、検証済みIDトークンのLINE画像の順に解決します。画像があれば`Content-Type`を付けた画像bodyを`200`で返し、どちらも利用できなければbodyなしの`204`を返します。Private R2の不整合やLINE画像の取得失敗はプロフィール画面全体の失敗にせず、次の候補または`204`へ縮退します。
+`GET /api/profile/avatar`は、アプリセッションから解決した本人について、保存画像、セッションへ保持した検証済みLINE画像の順に解決します。画像があれば`Content-Type`を付けた画像bodyを`200`で返し、どちらも利用できなければbodyなしの`204`を返します。Private R2の不整合やLINE画像の取得失敗はプロフィール画面全体の失敗にせず、次の候補または`204`へ縮退します。
 
-Web UIはこのAPIを通常の`img` URLとして直接参照せず、LIFF IDトークンをAuthorization headerへ付けて取得し、取得したBlobのObject URLを表示に使います。IDトークンをquery parameterや画像URLへ含めません。応答には`Cache-Control: no-store`と`X-Content-Type-Options: nosniff`を付けます。
+Web UIはこのAPIをcredential付き`fetch`で取得し、取得したBlobのObject URLを表示に使います。セッショントークンやIDトークンをquery parameterや画像URLへ含めません。応答には`Cache-Control: no-store`と`X-Content-Type-Options: nosniff`を付けます。
 
 ### 4.2 うつしレベル進行度応答
 
@@ -111,12 +111,12 @@ Web UIによる縮小・切り抜きは通信量と操作体験のための一�
 
 ```mermaid
 flowchart LR
-    W[Web UI] -->|Bearer + image body| API[API Server]
-    API -->|LIFF ID token verify<br/>avatar metadata| D1[(Shared D1<br/>Account operation)]
+    W[Web UI] -->|session cookie + image body| API[API Server]
+    API -->|session verify<br/>avatar metadata| D1[(Shared D1<br/>Account operation)]
     API -->|未処理差分の反映・累積値取得| AD[(AccountData<br/>progression state)]
     API -->|image bytes| R2[(Private R2)]
     API -->|profile / progression JSON| W
-    API -->|Bearerで認可したimage response| W
+    API -->|sessionで認可したimage response| W
 ```
 
 R2 object keyは認証で解決したAccount IDとアップロードごとの一意なIDから決定します。同じ画像を再送してもkeyを再利用しないため、並行した置換・削除の後処理が新しい現在画像を削除しません。別Accountとobjectを共有しません。
@@ -145,7 +145,8 @@ GETで保存画像の不整合を検出した場合、共有D1のメタデータ
 | Status | 意味 |
 | --- | --- |
 | `400` | bodyが空 |
-| `401` | LIFF IDトークンを検証できない |
+| `401` | アプリセッションCookieがない、無効、または期限切れ |
+| `403` | OriginまたはCSRFトークンが不正 |
 | `404` | 対応するAccountがない |
 | `413` | 画像が2 MiBを超える |
 | `415` | 対応外形式、または`Content-Type`と実データが一致しない |
@@ -157,7 +158,7 @@ GETで保存画像の不整合を検出した場合、共有D1のメタデータ
 
 ## 9. 利用プラン表示
 
-`GET /api/profile/entitlement`はLIFF IDトークンで解決した本人について、現在Plan、契約状態、付与元、適用開始、利用可能期限、AI返信とまとめ生成の上限・利用量・予約量・残量・次回更新日時を返します。`Cache-Control: no-store`とし、Account ID、支払者Account ID、Stripeの識別子を応答へ含めません。値の解決規則とAPI / Workerの実行境界は[課金・Plan紐付け実装設計](../architecture/billing-implementation-design.md#33-機能境界への接続)を正とします。
+`GET /api/profile/entitlement`はアプリセッションで解決した本人について、現在Plan、契約状態、付与元、適用開始、利用可能期限、AI返信とまとめ生成の上限・利用量・予約量・残量・次回更新日時を返します。`Cache-Control: no-store`とし、Account ID、支払者Account ID、Stripeの識別子を応答へ含めません。値の解決規則とAPI / Workerの実行境界は[課金・Plan紐付け実装設計](../architecture/billing-implementation-design.md#33-機能境界への接続)を正とします。
 
 ## 10. プライバシーと運用ログ
 
@@ -175,7 +176,7 @@ GETで保存画像の不整合を検出した場合、共有D1のメタデータ
 - PNG、JPEG、WebPの正方形画像をPrivate R2へ保存できる
 - 現在画像のメタデータを共有D1へ保存できる
 - 保存・削除の応答だけで更新後表示へ切り替えられる
-- 本人の画像をAccount IDやIDトークンをURLへ含めずバイナリ取得できる
+- 本人の画像をAccount ID、セッショントークン、IDトークンをURLへ含めずバイナリ取得できる
 - 不正形式、形式偽装、過大画像、非正方形画像を拒否できる
 - 別AccountのプロフィールやR2 objectを取得・更新できない
 - OpenAPIとWeb UI用の生成型へ契約が反映される

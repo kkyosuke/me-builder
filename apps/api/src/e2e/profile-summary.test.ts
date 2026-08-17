@@ -4,9 +4,10 @@ import type { D1Database } from "@cloudflare/workers-types";
 import { D1, DO } from "@me-builder/lib";
 import type { ProfileSummaryGenerationQueueMessage, Queue } from "@me-builder/shared";
 import { Miniflare } from "miniflare";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { app } from "../index";
 import { type AccountDataTestStore, createAccountDataTestStore } from "../testing/account-data";
+import { createApplicationSessionFixture } from "../testing/application-session";
 import { profileSummaryCases } from "./case/profile-summary.case";
 
 const repositoryRoot = path.resolve(__dirname, "../../../..");
@@ -17,6 +18,8 @@ const e2eSetupTimeoutMs = 90_000;
 let miniflare: Miniflare;
 let database: D1Database;
 let accountDataStore: AccountDataTestStore;
+let sessionFixture: ReturnType<typeof createApplicationSessionFixture>;
+let sessionHeaders: Record<string, string>;
 const send = vi.fn();
 const queue = { send } as unknown as Queue<ProfileSummaryGenerationQueueMessage>;
 
@@ -148,21 +151,6 @@ async function insertSummaryVersions(evidenceSourceRecordId: string): Promise<vo
   }
 }
 
-function mockLineVerification(): void {
-  vi.stubGlobal(
-    "fetch",
-    vi.fn(async () =>
-      Response.json({
-        iss: "https://access.line.me",
-        sub: "line-summary-e2e",
-        aud: "1234567890",
-        iat: Math.floor(Date.now() / 1_000),
-        exp: timestamp + 86_400,
-      }),
-    ),
-  );
-}
-
 async function request(
   pathname = "/api/profile-summary",
   method = "GET",
@@ -170,12 +158,12 @@ async function request(
 ): Promise<Response> {
   return app.request(
     pathname,
-    { method, headers: { Authorization: "Bearer known-token" } },
+    { method, headers: sessionHeaders },
     {
       DB: database,
       ACCOUNT_DATA: accountDataStore.namespace,
       PROFILE_SUMMARY_QUEUE: queue,
-      LINE_LOGIN_CHANNEL_ID: "1234567890",
+      ...sessionFixture.bindings,
       ENVIRONMENT: environment,
     },
   );
@@ -191,6 +179,7 @@ describe("Profile Summary local D1 E2E", () => {
     });
     database = (await miniflare.getD1Database("DB")) as D1Database;
     await prepareAccount(database);
+    sessionFixture = createApplicationSessionFixture(database);
   }, e2eSetupTimeoutMs);
 
   beforeEach(async () => {
@@ -198,10 +187,9 @@ describe("Profile Summary local D1 E2E", () => {
     await accountDataStore.syncCatalogFrom(D1.shared.client.create(database));
     send.mockReset();
     send.mockResolvedValue(undefined);
-    mockLineVerification();
+    sessionHeaders = (await sessionFixture.issue("account-summary-e2e")).headers;
   });
 
-  afterEach(() => vi.unstubAllGlobals());
   afterAll(async () => miniflare.dispose());
 
   it(`${profileSummaryCases.noRecords.id}: ${profileSummaryCases.noRecords.name}`, async () => {

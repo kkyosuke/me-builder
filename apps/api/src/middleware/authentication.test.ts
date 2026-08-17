@@ -63,6 +63,7 @@ describe("authentication middleware", () => {
             expiresAt: new Date(now.getTime() + 60_000).toISOString(),
             sessionVersion: 1,
             csrfToken: "csrf-token",
+            authenticatedIdentityId: "identity-1",
           }),
           put,
         } as never,
@@ -71,20 +72,6 @@ describe("authentication middleware", () => {
 
     expect(response.status).toBe(status);
     expect(put).toHaveBeenCalledTimes(status === 200 ? 1 : 0);
-  });
-
-  it("移行期間の旧Bearer更新にはapplication session用CSRFを要求しない", async () => {
-    const app = new Hono<AppEnv>();
-    app.post(
-      "/",
-      createAuthenticationMiddleware(async (c) => {
-        c.set("authenticationSource", "legacy-bearer");
-        return { type: "authenticated", actor, accountRole: "user" };
-      }),
-      (c) => c.text("ok"),
-    );
-
-    expect((await app.request("/", { method: "POST" })).status).toBe(200);
   });
 
   it.each([

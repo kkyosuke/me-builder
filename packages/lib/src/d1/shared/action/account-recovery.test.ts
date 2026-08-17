@@ -28,6 +28,78 @@ function createTestDb(): SharedD1Client {
 }
 
 describe("account recovery action", () => {
+  it("認証済みsource AccountのLINE Identityを復旧対象Accountへ移す", async () => {
+    const db = createTestDb();
+    const target = await upsertIdentity(db, {
+      provider: "line_login",
+      providerAccountId: "line-old-transfer",
+    });
+    const source = await upsertIdentity(db, {
+      provider: "line_login",
+      providerAccountId: "line-new-transfer",
+    });
+    await db.insert(schema.accountIdentities).values({
+      id: "legacy-line-identity",
+      accountId: source.account.id,
+      provider: "line",
+      providerAccountId: "line-new-transfer",
+      createdAt: new Date("2026-08-01T00:00:00Z"),
+      updatedAt: new Date("2026-08-01T00:00:00Z"),
+      isDeleted: false,
+    });
+    await issueAccountRecoveryCredential(db, {
+      id: "credential-transfer",
+      accountId: target.account.id,
+      secretHash: "secret-hash",
+      expiresAt: new Date("2026-09-01T00:00:00Z"),
+      now: new Date("2026-08-01T00:00:00Z"),
+    });
+
+    await expect(
+      completeAccountRecovery(db, {
+        credentialId: "credential-transfer",
+        expectedSecretHash: "secret-hash",
+        newProviderAccountId: "line-new-transfer",
+        sourceAccountId: source.account.id,
+        sourceIdentityId: source.identity.id,
+        identityFingerprint: "identity-fingerprint",
+        now: new Date("2026-08-15T00:00:00Z"),
+      }),
+    ).resolves.toBe("recovered");
+
+    await expect(
+      db.query.accountIdentities.findMany({
+        where: (table, { eq }) => eq(table.providerAccountId, "line-new-transfer"),
+      }),
+    ).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: source.identity.id,
+          accountId: target.account.id,
+          provider: "line_login",
+          isDeleted: false,
+        }),
+        expect.objectContaining({
+          id: "legacy-line-identity",
+          accountId: source.account.id,
+          provider: "line",
+          isDeleted: false,
+        }),
+      ]),
+    );
+    await expect(
+      db.query.accounts.findMany({
+        columns: { id: true, sessionVersion: true },
+        where: (table, { inArray }) => inArray(table.id, [target.account.id, source.account.id]),
+      }),
+    ).resolves.toEqual(
+      expect.arrayContaining([
+        { id: target.account.id, sessionVersion: 2 },
+        { id: source.account.id, sessionVersion: 2 },
+      ]),
+    );
+  });
+
   it("コード発行後に削除されたAccountへIdentityを再接続しない", async () => {
     const db = createTestDb();
     const target = await upsertIdentity(db, {
@@ -51,6 +123,8 @@ describe("account recovery action", () => {
         credentialId: "credential-deleted",
         expectedSecretHash: "secret-hash",
         newProviderAccountId: "line-new",
+        sourceAccountId: target.account.id,
+        sourceIdentityId: target.identity.id,
         identityFingerprint: "identity-fingerprint",
         now: new Date("2026-08-15T00:00:00Z"),
       }),
@@ -85,6 +159,8 @@ describe("account recovery action", () => {
         credentialId: "credential-stopped",
         expectedSecretHash: "secret-hash",
         newProviderAccountId: "line-new-stopped",
+        sourceAccountId: target.account.id,
+        sourceIdentityId: target.identity.id,
         identityFingerprint: "identity-fingerprint",
         now: new Date("2026-08-15T00:00:00Z"),
       }),
@@ -107,7 +183,9 @@ describe("account recovery action", () => {
     const input = {
       credentialId: "credential-version",
       expectedSecretHash: "secret-hash",
-      newProviderAccountId: "line-new",
+      newProviderAccountId: "line-old-version",
+      sourceAccountId: target.account.id,
+      sourceIdentityId: target.identity.id,
       identityFingerprint: "identity-fingerprint",
       now: new Date("2026-08-15T00:00:00Z"),
     };
@@ -153,6 +231,8 @@ describe("account recovery action", () => {
         credentialId: "credential-1",
         expectedSecretHash: "secret-hash",
         newProviderAccountId: "line-new",
+        sourceAccountId: target.account.id,
+        sourceIdentityId: target.identity.id,
         identityFingerprint: "identity-fingerprint",
         now: new Date("2026-08-15T00:00:00Z"),
       }),

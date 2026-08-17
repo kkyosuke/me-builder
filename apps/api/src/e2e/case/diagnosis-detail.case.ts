@@ -8,7 +8,7 @@ export const diagnosisDetailCases = {
     in: {
       method: "GET",
       path: "/api/diagnoses/relationship-priority",
-      authorization: "Bearer known-token",
+      session: "known-token",
       setup: ["migrationとdiagnosis seedを適用"],
     },
     out: {
@@ -31,7 +31,7 @@ export const diagnosisDetailCases = {
     in: {
       method: "GET",
       path: "/api/diagnoses/missing",
-      authorization: "Bearer known-token",
+      session: "known-token",
     },
     out: {
       status: 404,
@@ -47,7 +47,7 @@ export const diagnosisDetailCases = {
     in: {
       method: "GET",
       path: "/api/diagnoses/relationship-priority",
-      authorization: "Bearer known-token",
+      session: "known-token",
       setup: ["relationship-priorityのcloses_atを現在時刻に更新"],
     },
     out: {

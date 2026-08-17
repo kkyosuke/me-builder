@@ -46,7 +46,7 @@ describe("DELETE /api/dev/account-data", () => {
   const remove = (environment: string | undefined, withBindings = true) =>
     app.request(
       "/api/dev/account-data",
-      { method: "DELETE", headers: { Authorization: "Bearer dummy.id.token" } },
+      { method: "DELETE" },
       {
         LIFF_ID,
         ...(environment === undefined ? {} : { ENVIRONMENT: environment }),

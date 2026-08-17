@@ -38,7 +38,7 @@ export const issueCompatibilityInvitationRoute = describeRoute({
   operationId: "issueCompatibilityInvitation",
   tags: ["Compatibility"],
   summary: "共有へ同意した本人が1人用の招待リンクを発行する",
-  security: [{ applicationSession: [], csrfToken: [] }, { liffIdToken: [] }],
+  security: [{ applicationSession: [], csrfToken: [] }],
   responses: {
     201: jsonResponse("発行した招待リンクと有効期限", IssueCompatibilityInvitationResponseSchema),
     400: jsonResponse("関係カテゴリが不正", InvalidCompatibilityInvitationRequestSchema),

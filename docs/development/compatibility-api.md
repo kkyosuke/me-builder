@@ -8,13 +8,13 @@
 
 ## 2. 認証境界
 
-相性APIはLIFF IDトークンをAuthorizationヘッダーで受け取り、API ServerがLINEへ検証した`sub`からAccountを解決します。クライアント指定のAccount ID、表示名、診断結果は受け付けません。
+相性APIは`POST /api/auth/liff/exchange`で発行したHttpOnlyのアプリセッションCookieからAccountを解決します。クライアント指定のAccount ID、表示名、診断結果は受け付けません。
 
 ```http
-Authorization: Bearer <LIFF ID token>
+Cookie: __Host-me_builder_session=<opaque session token>
 ```
 
-IDトークン、Account ID、生の回答、内部の指紋はレスポンスとログへ出しません。
+変更系リクエストは同一Originと`X-CSRF-Token`も検証します。セッショントークン、CSRFトークン、IDトークン、Account ID、生の回答、内部の指紋はレスポンスとログへ出しません。
 
 ### 2.1 相性画面のプロフィール画像
 
@@ -24,9 +24,9 @@ IDトークン、Account ID、生の回答、内部の指紋はレスポンス�
 2. LINEプロフィール画像
 3. 画像なし
 
-本人のLINE画像は検証済みLIFF IDトークンの`picture`を使います。相手のLINE画像は、Accountに紐づくMessaging APIのuser IDを共有D1から解決し、[Messaging APIのGet profile](https://developers.line.biz/en/reference/messaging-api/#get-profile)をAPI Serverから呼び出して取得します。このAPIが相手のLIFFトークンを要求することはありません。本システムでは公式アカウントの友だち追加をAccount作成の起点としており、Messaging APIチャネルとLINE Loginチャネルを同じProviderに置くため、両チャネルのuser IDを同一人物へ安全に対応付けられます。
+本人のLINE画像はIDトークン交換時に検証し、アプリセッションへ保持した`picture`を使います。相手のLINE画像は、Accountに紐づくMessaging APIのuser IDを共有D1から解決し、[Messaging APIのGet profile](https://developers.line.biz/en/reference/messaging-api/#get-profile)をAPI Serverから呼び出して取得します。このAPIが相手のLIFFトークンを要求することはありません。本システムでは公式アカウントの友だち追加をAccount作成の起点としており、Messaging APIチャネルとLINE Loginチャネルを同じProviderに置くため、両チャネルのuser IDを同一人物へ安全に対応付けられます。
 
-`avatarUrl`には画像本体や外部画像URLではなく、Bearer認証付きで取得する同一APIの相対pathを入れます。本人は`GET /api/profile/avatar`、招待の送信者は`GET /api/compatibility/invitations/:relationshipId/avatar`から画像bodyを取得します。Web UIは取得したBlobのObject URLを表示に使い、LIFF IDトークンをquery parameterや画像URLへ含めません。
+`avatarUrl`には画像本体や外部画像URLではなく、アプリセッションCookie付きで取得する同一APIの相対pathを入れます。本人は`GET /api/profile/avatar`、招待の送信者は`GET /api/compatibility/invitations/:relationshipId/avatar`から画像bodyを取得します。Web UIは取得したBlobのObject URLを表示に使い、セッショントークンやIDトークンをquery parameterや画像URLへ含めません。
 
 R2 objectの欠落・メタデータ不一致、Messaging APIの取得失敗、LINE画像未設定はいずれもプロフィールや招待の取得全体を失敗させず、画像APIの次候補またはbodyなしの`204`へ縮退します。Web UIは画像がない場合や画像読み込み失敗時に表示名の先頭文字を表示します。表示名も取得できない本人については「あなた」の先頭文字を使います。
 
@@ -40,7 +40,7 @@ R2 objectの欠落・メタデータ不一致、Messaging APIの取得失敗、L
 
 ```mermaid
 flowchart LR
-    T[LIFF ID token] --> A[本人のAccountを解決]
+    T[Application session] --> A[本人のAccountを解決]
     A --> D[共有用プロフィールprojectionと回答済みDiagnosisの有無を確認]
     D --> P[共有可否と次の案内]
 ```
@@ -55,11 +55,11 @@ flowchart LR
 }
 ```
 
-`displayName`は検証済みIDトークンに表示名がなければ`null`です。`avatarUrl`の決定と縮退は[相性画面のプロフィール画像](#21-相性画面のプロフィール画像)に従います。`canShare`は`blockingReasons`が空の場合だけ`true`です。
+`displayName`はAccount profileにもアプリセッションにも表示名がなければ`null`です。`avatarUrl`の決定と縮退は[相性画面のプロフィール画像](#21-相性画面のプロフィール画像)に従います。`canShare`は`blockingReasons`が空の場合だけ`true`です。
 
 | 値 | 条件 |
 | --- | --- |
-| `display_name_unavailable` | 検証済みIDトークンに表示名がない |
+| `display_name_unavailable` | Account profileとアプリセッションのどちらにも表示名がない |
 
 共有できる内容がまだない状態でも共有は開始できます。`nextAction`は、共有専用プロフィールprojectionを開示できなければ`profile-summary`、それ以外で共有可能なテーマがなく現在回答できる未完了Diagnosisがあれば`diagnosis`、それ以外は`null`です。`relationshipCategory`を指定した場合、共有可能なテーマと未完了Diagnosisは指定カテゴリと`general`に絞って判定します。これは本人への案内だけに使い、発行可否には影響しません。
 
@@ -70,8 +70,9 @@ flowchart LR
 | HTTP | 条件 | レスポンス |
 | --- | --- | --- |
 | `400` | `relationshipCategory`が`partner`、`family`、`friend`、`work`以外である | `{ "error": "Invalid request" }` |
-| `401` | IDトークンがない、検証できない、またはLINE Login設定がない | `{ "error": "Unauthorized" }` |
-| `503` | D1またはAccountData bindingがない | `{ "error": "Service Unavailable" }` |
+| `401` | アプリセッションCookieがない、無効、または期限切れ | `{ "error": "Unauthorized" }` |
+| `403` | 変更系リクエストのOriginまたはCSRFトークンが不正 | `{ "error": "Forbidden" }` |
+| `503` | D1、セッションストア、またはAccountData bindingがない | `{ "error": "Service Unavailable" }` |
 | `500` | 未処理のサーバーエラー | `{ "error": "Internal Server Error" }` |
 
 ### `GET /api/compatibility/share-content`
@@ -130,7 +131,7 @@ flowchart LR
 { "relationshipCategory": "partner" }
 ```
 
-API Serverは検証済みIDトークンから本人と表示名を解決し、表示名を取得できる場合だけ、256 bitの不透明な関係IDでCompatibilityDataへ`pending`招待を作成し、送信者のAccountDataへ一覧参照を保存します。招待リンクへAccount IDを含めません。
+API Serverはアプリセッションから本人を、Account profileまたはセッションから表示名を解決し、表示名を取得できる場合だけ、256 bitの不透明な関係IDでCompatibilityDataへ`pending`招待を作成し、送信者のAccountDataへ一覧参照を保存します。招待リンクへAccount IDを含めません。
 
 ```mermaid
 sequenceDiagram
@@ -176,7 +177,7 @@ sequenceDiagram
     participant API
     participant CompatibilityData
     participant Invitee as 受信者AccountData
-    Web->>API: relationshipId, LIFF ID token
+    Web->>API: relationshipId, application session cookie
     API->>CompatibilityData: pending招待の安全なpreviewと内部context
     API->>Invitee: 受信者の共有準備状況を確認
     API-->>Web: 双方の表示名、承諾可否
@@ -201,7 +202,7 @@ sequenceDiagram
 
 双方の`avatarUrl`は[相性画面のプロフィール画像](#21-相性画面のプロフィール画像)に従い、送信者側も招待が特定したAccountからサーバー側で解決します。
 
-`GET /api/compatibility/invitations/:relationshipId/avatar`は、招待確認APIと同じBearer認証を要求し、受信者としてpending招待を確認できる場合だけ送信者の現在画像を返します。送信者Accountは招待contextから決め、path、query、bodyでAccount IDを受け取りません。画像がなければ`204`、招待が無効なら`404`、自分の招待なら`409`とし、画像応答には`Cache-Control: no-store`と`X-Content-Type-Options: nosniff`を付けます。
+`GET /api/compatibility/invitations/:relationshipId/avatar`は、招待確認APIと同じアプリセッション認証を要求し、受信者としてpending招待を確認できる場合だけ送信者の現在画像を返します。送信者Accountは招待contextから決め、path、query、bodyでAccount IDを受け取りません。画像がなければ`204`、招待が無効なら`404`、自分の招待なら`409`とし、画像応答には`Cache-Control: no-store`と`X-Content-Type-Options: nosniff`を付けます。
 
 `relationshipCategory`は送信者が招待発行時に選んだ関係カテゴリで、受信者はこの値を確認して承諾します。`canAccept`は受信者の検証済み表示名がある場合だけ`true`です。`blockingReasons`は共有の可否と同じ`display_name_unavailable`だけを返します。`nextAction`は受信者への案内であり、承諾可否には影響しません。共有できる内容がまだない場合も承諾でき、双方の内容がそろった時点で追加の同意なしに相性シートを表示します。
 

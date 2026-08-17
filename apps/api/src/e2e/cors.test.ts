@@ -29,7 +29,7 @@ describe("API CORS E2E", () => {
     ).toEqual([]);
   });
 
-  it("許可されたWebオリジンのプリフライトでBearer認証用ヘッダを許可する", async () => {
+  it("許可されたWebオリジンのプリフライトでJSONとCSRFヘッダを許可する", async () => {
     const response = await app.request(
       "/api/health",
       {
@@ -37,7 +37,7 @@ describe("API CORS E2E", () => {
         headers: {
           Origin: allowedOrigin,
           "Access-Control-Request-Method": "GET",
-          "Access-Control-Request-Headers": "Authorization, Content-Type, X-CSRF-Token",
+          "Access-Control-Request-Headers": "Content-Type, X-CSRF-Token",
         },
       },
       { ENVIRONMENT: "preview", WEB_ORIGIN: allowedOrigin },
@@ -46,9 +46,7 @@ describe("API CORS E2E", () => {
     expect(response.status).toBe(204);
     expect(response.headers.get("Access-Control-Allow-Origin")).toBe(allowedOrigin);
     expect(response.headers.get("Access-Control-Allow-Methods")).toContain("GET");
-    expect(response.headers.get("Access-Control-Allow-Headers")).toBe(
-      "Authorization,Content-Type,X-CSRF-Token",
-    );
+    expect(response.headers.get("Access-Control-Allow-Headers")).toBe("Content-Type,X-CSRF-Token");
   });
 
   it("未許可のオリジンにはCORSヘッダを返さない", async () => {
@@ -59,7 +57,7 @@ describe("API CORS E2E", () => {
         headers: {
           Origin: "https://attacker.example",
           "Access-Control-Request-Method": "GET",
-          "Access-Control-Request-Headers": "Authorization, Content-Type",
+          "Access-Control-Request-Headers": "Content-Type, X-CSRF-Token",
         },
       },
       { ENVIRONMENT: "preview", WEB_ORIGIN: allowedOrigin },

@@ -4,9 +4,10 @@ import type { D1Database } from "@cloudflare/workers-types";
 import { D1 } from "@me-builder/lib";
 import { currentServiceTerms } from "@me-builder/shared";
 import { Miniflare } from "miniflare";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { app } from "../index";
 import { type AccountDataTestStore, createAccountDataTestStore } from "../testing/account-data";
+import { createApplicationSessionFixture } from "../testing/application-session";
 import { diagnosisDetailCases } from "./case/diagnosis-detail.case";
 import { diagnosisListCases } from "./case/diagnosis-list.case";
 
@@ -18,6 +19,9 @@ const timestamp = 1_785_801_600;
 let miniflare: Miniflare;
 let database: D1Database;
 let accountDataStore: AccountDataTestStore;
+let sessionFixture: ReturnType<typeof createApplicationSessionFixture>;
+let knownSessionHeaders: Record<string, string>;
+let unknownSessionHeaders: Record<string, string>;
 
 async function applyMigrations(db: D1Database): Promise<void> {
   const migrationFiles = (await readdir(migrationsDirectory))
@@ -88,29 +92,35 @@ async function prepareDatabase(db: D1Database): Promise<void> {
     )
     .bind("identity-e2e", timestamp, timestamp, "account-e2e", "line-user-e2e")
     .run();
+  await db.batch([
+    db
+      .prepare(
+        `INSERT INTO accounts (id, created_at, updated_at, is_deleted, status)
+         VALUES (?, ?, ?, 0, 'active')`,
+      )
+      .bind("account-unknown-e2e", timestamp + 1, timestamp + 1),
+    db
+      .prepare(
+        `INSERT INTO account_identities (
+           id, created_at, updated_at, is_deleted, account_id, provider, provider_account_id
+         ) VALUES (?, ?, ?, 0, ?, 'line_login', ?)`,
+      )
+      .bind(
+        "identity-unknown-e2e",
+        timestamp + 1,
+        timestamp + 1,
+        "account-unknown-e2e",
+        "unknown-line-user",
+      ),
+  ]);
   await D1.shared.action.agreement.acceptCurrentTerms(D1.shared.client.create(db), "account-e2e");
 }
 
-function mockLineVerification(): void {
-  vi.stubGlobal(
-    "fetch",
-    vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
-      const body = new URLSearchParams(init?.body?.toString());
-      const idToken = body.get("id_token");
-      if (idToken === "invalid-token") {
-        return Response.json({ error: "invalid_request" }, { status: 400 });
-      }
-      const sub = idToken === "known-token" ? "line-user-e2e" : "unknown-line-user";
-
-      return Response.json({
-        iss: "https://access.line.me",
-        sub,
-        aud: "1234567890",
-        iat: Math.floor(Date.now() / 1_000),
-        exp: timestamp + 86_400,
-      });
-    }),
-  );
+function authenticationHeaders(credential?: string): HeadersInit | undefined {
+  if (credential === "known-token") return knownSessionHeaders;
+  if (credential === "unknown-token") return unknownSessionHeaders;
+  if (credential === "bearer-only") return { Authorization: "Bearer legacy-token" };
+  return undefined;
 }
 
 async function insertAnswers(
@@ -172,19 +182,19 @@ async function insertAnswers(
 }
 
 async function request(idToken?: string, path = "/api/diagnoses"): Promise<Response> {
-  const init: RequestInit = idToken ? { headers: { Authorization: `Bearer ${idToken}` } } : {};
+  const headers = authenticationHeaders(idToken);
 
-  return await app.request(path, init, {
+  return await app.request(path, headers ? { headers } : {}, {
     DB: database,
     ACCOUNT_DATA: accountDataStore.namespace,
-    LINE_LOGIN_CHANNEL_ID: "1234567890",
+    ...sessionFixture.bindings,
     ENVIRONMENT: "test",
   });
 }
 
 async function requestLegal(idToken: string, path = "/api/legal/terms", init?: RequestInit) {
-  const headers = new Headers(init?.headers);
-  headers.set("Authorization", `Bearer ${idToken}`);
+  const headers = new Headers(authenticationHeaders(idToken));
+  for (const [name, value] of new Headers(init?.headers)) headers.set(name, value);
   return await app.request(
     path,
     {
@@ -193,7 +203,7 @@ async function requestLegal(idToken: string, path = "/api/legal/terms", init?: R
     },
     {
       DB: database,
-      LINE_LOGIN_CHANNEL_ID: "1234567890",
+      ...sessionFixture.bindings,
       ENVIRONMENT: "test",
     },
   );
@@ -211,11 +221,12 @@ describe("GET /api/diagnoses local D1 E2E", () => {
     await prepareDatabase(database);
     accountDataStore = createAccountDataTestStore();
     await accountDataStore.syncCatalogFrom(D1.shared.client.create(database));
-    mockLineVerification();
+    sessionFixture = createApplicationSessionFixture(database);
+    knownSessionHeaders = (await sessionFixture.issue("account-e2e")).headers;
+    unknownSessionHeaders = (await sessionFixture.issue("account-unknown-e2e")).headers;
   });
 
   afterEach(async () => {
-    vi.unstubAllGlobals();
     await miniflare.dispose();
   });
 
@@ -324,15 +335,15 @@ describe("GET /api/diagnoses local D1 E2E", () => {
     );
   });
 
-  it(`${diagnosisListCases.missingAuthorization.id}: ${diagnosisListCases.missingAuthorization.name}`, async () => {
+  it(`${diagnosisListCases.missingSession.id}: ${diagnosisListCases.missingSession.name}`, async () => {
     const response = await request();
 
     expect(response.status).toBe(401);
     expect(await response.json()).toEqual({ error: "Unauthorized" });
   });
 
-  it(`${diagnosisListCases.invalidToken.id}: ${diagnosisListCases.invalidToken.name}`, async () => {
-    const response = await request("invalid-token");
+  it(`${diagnosisListCases.bearerRejected.id}: ${diagnosisListCases.bearerRejected.name}`, async () => {
+    const response = await request("bearer-only");
 
     expect(response.status).toBe(401);
     expect(await response.json()).toEqual({ error: "Unauthorized" });
@@ -496,14 +507,14 @@ describe("GET /api/diagnoses local D1 E2E", () => {
       {
         method: "PUT",
         headers: {
-          Authorization: "Bearer unknown-token",
+          ...unknownSessionHeaders,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ version: currentServiceTerms.version }),
       },
       {
         DB: database,
-        LINE_LOGIN_CHANNEL_ID: "1234567890",
+        ...sessionFixture.bindings,
         ENVIRONMENT: "test",
       },
     );
@@ -547,11 +558,12 @@ describe("GET /api/diagnoses/:diagnosisId local D1 E2E", () => {
     await prepareDatabase(database);
     accountDataStore = createAccountDataTestStore();
     await accountDataStore.syncCatalogFrom(D1.shared.client.create(database));
-    mockLineVerification();
+    sessionFixture = createApplicationSessionFixture(database);
+    knownSessionHeaders = (await sessionFixture.issue("account-e2e")).headers;
+    unknownSessionHeaders = (await sessionFixture.issue("account-unknown-e2e")).headers;
   });
 
   afterEach(async () => {
-    vi.unstubAllGlobals();
     await miniflare.dispose();
   });
 

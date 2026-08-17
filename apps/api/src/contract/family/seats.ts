@@ -59,8 +59,8 @@ export const familyInvitationTokenValidator = validator(
       : c.json(v.parse(InvalidFamilyInvitationRequestSchema, { error: "Invalid request" }), 400),
 );
 
-const readSecurity = [{ applicationSession: [] }, { liffIdToken: [] }];
-const mutationSecurity = [{ applicationSession: [], csrfToken: [] }, { liffIdToken: [] }];
+const readSecurity = [{ applicationSession: [] }];
+const mutationSecurity = [{ applicationSession: [], csrfToken: [] }];
 const familyErrors = {
   400: jsonResponse("招待tokenの形式が不正", InvalidFamilyInvitationRequestSchema),
   409: jsonResponse("現在の状態では操作できない", FamilyOperationUnavailableSchema),

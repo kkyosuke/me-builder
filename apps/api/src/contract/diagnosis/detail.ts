@@ -54,7 +54,7 @@ export const diagnosisDetailRoute = describeRoute({
   operationId: "getDiagnosisDetail",
   tags: ["Diagnosis"],
   summary: "新規回答用の診断詳細を取得する",
-  security: [{ applicationSession: [] }, { liffIdToken: [] }],
+  security: [{ applicationSession: [] }],
   responses: {
     200: jsonResponse("Question VersionとChoiceを含む診断詳細", DiagnosisDetailResponseSchema),
     ...authenticatedErrors,

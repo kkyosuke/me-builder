@@ -51,7 +51,7 @@ describe("service terms controller", () => {
     });
     const response = await app.request(
       "/api/legal/terms",
-      { headers: { Authorization: "Bearer token" } },
+      {},
       { DB: db, LIFF_ID: "2010850319-Yl63upAR" },
     );
     expect(response.status).toBe(200);
@@ -82,7 +82,7 @@ describe("service terms controller", () => {
       "/api/legal/terms/acceptance",
       {
         method: "PUT",
-        headers: { Authorization: "Bearer token", "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ version: currentServiceTerms.version }),
       },
       { DB: db, LIFF_ID: "2010850319-Yl63upAR" },
@@ -105,7 +105,7 @@ describe("service terms controller", () => {
       "/api/legal/terms/acceptance",
       {
         method: "PUT",
-        headers: { Authorization: "Bearer token", "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ version: "2026-01-01" }),
       },
       { DB: db, LIFF_ID: "2010850319-Yl63upAR" },
@@ -129,7 +129,7 @@ describe("service terms controller", () => {
 
     const response = await app.request(
       "/api/legal/terms/acceptances",
-      { headers: { Authorization: "Bearer token" } },
+      {},
       { DB: db, LIFF_ID: "2010850319-Yl63upAR" },
     );
 
