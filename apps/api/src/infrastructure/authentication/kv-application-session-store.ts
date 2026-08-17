@@ -5,7 +5,9 @@ import type {
   ApplicationSessionStore,
 } from "../../logic/authentication/application-session";
 
-const keyPrefix = "session:v1:";
+// v2でauthenticatedIdentityIdを追加した。旧recordをprefixで拒否し、Identity固有操作が
+// sessionを認証したprovider Identityを推測しないようにする。
+const keyPrefix = "session:v2:";
 const timestamp = v.pipe(v.string(), v.isoTimestamp());
 const applicationSessionRecordSchema = v.object({
   accountId: v.pipe(v.string(), v.nonEmpty(), v.maxLength(128)),
@@ -16,6 +18,7 @@ const applicationSessionRecordSchema = v.object({
   expiresAt: timestamp,
   sessionVersion: v.pipe(v.number(), v.integer(), v.minValue(1)),
   csrfToken: v.pipe(v.string(), v.nonEmpty(), v.maxLength(128)),
+  authenticatedIdentityId: v.optional(v.pipe(v.string(), v.nonEmpty(), v.maxLength(128))),
   displayProfile: v.optional(
     v.object({
       displayName: v.optional(v.pipe(v.string(), v.maxLength(256))),
@@ -33,9 +36,10 @@ export class KvApplicationSessionStore implements ApplicationSessionStore {
     if (record === null) return undefined;
     const parsed = v.safeParse(applicationSessionRecordSchema, record);
     if (parsed.success) {
-      const { displayProfile, ...session } = parsed.output;
+      const { authenticatedIdentityId, displayProfile, ...session } = parsed.output;
       return {
         ...session,
+        ...(authenticatedIdentityId ? { authenticatedIdentityId } : {}),
         ...(displayProfile
           ? {
               displayProfile: {

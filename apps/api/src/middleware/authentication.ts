@@ -53,6 +53,9 @@ async function resolveRequestAuthentication(c: Context<AppEnv>): Promise<Authent
     type: "authenticated",
     actor: verified.actor,
     accountRole: account.role,
+    ...(verified.authenticatedIdentityId
+      ? { authenticatedIdentityId: verified.authenticatedIdentityId }
+      : {}),
     ...(displayName || pictureUrl
       ? {
           displayProfile: {

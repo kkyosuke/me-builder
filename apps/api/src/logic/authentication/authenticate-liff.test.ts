@@ -21,6 +21,7 @@ describe("authenticateLiff", () => {
       .spyOn(D1.shared.action.account, "resolveAccountByLineLogin")
       .mockResolvedValue({
         account: { id: "account-1", role: "user", status: "active", isDeleted: false },
+        identity: { id: "identity-1" },
       } as never);
     vi.spyOn(D1.shared.action.profile, "saveVerifiedDisplayName").mockResolvedValue(undefined);
 
@@ -38,6 +39,7 @@ describe("authenticateLiff", () => {
         authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
       },
       accountRole: "user",
+      authenticatedIdentityId: "identity-1",
       displayProfile: { displayName: "うつし" },
     });
     expect(JSON.stringify(result)).not.toContain("secret-subject");

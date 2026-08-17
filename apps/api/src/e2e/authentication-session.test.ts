@@ -125,7 +125,7 @@ async function sessionReference(cookie: string): Promise<string> {
   const hash = Array.from(new Uint8Array(digest), (byte) =>
     byte.toString(16).padStart(2, "0"),
   ).join("");
-  return `session:v1:${hash}`;
+  return `session:v2:${hash}`;
 }
 
 describe("application session local D1/KV E2E", () => {

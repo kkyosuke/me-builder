@@ -12,6 +12,7 @@ const record: ApplicationSessionRecord = {
   expiresAt: "2026-08-18T00:00:00.000Z",
   sessionVersion: 1,
   csrfToken: "csrf-token",
+  authenticatedIdentityId: "identity-1",
   displayProfile: {
     displayName: "利用者A",
     pictureUrl: "https://example.com/picture.jpg",
@@ -31,13 +32,13 @@ describe("KvApplicationSessionStore", () => {
     await store.put("reference-hash", record, 30);
     await store.delete("reference-hash");
 
-    expect(namespace.get).toHaveBeenCalledWith("session:v1:reference-hash", "json");
+    expect(namespace.get).toHaveBeenCalledWith("session:v2:reference-hash", "json");
     expect(namespace.put).toHaveBeenCalledWith(
-      "session:v1:reference-hash",
+      "session:v2:reference-hash",
       JSON.stringify(record),
       { expirationTtl: 60 },
     );
-    expect(namespace.delete).toHaveBeenCalledWith("session:v1:reference-hash");
+    expect(namespace.delete).toHaveBeenCalledWith("session:v2:reference-hash");
   });
 
   it("破損したKV recordを削除してfail-closedに扱う", async () => {
@@ -49,6 +50,6 @@ describe("KvApplicationSessionStore", () => {
     const store = new KvApplicationSessionStore(namespace);
 
     await expect(store.get("corrupted-reference")).resolves.toBeUndefined();
-    expect(namespace.delete).toHaveBeenCalledWith("session:v1:corrupted-reference");
+    expect(namespace.delete).toHaveBeenCalledWith("session:v2:corrupted-reference");
   });
 });

@@ -9,6 +9,7 @@ export type ApplicationSessionRecord = Readonly<{
   expiresAt: string;
   sessionVersion: number;
   csrfToken: string;
+  authenticatedIdentityId?: string;
   displayProfile?: DisplayProfile;
 }>;
 
@@ -31,6 +32,7 @@ export type IssuedApplicationSession = Readonly<{
 
 export type VerifiedApplicationSession = Readonly<{
   actor: AuthenticatedActor;
+  authenticatedIdentityId?: string;
   displayProfile?: DisplayProfile;
 }>;
 
@@ -52,6 +54,7 @@ export class ApplicationSessionService {
   async issue(
     actor: AuthenticatedActor,
     displayProfile?: DisplayProfile,
+    authenticatedIdentityId?: string,
   ): Promise<IssuedApplicationSession | undefined> {
     const sessionVersion = await this.versions.current(actor.accountId);
     if (sessionVersion === undefined) return undefined;
@@ -61,6 +64,7 @@ export class ApplicationSessionService {
       sessionVersion,
       new Date(now.getTime() + this.policy.absoluteTtlMs),
       displayProfile,
+      authenticatedIdentityId,
     );
   }
 
@@ -69,6 +73,7 @@ export class ApplicationSessionService {
     sessionVersion: number,
     expiresAt: Date,
     displayProfile?: DisplayProfile,
+    authenticatedIdentityId?: string,
   ): Promise<IssuedApplicationSession | undefined> {
     const now = this.now();
     if (expiresAt.getTime() <= now.getTime()) return undefined;
@@ -85,6 +90,7 @@ export class ApplicationSessionService {
         expiresAt: expiresAt.toISOString(),
         sessionVersion,
         csrfToken,
+        ...(authenticatedIdentityId ? { authenticatedIdentityId } : {}),
         ...(displayProfile ? { displayProfile } : {}),
       },
       Math.ceil((expiresAt.getTime() - now.getTime()) / 1_000),
@@ -119,6 +125,9 @@ export class ApplicationSessionService {
         authenticationMethod: record.authenticationMethod,
         authenticatedAt: new Date(record.authenticatedAt),
       },
+      ...(record.authenticatedIdentityId
+        ? { authenticatedIdentityId: record.authenticatedIdentityId }
+        : {}),
       ...(record.displayProfile ? { displayProfile: record.displayProfile } : {}),
     };
   }
@@ -139,6 +148,7 @@ export class ApplicationSessionService {
       sessionVersion,
       new Date(record.expiresAt),
       verified.displayProfile,
+      verified.authenticatedIdentityId,
     );
   }
 

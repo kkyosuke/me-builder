@@ -49,6 +49,15 @@ export function createApplicationSessionFixture(database: D1Database) {
     async issue(accountId: string, displayProfile?: DisplayProfile) {
       const runtime = createApplicationSessionService({ DB: database, ...bindings });
       if (!runtime) throw new Error("Application session test runtime is unavailable");
+      const identity = await runtime.db.query.accountIdentities.findFirst({
+        columns: { id: true },
+        where: (table, { and, eq }) =>
+          and(
+            eq(table.accountId, accountId),
+            eq(table.provider, "line_login"),
+            eq(table.isDeleted, false),
+          ),
+      });
       const issued = await runtime.sessions.issue(
         {
           accountId,
@@ -56,6 +65,7 @@ export function createApplicationSessionFixture(database: D1Database) {
           authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
         },
         displayProfile,
+        identity?.id,
       );
       if (!issued) throw new Error(`Application session could not be issued for ${accountId}`);
       return {

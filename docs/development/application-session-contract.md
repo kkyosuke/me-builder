@@ -18,7 +18,7 @@
 
 ## 2. 保存と有効期限
 
-session参照は32 byteの乱数をbase64urlで表現し、cookie値そのものは保存しません。Cloudflare KVではSHA-256 hashを`session:v1:{hash}`として引き、Account ID、認証方式、外部providerでの認証時刻、発行時刻、最終利用時刻、絶対期限、D1 session version、CSRF検証情報、交換時に検証済みの表示プロフィールを保存します。
+session参照は32 byteの乱数をbase64urlで表現し、cookie値そのものは保存しません。Cloudflare KVではSHA-256 hashを`session:v2:{hash}`として引き、Account ID、認証方式、認証に使ったD1 Identity ID、外部providerでの認証時刻、発行時刻、最終利用時刻、絶対期限、D1 session version、CSRF検証情報、交換時に検証済みの表示プロフィールを保存します。D1 Identity IDはAccount復旧等のIdentity固有操作だけに使い、`AuthenticatedActor`、HTTP response、Web UIへ公開しません。`authenticatedIdentityId`を持たないv1 recordは読み取らず、再認証交換でv2 sessionへ更新します。
 
 - 絶対期限: 発行から30日
 - idle期限: 最終利用から7日

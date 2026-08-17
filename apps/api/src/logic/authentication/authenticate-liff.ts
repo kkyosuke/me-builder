@@ -49,6 +49,7 @@ export async function authenticateLiff({
       authenticatedAt: identity.authenticatedAt,
     },
     accountRole: resolved.account.role,
+    authenticatedIdentityId: resolved.identity.id,
     ...(identity.displayProfile ? { displayProfile: identity.displayProfile } : {}),
   };
 }

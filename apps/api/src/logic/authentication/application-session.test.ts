@@ -61,7 +61,7 @@ describe("ApplicationSessionService", () => {
       displayName: "利用者A",
       pictureUrl: "https://example.com/picture.jpg",
     };
-    const issued = await sessions.issue(actor, displayProfile);
+    const issued = await sessions.issue(actor, displayProfile, "identity-1");
     expect(issued).toBeDefined();
     const reference = [...store.records.keys()][0];
     expect(reference).toMatch(/^[a-f0-9]{64}$/);
@@ -70,6 +70,7 @@ describe("ApplicationSessionService", () => {
     now = new Date("2026-08-17T00:00:04.000Z");
     await expect(sessions.verify(issued?.sessionToken)).resolves.toEqual({
       actor,
+      authenticatedIdentityId: "identity-1",
       displayProfile,
     });
     expect([...store.records.values()][0]?.lastSeenAt).toBe(now.toISOString());

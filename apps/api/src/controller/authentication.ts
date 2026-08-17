@@ -52,7 +52,11 @@ export async function postLiffAuthenticationExchange(c: Context<AppEnv>): Promis
   // logoutはD1 versionを進めるため、新sessionを発行した後に呼ぶと同じAccountの
   // 新sessionまで失効する。以前のsessionを先に失効してから現在versionで発行する。
   if (previousToken) await runtime.sessions.logout(previousToken);
-  const issued = await runtime.sessions.issue(result.actor, result.displayProfile);
+  const issued = await runtime.sessions.issue(
+    result.actor,
+    result.displayProfile,
+    result.authenticatedIdentityId,
+  );
   if (!issued) {
     return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
   }

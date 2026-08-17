@@ -9,7 +9,7 @@ import {
 } from "../contract/account-recovery";
 import { ServiceUnavailableErrorSchema, UnauthorizedErrorSchema } from "../contract/shared/errors";
 import { issueAccountRecoveryCode, recoverAccountWithCode } from "../logic/account-recovery";
-import { authenticatedActor } from "../middleware/authentication";
+import { authenticatedActor, authenticatedSession } from "../middleware/authentication";
 import type { AppEnv } from "../types";
 
 export async function postAccountRecoveryCode(c: Context<AppEnv>): Promise<Response> {
@@ -47,10 +47,15 @@ export async function postAccountRecoveryComplete(c: Context<AppEnv>): Promise<R
   }
   const db = D1.shared.client.create(c.env.DB);
   const actor = authenticatedActor(c);
+  const authenticatedIdentityId = authenticatedSession(c).authenticatedIdentityId;
+  if (!authenticatedIdentityId) {
+    return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
+  }
   const identity = await db.query.accountIdentities.findFirst({
     columns: { providerAccountId: true },
     where: (table, { and, eq }) =>
       and(
+        eq(table.id, authenticatedIdentityId),
         eq(table.accountId, actor.accountId),
         eq(table.provider, "line_login"),
         eq(table.isDeleted, false),
