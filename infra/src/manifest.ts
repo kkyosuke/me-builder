@@ -7,6 +7,8 @@ export interface InfrastructureManifest {
   baseDomain: string;
   database: { id: string; name: string };
   avatarBucket: { name: string };
+  /** Pulumi適用前の既存manifestとの段階的移行中だけ未指定を許容する。 */
+  sessionStore?: { id: string; name: string };
   queues: Record<QueueKey, { id?: string; name: string }>;
 }
 
@@ -29,6 +31,13 @@ export function parseManifest(input: unknown): InfrastructureManifest {
   if (!avatarBucket || avatarBucket.name !== expected.avatarBucket) {
     throw new Error(`Invalid Avatar R2 output for ${environment}`);
   }
+  const inputSessionStore = value.sessionStore as Record<string, unknown> | undefined;
+  if (
+    inputSessionStore &&
+    (inputSessionStore.name !== expected.sessionStore || typeof inputSessionStore.id !== "string")
+  ) {
+    throw new Error(`Invalid session KV output for ${environment}`);
+  }
   const inputQueues = value.queues as Record<string, Record<string, unknown>> | undefined;
   const queues = {} as InfrastructureManifest["queues"];
   for (const [key, name] of Object.entries(expected.queues)) {
@@ -43,6 +52,9 @@ export function parseManifest(input: unknown): InfrastructureManifest {
     baseDomain,
     database: { id: database.id, name: expected.database },
     avatarBucket: { name: expected.avatarBucket },
+    ...(inputSessionStore
+      ? { sessionStore: { id: inputSessionStore.id as string, name: expected.sessionStore } }
+      : {}),
     queues,
   };
 }

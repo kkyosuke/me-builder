@@ -13,6 +13,7 @@ export function resourceNames(environment: Environment) {
   return {
     database: `me-builder-db-${environment}`,
     avatarBucket: `me-builder-avatar-${environment}`,
+    sessionStore: `me-builder-session-${environment}`,
     queues: {
       webhook: `me-builder-webhook-queue-${environment}`,
       webhookDeadLetter: `me-builder-webhook-dlq-${environment}`,

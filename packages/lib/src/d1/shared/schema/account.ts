@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 import { baseSchema } from "../../../table/base";
 
 /**
@@ -7,12 +7,13 @@ import { baseSchema } from "../../../table/base";
  */
 export const accounts = sqliteTable("accounts", {
   ...baseSchema,
-  status: text("status", { enum: ["active"] })
+  status: text("status", { enum: ["active", "stopped"] })
     .notNull()
     .default("active"),
   role: text("role", { enum: ["user", "admin"] })
     .notNull()
     .default("user"),
+  sessionVersion: integer("session_version").notNull().default(1),
 });
 
 /**

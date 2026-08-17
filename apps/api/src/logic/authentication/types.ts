@@ -8,7 +8,7 @@ export type AuthenticatedActor = {
 };
 
 /** 認証交換APIのresponse等へ載せてよい表示情報。本人識別には使わない。 */
-type DisplayProfile = {
+export type DisplayProfile = {
   displayName?: string;
   pictureUrl?: string;
 };

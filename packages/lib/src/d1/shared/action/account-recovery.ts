@@ -1,6 +1,6 @@
 import { and, eq, inArray, isNull, lte, ne, sql } from "drizzle-orm";
 import type { SharedD1Client } from "../client";
-import { accountIdentities } from "../schema/account";
+import { accountIdentities, accounts } from "../schema/account";
 import {
   accountRecoveryAudits,
   accountRecoveryCredentials,
@@ -213,6 +213,11 @@ export async function completeAccountRecovery(
     );
   }
   queries.push(
+    // Identity再接続と同じD1 batchでversionを進め、旧sessionを即時失効させる。
+    db
+      .update(accounts)
+      .set({ sessionVersion: sql`${accounts.sessionVersion} + 1`, updatedAt: now })
+      .where(eq(accounts.id, credential.accountId)),
     db
       .update(accountIdentities)
       .set({ isDeleted: true, deletedAt: now, updatedAt: now })
