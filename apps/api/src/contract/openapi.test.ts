@@ -15,6 +15,28 @@ describe("GET /api/openapi.json", () => {
     expect(document.openapi).toBe("3.1.0");
     expect(document.paths["/api/diagnoses"]?.get).toBeDefined();
     expect(document.paths["/api/auth/liff/exchange"]?.post).toBeDefined();
+    expect(document.paths["/api/observability/web-errors"]?.post).toMatchObject({
+      responses: { "204": { description: "ブラウザエラーを受理した" } },
+      security: [{ applicationSession: [], csrfToken: [] }],
+      requestBody: {
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              required: [
+                "schemaVersion",
+                "kind",
+                "route",
+                "release",
+                "errorType",
+                "online",
+                "recovered",
+              ],
+            },
+          },
+        },
+      },
+    });
     expect(document.paths["/api/auth/session"]?.get).toMatchObject({
       security: [{ applicationSession: [] }],
     });

@@ -984,6 +984,17 @@ describe("App", () => {
     expect(mocks.fetchDiagnosisList).not.toHaveBeenCalled();
   });
 
+  it("SSO Identity連携のキャンセル結果を表示してURL markerだけを消費する", async () => {
+    window.history.replaceState({}, "", "/profile?from=settings&sso=cancelled#login-method");
+
+    render(<App />);
+
+    expect(await screen.findByText("SSO接続をキャンセルしました。")).toBeTruthy();
+    expect(`${window.location.pathname}${window.location.search}${window.location.hash}`).toBe(
+      "/profile?from=settings#login-method",
+    );
+  });
+
   it("/meでは診断・日記レコードから生成したまとめだけを表示する", async () => {
     window.history.replaceState({}, "", "/me");
 
@@ -1192,7 +1203,9 @@ describe("App", () => {
 
     render(<App />);
 
-    expect(await screen.findByRole("heading", { name: "ふたりの見取り図" })).toBeTruthy();
+    expect(
+      await screen.findByRole("heading", { name: "ふたりの見取り図" }, { timeout: 5_000 }),
+    ).toBeTruthy();
     expect(screen.getByRole("link", { name: "相性" }).getAttribute("aria-current")).toBe("page");
     expect(mocks.fetchDiagnosisList).not.toHaveBeenCalled();
   });

@@ -33,8 +33,20 @@ function kv(namespace: NonNullable<InfrastructureManifest["sessionStore"]>, pref
   return `[[${prefix}kv_namespaces]]\nbinding = "SESSION_STORE"\nid = "${namespace.id}"`;
 }
 
+function webErrorRateLimit(prefix: string, namespaceId: string) {
+  return `[[${prefix}ratelimits]]\nname = "WEB_ERROR_RATE_LIMITER"\nnamespace_id = "${namespaceId}"\n\n[${prefix}ratelimits.simple]\nlimit = 300\nperiod = 60`;
+}
+
 function webVars(baseDomain: string, environment: string) {
   return [`ENVIRONMENT = "${environment}"`, `WEB_ORIGIN = "https://${baseDomain}"`];
+}
+
+function apiVars(baseDomain: string, environment: string) {
+  return [
+    ...webVars(baseDomain, environment),
+    'SSO_ROLLOUT_MODE = "disabled"',
+    'SSO_ROLLOUT_PERCENT = "0"',
+  ];
 }
 
 function workerEnvironment(manifest: InfrastructureManifest) {
@@ -104,6 +116,8 @@ function apiEnvironment(manifest: InfrastructureManifest) {
     "",
     queueProducer(prefix, manifest.queues.profileSummary.name, "PROFILE_SUMMARY_QUEUE"),
     "",
+    webErrorRateLimit(prefix, env === "preview" ? "11002" : "11003"),
+    "",
     d1(manifest.database, prefix),
   ];
   if (manifest.sessionStore) config.push("", kv(manifest.sessionStore, prefix));
@@ -119,7 +133,7 @@ function apiEnvironment(manifest: InfrastructureManifest) {
     durableObject(prefix, "COMPATIBILITY_DATA", `me-builder-worker-${env}`),
     "",
     `[env.${env}.vars]`,
-    ...webVars(manifest.baseDomain, env),
+    ...apiVars(manifest.baseDomain, env),
   );
   return config.join("\n");
 }
@@ -258,6 +272,8 @@ export function renderWranglerConfigs(
     "",
     queueProducer("env.local.", localQueues.profileSummary.name, "PROFILE_SUMMARY_QUEUE"),
     "",
+    webErrorRateLimit("env.local.", "11001"),
+    "",
     d1(localDatabase, "env.local."),
     "",
     kv(localManifest.sessionStore, "env.local."),
@@ -275,6 +291,8 @@ export function renderWranglerConfigs(
     "[env.local.vars]",
     'ENVIRONMENT = "local"',
     'WEB_ORIGIN = "http://localhost:5173"',
+    'SSO_ROLLOUT_MODE = "disabled"',
+    'SSO_ROLLOUT_PERCENT = "0"',
   ].join("\n");
   const api = [
     header,
@@ -295,6 +313,8 @@ export function renderWranglerConfigs(
     "",
     queueProducer("", localQueues.profileSummary.name, "PROFILE_SUMMARY_QUEUE"),
     "",
+    webErrorRateLimit("", "11001"),
+    "",
     d1(localDatabase),
     "",
     kv(localManifest.sessionStore),
@@ -312,6 +332,8 @@ export function renderWranglerConfigs(
     "[vars]",
     'ENVIRONMENT = "local"',
     'WEB_ORIGIN = "http://localhost:5173"',
+    'SSO_ROLLOUT_MODE = "disabled"',
+    'SSO_ROLLOUT_PERCENT = "0"',
     "",
     apiLocal,
     "",

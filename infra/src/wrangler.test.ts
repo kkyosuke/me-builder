@@ -40,6 +40,11 @@ describe("renderWranglerConfigs", () => {
     expect(configs.api).toContain('binding = "BILLING_QUEUE"');
     expect(configs.worker).toContain('queue = "me-builder-billing-dlq-production"');
     expect(configs.api).toContain('binding = "PROFILE_SUMMARY_QUEUE"');
+    expect(configs.api).toContain('name = "WEB_ERROR_RATE_LIMITER"');
+    expect(configs.api).toContain('namespace_id = "11002"');
+    expect(configs.api).toContain('namespace_id = "11003"');
+    expect(configs.api.match(/name = "WEB_ERROR_RATE_LIMITER"/g)).toHaveLength(4);
+    expect(configs.api.match(/limit = 300/g)).toHaveLength(4);
     expect(configs.worker).toContain('queue = "me-builder-profile-summary-queue-production"');
     expect(configs.worker).toContain('binding = "PROFILE_SUMMARY_QUEUE"');
     expect(configs.worker).toContain('binding = "BRAIN_VECTOR_QUEUE"');
@@ -59,6 +64,8 @@ describe("renderWranglerConfigs", () => {
     expect(configs.api).toContain('WEB_ORIGIN = "https://preview.example.com"');
     expect(configs.api).toContain('WEB_ORIGIN = "https://example.com"');
     expect(configs.api).toContain('WEB_ORIGIN = "http://localhost:5173"');
+    expect(configs.api.match(/SSO_ROLLOUT_MODE = "disabled"/gu)).toHaveLength(4);
+    expect(configs.api.match(/SSO_ROLLOUT_PERCENT = "0"/gu)).toHaveLength(4);
     expect(configs.api).toContain('{ pattern = "api.preview.example.com", custom_domain = true }');
     expect(configs.mcp).toContain('{ pattern = "mcp.example.com", custom_domain = true }');
     expect(configs.mcp).toContain('database_id = "production-id"');

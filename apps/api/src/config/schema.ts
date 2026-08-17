@@ -1,6 +1,46 @@
 import type { BillingQueueMessage, Queue, WebhookQueueMessage } from "@me-builder/shared";
 import * as v from "valibot";
 
+function isLoopbackHttpUrl(url: URL): boolean {
+  return url.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
+}
+
+function isSecureOrigin(value: string): boolean {
+  const url = new URL(value);
+  return (
+    (url.protocol === "https:" || isLoopbackHttpUrl(url)) &&
+    !url.username &&
+    !url.password &&
+    url.pathname === "/" &&
+    !url.search &&
+    !url.hash
+  );
+}
+
+function isSsoIssuer(value: string): boolean {
+  const url = new URL(value);
+  return (
+    url.protocol === "https:" &&
+    !url.username &&
+    !url.password &&
+    url.pathname === "/" &&
+    !url.search &&
+    !url.hash
+  );
+}
+
+function isSsoCallback(value: string): boolean {
+  const url = new URL(value);
+  return (
+    (url.protocol === "https:" || isLoopbackHttpUrl(url)) &&
+    !url.username &&
+    !url.password &&
+    url.pathname === "/api/auth/sso/callback" &&
+    !url.search &&
+    !url.hash
+  );
+}
+
 export const ConfigSchema = v.object({
   port: v.pipe(
     v.optional(v.string(), "3000"),
@@ -12,12 +52,34 @@ export const ConfigSchema = v.object({
   baseDomain: v.optional(v.string()),
   baseUrl: v.optional(v.string()),
   /** ブラウザからのCORSリクエストを許可するWeb UIのオリジン。 */
-  webOrigin: v.optional(v.pipe(v.string(), v.url())),
+  webOrigin: v.optional(
+    v.pipe(v.string(), v.url(), v.check(isSecureOrigin, "WEB_ORIGIN must be a secure origin")),
+  ),
   lineWebhookUrl: v.optional(v.string()),
   /** LIFF ID。未設定の場合、LINE Login チャネル ID の補完元がなくなります。 */
   liffId: v.optional(v.string()),
   /** LINE Login チャネル ID。ID トークンの `aud` の期待値として使います。 */
   lineLoginChannelId: v.optional(v.string()),
+  /** 外部ブラウザSSOの段階公開状態。disabledではSSO設定を要求しない。 */
+  ssoRolloutMode: v.optional(v.picklist(["disabled", "linking", "linked-login"]), "disabled"),
+  /** 管理者以外のlink済みAccountへSSO sessionを発行する安定割合。 */
+  ssoRolloutPercent: v.optional(
+    v.pipe(v.number(), v.safeInteger(), v.minValue(0), v.maxValue(100)),
+    0,
+  ),
+  /** Auth0 tenantのOIDC issuer。末尾slashを含む。 */
+  ssoIssuerUrl: v.optional(
+    v.pipe(v.string(), v.url(), v.check(isSsoIssuer, "SSO_ISSUER_URL must be a HTTPS origin")),
+  ),
+  ssoClientId: v.optional(v.pipe(v.string(), v.nonEmpty())),
+  ssoClientSecret: v.optional(v.pipe(v.string(), v.nonEmpty())),
+  ssoCallbackUrl: v.optional(
+    v.pipe(
+      v.string(),
+      v.url(),
+      v.check(isSsoCallback, "SSO callback must use the fixed secure callback path"),
+    ),
+  ),
   /** カンマ区切りの設定値を解析した、管理者として扱うLINE user ID。 */
   adminLineUserIds: v.optional(v.array(v.string()), []),
   webhookQueueName: v.optional(v.string()),

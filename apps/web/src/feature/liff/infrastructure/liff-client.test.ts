@@ -89,13 +89,13 @@ describe("initializeLiffForAuthExchange", () => {
     expect(state).toMatchObject({ status: "ready", inClient: false });
   });
 
-  it("未ログインならログイン画面へ遷移し login-required を返すこと", async () => {
+  it("未ログインなら環境判定用のinClientを保持してlogin-requiredを返すこと", async () => {
     mockLiff.isLoggedIn.mockReturnValue(false);
 
     const state = await initializeLiffForAuthExchange(LIFF_ID);
 
-    expect(mockLiff.login).toHaveBeenCalledTimes(1);
-    expect(state).toEqual({ status: "login-required" });
+    expect(mockLiff.login).not.toHaveBeenCalled();
+    expect(state).toEqual({ status: "login-required", inClient: true });
   });
 
   it("liff.init が失敗しても例外を投げず error を返すこと", async () => {

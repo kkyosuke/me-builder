@@ -277,74 +277,41 @@ flowchart TD
 
 ## 7. 系列C: SSO追加と外部ブラウザ切替
 
-### AUTH-C-001 SSO実装条件と運用設定を確定する
+### AUTH-C-001 SSO実装条件と運用設定を確定する ([PR #310](https://github.com/kkyosuke/me-builder/pull/310))
 
 依存: なし
 
-- 採用するSSO製品、OIDC issuer、client、redirect URI、scope、Secret配布を決定する
-- subjectの安定性、provider key、link-only期間、session期限、local / IdP logoutの範囲を確定する
-- PreviewとProductionのtenant、callback、許可origin、段階公開flagを分離する
-- 公式情報でAuthorization Code Flow、PKCE、state、nonce、logout制約を確認して設計SSoTを更新する
+実装と検証はPRへ移しました。未完了条件はレビューとmergeです。
 
-完了条件は、製品固有の未決事項がなく、Secret値を文書へ記載せずLocalとPreviewの設定を再現できることです。
-
-### AUTH-C-002 SSO server adapterと認証transactionを追加する
+### AUTH-C-002 SSO server adapterと認証transactionを追加する ([PR #316](https://github.com/kkyosuke/me-builder/pull/316))
 
 依存: `AUTH-C-001`, `AUTH-A-011`
 
-- SSO開始、callback、token交換、issuer・audience・署名・期限検証をadapterへ実装する
-- state、nonce、PKCE verifier、要求pathを短命な認証transactionへ保存して一度だけ消費する
-- callbackで`VerifiedExternalIdentity`を生成し、共通Account resolverとsession issuerへ渡す
-- 未知Identityは`link-only`結果として拒否し、Accountを自動作成しない
-- IdPへ接続しないfake / fixture testで改ざん、再送、期限切れ、open redirectを拒否する
+実装と検証はPRへ移し、mainへmerge済みの`AUTH-A-011`が提供するKV bindingへ接続しました。未完了条件はレビューとmergeです。
 
-完了条件は、SSO固有情報がadapter外へ漏れず、既知Identityだけがapplication sessionを取得できることです。
-
-### AUTH-C-003 既存AccountへSSO Identityを追加する
+### AUTH-C-003 既存AccountへSSO Identityを追加する ([PR #322](https://github.com/kkyosuke/me-builder/pull/322))
 
 依存: `AUTH-C-002`, `AUTH-B-001`
 
-- LIFFまたは既存sessionで認証済みの本人がSSO追加を開始できるAPIと設定画面を追加する
-- SSO側の新しい認証成功と元sessionのAccountを同じ短命transactionで結び、`linkIdentity`を使う
-- emailや表示名の一致でlinkせず、別Accountへ接続済みのIdentityは自動統合しない
-- 成功、キャンセル、再送、別Account、最後のIdentity解除防止をE2E相当testへ含める
+実装と検証はPRへ移し、`AUTH-A-011`のsession / CSRF基盤へ接続しました。未完了条件は依存PRのmerge、レビュー、mergeです。
 
-完了条件は、既存Account IDと本人データを変えずにSSO Identityを追加でき、別Account同士を自動統合しないことです。
-
-### AUTH-C-004 LIFF内と外部ブラウザの認証入口を切り替える
+### AUTH-C-004 LIFF内と外部ブラウザの認証入口を切り替える ([PR #326](https://github.com/kkyosuke/me-builder/pull/326))
 
 依存: `AUTH-C-003`, `AUTH-B-006`
 
-- `AuthGate`がLIFF SDKで実行環境を確認し、LIFF内はLIFF adapter、外部ブラウザはSSO adapterを選ぶ
-- LIFF内では既存SSO sessionがあってもLIFF Identityを確認し、別AccountならUI cacheを破棄してLIFF側sessionへ切り替える
-- LIFF失敗時にSSOへ自動fallbackせず、外部ブラウザで開く案内を表示する
-- 外部ブラウザから`liff.login()`を呼ばず、要求された相対pathをSSO callback後に復元する
-- 段階公開flagが無効な環境では外部ブラウザの現行LINE Login adapterへ戻せるようにする
+実装と検証はPRへ移し、`AUTH-A-011`のsession issuerをSSO callbackへ接続しました。未完了条件は依存PRをmergeし、レビューとmergeを完了することです。
 
-完了条件は、実行環境ごとに認証入口が一意に決まり、別Accountのsessionや画面内容を引き継がないことです。
-
-### AUTH-C-005 PreviewでLIFFとSSOを通しで検証する
+### AUTH-C-005 PreviewでLIFFとSSOを通しで検証する ([PR #328](https://github.com/kkyosuke/me-builder/pull/328))
 
 依存: `AUTH-C-004`
 
-- LIFF実端末、外部ブラウザ、直接リンク、相性招待、管理者URLで認証と要求画面復帰を確認する
-- 同じAccountへlinkしたLIFFとSSOが同じプロフィール・診断・相性へ到達することを確認する
-- 別Account cookie、期限切れ、IdP拒否、LIFF初期化失敗、CSRF、logout、復旧後の旧sessionを確認する
-- token、subject、Account ID、個人内容をログやチケットへ残さず結果を追跡できることを確認する
-- SSO開始、callback失敗、session発行・失効を機微情報なしで判断できる運用ログとrunbookを追加する
+実装と検証手順はPRへ移し、`AUTH-A-011`のsession発行・失効eventへ接続しました。未完了条件はPreview deploy後にRunbookの実端末／実IdP／rollback結果を記録し、レビューとmergeを完了することです。
 
-完了条件は、Previewで主要な成功・失敗経路を再現し、問題時にSSO経路だけを停止してLIFF利用を継続できることです。
-
-### AUTH-C-006 ProductionへSSOを段階公開する
+### AUTH-C-006 ProductionへSSOを段階公開する ([PR #330](https://github.com/kkyosuke/me-builder/pull/330))
 
 依存: `AUTH-C-005`
 
-- 運営Account、SSO link済みの少数Account、対象利用者全体の順に外部ブラウザSSOを有効化する
-- 認証成功率、callback失敗、Account未解決、session失効、LIFFへの影響を個人識別子なしで確認する
-- SSO経路だけを即時停止できることと、停止中もLIFF内の本人機能を利用できることを確認する
-- 外部ブラウザの旧LINE Loginを終了する時点で、公開案内とサポート手順を更新する
-
-完了条件は、ProductionでLIFF内の利用を維持したまま外部ブラウザSSOを安全に停止・再開でき、対象利用者へ段階公開できることです。
+実装と公開RunbookはPRへ移し、`AUTH-A-011`のsession issuerへ割合gateを接続しました。未完了条件はPreview gate完了後にProductionの各phase、即時停止、0%からの再開結果を記録し、レビューとmergeを完了することです。
 
 ## 8. リリースゲート
 

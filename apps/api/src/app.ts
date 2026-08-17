@@ -19,6 +19,13 @@ import { adminBillingHealthRoute } from "./contract/admin/billing-health";
 import { adminBillingReconciliationRoute } from "./contract/admin/billing-reconciliation";
 import { adminStatisticsRoute } from "./contract/admin/statistics";
 import {
+  completeSsoCallbackRoute,
+  getSsoIdentityStatusRoute,
+  startSsoIdentityLinkRoute,
+  startSsoLoginRoute,
+  unlinkSsoIdentityRoute,
+} from "./contract/auth/sso-identity";
+import {
   applicationSessionRoute,
   liffAuthenticationExchangeRoute,
   logoutApplicationSessionRoute,
@@ -72,6 +79,7 @@ import {
   getServiceTermsAcceptanceHistoryRoute,
   getServiceTermsRoute,
 } from "./contract/legal/terms";
+import { webClientErrorReportRoute } from "./contract/observability/web-client-error";
 import { openApiOptions } from "./contract/openapi";
 import {
   downloadPersonalDataExportRoute,
@@ -173,6 +181,7 @@ import {
   putServiceTermsAcceptance,
 } from "./controller/legal";
 import { postLineWebhook } from "./controller/line";
+import { postWebClientError } from "./controller/observability";
 import {
   deletePersonalDataRecordContents,
   downloadPersonalDataExportContents,
@@ -203,6 +212,13 @@ import {
   getSelfCareContextContents,
   postSelfCareContextConfirmation,
 } from "./controller/self-care-context";
+import {
+  deleteSsoIdentity,
+  getSsoCallback,
+  getSsoIdentityStatusContents,
+  postSsoIdentityLink,
+  postSsoLogin,
+} from "./controller/sso-identity";
 import { requireAuthentication } from "./middleware/authentication";
 import {
   requireAdmin,
@@ -244,6 +260,7 @@ app.onError((err, c) => {
 app.use("*", async (c, next) => {
   const start = Date.now();
   await next();
+  if (c.get("terminalLogOwnedByRoute")) return;
   const responseTimeMs = Date.now() - start;
   const status = c.res.status;
   const path = operationalHttpPath(c.req.path);
@@ -282,7 +299,33 @@ app.get("/api/health", (c) => {
   });
 });
 
+app.post(
+  "/api/observability/web-errors",
+  requireAuthentication,
+  webClientErrorReportRoute,
+  postWebClientError,
+);
 app.post("/api/line/webhook", postLineWebhook);
+app.get(
+  "/api/auth/sso/identity",
+  getSsoIdentityStatusRoute,
+  requireAuthentication,
+  getSsoIdentityStatusContents,
+);
+app.delete(
+  "/api/auth/sso/identity",
+  unlinkSsoIdentityRoute,
+  requireAuthentication,
+  deleteSsoIdentity,
+);
+app.post(
+  "/api/auth/sso/link",
+  startSsoIdentityLinkRoute,
+  requireAuthentication,
+  postSsoIdentityLink,
+);
+app.post("/api/auth/sso/login", startSsoLoginRoute, postSsoLogin);
+app.get("/api/auth/sso/callback", completeSsoCallbackRoute, getSsoCallback);
 app.post("/api/billing/webhook", postStripeWebhook);
 app.post(
   "/api/auth/liff/exchange",

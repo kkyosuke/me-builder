@@ -1,6 +1,6 @@
-import { logger } from "@me-builder/shared";
 import { AlertTriangle, RotateCw } from "lucide-react";
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { reportRouteRenderError } from "../infrastructure/web-error-reporter";
 
 interface RouteErrorBoundaryProps {
   children: ReactNode;
@@ -54,20 +54,13 @@ export class RouteErrorBoundary extends Component<
   }
 
   componentDidCatch(error: Error, _info: ErrorInfo): void {
-    logger.error(
-      {
-        event: "web.route-render.failed",
-        outcome: "failed",
-        reason: "render-error",
-      },
-      "画面の描画に失敗しました",
-    );
-    recoverFromChunkLoadFailure(error, {
+    const recovered = recoverFromChunkLoadFailure(error, {
       appVersion,
       currentUrl: window.location.href,
       replace: (url) => window.location.replace(url),
       storage: window.sessionStorage,
     });
+    reportRouteRenderError(error, recovered);
   }
 
   private reload = (): void => {

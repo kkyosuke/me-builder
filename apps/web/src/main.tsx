@@ -1,6 +1,11 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import { authSessionRuntime } from "./feature/auth/infrastructure/auth-session-runtime";
 import { initializeColorTheme, initializeFontSize } from "./feature/theme";
+import {
+  configureWebErrorCsrfTokenProvider,
+  installGlobalWebErrorHandlers,
+} from "./infrastructure/web-error-reporter";
 import "./index.css";
 import { RootApplication } from "./root-application";
 
@@ -8,15 +13,10 @@ import { RootApplication } from "./root-application";
 initializeColorTheme();
 initializeFontSize();
 
-// フロントエンド最上位での未捕捉例外・未処理 Rejection のキャッチとログ出力
+// フロントエンド最上位の未捕捉例外をAPI Worker経由でWorkers Logsへ送る。
 if (typeof window !== "undefined") {
-  window.addEventListener("error", (event) => {
-    console.error("[Unhandled Error]", event.error || event.message);
-  });
-
-  window.addEventListener("unhandledrejection", (event) => {
-    console.error("[Unhandled Rejection]", event.reason);
-  });
+  configureWebErrorCsrfTokenProvider(() => authSessionRuntime.csrfToken());
+  installGlobalWebErrorHandlers(window);
 }
 
 const rootElement = document.getElementById("root");

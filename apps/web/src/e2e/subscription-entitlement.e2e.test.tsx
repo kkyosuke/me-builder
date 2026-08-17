@@ -62,6 +62,7 @@ describe("subscription entitlement user journey", () => {
   it("年額契約では月次AI枠のリセット日でなく契約の利用可能期限を表示する", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
       const url = urlOf(input);
+      if (url.pathname === "/api/auth/liff/exchange") return Response.json(authSession);
       if (url.pathname === "/api/auth/session") return Response.json(authSession);
       if (url.pathname === "/api/profile") {
         return Response.json({ role: "user", displayName: "テスト", avatar: null });
@@ -123,6 +124,7 @@ describe("subscription entitlement user journey", () => {
     let entitlementRequests = 0;
     const fetchMock = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
       const url = urlOf(input);
+      if (url.pathname === "/api/auth/liff/exchange") return Response.json(authSession);
       if (url.pathname === "/api/auth/session") return Response.json(authSession);
       if (url.pathname === "/api/profile") {
         return Response.json({ role: "user", displayName: "テスト", avatar: null });

@@ -198,6 +198,94 @@ describe("ProfileSettingsScreen", () => {
     expect(onOpenPersonalData).toHaveBeenCalledOnce();
   });
 
+  it("未接続のSSOを現在のAccountへ追加できる", async () => {
+    const onLinkSsoIdentity = vi.fn().mockResolvedValue(undefined);
+    render(
+      <ProfileSettingsScreen
+        avatar={null}
+        theme="dark"
+        fontSize="medium"
+        onBack={vi.fn()}
+        onOpenAvatar={vi.fn()}
+        onThemeChange={vi.fn()}
+        onFontSizeChange={vi.fn()}
+        ssoIdentity={{ status: "success", data: { linked: false, canUnlink: false } }}
+        onLinkSsoIdentity={onLinkSsoIdentity}
+        onUnlinkSsoIdentity={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(/現在のAccountへSSOを追加/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "SSOを接続" }));
+    expect(onLinkSsoIdentity).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ["linked", "SSOを接続しました。"],
+    ["cancelled", "SSO接続をキャンセルしました。"],
+    ["error", "SSOを接続できませんでした。"],
+  ] as const)("SSO Identity連携callbackの%s結果を表示する", (result, message) => {
+    render(
+      <ProfileSettingsScreen
+        avatar={null}
+        theme="dark"
+        fontSize="medium"
+        onBack={vi.fn()}
+        onOpenAvatar={vi.fn()}
+        onThemeChange={vi.fn()}
+        onFontSizeChange={vi.fn()}
+        ssoIdentity={{ status: "success", data: { linked: result === "linked", canUnlink: false } }}
+        ssoIdentityCallbackResult={result}
+        onLinkSsoIdentity={vi.fn()}
+        onUnlinkSsoIdentity={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(new RegExp(message))).toBeTruthy();
+  });
+
+  it("別のログイン方法がある場合だけSSOを解除する", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const onUnlinkSsoIdentity = vi.fn().mockResolvedValue(undefined);
+    const { rerender } = render(
+      <ProfileSettingsScreen
+        avatar={null}
+        theme="dark"
+        fontSize="medium"
+        onBack={vi.fn()}
+        onOpenAvatar={vi.fn()}
+        onThemeChange={vi.fn()}
+        onFontSizeChange={vi.fn()}
+        ssoIdentity={{ status: "success", data: { linked: true, canUnlink: true } }}
+        onLinkSsoIdentity={vi.fn()}
+        onUnlinkSsoIdentity={onUnlinkSsoIdentity}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "SSO接続を解除" }));
+    expect(await screen.findByText("SSOを解除しました。")).toBeTruthy();
+    expect(onUnlinkSsoIdentity).toHaveBeenCalledOnce();
+
+    rerender(
+      <ProfileSettingsScreen
+        avatar={null}
+        theme="dark"
+        fontSize="medium"
+        onBack={vi.fn()}
+        onOpenAvatar={vi.fn()}
+        onThemeChange={vi.fn()}
+        onFontSizeChange={vi.fn()}
+        ssoIdentity={{ status: "success", data: { linked: true, canUnlink: false } }}
+        onLinkSsoIdentity={vi.fn()}
+        onUnlinkSsoIdentity={onUnlinkSsoIdentity}
+      />,
+    );
+    expect(screen.getByText("最後のログイン方法は解除できません。")).toBeTruthy();
+    expect(
+      (screen.getByRole("button", { name: "SSO接続を解除" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+  });
+
   it("アバター変更中はプロフィールを操作対象から外す", () => {
     render(
       <ProfileSettingsScreen

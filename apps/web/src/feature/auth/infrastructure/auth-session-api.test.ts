@@ -17,7 +17,11 @@ describe("auth session API", () => {
 
     await expect(
       fetchAuthSession("https://api.example.com", new AbortController().signal),
-    ).resolves.toMatchObject({ authenticated: true, role: "user" });
+    ).resolves.toMatchObject({
+      authenticated: true,
+      displayProfile: { displayName: "うさぎ" },
+      role: "user",
+    });
     expect(fetchMock).toHaveBeenCalledWith(
       "https://api.example.com/api/auth/session",
       expect.objectContaining({ credentials: "include" }),

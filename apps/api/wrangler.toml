@@ -22,6 +22,14 @@ binding = "BILLING_QUEUE"
 queue = "me-builder-profile-summary-queue-local"
 binding = "PROFILE_SUMMARY_QUEUE"
 
+[[ratelimits]]
+name = "WEB_ERROR_RATE_LIMITER"
+namespace_id = "11001"
+
+[ratelimits.simple]
+limit = 300
+period = 60
+
 [[d1_databases]]
 binding = "DB"
 database_name = "me-builder-db-local"
@@ -57,6 +65,8 @@ script_name = "me-builder-worker-local"
 [vars]
 ENVIRONMENT = "local"
 WEB_ORIGIN = "http://localhost:5173"
+SSO_ROLLOUT_MODE = "disabled"
+SSO_ROLLOUT_PERCENT = "0"
 
 [env.local]
 name = "me-builder-api-local"
@@ -72,6 +82,14 @@ binding = "BILLING_QUEUE"
 [[env.local.queues.producers]]
 queue = "me-builder-profile-summary-queue-local"
 binding = "PROFILE_SUMMARY_QUEUE"
+
+[[env.local.ratelimits]]
+name = "WEB_ERROR_RATE_LIMITER"
+namespace_id = "11001"
+
+[env.local.ratelimits.simple]
+limit = 300
+period = 60
 
 [[env.local.d1_databases]]
 binding = "DB"
@@ -108,6 +126,8 @@ script_name = "me-builder-worker-local"
 [env.local.vars]
 ENVIRONMENT = "local"
 WEB_ORIGIN = "http://localhost:5173"
+SSO_ROLLOUT_MODE = "disabled"
+SSO_ROLLOUT_PERCENT = "0"
 
 [env.preview]
 name = "me-builder-api-preview"
@@ -126,6 +146,14 @@ binding = "BILLING_QUEUE"
 [[env.preview.queues.producers]]
 queue = "me-builder-profile-summary-queue-preview"
 binding = "PROFILE_SUMMARY_QUEUE"
+
+[[env.preview.ratelimits]]
+name = "WEB_ERROR_RATE_LIMITER"
+namespace_id = "11002"
+
+[env.preview.ratelimits.simple]
+limit = 300
+period = 60
 
 [[env.preview.d1_databases]]
 binding = "DB"
@@ -158,6 +186,8 @@ script_name = "me-builder-worker-preview"
 [env.preview.vars]
 ENVIRONMENT = "preview"
 WEB_ORIGIN = "https://stg.kagami.kyosuke.dev"
+SSO_ROLLOUT_MODE = "disabled"
+SSO_ROLLOUT_PERCENT = "0"
 
 [env.production]
 name = "me-builder-api-production"
@@ -176,6 +206,14 @@ binding = "BILLING_QUEUE"
 [[env.production.queues.producers]]
 queue = "me-builder-profile-summary-queue-production"
 binding = "PROFILE_SUMMARY_QUEUE"
+
+[[env.production.ratelimits]]
+name = "WEB_ERROR_RATE_LIMITER"
+namespace_id = "11003"
+
+[env.production.ratelimits.simple]
+limit = 300
+period = 60
 
 [[env.production.d1_databases]]
 binding = "DB"
@@ -204,3 +242,5 @@ script_name = "me-builder-worker-production"
 [env.production.vars]
 ENVIRONMENT = "production"
 WEB_ORIGIN = "https://kagami.kyosuke.dev"
+SSO_ROLLOUT_MODE = "disabled"
+SSO_ROLLOUT_PERCENT = "0"
