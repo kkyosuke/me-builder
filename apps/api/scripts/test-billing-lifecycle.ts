@@ -23,6 +23,7 @@ const clock = await stripe.testHelpers.testClocks.create({
 });
 
 try {
+  await logStripeAccountReadiness(stripe);
   const [litePriceId, liteYearlyPriceId, fullPriceId, fullYearlyPriceId] = await Promise.all([
     resolvePriceId(stripe, "lite", "month"),
     resolvePriceId(stripe, "lite", "year"),
@@ -211,6 +212,32 @@ try {
   );
 } finally {
   await stripe.testHelpers.testClocks.del(clock.id);
+}
+
+async function logStripeAccountReadiness(client: Stripe): Promise<void> {
+  const account = await client.accounts.retrieve();
+  const readiness = {
+    businessProfileNameConfigured: Boolean(account.business_profile?.name),
+    statementDescriptorConfigured: Boolean(account.settings?.payments?.statement_descriptor),
+    chargesEnabled: account.charges_enabled,
+    detailsSubmitted: account.details_submitted,
+    cardPaymentsCapability: account.capabilities?.card_payments ?? "unknown",
+  };
+  const ready =
+    readiness.businessProfileNameConfigured &&
+    readiness.statementDescriptorConfigured &&
+    readiness.chargesEnabled;
+  const fields = {
+    event: ready
+      ? "stripe.sandbox.account-configuration.completed"
+      : "stripe.sandbox.account-configuration.failed",
+    service: "api",
+    outcome: ready ? "succeeded" : "failed",
+    ...(ready ? {} : { errorCode: "STRIPE_SANDBOX_ACCOUNT_CONFIGURATION_INCOMPLETE" }),
+    ...readiness,
+  };
+  if (ready) logger.info(fields, "Stripe sandbox account configuration is ready");
+  else logger.error(fields, "Stripe sandbox account configuration is incomplete");
 }
 
 async function assertCheckoutSession(client: Stripe, priceId: string): Promise<void> {
